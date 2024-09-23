@@ -21,99 +21,81 @@ package constant
 
 // k8s recommended well-known label keys
 const (
-	// AppInstanceLabelKey refer cluster.Name
-	AppInstanceLabelKey = "app.kubernetes.io/instance"
-	// AppNameLabelKey refer clusterDefinition.Name before KubeBlocks Version 0.8.0 or refer ComponentDefinition.Name after KubeBlocks Version 0.8.0 (TODO：Pending)
-	AppNameLabelKey = "app.kubernetes.io/name"
-	// AppComponentLabelKey refer clusterDefinition.Spec.ComponentDefs[*].Name before KubeBlocks Version 0.8.0 or refer ComponentDefinition.Name after KubeBlocks Version 0.8.0
-	AppComponentLabelKey = "app.kubernetes.io/component"
-	// AppVersionLabelKey refer clusterVersion.Name before KubeBlocks Version 0.8.0 or refer ComponentDefinition.Name after KubeBlocks Version 0.8.0
-	AppVersionLabelKey   = "app.kubernetes.io/version"
+	AppVersionLabelKey = "app.kubernetes.io/version"
+
 	AppManagedByLabelKey = "app.kubernetes.io/managed-by"
-	RegionLabelKey       = "topology.kubernetes.io/region"
-	ZoneLabelKey         = "topology.kubernetes.io/zone"
+
+	AppNameLabelKey      = "app.kubernetes.io/name"
+	AppComponentLabelKey = "app.kubernetes.io/component"
+
+	AppInstanceLabelKey = "app.kubernetes.io/instance"
 )
 
-// well-known labels for KubeBlocks and its resources
+// labels defined by KubeBlocks
 const (
-	BackupProtectionLabelKey               = "kubeblocks.io/backup-protection" // BackupProtectionLabelKey Backup delete protection policy label
-	RoleLabelKey                           = "kubeblocks.io/role"              // RoleLabelKey consensusSet and replicationSet role label key
-	AccessModeLabelKey                     = "workloads.kubeblocks.io/access-mode"
-	ReadyWithoutPrimaryKey                 = "kubeblocks.io/ready-without-primary"
-	ClusterAccountLabelKey                 = "account.kubeblocks.io/name"
-	KBAppComponentLabelKey                 = "apps.kubeblocks.io/component-name"
-	KBAppShardingNameLabelKey              = "apps.kubeblocks.io/sharding-name"
-	KBManagedByKey                         = "apps.kubeblocks.io/managed-by" // KBManagedByKey marks resources that auto created
+	ClusterDefLabelKey            = "clusterdefinition.kubeblocks.io/name"
+	ComponentDefinitionLabelKey   = "componentdefinition.kubeblocks.io/name"
+	ComponentVersionLabelKey      = "componentversion.kubeblocks.io/name"
+	ServiceDescriptorNameLabelKey = "servicedescriptor.kubeblocks.io/name"
+	AddonNameLabelKey             = "extensions.kubeblocks.io/addon-name"
+
+	KBAppComponentLabelKey    = "apps.kubeblocks.io/component-name"
+	KBAppShardingNameLabelKey = "apps.kubeblocks.io/sharding-name"
+
+	KBAppComponentInstanceTemplateLabelKey = "apps.kubeblocks.io/instance-template"
 	PVCNameLabelKey                        = "apps.kubeblocks.io/pvc-name"
 	VolumeClaimTemplateNameLabelKey        = "apps.kubeblocks.io/vct-name"
-	KBAppComponentInstanceTemplateLabelKey = "apps.kubeblocks.io/instance-template"
-	KBAppServiceVersionKey                 = "apps.kubeblocks.io/service-version"
 	KBAppPodNameLabelKey                   = "apps.kubeblocks.io/pod-name"
-	ClusterDefLabelKey                     = "clusterdefinition.kubeblocks.io/name"
-	ComponentDefinitionLabelKey            = "componentdefinition.kubeblocks.io/name"
-	ComponentVersionLabelKey               = "componentversion.kubeblocks.io/name"
-	ConsensusSetAccessModeLabelKey         = "cs.apps.kubeblocks.io/access-mode"
-	AddonNameLabelKey                      = "extensions.kubeblocks.io/addon-name"
+	ClusterAccountLabelKey                 = "account.kubeblocks.io/name"
 
-	ServiceDescriptorNameLabelKey = "servicedescriptor.kubeblocks.io/name"
+	RoleLabelKey             = "kubeblocks.io/role" // RoleLabelKey consensusSet and replicationSet role label key
+	KBAppServiceVersionKey   = "apps.kubeblocks.io/service-version"
+	BackupProtectionLabelKey = "kubeblocks.io/backup-protection" // BackupProtectionLabelKey Backup delete protection policy label
+	AccessModeLabelKey       = "workloads.kubeblocks.io/access-mode"
+	ReadyWithoutPrimaryKey   = "kubeblocks.io/ready-without-primary"
+
+	KBManagedByKey = "apps.kubeblocks.io/managed-by" // KBManagedByKey marks resources that auto created
 )
 
-// GetKBConfigMapWellKnownLabels returns the well-known labels for KB ConfigMap
-func GetKBConfigMapWellKnownLabels(cmTplName, componentDefName, clusterName, componentName string) map[string]string {
-	return map[string]string{
-		CMTemplateNameLabelKey: cmTplName,
-		AppNameLabelKey:        componentDefName,
-		AppInstanceLabelKey:    clusterName,
-		KBAppComponentLabelKey: componentName,
-	}
-}
-
-// GetKBWellKnownLabels returns the well-known labels for KB resources with ClusterDefinition API
-func GetKBWellKnownLabels(clusterDefName, clusterName, componentName string) map[string]string {
-	return map[string]string{
-		AppManagedByLabelKey:   AppName,
-		AppNameLabelKey:        clusterDefName,
-		AppInstanceLabelKey:    clusterName,
-		KBAppComponentLabelKey: componentName,
-	}
-}
-
-// GetKBWellKnownLabelsWithCompDef returns the well-known labels for KB resources with ComponentDefinition API
-func GetKBWellKnownLabelsWithCompDef(compDefName, clusterName, componentName string) map[string]string {
-	return map[string]string{
-		AppManagedByLabelKey:   AppName,
-		AppNameLabelKey:        compDefName, // TODO: reusing AppNameLabelKey for compDefName ?
-		AppInstanceLabelKey:    clusterName,
-		KBAppComponentLabelKey: componentName,
-	}
-}
-
-// GetClusterWellKnownLabels returns the well-known labels for a cluster
-func GetClusterWellKnownLabels(clusterName string) map[string]string {
+func GetClusterLabels(clusterName string) map[string]string {
 	return map[string]string{
 		AppManagedByLabelKey: AppName,
 		AppInstanceLabelKey:  clusterName,
 	}
 }
 
-// GetKBKnownLabels returns the kb-known labels for the headless svc
-func GetKBKnownLabels() map[string]string {
-	return map[string]string{
-		AppManagedByLabelKey: AppName,
-	}
-}
+// func GetClusterLabelsWithDef(clusterName, clusterDef string) map[string]string {
+//	labels := map[string]string{
+//		AppManagedByLabelKey: AppName,
+//		AppInstanceLabelKey:  clusterName,
+//	}
+//	if len(clusterDef) > 0 {
+//		labels[AppNameLabelKey] = clusterDef
+//	}
+//	return labels
+// }
 
-// GetComponentWellKnownLabels returns the well-known labels for Component API
-func GetComponentWellKnownLabels(clusterName, componentName string) map[string]string {
+func GetCompLabels(clusterName, compName string) map[string]string {
 	return map[string]string{
 		AppManagedByLabelKey:   AppName,
 		AppInstanceLabelKey:    clusterName,
-		KBAppComponentLabelKey: componentName,
+		KBAppComponentLabelKey: compName,
 	}
 }
 
-// GetShardingWellKnownLabels returns the well-known labels for Sharding API
-func GetShardingWellKnownLabels(clusterName, shardingName string) map[string]string {
+func GetCompLabelsWithDef(clusterName, compName, compDef string) map[string]string {
+	labels := map[string]string{
+		AppManagedByLabelKey:   AppName,
+		AppInstanceLabelKey:    clusterName,
+		KBAppComponentLabelKey: compName,
+	}
+	if len(compDef) > 0 {
+		labels[AppComponentLabelKey] = compDef
+	}
+	return labels
+}
+
+func GetShardingLabels(clusterName, shardingName string) map[string]string {
 	return map[string]string{
 		AppManagedByLabelKey:      AppName,
 		AppInstanceLabelKey:       clusterName,
@@ -121,38 +103,11 @@ func GetShardingWellKnownLabels(clusterName, shardingName string) map[string]str
 	}
 }
 
-// GetAppVersionLabel returns the label for AppVersion
-func GetAppVersionLabel(appVersion string) map[string]string {
+func GetConfigurationLabels(clusterName, compName, cmTplName string) map[string]string {
 	return map[string]string{
-		AppVersionLabelKey: appVersion,
-	}
-}
-
-// GetComponentDefLabel returns the label for ComponentDefinition (refer ComponentDefinition.Name)
-func GetComponentDefLabel(compDefName string) map[string]string {
-	return map[string]string{
-		AppComponentLabelKey: compDefName,
-	}
-}
-
-// GetShardingNameLabel returns the shard template name label for component generated from shardSpec
-func GetShardingNameLabel(shardingName string) map[string]string {
-	return map[string]string{
-		KBAppShardingNameLabelKey: shardingName,
-	}
-}
-
-// GetKBReservedLabelKeys returns the reserved label keys for KubeBlocks
-func GetKBReservedLabelKeys() []string {
-	return []string{
-		AppManagedByLabelKey,
-		AppNameLabelKey,
-		AppInstanceLabelKey,
-		AppComponentLabelKey,
-		AppVersionLabelKey,
-		KBAppComponentLabelKey,
-		KBAppShardingNameLabelKey,
-		KBManagedByKey,
-		RoleLabelKey,
+		AppManagedByLabelKey:   AppName,
+		AppInstanceLabelKey:    clusterName,
+		KBAppComponentLabelKey: compName,
+		CMTemplateNameLabelKey: cmTplName,
 	}
 }

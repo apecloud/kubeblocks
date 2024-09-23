@@ -238,7 +238,7 @@ func listObjectsOfCluster(ctx context.Context,
 	cli client.Client,
 	cluster *kbappsv1.Cluster,
 	object client.ObjectList) (client.ObjectList, error) {
-	labels := constant.GetClusterWellKnownLabels(cluster.Name)
+	labels := constant.GetClusterLabels(cluster.Name)
 	if err := cli.List(ctx, object, client.InNamespace(cluster.Namespace), client.MatchingLabels(labels)); err != nil {
 		return nil, err
 	}

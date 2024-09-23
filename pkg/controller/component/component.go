@@ -56,8 +56,7 @@ func GetClusterUID(comp *appsv1.Component) (string, error) {
 }
 
 // BuildComponent builds a new Component object from cluster component spec and definition.
-func BuildComponent(cluster *appsv1.Cluster, compSpec *appsv1.ClusterComponentSpec,
-	labels, annotations map[string]string) (*appsv1.Component, error) {
+func BuildComponent(cluster *appsv1.Cluster, compSpec *appsv1.ClusterComponentSpec) (*appsv1.Component, error) {
 	schedulingPolicy, err := scheduling.BuildSchedulingPolicy(cluster, compSpec)
 	if err != nil {
 		return nil, err
@@ -65,7 +64,7 @@ func BuildComponent(cluster *appsv1.Cluster, compSpec *appsv1.ClusterComponentSp
 	compBuilder := builder.NewComponentBuilder(cluster.Namespace, FullName(cluster.Name, compSpec.Name), compSpec.ComponentDef).
 		AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(cluster.Generation, 10)).
 		AddAnnotations(constant.KBAppClusterUIDKey, string(cluster.UID)).
-		AddLabelsInMap(constant.GetComponentWellKnownLabels(cluster.Name, compSpec.Name)).
+		AddLabelsInMap(constant.GetCompLabelsWithDef(cluster.Name, compSpec.Name, compSpec.ComponentDef)).
 		SetServiceVersion(compSpec.ServiceVersion).
 		SetLabels(compSpec.Labels).
 		SetAnnotations(compSpec.Annotations).
@@ -88,12 +87,6 @@ func BuildComponent(cluster *appsv1.Cluster, compSpec *appsv1.ClusterComponentSp
 		SetRuntimeClassName(cluster.Spec.RuntimeClassName).
 		SetSystemAccounts(compSpec.SystemAccounts).
 		SetStop(compSpec.Stop)
-	if labels != nil {
-		compBuilder.AddLabelsInMap(labels)
-	}
-	if annotations != nil {
-		compBuilder.AddAnnotationsInMap(annotations)
-	}
 	if cluster.Annotations != nil {
 		p, ok := cluster.Annotations[constant.KBAppMultiClusterPlacementKey]
 		if ok {

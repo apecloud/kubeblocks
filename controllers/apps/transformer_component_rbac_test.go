@@ -50,6 +50,7 @@ var _ = Describe("object rbac transformer test.", func() {
 	var cluster *appsv1.Cluster
 	var compDefObj *appsv1.ComponentDefinition
 	var compObj *appsv1.Component
+	var synthesizedComp *component.SynthesizedComponent
 	var saKey types.NamespacedName
 	var allSettings map[string]interface{}
 
@@ -85,7 +86,8 @@ var _ = Describe("object rbac transformer test.", func() {
 
 		graphCli = model.NewGraphClient(k8sClient)
 
-		synthesizedComponent, err := component.BuildSynthesizedComponent(ctx, k8sClient, compDefObj, compObj, cluster)
+		var err error
+		synthesizedComp, err = component.BuildSynthesizedComponent(ctx, k8sClient, compDefObj, compObj, cluster)
 		Expect(err).Should(Succeed())
 
 		transCtx = &componentTransformContext{
@@ -97,7 +99,7 @@ var _ = Describe("object rbac transformer test.", func() {
 			CompDef:             compDefObj,
 			Component:           compObj,
 			ComponentOrig:       compObj.DeepCopy(),
-			SynthesizeComponent: synthesizedComponent,
+			SynthesizeComponent: synthesizedComp,
 		}
 
 		dag = mockDAG(graphCli, cluster)
@@ -134,8 +136,8 @@ var _ = Describe("object rbac transformer test.", func() {
 				&corev1.ServiceAccount{}, false)).Should(Succeed())
 			Expect(transformer.Transform(transCtx, dag)).Should(BeNil())
 
-			serviceAccount := factory.BuildServiceAccount(cluster, serviceAccountName)
-			roleBinding := factory.BuildRoleBinding(cluster, serviceAccount.Name)
+			serviceAccount := factory.BuildServiceAccount(synthesizedComp, serviceAccountName)
+			roleBinding := factory.BuildRoleBinding(synthesizedComp, serviceAccount.Name)
 
 			dagExpected := mockDAG(graphCli, cluster)
 			graphCli.Create(dagExpected, serviceAccount)
@@ -155,9 +157,9 @@ var _ = Describe("object rbac transformer test.", func() {
 				&corev1.ServiceAccount{}, false)).Should(Succeed())
 			Expect(transformer.Transform(transCtx, dag)).Should(BeNil())
 
-			serviceAccount := factory.BuildServiceAccount(cluster, serviceAccountName)
-			roleBinding := factory.BuildRoleBinding(cluster, serviceAccount.Name)
-			clusterRoleBinding := factory.BuildClusterRoleBinding(cluster, serviceAccount.Name)
+			serviceAccount := factory.BuildServiceAccount(synthesizedComp, serviceAccountName)
+			roleBinding := factory.BuildRoleBinding(synthesizedComp, serviceAccount.Name)
+			clusterRoleBinding := factory.BuildClusterRoleBinding(synthesizedComp, serviceAccount.Name)
 
 			dagExpected := mockDAG(graphCli, cluster)
 			graphCli.Create(dagExpected, serviceAccount)

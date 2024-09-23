@@ -35,6 +35,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -82,14 +83,14 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 	}
 
 	var parent client.Object
-	rb, err := buildRoleBinding(transCtx.Cluster, transCtx.Component, serviceAccount.Name)
+	rb, err := buildRoleBinding(transCtx.SynthesizeComponent, transCtx.Component, serviceAccount.Name)
 	if err != nil {
 		return err
 	}
 	graphCli.Create(dag, rb, inDataContext4G())
 	parent = rb
 	if needCRB {
-		crb := factory.BuildClusterRoleBinding(transCtx.Cluster, serviceAccount.Name)
+		crb := factory.BuildClusterRoleBinding(transCtx.SynthesizeComponent, serviceAccount.Name)
 		graphCli.Create(dag, crb, inDataContext4G())
 		graphCli.DependOn(dag, parent, crb)
 		parent = crb
@@ -246,9 +247,10 @@ func getDefaultBackupPolicyTemplate(transCtx *componentTransformContext, cluster
 // buildServiceAccount builds the service account for the component and returns serviceAccount, needCRB(need create ClusterRoleBinding), error.
 func buildServiceAccount(transCtx *componentTransformContext) (*corev1.ServiceAccount, bool, error) {
 	var (
-		cluster = transCtx.Cluster
-		comp    = transCtx.Component
-		compDef = transCtx.CompDef
+		cluster         = transCtx.Cluster
+		comp            = transCtx.Component
+		compDef         = transCtx.CompDef
+		synthesizedComp = transCtx.SynthesizeComponent
 	)
 
 	// TODO(component): dependency on cluster definition
@@ -276,7 +278,7 @@ func buildServiceAccount(transCtx *componentTransformContext) (*corev1.ServiceAc
 		}
 	}
 
-	saObj := factory.BuildServiceAccount(cluster, serviceAccountName)
+	saObj := factory.BuildServiceAccount(synthesizedComp, serviceAccountName)
 	if err := setCompOwnershipNFinalizer(comp, saObj); err != nil {
 		return nil, false, err
 	}
@@ -284,8 +286,8 @@ func buildServiceAccount(transCtx *componentTransformContext) (*corev1.ServiceAc
 	return saObj, volumeProtectionEnable, nil
 }
 
-func buildRoleBinding(cluster *appsv1.Cluster, comp *appsv1.Component, serviceAccountName string) (*rbacv1.RoleBinding, error) {
-	roleBinding := factory.BuildRoleBinding(cluster, serviceAccountName)
+func buildRoleBinding(synthesizeComp *component.SynthesizedComponent, comp *appsv1.Component, serviceAccountName string) (*rbacv1.RoleBinding, error) {
+	roleBinding := factory.BuildRoleBinding(synthesizeComp, serviceAccountName)
 	if err := setCompOwnershipNFinalizer(comp, roleBinding); err != nil {
 		return nil, err
 	}

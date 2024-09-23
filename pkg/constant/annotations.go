@@ -23,7 +23,7 @@ const (
 	HorizontalScaleBackupPolicyTemplateKey = "apps.kubeblocks.io/horizontal-scale-backup-policy-template"
 )
 
-// annotations for kubeblocks
+// annotations defined by KubeBlocks
 const (
 	ClusterSnapshotAnnotationKey             = "kubeblocks.io/cluster-snapshot"          // ClusterSnapshotAnnotationKey saves the snapshot of cluster.
 	EncryptedSystemAccountsAnnotationKey     = "kubeblocks.io/encrypted-system-accounts" // EncryptedSystemAccountsAnnotationKey saves the encrypted system accounts.
@@ -55,13 +55,3 @@ const (
 	KBAppMultiClusterPlacementKey   = "apps.kubeblocks.io/multi-cluster-placement"
 	MultiClusterServicePlacementKey = "apps.kubeblocks.io/multi-cluster-service-placement"
 )
-
-// GetKBReservedAnnotationKeys returns the reserved annotation keys for KubeBlocks
-func GetKBReservedAnnotationKeys() []string {
-	return []string{
-		KubeBlocksGenerationKey,
-		ReconcileAnnotationKey,
-		KBAppClusterUIDKey,
-		KBAppServiceVersionKey,
-	}
-}

@@ -435,8 +435,8 @@ func buildInstanceByTemplate(name string, template *instanceTemplateExt, parent 
 		AddAnnotationsInMap(template.Annotations).
 		AddLabelsInMap(template.Labels).
 		AddLabelsInMap(labels).
+		AddLabels(constant.KBAppPodNameLabelKey, name). // used as a pod-service selector
 		AddControllerRevisionHashLabel(revision).
-		AddLabelsInMap(map[string]string{constant.KBAppPodNameLabelKey: name}).
 		SetPodSpec(*template.Spec.DeepCopy()).
 		GetObject()
 	// Set these immutable fields only on initial Pod creation, not updates.
@@ -512,8 +512,8 @@ func buildInstancePVCByTemplate(name string, template *instanceTemplateExt, pare
 	for _, claimTemplate := range template.VolumeClaimTemplates {
 		pvcName := fmt.Sprintf("%s-%s", claimTemplate.Name, name)
 		pvc := builder.NewPVCBuilder(parent.Namespace, pvcName).
-			AddLabelsInMap(template.Labels).
 			AddLabelsInMap(labels).
+			AddLabelsInMap(template.Labels).
 			AddLabelsInMap(claimTemplate.Labels).
 			AddLabels(constant.VolumeClaimTemplateNameLabelKey, claimTemplate.Name).
 			AddAnnotationsInMap(claimTemplate.Annotations).

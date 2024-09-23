@@ -36,7 +36,7 @@ import (
 type ObjectStore interface {
 	Insert(object, reference client.Object) error
 	Get(objectRef *model.GVKNObjKey, revision int64) (client.Object, error)
-	List(gvk *schema.GroupVersionKind) (map[types.NamespacedName]map[int64]client.Object, error)
+	List(gvk *schema.GroupVersionKind) map[types.NamespacedName]map[int64]client.Object
 	Delete(objectRef *model.GVKNObjKey, reference client.Object, revision int64)
 }
 
@@ -114,15 +114,15 @@ func (s *objectStore) Get(objectRef *model.GVKNObjKey, revision int64) (client.O
 	return object, nil
 }
 
-func (s *objectStore) List(gvk *schema.GroupVersionKind) (map[types.NamespacedName]map[int64]client.Object, error) {
+func (s *objectStore) List(gvk *schema.GroupVersionKind) map[types.NamespacedName]map[int64]client.Object {
 	s.storeLock.RLock()
 	defer s.storeLock.RUnlock()
 
 	objectMap, ok := s.store[*gvk]
 	if !ok {
-		return nil, apierrors.NewNotFound(gvk.GroupVersion().WithResource(strings.ToLower(gvk.Kind)).GroupResource(), gvk.Kind)
+		return nil
 	}
-	return objectMap, nil
+	return objectMap
 }
 
 func (s *objectStore) Delete(objectRef *model.GVKNObjKey, reference client.Object, revision int64) {

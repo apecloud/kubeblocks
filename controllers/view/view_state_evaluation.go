@@ -209,10 +209,7 @@ func getObjectTreeWithRevision(primary client.Object, ownershipRules []viewv1.Ow
 }
 
 func getObjectsByRevision(gvk *schema.GroupVersionKind, store ObjectStore, ml client.MatchingLabels, revision int64) ([]client.Object, error) {
-	objectMap, err := store.List(gvk)
-	if err != nil {
-		return nil, err
-	}
+	objectMap := store.List(gvk)
 
 	var matchedObjects []client.Object
 	opts := &client.ListOptions{}

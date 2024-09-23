@@ -26,7 +26,6 @@ import (
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/checker/decls"
 	"github.com/google/cel-go/common/types"
-	"github.com/google/cel-go/common/types/ref"
 	"google.golang.org/protobuf/types/known/structpb"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -281,8 +280,8 @@ func doStateEvaluation(object client.Object, expression viewv1.StateEvaluationEx
 		return false, fmt.Errorf("failed to create structpb value: %w", err)
 	}
 
-	out, _, err := prg.Eval(map[string]ref.Val{
-		"object": types.NewDynamicMap(types.DefaultTypeAdapter, objValue),
+	out, _, err := prg.Eval(map[string]any{
+		"object": types.NewDynamicMap(types.DefaultTypeAdapter, objValue.AsMap()),
 	})
 	if err != nil {
 		return false, fmt.Errorf("failed to evaluate expression: %w", err)

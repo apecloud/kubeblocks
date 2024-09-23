@@ -30,9 +30,9 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testops "github.com/apecloud/kubeblocks/pkg/testutil/operations"
@@ -100,7 +100,7 @@ var _ = Describe("Restart OpsRequest", func() {
 			Expect(err).ShouldNot(HaveOccurred())
 		})
 
-		ExpectCompRestarted := func(opsRequest *appsv1alpha1.OpsRequest, compName string, expectRestarted bool) {
+		ExpectCompRestarted := func(opsRequest *opsv1alpha1.OpsRequest, compName string, expectRestarted bool) {
 			instanceSetName := constant.GenerateWorkloadNamePattern(clusterName, compName)
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKey{Name: instanceSetName, Namespace: testCtx.DefaultNamespace},
 				func(g Gomega, pobj *workloads.InstanceSet) {
@@ -118,13 +118,13 @@ var _ = Describe("Restart OpsRequest", func() {
 			By("create Restart opsRequest")
 			opsRes.OpsRequest = createRestartOpsObj(clusterName, "restart-ops-"+randomStr,
 				defaultCompName, secondaryCompName, thirdCompName)
-			mockComponentIsOperating(opsRes.Cluster, appsv1alpha1.UpdatingClusterCompPhase,
+			mockComponentIsOperating(opsRes.Cluster, appsv1.UpdatingClusterCompPhase,
 				defaultCompName, secondaryCompName, thirdCompName)
 
 			By("mock restart OpsRequest to Creating")
 			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(appsv1alpha1.OpsCreatingPhase))
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
 
 			By("test restart Action")
 			rHandler := restartOpsHandler{}
@@ -141,18 +141,18 @@ var _ = Describe("Restart OpsRequest", func() {
 			ExpectCompRestarted(opsRes.OpsRequest, thirdCompName, false)
 
 			By("mock restart secondary component completed")
-			setCompProgress := func(compName string, status appsv1alpha1.ProgressStatus) {
+			setCompProgress := func(compName string, status opsv1alpha1.ProgressStatus) {
 				workloadName := constant.GenerateWorkloadNamePattern(clusterName, compName)
-				opsRes.OpsRequest.Status.Components[compName] = appsv1alpha1.OpsRequestComponentStatus{
-					ProgressDetails: []appsv1alpha1.ProgressStatusDetail{
+				opsRes.OpsRequest.Status.Components[compName] = opsv1alpha1.OpsRequestComponentStatus{
+					ProgressDetails: []opsv1alpha1.ProgressStatusDetail{
 						{ObjectKey: getProgressObjectKey(constant.PodKind, workloadName+"-0"), Status: status},
 						{ObjectKey: getProgressObjectKey(constant.PodKind, workloadName+"-1"), Status: status},
 						{ObjectKey: getProgressObjectKey(constant.PodKind, workloadName+"-2"), Status: status},
 					},
 				}
 			}
-			setCompProgress(defaultCompName, appsv1alpha1.SucceedProgressStatus)
-			setCompProgress(secondaryCompName, appsv1alpha1.PendingProgressStatus)
+			setCompProgress(defaultCompName, opsv1alpha1.SucceedProgressStatus)
+			setCompProgress(secondaryCompName, opsv1alpha1.PendingProgressStatus)
 
 			By("test reconcile Action and expect to restart third component")
 			_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
@@ -184,7 +184,7 @@ var _ = Describe("Restart OpsRequest", func() {
 })
 
 func createRestartOpsObj(clusterName, restartOpsName string, compNames ...string) *opsv1alpha1.OpsRequest {
-	ops := testapps.NewOpsRequestObj(restartOpsName, testCtx.DefaultNamespace,
+	ops := testops.NewOpsRequestObj(restartOpsName, testCtx.DefaultNamespace,
 		clusterName, opsv1alpha1.RestartType)
 	if len(compNames) == 0 {
 		ops.Spec.RestartList = []opsv1alpha1.ComponentOps{

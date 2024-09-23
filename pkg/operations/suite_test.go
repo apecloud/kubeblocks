@@ -187,19 +187,19 @@ func initOperationsResources(compDefName, clusterName string) (*OpsResource, *ap
 	return opsRes, compDef, clusterObject
 }
 
-func initOperationsResourcesWithTopology(clusterDefName, compDefName, clusterName string) (*OpsResource, *appsv1alpha1.ComponentDefinition, *appsv1alpha1.Cluster) {
+func initOperationsResourcesWithTopology(clusterDefName, compDefName, clusterName string) (*OpsResource, *appsv1.ComponentDefinition, *appsv1.Cluster) {
 	topologyName := "cluster-mode"
 	testapps.NewClusterDefFactory(clusterDefName).
-		AddClusterTopology(appsv1alpha1.ClusterTopology{
+		AddClusterTopology(appsv1.ClusterTopology{
 			Name: topologyName,
-			Orders: &appsv1alpha1.ClusterTopologyOrders{
+			Orders: &appsv1.ClusterTopologyOrders{
 				Update: []string{
 					defaultCompName,
 					secondaryCompName,
 					thirdCompName,
 				},
 			},
-			Components: []appsv1alpha1.ClusterTopologyComponent{
+			Components: []appsv1.ClusterTopologyComponent{
 				{Name: defaultCompName, CompDef: compDefName},
 				{Name: secondaryCompName, CompDef: compDefName},
 				{Name: thirdCompName, CompDef: compDefName},
@@ -233,16 +233,16 @@ func initOperationsResourcesWithTopology(clusterDefName, compDefName, clusterNam
 
 	By("mock cluster is Running and the status operations")
 	Expect(testapps.ChangeObjStatus(&testCtx, clusterObject, func() {
-		clusterObject.Status.Phase = appsv1alpha1.RunningClusterPhase
-		clusterObject.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
+		clusterObject.Status.Phase = appsv1.RunningClusterPhase
+		clusterObject.Status.Components = map[string]appsv1.ClusterComponentStatus{
 			defaultCompName: {
-				Phase: appsv1alpha1.RunningClusterCompPhase,
+				Phase: appsv1.RunningClusterCompPhase,
 			},
 			secondaryCompName: {
-				Phase: appsv1alpha1.RunningClusterCompPhase,
+				Phase: appsv1.RunningClusterCompPhase,
 			},
 			thirdCompName: {
-				Phase: appsv1alpha1.RunningClusterCompPhase,
+				Phase: appsv1.RunningClusterCompPhase,
 			},
 		}
 	})).Should(Succeed())

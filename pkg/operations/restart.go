@@ -85,7 +85,7 @@ func (r restartOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 // ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
 // the Reconcile function for restart opsRequest.
 func (r restartOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (opsv1alpha1.OpsPhase, time.Duration, error) {
-	r.compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.RestartList)
+	r.compOpsHelper = newComponentOpsHelper(opsRes.OpsRequest.Spec.RestartList)
 	handleRestartProgress := func(reqCtx intctrlutil.RequestCtx,
 		cli client.Client,
 		opsRes *OpsResource,
@@ -122,10 +122,10 @@ func (r restartOpsHandler) podApplyCompOps(
 
 func (r restartOpsHandler) getComponentOrders(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) ([]opsv1alpha1.ComponentOps, error) {
 	cd := &appsv1.ClusterDefinition{}
-	if opsRes.Cluster.Spec.ClusterDefRef == "" || opsRes.Cluster.Spec.Topology == "" {
+	if opsRes.Cluster.Spec.ClusterDef == "" || opsRes.Cluster.Spec.Topology == "" {
 		return nil, nil
 	}
-	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: opsRes.Cluster.Spec.ClusterDefRef}, cd); err != nil {
+	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: opsRes.Cluster.Spec.ClusterDef}, cd); err != nil {
 		return nil, err
 	}
 	// components that require sequential restart
@@ -211,7 +211,7 @@ func (r restartOpsHandler) matchToRestart(opsRes *OpsResource, comOpsList []opsv
 	return !compHasRestartCompleted(comOpsList[index].ComponentName)
 }
 
-func (r restartOpsHandler) getCompReplicas(cluster *appsv1alpha1.Cluster, compName string) int32 {
+func (r restartOpsHandler) getCompReplicas(cluster *appsv1.Cluster, compName string) int32 {
 	compSpec := cluster.Spec.GetComponentByName(compName)
 	if compSpec != nil {
 		return compSpec.Replicas

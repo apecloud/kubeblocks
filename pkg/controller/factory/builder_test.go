@@ -97,7 +97,7 @@ var _ = Describe("builder", func() {
 
 	newAllFieldsSynthesizedComponent := func(compDef *appsv1.ComponentDefinition, cluster *appsv1.Cluster) *component.SynthesizedComponent {
 		By("assign every available fields")
-		comp, err := component.BuildComponent(cluster, &cluster.Spec.ComponentSpecs[0])
+		comp, err := component.BuildComponent(cluster, &cluster.Spec.ComponentSpecs[0], nil, nil)
 		Expect(err).Should(Succeed())
 		synthesizeComp, err := component.BuildSynthesizedComponent(testCtx.Ctx, testCtx.Cli, compDef, comp, cluster)
 		Expect(err).Should(Succeed())

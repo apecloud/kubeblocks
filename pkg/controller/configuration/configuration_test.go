@@ -78,7 +78,7 @@ func newAllFieldsClusterObj(compDef *appsv1.ComponentDefinition, create bool) (*
 }
 
 func newAllFieldsSynthesizedComponent(compDef *appsv1.ComponentDefinition, cluster *appsv1.Cluster) *component.SynthesizedComponent {
-	comp, err := component.BuildComponent(cluster, &cluster.Spec.ComponentSpecs[0])
+	comp, err := component.BuildComponent(cluster, &cluster.Spec.ComponentSpecs[0], nil, nil)
 	if err != nil {
 		panic(fmt.Sprintf("build component object error: %v", err))
 	}
@@ -94,7 +94,7 @@ func newAllFieldsSynthesizedComponent(compDef *appsv1.ComponentDefinition, clust
 }
 
 func newAllFieldsComponent(cluster *appsv1.Cluster) *appsv1.Component {
-	comp, _ := component.BuildComponent(cluster, &cluster.Spec.ComponentSpecs[0])
+	comp, _ := component.BuildComponent(cluster, &cluster.Spec.ComponentSpecs[0], nil, nil)
 	return comp
 }
 

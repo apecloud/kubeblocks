@@ -103,7 +103,7 @@ var _ = Describe("Prepare Test", func() {
 				GetObject()
 
 			var err error
-			comp, err = component.BuildComponent(cluster, &cluster.Spec.ComponentSpecs[0])
+			comp, err = component.BuildComponent(cluster, &cluster.Spec.ComponentSpecs[0], nil, nil)
 			Expect(err).Should(Succeed())
 			comp.SetUID("test-uid")
 		})

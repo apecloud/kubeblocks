@@ -23,11 +23,13 @@ import (
 	"context"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
+	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
@@ -38,7 +40,8 @@ func init() {
 // ReconciliationPlanReconciler reconciles a ReconciliationPlan object
 type ReconciliationPlanReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme   *runtime.Scheme
+	Recorder record.EventRecorder
 }
 
 //+kubebuilder:rbac:groups=view.kubeblocks.io,resources=reconciliationplans,verbs=get;list;watch;create;update;patch;delete
@@ -51,11 +54,17 @@ type ReconciliationPlanReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.4/pkg/reconcile
 func (r *ReconciliationPlanReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
+	logger := log.FromContext(ctx).WithValues("ReconciliationPlan", req.NamespacedName)
 
-	// TODO(user): your logic here
+	res, err := kubebuilderx.NewController(ctx, r.Client, req, r.Recorder, logger).
+		Prepare(planResources()).
+		Do(planResourcesValidation(ctx, r.Client)).
+		Do(planGeneration(r.Client)).
+		Commit()
 
-	return ctrl.Result{}, nil
+	// TODO(free6om): err handling
+
+	return res, err
 }
 
 // SetupWithManager sets up the controller with the Manager.

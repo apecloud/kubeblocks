@@ -131,7 +131,7 @@ func (f *rootFinder) findRoots(ctx context.Context, object client.Object) []reco
 					f.logger.Error(err, "convert objectType %s to GVK failed", rule.Primary)
 					return nil
 				}
-				objectList, err := getObjectsByGVK(ctx, f, f.Scheme(), primaryGVK)
+				objectList, err := getObjectsByGVK(ctx, f, primaryGVK)
 				if err != nil {
 					f.logger.Error(err, "getObjectsByGVK for GVK %s failed", primaryGVK)
 					return nil

@@ -1,0 +1,84 @@
+/*
+Copyright (C) 2022-2024 ApeCloud Co., Ltd
+
+This file is part of KubeBlocks project
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
+package view
+
+import (
+	"context"
+
+	"github.com/go-logr/logr"
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/record"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
+	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
+)
+
+type planResourcesLoader struct{}
+
+func (r *planResourcesLoader) Load(ctx context.Context, reader client.Reader, req ctrl.Request, recorder record.EventRecorder, logger logr.Logger) (*kubebuilderx.ObjectTree, error) {
+	// load view object
+	tree, err := kubebuilderx.ReadObjectTree[*viewv1.ReconciliationPlan](ctx, reader, req, nil)
+	if err != nil {
+		return nil, err
+	}
+	if tree.GetRoot() == nil {
+		return tree, nil
+	}
+
+	// load view definition object
+	p, _ := tree.GetRoot().(*viewv1.ReconciliationPlan)
+	viewDef := &viewv1.ReconciliationViewDefinition{}
+	if err = reader.Get(ctx, types.NamespacedName{Name: p.Spec.ViewDefinition}, viewDef); err != nil {
+		if apierrors.IsNotFound(err) {
+			return tree, nil
+		}
+		return nil, err
+	}
+	if err = tree.Add(viewDef); err != nil {
+		return nil, err
+	}
+
+	// load i18n resources
+	if viewDef.Spec.I18nResourceRef == nil {
+		return tree, nil
+	}
+	i18n := &corev1.ConfigMap{}
+	if err = reader.Get(ctx, types.NamespacedName{Namespace: viewDef.Spec.I18nResourceRef.Namespace, Name: viewDef.Spec.I18nResourceRef.Name}, i18n); err != nil {
+		if apierrors.IsNotFound(err) {
+			return tree, nil
+		}
+		return nil, err
+	}
+	if err = tree.Add(i18n); err != nil {
+		return nil, err
+	}
+
+	return tree, nil
+}
+
+func planResources() kubebuilderx.TreeLoader {
+	return &planResourcesLoader{}
+}
+
+var _ kubebuilderx.TreeLoader = &planResourcesLoader{}

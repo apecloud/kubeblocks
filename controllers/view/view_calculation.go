@@ -27,7 +27,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -40,10 +39,9 @@ import (
 )
 
 type viewCalculator struct {
-	ctx    context.Context
-	cli    client.Reader
-	store  ObjectStore
-	scheme *runtime.Scheme
+	ctx   context.Context
+	cli   client.Client
+	store ObjectStore
 }
 
 func (c *viewCalculator) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
@@ -74,32 +72,14 @@ func (c *viewCalculator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.
 	if err := c.cli.Get(c.ctx, objectKey, root); err != nil {
 		return kubebuilderx.Commit, err
 	}
-	newObjectMap := make(map[model.GVKNObjKey]client.Object)
-	newObjectSet := sets.New[model.GVKNObjKey]()
-	waitingList := list.New()
-	waitingList.PushFront(root)
-	for waitingList.Len() > 0 {
-		e := waitingList.Front()
-		waitingList.Remove(e)
-		obj, _ := e.Value.(client.Object)
-		objKey, err := getObjectRef(obj, c.scheme)
-		if err != nil {
-			return kubebuilderx.Commit, err
-		}
-		newObjectSet.Insert(*objKey)
-		newObjectMap[*objKey] = obj
 
-		secondaries, err := c.getSecondaryObjectsOf(obj, viewDef.Spec.OwnershipRules)
-		if err != nil {
-			return kubebuilderx.Commit, err
-		}
-		for _, secondary := range secondaries {
-			waitingList.PushBack(secondary)
-		}
+	newObjectSet, newObjectMap, err := getObjectsFromCache(c.ctx, c.cli, root, viewDef.Spec.OwnershipRules)
+	if err != nil {
+		return kubebuilderx.Commit, err
 	}
 
 	// build old object set from view.status.currentObjectTree
-	oldObjectSet, oldObjectMap, err := c.getAllObjectsFrom(view.Status.CurrentObjectTree)
+	oldObjectSet, oldObjectMap, err := getObjectsFromTree(view.Status.CurrentObjectTree, c.store)
 	if err != nil {
 		return kubebuilderx.Commit, err
 	}
@@ -137,13 +117,13 @@ func (c *viewCalculator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.
 	}
 
 	// update view.status.currentObjectTree
-	view.Status.CurrentObjectTree, err = getObjectTreeWithRevision(root, viewDef.Spec.OwnershipRules, c.store, parseRevision(root.ResourceVersion), c.scheme)
+	view.Status.CurrentObjectTree, err = getObjectTreeWithRevision(root, viewDef.Spec.OwnershipRules, c.store, parseRevision(root.ResourceVersion), c.cli.Scheme())
 	if err != nil {
 		return kubebuilderx.Commit, err
 	}
 
 	// update view summary
-	initialObjectSet, initialObjectMap, err := c.getAllObjectsFrom(view.Status.InitialObjectTree)
+	initialObjectSet, initialObjectMap, err := getObjectsFromTree(view.Status.InitialObjectTree, c.store)
 	if err != nil {
 		return kubebuilderx.Commit, err
 	}
@@ -187,7 +167,7 @@ func (c *viewCalculator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.
 		}
 		*summary.ChangeSummary.Updated += 1
 	})
-	doCount(deleteSet, func(_ *model.GVKNObjKey,summary *viewv1.ObjectSummary) {
+	doCount(deleteSet, func(_ *model.GVKNObjKey, summary *viewv1.ObjectSummary) {
 		if summary.ChangeSummary.Deleted == nil {
 			summary.ChangeSummary.Deleted = pointer.Int32(0)
 		}
@@ -223,7 +203,7 @@ func buildChanges(objKeySet sets.Set[model.GVKNObjKey], oldObjectMap, newObjectM
 			obj = oldObj
 		}
 		if changeType == viewv1.ObjectUpdateType &&
-			(oldObj == nil || newObj == nil  || oldObj.GetResourceVersion() == newObj.GetResourceVersion()) {
+			(oldObj == nil || newObj == nil || oldObj.GetResourceVersion() == newObj.GetResourceVersion()) {
 			continue
 		}
 		change := viewv1.ObjectChange{
@@ -259,47 +239,7 @@ func formatDescription(oldObj, newObj client.Object, changeType viewv1.ObjectCha
 	return string(changeType)
 }
 
-func (c *viewCalculator) getSecondaryObjectsOf(obj client.Object, ownershipRules []viewv1.OwnershipRule) ([]client.Object, error) {
-	objGVK, err := apiutil.GVKForObject(obj, c.scheme)
-	if err != nil {
-		return nil, err
-	}
-	// find matched rules
-	var rules []viewv1.OwnershipRule
-	for _, rule := range ownershipRules {
-		gvk, err := objectTypeToGVK(&rule.Primary)
-		if err != nil {
-			return nil, err
-		}
-		if *gvk == objGVK {
-			rules = append(rules, rule)
-		}
-	}
-
-	// get secondary objects
-	var secondaries []client.Object
-	for _, rule := range rules {
-		for _, ownedResource := range rule.OwnedResources {
-			gvk, err := objectTypeToGVK(&ownedResource.Secondary)
-			if err != nil {
-				return nil, err
-			}
-			ml, err := parseMatchingLabels(obj, &ownedResource.Criteria)
-			if err != nil {
-				return nil, err
-			}
-			objects, err := getObjectsByGVK(c.ctx, c.cli, c.scheme, gvk, ml)
-			if err != nil {
-				return nil, err
-			}
-			secondaries = append(secondaries, objects...)
-		}
-	}
-
-	return secondaries, nil
-}
-
-func (c *viewCalculator) getAllObjectsFrom(tree *viewv1.ObjectTreeNode) (sets.Set[model.GVKNObjKey], map[model.GVKNObjKey]client.Object, error) {
+func getObjectsFromTree(tree *viewv1.ObjectTreeNode, store ObjectStore) (sets.Set[model.GVKNObjKey], map[model.GVKNObjKey]client.Object, error) {
 	if tree == nil {
 		return nil, nil, nil
 	}
@@ -308,7 +248,7 @@ func (c *viewCalculator) getAllObjectsFrom(tree *viewv1.ObjectTreeNode) (sets.Se
 		return nil, nil, err
 	}
 	revision := parseRevision(tree.Primary.ResourceVersion)
-	obj, err := c.store.Get(objectRef, revision)
+	obj, err := store.Get(objectRef, revision)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return nil, nil, err
 	}
@@ -319,7 +259,7 @@ func (c *viewCalculator) getAllObjectsFrom(tree *viewv1.ObjectTreeNode) (sets.Se
 
 	}
 	for _, treeNode := range tree.Secondaries {
-		secondaryRefSet, secondaryMap, err := c.getAllObjectsFrom(treeNode)
+		secondaryRefSet, secondaryMap, err := getObjectsFromTree(treeNode, store)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -331,12 +271,11 @@ func (c *viewCalculator) getAllObjectsFrom(tree *viewv1.ObjectTreeNode) (sets.Se
 	return objectRefSet, objectMap, nil
 }
 
-func viewCalculation(ctx context.Context, cli client.Client, store ObjectStore, scheme *runtime.Scheme) kubebuilderx.Reconciler {
+func viewCalculation(ctx context.Context, cli client.Client, store ObjectStore) kubebuilderx.Reconciler {
 	return &viewCalculator{
-		ctx:    ctx,
-		cli:    cli,
-		store:  store,
-		scheme: scheme,
+		ctx:   ctx,
+		cli:   cli,
+		store: store,
 	}
 }
 

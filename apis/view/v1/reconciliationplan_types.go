@@ -50,10 +50,15 @@ type ReconciliationPlanSpec struct {
 	// +optional
 	Depth *int32 `json:"depth,omitempty"`
 
+	// StateEvaluationExpression overrides the value specified in ReconciliationViewDefinition.
+	//
+	// +optional
+	StateEvaluationExpression *StateEvaluationExpression `json:"stateEvaluationExpression,omitempty"`
+
 	// Locale specifies the locale to use when localizing the reconciliation plan.
 	//
 	// +optional
-	Locale string `json:"locale,omitempty"`
+	Locale *string `json:"locale,omitempty"`
 }
 
 // ReconciliationPlanStatus defines the observed state of ReconciliationPlan

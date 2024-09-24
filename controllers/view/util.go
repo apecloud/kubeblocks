@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package view
 
 import (
+	"container/list"
 	"context"
 	"fmt"
 	"strconv"
@@ -29,9 +30,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
@@ -120,8 +123,8 @@ func getObjectReference(obj client.Object, scheme *runtime.Scheme) (*corev1.Obje
 	}, nil
 }
 
-func getObjectsByGVK(ctx context.Context, cli client.Reader, scheme *runtime.Scheme, gvk *schema.GroupVersionKind, opts ...client.ListOption) ([]client.Object, error) {
-	runtimeObjectList, err := scheme.New(schema.GroupVersionKind{
+func getObjectsByGVK(ctx context.Context, cli client.Client, gvk *schema.GroupVersionKind, opts ...client.ListOption) ([]client.Object, error) {
+	runtimeObjectList, err := cli.Scheme().New(schema.GroupVersionKind{
 		Group:   gvk.Group,
 		Version: gvk.Version,
 		Kind:    gvk.Kind + "List",
@@ -171,3 +174,69 @@ func parseMatchingLabels(obj client.Object, criteria *viewv1.OwnershipCriteria) 
 	return nil, fmt.Errorf("parse matching labels failed")
 }
 
+func getObjectsFromCache(ctx context.Context, cli client.Client, root *appsv1alpha1.Cluster, ownershipRules []viewv1.OwnershipRule) (sets.Set[model.GVKNObjKey], map[model.GVKNObjKey]client.Object, error) {
+	objectMap := make(map[model.GVKNObjKey]client.Object)
+	objectSet := sets.New[model.GVKNObjKey]()
+	waitingList := list.New()
+	waitingList.PushFront(root)
+	for waitingList.Len() > 0 {
+		e := waitingList.Front()
+		waitingList.Remove(e)
+		obj, _ := e.Value.(client.Object)
+		objKey, err := getObjectRef(obj, cli.Scheme())
+		if err != nil {
+			return nil, nil, err
+		}
+		objectSet.Insert(*objKey)
+		objectMap[*objKey] = obj
+
+		secondaries, err := getSecondaryObjectsOf(ctx, cli, obj, ownershipRules)
+		if err != nil {
+			return nil, nil, err
+		}
+		for _, secondary := range secondaries {
+			waitingList.PushBack(secondary)
+		}
+	}
+	return objectSet, objectMap, nil
+}
+
+func getSecondaryObjectsOf(ctx context.Context, cli client.Client, obj client.Object, ownershipRules []viewv1.OwnershipRule) ([]client.Object, error) {
+	objGVK, err := apiutil.GVKForObject(obj, cli.Scheme())
+	if err != nil {
+		return nil, err
+	}
+	// find matched rules
+	var rules []viewv1.OwnershipRule
+	for _, rule := range ownershipRules {
+		gvk, err := objectTypeToGVK(&rule.Primary)
+		if err != nil {
+			return nil, err
+		}
+		if *gvk == objGVK {
+			rules = append(rules, rule)
+		}
+	}
+
+	// get secondary objects
+	var secondaries []client.Object
+	for _, rule := range rules {
+		for _, ownedResource := range rule.OwnedResources {
+			gvk, err := objectTypeToGVK(&ownedResource.Secondary)
+			if err != nil {
+				return nil, err
+			}
+			ml, err := parseMatchingLabels(obj, &ownedResource.Criteria)
+			if err != nil {
+				return nil, err
+			}
+			objects, err := getObjectsByGVK(ctx, cli, gvk, ml)
+			if err != nil {
+				return nil, err
+			}
+			secondaries = append(secondaries, objects...)
+		}
+	}
+
+	return secondaries, nil
+}

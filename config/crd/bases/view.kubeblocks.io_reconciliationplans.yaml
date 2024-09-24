@@ -60,6 +60,22 @@ spec:
                 description: Locale specifies the locale to use when localizing the
                   reconciliation plan.
                 type: string
+              stateEvaluationExpression:
+                description: StateEvaluationExpression overrides the value specified
+                  in ReconciliationViewDefinition.
+                properties:
+                  celExpression:
+                    description: |-
+                      CELExpression specifies to use CEL to evaluation the object state.
+                      The root object used in the expression is the primary object.
+                    properties:
+                      expression:
+                        description: Expression specifies the CEL expression.
+                        type: string
+                    required:
+                    - expression
+                    type: object
+                type: object
               targetObject:
                 description: |-
                   TargetObject specifies the target Cluster object.

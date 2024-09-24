@@ -20,27 +20,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"context"
 	"fmt"
 	"maps"
 
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/sets"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	"github.com/apecloud/kubeblocks/pkg/controllerutil"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 )
 
-// ClusterAPINormalizationTransformer handles cluster and component API conversion.
-type ClusterAPINormalizationTransformer struct{}
+// clusterAPINormalizationTransformer handles cluster and component API conversion.
+type clusterAPINormalizationTransformer struct{}
 
-var _ graph.Transformer = &ClusterAPINormalizationTransformer{}
+var _ graph.Transformer = &clusterAPINormalizationTransformer{}
 
-func (t *ClusterAPINormalizationTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+func (t *clusterAPINormalizationTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*clusterTransformContext)
 	cluster := transCtx.Cluster
 	if model.IsObjectDeleting(transCtx.OrigCluster) {
@@ -51,10 +51,6 @@ func (t *ClusterAPINormalizationTransformer) Transform(ctx graph.TransformContex
 	defer func() {
 		setProvisioningStartedCondition(&cluster.Status.Conditions, cluster.Name, cluster.Generation, err)
 	}()
-
-	if err = t.validateSpec(cluster); err != nil {
-		return err
-	}
 
 	// build all component specs
 	transCtx.ComponentSpecs, err = t.buildCompSpecs(transCtx, cluster)
@@ -75,34 +71,18 @@ func (t *ClusterAPINormalizationTransformer) Transform(ctx graph.TransformContex
 	return nil
 }
 
-func (t *ClusterAPINormalizationTransformer) validateSpec(cluster *appsv1.Cluster) error {
-	if len(cluster.Spec.ShardingSpecs) == 0 {
-		return nil
-	}
-	shardCompNameMap := map[string]sets.Empty{}
-	for _, v := range cluster.Spec.ShardingSpecs {
-		shardCompNameMap[v.Name] = sets.Empty{}
-	}
-	for _, v := range cluster.Spec.ComponentSpecs {
-		if _, ok := shardCompNameMap[v.Name]; ok {
-			return fmt.Errorf(`duplicate component name "%s" in spec.shardingSpec`, v.Name)
-		}
-	}
-	return nil
-}
-
-func (t *ClusterAPINormalizationTransformer) buildCompSpecs(transCtx *clusterTransformContext,
+func (t *clusterAPINormalizationTransformer) buildCompSpecs(transCtx *clusterTransformContext,
 	cluster *appsv1.Cluster) ([]*appsv1.ClusterComponentSpec, error) {
 	if withClusterTopology(cluster) {
 		return t.buildCompSpecs4Topology(transCtx.ClusterDef, cluster)
 	}
 	if withClusterUserDefined(cluster) {
-		return t.buildCompSpecs4Specified(transCtx, cluster)
+		return t.buildCompSpecs4Specified(cluster), nil
 	}
 	return nil, nil
 }
 
-func (t *ClusterAPINormalizationTransformer) buildCompSpecs4Topology(clusterDef *appsv1.ClusterDefinition,
+func (t *clusterAPINormalizationTransformer) buildCompSpecs4Topology(clusterDef *appsv1.ClusterDefinition,
 	cluster *appsv1.Cluster) ([]*appsv1.ClusterComponentSpec, error) {
 	newCompSpec := func(comp appsv1.ClusterTopologyComponent) *appsv1.ClusterComponentSpec {
 		return &appsv1.ClusterComponentSpec{
@@ -140,55 +120,25 @@ func (t *ClusterAPINormalizationTransformer) buildCompSpecs4Topology(clusterDef 
 	return compSpecs, nil
 }
 
-func (t *ClusterAPINormalizationTransformer) buildCompSpecs4Specified(transCtx *clusterTransformContext,
-	cluster *appsv1.Cluster) ([]*appsv1.ClusterComponentSpec, error) {
+func (t *clusterAPINormalizationTransformer) buildCompSpecs4Specified(cluster *appsv1.Cluster) []*appsv1.ClusterComponentSpec {
 	compSpecs := make([]*appsv1.ClusterComponentSpec, 0)
 	for i := range cluster.Spec.ComponentSpecs {
 		compSpecs = append(compSpecs, cluster.Spec.ComponentSpecs[i].DeepCopy())
 	}
-	if cluster.Spec.ShardingSpecs != nil {
-		shardingCompSpecs, err := t.buildCompSpecs4Sharding(transCtx, cluster)
-		if err != nil {
-			return nil, err
-		}
-		compSpecs = append(compSpecs, shardingCompSpecs...)
-	}
-	return compSpecs, nil
+	return compSpecs
 }
 
-func (t *ClusterAPINormalizationTransformer) buildCompSpecs4Sharding(transCtx *clusterTransformContext,
-	cluster *appsv1.Cluster) ([]*appsv1.ClusterComponentSpec, error) {
-	compSpecs := make([]*appsv1.ClusterComponentSpec, 0)
-	if transCtx.ShardingComponentSpecs == nil {
-		transCtx.ShardingComponentSpecs = make(map[string][]*appsv1.ClusterComponentSpec, 0)
-	}
-	for i, sharding := range cluster.Spec.ShardingSpecs {
-		shardingComps, err := controllerutil.GenShardingCompSpecList(transCtx.Context, transCtx.Client, cluster, &cluster.Spec.ShardingSpecs[i])
-		if err != nil {
-			return nil, err
-		}
-		compSpecs = append(compSpecs, shardingComps...)
-		transCtx.ShardingComponentSpecs[sharding.Name] = shardingComps
-	}
-	return compSpecs, nil
-}
-
-func (t *ClusterAPINormalizationTransformer) buildCompLabelsInheritedFromCluster(transCtx *clusterTransformContext,
+func (t *clusterAPINormalizationTransformer) buildCompLabelsInheritedFromCluster(transCtx *clusterTransformContext,
 	cluster *appsv1.Cluster) map[string]map[string]string {
 	clusterLabels := filterReservedLabels(cluster.Labels)
 	labels := make(map[string]map[string]string)
 	for _, compSpec := range transCtx.ComponentSpecs {
 		labels[compSpec.Name] = maps.Clone(clusterLabels)
 	}
-	for name, shardingCompSpecs := range transCtx.ShardingComponentSpecs {
-		for _, compSpec := range shardingCompSpecs {
-			labels[compSpec.Name] = controllerutil.MergeMetadataMaps(clusterLabels, constant.GetShardingNameLabel(name))
-		}
-	}
 	return labels
 }
 
-func (t *ClusterAPINormalizationTransformer) buildCompAnnotationsInheritedFromCluster(transCtx *clusterTransformContext,
+func (t *clusterAPINormalizationTransformer) buildCompAnnotationsInheritedFromCluster(transCtx *clusterTransformContext,
 	cluster *appsv1.Cluster) map[string]map[string]string {
 	clusterAnnotations := filterReservedAnnotations(cluster.Annotations)
 	annotations := make(map[string]map[string]string)
@@ -198,12 +148,12 @@ func (t *ClusterAPINormalizationTransformer) buildCompAnnotationsInheritedFromCl
 	return annotations
 }
 
-func (t *ClusterAPINormalizationTransformer) resolveCompDefinitions(transCtx *clusterTransformContext) error {
+func (t *clusterAPINormalizationTransformer) resolveCompDefinitions(transCtx *clusterTransformContext) error {
 	if transCtx.ComponentDefs == nil {
 		transCtx.ComponentDefs = make(map[string]*appsv1.ComponentDefinition)
 	}
 	for i, compSpec := range transCtx.ComponentSpecs {
-		compDef, serviceVersion, err := t.resolveCompDefinitionNServiceVersion(transCtx, compSpec)
+		compDef, serviceVersion, err := compSpecResolveCompDefinitionNServiceVersion(transCtx.Context, transCtx.Client, transCtx.Cluster, compSpec)
 		if err != nil {
 			return err
 		}
@@ -215,30 +165,7 @@ func (t *ClusterAPINormalizationTransformer) resolveCompDefinitions(transCtx *cl
 	return nil
 }
 
-func (t *ClusterAPINormalizationTransformer) resolveCompDefinitionNServiceVersion(transCtx *clusterTransformContext,
-	compSpec *appsv1.ClusterComponentSpec) (*appsv1.ComponentDefinition, string, error) {
-	var (
-		ctx     = transCtx.Context
-		cli     = transCtx.Client
-		cluster = transCtx.Cluster
-	)
-	comp := &appsv1.Component{}
-	err := cli.Get(ctx, types.NamespacedName{Namespace: cluster.Namespace, Name: component.FullName(cluster.Name, compSpec.Name)}, comp)
-	if err != nil && !apierrors.IsNotFound(err) {
-		return nil, "", err
-	}
-
-	if apierrors.IsNotFound(err) || t.checkCompUpgrade(compSpec, comp) {
-		return resolveCompDefinitionNServiceVersion(ctx, cli, compSpec.ComponentDef, compSpec.ServiceVersion)
-	}
-	return resolveCompDefinitionNServiceVersion(ctx, cli, comp.Spec.CompDef, comp.Spec.ServiceVersion)
-}
-
-func (t *ClusterAPINormalizationTransformer) checkCompUpgrade(compSpec *appsv1.ClusterComponentSpec, comp *appsv1.Component) bool {
-	return compSpec.ServiceVersion != comp.Spec.ServiceVersion || compSpec.ComponentDef != comp.Spec.CompDef
-}
-
-func (t *ClusterAPINormalizationTransformer) updateCompSpecs(transCtx *clusterTransformContext) {
+func (t *clusterAPINormalizationTransformer) updateCompSpecs(transCtx *clusterTransformContext) {
 	if withClusterTopology(transCtx.Cluster) {
 		t.updateCompSpecs4Topology(transCtx)
 	}
@@ -247,7 +174,7 @@ func (t *ClusterAPINormalizationTransformer) updateCompSpecs(transCtx *clusterTr
 	}
 }
 
-func (t *ClusterAPINormalizationTransformer) updateCompSpecs4Topology(transCtx *clusterTransformContext) {
+func (t *clusterAPINormalizationTransformer) updateCompSpecs4Topology(transCtx *clusterTransformContext) {
 	var (
 		cluster = transCtx.Cluster
 	)
@@ -272,23 +199,33 @@ func (t *ClusterAPINormalizationTransformer) updateCompSpecs4Topology(transCtx *
 	cluster.Spec.ComponentSpecs = compSpecs
 }
 
-func (t *ClusterAPINormalizationTransformer) updateCompSpecs4Specified(transCtx *clusterTransformContext) {
+func (t *clusterAPINormalizationTransformer) updateCompSpecs4Specified(transCtx *clusterTransformContext) {
 	var (
 		resolvedCompSpecs = transCtx.ComponentSpecs
-		idx               = 0
 		cluster           = transCtx.Cluster
 	)
 	for i := range cluster.Spec.ComponentSpecs {
 		cluster.Spec.ComponentSpecs[i].ComponentDef = resolvedCompSpecs[i].ComponentDef
 		cluster.Spec.ComponentSpecs[i].ServiceVersion = resolvedCompSpecs[i].ServiceVersion
 	}
-	idx += len(cluster.Spec.ComponentSpecs)
+}
 
-	for i, sharding := range cluster.Spec.ShardingSpecs {
-		cluster.Spec.ShardingSpecs[i].Template.ComponentDef = resolvedCompSpecs[idx].ComponentDef
-		cluster.Spec.ShardingSpecs[i].Template.ServiceVersion = resolvedCompSpecs[idx].ServiceVersion
-		idx += int(sharding.Shards)
+func compSpecResolveCompDefinitionNServiceVersion(ctx context.Context, cli client.Reader, cluster *appsv1.Cluster,
+	compSpec *appsv1.ClusterComponentSpec) (*appsv1.ComponentDefinition, string, error) {
+	comp := &appsv1.Component{}
+	err := cli.Get(ctx, types.NamespacedName{Namespace: cluster.Namespace, Name: component.FullName(cluster.Name, compSpec.Name)}, comp)
+	if err != nil && !apierrors.IsNotFound(err) {
+		return nil, "", err
 	}
+
+	if apierrors.IsNotFound(err) || checkCompUpgrade(compSpec, comp) {
+		return resolveCompDefinitionNServiceVersion(ctx, cli, compSpec.ComponentDef, compSpec.ServiceVersion)
+	}
+	return resolveCompDefinitionNServiceVersion(ctx, cli, comp.Spec.CompDef, comp.Spec.ServiceVersion)
+}
+
+func checkCompUpgrade(compSpec *appsv1.ClusterComponentSpec, comp *appsv1.Component) bool {
+	return compSpec.ServiceVersion != comp.Spec.ServiceVersion || compSpec.ComponentDef != comp.Spec.CompDef
 }
 
 // filterReservedEntries filters out reserved keys from a map based on a provided set of reserved keys

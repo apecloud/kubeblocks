@@ -153,13 +153,17 @@ func ListClusterComponents(ctx context.Context, cli client.Reader, cluster *apps
 }
 
 // GetClusterComponentShortNameSet gets the component short name set of the cluster.
-func GetClusterComponentShortNameSet(ctx context.Context, cli client.Reader, cluster *appsv1.Cluster) (sets.Set[string], error) {
+func GetClusterComponentShortNameSet(ctx context.Context, cli client.Reader, cluster *appsv1.Cluster, filter func(obj client.Object) bool) (sets.Set[string], error) {
 	compList, err := ListClusterComponents(ctx, cli, cluster)
 	if err != nil {
 		return nil, err
 	}
 	compSet := sets.Set[string]{}
 	for _, comp := range compList {
+		// filter out the components that do not meet the filter condition
+		if filter != nil && !filter(&comp) {
+			continue
+		}
 		compShortName, err := ShortName(cluster.Name, comp.Name)
 		if err != nil {
 			return nil, err

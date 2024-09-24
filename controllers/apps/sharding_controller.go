@@ -21,7 +21,10 @@ package apps
 
 import (
 	"context"
+	"k8s.io/apimachinery/pkg/types"
 	"math"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -33,7 +36,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -60,18 +62,13 @@ import (
 // +kubebuilder:rbac:groups=core,resources=services/status,verbs=get
 // +kubebuilder:rbac:groups=core,resources=services/finalizers,verbs=update
 
-// read + update access
-// +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;update;patch
-// +kubebuilder:rbac:groups=core,resources=pods/finalizers,verbs=update
-// +kubebuilder:rbac:groups=core,resources=pods/exec,verbs=create
-
 // dataprotection get list and delete
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=backuppolicytemplates,verbs=get;list
 // +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backuppolicies,verbs=get;list;create;update;patch;delete;deletecollection
 // +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backups,verbs=get;list;delete;deletecollection
 
-// ClusterReconciler reconciles a Cluster object
-type ClusterReconciler struct {
+// ShardingReconciler reconciles a Cluster object with shardingSpecs definition
+type ShardingReconciler struct {
 	client.Client
 	Scheme          *runtime.Scheme
 	Recorder        record.EventRecorder
@@ -83,19 +80,17 @@ type ClusterReconciler struct {
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.4/pkg/reconcile
-func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *ShardingReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	reqCtx := intctrlutil.RequestCtx{
 		Ctx:      ctx,
 		Req:      req,
-		Log:      log.FromContext(ctx).WithValues("cluster", req.NamespacedName),
+		Log:      log.FromContext(ctx).WithValues("sharding", req.NamespacedName),
 		Recorder: r.Recorder,
 	}
 
-	reqCtx.Log.V(1).Info("reconcile", "cluster", req.NamespacedName)
+	reqCtx.Log.V(1).Info("reconcile", "sharding", req.NamespacedName)
 
-	// the cluster reconciliation loop is a 3-stage model: plan Init, plan Build and plan Execute
-	// Init stage
-	planBuilder := newClusterPlanBuilder(reqCtx, r.Client)
+	planBuilder := newShardingPlanBuilder(reqCtx, r.Client)
 	if err := planBuilder.Init(); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
@@ -124,39 +119,19 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// 4. don't use client.Client for object write, use client.ReadonlyClient for object read.
 	//    If you do need to create/update/delete object, make your intent operation a lifecycleVertex and put it into the DAG.
 	//
-	// TODO: transformers are vertices, theirs' dependencies are edges, make plan Build stage a DAG.
+	// TODO: transformers are vertices, theirs dependencies are edges, make plan Build stage a DAG.
 	plan, errBuild := planBuilder.
 		AddTransformer(
-			// handle cluster halt first
-			&clusterHaltTransformer{},
 			// handle cluster deletion
 			&clusterDeletionTransformer{},
-			// check is recovering from halted cluster
-			&clusterHaltRecoveryTransformer{},
-			// update finalizer and cd&cv labels
-			&clusterAssureMetaTransformer{},
-			// validate cd & cv's existence and availability
-			&clusterLoadRefResourcesTransformer{},
-			// normalize the cluster and component API
-			&clusterAPINormalizationTransformer{},
-			// placement replicas across data-plane k8s clusters
-			&clusterPlacementTransformer{multiClusterMgr: r.MultiClusterMgr},
-			// handle cluster services
-			&clusterServiceTransformer{},
-			// handle the restore for cluster
-			&clusterRestoreTransformer{},
-			// create all cluster components objects
-			&clusterComponentTransformer{},
-			// update cluster components' status
-			&clusterComponentStatusTransformer{},
-			// build backuppolicy and backupschedule from backupPolicyTemplate
-			&clusterBackupPolicyTransformer{},
-			// add our finalizer to all objects
-			&clusterOwnershipTransformer{},
-			// make all workload objects depending on credential secret
-			&clusterSecretTransformer{},
-			// update cluster status
-			&clusterStatusTransformer{},
+			// normalize the cluster shardingSpecs API
+			&shardingAPINormalizationTransformer{},
+			// handle cluster services with sharding selector
+			&shardingServiceTransformer{},
+			// handle cluster sharding shared account
+			&shardingSharedAccountTransformer{},
+			// create/update/delete cluster sharding components
+			&shardingComponentTransformer{},
 			// always safe to put your transformer below
 		).
 		Build()
@@ -174,16 +149,35 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *ShardingReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return intctrlutil.NewNamespacedControllerManagedBy(mgr).
 		For(&appsv1.Cluster{}).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: int(math.Ceil(viper.GetFloat64(constant.CfgKBReconcileWorkers) / 4)),
 		}).
-		Owns(&appsv1.Component{}).
-		Owns(&corev1.Service{}). // cluster services
-		Owns(&corev1.Secret{}).  // cluster conn-credential secret
-		Owns(&dpv1alpha1.BackupPolicy{}).
-		Owns(&dpv1alpha1.BackupSchedule{}).
+		Watches(&appsv1.Component{}, handler.EnqueueRequestsFromMapFunc(r.filterShardingResources)).
+		Watches(&corev1.Service{}, handler.EnqueueRequestsFromMapFunc(r.filterShardingResources)). // sharding services
+		Watches(&corev1.Secret{}, handler.EnqueueRequestsFromMapFunc(r.filterShardingResources)).  // sharding shared account secret
 		Complete(r)
+}
+
+func (r *ShardingReconciler) filterShardingResources(_ context.Context, obj client.Object) []reconcile.Request {
+	labels := obj.GetLabels()
+	if v, ok := labels[constant.AppManagedByLabelKey]; !ok || v != constant.AppName {
+		return []reconcile.Request{}
+	}
+	if _, ok := labels[constant.AppInstanceLabelKey]; !ok {
+		return []reconcile.Request{}
+	}
+	if _, ok := labels[constant.KBAppShardingNameLabelKey]; !ok {
+		return []reconcile.Request{}
+	}
+	return []reconcile.Request{
+		{
+			NamespacedName: types.NamespacedName{
+				Namespace: obj.GetNamespace(),
+				Name:      labels[constant.AppInstanceLabelKey],
+			},
+		},
+	}
 }

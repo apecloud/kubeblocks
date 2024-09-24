@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"slices"
@@ -55,7 +56,8 @@ func (t *clusterComponentTransformer) Transform(ctx graph.TransformContext, dag 
 		return nil
 	}
 
-	allCompsUpToDate, err := checkAllCompsUpToDate(transCtx, transCtx.Cluster)
+	// check all the component owned by cluster and do not belong to sharding
+	allCompsUpToDate, err := checkAllCompsUpToDate(transCtx.Context, transCtx.Client, transCtx.Cluster, len(transCtx.ComponentSpecs), withShardingDefined)
 	if err != nil {
 		return err
 	}
@@ -77,7 +79,7 @@ func (t *clusterComponentTransformer) reconcileComponents(transCtx *clusterTrans
 	}
 
 	protoCompSet := sets.KeySet(protoCompSpecMap)
-	runningCompSet, err := component.GetClusterComponentShortNameSet(transCtx.Context, transCtx.Client, cluster)
+	runningCompSet, err := component.GetClusterComponentShortNameSet(transCtx.Context, transCtx.Client, cluster, withShardingDefined)
 	if err != nil {
 		return err
 	}
@@ -155,35 +157,33 @@ func handleCompsInOrder(transCtx *clusterTransformContext, dag *graph.DAG,
 	return nil
 }
 
-func checkAllCompsUpToDate(transCtx *clusterTransformContext, cluster *appsv1.Cluster) (bool, error) {
+func checkAllCompsUpToDate(ctx context.Context, cli client.Reader, cluster *appsv1.Cluster, expectedCompCount int, filter func(obj client.Object) bool) (bool, error) {
 	compList := &appsv1.ComponentList{}
 	labels := constant.GetClusterWellKnownLabels(cluster.Name)
-	if err := transCtx.Client.List(transCtx.Context, compList, client.InNamespace(cluster.Namespace), client.MatchingLabels(labels)); err != nil {
+	if err := cli.List(ctx, compList, client.InNamespace(cluster.Namespace), client.MatchingLabels(labels)); err != nil {
 		return false, err
 	}
-	if len(compList.Items) != len(transCtx.ComponentSpecs) {
-		return false, nil
-	}
+	var validCompCount int
 	for _, comp := range compList.Items {
-		kbGeneration, ok := comp.Annotations[constant.KubeBlocksGenerationKey]
-		if !ok {
-			return false, nil
-		}
-		if comp.Generation != comp.Status.ObservedGeneration || kbGeneration != strconv.FormatInt(cluster.Generation, 10) {
-			return false, nil
+		if filter == nil || filter(&comp) {
+			validCompCount++
+			kbGeneration, ok := comp.Annotations[constant.KubeBlocksGenerationKey]
+			if !ok || comp.Generation != comp.Status.ObservedGeneration || kbGeneration != strconv.FormatInt(cluster.Generation, 10) {
+				return false, nil
+			}
 		}
 	}
-	return true, nil
+	return validCompCount == expectedCompCount, nil
 }
 
 // getRunningCompObject gets the component object from cache snapshot
-func getRunningCompObject(transCtx *clusterTransformContext, cluster *appsv1.Cluster, compName string) (*appsv1.Component, error) {
+func getRunningCompObject(ctx context.Context, cli client.Reader, cluster *appsv1.Cluster, compName string) (*appsv1.Component, error) {
 	compKey := types.NamespacedName{
 		Namespace: cluster.Namespace,
 		Name:      component.FullName(cluster.Name, compName),
 	}
 	comp := &appsv1.Component{}
-	if err := transCtx.Client.Get(transCtx.Context, compKey, comp); err != nil {
+	if err := cli.Get(ctx, compKey, comp); err != nil {
 		return nil, err
 	}
 	return comp, nil
@@ -515,7 +515,7 @@ type deleteCompHandler struct {
 func (h *deleteCompHandler) handle(transCtx *clusterTransformContext, dag *graph.DAG, compName string) error {
 	cluster := transCtx.Cluster
 	graphCli, _ := transCtx.Client.(model.GraphClient)
-	comp, err := getRunningCompObject(transCtx, cluster, compName)
+	comp, err := getRunningCompObject(transCtx.Context, transCtx.Client, cluster, compName)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
@@ -545,7 +545,7 @@ type updateCompHandler struct {
 func (h *updateCompHandler) handle(transCtx *clusterTransformContext, dag *graph.DAG, compName string) error {
 	cluster := transCtx.Cluster
 	graphCli, _ := transCtx.Client.(model.GraphClient)
-	runningComp, getErr := getRunningCompObject(transCtx, cluster, compName)
+	runningComp, getErr := getRunningCompObject(transCtx.Context, transCtx.Client, cluster, compName)
 	if getErr != nil {
 		return getErr
 	}

@@ -26,6 +26,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/common"
@@ -33,15 +34,16 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-// clusterSharedAccountTransformer handles the shared system accounts between components in a cluster.
-type clusterSharedAccountTransformer struct{}
+// shardingSharedAccountTransformer handles the shared system accounts between components in a cluster.
+type shardingSharedAccountTransformer struct{}
 
-var _ graph.Transformer = &clusterSharedAccountTransformer{}
+var _ graph.Transformer = &shardingSharedAccountTransformer{}
 
-func (t *clusterSharedAccountTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	transCtx, _ := ctx.(*clusterTransformContext)
+func (t *shardingSharedAccountTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+	transCtx, _ := ctx.(*shardingTransformContext)
 	if model.IsObjectDeleting(transCtx.Cluster) {
 		return nil
 	}
@@ -51,12 +53,11 @@ func (t *clusterSharedAccountTransformer) Transform(ctx graph.TransformContext, 
 		return nil
 	}
 
-	// currently, we only support shared system account for sharding components
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	return t.reconcileShardingsSharedAccounts(transCtx, graphCli, dag)
 }
 
-func (t *clusterSharedAccountTransformer) reconcileShardingsSharedAccounts(transCtx *clusterTransformContext,
+func (t *shardingSharedAccountTransformer) reconcileShardingsSharedAccounts(transCtx *shardingTransformContext,
 	graphCli model.GraphClient, dag *graph.DAG) error {
 	if len(transCtx.Cluster.Spec.ShardingSpecs) == 0 {
 		return nil
@@ -83,7 +84,7 @@ func (t *clusterSharedAccountTransformer) reconcileShardingsSharedAccounts(trans
 	return nil
 }
 
-func (t *clusterSharedAccountTransformer) needCreateSharedAccount(transCtx *clusterTransformContext,
+func (t *shardingSharedAccountTransformer) needCreateSharedAccount(transCtx *shardingTransformContext,
 	account *appsv1.ComponentSystemAccount, shardingSpec appsv1.ShardingSpec) (bool, error) {
 	// respect the secretRef if it is set
 	if account.SecretRef != nil {
@@ -106,7 +107,7 @@ func (t *clusterSharedAccountTransformer) needCreateSharedAccount(transCtx *clus
 	return true, nil
 }
 
-func (t *clusterSharedAccountTransformer) createNConvertToSharedAccountSecret(transCtx *clusterTransformContext,
+func (t *shardingSharedAccountTransformer) createNConvertToSharedAccountSecret(transCtx *shardingTransformContext,
 	account *appsv1.ComponentSystemAccount, shardingSpec appsv1.ShardingSpec, graphCli model.GraphClient, dag *graph.DAG) error {
 	// Create the shared account secret if it does not exist
 	secretName := constant.GenerateShardingSharedAccountSecretName(transCtx.Cluster.Name, shardingSpec.Name, account.Name)
@@ -125,7 +126,7 @@ func (t *clusterSharedAccountTransformer) createNConvertToSharedAccountSecret(tr
 	return nil
 }
 
-func (t *clusterSharedAccountTransformer) checkShardingSharedAccountSecretExist(transCtx *clusterTransformContext,
+func (t *shardingSharedAccountTransformer) checkShardingSharedAccountSecretExist(transCtx *shardingTransformContext,
 	cluster *appsv1.Cluster, secretName string) (*corev1.Secret, error) {
 	secretKey := types.NamespacedName{
 		Namespace: cluster.Namespace,
@@ -143,13 +144,13 @@ func (t *clusterSharedAccountTransformer) checkShardingSharedAccountSecretExist(
 	}
 }
 
-func (t *clusterSharedAccountTransformer) buildAccountSecret(cluster *appsv1.Cluster,
+func (t *shardingSharedAccountTransformer) buildAccountSecret(cluster *appsv1.Cluster,
 	account appsv1.ComponentSystemAccount, shardingName, secretName string) (*corev1.Secret, error) {
 	password := t.generatePassword(account)
 	return t.buildAccountSecretWithPassword(cluster, account, shardingName, secretName, password)
 }
 
-func (t *clusterSharedAccountTransformer) generatePassword(account appsv1.ComponentSystemAccount) []byte {
+func (t *shardingSharedAccountTransformer) generatePassword(account appsv1.ComponentSystemAccount) []byte {
 	config := account.PasswordConfig
 	passwd, _ := common.GeneratePassword((int)(config.Length), (int)(config.NumDigits), (int)(config.NumSymbols), false, "")
 	switch config.LetterCase {
@@ -161,15 +162,21 @@ func (t *clusterSharedAccountTransformer) generatePassword(account appsv1.Compon
 	return []byte(passwd)
 }
 
-func (t *clusterSharedAccountTransformer) buildAccountSecretWithPassword(cluster *appsv1.Cluster,
+func (t *shardingSharedAccountTransformer) buildAccountSecretWithPassword(cluster *appsv1.Cluster,
 	account appsv1.ComponentSystemAccount, shardingName, secretName string, password []byte) (*corev1.Secret, error) {
 	labels := constant.GetShardingWellKnownLabels(cluster.Name, shardingName)
 	secret := builder.NewSecretBuilder(cluster.Namespace, secretName).
 		AddLabelsInMap(labels).
-		AddLabels(constant.ClusterAccountLabelKey, account.Name).
 		PutData(constant.AccountNameForSecret, []byte(account.Name)).
 		PutData(constant.AccountPasswdForSecret, password).
 		SetImmutable(true).
 		GetObject()
+	// use SetOwnerReference instead of SetControllerReference
+	if err := intctrlutil.SetOwnership(cluster, secret, rscheme, constant.DBClusterFinalizerName, true); err != nil {
+		if _, ok := err.(*controllerutil.AlreadyOwnedError); ok {
+			return secret, nil
+		}
+		return nil, err
+	}
 	return secret, nil
 }

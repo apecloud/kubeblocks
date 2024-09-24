@@ -32,8 +32,4 @@ type ComponentVersionExpansion interface{}
 
 type ConfigConstraintExpansion interface{}
 
-type OpsDefinitionExpansion interface{}
-
-type OpsRequestExpansion interface{}
-
 type ServiceDescriptorExpansion interface{}

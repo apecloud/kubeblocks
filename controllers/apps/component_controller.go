@@ -171,8 +171,6 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			&componentTLSTransformer{Client: r.Client},
 			// rerender parameters after v-scale and h-scale
 			&componentRelatedParametersTransformer{Client: r.Client},
-			// handle component custom volumes
-			&componentCustomVolumesTransformer{},
 			// resolve and build vars for template and Env
 			&componentVarsTransformer{},
 			// provision component system accounts, depend on vars

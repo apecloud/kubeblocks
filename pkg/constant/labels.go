@@ -55,10 +55,8 @@ const (
 	ComponentVersionLabelKey               = "componentversion.kubeblocks.io/name"
 	ConsensusSetAccessModeLabelKey         = "cs.apps.kubeblocks.io/access-mode"
 	AddonNameLabelKey                      = "extensions.kubeblocks.io/addon-name"
-	OpsRequestTypeLabelKey                 = "ops.kubeblocks.io/ops-type"
-	OpsRequestNameLabelKey                 = "ops.kubeblocks.io/ops-name"
-	OpsRequestNamespaceLabelKey            = "ops.kubeblocks.io/ops-namespace"
-	ServiceDescriptorNameLabelKey          = "servicedescriptor.kubeblocks.io/name"
+
+	ServiceDescriptorNameLabelKey = "servicedescriptor.kubeblocks.io/name"
 )
 
 // GetKBConfigMapWellKnownLabels returns the well-known labels for KB ConfigMap

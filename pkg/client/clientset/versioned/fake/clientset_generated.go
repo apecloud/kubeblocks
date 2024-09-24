@@ -30,6 +30,8 @@ import (
 	fakedataprotectionv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/dataprotection/v1alpha1/fake"
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/extensions/v1alpha1"
 	fakeextensionsv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/extensions/v1alpha1/fake"
+	operationsv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/operations/v1alpha1"
+	fakeoperationsv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/operations/v1alpha1/fake"
 	workloadsv1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/workloads/v1"
 	fakeworkloadsv1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/workloads/v1/fake"
 	workloadsv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/workloads/v1alpha1"
@@ -114,6 +116,11 @@ func (c *Clientset) DataprotectionV1alpha1() dataprotectionv1alpha1.Dataprotecti
 // ExtensionsV1alpha1 retrieves the ExtensionsV1alpha1Client
 func (c *Clientset) ExtensionsV1alpha1() extensionsv1alpha1.ExtensionsV1alpha1Interface {
 	return &fakeextensionsv1alpha1.FakeExtensionsV1alpha1{Fake: &c.Fake}
+}
+
+// OperationsV1alpha1 retrieves the OperationsV1alpha1Client
+func (c *Clientset) OperationsV1alpha1() operationsv1alpha1.OperationsV1alpha1Interface {
+	return &fakeoperationsv1alpha1.FakeOperationsV1alpha1{Fake: &c.Fake}
 }
 
 // WorkloadsV1alpha1 retrieves the WorkloadsV1alpha1Client

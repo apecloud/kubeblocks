@@ -98,12 +98,12 @@ func (t *clusterHaltRecoveryTransformer) Transform(ctx graph.TransformContext, d
 		return nil
 	}
 
-	// check clusterDefRef equality
-	if cluster.Spec.ClusterDefRef != lc.Spec.ClusterDefRef {
+	// check clusterDef equality
+	if cluster.Spec.ClusterDef != lc.Spec.ClusterDef {
 		return emitError(metav1.Condition{
 			Type:    appsv1.ConditionTypeHaltRecovery,
 			Reason:  "HaltRecoveryFailed",
-			Message: fmt.Sprintf("not equal to last applied cluster.spec.clusterDefRef %s", lc.Spec.ClusterDefRef),
+			Message: fmt.Sprintf("not equal to last applied cluster.spec.clusterDef %s", lc.Spec.ClusterDef),
 		})
 	}
 
@@ -123,14 +123,6 @@ func (t *clusterHaltRecoveryTransformer) Transform(ctx graph.TransformContext, d
 			// only need to verify [name, componentDefRef, replicas] for equality
 			if comp.Name != lastUsedComp.Name {
 				continue
-			}
-			if comp.ComponentDefRef != lastUsedComp.ComponentDefRef {
-				return emitError(metav1.Condition{
-					Type:   appsv1.ConditionTypeHaltRecovery,
-					Reason: "HaltRecoveryFailed",
-					Message: fmt.Sprintf("not equal to last applied cluster.spec.componentSpecs[%s].componentDefRef=%s",
-						comp.Name, lastUsedComp.ComponentDefRef),
-				})
 			}
 			if comp.Replicas != lastUsedComp.Replicas {
 				return emitError(metav1.Condition{

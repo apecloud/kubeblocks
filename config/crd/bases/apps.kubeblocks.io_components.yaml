@@ -78,7 +78,7 @@ spec:
                 additionalProperties:
                   type: string
                 description: Specifies Annotations to override or add for underlying
-                  Pods.
+                  Pods, PVCs, Account & TLS Secrets, Services Owned by Component.
                 type: object
               compDef:
                 description: Specifies the name of the referenced ComponentDefinition.
@@ -173,25 +173,6 @@ spec:
 
                   These annotations allow the Prometheus installed by KubeBlocks to discover and scrape metrics from the exporter.
                 type: boolean
-              enabledLogs:
-                description: |-
-                  Specifies which types of logs should be collected for the Cluster.
-                  The log types are defined in the `componentDefinition.spec.logConfigs` field with the LogConfig entries.
-
-
-                  The elements in the `enabledLogs` array correspond to the names of the LogConfig entries.
-                  For example, if the `componentDefinition.spec.logConfigs` defines LogConfig entries with
-                  names "slow_query_log" and "error_log",
-                  you can enable the collection of these logs by including their names in the `enabledLogs` array:
-                  ```yaml
-                  enabledLogs:
-                  - slow_query_log
-                  - error_log
-                  ```
-                items:
-                  type: string
-                type: array
-                x-kubernetes-list-type: set
               env:
                 description: List of environment variables to add.
                 items:
@@ -3548,7 +3529,8 @@ spec:
               labels:
                 additionalProperties:
                   type: string
-                description: Specifies Labels to override or add for underlying Pods.
+                description: Specifies Labels to override or add for underlying Pods,
+                  PVCs, Account & TLS Secrets, Services Owned by Component.
                 type: object
               offlineInstances:
                 description: |-
@@ -5005,9 +4987,8 @@ spec:
                 maxLength: 32
                 type: string
               services:
-                description: |-
-                  Overrides Services defined in referenced ComponentDefinition and exposes endpoints that can be accessed
-                  by clients.
+                description: Overrides Services defined in referenced ComponentDefinition
+                  and exposes endpoints that can be accessed by clients.
                 items:
                   description: |-
                     ComponentService defines a service that would be exposed as an inter-component service within a Cluster.

@@ -33,7 +33,6 @@ import (
 	"go.uber.org/zap/zapcore"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
@@ -59,7 +58,6 @@ var testEnv *envtest.Environment
 var ctx context.Context
 var cancel context.CancelFunc
 var testCtx testutil.TestContext
-var clusterRecorder record.EventRecorder
 var logger logr.Logger
 
 func init() {

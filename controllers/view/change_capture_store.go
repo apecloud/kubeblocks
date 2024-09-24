@@ -20,31 +20,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package view
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/tools/record"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
-type mockEventRecorder struct {
-	store ChangeCaptureStore
+type ChangeCaptureStore interface {
+	Insert(object client.Object, capture bool) error
+	GetChanges() []viewv1.ObjectChange
 }
 
-func (r *mockEventRecorder) Event(object runtime.Object, eventtype, reason, message string) {
+type changeCaptureStore struct {
+	scheme        *runtime.Scheme
+	i18nResources *corev1.ConfigMap
+	store         map[model.GVKNObjKey]client.Object
+	changes       []viewv1.ObjectChange
+}
+
+func (s *changeCaptureStore) Insert(object client.Object, capture bool) error {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (r *mockEventRecorder) Eventf(object runtime.Object, eventtype, reason, messageFmt string, args ...interface{}) {
+func (s *changeCaptureStore) GetChanges() []viewv1.ObjectChange {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (r *mockEventRecorder) AnnotatedEventf(object runtime.Object, annotations map[string]string, eventtype, reason, messageFmt string, args ...interface{}) {
-	//TODO implement me
-	panic("implement me")
+func newChangeCaptureStore(scheme *runtime.Scheme, resource *corev1.ConfigMap) ChangeCaptureStore {
+	return &changeCaptureStore{
+		scheme:        scheme,
+		i18nResources: resource,
+	}
 }
 
-func newMockEventRecorder(store ChangeCaptureStore) record.EventRecorder {
-	return &mockEventRecorder{store: store}
-}
-
-var _ record.EventRecorder = &mockEventRecorder{}
+var _ ChangeCaptureStore = &changeCaptureStore{}

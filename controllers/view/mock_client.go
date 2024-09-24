@@ -26,13 +26,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
 type mockClient struct {
 	realClient client.Client
-	store      map[model.GVKNObjKey]client.Object
+	store      ChangeCaptureStore
 }
 
 func (c *mockClient) Get(ctx context.Context, objKey client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
@@ -100,7 +98,7 @@ func (c *mockClient) IsObjectNamespaced(obj runtime.Object) (bool, error) {
 	panic("implement me")
 }
 
-func newMockClient(realClient client.Client, store map[model.GVKNObjKey]client.Object) client.Client {
+func newMockClient(realClient client.Client, store ChangeCaptureStore) client.Client {
 	return &mockClient{
 		realClient: realClient,
 		store:      store,

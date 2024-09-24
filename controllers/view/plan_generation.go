@@ -24,10 +24,10 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
@@ -76,14 +76,14 @@ func (g *planGenerator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.R
 	}
 
 	// create mock client, mock event recorder, mock kbagent client
-	store := make(map[model.GVKNObjKey]client.Object)
+	store := newChangeCaptureStore(g.cli.Scheme(), i18nResource)
 	mClient := newMockClient(g.cli, store)
 	mEventRecorder := newMockEventRecorder(store)
 	// build reconciler tree based on ownership rules:
 	// 1. each gvk has a corresponding reconciler
 	// 2. mock K8s native object reconciler
 	// 3. encapsulate KB controller as reconciler
-	reconcilerTree, err := newReconcilerTree(viewDef.Spec.OwnershipRules, mClient, mEventRecorder)
+	reconcilerTree, err := newReconcilerTree(g.ctx, mClient, mEventRecorder, viewDef.Spec.OwnershipRules)
 	if err != nil {
 		return kubebuilderx.Commit, err
 	}
@@ -98,26 +98,10 @@ func (g *planGenerator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.R
 
 	// start plan generation loop
 	for {
-		// deepcopy object store into old store
-		oldStore := deepCopyStore(store)
 		// run reconciler tree
 		if err = reconcilerTree.Run(); err != nil {
 			return kubebuilderx.Commit, err
 		}
-		// compare object store(new store) to old store
-		oldSet := sets.KeySet(oldStore)
-		newSet := sets.KeySet(store)
-		createSet := newSet.Difference(oldSet)
-		updateSet := newSet.Intersection(oldSet)
-		deleteSet := oldSet.Difference(newSet)
-		// append changes to status.plan
-		var planSlice []viewv1.ObjectChange
-		changes := buildChanges(createSet, oldStore, store, viewv1.ObjectCreationType, i18nResource, viewDef.Spec.Locale, plan.Spec.Locale)
-		planSlice = append(planSlice, changes...)
-		changes = buildChanges(updateSet, oldStore, store, viewv1.ObjectUpdateType, i18nResource, viewDef.Spec.Locale, plan.Spec.Locale)
-		planSlice = append(planSlice, changes...)
-		changes = buildChanges(deleteSet, oldStore, store, viewv1.ObjectDeletionType, i18nResource, viewDef.Spec.Locale, plan.Spec.Locale)
-		planSlice = append(planSlice, changes...)
 		//
 		// state evaluation
 		// if true, break
@@ -134,18 +118,21 @@ func (g *planGenerator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.R
 			break
 		}
 	}
+	plan.Status.ObservedPlanGeneration = plan.Generation
+	plan.Status.ObservedTargetGeneration = root.Generation
+	plan.Status.Phase = "Succeed"
+	// TODO(free6om): update status.currentObjectTree
+	// TODO(free6om): update status.desiredObjectTree
+	changes := store.GetChanges()
+	slices.SortStableFunc(changes, func(a, b viewv1.ObjectChange) bool {
+		return a.Revision < b.Revision
+	})
+	plan.Status.Plan = changes
+	// TODO(free6om): update plan summary
 	//
 	// TODO(free6om): put the plan generation loop into a timeout goroutine
 
 	return kubebuilderx.Continue, nil
-}
-
-func deepCopyStore(store map[model.GVKNObjKey]client.Object) map[model.GVKNObjKey]client.Object {
-	newStore := make(map[model.GVKNObjKey]client.Object, len(store))
-	for key, object := range store {
-		newStore[key] = object.DeepCopyObject().(client.Object)
-	}
-	return newStore
 }
 
 func applyDesiredSpec(desiredSpec string, obj client.Object) error {
@@ -206,13 +193,15 @@ func applyDesiredSpec(desiredSpec string, obj client.Object) error {
 	return nil
 }
 
-func loadCurrentObjectTree(ctx context.Context, cli client.Client, root *appsv1alpha1.Cluster, ownershipRules []viewv1.OwnershipRule, store map[model.GVKNObjKey]client.Object) error {
+func loadCurrentObjectTree(ctx context.Context, cli client.Client, root *appsv1alpha1.Cluster, ownershipRules []viewv1.OwnershipRule, store ChangeCaptureStore) error {
 	_, objectMap, err := getObjectsFromCache(ctx, cli, root, ownershipRules)
 	if err != nil {
 		return err
 	}
-	for key, object := range objectMap {
-		store[key] = object
+	for _, object := range objectMap {
+		if err := store.Insert(object, false); err != nil {
+			return err
+		}
 	}
 	return nil
 }

@@ -79,6 +79,9 @@ var _ = Describe("Upgrade OpsRequest", func() {
 		_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 		Expect(err).ShouldNot(HaveOccurred())
 		mockComponentIsOperating(opsRes.Cluster, appsv1.UpdatingClusterCompPhase, defaultCompName)
+		Expect(testapps.ChangeObjStatus(&testCtx, opsRes.OpsRequest, func() {
+			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsRunningPhase
+		})).Should(Succeed())
 	}
 
 	mockClusterRunning := func(clusterObject *appsv1.Cluster) {
@@ -251,6 +254,12 @@ var _ = Describe("Upgrade OpsRequest", func() {
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest), func(g Gomega, ops *opsv1alpha1.OpsRequest) {
 				g.Expect(ops.Status.LastConfiguration.Components[defaultCompName].ComponentDefinitionName).Should(Equal(compDef1.Name))
 			})).Should(Succeed())
+
+			By("the ops is expected to be Running when the component phase is in a terminal state but progress is not completed")
+			mockComponentIsOperating(opsRes.Cluster, appsv1.RunningClusterCompPhase, defaultCompName)
+			_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsRunningPhase))
 
 			By("expect upgrade successfully with the image that is provided in the specified componentDefinition")
 			mockPodsAppliedImage(opsRes.Cluster, release2)

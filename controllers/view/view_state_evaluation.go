@@ -84,7 +84,7 @@ func (s *stateEvaluation) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx
 	latestReconciliationCycleStart := 0
 	for i := len(view.Status.View) - 1; i >= 0; i-- {
 		change := view.Status.View[i]
-		objType := objectRefToType(&change.ObjectReference)
+		objType := objectReferenceToType(&change.ObjectReference)
 		if *objType != clusterType {
 			continue
 		}

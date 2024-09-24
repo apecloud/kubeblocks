@@ -632,7 +632,11 @@ func (in *ReconciliationViewStatus) DeepCopyInto(out *ReconciliationViewStatus) 
 		*out = new(ObjectTreeNode)
 		(*in).DeepCopyInto(*out)
 	}
-	in.PlanSummary.DeepCopyInto(&out.PlanSummary)
+	if in.PlanSummary != nil {
+		in, out := &in.PlanSummary, &out.PlanSummary
+		*out = new(PlanSummary)
+		(*in).DeepCopyInto(*out)
+	}
 	in.ViewSummary.DeepCopyInto(&out.ViewSummary)
 	if in.Plan != nil {
 		in, out := &in.Plan, &out.Plan

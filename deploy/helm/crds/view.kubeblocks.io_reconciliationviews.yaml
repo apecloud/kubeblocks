@@ -613,10 +613,7 @@ spec:
                 type: object
             required:
             - currentObjectTree
-            - desiredObjectTree
             - initialObjectTree
-            - plan
-            - planSummary
             - view
             - viewSummary
             type: object

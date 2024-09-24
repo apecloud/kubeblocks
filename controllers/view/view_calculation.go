@@ -153,6 +153,72 @@ func (c *viewCalculator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.
 		return kubebuilderx.Commit, err
 	}
 
+	// update view summary
+	initialObjectSet := sets.New[model.GVKNObjKey]()
+	initialObjects, err := c.getAllObjectsFrom(view.Status.InitialObjectTree)
+	if err != nil {
+		return kubebuilderx.Commit, err
+	}
+	for _, obj := range initialObjects {
+		objKey, err := getObjectRef(obj, c.scheme)
+		if err != nil {
+			return kubebuilderx.Commit, err
+		}
+		initialObjectSet.Insert(*objKey)
+	}
+	createSet = newObjectSet.Difference(initialObjectSet)
+	updateSet = newObjectSet.Intersection(initialObjectSet)
+	deleteSet = initialObjectSet.Difference(newObjectSet)
+	summaryMap := make(map[viewv1.ObjectType]*viewv1.ObjectSummary)
+	doCount := func(s sets.Set[model.GVKNObjKey], summaryUpdater func(summary *viewv1.ObjectSummary)) {
+		for objectRef := range s {
+			key := *objectRefToType(&objectRef)
+			summary, ok := summaryMap[key]
+			if !ok {
+				summary = &viewv1.ObjectSummary{
+					Type:  key,
+					Total: 0,
+				}
+				summaryMap[key] = summary
+			}
+			if summary.ChangeSummary == nil {
+				summary.ChangeSummary = &viewv1.ObjectChangeSummary{}
+			}
+			summaryUpdater(summary)
+		}
+	}
+	doCount(createSet, func(summary *viewv1.ObjectSummary) {
+		summary.Total += 1
+		if summary.ChangeSummary.Added == nil {
+			summary.ChangeSummary.Added = pointer.Int32(0)
+		}
+		*summary.ChangeSummary.Added += 1
+	})
+	doCount(updateSet, func(summary *viewv1.ObjectSummary) {
+		summary.Total += 1
+		if summary.ChangeSummary.Updated == nil {
+			summary.ChangeSummary.Updated = pointer.Int32(0)
+		}
+		*summary.ChangeSummary.Updated += 1
+	})
+	doCount(deleteSet, func(summary *viewv1.ObjectSummary) {
+		if summary.ChangeSummary.Deleted == nil {
+			summary.ChangeSummary.Deleted = pointer.Int32(0)
+		}
+		*summary.ChangeSummary.Deleted += 1
+	})
+	var objectSummaries []viewv1.ObjectSummary
+	for _, summary := range summaryMap {
+		objectSummaries = append(objectSummaries, *summary)
+	}
+	slices.SortStableFunc(objectSummaries, func(a, b viewv1.ObjectSummary) bool {
+		if a.Type.APIVersion != b.Type.APIVersion {
+			return a.Type.APIVersion < b.Type.APIVersion
+		}
+		return a.Type.Kind < b.Type.Kind
+	})
+	view.Status.ViewSummary.ObjectSummaries = objectSummaries
+
 	return kubebuilderx.Continue, nil
 }
 

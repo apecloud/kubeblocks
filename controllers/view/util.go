@@ -46,7 +46,7 @@ func objectTypeToGVK(objectType *viewv1.ObjectType) (*schema.GroupVersionKind, e
 	return &gvk, nil
 }
 
-func objectRefToType(objectRef *corev1.ObjectReference) *viewv1.ObjectType {
+func objectReferenceToType(objectRef *corev1.ObjectReference) *viewv1.ObjectType {
 	return &viewv1.ObjectType{
 		APIVersion: objectRef.APIVersion,
 		Kind:       objectRef.Kind,
@@ -79,6 +79,13 @@ func objectRefToReference(objectRef model.GVKNObjKey, uid types.UID, resourceVer
 		Name:            objectRef.Name,
 		UID:             uid,
 		ResourceVersion: resourceVersion,
+	}
+}
+
+func objectRefToType(objectRef *model.GVKNObjKey) *viewv1.ObjectType {
+	return &viewv1.ObjectType{
+		APIVersion: objectRef.GroupVersionKind.GroupVersion().String(),
+		Kind:       objectRef.Kind,
 	}
 }
 

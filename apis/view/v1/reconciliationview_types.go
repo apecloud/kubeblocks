@@ -62,6 +62,7 @@ type ReconciliationViewStatus struct {
 
 	// DesiredObjectTree specifies the object tree if the spec.desiredSpec is applied.
 	//
+	// +optional
 	DesiredObjectTree *ObjectTreeNode `json:"desiredObjectTree"`
 
 	// CurrentObjectTree specifies the current object tree.
@@ -71,7 +72,8 @@ type ReconciliationViewStatus struct {
 
 	// PlanSummary summarizes the desired state by comparing it to the initial state.
 	//
-	PlanSummary PlanSummary `json:"planSummary"`
+	// +optional
+	PlanSummary *PlanSummary `json:"planSummary"`
 
 	// ViewSummary summarizes the current state by comparing it to the initial state.
 	//
@@ -79,6 +81,7 @@ type ReconciliationViewStatus struct {
 
 	// Plan describes the detail reconciliation process when the current spec of the TargetObject is fully applied.
 	//
+	// +optional
 	Plan []ObjectChange `json:"plan"`
 
 	// View describes the detail reconciliation progress ongoing.

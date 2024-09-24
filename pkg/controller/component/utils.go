@@ -21,11 +21,21 @@ package component
 
 import (
 	"context"
+	"fmt"
+	"net/http"
+	"os"
 	"regexp"
 	"slices"
 	"strings"
+	"sync"
+	"time"
 
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/portforward"
+	"k8s.io/client-go/transport/spdy"
+	ctlruntime "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -157,3 +167,97 @@ var (
 )
 
 type mockHostNetworkPortManagerKey struct{}
+
+type PortForwardManager struct {
+	pfs []*portforward.PortForwarder
+	mu  sync.Mutex
+}
+
+func NewPortForwardManager() *PortForwardManager {
+	return &PortForwardManager{
+		pfs: make([]*portforward.PortForwarder, 0),
+		mu:  sync.Mutex{},
+	}
+}
+
+func (pfm *PortForwardManager) NewPortForwarder(namespace, podName string, podPort int32) (int32, chan error, error) {
+	clientSet, restConfig, err := getK8sClientSet()
+	if err != nil {
+		return -1, nil, err
+	}
+	return pfm.setupPortForward(restConfig, clientSet, namespace, podName, podPort)
+}
+
+func (pfm *PortForwardManager) setupPortForward(restConfig *rest.Config, clientset *kubernetes.Clientset, namespace, podName string, podPort int32) (int32, chan error, error) {
+	req := clientset.CoreV1().RESTClient().Post().
+		Resource("pods").
+		Namespace(namespace).
+		Name(podName).
+		SubResource("portforward")
+
+	transport, upgrader, err := spdy.RoundTripperFor(restConfig)
+	if err != nil {
+		return -1, nil, err
+	}
+
+	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport}, "POST", req.URL())
+
+	stopChan := make(chan struct{}, 1)
+	readyChan := make(chan struct{})
+
+	localPort := "0"
+	ports := []string{fmt.Sprintf("%s:%d", localPort, podPort)}
+
+	pf, err := portforward.New(dialer, ports, stopChan, readyChan, os.Stdout, os.Stderr)
+	if err != nil {
+		return -1, nil, err
+	}
+
+	pfm.addPortForwarder(pf)
+
+	errChan := make(chan error, 1)
+	go func(errChan chan error) {
+		if err := pf.ForwardPorts(); err != nil {
+			errChan <- err
+		}
+	}(errChan)
+
+	select {
+	case <-readyChan:
+		portList, err := pf.GetPorts()
+		if err != nil || len(portList) == 0 {
+			return -1, nil, fmt.Errorf("get local port error")
+		}
+		return int32(portList[0].Local), errChan, nil
+	case <-time.After(10 * time.Second):
+		close(stopChan)
+		return -1, nil, fmt.Errorf("port-forward timeout")
+	}
+}
+
+func (pfm *PortForwardManager) addPortForwarder(pf *portforward.PortForwarder) {
+	pfm.mu.Lock()
+	defer pfm.mu.Unlock()
+	pfm.pfs = append(pfm.pfs, pf)
+}
+
+func (pfm *PortForwardManager) CloseAll() {
+	pfm.mu.Lock()
+	defer pfm.mu.Unlock()
+	for _, p := range pfm.pfs {
+		p.Close()
+	}
+	pfm.pfs = nil
+}
+
+func getK8sClientSet() (*kubernetes.Clientset, *rest.Config, error) {
+	restConfig, err := ctlruntime.GetConfig()
+	if err != nil {
+		return nil, nil, err
+	}
+	clientSet, err := kubernetes.NewForConfig(restConfig)
+	if err != nil {
+		return nil, nil, err
+	}
+	return clientSet, restConfig, nil
+}

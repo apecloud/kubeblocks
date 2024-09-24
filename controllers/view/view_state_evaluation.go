@@ -22,6 +22,7 @@ package view
 import (
 	"context"
 	"fmt"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/checker/decls"
@@ -93,11 +94,12 @@ func (s *stateEvaluation) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx
 			return kubebuilderx.Commit, err
 		}
 		obj, err := s.store.Get(objectRef, change.Revision)
-		if err != nil {
+		if err != nil && !apierrors.IsNotFound(err){
 			return kubebuilderx.Commit, err
 		}
+		// handle revision lost after controller restarted
 		if obj == nil {
-			return kubebuilderx.Commit, fmt.Errorf("object %s not found", change.ObjectReference)
+			continue
 		}
 		expr := viewDef.Spec.StateEvaluationExpression
 		if view.Spec.StateEvaluationExpression != nil {

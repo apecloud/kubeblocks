@@ -23,6 +23,7 @@ import (
 	"container/list"
 	"context"
 	"fmt"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"strconv"
 
@@ -100,19 +101,9 @@ func (c *viewCalculator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.
 	}
 
 	// build old object set from view.status.currentObjectTree
-	oldObjectMap := make(map[model.GVKNObjKey]client.Object)
-	oldObjectSet := sets.New[model.GVKNObjKey]()
-	oldObjects, err := c.getAllObjectsFrom(view.Status.CurrentObjectTree)
+	oldObjectSet, oldObjectMap, err := c.getAllObjectsFrom(view.Status.CurrentObjectTree)
 	if err != nil {
 		return kubebuilderx.Commit, err
-	}
-	for _, obj := range oldObjects {
-		objKey, err := getObjectRef(obj, c.scheme)
-		if err != nil {
-			return kubebuilderx.Commit, err
-		}
-		oldObjectSet.Insert(*objKey)
-		oldObjectMap[*objKey] = obj
 	}
 
 	// calculate createSet, deleteSet and updateSet
@@ -154,23 +145,15 @@ func (c *viewCalculator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.
 	}
 
 	// update view summary
-	initialObjectSet := sets.New[model.GVKNObjKey]()
-	initialObjects, err := c.getAllObjectsFrom(view.Status.InitialObjectTree)
+	initialObjectSet, initialObjectMap, err := c.getAllObjectsFrom(view.Status.InitialObjectTree)
 	if err != nil {
 		return kubebuilderx.Commit, err
-	}
-	for _, obj := range initialObjects {
-		objKey, err := getObjectRef(obj, c.scheme)
-		if err != nil {
-			return kubebuilderx.Commit, err
-		}
-		initialObjectSet.Insert(*objKey)
 	}
 	createSet = newObjectSet.Difference(initialObjectSet)
 	updateSet = newObjectSet.Intersection(initialObjectSet)
 	deleteSet = initialObjectSet.Difference(newObjectSet)
 	summaryMap := make(map[viewv1.ObjectType]*viewv1.ObjectSummary)
-	doCount := func(s sets.Set[model.GVKNObjKey], summaryUpdater func(summary *viewv1.ObjectSummary)) {
+	doCount := func(s sets.Set[model.GVKNObjKey], summaryUpdater func(objectRef *model.GVKNObjKey, summary *viewv1.ObjectSummary)) {
 		for objectRef := range s {
 			key := *objectRefToType(&objectRef)
 			summary, ok := summaryMap[key]
@@ -184,24 +167,29 @@ func (c *viewCalculator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.
 			if summary.ChangeSummary == nil {
 				summary.ChangeSummary = &viewv1.ObjectChangeSummary{}
 			}
-			summaryUpdater(summary)
+			summaryUpdater(&objectRef, summary)
 		}
 	}
-	doCount(createSet, func(summary *viewv1.ObjectSummary) {
+	doCount(createSet, func(_ *model.GVKNObjKey, summary *viewv1.ObjectSummary) {
 		summary.Total += 1
 		if summary.ChangeSummary.Added == nil {
 			summary.ChangeSummary.Added = pointer.Int32(0)
 		}
 		*summary.ChangeSummary.Added += 1
 	})
-	doCount(updateSet, func(summary *viewv1.ObjectSummary) {
+	doCount(updateSet, func(objectRef *model.GVKNObjKey, summary *viewv1.ObjectSummary) {
+		initialObj, _ := initialObjectMap[*objectRef]
+		newObj, _ := newObjectMap[*objectRef]
 		summary.Total += 1
+		if initialObj != nil && newObj != nil && initialObj.GetResourceVersion() == newObj.GetResourceVersion() {
+			return
+		}
 		if summary.ChangeSummary.Updated == nil {
 			summary.ChangeSummary.Updated = pointer.Int32(0)
 		}
 		*summary.ChangeSummary.Updated += 1
 	})
-	doCount(deleteSet, func(summary *viewv1.ObjectSummary) {
+	doCount(deleteSet, func(_ *model.GVKNObjKey,summary *viewv1.ObjectSummary) {
 		if summary.ChangeSummary.Deleted == nil {
 			summary.ChangeSummary.Deleted = pointer.Int32(0)
 		}
@@ -236,7 +224,8 @@ func buildChanges(objKeySet sets.Set[model.GVKNObjKey], oldObjectMap, newObjectM
 		if changeType == viewv1.ObjectDeletionType {
 			obj = oldObj
 		}
-		if changeType == viewv1.ObjectUpdateType && oldObj.GetResourceVersion() == newObj.GetResourceVersion() {
+		if changeType == viewv1.ObjectUpdateType &&
+			(oldObj == nil || newObj == nil  || oldObj.GetResourceVersion() == newObj.GetResourceVersion()) {
 			continue
 		}
 		change := viewv1.ObjectChange{
@@ -268,6 +257,7 @@ func formatDescription(oldObj, newObj client.Object, changeType viewv1.ObjectCha
 		return ""
 	}
 	// TODO(free6om): finish me
+	// TODO(free6om): handle nil oldObj(that lost after controller restarted)
 	return string(changeType)
 }
 
@@ -319,31 +309,36 @@ func (c *viewCalculator) getSecondaryObjectsOf(obj client.Object, ownershipRules
 	return secondaries, nil
 }
 
-func (c *viewCalculator) getAllObjectsFrom(tree *viewv1.ObjectTreeNode) ([]client.Object, error) {
+func (c *viewCalculator) getAllObjectsFrom(tree *viewv1.ObjectTreeNode) (sets.Set[model.GVKNObjKey], map[model.GVKNObjKey]client.Object, error) {
 	if tree == nil {
-		return nil, nil
+		return nil, nil, nil
 	}
 	objectRef, err := objectReferenceToRef(&tree.Primary)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	revision := parseRevision(tree.Primary.ResourceVersion)
 	obj, err := c.store.Get(objectRef, revision)
-	if err != nil {
-		return nil, err
+	if err != nil && !apierrors.IsNotFound(err) {
+		return nil, nil, err
 	}
-	var objects []client.Object
+	objectRefSet := sets.New(*objectRef)
+	objectMap := make(map[model.GVKNObjKey]client.Object)
 	if obj != nil {
-		objects = append(objects, obj)
+		objectMap[*objectRef] = obj
+
 	}
 	for _, treeNode := range tree.Secondaries {
-		secondaries, err := c.getAllObjectsFrom(treeNode)
+		secondaryRefSet, secondaryMap, err := c.getAllObjectsFrom(treeNode)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		objects = append(objects, secondaries...)
+		objectRefSet.Insert(secondaryRefSet.UnsortedList()...)
+		for key, object := range secondaryMap {
+			objectMap[key] = object
+		}
 	}
-	return objects, nil
+	return objectRefSet, objectMap, nil
 }
 
 func parseMatchingLabels(obj client.Object, criteria *viewv1.OwnershipCriteria) (client.MatchingLabels, error) {

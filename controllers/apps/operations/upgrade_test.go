@@ -87,6 +87,9 @@ var _ = Describe("Upgrade OpsRequest", func() {
 		Expect(err).ShouldNot(HaveOccurred())
 		mockComponentIsOperating(opsRes.Cluster, appsv1alpha1.UpdatingClusterCompPhase,
 			consensusComp, statelessComp, statefulComp)
+		Expect(testapps.ChangeObjStatus(&testCtx, opsRes.OpsRequest, func() {
+			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsRunningPhase
+		})).Should(Succeed())
 	}
 
 	mockClusterRunning := func(clusterObject *appsv1alpha1.Cluster) {
@@ -253,6 +256,12 @@ var _ = Describe("Upgrade OpsRequest", func() {
 
 			By("mock upgrade OpsRequest phase is Running")
 			makeUpgradeOpsIsRunning(reqCtx, opsRes)
+
+			By("the ops is expected to be Running when the component phase is in a terminal state but progress is not completed")
+			mockComponentIsOperating(opsRes.Cluster, appsv1alpha1.RunningClusterCompPhase, consensusComp)
+			_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(appsv1alpha1.OpsRunningPhase))
 
 			By("expect upgrade successfully")
 			_ = testapps.MockInstanceSetPod(&testCtx, nil, clusterName, statelessComp, fmt.Sprintf(clusterName+"-"+statelessComp+"-0"), "", "")

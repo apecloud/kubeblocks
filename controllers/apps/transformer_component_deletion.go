@@ -72,7 +72,7 @@ func (t *componentDeletionTransformer) Transform(ctx graph.TransformContext, dag
 	if err != nil {
 		return err
 	}
-	ml := constant.GetComponentWellKnownLabels(cluster.Name, compShortName)
+	ml := constant.GetCompLabels(cluster.Name, compShortName)
 
 	compScaleIn, ok := comp.Annotations[constant.ComponentScaleInAnnotationKey]
 	if ok && compScaleIn == trueVal {

@@ -109,8 +109,8 @@ var _ = Describe("CustomOps", func() {
 
 			fullCompName := constant.GenerateClusterComponentName(cluster.Name, defaultCompName)
 			compObj = testapps.NewComponentFactory(testCtx.DefaultNamespace, fullCompName, compDefName).
+				AddAnnotations(constant.KBAppClusterUIDKey, string(cluster.UID)).
 				AddLabels(constant.AppInstanceLabelKey, cluster.Name).
-				AddLabels(constant.KBAppClusterUIDLabelKey, string(cluster.UID)).
 				SetReplicas(1).
 				Create(&testCtx).
 				GetObject()

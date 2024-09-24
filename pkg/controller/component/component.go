@@ -52,20 +52,21 @@ func GetClusterName(comp *appsv1.Component) (string, error) {
 }
 
 func GetClusterUID(comp *appsv1.Component) (string, error) {
-	return getCompLabelValue(comp, constant.KBAppClusterUIDLabelKey)
+	return getCompAnnotationValue(comp, constant.KBAppClusterUIDKey)
 }
 
 // BuildComponent builds a new Component object from cluster component spec and definition.
-func BuildComponent(cluster *appsv1.Cluster, compSpec *appsv1.ClusterComponentSpec,
-	labels, annotations map[string]string) (*appsv1.Component, error) {
+func BuildComponent(cluster *appsv1.Cluster, compSpec *appsv1.ClusterComponentSpec, labels, annotations map[string]string) (*appsv1.Component, error) {
 	schedulingPolicy, err := scheduling.BuildSchedulingPolicy(cluster, compSpec)
 	if err != nil {
 		return nil, err
 	}
 	compBuilder := builder.NewComponentBuilder(cluster.Namespace, FullName(cluster.Name, compSpec.Name), compSpec.ComponentDef).
 		AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(cluster.Generation, 10)).
-		AddLabelsInMap(constant.GetComponentWellKnownLabels(cluster.Name, compSpec.Name)).
-		AddLabels(constant.KBAppClusterUIDLabelKey, string(cluster.UID)).
+		AddAnnotations(constant.KBAppClusterUIDKey, string(cluster.UID)).
+		AddAnnotationsInMap(inheritedAnnotations(cluster)).
+		AddAnnotationsInMap(annotations). // annotations added by the cluster controller
+		AddLabelsInMap(constant.GetCompLabelsWithDef(cluster.Name, compSpec.Name, compSpec.ComponentDef, labels)).
 		SetServiceVersion(compSpec.ServiceVersion).
 		SetLabels(compSpec.Labels).
 		SetAnnotations(compSpec.Annotations).
@@ -88,28 +89,46 @@ func BuildComponent(cluster *appsv1.Cluster, compSpec *appsv1.ClusterComponentSp
 		SetRuntimeClassName(cluster.Spec.RuntimeClassName).
 		SetSystemAccounts(compSpec.SystemAccounts).
 		SetStop(compSpec.Stop)
-	if labels != nil {
-		compBuilder.AddLabelsInMap(labels)
-	}
-	if annotations != nil {
-		compBuilder.AddAnnotationsInMap(annotations)
-	}
-	if cluster.Annotations != nil {
-		p, ok := cluster.Annotations[constant.KBAppMultiClusterPlacementKey]
-		if ok {
-			compBuilder.AddAnnotations(constant.KBAppMultiClusterPlacementKey, p)
-		}
-	}
 	return compBuilder.GetObject(), nil
 }
 
-func getCompLabelValue(comp *appsv1.Component, label string) (string, error) {
-	if comp.Labels == nil {
-		return "", fmt.Errorf("required label %s is not provided, component: %s", label, comp.GetName())
+func BuildComponentExt(cluster *appsv1.Cluster, compSpec *appsv1.ClusterComponentSpec, shardingName string,
+	annotations map[string]string) (*appsv1.Component, error) {
+	labels := map[string]string{}
+	if len(shardingName) > 0 {
+		labels[constant.KBAppShardingNameLabelKey] = shardingName
 	}
-	val, ok := comp.Labels[label]
+	return BuildComponent(cluster, compSpec, labels, annotations)
+}
+
+func inheritedAnnotations(cluster *appsv1.Cluster) map[string]string {
+	m := map[string]string{}
+	annotations := cluster.Annotations
+	if annotations != nil {
+		for _, key := range constant.InheritedAnnotations() {
+			if val, ok := annotations[key]; ok {
+				m[key] = val
+			}
+		}
+	}
+	return m
+}
+
+func getCompAnnotationValue(comp *appsv1.Component, annotation string) (string, error) {
+	return getCompValueFromMap(comp, comp.Annotations, "annotation", annotation)
+}
+
+func getCompLabelValue(comp *appsv1.Component, label string) (string, error) {
+	return getCompValueFromMap(comp, comp.Labels, "label", label)
+}
+
+func getCompValueFromMap(comp *appsv1.Component, m map[string]string, tp string, key string) (string, error) {
+	if m == nil {
+		return "", fmt.Errorf("required %s %s is not provided, component: %s", tp, key, comp.GetName())
+	}
+	val, ok := m[key]
 	if !ok {
-		return "", fmt.Errorf("required label %s is not provided, component: %s", label, comp.GetName())
+		return "", fmt.Errorf("required %s %s is not provided, component: %s", tp, key, comp.GetName())
 	}
 	return val, nil
 }

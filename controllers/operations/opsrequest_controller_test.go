@@ -70,7 +70,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			corev1.ResourceCPU:    resource.MustParse("2"),
 			corev1.ResourceMemory: resource.MustParse("4Gi"),
 		}
-		podAnnotationKey4Test = fmt.Sprintf("%s-test", constant.ComponentReplicasAnnotationKey)
+		podAnnotationKey4Test = "component-replicas-test"
 	)
 
 	cleanEnv := func() {

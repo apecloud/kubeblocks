@@ -62,7 +62,7 @@ func (t *componentWorkloadUpgradeTransformer) Transform(ctx graph.TransformConte
 
 	// update pod & pvc & svc labels
 	objectList := []client.ObjectList{&corev1.PersistentVolumeClaimList{}, &corev1.PodList{}, &corev1.ServiceList{}, &corev1.ConfigMapList{}}
-	ml := constant.GetComponentWellKnownLabels(synthesizeComp.ClusterName, synthesizeComp.Name)
+	ml := constant.GetCompLabels(synthesizeComp.ClusterName, synthesizeComp.Name)
 	inNS := client.InNamespace(comp.Namespace)
 	defaultHeadlessSvc := constant.GenerateDefaultComponentHeadlessServiceName(synthesizeComp.ClusterName, synthesizeComp.Name)
 	envCM := instanceset.GetEnvConfigMapName(constant.GenerateClusterComponentName(synthesizeComp.ClusterName, synthesizeComp.Name))

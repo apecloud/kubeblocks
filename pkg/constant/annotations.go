@@ -23,7 +23,7 @@ const (
 	HorizontalScaleBackupPolicyTemplateKey = "apps.kubeblocks.io/horizontal-scale-backup-policy-template"
 )
 
-// annotations for kubeblocks
+// annotations defined by KubeBlocks
 const (
 	ClusterSnapshotAnnotationKey             = "kubeblocks.io/cluster-snapshot"          // ClusterSnapshotAnnotationKey saves the snapshot of cluster.
 	EncryptedSystemAccountsAnnotationKey     = "kubeblocks.io/encrypted-system-accounts" // EncryptedSystemAccountsAnnotationKey saves the encrypted system accounts.
@@ -32,13 +32,13 @@ const (
 	RestartAnnotationKey                     = "kubeblocks.io/restart"                   // RestartAnnotationKey the annotation which notices the StatefulSet/DeploySet to restart
 	RestoreFromBackupAnnotationKey           = "kubeblocks.io/restore-from-backup"
 	RestoreDoneAnnotationKey                 = "kubeblocks.io/restore-done"
-	BackupSourceTargetAnnotationKey          = "kubeblocks.io/backup-source-target"    // RestoreFromBackupAnnotationKey specifies the component to recover from the backup.
-	ComponentReplicasAnnotationKey           = "apps.kubeblocks.io/component-replicas" // ComponentReplicasAnnotationKey specifies the number of pods in replicas
+	BackupSourceTargetAnnotationKey          = "kubeblocks.io/backup-source-target" // RestoreFromBackupAnnotationKey specifies the component to recover from the backup.
 	BackupPolicyTemplateAnnotationKey        = "apps.kubeblocks.io/backup-policy-template"
 	LastAppliedClusterAnnotationKey          = "apps.kubeblocks.io/last-applied-cluster"
 	PVLastClaimPolicyAnnotationKey           = "apps.kubeblocks.io/pv-last-claim-policy"
 	HaltRecoveryAllowInconsistentResAnnotKey = "clusters.apps.kubeblocks.io/allow-inconsistent-resource"
 	KubeBlocksGenerationKey                  = "kubeblocks.io/generation"
+	KBAppClusterUIDKey                       = "apps.kubeblocks.io/cluster-uid"
 	LastRoleSnapshotVersionAnnotationKey     = "apps.kubeblocks.io/last-role-snapshot-version"
 	ComponentScaleInAnnotationKey            = "apps.kubeblocks.io/component-scale-in" // ComponentScaleInAnnotationKey specifies whether the component is scaled in
 
@@ -56,24 +56,12 @@ const (
 	MultiClusterServicePlacementKey = "apps.kubeblocks.io/multi-cluster-service-placement"
 )
 
-// GetKBGenerationAnnotation returns the annotation for kubeblocks generation.
-func GetKBGenerationAnnotation(generation string) map[string]string {
-	return map[string]string{
-		KubeBlocksGenerationKey: generation,
-	}
-}
-
-func GetServiceVersionAnnotation(serviceVersion string) map[string]string {
-	return map[string]string{
-		KBAppServiceVersionKey: serviceVersion,
-	}
-}
-
-// GetKBReservedAnnotationKeys returns the reserved annotation keys for KubeBlocks
-func GetKBReservedAnnotationKeys() []string {
+func InheritedAnnotations() []string {
 	return []string{
-		KubeBlocksGenerationKey,
-		ReconcileAnnotationKey,
-		KBAppServiceVersionKey,
+		RestoreFromBackupAnnotationKey,
+		BackupSourceTargetAnnotationKey,
+		HostNetworkAnnotationKey,
+		FeatureReconciliationInCompactModeAnnotationKey,
+		KBAppMultiClusterPlacementKey,
 	}
 }

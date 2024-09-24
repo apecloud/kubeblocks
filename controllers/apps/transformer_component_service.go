@@ -197,12 +197,13 @@ func (t *componentServiceTransformer) buildService(comp *appsv1.Component,
 	)
 
 	serviceFullName := constant.GenerateComponentServiceName(synthesizeComp.ClusterName, synthesizeComp.Name, service.ServiceName)
-	labels := constant.GetComponentWellKnownLabels(clusterName, compName)
 	builder := builder.NewServiceBuilder(namespace, serviceFullName).
-		AddLabelsInMap(labels).
-		AddLabelsInMap(synthesizeComp.UserDefinedLabels).
+		AddLabelsInMap(constant.GetCompLabels(clusterName, compName)).
+		AddLabelsInMap(synthesizeComp.DynamicLabels).
+		AddLabelsInMap(synthesizeComp.StaticLabels).
 		AddAnnotationsInMap(service.Annotations).
-		AddAnnotationsInMap(synthesizeComp.UserDefinedAnnotations).
+		AddAnnotationsInMap(synthesizeComp.DynamicAnnotations).
+		AddAnnotationsInMap(synthesizeComp.StaticAnnotations).
 		SetSpec(&service.Spec).
 		AddSelectorsInMap(t.builtinSelector(comp)).
 		Optimize4ExternalTraffic()

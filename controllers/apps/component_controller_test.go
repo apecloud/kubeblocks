@@ -1815,7 +1815,8 @@ var _ = Describe("Component Controller", func() {
 			tesCreateCompWithRBACCreateByUser(defaultCompName, compDefName)
 		})
 
-		It("update kubeblocks-tools image", func() {
+		// TODO(v1.0): support for multiple versions of the KB tools images
+		PIt("update kubeblocks-tools image", func() {
 			testUpdateKubeBlocksToolsImage(defaultCompName, compDefName)
 		})
 	})

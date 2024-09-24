@@ -66,7 +66,6 @@ const (
 )
 
 var reconfigureRequiredLabels = []string{
-	constant.AppNameLabelKey,
 	constant.AppInstanceLabelKey,
 	constant.KBAppComponentLabelKey,
 	constant.CMConfigurationTemplateNameLabelKey,

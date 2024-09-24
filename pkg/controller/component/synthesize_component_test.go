@@ -91,10 +91,10 @@ var _ = Describe("synthesized component", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-cluster-comp",
 					Labels: map[string]string{
-						constant.AppInstanceLabelKey:     "test-cluster",
-						constant.KBAppClusterUIDLabelKey: "uuid",
+						constant.AppInstanceLabelKey: "test-cluster",
 					},
 					Annotations: map[string]string{
+						constant.KBAppClusterUIDKey:      "uuid",
 						constant.KubeBlocksGenerationKey: "1",
 					},
 				},
@@ -204,10 +204,10 @@ var _ = Describe("synthesized component", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-cluster-comp",
 					Labels: map[string]string{
-						constant.AppInstanceLabelKey:     "test-cluster",
-						constant.KBAppClusterUIDLabelKey: "uuid",
+						constant.AppInstanceLabelKey: "test-cluster",
 					},
 					Annotations: map[string]string{
+						constant.KBAppClusterUIDKey:      "uuid",
 						constant.KubeBlocksGenerationKey: "1",
 					},
 				},
@@ -278,10 +278,10 @@ var _ = Describe("synthesized component", func() {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-cluster-comp",
 					Labels: map[string]string{
-						constant.AppInstanceLabelKey:     "test-cluster",
-						constant.KBAppClusterUIDLabelKey: "uuid",
+						constant.AppInstanceLabelKey: "test-cluster",
 					},
 					Annotations: map[string]string{
+						constant.KBAppClusterUIDKey:      "uuid",
 						constant.KubeBlocksGenerationKey: "1",
 					},
 				},

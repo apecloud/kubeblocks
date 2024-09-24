@@ -32,11 +32,11 @@ type SynthesizedComponent struct {
 	Namespace                        string            `json:"namespace,omitempty"`
 	ClusterName                      string            `json:"clusterName,omitempty"`
 	ClusterUID                       string            `json:"clusterUID,omitempty"`
-	ClusterGeneration                string            `json:"clusterGeneration,omitempty"`
 	Comp2CompDefs                    map[string]string `json:"comp2CompDefs,omitempty"` // {compName: compDefName}
 	Name                             string            `json:"name,omitempty"`          // the name of the component w/o clusterName prefix
 	FullCompName                     string            `json:"fullCompName,omitempty"`  // the full name of the component w/ clusterName prefix
-	CompDefName                      string            `json:"compDefName,omitempty"`   // the name of the componentDefinition
+	Generation                       string
+	CompDefName                      string `json:"compDefName,omitempty"` // the name of the componentDefinition
 	ServiceKind                      string
 	ServiceVersion                   string                                 `json:"serviceVersion,omitempty"`
 	Replicas                         int32                                  `json:"replicas"`
@@ -49,28 +49,30 @@ type SynthesizedComponent struct {
 	TLSConfig                        *kbappsv1.TLSConfig                    `json:"tlsConfig"`
 	ServiceAccountName               string                                 `json:"serviceAccountName,omitempty"`
 	ServiceReferences                map[string]*kbappsv1.ServiceDescriptor `json:"serviceReferences,omitempty"`
-	UserDefinedLabels                map[string]string
-	UserDefinedAnnotations           map[string]string
-	TemplateVars                     map[string]any                      `json:"templateVars,omitempty"`
-	EnvVars                          []corev1.EnvVar                     `json:"envVars,omitempty"`
-	EnvFromSources                   []corev1.EnvFromSource              `json:"envFromSources,omitempty"`
-	Instances                        []kbappsv1.InstanceTemplate         `json:"instances,omitempty"`
-	OfflineInstances                 []string                            `json:"offlineInstances,omitempty"`
-	Roles                            []kbappsv1.ReplicaRole              `json:"roles,omitempty"`
-	Labels                           map[string]string                   `json:"labels,omitempty"`
-	Annotations                      map[string]string                   `json:"annotations,omitempty"`
-	UpdateStrategy                   *kbappsv1.UpdateStrategy            `json:"updateStrategy,omitempty"`
-	PodManagementPolicy              *appsv1.PodManagementPolicyType     `json:"podManagementPolicy,omitempty"`
-	ParallelPodManagementConcurrency *intstr.IntOrString                 `json:"parallelPodManagementConcurrency,omitempty"`
-	PodUpdatePolicy                  *kbappsv1.PodUpdatePolicyType       `json:"podUpdatePolicy,omitempty"`
-	PolicyRules                      []rbacv1.PolicyRule                 `json:"policyRules,omitempty"`
-	LifecycleActions                 *kbappsv1.ComponentLifecycleActions `json:"lifecycleActions,omitempty"`
-	SystemAccounts                   []kbappsv1.SystemAccount            `json:"systemAccounts,omitempty"`
-	Volumes                          []kbappsv1.ComponentVolume          `json:"volumes,omitempty"`
-	HostNetwork                      *kbappsv1.HostNetwork               `json:"hostNetwork,omitempty"`
-	ComponentServices                []kbappsv1.ComponentService         `json:"componentServices,omitempty"`
-	MinReadySeconds                  int32                               `json:"minReadySeconds,omitempty"`
-	DisableExporter                  *bool                               `json:"disableExporter,omitempty"`
+	Labels                           map[string]string                      `json:"labels,omitempty"`
+	StaticLabels                     map[string]string                      // labels defined by the component definition
+	DynamicLabels                    map[string]string                      // labels defined by the cluster and component API
+	Annotations                      map[string]string                      `json:"annotations,omitempty"`
+	StaticAnnotations                map[string]string                      // annotations defined by the component definition
+	DynamicAnnotations               map[string]string                      // annotations defined by the cluster and component API
+	TemplateVars                     map[string]any                         `json:"templateVars,omitempty"`
+	EnvVars                          []corev1.EnvVar                        `json:"envVars,omitempty"`
+	EnvFromSources                   []corev1.EnvFromSource                 `json:"envFromSources,omitempty"`
+	Instances                        []kbappsv1.InstanceTemplate            `json:"instances,omitempty"`
+	OfflineInstances                 []string                               `json:"offlineInstances,omitempty"`
+	Roles                            []kbappsv1.ReplicaRole                 `json:"roles,omitempty"`
+	UpdateStrategy                   *kbappsv1.UpdateStrategy               `json:"updateStrategy,omitempty"`
+	PodManagementPolicy              *appsv1.PodManagementPolicyType        `json:"podManagementPolicy,omitempty"`
+	ParallelPodManagementConcurrency *intstr.IntOrString                    `json:"parallelPodManagementConcurrency,omitempty"`
+	PodUpdatePolicy                  *kbappsv1.PodUpdatePolicyType          `json:"podUpdatePolicy,omitempty"`
+	PolicyRules                      []rbacv1.PolicyRule                    `json:"policyRules,omitempty"`
+	LifecycleActions                 *kbappsv1.ComponentLifecycleActions    `json:"lifecycleActions,omitempty"`
+	SystemAccounts                   []kbappsv1.SystemAccount               `json:"systemAccounts,omitempty"`
+	Volumes                          []kbappsv1.ComponentVolume             `json:"volumes,omitempty"`
+	HostNetwork                      *kbappsv1.HostNetwork                  `json:"hostNetwork,omitempty"`
+	ComponentServices                []kbappsv1.ComponentService            `json:"componentServices,omitempty"`
+	MinReadySeconds                  int32                                  `json:"minReadySeconds,omitempty"`
+	DisableExporter                  *bool                                  `json:"disableExporter,omitempty"`
 	Stop                             *bool
 
 	// TODO(xingran): The following fields will be deprecated after KubeBlocks version 0.8.0

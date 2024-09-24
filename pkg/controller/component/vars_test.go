@@ -817,7 +817,7 @@ var _ = Describe("vars", func() {
 						ObjectMeta: metav1.ObjectMeta{
 							Namespace: testCtx.DefaultNamespace,
 							Name:      svcName0,
-							Labels:    constant.GetComponentWellKnownLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
+							Labels:    constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
 						},
 						Spec: corev1.ServiceSpec{
 							Type: corev1.ServiceTypeNodePort,
@@ -834,7 +834,7 @@ var _ = Describe("vars", func() {
 						ObjectMeta: metav1.ObjectMeta{
 							Namespace: testCtx.DefaultNamespace,
 							Name:      svcName1,
-							Labels:    constant.GetComponentWellKnownLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
+							Labels:    constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
 						},
 						Spec: corev1.ServiceSpec{
 							Type: corev1.ServiceTypeNodePort,
@@ -879,7 +879,7 @@ var _ = Describe("vars", func() {
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: testCtx.DefaultNamespace,
 						Name:      lbSvcName,
-						Labels:    constant.GetComponentWellKnownLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
+						Labels:    constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
 					},
 					Spec: corev1.ServiceSpec{
 						Type: corev1.ServiceTypeLoadBalancer,
@@ -932,7 +932,7 @@ var _ = Describe("vars", func() {
 						ObjectMeta: metav1.ObjectMeta{
 							Namespace: testCtx.DefaultNamespace,
 							Name:      lbSvcName0,
-							Labels:    constant.GetComponentWellKnownLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
+							Labels:    constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
 						},
 						Spec: corev1.ServiceSpec{
 							Type: corev1.ServiceTypeLoadBalancer,
@@ -957,7 +957,7 @@ var _ = Describe("vars", func() {
 						ObjectMeta: metav1.ObjectMeta{
 							Namespace: testCtx.DefaultNamespace,
 							Name:      lbSvcName1,
-							Labels:    constant.GetComponentWellKnownLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
+							Labels:    constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
 						},
 						Spec: corev1.ServiceSpec{
 							Type: corev1.ServiceTypeLoadBalancer,
@@ -982,7 +982,7 @@ var _ = Describe("vars", func() {
 						ObjectMeta: metav1.ObjectMeta{
 							Namespace: testCtx.DefaultNamespace,
 							Name:      lbSvcName2,
-							Labels:    constant.GetComponentWellKnownLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
+							Labels:    constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
 						},
 						Spec: corev1.ServiceSpec{
 							Type: corev1.ServiceTypeLoadBalancer,
@@ -1043,7 +1043,7 @@ var _ = Describe("vars", func() {
 						ObjectMeta: metav1.ObjectMeta{
 							Namespace: testCtx.DefaultNamespace,
 							Name:      lbSvcName0,
-							Labels:    constant.GetComponentWellKnownLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
+							Labels:    constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
 						},
 						Spec: corev1.ServiceSpec{
 							Type: corev1.ServiceTypeLoadBalancer,
@@ -1068,7 +1068,7 @@ var _ = Describe("vars", func() {
 						ObjectMeta: metav1.ObjectMeta{
 							Namespace: testCtx.DefaultNamespace,
 							Name:      lbSvcName1,
-							Labels:    constant.GetComponentWellKnownLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
+							Labels:    constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
 						},
 						Spec: corev1.ServiceSpec{
 							Type: corev1.ServiceTypeLoadBalancer,
@@ -1112,7 +1112,7 @@ var _ = Describe("vars", func() {
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: testCtx.DefaultNamespace,
 						Name:      advertisedSvcName,
-						Labels:    constant.GetComponentWellKnownLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
+						Labels:    constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
 					},
 					Spec: corev1.ServiceSpec{
 						Type: corev1.ServiceTypeLoadBalancer,
@@ -1166,7 +1166,7 @@ var _ = Describe("vars", func() {
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: testCtx.DefaultNamespace,
 						Name:      advertisedSvcName,
-						Labels:    constant.GetComponentWellKnownLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
+						Labels:    constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
 					},
 					Spec: corev1.ServiceSpec{
 						Type: corev1.ServiceTypeClusterIP,
@@ -1209,7 +1209,7 @@ var _ = Describe("vars", func() {
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: testCtx.DefaultNamespace,
 						Name:      advertisedSvcName,
-						Labels:    constant.GetComponentWellKnownLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
+						Labels:    constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
 					},
 					Spec: corev1.ServiceSpec{
 						Type: corev1.ServiceTypeLoadBalancer,
@@ -1230,7 +1230,7 @@ var _ = Describe("vars", func() {
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: testCtx.DefaultNamespace,
 						Name:      advertisedSvcName,
-						Labels:    constant.GetComponentWellKnownLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
+						Labels:    constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
 					},
 					Spec: corev1.ServiceSpec{
 						Type: corev1.ServiceTypeLoadBalancer,

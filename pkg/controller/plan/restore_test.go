@@ -33,7 +33,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -136,7 +135,6 @@ var _ = Describe("Restore", func() {
 				AddAppComponentLabel(defaultCompName).
 				AddAppManagedByLabel().
 				AddVolume(volume).
-				AddLabels(constant.ConsensusSetAccessModeLabelKey, string(appsv1alpha1.ReadWrite)).
 				AddContainer(corev1.Container{Name: testapps.DefaultMySQLContainerName, Image: testapps.ApeCloudMySQLImage}).
 				AddNodeName("fake-node-name").
 				Create(&testCtx).GetObject()
@@ -174,8 +172,8 @@ var _ = Describe("Restore", func() {
 			}
 			By("create component object")
 			compObj = testapps.NewComponentFactory(testCtx.DefaultNamespace, cluster.Name+"-"+synthesizedComponent.Name, "").
+				AddAnnotations(constant.KBAppClusterUIDKey, string(cluster.UID)).
 				AddLabels(constant.AppInstanceLabelKey, cluster.Name).
-				AddLabels(constant.KBAppClusterUIDLabelKey, string(cluster.UID)).
 				SetReplicas(1).
 				Create(&testCtx).
 				GetObject()

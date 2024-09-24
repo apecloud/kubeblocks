@@ -94,7 +94,7 @@ func (t *clusterServiceTransformer) buildService(transCtx *clusterTransformConte
 
 	serviceName := constant.GenerateClusterServiceName(cluster.Name, svc.ServiceName)
 	builder := builder.NewServiceBuilder(namespace, serviceName).
-		AddLabelsInMap(constant.GetClusterWellKnownLabels(clusterName)).
+		AddLabelsInMap(constant.GetClusterLabels(clusterName)).
 		AddAnnotationsInMap(svc.Annotations).
 		SetSpec(&svc.Spec).
 		AddSelectorsInMap(t.buildServiceSelector(cluster)).
@@ -154,7 +154,7 @@ func checkComponentRoles(compDef *appsv1.ComponentDefinition, clusterService *ap
 func listOwnedClusterServices(ctx context.Context, cli client.Reader,
 	cluster *appsv1.Cluster, filter func(obj client.Object) bool) (map[string]*corev1.Service, error) {
 	svcList := &corev1.ServiceList{}
-	labels := client.MatchingLabels(constant.GetClusterWellKnownLabels(cluster.Name))
+	labels := client.MatchingLabels(constant.GetClusterLabels(cluster.Name))
 	if err := cli.List(ctx, svcList, labels, client.InNamespace(cluster.Namespace)); err != nil {
 		return nil, err
 	}

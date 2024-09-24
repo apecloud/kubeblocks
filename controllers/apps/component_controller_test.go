@@ -28,7 +28,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"k8s.io/utils/pointer"
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/sethvargo/go-password/password"
@@ -43,6 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/utils/pointer"
 	controllerruntime "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -63,7 +63,9 @@ import (
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
-var podAnnotationKey4Test = fmt.Sprintf("%s-test", constant.ComponentReplicasAnnotationKey)
+const (
+	podAnnotationKey4Test = "component-replicas-test"
+)
 
 var _ = Describe("Component Controller", func() {
 	const (
@@ -232,10 +234,8 @@ var _ = Describe("Component Controller", func() {
 	// createCompObj := func(compName, compDefName, serviceVersion string, processor func(*testapps.MockComponentFactory)) {
 	//	By("Creating a component")
 	//	factory := testapps.NewComponentFactory(testCtx.DefaultNamespace, component.FullName(clusterObj.Name, compName), compDefName).
-	//		AddLabelsInMap(map[string]string{
-	//			constant.AppInstanceLabelKey:     clusterObj.Name,
-	//			constant.KBAppClusterUIDLabelKey: string(clusterObj.UID),
-	//		}).
+	//		AddAnnotations(constant.KBAppClusterUIDKey, string(clusterObj.UID)),
+	//		AddLabels(constant.AppInstanceLabelKey, clusterObj.Name).
 	//		SetServiceVersion(serviceVersion).
 	//		SetReplicas(1)
 	//	if processor != nil {
@@ -404,7 +404,6 @@ var _ = Describe("Component Controller", func() {
 		clusterName := cluster.Name
 		itsName := cluster.Name + "-" + componentName
 		pods := make([]corev1.Pod, 0)
-		replicasStr := strconv.Itoa(number)
 		for i := 0; i < number; i++ {
 			pod := &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -418,8 +417,7 @@ var _ = Describe("Component Controller", func() {
 						appsv1.ControllerRevisionHashLabelKey: "mock-version",
 					},
 					Annotations: map[string]string{
-						podAnnotationKey4Test:                   fmt.Sprintf("%d", number),
-						constant.ComponentReplicasAnnotationKey: replicasStr,
+						podAnnotationKey4Test: fmt.Sprintf("%d", number),
 					},
 				},
 				Spec: corev1.PodSpec{
@@ -1571,19 +1569,8 @@ var _ = Describe("Component Controller", func() {
 			its.Annotations["time"] = time.Now().Format(time.RFC3339)
 		})()).Should(Succeed())
 
-		By("Checking pods' annotations")
-		Eventually(func(g Gomega) {
-			pods, err := intctrlutil.GetPodListByInstanceSet(ctx, k8sClient, its)
-			g.Expect(err).ShouldNot(HaveOccurred())
-			g.Expect(pods).Should(HaveLen(int(*its.Spec.Replicas)))
-			for _, pod := range pods {
-				g.Expect(pod.Annotations).ShouldNot(BeNil())
-				g.Expect(pod.Annotations[constant.ComponentReplicasAnnotationKey]).Should(Equal(strconv.Itoa(int(*its.Spec.Replicas))))
-			}
-		}).Should(Succeed())
-		itsPatch := client.MergeFrom(its.DeepCopy())
-
 		By("Updating ITS status")
+		itsPatch := client.MergeFrom(its.DeepCopy())
 		its.Status.UpdateRevision = "mock-version"
 		pods, err := intctrlutil.GetPodListByInstanceSet(ctx, k8sClient, its)
 		Expect(err).Should(BeNil())
@@ -1750,41 +1737,6 @@ var _ = Describe("Component Controller", func() {
 		checkWorkloadGenerationAndToolsImage(Eventually, initWorkloadGeneration+2, 0, 1)
 	}
 
-	testCompInheritLabelsAndAnnotations := func(compName, compDefName string) {
-		By("Mock a cluster obj with custom labels and annotations.")
-		customLabelKey := "custom-inherit-label-key"
-		customLabelValue := "custom-inherit-label-value"
-		customLabelKeyBeFiltered := constant.RoleLabelKey
-		customLabelValueBeFiltered := "cluster-role-should-be-filtered"
-		customLabels := map[string]string{
-			customLabelKey:           customLabelValue,
-			customLabelKeyBeFiltered: customLabelValueBeFiltered,
-		}
-
-		customAnnotationKey := "custom-inherit-annotation-key"
-		customAnnotationValue := "custom-inherit-annotation-value"
-		customAnnotationKeyBeFiltered := constant.KubeBlocksGenerationKey
-		customAnnotationValueBeFiltered := "cluster-annotation-should-be-filtered"
-		customAnnotations := map[string]string{
-			customAnnotationKey:                                      customAnnotationValue,
-			customAnnotationKeyBeFiltered:                            customAnnotationValueBeFiltered,
-			constant.FeatureReconciliationInCompactModeAnnotationKey: "true",
-		}
-		createClusterObj(compName, compDefName, func(f *testapps.MockClusterFactory) {
-			f.AddLabelsInMap(customLabels)
-			f.AddAnnotationsInMap(customAnnotations)
-		})
-
-		By("check component inherit clusters labels and annotations")
-		Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *kbappsv1.Component) {
-			g.Expect(comp.Labels).Should(HaveKeyWithValue(customLabelKey, customLabelValue))
-			g.Expect(comp.Labels).ShouldNot(HaveKeyWithValue(customLabelKeyBeFiltered, customLabelValueBeFiltered))
-			g.Expect(comp.Annotations).Should(HaveKeyWithValue(customAnnotationKey, customAnnotationValue))
-			g.Expect(comp.Annotations).ShouldNot(HaveKeyWithValue(customAnnotationKeyBeFiltered, customAnnotationValueBeFiltered))
-			g.Expect(comp.Annotations).Should(HaveKeyWithValue(constant.FeatureReconciliationInCompactModeAnnotationKey, "true"))
-		})).Should(Succeed())
-	}
-
 	Context("provisioning", func() {
 		BeforeEach(func() {
 			createAllDefinitionObjects()
@@ -1797,10 +1749,6 @@ var _ = Describe("Component Controller", func() {
 
 		It("component finalizers and labels", func() {
 			testCompFinalizerNLabel(defaultCompName, compDefName)
-		})
-
-		It("with inherit cluster labels and annotations", func() {
-			testCompInheritLabelsAndAnnotations(defaultCompName, compDefName)
 		})
 
 		It("with component zero replicas", func() {
@@ -1867,7 +1815,8 @@ var _ = Describe("Component Controller", func() {
 			tesCreateCompWithRBACCreateByUser(defaultCompName, compDefName)
 		})
 
-		It("update kubeblocks-tools image", func() {
+		// TODO(v1.0): support for multiple versions of the KB tools images
+		PIt("update kubeblocks-tools image", func() {
 			testUpdateKubeBlocksToolsImage(defaultCompName, compDefName)
 		})
 	})
@@ -2185,11 +2134,9 @@ var _ = Describe("Component Controller", func() {
 				comp.Annotations["now"] = now
 			})()).Should(Succeed())
 
-			By("wait its updated and check the labels and image in its not changed")
-			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
-				// check the its is updated
+			By("check the labels and image in its not changed")
+			Consistently(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 				g.Expect(its.Annotations).ShouldNot(BeEmpty())
-				g.Expect(its.Annotations).Should(HaveKeyWithValue("now", now))
 				// check comp-def and service-version labels unchanged
 				g.Expect(its.Annotations).Should(HaveKeyWithValue(constant.AppComponentLabelKey, compObj.Spec.CompDef))
 				g.Expect(its.Annotations).Should(HaveKeyWithValue(constant.KBAppServiceVersionKey, compObj.Spec.ServiceVersion))

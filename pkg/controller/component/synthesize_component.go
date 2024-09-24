@@ -73,12 +73,16 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 		Comp2CompDefs:                    comp2CompDef,
 		Name:                             compName,
 		FullCompName:                     comp.Name,
+		Generation:                       strconv.FormatInt(comp.Generation, 10),
 		CompDefName:                      compDef.Name,
 		ServiceKind:                      compDefObj.Spec.ServiceKind,
 		ServiceVersion:                   comp.Spec.ServiceVersion,
-		ClusterGeneration:                clusterGeneration(cluster, comp),
-		UserDefinedLabels:                comp.Spec.Labels,
-		UserDefinedAnnotations:           comp.Spec.Annotations,
+		Labels:                           comp.Labels,
+		StaticLabels:                     compDef.Spec.Labels,
+		DynamicLabels:                    comp.Spec.Labels,
+		Annotations:                      comp.Annotations,
+		StaticAnnotations:                compDef.Spec.Annotations,
+		DynamicAnnotations:               comp.Spec.Annotations,
 		PodSpec:                          &compDef.Spec.Runtime,
 		HostNetwork:                      compDefObj.Spec.HostNetwork,
 		ComponentServices:                compDefObj.Spec.Services,
@@ -116,9 +120,6 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 	// update resources
 	buildAndUpdateResources(synthesizeComp, comp)
 
-	// build labels and annotations
-	buildLabelsAndAnnotations(compDef, comp, synthesizeComp)
-
 	// build volumes & volumeClaimTemplates
 	buildVolumeClaimTemplates(synthesizeComp, comp)
 	if err = mergeUserDefinedVolumes(synthesizeComp, comp); err != nil {
@@ -149,16 +150,6 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 	}
 
 	return synthesizeComp, nil
-}
-
-func clusterGeneration(cluster *appsv1.Cluster, comp *appsv1.Component) string {
-	if comp != nil && comp.Annotations != nil {
-		if generation, ok := comp.Annotations[constant.KubeBlocksGenerationKey]; ok {
-			return generation
-		}
-	}
-	// back-off to use cluster.Generation
-	return strconv.FormatInt(cluster.Generation, 10)
 }
 
 func buildComp2CompDefs(ctx context.Context, cli client.Reader, cluster *appsv1.Cluster) (map[string]string, error) {
@@ -192,33 +183,6 @@ func buildComp2CompDefs(ctx context.Context, cli client.Reader, cluster *appsv1.
 	}
 
 	return mapping, nil
-}
-
-func buildLabelsAndAnnotations(compDef *appsv1.ComponentDefinition, comp *appsv1.Component, synthesizeComp *SynthesizedComponent) {
-	mergeMaps := func(baseMap, overrideMap map[string]string) map[string]string {
-		for k, v := range overrideMap {
-			baseMap[k] = v
-		}
-		return baseMap
-	}
-
-	if compDef.Spec.Labels != nil || comp.Labels != nil {
-		baseLabels := compDef.Spec.Labels
-		if baseLabels == nil {
-			baseLabels = make(map[string]string)
-		}
-		// override labels from component
-		synthesizeComp.Labels = mergeMaps(baseLabels, comp.Labels)
-	}
-
-	if compDef.Spec.Annotations != nil || comp.Annotations != nil {
-		baseAnnotations := compDef.Spec.Annotations
-		if baseAnnotations == nil {
-			baseAnnotations = make(map[string]string)
-		}
-		// override annotations from component
-		synthesizeComp.Annotations = mergeMaps(baseAnnotations, comp.Annotations)
-	}
 }
 
 func mergeUserDefinedEnv(synthesizedComp *SynthesizedComponent, comp *appsv1.Component) error {

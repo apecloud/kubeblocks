@@ -125,8 +125,8 @@ func mockReconcileResource() (*corev1.ConfigMap, *appsv1beta1.ConfigConstraint, 
 	By("Create a component obj")
 	fullCompName := constant.GenerateClusterComponentName(clusterName, defaultCompName)
 	compObj := testapps.NewComponentFactory(testCtx.DefaultNamespace, fullCompName, compDefObj.Name).
+		AddAnnotations(constant.KBAppClusterUIDKey, string(clusterObj.UID)).
 		AddLabels(constant.AppInstanceLabelKey, clusterName).
-		AddLabels(constant.KBAppClusterUIDLabelKey, string(clusterObj.UID)).
 		SetUID(types.UID(fmt.Sprintf("%s-%s", clusterObj.Name, "test-uid"))).
 		SetReplicas(1).
 		Create(&testCtx).GetObject()

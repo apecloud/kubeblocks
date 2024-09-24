@@ -42,8 +42,8 @@ func buildSvc(its workloads.InstanceSet, labels, selectors map[string]string) *c
 	annotations := ParseAnnotationsOfScope(ServiceScope, its.Annotations)
 	return builder.NewServiceBuilder(its.Namespace, its.Name).
 		AddAnnotationsInMap(annotations).
-		AddLabelsInMap(its.Spec.Service.Labels).
 		AddLabelsInMap(labels).
+		AddLabelsInMap(its.Spec.Service.Labels).
 		AddSelectorsInMap(selectors).
 		AddPorts(its.Spec.Service.Spec.Ports...).
 		SetType(its.Spec.Service.Spec.Type).
@@ -54,7 +54,6 @@ func buildHeadlessSvc(its workloads.InstanceSet, labels, selectors map[string]st
 	annotations := ParseAnnotationsOfScope(HeadlessServiceScope, its.Annotations)
 	hdlBuilder := builder.NewHeadlessServiceBuilder(its.Namespace, getHeadlessSvcName(its.Name)).
 		AddLabelsInMap(labels).
-		AddLabelsInMap(constant.GetKBKnownLabels()).
 		AddSelectorsInMap(selectors).
 		AddAnnotationsInMap(annotations).
 		SetPublishNotReadyAddresses(true)

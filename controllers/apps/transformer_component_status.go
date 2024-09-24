@@ -195,12 +195,11 @@ func (t *componentStatusTransformer) reconcileStatus(transCtx *componentTransfor
 }
 
 func (t *componentStatusTransformer) isWorkloadUpdated() bool {
-	if t.cluster == nil || t.runningITS == nil {
+	if t.comp == nil || t.runningITS == nil {
 		return false
 	}
-	// check whether component spec has been sent to the underlying workload
-	itsComponentGeneration := t.runningITS.GetAnnotations()[constant.KubeBlocksGenerationKey]
-	return itsComponentGeneration == strconv.FormatInt(t.cluster.Generation, 10)
+	generation := t.runningITS.GetAnnotations()[constant.KubeBlocksGenerationKey]
+	return generation == strconv.FormatInt(t.comp.Generation, 10)
 }
 
 // isComponentAvailable tells whether the component is basically available, ether working well or in a fragile state:

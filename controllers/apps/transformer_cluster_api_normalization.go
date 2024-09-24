@@ -22,12 +22,10 @@ package apps
 import (
 	"context"
 	"fmt"
-	"maps"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -57,8 +55,6 @@ func (t *clusterAPINormalizationTransformer) Transform(ctx graph.TransformContex
 	if err != nil {
 		return err
 	}
-	transCtx.Labels = t.buildCompLabelsInheritedFromCluster(transCtx, cluster)
-	transCtx.Annotations = t.buildCompAnnotationsInheritedFromCluster(transCtx, cluster)
 
 	// resolve all component definitions referenced
 	if err = t.resolveCompDefinitions(transCtx); err != nil {
@@ -126,26 +122,6 @@ func (t *clusterAPINormalizationTransformer) buildCompSpecs4Specified(cluster *a
 		compSpecs = append(compSpecs, cluster.Spec.ComponentSpecs[i].DeepCopy())
 	}
 	return compSpecs
-}
-
-func (t *clusterAPINormalizationTransformer) buildCompLabelsInheritedFromCluster(transCtx *clusterTransformContext,
-	cluster *appsv1.Cluster) map[string]map[string]string {
-	clusterLabels := filterReservedLabels(cluster.Labels)
-	labels := make(map[string]map[string]string)
-	for _, compSpec := range transCtx.ComponentSpecs {
-		labels[compSpec.Name] = maps.Clone(clusterLabels)
-	}
-	return labels
-}
-
-func (t *clusterAPINormalizationTransformer) buildCompAnnotationsInheritedFromCluster(transCtx *clusterTransformContext,
-	cluster *appsv1.Cluster) map[string]map[string]string {
-	clusterAnnotations := filterReservedAnnotations(cluster.Annotations)
-	annotations := make(map[string]map[string]string)
-	for _, compSpec := range transCtx.ComponentSpecs {
-		annotations[compSpec.Name] = maps.Clone(clusterAnnotations)
-	}
-	return annotations
 }
 
 func (t *clusterAPINormalizationTransformer) resolveCompDefinitions(transCtx *clusterTransformContext) error {
@@ -226,34 +202,4 @@ func compSpecResolveCompDefinitionNServiceVersion(ctx context.Context, cli clien
 
 func checkCompUpgrade(compSpec *appsv1.ClusterComponentSpec, comp *appsv1.Component) bool {
 	return compSpec.ServiceVersion != comp.Spec.ServiceVersion || compSpec.ComponentDef != comp.Spec.CompDef
-}
-
-// filterReservedEntries filters out reserved keys from a map based on a provided set of reserved keys
-func filterReservedEntries(entries map[string]string, reservedKeys []string) map[string]string {
-	reservedSet := make(map[string]struct{}, len(reservedKeys))
-	for _, key := range reservedKeys {
-		reservedSet[key] = struct{}{}
-	}
-
-	filteredEntries := make(map[string]string)
-	for key, value := range entries {
-		if _, exists := reservedSet[key]; !exists {
-			filteredEntries[key] = value
-		}
-	}
-	return filteredEntries
-}
-
-func filterReservedLabels(labels map[string]string) map[string]string {
-	if labels == nil {
-		return nil
-	}
-	return filterReservedEntries(labels, constant.GetKBReservedLabelKeys())
-}
-
-func filterReservedAnnotations(annotations map[string]string) map[string]string {
-	if annotations == nil {
-		return nil
-	}
-	return filterReservedEntries(annotations, constant.GetKBReservedAnnotationKeys())
 }

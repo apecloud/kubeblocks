@@ -89,7 +89,7 @@ type ObjectChangeSummary struct {
 type ObjectTreeNode struct {
 	// Primary specifies reference of the primary object.
 	//
-	Primary corev1.ObjectReference `json:"objectReference"`
+	Primary corev1.ObjectReference `json:"primary"`
 
 	// Secondaries describes all the secondary objects of this object, if any.
 	// The secondary objects are collected by the rules specified in ReconciliationViewDefinition.

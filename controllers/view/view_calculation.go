@@ -236,6 +236,9 @@ func buildChanges(objKeySet sets.Set[model.GVKNObjKey], oldObjectMap, newObjectM
 		if changeType == viewv1.ObjectDeletionType {
 			obj = oldObj
 		}
+		if changeType == viewv1.ObjectUpdateType && oldObj.GetResourceVersion() == newObj.GetResourceVersion() {
+			continue
+		}
 		change := viewv1.ObjectChange{
 			ObjectReference: *objectRefToReference(key, obj.GetUID(), obj.GetResourceVersion()),
 			ChangeType:      changeType,

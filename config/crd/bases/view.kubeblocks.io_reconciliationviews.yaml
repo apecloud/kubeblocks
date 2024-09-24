@@ -99,7 +99,7 @@ spec:
                   CurrentObjectTree specifies the current object tree.
                   Ideally, CurrentObjectTree should be same as applying changes in View to InitialObjectTree.
                 properties:
-                  objectReference:
+                  primary:
                     description: Primary specifies reference of the primary object.
                     properties:
                       apiVersion:
@@ -149,13 +149,13 @@ spec:
                       The secondary objects are collected by the rules specified in ReconciliationViewDefinition.
                     x-kubernetes-preserve-unknown-fields: true
                 required:
-                - objectReference
+                - primary
                 type: object
               desiredObjectTree:
                 description: DesiredObjectTree specifies the object tree if the spec.desiredSpec
                   is applied.
                 properties:
-                  objectReference:
+                  primary:
                     description: Primary specifies reference of the primary object.
                     properties:
                       apiVersion:
@@ -205,12 +205,12 @@ spec:
                       The secondary objects are collected by the rules specified in ReconciliationViewDefinition.
                     x-kubernetes-preserve-unknown-fields: true
                 required:
-                - objectReference
+                - primary
                 type: object
               initialObjectTree:
                 description: InitialObjectTree specifies the initial object tree.
                 properties:
-                  objectReference:
+                  primary:
                     description: Primary specifies reference of the primary object.
                     properties:
                       apiVersion:
@@ -260,7 +260,7 @@ spec:
                       The secondary objects are collected by the rules specified in ReconciliationViewDefinition.
                     x-kubernetes-preserve-unknown-fields: true
                 required:
-                - objectReference
+                - primary
                 type: object
               plan:
                 description: Plan describes the detail reconciliation process when

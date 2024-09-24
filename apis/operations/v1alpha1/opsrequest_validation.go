@@ -201,9 +201,6 @@ func (r *OpsRequest) validateUpgrade(ctx context.Context, k8sClient client.Clien
 	if upgrade == nil {
 		return notEmptyError("spec.upgrade")
 	}
-	if upgrade.ClusterVersionRef != nil && *upgrade.ClusterVersionRef != "" {
-		return fmt.Errorf("not supported")
-	}
 	if len(r.Spec.Upgrade.Components) == 0 {
 		return notEmptyError("spec.upgrade.components")
 	}
@@ -245,12 +242,8 @@ func (r *OpsRequest) validateVerticalScaling(cluster *appsv1.Cluster) error {
 func (r *OpsRequest) validateReconfigure(ctx context.Context,
 	k8sClient client.Client,
 	cluster *appsv1.Cluster) error {
-	reconfigure := r.Spec.Reconfigure
-	if reconfigure == nil && len(r.Spec.Reconfigures) == 0 {
-		return notEmptyError("spec.reconfigure")
-	}
-	if reconfigure != nil {
-		return r.validateReconfigureParams(ctx, k8sClient, cluster, reconfigure)
+	if len(r.Spec.Reconfigures) == 0 {
+		return notEmptyError("spec.reconfigures")
 	}
 	for _, reconfigure := range r.Spec.Reconfigures {
 		if err := r.validateReconfigureParams(ctx, k8sClient, cluster, &reconfigure); err != nil {
@@ -367,12 +360,6 @@ func (r *OpsRequest) CountOfflineOrOnlineInstances(clusterName, componentName st
 func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, compSpec appsv1.ClusterComponentSpec, clusterName string, isSharding bool) error {
 	scaleIn := hScale.ScaleIn
 	scaleOut := hScale.ScaleOut
-	if hScale.Replicas != nil && (scaleIn != nil || scaleOut != nil) {
-		return fmt.Errorf(`"replicas" has been deprecated and cannot be used with "scaleOut" and "scaleIn"`)
-	}
-	if hScale.Replicas != nil {
-		return nil
-	}
 	if lastCompConfiguration, ok := r.Status.LastConfiguration.Components[hScale.ComponentName]; ok {
 		// use last component configuration snapshot
 		compSpec.Instances = lastCompConfiguration.Instances

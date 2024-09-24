@@ -113,18 +113,28 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.Cluster), func(g Gomega, tmpCluster *appsv1.Cluster) {
-				if horizontalScaling.Replicas == nil {
-					return
-				}
 				lastCompConfiguration := opsRes.OpsRequest.Status.LastConfiguration.Components[defaultCompName]
-				var expectedCompReplicas int32
-				switch {
-				case horizontalScaling.ScaleIn != nil:
-					expectedCompReplicas = *lastCompConfiguration.Replicas - *horizontalScaling.ScaleIn.ReplicaChanges
-				case horizontalScaling.ScaleOut != nil:
-					expectedCompReplicas = *lastCompConfiguration.Replicas + *horizontalScaling.ScaleOut.ReplicaChanges
-				default:
-					expectedCompReplicas = *horizontalScaling.Replicas
+				expectedCompReplicas := *lastCompConfiguration.Replicas
+				scaleIn := horizontalScaling.ScaleIn
+				if scaleIn != nil {
+					if scaleIn.ReplicaChanges != nil {
+						expectedCompReplicas -= *scaleIn.ReplicaChanges
+					} else {
+						expectedCompReplicas -= int32(len(scaleIn.OnlineInstancesToOffline))
+					}
+				}
+				scaleOut := horizontalScaling.ScaleOut
+				if scaleOut != nil {
+					switch {
+					case scaleOut.ReplicaChanges != nil:
+						expectedCompReplicas += *scaleOut.ReplicaChanges
+					case len(scaleOut.NewInstances) > 0:
+						for _, v := range scaleOut.NewInstances {
+							expectedCompReplicas += *v.Replicas
+						}
+					default:
+						expectedCompReplicas += int32(len(scaleOut.OfflineInstancesToOnline))
+					}
 				}
 				g.Expect(tmpCluster.Spec.GetComponentByName(defaultCompName).Replicas).Should(BeEquivalentTo(expectedCompReplicas))
 			})).Should(Succeed())
@@ -218,26 +228,6 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 				getProgressObjectKey(constant.PodKind, pod.Name)).Status).Should(Equal(opsv1alpha1.SucceedProgressStatus))
 		}
 
-		It("test to scale in replicas with `replicas`", func() {
-			By("scale in replicas from 3 to 1 ")
-			horizontalScaling := opsv1alpha1.HorizontalScaling{}
-			horizontalScaling.Replicas = pointer.Int32(1)
-			testHScaleReplicas(nil, horizontalScaling, func(podList []*corev1.Pod) {
-				By("delete the pods")
-				deletePods(podList[1], podList[2])
-			})
-		})
-
-		It("test to scale out replicas with `replicas`", func() {
-			By("scale out replicas from 3 to 5")
-			horizontalScaling := opsv1alpha1.HorizontalScaling{}
-			horizontalScaling.Replicas = pointer.Int32(5)
-			testHScaleReplicas(nil, horizontalScaling, func(podList []*corev1.Pod) {
-				By("create the pods(ordinal:[3,4])")
-				createPods("", 3, 4)
-			})
-		})
-
 		It("test to scale out replicas with `scaleOut`", func() {
 			By("scale out replicas from 3 to 5 with `scaleOut`")
 			horizontalScaling := opsv1alpha1.HorizontalScaling{ScaleOut: &opsv1alpha1.ScaleOut{}}
@@ -260,12 +250,20 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 
 		It("cancel the opsRequest which scaling in replicas with `replicas`", func() {
 			By("scale in replicas of component from 3 to 1")
-			testCancelHScale(opsv1alpha1.HorizontalScaling{Replicas: pointer.Int32(1)}, true)
+			testCancelHScale(opsv1alpha1.HorizontalScaling{ScaleIn: &opsv1alpha1.ScaleIn{
+				ReplicaChanger: opsv1alpha1.ReplicaChanger{
+					ReplicaChanges: pointer.Int32(2),
+				},
+			}}, true)
 		})
 
 		It("cancel the opsRequest which scaling out replicas with `replicas`", func() {
 			By("scale out replicas of component from 3 to 5")
-			testCancelHScale(opsv1alpha1.HorizontalScaling{Replicas: pointer.Int32(5)}, false)
+			testCancelHScale(opsv1alpha1.HorizontalScaling{ScaleOut: &opsv1alpha1.ScaleOut{
+				ReplicaChanger: opsv1alpha1.ReplicaChanger{
+					ReplicaChanges: pointer.Int32(2),
+				},
+			}}, false)
 		})
 
 		It("cancel the opsRequest which scaling out replicas with `scaleOut`", func() {
@@ -508,13 +506,13 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
 			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
 			By("create first opsRequest to add 1 replicas with `scaleOut` field and expect replicas to 4")
-			ops1 := createOpsAndToCreatingPhase(reqCtx, opsRes, opsv1alpha1.HorizontalScaling{
+			createOpsAndToCreatingPhase(reqCtx, opsRes, opsv1alpha1.HorizontalScaling{
 				ScaleOut: &opsv1alpha1.ScaleOut{ReplicaChanger: opsv1alpha1.ReplicaChanger{ReplicaChanges: pointer.Int32(1)}},
 			})
 			Expect(opsRes.Cluster.Spec.GetComponentByName(defaultCompName).Replicas).Should(BeEquivalentTo(4))
 
 			By("create secondary opsRequest to add 1 replicas with `replicasToAdd` field and expect replicas to 5")
-			ops2 := createOpsAndToCreatingPhase(reqCtx, opsRes, opsv1alpha1.HorizontalScaling{
+			createOpsAndToCreatingPhase(reqCtx, opsRes, opsv1alpha1.HorizontalScaling{
 				ScaleOut: &opsv1alpha1.ScaleOut{ReplicaChanger: opsv1alpha1.ReplicaChanger{ReplicaChanges: pointer.Int32(1)}},
 			})
 			Expect(opsRes.Cluster.Spec.GetComponentByName(defaultCompName).Replicas).Should(BeEquivalentTo(5))
@@ -538,22 +536,6 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsFailedPhase))
 			conditions = opsRes.OpsRequest.Status.Conditions
 			Expect(conditions[len(conditions)-1].Message).Should(ContainSubstring(`cannot be taken offline as it has been created by another running opsRequest`))
-
-			By("create a opsRequest with `replicas` field and expect to abort the running ops")
-			// if existing an overwrite replicas operation for a component or instanceTemplate, need to abort.
-			ops3 := createOpsAndToCreatingPhase(reqCtx, opsRes, opsv1alpha1.HorizontalScaling{
-				Replicas: pointer.Int32(3),
-			})
-			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops1))).Should(Equal(opsv1alpha1.OpsAbortedPhase))
-			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops2))).Should(Equal(opsv1alpha1.OpsAbortedPhase))
-
-			By("create a opsRequest with `scaleOut` field and expect to abort last running ops")
-			// if running opsRequest exists an overwrite replicas operation for a component or instanceTemplate, need to abort.
-			createOpsAndToCreatingPhase(reqCtx, opsRes, opsv1alpha1.HorizontalScaling{
-				ScaleOut: &opsv1alpha1.ScaleOut{ReplicaChanger: opsv1alpha1.ReplicaChanger{ReplicaChanges: pointer.Int32(1)}},
-			})
-			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops3))).Should(Equal(opsv1alpha1.OpsAbortedPhase))
-			Expect(opsRes.Cluster.Spec.GetComponentByName(defaultCompName).Replicas).Should(BeEquivalentTo(4))
 		})
 	})
 })

@@ -190,24 +190,26 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 			By("mock reconfigure success")
 			ops := testops.NewOpsRequestObj("reconfigure-ops-"+randomStr, testCtx.DefaultNamespace,
 				clusterName, opsv1alpha1.ReconfiguringType)
-			ops.Spec.Reconfigure = &opsv1alpha1.Reconfigure{
-				Configurations: []opsv1alpha1.ConfigurationItem{{
-					Name: "mysql-test",
-					Keys: []opsv1alpha1.ParameterConfig{{
-						Key: "my.cnf",
-						Parameters: []opsv1alpha1.ParameterPair{
-							{
-								Key:   "binlog_stmt_cache_size",
-								Value: func() *string { v := "4096"; return &v }(),
+			ops.Spec.Reconfigures = []opsv1alpha1.Reconfigure{
+				{
+					Configurations: []opsv1alpha1.ConfigurationItem{{
+						Name: "mysql-test",
+						Keys: []opsv1alpha1.ParameterConfig{{
+							Key: "my.cnf",
+							Parameters: []opsv1alpha1.ParameterPair{
+								{
+									Key:   "binlog_stmt_cache_size",
+									Value: func() *string { v := "4096"; return &v }(),
+								},
+								{
+									Key:   "key",
+									Value: func() *string { v := "abcd"; return &v }(),
+								},
 							},
-							{
-								Key:   "key",
-								Value: func() *string { v := "abcd"; return &v }(),
-							},
-						},
+						}},
 					}},
-				}},
-				ComponentOps: opsv1alpha1.ComponentOps{ComponentName: defaultCompName},
+					ComponentOps: opsv1alpha1.ComponentOps{ComponentName: defaultCompName},
+				},
 			}
 
 			By("Init Reconfiguring opsrequest")
@@ -285,19 +287,21 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 			By("mock reconfigure success")
 			ops := testops.NewOpsRequestObj("reconfigure-ops-"+randomStr+"-reload", testCtx.DefaultNamespace,
 				clusterName, opsv1alpha1.ReconfiguringType)
-			ops.Spec.Reconfigure = &opsv1alpha1.Reconfigure{
-				Configurations: []opsv1alpha1.ConfigurationItem{{
-					Name: "mysql-test",
-					Keys: []opsv1alpha1.ParameterConfig{{
-						Key: "my.cnf",
-						Parameters: []opsv1alpha1.ParameterPair{
-							{
-								Key:   "binlog_stmt_cache_size",
-								Value: func() *string { v := "4096"; return &v }(),
-							}},
+			ops.Spec.Reconfigures = []opsv1alpha1.Reconfigure{
+				{
+					Configurations: []opsv1alpha1.ConfigurationItem{{
+						Name: "mysql-test",
+						Keys: []opsv1alpha1.ParameterConfig{{
+							Key: "my.cnf",
+							Parameters: []opsv1alpha1.ParameterPair{
+								{
+									Key:   "binlog_stmt_cache_size",
+									Value: func() *string { v := "4096"; return &v }(),
+								}},
+						}},
 					}},
-				}},
-				ComponentOps: opsv1alpha1.ComponentOps{ComponentName: defaultCompName},
+					ComponentOps: opsv1alpha1.ComponentOps{ComponentName: defaultCompName},
+				},
 			}
 
 			By("Init Reconfiguring opsrequest")

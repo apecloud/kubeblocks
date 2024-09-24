@@ -126,7 +126,11 @@ var _ = Describe("Ops ProgressDetails", func() {
 			By("create horizontalScaling operation to test the progressDetails when scaling in the replicas")
 			opsRes.OpsRequest = createHorizontalScaling(clusterName, opsv1alpha1.HorizontalScaling{
 				ComponentOps: opsv1alpha1.ComponentOps{ComponentName: defaultCompName},
-				Replicas:     pointer.Int32(1),
+				ScaleIn: &opsv1alpha1.ScaleIn{
+					ReplicaChanger: opsv1alpha1.ReplicaChanger{
+						ReplicaChanges: pointer.Int32(2),
+					},
+				},
 			})
 			mockComponentIsOperating(opsRes.Cluster, appsv1.UpdatingClusterCompPhase, defaultCompName) // appsv1.HorizontalScalingPhase
 			initClusterForOps(opsRes)
@@ -179,7 +183,11 @@ var _ = Describe("Ops ProgressDetails", func() {
 			By("create horizontalScaling operation to test the progressDetails when scaling out the replicas ")
 			opsRes.OpsRequest = createHorizontalScaling(clusterName, opsv1alpha1.HorizontalScaling{
 				ComponentOps: opsv1alpha1.ComponentOps{ComponentName: defaultCompName},
-				Replicas:     pointer.Int32(4),
+				ScaleOut: &opsv1alpha1.ScaleOut{
+					ReplicaChanger: opsv1alpha1.ReplicaChanger{
+						ReplicaChanges: pointer.Int32(1),
+					},
+				},
 			})
 			mockComponentIsOperating(opsRes.Cluster, appsv1.UpdatingClusterCompPhase, defaultCompName) // appsv1.HorizontalScalingPhase
 			initClusterForOps(opsRes)

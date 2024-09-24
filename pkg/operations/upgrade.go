@@ -58,29 +58,22 @@ func (u upgradeOpsHandler) ActionStartedCondition(reqCtx intctrlutil.RequestCtx,
 func (u upgradeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	var compOpsHelper componentOpsHelper
 	upgradeSpec := opsRes.OpsRequest.Spec.Upgrade
-	if u.existClusterVersion(opsRes.OpsRequest) {
-		return fmt.Errorf("not implemented")
-	} else {
-		compOpsHelper = newComponentOpsHelper(upgradeSpec.Components)
-		if err := compOpsHelper.updateClusterComponentsAndShardings(opsRes.Cluster, func(compSpec *appsv1.ClusterComponentSpec, obj ComponentOpsInterface) error {
-			upgradeComp := obj.(opsv1alpha1.UpgradeComponent)
-			if u.needUpdateCompDef(upgradeComp, opsRes.Cluster) {
-				compSpec.ComponentDef = *upgradeComp.ComponentDefinitionName
-			}
-			if upgradeComp.ServiceVersion != nil {
-				compSpec.ServiceVersion = *upgradeComp.ServiceVersion
-			}
-			return nil
-		}); err != nil {
-			return err
+	compOpsHelper = newComponentOpsHelper(upgradeSpec.Components)
+	if err := compOpsHelper.updateClusterComponentsAndShardings(opsRes.Cluster, func(compSpec *appsv1.ClusterComponentSpec, obj ComponentOpsInterface) error {
+		upgradeComp := obj.(opsv1alpha1.UpgradeComponent)
+		if u.needUpdateCompDef(upgradeComp, opsRes.Cluster) {
+			compSpec.ComponentDef = *upgradeComp.ComponentDefinitionName
 		}
+		if upgradeComp.ServiceVersion != nil {
+			compSpec.ServiceVersion = *upgradeComp.ServiceVersion
+		}
+		return nil
+	}); err != nil {
+		return err
 	}
 	// abort earlier running upgrade opsRequest.
 	if err := abortEarlierOpsRequestWithSameKind(reqCtx, cli, opsRes, []opsv1alpha1.OpsType{opsv1alpha1.UpgradeType},
 		func(earlierOps *opsv1alpha1.OpsRequest) (bool, error) {
-			if u.existClusterVersion(earlierOps) {
-				return true, nil
-			}
 			for _, v := range earlierOps.Spec.Upgrade.Components {
 				// abort the earlierOps if exists the same component.
 				if _, ok := compOpsHelper.componentOpsSet[v.ComponentName]; ok {
@@ -103,13 +96,9 @@ func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 		componentDefMap map[string]*appsv1.ComponentDefinition
 		err             error
 	)
-	if u.existClusterVersion(opsRes.OpsRequest) {
-		return opsv1alpha1.OpsFailedPhase, 0, fmt.Errorf("not implemented")
-	} else {
-		compOpsHelper = newComponentOpsHelper(upgradeSpec.Components)
-		if componentDefMap, err = u.getComponentDefMapWithUpdatedImages(reqCtx, cli, opsRes); err != nil {
-			return opsRes.OpsRequest.Status.Phase, 0, err
-		}
+	compOpsHelper = newComponentOpsHelper(upgradeSpec.Components)
+	if componentDefMap, err = u.getComponentDefMapWithUpdatedImages(reqCtx, cli, opsRes); err != nil {
+		return opsRes.OpsRequest.Status.Phase, 0, err
 	}
 	componentUpgraded := func(cluster *appsv1.Cluster,
 		lastCompConfiguration opsv1alpha1.LastComponentConfiguration,
@@ -128,9 +117,6 @@ func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 		pod *corev1.Pod,
 		compOps ComponentOpsInterface,
 		insTemplateName string) bool {
-		if u.existClusterVersion(opsRes.OpsRequest) {
-			return false
-		}
 		upgradeComponent := compOps.(opsv1alpha1.UpgradeComponent)
 		lastCompConfiguration := opsRes.OpsRequest.Status.LastConfiguration.Components[compOps.GetComponentName()]
 		if !componentUpgraded(opsRes.Cluster, lastCompConfiguration, upgradeComponent) {
@@ -207,10 +193,6 @@ func (u upgradeOpsHandler) podImageApplied(pod *corev1.Pod, expectContainers []c
 		}
 	}
 	return true
-}
-
-func (u upgradeOpsHandler) existClusterVersion(ops *opsv1alpha1.OpsRequest) bool {
-	return ops.Spec.Upgrade.ClusterVersionRef != nil && *ops.Spec.Upgrade.ClusterVersionRef != ""
 }
 
 func (u upgradeOpsHandler) needUpdateCompDef(upgradeComp opsv1alpha1.UpgradeComponent, cluster *appsv1.Cluster) bool {

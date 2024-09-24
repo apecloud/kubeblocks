@@ -82,7 +82,11 @@ var _ = Describe("OpsUtil functions", func() {
 			By("Test the functions in ops_util.go")
 			opsRes.OpsRequest = createHorizontalScaling(clusterName, opsv1alpha1.HorizontalScaling{
 				ComponentOps: opsv1alpha1.ComponentOps{ComponentName: defaultCompName},
-				Replicas:     pointer.Int32(1),
+				ScaleIn: &opsv1alpha1.ScaleIn{
+					ReplicaChanger: opsv1alpha1.ReplicaChanger{
+						ReplicaChanges: pointer.Int32(2),
+					},
+				},
 			})
 			Expect(patchValidateErrorCondition(ctx, k8sClient, opsRes, "validate error")).Should(Succeed())
 			Expect(PatchOpsHandlerNotSupported(ctx, k8sClient, opsRes)).Should(Succeed())
@@ -200,7 +204,11 @@ var _ = Describe("OpsUtil functions", func() {
 			runHscaleOps := func(expectPhase opsv1alpha1.OpsPhase) *opsv1alpha1.OpsRequest {
 				ops := createHorizontalScaling(clusterName, opsv1alpha1.HorizontalScaling{
 					ComponentOps: opsv1alpha1.ComponentOps{ComponentName: defaultCompName},
-					Replicas:     pointer.Int32(1),
+					ScaleIn: &opsv1alpha1.ScaleIn{
+						ReplicaChanger: opsv1alpha1.ReplicaChanger{
+							ReplicaChanges: pointer.Int32(1),
+						},
+					},
 				})
 				opsRes.OpsRequest = ops
 				_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
@@ -316,7 +324,11 @@ var _ = Describe("OpsUtil functions", func() {
 			By("expect the ops phase is failed")
 			opsRes.OpsRequest = createHorizontalScaling(clusterName, opsv1alpha1.HorizontalScaling{
 				ComponentOps: opsv1alpha1.ComponentOps{ComponentName: defaultCompName},
-				Replicas:     pointer.Int32(1),
+				ScaleIn: &opsv1alpha1.ScaleIn{
+					ReplicaChanger: opsv1alpha1.ReplicaChanger{
+						ReplicaChanges: pointer.Int32(1),
+					},
+				},
 			})
 			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
 			_, _ = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
@@ -325,7 +337,11 @@ var _ = Describe("OpsUtil functions", func() {
 			By("Test EnqueueOnForce=true")
 			opsRes.OpsRequest = createHorizontalScaling(clusterName, opsv1alpha1.HorizontalScaling{
 				ComponentOps: opsv1alpha1.ComponentOps{ComponentName: defaultCompName},
-				Replicas:     pointer.Int32(1),
+				ScaleIn: &opsv1alpha1.ScaleIn{
+					ReplicaChanger: opsv1alpha1.ReplicaChanger{
+						ReplicaChanges: pointer.Int32(1),
+					},
+				},
 			})
 			opsRes.OpsRequest.Spec.Force = true
 			opsRes.OpsRequest.Spec.EnqueueOnForce = true

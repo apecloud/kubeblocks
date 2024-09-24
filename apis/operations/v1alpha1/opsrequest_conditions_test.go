@@ -51,9 +51,12 @@ func TestNewAllCondition(t *testing.T) {
 	NewReconfigureFailedCondition(opsRequest, errors.New("reconfigure opsRequest failed"))
 	NewBackupCondition(opsRequest)
 
-	opsRequest.Spec.Reconfigure = &Reconfigure{
-		ComponentOps: ComponentOps{
-			ComponentName: "testReconfiguring",
+	opsRequest.Spec.Reconfigures = []Reconfigure{
+		{
+
+			ComponentOps: ComponentOps{
+				ComponentName: "testReconfiguring",
+			},
 		},
 	}
 	NewReconfigureCondition(opsRequest)

@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	"fmt"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -319,10 +320,11 @@ func NewReconfigureRunningCondition(ops *OpsRequest, conditionType string, confi
 }
 
 func getComponentName(request OpsRequestSpec) string {
-	if request.Reconfigure != nil {
-		return request.Reconfigure.ComponentName
+	var compNames []string
+	for _, v := range request.Reconfigures {
+		compNames = append(compNames, v.ComponentName)
 	}
-	return ""
+	return strings.Join(compNames, ",")
 }
 
 // NewReconfigureFailedCondition creates a condition for the failed reconfigure.

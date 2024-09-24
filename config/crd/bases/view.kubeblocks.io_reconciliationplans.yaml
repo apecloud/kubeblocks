@@ -76,8 +76,12 @@ spec:
                       Default is same as the ReconciliationPlan object.
                     type: string
                 type: object
+              viewDefinition:
+                description: ViewDefinition specifies the name of the ReconciliationViewDefinition.
+                type: string
             required:
             - desiredSpec
+            - viewDefinition
             type: object
           status:
             description: ReconciliationPlanStatus defines the observed state of ReconciliationPlan
@@ -193,6 +197,16 @@ spec:
                 required:
                 - primary
                 type: object
+              observedPlanGeneration:
+                description: ObservedPlanGeneration specifies the observed generation
+                  of the ReconciliationPlan object.
+                format: int64
+                type: integer
+              observedTargetGeneration:
+                description: ObservedTargetGeneration specifies the observed generation
+                  of the target object.
+                format: int64
+                type: integer
               phase:
                 description: |-
                   Phase specifies the current phase of the plan calculation process.
@@ -390,6 +404,8 @@ spec:
             required:
             - currentObjectTree
             - desiredObjectTree
+            - observedPlanGeneration
+            - observedTargetGeneration
             - plan
             - summary
             type: object

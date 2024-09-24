@@ -25,6 +25,10 @@ import (
 
 // ReconciliationPlanSpec defines the desired state of ReconciliationPlan
 type ReconciliationPlanSpec struct {
+	// ViewDefinition specifies the name of the ReconciliationViewDefinition.
+	//
+	ViewDefinition string `json:"viewDefinition"`
+
 	// TargetObject specifies the target Cluster object.
 	// Default is the Cluster object with same namespace and name as this ReconciliationPlan object.
 	//
@@ -54,6 +58,14 @@ type ReconciliationPlanSpec struct {
 
 // ReconciliationPlanStatus defines the observed state of ReconciliationPlan
 type ReconciliationPlanStatus struct {
+	// ObservedPlanGeneration specifies the observed generation of the ReconciliationPlan object.
+	//
+	ObservedPlanGeneration int64 `json:"observedPlanGeneration"`
+
+	// ObservedTargetGeneration specifies the observed generation of the target object.
+	//
+	ObservedTargetGeneration int64 `json:"observedTargetGeneration"`
+
 	// Phase specifies the current phase of the plan calculation process.
 	// Succeed - the plan is calculated successfully.
 	// Failed - the plan can't be calculated for some reason described in Reason.

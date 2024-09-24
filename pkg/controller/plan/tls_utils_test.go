@@ -115,7 +115,7 @@ var _ = Describe("TLSUtilsTest", func() {
 			Expect(err).ShouldNot(BeNil())
 			Expect(err.Error()).Should(ContainSubstring(secretRef.CA))
 
-			By("set everything ok")
+			By("stringData field is ok")
 			k8sMock.EXPECT().
 				Get(gomock.Any(), gomock.Any(), &corev1.Secret{}, gomock.Any()).
 				DoAndReturn(func(_ context.Context, objKey client.ObjectKey, obj *corev1.Secret, _ ...client.GetOption) error {
@@ -126,6 +126,22 @@ var _ = Describe("TLSUtilsTest", func() {
 						secretRef.Cert: "foo",
 						secretRef.Key:  "bar",
 						secretRef.CA:   "ca",
+					}
+					return nil
+				}).Times(1)
+			Expect(CheckTLSSecretRef(ctx, k8sMock, namespace, secretRef)).Should(Succeed())
+
+			By("data field is ok")
+			k8sMock.EXPECT().
+				Get(gomock.Any(), gomock.Any(), &corev1.Secret{}, gomock.Any()).
+				DoAndReturn(func(_ context.Context, objKey client.ObjectKey, obj *corev1.Secret, _ ...client.GetOption) error {
+					Expect(obj).ShouldNot(BeNil())
+					obj.Namespace = objKey.Namespace
+					obj.Name = objKey.Name
+					obj.Data = map[string][]byte{
+						secretRef.Cert: []byte("foo"),
+						secretRef.Key:  []byte("bar"),
+						secretRef.CA:   []byte("ca"),
 					}
 					return nil
 				}).Times(1)

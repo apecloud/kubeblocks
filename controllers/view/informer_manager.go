@@ -47,6 +47,8 @@ type InformerManager interface {
 }
 
 type informerManager struct {
+	once sync.Once
+
 	eventChan chan event.GenericEvent
 
 	informerRefCounter map[schema.GroupVersionKind]sets.Set[model.GVKNObjKey]
@@ -69,10 +71,13 @@ func (m *informerManager) SetContext(ctx context.Context) {
 }
 
 func (m *informerManager) Start() error {
-	go func() {
-		for m.processNextWorkItem() {
-		}
-	}()
+	m.once.Do(func() {
+		go func() {
+			for m.processNextWorkItem() {
+			}
+		}()
+	})
+
 	return nil
 }
 

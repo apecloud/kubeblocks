@@ -22,18 +22,16 @@ package view
 import (
 	"container/list"
 	"context"
-	"fmt"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
-	"strconv"
 
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
@@ -261,14 +259,6 @@ func formatDescription(oldObj, newObj client.Object, changeType viewv1.ObjectCha
 	return string(changeType)
 }
 
-func parseRevision(revisionStr string) int64 {
-	revision, err := strconv.ParseInt(revisionStr, 10, 64)
-	if err != nil {
-		revision = 0
-	}
-	return revision
-}
-
 func (c *viewCalculator) getSecondaryObjectsOf(obj client.Object, ownershipRules []viewv1.OwnershipRule) ([]client.Object, error) {
 	objGVK, err := apiutil.GVKForObject(obj, c.scheme)
 	if err != nil {
@@ -339,33 +329,6 @@ func (c *viewCalculator) getAllObjectsFrom(tree *viewv1.ObjectTreeNode) (sets.Se
 		}
 	}
 	return objectRefSet, objectMap, nil
-}
-
-func parseMatchingLabels(obj client.Object, criteria *viewv1.OwnershipCriteria) (client.MatchingLabels, error) {
-	if criteria.SelectorCriteria != nil {
-		return parseSelector(obj, criteria.SelectorCriteria.Path)
-	}
-	if criteria.LabelCriteria != nil {
-		return parseLabels(obj, criteria.LabelCriteria), nil
-	}
-	return nil, fmt.Errorf("parse matching labels failed")
-}
-
-// getObjectReference creates a corev1.ObjectReference from a client.Object
-func getObjectReference(obj client.Object, scheme *runtime.Scheme) (*corev1.ObjectReference, error) {
-	gvk, err := apiutil.GVKForObject(obj, scheme)
-	if err != nil {
-		return nil, err
-	}
-
-	return &corev1.ObjectReference{
-		APIVersion:      gvk.GroupVersion().String(),
-		Kind:            gvk.Kind,
-		Namespace:       obj.GetNamespace(),
-		Name:            obj.GetName(),
-		UID:             obj.GetUID(),
-		ResourceVersion: obj.GetResourceVersion(),
-	}, nil
 }
 
 func viewCalculation(ctx context.Context, cli client.Client, store ObjectStore, scheme *runtime.Scheme) kubebuilderx.Reconciler {

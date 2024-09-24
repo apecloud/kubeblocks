@@ -22,13 +22,15 @@ package view
 import (
 	"context"
 	"fmt"
-	"k8s.io/apimachinery/pkg/types"
+	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
 	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -89,6 +91,35 @@ func objectRefToType(objectRef *model.GVKNObjKey) *viewv1.ObjectType {
 	}
 }
 
+
+func getObjectRef(object client.Object, scheme *runtime.Scheme) (*model.GVKNObjKey, error) {
+	gvk, err := apiutil.GVKForObject(object, scheme)
+	if err != nil {
+		return nil, err
+	}
+	return &model.GVKNObjKey{
+		GroupVersionKind: gvk,
+		ObjectKey:        client.ObjectKeyFromObject(object),
+	}, nil
+}
+
+// getObjectReference creates a corev1.ObjectReference from a client.Object
+func getObjectReference(obj client.Object, scheme *runtime.Scheme) (*corev1.ObjectReference, error) {
+	gvk, err := apiutil.GVKForObject(obj, scheme)
+	if err != nil {
+		return nil, err
+	}
+
+	return &corev1.ObjectReference{
+		APIVersion:      gvk.GroupVersion().String(),
+		Kind:            gvk.Kind,
+		Namespace:       obj.GetNamespace(),
+		Name:            obj.GetName(),
+		UID:             obj.GetUID(),
+		ResourceVersion: obj.GetResourceVersion(),
+	}, nil
+}
+
 func getObjectsByGVK(ctx context.Context, cli client.Reader, scheme *runtime.Scheme, gvk *schema.GroupVersionKind, opts ...client.ListOption) ([]client.Object, error) {
 	runtimeObjectList, err := scheme.New(schema.GroupVersionKind{
 		Group:   gvk.Group,
@@ -120,3 +151,23 @@ func getObjectsByGVK(ctx context.Context, cli client.Reader, scheme *runtime.Sch
 
 	return objects, nil
 }
+
+
+func parseRevision(revisionStr string) int64 {
+	revision, err := strconv.ParseInt(revisionStr, 10, 64)
+	if err != nil {
+		revision = 0
+	}
+	return revision
+}
+
+func parseMatchingLabels(obj client.Object, criteria *viewv1.OwnershipCriteria) (client.MatchingLabels, error) {
+	if criteria.SelectorCriteria != nil {
+		return parseSelector(obj, criteria.SelectorCriteria.Path)
+	}
+	if criteria.LabelCriteria != nil {
+		return parseLabels(obj, criteria.LabelCriteria), nil
+	}
+	return nil, fmt.Errorf("parse matching labels failed")
+}
+

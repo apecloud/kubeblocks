@@ -70,40 +70,6 @@ func (r *ReconciliationViewReconciler) Reconcile(ctx context.Context, req ctrl.R
 
 	// TODO(free6om): err handling
 
-	// load view, viewDef, i18n resources
-	//
-	// validation viewDef
-	//
-	// if isViewCreationOrUpdate, create new Informer and/or increase reference count
-	// if isViewDeletion, decrease reference count and delete informer if count to zero.
-	//
-	// view calculation
-	//
-	// build new object set from cache
-	// update object.uid to tree.primaryReference map(one object might belong to many tree, not in KB)
-	// build old object set from view.status.currentObjectTree
-	// calculate createSet, deleteSet and updateSet
-	// build view progress from three sets.
-	// for createSet, build objectChange.description by reading i18n of the corresponding object type.
-	// for updateSet, read old version from object store by object type and resource version, calculate the diff, render the objectChange.description
-	// for deleteSet, build objectChange.description by reading i18n of the corresponding object type.
-	// sort the view progress by resource version.
-	// concat it to view.status.view
-	// save new version objects to object store.
-	//
-	// state evaluation(to find whether a new reconciliation cycle has started)
-	//
-	// traverse the view progress list from tail to head:
-	// if object type is not target object type, continue
-	// read the corresponding version of the object from object store by objectChange.resourceVersion
-	// evaluation state
-	// if we find the first-false-then-true pattern, means a new reconciliation cycle starts.
-	// build new view.status.initialObjectTree by read all max but less than primary.resourceVersion version of objects from object store
-	// truncate status.view
-	// clean useless version of objects in object store:
-	// traverse the truncated status.view list
-	// delete object with version objectChange.version
-
 	return res, err
 }
 

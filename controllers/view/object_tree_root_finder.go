@@ -23,13 +23,13 @@ import (
 	"container/list"
 	"context"
 	"fmt"
-	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"strings"
 
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -59,15 +59,12 @@ func (f *rootFinder) GetEventHandler() handler.EventHandler {
 }
 
 // findRoots finds the root(s) object of the 'object' by the object tree.
+// The basic idea is, find the parent(s) of the object based on ownership rules defined in view definition,
+// and do this recursively until find all the root object(s).
 func (f *rootFinder) findRoots(ctx context.Context, object client.Object) []reconcile.Request {
-	// new a waiting list W
-	// put 'object' into W
 	waitingList := list.New()
 	waitingList.PushFront(object)
 
-	// list all view definitions
-	// build primary type list P
-	// build ownership rule list O
 	var roots []client.Object
 	viewDefList := &viewv1.ReconciliationViewDefinitionList{}
 	if err := f.List(ctx, viewDefList); err != nil {
@@ -152,19 +149,6 @@ func (f *rootFinder) findRoots(ctx context.Context, object client.Object) []reco
 	for _, root := range roots {
 		result.Insert(reconcile.Request{NamespacedName: client.ObjectKeyFromObject(root)})
 	}
-
-	// while(len(W) > 0) {
-	// get and remove head of W
-	// traverse P
-	// if object type matched, put object to root object list R, continue
-	// traverse O
-	// if ownedResources contains type of 'object'
-	// list all primary objects of this rule
-	// traverse the list
-	// try applying ownership rule to the primary object
-	// if matched, append to W
-	// }
-	// return R
 
 	return result.UnsortedList()
 }

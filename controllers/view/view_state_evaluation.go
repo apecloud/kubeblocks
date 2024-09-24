@@ -22,12 +22,12 @@ package view
 import (
 	"context"
 	"fmt"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/checker/decls"
 	"github.com/google/cel-go/common/types"
 	"google.golang.org/protobuf/types/known/structpb"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -232,16 +232,6 @@ func getObjectsByRevision(gvk *schema.GroupVersionKind, store ObjectStore, ml cl
 	return matchedObjects, nil
 }
 
-func getObjectRef(object client.Object, scheme *runtime.Scheme) (*model.GVKNObjKey, error) {
-	gvk, err := apiutil.GVKForObject(object, scheme)
-	if err != nil {
-		return nil, err
-	}
-	return &model.GVKNObjKey{
-		GroupVersionKind: gvk,
-		ObjectKey:        client.ObjectKeyFromObject(object),
-	}, nil
-}
 
 func doStateEvaluation(object client.Object, expression viewv1.StateEvaluationExpression) (bool, error) {
 	if expression.CELExpression == nil {

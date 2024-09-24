@@ -22,12 +22,12 @@ package view
 import (
 	"context"
 	"fmt"
-	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
+	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 )
 

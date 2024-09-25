@@ -151,8 +151,6 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			&clusterBackupPolicyTransformer{},
 			// add our finalizer to all objects
 			&clusterOwnershipTransformer{},
-			// make all workload objects depending on credential secret
-			&clusterSecretTransformer{},
 			// update cluster status
 			&clusterStatusTransformer{},
 			// always safe to put your transformer below
@@ -180,7 +178,7 @@ func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		}).
 		Owns(&appsv1.Component{}).
 		Owns(&corev1.Service{}). // cluster services
-		Owns(&corev1.Secret{}).  // cluster conn-credential secret
+		Owns(&corev1.Secret{}).  // sharding account secret
 		Owns(&dpv1alpha1.BackupPolicy{}).
 		Owns(&dpv1alpha1.BackupSchedule{}).
 		Complete(r)

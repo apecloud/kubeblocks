@@ -23,7 +23,6 @@ import (
 	"context"
 	"time"
 
-	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -88,9 +87,6 @@ type ComponentReconciler struct {
 // +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims/finalizers,verbs=update
 
 // +kubebuilder:rbac:groups=core,resources=persistentvolumes,verbs=get;list;watch;update;patch
-
-// +kubebuilder:rbac:groups=policy,resources=poddisruptionbudgets,verbs=get;list;watch;create;update;patch;delete;deletecollection
-// +kubebuilder:rbac:groups=policy,resources=poddisruptionbudgets/finalizers,verbs=update
 
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=batch,resources=jobs/status,verbs=get
@@ -228,7 +224,6 @@ func (r *ComponentReconciler) setupWithManager(mgr ctrl.Manager) error {
 		Owns(&dpv1alpha1.Backup{}).
 		Owns(&dpv1alpha1.Restore{}).
 		Watches(&corev1.PersistentVolumeClaim{}, handler.EnqueueRequestsFromMapFunc(r.filterComponentResources)).
-		Owns(&batchv1.Job{}).
 		Watches(&appsv1alpha1.Configuration{}, handler.EnqueueRequestsFromMapFunc(r.configurationEventHandler))
 
 	if viper.GetBool(constant.EnableRBACManager) {
@@ -260,7 +255,6 @@ func (r *ComponentReconciler) setupWithMultiClusterManager(mgr ctrl.Manager, mul
 		Watch(b, &corev1.Secret{}, eventHandler).
 		Watch(b, &corev1.ConfigMap{}, eventHandler).
 		Watch(b, &corev1.PersistentVolumeClaim{}, eventHandler).
-		Watch(b, &batchv1.Job{}, eventHandler).
 		Watch(b, &corev1.ServiceAccount{}, eventHandler).
 		Watch(b, &rbacv1.RoleBinding{}, eventHandler).
 		Watch(b, &rbacv1.ClusterRoleBinding{}, eventHandler)

@@ -1353,57 +1353,6 @@ var _ = Describe("Component Controller", func() {
 	testCompConfiguration := func(compName, compDefName string) {
 	}
 
-	// testCompAffinityNToleration := func(compName, compDefName string) {
-	//	const (
-	//		topologyKey     = "testTopologyKey"
-	//		labelKey        = "testNodeLabelKey"
-	//		labelValue      = "testNodeLabelValue"
-	//		tolerationKey   = "testTolerationKey"
-	//		tolerationValue = "testTolerationValue"
-	//	)
-	//
-	//	By("Creating a component with affinity and toleration")
-	//	affinity := appsv1alpha1.Affinity{
-	//		PodAntiAffinity: appsv1alpha1.Required,
-	//		TopologyKeys:    []string{topologyKey},
-	//		NodeLabels: map[string]string{
-	//			labelKey: labelValue,
-	//		},
-	//		Tenancy: appsv1alpha1.SharedNode,
-	//	}
-	//	toleration := corev1.Toleration{
-	//		Key:      tolerationKey,
-	//		Value:    tolerationValue,
-	//		Operator: corev1.TolerationOpEqual,
-	//		Effect:   corev1.TaintEffectNoSchedule,
-	//	}
-	//	createClusterObj(compName, compDefName, func(f *testapps.MockClusterFactory) {
-	//		f.SetComponentAffinity(&affinity).AddComponentToleration(toleration)
-	//	})
-	//
-	//	By("Checking the Affinity, the TopologySpreadConstraints and Tolerations")
-	//	itsKey := types.NamespacedName{
-	//		Namespace: compObj.Namespace,
-	//		Name:      compObj.Name,
-	//	}
-	//	Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
-	//		podSpec := its.Spec.Template.Spec
-	//		// node affinity
-	//		g.Expect(podSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Key).To(Equal(labelKey))
-	//		// pod anti-affinity
-	//		g.Expect(podSpec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution).Should(HaveLen(1))
-	//		g.Expect(podSpec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].TopologyKey).To(Equal(topologyKey))
-	//		// topology spread constraint
-	//		g.Expect(podSpec.TopologySpreadConstraints).Should(HaveLen(1))
-	//		// Required -> DoNotSchedule, Preferred -> ScheduleAnyway
-	//		g.Expect(podSpec.TopologySpreadConstraints[0].WhenUnsatisfiable).To(Equal(corev1.DoNotSchedule))
-	//		g.Expect(podSpec.TopologySpreadConstraints[0].TopologyKey).To(Equal(topologyKey))
-	//		// toleration
-	//		g.Expect(podSpec.Tolerations).Should(HaveLen(2))
-	//		g.Expect(podSpec.Tolerations[0]).Should(BeEquivalentTo(toleration))
-	//	})).Should(Succeed())
-	// }
-
 	checkRBACResourcesExistence := func(saName string, expectExisted bool) {
 		saKey := types.NamespacedName{
 			Namespace: compObj.Namespace,
@@ -1723,18 +1672,18 @@ var _ = Describe("Component Controller", func() {
 		checkWorkloadGenerationAndToolsImage(Consistently, initWorkloadGeneration, 1, 0)
 
 		By("update spec to trigger component spec reconcile, but workload not changed")
-		Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
-			comp.Spec.ServiceRefs = []kbappsv1.ServiceRef{
+		Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *kbappsv1.Cluster) {
+			cluster.Spec.ComponentSpecs[0].ServiceRefs = []kbappsv1.ServiceRef{
 				{Name: randomStr()}, // set a non-existed reference.
 			}
 		})()).Should(Succeed())
 		checkWorkloadGenerationAndToolsImage(Consistently, initWorkloadGeneration, 1, 0)
 
 		By("update replicas to trigger component spec and workload reconcile")
-		Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
-			comp.Spec.Replicas += 1
+		Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *kbappsv1.Cluster) {
+			cluster.Spec.ComponentSpecs[0].Replicas += 1
 		})()).Should(Succeed())
-		checkWorkloadGenerationAndToolsImage(Eventually, initWorkloadGeneration+2, 0, 1)
+		checkWorkloadGenerationAndToolsImage(Eventually, initWorkloadGeneration+1, 0, 1)
 	}
 
 	Context("provisioning", func() {
@@ -1798,11 +1747,6 @@ var _ = Describe("Component Controller", func() {
 			testCompConfiguration(defaultCompName, compDefName)
 		})
 
-		// TODO(v1.0): scheduling
-		// It("with component affinity and toleration set", func() {
-		//	testCompAffinityNToleration(defaultCompName, compDefName)
-		// })
-
 		It("with component RBAC set", func() {
 			testCompRBAC(defaultCompName, compDefName, "")
 		})
@@ -1815,8 +1759,7 @@ var _ = Describe("Component Controller", func() {
 			tesCreateCompWithRBACCreateByUser(defaultCompName, compDefName)
 		})
 
-		// TODO(v1.0): support for multiple versions of the KB tools images
-		PIt("update kubeblocks-tools image", func() {
+		It("update kubeblocks-tools image", func() {
 			testUpdateKubeBlocksToolsImage(defaultCompName, compDefName)
 		})
 	})

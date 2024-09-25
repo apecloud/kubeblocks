@@ -24,9 +24,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	policyv1 "k8s.io/api/policy/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -84,28 +82,28 @@ func (t *componentDeletionTransformer) Transform(ctx graph.TransformContext, dag
 // handleCompDeleteWhenScaleIn handles the component deletion when scale-in, this scenario will delete all the sub-resources owned by the component by default.
 func (t *componentDeletionTransformer) handleCompDeleteWhenScaleIn(transCtx *componentTransformContext, graphCli model.GraphClient,
 	dag *graph.DAG, comp *appsv1.Component, matchLabels map[string]string) error {
-	return t.deleteCompResources(transCtx, graphCli, dag, comp, matchLabels, kindsForCompWipeOut())
+	namespacedKinds, nonNamespacedKinds := kindsForCompWipeOut()
+	return t.deleteCompResources(transCtx, graphCli, dag, comp, matchLabels, namespacedKinds, nonNamespacedKinds)
 }
 
 // handleCompDeleteWhenClusterDelete handles the component deletion when the cluster is being deleted, the sub-resources owned by the component depends on the cluster's TerminationPolicy.
 func (t *componentDeletionTransformer) handleCompDeleteWhenClusterDelete(transCtx *componentTransformContext, graphCli model.GraphClient,
 	dag *graph.DAG, cluster *appsv1.Cluster, comp *appsv1.Component, matchLabels map[string]string) error {
-	var toDeleteKinds []client.ObjectList
+	var namespacedKinds, nonNamespacedKinds []client.ObjectList
 	switch cluster.Spec.TerminationPolicy {
 	case appsv1.Delete:
-		toDeleteKinds = kindsForCompDelete()
+		namespacedKinds, nonNamespacedKinds = kindsForCompDelete()
 	case appsv1.WipeOut:
-		toDeleteKinds = kindsForCompWipeOut()
+		namespacedKinds, nonNamespacedKinds = kindsForCompWipeOut()
 	}
-
-	return t.deleteCompResources(transCtx, graphCli, dag, comp, matchLabels, toDeleteKinds)
+	return t.deleteCompResources(transCtx, graphCli, dag, comp, matchLabels, namespacedKinds, nonNamespacedKinds)
 }
 
 func (t *componentDeletionTransformer) deleteCompResources(transCtx *componentTransformContext, graphCli model.GraphClient,
-	dag *graph.DAG, comp *appsv1.Component, matchLabels map[string]string, toDeleteKinds []client.ObjectList) error {
+	dag *graph.DAG, comp *appsv1.Component, matchLabels map[string]string, namespacedKinds, nonNamespacedKinds []client.ObjectList) error {
 
 	// firstly, delete the workloads owned by the component
-	workloads, err := model.ReadCacheSnapshot(transCtx, comp, matchLabels, compOwnedWorkloadKinds()...)
+	workloads, err := model.ReadCacheSnapshot(transCtx, comp, matchLabels, true, compOwnedWorkloadKinds()...)
 	if err != nil {
 		return newRequeueError(requeueDuration, err.Error())
 	}
@@ -119,17 +117,23 @@ func (t *componentDeletionTransformer) deleteCompResources(transCtx *componentTr
 	}
 
 	// secondly, delete the other sub-resources owned by the component
-	snapshot, err := model.ReadCacheSnapshot(transCtx, comp, matchLabels, toDeleteKinds...)
-	if err != nil {
-		return newRequeueError(requeueDuration, err.Error())
+	namespacedObjs, err1 := model.ReadCacheSnapshot(transCtx, comp, matchLabels, true, namespacedKinds...)
+	if err1 != nil {
+		return newRequeueError(requeueDuration, err1.Error())
 	}
-	if len(snapshot) > 0 {
+	nonNamespacedObjs, err2 := model.ReadCacheSnapshot(transCtx, comp, matchLabels, false, nonNamespacedKinds...)
+	if err2 != nil {
+		return newRequeueError(requeueDuration, err2.Error())
+	}
+	if len(namespacedObjs) > 0 || len(nonNamespacedObjs) > 0 {
 		// delete the sub-resources owned by the component before deleting the component
-		for _, object := range snapshot {
-			if isOwnedByInstanceSet(object) {
-				continue
+		for _, snapshot := range []model.ObjectSnapshot{namespacedObjs, nonNamespacedObjs} {
+			for _, object := range snapshot {
+				if isOwnedByInstanceSet(object) {
+					continue
+				}
+				graphCli.Delete(dag, object)
 			}
-			graphCli.Delete(dag, object)
 		}
 		graphCli.Status(dag, comp, transCtx.Component)
 		return newRequeueError(time.Second*1, "not all component sub-resources deleted")
@@ -166,44 +170,44 @@ func compOwnedWorkloadKinds() []client.ObjectList {
 	}
 }
 
-func compOwnedKinds() []client.ObjectList {
+func compOwnedKinds() ([]client.ObjectList, []client.ObjectList) {
 	return []client.ObjectList{
-		&workloads.InstanceSetList{},
-		&policyv1.PodDisruptionBudgetList{},
-		&corev1.ServiceList{},
-		&corev1.ServiceAccountList{},
-		&rbacv1.RoleBindingList{},
-		&batchv1.JobList{},
-		&dpv1alpha1.RestoreList{},
-		&dpv1alpha1.BackupList{},
-		&appsv1alpha1.ConfigurationList{},
-	}
+			&workloads.InstanceSetList{},
+			&corev1.ServiceList{},
+			&dpv1alpha1.BackupList{},
+			&dpv1alpha1.RestoreList{},
+			&appsv1alpha1.ConfigurationList{},
+			&corev1.ServiceAccountList{},
+			&rbacv1.RoleBindingList{},
+		},
+		[]client.ObjectList{
+			&rbacv1.ClusterRoleBindingList{},
+		}
 }
 
 func compOwnedPreserveKinds() []client.ObjectList {
 	return []client.ObjectList{
-		&corev1.PersistentVolumeClaimList{},
 		&corev1.SecretList{},
 		&corev1.ConfigMapList{},
+		&corev1.PersistentVolumeClaimList{},
 	}
 }
 
-func kindsForCompDoNotTerminate() []client.ObjectList {
-	return []client.ObjectList{}
+func kindsForCompDoNotTerminate() ([]client.ObjectList, []client.ObjectList) {
+	return []client.ObjectList{}, []client.ObjectList{}
 }
 
-func kindsForCompHalt() []client.ObjectList {
-	doNotTerminateKinds := kindsForCompDoNotTerminate()
-	ownedKinds := compOwnedKinds()
-	return append(doNotTerminateKinds, ownedKinds...)
+func kindsForCompHalt() ([]client.ObjectList, []client.ObjectList) {
+	namespacedKinds, nonNamespacedKinds := kindsForCompDoNotTerminate()
+	namespacedKindsPlus, nonNamespacedKindsPlus := compOwnedKinds()
+	return append(namespacedKinds, namespacedKindsPlus...), append(nonNamespacedKinds, nonNamespacedKindsPlus...)
 }
 
-func kindsForCompDelete() []client.ObjectList {
-	haltKinds := kindsForCompHalt()
-	preserveKinds := compOwnedPreserveKinds()
-	return append(haltKinds, preserveKinds...)
+func kindsForCompDelete() ([]client.ObjectList, []client.ObjectList) {
+	namespacedKinds, nonNamespacedKinds := kindsForCompHalt()
+	return append(namespacedKinds, compOwnedPreserveKinds()...), nonNamespacedKinds
 }
 
-func kindsForCompWipeOut() []client.ObjectList {
+func kindsForCompWipeOut() ([]client.ObjectList, []client.ObjectList) {
 	return kindsForCompDelete()
 }

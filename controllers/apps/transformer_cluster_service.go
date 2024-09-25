@@ -73,7 +73,7 @@ func (t *clusterServiceTransformer) Transform(ctx graph.TransformContext, dag *g
 		if err != nil {
 			return err
 		}
-		if err = createOrUpdateService(ctx, dag, graphCli, service, nil); err != nil {
+		if err = createOrUpdateService(transCtx.Context, transCtx.Client, dag, graphCli, service); err != nil {
 			return err
 		}
 		delete(services, service.Name)
@@ -168,13 +168,13 @@ func listOwnedClusterServices(ctx context.Context, cli client.Reader,
 	return services, nil
 }
 
-func createOrUpdateService(ctx graph.TransformContext, dag *graph.DAG, graphCli model.GraphClient, service *corev1.Service, owner client.Object) error {
+func createOrUpdateService(ctx context.Context, cli client.Reader, dag *graph.DAG, graphCli model.GraphClient, service *corev1.Service) error {
 	key := types.NamespacedName{
 		Namespace: service.Namespace,
 		Name:      service.Name,
 	}
-	obj := &corev1.Service{}
-	if err := ctx.GetClient().Get(ctx.GetContext(), key, obj, inDataContext4C()); err != nil {
+	originSvc := &corev1.Service{}
+	if err := cli.Get(ctx, key, originSvc, inDataContext4C()); err != nil {
 		if apierrors.IsNotFound(err) {
 			graphCli.Create(dag, service, inDataContext4G())
 			return nil
@@ -182,65 +182,14 @@ func createOrUpdateService(ctx graph.TransformContext, dag *graph.DAG, graphCli 
 		return err
 	}
 
-	// don't update service not owned by the owner, to keep compatible with existed cluster
-	if owner != nil && !model.IsOwnerOf(owner, obj) {
-		return nil
-	}
+	newSvc := originSvc.DeepCopy()
+	newSvc.Spec = service.Spec
+	ctrlutil.MergeMetadataMapInplace(service.Labels, &newSvc.Labels)
+	ctrlutil.MergeMetadataMapInplace(service.Annotations, &newSvc.Annotations)
+	resolveServiceDefaultFields(&originSvc.Spec, &newSvc.Spec)
 
-	objCopy := obj.DeepCopy()
-	objCopy.Spec = service.Spec
-
-	ctrlutil.MergeMetadataMapInplace(service.Labels, &objCopy.Labels)
-	ctrlutil.MergeMetadataMapInplace(service.Annotations, &objCopy.Annotations)
-
-	resolveServiceDefaultFields(&obj.Spec, &objCopy.Spec)
-
-	if !reflect.DeepEqual(obj, objCopy) {
-		graphCli.Update(dag, obj, objCopy, inDataContext4G())
+	if !reflect.DeepEqual(originSvc, newSvc) {
+		graphCli.Update(dag, originSvc, newSvc, inDataContext4G())
 	}
 	return nil
-}
-
-func resolveServiceDefaultFields(obj, objCopy *corev1.ServiceSpec) {
-	// TODO: how about the order changed?
-	for i, port := range objCopy.Ports {
-		if i == len(obj.Ports) {
-			break
-		}
-		// if the service type is NodePort or LoadBalancer, and the nodeport is not set, we should use the nodeport of the exist service
-		if (objCopy.Type == corev1.ServiceTypeNodePort || objCopy.Type == corev1.ServiceTypeLoadBalancer) && port.NodePort == 0 && obj.Ports[i].NodePort != 0 {
-			objCopy.Ports[i].NodePort = obj.Ports[i].NodePort
-		}
-		if port.TargetPort.IntVal != 0 {
-			continue
-		}
-		port.TargetPort = obj.Ports[i].TargetPort
-		if reflect.DeepEqual(port, obj.Ports[i]) {
-			objCopy.Ports[i].TargetPort = obj.Ports[i].TargetPort
-		}
-	}
-	if len(objCopy.ClusterIP) == 0 {
-		objCopy.ClusterIP = obj.ClusterIP
-	}
-	if len(objCopy.ClusterIPs) == 0 {
-		objCopy.ClusterIPs = obj.ClusterIPs
-	}
-	if len(objCopy.Type) == 0 {
-		objCopy.Type = obj.Type
-	}
-	if len(objCopy.SessionAffinity) == 0 {
-		objCopy.SessionAffinity = obj.SessionAffinity
-	}
-	if len(objCopy.IPFamilies) == 0 || (len(objCopy.IPFamilies) == 1 && *objCopy.IPFamilyPolicy != corev1.IPFamilyPolicySingleStack) {
-		objCopy.IPFamilies = obj.IPFamilies
-	}
-	if objCopy.IPFamilyPolicy == nil {
-		objCopy.IPFamilyPolicy = obj.IPFamilyPolicy
-	}
-	if objCopy.InternalTrafficPolicy == nil {
-		objCopy.InternalTrafficPolicy = obj.InternalTrafficPolicy
-	}
-	if objCopy.ExternalTrafficPolicy == "" && obj.ExternalTrafficPolicy != "" {
-		objCopy.ExternalTrafficPolicy = obj.ExternalTrafficPolicy
-	}
 }

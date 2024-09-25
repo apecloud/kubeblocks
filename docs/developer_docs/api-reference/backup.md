@@ -1906,6 +1906,120 @@ will be backed up collectively.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="dataprotection.kubeblocks.io/v1alpha1.BackupMethodTPL">BackupMethodTPL
+</h3>
+<p>
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.BackupPolicyTemplateSpec">BackupPolicyTemplateSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>The name of backup method.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>snapshotVolumes</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies whether to take snapshots of persistent volumes. If true,
+the ActionSetName is not required, the controller will use the CSI volume
+snapshotter to create the snapshot.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>actionSetName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Refers to the ActionSet object that defines the backup actions.
+For volume snapshot backup, the actionSet is not required, the controller
+will use the CSI volume snapshotter to create the snapshot.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>targetVolumes</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.TargetVolumeInfo">
+TargetVolumeInfo
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies which volumes from the target should be mounted in the backup workload.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>env</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.EnvVar">
+[]EnvVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the environment variables for the backup workload.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>runtimeSettings</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.RuntimeSettings">
+RuntimeSettings
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies runtime settings for the backup workload container.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>target</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.TargetInstance">
+TargetInstance
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>If set, specifies the method for selecting the replica to be backed up using the criteria defined here.
+If this field is not set, the selection method specified in <code>backupPolicy.target</code> is used.</p>
+<p>This field provides a way to override the global <code>backupPolicy.target</code> setting for specific BackupMethod.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="dataprotection.kubeblocks.io/v1alpha1.BackupPhase">BackupPhase
 (<code>string</code> alias)</h3>
 <p>
@@ -2143,6 +2257,290 @@ int64
 <em>(Optional)</em>
 <p>ObservedGeneration is the most recent generation observed for this BackupPolicy.
 It refers to the BackupPolicy&rsquo;s generation, which is updated on mutation by the API Server.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="dataprotection.kubeblocks.io/v1alpha1.BackupPolicyTemplate">BackupPolicyTemplate
+</h3>
+<div>
+<p>BackupPolicyTemplate should be provided by addon developers.
+It is responsible for generating BackupPolicies for the addon that requires backup operations,
+also determining the suitable backup methods and strategies.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>metadata</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#objectmeta-v1-meta">
+Kubernetes meta/v1.ObjectMeta
+</a>
+</em>
+</td>
+<td>
+<p>The metadata for the BackupPolicyTemplate object, including name, namespace, labels, and annotations.</p>
+Refer to the Kubernetes API documentation for the fields of the
+<code>metadata</code> field.
+</td>
+</tr>
+<tr>
+<td>
+<code>spec</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.BackupPolicyTemplateSpec">
+BackupPolicyTemplateSpec
+</a>
+</em>
+</td>
+<td>
+<p>Defines the desired state of the BackupPolicyTemplate.</p>
+<br/>
+<br/>
+<table>
+<tr>
+<td>
+<code>serviceKind</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the type of well-known service protocol that the BackupPolicyTemplate provides, and it is optional.
+Some examples of well-known service protocols include:</p>
+<ul>
+<li>&ldquo;MySQL&rdquo;: Indicates that the Component provides a MySQL database service.</li>
+<li>&ldquo;PostgreSQL&rdquo;: Indicates that the Component offers a PostgreSQL database service.</li>
+<li>&ldquo;Redis&rdquo;: Signifies that the Component functions as a Redis key-value store.</li>
+<li>&ldquo;ETCD&rdquo;: Denotes that the Component serves as an ETCD distributed key-value store</li>
+</ul>
+</td>
+</tr>
+<tr>
+<td>
+<code>target</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.TargetInstance">
+TargetInstance
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the selection criteria of instance to be backed up, and the connection credential to be used
+during the backup process.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>schedules</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.SchedulePolicy">
+[]SchedulePolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the execution plans for backup tasks, specifying when and how backups should occur,
+and the retention period of backup files.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>backupMethods</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.BackupMethodTPL">
+[]BackupMethodTPL
+</a>
+</em>
+</td>
+<td>
+<p>Defines an array of BackupMethods to be used.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>backoffLimit</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the maximum number of retry attempts for a backup before it is considered a failure.</p>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+<tr>
+<td>
+<code>status</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.BackupPolicyTemplateStatus">
+BackupPolicyTemplateStatus
+</a>
+</em>
+</td>
+<td>
+<p>Populated by the system, it represents the current information about the BackupPolicyTemplate.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="dataprotection.kubeblocks.io/v1alpha1.BackupPolicyTemplateSpec">BackupPolicyTemplateSpec
+</h3>
+<p>
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.BackupPolicyTemplate">BackupPolicyTemplate</a>)
+</p>
+<div>
+<p>BackupPolicyTemplateSpec contains the settings in a BackupPolicyTemplate.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>serviceKind</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the type of well-known service protocol that the BackupPolicyTemplate provides, and it is optional.
+Some examples of well-known service protocols include:</p>
+<ul>
+<li>&ldquo;MySQL&rdquo;: Indicates that the Component provides a MySQL database service.</li>
+<li>&ldquo;PostgreSQL&rdquo;: Indicates that the Component offers a PostgreSQL database service.</li>
+<li>&ldquo;Redis&rdquo;: Signifies that the Component functions as a Redis key-value store.</li>
+<li>&ldquo;ETCD&rdquo;: Denotes that the Component serves as an ETCD distributed key-value store</li>
+</ul>
+</td>
+</tr>
+<tr>
+<td>
+<code>target</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.TargetInstance">
+TargetInstance
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the selection criteria of instance to be backed up, and the connection credential to be used
+during the backup process.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>schedules</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.SchedulePolicy">
+[]SchedulePolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the execution plans for backup tasks, specifying when and how backups should occur,
+and the retention period of backup files.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>backupMethods</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.BackupMethodTPL">
+[]BackupMethodTPL
+</a>
+</em>
+</td>
+<td>
+<p>Defines an array of BackupMethods to be used.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>backoffLimit</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the maximum number of retry attempts for a backup before it is considered a failure.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="dataprotection.kubeblocks.io/v1alpha1.BackupPolicyTemplateStatus">BackupPolicyTemplateStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.BackupPolicyTemplate">BackupPolicyTemplate</a>)
+</p>
+<div>
+<p>BackupPolicyTemplateStatus defines the observed state of BackupPolicyTemplate.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>observedGeneration</code><br/>
+<em>
+int64
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Represents the most recent generation observed for this BackupPolicyTemplate.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>phase</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.Phase">
+Phase
+</a>
+</em>
+</td>
+<td>
+<p>Specifies the current phase of the BackupPolicyTemplate. Valid values are <code>empty</code>, <code>Available</code>, <code>Unavailable</code>.
+When <code>Available</code>, the BackupPolicyTemplate is ready and can be referenced by related objects.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>message</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Provides additional information about the current phase.</p>
 </td>
 </tr>
 </tbody>
@@ -3341,7 +3739,7 @@ string
 <h3 id="dataprotection.kubeblocks.io/v1alpha1.ContainerPort">ContainerPort
 </h3>
 <p>
-(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.BackupTarget">BackupTarget</a>)
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.BackupTarget">BackupTarget</a>, <a href="#dataprotection.kubeblocks.io/v1alpha1.TargetInstance">TargetInstance</a>)
 </p>
 <div>
 </div>
@@ -3441,6 +3839,61 @@ Kubernetes core/v1.SecretKeySelector
 <td>
 <p>Selects the key of a secret in the current namespace, the value of the secret
 is used as the encryption key.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="dataprotection.kubeblocks.io/v1alpha1.EnvVar">EnvVar
+</h3>
+<p>
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.BackupMethodTPL">BackupMethodTPL</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>value</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the environment variable key.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>value</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the environment variable value.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>valueFrom</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.ValueFrom">
+ValueFrom
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the source used to determine the value of the environment variable.
+Cannot be used if value is not empty.</p>
 </td>
 </tr>
 </tbody>
@@ -3879,7 +4332,7 @@ For instance, these should be stored in a <code>Secret</code> instead of a <code
 <h3 id="dataprotection.kubeblocks.io/v1alpha1.Phase">Phase
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.ActionSetStatus">ActionSetStatus</a>, <a href="#dataprotection.kubeblocks.io/v1alpha1.BackupPolicyStatus">BackupPolicyStatus</a>)
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.ActionSetStatus">ActionSetStatus</a>, <a href="#dataprotection.kubeblocks.io/v1alpha1.BackupPolicyStatus">BackupPolicyStatus</a>, <a href="#dataprotection.kubeblocks.io/v1alpha1.BackupPolicyTemplateStatus">BackupPolicyTemplateStatus</a>)
 </p>
 <div>
 <p>Phase defines the BackupPolicy and ActionSet CR .status.phase</p>
@@ -3900,7 +4353,7 @@ For instance, these should be stored in a <code>Secret</code> instead of a <code
 <h3 id="dataprotection.kubeblocks.io/v1alpha1.PodSelectionStrategy">PodSelectionStrategy
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.PodSelector">PodSelector</a>)
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.PodSelector">PodSelector</a>, <a href="#dataprotection.kubeblocks.io/v1alpha1.TargetInstance">TargetInstance</a>)
 </p>
 <div>
 <p>PodSelectionStrategy specifies the strategy to select when multiple pods are
@@ -5006,7 +5459,7 @@ y=year, mo=month, w=week, d=day, h=hour, m=minute.</p>
 <h3 id="dataprotection.kubeblocks.io/v1alpha1.RuntimeSettings">RuntimeSettings
 </h3>
 <p>
-(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.BackupMethod">BackupMethod</a>)
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.BackupMethod">BackupMethod</a>, <a href="#dataprotection.kubeblocks.io/v1alpha1.BackupMethodTPL">BackupMethodTPL</a>)
 </p>
 <div>
 </div>
@@ -5059,7 +5512,7 @@ More info: <a href="https://kubernetes.io/docs/concepts/configuration/manage-com
 <h3 id="dataprotection.kubeblocks.io/v1alpha1.SchedulePolicy">SchedulePolicy
 </h3>
 <p>
-(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.BackupScheduleSpec">BackupScheduleSpec</a>)
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.BackupPolicyTemplateSpec">BackupPolicyTemplateSpec</a>, <a href="#dataprotection.kubeblocks.io/v1alpha1.BackupScheduleSpec">BackupScheduleSpec</a>)
 </p>
 <div>
 </div>
@@ -5554,10 +6007,110 @@ int32
 </tr>
 </tbody>
 </table>
+<h3 id="dataprotection.kubeblocks.io/v1alpha1.TargetInstance">TargetInstance
+</h3>
+<p>
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.BackupMethodTPL">BackupMethodTPL</a>, <a href="#dataprotection.kubeblocks.io/v1alpha1.BackupPolicyTemplateSpec">BackupPolicyTemplateSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>role</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the role to select one or more replicas for backup.</p>
+<ul>
+<li>If no replica with the specified role exists, the backup task will fail.
+Special case: If there is only one replica in the cluster, it will be used for backup,
+even if its role differs from the specified one.
+For example, if you specify backing up on a secondary replica, but the cluster is single-node
+with only one primary replica, the primary will be used for backup.
+Future versions will address this special case using role priorities.</li>
+<li>If multiple replicas satisfy the specified role, the choice (<code>Any</code> or <code>All</code>) will be made according to
+the <code>strategy</code> field below.</li>
+</ul>
+</td>
+</tr>
+<tr>
+<td>
+<code>fallbackRole</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the fallback role to select one replica for backup, this only takes effect when the
+<code>strategy</code> field below is set to <code>Any</code>.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>account</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>If <code>backupPolicy.componentDefs</code> is set, this field is required to specify the system account name.
+This account must match one listed in <code>componentDefinition.spec.systemAccounts[*].name</code>.
+The corresponding secret created by this account is used to connect to the database.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>strategy</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.PodSelectionStrategy">
+PodSelectionStrategy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the PodSelectionStrategy to use when multiple pods are
+selected for the backup target.
+Valid values are:</p>
+<ul>
+<li>Any: Selects any one pod that matches the labelsSelector.</li>
+<li>All: Selects all pods that match the labelsSelector.</li>
+</ul>
+</td>
+</tr>
+<tr>
+<td>
+<code>containerPort</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.ContainerPort">
+ContainerPort
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the container port in the target pod.
+If not specified, the first container and its first port will be used.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="dataprotection.kubeblocks.io/v1alpha1.TargetVolumeInfo">TargetVolumeInfo
 </h3>
 <p>
-(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.BackupMethod">BackupMethod</a>)
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.BackupMethod">BackupMethod</a>, <a href="#dataprotection.kubeblocks.io/v1alpha1.BackupMethodTPL">BackupMethodTPL</a>)
 </p>
 <div>
 <p>TargetVolumeInfo specifies the volumes and their mounts of the targeted application
@@ -5596,6 +6149,84 @@ on the backup workload.</p>
 <td>
 <em>(Optional)</em>
 <p>Specifies the mount for the volumes specified in <code>volumes</code> section.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="dataprotection.kubeblocks.io/v1alpha1.ValueFrom">ValueFrom
+</h3>
+<p>
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.EnvVar">EnvVar</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>versionMapping</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.VersionMapping">
+[]VersionMapping
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Determine the appropriate version of the backup tool image from service version.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="dataprotection.kubeblocks.io/v1alpha1.VersionMapping">VersionMapping
+</h3>
+<p>
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.ValueFrom">ValueFrom</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>serviceVersions</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<p>Represents an array of the service version that can be mapped to the appropriate value.
+Each name in the list can represent an exact name, a name prefix, or a regular expression pattern.</p>
+<p>For example:</p>
+<ul>
+<li>&ldquo;8.0.33&rdquo;: Matches the exact name &ldquo;8.0.33&rdquo;</li>
+<li>&ldquo;8.0&rdquo;: Matches all names starting with &ldquo;8.0&rdquo;</li>
+<li>&rdquo;^8.0.\d&#123;1,2&#125;$&ldquo;: Matches all names starting with &ldquo;8.0.&rdquo; followed by one or two digits.</li>
+</ul>
+</td>
+</tr>
+<tr>
+<td>
+<code>mappedValue</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies a mapping value based on service version.
+Typically used to set up the tools image required for backup operations.</p>
 </td>
 </tr>
 </tbody>

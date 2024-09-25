@@ -97,16 +97,6 @@ type BackupMethodTPL struct {
 	// +optional
 	RuntimeSettings *RuntimeSettings `json:"runtimeSettings,omitempty"`
 
-	// Specifies the target information to back up, it will override the target in backup policy.
-	//
-	// +optional
-	//Target *BackupTarget `json:"target,omitempty"`
-
-	// Specifies multiple target information for backup operations. This includes details
-	// such as the target pod and cluster connection credentials. All specified targets
-	// will be backed up collectively.
-	//Targets []BackupTarget `json:"targets,omitempty"`
-
 	// If set, specifies the method for selecting the replica to be backed up using the criteria defined here.
 	// If this field is not set, the selection method specified in `backupPolicy.target` is used.
 	//
@@ -127,8 +117,8 @@ type EnvVar struct {
 	// +optional
 	Value *string `json:"value,omitempty"`
 
-	// Specifies the source used to derive the value of the environment variable,
-	// which typically represents the tool image required for backup operation.
+	// Specifies the source used to determine the value of the environment variable.
+	// Cannot be used if value is not empty.
 	//
 	// +optional
 	ValueFrom *ValueFrom `json:"valueFrom,omitempty"`
@@ -141,7 +131,7 @@ type ValueFrom struct {
 }
 
 type VersionMapping struct {
-	// Represents an array of names of ComponentDefinition that can be mapped to the appropriate version of the backup tool image.
+	// Represents an array of the service version that can be mapped to the appropriate value.
 	// Each name in the list can represent an exact name, a name prefix, or a regular expression pattern.
 	//
 	// For example:
@@ -153,7 +143,8 @@ type VersionMapping struct {
 	// +kubebuilder:validation:Required
 	ServiceVersions []string `json:"serviceVersions"`
 
-	// Specifies the appropriate version of the backup tool image.
+	// Specifies a mapping value based on service version.
+	// Typically used to set up the tools image required for backup operations.
 	//
 	// +kubebuilder:validation:Required
 	MappedValue string `json:"mappedValue"`
@@ -209,7 +200,7 @@ type BackupPolicyTemplateStatus struct {
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
-	// Specifies the current phase of the ClusterDefinition. Valid values are `empty`, `Available`, `Unavailable`.
+	// Specifies the current phase of the BackupPolicyTemplate. Valid values are `empty`, `Available`, `Unavailable`.
 	// When `Available`, the BackupPolicyTemplate is ready and can be referenced by related objects.
 	Phase Phase `json:"phase,omitempty"`
 

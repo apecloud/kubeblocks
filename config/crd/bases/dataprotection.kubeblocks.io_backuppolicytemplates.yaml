@@ -83,8 +83,8 @@ spec:
                             type: string
                           valueFrom:
                             description: |-
-                              Specifies the source used to derive the value of the environment variable,
-                              which typically represents the tool image required for backup operation.
+                              Specifies the source used to determine the value of the environment variable.
+                              Cannot be used if value is not empty.
                             properties:
                               versionMapping:
                                 description: Determine the appropriate version of
@@ -92,12 +92,13 @@ spec:
                                 items:
                                   properties:
                                     mappedValue:
-                                      description: Specifies the appropriate version
-                                        of the backup tool image.
+                                      description: |-
+                                        Specifies a mapping value based on service version.
+                                        Typically used to set up the tools image required for backup operations.
                                       type: string
                                     serviceVersions:
                                       description: |-
-                                        Represents an array of names of ComponentDefinition that can be mapped to the appropriate version of the backup tool image.
+                                        Represents an array of the service version that can be mapped to the appropriate value.
                                         Each name in the list can represent an exact name, a name prefix, or a regular expression pattern.
 
 
@@ -437,7 +438,7 @@ spec:
                 type: integer
               phase:
                 description: |-
-                  Specifies the current phase of the ClusterDefinition. Valid values are `empty`, `Available`, `Unavailable`.
+                  Specifies the current phase of the BackupPolicyTemplate. Valid values are `empty`, `Available`, `Unavailable`.
                   When `Available`, the BackupPolicyTemplate is ready and can be referenced by related objects.
                 enum:
                 - Available

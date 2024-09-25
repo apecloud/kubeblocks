@@ -133,6 +133,7 @@ func (r *ComponentDefinitionReconciler) deletionHandler(rctx intctrlutil.Request
 			recordEvent, &appsv1alpha1.ComponentList{}); res != nil || err != nil {
 			return res, err
 		}
+		_ = appsconfig.DeleteConfigMapFinalizer(r.Client, rctx, cmpd)
 		return nil, nil
 	}
 }

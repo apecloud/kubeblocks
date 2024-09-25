@@ -164,16 +164,6 @@ func (r *RestoreManager) BuildPrepareDataRestore(comp *component.SynthesizedComp
 	if targetVolumes == nil {
 		return nil, nil
 	}
-	getClusterJSON := func() string {
-		clusterSpec := r.Cluster.DeepCopy()
-		clusterSpec.ObjectMeta = metav1.ObjectMeta{
-			Name: clusterSpec.GetName(),
-			UID:  clusterSpec.GetUID(),
-		}
-		clusterSpec.Status = appsv1.ClusterStatus{}
-		b, _ := json.Marshal(*clusterSpec)
-		return string(b)
-	}
 
 	var templates []dpv1alpha1.RestoreVolumeClaim
 	pvcLabels := constant.GetCompLabels(r.Cluster.Name, comp.Name)
@@ -190,10 +180,6 @@ func (r *RestoreManager) BuildPrepareDataRestore(comp *component.SynthesizedComp
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   name,
 				Labels: pvcLabels,
-				Annotations: map[string]string{
-					// satisfy the detection of transformer_halt_recovering.
-					constant.LastAppliedClusterAnnotationKey: getClusterJSON(),
-				},
 			},
 		}
 		// build pvc labels

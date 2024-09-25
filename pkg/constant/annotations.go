@@ -25,22 +25,20 @@ const (
 
 // annotations defined by KubeBlocks
 const (
-	ClusterSnapshotAnnotationKey             = "kubeblocks.io/cluster-snapshot"          // ClusterSnapshotAnnotationKey saves the snapshot of cluster.
-	EncryptedSystemAccountsAnnotationKey     = "kubeblocks.io/encrypted-system-accounts" // EncryptedSystemAccountsAnnotationKey saves the encrypted system accounts.
-	OpsRequestAnnotationKey                  = "kubeblocks.io/ops-request"               // OpsRequestAnnotationKey OpsRequest annotation key in Cluster
-	ReconcileAnnotationKey                   = "kubeblocks.io/reconcile"                 // ReconcileAnnotationKey Notify k8s object to reconcile
-	RestartAnnotationKey                     = "kubeblocks.io/restart"                   // RestartAnnotationKey the annotation which notices the StatefulSet/DeploySet to restart
-	RestoreFromBackupAnnotationKey           = "kubeblocks.io/restore-from-backup"
-	RestoreDoneAnnotationKey                 = "kubeblocks.io/restore-done"
-	BackupSourceTargetAnnotationKey          = "kubeblocks.io/backup-source-target" // RestoreFromBackupAnnotationKey specifies the component to recover from the backup.
-	BackupPolicyTemplateAnnotationKey        = "apps.kubeblocks.io/backup-policy-template"
-	LastAppliedClusterAnnotationKey          = "apps.kubeblocks.io/last-applied-cluster"
-	PVLastClaimPolicyAnnotationKey           = "apps.kubeblocks.io/pv-last-claim-policy"
-	HaltRecoveryAllowInconsistentResAnnotKey = "clusters.apps.kubeblocks.io/allow-inconsistent-resource"
-	KubeBlocksGenerationKey                  = "kubeblocks.io/generation"
-	KBAppClusterUIDKey                       = "apps.kubeblocks.io/cluster-uid"
-	LastRoleSnapshotVersionAnnotationKey     = "apps.kubeblocks.io/last-role-snapshot-version"
-	ComponentScaleInAnnotationKey            = "apps.kubeblocks.io/component-scale-in" // ComponentScaleInAnnotationKey specifies whether the component is scaled in
+	ClusterSnapshotAnnotationKey         = "kubeblocks.io/cluster-snapshot"          // ClusterSnapshotAnnotationKey saves the snapshot of cluster.
+	EncryptedSystemAccountsAnnotationKey = "kubeblocks.io/encrypted-system-accounts" // EncryptedSystemAccountsAnnotationKey saves the encrypted system accounts.
+	OpsRequestAnnotationKey              = "kubeblocks.io/ops-request"               // OpsRequestAnnotationKey OpsRequest annotation key in Cluster
+	ReconcileAnnotationKey               = "kubeblocks.io/reconcile"                 // ReconcileAnnotationKey Notify k8s object to reconcile
+	RestartAnnotationKey                 = "kubeblocks.io/restart"                   // RestartAnnotationKey the annotation which notices the StatefulSet/DeploySet to restart
+	RestoreFromBackupAnnotationKey       = "kubeblocks.io/restore-from-backup"
+	RestoreDoneAnnotationKey             = "kubeblocks.io/restore-done"
+	BackupSourceTargetAnnotationKey      = "kubeblocks.io/backup-source-target" // RestoreFromBackupAnnotationKey specifies the component to recover from the backup.
+	BackupPolicyTemplateAnnotationKey    = "apps.kubeblocks.io/backup-policy-template"
+	PVLastClaimPolicyAnnotationKey       = "apps.kubeblocks.io/pv-last-claim-policy"
+	KubeBlocksGenerationKey              = "kubeblocks.io/generation"
+	KBAppClusterUIDKey                   = "apps.kubeblocks.io/cluster-uid"
+	LastRoleSnapshotVersionAnnotationKey = "apps.kubeblocks.io/last-role-snapshot-version"
+	ComponentScaleInAnnotationKey        = "apps.kubeblocks.io/component-scale-in" // ComponentScaleInAnnotationKey specifies whether the component is scaled in
 
 	// SkipImmutableCheckAnnotationKey specifies to skip the mutation check for the object.
 	// The mutation check is only applied to the fields that are declared as immutable.

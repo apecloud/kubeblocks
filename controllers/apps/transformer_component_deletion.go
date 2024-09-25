@@ -97,7 +97,6 @@ func (t *componentDeletionTransformer) handleCompDeleteWhenClusterDelete(transCt
 	case appsv1.WipeOut:
 		toDeleteKinds = kindsForCompWipeOut()
 	}
-
 	return t.deleteCompResources(transCtx, graphCli, dag, comp, matchLabels, toDeleteKinds)
 }
 
@@ -188,20 +187,10 @@ func compOwnedPreserveKinds() []client.ObjectList {
 	}
 }
 
-func kindsForCompDoNotTerminate() []client.ObjectList {
-	return []client.ObjectList{}
-}
-
-func kindsForCompHalt() []client.ObjectList {
-	doNotTerminateKinds := kindsForCompDoNotTerminate()
-	ownedKinds := compOwnedKinds()
-	return append(doNotTerminateKinds, ownedKinds...)
-}
-
 func kindsForCompDelete() []client.ObjectList {
-	haltKinds := kindsForCompHalt()
+	ownedKinds := compOwnedKinds()
 	preserveKinds := compOwnedPreserveKinds()
-	return append(haltKinds, preserveKinds...)
+	return append(ownedKinds, preserveKinds...)
 }
 
 func kindsForCompWipeOut() []client.ObjectList {

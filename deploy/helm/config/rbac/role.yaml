@@ -46,13 +46,6 @@ rules:
 - apiGroups:
   - apps.kubeblocks.io
   resources:
-  - backuppolicytemplates
-  verbs:
-  - get
-  - list
-- apiGroups:
-  - apps.kubeblocks.io
-  resources:
   - clusterdefinitions
   verbs:
   - create

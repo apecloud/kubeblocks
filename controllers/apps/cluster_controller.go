@@ -149,7 +149,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			&clusterComponentTransformer{},
 			// update cluster components' status
 			&clusterComponentStatusTransformer{},
-			// build backuppolicy and backupschedule from backupPolicyTemplate
+			// build backupPolicy and backupSchedule from backupPolicyTemplate
 			&clusterBackupPolicyTransformer{},
 			// add our finalizer to all objects
 			&clusterOwnershipTransformer{},

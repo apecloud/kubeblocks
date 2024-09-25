@@ -21,6 +21,7 @@ package apps
 
 import (
 	"fmt"
+	"reflect"
 
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -61,7 +62,7 @@ func (t *shardingAPINormalizationTransformer) Transform(ctx graph.TransformConte
 	}
 
 	// build all component specs generated from shardingSpecs
-	if err = t.buildShardingCompSpecs(transCtx, cluster); err != nil {
+	if err = t.buildShardingCompSpecs(transCtx, cluster, dag); err != nil {
 		return err
 	}
 
@@ -102,14 +103,26 @@ func (t *shardingAPINormalizationTransformer) validateComponentDef(cluster *apps
 }
 
 func (t *shardingAPINormalizationTransformer) buildShardingCompSpecs(transCtx *shardingTransformContext,
-	cluster *appsv1.Cluster) error {
+	cluster *appsv1.Cluster, dag *graph.DAG) error {
+
+	if transCtx.ShardingToComponentSpecs == nil {
+		transCtx.ShardingToComponentSpecs = make(map[string][]*appsv1.ClusterComponentSpec)
+	}
+	clusterCopy := cluster.DeepCopy()
 	for i, sharding := range cluster.Spec.ShardingSpecs {
-		shardingComps, err := controllerutil.GenShardingCompSpecList(transCtx.Context, transCtx.Client, cluster, &cluster.Spec.ShardingSpecs[i])
+		shardingComps, err := controllerutil.GenShardingCompSpecList(transCtx.Context, transCtx.Client, clusterCopy, &cluster.Spec.ShardingSpecs[i])
 		if err != nil {
 			return err
 		}
 		transCtx.ShardingToComponentSpecs[sharding.Name] = shardingComps
 	}
+
+	if reflect.DeepEqual(cluster, clusterCopy) {
+		// update the cluster object if the sharding component specs are changed
+		graphCli, _ := transCtx.Client.(model.GraphClient)
+		graphCli.Update(dag, cluster, clusterCopy, &model.ReplaceIfExistingOption{})
+	}
+
 	// TODO: cluster definition topology supports sharding
 	return nil
 }

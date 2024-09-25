@@ -91,7 +91,7 @@ func (c *shardingPlanBuilder) Init() error {
 	if err := c.cli.Get(c.transCtx.Context, c.req.NamespacedName, cluster); err != nil {
 		return err
 	}
-	c.AddTransformer(&clusterInitTransformer{cluster: cluster})
+	c.AddTransformer(&shardingInitTransformer{cluster: cluster})
 	return nil
 }
 

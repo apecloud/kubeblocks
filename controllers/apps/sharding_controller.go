@@ -102,7 +102,7 @@ func (r *ShardingReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		if apierrors.IsConflict(err) {
 			return intctrlutil.Requeue(reqCtx.Log, err.Error())
 		}
-		c := planBuilder.(*clusterPlanBuilder)
+		c := planBuilder.(*shardingPlanBuilder)
 		sendWarningEventWithError(r.Recorder, c.transCtx.Cluster, corev1.EventTypeWarning, err)
 		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
 	}
@@ -120,19 +120,16 @@ func (r *ShardingReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	//    If you do need to create/update/delete object, make your intent operation a lifecycleVertex and put it into the DAG.
 	plan, errBuild := planBuilder.
 		AddTransformer(
-			// handle cluster deletion
-			&clusterDeletionTransformer{},
+			// handle cluster sharding shared account
+			&shardingSharedAccountTransformer{},
 			// normalize the cluster shardingSpecs API
 			&shardingAPINormalizationTransformer{},
 			// handle cluster services with sharding selector
 			&shardingServiceTransformer{},
-			// handle cluster sharding shared account
-			&shardingSharedAccountTransformer{},
 			// create/update/delete cluster sharding components
 			&shardingComponentTransformer{},
 			// handle the restore for cluster sharding components
 			&shardingRestoreTransformer{},
-			// always safe to put your transformer below
 		).Build()
 
 	// Execute stage

@@ -443,10 +443,10 @@ func (r *backupPolicyBuilder) resolveBackupMethodEnv(compSpec *appsv1.ClusterCom
 		}
 		if v.ValueFrom != nil {
 			for _, versionMapping := range v.ValueFrom.VersionMapping {
-				if !r.matchMappingName(versionMapping.ServiceVersions, compSpec.ServiceVersion) {
-					continue
+				if r.matchMappingName(versionMapping.ServiceVersions, compSpec.ServiceVersion) {
+					env = append(env, corev1.EnvVar{Name: v.Name, Value: versionMapping.MappedValue})
+					break
 				}
-				env = append(env, corev1.EnvVar{Name: v.Name, Value: versionMapping.MappedValue})
 			}
 		}
 	}

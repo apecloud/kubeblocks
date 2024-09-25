@@ -419,17 +419,19 @@ func (s *Scheduler) reconfigure(schedulePolicy *dpv1alpha1.SchedulePolicy) error
 			Type:        opsv1alpha1.ReconfiguringType,
 			ClusterName: clusterName,
 			SpecificOpsRequest: opsv1alpha1.SpecificOpsRequest{
-				Reconfigure: &opsv1alpha1.Reconfigure{
-					ComponentOps: opsv1alpha1.ComponentOps{
-						ComponentName: targetPodSelector.MatchLabels[constant.KBAppComponentLabelKey],
-					},
-					Configurations: []opsv1alpha1.ConfigurationItem{
-						{
-							Name: configRef.Name,
-							Keys: []opsv1alpha1.ParameterConfig{
-								{
-									Key:        configRef.Key,
-									Parameters: parameters,
+				Reconfigures: []opsv1alpha1.Reconfigure{
+					{
+						ComponentOps: opsv1alpha1.ComponentOps{
+							ComponentName: targetPodSelector.MatchLabels[constant.KBAppComponentLabelKey],
+						},
+						Configurations: []opsv1alpha1.ConfigurationItem{
+							{
+								Name: configRef.Name,
+								Keys: []opsv1alpha1.ParameterConfig{
+									{
+										Key:        configRef.Key,
+										Parameters: parameters,
+									},
 								},
 							},
 						},

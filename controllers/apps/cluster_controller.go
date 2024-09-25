@@ -180,7 +180,6 @@ func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		}).
 		Owns(&appsv1.Component{}).
 		Owns(&corev1.Service{}). // cluster services
-		Owns(&corev1.Secret{}).  // sharding account secret
 		Owns(&dpv1alpha1.BackupPolicy{}).
 		Owns(&dpv1alpha1.BackupSchedule{}).
 		Complete(r)

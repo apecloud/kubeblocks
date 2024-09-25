@@ -24,6 +24,9 @@ spec:
       jsonPath: .spec.serviceKind
       name: SERVICE-KIND
       type: string
+    - jsonPath: .status.phase
+      name: STATUS
+      type: string
     - jsonPath: .metadata.creationTimestamp
       name: AGE
       type: date

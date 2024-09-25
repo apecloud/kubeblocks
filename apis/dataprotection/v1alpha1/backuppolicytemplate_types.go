@@ -221,6 +221,7 @@ type BackupPolicyTemplateStatus struct {
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=bpt
 // +kubebuilder:printcolumn:name="SERVICE-KIND",type="string",JSONPath=".spec.serviceKind",description="service kind of the backupPolicyTemplate."
+// +kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase"
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 type BackupPolicyTemplate struct {
 	// The metadata for the API version and kind of the BackupPolicyTemplate.

@@ -36,6 +36,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
@@ -77,7 +78,8 @@ func (g *planGenerator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.R
 		return kubebuilderx.Commit, err
 	}
 
-	// create mock client, mock event recorder, mock kbagent client
+	// create mock client and mock event recorder
+	// kbagent client is running in dry-run mode by setting context key-value pair: dry-run=true
 	store := newChangeCaptureStore(g.cli.Scheme(), i18nResource)
 	mClient, err := newMockClient(g.cli, store, viewDef.Spec.OwnershipRules)
 	if err != nil {
@@ -110,19 +112,19 @@ func (g *planGenerator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.R
 	}
 
 	// start plan generation loop
+	expr := viewDef.Spec.StateEvaluationExpression
+	if plan.Spec.StateEvaluationExpression != nil {
+		expr = *plan.Spec.StateEvaluationExpression
+	}
 	for {
+		changeCount := len(store.GetChanges())
+
 		// run reconciler tree
 		if err = reconcilerTree.Run(); err != nil {
 			return kubebuilderx.Commit, err
 		}
-		//
+
 		// state evaluation
-		// if true, break
-		// else continue plan generation loop
-		expr := viewDef.Spec.StateEvaluationExpression
-		if plan.Spec.StateEvaluationExpression != nil {
-			expr = *plan.Spec.StateEvaluationExpression
-		}
 		if err = mClient.Get(g.ctx, objectKey, root); err != nil {
 			return kubebuilderx.Commit, err
 		}
@@ -130,10 +132,14 @@ func (g *planGenerator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.R
 		if err != nil {
 			return kubebuilderx.Commit, err
 		}
-		if state {
+
+		// final state with no more changes happen, the reconciliation cycle is done.
+		if state && changeCount == len(store.GetChanges()) {
 			break
 		}
 	}
+
+	// update plan.status
 	plan.Status.ObservedPlanGeneration = plan.Generation
 	plan.Status.ObservedTargetGeneration = root.Generation
 	plan.Status.Phase = "Succeed"
@@ -197,7 +203,6 @@ func applyDesiredSpec(desiredSpec string, obj client.Object) (string, error) {
 		return "", fmt.Errorf("failed to get current spec: %w", err)
 	}
 
-	// TODO(free6om): StrategicMergePatch is incorrect, fix it
 	// Create a strategic merge patch
 	patch, err := strategicpatch.CreateTwoWayMergePatch(
 		specMapToJSON(currentSpec),
@@ -265,7 +270,7 @@ func loadCurrentObjectTree(ctx context.Context, cli client.Client, root *appsv1a
 
 func planGeneration(ctx context.Context, cli client.Client) kubebuilderx.Reconciler {
 	return &planGenerator{
-		ctx: ctx,
+		ctx: context.WithValue(ctx, constant.DryRunContextKey, true),
 		cli: cli,
 	}
 }

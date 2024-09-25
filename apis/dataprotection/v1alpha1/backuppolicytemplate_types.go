@@ -110,7 +110,7 @@ type EnvVar struct {
 	// Specifies the environment variable key.
 	//
 	// +kubebuilder:validation:Required
-	Name string `json:"value"`
+	Name string `json:"name"`
 
 	// Specifies the environment variable value.
 	//

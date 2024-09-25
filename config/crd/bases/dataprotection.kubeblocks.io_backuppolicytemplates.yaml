@@ -78,6 +78,9 @@ spec:
                         workload.
                       items:
                         properties:
+                          name:
+                            description: Specifies the environment variable key.
+                            type: string
                           value:
                             description: Specifies the environment variable value.
                             type: string
@@ -118,7 +121,7 @@ spec:
                                 type: array
                             type: object
                         required:
-                        - value
+                        - name
                         type: object
                       type: array
                     name:

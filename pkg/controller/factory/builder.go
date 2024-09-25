@@ -54,7 +54,8 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, component
 	)
 
 	podBuilder := builder.NewPodBuilder("", "").
-		AddLabelsInMap(constant.GetCompLabels(clusterName, compName, synthesizedComp.Labels)).
+		AddLabelsInMap(constant.GetCompLabels(clusterName, compName)).
+		AddLabelsInMap(synthesizedComp.Labels).
 		AddLabelsInMap(synthesizedComp.DynamicLabels).
 		AddLabelsInMap(synthesizedComp.StaticLabels).
 		AddAnnotationsInMap(synthesizedComp.DynamicAnnotations).

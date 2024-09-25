@@ -110,7 +110,7 @@ func (t *shardingServiceTransformer) buildService4Sharding(transCtx *shardingTra
 
 	serviceName := constant.GenerateClusterServiceName(cluster.Name, genSvc.ServiceName)
 	builder := builder.NewServiceBuilder(namespace, serviceName).
-		AddLabelsInMap(constant.GetClusterWellKnownLabels(clusterName)).
+		AddLabelsInMap(constant.GetClusterLabels(clusterName)).
 		AddLabels(constant.KBAppShardingNameLabelKey, genSvc.ShardingSelector).
 		AddAnnotationsInMap(genSvc.Annotations).
 		SetSpec(&genSvc.Spec).

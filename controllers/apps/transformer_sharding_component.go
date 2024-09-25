@@ -117,7 +117,7 @@ func (t *shardingComponentTransformer) handleCompsCreate(transCtx *shardingTrans
 	cluster := transCtx.Cluster
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	for compName := range createCompSet {
-		comp, err := component.BuildComponent(cluster, protoCompSpecMap[compName], nil, nil)
+		comp, err := component.BuildComponent(cluster, protoCompSpecMap[compName])
 		if err != nil {
 			return err
 		}
@@ -143,7 +143,7 @@ func (t *shardingComponentTransformer) handleCompsUpdate(transCtx *shardingTrans
 		if getErr != nil {
 			return getErr
 		}
-		comp, buildErr := component.BuildComponent(cluster, protoCompSpecMap[compName], nil, nil)
+		comp, buildErr := component.BuildComponent(cluster, protoCompSpecMap[compName])
 		if buildErr != nil {
 			return buildErr
 		}

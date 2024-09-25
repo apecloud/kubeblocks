@@ -221,7 +221,7 @@ func shouldSkipObjOwnedByComp(obj client.Object, cluster kbappsv1.Cluster) bool 
 }
 
 func deleteCompsInOrder4Terminate(transCtx *clusterTransformContext, dag *graph.DAG) (sets.Set[string], error) {
-	compNameSet, err := component.GetClusterComponentShortNameSet(transCtx.Context, transCtx.Client, transCtx.Cluster)
+	compNameSet, err := component.GetClusterComponentShortNameSet(transCtx.Context, transCtx.Client, transCtx.Cluster, nil)
 	if err != nil {
 		return nil, err
 	}

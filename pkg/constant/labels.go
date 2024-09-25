@@ -56,22 +56,22 @@ const (
 	KBManagedByKey = "apps.kubeblocks.io/managed-by" // KBManagedByKey marks resources that auto created
 )
 
-func GetClusterLabels(clusterName string, labels ...map[string]string) map[string]string {
-	return withShardingNameLabel(map[string]string{
+func GetClusterLabels(clusterName string) map[string]string {
+	return map[string]string{
 		AppManagedByLabelKey: AppName,
 		AppInstanceLabelKey:  clusterName,
-	}, labels...)
+	}
 }
 
-func GetCompLabels(clusterName, compName string, labels ...map[string]string) map[string]string {
-	return withShardingNameLabel(map[string]string{
+func GetCompLabels(clusterName, compName string) map[string]string {
+	return map[string]string{
 		AppManagedByLabelKey:   AppName,
 		AppInstanceLabelKey:    clusterName,
 		KBAppComponentLabelKey: compName,
-	}, labels...)
+	}
 }
 
-func GetCompLabelsWithDef(clusterName, compName, compDef string, labels ...map[string]string) map[string]string {
+func GetCompLabelsWithDef(clusterName, compName, compDef string) map[string]string {
 	m := map[string]string{
 		AppManagedByLabelKey:   AppName,
 		AppInstanceLabelKey:    clusterName,
@@ -80,7 +80,7 @@ func GetCompLabelsWithDef(clusterName, compName, compDef string, labels ...map[s
 	if len(compDef) > 0 {
 		m[AppComponentLabelKey] = compDef
 	}
-	return withShardingNameLabel(m, labels...)
+	return m
 }
 
 func GetConfigurationLabels(clusterName, compName, cmTplName string) map[string]string {
@@ -90,16 +90,4 @@ func GetConfigurationLabels(clusterName, compName, cmTplName string) map[string]
 		KBAppComponentLabelKey: compName,
 		CMTemplateNameLabelKey: cmTplName,
 	}
-}
-
-func withShardingNameLabel(labels map[string]string, extraLabels ...map[string]string) map[string]string {
-	for _, m := range extraLabels {
-		if m != nil {
-			if v, ok := m[KBAppShardingNameLabelKey]; ok {
-				labels[KBAppShardingNameLabelKey] = v
-				break
-			}
-		}
-	}
-	return labels
 }

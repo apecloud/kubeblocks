@@ -116,7 +116,7 @@ $kubeblocks_changes
 
 ### API changes
 - New APIs:
-    - backuppolicytemplates.dataprotection.kubeblocks.io
+    - backuppolicytemplates.apps.kubeblocks.io
 
 - Deleted APIs:
     - backuppolicytemplates.dataprotection.kubeblocks.io

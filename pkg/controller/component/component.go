@@ -92,15 +92,6 @@ func BuildComponent(cluster *appsv1.Cluster, compSpec *appsv1.ClusterComponentSp
 	return compBuilder.GetObject(), nil
 }
 
-func BuildComponentExt(cluster *appsv1.Cluster, compSpec *appsv1.ClusterComponentSpec, shardingName string,
-	annotations map[string]string) (*appsv1.Component, error) {
-	labels := map[string]string{}
-	if len(shardingName) > 0 {
-		labels[constant.KBAppShardingNameLabelKey] = shardingName
-	}
-	return BuildComponent(cluster, compSpec, labels, annotations)
-}
-
 func inheritedAnnotations(cluster *appsv1.Cluster) map[string]string {
 	m := map[string]string{}
 	annotations := cluster.Annotations

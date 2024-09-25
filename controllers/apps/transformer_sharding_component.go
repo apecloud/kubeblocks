@@ -86,7 +86,7 @@ func (t *shardingComponentTransformer) reconcileShardingComponents(transCtx *sha
 
 	// TODO: support sharding topology order
 
-	// component objects to be deleted (scale-in)
+	// sharding component objects to be deleted (scale-in)
 	if err := t.handleCompsDelete(transCtx, dag, deleteCompSet, false); err != nil {
 		return err
 	}
@@ -95,7 +95,7 @@ func (t *shardingComponentTransformer) reconcileShardingComponents(transCtx *sha
 		return err
 	}
 
-	// component objects to be created
+	// sharding component objects to be created
 	if err := t.handleCompsCreate(transCtx, dag, protoCompSpecMap, protoCompToShardingName, createCompSet); err != nil {
 		return err
 	}

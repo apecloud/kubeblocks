@@ -487,7 +487,7 @@ type createCompHandler struct {
 func (h *createCompHandler) handle(transCtx *clusterTransformContext, dag *graph.DAG, compName string) error {
 	cluster := transCtx.Cluster
 	graphCli, _ := transCtx.Client.(model.GraphClient)
-	comp, err := component.BuildComponentExt(cluster, h.compSpecs[compName], shardingNameFromComp(transCtx, compName), h.annotations[compName])
+	comp, err := component.BuildComponent(cluster, h.compSpecs[compName], nil, h.annotations[compName])
 	if err != nil {
 		return err
 	}
@@ -543,7 +543,7 @@ func (h *updateCompHandler) handle(transCtx *clusterTransformContext, dag *graph
 	if getErr != nil {
 		return getErr
 	}
-	comp, buildErr := component.BuildComponentExt(cluster, h.compSpecs[compName], shardingNameFromComp(transCtx, compName), h.annotations[compName])
+	comp, buildErr := component.BuildComponent(cluster, h.compSpecs[compName], nil, h.annotations[compName])
 	if buildErr != nil {
 		return buildErr
 	}
@@ -587,16 +587,4 @@ type orderedUpdateCompHandler struct {
 	compOrderedOrder
 	compPhasePrecondition
 	updateCompHandler
-}
-
-func shardingNameFromComp(transCtx *clusterTransformContext, compName string) string {
-	equal := func(spec *appsv1.ClusterComponentSpec) bool {
-		return spec.Name == compName
-	}
-	for shardingName, shardingComps := range transCtx.ShardingComponentSpecs {
-		if slices.IndexFunc(shardingComps, equal) >= 0 {
-			return shardingName
-		}
-	}
-	return ""
 }

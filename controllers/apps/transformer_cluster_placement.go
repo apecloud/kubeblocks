@@ -52,6 +52,7 @@ func (t *clusterPlacementTransformer) Transform(ctx graph.TransformContext, dag 
 		return nil
 	}
 
+	// TODO: sharding components placement
 	p := t.assign(transCtx)
 
 	cluster := transCtx.Cluster

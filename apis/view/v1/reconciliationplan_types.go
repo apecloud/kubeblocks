@@ -25,10 +25,6 @@ import (
 
 // ReconciliationPlanSpec defines the desired state of ReconciliationPlan
 type ReconciliationPlanSpec struct {
-	// ViewDefinition specifies the name of the ReconciliationViewDefinition.
-	//
-	ViewDefinition string `json:"viewDefinition"`
-
 	// TargetObject specifies the target Cluster object.
 	// Default is the Cluster object with same namespace and name as this ReconciliationPlan object.
 	//
@@ -50,7 +46,7 @@ type ReconciliationPlanSpec struct {
 	// +optional
 	Depth *int32 `json:"depth,omitempty"`
 
-	// StateEvaluationExpression overrides the value specified in ReconciliationViewDefinition.
+	// StateEvaluationExpression overrides the builtin default value.
 	//
 	// +optional
 	StateEvaluationExpression *StateEvaluationExpression `json:"stateEvaluationExpression,omitempty"`

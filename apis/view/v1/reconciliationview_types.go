@@ -25,10 +25,6 @@ import (
 
 // ReconciliationViewSpec defines the desired state of ReconciliationView
 type ReconciliationViewSpec struct {
-	// ViewDefinition specifies the name of the ReconciliationViewDefinition.
-	//
-	ViewDefinition string `json:"viewDefinition"`
-
 	// TargetObject specifies the target Cluster object.
 	// Default is the Cluster object with same namespace and name as this ReconciliationView object.
 	//
@@ -43,7 +39,7 @@ type ReconciliationViewSpec struct {
 	// +optional
 	Depth *int32 `json:"depth,omitempty"`
 
-	// StateEvaluationExpression overrides the value specified in ReconciliationViewDefinition.
+	// StateEvaluationExpression overrides the builtin default value.
 	//
 	// +optional
 	StateEvaluationExpression *StateEvaluationExpression `json:"stateEvaluationExpression,omitempty"`

@@ -31,7 +31,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 type planResourcesLoader struct{}
@@ -46,25 +48,11 @@ func (r *planResourcesLoader) Load(ctx context.Context, reader client.Reader, re
 		return tree, nil
 	}
 
-	// load view definition object
-	p, _ := tree.GetRoot().(*viewv1.ReconciliationPlan)
-	viewDef := &viewv1.ReconciliationViewDefinition{}
-	if err = reader.Get(ctx, types.NamespacedName{Name: p.Spec.ViewDefinition}, viewDef); err != nil {
-		if apierrors.IsNotFound(err) {
-			return tree, nil
-		}
-		return nil, err
-	}
-	if err = tree.Add(viewDef); err != nil {
-		return nil, err
-	}
-
 	// load i18n resources
-	if viewDef.Spec.I18nResourceRef == nil {
-		return tree, nil
-	}
 	i18n := &corev1.ConfigMap{}
-	if err = reader.Get(ctx, types.NamespacedName{Namespace: viewDef.Spec.I18nResourceRef.Namespace, Name: viewDef.Spec.I18nResourceRef.Name}, i18n); err != nil {
+	i18nResourcesNamespace := viper.GetString(constant.CfgKeyCtrlrMgrNS)
+	i18nResourcesName := viper.GetString(constant.I18nResourcesName)
+	if err = reader.Get(ctx, types.NamespacedName{Namespace: i18nResourcesNamespace, Name: i18nResourcesName}, i18n); err != nil {
 		if apierrors.IsNotFound(err) {
 			return tree, nil
 		}

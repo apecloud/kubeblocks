@@ -147,6 +147,7 @@ func init() {
 	viper.SetDefault(constant.FeatureGateComponentReplicasAnnotation, true)
 	viper.SetDefault(constant.FeatureGateInPlacePodVerticalScaling, false)
 	viper.SetDefault(constant.FeatureGateNoRSMEnv, false)
+	viper.SetDefault(constant.I18nResourcesName, "kubeblocks-i18n-resources")
 }
 
 type flagName string

@@ -23,7 +23,6 @@ resources:
 #- bases/apps.kubeblocks.io_componentversions.yaml
 #- bases/dataprotection.kubeblocks.io_storageproviders.yaml
 #- bases/experimental.kubeblocks.io_nodecountscalers.yaml
-- bases/view.kubeblocks.io_reconciliationviewdefinitions.yaml
 - bases/view.kubeblocks.io_reconciliationviews.yaml
 - bases/view.kubeblocks.io_reconciliationplans.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
@@ -54,7 +53,6 @@ patchesStrategicMerge:
 #- patches/webhook_in_opsdefinitions.yaml
 #- patches/webhook_in_componentversions.yaml
 #- patches/webhook_in_nodecountscalers.yaml
-#- patches/webhook_in_reconciliationviewdefinitions.yaml
 #- patches/webhook_in_reconciliationviews.yaml
 #- patches/webhook_in_reconciliationplans.yaml
 #+kubebuilder:scaffold:crdkustomizewebhookpatch
@@ -84,7 +82,6 @@ patchesStrategicMerge:
 #- patches/cainjection_in_opsdefinitions.yaml
 #- patches/cainjection_in_componentversions.yaml
 #- patches/cainjection_in_nodecountscalers.yaml
-#- patches/cainjection_in_reconciliationviewdefinitions.yaml
 #- patches/cainjection_in_reconciliationviews.yaml
 #- patches/cainjection_in_reconciliationplans.yaml
 #+kubebuilder:scaffold:crdkustomizecainjectionpatch

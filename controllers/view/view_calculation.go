@@ -51,7 +51,6 @@ func (c *viewCalculator) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilde
 
 func (c *viewCalculator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	view, _ := tree.GetRoot().(*viewv1.ReconciliationView)
-	viewDef := tree.List(&viewv1.ReconciliationViewDefinition{})[0].(*viewv1.ReconciliationViewDefinition)
 	objs := tree.List(&corev1.ConfigMap{})
 	var i18nResource *corev1.ConfigMap
 	if len(objs) > 0 {
@@ -71,7 +70,7 @@ func (c *viewCalculator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.
 		return kubebuilderx.Commit, err
 	}
 
-	newObjectSet, newObjectMap, err := getObjectsFromCache(c.ctx, c.cli, root, viewDef.Spec.OwnershipRules)
+	newObjectSet, newObjectMap, err := getObjectsFromCache(c.ctx, c.cli, root, KBOwnershipRules)
 	if err != nil {
 		return kubebuilderx.Commit, err
 	}
@@ -90,13 +89,13 @@ func (c *viewCalculator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.
 	// build view progress from three sets.
 	var viewSlice []viewv1.ObjectChange
 	// for createSet, build objectChange.description by reading i18n of the corresponding object type.
-	changes := buildChanges(createSet, oldObjectMap, newObjectMap, viewv1.ObjectCreationType, i18nResource, viewDef.Spec.Locale, view.Spec.Locale)
+	changes := buildChanges(createSet, oldObjectMap, newObjectMap, viewv1.ObjectCreationType, i18nResource, defaultLocale, view.Spec.Locale)
 	viewSlice = append(viewSlice, changes...)
 	// for updateSet, read old version from object store by object type and resource version, calculate the diff, render the objectChange.description
-	changes = buildChanges(updateSet, oldObjectMap, newObjectMap, viewv1.ObjectUpdateType, i18nResource, viewDef.Spec.Locale, view.Spec.Locale)
+	changes = buildChanges(updateSet, oldObjectMap, newObjectMap, viewv1.ObjectUpdateType, i18nResource, defaultLocale, view.Spec.Locale)
 	viewSlice = append(viewSlice, changes...)
 	// for deleteSet, build objectChange.description by reading i18n of the corresponding object type.
-	changes = buildChanges(deleteSet, oldObjectMap, newObjectMap, viewv1.ObjectDeletionType, i18nResource, viewDef.Spec.Locale, view.Spec.Locale)
+	changes = buildChanges(deleteSet, oldObjectMap, newObjectMap, viewv1.ObjectDeletionType, i18nResource, defaultLocale, view.Spec.Locale)
 	viewSlice = append(viewSlice, changes...)
 
 	// sort the view progress by resource version.
@@ -115,7 +114,7 @@ func (c *viewCalculator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.
 	}
 
 	// update view.status.currentObjectTree
-	view.Status.CurrentObjectTree, err = getObjectTreeWithRevision(root, viewDef.Spec.OwnershipRules, c.store, parseRevision(root.ResourceVersion), c.cli.Scheme())
+	view.Status.CurrentObjectTree, err = getObjectTreeWithRevision(root, KBOwnershipRules, c.store, parseRevision(root.ResourceVersion), c.cli.Scheme())
 	if err != nil {
 		return kubebuilderx.Commit, err
 	}

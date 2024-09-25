@@ -56,7 +56,6 @@ func (s *stateEvaluation) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuild
 
 func (s *stateEvaluation) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	view, _ := tree.GetRoot().(*viewv1.ReconciliationView)
-	viewDef, _ := tree.List(&viewv1.ReconciliationViewDefinition{})[0].(*viewv1.ReconciliationViewDefinition)
 
 	// build new object set from cache
 	root := &appsv1alpha1.Cluster{}
@@ -101,7 +100,7 @@ func (s *stateEvaluation) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx
 		if obj == nil {
 			continue
 		}
-		expr := viewDef.Spec.StateEvaluationExpression
+		expr := defaultStateEvaluationExpression
 		if view.Spec.StateEvaluationExpression != nil {
 			expr = *view.Spec.StateEvaluationExpression
 		}
@@ -132,7 +131,7 @@ func (s *stateEvaluation) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx
 
 	// build new InitialObjectTree
 	var err error
-	view.Status.InitialObjectTree, err = getObjectTreeWithRevision(root, viewDef.Spec.OwnershipRules, s.store, view.Status.View[latestReconciliationCycleStart].Revision, s.scheme)
+	view.Status.InitialObjectTree, err = getObjectTreeWithRevision(root, KBOwnershipRules, s.store, view.Status.View[latestReconciliationCycleStart].Revision, s.scheme)
 	if err != nil {
 		return kubebuilderx.Commit, err
 	}
@@ -154,9 +153,9 @@ func (s *stateEvaluation) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx
 }
 
 // TODO(free6om): similar as getSecondaryObjectsOf, refactor and merge them
-func getObjectTreeWithRevision(primary client.Object, ownershipRules []viewv1.OwnershipRule, store ObjectStore, revision int64, scheme *runtime.Scheme) (*viewv1.ObjectTreeNode, error) {
+func getObjectTreeWithRevision(primary client.Object, ownershipRules []OwnershipRule, store ObjectStore, revision int64, scheme *runtime.Scheme) (*viewv1.ObjectTreeNode, error) {
 	// find matched rules
-	var matchedRules []*viewv1.OwnershipRule
+	var matchedRules []*OwnershipRule
 	for i := range ownershipRules {
 		rule := &ownershipRules[i]
 		gvk, err := objectTypeToGVK(&rule.Primary)

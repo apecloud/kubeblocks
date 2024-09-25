@@ -91,7 +91,7 @@ func (r *reconcilerTree) Run() error {
 	})
 }
 
-func newReconcilerTree(ctx context.Context, mClient client.Client, recorder record.EventRecorder, rules []viewv1.OwnershipRule) (ReconcilerTree, error) {
+func newReconcilerTree(ctx context.Context, mClient client.Client, recorder record.EventRecorder, rules []OwnershipRule) (ReconcilerTree, error) {
 	dag := graph.NewDAG()
 	reconcilers := make(map[viewv1.ObjectType]reconcile.Reconciler)
 	for _, rule := range rules {

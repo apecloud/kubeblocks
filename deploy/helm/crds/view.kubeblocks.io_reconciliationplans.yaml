@@ -61,8 +61,8 @@ spec:
                   reconciliation plan.
                 type: string
               stateEvaluationExpression:
-                description: StateEvaluationExpression overrides the value specified
-                  in ReconciliationViewDefinition.
+                description: StateEvaluationExpression overrides the builtin default
+                  value.
                 properties:
                   celExpression:
                     description: |-
@@ -92,12 +92,8 @@ spec:
                       Default is same as the ReconciliationPlan object.
                     type: string
                 type: object
-              viewDefinition:
-                description: ViewDefinition specifies the name of the ReconciliationViewDefinition.
-                type: string
             required:
             - desiredSpec
-            - viewDefinition
             type: object
           status:
             description: ReconciliationPlanStatus defines the observed state of ReconciliationPlan
@@ -150,9 +146,8 @@ spec:
                     type: object
                     x-kubernetes-map-type: atomic
                   secondaries:
-                    description: |-
-                      Secondaries describes all the secondary objects of this object, if any.
-                      The secondary objects are collected by the rules specified in ReconciliationViewDefinition.
+                    description: Secondaries describes all the secondary objects of
+                      this object, if any.
                     x-kubernetes-preserve-unknown-fields: true
                 required:
                 - primary
@@ -206,9 +201,8 @@ spec:
                     type: object
                     x-kubernetes-map-type: atomic
                   secondaries:
-                    description: |-
-                      Secondaries describes all the secondary objects of this object, if any.
-                      The secondary objects are collected by the rules specified in ReconciliationViewDefinition.
+                    description: Secondaries describes all the secondary objects of
+                      this object, if any.
                     x-kubernetes-preserve-unknown-fields: true
                 required:
                 - primary
@@ -326,8 +320,7 @@ spec:
                       format: int64
                       type: integer
                     state:
-                      description: State represents the state calculated by StateEvaluationExpression
-                        defines in ReconciliationViewDefinition when this change occurs.
+                      description: State represents the state calculated by StateEvaluationExpression.
                       type: string
                     timestamp:
                       description: |-

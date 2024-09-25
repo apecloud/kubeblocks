@@ -59,7 +59,6 @@ func (g *planGenerator) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilder
 
 func (g *planGenerator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	plan, _ := tree.GetRoot().(*viewv1.ReconciliationPlan)
-	viewDef, _ := tree.List(&viewv1.ReconciliationViewDefinition{})[0].(*viewv1.ReconciliationViewDefinition)
 	objs := tree.List(&corev1.ConfigMap{})
 	var i18nResource *corev1.ConfigMap
 	if len(objs) > 0 {
@@ -81,7 +80,7 @@ func (g *planGenerator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.R
 	// create mock client and mock event recorder
 	// kbagent client is running in dry-run mode by setting context key-value pair: dry-run=true
 	store := newChangeCaptureStore(g.cli.Scheme(), i18nResource)
-	mClient, err := newMockClient(g.cli, store, viewDef.Spec.OwnershipRules)
+	mClient, err := newMockClient(g.cli, store, KBOwnershipRules)
 	if err != nil {
 		return kubebuilderx.Commit, err
 	}
@@ -91,13 +90,13 @@ func (g *planGenerator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.R
 	// 1. each gvk has a corresponding reconciler
 	// 2. mock K8s native object reconciler
 	// 3. encapsulate KB controller as reconciler
-	reconcilerTree, err := newReconcilerTree(g.ctx, mClient, mEventRecorder, viewDef.Spec.OwnershipRules)
+	reconcilerTree, err := newReconcilerTree(g.ctx, mClient, mEventRecorder, KBOwnershipRules)
 	if err != nil {
 		return kubebuilderx.Commit, err
 	}
 
 	// load object store
-	if err = loadCurrentObjectTree(g.ctx, g.cli, root, viewDef.Spec.OwnershipRules, store); err != nil {
+	if err = loadCurrentObjectTree(g.ctx, g.cli, root, KBOwnershipRules, store); err != nil {
 		return kubebuilderx.Commit, err
 	}
 	initialObjectMap := store.GetAll()
@@ -112,7 +111,7 @@ func (g *planGenerator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.R
 	}
 
 	// start plan generation loop
-	expr := viewDef.Spec.StateEvaluationExpression
+	expr := defaultStateEvaluationExpression
 	if plan.Spec.StateEvaluationExpression != nil {
 		expr = *plan.Spec.StateEvaluationExpression
 	}
@@ -146,7 +145,7 @@ func (g *planGenerator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.R
 	if err = g.cli.Get(g.ctx, objectKey, root); err != nil {
 		return kubebuilderx.Commit, err
 	}
-	currentTree, err := getObjectTreeFromCache(g.ctx, g.cli, root, viewDef.Spec.OwnershipRules)
+	currentTree, err := getObjectTreeFromCache(g.ctx, g.cli, root, KBOwnershipRules)
 	if err != nil {
 		return kubebuilderx.Commit, err
 	}
@@ -155,7 +154,7 @@ func (g *planGenerator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.R
 	if err = mClient.Get(g.ctx, objectKey, desiredRoot); err != nil {
 		return kubebuilderx.Commit, err
 	}
-	desiredTree, err := getObjectTreeFromCache(g.ctx, mClient, desiredRoot, viewDef.Spec.OwnershipRules)
+	desiredTree, err := getObjectTreeFromCache(g.ctx, mClient, desiredRoot, KBOwnershipRules)
 	if err != nil {
 		return kubebuilderx.Commit, err
 	}
@@ -255,7 +254,7 @@ func applyDesiredSpec(desiredSpec string, obj client.Object) (string, error) {
 	return specChange, nil
 }
 
-func loadCurrentObjectTree(ctx context.Context, cli client.Client, root *appsv1alpha1.Cluster, ownershipRules []viewv1.OwnershipRule, store ChangeCaptureStore) error {
+func loadCurrentObjectTree(ctx context.Context, cli client.Client, root *appsv1alpha1.Cluster, ownershipRules []OwnershipRule, store ChangeCaptureStore) error {
 	_, objectMap, err := getObjectsFromCache(ctx, cli, root, ownershipRules)
 	if err != nil {
 		return err

@@ -36,7 +36,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
-	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 )
 
 type ObjectTreeRootFinder interface {
@@ -66,32 +65,7 @@ func (f *rootFinder) findRoots(ctx context.Context, object client.Object) []reco
 	waitingList.PushFront(object)
 
 	var roots []client.Object
-	viewDefList := &viewv1.ReconciliationViewDefinitionList{}
-	if err := f.List(ctx, viewDefList); err != nil {
-		f.logger.Error(err, "list reconciliation view definition failed")
-		return nil
-	}
-	var primaryTypeList []viewv1.ObjectType
-	var ownershipRuleList []viewv1.OwnershipRule
-	for _, viewDef := range viewDefList.Items {
-		// build the ownership hierarchy as a DAG
-		dag := graph.NewDAG()
-		for _, rule := range viewDef.Spec.OwnershipRules {
-			dag.AddVertex(rule.Primary)
-			for _, resource := range rule.OwnedResources {
-				dag.AddVertex(resource.Secondary)
-				dag.Connect(rule.Primary, resource.Secondary)
-			}
-			ownershipRuleList = append(ownershipRuleList, rule)
-		}
-		// DAG should be valid(one and only one root without cycle)
-		if err := dag.Validate(); err != nil {
-			f.logger.Error(err, "invalid spec.ownershipRules in view definition %s", viewDef.Name)
-			return nil
-		}
-		primaryTypeList = append(primaryTypeList, dag.Root().(viewv1.ObjectType))
-	}
-
+	primaryTypeList := []viewv1.ObjectType{rootObjectType}
 	for waitingList.Len() > 0 {
 		e := waitingList.Front()
 		waitingList.Remove(e)
@@ -116,7 +90,7 @@ func (f *rootFinder) findRoots(ctx context.Context, object client.Object) []reco
 		if found {
 			continue
 		}
-		for _, rule := range ownershipRuleList {
+		for _, rule := range KBOwnershipRules {
 			for _, resource := range rule.OwnedResources {
 				gvk, err := objectTypeToGVK(&resource.Secondary)
 				if err != nil {
@@ -153,7 +127,7 @@ func (f *rootFinder) findRoots(ctx context.Context, object client.Object) []reco
 	return result.UnsortedList()
 }
 
-func ownedBy(owner client.Object, obj client.Object, ownedResource viewv1.OwnedResource) bool {
+func ownedBy(owner client.Object, obj client.Object, ownedResource OwnedResource) bool {
 	if ownedResource.Criteria.SelectorCriteria != nil {
 		labels, err := parseSelector(owner, ownedResource.Criteria.SelectorCriteria.Path)
 		if err != nil {

@@ -17,44 +17,78 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package v1
+package view
 
 import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/utils/pointer"
+
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
-// ReconciliationViewDefinitionSpec defines the desired state of ReconciliationViewDefinition
-type ReconciliationViewDefinitionSpec struct {
-	// OwnershipRules specifies ownership rules to build the object tree.
-	// A primary object and all its recursive secondary objects compose an object tree.
-	//
-	OwnershipRules []OwnershipRule `json:"ownershipRules"`
-
-	// StateEvaluationExpression is used to evaluate whether the primary object has reach its desired state
-	// by applying the expression to the object tree.
-	//
-	StateEvaluationExpression StateEvaluationExpression `json:"stateEvaluationExpression"`
-
-	// I18nResourceRef specifies the ConfigMap object that contains the i18n resources
-	// which are used to make the View/Plan Status more user-friendly.
-	//
-	// +optional
-	I18nResourceRef *ObjectReference `json:"i18nResourceRef"`
-
-	// Locale specifies the default locale.
-	//
-	// +optional
-	Locale *string `json:"locale"`
+var KBOwnershipRules = []OwnershipRule{
+	{
+		Primary: objectType(appsv1alpha1.APIVersion, appsv1alpha1.ClusterKind),
+		OwnedResources: []OwnedResource{
+			{
+				Secondary: objectType(appsv1alpha1.APIVersion, appsv1alpha1.ComponentKind),
+				Criteria: OwnershipCriteria{
+					LabelCriteria: map[string]string{
+						constant.AppInstanceLabelKey:  "$(primary.name)",
+						constant.AppManagedByLabelKey: constant.AppName,
+					},
+				},
+			},
+		},
+	},
+	{
+		Primary: objectType(appsv1alpha1.APIVersion, appsv1alpha1.ComponentKind),
+		OwnedResources: []OwnedResource{
+			{
+				Secondary: objectType(workloads.GroupVersion.String(), workloads.Kind),
+				Criteria: OwnershipCriteria{
+					LabelCriteria: map[string]string{
+						constant.KBAppComponentLabelKey: "$(primary.name)",
+						constant.AppManagedByLabelKey:   constant.AppName,
+					},
+				},
+			},
+			{
+				Secondary: objectType(corev1.SchemeGroupVersion.String(), constant.ServiceKind),
+				Criteria: OwnershipCriteria{
+					LabelCriteria: map[string]string{
+						constant.KBAppComponentLabelKey: "$(primary.name)",
+						constant.AppManagedByLabelKey:   constant.AppName,
+					},
+				},
+			},
+		},
+	},
 }
 
-// ReconciliationViewDefinitionStatus defines the observed state of ReconciliationViewDefinition
-type ReconciliationViewDefinitionStatus struct{}
+var rootObjectType = viewv1.ObjectType{
+	APIVersion: appsv1alpha1.APIVersion,
+	Kind:       appsv1alpha1.ClusterKind,
+}
+
+var (
+	defaultStateEvaluationExpression = viewv1.StateEvaluationExpression{
+		CELExpression: &viewv1.CELExpression{
+			Expression: "object.status.phase == \"Running\"",
+		},
+	}
+
+	defaultLocale = pointer.String("en")
+)
 
 // OwnershipRule defines an ownership rule between primary resource and its secondary resources.
 type OwnershipRule struct {
 	// Primary specifies the primary object type.
 	//
-	Primary ObjectType `json:"primary"`
+	Primary viewv1.ObjectType `json:"primary"`
 
 	// OwnedResources specifies all the secondary resources of Primary.
 	//
@@ -65,7 +99,7 @@ type OwnershipRule struct {
 type OwnedResource struct {
 	// Secondary specifies the secondary object type.
 	//
-	Secondary ObjectType `json:"secondary"`
+	Secondary viewv1.ObjectType `json:"secondary"`
 
 	// Criteria specifies the ownership criteria with its primary resource.
 	//
@@ -114,24 +148,6 @@ type FieldPath struct {
 	Path string `json:"path"`
 }
 
-// StateEvaluationExpression defines an object state evaluation expression.
-// Currently supported types:
-// CEL - Common Expression Language (https://cel.dev/).
-type StateEvaluationExpression struct {
-	// CELExpression specifies to use CEL to evaluation the object state.
-	// The root object used in the expression is the primary object.
-	//
-	// +optional
-	CELExpression *CELExpression `json:"celExpression,omitempty"`
-}
-
-// CELExpression defines a CEL expression.
-type CELExpression struct {
-	// Expression specifies the CEL expression.
-	//
-	Expression string `json:"expression"`
-}
-
 // ValidationType specifies the method to validate the OwnerReference of secondary resources.
 type ValidationType string
 
@@ -147,29 +163,3 @@ const (
 	// NoValidation means no validation is performed on the OwnerReference.
 	NoValidation ValidationType = "None"
 )
-
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
-//+kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=rvd
-
-// ReconciliationViewDefinition is the Schema for the reconciliationviewdefinitions API
-type ReconciliationViewDefinition struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-
-	Spec   ReconciliationViewDefinitionSpec   `json:"spec,omitempty"`
-	Status ReconciliationViewDefinitionStatus `json:"status,omitempty"`
-}
-
-//+kubebuilder:object:root=true
-
-// ReconciliationViewDefinitionList contains a list of ReconciliationViewDefinition
-type ReconciliationViewDefinitionList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []ReconciliationViewDefinition `json:"items"`
-}
-
-func init() {
-	SchemeBuilder.Register(&ReconciliationViewDefinition{}, &ReconciliationViewDefinitionList{})
-}

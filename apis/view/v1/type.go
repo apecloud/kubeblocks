@@ -85,14 +85,13 @@ type ObjectChangeSummary struct {
 	Deleted *int32 `json:"deleted,omitempty"`
 }
 
-// ObjectTreeNode defines an object tree specified by rules in ReconciliationViewDefinition.
+// ObjectTreeNode defines an object tree of the KubeBlocks Cluster.
 type ObjectTreeNode struct {
 	// Primary specifies reference of the primary object.
 	//
 	Primary corev1.ObjectReference `json:"primary"`
 
 	// Secondaries describes all the secondary objects of this object, if any.
-	// The secondary objects are collected by the rules specified in ReconciliationViewDefinition.
 	//
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +kubebuilder:validation:Schemaless
@@ -129,7 +128,7 @@ type ObjectChange struct {
 	// +optional
 	EventAttributes *EventAttributes `json:"eventAttributes,omitempty"`
 
-	// State represents the state calculated by StateEvaluationExpression defines in ReconciliationViewDefinition when this change occurs.
+	// State represents the state calculated by StateEvaluationExpression.
 	//
 	State string `json:"state,omitempty"`
 
@@ -165,4 +164,22 @@ type EventAttributes struct {
 	// Reason of the Event.
 	//
 	Reason string `json:"reason"`
+}
+
+// StateEvaluationExpression defines an object state evaluation expression.
+// Currently supported types:
+// CEL - Common Expression Language (https://cel.dev/).
+type StateEvaluationExpression struct {
+	// CELExpression specifies to use CEL to evaluation the object state.
+	// The root object used in the expression is the primary object.
+	//
+	// +optional
+	CELExpression *CELExpression `json:"celExpression,omitempty"`
+}
+
+// CELExpression defines a CEL expression.
+type CELExpression struct {
+	// Expression specifies the CEL expression.
+	//
+	Expression string `json:"expression"`
 }

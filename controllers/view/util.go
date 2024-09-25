@@ -163,7 +163,7 @@ func parseRevision(revisionStr string) int64 {
 	return revision
 }
 
-func parseMatchingLabels(obj client.Object, criteria *viewv1.OwnershipCriteria) (client.MatchingLabels, error) {
+func parseMatchingLabels(obj client.Object, criteria *OwnershipCriteria) (client.MatchingLabels, error) {
 	if criteria.SelectorCriteria != nil {
 		return parseSelector(obj, criteria.SelectorCriteria.Path)
 	}
@@ -173,7 +173,7 @@ func parseMatchingLabels(obj client.Object, criteria *viewv1.OwnershipCriteria) 
 	return nil, fmt.Errorf("parse matching labels failed")
 }
 
-func getObjectTreeFromCache(ctx context.Context, cli client.Client, primary client.Object, ownershipRules []viewv1.OwnershipRule) (*viewv1.ObjectTreeNode, error) {
+func getObjectTreeFromCache(ctx context.Context, cli client.Client, primary client.Object, ownershipRules []OwnershipRule) (*viewv1.ObjectTreeNode, error) {
 	if primary == nil {
 		return nil, nil
 	}
@@ -193,7 +193,7 @@ func getObjectTreeFromCache(ctx context.Context, cli client.Client, primary clie
 	if err != nil {
 		return nil, err
 	}
-	var matchedRules []viewv1.OwnershipRule
+	var matchedRules []OwnershipRule
 	for i := range ownershipRules {
 		rule := ownershipRules[i]
 		gvk, err := objectTypeToGVK(&rule.Primary)
@@ -220,7 +220,7 @@ func getObjectTreeFromCache(ctx context.Context, cli client.Client, primary clie
 	return tree, nil
 }
 
-func getObjectsFromCache(ctx context.Context, cli client.Client, root *appsv1alpha1.Cluster, ownershipRules []viewv1.OwnershipRule) (sets.Set[model.GVKNObjKey], map[model.GVKNObjKey]client.Object, error) {
+func getObjectsFromCache(ctx context.Context, cli client.Client, root *appsv1alpha1.Cluster, ownershipRules []OwnershipRule) (sets.Set[model.GVKNObjKey], map[model.GVKNObjKey]client.Object, error) {
 	objectMap := make(map[model.GVKNObjKey]client.Object)
 	objectSet := sets.New[model.GVKNObjKey]()
 	waitingList := list.New()
@@ -247,13 +247,13 @@ func getObjectsFromCache(ctx context.Context, cli client.Client, root *appsv1alp
 	return objectSet, objectMap, nil
 }
 
-func getSecondaryObjectsOf(ctx context.Context, cli client.Client, obj client.Object, ownershipRules []viewv1.OwnershipRule) ([]client.Object, error) {
+func getSecondaryObjectsOf(ctx context.Context, cli client.Client, obj client.Object, ownershipRules []OwnershipRule) ([]client.Object, error) {
 	objGVK, err := apiutil.GVKForObject(obj, cli.Scheme())
 	if err != nil {
 		return nil, err
 	}
 	// find matched rules
-	var rules []viewv1.OwnershipRule
+	var rules []OwnershipRule
 	for _, rule := range ownershipRules {
 		gvk, err := objectTypeToGVK(&rule.Primary)
 		if err != nil {

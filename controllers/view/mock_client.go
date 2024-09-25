@@ -211,7 +211,7 @@ func (c *mockSubResourceClient) Patch(ctx context.Context, obj client.Object, pa
 	return doPatch(obj, patch, c.store, c.scheme)
 }
 
-func newMockClient(realClient client.Client, store ChangeCaptureStore, rules []viewv1.OwnershipRule) (client.Client, error) {
+func newMockClient(realClient client.Client, store ChangeCaptureStore, rules []OwnershipRule) (client.Client, error) {
 	managedGVK := sets.New[schema.GroupVersionKind]()
 	addToManaged := func(objType *viewv1.ObjectType) error {
 		gvk, err := objectTypeToGVK(objType)

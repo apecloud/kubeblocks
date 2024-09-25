@@ -152,6 +152,7 @@ func newChangeCaptureStore(scheme *runtime.Scheme, resource *corev1.ConfigMap) C
 	return &changeCaptureStore{
 		scheme:        scheme,
 		i18nResources: resource,
+		store:         make(map[model.GVKNObjKey]client.Object),
 	}
 }
 

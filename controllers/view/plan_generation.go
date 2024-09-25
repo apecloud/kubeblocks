@@ -21,7 +21,9 @@ package view
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"reflect"
 
 	"github.com/google/go-cmp/cmp"
 	corev1 "k8s.io/api/core/v1"
@@ -77,7 +79,10 @@ func (g *planGenerator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.R
 
 	// create mock client, mock event recorder, mock kbagent client
 	store := newChangeCaptureStore(g.cli.Scheme(), i18nResource)
-	mClient := newMockClient(g.cli, store)
+	mClient, err := newMockClient(g.cli, store, viewDef.Spec.OwnershipRules)
+	if err != nil {
+		return kubebuilderx.Commit, err
+	}
 	mEventRecorder := newMockEventRecorder(store)
 
 	// build reconciler tree based on ownership rules:
@@ -100,6 +105,9 @@ func (g *planGenerator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.R
 	if specChange, err = applyDesiredSpec(plan.Spec.DesiredSpec, root); err != nil {
 		return kubebuilderx.Commit, err
 	}
+	if err = mClient.Update(g.ctx, root); err != nil {
+		return kubebuilderx.Commit, err
+	}
 
 	// start plan generation loop
 	for {
@@ -115,6 +123,9 @@ func (g *planGenerator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.R
 		if plan.Spec.StateEvaluationExpression != nil {
 			expr = *plan.Spec.StateEvaluationExpression
 		}
+		if err = mClient.Get(g.ctx, objectKey, root); err != nil {
+			return kubebuilderx.Commit, err
+		}
 		state, err := doStateEvaluation(root, expr)
 		if err != nil {
 			return kubebuilderx.Commit, err
@@ -126,6 +137,9 @@ func (g *planGenerator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.R
 	plan.Status.ObservedPlanGeneration = plan.Generation
 	plan.Status.ObservedTargetGeneration = root.Generation
 	plan.Status.Phase = "Succeed"
+	if err = g.cli.Get(g.ctx, objectKey, root); err != nil {
+		return kubebuilderx.Commit, err
+	}
 	currentTree, err := getObjectTreeFromCache(g.ctx, g.cli, root, viewDef.Spec.OwnershipRules)
 	if err != nil {
 		return kubebuilderx.Commit, err
@@ -150,6 +164,26 @@ func (g *planGenerator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.R
 	return kubebuilderx.Continue, nil
 }
 
+// getSpecFieldAsStruct extracts the Spec field from a client.Object and returns it as an interface{}.
+func getSpecFieldAsStruct(obj client.Object) (interface{}, error) {
+	// Get the value of the object
+	objValue := reflect.ValueOf(obj)
+
+	// Check if the object is a pointer to a struct
+	if objValue.Kind() != reflect.Ptr || objValue.Elem().Kind() != reflect.Struct {
+		return nil, fmt.Errorf("obj must be a pointer to a struct")
+	}
+
+	// Get the Spec field
+	specField := objValue.Elem().FieldByName("Spec")
+	if !specField.IsValid() {
+		return nil, fmt.Errorf("spec field not found")
+	}
+
+	// Return the Spec field as an interface{}
+	return specField.Interface(), nil
+}
+
 func applyDesiredSpec(desiredSpec string, obj client.Object) (string, error) {
 	// Convert the desiredSpec YAML string to a map
 	specMap := make(map[string]interface{})
@@ -157,18 +191,13 @@ func applyDesiredSpec(desiredSpec string, obj client.Object) (string, error) {
 		return "", fmt.Errorf("failed to unmarshal desiredSpec: %w", err)
 	}
 
-	// Convert the object to an unstructured map
-	objMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
-	if err != nil {
-		return "", fmt.Errorf("failed to convert object to unstructured: %w", err)
-	}
-
 	// Extract the current spec and apply the patch
-	currentSpec, _, err := unstructured.NestedMap(objMap, "spec")
+	currentSpec, err := getSpecFieldAsStruct(obj)
 	if err != nil {
 		return "", fmt.Errorf("failed to get current spec: %w", err)
 	}
 
+	// TODO(free6om): StrategicMergePatch is incorrect, fix it
 	// Create a strategic merge patch
 	patch, err := strategicpatch.CreateTwoWayMergePatch(
 		specMapToJSON(currentSpec),
@@ -188,9 +217,25 @@ func applyDesiredSpec(desiredSpec string, obj client.Object) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to apply merge patch: %w", err)
 	}
+	modifiedSpecMap := make(map[string]interface{})
+	if err = json.Unmarshal(modifiedSpec, &modifiedSpecMap); err != nil {
+		return "", fmt.Errorf("failed to unmarshal final spec: %w", err)
+	}
+
+	// Convert the object to an unstructured map
+	objMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
+	if err != nil {
+		return "", fmt.Errorf("failed to convert object to unstructured: %w", err)
+	}
+
+	// Extract the initial spec
+	initialSpec, _, err := unstructured.NestedMap(objMap, "spec")
+	if err != nil {
+		return "", fmt.Errorf("failed to get current spec: %w", err)
+	}
 
 	// Update the spec in the object map
-	if err := unstructured.SetNestedField(objMap, modifiedSpec, "spec"); err != nil {
+	if err := unstructured.SetNestedField(objMap, modifiedSpecMap, "spec"); err != nil {
 		return "", fmt.Errorf("failed to set modified spec: %w", err)
 	}
 
@@ -199,14 +244,8 @@ func applyDesiredSpec(desiredSpec string, obj client.Object) (string, error) {
 		return "", fmt.Errorf("failed to convert back to object: %w", err)
 	}
 
-	// Extract the final spec
-	finalSpec, _, err := unstructured.NestedMap(objMap, "spec")
-	if err != nil {
-		return "", fmt.Errorf("failed to get final spec: %w", err)
-	}
-
 	// build the spec change
-	specChange := cmp.Diff(currentSpec, finalSpec)
+	specChange := cmp.Diff(initialSpec, modifiedSpecMap)
 
 	return specChange, nil
 }
@@ -224,8 +263,11 @@ func loadCurrentObjectTree(ctx context.Context, cli client.Client, root *appsv1a
 	return nil
 }
 
-func planGeneration(cli client.Client) kubebuilderx.Reconciler {
-	return &planGenerator{cli: cli}
+func planGeneration(ctx context.Context, cli client.Client) kubebuilderx.Reconciler {
+	return &planGenerator{
+		ctx: ctx,
+		cli: cli,
+	}
 }
 
 var _ kubebuilderx.Reconciler = &planGenerator{}

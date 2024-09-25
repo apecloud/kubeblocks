@@ -46,11 +46,12 @@ type ReconcilerTree interface {
 type reconcilerFunc func(client.Client, record.EventRecorder) reconcile.Reconciler
 
 var reconcilerFuncMap = map[viewv1.ObjectType]reconcilerFunc{
-	objectType(appsv1alpha1.APIVersion, appsv1alpha1.ClusterKind):     newClusterReconciler,
-	objectType(appsv1alpha1.APIVersion, appsv1alpha1.ComponentKind):   newComponentReconciler,
-	objectType(appsv1alpha1.APIVersion, "Configuration"):              newConfigurationReconciler,
-	objectType(workloadsAPI.GroupVersion.String(), workloadsAPI.Kind): newInstanceSetReconciler,
-	objectType(corev1.SchemeGroupVersion.String(), constant.PodKind):  newPodReconciler,
+	objectType(appsv1alpha1.APIVersion, appsv1alpha1.ClusterKind):        newClusterReconciler,
+	objectType(appsv1alpha1.APIVersion, appsv1alpha1.ComponentKind):      newComponentReconciler,
+	objectType(appsv1alpha1.APIVersion, "Configuration"):                 newConfigurationReconciler,
+	objectType(workloadsAPI.GroupVersion.String(), workloadsAPI.Kind):    newInstanceSetReconciler,
+	objectType(corev1.SchemeGroupVersion.String(), constant.PodKind):     newPodReconciler,
+	objectType(corev1.SchemeGroupVersion.String(), constant.ServiceKind): newServiceReconciler,
 }
 
 type reconcilerTree struct {
@@ -128,7 +129,7 @@ func newReconciler(mClient client.Client, recorder record.EventRecorder, objectT
 	if ok {
 		return reconcilerF(mClient, recorder), nil
 	}
-	return nil, fmt.Errorf("can't instancilized a reconciler for GVK: %s/%s", objectType.APIVersion, objectType.Kind)
+	return nil, fmt.Errorf("can't initialize a reconciler for GVK: %s/%s", objectType.APIVersion, objectType.Kind)
 }
 
 func objectType(apiVersion, kind string) viewv1.ObjectType {
@@ -170,10 +171,14 @@ func newInstanceSetReconciler(cli client.Client, recorder record.EventRecorder) 
 	}
 }
 
-type podReconciler struct {
+type baseReconciler struct {
 	client.Client
 	Scheme   *runtime.Scheme
 	Recorder record.EventRecorder
+}
+
+type podReconciler struct {
+	baseReconciler
 }
 
 func (p *podReconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
@@ -183,11 +188,33 @@ func (p *podReconciler) Reconcile(ctx context.Context, request reconcile.Request
 
 func newPodReconciler(cli client.Client, recorder record.EventRecorder) reconcile.Reconciler {
 	return &podReconciler{
-		Client:   cli,
-		Scheme:   cli.Scheme(),
-		Recorder: recorder,
+		baseReconciler: baseReconciler{
+			Client:   cli,
+			Scheme:   cli.Scheme(),
+			Recorder: recorder,
+		},
+	}
+}
+
+type serviceReconciler struct {
+	baseReconciler
+}
+
+func (p *serviceReconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func newServiceReconciler(cli client.Client, recorder record.EventRecorder) reconcile.Reconciler {
+	return &serviceReconciler{
+		baseReconciler: baseReconciler{
+			Client:   cli,
+			Scheme:   cli.Scheme(),
+			Recorder: recorder,
+		},
 	}
 }
 
 var _ ReconcilerTree = &reconcilerTree{}
 var _ reconcile.Reconciler = &podReconciler{}
+var _ reconcile.Reconciler = &serviceReconciler{}

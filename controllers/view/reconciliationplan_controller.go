@@ -59,7 +59,7 @@ func (r *ReconciliationPlanReconciler) Reconcile(ctx context.Context, req ctrl.R
 	res, err := kubebuilderx.NewController(ctx, r.Client, req, r.Recorder, logger).
 		Prepare(planResources()).
 		Do(planResourcesValidation(ctx, r.Client)).
-		Do(planGeneration(r.Client)).
+		Do(planGeneration(ctx, r.Client)).
 		Commit()
 
 	// TODO(free6om): err handling

@@ -23,6 +23,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"strings"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -38,6 +41,7 @@ type mockClient struct {
 	realClient        client.Client
 	subResourceClient client.SubResourceWriter
 	store             ChangeCaptureStore
+	managedGVK        sets.Set[schema.GroupVersionKind]
 }
 
 type mockSubResourceClient struct {
@@ -49,6 +53,9 @@ func (c *mockClient) Get(ctx context.Context, objKey client.ObjectKey, obj clien
 	objectRef, err := getObjectRef(obj, c.realClient.Scheme())
 	if err != nil {
 		return err
+	}
+	if !c.managedGVK.Has(objectRef.GroupVersionKind) {
+		return c.realClient.Get(ctx, objKey, obj, opts...)
 	}
 	objectRef.ObjectKey = objKey
 	res, err := c.store.Get(objectRef)
@@ -64,10 +71,11 @@ func (c *mockClient) List(ctx context.Context, list client.ObjectList, opts ...c
 	if err != nil {
 		return fmt.Errorf("failed to get GVK for list: %w", err)
 	}
+	gvk.Kind, _ = strings.CutSuffix(gvk.Kind, "List")
 
-	// Extract namespace and other options from opts
-	listOptions := &client.ListOptions{}
-	listOptions.ApplyOptions(opts)
+	if !c.managedGVK.Has(gvk) {
+		return c.realClient.List(ctx, list, opts...)
+	}
 
 	// Get the objects of the same GVK from the store
 	objects := c.store.List(&gvk)
@@ -78,11 +86,15 @@ func (c *mockClient) List(ctx context.Context, list client.ObjectList, opts ...c
 		return fmt.Errorf("failed to extract list: %w", err)
 	}
 
+	// Extract namespace and other options from opts
+	listOptions := &client.ListOptions{}
+	listOptions.ApplyOptions(opts)
+
 	for _, obj := range objects {
 		if listOptions.Namespace != "" && obj.GetNamespace() != listOptions.Namespace {
 			continue
 		}
-		if !listOptions.LabelSelector.Matches(labels.Set(obj.GetLabels())) {
+		if listOptions.LabelSelector != nil && !listOptions.LabelSelector.Matches(labels.Set(obj.GetLabels())) {
 			continue
 		}
 		items = append(items, obj.DeepCopyObject())
@@ -138,17 +150,12 @@ func doPatch(obj client.Object, patch client.Patch, store ChangeCaptureStore, sc
 		return fmt.Errorf("failed to convert existing object to unstructured: %w", err)
 	}
 
-	objMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
-	if err != nil {
-		return fmt.Errorf("failed to convert object to unstructured: %w", err)
-	}
-
 	patchData, err := patch.Data(obj)
 	if err != nil {
 		return fmt.Errorf("failed to get patch data: %w", err)
 	}
 
-	patchedObjJSON, err := strategicpatch.StrategicMergePatch(specMapToJSON(existingObjMap), patchData, objMap)
+	patchedObjJSON, err := strategicpatch.StrategicMergePatch(specMapToJSON(existingObjMap), patchData, o)
 	if err != nil {
 		return fmt.Errorf("failed to apply patch: %w", err)
 	}
@@ -204,15 +211,36 @@ func (c *mockSubResourceClient) Patch(ctx context.Context, obj client.Object, pa
 	return doPatch(obj, patch, c.store, c.scheme)
 }
 
-func newMockClient(realClient client.Client, store ChangeCaptureStore) client.Client {
+func newMockClient(realClient client.Client, store ChangeCaptureStore, rules []viewv1.OwnershipRule) (client.Client, error) {
+	managedGVK := sets.New[schema.GroupVersionKind]()
+	addToManaged := func(objType *viewv1.ObjectType) error {
+		gvk, err := objectTypeToGVK(objType)
+		if err != nil {
+			return err
+		}
+		managedGVK.Insert(*gvk)
+		return nil
+	}
+	for _, rule := range rules {
+		if err := addToManaged(&rule.Primary); err != nil {
+			return nil, err
+		}
+		for _, ownedResource := range rule.OwnedResources {
+			if err := addToManaged(&ownedResource.Secondary); err != nil {
+				return nil, err
+			}
+		}
+	}
+
 	return &mockClient{
 		realClient: realClient,
 		store:      store,
+		managedGVK: managedGVK,
 		subResourceClient: &mockSubResourceClient{
 			store:  store,
 			scheme: realClient.Scheme(),
 		},
-	}
+	}, nil
 }
 
 func copyObj(src, dst client.Object) error {

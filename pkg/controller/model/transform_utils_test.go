@@ -140,7 +140,7 @@ var _ = Describe("transform utils test", func() {
 				Context:     context.Background(),
 				GraphClient: NewGraphClient(k8sMock),
 			}
-			snapshot, err := ReadCacheSnapshot(transCtx, root, nil, true, &corev1.PodList{})
+			snapshot, err := ReadCacheSnapshot(transCtx, root, nil, &corev1.PodList{})
 			Expect(err).Should(BeNil())
 			Expect(snapshot).Should(HaveLen(3))
 			objList := []*corev1.Pod{obj0, obj1, obj2}

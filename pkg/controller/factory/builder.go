@@ -391,21 +391,3 @@ func BuildRoleBinding(synthesizedComp *component.SynthesizedComponent, saName st
 		}).
 		GetObject()
 }
-
-func BuildClusterRoleBinding(synthesizedComp *component.SynthesizedComponent, saName string) *rbacv1.ClusterRoleBinding {
-	return builder.NewClusterRoleBindingBuilder(synthesizedComp.Namespace, saName).
-		AddLabelsInMap(constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name)).
-		AddLabelsInMap(synthesizedComp.StaticLabels).
-		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
-		SetRoleRef(rbacv1.RoleRef{
-			APIGroup: rbacv1.GroupName,
-			Kind:     "ClusterRole",
-			Name:     constant.RBACClusterRoleName,
-		}).
-		AddSubjects(rbacv1.Subject{
-			Kind:      rbacv1.ServiceAccountKind,
-			Namespace: synthesizedComp.Namespace,
-			Name:      saName,
-		}).
-		GetObject()
-}

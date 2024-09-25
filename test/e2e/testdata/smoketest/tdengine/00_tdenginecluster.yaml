@@ -12,24 +12,6 @@ metadata:
 ---
 # Source: tdengine-cluster/templates/rbac.yaml
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: kb-td-cluster
-  labels:
-    helm.sh/chart: tdengine-cluster-0.7.0-alpha.0
-    app.kubernetes.io/version: "3.0.5.0"
-    app.kubernetes.io/instance: td-cluster
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: kubeblocks-volume-protection-pod-role
-subjects:
-  - kind: ServiceAccount
-    name: kb-td-cluster
-    namespace: default
----
-# Source: tdengine-cluster/templates/rbac.yaml
-apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: kb-td-cluster

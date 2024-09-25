@@ -12,24 +12,6 @@ metadata:
 ---
 # Source: postgresql-cluster/templates/rbac.yaml
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: kb-pg-cluster
-  labels:
-    helm.sh/chart: postgresql-cluster-0.7.0-alpha.0
-    app.kubernetes.io/version: "14.8.0"
-    app.kubernetes.io/instance: pg-cluster
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: kubeblocks-volume-protection-pod-role
-subjects:
-  - kind: ServiceAccount
-    name: kb-pg-cluster
-    namespace: default
----
-# Source: postgresql-cluster/templates/rbac.yaml
-apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: kb-pg-cluster

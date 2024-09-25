@@ -314,11 +314,6 @@ func (r *OpsRequestReconciler) addClusterLabelAndSetOwnerReference(reqCtx intctr
 	if err := controllerutil.SetOwnerReference(opsRes.Cluster, opsRequest, scheme); err != nil {
 		return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
 	}
-	// mutate the clusterRef to clusterName.
-	// TODO: remove it after 0.9.0
-	if opsRequest.Spec.ClusterName == "" {
-		opsRequest.Spec.ClusterName = opsRequest.Spec.ClusterRef
-	}
 	if err := r.Client.Patch(reqCtx.Ctx, opsRequest, patch); err != nil {
 		return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
 	}

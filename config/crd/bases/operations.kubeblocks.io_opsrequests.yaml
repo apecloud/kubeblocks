@@ -65,66 +65,7 @@ spec:
             description: OpsRequestSpec defines the desired state of OpsRequest
             properties:
               backup:
-                description: Specifies the parameters to backup a Cluster.
-                properties:
-                  backupMethod:
-                    description: |-
-                      Specifies the name of BackupMethod.
-                      The specified BackupMethod must be defined in the BackupPolicy.
-                    type: string
-                  backupName:
-                    description: Specifies the name of the Backup custom resource.
-                    type: string
-                  backupPolicyName:
-                    description: Indicates the name of the BackupPolicy applied to
-                      perform this Backup.
-                    type: string
-                  deletionPolicy:
-                    default: Delete
-                    description: |-
-                      Determines whether the backup contents stored in backup repository
-                      should be deleted when the Backup custom resource is deleted.
-                      Supported values are `Retain` and `Delete`.
-                      - `Retain` means that the backup content and its physical snapshot on backup repository are kept.
-                      - `Delete` means that the backup content and its physical snapshot on backup repository are deleted.
-                    enum:
-                    - Delete
-                    - Retain
-                    type: string
-                  parentBackupName:
-                    description: If the specified BackupMethod is incremental, `parentBackupName`
-                      is required.
-                    type: string
-                  retentionPeriod:
-                    description: |-
-                      Determines the duration for which the Backup custom resources should be retained.
-
-
-                      The controller will automatically remove all Backup objects that are older than the specified RetentionPeriod.
-                      For example, RetentionPeriod of `30d` will keep only the Backup objects of last 30 days.
-                      Sample duration format:
-
-
-                      - years: 2y
-                      - months: 6mo
-                      - days: 30d
-                      - hours: 12h
-                      - minutes: 30m
-
-
-                      You can also combine the above durations. For example: 30d12h30m.
-                      If not set, the Backup objects will be kept forever.
-
-
-                      If the `deletionPolicy` is set to 'Delete', then the associated backup data will also be deleted
-                      along with the Backup object.
-                      Otherwise, only the Backup custom resource will be deleted.
-                    type: string
-                type: object
-              backupSpec:
-                description: |-
-                  Deprecated: since v0.9, use backup instead.
-                  Specifies the parameters to backup a Cluster.
+                description: Specifies the parameters to back up a Cluster.
                 properties:
                   backupMethod:
                     description: |-
@@ -197,14 +138,6 @@ spec:
                 type: string
                 x-kubernetes-validations:
                 - message: forbidden to update spec.clusterName
-                  rule: self == oldSelf
-              clusterRef:
-                description: |-
-                  Deprecated: since v0.9, use clusterName instead.
-                  Specifies the name of the Cluster resource that this operation is targeting.
-                type: string
-                x-kubernetes-validations:
-                - message: forbidden to update spec.clusterRef
                   rule: self == oldSelf
               custom:
                 description: Specifies a custom operation defined by OpsDefinition.
@@ -558,13 +491,6 @@ spec:
                     componentName:
                       description: Specifies the name of the Component.
                       type: string
-                    replicas:
-                      description: |-
-                        Deprecated: since v0.9, use scaleOut and scaleIn instead.
-                        Specifies the number of replicas for the component. Cannot be used with "scaleIn" and "scaleOut".
-                      format: int32
-                      minimum: 0
-                      type: integer
                     scaleIn:
                       description: |-
                         Specifies the replica changes for scaling in components and instance templates,
@@ -3988,7 +3914,7 @@ spec:
                   Specifies the parameters to rebuild some instances.
                   Rebuilding an instance involves restoring its data from a backup or another database replica.
                   The instances being rebuilt usually serve as standby in the cluster.
-                  Hence rebuilding instances is often also referred to as "standby reconstruction".
+                  Hence, rebuilding instances is often also referred to as "standby reconstruction".
                 items:
                   properties:
                     backupName:
@@ -4167,100 +4093,6 @@ spec:
                 x-kubernetes-validations:
                 - message: forbidden to update spec.rebuildFrom
                   rule: self == oldSelf
-              reconfigure:
-                description: |-
-                  Specifies a component and its configuration updates.
-
-
-                  This field is deprecated and replaced by `reconfigures`.
-                properties:
-                  componentName:
-                    description: Specifies the name of the Component.
-                    type: string
-                  configurations:
-                    description: |-
-                      Contains a list of ConfigurationItem objects, specifying the Component's configuration template name,
-                      upgrade policy, and parameter key-value pairs to be updated.
-                    items:
-                      properties:
-                        keys:
-                          description: |-
-                            Sets the configuration files and their associated parameters that need to be updated.
-                            It should contain at least one item.
-                          items:
-                            properties:
-                              fileContent:
-                                description: |-
-                                  Specifies the content of the entire configuration file.
-                                  This field is used to update the complete configuration file.
-
-
-                                  Either the `parameters` field or the `fileContent` field must be set, but not both.
-                                type: string
-                              key:
-                                description: |-
-                                  Represents a key in the configuration template(as ConfigMap).
-                                  Each key in the ConfigMap corresponds to a specific configuration file.
-                                type: string
-                              parameters:
-                                description: |-
-                                  Specifies a list of key-value pairs representing parameters and their corresponding values
-                                  within a single configuration file.
-                                  This field is used to override or set the values of parameters without modifying the entire configuration file.
-
-
-                                  Either the `parameters` field or the `fileContent` field must be set, but not both.
-                                items:
-                                  properties:
-                                    key:
-                                      description: Represents the name of the parameter
-                                        that is to be updated.
-                                      type: string
-                                    value:
-                                      description: |-
-                                        Represents the parameter values that are to be updated.
-                                        If set to nil, the parameter defined by the Key field will be removed from the configuration file.
-                                      type: string
-                                  required:
-                                  - key
-                                  type: object
-                                type: array
-                            required:
-                            - key
-                            type: object
-                          minItems: 1
-                          type: array
-                          x-kubernetes-list-map-keys:
-                          - key
-                          x-kubernetes-list-type: map
-                        name:
-                          description: Specifies the name of the configuration template.
-                          maxLength: 63
-                          pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
-                          type: string
-                        policy:
-                          description: Defines the upgrade policy for the configuration.
-                          enum:
-                          - simple
-                          - parallel
-                          - rolling
-                          - autoReload
-                          - operatorSyncUpdate
-                          - dynamicReloadBeginRestart
-                          type: string
-                      required:
-                      - keys
-                      - name
-                      type: object
-                    minItems: 1
-                    type: array
-                    x-kubernetes-list-map-keys:
-                    - name
-                    x-kubernetes-list-type: map
-                required:
-                - componentName
-                - configurations
-                type: object
               reconfigures:
                 description: Lists Reconfigure objects, each specifying a Component
                   and its configuration updates.
@@ -4544,169 +4376,6 @@ spec:
                 required:
                 - backupName
                 type: object
-              restoreSpec:
-                description: |-
-                  Deprecated: since v0.9, use restore instead.
-                  Specifies the parameters to restore a Cluster.
-                  Note that this restore operation will roll back cluster services.
-                properties:
-                  backupName:
-                    description: Specifies the name of the Backup custom resource.
-                    type: string
-                  deferPostReadyUntilClusterRunning:
-                    description: |-
-                      Controls the timing of PostReady actions during the recovery process.
-
-
-                      If false (default), PostReady actions execute when the Component reaches the "Running" state.
-                      If true, PostReady actions are delayed until the entire Cluster is "Running,"
-                      ensuring the cluster's overall stability before proceeding.
-
-
-                      This setting is useful for coordinating PostReady operations across the Cluster for optimal cluster conditions.
-                    type: boolean
-                  env:
-                    description: Specifies a list of environment variables to be set
-                      in the container.
-                    items:
-                      description: EnvVar represents an environment variable present
-                        in a Container.
-                      properties:
-                        name:
-                          description: Name of the environment variable. Must be a
-                            C_IDENTIFIER.
-                          type: string
-                        value:
-                          description: |-
-                            Variable references $(VAR_NAME) are expanded
-                            using the previously defined environment variables in the container and
-                            any service environment variables. If a variable cannot be resolved,
-                            the reference in the input string will be unchanged. Double $$ are reduced
-                            to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e.
-                            "$$(VAR_NAME)" will produce the string literal "$(VAR_NAME)".
-                            Escaped references will never be expanded, regardless of whether the variable
-                            exists or not.
-                            Defaults to "".
-                          type: string
-                        valueFrom:
-                          description: Source for the environment variable's value.
-                            Cannot be used if value is not empty.
-                          properties:
-                            configMapKeyRef:
-                              description: Selects a key of a ConfigMap.
-                              properties:
-                                key:
-                                  description: The key to select.
-                                  type: string
-                                name:
-                                  description: |-
-                                    Name of the referent.
-                                    More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                    TODO: Add other useful fields. apiVersion, kind, uid?
-                                  type: string
-                                optional:
-                                  description: Specify whether the ConfigMap or its
-                                    key must be defined
-                                  type: boolean
-                              required:
-                              - key
-                              type: object
-                              x-kubernetes-map-type: atomic
-                            fieldRef:
-                              description: |-
-                                Selects a field of the pod: supports metadata.name, metadata.namespace, `metadata.labels['<KEY>']`, `metadata.annotations['<KEY>']`,
-                                spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP, status.podIPs.
-                              properties:
-                                apiVersion:
-                                  description: Version of the schema the FieldPath
-                                    is written in terms of, defaults to "v1".
-                                  type: string
-                                fieldPath:
-                                  description: Path of the field to select in the
-                                    specified API version.
-                                  type: string
-                              required:
-                              - fieldPath
-                              type: object
-                              x-kubernetes-map-type: atomic
-                            resourceFieldRef:
-                              description: |-
-                                Selects a resource of the container: only resources limits and requests
-                                (limits.cpu, limits.memory, limits.ephemeral-storage, requests.cpu, requests.memory and requests.ephemeral-storage) are currently supported.
-                              properties:
-                                containerName:
-                                  description: 'Container name: required for volumes,
-                                    optional for env vars'
-                                  type: string
-                                divisor:
-                                  anyOf:
-                                  - type: integer
-                                  - type: string
-                                  description: Specifies the output format of the
-                                    exposed resources, defaults to "1"
-                                  pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                                  x-kubernetes-int-or-string: true
-                                resource:
-                                  description: 'Required: resource to select'
-                                  type: string
-                              required:
-                              - resource
-                              type: object
-                              x-kubernetes-map-type: atomic
-                            secretKeyRef:
-                              description: Selects a key of a secret in the pod's
-                                namespace
-                              properties:
-                                key:
-                                  description: The key of the secret to select from.  Must
-                                    be a valid secret key.
-                                  type: string
-                                name:
-                                  description: |-
-                                    Name of the referent.
-                                    More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                    TODO: Add other useful fields. apiVersion, kind, uid?
-                                  type: string
-                                optional:
-                                  description: Specify whether the Secret or its key
-                                    must be defined
-                                  type: boolean
-                              required:
-                              - key
-                              type: object
-                              x-kubernetes-map-type: atomic
-                          type: object
-                      required:
-                      - name
-                      type: object
-                    type: array
-                    x-kubernetes-preserve-unknown-fields: true
-                  restorePointInTime:
-                    description: |-
-                      Specifies the point in time to which the restore should be performed.
-                      Supported time formats:
-
-
-                      - RFC3339 format, e.g. "2023-11-25T18:52:53Z"
-                      - A human-readable date-time format, e.g. "Jul 25,2023 18:52:53 UTC+0800"
-                    type: string
-                  volumeRestorePolicy:
-                    default: Parallel
-                    description: |-
-                      Specifies the policy for restoring volume claims of a Component's Pods.
-                      It determines whether the volume claims should be restored sequentially (one by one) or in parallel (all at once).
-                      Support values:
-
-
-                      - "Serial"
-                      - "Parallel"
-                    enum:
-                    - Serial
-                    - Parallel
-                    type: string
-                required:
-                - backupName
-                type: object
               switchover:
                 description: Lists Switchover objects, each specifying a Component
                   to perform the switchover operation.
@@ -4799,11 +4468,6 @@ spec:
 
                   Note: This field is immutable once set.
                 properties:
-                  clusterVersionRef:
-                    description: |-
-                      Deprecated: since v0.9 because ClusterVersion is deprecated.
-                      Specifies the name of the target ClusterVersion for the upgrade.
-                    type: string
                   components:
                     description: |-
                       Lists components to be upgrade based on desired ComponentDefinition and ServiceVersion.
@@ -5320,11 +4984,6 @@ spec:
               lastConfiguration:
                 description: Records the configuration prior to any changes.
                 properties:
-                  clusterVersionRef:
-                    description: |-
-                      Specifies the name of the ClusterVersion.
-                      Deprecated and should be removed in the future version.
-                    type: string
                   components:
                     additionalProperties:
                       description: LastComponentConfiguration can be used to track
@@ -8810,180 +8469,6 @@ spec:
                 description: Represents the progress of the OpsRequest.
                 pattern: ^(\d+|\-)/(\d+|\-)$
                 type: string
-              reconfiguringStatus:
-                description: |-
-                  Deprecated: Replaced by ReconfiguringStatusAsComponent.
-                  Defines the status information of reconfiguring.
-                properties:
-                  conditions:
-                    description: |-
-                      Describes the reconfiguring detail status.
-                      Possible condition types include "Creating", "Init", "Running", "Pending", "Merged", "MergeFailed", "FailedAndPause",
-                      "Upgrading", "Deleting", "FailedAndRetry", "Finished", "ReconfigurePersisting", "ReconfigurePersisted".
-                    items:
-                      description: "Condition contains details for one aspect of the
-                        current state of this API Resource.\n---\nThis struct is intended
-                        for direct use as an array at the field path .status.conditions.
-                        \ For example,\n\n\n\ttype FooStatus struct{\n\t    // Represents
-                        the observations of a foo's current state.\n\t    // Known
-                        .status.conditions.type are: \"Available\", \"Progressing\",
-                        and \"Degraded\"\n\t    // +patchMergeKey=type\n\t    // +patchStrategy=merge\n\t
-                        \   // +listType=map\n\t    // +listMapKey=type\n\t    Conditions
-                        []metav1.Condition `json:\"conditions,omitempty\" patchStrategy:\"merge\"
-                        patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"`\n\n\n\t
-                        \   // other fields\n\t}"
-                      properties:
-                        lastTransitionTime:
-                          description: |-
-                            lastTransitionTime is the last time the condition transitioned from one status to another.
-                            This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
-                          format: date-time
-                          type: string
-                        message:
-                          description: |-
-                            message is a human readable message indicating details about the transition.
-                            This may be an empty string.
-                          maxLength: 32768
-                          type: string
-                        observedGeneration:
-                          description: |-
-                            observedGeneration represents the .metadata.generation that the condition was set based upon.
-                            For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
-                            with respect to the current state of the instance.
-                          format: int64
-                          minimum: 0
-                          type: integer
-                        reason:
-                          description: |-
-                            reason contains a programmatic identifier indicating the reason for the condition's last transition.
-                            Producers of specific condition types may define expected values and meanings for this field,
-                            and whether the values are considered a guaranteed API.
-                            The value should be a CamelCase string.
-                            This field may not be empty.
-                          maxLength: 1024
-                          minLength: 1
-                          pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
-                          type: string
-                        status:
-                          description: status of the condition, one of True, False,
-                            Unknown.
-                          enum:
-                          - "True"
-                          - "False"
-                          - Unknown
-                          type: string
-                        type:
-                          description: |-
-                            type of condition in CamelCase or in foo.example.com/CamelCase.
-                            ---
-                            Many .condition.type values are consistent across resources like Available, but because arbitrary conditions can be
-                            useful (see .node.status.conditions), the ability to deconflict is important.
-                            The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
-                          maxLength: 316
-                          pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
-                          type: string
-                      required:
-                      - lastTransitionTime
-                      - message
-                      - reason
-                      - status
-                      - type
-                      type: object
-                    type: array
-                    x-kubernetes-list-map-keys:
-                    - type
-                    x-kubernetes-list-type: map
-                  configurationStatus:
-                    description: Describes the status of the component reconfiguring.
-                    items:
-                      properties:
-                        expectedCount:
-                          default: -1
-                          description: Represents the total count of pods intended
-                            to be updated by a configuration change.
-                          format: int32
-                          type: integer
-                        lastAppliedConfiguration:
-                          additionalProperties:
-                            type: string
-                          description: Stores the last applied configuration.
-                          type: object
-                        lastStatus:
-                          description: |-
-                            Records the last state of the reconfiguration finite state machine.
-                            Possible values include "None", "Retry", "Failed", "NotSupport", "FailedAndRetry".
-
-
-                            - "None" describes fsm has finished and quit.
-                            - "Retry" describes fsm is running.
-                            - "Failed" describes fsm is failed and exited.
-                            - "NotSupport" describes fsm does not support the feature.
-                            - "FailedAndRetry" describes fsm is failed in current state, but can be retried.
-                          type: string
-                        message:
-                          description: Provides details about the operation.
-                          type: string
-                        name:
-                          description: Indicates the name of the configuration template
-                            (as ConfigMap).
-                          maxLength: 63
-                          pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
-                          type: string
-                        status:
-                          description: |-
-                            Represents the current state of the reconfiguration state machine.
-                            Possible values include "Creating", "Init", "Running", "Pending", "Merged", "MergeFailed", "FailedAndPause",
-                            "Upgrading", "Deleting", "FailedAndRetry", "Finished", "ReconfigurePersisting", "ReconfigurePersisted".
-                          type: string
-                        succeedCount:
-                          default: 0
-                          description: Records the number of pods successfully updated
-                            following a configuration change.
-                          format: int32
-                          type: integer
-                        updatePolicy:
-                          description: Records the UpgradePolicy of the configuration
-                            change operation.
-                          enum:
-                          - simple
-                          - parallel
-                          - rolling
-                          - autoReload
-                          - operatorSyncUpdate
-                          - dynamicReloadBeginRestart
-                          type: string
-                        updatedParameters:
-                          description: Contains the updated parameters.
-                          properties:
-                            addedKeys:
-                              additionalProperties:
-                                type: string
-                              description: Maps newly added configuration files to
-                                their content.
-                              type: object
-                            deletedKeys:
-                              additionalProperties:
-                                type: string
-                              description: Lists the name of configuration files that
-                                have been deleted.
-                              type: object
-                            updatedKeys:
-                              additionalProperties:
-                                type: string
-                              description: Maps the name of configuration files to
-                                their updated content, detailing the changes made.
-                              type: object
-                          type: object
-                      required:
-                      - name
-                      type: object
-                    type: array
-                    x-kubernetes-list-map-keys:
-                    - name
-                    x-kubernetes-list-type: map
-                required:
-                - configurationStatus
-                type: object
               reconfiguringStatusAsComponent:
                 additionalProperties:
                   properties:

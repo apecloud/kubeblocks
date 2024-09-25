@@ -35,12 +35,6 @@ type OpsRequestSpec struct {
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.clusterName"
 	ClusterName string `json:"clusterName,omitempty"`
 
-	// Deprecated: since v0.9, use clusterName instead.
-	// Specifies the name of the Cluster resource that this operation is targeting.
-	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.clusterRef"
-	ClusterRef string `json:"clusterRef,omitempty"`
-
 	// Indicates whether the current operation should be canceled and terminated gracefully if it's in the
 	// "Pending", "Creating", or "Running" state.
 	//
@@ -173,13 +167,6 @@ type SpecificOpsRequest struct {
 	// +listMapKey=componentName
 	VerticalScalingList []VerticalScaling `json:"verticalScaling,omitempty"  patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
 
-	// Specifies a component and its configuration updates.
-	//
-	// This field is deprecated and replaced by `reconfigures`.
-	//
-	// +optional
-	Reconfigure *Reconfigure `json:"reconfigure,omitempty"`
-
 	// Lists Reconfigure objects, each specifying a Component and its configuration updates.
 	//
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.reconfigure"
@@ -195,15 +182,9 @@ type SpecificOpsRequest struct {
 	// +optional
 	ExposeList []Expose `json:"expose,omitempty"`
 
-	// Specifies the parameters to backup a Cluster.
+	// Specifies the parameters to back up a Cluster.
 	// +optional
 	Backup *Backup `json:"backup,omitempty"`
-
-	// Deprecated: since v0.9, use backup instead.
-	// Specifies the parameters to backup a Cluster.
-	// +optional
-	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
-	BackupSpec *Backup `json:"backupSpec,omitempty"`
 
 	// Specifies the parameters to restore a Cluster.
 	// Note that this restore operation will roll back cluster services.
@@ -211,17 +192,10 @@ type SpecificOpsRequest struct {
 	// +optional
 	Restore *Restore `json:"restore,omitempty"`
 
-	// Deprecated: since v0.9, use restore instead.
-	// Specifies the parameters to restore a Cluster.
-	// Note that this restore operation will roll back cluster services.
-	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
-	// +optional
-	RestoreSpec *Restore `json:"restoreSpec,omitempty"`
-
 	// Specifies the parameters to rebuild some instances.
 	// Rebuilding an instance involves restoring its data from a backup or another database replica.
 	// The instances being rebuilt usually serve as standby in the cluster.
-	// Hence rebuilding instances is often also referred to as "standby reconstruction".
+	// Hence, rebuilding instances is often also referred to as "standby reconstruction".
 	//
 	// +optional
 	// +patchMergeKey=componentName
@@ -323,12 +297,6 @@ type Switchover struct {
 
 // Upgrade defines the parameters for an upgrade operation.
 type Upgrade struct {
-	// Deprecated: since v0.9 because ClusterVersion is deprecated.
-	// Specifies the name of the target ClusterVersion for the upgrade.
-	//
-	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
-	ClusterVersionRef *string `json:"clusterVersionRef,omitempty"`
-
 	// Lists components to be upgrade based on desired ComponentDefinition and ServiceVersion.
 	// From the perspective of cluster API, the reasonable combinations should be:
 	// 1. (comp-def, service-ver) - upgrade to the specified service version and component definition, the user takes the responsibility to ensure that they are compatible.
@@ -450,13 +418,6 @@ type OpsRequestVolumeClaimTemplate struct {
 type HorizontalScaling struct {
 	// Specifies the name of the Component.
 	ComponentOps `json:",inline"`
-
-	// Deprecated: since v0.9, use scaleOut and scaleIn instead.
-	// Specifies the number of replicas for the component. Cannot be used with "scaleIn" and "scaleOut".
-	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
-	// +kubebuilder:validation:Minimum=0
-	// +optional
-	Replicas *int32 `json:"replicas,omitempty"`
 
 	// Specifies the replica changes for scaling out components and instance templates,
 	// and brings offline instances back online. Can be used in conjunction with the "scaleIn" operation.
@@ -995,11 +956,6 @@ type OpsRequestStatus struct {
 	// +optional
 	CancelTimestamp metav1.Time `json:"cancelTimestamp,omitempty"`
 
-	// Deprecated: Replaced by ReconfiguringStatusAsComponent.
-	// Defines the status information of reconfiguring.
-	// +optional
-	ReconfiguringStatus *ReconfiguringStatus `json:"reconfiguringStatus,omitempty"`
-
 	// Records the status of a reconfiguring operation if `opsRequest.spec.type` equals to "Reconfiguring".
 	// +optional
 	ReconfiguringStatusAsComponent map[string]*ReconfiguringStatus `json:"reconfiguringStatusAsComponent,omitempty"`
@@ -1113,10 +1069,6 @@ type LastComponentConfiguration struct {
 }
 
 type LastConfiguration struct {
-	// Specifies the name of the ClusterVersion.
-	// Deprecated and should be removed in the future version.
-	// +optional
-	ClusterVersionRef string `json:"clusterVersionRef,omitempty"`
 
 	// Records the configuration of each Component prior to any changes.
 	// +optional
@@ -1150,14 +1102,6 @@ type OpsRequestComponentStatus struct {
 	// +kubebuilder:validation:MaxLength=32768
 	// +optional
 	Message string `json:"message,omitempty" protobuf:"bytes,6,opt,name=message"`
-}
-
-type OverrideBy struct {
-	// Indicates the name of the OpsRequest.
-	// +optional
-	OpsName string `json:"opsName"`
-
-	LastComponentConfiguration `json:",inline"`
 }
 
 type PreCheckResult struct {
@@ -1312,24 +1256,15 @@ func (r OpsRequestSpec) ToExposeListToMap() map[string]Expose {
 }
 
 func (r OpsRequestSpec) GetClusterName() string {
-	if r.ClusterName != "" {
-		return r.ClusterName
-	}
-	return r.ClusterRef
+	return r.ClusterName
 }
 
 func (r OpsRequestSpec) GetBackup() *Backup {
-	if r.Backup != nil {
-		return r.Backup
-	}
-	return r.BackupSpec
+	return r.Backup
 }
 
 func (r OpsRequestSpec) GetRestore() *Restore {
-	if r.Restore != nil {
-		return r.Restore
-	}
-	return r.RestoreSpec
+	return r.Restore
 }
 
 func (p *ProgressStatusDetail) SetStatusAndMessage(status ProgressStatus, message string) {

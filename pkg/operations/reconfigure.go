@@ -143,10 +143,6 @@ func (r *reconfigureAction) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli c
 
 func fromReconfigureOperations(request opsv1alpha1.OpsRequestSpec, reqCtx intctrlutil.RequestCtx, cli client.Client, resource *OpsResource) (reconfigures []reconfigureParams) {
 	var operations []opsv1alpha1.Reconfigure
-
-	if request.Reconfigure != nil {
-		operations = append(operations, *request.Reconfigure)
-	}
 	operations = append(operations, request.Reconfigures...)
 
 	for _, reconfigure := range operations {
@@ -319,15 +315,6 @@ func isExpectedPhase(condition metav1.Condition, expectedTypes []string, expecte
 
 func initReconfigureStatus(opsRequest *opsv1alpha1.OpsRequest, componentName string) *opsv1alpha1.ReconfiguringStatus {
 	status := &opsRequest.Status
-	if componentName == "" || (opsRequest.Spec.Reconfigure != nil && opsRequest.Spec.Reconfigure.ComponentName == componentName) {
-		if status.ReconfiguringStatus == nil {
-			status.ReconfiguringStatus = &opsv1alpha1.ReconfiguringStatus{
-				ConfigurationStatus: make([]opsv1alpha1.ConfigurationItemStatus, 0),
-			}
-		}
-		return status.ReconfiguringStatus
-	}
-
 	if status.ReconfiguringStatusAsComponent == nil {
 		status.ReconfiguringStatusAsComponent = make(map[string]*opsv1alpha1.ReconfiguringStatus)
 	}

@@ -80,10 +80,6 @@ func (hs horizontalScalingOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli 
 					return false, nil
 				}
 				currHorizontalScaling := compOps.(opsv1alpha1.HorizontalScaling)
-				// abort the opsRequest for overwrite replicas operation.
-				if currHorizontalScaling.Replicas != nil || v.Replicas != nil {
-					return true, nil
-				}
 				// if the earlier opsRequest is pending and not `Overwrite` operator, return false.
 				if earlierOps.Status.Phase == opsv1alpha1.OpsPendingPhase {
 					return false, nil
@@ -295,14 +291,9 @@ func (hs horizontalScalingOpsHandler) getExpectedCompValues(
 	compSpec *appsv1.ClusterComponentSpec,
 	lastCompConfiguration opsv1alpha1.LastComponentConfiguration,
 	horizontalScaling opsv1alpha1.HorizontalScaling) (int32, []appsv1.InstanceTemplate, []string, error) {
-	compReplicas := compSpec.Replicas
-	compInstanceTpls := compSpec.Instances
-	compOfflineInstances := compSpec.OfflineInstances
-	if horizontalScaling.Replicas == nil {
-		compReplicas = *lastCompConfiguration.Replicas
-		compInstanceTpls = slices.Clone(lastCompConfiguration.Instances)
-		compOfflineInstances = lastCompConfiguration.OfflineInstances
-	}
+	compReplicas := *lastCompConfiguration.Replicas
+	compInstanceTpls := slices.Clone(lastCompConfiguration.Instances)
+	compOfflineInstances := lastCompConfiguration.OfflineInstances
 	expectOfflineInstances := hs.getCompExpectedOfflineInstances(compOfflineInstances, horizontalScaling)
 	err := hs.autoSyncReplicaChanges(opsRes, horizontalScaling, compReplicas, compInstanceTpls, expectOfflineInstances)
 	if err != nil {
@@ -379,9 +370,6 @@ func (hs horizontalScalingOpsHandler) autoSyncReplicaChanges(
 // getCompExpectReplicas gets the expected replicas for the component.
 func (hs horizontalScalingOpsHandler) getCompExpectReplicas(horizontalScaling opsv1alpha1.HorizontalScaling,
 	compReplicas int32) int32 {
-	if horizontalScaling.Replicas != nil {
-		return *horizontalScaling.Replicas
-	}
 	if horizontalScaling.ScaleOut != nil && horizontalScaling.ScaleOut.ReplicaChanges != nil {
 		compReplicas += *horizontalScaling.ScaleOut.ReplicaChanges
 	}
@@ -396,9 +384,6 @@ func (hs horizontalScalingOpsHandler) getCompExpectedInstances(
 	compInstanceTpls []appsv1.InstanceTemplate,
 	horizontalScaling opsv1alpha1.HorizontalScaling,
 ) []appsv1.InstanceTemplate {
-	if horizontalScaling.Replicas != nil {
-		return compInstanceTpls
-	}
 	compInsTplSet := map[string]int{}
 	for i := range compInstanceTpls {
 		compInsTplSet[compInstanceTpls[i].Name] = i

@@ -77,30 +77,6 @@ type OpsDefinitionSpec struct {
 type PreCondition struct {
 	// Specifies the conditions that must be met for the operation to execute.
 	Rule *Rule `json:"rule,omitempty"`
-
-	// Represents a job that will be run to execute the PreCondition.
-	// The operation will only be executed if the job is successful.
-	// +optional
-	// Exec *PreConditionExec `json:"exec,omitempty"`
-}
-
-// PreConditionExec is deprecated.
-type PreConditionExec struct {
-	// Specifies the name of the image used for execution.
-	// +kubebuilder:validation:Required
-	Image string `json:"image"`
-
-	// Specifies a list of environment variables to be set in the container.
-	// +optional
-	Env []corev1.EnvVar `json:"env,omitempty"`
-
-	// Specifies the command to be executed in the container.
-	// +optional
-	Command []string `json:"command,omitempty"`
-
-	// Specifies the arguments to be passed to the command in the container.
-	// +optional
-	Args []string `json:"args,omitempty"`
 }
 
 type Rule struct {

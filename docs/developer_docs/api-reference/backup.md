@@ -3860,7 +3860,7 @@ is used as the encryption key.</p>
 <tbody>
 <tr>
 <td>
-<code>value</code><br/>
+<code>name</code><br/>
 <em>
 string
 </em>

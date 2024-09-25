@@ -21,31 +21,73 @@ package view
 
 import (
 	"context"
-	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"fmt"
+
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
+	workloadsAPI "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/apps"
+	"github.com/apecloud/kubeblocks/controllers/apps/configuration"
+	"github.com/apecloud/kubeblocks/controllers/workloads"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 )
 
 type ReconcilerTree interface {
 	Run() error
 }
 
+type reconcilerFunc func(client.Client, record.EventRecorder) reconcile.Reconciler
+
+var reconcilerFuncMap = map[viewv1.ObjectType]reconcilerFunc{
+	objectType(appsv1alpha1.APIVersion, appsv1alpha1.ClusterKind):     newClusterReconciler,
+	objectType(appsv1alpha1.APIVersion, appsv1alpha1.ComponentKind):   newComponentReconciler,
+	objectType(appsv1alpha1.APIVersion, "Configuration"):              newConfigurationReconciler,
+	objectType(workloadsAPI.GroupVersion.String(), workloadsAPI.Kind): newInstanceSetReconciler,
+	objectType(corev1.SchemeGroupVersion.String(), constant.PodKind):  newPodReconciler,
+}
+
 type reconcilerTree struct {
+	ctx         context.Context
+	cli         client.Client
 	tree        *graph.DAG
 	reconcilers map[viewv1.ObjectType]reconcile.Reconciler
 }
 
 func (r *reconcilerTree) Run() error {
-	r.tree.WalkTopoOrder(func(v graph.Vertex) error {
+	return r.tree.WalkTopoOrder(func(v graph.Vertex) error {
 		objType, _ := v.(viewv1.ObjectType)
 		reconciler, _ := r.reconcilers[objType]
-		return reconciler.Reconcile()
-	}, nil)
-	//TODO implement me
-	panic("implement me")
+		gvk, err := objectTypeToGVK(&objType)
+		if err != nil {
+			return err
+		}
+		objects, err := getObjectsByGVK(r.ctx, r.cli, gvk)
+		if err != nil {
+			return err
+		}
+		for _, object := range objects {
+			// TODO(free6om): verify whether safe to ignore reconciliation result
+			_, err = reconciler.Reconcile(r.ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(object)})
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	}, func(v1, v2 graph.Vertex) bool {
+		t1, _ := v1.(viewv1.ObjectType)
+		t2, _ := v2.(viewv1.ObjectType)
+		if t1.APIVersion != t2.APIVersion {
+			return t1.APIVersion < t2.APIVersion
+		}
+		return t1.Kind < t2.Kind
+	})
 }
 
 func newReconcilerTree(ctx context.Context, mClient client.Client, recorder record.EventRecorder, rules []viewv1.OwnershipRule) (ReconcilerTree, error) {
@@ -53,11 +95,19 @@ func newReconcilerTree(ctx context.Context, mClient client.Client, recorder reco
 	reconcilers := make(map[viewv1.ObjectType]reconcile.Reconciler)
 	for _, rule := range rules {
 		dag.AddVertex(rule.Primary)
-		reconcilers[rule.Primary] = newReconciler(ctx, mClient, recorder, rule.Primary)
+		reconciler, err := newReconciler(mClient, recorder, rule.Primary)
+		if err != nil {
+			return nil, err
+		}
+		reconcilers[rule.Primary] = reconciler
 		for _, resource := range rule.OwnedResources {
 			dag.AddVertex(resource.Secondary)
 			dag.Connect(rule.Primary, resource.Secondary)
-			reconcilers[resource.Secondary] = newReconciler(ctx, mClient, recorder, resource.Secondary)
+			reconciler, err = newReconciler(mClient, recorder, resource.Secondary)
+			if err != nil {
+				return nil, err
+			}
+			reconcilers[resource.Secondary] = reconciler
 		}
 	}
 	// DAG should be valid(one and only one root without cycle)
@@ -66,9 +116,78 @@ func newReconcilerTree(ctx context.Context, mClient client.Client, recorder reco
 	}
 
 	return &reconcilerTree{
+		ctx:         ctx,
+		cli:         mClient,
 		tree:        dag,
 		reconcilers: reconcilers,
 	}, nil
 }
 
+func newReconciler(mClient client.Client, recorder record.EventRecorder, objectType viewv1.ObjectType) (reconcile.Reconciler, error) {
+	reconcilerF, ok := reconcilerFuncMap[objectType]
+	if ok {
+		return reconcilerF(mClient, recorder), nil
+	}
+	return nil, fmt.Errorf("can't instancilized a reconciler for GVK: %s/%s", objectType.APIVersion, objectType.Kind)
+}
+
+func objectType(apiVersion, kind string) viewv1.ObjectType {
+	return viewv1.ObjectType{
+		APIVersion: apiVersion,
+		Kind:       kind,
+	}
+}
+
+func newClusterReconciler(cli client.Client, recorder record.EventRecorder) reconcile.Reconciler {
+	return &apps.ClusterReconciler{
+		Client:   cli,
+		Scheme:   cli.Scheme(),
+		Recorder: recorder,
+	}
+}
+
+func newComponentReconciler(cli client.Client, recorder record.EventRecorder) reconcile.Reconciler {
+	return &apps.ComponentReconciler{
+		Client:   cli,
+		Scheme:   cli.Scheme(),
+		Recorder: recorder,
+	}
+}
+
+func newConfigurationReconciler(cli client.Client, recorder record.EventRecorder) reconcile.Reconciler {
+	return &configuration.ConfigurationReconciler{
+		Client:   cli,
+		Scheme:   cli.Scheme(),
+		Recorder: recorder,
+	}
+}
+
+func newInstanceSetReconciler(cli client.Client, recorder record.EventRecorder) reconcile.Reconciler {
+	return &workloads.InstanceSetReconciler{
+		Client:   cli,
+		Scheme:   cli.Scheme(),
+		Recorder: recorder,
+	}
+}
+
+type podReconciler struct {
+	client.Client
+	Scheme   *runtime.Scheme
+	Recorder record.EventRecorder
+}
+
+func (p *podReconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func newPodReconciler(cli client.Client, recorder record.EventRecorder) reconcile.Reconciler {
+	return &podReconciler{
+		Client:   cli,
+		Scheme:   cli.Scheme(),
+		Recorder: recorder,
+	}
+}
+
 var _ ReconcilerTree = &reconcilerTree{}
+var _ reconcile.Reconciler = &podReconciler{}

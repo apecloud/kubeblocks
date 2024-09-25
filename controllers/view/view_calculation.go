@@ -125,9 +125,16 @@ func (c *viewCalculator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.
 	if err != nil {
 		return kubebuilderx.Commit, err
 	}
-	createSet = newObjectSet.Difference(initialObjectSet)
-	updateSet = newObjectSet.Intersection(initialObjectSet)
-	deleteSet = initialObjectSet.Difference(newObjectSet)
+
+	view.Status.ViewSummary.ObjectSummaries = buildObjectSummaries(initialObjectSet, newObjectSet, initialObjectMap, newObjectMap)
+
+	return kubebuilderx.Continue, nil
+}
+
+func buildObjectSummaries(initialObjectSet, newObjectSet sets.Set[model.GVKNObjKey], initialObjectMap, newObjectMap map[model.GVKNObjKey]client.Object) []viewv1.ObjectSummary {
+	createSet := newObjectSet.Difference(initialObjectSet)
+	updateSet := newObjectSet.Intersection(initialObjectSet)
+	deleteSet := initialObjectSet.Difference(newObjectSet)
 	summaryMap := make(map[viewv1.ObjectType]*viewv1.ObjectSummary)
 	doCount := func(s sets.Set[model.GVKNObjKey], summaryUpdater func(objectRef *model.GVKNObjKey, summary *viewv1.ObjectSummary)) {
 		for objectRef := range s {
@@ -171,6 +178,7 @@ func (c *viewCalculator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.
 		}
 		*summary.ChangeSummary.Deleted += 1
 	})
+
 	var objectSummaries []viewv1.ObjectSummary
 	for _, summary := range summaryMap {
 		objectSummaries = append(objectSummaries, *summary)
@@ -181,9 +189,8 @@ func (c *viewCalculator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.
 		}
 		return a.Type.Kind < b.Type.Kind
 	})
-	view.Status.ViewSummary.ObjectSummaries = objectSummaries
 
-	return kubebuilderx.Continue, nil
+	return objectSummaries
 }
 
 func buildChanges(objKeySet sets.Set[model.GVKNObjKey], oldObjectMap, newObjectMap map[model.GVKNObjKey]client.Object, changeType viewv1.ObjectChangeType, i18nResource *corev1.ConfigMap, defaultLocale, locale *string) []viewv1.ObjectChange {

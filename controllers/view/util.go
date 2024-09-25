@@ -22,6 +22,7 @@ package view
 import (
 	"container/list"
 	"context"
+	"encoding/json"
 	"fmt"
 	"strconv"
 
@@ -94,7 +95,6 @@ func objectRefToType(objectRef *model.GVKNObjKey) *viewv1.ObjectType {
 	}
 }
 
-
 func getObjectRef(object client.Object, scheme *runtime.Scheme) (*model.GVKNObjKey, error) {
 	gvk, err := apiutil.GVKForObject(object, scheme)
 	if err != nil {
@@ -155,7 +155,6 @@ func getObjectsByGVK(ctx context.Context, cli client.Client, gvk *schema.GroupVe
 	return objects, nil
 }
 
-
 func parseRevision(revisionStr string) int64 {
 	revision, err := strconv.ParseInt(revisionStr, 10, 64)
 	if err != nil {
@@ -172,6 +171,53 @@ func parseMatchingLabels(obj client.Object, criteria *viewv1.OwnershipCriteria) 
 		return parseLabels(obj, criteria.LabelCriteria), nil
 	}
 	return nil, fmt.Errorf("parse matching labels failed")
+}
+
+func getObjectTreeFromCache(ctx context.Context, cli client.Client, primary client.Object, ownershipRules []viewv1.OwnershipRule) (*viewv1.ObjectTreeNode, error) {
+	if primary == nil {
+		return nil, nil
+	}
+
+	// primary tree node
+	reference, err := getObjectReference(primary, cli.Scheme())
+	if err != nil {
+		return nil, err
+	}
+	tree := &viewv1.ObjectTreeNode{
+		Primary: *reference,
+	}
+
+	// secondary tree nodes
+	// find matched rules
+	primaryGVK, err := apiutil.GVKForObject(primary, cli.Scheme())
+	if err != nil {
+		return nil, err
+	}
+	var matchedRules []viewv1.OwnershipRule
+	for i := range ownershipRules {
+		rule := ownershipRules[i]
+		gvk, err := objectTypeToGVK(&rule.Primary)
+		if err != nil {
+			return nil, err
+		}
+		if *gvk == primaryGVK {
+			matchedRules = append(matchedRules, rule)
+		}
+	}
+	// build subtree
+	secondaries, err := getSecondaryObjectsOf(ctx, cli, primary, matchedRules)
+	if err != nil {
+		return nil, err
+	}
+	for _, secondary := range secondaries {
+		subTree, err := getObjectTreeFromCache(ctx, cli, secondary, ownershipRules)
+		if err != nil {
+			return nil, err
+		}
+		tree.Secondaries = append(tree.Secondaries, subTree)
+	}
+
+	return tree, nil
 }
 
 func getObjectsFromCache(ctx context.Context, cli client.Client, root *appsv1alpha1.Cluster, ownershipRules []viewv1.OwnershipRule) (sets.Set[model.GVKNObjKey], map[model.GVKNObjKey]client.Object, error) {
@@ -239,4 +285,10 @@ func getSecondaryObjectsOf(ctx context.Context, cli client.Client, obj client.Ob
 	}
 
 	return secondaries, nil
+}
+
+func specMapToJSON(spec interface{}) []byte {
+	// Convert the spec map to JSON for the patch functions
+	specJSON, _ := json.Marshal(spec)
+	return specJSON
 }

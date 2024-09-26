@@ -22,12 +22,12 @@ package view
 import (
 	"context"
 	"fmt"
-
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/checker/decls"
 	"github.com/google/cel-go/common/types"
 	"google.golang.org/protobuf/types/known/structpb"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -93,7 +93,7 @@ func (s *stateEvaluation) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx
 			return kubebuilderx.Commit, err
 		}
 		obj, err := s.store.Get(objectRef, change.Revision)
-		if err != nil && !apierrors.IsNotFound(err){
+		if err != nil && !apierrors.IsNotFound(err) {
 			return kubebuilderx.Commit, err
 		}
 		// handle revision lost after controller restarted
@@ -186,11 +186,11 @@ func getObjectTreeWithRevision(primary client.Object, ownershipRules []Ownership
 			if err != nil {
 				return nil, err
 			}
-			ml, err := parseMatchingLabels(primary, &ownedResource.Criteria)
+			opts, err := parseListOptions(primary, &ownedResource.Criteria)
 			if err != nil {
 				return nil, err
 			}
-			objects, err := getObjectsByRevision(gvk, store, ml, revision)
+			objects, err := getObjectsByRevision(gvk, store, revision, opts...)
 			if err != nil {
 				return nil, err
 			}
@@ -208,16 +208,31 @@ func getObjectTreeWithRevision(primary client.Object, ownershipRules []Ownership
 	return tree, nil
 }
 
-func getObjectsByRevision(gvk *schema.GroupVersionKind, store ObjectStore, ml client.MatchingLabels, revision int64) ([]client.Object, error) {
+func objectMatched(object client.Object, opts ...client.ListOption) bool {
+	listOptions := &client.ListOptions{}
+	listOptions.ApplyOptions(opts)
+	// default match
+	if listOptions.LabelSelector == nil && listOptions.FieldSelector == nil {
+		return true
+	}
+	if listOptions.LabelSelector != nil && listOptions.LabelSelector.Matches(labels.Set(object.GetLabels())) {
+		return true
+	}
+	if listOptions.FieldSelector != nil &&
+		listOptions.FieldSelector.Matches(fields.Set{"metadata.name": object.GetName()}) {
+		return true
+	}
+	return false
+}
+
+func getObjectsByRevision(gvk *schema.GroupVersionKind, store ObjectStore, revision int64, opts ...client.ListOption) ([]client.Object, error) {
 	objectMap := store.List(gvk)
 
 	var matchedObjects []client.Object
-	opts := &client.ListOptions{}
-	ml.ApplyToList(opts)
 	for _, revisionMap := range objectMap {
 		rev := int64(-1)
 		for r, object := range revisionMap {
-			if !opts.LabelSelector.Matches(labels.Set(object.GetLabels())) {
+			if !objectMatched(object, opts...) {
 				continue
 			}
 			if rev < r && r <= revision {
@@ -230,7 +245,6 @@ func getObjectsByRevision(gvk *schema.GroupVersionKind, store ObjectStore, ml cl
 	}
 	return matchedObjects, nil
 }
-
 
 func doStateEvaluation(object client.Object, expression viewv1.StateEvaluationExpression) (bool, error) {
 	if expression.CELExpression == nil {

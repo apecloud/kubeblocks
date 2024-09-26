@@ -105,7 +105,7 @@ func (f *rootFinder) findRoots(ctx context.Context, object client.Object) []reco
 					f.logger.Error(err, "convert objectType %s to GVK failed", rule.Primary)
 					return nil
 				}
-				objectList, err := getObjectsByGVK(ctx, f, primaryGVK)
+				objectList, err := getObjectsByGVK(ctx, f, primaryGVK, nil)
 				if err != nil {
 					f.logger.Error(err, "getObjectsByGVK for GVK %s failed", primaryGVK)
 					return nil
@@ -128,38 +128,11 @@ func (f *rootFinder) findRoots(ctx context.Context, object client.Object) []reco
 }
 
 func ownedBy(owner client.Object, obj client.Object, ownedResource OwnedResource) bool {
-	if ownedResource.Criteria.SelectorCriteria != nil {
-		labels, err := parseSelector(owner, ownedResource.Criteria.SelectorCriteria.Path)
-		if err != nil {
-			return false
-		}
-		if len(labels) > 0 && isSubset(labels, obj.GetLabels()) {
-			return true
-		}
+	opts, err := parseListOptions(owner, &ownedResource.Criteria)
+	if err != nil {
 		return false
 	}
-
-	if ownedResource.Criteria.LabelCriteria != nil {
-		labels := parseLabels(owner, ownedResource.Criteria.LabelCriteria)
-		if len(labels) > 0 && isSubset(labels, obj.GetLabels()) {
-			return true
-		}
-		return false
-	}
-
-	if ownedResource.Criteria.SpecifiedNameCriteria != nil {
-		nameField, err := parseField(owner, ownedResource.Criteria.SpecifiedNameCriteria.Path)
-		if err != nil {
-			return false
-		}
-		name, ok := nameField.(string)
-		if !ok {
-			return false
-		}
-		return name == obj.GetName()
-	}
-
-	return false
+	return objectMatched(obj, opts...)
 }
 
 func parseLabels(obj client.Object, criteria map[string]string) map[string]string {
@@ -213,17 +186,6 @@ func parseSelector(obj client.Object, fieldPath string) (map[string]string, erro
 	}
 
 	return labelSelector, nil
-}
-
-// isSubset checks if map1 is a subset of map2
-func isSubset(map1, map2 map[string]string) bool {
-	for key, value := range map1 {
-		// Check if the key exists in map2 and if the values match
-		if v, exists := map2[key]; !exists || v != value {
-			return false
-		}
-	}
-	return true
 }
 
 func NewObjectTreeRootFinder(cli client.Client) ObjectTreeRootFinder {

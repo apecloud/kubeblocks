@@ -22,6 +22,15 @@ package view
 import (
 	"context"
 	"fmt"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	"github.com/apecloud/kubeblocks/controllers/dataprotection"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/dataprotection/types"
+	vsv1beta1 "github.com/kubernetes-csi/external-snapshotter/client/v3/apis/volumesnapshot/v1beta1"
+	vsv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
+	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -46,12 +55,25 @@ type ReconcilerTree interface {
 type reconcilerFunc func(client.Client, record.EventRecorder) reconcile.Reconciler
 
 var reconcilerFuncMap = map[viewv1.ObjectType]reconcilerFunc{
-	objectType(appsv1alpha1.APIVersion, appsv1alpha1.ClusterKind):        newClusterReconciler,
-	objectType(appsv1alpha1.APIVersion, appsv1alpha1.ComponentKind):      newComponentReconciler,
-	objectType(appsv1alpha1.APIVersion, "Configuration"):                 newConfigurationReconciler,
-	objectType(workloadsAPI.GroupVersion.String(), workloadsAPI.Kind):    newInstanceSetReconciler,
-	objectType(corev1.SchemeGroupVersion.String(), constant.PodKind):     newPodReconciler,
-	objectType(corev1.SchemeGroupVersion.String(), constant.ServiceKind): newServiceReconciler,
+	objectType(appsv1alpha1.SchemeGroupVersion.String(), appsv1alpha1.ClusterKind):     newClusterReconciler,
+	objectType(appsv1alpha1.SchemeGroupVersion.String(), appsv1alpha1.ComponentKind):   newComponentReconciler,
+	objectType(corev1.SchemeGroupVersion.String(), constant.SecretKind):                newSecretReconciler,
+	objectType(corev1.SchemeGroupVersion.String(), constant.ServiceKind):               newServiceReconciler,
+	objectType(workloadsAPI.SchemeGroupVersion.String(), workloadsAPI.Kind):            newInstanceSetReconciler,
+	objectType(corev1.SchemeGroupVersion.String(), constant.ConfigMapKind):             newConfigMapReconciler,
+	objectType(corev1.SchemeGroupVersion.String(), constant.PersistentVolumeClaimKind): newPVCReconciler,
+	objectType(rbacv1.SchemeGroupVersion.String(), constant.ClusterRoleBindingKind):    newClusterRoleBindingReconciler,
+	objectType(rbacv1.SchemeGroupVersion.String(), constant.RoleBindingKind):           newRoleBindingReconciler,
+	objectType(corev1.SchemeGroupVersion.String(), constant.ServiceAccountKind):        newSAReconciler,
+	objectType(batchv1.SchemeGroupVersion.String(), constant.JobKind):                  newJobReconciler,
+	objectType(dpv1alpha1.SchemeGroupVersion.String(), types.BackupKind):               newBackupReconciler,
+	objectType(dpv1alpha1.SchemeGroupVersion.String(), types.RestoreKind):              newRestoreReconciler,
+	objectType(appsv1alpha1.SchemeGroupVersion.String(), constant.ConfigurationKind):   newConfigurationReconciler,
+	objectType(corev1.SchemeGroupVersion.String(), constant.PodKind):                   newPodReconciler,
+	objectType(appsv1.SchemeGroupVersion.String(), constant.StatefulSetKind):           newSTSReconciler,
+	objectType(vsv1.SchemeGroupVersion.String(), constant.VolumeSnapshotKind):          newVolumeSnapshotV1Reconciler,
+	objectType(vsv1beta1.SchemeGroupVersion.String(), constant.VolumeSnapshotKind):     newVolumeSnapshotV1Beta1Reconciler,
+	objectType(corev1.SchemeGroupVersion.String(), constant.PersistentVolumeKind):      newPVReconciler,
 }
 
 type reconcilerTree struct {
@@ -69,7 +91,7 @@ func (r *reconcilerTree) Run() error {
 		if err != nil {
 			return err
 		}
-		objects, err := getObjectsByGVK(r.ctx, r.cli, gvk)
+		objects, err := getObjectsByGVK(r.ctx, r.cli, gvk, nil)
 		if err != nil {
 			return err
 		}
@@ -177,6 +199,86 @@ type baseReconciler struct {
 	Recorder record.EventRecorder
 }
 
+type doNothingReconciler struct {
+	baseReconciler
+}
+
+func (r *doNothingReconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
+	return reconcile.Result{}, nil
+}
+
+func newPVReconciler(c client.Client, recorder record.EventRecorder) reconcile.Reconciler {
+	// TODO(free6om): finish me
+	panic("implement me")
+}
+
+func newVolumeSnapshotV1Beta1Reconciler(c client.Client, recorder record.EventRecorder) reconcile.Reconciler {
+	// TODO(free6om): finish me
+	panic("implement me")
+}
+
+func newVolumeSnapshotV1Reconciler(c client.Client, recorder record.EventRecorder) reconcile.Reconciler {
+	// TODO(free6om): finish me
+	panic("implement me")
+}
+
+func newSTSReconciler(c client.Client, recorder record.EventRecorder) reconcile.Reconciler {
+	// TODO(free6om): set sts to ready
+	panic("implement me")
+}
+
+func newRestoreReconciler(c client.Client, recorder record.EventRecorder) reconcile.Reconciler {
+	return &dataprotection.RestoreReconciler{
+		Client:   c,
+		Scheme:   c.Scheme(),
+		Recorder: recorder,
+	}
+}
+
+func newBackupReconciler(c client.Client, recorder record.EventRecorder) reconcile.Reconciler {
+	config := intctrlutil.GeKubeRestConfig("kubeblocks-view")
+	return &dataprotection.BackupReconciler{
+		Client:     c,
+		Scheme:     c.Scheme(),
+		Recorder:   recorder,
+		RestConfig: config,
+	}
+}
+
+func newJobReconciler(c client.Client, recorder record.EventRecorder) reconcile.Reconciler {
+	// TODO(free6om): set job to succeed
+	panic("implement me")
+}
+
+func newSAReconciler(c client.Client, recorder record.EventRecorder) reconcile.Reconciler {
+	return newDoNothingReconciler()
+}
+
+func newRoleBindingReconciler(c client.Client, recorder record.EventRecorder) reconcile.Reconciler {
+	return newDoNothingReconciler()
+}
+
+func newClusterRoleBindingReconciler(c client.Client, recorder record.EventRecorder) reconcile.Reconciler {
+	return newDoNothingReconciler()
+}
+
+func newPVCReconciler(c client.Client, recorder record.EventRecorder) reconcile.Reconciler {
+	// TODO(free6om): set pvc to bound
+	panic("implement me")
+}
+
+func newConfigMapReconciler(c client.Client, recorder record.EventRecorder) reconcile.Reconciler {
+	return newDoNothingReconciler()
+}
+
+func newSecretReconciler(c client.Client, recorder record.EventRecorder) reconcile.Reconciler {
+	return newDoNothingReconciler()
+}
+
+func newDoNothingReconciler() reconcile.Reconciler {
+	return &doNothingReconciler{}
+}
+
 type podReconciler struct {
 	baseReconciler
 }
@@ -216,5 +318,6 @@ func newServiceReconciler(cli client.Client, recorder record.EventRecorder) reco
 }
 
 var _ ReconcilerTree = &reconcilerTree{}
+var _ reconcile.Reconciler = &doNothingReconciler{}
 var _ reconcile.Reconciler = &podReconciler{}
 var _ reconcile.Reconciler = &serviceReconciler{}

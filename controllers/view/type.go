@@ -20,7 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package view
 
 import (
+	"fmt"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	vsv1beta1 "github.com/kubernetes-csi/external-snapshotter/client/v3/apis/volumesnapshot/v1beta1"
 	vsv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
@@ -28,6 +30,9 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/discovery"
 	"k8s.io/utils/pointer"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -76,12 +81,12 @@ var (
 		},
 	}
 
-	KBOwnershipRules = []OwnershipRule{
+	FullKBOwnershipRules = []OwnershipRule{
 		{
-			Primary: objectType(appsv1alpha1.APIVersion, appsv1alpha1.ClusterKind),
+			Primary: objectType(appsv1alpha1.SchemeGroupVersion.String(), appsv1alpha1.ClusterKind),
 			OwnedResources: []OwnedResource{
 				{
-					Secondary: objectType(appsv1alpha1.APIVersion, appsv1alpha1.ComponentKind),
+					Secondary: objectType(appsv1alpha1.SchemeGroupVersion.String(), appsv1alpha1.ComponentKind),
 					Criteria:  clusterCriteria,
 				},
 				{
@@ -96,10 +101,10 @@ var (
 			},
 		},
 		{
-			Primary: objectType(appsv1alpha1.APIVersion, appsv1alpha1.ComponentKind),
+			Primary: objectType(appsv1alpha1.SchemeGroupVersion.String(), appsv1alpha1.ComponentKind),
 			OwnedResources: []OwnedResource{
 				{
-					Secondary: objectType(workloads.GroupVersion.String(), workloads.Kind),
+					Secondary: objectType(workloads.SchemeGroupVersion.String(), workloads.Kind),
 					Criteria:  componentCriteria,
 				},
 				{
@@ -135,21 +140,21 @@ var (
 					Criteria:  componentCriteria,
 				},
 				{
-					Secondary: objectType(dpv1alpha1.GroupVersion.String(), types.BackupKind),
+					Secondary: objectType(dpv1alpha1.SchemeGroupVersion.String(), types.BackupKind),
 					Criteria:  componentCriteria,
 				},
 				{
-					Secondary: objectType(dpv1alpha1.GroupVersion.String(), types.RestoreKind),
+					Secondary: objectType(dpv1alpha1.SchemeGroupVersion.String(), types.RestoreKind),
 					Criteria:  componentCriteria,
 				},
 				{
-					Secondary: objectType(appsv1alpha1.GroupVersion.String(), constant.ConfigurationKind),
+					Secondary: objectType(appsv1alpha1.SchemeGroupVersion.String(), constant.ConfigurationKind),
 					Criteria:  componentCriteria,
 				},
 			},
 		},
 		{
-			Primary: objectType(workloads.GroupVersion.String(), workloads.Kind),
+			Primary: objectType(workloads.SchemeGroupVersion.String(), workloads.Kind),
 			OwnedResources: []OwnedResource{
 				{
 					Secondary: objectType(corev1.SchemeGroupVersion.String(), constant.PodKind),
@@ -170,7 +175,7 @@ var (
 			},
 		},
 		{
-			Primary: objectType(appsv1alpha1.GroupVersion.String(), constant.ConfigurationKind),
+			Primary: objectType(appsv1alpha1.SchemeGroupVersion.String(), constant.ConfigurationKind),
 			OwnedResources: []OwnedResource{
 				{
 					Secondary: objectType(corev1.SchemeGroupVersion.String(), constant.ConfigMapKind),
@@ -179,7 +184,7 @@ var (
 			},
 		},
 		{
-			Primary: objectType(dpv1alpha1.GroupVersion.String(), types.BackupKind),
+			Primary: objectType(dpv1alpha1.SchemeGroupVersion.String(), types.BackupKind),
 			OwnedResources: []OwnedResource{
 				{
 					Secondary: objectType(batchv1.SchemeGroupVersion.String(), constant.JobKind),
@@ -200,7 +205,7 @@ var (
 			},
 		},
 		{
-			Primary: objectType(dpv1alpha1.GroupVersion.String(), types.RestoreKind),
+			Primary: objectType(dpv1alpha1.SchemeGroupVersion.String(), types.RestoreKind),
 			OwnedResources: []OwnedResource{
 				{
 					Secondary: objectType(batchv1.SchemeGroupVersion.String(), constant.JobKind),
@@ -218,7 +223,67 @@ var (
 			},
 		},
 	}
+
+	KBOwnershipRules = filterUnsupportedRules(FullKBOwnershipRules)
 )
+
+func filterUnsupportedRules(ownershipRules []OwnershipRule) []OwnershipRule {
+	var rules []OwnershipRule
+	for _, rule := range ownershipRules {
+		if exists, _ := resourceExists(rule.Primary.APIVersion, rule.Primary.Kind); !exists {
+			continue
+		}
+		filteredRule := OwnershipRule{
+			Primary: rule.Primary,
+		}
+		for _, ownedResource := range rule.OwnedResources {
+			if exists, _ := resourceExists(ownedResource.Secondary.APIVersion, ownedResource.Secondary.Kind); !exists {
+				continue
+			}
+			filteredRule.OwnedResources = append(filteredRule.OwnedResources, ownedResource)
+		}
+		if len(filteredRule.OwnedResources) > 0 {
+			rules = append(rules, filteredRule)
+		}
+	}
+	return rules
+}
+
+// resourceExists checks if a resource with the given apiVersion and kind exists in the cluster.
+func resourceExists(apiVersion, kind string) (bool, error) {
+	// Load the kubeconfig file to get a config object
+	config := intctrlutil.GeKubeRestConfig("kubeblocks-api-tester")
+
+	// Create a discovery client
+	discoveryClient, err := discovery.NewDiscoveryClientForConfig(config)
+	if err != nil {
+		return false, fmt.Errorf("failed to create discovery client: %w", err)
+	}
+
+	// Parse the apiVersion into a GroupVersion
+	_, err = schema.ParseGroupVersion(apiVersion)
+	if err != nil {
+		return false, fmt.Errorf("failed to parse apiVersion: %w", err)
+	}
+
+	// Get the API Resources for the given GroupVersion
+	apiResources, err := discoveryClient.ServerResourcesForGroupVersion(apiVersion)
+	if err != nil {
+		if meta.IsNoMatchError(err) {
+			return false, nil // GroupVersion does not exist
+		}
+		return false, fmt.Errorf("failed to get server resources: %w", err)
+	}
+
+	// Check if the kind exists in the API Resources
+	for _, resource := range apiResources.APIResources {
+		if resource.Kind == kind {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
 
 var rootObjectType = viewv1.ObjectType{
 	APIVersion: appsv1alpha1.APIVersion,

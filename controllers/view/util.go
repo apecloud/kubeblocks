@@ -24,6 +24,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"k8s.io/apimachinery/pkg/fields"
 	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
@@ -123,7 +124,10 @@ func getObjectReference(obj client.Object, scheme *runtime.Scheme) (*corev1.Obje
 	}, nil
 }
 
-func getObjectsByGVK(ctx context.Context, cli client.Client, gvk *schema.GroupVersionKind, opts ...client.ListOption) ([]client.Object, error) {
+// getObjectsByGVK gets all objects of a specific GVK.
+// why not merge matchingFields into opts:
+// fields.Selector needs the underlying cache to build an Indexer on the specific field, which is too heavy.
+func getObjectsByGVK(ctx context.Context, cli client.Client, gvk *schema.GroupVersionKind, matchingFields []client.MatchingFields, opts ...client.ListOption) ([]client.Object, error) {
 	runtimeObjectList, err := cli.Scheme().New(schema.GroupVersionKind{
 		Group:   gvk.Group,
 		Version: gvk.Version,
@@ -144,10 +148,17 @@ func getObjectsByGVK(ctx context.Context, cli client.Client, gvk *schema.GroupVe
 		return nil, err
 	}
 	var objects []client.Object
+	listOptions := &client.ListOptions{}
+	for _, mf := range matchingFields {
+		mf.ApplyToList(listOptions)
+	}
 	for _, object := range runtimeObjects {
 		o, ok := object.(client.Object)
 		if !ok {
 			return nil, fmt.Errorf("object is not a client.Object for GVK %s", gvk)
+		}
+		if listOptions.FieldSelector != nil && !listOptions.FieldSelector.Matches(fields.Set{"metadata.name": o.GetName()}) {
+			continue
 		}
 		objects = append(objects, o)
 	}
@@ -163,14 +174,49 @@ func parseRevision(revisionStr string) int64 {
 	return revision
 }
 
-func parseMatchingLabels(obj client.Object, criteria *OwnershipCriteria) (client.MatchingLabels, error) {
+func parseListOptions(obj client.Object, criteria *OwnershipCriteria) ([]client.ListOption, error) {
+	opts, err := parseMatchingLabels(obj, criteria)
+	if err != nil {
+		return nil, err
+	}
+	mfs, err := parseMatchingFields(obj, criteria)
+	if err != nil {
+		return nil, err
+	}
+	for _, mf := range mfs {
+		opts = append(opts, mf)
+	}
+	return opts, nil
+}
+
+func parseMatchingLabels(obj client.Object, criteria *OwnershipCriteria) ([]client.ListOption, error) {
+	var opts []client.ListOption
 	if criteria.SelectorCriteria != nil {
-		return parseSelector(obj, criteria.SelectorCriteria.Path)
+		ml, err := parseSelector(obj, criteria.SelectorCriteria.Path)
+		if err != nil {
+			return nil, err
+		}
+		opts = append(opts, client.MatchingLabels(ml))
 	}
 	if criteria.LabelCriteria != nil {
-		return parseLabels(obj, criteria.LabelCriteria), nil
+		ml := parseLabels(obj, criteria.LabelCriteria)
+		opts = append(opts, client.MatchingLabels(ml))
 	}
-	return nil, fmt.Errorf("parse matching labels failed")
+	return opts, nil
+}
+
+func parseMatchingFields(obj client.Object, criteria *OwnershipCriteria) ([]client.MatchingFields, error) {
+	if criteria.SpecifiedNameCriteria != nil {
+		fieldMap, err := flattenObject(obj)
+		if err != nil {
+			return nil, err
+		}
+		name, ok := fieldMap[criteria.SpecifiedNameCriteria.Path]
+		if ok {
+			return []client.MatchingFields{{"metadata.name": name}}, nil
+		}
+	}
+	return nil, nil
 }
 
 func getObjectTreeFromCache(ctx context.Context, cli client.Client, primary client.Object, ownershipRules []OwnershipRule) (*viewv1.ObjectTreeNode, error) {
@@ -272,11 +318,15 @@ func getSecondaryObjectsOf(ctx context.Context, cli client.Client, obj client.Ob
 			if err != nil {
 				return nil, err
 			}
-			ml, err := parseMatchingLabels(obj, &ownedResource.Criteria)
+			opts, err := parseMatchingLabels(obj, &ownedResource.Criteria)
 			if err != nil {
 				return nil, err
 			}
-			objects, err := getObjectsByGVK(ctx, cli, gvk, ml)
+			mf, err := parseMatchingFields(obj, &ownedResource.Criteria)
+			if err != nil {
+				return nil, err
+			}
+			objects, err := getObjectsByGVK(ctx, cli, gvk, mf, opts...)
 			if err != nil {
 				return nil, err
 			}
@@ -291,4 +341,50 @@ func specMapToJSON(spec interface{}) []byte {
 	// Convert the spec map to JSON for the patch functions
 	specJSON, _ := json.Marshal(spec)
 	return specJSON
+}
+
+// convertToMap converts a client.Object to a map respecting JSON tags.
+func convertToMap(obj client.Object) (map[string]interface{}, error) {
+	objBytes, err := json.Marshal(obj)
+	if err != nil {
+		return nil, err
+	}
+	var objMap map[string]interface{}
+	if err := json.Unmarshal(objBytes, &objMap); err != nil {
+		return nil, err
+	}
+	return objMap, nil
+}
+
+// flattenJSON flattens a nested JSON object into a single-level map.
+func flattenJSON(data map[string]interface{}, prefix string, flatMap map[string]string) {
+	for key, value := range data {
+		newKey := key
+		if prefix != "" {
+			newKey = prefix + "." + key
+		}
+
+		switch v := value.(type) {
+		case map[string]interface{}:
+			flattenJSON(v, newKey, flatMap)
+		case []interface{}:
+			for i, item := range v {
+				flattenJSON(map[string]interface{}{fmt.Sprintf("%d", i): item}, newKey, flatMap)
+			}
+		default:
+			flatMap[newKey] = fmt.Sprintf("%v", v)
+		}
+	}
+}
+
+// flattenObject converts a client.Object to a flattened map.
+func flattenObject(obj client.Object) (map[string]string, error) {
+	objMap, err := convertToMap(obj)
+	if err != nil {
+		return nil, err
+	}
+
+	flatMap := make(map[string]string)
+	flattenJSON(objMap, "", flatMap)
+	return flatMap, nil
 }

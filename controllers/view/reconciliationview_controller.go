@@ -66,6 +66,7 @@ func (r *ReconciliationViewReconciler) Reconcile(ctx context.Context, req ctrl.R
 		Do(updateInformerManager(r.InformerManager)).
 		Do(viewCalculation(ctx, r.Client, r.ObjectStore)).
 		Do(viewStateEvaluation(ctx, r.Client, r.ObjectStore, r.Scheme)).
+		Do(planGeneration(ctx, r.Client)).
 		Commit()
 
 	// TODO(free6om): err handling

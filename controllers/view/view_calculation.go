@@ -75,8 +75,9 @@ func (c *viewCalculator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.
 		return kubebuilderx.Commit, err
 	}
 
-	// build old object set from view.status.currentObjectTree
-	oldObjectSet, oldObjectMap, err := getObjectsFromTree(view.Status.CurrentObjectTree, c.store)
+	currentState := &view.Status.CurrentState
+	// build old object set from view.status.currentState.objectTree
+	oldObjectSet, oldObjectMap, err := getObjectsFromTree(currentState.ObjectTree, c.store)
 	if err != nil {
 		return kubebuilderx.Commit, err
 	}
@@ -87,24 +88,24 @@ func (c *viewCalculator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.
 	deleteSet := oldObjectSet.Difference(newObjectSet)
 
 	// build view progress from three sets.
-	var viewSlice []viewv1.ObjectChange
+	var changeSlice []viewv1.ObjectChange
 	// for createSet, build objectChange.description by reading i18n of the corresponding object type.
 	changes := buildChanges(createSet, oldObjectMap, newObjectMap, viewv1.ObjectCreationType, i18nResource, defaultLocale, view.Spec.Locale)
-	viewSlice = append(viewSlice, changes...)
+	changeSlice = append(changeSlice, changes...)
 	// for updateSet, read old version from object store by object type and resource version, calculate the diff, render the objectChange.description
 	changes = buildChanges(updateSet, oldObjectMap, newObjectMap, viewv1.ObjectUpdateType, i18nResource, defaultLocale, view.Spec.Locale)
-	viewSlice = append(viewSlice, changes...)
+	changeSlice = append(changeSlice, changes...)
 	// for deleteSet, build objectChange.description by reading i18n of the corresponding object type.
 	changes = buildChanges(deleteSet, oldObjectMap, newObjectMap, viewv1.ObjectDeletionType, i18nResource, defaultLocale, view.Spec.Locale)
-	viewSlice = append(viewSlice, changes...)
+	changeSlice = append(changeSlice, changes...)
 
 	// sort the view progress by resource version.
-	slices.SortStableFunc(viewSlice, func(a, b viewv1.ObjectChange) bool {
+	slices.SortStableFunc(changeSlice, func(a, b viewv1.ObjectChange) bool {
 		return a.Revision < b.Revision
 	})
 
 	// concat it to view.status.view
-	view.Status.View = append(view.Status.View, viewSlice...)
+	currentState.Changes = append(currentState.Changes, changeSlice...)
 
 	// save new version objects to object store.
 	for _, object := range newObjectMap {
@@ -113,8 +114,8 @@ func (c *viewCalculator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.
 		}
 	}
 
-	// update view.status.currentObjectTree
-	view.Status.CurrentObjectTree, err = getObjectTreeWithRevision(root, KBOwnershipRules, c.store, parseRevision(root.ResourceVersion), c.cli.Scheme())
+	// update current object tree
+	currentState.ObjectTree, err = getObjectTreeWithRevision(root, KBOwnershipRules, c.store, parseRevision(root.ResourceVersion), c.cli.Scheme())
 	if err != nil {
 		return kubebuilderx.Commit, err
 	}
@@ -125,7 +126,7 @@ func (c *viewCalculator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.
 		return kubebuilderx.Commit, err
 	}
 
-	view.Status.ViewSummary.ObjectSummaries = buildObjectSummaries(initialObjectSet, newObjectSet, initialObjectMap, newObjectMap)
+	currentState.Summary.ObjectSummaries = buildObjectSummaries(initialObjectSet, newObjectSet, initialObjectMap, newObjectMap)
 
 	return kubebuilderx.Continue, nil
 }
@@ -141,8 +142,8 @@ func buildObjectSummaries(initialObjectSet, newObjectSet sets.Set[model.GVKNObjK
 			summary, ok := summaryMap[key]
 			if !ok {
 				summary = &viewv1.ObjectSummary{
-					Type:  key,
-					Total: 0,
+					ObjectType: key,
+					Total:      0,
 				}
 				summaryMap[key] = summary
 			}
@@ -183,10 +184,10 @@ func buildObjectSummaries(initialObjectSet, newObjectSet sets.Set[model.GVKNObjK
 		objectSummaries = append(objectSummaries, *summary)
 	}
 	slices.SortStableFunc(objectSummaries, func(a, b viewv1.ObjectSummary) bool {
-		if a.Type.APIVersion != b.Type.APIVersion {
-			return a.Type.APIVersion < b.Type.APIVersion
+		if a.ObjectType.APIVersion != b.ObjectType.APIVersion {
+			return a.ObjectType.APIVersion < b.ObjectType.APIVersion
 		}
-		return a.Type.Kind < b.Type.Kind
+		return a.ObjectType.Kind < b.ObjectType.Kind
 	})
 
 	return objectSummaries

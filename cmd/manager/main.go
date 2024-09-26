@@ -540,13 +540,6 @@ func main() {
 			setupLog.Error(err, "unable to create controller", "controller", "ReconciliationView")
 			os.Exit(1)
 		}
-		if err = (&viewcontrollers.ReconciliationPlanReconciler{
-			Client: mgr.GetClient(),
-			Scheme: mgr.GetScheme(),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "ReconciliationPlan")
-			os.Exit(1)
-		}
 	}
 	// +kubebuilder:scaffold:builder
 

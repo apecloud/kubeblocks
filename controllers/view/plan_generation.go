@@ -23,12 +23,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"hash/fnv"
 	"reflect"
 
 	"github.com/google/go-cmp/cmp"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -50,15 +52,32 @@ func (g *planGenerator) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilder
 	if tree.GetRoot() == nil || model.IsObjectDeleting(tree.GetRoot()) {
 		return kubebuilderx.ConditionUnsatisfied
 	}
-	p, _ := tree.GetRoot().(*viewv1.ReconciliationPlan)
-	if p.Generation == p.Status.ObservedPlanGeneration {
-		return kubebuilderx.ConditionUnsatisfied
+	v, _ := tree.GetRoot().(*viewv1.ReconciliationView)
+	if isDesiredSpecChanged(v) {
+		return kubebuilderx.ConditionSatisfied
 	}
-	return kubebuilderx.ConditionSatisfied
+	return kubebuilderx.ConditionUnsatisfied
+}
+
+func isDesiredSpecChanged(v *viewv1.ReconciliationView) bool {
+	if v.Spec.DryRun == nil && v.Status.DryRunResult == nil {
+		return false
+	}
+	if v.Spec.DryRun == nil || v.Status.DryRunResult == nil {
+		return true
+	}
+	revision := getDesiredSpecRevision(v.Spec.DryRun.DesiredSpec)
+	return revision != v.Status.DryRunResult.DesiredSpecRevision
+}
+
+func getDesiredSpecRevision(desiredSpec string) string {
+	hf := fnv.New32()
+	_, _ = hf.Write([]byte(desiredSpec))
+	return rand.SafeEncodeString(fmt.Sprint(hf.Sum32()))
 }
 
 func (g *planGenerator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
-	plan, _ := tree.GetRoot().(*viewv1.ReconciliationPlan)
+	view, _ := tree.GetRoot().(*viewv1.ReconciliationView)
 	objs := tree.List(&corev1.ConfigMap{})
 	var i18nResource *corev1.ConfigMap
 	if len(objs) > 0 {
@@ -66,11 +85,11 @@ func (g *planGenerator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.R
 	}
 
 	root := &appsv1alpha1.Cluster{}
-	objectKey := client.ObjectKeyFromObject(plan)
-	if plan.Spec.TargetObject != nil {
+	objectKey := client.ObjectKeyFromObject(view)
+	if view.Spec.TargetObject != nil {
 		objectKey = client.ObjectKey{
-			Namespace: plan.Spec.TargetObject.Namespace,
-			Name:      plan.Spec.TargetObject.Name,
+			Namespace: view.Spec.TargetObject.Namespace,
+			Name:      view.Spec.TargetObject.Name,
 		}
 	}
 	if err := g.cli.Get(g.ctx, objectKey, root); err != nil {
@@ -103,7 +122,7 @@ func (g *planGenerator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.R
 
 	// apply plan.spec.desiredSpec to root object
 	var specChange string
-	if specChange, err = applyDesiredSpec(plan.Spec.DesiredSpec, root); err != nil {
+	if specChange, err = applyDesiredSpec(view.Spec.DryRun.DesiredSpec, root); err != nil {
 		return kubebuilderx.Commit, err
 	}
 	if err = mClient.Update(g.ctx, root); err != nil {
@@ -112,8 +131,8 @@ func (g *planGenerator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.R
 
 	// start plan generation loop
 	expr := defaultStateEvaluationExpression
-	if plan.Spec.StateEvaluationExpression != nil {
-		expr = *plan.Spec.StateEvaluationExpression
+	if view.Spec.StateEvaluationExpression != nil {
+		expr = *view.Spec.StateEvaluationExpression
 	}
 	for {
 		changeCount := len(store.GetChanges())
@@ -138,18 +157,17 @@ func (g *planGenerator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.R
 		}
 	}
 
-	// update plan.status
-	plan.Status.ObservedPlanGeneration = plan.Generation
-	plan.Status.ObservedTargetGeneration = root.Generation
-	plan.Status.Phase = "Succeed"
+	// update dry-run result
+	dryRunResult := view.Status.DryRunResult
+	if dryRunResult == nil {
+		dryRunResult = &viewv1.DryRunResult{}
+	}
+	dryRunResult.DesiredSpecRevision = getDesiredSpecRevision(view.Spec.DryRun.DesiredSpec)
+	dryRunResult.ObservedTargetGeneration = root.Generation
+	dryRunResult.Phase = viewv1.DryRunSucceedPhase
 	if err = g.cli.Get(g.ctx, objectKey, root); err != nil {
 		return kubebuilderx.Commit, err
 	}
-	currentTree, err := getObjectTreeFromCache(g.ctx, g.cli, root, KBOwnershipRules)
-	if err != nil {
-		return kubebuilderx.Commit, err
-	}
-	plan.Status.CurrentObjectTree = *currentTree
 	desiredRoot := &appsv1alpha1.Cluster{}
 	if err = mClient.Get(g.ctx, objectKey, desiredRoot); err != nil {
 		return kubebuilderx.Commit, err
@@ -158,11 +176,11 @@ func (g *planGenerator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.R
 	if err != nil {
 		return kubebuilderx.Commit, err
 	}
-	plan.Status.DesiredObjectTree = *desiredTree
-	plan.Status.Plan = store.GetChanges()
-	plan.Status.Summary.SpecChange = specChange
+	dryRunResult.FinalObjectTree = *desiredTree
+	dryRunResult.Plan = store.GetChanges()
+	dryRunResult.PlanSummary.SpecChange = specChange
 	newObjectMap := store.GetAll()
-	plan.Status.Summary.ObjectSummaries = buildObjectSummaries(sets.KeySet(initialObjectMap), sets.KeySet(newObjectMap), initialObjectMap, newObjectMap)
+	dryRunResult.PlanSummary.ObjectSummaries = buildObjectSummaries(sets.KeySet(initialObjectMap), sets.KeySet(newObjectMap), initialObjectMap, newObjectMap)
 
 	// TODO(free6om): put the plan generation loop into a timeout goroutine
 

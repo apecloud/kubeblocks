@@ -82,8 +82,8 @@ func (s *stateEvaluation) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx
 		Kind:       appsv1alpha1.ClusterKind,
 	}
 	latestReconciliationCycleStart := 0
-	for i := len(view.Status.View) - 1; i >= 0; i-- {
-		change := view.Status.View[i]
+	for i := len(view.Status.CurrentState.Changes) - 1; i >= 0; i-- {
+		change := view.Status.CurrentState.Changes[i]
 		objType := objectReferenceToType(&change.ObjectReference)
 		if *objType != clusterType {
 			continue
@@ -131,14 +131,14 @@ func (s *stateEvaluation) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx
 
 	// build new InitialObjectTree
 	var err error
-	view.Status.InitialObjectTree, err = getObjectTreeWithRevision(root, KBOwnershipRules, s.store, view.Status.View[latestReconciliationCycleStart].Revision, s.scheme)
+	view.Status.InitialObjectTree, err = getObjectTreeWithRevision(root, KBOwnershipRules, s.store, view.Status.CurrentState.Changes[latestReconciliationCycleStart].Revision, s.scheme)
 	if err != nil {
 		return kubebuilderx.Commit, err
 	}
 
 	// delete unused object revisions
 	for i := 0; i < latestReconciliationCycleStart; i++ {
-		change := view.Status.View[i]
+		change := view.Status.CurrentState.Changes[i]
 		objectRef, err := objectReferenceToRef(&change.ObjectReference)
 		if err != nil {
 			return kubebuilderx.Commit, err
@@ -147,7 +147,7 @@ func (s *stateEvaluation) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx
 	}
 
 	// truncate view
-	view.Status.View = view.Status.View[latestReconciliationCycleStart:]
+	view.Status.CurrentState.Changes = view.Status.CurrentState.Changes[latestReconciliationCycleStart:]
 
 	return kubebuilderx.Continue, nil
 }

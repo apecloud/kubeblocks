@@ -215,22 +215,21 @@ func handleSwitchover(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *
 
 	synthesizedComp, err := buildSynthesizedComp(reqCtx.Ctx, cli, opsRes, opsRes.Cluster.Spec.GetComponentByName(switchover.ComponentName))
 	if err != nil {
-		return handleError(reqCtx, opsRequest, &detail, switchover.ComponentName, "build synthesizedComponent failed", failedCount)
+		return handleError(reqCtx, opsRequest, &detail, switchover.ComponentName, fmt.Sprintf("build synthesizedComponent failed: %s", err.Error()), failedCount)
 	}
 
 	compDef, err := component.GetCompDefByName(reqCtx.Ctx, cli, synthesizedComp.CompDefName)
 	if err != nil {
-		return handleError(reqCtx, opsRequest, &detail, switchover.ComponentName, "get component definition failed", failedCount)
+		return handleError(reqCtx, opsRequest, &detail, switchover.ComponentName, fmt.Sprintf("get component definition failed: %s", err.Error()), failedCount)
 	}
 
-	var resolveErr error
-	synthesizedComp.TemplateVars, _, resolveErr = component.ResolveTemplateNEnvVars(reqCtx.Ctx, cli, synthesizedComp, compDef.Spec.Vars)
-	if resolveErr != nil {
-		return handleError(reqCtx, opsRequest, &detail, switchover.ComponentName, "build synthesizedComponent template vars failed", failedCount)
+	synthesizedComp.TemplateVars, _, err = component.ResolveTemplateNEnvVars(reqCtx.Ctx, cli, synthesizedComp, compDef.Spec.Vars)
+	if err != nil {
+		return handleError(reqCtx, opsRequest, &detail, switchover.ComponentName, fmt.Sprintf("build synthesizedComponent template vars failed: %s", err.Error()), failedCount)
 	}
 
-	if err := doSwitchover(reqCtx.Ctx, cli, synthesizedComp, switchover, switchoverCondition); err != nil {
-		return handleError(reqCtx, opsRequest, &detail, switchover.ComponentName, "call switchover action and check role label failed", failedCount)
+	if err = doSwitchover(reqCtx.Ctx, cli, synthesizedComp, switchover, switchoverCondition); err != nil {
+		return handleError(reqCtx, opsRequest, &detail, switchover.ComponentName, fmt.Sprintf("call switchover action and check role label failed: %s", err.Error()), failedCount)
 	}
 
 	*completedCount++

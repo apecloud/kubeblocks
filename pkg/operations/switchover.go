@@ -100,7 +100,7 @@ func (r switchoverOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli
 		opsRequestPhase = opsv1alpha1.OpsRunningPhase
 	)
 
-	expectCount, actualCount, failedCount, err := handleSwitchover(reqCtx, cli, opsRes)
+	expectCount, actualCount, failedCount, err := handleSwitchovers(reqCtx, cli, opsRes)
 	if err != nil {
 		return "", 0, err
 	}
@@ -164,94 +164,80 @@ func switchoverPreCheck(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes
 	return nil
 }
 
-// handleSwitchover handles the component progressDetails during switchover.
+// handleSwitchovers handles the component progressDetails during switchover.
 // Returns:
 // - expectCount: the expected count of switchover operations
 // - completedCount: the number of completed switchover operations
+// - failedCount: the number of failed switchover operations
 // - error: any error that occurred during the handling
-func handleSwitchover(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (int32, int32, int32, error) {
-	var (
-		expectCount         = int32(len(opsRes.OpsRequest.Spec.SwitchoverList))
-		failedCount         int32
-		completedCount      int32
-		opsRequest          = opsRes.OpsRequest
-		oldOpsRequestStatus = opsRequest.Status.DeepCopy()
-		err                 error
-	)
+func handleSwitchovers(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (int32, int32, int32, error) {
+	expectCount := int32(len(opsRes.OpsRequest.Spec.SwitchoverList))
+	var completedCount, failedCount int32
+
+	opsRequest := opsRes.OpsRequest
+	oldOpsRequestStatus := opsRequest.Status.DeepCopy()
 	patch := client.MergeFrom(opsRequest.DeepCopy())
+
 	for _, switchover := range opsRequest.Spec.SwitchoverList {
-		switchoverCondition := meta.FindStatusCondition(opsRes.OpsRequest.Status.Conditions, opsv1alpha1.ConditionTypeSwitchover)
-		if switchoverCondition == nil {
-			err = errors.New("switchover condition is nil")
-			break
+		if err := handleSwitchover(reqCtx, cli, opsRes, &switchover, opsRequest, &completedCount, &failedCount); err != nil {
+			return expectCount, completedCount, failedCount, err
 		}
-
-		// if the component do not need switchover, skip it
-		reason := opsRequest.Status.Components[switchover.ComponentName].Reason
-		if reason == OpsReasonForSkipSwitchover {
-			completedCount += 1
-			continue
-		}
-
-		doNCheckSwitchoverProcessDetail := opsv1alpha1.ProgressStatusDetail{
-			ObjectKey: getProgressObjectKey(KBSwitchoverDoNCheckRoleChangeKey, switchover.ComponentName),
-			Status:    opsv1alpha1.ProcessingProgressStatus,
-			Message:   fmt.Sprintf("do switchover for component %s and check role label", switchover.ComponentName),
-		}
-		compSpec := opsRes.Cluster.Spec.GetComponentByName(switchover.ComponentName)
-		synthesizedComp, err := buildSynthesizedComp(reqCtx.Ctx, cli, opsRes, compSpec)
-		if err != nil {
-			failedCount += 1
-			doNCheckSwitchoverProcessDetail.Message = fmt.Sprintf("component %s do switchover build synthesizedComponent failed", switchover.ComponentName)
-			doNCheckSwitchoverProcessDetail.Status = opsv1alpha1.FailedProgressStatus
-			setComponentSwitchoverProgressDetails(reqCtx.Recorder, opsRequest, appsv1.UpdatingClusterCompPhase, doNCheckSwitchoverProcessDetail, switchover.ComponentName)
-			break
-		}
-		compDef, err := component.GetCompDefByName(reqCtx.Ctx, cli, synthesizedComp.CompDefName)
-		if err != nil {
-			failedCount += 1
-			doNCheckSwitchoverProcessDetail.Message = fmt.Sprintf("component %s do switchover get component definition failed", switchover.ComponentName)
-			doNCheckSwitchoverProcessDetail.Status = opsv1alpha1.FailedProgressStatus
-			setComponentSwitchoverProgressDetails(reqCtx.Recorder, opsRequest, appsv1.UpdatingClusterCompPhase, doNCheckSwitchoverProcessDetail, switchover.ComponentName)
-			break
-		}
-		synthesizedComp.TemplateVars, _, err = component.ResolveTemplateNEnvVars(reqCtx.Ctx, cli, synthesizedComp, compDef.Spec.Vars)
-		if err != nil {
-			failedCount += 1
-			doNCheckSwitchoverProcessDetail.Message = fmt.Sprintf("component %s do switchover build synthesizedComponent template vars failed", switchover.ComponentName)
-			doNCheckSwitchoverProcessDetail.Status = opsv1alpha1.FailedProgressStatus
-			setComponentSwitchoverProgressDetails(reqCtx.Recorder, opsRequest, appsv1.UpdatingClusterCompPhase, doNCheckSwitchoverProcessDetail, switchover.ComponentName)
-			break
-		}
-
-		// do component switchover and check the result one by one
-		if err := doSwitchover(reqCtx.Ctx, cli, synthesizedComp, &switchover, switchoverCondition); err != nil {
-			failedCount += 1
-			doNCheckSwitchoverProcessDetail.Message = fmt.Sprintf("do switchover and check role label for component %s failed, error: %s", switchover.ComponentName, err.Error())
-			doNCheckSwitchoverProcessDetail.Status = opsv1alpha1.ProcessingProgressStatus
-			setComponentSwitchoverProgressDetails(reqCtx.Recorder, opsRequest, appsv1.UpdatingClusterCompPhase, doNCheckSwitchoverProcessDetail, switchover.ComponentName)
-			break
-		}
-
-		completedCount += 1
-		doNCheckSwitchoverProcessDetail.Message = fmt.Sprintf("do switchover for component %s and check role label consistency after switchover is succeed", switchover.ComponentName)
-		doNCheckSwitchoverProcessDetail.Status = opsv1alpha1.SucceedProgressStatus
-		setComponentSwitchoverProgressDetails(reqCtx.Recorder, opsRequest, appsv1.RunningClusterCompPhase, doNCheckSwitchoverProcessDetail, switchover.ComponentName)
 	}
 
 	opsRequest.Status.Progress = fmt.Sprintf("%d/%d", completedCount, expectCount)
-	// patch OpsRequest.status.components
 	if !reflect.DeepEqual(*oldOpsRequestStatus, opsRequest.Status) {
 		if err := cli.Status().Patch(reqCtx.Ctx, opsRequest, patch); err != nil {
-			return expectCount, 0, 0, err
+			return expectCount, completedCount, failedCount, err
 		}
 	}
 
-	if err != nil {
-		return expectCount, completedCount, failedCount, err
+	return expectCount, completedCount, failedCount, nil
+}
+
+func handleSwitchover(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource, switchover *opsv1alpha1.Switchover, opsRequest *opsv1alpha1.OpsRequest, completedCount, failedCount *int32) error {
+	switchoverCondition := meta.FindStatusCondition(opsRequest.Status.Conditions, opsv1alpha1.ConditionTypeSwitchover)
+	if switchoverCondition == nil {
+		return errors.New("switchover condition is nil")
 	}
 
-	return expectCount, completedCount, failedCount, nil
+	// Skip if the component does not need switchover
+	reason := opsRequest.Status.Components[switchover.ComponentName].Reason
+	if reason == OpsReasonForSkipSwitchover {
+		*completedCount++
+		return nil
+	}
+
+	detail := opsv1alpha1.ProgressStatusDetail{
+		ObjectKey: getProgressObjectKey(KBSwitchoverDoNCheckRoleChangeKey, switchover.ComponentName),
+		Status:    opsv1alpha1.ProcessingProgressStatus,
+		Message:   fmt.Sprintf("do switchover for component %s and check role label", switchover.ComponentName),
+	}
+
+	synthesizedComp, err := buildSynthesizedComp(reqCtx.Ctx, cli, opsRes, opsRes.Cluster.Spec.GetComponentByName(switchover.ComponentName))
+	if err != nil {
+		return handleError(reqCtx, opsRequest, &detail, switchover.ComponentName, "build synthesizedComponent failed", failedCount)
+	}
+
+	compDef, err := component.GetCompDefByName(reqCtx.Ctx, cli, synthesizedComp.CompDefName)
+	if err != nil {
+		return handleError(reqCtx, opsRequest, &detail, switchover.ComponentName, "get component definition failed", failedCount)
+	}
+
+	var resolveErr error
+	synthesizedComp.TemplateVars, _, resolveErr = component.ResolveTemplateNEnvVars(reqCtx.Ctx, cli, synthesizedComp, compDef.Spec.Vars)
+	if resolveErr != nil {
+		return handleError(reqCtx, opsRequest, &detail, switchover.ComponentName, "build synthesizedComponent template vars failed", failedCount)
+	}
+
+	if err := doSwitchover(reqCtx.Ctx, cli, synthesizedComp, switchover, switchoverCondition); err != nil {
+		return handleError(reqCtx, opsRequest, &detail, switchover.ComponentName, "call switchover action and check role label failed", failedCount)
+	}
+
+	*completedCount++
+	detail.Message = fmt.Sprintf("do switchover for component %s succeeded", switchover.ComponentName)
+	detail.Status = opsv1alpha1.SucceedProgressStatus
+	setComponentSwitchoverProgressDetails(reqCtx.Recorder, opsRequest, appsv1.RunningClusterCompPhase, detail, switchover.ComponentName)
+	return nil
 }
 
 func doSwitchover(ctx context.Context, cli client.Reader, synthesizedComp *component.SynthesizedComponent,
@@ -310,4 +296,12 @@ func buildSynthesizedComp(ctx context.Context, cli client.Client, opsRes *OpsRes
 	}
 	// build synthesized component for the component
 	return component.BuildSynthesizedComponent(ctx, cli, compDefObj, compObj, opsRes.Cluster)
+}
+
+func handleError(reqCtx intctrlutil.RequestCtx, opsRequest *opsv1alpha1.OpsRequest, detail *opsv1alpha1.ProgressStatusDetail, componentName, errorMsg string, failedCount *int32) error {
+	*failedCount++
+	detail.Message = fmt.Sprintf("component %s %s", componentName, errorMsg)
+	detail.Status = opsv1alpha1.FailedProgressStatus
+	setComponentSwitchoverProgressDetails(reqCtx.Recorder, opsRequest, appsv1.UpdatingClusterCompPhase, *detail, componentName)
+	return nil
 }

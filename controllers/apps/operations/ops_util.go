@@ -197,7 +197,7 @@ func updateReconfigureStatusByCM(reconfiguringStatus *appsv1alpha1.Reconfiguring
 
 // validateOpsWaitingPhase validates whether the current cluster phase is expected, and whether the waiting time exceeds the limit.
 // only requests with `Pending` phase will be validated.
-func validateOpsWaitingPhase(cluster *appsv1alpha1.Cluster, ops *appsv1alpha1.OpsRequest, opsBehaviour OpsBehaviour) error {
+func validateOpsNeedWaitingClusterPhase(cluster *appsv1alpha1.Cluster, ops *appsv1alpha1.OpsRequest, opsBehaviour OpsBehaviour) error {
 	if ops.Force() {
 		return nil
 	}
@@ -211,12 +211,20 @@ func validateOpsWaitingPhase(cluster *appsv1alpha1.Cluster, ops *appsv1alpha1.Op
 	if slices.Contains(opsBehaviour.FromClusterPhases, cluster.Status.Phase) {
 		return nil
 	}
+	opsRequestSlice, err := opsutil.GetOpsRequestSliceFromCluster(cluster)
+	if err != nil {
+		return intctrlutil.NewFatalError(err.Error())
+	}
+	// skip the preConditionDeadline check if the ops is in queue.
+	index, opsRecorder := GetOpsRecorderFromSlice(opsRequestSlice, ops.Name)
+	if index != -1 && opsRecorder.InQueue {
+		return nil
+	}
 	// check if entry-condition is met
 	// if the cluster is not in the expected phase, we should wait for it for up to TTLSecondsBeforeAbort seconds.
 	if !needWaitPreConditionDeadline(ops) {
 		return nil
 	}
-
 	return &WaitForClusterPhaseErr{
 		clusterName:   cluster.Name,
 		currentPhase:  cluster.Status.Phase,
@@ -224,11 +232,22 @@ func validateOpsWaitingPhase(cluster *appsv1alpha1.Cluster, ops *appsv1alpha1.Op
 	}
 }
 
+func preConditionDeadlineSecondsIsSet(ops *appsv1alpha1.OpsRequest) bool {
+	return ops.Spec.PreConditionDeadlineSeconds != nil && *ops.Spec.PreConditionDeadlineSeconds != 0
+}
+
 func needWaitPreConditionDeadline(ops *appsv1alpha1.OpsRequest) bool {
-	if ops.Spec.PreConditionDeadlineSeconds == nil {
+	if !preConditionDeadlineSecondsIsSet(ops) {
 		return false
 	}
-	return time.Now().Before(ops.GetCreationTimestamp().Add(time.Duration(*ops.Spec.PreConditionDeadlineSeconds) * time.Second))
+	baseTime := ops.GetCreationTimestamp()
+	if queueEndTimeStr, ok := ops.Annotations[constant.QueueEndTimeAnnotationKey]; ok {
+		queueEndTime, _ := time.Parse(time.RFC3339, queueEndTimeStr)
+		if !queueEndTime.IsZero() {
+			baseTime = metav1.Time{Time: queueEndTime}
+		}
+	}
+	return time.Now().Before(baseTime.Add(time.Duration(*ops.Spec.PreConditionDeadlineSeconds) * time.Second))
 }
 
 func abortEarlierOpsRequestWithSameKind(reqCtx intctrlutil.RequestCtx,

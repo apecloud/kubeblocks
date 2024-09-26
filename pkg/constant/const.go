@@ -23,8 +23,7 @@ const (
 	APIGroup = "kubeblocks.io"
 	AppName  = "kubeblocks"
 
-	RBACRoleName        = "kubeblocks-cluster-pod-role"
-	RBACClusterRoleName = "kubeblocks-volume-protection-pod-role"
+	RBACRoleName = "kubeblocks-cluster-pod-role"
 )
 
 const (

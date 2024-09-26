@@ -253,19 +253,6 @@ func (r *ComponentDefinitionReconciler) validateVolumes(cli client.Client, rctx 
 	if !checkUniqueItemWithValue(cmpd.Spec.Volumes, "Name", nil) {
 		return fmt.Errorf("duplicate volume names are not allowed")
 	}
-
-	hasVolumeToProtect := false
-	for _, vol := range cmpd.Spec.Volumes {
-		if vol.HighWatermark > 0 && vol.HighWatermark < 100 {
-			hasVolumeToProtect = true
-			break
-		}
-	}
-	if hasVolumeToProtect {
-		if cmpd.Spec.LifecycleActions == nil || cmpd.Spec.LifecycleActions.Readonly == nil || cmpd.Spec.LifecycleActions.Readwrite == nil {
-			return fmt.Errorf("the Readonly and Readwrite actions are needed to protect volumes")
-		}
-	}
 	return nil
 }
 

@@ -260,13 +260,5 @@ var _ = Describe("builder", func() {
 			Expect(rb).ShouldNot(BeNil())
 			Expect(rb.Name).Should(Equal(expectName))
 		})
-
-		It("builds clusterrolebinding correctly", func() {
-			_, cluster, synthesizedComp := newClusterObjs(nil)
-			expectName := fmt.Sprintf("kb-%s", cluster.Name)
-			crb := BuildClusterRoleBinding(synthesizedComp, expectName)
-			Expect(crb).ShouldNot(BeNil())
-			Expect(crb.Name).Should(Equal(expectName))
-		})
 	})
 })

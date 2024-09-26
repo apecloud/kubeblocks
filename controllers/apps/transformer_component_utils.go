@@ -51,7 +51,7 @@ func setCompOwnershipNFinalizer(comp *appsv1.Component, object client.Object) er
 // skipSetCompOwnershipNFinalizer returns true if the object should not be set ownership to the component
 func skipSetCompOwnershipNFinalizer(obj client.Object) bool {
 	switch obj.(type) {
-	case *rbacv1.ClusterRoleBinding, *corev1.PersistentVolume, *corev1.PersistentVolumeClaim, *corev1.Pod:
+	case *corev1.PersistentVolume, *corev1.PersistentVolumeClaim, *corev1.Pod:
 		return true
 	default:
 		return false

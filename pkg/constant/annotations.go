@@ -19,10 +19,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package constant
 
-import (
-	"fmt"
-)
-
 const (
 	HorizontalScaleBackupPolicyTemplateKey = "apps.kubeblocks.io/horizontal-scale-backup-policy-template"
 )
@@ -52,8 +48,6 @@ const (
 
 	// NodeSelectorOnceAnnotationKey adds nodeSelector in podSpec for one pod exactly once
 	NodeSelectorOnceAnnotationKey = "workloads.kubeblocks.io/node-selector-once"
-
-	ShardingCompsAnnotationKeyPattern = "apps.kubeblocks.io/%s-sharding-components" // ShardingNameAnnotationKeyPattern is the pattern for recording sharding components.
 )
 
 // annotations for multi-cluster
@@ -61,10 +55,6 @@ const (
 	KBAppMultiClusterPlacementKey   = "apps.kubeblocks.io/multi-cluster-placement"
 	MultiClusterServicePlacementKey = "apps.kubeblocks.io/multi-cluster-service-placement"
 )
-
-func GetShardingCompsAnnotationKey(shardingName string) string {
-	return fmt.Sprintf(ShardingCompsAnnotationKeyPattern, shardingName)
-}
 
 func InheritedAnnotations() []string {
 	return []string{

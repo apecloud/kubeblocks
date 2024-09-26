@@ -27,6 +27,7 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 type clusterStatusTransformer struct {
@@ -44,15 +45,12 @@ func (t *clusterStatusTransformer) Transform(ctx graph.TransformContext, dag *gr
 	cluster := transCtx.Cluster
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 
-	updateObservedGeneration := func() {
-		cluster.Status.ObservedGeneration = cluster.Generation
-		cluster.Status.ClusterDefGeneration = transCtx.ClusterDef.Generation
-	}
-
 	switch {
 	case origCluster.IsUpdating():
 		transCtx.Logger.Info(fmt.Sprintf("update cluster status after applying resources, generation: %d", cluster.Generation))
-		updateObservedGeneration()
+		if err := t.updateObservedGeneration(transCtx, cluster); err != nil {
+			return err
+		}
 		t.markClusterDagStatusAction(graphCli, dag, origCluster, cluster)
 	case origCluster.IsStatusUpdating():
 		defer func() { t.markClusterDagStatusAction(graphCli, dag, origCluster, cluster) }()
@@ -66,6 +64,22 @@ func (t *clusterStatusTransformer) Transform(ctx graph.TransformContext, dag *gr
 		panic(fmt.Sprintf("runtime error - unknown cluster status: %+v", origCluster))
 	}
 
+	return nil
+}
+
+func (t *clusterStatusTransformer) updateObservedGeneration(transCtx *clusterTransformContext, cluster *appsv1.Cluster) error {
+	if len(cluster.Spec.ShardingSpecs) > 0 {
+		ready, err := controllerutil.ValidateShardingComponentCount(transCtx.Context, transCtx.Client, cluster, cluster.Spec.ShardingSpecs)
+		if err != nil {
+			return err
+		}
+		// if sharding components are not generated, return
+		if !ready {
+			return nil
+		}
+	}
+	cluster.Status.ObservedGeneration = cluster.Generation
+	cluster.Status.ClusterDefGeneration = transCtx.ClusterDef.Generation
 	return nil
 }
 
@@ -189,10 +203,6 @@ func (t *clusterStatusTransformer) removeInnerCompStatus(transCtx *clusterTransf
 	for i := range cluster.Spec.ComponentSpecs {
 		compSpecs = append(compSpecs, &cluster.Spec.ComponentSpecs[i])
 	}
-	// TODO: how to display the status of sharding components
-	/*	for _, v := range transCtx.ShardingComponentSpecs {
-		compSpecs = append(compSpecs, v...)
-	}*/
 	t.removeCompStatus(cluster, compSpecs)
 }
 

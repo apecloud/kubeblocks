@@ -35,6 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -116,7 +117,7 @@ func (r *ConfigurationReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	if fetcherTask.ClusterComObj == nil || fetcherTask.ComponentObj == nil {
 		return r.failWithInvalidComponent(config, reqCtx)
 	}
-	if err := r.runTasks(TaskContext{config, reqCtx, fetcherTask}, tasks); err != nil {
+	if err := r.runTasks(TaskContext{config, ctx, fetcherTask}, tasks); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to run configuration reconcile task.")
 	}
 	if !isAllReady(config) {
@@ -150,20 +151,14 @@ func (r *ConfigurationReconciler) runTasks(taskCtx TaskContext, tasks []Task) (e
 	var (
 		errs            []error
 		synthesizedComp *component.SynthesizedComponent
-
-		ctx           = taskCtx.reqCtx.Ctx
-		configuration = taskCtx.configuration
+		configuration   = taskCtx.configuration
 	)
 
-	if len(taskCtx.fetcher.ComponentObj.Spec.CompDef) == 0 {
-		// build synthesized component for generated component
-		synthesizedComp, err = component.BuildSynthesizedComponentWrapper(taskCtx.reqCtx, r.Client, taskCtx.fetcher.ClusterObj, taskCtx.fetcher.ClusterComObj)
-	} else {
-		// build synthesized component for native component
-		synthesizedComp, err = component.BuildSynthesizedComponent(taskCtx.reqCtx, r.Client, taskCtx.fetcher.ClusterObj, taskCtx.fetcher.ComponentDefObj, taskCtx.fetcher.ComponentObj)
-		if err == nil {
-			err = buildTemplateVars(taskCtx.reqCtx.Ctx, r.Client, taskCtx.fetcher.ComponentDefObj, synthesizedComp)
-		}
+	// build synthesized component for the component
+	synthesizedComp, err = component.BuildSynthesizedComponent(taskCtx.ctx, r.Client,
+		taskCtx.fetcher.ComponentDefObj, taskCtx.fetcher.ComponentObj, taskCtx.fetcher.ClusterObj)
+	if err == nil {
+		err = buildTemplateVars(taskCtx.ctx, r.Client, taskCtx.fetcher.ComponentDefObj, synthesizedComp)
 	}
 	if err != nil {
 		return err
@@ -183,7 +178,7 @@ func (r *ConfigurationReconciler) runTasks(taskCtx TaskContext, tasks []Task) (e
 	if len(errs) > 0 {
 		configuration.Status.Message = utilerrors.NewAggregate(errs).Error()
 	}
-	if err := r.Client.Status().Patch(ctx, configuration, patch); err != nil {
+	if err := r.Client.Status().Patch(taskCtx.ctx, configuration, patch); err != nil {
 		errs = append(errs, err)
 	}
 	if len(errs) == 0 {
@@ -236,7 +231,7 @@ func isFinishStatus(phase appsv1alpha1.ConfigurationPhase) bool {
 }
 
 func buildTemplateVars(ctx context.Context, cli client.Reader,
-	compDef *appsv1alpha1.ComponentDefinition, synthesizedComp *component.SynthesizedComponent) error {
+	compDef *appsv1.ComponentDefinition, synthesizedComp *component.SynthesizedComponent) error {
 	if compDef != nil && len(compDef.Spec.Vars) > 0 {
 		templateVars, _, err := component.ResolveTemplateNEnvVars(ctx, cli, synthesizedComp, compDef.Spec.Vars)
 		if err != nil {

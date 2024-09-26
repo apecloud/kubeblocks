@@ -26,11 +26,11 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
+	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 )
@@ -43,8 +43,8 @@ var _ = Describe("ConfigEnvFrom test", func() {
 	)
 
 	var (
-		compDef *appsv1alpha1.ComponentDefinition
-		cluster *appsv1alpha1.Cluster
+		compDef *appsv1.ComponentDefinition
+		cluster *appsv1.Cluster
 
 		k8sMockClient    *testutil.K8sClientMockHelper
 		origCMObject     *corev1.ConfigMap
@@ -81,14 +81,10 @@ var _ = Describe("ConfigEnvFrom test", func() {
 
 	Context("test config template inject envfrom", func() {
 		It("should inject success", func() {
-			reqCtx := intctrlutil.RequestCtx{
-				Ctx: ctx,
-				Log: logger,
-			}
 			comp, err := component.BuildComponent(cluster, &cluster.Spec.ComponentSpecs[0], nil, nil)
 			Expect(err).Should(Succeed())
 
-			synthesizeComp, err := component.BuildSynthesizedComponent(reqCtx, testCtx.Cli, cluster, compDef, comp)
+			synthesizeComp, err := component.BuildSynthesizedComponent(ctx, testCtx.Cli, compDef, comp, cluster)
 			Expect(err).Should(Succeed())
 
 			podSpec := &corev1.PodSpec{
@@ -108,31 +104,44 @@ var _ = Describe("ConfigEnvFrom test", func() {
 				testutil.WithCreateReturned(testutil.WithCreatedSucceedResult(), testutil.WithAnyTimes()),
 			)
 
-			Expect(injectTemplateEnvFrom(cluster, synthesizeComp, podSpec, k8sMockClient.Client(), reqCtx.Ctx, nil)).ShouldNot(Succeed())
-			Expect(injectTemplateEnvFrom(cluster, synthesizeComp, podSpec, k8sMockClient.Client(), reqCtx.Ctx, nil)).Should(Succeed())
+			synthesizeComp.ConfigTemplates[0].AsSecret = cfgutil.ToPointer(true)
+			Expect(injectTemplateEnvFrom(cluster, synthesizeComp, podSpec, k8sMockClient.Client(), ctx, nil)).ShouldNot(Succeed())
+			Expect(injectTemplateEnvFrom(cluster, synthesizeComp, podSpec, k8sMockClient.Client(), ctx, nil)).Should(Succeed())
 		})
 
-		It("should SyncEnvConfigmap success", func() {
+		It("should SyncEnvSourceObject success", func() {
 			configSpec := compDef.Spec.Configs[0]
 			configSpec.Keys = []string{"env-config"}
 
+			comp, err := component.BuildComponent(cluster, &cluster.Spec.ComponentSpecs[0], nil, nil)
+			Expect(err).Should(Succeed())
+
+			synthesizeComp, err := component.BuildSynthesizedComponent(ctx, testCtx.Cli, compDef, comp, cluster)
+			Expect(err).Should(Succeed())
+
 			cmObj := origCMObject.DeepCopy()
 			cmObj.SetName(core.GenerateEnvFromName(origCMObject.Name))
 			k8sMockClient.MockGetMethod(testutil.WithGetReturned(testutil.WithConstructSimpleGetResult([]client.Object{
 				cmObj,
 				configConstraint,
 			}), testutil.WithAnyTimes()))
-			k8sMockClient.MockPatchMethod(testutil.WithFailed(core.MakeError("failed to patch"), testutil.WithTimes(1)),
+			k8sMockClient.MockUpdateMethod(testutil.WithFailed(core.MakeError("failed to patch"), testutil.WithTimes(1)),
 				testutil.WithSucceed(), testutil.WithAnyTimes())
 
-			Expect(SyncEnvConfigmap(configSpec, origCMObject, &configConstraint.Spec, k8sMockClient.Client(), ctx)).ShouldNot(Succeed())
-			Expect(SyncEnvConfigmap(configSpec, origCMObject, &configConstraint.Spec, k8sMockClient.Client(), ctx)).Should(Succeed())
+			Expect(SyncEnvSourceObject(configSpec, origCMObject, &configConstraint.Spec, k8sMockClient.Client(), ctx, cluster, synthesizeComp)).ShouldNot(Succeed())
+			Expect(SyncEnvSourceObject(configSpec, origCMObject, &configConstraint.Spec, k8sMockClient.Client(), ctx, cluster, synthesizeComp)).Should(Succeed())
 		})
 
-		It("SyncEnvConfigmap abnormal test", func() {
+		It("SyncEnvSourceObject abnormal test", func() {
+			comp, err := component.BuildComponent(cluster, &cluster.Spec.ComponentSpecs[0], nil, nil)
+			Expect(err).Should(Succeed())
+
+			synthesizeComp, err := component.BuildSynthesizedComponent(ctx, testCtx.Cli, compDef, comp, cluster)
+			Expect(err).Should(Succeed())
+
 			configSpec := compDef.Spec.Configs[0]
 			configSpec.InjectEnvTo = nil
-			Expect(SyncEnvConfigmap(configSpec, origCMObject, &configConstraint.Spec, k8sMockClient.Client(), ctx)).Should(Succeed())
+			Expect(SyncEnvSourceObject(configSpec, origCMObject, &configConstraint.Spec, k8sMockClient.Client(), ctx, cluster, synthesizeComp)).Should(Succeed())
 
 			configSpec.InjectEnvTo = nil
 			cmObj := origCMObject.DeepCopy()
@@ -141,11 +150,11 @@ var _ = Describe("ConfigEnvFrom test", func() {
 				cmObj,
 				configConstraint,
 			}), testutil.WithAnyTimes()))
-			k8sMockClient.MockPatchMethod(testutil.WithSucceed(testutil.WithAnyTimes()))
+			k8sMockClient.MockUpdateMethod(testutil.WithSucceed(testutil.WithAnyTimes()))
 
 			configSpec = compDef.Spec.Configs[0]
 			configSpec.Keys = []string{"env-config", "not-exist"}
-			Expect(SyncEnvConfigmap(configSpec, origCMObject, &configConstraint.Spec, k8sMockClient.Client(), ctx)).Should(Succeed())
+			Expect(SyncEnvSourceObject(configSpec, origCMObject, &configConstraint.Spec, k8sMockClient.Client(), ctx, cluster, synthesizeComp)).Should(Succeed())
 		})
 	})
 })

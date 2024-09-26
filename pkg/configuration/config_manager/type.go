@@ -24,7 +24,7 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 )
 
@@ -37,9 +37,9 @@ type ConfigHandler interface {
 type ConfigSpecInfo struct {
 	*appsv1beta1.ReloadAction `json:",inline"`
 
-	ReloadType      appsv1beta1.DynamicReloadType    `json:"reloadType"`
-	ConfigSpec      appsv1alpha1.ComponentConfigSpec `json:"configSpec"`
-	FormatterConfig appsv1beta1.FileFormatConfig     `json:"formatterConfig"`
+	ReloadType      appsv1beta1.DynamicReloadType `json:"reloadType"`
+	ConfigSpec      appsv1.ComponentConfigSpec    `json:"configSpec"`
+	FormatterConfig appsv1beta1.FileFormatConfig  `json:"formatterConfig"`
 
 	DownwardAPIOptions []appsv1beta1.DownwardAPIChangeTriggeredAction `json:"downwardAPIOptions"`
 
@@ -65,7 +65,7 @@ type TPLScriptConfig struct {
 }
 
 type ConfigLazyRenderedMeta struct {
-	*appsv1alpha1.ComponentConfigSpec `json:",inline"`
+	*appsv1.ComponentConfigSpec `json:",inline"`
 
 	// secondary template path
 	Templates       []string                     `json:"templates"`

@@ -20,23 +20,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
 type MockClusterDefFactory struct {
-	BaseFactory[appsv1alpha1.ClusterDefinition, *appsv1alpha1.ClusterDefinition, MockClusterDefFactory]
+	BaseFactory[appsv1.ClusterDefinition, *appsv1.ClusterDefinition, MockClusterDefFactory]
 }
 
 func NewClusterDefFactory(name string) *MockClusterDefFactory {
 	f := &MockClusterDefFactory{}
 	f.Init("", name,
-		&appsv1alpha1.ClusterDefinition{
-			Spec: appsv1alpha1.ClusterDefinitionSpec{},
+		&appsv1.ClusterDefinition{
+			Spec: appsv1.ClusterDefinitionSpec{},
 		}, f)
 	return f
 }
 
-func (factory *MockClusterDefFactory) AddClusterTopology(topology appsv1alpha1.ClusterTopology) *MockClusterDefFactory {
+func (factory *MockClusterDefFactory) AddClusterTopology(topology appsv1.ClusterTopology) *MockClusterDefFactory {
 	factory.Get().Spec.Topologies = append(factory.Get().Spec.Topologies, topology)
 	return factory
 }

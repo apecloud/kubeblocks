@@ -30,9 +30,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -54,8 +55,8 @@ const (
 type componentStatusTransformer struct {
 	client.Client
 
-	cluster        *appsv1alpha1.Cluster
-	comp           *appsv1alpha1.Component
+	cluster        *appsv1.Cluster
+	comp           *appsv1.Component
 	synthesizeComp *component.SynthesizedComponent
 	dag            *graph.DAG
 
@@ -161,7 +162,7 @@ func (t *componentStatusTransformer) reconcileStatus(transCtx *componentTransfor
 	// check if the component is in creating phase
 	isInCreatingPhase := func() bool {
 		phase := t.comp.Status.Phase
-		return phase == "" || phase == appsv1alpha1.CreatingClusterCompPhase
+		return phase == "" || phase == appsv1.CreatingClusterCompPhase
 	}()
 
 	transCtx.Logger.Info(
@@ -170,31 +171,30 @@ func (t *componentStatusTransformer) reconcileStatus(transCtx *componentTransfor
 
 	switch {
 	case isDeleting:
-		t.setComponentStatusPhase(transCtx, appsv1alpha1.DeletingClusterCompPhase, nil, "component is Deleting")
+		t.setComponentStatusPhase(transCtx, appsv1.DeletingClusterCompPhase, nil, "component is Deleting")
 	case stopped && hasRunningPods:
-		t.setComponentStatusPhase(transCtx, appsv1alpha1.StoppingClusterCompPhase, nil, "component is Stopping")
+		t.setComponentStatusPhase(transCtx, appsv1.StoppingClusterCompPhase, nil, "component is Stopping")
 	case stopped:
-		t.setComponentStatusPhase(transCtx, appsv1alpha1.StoppedClusterCompPhase, nil, "component is Stopped")
+		t.setComponentStatusPhase(transCtx, appsv1.StoppedClusterCompPhase, nil, "component is Stopped")
 	case isITSUpdatedNRunning && isAllConfigSynced && !hasRunningVolumeExpansion:
-		t.setComponentStatusPhase(transCtx, appsv1alpha1.RunningClusterCompPhase, nil, "component is Running")
+		t.setComponentStatusPhase(transCtx, appsv1.RunningClusterCompPhase, nil, "component is Running")
 	case !hasFailure && isInCreatingPhase:
-		t.setComponentStatusPhase(transCtx, appsv1alpha1.CreatingClusterCompPhase, nil, "component is Creating")
+		t.setComponentStatusPhase(transCtx, appsv1.CreatingClusterCompPhase, nil, "component is Creating")
 	case !hasFailure:
-		t.setComponentStatusPhase(transCtx, appsv1alpha1.UpdatingClusterCompPhase, nil, "component is Updating")
+		t.setComponentStatusPhase(transCtx, appsv1.UpdatingClusterCompPhase, nil, "component is Updating")
 	default:
-		t.setComponentStatusPhase(transCtx, appsv1alpha1.FailedClusterCompPhase, messages, "component is Failed")
+		t.setComponentStatusPhase(transCtx, appsv1.FailedClusterCompPhase, messages, "component is Failed")
 	}
 
 	return nil
 }
 
 func (t *componentStatusTransformer) isWorkloadUpdated() bool {
-	if t.cluster == nil || t.runningITS == nil {
+	if t.comp == nil || t.runningITS == nil {
 		return false
 	}
-	// check whether component spec has been sent to the underlying workload
-	itsComponentGeneration := t.runningITS.GetAnnotations()[constant.KubeBlocksGenerationKey]
-	return itsComponentGeneration == strconv.FormatInt(t.cluster.Generation, 10)
+	generation := t.runningITS.GetAnnotations()[constant.KubeBlocksGenerationKey]
+	return generation == strconv.FormatInt(t.comp.Generation, 10)
 }
 
 // isRunning checks if the component underlying workload is running.
@@ -362,8 +362,8 @@ func (t *componentStatusTransformer) hasFailedPod() (bool, appsv1alpha1.Componen
 
 // setComponentStatusPhase sets the component phase and messages conditionally.
 func (t *componentStatusTransformer) setComponentStatusPhase(transCtx *componentTransformContext,
-	phase appsv1alpha1.ClusterComponentPhase, statusMessage appsv1alpha1.ComponentMessageMap, phaseTransitionMsg string) {
-	updateFn := func(status *appsv1alpha1.ComponentStatus) error {
+	phase appsv1.ClusterComponentPhase, statusMessage map[string]string, phaseTransitionMsg string) {
+	updateFn := func(status *appsv1.ComponentStatus) error {
 		if status.Phase == phase {
 			return nil
 		}
@@ -384,7 +384,7 @@ func (t *componentStatusTransformer) setComponentStatusPhase(transCtx *component
 
 // updateComponentStatus updates the component status by @updateFn, with additional message to explain the transition occurred.
 func (t *componentStatusTransformer) updateComponentStatus(transCtx *componentTransformContext,
-	phaseTransitionMsg string, updateFn func(status *appsv1alpha1.ComponentStatus) error) error {
+	phaseTransitionMsg string, updateFn func(status *appsv1.ComponentStatus) error) error {
 	if updateFn == nil {
 		return nil
 	}

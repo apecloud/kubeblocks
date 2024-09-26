@@ -24,7 +24,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
@@ -69,7 +69,7 @@ func (t *clusterStatusTransformer) Transform(ctx graph.TransformContext, dag *gr
 	return nil
 }
 
-func (t *clusterStatusTransformer) markClusterDagStatusAction(graphCli model.GraphClient, dag *graph.DAG, origCluster, cluster *appsv1alpha1.Cluster) {
+func (t *clusterStatusTransformer) markClusterDagStatusAction(graphCli model.GraphClient, dag *graph.DAG, origCluster, cluster *appsv1.Cluster) {
 	if vertex := graphCli.FindMatchedVertex(dag, cluster); vertex != nil {
 		// check if the component needs to do other action.
 		ov, _ := vertex.(*model.ObjectVertex)
@@ -80,7 +80,7 @@ func (t *clusterStatusTransformer) markClusterDagStatusAction(graphCli model.Gra
 	graphCli.Status(dag, origCluster, cluster)
 }
 
-func (t *clusterStatusTransformer) reconcileClusterPhase(cluster *appsv1alpha1.Cluster) {
+func (t *clusterStatusTransformer) reconcileClusterPhase(cluster *appsv1.Cluster) {
 	var (
 		isAllComponentCreating       = true
 		isAllComponentRunning        = true
@@ -90,7 +90,7 @@ func (t *clusterStatusTransformer) reconcileClusterPhase(cluster *appsv1alpha1.C
 		isAllComponentFailed         = true
 		hasComponentAbnormalOrFailed = false
 	)
-	isPhaseIn := func(phase appsv1alpha1.ClusterComponentPhase, phases ...appsv1alpha1.ClusterComponentPhase) bool {
+	isPhaseIn := func(phase appsv1.ClusterComponentPhase, phases ...appsv1.ClusterComponentPhase) bool {
 		for _, p := range phases {
 			if p == phase {
 				return true
@@ -100,57 +100,57 @@ func (t *clusterStatusTransformer) reconcileClusterPhase(cluster *appsv1alpha1.C
 	}
 	for _, status := range cluster.Status.Components {
 		phase := status.Phase
-		if !isPhaseIn(phase, appsv1alpha1.CreatingClusterCompPhase) {
+		if !isPhaseIn(phase, appsv1.CreatingClusterCompPhase) {
 			isAllComponentCreating = false
 		}
-		if !isPhaseIn(phase, appsv1alpha1.RunningClusterCompPhase) {
+		if !isPhaseIn(phase, appsv1.RunningClusterCompPhase) {
 			isAllComponentRunning = false
 		}
-		if !isPhaseIn(phase, appsv1alpha1.CreatingClusterCompPhase,
-			appsv1alpha1.RunningClusterCompPhase,
-			appsv1alpha1.UpdatingClusterCompPhase) {
+		if !isPhaseIn(phase, appsv1.CreatingClusterCompPhase,
+			appsv1.RunningClusterCompPhase,
+			appsv1.UpdatingClusterCompPhase) {
 			isAllComponentWorking = false
 		}
-		if isPhaseIn(phase, appsv1alpha1.StoppingClusterCompPhase) {
+		if isPhaseIn(phase, appsv1.StoppingClusterCompPhase) {
 			hasComponentStopping = true
 		}
-		if !isPhaseIn(phase, appsv1alpha1.StoppedClusterCompPhase) {
+		if !isPhaseIn(phase, appsv1.StoppedClusterCompPhase) {
 			isAllComponentStopped = false
 		}
-		if !isPhaseIn(phase, appsv1alpha1.FailedClusterCompPhase) {
+		if !isPhaseIn(phase, appsv1.FailedClusterCompPhase) {
 			isAllComponentFailed = false
 		}
-		if isPhaseIn(phase, appsv1alpha1.FailedClusterCompPhase) {
+		if isPhaseIn(phase, appsv1.FailedClusterCompPhase) {
 			hasComponentAbnormalOrFailed = true
 		}
 	}
 
 	switch {
 	case isAllComponentRunning:
-		if cluster.Status.Phase != appsv1alpha1.RunningClusterPhase {
+		if cluster.Status.Phase != appsv1.RunningClusterPhase {
 			t.syncClusterPhaseToRunning(cluster)
 		}
 	case isAllComponentCreating:
-		cluster.Status.Phase = appsv1alpha1.CreatingClusterPhase
+		cluster.Status.Phase = appsv1.CreatingClusterPhase
 	case isAllComponentWorking:
-		cluster.Status.Phase = appsv1alpha1.UpdatingClusterPhase
+		cluster.Status.Phase = appsv1.UpdatingClusterPhase
 	case isAllComponentStopped:
-		if cluster.Status.Phase != appsv1alpha1.StoppedClusterPhase {
+		if cluster.Status.Phase != appsv1.StoppedClusterPhase {
 			t.syncClusterPhaseToStopped(cluster)
 		}
 	case hasComponentStopping:
-		cluster.Status.Phase = appsv1alpha1.StoppingClusterPhase
+		cluster.Status.Phase = appsv1.StoppingClusterPhase
 	case isAllComponentFailed:
-		cluster.Status.Phase = appsv1alpha1.FailedClusterPhase
+		cluster.Status.Phase = appsv1.FailedClusterPhase
 	case hasComponentAbnormalOrFailed:
-		cluster.Status.Phase = appsv1alpha1.AbnormalClusterPhase
+		cluster.Status.Phase = appsv1.AbnormalClusterPhase
 	default:
 		// nothing
 	}
 }
 
 // reconcileClusterStatus reconciles phase and conditions of the Cluster.status.
-func (t *clusterStatusTransformer) reconcileClusterStatus(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster) error {
+func (t *clusterStatusTransformer) reconcileClusterStatus(transCtx *clusterTransformContext, cluster *appsv1.Cluster) error {
 	if len(cluster.Status.Components) == 0 {
 		return nil
 	}
@@ -178,14 +178,14 @@ func (t *clusterStatusTransformer) reconcileClusterStatus(transCtx *clusterTrans
 }
 
 // removeInvalidCompStatus removes the invalid component of status.components which is deleted from spec.components.
-func (t *clusterStatusTransformer) removeInvalidCompStatus(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster) {
+func (t *clusterStatusTransformer) removeInvalidCompStatus(transCtx *clusterTransformContext, cluster *appsv1.Cluster) {
 	// removes deleted components and keeps created components by simplified API
 	t.removeCompStatus(cluster, transCtx.ComponentSpecs)
 }
 
 // removeInnerCompStatus removes the component of status.components which is created by simplified API.
-func (t *clusterStatusTransformer) removeInnerCompStatus(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster) {
-	compSpecs := make([]*appsv1alpha1.ClusterComponentSpec, 0)
+func (t *clusterStatusTransformer) removeInnerCompStatus(transCtx *clusterTransformContext, cluster *appsv1.Cluster) {
+	compSpecs := make([]*appsv1.ClusterComponentSpec, 0)
 	for i := range cluster.Spec.ComponentSpecs {
 		compSpecs = append(compSpecs, &cluster.Spec.ComponentSpecs[i])
 	}
@@ -197,8 +197,8 @@ func (t *clusterStatusTransformer) removeInnerCompStatus(transCtx *clusterTransf
 }
 
 // removeCompStatus removes the component of status.components which is not in comp specs.
-func (t *clusterStatusTransformer) removeCompStatus(cluster *appsv1alpha1.Cluster, compSpecs []*appsv1alpha1.ClusterComponentSpec) {
-	tmpCompsStatus := map[string]appsv1alpha1.ClusterComponentStatus{}
+func (t *clusterStatusTransformer) removeCompStatus(cluster *appsv1.Cluster, compSpecs []*appsv1.ClusterComponentSpec) {
+	tmpCompsStatus := map[string]appsv1.ClusterComponentStatus{}
 	compsStatus := cluster.Status.Components
 	for _, v := range compSpecs {
 		if compStatus, ok := compsStatus[v.Name]; ok {
@@ -210,22 +210,25 @@ func (t *clusterStatusTransformer) removeCompStatus(cluster *appsv1alpha1.Cluste
 }
 
 // doAnalysisAndUpdateSynchronizer analyzes the Cluster.Status.Components and updates the results to the synchronizer.
-func (t *clusterStatusTransformer) doAnalysisAndUpdateSynchronizer(cluster *appsv1alpha1.Cluster) {
+func (t *clusterStatusTransformer) doAnalysisAndUpdateSynchronizer(cluster *appsv1.Cluster) {
 	// analysis the status of components and calculate the cluster phase.
 	for k, v := range cluster.Status.Components {
-		if v.PodsReady == nil || !*v.PodsReady {
-			t.replicasNotReadyCompNames[k] = struct{}{}
-			t.notReadyCompNames[k] = struct{}{}
-		}
-		switch v.Phase {
-		case appsv1alpha1.FailedClusterCompPhase:
+		// if v.PodsReady == nil || !*v.PodsReady {
+		//	t.replicasNotReadyCompNames[k] = struct{}{}
+		//	t.notReadyCompNames[k] = struct{}{}
+		// }
+		// switch v.Phase {
+		// case appsv1.FailedClusterCompPhase:
+		//	t.notReadyCompNames[k] = struct{}{}
+		// }
+		if v.Phase == appsv1.FailedClusterCompPhase {
 			t.notReadyCompNames[k] = struct{}{}
 		}
 	}
 }
 
 // syncReadyConditionForCluster syncs the cluster conditions with ClusterReady and ReplicasReady type.
-func (t *clusterStatusTransformer) syncReadyConditionForCluster(cluster *appsv1alpha1.Cluster) {
+func (t *clusterStatusTransformer) syncReadyConditionForCluster(cluster *appsv1.Cluster) {
 	if len(t.replicasNotReadyCompNames) == 0 {
 		// if all replicas of cluster are ready, set ReasonAllReplicasReady to status.conditions
 		readyCondition := newAllReplicasPodsReadyConditions()
@@ -240,12 +243,12 @@ func (t *clusterStatusTransformer) syncReadyConditionForCluster(cluster *appsv1a
 }
 
 // syncClusterPhaseToRunning syncs the cluster phase to Running.
-func (t *clusterStatusTransformer) syncClusterPhaseToRunning(cluster *appsv1alpha1.Cluster) {
-	cluster.Status.Phase = appsv1alpha1.RunningClusterPhase
+func (t *clusterStatusTransformer) syncClusterPhaseToRunning(cluster *appsv1.Cluster) {
+	cluster.Status.Phase = appsv1.RunningClusterPhase
 	meta.SetStatusCondition(&cluster.Status.Conditions, newClusterReadyCondition(cluster.Name))
 }
 
 // syncClusterPhaseToStopped syncs the cluster phase to Stopped.
-func (t *clusterStatusTransformer) syncClusterPhaseToStopped(cluster *appsv1alpha1.Cluster) {
-	cluster.Status.Phase = appsv1alpha1.StoppedClusterPhase
+func (t *clusterStatusTransformer) syncClusterPhaseToStopped(cluster *appsv1.Cluster) {
+	cluster.Status.Phase = appsv1.StoppedClusterPhase
 }

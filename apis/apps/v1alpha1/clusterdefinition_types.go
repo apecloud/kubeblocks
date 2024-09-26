@@ -22,6 +22,60 @@ import (
 
 // ClusterDefinitionSpec defines the desired state of ClusterDefinition.
 type ClusterDefinitionSpec struct {
+	// Specifies the well-known database type, such as mysql, redis, or mongodb.
+	//
+	// Deprecated since v0.9.
+	// This field is maintained for backward compatibility and its use is discouraged.
+	// Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.
+	//
+	// +kubebuilder:validation:MaxLength=24
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$`
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
+	// +optional
+	Type string `json:"type,omitempty"`
+
+	// Provides the definitions for the cluster components.
+	//
+	// Deprecated since v0.9.
+	// Components should now be individually defined using ComponentDefinition and
+	// collectively referenced via `topology.components`.
+	// This field is maintained for backward compatibility and its use is discouraged.
+	// Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.
+	//
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
+	// +optional
+	ComponentDefs []ClusterComponentDefinition `json:"componentDefs" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
+
+	// Connection credential template used for creating a connection credential secret for cluster objects.
+	//
+	// Built-in objects are:
+	//
+	// - `$(RANDOM_PASSWD)` random 8 characters.
+	// - `$(STRONG_RANDOM_PASSWD)` random 16 characters, with mixed cases, digits and symbols.
+	// - `$(UUID)` generate a random UUID v4 string.
+	// - `$(UUID_B64)` generate a random UUID v4 BASE64 encoded string.
+	// - `$(UUID_STR_B64)` generate a random UUID v4 string then BASE64 encoded.
+	// - `$(UUID_HEX)` generate a random UUID v4 HEX representation.
+	// - `$(HEADLESS_SVC_FQDN)` headless service FQDN placeholder, value pattern is `$(CLUSTER_NAME)-$(1ST_COMP_NAME)-headless.$(NAMESPACE).svc`,
+	//    where 1ST_COMP_NAME is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service` attribute;
+	// - `$(SVC_FQDN)` service FQDN placeholder, value pattern is `$(CLUSTER_NAME)-$(1ST_COMP_NAME).$(NAMESPACE).svc`,
+	//    where 1ST_COMP_NAME is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service` attribute;
+	// - `$(SVC_PORT_{PORT-NAME})` is ServicePort's port value with specified port name, i.e, a servicePort JSON struct:
+	//    `{"name": "mysql", "targetPort": "mysqlContainerPort", "port": 3306}`, and `$(SVC_PORT_mysql)` in the
+	//    connection credential value is 3306.
+	//
+	// Deprecated since v0.9.
+	// This field is maintained for backward compatibility and its use is discouraged.
+	// Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.
+	//
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
+	// +optional
+	ConnectionCredential map[string]string `json:"connectionCredential,omitempty"`
+
 	// Topologies defines all possible topologies within the cluster.
 	//
 	// +kubebuilder:validation:MinItems=1
@@ -74,14 +128,15 @@ type ClusterTopologyComponent struct {
 	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
 	Name string `json:"name"`
 
-	// Specifies the name or prefix of the ComponentDefinition custom resource(CR) that
-	// defines the Component's characteristics and behavior.
+	// Specifies the exact name, name prefix, or regular expression pattern for matching the name of the ComponentDefinition
+	// custom resource (CR) that defines the Component's characteristics and behavior.
 	//
-	// When a prefix is used, the system selects the ComponentDefinition CR with the latest version that matches the prefix.
+	// The system selects the ComponentDefinition CR with the latest version that matches the pattern.
 	// This approach allows:
 	//
 	// 1. Precise selection by providing the exact name of a ComponentDefinition CR.
-	// 2. Flexible and automatic selection of the most up-to-date ComponentDefinition CR by specifying a prefix.
+	// 2. Flexible and automatic selection of the most up-to-date ComponentDefinition CR
+	// 	  by specifying a name prefix or regular expression pattern.
 	//
 	// Once set, this field cannot be updated.
 	//

@@ -27,18 +27,20 @@ import (
 	"strings"
 	"sync"
 
+	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
@@ -215,12 +217,12 @@ func GetTargetPods(reqCtx intctrlutil.RequestCtx,
 // getCluster gets the cluster and will ignore the error.
 func getCluster(ctx context.Context,
 	cli client.Client,
-	targetPod *corev1.Pod) *appsv1alpha1.Cluster {
+	targetPod *corev1.Pod) *kbappsv1.Cluster {
 	clusterName := targetPod.Labels[constant.AppInstanceLabelKey]
 	if len(clusterName) == 0 {
 		return nil
 	}
-	cluster := &appsv1alpha1.Cluster{}
+	cluster := &kbappsv1.Cluster{}
 	if err := cli.Get(ctx, client.ObjectKey{
 		Namespace: targetPod.Namespace,
 		Name:      clusterName,
@@ -234,9 +236,9 @@ func getCluster(ctx context.Context,
 // listObjectsOfCluster list the objects of the cluster by labels.
 func listObjectsOfCluster(ctx context.Context,
 	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
+	cluster *kbappsv1.Cluster,
 	object client.ObjectList) (client.ObjectList, error) {
-	labels := constant.GetClusterWellKnownLabels(cluster.Name)
+	labels := constant.GetClusterLabels(cluster.Name)
 	if err := cli.List(ctx, object, client.InNamespace(cluster.Namespace), client.MatchingLabels(labels)); err != nil {
 		return nil, err
 	}
@@ -295,24 +297,35 @@ func getDefaultBackupRepo(ctx context.Context, cli client.Client) (*dpv1alpha1.B
 	return defaultRepo, nil
 }
 
-func deleteRelatedJobs(reqCtx intctrlutil.RequestCtx, cli client.Client, namespace string, labels map[string]string) error {
-	if labels == nil || namespace == "" {
+type objectList interface {
+	*appsv1.StatefulSetList | *batchv1.JobList
+	client.ObjectList
+}
+
+func deleteRelatedObjectList[T objectList](reqCtx intctrlutil.RequestCtx, cli client.Client, list T, namespaces map[string]sets.Empty, labels map[string]string) error {
+	if labels == nil || len(namespaces) == 0 {
 		return nil
 	}
-	jobs := &batchv1.JobList{}
-	if err := cli.List(reqCtx.Ctx, jobs,
-		client.MatchingLabels(labels)); err != nil {
-		return client.IgnoreNotFound(err)
-	}
-	for i := range jobs.Items {
-		job := &jobs.Items[i]
-		if err := dputils.RemoveDataProtectionFinalizer(reqCtx.Ctx, cli, job); err != nil {
-			return err
+
+	for ns := range namespaces {
+		if err := cli.List(reqCtx.Ctx, list, client.InNamespace(ns),
+			client.MatchingLabels(labels)); err != nil {
+			return client.IgnoreNotFound(err)
 		}
-		if err := intctrlutil.BackgroundDeleteObject(cli, reqCtx.Ctx, job); err != nil {
-			return err
+		objs := reflect.ValueOf(list).Elem().FieldByName("Items")
+		if !objs.IsZero() {
+			for i := 0; i < objs.Len(); i++ {
+				obj := objs.Index(i).Addr().Interface().(client.Object)
+				if err := dputils.RemoveDataProtectionFinalizer(reqCtx.Ctx, cli, obj); err != nil {
+					return err
+				}
+				if err := intctrlutil.BackgroundDeleteObject(cli, reqCtx.Ctx, obj); err != nil {
+					return err
+				}
+			}
 		}
 	}
+
 	return nil
 }
 

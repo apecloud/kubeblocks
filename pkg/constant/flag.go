@@ -26,11 +26,6 @@ const (
 )
 
 const (
-	// ShardSvcAnnotationKey defines the feature gate of creating service for each shard.
-	// Sharding name defined in the annotation value, a set of Service defined in Cluster.Spec.Services with the ShardingSelector will be automatically generated for each shard when Cluster.Spec.ShardingSpecs[x].shards is not nil.
-	// Multiple sharding names are separated by ','. for example: "kubeblocks.io/enabled-shard-svc: proxy-shard,db-shard"
-	ShardSvcAnnotationKey = "kubeblocks.io/enabled-shard-svc"
-
 	// HostNetworkAnnotationKey defines the feature gate to enable the host-network for specified components or shardings.
 	HostNetworkAnnotationKey = "kubeblocks.io/host-network"
 
@@ -38,10 +33,10 @@ const (
 	// means to try the best to cutoff useless objects.
 	FeatureReconciliationInCompactModeAnnotationKey = "kubeblocks.io/compact-mode"
 
-	// FeatureGateComponentReplicasAnnotation tells whether to add and update the annotation "component-replicas" to all pods of a Component
-	FeatureGateComponentReplicasAnnotation = "COMPONENT_REPLICAS_ANNOTATION"
-
 	// FeatureGateInPlacePodVerticalScaling specifies to enable in-place pod vertical scaling
 	// NOTE: This feature depends on the InPlacePodVerticalScaling feature of the K8s cluster in which the KubeBlocks runs.
 	FeatureGateInPlacePodVerticalScaling = "IN_PLACE_POD_VERTICAL_SCALING"
+
+	// FeatureGateNoRSMEnv specifies not to create the '$(instanceset.name)-rsm-env' ConfigMap object.
+	FeatureGateNoRSMEnv = "NO_RSM_ENV"
 )

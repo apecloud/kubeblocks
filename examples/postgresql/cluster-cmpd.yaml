@@ -21,18 +21,6 @@ spec:
     - running
     # Determines whether the metrics exporter needs to be published to the service endpoint.  
     disableExporter: true
-    # Specifies a group of affinity scheduling rules for the Component. It allows users to control how the Component's Pods are scheduled onto nodes in the cluster.
-    affinity:
-      podAntiAffinity: Preferred
-      topologyKeys:
-      - kubernetes.io/hostname
-      tenancy: SharedNode
-    # Allows the Component to be scheduled onto nodes with matching taints. 
-    tolerations:
-    - key: kb-data
-      operator: Equal
-      value: 'true'
-      effect: NoSchedule
     # Specifies the name of the ServiceAccount required by the running Component.   
     serviceAccountName: kb-pg-cluster
     # Each component supports running multiple replicas to provide high availability and persistence. This field can be used to specify the desired number of replicas.

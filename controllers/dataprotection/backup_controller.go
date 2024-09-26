@@ -34,9 +34,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/clock"
+	"k8s.io/utils/pointer"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -46,7 +48,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -625,13 +627,13 @@ func (r *BackupReconciler) checkIsCompletedDuringRunning(reqCtx intctrlutil.Requ
 	// check if target cluster exits
 	clusterName := backup.Labels[constant.AppInstanceLabelKey]
 	if clusterName != "" {
-		cluster := &appsv1alpha1.Cluster{}
+		cluster := &kbappsv1.Cluster{}
 		backupTargetExists, err = intctrlutil.CheckResourceExists(reqCtx.Ctx, r.Client,
 			client.ObjectKey{Name: clusterName, Namespace: backup.Namespace}, cluster)
 		if err != nil {
 			return false, err
 		}
-		backupTargetIsStoppedOrDeleting = cluster.IsDeleting() || cluster.Status.Phase == appsv1alpha1.StoppedClusterPhase
+		backupTargetIsStoppedOrDeleting = cluster.IsDeleting() || cluster.Status.Phase == kbappsv1.StoppedClusterPhase
 	}
 	// if backup target exists, and it is not deleting or stopped, check if the schedule is enabled.
 	if backupTargetExists && !backupTargetIsStoppedOrDeleting {
@@ -656,6 +658,14 @@ func (r *BackupReconciler) checkIsCompletedDuringRunning(reqCtx intctrlutil.Requ
 		duration := backup.Status.CompletionTimestamp.Sub(backup.Status.StartTimestamp.Time).Round(time.Second)
 		backup.Status.Duration = &metav1.Duration{Duration: duration}
 	}
+
+	for i := range backup.Status.Actions {
+		act := &backup.Status.Actions[i]
+		act.Phase = dpv1alpha1.ActionPhaseCompleted
+		act.AvailableReplicas = pointer.Int32(int32(0))
+		act.CompletionTimestamp = backup.Status.CompletionTimestamp
+	}
+
 	return true, r.Client.Status().Patch(reqCtx.Ctx, backup, patch)
 }
 
@@ -693,15 +703,6 @@ func (r *BackupReconciler) updateStatusIfFailed(
 	return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 }
 
-// deleteExternalJobs deletes the external jobs.
-func (r *BackupReconciler) deleteExternalJobs(reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) error {
-	labels := dpbackup.BuildBackupWorkloadLabels(backup)
-	if err := deleteRelatedJobs(reqCtx, r.Client, backup.Namespace, labels); err != nil {
-		return err
-	}
-	return deleteRelatedJobs(reqCtx, r.Client, viper.GetString(constant.CfgKeyCtrlrMgrNS), labels)
-}
-
 func (r *BackupReconciler) deleteVolumeSnapshots(reqCtx intctrlutil.RequestCtx,
 	backup *dpv1alpha1.Backup) error {
 	deleter := &dpbackup.Deleter{
@@ -711,34 +712,25 @@ func (r *BackupReconciler) deleteVolumeSnapshots(reqCtx intctrlutil.RequestCtx,
 	return deleter.DeleteVolumeSnapshots(backup)
 }
 
-// deleteExternalStatefulSet deletes the external statefulSet.
-func (r *BackupReconciler) deleteExternalStatefulSet(reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) error {
-	key := client.ObjectKey{
-		Namespace: backup.Namespace,
-		Name:      backup.Name,
-	}
-	sts := &appsv1.StatefulSet{}
-	if err := r.Client.Get(reqCtx.Ctx, key, sts); err != nil {
-		return client.IgnoreNotFound(err)
-	}
-
-	patch := client.MergeFrom(sts.DeepCopy())
-	controllerutil.RemoveFinalizer(sts, dptypes.DataProtectionFinalizerName)
-	if err := r.Client.Patch(reqCtx.Ctx, sts, patch); err != nil {
-		return err
-	}
-	reqCtx.Log.V(1).Info("delete statefulSet", "statefulSet", sts)
-	return intctrlutil.BackgroundDeleteObject(r.Client, reqCtx.Ctx, sts)
-}
-
 // deleteExternalResources deletes the external workloads that execute backup.
-// Currently, it only supports two types of workloads: job.
+// Currently, it only supports two types of workloads: job, statefulSet
 func (r *BackupReconciler) deleteExternalResources(
 	reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) error {
-	if err := r.deleteExternalJobs(reqCtx, backup); err != nil {
+	labels := dpbackup.BuildBackupWorkloadLabels(backup)
+
+	// use map to avoid duplicate deletion of the same namespace.
+	namespaces := map[string]sets.Empty{
+		backup.Namespace: {},
+		viper.GetString(constant.CfgKeyCtrlrMgrNS): {},
+	}
+
+	// delete the external jobs.
+	if err := deleteRelatedObjectList(reqCtx, r.Client, &batchv1.JobList{}, namespaces, labels); err != nil {
 		return err
 	}
-	return r.deleteExternalStatefulSet(reqCtx, backup)
+
+	// delete the external statefulSets.
+	return deleteRelatedObjectList(reqCtx, r.Client, &appsv1.StatefulSetList{}, namespaces, labels)
 }
 
 // PatchBackupObjectMeta patches backup object metaObject include cluster snapshot.
@@ -824,7 +816,7 @@ func updateBackupStatusByActionStatus(backupStatus *dpv1alpha1.BackupStatus) {
 	}
 }
 
-func setEncryptedSystemAccountsAnnotation(request *dpbackup.Request, cluster *appsv1alpha1.Cluster) error {
+func setEncryptedSystemAccountsAnnotation(request *dpbackup.Request, cluster *kbappsv1.Cluster) error {
 	usernameKey := constant.AccountNameForSecret
 	passwordKey := constant.AccountPasswdForSecret
 	isSystemAccountSecret := func(secret *corev1.Secret) bool {
@@ -868,19 +860,24 @@ func setEncryptedSystemAccountsAnnotation(request *dpbackup.Request, cluster *ap
 }
 
 // getClusterObjectString gets the cluster object and convert it to string.
-func getClusterObjectString(cluster *appsv1alpha1.Cluster) (*string, error) {
+func getClusterObjectString(cluster *kbappsv1.Cluster) (*string, error) {
 	// maintain only the cluster's spec and name/namespace.
-	newCluster := &appsv1alpha1.Cluster{
+	newCluster := &kbappsv1.Cluster{
 		Spec: cluster.Spec,
 		ObjectMeta: metav1.ObjectMeta{
-			Namespace: cluster.Namespace,
-			Name:      cluster.Name,
+			Namespace:   cluster.Namespace,
+			Name:        cluster.Name,
+			Annotations: map[string]string{},
 		},
 		TypeMeta: cluster.TypeMeta,
 	}
-	if v, ok := cluster.Annotations[constant.ExtraEnvAnnotationKey]; ok {
-		newCluster.Annotations = map[string]string{
-			constant.ExtraEnvAnnotationKey: v,
+	removedAnnotations := map[string]sets.Empty{
+		constant.OpsRequestAnnotationKey:   {},
+		corev1.LastAppliedConfigAnnotation: {},
+	}
+	for k, v := range cluster.Annotations {
+		if _, ok := removedAnnotations[k]; !ok {
+			newCluster.Annotations[k] = v
 		}
 	}
 	clusterString, err := getObjectString(newCluster)
@@ -888,7 +885,7 @@ func getClusterObjectString(cluster *appsv1alpha1.Cluster) (*string, error) {
 }
 
 // setClusterSnapshotAnnotation sets the snapshot of cluster to the backup's annotations.
-func setClusterSnapshotAnnotation(request *dpbackup.Request, cluster *appsv1alpha1.Cluster) error {
+func setClusterSnapshotAnnotation(request *dpbackup.Request, cluster *kbappsv1.Cluster) error {
 	if request.Backup.Annotations == nil {
 		request.Backup.Annotations = map[string]string{}
 	}

@@ -32,8 +32,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 )
 
@@ -42,16 +43,19 @@ var _ = Describe("TLSUtilsTest", func() {
 
 	Context("ComposeTLSSecret function", func() {
 		It("should work well", func() {
-			clusterName := "bar"
-			componentName := "test"
-			secret, err := ComposeTLSSecret(namespace, clusterName, componentName)
+			synthesizedComp := component.SynthesizedComponent{
+				Namespace:   testCtx.DefaultNamespace,
+				ClusterName: "bar",
+				Name:        "test",
+			}
+			secret, err := ComposeTLSSecret(synthesizedComp)
 			Expect(err).Should(BeNil())
 			Expect(secret).ShouldNot(BeNil())
-			Expect(secret.Name).Should(Equal(fmt.Sprintf("%s-%s-tls-certs", clusterName, componentName)))
+			Expect(secret.Name).Should(Equal(fmt.Sprintf("%s-%s-tls-certs", synthesizedComp.ClusterName, synthesizedComp.Name)))
 			Expect(secret.Labels).ShouldNot(BeNil())
-			Expect(secret.Labels[constant.AppInstanceLabelKey]).Should(Equal(clusterName))
+			Expect(secret.Labels[constant.AppInstanceLabelKey]).Should(Equal(synthesizedComp.ClusterName))
 			Expect(secret.Labels[constant.AppManagedByLabelKey]).Should(Equal(constant.AppName))
-			Expect(secret.Labels[constant.KBAppComponentLabelKey]).Should(Equal(componentName))
+			Expect(secret.Labels[constant.KBAppComponentLabelKey]).Should(Equal(synthesizedComp.Name))
 			Expect(secret.StringData).ShouldNot(BeNil())
 			Expect(secret.StringData[constant.CAName]).ShouldNot(BeZero())
 			Expect(secret.StringData[constant.CertName]).ShouldNot(BeZero())
@@ -63,7 +67,7 @@ var _ = Describe("TLSUtilsTest", func() {
 		It("should work well", func() {
 			ctx := context.Background()
 			name := "bar"
-			secretRef := &appsv1alpha1.TLSSecretRef{
+			secretRef := &appsv1.TLSSecretRef{
 				Name: name,
 				CA:   "caName",
 				Cert: "certName",

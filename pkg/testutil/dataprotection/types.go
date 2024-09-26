@@ -22,11 +22,11 @@ package dataprotection
 import (
 	corev1 "k8s.io/api/core/v1"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
 type BackupClusterInfo struct {
-	Cluster   *appsv1alpha1.Cluster
+	Cluster   *appsv1.Cluster
 	TargetPod *corev1.Pod
 	TargetPVC string
 }

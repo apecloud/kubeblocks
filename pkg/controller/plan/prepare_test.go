@@ -26,12 +26,11 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/configuration"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
@@ -69,9 +68,9 @@ var _ = Describe("Prepare Test", func() {
 	)
 
 	var (
-		compDefObj     *appsv1alpha1.ComponentDefinition
-		cluster        *appsv1alpha1.Cluster
-		comp           *appsv1alpha1.Component
+		compDefObj     *appsv1.ComponentDefinition
+		cluster        *appsv1.Cluster
+		comp           *appsv1.Component
 		configSpecName string
 	)
 
@@ -110,12 +109,7 @@ var _ = Describe("Prepare Test", func() {
 		})
 
 		It("render configuration should success", func() {
-			reqCtx := intctrlutil.RequestCtx{
-				Ctx: ctx,
-				Log: logger,
-			}
-
-			synthesizeComp, err := component.BuildSynthesizedComponent(reqCtx, testCtx.Cli, cluster, compDefObj, comp)
+			synthesizeComp, err := component.BuildSynthesizedComponent(ctx, testCtx.Cli, compDefObj, comp, cluster)
 			Expect(err).Should(Succeed())
 			Expect(synthesizeComp.PodSpec).ShouldNot(BeNil())
 			resCtx := &configuration.ResourceCtx{

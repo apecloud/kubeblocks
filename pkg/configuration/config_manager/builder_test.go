@@ -33,7 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 )
@@ -118,8 +118,8 @@ var _ = Describe("Config Builder Test", func() {
 		return []ConfigSpecMeta{
 			{
 				ConfigSpecInfo: ConfigSpecInfo{
-					ConfigSpec: appsv1alpha1.ComponentConfigSpec{
-						ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+					ConfigSpec: appsv1.ComponentConfigSpec{
+						ComponentTemplateSpec: appsv1.ComponentTemplateSpec{
 							Name:       "pg_config",
 							VolumeName: "pg_config",
 						},
@@ -131,7 +131,7 @@ var _ = Describe("Config Builder Test", func() {
 
 	newCMBuildParams := func(hasScripts bool) *CfgManagerBuildParams {
 		param := &CfgManagerBuildParams{
-			Cluster: &appsv1alpha1.Cluster{
+			Cluster: &appsv1.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "abcd",
 					Namespace: "default",
@@ -277,8 +277,8 @@ formatterConfig:
 				buildParam := &param.ConfigSpecsBuildParams[i]
 				buildParam.ReloadAction = reloadOptions
 				buildParam.ReloadType = appsv1beta1.TPLScriptType
-				buildParam.ConfigSpec.LegacyRenderedConfigSpec = &appsv1alpha1.LegacyRenderedTemplateSpec{
-					ConfigTemplateExtension: appsv1alpha1.ConfigTemplateExtension{
+				buildParam.ConfigSpec.LegacyRenderedConfigSpec = &appsv1.LegacyRenderedTemplateSpec{
+					ConfigTemplateExtension: appsv1.ConfigTemplateExtension{
 						Namespace:   scriptsNS,
 						TemplateRef: lazyRenderedTemplateName,
 					},

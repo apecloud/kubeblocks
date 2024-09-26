@@ -32,7 +32,7 @@ It is recommended to use kbcli to create an ApeCloud MySQL Proxy Cluster.
 
 1. Enable the etcd addon and create an etcd cluster.
 
-   1. Install and enable the etcd addon. You need to install the etcd addon first since the etcd addon is not installed by default. Refer to [User addons](./../../overview/supported-addons.md#use-addons) for details.
+   1. Install and enable the etcd addon. You need to install the etcd addon first since the etcd addon is not installed by default. Refer to [Addons installation tutorial](./../../installation/install-with-kbcli/install-addons.md) for details.
 
        ```bash
        # 1. Check whether the KubeBlocks addon index is added

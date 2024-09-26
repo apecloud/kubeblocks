@@ -21,13 +21,14 @@ package component
 
 import (
 	"context"
+	"regexp"
 	"slices"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -39,6 +40,35 @@ func inDataContext() *multicluster.ClientOption {
 
 func inDataContextUnspecified() *multicluster.ClientOption {
 	return multicluster.InDataContextUnspecified()
+}
+
+func ValidateCompDefRegexp(compDefPattern string) error {
+	_, err := regexp.Compile(compDefPattern)
+	return err
+}
+
+func CompDefMatched(compDef, compDefPattern string) bool {
+	if strings.HasPrefix(compDef, compDefPattern) {
+		return true
+	}
+
+	isRegexpPattern := func(pattern string) bool {
+		escapedPattern := regexp.QuoteMeta(pattern)
+		return escapedPattern != pattern
+	}
+
+	isRegex := false
+	regex, err := regexp.Compile(compDefPattern)
+	if err == nil {
+		// distinguishing between regular expressions and ordinary strings.
+		if isRegexpPattern(compDefPattern) {
+			isRegex = true
+		}
+	}
+	if !isRegex {
+		return false
+	}
+	return regex.MatchString(compDef)
 }
 
 func IsHostNetworkEnabled(synthesizedComp *SynthesizedComponent) bool {
@@ -63,7 +93,7 @@ func isHostNetworkEnabled(ctx context.Context, cli client.Reader, synthesizedCom
 		Namespace: synthesizedComp.Namespace,
 		Name:      constant.GenerateClusterComponentName(synthesizedComp.ClusterName, compName),
 	}
-	comp := &appsv1alpha1.Component{}
+	comp := &appsv1.Component{}
 	if err := cli.Get(ctx, compKey, comp, inDataContext()); err != nil {
 		return false, err
 	}
@@ -73,7 +103,7 @@ func isHostNetworkEnabled(ctx context.Context, cli client.Reader, synthesizedCom
 
 	// check the component definition that whether it has the host-network capability
 	if len(comp.Spec.CompDef) > 0 {
-		compDef := &appsv1alpha1.ComponentDefinition{}
+		compDef := &appsv1.ComponentDefinition{}
 		if err := cli.Get(ctx, types.NamespacedName{Name: comp.Spec.CompDef}, compDef); err != nil {
 			return false, err
 		}
@@ -84,7 +114,7 @@ func isHostNetworkEnabled(ctx context.Context, cli client.Reader, synthesizedCom
 	return false, nil
 }
 
-func hasHostNetworkCapability(synthesizedComp *SynthesizedComponent, compDef *appsv1alpha1.ComponentDefinition) bool {
+func hasHostNetworkCapability(synthesizedComp *SynthesizedComponent, compDef *appsv1.ComponentDefinition) bool {
 	switch {
 	case synthesizedComp != nil:
 		return synthesizedComp.HostNetwork != nil

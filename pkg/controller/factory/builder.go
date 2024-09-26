@@ -24,16 +24,15 @@ import (
 	"path/filepath"
 	"strconv"
 
-	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	cfgcm "github.com/apecloud/kubeblocks/pkg/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -46,40 +45,20 @@ import (
 )
 
 // BuildInstanceSet builds an InstanceSet object from SynthesizedComponent.
-func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, componentDef *appsv1alpha1.ComponentDefinition) (*workloads.InstanceSet, error) {
+func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, componentDef *appsv1.ComponentDefinition) (*workloads.InstanceSet, error) {
 	var (
 		compDefName = synthesizedComp.CompDefName
 		namespace   = synthesizedComp.Namespace
 		clusterName = synthesizedComp.ClusterName
 		compName    = synthesizedComp.Name
 	)
-	// build labels
-	labels := constant.GetKBWellKnownLabelsWithCompDef(compDefName, clusterName, compName)
-	compDefLabel := constant.GetComponentDefLabel(compDefName)
-	mergeLabels := intctrlutil.MergeMetadataMaps(labels, compDefLabel, synthesizedComp.Labels)
-
-	// build annotations
-	mergeAnnotations := intctrlutil.MergeMetadataMaps(
-		constant.GetKBGenerationAnnotation(synthesizedComp.ClusterGeneration),
-		getMonitorAnnotations(synthesizedComp, componentDef),
-		compDefLabel,
-		constant.GetServiceVersionAnnotation(synthesizedComp.ServiceVersion),
-		synthesizedComp.Annotations,
-	)
 
 	podBuilder := builder.NewPodBuilder("", "").
-		AddLabelsInMap(synthesizedComp.Labels).
-		AddLabelsInMap(labels).
-		AddLabelsInMap(compDefLabel).
-		AddLabelsInMap(constant.GetAppVersionLabel(compDefName)).
-		AddLabelsInMap(synthesizedComp.UserDefinedLabels).
-		AddLabelsInMap(constant.GetClusterWellKnownLabels(clusterName)).
-		AddAnnotationsInMap(synthesizedComp.UserDefinedAnnotations)
-	if viper.GetBool(constant.FeatureGateComponentReplicasAnnotation) {
-		replicasStr := strconv.Itoa(int(synthesizedComp.Replicas))
-		podBuilder.AddAnnotations(constant.ComponentReplicasAnnotationKey, replicasStr)
-
-	}
+		AddLabelsInMap(constant.GetCompLabels(clusterName, compName, synthesizedComp.Labels)).
+		AddLabelsInMap(synthesizedComp.DynamicLabels).
+		AddLabelsInMap(synthesizedComp.StaticLabels).
+		AddAnnotationsInMap(synthesizedComp.DynamicAnnotations).
+		AddAnnotationsInMap(synthesizedComp.StaticAnnotations)
 	template := corev1.PodTemplateSpec{
 		ObjectMeta: podBuilder.GetObject().ObjectMeta,
 		Spec:       *synthesizedComp.PodSpec.DeepCopy(),
@@ -87,15 +66,24 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, component
 
 	itsName := constant.GenerateWorkloadNamePattern(clusterName, compName)
 	itsBuilder := builder.NewInstanceSetBuilder(namespace, itsName).
-		AddLabelsInMap(mergeLabels).
-		AddAnnotationsInMap(mergeAnnotations).
-		AddMatchLabelsInMap(labels).
+		AddLabelsInMap(constant.GetCompLabels(clusterName, compName)).
+		AddLabelsInMap(synthesizedComp.StaticLabels).
+		AddAnnotations(constant.KubeBlocksGenerationKey, synthesizedComp.Generation).
+		AddAnnotationsInMap(map[string]string{
+			constant.AppComponentLabelKey:   compDefName,
+			constant.KBAppServiceVersionKey: synthesizedComp.ServiceVersion,
+		}).
+		AddAnnotationsInMap(getMonitorAnnotations(synthesizedComp, componentDef)).
+		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
+		SetTemplate(template).
+		AddMatchLabelsInMap(constant.GetCompLabels(clusterName, compName)).
 		SetReplicas(synthesizedComp.Replicas).
-		SetMinReadySeconds(synthesizedComp.MinReadySeconds).
-		SetTemplate(template)
+		SetMinReadySeconds(synthesizedComp.MinReadySeconds)
 
 	var vcts []corev1.PersistentVolumeClaim
 	for _, vct := range synthesizedComp.VolumeClaimTemplates {
+		intctrlutil.MergeMetadataMapInplace(synthesizedComp.DynamicLabels, &vct.ObjectMeta.Labels)
+		intctrlutil.MergeMetadataMapInplace(synthesizedComp.DynamicAnnotations, &vct.ObjectMeta.Annotations)
 		vcts = append(vcts, vctToPVC(vct))
 	}
 	itsBuilder.SetVolumeClaimTemplates(vcts...)
@@ -133,7 +121,7 @@ func vctToPVC(vct corev1.PersistentVolumeClaimTemplate) corev1.PersistentVolumeC
 }
 
 // getMonitorAnnotations returns the annotations for the monitor.
-func getMonitorAnnotations(synthesizedComp *component.SynthesizedComponent, componentDef *appsv1alpha1.ComponentDefinition) map[string]string {
+func getMonitorAnnotations(synthesizedComp *component.SynthesizedComponent, componentDef *appsv1.ComponentDefinition) map[string]string {
 	if synthesizedComp.DisableExporter == nil || *synthesizedComp.DisableExporter || componentDef == nil {
 		return nil
 	}
@@ -211,7 +199,7 @@ func GetRestorePassword(synthesizedComp *component.SynthesizedComponent) string 
 }
 
 // GetRestoreSystemAccountPassword gets restore password if exists during recovery.
-func GetRestoreSystemAccountPassword(synthesizedComp *component.SynthesizedComponent, account appsv1alpha1.SystemAccount) string {
+func GetRestoreSystemAccountPassword(synthesizedComp *component.SynthesizedComponent, account appsv1.SystemAccount) string {
 	valueString := synthesizedComp.Annotations[constant.RestoreFromBackupAnnotationKey]
 	if len(valueString) == 0 {
 		return ""
@@ -243,16 +231,19 @@ func GetRestoreSystemAccountPassword(synthesizedComp *component.SynthesizedCompo
 	return password
 }
 
-func BuildPVC(cluster *appsv1alpha1.Cluster,
-	component *component.SynthesizedComponent,
+func BuildPVC(cluster *appsv1.Cluster,
+	synthesizedComp *component.SynthesizedComponent,
 	vct *corev1.PersistentVolumeClaimTemplate,
 	pvcKey types.NamespacedName,
 	templateName,
 	snapshotName string) *corev1.PersistentVolumeClaim {
-	wellKnownLabels := constant.GetKBWellKnownLabels(component.ClusterDefName, cluster.Name, component.Name)
 	pvcBuilder := builder.NewPVCBuilder(pvcKey.Namespace, pvcKey.Name).
-		AddLabelsInMap(wellKnownLabels).
+		AddLabelsInMap(constant.GetCompLabels(cluster.Name, synthesizedComp.Name)).
+		AddLabelsInMap(synthesizedComp.DynamicLabels).
 		AddLabels(constant.VolumeClaimTemplateNameLabelKey, vct.Name).
+		AddLabelsInMap(synthesizedComp.StaticLabels).
+		AddAnnotationsInMap(synthesizedComp.DynamicAnnotations).
+		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
 		SetAccessModes(vct.Spec.AccessModes).
 		SetResources(vct.Spec.Resources)
 	if vct.Spec.StorageClassName != nil {
@@ -267,12 +258,12 @@ func BuildPVC(cluster *appsv1alpha1.Cluster,
 		})
 	}
 	pvc := pvcBuilder.GetObject()
-	BuildPersistentVolumeClaimLabels(component, pvc, vct.Name, templateName)
+	BuildPersistentVolumeClaimLabels(synthesizedComp, pvc, vct.Name, templateName)
 	return pvc
 }
 
-func BuildBackup(cluster *appsv1alpha1.Cluster,
-	component *component.SynthesizedComponent,
+func BuildBackup(cluster *appsv1.Cluster,
+	synthesizedComp *component.SynthesizedComponent,
 	backupPolicyName string,
 	backupKey types.NamespacedName,
 	backupMethod string) *dpv1alpha1.Backup {
@@ -280,27 +271,27 @@ func BuildBackup(cluster *appsv1alpha1.Cluster,
 		AddLabels(dptypes.BackupMethodLabelKey, backupMethod).
 		AddLabels(dptypes.BackupPolicyLabelKey, backupPolicyName).
 		AddLabels(constant.KBManagedByKey, "cluster").
-		AddLabels(constant.AppNameLabelKey, component.ClusterDefName).
+		AddLabels(constant.AppNameLabelKey, synthesizedComp.ClusterDefName).
 		AddLabels(constant.AppInstanceLabelKey, cluster.Name).
 		AddLabels(constant.AppManagedByLabelKey, constant.AppName).
-		AddLabels(constant.KBAppComponentLabelKey, component.Name).
+		AddLabels(constant.KBAppComponentLabelKey, synthesizedComp.Name).
 		SetBackupPolicyName(backupPolicyName).
 		SetBackupMethod(backupMethod).
 		GetObject()
 }
 
-func BuildConfigMapWithTemplate(cluster *appsv1alpha1.Cluster,
-	component *component.SynthesizedComponent,
+func BuildConfigMapWithTemplate(cluster *appsv1.Cluster,
+	synthesizedComp *component.SynthesizedComponent,
 	configs map[string]string,
 	cmName string,
-	configTemplateSpec appsv1alpha1.ComponentTemplateSpec) *corev1.ConfigMap {
-	wellKnownLabels := constant.GetKBWellKnownLabels(component.ClusterDefName, cluster.Name, component.Name)
-	wellKnownLabels[constant.AppComponentLabelKey] = component.CompDefName
+	configTemplateSpec appsv1.ComponentTemplateSpec) *corev1.ConfigMap {
 	return builder.NewConfigMapBuilder(cluster.Namespace, cmName).
-		AddLabelsInMap(wellKnownLabels).
+		AddLabelsInMap(constant.GetCompLabels(cluster.Name, synthesizedComp.Name)).
 		AddLabels(constant.CMConfigurationTypeLabelKey, constant.ConfigInstanceType).
 		AddLabels(constant.CMTemplateNameLabelKey, configTemplateSpec.TemplateRef).
+		AddLabelsInMap(synthesizedComp.StaticLabels).
 		AddAnnotations(constant.DisableUpgradeInsConfigurationAnnotationKey, strconv.FormatBool(false)).
+		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
 		SetData(configs).
 		GetObject()
 }
@@ -374,28 +365,20 @@ func setToolsScriptsPath(container *corev1.Container, meta cfgcm.ConfigSpecMeta)
 	})
 }
 
-func BuildVolumeSnapshotClass(name string, driver string) *snapshotv1.VolumeSnapshotClass {
-	return builder.NewVolumeSnapshotClassBuilder("", name).
-		AddLabels(constant.AppManagedByLabelKey, constant.AppName).
-		SetDriver(driver).
-		SetDeletionPolicy(snapshotv1.VolumeSnapshotContentDelete).
-		GetObject()
-}
-
-func BuildServiceAccount(cluster *appsv1alpha1.Cluster, saName string) *corev1.ServiceAccount {
-	// TODO(component): compName
-	wellKnownLabels := constant.GetKBWellKnownLabels(cluster.Spec.ClusterDefRef, cluster.Name, "")
-	return builder.NewServiceAccountBuilder(cluster.Namespace, saName).
-		AddLabelsInMap(wellKnownLabels).
+func BuildServiceAccount(synthesizedComp *component.SynthesizedComponent, saName string) *corev1.ServiceAccount {
+	return builder.NewServiceAccountBuilder(synthesizedComp.Namespace, saName).
+		AddLabelsInMap(constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name)).
+		AddLabelsInMap(synthesizedComp.StaticLabels).
+		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
 		SetImagePullSecrets(intctrlutil.BuildImagePullSecrets()).
 		GetObject()
 }
 
-func BuildRoleBinding(cluster *appsv1alpha1.Cluster, saName string) *rbacv1.RoleBinding {
-	// TODO(component): compName
-	wellKnownLabels := constant.GetKBWellKnownLabels(cluster.Spec.ClusterDefRef, cluster.Name, "")
-	return builder.NewRoleBindingBuilder(cluster.Namespace, saName).
-		AddLabelsInMap(wellKnownLabels).
+func BuildRoleBinding(synthesizedComp *component.SynthesizedComponent, saName string) *rbacv1.RoleBinding {
+	return builder.NewRoleBindingBuilder(synthesizedComp.Namespace, saName).
+		AddLabelsInMap(constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name)).
+		AddLabelsInMap(synthesizedComp.StaticLabels).
+		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
 		SetRoleRef(rbacv1.RoleRef{
 			APIGroup: rbacv1.GroupName,
 			Kind:     "ClusterRole",
@@ -403,25 +386,7 @@ func BuildRoleBinding(cluster *appsv1alpha1.Cluster, saName string) *rbacv1.Role
 		}).
 		AddSubjects(rbacv1.Subject{
 			Kind:      rbacv1.ServiceAccountKind,
-			Namespace: cluster.Namespace,
-			Name:      saName,
-		}).
-		GetObject()
-}
-
-func BuildClusterRoleBinding(cluster *appsv1alpha1.Cluster, saName string) *rbacv1.ClusterRoleBinding {
-	// TODO(component): compName
-	wellKnownLabels := constant.GetKBWellKnownLabels(cluster.Spec.ClusterDefRef, cluster.Name, "")
-	return builder.NewClusterRoleBindingBuilder(cluster.Namespace, saName).
-		AddLabelsInMap(wellKnownLabels).
-		SetRoleRef(rbacv1.RoleRef{
-			APIGroup: rbacv1.GroupName,
-			Kind:     "ClusterRole",
-			Name:     constant.RBACClusterRoleName,
-		}).
-		AddSubjects(rbacv1.Subject{
-			Kind:      rbacv1.ServiceAccountKind,
-			Namespace: cluster.Namespace,
+			Namespace: synthesizedComp.Namespace,
 			Name:      saName,
 		}).
 		GetObject()

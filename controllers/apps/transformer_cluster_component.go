@@ -161,7 +161,7 @@ func checkAllCompsUpToDate(ctx context.Context, cli client.Reader, cluster *apps
 	}
 	var validCompCount int
 	for _, comp := range compList.Items {
-		if filter == nil || filter(&comp) {
+		if filter == nil || !filter(&comp) {
 			validCompCount++
 			generation, ok := comp.Annotations[constant.KubeBlocksGenerationKey]
 			if !ok || comp.Generation != comp.Status.ObservedGeneration || generation != strconv.FormatInt(cluster.Generation, 10) {

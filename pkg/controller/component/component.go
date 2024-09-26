@@ -170,7 +170,7 @@ func GetClusterComponentShortNameSet(ctx context.Context, cli client.Reader, clu
 	compSet := sets.Set[string]{}
 	for _, comp := range compList {
 		// filter out the components that do not meet the filter condition
-		if filter != nil && !filter(&comp) {
+		if filter != nil && filter(&comp) {
 			continue
 		}
 		compShortName, err := ShortName(cluster.Name, comp.Name)

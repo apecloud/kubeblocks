@@ -206,7 +206,7 @@ func listOwnedClusterServices(ctx context.Context, cli client.Reader,
 
 	services := make(map[string]*corev1.Service)
 	for i, svc := range svcList.Items {
-		if model.IsOwnerOf(cluster, &svc) && (filter == nil || filter(&svc)) {
+		if model.IsOwnerOf(cluster, &svc) && (filter == nil || !filter(&svc)) {
 			services[svc.Name] = &svcList.Items[i]
 		}
 	}

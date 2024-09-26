@@ -111,15 +111,15 @@ var _ = Describe("Restore", func() {
 
 		BeforeEach(func() {
 			By("By creating backup policyTemplate ")
-			bpt := testdp.NewBackupPolicyTemplateFactory("backup-policy-template").
+			compDef = testapps.NewComponentDefinitionFactory(compDefName).
+				SetDefaultSpec().
+				Create(&testCtx).GetObject()
+
+			testdp.NewBackupPolicyTemplateFactory("backup-policy-template").
+				SetCompDefs(compDef.Name).
 				WithRandomName().
 				AddBackupMethod(testdp.BackupMethodName, false, fullBackupActionSetName).
 				SetBackupMethodVolumeMounts(testapps.DataVolumeName, "/data").Create(&testCtx).Get()
-
-			compDef = testapps.NewComponentDefinitionFactory(compDefName).
-				SetDefaultSpec().
-				SetBackupPolicyTemplateName(bpt.Name).
-				Create(&testCtx).GetObject()
 
 			pvcSpec := testapps.NewPVCSpec("1Gi")
 			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").

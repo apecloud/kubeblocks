@@ -2326,6 +2326,24 @@ Some examples of well-known service protocols include:</p>
 </tr>
 <tr>
 <td>
+<code>compDefs</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<p>CompDefs specifies names for the component definitions associated with this BackupPolicyTemplate.
+Each name in the list can represent an exact name, a name prefix, or a regular expression pattern.</p>
+<p>For example:</p>
+<ul>
+<li>&ldquo;mysql-8.0.30-v1alpha1&rdquo;: Matches the exact name &ldquo;mysql-8.0.30-v1alpha1&rdquo;</li>
+<li>&ldquo;mysql-8.0.30&rdquo;: Matches all names starting with &ldquo;mysql-8.0.30&rdquo;</li>
+<li>&rdquo;^mysql-8.0.\d&#123;1,2&#125;$&ldquo;: Matches all names starting with &ldquo;mysql-8.0.&rdquo; followed by one or two digits.</li>
+</ul>
+</td>
+</tr>
+<tr>
+<td>
 <code>target</code><br/>
 <em>
 <a href="#dataprotection.kubeblocks.io/v1alpha1.TargetInstance">
@@ -2429,6 +2447,24 @@ Some examples of well-known service protocols include:</p>
 <li>&ldquo;PostgreSQL&rdquo;: Indicates that the Component offers a PostgreSQL database service.</li>
 <li>&ldquo;Redis&rdquo;: Signifies that the Component functions as a Redis key-value store.</li>
 <li>&ldquo;ETCD&rdquo;: Denotes that the Component serves as an ETCD distributed key-value store</li>
+</ul>
+</td>
+</tr>
+<tr>
+<td>
+<code>compDefs</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<p>CompDefs specifies names for the component definitions associated with this BackupPolicyTemplate.
+Each name in the list can represent an exact name, a name prefix, or a regular expression pattern.</p>
+<p>For example:</p>
+<ul>
+<li>&ldquo;mysql-8.0.30-v1alpha1&rdquo;: Matches the exact name &ldquo;mysql-8.0.30-v1alpha1&rdquo;</li>
+<li>&ldquo;mysql-8.0.30&rdquo;: Matches all names starting with &ldquo;mysql-8.0.30&rdquo;</li>
+<li>&rdquo;^mysql-8.0.\d&#123;1,2&#125;$&ldquo;: Matches all names starting with &ldquo;mysql-8.0.&rdquo; followed by one or two digits.</li>
 </ul>
 </td>
 </tr>

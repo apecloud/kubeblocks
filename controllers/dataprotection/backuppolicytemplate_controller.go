@@ -30,7 +30,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils/boolptr"
 )
@@ -68,12 +70,20 @@ func (r *BackupPolicyTemplateReconciler) Reconcile(ctx context.Context, req reco
 }
 
 func (r *BackupPolicyTemplateReconciler) setComponentDefLabels(reqCtx intctrlutil.RequestCtx, oldBPT, bpt *dpv1alpha1.BackupPolicyTemplate) error {
+	compDefList := &appsv1.ComponentDefinitionList{}
+	if err := r.Client.List(reqCtx.Ctx, compDefList); err != nil {
+		return err
+	}
 	if bpt.Labels == nil {
 		bpt.Labels = map[string]string{}
 	}
-	// set componentDef labels
-	for _, compDef := range bpt.Spec.CompDefs {
-		bpt.Labels[compDef] = compDef
+	for _, item := range compDefList.Items {
+		for _, compDef := range bpt.Spec.CompDefs {
+			// set componentDef labels
+			if component.CompDefMatched(item.Name, compDef) {
+				bpt.Labels[item.Name] = item.Name
+			}
+		}
 	}
 	if !reflect.DeepEqual(oldBPT.Labels, bpt.Labels) {
 		return r.Client.Update(reqCtx.Ctx, bpt)

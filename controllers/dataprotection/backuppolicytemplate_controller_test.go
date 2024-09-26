@@ -59,7 +59,20 @@ var _ = Describe("", func() {
 
 	Context("create a BackupPolicyTemplate", func() {
 		It("test BackupPolicyTemplate", func() {
+			var (
+				compDef1 = "comp-def1"
+				compDef2 = "comp-def2"
+			)
+			testapps.NewComponentDefinitionFactory(compDef1).
+				SetDefaultSpec().
+				Create(&testCtx).
+				GetObject()
+			testapps.NewComponentDefinitionFactory(compDef2).
+				SetDefaultSpec().
+				Create(&testCtx).
+				GetObject()
 			bpt := testdp.NewBackupPolicyTemplateFactory(BackupPolicyTemplateName).
+				SetCompDefs(compDef1, compDef2).
 				AddBackupMethod(BackupMethod, false, testdp.ActionSetName).
 				SetBackupMethodVolumeMounts("data", "/data").
 				AddBackupMethod(VsBackupMethodName, true, "").
@@ -68,6 +81,12 @@ var _ = Describe("", func() {
 				AddSchedule(VsBackupMethodName, "0 0 * * *", ttl, true).
 				Create(&testCtx).GetObject()
 			key := client.ObjectKeyFromObject(bpt)
+
+			By("check labels")
+			Eventually(testapps.CheckObj(&testCtx, key, func(g Gomega, pobj *dpv1alpha1.BackupPolicyTemplate) {
+				g.Expect(pobj.Labels[compDef1]).To(Equal(compDef1))
+				g.Expect(pobj.Labels[compDef2]).To(Equal(compDef2))
+			})).Should(Succeed())
 
 			By("should be unavailable")
 			Eventually(testapps.CheckObj(&testCtx, key, func(g Gomega, pobj *dpv1alpha1.BackupPolicyTemplate) {

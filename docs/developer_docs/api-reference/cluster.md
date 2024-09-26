@@ -948,19 +948,6 @@ It identifies the entity responsible for creating and maintaining the Component.
 </tr>
 <tr>
 <td>
-<code>backupPolicyTemplateName</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies a BackupPolicyTemplate name if data protection functionality is supported.
-Which will automatically create the corresponding backupPolicy.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>description</code><br/>
 <em>
 string
@@ -3856,19 +3843,6 @@ It identifies the entity responsible for creating and maintaining the Component.
 <li>Use a consistent naming convention across Components from the same provider.</li>
 <li>Avoid using trademarked or copyrighted names without proper permission.</li>
 </ul>
-</td>
-</tr>
-<tr>
-<td>
-<code>backupPolicyTemplateName</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies a BackupPolicyTemplate name if data protection functionality is supported.
-Which will automatically create the corresponding backupPolicy.</p>
 </td>
 </tr>
 <tr>

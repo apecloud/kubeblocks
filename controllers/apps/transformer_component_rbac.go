@@ -30,6 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -99,8 +100,12 @@ func isLifecycleActionsEnabled(compDef *appsv1.ComponentDefinition) bool {
 	return compDef.Spec.LifecycleActions != nil
 }
 
-func isDataProtectionEnabled(compDef *appsv1.ComponentDefinition) bool {
-	return compDef.Spec.BackupPolicyTemplateName != "" || compDef.Annotations[constant.HorizontalScaleBackupPolicyTemplateKey] != ""
+func isDataProtectionEnabled(transCtx *componentTransformContext, compDef *appsv1.ComponentDefinition) (bool, error) {
+	backupPolicyTPLs := &dpv1alpha1.BackupPolicyTemplateList{}
+	if err := transCtx.Client.List(transCtx.Context, backupPolicyTPLs, client.MatchingLabels{compDef.Name: compDef.Name}); err != nil {
+		return false, err
+	}
+	return len(backupPolicyTPLs.Items) > 0, nil
 }
 
 func isServiceAccountExist(transCtx *componentTransformContext, serviceAccountName string) bool {
@@ -169,7 +174,10 @@ func buildServiceAccount(transCtx *componentTransformContext) (*corev1.ServiceAc
 		synthesizedComp = transCtx.SynthesizeComponent
 	)
 	serviceAccountName := comp.Spec.ServiceAccountName
-	dataProtectionEnable := isDataProtectionEnabled( cluster, comp)
+	dataProtectionEnable, err := isDataProtectionEnabled(transCtx, compDef)
+	if err != nil {
+		return nil, err
+	}
 	if serviceAccountName == "" {
 		// If lifecycle actions and data protection are disabled at the same tme, then do not create a service account.
 		if !isLifecycleActionsEnabled(compDef) && !dataProtectionEnable {

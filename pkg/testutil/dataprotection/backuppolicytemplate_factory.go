@@ -38,14 +38,10 @@ func NewBackupPolicyTemplateFactory(name string) *MockBackupPolicyTemplateFactor
 	return f
 }
 
-/*func (f *MockBackupPolicyTemplateFactory) getLastBackupPolicy() *dpv1alpha1.BackupPolicy {
-	l := len(f.Get().Spec.BackupPolicies)
-	if l == 0 {
-		return nil
-	}
-	backupPolicies := f.Get().Spec.BackupPolicies
-	return &backupPolicies[l-1]
-}*/
+func (f *MockBackupPolicyTemplateFactory) SetCompDefs(compDefs ...string) *MockBackupPolicyTemplateFactory {
+	f.Get().Spec.CompDefs = compDefs
+	return f
+}
 
 func (f *MockBackupPolicyTemplateFactory) getLastBackupMethod() *dpv1alpha1.BackupMethodTPL {
 	l := len(f.Get().Spec.BackupMethods)
@@ -55,15 +51,6 @@ func (f *MockBackupPolicyTemplateFactory) getLastBackupMethod() *dpv1alpha1.Back
 	backupMethods := f.Get().Spec.BackupMethods
 	return &backupMethods[l-1]
 }
-
-/*func (f *MockBackupPolicyTemplateFactory) setBackupPolicyField(setField func(backupPolicy *dpv1alpha1.BackupPolicy)) {
-	backupPolicy := f.getLastBackupPolicy()
-	if backupPolicy == nil {
-		// ignore
-		return
-	}
-	setField(backupPolicy)
-}*/
 
 func (f *MockBackupPolicyTemplateFactory) AddSchedule(method, schedule, retentionPeriod string, enable bool) *MockBackupPolicyTemplateFactory {
 	schedulePolicy := dpv1alpha1.SchedulePolicy{

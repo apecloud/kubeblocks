@@ -130,14 +130,10 @@ var _ = Describe("Cluster Controller", func() {
 	}
 
 	createAllDefinitionObjects := func() {
-		By("Create a bpt obj")
-		bpt := testdp.CreateBackupPolicyTpl(&testCtx)
-
 		By("Create a componentDefinition obj")
 		compDefObj = testapps.NewComponentDefinitionFactory(compDefName).
 			WithRandomName().
 			SetDefaultSpec().
-			SetBackupPolicyTemplateName(bpt.Name).
 			Create(&testCtx).
 			GetObject()
 
@@ -177,6 +173,9 @@ var _ = Describe("Cluster Controller", func() {
 			AddClusterTopology(defaultTopology).
 			Create(&testCtx).
 			GetObject()
+
+		By("Create a bpt obj")
+		testdp.CreateBackupPolicyTpl(&testCtx, compDefObj.Name)
 
 		By("Wait objects available")
 		Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(compDefObj),

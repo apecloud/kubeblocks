@@ -784,36 +784,6 @@ var _ = Describe("Cluster Controller", func() {
 		}
 	}
 
-	testDeleteClusterWithHalt := func(createObj func(appsv1.TerminationPolicyType)) {
-		createObj(appsv1.Halt)
-
-		transCtx := &clusterTransformContext{
-			Context: testCtx.Ctx,
-			Client:  testCtx.Cli,
-		}
-		namespacedKinds, clusteredKinds := kindsForWipeOut()
-		allKinds := append(namespacedKinds, clusteredKinds...)
-		createdObjs, err := getOwningNamespacedObjects(transCtx.Context, transCtx.Client, clusterObj.Namespace, getAppInstanceML(*clusterObj), allKinds)
-		Expect(err).Should(Succeed())
-
-		By("delete the cluster")
-		testapps.DeleteObject(&testCtx, clusterKey, &appsv1.Cluster{})
-		Consistently(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1.Cluster{}, true)).Should(Succeed())
-
-		By("check all cluster resources again")
-		objs, err := getOwningNamespacedObjects(transCtx.Context, transCtx.Client, clusterObj.Namespace, getAppInstanceML(*clusterObj), allKinds)
-		Expect(err).Should(Succeed())
-		// check all objects existed before cluster deletion still be there
-		for key, obj := range createdObjs {
-			Expect(objs).Should(HaveKey(key))
-			Expect(obj.GetUID()).Should(BeEquivalentTo(objs[key].GetUID()))
-		}
-	}
-
-	testClusterHaltNRecovery := func(createObj func(appsv1.TerminationPolicyType)) {
-		// TODO(component)
-	}
-
 	deleteClusterWithBackup := func(terminationPolicy appsv1.TerminationPolicyType, backupRetainPolicy string) {
 		By("mocking a retained backup")
 		backupPolicyName := "test-backup-policy"
@@ -950,14 +920,6 @@ var _ = Describe("Cluster Controller", func() {
 
 		It("delete cluster with terminationPolicy=DoNotTerminate", func() {
 			testDeleteClusterWithDoNotTerminate(createObj)
-		})
-
-		It("delete cluster with terminationPolicy=Halt", func() {
-			testDeleteClusterWithHalt(createObj)
-		})
-
-		It("cluster Halt and Recovery", func() {
-			testClusterHaltNRecovery(createObj)
 		})
 
 		It("delete cluster with terminationPolicy=Delete", func() {

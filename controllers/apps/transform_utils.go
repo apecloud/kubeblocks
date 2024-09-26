@@ -21,23 +21,18 @@ package apps
 
 import (
 	"context"
-	"encoding/json"
 	"reflect"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/graph"
-	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -165,58 +160,6 @@ func isVolumeClaimTemplatesEqual(a, b []appsv1.ClusterComponentVolumeClaimTempla
 		}
 	}
 	return true
-}
-
-func preserveObjects[T client.Object](ctx context.Context, cli client.Reader, graphCli model.GraphClient, dag *graph.DAG,
-	obj T, ml client.MatchingLabels, toPreserveKinds []client.ObjectList, finalizerName string, lastApplyAnnotationKey string) error {
-	if len(toPreserveKinds) == 0 {
-		return nil
-	}
-
-	objs, err := getOwningNamespacedObjects(ctx, cli, obj.GetNamespace(), ml, toPreserveKinds)
-	if err != nil {
-		return err
-	}
-
-	objSpec := obj.DeepCopyObject().(client.Object)
-	objSpec.SetNamespace("")
-	objSpec.SetName(obj.GetName())
-	objSpec.SetUID(obj.GetUID())
-	objSpec.SetResourceVersion("")
-	objSpec.SetGeneration(0)
-	objSpec.SetManagedFields(nil)
-
-	b, err := json.Marshal(objSpec)
-	if err != nil {
-		return err
-	}
-	objJSON := string(b)
-
-	for _, o := range objs {
-		origObj := o.DeepCopyObject().(client.Object)
-		controllerutil.RemoveFinalizer(o, finalizerName)
-		removeOwnerRefOfType(o, obj.GetObjectKind().GroupVersionKind())
-
-		annot := o.GetAnnotations()
-		if annot == nil {
-			annot = make(map[string]string)
-		}
-		annot[lastApplyAnnotationKey] = objJSON
-		o.SetAnnotations(annot)
-		graphCli.Update(dag, origObj, o)
-	}
-	return nil
-}
-
-func removeOwnerRefOfType(obj client.Object, gvk schema.GroupVersionKind) {
-	ownerRefs := obj.GetOwnerReferences()
-	for i, ref := range ownerRefs {
-		if ref.Kind == gvk.Kind && ref.APIVersion == gvk.GroupVersion().String() {
-			ownerRefs = append(ownerRefs[:i], ownerRefs[i+1:]...)
-			break
-		}
-	}
-	obj.SetOwnerReferences(ownerRefs)
 }
 
 // isOwnedByComp is used to judge if the obj is owned by Component.

@@ -167,6 +167,9 @@ func compOwnedKinds() []client.ObjectList {
 	return []client.ObjectList{
 		&workloads.InstanceSetList{},
 		&corev1.ServiceList{},
+		&corev1.SecretList{},
+		&corev1.ConfigMapList{},
+		&corev1.PersistentVolumeClaimList{},
 		&dpv1alpha1.BackupList{},
 		&dpv1alpha1.RestoreList{},
 		&appsv1alpha1.ConfigurationList{},
@@ -175,24 +178,8 @@ func compOwnedKinds() []client.ObjectList {
 	}
 }
 
-func compOwnedPreserveKinds() []client.ObjectList {
-	return []client.ObjectList{
-		&corev1.SecretList{},
-		&corev1.ConfigMapList{},
-		&corev1.PersistentVolumeClaimList{},
-	}
-}
-
-func kindsForCompDoNotTerminate() []client.ObjectList {
-	return []client.ObjectList{}
-}
-
-func kindsForCompHalt() []client.ObjectList {
-	return append(kindsForCompDoNotTerminate(), compOwnedKinds()...)
-}
-
 func kindsForCompDelete() []client.ObjectList {
-	return append(kindsForCompHalt(), compOwnedPreserveKinds()...)
+	return compOwnedKinds()
 }
 
 func kindsForCompWipeOut() []client.ObjectList {

@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
-	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -362,14 +361,13 @@ var _ = Describe("Component Controller", func() {
 		if storageSize == "" {
 			storageSize = "1Gi"
 		}
-		clusterBytes, _ := json.Marshal(clusterObj)
 		testapps.NewPersistentVolumeClaimFactory(testCtx.DefaultNamespace, pvcName, clusterName,
 			compName, testapps.DataVolumeName).
 			AddLabelsInMap(map[string]string{
 				constant.AppInstanceLabelKey:    clusterName,
 				constant.KBAppComponentLabelKey: compName,
 				constant.AppManagedByLabelKey:   constant.AppName,
-			}).AddAnnotations(constant.LastAppliedClusterAnnotationKey, string(clusterBytes)).
+			}).
 			SetStorage(storageSize).
 			SetStorageClass(storageClassName).
 			CheckedCreate(&testCtx)

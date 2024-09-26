@@ -175,10 +175,7 @@ It defines how resources, data, and backups associated with a Cluster are manage
 Choose a policy based on the desired level of resource cleanup and data preservation:</p>
 <ul>
 <li><code>DoNotTerminate</code>: Prevents deletion of the Cluster. This policy ensures that all resources remain intact.</li>
-<li><code>Halt</code>: Deletes Cluster resources like Pods and Services but retains Persistent Volume Claims (PVCs),
-allowing for data preservation while stopping other operations.</li>
-<li><code>Delete</code>: Extends the <code>Halt</code> policy by also removing PVCs, leading to a thorough cleanup while
-removing all persistent data.</li>
+<li><code>Delete</code>: Deletes all runtime resources belong to the Cluster.</li>
 <li><code>WipeOut</code>: An aggressive policy that deletes all Cluster resources, including volume snapshots and
 backups in external storage.
 This results in complete data removal and should be used cautiously, primarily in non-production environments
@@ -3187,10 +3184,7 @@ It defines how resources, data, and backups associated with a Cluster are manage
 Choose a policy based on the desired level of resource cleanup and data preservation:</p>
 <ul>
 <li><code>DoNotTerminate</code>: Prevents deletion of the Cluster. This policy ensures that all resources remain intact.</li>
-<li><code>Halt</code>: Deletes Cluster resources like Pods and Services but retains Persistent Volume Claims (PVCs),
-allowing for data preservation while stopping other operations.</li>
-<li><code>Delete</code>: Extends the <code>Halt</code> policy by also removing PVCs, leading to a thorough cleanup while
-removing all persistent data.</li>
+<li><code>Delete</code>: Deletes all runtime resources belong to the Cluster.</li>
 <li><code>WipeOut</code>: An aggressive policy that deletes all Cluster resources, including volume snapshots and
 backups in external storage.
 This results in complete data removal and should be used cautiously, primarily in non-production environments
@@ -9701,13 +9695,10 @@ string
 </tr>
 </thead>
 <tbody><tr><td><p>&#34;Delete&#34;</p></td>
-<td><p>Delete is based on Halt and deletes PVCs.</p>
+<td><p>Delete will delete all runtime resources belong to the cluster.</p>
 </td>
 </tr><tr><td><p>&#34;DoNotTerminate&#34;</p></td>
 <td><p>DoNotTerminate will block delete operation.</p>
-</td>
-</tr><tr><td><p>&#34;Halt&#34;</p></td>
-<td><p>Halt will delete workload resources such as statefulset, deployment workloads but keep PVCs.</p>
 </td>
 </tr><tr><td><p>&#34;WipeOut&#34;</p></td>
 <td><p>WipeOut is based on Delete and wipe out all volume snapshots and snapshot data from backup storage location.</p>

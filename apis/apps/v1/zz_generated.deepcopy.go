@@ -1000,6 +1000,11 @@ func (in *ComponentLifecycleActions) DeepCopyInto(out *ComponentLifecycleActions
 		*out = new(Probe)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.AvailableProbe != nil {
+		in, out := &in.AvailableProbe, &out.AvailableProbe
+		*out = new(Probe)
+		(*in).DeepCopyInto(*out)
+	}
 	if in.Switchover != nil {
 		in, out := &in.Switchover, &out.Switchover
 		*out = new(Action)

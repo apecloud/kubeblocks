@@ -4542,6 +4542,21 @@ Without this, services that rely on roleSelectors might improperly direct traffi
 </tr>
 <tr>
 <td>
+<code>availableProbe</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Probe">
+Probe
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the procedure which is invoked regularly to assess the availability of the component.</p>
+<p>Note: This field is immutable once it has been set.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>switchover</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.Action">

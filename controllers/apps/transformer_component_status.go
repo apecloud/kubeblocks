@@ -21,6 +21,7 @@ package apps
 
 import (
 	"fmt"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"strconv"
 	"time"
 
@@ -202,10 +203,7 @@ func (t *componentStatusTransformer) isWorkloadUpdated() bool {
 	return generation == strconv.FormatInt(t.comp.Generation, 10)
 }
 
-// isComponentAvailable tells whether the component is basically available, ether working well or in a fragile state:
-// 1. at least one pod is available
-// 2. with latest revision
-// 3. and with leader role label set
+// isComponentAvailable tells whether the component is available.
 func (t *componentStatusTransformer) isComponentAvailable() bool {
 	if !t.isWorkloadUpdated() {
 		return false
@@ -213,6 +211,25 @@ func (t *componentStatusTransformer) isComponentAvailable() bool {
 	if t.runningITS.Status.CurrentRevision != t.runningITS.Status.UpdateRevision {
 		return false
 	}
+	if defined, available := t.definedAvailableCondition(); defined {
+		return available
+	}
+	return t.builtinAvailableCondition()
+}
+
+func (t *componentStatusTransformer) definedAvailableCondition() (bool, bool) {
+	if t.synthesizeComp.LifecycleActions == nil || t.synthesizeComp.LifecycleActions.AvailableProbe == nil {
+		return false, false
+	}
+	for _, cond := range t.comp.Status.Conditions {
+		if cond.Type == appsv1.ConditionTypeAvailable {
+			return true, cond.Status == metav1.ConditionTrue // TODO: check the generation?
+		}
+	}
+	return true, false
+}
+
+func (t *componentStatusTransformer) builtinAvailableCondition() bool {
 	if t.runningITS.Status.AvailableReplicas <= 0 {
 		return false
 	}

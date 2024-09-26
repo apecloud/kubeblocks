@@ -141,10 +141,10 @@ func (r *probeRunner) report(probe *proto.Probe, output []byte, err error) {
 	succeed, thresholdPoint := r.succeed(probe)
 	if succeed && thresholdPoint ||
 		succeed && !thresholdPoint && !reflect.DeepEqual(output, r.latestOutput) {
-		r.sendEvent(probe.Action, 0, output, "")
+		r.sendEvent(probe.Instance, probe.Action, 0, output, "")
 	}
 	if r.fail(probe) {
-		r.sendEvent(probe.Action, -1, r.latestOutput, err.Error())
+		r.sendEvent(probe.Instance, probe.Action, -1, r.latestOutput, err.Error())
 	}
 }
 
@@ -170,17 +170,18 @@ func (r *probeRunner) fail(probe *proto.Probe) bool {
 	return false
 }
 
-func (r *probeRunner) sendEvent(probe string, code int32, output []byte, message string) {
+func (r *probeRunner) sendEvent(instance, probe string, code int32, output []byte, message string) {
 	prefixLen := min(len(output), 32)
 	r.logger.Info("send probe event", "code", code, "output", string(output[:prefixLen]), "message", message)
 
-	eventMsg := &proto.ProbeEvent{
-		Probe:   probe,
-		Code:    code,
-		Message: message,
-		Output:  output,
+	event := &proto.ProbeEvent{
+		Instance: instance,
+		Probe:    probe,
+		Code:     code,
+		Output:   output,
+		Message:  message,
 	}
-	msg, err := json.Marshal(&eventMsg)
+	msg, err := json.Marshal(&event)
 	if err != nil {
 		r.logger.Error(err, "failed to marshal probe event")
 		return

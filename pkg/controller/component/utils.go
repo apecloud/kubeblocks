@@ -38,6 +38,10 @@ func inDataContext() *multicluster.ClientOption {
 	return multicluster.InDataContext()
 }
 
+func inDataContextUnspecified() *multicluster.ClientOption {
+	return multicluster.InDataContextUnspecified()
+}
+
 func ValidateCompDefRegexp(compDefPattern string) error {
 	_, err := regexp.Compile(compDefPattern)
 	return err

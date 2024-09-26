@@ -165,6 +165,7 @@ func isRoleBindingExist(transCtx *componentTransformContext, serviceAccountName 
 	}
 	return true
 }
+
 // buildServiceAccount builds the service account for the component.
 func buildServiceAccount(transCtx *componentTransformContext) (*corev1.ServiceAccount, error) {
 	var (

@@ -191,15 +191,11 @@ func IsReconciliationPaused(object client.Object) bool {
 }
 
 // ReadCacheSnapshot reads all objects owned by root object.
-func ReadCacheSnapshot(transCtx graph.TransformContext, root client.Object, ml client.MatchingLabels,
-	namespaced bool, kinds ...client.ObjectList) (ObjectSnapshot, error) {
+func ReadCacheSnapshot(transCtx graph.TransformContext, root client.Object, ml client.MatchingLabels, kinds ...client.ObjectList) (ObjectSnapshot, error) {
 	snapshot := make(ObjectSnapshot)
-	opts := []client.ListOption{ml}
-	if namespaced {
-		opts = append(opts, client.InNamespace(root.GetNamespace()))
-	}
+	inNs := client.InNamespace(root.GetNamespace())
 	for _, list := range kinds {
-		if err := transCtx.GetClient().List(transCtx.GetContext(), list, opts...); err != nil {
+		if err := transCtx.GetClient().List(transCtx.GetContext(), list, inNs, ml); err != nil {
 			return nil, err
 		}
 		// reflect get list.Items

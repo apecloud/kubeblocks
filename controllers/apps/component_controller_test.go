@@ -1362,23 +1362,13 @@ var _ = Describe("Component Controller", func() {
 			Namespace: compObj.Namespace,
 			Name:      saName,
 		}
-		crbKey := types.NamespacedName{
-			Namespace: compObj.Namespace,
-			Name:      saName,
-		}
 		Eventually(testapps.CheckObjExists(&testCtx, saKey, &corev1.ServiceAccount{}, expectExisted)).Should(Succeed())
 		Eventually(testapps.CheckObjExists(&testCtx, rbKey, &rbacv1.RoleBinding{}, expectExisted)).Should(Succeed())
-		Eventually(testapps.CheckObjExists(&testCtx, crbKey, &rbacv1.ClusterRoleBinding{}, expectExisted)).Should(Succeed())
 	}
 
 	testCompRBAC := func(compName, compDefName, saName string) {
-		By("update comp definition to enable volume protection")
+		By("update comp definition to enable lifecycle actions")
 		Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(compDefObj), func(compDef *kbappsv1.ComponentDefinition) {
-			for i, vol := range compDef.Spec.Volumes {
-				if vol.HighWatermark <= 0 || vol.HighWatermark >= 100 {
-					compDef.Spec.Volumes[i].HighWatermark = 85
-				}
-			}
 			compDef.Spec.LifecycleActions.Readonly = testapps.NewLifecycleAction("readonly")
 			compDef.Spec.LifecycleActions.Readwrite = testapps.NewLifecycleAction("readwrite")
 		})()).Should(Succeed())

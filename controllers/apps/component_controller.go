@@ -106,9 +106,6 @@ type ComponentReconciler struct {
 // +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings,verbs=get;list;watch
 // +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings/status,verbs=get
 
-// +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterrolebindings,verbs=get;list;watch
-// +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterrolebindings/status,verbs=get
-
 // +kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=get;list;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -227,12 +224,10 @@ func (r *ComponentReconciler) setupWithManager(mgr ctrl.Manager) error {
 		Watches(&appsv1alpha1.Configuration{}, handler.EnqueueRequestsFromMapFunc(r.configurationEventHandler))
 
 	if viper.GetBool(constant.EnableRBACManager) {
-		b.Owns(&rbacv1.ClusterRoleBinding{}).
-			Owns(&rbacv1.RoleBinding{}).
+		b.Owns(&rbacv1.RoleBinding{}).
 			Owns(&corev1.ServiceAccount{})
 	} else {
-		b.Watches(&rbacv1.ClusterRoleBinding{}, handler.EnqueueRequestsFromMapFunc(r.filterComponentResources)).
-			Watches(&rbacv1.RoleBinding{}, handler.EnqueueRequestsFromMapFunc(r.filterComponentResources)).
+		b.Watches(&rbacv1.RoleBinding{}, handler.EnqueueRequestsFromMapFunc(r.filterComponentResources)).
 			Watches(&corev1.ServiceAccount{}, handler.EnqueueRequestsFromMapFunc(r.filterComponentResources))
 	}
 
@@ -256,8 +251,7 @@ func (r *ComponentReconciler) setupWithMultiClusterManager(mgr ctrl.Manager, mul
 		Watch(b, &corev1.ConfigMap{}, eventHandler).
 		Watch(b, &corev1.PersistentVolumeClaim{}, eventHandler).
 		Watch(b, &corev1.ServiceAccount{}, eventHandler).
-		Watch(b, &rbacv1.RoleBinding{}, eventHandler).
-		Watch(b, &rbacv1.ClusterRoleBinding{}, eventHandler)
+		Watch(b, &rbacv1.RoleBinding{}, eventHandler)
 
 	return b.Complete(r)
 }

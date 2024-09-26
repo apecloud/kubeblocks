@@ -12,24 +12,6 @@ metadata:
 ---
 # Source: orioledb-cluster/templates/rbac.yaml
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: kb-oriole-cluster
-  labels:
-    helm.sh/chart: orioledb-cluster-0.6.0-beta.44
-    app.kubernetes.io/version: "14.7.2-beta1"
-    app.kubernetes.io/instance: oriole-cluster
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: kubeblocks-volume-protection-pod-role
-subjects:
-  - kind: ServiceAccount
-    name: kb-oriole-cluster
-    namespace: default
----
-# Source: orioledb-cluster/templates/rbac.yaml
-apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: kb-oriole-cluster

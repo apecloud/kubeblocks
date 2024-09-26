@@ -8,24 +8,32 @@ sidebar_label: 使用 KubeBlocks 管理 RabbitMQ
 
 # 使用 KubeBlocks 管理 RabbitMQ
 
-RabbitMQ is a reliable and mature messaging and streaming broker, which is easy to deploy on cloud environments, on-premises, and on your local machine.
+RabbitMQ 是可靠且成熟的消息和流处理代理，可通过简单的方式在云环境、本地数据中心以及本地机器上部署。
 
-KubeBlocks supports the management of RabbitMQ.
+KubeBlocks 支持管理 RabiitMQ。
 
 :::note
 
-Currently, KubeBlocks only supports managing RabbitMQ by `kubectl`.
+当前，KubeBlocks 仅支持通过 `kubectl` 管理 RabbitMQ。
 
 :::
 
-## Before you start
+## 开始之前
 
-- Install KubeBlocks [by kbcli](./../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) or [by Helm](./../installation/install-with-helm/install-kubeblocks.md).
-- Install and enable the rabbitmq addon [by kbcli](./../installation/install-with-kbcli/install-addons.md) or [by Helm](./../installation/install-with-helm/install-addons.md).
+- 安装 KubeBlocks：可按需采用 [kbcli](./../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) 或 [Helm](./../installation/install-with-helm/install-kubeblocks.md)方式。
+- 安装并启用 rabbitmq Addon：可按需采用 [kbcli](./../installation/install-with-kbcli/install-addons.md) 或 [Helm](./../installation/install-with-helm/install-addons.md) 方式。
 
-## Create a cluster
+## 创建集群
 
 KubeBlocks implements a Cluster CRD to define a cluster. Here is an example of creating a RabbitMQ cluster with three replicas. Pods are distributed on different nodes by default. But if you only have one node for a cluster with three replicas, set `spec.affinity.topologyKeys` as `null`.
+
+KubeBlocks 通过执行 Cluster CRD 定义集群。以下是创建三副本 RabbitMQ 集群的示例。Pod 默认分布在不同节点上。如果您只有一个节点，但仍想要创建三副本集群，建议将 `spec.affinity.topologyKeys` 设置为 `null`。
+
+:::note
+
+生产环境中，不建议将所有副本部署在同一个节点上，因为这可能会降低集群的可用性。
+
+:::
 
 ```bash
 cat <<EOF | kubectl apply -f -
@@ -69,40 +77,40 @@ spec:
 EOF
 ```
 
-| Field                                 | Definition  |
+| 字段                                   | 定义  |
 |---------------------------------------|--------------------------------------|
-| `spec.terminationPolicy`              | It is the policy of cluster termination. The default value is `Delete`. Valid values are `DoNotTerminate`, `Halt`, `Delete`, `WipeOut`.  <p> - `DoNotTerminate` blocks deletion operation. </p><p> - `Halt` deletes workload resources such as statefulset and deployment workloads but keep PVCs. </p><p> - `Delete` is based on Halt and deletes PVCs. </p> - `WipeOut` is based on Delete and wipe out all volume snapshots and snapshot data from a backup storage location. |
-| `spec.affinity`                       | It defines a set of node affinity scheduling rules for the cluster's Pods. This field helps control the placement of Pods on nodes within the cluster.  |
-| `spec.affinity.podAntiAffinity`       | It specifies the anti-affinity level of Pods within a component. It determines how pods should spread across nodes to improve availability and performance. |
-| `spec.affinity.topologyKeys`          | It represents the key of node labels used to define the topology domain for Pod anti-affinity and Pod spread constraints.   |
-| `spec.componentSpecs`                 | It is the list of components that define the cluster components. This field allows customized configuration of each component within a cluster.   |
-| `spec.componentSpecs.componentDefRef` | It is the name of the component definition that is defined in the cluster definition and you can get the component definition names with `kubectl get clusterdefinition qdrant -o json \| jq '.spec.componentDefs[].name'`.   |
-| `spec.componentSpecs.name`            | It specifies the name of the component.     |
-| `spec.componentSpecs.disableExporter` | It defines whether the monitoring function is enabled. |
-| `spec.componentSpecs.replicas`        | It specifies the number of replicas of the component.  |
-| `spec.componentSpecs.resources`       | It specifies the resource requirements of the component.  |
+| `spec.terminationPolicy`              | 集群的终止策略，默认值为 `Delete`，有效值为 `DoNotTerminate`、`Halt`、`Delete` 和 `WipeOut`。 <p> - `DoNotTerminate` 会阻止删除操作。 </p><p> - `Halt` 会删除工作负载资源，如 statefulset 和 deployment 等，但是保留了 PVC 。  </p><p> - `Delete` 在 `Halt` 的基础上进一步删除了 PVC。 </p><p> - `WipeOut` 在 `Delete` 的基础上从备份存储的位置完全删除所有卷快照和快照数据。 </p>|
+| `spec.affinity`                       | 为集群的 Pods 定义了一组节点亲和性调度规则。该字段可控制 Pods 在集群中节点上的分布。 |
+| `spec.affinity.podAntiAffinity`       | 定义了不在同一 component 中的 Pods 的反亲和性水平。该字段决定了 Pods 以何种方式跨节点分布，以提升可用性和性能。 |
+| `spec.affinity.topologyKeys`          | 用于定义 Pod 反亲和性和 Pod 分布约束的拓扑域的节点标签值。 |
+| `spec.componentSpecs`                 | 集群 components 列表，定义了集群 components。该字段允许对集群中的每个 component 进行自定义配置。 |
+| `spec.componentSpecs.componentDefRef` | 表示 cluster definition 中定义的 component definition 的名称，可通过执行 `kubectl get clusterdefinition apecloud-mysql -o json \| jq '.spec.componentDefs[].name'` 命令获取 component definition 名称。 |
+| `spec.componentSpecs.name`            | 定义了 component 的名称。  |
+| `spec.componentSpecs.disableExporter` | 定义了是否开启监控功能。 |
+| `spec.componentSpecs.replicas`        | 定义了 component 中 replicas 的数量。 |
+| `spec.componentSpecs.resources`       | 定义了 component 的资源要求。  |
 
-KubeBlocks operator watches for the `Cluster` CRD and creates the cluster and all dependent resources. You can get all the resources created by the cluster with `kubectl get all,secret,rolebinding,serviceaccount -l app.kubernetes.io/instance=mycluster -n demo`.
+KubeBlocks operator 监控 `Cluster` CRD 并创建集群和全部依赖资源。您可执行以下命令获取集群创建的所有资源信息。
 
 ```bash
 kubectl get all,secret,rolebinding,serviceaccount -l app.kubernetes.io/instance=mycluster -n demo
 ```
 
-Run the following command to see the created RabbitMQ cluster object:
+执行以下命令，查看已创建的 RabbitMQ 集群：
 
 ```bash
 kubectl get cluster mycluster -n demo -o yaml
 ```
 
-## Connect to the cluster
+## 连接集群
 
-Use the [RabbitMQ tools](https://www.rabbitmq.com/docs/cli) to connect to and manage the RabbitMQ cluster.
+使用 [RabbitMQ 工具](https://www.rabbitmq.com/docs/cli) 连接并管理 RabbitMQ 集群。
 
-## Scale
+## 集群扩缩容
 
-### Scale vertically
+### 垂直扩缩容
 
-Before you start, check whether the cluster status is `Running`. Otherwise, the following operations may fail.
+检查集群状态是否为 `Running`。否则，后续操作可能会失败。
 
 ```bash
 kubectl get cluster mycluster -n demo

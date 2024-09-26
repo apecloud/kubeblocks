@@ -3083,20 +3083,6 @@ Service
 </tr>
 <tr>
 <td>
-<code>shardingSelector</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Extends the ServiceSpec.Selector by allowing the specification of a sharding name, which is defined in
-<code>cluster.spec.shardingSpecs[*].name</code>, to be used as a selector for the service.
-Note that this and the <code>componentSelector</code> are mutually exclusive and cannot be set simultaneously.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>componentSelector</code><br/>
 <em>
 string
@@ -3104,8 +3090,8 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Extends the ServiceSpec.Selector by allowing the specification of a component, to be used as a selector for the service.
-Note that this and the <code>shardingSelector</code> are mutually exclusive and cannot be set simultaneously.</p>
+<p>Extends the ServiceSpec.Selector by allowing the specification of components, to be used as a selector for the service.</p>
+<p>If the <code>componentSelector</code> is set as the name of a sharding, the service will be exposed to all components in the sharding.</p>
 </td>
 </tr>
 </tbody>

@@ -82,9 +82,7 @@ func (t *clusterComponentTransformer) reconcileComponents(transCtx *clusterTrans
 		return err
 	}
 
-	createCompSet := protoCompSet.Difference(runningCompSet)
-	updateCompSet := protoCompSet.Intersection(runningCompSet)
-	deleteCompSet := runningCompSet.Difference(protoCompSet)
+	createCompSet, deleteCompSet, updateCompSet := setDiff(runningCompSet, protoCompSet)
 
 	// component objects to be deleted (scale-in)
 	if err := deleteCompsInOrder(transCtx, dag, deleteCompSet, false); err != nil {
@@ -599,4 +597,13 @@ func shardingNameFromComp(transCtx *clusterTransformContext, compName string) st
 		}
 	}
 	return ""
+}
+
+func setDiff(s1, s2 sets.Set[string]) (sets.Set[string], sets.Set[string], sets.Set[string]) {
+	return s2.Difference(s1), s1.Difference(s2), s1.Intersection(s2)
+}
+
+func mapDiff[T interface{}](m1, m2 map[string]T) (sets.Set[string], sets.Set[string], sets.Set[string]) {
+	s1, s2 := sets.KeySet(m1), sets.KeySet(m2)
+	return setDiff(s1, s2)
 }

@@ -606,15 +606,9 @@ type ShardingSpec struct {
 type ClusterService struct {
 	Service `json:",inline"`
 
-	// Extends the ServiceSpec.Selector by allowing the specification of a sharding name, which is defined in
-	// `cluster.spec.shardingSpecs[*].name`, to be used as a selector for the service.
-	// Note that this and the `componentSelector` are mutually exclusive and cannot be set simultaneously.
+	// Extends the ServiceSpec.Selector by allowing the specification of components, to be used as a selector for the service.
 	//
-	// +optional
-	ShardingSelector string `json:"shardingSelector,omitempty"`
-
-	// Extends the ServiceSpec.Selector by allowing the specification of a component, to be used as a selector for the service.
-	// Note that this and the `shardingSelector` are mutually exclusive and cannot be set simultaneously.
+	// If the `componentSelector` is set as the name of a sharding, the service will be exposed to all components in the sharding.
 	//
 	// +optional
 	ComponentSelector string `json:"componentSelector,omitempty"`

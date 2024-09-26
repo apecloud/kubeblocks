@@ -170,11 +170,11 @@ func (t *shardingAPINormalizationTransformer) updateShardingTemplate(transCtx *s
 	}
 }
 
-func withShardingDefined(obj client.Object) bool {
+func withShardingLabel(obj client.Object) bool {
 	labels := obj.GetLabels()
 	return labels != nil && labels[constant.KBAppShardingNameLabelKey] != ""
 }
 
-func withoutShardingDefined(obj client.Object) bool {
-	return !withShardingDefined(obj)
+func withoutShardingLabel(obj client.Object) bool {
+	return !withShardingLabel(obj)
 }

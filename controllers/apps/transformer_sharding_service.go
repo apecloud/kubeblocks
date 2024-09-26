@@ -21,9 +21,6 @@ package apps
 
 import (
 	"fmt"
-	"strings"
-
-	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -44,7 +41,7 @@ var _ graph.Transformer = &shardingServiceTransformer{}
 
 func (t *shardingServiceTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*shardingTransformContext)
-	if model.IsObjectDeleting(transCtx.OrigCluster) {
+	if model.IsObjectDeleting(transCtx.OrigCluster) || len(transCtx.Cluster.Spec.ShardingSpecs) == 0 {
 		return nil
 	}
 	if common.IsCompactMode(transCtx.OrigCluster.Annotations) {
@@ -56,80 +53,78 @@ func (t *shardingServiceTransformer) Transform(ctx graph.TransformContext, dag *
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 
 	// list all owned cluster services and filter out the services without sharding defined
-	services, err := listOwnedClusterServices(transCtx.Context, transCtx.Client, cluster, withoutShardingDefined)
+	services, err := listOwnedClusterServices(transCtx.Context, transCtx.Client, cluster, withoutShardingLabel)
 	if err != nil {
 		return err
 	}
 
-	handleServiceFunc := func(origSvc, genSvc *appsv1.ClusterService) error {
-		service, err := t.buildService4Sharding(transCtx, cluster, origSvc, genSvc)
-		if err != nil {
-			return err
-		}
-		if err = createOrUpdateService(transCtx.Context, transCtx.Client, dag, graphCli, service); err != nil {
-			return err
-		}
-		delete(services, service.Name)
-		return nil
+	protoServices, err := t.buildShardingServices(transCtx, cluster)
+	if err != nil {
+		return err
 	}
 
-	for i := range cluster.Spec.Services {
-		svc := &cluster.Spec.Services[i]
-		// cluster service without sharding selector will be handled in cluster controller
-		if len(svc.ShardingSelector) == 0 {
-			continue
-		}
-		if len(svc.ShardingSelector) > 0 && len(svc.ComponentSelector) > 0 {
-			return fmt.Errorf("the ShardingSelector and ComponentSelector of service can't be defined at the same time, service: %s", svc.Name)
-		}
-		shardServices, err := t.genShardServiceIfNeed(transCtx, cluster, svc)
-		if err != nil {
-			return err
-		}
-		for j := range shardServices {
-			genSvc := shardServices[j]
-			if err = handleServiceFunc(svc, genSvc); err != nil {
-				return err
-			}
-		}
-	}
+	toCreateServices, toDeleteServices, toUpdateServices := mapDiff(services, protoServices)
 
-	for svc := range services {
-		graphCli.Delete(dag, services[svc])
+	for svc := range toCreateServices {
+		graphCli.Create(dag, protoServices[svc], inDataContext4G())
+	}
+	for svc := range toUpdateServices {
+		updateService(dag, graphCli, services[svc], protoServices[svc])
+	}
+	for svc := range toDeleteServices {
+		graphCli.Delete(dag, services[svc], inDataContext4G())
 	}
 
 	return nil
 }
 
-func (t *shardingServiceTransformer) buildService4Sharding(transCtx *shardingTransformContext, cluster *appsv1.Cluster,
-	origSvc, genSvc *appsv1.ClusterService) (*corev1.Service, error) {
+func (t *shardingServiceTransformer) buildShardingServices(transCtx *shardingTransformContext, cluster *appsv1.Cluster) (map[string]*corev1.Service, error) {
+	services := make(map[string]*corev1.Service)
+	for i := range cluster.Spec.Services {
+		svc := &cluster.Spec.Services[i]
+		if len(svc.ComponentSelector) == 0 {
+			continue
+		}
+		if _, exists := transCtx.ShardingToComponentSpecs[svc.ComponentSelector]; !exists {
+			if !isComponentSelector(svc.ComponentSelector, cluster.Spec.ComponentSpecs) {
+				return nil, fmt.Errorf("the component selector of service is not exist, service: %s, component slector: %s", svc.Name, svc.ComponentSelector)
+			}
+			// componentSelector points to a component, not a sharding, so skip
+			continue
+		}
+		service, err := t.buildShardingService(transCtx, cluster, svc, svc.ComponentSelector)
+		if err != nil {
+			return nil, err
+		}
+		services[service.Name] = service
+	}
+	return services, nil
+}
+
+func (t *shardingServiceTransformer) buildShardingService(transCtx *shardingTransformContext, cluster *appsv1.Cluster,
+	svc *appsv1.ClusterService, shardingSelector string) (*corev1.Service, error) {
 	var (
 		namespace   = cluster.Namespace
 		clusterName = cluster.Name
 	)
-
-	serviceName := constant.GenerateClusterServiceName(cluster.Name, genSvc.ServiceName)
+	serviceName := constant.GenerateClusterServiceName(cluster.Name, svc.ServiceName)
 	builder := builder.NewServiceBuilder(namespace, serviceName).
 		AddLabelsInMap(constant.GetClusterLabels(clusterName)).
-		AddLabels(constant.KBAppShardingNameLabelKey, genSvc.ShardingSelector).
-		AddAnnotationsInMap(genSvc.Annotations).
-		SetSpec(&genSvc.Spec).
-		AddSelectorsInMap(t.builtServiceSelector(cluster, genSvc.ShardingSelector)).
+		AddLabels(constant.KBAppShardingNameLabelKey, shardingSelector).
+		AddAnnotationsInMap(svc.Annotations).
+		SetSpec(&svc.Spec).
+		AddSelectorsInMap(t.builtSelector(cluster, shardingSelector)).
 		Optimize4ExternalTraffic()
 
-	if enableShardService(cluster, genSvc.ShardingSelector) {
-		builder.AddSelector(constant.KBAppComponentLabelKey, genComponentSelector(origSvc, genSvc))
-	}
-
-	if len(genSvc.RoleSelector) > 0 {
-		compDef, err := t.checkCompDef4ShardingSelector(transCtx, genSvc)
+	if len(svc.RoleSelector) > 0 {
+		compDef, err := t.checkCompDef4ShardingSelector(transCtx, svc, shardingSelector)
 		if err != nil {
 			return nil, err
 		}
-		if err := checkComponentRoles(compDef, genSvc); err != nil {
+		if err := checkComponentRoles(compDef, svc); err != nil {
 			return nil, err
 		}
-		builder.AddSelector(constant.RoleLabelKey, genSvc.RoleSelector)
+		builder.AddSelector(constant.RoleLabelKey, svc.RoleSelector)
 	}
 
 	svcObj := builder.GetObject()
@@ -143,41 +138,7 @@ func (t *shardingServiceTransformer) buildService4Sharding(transCtx *shardingTra
 	return builder.GetObject(), nil
 }
 
-func (t *shardingServiceTransformer) genShardServiceIfNeed(transCtx *shardingTransformContext,
-	cluster *appsv1.Cluster, clusterService *appsv1.ClusterService) ([]*appsv1.ClusterService, error) {
-	shardingName := ""
-	shardingCompSpecs := make([]*appsv1.ClusterComponentSpec, 0)
-	for k, v := range transCtx.ShardingToComponentSpecs {
-		if k != clusterService.ShardingSelector {
-			continue
-		}
-		shardingName = k
-		shardingCompSpecs = v
-	}
-
-	if len(shardingName) == 0 {
-		return nil, fmt.Errorf("the ShardingSelector of service is not defined, service: %s, shard: %s", clusterService.Name, clusterService.ShardingSelector)
-	}
-
-	if !enableShardService(cluster, shardingName) {
-		return []*appsv1.ClusterService{clusterService}, nil
-	}
-
-	shardOrdinalClusterSvcs := make([]*appsv1.ClusterService, 0, len(shardingCompSpecs))
-	for _, shardingCompSpec := range shardingCompSpecs {
-		svc := clusterService.DeepCopy()
-		svc.Name = fmt.Sprintf("%s-%s", clusterService.Name, shardingCompSpec.Name)
-		if len(clusterService.ServiceName) == 0 {
-			svc.ServiceName = shardingCompSpec.Name
-		} else {
-			svc.ServiceName = fmt.Sprintf("%s-%s", clusterService.ServiceName, shardingCompSpec.Name)
-		}
-		shardOrdinalClusterSvcs = append(shardOrdinalClusterSvcs, svc)
-	}
-	return shardOrdinalClusterSvcs, nil
-}
-
-func (t *shardingServiceTransformer) builtServiceSelector(cluster *appsv1.Cluster, shardingName string) map[string]string {
+func (t *shardingServiceTransformer) builtSelector(cluster *appsv1.Cluster, shardingName string) map[string]string {
 	selectors := map[string]string{
 		constant.AppManagedByLabelKey:      constant.AppName,
 		constant.AppInstanceLabelKey:       cluster.Name,
@@ -186,32 +147,28 @@ func (t *shardingServiceTransformer) builtServiceSelector(cluster *appsv1.Cluste
 	return selectors
 }
 
-func (t *shardingServiceTransformer) checkCompDef4ShardingSelector(transCtx *shardingTransformContext, clusterService *appsv1.ClusterService) (*appsv1.ComponentDefinition, error) {
-	shardingName := clusterService.ShardingSelector
-	compSecs, ok := transCtx.ShardingToComponentSpecs[shardingName]
+func (t *shardingServiceTransformer) checkCompDef4ShardingSelector(transCtx *shardingTransformContext,
+	clusterService *appsv1.ClusterService, shardingSelector string) (*appsv1.ComponentDefinition, error) {
+	compSecs, ok := transCtx.ShardingToComponentSpecs[shardingSelector]
 	if !ok || len(compSecs) == 0 {
-		return nil, fmt.Errorf("the sharding selector of service is not exist, service: %s, shard: %s", clusterService.Name, shardingName)
+		return nil, fmt.Errorf("the sharding selector of service is not exist, service: %s, shard: %s", clusterService.Name, shardingSelector)
 	}
 	compDef, ok := transCtx.ComponentDefs[compSecs[0].ComponentDef]
 	if !ok {
-		return nil, fmt.Errorf("the component definition of service selector is not defined, service: %s, shard: %s", clusterService.Name, shardingName)
+		return nil, fmt.Errorf("the component definition of service selector is not defined, service: %s, shard: %s", clusterService.Name, shardingSelector)
 	}
 	return compDef, nil
 }
 
-func enableShardService(cluster *appsv1.Cluster, shardingName string) bool {
-	enableShardSvcList, ok := cluster.Annotations[constant.ShardSvcAnnotationKey]
-	if !ok || !slices.Contains(strings.Split(enableShardSvcList, ","), shardingName) {
+// isShardingSelector checks if the given component selector exists in the sharding specs.
+func isShardingSelector(selector string, cluster *appsv1.Cluster) bool {
+	if len(cluster.Spec.ShardingSpecs) == 0 || len(selector) == 0 {
 		return false
 	}
-	return true
-}
-
-// genComponentSelector generates component selector for sharding service.
-func genComponentSelector(origSvc, genSvc *appsv1.ClusterService) string {
-	origSvcPrefix := constant.GenerateShardingNameSvcPrefix(origSvc.Name)
-	if strings.HasPrefix(genSvc.Name, origSvcPrefix) {
-		return strings.TrimPrefix(genSvc.Name, origSvcPrefix)
+	for _, shardingSpec := range cluster.Spec.ShardingSpecs {
+		if shardingSpec.Name == selector {
+			return true
+		}
 	}
-	return genSvc.Name
+	return false
 }

@@ -116,22 +116,8 @@ var _ = Describe("object rbac transformer test.", func() {
 		}
 	})
 
-	disableVolumeProtection := func() {
-		for i := range compDefObj.Spec.Volumes {
-			compDefObj.Spec.Volumes[i].HighWatermark = 0
-		}
-	}
-
-	enableVolumeProtection := func() {
-		for i := range compDefObj.Spec.Volumes {
-			compDefObj.Spec.Volumes[i].HighWatermark = 85
-		}
-	}
-
 	Context("transformer rbac manager", func() {
 		It("create serviceaccount, rolebinding if not exist", func() {
-			disableVolumeProtection()
-
 			Eventually(testapps.CheckObjExists(&testCtx, saKey,
 				&corev1.ServiceAccount{}, false)).Should(Succeed())
 			Expect(transformer.Transform(transCtx, dag)).Should(BeNil())
@@ -143,30 +129,6 @@ var _ = Describe("object rbac transformer test.", func() {
 			graphCli.Create(dagExpected, serviceAccount)
 			graphCli.Create(dagExpected, roleBinding)
 			graphCli.DependOn(dagExpected, roleBinding, serviceAccount)
-			itsList := graphCli.FindAll(dagExpected, &workloads.InstanceSet{})
-			for i := range itsList {
-				graphCli.DependOn(dagExpected, itsList[i], serviceAccount)
-			}
-			Expect(dag.Equals(dagExpected, model.DefaultLess)).Should(BeTrue())
-		})
-
-		It("create clusterrolebinding if volumeprotection enabled", func() {
-			enableVolumeProtection()
-
-			Eventually(testapps.CheckObjExists(&testCtx, saKey,
-				&corev1.ServiceAccount{}, false)).Should(Succeed())
-			Expect(transformer.Transform(transCtx, dag)).Should(BeNil())
-
-			serviceAccount := factory.BuildServiceAccount(synthesizedComp, serviceAccountName)
-			roleBinding := factory.BuildRoleBinding(synthesizedComp, serviceAccount.Name)
-			clusterRoleBinding := factory.BuildClusterRoleBinding(synthesizedComp, serviceAccount.Name)
-
-			dagExpected := mockDAG(graphCli, cluster)
-			graphCli.Create(dagExpected, serviceAccount)
-			graphCli.Create(dagExpected, roleBinding)
-			graphCli.Create(dagExpected, clusterRoleBinding)
-			graphCli.DependOn(dagExpected, roleBinding, clusterRoleBinding)
-			graphCli.DependOn(dagExpected, clusterRoleBinding, serviceAccount)
 			itsList := graphCli.FindAll(dagExpected, &workloads.InstanceSet{})
 			for i := range itsList {
 				graphCli.DependOn(dagExpected, itsList[i], serviceAccount)

@@ -62,10 +62,6 @@ func (t *clusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 		transCtx.EventRecorder.Eventf(cluster, corev1.EventTypeWarning, "DoNotTerminate",
 			"spec.terminationPolicy %s is preventing deletion.", cluster.Spec.TerminationPolicy)
 		return graph.ErrPrematureStop
-	case kbappsv1.Halt:
-		transCtx.EventRecorder.Eventf(cluster, corev1.EventTypeWarning, "Halt",
-			"spec.terminationPolicy %s is preventing deletion. Halt policy is deprecated is 0.9.1 and will have same meaning as DoNotTerminate.", cluster.Spec.TerminationPolicy)
-		return graph.ErrPrematureStop
 	case kbappsv1.Delete:
 		toDeleteNamespacedKinds, toDeleteNonNamespacedKinds = kindsForDelete()
 	case kbappsv1.WipeOut:
@@ -149,7 +145,7 @@ func kindsForDoNotTerminate() ([]client.ObjectList, []client.ObjectList) {
 	return []client.ObjectList{}, []client.ObjectList{}
 }
 
-func kindsForHalt() ([]client.ObjectList, []client.ObjectList) {
+func kindsForDelete() ([]client.ObjectList, []client.ObjectList) {
 	namespacedKinds, nonNamespacedKinds := kindsForDoNotTerminate()
 	namespacedKindsPlus := []client.ObjectList{
 		&kbappsv1.ComponentList{},
@@ -159,11 +155,6 @@ func kindsForHalt() ([]client.ObjectList, []client.ObjectList) {
 		&dpv1alpha1.BackupScheduleList{},
 	}
 	return append(namespacedKinds, namespacedKindsPlus...), nonNamespacedKinds
-}
-
-func kindsForDelete() ([]client.ObjectList, []client.ObjectList) {
-	namespacedKinds, nonNamespacedKinds := kindsForHalt()
-	return append(namespacedKinds, haltPreserveKinds()...), nonNamespacedKinds
 }
 
 func kindsForWipeOut() ([]client.ObjectList, []client.ObjectList) {

@@ -127,12 +127,8 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// TODO: transformers are vertices, theirs' dependencies are edges, make plan Build stage a DAG.
 	plan, errBuild := planBuilder.
 		AddTransformer(
-			// handle cluster halt first
-			&clusterHaltTransformer{},
 			// handle cluster deletion
 			&clusterDeletionTransformer{},
-			// check is recovering from halted cluster
-			&clusterHaltRecoveryTransformer{},
 			// update finalizer and cd&cv labels
 			&clusterAssureMetaTransformer{},
 			// validate cd & cv's existence and availability

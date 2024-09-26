@@ -131,10 +131,7 @@ type ClusterSpec struct {
 	// Choose a policy based on the desired level of resource cleanup and data preservation:
 	//
 	// - `DoNotTerminate`: Prevents deletion of the Cluster. This policy ensures that all resources remain intact.
-	// - `Halt`: Deletes Cluster resources like Pods and Services but retains Persistent Volume Claims (PVCs),
-	//   allowing for data preservation while stopping other operations.
-	// - `Delete`: Extends the `Halt` policy by also removing PVCs, leading to a thorough cleanup while
-	//   removing all persistent data.
+	// - `Delete`: Deletes all runtime resources belong to the Cluster.
 	// - `WipeOut`: An aggressive policy that deletes all Cluster resources, including volume snapshots and
 	//   backups in external storage.
 	//   This results in complete data removal and should be used cautiously, primarily in non-production environments
@@ -244,17 +241,14 @@ type ClusterStatus struct {
 // TerminationPolicyType defines termination policy types.
 //
 // +enum
-// +kubebuilder:validation:Enum={DoNotTerminate,Halt,Delete,WipeOut}
+// +kubebuilder:validation:Enum={DoNotTerminate,Delete,WipeOut}
 type TerminationPolicyType string
 
 const (
 	// DoNotTerminate will block delete operation.
 	DoNotTerminate TerminationPolicyType = "DoNotTerminate"
 
-	// Halt will delete workload resources such as statefulset, deployment workloads but keep PVCs.
-	Halt TerminationPolicyType = "Halt"
-
-	// Delete is based on Halt and deletes PVCs.
+	// Delete will delete all runtime resources belong to the cluster.
 	Delete TerminationPolicyType = "Delete"
 
 	// WipeOut is based on Delete and wipe out all volume snapshots and snapshot data from backup storage location.
@@ -612,15 +606,9 @@ type ShardingSpec struct {
 type ClusterService struct {
 	Service `json:",inline"`
 
-	// Extends the ServiceSpec.Selector by allowing the specification of a sharding name, which is defined in
-	// `cluster.spec.shardingSpecs[*].name`, to be used as a selector for the service.
-	// Note that this and the `componentSelector` are mutually exclusive and cannot be set simultaneously.
+	// Extends the ServiceSpec.Selector by allowing the specification of components, to be used as a selector for the service.
 	//
-	// +optional
-	ShardingSelector string `json:"shardingSelector,omitempty"`
-
-	// Extends the ServiceSpec.Selector by allowing the specification of a component, to be used as a selector for the service.
-	// Note that this and the `shardingSelector` are mutually exclusive and cannot be set simultaneously.
+	// If the `componentSelector` is set as the name of a sharding, the service will be exposed to all components in the sharding.
 	//
 	// +optional
 	ComponentSelector string `json:"componentSelector,omitempty"`

@@ -26,8 +26,6 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -50,75 +48,98 @@ func (t *clusterServiceTransformer) Transform(ctx graph.TransformContext, dag *g
 		return nil
 	}
 	if common.IsCompactMode(transCtx.OrigCluster.Annotations) {
-		transCtx.V(1).Info("Cluster is in compact mode, no need to create service objects", "cluster", client.ObjectKeyFromObject(transCtx.OrigCluster))
+		transCtx.V(1).Info("Cluster is in compact mode, no need to create service objects",
+			"cluster", client.ObjectKeyFromObject(transCtx.OrigCluster))
 		return nil
 	}
 
 	cluster := transCtx.Cluster
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 
-	// list all owned cluster services and filter out the services with sharding defined
-	services, err := listOwnedClusterServices(transCtx.Context, transCtx.Client, cluster, withShardingDefined)
+	services, err := listOwnedClusterServices(transCtx.Context, transCtx.Client, cluster, withShardingLabel)
 	if err != nil {
 		return err
 	}
 
-	for i := range cluster.Spec.Services {
-		svc := &cluster.Spec.Services[i]
-		// cluster service with sharding selector will be handled in sharding controller
-		if len(svc.ShardingSelector) > 0 {
-			continue
-		}
-		service, err := t.buildService(transCtx, cluster, svc)
-		if err != nil {
-			return err
-		}
-		if err = createOrUpdateService(transCtx.Context, transCtx.Client, dag, graphCli, service); err != nil {
-			return err
-		}
-		delete(services, service.Name)
+	protoServices, err := t.buildClusterServices(transCtx, cluster)
+	if err != nil {
+		return err
 	}
 
-	for svc := range services {
-		graphCli.Delete(dag, services[svc])
-	}
+	toCreateServices, toDeleteServices, toUpdateServices := mapDiff(services, protoServices)
 
+	for svc := range toCreateServices {
+		graphCli.Create(dag, protoServices[svc], inDataContext4G())
+	}
+	for svc := range toUpdateServices {
+		updateService(dag, graphCli, services[svc], protoServices[svc])
+	}
+	for svc := range toDeleteServices {
+		graphCli.Delete(dag, services[svc], inDataContext4G())
+	}
 	return nil
 }
 
-func (t *clusterServiceTransformer) buildService(transCtx *clusterTransformContext, cluster *appsv1.Cluster, svc *appsv1.ClusterService) (*corev1.Service, error) {
-	var (
-		namespace   = cluster.Namespace
-		clusterName = cluster.Name
-	)
-
-	serviceName := constant.GenerateClusterServiceName(cluster.Name, svc.ServiceName)
-	builder := builder.NewServiceBuilder(namespace, serviceName).
-		AddLabelsInMap(constant.GetClusterLabels(clusterName)).
-		AddAnnotationsInMap(svc.Annotations).
-		SetSpec(&svc.Spec).
-		AddSelectorsInMap(t.buildServiceSelector(cluster)).
-		Optimize4ExternalTraffic()
-
-	if len(svc.ComponentSelector) > 0 {
-		builder.AddSelector(constant.KBAppComponentLabelKey, svc.ComponentSelector)
-	}
-
-	if len(svc.RoleSelector) > 0 {
-		compDef, err := t.checkComponent(transCtx, svc)
+func (t *clusterServiceTransformer) buildClusterServices(transCtx *clusterTransformContext,
+	cluster *appsv1.Cluster) (map[string]*corev1.Service, error) {
+	services := make(map[string]*corev1.Service)
+	for i := range cluster.Spec.Services {
+		svc := &cluster.Spec.Services[i]
+		if isShardingSelector(svc.ComponentSelector, cluster) {
+			// service points to a sharding component which should be handled by sharding controller
+			continue
+		}
+		service, err := t.buildClusterService(transCtx, cluster, svc)
 		if err != nil {
 			return nil, err
 		}
-		if err := checkComponentRoles(compDef, svc); err != nil {
+		services[service.Name] = service
+	}
+	return services, nil
+}
+
+func (t *clusterServiceTransformer) buildClusterService(transCtx *clusterTransformContext,
+	cluster *appsv1.Cluster, service *appsv1.ClusterService) (*corev1.Service, error) {
+	var selectors map[string]string
+	if len(service.ComponentSelector) > 0 {
+		for _, spec := range cluster.Spec.ComponentSpecs {
+			if spec.Name != service.ComponentSelector {
+				continue
+			}
+			selectors = map[string]string{
+				constant.KBAppComponentLabelKey: service.ComponentSelector,
+			}
+		}
+	}
+	return t.buildService(transCtx, cluster, service, selectors)
+}
+
+func (t *clusterServiceTransformer) buildService(transCtx *clusterTransformContext, cluster *appsv1.Cluster,
+	service *appsv1.ClusterService, selectors map[string]string) (*corev1.Service, error) {
+	serviceName := constant.GenerateClusterServiceName(cluster.Name, service.ServiceName)
+	builder := builder.NewServiceBuilder(cluster.Namespace, serviceName).
+		AddLabelsInMap(constant.GetClusterLabels(cluster.Name)).
+		AddAnnotationsInMap(service.Annotations).
+		SetSpec(&service.Spec).
+		AddSelectorsInMap(t.builtinSelector(cluster)).
+		AddSelectorsInMap(selectors).
+		Optimize4ExternalTraffic()
+
+	if len(service.RoleSelector) > 0 {
+		compDef, err := t.checkComponentDef(transCtx, cluster, service)
+		if err != nil {
 			return nil, err
 		}
-		builder.AddSelector(constant.RoleLabelKey, svc.RoleSelector)
+		if err := checkComponentRoles(compDef, service); err != nil {
+			return nil, err
+		}
+		builder.AddSelector(constant.RoleLabelKey, service.RoleSelector)
 	}
 
 	return builder.GetObject(), nil
 }
 
-func (t *clusterServiceTransformer) buildServiceSelector(cluster *appsv1.Cluster) map[string]string {
+func (t *clusterServiceTransformer) builtinSelector(cluster *appsv1.Cluster) map[string]string {
 	selectors := map[string]string{
 		constant.AppManagedByLabelKey: constant.AppName,
 		constant.AppInstanceLabelKey:  cluster.Name,
@@ -126,18 +147,42 @@ func (t *clusterServiceTransformer) buildServiceSelector(cluster *appsv1.Cluster
 	return selectors
 }
 
-func (t *clusterServiceTransformer) checkComponent(transCtx *clusterTransformContext, clusterService *appsv1.ClusterService) (*appsv1.ComponentDefinition, error) {
-	compName := clusterService.ComponentSelector
-	for _, compSpec := range transCtx.ComponentSpecs {
-		if compSpec.Name == compName {
-			compDef, ok := transCtx.ComponentDefs[compSpec.ComponentDef]
-			if !ok {
-				return nil, fmt.Errorf("the component definition of service selector is not defined, service: %s, component: %s", clusterService.Name, compName)
-			}
-			return compDef, nil
+func (t *clusterServiceTransformer) checkComponentDef(transCtx *clusterTransformContext,
+	cluster *appsv1.Cluster, service *appsv1.ClusterService) (*appsv1.ComponentDefinition, error) {
+	selector := service.ComponentSelector
+	for _, spec := range cluster.Spec.ComponentSpecs {
+		if spec.Name != selector {
+			continue
+		}
+		compDef, ok := transCtx.ComponentDefs[spec.ComponentDef]
+		if !ok {
+			return nil, fmt.Errorf("the component definition of service selector is not defined, service: %s, component: %s", service.Name, selector)
+		}
+		return compDef, nil
+	}
+	return nil, fmt.Errorf("the component of service selector is not exist, service: %s, component: %s", service.Name, selector)
+}
+
+// isComponentSelector checks if the given component selector exists in the component specs.
+func isComponentSelector(selector string, componentSpecs []appsv1.ClusterComponentSpec) bool {
+	for _, comp := range componentSpecs {
+		if comp.Name == selector {
+			return true
 		}
 	}
-	return nil, fmt.Errorf("the component of service selector is not exist, service: %s, component: %s", clusterService.Name, compName)
+	return false
+}
+
+func updateService(dag *graph.DAG, graphCli model.GraphClient, running, proto *corev1.Service) {
+	newSvc := running.DeepCopy()
+	newSvc.Spec = proto.Spec
+	ctrlutil.MergeMetadataMapInplace(proto.Labels, &newSvc.Labels)
+	ctrlutil.MergeMetadataMapInplace(proto.Annotations, &newSvc.Annotations)
+	resolveServiceDefaultFields(&running.Spec, &newSvc.Spec)
+
+	if !reflect.DeepEqual(running, newSvc) {
+		graphCli.Update(dag, running, newSvc, inDataContext4G())
+	}
 }
 
 func checkComponentRoles(compDef *appsv1.ComponentDefinition, clusterService *appsv1.ClusterService) error {
@@ -166,30 +211,4 @@ func listOwnedClusterServices(ctx context.Context, cli client.Reader,
 		}
 	}
 	return services, nil
-}
-
-func createOrUpdateService(ctx context.Context, cli client.Reader, dag *graph.DAG, graphCli model.GraphClient, service *corev1.Service) error {
-	key := types.NamespacedName{
-		Namespace: service.Namespace,
-		Name:      service.Name,
-	}
-	originSvc := &corev1.Service{}
-	if err := cli.Get(ctx, key, originSvc, inDataContext4C()); err != nil {
-		if apierrors.IsNotFound(err) {
-			graphCli.Create(dag, service, inDataContext4G())
-			return nil
-		}
-		return err
-	}
-
-	newSvc := originSvc.DeepCopy()
-	newSvc.Spec = service.Spec
-	ctrlutil.MergeMetadataMapInplace(service.Labels, &newSvc.Labels)
-	ctrlutil.MergeMetadataMapInplace(service.Annotations, &newSvc.Annotations)
-	resolveServiceDefaultFields(&originSvc.Spec, &newSvc.Spec)
-
-	if !reflect.DeepEqual(originSvc, newSvc) {
-		graphCli.Update(dag, originSvc, newSvc, inDataContext4G())
-	}
-	return nil
 }

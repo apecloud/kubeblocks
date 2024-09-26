@@ -49,7 +49,7 @@ func (t *shardingComponentTransformer) Transform(ctx graph.TransformContext, dag
 	for _, s := range transCtx.ShardingToComponentSpecs {
 		expectedShardingCompCount += len(s)
 	}
-	allCompsUpToDate, err := checkAllCompsUpToDate(transCtx.Context, transCtx.Client, transCtx.Cluster, expectedShardingCompCount, withShardingDefined)
+	allCompsUpToDate, err := checkAllCompsUpToDate(transCtx.Context, transCtx.Client, transCtx.Cluster, expectedShardingCompCount, withShardingLabel)
 	if err != nil {
 		return err
 	}
@@ -75,7 +75,7 @@ func (t *shardingComponentTransformer) reconcileShardingComponents(transCtx *sha
 	}
 
 	protoCompSet := sets.KeySet(protoCompSpecMap)
-	runningCompSet, err := component.GetClusterComponentShortNameSet(transCtx.Context, transCtx.Client, cluster, withoutShardingDefined)
+	runningCompSet, err := component.GetClusterComponentShortNameSet(transCtx.Context, transCtx.Client, cluster, withoutShardingLabel)
 	if err != nil {
 		return err
 	}

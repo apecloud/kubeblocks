@@ -57,7 +57,7 @@ func (t *clusterComponentTransformer) Transform(ctx graph.TransformContext, dag 
 	}
 
 	// check all the component owned by cluster and do not belong to sharding
-	allCompsUpToDate, err := checkAllCompsUpToDate(transCtx.Context, transCtx.Client, transCtx.Cluster, len(transCtx.ComponentSpecs), withShardingDefined)
+	allCompsUpToDate, err := checkAllCompsUpToDate(transCtx.Context, transCtx.Client, transCtx.Cluster, len(transCtx.ComponentSpecs), withShardingLabel)
 	if err != nil {
 		return err
 	}
@@ -79,14 +79,12 @@ func (t *clusterComponentTransformer) reconcileComponents(transCtx *clusterTrans
 	}
 
 	protoCompSet := sets.KeySet(protoCompSpecMap)
-	runningCompSet, err := component.GetClusterComponentShortNameSet(transCtx.Context, transCtx.Client, cluster, withShardingDefined)
+	runningCompSet, err := component.GetClusterComponentShortNameSet(transCtx.Context, transCtx.Client, cluster, withShardingLabel)
 	if err != nil {
 		return err
 	}
 
-	createCompSet := protoCompSet.Difference(runningCompSet)
-	updateCompSet := protoCompSet.Intersection(runningCompSet)
-	deleteCompSet := runningCompSet.Difference(protoCompSet)
+	createCompSet, deleteCompSet, updateCompSet := setDiff(runningCompSet, protoCompSet)
 
 	// component objects to be deleted (scale-in)
 	if err := deleteCompsInOrder(transCtx, dag, deleteCompSet, false); err != nil {
@@ -576,4 +574,13 @@ type orderedUpdateCompHandler struct {
 	compOrderedOrder
 	compPhasePrecondition
 	updateCompHandler
+}
+
+func setDiff(s1, s2 sets.Set[string]) (sets.Set[string], sets.Set[string], sets.Set[string]) {
+	return s2.Difference(s1), s1.Difference(s2), s1.Intersection(s2)
+}
+
+func mapDiff[T interface{}](m1, m2 map[string]T) (sets.Set[string], sets.Set[string], sets.Set[string]) {
+	s1, s2 := sets.KeySet(m1), sets.KeySet(m2)
+	return setDiff(s1, s2)
 }

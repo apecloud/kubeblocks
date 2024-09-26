@@ -58,11 +58,35 @@ func (r *BackupPolicyTemplateReconciler) Reconcile(ctx context.Context, req reco
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 	oldBPT := backupPolicyTemplate.DeepCopy()
+	if err := r.setComponentDefLabels(reqCtx, oldBPT, backupPolicyTemplate); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
+	if err := r.validateAvailable(reqCtx, oldBPT, backupPolicyTemplate); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
+	return intctrlutil.Reconciled()
+}
+
+func (r *BackupPolicyTemplateReconciler) setComponentDefLabels(reqCtx intctrlutil.RequestCtx, oldBPT, bpt *dpv1alpha1.BackupPolicyTemplate) error {
+	if bpt.Labels == nil {
+		bpt.Labels = map[string]string{}
+	}
+	// set componentDef labels
+	for _, compDef := range bpt.Spec.CompDefs {
+		bpt.Labels[compDef] = compDef
+	}
+	if !reflect.DeepEqual(oldBPT.Labels, bpt.Labels) {
+		return r.Client.Update(reqCtx.Ctx, bpt)
+	}
+	return nil
+}
+
+func (r *BackupPolicyTemplateReconciler) validateAvailable(reqCtx intctrlutil.RequestCtx, oldBPT, bpt *dpv1alpha1.BackupPolicyTemplate) error {
 	message := ""
 	backupMethodMap := map[string]sets.Empty{}
 	actionSetNotFound := false
 	// validate the referred actionSetName of the backupMethod
-	for _, v := range backupPolicyTemplate.Spec.BackupMethods {
+	for _, v := range bpt.Spec.BackupMethods {
 		backupMethodMap[v.Name] = sets.Empty{}
 		if boolptr.IsSetToFalse(v.SnapshotVolumes) && v.ActionSetName == "" {
 			message += fmt.Sprintf(`backupMethod "%s" is missing an ActionSet name;`, v.Name)
@@ -72,37 +96,37 @@ func (r *BackupPolicyTemplateReconciler) Reconcile(ctx context.Context, req reco
 			continue
 		}
 		actionSet := &dpv1alpha1.ActionSet{}
-		if err := r.Client.Get(ctx, client.ObjectKey{Name: v.ActionSetName}, actionSet); err != nil {
+		if err := r.Client.Get(reqCtx.Ctx, client.ObjectKey{Name: v.ActionSetName}, actionSet); err != nil {
 			if apierrors.IsNotFound(err) {
 				message += fmt.Sprintf(`ActionSet "%s" not found;`, v.ActionSetName)
 				actionSetNotFound = true
 				continue
 			}
-			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+			return err
 		}
 	}
 	// validate the schedules
-	for _, v := range backupPolicyTemplate.Spec.Schedules {
+	for _, v := range bpt.Spec.Schedules {
 		if _, ok := backupMethodMap[v.BackupMethod]; !ok {
 			message += fmt.Sprintf(`backupMethod "%s" not found in the spec.backupMethods;`, v.BackupMethod)
 		}
 	}
-	backupPolicyTemplate.Status.ObservedGeneration = backupPolicyTemplate.Generation
-	backupPolicyTemplate.Status.Message = message
+	bpt.Status.ObservedGeneration = bpt.Generation
+	bpt.Status.Message = message
 	if len(message) > 0 {
-		backupPolicyTemplate.Status.Phase = dpv1alpha1.UnavailablePhase
+		bpt.Status.Phase = dpv1alpha1.UnavailablePhase
 	} else {
-		backupPolicyTemplate.Status.Phase = dpv1alpha1.AvailablePhase
+		bpt.Status.Phase = dpv1alpha1.AvailablePhase
 	}
-	if !reflect.DeepEqual(oldBPT.Status, backupPolicyTemplate.Status) {
-		if err := r.Client.Status().Patch(reqCtx.Ctx, backupPolicyTemplate, client.MergeFrom(oldBPT)); err != nil {
-			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	if !reflect.DeepEqual(oldBPT.Status, bpt.Status) {
+		if err := r.Client.Status().Patch(reqCtx.Ctx, bpt, client.MergeFrom(oldBPT)); err != nil {
+			return err
 		}
 	}
 	if actionSetNotFound {
-		return intctrlutil.CheckedRequeueWithError(fmt.Errorf("some ActionSets not found"), reqCtx.Log, "")
+		return fmt.Errorf("some ActionSets not found")
 	}
-	return intctrlutil.Reconciled()
+	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

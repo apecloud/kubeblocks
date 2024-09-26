@@ -45,6 +45,9 @@ func (h *AvailableProbeEventHandler) Handle(cli client.Client, reqCtx intctrluti
 		return nil
 	}
 
+	// TODO:
+	// 1. how to merge
+
 	probeEvent := &proto.ProbeEvent{}
 	if err := json.Unmarshal([]byte(event.Message), probeEvent); err != nil {
 		return err

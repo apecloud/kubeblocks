@@ -61,7 +61,7 @@ type Probe struct {
 	PeriodSeconds       int32  `json:"periodSeconds,omitempty"`
 	SuccessThreshold    int32  `json:"successThreshold,omitempty"`
 	FailureThreshold    int32  `json:"failureThreshold,omitempty"`
-	ReportPeriodSeconds *int32 `json:"reportPeriodSeconds,omitempty"`
+	ReportPeriodSeconds int32  `json:"reportPeriodSeconds,omitempty"`
 }
 
 type ProbeEvent struct {

@@ -62,6 +62,13 @@ Use Helm and follow the steps below to install KubeBlocks.
    ```bash
    kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/vx.x.x/kubeblocks_crds.yaml
    ```
+   You can view all versions of kubeblocks, including alpha and beta releases, on the [kubeblocks releases list](https://github.com/apecloud/kubeblocks/releases).
+
+   To get stable releases, use this command:
+   ```bash
+   curl -s "https://api.github.com/repos/apecloud/kubeblocks/releases?per_page=100&page=1" | jq '.[] | select(.prerelease == false) | .tag_name'
+   ```
+   
 
 2. Add the KubeBlocks Helm repo.
 

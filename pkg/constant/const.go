@@ -41,11 +41,19 @@ const (
 )
 
 const (
-	StatefulSetKind    = "StatefulSet"
-	PodKind            = "Pod"
-	JobKind            = "Job"
-	VolumeSnapshotKind = "VolumeSnapshot"
-	ServiceKind        = "Service"
+	StatefulSetKind           = "StatefulSet"
+	PodKind                   = "Pod"
+	JobKind                   = "Job"
+	VolumeSnapshotKind        = "VolumeSnapshot"
+	ServiceKind               = "Service"
+	SecretKind                = "Secret"
+	ConfigMapKind             = "ConfigMap"
+	PersistentVolumeClaimKind = "PersistentVolumeClaim"
+	PersistentVolumeKind      = "PersistentVolume"
+	ConfigurationKind         = "Configuration"
+	ClusterRoleBindingKind    = "ClusterRoleBinding"
+	RoleBindingKind           = "RoleBinding"
+	ServiceAccountKind        = "ServiceAccount"
 )
 
 // username and password are keys in created secrets for others to refer to.

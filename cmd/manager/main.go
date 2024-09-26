@@ -47,9 +47,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
-	viewcontrollers "github.com/apecloud/kubeblocks/controllers/view"
-
 	// +kubebuilder:scaffold:imports
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -57,6 +54,7 @@ import (
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	experimentalv1alpha1 "github.com/apecloud/kubeblocks/apis/experimental/v1alpha1"
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
+	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
 	"github.com/apecloud/kubeblocks/apis/workloads/legacy"
 	workloadsv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	appscontrollers "github.com/apecloud/kubeblocks/controllers/apps"
@@ -64,6 +62,7 @@ import (
 	experimentalcontrollers "github.com/apecloud/kubeblocks/controllers/experimental"
 	extensionscontrollers "github.com/apecloud/kubeblocks/controllers/extensions"
 	k8scorecontrollers "github.com/apecloud/kubeblocks/controllers/k8score"
+	viewcontrollers "github.com/apecloud/kubeblocks/controllers/view"
 	workloadscontrollers "github.com/apecloud/kubeblocks/controllers/workloads"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"

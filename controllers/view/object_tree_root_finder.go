@@ -147,7 +147,17 @@ func ownedBy(owner client.Object, obj client.Object, ownedResource OwnedResource
 		return false
 	}
 
-	// TODO(free6om): handle builtin
+	if ownedResource.Criteria.SpecifiedNameCriteria != nil {
+		nameField, err := parseField(owner, ownedResource.Criteria.SpecifiedNameCriteria.Path)
+		if err != nil {
+			return false
+		}
+		name, ok := nameField.(string)
+		if !ok {
+			return false
+		}
+		return name == obj.GetName()
+	}
 
 	return false
 }
@@ -156,14 +166,13 @@ func parseLabels(obj client.Object, criteria map[string]string) map[string]strin
 	labels := make(map[string]string, len(criteria))
 	for k, v := range criteria {
 		value := strings.ReplaceAll(v, "$(primary.name)", obj.GetName())
+		value = strings.ReplaceAll(value, "$(primary)", obj.GetLabels()[k])
 		labels[k] = value
 	}
 	return labels
 }
 
-// parseSelector checks if a field exists in the object and returns it if it's a metav1.LabelSelector
-func parseSelector(obj client.Object, fieldPath string) (map[string]string, error) {
-	// Convert client.Object to unstructured to handle dynamic fields
+func parseField(obj client.Object, fieldPath string) (any, error) {
 	unstructuredObj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert to unstructured: %w", err)
@@ -172,19 +181,34 @@ func parseSelector(obj client.Object, fieldPath string) (map[string]string, erro
 	// Use the field path to find the field
 	pathParts := strings.Split(fieldPath, ".")
 	current := unstructuredObj
-	for _, part := range pathParts {
+	for i := 0; i < len(pathParts)-1; i++ {
+		part := pathParts[i]
 		if next, ok := current[part].(map[string]interface{}); ok {
 			current = next
 		} else {
 			return nil, fmt.Errorf("field '%s' does not exist", fieldPath)
 		}
 	}
+	last := len(pathParts) - 1
+	return current[pathParts[last]], nil
+}
+
+// parseSelector checks if a field exists in the object and returns it if it's a metav1.LabelSelector
+func parseSelector(obj client.Object, fieldPath string) (map[string]string, error) {
+	f, err := parseField(obj, fieldPath)
+	if err != nil {
+		return nil, err
+	}
+	selectorField, ok := f.(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("field '%s' does not exist", fieldPath)
+	}
 
 	// Attempt to convert the final field to a LabelSelector
 	// TODO(free6om): handle metav1.LabelSelector
 	//labelSelector := &metav1.LabelSelector{}
 	labelSelector := make(map[string]string)
-	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(current, labelSelector); err != nil {
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(selectorField, labelSelector); err != nil {
 		return nil, fmt.Errorf("failed to parse as LabelSelector: %w", err)
 	}
 

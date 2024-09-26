@@ -23,8 +23,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"strings"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -32,9 +30,12 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
+
+	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
 )
 
 type mockClient struct {

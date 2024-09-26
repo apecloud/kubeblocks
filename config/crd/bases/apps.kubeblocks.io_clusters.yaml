@@ -8350,8 +8350,10 @@ spec:
                       type: object
                     componentSelector:
                       description: |-
-                        Extends the ServiceSpec.Selector by allowing the specification of a component, to be used as a selector for the service.
-                        Note that this and the `shardingSelector` are mutually exclusive and cannot be set simultaneously.
+                        Extends the ServiceSpec.Selector by allowing the specification of components, to be used as a selector for the service.
+
+
+                        If the `componentSelector` is set as the name of a sharding, the service will be exposed to all components in the sharding.
                       type: string
                     name:
                       description: |-
@@ -8389,12 +8391,6 @@ spec:
                         Cannot be updated.
                       maxLength: 25
                       pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
-                      type: string
-                    shardingSelector:
-                      description: |-
-                        Extends the ServiceSpec.Selector by allowing the specification of a sharding name, which is defined in
-                        `cluster.spec.shardingSpecs[*].name`, to be used as a selector for the service.
-                        Note that this and the `componentSelector` are mutually exclusive and cannot be set simultaneously.
                       type: string
                     spec:
                       description: |-

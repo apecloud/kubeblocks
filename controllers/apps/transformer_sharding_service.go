@@ -66,7 +66,7 @@ func (t *shardingServiceTransformer) Transform(ctx graph.TransformContext, dag *
 		if err != nil {
 			return err
 		}
-		if err = createOrUpdateService(ctx, dag, graphCli, service, nil); err != nil {
+		if err = createOrUpdateService(transCtx.Context, transCtx.Client, dag, graphCli, service); err != nil {
 			return err
 		}
 		delete(services, service.Name)

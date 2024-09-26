@@ -172,7 +172,7 @@ func createOrUpdateResourceFromConfigTemplate(cluster *appsv1.Cluster, component
 	}
 
 	updateObjectMeta := func(obj client.Object) {
-		obj.SetLabels(constant.GetKBConfigMapWellKnownLabels(template.Name, component.CompDefName, component.ClusterName, component.Name))
+		obj.SetLabels(constant.GetConfigurationLabels(component.ClusterName, component.Name, template.Name))
 		_ = intctrlutil.SetOwnerReference(cluster, obj)
 	}
 

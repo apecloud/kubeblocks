@@ -21,11 +21,9 @@ package component
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"regexp"
 	"slices"
-	"sort"
 	"strconv"
 	"strings"
 	"text/template"
@@ -45,7 +43,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/generics"
-	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 var (
@@ -53,19 +50,13 @@ var (
 	varTemplate        = template.New("vars").Option("missingkey=error").Funcs(sprig.TxtFuncMap())
 )
 
-const builtinClusterDomain = "ClusterDomain"
-
 func VarReferenceRegExp() *regexp.Regexp {
 	return varReferenceRegExp
 }
 
 // ResolveTemplateNEnvVars resolves all built-in and user-defined vars for config template and Env usage.
 func ResolveTemplateNEnvVars(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent, definedVars []appsv1.EnvVar) (map[string]any, []corev1.EnvVar, error) {
-	return resolveTemplateNEnvVars(ctx, cli, synthesizedComp, definedVars, false)
-}
-
-func ResolveEnvVars4LegacyCluster(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent, definedVars []appsv1.EnvVar) (map[string]any, []corev1.EnvVar, error) {
-	return resolveTemplateNEnvVars(ctx, cli, synthesizedComp, definedVars, true)
+	return resolveTemplateNEnvVars(ctx, cli, synthesizedComp, definedVars)
 }
 
 func InjectEnvVars(synthesizedComp *SynthesizedComponent, envVars []corev1.EnvVar, envFromSources []corev1.EnvFromSource) {
@@ -104,22 +95,10 @@ func InjectEnvVars4Containers(synthesizedComp *SynthesizedComponent, envVars []c
 }
 
 func resolveTemplateNEnvVars(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
-	definedVars []appsv1.EnvVar, legacy bool) (map[string]any, []corev1.EnvVar, error) {
+	definedVars []appsv1.EnvVar) (map[string]any, []corev1.EnvVar, error) {
 	templateVars, envVars, err := resolveNewTemplateNEnvVars(ctx, cli, synthesizedComp, definedVars)
 	if err != nil {
 		return nil, nil, err
-	}
-
-	implicitEnvVars, err := buildLegacyImplicitEnvVars(synthesizedComp, legacy)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	if legacy {
-		envVars = implicitEnvVars
-	} else {
-		// TODO: duplicated
-		envVars = append(envVars, implicitEnvVars...)
 	}
 
 	formattedTemplateVars := func() map[string]any {
@@ -140,18 +119,6 @@ func resolveNewTemplateNEnvVars(ctx context.Context, cli client.Reader, synthesi
 	}
 	envVars, templateVars := resolveVarsReferenceNEscaping(vars, credentialVars)
 	return templateVars, append(envVars, credentialVars...), nil
-}
-
-func buildLegacyImplicitEnvVars(synthesizedComp *SynthesizedComponent, legacy bool) ([]corev1.EnvVar, error) {
-	envVars := make([]corev1.EnvVar, 0)
-	envVars = append(envVars, buildDefaultEnvVars(synthesizedComp, legacy)...)
-	envVars = append(envVars, buildEnv4TLS(synthesizedComp)...)
-	userDefinedVars, err := buildEnv4UserDefined(synthesizedComp.Annotations)
-	if err != nil {
-		return nil, err
-	}
-	envVars = append(envVars, userDefinedVars...)
-	return envVars, nil
 }
 
 func resolveBuiltinNObjectRefVars(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
@@ -184,7 +151,6 @@ func builtinTemplateVars(synthesizedComp *SynthesizedComponent, definedVars []ap
 			{constant.KBEnvClusterCompName, constant.GenerateClusterComponentName(synthesizedComp.ClusterName, synthesizedComp.Name)},
 			{constant.KBEnvCompName, synthesizedComp.Name},
 			{constant.KBEnvCompReplicas, strconv.Itoa(int(synthesizedComp.Replicas))},
-			{constant.KBEnvClusterUIDPostfix8Deprecated, clusterUIDPostfix(synthesizedComp)},
 		} {
 			if !defined.Has(e[0]) {
 				vars = append(vars, corev1.EnvVar{Name: e[0], Value: e[1]})
@@ -193,13 +159,6 @@ func builtinTemplateVars(synthesizedComp *SynthesizedComponent, definedVars []ap
 		return vars
 	}
 	return []corev1.EnvVar{}
-}
-
-func clusterUIDPostfix(synthesizedComp *SynthesizedComponent) string {
-	if len(synthesizedComp.ClusterUID) > 8 {
-		return synthesizedComp.ClusterUID[len(synthesizedComp.ClusterUID)-8:]
-	}
-	return synthesizedComp.ClusterUID
 }
 
 func resolveVarsReferenceNEscaping(templateVars []corev1.EnvVar, credentialVars []corev1.EnvVar) ([]corev1.EnvVar, []corev1.EnvVar) {
@@ -305,97 +264,6 @@ func resolveValueReferenceNEscaping(templateVars, credentialVars map[string]core
 	return v1, v2
 }
 
-func buildDefaultEnvVars(synthesizedComp *SynthesizedComponent, legacy bool) []corev1.EnvVar {
-	vars := make([]corev1.EnvVar, 0)
-	// can not use map, it is unordered
-	namedFields := []struct {
-		name      string
-		fieldPath string
-	}{
-		{name: constant.KBEnvPodName, fieldPath: "metadata.name"},
-		{name: constant.KBEnvPodUID, fieldPath: "metadata.uid"},
-		{name: constant.KBEnvNamespace, fieldPath: "metadata.namespace"},
-		{name: constant.KBEnvServiceAccountName, fieldPath: "spec.serviceAccountName"},
-		{name: constant.KBEnvNodeName, fieldPath: "spec.nodeName"},
-		{name: constant.KBEnvHostIP, fieldPath: "status.hostIP"},
-		{name: constant.KBEnvPodIP, fieldPath: "status.podIP"},
-		{name: constant.KBEnvPodIPs, fieldPath: "status.podIPs"},
-		// deprecated
-		{name: constant.KBEnvHostIPDeprecated, fieldPath: "status.hostIP"},
-		{name: constant.KBEnvPodIPDeprecated, fieldPath: "status.podIP"},
-		{name: constant.KBEnvPodIPsDeprecated, fieldPath: "status.podIPs"},
-	}
-	for _, v := range namedFields {
-		vars = append(vars, corev1.EnvVar{
-			Name: v.name,
-			ValueFrom: &corev1.EnvVarSource{
-				FieldRef: &corev1.ObjectFieldSelector{
-					APIVersion: "v1",
-					FieldPath:  v.fieldPath,
-				},
-			},
-		})
-	}
-	clusterCompName := func() string {
-		return constant.GenerateClusterComponentName(synthesizedComp.ClusterName, synthesizedComp.Name)
-	}()
-	if legacy {
-		vars = append(vars, []corev1.EnvVar{
-			{Name: constant.KBEnvClusterName, Value: synthesizedComp.ClusterName},
-			{Name: constant.KBEnvCompName, Value: synthesizedComp.Name},
-			{Name: constant.KBEnvClusterCompName, Value: clusterCompName},
-			{Name: constant.KBEnvClusterUIDPostfix8Deprecated, Value: clusterUIDPostfix(synthesizedComp)},
-			{Name: constant.KBEnvPodFQDN, Value: fmt.Sprintf("%s.%s-headless.%s.svc", constant.EnvPlaceHolder(constant.KBEnvPodName), constant.EnvPlaceHolder(constant.KBEnvClusterCompName), constant.EnvPlaceHolder(constant.KBEnvNamespace))}}...)
-	} else {
-		vars = append(vars, corev1.EnvVar{
-			Name:  constant.KBEnvPodFQDN,
-			Value: fmt.Sprintf("%s.%s-headless.%s.svc", constant.EnvPlaceHolder(constant.KBEnvPodName), clusterCompName, constant.EnvPlaceHolder(constant.KBEnvNamespace)),
-		})
-	}
-	return vars
-}
-
-func buildEnv4TLS(synthesizedComp *SynthesizedComponent) []corev1.EnvVar {
-	if synthesizedComp.TLSConfig == nil || !synthesizedComp.TLSConfig.Enable {
-		return []corev1.EnvVar{}
-	}
-	return []corev1.EnvVar{
-		{Name: constant.KBEnvTLSCertPath, Value: constant.MountPath},
-		{Name: constant.KBEnvTLSCAFile, Value: constant.CAName},
-		{Name: constant.KBEnvTLSCertFile, Value: constant.CertName},
-		{Name: constant.KBEnvTLSKeyFile, Value: constant.KeyName},
-	}
-}
-
-func buildEnv4UserDefined(annotations map[string]string) ([]corev1.EnvVar, error) {
-	vars := make([]corev1.EnvVar, 0)
-	if annotations == nil {
-		return vars, nil
-	}
-	str, ok := annotations[constant.ExtraEnvAnnotationKey]
-	if !ok {
-		return vars, nil
-	}
-
-	udeMap := make(map[string]string)
-	if err := json.Unmarshal([]byte(str), &udeMap); err != nil {
-		return nil, err
-	}
-	keys := make([]string, 0)
-	for k := range udeMap {
-		if k == "" || udeMap[k] == "" {
-			continue
-		}
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-
-	for _, k := range keys {
-		vars = append(vars, corev1.EnvVar{Name: k, Value: udeMap[k]})
-	}
-	return vars, nil
-}
-
 func evaluateObjectVarsExpression(definedVars []appsv1.EnvVar, credentialVars []corev1.EnvVar, vars *[]corev1.EnvVar) error {
 	var (
 		isValues = make(map[string]bool)
@@ -405,7 +273,6 @@ func evaluateObjectVarsExpression(definedVars []appsv1.EnvVar, credentialVars []
 		return strings.ReplaceAll(name, "-", "_")
 	}
 	for _, v := range [][]corev1.EnvVar{*vars, credentialVars} {
-		values[builtinClusterDomain] = viper.GetString(constant.KubernetesClusterDomainEnv)
 		for _, vv := range v {
 			if vv.ValueFrom == nil {
 				isValues[vv.Name] = true
@@ -1107,7 +974,7 @@ func compServiceGetter(ctx context.Context, cli client.Reader, namespace, cluste
 
 	// fall-back to list services and find the matched prefix
 	svcList := &corev1.ServiceList{}
-	matchingLabels := client.MatchingLabels(constant.GetComponentWellKnownLabels(clusterName, compName))
+	matchingLabels := client.MatchingLabels(constant.GetCompLabels(clusterName, compName))
 	err = cli.List(ctx, svcList, matchingLabels, inDataContext())
 	if err != nil {
 		return nil, err

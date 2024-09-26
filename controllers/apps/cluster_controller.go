@@ -127,12 +127,8 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// TODO: transformers are vertices, theirs' dependencies are edges, make plan Build stage a DAG.
 	plan, errBuild := planBuilder.
 		AddTransformer(
-			// handle cluster halt first
-			&clusterHaltTransformer{},
 			// handle cluster deletion
 			&clusterDeletionTransformer{},
-			// check is recovering from halted cluster
-			&clusterHaltRecoveryTransformer{},
 			// update finalizer and cd&cv labels
 			&clusterAssureMetaTransformer{},
 			// validate cd & cv's existence and availability
@@ -155,8 +151,6 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			&clusterBackupPolicyTransformer{},
 			// add our finalizer to all objects
 			&clusterOwnershipTransformer{},
-			// make all workload objects depending on credential secret
-			&clusterSecretTransformer{},
 			// update cluster status
 			&clusterStatusTransformer{},
 			// always safe to put your transformer below
@@ -184,7 +178,7 @@ func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		}).
 		Owns(&appsv1.Component{}).
 		Owns(&corev1.Service{}). // cluster services
-		Owns(&corev1.Secret{}).  // cluster conn-credential secret
+		Owns(&corev1.Secret{}).  // sharding account secret
 		Owns(&dpv1alpha1.BackupPolicy{}).
 		Owns(&dpv1alpha1.BackupSchedule{}).
 		Complete(r)

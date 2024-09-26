@@ -24,6 +24,8 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
@@ -39,6 +41,8 @@ func TestAPIs(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
+	AddScheme(workloadsv1.AddToScheme)
+
 	go func() {
 		defer GinkgoRecover()
 	}()

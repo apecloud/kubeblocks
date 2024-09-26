@@ -36,6 +36,7 @@ const (
 	DataVolumeName      = "data"
 	ScriptsVolumeName   = "scripts"
 	ServiceDefaultName  = "default"
+	ServiceNodePortName = "nodeport"
 	ServiceHeadlessName = "headless"
 	ServiceVPCName      = "vpc-lb"
 	ServiceInternetName = "internet-lb"

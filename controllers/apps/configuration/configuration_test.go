@@ -28,7 +28,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -38,7 +37,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
@@ -127,8 +125,8 @@ func mockReconcileResource() (*corev1.ConfigMap, *appsv1beta1.ConfigConstraint, 
 	By("Create a component obj")
 	fullCompName := constant.GenerateClusterComponentName(clusterName, defaultCompName)
 	compObj := testapps.NewComponentFactory(testCtx.DefaultNamespace, fullCompName, compDefObj.Name).
+		AddAnnotations(constant.KBAppClusterUIDKey, string(clusterObj.UID)).
 		AddLabels(constant.AppInstanceLabelKey, clusterName).
-		AddLabels(constant.KBAppClusterUIDLabelKey, string(clusterObj.UID)).
 		SetUID(types.UID(fmt.Sprintf("%s-%s", clusterObj.Name, "test-uid"))).
 		SetReplicas(1).
 		Create(&testCtx).GetObject()
@@ -147,11 +145,7 @@ func mockReconcileResource() (*corev1.ConfigMap, *appsv1beta1.ConfigConstraint, 
 		AddAnnotations(core.GenerateTPLUniqLabelKeyWithConfig(configSpecName), configmap.Name).
 		Create(&testCtx).GetObject()
 
-	reqCtx := intctrlutil.RequestCtx{
-		Ctx: testCtx.Ctx,
-		Log: log.FromContext(testCtx.Ctx),
-	}
-	synthesizedComp, err := component.BuildSynthesizedComponent(reqCtx, testCtx.Cli, clusterObj, compDefObj, compObj)
+	synthesizedComp, err := component.BuildSynthesizedComponent(testCtx.Ctx, testCtx.Cli, compDefObj, compObj, clusterObj)
 	Expect(err).ShouldNot(HaveOccurred())
 
 	return configmap, constraint, clusterObj, compObj, synthesizedComp

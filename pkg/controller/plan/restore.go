@@ -56,6 +56,7 @@ type RestoreManager struct {
 	// private
 	namespace                         string
 	restoreTime                       string
+	env                               []corev1.EnvVar
 	volumeRestorePolicy               dpv1alpha1.VolumeClaimRestorePolicy
 	doReadyRestoreAfterClusterRunning bool
 	startingIndex                     int32
@@ -163,19 +164,9 @@ func (r *RestoreManager) BuildPrepareDataRestore(comp *component.SynthesizedComp
 	if targetVolumes == nil {
 		return nil, nil
 	}
-	getClusterJSON := func() string {
-		clusterSpec := r.Cluster.DeepCopy()
-		clusterSpec.ObjectMeta = metav1.ObjectMeta{
-			Name: clusterSpec.GetName(),
-			UID:  clusterSpec.GetUID(),
-		}
-		clusterSpec.Status = appsv1.ClusterStatus{}
-		b, _ := json.Marshal(*clusterSpec)
-		return string(b)
-	}
 
 	var templates []dpv1alpha1.RestoreVolumeClaim
-	pvcLabels := constant.GetKBWellKnownLabels(r.Cluster.Spec.ClusterDefRef, r.Cluster.Name, comp.Name)
+	pvcLabels := constant.GetCompLabels(r.Cluster.Name, comp.Name)
 	// TODO: create pvc by the volumeClaimTemplates of instance template if it is necessary.
 	for _, v := range comp.VolumeClaimTemplates {
 		if !dputils.ExistTargetVolume(targetVolumes, v.Name) {
@@ -189,10 +180,6 @@ func (r *RestoreManager) BuildPrepareDataRestore(comp *component.SynthesizedComp
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   name,
 				Labels: pvcLabels,
-				Annotations: map[string]string{
-					// satisfy the detection of transformer_halt_recovering.
-					constant.LastAppliedClusterAnnotationKey: getClusterJSON(),
-				},
 			},
 		}
 		// build pvc labels
@@ -224,6 +211,7 @@ func (r *RestoreManager) BuildPrepareDataRestore(comp *component.SynthesizedComp
 				SourceTargetName: sourceTargetName,
 			},
 			RestoreTime: r.restoreTime,
+			Env:         r.env,
 			PrepareDataConfig: &dpv1alpha1.PrepareDataConfig{
 				RequiredPolicyForAllPodSelection: r.buildRequiredPolicy(sourceTarget),
 				SchedulingSpec:                   schedulingSpec,
@@ -242,7 +230,7 @@ func (r *RestoreManager) BuildPrepareDataRestore(comp *component.SynthesizedComp
 func (r *RestoreManager) DoPostReady(comp *component.SynthesizedComponent,
 	compObj *appsv1.Component,
 	backupObj *dpv1alpha1.Backup) error {
-	jobActionLabels := constant.GetComponentWellKnownLabels(r.Cluster.Name, comp.Name)
+	jobActionLabels := constant.GetCompLabels(r.Cluster.Name, comp.Name)
 	if len(comp.Roles) > 0 {
 		jobActionLabels[instanceset.AccessModeLabelKey] = string(appsv1alpha1.ReadWrite)
 	}
@@ -256,11 +244,12 @@ func (r *RestoreManager) DoPostReady(comp *component.SynthesizedComponent,
 				SourceTargetName: sourceTargetName,
 			},
 			RestoreTime: r.restoreTime,
+			Env:         r.env,
 			ReadyConfig: &dpv1alpha1.ReadyConfig{
 				ExecAction: &dpv1alpha1.ExecAction{
 					Target: dpv1alpha1.ExecActionTarget{
 						PodSelector: metav1.LabelSelector{
-							MatchLabels: constant.GetComponentWellKnownLabels(r.Cluster.Name, comp.Name),
+							MatchLabels: constant.GetCompLabels(r.Cluster.Name, comp.Name),
 						},
 					},
 				},
@@ -328,7 +317,7 @@ func (r *RestoreManager) GetRestoreObjectMeta(comp *component.SynthesizedCompone
 		name = fmt.Sprintf("%s-%d", name, r.startingIndex)
 	}
 	if len(r.restoreLabels) == 0 {
-		r.restoreLabels = constant.GetKBWellKnownLabels(r.Cluster.Spec.ClusterDefRef, r.Cluster.Name, comp.Name)
+		r.restoreLabels = constant.GetCompLabels(r.Cluster.Name, comp.Name)
 	}
 	return metav1.ObjectMeta{
 		Name:      name,
@@ -365,6 +354,11 @@ func (r *RestoreManager) initFromAnnotation(synthesizedComponent *component.Synt
 	doReadyRestoreAfterClusterRunning := backupSource[constant.DoReadyRestoreAfterClusterRunning]
 	if doReadyRestoreAfterClusterRunning == "true" {
 		r.doReadyRestoreAfterClusterRunning = true
+	}
+	if env := backupSource[constant.EnvForRestore]; env != "" {
+		if err = json.Unmarshal([]byte(env), &r.env); err != nil {
+			return nil, err
+		}
 	}
 	return GetBackupFromClusterAnnotation(r.Ctx, r.Client, backupSource, synthesizedComponent.Name, r.Cluster.Namespace)
 }

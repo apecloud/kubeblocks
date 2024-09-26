@@ -24,9 +24,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	policyv1 "k8s.io/api/policy/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -72,7 +70,7 @@ func (t *componentDeletionTransformer) Transform(ctx graph.TransformContext, dag
 	if err != nil {
 		return err
 	}
-	ml := constant.GetComponentWellKnownLabels(cluster.Name, compShortName)
+	ml := constant.GetCompLabels(cluster.Name, compShortName)
 
 	compScaleIn, ok := comp.Annotations[constant.ComponentScaleInAnnotationKey]
 	if ok && compScaleIn == trueVal {
@@ -90,19 +88,18 @@ func (t *componentDeletionTransformer) handleCompDeleteWhenScaleIn(transCtx *com
 // handleCompDeleteWhenClusterDelete handles the component deletion when the cluster is being deleted, the sub-resources owned by the component depends on the cluster's TerminationPolicy.
 func (t *componentDeletionTransformer) handleCompDeleteWhenClusterDelete(transCtx *componentTransformContext, graphCli model.GraphClient,
 	dag *graph.DAG, cluster *appsv1.Cluster, comp *appsv1.Component, matchLabels map[string]string) error {
-	var toDeleteKinds []client.ObjectList
+	var kinds []client.ObjectList
 	switch cluster.Spec.TerminationPolicy {
 	case appsv1.Delete:
-		toDeleteKinds = kindsForCompDelete()
+		kinds = kindsForCompDelete()
 	case appsv1.WipeOut:
-		toDeleteKinds = kindsForCompWipeOut()
+		kinds = kindsForCompWipeOut()
 	}
-
-	return t.deleteCompResources(transCtx, graphCli, dag, comp, matchLabels, toDeleteKinds)
+	return t.deleteCompResources(transCtx, graphCli, dag, comp, matchLabels, kinds)
 }
 
 func (t *componentDeletionTransformer) deleteCompResources(transCtx *componentTransformContext, graphCli model.GraphClient,
-	dag *graph.DAG, comp *appsv1.Component, matchLabels map[string]string, toDeleteKinds []client.ObjectList) error {
+	dag *graph.DAG, comp *appsv1.Component, matchLabels map[string]string, kinds []client.ObjectList) error {
 
 	// firstly, delete the workloads owned by the component
 	workloads, err := model.ReadCacheSnapshot(transCtx, comp, matchLabels, compOwnedWorkloadKinds()...)
@@ -119,9 +116,9 @@ func (t *componentDeletionTransformer) deleteCompResources(transCtx *componentTr
 	}
 
 	// secondly, delete the other sub-resources owned by the component
-	snapshot, err := model.ReadCacheSnapshot(transCtx, comp, matchLabels, toDeleteKinds...)
-	if err != nil {
-		return newRequeueError(requeueDuration, err.Error())
+	snapshot, err1 := model.ReadCacheSnapshot(transCtx, comp, matchLabels, kinds...)
+	if err1 != nil {
+		return newRequeueError(requeueDuration, err1.Error())
 	}
 	if len(snapshot) > 0 {
 		// delete the sub-resources owned by the component before deleting the component
@@ -169,39 +166,20 @@ func compOwnedWorkloadKinds() []client.ObjectList {
 func compOwnedKinds() []client.ObjectList {
 	return []client.ObjectList{
 		&workloads.InstanceSetList{},
-		&policyv1.PodDisruptionBudgetList{},
 		&corev1.ServiceList{},
-		&corev1.ServiceAccountList{},
-		&rbacv1.RoleBindingList{},
-		&batchv1.JobList{},
-		&dpv1alpha1.RestoreList{},
-		&dpv1alpha1.BackupList{},
-		&appsv1alpha1.ConfigurationList{},
-	}
-}
-
-func compOwnedPreserveKinds() []client.ObjectList {
-	return []client.ObjectList{
-		&corev1.PersistentVolumeClaimList{},
 		&corev1.SecretList{},
 		&corev1.ConfigMapList{},
+		&corev1.PersistentVolumeClaimList{},
+		&dpv1alpha1.BackupList{},
+		&dpv1alpha1.RestoreList{},
+		&appsv1alpha1.ConfigurationList{},
+		&corev1.ServiceAccountList{},
+		&rbacv1.RoleBindingList{},
 	}
-}
-
-func kindsForCompDoNotTerminate() []client.ObjectList {
-	return []client.ObjectList{}
-}
-
-func kindsForCompHalt() []client.ObjectList {
-	doNotTerminateKinds := kindsForCompDoNotTerminate()
-	ownedKinds := compOwnedKinds()
-	return append(doNotTerminateKinds, ownedKinds...)
 }
 
 func kindsForCompDelete() []client.ObjectList {
-	haltKinds := kindsForCompHalt()
-	preserveKinds := compOwnedPreserveKinds()
-	return append(haltKinds, preserveKinds...)
+	return compOwnedKinds()
 }
 
 func kindsForCompWipeOut() []client.ObjectList {

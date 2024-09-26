@@ -63,6 +63,7 @@ import (
 	experimentalcontrollers "github.com/apecloud/kubeblocks/controllers/experimental"
 	extensionscontrollers "github.com/apecloud/kubeblocks/controllers/extensions"
 	k8scorecontrollers "github.com/apecloud/kubeblocks/controllers/k8score"
+	opscontrollers "github.com/apecloud/kubeblocks/controllers/operations"
 	workloadscontrollers "github.com/apecloud/kubeblocks/controllers/workloads"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
@@ -143,7 +144,6 @@ func init() {
 	viper.SetDefault(intctrlutil.FeatureGateEnableRuntimeMetrics, false)
 	viper.SetDefault(constant.CfgKBReconcileWorkers, 8)
 	viper.SetDefault(constant.FeatureGateIgnoreConfigTemplateDefaultMode, false)
-	viper.SetDefault(constant.FeatureGateComponentReplicasAnnotation, true)
 	viper.SetDefault(constant.FeatureGateInPlacePodVerticalScaling, false)
 	viper.SetDefault(constant.FeatureGateNoRSMEnv, false)
 }
@@ -419,7 +419,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		if err = (&appscontrollers.OpsDefinitionReconciler{
+		if err = (&opscontrollers.OpsDefinitionReconciler{
 			Client:   mgr.GetClient(),
 			Scheme:   mgr.GetScheme(),
 			Recorder: mgr.GetEventRecorderFor("ops-definition-controller"),
@@ -428,7 +428,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		if err = (&appscontrollers.OpsRequestReconciler{
+		if err = (&opscontrollers.OpsRequestReconciler{
 			Client:   mgr.GetClient(),
 			Scheme:   mgr.GetScheme(),
 			Recorder: mgr.GetEventRecorderFor("ops-request-controller"),

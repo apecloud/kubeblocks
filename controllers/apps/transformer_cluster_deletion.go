@@ -26,16 +26,12 @@ import (
 	"time"
 
 	"golang.org/x/exp/maps"
-	appsv1 "k8s.io/api/apps/v1"
-	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	policyv1 "k8s.io/api/policy/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -65,10 +61,6 @@ func (t *clusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 	case kbappsv1.DoNotTerminate:
 		transCtx.EventRecorder.Eventf(cluster, corev1.EventTypeWarning, "DoNotTerminate",
 			"spec.terminationPolicy %s is preventing deletion.", cluster.Spec.TerminationPolicy)
-		return graph.ErrPrematureStop
-	case kbappsv1.Halt:
-		transCtx.EventRecorder.Eventf(cluster, corev1.EventTypeWarning, "Halt",
-			"spec.terminationPolicy %s is preventing deletion. Halt policy is deprecated is 0.9.1 and will have same meaning as DoNotTerminate.", cluster.Spec.TerminationPolicy)
 		return graph.ErrPrematureStop
 	case kbappsv1.Delete:
 		toDeleteNamespacedKinds, toDeleteNonNamespacedKinds = kindsForDelete()
@@ -153,33 +145,16 @@ func kindsForDoNotTerminate() ([]client.ObjectList, []client.ObjectList) {
 	return []client.ObjectList{}, []client.ObjectList{}
 }
 
-func kindsForHalt() ([]client.ObjectList, []client.ObjectList) {
+func kindsForDelete() ([]client.ObjectList, []client.ObjectList) {
 	namespacedKinds, nonNamespacedKinds := kindsForDoNotTerminate()
 	namespacedKindsPlus := []client.ObjectList{
 		&kbappsv1.ComponentList{},
-		&appsv1alpha1.OpsRequestList{},
-		&appsv1.StatefulSetList{},           // be compatible with 0.6 workloads.
-		&policyv1.PodDisruptionBudgetList{}, // be compatible with 0.6 workloads.
 		&corev1.ServiceList{},
-		&corev1.ServiceAccountList{}, // be backward compatible
-		&rbacv1.RoleBindingList{},    // be backward compatible
+		&corev1.SecretList{},
 		&dpv1alpha1.BackupPolicyList{},
 		&dpv1alpha1.BackupScheduleList{},
-		&dpv1alpha1.RestoreList{},
-		&batchv1.JobList{},
-		// The owner of the configuration in version 0.9 has been adjusted to component cr.
-		// for compatible with version 0.8
-		&appsv1alpha1.ConfigurationList{},
 	}
-	nonNamespacedKindsPlus := []client.ObjectList{
-		&rbacv1.ClusterRoleBindingList{},
-	}
-	return append(namespacedKinds, namespacedKindsPlus...), append(nonNamespacedKinds, nonNamespacedKindsPlus...)
-}
-
-func kindsForDelete() ([]client.ObjectList, []client.ObjectList) {
-	namespacedKinds, nonNamespacedKinds := kindsForHalt()
-	return append(namespacedKinds, haltPreserveKinds()...), nonNamespacedKinds
+	return append(namespacedKinds, namespacedKindsPlus...), nonNamespacedKinds
 }
 
 func kindsForWipeOut() ([]client.ObjectList, []client.ObjectList) {

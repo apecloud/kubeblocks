@@ -100,11 +100,6 @@ func (builder *ComponentBuilder) SetDisableExporter(disableExporter *bool) *Comp
 	return builder
 }
 
-func (builder *ComponentBuilder) SetEnabledLogs(logNames []string) *ComponentBuilder {
-	builder.get().Spec.EnabledLogs = logNames
-	return builder
-}
-
 func (builder *ComponentBuilder) SetTLSConfig(enable bool, issuer *appsv1.Issuer) *ComponentBuilder {
 	if enable {
 		builder.get().Spec.TLSConfig = &appsv1.TLSConfig{

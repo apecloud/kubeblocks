@@ -42,8 +42,8 @@ func buildSvc(its workloads.InstanceSet, labels, selectors map[string]string) *c
 	annotations := ParseAnnotationsOfScope(ServiceScope, its.Annotations)
 	return builder.NewServiceBuilder(its.Namespace, its.Name).
 		AddAnnotationsInMap(annotations).
-		AddLabelsInMap(its.Spec.Service.Labels).
 		AddLabelsInMap(labels).
+		AddLabelsInMap(its.Spec.Service.Labels).
 		AddSelectorsInMap(selectors).
 		AddPorts(its.Spec.Service.Spec.Ports...).
 		SetType(its.Spec.Service.Spec.Type).
@@ -54,7 +54,6 @@ func buildHeadlessSvc(its workloads.InstanceSet, labels, selectors map[string]st
 	annotations := ParseAnnotationsOfScope(HeadlessServiceScope, its.Annotations)
 	hdlBuilder := builder.NewHeadlessServiceBuilder(its.Namespace, getHeadlessSvcName(its.Name)).
 		AddLabelsInMap(labels).
-		AddLabelsInMap(constant.GetKBKnownLabels()).
 		AddSelectorsInMap(selectors).
 		AddAnnotationsInMap(annotations).
 		SetPublishNotReadyAddresses(true)
@@ -198,7 +197,6 @@ func injectRoleProbeBaseContainer(its *workloads.InstanceSet, template *corev1.P
 		return
 	}
 
-	credential := its.Spec.Credential
 	image := viper.GetString(constant.KBToolsImage)
 	probeHTTPPort := viper.GetInt("ROLE_SERVICE_HTTP_PORT")
 	if probeHTTPPort == 0 {
@@ -214,31 +212,12 @@ func injectRoleProbeBaseContainer(its *workloads.InstanceSet, template *corev1.P
 			Name:  actionSvcListVarName,
 			Value: actionSvcList,
 		})
-	if credential != nil {
-		// for compatibility with old probe env var names
-		env = append(env,
-			corev1.EnvVar{
-				Name:      constant.KBEnvServiceUser,
-				Value:     credential.Username.Value,
-				ValueFrom: credential.Username.ValueFrom,
-			},
-			corev1.EnvVar{
-				Name:      constant.KBEnvServicePassword,
-				Value:     credential.Password.Value,
-				ValueFrom: credential.Password.ValueFrom,
-			})
-	}
 	// find service port of th db engine
 	servicePort := findSvcPort(its)
 	if servicePort > 0 {
 		env = append(env,
 			corev1.EnvVar{
 				Name:  servicePortVarName,
-				Value: strconv.Itoa(servicePort),
-			},
-			// for compatibility with old probe env var names
-			corev1.EnvVar{
-				Name:  "KB_SERVICE_PORT",
 				Value: strconv.Itoa(servicePort),
 			})
 	}
@@ -256,58 +235,6 @@ func injectRoleProbeBaseContainer(its *workloads.InstanceSet, template *corev1.P
 			Name:  roleProbeTimeoutVarName,
 			Value: strconv.Itoa(int(roleProbe.TimeoutSeconds)),
 		})
-
-	// lorry related envs
-	env = append(env,
-		corev1.EnvVar{
-			Name: constant.KBEnvPodName,
-			ValueFrom: &corev1.EnvVarSource{
-				FieldRef: &corev1.ObjectFieldSelector{
-					FieldPath: "metadata.name",
-				},
-			},
-		},
-		corev1.EnvVar{
-			Name: constant.KBEnvNamespace,
-			ValueFrom: &corev1.EnvVarSource{
-				FieldRef: &corev1.ObjectFieldSelector{
-					FieldPath: "metadata.namespace",
-				},
-			},
-		},
-		corev1.EnvVar{
-			Name: constant.KBEnvPodUID,
-			ValueFrom: &corev1.EnvVarSource{
-				FieldRef: &corev1.ObjectFieldSelector{
-					FieldPath: "metadata.uid",
-				},
-			},
-		},
-		corev1.EnvVar{
-			Name: constant.KBEnvNodeName,
-			ValueFrom: &corev1.EnvVarSource{
-				FieldRef: &corev1.ObjectFieldSelector{
-					FieldPath: "spec.nodeName",
-				},
-			},
-		},
-		corev1.EnvVar{
-			Name: constant.KBEnvClusterName,
-			ValueFrom: &corev1.EnvVarSource{
-				FieldRef: &corev1.ObjectFieldSelector{
-					FieldPath: "metadata.labels['" + constant.AppInstanceLabelKey + "']",
-				},
-			},
-		},
-		corev1.EnvVar{
-			Name: constant.KBEnvCompName,
-			ValueFrom: &corev1.EnvVarSource{
-				FieldRef: &corev1.ObjectFieldSelector{
-					FieldPath: "metadata.labels['" + constant.KBAppComponentLabelKey + "']",
-				},
-			},
-		},
-	)
 
 	readinessProbe := &corev1.Probe{
 		InitialDelaySeconds: roleProbe.InitialDelaySeconds,
@@ -487,23 +414,6 @@ func buildEnvConfigData(its workloads.InstanceSet) (map[string]string, error) {
 	// set owner uid to let pod know if the owner is recreated
 	envData[prefix+"OWNER_UID"] = uid
 	envData[prefix+"OWNER_UID_SUFFIX8"] = uid[len(uid)-4:]
-
-	// have backward compatible handling for env generated in version prior 0.6.0
-	prefix = constant.KBPrefix + "_"
-	envData[prefix+"REPLICA_COUNT"] = strReplicas
-	generateReplicaEnv(prefix, podNames)
-	generateMemberEnv(prefix)
-	// KB_POD_LIST
-	envData[prefix+"POD_LIST"] = strings.Join(podNames, ",")
-
-	// have backward compatible handling for CM key with 'compDefName' being part of the key name, prior 0.5.0
-	// and introduce env/cm key naming reference complexity
-	componentDefName := its.Labels[constant.AppComponentLabelKey]
-	prefixWithCompDefName := prefix + strings.ToUpper(componentDefName) + "_"
-	envData[prefixWithCompDefName+"N"] = strReplicas
-	generateReplicaEnv(prefixWithCompDefName, podNames)
-	generateMemberEnv(prefixWithCompDefName)
-	envData[prefixWithCompDefName+"CLUSTER_UID"] = uid
 
 	return envData, nil
 }

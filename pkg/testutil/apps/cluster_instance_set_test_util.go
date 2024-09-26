@@ -23,7 +23,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strconv"
 
 	"github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -40,8 +39,7 @@ import (
 )
 
 const (
-	errorLogName = "error"
-	replicas     = 3
+	replicas = 3
 )
 
 func InitConsensusMysql(testCtx *testutil.TestContext, clusterName, compDefName, compName string) (*appsv1.ComponentDefinition, *appsv1.Cluster) {
@@ -59,7 +57,6 @@ func CreateDefaultMysqlCluster(testCtx *testutil.TestContext, clusterName, compD
 	return NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
 		AddComponent(compName, compDefName).
 		SetReplicas(replicas).
-		SetEnabledLogs(errorLogName).
 		AddVolumeClaimTemplate("data", pvcSpec).
 		Create(testCtx).
 		GetObject()
@@ -117,9 +114,7 @@ func MockInstanceSetPods(
 		}
 		return nil
 	}()
-	replicas := getReplicas()
-	replicasStr := strconv.Itoa(replicas)
-	podList := make([]*corev1.Pod, replicas)
+	podList := make([]*corev1.Pod, getReplicas())
 	podNames := generatePodNames(cluster, compName)
 	for i, pName := range podNames {
 		var podRole, accessMode string
@@ -137,7 +132,6 @@ func MockInstanceSetPods(
 		if annotations == nil {
 			annotations = make(map[string]string)
 		}
-		annotations[constant.ComponentReplicasAnnotationKey] = replicasStr
 		pod.Annotations = annotations
 		podList[i] = pod
 	}

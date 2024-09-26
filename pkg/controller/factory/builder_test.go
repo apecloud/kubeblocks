@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package factory
 
 import (
-	"encoding/json"
 	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -37,7 +36,6 @@ import (
 	cfgcm "github.com/apecloud/kubeblocks/pkg/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -58,15 +56,6 @@ var _ = Describe("builder", func() {
 		return compDebObj
 	}
 
-	newExtraEnvs := func() map[string]string {
-		jsonStr, _ := json.Marshal(map[string]string{
-			"mock-key": "mock-value",
-		})
-		return map[string]string{
-			constant.ExtraEnvAnnotationKey: string(jsonStr),
-		}
-	}
-
 	newAllFieldsClusterObj := func(compDefObj *appsv1.ComponentDefinition, create bool) (*appsv1.Cluster, *appsv1.ComponentDefinition, types.NamespacedName) {
 		// setup Cluster obj requires default ComponentDefinition object
 		if compDefObj == nil {
@@ -74,7 +63,6 @@ var _ = Describe("builder", func() {
 		}
 		pvcSpec := testapps.NewPVCSpec("1Gi")
 		clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
-			AddAnnotationsInMap(newExtraEnvs()).
 			AddComponent(mysqlCompName, compDefObj.GetName()).
 			SetReplicas(1).
 			AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
@@ -107,26 +95,16 @@ var _ = Describe("builder", func() {
 			}).GetObject()
 	}
 
-	newReqCtx := func() intctrlutil.RequestCtx {
-		reqCtx := intctrlutil.RequestCtx{
-			Ctx:      testCtx.Ctx,
-			Log:      logger,
-			Recorder: clusterRecorder,
-		}
-		return reqCtx
-	}
-
 	newAllFieldsSynthesizedComponent := func(compDef *appsv1.ComponentDefinition, cluster *appsv1.Cluster) *component.SynthesizedComponent {
-		reqCtx := newReqCtx()
 		By("assign every available fields")
 		comp, err := component.BuildComponent(cluster, &cluster.Spec.ComponentSpecs[0], nil, nil)
 		Expect(err).Should(Succeed())
-		synthesizeComp, err := component.BuildSynthesizedComponent(reqCtx, testCtx.Cli, cluster, compDef, comp)
+		synthesizeComp, err := component.BuildSynthesizedComponent(testCtx.Ctx, testCtx.Cli, compDef, comp, cluster)
 		Expect(err).Should(Succeed())
 		Expect(synthesizeComp).ShouldNot(BeNil())
 		// to resolve and inject env vars
 		synthesizeComp.Annotations = cluster.Annotations
-		_, envVars, err := component.ResolveTemplateNEnvVars(reqCtx.Ctx, testCtx.Cli, synthesizeComp, nil)
+		_, envVars, err := component.ResolveTemplateNEnvVars(testCtx.Ctx, testCtx.Cli, synthesizeComp, nil)
 		Expect(err).Should(Succeed())
 		component.InjectEnvVars(synthesizeComp, envVars, nil)
 		return synthesizeComp
@@ -250,15 +228,6 @@ var _ = Describe("builder", func() {
 			Expect(*configmap.SecurityContext.RunAsUser).Should(BeEquivalentTo(int64(0)))
 		})
 
-		It("builds volume snapshot class correctly", func() {
-			className := "vsc-test"
-			driverName := "csi-driver-test"
-			obj := BuildVolumeSnapshotClass(className, driverName)
-			Expect(obj).ShouldNot(BeNil())
-			Expect(obj.Name).Should(Equal(className))
-			Expect(obj.Driver).Should(Equal(driverName))
-		})
-
 		It("builds cfg manager tools  correctly", func() {
 			_, cluster, _ := newClusterObjs(nil)
 			cfgManagerParams := &cfgcm.CfgManagerBuildParams{
@@ -277,27 +246,19 @@ var _ = Describe("builder", func() {
 		})
 
 		It("builds serviceaccount correctly", func() {
-			_, cluster, _ := newClusterObjs(nil)
+			_, cluster, synthesizedComp := newClusterObjs(nil)
 			expectName := fmt.Sprintf("kb-%s", cluster.Name)
-			sa := BuildServiceAccount(cluster, expectName)
+			sa := BuildServiceAccount(synthesizedComp, expectName)
 			Expect(sa).ShouldNot(BeNil())
 			Expect(sa.Name).Should(Equal(expectName))
 		})
 
 		It("builds rolebinding correctly", func() {
-			_, cluster, _ := newClusterObjs(nil)
+			_, cluster, synthesizedComp := newClusterObjs(nil)
 			expectName := fmt.Sprintf("kb-%s", cluster.Name)
-			rb := BuildRoleBinding(cluster, expectName)
+			rb := BuildRoleBinding(synthesizedComp, expectName)
 			Expect(rb).ShouldNot(BeNil())
 			Expect(rb.Name).Should(Equal(expectName))
-		})
-
-		It("builds clusterrolebinding correctly", func() {
-			_, cluster, _ := newClusterObjs(nil)
-			expectName := fmt.Sprintf("kb-%s", cluster.Name)
-			crb := BuildClusterRoleBinding(cluster, expectName)
-			Expect(crb).ShouldNot(BeNil())
-			Expect(crb.Name).Should(Equal(expectName))
 		})
 	})
 })

@@ -22,12 +22,15 @@ package apps
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
 
 	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -197,12 +200,13 @@ func (t *componentServiceTransformer) buildService(comp *appsv1.Component,
 	)
 
 	serviceFullName := constant.GenerateComponentServiceName(synthesizeComp.ClusterName, synthesizeComp.Name, service.ServiceName)
-	labels := constant.GetComponentWellKnownLabels(clusterName, compName)
 	builder := builder.NewServiceBuilder(namespace, serviceFullName).
-		AddLabelsInMap(labels).
-		AddLabelsInMap(synthesizeComp.UserDefinedLabels).
+		AddLabelsInMap(constant.GetCompLabels(clusterName, compName)).
+		AddLabelsInMap(synthesizeComp.DynamicLabels).
+		AddLabelsInMap(synthesizeComp.StaticLabels).
 		AddAnnotationsInMap(service.Annotations).
-		AddAnnotationsInMap(synthesizeComp.UserDefinedAnnotations).
+		AddAnnotationsInMap(synthesizeComp.DynamicAnnotations).
+		AddAnnotationsInMap(synthesizeComp.StaticAnnotations).
 		SetSpec(&service.Spec).
 		AddSelectorsInMap(t.builtinSelector(comp)).
 		Optimize4ExternalTraffic()
@@ -269,21 +273,76 @@ func (t *componentServiceTransformer) createOrUpdateService(ctx graph.TransformC
 	}
 
 	if podService && kind == multiClusterServicePlacementInUnique {
-		return t.createOrUpdateServiceInUnique(ctx, dag, graphCli, service, owner)
+		// create or update service in unique, by hacking the pod placement strategy.
+		ordinal := func() int {
+			subs := strings.Split(service.GetName(), "-")
+			o, _ := strconv.Atoi(subs[len(subs)-1])
+			return o
+		}
+		multicluster.Assign(ctx.GetContext(), service, ordinal)
 	}
-	return createOrUpdateService(ctx, dag, graphCli, service, owner)
+
+	createOrUpdateService := func(service *corev1.Service) error {
+		key := types.NamespacedName{
+			Namespace: service.Namespace,
+			Name:      service.Name,
+		}
+		originSvc := &corev1.Service{}
+		if err := ctx.GetClient().Get(ctx.GetContext(), key, originSvc, inDataContext4C()); err != nil {
+			if apierrors.IsNotFound(err) {
+				graphCli.Create(dag, service, inDataContext4G())
+				return nil
+			}
+			return err
+		}
+
+		// don't update service not owned by the owner, to keep compatible with existed cluster
+		if !model.IsOwnerOf(owner, originSvc) {
+			return nil
+		}
+
+		newSvc := originSvc.DeepCopy()
+		newSvc.Spec = service.Spec
+
+		// if skip immutable check, update the service directly
+		if skipImmutableCheckForComponentService(originSvc) {
+			resolveServiceDefaultFields(&originSvc.Spec, &newSvc.Spec)
+			if !reflect.DeepEqual(originSvc, newSvc) {
+				graphCli.Update(dag, originSvc, newSvc, inDataContext4G())
+			}
+			return nil
+		}
+		// otherwise only support to update the override params defined in cluster.spec.componentSpec[].services
+
+		overrideMutableParams := func(originSvc, newSvc *corev1.Service) {
+			newSvc.Spec.Type = originSvc.Spec.Type
+			newSvc.Name = originSvc.Name
+			newSvc.Spec.Selector = originSvc.Spec.Selector
+			newSvc.Annotations = originSvc.Annotations
+		}
+
+		// modify mutable field of newSvc to check if it is overridable
+		overrideMutableParams(originSvc, newSvc)
+		if !reflect.DeepEqual(originSvc, newSvc) {
+			// other fields are immutable, we can't update the service
+			return nil
+		}
+
+		overrideMutableParams(service, newSvc)
+		if !reflect.DeepEqual(originSvc, newSvc) {
+			graphCli.Update(dag, originSvc, newSvc, inDataContext4G())
+		}
+		return nil
+	}
+	return createOrUpdateService(service)
 }
 
-func (t *componentServiceTransformer) createOrUpdateServiceInUnique(ctx graph.TransformContext, dag *graph.DAG,
-	graphCli model.GraphClient, service *corev1.Service, owner client.Object) error {
-	// hack the pod placement strategy.
-	ordinal := func() int {
-		subs := strings.Split(service.GetName(), "-")
-		o, _ := strconv.Atoi(subs[len(subs)-1])
-		return o
+func skipImmutableCheckForComponentService(svc *corev1.Service) bool {
+	if svc.Annotations == nil {
+		return false
 	}
-	multicluster.Assign(ctx.GetContext(), service, ordinal)
-	return createOrUpdateService(ctx, dag, graphCli, service, owner)
+	skip, ok := svc.Annotations[constant.SkipImmutableCheckAnnotationKey]
+	return ok && strings.ToLower(skip) == "true"
 }
 
 func generatePodNames(synthesizeComp *component.SynthesizedComponent) ([]string, error) {

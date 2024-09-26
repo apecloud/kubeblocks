@@ -32,8 +32,8 @@ var _ = Describe("cluster load resources transformer test", func() {
 			By("explicitly specify topology")
 			cluster := &appsv1.Cluster{
 				Spec: appsv1.ClusterSpec{
-					ClusterDefRef: "clusterdef",
-					Topology:      "topology",
+					ClusterDef: "clusterdef",
+					Topology:   "topology",
 					ComponentSpecs: []appsv1.ClusterComponentSpec{
 						{
 							ComponentDef: "compdef",
@@ -50,13 +50,8 @@ var _ = Describe("cluster load resources transformer test", func() {
 			cluster.Spec.Topology = ""
 			Expect(withClusterTopology(cluster)).Should(BeTrue())
 
-			By("specify topology and set componentDefRef")
-			cluster.Spec.Topology = "topology"
-			cluster.Spec.ComponentSpecs[0].ComponentDefRef = "compdef"
-			cluster.Spec.ComponentSpecs[1].ComponentDefRef = "compdef"
-			Expect(withClusterTopology(cluster)).Should(BeTrue())
-
 			By("w/o topology")
+			cluster.Spec.ClusterDef = ""
 			cluster.Spec.Topology = ""
 			Expect(withClusterTopology(cluster)).Should(BeFalse())
 		})
@@ -77,31 +72,9 @@ var _ = Describe("cluster load resources transformer test", func() {
 			}
 			Expect(withClusterUserDefined(cluster)).Should(BeTrue())
 
-			By("specify both componentDef and componentDefRef")
-			cluster.Spec.ComponentSpecs[0].ComponentDefRef = "compdef"
-			cluster.Spec.ComponentSpecs[1].ComponentDefRef = "compdef"
-			Expect(withClusterUserDefined(cluster)).Should(BeTrue())
-
-			By("+clusterDefRef")
-			cluster.Spec.ClusterDefRef = "clusterdef"
-			Expect(withClusterUserDefined(cluster)).Should(BeTrue())
-		})
-
-		It("with cluster legacy definition", func() {
-			cluster := &appsv1.Cluster{
-				Spec: appsv1.ClusterSpec{
-					ClusterDefRef: "clusterdef",
-					ComponentSpecs: []appsv1.ClusterComponentSpec{
-						{
-							ComponentDefRef: "compdef",
-						},
-						{
-							ComponentDefRef: "compdef",
-						},
-					},
-				},
-			}
-			Expect(withClusterLegacyDefinition(cluster)).Should(BeTrue())
+			By("+clusterDef")
+			cluster.Spec.ClusterDef = "clusterdef"
+			Expect(withClusterUserDefined(cluster)).Should(BeFalse())
 		})
 	})
 })

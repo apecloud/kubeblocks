@@ -36,7 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
@@ -266,7 +266,7 @@ func getObjectTreeFromCache(ctx context.Context, cli client.Client, primary clie
 	return tree, nil
 }
 
-func getObjectsFromCache(ctx context.Context, cli client.Client, root *appsv1alpha1.Cluster, ownershipRules []OwnershipRule) (sets.Set[model.GVKNObjKey], map[model.GVKNObjKey]client.Object, error) {
+func getObjectsFromCache(ctx context.Context, cli client.Client, root *kbappsv1.Cluster, ownershipRules []OwnershipRule) (sets.Set[model.GVKNObjKey], map[model.GVKNObjKey]client.Object, error) {
 	objectMap := make(map[model.GVKNObjKey]client.Object)
 	objectSet := sets.New[model.GVKNObjKey]()
 	waitingList := list.New()

@@ -34,7 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -58,7 +58,7 @@ func (s *stateEvaluation) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx
 	view, _ := tree.GetRoot().(*viewv1.ReconciliationView)
 
 	// build new object set from cache
-	root := &appsv1alpha1.Cluster{}
+	root := &kbappsv1.Cluster{}
 	objectKey := client.ObjectKeyFromObject(view)
 	if view.Spec.TargetObject != nil {
 		objectKey = client.ObjectKey{
@@ -78,8 +78,8 @@ func (s *stateEvaluation) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx
 	// if we find the first-false-then-true pattern, means a new reconciliation cycle starts.
 	firstFalseStateFound := false
 	clusterType := viewv1.ObjectType{
-		APIVersion: appsv1alpha1.APIVersion,
-		Kind:       appsv1alpha1.ClusterKind,
+		APIVersion: kbappsv1.APIVersion,
+		Kind:       kbappsv1.ClusterKind,
 	}
 	latestReconciliationCycleStart := 0
 	for i := len(view.Status.CurrentState.Changes) - 1; i >= 0; i-- {

@@ -22,10 +22,10 @@ package view
 import (
 	"context"
 	"fmt"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
-	workloadsAPI "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	workloadsAPI "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/controllers/apps"
 	"github.com/apecloud/kubeblocks/controllers/apps/configuration"
 	"github.com/apecloud/kubeblocks/controllers/dataprotection"
@@ -61,8 +61,8 @@ type ReconcilerTree interface {
 type reconcilerFunc func(client.Client, record.EventRecorder) reconcile.Reconciler
 
 var reconcilerFuncMap = map[viewv1.ObjectType]reconcilerFunc{
-	objectType(appsv1alpha1.SchemeGroupVersion.String(), appsv1alpha1.ClusterKind):     newClusterReconciler,
-	objectType(appsv1alpha1.SchemeGroupVersion.String(), appsv1alpha1.ComponentKind):   newComponentReconciler,
+	objectType(kbappsv1.SchemeGroupVersion.String(), kbappsv1.ClusterKind):             newClusterReconciler,
+	objectType(kbappsv1.SchemeGroupVersion.String(), kbappsv1.ComponentKind):           newComponentReconciler,
 	objectType(corev1.SchemeGroupVersion.String(), constant.SecretKind):                newSecretReconciler,
 	objectType(corev1.SchemeGroupVersion.String(), constant.ServiceKind):               newServiceReconciler,
 	objectType(workloadsAPI.SchemeGroupVersion.String(), workloadsAPI.Kind):            newInstanceSetReconciler,
@@ -74,7 +74,7 @@ var reconcilerFuncMap = map[viewv1.ObjectType]reconcilerFunc{
 	objectType(batchv1.SchemeGroupVersion.String(), constant.JobKind):                  newJobReconciler,
 	objectType(dpv1alpha1.SchemeGroupVersion.String(), types.BackupKind):               newBackupReconciler,
 	objectType(dpv1alpha1.SchemeGroupVersion.String(), types.RestoreKind):              newRestoreReconciler,
-	objectType(appsv1alpha1.SchemeGroupVersion.String(), constant.ConfigurationKind):   newConfigurationReconciler,
+	objectType(kbappsv1.SchemeGroupVersion.String(), constant.ConfigurationKind):       newConfigurationReconciler,
 	objectType(corev1.SchemeGroupVersion.String(), constant.PodKind):                   newPodReconciler,
 	objectType(appsv1.SchemeGroupVersion.String(), constant.StatefulSetKind):           newSTSReconciler,
 	objectType(vsv1.SchemeGroupVersion.String(), constant.VolumeSnapshotKind):          newVolumeSnapshotV1Reconciler,

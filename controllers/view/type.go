@@ -35,10 +35,10 @@ import (
 	"k8s.io/client-go/discovery"
 	"k8s.io/utils/pointer"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
@@ -83,10 +83,10 @@ var (
 
 	FullKBOwnershipRules = []OwnershipRule{
 		{
-			Primary: objectType(appsv1alpha1.SchemeGroupVersion.String(), appsv1alpha1.ClusterKind),
+			Primary: objectType(kbappsv1.SchemeGroupVersion.String(), kbappsv1.ClusterKind),
 			OwnedResources: []OwnedResource{
 				{
-					Secondary: objectType(appsv1alpha1.SchemeGroupVersion.String(), appsv1alpha1.ComponentKind),
+					Secondary: objectType(kbappsv1.SchemeGroupVersion.String(), kbappsv1.ComponentKind),
 					Criteria:  clusterCriteria,
 				},
 				{
@@ -101,7 +101,7 @@ var (
 			},
 		},
 		{
-			Primary: objectType(appsv1alpha1.SchemeGroupVersion.String(), appsv1alpha1.ComponentKind),
+			Primary: objectType(kbappsv1.SchemeGroupVersion.String(), kbappsv1.ComponentKind),
 			OwnedResources: []OwnedResource{
 				{
 					Secondary: objectType(workloads.SchemeGroupVersion.String(), workloads.Kind),
@@ -148,7 +148,7 @@ var (
 					Criteria:  componentCriteria,
 				},
 				{
-					Secondary: objectType(appsv1alpha1.SchemeGroupVersion.String(), constant.ConfigurationKind),
+					Secondary: objectType(kbappsv1.SchemeGroupVersion.String(), constant.ConfigurationKind),
 					Criteria:  componentCriteria,
 				},
 			},
@@ -175,7 +175,7 @@ var (
 			},
 		},
 		{
-			Primary: objectType(appsv1alpha1.SchemeGroupVersion.String(), constant.ConfigurationKind),
+			Primary: objectType(kbappsv1.SchemeGroupVersion.String(), constant.ConfigurationKind),
 			OwnedResources: []OwnedResource{
 				{
 					Secondary: objectType(corev1.SchemeGroupVersion.String(), constant.ConfigMapKind),
@@ -286,8 +286,8 @@ func resourceExists(apiVersion, kind string) (bool, error) {
 }
 
 var rootObjectType = viewv1.ObjectType{
-	APIVersion: appsv1alpha1.APIVersion,
-	Kind:       appsv1alpha1.ClusterKind,
+	APIVersion: kbappsv1.APIVersion,
+	Kind:       kbappsv1.ClusterKind,
 }
 
 var (

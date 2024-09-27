@@ -36,7 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
@@ -84,7 +84,7 @@ func (g *planGenerator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.R
 		i18nResource, _ = objs[0].(*corev1.ConfigMap)
 	}
 
-	root := &appsv1alpha1.Cluster{}
+	root := &kbappsv1.Cluster{}
 	objectKey := client.ObjectKeyFromObject(view)
 	if view.Spec.TargetObject != nil {
 		objectKey = client.ObjectKey{
@@ -168,7 +168,7 @@ func (g *planGenerator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.R
 	if err = g.cli.Get(g.ctx, objectKey, root); err != nil {
 		return kubebuilderx.Commit, err
 	}
-	desiredRoot := &appsv1alpha1.Cluster{}
+	desiredRoot := &kbappsv1.Cluster{}
 	if err = mClient.Get(g.ctx, objectKey, desiredRoot); err != nil {
 		return kubebuilderx.Commit, err
 	}
@@ -272,7 +272,7 @@ func applyDesiredSpec(desiredSpec string, obj client.Object) (string, error) {
 	return specChange, nil
 }
 
-func loadCurrentObjectTree(ctx context.Context, cli client.Client, root *appsv1alpha1.Cluster, ownershipRules []OwnershipRule, store ChangeCaptureStore) error {
+func loadCurrentObjectTree(ctx context.Context, cli client.Client, root *kbappsv1.Cluster, ownershipRules []OwnershipRule, store ChangeCaptureStore) error {
 	_, objectMap, err := getObjectsFromCache(ctx, cli, root, ownershipRules)
 	if err != nil {
 		return err

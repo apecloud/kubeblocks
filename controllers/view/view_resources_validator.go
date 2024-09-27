@@ -24,7 +24,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 )
@@ -54,7 +54,7 @@ func (r *resourcesValidator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuild
 		objectKey.Namespace = v.Spec.TargetObject.Namespace
 		objectKey.Name = v.Spec.TargetObject.Name
 	}
-	if err := r.reader.Get(r.ctx, objectKey, &appsv1alpha1.Cluster{}); err != nil {
+	if err := r.reader.Get(r.ctx, objectKey, &kbappsv1.Cluster{}); err != nil {
 		return kubebuilderx.Commit, err
 	}
 

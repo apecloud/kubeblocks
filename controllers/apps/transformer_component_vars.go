@@ -31,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
@@ -60,27 +59,15 @@ func (t *componentVarsTransformer) Transform(ctx graph.TransformContext, dag *gr
 	reader := &varsReader{transCtx.Client, graphCli, dag}
 	synthesizedComp := transCtx.SynthesizeComponent
 
-	legacy, err := generatedComponent4LegacyCluster(transCtx)
-	if err != nil {
-		return err
-	}
-
-	var templateVars map[string]any
-	var envVars []corev1.EnvVar
-	if legacy {
-		templateVars, envVars, err = component.ResolveEnvVars4LegacyCluster(transCtx.Context, reader,
-			synthesizedComp, transCtx.CompDef.Spec.Vars)
-	} else {
-		templateVars, envVars, err = component.ResolveTemplateNEnvVars(transCtx.Context, reader,
-			synthesizedComp, transCtx.CompDef.Spec.Vars)
-	}
+	templateVars, envVars, err := component.ResolveTemplateNEnvVars(transCtx.Context, reader,
+		synthesizedComp, transCtx.CompDef.Spec.Vars)
 	if err != nil {
 		return err
 	}
 
 	// pass all direct value env vars through CM
-	envVars2, envData := buildEnvVarsNData(synthesizedComp, envVars, legacy)
-	setTemplateNEnvVars(synthesizedComp, templateVars, envVars2, legacy)
+	envVars2, envData := buildEnvVarsNData(envVars)
+	setTemplateNEnvVars(synthesizedComp, templateVars, envVars2)
 
 	if err := createOrUpdateEnvConfigMap(ctx, dag, envData); err != nil {
 		return err
@@ -88,39 +75,13 @@ func (t *componentVarsTransformer) Transform(ctx graph.TransformContext, dag *gr
 	return nil
 }
 
-// generatedComponent4LegacyCluster checks whether the cluster to which this component belongs was created before 0.8.
-func generatedComponent4LegacyCluster(transCtx *componentTransformContext) (bool, error) {
-	generated := component.IsGenerated(transCtx.ComponentOrig)
-	if !generated {
-		return false, nil
-	}
-
-	synthesizedComp := transCtx.SynthesizeComponent
-	itsObj := &workloads.InstanceSet{}
-	itsKey := types.NamespacedName{
-		Namespace: synthesizedComp.Namespace,
-		Name:      constant.GenerateWorkloadNamePattern(synthesizedComp.ClusterName, synthesizedComp.Name),
-	}
-	if err := transCtx.Client.Get(transCtx.Context, itsKey, itsObj); err != nil {
-		return false, client.IgnoreNotFound(err)
-	}
-
-	return !model.IsOwnerOf(transCtx.ComponentOrig, itsObj), nil
-}
-
-func buildEnvVarsNData(synthesizedComp *component.SynthesizedComponent, vars []corev1.EnvVar, legacy bool) ([]corev1.EnvVar, map[string]string) {
-	envData := make(map[string]string)
-
-	// for legacy cluster, don't move direct values into ConfigMap
-	if legacy {
-		return vars, envData
-	}
-
+func buildEnvVarsNData(vars []corev1.EnvVar) ([]corev1.EnvVar, map[string]string) {
 	hasReference := func(v corev1.EnvVar) bool {
 		return len(component.VarReferenceRegExp().FindAllStringSubmatchIndex(v.Value, -1)) > 0
 	}
 
 	envVars := make([]corev1.EnvVar, 0)
+	envData := make(map[string]string)
 	for i, v := range vars {
 		if v.ValueFrom != nil || hasReference(v) {
 			envVars = append(envVars, vars[i])
@@ -131,12 +92,8 @@ func buildEnvVarsNData(synthesizedComp *component.SynthesizedComponent, vars []c
 	return envVars, envData
 }
 
-func setTemplateNEnvVars(synthesizedComp *component.SynthesizedComponent, templateVars map[string]any, envVars []corev1.EnvVar, legacy bool) {
+func setTemplateNEnvVars(synthesizedComp *component.SynthesizedComponent, templateVars map[string]any, envVars []corev1.EnvVar) {
 	envSource := envConfigMapSource(synthesizedComp.ClusterName, synthesizedComp.Name)
-	if legacy {
-		envSource.ConfigMapRef.Optional = nil
-	}
-
 	synthesizedComp.TemplateVars = templateVars
 	synthesizedComp.EnvVars = envVars
 	synthesizedComp.EnvFromSources = []corev1.EnvFromSource{envSource}
@@ -173,7 +130,9 @@ func createOrUpdateEnvConfigMap(ctx graph.TransformContext, dag *graph.DAG, data
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	if err != nil { // not-found
 		obj := builder.NewConfigMapBuilder(envKey.Namespace, envKey.Name).
-			AddLabelsInMap(constant.GetComponentWellKnownLabels(synthesizedComp.ClusterName, synthesizedComp.Name)).
+			AddLabelsInMap(constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name)).
+			AddLabelsInMap(synthesizedComp.StaticLabels).
+			AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
 			SetData(data).
 			GetObject()
 		if err := setCompOwnershipNFinalizer(transCtx.Component, obj); err != nil {

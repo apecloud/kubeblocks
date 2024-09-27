@@ -37,7 +37,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	"github.com/apecloud/kubeblocks/pkg/gotemplate"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
@@ -335,8 +335,8 @@ var _ = Describe("ReloadUtil Test", func() {
 				name: "test2",
 				args: []ConfigSpecMeta{{
 					ConfigSpecInfo: ConfigSpecInfo{
-						ConfigSpec: appsv1alpha1.ComponentConfigSpec{
-							ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+						ConfigSpec: appsv1.ComponentConfigSpec{
+							ComponentTemplateSpec: appsv1.ComponentTemplateSpec{
 								Name:        "test",
 								TemplateRef: "test_cm",
 							}},
@@ -347,8 +347,8 @@ var _ = Describe("ReloadUtil Test", func() {
 				name: "test3",
 				args: []ConfigSpecMeta{{
 					ConfigSpecInfo: ConfigSpecInfo{
-						ConfigSpec: appsv1alpha1.ComponentConfigSpec{
-							ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+						ConfigSpec: appsv1.ComponentConfigSpec{
+							ComponentTemplateSpec: appsv1.ComponentTemplateSpec{
 								Name:        "test",
 								TemplateRef: "test_cm",
 							},
@@ -358,8 +358,8 @@ var _ = Describe("ReloadUtil Test", func() {
 					},
 				}, {
 					ConfigSpecInfo: ConfigSpecInfo{
-						ConfigSpec: appsv1alpha1.ComponentConfigSpec{
-							ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+						ConfigSpec: appsv1.ComponentConfigSpec{
+							ComponentTemplateSpec: appsv1.ComponentTemplateSpec{
 								Name:        "test2",
 								TemplateRef: "test_cm",
 							},
@@ -372,8 +372,8 @@ var _ = Describe("ReloadUtil Test", func() {
 				name: "test4",
 				args: []ConfigSpecMeta{{
 					ConfigSpecInfo: ConfigSpecInfo{
-						ConfigSpec: appsv1alpha1.ComponentConfigSpec{
-							ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+						ConfigSpec: appsv1.ComponentConfigSpec{
+							ComponentTemplateSpec: appsv1.ComponentTemplateSpec{
 								Name:        "test",
 								TemplateRef: "test_cm",
 							},
@@ -383,8 +383,8 @@ var _ = Describe("ReloadUtil Test", func() {
 					},
 				}, {
 					ConfigSpecInfo: ConfigSpecInfo{
-						ConfigSpec: appsv1alpha1.ComponentConfigSpec{
-							ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+						ConfigSpec: appsv1.ComponentConfigSpec{
+							ComponentTemplateSpec: appsv1.ComponentTemplateSpec{
 								Name:        "test2",
 								TemplateRef: "test_cm",
 							},

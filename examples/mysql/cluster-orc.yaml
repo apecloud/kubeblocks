@@ -1,0 +1,75 @@
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: mysql-cluster
+  namespace: default
+spec:
+  # Specifies the behavior when a Cluster is deleted.
+  # - `DoNotTerminate`: Prevents deletion of the Cluster. This policy ensures that all resources remain intact.
+  # - `Halt`: Deletes Cluster resources like Pods and Services but retains Persistent Volume Claims (PVCs), allowing for data preservation while stopping other operations.
+  # - `Delete`: Extends the `Halt` policy by also removing PVCs, leading to a thorough cleanup while removing all persistent data.
+  # - `WipeOut`: An aggressive policy that deletes all Cluster resources, including volume snapshots and backups in external storage. This results in complete data removal and should be used cautiously, primarily in non-production environments to avoid irreversible data loss.
+  terminationPolicy: Delete
+  # Specifies a list of ClusterComponentSpec objects used to define the individual components that make up a Cluster. This field allows for detailed configuration of each component within the Cluster.
+  # Note: `shardingSpecs` and `componentSpecs` cannot both be empty; at least one must be defined to configure a cluster.
+  # ClusterComponentSpec defines the specifications for a Component in a Cluster.
+  componentSpecs:
+  - name: mysql
+    componentDef: mysql-8.0.33-orc
+    disableExporter: true
+    replicas: 1
+    serviceAccountName: kb-mysql-cluster
+    resources:
+      limits:
+        cpu: '0.5'
+        memory: 0.5Gi
+      requests:
+        cpu: '0.5'
+        memory: 0.5Gi
+    volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi
+    serviceRefs:
+        - name: orchestrator
+          namespace: default
+          clusterServiceSelector:
+            cluster: orchestratorm-cluster
+            service:
+              component: orchestrator
+              service: orchestrator
+              port: http
+---
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: orchestratorm-cluster
+  namespace: default
+  annotations:
+    "kubeblocks.io/extra-env": '{"ORC_TOPOLOGY_PASSWORD":"orchestrator","ORC_META_PASSWORD":"orchestrator","ORC_META_DATABASE":"orchestrator"}'
+spec:
+  terminationPolicy: Delete
+  componentSpecs:
+    - name: orchestrator
+      componentDef: orchestrator-raft
+      disableExporter: true
+      replicas: 3
+      resources:
+        requests:
+          cpu: '0.5'
+          memory: 0.5Gi
+        limits:
+          cpu: '0.5'
+          memory: 0.5Gi
+      volumeClaimTemplates:
+        - name: data
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 20Gi

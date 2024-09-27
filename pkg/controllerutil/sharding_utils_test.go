@@ -25,7 +25,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
@@ -63,7 +63,7 @@ var _ = Describe("cluster shard component", func() {
 		)
 
 		var (
-			cluster *appsv1alpha1.Cluster
+			cluster *appsv1.Cluster
 		)
 
 		BeforeEach(func() {
@@ -81,17 +81,17 @@ var _ = Describe("cluster shard component", func() {
 		It("generate sharding component spec test", func() {
 			By("create mock sharding component object")
 			mockCompObj := testapps.NewComponentFactory(testCtx.DefaultNamespace, cluster.Name+"-"+mysqlShardingCompName, "").
+				AddAnnotations(constant.KBAppClusterUIDKey, string(cluster.UID)).
 				AddLabels(constant.AppInstanceLabelKey, cluster.Name).
-				AddLabels(constant.KBAppClusterUIDLabelKey, string(cluster.UID)).
 				AddLabels(constant.KBAppShardingNameLabelKey, mysqlShardingName).
 				SetReplicas(1).
 				Create(&testCtx).
 				GetObject()
 			compKey := client.ObjectKeyFromObject(mockCompObj)
-			Eventually(testapps.CheckObjExists(&testCtx, compKey, &appsv1alpha1.Component{}, true)).Should(Succeed())
+			Eventually(testapps.CheckObjExists(&testCtx, compKey, &appsv1.Component{}, true)).Should(Succeed())
 
-			shardingSpec := &appsv1alpha1.ShardingSpec{
-				Template: appsv1alpha1.ClusterComponentSpec{
+			shardingSpec := &appsv1.ShardingSpec{
+				Template: appsv1.ClusterComponentSpec{
 					Replicas: 2,
 				},
 				Name:   mysqlShardingName,

@@ -25,7 +25,7 @@ import (
 	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/gotemplate"
@@ -38,7 +38,7 @@ type ResourceDefinition struct {
 }
 
 type builtInObjects struct {
-	cluster   *appsv1alpha1.Cluster
+	cluster   *appsv1.Cluster
 	podSpec   *corev1.PodSpec
 	component *component.SynthesizedComponent
 }
@@ -51,7 +51,7 @@ const (
 	builtinClusterDomainObject = "clusterDomain"
 )
 
-func buildInComponentObjects(podSpec *corev1.PodSpec, component *component.SynthesizedComponent, cluster *appsv1alpha1.Cluster) *builtInObjects {
+func buildInComponentObjects(podSpec *corev1.PodSpec, component *component.SynthesizedComponent, cluster *appsv1.Cluster) *builtInObjects {
 	return &builtInObjects{
 		podSpec:   podSpec,
 		component: component,

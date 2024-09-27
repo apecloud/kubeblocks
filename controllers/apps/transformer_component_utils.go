@@ -28,12 +28,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-func setCompOwnershipNFinalizer(comp *appsv1alpha1.Component, object client.Object) error {
+func setCompOwnershipNFinalizer(comp *appsv1.Component, object client.Object) error {
 	if skipSetCompOwnershipNFinalizer(object) {
 		return nil
 	}
@@ -51,21 +51,21 @@ func setCompOwnershipNFinalizer(comp *appsv1alpha1.Component, object client.Obje
 // skipSetCompOwnershipNFinalizer returns true if the object should not be set ownership to the component
 func skipSetCompOwnershipNFinalizer(obj client.Object) bool {
 	switch obj.(type) {
-	case *rbacv1.ClusterRoleBinding, *corev1.PersistentVolume, *corev1.PersistentVolumeClaim, *corev1.Pod:
+	case *corev1.PersistentVolume, *corev1.PersistentVolumeClaim, *corev1.Pod:
 		return true
 	default:
 		return false
 	}
 }
 
-func addFinalizer(obj client.Object, comp *appsv1alpha1.Component) {
+func addFinalizer(obj client.Object, comp *appsv1.Component) {
 	if skipAddCompFinalizer(obj, comp) {
 		return
 	}
 	controllerutil.AddFinalizer(obj, constant.DBComponentFinalizerName)
 }
 
-func skipAddCompFinalizer(obj client.Object, comp *appsv1alpha1.Component) bool {
+func skipAddCompFinalizer(obj client.Object, comp *appsv1.Component) bool {
 	// Due to compatibility reasons, the component controller creates cluster-scoped RoleBinding and ServiceAccount objects in the following two scenarios:
 	// 1. When the user does not specify a ServiceAccount, KubeBlocks automatically creates a ServiceAccount and a RoleBinding with named pattern kb-{cluster.Name}.
 	// 2. When the user specifies a ServiceAccount that does not exist, KubeBlocks will automatically create a ServiceAccount and a RoleBinding with the same name.

@@ -11,6 +11,7 @@ spec:
   {{- end }}
   selector:
     matchLabels:
+      app.kubernetes.io/component: "apps"
       {{- include "kubeblocks.selectorLabels" . | nindent 6 }}
       {{- with .Values.extraLabels }}
         {{- toYaml . | nindent 6 }}
@@ -26,6 +27,7 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       labels:
+        app.kubernetes.io/component: "apps"
         {{- include "kubeblocks.selectorLabels" . | nindent 8 }}
         {{- with .Values.extraLabels }}
           {{- toYaml . | nindent 8 }}
@@ -176,6 +178,8 @@ spec:
               value: {{ .Values.featureGates.componentReplicasAnnotation.enabled | quote }}
             - name: IN_PLACE_POD_VERTICAL_SCALING
               value: {{ .Values.featureGates.inPlacePodVerticalScaling.enabled | quote }}
+            - name: NO_RSM_ENV
+              value: {{ .Values.featureGates.noRSMEnv.enabled | quote }}
           {{- with .Values.securityContext }}
           securityContext:
             {{- toYaml . | nindent 12 }}

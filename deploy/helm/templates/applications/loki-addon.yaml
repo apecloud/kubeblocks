@@ -38,7 +38,6 @@ spec:
 
   defaultInstallValues:
     - replicas: 1
-      storageClass:
       resources:
         requests:
           storage: 8Gi

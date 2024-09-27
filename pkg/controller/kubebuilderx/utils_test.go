@@ -26,12 +26,12 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/golang/mock/gomock"
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
@@ -48,7 +48,7 @@ var _ = Describe("utils test", func() {
 			controller, k8sMock := testutil.SetupK8sMock()
 			defer controller.Finish()
 
-			root := builder.NewStatefulSetBuilder(namespace, name).GetObject()
+			root := builder.NewInstanceSetBuilder(namespace, name).GetObject()
 			obj0 := builder.NewPodBuilder(namespace, name+"-0").GetObject()
 			obj1 := builder.NewPodBuilder(namespace, name+"-1").GetObject()
 			obj2 := builder.NewPodBuilder(namespace, name+"-2").GetObject()
@@ -57,8 +57,8 @@ var _ = Describe("utils test", func() {
 			}
 
 			k8sMock.EXPECT().
-				Get(gomock.Any(), gomock.Any(), &appsv1.StatefulSet{}, gomock.Any()).
-				DoAndReturn(func(_ context.Context, objKey client.ObjectKey, obj *appsv1.StatefulSet, _ ...client.GetOption) error {
+				Get(gomock.Any(), gomock.Any(), &workloads.InstanceSet{}, gomock.Any()).
+				DoAndReturn(func(_ context.Context, objKey client.ObjectKey, obj *workloads.InstanceSet, _ ...client.GetOption) error {
 					*obj = *root
 					return nil
 				}).Times(1)
@@ -71,7 +71,7 @@ var _ = Describe("utils test", func() {
 				}).Times(1)
 			req := ctrl.Request{NamespacedName: client.ObjectKeyFromObject(root)}
 			ml := client.MatchingLabels{"foo": "bar"}
-			tree, err := ReadObjectTree[*appsv1.StatefulSet](context.Background(), k8sMock, req, ml, &corev1.PodList{})
+			tree, err := ReadObjectTree[*workloads.InstanceSet](context.Background(), k8sMock, req, ml, &corev1.PodList{})
 			Expect(err).Should(BeNil())
 			Expect(tree.GetRoot()).ShouldNot(BeNil())
 			Expect(tree.GetRoot()).Should(Equal(root))

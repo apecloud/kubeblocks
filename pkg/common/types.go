@@ -22,7 +22,7 @@ package common
 import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
 // PodRoleNamePair defines a pod name and role name pair.
@@ -47,6 +47,6 @@ type GlobalRoleSnapshot struct {
 
 // Exporter defines the built-in metrics exporter.
 type Exporter struct {
-	appsv1alpha1.Exporter `json:",inline"`
-	TargetPort            *intstr.IntOrString `json:"targetPort,omitempty"`
+	appsv1.Exporter `json:",inline"`
+	TargetPort      *intstr.IntOrString `json:"targetPort,omitempty"`
 }

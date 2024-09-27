@@ -91,7 +91,7 @@ KubeCon 2024 in HongKong from 21-23 August 2024: [KuaiShou's 100% Resource Utili
 
 If you have any questions, you can reach out to us through:
 
-- KubeBlocks [Slack Channel](https://join.slack.com/t/kubeblocks/shared_invite/zt-2njvf6bxx-WwWIEH9MlWp5LrkS7h8qFQ)
+- KubeBlocks [Slack Channel](https://join.slack.com/t/kubeblocks/shared_invite/zt-2pjob3ezp-FzaZM7NId~Tbzp6PYNbOzQ)
 - KubeBlocks Github [Discussions](https://github.com/apecloud/kubeblocks/discussions)
 - KubeBlocks Wechat Account:
 

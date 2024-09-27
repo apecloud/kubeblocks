@@ -23,14 +23,17 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	"github.com/golang/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	"github.com/apecloud/kubeblocks/pkg/configuration/validate"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 )
 
@@ -81,6 +84,27 @@ my friend name is test2
 			context, err := emptyTplEngine(&pp, nil, tplString)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(context).To(Equal(expectString))
+		})
+	})
+
+	Context("ssh-key-generator", func() {
+		It("Should success with no error", func() {
+			tplString := `
+{{- $key := sshKeyGen }}
+private_key={{ $key.PrivateKey | quote }}
+public_key={{ $key.PublicKey | quote }}
+`
+
+			context, err := emptyTplEngine(&TplValues{
+				"cluster": map[string]string{"name": "cluster"},
+				"name":    "component_name",
+			}, nil, tplString)
+			Expect(err).NotTo(HaveOccurred())
+
+			keyValue, err := validate.LoadConfigObjectFromContent(appsv1beta1.Dotenv, context)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(keyValue).To(HaveKey("private_key"))
+			Expect(keyValue).To(HaveKey("public_key"))
 		})
 	})
 

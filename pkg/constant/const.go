@@ -23,14 +23,7 @@ const (
 	APIGroup = "kubeblocks.io"
 	AppName  = "kubeblocks"
 
-	RBACRoleName        = "kubeblocks-cluster-pod-role"
-	RBACClusterRoleName = "kubeblocks-volume-protection-pod-role"
-)
-
-// TODO: deprecated, will be removed later.
-const (
-	KBComponentEnvCMPlaceHolder = "$(COMP_ENV_CM_NAME)"
-	KBToolsImagePlaceHolder     = "$(KUBEBLOCKS_TOOLS_IMAGE)"
+	RBACRoleName = "kubeblocks-cluster-pod-role"
 )
 
 const (
@@ -45,7 +38,6 @@ const (
 	PodKind            = "Pod"
 	JobKind            = "Job"
 	VolumeSnapshotKind = "VolumeSnapshot"
-	ServiceKind        = "Service"
 )
 
 // username and password are keys in created secrets for others to refer to.
@@ -60,19 +52,16 @@ const (
 )
 
 const (
-	KBPrefix                        = "KB"
-	KBLowerPrefix                   = "kb"
-	KBGeneratedVirtualCompDefPrefix = "KB_GENERATED_VIRTUAL_COMP_DEF"
-	SlashScalingLowerSuffix         = "scaling"
+	KBPrefix                = "KB"
+	KBLowerPrefix           = "kb"
+	SlashScalingLowerSuffix = "scaling"
 )
 
 const (
 	KubeblocksAPIConversionTypeAnnotationName = "api.kubeblocks.io/converted"
 	SourceAPIVersionAnnotationName            = "api.kubeblocks.io/source"
 
-	SourceAPIVersion   = "source"
 	MigratedAPIVersion = "migrated"
-	ReviewAPIVersion   = "reviewer"
 )
 
 const InvalidContainerPort int32 = 0

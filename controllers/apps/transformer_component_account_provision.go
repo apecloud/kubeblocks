@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
-	"fmt"
 	"strings"
 
 	"golang.org/x/exp/slices"
@@ -29,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -63,7 +62,7 @@ func (t *componentAccountProvisionTransformer) Transform(ctx graph.TransformCont
 	if len(transCtx.SynthesizeComponent.SystemAccounts) == 0 {
 		return nil
 	}
-	if transCtx.Component.Status.Phase != appsv1alpha1.RunningClusterCompPhase {
+	if transCtx.Component.Status.Phase != appsv1.RunningClusterCompPhase {
 		return nil
 	}
 	// TODO: (good-first-issue) if the component's account is deleted by user, we should re-provision it
@@ -73,7 +72,7 @@ func (t *componentAccountProvisionTransformer) Transform(ctx graph.TransformCont
 	}
 
 	lifecycleActions := transCtx.CompDef.Spec.LifecycleActions
-	if !component.IsGenerated(transCtx.Component) && (lifecycleActions == nil || lifecycleActions.AccountProvision == nil) {
+	if lifecycleActions == nil || lifecycleActions.AccountProvision == nil {
 		return nil
 	}
 
@@ -155,7 +154,7 @@ func (t *componentAccountProvisionTransformer) markProvisioned(transCtx *compone
 	transCtx.Component.Status.Conditions = conditions
 }
 
-func (t *componentAccountProvisionTransformer) isAccountProvisioned(cond metav1.Condition, account appsv1alpha1.SystemAccount) bool {
+func (t *componentAccountProvisionTransformer) isAccountProvisioned(cond metav1.Condition, account appsv1.SystemAccount) bool {
 	if len(cond.Message) == 0 {
 		return false
 	}
@@ -163,7 +162,7 @@ func (t *componentAccountProvisionTransformer) isAccountProvisioned(cond metav1.
 	return slices.Contains(accounts, account.Name)
 }
 
-func (t *componentAccountProvisionTransformer) markAccountProvisioned(cond *metav1.Condition, account appsv1alpha1.SystemAccount) {
+func (t *componentAccountProvisionTransformer) markAccountProvisioned(cond *metav1.Condition, account appsv1.SystemAccount) {
 	if len(cond.Message) == 0 {
 		cond.Message = account.Name
 		return
@@ -178,28 +177,12 @@ func (t *componentAccountProvisionTransformer) markAccountProvisioned(cond *meta
 
 func (t *componentAccountProvisionTransformer) lifecycleAction(transCtx *componentTransformContext) (lifecycle.Lifecycle, error) {
 	synthesizedComp := transCtx.SynthesizeComponent
-
-	// TODO(v1.0): remove this, and use the role selector in lifecycle action.
-	roleName := ""
-	for _, role := range synthesizedComp.Roles {
-		if role.Serviceable && role.Writable {
-			roleName = role.Name
-		}
-	}
-	if roleName == "" {
-		return nil, nil
-	}
-
-	pods, err := component.ListOwnedPodsWithRole(transCtx.Context, transCtx.Client,
-		synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name, roleName)
+	pods, err := component.ListOwnedPods(transCtx.Context, transCtx.Client,
+		synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name)
 	if err != nil {
 		return nil, err
 	}
-	if len(pods) == 0 {
-		return nil, fmt.Errorf("unable to find appropriate pods to create accounts")
-	}
-
-	lfa, err := lifecycle.New(transCtx.SynthesizeComponent, pods[0])
+	lfa, err := lifecycle.New(transCtx.SynthesizeComponent, nil, pods...)
 	if err != nil {
 		return nil, err
 	}
@@ -207,7 +190,7 @@ func (t *componentAccountProvisionTransformer) lifecycleAction(transCtx *compone
 }
 
 func (t *componentAccountProvisionTransformer) provisionAccount(transCtx *componentTransformContext,
-	_ metav1.Condition, lfa lifecycle.Lifecycle, account appsv1alpha1.SystemAccount) error {
+	_ metav1.Condition, lfa lifecycle.Lifecycle, account appsv1.SystemAccount) error {
 
 	synthesizedComp := transCtx.SynthesizeComponent
 	secret, err := t.getAccountSecret(transCtx, synthesizedComp, account)
@@ -220,17 +203,12 @@ func (t *componentAccountProvisionTransformer) provisionAccount(transCtx *compon
 		return nil
 	}
 
-	vars := map[string]string{
-		"$(USERNAME)": string(username),
-		"$(PASSWD)":   string(password),
-	}
-	stmt := component.ReplaceNamedVars(vars, account.Statement, -1, true)
-	err = lfa.AccountProvision(transCtx.Context, transCtx.Client, nil, string(username), string(password), stmt)
+	err = lfa.AccountProvision(transCtx.Context, transCtx.Client, nil, account.Statement, string(username), string(password))
 	return lifecycle.IgnoreNotDefined(err)
 }
 
 func (t *componentAccountProvisionTransformer) getAccountSecret(ctx graph.TransformContext,
-	synthesizeComp *component.SynthesizedComponent, account appsv1alpha1.SystemAccount) (*corev1.Secret, error) {
+	synthesizeComp *component.SynthesizedComponent, account appsv1.SystemAccount) (*corev1.Secret, error) {
 	secretKey := types.NamespacedName{
 		Namespace: synthesizeComp.Namespace,
 		Name:      constant.GenerateAccountSecretName(synthesizeComp.ClusterName, synthesizeComp.Name, account.Name),

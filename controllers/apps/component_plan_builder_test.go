@@ -27,7 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
@@ -77,7 +77,7 @@ var _ = Describe("component plan builder test", func() {
 			compObj := testapps.NewComponentFactory(testCtx.DefaultNamespace, compName, compDefName).WithRandomName().GetObject()
 			Expect(testCtx.Cli.Create(testCtx.Ctx, compObj)).Should(Succeed())
 			compKey := client.ObjectKeyFromObject(compObj)
-			Eventually(testapps.CheckObjExists(&testCtx, compKey, &appsv1alpha1.Component{}, true)).Should(Succeed())
+			Eventually(testapps.CheckObjExists(&testCtx, compKey, &appsv1.Component{}, true)).Should(Succeed())
 
 			req := ctrl.Request{
 				NamespacedName: compKey,

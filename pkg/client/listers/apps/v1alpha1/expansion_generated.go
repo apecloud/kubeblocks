@@ -54,18 +54,6 @@ type ComponentVersionListerExpansion interface{}
 // ConfigConstraintLister.
 type ConfigConstraintListerExpansion interface{}
 
-// OpsDefinitionListerExpansion allows custom methods to be added to
-// OpsDefinitionLister.
-type OpsDefinitionListerExpansion interface{}
-
-// OpsRequestListerExpansion allows custom methods to be added to
-// OpsRequestLister.
-type OpsRequestListerExpansion interface{}
-
-// OpsRequestNamespaceListerExpansion allows custom methods to be added to
-// OpsRequestNamespaceLister.
-type OpsRequestNamespaceListerExpansion interface{}
-
 // ServiceDescriptorListerExpansion allows custom methods to be added to
 // ServiceDescriptorLister.
 type ServiceDescriptorListerExpansion interface{}

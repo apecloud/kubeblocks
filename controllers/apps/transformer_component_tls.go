@@ -22,6 +22,7 @@ package apps
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -29,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -144,25 +146,40 @@ func buildTLSCert(ctx context.Context, cli client.Reader, synthesizedComp compon
 	}
 
 	switch tls.Issuer.Name {
-	case appsv1alpha1.IssuerUserProvided:
+	case appsv1.IssuerUserProvided:
 		if err := plan.CheckTLSSecretRef(ctx, cli, synthesizedComp.Namespace, tls.Issuer.SecretRef); err != nil {
 			return err
 		}
-	case appsv1alpha1.IssuerKubeBlocks:
-		secretName := plan.GenerateTLSSecretName(synthesizedComp.ClusterName, synthesizedComp.Name)
-		preSecret := &corev1.Secret{}
-		if err := cli.Get(ctx, types.NamespacedName{Namespace: synthesizedComp.Namespace, Name: secretName}, preSecret); !errors.IsNotFound(err) {
-			return err
-		}
-		secret, err := plan.ComposeTLSSecret(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name)
-		if err != nil {
-			return err
-		}
+	case appsv1.IssuerKubeBlocks:
 		graphCli, _ := cli.(model.GraphClient)
-		graphCli.Create(dag, secret)
+		secretName := plan.GenerateTLSSecretName(synthesizedComp.ClusterName, synthesizedComp.Name)
+		existSecret := &corev1.Secret{}
+		err := cli.Get(ctx, types.NamespacedName{Namespace: synthesizedComp.Namespace, Name: secretName}, existSecret)
+		if err != nil {
+			if errors.IsNotFound(err) {
+				secret, err := plan.ComposeTLSSecret(synthesizedComp)
+				if err != nil {
+					return err
+				}
+				graphCli.Create(dag, secret)
+				return nil
+			}
+			return err
+		} else {
+			updateTLSSecretMeta(existSecret, graphCli, dag, synthesizedComp)
+		}
 	}
-
 	return nil
+}
+
+func updateTLSSecretMeta(existSecret *corev1.Secret, graphCli model.GraphClient, dag *graph.DAG, synthesizedComp component.SynthesizedComponent) {
+	secretProto := plan.BuildTLSSecret(synthesizedComp)
+	existSecretCopy := existSecret.DeepCopy()
+	existSecretCopy.Labels = secretProto.Labels
+	existSecretCopy.Annotations = secretProto.Annotations
+	if !reflect.DeepEqual(existSecret, existSecretCopy) {
+		graphCli.Update(dag, existSecret, existSecretCopy)
+	}
 }
 
 func updateTLSVolumeAndVolumeMount(podSpec *corev1.PodSpec, clusterName string, synthesizeComp component.SynthesizedComponent) error {
@@ -199,18 +216,18 @@ func composeTLSVolume(clusterName string, synthesizeComp component.SynthesizedCo
 	if tls.Issuer == nil {
 		return nil, fmt.Errorf("issuer shouldn't be nil when TLS enabled")
 	}
-	if tls.Issuer.Name == appsv1alpha1.IssuerUserProvided && tls.Issuer.SecretRef == nil {
+	if tls.Issuer.Name == appsv1.IssuerUserProvided && tls.Issuer.SecretRef == nil {
 		return nil, fmt.Errorf("secret ref shouldn't be nil when issuer is UserProvided")
 	}
 
 	var secretName, ca, cert, key string
 	switch tls.Issuer.Name {
-	case appsv1alpha1.IssuerKubeBlocks:
+	case appsv1.IssuerKubeBlocks:
 		secretName = plan.GenerateTLSSecretName(clusterName, synthesizeComp.Name)
 		ca = constant.CAName
 		cert = constant.CertName
 		key = constant.KeyName
-	case appsv1alpha1.IssuerUserProvided:
+	case appsv1.IssuerUserProvided:
 		secretName = tls.Issuer.SecretRef.Name
 		ca = tls.Issuer.SecretRef.CA
 		cert = tls.Issuer.SecretRef.Cert

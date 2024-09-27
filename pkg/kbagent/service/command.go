@@ -25,7 +25,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"sync"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -38,9 +38,18 @@ const (
 	defaultBufferSize = 4096
 )
 
+type commandResult struct {
+	err    error
+	stdout *bytes.Buffer
+	stderr *bytes.Buffer
+}
+
 func gather[T interface{}](ch chan T) *T {
 	select {
-	case v := <-ch:
+	case v, ok := <-ch:
+		if !ok {
+			return nil
+		}
 		return &v
 	default:
 		return nil
@@ -48,52 +57,60 @@ func gather[T interface{}](ch chan T) *T {
 }
 
 func runCommand(ctx context.Context, action *proto.ExecAction, parameters map[string]string, timeout *int32) ([]byte, error) {
-	stdoutChan, _, errChan, err := runCommandNonBlocking(ctx, action, parameters, timeout)
+	resultChan, err := runCommandNonBlocking(ctx, action, parameters, timeout)
 	if err != nil {
 		return nil, err
 	}
-	err = <-errChan
+	result := <-resultChan
+	err = result.err
 	if err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			stderrMsg := result.stderr.String()
+			if len(stderrMsg) > 0 {
+				err = errors.Wrapf(proto.ErrFailed, "exec exit %d and stderr: %s", exitErr.ExitCode(), stderrMsg)
+			} else {
+				err = errors.Wrapf(proto.ErrFailed, "exec exit %d but stderr is blank", exitErr.ExitCode())
+			}
+		}
 		return nil, err
 	}
-	return <-stdoutChan, nil
+	return result.stdout.Bytes(), nil
 }
 
-func runCommandNonBlocking(ctx context.Context, action *proto.ExecAction, parameters map[string]string, timeout *int32) (chan []byte, chan []byte, chan error, error) {
+func runCommandNonBlocking(ctx context.Context, action *proto.ExecAction, parameters map[string]string, timeout *int32) (chan *commandResult, error) {
 	stdoutBuf := bytes.NewBuffer(make([]byte, 0, defaultBufferSize))
 	stderrBuf := bytes.NewBuffer(make([]byte, 0, defaultBufferSize))
 	execErrorChan, err := runCommandX(ctx, action, parameters, timeout, nil, stdoutBuf, stderrBuf)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, err
 	}
-
-	stdoutChan := make(chan []byte, defaultBufferSize)
-	stderrChan := make(chan []byte, defaultBufferSize)
-	errChan := make(chan error)
+	resultChan := make(chan *commandResult, 1)
 	go func() {
-		defer close(errChan)
-		defer close(stderrChan)
-		defer close(stdoutChan)
-
 		// wait for the command to finish
 		execErr, ok := <-execErrorChan
 		if !ok {
 			execErr = errors.New("runtime error: error chan closed unexpectedly")
 		}
-
-		stdoutChan <- stdoutBuf.Bytes()
-		stderrChan <- stderrBuf.Bytes()
-		errChan <- execErr
+		resultChan <- &commandResult{
+			err:    execErr,
+			stdout: stdoutBuf,
+			stderr: stderrBuf,
+		}
 	}()
-	return stdoutChan, stderrChan, errChan, nil
+	return resultChan, nil
 }
 
 func runCommandX(ctx context.Context, action *proto.ExecAction, parameters map[string]string, timeout *int32,
 	stdinReader io.Reader, stdoutWriter, stderrWriter io.Writer) (chan error, error) {
+	var timeoutCancel context.CancelFunc
 	if timeout != nil && *timeout > 0 {
-		timeoutCtx, cancel := context.WithTimeout(ctx, time.Duration(*timeout)*time.Second)
-		defer cancel()
-		ctx = timeoutCtx
+		ctx, timeoutCancel = context.WithTimeout(ctx, time.Duration(*timeout)*time.Second)
+	}
+	cancelTimeout := func() {
+		if timeoutCancel != nil {
+			timeoutCancel()
+		}
 	}
 
 	mergedArgs := func() []string {
@@ -106,14 +123,21 @@ func runCommandX(ctx context.Context, action *proto.ExecAction, parameters map[s
 	}()
 
 	mergedEnv := func() []string {
-		// env order: parameters (action specific variables) | os env (defined by vars) | user-defined env in action
-		env := util.EnvM2L(parameters)
-		if len(env) > 0 || len(action.Env) > 0 {
-			env = append(env, os.Environ()...)
+		// order: parameters (action specific variables) | var | action env
+		filterDuplicates := func(osEnv []string, filter func(string) bool) []string {
+			unionEnv := make([]string, 0, len(osEnv))
+			for _, e := range osEnv {
+				if filter(e) {
+					unionEnv = append(unionEnv, e)
+				}
+			}
+			return unionEnv
 		}
-		if len(action.Env) > 0 {
-			env = append(env, action.Env...)
-		}
+		env := append(util.EnvM2L(parameters), filterDuplicates(os.Environ(), func(env string) bool {
+			kv := strings.Split(env, "=")
+			_, ok := parameters[kv[0]]
+			return !ok
+		})...)
 		return env
 	}()
 
@@ -122,88 +146,28 @@ func runCommandX(ctx context.Context, action *proto.ExecAction, parameters map[s
 		cmd.Env = mergedEnv
 	}
 
-	var (
-		stdin          io.WriteCloser
-		stdout, stderr io.ReadCloser
-	)
-	if stdinReader != nil {
-		var stdinErr error
-		stdin, stdinErr = cmd.StdinPipe()
-		if stdinErr != nil {
-			return nil, errors.Wrapf(ErrInternalError, "failed to create stdin pipe: %v", stdinErr)
-		}
-	}
-	if stdoutWriter != nil {
-		var stdoutErr error
-		stdout, stdoutErr = cmd.StdoutPipe()
-		if stdoutErr != nil {
-			return nil, errors.Wrapf(ErrInternalError, "failed to create stdout pipe: %v", stdoutErr)
-		}
-	}
-	if stderrWriter != nil {
-		var stderrErr error
-		stderr, stderrErr = cmd.StderrPipe()
-		if stderrErr != nil {
-			return nil, errors.Wrapf(ErrInternalError, "failed to create stderr pipe: %v", stderrErr)
-		}
-	}
+	cmd.Stdin = stdinReader
+	cmd.Stdout = stdoutWriter
+	cmd.Stderr = stderrWriter
 
-	errChan := make(chan error)
+	errChan := make(chan error, 1)
 	go func() {
+		defer cancelTimeout()
 		defer close(errChan)
 
 		if err := cmd.Start(); err != nil {
 			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-				errChan <- ErrTimeout
+				errChan <- proto.ErrTimedOut
 			} else {
-				errChan <- errors.Wrapf(ErrFailed, "failed to start command: %v", err)
+				errChan <- errors.Wrapf(proto.ErrFailed, "failed to start command: %v", err)
 			}
 			return
 		}
 
-		var wg sync.WaitGroup
-		wg.Add(3)
-
-		go func() {
-			defer wg.Done()
-			if stdinReader != nil {
-				defer stdin.Close()
-				_, copyErr := io.Copy(stdin, stdinReader)
-				if copyErr != nil {
-					errChan <- errors.Wrapf(ErrFailed, "failed to copy from input reader to stdin: %v", copyErr)
-				}
-			}
-		}()
-		go func() {
-			defer wg.Done()
-			if stdoutWriter != nil {
-				_, copyErr := io.Copy(stdoutWriter, stdout)
-				if copyErr != nil {
-					errChan <- errors.Wrapf(ErrFailed, "failed to copy stdout to output writer: %v", copyErr)
-				}
-			}
-		}()
-		go func() {
-			defer wg.Done()
-			if stderrWriter != nil {
-				_, copyErr := io.Copy(stderrWriter, stderr)
-				if copyErr != nil {
-					errChan <- errors.Wrapf(ErrFailed, "failed to copy stderr to error writer: %v", copyErr)
-				}
-			}
-		}()
-
-		wg.Wait()
-
 		execErr := cmd.Wait()
 		if execErr != nil {
 			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-				execErr = ErrTimeout
-			} else {
-				var exitErr *exec.ExitError
-				if errors.As(execErr, &exitErr) && stderrWriter == nil {
-					execErr = errors.Wrap(ErrFailed, string(exitErr.Stderr))
-				}
+				execErr = proto.ErrTimedOut
 			}
 		}
 		errChan <- execErr

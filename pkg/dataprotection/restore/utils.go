@@ -306,6 +306,10 @@ func FormatRestoreTimeAndValidate(restoreTimeStr string, continuousBackup *dpv1a
 	}
 	restoreTimeStr = restoreTime.UTC().Format(time.RFC3339)
 	// TODO: check with Recoverable time
+
+	if continuousBackup.Status.TimeRange == nil || continuousBackup.Status.TimeRange.Start.IsZero() || continuousBackup.Status.TimeRange.End.IsZero() {
+		return restoreTimeStr, fmt.Errorf("invalid timeRange of the backup")
+	}
 	if !isTimeInRange(restoreTime, continuousBackup.Status.TimeRange.Start.Time, continuousBackup.Status.TimeRange.End.Time) {
 		return restoreTimeStr, fmt.Errorf("restore-to-time is out of time range, you can view the recoverable time: \n"+
 			"\tkbcli cluster describe %s -n %s", continuousBackup.Labels[constant.AppInstanceLabelKey], continuousBackup.Namespace)
@@ -317,7 +321,7 @@ func isTimeInRange(t time.Time, start time.Time, end time.Time) bool {
 	return !t.Before(start) && !t.After(end)
 }
 
-func GetRestoreFromBackupAnnotation(backup *dpv1alpha1.Backup, volumeRestorePolicy, restoreTime string, doReadyRestoreAfterClusterRunning bool) (string, error) {
+func GetRestoreFromBackupAnnotation(backup *dpv1alpha1.Backup, volumeRestorePolicy, restoreTime string, env []corev1.EnvVar, doReadyRestoreAfterClusterRunning bool) (string, error) {
 	componentName := backup.Labels[constant.KBAppShardingNameLabelKey]
 	if len(componentName) == 0 {
 		componentName = backup.Labels[constant.KBAppComponentLabelKey]
@@ -333,6 +337,14 @@ func GetRestoreFromBackupAnnotation(backup *dpv1alpha1.Backup, volumeRestorePoli
 	if restoreTime != "" {
 		restoreInfoMap[constant.RestoreTimeKeyForRestore] = restoreTime
 	}
+	if env != nil {
+		bytes, err := json.Marshal(env)
+		if err != nil {
+			return "", err
+		}
+		restoreInfoMap[constant.EnvForRestore] = string(bytes)
+	}
+
 	connectionPassword := backup.Annotations[dptypes.ConnectionPasswordAnnotationKey]
 	if connectionPassword != "" {
 		restoreInfoMap[constant.ConnectionPassword] = connectionPassword

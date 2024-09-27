@@ -41,16 +41,6 @@ spec:
     componentDef: kafka-combine
     tls: false
     replicas: 1
-    affinity:
-      podAntiAffinity: Preferred
-      topologyKeys:
-      - kubernetes.io/hostname
-      tenancy: SharedNode
-    tolerations:
-    - key: kb-data
-      operator: Equal
-      value: 'true'
-      effect: NoSchedule
     serviceAccountName: kb-kafka-cluster
     resources:
       limits:

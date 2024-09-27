@@ -32,7 +32,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -99,10 +99,10 @@ var _ = Describe("Restore", func() {
 		)
 
 		var (
-			compDef                 *appsv1alpha1.ComponentDefinition
-			cluster                 *appsv1alpha1.Cluster
+			compDef                 *appsv1.ComponentDefinition
+			cluster                 *appsv1.Cluster
 			synthesizedComponent    *component.SynthesizedComponent
-			compObj                 *appsv1alpha1.Component
+			compObj                 *appsv1.Component
 			pvc                     *corev1.PersistentVolumeClaim
 			backup                  *dpv1alpha1.Backup
 			fullBackupActionSet     *dpv1alpha1.ActionSet
@@ -118,13 +118,6 @@ var _ = Describe("Restore", func() {
 			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
 				AddComponent(defaultCompName, compDefName).
 				SetReplicas(3).
-				SetClusterAffinity(&appsv1alpha1.Affinity{
-					PodAntiAffinity: appsv1alpha1.Required,
-					TopologyKeys:    []string{topologyKey},
-					NodeLabels: map[string]string{
-						labelKey: labelValue,
-					},
-				}).
 				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 				Create(&testCtx).GetObject()
 
@@ -142,7 +135,6 @@ var _ = Describe("Restore", func() {
 				AddAppComponentLabel(defaultCompName).
 				AddAppManagedByLabel().
 				AddVolume(volume).
-				AddLabels(constant.ConsensusSetAccessModeLabelKey, string(appsv1alpha1.ReadWrite)).
 				AddContainer(corev1.Container{Name: testapps.DefaultMySQLContainerName, Image: testapps.ApeCloudMySQLImage}).
 				AddNodeName("fake-node-name").
 				Create(&testCtx).GetObject()
@@ -163,7 +155,7 @@ var _ = Describe("Restore", func() {
 				VolumeClaimTemplates: cluster.Spec.ComponentSpecs[0].ToVolumeClaimTemplates(),
 				Name:                 defaultCompName,
 				Replicas:             1,
-				Roles: []appsv1alpha1.ReplicaRole{
+				Roles: []appsv1.ReplicaRole{
 					{
 						Name:        "leader",
 						Serviceable: true,
@@ -180,8 +172,8 @@ var _ = Describe("Restore", func() {
 			}
 			By("create component object")
 			compObj = testapps.NewComponentFactory(testCtx.DefaultNamespace, cluster.Name+"-"+synthesizedComponent.Name, "").
+				AddAnnotations(constant.KBAppClusterUIDKey, string(cluster.UID)).
 				AddLabels(constant.AppInstanceLabelKey, cluster.Name).
-				AddLabels(constant.KBAppClusterUIDLabelKey, string(cluster.UID)).
 				SetReplicas(1).
 				Create(&testCtx).
 				GetObject()
@@ -217,14 +209,14 @@ var _ = Describe("Restore", func() {
 		It("Test restore", func() {
 			By("restore from backup")
 			restoreFromBackup := fmt.Sprintf(`{"%s": {"name":"%s"}}`, defaultCompName, backup.Name)
-			Expect(testapps.ChangeObj(&testCtx, cluster, func(tmpCluster *appsv1alpha1.Cluster) {
+			Expect(testapps.ChangeObj(&testCtx, cluster, func(tmpCluster *appsv1.Cluster) {
 				tmpCluster.Annotations = map[string]string{
 					constant.RestoreFromBackupAnnotationKey: restoreFromBackup,
 				}
 			})).Should(Succeed())
 			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(cluster), cluster)).Should(Succeed())
 			restoreMGR := NewRestoreManager(ctx, k8sClient, cluster, scheme.Scheme, nil, 3, 0)
-			err := restoreMGR.DoRestore(synthesizedComponent, compObj, false)
+			err := restoreMGR.DoRestore(synthesizedComponent, compObj, true)
 			Expect(intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeNeedWaiting)).Should(BeTrue())
 
 			By("mock restore of prepareData stage to Completed")
@@ -236,20 +228,20 @@ var _ = Describe("Restore", func() {
 
 			By("mock component and cluster phase to Running")
 			Expect(testapps.ChangeObjStatus(&testCtx, cluster, func() {
-				cluster.Status.Phase = appsv1alpha1.RunningClusterPhase
-				cluster.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
+				cluster.Status.Phase = appsv1.RunningClusterPhase
+				cluster.Status.Components = map[string]appsv1.ClusterComponentStatus{
 					defaultCompName: {
-						Phase: appsv1alpha1.RunningClusterCompPhase,
+						Phase: appsv1.RunningClusterCompPhase,
 					},
 				}
 			})).Should(Succeed())
 			Expect(testapps.ChangeObjStatus(&testCtx, compObj, func() {
-				compObj.Status.Phase = appsv1alpha1.RunningClusterCompPhase
+				compObj.Status.Phase = appsv1.RunningClusterCompPhase
 			})).Should(Succeed())
 
 			By("wait for postReady restore created and mock it to Completed")
 			restoreMGR.Cluster = cluster
-			_ = restoreMGR.DoRestore(synthesizedComponent, compObj, false)
+			_ = restoreMGR.DoRestore(synthesizedComponent, compObj, true)
 
 			// check if restore CR of postReady stage is created.
 			restoreMeta = restoreMGR.GetRestoreObjectMeta(synthesizedComponent, dpv1alpha1.PostReady, "")
@@ -262,8 +254,8 @@ var _ = Describe("Restore", func() {
 			})()).ShouldNot(HaveOccurred())
 
 			By("clean up annotations after cluster running")
-			_ = restoreMGR.DoRestore(synthesizedComponent, compObj, false)
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, tmpCluster *appsv1alpha1.Cluster) {
+			_ = restoreMGR.DoRestore(synthesizedComponent, compObj, true)
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(cluster), func(g Gomega, tmpCluster *appsv1.Cluster) {
 				g.Expect(tmpCluster.Annotations[constant.RestoreFromBackupAnnotationKey]).Should(BeEmpty())
 			})).Should(Succeed())
 		})

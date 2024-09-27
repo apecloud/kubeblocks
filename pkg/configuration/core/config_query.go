@@ -31,7 +31,7 @@ import (
 // GetParameterFromConfiguration gets configure parameter
 // ctx: apiserver context
 // cli: apiserver client
-// cluster: appsv1alpha1.Cluster
+// cluster: appsv1.Cluster
 // component: component name
 func GetParameterFromConfiguration(configMap *corev1.ConfigMap, allFiles bool, fieldPath ...string) ([]string, error) {
 	if configMap == nil || len(configMap.Data) == 0 {

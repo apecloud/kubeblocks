@@ -31,16 +31,20 @@ import (
 )
 
 const (
+	ContainerName     = "kbagent"
+	InitContainerName = "init-kbagent"
+	DefaultPortName   = "http"
+
 	actionEnvName = "KB_AGENT_ACTION"
 	probeEnvName  = "KB_AGENT_PROBE"
 )
 
-func BuildStartupEnvs(actions []proto.Action, probes []proto.Probe) ([]corev1.EnvVar, error) {
+func BuildStartupEnv(actions []proto.Action, probes []proto.Probe) ([]corev1.EnvVar, error) {
 	da, dp, err := serializeActionNProbe(actions, probes)
 	if err != nil {
 		return nil, err
 	}
-	return []corev1.EnvVar{
+	return append(util.DefaultEnvVars(), []corev1.EnvVar{
 		{
 			Name:  actionEnvName,
 			Value: da,
@@ -49,7 +53,7 @@ func BuildStartupEnvs(actions []proto.Action, probes []proto.Probe) ([]corev1.En
 			Name:  probeEnvName,
 			Value: dp,
 		},
-	}, nil
+	}...), nil
 }
 
 func Initialize(logger logr.Logger, envs []string) ([]service.Service, error) {

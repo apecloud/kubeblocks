@@ -49,19 +49,22 @@ import (
 
 	// +kubebuilder:scaffold:imports
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	experimentalv1alpha1 "github.com/apecloud/kubeblocks/apis/experimental/v1alpha1"
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
-	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
+	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	"github.com/apecloud/kubeblocks/apis/workloads/legacy"
+	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	workloadsv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	appscontrollers "github.com/apecloud/kubeblocks/controllers/apps"
 	"github.com/apecloud/kubeblocks/controllers/apps/configuration"
 	experimentalcontrollers "github.com/apecloud/kubeblocks/controllers/experimental"
 	extensionscontrollers "github.com/apecloud/kubeblocks/controllers/extensions"
 	k8scorecontrollers "github.com/apecloud/kubeblocks/controllers/k8score"
+	opscontrollers "github.com/apecloud/kubeblocks/controllers/operations"
 	workloadscontrollers "github.com/apecloud/kubeblocks/controllers/workloads"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
@@ -102,18 +105,20 @@ var (
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-
 	utilruntime.Must(appsv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(appsv1beta1.AddToScheme(scheme))
+	utilruntime.Must(appsv1.AddToScheme(scheme))
+	utilruntime.Must(opsv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(dpv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(snapshotv1.AddToScheme(scheme))
 	utilruntime.Must(snapshotv1beta1.AddToScheme(scheme))
 	utilruntime.Must(extensionsv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(workloadsv1alpha1.AddToScheme(scheme))
-	utilruntime.Must(storagev1alpha1.AddToScheme(scheme))
-	utilruntime.Must(appsv1beta1.AddToScheme(scheme))
+	utilruntime.Must(workloadsv1.AddToScheme(scheme))
 	utilruntime.Must(legacy.AddToScheme(scheme))
 	utilruntime.Must(apiextv1.AddToScheme(scheme))
 	utilruntime.Must(experimentalv1alpha1.AddToScheme(scheme))
+
 	// +kubebuilder:scaffold:scheme
 
 	viper.SetConfigName("config")                          // name of config file (without extension)
@@ -141,8 +146,8 @@ func init() {
 	viper.SetDefault(intctrlutil.FeatureGateEnableRuntimeMetrics, false)
 	viper.SetDefault(constant.CfgKBReconcileWorkers, 8)
 	viper.SetDefault(constant.FeatureGateIgnoreConfigTemplateDefaultMode, false)
-	viper.SetDefault(constant.FeatureGateComponentReplicasAnnotation, true)
 	viper.SetDefault(constant.FeatureGateInPlacePodVerticalScaling, false)
+	viper.SetDefault(constant.FeatureGateNoRSMEnv, false)
 }
 
 type flagName string
@@ -418,7 +423,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		if err = (&appscontrollers.OpsDefinitionReconciler{
+		if err = (&opscontrollers.OpsDefinitionReconciler{
 			Client:   mgr.GetClient(),
 			Scheme:   mgr.GetScheme(),
 			Recorder: mgr.GetEventRecorderFor("ops-definition-controller"),
@@ -427,7 +432,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		if err = (&appscontrollers.OpsRequestReconciler{
+		if err = (&opscontrollers.OpsRequestReconciler{
 			Client:   mgr.GetClient(),
 			Scheme:   mgr.GetScheme(),
 			Recorder: mgr.GetEventRecorderFor("ops-request-controller"),
@@ -521,6 +526,37 @@ func main() {
 			Recorder: mgr.GetEventRecorderFor("node-count-scaler-controller"),
 		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "NodeCountScaler")
+			os.Exit(1)
+		}
+	}
+
+	if os.Getenv("ENABLE_WEBHOOKS") == "true" {
+		if err = (&appsv1.ClusterDefinition{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "ClusterDefinition")
+			os.Exit(1)
+		}
+		if err = (&appsv1.ComponentDefinition{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "ComponentDefinition")
+			os.Exit(1)
+		}
+		if err = (&appsv1.ComponentVersion{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "ComponentVersion")
+			os.Exit(1)
+		}
+		if err = (&appsv1.Cluster{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "Cluster")
+			os.Exit(1)
+		}
+		if err = (&appsv1.Component{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "Component")
+			os.Exit(1)
+		}
+		if err = (&workloadsv1.InstanceSet{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "InstanceSet")
+			os.Exit(1)
+		}
+		if err = (&appsv1.ServiceDescriptor{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "ServiceDescriptor")
 			os.Exit(1)
 		}
 	}

@@ -45,9 +45,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	"github.com/apecloud/kubeblocks/pkg/testutil"
@@ -119,13 +118,10 @@ var _ = BeforeSuite(func() {
 	err = vsv1beta1.AddToScheme(scheme)
 	Expect(err).NotTo(HaveOccurred())
 
-	err = appsv1alpha1.AddToScheme(scheme)
+	err = appsv1.AddToScheme(scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	err = dpv1alpha1.AddToScheme(scheme)
-	Expect(err).NotTo(HaveOccurred())
-
-	err = storagev1alpha1.AddToScheme(scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	// +kubebuilder:scaffold:scheme

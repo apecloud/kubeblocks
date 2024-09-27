@@ -21,16 +21,18 @@ package job
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 
 	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/controller/graph"
-	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 var (
@@ -43,7 +45,7 @@ var (
 // GetJobWithLabels gets the job list with the specified labels.
 func GetJobWithLabels(ctx context.Context,
 	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
+	cluster *appsv1.Cluster,
 	matchLabels client.MatchingLabels) ([]batchv1.Job, error) {
 	jobList := &batchv1.JobList{}
 	if err := cli.List(ctx, jobList, client.InNamespace(cluster.Namespace), matchLabels); err != nil {
@@ -55,7 +57,7 @@ func GetJobWithLabels(ctx context.Context,
 // CleanJobWithLabels cleans up the job tasks with label.
 func CleanJobWithLabels(ctx context.Context,
 	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
+	cluster *appsv1.Cluster,
 	matchLabels client.MatchingLabels) error {
 	jobList, err := GetJobWithLabels(ctx, cli, cluster, matchLabels)
 	if err != nil {
@@ -74,7 +76,7 @@ func CleanJobWithLabels(ctx context.Context,
 // CleanJobByName cleans up the job task by name.
 func CleanJobByName(ctx context.Context,
 	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
+	cluster *appsv1.Cluster,
 	jobName string) error {
 	job := &batchv1.Job{}
 	key := types.NamespacedName{Namespace: cluster.Namespace, Name: jobName}
@@ -89,31 +91,13 @@ func CleanJobByName(ctx context.Context,
 	return nil
 }
 
-// CleanJobByNameWithDAG cleans up the job task by name with DAG.
-func CleanJobByNameWithDAG(ctx context.Context,
-	cli client.Reader,
-	dag *graph.DAG,
-	cluster *appsv1alpha1.Cluster,
-	jobName string) error {
-	job := &batchv1.Job{}
-	key := types.NamespacedName{Namespace: cluster.Namespace, Name: jobName}
-	if err := cli.Get(ctx, key, job); err != nil {
-		return err
-	}
-	patch := job.DeepCopy()
-	job.Spec.TTLSecondsAfterFinished = jobTTLSecondsAfterFinished
-	graphCli, _ := cli.(model.GraphClient)
-	graphCli.Update(dag, patch, job, &model.ReplaceIfExistingOption{})
-	return nil
-}
-
 // CheckJobSucceed checks the result of job execution.
 // Returns:
 // - bool: whether job exist, true exist
 // - error: any error that occurred during the handling
 func CheckJobSucceed(ctx context.Context,
 	cli client.Reader,
-	cluster *appsv1alpha1.Cluster,
+	cluster *appsv1.Cluster,
 	jobName string) error {
 	key := types.NamespacedName{Namespace: cluster.Namespace, Name: jobName}
 	currentJob := batchv1.Job{}
@@ -136,4 +120,26 @@ func CheckJobSucceed(ctx context.Context,
 		}
 	}
 	return intctrlutil.NewErrorf(intctrlutil.ErrorTypeExpectedInProcess, "requeue to waiting for job %s finished.", key.Name)
+}
+
+func BuildJobTolerations(cluster *appsv1.Cluster, job *batchv1.Job) error {
+	// build data plane tolerations from config
+	var tolerations []corev1.Toleration
+	if val := viper.GetString(constant.CfgKeyDataPlaneTolerations); val != "" {
+		if err := json.Unmarshal([]byte(val), &tolerations); err != nil {
+			return err
+		}
+	}
+
+	if len(job.Spec.Template.Spec.Tolerations) > 0 {
+		job.Spec.Template.Spec.Tolerations = append(job.Spec.Template.Spec.Tolerations, tolerations...)
+	} else {
+		job.Spec.Template.Spec.Tolerations = tolerations
+	}
+
+	// build job tolerations from cluster.spec.SchedulingPolicy.Tolerations
+	if cluster.Spec.SchedulingPolicy != nil && len(cluster.Spec.SchedulingPolicy.Tolerations) > 0 {
+		job.Spec.Template.Spec.Tolerations = append(job.Spec.Template.Spec.Tolerations, cluster.Spec.SchedulingPolicy.Tolerations...)
+	}
+	return nil
 }

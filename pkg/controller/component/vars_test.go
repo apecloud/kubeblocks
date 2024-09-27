@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
-	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -33,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
@@ -50,41 +49,6 @@ var _ = Describe("vars", func() {
 
 	expp := func(exp string) *string {
 		return &exp
-	}
-
-	checkTemplateVars := func(templateVars map[string]any, targetVars []corev1.EnvVar) {
-		templateVarsMapping := make(map[string]corev1.EnvVar)
-		for k, v := range templateVars {
-			val := ""
-			if v != nil {
-				val = v.(string)
-			}
-			templateVarsMapping[k] = corev1.EnvVar{Name: k, Value: val}
-		}
-
-		vars := make([]corev1.EnvVar, 0)
-		for _, v := range targetVars {
-			if templateVar, ok := templateVarsMapping[v.Name]; ok {
-				vars = append(vars, templateVar)
-			}
-		}
-		Expect(vars).Should(BeEquivalentTo(targetVars))
-	}
-
-	// without the order check
-	checkEnvVars := func(envVars []corev1.EnvVar, targetEnvVars []corev1.EnvVar) {
-		targetEnvVarMapping := map[string]corev1.EnvVar{}
-		for i, env := range targetEnvVars {
-			targetEnvVarMapping[env.Name] = targetEnvVars[i]
-		}
-
-		envVarMapping := map[string]corev1.EnvVar{}
-		for i, env := range envVars {
-			if _, ok := targetEnvVarMapping[env.Name]; ok {
-				envVarMapping[env.Name] = envVars[i]
-			}
-		}
-		Expect(envVarMapping).Should(BeEquivalentTo(targetEnvVarMapping))
 	}
 
 	checkEnvVarNotExist := func(envVars []corev1.EnvVar, envName string) {
@@ -172,58 +136,14 @@ var _ = Describe("vars", func() {
 			}
 		})
 
-		It("default vars", func() {
-			templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, testCtx.Cli, synthesizedComp, nil)
-			Expect(err).Should(Succeed())
-
-			By("check default template vars")
-			checkTemplateVars(templateVars, builtinTemplateVars(synthesizedComp, nil))
-
-			By("check default env vars")
-			targetEnvVars := builtinTemplateVars(synthesizedComp, nil)
-			targetEnvVars = append(targetEnvVars, buildDefaultEnvVars(synthesizedComp, false)...)
-			checkEnvVars(envVars, targetEnvVars)
-		})
-
-		It("TLS env vars", func() {
-			synthesizedComp.TLSConfig = &appsv1alpha1.TLSConfig{
-				Enable: true,
-			}
-			_, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, testCtx.Cli, synthesizedComp, nil)
-			Expect(err).Should(Succeed())
-			checkEnvVars(envVars, buildEnv4TLS(synthesizedComp))
-		})
-
-		It("user-defined env vars", func() {
-			By("invalid")
-			annotations := map[string]string{
-				constant.ExtraEnvAnnotationKey: "invalid-json-format",
-			}
-			synthesizedComp.Annotations = annotations
-			_, _, err := ResolveTemplateNEnvVars(testCtx.Ctx, testCtx.Cli, synthesizedComp, nil)
-			Expect(err).ShouldNot(Succeed())
-
-			By("ok")
-			data, _ := json.Marshal(map[string]string{
-				"user-defined-var": "user-defined-value",
-			})
-			annotations = map[string]string{
-				constant.ExtraEnvAnnotationKey: string(data),
-			}
-			synthesizedComp.Annotations = annotations
-			_, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, testCtx.Cli, synthesizedComp, nil)
-			Expect(err).Should(Succeed())
-			checkEnvVars(envVars, []corev1.EnvVar{{Name: "user-defined-var", Value: "user-defined-value"}})
-		})
-
 		It("component-ref env vars", func() {})
 
 		It("configmap vars", func() {
 			By("non-exist configmap with optional")
-			vars := []appsv1alpha1.EnvVar{
+			vars := []appsv1.EnvVar{
 				{
 					Name: "non-exist-cm-var",
-					ValueFrom: &appsv1alpha1.VarSource{
+					ValueFrom: &appsv1.VarSource{
 						ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
 							LocalObjectReference: corev1.LocalObjectReference{
 								Name: "non-exist",
@@ -240,10 +160,10 @@ var _ = Describe("vars", func() {
 			checkEnvVarNotExist(envVars, "non-exist-cm-var")
 
 			By("non-exist configmap with required")
-			vars = []appsv1alpha1.EnvVar{
+			vars = []appsv1.EnvVar{
 				{
 					Name: "non-exist-cm-var",
-					ValueFrom: &appsv1alpha1.VarSource{
+					ValueFrom: &appsv1.VarSource{
 						ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
 							LocalObjectReference: corev1.LocalObjectReference{
 								Name: "non-exist",
@@ -258,10 +178,10 @@ var _ = Describe("vars", func() {
 			Expect(err).ShouldNot(Succeed())
 
 			By("ok")
-			vars = []appsv1alpha1.EnvVar{
+			vars = []appsv1.EnvVar{
 				{
 					Name: "cm-var",
-					ValueFrom: &appsv1alpha1.VarSource{
+					ValueFrom: &appsv1.VarSource{
 						ConfigMapKeyRef: &corev1.ConfigMapKeySelector{
 							LocalObjectReference: corev1.LocalObjectReference{
 								Name: "cm",
@@ -293,10 +213,10 @@ var _ = Describe("vars", func() {
 
 		It("secret vars", func() {
 			By("non-exist secret with optional")
-			vars := []appsv1alpha1.EnvVar{
+			vars := []appsv1.EnvVar{
 				{
 					Name: "non-exist-secret-var",
-					ValueFrom: &appsv1alpha1.VarSource{
+					ValueFrom: &appsv1.VarSource{
 						SecretKeyRef: &corev1.SecretKeySelector{
 							LocalObjectReference: corev1.LocalObjectReference{
 								Name: "non-exist",
@@ -313,10 +233,10 @@ var _ = Describe("vars", func() {
 			checkEnvVarNotExist(envVars, "non-exist-secret-var")
 
 			By("non-exist secret with required")
-			vars = []appsv1alpha1.EnvVar{
+			vars = []appsv1.EnvVar{
 				{
 					Name: "non-exist-secret-var",
-					ValueFrom: &appsv1alpha1.VarSource{
+					ValueFrom: &appsv1.VarSource{
 						SecretKeyRef: &corev1.SecretKeySelector{
 							LocalObjectReference: corev1.LocalObjectReference{
 								Name: "non-exist",
@@ -331,10 +251,10 @@ var _ = Describe("vars", func() {
 			Expect(err).ShouldNot(Succeed())
 
 			By("ok")
-			vars = []appsv1alpha1.EnvVar{
+			vars = []appsv1.EnvVar{
 				{
 					Name: "secret-var",
-					ValueFrom: &appsv1alpha1.VarSource{
+					ValueFrom: &appsv1.VarSource{
 						SecretKeyRef: &corev1.SecretKeySelector{
 							LocalObjectReference: corev1.LocalObjectReference{
 								Name: "secret",
@@ -372,21 +292,21 @@ var _ = Describe("vars", func() {
 		})
 
 		It("host-network vars", func() {
-			vars := []appsv1alpha1.EnvVar{
+			vars := []appsv1.EnvVar{
 				{
 					Name:  "host-network-port",
 					Value: "3306", // default value
-					ValueFrom: &appsv1alpha1.VarSource{
-						HostNetworkVarRef: &appsv1alpha1.HostNetworkVarSelector{
-							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+					ValueFrom: &appsv1.VarSource{
+						HostNetworkVarRef: &appsv1.HostNetworkVarSelector{
+							ClusterObjectReference: appsv1.ClusterObjectReference{
 								Optional: required(),
 							},
-							HostNetworkVars: appsv1alpha1.HostNetworkVars{
-								Container: &appsv1alpha1.ContainerVars{
+							HostNetworkVars: appsv1.HostNetworkVars{
+								Container: &appsv1.ContainerVars{
 									Name: "default",
-									Port: &appsv1alpha1.NamedVar{
+									Port: &appsv1.NamedVar{
 										Name:   "default",
-										Option: &appsv1alpha1.VarRequired,
+										Option: &appsv1.VarRequired,
 									},
 								},
 							},
@@ -401,7 +321,7 @@ var _ = Describe("vars", func() {
 			Expect(err.Error()).Should(And(ContainSubstring("has no HostNetwork"), ContainSubstring("found when resolving vars")))
 
 			By("has no host-network enabled")
-			synthesizedComp.HostNetwork = &appsv1alpha1.HostNetwork{}
+			synthesizedComp.HostNetwork = &appsv1.HostNetwork{}
 			_, _, err = ResolveTemplateNEnvVars(ctx, testCtx.Cli, synthesizedComp, vars)
 			Expect(err).ShouldNot(Succeed())
 			Expect(err.Error()).Should(And(ContainSubstring("has no HostNetwork"), ContainSubstring("found when resolving vars")))
@@ -423,21 +343,21 @@ var _ = Describe("vars", func() {
 			checkEnvVarWithValue(envVars, "host-network-port", "30001")
 
 			By("w/ default value - has host-network port")
-			vars = []appsv1alpha1.EnvVar{
+			vars = []appsv1.EnvVar{
 				{
 					Name:  "host-network-port",
 					Value: "3306", // default value
-					ValueFrom: &appsv1alpha1.VarSource{
-						HostNetworkVarRef: &appsv1alpha1.HostNetworkVarSelector{
-							ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+					ValueFrom: &appsv1.VarSource{
+						HostNetworkVarRef: &appsv1.HostNetworkVarSelector{
+							ClusterObjectReference: appsv1.ClusterObjectReference{
 								Optional: optional(), // optional
 							},
-							HostNetworkVars: appsv1alpha1.HostNetworkVars{
-								Container: &appsv1alpha1.ContainerVars{
+							HostNetworkVars: appsv1.HostNetworkVars{
+								Container: &appsv1.ContainerVars{
 									Name: "default",
-									Port: &appsv1alpha1.NamedVar{
+									Port: &appsv1.NamedVar{
 										Name:   "default",
-										Option: &appsv1alpha1.VarRequired,
+										Option: &appsv1.VarRequired,
 									},
 								},
 							},
@@ -464,26 +384,26 @@ var _ = Describe("vars", func() {
 			)
 
 			BeforeEach(func() {
-				comp := &appsv1alpha1.Component{
+				comp := &appsv1.Component{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: synthesizedComp.Namespace,
 						Name:      FullName(synthesizedComp.ClusterName, synthesizedComp.Name),
 					},
-					Spec: appsv1alpha1.ComponentSpec{
+					Spec: appsv1.ComponentSpec{
 						CompDef: synthesizedComp.CompDefName,
 					},
 				}
-				compDef := &appsv1alpha1.ComponentDefinition{
+				compDef := &appsv1.ComponentDefinition{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: synthesizedComp.CompDefName,
 					},
-					Spec: appsv1alpha1.ComponentDefinitionSpec{
-						Services: []appsv1alpha1.ComponentService{},
+					Spec: appsv1.ComponentDefinitionSpec{
+						Services: []appsv1.ComponentService{},
 					},
 				}
 				for _, name := range []string{"non-exist", "service", "service-wo-port-name", "pod-service", "lb", "advertised"} {
-					compDef.Spec.Services = append(compDef.Spec.Services, appsv1alpha1.ComponentService{
-						Service: appsv1alpha1.Service{
+					compDef.Spec.Services = append(compDef.Spec.Services, appsv1.ComponentService{
+						Service: appsv1.Service{
 							Name:        name,
 							ServiceName: name,
 						},
@@ -496,17 +416,17 @@ var _ = Describe("vars", func() {
 			})
 
 			It("non-exist service - optional", func() {
-				vars := []appsv1alpha1.EnvVar{
+				vars := []appsv1.EnvVar{
 					{
 						Name: "non-exist-service-var",
-						ValueFrom: &appsv1alpha1.VarSource{
-							ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
-								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+						ValueFrom: &appsv1.VarSource{
+							ServiceVarRef: &appsv1.ServiceVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
 									Name:     "non-exist",
 									Optional: optional(),
 								},
-								ServiceVars: appsv1alpha1.ServiceVars{
-									Host: &appsv1alpha1.VarOptional,
+								ServiceVars: appsv1.ServiceVars{
+									Host: &appsv1.VarOptional,
 								},
 							},
 						},
@@ -519,17 +439,17 @@ var _ = Describe("vars", func() {
 			})
 
 			It("non-exist service - required", func() {
-				vars := []appsv1alpha1.EnvVar{
+				vars := []appsv1.EnvVar{
 					{
 						Name: "non-exist-service-var",
-						ValueFrom: &appsv1alpha1.VarSource{
-							ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
-								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+						ValueFrom: &appsv1.VarSource{
+							ServiceVarRef: &appsv1.ServiceVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
 									Name:     "non-exist",
 									Optional: required(),
 								},
-								ServiceVars: appsv1alpha1.ServiceVars{
-									Host: &appsv1alpha1.VarRequired,
+								ServiceVars: appsv1.ServiceVars{
+									Host: &appsv1.VarRequired,
 								},
 							},
 						},
@@ -541,17 +461,17 @@ var _ = Describe("vars", func() {
 
 			It("has no service defined", func() {
 				By("optional")
-				vars := []appsv1alpha1.EnvVar{
+				vars := []appsv1.EnvVar{
 					{
 						Name: "not-defined-service",
-						ValueFrom: &appsv1alpha1.VarSource{
-							ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
-								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+						ValueFrom: &appsv1.VarSource{
+							ServiceVarRef: &appsv1.ServiceVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
 									Name:     "not-defined", // the service has not been defined in the componentDefinition
 									Optional: optional(),
 								},
-								ServiceVars: appsv1alpha1.ServiceVars{
-									Host: &appsv1alpha1.VarRequired,
+								ServiceVars: appsv1.ServiceVars{
+									Host: &appsv1.VarRequired,
 								},
 							},
 						},
@@ -562,17 +482,17 @@ var _ = Describe("vars", func() {
 				Expect(err.Error()).Should(ContainSubstring("not defined in the component definition"))
 
 				By("required")
-				vars = []appsv1alpha1.EnvVar{
+				vars = []appsv1.EnvVar{
 					{
 						Name: "not-defined-service",
-						ValueFrom: &appsv1alpha1.VarSource{
-							ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
-								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+						ValueFrom: &appsv1.VarSource{
+							ServiceVarRef: &appsv1.ServiceVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
 									Name:     "not-defined", // the service has not been defined in the componentDefinition
 									Optional: required(),
 								},
-								ServiceVars: appsv1alpha1.ServiceVars{
-									Host: &appsv1alpha1.VarRequired,
+								ServiceVars: appsv1.ServiceVars{
+									Host: &appsv1.VarRequired,
 								},
 							},
 						},
@@ -587,47 +507,47 @@ var _ = Describe("vars", func() {
 				svcName := constant.GenerateComponentServiceName(synthesizedComp.ClusterName, synthesizedComp.Name, "service")
 				svcPort := 3306
 
-				vars := []appsv1alpha1.EnvVar{
+				vars := []appsv1.EnvVar{
 					{
 						Name: "service-type",
-						ValueFrom: &appsv1alpha1.VarSource{
-							ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
-								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+						ValueFrom: &appsv1.VarSource{
+							ServiceVarRef: &appsv1.ServiceVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
 									Name:     "service",
 									Optional: required(),
 								},
-								ServiceVars: appsv1alpha1.ServiceVars{
-									ServiceType: &appsv1alpha1.VarRequired,
+								ServiceVars: appsv1.ServiceVars{
+									ServiceType: &appsv1.VarRequired,
 								},
 							},
 						},
 					},
 					{
 						Name: "service-host",
-						ValueFrom: &appsv1alpha1.VarSource{
-							ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
-								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+						ValueFrom: &appsv1.VarSource{
+							ServiceVarRef: &appsv1.ServiceVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
 									Name:     "service",
 									Optional: required(),
 								},
-								ServiceVars: appsv1alpha1.ServiceVars{
-									Host: &appsv1alpha1.VarRequired,
+								ServiceVars: appsv1.ServiceVars{
+									Host: &appsv1.VarRequired,
 								},
 							},
 						},
 					},
 					{
 						Name: "service-port",
-						ValueFrom: &appsv1alpha1.VarSource{
-							ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
-								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+						ValueFrom: &appsv1.VarSource{
+							ServiceVarRef: &appsv1.ServiceVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
 									Name:     "service",
 									Optional: required(),
 								},
-								ServiceVars: appsv1alpha1.ServiceVars{
-									Port: &appsv1alpha1.NamedVar{
+								ServiceVars: appsv1.ServiceVars{
+									Port: &appsv1.NamedVar{
 										Name:   "default",
-										Option: &appsv1alpha1.VarRequired,
+										Option: &appsv1.VarRequired,
 									},
 								},
 							},
@@ -635,16 +555,16 @@ var _ = Describe("vars", func() {
 					},
 					{
 						Name: "service-port-wo-name",
-						ValueFrom: &appsv1alpha1.VarSource{
-							ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
-								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+						ValueFrom: &appsv1.VarSource{
+							ServiceVarRef: &appsv1.ServiceVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
 									Name:     "service-wo-port-name",
 									Optional: required(),
 								},
-								ServiceVars: appsv1alpha1.ServiceVars{
-									Port: &appsv1alpha1.NamedVar{
+								ServiceVars: appsv1.ServiceVars{
+									Port: &appsv1.NamedVar{
 										Name:   "default",
-										Option: &appsv1alpha1.VarRequired,
+										Option: &appsv1.VarRequired,
 									},
 								},
 							},
@@ -697,25 +617,25 @@ var _ = Describe("vars", func() {
 				svcName := constant.GenerateComponentServiceName(synthesizedComp.ClusterName, synthesizedComp.Name, "quorum")
 				svcPort := 3306
 
-				compDef := reader.objs[1].(*appsv1alpha1.ComponentDefinition)
-				compDef.Spec.Services = append(compDef.Spec.Services, appsv1alpha1.ComponentService{
-					Service: appsv1alpha1.Service{
+				compDef := reader.objs[1].(*appsv1.ComponentDefinition)
+				compDef.Spec.Services = append(compDef.Spec.Services, appsv1.ComponentService{
+					Service: appsv1.Service{
 						Name:        "client", // name and service name are different
 						ServiceName: "quorum",
 					},
 				})
 
-				vars := []appsv1alpha1.EnvVar{
+				vars := []appsv1.EnvVar{
 					{
 						Name: "service-host",
-						ValueFrom: &appsv1alpha1.VarSource{
-							ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
-								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+						ValueFrom: &appsv1.VarSource{
+							ServiceVarRef: &appsv1.ServiceVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
 									Name:     "client", // should use the service.name
 									Optional: required(),
 								},
-								ServiceVars: appsv1alpha1.ServiceVars{
-									Host: &appsv1alpha1.VarRequired,
+								ServiceVars: appsv1.ServiceVars{
+									Host: &appsv1.VarRequired,
 								},
 							},
 						},
@@ -746,19 +666,19 @@ var _ = Describe("vars", func() {
 				svcPort := 3306
 				nodePort := 30001
 
-				vars := []appsv1alpha1.EnvVar{
+				vars := []appsv1.EnvVar{
 					{
 						Name: "service-node-port",
-						ValueFrom: &appsv1alpha1.VarSource{
-							ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
-								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+						ValueFrom: &appsv1.VarSource{
+							ServiceVarRef: &appsv1.ServiceVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
 									Name:     "service",
 									Optional: required(),
 								},
-								ServiceVars: appsv1alpha1.ServiceVars{
-									Port: &appsv1alpha1.NamedVar{
+								ServiceVars: appsv1.ServiceVars{
+									Port: &appsv1.NamedVar{
 										Name:   "default",
-										Option: &appsv1alpha1.VarRequired,
+										Option: &appsv1.VarRequired,
 									},
 								},
 							},
@@ -792,19 +712,19 @@ var _ = Describe("vars", func() {
 				svcPort := 3306
 				nodePort := 30001
 
-				vars := []appsv1alpha1.EnvVar{
+				vars := []appsv1.EnvVar{
 					{
 						Name: "service-node-port",
-						ValueFrom: &appsv1alpha1.VarSource{
-							ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
-								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+						ValueFrom: &appsv1.VarSource{
+							ServiceVarRef: &appsv1.ServiceVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
 									Name:     "service",
 									Optional: required(),
 								},
-								ServiceVars: appsv1alpha1.ServiceVars{
-									Port: &appsv1alpha1.NamedVar{
+								ServiceVars: appsv1.ServiceVars{
+									Port: &appsv1.NamedVar{
 										Name:   "default",
-										Option: &appsv1alpha1.VarRequired,
+										Option: &appsv1.VarRequired,
 									},
 								},
 							},
@@ -845,47 +765,47 @@ var _ = Describe("vars", func() {
 				svcName1 := constant.GenerateComponentServiceName(synthesizedComp.ClusterName, synthesizedComp.Name, "pod-service-1")
 				svcPort := 3306
 
-				vars := []appsv1alpha1.EnvVar{
+				vars := []appsv1.EnvVar{
 					{
 						Name: "pod-service-type",
-						ValueFrom: &appsv1alpha1.VarSource{
-							ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
-								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+						ValueFrom: &appsv1.VarSource{
+							ServiceVarRef: &appsv1.ServiceVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
 									Name:     "pod-service",
 									Optional: required(),
 								},
-								ServiceVars: appsv1alpha1.ServiceVars{
-									ServiceType: &appsv1alpha1.VarRequired,
+								ServiceVars: appsv1.ServiceVars{
+									ServiceType: &appsv1.VarRequired,
 								},
 							},
 						},
 					},
 					{
 						Name: "pod-service-endpoint",
-						ValueFrom: &appsv1alpha1.VarSource{
-							ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
-								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+						ValueFrom: &appsv1.VarSource{
+							ServiceVarRef: &appsv1.ServiceVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
 									Name:     "pod-service",
 									Optional: required(),
 								},
-								ServiceVars: appsv1alpha1.ServiceVars{
-									Host: &appsv1alpha1.VarRequired,
+								ServiceVars: appsv1.ServiceVars{
+									Host: &appsv1.VarRequired,
 								},
 							},
 						},
 					},
 					{
 						Name: "pod-service-port",
-						ValueFrom: &appsv1alpha1.VarSource{
-							ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
-								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+						ValueFrom: &appsv1.VarSource{
+							ServiceVarRef: &appsv1.ServiceVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
 									Name:     "pod-service",
 									Optional: required(),
 								},
-								ServiceVars: appsv1alpha1.ServiceVars{
-									Port: &appsv1alpha1.NamedVar{
+								ServiceVars: appsv1.ServiceVars{
+									Port: &appsv1.NamedVar{
 										Name:   "default",
-										Option: &appsv1alpha1.VarRequired,
+										Option: &appsv1.VarRequired,
 									},
 								},
 							},
@@ -897,7 +817,7 @@ var _ = Describe("vars", func() {
 						ObjectMeta: metav1.ObjectMeta{
 							Namespace: testCtx.DefaultNamespace,
 							Name:      svcName0,
-							Labels:    constant.GetComponentWellKnownLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
+							Labels:    constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
 						},
 						Spec: corev1.ServiceSpec{
 							Type: corev1.ServiceTypeNodePort,
@@ -914,7 +834,7 @@ var _ = Describe("vars", func() {
 						ObjectMeta: metav1.ObjectMeta{
 							Namespace: testCtx.DefaultNamespace,
 							Name:      svcName1,
-							Labels:    constant.GetComponentWellKnownLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
+							Labels:    constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
 						},
 						Spec: corev1.ServiceSpec{
 							Type: corev1.ServiceTypeNodePort,
@@ -939,17 +859,17 @@ var _ = Describe("vars", func() {
 				lbSvcName := constant.GenerateComponentServiceName(synthesizedComp.ClusterName, synthesizedComp.Name, "lb")
 				svcPort := 3306
 
-				vars := []appsv1alpha1.EnvVar{
+				vars := []appsv1.EnvVar{
 					{
 						Name: "lb",
-						ValueFrom: &appsv1alpha1.VarSource{
-							ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
-								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+						ValueFrom: &appsv1.VarSource{
+							ServiceVarRef: &appsv1.ServiceVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
 									Name:     "lb",
 									Optional: required(),
 								},
-								ServiceVars: appsv1alpha1.ServiceVars{
-									LoadBalancer: &appsv1alpha1.VarRequired,
+								ServiceVars: appsv1.ServiceVars{
+									LoadBalancer: &appsv1.VarRequired,
 								},
 							},
 						},
@@ -959,7 +879,7 @@ var _ = Describe("vars", func() {
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: testCtx.DefaultNamespace,
 						Name:      lbSvcName,
-						Labels:    constant.GetComponentWellKnownLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
+						Labels:    constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
 					},
 					Spec: corev1.ServiceSpec{
 						Type: corev1.ServiceTypeLoadBalancer,
@@ -991,17 +911,17 @@ var _ = Describe("vars", func() {
 				lbSvcName2 := constant.GenerateComponentServiceName(synthesizedComp.ClusterName, synthesizedComp.Name, "lb-2")
 				svcPort := 3306
 
-				vars := []appsv1alpha1.EnvVar{
+				vars := []appsv1.EnvVar{
 					{
 						Name: "lb",
-						ValueFrom: &appsv1alpha1.VarSource{
-							ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
-								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+						ValueFrom: &appsv1.VarSource{
+							ServiceVarRef: &appsv1.ServiceVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
 									Name:     "lb",
 									Optional: required(),
 								},
-								ServiceVars: appsv1alpha1.ServiceVars{
-									LoadBalancer: &appsv1alpha1.VarRequired,
+								ServiceVars: appsv1.ServiceVars{
+									LoadBalancer: &appsv1.VarRequired,
 								},
 							},
 						},
@@ -1012,7 +932,7 @@ var _ = Describe("vars", func() {
 						ObjectMeta: metav1.ObjectMeta{
 							Namespace: testCtx.DefaultNamespace,
 							Name:      lbSvcName0,
-							Labels:    constant.GetComponentWellKnownLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
+							Labels:    constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
 						},
 						Spec: corev1.ServiceSpec{
 							Type: corev1.ServiceTypeLoadBalancer,
@@ -1037,7 +957,7 @@ var _ = Describe("vars", func() {
 						ObjectMeta: metav1.ObjectMeta{
 							Namespace: testCtx.DefaultNamespace,
 							Name:      lbSvcName1,
-							Labels:    constant.GetComponentWellKnownLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
+							Labels:    constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
 						},
 						Spec: corev1.ServiceSpec{
 							Type: corev1.ServiceTypeLoadBalancer,
@@ -1062,7 +982,7 @@ var _ = Describe("vars", func() {
 						ObjectMeta: metav1.ObjectMeta{
 							Namespace: testCtx.DefaultNamespace,
 							Name:      lbSvcName2,
-							Labels:    constant.GetComponentWellKnownLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
+							Labels:    constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
 						},
 						Spec: corev1.ServiceSpec{
 							Type: corev1.ServiceTypeLoadBalancer,
@@ -1102,17 +1022,17 @@ var _ = Describe("vars", func() {
 				lbSvcName1 := constant.GenerateComponentServiceName(synthesizedComp.ClusterName, synthesizedComp.Name, "lb-1")
 				svcPort := 3306
 
-				vars := []appsv1alpha1.EnvVar{
+				vars := []appsv1.EnvVar{
 					{
 						Name: "lb",
-						ValueFrom: &appsv1alpha1.VarSource{
-							ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
-								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+						ValueFrom: &appsv1.VarSource{
+							ServiceVarRef: &appsv1.ServiceVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
 									Name:     "lb",
 									Optional: required(),
 								},
-								ServiceVars: appsv1alpha1.ServiceVars{
-									LoadBalancer: &appsv1alpha1.VarRequired,
+								ServiceVars: appsv1.ServiceVars{
+									LoadBalancer: &appsv1.VarRequired,
 								},
 							},
 						},
@@ -1123,7 +1043,7 @@ var _ = Describe("vars", func() {
 						ObjectMeta: metav1.ObjectMeta{
 							Namespace: testCtx.DefaultNamespace,
 							Name:      lbSvcName0,
-							Labels:    constant.GetComponentWellKnownLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
+							Labels:    constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
 						},
 						Spec: corev1.ServiceSpec{
 							Type: corev1.ServiceTypeLoadBalancer,
@@ -1148,7 +1068,7 @@ var _ = Describe("vars", func() {
 						ObjectMeta: metav1.ObjectMeta{
 							Namespace: testCtx.DefaultNamespace,
 							Name:      lbSvcName1,
-							Labels:    constant.GetComponentWellKnownLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
+							Labels:    constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
 						},
 						Spec: corev1.ServiceSpec{
 							Type: corev1.ServiceTypeLoadBalancer,
@@ -1171,18 +1091,18 @@ var _ = Describe("vars", func() {
 				advertisedSvcName := constant.GenerateComponentServiceName(synthesizedComp.ClusterName, synthesizedComp.Name, "advertised-0")
 				svcPort := 3306
 
-				vars := []appsv1alpha1.EnvVar{
+				vars := []appsv1.EnvVar{
 					{
 						Name: "advertised",
-						ValueFrom: &appsv1alpha1.VarSource{
-							ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
-								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+						ValueFrom: &appsv1.VarSource{
+							ServiceVarRef: &appsv1.ServiceVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
 									Name:     "advertised",
 									Optional: required(),
 								},
-								ServiceVars: appsv1alpha1.ServiceVars{
-									Host:         &appsv1alpha1.VarRequired, // both host and loadBalancer
-									LoadBalancer: &appsv1alpha1.VarRequired,
+								ServiceVars: appsv1.ServiceVars{
+									Host:         &appsv1.VarRequired, // both host and loadBalancer
+									LoadBalancer: &appsv1.VarRequired,
 								},
 							},
 						},
@@ -1192,7 +1112,7 @@ var _ = Describe("vars", func() {
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: testCtx.DefaultNamespace,
 						Name:      advertisedSvcName,
-						Labels:    constant.GetComponentWellKnownLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
+						Labels:    constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
 					},
 					Spec: corev1.ServiceSpec{
 						Type: corev1.ServiceTypeLoadBalancer,
@@ -1225,18 +1145,18 @@ var _ = Describe("vars", func() {
 				advertisedSvcName := constant.GenerateComponentServiceName(synthesizedComp.ClusterName, synthesizedComp.Name, "advertised-0")
 				svcPort := 3306
 
-				vars := []appsv1alpha1.EnvVar{
+				vars := []appsv1.EnvVar{
 					{
 						Name: "advertised",
-						ValueFrom: &appsv1alpha1.VarSource{
-							ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
-								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+						ValueFrom: &appsv1.VarSource{
+							ServiceVarRef: &appsv1.ServiceVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
 									Name:     "advertised",
 									Optional: required(),
 								},
-								ServiceVars: appsv1alpha1.ServiceVars{
-									Host:         &appsv1alpha1.VarRequired, // both host and loadBalancer
-									LoadBalancer: &appsv1alpha1.VarRequired,
+								ServiceVars: appsv1.ServiceVars{
+									Host:         &appsv1.VarRequired, // both host and loadBalancer
+									LoadBalancer: &appsv1.VarRequired,
 								},
 							},
 						},
@@ -1246,7 +1166,7 @@ var _ = Describe("vars", func() {
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: testCtx.DefaultNamespace,
 						Name:      advertisedSvcName,
-						Labels:    constant.GetComponentWellKnownLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
+						Labels:    constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
 					},
 					Spec: corev1.ServiceSpec{
 						Type: corev1.ServiceTypeClusterIP,
@@ -1268,18 +1188,18 @@ var _ = Describe("vars", func() {
 				advertisedSvcName := constant.GenerateComponentServiceName(synthesizedComp.ClusterName, synthesizedComp.Name, "advertised")
 				svcPort := 3306
 
-				vars := []appsv1alpha1.EnvVar{
+				vars := []appsv1.EnvVar{
 					{
 						Name: "advertised",
-						ValueFrom: &appsv1alpha1.VarSource{
-							ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
-								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+						ValueFrom: &appsv1.VarSource{
+							ServiceVarRef: &appsv1.ServiceVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
 									Name:     "advertised",
 									Optional: required(),
 								},
-								ServiceVars: appsv1alpha1.ServiceVars{
-									Host:         &appsv1alpha1.VarRequired, // both host and loadBalancer
-									LoadBalancer: &appsv1alpha1.VarRequired,
+								ServiceVars: appsv1.ServiceVars{
+									Host:         &appsv1.VarRequired, // both host and loadBalancer
+									LoadBalancer: &appsv1.VarRequired,
 								},
 							},
 						},
@@ -1289,7 +1209,7 @@ var _ = Describe("vars", func() {
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: testCtx.DefaultNamespace,
 						Name:      advertisedSvcName,
-						Labels:    constant.GetComponentWellKnownLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
+						Labels:    constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
 					},
 					Spec: corev1.ServiceSpec{
 						Type: corev1.ServiceTypeLoadBalancer,
@@ -1310,7 +1230,7 @@ var _ = Describe("vars", func() {
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: testCtx.DefaultNamespace,
 						Name:      advertisedSvcName,
-						Labels:    constant.GetComponentWellKnownLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
+						Labels:    constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name),
 					},
 					Spec: corev1.ServiceSpec{
 						Type: corev1.ServiceTypeLoadBalancer,
@@ -1339,17 +1259,17 @@ var _ = Describe("vars", func() {
 
 		Context("credential vars", func() {
 			It("non-exist credential with optional", func() {
-				vars := []appsv1alpha1.EnvVar{
+				vars := []appsv1.EnvVar{
 					{
 						Name: "non-exist-credential-var",
-						ValueFrom: &appsv1alpha1.VarSource{
-							CredentialVarRef: &appsv1alpha1.CredentialVarSelector{
-								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+						ValueFrom: &appsv1.VarSource{
+							CredentialVarRef: &appsv1.CredentialVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
 									Name:     "non-exist",
 									Optional: optional(),
 								},
-								CredentialVars: appsv1alpha1.CredentialVars{
-									Username: &appsv1alpha1.VarOptional,
+								CredentialVars: appsv1.CredentialVars{
+									Username: &appsv1.VarOptional,
 								},
 							},
 						},
@@ -1362,17 +1282,17 @@ var _ = Describe("vars", func() {
 			})
 
 			It("non-exist credential with required", func() {
-				vars := []appsv1alpha1.EnvVar{
+				vars := []appsv1.EnvVar{
 					{
 						Name: "non-exist-credential-var",
-						ValueFrom: &appsv1alpha1.VarSource{
-							CredentialVarRef: &appsv1alpha1.CredentialVarSelector{
-								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+						ValueFrom: &appsv1.VarSource{
+							CredentialVarRef: &appsv1.CredentialVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
 									Name:     "non-exist",
 									Optional: required(),
 								},
-								CredentialVars: appsv1alpha1.CredentialVars{
-									Username: &appsv1alpha1.VarRequired,
+								CredentialVars: appsv1.CredentialVars{
+									Username: &appsv1.VarRequired,
 								},
 							},
 						},
@@ -1383,31 +1303,31 @@ var _ = Describe("vars", func() {
 			})
 
 			It("ok", func() {
-				vars := []appsv1alpha1.EnvVar{
+				vars := []appsv1.EnvVar{
 					{
 						Name: "credential-username",
-						ValueFrom: &appsv1alpha1.VarSource{
-							CredentialVarRef: &appsv1alpha1.CredentialVarSelector{
-								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+						ValueFrom: &appsv1.VarSource{
+							CredentialVarRef: &appsv1.CredentialVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
 									Name:     "credential",
 									Optional: required(),
 								},
-								CredentialVars: appsv1alpha1.CredentialVars{
-									Username: &appsv1alpha1.VarRequired,
+								CredentialVars: appsv1.CredentialVars{
+									Username: &appsv1.VarRequired,
 								},
 							},
 						},
 					},
 					{
 						Name: "credential-password",
-						ValueFrom: &appsv1alpha1.VarSource{
-							CredentialVarRef: &appsv1alpha1.CredentialVarSelector{
-								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+						ValueFrom: &appsv1.VarSource{
+							CredentialVarRef: &appsv1.CredentialVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
 									Name:     "credential",
 									Optional: required(),
 								},
-								CredentialVars: appsv1alpha1.CredentialVars{
-									Password: &appsv1alpha1.VarRequired,
+								CredentialVars: appsv1.CredentialVars{
+									Password: &appsv1.VarRequired,
 								},
 							},
 						},
@@ -1453,17 +1373,17 @@ var _ = Describe("vars", func() {
 
 		Context("service-ref vars", func() {
 			It("non-exist service-ref with optional", func() {
-				vars := []appsv1alpha1.EnvVar{
+				vars := []appsv1.EnvVar{
 					{
 						Name: "non-exist-serviceref-var",
-						ValueFrom: &appsv1alpha1.VarSource{
-							ServiceRefVarRef: &appsv1alpha1.ServiceRefVarSelector{
-								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+						ValueFrom: &appsv1.VarSource{
+							ServiceRefVarRef: &appsv1.ServiceRefVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
 									Name:     "non-exist",
 									Optional: optional(),
 								},
-								ServiceRefVars: appsv1alpha1.ServiceRefVars{
-									Endpoint: &appsv1alpha1.VarOptional,
+								ServiceRefVars: appsv1.ServiceRefVars{
+									Endpoint: &appsv1.VarOptional,
 								},
 							},
 						},
@@ -1476,17 +1396,17 @@ var _ = Describe("vars", func() {
 			})
 
 			It("non-exist service-ref with required", func() {
-				vars := []appsv1alpha1.EnvVar{
+				vars := []appsv1.EnvVar{
 					{
 						Name: "non-exist-serviceref-var",
-						ValueFrom: &appsv1alpha1.VarSource{
-							ServiceRefVarRef: &appsv1alpha1.ServiceRefVarSelector{
-								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+						ValueFrom: &appsv1.VarSource{
+							ServiceRefVarRef: &appsv1.ServiceRefVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
 									Name:     "non-exist",
 									Optional: required(),
 								},
-								ServiceRefVars: appsv1alpha1.ServiceRefVars{
-									Endpoint: &appsv1alpha1.VarRequired,
+								ServiceRefVars: appsv1.ServiceRefVars{
+									Endpoint: &appsv1.VarRequired,
 								},
 							},
 						},
@@ -1497,60 +1417,74 @@ var _ = Describe("vars", func() {
 			})
 
 			It("ok", func() {
-				vars := []appsv1alpha1.EnvVar{
+				vars := []appsv1.EnvVar{
 					{
 						Name: "serviceref-endpoint",
-						ValueFrom: &appsv1alpha1.VarSource{
-							ServiceRefVarRef: &appsv1alpha1.ServiceRefVarSelector{
-								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+						ValueFrom: &appsv1.VarSource{
+							ServiceRefVarRef: &appsv1.ServiceRefVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
 									Name:     "serviceref",
 									Optional: required(),
 								},
-								ServiceRefVars: appsv1alpha1.ServiceRefVars{
-									Endpoint: &appsv1alpha1.VarRequired,
+								ServiceRefVars: appsv1.ServiceRefVars{
+									Endpoint: &appsv1.VarRequired,
 								},
 							},
 						},
 					},
 					{
 						Name: "serviceref-host",
-						ValueFrom: &appsv1alpha1.VarSource{
-							ServiceRefVarRef: &appsv1alpha1.ServiceRefVarSelector{
-								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+						ValueFrom: &appsv1.VarSource{
+							ServiceRefVarRef: &appsv1.ServiceRefVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
 									Name:     "serviceref",
 									Optional: required(),
 								},
-								ServiceRefVars: appsv1alpha1.ServiceRefVars{
-									Host: &appsv1alpha1.VarRequired,
+								ServiceRefVars: appsv1.ServiceRefVars{
+									Host: &appsv1.VarRequired,
 								},
 							},
 						},
 					},
 					{
 						Name: "serviceref-port",
-						ValueFrom: &appsv1alpha1.VarSource{
-							ServiceRefVarRef: &appsv1alpha1.ServiceRefVarSelector{
-								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+						ValueFrom: &appsv1.VarSource{
+							ServiceRefVarRef: &appsv1.ServiceRefVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
 									Name:     "serviceref",
 									Optional: required(),
 								},
-								ServiceRefVars: appsv1alpha1.ServiceRefVars{
-									Port: &appsv1alpha1.VarRequired,
+								ServiceRefVars: appsv1.ServiceRefVars{
+									Port: &appsv1.VarRequired,
+								},
+							},
+						},
+					},
+					{
+						Name: "serviceref-fqdn",
+						ValueFrom: &appsv1.VarSource{
+							ServiceRefVarRef: &appsv1.ServiceRefVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
+									Name:     "serviceref",
+									Optional: required(),
+								},
+								ServiceRefVars: appsv1.ServiceRefVars{
+									PodFQDNs: &appsv1.VarRequired,
 								},
 							},
 						},
 					},
 					{
 						Name: "serviceref-username",
-						ValueFrom: &appsv1alpha1.VarSource{
-							ServiceRefVarRef: &appsv1alpha1.ServiceRefVarSelector{
-								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+						ValueFrom: &appsv1.VarSource{
+							ServiceRefVarRef: &appsv1.ServiceRefVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
 									Name:     "serviceref",
 									Optional: required(),
 								},
-								ServiceRefVars: appsv1alpha1.ServiceRefVars{
-									CredentialVars: appsv1alpha1.CredentialVars{
-										Username: &appsv1alpha1.VarRequired,
+								ServiceRefVars: appsv1.ServiceRefVars{
+									CredentialVars: appsv1.CredentialVars{
+										Username: &appsv1.VarRequired,
 									},
 								},
 							},
@@ -1558,44 +1492,47 @@ var _ = Describe("vars", func() {
 					},
 					{
 						Name: "serviceref-password",
-						ValueFrom: &appsv1alpha1.VarSource{
-							ServiceRefVarRef: &appsv1alpha1.ServiceRefVarSelector{
-								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+						ValueFrom: &appsv1.VarSource{
+							ServiceRefVarRef: &appsv1.ServiceRefVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
 									Name:     "serviceref",
 									Optional: required(),
 								},
-								ServiceRefVars: appsv1alpha1.ServiceRefVars{
-									CredentialVars: appsv1alpha1.CredentialVars{
-										Password: &appsv1alpha1.VarRequired,
+								ServiceRefVars: appsv1.ServiceRefVars{
+									CredentialVars: appsv1.CredentialVars{
+										Password: &appsv1.VarRequired,
 									},
 								},
 							},
 						},
 					},
 				}
-				synthesizedComp.ServiceReferences = map[string]*appsv1alpha1.ServiceDescriptor{
+				synthesizedComp.ServiceReferences = map[string]*appsv1.ServiceDescriptor{
 					"serviceref": {
 						ObjectMeta: metav1.ObjectMeta{
 							Namespace: testCtx.DefaultNamespace,
 							Name:      "serviceref",
 						},
-						Spec: appsv1alpha1.ServiceDescriptorSpec{
+						Spec: appsv1.ServiceDescriptorSpec{
 							ServiceKind:    "",
 							ServiceVersion: "",
-							Endpoint: &appsv1alpha1.CredentialVar{
+							Endpoint: &appsv1.CredentialVar{
 								Value: "endpoint",
 							},
-							Host: &appsv1alpha1.CredentialVar{
+							Host: &appsv1.CredentialVar{
 								Value: "host",
 							},
-							Port: &appsv1alpha1.CredentialVar{
+							Port: &appsv1.CredentialVar{
 								Value: "port",
 							},
-							Auth: &appsv1alpha1.ConnectionCredentialAuth{
-								Username: &appsv1alpha1.CredentialVar{
+							PodFQDNs: &appsv1.CredentialVar{
+								Value: "fqdn",
+							},
+							Auth: &appsv1.ConnectionCredentialAuth{
+								Username: &appsv1.CredentialVar{
 									Value: "username",
 								},
-								Password: &appsv1alpha1.CredentialVar{
+								Password: &appsv1.CredentialVar{
 									Value: "password",
 								},
 							},
@@ -1607,11 +1544,13 @@ var _ = Describe("vars", func() {
 				Expect(templateVars).Should(HaveKeyWithValue("serviceref-endpoint", "endpoint"))
 				Expect(templateVars).Should(HaveKeyWithValue("serviceref-host", "host"))
 				Expect(templateVars).Should(HaveKeyWithValue("serviceref-port", "port"))
+				Expect(templateVars).Should(HaveKeyWithValue("serviceref-fqdn", "fqdn"))
 				Expect(templateVars).ShouldNot(HaveKey("serviceref-username"))
 				Expect(templateVars).ShouldNot(HaveKey("serviceref-password"))
 				checkEnvVarWithValue(envVars, "serviceref-endpoint", "endpoint")
 				checkEnvVarWithValue(envVars, "serviceref-host", "host")
 				checkEnvVarWithValue(envVars, "serviceref-port", "port")
+				checkEnvVarWithValue(envVars, "serviceref-fqdn", "fqdn")
 				checkEnvVarWithValue(envVars, "serviceref-username", "username")
 				checkEnvVarWithValue(envVars, "serviceref-password", "password")
 			})
@@ -1619,17 +1558,17 @@ var _ = Describe("vars", func() {
 
 		Context("component vars", func() {
 			It("non-exist component with optional", func() {
-				vars := []appsv1alpha1.EnvVar{
+				vars := []appsv1.EnvVar{
 					{
 						Name: "non-exist-component-var",
-						ValueFrom: &appsv1alpha1.VarSource{
-							ComponentVarRef: &appsv1alpha1.ComponentVarSelector{
-								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+						ValueFrom: &appsv1.VarSource{
+							ComponentVarRef: &appsv1.ComponentVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
 									Name:     "non-exist",
 									Optional: optional(),
 								},
-								ComponentVars: appsv1alpha1.ComponentVars{
-									Replicas: &appsv1alpha1.VarOptional,
+								ComponentVars: appsv1.ComponentVars{
+									Replicas: &appsv1.VarOptional,
 								},
 							},
 						},
@@ -1642,17 +1581,17 @@ var _ = Describe("vars", func() {
 			})
 
 			It("non-exist component with required", func() {
-				vars := []appsv1alpha1.EnvVar{
+				vars := []appsv1.EnvVar{
 					{
 						Name: "non-exist-component-var",
-						ValueFrom: &appsv1alpha1.VarSource{
-							ComponentVarRef: &appsv1alpha1.ComponentVarSelector{
-								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+						ValueFrom: &appsv1.VarSource{
+							ComponentVarRef: &appsv1.ComponentVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
 									Name:     "non-exist",
 									Optional: required(),
 								},
-								ComponentVars: appsv1alpha1.ComponentVars{
-									Replicas: &appsv1alpha1.VarRequired,
+								ComponentVars: appsv1.ComponentVars{
+									Replicas: &appsv1.VarRequired,
 								},
 							},
 						},
@@ -1663,75 +1602,89 @@ var _ = Describe("vars", func() {
 			})
 
 			It("ok", func() {
-				vars := []appsv1alpha1.EnvVar{
+				vars := []appsv1.EnvVar{
 					{
 						Name: "name",
-						ValueFrom: &appsv1alpha1.VarSource{
-							ComponentVarRef: &appsv1alpha1.ComponentVarSelector{
-								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+						ValueFrom: &appsv1.VarSource{
+							ComponentVarRef: &appsv1.ComponentVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
 									CompDef:  synthesizedComp.CompDefName,
 									Optional: required(),
 								},
-								ComponentVars: appsv1alpha1.ComponentVars{
-									ComponentName: &appsv1alpha1.VarRequired,
+								ComponentVars: appsv1.ComponentVars{
+									ComponentName: &appsv1.VarRequired,
+								},
+							},
+						},
+					},
+					{
+						Name: "shortName",
+						ValueFrom: &appsv1.VarSource{
+							ComponentVarRef: &appsv1.ComponentVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
+									CompDef:  synthesizedComp.CompDefName,
+									Optional: required(),
+								},
+								ComponentVars: appsv1.ComponentVars{
+									ShortName: &appsv1.VarRequired,
 								},
 							},
 						},
 					},
 					{
 						Name: "replicas",
-						ValueFrom: &appsv1alpha1.VarSource{
-							ComponentVarRef: &appsv1alpha1.ComponentVarSelector{
-								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+						ValueFrom: &appsv1.VarSource{
+							ComponentVarRef: &appsv1.ComponentVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
 									CompDef:  synthesizedComp.CompDefName,
 									Optional: required(),
 								},
-								ComponentVars: appsv1alpha1.ComponentVars{
-									Replicas: &appsv1alpha1.VarRequired,
+								ComponentVars: appsv1.ComponentVars{
+									Replicas: &appsv1.VarRequired,
 								},
 							},
 						},
 					},
 					{
 						Name: "podNames",
-						ValueFrom: &appsv1alpha1.VarSource{
-							ComponentVarRef: &appsv1alpha1.ComponentVarSelector{
-								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+						ValueFrom: &appsv1.VarSource{
+							ComponentVarRef: &appsv1.ComponentVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
 									CompDef:  synthesizedComp.CompDefName,
 									Optional: required(),
 								},
-								ComponentVars: appsv1alpha1.ComponentVars{
-									PodNames: &appsv1alpha1.VarRequired,
+								ComponentVars: appsv1.ComponentVars{
+									PodNames: &appsv1.VarRequired,
 								},
 							},
 						},
 					},
 					{
 						Name: "podFQDNs",
-						ValueFrom: &appsv1alpha1.VarSource{
-							ComponentVarRef: &appsv1alpha1.ComponentVarSelector{
-								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+						ValueFrom: &appsv1.VarSource{
+							ComponentVarRef: &appsv1.ComponentVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
 									CompDef:  synthesizedComp.CompDefName,
 									Optional: required(),
 								},
-								ComponentVars: appsv1alpha1.ComponentVars{
-									PodFQDNs: &appsv1alpha1.VarRequired,
+								ComponentVars: appsv1.ComponentVars{
+									PodFQDNs: &appsv1.VarRequired,
 								},
 							},
 						},
 					},
 					{
 						Name: "podNames4EmptyRole",
-						ValueFrom: &appsv1alpha1.VarSource{
-							ComponentVarRef: &appsv1alpha1.ComponentVarSelector{
-								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+						ValueFrom: &appsv1.VarSource{
+							ComponentVarRef: &appsv1.ComponentVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
 									CompDef:  synthesizedComp.CompDefName,
 									Optional: required(),
 								},
-								ComponentVars: appsv1alpha1.ComponentVars{
-									PodNamesForRole: &appsv1alpha1.RoledVar{
+								ComponentVars: appsv1.ComponentVars{
+									PodNamesForRole: &appsv1.RoledVar{
 										// empty role
-										Option: &appsv1alpha1.VarRequired,
+										Option: &appsv1.VarRequired,
 									},
 								},
 							},
@@ -1739,16 +1692,16 @@ var _ = Describe("vars", func() {
 					},
 					{
 						Name: "podFQDNs4Leader",
-						ValueFrom: &appsv1alpha1.VarSource{
-							ComponentVarRef: &appsv1alpha1.ComponentVarSelector{
-								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+						ValueFrom: &appsv1.VarSource{
+							ComponentVarRef: &appsv1.ComponentVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
 									CompDef:  synthesizedComp.CompDefName,
 									Optional: required(),
 								},
-								ComponentVars: appsv1alpha1.ComponentVars{
-									PodFQDNsForRole: &appsv1alpha1.RoledVar{
+								ComponentVars: appsv1.ComponentVars{
+									PodFQDNsForRole: &appsv1.RoledVar{
 										Role:   "leader",
-										Option: &appsv1alpha1.VarRequired,
+										Option: &appsv1.VarRequired,
 									},
 								},
 							},
@@ -1761,12 +1714,12 @@ var _ = Describe("vars", func() {
 				reader := &mockReader{
 					cli: testCtx.Cli,
 					objs: []client.Object{
-						&appsv1alpha1.Component{
+						&appsv1.Component{
 							ObjectMeta: metav1.ObjectMeta{
 								Namespace: testCtx.DefaultNamespace,
 								Name:      constant.GenerateClusterComponentName(synthesizedComp.ClusterName, synthesizedComp.Name),
 							},
-							Spec: appsv1alpha1.ComponentSpec{
+							Spec: appsv1.ComponentSpec{
 								CompDef:  synthesizedComp.CompDefName,
 								Replicas: 3,
 							},
@@ -1821,6 +1774,7 @@ var _ = Describe("vars", func() {
 				Expect(err).Should(Succeed())
 				compName := constant.GenerateClusterComponentName(synthesizedComp.ClusterName, synthesizedComp.Name)
 				checkEnvVarWithValue(envVars, "name", compName)
+				checkEnvVarWithValue(envVars, "shortName", synthesizedComp.Name)
 				checkEnvVarWithValue(envVars, "replicas", fmt.Sprintf("%d", 3))
 				checkEnvVarWithValue(envVars, "podNames", strings.Join(mockInstanceList, ","))
 				checkEnvVarWithValue(envVars, "podNames4EmptyRole", podName("empty"))
@@ -1838,33 +1792,33 @@ var _ = Describe("vars", func() {
 
 		Context("cluster vars", func() {
 			It("ok", func() {
-				vars := []appsv1alpha1.EnvVar{
+				vars := []appsv1.EnvVar{
 					{
 						Name: "namespace",
-						ValueFrom: &appsv1alpha1.VarSource{
-							ClusterVarRef: &appsv1alpha1.ClusterVarSelector{
-								ClusterVars: appsv1alpha1.ClusterVars{
-									Namespace: &appsv1alpha1.VarRequired,
+						ValueFrom: &appsv1.VarSource{
+							ClusterVarRef: &appsv1.ClusterVarSelector{
+								ClusterVars: appsv1.ClusterVars{
+									Namespace: &appsv1.VarRequired,
 								},
 							},
 						},
 					},
 					{
 						Name: "name",
-						ValueFrom: &appsv1alpha1.VarSource{
-							ClusterVarRef: &appsv1alpha1.ClusterVarSelector{
-								ClusterVars: appsv1alpha1.ClusterVars{
-									ClusterName: &appsv1alpha1.VarRequired,
+						ValueFrom: &appsv1.VarSource{
+							ClusterVarRef: &appsv1.ClusterVarSelector{
+								ClusterVars: appsv1.ClusterVars{
+									ClusterName: &appsv1.VarRequired,
 								},
 							},
 						},
 					},
 					{
 						Name: "uid",
-						ValueFrom: &appsv1alpha1.VarSource{
-							ClusterVarRef: &appsv1alpha1.ClusterVarSelector{
-								ClusterVars: appsv1alpha1.ClusterVars{
-									ClusterUID: &appsv1alpha1.VarRequired,
+						ValueFrom: &appsv1.VarSource{
+							ClusterVarRef: &appsv1.ClusterVarSelector{
+								ClusterVars: appsv1.ClusterVars{
+									ClusterUID: &appsv1.VarRequired,
 								},
 							},
 						},
@@ -1887,26 +1841,26 @@ var _ = Describe("vars", func() {
 			)
 
 			BeforeEach(func() {
-				comp := &appsv1alpha1.Component{
+				comp := &appsv1.Component{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: synthesizedComp.Namespace,
 						Name:      FullName(synthesizedComp.ClusterName, synthesizedComp.Name),
 					},
-					Spec: appsv1alpha1.ComponentSpec{
+					Spec: appsv1.ComponentSpec{
 						CompDef: synthesizedComp.CompDefName,
 					},
 				}
-				compDef := &appsv1alpha1.ComponentDefinition{
+				compDef := &appsv1.ComponentDefinition{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: synthesizedComp.CompDefName,
 					},
-					Spec: appsv1alpha1.ComponentDefinitionSpec{
-						Services: []appsv1alpha1.ComponentService{},
+					Spec: appsv1.ComponentDefinitionSpec{
+						Services: []appsv1.ComponentService{},
 					},
 				}
 				for _, name := range []string{"service"} {
-					compDef.Spec.Services = append(compDef.Spec.Services, appsv1alpha1.ComponentService{
-						Service: appsv1alpha1.Service{
+					compDef.Spec.Services = append(compDef.Spec.Services, appsv1.ComponentService{
+						Service: appsv1.Service{
 							Name:        name,
 							ServiceName: name,
 						},
@@ -1919,18 +1873,18 @@ var _ = Describe("vars", func() {
 			})
 
 			It("component not found w/ optional", func() {
-				vars := []appsv1alpha1.EnvVar{
+				vars := []appsv1.EnvVar{
 					{
 						Name: "service-host",
-						ValueFrom: &appsv1alpha1.VarSource{
-							ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
-								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+						ValueFrom: &appsv1.VarSource{
+							ServiceVarRef: &appsv1.ServiceVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
 									CompDef:  "non-exist",
 									Name:     "service",
 									Optional: optional(),
 								},
-								ServiceVars: appsv1alpha1.ServiceVars{
-									Host: &appsv1alpha1.VarOptional,
+								ServiceVars: appsv1.ServiceVars{
+									Host: &appsv1.VarOptional,
 								},
 							},
 						},
@@ -1943,18 +1897,18 @@ var _ = Describe("vars", func() {
 			})
 
 			It("component not found w/ required", func() {
-				vars := []appsv1alpha1.EnvVar{
+				vars := []appsv1.EnvVar{
 					{
 						Name: "service-host",
-						ValueFrom: &appsv1alpha1.VarSource{
-							ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
-								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+						ValueFrom: &appsv1.VarSource{
+							ServiceVarRef: &appsv1.ServiceVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
 									CompDef:  "non-exist",
 									Name:     "service",
 									Optional: required(),
 								},
-								ServiceVars: appsv1alpha1.ServiceVars{
-									Host: &appsv1alpha1.VarRequired,
+								ServiceVars: appsv1.ServiceVars{
+									Host: &appsv1.VarRequired,
 								},
 							},
 						},
@@ -1967,18 +1921,18 @@ var _ = Describe("vars", func() {
 			It("default component", func() {
 				svcName := constant.GenerateComponentServiceName(synthesizedComp.ClusterName, synthesizedComp.Name, "service")
 
-				vars := []appsv1alpha1.EnvVar{
+				vars := []appsv1.EnvVar{
 					{
 						Name: "service-host",
-						ValueFrom: &appsv1alpha1.VarSource{
-							ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
-								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+						ValueFrom: &appsv1.VarSource{
+							ServiceVarRef: &appsv1.ServiceVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
 									// don't specify the comp def, it will match self by default
 									Name:     "service",
 									Optional: required(),
 								},
-								ServiceVars: appsv1alpha1.ServiceVars{
-									Host: &appsv1alpha1.VarRequired,
+								ServiceVars: appsv1.ServiceVars{
+									Host: &appsv1.VarRequired,
 								},
 							},
 						},
@@ -2101,26 +2055,26 @@ var _ = Describe("vars", func() {
 				}
 
 				for _, name := range []string{compName1, compName2, compName3} {
-					comp := &appsv1alpha1.Component{
+					comp := &appsv1.Component{
 						ObjectMeta: metav1.ObjectMeta{
 							Namespace: synthesizedComp.Namespace,
 							Name:      FullName(synthesizedComp.ClusterName, name),
 						},
-						Spec: appsv1alpha1.ComponentSpec{
+						Spec: appsv1.ComponentSpec{
 							CompDef: synthesizedComp.CompDefName,
 						},
 					}
-					compDef := &appsv1alpha1.ComponentDefinition{
+					compDef := &appsv1.ComponentDefinition{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: synthesizedComp.CompDefName,
 						},
-						Spec: appsv1alpha1.ComponentDefinitionSpec{
-							Services: []appsv1alpha1.ComponentService{},
+						Spec: appsv1.ComponentDefinitionSpec{
+							Services: []appsv1.ComponentService{},
 						},
 					}
 					for _, name := range []string{"service", svcName1, svcName2} {
-						compDef.Spec.Services = append(compDef.Spec.Services, appsv1alpha1.ComponentService{
-							Service: appsv1alpha1.Service{
+						compDef.Spec.Services = append(compDef.Spec.Services, appsv1.ComponentService{
+							Service: appsv1.Service{
 								Name:        name,
 								ServiceName: name,
 							},
@@ -2131,18 +2085,42 @@ var _ = Describe("vars", func() {
 			})
 
 			It("w/o option - ref self", func() {
-				vars := []appsv1alpha1.EnvVar{
+				vars := []appsv1.EnvVar{
 					{
 						Name: "service-host",
-						ValueFrom: &appsv1alpha1.VarSource{
-							ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
-								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+						ValueFrom: &appsv1.VarSource{
+							ServiceVarRef: &appsv1.ServiceVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
 									CompDef:  synthesizedComp.CompDefName, // same as synthesizedComp
 									Name:     "service",
 									Optional: required(),
 								},
-								ServiceVars: appsv1alpha1.ServiceVars{
-									Host: &appsv1alpha1.VarRequired,
+								ServiceVars: appsv1.ServiceVars{
+									Host: &appsv1.VarRequired,
+								},
+							},
+						},
+					},
+				}
+				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
+				Expect(err).Should(Succeed())
+				Expect(templateVars).Should(HaveKeyWithValue("service-host", svcName1))
+				checkEnvVarWithValue(envVars, "service-host", svcName1)
+			})
+
+			It("w/o option - comp def name with regexp", func() {
+				vars := []appsv1.EnvVar{
+					{
+						Name: "service-host",
+						ValueFrom: &appsv1.VarSource{
+							ServiceVarRef: &appsv1.ServiceVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
+									CompDef:  "^" + synthesizedComp.CompDefName + "$", // compDef name with regexp
+									Name:     "service",
+									Optional: required(),
+								},
+								ServiceVars: appsv1.ServiceVars{
+									Host: &appsv1.VarRequired,
 								},
 							},
 						},
@@ -2155,18 +2133,18 @@ var _ = Describe("vars", func() {
 			})
 
 			It("w/ option - ref others", func() {
-				vars := []appsv1alpha1.EnvVar{
+				vars := []appsv1.EnvVar{
 					{
 						Name: "service-host",
-						ValueFrom: &appsv1alpha1.VarSource{
-							ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
-								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+						ValueFrom: &appsv1.VarSource{
+							ServiceVarRef: &appsv1.ServiceVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
 									CompDef:  "abc" + synthesizedComp.CompDefName, // different with synthesizedComp
 									Name:     "service",
 									Optional: required(),
 								},
-								ServiceVars: appsv1alpha1.ServiceVars{
-									Host: &appsv1alpha1.VarRequired,
+								ServiceVars: appsv1.ServiceVars{
+									Host: &appsv1.VarRequired,
 								},
 							},
 						},
@@ -2178,39 +2156,39 @@ var _ = Describe("vars", func() {
 			})
 
 			It("individual", func() {
-				vars := []appsv1alpha1.EnvVar{
+				vars := []appsv1.EnvVar{
 					{
 						Name: "service-host",
-						ValueFrom: &appsv1alpha1.VarSource{
-							ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
-								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+						ValueFrom: &appsv1.VarSource{
+							ServiceVarRef: &appsv1.ServiceVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
 									CompDef:  synthesizedComp.CompDefName,
 									Name:     "service",
 									Optional: required(),
-									MultipleClusterObjectOption: &appsv1alpha1.MultipleClusterObjectOption{
-										Strategy: appsv1alpha1.MultipleClusterObjectStrategyIndividual,
+									MultipleClusterObjectOption: &appsv1.MultipleClusterObjectOption{
+										Strategy: appsv1.MultipleClusterObjectStrategyIndividual,
 									},
 								},
-								ServiceVars: appsv1alpha1.ServiceVars{
-									Host: &appsv1alpha1.VarRequired,
+								ServiceVars: appsv1.ServiceVars{
+									Host: &appsv1.VarRequired,
 								},
 							},
 						},
 					},
 					{
 						Name: "credential-username",
-						ValueFrom: &appsv1alpha1.VarSource{
-							CredentialVarRef: &appsv1alpha1.CredentialVarSelector{
-								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+						ValueFrom: &appsv1.VarSource{
+							CredentialVarRef: &appsv1.CredentialVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
 									CompDef:  synthesizedComp.CompDefName,
 									Name:     "credential",
 									Optional: required(),
-									MultipleClusterObjectOption: &appsv1alpha1.MultipleClusterObjectOption{
-										Strategy: appsv1alpha1.MultipleClusterObjectStrategyIndividual,
+									MultipleClusterObjectOption: &appsv1.MultipleClusterObjectOption{
+										Strategy: appsv1.MultipleClusterObjectStrategyIndividual,
 									},
 								},
-								CredentialVars: appsv1alpha1.CredentialVars{
-									Username: &appsv1alpha1.VarRequired,
+								CredentialVars: appsv1.CredentialVars{
+									Username: &appsv1.VarRequired,
 								},
 							},
 						},
@@ -2247,21 +2225,21 @@ var _ = Describe("vars", func() {
 			})
 
 			It("combined - reuse", func() {
-				vars := []appsv1alpha1.EnvVar{
+				vars := []appsv1.EnvVar{
 					{
 						Name: "service-host",
-						ValueFrom: &appsv1alpha1.VarSource{
-							ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
-								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+						ValueFrom: &appsv1.VarSource{
+							ServiceVarRef: &appsv1.ServiceVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
 									CompDef:  synthesizedComp.CompDefName,
 									Name:     "service",
 									Optional: required(),
-									MultipleClusterObjectOption: &appsv1alpha1.MultipleClusterObjectOption{
-										Strategy: appsv1alpha1.MultipleClusterObjectStrategyCombined,
+									MultipleClusterObjectOption: &appsv1.MultipleClusterObjectOption{
+										Strategy: appsv1.MultipleClusterObjectStrategyCombined,
 									},
 								},
-								ServiceVars: appsv1alpha1.ServiceVars{
-									Host: &appsv1alpha1.VarRequired,
+								ServiceVars: appsv1.ServiceVars{
+									Host: &appsv1.VarRequired,
 								},
 							},
 						},
@@ -2283,24 +2261,24 @@ var _ = Describe("vars", func() {
 				suffix := "suffix"
 				combinedSvcVarName := fmt.Sprintf("%s_%s", "service-host", suffix)
 
-				vars := []appsv1alpha1.EnvVar{
+				vars := []appsv1.EnvVar{
 					{
 						Name: "service-host",
-						ValueFrom: &appsv1alpha1.VarSource{
-							ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
-								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+						ValueFrom: &appsv1.VarSource{
+							ServiceVarRef: &appsv1.ServiceVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
 									CompDef:  synthesizedComp.CompDefName,
 									Name:     "service",
 									Optional: required(),
-									MultipleClusterObjectOption: &appsv1alpha1.MultipleClusterObjectOption{
-										Strategy: appsv1alpha1.MultipleClusterObjectStrategyCombined,
-										CombinedOption: &appsv1alpha1.MultipleClusterObjectCombinedOption{
+									MultipleClusterObjectOption: &appsv1.MultipleClusterObjectOption{
+										Strategy: appsv1.MultipleClusterObjectStrategyCombined,
+										CombinedOption: &appsv1.MultipleClusterObjectCombinedOption{
 											NewVarSuffix: &suffix,
 										},
 									},
 								},
-								ServiceVars: appsv1alpha1.ServiceVars{
-									Host: &appsv1alpha1.VarRequired,
+								ServiceVars: appsv1.ServiceVars{
+									Host: &appsv1.VarRequired,
 								},
 							},
 						},
@@ -2321,21 +2299,21 @@ var _ = Describe("vars", func() {
 			})
 
 			It("combined - value from error", func() {
-				vars := []appsv1alpha1.EnvVar{
+				vars := []appsv1.EnvVar{
 					{
 						Name: "credential-username",
-						ValueFrom: &appsv1alpha1.VarSource{
-							CredentialVarRef: &appsv1alpha1.CredentialVarSelector{
-								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+						ValueFrom: &appsv1.VarSource{
+							CredentialVarRef: &appsv1.CredentialVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
 									CompDef:  synthesizedComp.CompDefName,
 									Name:     "credential",
 									Optional: required(),
-									MultipleClusterObjectOption: &appsv1alpha1.MultipleClusterObjectOption{
-										Strategy: appsv1alpha1.MultipleClusterObjectStrategyCombined,
+									MultipleClusterObjectOption: &appsv1.MultipleClusterObjectOption{
+										Strategy: appsv1.MultipleClusterObjectStrategyCombined,
 									},
 								},
-								CredentialVars: appsv1alpha1.CredentialVars{
-									Username: &appsv1alpha1.VarRequired,
+								CredentialVars: appsv1.CredentialVars{
+									Username: &appsv1.VarRequired,
 								},
 							},
 						},
@@ -2352,21 +2330,21 @@ var _ = Describe("vars", func() {
 					compName2: synthesizedComp.CompDefName,
 					compName3: synthesizedComp.CompDefName, // there is no service object for comp3.
 				}
-				vars := []appsv1alpha1.EnvVar{
+				vars := []appsv1.EnvVar{
 					{
 						Name: "service-host",
-						ValueFrom: &appsv1alpha1.VarSource{
-							ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
-								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+						ValueFrom: &appsv1.VarSource{
+							ServiceVarRef: &appsv1.ServiceVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
 									CompDef:  synthesizedComp.CompDefName,
 									Name:     "service",
 									Optional: optional(), // optional
-									MultipleClusterObjectOption: &appsv1alpha1.MultipleClusterObjectOption{
-										Strategy: appsv1alpha1.MultipleClusterObjectStrategyIndividual,
+									MultipleClusterObjectOption: &appsv1.MultipleClusterObjectOption{
+										Strategy: appsv1.MultipleClusterObjectStrategyIndividual,
 									},
 								},
-								ServiceVars: appsv1alpha1.ServiceVars{
-									Host: &appsv1alpha1.VarRequired,
+								ServiceVars: appsv1.ServiceVars{
+									Host: &appsv1.VarRequired,
 								},
 							},
 						},
@@ -2392,21 +2370,21 @@ var _ = Describe("vars", func() {
 					compName2: synthesizedComp.CompDefName,
 					compName3: synthesizedComp.CompDefName, // there is no service object for comp3.
 				}
-				vars := []appsv1alpha1.EnvVar{
+				vars := []appsv1.EnvVar{
 					{
 						Name: "service-host",
-						ValueFrom: &appsv1alpha1.VarSource{
-							ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
-								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+						ValueFrom: &appsv1.VarSource{
+							ServiceVarRef: &appsv1.ServiceVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
 									CompDef:  synthesizedComp.CompDefName,
 									Name:     "service",
 									Optional: required(), // required
-									MultipleClusterObjectOption: &appsv1alpha1.MultipleClusterObjectOption{
-										Strategy: appsv1alpha1.MultipleClusterObjectStrategyIndividual,
+									MultipleClusterObjectOption: &appsv1.MultipleClusterObjectOption{
+										Strategy: appsv1.MultipleClusterObjectStrategyIndividual,
 									},
 								},
-								ServiceVars: appsv1alpha1.ServiceVars{
-									Host: &appsv1alpha1.VarRequired,
+								ServiceVars: appsv1.ServiceVars{
+									Host: &appsv1.VarRequired,
 								},
 							},
 						},
@@ -2448,21 +2426,21 @@ var _ = Describe("vars", func() {
 					compName2: synthesizedComp.CompDefName,
 					compName3: synthesizedComp.CompDefName, // there is no service object for comp3.
 				}
-				vars := []appsv1alpha1.EnvVar{
+				vars := []appsv1.EnvVar{
 					{
 						Name: "service-host",
-						ValueFrom: &appsv1alpha1.VarSource{
-							ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
-								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+						ValueFrom: &appsv1.VarSource{
+							ServiceVarRef: &appsv1.ServiceVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
 									CompDef:  synthesizedComp.CompDefName,
 									Name:     "service",
 									Optional: optional(),
-									MultipleClusterObjectOption: &appsv1alpha1.MultipleClusterObjectOption{
-										Strategy: appsv1alpha1.MultipleClusterObjectStrategyCombined,
+									MultipleClusterObjectOption: &appsv1.MultipleClusterObjectOption{
+										Strategy: appsv1.MultipleClusterObjectStrategyCombined,
 									},
 								},
-								ServiceVars: appsv1alpha1.ServiceVars{
-									Host: &appsv1alpha1.VarRequired,
+								ServiceVars: appsv1.ServiceVars{
+									Host: &appsv1.VarRequired,
 								},
 							},
 						},
@@ -2488,21 +2466,21 @@ var _ = Describe("vars", func() {
 					compName2: synthesizedComp.CompDefName,
 					compName3: synthesizedComp.CompDefName, // there is no service object for comp3.
 				}
-				vars := []appsv1alpha1.EnvVar{
+				vars := []appsv1.EnvVar{
 					{
 						Name: "service-host",
-						ValueFrom: &appsv1alpha1.VarSource{
-							ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
-								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+						ValueFrom: &appsv1.VarSource{
+							ServiceVarRef: &appsv1.ServiceVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
 									CompDef:  synthesizedComp.CompDefName,
 									Name:     "service",
 									Optional: required(), // required
-									MultipleClusterObjectOption: &appsv1alpha1.MultipleClusterObjectOption{
-										Strategy: appsv1alpha1.MultipleClusterObjectStrategyCombined,
+									MultipleClusterObjectOption: &appsv1.MultipleClusterObjectOption{
+										Strategy: appsv1.MultipleClusterObjectStrategyCombined,
 									},
 								},
-								ServiceVars: appsv1alpha1.ServiceVars{
-									Host: &appsv1alpha1.VarRequired,
+								ServiceVars: appsv1.ServiceVars{
+									Host: &appsv1.VarRequired,
 								},
 							},
 						},
@@ -2563,7 +2541,7 @@ var _ = Describe("vars", func() {
 			})
 
 			It("reference", func() {
-				vars := []appsv1alpha1.EnvVar{
+				vars := []appsv1.EnvVar{
 					{
 						Name:  "aa",
 						Value: "~",
@@ -2586,7 +2564,7 @@ var _ = Describe("vars", func() {
 			})
 
 			It("reference not defined", func() {
-				vars := []appsv1alpha1.EnvVar{
+				vars := []appsv1.EnvVar{
 					{
 						Name:  "ba",
 						Value: "~",
@@ -2609,7 +2587,7 @@ var _ = Describe("vars", func() {
 			})
 
 			It("reference credential var", func() {
-				vars := []appsv1alpha1.EnvVar{
+				vars := []appsv1.EnvVar{
 					{
 						Name:  "ca",
 						Value: "~",
@@ -2620,14 +2598,14 @@ var _ = Describe("vars", func() {
 					},
 					{
 						Name: "credential-username",
-						ValueFrom: &appsv1alpha1.VarSource{
-							CredentialVarRef: &appsv1alpha1.CredentialVarSelector{
-								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+						ValueFrom: &appsv1.VarSource{
+							CredentialVarRef: &appsv1.CredentialVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
 									Name:     "credential",
 									Optional: optional(),
 								},
-								CredentialVars: appsv1alpha1.CredentialVars{
-									Username: &appsv1alpha1.VarOptional,
+								CredentialVars: appsv1.CredentialVars{
+									Username: &appsv1.VarOptional,
 								},
 							},
 						},
@@ -2647,7 +2625,7 @@ var _ = Describe("vars", func() {
 			})
 
 			It("escaping", func() {
-				vars := []appsv1alpha1.EnvVar{
+				vars := []appsv1.EnvVar{
 					{
 						Name:  "da",
 						Value: "~",
@@ -2670,7 +2648,7 @@ var _ = Describe("vars", func() {
 			})
 
 			It("reference and escaping", func() {
-				vars := []appsv1alpha1.EnvVar{
+				vars := []appsv1.EnvVar{
 					{
 						Name:  "ea",
 						Value: "~",
@@ -2699,7 +2677,7 @@ var _ = Describe("vars", func() {
 			})
 
 			It("all in one", func() {
-				vars := []appsv1alpha1.EnvVar{
+				vars := []appsv1.EnvVar{
 					{
 						Name:  "fa",
 						Value: "~",
@@ -2710,14 +2688,14 @@ var _ = Describe("vars", func() {
 					},
 					{
 						Name: "credential-username",
-						ValueFrom: &appsv1alpha1.VarSource{
-							CredentialVarRef: &appsv1alpha1.CredentialVarSelector{
-								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+						ValueFrom: &appsv1.VarSource{
+							CredentialVarRef: &appsv1.CredentialVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
 									Name:     "credential",
 									Optional: optional(),
 								},
-								CredentialVars: appsv1alpha1.CredentialVars{
-									Username: &appsv1alpha1.VarOptional,
+								CredentialVars: appsv1.CredentialVars{
+									Username: &appsv1.VarOptional,
 								},
 							},
 						},
@@ -2732,7 +2710,7 @@ var _ = Describe("vars", func() {
 
 		Context("vars expression", func() {
 			It("simple format", func() {
-				vars := []appsv1alpha1.EnvVar{
+				vars := []appsv1.EnvVar{
 					{
 						Name:       "port",
 						Value:      "12345",
@@ -2745,22 +2723,8 @@ var _ = Describe("vars", func() {
 				checkEnvVarWithValue(envVars, "port", "012345")
 			})
 
-			It("cluster domain", func() {
-				vars := []appsv1alpha1.EnvVar{
-					{
-						Name:       "headless",
-						Value:      "test-headless.default.svc",
-						Expression: expp("{{ printf \"%s.%s\" .headless .ClusterDomain }}"),
-					},
-				}
-				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, nil, synthesizedComp, vars)
-				Expect(err).Should(Succeed())
-				Expect(templateVars).Should(HaveKeyWithValue("headless", "test-headless.default.svc.cluster.local"))
-				checkEnvVarWithValue(envVars, "headless", "test-headless.default.svc.cluster.local")
-			})
-
 			It("condition exp", func() {
-				vars := []appsv1alpha1.EnvVar{
+				vars := []appsv1.EnvVar{
 					{
 						Name:       "port",
 						Value:      "12345",
@@ -2774,7 +2738,7 @@ var _ = Describe("vars", func() {
 			})
 
 			It("exp only", func() {
-				vars := []appsv1alpha1.EnvVar{
+				vars := []appsv1.EnvVar{
 					{
 						Name:       "port",
 						Expression: expp("12345"),
@@ -2787,7 +2751,7 @@ var _ = Describe("vars", func() {
 			})
 
 			It("exp error", func() {
-				vars := []appsv1alpha1.EnvVar{
+				vars := []appsv1.EnvVar{
 					{
 						Name:       "port",
 						Expression: expp("{{ if eq .port 12345 }}54321{{ end }}"),
@@ -2799,7 +2763,7 @@ var _ = Describe("vars", func() {
 			})
 
 			It("access another vars", func() {
-				vars := []appsv1alpha1.EnvVar{
+				vars := []appsv1.EnvVar{
 					{
 						Name:  "host",
 						Value: "localhost",
@@ -2836,21 +2800,21 @@ var _ = Describe("vars", func() {
 					compName1: synthesizedComp.CompDefName,
 					compName2: synthesizedComp.CompDefName,
 				}
-				vars := []appsv1alpha1.EnvVar{
+				vars := []appsv1.EnvVar{
 					{
 						Name: "host",
-						ValueFrom: &appsv1alpha1.VarSource{
-							ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
-								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+						ValueFrom: &appsv1.VarSource{
+							ServiceVarRef: &appsv1.ServiceVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
 									CompDef:  synthesizedComp.CompDefName,
 									Name:     "",
 									Optional: required(),
-									MultipleClusterObjectOption: &appsv1alpha1.MultipleClusterObjectOption{
-										Strategy: appsv1alpha1.MultipleClusterObjectStrategyIndividual,
+									MultipleClusterObjectOption: &appsv1.MultipleClusterObjectOption{
+										Strategy: appsv1.MultipleClusterObjectStrategyIndividual,
 									},
 								},
-								ServiceVars: appsv1alpha1.ServiceVars{
-									Host: &appsv1alpha1.VarRequired,
+								ServiceVars: appsv1.ServiceVars{
+									Host: &appsv1.VarRequired,
 								},
 							},
 						},
@@ -2907,17 +2871,17 @@ var _ = Describe("vars", func() {
 
 			It("exp for resolved but not-exist vars", func() {
 				svcName := constant.GenerateComponentServiceName(synthesizedComp.ClusterName, synthesizedComp.Name, "")
-				vars := []appsv1alpha1.EnvVar{
+				vars := []appsv1.EnvVar{
 					{
 						Name: "host",
-						ValueFrom: &appsv1alpha1.VarSource{
-							ServiceVarRef: &appsv1alpha1.ServiceVarSelector{
-								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+						ValueFrom: &appsv1.VarSource{
+							ServiceVarRef: &appsv1.ServiceVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
 									Name:     "", // the default component service
 									Optional: optional(),
 								},
-								ServiceVars: appsv1alpha1.ServiceVars{
-									Host: &appsv1alpha1.VarOptional,
+								ServiceVars: appsv1.ServiceVars{
+									Host: &appsv1.VarOptional,
 								},
 							},
 						},
@@ -2954,17 +2918,17 @@ var _ = Describe("vars", func() {
 			})
 
 			It("exp for credential-vars", func() {
-				vars := []appsv1alpha1.EnvVar{
+				vars := []appsv1.EnvVar{
 					{
 						Name: "password",
-						ValueFrom: &appsv1alpha1.VarSource{
-							CredentialVarRef: &appsv1alpha1.CredentialVarSelector{
-								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+						ValueFrom: &appsv1.VarSource{
+							CredentialVarRef: &appsv1.CredentialVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
 									Name:     "credential",
 									Optional: required(),
 								},
-								CredentialVars: appsv1alpha1.CredentialVars{
-									Password: &appsv1alpha1.VarRequired,
+								CredentialVars: appsv1.CredentialVars{
+									Password: &appsv1.VarRequired,
 								},
 							},
 						},
@@ -2999,17 +2963,17 @@ var _ = Describe("vars", func() {
 			})
 
 			It("depends on credential-vars", func() {
-				vars := []appsv1alpha1.EnvVar{
+				vars := []appsv1.EnvVar{
 					{
 						Name: "raw",
-						ValueFrom: &appsv1alpha1.VarSource{
-							CredentialVarRef: &appsv1alpha1.CredentialVarSelector{
-								ClusterObjectReference: appsv1alpha1.ClusterObjectReference{
+						ValueFrom: &appsv1.VarSource{
+							CredentialVarRef: &appsv1.CredentialVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
 									Name:     "credential",
 									Optional: required(),
 								},
-								CredentialVars: appsv1alpha1.CredentialVars{
-									Password: &appsv1alpha1.VarRequired,
+								CredentialVars: appsv1.CredentialVars{
+									Password: &appsv1.VarRequired,
 								},
 							},
 						},
@@ -3041,7 +3005,7 @@ var _ = Describe("vars", func() {
 			})
 
 			It("depends on intermediate values", func() {
-				vars := []appsv1alpha1.EnvVar{
+				vars := []appsv1.EnvVar{
 					{
 						Name:       "endpoint",
 						Expression: expp("{{ .host }}:{{ .port }}"),

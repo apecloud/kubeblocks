@@ -176,11 +176,11 @@ func setupFlags() {
 		"The leader election ID prefix for controller manager. "+
 			"This ID must be unique to controller manager.")
 
-	flag.Bool(appsFlagKey.String(), false,
+	flag.Bool(appsFlagKey.String(), true,
 		"Enable the apps controller manager.")
-	flag.Bool(extensionsFlagKey.String(), false,
+	flag.Bool(extensionsFlagKey.String(), true,
 		"Enable the extensions controller manager.")
-	flag.Bool(workloadsFlagKey.String(), false,
+	flag.Bool(workloadsFlagKey.String(), true,
 		"Enable the workloads controller manager.")
 	flag.Bool(experimentalFlagKey.String(), false,
 		"Enable the experimental controller manager.")

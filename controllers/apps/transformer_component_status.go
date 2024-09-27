@@ -26,7 +26,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -170,6 +169,10 @@ func (t *componentStatusTransformer) reconcileStatus(transCtx *componentTransfor
 		return phase == "" || phase == appsv1.CreatingClusterCompPhase
 	}()
 
+	isResourcesUpdateToDate := func() bool {
+		return true
+	}()
+
 	transCtx.Logger.Info(
 		fmt.Sprintf("status conditions, creating: %v, running: %v, failure: %v, scale-out: %v, scale-up: %v, config: %v",
 			isInCreatingPhase, running, hasFailure, hasRunningScaleOut, hasRunningVolumeExpansion, isAllConfigSynced))
@@ -185,8 +188,10 @@ func (t *componentStatusTransformer) reconcileStatus(transCtx *componentTransfor
 		t.setComponentStatusPhase(transCtx, appsv1.RunningClusterCompPhase, nil, "component is Running")
 	case !hasFailure && isInCreatingPhase:
 		t.setComponentStatusPhase(transCtx, appsv1.CreatingClusterCompPhase, nil, "component is Creating")
-	case !hasFailure:
+	case !hasFailure && !isResourcesUpdateToDate:
 		t.setComponentStatusPhase(transCtx, appsv1.UpdatingClusterCompPhase, nil, "component is Updating")
+	case !hasFailure && isResourcesUpdateToDate:
+		t.setComponentStatusPhase(transCtx, appsv1.RecoveringClusterCompPhase, nil, "component is Recovering")
 	default:
 		t.setComponentStatusPhase(transCtx, appsv1.FailedClusterCompPhase, messages, "component is Failed")
 	}
@@ -200,47 +205,6 @@ func (t *componentStatusTransformer) isWorkloadUpdated() bool {
 	}
 	generation := t.runningITS.GetAnnotations()[constant.KubeBlocksGenerationKey]
 	return generation == strconv.FormatInt(t.comp.Generation, 10)
-}
-
-// isComponentAvailable tells whether the component is available.
-func (t *componentStatusTransformer) isComponentAvailable() bool {
-	if !t.isWorkloadUpdated() {
-		return false
-	}
-	if t.runningITS.Status.CurrentRevision != t.runningITS.Status.UpdateRevision {
-		return false
-	}
-	if defined, available := t.definedAvailableCondition(); defined {
-		return available
-	}
-	return t.builtinAvailableCondition()
-}
-
-func (t *componentStatusTransformer) definedAvailableCondition() (bool, bool) {
-	if t.synthesizeComp.LifecycleActions == nil || t.synthesizeComp.LifecycleActions.AvailableProbe == nil {
-		return false, false
-	}
-	for _, cond := range t.comp.Status.Conditions {
-		if cond.Type == appsv1.ConditionTypeAvailable {
-			return true, cond.Status == metav1.ConditionTrue // TODO: check the generation?
-		}
-	}
-	return true, false
-}
-
-func (t *componentStatusTransformer) builtinAvailableCondition() bool {
-	if t.runningITS.Status.AvailableReplicas <= 0 {
-		return false
-	}
-	if len(t.synthesizeComp.Roles) == 0 {
-		return true
-	}
-	for _, status := range t.runningITS.Status.MembersStatus {
-		if status.ReplicaRole.IsLeader {
-			return true
-		}
-	}
-	return false
 }
 
 // isRunning checks if the component underlying workload is running.

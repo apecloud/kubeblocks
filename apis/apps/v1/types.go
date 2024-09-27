@@ -63,6 +63,9 @@ const (
 	// DeletingClusterCompPhase indicates the component is currently being deleted.
 	DeletingClusterCompPhase ClusterComponentPhase = "Deleting"
 
+	// RecoveringClusterCompPhase indicates the component is currently being recovered from some passive exception.
+	RecoveringClusterCompPhase ClusterComponentPhase = "Recovering"
+
 	// RunningClusterCompPhase indicates all resources of the component are up-to-date and running w/o any failure.
 	RunningClusterCompPhase ClusterComponentPhase = "Running"
 

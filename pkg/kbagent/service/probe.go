@@ -162,6 +162,8 @@ func (r *probeRunner) launchReportLoop(probe *proto.Probe) {
 		for range ticker.C {
 			latestEvent := gather(r.latestEvent)
 			if latestEvent != nil {
+				r.logger.Info("send probe event periodically", "probe", latestEvent.Probe,
+					"code", latestEvent.Code, "output", outputPrefix(latestEvent.Output), "message", latestEvent.Message)
 				r.sendEvent(latestEvent)
 			}
 		}
@@ -213,9 +215,7 @@ func (r *probeRunner) fail(probe *proto.Probe) bool {
 }
 
 func (r *probeRunner) buildNSendEvent(instance, probe string, code int32, output []byte, message string) *proto.ProbeEvent {
-	prefixLen := min(len(output), 32)
-	r.logger.Info("send probe event", "code", code, "output", string(output[:prefixLen]), "message", message)
-
+	r.logger.Info("send probe event", "probe", probe, "code", code, "output", outputPrefix(output), "message", message)
 	event := &proto.ProbeEvent{
 		Instance: instance,
 		Probe:    probe,
@@ -232,7 +232,11 @@ func (r *probeRunner) sendEvent(event *proto.ProbeEvent) {
 	if err == nil {
 		util.SendEventWithMessage(&r.logger, event.Probe, string(msg))
 	} else {
-		r.logger.Error(err, fmt.Sprintf("failed to marshal probe event, probe: %s, code: %d, message: %s",
-			event.Probe, event.Code, event.Message))
+		r.logger.Error(err, fmt.Sprintf("failed to marshal probe event, probe: %s", event.Probe))
 	}
+}
+
+func outputPrefix(output []byte) string {
+	prefixLen := min(len(output), 32)
+	return string(output[:prefixLen])
 }

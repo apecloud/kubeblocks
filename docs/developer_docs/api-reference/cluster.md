@@ -2141,6 +2141,9 @@ Kubernetes core/v1.ConfigMapVolumeSource
 </tr><tr><td><p>&#34;Failed&#34;</p></td>
 <td><p>FailedClusterCompPhase indicates the component encountered some error and did not complete successfully.</p>
 </td>
+</tr><tr><td><p>&#34;Recovering&#34;</p></td>
+<td><p>RecoveringClusterCompPhase indicates the component is currently being recovered from some passive exception.</p>
+</td>
 </tr><tr><td><p>&#34;Running&#34;</p></td>
 <td><p>RunningClusterCompPhase indicates all resources of the component are up-to-date and running w/o any failure.</p>
 </td>

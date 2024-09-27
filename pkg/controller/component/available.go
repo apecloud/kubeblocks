@@ -96,28 +96,27 @@ func (h *AvailableProbeEventHandler) status(ctx context.Context, cli client.Clie
 		}
 	}()
 
-	var (
-		compCopy = comp.DeepCopy()
-		cond     *metav1.Condition
-	)
+	idx := -1
 	for i, c := range comp.Status.Conditions {
 		if c.Type == appsv1.ConditionTypeAvailable {
-			cond = &comp.Status.Conditions[i]
+			idx = i
 			break
 		}
 	}
-	if cond == nil {
-		comp.Status.Conditions = append(comp.Status.Conditions, newCond)
-		cond = &comp.Status.Conditions[len(comp.Status.Conditions)-1]
+	if idx >= 0 && h.condEqual(comp.Status.Conditions[idx], newCond) {
+		return nil
 	}
 
-	if h.condEqual(*cond, newCond) {
-		return nil
+	compCopy := comp.DeepCopy()
+	if idx < 0 {
+		comp.Status.Conditions = append(comp.Status.Conditions, newCond)
+	} else {
+		comp.Status.Conditions[idx] = newCond
 	}
 
 	recorder.Event(comp, corev1.EventTypeNormal, reason, message)
 
-	return cli.Status().Patch(ctx, compCopy, client.MergeFrom(comp))
+	return cli.Status().Patch(ctx, comp, client.MergeFrom(compCopy))
 }
 
 func (h *AvailableProbeEventHandler) condEqual(cond1, cond2 metav1.Condition) bool {

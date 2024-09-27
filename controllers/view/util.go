@@ -24,7 +24,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"golang.org/x/exp/slices"
 	"strconv"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -261,9 +263,24 @@ func getObjectTreeFromCache(ctx context.Context, cli client.Client, primary clie
 			return nil, err
 		}
 		tree.Secondaries = append(tree.Secondaries, subTree)
+		slices.SortStableFunc(tree.Secondaries, func(a, b *viewv1.ObjectTreeNode) bool {
+			return getObjectReferenceString(a) < getObjectReferenceString(b)
+		})
 	}
 
 	return tree, nil
+}
+
+func getObjectReferenceString(n *viewv1.ObjectTreeNode) string {
+	if n == nil {
+		return "nil"
+	}
+	return strings.Join([]string{
+		n.Primary.Kind,
+		n.Primary.Namespace,
+		n.Primary.Name,
+		n.Primary.APIVersion,
+	}, "")
 }
 
 func getObjectsFromCache(ctx context.Context, cli client.Client, root *kbappsv1.Cluster, ownershipRules []OwnershipRule) (sets.Set[model.GVKNObjKey], map[model.GVKNObjKey]client.Object, error) {

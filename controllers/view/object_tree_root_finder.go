@@ -90,7 +90,8 @@ func (f *rootFinder) findRoots(ctx context.Context, object client.Object) []reco
 		if found {
 			continue
 		}
-		for _, rule := range KBOwnershipRules {
+		for i := range KBOwnershipRules {
+			rule := &KBOwnershipRules[i]
 			for _, resource := range rule.OwnedResources {
 				gvk, err := objectTypeToGVK(&resource.Secondary)
 				if err != nil {
@@ -119,12 +120,35 @@ func (f *rootFinder) findRoots(ctx context.Context, object client.Object) []reco
 		}
 	}
 
-	result := sets.New[reconcile.Request]()
+	clusterKeys := sets.New[client.ObjectKey]()
 	for _, root := range roots {
-		result.Insert(reconcile.Request{NamespacedName: client.ObjectKeyFromObject(root)})
+		clusterKeys.Insert(client.ObjectKeyFromObject(root))
 	}
 
-	return result.UnsortedList()
+	// TODO(free6om): list all view objects, filter by result Cluster objects.
+	viewList := &viewv1.ReconciliationViewList{}
+	if err := f.List(ctx, viewList); err != nil {
+		f.logger.Error(err, "list view failed", "")
+		return nil
+	}
+	getTargetObjectKey := func(view *viewv1.ReconciliationView) client.ObjectKey {
+		key := client.ObjectKeyFromObject(view)
+		if view.Spec.TargetObject != nil {
+			key.Namespace = view.Spec.TargetObject.Namespace
+			key.Name = view.Spec.TargetObject.Name
+		}
+		return key
+	}
+	var requests []reconcile.Request
+	for i := range viewList.Items {
+		view := &viewList.Items[i]
+		key := getTargetObjectKey(view)
+		if clusterKeys.Has(key) {
+			requests = append(requests, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(view)})
+		}
+	}
+
+	return requests
 }
 
 func ownedBy(owner client.Object, obj client.Object, ownedResource OwnedResource) bool {
@@ -132,6 +156,7 @@ func ownedBy(owner client.Object, obj client.Object, ownedResource OwnedResource
 	if err != nil {
 		return false
 	}
+	// TODO(free6om): OwnerReference
 	return objectMatched(obj, opts...)
 }
 

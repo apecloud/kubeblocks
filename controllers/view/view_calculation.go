@@ -21,6 +21,7 @@ package view
 
 import (
 	"context"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
@@ -77,7 +78,7 @@ func (c *viewCalculator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.
 
 	currentState := &view.Status.CurrentState
 	// build old object set from view.status.currentState.objectTree
-	oldObjectSet, oldObjectMap, err := getObjectsFromTree(currentState.ObjectTree, c.store)
+	oldObjectSet, oldObjectMap, err := getObjectsFromTree(currentState.ObjectTree, c.store, c.cli.Scheme())
 	if err != nil {
 		return kubebuilderx.Commit, err
 	}
@@ -107,26 +108,28 @@ func (c *viewCalculator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.
 	// concat it to view.status.view
 	currentState.Changes = append(currentState.Changes, changeSlice...)
 
-	// save new version objects to object store.
-	for _, object := range newObjectMap {
-		if err = c.store.Insert(object, view); err != nil {
+	if len(changeSlice) > 0 {
+		// save new version objects to object store.
+		for _, object := range newObjectMap {
+			if err = c.store.Insert(object, view); err != nil {
+				return kubebuilderx.Commit, err
+			}
+		}
+
+		// update current object tree
+		currentState.ObjectTree, err = getObjectTreeWithRevision(root, KBOwnershipRules, c.store, currentState.Changes[len(currentState.Changes)-1].Revision, c.cli.Scheme())
+		if err != nil {
 			return kubebuilderx.Commit, err
 		}
-	}
 
-	// update current object tree
-	currentState.ObjectTree, err = getObjectTreeWithRevision(root, KBOwnershipRules, c.store, parseRevision(root.ResourceVersion), c.cli.Scheme())
-	if err != nil {
-		return kubebuilderx.Commit, err
-	}
+		// update view summary
+		initialObjectSet, initialObjectMap, err := getObjectsFromTree(view.Status.InitialObjectTree, c.store, c.cli.Scheme())
+		if err != nil {
+			return kubebuilderx.Commit, err
+		}
 
-	// update view summary
-	initialObjectSet, initialObjectMap, err := getObjectsFromTree(view.Status.InitialObjectTree, c.store)
-	if err != nil {
-		return kubebuilderx.Commit, err
+		currentState.Summary.ObjectSummaries = buildObjectSummaries(initialObjectSet, newObjectSet, initialObjectMap, newObjectMap)
 	}
-
-	currentState.Summary.ObjectSummaries = buildObjectSummaries(initialObjectSet, newObjectSet, initialObjectMap, newObjectMap)
 
 	return kubebuilderx.Continue, nil
 }
@@ -244,7 +247,7 @@ func formatDescription(oldObj, newObj client.Object, changeType viewv1.ObjectCha
 	return string(changeType)
 }
 
-func getObjectsFromTree(tree *viewv1.ObjectTreeNode, store ObjectStore) (sets.Set[model.GVKNObjKey], map[model.GVKNObjKey]client.Object, error) {
+func getObjectsFromTree(tree *viewv1.ObjectTreeNode, store ObjectStore, scheme *runtime.Scheme) (sets.Set[model.GVKNObjKey], map[model.GVKNObjKey]client.Object, error) {
 	if tree == nil {
 		return nil, nil, nil
 	}
@@ -259,12 +262,22 @@ func getObjectsFromTree(tree *viewv1.ObjectTreeNode, store ObjectStore) (sets.Se
 	}
 	objectRefSet := sets.New(*objectRef)
 	objectMap := make(map[model.GVKNObjKey]client.Object)
-	if obj != nil {
-		objectMap[*objectRef] = obj
-
+	// cache loss after controller restarted, mock one
+	if obj == nil {
+		ro, err := scheme.New(objectRef.GroupVersionKind)
+		if err != nil {
+			return nil, nil, err
+		}
+		obj, _ = ro.(client.Object)
+		obj.SetNamespace(tree.Primary.Namespace)
+		obj.SetName(tree.Primary.Name)
+		obj.SetResourceVersion(tree.Primary.ResourceVersion)
+		obj.SetUID(tree.Primary.UID)
 	}
+	objectMap[*objectRef] = obj
+
 	for _, treeNode := range tree.Secondaries {
-		secondaryRefSet, secondaryMap, err := getObjectsFromTree(treeNode, store)
+		secondaryRefSet, secondaryMap, err := getObjectsFromTree(treeNode, store, scheme)
 		if err != nil {
 			return nil, nil, err
 		}

@@ -22,9 +22,11 @@ package view
 import (
 	"context"
 	"fmt"
+
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/checker/decls"
 	"github.com/google/cel-go/common/types"
+	"golang.org/x/exp/slices"
 	"google.golang.org/protobuf/types/known/structpb"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/fields"
@@ -203,6 +205,9 @@ func getObjectTreeWithRevision(primary client.Object, ownershipRules []Ownership
 			return nil, err
 		}
 		tree.Secondaries = append(tree.Secondaries, subTree)
+		slices.SortStableFunc(tree.Secondaries, func(a, b *viewv1.ObjectTreeNode) bool {
+			return getObjectReferenceString(a) < getObjectReferenceString(b)
+		})
 	}
 
 	return tree, nil

@@ -293,7 +293,7 @@ var rootObjectType = viewv1.ObjectType{
 var (
 	defaultStateEvaluationExpression = viewv1.StateEvaluationExpression{
 		CELExpression: &viewv1.CELExpression{
-			Expression: "object.status.phase == \"Running\"",
+			Expression: "has(object.status.phase) && object.status.phase == \"Running\"",
 		},
 	}
 

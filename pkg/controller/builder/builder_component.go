@@ -20,22 +20,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package builder
 
 import (
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 )
 
 type ComponentBuilder struct {
-	BaseBuilder[appsv1alpha1.Component, *appsv1alpha1.Component, ComponentBuilder]
+	BaseBuilder[appsv1.Component, *appsv1.Component, ComponentBuilder]
 }
 
 func NewComponentBuilder(namespace, name, compDef string) *ComponentBuilder {
 	builder := &ComponentBuilder{}
 	builder.init(namespace, name,
-		&appsv1alpha1.Component{
-			Spec: appsv1alpha1.ComponentSpec{
+		&appsv1.Component{
+			Spec: appsv1.ComponentSpec{
 				CompDef: compDef,
 			},
 		}, builder)
@@ -62,7 +60,7 @@ func (builder *ComponentBuilder) SetEnv(env []corev1.EnvVar) *ComponentBuilder {
 	return builder
 }
 
-func (builder *ComponentBuilder) SetSchedulingPolicy(schedulingPolicy *appsv1alpha1.SchedulingPolicy) *ComponentBuilder {
+func (builder *ComponentBuilder) SetSchedulingPolicy(schedulingPolicy *appsv1.SchedulingPolicy) *ComponentBuilder {
 	builder.get().Spec.SchedulingPolicy = schedulingPolicy
 	return builder
 }
@@ -72,7 +70,7 @@ func (builder *ComponentBuilder) SetReplicas(replicas int32) *ComponentBuilder {
 	return builder
 }
 
-func (builder *ComponentBuilder) SetConfigs(configs []appsv1alpha1.ClusterComponentConfig) *ComponentBuilder {
+func (builder *ComponentBuilder) SetConfigs(configs []appsv1.ClusterComponentConfig) *ComponentBuilder {
 	builder.get().Spec.Configs = configs
 	return builder
 }
@@ -87,7 +85,7 @@ func (builder *ComponentBuilder) SetParallelPodManagementConcurrency(parallelPod
 	return builder
 }
 
-func (builder *ComponentBuilder) SetPodUpdatePolicy(policy *workloads.PodUpdatePolicyType) *ComponentBuilder {
+func (builder *ComponentBuilder) SetPodUpdatePolicy(policy *appsv1.PodUpdatePolicyType) *ComponentBuilder {
 	builder.get().Spec.PodUpdatePolicy = policy
 	return builder
 }
@@ -102,14 +100,9 @@ func (builder *ComponentBuilder) SetDisableExporter(disableExporter *bool) *Comp
 	return builder
 }
 
-func (builder *ComponentBuilder) SetEnabledLogs(logNames []string) *ComponentBuilder {
-	builder.get().Spec.EnabledLogs = logNames
-	return builder
-}
-
-func (builder *ComponentBuilder) SetTLSConfig(enable bool, issuer *appsv1alpha1.Issuer) *ComponentBuilder {
+func (builder *ComponentBuilder) SetTLSConfig(enable bool, issuer *appsv1.Issuer) *ComponentBuilder {
 	if enable {
-		builder.get().Spec.TLSConfig = &appsv1alpha1.TLSConfig{
+		builder.get().Spec.TLSConfig = &appsv1.TLSConfig{
 			Enable: enable,
 			Issuer: issuer,
 		}
@@ -117,16 +110,15 @@ func (builder *ComponentBuilder) SetTLSConfig(enable bool, issuer *appsv1alpha1.
 	return builder
 }
 
-func (builder *ComponentBuilder) AddVolumeClaimTemplate(volumeName string,
-	pvcSpec appsv1alpha1.PersistentVolumeClaimSpec) *ComponentBuilder {
-	builder.get().Spec.VolumeClaimTemplates = append(builder.get().Spec.VolumeClaimTemplates, appsv1alpha1.ClusterComponentVolumeClaimTemplate{
+func (builder *ComponentBuilder) AddVolumeClaimTemplate(volumeName string, pvcSpec appsv1.PersistentVolumeClaimSpec) *ComponentBuilder {
+	builder.get().Spec.VolumeClaimTemplates = append(builder.get().Spec.VolumeClaimTemplates, appsv1.ClusterComponentVolumeClaimTemplate{
 		Name: volumeName,
 		Spec: pvcSpec,
 	})
 	return builder
 }
 
-func (builder *ComponentBuilder) SetVolumeClaimTemplates(volumeClaimTemplates []appsv1alpha1.ClusterComponentVolumeClaimTemplate) *ComponentBuilder {
+func (builder *ComponentBuilder) SetVolumeClaimTemplates(volumeClaimTemplates []appsv1.ClusterComponentVolumeClaimTemplate) *ComponentBuilder {
 	builder.get().Spec.VolumeClaimTemplates = volumeClaimTemplates
 	return builder
 }
@@ -136,10 +128,10 @@ func (builder *ComponentBuilder) SetVolumes(volumes []corev1.Volume) *ComponentB
 	return builder
 }
 
-func (builder *ComponentBuilder) SetServices(services []appsv1alpha1.ClusterComponentService) *ComponentBuilder {
-	toCompService := func(svc appsv1alpha1.ClusterComponentService) appsv1alpha1.ComponentService {
-		return appsv1alpha1.ComponentService{
-			Service: appsv1alpha1.Service{
+func (builder *ComponentBuilder) SetServices(services []appsv1.ClusterComponentService) *ComponentBuilder {
+	toCompService := func(svc appsv1.ClusterComponentService) appsv1.ComponentService {
+		return appsv1.ComponentService{
+			Service: appsv1.Service{
 				Name:        svc.Name,
 				Annotations: svc.Annotations,
 				Spec: corev1.ServiceSpec{
@@ -155,17 +147,17 @@ func (builder *ComponentBuilder) SetServices(services []appsv1alpha1.ClusterComp
 	return builder
 }
 
-func (builder *ComponentBuilder) SetSystemAccounts(systemAccounts []appsv1alpha1.ComponentSystemAccount) *ComponentBuilder {
+func (builder *ComponentBuilder) SetSystemAccounts(systemAccounts []appsv1.ComponentSystemAccount) *ComponentBuilder {
 	builder.get().Spec.SystemAccounts = systemAccounts
 	return builder
 }
 
-func (builder *ComponentBuilder) SetServiceRefs(serviceRefs []appsv1alpha1.ServiceRef) *ComponentBuilder {
+func (builder *ComponentBuilder) SetServiceRefs(serviceRefs []appsv1.ServiceRef) *ComponentBuilder {
 	builder.get().Spec.ServiceRefs = serviceRefs
 	return builder
 }
 
-func (builder *ComponentBuilder) SetInstances(instances []appsv1alpha1.InstanceTemplate) *ComponentBuilder {
+func (builder *ComponentBuilder) SetInstances(instances []appsv1.InstanceTemplate) *ComponentBuilder {
 	builder.get().Spec.Instances = instances
 	return builder
 }

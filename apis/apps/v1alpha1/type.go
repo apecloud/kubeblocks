@@ -22,6 +22,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 const (
@@ -29,7 +30,6 @@ const (
 	ClusterDefinitionKind = "ClusterDefinition"
 	ClusterKind           = "Cluster"
 	ComponentKind         = "Component"
-	OpsRequestKind        = "OpsRequestKind"
 
 	defaultInstanceTemplateReplicas = 1
 )
@@ -62,9 +62,9 @@ type ComponentTemplateSpec struct {
 	// template will be mounted to the corresponding volume. Must be a DNS_LABEL name.
 	// The volume name must be defined in podSpec.containers[*].volumeMounts.
 	//
-	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=63
 	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
+	// +optional
 	VolumeName string `json:"volumeName"`
 
 	// The operator attempts to set default file permissions for scripts (0555) and configurations (0444).
@@ -198,6 +198,11 @@ type ComponentConfigSpec struct {
 	// +listType=set
 	// +optional
 	ReRenderResourceTypes []RerenderResourceType `json:"reRenderResourceTypes,omitempty"`
+
+	// Whether to store the final rendered parameters as a secret.
+	//
+	// +optional
+	AsSecret *bool `json:"asSecret,omitempty"`
 }
 
 // RerenderResourceType defines the resource requirements for a component.
@@ -317,32 +322,6 @@ const (
 	UnavailablePhase Phase = "Unavailable"
 )
 
-// OpsPhase defines opsRequest phase.
-// +enum
-// +kubebuilder:validation:Enum={Pending,Creating,Running,Cancelling,Cancelled,Aborted,Failed,Succeed}
-type OpsPhase string
-
-const (
-	OpsPendingPhase    OpsPhase = "Pending"
-	OpsCreatingPhase   OpsPhase = "Creating"
-	OpsRunningPhase    OpsPhase = "Running"
-	OpsCancellingPhase OpsPhase = "Cancelling"
-	OpsSucceedPhase    OpsPhase = "Succeed"
-	OpsCancelledPhase  OpsPhase = "Cancelled"
-	OpsFailedPhase     OpsPhase = "Failed"
-	OpsAbortedPhase    OpsPhase = "Aborted"
-)
-
-// PodSelectionPolicy pod selection strategy.
-// +enum
-// +kubebuilder:validation:Enum={All,Any}
-type PodSelectionPolicy string
-
-const (
-	All PodSelectionPolicy = "All"
-	Any PodSelectionPolicy = "Any"
-)
-
 // PodAvailabilityPolicy pod availability strategy.
 // +enum
 // +kubebuilder:validation:Enum={Available,PreferredAvailable,None}
@@ -353,45 +332,6 @@ const (
 	UnAvailablePolicy      PodAvailabilityPolicy = "UnAvailable"
 	NoneAvailabilityPolicy PodAvailabilityPolicy = "None"
 )
-
-// OpsWorkloadType policy after action failure.
-// +enum
-// +kubebuilder:validation:Enum={Job,Pod}
-type OpsWorkloadType string
-
-const (
-	PodWorkload OpsWorkloadType = "Pod"
-	JobWorkload OpsWorkloadType = "Job"
-)
-
-// OpsType defines operation types.
-// +enum
-// +kubebuilder:validation:Enum={Upgrade,VerticalScaling,VolumeExpansion,HorizontalScaling,Restart,Reconfiguring,Start,Stop,Expose,Switchover,Backup,Restore,RebuildInstance,Custom}
-type OpsType string
-
-const (
-	VerticalScalingType   OpsType = "VerticalScaling"
-	HorizontalScalingType OpsType = "HorizontalScaling"
-	VolumeExpansionType   OpsType = "VolumeExpansion"
-	UpgradeType           OpsType = "Upgrade"
-	ReconfiguringType     OpsType = "Reconfiguring"
-	SwitchoverType        OpsType = "Switchover"
-	RestartType           OpsType = "Restart" // RestartType the restart operation is a special case of the rolling update operation.
-	StopType              OpsType = "Stop"    // StopType the stop operation will delete all pods in a cluster concurrently.
-	StartType             OpsType = "Start"   // StartType the start operation will start the pods which is deleted in stop operation.
-	ExposeType            OpsType = "Expose"
-	BackupType            OpsType = "Backup"
-	RestoreType           OpsType = "Restore"
-	RebuildInstanceType   OpsType = "RebuildInstance" // RebuildInstance rebuilding an instance is very useful when a node is offline or an instance is unrecoverable.
-	CustomType            OpsType = "Custom"          // use opsDefinition
-)
-
-// ComponentResourceKey defines the resource key of component, such as pod/pvc.
-// +enum
-// +kubebuilder:validation:Enum={pods}
-type ComponentResourceKey string
-
-const PodsCompResourceKey ComponentResourceKey = "pods"
 
 // AccessMode defines the modes of access granted to the SVC.
 // The modes can be `None`, `Readonly`, or `ReadWrite`.
@@ -444,6 +384,25 @@ const (
 	// The `BestEffortParallel` strategy strikes a balance between update speed and component availability.
 	BestEffortParallelStrategy UpdateStrategy = "BestEffortParallel"
 )
+
+// InstanceUpdateStrategy indicates the strategy that the InstanceSet
+// controller will use to perform updates.
+type InstanceUpdateStrategy struct {
+	// Partition indicates the number of pods that should be updated during a rolling update.
+	// The remaining pods will remain untouched. This is helpful in defining how many pods
+	// should participate in the update process. The update process will follow the order
+	// of pod names in descending lexicographical (dictionary) order. The default value is
+	// ComponentSpec.Replicas (i.e., update all pods).
+	// +optional
+	Partition *int32 `json:"partition,omitempty"`
+	// The maximum number of pods that can be unavailable during the update.
+	// Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
+	// Absolute number is calculated from percentage by rounding up. This can not be 0.
+	// Defaults to 1. The field applies to all pods. That means if there is any unavailable pod,
+	// it will be counted towards MaxUnavailable.
+	// +optional
+	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty"`
+}
 
 // TerminationPolicyType defines termination policy types.
 //
@@ -520,45 +479,6 @@ const (
 	// zone or node based on other scheduling decisions.
 	AvailabilityPolicyNone AvailabilityPolicyType = "none"
 )
-
-// ProgressStatus defines the status of the opsRequest progress.
-// +enum
-// +kubebuilder:validation:Enum={Processing,Pending,Failed,Succeed}
-type ProgressStatus string
-
-const (
-	PendingProgressStatus    ProgressStatus = "Pending"
-	ProcessingProgressStatus ProgressStatus = "Processing"
-	FailedProgressStatus     ProgressStatus = "Failed"
-	SucceedProgressStatus    ProgressStatus = "Succeed"
-)
-
-// ActionTaskStatus defines the status of the task.
-// +enum
-// +kubebuilder:validation:Enum={Processing,Failed,Succeed}
-type ActionTaskStatus string
-
-const (
-	ProcessingActionTaskStatus ActionTaskStatus = "Processing"
-	FailedActionTaskStatus     ActionTaskStatus = "Failed"
-	SucceedActionTaskStatus    ActionTaskStatus = "Succeed"
-)
-
-type OpsRequestBehaviour struct {
-	FromClusterPhases []ClusterPhase
-	ToClusterPhase    ClusterPhase
-}
-
-type OpsRecorder struct {
-	// name OpsRequest name
-	Name string `json:"name"`
-	// opsRequest type
-	Type OpsType `json:"type"`
-	// indicates whether the current opsRequest is in the queue
-	InQueue bool `json:"inQueue,omitempty"`
-	// indicates that the operation is queued for execution within its own-type scope.
-	QueueBySelf bool `json:"queueBySelf,omitempty"`
-}
 
 // LetterCase defines the available cases to be used in password generation.
 //
@@ -889,10 +809,6 @@ type VarSource struct {
 	// Selects a defined var of a Component.
 	// +optional
 	ComponentVarRef *ComponentVarSelector `json:"componentVarRef,omitempty"`
-
-	// Selects a defined var of a Cluster.
-	// +optional
-	ClusterVarRef *ClusterVarSelector `json:"clusterVarRef,omitempty"`
 }
 
 // VarOption defines whether a variable is required or optional.
@@ -908,14 +824,6 @@ var (
 type NamedVar struct {
 	// +optional
 	Name string `json:"name,omitempty"`
-
-	// +optional
-	Option *VarOption `json:"option,omitempty"`
-}
-
-type RoledVar struct {
-	// +optional
-	Role string `json:"role,omitempty"`
 
 	// +optional
 	Option *VarOption `json:"option,omitempty"`
@@ -942,11 +850,6 @@ type HostNetworkVars struct {
 
 // ServiceVars defines the vars that can be referenced from a Service.
 type ServiceVars struct {
-	// ServiceType references the type of the service.
-	//
-	// +optional
-	ServiceType *VarOption `json:"serviceType,omitempty"`
-
 	// +optional
 	Host *VarOption `json:"host,omitempty"`
 
@@ -1037,11 +940,6 @@ type ComponentVars struct {
 	// +optional
 	ComponentName *VarOption `json:"componentName,omitempty"`
 
-	// Reference to the short name of the Component object.
-	//
-	// +optional
-	ShortName *VarOption `json:"shortName,omitempty"`
-
 	// Reference to the replicas of the component.
 	//
 	// +optional
@@ -1051,52 +949,20 @@ type ComponentVars struct {
 	// and the value will be presented in the following format: name1,name2,...
 	//
 	// +optional
-	PodNames *VarOption `json:"podNames,omitempty"`
+	InstanceNames *VarOption `json:"instanceNames,omitempty"`
 
 	// Reference to the pod FQDN list of the component.
 	// The value will be presented in the following format: FQDN1,FQDN2,...
 	//
 	// +optional
 	PodFQDNs *VarOption `json:"podFQDNs,omitempty"`
-
-	// Reference to the pod name list of the component that have a specific role.
-	// The value will be presented in the following format: name1,name2,...
-	//
-	// +optional
-	PodNamesForRole *RoledVar `json:"podNamesForRole,omitempty"`
-
-	// Reference to the pod FQDN list of the component that have a specific role.
-	// The value will be presented in the following format: FQDN1,FQDN2,...
-	//
-	// +optional
-	PodFQDNsForRole *RoledVar `json:"podFQDNsForRole,omitempty"`
-}
-
-// ClusterVarSelector selects a var from a Cluster.
-type ClusterVarSelector struct {
-	ClusterVars `json:",inline"`
-}
-
-type ClusterVars struct {
-	// Reference to the namespace of the Cluster object.
-	//
-	// +optional
-	Namespace *VarOption `json:"namespace,omitempty"`
-
-	// Reference to the name of the Cluster object.
-	//
-	// +optional
-	ClusterName *VarOption `json:"clusterName,omitempty"`
-
-	// Reference to the UID of the Cluster object.
-	//
-	// +optional
-	ClusterUID *VarOption `json:"clusterUID,omitempty"`
 }
 
 // ClusterObjectReference defines information to let you locate the referenced object inside the same Cluster.
 type ClusterObjectReference struct {
-	// CompDef specifies the definition used by the component that the referent object resident in.
+	// Specifies the exact name, name prefix, or regular expression pattern for matching the name of the ComponentDefinition
+	// custom resource (CR) used by the component that the referent object resident in.
+	//
 	// If not specified, the component itself will be used.
 	//
 	// +optional
@@ -1202,4 +1068,28 @@ type PrometheusScheme string
 const (
 	HTTPProtocol  PrometheusScheme = "http"
 	HTTPSProtocol PrometheusScheme = "https"
+)
+
+// FailurePolicyType specifies the type of failure policy.
+//
+// +enum
+// +kubebuilder:validation:Enum={Ignore,Fail}
+type FailurePolicyType string
+
+const (
+	// FailurePolicyIgnore means that an error will be ignored but logged.
+	FailurePolicyIgnore FailurePolicyType = "Ignore"
+	// FailurePolicyFail means that an error will be reported.
+	FailurePolicyFail FailurePolicyType = "Fail"
+)
+
+const (
+	ReasonReconfigurePersisting    = "ReconfigurePersisting"
+	ReasonReconfigurePersisted     = "ReconfigurePersisted"
+	ReasonReconfigureFailed        = "ReconfigureFailed"
+	ReasonReconfigureRestartFailed = "ReconfigureRestartFailed"
+	ReasonReconfigureRestart       = "ReconfigureRestarted"
+	ReasonReconfigureNoChanged     = "ReconfigureNoChanged"
+	ReasonReconfigureSucceed       = "ReconfigureSucceed"
+	ReasonReconfigureRunning       = "ReconfigureRunning"
 )

@@ -26,13 +26,13 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/stretchr/testify/assert"
 
+	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
@@ -147,9 +147,9 @@ var _ = Describe("Handler Util Test", func() {
 			}}
 	}
 
-	mockConfigSpec := func(ccName string) appsv1alpha1.ComponentConfigSpec {
-		return appsv1alpha1.ComponentConfigSpec{
-			ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+	mockConfigSpec := func(ccName string) appsv1.ComponentConfigSpec {
+		return appsv1.ComponentConfigSpec{
+			ComponentTemplateSpec: appsv1.ComponentTemplateSpec{
 				Name:        "test",
 				TemplateRef: "config_template",
 				Namespace:   "default",
@@ -264,8 +264,8 @@ var _ = Describe("Handler Util Test", func() {
 
 	Context("TestGetSupportReloadConfigSpecs", func() {
 		It("not support reload", func() {
-			configSpecs, err := GetSupportReloadConfigSpecs([]appsv1alpha1.ComponentConfigSpec{{
-				ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+			configSpecs, err := GetSupportReloadConfigSpecs([]appsv1.ComponentConfigSpec{{
+				ComponentTemplateSpec: appsv1.ComponentTemplateSpec{
 					Name: "test",
 				}}}, nil, nil)
 			Expect(err).Should(Succeed())
@@ -273,8 +273,8 @@ var _ = Describe("Handler Util Test", func() {
 		})
 
 		It("not ConfigConstraint ", func() {
-			configSpecs, err := GetSupportReloadConfigSpecs([]appsv1alpha1.ComponentConfigSpec{{
-				ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+			configSpecs, err := GetSupportReloadConfigSpecs([]appsv1.ComponentConfigSpec{{
+				ComponentTemplateSpec: appsv1.ComponentTemplateSpec{
 					Name:        "test",
 					TemplateRef: "config_template",
 					Namespace:   "default",
@@ -290,7 +290,7 @@ var _ = Describe("Handler Util Test", func() {
 			}), testutil.WithTimes(1)))
 
 			configSpecs, err := GetSupportReloadConfigSpecs(
-				[]appsv1alpha1.ComponentConfigSpec{mockConfigSpec(ccName)},
+				[]appsv1.ComponentConfigSpec{mockConfigSpec(ccName)},
 				mockK8sCli.Client(), ctx)
 
 			Expect(err).Should(Succeed())
@@ -310,7 +310,7 @@ var _ = Describe("Handler Util Test", func() {
 				testutil.WithTimes(1)))
 
 			configSpecs, err := GetSupportReloadConfigSpecs(
-				[]appsv1alpha1.ComponentConfigSpec{mockConfigSpec(ccName)},
+				[]appsv1.ComponentConfigSpec{mockConfigSpec(ccName)},
 				mockK8sCli.Client(), ctx)
 
 			Expect(err).Should(Succeed())
@@ -332,7 +332,7 @@ var _ = Describe("Handler Util Test", func() {
 				testutil.WithTimes(1)))
 
 			configSpecs, err := GetSupportReloadConfigSpecs(
-				[]appsv1alpha1.ComponentConfigSpec{mockConfigSpec(ccName)},
+				[]appsv1.ComponentConfigSpec{mockConfigSpec(ccName)},
 				mockK8sCli.Client(), ctx)
 
 			Expect(err).Should(Succeed())
@@ -449,8 +449,8 @@ func TestFilterSubPathVolumeMount(t *testing.T) {
 		return ConfigSpecMeta{ConfigSpecInfo: ConfigSpecInfo{
 			ReloadAction: reloadAction,
 			ReloadType:   reloadType,
-			ConfigSpec: appsv1alpha1.ComponentConfigSpec{
-				ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+			ConfigSpec: appsv1.ComponentConfigSpec{
+				ComponentTemplateSpec: appsv1.ComponentTemplateSpec{
 					VolumeName: volumeName,
 				}}}}
 	}

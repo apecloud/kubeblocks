@@ -29,8 +29,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
@@ -131,7 +131,7 @@ func (a *kbagent) ignoreOutput(_ []byte, err error) error {
 	return err
 }
 
-func (a *kbagent) checkedCallAction(ctx context.Context, cli client.Reader, spec *appsv1alpha1.Action, lfa lifecycleAction, opts *Options) ([]byte, error) {
+func (a *kbagent) checkedCallAction(ctx context.Context, cli client.Reader, spec *appsv1.Action, lfa lifecycleAction, opts *Options) ([]byte, error) {
 	if spec == nil || spec.Exec == nil {
 		return nil, errors.Wrap(ErrActionNotDefined, lfa.name())
 	}
@@ -142,25 +142,25 @@ func (a *kbagent) checkedCallAction(ctx context.Context, cli client.Reader, spec
 	return a.callAction(ctx, cli, spec, lfa, opts)
 }
 
-func (a *kbagent) checkedCallProbe(ctx context.Context, cli client.Reader, spec *appsv1alpha1.Probe, lfa lifecycleAction, opts *Options) ([]byte, error) {
+func (a *kbagent) checkedCallProbe(ctx context.Context, cli client.Reader, spec *appsv1.Probe, lfa lifecycleAction, opts *Options) ([]byte, error) {
 	if spec == nil || spec.Exec == nil {
 		return nil, errors.Wrap(ErrActionNotDefined, lfa.name())
 	}
 	return a.checkedCallAction(ctx, cli, &spec.Action, lfa, opts)
 }
 
-func (a *kbagent) precondition(ctx context.Context, cli client.Reader, spec *appsv1alpha1.Action) error {
+func (a *kbagent) precondition(ctx context.Context, cli client.Reader, spec *appsv1.Action) error {
 	if spec.PreCondition == nil {
 		return nil
 	}
 	switch *spec.PreCondition {
-	case appsv1alpha1.ImmediatelyPreConditionType:
+	case appsv1.ImmediatelyPreConditionType:
 		return nil
-	case appsv1alpha1.RuntimeReadyPreConditionType:
+	case appsv1.RuntimeReadyPreConditionType:
 		return a.runtimeReadyCheck(ctx, cli)
-	case appsv1alpha1.ComponentReadyPreConditionType:
+	case appsv1.ComponentReadyPreConditionType:
 		return a.compReadyCheck(ctx, cli)
-	case appsv1alpha1.ClusterReadyPreConditionType:
+	case appsv1.ClusterReadyPreConditionType:
 		return a.clusterReadyCheck(ctx, cli)
 	default:
 		return fmt.Errorf("unknown precondition type %s", *spec.PreCondition)
@@ -169,19 +169,19 @@ func (a *kbagent) precondition(ctx context.Context, cli client.Reader, spec *app
 
 func (a *kbagent) clusterReadyCheck(ctx context.Context, cli client.Reader) error {
 	ready := func(object client.Object) bool {
-		cluster := object.(*appsv1alpha1.Cluster)
-		return cluster.Status.Phase == appsv1alpha1.RunningClusterPhase
+		cluster := object.(*appsv1.Cluster)
+		return cluster.Status.Phase == appsv1.RunningClusterPhase
 	}
-	return a.readyCheck(ctx, cli, a.synthesizedComp.ClusterName, "cluster", &appsv1alpha1.Cluster{}, ready)
+	return a.readyCheck(ctx, cli, a.synthesizedComp.ClusterName, "cluster", &appsv1.Cluster{}, ready)
 }
 
 func (a *kbagent) compReadyCheck(ctx context.Context, cli client.Reader) error {
 	ready := func(object client.Object) bool {
-		comp := object.(*appsv1alpha1.Component)
-		return comp.Status.Phase == appsv1alpha1.RunningClusterCompPhase
+		comp := object.(*appsv1.Component)
+		return comp.Status.Phase == appsv1.RunningClusterCompPhase
 	}
 	compName := constant.GenerateClusterComponentName(a.synthesizedComp.ClusterName, a.synthesizedComp.Name)
-	return a.readyCheck(ctx, cli, compName, "component", &appsv1alpha1.Component{}, ready)
+	return a.readyCheck(ctx, cli, compName, "component", &appsv1.Component{}, ready)
 }
 
 func (a *kbagent) runtimeReadyCheck(ctx context.Context, cli client.Reader) error {
@@ -207,7 +207,7 @@ func (a *kbagent) readyCheck(ctx context.Context, cli client.Reader, name, kind 
 	return nil
 }
 
-func (a *kbagent) callAction(ctx context.Context, cli client.Reader, spec *appsv1alpha1.Action, lfa lifecycleAction, opts *Options) ([]byte, error) {
+func (a *kbagent) callAction(ctx context.Context, cli client.Reader, spec *appsv1.Action, lfa lifecycleAction, opts *Options) ([]byte, error) {
 	req, err1 := a.buildActionRequest(ctx, cli, lfa, opts)
 	if err1 != nil {
 		return nil, err1
@@ -268,7 +268,7 @@ func (a *kbagent) templateVarsParameters() (map[string]string, error) {
 	return m, nil
 }
 
-func (a *kbagent) callActionWithSelector(ctx context.Context, spec *appsv1alpha1.Action, lfa lifecycleAction, req *proto.ActionRequest) ([]byte, error) {
+func (a *kbagent) callActionWithSelector(ctx context.Context, spec *appsv1.Action, lfa lifecycleAction, req *proto.ActionRequest) ([]byte, error) {
 	pods, err := a.selectTargetPods(spec)
 	if err != nil {
 		return nil, err
@@ -308,7 +308,7 @@ func (a *kbagent) callActionWithSelector(ctx context.Context, spec *appsv1alpha1
 	return output, nil
 }
 
-func (a *kbagent) selectTargetPods(spec *appsv1alpha1.Action) ([]*corev1.Pod, error) {
+func (a *kbagent) selectTargetPods(spec *appsv1.Action) ([]*corev1.Pod, error) {
 	if spec.Exec == nil || len(spec.Exec.TargetPodSelector) == 0 {
 		return []*corev1.Pod{a.pod}, nil
 	}
@@ -336,13 +336,13 @@ func (a *kbagent) selectTargetPods(spec *appsv1alpha1.Action) ([]*corev1.Pod, er
 	}
 
 	switch spec.Exec.TargetPodSelector {
-	case appsv1alpha1.AnyReplica:
+	case appsv1.AnyReplica:
 		return anyPod(), nil
-	case appsv1alpha1.AllReplicas:
+	case appsv1.AllReplicas:
 		return allPods(), nil
-	case appsv1alpha1.RoleSelector:
+	case appsv1.RoleSelector:
 		return podsWithRole(), nil
-	case appsv1alpha1.OrdinalSelector:
+	case appsv1.OrdinalSelector:
 		return nil, fmt.Errorf("ordinal selector is not supported")
 	default:
 		return nil, fmt.Errorf("unknown pod selector: %s", spec.Exec.TargetPodSelector)

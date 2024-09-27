@@ -23,29 +23,12 @@ jobs:
       APECD_REF: "v0.1.38"
     secrets: inherit
 
-  trigger-mode:
-    runs-on: ubuntu-latest
-    outputs:
-      matrix: ${{ steps.get_trigger_mode.outputs.matrix }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: release message
-        id: get_trigger_mode
-        run: |
-          TEST_PACKAGES=`bash .github/utils/utils.sh --type 16 \
-              --trigger-type "[test]" \
-              --test-pkgs "${{ vars.TEST_PKGS }}" \
-              --test-check "${{ vars.TEST_CHECK }}" \
-              --test-pkgs-first "${{ vars.TEST_PKGS_FIRST }}" \
-              --ignore-pkgs "${{ vars.SKIP_CHECK_PKG }}"`
-          echo "matrix={\"include\":[$TEST_PACKAGES]}" >> $GITHUB_OUTPUT
-
   release-test:
-    needs: [ trigger-mode ]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: true
-      matrix: ${{ fromJSON(needs.trigger-mode.outputs.matrix) }}
+      matrix:
+        ops: [ 'manifests', 'mod-vendor', 'generate', 'lint', 'staticcheck', 'test' ]
     steps:
       - uses: actions/checkout@v4
       - name: install lib
@@ -67,15 +50,13 @@ jobs:
           curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.55.2
 
       - name: make ${{ matrix.ops }}
-        if: ${{ ! contains(matrix.ops, '/') }}
         run: |
           make ${{ matrix.ops }}
-
-      - name: make test ${{ matrix.ops }}
-        if: ${{ contains(matrix.ops, '/') }}
-        run: |
-          if [[ -d "./${{ matrix.ops }}" ]]; then
-              make test TEST_PACKAGES=./${{ matrix.ops }}/...
+          FILE_CHANGES=`git diff --name-only ${{ github.sha }}`
+          if [[ ("${{ matrix.ops }}" == 'generate' || "${{ matrix.ops }}" == 'manifests') && -n "$FILE_CHANGES" ]]; then
+              echo $FILE_CHANGES
+              echo "make "${{ matrix.ops }}" causes inconsistent files"
+              exit 1
           fi
 
   release-branch:
@@ -190,7 +171,7 @@ jobs:
       - name: auto create pr head new branch
         if: ${{ (steps.update_apis_doc.outputs.file_changes || steps.upgrade_addon_version.outputs.file_changes) && github.ref_name == 'main' }}
         run: |
-          gh pr create --head "support/auto-update-${{ env.RELEASE_COMMIT }}" --title "chore: auto upgrade addons version or update apis doc" --body ""
+          gh pr create --base "${{ github.ref }}" --head "support/auto-update-${{ env.RELEASE_COMMIT }}" --title "chore: auto upgrade addons version or update apis doc" --body ""
 
       - name: push addons version changes
         uses: ad-m/github-push-action@master

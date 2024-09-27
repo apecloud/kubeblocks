@@ -30,7 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
@@ -45,10 +45,10 @@ type componentTransformContext struct {
 	Client client.Reader
 	record.EventRecorder
 	logr.Logger
-	Cluster             *appsv1alpha1.Cluster
-	CompDef             *appsv1alpha1.ComponentDefinition
-	Component           *appsv1alpha1.Component
-	ComponentOrig       *appsv1alpha1.Component
+	Cluster             *appsv1.Cluster
+	CompDef             *appsv1.ComponentDefinition
+	Component           *appsv1.Component
+	ComponentOrig       *appsv1.Component
 	SynthesizeComponent *component.SynthesizedComponent
 	RunningWorkload     client.Object
 	ProtoWorkload       client.Object
@@ -90,7 +90,7 @@ var _ graph.PlanBuilder = &componentPlanBuilder{}
 var _ graph.Plan = &componentPlan{}
 
 func (c *componentPlanBuilder) Init() error {
-	comp := &appsv1alpha1.Component{}
+	comp := &appsv1.Component{}
 	if err := c.cli.Get(c.transCtx.Context, c.req.NamespacedName, comp); err != nil {
 		return err
 	}

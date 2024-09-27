@@ -29,6 +29,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 )
@@ -44,7 +45,7 @@ var _ = Describe("graph client test.", func() {
 			graphCli := NewGraphClient(nil)
 			dag := graph.NewDAG()
 			dagExpected := graph.NewDAG()
-			root := builder.NewStatefulSetBuilder(namespace, name).GetObject()
+			root := builder.NewInstanceSetBuilder(namespace, name).GetObject()
 
 			By("init root vertex")
 			graphCli.Root(dag, root.DeepCopy(), root, ActionStatusPtr())
@@ -115,7 +116,7 @@ var _ = Describe("graph client test.", func() {
 			Expect(graphCli.FindAll(dag, &appsv1.Deployment{})).Should(HaveLen(0))
 
 			By("find objects different with the given type")
-			newPodList := graphCli.FindAll(dag, &appsv1.StatefulSet{}, &HaveDifferentTypeWithOption{})
+			newPodList := graphCli.FindAll(dag, &workloads.InstanceSet{}, &HaveDifferentTypeWithOption{})
 			Expect(newPodList).Should(HaveLen(3))
 			// should have same result as podList
 			for _, object := range podList {
@@ -153,7 +154,7 @@ var _ = Describe("graph client test.", func() {
 			Expect(dag.Equals(dagExpected, DefaultLess)).Should(BeTrue())
 
 			By("post create root vertex")
-			root := builder.NewStatefulSetBuilder(namespace, name).GetObject()
+			root := builder.NewInstanceSetBuilder(namespace, name).GetObject()
 			graphCli.Root(dag, root.DeepCopy(), root, ActionStatusPtr())
 			rootVertex := &ObjectVertex{Obj: root, OriObj: root, Action: ActionStatusPtr()}
 			dagExpected.AddVertex(rootVertex)

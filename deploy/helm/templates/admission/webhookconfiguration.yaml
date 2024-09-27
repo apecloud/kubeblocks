@@ -225,7 +225,7 @@ webhooks:
     service:
       name: {{ include "kubeblocks.svcName" . }}
       namespace: {{ .Release.Namespace }}
-      path: /validate-apps-kubeblocks-io-v1-configconstraint
+      path: /validate-apps-kubeblocks-io-v1beta1-configconstraint
       port: {{ .Values.service.port }}
     {{- if .Values.admissionWebhooks.createSelfSignedCert }}
     caBundle: {{ $ca.Cert | b64enc }}

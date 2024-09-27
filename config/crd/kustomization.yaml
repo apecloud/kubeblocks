@@ -23,6 +23,8 @@ resources:
 #- bases/apps.kubeblocks.io_componentversions.yaml
 #- bases/dataprotection.kubeblocks.io_storageproviders.yaml
 #- bases/experimental.kubeblocks.io_nodecountscalers.yaml
+#- bases/operations.kubeblocks.io_opsrequests.yaml
+#- bases/operations.kubeblocks.io_opsdefinitions.yaml
 - bases/view.kubeblocks.io_reconciliationviews.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
 

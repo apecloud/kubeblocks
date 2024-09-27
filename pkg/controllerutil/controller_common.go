@@ -41,7 +41,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -134,9 +134,9 @@ func HandleCRDeletion(reqCtx RequestCtx,
 			// If the resource has dependencies, it will not be automatically deleted.
 			// It can also prevent users from manually deleting it without event records
 			if reqCtx.Recorder != nil {
-				cluster, ok := cr.(*v1alpha1.Cluster)
+				cluster, ok := cr.(*appsv1.Cluster)
 				// throw warning event if terminationPolicy set to DoNotTerminate
-				if ok && cluster.Spec.TerminationPolicy == v1alpha1.DoNotTerminate {
+				if ok && cluster.Spec.TerminationPolicy == appsv1.DoNotTerminate {
 					reqCtx.Eventf(cr, corev1.EventTypeWarning, constant.ReasonDeleteFailed,
 						"Deleting %s: %s failed due to terminationPolicy set to DoNotTerminate",
 						strings.ToLower(cr.GetObjectKind().GroupVersionKind().Kind), cr.GetName())

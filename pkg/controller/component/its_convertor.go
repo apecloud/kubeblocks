@@ -27,9 +27,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 // BuildWorkloadFrom builds a new Component object based on SynthesizedComponent.
@@ -181,7 +182,7 @@ func (c *itsOfflineInstancesConvertor) convert(args ...any) (any, error) {
 	return offlineInstances, nil
 }
 
-func AppsInstanceToWorkloadInstance(instance *appsv1alpha1.InstanceTemplate) *workloads.InstanceTemplate {
+func AppsInstanceToWorkloadInstance(instance *kbappsv1.InstanceTemplate) *workloads.InstanceTemplate {
 	if instance == nil {
 		return nil
 	}
@@ -212,14 +213,28 @@ func AppsInstanceToWorkloadInstance(instance *appsv1alpha1.InstanceTemplate) *wo
 	}
 }
 
-func toPersistentVolumeClaims(vcts []appsv1alpha1.ClusterComponentVolumeClaimTemplate) []corev1.PersistentVolumeClaim {
+func toPersistentVolumeClaims(vcts []kbappsv1.ClusterComponentVolumeClaimTemplate) []corev1.PersistentVolumeClaim {
+	storageClassName := func(spec kbappsv1.PersistentVolumeClaimSpec, defaultStorageClass string) *string {
+		if spec.StorageClassName != nil && *spec.StorageClassName != "" {
+			return spec.StorageClassName
+		}
+		if defaultStorageClass != "" {
+			return &defaultStorageClass
+		}
+		return nil
+	}
 	var pvcs []corev1.PersistentVolumeClaim
 	for _, v := range vcts {
 		pvcs = append(pvcs, corev1.PersistentVolumeClaim{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: v.Name,
 			},
-			Spec: v.Spec.ToV1PersistentVolumeClaimSpec(),
+			Spec: corev1.PersistentVolumeClaimSpec{
+				AccessModes:      v.Spec.AccessModes,
+				Resources:        v.Spec.Resources,
+				StorageClassName: storageClassName(v.Spec, viper.GetString(constant.CfgKeyDefaultStorageClass)),
+				VolumeMode:       v.Spec.VolumeMode,
+			},
 		})
 	}
 	return pvcs
@@ -244,11 +259,11 @@ func getMemberUpdateStrategy(synthesizedComp *SynthesizedComponent) *workloads.M
 		bestEffortParallelUpdate = workloads.BestEffortParallelUpdateStrategy
 	)
 	switch *synthesizedComp.UpdateStrategy {
-	case appsv1alpha1.SerialStrategy:
+	case kbappsv1.SerialStrategy:
 		return &serial
-	case appsv1alpha1.ParallelStrategy:
+	case kbappsv1.ParallelStrategy:
 		return &parallelUpdate
-	case appsv1alpha1.BestEffortParallelStrategy:
+	case kbappsv1.BestEffortParallelStrategy:
 		return &bestEffortParallelUpdate
 	default:
 		return nil
@@ -287,7 +302,7 @@ func (c *itsCredentialConvertor) convert(args ...any) (any, error) {
 		return nil, err
 	}
 
-	credential := func(sysAccount appsv1alpha1.SystemAccount) *workloads.Credential {
+	credential := func(sysAccount kbappsv1.SystemAccount) *workloads.Credential {
 		secretName := constant.GenerateAccountSecretName(synthesizeComp.ClusterName, synthesizeComp.Name, sysAccount.Name)
 		return &workloads.Credential{
 			Username: workloads.CredentialVar{
@@ -333,7 +348,7 @@ func ConvertSynthesizeCompRoleToInstanceSetRole(synthesizedComp *SynthesizedComp
 		return nil
 	}
 
-	accessMode := func(role appsv1alpha1.ReplicaRole) workloads.AccessMode {
+	accessMode := func(role kbappsv1.ReplicaRole) workloads.AccessMode {
 		switch {
 		case role.Serviceable && role.Writable:
 			return workloads.ReadWriteMode

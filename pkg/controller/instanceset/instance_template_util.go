@@ -22,7 +22,7 @@ package instanceset
 import (
 	corev1 "k8s.io/api/core/v1"
 
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 )
 
 // TODO: remove these after extract the Schema of the API types from Kubeblocks into a separate Go package.
@@ -41,6 +41,40 @@ type InstanceTemplateExt struct {
 	Replicas int32
 	corev1.PodTemplateSpec
 	VolumeClaimTemplates []corev1.PersistentVolumeClaim
+}
+
+// BuildInstanceName2TemplateMap serves as a Public API, through which users can obtain InstanceName2TemplateMap objects
+// processed by the buildInstanceName2TemplateMap function.
+func BuildInstanceName2TemplateMap(itsExt *InstanceSetExt) (map[string]*instanceTemplateExt, error) {
+	instanceTemplateList := buildInstanceTemplateExts(&instanceSetExt{
+		its:               itsExt.Its,
+		instanceTemplates: itsExt.InstanceTemplates,
+	})
+	allNameTemplateMap := make(map[string]*instanceTemplateExt)
+	var instanceNameList []string
+	for _, template := range instanceTemplateList {
+		ordinalList, err := GetOrdinalListByTemplateName(itsExt.Its, template.Name)
+		if err != nil {
+			return nil, err
+		}
+		instanceNames, err := GenerateInstanceNamesFromTemplate(itsExt.Its.Name, template.Name, template.Replicas, itsExt.Its.Spec.OfflineInstances, ordinalList)
+		if err != nil {
+			return nil, err
+		}
+		instanceNameList = append(instanceNameList, instanceNames...)
+		for _, name := range instanceNames {
+			allNameTemplateMap[name] = template
+		}
+	}
+	// validate duplicate pod names
+	getNameFunc := func(n string) string {
+		return n
+	}
+	if err := ValidateDupInstanceNames(instanceNameList, getNameFunc); err != nil {
+		return nil, err
+	}
+
+	return allNameTemplateMap, nil
 }
 
 // BuildInstanceTemplateExts serves as a Public API, through which users can obtain InstanceTemplateExt objects

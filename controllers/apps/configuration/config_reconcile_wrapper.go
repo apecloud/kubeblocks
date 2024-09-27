@@ -20,19 +20,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package configuration
 
 import (
+	"context"
+
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 )
 
 type configReconcileContext struct {
 	configctrl.ResourceFetcher[configReconcileContext]
 
+	ctx              context.Context
 	Name             string
 	MatchingLabels   client.MatchingLabels
 	ConfigMap        *corev1.ConfigMap
@@ -40,17 +42,15 @@ type configReconcileContext struct {
 
 	Containers      []string
 	InstanceSetList []workloads.InstanceSet
-
-	reqCtx intctrlutil.RequestCtx
 }
 
-func newConfigReconcileContext(resourceCtx *configctrl.ResourceCtx,
+func newConfigReconcileContext(ctx context.Context,
+	resourceCtx *configctrl.ResourceCtx,
 	cm *corev1.ConfigMap,
 	configSpecName string,
-	reqCtx intctrlutil.RequestCtx,
 	matchingLabels client.MatchingLabels) *configReconcileContext {
 	configContext := configReconcileContext{
-		reqCtx:         reqCtx,
+		ctx:            ctx,
 		ConfigMap:      cm,
 		Name:           configSpecName,
 		MatchingLabels: matchingLabels,
@@ -84,13 +84,8 @@ func (c *configReconcileContext) Workload() *configReconcileContext {
 
 func (c *configReconcileContext) SynthesizedComponent() *configReconcileContext {
 	return c.Wrap(func() (err error) {
-		if c.ComponentDefObj != nil && c.ComponentObj != nil && len(c.ComponentObj.Spec.CompDef) > 0 {
-			// build synthesized component for native component
-			c.BuiltinComponent, err = component.BuildSynthesizedComponent(c.reqCtx, c.Client, c.ClusterObj, c.ComponentDefObj, c.ComponentObj)
-		} else {
-			// build synthesized component for generated component
-			c.BuiltinComponent, err = component.BuildSynthesizedComponentWrapper(c.reqCtx, c.Client, c.ClusterObj, c.ClusterComObj)
-		}
+		// build synthesized component for the component
+		c.BuiltinComponent, err = component.BuildSynthesizedComponent(c.ctx, c.Client, c.ComponentDefObj, c.ComponentObj, c.ClusterObj)
 		return err
 	})
 }

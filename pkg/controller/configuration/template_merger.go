@@ -24,7 +24,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 )
@@ -39,8 +39,8 @@ type TemplateMerger interface {
 }
 
 type mergeContext struct {
-	template   appsv1alpha1.ConfigTemplateExtension
-	configSpec appsv1alpha1.ComponentConfigSpec
+	template   appsv1.ConfigTemplateExtension
+	configSpec appsv1.ComponentConfigSpec
 	ccSpec     *appsv1beta1.ConfigConstraintSpec
 
 	builder *configTemplateBuilder
@@ -49,7 +49,7 @@ type mergeContext struct {
 }
 
 func (m *mergeContext) renderTemplate() (map[string]string, error) {
-	templateSpec := appsv1alpha1.ComponentTemplateSpec{
+	templateSpec := appsv1.ComponentTemplateSpec{
 		// Name:        m.template.Name,
 		Namespace:   m.template.Namespace,
 		TemplateRef: m.template.TemplateRef,
@@ -119,7 +119,7 @@ func (c *configOnlyAddMerger) Merge(baseData map[string]string, updatedData map[
 	return nil, core.MakeError("not implemented")
 }
 
-func NewTemplateMerger(template appsv1alpha1.ConfigTemplateExtension, ctx context.Context, cli client.Client, builder *configTemplateBuilder, configSpec appsv1alpha1.ComponentConfigSpec, ccSpec *appsv1beta1.ConfigConstraintSpec) (TemplateMerger, error) {
+func NewTemplateMerger(template appsv1.ConfigTemplateExtension, ctx context.Context, cli client.Client, builder *configTemplateBuilder, configSpec appsv1.ComponentConfigSpec, ccSpec *appsv1beta1.ConfigConstraintSpec) (TemplateMerger, error) {
 	templateData := &mergeContext{
 		configSpec: configSpec,
 		template:   template,
@@ -133,21 +133,21 @@ func NewTemplateMerger(template appsv1alpha1.ConfigTemplateExtension, ctx contex
 	switch template.Policy {
 	default:
 		return nil, core.MakeError("unknown template policy: %s", template.Policy)
-	case appsv1alpha1.NoneMergePolicy:
+	case appsv1.NoneMergePolicy:
 		merger = &noneOp{templateData}
-	case appsv1alpha1.PatchPolicy:
+	case appsv1.PatchPolicy:
 		merger = &configPatcher{templateData}
-	case appsv1alpha1.OnlyAddPolicy:
+	case appsv1.OnlyAddPolicy:
 		merger = &configOnlyAddMerger{templateData}
-	case appsv1alpha1.ReplacePolicy:
+	case appsv1.ReplacePolicy:
 		merger = &configReplaceMerger{templateData}
 	}
 	return merger, nil
 }
 
-func mergerConfigTemplate(template *appsv1alpha1.LegacyRenderedTemplateSpec,
+func mergerConfigTemplate(template *appsv1.LegacyRenderedTemplateSpec,
 	builder *configTemplateBuilder,
-	configSpec appsv1alpha1.ComponentConfigSpec,
+	configSpec appsv1.ComponentConfigSpec,
 	baseData map[string]string,
 	ctx context.Context, cli client.Client) (map[string]string, error) {
 	if configSpec.ConfigConstraintRef == "" {

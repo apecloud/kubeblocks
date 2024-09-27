@@ -156,6 +156,17 @@ func GenerateBackupJobName(backup *dpv1alpha1.Backup, prefix string) string {
 	return name
 }
 
+func GenerateBackupStatefulSetName(backup *dpv1alpha1.Backup, targetName, prefix string) string {
+	name := backup.Name
+	// for cluster mode with multiple targets, the statefulSet name should include the target name.
+	if targetName != "" {
+		name = fmt.Sprintf("%s-%s-%s", prefix, targetName, backup.Name)
+	}
+	// statefulSet name cannot exceed 52 characters for label name limit as the statefulset controller will
+	// add a 10-length suffix to the name to construct the label "controller-revision-hash": "<statefulset_name>-<hash>"
+	return strings.TrimSuffix(name[:min(len(name), 52)], "-")
+}
+
 func generateBaseCRNameByBackupSchedule(uniqueNameWithBackupSchedule, backupScheduleNS, method string) string {
 	name := fmt.Sprintf("%s-%s", uniqueNameWithBackupSchedule, backupScheduleNS)
 	if len(name) > 30 {

@@ -39,7 +39,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
@@ -369,6 +369,58 @@ func ConvertOrdinalsToSortedList(ordinals workloads.Ordinals) ([]int32, error) {
 	return sortedOrdinalList, nil
 }
 
+// ParseNodeSelectorOnceAnnotation will return a non-nil map
+func ParseNodeSelectorOnceAnnotation(its *workloads.InstanceSet) (map[string]string, error) {
+	podToNodeMapping := make(map[string]string)
+	data, ok := its.Annotations[constant.NodeSelectorOnceAnnotationKey]
+	if !ok {
+		return podToNodeMapping, nil
+	}
+	if err := json.Unmarshal([]byte(data), &podToNodeMapping); err != nil {
+		return nil, fmt.Errorf("can't unmarshal scheduling information: %w", err)
+	}
+	return podToNodeMapping, nil
+}
+
+// sets annotation in place
+func deleteNodeSelectorOnceAnnotation(its *workloads.InstanceSet, podName string) error {
+	podToNodeMapping, err := ParseNodeSelectorOnceAnnotation(its)
+	if err != nil {
+		return err
+	}
+	delete(podToNodeMapping, podName)
+	if len(podToNodeMapping) == 0 {
+		delete(its.Annotations, constant.NodeSelectorOnceAnnotationKey)
+	} else {
+		data, err := json.Marshal(podToNodeMapping)
+		if err != nil {
+			return err
+		}
+		its.Annotations[constant.NodeSelectorOnceAnnotationKey] = string(data)
+	}
+	return nil
+}
+
+// MergeNodeSelectorOnceAnnotation merges its's nodeSelectorOnce annotation in place
+func MergeNodeSelectorOnceAnnotation(its *workloads.InstanceSet, podToNodeMapping map[string]string) error {
+	origPodToNodeMapping, err := ParseNodeSelectorOnceAnnotation(its)
+	if err != nil {
+		return err
+	}
+	for k, v := range podToNodeMapping {
+		origPodToNodeMapping[k] = v
+	}
+	data, err := json.Marshal(origPodToNodeMapping)
+	if err != nil {
+		return err
+	}
+	if its.Annotations == nil {
+		its.Annotations = make(map[string]string)
+	}
+	its.Annotations[constant.NodeSelectorOnceAnnotationKey] = string(data)
+	return nil
+}
+
 func buildInstanceByTemplate(name string, template *instanceTemplateExt, parent *workloads.InstanceSet, revision string) (*instance, error) {
 	// 1. build a pod from template
 	var err error
@@ -383,13 +435,25 @@ func buildInstanceByTemplate(name string, template *instanceTemplateExt, parent 
 		AddAnnotationsInMap(template.Annotations).
 		AddLabelsInMap(template.Labels).
 		AddLabelsInMap(labels).
+		AddLabels(constant.KBAppPodNameLabelKey, name). // used as a pod-service selector
 		AddControllerRevisionHashLabel(revision).
-		AddLabelsInMap(map[string]string{constant.KBAppPodNameLabelKey: name}).
 		SetPodSpec(*template.Spec.DeepCopy()).
 		GetObject()
 	// Set these immutable fields only on initial Pod creation, not updates.
 	pod.Spec.Hostname = pod.Name
 	pod.Spec.Subdomain = getHeadlessSvcName(parent.Name)
+
+	podToNodeMapping, err := ParseNodeSelectorOnceAnnotation(parent)
+	if err != nil {
+		return nil, err
+	}
+	if nodeName, ok := podToNodeMapping[name]; ok {
+		// don't specify nodeName directly here, because it may affect WaitForFirstConsumer StorageClass
+		if pod.Spec.NodeSelector == nil {
+			pod.Spec.NodeSelector = make(map[string]string)
+		}
+		pod.Spec.NodeSelector[corev1.LabelHostname] = nodeName
+	}
 
 	// 2. build pvcs from template
 	pvcMap := make(map[string]*corev1.PersistentVolumeClaim)
@@ -429,6 +493,11 @@ func buildInstanceByTemplate(name string, template *instanceTemplateExt, parent 
 	if err := controllerutil.SetControllerReference(parent, pod, model.GetScheme()); err != nil {
 		return nil, err
 	}
+	for _, pvc := range pvcs {
+		if err = controllerutil.SetControllerReference(parent, pvc, model.GetScheme()); err != nil {
+			return nil, err
+		}
+	}
 	inst := &instance{
 		pod:  pod,
 		pvcs: pvcs,
@@ -443,9 +512,11 @@ func buildInstancePVCByTemplate(name string, template *instanceTemplateExt, pare
 	for _, claimTemplate := range template.VolumeClaimTemplates {
 		pvcName := fmt.Sprintf("%s-%s", claimTemplate.Name, name)
 		pvc := builder.NewPVCBuilder(parent.Namespace, pvcName).
-			AddLabelsInMap(template.Labels).
 			AddLabelsInMap(labels).
+			AddLabelsInMap(template.Labels).
+			AddLabelsInMap(claimTemplate.Labels).
 			AddLabels(constant.VolumeClaimTemplateNameLabelKey, claimTemplate.Name).
+			AddAnnotationsInMap(claimTemplate.Annotations).
 			SetSpec(*claimTemplate.Spec.DeepCopy()).
 			GetObject()
 		if template.Name != "" {
@@ -508,6 +579,8 @@ func copyAndMerge(oldObj, newObj client.Object) client.Object {
 	}
 
 	copyAndMergePVC := func(oldPVC, newPVC *corev1.PersistentVolumeClaim) client.Object {
+		mergeMap(&newPVC.Annotations, &oldPVC.Annotations)
+		mergeMap(&newPVC.Labels, &oldPVC.Labels)
 		// resources.request.storage and accessModes support in-place update.
 		// resources.request.storage only supports volume expansion.
 		if reflect.DeepEqual(oldPVC.Spec.AccessModes, newPVC.Spec.AccessModes) &&

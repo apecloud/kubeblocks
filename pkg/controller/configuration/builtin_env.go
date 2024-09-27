@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package configuration
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
 
@@ -30,8 +31,15 @@ import (
 	coreclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/generics"
+)
+
+const (
+	kbEnvClusterUIDPostfix8Deprecated = "KB_CLUSTER_UID_POSTFIX_8"
+	kbComponentEnvCMPlaceHolder       = "$(COMP_ENV_CM_NAME)"
+	kbToolsImagePlaceHolder           = "$(KUBEBLOCKS_TOOLS_IMAGE)"
 )
 
 type envBuildInFunc func(container interface{}, envName string) (string, error)
@@ -228,7 +236,7 @@ func (w *envWrapper) doEnvReplace(replacedVars *set.LinkedHashSetString, oldValu
 		clusterName   = w.clusterName
 		clusterUID    = w.clusterUID
 		componentName = w.componentName
-		builtInEnvMap = component.GetReplacementMapForBuiltInEnv(clusterName, clusterUID, componentName)
+		builtInEnvMap = getReplacementMapForBuiltInEnv(clusterName, clusterUID, componentName)
 	)
 
 	kbInnerEnvReplaceFn := func(envName string, strToReplace string) string {
@@ -306,4 +314,24 @@ func containerResourceRefValue(fieldSelector *corev1.ResourceFieldSelector, c *c
 
 func fieldRefValue(podReference *corev1.ObjectFieldSelector, podSpec *corev1.PodSpec) (string, error) {
 	return "", cfgcore.MakeError("not support pod field ref")
+}
+
+func getReplacementMapForBuiltInEnv(clusterName, clusterUID, componentName string) map[string]string {
+	cc := constant.GenerateClusterComponentName(clusterName, componentName)
+	replacementMap := map[string]string{
+		envPlaceHolder(constant.KBEnvClusterName):     clusterName,
+		envPlaceHolder(constant.KBEnvCompName):        componentName,
+		envPlaceHolder(constant.KBEnvClusterCompName): cc,
+		kbComponentEnvCMPlaceHolder:                   constant.GenerateClusterComponentEnvPattern(clusterName, componentName),
+	}
+	clusterUIDPostfix := clusterUID
+	if len(clusterUID) > 8 {
+		clusterUIDPostfix = clusterUID[len(clusterUID)-8:]
+	}
+	replacementMap[envPlaceHolder(kbEnvClusterUIDPostfix8Deprecated)] = clusterUIDPostfix
+	return replacementMap
+}
+
+func envPlaceHolder(env string) string {
+	return fmt.Sprintf("$(%s)", env)
 }

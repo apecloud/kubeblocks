@@ -29,12 +29,13 @@ import (
 	"github.com/golang/mock/gomock"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/workqueue"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -53,17 +54,19 @@ var _ = Describe("handler builder test.", func() {
 			eventName := podName + ".123456"
 			labels := map[string]string{
 				constant.AppManagedByLabelKey:   constant.AppName,
-				constant.AppNameLabelKey:        clusterName + "def",
-				constant.AppComponentLabelKey:   componentName + "def",
 				constant.AppInstanceLabelKey:    clusterName,
 				constant.KBAppComponentLabelKey: componentName,
 			}
 			its := builder.NewInstanceSetBuilder(namespace, name).
 				AddLabelsInMap(labels).
 				GetObject()
-			sts := builder.NewStatefulSetBuilder(namespace, stsName).
-				AddLabelsInMap(labels).
-				GetObject()
+			sts := &appsv1.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: namespace,
+					Name:      stsName,
+					Labels:    labels,
+				},
+			}
 			pod := builder.NewPodBuilder(namespace, podName).
 				SetOwnerReferences("apps/v1", "StatefulSet", sts).
 				GetObject()

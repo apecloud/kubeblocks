@@ -19,7 +19,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       trigger-mode: ${{ steps.get_trigger_mode.outputs.trigger_mode }}
-      matrix: ${{ steps.get_trigger_mode.outputs.matrix }}
       git-commit: ${{ steps.get_git_info.outputs.git_commit }}
       git-version: ${{ steps.get_git_info.outputs.git_version }}
     steps:
@@ -48,15 +47,6 @@ jobs:
           echo $TRIGGER_MODE
           echo trigger_mode=$TRIGGER_MODE >> $GITHUB_OUTPUT
 
-          TEST_PACKAGES=`bash .github/utils/utils.sh --type 16 \
-              --trigger-type "$TRIGGER_MODE" \
-              --test-pkgs "${{ vars.TEST_PKGS }}" \
-              --test-check "${{ vars.TEST_CHECK }}" \
-              --test-pkgs-first "${{ vars.TEST_PKGS_FIRST }}" \
-              --ignore-pkgs "${{ vars.SKIP_CHECK_PKG }}"`
-          echo "$TEST_PACKAGES"
-          echo "matrix={\"include\":[$TEST_PACKAGES]}" >> $GITHUB_OUTPUT
-
       - name: get git info
         id: get_git_info
         run: |
@@ -65,54 +55,14 @@ jobs:
           echo git_commit=$GIT_COMMIT >> $GITHUB_OUTPUT
           echo git_version=$GIT_VERSION >> $GITHUB_OUTPUT
 
-  test-parallel:
-    name: test
-    needs: trigger-mode
-    if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[test]') && github.event.pull_request.head.repo.full_name == github.repository }}
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: true
-      matrix: ${{ fromJSON(needs.trigger-mode.outputs.matrix) }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: install lib
-        run: |
-          sudo rm /etc/apt/sources.list.d/microsoft-prod.list
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            libbtrfs-dev \
-            libdevmapper-dev
-
-      - name: Set up Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: "${{ env.GO_VERSION }}"
-
-      - name: Install golangci-lint
-        if: matrix.ops == 'lint'
-        run: |
-          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.55.2
-
-      - name: make ${{ matrix.ops }}
-        if: ${{ ! contains(matrix.ops, '/') }}
-        run: |
-          make ${{ matrix.ops }}
-
-      - name: make test ${{ matrix.ops }}
-        if: ${{ contains(matrix.ops, '/') }}
-        run: |
-          if [[ -d "./${{ matrix.ops }}" ]]; then
-              make test TEST_PACKAGES=./${{ matrix.ops }}/...
-          fi
-
   pr-pre-check:
     needs: trigger-mode
-    if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[test]') && github.event.pull_request.head.repo.full_name != github.repository }}
+    if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[test]') }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: true
       matrix:
-        ops: [ 'manifests', 'mod-vendor', 'generate', 'lint', 'staticcheck' ]
+        ops: [ 'manifests', 'mod-vendor', 'generate', 'lint', 'staticcheck', 'test' ]
     steps:
       - uses: actions/checkout@v4
       - name: install lib
@@ -143,25 +93,15 @@ jobs:
               exit 1
           fi
 
-  pr-make-test:
-    needs: trigger-mode
-    if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[test]') && github.event.pull_request.head.repo.full_name != github.repository }}
-    outputs:
-      runner-name: ${{ steps.get_runner_name.outputs.runner_name }}
-    runs-on: [ self-hosted, gke-runner-go1.21 ]
-    steps:
-      - uses: actions/checkout@v4
-      - name: make test
-        run: |
-          make test
-
       - name: ignore cover pkgs
+        if: matrix.ops == 'test'
         run: |
           bash .github/utils/utils.sh --type 14 \
               --file cover.out \
               --ignore-pkgs "${{ vars.IGNORE_COVERAGE_PKG }}"
 
       - name: upload coverage report
+        if: matrix.ops == 'test'
         uses: codecov/codecov-action@v3
         continue-on-error: true
         with:
@@ -170,25 +110,6 @@ jobs:
           flags: unittests
           name: codecov-report
           verbose: true
-
-      - name: kill kube-apiserver and etcd
-        id: get_runner_name
-        if: ${{ always() }}
-        run: |
-          echo runner_name=${RUNNER_NAME} >> $GITHUB_OUTPUT
-          bash .github/utils/utils.sh --type 8
-
-  remove-runner:
-    needs: [ trigger-mode, pr-make-test ]
-    runs-on: ubuntu-latest
-    if: ${{ contains(needs.trigger-mode.outputs.trigger-mode, '[test]') && github.event.pull_request.head.repo.full_name != github.repository && always()  }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: remove runner
-        run: |
-          bash .github/utils/utils.sh --type 9 \
-              --github-token ${{ env.GITHUB_TOKEN }} \
-              --runner-name ${{ needs.pr-make-test.outputs.runner-name }}
 
   check-image:
     needs: trigger-mode
@@ -245,31 +166,13 @@ jobs:
 
   pr-check:
     name: make test
-    needs: [ trigger-mode, test-parallel, pr-pre-check, pr-make-test,
-             check-image, check-tools-image, check-dataprotection-image, check-helm ]
+    needs: [ trigger-mode, pr-pre-check, check-image, check-tools-image, check-dataprotection-image, check-helm ]
     if: ${{ github.event.action == 'labeled' && (github.event.label.name == 'approved' || github.event.label.name == 'pre-approve') && always() }}
     runs-on: ubuntu-latest
     steps:
-      - name: test parallel check
-        if: github.event.pull_request.head.repo.full_name == github.repository
-        run: |
-          if [[ "${{ needs.test-parallel.result }}" == "failure" || "${{ needs.test-parallel.result }}" == "cancelled" ]]; then
-              echo "test parallel fail"
-              exit 1
-          fi
-
       - name: pr pre check
-        if: github.event.pull_request.head.repo.full_name != github.repository
         run: |
           if [[ "${{ needs.pr-pre-check.result }}" == "failure" || "${{ needs.pr-pre-check.result }}" == "cancelled" ]]; then
-              echo "make test fail"
-              exit 1
-          fi
-
-      - name: make test check
-        if: github.event.pull_request.head.repo.full_name != github.repository
-        run: |
-          if [[ "${{ needs.pr-make-test.result }}" == "failure" || "${{ needs.pr-make-test.result }}" == "cancelled" ]]; then
               echo "make test fail"
               exit 1
           fi

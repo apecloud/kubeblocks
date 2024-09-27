@@ -29,8 +29,10 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	kbagent "github.com/apecloud/kubeblocks/pkg/kbagent"
+	"github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 var _ = Describe("kb-agent", func() {
@@ -83,21 +85,21 @@ var _ = Describe("kb-agent", func() {
 						},
 					},
 				},
-				LifecycleActions: &appsv1alpha1.ComponentLifecycleActions{
-					PostProvision: &appsv1alpha1.Action{
-						Exec: &appsv1alpha1.ExecAction{
+				LifecycleActions: &appsv1.ComponentLifecycleActions{
+					PostProvision: &appsv1.Action{
+						Exec: &appsv1.ExecAction{
 							Command: []string{"echo", "hello"},
 						},
 						TimeoutSeconds: 5,
-						RetryPolicy: &appsv1alpha1.RetryPolicy{
+						RetryPolicy: &appsv1.RetryPolicy{
 							MaxRetries:    5,
 							RetryInterval: 10,
 						},
-						PreCondition: &[]appsv1alpha1.PreConditionType{appsv1alpha1.ComponentReadyPreConditionType}[0],
+						PreCondition: &[]appsv1.PreConditionType{appsv1.ComponentReadyPreConditionType}[0],
 					},
-					RoleProbe: &appsv1alpha1.Probe{
-						Action: appsv1alpha1.Action{
-							Exec: &appsv1alpha1.ExecAction{
+					RoleProbe: &appsv1.Probe{
+						Action: appsv1.Action{
+							Exec: &appsv1.ExecAction{
 								Command: []string{"echo", "hello"},
 							},
 							TimeoutSeconds: 5,
@@ -150,7 +152,7 @@ var _ = Describe("kb-agent", func() {
 
 			c := kbAgentContainer()
 			Expect(c).ShouldNot(BeNil())
-			Expect(c.Env).Should(HaveLen(2))
+			Expect(c.Env).Should(HaveLen(6))
 		})
 
 		It("action env", func() {
@@ -175,7 +177,7 @@ var _ = Describe("kb-agent", func() {
 
 			c := kbAgentContainer()
 			Expect(c).ShouldNot(BeNil())
-			Expect(c.Env).Should(HaveLen(4))
+			Expect(c.Env).Should(HaveLen(8))
 			Expect(reflect.DeepEqual(c.Env[0], env[0])).Should(BeTrue())
 			Expect(reflect.DeepEqual(c.Env[1], env[1])).Should(BeTrue())
 		})
@@ -226,14 +228,13 @@ var _ = Describe("kb-agent", func() {
 			Expect(err).Should(BeNil())
 
 			ic := kbAgentInitContainer()
-			Expect(ic).ShouldNot(BeNil())
+			Expect(ic).Should(BeNil())
 
 			c := kbAgentContainer()
 			Expect(c).ShouldNot(BeNil())
-			Expect(c.Image).Should(Equal(container.Image))
-			Expect(c.Command[0]).Should(Equal(kbAgentCommandOnSharedMount))
-			Expect(c.VolumeMounts).Should(HaveLen(1))
-			Expect(c.VolumeMounts[0]).Should(Equal(sharedVolumeMount))
+			Expect(c.Image).Should(Equal(viperx.GetString(constant.KBToolsImage)))
+			Expect(c.Command[0]).Should(Equal(kbAgentCommand))
+			Expect(c.VolumeMounts).Should(HaveLen(0))
 		})
 
 		It("custom container - volume mounts", func() {
@@ -251,9 +252,8 @@ var _ = Describe("kb-agent", func() {
 
 			c := kbAgentContainer()
 			Expect(c).ShouldNot(BeNil())
-			Expect(c.VolumeMounts).Should(HaveLen(2))
-			Expect(c.VolumeMounts[0]).Should(Equal(sharedVolumeMount))
-			Expect(c.VolumeMounts[1]).Should(Equal(container.VolumeMounts[0]))
+			Expect(c.VolumeMounts).Should(HaveLen(1))
+			Expect(c.VolumeMounts[0]).Should(Equal(container.VolumeMounts[0]))
 		})
 
 		It("custom container - two same containers", func() {
@@ -317,14 +317,29 @@ var _ = Describe("kb-agent", func() {
 
 		It("custom image & container - different images", func() {
 			image := "custom-image"
+			synthesizedComp.PodSpec.Containers[0].VolumeMounts = []corev1.VolumeMount{
+				{
+					Name:      "test-volume",
+					MountPath: "/test",
+				},
+			}
 			container := synthesizedComp.PodSpec.Containers[0]
 			Expect(image).ShouldNot(Equal(container.Image))
 			synthesizedComp.LifecycleActions.PostProvision.Exec.Image = image
 			synthesizedComp.LifecycleActions.PostProvision.Exec.Container = container.Name
 
 			err := buildKBAgentContainer(synthesizedComp)
-			Expect(err).ShouldNot(BeNil())
-			Expect(err.Error()).Should(ContainSubstring("exec image and container must be the same"))
+			Expect(err).Should(BeNil())
+
+			ic := kbAgentInitContainer()
+			Expect(ic).ShouldNot(BeNil())
+
+			c := kbAgentContainer()
+			Expect(c.Image).Should(Equal(image))
+			Expect(c.Command[0]).Should(Equal(kbAgentCommandOnSharedMount))
+			Expect(c.VolumeMounts).Should(HaveLen(2))
+			Expect(c.VolumeMounts[0]).Should(Equal(sharedVolumeMount))
+			Expect(c.VolumeMounts[1]).Should(Equal(container.VolumeMounts[0]))
 		})
 
 		// TODO: host-network

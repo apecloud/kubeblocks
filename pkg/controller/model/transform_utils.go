@@ -20,17 +20,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package model
 
 import (
-	"errors"
 	"fmt"
 	"reflect"
 	"time"
 
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/client-go/discovery"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
@@ -196,13 +193,9 @@ func IsReconciliationPaused(object client.Object) bool {
 // ReadCacheSnapshot reads all objects owned by root object.
 func ReadCacheSnapshot(transCtx graph.TransformContext, root client.Object, ml client.MatchingLabels, kinds ...client.ObjectList) (ObjectSnapshot, error) {
 	snapshot := make(ObjectSnapshot)
-	inNS := client.InNamespace(root.GetNamespace())
+	inNs := client.InNamespace(root.GetNamespace())
 	for _, list := range kinds {
-		if err := transCtx.GetClient().List(transCtx.GetContext(), list, inNS, ml); err != nil {
-			// check for policy/v1 discovery error, to support k8s clusters before 1.21.
-			if isPolicyV1DiscoveryNotFoundError(err) {
-				continue
-			}
+		if err := transCtx.GetClient().List(transCtx.GetContext(), list, inNs, ml); err != nil {
 			return nil, err
 		}
 		// reflect get list.Items
@@ -218,25 +211,7 @@ func ReadCacheSnapshot(transCtx graph.TransformContext, root client.Object, ml c
 			snapshot[*name] = object
 		}
 	}
-
 	return snapshot, nil
-}
-
-// isPolicyV1DiscoveryNotFoundError checks whether the @err is an error of type ErrGroupDiscoveryFailed for policy/v1 resource.
-func isPolicyV1DiscoveryNotFoundError(err error) bool {
-	wrappedErr := errors.Unwrap(err)
-	if wrappedErr != nil {
-		err = wrappedErr
-	}
-	if !discovery.IsGroupDiscoveryFailedError(err) {
-		return false
-	}
-	discoveryErr, _ := err.(*discovery.ErrGroupDiscoveryFailed)
-	statusErr := discoveryErr.Groups[schema.GroupVersion{Group: "policy", Version: "v1"}]
-	if statusErr == nil {
-		return false
-	}
-	return apierrors.IsNotFound(statusErr)
 }
 
 func DefaultLess(v1, v2 graph.Vertex) bool {

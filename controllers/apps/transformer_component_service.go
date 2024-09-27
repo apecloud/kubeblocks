@@ -22,16 +22,19 @@ package apps
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
 
 	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
@@ -97,7 +100,7 @@ func (t *componentServiceTransformer) Transform(ctx graph.TransformContext, dag 
 }
 
 func (t *componentServiceTransformer) listOwnedServices(ctx context.Context, cli client.Reader,
-	comp *appsv1alpha1.Component, synthesizedComp *component.SynthesizedComponent) (map[string]*corev1.Service, error) {
+	comp *appsv1.Component, synthesizedComp *component.SynthesizedComponent) (map[string]*corev1.Service, error) {
 	services, err := component.ListOwnedServices(ctx, cli, synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name)
 	if err != nil {
 		return nil, err
@@ -111,8 +114,8 @@ func (t *componentServiceTransformer) listOwnedServices(ctx context.Context, cli
 	return owned, nil
 }
 
-func (t *componentServiceTransformer) buildCompService(comp *appsv1alpha1.Component,
-	synthesizeComp *component.SynthesizedComponent, service *appsv1alpha1.ComponentService) ([]*corev1.Service, error) {
+func (t *componentServiceTransformer) buildCompService(comp *appsv1.Component,
+	synthesizeComp *component.SynthesizedComponent, service *appsv1.ComponentService) ([]*corev1.Service, error) {
 	if service.DisableAutoProvision != nil && *service.DisableAutoProvision {
 		return nil, nil
 	}
@@ -120,21 +123,21 @@ func (t *componentServiceTransformer) buildCompService(comp *appsv1alpha1.Compon
 	if t.isPodService(service) {
 		return t.buildPodService(comp, synthesizeComp, service)
 	}
-	return t.buildServices(comp, synthesizeComp, []*appsv1alpha1.ComponentService{service})
+	return t.buildServices(comp, synthesizeComp, []*appsv1.ComponentService{service})
 }
 
-func (t *componentServiceTransformer) isPodService(service *appsv1alpha1.ComponentService) bool {
+func (t *componentServiceTransformer) isPodService(service *appsv1.ComponentService) bool {
 	return service.PodService != nil && *service.PodService
 }
 
-func (t *componentServiceTransformer) buildPodService(comp *appsv1alpha1.Component,
-	synthesizeComp *component.SynthesizedComponent, service *appsv1alpha1.ComponentService) ([]*corev1.Service, error) {
+func (t *componentServiceTransformer) buildPodService(comp *appsv1.Component,
+	synthesizeComp *component.SynthesizedComponent, service *appsv1.ComponentService) ([]*corev1.Service, error) {
 	pods, err := t.podsNameNOrdinal(synthesizeComp)
 	if err != nil {
 		return nil, err
 	}
 
-	services := make([]*appsv1alpha1.ComponentService, 0)
+	services := make([]*appsv1.ComponentService, 0)
 	for name, ordinal := range pods {
 		svc := service.DeepCopy()
 		svc.Name = fmt.Sprintf("%s-%d", service.Name, ordinal)
@@ -175,8 +178,8 @@ func (t *componentServiceTransformer) podsNameNOrdinal(synthesizeComp *component
 	return pods, nil
 }
 
-func (t *componentServiceTransformer) buildServices(comp *appsv1alpha1.Component,
-	synthesizeComp *component.SynthesizedComponent, compServices []*appsv1alpha1.ComponentService) ([]*corev1.Service, error) {
+func (t *componentServiceTransformer) buildServices(comp *appsv1.Component,
+	synthesizeComp *component.SynthesizedComponent, compServices []*appsv1.ComponentService) ([]*corev1.Service, error) {
 	services := make([]*corev1.Service, 0, len(compServices))
 	for _, compService := range compServices {
 		svc, err := t.buildService(comp, synthesizeComp, compService)
@@ -188,8 +191,8 @@ func (t *componentServiceTransformer) buildServices(comp *appsv1alpha1.Component
 	return services, nil
 }
 
-func (t *componentServiceTransformer) buildService(comp *appsv1alpha1.Component,
-	synthesizeComp *component.SynthesizedComponent, service *appsv1alpha1.ComponentService) (*corev1.Service, error) {
+func (t *componentServiceTransformer) buildService(comp *appsv1.Component,
+	synthesizeComp *component.SynthesizedComponent, service *appsv1.ComponentService) (*corev1.Service, error) {
 	var (
 		namespace   = synthesizeComp.Namespace
 		clusterName = synthesizeComp.ClusterName
@@ -197,10 +200,13 @@ func (t *componentServiceTransformer) buildService(comp *appsv1alpha1.Component,
 	)
 
 	serviceFullName := constant.GenerateComponentServiceName(synthesizeComp.ClusterName, synthesizeComp.Name, service.ServiceName)
-	labels := constant.GetComponentWellKnownLabels(clusterName, compName)
 	builder := builder.NewServiceBuilder(namespace, serviceFullName).
-		AddLabelsInMap(labels).
+		AddLabelsInMap(constant.GetCompLabels(clusterName, compName)).
+		AddLabelsInMap(synthesizeComp.DynamicLabels).
+		AddLabelsInMap(synthesizeComp.StaticLabels).
 		AddAnnotationsInMap(service.Annotations).
+		AddAnnotationsInMap(synthesizeComp.DynamicAnnotations).
+		AddAnnotationsInMap(synthesizeComp.StaticAnnotations).
 		SetSpec(&service.Spec).
 		AddSelectorsInMap(t.builtinSelector(comp)).
 		Optimize4ExternalTraffic()
@@ -219,7 +225,7 @@ func (t *componentServiceTransformer) buildService(comp *appsv1alpha1.Component,
 	return svcObj, nil
 }
 
-func (t *componentServiceTransformer) builtinSelector(comp *appsv1alpha1.Component) map[string]string {
+func (t *componentServiceTransformer) builtinSelector(comp *appsv1.Component) map[string]string {
 	selectors := map[string]string{
 		constant.AppManagedByLabelKey:   "",
 		constant.AppInstanceLabelKey:    "",
@@ -245,14 +251,14 @@ func (t *componentServiceTransformer) checkRoleSelector(synthesizeComp *componen
 	return nil
 }
 
-func (t *componentServiceTransformer) skipDefaultHeadlessSvc(synthesizeComp *component.SynthesizedComponent, service *appsv1alpha1.ComponentService) bool {
+func (t *componentServiceTransformer) skipDefaultHeadlessSvc(synthesizeComp *component.SynthesizedComponent, service *appsv1.ComponentService) bool {
 	svcName := constant.GenerateComponentServiceName(synthesizeComp.ClusterName, synthesizeComp.Name, service.ServiceName)
 	defaultHeadlessSvcName := constant.GenerateDefaultComponentHeadlessServiceName(synthesizeComp.ClusterName, synthesizeComp.Name)
 	return svcName == defaultHeadlessSvcName
 }
 
 func (t *componentServiceTransformer) createOrUpdateService(ctx graph.TransformContext, dag *graph.DAG,
-	graphCli model.GraphClient, compService *appsv1alpha1.ComponentService, service *corev1.Service, owner client.Object) error {
+	graphCli model.GraphClient, compService *appsv1.ComponentService, service *corev1.Service, owner client.Object) error {
 	var (
 		kind       string
 		podService = t.isPodService(compService)
@@ -267,21 +273,76 @@ func (t *componentServiceTransformer) createOrUpdateService(ctx graph.TransformC
 	}
 
 	if podService && kind == multiClusterServicePlacementInUnique {
-		return t.createOrUpdateServiceInUnique(ctx, dag, graphCli, service, owner)
+		// create or update service in unique, by hacking the pod placement strategy.
+		ordinal := func() int {
+			subs := strings.Split(service.GetName(), "-")
+			o, _ := strconv.Atoi(subs[len(subs)-1])
+			return o
+		}
+		multicluster.Assign(ctx.GetContext(), service, ordinal)
 	}
-	return createOrUpdateService(ctx, dag, graphCli, service, owner)
+
+	createOrUpdateService := func(service *corev1.Service) error {
+		key := types.NamespacedName{
+			Namespace: service.Namespace,
+			Name:      service.Name,
+		}
+		originSvc := &corev1.Service{}
+		if err := ctx.GetClient().Get(ctx.GetContext(), key, originSvc, inDataContext4C()); err != nil {
+			if apierrors.IsNotFound(err) {
+				graphCli.Create(dag, service, inDataContext4G())
+				return nil
+			}
+			return err
+		}
+
+		// don't update service not owned by the owner, to keep compatible with existed cluster
+		if !model.IsOwnerOf(owner, originSvc) {
+			return nil
+		}
+
+		newSvc := originSvc.DeepCopy()
+		newSvc.Spec = service.Spec
+
+		// if skip immutable check, update the service directly
+		if skipImmutableCheckForComponentService(originSvc) {
+			resolveServiceDefaultFields(&originSvc.Spec, &newSvc.Spec)
+			if !reflect.DeepEqual(originSvc, newSvc) {
+				graphCli.Update(dag, originSvc, newSvc, inDataContext4G())
+			}
+			return nil
+		}
+		// otherwise only support to update the override params defined in cluster.spec.componentSpec[].services
+
+		overrideMutableParams := func(originSvc, newSvc *corev1.Service) {
+			newSvc.Spec.Type = originSvc.Spec.Type
+			newSvc.Name = originSvc.Name
+			newSvc.Spec.Selector = originSvc.Spec.Selector
+			newSvc.Annotations = originSvc.Annotations
+		}
+
+		// modify mutable field of newSvc to check if it is overridable
+		overrideMutableParams(originSvc, newSvc)
+		if !reflect.DeepEqual(originSvc, newSvc) {
+			// other fields are immutable, we can't update the service
+			return nil
+		}
+
+		overrideMutableParams(service, newSvc)
+		if !reflect.DeepEqual(originSvc, newSvc) {
+			graphCli.Update(dag, originSvc, newSvc, inDataContext4G())
+		}
+		return nil
+	}
+	return createOrUpdateService(service)
 }
 
-func (t *componentServiceTransformer) createOrUpdateServiceInUnique(ctx graph.TransformContext, dag *graph.DAG,
-	graphCli model.GraphClient, service *corev1.Service, owner client.Object) error {
-	// hack the pod placement strategy.
-	ordinal := func() int {
-		subs := strings.Split(service.GetName(), "-")
-		o, _ := strconv.Atoi(subs[len(subs)-1])
-		return o
+func skipImmutableCheckForComponentService(svc *corev1.Service) bool {
+	if svc.Annotations == nil {
+		return false
 	}
-	multicluster.Assign(ctx.GetContext(), service, ordinal)
-	return createOrUpdateService(ctx, dag, graphCli, service, owner)
+	skip, ok := svc.Annotations[constant.SkipImmutableCheckAnnotationKey]
+	return ok && strings.ToLower(skip) == "true"
 }
 
 func generatePodNames(synthesizeComp *component.SynthesizedComponent) ([]string, error) {

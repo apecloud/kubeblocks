@@ -28,7 +28,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 )
@@ -66,8 +66,8 @@ var _ = Describe("object generation transformer test.", func() {
 				},
 			}
 			requiredKeys := []string{
-				"KB_REPLICA_COUNT",
-				"KB_0_HOSTNAME",
+				"KB_ITS_N",
+				"KB_ITS_0_HOSTNAME",
 			}
 			cfg, err := buildEnvConfigData(*its)
 			Expect(err).Should(BeNil())
@@ -80,8 +80,8 @@ var _ = Describe("object generation transformer test.", func() {
 
 			By("builds Env Config with ConsensusSet status correctly")
 			toCheckKeys := append(requiredKeys, []string{
-				"KB_LEADER",
-				"KB_FOLLOWERS",
+				"KB_ITS_LEADER",
+				"KB_ITS_FOLLOWERS",
 			}...)
 			for _, k := range toCheckKeys {
 				_, ok := cfg[k]
@@ -98,10 +98,10 @@ var _ = Describe("object generation transformer test.", func() {
 				return fmt.Sprintf("%s.%s", getPodName(its.Name, i), getHeadlessSvcName(its.Name))
 			}
 			requiredKeys := map[string]string{
-				"KB_REPLICA_COUNT": "3",
-				"KB_0_HOSTNAME":    hostname(0),
-				"KB_2_HOSTNAME":    hostname(2),
-				"KB_3_HOSTNAME":    hostname(3),
+				"KB_ITS_N":          "3",
+				"KB_ITS_0_HOSTNAME": hostname(0),
+				"KB_ITS_2_HOSTNAME": hostname(2),
+				"KB_ITS_3_HOSTNAME": hostname(3),
 			}
 			cfg, err := buildEnvConfigData(*its)
 			Expect(err).Should(BeNil())
@@ -111,7 +111,7 @@ var _ = Describe("object generation transformer test.", func() {
 			for k, v := range requiredKeys {
 				Expect(cfg).Should(HaveKeyWithValue(k, v))
 			}
-			Expect(cfg).ShouldNot(HaveKey("KB_1_HOSTNAME"))
+			Expect(cfg).ShouldNot(HaveKey("KB_ITS_1_HOSTNAME"))
 		})
 	})
 

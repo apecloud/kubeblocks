@@ -14,8 +14,8 @@ This tutorial shows how to create and connect to an ApeCloud MySQL cluster.
 
 ### Before you start
 
-* [Install KubeBlocks](./../../installation/install-kubeblocks.md).
-* Make sure the `apecloud-mysql` cluster definition is installed. If the cluster definition is not available, refer to [this doc](./../../installation/install-addons.md) to enable it first.
+* [Install KubeBlocks](../../../user_docs/installation/install-with-helm/install-kubeblocks.md).
+* Make sure the `apecloud-mysql` cluster definition is installed. If the cluster definition is not available, refer to [this doc](../../../user_docs/installation/install-with-helm/install-addons.md) to enable it first.
 
   ```bash
   kubectl get clusterdefinition apecloud-mysql
@@ -267,4 +267,4 @@ You can also port forward the service to connect to a database from your local m
 
 </Tabs>
 
-For the detailed database connection guide, refer to [Connect database](./../../connect_database/overview-of-database-connection.md).
+For the detailed database connection guide, refer to [Connect database](./../../../user_docs/connect_database/overview-of-database-connection.md).

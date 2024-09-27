@@ -20,6 +20,8 @@ package fake
 
 import (
 	clientset "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned"
+	appsv1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/apps/v1"
+	fakeappsv1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/apps/v1/fake"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/apps/v1alpha1"
 	fakeappsv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/apps/v1alpha1/fake"
 	appsv1beta1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/apps/v1beta1"
@@ -28,6 +30,10 @@ import (
 	fakedataprotectionv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/dataprotection/v1alpha1/fake"
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/extensions/v1alpha1"
 	fakeextensionsv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/extensions/v1alpha1/fake"
+	operationsv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/operations/v1alpha1"
+	fakeoperationsv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/operations/v1alpha1/fake"
+	workloadsv1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/workloads/v1"
+	fakeworkloadsv1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/workloads/v1/fake"
 	workloadsv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/workloads/v1alpha1"
 	fakeworkloadsv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/workloads/v1alpha1/fake"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -97,6 +103,11 @@ func (c *Clientset) AppsV1beta1() appsv1beta1.AppsV1beta1Interface {
 	return &fakeappsv1beta1.FakeAppsV1beta1{Fake: &c.Fake}
 }
 
+// AppsV1 retrieves the AppsV1Client
+func (c *Clientset) AppsV1() appsv1.AppsV1Interface {
+	return &fakeappsv1.FakeAppsV1{Fake: &c.Fake}
+}
+
 // DataprotectionV1alpha1 retrieves the DataprotectionV1alpha1Client
 func (c *Clientset) DataprotectionV1alpha1() dataprotectionv1alpha1.DataprotectionV1alpha1Interface {
 	return &fakedataprotectionv1alpha1.FakeDataprotectionV1alpha1{Fake: &c.Fake}
@@ -107,7 +118,17 @@ func (c *Clientset) ExtensionsV1alpha1() extensionsv1alpha1.ExtensionsV1alpha1In
 	return &fakeextensionsv1alpha1.FakeExtensionsV1alpha1{Fake: &c.Fake}
 }
 
+// OperationsV1alpha1 retrieves the OperationsV1alpha1Client
+func (c *Clientset) OperationsV1alpha1() operationsv1alpha1.OperationsV1alpha1Interface {
+	return &fakeoperationsv1alpha1.FakeOperationsV1alpha1{Fake: &c.Fake}
+}
+
 // WorkloadsV1alpha1 retrieves the WorkloadsV1alpha1Client
 func (c *Clientset) WorkloadsV1alpha1() workloadsv1alpha1.WorkloadsV1alpha1Interface {
 	return &fakeworkloadsv1alpha1.FakeWorkloadsV1alpha1{Fake: &c.Fake}
+}
+
+// WorkloadsV1 retrieves the WorkloadsV1Client
+func (c *Clientset) WorkloadsV1() workloadsv1.WorkloadsV1Interface {
+	return &fakeworkloadsv1.FakeWorkloadsV1{Fake: &c.Fake}
 }

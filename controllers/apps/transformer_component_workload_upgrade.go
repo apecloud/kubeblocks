@@ -30,9 +30,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/apis/workloads/legacy"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
@@ -62,7 +62,7 @@ func (t *componentWorkloadUpgradeTransformer) Transform(ctx graph.TransformConte
 
 	// update pod & pvc & svc labels
 	objectList := []client.ObjectList{&corev1.PersistentVolumeClaimList{}, &corev1.PodList{}, &corev1.ServiceList{}, &corev1.ConfigMapList{}}
-	ml := constant.GetComponentWellKnownLabels(synthesizeComp.ClusterName, synthesizeComp.Name)
+	ml := constant.GetCompLabels(synthesizeComp.ClusterName, synthesizeComp.Name)
 	inNS := client.InNamespace(comp.Namespace)
 	defaultHeadlessSvc := constant.GenerateDefaultComponentHeadlessServiceName(synthesizeComp.ClusterName, synthesizeComp.Name)
 	envCM := instanceset.GetEnvConfigMapName(constant.GenerateClusterComponentName(synthesizeComp.ClusterName, synthesizeComp.Name))
@@ -163,7 +163,7 @@ func legacyCRDExists(ctx context.Context, cli model.GraphClient) (bool, error) {
 	return false, err
 }
 
-func buildRevision(synthesizeComp *component.SynthesizedComponent, componentDef *appsv1alpha1.ComponentDefinition) (string, error) {
+func buildRevision(synthesizeComp *component.SynthesizedComponent, componentDef *kbappsv1.ComponentDefinition) (string, error) {
 	buildPodSpecVolumeMounts(synthesizeComp)
 	its, err := factory.BuildInstanceSet(synthesizeComp, componentDef)
 	if err != nil {

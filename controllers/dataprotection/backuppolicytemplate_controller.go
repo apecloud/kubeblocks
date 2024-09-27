@@ -23,10 +23,12 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
@@ -139,9 +141,41 @@ func (r *BackupPolicyTemplateReconciler) validateAvailable(reqCtx intctrlutil.Re
 	return nil
 }
 
+func (r *BackupPolicyTemplateReconciler) isCompatibleWith(compDef appsv1.ComponentDefinition, bpt *dpv1alpha1.BackupPolicyTemplate) bool {
+	for _, compDefRegex := range bpt.Spec.CompDefs {
+		if component.CompDefMatched(compDef.Name, compDefRegex) {
+			return true
+		}
+	}
+	return false
+}
+
+func (r *BackupPolicyTemplateReconciler) compatibleBackupPolicyTemplate(ctx context.Context, obj client.Object) []reconcile.Request {
+	compDef, ok := obj.(*appsv1.ComponentDefinition)
+	if !ok {
+		return nil
+	}
+	bpts := &dpv1alpha1.BackupPolicyTemplateList{}
+	if err := r.Client.List(ctx, bpts); err != nil {
+		return nil
+	}
+	requests := make([]reconcile.Request, 0)
+	for i := range bpts.Items {
+		if r.isCompatibleWith(*compDef, &bpts.Items[i]) {
+			requests = append(requests, reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Name: bpts.Items[i].Name,
+				},
+			})
+		}
+	}
+	return requests
+}
+
 // SetupWithManager sets up the controller with the Manager.
 func (r *BackupPolicyTemplateReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return intctrlutil.NewNamespacedControllerManagedBy(mgr).
 		For(&dpv1alpha1.BackupPolicyTemplate{}).
+		Watches(&appsv1.ComponentDefinition{}, handler.EnqueueRequestsFromMapFunc(r.compatibleBackupPolicyTemplate)).
 		Complete(r)
 }

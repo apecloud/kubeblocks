@@ -20,19 +20,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package view
 
 import (
-	"fmt"
 	"strconv"
 	"sync/atomic"
 
-	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
-	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
 type ChangeCaptureStore interface {
@@ -40,7 +40,7 @@ type ChangeCaptureStore interface {
 	Insert(object client.Object) error
 	Update(object client.Object) error
 	Delete(object client.Object) error
-	Get(objectRef *model.GVKNObjKey) (client.Object, error)
+	Get(objectRef *model.GVKNObjKey) client.Object
 	List(gvk *schema.GroupVersionKind) []client.Object
 	GetAll() map[model.GVKNObjKey]client.Object
 	GetChanges() []viewv1.ObjectChange
@@ -108,19 +108,20 @@ func (s *changeCaptureStore) Delete(object client.Object) error {
 	if !ok {
 		return nil
 	}
-	obj.SetResourceVersion(s.applyRevision())
-	delete(s.store, *objectRef)
+	if obj.GetDeletionTimestamp() == nil {
+		ts := metav1.Now()
+		obj.SetDeletionTimestamp(&ts)
+	} else {
+		delete(s.store, *objectRef)
+	}
 
+	obj.SetResourceVersion(s.applyRevision())
 	s.captureDeletion(objectRef, obj)
 	return nil
 }
 
-func (s *changeCaptureStore) Get(objectRef *model.GVKNObjKey) (client.Object, error) {
-	obj, ok := s.store[*objectRef]
-	if !ok {
-		return nil, apierrors.NewNotFound(objectRef.GroupVersion().WithResource(objectRef.Kind).GroupResource(), fmt.Sprintf("%s/%s", objectRef.Namespace, objectRef.Name))
-	}
-	return obj, nil
+func (s *changeCaptureStore) Get(objectRef *model.GVKNObjKey) client.Object {
+	return s.store[*objectRef]
 }
 
 func (s *changeCaptureStore) List(gvk *schema.GroupVersionKind) []client.Object {

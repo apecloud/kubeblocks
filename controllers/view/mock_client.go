@@ -59,9 +59,9 @@ func (c *mockClient) Get(ctx context.Context, objKey client.ObjectKey, obj clien
 		return c.realClient.Get(ctx, objKey, obj, opts...)
 	}
 	objectRef.ObjectKey = objKey
-	res, err := c.store.Get(objectRef)
-	if err != nil {
-		return err
+	res := c.store.Get(objectRef)
+	if res == nil {
+		return apierrors.NewNotFound(objectRef.GroupVersion().WithResource(objectRef.Kind).GroupResource(), fmt.Sprintf("%s/%s", objectRef.Namespace, objectRef.Name))
 	}
 	return copyObj(res, obj)
 }
@@ -114,10 +114,7 @@ func (c *mockClient) Create(ctx context.Context, obj client.Object, opts ...clie
 	if err != nil {
 		return err
 	}
-	o, err := c.store.Get(objectRef)
-	if err != nil && !apierrors.IsNotFound(err) {
-		return err
-	}
+	o := c.store.Get(objectRef)
 	if o != nil {
 		return apierrors.NewAlreadyExists(objectRef.GroupVersion().WithResource(objectRef.Kind).GroupResource(), fmt.Sprintf("%s/%s", objectRef.Namespace, objectRef.Name))
 	}
@@ -141,9 +138,9 @@ func doPatch(obj client.Object, patch client.Patch, store ChangeCaptureStore, sc
 	if err != nil {
 		return err
 	}
-	o, err := store.Get(objectRef)
-	if err != nil {
-		return err
+	o := store.Get(objectRef)
+	if o == nil {
+		return apierrors.NewNotFound(objectRef.GroupVersion().WithResource(objectRef.Kind).GroupResource(), fmt.Sprintf("%s/%s", objectRef.Namespace, objectRef.Name))
 	}
 	// Apply the patch to the existing object
 	existingObjMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(o)

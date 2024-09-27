@@ -68,7 +68,7 @@ If you want to specify a cluster version, you can first view the available versi
 ```bash
 kbcli clusterversion list
 
-kbcli cluster create --cluster-definition posrgresql --version postgresql-14.8.0
+kbcli cluster create --cluster-definition postgresql --version postgresql-14.8.0
 ```
 
 :::note

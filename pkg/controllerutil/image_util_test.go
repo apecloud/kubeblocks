@@ -59,8 +59,7 @@ var _ = Describe("image util test", func() {
 
 	It("only expands image when config does not exist", func() {
 		for _, image := range imageList {
-			newImage, err := ReplaceImageRegistry(image[0])
-			Expect(err).NotTo(HaveOccurred())
+			newImage := ReplaceImageRegistry(image[0])
 			if image[2] == "" {
 				Expect(newImage).To(Equal(fmt.Sprintf("%v/%v%v", image[1], image[3], image[4])))
 			} else {
@@ -74,8 +73,7 @@ var _ = Describe("image util test", func() {
 			DefaultRegistry: "foo.bar",
 		}
 		for _, image := range imageList {
-			newImage, err := ReplaceImageRegistry(image[0])
-			Expect(err).NotTo(HaveOccurred())
+			newImage := ReplaceImageRegistry(image[0])
 			if image[2] == "" {
 				Expect(newImage).To(Equal(fmt.Sprintf("%v/%v%v", "foo.bar", image[3], image[4])))
 			} else {
@@ -88,8 +86,7 @@ var _ = Describe("image util test", func() {
 			DefaultNamespace: "test",
 		}
 		for _, image := range imageList {
-			newImage, err := ReplaceImageRegistry(image[0])
-			Expect(err).NotTo(HaveOccurred())
+			newImage := ReplaceImageRegistry(image[0])
 			Expect(newImage).To(Equal(fmt.Sprintf("%v/%v/%v%v", "foo.bar", "test", image[3], image[4])))
 		}
 	})
@@ -130,8 +127,7 @@ var _ = Describe("image util test", func() {
 			"k8s.bar/k8s/pause:latest@sha256:1ff6c18fbef2045af6b9c16bf034cc421a29027b800e4f9b68ae9b1cb3e9ae07",
 		}
 		for i, image := range imageList {
-			newImage, err := ReplaceImageRegistry(image[0])
-			Expect(err).NotTo(HaveOccurred())
+			newImage := ReplaceImageRegistry(image[0])
 			Expect(newImage).To(Equal(expectedImage[i]))
 		}
 	})
@@ -159,8 +155,7 @@ var _ = Describe("image util test", func() {
 			"foo.bar/default/pause:latest@sha256:1ff6c18fbef2045af6b9c16bf034cc421a29027b800e4f9b68ae9b1cb3e9ae07",
 		}
 		for i, image := range imageList {
-			newImage, err := ReplaceImageRegistry(image[0])
-			Expect(err).NotTo(HaveOccurred())
+			newImage := ReplaceImageRegistry(image[0])
 			Expect(newImage).To(Equal(expectedImage[i]))
 		}
 	})

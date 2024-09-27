@@ -149,18 +149,10 @@ func (t *componentWorkloadTransformer) reconcileWorkload(synthesizedComp *compon
 	// rollback to the original image in `checkNRollbackProtoImages`.
 	// So changing registry configs won't affect existing clusters.
 	for i, container := range protoITS.Spec.Template.Spec.Containers {
-		newImage, err := intctrlutil.ReplaceImageRegistry(container.Image)
-		if err != nil {
-			return err
-		}
-		protoITS.Spec.Template.Spec.Containers[i].Image = newImage
+		protoITS.Spec.Template.Spec.Containers[i].Image = intctrlutil.ReplaceImageRegistry(container.Image)
 	}
 	for i, container := range protoITS.Spec.Template.Spec.InitContainers {
-		newImage, err := intctrlutil.ReplaceImageRegistry(container.Image)
-		if err != nil {
-			return err
-		}
-		protoITS.Spec.Template.Spec.InitContainers[i].Image = newImage
+		protoITS.Spec.Template.Spec.InitContainers[i].Image = intctrlutil.ReplaceImageRegistry(container.Image)
 	}
 
 	buildInstanceSetPlacementAnnotation(comp, protoITS)

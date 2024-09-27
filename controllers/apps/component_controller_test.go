@@ -2143,7 +2143,7 @@ var _ = Describe("Component Controller", func() {
 			setRegistryConfig()
 			By("trigger component reconcile")
 			now := time.Now().Format(time.RFC3339)
-			Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *appsv1alpha1.Component) {
+			Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
 				comp.Annotations["now"] = now
 			})()).Should(Succeed())
 
@@ -2154,7 +2154,7 @@ var _ = Describe("Component Controller", func() {
 			})).Should(Succeed())
 
 			By("replaces registry when upgrading")
-			release := appsv1alpha1.ComponentVersionRelease{
+			release := kbappsv1.ComponentVersionRelease{
 				Name:           "8.0.31",
 				ServiceVersion: "8.0.31",
 				Images: map[string]string{
@@ -2164,19 +2164,19 @@ var _ = Describe("Component Controller", func() {
 
 			By("publish a new release")
 			compVerKey := client.ObjectKeyFromObject(compVerObj)
-			Expect(testapps.GetAndChangeObj(&testCtx, compVerKey, func(compVer *appsv1alpha1.ComponentVersion) {
+			Expect(testapps.GetAndChangeObj(&testCtx, compVerKey, func(compVer *kbappsv1.ComponentVersion) {
 				compVer.Spec.Releases = append(compVer.Spec.Releases, release)
 				compVer.Spec.CompatibilityRules[0].Releases = append(compVer.Spec.CompatibilityRules[0].Releases, release.Name)
 			})()).Should(Succeed())
 
 			By("update serviceversion in cluster")
-			Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
+			Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *kbappsv1.Cluster) {
 				cluster.Spec.ComponentSpecs[0].ServiceVersion = "8.0.31"
 			})()).Should(Succeed())
 
 			By("trigger component reconcile")
 			now = time.Now().Format(time.RFC3339)
-			Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *appsv1alpha1.Component) {
+			Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
 				comp.Annotations["now"] = now
 			})()).Should(Succeed())
 

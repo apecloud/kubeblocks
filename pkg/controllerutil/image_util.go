@@ -129,10 +129,12 @@ func parseImageName(image string) (
 	return
 }
 
-func ReplaceImageRegistry(image string) (string, error) {
+func ReplaceImageRegistry(image string) string {
 	registry, namespace, repository, remainder, err := parseImageName(image)
+	// if parse has failed, return the original image. Since k8s will always error an invalid image, we
+	// don't need to deal with the error here
 	if err != nil {
-		return "", err
+		return image
 	}
 	registriesConfigCopy := GetRegistriesConfig()
 
@@ -187,7 +189,7 @@ func ReplaceImageRegistry(image string) (string, error) {
 	}
 
 	if *dstNamespace == "" {
-		return fmt.Sprintf("%v/%v%v", dstRegistry, repository, remainder), nil
+		return fmt.Sprintf("%v/%v%v", dstRegistry, repository, remainder)
 	}
-	return fmt.Sprintf("%v/%v/%v%v", dstRegistry, *dstNamespace, repository, remainder), nil
+	return fmt.Sprintf("%v/%v/%v%v", dstRegistry, *dstNamespace, repository, remainder)
 }

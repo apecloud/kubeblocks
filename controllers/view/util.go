@@ -24,11 +24,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"k8s.io/apimachinery/pkg/fields"
 	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -387,4 +387,11 @@ func flattenObject(obj client.Object) (map[string]string, error) {
 	flatMap := make(map[string]string)
 	flattenJSON(objMap, "", flatMap)
 	return flatMap, nil
+}
+
+func objectType(apiVersion, kind string) viewv1.ObjectType {
+	return viewv1.ObjectType{
+		APIVersion: apiVersion,
+		Kind:       kind,
+	}
 }

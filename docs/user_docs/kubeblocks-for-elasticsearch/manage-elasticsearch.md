@@ -19,7 +19,7 @@ KubeBlocks supports the management of Elasticsearch. This tutorial illustrates h
 
 - [Install kbcli](./../installation/install-with-kbcli/install-kbcli.md) if you want to manage your Elasticsearch cluster with kbcli.
 - Install KubeBlocks [by kbcli](./../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) or [by Helm](./../installation/install-with-helm/install-kubeblocks.md).
-- Install and enable the elasticsearch addon [by kbcli](./../installation/install-with-kbcli/install-addons.md) or [by Helm](./../installation/install-with-helm/install-addons.md).
+- Install and enable the elasticsearch Addon [by kbcli](./../installation/install-with-kbcli/install-addons.md) or [by Helm](./../installation/install-with-helm/install-addons.md).
 - To keep things isolated, create a separate namespace called `demo` throughout this tutorial.
 
   ```bash

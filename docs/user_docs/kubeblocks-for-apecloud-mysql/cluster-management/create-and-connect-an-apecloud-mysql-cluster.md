@@ -218,7 +218,7 @@ KubeBlocks supports creating two types of ApeCloud MySQL clusters: Standalone an
    kubectl get all,secret,rolebinding,serviceaccount -l app.kubernetes.io/instance=mycluster -n demo
    ```
 
-   Run the following command to view the deatils of the created ApeCloud MySQL cluster:
+   Run the following command to view the details of the created ApeCloud MySQL cluster:
 
    ```bash
    kubectl get cluster mycluster -n demo -o yaml

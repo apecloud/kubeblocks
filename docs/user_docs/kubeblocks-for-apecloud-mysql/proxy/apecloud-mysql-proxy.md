@@ -37,27 +37,27 @@ It is recommended to use kbcli to create an ApeCloud MySQL Proxy Cluster.
 
 <TabItem value="kbcli" label="kbcli" default>
 
-1. Enable the etcd addon and create an etcd cluster.
+1. Enable the etcd Addon and create an etcd cluster.
 
-   1. Install and enable the etcd addon. You need to install the etcd addon first since the etcd addon is not installed by default. Refer to [Addons installation tutorial](./../../installation/install-with-kbcli/install-addons.md) for details.
+   1. Install and enable the etcd Addon. You need to install the etcd Addon first since the etcd Addon is not installed by default. Refer to [Addons installation tutorial](./../../installation/install-with-kbcli/install-addons.md) for details.
 
        ```bash
-       # 1. Check whether the KubeBlocks addon index is added
+       # 1. Check whether the KubeBlocks Addon index is added
        kbcli addon index list
 
        # If the list is empty, add the index
        kbcli addon index add kubeblocks https://github.com/apecloud/block-index.git
 
-       # 2. Search the etcd addon
+       # 2. Search the etcd Addon
        kbcli addon search etcd
 
-       # 3. Install the etcd addon
+       # 3. Install the etcd Addon
        kbcli addon install etcd --index kubeblocks --version 0.9.0
 
-       # 4. Enable the etcd addon
+       # 4. Enable the etcd Addon
        kbcli addon enable etcd
 
-       # 5. Check whether the etcd addon is enabled.
+       # 5. Check whether the etcd Addon is enabled.
        kbcli addon list
        ```
 
@@ -136,7 +136,7 @@ It is recommended to use kbcli to create an ApeCloud MySQL Proxy Cluster.
        helm search repo kubeblocks/etcd --devel --versions
        ```
 
-   2. Install the etcd addon.
+   2. Install the etcd Addon.
 
        ```bash
        helm install etcd kubeblocks/etcd --version=v0.6.5
@@ -183,7 +183,7 @@ It is recommended to use kbcli to create an ApeCloud MySQL Proxy Cluster.
        helm search repo kubeblocks/apecloud-mysql --devel --versions
        ```
 
-   2. (Optional) If you disable the `apecloud-mysql` addon when installing KuebBlocks, run the command below to specify a version and install the cluster definition of ApeCloud MySQL. Skip this step if you install KubeBlocks with the default settings.
+   2. (Optional) If you disable the `apecloud-mysql` Addon when installing KuebBlocks, run the command below to specify a version and install the cluster definition of ApeCloud MySQL. Skip this step if you install KubeBlocks with the default settings.
 
        ```bash
        helm install myproxy kubeblocks/apecloud-mysql --version=v0.9.0
@@ -601,7 +601,7 @@ ls /vtdataroot
 
 :::note
 
-In the production environment, all monitoring addons are disabled by default when installing KubeBlocks. You can enable these addons but it is highly recommended to build your monitoring system or purchase a third-party monitoring service. For details, refer to [Monitoring](./../../observability/monitor-database.md).
+In the production environment, all monitoring Addons are disabled by default when installing KubeBlocks. You can enable these Addons but it is highly recommended to build your monitoring system or purchase a third-party monitoring service. For details, refer to [Monitoring](./../../observability/monitor-database.md).
 
 :::
 
@@ -615,7 +615,7 @@ In the production environment, all monitoring addons are disabled by default whe
    kbcli cluster update myproxy --disable-exporter=false
    ```
 
-2. View the addon list and enable the Grafana addon.
+2. View the Addon list and enable the Grafana Addon.
 
    ```bash
    kbcli addon list 
@@ -639,9 +639,9 @@ In the production environment, all monitoring addons are disabled by default whe
 
 <TabItem value="kubectl" label="kubectl">
 
-1. Enable the monitoring addons.
+1. Enable the monitoring Addons.
 
-   For the testing/demo environment, run the commands below to enable the monitoring addons provided by KubeBlocks.
+   For the testing/demo environment, run the commands below to enable the monitoring Addons provided by KubeBlocks.
 
    ```bash
    helm install prometheus kubeblocks/prometheus --namespace kb-system --create-namespace

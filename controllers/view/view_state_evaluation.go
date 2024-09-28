@@ -23,23 +23,17 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/google/cel-go/cel"
-	"github.com/google/cel-go/checker/decls"
-	"github.com/google/cel-go/common/types"
-	"golang.org/x/exp/slices"
-	"google.golang.org/protobuf/types/known/structpb"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
-
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/google/cel-go/cel"
+	"github.com/google/cel-go/checker/decls"
+	"github.com/google/cel-go/common/types"
+	"google.golang.org/protobuf/types/known/structpb"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type stateEvaluation struct {
@@ -152,103 +146,6 @@ func (s *stateEvaluation) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx
 	view.Status.CurrentState.Changes = view.Status.CurrentState.Changes[latestReconciliationCycleStart:]
 
 	return kubebuilderx.Continue, nil
-}
-
-// TODO(free6om): similar as getSecondaryObjectsOf, refactor and merge them
-func getObjectTreeWithRevision(primary client.Object, ownershipRules []OwnershipRule, store ObjectRevisionStore, revision int64, scheme *runtime.Scheme) (*viewv1.ObjectTreeNode, error) {
-	// find matched rules
-	var matchedRules []*OwnershipRule
-	for i := range ownershipRules {
-		rule := &ownershipRules[i]
-		gvk, err := objectTypeToGVK(&rule.Primary)
-		if err != nil {
-			return nil, err
-		}
-		primaryGVK, err := apiutil.GVKForObject(primary, scheme)
-		if err != nil {
-			return nil, err
-		}
-		if *gvk == primaryGVK {
-			matchedRules = append(matchedRules, rule)
-		}
-	}
-
-	reference, err := getObjectReference(primary, scheme)
-	if err != nil {
-		return nil, err
-	}
-	tree := &viewv1.ObjectTreeNode{
-		Primary: *reference,
-	}
-	// traverse rules, build subtree
-	var secondaries []client.Object
-	for _, rule := range matchedRules {
-		for _, ownedResource := range rule.OwnedResources {
-			gvk, err := objectTypeToGVK(&ownedResource.Secondary)
-			if err != nil {
-				return nil, err
-			}
-			opts, err := parseListOptions(primary, &ownedResource.Criteria)
-			if err != nil {
-				return nil, err
-			}
-			objects, err := getObjectsByRevision(gvk, store, revision, opts...)
-			if err != nil {
-				return nil, err
-			}
-			secondaries = append(secondaries, objects...)
-		}
-	}
-	for _, secondary := range secondaries {
-		subTree, err := getObjectTreeWithRevision(secondary, ownershipRules, store, revision, scheme)
-		if err != nil {
-			return nil, err
-		}
-		tree.Secondaries = append(tree.Secondaries, subTree)
-		slices.SortStableFunc(tree.Secondaries, func(a, b *viewv1.ObjectTreeNode) bool {
-			return getObjectReferenceString(a) < getObjectReferenceString(b)
-		})
-	}
-
-	return tree, nil
-}
-
-func objectMatched(object client.Object, opts ...client.ListOption) bool {
-	listOptions := &client.ListOptions{}
-	listOptions.ApplyOptions(opts)
-	// default match
-	if listOptions.LabelSelector == nil && listOptions.FieldSelector == nil {
-		return true
-	}
-	if listOptions.LabelSelector != nil && listOptions.LabelSelector.Matches(labels.Set(object.GetLabels())) {
-		return true
-	}
-	if listOptions.FieldSelector != nil &&
-		listOptions.FieldSelector.Matches(fields.Set{"metadata.name": object.GetName()}) {
-		return true
-	}
-	return false
-}
-
-func getObjectsByRevision(gvk *schema.GroupVersionKind, store ObjectRevisionStore, revision int64, opts ...client.ListOption) ([]client.Object, error) {
-	objectMap := store.List(gvk)
-
-	var matchedObjects []client.Object
-	for _, revisionMap := range objectMap {
-		rev := int64(-1)
-		for r, object := range revisionMap {
-			if !objectMatched(object, opts...) {
-				continue
-			}
-			if rev < r && r <= revision {
-				rev = r
-			}
-		}
-		if rev > -1 {
-			matchedObjects = append(matchedObjects, revisionMap[rev])
-		}
-	}
-	return matchedObjects, nil
 }
 
 func doStateEvaluation(object client.Object, expression viewv1.StateEvaluationExpression) (bool, error) {

@@ -22,11 +22,8 @@ package view
 import (
 	"container/list"
 	"context"
-	"fmt"
-	"strings"
 
 	"github.com/go-logr/logr"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
@@ -112,7 +109,12 @@ func (f *rootFinder) findRoots(ctx context.Context, object client.Object) []reco
 					return nil
 				}
 				for _, owner := range objectList {
-					if ownedBy(owner, obj, resource) {
+					opts, err := parseQueryOptions(owner, &resource.Criteria)
+					if err != nil {
+						f.logger.Error(err, "parse query options failed: %s", resource.Criteria)
+						return nil
+					}
+					if opts.match(obj) {
 						waitingList.PushBack(owner)
 					}
 				}
@@ -125,7 +127,7 @@ func (f *rootFinder) findRoots(ctx context.Context, object client.Object) []reco
 		clusterKeys.Insert(client.ObjectKeyFromObject(root))
 	}
 
-	// TODO(free6om): list all view objects, filter by result Cluster objects.
+	// list all view objects, filter by result Cluster objects.
 	viewList := &viewv1.ReconciliationViewList{}
 	if err := f.List(ctx, viewList); err != nil {
 		f.logger.Error(err, "list view failed", "")
@@ -149,68 +151,6 @@ func (f *rootFinder) findRoots(ctx context.Context, object client.Object) []reco
 	}
 
 	return requests
-}
-
-func ownedBy(owner client.Object, obj client.Object, ownedResource OwnedResource) bool {
-	opts, err := parseListOptions(owner, &ownedResource.Criteria)
-	if err != nil {
-		return false
-	}
-	// TODO(free6om): OwnerReference
-	return objectMatched(obj, opts...)
-}
-
-func parseLabels(obj client.Object, criteria map[string]string) map[string]string {
-	labels := make(map[string]string, len(criteria))
-	for k, v := range criteria {
-		value := strings.ReplaceAll(v, "$(primary.name)", obj.GetName())
-		value = strings.ReplaceAll(value, "$(primary)", obj.GetLabels()[k])
-		labels[k] = value
-	}
-	return labels
-}
-
-func parseField(obj client.Object, fieldPath string) (any, error) {
-	unstructuredObj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert to unstructured: %w", err)
-	}
-
-	// Use the field path to find the field
-	pathParts := strings.Split(fieldPath, ".")
-	current := unstructuredObj
-	for i := 0; i < len(pathParts)-1; i++ {
-		part := pathParts[i]
-		if next, ok := current[part].(map[string]interface{}); ok {
-			current = next
-		} else {
-			return nil, fmt.Errorf("field '%s' does not exist", fieldPath)
-		}
-	}
-	last := len(pathParts) - 1
-	return current[pathParts[last]], nil
-}
-
-// parseSelector checks if a field exists in the object and returns it if it's a metav1.LabelSelector
-func parseSelector(obj client.Object, fieldPath string) (map[string]string, error) {
-	f, err := parseField(obj, fieldPath)
-	if err != nil {
-		return nil, err
-	}
-	selectorField, ok := f.(map[string]interface{})
-	if !ok {
-		return nil, fmt.Errorf("field '%s' does not exist", fieldPath)
-	}
-
-	// Attempt to convert the final field to a LabelSelector
-	// TODO(free6om): handle metav1.LabelSelector
-	//labelSelector := &metav1.LabelSelector{}
-	labelSelector := make(map[string]string)
-	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(selectorField, labelSelector); err != nil {
-		return nil, fmt.Errorf("failed to parse as LabelSelector: %w", err)
-	}
-
-	return labelSelector, nil
 }
 
 func NewObjectTreeRootFinder(cli client.Client) ObjectTreeRootFinder {

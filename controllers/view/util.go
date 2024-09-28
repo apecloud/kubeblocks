@@ -132,7 +132,7 @@ func getObjectReference(obj client.Object, scheme *runtime.Scheme) (*corev1.Obje
 // getObjectsByGVK gets all objects of a specific GVK.
 // why not merge matchingFields into opts:
 // fields.Selector needs the underlying cache to build an Indexer on the specific field, which is too heavy.
-func getObjectsByGVK(ctx context.Context, cli client.Client, gvk *schema.GroupVersionKind, matchingFields []client.MatchingFields, opts ...client.ListOption) ([]client.Object, error) {
+func getObjectsByGVK(ctx context.Context, cli client.Client, gvk *schema.GroupVersionKind, opts *queryOptions) ([]client.Object, error) {
 	runtimeObjectList, err := cli.Scheme().New(schema.GroupVersionKind{
 		Group:   gvk.Group,
 		Version: gvk.Version,
@@ -145,7 +145,11 @@ func getObjectsByGVK(ctx context.Context, cli client.Client, gvk *schema.GroupVe
 	if !ok {
 		return nil, fmt.Errorf("list object is not a client.ObjectList for GVK %s", gvk)
 	}
-	if err = cli.List(ctx, objectList, opts...); err != nil {
+	var ml client.MatchingLabels
+	if opts != nil && opts.matchLabels != nil {
+		ml = opts.matchLabels
+	}
+	if err = cli.List(ctx, objectList, ml); err != nil {
 		return nil, err
 	}
 	runtimeObjects, err := meta.ExtractList(objectList)
@@ -154,8 +158,8 @@ func getObjectsByGVK(ctx context.Context, cli client.Client, gvk *schema.GroupVe
 	}
 	var objects []client.Object
 	listOptions := &client.ListOptions{}
-	for _, mf := range matchingFields {
-		mf.ApplyToList(listOptions)
+	if opts != nil && opts.matchFields != nil {
+		opts.matchFields.ApplyToList(listOptions)
 	}
 	for _, object := range runtimeObjects {
 		o, ok := object.(client.Object)
@@ -165,10 +169,25 @@ func getObjectsByGVK(ctx context.Context, cli client.Client, gvk *schema.GroupVe
 		if listOptions.FieldSelector != nil && !listOptions.FieldSelector.Matches(fields.Set{"metadata.name": o.GetName()}) {
 			continue
 		}
+		if opts != nil && opts.matchOwner != nil && !matchOwnerOf(opts.matchOwner, o) {
+			continue
+		}
 		objects = append(objects, o)
 	}
 
 	return objects, nil
+}
+
+func matchOwnerOf(owner *matchOwner, o client.Object) bool {
+	for _, ref := range o.GetOwnerReferences() {
+		if ref.UID == owner.ownerUID {
+			if !owner.controller {
+				return true
+			}
+			return ref.Controller != nil && *ref.Controller
+		}
+	}
+	return false
 }
 
 func parseRevision(revisionStr string) int64 {
@@ -179,49 +198,41 @@ func parseRevision(revisionStr string) int64 {
 	return revision
 }
 
-func parseListOptions(obj client.Object, criteria *OwnershipCriteria) ([]client.ListOption, error) {
-	opts, err := parseMatchingLabels(obj, criteria)
+func parseField(obj client.Object, fieldPath string) (map[string]interface{}, error) {
+	unstructuredObj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert to unstructured: %w", err)
+	}
+
+	// Use the field path to find the field
+	pathParts := strings.Split(fieldPath, ".")
+	current := unstructuredObj
+	for i := 0; i < len(pathParts); i++ {
+		part := pathParts[i]
+		if next, ok := current[part].(map[string]interface{}); ok {
+			current = next
+		} else {
+			return nil, fmt.Errorf("field '%s' does not exist", fieldPath)
+		}
+	}
+	return current, nil
+}
+
+// parseSelector checks if a field exists in the object and returns it if it's a metav1.LabelSelector
+func parseSelector(obj client.Object, fieldPath string) (map[string]string, error) {
+	selectorField, err := parseField(obj, fieldPath)
 	if err != nil {
 		return nil, err
 	}
-	mfs, err := parseMatchingFields(obj, criteria)
-	if err != nil {
-		return nil, err
+	// Attempt to convert the final field to a LabelSelector
+	// TODO(free6om): handle metav1.LabelSelector
+	//labelSelector := &metav1.LabelSelector{}
+	labelSelector := make(map[string]string)
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(selectorField, labelSelector); err != nil {
+		return nil, fmt.Errorf("failed to parse as LabelSelector: %w", err)
 	}
-	for _, mf := range mfs {
-		opts = append(opts, mf)
-	}
-	return opts, nil
-}
 
-func parseMatchingLabels(obj client.Object, criteria *OwnershipCriteria) ([]client.ListOption, error) {
-	var opts []client.ListOption
-	if criteria.SelectorCriteria != nil {
-		ml, err := parseSelector(obj, criteria.SelectorCriteria.Path)
-		if err != nil {
-			return nil, err
-		}
-		opts = append(opts, client.MatchingLabels(ml))
-	}
-	if criteria.LabelCriteria != nil {
-		ml := parseLabels(obj, criteria.LabelCriteria)
-		opts = append(opts, client.MatchingLabels(ml))
-	}
-	return opts, nil
-}
-
-func parseMatchingFields(obj client.Object, criteria *OwnershipCriteria) ([]client.MatchingFields, error) {
-	if criteria.SpecifiedNameCriteria != nil {
-		fieldMap, err := flattenObject(obj)
-		if err != nil {
-			return nil, err
-		}
-		name, ok := fieldMap[criteria.SpecifiedNameCriteria.Path]
-		if ok {
-			return []client.MatchingFields{{"metadata.name": name}}, nil
-		}
-	}
-	return nil, nil
+	return labelSelector, nil
 }
 
 func getObjectTreeFromCache(ctx context.Context, cli client.Client, primary client.Object, ownershipRules []OwnershipRule) (*viewv1.ObjectTreeNode, error) {
@@ -256,7 +267,7 @@ func getObjectTreeFromCache(ctx context.Context, cli client.Client, primary clie
 		}
 	}
 	// build subtree
-	secondaries, err := getSecondaryObjectsOf(ctx, cli, primary, matchedRules)
+	secondaries, err := getSecondaryObjects(ctx, cli, primary, matchedRules)
 	if err != nil {
 		return nil, err
 	}
@@ -300,7 +311,7 @@ func getObjectsFromCache(ctx context.Context, cli client.Client, root *kbappsv1.
 		}
 		objectMap[*objKey] = obj
 
-		secondaries, err := getSecondaryObjectsOf(ctx, cli, obj, ownershipRules)
+		secondaries, err := getSecondaryObjects(ctx, cli, obj, ownershipRules)
 		if err != nil {
 			return nil, err
 		}
@@ -311,7 +322,7 @@ func getObjectsFromCache(ctx context.Context, cli client.Client, root *kbappsv1.
 	return objectMap, nil
 }
 
-func getSecondaryObjectsOf(ctx context.Context, cli client.Client, obj client.Object, ownershipRules []OwnershipRule) ([]client.Object, error) {
+func getSecondaryObjects(ctx context.Context, cli client.Client, obj client.Object, ownershipRules []OwnershipRule) ([]client.Object, error) {
 	objGVK, err := apiutil.GVKForObject(obj, cli.Scheme())
 	if err != nil {
 		return nil, err
@@ -336,15 +347,11 @@ func getSecondaryObjectsOf(ctx context.Context, cli client.Client, obj client.Ob
 			if err != nil {
 				return nil, err
 			}
-			opts, err := parseMatchingLabels(obj, &ownedResource.Criteria)
+			opts, err := parseQueryOptions(obj, &ownedResource.Criteria)
 			if err != nil {
 				return nil, err
 			}
-			mf, err := parseMatchingFields(obj, &ownedResource.Criteria)
-			if err != nil {
-				return nil, err
-			}
-			objects, err := getObjectsByGVK(ctx, cli, gvk, mf, opts...)
+			objects, err := getObjectsByGVK(ctx, cli, gvk, opts)
 			if err != nil {
 				return nil, err
 			}
@@ -353,6 +360,43 @@ func getSecondaryObjectsOf(ctx context.Context, cli client.Client, obj client.Ob
 	}
 
 	return secondaries, nil
+}
+
+func parseQueryOptions(primary client.Object, criteria *OwnershipCriteria) (*queryOptions, error) {
+	opts := &queryOptions{}
+	if criteria.SelectorCriteria != nil {
+		ml, err := parseSelector(primary, criteria.SelectorCriteria.Path)
+		if err != nil {
+			return nil, err
+		}
+		opts.matchLabels = ml
+	}
+	if criteria.LabelCriteria != nil {
+		labels := make(map[string]string, len(criteria.LabelCriteria))
+		for k, v := range criteria.LabelCriteria {
+			value := strings.ReplaceAll(v, "$(primary.name)", primary.GetName())
+			value = strings.ReplaceAll(value, "$(primary)", primary.GetLabels()[k])
+			labels[k] = value
+		}
+		opts.matchLabels = labels
+	}
+	if criteria.SpecifiedNameCriteria != nil {
+		fieldMap, err := flattenObject(primary)
+		if err != nil {
+			return nil, err
+		}
+		name, ok := fieldMap[criteria.SpecifiedNameCriteria.Path]
+		if ok {
+			opts.matchFields = client.MatchingFields{"metadata.name": name}
+		}
+	}
+	if criteria.Validation != NoValidation {
+		opts.matchOwner = &matchOwner{
+			ownerUID:   primary.GetUID(),
+			controller: criteria.Validation == ControllerValidation,
+		}
+	}
+	return opts, nil
 }
 
 func specMapToJSON(spec interface{}) []byte {
@@ -413,7 +457,6 @@ func objectType(apiVersion, kind string) viewv1.ObjectType {
 		Kind:       kind,
 	}
 }
-
 
 func buildObjectSummaries(initialObjectMap, newObjectMap map[model.GVKNObjKey]client.Object) []viewv1.ObjectSummary {
 	initialObjectSet, newObjectSet := sets.KeySet(initialObjectMap), sets.KeySet(newObjectMap)
@@ -567,4 +610,92 @@ func getObjectsFromTree(tree *viewv1.ObjectTreeNode, store ObjectRevisionStore, 
 		}
 	}
 	return objectMap, nil
+}
+
+
+// TODO(free6om): similar as getSecondaryObjects, refactor and merge them
+func getObjectTreeWithRevision(primary client.Object, ownershipRules []OwnershipRule, store ObjectRevisionStore, revision int64, scheme *runtime.Scheme) (*viewv1.ObjectTreeNode, error) {
+	// find matched rules
+	var matchedRules []*OwnershipRule
+	for i := range ownershipRules {
+		rule := &ownershipRules[i]
+		gvk, err := objectTypeToGVK(&rule.Primary)
+		if err != nil {
+			return nil, err
+		}
+		primaryGVK, err := apiutil.GVKForObject(primary, scheme)
+		if err != nil {
+			return nil, err
+		}
+		if *gvk == primaryGVK {
+			matchedRules = append(matchedRules, rule)
+		}
+	}
+
+	reference, err := getObjectReference(primary, scheme)
+	if err != nil {
+		return nil, err
+	}
+	tree := &viewv1.ObjectTreeNode{
+		Primary: *reference,
+	}
+	// traverse rules, build subtree
+	var secondaries []client.Object
+	for _, rule := range matchedRules {
+		for _, ownedResource := range rule.OwnedResources {
+			gvk, err := objectTypeToGVK(&ownedResource.Secondary)
+			if err != nil {
+				return nil, err
+			}
+			objects := getObjectsByRevision(gvk, store, revision)
+			objects, err = filterByCriteria(primary, objects, &ownedResource.Criteria)
+			if err != nil {
+				return nil, err
+			}
+			secondaries = append(secondaries, objects...)
+		}
+	}
+	for _, secondary := range secondaries {
+		subTree, err := getObjectTreeWithRevision(secondary, ownershipRules, store, revision, scheme)
+		if err != nil {
+			return nil, err
+		}
+		tree.Secondaries = append(tree.Secondaries, subTree)
+		slices.SortStableFunc(tree.Secondaries, func(a, b *viewv1.ObjectTreeNode) bool {
+			return getObjectReferenceString(a) < getObjectReferenceString(b)
+		})
+	}
+
+	return tree, nil
+}
+
+func filterByCriteria(primary client.Object, objects []client.Object, criteria *OwnershipCriteria) ([]client.Object, error) {
+	var matchedObjects []client.Object
+	opts, err := parseQueryOptions(primary, criteria)
+	if err != nil {
+		return nil, err
+	}
+	for _, object := range objects {
+		if opts.match(object) {
+			matchedObjects = append(matchedObjects, object)
+		}
+	}
+	return matchedObjects, nil
+}
+
+func getObjectsByRevision(gvk *schema.GroupVersionKind, store ObjectRevisionStore, revision int64) []client.Object {
+	objectMap := store.List(gvk)
+	var matchedObjects []client.Object
+	for _, revisionMap := range objectMap {
+		rev := int64(-1)
+		for r := range revisionMap {
+			if rev < r && r <= revision {
+				rev = r
+			}
+		}
+		if rev > -1 {
+			matchedObjects = append(matchedObjects, revisionMap[rev])
+		}
+	}
+	return matchedObjects
 }

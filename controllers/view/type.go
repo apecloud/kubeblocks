@@ -29,9 +29,13 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/discovery"
 	"k8s.io/utils/pointer"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -40,7 +44,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	"github.com/apecloud/kubeblocks/pkg/dataprotection/types"
+	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 )
 
 var (
@@ -72,7 +76,7 @@ var (
 	backupCriteria = OwnershipCriteria{
 		LabelCriteria: map[string]string{
 			constant.AppInstanceLabelKey:  "$(primary)",
-			constant.AppManagedByLabelKey: types.AppName,
+			constant.AppManagedByLabelKey: dptypes.AppName,
 		},
 	}
 
@@ -143,11 +147,11 @@ var (
 					Criteria:  componentCriteria,
 				},
 				{
-					Secondary: objectType(dpv1alpha1.SchemeGroupVersion.String(), types.BackupKind),
+					Secondary: objectType(dpv1alpha1.SchemeGroupVersion.String(), dptypes.BackupKind),
 					Criteria:  componentCriteria,
 				},
 				{
-					Secondary: objectType(dpv1alpha1.SchemeGroupVersion.String(), types.RestoreKind),
+					Secondary: objectType(dpv1alpha1.SchemeGroupVersion.String(), dptypes.RestoreKind),
 					Criteria:  componentCriteria,
 				},
 				{
@@ -187,7 +191,7 @@ var (
 			},
 		},
 		{
-			Primary: objectType(dpv1alpha1.SchemeGroupVersion.String(), types.BackupKind),
+			Primary: objectType(dpv1alpha1.SchemeGroupVersion.String(), dptypes.BackupKind),
 			OwnedResources: []OwnedResource{
 				{
 					Secondary: objectType(batchv1.SchemeGroupVersion.String(), constant.JobKind),
@@ -208,7 +212,7 @@ var (
 			},
 		},
 		{
-			Primary: objectType(dpv1alpha1.SchemeGroupVersion.String(), types.RestoreKind),
+			Primary: objectType(dpv1alpha1.SchemeGroupVersion.String(), dptypes.RestoreKind),
 			OwnedResources: []OwnedResource{
 				{
 					Secondary: objectType(batchv1.SchemeGroupVersion.String(), constant.JobKind),
@@ -381,3 +385,39 @@ const (
 	// NoValidation means no validation is performed on the OwnerReference.
 	NoValidation ValidationType = "None"
 )
+
+type matchOwner struct {
+	controller bool
+	ownerUID   types.UID
+}
+
+type queryOptions struct {
+	matchLabels client.MatchingLabels
+	matchFields client.MatchingFields
+	matchOwner  *matchOwner
+}
+
+func (q *queryOptions) match(o client.Object) bool {
+	listOptions := &client.ListOptions{}
+	if q.matchLabels != nil {
+		q.matchLabels.ApplyToList(listOptions)
+	}
+	if q.matchFields != nil {
+		q.matchFields.ApplyToList(listOptions)
+	}
+	// default match
+	if listOptions.LabelSelector == nil && listOptions.FieldSelector == nil && q.matchOwner == nil {
+		return true
+	}
+	if listOptions.LabelSelector != nil && listOptions.LabelSelector.Matches(labels.Set(o.GetLabels())) {
+		return true
+	}
+	if listOptions.FieldSelector != nil &&
+		listOptions.FieldSelector.Matches(fields.Set{"metadata.name": o.GetName()}) {
+		return true
+	}
+	if q.matchOwner != nil && matchOwnerOf(q.matchOwner, o) {
+		return true
+	}
+	return false
+}

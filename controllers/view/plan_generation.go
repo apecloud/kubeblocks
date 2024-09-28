@@ -31,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/rand"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
@@ -180,7 +179,7 @@ func (g *planGenerator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.R
 	dryRunResult.Plan = store.GetChanges()
 	dryRunResult.PlanSummary.SpecChange = specChange
 	newObjectMap := store.GetAll()
-	dryRunResult.PlanSummary.ObjectSummaries = buildObjectSummaries(sets.KeySet(initialObjectMap), sets.KeySet(newObjectMap), initialObjectMap, newObjectMap)
+	dryRunResult.PlanSummary.ObjectSummaries = buildObjectSummaries(initialObjectMap, newObjectMap)
 
 	// TODO(free6om): put the plan generation loop into a timeout goroutine
 

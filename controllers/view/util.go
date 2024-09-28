@@ -24,17 +24,20 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"golang.org/x/exp/slices"
 	"strconv"
 	"strings"
 
+	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
@@ -283,9 +286,8 @@ func getObjectReferenceString(n *viewv1.ObjectTreeNode) string {
 	}, "")
 }
 
-func getObjectsFromCache(ctx context.Context, cli client.Client, root *kbappsv1.Cluster, ownershipRules []OwnershipRule) (sets.Set[model.GVKNObjKey], map[model.GVKNObjKey]client.Object, error) {
+func getObjectsFromCache(ctx context.Context, cli client.Client, root *kbappsv1.Cluster, ownershipRules []OwnershipRule) (map[model.GVKNObjKey]client.Object, error) {
 	objectMap := make(map[model.GVKNObjKey]client.Object)
-	objectSet := sets.New[model.GVKNObjKey]()
 	waitingList := list.New()
 	waitingList.PushFront(root)
 	for waitingList.Len() > 0 {
@@ -294,20 +296,19 @@ func getObjectsFromCache(ctx context.Context, cli client.Client, root *kbappsv1.
 		obj, _ := e.Value.(client.Object)
 		objKey, err := getObjectRef(obj, cli.Scheme())
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
-		objectSet.Insert(*objKey)
 		objectMap[*objKey] = obj
 
 		secondaries, err := getSecondaryObjectsOf(ctx, cli, obj, ownershipRules)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 		for _, secondary := range secondaries {
 			waitingList.PushBack(secondary)
 		}
 	}
-	return objectSet, objectMap, nil
+	return objectMap, nil
 }
 
 func getSecondaryObjectsOf(ctx context.Context, cli client.Client, obj client.Object, ownershipRules []OwnershipRule) ([]client.Object, error) {
@@ -411,4 +412,159 @@ func objectType(apiVersion, kind string) viewv1.ObjectType {
 		APIVersion: apiVersion,
 		Kind:       kind,
 	}
+}
+
+
+func buildObjectSummaries(initialObjectMap, newObjectMap map[model.GVKNObjKey]client.Object) []viewv1.ObjectSummary {
+	initialObjectSet, newObjectSet := sets.KeySet(initialObjectMap), sets.KeySet(newObjectMap)
+	createSet := newObjectSet.Difference(initialObjectSet)
+	updateSet := newObjectSet.Intersection(initialObjectSet)
+	deleteSet := initialObjectSet.Difference(newObjectSet)
+	summaryMap := make(map[viewv1.ObjectType]*viewv1.ObjectSummary)
+	doCount := func(s sets.Set[model.GVKNObjKey], summaryUpdater func(objectRef *model.GVKNObjKey, summary *viewv1.ObjectSummary)) {
+		for objectRef := range s {
+			key := *objectRefToType(&objectRef)
+			summary, ok := summaryMap[key]
+			if !ok {
+				summary = &viewv1.ObjectSummary{
+					ObjectType: key,
+					Total:      0,
+				}
+				summaryMap[key] = summary
+			}
+			if summary.ChangeSummary == nil {
+				summary.ChangeSummary = &viewv1.ObjectChangeSummary{}
+			}
+			summaryUpdater(&objectRef, summary)
+		}
+	}
+	doCount(createSet, func(_ *model.GVKNObjKey, summary *viewv1.ObjectSummary) {
+		summary.Total += 1
+		if summary.ChangeSummary.Added == nil {
+			summary.ChangeSummary.Added = pointer.Int32(0)
+		}
+		*summary.ChangeSummary.Added += 1
+	})
+	doCount(updateSet, func(objectRef *model.GVKNObjKey, summary *viewv1.ObjectSummary) {
+		initialObj, _ := initialObjectMap[*objectRef]
+		newObj, _ := newObjectMap[*objectRef]
+		summary.Total += 1
+		if initialObj != nil && newObj != nil && initialObj.GetResourceVersion() == newObj.GetResourceVersion() {
+			return
+		}
+		if summary.ChangeSummary.Updated == nil {
+			summary.ChangeSummary.Updated = pointer.Int32(0)
+		}
+		*summary.ChangeSummary.Updated += 1
+	})
+	doCount(deleteSet, func(_ *model.GVKNObjKey, summary *viewv1.ObjectSummary) {
+		if summary.ChangeSummary.Deleted == nil {
+			summary.ChangeSummary.Deleted = pointer.Int32(0)
+		}
+		*summary.ChangeSummary.Deleted += 1
+	})
+
+	var objectSummaries []viewv1.ObjectSummary
+	for _, summary := range summaryMap {
+		objectSummaries = append(objectSummaries, *summary)
+	}
+	slices.SortStableFunc(objectSummaries, func(a, b viewv1.ObjectSummary) bool {
+		if a.ObjectType.APIVersion != b.ObjectType.APIVersion {
+			return a.ObjectType.APIVersion < b.ObjectType.APIVersion
+		}
+		return a.ObjectType.Kind < b.ObjectType.Kind
+	})
+
+	return objectSummaries
+}
+
+func buildChanges(objKeySet sets.Set[model.GVKNObjKey], oldObjectMap, newObjectMap map[model.GVKNObjKey]client.Object, changeType viewv1.ObjectChangeType, i18nResource *corev1.ConfigMap, defaultLocale, locale *string) []viewv1.ObjectChange {
+	var changes []viewv1.ObjectChange
+	for key := range objKeySet {
+		var oldObj, newObj client.Object
+		if oldObjectMap != nil {
+			oldObj = oldObjectMap[key]
+		}
+		if newObjectMap != nil {
+			newObj = newObjectMap[key]
+		}
+		obj := newObj
+		if changeType == viewv1.ObjectDeletionType {
+			obj = oldObj
+		}
+		if changeType == viewv1.ObjectUpdateType &&
+			(oldObj == nil || newObj == nil || oldObj.GetResourceVersion() == newObj.GetResourceVersion()) {
+			continue
+		}
+		change := viewv1.ObjectChange{
+			ObjectReference: *objectRefToReference(key, obj.GetUID(), obj.GetResourceVersion()),
+			ChangeType:      changeType,
+			// TODO(free6om): EventAttributes
+			// TODO(free6om): State
+			Revision:    parseRevision(obj.GetResourceVersion()),
+			Timestamp:   func() *metav1.Time { t := metav1.Now(); return &t }(),
+			Description: formatDescription(oldObj, newObj, changeType, i18nResource, getStringWithDefault(defaultLocale, "en")),
+		}
+		if locale != nil {
+			change.LocalDescription = pointer.String(formatDescription(oldObj, newObj, changeType, i18nResource, *locale))
+		}
+		changes = append(changes, change)
+	}
+	return changes
+}
+
+func getStringWithDefault(ptr *string, defaultStr string) string {
+	if ptr != nil && len(*ptr) > 0 {
+		return *ptr
+	}
+	return defaultStr
+}
+
+func formatDescription(oldObj, newObj client.Object, changeType viewv1.ObjectChangeType, i18nResource *corev1.ConfigMap, locale string) string {
+	if locale == "" {
+		return ""
+	}
+	// TODO(free6om): finish me
+	// TODO(free6om): handle nil oldObj(that lost after controller restarted)
+	return string(changeType)
+}
+
+func getObjectsFromTree(tree *viewv1.ObjectTreeNode, store ObjectRevisionStore, scheme *runtime.Scheme) (map[model.GVKNObjKey]client.Object, error) {
+	if tree == nil {
+		return nil, nil
+	}
+	objectRef, err := objectReferenceToRef(&tree.Primary)
+	if err != nil {
+		return nil, err
+	}
+	revision := parseRevision(tree.Primary.ResourceVersion)
+	obj, err := store.Get(objectRef, revision)
+	if err != nil && !apierrors.IsNotFound(err) {
+		return nil, err
+	}
+	objectMap := make(map[model.GVKNObjKey]client.Object)
+	// cache loss after controller restarted, mock one
+	if obj == nil {
+		ro, err := scheme.New(objectRef.GroupVersionKind)
+		if err != nil {
+			return nil, err
+		}
+		obj, _ = ro.(client.Object)
+		obj.SetNamespace(tree.Primary.Namespace)
+		obj.SetName(tree.Primary.Name)
+		obj.SetResourceVersion(tree.Primary.ResourceVersion)
+		obj.SetUID(tree.Primary.UID)
+	}
+	objectMap[*objectRef] = obj
+
+	for _, treeNode := range tree.Secondaries {
+		secondaryMap, err := getObjectsFromTree(treeNode, store, scheme)
+		if err != nil {
+			return nil, err
+		}
+		for key, object := range secondaryMap {
+			objectMap[key] = object
+		}
+	}
+	return objectMap, nil
 }

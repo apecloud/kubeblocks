@@ -45,7 +45,7 @@ import (
 type stateEvaluation struct {
 	ctx    context.Context
 	reader client.Reader
-	store  ObjectStore
+	store  ObjectRevisionStore
 	scheme *runtime.Scheme
 }
 
@@ -133,7 +133,7 @@ func (s *stateEvaluation) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx
 
 	// build new InitialObjectTree
 	var err error
-	view.Status.InitialObjectTree, err = getObjectTreeWithRevision(root, KBOwnershipRules, s.store, view.Status.CurrentState.Changes[latestReconciliationCycleStart].Revision, s.scheme)
+	view.Status.InitialObjectTree, err = getObjectTreeWithRevision(root, kbOwnershipRules, s.store, view.Status.CurrentState.Changes[latestReconciliationCycleStart].Revision, s.scheme)
 	if err != nil {
 		return kubebuilderx.Commit, err
 	}
@@ -155,7 +155,7 @@ func (s *stateEvaluation) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx
 }
 
 // TODO(free6om): similar as getSecondaryObjectsOf, refactor and merge them
-func getObjectTreeWithRevision(primary client.Object, ownershipRules []OwnershipRule, store ObjectStore, revision int64, scheme *runtime.Scheme) (*viewv1.ObjectTreeNode, error) {
+func getObjectTreeWithRevision(primary client.Object, ownershipRules []OwnershipRule, store ObjectRevisionStore, revision int64, scheme *runtime.Scheme) (*viewv1.ObjectTreeNode, error) {
 	// find matched rules
 	var matchedRules []*OwnershipRule
 	for i := range ownershipRules {
@@ -230,7 +230,7 @@ func objectMatched(object client.Object, opts ...client.ListOption) bool {
 	return false
 }
 
-func getObjectsByRevision(gvk *schema.GroupVersionKind, store ObjectStore, revision int64, opts ...client.ListOption) ([]client.Object, error) {
+func getObjectsByRevision(gvk *schema.GroupVersionKind, store ObjectRevisionStore, revision int64, opts ...client.ListOption) ([]client.Object, error) {
 	objectMap := store.List(gvk)
 
 	var matchedObjects []client.Object
@@ -306,12 +306,12 @@ func doStateEvaluation(object client.Object, expression viewv1.StateEvaluationEx
 	return result, nil
 }
 
-func viewStateEvaluation(ctx context.Context, reader client.Reader, store ObjectStore, scheme *runtime.Scheme) kubebuilderx.Reconciler {
+func viewStateEvaluation(ctx context.Context, reader client.Reader, scheme *runtime.Scheme, store ObjectRevisionStore) kubebuilderx.Reconciler {
 	return &stateEvaluation{
 		ctx:    ctx,
 		reader: reader,
-		store:  store,
 		scheme: scheme,
+		store:  store,
 	}
 }
 

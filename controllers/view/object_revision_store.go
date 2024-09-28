@@ -33,14 +33,14 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
-type ObjectStore interface {
+type ObjectRevisionStore interface {
 	Insert(object, reference client.Object) error
 	Get(objectRef *model.GVKNObjKey, revision int64) (client.Object, error)
 	List(gvk *schema.GroupVersionKind) map[types.NamespacedName]map[int64]client.Object
 	Delete(objectRef *model.GVKNObjKey, reference client.Object, revision int64)
 }
 
-type objectStore struct {
+type objectRevisionStore struct {
 	store     map[schema.GroupVersionKind]map[types.NamespacedName]map[int64]client.Object
 	storeLock sync.RWMutex
 
@@ -55,7 +55,7 @@ type revisionObjectRef struct {
 	revision int64
 }
 
-func (s *objectStore) Insert(object, reference client.Object) error {
+func (s *objectRevisionStore) Insert(object, reference client.Object) error {
 	// insert into store
 	s.storeLock.Lock()
 	defer s.storeLock.Unlock()
@@ -95,7 +95,7 @@ func (s *objectStore) Insert(object, reference client.Object) error {
 	return nil
 }
 
-func (s *objectStore) Get(objectRef *model.GVKNObjKey, revision int64) (client.Object, error) {
+func (s *objectRevisionStore) Get(objectRef *model.GVKNObjKey, revision int64) (client.Object, error) {
 	s.storeLock.RLock()
 	defer s.storeLock.RUnlock()
 
@@ -114,7 +114,7 @@ func (s *objectStore) Get(objectRef *model.GVKNObjKey, revision int64) (client.O
 	return object, nil
 }
 
-func (s *objectStore) List(gvk *schema.GroupVersionKind) map[types.NamespacedName]map[int64]client.Object {
+func (s *objectRevisionStore) List(gvk *schema.GroupVersionKind) map[types.NamespacedName]map[int64]client.Object {
 	s.storeLock.RLock()
 	defer s.storeLock.RUnlock()
 
@@ -125,7 +125,7 @@ func (s *objectStore) List(gvk *schema.GroupVersionKind) map[types.NamespacedNam
 	return objectMap
 }
 
-func (s *objectStore) Delete(objectRef *model.GVKNObjKey, reference client.Object, revision int64) {
+func (s *objectRevisionStore) Delete(objectRef *model.GVKNObjKey, reference client.Object, revision int64) {
 	s.storeLock.Lock()
 	defer s.storeLock.Unlock()
 	s.counterLock.Lock()
@@ -163,12 +163,12 @@ func (s *objectStore) Delete(objectRef *model.GVKNObjKey, reference client.Objec
 	return
 }
 
-func NewObjectStore(scheme *runtime.Scheme) ObjectStore {
-	return &objectStore{
+func NewObjectStore(scheme *runtime.Scheme) ObjectRevisionStore {
+	return &objectRevisionStore{
 		store:            make(map[schema.GroupVersionKind]map[types.NamespacedName]map[int64]client.Object),
 		referenceCounter: make(map[revisionObjectRef]sets.Set[types.UID]),
 		scheme:           scheme,
 	}
 }
 
-var _ ObjectStore = &objectStore{}
+var _ ObjectRevisionStore = &objectRevisionStore{}

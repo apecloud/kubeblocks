@@ -21,9 +21,7 @@ package view
 
 import (
 	"fmt"
-	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	"github.com/apecloud/kubeblocks/pkg/dataprotection/types"
+
 	vsv1beta1 "github.com/kubernetes-csi/external-snapshotter/client/v3/apis/volumesnapshot/v1beta1"
 	vsv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -40,6 +38,9 @@ import (
 	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 )
 
 var (
@@ -48,6 +49,7 @@ var (
 			constant.AppInstanceLabelKey:  "$(primary.name)",
 			constant.AppManagedByLabelKey: constant.AppName,
 		},
+		Validation: OwnerValidation,
 	}
 
 	componentCriteria = OwnershipCriteria{
@@ -55,6 +57,7 @@ var (
 			constant.AppInstanceLabelKey:  "$(primary)",
 			constant.AppManagedByLabelKey: constant.AppName,
 		},
+		Validation: OwnerValidation,
 	}
 
 	itsCriteria = OwnershipCriteria{
@@ -81,7 +84,7 @@ var (
 		},
 	}
 
-	FullKBOwnershipRules = []OwnershipRule{
+	fullKBOwnershipRules = []OwnershipRule{
 		{
 			Primary: objectType(kbappsv1.SchemeGroupVersion.String(), kbappsv1.ClusterKind),
 			OwnedResources: []OwnedResource{
@@ -224,7 +227,7 @@ var (
 		},
 	}
 
-	KBOwnershipRules = filterUnsupportedRules(FullKBOwnershipRules)
+	kbOwnershipRules = filterUnsupportedRules(fullKBOwnershipRules)
 )
 
 func filterUnsupportedRules(ownershipRules []OwnershipRule) []OwnershipRule {

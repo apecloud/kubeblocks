@@ -217,7 +217,7 @@ func (r *informerManagerReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (ku
 		gvks.Insert(*gvk)
 		return nil
 	}
-	for _, rule := range KBOwnershipRules {
+	for _, rule := range kbOwnershipRules {
 		if err := parseGVK(rule.Primary); err != nil {
 			return kubebuilderx.Commit, err
 		}

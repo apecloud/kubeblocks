@@ -99,7 +99,7 @@ func (g *planGenerator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.R
 	// create mock client and mock event recorder
 	// kbagent client is running in dry-run mode by setting context key-value pair: dry-run=true
 	store := newChangeCaptureStore(g.cli.Scheme(), i18nResource)
-	mClient, err := newMockClient(g.cli, store, KBOwnershipRules)
+	mClient, err := newMockClient(g.cli, store, kbOwnershipRules)
 	if err != nil {
 		return kubebuilderx.Commit, err
 	}
@@ -109,13 +109,13 @@ func (g *planGenerator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.R
 	// 1. each gvk has a corresponding reconciler
 	// 2. mock K8s native object reconciler
 	// 3. encapsulate KB controller as reconciler
-	reconcilerTree, err := newReconcilerTree(g.ctx, mClient, mEventRecorder, KBOwnershipRules)
+	reconcilerTree, err := newReconcilerTree(g.ctx, mClient, mEventRecorder, kbOwnershipRules)
 	if err != nil {
 		return kubebuilderx.Commit, err
 	}
 
 	// load object store
-	if err = loadCurrentObjectTree(g.ctx, g.cli, root, KBOwnershipRules, store); err != nil {
+	if err = loadCurrentObjectTree(g.ctx, g.cli, root, kbOwnershipRules, store); err != nil {
 		return kubebuilderx.Commit, err
 	}
 	initialObjectMap := store.GetAll()
@@ -172,7 +172,7 @@ func (g *planGenerator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.R
 	if err = mClient.Get(g.ctx, objectKey, desiredRoot); err != nil {
 		return kubebuilderx.Commit, err
 	}
-	desiredTree, err := getObjectTreeFromCache(g.ctx, mClient, desiredRoot, KBOwnershipRules)
+	desiredTree, err := getObjectTreeFromCache(g.ctx, mClient, desiredRoot, kbOwnershipRules)
 	if err != nil {
 		return kubebuilderx.Commit, err
 	}
@@ -273,7 +273,7 @@ func applyDesiredSpec(desiredSpec string, obj client.Object) (string, error) {
 }
 
 func loadCurrentObjectTree(ctx context.Context, cli client.Client, root *kbappsv1.Cluster, ownershipRules []OwnershipRule, store ChangeCaptureStore) error {
-	_, objectMap, err := getObjectsFromCache(ctx, cli, root, ownershipRules)
+	objectMap, err := getObjectsFromCache(ctx, cli, root, ownershipRules)
 	if err != nil {
 		return err
 	}

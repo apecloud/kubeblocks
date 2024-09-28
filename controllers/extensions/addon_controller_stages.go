@@ -303,6 +303,12 @@ func (r *installableCheckStage) Handle(ctx context.Context) {
 			return
 		}
 
+		if err := checkDependentAddon(addon, r.reconciler.Client); err != nil {
+			setAddonErrorConditions(ctx, &r.stageCtx, addon, true, true, AddonCheckDependencyError, err.Error())
+			r.setReconciled()
+			return
+		}
+
 		r.reqCtx.Log.V(1).Info("installableCheckStage", "phase", addon.Status.Phase)
 
 		// check the annotations constraint about Kubeblocks Version
@@ -1254,6 +1260,60 @@ func checkAddonSpec(addon *extensionsv1alpha1.Addon) error {
 	if addon.Spec.Type == extensionsv1alpha1.HelmType {
 		if addon.Spec.Helm == nil {
 			return fmt.Errorf("invalid Helm configuration: either 'Helm' is not specified")
+		}
+	}
+	return nil
+}
+
+func checkDependentAddon(addon *extensionsv1alpha1.Addon, cli client.Client) error {
+	if len(addon.Spec.DependentAddons) == 0 {
+		return nil
+	}
+	for _, dependency := range addon.Spec.DependentAddons {
+		versions := dependency.Version
+		if len(versions) == 0 {
+			currentVersion, ok := addon.Labels[AddonVersion]
+			if !ok {
+				return fmt.Errorf("dependent addon version is nil and current addon does not have a version label")
+			}
+			versions = []string{currentVersion}
+		}
+		found := false
+
+		// Retrieve the dependent addon object
+		dependentAddon := &extensionsv1alpha1.Addon{}
+		if err := cli.Get(context.TODO(), client.ObjectKey{Name: dependency.Name, Namespace: addon.Namespace}, dependentAddon); err != nil {
+			if apierrors.IsNotFound(err) {
+				return fmt.Errorf("dependent addon %s not found", dependency.Name)
+			}
+			return err
+		}
+
+		// Get the version of the dependent addon
+		depAddonVersionStr, ok := dependentAddon.Labels[AddonVersion]
+		if !ok {
+			return fmt.Errorf("dependent addon %s does not have a version label", dependency.Name)
+		}
+		depAddonVersion, err := semver.NewVersion(depAddonVersionStr)
+		if err != nil {
+			return fmt.Errorf("invalid version %s for addon %s: %v", depAddonVersionStr, dependency.Name, err)
+		}
+
+		// Check if the dependent addon's version satisfies any of the specified constraints
+		for _, versionConstraint := range versions {
+			// Parse the version constraint
+			constraint, err := semver.NewConstraint(versionConstraint)
+			if err != nil {
+				return fmt.Errorf("invalid version constraint %s: %v", versionConstraint, err)
+			}
+			// Check if the version satisfies the constraint
+			if constraint.Check(depAddonVersion) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return fmt.Errorf("dependent addon %s does not satisfy any of the specified version constraints %v", dependency.Name, versions)
 		}
 	}
 	return nil

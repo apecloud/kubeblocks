@@ -5,40 +5,49 @@ keywords: [kafka, parameter, configuration, reconfiguration]
 sidebar_position: 1
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # Configure cluster parameters
 
 The KubeBlocks configuration function provides a set of consistent default configuration generation strategies for all the databases running on KubeBlocks and also provides a unified parameter configuration interface to facilitate managing parameter configuration, searching the parameter user guide, and validating parameter effectiveness.
 
 From v0.6.0, KubeBlocks supports `kbcli cluster configure` and `kbcli cluster edit-config` to configure parameters. The difference is that KubeBlocks configures parameters automatically with `kbcli cluster configure` but `kbcli cluster edit-config` provides a visualized way for you to edit parameters directly.
 
+KubeBlocks also supports configuring a cluster by editing the configuration file or applying an OpsRequest.
+
+<Tabs>
+
+<TabItem value="kbcli" label="kbcli" default>
+
 ## View parameter information
 
 View the current configuration file of a cluster.
 
 ```bash
-kbcli cluster describe-config mykafka  
+kbcli cluster describe-config mycluster -n demo
 ```
 
-From the meta information, the cluster `mykafka` has a configuration file named `server.properties`.
+From the meta information, the cluster `mycluster` has a configuration file named `server.properties`.
 
 You can also view the details of this configuration file and parameters.
 
 * View the details of the current configuration file.
 
    ```bash
-   kbcli cluster describe-config mykafka --show-detail
+   kbcli cluster describe-config mycluster -n demo --show-detail
    ```
 
 * View the parameter description.
 
   ```bash
-  kbcli cluster explain-config mykafka | head -n 20
+  kbcli cluster explain-config mycluster -n demo | head -n 20
   ```
 
 * View the user guide of a specified parameter.
   
   ```bash
-  kbcli cluster explain-config mykafka --param=log.cleanup.policy
+  kbcli cluster explain-config mycluster -n demo --param=log.cleanup.policy
   ```
 
   <details>
@@ -47,7 +56,7 @@ You can also view the details of this configuration file and parameters.
 
   ```bash
   template meta:
-    ConfigSpec: kafka-configuration-tpl	ComponentName: broker	ClusterName: mykafka
+    ConfigSpec: kafka-configuration-tpl	ComponentName: broker	ClusterName: mycluster
 
   Configure Constraint:
     Parameter Name:     log.cleanup.policy
@@ -71,7 +80,7 @@ You can also view the details of this configuration file and parameters.
 1. View the current value of `log.cleanup.policy`.
 
    ```bash
-   kbcli cluster describe-config mykafka --show-detail | grep log.cleanup.policy
+   kbcli cluster describe-config mycluster -n demo --show-detail | grep log.cleanup.policy
    >
    log.cleanup.policy=delete
    ```
@@ -79,7 +88,7 @@ You can also view the details of this configuration file and parameters.
 2. Adjust the value of `log.cleanup.policy`.
 
    ```bash
-   kbcli cluster configure mykafka --set=log.cleanup.policy=compact
+   kbcli cluster configure mycluster -n demo --set=log.cleanup.policy=compact
    ```
 
    :::note
@@ -100,13 +109,13 @@ You can also view the details of this configuration file and parameters.
 
    ```bash
    # In progress
-   kbcli cluster describe-ops mykafka-reconfiguring-wvqns -n default
+   kbcli cluster describe-ops mycluster-reconfiguring-wvqns -n default
    >
    Spec:
-     Name: mykafka-reconfiguring-wvqns	NameSpace: default	Cluster: mykafka	Type: Reconfiguring
+     Name: mycluster-reconfiguring-wvqns	NameSpace: default	Cluster: mycluster	Type: Reconfiguring
 
    Command:
-     kbcli cluster configure mykafka --components=broker --config-specs=kafka-configuration-tpl --config-file=server.properties --set log.cleanup.policy=compact --namespace=default
+     kbcli cluster configure mycluster -n demo --components=broker --config-specs=kafka-configuration-tpl --config-file=server.properties --set log.cleanup.policy=compact --namespace=default
 
    Status:
      Start Time:         Sep 14,2023 16:28 UTC+0800
@@ -118,13 +127,13 @@ You can also view the details of this configuration file and parameters.
 
    ```bash
    # Parameter reconfiguration is completed
-   kbcli cluster describe-ops mykafka-reconfiguring-wvqns -n default
+   kbcli cluster describe-ops mycluster-reconfiguring-wvqns -n demo
    >
    Spec:
-     Name: mykafka-reconfiguring-wvqns	NameSpace: default	Cluster: mykafka	Type: Reconfiguring
+     Name: mycluster-reconfiguring-wvqns	NameSpace: default	Cluster: mycluster	Type: Reconfiguring
 
    Command:
-     kbcli cluster configure mykafka --components=broker --config-specs=kafka-configuration-tpl --config-file=server.properties --set log.cleanup.policy=compact --namespace=default
+     kbcli cluster configure mycluster -n demo --components=broker --config-specs=kafka-configuration-tpl --config-file=server.properties --set log.cleanup.policy=compact --namespace=default
 
    Status:
      Start Time:         Sep 14,2023 16:28 UTC+0800
@@ -142,10 +151,10 @@ You can also view the details of this configuration file and parameters.
    The whole searching process has a 30-second delay.
 
    ```bash
-   kbcli cluster describe-config mykafka --show-detail | grep log.cleanup.policy
+   kbcli cluster describe-config mycluster -n demo --show-detail | grep log.cleanup.policy
    >
    log.cleanup.policy = compact
-   mykafka-reconfiguring-wvqns   mykafka   broker      kafka-configuration-tpl   server.properties   Succeed   restart   1/1        Sep 14,2023 16:28 UTC+0800   {"server.properties":"{\"log.cleanup.policy\":\"compact\"}"}
+   mycluster-reconfiguring-wvqns   mycluster   broker      kafka-configuration-tpl   server.properties   Succeed   restart   1/1        Sep 14,2023 16:28 UTC+0800   {"server.properties":"{\"log.cleanup.policy\":\"compact\"}"}
    ```
 
 ### Configure parameters with edit-config command
@@ -157,7 +166,7 @@ For Linux and macOS, you can edit configuration files by vi. For Windows, you ca
 1. Edit the configuration file.
 
    ```bash
-   kbcli cluster edit-config mykafka
+   kbcli cluster edit-config mycluster -n demo
    ```
 
    :::note
@@ -175,7 +184,7 @@ For Linux and macOS, you can edit configuration files by vi. For Windows, you ca
 3. Connect to the database to verify whether the parameters are configured as expected.
 
    ```bash
-   kbcli cluster connect mykafka
+   kbcli cluster connect mycluster -n demo
    ```
 
    :::note
@@ -192,7 +201,7 @@ After the configuration is completed, you can search the configuration history a
 View the parameter configuration history.
 
 ```bash
-kbcli cluster describe-config mykafka                 
+kbcli cluster describe-config mycluster -n demo                 
 ```
 
 From the above results, there are three parameter modifications.
@@ -200,11 +209,128 @@ From the above results, there are three parameter modifications.
 Compare these modifications to view the configured parameters and their different values for different versions.
 
 ```bash
-kbcli cluster diff-config mykafka-reconfiguring-wvqns mykafka-reconfiguring-hxqfx
+kbcli cluster diff-config mycluster-reconfiguring-wvqns mycluster-reconfiguring-hxqfx -n demo
 >
 DIFF-CONFIG RESULT:
-  ConfigFile: server.properties	TemplateName: kafka-configuration-tpl	ComponentName: broker	ClusterName: mykafka	UpdateType: update
+  ConfigFile: server.properties	TemplateName: kafka-configuration-tpl	ComponentName: broker	ClusterName: mycluster	UpdateType: update
 
-PARAMETERNAME         MYKAFKA-RECONFIGURING-WVQNS   MYKAFKA-RECONFIGURING-HXQFX
-log.retention.hours   168                           200
+PARAMETERNAME         MYCLUSTER-RECONFIGURING-WVQNS   MYCLUSTER-RECONFIGURING-HXQFX
+log.retention.hours   168                             200
 ```
+
+</TabItem>
+
+<TabItem value="Edit config file" label="Edit config file">
+
+KubeBlocks supports configuring cluster parameters by editing its configuration file.
+
+1. Get the configuration file of this cluster.
+
+   ```bash
+   kubectl get configurations.apps.kubeblocks.io -n demo
+
+   kubectl edit configurations.apps.kubeblocks.io mycluster-kafka-combine -n demo
+   ```
+
+2. Configure parameters according to your needs. The example below adds the `spec.configFileParams` part to configure `log.cleanup.policy`.
+
+   ```yaml
+   spec:
+     clusterRef: mycluster
+     componentName: kafka
+     configItemDetails:
+     - configFileParams:
+         server.properties:
+           parameters:
+             log.cleanup.policy: "compact"
+       configSpec:
+         constraintRef: kafka-cc
+         name: kafka-configuration-tpl
+         namespace: kb-system
+         templateRef: kafka-configuration-tpl
+         volumeName: kafka-config
+       name: kafka-configuration-tpl
+   ```
+
+3. Connect to this cluster to verify whether the configuration takes effect as expected.
+
+   ```bash
+   kbcli cluster describe-config mycluster -n demo --show-detail | grep log.cleanup.policy
+   >
+   log.cleanup.policy = compact
+   ```
+
+:::note
+
+Just in case you cannot find the configuration file of your cluster, you can switch to the `kbcli` tab to view the current configuration file of a cluster.
+
+:::
+
+</TabItem>
+
+<TabItem value="OpsRequest" label="OpsRequest">
+
+KubeBlocks supports configuring cluster parameters with OpsRequest.
+
+1. Define an OpsRequest file and configure the parameters in the OpsRequest in a yaml file named `mycluster-configuring-demo.yaml`. In this example, `log.cleanup.policy` is configured as `compact`.
+
+   ```bash
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: OpsRequest
+   metadata:
+     name: mycluster-configuring-demo
+     namespace: demo
+   spec:
+     clusterName: mycluster
+     reconfigure:
+       componentName: kafka
+       configurations:
+       - keys:
+         - key: server.properties
+           parameters:
+           - key: log.cleanup.policy
+             value: "compact"
+         name: kafka-configuration-tpl
+     preConditionDeadlineSeconds: 0
+     type: Reconfiguring
+   EOF
+   ```
+
+   | Field                                                  | Definition     |
+   |--------------------------------------------------------|--------------------------------|
+   | `metadata.name`                                        | It specifies the name of this OpsRequest. |
+   | `metadata.namespace`                                   | It specifies the namespace where this cluster is created. |
+   | `spec.clusterName`                                     | It specifies the cluster name that this operation is targeted at. |
+   | `spec.reconfigure`                                     | It specifies a component and its configuration updates. |
+   | `spec.reconfigure.componentName`                       | It specifies the component name of this cluster.  |
+   | `spec.configurations`                                  | It contains a list of ConfigurationItem objects, specifying the component's configuration template name, upgrade policy, and parameter key-value pairs to be updated. |
+   | `spec.reconfigure.configurations.keys.key`             | It specifies the configuration map. |
+   | `spec.reconfigure.configurations.keys.parameters`      | It defines a list of key-value pairs for a single configuration file. |
+   | `spec.reconfigure.configurations.keys.parameter.key`   | It represents the name of the parameter you want to edit. |
+   | `spec.reconfigure.configurations.keys.parameter.value` | It represents the parameter values that are to be updated. If set to nil, the parameter defined by the Key field will be removed from the configuration file.  |
+   | `spec.reconfigure.configurations.name`                 | It specifies the configuration template name.  |
+   | `preConditionDeadlineSeconds`                          | It specifies the maximum number of seconds this OpsRequest will wait for its start conditions to be met before aborting. If set to 0 (default), the start conditions must be met immediately for the OpsRequest to proceed. |
+
+2. Apply the configuration opsRequest.
+
+   ```bash
+   kubectl apply -f mycluster-configuring-demo.yaml
+   ```
+
+3. Verify whether the configuration takes effect as expected.
+
+   ```bash
+   kbcli cluster describe-config mycluster -n demo --show-detail | grep log.cleanup.policy
+   >
+   log.cleanup.policy = compact
+   ```
+
+:::note
+
+Just in case you cannot find the configuration file of your cluster, you can switch to the kbcli tab to view the current configuration file of a cluster.
+
+:::
+
+</TabItem>
+
+</Tabs>

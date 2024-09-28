@@ -409,15 +409,15 @@ func (q *queryOptions) match(o client.Object) bool {
 	if listOptions.LabelSelector == nil && listOptions.FieldSelector == nil && q.matchOwner == nil {
 		return true
 	}
-	if listOptions.LabelSelector != nil && listOptions.LabelSelector.Matches(labels.Set(o.GetLabels())) {
-		return true
+	if listOptions.LabelSelector != nil && !listOptions.LabelSelector.Matches(labels.Set(o.GetLabels())) {
+		return false
 	}
 	if listOptions.FieldSelector != nil &&
-		listOptions.FieldSelector.Matches(fields.Set{"metadata.name": o.GetName()}) {
-		return true
+		!listOptions.FieldSelector.Matches(fields.Set{"metadata.name": o.GetName()}) {
+		return false
 	}
-	if q.matchOwner != nil && matchOwnerOf(q.matchOwner, o) {
-		return true
+	if q.matchOwner != nil && !matchOwnerOf(q.matchOwner, o) {
+		return false
 	}
-	return false
+	return true
 }

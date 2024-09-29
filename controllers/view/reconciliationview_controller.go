@@ -63,6 +63,7 @@ func (r *ReconciliationViewReconciler) Reconcile(ctx context.Context, req ctrl.R
 	res, err := kubebuilderx.NewController(ctx, r.Client, req, r.Recorder, logger).
 		Prepare(viewResources()).
 		Do(viewResourcesValidation(ctx, r.Client)).
+		// TODO(free6om): do store cleanup at view deletion
 		Do(updateInformerManager(r.InformerManager)).
 		Do(viewCalculation(ctx, r.Client, r.Scheme, r.ObjectStore)).
 		Do(viewStateEvaluation(ctx, r.Client, r.Scheme, r.ObjectStore)).

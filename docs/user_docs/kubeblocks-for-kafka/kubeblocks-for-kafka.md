@@ -7,7 +7,7 @@ sidebar_position: 1
 
 # KubeBlocks for Kafka
 
-This tutorial illustrates how to create and manage a Kafka cluster by kbcli, kubectl or a YAML file. You can find the YAML examples in [the GitHub repository](https://github.com/apecloud/kubeblocks-addons/tree/release-0.9/examples/kafka).
+This tutorial illustrates how to create and manage a Kafka cluster by `kbcli`, `kubectl` or a YAML file. You can find the YAML examples in [the GitHub repository](https://github.com/apecloud/kubeblocks-addons/tree/release-0.9/examples/kafka).
 
 * [Cluster Management](./cluster-management/create-a-kafka-cluster.md)
 * [Configuration](./configuration/configuration.md)

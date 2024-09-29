@@ -17,7 +17,7 @@ This tutorial shows how to create and connect to a MongoDB cluster.
 
 ### Before you start
 
-* [Install kbcli](./../../installation/install-with-kbcli/install-kbcli.md) if you want to create and connect a MySQL cluster by kbcli.
+* [Install kbcli](./../../installation/install-with-kbcli/install-kbcli.md) if you want to create and connect a MySQL cluster by `kbcli`.
 * Install KubeBlocks [by kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) or [by Helm](./../../installation/install-with-helm/install-kubeblocks.md).
 * Make sure the MongoDB Addon is enabled. If this addon is not enabled, enable it first. Both [kbcli](./../../installation/install-with-kbcli/install-addons.md) and [Helm](./../../installation/install-with-helm/install-addons.md) options are available.
 

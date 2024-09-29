@@ -6,72 +6,71 @@ sidebar_position: 1
 sidebar_label: Manage Qdrant with KubeBlocks
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # Manage Qdrant with KubeBlocks
 
 The popularity of generative AI (Generative AI) has aroused widespread attention and completely ignited the vector database (Vector Database) market. Qdrant (read: quadrant) is a vector similarity search engine and vector database. It provides a production-ready service with a convenient API to store, search, and manage points—vectors with an additional payload Qdrant is tailored to extended filtering support. It makes it useful for all sorts of neural-network or semantic-based matching, faceted search, and other applications.
 
-KubeBlocks supports the management of Qdrant.
+KubeBlocks supports the management of Qdrant. This tutorial illustrates how to create and manage a Qdrant cluster by `kbcli`, `kubectl` or a YAML file. You can find the YAML examples in [the GitHub repository](https://github.com/apecloud/kubeblocks-addons/tree/release-0.9/examples/qdrant).
 
 ## Before you start
 
-- [Install kbcli](./../installation/install-with-kbcli/install-kbcli.md).
-- [Install KubeBlocks](./../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md).
-- [Install and enable the qdrant addon](./../installation/install-with-kbcli/install-addons.md).
+- [Install kbcli](./../installation/install-with-kbcli/install-kbcli.md) if you want to manage the Qdrant cluster with `kbcli`.
+- Install KubeBlocks [by kbcli](./../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) or [by Helm](./../installation/install-with-helm/install-kubeblocks.md).
+- Install and enable the Qdrant Addon [by kbcli](./../installation/install-with-kbcli/install-addons.md) or [by Helm](./../installation/install-with-helm/install-addons.md).
 
 ## Create a cluster
 
 ***Steps***
 
-1. Execute the following command to create a Qdrant cluster. 
+<Tabs>
+
+<TabItem value="kbcli" label="kbcli" default>
+
+1. Execute the following command to create a Qdrant cluster.
 
    ```bash
-   kbcli cluster create qdrant --cluster-definition=qdrant
+   kbcli cluster create qdrant mycluster -n demo
    ```
 
-   If you want to create a Qdrant cluster with multiple replicas. Use the following command and set the replica numbers.
+   If you want to customize your cluster specifications, kbcli provides various options, such as setting cluster version, termination policy, CPU, and memory. You can view these options by adding `--help` or `-h` flag.
 
    ```bash
-   kbcli cluster create qdrant --cluster-definition=qdrant --set replicas=3
+   kbcli cluster create qdrant --help
+
+   kbcli cluster create qdrant -h
    ```
 
-:::note
-
-View more flags for creating a cluster to create a cluster with customized specifications.
-  
-```bash
-kbcli cluster create --help
-```
-
-:::
-
-1. Check whether the cluster is created.
+2. Check whether the cluster is created.
 
    ```bash
-   kbcli cluster list
+   kbcli cluster list -n demo
    >
-   NAME     NAMESPACE   CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    CREATED-TIME
-   qdrant   default     qdrant               qdrant-1.8.1   Delete               Running   Aug 15,2023 23:03 UTC+0800
+   NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    CREATED-TIME
+   mycluster   demo        qdrant                              Delete               Running   Aug 15,2023 23:03 UTC+0800
    ```
 
-2. Check the cluster information.
+3. Check the cluster information.
 
    ```bash
-   kbcli cluster describe qdrant
+   kbcli cluster describe mycluster -n demo
    >
-   Name: qdrant         Created Time: Aug 15,2023 23:03 UTC+0800
+   Name: mycluster         Created Time: Aug 15,2023 23:03 UTC+0800
    NAMESPACE   CLUSTER-DEFINITION   VERSION        STATUS    TERMINATION-POLICY
-   default     qdrant               qdrant-1.8.1   Running   Delete
+   demo        qdrant                              Running   Delete
 
    Endpoints:
-   COMPONENT   MODE        INTERNAL                                       EXTERNAL
-   qdrant      ReadWrite   qdrant-qdrant.default.svc.cluster.local:6333   <none>
-                           qdrant-qdrant.default.svc.cluster.local:6334
+   COMPONENT   MODE        INTERNAL                                                 EXTERNAL
+   qdrant      ReadWrite   mycluster-qdrant-qdrant.default.svc.cluster.local:6333   <none>
+                           mycluster-qdrant-qdrant.default.svc.cluster.local:6334
 
    Topology:
-   COMPONENT   INSTANCE          ROLE     STATUS    AZ       NODE                   CREATED-TIME
-   qdrant      qdrant-qdrant-0   <none>   Running   <none>   x-worker3/172.20.0.3   Aug 15,2023 23:03 UTC+0800
-   qdrant      qdrant-qdrant-1   <none>   Running   <none>   x-worker2/172.20.0.5   Aug 15,2023 23:03 UTC+0800
-   qdrant      qdrant-qdrant-2   <none>   Running   <none>   x-worker/172.20.0.2    Aug 15,2023 23:04 UTC+0800
+   COMPONENT   INSTANCE             ROLE     STATUS    AZ       NODE                   CREATED-TIME
+   qdrant      mycluster-qdrant-0   <none>   Running   <none>   x-worker3/172.20.0.3   Aug 15,2023 23:03 UTC+0800
+   qdrant      mycluster-qdrant-1   <none>   Running   <none>   x-worker2/172.20.0.5   Aug 15,2023 23:03 UTC+0800
+   qdrant      mycluster-qdrant-2   <none>   Running   <none>   x-worker/172.20.0.2    Aug 15,2023 23:04 UTC+0800
 
    Resources Allocation:
    COMPONENT   DEDICATED   CPU(REQUEST/LIMIT)   MEMORY(REQUEST/LIMIT)   STORAGE-SIZE   STORAGE-CLASS
@@ -85,12 +84,98 @@ kbcli cluster create --help
    AUTO-BACKUP   BACKUP-SCHEDULE   TYPE     BACKUP-TTL   LAST-SCHEDULE   RECOVERABLE-TIME
    Disabled      <none>            <none>   7d           <none>          <none>
 
-   Show cluster events: kbcli cluster list-events -n default qdrant
+   Show cluster events: kbcli cluster list-events -n demo mycluster
    ```
+
+</TabItem>
+
+<TabItem value="kubectl" label="kubectl">
+
+KubeBlocks implements a `Cluster` CRD to define a cluster. Here is an example of creating a Qdrant Replication cluster. Primary and Secondary are distributed on different nodes by default. But if you only have one node for deploying a Replication Cluster, set `spec.affinity.topologyKeys` as `null`.
+
+```yaml
+cat <<EOF | kubectl apply -f -
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: mycluster
+  namespace: demo
+spec:
+  clusterDefinitionRef: qdrant
+  clusterVersionRef: qdrant-1.8.1
+  terminationPolicy: Delete
+  affinity:
+    podAntiAffinity: Preferred
+    topologyKeys:
+    - kubernetes.io/hostname
+  tolerations:
+    - key: kb-data
+      operator: Equal
+      value: 'true'
+      effect: NoSchedule
+  componentSpecs:
+  - name: qdrant
+    componentDefRef: qdrant
+    disableExporter: true
+    serviceAccountName: kb-mycluster
+    replicas: 2
+    resources:
+      limits:
+        cpu: '0.5'
+        memory: 0.5Gi
+      requests:
+        cpu: '0.5'
+        memory: 0.5Gi
+    volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi
+EOF
+```
+
+| Field                                 | Definition  |
+|---------------------------------------|--------------------------------------|
+| `spec.clusterDefinitionRef`           | It specifies the name of the ClusterDefinition for creating a specific type of cluster.  |
+| `spec.clusterVersionRef`              | It is the name of the cluster version CRD that defines the cluster version.  |
+| `spec.terminationPolicy`              | It is the policy of cluster termination. The default value is `Delete`. Valid values are `DoNotTerminate`, `Halt`, `Delete`, `WipeOut`.  <p> - `DoNotTerminate` blocks deletion operation. </p><p> - `Halt` deletes workload resources such as statefulset and deployment workloads but keep PVCs. </p><p> - `Delete` is based on Halt and deletes PVCs. </p> - `WipeOut` is based on Delete and wipe out all volume snapshots and snapshot data from a backup storage location. |
+| `spec.affinity`                       | It defines a set of node affinity scheduling rules for the cluster's Pods. This field helps control the placement of Pods on nodes within the cluster.  |
+| `spec.affinity.podAntiAffinity`       | It specifies the anti-affinity level of Pods within a component. It determines how pods should spread across nodes to improve availability and performance. |
+| `spec.affinity.topologyKeys`          | It represents the key of node labels used to define the topology domain for Pod anti-affinity and Pod spread constraints.   |
+| `spec.tolerations`                    | It is an array that specifies tolerations attached to the cluster's Pods, allowing them to be scheduled onto nodes with matching taints.  |
+| `spec.componentSpecs`                 | It is the list of components that define the cluster components. This field allows customized configuration of each component within a cluster.   |
+| `spec.componentSpecs.componentDefRef` | It is the name of the component definition that is defined in the cluster definition and you can get the component definition names with `kubectl get clusterdefinition qdrant -o json \| jq '.spec.componentDefs[].name'`.   |
+| `spec.componentSpecs.name`            | It specifies the name of the component.     |
+| `spec.componentSpecs.disableExporter` | It defines whether the monitoring function is enabled. |
+| `spec.componentSpecs.replicas`        | It specifies the number of replicas of the component.  |
+| `spec.componentSpecs.resources`       | It specifies the resource requirements of the component.  |
+
+KubeBlocks operator watches for the `Cluster` CRD and creates the cluster and all dependent resources. You can get all the resources created by the cluster with `kubectl get all,secret,rolebinding,serviceaccount -l app.kubernetes.io/instance=mycluster -n demo`.
+
+```bash
+kubectl get all,secret,rolebinding,serviceaccount -l app.kubernetes.io/instance=mycluster -n demo
+```
+
+Run the following command to see the created Qdrant cluster object:
+
+```bash
+kubectl get cluster mycluster -n demo -o yaml
+```
+
+</TabItem>
+
+</Tabs>
 
 ## Connect to a Qdrant cluster
 
 Qdrant provides both HTTP and gRPC protocols for client access on ports 6333 and 6334 respectively. Depending on where the client is, different connection options are offered to connect to the Qdrant cluster.
+
+<Tabs>
+
+<TabItem value="kbcli" label="kbcli" default>
 
 :::note
 
@@ -98,18 +183,40 @@ If your cluster is on AWS, install the AWS Load Balancer Controller first.
 
 :::
 
-- If your client is inside a K8s cluster, run `kbcli cluster describe qdrant` to get the ClusterIP address of the cluster or the corresponding K8s cluster domain name.
-- If your client is outside the K8s cluster but in the same VPC as the server, run `kbcli cluster expose qdrant --enable=true --type=vpc` to get a VPC load balancer address for the database cluster.
-- If your client is outside the VPC, run `kbcli cluster expose qdrant --enable=true --type=internet` to open a public network reachable address for the database cluster.
+- If your client is inside a K8s cluster, run `kbcli cluster describe mycluster -n demo` to get the ClusterIP address of the cluster or the corresponding K8s cluster domain name.
+- If your client is outside the K8s cluster but in the same VPC as the server, run `kbcli cluster expose mycluster -n demo --enable=true --type=vpc` to get a VPC load balancer address for the database cluster.
+- If your client is outside the VPC, run `kbcli cluster expose mycluster -n demo --enable=true --type=internet` to open a public network reachable address for the database cluster.
+
+</TabItem>
+
+<TabItem value="Port forward" label="Port forward">
+
+1. Run the following command to port forward the service.
+
+   ```bash
+   kubectl port-forward svc/mycluster-qdrant 6333:6333 -n demo
+   ```
+
+2. Open a new terminal and run the following command to connect to the database.
+
+   ```bash
+   curl http://127.0.0.1:6333/collections
+   ```
+
+   Refer to [the official Qdrant documents](https://qdrant.tech/documentation/) for the cluster operations.
+
+</TabItem>
+
+</Tabs>
 
 ## Monitor the database
 
-For the testing environment, you can run the command below to open the Grafana monitor web page.
+For the testing environment, you can run the command below to open the Grafana monitoring web page.
 
-1. View all built-in addons and make sure the monitoring addons are enabled. If the monitoring addons are not enabled, [enable these addons](./../installation/install-with-kbcli/install-addons.md) first.
+1. View all built-in Addons and make sure the monitoring Addons are enabled. If the monitoring Addons are not enabled, [enable these Addons](./../installation/install-with-kbcli/install-addons.md) first.
 
    ```bash
-   # View all addons supported
+   # View Addons
    kbcli addon list
    ...
    grafana                        Helm   Enabled                   true                                                                                    
@@ -121,7 +228,7 @@ For the testing environment, you can run the command below to open the Grafana m
 2. Check whether the monitoring function of the cluster is enabled. If the monitoring function is enabled, the output shows `disableExporter: false`.
 
    ```bash
-   kubectl get cluster qdrant -o yaml
+   kubectl get cluster mycluster -n demo -o yaml
    >
    apiVersion: apps.kubeblocks.io/v1alpha1
    kind: Cluster
@@ -137,7 +244,7 @@ For the testing environment, you can run the command below to open the Grafana m
    If `disableExporter: false` is not shown in the output, it means the monitoring function of this cluster is not enabled and you need to enable it first.
 
    ```bash
-   kbcli cluster update qdrant --disable-exporter=false
+   kbcli cluster update mycluster -n demo --disable-exporter=false
    ```
 
 3. View the dashboard list.
@@ -161,7 +268,7 @@ For the production environment, it is highly recommended to build your monitorin
 
 ## Scale
 
-The scaling function for vector databases is also supported.
+The scaling function for Qdrant is also supported.
 
 ### Scale horizontally
 
@@ -173,40 +280,172 @@ From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out insta
 
 Check whether the cluster status is Running. Otherwise, the following operations may fail.
 
+<Tabs>
+
+<TabItem value="kbcli" label="kbcli" default>
+
 ```bash
-kbcli cluster list qdrant
+kbcli cluster list mycluster -n demo
 >
-NAME     CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY    STATUS    AGE
-qdrant   qdrant               qdrant-1.8.1   Delete                Running   47m
+NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION   TERMINATION-POLICY   STATUS    CREATED-TIME
+mycluster   demo        qdrant                         Delete               Running   Aug 15,2023 23:03 UTC+0800
 ```
+
+</TabItem>
+
+<TabItem value="kubectl" label="kubectl">
+
+```bash
+kubectl get cluster mycluster -n demo
+>
+NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY     STATUS    AGE
+mycluster   qdrant                              Delete                 Running   47m
+```
+
+</TabItem>
+
+</Tabs>
 
 #### Steps
 
-Use the following command to perform horizontal scaling.
+<Tabs>
 
-```bash
-kbcli cluster hscale qdrant --replicas=5 --components=qdrant
-```
+<TabItem value="kbcli" label="kbcli" default>
 
-- `--components` describes the component name ready for horizontal scaling.
-- `--replicas` describes the replica amount of the specified components. Edit the amount based on your demands to scale in or out replicas.
+1. Set the `--replicas` value according to your needs and perform the horizontal scaling.
+
+    ```bash
+    kbcli cluster hscale mycluster -n demo --replicas=5 --components=qdrant
+    ```
+
+    - `--components` describes the component name ready for horizontal scaling.
+    - `--replicas` describes the replica amount of the specified components. Edit the amount based on your demands to scale in or out replicas.
   
-Please wait a few seconds until the scaling process is over.
+    Please wait a few seconds until the scaling process is over.
 
-The `kbcli cluster hscale` command print the `opsname`, to check the progress of horizontal scaling, you can use the following command with the `opsname`.
+2. Validate the horizontal scaling operation.
 
-```bash
-kubectl get ops qdrant-horizontalscaling-xpdwz
->
-NAME                             TYPE                CLUSTER   STATUS    PROGRESS   AGE
-qdrant-horizontalscaling-xpdwz   HorizontalScaling   qdrant    Running   0/2        16s
-```
+   - View the OpsRequest progress.
 
-To check whether the scaling is done, use the following command.
+     KubeBlocks outputs a command automatically for you to view the OpsRequest progress. The output includes the status of this OpsRequest and Pods. When the status is `Succeed`, this OpsRequest is completed.
 
-```bash
-kbcli cluster describe qdrant
-```
+     ```bash
+     kbcli cluster describe-ops mycluster-horizontalscaling-xpdwz -n demo
+     ```
+
+   - View the cluster satus.
+
+     ```bash
+     kbcli cluster list mycluster -n demo
+     >
+     NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION   TERMINATION-POLICY   STATUS    CREATED-TIME
+     mycluster   demo        qdrant                         Delete               Running   Jul 24,2023 11:38 UTC+0800
+     ```
+
+     - STATUS=Updating: it means horizontal scaling is in progress.
+     - STATUS=Running: it means horizontal scaling has been applied.
+
+3. After the OpsRequest status is `Succeed` or the cluster status is `Running` again, check whether the corresponding resources change.
+
+    ```bash
+    kbcli cluster describe mycluster -n demo
+    ```
+
+</TabItem>
+
+<TabItem value="OpsRequest" label="OpsRequest">
+
+1. Apply an OpsRequest to a specified cluster. Configure the parameters according to your needs.
+
+   The example below means adding two replicas.
+
+   ```bash
+   kubectl apply -f - <<EOF
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: OpsRequest
+   metadata:
+     name: ops-horizontal-scaling
+     namespace: demo
+   spec:
+     clusterName: mycluster
+     type: HorizontalScaling
+     horizontalScaling:
+     - componentName: qdrant
+       scaleOut:
+         replicaChanges: 2
+   EOF
+   ```
+
+   If you want to scale in replicas, replace `scaleOut` with `scaleIn`.
+
+   The example below means deleting two replicas.
+
+   ```bash
+   kubectl apply -f - <<EOF
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: OpsRequest
+   metadata:
+     name: ops-horizontal-scaling
+     namespace: demo
+   spec:
+     clusterName: mycluster
+     type: HorizontalScaling
+     horizontalScaling:
+     - componentName: qdrant
+       scaleIn:
+         replicaChanges: 2
+   EOF
+   ```
+
+2. Check the operation status to validate the horizontal scaling status.
+
+   ```bash
+   kubectl get ops -n demo
+   >
+   NAMESPACE   NAME                     TYPE                CLUSTER     STATUS    PROGRESS   AGE
+   demo        ops-horizontal-scaling   HorizontalScaling   mycluster   Succeed   3/3        6m
+   ```
+
+   If an error occurs, you can troubleshoot with `kubectl describe ops -n demo` command to view the events of this operation.
+
+3. Check whether the corresponding resources change.
+
+    ```bash
+    kubectl describe cluster mycluster -n demo
+    ```
+
+</TabItem>
+  
+<TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
+
+1. Change the configuration of `spec.componentSpecs.replicas` in the YAML file. `spec.componentSpecs.replicas` stands for the pod amount and changing this value triggers a horizontal scaling of a cluster.
+
+   ```yaml
+   kubectl edit cluster mycluster -n demo
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: Cluster
+   metadata:
+     name: mycluster
+     namespace: demo
+   spec:
+     clusterDefinitionRef: qdrant
+     clusterVersionRef: qdrant-1.8.1
+     componentSpecs:
+     - name: qdrant
+       componentDefRef: qdrant
+       replicas: 2 # Change the amount
+   ......
+   ```
+
+2. Check whether the corresponding resources change.
+
+    ```bash
+    kubectl describe cluster mycluster -n demo
+    ```
+
+</TabItem>
+
+</Tabs>
 
 ### Scale vertically
 
@@ -216,72 +455,340 @@ You can vertically scale a cluster by changing resource requirements and limits 
 
 Check whether the cluster status is Running. Otherwise, the following operations may fail.
 
+<Tabs>
+
+<TabItem value="kbcli" label="kbcli" default>
+
 ```bash
-kbcli cluster list qdrant
+kbcli cluster list mycluster -n demo
 >
-NAME     CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY    STATUS    AGE
-qdrant   qdrant               qdrant-1.8.1   Delete                Running   47m
+NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION   TERMINATION-POLICY   STATUS    CREATED-TIME
+mycluster   demo        qdrant                         Delete               Running   Aug 15,2023 23:03 UTC+0800
 ```
+
+</TabItem>
+
+<TabItem value="kubectl" label="kubectl">
+
+```bash
+kubectl get cluster mycluster -n demo
+>
+NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY     STATUS    AGE
+mycluster   qdrant                              Delete                 Running   47m
+```
+
+</TabItem>
+
+</Tabs>
 
 #### Steps
 
-Use the following command to perform vertical scaling.
+<Tabs>
 
-```bash
-kbcli cluster vscale qdrant --cpu=0.5 --memory=512Mi --components=qdrant 
-```
+<TabItem value="kbcli" label="kbcli" default>
 
-Please wait a few seconds until the scaling process is over.
+1. Set the `--cpu` and `--memory` values according to your needs and run the following command to perform vertical scaling.
 
-The `kbcli cluster vscale` command prints a command to help check the progress of scaling.
+    ```bash
+    kbcli cluster vscale mycluster -n demo --cpu=0.5 --memory=512Mi --components=qdrant 
+    ```
 
-```bash
-kubectl get ops qdrant-verticalscaling-rpw2l
->
-NAME                           TYPE              CLUSTER   STATUS    PROGRESS   AGE
-qdrant-verticalscaling-rpw2l   VerticalScaling   qdrant    Running   1/5        44s
-```
+    Please wait a few seconds until the scaling process is over.
 
-To check whether the scaling is done, use the following command.
+2. Validate the vertical scaling operation.
+   - View the OpsRequest progress.
 
-```bash
-kbcli cluster describe qdrant
-```
+      KubeBlocks outputs a command automatically for you to view the OpsRequest progress. The output includes the status of this OpsRequest and Pods. When the status is `Succeed`, this OpsRequest is completed.
+
+      ```bash
+      kbcli cluster describe-ops mycluster-verticalscaling-rpw2l -n demo
+      >
+      NAME                              TYPE              CLUSTER      STATUS    PROGRESS   AGE
+      mycluster-verticalscaling-rpw2l   VerticalScaling   mycluster    Running   1/5        44s
+     ```
+
+   - Check the cluster status.
+
+      ```bash
+      kbcli cluster list mycluster -n demo
+      >
+      NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS     CREATED-TIME
+      mycluster   demo                                               Delete               Updating   Aug 15,2023 23:03 UTC+0800
+      ```
+
+      - STATUS=Updating: it means the vertical scaling is in progress.
+      - STATUS=Running: it means the vertical scaling operation has been applied.
+      - STATUS=Abnormal: it means the vertical scaling is abnormal. The reason may be that the number of the normal instances is less than that of the total instance or the leader instance is running properly while others are abnormal.
+          >To solve the problem, you can manually check whether this error is caused by insufficient resources. Then if AutoScaling is supported by the Kubernetes cluster, the system recovers when there are enough resources. Otherwise, you can create enough resources and troubleshoot with `kubectl describe` command.
+
+3. After the OpsRequest status is `Succeed` or the cluster status is `Running` again, check whether the corresponding resources change.
+
+    ```bash
+    kbcli cluster describe mycluster -n demo
+    ```
+
+</TabItem>
+  
+<TabItem value="OpsRequest" label="OpsRequest">
+
+1. Apply an OpsRequest to the specified cluster. Configure the parameters according to your needs.
+
+   ```bash
+   kubectl apply -f - <<EOF
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: OpsRequest
+   metadata:
+     name: ops-vertical-scaling
+     namespace: demo
+   spec:
+     clusterName: mycluster
+     type: VerticalScaling
+     verticalScaling:
+     - componentName: qdrant
+       requests:
+         memory: "2Gi"
+         cpu: "1"
+       limits:
+         memory: "4Gi"
+         cpu: "2"
+   EOF
+   ```
+
+2. Check the operation status to validate the vertical scaling.
+
+   ```bash
+   kubectl get ops -n demo
+   >
+   NAMESPACE   NAME                   TYPE              CLUSTER     STATUS    PROGRESS   AGE
+   demo        ops-vertical-scaling   VerticalScaling   mycluster   Succeed   3/3        6m
+   ```
+
+   If an error occurs, you can troubleshoot with `kubectl describe ops -n demo` command to view the events of this operation.
+
+3. Check whether the corresponding resources change.
+
+    ```bash
+    kubectl describe cluster mycluster -n demo
+    ```
+
+</TabItem>
+
+<TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
+
+1. Change the configuration of `spec.componentSpecs.resources` in the YAML file. `spec.componentSpecs.resources` controls the requirement and limit of resources and changing them triggers a vertical scaling.
+
+   ```yaml
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: Cluster
+   metadata:
+     name: mycluster
+     namespace: demo
+   spec:
+     clusterDefinitionRef: qdrant
+     clusterVersionRef: qdrant-1.8.1
+     componentSpecs:
+     - name: qdrant
+       componentDefRef: qdrant
+       replicas: 1
+       resources: # Change the values of resources.
+         requests:
+           memory: "2Gi"
+           cpu: "1"
+         limits:
+           memory: "4Gi"
+           cpu: "2"
+       volumeClaimTemplates:
+       - name: data
+         spec:
+           accessModes:
+             - ReadWriteOnce
+           resources:
+             requests:
+               storage: 1Gi
+     terminationPolicy: Delete
+   ```
+
+2. Check whether the corresponding resources change.
+
+    ```bash
+    kubectl describe cluster mycluster -n demo
+    ```
+
+</TabItem>
+
+</Tabs>
 
 ## Volume Expansion
 
-***Steps:***
+### Before you start
+
+Check whether the cluster status is Running. Otherwise, the following operations may fail.
+
+<Tabs>
+
+<TabItem value="kbcli" label="kbcli" default>
 
 ```bash
-kbcli cluster volume-expand qdrant --storage=40Gi --components=qdrant -t data
-```
-
-The volume expansion may take a few minutes.
-
-The `kbcli cluster volume-expand` command print the `opsname`, to check the progress of volume expanding, you can use the following command with the `opsname`.
-
-```bash
-kubectl get ops qdrant-volumeexpansion-5pbd2
+kbcli cluster list mycluster -n demo
 >
-NAME                           TYPE              CLUSTER   STATUS   PROGRESS   AGE
-qdrant-volumeexpansion-5pbd2   VolumeExpansion   qdrant    Running  1/1        67s
+NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION   TERMINATION-POLICY   STATUS    CREATED-TIME
+mycluster   demo        qdrant                         Delete               Running   Aug 15,2023 23:03 UTC+0800
 ```
 
-To check whether the expanding is done, use the following command.
+</TabItem>
+
+<TabItem value="kubectl" label="kubectl">
 
 ```bash
-kbcli cluster describe qdrant
+kubectl get cluster mycluster -n demo
+>
+NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY     STATUS    AGE
+mycluster   qdrant                              Delete                 Running   47m
 ```
+
+</TabItem>
+
+</Tabs>
+
+### Steps
+
+<Tabs>
+
+<TabItem value="kbcli" label="kbcli" default>
+
+1. Set the `--storage` value according to your need and run the command to expand the volume.
+
+    ```bash
+    kbcli cluster volume-expand mycluster -n demo --storage=40Gi --components=qdrant -t data
+    ```
+
+    The volume expansion may take a few minutes.
+
+2. Validate the volume expansion operation.
+
+    - View the OpsRequest progress.
+
+       KubeBlocks outputs a command automatically for you to view the details of the OpsRequest progress. The output includes the status of this OpsRequest and PVC. When the status is `Succeed`, this OpsRequest is completed.
+   
+       ```bash
+       kbcli cluster describe-ops mycluster-volumeexpansion-5pbd2 -n demo
+       >
+       NAME                              TYPE              CLUSTER      STATUS   PROGRESS   AGE
+       mycluster-volumeexpansion-5pbd2   VolumeExpansion   mycluster    Running  1/1        67s
+       ```
+
+    - View the cluster status.
+
+       ```bash
+       kbcli cluster list mycluster -n demo
+       >
+       NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS     CREATED-TIME
+       mycluster   demo        qdrant                                 Delete               Updating   Aug 15,2023 23:03 UTC+0800
+       ```
+
+      * STATUS=Updating: it means the volume expansion is in progress.
+      * STATUS=Running: it means the volume expansion operation has been applied.
+
+3. After the OpsRequest status is `Succeed` or the cluster status is `Running` again, check whether the corresponding resources change.
+
+    ```bash
+    kbcli cluster describe mycluster -n demo
+    ```
+
+</TabItem>
+
+<TabItem value="OpsRequest" label="OpsRequest">
+
+1. Change the value of storage according to your need and run the command below to expand the volume of a cluster.
+
+    ```yaml
+    kubectl apply -f - <<EOF
+    apiVersion: apps.kubeblocks.io/v1alpha1
+    kind: OpsRequest
+    metadata:
+      name: ops-volume-expansion
+      namespace: demo
+    spec:
+      clusterName: mycluster
+      type: VolumeExpansion
+      volumeExpansion:
+      - componentName: qdrant
+        volumeClaimTemplates:
+        - name: data
+          storage: "40Gi"
+    EOF
+    ```
+
+2. Validate the volume expansion operation.
+
+    ```bash
+    kubectl get ops -n demo
+    >
+    NAMESPACE   NAME                   TYPE              CLUSTER     STATUS    PROGRESS   AGE
+    demo        ops-volume-expansion   VolumeExpansion   mycluster   Succeed   3/3        6m
+    ```
+
+    If an error occurs, you can troubleshoot with `kubectl describe ops -n demo` command to view the events of this operation.
+
+3. Check whether the corresponding cluster resources change.
+
+    ```bash
+    kubectl describe cluster mycluster -n demo
+    ```
+
+</TabItem>
+
+<TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
+
+1. Change the value of `spec.componentSpecs.volumeClaimTemplates.spec.resources` in the cluster YAML file.
+
+   `spec.componentSpecs.volumeClaimTemplates.spec.resources` is the storage resource information of the pod and changing this value triggers the volume expansion of a cluster.
+
+   ```yaml
+   kubectl edit cluster mycluster -n demo
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: Cluster
+   metadata:
+     name: mycluster
+     namespace: demo
+   spec:
+     clusterDefinitionRef: qdrant
+     clusterVersionRef: qdrant-1.8.1
+     componentSpecs:
+     - name: qdrant
+       componentDefRef: qdrant
+       replicas: 2
+       volumeClaimTemplates:
+       - name: data
+         spec:
+           accessModes:
+             - ReadWriteOnce
+           resources:
+             requests:
+               storage: 1Gi # Change the volume storage size.
+     terminationPolicy: Delete
+   ```
+
+2. Check whether the corresponding cluster resources change.
+
+    ```bash
+    kubectl describe cluster mycluster -n demo
+    ```
+
+</TabItem>
+
+</Tabs>
 
 ## Restart
 
-1. Restart a cluster.
+<Tabs>
 
-   Configure the values of `components` and `ttlSecondsAfterSucceed` and run the command below to restart a specified cluster.
+<TabItem value="kbcli" label="kbcli" default>
+
+1. Configure the values of `components` and `ttlSecondsAfterSucceed` and run the command below to restart a specified cluster.
 
    ```bash
-   kbcli cluster restart qdrant --components="qdrant" \
-   --ttlSecondsAfterSucceed=30
+   kbcli cluster restart mycluster -n demo --components="qdrant" --ttlSecondsAfterSucceed=30
    ```
 
    - `components` describes the component name that needs to be restarted.
@@ -292,14 +799,51 @@ kbcli cluster describe qdrant
    Run the command below to check the cluster status to check the restarting status.
 
    ```bash
-   kbcli cluster list qdrant
+   kbcli cluster list mycluster -n demo
    >
-   NAME     NAMESPACE   CLUSTER-DEFINITION     VERSION         TERMINATION-POLICY   STATUS    CREATED-TIME
-   qdrant   default     qdrant                 qdrant-1.8.1    Delete               Running   Aug 15,2023 23:03 UTC+0800
+   NAME        NAMESPACE   CLUSTER-DEFINITION     VERSION         TERMINATION-POLICY   STATUS    CREATED-TIME
+   mycluster   demo        qdrant                                 Delete               Running   Aug 15,2023 23:03 UTC+0800
    ```
 
    * STATUS=Updating: it means the cluster restart is in progress.
    * STATUS=Running: it means the cluster has been restarted.
+
+</TabItem>
+
+<TabItem value="OpsRequest" label="OpsRequest">
+
+1. Restart a cluster.
+
+   ```bash
+   kubectl apply -f - <<EOF
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: OpsRequest
+   metadata:
+     name: ops-restart
+     namespace: demo
+   spec:
+     clusterName: mycluster
+     type: Restart 
+     restart:
+     - componentName: qdrant
+   EOF
+   ```
+
+2. Check the pod and operation status to validate the restarting.
+
+   ```bash
+   kubectl get pod -n demo
+   kubectl get ops ops-restart -n demo
+   ```
+
+   During the restarting process, there are two status types for pods.
+
+   - STATUS=Terminating: it means the cluster restart is in progress.
+   - STATUS=Running: it means the cluster has been restarted.
+
+</TabItem>
+
+</Tabs>
 
 ## Stop/Start a cluster
 
@@ -309,29 +853,167 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
 
 1. Configure the name of your cluster and run the command below to stop this cluster.
 
-   ```bash
-   kbcli cluster stop qdrant
-   ```
+    <Tabs>
+
+    <TabItem value="kbcli" label="kbcli" default>
+
+    ```bash
+    kbcli cluster stop mycluster -n demo
+    ```
+
+    </TabItem>
+
+    <TabItem value="OpsRequest" label="OpsRequest">
+
+    Configure replicas as 0 to delete pods.
+
+    ```bash
+    kubectl apply -f - <<EOF
+    apiVersion: apps.kubeblocks.io/v1alpha1
+    kind: OpsRequest
+    metadata:
+      name: ops-stop
+      namespace: demo
+    spec:
+      clusterName: mycluster
+      type: Stop
+    EOF
+    ```
+
+    </TabItem>
+
+    <TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
+
+    Edit the cluster YAML file and configure replicas as 0 to delete pods.
+
+    ```yaml
+    kubectl edit cluster mycluster -n demo
+    >
+    apiVersion: apps.kubeblocks.io/v1alpha1
+    kind: Cluster
+    metadata:
+        name: mycluster
+        namespace: demo
+    spec:
+      clusterDefinitionRef: qdrant
+      clusterVersionRef: qdrant-1.8.1
+      terminationPolicy: Delete
+      componentSpecs:
+      - name: qdrant
+        componentDefRef: qdrant
+        disableExporter: true  
+        replicas: 0
+    ......
+    ```
+
+    </TabItem>
+
+    </Tabs>
 
 2. Check the status of the cluster to see whether it is stopped.
 
+    <Tabs>
+
+    <TabItem value="kbcli" label="kbcli" default>
+
     ```bash
-    kbcli cluster list
+    kbcli cluster list mycluster -n demo
     ```
+
+    </TabItem>
+
+    <TabItem value="kubectl" label="kubectl">
+
+    ```bash
+    kubectl get cluster mycluster -n demo
+    ```
+
+    </TabItem>
+
+    </Tabs>
 
 ### Start a cluster
 
 1. Configure the name of your cluster and run the command below to start this cluster.
+  
+    <Tabs>
 
-   ```bash
-   kbcli cluster start qdrant
-   ```
+    <TabItem value="kbcli" label="kbcli" default>
+
+    ```bash
+    kbcli cluster start mycluster -n demo
+    ```
+
+    </TabItem>
+
+    <TabItem value="OpsRequest" label="OpsRequest">
+
+    Run the command below to start a cluster.
+
+    ```bash
+    kubectl apply -f - <<EOF
+    apiVersion: apps.kubeblocks.io/v1alpha1
+    kind: OpsRequest
+    metadata:
+      name: ops-start
+      namespace: demo
+    spec:
+      clusterName: mycluster
+      type: Start
+    EOF 
+    ```
+
+    </TabItem>
+
+    <TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
+
+    Change replicas back to the original amount to start this cluster again.
+
+    ```yaml
+    kubectl edit cluster mycluster -n demo
+    >
+    apiVersion: apps.kubeblocks.io/v1alpha1
+    kind: Cluster
+    metadata:
+        name: mycluster
+        namespace: demo
+    spec:
+      clusterDefinitionRef: qdrant
+      clusterVersionRef: qdrant-1.8.1
+      terminationPolicy: Delete
+      componentSpecs:
+      - name: qdrant
+        componentDefRef: qdrant
+        disableExporter: true  
+        replicas: 1
+    ......
+    ```
+
+    </TabItem>
+
+    </Tabs>
 
 2. Check the status of the cluster to see whether it is running again.
 
+    <Tabs>
+
+    <TabItem value="kbcli" label="kbcli" default>
+
     ```bash
-    kbcli cluster list
+    kbcli cluster list mycluster -n demo
     ```
+
+    </TabItem>
+
+    <TabItem value="kubectl" label="kubectl">
+
+    ```bash
+    kubectl get cluster mycluster -n demo
+    ```
+
+    </TabItem>
+
+    </Tabs>
 
 ## Backup and restore
 

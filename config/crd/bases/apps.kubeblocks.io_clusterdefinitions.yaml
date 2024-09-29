@@ -72,6 +72,7 @@ spec:
             description: ClusterDefinitionSpec defines the desired state of ClusterDefinition.
             properties:
               componentDefs:
+                default: []
                 description: |-
                   Provides the definitions for the cluster components.
 

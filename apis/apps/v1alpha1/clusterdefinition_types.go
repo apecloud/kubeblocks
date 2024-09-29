@@ -50,6 +50,7 @@ type ClusterDefinitionSpec struct {
 	// Existing usage should be updated to the current preferred approach to avoid compatibility issues in future releases.
 	//
 	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0"
+	// +kubebuilder:default={}
 	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
 	// +listType=map

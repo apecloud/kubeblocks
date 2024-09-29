@@ -34,6 +34,8 @@ import (
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
+var imageLogger = log.Log.WithName("ImageUtil")
+
 type RegistryConfig struct {
 	From                     string `mapstructure:"from"`
 	To                       string `mapstructure:"to"`
@@ -96,7 +98,7 @@ func ReloadRegistryConfig() {
 	// to replace it every time
 	viper.Set(constant.KBToolsImage, ReplaceImageRegistry(viper.GetString(constant.KBToolsImage)))
 
-	log.Log.Info("registriesConfig reloaded", "registriesConfig", registriesConfig)
+	imageLogger.Info("registriesConfig reloaded", "registriesConfig", registriesConfig)
 }
 
 // For a detailed explanation of an image's format, see:
@@ -109,6 +111,7 @@ func parseImageName(image string) (
 ) {
 	named, err := reference.ParseNormalizedNamed(image)
 	if err != nil {
+		imageLogger.Error(err, "parse image failed, the image remains unchanged", "image", image)
 		return
 	}
 

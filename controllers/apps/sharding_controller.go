@@ -125,6 +125,8 @@ func (r *ShardingReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 			&shardingComponentTransformer{},
 			// handle the restore for cluster sharding components
 			&shardingRestoreTransformer{},
+			// build backupPolicy and backupSchedule from backupPolicyTemplate for cluster sharding components
+			&shardingBackupPolicyTransformer{},
 		).Build()
 
 	// Execute stage

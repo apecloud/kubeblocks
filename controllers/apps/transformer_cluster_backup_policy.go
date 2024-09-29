@@ -87,6 +87,7 @@ func (r *clusterBackupPolicyTransformer) Transform(ctx graph.TransformContext, d
 	if model.IsObjectDeleting(transCtx.OrigCluster) {
 		return nil
 	}
+
 	if common.IsCompactMode(transCtx.OrigCluster.Annotations) {
 		transCtx.V(1).Info("Cluster is in compact mode, no need to create backup related objects",
 			"cluster", client.ObjectKeyFromObject(transCtx.OrigCluster))
@@ -99,7 +100,7 @@ func (r *clusterBackupPolicyTransformer) Transform(ctx graph.TransformContext, d
 		return err
 	}
 
-	backupPolicyCtx := &backupPolicyCtx{
+	bpCtx := &backupPolicyCtx{
 		ctx:      transCtx.Context,
 		cli:      transCtx.Client,
 		logger:   transCtx.Logger,
@@ -107,8 +108,7 @@ func (r *clusterBackupPolicyTransformer) Transform(ctx graph.TransformContext, d
 		cluster:  transCtx.OrigCluster,
 		tplCount: len(backupPolicyTPLs.Items),
 	}
-
-	if err := reconcileBackupPolicyTemplate(dag, graphCli, backupPolicyCtx, backupPolicyTPLs); err != nil {
+	if err := r.reconcileBackupPolicyTemplates(dag, graphCli, bpCtx, backupPolicyTPLs); err != nil {
 		return err
 	}
 	return nil
@@ -134,14 +134,34 @@ func (r *clusterBackupPolicyTransformer) getBackupPolicyTemplates(transCtx *clus
 	return backupPolicyTPLs, nil
 }
 
-func getClusterComponentItems(backupPolicyCtx *backupPolicyCtx) []componentItem {
+func (r *clusterBackupPolicyTransformer) reconcileBackupPolicyTemplates(dag *graph.DAG, graphCli model.GraphClient, backupPolicyCtx *backupPolicyCtx,
+	bptList *appsv1alpha1.BackupPolicyTemplateList) error {
+	backupPolicyMap := map[string]struct{}{}
+	backupScheduleMap := map[string]struct{}{}
+	for _, tpl := range bptList.Items {
+		backupPolicyCtx.isDefaultTemplate = tpl.Annotations[dptypes.DefaultBackupPolicyTemplateAnnotationKey]
+		backupPolicyCtx.tplIdentifier = tpl.Spec.Identifier
+		backupPolicyCtx.backupPolicyTpl = &tpl
+		for i := range tpl.Spec.BackupPolicies {
+			backupPolicyCtx.backupPolicy = &tpl.Spec.BackupPolicies[i]
+			compItems := r.getClusterComponentItems(backupPolicyCtx)
+			if err := reconcileBackupPolicyTemplate(dag, graphCli, backupPolicyCtx, compItems, backupPolicyMap, backupScheduleMap); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (r *clusterBackupPolicyTransformer) getClusterComponentItems(backupPolicyCtx *backupPolicyCtx) []componentItem {
 	matchedCompDef := func(compSpec appsv1.ClusterComponentSpec) bool {
 		// TODO: support to create bp when using cluster topology and componentDef is empty
-		if len(compSpec.ComponentDef) > 0 {
-			for _, compDef := range backupPolicyCtx.backupPolicy.ComponentDefs {
-				if strings.HasPrefix(compSpec.ComponentDef, compDef) || strings.HasPrefix(compDef, compSpec.ComponentDef) {
-					return true
-				}
+		if len(compSpec.ComponentDef) == 0 {
+			return false
+		}
+		for _, compDef := range backupPolicyCtx.backupPolicy.ComponentDefs {
+			if strings.HasPrefix(compSpec.ComponentDef, compDef) || strings.HasPrefix(compDef, compSpec.ComponentDef) {
+				return true
 			}
 		}
 		return false
@@ -156,120 +176,94 @@ func getClusterComponentItems(backupPolicyCtx *backupPolicyCtx) []componentItem 
 			})
 		}
 	}
-	for i, v := range backupPolicyCtx.cluster.Spec.ShardingSpecs {
-		shardComponents, _ := intctrlutil.ListShardingComponents(backupPolicyCtx.ctx, backupPolicyCtx.cli, backupPolicyCtx.cluster, v.Name)
-		if len(shardComponents) == 0 {
-			// waiting for sharding component to be created
-			continue
-		}
-		if matchedCompDef(v.Template) {
-			compSpecItems = append(compSpecItems, componentItem{
-				compSpec:      &backupPolicyCtx.cluster.Spec.ShardingSpecs[i].Template,
-				componentName: v.Name,
-				isSharding:    true,
-			})
-		}
-	}
 	return compSpecItems
 }
 
-func reconcileBackupPolicyTemplate(dag *graph.DAG, graphCli model.GraphClient, backupPolicyCtx *backupPolicyCtx, bptList *appsv1alpha1.BackupPolicyTemplateList) error {
-	backupPolicyNames := map[string]struct{}{}
-	backupScheduleNames := map[string]struct{}{}
-	for _, tpl := range bptList.Items {
-		backupPolicyCtx.isDefaultTemplate = tpl.Annotations[dptypes.DefaultBackupPolicyTemplateAnnotationKey]
-		backupPolicyCtx.tplIdentifier = tpl.Spec.Identifier
-		backupPolicyCtx.backupPolicyTpl = &tpl
-
-		for i := range tpl.Spec.BackupPolicies {
-			backupPolicyCtx.backupPolicy = &tpl.Spec.BackupPolicies[i]
-
-			transformBackupPolicy := func(comp componentItem) *dpv1alpha1.BackupPolicy {
-				// build the data protection backup policy from the template.
-				oldBackupPolicy, newBackupPolicy := transformBackupPolicy(backupPolicyCtx, comp)
-				if newBackupPolicy == nil {
-					return nil
-				}
-
-				// if exist multiple backup policy templates and duplicate spec.identifier,
-				// the generated backupPolicy may have duplicate names, so it is
-				// necessary to check if it already exists.
-				if _, ok := backupPolicyNames[newBackupPolicy.Name]; ok {
-					return nil
-				}
-
-				if oldBackupPolicy == nil {
-					graphCli.Create(dag, newBackupPolicy)
-				} else {
-					graphCli.Patch(dag, oldBackupPolicy, newBackupPolicy)
-				}
-				backupPolicyNames[newBackupPolicy.Name] = struct{}{}
-				return newBackupPolicy
-			}
-
-			transformBackupSchedule := func(comp componentItem, backupPolicy *dpv1alpha1.BackupPolicy, needMergeClusterBackup bool) {
-				// if backup policy is nil, it means that the backup policy template
-				// is invalid, backup schedule depends on backup policy, so we do
-				// not need to transform backup schedule.
-				if backupPolicy == nil {
-					return
-				}
-
-				// only create backup schedule for the default backup policy template
-				// if there are more than one backup policy templates.
-				if backupPolicyCtx.isDefaultTemplate != trueVal && backupPolicyCtx.tplCount > 1 {
-					backupPolicyCtx.logger.V(1).Info("Skip creating backup schedule for non-default backup policy template", "template", tpl.Name)
-					return
-				}
-
-				// build the data protection backup schedule from the template.
-				oldBackupSchedule, newBackupSchedule := transformBackupSchedule(backupPolicyCtx, comp, backupPolicy)
-
-				// merge cluster backup configuration into the backup schedule.
-				// If the backup schedule is nil, create a new backup schedule
-				// based on the cluster backup configuration.
-				// For a cluster, the default backup schedule is created by backup
-				// policy template, user can also configure cluster backup in the
-				// cluster custom object, such as enable cluster backup, set backup
-				// schedule, etc.
-				// We always prioritize the cluster backup configuration in the
-				// cluster object, so we need to merge the cluster backup configuration
-				// into the default backup schedule created by backup policy template
-				// if it exists.
-				if needMergeClusterBackup {
-					newBackupSchedule = mergeClusterBackup(backupPolicyCtx, comp, backupPolicy, newBackupSchedule)
-				}
-				if newBackupSchedule == nil {
-					return
-				}
-				// if exist multiple backup policy templates and duplicate spec.identifier,
-				// the backupSchedule that may be generated may have duplicate names,
-				// and it is necessary to check if it already exists.
-				if _, ok := backupScheduleNames[newBackupSchedule.Name]; ok {
-					return
-				}
-
-				if oldBackupSchedule == nil {
-					graphCli.Create(dag, newBackupSchedule)
-				} else {
-					graphCli.Patch(dag, oldBackupSchedule, newBackupSchedule)
-				}
-				graphCli.DependOn(dag, backupPolicy, newBackupSchedule)
-				comps := graphCli.FindAll(dag, &appsv1.Component{})
-				graphCli.DependOn(dag, backupPolicy, comps...)
-				backupScheduleNames[newBackupSchedule.Name] = struct{}{}
-			}
-
-			// transform backup policy template to data protection backupPolicy
-			// and backupSchedule
-			compItems := getClusterComponentItems(backupPolicyCtx)
-			for j, v := range compItems {
-				policy := transformBackupPolicy(v)
-				// only merge the first backupSchedule for the cluster backup.
-				transformBackupSchedule(v, policy, j == 0)
-			}
+func reconcileBackupPolicyTemplate(dag *graph.DAG, graphCli model.GraphClient, backupPolicyCtx *backupPolicyCtx,
+	compItems []componentItem, backupPolicyMap, backupScheduleMap map[string]struct{}) error {
+	transformBackupPolicyWrap := func(comp componentItem) *dpv1alpha1.BackupPolicy {
+		// build the data protection backup policy from the template.
+		oldBackupPolicy, newBackupPolicy := transformBackupPolicy(backupPolicyCtx, comp)
+		if newBackupPolicy == nil {
+			return nil
 		}
+
+		// if exist multiple backup policy templates and duplicate spec.identifier,
+		// the generated backupPolicy may have duplicate names, so it is
+		// necessary to check if it already exists.
+		if _, ok := backupPolicyMap[newBackupPolicy.Name]; ok {
+			return nil
+		}
+
+		if oldBackupPolicy == nil {
+			graphCli.Create(dag, newBackupPolicy)
+		} else {
+			graphCli.Patch(dag, oldBackupPolicy, newBackupPolicy)
+		}
+		backupPolicyMap[newBackupPolicy.Name] = struct{}{}
+		return newBackupPolicy
 	}
+
+	transformBackupScheduleWrap := func(comp componentItem, backupPolicy *dpv1alpha1.BackupPolicy, needMergeClusterBackup bool) {
+		// if backup policy is nil, it means that the backup policy template
+		// is invalid, backup schedule depends on backup policy, so we do
+		// not need to transform backup schedule.
+		if backupPolicy == nil {
+			return
+		}
+
+		// only create backup schedule for the default backup policy template
+		// if there are more than one backup policy templates.
+		if backupPolicyCtx.isDefaultTemplate != trueVal && backupPolicyCtx.tplCount > 1 {
+			backupPolicyCtx.logger.V(1).Info("Skip creating backup schedule for non-default backup policy template", "template", backupPolicyCtx.backupPolicyTpl.Name)
+			return
+		}
+
+		// build the data protection backup schedule from the template.
+		oldBackupSchedule, newBackupSchedule := transformBackupSchedule(backupPolicyCtx, comp, backupPolicy)
+
+		// merge cluster backup configuration into the backup schedule.
+		// If the backup schedule is nil, create a new backup schedule
+		// based on the cluster backup configuration.
+		// For a cluster, the default backup schedule is created by backup
+		// policy template, user can also configure cluster backup in the
+		// cluster custom object, such as enable cluster backup, set backup
+		// schedule, etc.
+		// We always prioritize the cluster backup configuration in the
+		// cluster object, so we need to merge the cluster backup configuration
+		// into the default backup schedule created by backup policy template
+		// if it exists.
+		if needMergeClusterBackup {
+			newBackupSchedule = mergeClusterBackup(backupPolicyCtx, comp, backupPolicy, newBackupSchedule)
+		}
+		if newBackupSchedule == nil {
+			return
+		}
+		// if exist multiple backup policy templates and duplicate spec.identifier,
+		// the backupSchedule that may be generated may have duplicate names,
+		// and it is necessary to check if it already exists.
+		if _, ok := backupScheduleMap[newBackupSchedule.Name]; ok {
+			return
+		}
+
+		if oldBackupSchedule == nil {
+			graphCli.Create(dag, newBackupSchedule)
+		} else {
+			graphCli.Patch(dag, oldBackupSchedule, newBackupSchedule)
+		}
+		graphCli.DependOn(dag, backupPolicy, newBackupSchedule)
+		comps := graphCli.FindAll(dag, &appsv1.Component{})
+		graphCli.DependOn(dag, backupPolicy, comps...)
+		backupScheduleMap[newBackupSchedule.Name] = struct{}{}
+	}
+
+	// transform backup policy template to data protection backupPolicy and backupSchedule
+	for j, v := range compItems {
+		policy := transformBackupPolicyWrap(v)
+		// only merge the first backupSchedule for the cluster backup.
+		transformBackupScheduleWrap(v, policy, j == 0)
+	}
+
 	return nil
 }
 

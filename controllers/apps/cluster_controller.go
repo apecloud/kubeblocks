@@ -176,9 +176,9 @@ func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			MaxConcurrentReconciles: int(math.Ceil(viper.GetFloat64(constant.CfgKBReconcileWorkers) / 4)),
 		}).
 		Owns(&appsv1.Component{}).
-		Watches(&appsv1.Component{}, handler.EnqueueRequestsFromMapFunc(filterShardingResources)). // for sharding components
 		Owns(&corev1.Service{}). // cluster services
 		Owns(&dpv1alpha1.BackupPolicy{}).
 		Owns(&dpv1alpha1.BackupSchedule{}).
+		Watches(&appsv1.Component{}, handler.EnqueueRequestsFromMapFunc(filterShardingResources)). // for sharding components
 		Complete(r)
 }

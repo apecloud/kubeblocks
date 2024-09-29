@@ -212,7 +212,7 @@ func renderSwitchoverCmdJob(ctx context.Context,
 						Containers: []corev1.Container{
 							{
 								Name:            KBSwitchoverJobContainerName,
-								Image:           switchoverSpec.Exec.Image,
+								Image:           intctrlutil.ReplaceImageRegistry(switchoverSpec.Exec.Image),
 								ImagePullPolicy: corev1.PullIfNotPresent,
 								Command:         switchoverSpec.Exec.Command,
 								Args:            switchoverSpec.Exec.Args,

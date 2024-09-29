@@ -92,6 +92,10 @@ func ReloadRegistryConfig() {
 		}
 	}
 
+	// since the use of kb tools image is widespread, set viper value here so that we don't need
+	// to replace it every time
+	viper.Set(constant.KBToolsImage, ReplaceImageRegistry(viper.GetString(constant.KBToolsImage)))
+
 	log.Log.Info("registriesConfig reloaded", "registriesConfig", registriesConfig)
 }
 

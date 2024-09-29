@@ -405,10 +405,11 @@ func (r *Request) BuildJobActionPodSpec(targetPod *corev1.Pod,
 	if err != nil {
 		return nil, err
 	}
+	// expand the image value with the env variables.
+	image := common.Expand(job.Image, common.MappingFuncFor(utils.CovertEnvToMap(env)))
 	container := corev1.Container{
-		Name: name,
-		// expand the image value with the env variables.
-		Image:           common.Expand(job.Image, common.MappingFuncFor(utils.CovertEnvToMap(env))),
+		Name:            name,
+		Image:           intctrlutil.ReplaceImageRegistry(image),
 		Command:         job.Command,
 		Env:             env,
 		EnvFrom:         targetPod.Spec.Containers[0].EnvFrom,

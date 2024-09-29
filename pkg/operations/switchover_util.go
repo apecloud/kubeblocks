@@ -22,44 +22,22 @@ package operations
 import (
 	"context"
 	"encoding/json"
-	"fmt"
-	"strings"
 
 	"github.com/pkg/errors"
-	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
-	jobutil "github.com/apecloud/kubeblocks/pkg/controller/job"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 // switchover constants
 const (
-	OpsReasonForSkipSwitchover = "SkipSwitchover"
-
+	OpsReasonForSkipSwitchover             = "SkipSwitchover"
 	KBSwitchoverCandidateInstanceForAnyPod = "*"
-
-	KBSwitchoverJobLabelKey       = "kubeblocks.io/switchover-job"
-	KBSwitchoverJobLabelValue     = "kb-switchover-job"
-	KBSwitchoverJobNamePrefix     = "kb-switchover-job"
-	KBSwitchoverJobContainerName  = "kb-switchover-job-container"
-	KBSwitchoverCheckJobKey       = "CheckJob"
-	KBSwitchoverCheckRoleLabelKey = "CheckRoleLabel"
-
-	KBSwitchoverCandidateName = "KB_SWITCHOVER_CANDIDATE_NAME"
-	KBSwitchoverCandidateFqdn = "KB_SWITCHOVER_CANDIDATE_FQDN"
-
-	KBSwitchoverLeaderPodIP   = "KB_LEADER_POD_IP"
-	KBSwitchoverLeaderPodName = "KB_LEADER_POD_NAME"
-	KBSwitchoverLeaderPodFqdn = "KB_LEADER_POD_FQDN"
+	KBSwitchoverDoNCheckRoleChangeKey      = "DoSwitchoverAndCheckRoleChange"
 )
 
 // needDoSwitchover checks whether we need to perform a switchover.
@@ -67,7 +45,7 @@ func needDoSwitchover(ctx context.Context,
 	cli client.Client,
 	synthesizedComp *component.SynthesizedComponent,
 	switchover *opsv1alpha1.Switchover) (bool, error) {
-	// get the Pod object whose current role label is primary
+	// get the Pod object whose current role label is already serviceable and writable
 	pod, err := getServiceableNWritablePod(ctx, cli, *synthesizedComp)
 	if err != nil {
 		return false, err
@@ -96,45 +74,9 @@ func needDoSwitchover(ctx context.Context,
 	return true, nil
 }
 
-// createSwitchoverJob creates a switchover job to do switchover.
-func createSwitchoverJob(reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
-	cluster *appsv1.Cluster,
-	synthesizedComp *component.SynthesizedComponent,
-	switchover *opsv1alpha1.Switchover) error {
-	switchoverJob, err := renderSwitchoverCmdJob(reqCtx.Ctx, cli, cluster, synthesizedComp, switchover)
-	if err != nil {
-		return err
-	}
-	// check the current generation switchoverJob whether exist
-	key := types.NamespacedName{Namespace: cluster.Namespace, Name: switchoverJob.Name}
-	exists, _ := intctrlutil.CheckResourceExists(reqCtx.Ctx, cli, key, &batchv1.Job{})
-	if !exists {
-		// check the previous generation switchoverJob whether exist
-		ml := getSwitchoverCmdJobLabel(cluster.Name, synthesizedComp.Name)
-		previousJobs, err := jobutil.GetJobWithLabels(reqCtx.Ctx, cli, cluster, ml)
-		if err != nil {
-			return err
-		}
-		if len(previousJobs) > 0 {
-			// delete the previous generation switchoverJob
-			reqCtx.Log.V(1).Info("delete previous generation switchoverJob", "job", previousJobs[0].Name)
-			if err := jobutil.CleanJobWithLabels(reqCtx.Ctx, cli, cluster, ml); err != nil {
-				return err
-			}
-		}
-		// create the current generation switchoverJob
-		if err := cli.Create(reqCtx.Ctx, switchoverJob); err != nil {
-			return err
-		}
-		return nil
-	}
-	return nil
-}
-
 // checkPodRoleLabelConsistency checks whether the pod role label is consistent with the specified role label after switchover.
 func checkPodRoleLabelConsistency(ctx context.Context,
-	cli client.Client,
+	cli client.Reader,
 	synthesizedComp component.SynthesizedComponent,
 	switchover *opsv1alpha1.Switchover,
 	switchoverCondition *metav1.Condition) (bool, error) {
@@ -171,181 +113,8 @@ func checkPodRoleLabelConsistency(ctx context.Context,
 	return false, nil
 }
 
-// renderSwitchoverCmdJob renders and creates the switchover command jobs.
-func renderSwitchoverCmdJob(ctx context.Context,
-	cli client.Client,
-	cluster *appsv1.Cluster,
-	synthesizedComp *component.SynthesizedComponent,
-	switchover *opsv1alpha1.Switchover) (*batchv1.Job, error) {
-	if synthesizedComp.LifecycleActions == nil || synthesizedComp.LifecycleActions.Switchover == nil || switchover == nil {
-		return nil, errors.New("switchover spec not found")
-	}
-	pod, err := getServiceableNWritablePod(ctx, cli, *synthesizedComp)
-	if err != nil {
-		return nil, err
-	}
-	if pod == nil {
-		return nil, errors.New("serviceable and writable pod not found")
-	}
-
-	renderJob := func(switchoverSpec *appsv1.Action, switchoverEnvs []corev1.EnvVar) (*batchv1.Job, error) {
-		if switchoverSpec == nil {
-			return nil, errors.New("switchover exec action not found")
-		}
-
-		// jobName named with generation to distinguish different switchover jobs.
-		jobName := genSwitchoverJobName(cluster.Name, synthesizedComp.Name, cluster.Generation)
-		job := &batchv1.Job{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: cluster.Namespace,
-				Name:      jobName,
-				Labels:    getSwitchoverCmdJobLabel(cluster.Name, synthesizedComp.Name),
-			},
-			Spec: batchv1.JobSpec{
-				Template: corev1.PodTemplateSpec{
-					ObjectMeta: metav1.ObjectMeta{
-						Namespace: cluster.Namespace,
-						Name:      jobName,
-					},
-					Spec: corev1.PodSpec{
-						RestartPolicy: corev1.RestartPolicyNever,
-						Containers: []corev1.Container{
-							{
-								Name:            KBSwitchoverJobContainerName,
-								Image:           switchoverSpec.Exec.Image,
-								ImagePullPolicy: corev1.PullIfNotPresent,
-								Command:         switchoverSpec.Exec.Command,
-								Args:            switchoverSpec.Exec.Args,
-								Env:             switchoverEnvs,
-							},
-						},
-					},
-				},
-			},
-		}
-		for i := range job.Spec.Template.Spec.Containers {
-			intctrlutil.InjectZeroResourcesLimitsIfEmpty(&job.Spec.Template.Spec.Containers[i])
-		}
-		if err := jobutil.BuildJobTolerations(cluster, job); err != nil {
-			return nil, err
-		}
-		return job, nil
-	}
-
-	switchoverEnvs, err := buildSwitchoverEnvs(ctx, cli, cluster, synthesizedComp, switchover)
-	if err != nil {
-		return nil, err
-	}
-	job, err := renderJob(synthesizedComp.LifecycleActions.Switchover, switchoverEnvs)
-	if err != nil {
-		return nil, err
-	}
-	return job, nil
-}
-
-// genSwitchoverJobName generates the switchover job name.
-func genSwitchoverJobName(clusterName, componentName string, generation int64) string {
-	return fmt.Sprintf("%s-%s-%s-%d", KBSwitchoverJobNamePrefix, clusterName, componentName, generation)
-}
-
-// getSwitchoverCmdJobLabel gets the labels for job that execute the switchover commands.
-func getSwitchoverCmdJobLabel(clusterName, componentName string) map[string]string {
-	return map[string]string{
-		constant.AppInstanceLabelKey:    clusterName,
-		constant.KBAppComponentLabelKey: componentName,
-		constant.AppManagedByLabelKey:   constant.AppName,
-		KBSwitchoverJobLabelKey:         KBSwitchoverJobLabelValue,
-	}
-}
-
-// buildSwitchoverCandidateEnv builds the candidate instance name environment variable for the switchover job.
-func buildSwitchoverCandidateEnv(
-	cluster *appsv1.Cluster,
-	componentName string,
-	switchover *opsv1alpha1.Switchover) []corev1.EnvVar {
-	svcName := strings.Join([]string{cluster.Name, componentName, "headless"}, "-")
-	if switchover == nil {
-		return nil
-	}
-	if switchover.InstanceName == KBSwitchoverCandidateInstanceForAnyPod {
-		return nil
-	}
-	return []corev1.EnvVar{
-		{
-			Name:  KBSwitchoverCandidateName,
-			Value: switchover.InstanceName,
-		},
-		{
-			Name:  KBSwitchoverCandidateFqdn,
-			Value: fmt.Sprintf("%s.%s", switchover.InstanceName, svcName),
-		},
-	}
-}
-
-// buildSwitchoverEnvs builds the environment variables for the switchover job.
-func buildSwitchoverEnvs(ctx context.Context,
-	cli client.Client,
-	cluster *appsv1.Cluster,
-	synthesizeComp *component.SynthesizedComponent,
-	switchover *opsv1alpha1.Switchover) ([]corev1.EnvVar, error) {
-	if synthesizeComp == nil || synthesizeComp.LifecycleActions == nil ||
-		synthesizeComp.LifecycleActions.Switchover == nil ||
-		synthesizeComp.LifecycleActions.Switchover.Exec == nil || switchover == nil {
-		return nil, errors.New("switchover spec not found")
-	}
-
-	var switchoverEnvs []corev1.EnvVar
-	switchoverEnvs = append(switchoverEnvs, synthesizeComp.LifecycleActions.Switchover.Exec.Env...)
-
-	// inject the old primary info into the environment variable
-	workloadEnvs, err := buildSwitchoverWorkloadEnvs(ctx, cli, synthesizeComp)
-	if err != nil {
-		return nil, err
-	}
-	switchoverEnvs = append(switchoverEnvs, workloadEnvs...)
-
-	// inject the candidate instance name into the environment variable if specify the candidate instance
-	switchoverCandidateEnvs := buildSwitchoverCandidateEnv(cluster, synthesizeComp.Name, switchover)
-	switchoverEnvs = append(switchoverEnvs, switchoverCandidateEnvs...)
-	return switchoverEnvs, nil
-}
-
-// buildSwitchoverWorkloadEnvs builds the replication or consensus workload environment variables for the switchover job.
-func buildSwitchoverWorkloadEnvs(ctx context.Context,
-	cli client.Client,
-	synthesizeComp *component.SynthesizedComponent) ([]corev1.EnvVar, error) {
-	var workloadEnvs []corev1.EnvVar
-	pod, err := getServiceableNWritablePod(ctx, cli, *synthesizeComp)
-	if err != nil {
-		return nil, err
-	}
-	if pod == nil {
-		return nil, errors.New("serviceable and writable pod not found")
-	}
-	svcName := strings.Join([]string{synthesizeComp.ClusterName, synthesizeComp.Name, "headless"}, "-")
-
-	workloadEnvs = append(workloadEnvs, []corev1.EnvVar{
-		{
-			Name:  KBSwitchoverLeaderPodIP,
-			Value: pod.Status.PodIP,
-		},
-		{
-			Name:  KBSwitchoverLeaderPodName,
-			Value: pod.Name,
-		},
-		{
-			Name:  KBSwitchoverLeaderPodFqdn,
-			Value: fmt.Sprintf("%s.%s", pod.Name, svcName),
-		},
-	}...)
-
-	// add the first container's environment variables of the primary pod
-	workloadEnvs = append(workloadEnvs, pod.Spec.Containers[0].Env...)
-	return workloadEnvs, nil
-}
-
 // getServiceableNWritablePod returns the serviceable and writable pod of the component.
-func getServiceableNWritablePod(ctx context.Context, cli client.Client, synthesizeComp component.SynthesizedComponent) (*corev1.Pod, error) {
+func getServiceableNWritablePod(ctx context.Context, cli client.Reader, synthesizeComp component.SynthesizedComponent) (*corev1.Pod, error) {
 	if synthesizeComp.Roles == nil {
 		return nil, errors.New("component does not support switchover")
 	}

@@ -157,23 +157,18 @@ spec:
                     items:
                       description: ObjectChange defines a detailed change of an object.
                       properties:
-                        LocalDescription:
-                          description: |-
-                            LocalDescription is the localized version of Description by using the Locale specified in `spec.locale`.
-                            Empty if the `spec.locale` is not specified.
-                          type: string
                         changeType:
                           description: |-
                             ChangeType specifies the change type.
                             Event - specifies that this is a Kubernetes Event.
-                            ObjectCreation - specifies that this is an object creation.
-                            ObjectUpdate - specifies that this is an object update.
-                            ObjectDeletion - specifies that this is an object deletion.
+                            Creation - specifies that this is an object creation.
+                            Update - specifies that this is an object update.
+                            Deletion - specifies that this is an object deletion.
                           enum:
                           - Event
-                          - ObjectCreation
-                          - ObjectUpdate
-                          - ObjectDeletion
+                          - Creation
+                          - Update
+                          - Deletion
                           type: string
                         description:
                           description: Description describes the change in a user-friendly
@@ -193,6 +188,11 @@ spec:
                           - reason
                           - type
                           type: object
+                        localDescription:
+                          description: |-
+                            LocalDescription is the localized version of Description by using the Locale specified in `spec.locale`.
+                            Empty if the `spec.locale` is not specified.
+                          type: string
                         objectReference:
                           description: ObjectReference specifies the Object this change
                             described.
@@ -387,23 +387,18 @@ spec:
                     items:
                       description: ObjectChange defines a detailed change of an object.
                       properties:
-                        LocalDescription:
-                          description: |-
-                            LocalDescription is the localized version of Description by using the Locale specified in `spec.locale`.
-                            Empty if the `spec.locale` is not specified.
-                          type: string
                         changeType:
                           description: |-
                             ChangeType specifies the change type.
                             Event - specifies that this is a Kubernetes Event.
-                            ObjectCreation - specifies that this is an object creation.
-                            ObjectUpdate - specifies that this is an object update.
-                            ObjectDeletion - specifies that this is an object deletion.
+                            Creation - specifies that this is an object creation.
+                            Update - specifies that this is an object update.
+                            Deletion - specifies that this is an object deletion.
                           enum:
                           - Event
-                          - ObjectCreation
-                          - ObjectUpdate
-                          - ObjectDeletion
+                          - Creation
+                          - Update
+                          - Deletion
                           type: string
                         description:
                           description: Description describes the change in a user-friendly
@@ -423,6 +418,11 @@ spec:
                           - reason
                           - type
                           type: object
+                        localDescription:
+                          description: |-
+                            LocalDescription is the localized version of Description by using the Locale specified in `spec.locale`.
+                            Empty if the `spec.locale` is not specified.
+                          type: string
                         objectReference:
                           description: ObjectReference specifies the Object this change
                             described.
@@ -642,23 +642,18 @@ spec:
                           description: ObjectChange defines a detailed change of an
                             object.
                           properties:
-                            LocalDescription:
-                              description: |-
-                                LocalDescription is the localized version of Description by using the Locale specified in `spec.locale`.
-                                Empty if the `spec.locale` is not specified.
-                              type: string
                             changeType:
                               description: |-
                                 ChangeType specifies the change type.
                                 Event - specifies that this is a Kubernetes Event.
-                                ObjectCreation - specifies that this is an object creation.
-                                ObjectUpdate - specifies that this is an object update.
-                                ObjectDeletion - specifies that this is an object deletion.
+                                Creation - specifies that this is an object creation.
+                                Update - specifies that this is an object update.
+                                Deletion - specifies that this is an object deletion.
                               enum:
                               - Event
-                              - ObjectCreation
-                              - ObjectUpdate
-                              - ObjectDeletion
+                              - Creation
+                              - Update
+                              - Deletion
                               type: string
                             description:
                               description: Description describes the change in a user-friendly
@@ -678,6 +673,11 @@ spec:
                               - reason
                               - type
                               type: object
+                            localDescription:
+                              description: |-
+                                LocalDescription is the localized version of Description by using the Locale specified in `spec.locale`.
+                                Empty if the `spec.locale` is not specified.
+                              type: string
                             objectReference:
                               description: ObjectReference specifies the Object this
                                 change described.

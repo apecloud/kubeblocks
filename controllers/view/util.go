@@ -546,10 +546,10 @@ func buildChanges(objKeySet sets.Set[model.GVKNObjKey], oldObjectMap, newObjectM
 			// TODO(free6om): State
 			Revision:    parseRevision(obj.GetResourceVersion()),
 			Timestamp:   func() *metav1.Time { t := metav1.Now(); return &t }(),
-			Description: formatDescription(oldObj, newObj, changeType, i18nResource, getStringWithDefault(defaultLocale, "en")),
+			Description: formatDescription(oldObj, newObj, changeType, &key.GroupVersionKind, i18nResource, getStringWithDefault(defaultLocale, "en")),
 		}
 		if locale != nil {
-			change.LocalDescription = pointer.String(formatDescription(oldObj, newObj, changeType, i18nResource, *locale))
+			change.LocalDescription = pointer.String(formatDescription(oldObj, newObj, changeType, &key.GroupVersionKind, i18nResource, *locale))
 		}
 		changes = append(changes, change)
 	}
@@ -563,13 +563,24 @@ func getStringWithDefault(ptr *string, defaultStr string) string {
 	return defaultStr
 }
 
-func formatDescription(oldObj, newObj client.Object, changeType viewv1.ObjectChangeType, i18nResource *corev1.ConfigMap, locale string) string {
-	if locale == "" {
-		return ""
+func formatDescription(oldObj, newObj client.Object, changeType viewv1.ObjectChangeType, gvk *schema.GroupVersionKind, i18nResource *corev1.ConfigMap, locale string) string {
+	defaultStr := string(changeType)
+	if oldObj == nil && newObj == nil {
+		return defaultStr
 	}
-	// TODO(free6om): finish me
-	// TODO(free6om): handle nil oldObj(that lost after controller restarted)
-	return string(changeType)
+	if err := defaultResourcesManager.ParseRaw(i18nResource); err != nil {
+		return defaultStr
+	}
+	obj := newObj
+	if obj == nil {
+		obj = oldObj
+	}
+	key := fmt.Sprintf("%s/%s/%s", gvk.GroupVersion().String(), gvk.Kind, changeType)
+	formatString := defaultResourcesManager.GetFormatString(key, locale)
+	if len(formatString) == 0 {
+		return defaultStr
+	}
+	return fmt.Sprintf(formatString, obj.GetNamespace(), obj.GetName())
 }
 
 func getObjectsFromTree(tree *viewv1.ObjectTreeNode, store ObjectRevisionStore, scheme *runtime.Scheme) (map[model.GVKNObjKey]client.Object, error) {

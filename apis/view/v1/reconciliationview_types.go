@@ -270,11 +270,11 @@ type ObjectChange struct {
 
 	// ChangeType specifies the change type.
 	// Event - specifies that this is a Kubernetes Event.
-	// ObjectCreation - specifies that this is an object creation.
-	// ObjectUpdate - specifies that this is an object update.
-	// ObjectDeletion - specifies that this is an object deletion.
+	// Creation - specifies that this is an object creation.
+	// Update - specifies that this is an object update.
+	// Deletion - specifies that this is an object deletion.
 	//
-	// +kubebuilder:validation:Enum={Event, ObjectCreation, ObjectUpdate, ObjectDeletion}
+	// +kubebuilder:validation:Enum={Event, Creation, Update, Deletion}
 	ChangeType ObjectChangeType `json:"changeType"`
 
 	// EventAttributes specifies the attributes of the event when ChangeType is Event.
@@ -305,15 +305,15 @@ type ObjectChange struct {
 	// LocalDescription is the localized version of Description by using the Locale specified in `spec.locale`.
 	// Empty if the `spec.locale` is not specified.
 	//
-	LocalDescription *string `json:"LocalDescription,omitempty"`
+	LocalDescription *string `json:"localDescription,omitempty"`
 }
 
 type ObjectChangeType string
 
 const (
-	ObjectCreationType ObjectChangeType = "ObjectCreation"
-	ObjectUpdateType   ObjectChangeType = "ObjectUpdate"
-	ObjectDeletionType ObjectChangeType = "ObjectDeletion"
+	ObjectCreationType ObjectChangeType = "Creation"
+	ObjectUpdateType   ObjectChangeType = "Update"
+	ObjectDeletionType ObjectChangeType = "Deletion"
 	EventType          ObjectChangeType = "Event"
 )
 

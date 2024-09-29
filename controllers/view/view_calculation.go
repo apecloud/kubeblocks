@@ -21,11 +21,11 @@ package view
 
 import (
 	"context"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -68,49 +68,49 @@ func (c *viewCalculator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.
 		return kubebuilderx.Commit, err
 	}
 
+	// handle object changes
 	// build new object set from cache
 	newObjectMap, err := getObjectsFromCache(c.ctx, c.cli, root, kbOwnershipRules)
 	if err != nil {
 		return kubebuilderx.Commit, err
 	}
-	newObjectSet := sets.KeySet(newObjectMap)
-
 	// build old object set from store
 	currentState := &view.Status.CurrentState
 	oldObjectMap, err := getObjectsFromTree(currentState.ObjectTree, c.store, c.scheme)
 	if err != nil {
 		return kubebuilderx.Commit, err
 	}
-	oldObjectSet := sets.KeySet(oldObjectMap)
+	changes := buildChanges(oldObjectMap, newObjectMap, buildDescriptionFormatter(i18nResource, defaultLocale, view.Spec.Locale))
 
-	// calculate createSet, deleteSet and updateSet
-	createSet := newObjectSet.Difference(oldObjectSet)
-	updateSet := newObjectSet.Intersection(oldObjectSet)
-	deleteSet := oldObjectSet.Difference(newObjectSet)
+	// handle event changes
+	newEventMap, err := filterEvents(func() ([]client.Object, error) {
+		eventList := &corev1.EventList{}
+		if err := c.cli.List(c.ctx, eventList); err != nil {
+			return nil, err
+		}
+		var objects []client.Object
+		for i := range eventList.Items {
+			objects = append(objects, &eventList.Items[i])
+		}
+		return objects, nil
+	}, newObjectMap)
+	oldEventMap, err := filterEvents(func() ([]client.Object, error) {
+		return c.store.List(&eventGVK), nil
+	}, oldObjectMap)
+	eventChanges := buildChanges(oldEventMap, newEventMap, buildDescriptionFormatter(i18nResource, defaultLocale, view.Spec.Locale))
+	changes = append(changes, eventChanges...)
 
-	// build new slice of reconciliation changes from last round calculation
-	var changeSlice []viewv1.ObjectChange
-	// for createSet, build objectChange.description by reading i18n of the corresponding object type.
-	changes := buildChanges(createSet, oldObjectMap, newObjectMap, viewv1.ObjectCreationType, i18nResource, defaultLocale, view.Spec.Locale)
-	changeSlice = append(changeSlice, changes...)
-	// for updateSet, read old version from object store by object type and resource version, calculate the diff, render the objectChange.description
-	changes = buildChanges(updateSet, oldObjectMap, newObjectMap, viewv1.ObjectUpdateType, i18nResource, defaultLocale, view.Spec.Locale)
-	changeSlice = append(changeSlice, changes...)
-	// for deleteSet, build objectChange.description by reading i18n of the corresponding object type.
-	changes = buildChanges(deleteSet, oldObjectMap, newObjectMap, viewv1.ObjectDeletionType, i18nResource, defaultLocale, view.Spec.Locale)
-	changeSlice = append(changeSlice, changes...)
-
-	if len(changeSlice) == 0 {
+	if len(changes) == 0 {
 		return kubebuilderx.Continue, nil
 	}
 
 	// sort the changes by resource version.
-	slices.SortStableFunc(changeSlice, func(a, b viewv1.ObjectChange) bool {
+	slices.SortStableFunc(changes, func(a, b viewv1.ObjectChange) bool {
 		return a.Revision < b.Revision
 	})
 
 	// concat it to current changes
-	currentState.Changes = append(currentState.Changes, changeSlice...)
+	currentState.Changes = append(currentState.Changes, changes...)
 
 	// save new version objects to store
 	for _, object := range newObjectMap {
@@ -134,6 +134,27 @@ func (c *viewCalculator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.
 	currentState.Summary.ObjectSummaries = buildObjectSummaries(initialObjectMap, newObjectMap)
 
 	return kubebuilderx.Continue, nil
+}
+
+func filterEvents(eventLister func() ([]client.Object, error), objectMap map[model.GVKNObjKey]client.Object) (map[model.GVKNObjKey]client.Object, error) {
+	eventList, err := eventLister()
+	if err != nil {
+		return nil, err
+	}
+	objectRefSet := sets.KeySet(objectMap)
+	matchedEventMap := make(map[model.GVKNObjKey]client.Object)
+	for i := range eventList {
+		event, _ := eventList[i].(*corev1.Event)
+		objRef := objectReferenceToRef(&event.InvolvedObject)
+		if objectRefSet.Has(*objRef) {
+			eventRef := model.GVKNObjKey{
+				GroupVersionKind: eventGVK,
+				ObjectKey:        client.ObjectKeyFromObject(event),
+			}
+			matchedEventMap[eventRef] = event
+		}
+	}
+	return matchedEventMap, nil
 }
 
 func viewCalculation(ctx context.Context, cli client.Client, scheme *runtime.Scheme, store ObjectRevisionStore) kubebuilderx.Reconciler {

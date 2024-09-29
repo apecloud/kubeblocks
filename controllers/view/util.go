@@ -65,22 +65,17 @@ func objectReferenceToType(objectRef *corev1.ObjectReference) *viewv1.ObjectType
 	}
 }
 
-func objectReferenceToRef(reference *corev1.ObjectReference) (*model.GVKNObjKey, error) {
+func objectReferenceToRef(reference *corev1.ObjectReference) *model.GVKNObjKey {
 	if reference == nil {
-		return nil, nil
+		return nil
 	}
-	gv, err := schema.ParseGroupVersion(reference.APIVersion)
-	if err != nil {
-		return nil, err
-	}
-	gvk := gv.WithKind(reference.Kind)
 	return &model.GVKNObjKey{
-		GroupVersionKind: gvk,
+		GroupVersionKind: reference.GroupVersionKind(),
 		ObjectKey: client.ObjectKey{
 			Namespace: reference.Namespace,
 			Name:      reference.Name,
 		},
-	}, nil
+	}
 }
 
 func objectRefToReference(objectRef model.GVKNObjKey, uid types.UID, resourceVersion string) *corev1.ObjectReference {
@@ -521,50 +516,86 @@ func buildObjectSummaries(initialObjectMap, newObjectMap map[model.GVKNObjKey]cl
 	return objectSummaries
 }
 
-func buildChanges(objKeySet sets.Set[model.GVKNObjKey], oldObjectMap, newObjectMap map[model.GVKNObjKey]client.Object, changeType viewv1.ObjectChangeType, i18nResource *corev1.ConfigMap, defaultLocale, locale *string) []viewv1.ObjectChange {
+func buildChanges(oldObjectMap, newObjectMap map[model.GVKNObjKey]client.Object,
+	descriptionFormat func(client.Object, client.Object, viewv1.ObjectChangeType, *schema.GroupVersionKind) (string, *string)) []viewv1.ObjectChange {
+	// calculate createSet, deleteSet and updateSet
+	newObjectSet := sets.KeySet(newObjectMap)
+	oldObjectSet := sets.KeySet(oldObjectMap)
+	createSet := newObjectSet.Difference(oldObjectSet)
+	updateSet := newObjectSet.Intersection(oldObjectSet)
+	deleteSet := oldObjectSet.Difference(newObjectSet)
+
+	// build new slice of reconciliation changes from last round calculation
 	var changes []viewv1.ObjectChange
-	for key := range objKeySet {
-		var oldObj, newObj client.Object
-		if oldObjectMap != nil {
-			oldObj = oldObjectMap[key]
+	for changeType, changeSet := range map[viewv1.ObjectChangeType]sets.Set[model.GVKNObjKey]{
+		viewv1.ObjectCreationType: createSet,
+		viewv1.ObjectUpdateType:   updateSet,
+		viewv1.ObjectDeletionType: deleteSet,
+	} {
+		for key := range changeSet {
+			var oldObj, newObj client.Object
+			if oldObjectMap != nil {
+				oldObj = oldObjectMap[key]
+			}
+			if newObjectMap != nil {
+				newObj = newObjectMap[key]
+			}
+			obj := newObj
+			if changeType == viewv1.ObjectDeletionType {
+				obj = oldObj
+			}
+			if changeType == viewv1.ObjectUpdateType &&
+				(oldObj == nil || newObj == nil || oldObj.GetResourceVersion() == newObj.GetResourceVersion()) {
+				continue
+			}
+			isEvent := isEvent(&key.GroupVersionKind)
+			if isEvent && changeType == viewv1.ObjectDeletionType {
+				continue
+			}
+			var (
+				ref             *corev1.ObjectReference
+				eventAttributes *viewv1.EventAttributes
+			)
+			if isEvent {
+				changeType = viewv1.EventType
+				evt, _ := obj.(*corev1.Event)
+				ref = &evt.InvolvedObject
+				eventAttributes = &viewv1.EventAttributes{
+					Type:   evt.Type,
+					Reason: evt.Reason,
+				}
+			} else {
+				ref = objectRefToReference(key, obj.GetUID(), obj.GetResourceVersion())
+			}
+			description, localDescription := descriptionFormat(oldObj, newObj, changeType, &key.GroupVersionKind)
+			change := viewv1.ObjectChange{
+				ObjectReference:  *ref,
+				ChangeType:       changeType,
+				EventAttributes:  eventAttributes,
+				Revision:         parseRevision(obj.GetResourceVersion()),
+				Timestamp:        func() *metav1.Time { t := metav1.Now(); return &t }(),
+				Description:      description,
+				LocalDescription: localDescription,
+			}
+			changes = append(changes, change)
 		}
-		if newObjectMap != nil {
-			newObj = newObjectMap[key]
-		}
-		obj := newObj
-		if changeType == viewv1.ObjectDeletionType {
-			obj = oldObj
-		}
-		if changeType == viewv1.ObjectUpdateType &&
-			(oldObj == nil || newObj == nil || oldObj.GetResourceVersion() == newObj.GetResourceVersion()) {
-			continue
-		}
-		change := viewv1.ObjectChange{
-			ObjectReference: *objectRefToReference(key, obj.GetUID(), obj.GetResourceVersion()),
-			ChangeType:      changeType,
-			// TODO(free6om): EventAttributes
-			// TODO(free6om): State
-			Revision:    parseRevision(obj.GetResourceVersion()),
-			Timestamp:   func() *metav1.Time { t := metav1.Now(); return &t }(),
-			Description: formatDescription(oldObj, newObj, changeType, &key.GroupVersionKind, i18nResource, getStringWithDefault(defaultLocale, "en")),
-		}
-		if locale != nil {
-			change.LocalDescription = pointer.String(formatDescription(oldObj, newObj, changeType, &key.GroupVersionKind, i18nResource, *locale))
-		}
-		changes = append(changes, change)
 	}
 	return changes
 }
 
-func getStringWithDefault(ptr *string, defaultStr string) string {
-	if ptr != nil && len(*ptr) > 0 {
-		return *ptr
+func buildDescriptionFormatter(i18nResources *corev1.ConfigMap, defaultLocale string, locale *string) func(client.Object, client.Object, viewv1.ObjectChangeType, *schema.GroupVersionKind) (string, *string) {
+	return func(oldObj client.Object, newObj client.Object, changeType viewv1.ObjectChangeType, gvk *schema.GroupVersionKind) (string, *string) {
+		description := formatDescription(oldObj, newObj, changeType, gvk, i18nResources, &defaultLocale)
+		localDescription := formatDescription(oldObj, newObj, changeType, gvk, i18nResources, locale)
+		return *description, localDescription
 	}
-	return defaultStr
 }
 
-func formatDescription(oldObj, newObj client.Object, changeType viewv1.ObjectChangeType, gvk *schema.GroupVersionKind, i18nResource *corev1.ConfigMap, locale string) string {
-	defaultStr := string(changeType)
+func formatDescription(oldObj, newObj client.Object, changeType viewv1.ObjectChangeType, gvk *schema.GroupVersionKind, i18nResource *corev1.ConfigMap, locale *string) *string {
+	if locale == nil {
+		return nil
+	}
+	defaultStr := pointer.String(string(changeType))
 	if oldObj == nil && newObj == nil {
 		return defaultStr
 	}
@@ -575,22 +606,38 @@ func formatDescription(oldObj, newObj client.Object, changeType viewv1.ObjectCha
 	if obj == nil {
 		obj = oldObj
 	}
-	key := fmt.Sprintf("%s/%s/%s", gvk.GroupVersion().String(), gvk.Kind, changeType)
-	formatString := defaultResourcesManager.GetFormatString(key, locale)
+	var (
+		key        string
+		needFormat bool
+	)
+	if isEvent(gvk) {
+		evt, _ := obj.(*corev1.Event)
+		defaultStr = pointer.String(evt.Message)
+		key = evt.Message
+	} else {
+		key = fmt.Sprintf("%s/%s/%s", gvk.GroupVersion().String(), gvk.Kind, changeType)
+		needFormat = true
+	}
+	formatString := defaultResourcesManager.GetFormatString(key, *locale)
 	if len(formatString) == 0 {
 		return defaultStr
 	}
-	return fmt.Sprintf(formatString, obj.GetNamespace(), obj.GetName())
+	result := formatString
+	if needFormat {
+		result = fmt.Sprintf(formatString, obj.GetNamespace(), obj.GetName())
+	}
+	return pointer.String(result)
+}
+
+func isEvent(gvk *schema.GroupVersionKind) bool {
+	return *gvk == eventGVK
 }
 
 func getObjectsFromTree(tree *viewv1.ObjectTreeNode, store ObjectRevisionStore, scheme *runtime.Scheme) (map[model.GVKNObjKey]client.Object, error) {
 	if tree == nil {
 		return nil, nil
 	}
-	objectRef, err := objectReferenceToRef(&tree.Primary)
-	if err != nil {
-		return nil, err
-	}
+	objectRef := objectReferenceToRef(&tree.Primary)
 	revision := parseRevision(tree.Primary.ResourceVersion)
 	obj, err := store.Get(objectRef, revision)
 	if err != nil && !apierrors.IsNotFound(err) {
@@ -622,7 +669,6 @@ func getObjectsFromTree(tree *viewv1.ObjectTreeNode, store ObjectRevisionStore, 
 	}
 	return objectMap, nil
 }
-
 
 // TODO(free6om): similar as getSecondaryObjects, refactor and merge them
 func getObjectTreeWithRevision(primary client.Object, ownershipRules []OwnershipRule, store ObjectRevisionStore, revision int64, scheme *runtime.Scheme) (*viewv1.ObjectTreeNode, error) {

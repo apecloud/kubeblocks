@@ -34,7 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/discovery"
-	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -305,7 +304,13 @@ var (
 		},
 	}
 
-	defaultLocale = pointer.String("en")
+	defaultLocale = "en"
+
+	eventGVK = schema.GroupVersionKind{
+		Group:   corev1.SchemeGroupVersion.Group,
+		Version: corev1.SchemeGroupVersion.Version,
+		Kind:    constant.EventKind,
+	}
 )
 
 // OwnershipRule defines an ownership rule between primary resource and its secondary resources.

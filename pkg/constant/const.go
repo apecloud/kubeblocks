@@ -47,6 +47,7 @@ const (
 	ClusterRoleBindingKind    = "ClusterRoleBinding"
 	RoleBindingKind           = "RoleBinding"
 	ServiceAccountKind        = "ServiceAccount"
+	EventKind                 = "Event"
 )
 
 // username and password are keys in created secrets for others to refer to.

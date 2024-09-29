@@ -84,10 +84,7 @@ func (s *stateEvaluation) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx
 		if *objType != clusterType {
 			continue
 		}
-		objectRef, err := objectReferenceToRef(&change.ObjectReference)
-		if err != nil {
-			return kubebuilderx.Commit, err
-		}
+		objectRef := objectReferenceToRef(&change.ObjectReference)
 		obj, err := s.store.Get(objectRef, change.Revision)
 		if err != nil && !apierrors.IsNotFound(err) {
 			return kubebuilderx.Commit, err
@@ -135,10 +132,7 @@ func (s *stateEvaluation) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx
 	// delete unused object revisions
 	for i := 0; i < latestReconciliationCycleStart; i++ {
 		change := view.Status.CurrentState.Changes[i]
-		objectRef, err := objectReferenceToRef(&change.ObjectReference)
-		if err != nil {
-			return kubebuilderx.Commit, err
-		}
+		objectRef := objectReferenceToRef(&change.ObjectReference)
 		s.store.Delete(objectRef, view, change.Revision)
 	}
 

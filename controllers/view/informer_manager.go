@@ -22,6 +22,8 @@ package view
 import (
 	"context"
 	"fmt"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	corev1 "k8s.io/api/core/v1"
 	"sync"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -209,20 +211,27 @@ func (r *informerManagerReconciler) PreCondition(tree *kubebuilderx.ObjectTree) 
 
 func (r *informerManagerReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	gvks := sets.New[schema.GroupVersionKind]()
-	parseGVK := func(ot viewv1.ObjectType) error {
-		gvk, err := objectTypeToGVK(&ot)
+	parseGVK := func(ot *viewv1.ObjectType) error {
+		gvk, err := objectTypeToGVK(ot)
 		if err != nil {
 			return err
 		}
 		gvks.Insert(*gvk)
 		return nil
 	}
+	// watch corev1.Event
+	if err := parseGVK(&viewv1.ObjectType{
+		APIVersion: corev1.SchemeGroupVersion.String(),
+		Kind:       constant.EventKind,
+	}); err != nil {
+		return kubebuilderx.Commit, err
+	}
 	for _, rule := range kbOwnershipRules {
-		if err := parseGVK(rule.Primary); err != nil {
+		if err := parseGVK(&rule.Primary); err != nil {
 			return kubebuilderx.Commit, err
 		}
 		for _, resource := range rule.OwnedResources {
-			if err := parseGVK(resource.Secondary); err != nil {
+			if err := parseGVK(&resource.Secondary); err != nil {
 				return kubebuilderx.Commit, err
 			}
 		}

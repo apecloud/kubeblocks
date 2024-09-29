@@ -282,9 +282,6 @@ type ObjectChange struct {
 	// +optional
 	EventAttributes *EventAttributes `json:"eventAttributes,omitempty"`
 
-	// State represents the state calculated by StateEvaluationExpression.
-	//
-	State string `json:"state,omitempty"`
 
 	// Revision specifies the revision of the object after this change.
 	// Revision can be compared globally between all ObjectChanges of all Objects, to build a total order object change sequence.

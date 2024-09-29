@@ -28,7 +28,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
@@ -49,7 +48,7 @@ type ChangeCaptureStore interface {
 type changeCaptureStore struct {
 	scheme        *runtime.Scheme
 	i18nResources *corev1.ConfigMap
-	defaultLocale *string
+	defaultLocale string
 	locale        *string
 	store         map[model.GVKNObjKey]client.Object
 	clock         atomic.Int64
@@ -162,24 +161,26 @@ func (s *changeCaptureStore) applyRevision() string {
 }
 
 func (s *changeCaptureStore) captureCreation(objectRef *model.GVKNObjKey, object client.Object) {
-	changes := buildChanges(sets.New(*objectRef),
-		nil, map[model.GVKNObjKey]client.Object{*objectRef: object},
-		viewv1.ObjectCreationType, s.i18nResources, s.defaultLocale, s.locale)
+	changes := buildChanges(
+		make(map[model.GVKNObjKey]client.Object),
+		map[model.GVKNObjKey]client.Object{*objectRef: object},
+		buildDescriptionFormatter(s.i18nResources, s.defaultLocale, s.locale))
 	s.changes = append(s.changes, changes...)
 }
 
 func (s *changeCaptureStore) captureUpdate(objectRef *model.GVKNObjKey, obj client.Object, object client.Object) {
-	changes := buildChanges(sets.New(*objectRef),
+	changes := buildChanges(
 		map[model.GVKNObjKey]client.Object{*objectRef: obj},
 		map[model.GVKNObjKey]client.Object{*objectRef: object},
-		viewv1.ObjectUpdateType, s.i18nResources, s.defaultLocale, s.locale)
+		buildDescriptionFormatter(s.i18nResources, s.defaultLocale, s.locale))
 	s.changes = append(s.changes, changes...)
 }
 
 func (s *changeCaptureStore) captureDeletion(objectRef *model.GVKNObjKey, object client.Object) {
-	changes := buildChanges(sets.New(*objectRef),
-		map[model.GVKNObjKey]client.Object{*objectRef: object}, nil,
-		viewv1.ObjectDeletionType, s.i18nResources, s.defaultLocale, s.locale)
+	changes := buildChanges(
+		map[model.GVKNObjKey]client.Object{*objectRef: object},
+		make(map[model.GVKNObjKey]client.Object),
+		buildDescriptionFormatter(s.i18nResources, s.defaultLocale, s.locale))
 	s.changes = append(s.changes, changes...)
 }
 

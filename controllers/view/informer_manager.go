@@ -22,10 +22,9 @@ package view
 import (
 	"context"
 	"fmt"
-	"github.com/apecloud/kubeblocks/pkg/constant"
-	corev1 "k8s.io/api/core/v1"
 	"sync"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -37,6 +36,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
@@ -58,6 +58,7 @@ type informerManager struct {
 
 	cache cache.Cache
 	ctx   context.Context
+	cli   client.Client
 
 	handler handler.EventHandler
 
@@ -137,15 +138,32 @@ func (m *informerManager) processNextWorkItem() bool {
 	}
 
 	defer m.queue.Done(obj)
+
+	var object client.Object
 	switch o := obj.(type) {
 	case event.CreateEvent:
-		m.eventChan <- event.GenericEvent{Object: o.Object}
+		object = o.Object
 	case event.UpdateEvent:
-		m.eventChan <- event.GenericEvent{Object: o.ObjectNew}
+		object = o.ObjectNew
 	case event.DeleteEvent:
-		m.eventChan <- event.GenericEvent{Object: o.Object}
+		object = o.Object
 	case event.GenericEvent:
-		m.eventChan <- o
+		object = o.Object
+	}
+	// get involved object if 'object' is an Event
+	if evt, ok := object.(*corev1.Event); ok {
+		ro, err := m.scheme.New(evt.InvolvedObject.GroupVersionKind())
+		if err != nil {
+			return false
+		}
+		object, _ = ro.(client.Object)
+		err = m.cli.Get(context.Background(), client.ObjectKey{Namespace: evt.InvolvedObject.Namespace, Name: evt.InvolvedObject.Name}, object)
+		if err != nil {
+			return false
+		}
+	}
+	if object != nil {
+		m.eventChan <- event.GenericEvent{Object: object}
 	}
 
 	return true
@@ -188,8 +206,9 @@ func (e *eventProxy) Generic(ctx context.Context, evt event.GenericEvent, q work
 	q.Add(evt)
 }
 
-func NewInformerManager(cache cache.Cache, scheme *runtime.Scheme, eventChan chan event.GenericEvent) InformerManager {
+func NewInformerManager(cli client.Client, cache cache.Cache, scheme *runtime.Scheme, eventChan chan event.GenericEvent) InformerManager {
 	return &informerManager{
+		cli:                cli,
 		cache:              cache,
 		scheme:             scheme,
 		eventChan:          eventChan,

@@ -78,7 +78,7 @@ func (r *ReconciliationViewReconciler) Reconcile(ctx context.Context, req ctrl.R
 func (r *ReconciliationViewReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.ObjectStore = NewObjectStore(r.Scheme)
 	r.ObjectTreeRootFinder = NewObjectTreeRootFinder(r.Client)
-	r.InformerManager = NewInformerManager(mgr.GetCache(), mgr.GetScheme(), r.ObjectTreeRootFinder.GetEventChannel())
+	r.InformerManager = NewInformerManager(r.Client, mgr.GetCache(), r.Scheme, r.ObjectTreeRootFinder.GetEventChannel())
 	if err := r.InformerManager.Start(); err != nil {
 		return err
 	}

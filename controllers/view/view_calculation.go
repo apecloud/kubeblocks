@@ -83,20 +83,8 @@ func (c *viewCalculator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.
 	changes := buildChanges(oldObjectMap, newObjectMap, buildDescriptionFormatter(i18nResource, defaultLocale, view.Spec.Locale))
 
 	// handle event changes
-	newEventMap, err := filterEvents(func() ([]client.Object, error) {
-		eventList := &corev1.EventList{}
-		if err := c.cli.List(c.ctx, eventList); err != nil {
-			return nil, err
-		}
-		var objects []client.Object
-		for i := range eventList.Items {
-			objects = append(objects, &eventList.Items[i])
-		}
-		return objects, nil
-	}, newObjectMap)
-	oldEventMap, err := filterEvents(func() ([]client.Object, error) {
-		return c.store.List(&eventGVK), nil
-	}, oldObjectMap)
+	newEventMap, err := filterEvents(getEventsFromCache(c.ctx, c.cli), newObjectMap)
+	oldEventMap, err := filterEvents(getEventsFromStore(c.store), oldObjectMap)
 	eventChanges := buildChanges(oldEventMap, newEventMap, buildDescriptionFormatter(i18nResource, defaultLocale, view.Spec.Locale))
 	changes = append(changes, eventChanges...)
 
@@ -118,6 +106,12 @@ func (c *viewCalculator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.
 			return kubebuilderx.Commit, err
 		}
 	}
+	// save new events to store
+	for _, object := range newEventMap {
+		if err = c.store.Insert(object, view); err != nil {
+			return kubebuilderx.Commit, err
+		}
+	}
 
 	// update current object tree
 	currentState.ObjectTree, err = getObjectTreeWithRevision(root, kbOwnershipRules, c.store, currentState.Changes[len(currentState.Changes)-1].Revision, c.scheme)
@@ -134,6 +128,39 @@ func (c *viewCalculator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.
 	currentState.Summary.ObjectSummaries = buildObjectSummaries(initialObjectMap, newObjectMap)
 
 	return kubebuilderx.Continue, nil
+}
+
+func getEventsFromCache(ctx context.Context, cli client.Client) func() ([]client.Object, error) {
+	return func() ([]client.Object, error) {
+		eventList := &corev1.EventList{}
+		if err := cli.List(ctx, eventList); err != nil {
+			return nil, err
+		}
+		var objects []client.Object
+		for i := range eventList.Items {
+			objects = append(objects, &eventList.Items[i])
+		}
+		return objects, nil
+	}
+}
+
+func getEventsFromStore(store ObjectRevisionStore) func() ([]client.Object, error) {
+	return func() ([]client.Object, error) {
+		eventRevisionMap := store.List(&eventGVK)
+		var objects []client.Object
+		for _, revisionMap := range eventRevisionMap {
+			revision := int64(-1)
+			for rev := range revisionMap {
+				if rev > revision {
+					revision = rev
+				}
+			}
+			if revision > -1 {
+				objects = append(objects, revisionMap[revision])
+			}
+		}
+		return objects, nil
+	}
 }
 
 func filterEvents(eventLister func() ([]client.Object, error), objectMap map[model.GVKNObjKey]client.Object) (map[model.GVKNObjKey]client.Object, error) {

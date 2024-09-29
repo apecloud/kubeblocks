@@ -77,6 +77,10 @@ The faults here are all simulated by deleting a pod. When there are sufficient r
 
     ![connect_cluster_after](./../../../img/failure_simulation_connect_cluster_after.png)
 
+***How the automatic recovery works***
+
+After the leader pod is deleted, the ApeCloud MySQL RaftGroup Cluster elects a new leader. In this example, `mycluster-mysql-1` is elected as the new leader. KubeBlocks detects that the leader has changed, and sends a notification to update the access link. The original exception node automatically rebuilds and recovers to the normal RaftGroup Cluster state. It normally takes 30 seconds from exception to recovery.
+
 </TabItem>
 
 <TabItem value="kubectl" label="kubectl">
@@ -123,13 +127,13 @@ The faults here are all simulated by deleting a pod. When there are sufficient r
 
     ![connect_cluster_after](./../../../img/api-ha-leader-pod-connect-check.png)
 
-</TabItem>
-
-</Tabs>
-
 ***How the automatic recovery works***
 
 After the leader pod is deleted, the ApeCloud MySQL RaftGroup Cluster elects a new leader. In this example, `mycluster-mysql-0` is elected as the new leader. KubeBlocks detects that the leader has changed, and sends a notification to update the access link. The original exception node automatically rebuilds and recovers to the normal RaftGroup Cluster state. It normally takes 30 seconds from exception to recovery.
+
+</TabItem>
+
+</Tabs>
 
 ### Single follower pod exception
 

@@ -79,7 +79,7 @@ mycluster   apecloud-mysql       ac-mysql-8.0.30   Delete               Running 
     - View the cluster status.
 
       ```bash
-      kbcli cluster list mycluster
+      kbcli cluster list mycluster -n demo
       >
       NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS     CREATED-TIME
       mycluster   demo        apecloud-mysql       ac-mysql-8.0.30   Delete               Updating   Sep 19,2024 16:01 UTC+0800

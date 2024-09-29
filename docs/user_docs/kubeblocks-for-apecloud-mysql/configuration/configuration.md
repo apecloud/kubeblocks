@@ -282,9 +282,9 @@ innodb_buffer_pool_size   512M                            512M
 
 </TabItem>
 
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="Edit config file" label="Edit config file">
 
-## Configure cluster parameters by editing configuration file
+KubeBlocks supports configuring cluster parameters by editing the configuration file.
 
 1. Get the configuration file of this cluster.
 
@@ -344,7 +344,11 @@ innodb_buffer_pool_size   512M                            512M
       1 row in set (0.00 sec)
       ```
 
-## Configure cluster parameters with an OpsRequest
+</TabItem>
+
+<TabItem value="OpsRequest" label="OpsRequest">
+
+KubeBlocks supports configuring cluster parameters with an OpsRequest.
 
 1. Define an OpsRequest file and configure the parameters in the OpsRequest in a YAML file named `mycluster-configuring-demo.yaml`. In this example, `max_connections` is configured as `600`.
 

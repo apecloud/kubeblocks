@@ -8,7 +8,7 @@ sidebar_label: Scale
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Scale for an ApeCloud MySQL cluster
+# Scale an ApeCloud MySQL cluster
 
 You can scale an ApeCloud MySQL cluster in two ways, vertical scaling and horizontal scaling.
 
@@ -267,6 +267,8 @@ mycluster   apecloud-mysql       ac-mysql-8.0.30   Delete               Running 
     ```bash
     kbcli cluster describe mycluster -n demo
     ```
+
+</TabItem>
 
 <TabItem value="OpsRequest" label="OpsRequest">
 

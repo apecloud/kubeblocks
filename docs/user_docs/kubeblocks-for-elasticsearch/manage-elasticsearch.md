@@ -13,11 +13,11 @@ import TabItem from '@theme/TabItem';
 
 Elasticsearch is a distributed, RESTful search and analytics engine that is capable of solving an ever-growing number of use cases. As the heart of the Elastic Stack, Elasticsearch stores your data centrally, allowing you to search it quickly, tune relevancy, perform sophisticated analytics, and easily scale.
 
-KubeBlocks supports the management of Elasticsearch. This tutorial illustrates how to create and manage an Elasticsearch cluster by kbcli, kubectl or a YAML file. You can find the YAML examples and guides in [the GitHub repository](https://github.com/apecloud/kubeblocks-addons/tree/release-0.9/examples/elasticsearch).
+KubeBlocks supports the management of Elasticsearch. This tutorial illustrates how to create and manage an Elasticsearch cluster by `kbcli`, `kubectl` or a YAML file. You can find the YAML examples and guides in [the GitHub repository](https://github.com/apecloud/kubeblocks-addons/tree/release-0.9/examples/elasticsearch).
 
 ## Before you start
 
-- [Install kbcli](./../installation/install-with-kbcli/install-kbcli.md) if you want to manage your Elasticsearch cluster with kbcli.
+- [Install kbcli](./../installation/install-with-kbcli/install-kbcli.md) if you want to manage your Elasticsearch cluster with `kbcli`.
 - Install KubeBlocks [by kbcli](./../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) or [by Helm](./../installation/install-with-helm/install-kubeblocks.md).
 - Install and enable the elasticsearch Addon [by kbcli](./../installation/install-with-kbcli/install-addons.md) or [by Helm](./../installation/install-with-helm/install-addons.md).
 - To keep things isolated, create a separate namespace called `demo` throughout this tutorial.

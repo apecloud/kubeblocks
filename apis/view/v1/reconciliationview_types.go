@@ -136,10 +136,15 @@ type DryRunResult struct {
 	// +kubebuilder:validation:Enum={Succeed,Failed}
 	Phase DryRunPhase `json:"phase,omitempty"`
 
-	// Reason specifies the detail reason when the Phase is Failed.
+	// Reason specifies the reason when the Phase is Failed.
 	//
 	// +optional
 	Reason string `json:"reason,omitempty"`
+
+	// Message specifies a description of the failure reason.
+	//
+	// +optional
+	Message string `json:"message,omitempty"`
 
 	// DesiredSpecRevision specifies the revision of the DesiredSpec.
 	//
@@ -149,30 +154,8 @@ type DryRunResult struct {
 	//
 	ObservedTargetGeneration int64 `json:"observedTargetGeneration"`
 
-	// PlanSummary summarizes the final state to give an overview of what will happen if the reconciliation plan is executed.
-	//
-	PlanSummary PlanSummary `json:"planSummary"`
-
-	// Plan describes the detail reconciliation process if the DesiredSpec is applied.
-	//
-	Plan []ObjectChange `json:"plan"`
-
-	// FinalObjectTree specifies the object tree if the DesiredSpec is applied.
-	//
-	FinalObjectTree ObjectTreeNode `json:"finalObjectTree"`
-}
-
-type DryRunPhase string
-
-const (
-	DryRunSucceedPhase DryRunPhase = "Succeed"
-	DryRunFailedPhase  DryRunPhase = "Failed"
-)
-
-// PlanSummary defines a summary of the reconciliation plan.
-type PlanSummary struct {
-	// SpecChange describes the change between the current spec and the final spec.
-	// The whole spec struct will be compared and an example SpecChange looks like:
+	// SpecDiff describes the diff between the current spec and the final spec.
+	// The whole spec struct will be compared and an example SpecDiff looks like:
 	// {
 	//		Affinity: {
 	//    		PodAntiAffinity: "Preferred",
@@ -205,12 +188,19 @@ type PlanSummary struct {
 	//		},
 	// }
 	//
-	SpecChange string `json:"specChange"`
+	SpecDiff string `json:"specDiff"`
 
-	// ObjectSummaries summarizes each object type.
+	// Plan describes the detail reconciliation process if the DesiredSpec is applied.
 	//
-	ObjectSummaries []ObjectSummary `json:"objectSummaries"`
+	Plan ReconciliationCycleState `json:"plan"`
 }
+
+type DryRunPhase string
+
+const (
+	DryRunSucceedPhase DryRunPhase = "Succeed"
+	DryRunFailedPhase  DryRunPhase = "Failed"
+)
 
 // ObjectTreeNode defines an object tree of the KubeBlocks Cluster.
 type ObjectTreeNode struct {
@@ -342,7 +332,7 @@ type EventAttributes struct {
 type ReconciliationCycleState struct {
 	// Summary summarizes the ObjectTree and Changes.
 	//
-	Summary StateSummary `json:"summary"`
+	Summary ObjectTreeDiffSummary `json:"summary"`
 
 	// ObjectTree specifies the current object tree of the reconciliation cycle.
 	// Ideally, ObjectTree should be same as applying Changes to InitialObjectTree.
@@ -354,8 +344,8 @@ type ReconciliationCycleState struct {
 	Changes []ObjectChange `json:"changes"`
 }
 
-// StateSummary defines a summary of reconciliation process.
-type StateSummary struct {
+// ObjectTreeDiffSummary defines a summary of the diff of two object tree.
+type ObjectTreeDiffSummary struct {
 	// ObjectSummaries summarizes each object type.
 	//
 	ObjectSummaries []ObjectSummary `json:"objectSummaries"`

@@ -121,8 +121,8 @@ func (g *planGenerator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.R
 	initialObjectMap := store.GetAll()
 
 	// apply dryRun.desiredSpec to target cluster object
-	var specChange string
-	if specChange, err = applyDesiredSpec(view.Spec.DryRun.DesiredSpec, root); err != nil {
+	var specDiff string
+	if specDiff, err = applyDesiredSpec(view.Spec.DryRun.DesiredSpec, root); err != nil {
 		return kubebuilderx.Commit, err
 	}
 	if err = mClient.Update(g.ctx, root); err != nil {
@@ -132,6 +132,7 @@ func (g *planGenerator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.R
 	// generate plan with timeout
 	startTime := time.Now()
 	timeout := false
+	var reconcileErr error
 	for {
 		if time.Since(startTime) > time.Second {
 			timeout = true
@@ -140,8 +141,8 @@ func (g *planGenerator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.R
 		previousCount := len(store.GetChanges())
 
 		// run reconciler tree
-		if err = reconcilerTree.Run(); err != nil {
-			return kubebuilderx.Commit, err
+		if reconcileErr = reconcilerTree.Run(); reconcileErr != nil {
+			break
 		}
 
 		// no change means reconciliation cycle is done
@@ -153,17 +154,32 @@ func (g *planGenerator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.R
 	}
 
 	// update dry-run result
+	//
+	// update spec info
 	dryRunResult := view.Status.DryRunResult
 	if dryRunResult == nil {
 		dryRunResult = &viewv1.DryRunResult{}
+		view.Status.DryRunResult = dryRunResult
 	}
 	dryRunResult.DesiredSpecRevision = getDesiredSpecRevision(view.Spec.DryRun.DesiredSpec)
 	dryRunResult.ObservedTargetGeneration = root.Generation
-	dryRunResult.Phase = viewv1.DryRunSucceedPhase
-	if timeout {
+	dryRunResult.SpecDiff = specDiff
+
+	// update phase
+	switch {
+	case reconcileErr != nil:
+		dryRunResult.Phase = viewv1.DryRunFailedPhase
+		dryRunResult.Reason = "ReconcileError"
+		dryRunResult.Message = reconcileErr.Error()
+	case timeout:
 		dryRunResult.Phase = viewv1.DryRunFailedPhase
 		dryRunResult.Reason = "Timeout"
+		dryRunResult.Message = "Can't generate the plan within one second"
+	default:
+		dryRunResult.Phase = viewv1.DryRunSucceedPhase
 	}
+
+	// update plan
 	if err = g.cli.Get(g.ctx, objectKey, root); err != nil {
 		return kubebuilderx.Commit, err
 	}
@@ -175,11 +191,10 @@ func (g *planGenerator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.R
 	if err != nil {
 		return kubebuilderx.Commit, err
 	}
-	dryRunResult.FinalObjectTree = *desiredTree
-	dryRunResult.Plan = store.GetChanges()
-	dryRunResult.PlanSummary.SpecChange = specChange
+	dryRunResult.Plan.ObjectTree = desiredTree
+	dryRunResult.Plan.Changes = store.GetChanges()
 	newObjectMap := store.GetAll()
-	dryRunResult.PlanSummary.ObjectSummaries = buildObjectSummaries(initialObjectMap, newObjectMap)
+	dryRunResult.Plan.Summary.ObjectSummaries = buildObjectSummaries(initialObjectMap, newObjectMap)
 
 	return kubebuilderx.Continue, nil
 }

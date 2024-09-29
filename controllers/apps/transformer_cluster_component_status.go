@@ -44,7 +44,7 @@ func (t *clusterComponentStatusTransformer) Transform(ctx graph.TransformContext
 	}
 
 	// has no components defined
-	if len(transCtx.ComponentSpecs) == 0 || !transCtx.OrigCluster.IsStatusUpdating() {
+	if !transCtx.OrigCluster.IsStatusUpdating() {
 		return nil
 	}
 	return t.reconcileComponentsStatus(transCtx)
@@ -68,6 +68,31 @@ func (t *clusterComponentStatusTransformer) reconcileComponentsStatus(transCtx *
 			return err
 		}
 		cluster.Status.Components[compSpec.Name] = t.buildClusterCompStatus(transCtx, comp, compSpec.Name)
+	}
+
+	// TODO: add sharding components to cluster status components here, which need to be refactored
+	if err := t.buildShardingCompStatus(transCtx, cluster); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (t *clusterComponentStatusTransformer) buildShardingCompStatus(transCtx *clusterTransformContext, cluster *appsv1.Cluster) error {
+	if len(cluster.Spec.ShardingSpecs) == 0 {
+		return nil
+	}
+	for _, shardingSpec := range cluster.Spec.ShardingSpecs {
+		shardingComps, err := component.ListShardingComponents(transCtx.Context, transCtx.Client, cluster, shardingSpec.Name)
+		if err != nil {
+			return err
+		}
+		if len(shardingComps) == 0 && shardingSpec.Shards != 0 {
+			return fmt.Errorf("sharding components not found for sharding spec %s when sync cluster component status", shardingSpec.Name)
+		}
+		for _, shardingComp := range shardingComps {
+			cluster.Status.Components[shardingComp.Name] = t.buildClusterCompStatus(transCtx, &shardingComp, shardingComp.Name)
+		}
 	}
 	return nil
 }

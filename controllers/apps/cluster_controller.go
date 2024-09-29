@@ -30,6 +30,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -175,6 +176,7 @@ func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			MaxConcurrentReconciles: int(math.Ceil(viper.GetFloat64(constant.CfgKBReconcileWorkers) / 4)),
 		}).
 		Owns(&appsv1.Component{}).
+		Watches(&appsv1.Component{}, handler.EnqueueRequestsFromMapFunc(filterShardingResources)). // for sharding components
 		Owns(&corev1.Service{}). // cluster services
 		Owns(&dpv1alpha1.BackupPolicy{}).
 		Owns(&dpv1alpha1.BackupSchedule{}).

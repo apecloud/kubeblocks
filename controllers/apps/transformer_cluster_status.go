@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -175,7 +176,9 @@ func (t *clusterStatusTransformer) reconcileClusterStatus(transCtx *clusterTrans
 	initClusterStatusParams()
 
 	// removes the invalid component of status.components which is deleted from spec.components.
-	t.removeInvalidCompStatus(transCtx, cluster)
+	if err := t.removeInvalidCompStatus(transCtx, cluster); err != nil {
+		return err
+	}
 
 	// do analysis of Cluster.Status.component and update the results to status synchronizer.
 	t.doAnalysisAndUpdateSynchronizer(cluster)
@@ -187,32 +190,50 @@ func (t *clusterStatusTransformer) reconcileClusterStatus(transCtx *clusterTrans
 	t.reconcileClusterPhase(cluster)
 
 	// removes the component of status.components which is created by simplified API.
-	t.removeInnerCompStatus(transCtx, cluster)
+	t.removeInnerCompStatus(cluster)
 	return nil
 }
 
 // removeInvalidCompStatus removes the invalid component of status.components which is deleted from spec.components.
-func (t *clusterStatusTransformer) removeInvalidCompStatus(transCtx *clusterTransformContext, cluster *appsv1.Cluster) {
+func (t *clusterStatusTransformer) removeInvalidCompStatus(transCtx *clusterTransformContext, cluster *appsv1.Cluster) error {
 	// removes deleted components and keeps created components by simplified API
-	t.removeCompStatus(cluster, transCtx.ComponentSpecs)
+	expectedCompNames := make([]string, 0)
+	for _, comp := range transCtx.ComponentSpecs {
+		expectedCompNames = append(expectedCompNames, comp.Name)
+	}
+
+	// TODO: add sharding components to cluster status components here, which need to be refactored
+	if len(cluster.Spec.ShardingSpecs) != 0 {
+		for _, shardingSpec := range cluster.Spec.ShardingSpecs {
+			shardingComps, err := component.ListShardingComponents(transCtx.Context, transCtx.Client, cluster, shardingSpec.Name)
+			if err != nil {
+				return err
+			}
+			for _, shardingComp := range shardingComps {
+				expectedCompNames = append(expectedCompNames, shardingComp.Name)
+			}
+		}
+	}
+	t.removeCompStatus(cluster, expectedCompNames)
+	return nil
 }
 
 // removeInnerCompStatus removes the component of status.components which is created by simplified API.
-func (t *clusterStatusTransformer) removeInnerCompStatus(transCtx *clusterTransformContext, cluster *appsv1.Cluster) {
-	compSpecs := make([]*appsv1.ClusterComponentSpec, 0)
+func (t *clusterStatusTransformer) removeInnerCompStatus(cluster *appsv1.Cluster) {
+	expectedCompNames := make([]string, 0)
 	for i := range cluster.Spec.ComponentSpecs {
-		compSpecs = append(compSpecs, &cluster.Spec.ComponentSpecs[i])
+		expectedCompNames = append(expectedCompNames, cluster.Spec.ComponentSpecs[i].Name)
 	}
-	t.removeCompStatus(cluster, compSpecs)
+	t.removeCompStatus(cluster, expectedCompNames)
 }
 
 // removeCompStatus removes the component of status.components which is not in comp specs.
-func (t *clusterStatusTransformer) removeCompStatus(cluster *appsv1.Cluster, compSpecs []*appsv1.ClusterComponentSpec) {
+func (t *clusterStatusTransformer) removeCompStatus(cluster *appsv1.Cluster, expectedCompNames []string) {
 	tmpCompsStatus := map[string]appsv1.ClusterComponentStatus{}
 	compsStatus := cluster.Status.Components
-	for _, v := range compSpecs {
-		if compStatus, ok := compsStatus[v.Name]; ok {
-			tmpCompsStatus[v.Name] = compStatus
+	for _, compName := range expectedCompNames {
+		if compStatus, ok := compsStatus[compName]; ok {
+			tmpCompsStatus[compName] = compStatus
 		}
 	}
 	// keep valid components' status

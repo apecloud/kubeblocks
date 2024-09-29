@@ -161,6 +161,18 @@ func ListClusterComponents(ctx context.Context, cli client.Reader, cluster *apps
 	return compList.Items, nil
 }
 
+// ListShardingComponents lists the components of the cluster.
+func ListShardingComponents(ctx context.Context, cli client.Reader, cluster *appsv1.Cluster, shardingName string) ([]appsv1.Component, error) {
+	compList := &appsv1.ComponentList{}
+	if err := cli.List(ctx, compList, client.InNamespace(cluster.Namespace), client.MatchingLabels{
+		constant.AppInstanceLabelKey:       cluster.Name,
+		constant.KBAppShardingNameLabelKey: shardingName,
+	}); err != nil {
+		return nil, err
+	}
+	return compList.Items, nil
+}
+
 // GetClusterComponentShortNameSet gets the component short name set of the cluster.
 func GetClusterComponentShortNameSet(ctx context.Context, cli client.Reader, cluster *appsv1.Cluster, filter func(obj client.Object) bool) (sets.Set[string], error) {
 	compList, err := ListClusterComponents(ctx, cli, cluster)

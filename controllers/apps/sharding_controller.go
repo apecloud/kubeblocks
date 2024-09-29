@@ -146,13 +146,13 @@ func (r *ShardingReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: int(math.Ceil(viper.GetFloat64(constant.CfgKBReconcileWorkers) / 4)),
 		}).
-		Watches(&appsv1.Component{}, handler.EnqueueRequestsFromMapFunc(r.filterShardingResources)).
-		Watches(&corev1.Service{}, handler.EnqueueRequestsFromMapFunc(r.filterShardingResources)). // sharding services
-		Watches(&corev1.Secret{}, handler.EnqueueRequestsFromMapFunc(r.filterShardingResources)).  // sharding shared account secret
+		Watches(&appsv1.Component{}, handler.EnqueueRequestsFromMapFunc(filterShardingResources)).
+		Watches(&corev1.Service{}, handler.EnqueueRequestsFromMapFunc(filterShardingResources)). // sharding services
+		Watches(&corev1.Secret{}, handler.EnqueueRequestsFromMapFunc(filterShardingResources)).  // sharding shared account secret
 		Complete(r)
 }
 
-func (r *ShardingReconciler) filterShardingResources(_ context.Context, obj client.Object) []reconcile.Request {
+func filterShardingResources(_ context.Context, obj client.Object) []reconcile.Request {
 	labels := obj.GetLabels()
 	if v, ok := labels[constant.AppManagedByLabelKey]; !ok || v != constant.AppName {
 		return []reconcile.Request{}

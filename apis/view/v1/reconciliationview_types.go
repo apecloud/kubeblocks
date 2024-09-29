@@ -50,10 +50,10 @@ type ReconciliationViewSpec struct {
 	StateEvaluationExpression *StateEvaluationExpression `json:"stateEvaluationExpression,omitempty"`
 
 	// Depth of the object tree.
-	// Default is 1, means the top primary object only.
+	// Default is 0, means all the primary object and secondary objects.
 	//
-	// +kubebuilder:default=1
-	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:default=0
+	// +kubebuilder:validation:Minimum=0
 	// +optional
 	Depth *int32 `json:"depth,omitempty"`
 

@@ -79,12 +79,12 @@ spec:
             description: ReconciliationViewSpec defines the desired state of ReconciliationView
             properties:
               depth:
-                default: 1
+                default: 0
                 description: |-
                   Depth of the object tree.
-                  Default is 1, means the top primary object only.
+                  Default is 0, means all the primary object and secondary objects.
                 format: int32
-                minimum: 1
+                minimum: 0
                 type: integer
               dryRun:
                 description: |-

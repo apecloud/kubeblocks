@@ -100,18 +100,9 @@ func (r *clusterBackupPolicyTransformer) Transform(ctx graph.TransformContext, d
 		return err
 	}
 
-	bpCtx := &backupPolicyCtx{
-		ctx:      transCtx.Context,
-		cli:      transCtx.Client,
-		logger:   transCtx.Logger,
-		event:    transCtx.EventRecorder,
-		cluster:  transCtx.OrigCluster,
-		tplCount: len(backupPolicyTPLs.Items),
-	}
-	if err := r.reconcileBackupPolicyTemplates(dag, graphCli, bpCtx, backupPolicyTPLs); err != nil {
-		return err
-	}
-	return nil
+	bpCtx := newBackupPolicyCtx(transCtx.Context, transCtx.Client, transCtx.Logger,
+		transCtx.EventRecorder, transCtx.OrigCluster, len(backupPolicyTPLs.Items))
+	return r.reconcileBackupPolicyTemplates(dag, graphCli, bpCtx, backupPolicyTPLs)
 }
 
 // getBackupPolicyTemplates gets the backupPolicyTemplate for the cluster.
@@ -784,5 +775,17 @@ func mergeSchedulePolicy(src *dpv1alpha1.SchedulePolicy, dst *dpv1alpha1.Schedul
 	}
 	if src.CronExpression != "" {
 		dst.CronExpression = src.CronExpression
+	}
+}
+
+func newBackupPolicyCtx(ctx context.Context, cli client.Reader, logger logr.Logger, event record.EventRecorder,
+	cluster *appsv1.Cluster, totalCount int) *backupPolicyCtx {
+	return &backupPolicyCtx{
+		ctx:      ctx,
+		cli:      cli,
+		logger:   logger,
+		event:    event,
+		cluster:  cluster,
+		tplCount: totalCount,
 	}
 }

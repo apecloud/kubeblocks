@@ -58,18 +58,9 @@ func (r *shardingBackupPolicyTransformer) Transform(ctx graph.TransformContext, 
 		return err
 	}
 
-	bpCtx := &backupPolicyCtx{
-		ctx:      transCtx.Context,
-		cli:      transCtx.Client,
-		logger:   transCtx.Logger,
-		event:    transCtx.EventRecorder,
-		cluster:  transCtx.OrigCluster,
-		tplCount: len(backupPolicyTPLs.Items),
-	}
-	if err := r.reconcileBackupPolicyTemplates(dag, graphCli, bpCtx, backupPolicyTPLs); err != nil {
-		return err
-	}
-	return nil
+	bpCtx := newBackupPolicyCtx(transCtx.Context, transCtx.Client, transCtx.Logger,
+		transCtx.EventRecorder, transCtx.OrigCluster, len(backupPolicyTPLs.Items))
+	return r.reconcileBackupPolicyTemplates(dag, graphCli, bpCtx, backupPolicyTPLs)
 }
 
 // getBackupPolicyTemplates gets the backupPolicyTemplate for the cluster.

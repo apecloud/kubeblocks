@@ -201,7 +201,7 @@ kbcli cluster diff-config mycluster-reconfiguring-qxw8s mycluster-reconfiguring-
 
 </TabItem>
 
-<TabItem value="Edit config file" label="Edit conig file">
+<TabItem value="Edit config file" label="Edit config file">
 
 KubeBlocks supports configuring cluster parameters by configuration file.
 

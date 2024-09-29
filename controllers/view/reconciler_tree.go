@@ -22,20 +22,7 @@ package view
 import (
 	"context"
 	"fmt"
-	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
-	workloadsAPI "github.com/apecloud/kubeblocks/apis/workloads/v1"
-	"github.com/apecloud/kubeblocks/controllers/apps"
-	"github.com/apecloud/kubeblocks/controllers/apps/configuration"
-	"github.com/apecloud/kubeblocks/controllers/dataprotection"
-	"github.com/apecloud/kubeblocks/controllers/workloads"
-	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/builder"
-	"github.com/apecloud/kubeblocks/pkg/controller/graph"
-	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	"github.com/apecloud/kubeblocks/pkg/dataprotection/types"
+
 	vsv1beta1 "github.com/kubernetes-csi/external-snapshotter/client/v3/apis/volumesnapshot/v1beta1"
 	vsv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -52,6 +39,22 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
+	workloadsAPI "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/controllers/apps"
+	"github.com/apecloud/kubeblocks/controllers/apps/configuration"
+	"github.com/apecloud/kubeblocks/controllers/dataprotection"
+	"github.com/apecloud/kubeblocks/controllers/workloads"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 )
 
 type ReconcilerTree interface {
@@ -74,7 +77,7 @@ var reconcilerFuncMap = map[viewv1.ObjectType]reconcilerFunc{
 	objectType(batchv1.SchemeGroupVersion.String(), constant.JobKind):                  newJobReconciler,
 	objectType(dpv1alpha1.SchemeGroupVersion.String(), types.BackupKind):               newBackupReconciler,
 	objectType(dpv1alpha1.SchemeGroupVersion.String(), types.RestoreKind):              newRestoreReconciler,
-	objectType(kbappsv1.SchemeGroupVersion.String(), constant.ConfigurationKind):       newConfigurationReconciler,
+	objectType(appsv1alpha1.SchemeGroupVersion.String(), constant.ConfigurationKind):   newConfigurationReconciler,
 	objectType(corev1.SchemeGroupVersion.String(), constant.PodKind):                   newPodReconciler,
 	objectType(appsv1.SchemeGroupVersion.String(), constant.StatefulSetKind):           newSTSReconciler,
 	objectType(vsv1.SchemeGroupVersion.String(), constant.VolumeSnapshotKind):          newVolumeSnapshotV1Reconciler,

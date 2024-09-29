@@ -55,13 +55,10 @@ func (c *mockClient) Get(ctx context.Context, objKey client.ObjectKey, obj clien
 	if err != nil {
 		return err
 	}
-	if !c.managedGVK.Has(objectRef.GroupVersionKind) {
-		return c.realClient.Get(ctx, objKey, obj, opts...)
-	}
 	objectRef.ObjectKey = objKey
 	res := c.store.Get(objectRef)
 	if res == nil {
-		return apierrors.NewNotFound(objectRef.GroupVersion().WithResource(objectRef.Kind).GroupResource(), fmt.Sprintf("%s/%s", objectRef.Namespace, objectRef.Name))
+		return c.realClient.Get(ctx, objKey, obj, opts...)
 	}
 	return copyObj(res, obj)
 }

@@ -38,6 +38,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
@@ -155,7 +156,7 @@ var (
 					Criteria:  componentCriteria,
 				},
 				{
-					Secondary: objectType(kbappsv1.SchemeGroupVersion.String(), constant.ConfigurationKind),
+					Secondary: objectType(appsv1alpha1.SchemeGroupVersion.String(), constant.ConfigurationKind),
 					Criteria:  componentCriteria,
 				},
 			},

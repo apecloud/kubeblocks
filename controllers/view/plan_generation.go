@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"hash/fnv"
 	"reflect"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	corev1 "k8s.io/api/core/v1"
@@ -113,13 +114,13 @@ func (g *planGenerator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.R
 		return kubebuilderx.Commit, err
 	}
 
-	// load object store
+	// load current object tree into store
 	if err = loadCurrentObjectTree(g.ctx, g.cli, root, kbOwnershipRules, store); err != nil {
 		return kubebuilderx.Commit, err
 	}
 	initialObjectMap := store.GetAll()
 
-	// apply plan.spec.desiredSpec to root object
+	// apply dryRun.desiredSpec to target cluster object
 	var specChange string
 	if specChange, err = applyDesiredSpec(view.Spec.DryRun.DesiredSpec, root); err != nil {
 		return kubebuilderx.Commit, err
@@ -128,32 +129,27 @@ func (g *planGenerator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.R
 		return kubebuilderx.Commit, err
 	}
 
-	// start plan generation loop
-	expr := defaultStateEvaluationExpression
-	if view.Spec.StateEvaluationExpression != nil {
-		expr = *view.Spec.StateEvaluationExpression
-	}
+	// generate plan with timeout
+	startTime := time.Now()
+	timeout := false
 	for {
-		changeCount := len(store.GetChanges())
+		if time.Since(startTime) > time.Second {
+			timeout = true
+			break
+		}
+		previousCount := len(store.GetChanges())
 
 		// run reconciler tree
 		if err = reconcilerTree.Run(); err != nil {
 			return kubebuilderx.Commit, err
 		}
 
-		// state evaluation
-		if err = mClient.Get(g.ctx, objectKey, root); err != nil {
-			return kubebuilderx.Commit, err
-		}
-		state, err := doStateEvaluation(root, expr)
-		if err != nil {
-			return kubebuilderx.Commit, err
-		}
-
-		// final state with no more changes happen, the reconciliation cycle is done.
-		if state && changeCount == len(store.GetChanges()) {
+		// no change means reconciliation cycle is done
+		currentCount := len(store.GetChanges())
+		if currentCount == previousCount {
 			break
 		}
+		previousCount = currentCount
 	}
 
 	// update dry-run result
@@ -164,6 +160,10 @@ func (g *planGenerator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.R
 	dryRunResult.DesiredSpecRevision = getDesiredSpecRevision(view.Spec.DryRun.DesiredSpec)
 	dryRunResult.ObservedTargetGeneration = root.Generation
 	dryRunResult.Phase = viewv1.DryRunSucceedPhase
+	if timeout {
+		dryRunResult.Phase = viewv1.DryRunFailedPhase
+		dryRunResult.Reason = "Timeout"
+	}
 	if err = g.cli.Get(g.ctx, objectKey, root); err != nil {
 		return kubebuilderx.Commit, err
 	}
@@ -181,29 +181,14 @@ func (g *planGenerator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.R
 	newObjectMap := store.GetAll()
 	dryRunResult.PlanSummary.ObjectSummaries = buildObjectSummaries(initialObjectMap, newObjectMap)
 
-	// TODO(free6om): put the plan generation loop into a timeout goroutine
-
 	return kubebuilderx.Continue, nil
 }
 
-// getSpecFieldAsStruct extracts the Spec field from a client.Object and returns it as an interface{}.
-func getSpecFieldAsStruct(obj client.Object) (interface{}, error) {
-	// Get the value of the object
-	objValue := reflect.ValueOf(obj)
-
-	// Check if the object is a pointer to a struct
-	if objValue.Kind() != reflect.Ptr || objValue.Elem().Kind() != reflect.Struct {
-		return nil, fmt.Errorf("obj must be a pointer to a struct")
+func planGeneration(ctx context.Context, cli client.Client) kubebuilderx.Reconciler {
+	return &planGenerator{
+		ctx: context.WithValue(ctx, constant.DryRunContextKey, true),
+		cli: cli,
 	}
-
-	// Get the Spec field
-	specField := objValue.Elem().FieldByName("Spec")
-	if !specField.IsValid() {
-		return nil, fmt.Errorf("spec field not found")
-	}
-
-	// Return the Spec field as an interface{}
-	return specField.Interface(), nil
 }
 
 func applyDesiredSpec(desiredSpec string, obj client.Object) (string, error) {
@@ -271,6 +256,26 @@ func applyDesiredSpec(desiredSpec string, obj client.Object) (string, error) {
 	return specChange, nil
 }
 
+// getSpecFieldAsStruct extracts the Spec field from a client.Object and returns it as an interface{}.
+func getSpecFieldAsStruct(obj client.Object) (interface{}, error) {
+	// Get the value of the object
+	objValue := reflect.ValueOf(obj)
+
+	// Check if the object is a pointer to a struct
+	if objValue.Kind() != reflect.Ptr || objValue.Elem().Kind() != reflect.Struct {
+		return nil, fmt.Errorf("obj must be a pointer to a struct")
+	}
+
+	// Get the Spec field
+	specField := objValue.Elem().FieldByName("Spec")
+	if !specField.IsValid() {
+		return nil, fmt.Errorf("spec field not found")
+	}
+
+	// Return the Spec field as an interface{}
+	return specField.Interface(), nil
+}
+
 func loadCurrentObjectTree(ctx context.Context, cli client.Client, root *kbappsv1.Cluster, ownershipRules []OwnershipRule, store ChangeCaptureStore) error {
 	objectMap, err := getObjectsFromCache(ctx, cli, root, ownershipRules)
 	if err != nil {
@@ -282,13 +287,6 @@ func loadCurrentObjectTree(ctx context.Context, cli client.Client, root *kbappsv
 		}
 	}
 	return nil
-}
-
-func planGeneration(ctx context.Context, cli client.Client) kubebuilderx.Reconciler {
-	return &planGenerator{
-		ctx: context.WithValue(ctx, constant.DryRunContextKey, true),
-		cli: cli,
-	}
 }
 
 var _ kubebuilderx.Reconciler = &planGenerator{}

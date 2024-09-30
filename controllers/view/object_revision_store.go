@@ -160,7 +160,6 @@ func (s *objectRevisionStore) Delete(objectRef *model.GVKNObjKey, reference clie
 	if len(objectMap) == 0 {
 		delete(s.store, objectRef.GroupVersionKind)
 	}
-	return
 }
 
 func NewObjectStore(scheme *runtime.Scheme) ObjectRevisionStore {

@@ -87,7 +87,7 @@ func (s *changeCaptureStore) Update(object client.Object) error {
 	if err != nil {
 		return err
 	}
-	oldObj, _ := s.store[*objectRef]
+	oldObj := s.store[*objectRef]
 	object.SetResourceVersion(s.applyRevision())
 	s.store[*objectRef] = object
 

@@ -78,5 +78,7 @@ const InvalidContainerPort int32 = 0
 
 const EmptyInsTemplateName = ""
 
+type Key string
+
 // DryRunContextKey tells the KB Controllers to do dry-run reconciliations
-const DryRunContextKey = "dry-run"
+const DryRunContextKey Key = "dry-run"

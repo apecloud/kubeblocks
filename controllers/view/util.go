@@ -221,7 +221,7 @@ func parseSelector(obj client.Object, fieldPath string) (map[string]string, erro
 	}
 	// Attempt to convert the final field to a LabelSelector
 	// TODO(free6om): handle metav1.LabelSelector
-	//labelSelector := &metav1.LabelSelector{}
+	// labelSelector := &metav1.LabelSelector{}
 	labelSelector := make(map[string]string)
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(selectorField, labelSelector); err != nil {
 		return nil, fmt.Errorf("failed to parse as LabelSelector: %w", err)
@@ -484,8 +484,8 @@ func buildObjectSummaries(initialObjectMap, newObjectMap map[model.GVKNObjKey]cl
 		*summary.ChangeSummary.Added += 1
 	})
 	doCount(updateSet, func(objectRef *model.GVKNObjKey, summary *viewv1.ObjectSummary) {
-		initialObj, _ := initialObjectMap[*objectRef]
-		newObj, _ := newObjectMap[*objectRef]
+		initialObj := initialObjectMap[*objectRef]
+		newObj := newObjectMap[*objectRef]
 		summary.Total += 1
 		if initialObj != nil && newObj != nil && initialObj.GetResourceVersion() == newObj.GetResourceVersion() {
 			return

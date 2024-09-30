@@ -41,7 +41,7 @@ type ReconciliationViewSpec struct {
 
 	// StateEvaluationExpression specifies the state evaluation expression used during reconciliation progress observation.
 	// The whole reconciliation process from the creation of the TargetObject to the deletion of it
-	// is seperated into several reconciliation cycles.
+	// is separated into several reconciliation cycles.
 	// The StateEvaluationExpression is applied to the TargetObject,
 	// and an evaluation result of true indicates the end of a reconciliation cycle.
 	// StateEvaluationExpression overrides the builtin default value.
@@ -281,7 +281,6 @@ type ObjectChange struct {
 	//
 	// +optional
 	EventAttributes *EventAttributes `json:"eventAttributes,omitempty"`
-
 
 	// Revision specifies the revision of the object after this change.
 	// Revision can be compared globally between all ObjectChanges of all Objects, to build a total order object change sequence.

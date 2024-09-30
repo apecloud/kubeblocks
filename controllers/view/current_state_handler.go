@@ -84,7 +84,13 @@ func (c *viewCalculator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.
 
 	// handle event changes
 	newEventMap, err := filterEvents(getEventsFromCache(c.ctx, c.cli), newObjectMap)
+	if err != nil {
+		return kubebuilderx.Commit, err
+	}
 	oldEventMap, err := filterEvents(getEventsFromStore(c.store), oldObjectMap)
+	if err != nil {
+		return kubebuilderx.Commit, err
+	}
 	eventChanges := buildChanges(oldEventMap, newEventMap, buildDescriptionFormatter(i18nResource, defaultLocale, view.Spec.Locale))
 	changes = append(changes, eventChanges...)
 

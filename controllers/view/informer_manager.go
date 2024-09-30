@@ -96,21 +96,6 @@ func (m *informerManager) watch(resource schema.GroupVersionKind) error {
 	return nil
 }
 
-func (m *informerManager) unWatch(resource schema.GroupVersionKind) error {
-	m.informerSetLock.Lock()
-	defer m.informerSetLock.Unlock()
-
-	if _, ok := m.informerSet[resource]; !ok {
-		return nil
-	}
-	if err := m.deleteInformer(resource); err != nil {
-		return err
-	}
-	m.informerSet.Delete(resource)
-
-	return nil
-}
-
 // processNextWorkItem will read a single work item off the workqueue and
 // attempt to process it, by calling the reconcileHandler.
 func (m *informerManager) processNextWorkItem() bool {
@@ -163,12 +148,6 @@ func (m *informerManager) createInformer(gvk schema.GroupVersionKind) error {
 	}
 	src := source.Kind(m.cache, obj)
 	return src.Start(m.ctx, m.handler, m.queue)
-}
-
-func (m *informerManager) deleteInformer(gvk schema.GroupVersionKind) error {
-	// Can't call m.cache.RemoveInformer() here, as m.cache is shared with all other controllers in the same Manager,
-	// they may still need the informer.
-	return nil
 }
 
 type eventProxy struct{}
@@ -230,7 +209,7 @@ func (m *informerManager) watchKubeBlocksRelatedResources() error {
 			}
 		}
 	}
-	for gvk, _ := range gvks {
+	for gvk := range gvks {
 		if err := m.watch(gvk); err != nil {
 			return err
 		}

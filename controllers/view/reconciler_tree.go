@@ -95,7 +95,7 @@ type reconcilerTree struct {
 func (r *reconcilerTree) Run() error {
 	return r.tree.WalkTopoOrder(func(v graph.Vertex) error {
 		objType, _ := v.(viewv1.ObjectType)
-		reconciler, _ := r.reconcilers[objType]
+		reconciler := r.reconcilers[objType]
 		gvk, err := objectTypeToGVK(&objType)
 		if err != nil {
 			return err

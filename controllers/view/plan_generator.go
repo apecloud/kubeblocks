@@ -93,12 +93,12 @@ func (g *planGenerator) generatePlan(root *kbappsv1.Cluster, patch client.Patch)
 	startTime := time.Now()
 	timeout := false
 	var reconcileErr error
+	previousCount := len(store.GetChanges())
 	for {
 		if time.Since(startTime) > time.Second {
 			timeout = true
 			break
 		}
-		previousCount := len(store.GetChanges())
 
 		// run reconciler tree
 		if reconcileErr = reconcilerTree.Run(); reconcileErr != nil {

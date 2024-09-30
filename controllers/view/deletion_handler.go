@@ -20,11 +20,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package view
 
 import (
+	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
-type deletionHandler struct{}
+type deletionHandler struct {
+	store ObjectRevisionStore
+}
 
 func (h *deletionHandler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
 	if tree.GetRoot() == nil || !model.IsObjectDeleting(tree.GetRoot()) {
@@ -34,15 +37,23 @@ func (h *deletionHandler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuild
 }
 
 func (h *deletionHandler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
-	// TODO(free6om)
-	// unwatch resources
+	view, _ := tree.GetRoot().(*viewv1.ReconciliationView)
+
 	// store cleanup
+	for _, change := range view.Status.CurrentState.Changes {
+		objectRef := objectReferenceToRef(&change.ObjectReference)
+		h.store.Delete(objectRef, view, change.Revision)
+	}
+	// TODO(free6om): events cleanup
+
 	// remove finalizer
+	tree.DeleteRoot()
+
 	return kubebuilderx.Commit, nil
 }
 
-func handleDeletion() kubebuilderx.Reconciler {
-	return &deletionHandler{}
+func handleDeletion(store ObjectRevisionStore) kubebuilderx.Reconciler {
+	return &deletionHandler{store: store}
 }
 
 var _ kubebuilderx.Reconciler = &deletionHandler{}

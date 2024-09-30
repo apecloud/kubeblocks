@@ -21,6 +21,7 @@ package apps
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -65,7 +66,7 @@ func (t *componentWorkloadUpgradeTransformer) Transform(ctx graph.TransformConte
 	ml := constant.GetCompLabels(synthesizeComp.ClusterName, synthesizeComp.Name)
 	inNS := client.InNamespace(comp.Namespace)
 	defaultHeadlessSvc := constant.GenerateDefaultComponentHeadlessServiceName(synthesizeComp.ClusterName, synthesizeComp.Name)
-	envCM := instanceset.GetEnvConfigMapName(constant.GenerateClusterComponentName(synthesizeComp.ClusterName, synthesizeComp.Name))
+	envCM := getEnvConfigMapName(constant.GenerateClusterComponentName(synthesizeComp.ClusterName, synthesizeComp.Name))
 	var revision string
 	for _, list := range objectList {
 		if err := graphCli.List(transCtx.Context, list, client.MatchingLabels(ml), inNS); err == nil {
@@ -169,6 +170,10 @@ func buildRevision(synthesizeComp *component.SynthesizedComponent, componentDef 
 	if err != nil {
 		return "", err
 	}
-	template := instanceset.BuildPodTemplate(its, instanceset.GetEnvConfigMapName(its.Name))
+	template := instanceset.BuildPodTemplate(its)
 	return instanceset.BuildInstanceTemplateRevision(template, its)
+}
+
+func getEnvConfigMapName(rsmName string) string {
+	return fmt.Sprintf("%s-rsm-env", rsmName)
 }

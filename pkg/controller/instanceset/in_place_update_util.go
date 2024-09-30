@@ -258,9 +258,6 @@ func equalBasicInPlaceFields(old, new *corev1.Pod) bool {
 }
 
 func equalResourcesInPlaceFields(old, new *corev1.Pod) bool {
-	if len(old.Spec.Containers) != len(new.Spec.Containers) {
-		return false
-	}
 	for _, nc := range new.Spec.Containers {
 		index := slices.IndexFunc(old.Spec.Containers, func(oc corev1.Container) bool {
 			return oc.Name == nc.Name

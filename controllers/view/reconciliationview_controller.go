@@ -43,7 +43,7 @@ type ReconciliationViewReconciler struct {
 	client.Client
 	Scheme               *runtime.Scheme
 	Recorder             record.EventRecorder
-	ObjectStore          ObjectRevisionStore
+	ObjectRevisionStore  ObjectRevisionStore
 	ObjectTreeRootFinder ObjectTreeRootFinder
 	InformerManager      InformerManager
 }
@@ -64,10 +64,10 @@ func (r *ReconciliationViewReconciler) Reconcile(ctx context.Context, req ctrl.R
 		Prepare(viewResources()).
 		Do(resourcesValidation(ctx, r.Client)).
 		Do(assureFinalizer()).
-		Do(handleDeletion()).
+		Do(handleDeletion(r.ObjectRevisionStore)).
 		Do(dryRun(ctx, r.Client, r.Scheme)).
-		Do(updateCurrentState(ctx, r.Client, r.Scheme, r.ObjectStore)).
-		Do(updateDesiredState(ctx, r.Client, r.Scheme, r.ObjectStore)).
+		Do(updateCurrentState(ctx, r.Client, r.Scheme, r.ObjectRevisionStore)).
+		Do(updateDesiredState(ctx, r.Client, r.Scheme, r.ObjectRevisionStore)).
 		Commit()
 
 	// TODO(free6om): err handling
@@ -77,7 +77,7 @@ func (r *ReconciliationViewReconciler) Reconcile(ctx context.Context, req ctrl.R
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ReconciliationViewReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	r.ObjectStore = NewObjectStore(r.Scheme)
+	r.ObjectRevisionStore = NewObjectStore(r.Scheme)
 	r.ObjectTreeRootFinder = NewObjectTreeRootFinder(r.Client)
 	r.InformerManager = NewInformerManager(r.Client, mgr.GetCache(), r.Scheme, r.ObjectTreeRootFinder.GetEventChannel())
 

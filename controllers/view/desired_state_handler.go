@@ -27,6 +27,7 @@ import (
 	"github.com/google/cel-go/checker/decls"
 	"github.com/google/cel-go/common/types"
 	"google.golang.org/protobuf/types/known/structpb"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -39,7 +40,7 @@ import (
 
 type stateEvaluation struct {
 	ctx    context.Context
-	reader client.Reader
+	cli    client.Client
 	store  ObjectRevisionStore
 	scheme *runtime.Scheme
 }
@@ -53,6 +54,11 @@ func (s *stateEvaluation) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuild
 
 func (s *stateEvaluation) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
 	view, _ := tree.GetRoot().(*viewv1.ReconciliationView)
+	objs := tree.List(&corev1.ConfigMap{})
+	var i18nResource *corev1.ConfigMap
+	if len(objs) > 0 {
+		i18nResource, _ = objs[0].(*corev1.ConfigMap)
+	}
 
 	// build new object set from cache
 	root := &kbappsv1.Cluster{}
@@ -63,7 +69,7 @@ func (s *stateEvaluation) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx
 			Name:      view.Spec.TargetObject.Name,
 		}
 	}
-	if err := s.reader.Get(s.ctx, objectKey, root); err != nil {
+	if err := s.cli.Get(s.ctx, objectKey, root); err != nil {
 		return kubebuilderx.Commit, err
 	}
 
@@ -79,6 +85,7 @@ func (s *stateEvaluation) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx
 		Kind:       kbappsv1.ClusterKind,
 	}
 	latestReconciliationCycleStart := 0
+	var initialRoot *kbappsv1.Cluster
 	for i := len(view.Status.CurrentState.Changes) - 1; i >= 0; i-- {
 		change := view.Status.CurrentState.Changes[i]
 		objType := objectReferenceToType(&change.ObjectReference)
@@ -107,6 +114,7 @@ func (s *stateEvaluation) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx
 		}
 		if state && firstFalseStateFound {
 			latestReconciliationCycleStart = i
+			initialRoot, _ = obj.(*kbappsv1.Cluster)
 			break
 		}
 	}
@@ -125,10 +133,21 @@ func (s *stateEvaluation) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx
 
 	// build new InitialObjectTree
 	var err error
-	view.Status.InitialObjectTree, err = getObjectTreeWithRevision(root, kbOwnershipRules, s.store, view.Status.CurrentState.Changes[latestReconciliationCycleStart].Revision, s.scheme)
+	view.Status.InitialObjectTree, err = getObjectTreeWithRevision(initialRoot, kbOwnershipRules, s.store, view.Status.CurrentState.Changes[latestReconciliationCycleStart].Revision, s.scheme)
 	if err != nil {
 		return kubebuilderx.Commit, err
 	}
+
+	// update desired state
+	generator := newPlanGenerator(s.ctx, s.cli, s.scheme,
+		treeObjectLoader(view.Status.InitialObjectTree, s.store, s.scheme),
+		buildDescriptionFormatter(i18nResource, defaultLocale, view.Spec.Locale))
+	patch := client.MergeFrom(root)
+	plan, err := generator.generatePlan(initialRoot, patch)
+	if err != nil {
+		return kubebuilderx.Commit, err
+	}
+	view.Status.DesiredState = &plan.Plan
 
 	// delete unused object revisions
 	for i := 0; i < latestReconciliationCycleStart; i++ {
@@ -138,10 +157,19 @@ func (s *stateEvaluation) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx
 	}
 	// TODO(free6om): delete unused event revisions
 
-	// truncate view
+	// truncate outage changes
 	view.Status.CurrentState.Changes = view.Status.CurrentState.Changes[latestReconciliationCycleStart:]
 
 	return kubebuilderx.Continue, nil
+}
+
+func updateDesiredState(ctx context.Context, cli client.Client, scheme *runtime.Scheme, store ObjectRevisionStore) kubebuilderx.Reconciler {
+	return &stateEvaluation{
+		ctx:    ctx,
+		cli:    cli,
+		scheme: scheme,
+		store:  store,
+	}
 }
 
 func doStateEvaluation(object client.Object, expression viewv1.StateEvaluationExpression) (bool, error) {
@@ -199,12 +227,9 @@ func doStateEvaluation(object client.Object, expression viewv1.StateEvaluationEx
 	return result, nil
 }
 
-func viewStateEvaluation(ctx context.Context, reader client.Reader, scheme *runtime.Scheme, store ObjectRevisionStore) kubebuilderx.Reconciler {
-	return &stateEvaluation{
-		ctx:    ctx,
-		reader: reader,
-		scheme: scheme,
-		store:  store,
+func treeObjectLoader(tree *viewv1.ObjectTreeNode, store ObjectRevisionStore, scheme *runtime.Scheme) objectLoader {
+	return func() (map[model.GVKNObjKey]client.Object, error) {
+		return getObjectsFromTree(tree, store, scheme)
 	}
 }
 

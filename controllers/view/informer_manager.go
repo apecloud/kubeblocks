@@ -37,15 +37,10 @@ import (
 
 	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
-	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
 type InformerManager interface {
-	SetContext(ctx context.Context)
-	Start() error
-	Watch(watcher client.Object, watched schema.GroupVersionKind) error
-	UnWatch(watcher client.Object, watched schema.GroupVersionKind) error
+	Start(context.Context) error
 }
 
 type informerManager struct {
@@ -53,12 +48,12 @@ type informerManager struct {
 
 	eventChan chan event.GenericEvent
 
-	informerRefCounter map[schema.GroupVersionKind]sets.Set[model.GVKNObjKey]
-	refCounterLock     sync.Mutex
+	informerSet     sets.Set[schema.GroupVersionKind]
+	informerSetLock sync.Mutex
 
 	cache cache.Cache
-	ctx   context.Context
 	cli   client.Client
+	ctx   context.Context
 
 	handler handler.EventHandler
 
@@ -69,11 +64,13 @@ type informerManager struct {
 	scheme *runtime.Scheme
 }
 
-func (m *informerManager) SetContext(ctx context.Context) {
+func (m *informerManager) Start(ctx context.Context) error {
 	m.ctx = ctx
-}
 
-func (m *informerManager) Start() error {
+	if err := m.watchKubeBlocksRelatedResources(); err != nil {
+		return err
+	}
+
 	m.once.Do(func() {
 		go func() {
 			for m.processNextWorkItem() {
@@ -84,47 +81,33 @@ func (m *informerManager) Start() error {
 	return nil
 }
 
-func (m *informerManager) Watch(watcher client.Object, watched schema.GroupVersionKind) error {
-	m.refCounterLock.Lock()
-	defer m.refCounterLock.Unlock()
+func (m *informerManager) watch(resource schema.GroupVersionKind) error {
+	m.informerSetLock.Lock()
+	defer m.informerSetLock.Unlock()
 
-	watchers, ok := m.informerRefCounter[watched]
-	if !ok {
-		watchers = sets.New[model.GVKNObjKey]()
-		m.informerRefCounter[watched] = watchers
+	if _, ok := m.informerSet[resource]; ok {
+		return nil
 	}
-	watcherRef, err := getObjectRef(watcher, m.scheme)
-	if err != nil {
+	if err := m.createInformer(resource); err != nil {
 		return err
 	}
-	if watchers.Has(*watcherRef) {
-		return nil
-	}
-	if err := m.createInformer(watched); err != nil {
-		return nil
-	}
-	watchers.Insert(*watcherRef)
+	m.informerSet.Insert(resource)
+
 	return nil
 }
 
-func (m *informerManager) UnWatch(watcher client.Object, watched schema.GroupVersionKind) error {
-	m.refCounterLock.Lock()
-	defer m.refCounterLock.Unlock()
+func (m *informerManager) unWatch(resource schema.GroupVersionKind) error {
+	m.informerSetLock.Lock()
+	defer m.informerSetLock.Unlock()
 
-	watchers, ok := m.informerRefCounter[watched]
-	if !ok {
+	if _, ok := m.informerSet[resource]; !ok {
 		return nil
 	}
-	watcherRef, err := getObjectRef(watcher, m.scheme)
-	if err != nil {
+	if err := m.deleteInformer(resource); err != nil {
 		return err
 	}
-	watchers.Delete(*watcherRef)
-	if watchers.Len() == 0 {
-		if err := m.deleteInformer(watched); err != nil {
-			return err
-		}
-	}
+	m.informerSet.Delete(resource)
+
 	return nil
 }
 
@@ -208,27 +191,19 @@ func (e *eventProxy) Generic(ctx context.Context, evt event.GenericEvent, q work
 
 func NewInformerManager(cli client.Client, cache cache.Cache, scheme *runtime.Scheme, eventChan chan event.GenericEvent) InformerManager {
 	return &informerManager{
-		cli:                cli,
-		cache:              cache,
-		scheme:             scheme,
-		eventChan:          eventChan,
-		handler:            &eventProxy{},
-		informerRefCounter: make(map[schema.GroupVersionKind]sets.Set[model.GVKNObjKey]),
+		cli:         cli,
+		cache:       cache,
+		scheme:      scheme,
+		eventChan:   eventChan,
+		handler:     &eventProxy{},
+		informerSet: sets.New[schema.GroupVersionKind](),
 		queue: workqueue.NewRateLimitingQueueWithConfig(workqueue.DefaultControllerRateLimiter(), workqueue.RateLimitingQueueConfig{
 			Name: "informer-manager",
 		}),
 	}
 }
 
-type informerManagerReconciler struct {
-	manager InformerManager
-}
-
-func (r *informerManagerReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
-	return kubebuilderx.ConditionSatisfied
-}
-
-func (r *informerManagerReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
+func (m *informerManager) watchKubeBlocksRelatedResources() error {
 	gvks := sets.New[schema.GroupVersionKind]()
 	parseGVK := func(ot *viewv1.ObjectType) error {
 		gvk, err := objectTypeToGVK(ot)
@@ -243,40 +218,25 @@ func (r *informerManagerReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (ku
 		APIVersion: corev1.SchemeGroupVersion.String(),
 		Kind:       constant.EventKind,
 	}); err != nil {
-		return kubebuilderx.Commit, err
+		return err
 	}
 	for _, rule := range kbOwnershipRules {
 		if err := parseGVK(&rule.Primary); err != nil {
-			return kubebuilderx.Commit, err
+			return err
 		}
 		for _, resource := range rule.OwnedResources {
 			if err := parseGVK(&resource.Secondary); err != nil {
-				return kubebuilderx.Commit, err
+				return err
 			}
 		}
 	}
-	v, _ := tree.GetRoot().(*viewv1.ReconciliationView)
-	if model.IsObjectDeleting(tree.GetRoot()) {
-		for gvk, _ := range gvks {
-			if err := r.manager.UnWatch(v, gvk); err != nil {
-				return kubebuilderx.Commit, err
-			}
-		}
-	} else {
-		for gvk, _ := range gvks {
-			if err := r.manager.Watch(v, gvk); err != nil {
-				return kubebuilderx.Commit, err
-			}
+	for gvk, _ := range gvks {
+		if err := m.watch(gvk); err != nil {
+			return err
 		}
 	}
-
-	return kubebuilderx.Continue, nil
-}
-
-func updateInformerManager(manager InformerManager) kubebuilderx.Reconciler {
-	return &informerManagerReconciler{manager: manager}
+	return nil
 }
 
 var _ InformerManager = &informerManager{}
-var _ kubebuilderx.Reconciler = &informerManagerReconciler{}
 var _ handler.EventHandler = &eventProxy{}

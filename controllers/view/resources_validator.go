@@ -61,7 +61,7 @@ func (r *resourcesValidator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuild
 	return kubebuilderx.Continue, nil
 }
 
-func viewResourcesValidation(ctx context.Context, reader client.Reader) kubebuilderx.Reconciler {
+func resourcesValidation(ctx context.Context, reader client.Reader) kubebuilderx.Reconciler {
 	return &resourcesValidator{ctx: ctx, reader: reader}
 }
 

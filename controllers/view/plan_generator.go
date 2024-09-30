@@ -23,85 +23,45 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"hash/fnv"
 	"reflect"
 	"time"
 
+	jsonpatch "github.com/evanphx/json-patch/v5"
 	"github.com/google/go-cmp/cmp"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/yaml"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
+type PlanGenerator interface {
+	generatePlan(root *kbappsv1.Cluster, patch client.Patch) (*viewv1.DryRunResult, error)
+}
+
+type objectLoader func() (map[model.GVKNObjKey]client.Object, error)
+type descriptionFormatter func(client.Object, client.Object, viewv1.ObjectChangeType, *schema.GroupVersionKind) (string, *string)
+
 type planGenerator struct {
-	ctx context.Context
-	cli client.Client
+	ctx       context.Context
+	cli       client.Client
+	scheme    *runtime.Scheme
+	loader    objectLoader
+	formatter descriptionFormatter
 }
 
-func (g *planGenerator) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
-	if tree.GetRoot() == nil || model.IsObjectDeleting(tree.GetRoot()) {
-		return kubebuilderx.ConditionUnsatisfied
-	}
-	v, _ := tree.GetRoot().(*viewv1.ReconciliationView)
-	if isDesiredSpecChanged(v) {
-		return kubebuilderx.ConditionSatisfied
-	}
-	return kubebuilderx.ConditionUnsatisfied
-}
-
-func isDesiredSpecChanged(v *viewv1.ReconciliationView) bool {
-	if v.Spec.DryRun == nil && v.Status.DryRunResult == nil {
-		return false
-	}
-	if v.Spec.DryRun == nil || v.Status.DryRunResult == nil {
-		return true
-	}
-	revision := getDesiredSpecRevision(v.Spec.DryRun.DesiredSpec)
-	return revision != v.Status.DryRunResult.DesiredSpecRevision
-}
-
-func getDesiredSpecRevision(desiredSpec string) string {
-	hf := fnv.New32()
-	_, _ = hf.Write([]byte(desiredSpec))
-	return rand.SafeEncodeString(fmt.Sprint(hf.Sum32()))
-}
-
-func (g *planGenerator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
-	view, _ := tree.GetRoot().(*viewv1.ReconciliationView)
-	objs := tree.List(&corev1.ConfigMap{})
-	var i18nResource *corev1.ConfigMap
-	if len(objs) > 0 {
-		i18nResource, _ = objs[0].(*corev1.ConfigMap)
-	}
-
-	root := &kbappsv1.Cluster{}
-	objectKey := client.ObjectKeyFromObject(view)
-	if view.Spec.TargetObject != nil {
-		objectKey = client.ObjectKey{
-			Namespace: view.Spec.TargetObject.Namespace,
-			Name:      view.Spec.TargetObject.Name,
-		}
-	}
-	if err := g.cli.Get(g.ctx, objectKey, root); err != nil {
-		return kubebuilderx.Commit, err
-	}
-
+func (g *planGenerator) generatePlan(root *kbappsv1.Cluster, patch client.Patch) (*viewv1.DryRunResult, error) {
 	// create mock client and mock event recorder
 	// kbagent client is running in dry-run mode by setting context key-value pair: dry-run=true
-	store := newChangeCaptureStore(g.cli.Scheme(), i18nResource)
+	store := newChangeCaptureStore(g.scheme, g.formatter)
 	mClient, err := newMockClient(g.cli, store, kbOwnershipRules)
 	if err != nil {
-		return kubebuilderx.Commit, err
+		return nil, err
 	}
 	mEventRecorder := newMockEventRecorder(store)
 
@@ -111,22 +71,22 @@ func (g *planGenerator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.R
 	// 3. encapsulate KB controller as reconciler
 	reconcilerTree, err := newReconcilerTree(g.ctx, mClient, mEventRecorder, kbOwnershipRules)
 	if err != nil {
-		return kubebuilderx.Commit, err
+		return nil, err
 	}
 
 	// load current object tree into store
-	if err = loadCurrentObjectTree(g.ctx, g.cli, root, kbOwnershipRules, store); err != nil {
-		return kubebuilderx.Commit, err
+	if err = loadCurrentObjectTree(g.loader, store); err != nil {
+		return nil, err
 	}
 	initialObjectMap := store.GetAll()
 
 	// apply dryRun.desiredSpec to target cluster object
 	var specDiff string
-	if specDiff, err = applyDesiredSpec(view.Spec.DryRun.DesiredSpec, root); err != nil {
-		return kubebuilderx.Commit, err
+	if specDiff, err = applyPatch(root, patch); err != nil {
+		return nil, err
 	}
 	if err = mClient.Update(g.ctx, root); err != nil {
-		return kubebuilderx.Commit, err
+		return nil, err
 	}
 
 	// generate plan with timeout
@@ -154,14 +114,8 @@ func (g *planGenerator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.R
 	}
 
 	// update dry-run result
-	//
 	// update spec info
-	dryRunResult := view.Status.DryRunResult
-	if dryRunResult == nil {
-		dryRunResult = &viewv1.DryRunResult{}
-		view.Status.DryRunResult = dryRunResult
-	}
-	dryRunResult.DesiredSpecRevision = getDesiredSpecRevision(view.Spec.DryRun.DesiredSpec)
+	dryRunResult := &viewv1.DryRunResult{}
 	dryRunResult.ObservedTargetGeneration = root.Generation
 	dryRunResult.SpecDiff = specDiff
 
@@ -180,89 +134,81 @@ func (g *planGenerator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.R
 	}
 
 	// update plan
-	if err = g.cli.Get(g.ctx, objectKey, root); err != nil {
-		return kubebuilderx.Commit, err
-	}
-	desiredRoot := &kbappsv1.Cluster{}
-	if err = mClient.Get(g.ctx, objectKey, desiredRoot); err != nil {
-		return kubebuilderx.Commit, err
-	}
-	desiredTree, err := getObjectTreeFromCache(g.ctx, mClient, desiredRoot, kbOwnershipRules)
+	desiredTree, err := getObjectTreeFromCache(g.ctx, mClient, root, kbOwnershipRules)
 	if err != nil {
-		return kubebuilderx.Commit, err
+		return nil, err
 	}
 	dryRunResult.Plan.ObjectTree = desiredTree
 	dryRunResult.Plan.Changes = store.GetChanges()
 	newObjectMap := store.GetAll()
 	dryRunResult.Plan.Summary.ObjectSummaries = buildObjectSummaries(initialObjectMap, newObjectMap)
 
-	return kubebuilderx.Continue, nil
+	return dryRunResult, nil
 }
 
-func planGeneration(ctx context.Context, cli client.Client) kubebuilderx.Reconciler {
+func newPlanGenerator(ctx context.Context, cli client.Client, scheme *runtime.Scheme, loader objectLoader, formatter descriptionFormatter) PlanGenerator {
 	return &planGenerator{
-		ctx: context.WithValue(ctx, constant.DryRunContextKey, true),
-		cli: cli,
+		ctx:       ctx,
+		cli:       cli,
+		scheme:    scheme,
+		loader:    loader,
+		formatter: formatter,
 	}
 }
 
-func applyDesiredSpec(desiredSpec string, obj client.Object) (string, error) {
-	// Convert the desiredSpec YAML string to a map
-	specMap := make(map[string]interface{})
-	if err := yaml.Unmarshal([]byte(desiredSpec), &specMap); err != nil {
-		return "", fmt.Errorf("failed to unmarshal desiredSpec: %w", err)
-	}
-
+func applyPatch(obj client.Object, patch client.Patch) (string, error) {
 	// Extract the current spec and apply the patch
 	currentSpec, err := getSpecFieldAsStruct(obj)
 	if err != nil {
-		return "", fmt.Errorf("failed to get current spec: %w", err)
+		return "", err
 	}
 
-	// Create a strategic merge patch
-	patch, err := strategicpatch.CreateTwoWayMergePatch(
-		specMapToJSON(currentSpec),
-		specMapToJSON(specMap),
-		currentSpec,
-	)
+	patchData, err := patch.Data(obj)
 	if err != nil {
-		return "", fmt.Errorf("failed to create merge patch: %w", err)
+		return "", err
 	}
-
 	// Apply the patch to the current spec
-	modifiedSpec, err := strategicpatch.StrategicMergePatch(
-		specMapToJSON(currentSpec),
-		patch,
-		currentSpec,
-	)
-	if err != nil {
-		return "", fmt.Errorf("failed to apply merge patch: %w", err)
+	var modifiedSpec []byte
+	if patch.Type() == types.StrategicMergePatchType {
+		modifiedSpec, err = strategicpatch.StrategicMergePatch(
+			specMapToJSON(currentSpec),
+			patchData,
+			currentSpec,
+		)
+		if err != nil {
+			return "", err
+		}
+	} else if patch.Type() == types.MergePatchType {
+		modifiedSpec, err = jsonpatch.MergePatch(specMapToJSON(currentSpec), patchData)
+		if err != nil {
+			return "", err
+		}
 	}
 	modifiedSpecMap := make(map[string]interface{})
 	if err = json.Unmarshal(modifiedSpec, &modifiedSpecMap); err != nil {
-		return "", fmt.Errorf("failed to unmarshal final spec: %w", err)
+		return "", err
 	}
 
 	// Convert the object to an unstructured map
 	objMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
 	if err != nil {
-		return "", fmt.Errorf("failed to convert object to unstructured: %w", err)
+		return "", err
 	}
 
 	// Extract the initial spec
 	initialSpec, _, err := unstructured.NestedMap(objMap, "spec")
 	if err != nil {
-		return "", fmt.Errorf("failed to get current spec: %w", err)
+		return "", err
 	}
 
 	// Update the spec in the object map
 	if err := unstructured.SetNestedField(objMap, modifiedSpecMap, "spec"); err != nil {
-		return "", fmt.Errorf("failed to set modified spec: %w", err)
+		return "", err
 	}
 
 	// Convert the modified map back to the original object
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(objMap, obj); err != nil {
-		return "", fmt.Errorf("failed to convert back to object: %w", err)
+		return "", err
 	}
 
 	// build the spec change
@@ -291,8 +237,8 @@ func getSpecFieldAsStruct(obj client.Object) (interface{}, error) {
 	return specField.Interface(), nil
 }
 
-func loadCurrentObjectTree(ctx context.Context, cli client.Client, root *kbappsv1.Cluster, ownershipRules []OwnershipRule, store ChangeCaptureStore) error {
-	objectMap, err := getObjectsFromCache(ctx, cli, root, ownershipRules)
+func loadCurrentObjectTree(loader objectLoader, store ChangeCaptureStore) error {
+	objectMap, err := loader()
 	if err != nil {
 		return err
 	}
@@ -304,4 +250,4 @@ func loadCurrentObjectTree(ctx context.Context, cli client.Client, root *kbappsv
 	return nil
 }
 
-var _ kubebuilderx.Reconciler = &planGenerator{}
+var _ PlanGenerator = &planGenerator{}

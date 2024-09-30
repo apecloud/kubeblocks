@@ -62,12 +62,12 @@ func (r *ReconciliationViewReconciler) Reconcile(ctx context.Context, req ctrl.R
 
 	res, err := kubebuilderx.NewController(ctx, r.Client, req, r.Recorder, logger).
 		Prepare(viewResources()).
-		Do(viewResourcesValidation(ctx, r.Client)).
-		// TODO(free6om): do store cleanup at view deletion
-		Do(updateInformerManager(r.InformerManager)).
-		Do(viewCalculation(ctx, r.Client, r.Scheme, r.ObjectStore)).
-		Do(viewStateEvaluation(ctx, r.Client, r.Scheme, r.ObjectStore)).
-		Do(planGeneration(ctx, r.Client)).
+		Do(resourcesValidation(ctx, r.Client)).
+		Do(assureFinalizer()).
+		Do(handleDeletion()).
+		Do(dryRun(ctx, r.Client, r.Scheme)).
+		Do(updateCurrentState(ctx, r.Client, r.Scheme, r.ObjectStore)).
+		Do(updateDesiredState(ctx, r.Client, r.Scheme, r.ObjectStore)).
 		Commit()
 
 	// TODO(free6om): err handling
@@ -80,9 +80,6 @@ func (r *ReconciliationViewReconciler) SetupWithManager(mgr ctrl.Manager) error 
 	r.ObjectStore = NewObjectStore(r.Scheme)
 	r.ObjectTreeRootFinder = NewObjectTreeRootFinder(r.Client)
 	r.InformerManager = NewInformerManager(r.Client, mgr.GetCache(), r.Scheme, r.ObjectTreeRootFinder.GetEventChannel())
-	if err := r.InformerManager.Start(); err != nil {
-		return err
-	}
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&viewv1.ReconciliationView{}).

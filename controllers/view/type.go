@@ -47,6 +47,8 @@ import (
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 )
 
+const finalizer = "view.kubeblocks.io/finalizer"
+
 var (
 	clusterCriteria = OwnershipCriteria{
 		LabelCriteria: map[string]string{

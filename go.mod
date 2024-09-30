@@ -16,6 +16,7 @@ require (
 	github.com/containers/common v0.55.4
 	github.com/docker/docker v25.0.6+incompatible
 	github.com/evanphx/json-patch v5.6.0+incompatible
+	github.com/evanphx/json-patch/v5 v5.8.0
 	github.com/fasthttp/router v1.4.20
 	github.com/fsnotify/fsnotify v1.7.0
 	github.com/go-logr/logr v1.4.1
@@ -115,7 +116,6 @@ require (
 	github.com/docker/libtrust v0.0.0-20160708172513-aabc10ec26b7 // indirect
 	github.com/emicklei/go-restful/v3 v3.11.0 // indirect
 	github.com/emicklei/proto v1.10.0 // indirect
-	github.com/evanphx/json-patch/v5 v5.8.0 // indirect
 	github.com/exponent-io/jsonpath v0.0.0-20151013193312-d6023ce2651d // indirect
 	github.com/fatih/camelcase v1.0.0 // indirect
 	github.com/fatih/color v1.16.0 // indirect

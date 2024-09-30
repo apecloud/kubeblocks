@@ -21,11 +21,11 @@ package view
 
 import (
 	"context"
-	"k8s.io/apimachinery/pkg/util/sets"
 
 	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -184,7 +184,7 @@ func filterEvents(eventLister func() ([]client.Object, error), objectMap map[mod
 	return matchedEventMap, nil
 }
 
-func viewCalculation(ctx context.Context, cli client.Client, scheme *runtime.Scheme, store ObjectRevisionStore) kubebuilderx.Reconciler {
+func updateCurrentState(ctx context.Context, cli client.Client, scheme *runtime.Scheme, store ObjectRevisionStore) kubebuilderx.Reconciler {
 	return &viewCalculator{
 		ctx:    ctx,
 		cli:    cli,

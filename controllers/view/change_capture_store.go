@@ -24,7 +24,6 @@ import (
 	"sync/atomic"
 
 	"golang.org/x/exp/slices"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -46,13 +45,11 @@ type ChangeCaptureStore interface {
 }
 
 type changeCaptureStore struct {
-	scheme        *runtime.Scheme
-	i18nResources *corev1.ConfigMap
-	defaultLocale string
-	locale        *string
-	store         map[model.GVKNObjKey]client.Object
-	clock         atomic.Int64
-	changes       []viewv1.ObjectChange
+	scheme    *runtime.Scheme
+	formatter descriptionFormatter
+	store     map[model.GVKNObjKey]client.Object
+	clock     atomic.Int64
+	changes   []viewv1.ObjectChange
 }
 
 func (s *changeCaptureStore) Load(objects ...client.Object) error {
@@ -148,11 +145,11 @@ func (s *changeCaptureStore) GetChanges() []viewv1.ObjectChange {
 	return s.changes
 }
 
-func newChangeCaptureStore(scheme *runtime.Scheme, resource *corev1.ConfigMap) ChangeCaptureStore {
+func newChangeCaptureStore(scheme *runtime.Scheme, formatter descriptionFormatter) ChangeCaptureStore {
 	return &changeCaptureStore{
-		scheme:        scheme,
-		i18nResources: resource,
-		store:         make(map[model.GVKNObjKey]client.Object),
+		scheme:    scheme,
+		store:     make(map[model.GVKNObjKey]client.Object),
+		formatter: formatter,
 	}
 }
 
@@ -164,7 +161,7 @@ func (s *changeCaptureStore) captureCreation(objectRef *model.GVKNObjKey, object
 	changes := buildChanges(
 		make(map[model.GVKNObjKey]client.Object),
 		map[model.GVKNObjKey]client.Object{*objectRef: object},
-		buildDescriptionFormatter(s.i18nResources, s.defaultLocale, s.locale))
+		s.formatter)
 	s.changes = append(s.changes, changes...)
 }
 
@@ -172,7 +169,7 @@ func (s *changeCaptureStore) captureUpdate(objectRef *model.GVKNObjKey, obj clie
 	changes := buildChanges(
 		map[model.GVKNObjKey]client.Object{*objectRef: obj},
 		map[model.GVKNObjKey]client.Object{*objectRef: object},
-		buildDescriptionFormatter(s.i18nResources, s.defaultLocale, s.locale))
+		s.formatter)
 	s.changes = append(s.changes, changes...)
 }
 
@@ -180,7 +177,7 @@ func (s *changeCaptureStore) captureDeletion(objectRef *model.GVKNObjKey, object
 	changes := buildChanges(
 		map[model.GVKNObjKey]client.Object{*objectRef: object},
 		make(map[model.GVKNObjKey]client.Object),
-		buildDescriptionFormatter(s.i18nResources, s.defaultLocale, s.locale))
+		s.formatter)
 	s.changes = append(s.changes, changes...)
 }
 

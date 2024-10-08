@@ -59,6 +59,9 @@ func objectTypeToGVK(objectType *viewv1.ObjectType) (*schema.GroupVersionKind, e
 }
 
 func objectReferenceToType(objectRef *corev1.ObjectReference) *viewv1.ObjectType {
+	if objectRef == nil {
+		return nil
+	}
 	return &viewv1.ObjectType{
 		APIVersion: objectRef.APIVersion,
 		Kind:       objectRef.Kind,
@@ -93,6 +96,13 @@ func objectRefToType(objectRef *model.GVKNObjKey) *viewv1.ObjectType {
 	return &viewv1.ObjectType{
 		APIVersion: objectRef.GroupVersionKind.GroupVersion().String(),
 		Kind:       objectRef.Kind,
+	}
+}
+
+func objectType(apiVersion, kind string) viewv1.ObjectType {
+	return viewv1.ObjectType{
+		APIVersion: apiVersion,
+		Kind:       kind,
 	}
 }
 
@@ -434,13 +444,6 @@ func flattenObject(obj client.Object) (map[string]string, error) {
 	flatMap := make(map[string]string)
 	flattenJSON(objMap, "", flatMap)
 	return flatMap, nil
-}
-
-func objectType(apiVersion, kind string) viewv1.ObjectType {
-	return viewv1.ObjectType{
-		APIVersion: apiVersion,
-		Kind:       kind,
-	}
 }
 
 func buildObjectSummaries(initialObjectMap, newObjectMap map[model.GVKNObjKey]client.Object) []viewv1.ObjectSummary {

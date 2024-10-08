@@ -178,6 +178,9 @@ spec:
                           description: EventAttributes specifies the attributes of
                             the event when ChangeType is Event.
                           properties:
+                            name:
+                              description: Name of the Event.
+                              type: string
                             reason:
                               description: Reason of the Event.
                               type: string
@@ -185,6 +188,7 @@ spec:
                               description: Type of the Event.
                               type: string
                           required:
+                          - name
                           - reason
                           - type
                           type: object
@@ -405,6 +409,9 @@ spec:
                           description: EventAttributes specifies the attributes of
                             the event when ChangeType is Event.
                           properties:
+                            name:
+                              description: Name of the Event.
+                              type: string
                             reason:
                               description: Reason of the Event.
                               type: string
@@ -412,6 +419,7 @@ spec:
                               description: Type of the Event.
                               type: string
                           required:
+                          - name
                           - reason
                           - type
                           type: object
@@ -657,6 +665,9 @@ spec:
                               description: EventAttributes specifies the attributes
                                 of the event when ChangeType is Event.
                               properties:
+                                name:
+                                  description: Name of the Event.
+                                  type: string
                                 reason:
                                   description: Reason of the Event.
                                   type: string
@@ -664,6 +675,7 @@ spec:
                                   description: Type of the Event.
                                   type: string
                               required:
+                              - name
                               - reason
                               - type
                               type: object

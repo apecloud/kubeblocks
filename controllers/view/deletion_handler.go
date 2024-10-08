@@ -40,11 +40,7 @@ func (h *deletionHandler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx
 	view, _ := tree.GetRoot().(*viewv1.ReconciliationView)
 
 	// store cleanup
-	for _, change := range view.Status.CurrentState.Changes {
-		objectRef := objectReferenceToRef(&change.ObjectReference)
-		h.store.Delete(objectRef, view, change.Revision)
-	}
-	// TODO(free6om): events cleanup
+	deleteUnusedRevisions(h.store, view.Status.CurrentState.Changes, view)
 
 	// remove finalizer
 	tree.DeleteRoot()

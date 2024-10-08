@@ -318,20 +318,10 @@ func getObjectsFromCache(ctx context.Context, cli client.Client, root *kbappsv1.
 }
 
 func getSecondaryObjects(ctx context.Context, cli client.Client, obj client.Object, ownershipRules []OwnershipRule) ([]client.Object, error) {
-	objGVK, err := apiutil.GVKForObject(obj, cli.Scheme())
+	// find matched rules
+	rules, err := findMatchedRules(obj, ownershipRules, cli.Scheme())
 	if err != nil {
 		return nil, err
-	}
-	// find matched rules
-	var rules []OwnershipRule
-	for _, rule := range ownershipRules {
-		gvk, err := objectTypeToGVK(&rule.Primary)
-		if err != nil {
-			return nil, err
-		}
-		if *gvk == objGVK {
-			rules = append(rules, rule)
-		}
 	}
 
 	// get secondary objects
@@ -562,6 +552,7 @@ func buildChanges(oldObjectMap, newObjectMap map[model.GVKNObjKey]client.Object,
 				evt, _ := obj.(*corev1.Event)
 				ref = &evt.InvolvedObject
 				eventAttributes = &viewv1.EventAttributes{
+					Name:   evt.Name,
 					Type:   evt.Type,
 					Reason: evt.Reason,
 				}
@@ -671,23 +662,11 @@ func getObjectsFromTree(tree *viewv1.ObjectTreeNode, store ObjectRevisionStore, 
 	return objectMap, nil
 }
 
-// TODO(free6om): similar as getSecondaryObjects, refactor and merge them
 func getObjectTreeWithRevision(primary client.Object, ownershipRules []OwnershipRule, store ObjectRevisionStore, revision int64, scheme *runtime.Scheme) (*viewv1.ObjectTreeNode, error) {
 	// find matched rules
-	var matchedRules []*OwnershipRule
-	for i := range ownershipRules {
-		rule := &ownershipRules[i]
-		gvk, err := objectTypeToGVK(&rule.Primary)
-		if err != nil {
-			return nil, err
-		}
-		primaryGVK, err := apiutil.GVKForObject(primary, scheme)
-		if err != nil {
-			return nil, err
-		}
-		if *gvk == primaryGVK {
-			matchedRules = append(matchedRules, rule)
-		}
+	matchedRules, err := findMatchedRules(primary, ownershipRules, scheme)
+	if err != nil {
+		return nil, err
 	}
 
 	reference, err := getObjectReference(primary, scheme)
@@ -727,6 +706,26 @@ func getObjectTreeWithRevision(primary client.Object, ownershipRules []Ownership
 	return tree, nil
 }
 
+func findMatchedRules(obj client.Object, ownershipRules []OwnershipRule, scheme *runtime.Scheme) ([]*OwnershipRule, error) {
+	targetGVK, err := apiutil.GVKForObject(obj, scheme)
+	if err != nil {
+		return nil, err
+	}
+	var matchedRules []*OwnershipRule
+	for i := range ownershipRules {
+		rule := &ownershipRules[i]
+		gvk, err := objectTypeToGVK(&rule.Primary)
+		if err != nil {
+			return nil, err
+		}
+
+		if *gvk == targetGVK {
+			matchedRules = append(matchedRules, rule)
+		}
+	}
+	return matchedRules, nil
+}
+
 func filterByCriteria(primary client.Object, objects []client.Object, criteria *OwnershipCriteria) ([]client.Object, error) {
 	var matchedObjects []client.Object
 	opts, err := parseQueryOptions(primary, criteria)
@@ -756,4 +755,15 @@ func getObjectsByRevision(gvk *schema.GroupVersionKind, store ObjectRevisionStor
 		}
 	}
 	return matchedObjects
+}
+
+func deleteUnusedRevisions(store ObjectRevisionStore, changes []viewv1.ObjectChange, reference client.Object) {
+	for _, change := range changes {
+		objectRef := objectReferenceToRef(&change.ObjectReference)
+		if change.ChangeType == viewv1.EventType {
+			objectRef.GroupVersionKind = eventGVK
+			objectRef.Name = change.EventAttributes.Name
+		}
+		store.Delete(objectRef, reference, change.Revision)
+	}
 }

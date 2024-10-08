@@ -70,8 +70,6 @@ func (r *ReconciliationViewReconciler) Reconcile(ctx context.Context, req ctrl.R
 		Do(updateDesiredState(ctx, r.Client, r.Scheme, r.ObjectRevisionStore)).
 		Commit()
 
-	// TODO(free6om): err handling
-
 	return res, err
 }
 

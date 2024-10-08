@@ -315,6 +315,10 @@ const (
 
 // EventAttributes defines attributes of the Event.
 type EventAttributes struct {
+	// Name of the Event.
+	//
+	Name string `json:"name"`
+
 	// Type of the Event.
 	//
 	Type string `json:"type"`

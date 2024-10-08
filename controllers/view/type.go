@@ -106,7 +106,6 @@ var (
 					Secondary: objectType(corev1.SchemeGroupVersion.String(), constant.SecretKind),
 					Criteria:  clusterCriteria,
 				},
-				// TODO(free6om): should own BackupPolicy and BackSchedule ?
 			},
 		},
 		{

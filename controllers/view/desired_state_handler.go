@@ -150,12 +150,7 @@ func (s *stateEvaluation) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx
 	view.Status.DesiredState = &plan.Plan
 
 	// delete unused object revisions
-	for i := 0; i < latestReconciliationCycleStart; i++ {
-		change := view.Status.CurrentState.Changes[i]
-		objectRef := objectReferenceToRef(&change.ObjectReference)
-		s.store.Delete(objectRef, view, change.Revision)
-	}
-	// TODO(free6om): delete unused event revisions
+	deleteUnusedRevisions(s.store, view.Status.CurrentState.Changes[:latestReconciliationCycleStart], view)
 
 	// truncate outage changes
 	view.Status.CurrentState.Changes = view.Status.CurrentState.Changes[latestReconciliationCycleStart:]

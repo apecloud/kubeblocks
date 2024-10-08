@@ -32,7 +32,6 @@ import (
 	"github.com/go-logr/logr"
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"go.uber.org/zap/zapcore"
-	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/record"
@@ -48,7 +47,6 @@ import (
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
-	"github.com/apecloud/kubeblocks/apis/workloads/legacy"
 	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/controllers/apps/configuration"
 	"github.com/apecloud/kubeblocks/controllers/k8score"
@@ -150,14 +148,6 @@ var _ = BeforeSuite(func() {
 	err = workloadsv1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 	model.AddScheme(workloadsv1.AddToScheme)
-
-	err = legacy.AddToScheme(scheme.Scheme)
-	Expect(err).NotTo(HaveOccurred())
-	model.AddScheme(legacy.AddToScheme)
-
-	err = apiextv1.AddToScheme(scheme.Scheme)
-	Expect(err).NotTo(HaveOccurred())
-	model.AddScheme(apiextv1.AddToScheme)
 
 	// +kubebuilder:scaffold:rscheme
 

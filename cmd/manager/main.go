@@ -143,7 +143,6 @@ func init() {
 	viper.SetDefault(constant.CfgKBReconcileWorkers, 8)
 	viper.SetDefault(constant.FeatureGateIgnoreConfigTemplateDefaultMode, false)
 	viper.SetDefault(constant.FeatureGateInPlacePodVerticalScaling, false)
-	viper.SetDefault(constant.FeatureGateNoRSMEnv, false)
 }
 
 type flagName string

@@ -21,23 +21,7 @@ package util
 
 import (
 	"math"
-
-	"golang.org/x/exp/constraints"
 )
-
-func Min[T constraints.Ordered](l, r T) T {
-	if l < r {
-		return l
-	}
-	return r
-}
-
-func Max[T constraints.Ordered](l, r T) T {
-	if l < r {
-		return r
-	}
-	return l
-}
 
 func Safe2Int32(v int) int32 {
 	switch {

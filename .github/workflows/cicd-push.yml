@@ -82,8 +82,8 @@ jobs:
           echo "FILE_PATH: $FILE_PATH"
           for filePath in $(echo "$FILE_PATH"); do
               filePath="${filePath%/*}"
-              if [[ -d $filePath && "$filePath" != *"i18n"* ]]; then
-                  echo $(pcregrep -r -n -I '[^\x00-\x7f]' $filePath >> pcregrep.out)
+              if [[ -d $filePath && "$filePath" != *"i18n/zh-cn"* ]]; then
+                  echo $(find "$filePath" -type f ! -name "*i18n*" -exec pcregrep -n -I '[^\x00-\x7f]' {} + >> pcregrep.out)
               fi
           done
           

@@ -184,9 +184,9 @@ func (param *reconfigureParams) maxRollingReplicas() int32 {
 	if isPercentage {
 		r = int32(math.Floor(float64(v) * float64(replicas) / 100))
 	} else {
-		r = util.Safe2Int32(util.Min(v, param.getTargetReplicas()))
+		r = util.Safe2Int32(min(v, param.getTargetReplicas()))
 	}
-	return util.Max(r, defaultRolling)
+	return max(r, defaultRolling)
 }
 
 func (param *reconfigureParams) getTargetReplicas() int {
@@ -195,7 +195,7 @@ func (param *reconfigureParams) getTargetReplicas() int {
 
 func (param *reconfigureParams) podMinReadySeconds() int32 {
 	minReadySeconds := param.SynthesizedComponent.MinReadySeconds
-	return util.Max(minReadySeconds, viper.GetInt32(constant.PodMinReadySecondsEnv))
+	return max(minReadySeconds, viper.GetInt32(constant.PodMinReadySecondsEnv))
 }
 
 func RegisterPolicy(policy appsv1alpha1.UpgradePolicy, action reconfigurePolicy) {

@@ -24,10 +24,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
-	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -272,8 +272,8 @@ func getObjectTreeFromCache(ctx context.Context, cli client.Client, primary clie
 			return nil, err
 		}
 		tree.Secondaries = append(tree.Secondaries, subTree)
-		slices.SortStableFunc(tree.Secondaries, func(a, b *viewv1.ObjectTreeNode) bool {
-			return getObjectReferenceString(a) < getObjectReferenceString(b)
+		sort.SliceStable(tree.Secondaries, func(i, j int) bool {
+			return getObjectReferenceString(tree.Secondaries[i]) < getObjectReferenceString(tree.Secondaries[j])
 		})
 	}
 
@@ -506,7 +506,8 @@ func buildObjectSummaries(initialObjectMap, newObjectMap map[model.GVKNObjKey]cl
 	for _, summary := range summaryMap {
 		objectSummaries = append(objectSummaries, *summary)
 	}
-	slices.SortStableFunc(objectSummaries, func(a, b viewv1.ObjectSummary) bool {
+	sort.SliceStable(objectSummaries, func(i, j int) bool {
+		a, b := &objectSummaries[i], &objectSummaries[j]
 		if a.ObjectType.APIVersion != b.ObjectType.APIVersion {
 			return a.ObjectType.APIVersion < b.ObjectType.APIVersion
 		}
@@ -718,8 +719,8 @@ func getObjectTreeWithRevision(primary client.Object, ownershipRules []Ownership
 			return nil, err
 		}
 		tree.Secondaries = append(tree.Secondaries, subTree)
-		slices.SortStableFunc(tree.Secondaries, func(a, b *viewv1.ObjectTreeNode) bool {
-			return getObjectReferenceString(a) < getObjectReferenceString(b)
+		sort.SliceStable(tree.Secondaries, func(i, j int) bool {
+			return getObjectReferenceString(tree.Secondaries[i]) < getObjectReferenceString(tree.Secondaries[j])
 		})
 	}
 

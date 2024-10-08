@@ -21,8 +21,8 @@ package view
 
 import (
 	"context"
+	"sort"
 
-	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -99,8 +99,8 @@ func (c *viewCalculator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.
 	}
 
 	// sort the changes by resource version.
-	slices.SortStableFunc(changes, func(a, b viewv1.ObjectChange) bool {
-		return a.Revision < b.Revision
+	sort.SliceStable(changes, func(i, j int) bool {
+		return changes[i].Revision < changes[j].Revision
 	})
 
 	// concat it to current changes

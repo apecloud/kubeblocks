@@ -20,10 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package view
 
 import (
+	"sort"
 	"strconv"
 	"sync/atomic"
 
-	"golang.org/x/exp/slices"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -139,8 +139,8 @@ func (s *changeCaptureStore) GetAll() map[model.GVKNObjKey]client.Object {
 }
 
 func (s *changeCaptureStore) GetChanges() []viewv1.ObjectChange {
-	slices.SortStableFunc(s.changes, func(a, b viewv1.ObjectChange) bool {
-		return a.Revision < b.Revision
+	sort.SliceStable(s.changes, func(i, j int) bool {
+		return s.changes[i].Revision < s.changes[j].Revision
 	})
 	return s.changes
 }

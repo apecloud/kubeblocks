@@ -335,6 +335,39 @@ func GetRestorePassword(cluster *appsv1alpha1.Cluster, synthesizedComp *componen
 	return password
 }
 
+// GetRestoreSystemAccountPassword gets restore password if exists during recovery.
+func GetRestoreSystemAccountPassword(synthesizedComp *component.SynthesizedComponent, account appsv1alpha1.SystemAccount) string {
+	valueString := synthesizedComp.Annotations[constant.RestoreFromBackupAnnotationKey]
+	if len(valueString) == 0 {
+		return ""
+	}
+	backupMap := map[string]map[string]string{}
+	err := json.Unmarshal([]byte(valueString), &backupMap)
+	if err != nil {
+		return ""
+	}
+	backupSource, ok := backupMap[synthesizedComp.Name]
+	if !ok {
+		return ""
+	}
+	systemAccountsString, ok := backupSource[constant.EncryptedSystemAccounts]
+	if !ok {
+		return ""
+	}
+	systemAccountsMap := map[string]string{}
+	err = json.Unmarshal([]byte(systemAccountsString), &systemAccountsMap)
+	if err != nil {
+		return ""
+	}
+	e := intctrlutil.NewEncryptor(viper.GetString(constant.CfgKeyDPEncryptionKey))
+	encryptedPwd, ok := systemAccountsMap[account.Name]
+	if !ok {
+		return ""
+	}
+	password, _ := e.Decrypt([]byte(encryptedPwd))
+	return password
+}
+
 func BuildPVC(cluster *appsv1alpha1.Cluster,
 	synthesizedComp *component.SynthesizedComponent,
 	vct *corev1.PersistentVolumeClaimTemplate,

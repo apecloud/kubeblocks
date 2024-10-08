@@ -63,59 +63,27 @@ func (opsMgr *OpsManager) Do(reqCtx intctrlutil.RequestCtx, cli client.Client, o
 
 	if opsRequest.Spec.Type == opsv1alpha1.CustomType {
 		err = initOpsDefAndValidate(reqCtx, cli, opsRes)
-		if err != nil {
-			return &ctrl.Result{}, patchValidateErrorCondition(reqCtx.Ctx, cli, opsRes, err.Error())
-		}
 	} else {
-		// validate entry condition for OpsRequest, check if the cluster is in the right phase
-		if err = validateOpsWaitingPhase(opsRes.Cluster, opsRequest, opsBehaviour); err != nil {
-			// check if the error is caused by WaitForClusterPhaseErr  error
-			if _, ok := err.(*WaitForClusterPhaseErr); ok {
-				return intctrlutil.ResultToP(intctrlutil.RequeueAfter(time.Second, reqCtx.Log, ""))
-			}
-			return &ctrl.Result{}, patchValidateErrorCondition(reqCtx.Ctx, cli, opsRes, err.Error())
-		}
 		// validate OpsRequest.spec
-		// if the operation will create a new cluster, don't validate the cluster phase
-		if err = opsRequest.Validate(reqCtx.Ctx, cli, opsRes.Cluster, !opsBehaviour.IsClusterCreation); err != nil {
-			return &ctrl.Result{}, patchValidateErrorCondition(reqCtx.Ctx, cli, opsRes, err.Error())
-		}
+		err = opsRequest.ValidateOps(reqCtx.Ctx, cli, opsRes.Cluster)
+	}
+	if err != nil {
+		return &ctrl.Result{}, patchValidateErrorCondition(reqCtx.Ctx, cli, opsRes, err.Error())
 	}
 
 	if opsRequest.Status.Phase == opsv1alpha1.OpsPendingPhase {
 		if opsRequest.Spec.Cancel {
 			return &ctrl.Result{}, PatchOpsStatus(reqCtx.Ctx, cli, opsRes, opsv1alpha1.OpsCancelledPhase)
 		}
-		// TODO: abort last OpsRequest if using 'force' and intersecting with cluster component name or shard name.
-		if opsBehaviour.QueueByCluster || opsBehaviour.QueueBySelf {
-			// if ToClusterPhase is not empty, enqueue OpsRequest to the cluster Annotation.
-			opsRecorde, err := enqueueOpsRequestToClusterAnnotation(reqCtx.Ctx, cli, opsRes, opsBehaviour)
-			if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal) {
-				return &ctrl.Result{}, patchValidateErrorCondition(reqCtx.Ctx, cli, opsRes, err.Error())
-			} else if err != nil {
-				return nil, err
-			}
-			if opsRecorde != nil && opsRecorde.InQueue {
-				// if the opsRequest is in the queue, return
-				return intctrlutil.ResultToP(intctrlutil.Reconciled())
-			}
-		}
-
-		// validate if the dependent ops have been successful
-		if pass, err := opsMgr.validateDependOnSuccessfulOps(reqCtx, cli, opsRes); intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal) {
+		if err = opsMgr.doPreConditionAndTransPhaseToCreating(reqCtx, cli, opsRes, opsBehaviour); intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal) {
 			return &ctrl.Result{}, patchValidateErrorCondition(reqCtx.Ctx, cli, opsRes, err.Error())
 		} else if err != nil {
-			return nil, err
-		} else if !pass {
-			return intctrlutil.ResultToP(intctrlutil.Reconciled())
-		}
-		opsDeepCopy := opsRequest.DeepCopy()
-		// save last configuration into status.lastConfiguration
-		if err = opsBehaviour.OpsHandler.SaveLastConfiguration(reqCtx, cli, opsRes); err != nil {
+			if _, ok := err.(*WaitForClusterPhaseErr); ok {
+				return intctrlutil.ResultToP(intctrlutil.RequeueAfter(time.Second, reqCtx.Log, "wait cluster to a right phase"))
+			}
 			return nil, err
 		}
-
-		return &ctrl.Result{}, patchOpsRequestToCreating(reqCtx, cli, opsRes, opsDeepCopy, opsBehaviour.OpsHandler)
+		return intctrlutil.ResultToP(intctrlutil.Reconciled())
 	}
 
 	if err = updateHAConfigIfNecessary(reqCtx, cli, opsRes.OpsRequest, "false"); err != nil {
@@ -132,6 +100,53 @@ func (opsMgr *OpsManager) Do(reqCtx intctrlutil.RequestCtx, cli client.Client, o
 		return nil, err
 	}
 	return nil, nil
+}
+
+func (opsMgr *OpsManager) doPreConditionAndTransPhaseToCreating(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	opsRes *OpsResource,
+	opsBehaviour OpsBehaviour) error {
+	if opsBehaviour.QueueByCluster || opsBehaviour.QueueBySelf {
+		// if ToClusterPhase is not empty, enqueue OpsRequest to the cluster Annotation.
+		opsRecorde, err := enqueueOpsRequestToClusterAnnotation(reqCtx.Ctx, cli, opsRes, opsBehaviour)
+		if err != nil {
+			return err
+		}
+		if opsRecorde != nil && opsRecorde.InQueue {
+			// if the opsRequest is in the queue, return
+			return nil
+		}
+	}
+	// validate if the dependent ops have been successful
+	pass, err := opsMgr.validateDependOnSuccessfulOps(reqCtx, cli, opsRes)
+	if err != nil || !pass {
+		return err
+	}
+	if preConditionDeadlineSecondsIsSet(opsRes.OpsRequest) &&
+		opsRes.OpsRequest.Annotations[constant.QueueEndTimeAnnotationKey] == "" {
+		// set the queue end time for preConditionDeadline validation
+		if opsRes.OpsRequest.Annotations == nil {
+			opsRes.OpsRequest.Annotations = map[string]string{}
+		}
+		opsRes.OpsRequest.Annotations[constant.QueueEndTimeAnnotationKey] = time.Now().Format(time.RFC3339)
+		return cli.Update(reqCtx.Ctx, opsRes.OpsRequest)
+	}
+	// if the operation will create a new cluster, don't validate the cluster phase
+	if !opsBehaviour.IsClusterCreation {
+		// validate entry condition for OpsRequest, check if the cluster is in the right phase
+		if err = validateOpsNeedWaitingClusterPhase(opsRes.Cluster, opsRes.OpsRequest, opsBehaviour); err != nil {
+			return err
+		}
+		if err = opsRes.OpsRequest.ValidateClusterPhase(opsRes.Cluster); err != nil {
+			return intctrlutil.NewFatalError(err.Error())
+		}
+	}
+	opsDeepCopy := opsRes.OpsRequest.DeepCopy()
+	// save last configuration into status.lastConfiguration
+	if err = opsBehaviour.OpsHandler.SaveLastConfiguration(reqCtx, cli, opsRes); err != nil {
+		return err
+	}
+	return patchOpsRequestToCreating(reqCtx, cli, opsRes, opsDeepCopy, opsBehaviour.OpsHandler)
 }
 
 // Reconcile entry function when OpsRequest.status.phase is Running.

@@ -144,7 +144,7 @@ func (r *AddonReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *AddonReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return intctrlutil.NewNamespacedControllerManagedBy(mgr).
+	return intctrlutil.NewControllerManagedBy(mgr).
 		For(&extensionsv1alpha1.Addon{}).
 		Watches(&batchv1.Job{}, handler.EnqueueRequestsFromMapFunc(r.findAddonJobs)).
 		WithOptions(controller.Options{

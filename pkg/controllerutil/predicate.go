@@ -29,17 +29,34 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	experimentalv1alpha1 "github.com/apecloud/kubeblocks/apis/experimental/v1alpha1"
+	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
+	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
+	workloadsv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 var (
-	managedNamespaces *sets.Set[string]
+	managedNamespaces    *sets.Set[string]
+	supportedAPIVersions = sets.New[string](
+		appsv1alpha1.GroupVersion.String(),
+		appsv1beta1.GroupVersion.String(),
+		dpv1alpha1.GroupVersion.String(),
+		experimentalv1alpha1.GroupVersion.String(),
+		extensionsv1alpha1.GroupVersion.String(),
+		storagev1alpha1.GroupVersion.String(),
+		workloadsv1alpha1.GroupVersion.String(),
+	)
 )
 
-func NewNamespacedControllerManagedBy(mgr manager.Manager) *builder.Builder {
+func NewControllerManagedBy(mgr manager.Manager) *builder.Builder {
 	return ctrl.NewControllerManagedBy(mgr).
-		WithEventFilter(predicate.NewPredicateFuncs(namespacePredicateFilter))
+		WithEventFilter(predicate.NewPredicateFuncs(namespacePredicateFilter)).
+		WithEventFilter(predicate.NewPredicateFuncs(apiVersionPredicateFilter))
 }
 
 func namespacePredicateFilter(object client.Object) bool {
@@ -55,4 +72,16 @@ func namespacePredicateFilter(object client.Object) bool {
 		return true
 	}
 	return managedNamespaces.Has(object.GetNamespace())
+}
+
+func apiVersionPredicateFilter(object client.Object) bool {
+	annotations := object.GetAnnotations()
+	if annotations == nil {
+		return true
+	}
+	apiVersion, ok := annotations[constant.CRDAPIVersionAnnotationKey]
+	if !ok {
+		return true
+	}
+	return supportedAPIVersions.Has(apiVersion)
 }

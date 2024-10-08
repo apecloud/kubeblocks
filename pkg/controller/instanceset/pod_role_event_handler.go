@@ -102,7 +102,7 @@ func (h *PodRoleEventHandler) Handle(cli client.Client, reqCtx intctrlutil.Reque
 }
 
 func (h *PodRoleEventHandler) transformKBAgentProbeEvent(logger logr.Logger, event *corev1.Event) *corev1.Event {
-	if event.ReportingController != "kbagent" || event.Reason != "roleProbe" {
+	if event.ReportingController != proto.ProbeEventReportingController || event.Reason != "roleProbe" {
 		return event
 	}
 

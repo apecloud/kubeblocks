@@ -343,7 +343,8 @@ func (r *ComponentVersionReconciler) validateImageContainer(cmpd appsv1.Componen
 	if r.imageDefinedInActions(cmpd, name) {
 		return nil
 	}
-	return fmt.Errorf("container %s is not found in ComponentDefinition %s", name, cmpd.Name)
+	// user-managed images, leave it to the user to handle
+	return nil
 }
 
 func (r *ComponentVersionReconciler) imageDefinedInContainers(cmpd appsv1.ComponentDefinition, name string) bool {

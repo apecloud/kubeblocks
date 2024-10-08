@@ -238,11 +238,12 @@ var _ = Describe("ComponentVersion Controller", func() {
 				compVersion.Spec.Releases[0].Images["app-non-exist"] = "app-image-non-exist"
 			})).Should(Succeed())
 
-			By("checking the object unavailable")
+			By("checking the object available")
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(compVersionObj),
 				func(g Gomega, cmpv *appsv1.ComponentVersion) {
 					g.Expect(cmpv.Status.ObservedGeneration).Should(Equal(cmpv.GetGeneration()))
-					g.Expect(cmpv.Status.Phase).Should(Equal(appsv1.UnavailablePhase))
+					// support to specify user-managed images
+					g.Expect(cmpv.Status.Phase).Should(Equal(appsv1.AvailablePhase))
 				})).Should(Succeed())
 		})
 

@@ -161,40 +161,35 @@ func resolveImagesWithCompVersions(compDef *appsv1.ComponentDefinition,
 func covertImagesFromCompDefinition(compDef *appsv1.ComponentDefinition) map[string]appNameVersionImage {
 	apps := make(map[string]appNameVersionImage)
 
-	func() {
-		checkNAdd := func(c *corev1.Container) {
-			if len(c.Image) > 0 {
-				apps[c.Name] = appNameVersionImage{
-					name:     c.Name,
-					version:  compDef.Spec.ServiceVersion,
-					image:    c.Image,
-					required: true,
-				}
+	// containers
+	checkNAdd := func(c *corev1.Container) {
+		if len(c.Image) > 0 {
+			apps[c.Name] = appNameVersionImage{
+				name:     c.Name,
+				version:  compDef.Spec.ServiceVersion,
+				image:    c.Image,
+				required: true,
 			}
 		}
-		for i := range compDef.Spec.Runtime.InitContainers {
-			checkNAdd(&compDef.Spec.Runtime.InitContainers[i])
-		}
-		for i := range compDef.Spec.Runtime.Containers {
-			checkNAdd(&compDef.Spec.Runtime.Containers[i])
-		}
-	}()
+	}
+	for i := range compDef.Spec.Runtime.InitContainers {
+		checkNAdd(&compDef.Spec.Runtime.InitContainers[i])
+	}
+	for i := range compDef.Spec.Runtime.Containers {
+		checkNAdd(&compDef.Spec.Runtime.Containers[i])
+	}
 
-	func() {
-		checkNAdd := func(name string, a *appsv1.Action) {
+	// actions
+	for name, action := range actionsToResolveImage(compDef) {
+		if action != nil && action.Exec != nil {
 			apps[name] = appNameVersionImage{
 				name:     name,
 				version:  compDef.Spec.ServiceVersion,
-				image:    a.Exec.Image,
+				image:    action.Exec.Image,
 				required: false,
 			}
 		}
-		for name, action := range actionsToResolveImage(compDef) {
-			if action != nil && action.Exec != nil {
-				checkNAdd(name, action)
-			}
-		}
-	}()
+	}
 
 	return apps
 }

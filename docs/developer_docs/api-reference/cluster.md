@@ -5770,7 +5770,7 @@ map[string]string
 </em>
 </td>
 <td>
-<p>Images define the new images for different containers and actions within the release.</p>
+<p>Images define the new images for containers, actions or external applications within the release.</p>
 <p>If an image is specified for a lifecycle action, the key should be the field name (case-insensitive) of
 the action in the LifecycleActions struct.</p>
 </td>

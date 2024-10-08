@@ -167,7 +167,7 @@ func buildServiceAccount(transCtx *componentTransformContext) (*corev1.ServiceAc
 	)
 	serviceAccountName := comp.Spec.ServiceAccountName
 	if serviceAccountName == "" {
-		// If lifecycle actions at the same tme, then do not create a service account.
+		// If lifecycle actions are disabled, then do not create a service account.
 		if !isLifecycleActionsEnabled(compDef) {
 			return nil, nil
 		}

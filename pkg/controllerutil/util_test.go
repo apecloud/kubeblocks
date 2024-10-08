@@ -21,12 +21,13 @@ package controllerutil
 
 import (
 	"context"
+	"slices"
+	"strings"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
 )
@@ -77,8 +78,8 @@ var _ = Describe("utils test", func() {
 			})
 
 			Expect(dst).Should(HaveLen(3))
-			slices.SortStableFunc(dst, func(a, b corev1.Volume) bool {
-				return a.Name < b.Name
+			slices.SortStableFunc(dst, func(a, b corev1.Volume) int {
+				return strings.Compare(a.Name, b.Name)
 			})
 			Expect(dst[0].Name).Should(Equal("pvc0"))
 			Expect(dst[1].Name).Should(Equal("pvc1"))

@@ -20,10 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"slices"
+	"strings"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -113,8 +115,8 @@ var _ = Describe("cluster service transformer test", func() {
 			graphCli := transCtx.Client.(model.GraphClient)
 			objs := graphCli.FindAll(dag, &corev1.Service{})
 			Expect(len(objs)).Should(Equal(len(reader.objs)))
-			slices.SortFunc(objs, func(a, b client.Object) bool {
-				return a.GetName() < b.GetName()
+			slices.SortFunc(objs, func(a, b client.Object) int {
+				return strings.Compare(a.GetName(), b.GetName())
 			})
 			for i := 0; i < len(reader.objs); i++ {
 				svc := objs[i].(*corev1.Service)
@@ -149,8 +151,8 @@ var _ = Describe("cluster service transformer test", func() {
 
 		for i := 0; i < len(transCtx.Cluster.Spec.Services); i++ {
 			svc := objs[i].(*corev1.Service)
-			slices.SortFunc(svc.Spec.Ports, func(a, b corev1.ServicePort) bool { return a.Name < b.Name })
-			slices.SortFunc(expectedPorts, func(a, b corev1.ServicePort) bool { return a.Name < b.Name })
+			slices.SortFunc(svc.Spec.Ports, func(a, b corev1.ServicePort) int { return strings.Compare(a.Name, b.Name) })
+			slices.SortFunc(expectedPorts, func(a, b corev1.ServicePort) int { return strings.Compare(a.Name, b.Name) })
 			Expect(svc.Spec.Ports).Should(Equal(expectedPorts))
 			Expect(graphCli.IsAction(dag, svc, model.ActionUpdatePtr())).Should(BeTrue())
 		}

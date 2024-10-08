@@ -23,8 +23,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -55,17 +53,15 @@ var _ = Describe("assistant object reconciler test", func() {
 			res, err := reconciler.Reconcile(tree)
 			Expect(err).Should(BeNil())
 			Expect(res).Should(Equal(kubebuilderx.Continue))
-			// desired: svc: "bar-headless", cm: "bar"
+			// desired: svc: "bar-headless"
 			objects := tree.GetSecondaryObjects()
-			Expect(objects).Should(HaveLen(2))
+			Expect(objects).Should(HaveLen(1))
 			svc := builder.NewHeadlessServiceBuilder(namespace, name+"-headless").GetObject()
-			cm := builder.NewConfigMapBuilder(namespace, GetEnvConfigMapName(name)).GetObject()
-			for _, object := range []client.Object{svc, cm} {
-				name, err := model.GetGVKName(object)
-				Expect(err).Should(BeNil())
-				_, ok := objects[*name]
-				Expect(ok).Should(BeTrue())
-			}
+			name, err := model.GetGVKName(svc)
+			Expect(err).Should(BeNil())
+			_, ok := objects[*name]
+			Expect(ok).Should(BeTrue())
+
 		})
 	})
 })

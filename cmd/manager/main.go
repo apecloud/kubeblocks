@@ -151,7 +151,6 @@ func init() {
 	viper.SetDefault(constant.CfgKBReconcileWorkers, 8)
 	viper.SetDefault(constant.FeatureGateIgnoreConfigTemplateDefaultMode, false)
 	viper.SetDefault(constant.FeatureGateInPlacePodVerticalScaling, false)
-	viper.SetDefault(constant.FeatureGateNoRSMEnv, false)
 	viper.SetDefault(constant.I18nResourcesName, "kubeblocks-i18n-resources")
 }
 
@@ -535,15 +534,19 @@ func main() {
 		}
 	}
 
-	var viewReconciler *viewcontrollers.ReconciliationViewReconciler
 	if viper.GetBool(viewFlagKey.viperName()) {
-		viewReconciler = &viewcontrollers.ReconciliationViewReconciler{
+		viewReconciler := &viewcontrollers.ReconciliationViewReconciler{
 			Client:   mgr.GetClient(),
 			Scheme:   mgr.GetScheme(),
 			Recorder: mgr.GetEventRecorderFor("reconciliation-view-controller"),
 		}
 		if err := viewReconciler.SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "ReconciliationView")
+			os.Exit(1)
+		}
+		if err := mgr.Add(viewReconciler.InformerManager); err != nil {
+			setupLog.Error(err, "unable to add view informer manager", "controller", "InformerManager")
+			os.Exit(1)
 		}
 	}
 
@@ -608,11 +611,7 @@ func main() {
 			os.Exit(1)
 		}
 	}
-	ctx := ctrl.SetupSignalHandler()
-	if viper.GetBool(viewFlagKey.viperName()) && viewReconciler != nil {
-		viewReconciler.InformerManager.SetContext(ctx)
-	}
-	if err := mgr.Start(ctx); err != nil {
+	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}

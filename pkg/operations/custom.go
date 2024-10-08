@@ -277,7 +277,7 @@ func resolveParameterValue(ctx context.Context,
 			return "", intctrlutil.NewFatalError(fmt.Sprintf(`key "%s" is not found in the ConfigMap "%s"`, key, valueFrom.ConfigMapKeyRef.Name))
 		})
 	case valueFrom.SecretKeyRef != nil:
-		return resoleObjectKey(valueFrom.SecretKeyRef.LocalObjectReference, &corev1.ConfigMap{}, func(obj client.Object) (string, error) {
+		return resoleObjectKey(valueFrom.SecretKeyRef.LocalObjectReference, &corev1.Secret{}, func(obj client.Object) (string, error) {
 			secret := obj.(*corev1.Secret)
 			key := valueFrom.SecretKeyRef.Key
 			if v, ok := secret.Data[key]; ok {
@@ -318,11 +318,11 @@ func initOpsDefAndValidate(reqCtx intctrlutil.RequestCtx,
 		// covert to type map[string]interface{}
 		params, err := common.CoverStringToInterfaceBySchemaType(parametersSchema.OpenAPIV3Schema, paramsMap)
 		if err != nil {
-			return err
+			return intctrlutil.NewFatalError(err.Error())
 		}
 		if parametersSchema != nil && parametersSchema.OpenAPIV3Schema != nil {
 			if err = common.ValidateDataWithSchema(parametersSchema.OpenAPIV3Schema, params); err != nil {
-				return err
+				return intctrlutil.NewFatalError(err.Error())
 			}
 		}
 

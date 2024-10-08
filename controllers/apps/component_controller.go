@@ -172,8 +172,6 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			&componentConfigurationTransformer{Client: r.Client},
 			// handle restore before workloads transform
 			&componentRestoreTransformer{Client: r.Client},
-			// handle upgrade from the legacy RSM API to the InstanceSet API
-			&componentWorkloadUpgradeTransformer{},
 			// handle the component workload
 			&componentWorkloadTransformer{Client: r.Client},
 			// handle RBAC for component workloads
@@ -219,7 +217,7 @@ func (r *ComponentReconciler) setupWithManager(mgr ctrl.Manager) error {
 		Owns(&corev1.Secret{}).
 		Owns(&corev1.ConfigMap{}).
 		Owns(&dpv1alpha1.Backup{}).
-		Owns(&dpv1alpha1.Restore{}).
+		Watches(&dpv1alpha1.Restore{}, handler.EnqueueRequestsFromMapFunc(r.filterComponentRestoreResources)).
 		Watches(&corev1.PersistentVolumeClaim{}, handler.EnqueueRequestsFromMapFunc(r.filterComponentResources)).
 		Watches(&appsv1alpha1.Configuration{}, handler.EnqueueRequestsFromMapFunc(r.configurationEventHandler))
 
@@ -242,7 +240,7 @@ func (r *ComponentReconciler) setupWithMultiClusterManager(mgr ctrl.Manager, mul
 		}).
 		Owns(&workloads.InstanceSet{}).
 		Owns(&dpv1alpha1.Backup{}).
-		Owns(&dpv1alpha1.Restore{}).
+		Watches(&dpv1alpha1.Restore{}, handler.EnqueueRequestsFromMapFunc(r.filterComponentRestoreResources)).
 		Watches(&appsv1alpha1.Configuration{}, handler.EnqueueRequestsFromMapFunc(r.configurationEventHandler))
 
 	eventHandler := handler.EnqueueRequestsFromMapFunc(r.filterComponentResources)
@@ -254,6 +252,28 @@ func (r *ComponentReconciler) setupWithMultiClusterManager(mgr ctrl.Manager, mul
 		Watch(b, &rbacv1.RoleBinding{}, eventHandler)
 
 	return b.Complete(r)
+}
+
+func (r *ComponentReconciler) filterComponentRestoreResources(ctx context.Context, obj client.Object) []reconcile.Request {
+	labels := obj.GetLabels()
+	if v, ok := labels[constant.KBManagedByKey]; !ok || v != "cluster" {
+		return []reconcile.Request{}
+	}
+	if _, ok := labels[constant.AppInstanceLabelKey]; !ok {
+		return []reconcile.Request{}
+	}
+	if _, ok := labels[constant.KBAppComponentLabelKey]; !ok {
+		return []reconcile.Request{}
+	}
+	fullCompName := constant.GenerateClusterComponentName(labels[constant.AppInstanceLabelKey], labels[constant.KBAppComponentLabelKey])
+	return []reconcile.Request{
+		{
+			NamespacedName: types.NamespacedName{
+				Namespace: obj.GetNamespace(),
+				Name:      fullCompName,
+			},
+		},
+	}
 }
 
 func (r *ComponentReconciler) filterComponentResources(ctx context.Context, obj client.Object) []reconcile.Request {

@@ -109,14 +109,18 @@ spec:
                     images:
                       additionalProperties:
                         type: string
-                      description: Images define the new images for different containers
-                        within the release.
+                      description: |-
+                        Images define the new images for different containers and actions within the release.
+
+
+                        If an image is specified for a lifecycle action, the key should be the field name (case-insensitive) of
+                        the action in the LifecycleActions struct.
                       maxProperties: 128
                       minProperties: 1
                       type: object
                       x-kubernetes-validations:
-                      - message: Container name may not exceed maximum length of 32
-                          characters
+                      - message: Container or Action name may not exceed maximum length
+                          of 32 characters
                         rule: self.all(key, size(key) <= 32)
                       - message: Image name may not exceed maximum length of 256 characters
                         rule: self.all(key, size(self[key]) <= 256)

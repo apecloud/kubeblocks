@@ -81,6 +81,8 @@ var _ = Describe("ComponentVersion Controller", func() {
 				// use empty revision as init image tag
 				f = f.SetRuntime(&corev1.Container{Name: app, Image: testapps.AppImage(app, testapps.ReleaseID(""))})
 			}
+			f.SetLifecycleAction(testapps.DefaultActionName,
+				&appsv1.Action{Exec: &appsv1.ExecAction{Image: testapps.AppImage(testapps.DefaultActionName, testapps.ReleaseID(""))}})
 			objs = append(objs, f.Create(&testCtx).GetObject())
 		}
 		for _, obj := range objs {
@@ -116,6 +118,7 @@ var _ = Describe("ComponentVersion Controller", func() {
 						Images: map[string]string{
 							testapps.AppName:           testapps.AppImage(testapps.AppName, testapps.ReleaseID("r0")),
 							testapps.AppNameSamePrefix: testapps.AppImage(testapps.AppNameSamePrefix, testapps.ReleaseID("r0")),
+							testapps.DefaultActionName: testapps.AppImage(testapps.DefaultActionName, testapps.ReleaseID("r0")),
 						},
 					},
 					{
@@ -133,6 +136,7 @@ var _ = Describe("ComponentVersion Controller", func() {
 						Images: map[string]string{
 							testapps.AppName:           testapps.AppImage(testapps.AppName, testapps.ReleaseID("r2")),
 							testapps.AppNameSamePrefix: testapps.AppImage(testapps.AppNameSamePrefix, testapps.ReleaseID("r2")),
+							testapps.DefaultActionName: testapps.AppImage(testapps.DefaultActionName, testapps.ReleaseID("r2")),
 						},
 					},
 					{
@@ -150,6 +154,7 @@ var _ = Describe("ComponentVersion Controller", func() {
 						Images: map[string]string{
 							testapps.AppName:           testapps.AppImage(testapps.AppName, testapps.ReleaseID("r4")),
 							testapps.AppNameSamePrefix: testapps.AppImage(testapps.AppNameSamePrefix, testapps.ReleaseID("r4")),
+							testapps.DefaultActionName: testapps.AppImage(testapps.DefaultActionName, testapps.ReleaseID("r4")),
 						},
 					},
 					{
@@ -159,6 +164,7 @@ var _ = Describe("ComponentVersion Controller", func() {
 						Images: map[string]string{
 							testapps.AppName:           testapps.AppImage(testapps.AppName, testapps.ReleaseID("r5")),
 							testapps.AppNameSamePrefix: testapps.AppImage(testapps.AppNameSamePrefix, testapps.ReleaseID("r5")),
+							testapps.DefaultActionName: testapps.AppImage(testapps.DefaultActionName, testapps.ReleaseID("r5")),
 						},
 					},
 				},
@@ -180,6 +186,11 @@ var _ = Describe("ComponentVersion Controller", func() {
 		Expect(compDef.Spec.Runtime.Containers).Should(HaveLen(2))
 		Expect(compDef.Spec.Runtime.Containers[0].Image).Should(Equal(testapps.AppImage(compDef.Spec.Runtime.Containers[0].Name, testapps.ReleaseID(r0))))
 		Expect(compDef.Spec.Runtime.Containers[1].Image).Should(Equal(testapps.AppImage(compDef.Spec.Runtime.Containers[1].Name, testapps.ReleaseID(r1))))
+
+		Expect(compDef.Spec.LifecycleActions).ShouldNot(BeNil())
+		Expect(compDef.Spec.LifecycleActions.PreTerminate).ShouldNot(BeNil())
+		Expect(compDef.Spec.LifecycleActions.PreTerminate.Exec).ShouldNot(BeNil())
+		Expect(compDef.Spec.LifecycleActions.PreTerminate.Exec.Image).Should(Equal(testapps.AppImage(testapps.DefaultActionName, testapps.ReleaseID(r1))))
 	}
 
 	Context("reconcile component version", func() {
@@ -220,7 +231,7 @@ var _ = Describe("ComponentVersion Controller", func() {
 				})).Should(Succeed())
 		})
 
-		It("w/o container defined", func() {
+		It("w/o container or action defined", func() {
 			By("update component version to add a non-exist app")
 			compVersionKey := client.ObjectKeyFromObject(compVersionObj)
 			Eventually(testapps.GetAndChangeObj(&testCtx, compVersionKey, func(compVersion *appsv1.ComponentVersion) {
@@ -584,6 +595,8 @@ var _ = Describe("ComponentVersion Controller", func() {
 				SetServiceVersion(testapps.ServiceVersion("v4")).
 				SetRuntime(&corev1.Container{Name: testapps.AppName, Image: testapps.AppImage(testapps.AppName, testapps.ReleaseID(""))}).
 				SetRuntime(&corev1.Container{Name: testapps.AppNameSamePrefix, Image: testapps.AppImage(testapps.AppNameSamePrefix, testapps.ReleaseID(""))}).
+				SetLifecycleAction(testapps.DefaultActionName,
+					&appsv1.Action{Exec: &appsv1.ExecAction{Image: testapps.AppImage(testapps.DefaultActionName, testapps.ReleaseID(""))}}).
 				Create(&testCtx).
 				GetObject()
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(compDefObj),

@@ -141,12 +141,15 @@ type ComponentVersionRelease struct {
 	// +kubebuilder:validation:MaxLength=32
 	ServiceVersion string `json:"serviceVersion"`
 
-	// Images define the new images for different containers within the release.
+	// Images define the new images for different containers and actions within the release.
+	//
+	// If an image is specified for a lifecycle action, the key should be the field name (case-insensitive) of
+	// the action in the LifecycleActions struct.
 	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinProperties=1
 	// +kubebuilder:validation:MaxProperties=128
-	// +kubebuilder:validation:XValidation:rule="self.all(key, size(key) <= 32)",message="Container name may not exceed maximum length of 32 characters"
+	// +kubebuilder:validation:XValidation:rule="self.all(key, size(key) <= 32)",message="Container or Action name may not exceed maximum length of 32 characters"
 	// +kubebuilder:validation:XValidation:rule="self.all(key, size(self[key]) <= 256)",message="Image name may not exceed maximum length of 256 characters"
 	Images map[string]string `json:"images"`
 }

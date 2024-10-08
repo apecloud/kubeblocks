@@ -49,7 +49,7 @@ const (
 	defaultCronExpression = "0 18 * * *"
 )
 
-// backupPolicyBuilder transforms the backup policy template to the data protection backup policy and backup schedule.
+// clusterBackupPolicyTransformer transforms the backup policy template to the data protection backup policy and backup schedule.
 type clusterBackupPolicyTransformer struct {
 	*clusterTransformContext
 }
@@ -473,7 +473,7 @@ func (r *backupPolicyBuilder) resolveBackupMethodEnv(compSpec *appsv1.ClusterCom
 
 func (r *backupPolicyBuilder) matchMappingName(names []string, target string) bool {
 	for _, name := range names {
-		if component.CompDefMatched(target, name) {
+		if component.PrefixOrRegexMatched(target, name) {
 			return true
 		}
 	}

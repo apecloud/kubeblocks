@@ -12877,8 +12877,6 @@ the risk of simultaneous downtime.</p>
 <td></td>
 </tr><tr><td><p>&#34;oceanbase&#34;</p></td>
 <td></td>
-</tr><tr><td><p>&#34;vanilla-postgresql&#34;</p></td>
-<td></td>
 </tr><tr><td><p>&#34;polardbx&#34;</p></td>
 <td></td>
 </tr><tr><td><p>&#34;postgresql&#34;</p></td>
@@ -12886,6 +12884,8 @@ the risk of simultaneous downtime.</p>
 </tr><tr><td><p>&#34;redis&#34;</p></td>
 <td></td>
 </tr><tr><td><p>&#34;unknown&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;vanilla-postgresql&#34;</p></td>
 <td></td>
 </tr><tr><td><p>&#34;wesql&#34;</p></td>
 <td></td>

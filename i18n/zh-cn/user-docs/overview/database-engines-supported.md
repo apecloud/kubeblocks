@@ -33,7 +33,7 @@ KubeBlocks 是基于 Kubernetes 的云原生数据基础设施，可以帮助用
 | nebula          | NebulaGraph 是一个开源的分布式图数据库，擅长处理具有千亿个顶点和万亿条边的超大规模数据集。                                                                                             |
 | neon            | Neon 是一家多云无服务器 Postgres 提供商。|
 | oceanbase       | OceanBase 是一个无限可扩展的分布式数据库，适用于数据密集型事务和实时运营分析工作负载，具有超快的性能，在 TPC-C 基准测试中曾一度创造了世界纪录。OceanBase 已经为全球超过 400 家客户提供了服务，并且一直在支持支付宝的所有关键业务系统。 |
-| vanilla-postgresql | Kubernetes 的官方 PostgreSQL 集群定义 Helm Chart。 |
+| vanilla-postgresql | Kubernetes 的原生 PostgreSQL 集群定义 Helm Chart。 |
 | opengauss       | openGauss 是一款开源关系型数据库管理系统，采用木兰宽松许可证 v2 发行。 |
 | openldap        | OpenLDAP 项目旨在协作开发一个强大、商业级、功能齐全、开源的 LDAP 应用套件和开发工具。其 Chart 为 KubeBlocks 提供了支持。 |
 | opensearch      | opensearch 是一个开源、分布式、 RESTful 风格的搜索引擎。|

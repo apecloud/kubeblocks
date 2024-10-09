@@ -20,6 +20,11 @@ KubeBlocks supports the management of Qdrant. This tutorial illustrates how to c
 - [Install kbcli](./../installation/install-with-kbcli/install-kbcli.md) if you want to manage the Qdrant cluster with `kbcli`.
 - Install KubeBlocks [by kbcli](./../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) or [by Helm](./../installation/install-with-helm/install-kubeblocks.md).
 - Install and enable the Qdrant Addon [by kbcli](./../installation/install-with-kbcli/install-addons.md) or [by Helm](./../installation/install-with-helm/install-addons.md).
+- To keep things isolated, create a separate namespace called `demo` throughout this tutorial.
+
+   ```bash
+   kubectl create namespace demo
+   ```
 
 ## Create a cluster
 
@@ -211,60 +216,7 @@ If your cluster is on AWS, install the AWS Load Balancer Controller first.
 
 ## Monitor the database
 
-For the testing environment, you can run the command below to open the Grafana monitoring web page.
-
-1. View all built-in Addons and make sure the monitoring Addons are enabled. If the monitoring Addons are not enabled, [enable these Addons](./../installation/install-with-kbcli/install-addons.md) first.
-
-   ```bash
-   # View Addons
-   kbcli addon list
-   ...
-   grafana                        Helm   Enabled                   true                                                                                    
-   alertmanager-webhook-adaptor   Helm   Enabled                   true                                                                                    
-   prometheus                     Helm   Enabled    alertmanager   true 
-   ...
-   ```
-
-2. Check whether the monitoring function of the cluster is enabled. If the monitoring function is enabled, the output shows `disableExporter: false`.
-
-   ```bash
-   kubectl get cluster mycluster -n demo -o yaml
-   >
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: Cluster
-   metadata:
-   ......
-   spec:
-     ......
-     componentSpecs:
-     ......
-       disableExporter: false
-   ```
-
-   If `disableExporter: false` is not shown in the output, it means the monitoring function of this cluster is not enabled and you need to enable it first.
-
-   ```bash
-   kbcli cluster update mycluster -n demo --disable-exporter=false
-   ```
-
-3. View the dashboard list.
-
-   ```bash
-   kbcli dashboard list
-   >
-   NAME                                 NAMESPACE   PORT    CREATED-TIME
-   kubeblocks-grafana                   kb-system   13000   Jul 24,2023 11:38 UTC+0800
-   kubeblocks-prometheus-alertmanager   kb-system   19093   Jul 24,2023 11:38 UTC+0800
-   kubeblocks-prometheus-server         kb-system   19090   Jul 24,2023 11:38 UTC+0800
-   ```
-
-4. Open and view the web console of a monitoring dashboard. For example,
-
-   ```bash
-   kbcli dashboard open kubeblocks-grafana
-   ```
-
-For the production environment, it is highly recommended to build your monitoring system or purchase a third-party monitoring service and you can refer to [the monitoring document](./../observability/monitor-database.md#for-production-environment) for details.
+The monitoring function of Qdrant is the same as other engines. For details, refer to [the monitoring tutorial](./../observability/monitor-database.md).
 
 ## Scale
 

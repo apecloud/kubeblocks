@@ -190,8 +190,7 @@ spec:
                                     type: object
                                     x-kubernetes-map-type: atomic
                                   secretKeyRef:
-                                    description: Selects a key of a secret in the
-                                      pod's namespace
+                                    description: Selects a key of a Secret.
                                     properties:
                                       key:
                                         description: The key of the secret to select

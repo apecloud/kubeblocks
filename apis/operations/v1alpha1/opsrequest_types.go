@@ -618,7 +618,7 @@ type ParameterSource struct {
 	// Selects a key of a ConfigMap.
 	// +optional
 	ConfigMapKeyRef *corev1.ConfigMapKeySelector `json:"configMapKeyRef,omitempty"`
-	// Selects a key of a secret in the pod's namespace
+	// Selects a key of a Secret.
 	// +optional
 	SecretKeyRef *corev1.SecretKeySelector `json:"secretKeyRef,omitempty"`
 }

@@ -323,29 +323,56 @@ func (r *ComponentVersionReconciler) validateServiceVersion(release appsv1.Compo
 }
 
 func (r *ComponentVersionReconciler) validateImages(release appsv1.ComponentVersionRelease, cmpds map[string]*appsv1.ComponentDefinition) error {
-	validateContainer := func(cmpd appsv1.ComponentDefinition, name string) error {
-		cmp := func(c corev1.Container) bool {
-			return c.Name == name
-		}
-		if slices.IndexFunc(cmpd.Spec.Runtime.InitContainers, cmp) != -1 {
-			return nil
-		}
-		if slices.IndexFunc(cmpd.Spec.Runtime.Containers, cmp) != -1 {
-			return nil
-		}
-		return fmt.Errorf("container %s is not found in ComponentDefinition %s", name, cmpd.Name)
-	}
 	for name := range release.Images {
 		for _, cmpd := range cmpds {
 			if cmpd == nil {
 				continue
 			}
-			if err := validateContainer(*cmpd, name); err != nil {
+			if err := r.validateImageContainer(*cmpd, name); err != nil {
 				return err
 			}
 		}
 	}
 	return nil
+}
+
+func (r *ComponentVersionReconciler) validateImageContainer(cmpd appsv1.ComponentDefinition, name string) error {
+	if r.imageDefinedInContainers(cmpd, name) {
+		return nil
+	}
+	if r.imageDefinedInActions(cmpd, name) {
+		return nil
+	}
+	// user-managed images, leave it to the user to handle
+	return nil
+}
+
+func (r *ComponentVersionReconciler) imageDefinedInContainers(cmpd appsv1.ComponentDefinition, name string) bool {
+	cmp := func(c corev1.Container) bool {
+		return c.Name == name
+	}
+	if slices.IndexFunc(cmpd.Spec.Runtime.InitContainers, cmp) != -1 {
+		return true
+	}
+	if slices.IndexFunc(cmpd.Spec.Runtime.Containers, cmp) != -1 {
+		return true
+	}
+	return false
+}
+
+func (r *ComponentVersionReconciler) imageDefinedInActions(_ appsv1.ComponentDefinition, name string) bool {
+	match := func(action string) bool {
+		// case insensitive
+		return strings.EqualFold(action, name)
+	}
+
+	tp := reflect.TypeOf(appsv1.ComponentLifecycleActions{})
+	for i := 0; i < tp.NumField(); i++ {
+		if match(tp.Field(i).Name) {
+			return true
+		}
+	}
+	return false
 }
 
 // validateCompatibilityRulesCompDef validates the reference component definition name pattern defined in compatibility rules.

@@ -416,6 +416,14 @@ func main() {
 			os.Exit(1)
 		}
 
+		if err = (&appscontrollers.SidecarDefinitionReconciler{
+			Client: mgr.GetClient(),
+			Scheme: mgr.GetScheme(),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "SidecarDefinition")
+			os.Exit(1)
+		}
+
 		if err = (&opscontrollers.OpsDefinitionReconciler{
 			Client:   mgr.GetClient(),
 			Scheme:   mgr.GetScheme(),

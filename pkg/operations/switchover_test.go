@@ -25,9 +25,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -54,21 +52,6 @@ var _ = Describe("", func() {
 			role = constant.Leader
 		}
 		return role
-	}
-
-	patchK8sJobStatus := func(jobStatus batchv1.JobConditionType, key types.NamespacedName) {
-		Eventually(testapps.GetAndChangeObjStatus(&testCtx, key, func(job *batchv1.Job) {
-			found := false
-			for _, cond := range job.Status.Conditions {
-				if cond.Type == jobStatus {
-					found = true
-				}
-			}
-			if !found {
-				jobCondition := batchv1.JobCondition{Type: jobStatus}
-				job.Status.Conditions = append(job.Status.Conditions, jobCondition)
-			}
-		})).Should(Succeed())
 	}
 
 	cleanEnv := func() {
@@ -190,14 +173,6 @@ var _ = Describe("", func() {
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err).Should(HaveOccurred())
 			Expect(err.Error()).Should(ContainSubstring("requeue to waiting for job"))
-
-			By("mock job status to success.")
-			jobName := fmt.Sprintf("%s-%s-%s-%d", KBSwitchoverJobNamePrefix, opsRes.Cluster.Name, defaultCompName, opsRes.Cluster.Generation)
-			key := types.NamespacedName{
-				Name:      jobName,
-				Namespace: clusterObj.Namespace,
-			}
-			patchK8sJobStatus(batchv1.JobComplete, key)
 
 			By("do reconcile switchoverAction failed because pod role label is not consistency")
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)

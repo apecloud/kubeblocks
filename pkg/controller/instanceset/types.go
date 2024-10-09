@@ -26,8 +26,6 @@ const (
 	RoleLabelKey       = "kubeblocks.io/role"
 	AccessModeLabelKey = "workloads.kubeblocks.io/access-mode"
 
-	defaultPodName = "Unknown"
-
 	LegacyRSMFinalizerName = "rsm.workloads.kubeblocks.io/finalizer"
 
 	roleProbeContainerName       = "kb-role-probe"

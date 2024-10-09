@@ -43,7 +43,7 @@ func ValidateCompDefRegexp(compDefPattern string) error {
 	return err
 }
 
-func CompDefMatched(compDef, compDefPattern string) bool {
+func PrefixOrRegexMatched(compDef, compDefPattern string) bool {
 	if strings.HasPrefix(compDef, compDefPattern) {
 		return true
 	}

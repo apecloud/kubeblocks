@@ -40,6 +40,10 @@ func (c *FakeDataprotectionV1alpha1) BackupPolicies(namespace string) v1alpha1.B
 	return &FakeBackupPolicies{c, namespace}
 }
 
+func (c *FakeDataprotectionV1alpha1) BackupPolicyTemplates() v1alpha1.BackupPolicyTemplateInterface {
+	return &FakeBackupPolicyTemplates{c}
+}
+
 func (c *FakeDataprotectionV1alpha1) BackupRepos() v1alpha1.BackupRepoInterface {
 	return &FakeBackupRepos{c}
 }

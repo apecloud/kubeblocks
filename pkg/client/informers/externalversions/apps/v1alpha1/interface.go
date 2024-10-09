@@ -24,8 +24,6 @@ import (
 
 // Interface provides access to all the informers in this group version.
 type Interface interface {
-	// BackupPolicyTemplates returns a BackupPolicyTemplateInformer.
-	BackupPolicyTemplates() BackupPolicyTemplateInformer
 	// Clusters returns a ClusterInformer.
 	Clusters() ClusterInformer
 	// ClusterDefinitions returns a ClusterDefinitionInformer.
@@ -51,11 +49,6 @@ type version struct {
 // New returns a new Interface.
 func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakListOptions internalinterfaces.TweakListOptionsFunc) Interface {
 	return &version{factory: f, namespace: namespace, tweakListOptions: tweakListOptions}
-}
-
-// BackupPolicyTemplates returns a BackupPolicyTemplateInformer.
-func (v *version) BackupPolicyTemplates() BackupPolicyTemplateInformer {
-	return &backupPolicyTemplateInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
 // Clusters returns a ClusterInformer.

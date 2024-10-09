@@ -74,8 +74,6 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1().ServiceDescriptors().Informer()}, nil
 
 		// Group=apps.kubeblocks.io, Version=v1alpha1
-	case v1alpha1.SchemeGroupVersion.WithResource("backuppolicytemplates"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1alpha1().BackupPolicyTemplates().Informer()}, nil
 	case v1alpha1.SchemeGroupVersion.WithResource("clusters"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1alpha1().Clusters().Informer()}, nil
 	case v1alpha1.SchemeGroupVersion.WithResource("clusterdefinitions"):
@@ -102,6 +100,8 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Dataprotection().V1alpha1().Backups().Informer()}, nil
 	case dataprotectionv1alpha1.SchemeGroupVersion.WithResource("backuppolicies"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Dataprotection().V1alpha1().BackupPolicies().Informer()}, nil
+	case dataprotectionv1alpha1.SchemeGroupVersion.WithResource("backuppolicytemplates"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Dataprotection().V1alpha1().BackupPolicyTemplates().Informer()}, nil
 	case dataprotectionv1alpha1.SchemeGroupVersion.WithResource("backuprepos"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Dataprotection().V1alpha1().BackupRepos().Informer()}, nil
 	case dataprotectionv1alpha1.SchemeGroupVersion.WithResource("backupschedules"):

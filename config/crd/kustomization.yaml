@@ -2,11 +2,11 @@
 # since it depends on service name and namespace that are out of this kustomize package.
 # It should be run by config/default
 resources:
-- bases/apps.kubeblocks.io_backuppolicytemplates.yaml
 - bases/apps.kubeblocks.io_clusters.yaml
 - bases/apps.kubeblocks.io_clusterdefinitions.yaml
 - bases/apps.kubeblocks.io_configconstraints.yaml
 - bases/dataprotection.kubeblocks.io_actionsets.yaml
+- bases/dataprotection.kubeblocks.io_backuppolicytemplates.yaml
 - bases/dataprotection.kubeblocks.io_backupschedules.yaml
 - bases/dataprotection.kubeblocks.io_backuppolicies.yaml
 - bases/dataprotection.kubeblocks.io_backups.yaml

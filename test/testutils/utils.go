@@ -169,10 +169,10 @@ func retry(ctx context.Context, operation func() error, maxRetry int) error {
 		delay := time.Duration(int(math.Pow(2, float64(attempt)))) * time.Second
 		klog.V(1).Infof("Failed, retrying in %s ... (%d/%d). Error: %v", delay, attempt+1, maxRetry, err)
 		select {
-		case <-time.After(delay):
-			break
 		case <-ctx.Done():
 			return err
+		case <-time.After(delay):
+			// try again
 		}
 		err = operation()
 	}

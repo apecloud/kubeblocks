@@ -21,6 +21,7 @@ package apps
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -106,12 +107,13 @@ func (t *clusterLoadRefResourcesTransformer) checkNUpdateClusterTopology(transCt
 		return fmt.Errorf("specified cluster topology not found: %s", cluster.Spec.Topology)
 	}
 
-	comps := make(map[string]bool, 0)
-	for _, comp := range clusterTopology.Components {
-		comps[comp.Name] = true
+	matched := func(compName string) bool {
+		return slices.ContainsFunc(clusterTopology.Components, func(comp appsv1.ClusterTopologyComponent) bool {
+			return clusterTopologyCompMatched(comp, compName)
+		})
 	}
 	for _, comp := range cluster.Spec.ComponentSpecs {
-		if !comps[comp.Name] {
+		if !matched(comp.Name) {
 			return fmt.Errorf("component %s not defined in topology %s", comp.Name, clusterTopology.Name)
 		}
 	}

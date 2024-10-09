@@ -101,6 +101,9 @@ func (t *ClusterAPINormalizationTransformer) buildCompSpecs(transCtx *clusterTra
 func (t *ClusterAPINormalizationTransformer) buildCompSpecs4Topology(clusterDef *appsv1.ClusterDefinition,
 	cluster *appsv1.Cluster) ([]*appsv1.ClusterComponentSpec, error) {
 	newCompSpec := func(comp appsv1.ClusterTopologyComponent) *appsv1.ClusterComponentSpec {
+		if comp.Dynamic != nil && *comp.Dynamic {
+			return nil // don't create the component spec for dynamic components
+		}
 		return &appsv1.ClusterComponentSpec{
 			Name:         comp.Name,
 			ComponentDef: comp.CompDef,
@@ -119,18 +122,33 @@ func (t *ClusterAPINormalizationTransformer) buildCompSpecs4Topology(clusterDef 
 		return nil, fmt.Errorf("referred cluster topology not found : %s", cluster.Spec.Topology)
 	}
 
-	specifiedCompSpecs := make(map[string]*appsv1.ClusterComponentSpec)
-	for i, compSpec := range cluster.Spec.ComponentSpecs {
-		specifiedCompSpecs[compSpec.Name] = cluster.Spec.ComponentSpecs[i].DeepCopy()
+	specifiedCompSpecs := make([]*appsv1.ClusterComponentSpec, 0)
+	for i := range cluster.Spec.ComponentSpecs {
+		specifiedCompSpecs = append(specifiedCompSpecs, cluster.Spec.ComponentSpecs[i].DeepCopy())
+	}
+
+	matchedCompSpec := func(comp appsv1.ClusterTopologyComponent) []*appsv1.ClusterComponentSpec {
+		specs := make([]*appsv1.ClusterComponentSpec, 0)
+		for i, spec := range specifiedCompSpecs {
+			if clusterTopologyCompMatched(comp, spec.Name) {
+				specs = append(specs, specifiedCompSpecs[i])
+			}
+		}
+		return specs
 	}
 
 	compSpecs := make([]*appsv1.ClusterComponentSpec, 0)
 	for i := range clusterTopology.Components {
 		comp := clusterTopology.Components[i]
-		if _, ok := specifiedCompSpecs[comp.Name]; ok {
-			compSpecs = append(compSpecs, mergeCompSpec(comp, specifiedCompSpecs[comp.Name]))
-		} else {
-			compSpecs = append(compSpecs, newCompSpec(comp))
+		specs := matchedCompSpec(comp)
+		if len(specs) == 0 {
+			spec := newCompSpec(comp)
+			if spec != nil {
+				specs = append(specs, spec)
+			}
+		}
+		for _, spec := range specs {
+			compSpecs = append(compSpecs, mergeCompSpec(comp, spec))
 		}
 	}
 	return compSpecs, nil

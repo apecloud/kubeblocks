@@ -29,6 +29,7 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -78,6 +79,7 @@ var _ = Describe("cluster component transformer test", func() {
 		clusterTopologyNoOrders            = "test-topology-no-orders"
 		clusterTopologyProvisionNUpdateOOD = "test-topology-ood"
 		clusterTopology4Stop               = "test-topology-stop"
+		clusterTopology4Dynamic            = "test-topology-dynamic"
 		compDefName                        = "test-compdef"
 		clusterName                        = "test-cluster"
 		comp1aName                         = "comp-1a"
@@ -198,6 +200,31 @@ var _ = Describe("cluster component transformer test", func() {
 				},
 				Orders: &appsv1.ClusterTopologyOrders{
 					Update: []string{comp1aName, comp2aName, comp3aName},
+				},
+			}).
+			AddClusterTopology(appsv1.ClusterTopology{
+				Name: clusterTopology4Dynamic,
+				Components: []appsv1.ClusterTopologyComponent{
+					{
+						Name:    comp1aName,
+						CompDef: compDefName,
+					},
+					{
+						Name:    comp2aName,
+						CompDef: compDefName,
+						Dynamic: pointer.Bool(true),
+					},
+					{
+						Name:    comp2bName,
+						CompDef: compDefName,
+					},
+					{
+						Name:    comp3aName,
+						CompDef: compDefName,
+					},
+				},
+				Orders: &appsv1.ClusterTopologyOrders{
+					Provision: []string{comp1aName, fmt.Sprintf("%s,%s", comp2aName, comp2bName), comp3aName},
 				},
 			}).
 			GetObject()
@@ -633,6 +660,62 @@ var _ = Describe("cluster component transformer test", func() {
 			// try again
 			err = transformer.Transform(transCtx, dag)
 			Expect(err).Should(BeNil())
+		})
+
+		It("w/ orders - dynamic components", func() {
+			transformer, transCtx, dag := newTransformerNCtx(clusterTopology4Dynamic)
+
+			// check the components, dynamic components should not be created
+			Expect(transCtx.ComponentSpecs).Should(HaveLen(3))
+			Expect(transCtx.ComponentSpecs[0].Name).Should(Equal(comp1aName))
+			Expect(transCtx.ComponentSpecs[1].Name).Should(Equal(comp2bName))
+			Expect(transCtx.ComponentSpecs[2].Name).Should(Equal(comp3aName))
+
+			// mock to specify two dynamic components
+			cluster := transCtx.Cluster.DeepCopy()
+			cluster.Spec.ComponentSpecs = append(cluster.Spec.ComponentSpecs, []appsv1.ClusterComponentSpec{
+				{
+					Name:         fmt.Sprintf("%s-0", comp2aName),
+					ComponentDef: compDefName,
+				},
+				{
+					Name:         fmt.Sprintf("%s-1", comp2aName),
+					ComponentDef: compDefName,
+				},
+			}...)
+			transCtx.Cluster = cluster
+			transCtx.OrigCluster = cluster.DeepCopy()
+			transCtx.ComponentSpecs = buildCompSpecs(clusterDef, cluster)
+			Expect(transCtx.ComponentSpecs).Should(HaveLen(5))
+			Expect(transCtx.ComponentSpecs[0].Name).Should(Equal(comp1aName))
+			Expect(transCtx.ComponentSpecs[1].Name).Should(HavePrefix(comp2aName))
+			Expect(transCtx.ComponentSpecs[2].Name).Should(HavePrefix(comp2aName))
+			Expect(transCtx.ComponentSpecs[3].Name).Should(Equal(comp2bName))
+			Expect(transCtx.ComponentSpecs[4].Name).Should(Equal(comp3aName))
+
+			// mock first component status as running
+			reader := &mockReader{
+				objs: []client.Object{
+					mockCompObj(transCtx, comp1aName, func(comp *appsv1.Component) {
+						comp.Status.Phase = appsv1.RunningClusterCompPhase
+					}),
+				},
+			}
+			transCtx.Client = model.NewGraphClient(reader)
+
+			err := transformer.Transform(transCtx, dag)
+			Expect(err).ShouldNot(BeNil())
+			Expect(err.Error()).Should(And(ContainSubstring("retry later"), ContainSubstring(comp3aName)))
+
+			// check other components
+			graphCli := transCtx.Client.(model.GraphClient)
+			objs := graphCli.FindAll(dag, &appsv1.Component{})
+			Expect(len(objs)).Should(Equal(3))
+			for _, obj := range objs {
+				comp := obj.(*appsv1.Component)
+				Expect(component.ShortName(transCtx.Cluster.Name, comp.Name)).Should(Or(HavePrefix(comp2aName), Equal(comp2bName)))
+				Expect(graphCli.IsAction(dag, comp, model.ActionCreatePtr())).Should(BeTrue())
+			}
 		})
 	})
 })

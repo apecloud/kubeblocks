@@ -86,7 +86,9 @@ mycluster      kafka                kafka-3.3.2    Delete               Running 
     kbcli cluster describe mycluster -n demo
     ```
 
-<TabItem value="OpsRequest" label="OpsRequest" default>
+</TabItem>
+
+<TabItem value="OpsRequest" label="OpsRequest">
 
 1. Apply an OpsRequest. Change the value of storage according to your need and run the command below to expand the volume of a cluster.
 

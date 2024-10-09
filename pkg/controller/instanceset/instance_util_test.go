@@ -806,7 +806,7 @@ var _ = Describe("instance util test", func() {
 			}
 			ordinalList, err := ConvertOrdinalsToSortedList(ordinals)
 			Expect(err).Should(BeNil())
-			sets.NewInt32(ordinalList...).Equal(sets.NewInt32(0, 2, 3, 4, 6))
+			sets.New(ordinalList...).Equal(sets.New[int32](0, 2, 3, 4, 6))
 		})
 		It("rightNumber must >= leftNumber", func() {
 			ordinals := workloads.Ordinals{

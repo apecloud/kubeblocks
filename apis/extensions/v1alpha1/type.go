@@ -16,6 +16,15 @@ limitations under the License.
 
 package v1alpha1
 
+import (
+	"fmt"
+
+	"k8s.io/apimachinery/pkg/version"
+
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
+)
+
 // AddonType defines the addon types.
 // +enum
 // +kubebuilder:validation:Enum={Helm}
@@ -67,3 +76,23 @@ const (
 	ConditionTypeSucceed     = "Succeed"
 	ConditionTypeFailed      = "Failed"
 )
+
+// SetKubeServerVersion provides "_KUBE_SERVER_INFO" viper settings helper function.
+func SetKubeServerVersion(major, minor, patch string) {
+	ver := version.Info{
+		Major:      major,
+		Minor:      minor,
+		GitVersion: fmt.Sprintf("v%s.%s.%s", major, minor, patch),
+	}
+	viper.Set(constant.CfgKeyServerInfo, ver)
+}
+
+// SetKubeServerVersionWithDistro provides "_KUBE_SERVER_INFO" viper settings helper function.
+func SetKubeServerVersionWithDistro(major, minor, patch, distro string) {
+	ver := version.Info{
+		Major:      major,
+		Minor:      minor,
+		GitVersion: fmt.Sprintf("v%s.%s.%s+%s", major, minor, patch, distro),
+	}
+	viper.Set(constant.CfgKeyServerInfo, ver)
+}

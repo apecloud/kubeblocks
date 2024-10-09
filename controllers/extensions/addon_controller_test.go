@@ -46,7 +46,6 @@ import (
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/generics"
-	"github.com/apecloud/kubeblocks/pkg/testutil"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -104,7 +103,7 @@ var _ = Describe("Addon controller", func() {
 		BeforeEach(func() {
 			cleanEnv()
 			const distro = "kubeblocks"
-			testutil.SetKubeServerVersionWithDistro("1", "24", "0", distro)
+			extensionsv1alpha1.SetKubeServerVersionWithDistro("1", "24", "0", distro)
 			Expect(client.IgnoreAlreadyExists(testCtx.CreateNamespace())).To(Not(HaveOccurred()))
 		})
 

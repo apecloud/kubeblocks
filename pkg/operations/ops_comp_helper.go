@@ -72,8 +72,8 @@ func (c componentOpsHelper) updateClusterComponentsAndShardings(cluster *appsv1.
 		}
 	}
 	// 1. update the sharding components
-	for index := range cluster.Spec.ShardingSpecs {
-		shardingSpec := &cluster.Spec.ShardingSpecs[index]
+	for index := range cluster.Spec.Shardings {
+		shardingSpec := &cluster.Spec.Shardings[index]
 		if err := updateComponentSpecs(&shardingSpec.Template, shardingSpec.Name); err != nil {
 			return err
 		}
@@ -100,7 +100,7 @@ func (c componentOpsHelper) saveLastConfigurations(opsRes *OpsResource,
 		setLastCompConfiguration(v, lastConfiguration, v.Name)
 	}
 	// 2. record the volumeTemplate of sharding components
-	for _, v := range opsRes.Cluster.Spec.ShardingSpecs {
+	for _, v := range opsRes.Cluster.Spec.Shardings {
 		setLastCompConfiguration(v.Template, lastConfiguration, v.Name)
 	}
 }
@@ -128,8 +128,8 @@ func (c componentOpsHelper) cancelComponentOps(ctx context.Context,
 		rollBackCompSpec(compSpec, lastCompInfos, compSpec.Name)
 	}
 	// 2. rollback the shardingSpecs
-	for index := range opsRes.Cluster.Spec.ShardingSpecs {
-		shardingSpec := &opsRes.Cluster.Spec.ShardingSpecs[index]
+	for index := range opsRes.Cluster.Spec.Shardings {
+		shardingSpec := &opsRes.Cluster.Spec.Shardings[index]
 		rollBackCompSpec(&shardingSpec.Template, lastCompInfos, shardingSpec.Name)
 	}
 	return cli.Update(ctx, opsRes.Cluster)
@@ -216,8 +216,8 @@ func (c componentOpsHelper) reconcileActionWithComponentOps(reqCtx intctrlutil.R
 	}
 
 	// 2. handle the sharding status.
-	for i := range opsRes.Cluster.Spec.ShardingSpecs {
-		shardingSpec := opsRes.Cluster.Spec.ShardingSpecs[i]
+	for i := range opsRes.Cluster.Spec.Shardings {
+		shardingSpec := opsRes.Cluster.Spec.Shardings[i]
 		compOps, ok := getCompOps(shardingSpec.Name)
 		if !ok {
 			continue

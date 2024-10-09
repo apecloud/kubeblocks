@@ -72,11 +72,11 @@ func (t *ClusterAPINormalizationTransformer) Transform(ctx graph.TransformContex
 }
 
 func (t *ClusterAPINormalizationTransformer) validateSpec(cluster *appsv1.Cluster) error {
-	if len(cluster.Spec.ShardingSpecs) == 0 {
+	if len(cluster.Spec.Shardings) == 0 {
 		return nil
 	}
 	shardCompNameMap := map[string]sets.Empty{}
-	for _, v := range cluster.Spec.ShardingSpecs {
+	for _, v := range cluster.Spec.Shardings {
 		shardCompNameMap[v.Name] = sets.Empty{}
 	}
 	for _, v := range cluster.Spec.ComponentSpecs {
@@ -142,7 +142,7 @@ func (t *ClusterAPINormalizationTransformer) buildCompSpecs4Specified(transCtx *
 	for i := range cluster.Spec.ComponentSpecs {
 		compSpecs = append(compSpecs, cluster.Spec.ComponentSpecs[i].DeepCopy())
 	}
-	if cluster.Spec.ShardingSpecs != nil {
+	if cluster.Spec.Shardings != nil {
 		shardingCompSpecs, err := t.buildCompSpecs4Sharding(transCtx, cluster)
 		if err != nil {
 			return nil, err
@@ -158,8 +158,8 @@ func (t *ClusterAPINormalizationTransformer) buildCompSpecs4Sharding(transCtx *c
 	if transCtx.ShardingComponentSpecs == nil {
 		transCtx.ShardingComponentSpecs = make(map[string][]*appsv1.ClusterComponentSpec, 0)
 	}
-	for i, sharding := range cluster.Spec.ShardingSpecs {
-		shardingComps, err := controllerutil.GenShardingCompSpecList(transCtx.Context, transCtx.Client, cluster, &cluster.Spec.ShardingSpecs[i])
+	for i, sharding := range cluster.Spec.Shardings {
+		shardingComps, err := controllerutil.GenShardingCompSpecList(transCtx.Context, transCtx.Client, cluster, &cluster.Spec.Shardings[i])
 		if err != nil {
 			return nil, err
 		}
@@ -255,9 +255,9 @@ func (t *ClusterAPINormalizationTransformer) updateCompSpecs4Specified(transCtx 
 	}
 	idx += len(cluster.Spec.ComponentSpecs)
 
-	for i, sharding := range cluster.Spec.ShardingSpecs {
-		cluster.Spec.ShardingSpecs[i].Template.ComponentDef = resolvedCompSpecs[idx].ComponentDef
-		cluster.Spec.ShardingSpecs[i].Template.ServiceVersion = resolvedCompSpecs[idx].ServiceVersion
+	for i, sharding := range cluster.Spec.Shardings {
+		cluster.Spec.Shardings[i].Template.ComponentDef = resolvedCompSpecs[idx].ComponentDef
+		cluster.Spec.Shardings[i].Template.ServiceVersion = resolvedCompSpecs[idx].ServiceVersion
 		idx += int(sharding.Shards)
 	}
 }

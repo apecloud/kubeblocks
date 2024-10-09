@@ -344,7 +344,7 @@ func (r *OpsRequest) validateHorizontalScaling(_ context.Context, _ client.Clien
 			}
 		}
 	}
-	for _, shardingSpec := range cluster.Spec.ShardingSpecs {
+	for _, shardingSpec := range cluster.Spec.Shardings {
 		if hScale, ok := hScaleMap[shardingSpec.Name]; ok {
 			if err := r.validateHorizontalScalingSpec(hScale, shardingSpec.Template, cluster.Name, true); err != nil {
 				return err
@@ -503,7 +503,7 @@ func (r *OpsRequest) checkInstanceTemplate(cluster *appsv1.Cluster, componentOps
 			instanceNameMap[instances[i].Name] = sets.Empty{}
 		}
 	}
-	for _, shardingSpec := range cluster.Spec.ShardingSpecs {
+	for _, shardingSpec := range cluster.Spec.Shardings {
 		if shardingSpec.Name != componentOps.ComponentName {
 			continue
 		}
@@ -533,7 +533,7 @@ func (r *OpsRequest) checkComponentExistence(cluster *appsv1.Cluster, compOpsLis
 	for _, compSpec := range cluster.Spec.ComponentSpecs {
 		compNameMap[compSpec.Name] = sets.Empty{}
 	}
-	for _, shardingSpec := range cluster.Spec.ShardingSpecs {
+	for _, shardingSpec := range cluster.Spec.Shardings {
 		compNameMap[shardingSpec.Name] = sets.Empty{}
 	}
 	var (
@@ -615,7 +615,7 @@ func (r *OpsRequest) checkVolumesAllowExpansion(ctx context.Context, cli client.
 	for _, comp := range cluster.Spec.ComponentSpecs {
 		fillCompVols(comp, comp.Name, false)
 	}
-	for _, sharding := range cluster.Spec.ShardingSpecs {
+	for _, sharding := range cluster.Spec.Shardings {
 		fillCompVols(sharding.Template, sharding.Name, true)
 	}
 

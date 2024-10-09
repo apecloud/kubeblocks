@@ -612,6 +612,10 @@ type VarSource struct {
 	// Selects a defined var of a Cluster.
 	// +optional
 	ClusterVarRef *ClusterVarSelector `json:"clusterVarRef,omitempty"`
+
+	// Selects a defined var of a Sharding.
+	// +optional
+	ShardingVarRef *ClusterVarSelector `json:"shardingVarRef,omitempty"`
 }
 
 // VarOption defines whether a variable is required or optional.
@@ -814,6 +818,28 @@ type ClusterVars struct {
 	//
 	// +optional
 	ClusterUID *VarOption `json:"clusterUID,omitempty"`
+}
+
+// ShardingVarSelector selects a var from a Sharding.
+type ShardingVarSelector struct {
+	ShardingVar `json:",inline"`
+}
+
+type ShardingVar struct {
+	// Reference to the name of the sharding.
+	//
+	// +optional
+	ShardingName *VarOption `json:"shardingName,omitempty"`
+
+	// Reference to the short name of the sharding.
+	//
+	// +optional
+	ShortName *VarOption `json:"shortName,omitempty"`
+
+	// Reference to the shards of the sharding.
+	//
+	// +optional
+	Shards *VarOption `json:"shards,omitempty"`
 }
 
 // ClusterObjectReference defines information to let you locate the referenced object inside the same Cluster.

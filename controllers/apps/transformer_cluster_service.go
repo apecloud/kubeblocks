@@ -118,7 +118,7 @@ func (t *clusterServiceTransformer) shardingService(cluster *appsv1.Cluster, ser
 	if len(service.ComponentSelector) == 0 {
 		return false, nil
 	}
-	for _, spec := range cluster.Spec.ShardingSpecs {
+	for _, spec := range cluster.Spec.Shardings {
 		if spec.Name == service.ComponentSelector {
 			return true, nil
 		}
@@ -177,7 +177,7 @@ func (t *clusterServiceTransformer) checkComponentDef(transCtx *clusterTransform
 		return compDef, nil
 	}
 
-	for _, spec := range cluster.Spec.ShardingSpecs {
+	for _, spec := range cluster.Spec.Shardings {
 		if spec.Name == selector {
 			return checkedCompDef(spec.Template.ComponentDef)
 		}

@@ -33,7 +33,7 @@ func GetComponentSpecByName(ctx context.Context, cli client.Reader,
 	if compSpec != nil {
 		return compSpec, nil
 	}
-	for _, shardingSpec := range cluster.Spec.ShardingSpecs {
+	for _, shardingSpec := range cluster.Spec.Shardings {
 		shardingCompList, err := listAllShardingCompSpecs(ctx, cli, cluster, &shardingSpec)
 		if err != nil {
 			return nil, err

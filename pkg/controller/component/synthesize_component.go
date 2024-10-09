@@ -166,7 +166,7 @@ func buildComp2CompDefs(ctx context.Context, cli client.Reader, cluster *appsv1.
 	}
 
 	// build from shardingSpecs
-	for _, shardingSpec := range cluster.Spec.ShardingSpecs {
+	for _, shardingSpec := range cluster.Spec.Shardings {
 		shardingComps, err := intctrlutil.ListShardingComponents(ctx, cli, cluster, shardingSpec.Name)
 		if err != nil {
 			return nil, err

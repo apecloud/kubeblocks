@@ -450,9 +450,9 @@ var _ = Describe("Cluster Controller", func() {
 
 		By("scale in the sharding component")
 		Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1.Cluster) {
-			for i := range cluster.Spec.ShardingSpecs {
-				if cluster.Spec.ShardingSpecs[i].Name == compName {
-					cluster.Spec.ShardingSpecs[i].Shards = int32(shards - 1)
+			for i := range cluster.Spec.Shardings {
+				if cluster.Spec.Shardings[i].Name == compName {
+					cluster.Spec.Shardings[i].Shards = int32(shards - 1)
 				}
 			}
 		})()).ShouldNot(HaveOccurred())

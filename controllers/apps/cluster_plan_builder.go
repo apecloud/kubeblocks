@@ -58,9 +58,9 @@ type clusterTransformContext struct {
 	OrigCluster   *appsv1.Cluster
 	ClusterDef    *appsv1.ClusterDefinition
 	ComponentDefs map[string]*appsv1.ComponentDefinition
-	// ComponentSpecs includes all cluster component specs generated from ComponentSpecs and ShardingSpecs
+	// ComponentSpecs includes all cluster component specs generated from ComponentSpecs and Shardings
 	ComponentSpecs []*appsv1.ClusterComponentSpec
-	// ShardingComponentSpecs includes all sharding component specs generated from ShardingSpecs
+	// ShardingComponentSpecs includes all sharding component specs generated from Shardings
 	ShardingComponentSpecs map[string][]*appsv1.ClusterComponentSpec
 	// Annotations to be added to components, mapping with ComponentSpecs.
 	Annotations map[string]map[string]string

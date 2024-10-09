@@ -13058,6 +13058,29 @@ spec:
                               - Optional
                               type: string
                           type: object
+                        shardingVarRef:
+                          description: Selects a defined var of a Sharding.
+                          properties:
+                            clusterName:
+                              description: Reference to the name of the Cluster object.
+                              enum:
+                              - Required
+                              - Optional
+                              type: string
+                            clusterUID:
+                              description: Reference to the UID of the Cluster object.
+                              enum:
+                              - Required
+                              - Optional
+                              type: string
+                            namespace:
+                              description: Reference to the namespace of the Cluster
+                                object.
+                              enum:
+                              - Required
+                              - Optional
+                              type: string
+                          type: object
                       type: object
                   required:
                   - name

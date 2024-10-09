@@ -58,11 +58,11 @@ func (t *clusterSharedAccountTransformer) Transform(ctx graph.TransformContext, 
 
 func (t *clusterSharedAccountTransformer) reconcileShardingsSharedAccounts(transCtx *clusterTransformContext,
 	graphCli model.GraphClient, dag *graph.DAG) error {
-	if len(transCtx.Cluster.Spec.ShardingSpecs) == 0 {
+	if len(transCtx.Cluster.Spec.Shardings) == 0 {
 		return nil
 	}
 
-	for _, shardingSpec := range transCtx.Cluster.Spec.ShardingSpecs {
+	for _, shardingSpec := range transCtx.Cluster.Spec.Shardings {
 		if len(shardingSpec.Template.SystemAccounts) == 0 {
 			return nil
 		}
@@ -84,7 +84,7 @@ func (t *clusterSharedAccountTransformer) reconcileShardingsSharedAccounts(trans
 }
 
 func (t *clusterSharedAccountTransformer) needCreateSharedAccount(transCtx *clusterTransformContext,
-	account *appsv1.ComponentSystemAccount, shardingSpec appsv1.ShardingSpec) (bool, error) {
+	account *appsv1.ComponentSystemAccount, shardingSpec appsv1.ClusterSharding) (bool, error) {
 	// respect the secretRef if it is set
 	if account.SecretRef != nil {
 		return false, nil
@@ -107,7 +107,7 @@ func (t *clusterSharedAccountTransformer) needCreateSharedAccount(transCtx *clus
 }
 
 func (t *clusterSharedAccountTransformer) createNConvertToSharedAccountSecret(transCtx *clusterTransformContext,
-	account *appsv1.ComponentSystemAccount, shardingSpec appsv1.ShardingSpec, graphCli model.GraphClient, dag *graph.DAG) error {
+	account *appsv1.ComponentSystemAccount, shardingSpec appsv1.ClusterSharding, graphCli model.GraphClient, dag *graph.DAG) error {
 	// Create the shared account secret if it does not exist
 	secretName := constant.GenerateShardingSharedAccountSecretName(transCtx.Cluster.Name, shardingSpec.Name, account.Name)
 	secret, err := t.buildAccountSecret(transCtx.Cluster, *account, shardingSpec.Name, secretName)

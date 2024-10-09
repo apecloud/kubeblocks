@@ -83,7 +83,19 @@ type ShardingDefinitionSpec struct {
 	// +optional
 	LifecycleActions *ShardingLifecycleActions `json:"lifecycleActions,omitempty"`
 
-	// TODO: shared resources: account, service, env, tls, etc.
+	// Defines additional Services to expose the sharding's endpoints.
+	//
+	// This field is immutable.
+	//
+	// +optional
+	Services []ShardingService `json:"services,omitempty"`
+
+	// Defines the system accounts for the sharding.
+	//
+	// This field is immutable.
+	//
+	// +optional
+	SystemAccounts []ShardingSystemAccount `json:"systemAccounts,omitempty"`
 }
 
 // ShardingDefinitionStatus defines the observed state of ShardingDefinition
@@ -112,7 +124,7 @@ type ShardingTemplate struct {
 
 // ShardsLimit defines the valid range of number of shards supported.
 //
-// +kubebuilder:validation:XValidation:rule="self.minShards >= 0 && self.maxShards <= 16384",message="the minimum and maximum limit of shards should be in the range of [0, 16384]"
+// +kubebuilder:validation:XValidation:rule="self.minShards >= 0 && self.maxShards <= 2048",message="the minimum and maximum limit of shards should be in the range of [0, 2048]"
 // +kubebuilder:validation:XValidation:rule="self.minShards <= self.maxShards",message="the minimum shards limit should be no greater than the maximum"
 type ShardsLimit struct {
 	// The minimum limit of shards.
@@ -133,12 +145,41 @@ type ShardingLifecycleActions struct {
 	// Note: This field is immutable once it has been set.
 	//
 	// +optional
-	PostShardProvision *Action `json:"postShardProvision,omitempty"`
+	ShardProvision *Action `json:"shardProvision,omitempty"`
 
 	// Specifies the hook to be executed prior to terminating a shard.
 	//
 	// Note: This field is immutable once it has been set.
 	//
 	// +optional
-	PreShardTerminate *Action `json:"preShardTerminate,omitempty"`
+	ShardTerminate *Action `json:"shardTerminate,omitempty"`
+}
+
+type ShardingService struct {
+	// The name of the service defined in the sharding template.
+	//
+	// This field is immutable once set.
+	//
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=25
+	Name string `json:"name"`
+
+	// Specifies whether the service is shared across shards.
+	//
+	// +optional
+	Shared bool `json:"shared,omitempty"`
+}
+
+type ShardingSystemAccount struct {
+	// The name of the system account defined in the sharding template.
+	//
+	// This field is immutable once set.
+	//
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// Specifies whether the account is shared across shards.
+	//
+	// +optional
+	Shared bool `json:"shared,omitempty"`
 }

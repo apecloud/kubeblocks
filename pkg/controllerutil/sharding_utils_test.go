@@ -90,7 +90,7 @@ var _ = Describe("cluster shard component", func() {
 			compKey := client.ObjectKeyFromObject(mockCompObj)
 			Eventually(testapps.CheckObjExists(&testCtx, compKey, &appsv1.Component{}, true)).Should(Succeed())
 
-			shardingSpec := &appsv1.ShardingSpec{
+			shardingSpec := &appsv1.ClusterSharding{
 				Template: appsv1.ClusterComponentSpec{
 					Replicas: 2,
 				},

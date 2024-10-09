@@ -169,7 +169,7 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCt
 		}
 		setVeHelpers(compSpec, compOps, compSpec.Name)
 	}
-	for _, shardingSpec := range opsRes.Cluster.Spec.ShardingSpecs {
+	for _, shardingSpec := range opsRes.Cluster.Spec.Shardings {
 		compOps, ok := compOpsHelper.componentOpsSet[shardingSpec.Name]
 		if !ok {
 			continue

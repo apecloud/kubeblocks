@@ -68,7 +68,7 @@ spec:
 
                   This field is immutable.
                 properties:
-                  postShardProvision:
+                  shardProvision:
                     description: |-
                       Specifies the hook to be executed after a shard's creation.
 
@@ -340,7 +340,7 @@ spec:
                         format: int32
                         type: integer
                     type: object
-                  preShardTerminate:
+                  shardTerminate:
                     description: |-
                       Specifies the hook to be executed prior to terminating a shard.
 
@@ -624,6 +624,30 @@ spec:
                 - BestEffortParallel
                 - Parallel
                 type: string
+              services:
+                description: |-
+                  Defines additional Services to expose the sharding's endpoints.
+
+
+                  This field is immutable.
+                items:
+                  properties:
+                    name:
+                      description: |-
+                        The name of the service defined in the sharding template.
+
+
+                        This field is immutable once set.
+                      maxLength: 25
+                      type: string
+                    shared:
+                      description: Specifies whether the service is shared across
+                        shards.
+                      type: boolean
+                  required:
+                  - name
+                  type: object
+                type: array
               shardsLimit:
                 description: |-
                   Defines the upper limit of the number of shards supported by the sharding.
@@ -645,11 +669,34 @@ spec:
                 type: object
                 x-kubernetes-validations:
                 - message: the minimum and maximum limit of shards should be in the
-                    range of [0, 16384]
-                  rule: self.minShards >= 0 && self.maxShards <= 16384
+                    range of [0, 2048]
+                  rule: self.minShards >= 0 && self.maxShards <= 2048
                 - message: the minimum shards limit should be no greater than the
                     maximum
                   rule: self.minShards <= self.maxShards
+              systemAccounts:
+                description: |-
+                  Defines the system accounts for the sharding.
+
+
+                  This field is immutable.
+                items:
+                  properties:
+                    name:
+                      description: |-
+                        The name of the system account defined in the sharding template.
+
+
+                        This field is immutable once set.
+                      type: string
+                    shared:
+                      description: Specifies whether the account is shared across
+                        shards.
+                      type: boolean
+                  required:
+                  - name
+                  type: object
+                type: array
               template:
                 properties:
                   compDef:

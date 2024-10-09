@@ -393,6 +393,61 @@ var _ = Describe("service references", func() {
 			Expect(serviceDescriptor.Spec.Auth).Should(BeNil())
 		})
 
+		It("service vars - different namespace", func() {
+			comp.Spec.ServiceRefs = []appsv1.ServiceRef{
+				{
+					Name:      serviceRefDeclaration.Name,
+					Namespace: "external",
+					ClusterServiceSelector: &appsv1.ServiceRefClusterSelector{
+						Cluster: etcdCluster,
+						Service: &appsv1.ServiceRefServiceSelector{
+							Service: "client",
+							Port:    "client",
+						},
+					},
+				},
+			}
+			reader := &mockReader{
+				cli: testCtx.Cli,
+				objs: []client.Object{
+					&corev1.Service{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace: "external",
+							Name:      constant.GenerateClusterServiceName(etcdCluster, "client"),
+						},
+						Spec: corev1.ServiceSpec{
+							Ports: []corev1.ServicePort{
+								{
+									Name: "peer",
+									Port: 2380,
+								},
+								{
+									Name: "client",
+									Port: 2379,
+								},
+							},
+						},
+					},
+				},
+			}
+
+			err := buildServiceReferencesWithoutResolve(testCtx.Ctx, reader, synthesizedComp, compDef, comp)
+			Expect(err).Should(Succeed())
+
+			svcFQDN := serviceFQDN("external", reader.objs[0].GetName())
+
+			Expect(synthesizedComp.ServiceReferences).Should(HaveKey(serviceRefDeclaration.Name))
+			serviceDescriptor := synthesizedComp.ServiceReferences[serviceRefDeclaration.Name]
+			Expect(serviceDescriptor).Should(Not(BeNil()))
+			Expect(serviceDescriptor.Spec.Endpoint).Should(Not(BeNil()))
+			Expect(serviceDescriptor.Spec.Endpoint.Value).Should(Equal(fmt.Sprintf("%s:%s", svcFQDN, "2379")))
+			Expect(serviceDescriptor.Spec.Host).Should(Not(BeNil()))
+			Expect(serviceDescriptor.Spec.Host.Value).Should(Equal(svcFQDN))
+			Expect(serviceDescriptor.Spec.Port).Should(Not(BeNil()))
+			Expect(serviceDescriptor.Spec.Port.Value).Should(Equal("2379"))
+			Expect(serviceDescriptor.Spec.Auth).Should(BeNil())
+		})
+
 		It("credential vars - same namespace", func() {
 			comp.Spec.ServiceRefs = []appsv1.ServiceRef{
 				{

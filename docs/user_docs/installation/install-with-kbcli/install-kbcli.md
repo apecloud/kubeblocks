@@ -46,7 +46,7 @@ You can install kbcli with `curl` or `brew`.
 
    To get stable releases, use this command:
    ```bash
-   curl -s "https://api.github.com/repos/apecloud/kbcli/releases?per_page=100&page=1" | jq '.[] | select(.prerelease == false) | .tag_name'
+   curl -s "https://api.github.com/repos/apecloud/kbcli/releases?per_page=100&page=1" | jq -r '.[] | select(.prerelease == false) | .tag_name' | sort -V
    ```
 
   :::note

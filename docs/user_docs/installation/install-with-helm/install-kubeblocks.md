@@ -66,7 +66,7 @@ Use Helm and follow the steps below to install KubeBlocks.
 
    To get stable releases, use this command:
    ```bash
-   curl -s "https://api.github.com/repos/apecloud/kubeblocks/releases?per_page=100&page=1" | jq '.[] | select(.prerelease == false) | .tag_name'
+   curl -s "https://api.github.com/repos/apecloud/kubeblocks/releases?per_page=100&page=1" | jq -r '.[] | select(.prerelease == false) | .tag_name' | sort -V
    ```
    
 

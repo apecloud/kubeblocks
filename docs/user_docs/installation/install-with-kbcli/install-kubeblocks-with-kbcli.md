@@ -72,7 +72,7 @@ If you want to install KubeBlocks with a specified version, follow the steps bel
 
    By default, when installing KubeBlocks, kbcli installs the corresponding version of KubeBlocks. It's important to ensure the major versions of kbcli and KubeBlocks are the same, if you specify a different version explicitly here.
 
-   For example, you can install kbcli v0.8.1 with KubeBlocks v0.8.3, but using mismatched major versions, such as kbcli v0.8.1 with KubeBlocks v0.9.0, may lead to errors.
+   For example, you can install kbcli v0.8.3 with KubeBlocks v0.8.1, but using mismatched major versions, such as kbcli v0.8.3 with KubeBlocks v0.9.0, may lead to errors.
   
   :::
 

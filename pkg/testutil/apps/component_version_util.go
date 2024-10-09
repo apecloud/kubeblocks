@@ -29,6 +29,7 @@ const (
 
 	AppName           = "app"
 	AppNameSamePrefix = "app-same-prefix"
+	DefaultActionName = "preTerminate"
 
 	ReleasePrefix        = "v0.0.1"
 	ServiceVersionPrefix = "8.0.30"

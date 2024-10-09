@@ -22,13 +22,13 @@ package operations
 import (
 	"fmt"
 	"reflect"
+	"slices"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
-	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -257,6 +257,8 @@ var _ = Describe("OpsRequest Controller", func() {
 				Create(&testCtx).
 				GetObject()
 
+			testdp.CreateBackupPolicyTpl(&testCtx, compDefObj.Name)
+
 			By("Create a componentDefinition obj")
 			compDefObj = testapps.NewComponentDefinitionFactory(compDefName).
 				WithRandomName().
@@ -311,7 +313,6 @@ var _ = Describe("OpsRequest Controller", func() {
 		}
 
 		createMysqlCluster := func(replicas int32) {
-			testdp.CreateBackupPolicyTpl(&testCtx, compDefObj.GetName())
 
 			By("set component to horizontal with snapshot policy")
 			testk8s.MockEnableVolumeSnapshot(&testCtx, testk8s.DefaultStorageClassName)

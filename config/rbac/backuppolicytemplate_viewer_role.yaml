@@ -1,23 +1,19 @@
-# permissions for end users to edit backuppolicytemplates.
+# permissions for end users to view backuppolicytemplates.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: backuppolicytemplate-editor-role
+  name: backuppolicytemplate-viewer-role
 rules:
 - apiGroups:
-  - apps.kubeblocks.io
+  - dataprotection.kubeblocks.io
   resources:
   - backuppolicytemplates
   verbs:
-  - create
-  - delete
   - get
   - list
-  - patch
-  - update
   - watch
 - apiGroups:
-  - apps.kubeblocks.io
+  - dataprotection.kubeblocks.io
   resources:
   - backuppolicytemplates/status
   verbs:

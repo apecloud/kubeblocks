@@ -82,35 +82,8 @@ func getHeadlessSvcName(itsName string) string {
 	return strings.Join([]string{itsName, "headless"}, "-")
 }
 
-func buildEnvConfigMap(its workloads.InstanceSet, labels map[string]string) (*corev1.ConfigMap, error) {
-	if viper.GetBool(constant.FeatureGateNoRSMEnv) {
-		return nil, nil
-	}
-	envData, err := buildEnvConfigData(its)
-	if err != nil {
-		return nil, err
-	}
-	annotations := ParseAnnotationsOfScope(ConfigMapScope, its.Annotations)
-	return builder.NewConfigMapBuilder(its.Namespace, GetEnvConfigMapName(its.Name)).
-		AddAnnotationsInMap(annotations).
-		AddLabelsInMap(labels).
-		SetData(envData).GetObject(), nil
-}
-
-func BuildPodTemplate(its *workloads.InstanceSet, envConfigName string) *corev1.PodTemplateSpec {
+func BuildPodTemplate(its *workloads.InstanceSet) *corev1.PodTemplateSpec {
 	template := its.Spec.Template.DeepCopy()
-	// inject env ConfigMap into workload pods only
-	for i := range template.Spec.Containers {
-		template.Spec.Containers[i].EnvFrom = append(template.Spec.Containers[i].EnvFrom,
-			corev1.EnvFromSource{
-				ConfigMapRef: &corev1.ConfigMapEnvSource{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: envConfigName,
-					},
-					Optional: func() *bool { optional := false; return &optional }(),
-				}})
-	}
-
 	injectRoleProbeContainer(its, template)
 
 	return template
@@ -356,64 +329,4 @@ func injectCustomRoleProbeContainer(its *workloads.InstanceSet, template *corev1
 		}
 		template.Spec.Containers = append(template.Spec.Containers, container)
 	}
-}
-
-func buildEnvConfigData(its workloads.InstanceSet) (map[string]string, error) {
-	envData := map[string]string{}
-	svcName := getHeadlessSvcName(its.Name)
-	uid := string(its.UID)
-	strReplicas := strconv.Itoa(int(*its.Spec.Replicas))
-	generateReplicaEnv := func(prefix string, podNames []string) {
-		for _, podName := range podNames {
-			_, ordinal := ParseParentNameAndOrdinal(podName)
-			hostNameTplKey := prefix + strconv.Itoa(ordinal) + "_HOSTNAME"
-			hostNameTplValue := its.Name + "-" + strconv.Itoa(ordinal)
-			envData[hostNameTplKey] = fmt.Sprintf("%s.%s", hostNameTplValue, svcName)
-		}
-	}
-	// build member related envs from set.Status.MembersStatus
-	generateMemberEnv := func(prefix string) {
-		followers := ""
-		for _, memberStatus := range its.Status.MembersStatus {
-			if memberStatus.PodName == "" || memberStatus.PodName == defaultPodName || memberStatus.ReplicaRole == nil {
-				continue
-			}
-			switch {
-			case memberStatus.ReplicaRole.IsLeader:
-				envData[prefix+"LEADER"] = memberStatus.PodName
-			case memberStatus.ReplicaRole.CanVote:
-				if len(followers) > 0 {
-					followers += ","
-				}
-				followers += memberStatus.PodName
-			}
-		}
-		if followers != "" {
-			envData[prefix+"FOLLOWERS"] = followers
-		}
-	}
-	// generate all pod names
-	generatePodNames := func() ([]string, error) {
-		var instances []InstanceTemplate
-		for i := range its.Spec.Instances {
-			instances = append(instances, &its.Spec.Instances[i])
-		}
-		return GenerateAllInstanceNames(its.Name, *its.Spec.Replicas, instances, its.Spec.OfflineInstances, its.Spec.DefaultTemplateOrdinals)
-	}
-
-	// all pod names
-	podNames, err := generatePodNames()
-	if err != nil {
-		return nil, err
-	}
-
-	prefix := constant.KBPrefix + "_ITS_"
-	envData[prefix+"N"] = strReplicas
-	generateReplicaEnv(prefix, podNames)
-	generateMemberEnv(prefix)
-	// set owner uid to let pod know if the owner is recreated
-	envData[prefix+"OWNER_UID"] = uid
-	envData[prefix+"OWNER_UID_SUFFIX8"] = uid[len(uid)-4:]
-
-	return envData, nil
 }

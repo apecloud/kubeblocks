@@ -56,19 +56,23 @@ If you want to install KubeBlocks with a specified version, follow the steps bel
    ```bash
    kbcli kubeblocks list-versions
    ```
+   
+   To include alpha and beta releases, use:
+   ```bash
+   kbcli kb list-versions --devel --limit=100
+   ```
 
-   Or you can view the available versions in [KubeBlocks Release](https://github.com/apecloud/kubeblocks/releases/).
+   Or you can view all available versions in [KubeBlocks Release](https://github.com/apecloud/kubeblocks/releases/).
 2. Specify a version with `--version` and run the command below.
 
    ```bash
    kbcli kubeblocks install --version=x.x.x
    ```
-
   :::note
 
-  By default, kbcli installs the latest release version and then when installing KubeBlocks, kbcli installs the matched version. Ensure that the major versions of kbcli and KubeBlocks match.
+   By default, when installing KubeBlocks, kbcli installs the corresponding version of KubeBlocks. It's important to ensure the major versions of kbcli and KubeBlocks are the same, if you specify a different version explicitly here.
 
-  For instance, you can install kbcli v0.6.1 and KubeBlocks v0.6.3, but mismatched versions like kbcli v0.5.0 and KubeBlocks v0.6.0 may result in errors.
+   For example, you can install kbcli v0.8.3 with KubeBlocks v0.8.1, but using mismatched major versions, such as kbcli v0.8.3 with KubeBlocks v0.9.0, may lead to errors.
   
   :::
 

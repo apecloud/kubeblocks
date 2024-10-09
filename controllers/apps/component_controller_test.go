@@ -396,9 +396,7 @@ var _ = Describe("Component Controller", func() {
 		}
 	}
 
-	mockPodsForTest := func(cluster *kbappsv1.Cluster, number int) []corev1.Pod {
-		componentName := cluster.Spec.ComponentSpecs[0].Name
-		compDefName := cluster.Spec.ComponentSpecs[0].ComponentDef
+	mockPodsForTest := func(cluster *kbappsv1.Cluster, componentName, compDefName string, number int) []corev1.Pod {
 		clusterName := cluster.Name
 		itsName := cluster.Name + "-" + componentName
 		pods := make([]corev1.Pod, 0)
@@ -439,7 +437,7 @@ var _ = Describe("Component Controller", func() {
 		Expect(int(*itsList.Items[0].Spec.Replicas)).To(BeEquivalentTo(comp.Replicas))
 
 		By("Creating mock pods in InstanceSet")
-		pods := mockPodsForTest(clusterObj, int(comp.Replicas))
+		pods := mockPodsForTest(clusterObj, comp.Name, comp.ComponentDef, int(comp.Replicas))
 		for _, pod := range pods {
 			Expect(testCtx.CheckedCreateObj(testCtx.Ctx, &pod)).Should(Succeed())
 			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(&pod), func(p *corev1.Pod) {
@@ -1460,7 +1458,7 @@ var _ = Describe("Component Controller", func() {
 		}).Should(Succeed())
 
 		By("Creating mock pods in InstanceSet, and set controller reference")
-		pods := mockPodsForTest(clusterObj, replicas)
+		pods := mockPodsForTest(clusterObj, compName, compDefName, replicas)
 		for i, pod := range pods {
 			Expect(controllerutil.SetControllerReference(its, &pod, scheme.Scheme)).Should(Succeed())
 			Expect(testCtx.CreateObj(testCtx.Ctx, &pod)).Should(Succeed())
@@ -1677,7 +1675,7 @@ var _ = Describe("Component Controller", func() {
 	Context("provisioning", func() {
 		BeforeEach(func() {
 			createAllDefinitionObjects()
-			testdp.CreateBackupPolicyTpl(&testCtx, compDefObj.GetName())
+			testdp.CreateBackupPolicyTpl(&testCtx, compDefObj.Name)
 		})
 
 		AfterEach(func() {
@@ -1755,7 +1753,7 @@ var _ = Describe("Component Controller", func() {
 	Context("h-scaling", func() {
 		BeforeEach(func() {
 			createAllDefinitionObjects()
-			testdp.CreateBackupPolicyTpl(&testCtx, compDefObj.GetName())
+			testdp.CreateBackupPolicyTpl(&testCtx, compDefObj.Name)
 		})
 
 		AfterEach(func() {
@@ -1855,7 +1853,7 @@ var _ = Describe("Component Controller", func() {
 
 		BeforeEach(func() {
 			createAllDefinitionObjects()
-			testdp.CreateBackupPolicyTpl(&testCtx, compDefObj.GetName())
+			testdp.CreateBackupPolicyTpl(&testCtx, compDefObj.Name)
 			mockStorageClass = testk8s.CreateMockStorageClass(&testCtx, testk8s.DefaultStorageClassName)
 		})
 
@@ -1882,7 +1880,7 @@ var _ = Describe("Component Controller", func() {
 	Context("restore", func() {
 		BeforeEach(func() {
 			createAllDefinitionObjects()
-			testdp.CreateBackupPolicyTpl(&testCtx, compDefObj.GetName())
+			testdp.CreateBackupPolicyTpl(&testCtx, compDefObj.Name)
 		})
 
 		AfterEach(func() {

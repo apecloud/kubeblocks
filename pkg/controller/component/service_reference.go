@@ -152,22 +152,25 @@ func referencedServiceVars(ctx context.Context, cli client.Reader, namespace str
 		return nil
 	}
 
+	svcNamespace := namespace
 	if serviceRef.Namespace != "" {
-		namespace = serviceRef.Namespace
+		svcNamespace = serviceRef.Namespace
 	}
 	switch {
 	case len(selector.Service.Component) == 0:
-		obj, err = clusterServiceGetter(ctx, cli, namespace, selector.Cluster, selector.Service.Service)
+		obj, err = clusterServiceGetter(ctx, cli, svcNamespace, selector.Cluster, selector.Service.Service)
 	case selector.Service.Service == "headless":
-		obj, err = headlessCompServiceGetter(ctx, cli, namespace, selector.Cluster, selector.Service.Component)
+		obj, err = headlessCompServiceGetter(ctx, cli, svcNamespace, selector.Cluster, selector.Service.Component)
 	default:
-		obj, err = compServiceGetter(ctx, cli, namespace, selector.Cluster, selector.Service.Component, selector.Service.Service)
+		obj, err = compServiceGetter(ctx, cli, svcNamespace, selector.Cluster, selector.Service.Component, selector.Service.Service)
 	}
 	if err != nil {
 		return err
 	}
 
-	vars.host = &appsv1.CredentialVar{Value: composeHostValueFromServices(obj)}
+	// use the service name when the referred service is in the same namespace, to keep it consistent with the vars.
+	fqdn := svcNamespace != namespace
+	vars.host = &appsv1.CredentialVar{Value: composeHostValueFromServices(obj, fqdn)}
 	if p := composePortValueFromServices(obj, selector.Service.Port); p != nil {
 		vars.port = &appsv1.CredentialVar{Value: *p}
 	}

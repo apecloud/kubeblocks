@@ -98,6 +98,7 @@ KubeBlocks supports PITR for databases such as MySQL and PostgreSQL. This docume
      <Tabs>
 
      <TabItem value="kbcli" label="kbcli" default>
+
      ```bash
      kbcli cluster list pg-cluster-pitr
      ```
@@ -106,7 +107,7 @@ KubeBlocks supports PITR for databases such as MySQL and PostgreSQL. This docume
 
      <TabItem value="kubectl" label="kubectl">
 
-     ```powershell
+     ```bash
      kubectl get cluster pg-cluster-pitr
      ```
 

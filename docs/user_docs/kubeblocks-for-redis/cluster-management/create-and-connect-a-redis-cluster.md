@@ -9,9 +9,6 @@ sidebar_label: Create and connect
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
-
 # Create and Connect to a Redis cluster
 
 This tutorial shows how to create and connect to a Redis cluster.

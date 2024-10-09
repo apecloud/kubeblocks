@@ -6,6 +6,9 @@ sidebar_position: 4
 sidebar_label: Restart
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # Restart a Pulsar cluster
 
 You can restart all pods of the cluster. When an exception occurs in a database, you can try to restart it.
@@ -17,6 +20,37 @@ The pod role may change after the cluster restarts.
 :::
 
 ## Steps
+
+<Tabs>
+
+<TabItem value="kbcli" label="kbcli" default>
+
+1. Configure the values of `components` and `ttlSecondsAfterSucceed` and run the command below to restart a specified cluster.
+
+   ```bash
+   kbcli cluster restart mycluster -n demo --components="pulsar" --ttlSecondsAfterSucceed=30
+   ```
+
+   - `components` describes the component name that needs to be restarted.
+   - `ttlSecondsAfterSucceed` describes the time to live of an OpsRequest job after the restarting succeeds.
+
+2. Validate the restarting.
+
+   Run the command below to check the cluster status to check the restarting status.
+
+   ```bash
+   kbcli cluster list mycluster -n demo
+   >
+   NAME           CLUSTER-DEFINITION   VERSION          TERMINATION-POLICY   STATUS     AGE
+   mycluster      pulsar               pulsar-3.0.2     Delete               Running    19m
+   ```
+
+   * STATUS=Updating: it means the cluster restart is in progress.
+   * STATUS=Running: it means the cluster has been restarted.
+
+</TabItem>
+
+<TabItem value="kubectl" label="kubectl">
 
 1. Restart a cluster.
 
@@ -50,3 +84,7 @@ The pod role may change after the cluster restarts.
 
    - STATUS=Terminating: it means the cluster restart is in progress.
    - STATUS=Running: it means the cluster has been restarted.
+
+</TabItem>
+
+</Tabs>

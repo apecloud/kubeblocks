@@ -783,8 +783,6 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
 
     <TabItem value="Edit Cluster YAML File" label="Edit Cluster YAML File">
 
-    </TabItem>
-
     Configure replicas as 0 to delete pods.
 
     ```yaml
@@ -816,6 +814,8 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
         replicas: 0
     ```
 
+    </TabItem>
+
     </Tabs>
 
 2. Check the status of the cluster to see whether it is stopped.
@@ -844,85 +844,85 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
 
 1. Configure the name of your cluster and run the command below to start this cluster.
 
-    <Tabs>
+   <Tabs>
 
-    <TabItem value="kbcli" label="kbcli" default>
+   <TabItem value="kbcli" label="kbcli" default>
 
-     ```bash
-     kbcli cluster start mycluster -n demo
-     ```
+   ```bash
+   kbcli cluster start mycluster -n demo
+   ```
 
-    </TabItem>
+   </TabItem>
 
-    <TabItem value="OpsRequest" label="OpsRequest">
+   <TabItem value="OpsRequest" label="OpsRequest">
 
-    Apply an OpsRequest to start a cluster.
+   Apply an OpsRequest to start a cluster.
 
-    ```bash
-    kubectl apply -f - <<EOF
-    apiVersion: apps.kubeblocks.io/v1alpha1
-    kind: OpsRequest
-    metadata:
-      name: ops-start
-      namespace: demo
-    spec:
-      clusterName: mycluster
-      type: Start
-    EOF 
-    ```
+   ```bash
+   kubectl apply -f - <<EOF
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: OpsRequest
+   metadata:
+     name: ops-start
+     namespace: demo
+   spec:
+     clusterName: mycluster
+     type: Start
+   EOF 
+   ```
 
-    </TabItem>
+   </TabItem>
 
-    <TabItem value="Edit Cluster YAML File" label="Edit Cluster YAML File">
+   <TabItem value="Edit Cluster YAML File" label="Edit Cluster YAML File">
 
-    Change replicas back to the original amount to start this cluster again.
+   Change replicas back to the original amount to start this cluster again.
 
-    ```yaml
-    spec:
-      clusterDefinitionRef: starrocks-ce
-      clusterVersionRef: starrocks-ce-3.1.1
-      terminationPolicy: Delete
-      affinity:
-        podAntiAffinity: Preferred
-        topologyKeys:
-        - kubernetes.io/hostname
-      tolerations:
-        - key: kb-data
-          operator: Equal
-          value: 'true'
-          effect: NoSchedule
-      componentSpecs:
-      - name: fe
-        componentDefRef: fe
-        serviceAccountName: kb-starrocks-cluster
-        replicas: 1
-      - name: be
-        componentDefRef: be
-        replicas: 2
-    ```
+   ```yaml
+   spec:
+     clusterDefinitionRef: starrocks-ce
+     clusterVersionRef: starrocks-ce-3.1.1
+     terminationPolicy: Delete
+     affinity:
+       podAntiAffinity: Preferred
+       topologyKeys:
+       - kubernetes.io/hostname
+     tolerations:
+       - key: kb-data
+         operator: Equal
+         value: 'true'
+         effect: NoSchedule
+     componentSpecs:
+     - name: fe
+       componentDefRef: fe
+       serviceAccountName: kb-starrocks-cluster
+       replicas: 1
+     - name: be
+       componentDefRef: be
+       replicas: 2
+   ```
 
-    </TabItem>
+   </TabItem>
 
-    </Tabs>
+   </Tabs>
 
 2. Check the status of the cluster to see whether it is running again.
 
-    <Tabs>
+   <Tabs>
 
-    <TabItem value="kbcli" label="kbcli" default>
+   <TabItem value="kbcli" label="kbcli" default>
 
-    ```bash
-    kbcli cluster list mycluster -n demo
-    ```
+   ```bash
+   kbcli cluster list mycluster -n demo
+   ```
 
-    </TabItem>
+   </TabItem>
 
-    <TabItem value="kubectl" label="kubectl">
+   <TabItem value="kubectl" label="kubectl">
 
-    ```bash
-    kubectl get cluster mycluster -n demo
-    ```
+   ```bash
+   kubectl get cluster mycluster -n demo
+   ```
 
-    </TabItem>
+   </TabItem>
 
-    </Tabs>
+   </Tabs>

@@ -186,6 +186,10 @@ func PodFQDN(namespace, compName, podName string) string {
 	return fmt.Sprintf("%s.%s-headless.%s.svc.%s", podName, compName, namespace, clusterDomain())
 }
 
+func serviceFQDN(namespace, serviceName string) string {
+	return fmt.Sprintf("%s.%s.svc.%s", serviceName, namespace, clusterDomain())
+}
+
 func clusterDomain() string {
 	return viper.GetString(constant.KubernetesClusterDomainEnv)
 }

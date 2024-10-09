@@ -28,7 +28,6 @@ import (
 
 type AppsV1alpha1Interface interface {
 	RESTClient() rest.Interface
-	BackupPolicyTemplatesGetter
 	ClustersGetter
 	ClusterDefinitionsGetter
 	ComponentsGetter
@@ -41,10 +40,6 @@ type AppsV1alpha1Interface interface {
 // AppsV1alpha1Client is used to interact with features provided by the apps.kubeblocks.io group.
 type AppsV1alpha1Client struct {
 	restClient rest.Interface
-}
-
-func (c *AppsV1alpha1Client) BackupPolicyTemplates() BackupPolicyTemplateInterface {
-	return newBackupPolicyTemplates(c)
 }
 
 func (c *AppsV1alpha1Client) Clusters(namespace string) ClusterInterface {

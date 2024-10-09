@@ -572,10 +572,10 @@ else ifeq ($(TEST_TYPE), oceanbase)
 	$(HELM) dependency build $(addonsPath)/oceanbase-cluster --skip-refresh
 	$(HELM) upgrade --install oceanbase $(addonsPath)/oceanbase
 	$(HELM) template oceanbase-cluster $(addonsPath)/oceanbase-cluster > test/e2e/testdata/smoketest/oceanbase/00_oceanbasecluster.yaml
-else ifeq ($(TEST_TYPE), official-postgresql)
-	$(HELM) dependency build $(addonsPath)/official-postgresql-cluster --skip-refresh
-	$(HELM) upgrade --install official-postgresql $(addonsPath)/official-postgresql
-	$(HELM) template official-pg $(addonsPath)/official-postgresql-cluster > test/e2e/testdata/smoketest/official-postgresql/00_official_pgcluster.yaml
+else ifeq ($(TEST_TYPE), vanilla-postgresql)
+	$(HELM) dependency build $(addonsPath)/vanilla-postgresql-cluster --skip-refresh
+	$(HELM) upgrade --install vanilla-postgresql $(addonsPath)/vanilla-postgresql
+	$(HELM) template official-pg $(addonsPath)/vanilla-postgresql-cluster > test/e2e/testdata/smoketest/vanilla-postgresql/00_official_pgcluster.yaml
 else ifeq ($(TEST_TYPE), openldap)
 	$(HELM) dependency build $(addonsPath)/openldap-cluster --skip-refresh
 	$(HELM) upgrade --install openldap $(addonsPath)/openldap
@@ -672,7 +672,7 @@ else ifeq ($(TEST_TYPE), foxlake)
 else ifeq ($(TEST_TYPE), oceanbase)
 	$(HELM) upgrade --install oceanbase $(addonsPath)/oceanbase
 else ifeq ($(TEST_TYPE), oceanbase)
-	$(HELM) upgrade --install official-postgresql $(addonsPath)/official-postgresql
+	$(HELM) upgrade --install vanilla-postgresql $(addonsPath)/vanilla-postgresql
 else ifeq ($(TEST_TYPE), openldap)
 	$(HELM) upgrade --install openldap $(addonsPath)/openldap
 else ifeq ($(TEST_TYPE), weaviate)

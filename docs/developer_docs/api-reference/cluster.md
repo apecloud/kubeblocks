@@ -12851,7 +12851,7 @@ the risk of simultaneous downtime.</p>
 <li><code>mongodb</code></li>
 <li><code>etcd</code></li>
 <li><code>postgresql</code></li>
-<li><code>official-postgresql</code></li>
+<li><code>vanilla-postgresql</code></li>
 <li><code>apecloud-postgresql</code></li>
 <li><code>polardbx</code></li>
 <li><code>custom</code></li>
@@ -12877,7 +12877,7 @@ the risk of simultaneous downtime.</p>
 <td></td>
 </tr><tr><td><p>&#34;oceanbase&#34;</p></td>
 <td></td>
-</tr><tr><td><p>&#34;official-postgresql&#34;</p></td>
+</tr><tr><td><p>&#34;vanilla-postgresql&#34;</p></td>
 <td></td>
 </tr><tr><td><p>&#34;polardbx&#34;</p></td>
 <td></td>
@@ -20998,7 +20998,7 @@ BuiltinActionHandlerType
 <p>Lorry, as a sidecar agent co-located with the database container in the same Pod,
 includes a suite of built-in action implementations that are tailored to different database engines.
 These are known as &ldquo;builtin&rdquo; handlers, includes: <code>mysql</code>, <code>redis</code>, <code>mongodb</code>, <code>etcd</code>,
-<code>postgresql</code>, <code>official-postgresql</code>, <code>apecloud-postgresql</code>, <code>wesql</code>, <code>oceanbase</code>, <code>polardbx</code>.</p>
+<code>postgresql</code>, <code>vanilla-postgresql</code>, <code>apecloud-postgresql</code>, <code>wesql</code>, <code>oceanbase</code>, <code>polardbx</code>.</p>
 <p>If the <code>builtinHandler</code> field is specified, it instructs Lorry to utilize its internal built-in action handler
 to execute the specified lifecycle actions.</p>
 <p>The <code>builtinHandler</code> field is of type <code>BuiltinActionHandlerType</code>,

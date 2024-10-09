@@ -37,12 +37,13 @@ import (
 // ClusterDefinition defines the topology for databases or storage systems,
 // offering a variety of topological configurations to meet diverse deployment needs and scenarios.
 //
-// It includes a list of Components, each linked to a ComponentDefinition, which enhances reusability and reduce redundancy.
+// It includes a list of Components and/or Shardings, each linked to a ComponentDefinition or a ShardingDefinition,
+// which enhances reusability and reduce redundancy.
 // For example, widely used components such as etcd and Zookeeper can be defined once and reused across multiple ClusterDefinitions,
 // simplifying the setup of new systems.
 //
-// Additionally, ClusterDefinition also specifies the sequence of startup, upgrade, and shutdown for Components,
-// ensuring a controlled and predictable management of component lifecycles.
+// Additionally, ClusterDefinition also specifies the sequence of startup, upgrade, and shutdown between Components and/or Shardings,
+// ensuring a controlled and predictable management of cluster lifecycles.
 type ClusterDefinition struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -107,14 +108,18 @@ type ClusterTopology struct {
 
 	// Components specifies the components in the topology.
 	//
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MinItems=1
 	// +kubebuilder:validation:MaxItems=128
-	Components []ClusterTopologyComponent `json:"components"`
+	// +optional
+	Components []ClusterTopologyComponent `json:"components,omitempty"`
 
-	// Specifies the sequence in which components within a cluster topology are
-	// started, stopped, and upgraded.
-	// This ordering is crucial for maintaining the correct dependencies and operational flow across components.
+	// Shardings specifies the shardings in the topology.
+	//
+	// +kubebuilder:validation:MaxItems=128
+	// +optional
+	Shardings []ClusterTopologySharding `json:"shardings,omitempty"`
+
+	// Specifies the sequence in which entities within a cluster topology are started, stopped, and upgraded.
+	// This ordering is crucial for maintaining the correct dependencies and operational flow across entities.
 	//
 	// +optional
 	Orders *ClusterTopologyOrders `json:"orders,omitempty"`
@@ -157,34 +162,64 @@ type ClusterTopologyComponent struct {
 	CompDef string `json:"compDef"`
 }
 
+// ClusterTopologySharding defines a sharding within a ClusterTopology.
+type ClusterTopologySharding struct {
+	// Defines the unique identifier of the sharding within the cluster topology.
+	// It follows IANA Service naming rules and is used as part of the Service's DNS name.
+	// The name must start with a lowercase letter, can contain lowercase letters, numbers,
+	// and hyphens, and must end with a lowercase letter or number.
+	//
+	// Cannot be updated once set.
+	//
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=16
+	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
+	Name string `json:"name"`
+
+	// Specifies the sharding definition that defines the characteristics and behavior of the sharding.
+	//
+	// The system selects the ShardingDefinition CR with the latest version that matches the pattern.
+	// This approach allows:
+	//
+	// 1. Precise selection by providing the exact name of a ShardingDefinition CR.
+	// 2. Flexible and automatic selection of the most up-to-date ShardingDefinition CR
+	// by specifying a regular expression pattern.
+	//
+	// Once set, this field cannot be updated.
+	//
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=64
+	ShardingDef string `json:"shardingDef"`
+}
+
 // ClusterTopologyOrders manages the lifecycle of components within a cluster by defining their provisioning,
 // terminating, and updating sequences.
 // It organizes components into stages or groups, where each group indicates a set of components
 // that can be managed concurrently.
 // These groups are processed sequentially, allowing precise control based on component dependencies and requirements.
 type ClusterTopologyOrders struct {
-	// Specifies the order for creating and initializing components.
-	// This is designed for components that depend on one another. Components without dependencies can be grouped together.
+	// Specifies the order for creating and initializing entities.
+	// This is designed for entities that depend on one another. Entities without dependencies can be grouped together.
 	//
-	// Components that can be provisioned independently or have no dependencies can be listed together in the same stage,
+	// Entities that can be provisioned independently or have no dependencies can be listed together in the same stage,
 	// separated by commas.
 	//
 	// +optional
 	Provision []string `json:"provision,omitempty"`
 
-	// Outlines the order for stopping and deleting components.
-	// This sequence is designed for components that require a graceful shutdown or have interdependencies.
+	// Outlines the order for stopping and deleting entities.
+	// This sequence is designed for entities that require a graceful shutdown or have interdependencies.
 	//
-	// Components that can be terminated independently or have no dependencies can be listed together in the same stage,
+	// Entities that can be terminated independently or have no dependencies can be listed together in the same stage,
 	// separated by commas.
 	//
 	// +optional
 	Terminate []string `json:"terminate,omitempty"`
 
-	// Update determines the order for updating components' specifications, such as image upgrades or resource scaling.
-	// This sequence is designed for components that have dependencies or require specific update procedures.
+	// Update determines the order for updating entities' specifications, such as image upgrades or resource scaling.
+	// This sequence is designed for entities that have dependencies or require specific update procedures.
 	//
-	// Components that can be updated independently or have no dependencies can be listed together in the same stage,
+	// Entities that can be updated independently or have no dependencies can be listed together in the same stage,
 	// separated by commas.
 	//
 	// +optional

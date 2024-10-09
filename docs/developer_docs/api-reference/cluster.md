@@ -40,6 +40,8 @@ Resource Types:
 <a href="#apps.kubeblocks.io/v1.ComponentVersion">ComponentVersion</a>
 </li><li>
 <a href="#apps.kubeblocks.io/v1.ServiceDescriptor">ServiceDescriptor</a>
+</li><li>
+<a href="#apps.kubeblocks.io/v1.ShardingDefinition">ShardingDefinition</a>
 </li></ul>
 <h3 id="apps.kubeblocks.io/v1.Cluster">Cluster
 </h3>
@@ -299,11 +301,12 @@ ClusterStatus
 <div>
 <p>ClusterDefinition defines the topology for databases or storage systems,
 offering a variety of topological configurations to meet diverse deployment needs and scenarios.</p>
-<p>It includes a list of Components, each linked to a ComponentDefinition, which enhances reusability and reduce redundancy.
+<p>It includes a list of Components and/or Shardings, each linked to a ComponentDefinition or a ShardingDefinition,
+which enhances reusability and reduce redundancy.
 For example, widely used components such as etcd and Zookeeper can be defined once and reused across multiple ClusterDefinitions,
 simplifying the setup of new systems.</p>
-<p>Additionally, ClusterDefinition also specifies the sequence of startup, upgrade, and shutdown for Components,
-ensuring a controlled and predictable management of component lifecycles.</p>
+<p>Additionally, ClusterDefinition also specifies the sequence of startup, upgrade, and shutdown between Components and/or Shardings,
+ensuring a controlled and predictable management of cluster lifecycles.</p>
 </div>
 <table>
 <thead>
@@ -1791,10 +1794,150 @@ ServiceDescriptorStatus
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1.ShardingDefinition">ShardingDefinition
+</h3>
+<div>
+<p>ShardingDefinition is the Schema for the shardingdefinitions API</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>apiVersion</code><br/>
+string</td>
+<td>
+<code>apps.kubeblocks.io/v1</code>
+</td>
+</tr>
+<tr>
+<td>
+<code>kind</code><br/>
+string
+</td>
+<td><code>ShardingDefinition</code></td>
+</tr>
+<tr>
+<td>
+<code>metadata</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#objectmeta-v1-meta">
+Kubernetes meta/v1.ObjectMeta
+</a>
+</em>
+</td>
+<td>
+Refer to the Kubernetes API documentation for the fields of the
+<code>metadata</code> field.
+</td>
+</tr>
+<tr>
+<td>
+<code>spec</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardingDefinitionSpec">
+ShardingDefinitionSpec
+</a>
+</em>
+</td>
+<td>
+<br/>
+<br/>
+<table>
+<tr>
+<td>
+<code>template</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardingTemplate">
+ShardingTemplate
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>shardsLimit</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardsLimit">
+ShardsLimit
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the upper limit of the number of shards supported by the sharding.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>provisionStrategy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.UpdateStrategy">
+UpdateStrategy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+<tr>
+<td>
+<code>updateStrategy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.UpdateStrategy">
+UpdateStrategy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+<tr>
+<td>
+<code>lifecycleActions</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardingLifecycleActions">
+ShardingLifecycleActions
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines a set of hooks and procedures that customize the behavior of a sharding throughout its lifecycle.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+<tr>
+<td>
+<code>status</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardingDefinitionStatus">
+ShardingDefinitionStatus
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1.Action">Action
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentLifecycleActions">ComponentLifecycleActions</a>, <a href="#apps.kubeblocks.io/v1.Probe">Probe</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentLifecycleActions">ComponentLifecycleActions</a>, <a href="#apps.kubeblocks.io/v1.Probe">Probe</a>, <a href="#apps.kubeblocks.io/v1.ShardingLifecycleActions">ShardingLifecycleActions</a>)
 </p>
 <div>
 <p>Action defines a customizable hook or procedure tailored for different database engines,
@@ -3413,7 +3556,22 @@ Cannot be updated.</p>
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Components specifies the components in the topology.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>shardings</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ClusterTopologySharding">
+[]ClusterTopologySharding
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Shardings specifies the shardings in the topology.</p>
 </td>
 </tr>
 <tr>
@@ -3427,9 +3585,8 @@ ClusterTopologyOrders
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the sequence in which components within a cluster topology are
-started, stopped, and upgraded.
-This ordering is crucial for maintaining the correct dependencies and operational flow across components.</p>
+<p>Specifies the sequence in which entities within a cluster topology are started, stopped, and upgraded.
+This ordering is crucial for maintaining the correct dependencies and operational flow across entities.</p>
 </td>
 </tr>
 <tr>
@@ -3529,9 +3686,9 @@ These groups are processed sequentially, allowing precise control based on compo
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the order for creating and initializing components.
-This is designed for components that depend on one another. Components without dependencies can be grouped together.</p>
-<p>Components that can be provisioned independently or have no dependencies can be listed together in the same stage,
+<p>Specifies the order for creating and initializing entities.
+This is designed for entities that depend on one another. Entities without dependencies can be grouped together.</p>
+<p>Entities that can be provisioned independently or have no dependencies can be listed together in the same stage,
 separated by commas.</p>
 </td>
 </tr>
@@ -3544,9 +3701,9 @@ separated by commas.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Outlines the order for stopping and deleting components.
-This sequence is designed for components that require a graceful shutdown or have interdependencies.</p>
-<p>Components that can be terminated independently or have no dependencies can be listed together in the same stage,
+<p>Outlines the order for stopping and deleting entities.
+This sequence is designed for entities that require a graceful shutdown or have interdependencies.</p>
+<p>Entities that can be terminated independently or have no dependencies can be listed together in the same stage,
 separated by commas.</p>
 </td>
 </tr>
@@ -3559,10 +3716,62 @@ separated by commas.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Update determines the order for updating components&rsquo; specifications, such as image upgrades or resource scaling.
-This sequence is designed for components that have dependencies or require specific update procedures.</p>
-<p>Components that can be updated independently or have no dependencies can be listed together in the same stage,
+<p>Update determines the order for updating entities&rsquo; specifications, such as image upgrades or resource scaling.
+This sequence is designed for entities that have dependencies or require specific update procedures.</p>
+<p>Entities that can be updated independently or have no dependencies can be listed together in the same stage,
 separated by commas.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ClusterTopologySharding">ClusterTopologySharding
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterTopology">ClusterTopology</a>)
+</p>
+<div>
+<p>ClusterTopologySharding defines a sharding within a ClusterTopology.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Defines the unique identifier of the sharding within the cluster topology.
+It follows IANA Service naming rules and is used as part of the Service&rsquo;s DNS name.
+The name must start with a lowercase letter, can contain lowercase letters, numbers,
+and hyphens, and must end with a lowercase letter or number.</p>
+<p>Cannot be updated once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>shardingDef</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the sharding definition that defines the characteristics and behavior of the sharding.</p>
+<p>The system selects the ShardingDefinition CR with the latest version that matches the pattern.
+This approach allows:</p>
+<ol>
+<li>Precise selection by providing the exact name of a ShardingDefinition CR.</li>
+<li>Flexible and automatic selection of the most up-to-date ShardingDefinition CR
+by specifying a regular expression pattern.</li>
+</ol>
+<p>Once set, this field cannot be updated.</p>
 </td>
 </tr>
 </tbody>
@@ -7460,7 +7669,7 @@ Kubernetes core/v1.PersistentVolumeMode
 <h3 id="apps.kubeblocks.io/v1.Phase">Phase
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterDefinitionStatus">ClusterDefinitionStatus</a>, <a href="#apps.kubeblocks.io/v1.ComponentDefinitionStatus">ComponentDefinitionStatus</a>, <a href="#apps.kubeblocks.io/v1.ComponentVersionStatus">ComponentVersionStatus</a>, <a href="#apps.kubeblocks.io/v1.ServiceDescriptorStatus">ServiceDescriptorStatus</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterDefinitionStatus">ClusterDefinitionStatus</a>, <a href="#apps.kubeblocks.io/v1.ComponentDefinitionStatus">ComponentDefinitionStatus</a>, <a href="#apps.kubeblocks.io/v1.ComponentVersionStatus">ComponentVersionStatus</a>, <a href="#apps.kubeblocks.io/v1.ServiceDescriptorStatus">ServiceDescriptorStatus</a>, <a href="#apps.kubeblocks.io/v1.ShardingDefinitionStatus">ShardingDefinitionStatus</a>)
 </p>
 <div>
 <p>Phase represents the status of a CR.</p>
@@ -9361,6 +9570,197 @@ and the value will be presented in the following format: service1.name:port1,ser
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1.ShardingDefinitionSpec">ShardingDefinitionSpec
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ShardingDefinition">ShardingDefinition</a>)
+</p>
+<div>
+<p>ShardingDefinitionSpec defines the desired state of ShardingDefinition</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>template</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardingTemplate">
+ShardingTemplate
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>shardsLimit</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardsLimit">
+ShardsLimit
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the upper limit of the number of shards supported by the sharding.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>provisionStrategy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.UpdateStrategy">
+UpdateStrategy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+<tr>
+<td>
+<code>updateStrategy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.UpdateStrategy">
+UpdateStrategy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+<tr>
+<td>
+<code>lifecycleActions</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardingLifecycleActions">
+ShardingLifecycleActions
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines a set of hooks and procedures that customize the behavior of a sharding throughout its lifecycle.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ShardingDefinitionStatus">ShardingDefinitionStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ShardingDefinition">ShardingDefinition</a>)
+</p>
+<div>
+<p>ShardingDefinitionStatus defines the observed state of ShardingDefinition</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>observedGeneration</code><br/>
+<em>
+int64
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Refers to the most recent generation that has been observed for the ShardingDefinition.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>phase</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Phase">
+Phase
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Represents the current status of the ShardingDefinition. Valid values include `<code>,</code>Available<code>, and</code>Unavailable<code>.
+When the status is</code>Available`, the ShardingDefinition is ready and can be utilized by related objects.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>message</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Provides additional information about the current phase.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ShardingLifecycleActions">ShardingLifecycleActions
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ShardingDefinitionSpec">ShardingDefinitionSpec</a>)
+</p>
+<div>
+<p>ShardingLifecycleActions defines a collection of Actions for customizing the behavior of a sharding.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>postShardProvision</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the hook to be executed after a shard&rsquo;s creation.</p>
+<p>Note: This field is immutable once it has been set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>preShardTerminate</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the hook to be executed prior to terminating a shard.</p>
+<p>Note: This field is immutable once it has been set.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1.ShardingSpec">ShardingSpec
 </h3>
 <p>
@@ -9439,6 +9839,73 @@ This allows for custom actions to be performed after a new shard is provisioned.
 This enables custom cleanup or data migration tasks to be executed before a shard is terminated.
 Resources and data associated with the corresponding Component will also be deleted.</li>
 </ul>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ShardingTemplate">ShardingTemplate
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ShardingDefinitionSpec">ShardingDefinitionSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>compDef</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ShardsLimit">ShardsLimit
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ShardingDefinitionSpec">ShardingDefinitionSpec</a>)
+</p>
+<div>
+<p>ShardsLimit defines the valid range of number of shards supported.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>minShards</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>The minimum limit of shards.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>maxShards</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>The maximum limit of replicas.</p>
 </td>
 </tr>
 </tbody>
@@ -9696,7 +10163,7 @@ string
 <h3 id="apps.kubeblocks.io/v1.UpdateStrategy">UpdateStrategy
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>, <a href="#apps.kubeblocks.io/v1.ShardingDefinitionSpec">ShardingDefinitionSpec</a>)
 </p>
 <div>
 <p>UpdateStrategy defines the update strategy for cluster components. This strategy determines how updates are applied

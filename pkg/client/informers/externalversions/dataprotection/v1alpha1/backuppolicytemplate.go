@@ -22,10 +22,10 @@ import (
 	"context"
 	time "time"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	versioned "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned"
 	internalinterfaces "github.com/apecloud/kubeblocks/pkg/client/informers/externalversions/internalinterfaces"
-	v1alpha1 "github.com/apecloud/kubeblocks/pkg/client/listers/apps/v1alpha1"
+	v1alpha1 "github.com/apecloud/kubeblocks/pkg/client/listers/dataprotection/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -61,16 +61,16 @@ func NewFilteredBackupPolicyTemplateInformer(client versioned.Interface, resyncP
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.AppsV1alpha1().BackupPolicyTemplates().List(context.TODO(), options)
+				return client.DataprotectionV1alpha1().BackupPolicyTemplates().List(context.TODO(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.AppsV1alpha1().BackupPolicyTemplates().Watch(context.TODO(), options)
+				return client.DataprotectionV1alpha1().BackupPolicyTemplates().Watch(context.TODO(), options)
 			},
 		},
-		&appsv1alpha1.BackupPolicyTemplate{},
+		&dataprotectionv1alpha1.BackupPolicyTemplate{},
 		resyncPeriod,
 		indexers,
 	)
@@ -81,7 +81,7 @@ func (f *backupPolicyTemplateInformer) defaultInformer(client versioned.Interfac
 }
 
 func (f *backupPolicyTemplateInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&appsv1alpha1.BackupPolicyTemplate{}, f.defaultInformer)
+	return f.factory.InformerFor(&dataprotectionv1alpha1.BackupPolicyTemplate{}, f.defaultInformer)
 }
 
 func (f *backupPolicyTemplateInformer) Lister() v1alpha1.BackupPolicyTemplateLister {

@@ -49,6 +49,7 @@ import (
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/controllers/apps/configuration"
+	"github.com/apecloud/kubeblocks/controllers/dataprotection"
 	"github.com/apecloud/kubeblocks/controllers/k8score"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -243,7 +244,7 @@ var _ = BeforeSuite(func() {
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
-	err = (&BackupPolicyTemplateReconciler{
+	err = (&dataprotection.BackupPolicyTemplateReconciler{
 		Client:   k8sManager.GetClient(),
 		Scheme:   k8sManager.GetScheme(),
 		Recorder: k8sManager.GetEventRecorderFor("backup-policy-template-controller"),

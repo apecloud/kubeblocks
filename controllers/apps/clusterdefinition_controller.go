@@ -250,7 +250,7 @@ func (r *ClusterDefinitionReconciler) loadTopologyCompDefs(ctx context.Context,
 	for _, comp := range topology.Components {
 		defs := make([]*appsv1.ComponentDefinition, 0)
 		for compDefName := range compDefs {
-			if component.CompDefMatched(compDefName, comp.CompDef) {
+			if component.PrefixOrRegexMatched(compDefName, comp.CompDef) {
 				defs = append(defs, compDefs[compDefName])
 			}
 		}

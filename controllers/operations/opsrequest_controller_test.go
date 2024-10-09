@@ -257,6 +257,8 @@ var _ = Describe("OpsRequest Controller", func() {
 				Create(&testCtx).
 				GetObject()
 
+			testdp.CreateBackupPolicyTpl(&testCtx, compDefObj.Name)
+
 			By("Create a componentDefinition obj")
 			compDefObj = testapps.NewComponentDefinitionFactory(compDefName).
 				WithRandomName().
@@ -311,7 +313,6 @@ var _ = Describe("OpsRequest Controller", func() {
 		}
 
 		createMysqlCluster := func(replicas int32) {
-			testdp.CreateBackupPolicyTpl(&testCtx, compDefObj.GetName())
 
 			By("set component to horizontal with snapshot policy")
 			testk8s.MockEnableVolumeSnapshot(&testCtx, testk8s.DefaultStorageClassName)

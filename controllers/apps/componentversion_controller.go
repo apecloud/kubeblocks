@@ -122,7 +122,7 @@ func (r *ComponentVersionReconciler) compatibleCompVersion(ctx context.Context, 
 func (r *ComponentVersionReconciler) isCompatibleWith(compDef appsv1.ComponentDefinition, compVer appsv1.ComponentVersion) bool {
 	for _, rule := range compVer.Spec.CompatibilityRules {
 		for _, name := range rule.CompDefs {
-			if strings.HasPrefix(compDef.Name, name) {
+			if component.PrefixOrRegexMatched(compDef.Name, name) {
 				return true
 			}
 		}

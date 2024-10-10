@@ -257,7 +257,7 @@ func resolveParameterValue(ctx context.Context,
 	cli client.Client,
 	valueFrom *opsv1alpha1.ParameterSource,
 	opsNamespace string) (string, error) {
-	resoleObjectKey := func(nativeObjRef corev1.LocalObjectReference, object client.Object, getValue func(obj client.Object) (string, error)) (string, error) {
+	resolveObjectKey := func(nativeObjRef corev1.LocalObjectReference, object client.Object, getValue func(obj client.Object) (string, error)) (string, error) {
 		if err := cli.Get(ctx, client.ObjectKey{Name: nativeObjRef.Name, Namespace: opsNamespace}, object); err != nil {
 			return "", err
 		}
@@ -265,7 +265,7 @@ func resolveParameterValue(ctx context.Context,
 	}
 	switch {
 	case valueFrom.ConfigMapKeyRef != nil:
-		return resoleObjectKey(valueFrom.ConfigMapKeyRef.LocalObjectReference, &corev1.ConfigMap{}, func(obj client.Object) (string, error) {
+		return resolveObjectKey(valueFrom.ConfigMapKeyRef.LocalObjectReference, &corev1.ConfigMap{}, func(obj client.Object) (string, error) {
 			cm := obj.(*corev1.ConfigMap)
 			key := valueFrom.ConfigMapKeyRef.Key
 			if v, ok := cm.Data[key]; ok {
@@ -277,7 +277,7 @@ func resolveParameterValue(ctx context.Context,
 			return "", intctrlutil.NewFatalError(fmt.Sprintf(`key "%s" is not found in the ConfigMap "%s"`, key, valueFrom.ConfigMapKeyRef.Name))
 		})
 	case valueFrom.SecretKeyRef != nil:
-		return resoleObjectKey(valueFrom.SecretKeyRef.LocalObjectReference, &corev1.Secret{}, func(obj client.Object) (string, error) {
+		return resolveObjectKey(valueFrom.SecretKeyRef.LocalObjectReference, &corev1.Secret{}, func(obj client.Object) (string, error) {
 			secret := obj.(*corev1.Secret)
 			key := valueFrom.SecretKeyRef.Key
 			if v, ok := secret.Data[key]; ok {

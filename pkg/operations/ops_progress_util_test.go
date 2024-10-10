@@ -131,7 +131,7 @@ var _ = Describe("Ops ProgressDetails", func() {
 						ReplicaChanges: pointer.Int32(2),
 					},
 				},
-			})
+			}, constant.HscaleValidatePolicyStrict)
 			mockComponentIsOperating(opsRes.Cluster, appsv1.UpdatingClusterCompPhase, defaultCompName) // appsv1.HorizontalScalingPhase
 			initClusterForOps(opsRes)
 
@@ -188,7 +188,7 @@ var _ = Describe("Ops ProgressDetails", func() {
 						ReplicaChanges: pointer.Int32(1),
 					},
 				},
-			})
+			}, constant.HscaleValidatePolicyStrict)
 			mockComponentIsOperating(opsRes.Cluster, appsv1.UpdatingClusterCompPhase, defaultCompName) // appsv1.HorizontalScalingPhase
 			initClusterForOps(opsRes)
 

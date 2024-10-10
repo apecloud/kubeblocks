@@ -28,6 +28,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -344,4 +345,14 @@ func getComponentSpecOrShardingTemplate(cluster *appsv1.Cluster, componentName s
 		}
 	}
 	return nil
+}
+
+func getMissingElementsInSetFromList(set sets.Set[string], list []string) []string {
+	var diff []string
+	for _, v := range list {
+		if !set.Has(v) {
+			diff = append(diff, v)
+		}
+	}
+	return diff
 }

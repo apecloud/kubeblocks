@@ -47,6 +47,10 @@ NAME        CLUSTER-DEFINITION   VERSION       TERMINATION-POLICY   STATUS    AG
 mycluster   mongodb              mongodb-5.0   Delete               Running   17m
 ```
 
+</TabItem>
+
+</Tabs>
+
 ## Steps
 
 Run the command below to delete a specified cluster.

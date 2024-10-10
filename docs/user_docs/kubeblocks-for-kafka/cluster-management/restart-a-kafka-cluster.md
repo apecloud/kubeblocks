@@ -6,6 +6,8 @@ sidebar_position: 4
 sidebar_label: Restart
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
 # Restart a Kafka cluster
 
@@ -19,13 +21,16 @@ The pod role may change after the cluster restarts.
 
 ## Steps
 
+<Tabs>
+
+<TabItem value="kbcli" label="kbcli" default>
+
 1. Restart a cluster.
   
    Configure the values of `components` and `ttlSecondsAfterSucceed` and run the command below to restart a specified cluster.
 
    ```bash
-   kbcli cluster restart NAME --components="kafka" \
-   --ttlSecondsAfterSucceed=30
+   kbcli cluster restart mycluster -n demo --components="kafka" --ttlSecondsAfterSucceed=30
    ```
 
    - `components` describes the component name that needs to be restarted.
@@ -44,3 +49,44 @@ The pod role may change after the cluster restarts.
 
    * STATUS=Restarting: it means the cluster restart is in progress.
    * STATUS=Running: it means the cluster has been restarted.
+
+</TabItem>
+
+<TabItem value="kubectl" label="kubectl">
+
+1. Create an OpsRequest to restart a cluster.
+
+    ```bash
+    kubectl apply -f - <<EOF
+    apiVersion: apps.kubeblocks.io/v1alpha1
+    kind: OpsRequest
+    metadata:
+      name: ops-restart
+      namespace: demo
+    spec:
+      clusterName: mycluster
+      type: Restart 
+      restart:
+      - componentName: broker
+    EOF
+    ```
+
+2. Check the pod and operation status to validate the restarting.
+
+   ```bash
+   kubectl get pod -n demo
+
+   kubectl get ops ops-restart -n demo
+   >
+   NAME          TYPE      CLUSTER     STATUS    PROGRESS   AGE
+   ops-restart   Restart   mycluster   Succeed   1/1        3m26s
+   ```
+
+   During the restarting process, there are two status types for pods.
+
+   - STATUS=Terminating: it means the cluster restart is in progress.
+   - STATUS=Running: it means the cluster has been restarted.
+
+</TabItem>
+
+</Tabs>

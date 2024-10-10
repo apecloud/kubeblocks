@@ -608,6 +608,19 @@ type Parameter struct {
 	// If the parameter type is an array, the format should be "v1,v2,v3".
 	// +kubebuilder:validation:Required
 	Value string `json:"value"`
+
+	// Source for the parameter's value. Cannot be used if value is not empty.
+	//
+	ValueFrom *ParameterSource `json:"valueFrom,omitempty"`
+}
+
+type ParameterSource struct {
+	// Selects a key of a ConfigMap.
+	// +optional
+	ConfigMapKeyRef *corev1.ConfigMapKeySelector `json:"configMapKeyRef,omitempty"`
+	// Selects a key of a Secret.
+	// +optional
+	SecretKeyRef *corev1.SecretKeySelector `json:"secretKeyRef,omitempty"`
 }
 
 type ParameterPair struct {

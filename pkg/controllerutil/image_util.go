@@ -77,12 +77,11 @@ func GetRegistriesConfig() *RegistriesConfig {
 
 func ReloadRegistryConfig() {
 	registriesConfigMutex.Lock()
-	defer registriesConfigMutex.Unlock()
-
 	registriesConfig = &RegistriesConfig{}
 	if err := viper.UnmarshalKey(constant.CfgRegistries, &registriesConfig); err != nil {
 		panic(err)
 	}
+	registriesConfigMutex.Unlock()
 
 	for _, registry := range registriesConfig.RegistryConfig {
 		if len(registry.From) == 0 {

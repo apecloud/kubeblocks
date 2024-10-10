@@ -148,7 +148,7 @@ func injectDatasafedInstaller(podSpec *corev1.PodSpec) {
 	}
 	initContainer := corev1.Container{
 		Name:            "dp-copy-datasafed",
-		Image:           datasafedImage,
+		Image:           intctrlutil.ReplaceImageRegistry(datasafedImage),
 		ImagePullPolicy: corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy)),
 		Command:         []string{"/bin/sh", "-c", fmt.Sprintf("/scripts/install-datasafed.sh %s", datasafedBinMountPath)},
 		VolumeMounts:    []corev1.VolumeMount{sharedVolumeMount},

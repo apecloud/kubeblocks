@@ -281,9 +281,11 @@ func main() {
 	if err := viper.ReadInConfig(); err != nil { // Handle errors reading the config file
 		setupLog.Info("unable to read in config, errors ignored")
 	}
+	intctrlutil.ReloadRegistryConfig()
 	setupLog.Info(fmt.Sprintf("config file: %s", viper.GetViper().ConfigFileUsed()))
 	viper.OnConfigChange(func(e fsnotify.Event) {
 		setupLog.Info(fmt.Sprintf("config file changed: %s", e.Name))
+		intctrlutil.ReloadRegistryConfig()
 	})
 	viper.WatchConfig()
 

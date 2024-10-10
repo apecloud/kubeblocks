@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "kubeblocks.i18nResourcesName" . }}
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+data:
+  en: |
+    v1/ConfigMap/Creation=configuration file %s/%s is created.
+    v1/Pod/Creation=Pod %s/%s is created.
+    v1/Pod/Update=Pod %s/%s is updated.
+  zh_CN: |
+    v1/ConfigMap/Creation=配置文件 %s/%s 创建成功。
+    v1/Pod/Creation=Pod %s/%s 创建成功。
+    v1/Pod/Update=Pod %s/%s 更新成功。

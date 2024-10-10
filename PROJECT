@@ -282,6 +282,15 @@ resources:
 - api:
     crdVersion: v1
     namespaced: true
+  controller: true
+  domain: kubeblocks.io
+  group: view
+  kind: ReconciliationView
+  path: github.com/apecloud/kubeblocks/apis/view/v1
+  version: v1
+- api:
+    crdVersion: v1
+    namespaced: true
   domain: kubeblocks.io
   controller: true
   group: operations

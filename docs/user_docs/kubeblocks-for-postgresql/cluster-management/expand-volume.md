@@ -6,36 +6,53 @@ sidebar_position: 3
 sidebar_label: Expand volume
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # Expand volume
 
 You can expand the storage volume size of each pod.
-
-:::note
-
-Volume expansion triggers a concurrent restart and the pod role may change after the operation.
-
-:::
 
 ## Before you start
 
 Check whether the cluster STATUS is `Running`. Otherwise, the following operations may fail.
 
+<Tabs>
+
+<TabItem value="kbcli" label="kbcli" default>
+
 ```bash
-kbcli cluster list pg-cluster
+kbcli cluster list mycluster -n demo
 >
-NAME              NAMESPACE        CLUSTER-DEFINITION    VERSION                  TERMINATION-POLICY        STATUS         CREATED-TIME
-pg-cluster        default          postgresql            postgresql-14.8.0        Delete                    Running        Mar 3,2023 10:29 UTC+0800
+NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION             TERMINATION-POLICY   STATUS    CREATED-TIME
+mycluster   demo        postgresql           postgresql-14.8.0   Delete               Running   Sep 28,2024 16:47 UTC+0800
 ```
+
+</TabItem>
+
+<TabItem value="kubectl" label="kubectl">
+
+```bash
+kubectl -n demo get cluster mycluster
+>
+NAME        CLUSTER-DEFINITION   VERSION             TERMINATION-POLICY   STATUS    AGE
+mycluster   postgresql           postgresql-14.8.0   Delete               Running   29m
+```
+
+</TabItem>
+
+</Tabs>
 
 ## Steps
 
-1. Change configuration.
+<Tabs>
 
-   Configure the values of `--components`, `--volume-claim-templates`, and `--storage`, and run the command below to expand the volume.
+<TabItem value="kbcli" label="kbcli" default>
+
+1. Configure the values of `--components`, `--volume-claim-templates`, and `--storage`, and run the command below to expand the volume.
 
    ```bash
-   kbcli cluster volume-expand pg-cluster --components="postgresql" \
-   --volume-claim-templates="data" --storage="20Gi"
+   kbcli cluster volume-expand mycluster --components="postgresql" --volume-claim-templates="data" --storage="30Gi" -n demo
    ```
 
    - `--components` describes the component name for volume expansion.
@@ -44,12 +61,129 @@ pg-cluster        default          postgresql            postgresql-14.8.0      
 
 2. Validate the volume expansion.
 
+   - View the OpsRequest progress.
+
+       KubeBlocks outputs a command automatically for you to view the details of the OpsRequest progress. The output includes the status of this OpsRequest and PVC. When the status is `Succeed`, this OpsRequest is completed.
+
+       ```bash
+       kbcli cluster describe-ops mycluster-volumeexpansion-8257f -n demo
+       ```
+
+    - View the cluster status.
+
+       ```bash
+       kbcli cluster list mycluster -n demo
+       >
+       NAME             NAMESPACE     CLUSTER-DEFINITION        VERSION                  TERMINATION-POLICY        STATUS          CREATED-TIME
+       mycluster        demo          postgresql                postgresql-14.8.0        Delete                    Updating        Sep 28,2024 16:47 UTC+0800
+       ```
+
+       * STATUS=Updating: it means the volume expansion is in progress.
+       * STATUS=Running: it means the volume expansion operation has been applied.
+
+3. After the OpsRequest status is `Succeed` or the cluster status is `Running` again, check whether the corresponding resources change.
+
+    ```bash
+    kbcli cluster describe mycluster -n demo
+    ```
+
+</TabItem>
+
+<TabItem value="OpsRequest" label="OpsRequest">
+
+1. Apply an OpsRequest. Change the value of storage according to your need and run the command below to expand the volume of a cluster.
+
    ```bash
-   kbcli cluster list pg-cluster
-   >
-   NAME              NAMESPACE        CLUSTER-DEFINITION        VERSION                  TERMINATION-POLICY        STATUS          CREATED-TIME
-   pg-cluster        default          postgresql                postgresql-14.8.0        Delete                    Updating        Apr 10,2023 16:27 UTC+0800
+   kubectl apply -f - <<EOF
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: OpsRequest
+   metadata:
+     name: ops-volume-expansion
+     namespace: demo
+   spec:
+     clusterName: mycluster
+     type: VolumeExpansion
+     volumeExpansion:
+     - componentName: postgresql
+       volumeClaimTemplates:
+       - name: data
+         storage: "40Gi"
+   EOF
    ```
 
-   * STATUS=Updating: it means the volume expansion is in progress.
-   * STATUS=Running: it means the volume expansion operation has been applied.
+2. Validate the volume expansion operation.
+
+   ```bash
+   kubectl get ops -n demo
+   >
+   NAMESPACE   NAME                   TYPE              CLUSTER     STATUS    PROGRESS   AGE
+   demo        ops-volume-expansion   VolumeExpansion   mycluster   Succeed   3/3        6m
+   ```
+
+3. Check whether the corresponding cluster resources change.
+
+   ```bash
+   kubectl describe cluster mycluster -n demo
+   >
+   ......
+   Volume Claim Templates:
+      Name:  data
+      Spec:
+        Access Modes:
+          ReadWriteOnce
+        Resources:
+          Requests:
+            Storage:   40Gi
+   ```
+
+</TabItem>
+
+<TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
+
+1. Change the value of `spec.components.volumeClaimTemplates.spec.resources` in the cluster YAML file. 
+
+   `spec.components.volumeClaimTemplates.spec.resources` is the storage resource information of the pod and changing this value triggers the volume expansion of a cluster.
+
+   ```yaml
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: Cluster
+   metadata:
+     name: mycluster
+     namespace: demo
+   spec:
+     clusterDefinitionRef: postgresql
+     clusterVersionRef: postgresql-14.8.0
+     componentSpecs:
+     - name: postgresql
+       componentDefRef: postgresql
+       replicas: 1
+       volumeClaimTemplates:
+       - name: data
+         spec:
+           accessModes:
+             - ReadWriteOnce
+           resources:
+             requests:
+               storage: 40Gi # Change the volume storage size.
+     terminationPolicy: Delete
+   ```
+
+2. Check whether the corresponding cluster resources change.
+
+   ```bash
+   kubectl describe cluster mycluster -n demo
+   >
+   ......
+   Volume Claim Templates:
+      Name:  data
+      Spec:
+        Access Modes:
+          ReadWriteOnce
+        Resources:
+          Requests:
+            Storage:   40Gi
+   ```
+
+</TabItem>
+
+</Tabs>

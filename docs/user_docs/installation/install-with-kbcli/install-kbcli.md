@@ -2,7 +2,7 @@
 title: Install kbcli 
 description: Install kbcli 
 keywords: [install, kbcli,]
-sidebar_position: 2
+sidebar_position: 1
 sidebar_label: Install kbcli
 ---
 
@@ -42,12 +42,18 @@ You can install kbcli with `curl` or `brew`.
       ```bash
       curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash -s x.x.x
       ```
+   You can view all versions of kbcli, including alpha and beta releases, on the [kbcli releases list](https://github.com/apecloud/kbcli/releases).
+
+   To get stable releases, use this command:
+   ```bash
+   curl -s "https://api.github.com/repos/apecloud/kbcli/releases?per_page=100&page=1" | jq -r '.[] | select(.prerelease == false) | .tag_name' | sort -V
+   ```
 
   :::note
 
-  By default, kbcli installs the latest release version and then when installing KubeBlocks, kbcli installs the matched version. Ensure that the major versions of kbcli and KubeBlocks match.
+   By default, kbcli installs the latest release version. However, if you already have a running KubeBlocks instance, you need to install a matching version of kbcli.
 
-  For instance, you can install kbcli v0.6.1 and KubeBlocks v0.6.3, but mismatched versions like kbcli v0.5.0 and KubeBlocks v0.6.0 may result in errors.
+   For example, if your existing KubeBlocks deployment is v0.8.3, you should install kbcli v0.8.3 instead of a higher version like v0.9.0, as mismatched versions may lead to errors.
 
   :::
 

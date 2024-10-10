@@ -32,25 +32,91 @@ You can initiate a switchover for a MySQL Replication Cluster. Then KubeBlocks s
 
 You can switch over a secondary of a MySQL Replication to the primary role, and the former primary instance to a secondary one.
 
+<Tabs>
+
+<TabItem value="kbcli" label="kbcli" default>
+
 * Initiate a switchover with a specified new primary instance.
 
     ```bash
-    kbcli cluster promote mycluster --instance='mycluster-mysql-1'
+    kbcli cluster promote mycluster --instance='mycluster-mysql-1' -n demo
     ```
 
 * If there are multiple components, you can use `--components` to specify a component.
 
     ```bash
-    kbcli cluster promote mycluster --instance='mycluster-mysql-1' --components='apecloud-mysql'
+    kbcli cluster promote mycluster --instance='mycluster-mysql-1' --components='apecloud-mysql' -n demo
     ```
+
+</TabItem>
+
+<TabItem value="kubectl" label="kubectl">
+
+The value of `instanceName` decides whether a new primary instance is specified for the switchover.
+
+* Initiate a switchover with no specified primary instance.
+
+  ```yaml
+  kubectl apply -f -<<EOF
+  apiVersion: apps.kubeblocks.io/v1alpha1
+  kind: OpsRequest
+  metadata:
+    name: mycluster-switchover-demo
+    namespace: demo
+  spec:
+    clusterRef: mycluster
+    type: Switchover
+    switchover:
+    - componentName: mysql
+      instanceName: '*'
+  >>
+  ```
+
+* Initiate a switchover with a specified new primary instance.
+
+  ```yaml
+  kubectl apply -f -<<EOF
+  apiVersion: apps.kubeblocks.io/v1alpha1
+  kind: OpsRequest
+  metadata:
+    name: mycluster-switchover-demo
+    namespace: demo
+  spec:
+    clusterRef: mycluster
+    type: Switchover
+    switchover:
+    - componentName: mysql
+      instanceName: 'mycluster-mysql-1'
+  >>
+  ```
+
+</TabItem>
+
+</Tabs>
 
 ## Verify the switchover
 
 Check the instance status to verify whether the switchover is performed successfully.
 
+<Tabs>
+
+<TabItem value="kbcli" label="kbcli" default>
+
 ```bash
-kbcli cluster list-instances
+kbcli cluster list-instances -n demo
 ```
+
+</TabItem>
+
+<TabItem value="kubectl" label="kubectl">
+
+```bash
+kubectl get pods -n demo
+```
+
+</TabItem>
+
+</Tabs>
 
 ## Handle an exception
 

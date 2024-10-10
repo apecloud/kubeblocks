@@ -30,9 +30,9 @@ Below is a brief introduction to the basic operations of Redis Cluster Mode.
 
 ### Before you start
 
-* [Install KubeBlocks](../../user_docs/installation/install-with-helm/install-kubeblocks.md).
+* Install KubeBlocks [by kbcli](./../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) or [by Helm](../../user_docs/installation/install-with-helm/install-kubeblocks.md).
     Make sure your KubeBlocks and addon are version 0.9 or above.
-* Make sure the Redis addon is enabled.
+* Make sure the Redis Addon is enabled.
 * View all the database types and versions available for creating a cluster.
 
   Make sure you can get the redis `componentdefinition`. It is used to describe and define the components in a database cluster, and usually presents basic information such as the name, type, version, status, etc.

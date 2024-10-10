@@ -295,7 +295,7 @@ func clusterTopologyCompMatched(comp appsv1.ClusterTopologyComponent, compName s
 	if comp.Name == compName {
 		return true
 	}
-	if comp.Dynamic != nil && *comp.Dynamic {
+	if comp.Template != nil && *comp.Template {
 		return strings.HasPrefix(compName, comp.Name)
 	}
 	return false

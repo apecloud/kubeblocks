@@ -134,7 +134,7 @@ type ClusterTopologyComponent struct {
 	// The name must start with a lowercase letter, can contain lowercase letters, numbers,
 	// and hyphens, and must end with a lowercase letter or number.
 	//
-	// If the @dynamic field is set to true, the name is used as a pattern to match the components dynamically spawned.
+	// If the @template field is set to true, the name will be used as a prefix to match the specific components dynamically created.
 	//
 	// Cannot be updated once set.
 	//
@@ -159,12 +159,11 @@ type ClusterTopologyComponent struct {
 	// +kubebuilder:validation:MaxLength=64
 	CompDef string `json:"compDef"`
 
-	// Specifies whether the component(s) will be spawned in/out dynamically.
-	//
-	// If set to true, the component(s) will be spawned in/out based on the user's request.
+	// Specifies whether the topology component will be considered as a template for instantiating
+	// multiple components upon user requests dynamically.
 	//
 	// +optional
-	Dynamic *bool `json:"dynamic,omitempty"`
+	Template *bool `json:"template,omitempty"`
 }
 
 // ClusterTopologyOrders manages the lifecycle of components within a cluster by defining their provisioning,

@@ -94,13 +94,6 @@ spec:
                               set, this field cannot be updated."
                             maxLength: 64
                             type: string
-                          dynamic:
-                            description: |-
-                              Specifies whether the component(s) will be spawned in/out dynamically.
-
-
-                              If set to true, the component(s) will be spawned in/out based on the user's request.
-                            type: boolean
                           name:
                             description: |-
                               Defines the unique identifier of the component within the cluster topology.
@@ -111,13 +104,18 @@ spec:
                               and hyphens, and must end with a lowercase letter or number.
 
 
-                              If the @dynamic field is set to true, the name is used as a pattern to match the components dynamically spawned.
+                              If the @template field is set to true, the name will be used as a prefix to match the specific components dynamically created.
 
 
                               Cannot be updated once set.
                             maxLength: 16
                             pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                             type: string
+                          template:
+                            description: |-
+                              Specifies whether the topology component will be considered as a template for instantiating
+                              multiple components upon user requests dynamically.
+                            type: boolean
                         required:
                         - compDef
                         - name

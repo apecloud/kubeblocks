@@ -101,8 +101,8 @@ func (t *ClusterAPINormalizationTransformer) buildCompSpecs(transCtx *clusterTra
 func (t *ClusterAPINormalizationTransformer) buildCompSpecs4Topology(clusterDef *appsv1.ClusterDefinition,
 	cluster *appsv1.Cluster) ([]*appsv1.ClusterComponentSpec, error) {
 	newCompSpec := func(comp appsv1.ClusterTopologyComponent) *appsv1.ClusterComponentSpec {
-		if comp.Dynamic != nil && *comp.Dynamic {
-			return nil // don't create the component spec for dynamic components
+		if comp.Template != nil && *comp.Template {
+			return nil // don't new component spec for the template component automatically
 		}
 		return &appsv1.ClusterComponentSpec{
 			Name:         comp.Name,

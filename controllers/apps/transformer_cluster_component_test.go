@@ -79,7 +79,7 @@ var _ = Describe("cluster component transformer test", func() {
 		clusterTopologyNoOrders            = "test-topology-no-orders"
 		clusterTopologyProvisionNUpdateOOD = "test-topology-ood"
 		clusterTopology4Stop               = "test-topology-stop"
-		clusterTopology4Dynamic            = "test-topology-dynamic"
+		clusterTopology4Template           = "test-topology-template"
 		compDefName                        = "test-compdef"
 		clusterName                        = "test-cluster"
 		comp1aName                         = "comp-1a"
@@ -203,16 +203,16 @@ var _ = Describe("cluster component transformer test", func() {
 				},
 			}).
 			AddClusterTopology(appsv1.ClusterTopology{
-				Name: clusterTopology4Dynamic,
+				Name: clusterTopology4Template,
 				Components: []appsv1.ClusterTopologyComponent{
 					{
 						Name:    comp1aName,
 						CompDef: compDefName,
 					},
 					{
-						Name:    comp2aName,
-						CompDef: compDefName,
-						Dynamic: pointer.Bool(true),
+						Name:     comp2aName,
+						CompDef:  compDefName,
+						Template: pointer.Bool(true),
 					},
 					{
 						Name:    comp2bName,
@@ -662,16 +662,16 @@ var _ = Describe("cluster component transformer test", func() {
 			Expect(err).Should(BeNil())
 		})
 
-		It("w/ orders - dynamic components", func() {
-			transformer, transCtx, dag := newTransformerNCtx(clusterTopology4Dynamic)
+		It("w/ orders - template component ", func() {
+			transformer, transCtx, dag := newTransformerNCtx(clusterTopology4Template)
 
-			// check the components, dynamic components should not be created
+			// check the components created, no components should be instantiated from the template automatically
 			Expect(transCtx.ComponentSpecs).Should(HaveLen(3))
 			Expect(transCtx.ComponentSpecs[0].Name).Should(Equal(comp1aName))
 			Expect(transCtx.ComponentSpecs[1].Name).Should(Equal(comp2bName))
 			Expect(transCtx.ComponentSpecs[2].Name).Should(Equal(comp3aName))
 
-			// mock to specify two dynamic components
+			// mock to specify two components instantiated from the template
 			cluster := transCtx.Cluster.DeepCopy()
 			cluster.Spec.ComponentSpecs = append(cluster.Spec.ComponentSpecs, []appsv1.ClusterComponentSpec{
 				{

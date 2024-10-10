@@ -3475,7 +3475,7 @@ string
 <p>It follows IANA Service naming rules and is used as part of the Service&rsquo;s DNS name.
 The name must start with a lowercase letter, can contain lowercase letters, numbers,
 and hyphens, and must end with a lowercase letter or number.</p>
-<p>If the @dynamic field is set to true, the name is used as a pattern to match the components dynamically spawned.</p>
+<p>If the @template field is set to true, the name will be used as a prefix to match the specific components dynamically created.</p>
 <p>Cannot be updated once set.</p>
 </td>
 </tr>
@@ -3501,15 +3501,15 @@ by specifying a name prefix or regular expression pattern.</li>
 </tr>
 <tr>
 <td>
-<code>dynamic</code><br/>
+<code>template</code><br/>
 <em>
 bool
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies whether the component(s) will be spawned in/out dynamically.</p>
-<p>If set to true, the component(s) will be spawned in/out based on the user&rsquo;s request.</p>
+<p>Specifies whether the topology component will be considered as a template for instantiating
+multiple components upon user requests dynamically.</p>
 </td>
 </tr>
 </tbody>

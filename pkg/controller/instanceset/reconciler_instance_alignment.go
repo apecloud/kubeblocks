@@ -68,11 +68,11 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 	}
 
 	// 2. find the create and delete set
-	newNameSet := sets.NewString()
+	newNameSet := sets.New[string]()
 	for name := range nameToTemplateMap {
 		newNameSet.Insert(name)
 	}
-	oldNameSet := sets.NewString()
+	oldNameSet := sets.New[string]()
 	oldInstanceMap := make(map[string]*corev1.Pod)
 	oldInstanceList := tree.List(&corev1.Pod{})
 	for _, object := range oldInstanceList {
@@ -97,7 +97,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 
 	// 3. handle alignment (create new instances and delete useless instances)
 	// create new instances
-	newNameList := newNameSet.List()
+	newNameList := sets.List(newNameSet)
 	baseSort(newNameList, func(i int) (string, int) {
 		return ParseParentNameAndOrdinal(newNameList[i])
 	}, nil, true)

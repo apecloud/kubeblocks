@@ -29,7 +29,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/containers/common/pkg/retry"
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v2"
 	"helm.sh/helm/v3/pkg/action"
@@ -154,9 +153,7 @@ func (i *InstallOpts) GetInstalled(cfg *action.Configuration) (*release.Release,
 // Install installs a Chart
 func (i *InstallOpts) Install(cfg *Config) (*release.Release, error) {
 	ctx := context.Background()
-	opts := retry.Options{
-		MaxRetry: 1 + i.TryTimes,
-	}
+	maxRetry := 1 + i.TryTimes
 
 	actionCfg, err := NewActionConfig(cfg)
 	if err != nil {
@@ -164,14 +161,14 @@ func (i *InstallOpts) Install(cfg *Config) (*release.Release, error) {
 	}
 
 	var rel *release.Release
-	if err = retry.IfNecessary(ctx, func() error {
+	if err = retry(ctx, func() error {
 		release, err1 := i.tryInstall(actionCfg)
 		if err1 != nil {
 			return err1
 		}
 		rel = release
 		return nil
-	}, &opts); err != nil {
+	}, maxRetry); err != nil {
 		return nil, errors.Errorf("install chart %s error: %s", i.Name, err.Error())
 	}
 
@@ -272,9 +269,7 @@ func (i *InstallOpts) tryInstall(cfg *action.Configuration) (*release.Release, e
 // Uninstall uninstalls a Chart
 func (i *InstallOpts) Uninstall(cfg *Config) error {
 	ctx := context.Background()
-	opts := retry.Options{
-		MaxRetry: 1 + i.TryTimes,
-	}
+	maxRetry := 1 + i.TryTimes
 	if cfg.Namespace() == "" {
 		cfg.SetNamespace(i.Namespace)
 	}
@@ -284,12 +279,12 @@ func (i *InstallOpts) Uninstall(cfg *Config) error {
 		return err
 	}
 
-	if err := retry.IfNecessary(ctx, func() error {
+	if err := retry(ctx, func() error {
 		if err := i.tryUninstall(actionCfg); err != nil {
 			return err
 		}
 		return nil
-	}, &opts); err != nil {
+	}, maxRetry); err != nil {
 		return err
 	}
 	return nil

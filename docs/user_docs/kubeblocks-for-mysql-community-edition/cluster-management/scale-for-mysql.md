@@ -99,6 +99,7 @@ mycluster   mysql                mysql-8.0.33   Delete               Running   1
     ```bash
     kbcli cluster describe mycluster -n demo
     ```
+
 </TabItem>
 
 <TabItem value="OpsRequest" label="OpsRequest">

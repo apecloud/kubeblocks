@@ -55,7 +55,7 @@ func (t *clusterLoadRefResourcesTransformer) Transform(ctx graph.TransformContex
 		return newRequeueError(requeueDuration, err.Error())
 	}
 
-	if err = t.checkAllCompDefinition(cluster); err != nil {
+	if err = t.validateComponentDef(cluster); err != nil {
 		return newRequeueError(requeueDuration, err.Error())
 	}
 
@@ -78,23 +78,13 @@ func (t *clusterLoadRefResourcesTransformer) apiValidation(cluster *appsv1.Clust
 		cluster.Spec.ClusterDef, cluster.Spec.Topology, clusterCompCnt(cluster))
 }
 
-func (t *clusterLoadRefResourcesTransformer) checkAllCompDefinition(cluster *appsv1.Cluster) error {
-	validate := func(spec appsv1.ClusterComponentSpec) error {
-		if len(spec.ComponentDef) > 0 {
-			if err := component.ValidateCompDefRegexp(spec.ComponentDef); err != nil {
-				return errors.Wrapf(err, "invalid reference component definition name pattern: %s", spec.ComponentDef)
-			}
-		}
-		return nil
-	}
+func (t *clusterLoadRefResourcesTransformer) validateComponentDef(cluster *appsv1.Cluster) error {
 	for _, compSpec := range cluster.Spec.ComponentSpecs {
-		if err := validate(compSpec); err != nil {
-			return err
+		if len(compSpec.ComponentDef) == 0 {
+			continue
 		}
-	}
-	for _, shardingSpec := range cluster.Spec.ShardingSpecs {
-		if err := validate(shardingSpec.Template); err != nil {
-			return err
+		if err := component.ValidateCompDefRegexp(compSpec.ComponentDef); err != nil {
+			return errors.Wrapf(err, "invalid reference component definition name pattern: %s", compSpec.ComponentDef)
 		}
 	}
 	return nil
@@ -164,11 +154,5 @@ func clusterCompCnt(cluster *appsv1.Cluster) int {
 }
 
 func clusterCompCntWithFunc(cluster *appsv1.Cluster, match func(spec appsv1.ClusterComponentSpec) bool) int {
-	cnt := generics.CountFunc(cluster.Spec.ComponentSpecs, match)
-	for _, sharding := range cluster.Spec.ShardingSpecs {
-		if match(sharding.Template) {
-			cnt += int(sharding.Shards)
-		}
-	}
-	return cnt
+	return generics.CountFunc(cluster.Spec.ComponentSpecs, match)
 }

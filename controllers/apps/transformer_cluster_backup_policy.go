@@ -68,109 +68,107 @@ func (r *clusterBackupPolicyTransformer) Transform(ctx graph.TransformContext, d
 		return nil
 	}
 	graphCli, _ := r.clusterTransformContext.Client.(model.GraphClient)
-	transformBackupPolicy := func(bpBuilder *backupPolicyBuilder) *dpv1alpha1.BackupPolicy {
-		// build the data protection backup policy from the template.
-		oldBackupPolicy, newBackupPolicy := bpBuilder.transformBackupPolicy()
-		if newBackupPolicy == nil {
-			return nil
-		}
-		if oldBackupPolicy == nil {
-			graphCli.Create(dag, newBackupPolicy)
-		} else {
-			graphCli.Patch(dag, oldBackupPolicy, newBackupPolicy)
-		}
-		return newBackupPolicy
-	}
-
-	transformBackupSchedule := func(bpBuilder *backupPolicyBuilder, backupPolicy *dpv1alpha1.BackupPolicy) {
-		// if backup policy is nil, it means that the backup policy template
-		// is invalid, backup schedule depends on backup policy, so we do
-		// not need to transform backup schedule.
-		if backupPolicy == nil {
-			return
-		}
-		if bpBuilder.isHScaleTPL {
-			r.V(1).Info("Skip creating backup schedule for the h-scale backup policy template", "template", bpBuilder.backupPolicyTPL.Name)
-			return
-		}
-		// build the data protection backup schedule from the template.
-		oldBackupSchedule, newBackupSchedule := bpBuilder.transformBackupSchedule(backupPolicy)
-		// merge cluster backup configuration into the backup schedule.
-		// If the backup schedule is nil, create a new backup schedule
-		// based on the cluster backup configuration.
-		// For a cluster, the default backup schedule is created by backup
-		// policy template, user can also configure cluster backup in the
-		// cluster custom object, such as enable cluster backup, set backup
-		// schedule, etc.
-		// We always prioritize the cluster backup configuration in the
-		// cluster object, so we need to merge the cluster backup configuration
-		// into the default backup schedule created by backup policy template
-		// if it exists.
-		newBackupSchedule = bpBuilder.mergeClusterBackup(backupPolicy, newBackupSchedule)
-		if newBackupSchedule == nil {
-			return
-		}
-		if oldBackupSchedule == nil {
-			graphCli.Create(dag, newBackupSchedule)
-		} else {
-			graphCli.Patch(dag, oldBackupSchedule, newBackupSchedule)
-		}
-		graphCli.DependOn(dag, backupPolicy, newBackupSchedule)
-		comps := graphCli.FindAll(dag, &appsv1.Component{})
-		graphCli.DependOn(dag, backupPolicy, comps...)
-	}
-
-	transformBackupPolicyAndSchedule := func(bpt *dpv1alpha1.BackupPolicyTemplate, compSpec *appsv1.ClusterComponentSpec, componentName string, isSharding, isHScaleTPL bool) error {
-		bpBuilder := newBackupPolicyBuilder(r, compSpec, bpt, componentName, isSharding, isHScaleTPL)
-		policy := transformBackupPolicy(bpBuilder)
-		// only merge the first backupSchedule for the cluster backup.
-		transformBackupSchedule(bpBuilder, policy)
-		return nil
-	}
-
-	transformComponentBackupPolicy := func(compSpec *appsv1.ClusterComponentSpec, componentName string, isSharding bool) error {
-		compDef := r.ComponentDefs[compSpec.ComponentDef]
-		if compDef == nil {
-			return nil
-		}
-		hScaleBPTName := compDef.Annotations[constant.HorizontalScaleBackupPolicyTemplateKey]
-		if hScaleBPTName != "" {
-			bpt := &dpv1alpha1.BackupPolicyTemplate{}
-			if err := r.Client.Get(ctx.GetContext(), client.ObjectKey{Name: hScaleBPTName}, bpt); err != nil {
-				return err
-			}
-			if err := transformBackupPolicyAndSchedule(bpt, compSpec, componentName, isSharding, true); err != nil {
-				return err
-			}
-		}
-		bpt, err := r.getBackupPolicyTemplate(compSpec.ComponentDef, hScaleBPTName)
-		if err != nil {
-			return err
-		}
-		if bpt == nil {
-			return nil
-		}
-		return transformBackupPolicyAndSchedule(bpt, compSpec, componentName, isSharding, false)
-	}
-
 	for i := range r.Cluster.Spec.ComponentSpecs {
 		compSpec := &r.Cluster.Spec.ComponentSpecs[i]
-		if err := transformComponentBackupPolicy(compSpec, compSpec.Name, false); err != nil {
-			return err
-		}
-	}
-	for i := range r.Cluster.Spec.ShardingSpecs {
-		shardingSpec := r.Cluster.Spec.ShardingSpecs[i]
-		if err := transformComponentBackupPolicy(&shardingSpec.Template, shardingSpec.Name, true); err != nil {
+		compDef := r.ComponentDefs[compSpec.ComponentDef]
+		if err := reconcileBackupPolicyAndSchedule(r.Context, r.Client, r.EventRecorder, r.Logger,
+			dag, graphCli, r.Cluster, compSpec, compDef, compSpec.Name, false); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (r *clusterBackupPolicyTransformer) getBackupPolicyTemplate(componentDef string, hScaleBPTName string) (*dpv1alpha1.BackupPolicyTemplate, error) {
+func reconcileBackupPolicyAndSchedule(ctx context.Context, cli client.Reader, recorder record.EventRecorder,
+	logger logr.Logger, dag *graph.DAG, graphCli model.GraphClient, cluster *appsv1.Cluster,
+	compSpec *appsv1.ClusterComponentSpec, compDef *appsv1.ComponentDefinition, componentName string, isSharding bool) error {
+
+	transformBackupPolicyAndSchedule := func(bpt *dpv1alpha1.BackupPolicyTemplate, compSpec *appsv1.ClusterComponentSpec, componentName string, isSharding, isHScaleTPL bool) error {
+		bpBuilder := newBackupPolicyBuilder(ctx, cli, recorder, logger, cluster, compSpec, bpt, componentName, isSharding, isHScaleTPL)
+		policy := transformBackupPolicy(bpBuilder, dag, graphCli)
+		// only merge the first backupSchedule for the cluster backup.
+		transformBackupSchedule(bpBuilder, policy, dag, graphCli)
+		return nil
+	}
+
+	if compDef == nil {
+		return nil
+	}
+	hScaleBPTName := compDef.Annotations[constant.HorizontalScaleBackupPolicyTemplateKey]
+	if hScaleBPTName != "" {
+		bpt := &dpv1alpha1.BackupPolicyTemplate{}
+		if err := cli.Get(ctx, client.ObjectKey{Name: hScaleBPTName}, bpt); err != nil {
+			return err
+		}
+		if err := transformBackupPolicyAndSchedule(bpt, compSpec, componentName, isSharding, true); err != nil {
+			return err
+		}
+	}
+	bpt, err := getBackupPolicyTemplate(ctx, cli, compSpec.ComponentDef, hScaleBPTName)
+	if err != nil {
+		return err
+	}
+	if bpt == nil {
+		return nil
+	}
+	return transformBackupPolicyAndSchedule(bpt, compSpec, componentName, isSharding, false)
+}
+
+func transformBackupPolicy(bpBuilder *backupPolicyBuilder, dag *graph.DAG, graphCli model.GraphClient) *dpv1alpha1.BackupPolicy {
+	// build the data protection backup policy from the template.
+	oldBackupPolicy, newBackupPolicy := bpBuilder.transformBackupPolicy()
+	if newBackupPolicy == nil {
+		return nil
+	}
+	if oldBackupPolicy == nil {
+		graphCli.Create(dag, newBackupPolicy)
+	} else {
+		graphCli.Patch(dag, oldBackupPolicy, newBackupPolicy)
+	}
+	return newBackupPolicy
+}
+
+func transformBackupSchedule(bpBuilder *backupPolicyBuilder, backupPolicy *dpv1alpha1.BackupPolicy, dag *graph.DAG, graphCli model.GraphClient) {
+	// if backup policy is nil, it means that the backup policy template
+	// is invalid, backup schedule depends on backup policy, so we do
+	// not need to transform backup schedule.
+	if backupPolicy == nil {
+		return
+	}
+	if bpBuilder.isHScaleTPL {
+		bpBuilder.V(1).Info("Skip creating backup schedule for the h-scale backup policy template", "template", bpBuilder.backupPolicyTPL.Name)
+		return
+	}
+	// build the data protection backup schedule from the template.
+	oldBackupSchedule, newBackupSchedule := bpBuilder.transformBackupSchedule(backupPolicy)
+	// merge cluster backup configuration into the backup schedule.
+	// If the backup schedule is nil, create a new backup schedule
+	// based on the cluster backup configuration.
+	// For a cluster, the default backup schedule is created by backup
+	// policy template, user can also configure cluster backup in the
+	// cluster custom object, such as enable cluster backup, set backup
+	// schedule, etc.
+	// We always prioritize the cluster backup configuration in the
+	// cluster object, so we need to merge the cluster backup configuration
+	// into the default backup schedule created by backup policy template
+	// if it exists.
+	newBackupSchedule = bpBuilder.mergeClusterBackup(backupPolicy, newBackupSchedule)
+	if newBackupSchedule == nil {
+		return
+	}
+	if oldBackupSchedule == nil {
+		graphCli.Create(dag, newBackupSchedule)
+	} else {
+		graphCli.Patch(dag, oldBackupSchedule, newBackupSchedule)
+	}
+	graphCli.DependOn(dag, backupPolicy, newBackupSchedule)
+	comps := graphCli.FindAll(dag, &appsv1.Component{})
+	graphCli.DependOn(dag, backupPolicy, comps...)
+}
+
+func getBackupPolicyTemplate(ctx context.Context, cli client.Reader, componentDef string, hScaleBPTName string) (*dpv1alpha1.BackupPolicyTemplate, error) {
 	bptList := &dpv1alpha1.BackupPolicyTemplateList{}
-	if err := r.Client.List(r.Context, bptList, client.MatchingLabels{
+	if err := cli.List(ctx, bptList, client.MatchingLabels{
 		componentDef: componentDef,
 	}); err != nil {
 		return nil, err
@@ -197,18 +195,22 @@ type backupPolicyBuilder struct {
 	isSharding      bool
 }
 
-func newBackupPolicyBuilder(r *clusterBackupPolicyTransformer,
+func newBackupPolicyBuilder(
+	ctx context.Context, cli client.Reader,
+	recorder record.EventRecorder,
+	logger logr.Logger,
+	cluster *appsv1.Cluster,
 	compSpec *appsv1.ClusterComponentSpec,
 	backupPolicyTPL *dpv1alpha1.BackupPolicyTemplate,
 	componentName string,
 	isSharding,
 	isHScaleTPL bool) *backupPolicyBuilder {
 	return &backupPolicyBuilder{
-		Context:         r.Context,
-		Client:          r.Client,
-		EventRecorder:   r.EventRecorder,
-		Logger:          r.Logger,
-		Cluster:         r.Cluster,
+		Context:         ctx,
+		Client:          cli,
+		EventRecorder:   recorder,
+		Logger:          logger,
+		Cluster:         cluster,
 		compSpec:        compSpec,
 		backupPolicyTPL: backupPolicyTPL,
 		componentName:   componentName,

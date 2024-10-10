@@ -115,7 +115,7 @@ var _ = Describe("OpsUtil functions", func() {
 		createComponentObject := func(ops *OpsResource) {
 			// mock create the component object
 			cluster := ops.Cluster
-			comp, err := component.BuildComponent(cluster, &cluster.Spec.ComponentSpecs[0], nil, nil)
+			comp, err := component.BuildComponent(cluster, &cluster.Spec.ComponentSpecs[0])
 			Expect(err).Should(BeNil())
 			Expect(testCtx.CreateObj(ctx, comp)).Should(Succeed())
 		}

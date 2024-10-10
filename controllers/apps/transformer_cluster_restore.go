@@ -28,8 +28,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	"github.com/apecloud/kubeblocks/pkg/controller/plan"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 type clusterRestoreTransformer struct {
@@ -41,72 +39,16 @@ var _ graph.Transformer = &clusterRestoreTransformer{}
 func (c *clusterRestoreTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	c.clusterTransformContext = ctx.(*clusterTransformContext)
 	restoreAnt := c.Cluster.Annotations[constant.RestoreFromBackupAnnotationKey]
-	if restoreAnt == "" {
+	if len(restoreAnt) == 0 {
 		return nil
 	}
+
 	backupMap := map[string]map[string]string{}
 	err := json.Unmarshal([]byte(restoreAnt), &backupMap)
 	if err != nil {
 		return err
 	}
 
-	// when restoring a sharded cluster, it is essential to specify the 'sourceTarget' from which data should be restored for each sharded component.
-	// to achieve this, we allocate the source target for each component using annotations.
-	for i := range c.Cluster.Spec.ShardingSpecs {
-		shardingSpec := c.Cluster.Spec.ShardingSpecs[i]
-		backupSource, ok := backupMap[shardingSpec.Name]
-		if !ok {
-			continue
-		}
-		backup, err := plan.GetBackupFromClusterAnnotation(c.Context, c.Client, backupSource, shardingSpec.Name, c.Cluster.Namespace)
-		if err != nil {
-			return err
-		}
-		if len(backup.Status.Targets) > int(shardingSpec.Shards) {
-			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRestoreFailed,
-				`the source targets count of the backup "%s" must be equal to or greater than the count of the shard components "%s"`,
-				backup.Name, shardingSpec.Name)
-		}
-		shardComponents, err := intctrlutil.ListShardingComponents(c.Context, c.Client, c.Cluster, shardingSpec.Name)
-		if err != nil {
-			return err
-		}
-		// obtain components that have already been assigned targets.
-		allocateTargetMap := map[string]string{}
-		restoreDoneForShardComponents := true
-		for _, v := range shardComponents {
-			if model.IsObjectDeleting(&v) {
-				continue
-			}
-			if v.Annotations[constant.RestoreDoneAnnotationKey] != "true" {
-				restoreDoneForShardComponents = false
-			}
-			if targetName, ok := v.Annotations[constant.BackupSourceTargetAnnotationKey]; ok {
-				compName := v.Labels[constant.KBAppComponentLabelKey]
-				allocateTargetMap[targetName] = compName
-				c.Annotations[compName][constant.BackupSourceTargetAnnotationKey] = targetName
-			}
-		}
-		if len(allocateTargetMap) == len(backup.Status.Targets) {
-			// check if the restore is completed when all source target have allocated.
-			if err = c.cleanupRestoreAnnotationForSharding(dag, shardingSpec.Name, restoreDoneForShardComponents); err != nil {
-				return err
-			}
-			continue
-		}
-		for _, target := range backup.Status.Targets {
-			if _, ok = allocateTargetMap[target.Name]; ok {
-				continue
-			}
-			for _, compSpec := range c.ShardingComponentSpecs[shardingSpec.Name] {
-				if _, ok = c.Annotations[compSpec.Name][constant.BackupSourceTargetAnnotationKey]; ok {
-					continue
-				}
-				c.Annotations[compSpec.Name][constant.BackupSourceTargetAnnotationKey] = target.Name
-				break
-			}
-		}
-	}
 	// if component needs to do post ready restore after cluster is running, annotate component
 	if c.Cluster.Status.Phase == appsv1.RunningClusterPhase {
 		for _, compSpec := range c.Cluster.Spec.ComponentSpecs {
@@ -125,26 +67,6 @@ func (c *clusterRestoreTransformer) Transform(ctx graph.TransformContext, dag *g
 			// annotate component to reconcile for postReady restore.
 			c.annotateComponent(dag, compObj)
 		}
-	}
-	return nil
-}
-
-func (c *clusterRestoreTransformer) cleanupRestoreAnnotationForSharding(dag *graph.DAG,
-	shardName string,
-	restoreDoneForShardComponents bool) error {
-	if c.Cluster.Status.Phase != appsv1.RunningClusterPhase {
-		return nil
-	}
-	if !restoreDoneForShardComponents {
-		return nil
-	}
-	needCleanup, err := plan.CleanupClusterRestoreAnnotation(c.Cluster, shardName)
-	if err != nil {
-		return err
-	}
-	if needCleanup {
-		graphCli, _ := c.Client.(model.GraphClient)
-		graphCli.Patch(dag, c.OrigCluster, c.Cluster, &model.ReplaceIfExistingOption{})
 	}
 	return nil
 }

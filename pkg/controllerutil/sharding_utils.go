@@ -96,6 +96,21 @@ func listNCheckShardingComponents(ctx context.Context, cli client.Reader,
 	return undeletedShardingComps, deletingShardingComps, nil
 }
 
+// ValidateShardingComponentCount validates the count of sharding components.
+func ValidateShardingComponentCount(ctx context.Context, cli client.Reader,
+	cluster *appsv1.Cluster, shardingSpecs []appsv1.ShardingSpec) (bool, error) {
+	for _, shardingSpec := range shardingSpecs {
+		shardingUndeleteComps, err := listUndeletedShardingCompSpecs(ctx, cli, cluster, &shardingSpec)
+		if err != nil {
+			return false, err
+		}
+		if len(shardingUndeleteComps) != int(shardingSpec.Shards) {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
 func ListShardingComponents(ctx context.Context, cli client.Reader,
 	cluster *appsv1.Cluster, shardingName string) ([]appsv1.Component, error) {
 	compList := &appsv1.ComponentList{}

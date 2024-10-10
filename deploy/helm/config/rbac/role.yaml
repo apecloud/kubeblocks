@@ -12,71 +12,12 @@ rules:
   - list
   - watch
 - apiGroups:
-  - apiextensions.k8s.io
-  resources:
-  - customresourcedefinitions
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
   - apps
   resources:
   - deployments
   verbs:
   - get
   - list
-- apiGroups:
-  - apps
-  resources:
-  - statefulsets
-  verbs:
-  - create
-  - delete
-  - deletecollection
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - apps
-  resources:
-  - statefulsets/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - apps
-  resources:
-  - statefulsets/status
-  verbs:
-  - get
-- apiGroups:
-  - apps.kubeblocks.io
-  resources:
-  - backuppolicytemplates
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - apps.kubeblocks.io
-  resources:
-  - backuppolicytemplates/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - apps.kubeblocks.io
-  resources:
-  - backuppolicytemplates/status
-  verbs:
-  - get
-  - patch
-  - update
 - apiGroups:
   - apps.kubeblocks.io
   resources:
@@ -586,6 +527,32 @@ rules:
 - apiGroups:
   - dataprotection.kubeblocks.io
   resources:
+  - backuppolicytemplates
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - dataprotection.kubeblocks.io
+  resources:
+  - backuppolicytemplates/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - dataprotection.kubeblocks.io
+  resources:
+  - backuppolicytemplates/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - dataprotection.kubeblocks.io
+  resources:
   - backuprepos
   verbs:
   - create
@@ -914,32 +881,6 @@ rules:
   - workloads.kubeblocks.io
   resources:
   - instancesets/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - workloads.kubeblocks.io
-  resources:
-  - replicatedstatemachines
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - workloads.kubeblocks.io
-  resources:
-  - replicatedstatemachines/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - workloads.kubeblocks.io
-  resources:
-  - replicatedstatemachines/status
   verbs:
   - get
   - patch

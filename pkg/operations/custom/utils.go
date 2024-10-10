@@ -267,9 +267,22 @@ func buildActionPodEnv(reqCtx intctrlutil.RequestCtx,
 	}
 
 	// inject params env
-	params := compCustomItem.Parameters
-	for i := range params {
-		env = append(env, corev1.EnvVar{Name: params[i].Name, Value: params[i].Value})
+	for i := range compCustomItem.Parameters {
+		param := compCustomItem.Parameters[i]
+		if param.Value != "" || param.ValueFrom == nil {
+			env = append(env, corev1.EnvVar{Name: param.Name, Value: param.Value})
+			continue
+		}
+		switch {
+		case param.ValueFrom.ConfigMapKeyRef != nil:
+			env = append(env, corev1.EnvVar{Name: param.Name, ValueFrom: &corev1.EnvVarSource{
+				ConfigMapKeyRef: param.ValueFrom.ConfigMapKeyRef,
+			}})
+		case param.ValueFrom.SecretKeyRef != nil:
+			env = append(env, corev1.EnvVar{Name: param.Name, ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: param.ValueFrom.SecretKeyRef,
+			}})
+		}
 	}
 	return env, nil
 }

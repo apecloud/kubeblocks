@@ -6,7 +6,7 @@ sidebar_position: 2
 sidebar_label: Connect
 ---
 
-## Overview
+# Connect to a Kafka cluster
 
 Before you connect to the Kafka cluster, you must check your network environment, and from which network you would like to connect to the cluster.
 There are three scenarios of connecting.
@@ -24,56 +24,56 @@ Within the same Kubernetes cluster, you can directly access the Kafka cluster wi
 1. Get the address of the Kafka ClusterIP service port No..
 
    ```bash
-   kubectl get svc 
+   kubectl get svc -n demo
    > 
-   NAME                            TYPE        CLUSTER-IP    EXTERNAL-IP   PORT(S)                               AGE
-   kubernetes                      ClusterIP   10.43.0.1     <none>        443/TCP                               9d
-   kafka-cluster-broker-headless   ClusterIP   None          <none>        9092/TCP,9093/TCP,9094/TCP,5556/TCP   7d16h
-   kafka-cluster-broker            ClusterIP   10.43.8.124   <none>        9093/TCP,9092/TCP,5556/TCP            7d16h
+   NAME                                      TYPE        CLUSTER-IP    EXTERNAL-IP   PORT(S)                               AGE
+   kubernetes                                ClusterIP   10.43.0.1     <none>        443/TCP                               9d
+   mycluster-kafka-cluster-broker-headless   ClusterIP   None          <none>        9092/TCP,9093/TCP,9094/TCP,5556/TCP   7d16h
+   mycluster-kafka-cluster-broker            ClusterIP   10.43.8.124   <none>        9093/TCP,9092/TCP,5556/TCP            7d16h
    ```
 
 2. Connect to the Kafka cluster with the port No..
 
    Below is an example of connecting with the official client script.
 
-   a. Start client pod
+   1. Start client pod.
 
-     ```bash
-     kubectl run kafka-producer --restart='Never' --image docker.io/bitnami/kafka:3.3.2-debian-11-r54 --command -- sleep infinity
-     kubectl run kafka-consumer --restart='Never' --image docker.io/bitnami/kafka:3.3.2-debian-11-r54 --command -- sleep infinity
-     ```
+       ```bash
+       kubectl run kafka-producer --restart='Never' --image docker.io/bitnami/kafka:3.3.2-debian-11-r54 --command -- sleep infinity
+       kubectl run kafka-consumer --restart='Never' --image docker.io/bitnami/kafka:3.3.2-debian-11-r54 --command -- sleep infinity
+       ```
 
-   b. Login to kafka-producer
+   2. Log in to kafka-producer.
 
-     ```bash
-     kubectl exec -ti kafka-producer -- bash
-     ```
+       ```bash
+       kubectl exec -ti kafka-producer -- bash
+       ```
 
-   c. Create topic
+   3. Create topic.
 
-     ```bash
-     kafka-topics.sh --create --topic quickstart-events --bootstrap-server xxx-broker:9092
-     ```
+       ```bash
+       kafka-topics.sh --create --topic quickstart-events --bootstrap-server xxx-broker:9092
+       ```
 
-   d. Create producer
+   4. Create producer.
 
-     ```bash
-     kafka-console-producer.sh --topic quickstart-events --bootstrap-server xxx-broker:9092 
-     ```
+       ```bash
+       kafka-console-producer.sh --topic quickstart-events --bootstrap-server xxx-broker:9092 
+       ```
 
-   e. Enter："Hello, KubeBlocks" and press Enter.
+   5. Enter："Hello, KubeBlocks" and press Enter.
 
-   f. Start a new terminal session and login to kafka-consumer.
+   6. Start a new terminal session and login to kafka-consumer.
 
-     ```bash
-     kubectl exec -ti kafka-consumer -- bash
-     ```
+       ```bash
+       kubectl exec -ti kafka-consumer -- bash
+       ```
 
-   g. Create consumer and specify consuming topic, and consuming message from the beginning.
+   7. Create consumer and specify consuming topic, and consuming message from the beginning.
 
-     ```bash
-     kafka-console-consumer.sh --topic quickstart-events --from-beginning --bootstrap-server xxx-broker:9092
-     ```
+       ```bash
+       kafka-console-consumer.sh --topic quickstart-events --from-beginning --bootstrap-server xxx-broker:9092
+       ```
 
     And you get the output 'Hello, KubeBlocks'.
 
@@ -86,14 +86,16 @@ If you use AWS EKS, you may want to access to the Kafka cluster from EC2 instanc
 1. Set the value of `host-network-accessible` as true.
 
     ```bash
-    kbcli cluster create kafka-cluster --cluster-definition kafka --host-network-accessible=true
+    kbcli cluster create kafka mycluster --host-network-accessible=true -n demo
     ```
 
 2. Get the corresponding ELB address.
 
    ```bash
-   kubectl get svc 
+   kubectl get svc -n demo
    ```
+
+   This image illustrates the ELB address of a cluster named `fig70`.
 
    ![gain elb address](./../../../img/connect-to-kafka-cluster-gain-elb-address.png)
 
@@ -120,14 +122,16 @@ The current version only supports Kafka broker with a single replica (combined: 
 1. Set the `--publicly-accessible` value as true when creating cluster.
 
     ```bash
-    kbcli cluster create kafka-cluster --cluster-definition kafka --publicly-accessible=true
+    kbcli cluster create kafka mycluster --publicly-accessible=true -n demo
     ```
 
 2. Get the corresponding ELB address.
 
    ```bash
-   kubectl get svc
+   kubectl get svc -n demo
    ```
+
+   This image illustrates the ELB address of a cluster named `maple96`.
 
    ![gain ELB address cross vpc](./../../../img/kafka-connect-cross-vpc.png)
 
@@ -139,7 +143,7 @@ The current version only supports Kafka broker with a single replica (combined: 
 
 3. Configure hostname mapping.
 
-   1. Login to the remote machine.
+   1. Log in to the remote machine.
    2. Check ELB address IP address.
 
       ```bash

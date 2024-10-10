@@ -21,7 +21,9 @@ package testutils
 
 import (
 	"context"
+	"errors"
 	"io"
+	"math"
 	"net/http"
 	"sync"
 	"time"
@@ -159,4 +161,34 @@ func GetIPLocation() (string, error) {
 
 	// remove last "\n"
 	return string(location[:len(location)-1]), nil
+}
+
+func retry(ctx context.Context, operation func() error, maxRetry int) error {
+	err := operation()
+	for attempt := 0; err != nil && isErrorRetryable(err) && attempt < maxRetry; attempt++ {
+		delay := time.Duration(int(math.Pow(2, float64(attempt)))) * time.Second
+		klog.V(1).Infof("Failed, retrying in %s ... (%d/%d). Error: %v", delay, attempt+1, maxRetry, err)
+		select {
+		case <-ctx.Done():
+			return err
+		case <-time.After(delay):
+			// try again
+		}
+		err = operation()
+	}
+	return err
+}
+
+func isErrorRetryable(err error) bool {
+	switch err {
+	case nil:
+		return false
+	case context.Canceled, context.DeadlineExceeded:
+		return false
+	default: // continue
+	}
+	if e := errors.Unwrap(err); e != nil {
+		return isErrorRetryable(e)
+	}
+	return true
 }

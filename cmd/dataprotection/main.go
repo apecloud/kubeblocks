@@ -328,6 +328,15 @@ func main() {
 		os.Exit(1)
 	}
 
+	if err = (&dpcontrollers.BackupPolicyTemplateReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("backup-policy-template-controller"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "BackupPolicyTemplate")
+		os.Exit(1)
+	}
+
 	if err = (&dpcontrollers.BackupRepoReconciler{
 		Client:          client,
 		Scheme:          mgr.GetScheme(),

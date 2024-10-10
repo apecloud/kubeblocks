@@ -22,12 +22,12 @@ package apps
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	"github.com/sethvargo/go-password/password"
-	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -305,14 +305,14 @@ var _ = Describe("Cluster Controller", func() {
 			ml, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(defaultShardCount))
 
 		By("checking backup policy")
-		backupPolicyName := generateBackupPolicyName(clusterKey.Name, compTplName, "")
+		backupPolicyName := generateBackupPolicyName(clusterKey.Name, compTplName, false)
 		backupPolicyKey := client.ObjectKey{Name: backupPolicyName, Namespace: clusterKey.Namespace}
 		Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, bp *dpv1alpha1.BackupPolicy) {
 			g.Expect(bp.Spec.Targets).Should(HaveLen(defaultShardCount))
 		})).Should(Succeed())
 
 		By("checking backup schedule")
-		backupScheduleName := generateBackupScheduleName(clusterKey.Name, compTplName, "")
+		backupScheduleName := generateBackupScheduleName(clusterKey.Name, compTplName)
 		backupScheduleKey := client.ObjectKey{Name: backupScheduleName, Namespace: clusterKey.Namespace}
 		Eventually(testapps.CheckObjExists(&testCtx, backupScheduleKey,
 			&dpv1alpha1.BackupSchedule{}, true)).Should(Succeed())
@@ -1070,14 +1070,14 @@ var _ = Describe("Cluster Controller", func() {
 				}
 
 				By("checking backup policy")
-				backupPolicyName := generateBackupPolicyName(clusterKey.Name, defaultCompName, "")
+				backupPolicyName := generateBackupPolicyName(clusterKey.Name, defaultCompName, false)
 				backupPolicyKey := client.ObjectKey{Name: backupPolicyName, Namespace: clusterKey.Namespace}
 				backupPolicy := &dpv1alpha1.BackupPolicy{}
 				Eventually(testapps.CheckObjExists(&testCtx, backupPolicyKey, backupPolicy, true)).Should(Succeed())
 				Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, checkPolicy)).Should(Succeed())
 
 				By("checking backup schedule")
-				backupScheduleName := generateBackupScheduleName(clusterKey.Name, defaultCompName, "")
+				backupScheduleName := generateBackupScheduleName(clusterKey.Name, defaultCompName)
 				backupScheduleKey := client.ObjectKey{Name: backupScheduleName, Namespace: clusterKey.Namespace}
 				if backup == nil {
 					Eventually(testapps.CheckObjExists(&testCtx, backupScheduleKey,

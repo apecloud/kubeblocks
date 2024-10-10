@@ -28,10 +28,6 @@ type FakeAppsV1alpha1 struct {
 	*testing.Fake
 }
 
-func (c *FakeAppsV1alpha1) BackupPolicyTemplates() v1alpha1.BackupPolicyTemplateInterface {
-	return &FakeBackupPolicyTemplates{c}
-}
-
 func (c *FakeAppsV1alpha1) Clusters(namespace string) v1alpha1.ClusterInterface {
 	return &FakeClusters{c, namespace}
 }

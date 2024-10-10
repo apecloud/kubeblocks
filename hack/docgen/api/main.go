@@ -300,8 +300,7 @@ func combineAPIPackages(pkgs []*types.Package) ([]*apiPackage, error) {
 	for _, pkg := range pkgs {
 		apiGroup, apiVersion, err := apiVersionForPackage(pkg)
 		if err != nil {
-			klog.Warningf("could not get apiVersion for package %s: %s", pkg.Path, err)
-			continue
+			return nil, errors.Wrapf(err, "could not get apiVersion for package %s", pkg.Path)
 		}
 
 		id := fmt.Sprintf("%s/%s", apiGroup, apiVersion)

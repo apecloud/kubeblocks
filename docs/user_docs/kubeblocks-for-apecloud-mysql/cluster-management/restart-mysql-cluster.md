@@ -6,25 +6,25 @@ sidebar_position: 4
 sidebar_label: Restart
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # Restart an ApeCloud MySQL cluster
 
 You can restart all pods of the cluster. When an exception occurs in a database, you can try to restart it.
 
-:::note
-
-All pods restart in the order of learner -> follower -> leader and the leader may change after the cluster restarts.
-
-:::
-
 ## Steps
+
+<Tabs>
+
+<TabItem value="kbcli" label="kbcli" default>
 
 1. Restart a cluster.  
 
    Configure the values of `components` and `ttlSecondsAfterSucceed` and run the command below to restart a specified cluster.
 
    ```bash
-   kbcli cluster restart <name> --components="mysql" \
-   --ttlSecondsAfterSucceed=30
+   kbcli cluster restart <name> --components="mysql" --ttlSecondsAfterSucceed=30
    ```
 
    - `components` describes the component name that needs to be restarted.
@@ -33,11 +33,59 @@ All pods restart in the order of learner -> follower -> leader and the leader ma
 2. Check the cluster status to validate the restarting.
 
    ```bash
-   kbcli cluster list mysql-cluster
+   kbcli cluster list mycluster
    >
-   NAME                 NAMESPACE        CLUSTER-DEFINITION        VERSION                TERMINATION-POLICY        STATUS         CREATED-TIME
-   mysql-cluster        default          apecloud-mysql            ac-mysql-8.0.30        Delete                    Running        Jan 29,2023 14:29 UTC+0800
+   NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    CREATED-TIME
+   mycluster   demo        apecloud-mysql       ac-mysql-8.0.30   Delete               Running   Sep 19,2024 16:01 UTC+0800
    ```
 
    - STATUS=Updating: it means the cluster restart is in progress.
    - STATUS=Running: it means the cluster has been restarted.
+
+</TabItem>
+
+<TabItem value="kubectl" label="kubectl">
+
+1. Create an OpsRequest to restart a cluster.
+
+   ```bash
+   kubectl apply -f - <<EOF
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: OpsRequest
+   metadata:
+     name: ops-restart
+     namespace: demo
+   spec:
+     clusterName: mycluster
+     type: Restart 
+     restart:
+     - componentName: mysql
+   EOF
+   ```
+
+2. Check the pod and operation status to validate the restarting.
+
+   ```bash
+   kubectl get pod -n demo
+   >
+   NAME                READY   STATUS        RESTARTS   AGE
+   mycluster-mysql-0   4/4     Running       0          5m32s
+   mycluster-mysql-1   4/4     Running       0          6m36s
+   mycluster-mysql-2   3/4     Terminating   0          7m37s
+
+   kubectl get ops ops-restart -n demo
+   >
+   NAME          TYPE      CLUSTER     STATUS    PROGRESS   AGE
+   ops-restart   Restart   mycluster   Succeed   1/1        3m26s
+   ```
+
+   During the restarting process, there are two status types for pods.
+
+   - STATUS=Terminating: it means the cluster restart is in progress.
+   - STATUS=Running: it means the cluster has been restarted.
+
+   If an error occurs, you can troubleshoot with `kubectl describe` command to view the events of this operation.
+
+</TabItem>
+
+</Tabs>

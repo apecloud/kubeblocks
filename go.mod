@@ -13,7 +13,6 @@ require (
 	github.com/bhmj/jsonslice v1.1.2
 	github.com/charmbracelet/keygen v0.5.1
 	github.com/clbanning/mxj/v2 v2.5.7
-	github.com/containers/common v0.55.4
 	github.com/distribution/reference v0.6.0
 	github.com/docker/docker v25.0.6+incompatible
 	github.com/evanphx/json-patch v5.6.0+incompatible

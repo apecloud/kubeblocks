@@ -19,178 +19,178 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
 
 1. Configure the name of your cluster and run the command below to stop this cluster.
 
-    <Tabs>
+   <Tabs>
 
-    <TabItem value="kbcli" label="kbcli" default>
+   <TabItem value="kbcli" label="kbcli" default>
 
-    ```bash
-    kbcli cluster stop mycluster -n demo
-    ```
+   ```bash
+   kbcli cluster stop mycluster -n demo
+   ```
 
-    </TabItem>
+   </TabItem>
 
-    <TabItem value="OpsRequest" label="OpsRequest">
+   <TabItem value="OpsRequest" label="OpsRequest">
 
-    Run the command below to stop a cluster.
+   Run the command below to stop a cluster.
 
-    ```bash
-    kubectl apply -f - <<EOF
-    apiVersion: apps.kubeblocks.io/v1alpha1
-    kind: OpsRequest
-    metadata:
-      name: ops-stop
-      namespace: demo
-    spec:
-      clusterName: mycluster
-      type: Stop
-    EOF
-    ```
+   ```bash
+   kubectl apply -f - <<EOF
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: OpsRequest
+   metadata:
+     name: ops-stop
+     namespace: demo
+   spec:
+     clusterName: mycluster
+     type: Stop
+   EOF
+   ```
 
-    </TabItem>
+   </TabItem>
 
-    <TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
+   <TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
 
-    Configure replicas as 0 to delete pods.
+   Configure replicas as 0 to delete pods.
 
-    ```yaml
-    kubectl edit cluster mycluster -n demo
-    >
-    apiVersion: apps.kubeblocks.io/v1alpha1
-    kind: Cluster
-    metadata:
-       name: mycluster
-       namespace: demo
-    spec:
-      clusterDefinitionRef: kafka
-      clusterVersionRef: kafka-3.3.2
-      terminationPolicy: Delete
-      componentSpecs:
-      - name: kafka
-        componentDefRef: kafka
-        disableExporter: true  
-        replicas: 0
-        volumeClaimTemplates:
-        - name: data
-          spec:
-            storageClassName: standard
-            accessModes:
-              - ReadWriteOnce
-            resources:
-              requests:
-                storage: 20Gi
-    ```
+   ```yaml
+   kubectl edit cluster mycluster -n demo
+   >
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: Cluster
+   metadata:
+     name: mycluster
+     namespace: demo
+   spec:
+     clusterDefinitionRef: kafka
+     clusterVersionRef: kafka-3.3.2
+     terminationPolicy: Delete
+     componentSpecs:
+     - name: kafka
+       componentDefRef: kafka
+       disableExporter: true  
+       replicas: 0
+       volumeClaimTemplates:
+       - name: data
+         spec:
+           storageClassName: standard
+           accessModes:
+             - ReadWriteOnce
+           resources:
+             requests:
+               storage: 20Gi
+     ```
 
-    </TabItem>
+   </TabItem>
 
-    </Tabs>
+   </Tabs>
 
 2. Check the status of the cluster to see whether it is stopped.
 
-    <Tabs>
+   <Tabs>
 
-    <TabItem value="kbcli" label="kbcli" default>
+   <TabItem value="kbcli" label="kbcli" default>
 
-    ```bash
-    kbcli cluster list -n demo
-    ```
+   ```bash
+   kbcli cluster list -n demo
+   ```
 
-    </TabItem>
+   </TabItem>
 
-    <TabItem value="kubectl" label="kubectl">
+   <TabItem value="kubectl" label="kubectl">
 
-    ```bash
-    kubectl get cluster mycluster -n demo
-    ```
+   ```bash
+   kubectl get cluster mycluster -n demo
+   ```
 
-    </TabItem>
+   </TabItem>
 
-    </Tabs>
+   </Tabs>
 
 ## Start a cluster
   
 1. Configure the name of your cluster and run the command below to start this cluster.
 
-    <Tabs>
+   <Tabs>
 
-    <TabItem value="kbcli" label="kbcli" default>
+   <TabItem value="kbcli" label="kbcli" default>
 
-    ```bash
-    kbcli cluster start mycluster -n demo
-    ```
+   ```bash
+   kbcli cluster start mycluster -n demo
+   ```
 
-    </TabItem>
+   </TabItem>
 
-    <TabItem value="OpsRequest" label="OpsRequest">
+   <TabItem value="OpsRequest" label="OpsRequest">
 
-    Apply an OpsRequest to start the cluster.
+   Apply an OpsRequest to start the cluster.
 
-    ```bash
-    kubectl apply -f - <<EOF
-    apiVersion: apps.kubeblocks.io/v1alpha1
-    kind: OpsRequest
-    metadata:
-      name: ops-start
-      namespace: demo
-    spec:
-      clusterName: mycluster
-      type: Start
-    EOF 
-    ```
+   ```bash
+   kubectl apply -f - <<EOF
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: OpsRequest
+   metadata:
+     name: ops-start
+     namespace: demo
+   spec:
+     clusterName: mycluster
+     type: Start
+   EOF 
+   ```
 
-    </TabItem>
+   </TabItem>
 
-    <TabItem value="Edit cluster YAML file" label="Edit cluster YAML File">
+   <TabItem value="Edit cluster YAML file" label="Edit cluster YAML File">
 
-    Change replicas back to the original amount to start this cluster again.
+   Change replicas back to the original amount to start this cluster again.
 
-    ```yaml
-    apiVersion: apps.kubeblocks.io/v1alpha1
-    kind: Cluster
-    metadata:
-       name: mycluster
-       namespace: demo
-    spec:
-      clusterDefinitionRef: kafka
-      clusterVersionRef: kafka-3.3.2
-      terminationPolicy: Delete
-      componentSpecs:
-      - name: kafka
-        componentDefRef: kafka
-        disableExporter: true   
-        replicas: 1
-        volumeClaimTemplates:
-        - name: data
-          spec:
-            storageClassName: standard
-            accessModes:
-              - ReadWriteOnce
-            resources:
-              requests:
-                storage: 20Gi
-    ```
+   ```yaml
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: Cluster
+   metadata:
+     name: mycluster
+     namespace: demo
+   spec:
+     clusterDefinitionRef: kafka
+     clusterVersionRef: kafka-3.3.2
+     terminationPolicy: Delete
+     componentSpecs:
+     - name: kafka
+       componentDefRef: kafka
+       disableExporter: true   
+       replicas: 1
+       volumeClaimTemplates:
+       - name: data
+         spec:
+           storageClassName: standard
+           accessModes:
+             - ReadWriteOnce
+           resources:
+             requests:
+               storage: 20Gi
+     ```
 
-</TabItem>
+   </TabItem>
 
-</Tabs>
+   </Tabs>
 
 2. Check the status of the cluster to see whether it is running again.
 
-    <Tabs>
+   <Tabs>
 
-    <TabItem value="kbcli" label="kbcli" default>
+   <TabItem value="kbcli" label="kbcli" default>
 
-    ```bash
-    kbcli cluster list -n demo
-    ```
+   ```bash
+   kbcli cluster list -n demo
+   ```
 
-    </TabItem>
+   </TabItem>
 
-    <TabItem value="kubectl" label="kubectl">
+   <TabItem value="kubectl" label="kubectl">
 
-    ```bash
-    kubectl get cluster mycluster -n demo
-    ```
+   ```bash
+   kubectl get cluster mycluster -n demo
+   ```
 
-    </TabItem>
+   </TabItem>
 
-    </Tabs>
+   </Tabs>

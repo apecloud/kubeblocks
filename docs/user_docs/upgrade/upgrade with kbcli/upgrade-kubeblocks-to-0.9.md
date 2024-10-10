@@ -2,7 +2,7 @@
 title: Upgrade to KubeBlocks v0.9
 description: Upgrade to KubeBlocks v0.9, operation, tips and notes
 keywords: [upgrade, 0.9]
-sidebar_position: 1
+sidebar_position: 2
 sidebar_label: Upgrade to KubeBlocks v0.9
 ---
 
@@ -49,7 +49,6 @@ KubeBlocks 0.9 is compatible with KubeBlocks 0.8 APIs, but compatibility with AP
 
     kbcli will automatically add the annotation `"helm.sh/resource-policy": "keep"` to ensure that existing addons are not deleted during the upgrade.
 
-
 ## Upgrade addons
 
 If you didn't specify `upgradeAddons` as `true` or your addon is not included in the default installed addons, you can upgrade addons by the options provided below to use the v0.9.0 API.
@@ -62,11 +61,25 @@ If the addon you want to use is `clickhouse/milvus/elasticsearch/llm`, you need 
 
 :::
 
-
 ```bash
+# View the Addon index list
 kbcli addon index list
 
+# Update one index and the default index is kubeblocks
 kbcli addon index update kubeblocks
 
-kbcli addon upgrade xxx --force
+#Search available Addon versions
+kbcli addon search <addonName>
+
+# Install an Addon
+kbcli addon install <addonName> --version x.y.z
+
+# Upgrade this Addon to a certain version
+kbcli addon upgrade <addonName> --version x.y.z
+
+# Force to upgrade to a certain version
+kbcli addon upgrade <addonName> --version x.y.z --force
+
+# View the available Addon versions
+kbcli addon list | grep <addonName>
 ```

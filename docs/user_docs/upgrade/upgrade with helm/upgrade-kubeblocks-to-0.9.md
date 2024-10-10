@@ -2,7 +2,7 @@
 title: Upgrade to KubeBlocks v0.9
 description: Upgrade to KubeBlocks v0.9, operation, tips and notes
 keywords: [upgrade, 0.9]
-sidebar_position: 1
+sidebar_position: 2
 sidebar_label: Upgrade to KubeBlocks v0.9
 ---
 
@@ -40,7 +40,7 @@ KubeBlocks 0.9 is compatible with KubeBlocks 0.8 APIs, but compatibility with AP
          helm -n kb-system upgrade kubeblocks kubeblocks/kubeblocks --version {VERSION} --set keepAddons=true
          ```
 
-         Replace `{VERSION}` with your current KubeBlocks version, such as 0.9.0.
+         Replace `{VERSION}` with your current KubeBlocks version, such as 0.8.0.
 
     - Check addons.
 

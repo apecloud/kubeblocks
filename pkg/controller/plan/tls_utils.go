@@ -109,12 +109,12 @@ func CheckTLSSecretRef(ctx context.Context, cli client.Reader, namespace string,
 	if err := cli.Get(ctx, types.NamespacedName{Namespace: namespace, Name: secretRef.Name}, secret); err != nil {
 		return err
 	}
-	if secret.StringData == nil {
+	if secret.Data == nil {
 		return errors.New("tls secret's data field shouldn't be nil")
 	}
 	keys := []string{secretRef.CA, secretRef.Cert, secretRef.Key}
 	for _, key := range keys {
-		if _, ok := secret.StringData[key]; !ok {
+		if len(secret.Data[key]) == 0 {
 			return errors.Errorf("tls secret's data[%s] field shouldn't be empty", key)
 		}
 	}

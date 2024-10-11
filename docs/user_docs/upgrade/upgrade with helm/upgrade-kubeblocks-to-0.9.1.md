@@ -16,15 +16,15 @@ Execute `helm -n kb-system list | grep kubeblocks` to check the current KubeBloc
 
 ## Compatibility
 
-KubeBlocks v0.9.1 is compatible with KubeBlocks v0.8 APIs, but compatibility with APIs from versions prior to v0.8 is not guaranteed. If you are using Addons from KubeBlocks v0.7 or earlier (v0.7., v0.6., etc), DO [upgrade KubeBlocks and all Addons to v0.8 first](./upgrade-kubeblocks-to-0.8.md) to ensure service availability before upgrading to v0.9.
+KubeBlocks v0.9.1 is compatible with KubeBlocks v0.8 APIs, but compatibility with APIs from versions prior to v0.8 is not guaranteed. If you are using Addons from KubeBlocks v0.7 or earlier (v0.6, etc), DO [upgrade KubeBlocks and all Addons to v0.8 first](./upgrade-kubeblocks-to-0.8.md) to ensure service availability before upgrading to v0.9.
 
 If you are upgrading from v0.8 to v0.9, it's recommended to enable webhook to ensure the availability.
 
 ## Upgrade from KubeBlocks v0.9.0
 
-1. Set keepAddons.
+1. Check whether `keepAddons` is set as `true`.
 
-    KubeBlocks v0.8 streamlines the default installed engines. To avoid deleting Addon resources that are already in use during the upgrade, execute the following commands first to keep the Addons in use.
+    KubeBlocks v0.8 streamlines the default installed engines. To avoid deleting Addon resources that are already in use during the upgrade, execute the following commands first to check whether `keepAddons` is set as `true`.
 
     - Check the current KubeBlocks version.
 
@@ -32,7 +32,7 @@ If you are upgrading from v0.8 to v0.9, it's recommended to enable webhook to en
          helm -n kb-system list | grep kubeblocks
          ```
 
-    - Set `crd.enabled` as `false`.
+    - Set `crd.enabled` as `false` to avoid automatic CRD installation.
 
          ```shell
          helm repo add kubeblocks https://apecloud.github.io/helm-charts
@@ -76,7 +76,7 @@ If you are upgrading from v0.8 to v0.9, it's recommended to enable webhook to en
 
 ## Upgrade from KubeBlocks v0.8
 
-1. Set keepAddons.
+1. Set `keepAddons` to preserve the Addon resources during the upgrade.
 
     KubeBlocks v0.8 streamlines the default installed engines. To avoid deleting Addon resources that are already in use during the upgrade, execute the following commands first.
 

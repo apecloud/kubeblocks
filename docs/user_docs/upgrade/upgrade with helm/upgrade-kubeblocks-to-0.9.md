@@ -22,7 +22,7 @@ KubeBlocks 0.9 is compatible with KubeBlocks 0.8 APIs, but compatibility with AP
 
 ## Upgrade from KubeBlocks v0.8
 
-1. Set keepAddons.
+1. Set `keepAddons` to preserve Addon resources during the upgrade.
 
     KubeBlocks v0.8 streamlines the default installed engines. To avoid deleting addon resources that are already in use during the upgrade, execute the following commands first.
 
@@ -61,7 +61,7 @@ KubeBlocks 0.9 is compatible with KubeBlocks 0.8 APIs, but compatibility with AP
     To reduce the size of Helm chart, KubeBlocks v0.8 removes CRD from the Helm chart. Before upgrading, you need to install CRD.
 
     ```shell
-    kubectl replace -f https://github.com/apecloud/kubeblocks/releases/download/v0.9.0/kubeblocks_crds.yaml || kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/v0.9./kubeblocks_crds.yaml 
+    kubectl replace -f https://github.com/apecloud/kubeblocks/releases/download/v0.9.0/kubeblocks_crds.yaml || kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/v0.9.0/kubeblocks_crds.yaml 
     ```
 
 4. Upgrade KubeBlocks.

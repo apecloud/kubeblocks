@@ -88,15 +88,17 @@ var VolumeSnapshotSignature = func(_ snapshotv1.VolumeSnapshot, _ *snapshotv1.Vo
 var VolumeSnapshotClassSignature = func(_ snapshotv1.VolumeSnapshotClass, _ *snapshotv1.VolumeSnapshotClass, _ snapshotv1.VolumeSnapshotClassList, _ *snapshotv1.VolumeSnapshotClassList) {
 }
 
-var ClusterSignature = func(_ appsv1.Cluster, _ *appsv1.Cluster, _ appsv1.ClusterList, _ *appsv1.ClusterList) {
-}
 var ClusterDefinitionSignature = func(_ appsv1.ClusterDefinition, _ *appsv1.ClusterDefinition, _ appsv1.ClusterDefinitionList, _ *appsv1.ClusterDefinitionList) {
 }
-var ComponentSignature = func(appsv1.Component, *appsv1.Component, appsv1.ComponentList, *appsv1.ComponentList) {
+var ShardingDefinitionSignature = func(_ appsv1.ShardingDefinition, _ *appsv1.ShardingDefinition, _ appsv1.ShardingDefinitionList, _ *appsv1.ShardingDefinitionList) {
 }
 var ComponentDefinitionSignature = func(appsv1.ComponentDefinition, *appsv1.ComponentDefinition, appsv1.ComponentDefinitionList, *appsv1.ComponentDefinitionList) {
 }
 var ComponentVersionSignature = func(appsv1.ComponentVersion, *appsv1.ComponentVersion, appsv1.ComponentVersionList, *appsv1.ComponentVersionList) {
+}
+var ClusterSignature = func(_ appsv1.Cluster, _ *appsv1.Cluster, _ appsv1.ClusterList, _ *appsv1.ClusterList) {
+}
+var ComponentSignature = func(appsv1.Component, *appsv1.Component, appsv1.ComponentList, *appsv1.ComponentList) {
 }
 var OpsDefinitionSignature = func(_ opsv1alpha1.OpsDefinition, _ *opsv1alpha1.OpsDefinition, _ opsv1alpha1.OpsDefinitionList, _ *opsv1alpha1.OpsDefinitionList) {
 }

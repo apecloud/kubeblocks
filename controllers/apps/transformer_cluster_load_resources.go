@@ -106,13 +106,22 @@ func (t *clusterLoadRefResourcesTransformer) checkNUpdateClusterTopology(transCt
 		return fmt.Errorf("specified cluster topology not found: %s", cluster.Spec.Topology)
 	}
 
-	comps := make(map[string]bool, 0)
+	names := make(map[string]bool, 0)
 	for _, comp := range clusterTopology.Components {
-		comps[comp.Name] = true
+		names[comp.Name] = true
 	}
+	for _, sharding := range clusterTopology.Shardings {
+		names[sharding.Name] = true
+	}
+
 	for _, comp := range cluster.Spec.ComponentSpecs {
-		if !comps[comp.Name] {
+		if !names[comp.Name] {
 			return fmt.Errorf("component %s not defined in topology %s", comp.Name, clusterTopology.Name)
+		}
+	}
+	for _, sharding := range cluster.Spec.Shardings {
+		if !names[sharding.Name] {
+			return fmt.Errorf("sharding %s not defined in topology %s", sharding.Name, clusterTopology.Name)
 		}
 	}
 

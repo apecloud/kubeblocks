@@ -43,8 +43,13 @@ func ValidateCompDefRegexp(compDefPattern string) error {
 	return err
 }
 
-func PrefixOrRegexMatched(compDef, compDefPattern string) bool {
-	if strings.HasPrefix(compDef, compDefPattern) {
+func ValidateShardingDefRegexp(shardingDefPattern string) error {
+	_, err := regexp.Compile(shardingDefPattern)
+	return err
+}
+
+func PrefixOrRegexMatched(def, pattern string) bool {
+	if strings.HasPrefix(def, pattern) {
 		return true
 	}
 
@@ -54,17 +59,17 @@ func PrefixOrRegexMatched(compDef, compDefPattern string) bool {
 	}
 
 	isRegex := false
-	regex, err := regexp.Compile(compDefPattern)
+	regex, err := regexp.Compile(pattern)
 	if err == nil {
 		// distinguishing between regular expressions and ordinary strings.
-		if isRegexpPattern(compDefPattern) {
+		if isRegexpPattern(pattern) {
 			isRegex = true
 		}
 	}
 	if !isRegex {
 		return false
 	}
-	return regex.MatchString(compDef)
+	return regex.MatchString(def)
 }
 
 func IsHostNetworkEnabled(synthesizedComp *SynthesizedComponent) bool {

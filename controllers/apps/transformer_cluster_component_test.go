@@ -213,7 +213,7 @@ var _ = Describe("cluster component transformer test", func() {
 
 	buildCompSpecs := func(clusterDef *appsv1.ClusterDefinition, cluster *appsv1.Cluster) []*appsv1.ClusterComponentSpec {
 		apiTransformer := ClusterAPINormalizationTransformer{}
-		compSpecs, err := apiTransformer.buildCompSpecs4Topology(clusterDef, cluster)
+		compSpecs, err := apiTransformer.buildCompSpecs4Topology(nil, clusterDef, cluster)
 		Expect(err).Should(BeNil())
 		return compSpecs
 	}

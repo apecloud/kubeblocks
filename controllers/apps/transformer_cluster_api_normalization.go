@@ -90,7 +90,7 @@ func (t *ClusterAPINormalizationTransformer) validateSpec(cluster *appsv1.Cluste
 func (t *ClusterAPINormalizationTransformer) buildCompSpecs(transCtx *clusterTransformContext,
 	cluster *appsv1.Cluster) ([]*appsv1.ClusterComponentSpec, error) {
 	if withClusterTopology(cluster) {
-		return t.buildCompSpecs4Topology(transCtx.ClusterDef, cluster)
+		return t.buildCompSpecs4Topology(transCtx, transCtx.ClusterDef, cluster)
 	}
 	if withClusterUserDefined(cluster) {
 		return t.buildCompSpecs4Specified(transCtx, cluster)
@@ -98,7 +98,27 @@ func (t *ClusterAPINormalizationTransformer) buildCompSpecs(transCtx *clusterTra
 	return nil, nil
 }
 
-func (t *ClusterAPINormalizationTransformer) buildCompSpecs4Topology(clusterDef *appsv1.ClusterDefinition,
+func (t *ClusterAPINormalizationTransformer) buildCompSpecs4Topology(transCtx *clusterTransformContext,
+	clusterDef *appsv1.ClusterDefinition, cluster *appsv1.Cluster) ([]*appsv1.ClusterComponentSpec, error) {
+	clusterTopology := referredClusterTopology(clusterDef, cluster.Spec.Topology)
+	if clusterTopology == nil {
+		return nil, fmt.Errorf("referred cluster topology not found : %s", cluster.Spec.Topology)
+	}
+
+	compSpecs, err := t.buildCompSpecs4TopologyComp(clusterTopology, cluster)
+	if err != nil {
+		return nil, err
+	}
+
+	shardingComps, err := t.buildCompSpecs4TopologySharding(transCtx, clusterTopology, cluster)
+	if err != nil {
+		return nil, err
+	}
+
+	return append(compSpecs, shardingComps...), nil
+}
+
+func (t *ClusterAPINormalizationTransformer) buildCompSpecs4TopologyComp(topology *appsv1.ClusterTopology,
 	cluster *appsv1.Cluster) ([]*appsv1.ClusterComponentSpec, error) {
 	newCompSpec := func(comp appsv1.ClusterTopologyComponent) *appsv1.ClusterComponentSpec {
 		return &appsv1.ClusterComponentSpec{
@@ -114,24 +134,55 @@ func (t *ClusterAPINormalizationTransformer) buildCompSpecs4Topology(clusterDef 
 		return compSpec
 	}
 
-	clusterTopology := referredClusterTopology(clusterDef, cluster.Spec.Topology)
-	if clusterTopology == nil {
-		return nil, fmt.Errorf("referred cluster topology not found : %s", cluster.Spec.Topology)
-	}
-
 	specifiedCompSpecs := make(map[string]*appsv1.ClusterComponentSpec)
 	for i, compSpec := range cluster.Spec.ComponentSpecs {
 		specifiedCompSpecs[compSpec.Name] = cluster.Spec.ComponentSpecs[i].DeepCopy()
 	}
 
 	compSpecs := make([]*appsv1.ClusterComponentSpec, 0)
-	for i := range clusterTopology.Components {
-		comp := clusterTopology.Components[i]
+	for _, comp := range topology.Components {
 		if _, ok := specifiedCompSpecs[comp.Name]; ok {
 			compSpecs = append(compSpecs, mergeCompSpec(comp, specifiedCompSpecs[comp.Name]))
 		} else {
 			compSpecs = append(compSpecs, newCompSpec(comp))
 		}
+	}
+	return compSpecs, nil
+}
+
+func (t *ClusterAPINormalizationTransformer) buildCompSpecs4TopologySharding(transCtx *clusterTransformContext,
+	topology *appsv1.ClusterTopology, cluster *appsv1.Cluster) ([]*appsv1.ClusterComponentSpec, error) {
+	newCompSpecs := func(spec appsv1.ClusterSharding) ([]*appsv1.ClusterComponentSpec, error) {
+		specs, err := controllerutil.GenShardingCompSpecList(transCtx.Context, transCtx.Client, cluster, &spec)
+		if err != nil {
+			return nil, err
+		}
+		return specs, nil
+	}
+
+	mergeSharding := func(sharding appsv1.ClusterTopologySharding, spec *appsv1.ClusterSharding) *appsv1.ClusterSharding {
+		if len(spec.ShardingDef) == 0 {
+			spec.ShardingDef = sharding.ShardingDef
+		}
+		return spec
+	}
+
+	specified := make(map[string]*appsv1.ClusterSharding)
+	for i, sharding := range cluster.Spec.Shardings {
+		specified[sharding.Name] = cluster.Spec.Shardings[i].DeepCopy()
+	}
+
+	compSpecs := make([]*appsv1.ClusterComponentSpec, 0)
+	for _, sharding := range topology.Shardings {
+		spec, ok := specified[sharding.Name]
+		if ok {
+			spec = mergeSharding(sharding, spec)
+		}
+		shardingComps, err := newCompSpecs(*spec)
+		if err != nil {
+			return nil, err
+		}
+		compSpecs = append(compSpecs, shardingComps...)
 	}
 	return compSpecs, nil
 }

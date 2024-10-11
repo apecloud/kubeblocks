@@ -23,6 +23,7 @@ import (
 	"context"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -33,7 +34,8 @@ import (
 // ShardingDefinitionReconciler reconciles a ShardingDefinition object
 type ShardingDefinitionReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme   *runtime.Scheme
+	Recorder record.EventRecorder
 }
 
 //+kubebuilder:rbac:groups=apps.kubeblocks.io,resources=shardingdefinitions,verbs=get;list;watch;create;update;patch;delete

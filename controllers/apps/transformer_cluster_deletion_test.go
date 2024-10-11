@@ -59,8 +59,11 @@ var _ = Describe("clusterDeletionTransformer", func() {
 					{Name: "comp2", CompDef: "compdef2"},
 					{Name: "comp3", CompDef: "compdef3"},
 				},
+				Shardings: []appsv1.ClusterTopologySharding{
+					{Name: "sharding1", ShardingDef: "shardingdef1"},
+				},
 				Orders: &appsv1.ClusterTopologyOrders{
-					Terminate: []string{"comp1", "comp2", "comp3"},
+					Terminate: []string{"sharding1", "comp1", "comp2", "comp3"},
 				},
 			}).
 			GetObject()
@@ -71,6 +74,8 @@ var _ = Describe("clusterDeletionTransformer", func() {
 			AddComponent("comp1", "compdef1").
 			AddComponent("comp2", "compdef2").
 			AddComponent("comp3", "compdef3").
+			AddComponent("sharding1-0", "sharding1-compdef").
+			AddComponent("sharding1-1", "sharding1-compdef").
 			GetObject()
 		cluster.DeletionTimestamp = &metav1.Time{Time: time.Now()}
 
@@ -93,6 +98,18 @@ var _ = Describe("clusterDeletionTransformer", func() {
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: testCtx.DefaultNamespace,
 						Name:      "test-cluster-comp3",
+					},
+				},
+				&appsv1.Component{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: testCtx.DefaultNamespace,
+						Name:      "test-cluster-sharding1-0",
+					},
+				},
+				&appsv1.Component{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: testCtx.DefaultNamespace,
+						Name:      "test-cluster-sharding1-1",
 					},
 				},
 			},

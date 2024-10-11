@@ -159,7 +159,7 @@ var _ = Describe("Component Controller", func() {
 	}
 
 	waitForCreatingResourceCompletely := func(clusterKey client.ObjectKey, compNames ...string) {
-		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+		Eventually(testapps.ClusterReconciled(&testCtx, clusterKey)).Should(BeTrue())
 		cluster := &kbappsv1.Cluster{}
 		Eventually(testapps.CheckObjExists(&testCtx, clusterKey, cluster, true)).Should(Succeed())
 		for _, compName := range compNames {
@@ -186,7 +186,7 @@ var _ = Describe("Component Controller", func() {
 		clusterKey = client.ObjectKeyFromObject(clusterObj)
 
 		By("Waiting for the cluster enter expected phase")
-		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+		Eventually(testapps.ClusterReconciled(&testCtx, clusterKey)).Should(BeTrue())
 		if phase == nil {
 			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(kbappsv1.CreatingClusterPhase))
 		} else {
@@ -201,7 +201,7 @@ var _ = Describe("Component Controller", func() {
 		compObj = &kbappsv1.Component{}
 		Eventually(testapps.CheckObjExists(&testCtx, compKey, compObj, true)).Should(Succeed())
 		if phase == nil {
-			Eventually(testapps.GetComponentObservedGeneration(&testCtx, compKey)).Should(BeEquivalentTo(1))
+			Eventually(testapps.ComponentReconciled(&testCtx, compKey)).Should(BeTrue())
 			Eventually(testapps.GetComponentPhase(&testCtx, compKey)).Should(Equal(kbappsv1.CreatingClusterCompPhase))
 		}
 	}
@@ -264,6 +264,28 @@ var _ = Describe("Component Controller", func() {
 			Expect(cluster.Spec.ComponentSpecs).Should(HaveLen(1))
 			cluster.Spec.ComponentSpecs[0].Replicas = replicas
 		})()).ShouldNot(HaveOccurred())
+	}
+
+	getStableClusterObservedGeneration := func(clusterKey types.NamespacedName, waitFor *time.Duration) (int64, *kbappsv1.Cluster) {
+		sleepTime := 300 * time.Millisecond
+		if waitFor != nil {
+			sleepTime = *waitFor
+		}
+		time.Sleep(sleepTime)
+		cluster := &kbappsv1.Cluster{}
+		Expect(testCtx.Cli.Get(testCtx.Ctx, clusterKey, cluster)).Should(Succeed())
+		return cluster.Status.ObservedGeneration, cluster
+	}
+
+	getStableComponentObservedGeneration := func(compKey types.NamespacedName, waitFor *time.Duration) (int64, *kbappsv1.Component) {
+		sleepTime := 300 * time.Millisecond
+		if waitFor != nil {
+			sleepTime = *waitFor
+		}
+		time.Sleep(sleepTime)
+		comp := &kbappsv1.Component{}
+		Expect(testCtx.Cli.Get(testCtx.Ctx, compKey, comp)).Should(Succeed())
+		return comp.Status.ObservedGeneration, comp
 	}
 
 	testChangeReplicas := func(compName, compDefName string) {
@@ -633,9 +655,7 @@ var _ = Describe("Component Controller", func() {
 	horizontalScale := func(updatedReplicas int, storageClassName string, policyType *string, compDefNames ...string) {
 		defer kbagent.UnsetMockClient()
 
-		cluster := &kbappsv1.Cluster{}
-		Expect(k8sClient.Get(testCtx.Ctx, clusterKey, cluster)).Should(Succeed())
-		initialGeneration := int(cluster.Status.ObservedGeneration)
+		initialGeneration, cluster := getStableClusterObservedGeneration(clusterKey, nil)
 
 		setHorizontalScalePolicy(policyType, compDefNames...)
 
@@ -665,7 +685,7 @@ var _ = Describe("Component Controller", func() {
 
 		By("Checking cluster status and the number of replicas changed")
 		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).
-			Should(BeEquivalentTo(initialGeneration + len(cluster.Spec.ComponentSpecs)))
+			Should(BeEquivalentTo(int(initialGeneration) + len(cluster.Spec.ComponentSpecs)))
 	}
 
 	testHorizontalScale := func(compName, compDefName string, initialReplicas, updatedReplicas int32, bpt *string) {
@@ -743,7 +763,7 @@ var _ = Describe("Component Controller", func() {
 			testk8s.MockInstanceSetReady(its, mockPods...)
 		})).ShouldNot(HaveOccurred())
 
-		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+		initialGeneration, _ := getStableClusterObservedGeneration(clusterKey, nil)
 		Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, compName)).Should(Equal(kbappsv1.RunningClusterCompPhase))
 		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(kbappsv1.RunningClusterPhase))
 
@@ -758,7 +778,7 @@ var _ = Describe("Component Controller", func() {
 		})()).ShouldNot(HaveOccurred())
 
 		By("Checking the resize operation in progress for data volume")
-		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(2))
+		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(initialGeneration + 1))
 		Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, compName)).Should(Equal(kbappsv1.UpdatingClusterCompPhase))
 		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(kbappsv1.UpdatingClusterPhase))
 		for i := 0; i < replicas; i++ {
@@ -789,7 +809,7 @@ var _ = Describe("Component Controller", func() {
 		Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(its), func(its *workloads.InstanceSet) {
 			testk8s.MockInstanceSetReady(its, mockPods...)
 		})()).ShouldNot(HaveOccurred())
-		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(2))
+		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(initialGeneration + 1))
 		Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, compName)).Should(Equal(kbappsv1.RunningClusterCompPhase))
 		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(kbappsv1.RunningClusterPhase))
 
@@ -903,9 +923,12 @@ var _ = Describe("Component Controller", func() {
 			}
 		}
 
-		checkResizeOperationFinished := func(generation int64) {
-			Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(generation))
-			Eventually(testapps.GetComponentObservedGeneration(&testCtx, compKey)).Should(BeEquivalentTo(generation))
+		initialClusterGeneration, _ := getStableClusterObservedGeneration(clusterKey, nil)
+		initialComponentGeneration, _ := getStableComponentObservedGeneration(compKey, pointer.Duration(0) /* no need to sleep */)
+
+		checkResizeOperationFinished := func(diffGeneration int64) {
+			Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(initialClusterGeneration + diffGeneration))
+			Eventually(testapps.GetComponentObservedGeneration(&testCtx, compKey)).Should(BeEquivalentTo(initialComponentGeneration + diffGeneration))
 		}
 
 		By("Updating the PVC storage size")
@@ -913,7 +936,7 @@ var _ = Describe("Component Controller", func() {
 		changePVC(newStorageValue)
 
 		By("Checking the resize operation finished")
-		checkResizeOperationFinished(2)
+		checkResizeOperationFinished(1)
 
 		By("Checking PVCs are resized")
 		checkPVC(newStorageValue)
@@ -923,7 +946,7 @@ var _ = Describe("Component Controller", func() {
 		changePVC(originStorageValue)
 
 		By("Checking the resize operation finished")
-		checkResizeOperationFinished(3)
+		checkResizeOperationFinished(2)
 
 		By("Checking PVCs are resized")
 		checkPVC(originStorageValue)

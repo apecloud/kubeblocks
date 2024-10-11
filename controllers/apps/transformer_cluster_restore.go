@@ -53,21 +53,21 @@ func (c *clusterRestoreTransformer) Transform(ctx graph.TransformContext, dag *g
 	// when restoring a sharded cluster, it is essential to specify the 'sourceTarget' from which data should be restored for each sharded component.
 	// to achieve this, we allocate the source target for each component using annotations.
 	for i := range c.Cluster.Spec.Shardings {
-		shardingSpec := c.Cluster.Spec.Shardings[i]
-		backupSource, ok := backupMap[shardingSpec.Name]
+		sharding := c.Cluster.Spec.Shardings[i]
+		backupSource, ok := backupMap[sharding.Name]
 		if !ok {
 			continue
 		}
-		backup, err := plan.GetBackupFromClusterAnnotation(c.Context, c.Client, backupSource, shardingSpec.Name, c.Cluster.Namespace)
+		backup, err := plan.GetBackupFromClusterAnnotation(c.Context, c.Client, backupSource, sharding.Name, c.Cluster.Namespace)
 		if err != nil {
 			return err
 		}
-		if len(backup.Status.Targets) > int(shardingSpec.Shards) {
+		if len(backup.Status.Targets) > int(sharding.Shards) {
 			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRestoreFailed,
 				`the source targets count of the backup "%s" must be equal to or greater than the count of the shard components "%s"`,
-				backup.Name, shardingSpec.Name)
+				backup.Name, sharding.Name)
 		}
-		shardComponents, err := intctrlutil.ListShardingComponents(c.Context, c.Client, c.Cluster, shardingSpec.Name)
+		shardComponents, err := intctrlutil.ListShardingComponents(c.Context, c.Client, c.Cluster, sharding.Name)
 		if err != nil {
 			return err
 		}
@@ -89,7 +89,7 @@ func (c *clusterRestoreTransformer) Transform(ctx graph.TransformContext, dag *g
 		}
 		if len(allocateTargetMap) == len(backup.Status.Targets) {
 			// check if the restore is completed when all source target have allocated.
-			if err = c.cleanupRestoreAnnotationForSharding(dag, shardingSpec.Name, restoreDoneForShardComponents); err != nil {
+			if err = c.cleanupRestoreAnnotationForSharding(dag, sharding.Name, restoreDoneForShardComponents); err != nil {
 				return err
 			}
 			continue
@@ -98,7 +98,7 @@ func (c *clusterRestoreTransformer) Transform(ctx graph.TransformContext, dag *g
 			if _, ok = allocateTargetMap[target.Name]; ok {
 				continue
 			}
-			for _, compSpec := range c.ShardingComponentSpecs[shardingSpec.Name] {
+			for _, compSpec := range c.ShardingComponentSpecs[sharding.Name] {
 				if _, ok = c.Annotations[compSpec.Name][constant.BackupSourceTargetAnnotationKey]; ok {
 					continue
 				}

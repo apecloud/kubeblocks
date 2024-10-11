@@ -169,17 +169,17 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCt
 		}
 		setVeHelpers(compSpec, compOps, compSpec.Name)
 	}
-	for _, shardingSpec := range opsRes.Cluster.Spec.Shardings {
-		compOps, ok := compOpsHelper.componentOpsSet[shardingSpec.Name]
+	for _, sharding := range opsRes.Cluster.Spec.Shardings {
+		compOps, ok := compOpsHelper.componentOpsSet[sharding.Name]
 		if !ok {
 			continue
 		}
-		shardingComps, err := intctrlutil.ListShardingComponents(reqCtx.Ctx, cli, opsRes.Cluster, shardingSpec.Name)
+		shardingComps, err := intctrlutil.ListShardingComponents(reqCtx.Ctx, cli, opsRes.Cluster, sharding.Name)
 		if err != nil {
 			return opsRequestPhase, 0, err
 		}
 		for _, v := range shardingComps {
-			setVeHelpers(shardingSpec.Template, compOps, v.Labels[constant.KBAppComponentLabelKey])
+			setVeHelpers(sharding.Template, compOps, v.Labels[constant.KBAppComponentLabelKey])
 		}
 	}
 	// reconcile the status.components. when the volume expansion is successful,

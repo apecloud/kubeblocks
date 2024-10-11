@@ -235,7 +235,7 @@ var _ = Describe("Cluster Controller", func() {
 
 	shardingComponentProcessorWrapper := func(compName, compDefName string, processor ...func(*testapps.MockClusterFactory)) func(f *testapps.MockClusterFactory) {
 		return func(f *testapps.MockClusterFactory) {
-			f.AddShardingSpec(compName, compDefName).SetShards(defaultShardCount)
+			f.AddSharding(compName, compDefName).SetShards(defaultShardCount)
 			for _, p := range processor {
 				if p != nil {
 					p(f)

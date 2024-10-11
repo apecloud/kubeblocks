@@ -29,8 +29,7 @@ import (
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=sdd
-// +kubebuilder:printcolumn:name="SERVICE",type="string",JSONPath=".spec.serviceKind",description="service"
-// +kubebuilder:printcolumn:name="SERVICE-VERSION",type="string",JSONPath=".spec.serviceVersion",description="service version"
+// +kubebuilder:printcolumn:name="TEMPLATE",type="string",JSONPath=".spec.template.compDef",description="template"
 // +kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="status phase"
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
@@ -83,7 +82,7 @@ type ShardingDefinitionSpec struct {
 	// +optional
 	LifecycleActions *ShardingLifecycleActions `json:"lifecycleActions,omitempty"`
 
-	// Defines additional Services to expose the sharding's endpoints.
+	// Defines the services for the sharding.
 	//
 	// This field is immutable.
 	//
@@ -140,6 +139,34 @@ type ShardsLimit struct {
 
 // ShardingLifecycleActions defines a collection of Actions for customizing the behavior of a sharding.
 type ShardingLifecycleActions struct {
+	// Specifies the hook to be executed after a sharding's creation.
+	//
+	// By setting `postProvision.preCondition`, you can determine the specific lifecycle stage at which
+	// the action should trigger, available conditions for sharding include: `Immediately`, `ComponentReady`,
+	// and `ClusterReady`. For sharding, the `ComponentReady` condition means all components of the sharding are ready.
+	//
+	// With `ComponentReady` being the default.
+	//
+	// The PostProvision Action is intended to run only once.
+	//
+	// Note: This field is immutable once it has been set.
+	//
+	// +optional
+	PostProvision *Action `json:"postProvision,omitempty"`
+
+	// Specifies the hook to be executed prior to terminating a sharding.
+	//
+	// The PreTerminate Action is intended to run only once.
+	//
+	// This action is executed immediately when a terminate operation for the sharding is initiated.
+	// The actual termination and cleanup of the sharding and its associated resources will not proceed
+	// until the PreTerminate action has completed successfully.
+	//
+	// Note: This field is immutable once it has been set.
+	//
+	// +optional
+	PreTerminate *Action `json:"preTerminate,omitempty"`
+
 	// Specifies the hook to be executed after a shard's creation.
 	//
 	// Note: This field is immutable once it has been set.
@@ -164,7 +191,7 @@ type ShardingService struct {
 	// +kubebuilder:validation:MaxLength=25
 	Name string `json:"name"`
 
-	// Specifies whether the service is shared across shards.
+	// Specifies whether the service is shared across all shards in the sharding.
 	//
 	// +optional
 	Shared bool `json:"shared,omitempty"`
@@ -178,7 +205,7 @@ type ShardingSystemAccount struct {
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
-	// Specifies whether the account is shared across shards.
+	// Specifies whether the account is shared across all shards in the sharding.
 	//
 	// +optional
 	Shared bool `json:"shared,omitempty"`

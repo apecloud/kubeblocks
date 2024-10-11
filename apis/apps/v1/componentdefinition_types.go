@@ -613,9 +613,9 @@ type VarSource struct {
 	// +optional
 	ClusterVarRef *ClusterVarSelector `json:"clusterVarRef,omitempty"`
 
-	// Selects a defined var of a Sharding.
+	// Selects a defined var of a sharding.
 	// +optional
-	ShardingVarRef *ClusterVarSelector `json:"shardingVarRef,omitempty"`
+	ShardingVarRef *ShardingVarSelector `json:"shardingVarRef,omitempty"`
 }
 
 // VarOption defines whether a variable is required or optional.
@@ -820,7 +820,7 @@ type ClusterVars struct {
 	ClusterUID *VarOption `json:"clusterUID,omitempty"`
 }
 
-// ShardingVarSelector selects a var from a Sharding.
+// ShardingVarSelector selects a var from a sharding.
 type ShardingVarSelector struct {
 	ShardingVar `json:",inline"`
 }
@@ -830,11 +830,6 @@ type ShardingVar struct {
 	//
 	// +optional
 	ShardingName *VarOption `json:"shardingName,omitempty"`
-
-	// Reference to the short name of the sharding.
-	//
-	// +optional
-	ShortName *VarOption `json:"shortName,omitempty"`
 
 	// Reference to the shards of the sharding.
 	//
@@ -1344,7 +1339,7 @@ const (
 type ComponentLifecycleActions struct {
 	// Specifies the hook to be executed after a component's creation.
 	//
-	// By setting `postProvision.customHandler.preCondition`, you can determine the specific lifecycle stage
+	// By setting `postProvision.preCondition`, you can determine the specific lifecycle stage
 	// at which the action should trigger: `Immediately`, `RuntimeReady`, `ComponentReady`, and `ClusterReady`.
 	// with `ComponentReady` being the default.
 	//

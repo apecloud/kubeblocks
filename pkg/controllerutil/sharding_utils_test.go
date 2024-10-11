@@ -73,7 +73,7 @@ var _ = Describe("cluster shard component", func() {
 			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
 				SetUID(clusterName).
 				AddComponent(mysqlCompName, compDefName).
-				AddShardingSpec(mysqlShardingName, compDefName).
+				AddSharding(mysqlShardingName, compDefName).
 				SetShards(1).
 				Create(&testCtx).GetObject()
 		})
@@ -90,14 +90,14 @@ var _ = Describe("cluster shard component", func() {
 			compKey := client.ObjectKeyFromObject(mockCompObj)
 			Eventually(testapps.CheckObjExists(&testCtx, compKey, &appsv1.Component{}, true)).Should(Succeed())
 
-			shardingSpec := &appsv1.ClusterSharding{
+			sharding := &appsv1.ClusterSharding{
 				Template: appsv1.ClusterComponentSpec{
 					Replicas: 2,
 				},
 				Name:   mysqlShardingName,
 				Shards: 2,
 			}
-			shardingCompSpecList, err := GenShardingCompSpecList(testCtx.Ctx, k8sClient, cluster, shardingSpec)
+			shardingCompSpecList, err := GenShardingCompSpecList(testCtx.Ctx, k8sClient, cluster, sharding)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(shardingCompSpecList).ShouldNot(BeNil())
 			Expect(len(shardingCompSpecList)).Should(BeEquivalentTo(2))

@@ -73,8 +73,8 @@ func (c componentOpsHelper) updateClusterComponentsAndShardings(cluster *appsv1.
 	}
 	// 1. update the sharding components
 	for index := range cluster.Spec.Shardings {
-		shardingSpec := &cluster.Spec.Shardings[index]
-		if err := updateComponentSpecs(&shardingSpec.Template, shardingSpec.Name); err != nil {
+		sharding := &cluster.Spec.Shardings[index]
+		if err := updateComponentSpecs(&sharding.Template, sharding.Name); err != nil {
 			return err
 		}
 	}
@@ -127,10 +127,10 @@ func (c componentOpsHelper) cancelComponentOps(ctx context.Context,
 		compSpec := &opsRes.Cluster.Spec.ComponentSpecs[index]
 		rollBackCompSpec(compSpec, lastCompInfos, compSpec.Name)
 	}
-	// 2. rollback the shardingSpecs
+	// 2. rollback the shardings
 	for index := range opsRes.Cluster.Spec.Shardings {
-		shardingSpec := &opsRes.Cluster.Spec.Shardings[index]
-		rollBackCompSpec(&shardingSpec.Template, lastCompInfos, shardingSpec.Name)
+		sharding := &opsRes.Cluster.Spec.Shardings[index]
+		rollBackCompSpec(&sharding.Template, lastCompInfos, sharding.Name)
 	}
 	return cli.Update(ctx, opsRes.Cluster)
 }
@@ -217,18 +217,18 @@ func (c componentOpsHelper) reconcileActionWithComponentOps(reqCtx intctrlutil.R
 
 	// 2. handle the sharding status.
 	for i := range opsRes.Cluster.Spec.Shardings {
-		shardingSpec := opsRes.Cluster.Spec.Shardings[i]
-		compOps, ok := getCompOps(shardingSpec.Name)
+		sharding := opsRes.Cluster.Spec.Shardings[i]
+		compOps, ok := getCompOps(sharding.Name)
 		if !ok {
 			continue
 		}
 		// handle the progress of the components of the sharding.
-		shardingComps, err := intctrlutil.ListShardingComponents(reqCtx.Ctx, cli, opsRes.Cluster, shardingSpec.Name)
+		shardingComps, err := intctrlutil.ListShardingComponents(reqCtx.Ctx, cli, opsRes.Cluster, sharding.Name)
 		if err != nil {
 			return opsRequestPhase, 0, err
 		}
 		for j := range shardingComps {
-			if err = setProgressResource(&shardingSpec.Template, compOps,
+			if err = setProgressResource(&sharding.Template, compOps,
 				shardingComps[j].Labels[constant.KBAppComponentLabelKey], true); err != nil {
 				return opsRequestPhase, 0, err
 			}

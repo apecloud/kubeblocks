@@ -1848,7 +1848,7 @@ spec:
                       Specifies the hook to be executed after a component's creation.
 
 
-                      By setting `postProvision.customHandler.preCondition`, you can determine the specific lifecycle stage
+                      By setting `postProvision.preCondition`, you can determine the specific lifecycle stage
                       at which the action should trigger: `Immediately`, `RuntimeReady`, `ComponentReady`, and `ClusterReady`.
                       with `ComponentReady` being the default.
 
@@ -13059,23 +13059,16 @@ spec:
                               type: string
                           type: object
                         shardingVarRef:
-                          description: Selects a defined var of a Sharding.
+                          description: Selects a defined var of a sharding.
                           properties:
-                            clusterName:
-                              description: Reference to the name of the Cluster object.
+                            shardingName:
+                              description: Reference to the name of the sharding.
                               enum:
                               - Required
                               - Optional
                               type: string
-                            clusterUID:
-                              description: Reference to the UID of the Cluster object.
-                              enum:
-                              - Required
-                              - Optional
-                              type: string
-                            namespace:
-                              description: Reference to the namespace of the Cluster
-                                object.
+                            shards:
+                              description: Reference to the shards of the sharding.
                               enum:
                               - Required
                               - Optional

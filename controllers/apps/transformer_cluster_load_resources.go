@@ -92,8 +92,8 @@ func (t *clusterLoadRefResourcesTransformer) checkAllCompDefinition(cluster *app
 			return err
 		}
 	}
-	for _, shardingSpec := range cluster.Spec.Shardings {
-		if err := validate(shardingSpec.Template); err != nil {
+	for _, sharding := range cluster.Spec.Shardings {
+		if err := validate(sharding.Template); err != nil {
 			return err
 		}
 	}

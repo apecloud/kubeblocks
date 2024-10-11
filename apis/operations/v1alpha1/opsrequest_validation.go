@@ -344,9 +344,9 @@ func (r *OpsRequest) validateHorizontalScaling(_ context.Context, _ client.Clien
 			}
 		}
 	}
-	for _, shardingSpec := range cluster.Spec.Shardings {
-		if hScale, ok := hScaleMap[shardingSpec.Name]; ok {
-			if err := r.validateHorizontalScalingSpec(hScale, shardingSpec.Template, cluster.Name, true); err != nil {
+	for _, sharding := range cluster.Spec.Shardings {
+		if hScale, ok := hScaleMap[sharding.Name]; ok {
+			if err := r.validateHorizontalScalingSpec(hScale, sharding.Template, cluster.Name, true); err != nil {
 				return err
 			}
 		}
@@ -503,11 +503,11 @@ func (r *OpsRequest) checkInstanceTemplate(cluster *appsv1.Cluster, componentOps
 			instanceNameMap[instances[i].Name] = sets.Empty{}
 		}
 	}
-	for _, shardingSpec := range cluster.Spec.Shardings {
-		if shardingSpec.Name != componentOps.ComponentName {
+	for _, sharding := range cluster.Spec.Shardings {
+		if sharding.Name != componentOps.ComponentName {
 			continue
 		}
-		setInstanceMap(shardingSpec.Template.Instances)
+		setInstanceMap(sharding.Template.Instances)
 	}
 	for _, compSpec := range cluster.Spec.ComponentSpecs {
 		if compSpec.Name != componentOps.ComponentName {
@@ -533,8 +533,8 @@ func (r *OpsRequest) checkComponentExistence(cluster *appsv1.Cluster, compOpsLis
 	for _, compSpec := range cluster.Spec.ComponentSpecs {
 		compNameMap[compSpec.Name] = sets.Empty{}
 	}
-	for _, shardingSpec := range cluster.Spec.Shardings {
-		compNameMap[shardingSpec.Name] = sets.Empty{}
+	for _, sharding := range cluster.Spec.Shardings {
+		compNameMap[sharding.Name] = sets.Empty{}
 	}
 	var (
 		notFoundCompNames []string
@@ -547,7 +547,7 @@ func (r *OpsRequest) checkComponentExistence(cluster *appsv1.Cluster, compOpsLis
 	}
 
 	if len(notFoundCompNames) > 0 {
-		return fmt.Errorf("components: %v not found, in cluster.spec.componentSpecs or cluster.spec.shardingSpecs", notFoundCompNames)
+		return fmt.Errorf("components: %v not found, in cluster.spec.componentSpecs or cluster.spec.shardings", notFoundCompNames)
 	}
 	return nil
 }

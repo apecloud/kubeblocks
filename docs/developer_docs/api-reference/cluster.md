@@ -1928,7 +1928,7 @@ ShardingLifecycleActions
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines additional Services to expose the sharding&rsquo;s endpoints.</p>
+<p>Defines the services for the sharding.</p>
 <p>This field is immutable.</p>
 </td>
 </tr>
@@ -4816,7 +4816,7 @@ Action
 <td>
 <em>(Optional)</em>
 <p>Specifies the hook to be executed after a component&rsquo;s creation.</p>
-<p>By setting <code>postProvision.customHandler.preCondition</code>, you can determine the specific lifecycle stage
+<p>By setting <code>postProvision.preCondition</code>, you can determine the specific lifecycle stage
 at which the action should trigger: <code>Immediately</code>, <code>RuntimeReady</code>, <code>ComponentReady</code>, and <code>ClusterReady</code>.
 with <code>ComponentReady</code> being the default.</p>
 <p>The PostProvision Action is intended to run only once.</p>
@@ -9790,7 +9790,7 @@ ShardingLifecycleActions
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines additional Services to expose the sharding&rsquo;s endpoints.</p>
+<p>Defines the services for the sharding.</p>
 <p>This field is immutable.</p>
 </td>
 </tr>
@@ -9886,6 +9886,45 @@ string
 <tbody>
 <tr>
 <td>
+<code>postProvision</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the hook to be executed after a sharding&rsquo;s creation.</p>
+<p>By setting <code>postProvision.preCondition</code>, you can determine the specific lifecycle stage at which
+the action should trigger, available conditions for sharding include: <code>Immediately</code>, <code>ComponentReady</code>,
+and <code>ClusterReady</code>. For sharding, the <code>ComponentReady</code> condition means all components of the sharding are ready.</p>
+<p>With <code>ComponentReady</code> being the default.</p>
+<p>The PostProvision Action is intended to run only once.</p>
+<p>Note: This field is immutable once it has been set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>preTerminate</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the hook to be executed prior to terminating a sharding.</p>
+<p>The PreTerminate Action is intended to run only once.</p>
+<p>This action is executed immediately when a terminate operation for the sharding is initiated.
+The actual termination and cleanup of the sharding and its associated resources will not proceed
+until the PreTerminate action has completed successfully.</p>
+<p>Note: This field is immutable once it has been set.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>shardProvision</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.Action">
@@ -9952,7 +9991,7 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies whether the service is shared across shards.</p>
+<p>Specifies whether the service is shared across all shards in the sharding.</p>
 </td>
 </tr>
 </tbody>
@@ -9993,7 +10032,7 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies whether the account is shared across shards.</p>
+<p>Specifies whether the account is shared across all shards in the sharding.</p>
 </td>
 </tr>
 </tbody>
@@ -10056,20 +10095,6 @@ VarOption
 </tr>
 <tr>
 <td>
-<code>shortName</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.VarOption">
-VarOption
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Reference to the short name of the sharding.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>shards</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.VarOption">
@@ -10086,8 +10111,11 @@ VarOption
 </table>
 <h3 id="apps.kubeblocks.io/v1.ShardingVarSelector">ShardingVarSelector
 </h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.VarSource">VarSource</a>)
+</p>
 <div>
-<p>ShardingVarSelector selects a var from a Sharding.</p>
+<p>ShardingVarSelector selects a var from a sharding.</p>
 </div>
 <table>
 <thead>
@@ -10585,14 +10613,14 @@ ClusterVarSelector
 <td>
 <code>shardingVarRef</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.ClusterVarSelector">
-ClusterVarSelector
+<a href="#apps.kubeblocks.io/v1.ShardingVarSelector">
+ShardingVarSelector
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Selects a defined var of a Sharding.</p>
+<p>Selects a defined var of a sharding.</p>
 </td>
 </tr>
 </tbody>

@@ -719,6 +719,58 @@ var _ = Describe("Cluster Controller", func() {
 		})).Should(Succeed())
 	}
 
+	testClusterAffinityNToleration4Update := func(compName, compDefName string, createObj func(string, string, func(*testapps.MockClusterFactory))) {
+		const (
+			clusterTopologyKey     = "testClusterTopologyKey"
+			clusterLabelKey        = "testClusterNodeLabelKey"
+			clusterLabelValue      = "testClusterNodeLabelValue"
+			clusterTolerationKey   = "testClusterTolerationKey"
+			clusterTolerationValue = "testClusterTolerationValue"
+		)
+
+		Expect(compDefName).Should(BeElementOf(consensusCompDefName))
+
+		By("Creating a cluster w/o Affinity and Toleration")
+		createObj(compName, compDefName, nil)
+
+		By("update cluster to set Affinity and Toleration")
+		affinity := appsv1alpha1.Affinity{
+			PodAntiAffinity: appsv1alpha1.Required,
+			TopologyKeys:    []string{clusterTopologyKey},
+			NodeLabels: map[string]string{
+				clusterLabelKey: clusterLabelValue,
+			},
+			Tenancy: appsv1alpha1.SharedNode,
+		}
+		toleration := corev1.Toleration{
+			Key:      clusterTolerationKey,
+			Value:    clusterTolerationValue,
+			Operator: corev1.TolerationOpEqual,
+			Effect:   corev1.TaintEffectNoSchedule,
+		}
+		Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
+			cluster.Spec.Affinity = &affinity
+			cluster.Spec.Tolerations = []corev1.Toleration{toleration}
+		})()).ShouldNot(HaveOccurred())
+
+		By("Checking the Affinity and Toleration")
+		schedulingPolicy, err := scheduling.BuildSchedulingPolicy4Component(clusterObj.Name, compName, &affinity, []corev1.Toleration{toleration})
+		Expect(err).Should(BeNil())
+
+		compKey := types.NamespacedName{
+			Namespace: clusterObj.Namespace,
+			Name:      component.FullName(clusterObj.Name, compName),
+		}
+		Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *appsv1alpha1.Component) {
+			g.Expect(comp.Spec.Affinity).Should(BeNil())
+			g.Expect(comp.Spec.Tolerations).Should(HaveLen(0))
+			g.Expect(comp.Spec.SchedulingPolicy).ShouldNot(BeNil())
+			g.Expect(comp.Spec.SchedulingPolicy.Affinity).Should(BeEquivalentTo(schedulingPolicy.Affinity))
+			g.Expect(comp.Spec.SchedulingPolicy.Tolerations).Should(HaveLen(2))
+			g.Expect(comp.Spec.SchedulingPolicy.Tolerations[0]).Should(BeEquivalentTo(toleration))
+		})).Should(Succeed())
+	}
+
 	type expectService struct {
 		clusterIP string
 		svcType   corev1.ServiceType
@@ -1455,6 +1507,10 @@ var _ = Describe("Cluster Controller", func() {
 
 		It("with both cluster and component affinity and toleration set", func() {
 			testClusterComponentAffinityNToleration(consensusCompName, consensusCompDefName, createLegacyClusterObj)
+		})
+
+		It("with cluster affinity and toleration set - update component", func() {
+			testClusterAffinityNToleration4Update(consensusCompName, consensusCompDefName, createLegacyClusterObj)
 		})
 	})
 

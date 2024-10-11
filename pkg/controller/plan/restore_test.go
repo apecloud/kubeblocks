@@ -110,9 +110,16 @@ var _ = Describe("Restore", func() {
 		)
 
 		BeforeEach(func() {
+			By("By creating backup policyTemplate ")
 			compDef = testapps.NewComponentDefinitionFactory(compDefName).
 				SetDefaultSpec().
 				Create(&testCtx).GetObject()
+
+			testdp.NewBackupPolicyTemplateFactory("backup-policy-template").
+				SetCompDefs(compDef.Name).
+				WithRandomName().
+				AddBackupMethod(testdp.BackupMethodName, false, fullBackupActionSetName).
+				SetBackupMethodVolumeMounts(testapps.DataVolumeName, "/data").Create(&testCtx).Get()
 
 			pvcSpec := testapps.NewPVCSpec("1Gi")
 			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
@@ -142,13 +149,6 @@ var _ = Describe("Restore", func() {
 			By("create actionset of full backup")
 			fullBackupActionSet = testapps.CreateCustomizedObj(&testCtx, "backup/actionset.yaml", &dpv1alpha1.ActionSet{}, testapps.RandomizedObjName())
 			fullBackupActionSetName = fullBackupActionSet.Name
-
-			By("By creating backup policyTemplate: ")
-			_ = testapps.NewBackupPolicyTemplateFactory("backup-policy-template").
-				WithRandomName().
-				AddBackupPolicy(compDef.Name).
-				AddBackupMethod(testdp.BackupMethodName, false, fullBackupActionSetName).
-				SetBackupMethodVolumeMounts(testapps.DataVolumeName, "/data")
 
 			synthesizedComponent = &component.SynthesizedComponent{
 				PodSpec:              &compDef.Spec.Runtime,

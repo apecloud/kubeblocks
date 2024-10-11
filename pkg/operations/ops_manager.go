@@ -167,8 +167,10 @@ func (opsMgr *OpsManager) Reconcile(reqCtx intctrlutil.RequestCtx, cli client.Cl
 	opsRes.ToClusterPhase = opsBehaviour.ToClusterPhase
 	if opsRequest.Spec.Type == opsv1alpha1.CustomType {
 		err = initOpsDefAndValidate(reqCtx, cli, opsRes)
-		if err != nil {
+		if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal) {
 			return requeueAfter, patchValidateErrorCondition(reqCtx.Ctx, cli, opsRes, err.Error())
+		} else if err != nil {
+			return requeueAfter, err
 		}
 	}
 	if opsRequestPhase, requeueAfter, err = opsBehaviour.OpsHandler.ReconcileAction(reqCtx, cli, opsRes); err != nil &&

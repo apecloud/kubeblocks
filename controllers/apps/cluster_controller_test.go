@@ -305,14 +305,14 @@ var _ = Describe("Cluster Controller", func() {
 			ml, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(defaultShardCount))
 
 		By("checking backup policy")
-		backupPolicyName := generateBackupPolicyName(clusterKey.Name, compTplName, "")
+		backupPolicyName := generateBackupPolicyName(clusterKey.Name, compTplName, false)
 		backupPolicyKey := client.ObjectKey{Name: backupPolicyName, Namespace: clusterKey.Namespace}
 		Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, bp *dpv1alpha1.BackupPolicy) {
 			g.Expect(bp.Spec.Targets).Should(HaveLen(defaultShardCount))
 		})).Should(Succeed())
 
 		By("checking backup schedule")
-		backupScheduleName := generateBackupScheduleName(clusterKey.Name, compTplName, "")
+		backupScheduleName := generateBackupScheduleName(clusterKey.Name, compTplName)
 		backupScheduleKey := client.ObjectKey{Name: backupScheduleName, Namespace: clusterKey.Namespace}
 		Eventually(testapps.CheckObjExists(&testCtx, backupScheduleKey,
 			&dpv1alpha1.BackupSchedule{}, true)).Should(Succeed())
@@ -1070,14 +1070,14 @@ var _ = Describe("Cluster Controller", func() {
 				}
 
 				By("checking backup policy")
-				backupPolicyName := generateBackupPolicyName(clusterKey.Name, defaultCompName, "")
+				backupPolicyName := generateBackupPolicyName(clusterKey.Name, defaultCompName, false)
 				backupPolicyKey := client.ObjectKey{Name: backupPolicyName, Namespace: clusterKey.Namespace}
 				backupPolicy := &dpv1alpha1.BackupPolicy{}
 				Eventually(testapps.CheckObjExists(&testCtx, backupPolicyKey, backupPolicy, true)).Should(Succeed())
 				Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, checkPolicy)).Should(Succeed())
 
 				By("checking backup schedule")
-				backupScheduleName := generateBackupScheduleName(clusterKey.Name, defaultCompName, "")
+				backupScheduleName := generateBackupScheduleName(clusterKey.Name, defaultCompName)
 				backupScheduleKey := client.ObjectKey{Name: backupScheduleName, Namespace: clusterKey.Namespace}
 				if backup == nil {
 					Eventually(testapps.CheckObjExists(&testCtx, backupScheduleKey,

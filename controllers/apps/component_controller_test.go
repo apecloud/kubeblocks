@@ -1675,7 +1675,7 @@ var _ = Describe("Component Controller", func() {
 	Context("provisioning", func() {
 		BeforeEach(func() {
 			createAllDefinitionObjects()
-			testdp.CreateBackupPolicyTpl(&testCtx, compDefObj.GetName())
+			testdp.CreateBackupPolicyTpl(&testCtx, compDefObj.Name)
 		})
 
 		AfterEach(func() {
@@ -1753,7 +1753,7 @@ var _ = Describe("Component Controller", func() {
 	Context("h-scaling", func() {
 		BeforeEach(func() {
 			createAllDefinitionObjects()
-			testdp.CreateBackupPolicyTpl(&testCtx, compDefObj.GetName())
+			testdp.CreateBackupPolicyTpl(&testCtx, compDefObj.Name)
 		})
 
 		AfterEach(func() {
@@ -1853,7 +1853,7 @@ var _ = Describe("Component Controller", func() {
 
 		BeforeEach(func() {
 			createAllDefinitionObjects()
-			testdp.CreateBackupPolicyTpl(&testCtx, compDefObj.GetName())
+			testdp.CreateBackupPolicyTpl(&testCtx, compDefObj.Name)
 			mockStorageClass = testk8s.CreateMockStorageClass(&testCtx, testk8s.DefaultStorageClassName)
 		})
 
@@ -1880,7 +1880,7 @@ var _ = Describe("Component Controller", func() {
 	Context("restore", func() {
 		BeforeEach(func() {
 			createAllDefinitionObjects()
-			testdp.CreateBackupPolicyTpl(&testCtx, compDefObj.GetName())
+			testdp.CreateBackupPolicyTpl(&testCtx, compDefObj.Name)
 		})
 
 		AfterEach(func() {

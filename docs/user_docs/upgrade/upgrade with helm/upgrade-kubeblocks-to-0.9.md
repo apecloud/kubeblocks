@@ -18,7 +18,7 @@ Execute `helm -n kb-system list | grep kubeblocks` to check the current KubeBloc
 
 ## Compatibility
 
-KubeBlocks 0.9 is compatible with KubeBlocks 0.8 APIs, but compatibility with APIs from versions prior to v0.8 is not guaranteed. If you are using addons from KubeBlocks 0.7 or earlier (v0.7., 0.6., etc), DO [upgrade KubeBlocks and all addons to v0.8 first](upgrade-kubeblocks-to-0.8.md) to ensure service availability before upgrading to v0.9.
+KubeBlocks 0.9 is compatible with KubeBlocks 0.8 APIs, but compatibility with APIs from versions prior to v0.8 is not guaranteed. If you are using addons from KubeBlocks 0.7 or earlier (0.6, etc), DO [upgrade KubeBlocks and all addons to v0.8 first](upgrade-kubeblocks-to-0.8.md) to ensure service availability before upgrading to v0.9.
 
 ## Upgrade from KubeBlocks v0.8
 
@@ -61,7 +61,7 @@ KubeBlocks 0.9 is compatible with KubeBlocks 0.8 APIs, but compatibility with AP
     To reduce the size of Helm chart, KubeBlocks v0.8 removes CRD from the Helm chart. Before upgrading, you need to install CRD.
 
     ```shell
-    kubectl replace -f https://github.com/apecloud/kubeblocks/releases/download/v0.9.0/kubeblocks_crds.yaml
+    kubectl replace -f https://github.com/apecloud/kubeblocks/releases/download/v0.9.0/kubeblocks_crds.yaml || kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/v0.9./kubeblocks_crds.yaml 
     ```
 
 4. Upgrade KubeBlocks.

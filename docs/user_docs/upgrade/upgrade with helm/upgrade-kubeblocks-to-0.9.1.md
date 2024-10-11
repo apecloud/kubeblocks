@@ -122,7 +122,7 @@ If you are upgrading from v0.8 to v0.9, it's recommended to enable webhook to en
 
 4. Upgrade KubeBlocks.
 
-    The commnad below set `--set admissionWebhooks.enabled=true --set admissionWebhooks.ignoreReplicasCheck=true` to enable the webhook, facilitating support for multiple versions related to ConfigConstraint.
+    The command below sets `--set admissionWebhooks.enabled=true --set admissionWebhooks.ignoreReplicasCheck=true` to enable the webhook, facilitating support for multiple versions related to ConfigConstraint.
 
     ```shell
     helm -n kb-system upgrade kubeblocks kubeblocks/kubeblocks --version 0.9.1 --set upgradeAddons=false --set admissionWebhooks.enabled=true --set admissionWebhooks.ignoreReplicasCheck=true --set crd.enabled=false 

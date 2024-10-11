@@ -19,9 +19,9 @@ Execute `kbcli version` to check the current KubeBlocks version you are running 
 
 ## Compatibility
 
-KubeBlocks v0.9.1 is compatible with KubeBlocks v0.8 APIs, but compatibility with APIs from versions prior to v0.8 is not guaranteed. If you are using Addons from KubeBlocks v0.7 or earlier (v0.7., v0.6., etc), DO [upgrade KubeBlocks and all addons to v0.8 first](./upgrade-kubeblocks-to-0.8.md) to ensure service availability before upgrading to v0.9.
+KubeBlocks v0.9.1 is compatible with KubeBlocks v0.8 APIs, but compatibility with APIs from versions prior to v0.8 is not guaranteed. If you are using Addons from KubeBlocks v0.7 or earlier (v0.6, etc), DO [upgrade KubeBlocks and all addons to v0.8 first](./upgrade-kubeblocks-to-0.8.md) to ensure service availability before upgrading to v0.9.
 
-If you are upgrading from v0.8 to v0.9, it's recommended to enable webhook to ensure the availability.
+If you are upgrading from v0.8 to v0.9, it's recommended to enable webhook to ensure the availability of the upgrade from v0.8 to v0.9.
 
 ## Upgrade from KubeBlocks 0.9.0
 
@@ -77,7 +77,7 @@ If you are upgrading from v0.8 to v0.9, it's recommended to enable webhook to en
 
 ## Upgrade addons
 
-If you didn't specify `upgradeAddons` as `true` or your Addon is not included in the default installed Addons, you can upgrade Addons by the options provided below to use the v0.9.x API.
+If you didn't specify `upgradeAddons` as `true` or your Addon is not included in the default installed Addons, you can upgrade Addons by the options provided below to use the v0.9 API.
 
 :::note
 

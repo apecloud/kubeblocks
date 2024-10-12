@@ -93,7 +93,7 @@ func parseCRDs(path string) ([]apiextensionsv1.CustomResourceDefinition, error) 
 func readCRDs(basePath string, files []string) ([]apiextensionsv1.CustomResourceDefinition, error) {
 	var crds []apiextensionsv1.CustomResourceDefinition
 
-	crdExts := sets.NewString(".yaml", ".yml")
+	crdExts := sets.New(".yaml", ".yml")
 	for _, file := range files {
 		if !crdExts.Has(filepath.Ext(file)) {
 			continue

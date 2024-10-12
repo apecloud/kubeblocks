@@ -57,6 +57,8 @@ func init() {
 
 // ShardingDefinitionSpec defines the desired state of ShardingDefinition
 type ShardingDefinitionSpec struct {
+	// This field is immutable.
+	//
 	// +kubebuilder:validation:Required
 	Template ShardingTemplate `json:"template"`
 
@@ -67,10 +69,18 @@ type ShardingDefinitionSpec struct {
 	// +optional
 	ShardsLimit *ShardsLimit `json:"shardsLimit,omitempty"`
 
+	// Specifies the strategy for provisioning shards of the sharding. Only `Serial` and `Parallel` are supported.
+	//
+	// This field is immutable.
+	//
 	// +kubebuilder:default=Serial
 	// +optional
 	ProvisionStrategy *UpdateStrategy `json:"provisionStrategy,omitempty"`
 
+	// Specifies the strategy for updating shards of the sharding. Only `Serial` and `Parallel` are supported.
+	//
+	// This field is immutable.
+	//
 	// +kubebuilder:default=Serial
 	// +optional
 	UpdateStrategy *UpdateStrategy `json:"updateStrategy,omitempty"`
@@ -81,13 +91,6 @@ type ShardingDefinitionSpec struct {
 	//
 	// +optional
 	LifecycleActions *ShardingLifecycleActions `json:"lifecycleActions,omitempty"`
-
-	// Defines the services for the sharding.
-	//
-	// This field is immutable.
-	//
-	// +optional
-	Services []ShardingService `json:"services,omitempty"`
 
 	// Defines the system accounts for the sharding.
 	//
@@ -117,6 +120,15 @@ type ShardingDefinitionStatus struct {
 }
 
 type ShardingTemplate struct {
+	// The component definition(s) that the sharding is based on.
+	//
+	// The component definition can be specified using one of the following:
+	//
+	// - the full name
+	// - the regular expression pattern ('^' will be added to the beginning of the pattern automatically)
+	//
+	// This field is immutable.
+	//
 	// +kubebuilder:validation:Required
 	CompDef string `json:"compDef"`
 }
@@ -182,21 +194,6 @@ type ShardingLifecycleActions struct {
 	ShardTerminate *Action `json:"shardTerminate,omitempty"`
 }
 
-type ShardingService struct {
-	// The name of the service defined in the sharding template.
-	//
-	// This field is immutable once set.
-	//
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=25
-	Name string `json:"name"`
-
-	// Specifies whether the service is shared across all shards in the sharding.
-	//
-	// +optional
-	Shared bool `json:"shared,omitempty"`
-}
-
 type ShardingSystemAccount struct {
 	// The name of the system account defined in the sharding template.
 	//
@@ -208,5 +205,5 @@ type ShardingSystemAccount struct {
 	// Specifies whether the account is shared across all shards in the sharding.
 	//
 	// +optional
-	Shared bool `json:"shared,omitempty"`
+	Shared *bool `json:"shared,omitempty"`
 }

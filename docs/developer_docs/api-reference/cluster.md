@@ -1859,6 +1859,7 @@ ShardingTemplate
 </em>
 </td>
 <td>
+<p>This field is immutable.</p>
 </td>
 </tr>
 <tr>
@@ -1887,6 +1888,8 @@ UpdateStrategy
 </td>
 <td>
 <em>(Optional)</em>
+<p>Specifies the strategy for provisioning shards of the sharding. Only <code>Serial</code> and <code>Parallel</code> are supported.</p>
+<p>This field is immutable.</p>
 </td>
 </tr>
 <tr>
@@ -1900,6 +1903,8 @@ UpdateStrategy
 </td>
 <td>
 <em>(Optional)</em>
+<p>Specifies the strategy for updating shards of the sharding. Only <code>Serial</code> and <code>Parallel</code> are supported.</p>
+<p>This field is immutable.</p>
 </td>
 </tr>
 <tr>
@@ -1914,21 +1919,6 @@ ShardingLifecycleActions
 <td>
 <em>(Optional)</em>
 <p>Defines a set of hooks and procedures that customize the behavior of a sharding throughout its lifecycle.</p>
-<p>This field is immutable.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>services</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.ShardingService">
-[]ShardingService
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the services for the sharding.</p>
 <p>This field is immutable.</p>
 </td>
 </tr>
@@ -9721,6 +9711,7 @@ ShardingTemplate
 </em>
 </td>
 <td>
+<p>This field is immutable.</p>
 </td>
 </tr>
 <tr>
@@ -9749,6 +9740,8 @@ UpdateStrategy
 </td>
 <td>
 <em>(Optional)</em>
+<p>Specifies the strategy for provisioning shards of the sharding. Only <code>Serial</code> and <code>Parallel</code> are supported.</p>
+<p>This field is immutable.</p>
 </td>
 </tr>
 <tr>
@@ -9762,6 +9755,8 @@ UpdateStrategy
 </td>
 <td>
 <em>(Optional)</em>
+<p>Specifies the strategy for updating shards of the sharding. Only <code>Serial</code> and <code>Parallel</code> are supported.</p>
+<p>This field is immutable.</p>
 </td>
 </tr>
 <tr>
@@ -9776,21 +9771,6 @@ ShardingLifecycleActions
 <td>
 <em>(Optional)</em>
 <p>Defines a set of hooks and procedures that customize the behavior of a sharding throughout its lifecycle.</p>
-<p>This field is immutable.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>services</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.ShardingService">
-[]ShardingService
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the services for the sharding.</p>
 <p>This field is immutable.</p>
 </td>
 </tr>
@@ -9955,47 +9935,6 @@ Action
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1.ShardingService">ShardingService
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ShardingDefinitionSpec">ShardingDefinitionSpec</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>name</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>The name of the service defined in the sharding template.</p>
-<p>This field is immutable once set.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>shared</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies whether the service is shared across all shards in the sharding.</p>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1.ShardingSystemAccount">ShardingSystemAccount
 </h3>
 <p>
@@ -10060,6 +9999,13 @@ string
 </em>
 </td>
 <td>
+<p>The component definition(s) that the sharding is based on.</p>
+<p>The component definition can be specified using one of the following:</p>
+<ul>
+<li>the full name</li>
+<li>the regular expression pattern (&lsquo;^&rsquo; will be added to the beginning of the pattern automatically)</li>
+</ul>
+<p>This field is immutable.</p>
 </td>
 </tr>
 </tbody>

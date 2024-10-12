@@ -1175,38 +1175,15 @@ spec:
               provisionStrategy:
                 default: Serial
                 description: |-
-                  UpdateStrategy defines the update strategy for cluster components. This strategy determines how updates are applied
-                  across the cluster.
-                  The available strategies are `Serial`, `BestEffortParallel`, and `Parallel`.
+                  Specifies the strategy for provisioning shards of the sharding. Only `Serial` and `Parallel` are supported.
+
+
+                  This field is immutable.
                 enum:
                 - Serial
                 - BestEffortParallel
                 - Parallel
                 type: string
-              services:
-                description: |-
-                  Defines the services for the sharding.
-
-
-                  This field is immutable.
-                items:
-                  properties:
-                    name:
-                      description: |-
-                        The name of the service defined in the sharding template.
-
-
-                        This field is immutable once set.
-                      maxLength: 25
-                      type: string
-                    shared:
-                      description: Specifies whether the service is shared across
-                        all shards in the sharding.
-                      type: boolean
-                  required:
-                  - name
-                  type: object
-                type: array
               shardsLimit:
                 description: |-
                   Defines the upper limit of the number of shards supported by the sharding.
@@ -1257,8 +1234,21 @@ spec:
                   type: object
                 type: array
               template:
+                description: This field is immutable.
                 properties:
                   compDef:
+                    description: |-
+                      The component definition(s) that the sharding is based on.
+
+
+                      The component definition can be specified using one of the following:
+
+
+                      - the full name
+                      - the regular expression pattern ('^' will be added to the beginning of the pattern automatically)
+
+
+                      This field is immutable.
                     type: string
                 required:
                 - compDef
@@ -1266,9 +1256,10 @@ spec:
               updateStrategy:
                 default: Serial
                 description: |-
-                  UpdateStrategy defines the update strategy for cluster components. This strategy determines how updates are applied
-                  across the cluster.
-                  The available strategies are `Serial`, `BestEffortParallel`, and `Parallel`.
+                  Specifies the strategy for updating shards of the sharding. Only `Serial` and `Parallel` are supported.
+
+
+                  This field is immutable.
                 enum:
                 - Serial
                 - BestEffortParallel

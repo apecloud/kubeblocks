@@ -170,7 +170,7 @@ var _ = Describe("TLS self-signed cert function", func() {
 					GetObject()
 				clusterKey := client.ObjectKeyFromObject(clusterObj)
 				Eventually(k8sClient.Get(ctx, clusterKey, clusterObj)).Should(Succeed())
-				Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+				Eventually(testapps.ClusterReconciled(&testCtx, clusterKey)).Should(BeTrue())
 				Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1.CreatingClusterPhase))
 
 				itsList := testk8s.ListAndCheckInstanceSet(&testCtx, clusterKey)

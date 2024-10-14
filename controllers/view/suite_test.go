@@ -29,7 +29,6 @@ import (
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apimachinery/pkg/util/uuid"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -46,11 +45,6 @@ import (
 
 var (
 	scheme = runtime.NewScheme()
-
-	namespace       = "foo"
-	name            = "bar"
-	uid             = uuid.NewUUID()
-	resourceVersion = "612345"
 )
 
 func TestAPIs(t *testing.T) {

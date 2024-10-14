@@ -225,7 +225,7 @@ test-current-ctx: manifests generate add-k8s-host ## Run operator controller tes
 
 .PHONY: test-fast
 test-fast: envtest
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test -short $(TEST_PACKAGES)  $(OUTPUT_COVERAGE)
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" $(GO) test -v -short $(TEST_PACKAGES)  $(OUTPUT_COVERAGE)
 
 .PHONY: test
 test: manifests generate test-go-generate add-k8s-host test-fast ## Run tests. if existing k8s cluster is k3d or minikube, specify EXISTING_CLUSTER_TYPE.

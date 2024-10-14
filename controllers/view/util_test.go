@@ -20,8 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package view
 
 import (
-	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -30,7 +28,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
+	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
@@ -159,7 +159,7 @@ var _ = Describe("util test", func() {
 	Context("getObjectRef", func() {
 		It("should work well", func() {
 			obj := builder.NewClusterBuilder(namespace, name).GetObject()
-			objectRef, err := getObjectRef(obj, scheme)
+			objectRef, err := getObjectRef(obj, testScheme)
 			Expect(err).Should(BeNil())
 			Expect(*objectRef).Should(Equal(model.GVKNObjKey{
 				GroupVersionKind: schema.GroupVersionKind{
@@ -178,7 +178,7 @@ var _ = Describe("util test", func() {
 	Context("getObjectReference", func() {
 		It("should work well", func() {
 			obj := builder.NewClusterBuilder(namespace, name).SetUID(uid).SetResourceVersion(resourceVersion).GetObject()
-			ref, err := getObjectReference(obj, scheme)
+			ref, err := getObjectReference(obj, testScheme)
 			Expect(err).Should(BeNil())
 			Expect(*ref).Should(Equal(corev1.ObjectReference{
 				APIVersion:      kbappsv1.APIVersion,

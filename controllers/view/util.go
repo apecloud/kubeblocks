@@ -93,6 +93,9 @@ func objectRefToReference(objectRef model.GVKNObjKey, uid types.UID, resourceVer
 }
 
 func objectRefToType(objectRef *model.GVKNObjKey) *viewv1.ObjectType {
+	if objectRef == nil {
+		return nil
+	}
 	return &viewv1.ObjectType{
 		APIVersion: objectRef.GroupVersionKind.GroupVersion().String(),
 		Kind:       objectRef.Kind,

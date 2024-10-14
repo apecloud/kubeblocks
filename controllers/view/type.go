@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -232,20 +233,20 @@ var (
 		},
 	}
 
-	kbOwnershipRules = filterUnsupportedRules(fullKBOwnershipRules)
+	kbOwnershipRules = filterUnsupportedRules(fullKBOwnershipRules, nil)
 )
 
-func filterUnsupportedRules(ownershipRules []OwnershipRule) []OwnershipRule {
+func filterUnsupportedRules(ownershipRules []OwnershipRule, cfg *rest.Config) []OwnershipRule {
 	var rules []OwnershipRule
 	for _, rule := range ownershipRules {
-		if exists, _ := resourceExists(rule.Primary.APIVersion, rule.Primary.Kind); !exists {
+		if exists, _ := resourceExists(rule.Primary.APIVersion, rule.Primary.Kind, cfg); !exists {
 			continue
 		}
 		filteredRule := OwnershipRule{
 			Primary: rule.Primary,
 		}
 		for _, ownedResource := range rule.OwnedResources {
-			if exists, _ := resourceExists(ownedResource.Secondary.APIVersion, ownedResource.Secondary.Kind); !exists {
+			if exists, _ := resourceExists(ownedResource.Secondary.APIVersion, ownedResource.Secondary.Kind, cfg); !exists {
 				continue
 			}
 			filteredRule.OwnedResources = append(filteredRule.OwnedResources, ownedResource)
@@ -258,9 +259,11 @@ func filterUnsupportedRules(ownershipRules []OwnershipRule) []OwnershipRule {
 }
 
 // resourceExists checks if a resource with the given apiVersion and kind exists in the cluster.
-func resourceExists(apiVersion, kind string) (bool, error) {
+func resourceExists(apiVersion, kind string, config *rest.Config) (bool, error) {
 	// Load the kubeconfig file to get a config object
-	config := intctrlutil.GeKubeRestConfig("kubeblocks-api-tester")
+	if config == nil {
+		config = intctrlutil.GeKubeRestConfig("kubeblocks-api-tester")
+	}
 
 	// Create a discovery client
 	discoveryClient, err := discovery.NewDiscoveryClientForConfig(config)

@@ -22,6 +22,7 @@ package view
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"k8s.io/client-go/kubernetes/scheme"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -159,7 +160,7 @@ var _ = Describe("util test", func() {
 	Context("getObjectRef", func() {
 		It("should work well", func() {
 			obj := builder.NewClusterBuilder(namespace, name).GetObject()
-			objectRef, err := getObjectRef(obj, scheme)
+			objectRef, err := getObjectRef(obj, scheme.Scheme)
 			Expect(err).Should(BeNil())
 			Expect(*objectRef).Should(Equal(model.GVKNObjKey{
 				GroupVersionKind: schema.GroupVersionKind{
@@ -178,7 +179,7 @@ var _ = Describe("util test", func() {
 	Context("getObjectReference", func() {
 		It("should work well", func() {
 			obj := builder.NewClusterBuilder(namespace, name).SetUID(uid).SetResourceVersion(resourceVersion).GetObject()
-			ref, err := getObjectReference(obj, scheme)
+			ref, err := getObjectReference(obj, scheme.Scheme)
 			Expect(err).Should(BeNil())
 			Expect(*ref).Should(Equal(corev1.ObjectReference{
 				APIVersion:      kbappsv1.APIVersion,

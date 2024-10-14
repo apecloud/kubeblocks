@@ -62,7 +62,7 @@ type clusterTransformContext struct {
 	shardingDefs  map[string]*appsv1.ShardingDefinition
 	componentDefs map[string]*appsv1.ComponentDefinition
 
-	// consolidated components and shardings
+	// consolidated components and shardings from topology and/or user-specified
 	components []*appsv1.ClusterComponentSpec
 	shardings  []*appsv1.ClusterSharding
 

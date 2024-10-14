@@ -236,7 +236,7 @@ func parseSelector(obj client.Object, fieldPath string) (map[string]string, erro
 	// TODO(free6om): handle metav1.LabelSelector
 	// labelSelector := &metav1.LabelSelector{}
 	labelSelector := make(map[string]string)
-	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(selectorField, labelSelector); err != nil {
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(selectorField, &labelSelector); err != nil {
 		return nil, fmt.Errorf("failed to parse as LabelSelector: %w", err)
 	}
 
@@ -388,7 +388,7 @@ func parseQueryOptions(primary client.Object, criteria *OwnershipCriteria) (*que
 			opts.matchFields = client.MatchingFields{"metadata.name": name}
 		}
 	}
-	if criteria.Validation != NoValidation {
+	if criteria.Validation != "" && criteria.Validation != NoValidation {
 		opts.matchOwner = &matchOwner{
 			ownerUID:   primary.GetUID(),
 			controller: criteria.Validation == ControllerValidation,

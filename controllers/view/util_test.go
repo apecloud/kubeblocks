@@ -229,4 +229,87 @@ var _ = Describe("util test", func() {
 			Expect(objects[0]).Should(Equal(owned))
 		})
 	})
+
+	Context("matchOwnerOf", func() {
+		It("should work well", func() {
+			owner := builder.NewClusterBuilder(namespace, name).SetUID(uid).GetObject()
+			compName := "hello"
+			fullCompName := fmt.Sprintf("%s-%s", owner.Name, compName)
+			owned := builder.NewComponentBuilder(namespace, fullCompName, "").
+				SetOwnerReferences(kbappsv1.APIVersion, kbappsv1.ClusterKind, owner).
+				GetObject()
+			matchOwner := &matchOwner{
+				controller: true,
+				ownerUID:   uid,
+			}
+			Expect(matchOwnerOf(matchOwner, owned)).Should(BeTrue())
+		})
+	})
+
+	Context("parseRevision", func() {
+		It("should work well", func() {
+			rev := parseRevision(resourceVersion)
+			Expect(rev).Should(Equal(int64(612345)))
+		})
+	})
+
+	Context("parseQueryOptions", func() {
+		It("should work well", func() {
+			By("selector criteria")
+			labels := map[string]string{
+				"label1": "value1",
+				"label2": "value2",
+			}
+			primary := builder.NewInstanceSetBuilder(namespace, name).AddLabelsInMap(labels).AddMatchLabelsInMap(labels).GetObject()
+			criteria := &OwnershipCriteria{
+				SelectorCriteria: &FieldPath{
+					Path: "spec.selector.matchLabels",
+				},
+			}
+			opt, err := parseQueryOptions(primary, criteria)
+			Expect(err).Should(BeNil())
+			Expect(opt).ShouldNot(BeNil())
+			Expect(opt.matchLabels).Should(BeEquivalentTo(labels))
+
+			By("label criteria")
+			labels = map[string]string{
+				"label1": "$(primary)",
+				"label2": "$(primary.name)",
+				"label3": "value3",
+			}
+			criteria = &OwnershipCriteria{
+				LabelCriteria: labels,
+			}
+			opt, err = parseQueryOptions(primary, criteria)
+			Expect(err).Should(BeNil())
+			Expect(opt).ShouldNot(BeNil())
+			expectedLabels := map[string]string{
+				"label1": primary.Labels["label1"],
+				"label2": primary.Name,
+				"label3": "value3",
+			}
+			Expect(opt.matchLabels).Should(BeEquivalentTo(expectedLabels))
+
+			By("specified name criteria")
+			criteria = &OwnershipCriteria{
+				SpecifiedNameCriteria: &FieldPath{
+					Path: "metadata.name",
+				},
+			}
+			opt, err = parseQueryOptions(primary, criteria)
+			Expect(err).Should(BeNil())
+			Expect(opt).ShouldNot(BeNil())
+			Expect(opt.matchFields).Should(BeEquivalentTo(map[string]string{"metadata.name": primary.Name}))
+
+			By("validation type")
+			criteria = &OwnershipCriteria{
+				Validation: ControllerValidation,
+			}
+			opt, err = parseQueryOptions(primary, criteria)
+			Expect(err).Should(BeNil())
+			Expect(opt).ShouldNot(BeNil())
+			Expect(opt.matchOwner).ShouldNot(BeNil())
+			Expect(*opt.matchOwner).Should(Equal(matchOwner{ownerUID: primary.UID, controller: true}))
+		})
+	})
 })

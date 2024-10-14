@@ -159,7 +159,7 @@ var _ = Describe("util test", func() {
 	Context("getObjectRef", func() {
 		It("should work well", func() {
 			obj := builder.NewClusterBuilder(namespace, name).GetObject()
-			objectRef, err := getObjectRef(obj, testScheme)
+			objectRef, err := getObjectRef(obj, scheme)
 			Expect(err).Should(BeNil())
 			Expect(*objectRef).Should(Equal(model.GVKNObjKey{
 				GroupVersionKind: schema.GroupVersionKind{
@@ -178,7 +178,7 @@ var _ = Describe("util test", func() {
 	Context("getObjectReference", func() {
 		It("should work well", func() {
 			obj := builder.NewClusterBuilder(namespace, name).SetUID(uid).SetResourceVersion(resourceVersion).GetObject()
-			ref, err := getObjectReference(obj, testScheme)
+			ref, err := getObjectReference(obj, scheme)
 			Expect(err).Should(BeNil())
 			Expect(*ref).Should(Equal(corev1.ObjectReference{
 				APIVersion:      kbappsv1.APIVersion,

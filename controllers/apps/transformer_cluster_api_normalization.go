@@ -33,12 +33,12 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-// ClusterAPINormalizationTransformer handles cluster and component API conversion.
-type ClusterAPINormalizationTransformer struct{}
+// clusterNormalizationTransformer handles the cluster API conversion.
+type clusterNormalizationTransformer struct{}
 
-var _ graph.Transformer = &ClusterAPINormalizationTransformer{}
+var _ graph.Transformer = &clusterNormalizationTransformer{}
 
-func (t *ClusterAPINormalizationTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+func (t *clusterNormalizationTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*clusterTransformContext)
 	cluster := transCtx.Cluster
 	if model.IsObjectDeleting(transCtx.OrigCluster) {
@@ -71,7 +71,7 @@ func (t *ClusterAPINormalizationTransformer) Transform(ctx graph.TransformContex
 	return nil
 }
 
-func (t *ClusterAPINormalizationTransformer) validateSpec(cluster *appsv1.Cluster) error {
+func (t *clusterNormalizationTransformer) validateSpec(cluster *appsv1.Cluster) error {
 	if len(cluster.Spec.ShardingSpecs) == 0 {
 		return nil
 	}
@@ -87,7 +87,7 @@ func (t *ClusterAPINormalizationTransformer) validateSpec(cluster *appsv1.Cluste
 	return nil
 }
 
-func (t *ClusterAPINormalizationTransformer) buildCompSpecs(transCtx *clusterTransformContext,
+func (t *clusterNormalizationTransformer) buildCompSpecs(transCtx *clusterTransformContext,
 	cluster *appsv1.Cluster) ([]*appsv1.ClusterComponentSpec, error) {
 	if withClusterTopology(cluster) {
 		return t.buildCompSpecs4Topology(transCtx.ClusterDef, cluster)
@@ -98,7 +98,7 @@ func (t *ClusterAPINormalizationTransformer) buildCompSpecs(transCtx *clusterTra
 	return nil, nil
 }
 
-func (t *ClusterAPINormalizationTransformer) buildCompSpecs4Topology(clusterDef *appsv1.ClusterDefinition,
+func (t *clusterNormalizationTransformer) buildCompSpecs4Topology(clusterDef *appsv1.ClusterDefinition,
 	cluster *appsv1.Cluster) ([]*appsv1.ClusterComponentSpec, error) {
 	newCompSpec := func(comp appsv1.ClusterTopologyComponent) *appsv1.ClusterComponentSpec {
 		return &appsv1.ClusterComponentSpec{
@@ -136,7 +136,7 @@ func (t *ClusterAPINormalizationTransformer) buildCompSpecs4Topology(clusterDef 
 	return compSpecs, nil
 }
 
-func (t *ClusterAPINormalizationTransformer) buildCompSpecs4Specified(transCtx *clusterTransformContext,
+func (t *clusterNormalizationTransformer) buildCompSpecs4Specified(transCtx *clusterTransformContext,
 	cluster *appsv1.Cluster) ([]*appsv1.ClusterComponentSpec, error) {
 	compSpecs := make([]*appsv1.ClusterComponentSpec, 0)
 	for i := range cluster.Spec.ComponentSpecs {
@@ -152,7 +152,7 @@ func (t *ClusterAPINormalizationTransformer) buildCompSpecs4Specified(transCtx *
 	return compSpecs, nil
 }
 
-func (t *ClusterAPINormalizationTransformer) buildCompSpecs4Sharding(transCtx *clusterTransformContext,
+func (t *clusterNormalizationTransformer) buildCompSpecs4Sharding(transCtx *clusterTransformContext,
 	cluster *appsv1.Cluster) ([]*appsv1.ClusterComponentSpec, error) {
 	compSpecs := make([]*appsv1.ClusterComponentSpec, 0)
 	if transCtx.ShardingComponentSpecs == nil {
@@ -169,7 +169,7 @@ func (t *ClusterAPINormalizationTransformer) buildCompSpecs4Sharding(transCtx *c
 	return compSpecs, nil
 }
 
-func (t *ClusterAPINormalizationTransformer) resolveCompDefinitions(transCtx *clusterTransformContext) error {
+func (t *clusterNormalizationTransformer) resolveCompDefinitions(transCtx *clusterTransformContext) error {
 	if transCtx.ComponentDefs == nil {
 		transCtx.ComponentDefs = make(map[string]*appsv1.ComponentDefinition)
 	}
@@ -186,7 +186,7 @@ func (t *ClusterAPINormalizationTransformer) resolveCompDefinitions(transCtx *cl
 	return nil
 }
 
-func (t *ClusterAPINormalizationTransformer) resolveCompDefinitionNServiceVersion(transCtx *clusterTransformContext,
+func (t *clusterNormalizationTransformer) resolveCompDefinitionNServiceVersion(transCtx *clusterTransformContext,
 	compSpec *appsv1.ClusterComponentSpec) (*appsv1.ComponentDefinition, string, error) {
 	var (
 		ctx     = transCtx.Context
@@ -205,11 +205,11 @@ func (t *ClusterAPINormalizationTransformer) resolveCompDefinitionNServiceVersio
 	return resolveCompDefinitionNServiceVersion(ctx, cli, comp.Spec.CompDef, comp.Spec.ServiceVersion)
 }
 
-func (t *ClusterAPINormalizationTransformer) checkCompUpgrade(compSpec *appsv1.ClusterComponentSpec, comp *appsv1.Component) bool {
+func (t *clusterNormalizationTransformer) checkCompUpgrade(compSpec *appsv1.ClusterComponentSpec, comp *appsv1.Component) bool {
 	return compSpec.ServiceVersion != comp.Spec.ServiceVersion || compSpec.ComponentDef != comp.Spec.CompDef
 }
 
-func (t *ClusterAPINormalizationTransformer) updateCompSpecs(transCtx *clusterTransformContext) {
+func (t *clusterNormalizationTransformer) updateCompSpecs(transCtx *clusterTransformContext) {
 	if withClusterTopology(transCtx.Cluster) {
 		t.updateCompSpecs4Topology(transCtx)
 	}
@@ -218,7 +218,7 @@ func (t *ClusterAPINormalizationTransformer) updateCompSpecs(transCtx *clusterTr
 	}
 }
 
-func (t *ClusterAPINormalizationTransformer) updateCompSpecs4Topology(transCtx *clusterTransformContext) {
+func (t *clusterNormalizationTransformer) updateCompSpecs4Topology(transCtx *clusterTransformContext) {
 	var (
 		cluster = transCtx.Cluster
 	)
@@ -243,7 +243,7 @@ func (t *ClusterAPINormalizationTransformer) updateCompSpecs4Topology(transCtx *
 	cluster.Spec.ComponentSpecs = compSpecs
 }
 
-func (t *ClusterAPINormalizationTransformer) updateCompSpecs4Specified(transCtx *clusterTransformContext) {
+func (t *clusterNormalizationTransformer) updateCompSpecs4Specified(transCtx *clusterTransformContext) {
 	var (
 		resolvedCompSpecs = transCtx.ComponentSpecs
 		idx               = 0

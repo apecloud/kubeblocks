@@ -31,12 +31,12 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/generics"
 )
 
-// clusterLoadRefResourcesTransformer loads and validates referenced resources (cd & cv).
-type clusterLoadRefResourcesTransformer struct{}
+// clusterValidationTransformer validates the cluster spec.
+type clusterValidationTransformer struct{}
 
-var _ graph.Transformer = &clusterLoadRefResourcesTransformer{}
+var _ graph.Transformer = &clusterValidationTransformer{}
 
-func (t *clusterLoadRefResourcesTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+func (t *clusterValidationTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*clusterTransformContext)
 	cluster := transCtx.Cluster
 
@@ -69,16 +69,15 @@ func (t *clusterLoadRefResourcesTransformer) Transform(ctx graph.TransformContex
 	return nil
 }
 
-func (t *clusterLoadRefResourcesTransformer) apiValidation(cluster *appsv1.Cluster) error {
-	if withClusterTopology(cluster) ||
-		withClusterUserDefined(cluster) {
+func (t *clusterValidationTransformer) apiValidation(cluster *appsv1.Cluster) error {
+	if withClusterTopology(cluster) || withClusterUserDefined(cluster) {
 		return nil
 	}
 	return fmt.Errorf("cluster API validate error, clusterDef: %s, topology: %s, comps: %d",
 		cluster.Spec.ClusterDef, cluster.Spec.Topology, clusterCompCnt(cluster))
 }
 
-func (t *clusterLoadRefResourcesTransformer) checkAllCompDefinition(cluster *appsv1.Cluster) error {
+func (t *clusterValidationTransformer) checkAllCompDefinition(cluster *appsv1.Cluster) error {
 	validate := func(spec appsv1.ClusterComponentSpec) error {
 		if len(spec.ComponentDef) > 0 {
 			if err := component.ValidateCompDefRegexp(spec.ComponentDef); err != nil {
@@ -100,7 +99,7 @@ func (t *clusterLoadRefResourcesTransformer) checkAllCompDefinition(cluster *app
 	return nil
 }
 
-func (t *clusterLoadRefResourcesTransformer) checkNUpdateClusterTopology(transCtx *clusterTransformContext, cluster *appsv1.Cluster) error {
+func (t *clusterValidationTransformer) checkNUpdateClusterTopology(transCtx *clusterTransformContext, cluster *appsv1.Cluster) error {
 	clusterTopology := referredClusterTopology(transCtx.ClusterDef, cluster.Spec.Topology)
 	if clusterTopology == nil {
 		return fmt.Errorf("specified cluster topology not found: %s", cluster.Spec.Topology)

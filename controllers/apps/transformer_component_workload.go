@@ -408,13 +408,12 @@ func checkNRollbackProtoImages(itsObj, itsProto *workloads.InstanceSet) {
 	}
 }
 
-// expandVolume handles workload expand volume
-func (r *componentWorkloadOps) expandVolume() error {
-	for _, vct := range r.runningITS.Spec.VolumeClaimTemplates {
+func (r *componentWorkloadOps) expandVolumeClaimTemplates(runningVCTs []corev1.PersistentVolumeClaim, protoVCTs []corev1.PersistentVolumeClaimTemplate, insTPLName string) error {
+	for _, vct := range runningVCTs {
 		var proto *corev1.PersistentVolumeClaimTemplate
-		for i, v := range r.synthesizeComp.VolumeClaimTemplates {
+		for i, v := range protoVCTs {
 			if v.Name == vct.Name {
-				proto = &r.synthesizeComp.VolumeClaimTemplates[i]
+				proto = &protoVCTs[i]
 				break
 			}
 		}
@@ -423,7 +422,43 @@ func (r *componentWorkloadOps) expandVolume() error {
 			continue
 		}
 
-		if err := r.expandVolumes(vct.Name, proto); err != nil {
+		if err := r.expandVolumes(insTPLName, vct.Name, proto); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// expandVolume handles workload expand volume
+func (r *componentWorkloadOps) expandVolume() error {
+	// 1. expand the volumes without instance template name.
+	if err := r.expandVolumeClaimTemplates(r.runningITS.Spec.VolumeClaimTemplates, r.synthesizeComp.VolumeClaimTemplates, ""); err != nil {
+		return err
+	}
+	// 2. expand the volumes with instance template name.
+	for i := range r.runningITS.Spec.Instances {
+		runningInsTPL := r.runningITS.Spec.Instances[i].DeepCopy()
+		intctrlutil.MergeList(&runningInsTPL.VolumeClaimTemplates, &r.runningITS.Spec.VolumeClaimTemplates,
+			func(item corev1.PersistentVolumeClaim) func(corev1.PersistentVolumeClaim) bool {
+				return func(claim corev1.PersistentVolumeClaim) bool {
+					return claim.Name == item.Name
+				}
+			})
+
+		var protoVCTs []corev1.PersistentVolumeClaimTemplate
+		for _, v := range r.synthesizeComp.Instances {
+			if runningInsTPL.Name == v.Name {
+				protoVCTs = component.ToVolumeClaimTemplates(v.VolumeClaimTemplates)
+				intctrlutil.MergeList(&protoVCTs, &r.synthesizeComp.VolumeClaimTemplates,
+					func(item corev1.PersistentVolumeClaimTemplate) func(corev1.PersistentVolumeClaimTemplate) bool {
+						return func(claim corev1.PersistentVolumeClaimTemplate) bool {
+							return claim.Name == item.Name
+						}
+					})
+				break
+			}
+		}
+		if err := r.expandVolumeClaimTemplates(runningInsTPL.VolumeClaimTemplates, protoVCTs, runningInsTPL.Name); err != nil {
 			return err
 		}
 	}
@@ -679,7 +714,7 @@ func (r *componentWorkloadOps) deletePVCs4ScaleIn(itsObj *workloads.InstanceSet)
 	return nil
 }
 
-func (r *componentWorkloadOps) expandVolumes(vctName string, proto *corev1.PersistentVolumeClaimTemplate) error {
+func (r *componentWorkloadOps) expandVolumes(insTPLName string, vctName string, proto *corev1.PersistentVolumeClaimTemplate) error {
 	for _, pod := range r.runningItsPodNames {
 		pvc := &corev1.PersistentVolumeClaim{}
 		pvcKey := types.NamespacedName{
@@ -694,7 +729,9 @@ func (r *componentWorkloadOps) expandVolumes(vctName string, proto *corev1.Persi
 				return err
 			}
 		}
-
+		if insTPLName != pvc.Labels[constant.KBAppComponentInstanceTemplateLabelKey] {
+			continue
+		}
 		if !pvcNotFound {
 			quantity := pvc.Spec.Resources.Requests.Storage()
 			newQuantity := proto.Spec.Resources.Requests.Storage()

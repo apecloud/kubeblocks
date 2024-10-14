@@ -117,7 +117,7 @@ func (c *componentPlanBuilder) Build() (graph.Plan, error) {
 	if err != nil {
 		c.transCtx.Logger.Info(fmt.Sprintf("build error: %s", err.Error()))
 	}
-	c.transCtx.Logger.Info(fmt.Sprintf("DAG: %s", dag))
+	c.transCtx.Logger.V(1).Info(fmt.Sprintf("DAG: %s", dag))
 
 	plan := &componentPlan{
 		dag:      dag,

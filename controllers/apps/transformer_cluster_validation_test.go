@@ -26,7 +26,7 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
-var _ = Describe("cluster load resources transformer test", func() {
+var _ = Describe("cluster validation transformer test", func() {
 	Context("cluster api validation", func() {
 		It("with cluster topology", func() {
 			By("explicitly specify topology")

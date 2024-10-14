@@ -91,8 +91,8 @@ func (t *clusterValidationTransformer) checkAllCompDefinition(cluster *appsv1.Cl
 			return err
 		}
 	}
-	for _, shardingSpec := range cluster.Spec.ShardingSpecs {
-		if err := validate(shardingSpec.Template); err != nil {
+	for _, spec := range cluster.Spec.Shardings {
+		if err := validate(spec.Template); err != nil {
 			return err
 		}
 	}
@@ -164,7 +164,7 @@ func clusterCompCnt(cluster *appsv1.Cluster) int {
 
 func clusterCompCntWithFunc(cluster *appsv1.Cluster, match func(spec appsv1.ClusterComponentSpec) bool) int {
 	cnt := generics.CountFunc(cluster.Spec.ComponentSpecs, match)
-	for _, sharding := range cluster.Spec.ShardingSpecs {
+	for _, sharding := range cluster.Spec.Shardings {
 		if match(sharding.Template) {
 			cnt += int(sharding.Shards)
 		}

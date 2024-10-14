@@ -72,16 +72,16 @@ func (t *clusterNormalizationTransformer) Transform(ctx graph.TransformContext, 
 }
 
 func (t *clusterNormalizationTransformer) validateSpec(cluster *appsv1.Cluster) error {
-	if len(cluster.Spec.ShardingSpecs) == 0 {
+	if len(cluster.Spec.Shardings) == 0 {
 		return nil
 	}
 	shardCompNameMap := map[string]sets.Empty{}
-	for _, v := range cluster.Spec.ShardingSpecs {
+	for _, v := range cluster.Spec.Shardings {
 		shardCompNameMap[v.Name] = sets.Empty{}
 	}
 	for _, v := range cluster.Spec.ComponentSpecs {
 		if _, ok := shardCompNameMap[v.Name]; ok {
-			return fmt.Errorf(`duplicate component name "%s" in spec.shardingSpec`, v.Name)
+			return fmt.Errorf(`duplicate component name "%s" in spec.shardings`, v.Name)
 		}
 	}
 	return nil
@@ -142,12 +142,12 @@ func (t *clusterNormalizationTransformer) buildCompSpecs4Specified(transCtx *clu
 	for i := range cluster.Spec.ComponentSpecs {
 		compSpecs = append(compSpecs, cluster.Spec.ComponentSpecs[i].DeepCopy())
 	}
-	if cluster.Spec.ShardingSpecs != nil {
-		shardingCompSpecs, err := t.buildCompSpecs4Sharding(transCtx, cluster)
+	if cluster.Spec.Shardings != nil {
+		shardings, err := t.buildCompSpecs4Sharding(transCtx, cluster)
 		if err != nil {
 			return nil, err
 		}
-		compSpecs = append(compSpecs, shardingCompSpecs...)
+		compSpecs = append(compSpecs, shardings...)
 	}
 	return compSpecs, nil
 }
@@ -158,8 +158,8 @@ func (t *clusterNormalizationTransformer) buildCompSpecs4Sharding(transCtx *clus
 	if transCtx.ShardingComponentSpecs == nil {
 		transCtx.ShardingComponentSpecs = make(map[string][]*appsv1.ClusterComponentSpec, 0)
 	}
-	for i, sharding := range cluster.Spec.ShardingSpecs {
-		shardingComps, err := controllerutil.GenShardingCompSpecList(transCtx.Context, transCtx.Client, cluster, &cluster.Spec.ShardingSpecs[i])
+	for i, sharding := range cluster.Spec.Shardings {
+		shardingComps, err := controllerutil.GenShardingCompSpecList(transCtx.Context, transCtx.Client, cluster, &cluster.Spec.Shardings[i])
 		if err != nil {
 			return nil, err
 		}
@@ -255,9 +255,9 @@ func (t *clusterNormalizationTransformer) updateCompSpecs4Specified(transCtx *cl
 	}
 	idx += len(cluster.Spec.ComponentSpecs)
 
-	for i, sharding := range cluster.Spec.ShardingSpecs {
-		cluster.Spec.ShardingSpecs[i].Template.ComponentDef = resolvedCompSpecs[idx].ComponentDef
-		cluster.Spec.ShardingSpecs[i].Template.ServiceVersion = resolvedCompSpecs[idx].ServiceVersion
+	for i, sharding := range cluster.Spec.Shardings {
+		cluster.Spec.Shardings[i].Template.ComponentDef = resolvedCompSpecs[idx].ComponentDef
+		cluster.Spec.Shardings[i].Template.ServiceVersion = resolvedCompSpecs[idx].ServiceVersion
 		idx += int(sharding.Shards)
 	}
 }

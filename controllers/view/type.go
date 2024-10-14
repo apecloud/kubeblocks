@@ -46,9 +46,12 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 const finalizer = "view.kubeblocks.io/finalizer"
+
+const useTestEnvCfg = "use_test_env_cfg"
 
 var (
 	clusterCriteria = OwnershipCriteria{
@@ -237,6 +240,9 @@ var (
 )
 
 func filterUnsupportedRules(ownershipRules []OwnershipRule, cfg *rest.Config) []OwnershipRule {
+	if !viper.GetBool(useTestEnvCfg) {
+		cfg = intctrlutil.GeKubeRestConfig("kubeblocks-api-tester")
+	}
 	var rules []OwnershipRule
 	for _, rule := range ownershipRules {
 		if exists, _ := resourceExists(rule.Primary.APIVersion, rule.Primary.Kind, cfg); !exists {
@@ -260,11 +266,6 @@ func filterUnsupportedRules(ownershipRules []OwnershipRule, cfg *rest.Config) []
 
 // resourceExists checks if a resource with the given apiVersion and kind exists in the cluster.
 func resourceExists(apiVersion, kind string, config *rest.Config) (bool, error) {
-	// Load the kubeconfig file to get a config object
-	if config == nil {
-		config = intctrlutil.GeKubeRestConfig("kubeblocks-api-tester")
-	}
-
 	// Create a discovery client
 	discoveryClient, err := discovery.NewDiscoveryClientForConfig(config)
 	if err != nil {

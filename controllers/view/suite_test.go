@@ -46,6 +46,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 	"github.com/apecloud/kubeblocks/pkg/testutil/k8s/mocks"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
@@ -88,6 +89,7 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(cfg).NotTo(BeNil())
 
+	viper.Set(useTestEnvCfg, true)
 	kbOwnershipRules = filterUnsupportedRules(fullKBOwnershipRules, cfg)
 
 	err = appsv1alpha1.AddToScheme(scheme.Scheme)
@@ -131,6 +133,8 @@ var _ = BeforeSuite(func() {
 
 var _ = AfterSuite(func() {
 	controller.Finish()
+
+	viper.Set(useTestEnvCfg, false)
 
 	cancel()
 	By("tearing down the test environment")

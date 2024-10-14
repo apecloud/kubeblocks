@@ -20,13 +20,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package view
 
 import (
+	"context"
+	"fmt"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"k8s.io/client-go/kubernetes/scheme"
 
+	"github.com/golang/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -189,6 +193,40 @@ var _ = Describe("util test", func() {
 				UID:             uid,
 				ResourceVersion: resourceVersion,
 			}))
+		})
+	})
+
+	Context("getObjectsByGVK", func() {
+		It("should work well", func() {
+			gvk := &schema.GroupVersionKind{
+				Group:   kbappsv1.GroupVersion.Group,
+				Version: kbappsv1.GroupVersion.Version,
+				Kind:    kbappsv1.ComponentKind,
+			}
+			opt := &queryOptions{
+				matchOwner: &matchOwner{
+					controller: true,
+					ownerUID:   uid,
+				},
+			}
+			owner := builder.NewClusterBuilder(namespace, name).SetUID(uid).GetObject()
+			compName := "hello"
+			fullCompName := fmt.Sprintf("%s-%s", owner.Name, compName)
+			owned := builder.NewComponentBuilder(namespace, fullCompName, "").
+				SetOwnerReferences(kbappsv1.APIVersion, kbappsv1.ClusterKind, owner).
+				GetObject()
+			k8sMock.EXPECT().Scheme().Return(scheme.Scheme).Times(1)
+			k8sMock.EXPECT().
+				List(gomock.Any(), &kbappsv1.ComponentList{}, gomock.Any()).
+				DoAndReturn(func(_ context.Context, list *kbappsv1.ComponentList, _ ...client.ListOption) error {
+					list.Items = []kbappsv1.Component{*owned}
+					return nil
+				}).Times(1)
+
+			objects, err := getObjectsByGVK(ctx, k8sMock, gvk, opt)
+			Expect(err).Should(BeNil())
+			Expect(objects).Should(HaveLen(1))
+			Expect(objects[0]).Should(Equal(owned))
 		})
 	})
 })

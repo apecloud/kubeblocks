@@ -228,6 +228,32 @@ rules:
   - patch
   - update
 - apiGroups:
+  - apps.kubeblocks.io
+  resources:
+  - shardingdefinitions
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps.kubeblocks.io
+  resources:
+  - shardingdefinitions/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - apps.kubeblocks.io
+  resources:
+  - shardingdefinitions/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
   - batch
   resources:
   - cronjobs

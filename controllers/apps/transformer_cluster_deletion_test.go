@@ -105,7 +105,7 @@ var _ = Describe("clusterDeletionTransformer", func() {
 			Logger:        logger,
 			Cluster:       cluster.DeepCopy(),
 			OrigCluster:   cluster,
-			ClusterDef:    clusterDef,
+			clusterDef:    clusterDef,
 		}
 		dag = newDag(transCtx.Client.(model.GraphClient))
 	})

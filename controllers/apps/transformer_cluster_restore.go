@@ -98,7 +98,7 @@ func (c *clusterRestoreTransformer) Transform(ctx graph.TransformContext, dag *g
 			if _, ok = allocateTargetMap[target.Name]; ok {
 				continue
 			}
-			for _, compSpec := range c.ShardingComponentSpecs[spec.Name] {
+			for _, compSpec := range c.shardingComps[spec.Name] {
 				if _, ok = c.Annotations[compSpec.Name][constant.BackupSourceTargetAnnotationKey]; ok {
 					continue
 				}

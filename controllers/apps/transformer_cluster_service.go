@@ -170,7 +170,7 @@ func (t *clusterServiceTransformer) checkComponentDef(transCtx *clusterTransform
 	selector := service.ComponentSelector
 
 	checkedCompDef := func(compDefName string) (*appsv1.ComponentDefinition, error) {
-		compDef, ok := transCtx.ComponentDefs[compDefName]
+		compDef, ok := transCtx.componentDefs[compDefName]
 		if !ok {
 			return nil, fmt.Errorf("the component definition of service selector is not defined, service: %s, component: %s", service.Name, selector)
 		}

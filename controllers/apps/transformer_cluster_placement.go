@@ -92,7 +92,7 @@ func (t *clusterPlacementTransformer) assign(transCtx *clusterTransformContext) 
 
 func (t *clusterPlacementTransformer) maxReplicas(transCtx *clusterTransformContext) int {
 	replicas := 0
-	for _, comp := range transCtx.ComponentSpecs {
+	for _, comp := range transCtx.allComps {
 		replicas = max(replicas, int(comp.Replicas))
 	}
 	return replicas

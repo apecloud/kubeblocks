@@ -46,7 +46,7 @@ func (t *clusterStatusTransformer) Transform(ctx graph.TransformContext, dag *gr
 
 	updateObservedGeneration := func() {
 		cluster.Status.ObservedGeneration = cluster.Generation
-		cluster.Status.ClusterDefGeneration = transCtx.ClusterDef.Generation
+		cluster.Status.ClusterDefGeneration = transCtx.clusterDef.Generation
 	}
 
 	switch {
@@ -180,7 +180,7 @@ func (t *clusterStatusTransformer) reconcileClusterStatus(transCtx *clusterTrans
 // removeInvalidCompStatus removes the invalid component of status.components which is deleted from spec.components.
 func (t *clusterStatusTransformer) removeInvalidCompStatus(transCtx *clusterTransformContext, cluster *appsv1.Cluster) {
 	// removes deleted components and keeps created components by simplified API
-	t.removeCompStatus(cluster, transCtx.ComponentSpecs)
+	t.removeCompStatus(cluster, transCtx.allComps)
 }
 
 // removeInnerCompStatus removes the component of status.components which is created by simplified API.

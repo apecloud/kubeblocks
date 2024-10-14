@@ -54,15 +54,22 @@ type clusterTransformContext struct {
 	Client client.Reader
 	record.EventRecorder
 	logr.Logger
-	Cluster       *appsv1.Cluster
-	OrigCluster   *appsv1.Cluster
-	ClusterDef    *appsv1.ClusterDefinition
-	ComponentDefs map[string]*appsv1.ComponentDefinition
-	// ComponentSpecs includes all cluster component specs generated from ComponentSpecs and Shardings
-	ComponentSpecs []*appsv1.ClusterComponentSpec
-	// ShardingComponentSpecs includes all sharding component specs generated from Shardings
-	ShardingComponentSpecs map[string][]*appsv1.ClusterComponentSpec
-	// Annotations to be added to components, mapping with ComponentSpecs.
+
+	Cluster     *appsv1.Cluster
+	OrigCluster *appsv1.Cluster
+
+	clusterDef    *appsv1.ClusterDefinition
+	shardingDefs  map[string]*appsv1.ShardingDefinition
+	componentDefs map[string]*appsv1.ComponentDefinition
+
+	// consolidated components and shardings
+	components []*appsv1.ClusterComponentSpec
+	shardings  []*appsv1.ClusterSharding
+
+	shardingComps map[string][]*appsv1.ClusterComponentSpec // shardings
+	allComps      []*appsv1.ClusterComponentSpec            // all comps
+
+	// Annotations to be added to components, mapping with @allComps.
 	Annotations map[string]map[string]string
 }
 

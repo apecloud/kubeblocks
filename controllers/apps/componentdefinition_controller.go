@@ -241,7 +241,7 @@ func (r *ComponentDefinitionReconciler) validateVars(cli client.Client, rctx int
 		if len(compDef) == 0 {
 			continue
 		}
-		if err := component.ValidateCompDefRegexp(compDef); err != nil {
+		if err := component.ValidateDefNameRegexp(compDef); err != nil {
 			return errors.Wrapf(err, "invalid reference to component definition name pattern: %s", compDef)
 		}
 	}

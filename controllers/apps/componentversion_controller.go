@@ -379,7 +379,7 @@ func (r *ComponentVersionReconciler) imageDefinedInActions(_ appsv1.ComponentDef
 func validateCompatibilityRulesCompDef(compVersion *appsv1.ComponentVersion) error {
 	for _, rule := range compVersion.Spec.CompatibilityRules {
 		for _, compDefName := range rule.CompDefs {
-			if err := component.ValidateCompDefRegexp(compDefName); err != nil {
+			if err := component.ValidateDefNameRegexp(compDefName); err != nil {
 				return errors.Wrapf(err, "invalid reference to component definition name pattern: %s in compatibility rules", compDefName)
 			}
 		}

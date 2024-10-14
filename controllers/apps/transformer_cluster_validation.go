@@ -55,7 +55,7 @@ func (t *clusterValidationTransformer) Transform(ctx graph.TransformContext, dag
 		return newRequeueError(requeueDuration, err.Error())
 	}
 
-	if err = t.checkAllCompDefinition(cluster); err != nil {
+	if err = t.checkDefinitionNamePattern(cluster); err != nil {
 		return newRequeueError(requeueDuration, err.Error())
 	}
 
@@ -77,22 +77,25 @@ func (t *clusterValidationTransformer) apiValidation(cluster *appsv1.Cluster) er
 		cluster.Spec.ClusterDef, cluster.Spec.Topology, clusterCompCnt(cluster))
 }
 
-func (t *clusterValidationTransformer) checkAllCompDefinition(cluster *appsv1.Cluster) error {
-	validate := func(spec appsv1.ClusterComponentSpec) error {
-		if len(spec.ComponentDef) > 0 {
-			if err := component.ValidateCompDefRegexp(spec.ComponentDef); err != nil {
-				return errors.Wrapf(err, "invalid reference component definition name pattern: %s", spec.ComponentDef)
+func (t *clusterValidationTransformer) checkDefinitionNamePattern(cluster *appsv1.Cluster) error {
+	validate := func(name string) error {
+		if len(name) > 0 {
+			if err := component.ValidateDefNameRegexp(name); err != nil {
+				return errors.Wrapf(err, "invalid reference component/sharding definition name: %s", name)
 			}
 		}
 		return nil
 	}
 	for _, compSpec := range cluster.Spec.ComponentSpecs {
-		if err := validate(compSpec); err != nil {
+		if err := validate(compSpec.ComponentDef); err != nil {
 			return err
 		}
 	}
 	for _, spec := range cluster.Spec.Shardings {
-		if err := validate(spec.Template); err != nil {
+		if err := validate(spec.ShardingDef); err != nil {
+			return err
+		}
+		if err := validate(spec.Template.ComponentDef); err != nil {
 			return err
 		}
 	}
@@ -100,7 +103,7 @@ func (t *clusterValidationTransformer) checkAllCompDefinition(cluster *appsv1.Cl
 }
 
 func (t *clusterValidationTransformer) checkNUpdateClusterTopology(transCtx *clusterTransformContext, cluster *appsv1.Cluster) error {
-	clusterTopology := referredClusterTopology(transCtx.ClusterDef, cluster.Spec.Topology)
+	clusterTopology := referredClusterTopology(transCtx.clusterDef, cluster.Spec.Topology)
 	if clusterTopology == nil {
 		return fmt.Errorf("specified cluster topology not found: %s", cluster.Spec.Topology)
 	}
@@ -142,7 +145,7 @@ func loadNCheckClusterDefinition(transCtx *clusterTransformContext, cluster *app
 	if cd == nil {
 		cd = &appsv1.ClusterDefinition{}
 	}
-	transCtx.ClusterDef = cd
+	transCtx.clusterDef = cd
 	return nil
 }
 

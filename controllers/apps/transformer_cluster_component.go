@@ -51,7 +51,7 @@ func (t *clusterComponentTransformer) Transform(ctx graph.TransformContext, dag 
 		return nil
 	}
 
-	if len(transCtx.ComponentSpecs) == 0 {
+	if len(transCtx.allComps) == 0 {
 		return nil
 	}
 
@@ -72,7 +72,7 @@ func (t *clusterComponentTransformer) reconcileComponents(transCtx *clusterTrans
 	cluster := transCtx.Cluster
 
 	protoCompSpecMap := make(map[string]*appsv1.ClusterComponentSpec)
-	for _, compSpec := range transCtx.ComponentSpecs {
+	for _, compSpec := range transCtx.allComps {
 		protoCompSpecMap[compSpec.Name] = compSpec
 	}
 
@@ -159,7 +159,7 @@ func checkAllCompsUpToDate(transCtx *clusterTransformContext, cluster *appsv1.Cl
 	if err := transCtx.Client.List(transCtx.Context, compList, client.InNamespace(cluster.Namespace), client.MatchingLabels(labels)); err != nil {
 		return false, err
 	}
-	if len(compList.Items) != len(transCtx.ComponentSpecs) {
+	if len(compList.Items) != len(transCtx.allComps) {
 		return false, nil
 	}
 	for _, comp := range compList.Items {
@@ -250,7 +250,7 @@ func newCompHandler(transCtx *clusterTransformContext, compSpecs map[string]*app
 func definedOrders(transCtx *clusterTransformContext, op int) []string {
 	var (
 		cluster    = transCtx.Cluster
-		clusterDef = transCtx.ClusterDef
+		clusterDef = transCtx.clusterDef
 	)
 	if len(cluster.Spec.Topology) != 0 && clusterDef != nil {
 		for _, topology := range clusterDef.Spec.Topologies {
@@ -485,7 +485,7 @@ type createCompHandler struct {
 func (h *createCompHandler) handle(transCtx *clusterTransformContext, dag *graph.DAG, compName string) error {
 	cluster := transCtx.Cluster
 	graphCli, _ := transCtx.Client.(model.GraphClient)
-	comp, err := component.BuildComponentExt(cluster, h.compSpecs[compName], shardingNameFromComp(transCtx, compName), h.annotations[compName])
+	comp, err := buildComponentExt(cluster, h.compSpecs[compName], shardingNameFromComp(transCtx, compName), h.annotations[compName])
 	if err != nil {
 		return err
 	}
@@ -541,7 +541,7 @@ func (h *updateCompHandler) handle(transCtx *clusterTransformContext, dag *graph
 	if getErr != nil {
 		return getErr
 	}
-	comp, buildErr := component.BuildComponentExt(cluster, h.compSpecs[compName], shardingNameFromComp(transCtx, compName), h.annotations[compName])
+	comp, buildErr := buildComponentExt(cluster, h.compSpecs[compName], shardingNameFromComp(transCtx, compName), h.annotations[compName])
 	if buildErr != nil {
 		return buildErr
 	}
@@ -587,13 +587,23 @@ type orderedUpdateCompHandler struct {
 	updateCompHandler
 }
 
+func buildComponentExt(cluster *appsv1.Cluster, compSpec *appsv1.ClusterComponentSpec, shardingName string,
+	annotations map[string]string) (*appsv1.Component, error) {
+	labels := map[string]string{}
+	// TODO: sharding def name
+	if len(shardingName) > 0 {
+		labels[constant.KBAppShardingNameLabelKey] = shardingName
+	}
+	return component.BuildComponent(cluster, compSpec, labels, annotations)
+}
+
 func shardingNameFromComp(transCtx *clusterTransformContext, compName string) string {
 	equal := func(spec *appsv1.ClusterComponentSpec) bool {
 		return spec.Name == compName
 	}
-	for shardingName, shardingComps := range transCtx.ShardingComponentSpecs {
-		if slices.IndexFunc(shardingComps, equal) >= 0 {
-			return shardingName
+	for name, comps := range transCtx.shardingComps {
+		if slices.IndexFunc(comps, equal) >= 0 {
+			return name
 		}
 	}
 	return ""

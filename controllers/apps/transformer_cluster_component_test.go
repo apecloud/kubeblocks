@@ -220,9 +220,9 @@ var _ = Describe("cluster component transformer test", func() {
 
 	mockCompObj := func(transCtx *clusterTransformContext, compName string, setters ...func(*appsv1.Component)) *appsv1.Component {
 		var compSpec *appsv1.ClusterComponentSpec
-		for i, spec := range transCtx.ComponentSpecs {
+		for i, spec := range transCtx.allComps {
 			if spec.Name == compName {
-				compSpec = transCtx.ComponentSpecs[i]
+				compSpec = transCtx.allComps[i]
 				break
 			}
 		}
@@ -248,14 +248,14 @@ var _ = Describe("cluster component transformer test", func() {
 			GetObject()
 		graphCli := model.NewGraphClient(k8sClient)
 		transCtx := &clusterTransformContext{
-			Context:        ctx,
-			Client:         graphCli,
-			EventRecorder:  nil,
-			Logger:         logger,
-			Cluster:        cluster,
-			OrigCluster:    cluster.DeepCopy(),
-			ClusterDef:     clusterDef,
-			ComponentSpecs: buildCompSpecs(clusterDef, cluster),
+			Context:       ctx,
+			Client:        graphCli,
+			EventRecorder: nil,
+			Logger:        logger,
+			Cluster:       cluster,
+			OrigCluster:   cluster.DeepCopy(),
+			clusterDef:    clusterDef,
+			allComps:      buildCompSpecs(clusterDef, cluster),
 		}
 		return &clusterComponentTransformer{}, transCtx, newDAG(graphCli, cluster)
 	}
@@ -530,8 +530,8 @@ var _ = Describe("cluster component transformer test", func() {
 				},
 			}
 			transCtx.Client = model.NewGraphClient(reader)
-			for i := range transCtx.ComponentSpecs {
-				transCtx.ComponentSpecs[i].Stop = &[]bool{true}[0]
+			for i := range transCtx.allComps {
+				transCtx.allComps[i].Stop = &[]bool{true}[0]
 			}
 			transCtx.OrigCluster.Generation += 1 // mock cluster spec update
 
@@ -569,8 +569,8 @@ var _ = Describe("cluster component transformer test", func() {
 				},
 			}
 			transCtx.Client = model.NewGraphClient(reader)
-			for i := range transCtx.ComponentSpecs {
-				transCtx.ComponentSpecs[i].Stop = &[]bool{true}[0]
+			for i := range transCtx.allComps {
+				transCtx.allComps[i].Stop = &[]bool{true}[0]
 			}
 			transCtx.OrigCluster.Generation += 1 // mock cluster spec update
 

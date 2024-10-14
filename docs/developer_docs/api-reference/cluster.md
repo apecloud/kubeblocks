@@ -301,11 +301,12 @@ ClusterStatus
 <div>
 <p>ClusterDefinition defines the topology for databases or storage systems,
 offering a variety of topological configurations to meet diverse deployment needs and scenarios.</p>
-<p>It includes a list of Components, each linked to a ComponentDefinition, which enhances reusability and reduce redundancy.
+<p>It includes a list of Components and/or Shardings, each linked to a ComponentDefinition or a ShardingDefinition,
+which enhances reusability and reduce redundancy.
 For example, widely used components such as etcd and Zookeeper can be defined once and reused across multiple ClusterDefinitions,
 simplifying the setup of new systems.</p>
-<p>Additionally, ClusterDefinition also specifies the sequence of startup, upgrade, and shutdown for Components,
-ensuring a controlled and predictable management of component lifecycles.</p>
+<p>Additionally, ClusterDefinition also specifies the sequence of startup, upgrade, and shutdown between Components and/or Shardings,
+ensuring a controlled and predictable management of cluster lifecycles.</p>
 </div>
 <table>
 <thead>
@@ -3670,7 +3671,22 @@ Cannot be updated.</p>
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Components specifies the components in the topology.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>shardings</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ClusterTopologySharding">
+[]ClusterTopologySharding
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Shardings specifies the shardings in the topology.</p>
 </td>
 </tr>
 <tr>
@@ -3786,9 +3802,9 @@ These groups are processed sequentially, allowing precise control based on compo
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the order for creating and initializing components.
-This is designed for components that depend on one another. Components without dependencies can be grouped together.</p>
-<p>Components that can be provisioned independently or have no dependencies can be listed together in the same stage,
+<p>Specifies the order for creating and initializing entities.
+This is designed for entities that depend on one another. Entities without dependencies can be grouped together.</p>
+<p>Entities that can be provisioned independently or have no dependencies can be listed together in the same stage,
 separated by commas.</p>
 </td>
 </tr>
@@ -3801,9 +3817,9 @@ separated by commas.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Outlines the order for stopping and deleting components.
-This sequence is designed for components that require a graceful shutdown or have interdependencies.</p>
-<p>Components that can be terminated independently or have no dependencies can be listed together in the same stage,
+<p>Outlines the order for stopping and deleting entities.
+This sequence is designed for entities that require a graceful shutdown or have interdependencies.</p>
+<p>Entities that can be terminated independently or have no dependencies can be listed together in the same stage,
 separated by commas.</p>
 </td>
 </tr>
@@ -3816,10 +3832,62 @@ separated by commas.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Update determines the order for updating components&rsquo; specifications, such as image upgrades or resource scaling.
-This sequence is designed for components that have dependencies or require specific update procedures.</p>
-<p>Components that can be updated independently or have no dependencies can be listed together in the same stage,
+<p>Update determines the order for updating entities&rsquo; specifications, such as image upgrades or resource scaling.
+This sequence is designed for entities that have dependencies or require specific update procedures.</p>
+<p>Entities that can be updated independently or have no dependencies can be listed together in the same stage,
 separated by commas.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ClusterTopologySharding">ClusterTopologySharding
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterTopology">ClusterTopology</a>)
+</p>
+<div>
+<p>ClusterTopologySharding defines a sharding within a ClusterTopology.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Defines the unique identifier of the sharding within the cluster topology.
+It follows IANA Service naming rules and is used as part of the Service&rsquo;s DNS name.
+The name must start with a lowercase letter, can contain lowercase letters, numbers,
+and hyphens, and must end with a lowercase letter or number.</p>
+<p>Cannot be updated once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>shardingDef</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the sharding definition that defines the characteristics and behavior of the sharding.</p>
+<p>The system selects the ShardingDefinition CR with the latest version that matches the pattern.
+This approach allows:</p>
+<ol>
+<li>Precise selection by providing the exact name of a ShardingDefinition CR.</li>
+<li>Flexible and automatic selection of the most up-to-date ShardingDefinition CR
+by specifying a regular expression pattern.</li>
+</ol>
+<p>Once set, this field cannot be updated.</p>
 </td>
 </tr>
 </tbody>

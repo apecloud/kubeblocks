@@ -23,7 +23,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"golang.org/x/exp/maps"
 	"hash/fnv"
+	"slices"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -162,7 +164,7 @@ func (r *ShardingDefinitionReconciler) validateTemplate(ctx context.Context, cli
 	shardingDef *appsv1.ShardingDefinition) error {
 	template := shardingDef.Spec.Template
 
-	if err := component.ValidateCompDefRegexp(template.CompDef); err != nil {
+	if err := component.ValidateDefNameRegexp(template.CompDef); err != nil {
 		return err
 	}
 
@@ -291,4 +293,48 @@ func (r *ShardingDefinitionReconciler) immutableHash(cli client.Client, rctx int
 	}
 	shardingDef.Annotations[immutableHashAnnotationKey], _ = r.specHash(shardingDef)
 	return cli.Patch(rctx.Ctx, shardingDef, patch)
+}
+
+// resolveShardingDefinition resolves and returns the specific sharding definition object supported.
+func resolveShardingDefinition(ctx context.Context, cli client.Reader, shardingDefName string) (*appsv1.ShardingDefinition, error) {
+	shardingDefs, err := listShardingDefinitionsWithPattern(ctx, cli, shardingDefName)
+	if err != nil {
+		return nil, err
+	}
+	if len(shardingDefs) == 0 {
+		return nil, fmt.Errorf("no sharding definition found for the specified name: %s", shardingDefName)
+	}
+
+	m := make(map[string]int)
+	for i, def := range shardingDefs {
+		m[def.Name] = i
+	}
+	// choose the latest one
+	names := maps.Keys(m)
+	slices.Sort(names)
+	latestName := names[len(names)-1]
+
+	return shardingDefs[m[latestName]], nil
+}
+
+// listShardingDefinitionsWithPattern returns all sharding definitions whose names match the given pattern
+func listShardingDefinitionsWithPattern(ctx context.Context, cli client.Reader, name string) ([]*appsv1.ShardingDefinition, error) {
+	shardingDefList := &appsv1.ShardingDefinitionList{}
+	if err := cli.List(ctx, shardingDefList); err != nil {
+		return nil, err
+	}
+	fullyMatched := make([]*appsv1.ShardingDefinition, 0)
+	patternMatched := make([]*appsv1.ShardingDefinition, 0)
+	for i, item := range shardingDefList.Items {
+		if item.Name == name {
+			patternMatched = append(fullyMatched, &shardingDefList.Items[i])
+		}
+		if component.PrefixOrRegexMatched(item.Name, name) {
+			patternMatched = append(patternMatched, &shardingDefList.Items[i])
+		}
+	}
+	if len(fullyMatched) > 0 {
+		return fullyMatched, nil
+	}
+	return patternMatched, nil
 }

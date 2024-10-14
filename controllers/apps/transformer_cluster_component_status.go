@@ -44,7 +44,7 @@ func (t *clusterComponentStatusTransformer) Transform(ctx graph.TransformContext
 	}
 
 	// has no components defined
-	if len(transCtx.ComponentSpecs) == 0 || !transCtx.OrigCluster.IsStatusUpdating() {
+	if len(transCtx.allComps) == 0 || !transCtx.OrigCluster.IsStatusUpdating() {
 		return nil
 	}
 	return t.reconcileComponentsStatus(transCtx)
@@ -55,7 +55,7 @@ func (t *clusterComponentStatusTransformer) reconcileComponentsStatus(transCtx *
 	if cluster.Status.Components == nil {
 		cluster.Status.Components = make(map[string]appsv1.ClusterComponentStatus)
 	}
-	for _, compSpec := range transCtx.ComponentSpecs {
+	for _, compSpec := range transCtx.allComps {
 		compKey := types.NamespacedName{
 			Namespace: cluster.Namespace,
 			Name:      component.FullName(cluster.Name, compSpec.Name),

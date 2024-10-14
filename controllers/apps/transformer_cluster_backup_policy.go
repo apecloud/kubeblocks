@@ -129,7 +129,7 @@ func (r *clusterBackupPolicyTransformer) Transform(ctx graph.TransformContext, d
 	}
 
 	transformComponentBackupPolicy := func(compSpec *appsv1.ClusterComponentSpec, componentName string, isSharding bool) error {
-		compDef := r.ComponentDefs[compSpec.ComponentDef]
+		compDef := r.componentDefs[compSpec.ComponentDef]
 		if compDef == nil {
 			return nil
 		}

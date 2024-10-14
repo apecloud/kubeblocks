@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package view
 
 import (
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -156,7 +158,36 @@ var _ = Describe("util test", func() {
 
 	Context("getObjectRef", func() {
 		It("should work well", func() {
+			obj := builder.NewClusterBuilder(namespace, name).GetObject()
+			objectRef, err := getObjectRef(obj, scheme)
+			Expect(err).Should(BeNil())
+			Expect(*objectRef).Should(Equal(model.GVKNObjKey{
+				GroupVersionKind: schema.GroupVersionKind{
+					Group:   kbappsv1.GroupVersion.Group,
+					Version: kbappsv1.GroupVersion.Version,
+					Kind:    kbappsv1.ClusterKind,
+				},
+				ObjectKey: client.ObjectKey{
+					Namespace: namespace,
+					Name:      name,
+				},
+			}))
+		})
+	})
 
+	Context("getObjectReference", func() {
+		It("should work well", func() {
+			obj := builder.NewClusterBuilder(namespace, name).SetUID(uid).SetResourceVersion(resourceVersion).GetObject()
+			ref, err := getObjectReference(obj, scheme)
+			Expect(err).Should(BeNil())
+			Expect(*ref).Should(Equal(corev1.ObjectReference{
+				APIVersion:      kbappsv1.APIVersion,
+				Kind:            kbappsv1.ClusterKind,
+				Namespace:       namespace,
+				Name:            name,
+				UID:             uid,
+				ResourceVersion: resourceVersion,
+			}))
 		})
 	})
 })

@@ -27,6 +27,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/uuid"
+
 	// +kubebuilder:scaffold:imports
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"

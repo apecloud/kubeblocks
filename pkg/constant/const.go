@@ -67,3 +67,9 @@ const (
 const InvalidContainerPort int32 = 0
 
 const EmptyInsTemplateName = ""
+
+const (
+	HscaleValidatePolicyKey    = "apps.kubeblocks.io/hscale-validate-policy"
+	HscaleValidatePolicyStrict = "strict"
+	HscaleValidatePolicyIgnore = "ignore"
+)

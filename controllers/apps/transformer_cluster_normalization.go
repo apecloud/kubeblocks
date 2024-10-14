@@ -21,17 +21,18 @@ package apps
 
 import (
 	"fmt"
-	"github.com/apecloud/kubeblocks/pkg/constant"
+
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controllerutil"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
 )
 
 // clusterNormalizationTransformer handles the cluster API conversion.
@@ -364,55 +365,55 @@ func (t *clusterNormalizationTransformer) updateCompNShardingSpecs4Topology(tran
 	cluster.Spec.ComponentSpecs = compSpecs
 }
 
-func (t *clusterNormalizationTransformer) updateCompSpecs4Topology(transCtx *clusterTransformContext) {
-	var (
-		cluster = transCtx.Cluster
-	)
-	compSpecs := make([]appsv1.ClusterComponentSpec, 0)
-	for i := range transCtx.allComps {
-		compSpecs = append(compSpecs, appsv1.ClusterComponentSpec{
-			Name:           transCtx.allComps[i].Name,
-			ComponentDef:   transCtx.allComps[i].ComponentDef,
-			ServiceVersion: transCtx.allComps[i].ServiceVersion,
-		})
-	}
-	for i, compSpec := range cluster.Spec.ComponentSpecs {
-		for j := range compSpecs {
-			if compSpec.Name == compSpecs[j].Name {
-				compSpecs[j] = cluster.Spec.ComponentSpecs[i]
-				compSpecs[j].ComponentDef = transCtx.allComps[j].ComponentDef
-				compSpecs[j].ServiceVersion = transCtx.allComps[j].ServiceVersion
-				break
-			}
-		}
-	}
-	cluster.Spec.ComponentSpecs = compSpecs
-}
-
-func (t *clusterNormalizationTransformer) updateShardingSpecs4Topology(transCtx *clusterTransformContext) {
-	var (
-		cluster = transCtx.Cluster
-	)
-	compSpecs := make([]appsv1.ClusterComponentSpec, 0)
-	for i := range transCtx.allComps {
-		compSpecs = append(compSpecs, appsv1.ClusterComponentSpec{
-			Name:           transCtx.allComps[i].Name,
-			ComponentDef:   transCtx.allComps[i].ComponentDef,
-			ServiceVersion: transCtx.allComps[i].ServiceVersion,
-		})
-	}
-	for i, compSpec := range cluster.Spec.ComponentSpecs {
-		for j := range compSpecs {
-			if compSpec.Name == compSpecs[j].Name {
-				compSpecs[j] = cluster.Spec.ComponentSpecs[i]
-				compSpecs[j].ComponentDef = transCtx.allComps[j].ComponentDef
-				compSpecs[j].ServiceVersion = transCtx.allComps[j].ServiceVersion
-				break
-			}
-		}
-	}
-	cluster.Spec.ComponentSpecs = compSpecs
-}
+// func (t *clusterNormalizationTransformer) updateCompSpecs4Topology(transCtx *clusterTransformContext) {
+//	var (
+//		cluster = transCtx.Cluster
+//	)
+//	compSpecs := make([]appsv1.ClusterComponentSpec, 0)
+//	for i := range transCtx.allComps {
+//		compSpecs = append(compSpecs, appsv1.ClusterComponentSpec{
+//			Name:           transCtx.allComps[i].Name,
+//			ComponentDef:   transCtx.allComps[i].ComponentDef,
+//			ServiceVersion: transCtx.allComps[i].ServiceVersion,
+//		})
+//	}
+//	for i, compSpec := range cluster.Spec.ComponentSpecs {
+//		for j := range compSpecs {
+//			if compSpec.Name == compSpecs[j].Name {
+//				compSpecs[j] = cluster.Spec.ComponentSpecs[i]
+//				compSpecs[j].ComponentDef = transCtx.allComps[j].ComponentDef
+//				compSpecs[j].ServiceVersion = transCtx.allComps[j].ServiceVersion
+//				break
+//			}
+//		}
+//	}
+//	cluster.Spec.ComponentSpecs = compSpecs
+// }
+//
+// func (t *clusterNormalizationTransformer) updateShardingSpecs4Topology(transCtx *clusterTransformContext) {
+//	var (
+//		cluster = transCtx.Cluster
+//	)
+//	compSpecs := make([]appsv1.ClusterComponentSpec, 0)
+//	for i := range transCtx.allComps {
+//		compSpecs = append(compSpecs, appsv1.ClusterComponentSpec{
+//			Name:           transCtx.allComps[i].Name,
+//			ComponentDef:   transCtx.allComps[i].ComponentDef,
+//			ServiceVersion: transCtx.allComps[i].ServiceVersion,
+//		})
+//	}
+//	for i, compSpec := range cluster.Spec.ComponentSpecs {
+//		for j := range compSpecs {
+//			if compSpec.Name == compSpecs[j].Name {
+//				compSpecs[j] = cluster.Spec.ComponentSpecs[i]
+//				compSpecs[j].ComponentDef = transCtx.allComps[j].ComponentDef
+//				compSpecs[j].ServiceVersion = transCtx.allComps[j].ServiceVersion
+//				break
+//			}
+//		}
+//	}
+//	cluster.Spec.ComponentSpecs = compSpecs
+// }
 
 func (t *clusterNormalizationTransformer) updateCompNShardingSpecs4Specified(transCtx *clusterTransformContext) {
 	var (

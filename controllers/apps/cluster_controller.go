@@ -134,7 +134,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			// validate the cluster spec
 			&clusterValidationTransformer{},
 			// handle cluster shared account
-			&clusterSharedAccountTransformer{},
+			&clusterShardingAccountTransformer{},
 			// normalize the cluster spec
 			&clusterNormalizationTransformer{},
 			// placement replicas across data-plane k8s clusters

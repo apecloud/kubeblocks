@@ -23,11 +23,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"golang.org/x/exp/maps"
 	"hash/fnv"
 	"slices"
 	"strings"
 
+	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/rand"
@@ -327,7 +327,7 @@ func listShardingDefinitionsWithPattern(ctx context.Context, cli client.Reader, 
 	patternMatched := make([]*appsv1.ShardingDefinition, 0)
 	for i, item := range shardingDefList.Items {
 		if item.Name == name {
-			patternMatched = append(fullyMatched, &shardingDefList.Items[i])
+			fullyMatched = append(fullyMatched, &shardingDefList.Items[i])
 		}
 		if component.PrefixOrRegexMatched(item.Name, name) {
 			patternMatched = append(patternMatched, &shardingDefList.Items[i])

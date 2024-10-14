@@ -22,10 +22,10 @@ package view
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"k8s.io/apimachinery/pkg/util/uuid"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
@@ -126,6 +126,31 @@ var _ = Describe("util test", func() {
 				UID:             uid,
 				ResourceVersion: resourceVersion,
 			}))
+		})
+	})
+
+	Context("objectRefToType", func() {
+		It("should work well", func() {
+			objectRef := &model.GVKNObjKey{
+				GroupVersionKind: schema.GroupVersionKind{
+					Group:   viewv1.GroupVersion.Group,
+					Version: viewv1.GroupVersion.Version,
+					Kind:    viewv1.Kind,
+				},
+				ObjectKey: client.ObjectKey{
+					Namespace: "foo",
+					Name:      "bar",
+				},
+			}
+			t := objectRefToType(objectRef)
+			Expect(t).ShouldNot(BeNil())
+			Expect(*t).Should(Equal(viewv1.ObjectType{
+				APIVersion: viewv1.SchemeBuilder.GroupVersion.String(),
+				Kind:       viewv1.Kind,
+			}))
+			objectRef = nil
+			t = objectRefToType(objectRef)
+			Expect(t).Should(BeNil())
 		})
 	})
 })

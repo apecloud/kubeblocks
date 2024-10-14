@@ -153,4 +153,10 @@ var _ = Describe("util test", func() {
 			Expect(t).Should(BeNil())
 		})
 	})
+
+	Context("getObjectRef", func() {
+		It("should work well", func() {
+
+		})
+	})
 })

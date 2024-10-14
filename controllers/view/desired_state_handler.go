@@ -133,7 +133,7 @@ func (s *stateEvaluation) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx
 
 	// build new InitialObjectTree
 	var err error
-	view.Status.InitialObjectTree, err = getObjectTreeWithRevision(initialRoot, kbOwnershipRules, s.store, view.Status.CurrentState.Changes[latestReconciliationCycleStart].Revision, s.scheme)
+	view.Status.InitialObjectTree, err = getObjectTreeWithRevision(initialRoot, getKBOwnershipRules(), s.store, view.Status.CurrentState.Changes[latestReconciliationCycleStart].Revision, s.scheme)
 	if err != nil {
 		return kubebuilderx.Commit, err
 	}

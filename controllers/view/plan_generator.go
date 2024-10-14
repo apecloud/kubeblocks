@@ -59,7 +59,7 @@ func (g *planGenerator) generatePlan(root *kbappsv1.Cluster, patch client.Patch)
 	// create mock client and mock event recorder
 	// kbagent client is running in dry-run mode by setting context key-value pair: dry-run=true
 	store := newChangeCaptureStore(g.scheme, g.formatter)
-	mClient, err := newMockClient(g.cli, store, kbOwnershipRules)
+	mClient, err := newMockClient(g.cli, store, getKBOwnershipRules())
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +69,7 @@ func (g *planGenerator) generatePlan(root *kbappsv1.Cluster, patch client.Patch)
 	// 1. each gvk has a corresponding reconciler
 	// 2. mock K8s native object reconciler
 	// 3. encapsulate KB controller as reconciler
-	reconcilerTree, err := newReconcilerTree(g.ctx, mClient, mEventRecorder, kbOwnershipRules)
+	reconcilerTree, err := newReconcilerTree(g.ctx, mClient, mEventRecorder, getKBOwnershipRules())
 	if err != nil {
 		return nil, err
 	}
@@ -134,7 +134,7 @@ func (g *planGenerator) generatePlan(root *kbappsv1.Cluster, patch client.Patch)
 	}
 
 	// update plan
-	desiredTree, err := getObjectTreeFromCache(g.ctx, mClient, root, kbOwnershipRules)
+	desiredTree, err := getObjectTreeFromCache(g.ctx, mClient, root, getKBOwnershipRules())
 	if err != nil {
 		return nil, err
 	}

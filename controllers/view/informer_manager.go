@@ -199,7 +199,7 @@ func (m *informerManager) watchKubeBlocksRelatedResources() error {
 	}); err != nil {
 		return err
 	}
-	for _, rule := range kbOwnershipRules {
+	for _, rule := range getKBOwnershipRules() {
 		if err := parseGVK(&rule.Primary); err != nil {
 			return err
 		}

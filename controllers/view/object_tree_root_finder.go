@@ -87,8 +87,9 @@ func (f *rootFinder) findRoots(ctx context.Context, object client.Object) []reco
 		if found {
 			continue
 		}
-		for i := range kbOwnershipRules {
-			rule := &kbOwnershipRules[i]
+		rules := getKBOwnershipRules()
+		for i := range rules {
+			rule := &rules[i]
 			for _, resource := range rule.OwnedResources {
 				gvk, err := objectTypeToGVK(&resource.Secondary)
 				if err != nil {

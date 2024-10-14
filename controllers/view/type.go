@@ -21,6 +21,7 @@ package view
 
 import (
 	"fmt"
+	"sync"
 
 	vsv1beta1 "github.com/kubernetes-csi/external-snapshotter/client/v3/apis/volumesnapshot/v1beta1"
 	vsv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
@@ -46,12 +47,9 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
-	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 const finalizer = "view.kubeblocks.io/finalizer"
-
-const useTestEnvCfg = "use_test_env_cfg"
 
 var (
 	clusterCriteria = OwnershipCriteria{
@@ -236,11 +234,23 @@ var (
 		},
 	}
 
-	kbOwnershipRules = filterUnsupportedRules(fullKBOwnershipRules, nil)
+	kbOwnershipRules []OwnershipRule
+	once             sync.Once
 )
 
+func getKBOwnershipRules() []OwnershipRule {
+	once.Do(func() {
+		kbOwnershipRules = filterUnsupportedRules(fullKBOwnershipRules, nil)
+	})
+	return kbOwnershipRules
+}
+
+func initKBOwnershipRulesForTest(cfg *rest.Config) {
+	kbOwnershipRules = filterUnsupportedRules(fullKBOwnershipRules, cfg)
+}
+
 func filterUnsupportedRules(ownershipRules []OwnershipRule, cfg *rest.Config) []OwnershipRule {
-	if !viper.GetBool(useTestEnvCfg) {
+	if cfg == nil {
 		cfg = intctrlutil.GeKubeRestConfig("kubeblocks-api-tester")
 	}
 	var rules []OwnershipRule

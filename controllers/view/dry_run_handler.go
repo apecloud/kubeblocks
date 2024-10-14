@@ -77,7 +77,7 @@ func (r *dryRunner) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Resul
 	}
 
 	generator := newPlanGenerator(r.ctx, r.cli, r.scheme,
-		cacheObjectLoader(r.ctx, r.cli, root, kbOwnershipRules),
+		cacheObjectLoader(r.ctx, r.cli, root, getKBOwnershipRules()),
 		buildDescriptionFormatter(i18nResource, defaultLocale, view.Spec.Locale))
 
 	plan, err := generator.generatePlan(root, strategicMergeFrom(view.Spec.DryRun.DesiredSpec))

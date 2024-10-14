@@ -70,7 +70,7 @@ func (c *viewCalculator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.
 
 	// handle object changes
 	// build new object set from cache
-	newObjectMap, err := getObjectsFromCache(c.ctx, c.cli, root, kbOwnershipRules)
+	newObjectMap, err := getObjectsFromCache(c.ctx, c.cli, root, getKBOwnershipRules())
 	if err != nil {
 		return kubebuilderx.Commit, err
 	}
@@ -120,7 +120,7 @@ func (c *viewCalculator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.
 	}
 
 	// update current object tree
-	currentState.ObjectTree, err = getObjectTreeWithRevision(root, kbOwnershipRules, c.store, currentState.Changes[len(currentState.Changes)-1].Revision, c.scheme)
+	currentState.ObjectTree, err = getObjectTreeWithRevision(root, getKBOwnershipRules(), c.store, currentState.Changes[len(currentState.Changes)-1].Revision, c.scheme)
 	if err != nil {
 		return kubebuilderx.Commit, err
 	}

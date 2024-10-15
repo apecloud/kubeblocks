@@ -1913,6 +1913,8 @@ controllers:
     enabled: true
   workloads:
     enabled: true
+  operations:
+    enabled: true
   experimental:
     enabled: false
 

@@ -85,8 +85,9 @@ const (
 
 	// switch flags key for API groups
 	appsFlagKey         flagName = "apps"
-	extensionsFlagKey   flagName = "extensions"
 	workloadsFlagKey    flagName = "workloads"
+	operationsFlagKey   flagName = "operations"
+	extensionsFlagKey   flagName = "extensions"
 	experimentalFlagKey flagName = "experimental"
 
 	multiClusterKubeConfigFlagKey       flagName = "multi-cluster-kubeconfig"
@@ -168,10 +169,12 @@ func setupFlags() {
 
 	flag.Bool(appsFlagKey.String(), true,
 		"Enable the apps controller manager.")
-	flag.Bool(extensionsFlagKey.String(), true,
-		"Enable the extensions controller manager.")
 	flag.Bool(workloadsFlagKey.String(), true,
 		"Enable the workloads controller manager.")
+	flag.Bool(operationsFlagKey.String(), true,
+		"Enable the operations controller manager.")
+	flag.Bool(extensionsFlagKey.String(), true,
+		"Enable the extensions controller manager.")
 	flag.Bool(experimentalFlagKey.String(), false,
 		"Enable the experimental controller manager.")
 
@@ -370,16 +373,6 @@ func main() {
 	}
 
 	if viper.GetBool(appsFlagKey.viperName()) {
-		if err = (&appscontrollers.ClusterReconciler{
-			Client:          client,
-			Scheme:          mgr.GetScheme(),
-			Recorder:        mgr.GetEventRecorderFor("cluster-controller"),
-			MultiClusterMgr: multiClusterMgr,
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "Cluster")
-			os.Exit(1)
-		}
-
 		if err = (&appscontrollers.ClusterDefinitionReconciler{
 			Client:   mgr.GetClient(),
 			Scheme:   mgr.GetScheme(),
@@ -389,12 +382,12 @@ func main() {
 			os.Exit(1)
 		}
 
-		if err = (&appscontrollers.ComponentReconciler{
-			Client:   client,
+		if err = (&appscontrollers.ShardingDefinitionReconciler{
+			Client:   mgr.GetClient(),
 			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("component-controller"),
-		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "Component")
+			Recorder: mgr.GetEventRecorderFor("sharding-definition-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "ShardingDefinition")
 			os.Exit(1)
 		}
 
@@ -416,6 +409,83 @@ func main() {
 			os.Exit(1)
 		}
 
+		if err = (&appscontrollers.ClusterReconciler{
+			Client:          client,
+			Scheme:          mgr.GetScheme(),
+			Recorder:        mgr.GetEventRecorderFor("cluster-controller"),
+			MultiClusterMgr: multiClusterMgr,
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "Cluster")
+			os.Exit(1)
+		}
+
+		if err = (&appscontrollers.ComponentReconciler{
+			Client:   client,
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("component-controller"),
+		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "Component")
+			os.Exit(1)
+		}
+
+		if err = (&appscontrollers.ServiceDescriptorReconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("service-descriptor-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "ServiceDescriptor")
+			os.Exit(1)
+		}
+
+		if err = (&k8scorecontrollers.EventReconciler{
+			Client:   client,
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("event-controller"),
+		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "Event")
+			os.Exit(1)
+		}
+
+		if err = (&configuration.ConfigConstraintReconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("config-constraint-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "ConfigConstraint")
+			os.Exit(1)
+		}
+
+		if err = (&configuration.ConfigurationReconciler{
+			Client:   client,
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("configuration-controller"),
+		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "Configuration")
+			os.Exit(1)
+		}
+
+		if err = (&configuration.ReconfigureReconciler{
+			Client:   client,
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("reconfigure-controller"),
+		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "ReconfigureRequest")
+			os.Exit(1)
+		}
+	}
+
+	if viper.GetBool(workloadsFlagKey.viperName()) {
+		if err = (&workloadscontrollers.InstanceSetReconciler{
+			Client:   client,
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("instance-set-controller"),
+		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "InstanceSet")
+			os.Exit(1)
+		}
+	}
+
+	if viper.GetBool(operationsFlagKey.viperName()) {
 		if err = (&opscontrollers.OpsDefinitionReconciler{
 			Client:   mgr.GetClient(),
 			Scheme:   mgr.GetScheme(),
@@ -433,51 +503,6 @@ func main() {
 			setupLog.Error(err, "unable to create controller", "controller", "OpsRequest")
 			os.Exit(1)
 		}
-
-		if err = (&configuration.ConfigConstraintReconciler{
-			Client:   mgr.GetClient(),
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("config-constraint-controller"),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "ConfigConstraint")
-			os.Exit(1)
-		}
-
-		if err = (&configuration.ReconfigureReconciler{
-			Client:   client,
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("reconfigure-controller"),
-		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "ReconfigureRequest")
-			os.Exit(1)
-		}
-
-		if err = (&configuration.ConfigurationReconciler{
-			Client:   client,
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("configuration-controller"),
-		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "Configuration")
-			os.Exit(1)
-		}
-
-		if err = (&k8scorecontrollers.EventReconciler{
-			Client:   client,
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("event-controller"),
-		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "Event")
-			os.Exit(1)
-		}
-
-		if err = (&appscontrollers.ServiceDescriptorReconciler{
-			Client:   mgr.GetClient(),
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("service-descriptor-controller"),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "ServiceDescriptor")
-			os.Exit(1)
-		}
 	}
 
 	if viper.GetBool(extensionsFlagKey.viperName()) {
@@ -488,17 +513,6 @@ func main() {
 			RestConfig: mgr.GetConfig(),
 		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "Addon")
-			os.Exit(1)
-		}
-	}
-
-	if viper.GetBool(workloadsFlagKey.viperName()) {
-		if err = (&workloadscontrollers.InstanceSetReconciler{
-			Client:   client,
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("instance-set-controller"),
-		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "InstanceSet")
 			os.Exit(1)
 		}
 	}

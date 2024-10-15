@@ -860,9 +860,9 @@ rules:
   - list
   - watch
 - apiGroups:
-  - view.kubeblocks.io
+  - trace.kubeblocks.io
   resources:
-  - reconciliationviews
+  - reconciliationtraces
   verbs:
   - create
   - delete
@@ -872,15 +872,15 @@ rules:
   - update
   - watch
 - apiGroups:
-  - view.kubeblocks.io
+  - trace.kubeblocks.io
   resources:
-  - reconciliationviews/finalizers
+  - reconciliationtraces/finalizers
   verbs:
   - update
 - apiGroups:
-  - view.kubeblocks.io
+  - trace.kubeblocks.io
   resources:
-  - reconciliationviews/status
+  - reconciliationtraces/status
   verbs:
   - get
   - patch

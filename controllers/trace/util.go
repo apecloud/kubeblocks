@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package view
+package trace
 
 import (
 	"container/list"
@@ -42,11 +42,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
+	tracev1 "github.com/apecloud/kubeblocks/apis/trace/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
-func objectTypeToGVK(objectType *viewv1.ObjectType) (*schema.GroupVersionKind, error) {
+func objectTypeToGVK(objectType *tracev1.ObjectType) (*schema.GroupVersionKind, error) {
 	if objectType == nil {
 		return nil, nil
 	}
@@ -58,11 +58,11 @@ func objectTypeToGVK(objectType *viewv1.ObjectType) (*schema.GroupVersionKind, e
 	return &gvk, nil
 }
 
-func objectReferenceToType(objectRef *corev1.ObjectReference) *viewv1.ObjectType {
+func objectReferenceToType(objectRef *corev1.ObjectReference) *tracev1.ObjectType {
 	if objectRef == nil {
 		return nil
 	}
-	return &viewv1.ObjectType{
+	return &tracev1.ObjectType{
 		APIVersion: objectRef.APIVersion,
 		Kind:       objectRef.Kind,
 	}
@@ -92,18 +92,18 @@ func objectRefToReference(objectRef model.GVKNObjKey, uid types.UID, resourceVer
 	}
 }
 
-func objectRefToType(objectRef *model.GVKNObjKey) *viewv1.ObjectType {
+func objectRefToType(objectRef *model.GVKNObjKey) *tracev1.ObjectType {
 	if objectRef == nil {
 		return nil
 	}
-	return &viewv1.ObjectType{
+	return &tracev1.ObjectType{
 		APIVersion: objectRef.GroupVersionKind.GroupVersion().String(),
 		Kind:       objectRef.Kind,
 	}
 }
 
-func objectType(apiVersion, kind string) viewv1.ObjectType {
-	return viewv1.ObjectType{
+func objectType(apiVersion, kind string) tracev1.ObjectType {
+	return tracev1.ObjectType{
 		APIVersion: apiVersion,
 		Kind:       kind,
 	}
@@ -243,7 +243,7 @@ func parseSelector(obj client.Object, fieldPath string) (map[string]string, erro
 	return labelSelector, nil
 }
 
-func getObjectTreeFromCache(ctx context.Context, cli client.Client, primary client.Object, ownershipRules []OwnershipRule) (*viewv1.ObjectTreeNode, error) {
+func getObjectTreeFromCache(ctx context.Context, cli client.Client, primary client.Object, ownershipRules []OwnershipRule) (*tracev1.ObjectTreeNode, error) {
 	if primary == nil {
 		return nil, nil
 	}
@@ -253,7 +253,7 @@ func getObjectTreeFromCache(ctx context.Context, cli client.Client, primary clie
 	if err != nil {
 		return nil, err
 	}
-	tree := &viewv1.ObjectTreeNode{
+	tree := &tracev1.ObjectTreeNode{
 		Primary: *reference,
 	}
 
@@ -293,7 +293,7 @@ func getObjectTreeFromCache(ctx context.Context, cli client.Client, primary clie
 	return tree, nil
 }
 
-func getObjectReferenceString(n *viewv1.ObjectTreeNode) string {
+func getObjectReferenceString(n *tracev1.ObjectTreeNode) string {
 	if n == nil {
 		return "nil"
 	}
@@ -449,37 +449,37 @@ func flattenObject(obj client.Object) (map[string]string, error) {
 	return flatMap, nil
 }
 
-func buildObjectSummaries(initialObjectMap, newObjectMap map[model.GVKNObjKey]client.Object) []viewv1.ObjectSummary {
+func buildObjectSummaries(initialObjectMap, newObjectMap map[model.GVKNObjKey]client.Object) []tracev1.ObjectSummary {
 	initialObjectSet, newObjectSet := sets.KeySet(initialObjectMap), sets.KeySet(newObjectMap)
 	createSet := newObjectSet.Difference(initialObjectSet)
 	updateSet := newObjectSet.Intersection(initialObjectSet)
 	deleteSet := initialObjectSet.Difference(newObjectSet)
-	summaryMap := make(map[viewv1.ObjectType]*viewv1.ObjectSummary)
-	doCount := func(s sets.Set[model.GVKNObjKey], summaryUpdater func(objectRef *model.GVKNObjKey, summary *viewv1.ObjectSummary)) {
+	summaryMap := make(map[tracev1.ObjectType]*tracev1.ObjectSummary)
+	doCount := func(s sets.Set[model.GVKNObjKey], summaryUpdater func(objectRef *model.GVKNObjKey, summary *tracev1.ObjectSummary)) {
 		for objectRef := range s {
 			key := *objectRefToType(&objectRef)
 			summary, ok := summaryMap[key]
 			if !ok {
-				summary = &viewv1.ObjectSummary{
+				summary = &tracev1.ObjectSummary{
 					ObjectType: key,
 					Total:      0,
 				}
 				summaryMap[key] = summary
 			}
 			if summary.ChangeSummary == nil {
-				summary.ChangeSummary = &viewv1.ObjectChangeSummary{}
+				summary.ChangeSummary = &tracev1.ObjectChangeSummary{}
 			}
 			summaryUpdater(&objectRef, summary)
 		}
 	}
-	doCount(createSet, func(_ *model.GVKNObjKey, summary *viewv1.ObjectSummary) {
+	doCount(createSet, func(_ *model.GVKNObjKey, summary *tracev1.ObjectSummary) {
 		summary.Total += 1
 		if summary.ChangeSummary.Added == nil {
 			summary.ChangeSummary.Added = pointer.Int32(0)
 		}
 		*summary.ChangeSummary.Added += 1
 	})
-	doCount(updateSet, func(objectRef *model.GVKNObjKey, summary *viewv1.ObjectSummary) {
+	doCount(updateSet, func(objectRef *model.GVKNObjKey, summary *tracev1.ObjectSummary) {
 		initialObj := initialObjectMap[*objectRef]
 		newObj := newObjectMap[*objectRef]
 		summary.Total += 1
@@ -491,14 +491,14 @@ func buildObjectSummaries(initialObjectMap, newObjectMap map[model.GVKNObjKey]cl
 		}
 		*summary.ChangeSummary.Updated += 1
 	})
-	doCount(deleteSet, func(_ *model.GVKNObjKey, summary *viewv1.ObjectSummary) {
+	doCount(deleteSet, func(_ *model.GVKNObjKey, summary *tracev1.ObjectSummary) {
 		if summary.ChangeSummary.Deleted == nil {
 			summary.ChangeSummary.Deleted = pointer.Int32(0)
 		}
 		*summary.ChangeSummary.Deleted += 1
 	})
 
-	var objectSummaries []viewv1.ObjectSummary
+	var objectSummaries []tracev1.ObjectSummary
 	for _, summary := range summaryMap {
 		objectSummaries = append(objectSummaries, *summary)
 	}
@@ -514,7 +514,7 @@ func buildObjectSummaries(initialObjectMap, newObjectMap map[model.GVKNObjKey]cl
 }
 
 func buildChanges(oldObjectMap, newObjectMap map[model.GVKNObjKey]client.Object,
-	descriptionFormat func(client.Object, client.Object, viewv1.ObjectChangeType, *schema.GroupVersionKind) (string, *string)) []viewv1.ObjectChange {
+	descriptionFormat func(client.Object, client.Object, tracev1.ObjectChangeType, *schema.GroupVersionKind) (string, *string)) []tracev1.ObjectChange {
 	// calculate createSet, deleteSet and updateSet
 	newObjectSet := sets.KeySet(newObjectMap)
 	oldObjectSet := sets.KeySet(oldObjectMap)
@@ -523,11 +523,11 @@ func buildChanges(oldObjectMap, newObjectMap map[model.GVKNObjKey]client.Object,
 	deleteSet := oldObjectSet.Difference(newObjectSet)
 
 	// build new slice of reconciliation changes from last round calculation
-	var changes []viewv1.ObjectChange
-	for changeType, changeSet := range map[viewv1.ObjectChangeType]sets.Set[model.GVKNObjKey]{
-		viewv1.ObjectCreationType: createSet,
-		viewv1.ObjectUpdateType:   updateSet,
-		viewv1.ObjectDeletionType: deleteSet,
+	var changes []tracev1.ObjectChange
+	for changeType, changeSet := range map[tracev1.ObjectChangeType]sets.Set[model.GVKNObjKey]{
+		tracev1.ObjectCreationType: createSet,
+		tracev1.ObjectUpdateType:   updateSet,
+		tracev1.ObjectDeletionType: deleteSet,
 	} {
 		for key := range changeSet {
 			var oldObj, newObj client.Object
@@ -538,26 +538,26 @@ func buildChanges(oldObjectMap, newObjectMap map[model.GVKNObjKey]client.Object,
 				newObj = newObjectMap[key]
 			}
 			obj := newObj
-			if changeType == viewv1.ObjectDeletionType {
+			if changeType == tracev1.ObjectDeletionType {
 				obj = oldObj
 			}
-			if changeType == viewv1.ObjectUpdateType &&
+			if changeType == tracev1.ObjectUpdateType &&
 				(oldObj == nil || newObj == nil || oldObj.GetResourceVersion() == newObj.GetResourceVersion()) {
 				continue
 			}
 			isEvent := isEvent(&key.GroupVersionKind)
-			if isEvent && changeType == viewv1.ObjectDeletionType {
+			if isEvent && changeType == tracev1.ObjectDeletionType {
 				continue
 			}
 			var (
 				ref             *corev1.ObjectReference
-				eventAttributes *viewv1.EventAttributes
+				eventAttributes *tracev1.EventAttributes
 			)
 			if isEvent {
-				changeType = viewv1.EventType
+				changeType = tracev1.EventType
 				evt, _ := obj.(*corev1.Event)
 				ref = &evt.InvolvedObject
-				eventAttributes = &viewv1.EventAttributes{
+				eventAttributes = &tracev1.EventAttributes{
 					Name:   evt.Name,
 					Type:   evt.Type,
 					Reason: evt.Reason,
@@ -566,7 +566,7 @@ func buildChanges(oldObjectMap, newObjectMap map[model.GVKNObjKey]client.Object,
 				ref = objectRefToReference(key, obj.GetUID(), obj.GetResourceVersion())
 			}
 			description, localDescription := descriptionFormat(oldObj, newObj, changeType, &key.GroupVersionKind)
-			change := viewv1.ObjectChange{
+			change := tracev1.ObjectChange{
 				ObjectReference:  *ref,
 				ChangeType:       changeType,
 				EventAttributes:  eventAttributes,
@@ -581,15 +581,15 @@ func buildChanges(oldObjectMap, newObjectMap map[model.GVKNObjKey]client.Object,
 	return changes
 }
 
-func buildDescriptionFormatter(i18nResources *corev1.ConfigMap, defaultLocale string, locale *string) func(client.Object, client.Object, viewv1.ObjectChangeType, *schema.GroupVersionKind) (string, *string) {
-	return func(oldObj client.Object, newObj client.Object, changeType viewv1.ObjectChangeType, gvk *schema.GroupVersionKind) (string, *string) {
+func buildDescriptionFormatter(i18nResources *corev1.ConfigMap, defaultLocale string, locale *string) func(client.Object, client.Object, tracev1.ObjectChangeType, *schema.GroupVersionKind) (string, *string) {
+	return func(oldObj client.Object, newObj client.Object, changeType tracev1.ObjectChangeType, gvk *schema.GroupVersionKind) (string, *string) {
 		description := formatDescription(oldObj, newObj, changeType, gvk, i18nResources, &defaultLocale)
 		localDescription := formatDescription(oldObj, newObj, changeType, gvk, i18nResources, locale)
 		return *description, localDescription
 	}
 }
 
-func formatDescription(oldObj, newObj client.Object, changeType viewv1.ObjectChangeType, gvk *schema.GroupVersionKind, i18nResource *corev1.ConfigMap, locale *string) *string {
+func formatDescription(oldObj, newObj client.Object, changeType tracev1.ObjectChangeType, gvk *schema.GroupVersionKind, i18nResource *corev1.ConfigMap, locale *string) *string {
 	if locale == nil {
 		return nil
 	}
@@ -631,7 +631,7 @@ func isEvent(gvk *schema.GroupVersionKind) bool {
 	return *gvk == eventGVK
 }
 
-func getObjectsFromTree(tree *viewv1.ObjectTreeNode, store ObjectRevisionStore, scheme *runtime.Scheme) (map[model.GVKNObjKey]client.Object, error) {
+func getObjectsFromTree(tree *tracev1.ObjectTreeNode, store ObjectRevisionStore, scheme *runtime.Scheme) (map[model.GVKNObjKey]client.Object, error) {
 	if tree == nil {
 		return nil, nil
 	}
@@ -668,7 +668,7 @@ func getObjectsFromTree(tree *viewv1.ObjectTreeNode, store ObjectRevisionStore, 
 	return objectMap, nil
 }
 
-func getObjectTreeWithRevision(primary client.Object, ownershipRules []OwnershipRule, store ObjectRevisionStore, revision int64, scheme *runtime.Scheme) (*viewv1.ObjectTreeNode, error) {
+func getObjectTreeWithRevision(primary client.Object, ownershipRules []OwnershipRule, store ObjectRevisionStore, revision int64, scheme *runtime.Scheme) (*tracev1.ObjectTreeNode, error) {
 	// find matched rules
 	matchedRules, err := findMatchedRules(primary, ownershipRules, scheme)
 	if err != nil {
@@ -679,7 +679,7 @@ func getObjectTreeWithRevision(primary client.Object, ownershipRules []Ownership
 	if err != nil {
 		return nil, err
 	}
-	tree := &viewv1.ObjectTreeNode{
+	tree := &tracev1.ObjectTreeNode{
 		Primary: *reference,
 	}
 	// traverse rules, build subtree
@@ -763,10 +763,10 @@ func getObjectsByRevision(gvk *schema.GroupVersionKind, store ObjectRevisionStor
 	return matchedObjects
 }
 
-func deleteUnusedRevisions(store ObjectRevisionStore, changes []viewv1.ObjectChange, reference client.Object) {
+func deleteUnusedRevisions(store ObjectRevisionStore, changes []tracev1.ObjectChange, reference client.Object) {
 	for _, change := range changes {
 		objectRef := objectReferenceToRef(&change.ObjectReference)
-		if change.ChangeType == viewv1.EventType {
+		if change.ChangeType == tracev1.EventType {
 			objectRef.GroupVersionKind = eventGVK
 			objectRef.Name = change.EventAttributes.Name
 		}

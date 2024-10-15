@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package view
+package trace
 
 import (
 	"context"
@@ -35,7 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
+	tracev1 "github.com/apecloud/kubeblocks/apis/trace/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
@@ -184,7 +184,7 @@ func NewInformerManager(cli client.Client, cache cache.Cache, scheme *runtime.Sc
 
 func (m *informerManager) watchKubeBlocksRelatedResources() error {
 	gvks := sets.New[schema.GroupVersionKind]()
-	parseGVK := func(ot *viewv1.ObjectType) error {
+	parseGVK := func(ot *tracev1.ObjectType) error {
 		gvk, err := objectTypeToGVK(ot)
 		if err != nil {
 			return err
@@ -193,7 +193,7 @@ func (m *informerManager) watchKubeBlocksRelatedResources() error {
 		return nil
 	}
 	// watch corev1.Event
-	if err := parseGVK(&viewv1.ObjectType{
+	if err := parseGVK(&tracev1.ObjectType{
 		APIVersion: corev1.SchemeGroupVersion.String(),
 		Kind:       constant.EventKind,
 	}); err != nil {

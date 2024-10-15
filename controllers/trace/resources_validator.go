@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package view
+package trace
 
 import (
 	"context"
@@ -25,7 +25,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
+	tracev1 "github.com/apecloud/kubeblocks/apis/trace/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 )
 
@@ -42,13 +42,13 @@ func (r *resourcesValidator) PreCondition(tree *kubebuilderx.ObjectTree) *kubebu
 }
 
 func (r *resourcesValidator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
-	// view object should exist
+	// trace object should exist
 	if tree.GetRoot() == nil {
 		return kubebuilderx.Commit, nil
 	}
 
 	// target object should exist
-	v, _ := tree.GetRoot().(*viewv1.ReconciliationView)
+	v, _ := tree.GetRoot().(*tracev1.ReconciliationTrace)
 	objectKey := client.ObjectKeyFromObject(v)
 	if v.Spec.TargetObject != nil {
 		objectKey.Namespace = v.Spec.TargetObject.Namespace

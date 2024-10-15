@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package view
+package trace
 
 import (
 	"sort"
@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
+	tracev1 "github.com/apecloud/kubeblocks/apis/trace/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
@@ -41,7 +41,7 @@ type ChangeCaptureStore interface {
 	Get(objectRef *model.GVKNObjKey) client.Object
 	List(gvk *schema.GroupVersionKind) []client.Object
 	GetAll() map[model.GVKNObjKey]client.Object
-	GetChanges() []viewv1.ObjectChange
+	GetChanges() []tracev1.ObjectChange
 }
 
 type changeCaptureStore struct {
@@ -49,7 +49,7 @@ type changeCaptureStore struct {
 	formatter descriptionFormatter
 	store     map[model.GVKNObjKey]client.Object
 	clock     atomic.Int64
-	changes   []viewv1.ObjectChange
+	changes   []tracev1.ObjectChange
 }
 
 func (s *changeCaptureStore) Load(objects ...client.Object) error {
@@ -138,7 +138,7 @@ func (s *changeCaptureStore) GetAll() map[model.GVKNObjKey]client.Object {
 	return all
 }
 
-func (s *changeCaptureStore) GetChanges() []viewv1.ObjectChange {
+func (s *changeCaptureStore) GetChanges() []tracev1.ObjectChange {
 	sort.SliceStable(s.changes, func(i, j int) bool {
 		return s.changes[i].Revision < s.changes[j].Revision
 	})

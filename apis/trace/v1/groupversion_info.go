@@ -17,9 +17,9 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-// Package v1 contains API Schema definitions for the view v1 API group
+// Package v1 contains API Schema definitions for the trace v1 API group
 // +kubebuilder:object:generate=true
-// +groupName=view.kubeblocks.io
+// +groupName=trace.kubeblocks.io
 package v1
 
 import (
@@ -29,7 +29,7 @@ import (
 
 var (
 	// GroupVersion is group version used to register these objects
-	GroupVersion = schema.GroupVersion{Group: "view.kubeblocks.io", Version: "v1"}
+	GroupVersion = schema.GroupVersion{Group: "trace.kubeblocks.io", Version: "v1"}
 
 	// SchemeBuilder is used to add go types to the GroupVersionKind scheme
 	SchemeBuilder = &scheme.Builder{GroupVersion: GroupVersion}
@@ -38,4 +38,4 @@ var (
 	AddToScheme = SchemeBuilder.AddToScheme
 )
 
-const Kind = "ReconciliationView"
+const Kind = "ReconciliationTrace"

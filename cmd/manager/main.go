@@ -55,7 +55,7 @@ import (
 	experimentalv1alpha1 "github.com/apecloud/kubeblocks/apis/experimental/v1alpha1"
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
-	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
+	tracev1 "github.com/apecloud/kubeblocks/apis/trace/v1"
 	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	workloadsv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	appscontrollers "github.com/apecloud/kubeblocks/controllers/apps"
@@ -64,7 +64,7 @@ import (
 	extensionscontrollers "github.com/apecloud/kubeblocks/controllers/extensions"
 	k8scorecontrollers "github.com/apecloud/kubeblocks/controllers/k8score"
 	opscontrollers "github.com/apecloud/kubeblocks/controllers/operations"
-	viewcontrollers "github.com/apecloud/kubeblocks/controllers/view"
+	tracecontrollers "github.com/apecloud/kubeblocks/controllers/trace"
 	workloadscontrollers "github.com/apecloud/kubeblocks/controllers/workloads"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
@@ -90,7 +90,7 @@ const (
 	extensionsFlagKey   flagName = "extensions"
 	workloadsFlagKey    flagName = "workloads"
 	experimentalFlagKey flagName = "experimental"
-	viewFlagKey         flagName = "view"
+	traceFlagKey        flagName = "trace"
 
 	multiClusterKubeConfigFlagKey       flagName = "multi-cluster-kubeconfig"
 	multiClusterContextsFlagKey         flagName = "multi-cluster-contexts"
@@ -117,7 +117,7 @@ func init() {
 	utilruntime.Must(workloadsv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(workloadsv1.AddToScheme(scheme))
 	utilruntime.Must(experimentalv1alpha1.AddToScheme(scheme))
-	utilruntime.Must(viewv1.AddToScheme(scheme))
+	utilruntime.Must(tracev1.AddToScheme(scheme))
 
 	// +kubebuilder:scaffold:scheme
 
@@ -179,8 +179,8 @@ func setupFlags() {
 		"Enable the workloads controller manager.")
 	flag.Bool(experimentalFlagKey.String(), false,
 		"Enable the experimental controller manager.")
-	flag.Bool(viewFlagKey.String(), true,
-		"Enable the view controller manager.")
+	flag.Bool(traceFlagKey.String(), true,
+		"Enable the trace controller manager.")
 
 	flag.String(multiClusterKubeConfigFlagKey.String(), "", "Paths to the kubeconfig for multi-cluster accessing.")
 	flag.String(multiClusterContextsFlagKey.String(), "", "Kube contexts the manager will talk to.")
@@ -530,18 +530,18 @@ func main() {
 		}
 	}
 
-	if viper.GetBool(viewFlagKey.viperName()) {
-		viewReconciler := &viewcontrollers.ReconciliationViewReconciler{
+	if viper.GetBool(traceFlagKey.viperName()) {
+		traceReconciler := &tracecontrollers.ReconciliationTraceReconciler{
 			Client:   mgr.GetClient(),
 			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("reconciliation-view-controller"),
+			Recorder: mgr.GetEventRecorderFor("reconciliation-trace-controller"),
 		}
-		if err := viewReconciler.SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "ReconciliationView")
+		if err := traceReconciler.SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "ReconciliationTrace")
 			os.Exit(1)
 		}
-		if err := mgr.Add(viewReconciler.InformerManager); err != nil {
-			setupLog.Error(err, "unable to add view informer manager", "controller", "InformerManager")
+		if err := mgr.Add(traceReconciler.InformerManager); err != nil {
+			setupLog.Error(err, "unable to add trace informer manager", "controller", "InformerManager")
 			os.Exit(1)
 		}
 	}

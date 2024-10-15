@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package view
+package trace
 
 import (
 	"container/list"
@@ -32,7 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
+	tracev1 "github.com/apecloud/kubeblocks/apis/trace/v1"
 )
 
 type ObjectTreeRootFinder interface {
@@ -55,14 +55,14 @@ func (f *rootFinder) GetEventHandler() handler.EventHandler {
 }
 
 // findRoots finds the root(s) object of the 'object' by the object tree.
-// The basic idea is, find the parent(s) of the object based on ownership rules defined in view definition,
+// The basic idea is, find the parent(s) of the object based on ownership rules defined in trace definition,
 // and do this recursively until find all the root object(s).
 func (f *rootFinder) findRoots(ctx context.Context, object client.Object) []reconcile.Request {
 	waitingList := list.New()
 	waitingList.PushFront(object)
 
 	var roots []client.Object
-	primaryTypeList := []viewv1.ObjectType{rootObjectType}
+	primaryTypeList := []tracev1.ObjectType{rootObjectType}
 	for waitingList.Len() > 0 {
 		e := waitingList.Front()
 		waitingList.Remove(e)
@@ -128,26 +128,26 @@ func (f *rootFinder) findRoots(ctx context.Context, object client.Object) []reco
 		clusterKeys.Insert(client.ObjectKeyFromObject(root))
 	}
 
-	// list all view objects, filter by result Cluster objects.
-	viewList := &viewv1.ReconciliationViewList{}
-	if err := f.List(ctx, viewList); err != nil {
-		f.logger.Error(err, "list view failed", "")
+	// list all trace objects, filter by result Cluster objects.
+	traceList := &tracev1.ReconciliationTraceList{}
+	if err := f.List(ctx, traceList); err != nil {
+		f.logger.Error(err, "list trace failed", "")
 		return nil
 	}
-	getTargetObjectKey := func(view *viewv1.ReconciliationView) client.ObjectKey {
-		key := client.ObjectKeyFromObject(view)
-		if view.Spec.TargetObject != nil {
-			key.Namespace = view.Spec.TargetObject.Namespace
-			key.Name = view.Spec.TargetObject.Name
+	getTargetObjectKey := func(trace *tracev1.ReconciliationTrace) client.ObjectKey {
+		key := client.ObjectKeyFromObject(trace)
+		if trace.Spec.TargetObject != nil {
+			key.Namespace = trace.Spec.TargetObject.Namespace
+			key.Name = trace.Spec.TargetObject.Name
 		}
 		return key
 	}
 	var requests []reconcile.Request
-	for i := range viewList.Items {
-		view := &viewList.Items[i]
-		key := getTargetObjectKey(view)
+	for i := range traceList.Items {
+		trace := &traceList.Items[i]
+		key := getTargetObjectKey(trace)
 		if clusterKeys.Has(key) {
-			requests = append(requests, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(view)})
+			requests = append(requests, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(trace)})
 		}
 	}
 

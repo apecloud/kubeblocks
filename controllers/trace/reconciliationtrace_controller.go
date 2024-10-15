@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package view
+package trace
 
 import (
 	"context"
@@ -29,17 +29,17 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
+	tracev1 "github.com/apecloud/kubeblocks/apis/trace/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
 func init() {
-	model.AddScheme(viewv1.AddToScheme)
+	model.AddScheme(tracev1.AddToScheme)
 }
 
-// ReconciliationViewReconciler reconciles a ReconciliationView object
-type ReconciliationViewReconciler struct {
+// ReconciliationTraceReconciler reconciles a ReconciliationTrace object
+type ReconciliationTraceReconciler struct {
 	client.Client
 	Scheme               *runtime.Scheme
 	Recorder             record.EventRecorder
@@ -48,20 +48,20 @@ type ReconciliationViewReconciler struct {
 	InformerManager      InformerManager
 }
 
-//+kubebuilder:rbac:groups=view.kubeblocks.io,resources=reconciliationviews,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=view.kubeblocks.io,resources=reconciliationviews/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=view.kubeblocks.io,resources=reconciliationviews/finalizers,verbs=update
+//+kubebuilder:rbac:groups=trace.kubeblocks.io,resources=reconciliationtraces,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=trace.kubeblocks.io,resources=reconciliationtraces/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=trace.kubeblocks.io,resources=reconciliationtraces/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.4/pkg/reconcile
-func (r *ReconciliationViewReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	logger := log.FromContext(ctx).WithValues("ReconciliationView", req.NamespacedName)
+func (r *ReconciliationTraceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	logger := log.FromContext(ctx).WithValues("ReconciliationTrace", req.NamespacedName)
 
 	res, err := kubebuilderx.NewController(ctx, r.Client, req, r.Recorder, logger).
-		Prepare(viewResources()).
+		Prepare(traceResources()).
 		Do(resourcesValidation(ctx, r.Client)).
 		Do(assureFinalizer()).
 		Do(handleDeletion(r.ObjectRevisionStore)).
@@ -74,13 +74,13 @@ func (r *ReconciliationViewReconciler) Reconcile(ctx context.Context, req ctrl.R
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *ReconciliationViewReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *ReconciliationTraceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.ObjectRevisionStore = NewObjectStore(r.Scheme)
 	r.ObjectTreeRootFinder = NewObjectTreeRootFinder(r.Client)
 	r.InformerManager = NewInformerManager(r.Client, mgr.GetCache(), r.Scheme, r.ObjectTreeRootFinder.GetEventChannel())
 
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&viewv1.ReconciliationView{}).
+		For(&tracev1.ReconciliationTrace{}).
 		WatchesRawSource(&source.Channel{Source: r.ObjectTreeRootFinder.GetEventChannel()}, r.ObjectTreeRootFinder.GetEventHandler()).
 		Complete(r)
 }

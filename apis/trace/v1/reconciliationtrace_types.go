@@ -24,16 +24,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// ReconciliationViewSpec defines the desired state of ReconciliationView
-type ReconciliationViewSpec struct {
+// ReconciliationTraceSpec defines the desired state of ReconciliationTrace
+type ReconciliationTraceSpec struct {
 	// TargetObject specifies the target Cluster object.
-	// Default is the Cluster object with same namespace and name as this ReconciliationView object.
+	// Default is the Cluster object with same namespace and name as this ReconciliationTrace object.
 	//
 	// +optional
 	TargetObject *ObjectReference `json:"targetObject,omitempty"`
 
 	// DryRun tells the Controller to simulate the reconciliation process with a new desired spec of the TargetObject.
-	// And a reconciliation plan will be generated and described in the ReconciliationViewStatus.
+	// And a reconciliation plan will be generated and described in the ReconciliationTraceStatus.
 	// The plan generation process will not impact the state of the TargetObject.
 	//
 	// +optional
@@ -57,14 +57,14 @@ type ReconciliationViewSpec struct {
 	// +optional
 	Depth *int32 `json:"depth,omitempty"`
 
-	// Locale specifies the locale to use when localizing the reconciliation view.
+	// Locale specifies the locale to use when localizing the reconciliation trace.
 	//
 	// +optional
 	Locale *string `json:"locale,omitempty"`
 }
 
-// ReconciliationViewStatus defines the observed state of ReconciliationView
-type ReconciliationViewStatus struct {
+// ReconciliationTraceStatus defines the observed state of ReconciliationTrace
+type ReconciliationTraceStatus struct {
 	// DryRunResult specifies the dry-run result.
 	//
 	// +optional
@@ -88,13 +88,13 @@ type ReconciliationViewStatus struct {
 // ObjectReference defines a reference to an object.
 type ObjectReference struct {
 	// Namespace of the referent.
-	// Default is same as the ReconciliationView object.
+	// Default is same as the ReconciliationTrace object.
 	//
 	// +optional
 	Namespace string `json:"namespace,omitempty"`
 
 	// Name of the referent.
-	// Default is same as the ReconciliationView object.
+	// Default is same as the ReconciliationTrace object.
 	//
 	// +optional
 	Name string `json:"name,omitempty"`
@@ -287,7 +287,7 @@ type ObjectChange struct {
 	//
 	Revision int64 `json:"revision"`
 
-	// Timestamp is a timestamp representing the ReconciliationView Controller time when this change occurred.
+	// Timestamp is a timestamp representing the ReconciliationTrace Controller time when this change occurred.
 	// It is not guaranteed to be set in happens-before order across separate changes.
 	// It is represented in RFC3339 form and is in UTC.
 	//
@@ -354,7 +354,7 @@ type ObjectTreeDiffSummary struct {
 // +genclient
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:categories={kubeblocks,all},shortName=view
+// +kubebuilder:resource:categories={kubeblocks,all},shortName=trace
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 // +kubebuilder:printcolumn:name="TARGET_NS",type="string",JSONPath=".spec.targetObject.namespace",description="Target Object Namespace"
 // +kubebuilder:printcolumn:name="TARGET_NAME",type="string",JSONPath=".spec.targetObject.name",description="Target Object Name"
@@ -364,24 +364,24 @@ type ObjectTreeDiffSummary struct {
 // +kubebuilder:printcolumn:name="NAME",type="string",JSONPath=".status.currentState.changes[-1].objectReference.name",description="Latest Changed Object Name"
 // +kubebuilder:printcolumn:name="CHANGE",type="string",JSONPath=".status.currentState.changes[-1].description",description="Latest Change Description"
 
-// ReconciliationView is the Schema for the reconciliationviews API
-type ReconciliationView struct {
+// ReconciliationTrace is the Schema for the reconciliationtraces API
+type ReconciliationTrace struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   ReconciliationViewSpec   `json:"spec,omitempty"`
-	Status ReconciliationViewStatus `json:"status,omitempty"`
+	Spec   ReconciliationTraceSpec   `json:"spec,omitempty"`
+	Status ReconciliationTraceStatus `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 
-// ReconciliationViewList contains a list of ReconciliationView
-type ReconciliationViewList struct {
+// ReconciliationTraceList contains a list of ReconciliationTrace
+type ReconciliationTraceList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []ReconciliationView `json:"items"`
+	Items           []ReconciliationTrace `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&ReconciliationView{}, &ReconciliationViewList{})
+	SchemeBuilder.Register(&ReconciliationTrace{}, &ReconciliationTraceList{})
 }

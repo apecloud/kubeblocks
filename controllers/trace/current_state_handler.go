@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package view
+package trace
 
 import (
 	"context"
@@ -29,27 +29,27 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
+	tracev1 "github.com/apecloud/kubeblocks/apis/trace/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
-type viewCalculator struct {
+type traceCalculator struct {
 	ctx    context.Context
 	cli    client.Client
 	scheme *runtime.Scheme
 	store  ObjectRevisionStore
 }
 
-func (c *viewCalculator) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
+func (c *traceCalculator) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
 	if tree.GetRoot() == nil || model.IsObjectDeleting(tree.GetRoot()) {
 		return kubebuilderx.ConditionUnsatisfied
 	}
 	return kubebuilderx.ConditionSatisfied
 }
 
-func (c *viewCalculator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
-	view, _ := tree.GetRoot().(*viewv1.ReconciliationView)
+func (c *traceCalculator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
+	trace, _ := tree.GetRoot().(*tracev1.ReconciliationTrace)
 	objs := tree.List(&corev1.ConfigMap{})
 	var i18nResource *corev1.ConfigMap
 	if len(objs) > 0 {
@@ -57,11 +57,11 @@ func (c *viewCalculator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.
 	}
 
 	root := &kbappsv1.Cluster{}
-	objectKey := client.ObjectKeyFromObject(view)
-	if view.Spec.TargetObject != nil {
+	objectKey := client.ObjectKeyFromObject(trace)
+	if trace.Spec.TargetObject != nil {
 		objectKey = client.ObjectKey{
-			Namespace: view.Spec.TargetObject.Namespace,
-			Name:      view.Spec.TargetObject.Name,
+			Namespace: trace.Spec.TargetObject.Namespace,
+			Name:      trace.Spec.TargetObject.Name,
 		}
 	}
 	if err := c.cli.Get(c.ctx, objectKey, root); err != nil {
@@ -75,12 +75,12 @@ func (c *viewCalculator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.
 		return kubebuilderx.Commit, err
 	}
 	// build old object set from store
-	currentState := &view.Status.CurrentState
+	currentState := &trace.Status.CurrentState
 	oldObjectMap, err := getObjectsFromTree(currentState.ObjectTree, c.store, c.scheme)
 	if err != nil {
 		return kubebuilderx.Commit, err
 	}
-	changes := buildChanges(oldObjectMap, newObjectMap, buildDescriptionFormatter(i18nResource, defaultLocale, view.Spec.Locale))
+	changes := buildChanges(oldObjectMap, newObjectMap, buildDescriptionFormatter(i18nResource, defaultLocale, trace.Spec.Locale))
 
 	// handle event changes
 	newEventMap, err := filterEvents(getEventsFromCache(c.ctx, c.cli), newObjectMap)
@@ -91,7 +91,7 @@ func (c *viewCalculator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.
 	if err != nil {
 		return kubebuilderx.Commit, err
 	}
-	eventChanges := buildChanges(oldEventMap, newEventMap, buildDescriptionFormatter(i18nResource, defaultLocale, view.Spec.Locale))
+	eventChanges := buildChanges(oldEventMap, newEventMap, buildDescriptionFormatter(i18nResource, defaultLocale, trace.Spec.Locale))
 	changes = append(changes, eventChanges...)
 
 	if len(changes) == 0 {
@@ -108,13 +108,13 @@ func (c *viewCalculator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.
 
 	// save new version objects to store
 	for _, object := range newObjectMap {
-		if err = c.store.Insert(object, view); err != nil {
+		if err = c.store.Insert(object, trace); err != nil {
 			return kubebuilderx.Commit, err
 		}
 	}
 	// save new events to store
 	for _, object := range newEventMap {
-		if err = c.store.Insert(object, view); err != nil {
+		if err = c.store.Insert(object, trace); err != nil {
 			return kubebuilderx.Commit, err
 		}
 	}
@@ -126,7 +126,7 @@ func (c *viewCalculator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.
 	}
 
 	// update changes summary
-	initialObjectMap, err := getObjectsFromTree(view.Status.InitialObjectTree, c.store, c.scheme)
+	initialObjectMap, err := getObjectsFromTree(trace.Status.InitialObjectTree, c.store, c.scheme)
 	if err != nil {
 		return kubebuilderx.Commit, err
 	}
@@ -191,7 +191,7 @@ func filterEvents(eventLister func() ([]client.Object, error), objectMap map[mod
 }
 
 func updateCurrentState(ctx context.Context, cli client.Client, scheme *runtime.Scheme, store ObjectRevisionStore) kubebuilderx.Reconciler {
-	return &viewCalculator{
+	return &traceCalculator{
 		ctx:    ctx,
 		cli:    cli,
 		scheme: scheme,
@@ -199,4 +199,4 @@ func updateCurrentState(ctx context.Context, cli client.Client, scheme *runtime.
 	}
 }
 
-var _ kubebuilderx.Reconciler = &viewCalculator{}
+var _ kubebuilderx.Reconciler = &traceCalculator{}

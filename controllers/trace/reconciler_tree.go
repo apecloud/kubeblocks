@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package view
+package trace
 
 import (
 	"context"
@@ -43,7 +43,7 @@ import (
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
+	tracev1 "github.com/apecloud/kubeblocks/apis/trace/v1"
 	workloadsAPI "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/controllers/apps"
 	"github.com/apecloud/kubeblocks/controllers/apps/configuration"
@@ -63,7 +63,7 @@ type ReconcilerTree interface {
 
 type reconcilerFunc func(client.Client, record.EventRecorder) reconcile.Reconciler
 
-var reconcilerFuncMap = map[viewv1.ObjectType]reconcilerFunc{
+var reconcilerFuncMap = map[tracev1.ObjectType]reconcilerFunc{
 	objectType(kbappsv1.SchemeGroupVersion.String(), kbappsv1.ClusterKind):             newClusterReconciler,
 	objectType(kbappsv1.SchemeGroupVersion.String(), kbappsv1.ComponentKind):           newComponentReconciler,
 	objectType(corev1.SchemeGroupVersion.String(), constant.SecretKind):                newSecretReconciler,
@@ -89,12 +89,12 @@ type reconcilerTree struct {
 	ctx         context.Context
 	cli         client.Client
 	tree        *graph.DAG
-	reconcilers map[viewv1.ObjectType]reconcile.Reconciler
+	reconcilers map[tracev1.ObjectType]reconcile.Reconciler
 }
 
 func (r *reconcilerTree) Run() error {
 	return r.tree.WalkTopoOrder(func(v graph.Vertex) error {
-		objType, _ := v.(viewv1.ObjectType)
+		objType, _ := v.(tracev1.ObjectType)
 		reconciler := r.reconcilers[objType]
 		gvk, err := objectTypeToGVK(&objType)
 		if err != nil {
@@ -112,8 +112,8 @@ func (r *reconcilerTree) Run() error {
 		}
 		return nil
 	}, func(v1, v2 graph.Vertex) bool {
-		t1, _ := v1.(viewv1.ObjectType)
-		t2, _ := v2.(viewv1.ObjectType)
+		t1, _ := v1.(tracev1.ObjectType)
+		t2, _ := v2.(tracev1.ObjectType)
 		if t1.APIVersion != t2.APIVersion {
 			return t1.APIVersion < t2.APIVersion
 		}
@@ -123,7 +123,7 @@ func (r *reconcilerTree) Run() error {
 
 func newReconcilerTree(ctx context.Context, mClient client.Client, recorder record.EventRecorder, rules []OwnershipRule) (ReconcilerTree, error) {
 	dag := graph.NewDAG()
-	reconcilers := make(map[viewv1.ObjectType]reconcile.Reconciler)
+	reconcilers := make(map[tracev1.ObjectType]reconcile.Reconciler)
 	for _, rule := range rules {
 		dag.AddVertex(rule.Primary)
 		reconciler, err := newReconciler(mClient, recorder, rule.Primary)
@@ -154,7 +154,7 @@ func newReconcilerTree(ctx context.Context, mClient client.Client, recorder reco
 	}, nil
 }
 
-func newReconciler(mClient client.Client, recorder record.EventRecorder, objectType viewv1.ObjectType) (reconcile.Reconciler, error) {
+func newReconciler(mClient client.Client, recorder record.EventRecorder, objectType tracev1.ObjectType) (reconcile.Reconciler, error) {
 	reconcilerF, ok := reconcilerFuncMap[objectType]
 	if ok {
 		return reconcilerF(mClient, recorder), nil
@@ -600,7 +600,7 @@ func newRestoreReconciler(c client.Client, recorder record.EventRecorder) reconc
 }
 
 func newBackupReconciler(c client.Client, recorder record.EventRecorder) reconcile.Reconciler {
-	config := intctrlutil.GeKubeRestConfig("kubeblocks-view")
+	config := intctrlutil.GeKubeRestConfig("kubeblocks-trace")
 	return &dataprotection.BackupReconciler{
 		Client:     c,
 		Scheme:     c.Scheme(),

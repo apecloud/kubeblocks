@@ -5,19 +5,19 @@ metadata:
     controller-gen.kubebuilder.io/version: v0.14.0
   labels:
     app.kubernetes.io/name: kubeblocks
-  name: reconciliationviews.view.kubeblocks.io
+  name: reconciliationtraces.trace.kubeblocks.io
 spec:
-  group: view.kubeblocks.io
+  group: trace.kubeblocks.io
   names:
     categories:
     - kubeblocks
     - all
-    kind: ReconciliationView
-    listKind: ReconciliationViewList
-    plural: reconciliationviews
+    kind: ReconciliationTrace
+    listKind: ReconciliationTraceList
+    plural: reconciliationtraces
     shortNames:
-    - view
-    singular: reconciliationview
+    - trace
+    singular: reconciliationtrace
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
@@ -55,7 +55,7 @@ spec:
     name: v1
     schema:
       openAPIV3Schema:
-        description: ReconciliationView is the Schema for the reconciliationviews
+        description: ReconciliationTrace is the Schema for the reconciliationtraces
           API
         properties:
           apiVersion:
@@ -76,7 +76,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: ReconciliationViewSpec defines the desired state of ReconciliationView
+            description: ReconciliationTraceSpec defines the desired state of ReconciliationTrace
             properties:
               depth:
                 default: 0
@@ -89,7 +89,7 @@ spec:
               dryRun:
                 description: |-
                   DryRun tells the Controller to simulate the reconciliation process with a new desired spec of the TargetObject.
-                  And a reconciliation plan will be generated and described in the ReconciliationViewStatus.
+                  And a reconciliation plan will be generated and described in the ReconciliationTraceStatus.
                   The plan generation process will not impact the state of the TargetObject.
                 properties:
                   desiredSpec:
@@ -104,7 +104,7 @@ spec:
                 type: object
               locale:
                 description: Locale specifies the locale to use when localizing the
-                  reconciliation view.
+                  reconciliation trace.
                 type: string
               stateEvaluationExpression:
                 description: |-
@@ -130,22 +130,22 @@ spec:
               targetObject:
                 description: |-
                   TargetObject specifies the target Cluster object.
-                  Default is the Cluster object with same namespace and name as this ReconciliationView object.
+                  Default is the Cluster object with same namespace and name as this ReconciliationTrace object.
                 properties:
                   name:
                     description: |-
                       Name of the referent.
-                      Default is same as the ReconciliationView object.
+                      Default is same as the ReconciliationTrace object.
                     type: string
                   namespace:
                     description: |-
                       Namespace of the referent.
-                      Default is same as the ReconciliationView object.
+                      Default is same as the ReconciliationTrace object.
                     type: string
                 type: object
             type: object
           status:
-            description: ReconciliationViewStatus defines the observed state of ReconciliationView
+            description: ReconciliationTraceStatus defines the observed state of ReconciliationTrace
             properties:
               currentState:
                 description: |-
@@ -250,7 +250,7 @@ spec:
                           type: integer
                         timestamp:
                           description: |-
-                            Timestamp is a timestamp representing the ReconciliationView Controller time when this change occurred.
+                            Timestamp is a timestamp representing the ReconciliationTrace Controller time when this change occurred.
                             It is not guaranteed to be set in happens-before order across separate changes.
                             It is represented in RFC3339 form and is in UTC.
                           format: date-time
@@ -481,7 +481,7 @@ spec:
                           type: integer
                         timestamp:
                           description: |-
-                            Timestamp is a timestamp representing the ReconciliationView Controller time when this change occurred.
+                            Timestamp is a timestamp representing the ReconciliationTrace Controller time when this change occurred.
                             It is not guaranteed to be set in happens-before order across separate changes.
                             It is represented in RFC3339 form and is in UTC.
                           format: date-time
@@ -737,7 +737,7 @@ spec:
                               type: integer
                             timestamp:
                               description: |-
-                                Timestamp is a timestamp representing the ReconciliationView Controller time when this change occurred.
+                                Timestamp is a timestamp representing the ReconciliationTrace Controller time when this change occurred.
                                 It is not guaranteed to be set in happens-before order across separate changes.
                                 It is represented in RFC3339 form and is in UTC.
                               format: date-time

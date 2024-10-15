@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package view
+package trace
 
 import (
 	"context"
@@ -33,7 +33,7 @@ import (
 	"sigs.k8s.io/yaml"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
+	tracev1 "github.com/apecloud/kubeblocks/apis/trace/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -49,7 +49,7 @@ func (r *dryRunner) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.Ch
 	if tree.GetRoot() == nil || model.IsObjectDeleting(tree.GetRoot()) {
 		return kubebuilderx.ConditionUnsatisfied
 	}
-	v, _ := tree.GetRoot().(*viewv1.ReconciliationView)
+	v, _ := tree.GetRoot().(*tracev1.ReconciliationTrace)
 	if isDesiredSpecChanged(v) {
 		return kubebuilderx.ConditionSatisfied
 	}
@@ -57,7 +57,7 @@ func (r *dryRunner) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.Ch
 }
 
 func (r *dryRunner) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
-	view, _ := tree.GetRoot().(*viewv1.ReconciliationView)
+	trace, _ := tree.GetRoot().(*tracev1.ReconciliationTrace)
 	objs := tree.List(&corev1.ConfigMap{})
 	var i18nResource *corev1.ConfigMap
 	if len(objs) > 0 {
@@ -65,11 +65,11 @@ func (r *dryRunner) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Resul
 	}
 
 	root := &kbappsv1.Cluster{}
-	objectKey := client.ObjectKeyFromObject(view)
-	if view.Spec.TargetObject != nil {
+	objectKey := client.ObjectKeyFromObject(trace)
+	if trace.Spec.TargetObject != nil {
 		objectKey = client.ObjectKey{
-			Namespace: view.Spec.TargetObject.Namespace,
-			Name:      view.Spec.TargetObject.Name,
+			Namespace: trace.Spec.TargetObject.Namespace,
+			Name:      trace.Spec.TargetObject.Name,
 		}
 	}
 	if err := r.cli.Get(r.ctx, objectKey, root); err != nil {
@@ -78,14 +78,14 @@ func (r *dryRunner) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Resul
 
 	generator := newPlanGenerator(r.ctx, r.cli, r.scheme,
 		cacheObjectLoader(r.ctx, r.cli, root, getKBOwnershipRules()),
-		buildDescriptionFormatter(i18nResource, defaultLocale, view.Spec.Locale))
+		buildDescriptionFormatter(i18nResource, defaultLocale, trace.Spec.Locale))
 
-	plan, err := generator.generatePlan(root, strategicMergeFrom(view.Spec.DryRun.DesiredSpec))
+	plan, err := generator.generatePlan(root, strategicMergeFrom(trace.Spec.DryRun.DesiredSpec))
 	if err != nil {
 		return kubebuilderx.Commit, err
 	}
-	plan.DesiredSpecRevision = getDesiredSpecRevision(view.Spec.DryRun.DesiredSpec)
-	view.Status.DryRunResult = plan
+	plan.DesiredSpecRevision = getDesiredSpecRevision(trace.Spec.DryRun.DesiredSpec)
+	trace.Status.DryRunResult = plan
 
 	return kubebuilderx.Continue, nil
 }
@@ -98,7 +98,7 @@ func dryRun(ctx context.Context, cli client.Client, scheme *runtime.Scheme) kube
 	}
 }
 
-func isDesiredSpecChanged(v *viewv1.ReconciliationView) bool {
+func isDesiredSpecChanged(v *tracev1.ReconciliationTrace) bool {
 	if v.Spec.DryRun == nil && v.Status.DryRunResult == nil {
 		return false
 	}

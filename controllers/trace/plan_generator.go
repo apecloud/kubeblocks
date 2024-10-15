@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package view
+package trace
 
 import (
 	"context"
@@ -36,16 +36,16 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
+	tracev1 "github.com/apecloud/kubeblocks/apis/trace/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
 type PlanGenerator interface {
-	generatePlan(root *kbappsv1.Cluster, patch client.Patch) (*viewv1.DryRunResult, error)
+	generatePlan(root *kbappsv1.Cluster, patch client.Patch) (*tracev1.DryRunResult, error)
 }
 
 type objectLoader func() (map[model.GVKNObjKey]client.Object, error)
-type descriptionFormatter func(client.Object, client.Object, viewv1.ObjectChangeType, *schema.GroupVersionKind) (string, *string)
+type descriptionFormatter func(client.Object, client.Object, tracev1.ObjectChangeType, *schema.GroupVersionKind) (string, *string)
 
 type planGenerator struct {
 	ctx       context.Context
@@ -55,7 +55,7 @@ type planGenerator struct {
 	formatter descriptionFormatter
 }
 
-func (g *planGenerator) generatePlan(root *kbappsv1.Cluster, patch client.Patch) (*viewv1.DryRunResult, error) {
+func (g *planGenerator) generatePlan(root *kbappsv1.Cluster, patch client.Patch) (*tracev1.DryRunResult, error) {
 	// create mock client and mock event recorder
 	// kbagent client is running in dry-run mode by setting context key-value pair: dry-run=true
 	store := newChangeCaptureStore(g.scheme, g.formatter)
@@ -115,22 +115,22 @@ func (g *planGenerator) generatePlan(root *kbappsv1.Cluster, patch client.Patch)
 
 	// update dry-run result
 	// update spec info
-	dryRunResult := &viewv1.DryRunResult{}
+	dryRunResult := &tracev1.DryRunResult{}
 	dryRunResult.ObservedTargetGeneration = root.Generation
 	dryRunResult.SpecDiff = specDiff
 
 	// update phase
 	switch {
 	case reconcileErr != nil:
-		dryRunResult.Phase = viewv1.DryRunFailedPhase
+		dryRunResult.Phase = tracev1.DryRunFailedPhase
 		dryRunResult.Reason = "ReconcileError"
 		dryRunResult.Message = reconcileErr.Error()
 	case timeout:
-		dryRunResult.Phase = viewv1.DryRunFailedPhase
+		dryRunResult.Phase = tracev1.DryRunFailedPhase
 		dryRunResult.Reason = "Timeout"
 		dryRunResult.Message = "Can't generate the plan within one second"
 	default:
-		dryRunResult.Phase = viewv1.DryRunSucceedPhase
+		dryRunResult.Phase = tracev1.DryRunSucceedPhase
 	}
 
 	// update plan

@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package view
+package trace
 
 import (
 	"context"
@@ -30,7 +30,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
+	tracev1 "github.com/apecloud/kubeblocks/apis/trace/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
@@ -39,8 +39,8 @@ import (
 type resourcesLoader struct{}
 
 func (r *resourcesLoader) Load(ctx context.Context, reader client.Reader, req ctrl.Request, recorder record.EventRecorder, logger logr.Logger) (*kubebuilderx.ObjectTree, error) {
-	// load view object
-	tree, err := kubebuilderx.ReadObjectTree[*viewv1.ReconciliationView](ctx, reader, req, nil)
+	// load trace object
+	tree, err := kubebuilderx.ReadObjectTree[*tracev1.ReconciliationTrace](ctx, reader, req, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -68,7 +68,7 @@ func (r *resourcesLoader) Load(ctx context.Context, reader client.Reader, req ct
 	return tree, nil
 }
 
-func viewResources() kubebuilderx.TreeLoader {
+func traceResources() kubebuilderx.TreeLoader {
 	return &resourcesLoader{}
 }
 

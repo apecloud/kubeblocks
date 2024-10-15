@@ -1915,7 +1915,7 @@ controllers:
     enabled: true
   experimental:
     enabled: false
-  view:
+  trace:
     enabled: true
 
 featureGates:

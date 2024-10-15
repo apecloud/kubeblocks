@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package view
+package trace
 
 import (
 	"context"
@@ -33,7 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
+	tracev1 "github.com/apecloud/kubeblocks/apis/trace/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
@@ -53,7 +53,7 @@ func (s *stateEvaluation) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuild
 }
 
 func (s *stateEvaluation) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
-	view, _ := tree.GetRoot().(*viewv1.ReconciliationView)
+	trace, _ := tree.GetRoot().(*tracev1.ReconciliationTrace)
 	objs := tree.List(&corev1.ConfigMap{})
 	var i18nResource *corev1.ConfigMap
 	if len(objs) > 0 {
@@ -62,11 +62,11 @@ func (s *stateEvaluation) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx
 
 	// build new object set from cache
 	root := &kbappsv1.Cluster{}
-	objectKey := client.ObjectKeyFromObject(view)
-	if view.Spec.TargetObject != nil {
+	objectKey := client.ObjectKeyFromObject(trace)
+	if trace.Spec.TargetObject != nil {
 		objectKey = client.ObjectKey{
-			Namespace: view.Spec.TargetObject.Namespace,
-			Name:      view.Spec.TargetObject.Name,
+			Namespace: trace.Spec.TargetObject.Namespace,
+			Name:      trace.Spec.TargetObject.Name,
 		}
 	}
 	if err := s.cli.Get(s.ctx, objectKey, root); err != nil {
@@ -75,19 +75,19 @@ func (s *stateEvaluation) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx
 
 	// keep only the latest reconciliation cycle.
 	// the basic idea is:
-	// 1. traverse the view progress list from tail to head,
+	// 1. traverse the trace progress list from tail to head,
 	// 2. read the corresponding version of the Cluster object from object store by objectChange.resourceVersion,
 	// 3. evaluation its state,
 	// if we find the first-false-then-true pattern, means a new reconciliation cycle starts.
 	firstFalseStateFound := false
-	clusterType := viewv1.ObjectType{
+	clusterType := tracev1.ObjectType{
 		APIVersion: kbappsv1.APIVersion,
 		Kind:       kbappsv1.ClusterKind,
 	}
 	latestReconciliationCycleStart := 0
 	var initialRoot *kbappsv1.Cluster
-	for i := len(view.Status.CurrentState.Changes) - 1; i >= 0; i-- {
-		change := view.Status.CurrentState.Changes[i]
+	for i := len(trace.Status.CurrentState.Changes) - 1; i >= 0; i-- {
+		change := trace.Status.CurrentState.Changes[i]
 		objType := objectReferenceToType(&change.ObjectReference)
 		if *objType != clusterType {
 			continue
@@ -102,8 +102,8 @@ func (s *stateEvaluation) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx
 			continue
 		}
 		expr := defaultStateEvaluationExpression
-		if view.Spec.StateEvaluationExpression != nil {
-			expr = *view.Spec.StateEvaluationExpression
+		if trace.Spec.StateEvaluationExpression != nil {
+			expr = *trace.Spec.StateEvaluationExpression
 		}
 		state, err := doStateEvaluation(obj, expr)
 		if err != nil {
@@ -119,12 +119,12 @@ func (s *stateEvaluation) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx
 		}
 	}
 	if latestReconciliationCycleStart <= 0 {
-		if view.Status.InitialObjectTree == nil {
+		if trace.Status.InitialObjectTree == nil {
 			reference, err := getObjectReference(root, s.scheme)
 			if err != nil {
 				return kubebuilderx.Commit, err
 			}
-			view.Status.InitialObjectTree = &viewv1.ObjectTreeNode{
+			trace.Status.InitialObjectTree = &tracev1.ObjectTreeNode{
 				Primary: *reference,
 			}
 		}
@@ -133,27 +133,27 @@ func (s *stateEvaluation) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx
 
 	// build new InitialObjectTree
 	var err error
-	view.Status.InitialObjectTree, err = getObjectTreeWithRevision(initialRoot, getKBOwnershipRules(), s.store, view.Status.CurrentState.Changes[latestReconciliationCycleStart].Revision, s.scheme)
+	trace.Status.InitialObjectTree, err = getObjectTreeWithRevision(initialRoot, getKBOwnershipRules(), s.store, trace.Status.CurrentState.Changes[latestReconciliationCycleStart].Revision, s.scheme)
 	if err != nil {
 		return kubebuilderx.Commit, err
 	}
 
 	// update desired state
 	generator := newPlanGenerator(s.ctx, s.cli, s.scheme,
-		treeObjectLoader(view.Status.InitialObjectTree, s.store, s.scheme),
-		buildDescriptionFormatter(i18nResource, defaultLocale, view.Spec.Locale))
+		treeObjectLoader(trace.Status.InitialObjectTree, s.store, s.scheme),
+		buildDescriptionFormatter(i18nResource, defaultLocale, trace.Spec.Locale))
 	patch := client.MergeFrom(root)
 	plan, err := generator.generatePlan(initialRoot, patch)
 	if err != nil {
 		return kubebuilderx.Commit, err
 	}
-	view.Status.DesiredState = &plan.Plan
+	trace.Status.DesiredState = &plan.Plan
 
 	// delete unused object revisions
-	deleteUnusedRevisions(s.store, view.Status.CurrentState.Changes[:latestReconciliationCycleStart], view)
+	deleteUnusedRevisions(s.store, trace.Status.CurrentState.Changes[:latestReconciliationCycleStart], trace)
 
 	// truncate outage changes
-	view.Status.CurrentState.Changes = view.Status.CurrentState.Changes[latestReconciliationCycleStart:]
+	trace.Status.CurrentState.Changes = trace.Status.CurrentState.Changes[latestReconciliationCycleStart:]
 
 	return kubebuilderx.Continue, nil
 }
@@ -167,7 +167,7 @@ func updateDesiredState(ctx context.Context, cli client.Client, scheme *runtime.
 	}
 }
 
-func doStateEvaluation(object client.Object, expression viewv1.StateEvaluationExpression) (bool, error) {
+func doStateEvaluation(object client.Object, expression tracev1.StateEvaluationExpression) (bool, error) {
 	if expression.CELExpression == nil {
 		return false, fmt.Errorf("CEL expression can't be empty")
 	}
@@ -222,7 +222,7 @@ func doStateEvaluation(object client.Object, expression viewv1.StateEvaluationEx
 	return result, nil
 }
 
-func treeObjectLoader(tree *viewv1.ObjectTreeNode, store ObjectRevisionStore, scheme *runtime.Scheme) objectLoader {
+func treeObjectLoader(tree *tracev1.ObjectTreeNode, store ObjectRevisionStore, scheme *runtime.Scheme) objectLoader {
 	return func() (map[model.GVKNObjKey]client.Object, error) {
 		return getObjectsFromTree(tree, store, scheme)
 	}

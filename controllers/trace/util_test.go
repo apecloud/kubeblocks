@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package view
+package trace
 
 import (
 	"context"
@@ -34,7 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
+	tracev1 "github.com/apecloud/kubeblocks/apis/trace/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
@@ -42,16 +42,16 @@ import (
 var _ = Describe("util test", func() {
 	Context("objectTypeToGVK", func() {
 		It("should work well", func() {
-			objType := &viewv1.ObjectType{
-				APIVersion: viewv1.SchemeBuilder.GroupVersion.String(),
-				Kind:       viewv1.Kind,
+			objType := &tracev1.ObjectType{
+				APIVersion: tracev1.SchemeBuilder.GroupVersion.String(),
+				Kind:       tracev1.Kind,
 			}
 			gvk, err := objectTypeToGVK(objType)
 			Expect(err).Should(BeNil())
 			Expect(*gvk).Should(Equal(schema.GroupVersionKind{
-				Group:   viewv1.GroupVersion.Group,
-				Version: viewv1.GroupVersion.Version,
-				Kind:    viewv1.Kind,
+				Group:   tracev1.GroupVersion.Group,
+				Version: tracev1.GroupVersion.Version,
+				Kind:    tracev1.Kind,
 			}))
 
 			objType = nil
@@ -64,14 +64,14 @@ var _ = Describe("util test", func() {
 	Context("objectReferenceToType", func() {
 		It("should work well", func() {
 			ref := &corev1.ObjectReference{
-				APIVersion: viewv1.SchemeBuilder.GroupVersion.String(),
-				Kind:       viewv1.Kind,
+				APIVersion: tracev1.SchemeBuilder.GroupVersion.String(),
+				Kind:       tracev1.Kind,
 			}
 			objType := objectReferenceToType(ref)
 			Expect(objType).ShouldNot(BeNil())
-			Expect(*objType).Should(Equal(viewv1.ObjectType{
-				APIVersion: viewv1.SchemeBuilder.GroupVersion.String(),
-				Kind:       viewv1.Kind,
+			Expect(*objType).Should(Equal(tracev1.ObjectType{
+				APIVersion: tracev1.SchemeBuilder.GroupVersion.String(),
+				Kind:       tracev1.Kind,
 			}))
 
 			ref = nil
@@ -83,8 +83,8 @@ var _ = Describe("util test", func() {
 	Context("objectReferenceToRef", func() {
 		It("should work well", func() {
 			ref := &corev1.ObjectReference{
-				APIVersion: viewv1.SchemeBuilder.GroupVersion.String(),
-				Kind:       viewv1.Kind,
+				APIVersion: tracev1.SchemeBuilder.GroupVersion.String(),
+				Kind:       tracev1.Kind,
 				Namespace:  "foo",
 				Name:       "bar",
 			}
@@ -92,9 +92,9 @@ var _ = Describe("util test", func() {
 			Expect(objRef).ShouldNot(BeNil())
 			Expect(*objRef).Should(Equal(model.GVKNObjKey{
 				GroupVersionKind: schema.GroupVersionKind{
-					Group:   viewv1.GroupVersion.Group,
-					Version: viewv1.GroupVersion.Version,
-					Kind:    viewv1.Kind,
+					Group:   tracev1.GroupVersion.Group,
+					Version: tracev1.GroupVersion.Version,
+					Kind:    tracev1.Kind,
 				},
 				ObjectKey: client.ObjectKey{
 					Namespace: "foo",
@@ -112,9 +112,9 @@ var _ = Describe("util test", func() {
 		It("should work well", func() {
 			objectRef := model.GVKNObjKey{
 				GroupVersionKind: schema.GroupVersionKind{
-					Group:   viewv1.GroupVersion.Group,
-					Version: viewv1.GroupVersion.Version,
-					Kind:    viewv1.Kind,
+					Group:   tracev1.GroupVersion.Group,
+					Version: tracev1.GroupVersion.Version,
+					Kind:    tracev1.Kind,
 				},
 				ObjectKey: client.ObjectKey{
 					Namespace: "foo",
@@ -126,8 +126,8 @@ var _ = Describe("util test", func() {
 			ref := objectRefToReference(objectRef, uid, resourceVersion)
 			Expect(ref).ShouldNot(BeNil())
 			Expect(*ref).Should(Equal(corev1.ObjectReference{
-				APIVersion:      viewv1.SchemeBuilder.GroupVersion.String(),
-				Kind:            viewv1.Kind,
+				APIVersion:      tracev1.SchemeBuilder.GroupVersion.String(),
+				Kind:            tracev1.Kind,
 				Namespace:       "foo",
 				Name:            "bar",
 				UID:             uid,
@@ -140,9 +140,9 @@ var _ = Describe("util test", func() {
 		It("should work well", func() {
 			objectRef := &model.GVKNObjKey{
 				GroupVersionKind: schema.GroupVersionKind{
-					Group:   viewv1.GroupVersion.Group,
-					Version: viewv1.GroupVersion.Version,
-					Kind:    viewv1.Kind,
+					Group:   tracev1.GroupVersion.Group,
+					Version: tracev1.GroupVersion.Version,
+					Kind:    tracev1.Kind,
 				},
 				ObjectKey: client.ObjectKey{
 					Namespace: "foo",
@@ -151,9 +151,9 @@ var _ = Describe("util test", func() {
 			}
 			t := objectRefToType(objectRef)
 			Expect(t).ShouldNot(BeNil())
-			Expect(*t).Should(Equal(viewv1.ObjectType{
-				APIVersion: viewv1.SchemeBuilder.GroupVersion.String(),
-				Kind:       viewv1.Kind,
+			Expect(*t).Should(Equal(tracev1.ObjectType{
+				APIVersion: tracev1.SchemeBuilder.GroupVersion.String(),
+				Kind:       tracev1.Kind,
 			}))
 			objectRef = nil
 			t = objectRefToType(objectRef)

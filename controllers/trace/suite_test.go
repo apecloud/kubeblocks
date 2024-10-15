@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package view
+package trace
 
 import (
 	"context"
@@ -41,7 +41,7 @@ import (
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
-	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
+	tracev1 "github.com/apecloud/kubeblocks/apis/trace/v1"
 	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
@@ -118,9 +118,9 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	model.AddScheme(workloadsv1.AddToScheme)
 
-	err = viewv1.AddToScheme(scheme.Scheme)
+	err = tracev1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
-	model.AddScheme(viewv1.AddToScheme)
+	model.AddScheme(tracev1.AddToScheme)
 
 	controller, k8sMock = testutil.SetupK8sMock()
 

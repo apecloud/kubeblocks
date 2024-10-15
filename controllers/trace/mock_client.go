@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package view
+package trace
 
 import (
 	"context"
@@ -35,7 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
-	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
+	tracev1 "github.com/apecloud/kubeblocks/apis/trace/v1"
 )
 
 type mockClient struct {
@@ -208,7 +208,7 @@ func (c *mockSubResourceClient) Patch(ctx context.Context, obj client.Object, pa
 
 func newMockClient(realClient client.Client, store ChangeCaptureStore, rules []OwnershipRule) (client.Client, error) {
 	managedGVK := sets.New[schema.GroupVersionKind]()
-	addToManaged := func(objType *viewv1.ObjectType) error {
+	addToManaged := func(objType *tracev1.ObjectType) error {
 		gvk, err := objectTypeToGVK(objType)
 		if err != nil {
 			return err

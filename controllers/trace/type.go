@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package view
+package trace
 
 import (
 	"fmt"
@@ -41,7 +41,7 @@ import (
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
+	tracev1 "github.com/apecloud/kubeblocks/apis/trace/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
@@ -49,7 +49,7 @@ import (
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 )
 
-const finalizer = "view.kubeblocks.io/finalizer"
+const finalizer = "trace.kubeblocks.io/finalizer"
 
 var (
 	clusterCriteria = OwnershipCriteria{
@@ -307,14 +307,14 @@ func resourceExists(apiVersion, kind string, config *rest.Config) (bool, error) 
 	return false, nil
 }
 
-var rootObjectType = viewv1.ObjectType{
+var rootObjectType = tracev1.ObjectType{
 	APIVersion: kbappsv1.APIVersion,
 	Kind:       kbappsv1.ClusterKind,
 }
 
 var (
-	defaultStateEvaluationExpression = viewv1.StateEvaluationExpression{
-		CELExpression: &viewv1.CELExpression{
+	defaultStateEvaluationExpression = tracev1.StateEvaluationExpression{
+		CELExpression: &tracev1.CELExpression{
 			Expression: "has(object.status.phase) && object.status.phase == \"Running\"",
 		},
 	}
@@ -332,7 +332,7 @@ var (
 type OwnershipRule struct {
 	// Primary specifies the primary object type.
 	//
-	Primary viewv1.ObjectType `json:"primary"`
+	Primary tracev1.ObjectType `json:"primary"`
 
 	// OwnedResources specifies all the secondary resources of Primary.
 	//
@@ -343,7 +343,7 @@ type OwnershipRule struct {
 type OwnedResource struct {
 	// Secondary specifies the secondary object type.
 	//
-	Secondary viewv1.ObjectType `json:"secondary"`
+	Secondary tracev1.ObjectType `json:"secondary"`
 
 	// Criteria specifies the ownership criteria with its primary resource.
 	//
@@ -362,7 +362,7 @@ type OwnershipCriteria struct {
 	SelectorCriteria *FieldPath `json:"selectorCriteria,omitempty"`
 
 	// LabelCriteria specifies the labels used to select the secondary objects.
-	// The value of each k-v pair can contain placeholder that will be replaced by the ReconciliationView Controller.
+	// The value of each k-v pair can contain placeholder that will be replaced by the ReconciliationTrace Controller.
 	// Placeholder is formatted as "$(PLACEHOLDER)".
 	// Currently supported PLACEHOLDER:
 	// primary - same value as the primary object label with same key.

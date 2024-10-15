@@ -67,7 +67,7 @@ spec:
             - "--apps={{ ne .Values.controllers.apps.enabled false }}"
             - "--workloads={{ ne .Values.controllers.workloads.enabled false }}"
             - "--experimental={{- default "false" .Values.controllers.experimental.enabled }}"
-            - "--view={{- default "true" .Values.controllers.view.enabled }}"
+            - "--trace={{- default "true" .Values.controllers.trace.enabled }}"
             {{- with .Values.managedNamespaces }}
             - "--managed-namespaces={{ . }}"
             {{- end }}
@@ -179,7 +179,7 @@ spec:
               value: {{ .Values.featureGates.componentReplicasAnnotation.enabled | quote }}
             - name: IN_PLACE_POD_VERTICAL_SCALING
               value: {{ .Values.featureGates.inPlacePodVerticalScaling.enabled | quote }}
-            {{- if .Values.controllers.view.enabled }}
+            {{- if .Values.controllers.trace.enabled }}
             - name: I18N_RESOURCES_NAME
               value: {{ include "kubeblocks.i18nResourcesName" . }}
             {{- end }}

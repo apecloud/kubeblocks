@@ -17,10 +17,10 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package view
+package trace
 
 import (
-	viewv1 "github.com/apecloud/kubeblocks/apis/view/v1"
+	tracev1 "github.com/apecloud/kubeblocks/apis/trace/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
@@ -37,10 +37,10 @@ func (h *deletionHandler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuild
 }
 
 func (h *deletionHandler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
-	view, _ := tree.GetRoot().(*viewv1.ReconciliationView)
+	trace, _ := tree.GetRoot().(*tracev1.ReconciliationTrace)
 
 	// store cleanup
-	deleteUnusedRevisions(h.store, view.Status.CurrentState.Changes, view)
+	deleteUnusedRevisions(h.store, trace.Status.CurrentState.Changes, trace)
 
 	// remove finalizer
 	tree.DeleteRoot()

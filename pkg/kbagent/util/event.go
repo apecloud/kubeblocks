@@ -22,18 +22,19 @@ package util
 import (
 	"context"
 	"fmt"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	"os"
 	"sync"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/record"
 	ctlruntime "sigs.k8s.io/controller-runtime"
+
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 const (
@@ -128,7 +129,7 @@ func getPodObject() (*corev1.Pod, error) {
 		}
 	}
 
-	pod, err := clientSet.CoreV1().Pods(namespace).Get(context.TODO(), podName, v1.GetOptions{})
+	pod, err := clientSet.CoreV1().Pods(namespace).Get(context.TODO(), podName, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get pod: %v", err)
 	}

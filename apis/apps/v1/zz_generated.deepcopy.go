@@ -592,6 +592,13 @@ func (in *ClusterStatus) DeepCopyInto(out *ClusterStatus) {
 			(*out)[key] = *val.DeepCopy()
 		}
 	}
+	if in.Shardings != nil {
+		in, out := &in.Shardings, &out.Shardings
+		*out = make(map[string]ClusterComponentStatus, len(*in))
+		for key, val := range *in {
+			(*out)[key] = *val.DeepCopy()
+		}
+	}
 	if in.Conditions != nil {
 		in, out := &in.Conditions, &out.Conditions
 		*out = make([]metav1.Condition, len(*in))

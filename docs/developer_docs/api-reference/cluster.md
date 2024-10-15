@@ -3603,6 +3603,20 @@ map[string]github.com/apecloud/kubeblocks/apis/apps/v1.ClusterComponentStatus
 </tr>
 <tr>
 <td>
+<code>shardings</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ClusterComponentStatus">
+map[string]github.com/apecloud/kubeblocks/apis/apps/v1.ClusterComponentStatus
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Records the current status information of all shardings within the Cluster.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>conditions</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#condition-v1-meta">

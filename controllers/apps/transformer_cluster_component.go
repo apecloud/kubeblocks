@@ -593,7 +593,7 @@ func (h *clusterComponentHandler) create(transCtx *clusterTransformContext, dag 
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	graphCli.Create(dag, proto)
 
-	initClusterCompStatus(transCtx.Cluster, name)
+	initClusterCompNShardingStatus(transCtx, name)
 
 	return nil
 }
@@ -662,10 +662,9 @@ func (h *clusterShardingHandler) create(transCtx *clusterTransformContext, dag *
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	for i := range protoComps {
 		graphCli.Create(dag, protoComps[i])
-
-		shortName, _ := component.ShortName(transCtx.Cluster.Name, protoComps[i].Name)
-		initClusterCompStatus(transCtx.Cluster, shortName)
 	}
+
+	initClusterCompNShardingStatus(transCtx, name)
 
 	// TODO:
 	//  1. sharding post-provision
@@ -742,11 +741,7 @@ func (h *clusterShardingHandler) createComps(transCtx *clusterTransformContext, 
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	for name := range createSet {
 		graphCli.Create(dag, protoComps[name])
-
 		// TODO: shard post-provision
-
-		shortName, _ := component.ShortName(transCtx.Cluster.Name, name)
-		initClusterCompStatus(transCtx.Cluster, shortName)
 	}
 }
 
@@ -805,11 +800,18 @@ func (h *clusterShardingHandler) protoComps(transCtx *clusterTransformContext, n
 	return nil, fmt.Errorf("cluster sharding %s not found", name)
 }
 
-func initClusterCompStatus(cluster *appsv1.Cluster, compName string) {
-	if cluster.Status.Components == nil {
-		cluster.Status.Components = make(map[string]appsv1.ClusterComponentStatus)
+func initClusterCompNShardingStatus(transCtx *clusterTransformContext, name string) {
+	var (
+		cluster = transCtx.Cluster
+	)
+	m := &cluster.Status.Components
+	if transCtx.sharding(name) {
+		m = &cluster.Status.Shardings
 	}
-	cluster.Status.Components[compName] = appsv1.ClusterComponentStatus{}
+	if *m == nil {
+		*m = make(map[string]appsv1.ClusterComponentStatus)
+	}
+	(*m)[name] = appsv1.ClusterComponentStatus{}
 }
 
 func clusterRunningCompNShardingSet(ctx context.Context, cli client.Reader, cluster *appsv1.Cluster) (sets.Set[string], error) {

@@ -222,6 +222,11 @@ type ClusterStatus struct {
 	// +optional
 	Components map[string]ClusterComponentStatus `json:"components,omitempty"`
 
+	// Records the current status information of all shardings within the Cluster.
+	//
+	// +optional
+	Shardings map[string]ClusterComponentStatus `json:"shardings,omitempty"`
+
 	// Represents a list of detailed status of the Cluster object.
 	// Each condition in the list provides real-time information about certain aspect of the Cluster object.
 	//

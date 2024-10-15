@@ -109,7 +109,7 @@ func (vs verticalScalingHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, 
 		if len(pgRes.clusterComponent.Instances) != 0 {
 			// obtain the pods which should be updated.
 			updatedPodSet := map[string]string{}
-			vsInsMap := vs.coverInsResourcesToMap(verticalScaling)
+			vsInsMap := vs.covertInsResourcesToMap(verticalScaling)
 			workloadName := constant.GenerateWorkloadNamePattern(opsRes.Cluster.Name, pgRes.fullComponentName)
 			templateReplicasCnt := int32(0)
 			for _, template := range pgRes.clusterComponent.Instances {
@@ -144,7 +144,7 @@ func (vs verticalScalingHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, 
 	return compOpsHelper.reconcileActionWithComponentOps(reqCtx, cli, opsRes, "vertical scale", handleComponentStatusProgressForVS)
 }
 
-func (vs verticalScalingHandler) coverInsResourcesToMap(verticalScaling opsv1alpha1.VerticalScaling) map[string]*opsv1alpha1.InstanceResourceTemplate {
+func (vs verticalScalingHandler) covertInsResourcesToMap(verticalScaling opsv1alpha1.VerticalScaling) map[string]*opsv1alpha1.InstanceResourceTemplate {
 	vsInsMap := map[string]*opsv1alpha1.InstanceResourceTemplate{}
 	for i := range verticalScaling.Instances {
 		vsInsMap[verticalScaling.Instances[i].Name] = &verticalScaling.Instances[i]

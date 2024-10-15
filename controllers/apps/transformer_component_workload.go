@@ -450,9 +450,7 @@ func (r *componentWorkloadOps) expandVolume() error {
 			})
 
 		var protoVCTs []corev1.PersistentVolumeClaimTemplate
-		for j := range r.synthesizeComp.VolumeClaimTemplates {
-			protoVCTs = append(protoVCTs, r.synthesizeComp.VolumeClaimTemplates[j])
-		}
+		protoVCTs = append(protoVCTs, r.synthesizeComp.VolumeClaimTemplates...)
 		for _, v := range r.synthesizeComp.Instances {
 			if runningInsTPL.Name == v.Name {
 				insVCTs := component.ToVolumeClaimTemplates(v.VolumeClaimTemplates)

@@ -40,6 +40,8 @@ Resource Types:
 <a href="#apps.kubeblocks.io/v1.ComponentVersion">ComponentVersion</a>
 </li><li>
 <a href="#apps.kubeblocks.io/v1.ServiceDescriptor">ServiceDescriptor</a>
+</li><li>
+<a href="#apps.kubeblocks.io/v1.ShardingDefinition">ShardingDefinition</a>
 </li></ul>
 <h3 id="apps.kubeblocks.io/v1.Cluster">Cluster
 </h3>
@@ -1791,10 +1793,170 @@ ServiceDescriptorStatus
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1.ShardingDefinition">ShardingDefinition
+</h3>
+<div>
+<p>ShardingDefinition is the Schema for the shardingdefinitions API</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>apiVersion</code><br/>
+string</td>
+<td>
+<code>apps.kubeblocks.io/v1</code>
+</td>
+</tr>
+<tr>
+<td>
+<code>kind</code><br/>
+string
+</td>
+<td><code>ShardingDefinition</code></td>
+</tr>
+<tr>
+<td>
+<code>metadata</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#objectmeta-v1-meta">
+Kubernetes meta/v1.ObjectMeta
+</a>
+</em>
+</td>
+<td>
+Refer to the Kubernetes API documentation for the fields of the
+<code>metadata</code> field.
+</td>
+</tr>
+<tr>
+<td>
+<code>spec</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardingDefinitionSpec">
+ShardingDefinitionSpec
+</a>
+</em>
+</td>
+<td>
+<br/>
+<br/>
+<table>
+<tr>
+<td>
+<code>template</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardingTemplate">
+ShardingTemplate
+</a>
+</em>
+</td>
+<td>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>shardsLimit</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardsLimit">
+ShardsLimit
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the upper limit of the number of shards supported by the sharding.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>provisionStrategy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.UpdateStrategy">
+UpdateStrategy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the strategy for provisioning shards of the sharding. Only <code>Serial</code> and <code>Parallel</code> are supported.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>updateStrategy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.UpdateStrategy">
+UpdateStrategy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the strategy for updating shards of the sharding. Only <code>Serial</code> and <code>Parallel</code> are supported.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>lifecycleActions</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardingLifecycleActions">
+ShardingLifecycleActions
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines a set of hooks and procedures that customize the behavior of a sharding throughout its lifecycle.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>systemAccounts</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardingSystemAccount">
+[]ShardingSystemAccount
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the system accounts for the sharding.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+<tr>
+<td>
+<code>status</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardingDefinitionStatus">
+ShardingDefinitionStatus
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1.Action">Action
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentLifecycleActions">ComponentLifecycleActions</a>, <a href="#apps.kubeblocks.io/v1.Probe">Probe</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentLifecycleActions">ComponentLifecycleActions</a>, <a href="#apps.kubeblocks.io/v1.Probe">Probe</a>, <a href="#apps.kubeblocks.io/v1.ShardingLifecycleActions">ShardingLifecycleActions</a>)
 </p>
 <div>
 <p>Action defines a customizable hook or procedure tailored for different database engines,
@@ -5770,7 +5932,9 @@ map[string]string
 </em>
 </td>
 <td>
-<p>Images define the new images for different containers within the release.</p>
+<p>Images define the new images for containers, actions or external applications within the release.</p>
+<p>If an image is specified for a lifecycle action, the key should be the field name (case-insensitive) of
+the action in the LifecycleActions struct.</p>
 </td>
 </tr>
 </tbody>
@@ -7458,7 +7622,7 @@ Kubernetes core/v1.PersistentVolumeMode
 <h3 id="apps.kubeblocks.io/v1.Phase">Phase
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterDefinitionStatus">ClusterDefinitionStatus</a>, <a href="#apps.kubeblocks.io/v1.ComponentDefinitionStatus">ComponentDefinitionStatus</a>, <a href="#apps.kubeblocks.io/v1.ComponentVersionStatus">ComponentVersionStatus</a>, <a href="#apps.kubeblocks.io/v1.ServiceDescriptorStatus">ServiceDescriptorStatus</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterDefinitionStatus">ClusterDefinitionStatus</a>, <a href="#apps.kubeblocks.io/v1.ComponentDefinitionStatus">ComponentDefinitionStatus</a>, <a href="#apps.kubeblocks.io/v1.ComponentVersionStatus">ComponentVersionStatus</a>, <a href="#apps.kubeblocks.io/v1.ServiceDescriptorStatus">ServiceDescriptorStatus</a>, <a href="#apps.kubeblocks.io/v1.ShardingDefinitionStatus">ShardingDefinitionStatus</a>)
 </p>
 <div>
 <p>Phase represents the status of a CR.</p>
@@ -9359,6 +9523,256 @@ and the value will be presented in the following format: service1.name:port1,ser
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1.ShardingDefinitionSpec">ShardingDefinitionSpec
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ShardingDefinition">ShardingDefinition</a>)
+</p>
+<div>
+<p>ShardingDefinitionSpec defines the desired state of ShardingDefinition</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>template</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardingTemplate">
+ShardingTemplate
+</a>
+</em>
+</td>
+<td>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>shardsLimit</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardsLimit">
+ShardsLimit
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the upper limit of the number of shards supported by the sharding.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>provisionStrategy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.UpdateStrategy">
+UpdateStrategy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the strategy for provisioning shards of the sharding. Only <code>Serial</code> and <code>Parallel</code> are supported.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>updateStrategy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.UpdateStrategy">
+UpdateStrategy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the strategy for updating shards of the sharding. Only <code>Serial</code> and <code>Parallel</code> are supported.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>lifecycleActions</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardingLifecycleActions">
+ShardingLifecycleActions
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines a set of hooks and procedures that customize the behavior of a sharding throughout its lifecycle.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>systemAccounts</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardingSystemAccount">
+[]ShardingSystemAccount
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the system accounts for the sharding.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ShardingDefinitionStatus">ShardingDefinitionStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ShardingDefinition">ShardingDefinition</a>)
+</p>
+<div>
+<p>ShardingDefinitionStatus defines the observed state of ShardingDefinition</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>observedGeneration</code><br/>
+<em>
+int64
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Refers to the most recent generation that has been observed for the ShardingDefinition.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>phase</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Phase">
+Phase
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Represents the current status of the ShardingDefinition. Valid values include `<code>,</code>Available<code>, and</code>Unavailable<code>.
+When the status is</code>Available`, the ShardingDefinition is ready and can be utilized by related objects.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>message</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Provides additional information about the current phase.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ShardingLifecycleActions">ShardingLifecycleActions
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ShardingDefinitionSpec">ShardingDefinitionSpec</a>)
+</p>
+<div>
+<p>ShardingLifecycleActions defines a collection of Actions for customizing the behavior of a sharding.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>postProvision</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the hook to be executed after a sharding&rsquo;s creation.</p>
+<p>By setting <code>postProvision.preCondition</code>, you can determine the specific lifecycle stage at which
+the action should trigger, available conditions for sharding include: <code>Immediately</code>, <code>ComponentReady</code>,
+and <code>ClusterReady</code>. For sharding, the <code>ComponentReady</code> condition means all components of the sharding are ready.</p>
+<p>With <code>ComponentReady</code> being the default.</p>
+<p>The PostProvision Action is intended to run only once.</p>
+<p>Note: This field is immutable once it has been set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>preTerminate</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the hook to be executed prior to terminating a sharding.</p>
+<p>The PreTerminate Action is intended to run only once.</p>
+<p>This action is executed immediately when a terminate operation for the sharding is initiated.
+The actual termination and cleanup of the sharding and its associated resources will not proceed
+until the PreTerminate action has completed successfully.</p>
+<p>Note: This field is immutable once it has been set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>shardProvision</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the hook to be executed after a shard&rsquo;s creation.</p>
+<p>Note: This field is immutable once it has been set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>shardTerminate</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the hook to be executed prior to terminating a shard.</p>
+<p>Note: This field is immutable once it has been set.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1.ShardingSpec">ShardingSpec
 </h3>
 <p>
@@ -9437,6 +9851,121 @@ This allows for custom actions to be performed after a new shard is provisioned.
 This enables custom cleanup or data migration tasks to be executed before a shard is terminated.
 Resources and data associated with the corresponding Component will also be deleted.</li>
 </ul>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ShardingSystemAccount">ShardingSystemAccount
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ShardingDefinitionSpec">ShardingDefinitionSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>The name of the system account defined in the sharding template.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>shared</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies whether the account is shared across all shards in the sharding.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ShardingTemplate">ShardingTemplate
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ShardingDefinitionSpec">ShardingDefinitionSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>compDef</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>The component definition(s) that the sharding is based on.</p>
+<p>The component definition can be specified using one of the following:</p>
+<ul>
+<li>the full name</li>
+<li>the regular expression pattern (&lsquo;^&rsquo; will be added to the beginning of the pattern automatically)</li>
+</ul>
+<p>This field is immutable.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ShardsLimit">ShardsLimit
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ShardingDefinitionSpec">ShardingDefinitionSpec</a>)
+</p>
+<div>
+<p>ShardsLimit defines the valid range of number of shards supported.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>minShards</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>The minimum limit of shards.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>maxShards</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>The maximum limit of replicas.</p>
 </td>
 </tr>
 </tbody>
@@ -9694,7 +10223,7 @@ string
 <h3 id="apps.kubeblocks.io/v1.UpdateStrategy">UpdateStrategy
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>, <a href="#apps.kubeblocks.io/v1.ShardingDefinitionSpec">ShardingDefinitionSpec</a>)
 </p>
 <div>
 <p>UpdateStrategy defines the update strategy for cluster components. This strategy determines how updates are applied
@@ -12824,311 +13353,6 @@ the risk of simultaneous downtime.</p>
 </td>
 </tr></tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.BackupMethod">BackupMethod
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.BackupPolicy">BackupPolicy</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>BackupMethod</code><br/>
-<em>
-github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1.BackupMethod
-</em>
-</td>
-<td>
-<p>
-(Members of <code>BackupMethod</code> are embedded into this type.)
-</p>
-<p>Specifies the name of dataprotection.BackupMethod.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>target</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.TargetInstance">
-TargetInstance
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>If set, specifies the method for selecting the replica to be backed up using the criteria defined here.
-If this field is not set, the selection method specified in <code>backupPolicy.target</code> is used.</p>
-<p>This field provides a way to override the global <code>backupPolicy.target</code> setting for specific BackupMethod.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>envMapping</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.EnvMappingVar">
-[]EnvMappingVar
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies a mapping of an environment variable key to the appropriate version of the tool image
-required for backups, as determined by ClusterVersion and ComponentDefinition.
-The environment variable is then injected into the container executing the backup task.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.BackupPolicy">BackupPolicy
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.BackupPolicyTemplateSpec">BackupPolicyTemplateSpec</a>)
-</p>
-<div>
-<p>BackupPolicy is the template corresponding to a specified ComponentDefinition
-or to a group of ComponentDefinitions that are different versions of definitions of the same component.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>componentDefs</code><br/>
-<em>
-[]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies a list of names of ComponentDefinitions that the specified ClusterDefinition references.
-They should be different versions of definitions of the same component,
-thus allowing them to share a single BackupPolicy.
-Each name must adhere to the IANA Service Naming rule.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>target</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.TargetInstance">
-TargetInstance
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the selection criteria of instance to be backed up, and the connection credential to be used
-during the backup process.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>schedules</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.SchedulePolicy">
-[]SchedulePolicy
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the execution plans for backup tasks, specifying when and how backups should occur,
-and the retention period of backup files.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>backupMethods</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.BackupMethod">
-[]BackupMethod
-</a>
-</em>
-</td>
-<td>
-<p>Defines an array of BackupMethods to be used.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>backoffLimit</code><br/>
-<em>
-int32
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the maximum number of retry attempts for a backup before it is considered a failure.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.BackupPolicyTemplate">BackupPolicyTemplate
-</h3>
-<div>
-<p>BackupPolicyTemplate should be provided by addon developers and is linked to a ClusterDefinition
-and its associated ComponentDefinitions.
-It is responsible for generating BackupPolicies for Components that require backup operations,
-also determining the suitable backup methods and strategies.
-This template is automatically selected based on the specified ClusterDefinition and ComponentDefinitions
-when a Cluster is created.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>metadata</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#objectmeta-v1-meta">
-Kubernetes meta/v1.ObjectMeta
-</a>
-</em>
-</td>
-<td>
-<p>The metadata for the BackupPolicyTemplate object, including name, namespace, labels, and annotations.</p>
-Refer to the Kubernetes API documentation for the fields of the
-<code>metadata</code> field.
-</td>
-</tr>
-<tr>
-<td>
-<code>spec</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.BackupPolicyTemplateSpec">
-BackupPolicyTemplateSpec
-</a>
-</em>
-</td>
-<td>
-<p>Defines the desired state of the BackupPolicyTemplate.</p>
-<br/>
-<br/>
-<table>
-<tr>
-<td>
-<code>backupPolicies</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.BackupPolicy">
-[]BackupPolicy
-</a>
-</em>
-</td>
-<td>
-<p>Represents an array of BackupPolicy templates, with each template corresponding to a specified ComponentDefinition
-or to a group of ComponentDefinitions that are different versions of definitions of the same component.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>identifier</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies a unique identifier for the BackupPolicyTemplate.</p>
-<p>This identifier will be used as the suffix of the name of automatically generated BackupPolicy.
-This prevents unintended overwriting of BackupPolicies due to name conflicts when multiple BackupPolicyTemplates
-are present.
-For instance, using &ldquo;backup-policy&rdquo; for regular backups and &ldquo;backup-policy-hscale&rdquo; for horizontal-scale ops
-can differentiate the policies.</p>
-</td>
-</tr>
-</table>
-</td>
-</tr>
-<tr>
-<td>
-<code>status</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.BackupPolicyTemplateStatus">
-BackupPolicyTemplateStatus
-</a>
-</em>
-</td>
-<td>
-<p>Populated by the system, it represents the current information about the BackupPolicyTemplate.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.BackupPolicyTemplateSpec">BackupPolicyTemplateSpec
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.BackupPolicyTemplate">BackupPolicyTemplate</a>)
-</p>
-<div>
-<p>BackupPolicyTemplateSpec contains the settings in a BackupPolicyTemplate.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>backupPolicies</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.BackupPolicy">
-[]BackupPolicy
-</a>
-</em>
-</td>
-<td>
-<p>Represents an array of BackupPolicy templates, with each template corresponding to a specified ComponentDefinition
-or to a group of ComponentDefinitions that are different versions of definitions of the same component.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>identifier</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies a unique identifier for the BackupPolicyTemplate.</p>
-<p>This identifier will be used as the suffix of the name of automatically generated BackupPolicy.
-This prevents unintended overwriting of BackupPolicies due to name conflicts when multiple BackupPolicyTemplates
-are present.
-For instance, using &ldquo;backup-policy&rdquo; for regular backups and &ldquo;backup-policy-hscale&rdquo; for horizontal-scale ops
-can differentiate the policies.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.BackupPolicyTemplateStatus">BackupPolicyTemplateStatus
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.BackupPolicyTemplate">BackupPolicyTemplate</a>)
-</p>
-<div>
-<p>BackupPolicyTemplateStatus defines the observed state of BackupPolicyTemplate.</p>
-</div>
 <h3 id="apps.kubeblocks.io/v1alpha1.BackupStatusUpdateStage">BackupStatusUpdateStage
 (<code>string</code> alias)</h3>
 <div>
@@ -20249,48 +20473,6 @@ Kubernetes api extensions v1.JSONSchemaProps
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.EnvMappingVar">EnvMappingVar
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.BackupMethod">BackupMethod</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>key</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Specifies the environment variable key in the mapping.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>valueFrom</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ValueFrom">
-ValueFrom
-</a>
-</em>
-</td>
-<td>
-<p>Specifies the source used to derive the value of the environment variable,
-which typically represents the tool image required for backup operation.</p>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.EnvVar">EnvVar
 </h3>
 <p>
@@ -23041,81 +23223,6 @@ Default to 10 seconds. Minimum value is 1.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.SchedulePolicy">SchedulePolicy
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.BackupPolicy">BackupPolicy</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>enabled</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies whether the backup schedule is enabled or not.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>backupMethod</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Defines the backup method name that is defined in backupPolicy.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>cronExpression</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Represents the cron expression for schedule, with the timezone set in UTC.
-Refer to <a href="https://en.wikipedia.org/wiki/Cron">https://en.wikipedia.org/wiki/Cron</a> for more details.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>retentionPeriod</code><br/>
-<em>
-github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1.RetentionPeriod
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Determines the duration for which the backup should be retained.
-The controller will remove all backups that are older than the RetentionPeriod.
-For instance, a RetentionPeriod of <code>30d</code> will retain only the backups from the last 30 days.
-Sample duration format:</p>
-<ul>
-<li>years: 	2y</li>
-<li>months: 	6mo</li>
-<li>days: 		30d</li>
-<li>hours: 	12h</li>
-<li>minutes: 	30m</li>
-</ul>
-<p>These durations can also be combined, for example: 30d12h30m.</p>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.SchedulingPolicy">SchedulingPolicy
 </h3>
 <p>
@@ -25320,102 +25427,6 @@ string
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1alpha1.TargetInstance">TargetInstance
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.BackupMethod">BackupMethod</a>, <a href="#apps.kubeblocks.io/v1alpha1.BackupPolicy">BackupPolicy</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>role</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Specifies the role to select one or more replicas for backup.</p>
-<ul>
-<li>If no replica with the specified role exists, the backup task will fail.
-Special case: If there is only one replica in the cluster, it will be used for backup,
-even if its role differs from the specified one.
-For example, if you specify backing up on a secondary replica, but the cluster is single-node
-with only one primary replica, the primary will be used for backup.
-Future versions will address this special case using role priorities.</li>
-<li>If multiple replicas satisfy the specified role, the choice (<code>Any</code> or <code>All</code>) will be made according to
-the <code>strategy</code> field below.</li>
-</ul>
-</td>
-</tr>
-<tr>
-<td>
-<code>fallbackRole</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the fallback role to select one replica for backup, this only takes effect when the
-<code>strategy</code> field below is set to <code>Any</code>.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>account</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>If <code>backupPolicy.componentDefs</code> is set, this field is required to specify the system account name.
-This account must match one listed in <code>componentDefinition.spec.systemAccounts[*].name</code>.
-The corresponding secret created by this account is used to connect to the database.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>strategy</code><br/>
-<em>
-github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1.PodSelectionStrategy
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the PodSelectionStrategy to use when multiple pods are
-selected for the backup target.
-Valid values are:</p>
-<ul>
-<li>Any: Selects any one pod that matches the labelsSelector.</li>
-<li>All: Selects all pods that match the labelsSelector.</li>
-</ul>
-</td>
-</tr>
-<tr>
-<td>
-<code>containerPort</code><br/>
-<em>
-github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1.ContainerPort
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the container port in the target pod.
-If not specified, the first container and its first port will be used.</p>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1alpha1.TargetPodSelector">TargetPodSelector
 (<code>string</code> alias)</h3>
 <p>
@@ -25604,92 +25615,6 @@ This ensures that only one replica is unavailable at a time during the update pr
 <td>
 <em>(Optional)</em>
 <p>ConfigMapRefs defines the user-defined ConfigMaps.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ValueFrom">ValueFrom
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.EnvMappingVar">EnvMappingVar</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>clusterVersionRef</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ValueMapping">
-[]ValueMapping
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Determine the appropriate version of the backup tool image from ClusterVersion.</p>
-<p>Deprecated since v0.9, since ClusterVersion is deprecated.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>componentDef</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1alpha1.ValueMapping">
-[]ValueMapping
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Determine the appropriate version of the backup tool image from ComponentDefinition.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1alpha1.ValueMapping">ValueMapping
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ValueFrom">ValueFrom</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>names</code><br/>
-<em>
-[]string
-</em>
-</td>
-<td>
-<p>Represents an array of names of ComponentDefinition that can be mapped to the appropriate version of the backup tool image.</p>
-<p>This mapping allows different versions of component images to correspond to specific versions of backup tool images.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>mappingValue</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Specifies the appropriate version of the backup tool image.</p>
 </td>
 </tr>
 </tbody>

@@ -2,11 +2,11 @@
 # since it depends on service name and namespace that are out of this kustomize package.
 # It should be run by config/default
 resources:
-- bases/apps.kubeblocks.io_backuppolicytemplates.yaml
 - bases/apps.kubeblocks.io_clusters.yaml
 - bases/apps.kubeblocks.io_clusterdefinitions.yaml
 - bases/apps.kubeblocks.io_configconstraints.yaml
 - bases/dataprotection.kubeblocks.io_actionsets.yaml
+- bases/dataprotection.kubeblocks.io_backuppolicytemplates.yaml
 - bases/dataprotection.kubeblocks.io_backupschedules.yaml
 - bases/dataprotection.kubeblocks.io_backuppolicies.yaml
 - bases/dataprotection.kubeblocks.io_backups.yaml
@@ -24,6 +24,7 @@ resources:
 - bases/operations.kubeblocks.io_opsrequests.yaml
 - bases/operations.kubeblocks.io_opsdefinitions.yaml
 - bases/trace.kubeblocks.io_reconciliationtraces.yaml
+- bases/apps.kubeblocks.io_shardingdefinitions.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
 
 patchesStrategicMerge:
@@ -53,6 +54,7 @@ patchesStrategicMerge:
 #- patches/webhook_in_componentversions.yaml
 #- patches/webhook_in_nodecountscalers.yaml
 #- patches/webhook_in_reconciliationtraces.yaml
+#- patches/webhook_in_shardingdefinitions.yaml
 #+kubebuilder:scaffold:crdkustomizewebhookpatch
 
 # [CERTMANAGER] To enable cert-manager, uncomment all the sections with [CERTMANAGER] prefix.
@@ -81,6 +83,7 @@ patchesStrategicMerge:
 #- patches/cainjection_in_componentversions.yaml
 #- patches/cainjection_in_nodecountscalers.yaml
 #- patches/cainjection_in_reconciliationtraces.yaml
+#- patches/cainjection_in_shardingdefinitions.yaml
 #+kubebuilder:scaffold:crdkustomizecainjectionpatch
 
 # the following config is for teaching kustomize how to do kustomization for CRDs.

@@ -694,10 +694,17 @@ func (r *OpsRequest) checkStorageClassAllowExpansion(ctx context.Context,
 // getSCNameByPvcAndCheckStorageSize gets the storageClassName by pvc and checks if the storage size is valid.
 func (r *OpsRequest) getSCNameByPvcAndCheckStorageSize(ctx context.Context,
 	cli client.Client,
-	componentName,
+	key,
 	vctName string,
 	isShardingComponent bool,
 	requestStorage resource.Quantity) (*string, error) {
+	componentName := key
+	targetInsTPLName := ""
+	if strings.Contains(key, ".") {
+		keyStrs := strings.Split(key, ".")
+		componentName = keyStrs[0]
+		targetInsTPLName = keyStrs[1]
+	}
 	matchingLabels := client.MatchingLabels{
 		constant.AppInstanceLabelKey:             r.Spec.GetClusterName(),
 		constant.VolumeClaimTemplateNameLabelKey: vctName,
@@ -711,10 +718,16 @@ func (r *OpsRequest) getSCNameByPvcAndCheckStorageSize(ctx context.Context,
 	if err := cli.List(ctx, pvcList, client.InNamespace(r.Namespace), matchingLabels); err != nil {
 		return nil, err
 	}
-	if len(pvcList.Items) == 0 {
+	var pvc *corev1.PersistentVolumeClaim
+	for _, pvcItem := range pvcList.Items {
+		if targetInsTPLName == pvcItem.Labels[constant.KBAppComponentInstanceTemplateLabelKey] {
+			pvc = &pvcItem
+			break
+		}
+	}
+	if pvc == nil {
 		return nil, nil
 	}
-	pvc := pvcList.Items[0]
 	previousValue := *pvc.Status.Capacity.Storage()
 	if requestStorage.Cmp(previousValue) < 0 {
 		return nil, fmt.Errorf(`requested storage size of volumeClaimTemplate "%s" can not less than status.capacity.storage "%s" `,

@@ -254,11 +254,11 @@ func (r *ShardingDefinitionReconciler) immutableCheck(shardingDef *appsv1.Shardi
 	return nil
 }
 
-func (r *ShardingDefinitionReconciler) skipImmutableCheck(cmpd *appsv1.ShardingDefinition) bool {
-	if cmpd.Annotations == nil {
+func (r *ShardingDefinitionReconciler) skipImmutableCheck(sdd *appsv1.ShardingDefinition) bool {
+	if sdd.Annotations == nil {
 		return false
 	}
-	skip, ok := cmpd.Annotations[constant.SkipImmutableCheckAnnotationKey]
+	skip, ok := sdd.Annotations[constant.SkipImmutableCheckAnnotationKey]
 	return ok && strings.ToLower(skip) == "true"
 }
 

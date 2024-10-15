@@ -111,6 +111,12 @@ func (c *clusterTransformContext) GetLogger() logr.Logger {
 	return c.Logger
 }
 
+func (c *clusterTransformContext) sharding(name string) bool {
+	// hack: use shardingComps to determine if the entity is sharding or component
+	_, ok := c.shardingComps[name]
+	return ok
+}
+
 func init() {
 	model.AddScheme(appsv1alpha1.AddToScheme)
 	model.AddScheme(appsv1beta1.AddToScheme)

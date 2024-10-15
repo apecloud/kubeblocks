@@ -56,7 +56,7 @@ func GetClusterUID(comp *appsv1.Component) (string, error) {
 }
 
 // BuildComponent builds a new Component object from cluster component spec and definition.
-func BuildComponent(cluster *appsv1.Cluster, compSpec *appsv1.ClusterComponentSpec, labels, annotations map[string]string) (*appsv1.Component, error) {
+func BuildComponent(cluster *appsv1.Cluster, compSpec *appsv1.ClusterComponentSpec) (*appsv1.Component, error) {
 	schedulingPolicy, err := scheduling.BuildSchedulingPolicy(cluster, compSpec)
 	if err != nil {
 		return nil, err
@@ -65,8 +65,7 @@ func BuildComponent(cluster *appsv1.Cluster, compSpec *appsv1.ClusterComponentSp
 		AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(cluster.Generation, 10)).
 		AddAnnotations(constant.KBAppClusterUIDKey, string(cluster.UID)).
 		AddAnnotationsInMap(inheritedAnnotations(cluster)).
-		AddAnnotationsInMap(annotations). // annotations added by the cluster controller
-		AddLabelsInMap(constant.GetCompLabelsWithDef(cluster.Name, compSpec.Name, compSpec.ComponentDef, labels)).
+		AddLabelsInMap(constant.GetCompLabelsWithDef(cluster.Name, compSpec.Name, compSpec.ComponentDef)).
 		SetServiceVersion(compSpec.ServiceVersion).
 		SetLabels(compSpec.Labels).
 		SetAnnotations(compSpec.Annotations).
@@ -90,15 +89,6 @@ func BuildComponent(cluster *appsv1.Cluster, compSpec *appsv1.ClusterComponentSp
 		SetSystemAccounts(compSpec.SystemAccounts).
 		SetStop(compSpec.Stop)
 	return compBuilder.GetObject(), nil
-}
-
-func BuildComponentExt(cluster *appsv1.Cluster, compSpec *appsv1.ClusterComponentSpec, shardingName string,
-	annotations map[string]string) (*appsv1.Component, error) {
-	labels := map[string]string{}
-	if len(shardingName) > 0 {
-		labels[constant.KBAppShardingNameLabelKey] = shardingName
-	}
-	return BuildComponent(cluster, compSpec, labels, annotations)
 }
 
 func inheritedAnnotations(cluster *appsv1.Cluster) map[string]string {
@@ -171,14 +161,30 @@ func ListClusterComponents(ctx context.Context, cli client.Reader, cluster *apps
 	return compList.Items, nil
 }
 
+// ListShardingComponents lists the components of the cluster.
+func ListShardingComponents(ctx context.Context, cli client.Reader, cluster *appsv1.Cluster, shardingName string) ([]appsv1.Component, error) {
+	compList := &appsv1.ComponentList{}
+	if err := cli.List(ctx, compList, client.InNamespace(cluster.Namespace), client.MatchingLabels{
+		constant.AppInstanceLabelKey:       cluster.Name,
+		constant.KBAppShardingNameLabelKey: shardingName,
+	}); err != nil {
+		return nil, err
+	}
+	return compList.Items, nil
+}
+
 // GetClusterComponentShortNameSet gets the component short name set of the cluster.
-func GetClusterComponentShortNameSet(ctx context.Context, cli client.Reader, cluster *appsv1.Cluster) (sets.Set[string], error) {
+func GetClusterComponentShortNameSet(ctx context.Context, cli client.Reader, cluster *appsv1.Cluster, filter func(obj client.Object) bool) (sets.Set[string], error) {
 	compList, err := ListClusterComponents(ctx, cli, cluster)
 	if err != nil {
 		return nil, err
 	}
 	compSet := sets.Set[string]{}
 	for _, comp := range compList {
+		// filter out the components that do not meet the filter condition
+		if filter != nil && filter(&comp) {
+			continue
+		}
 		compShortName, err := ShortName(cluster.Name, comp.Name)
 		if err != nil {
 			return nil, err

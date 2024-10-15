@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"slices"
@@ -55,7 +56,8 @@ func (t *clusterComponentTransformer) Transform(ctx graph.TransformContext, dag 
 		return nil
 	}
 
-	allCompsUpToDate, err := checkAllCompsUpToDate(transCtx, transCtx.Cluster)
+	// check all the component owned by cluster and do not belong to sharding
+	allCompsUpToDate, err := checkAllCompsUpToDate(transCtx.Context, transCtx.Client, transCtx.Cluster, len(transCtx.ComponentSpecs), withShardingLabel)
 	if err != nil {
 		return err
 	}
@@ -77,7 +79,7 @@ func (t *clusterComponentTransformer) reconcileComponents(transCtx *clusterTrans
 	}
 
 	protoCompSet := sets.KeySet(protoCompSpecMap)
-	runningCompSet, err := component.GetClusterComponentShortNameSet(transCtx.Context, transCtx.Client, cluster)
+	runningCompSet, err := component.GetClusterComponentShortNameSet(transCtx.Context, transCtx.Client, cluster, withShardingLabel)
 	if err != nil {
 		return err
 	}
@@ -91,7 +93,7 @@ func (t *clusterComponentTransformer) reconcileComponents(transCtx *clusterTrans
 
 	// component objects to be updated
 	var delayedErr error
-	if err := t.handleCompsUpdate(transCtx, dag, protoCompSpecMap, updateCompSet, transCtx.Annotations); err != nil {
+	if err := t.handleCompsUpdate(transCtx, dag, protoCompSpecMap, updateCompSet); err != nil {
 		if !ictrlutil.IsDelayedRequeueError(err) {
 			return err
 		}
@@ -99,7 +101,7 @@ func (t *clusterComponentTransformer) reconcileComponents(transCtx *clusterTrans
 	}
 
 	// component objects to be created
-	if err := t.handleCompsCreate(transCtx, dag, protoCompSpecMap, createCompSet, transCtx.Annotations); err != nil {
+	if err := t.handleCompsCreate(transCtx, dag, protoCompSpecMap, createCompSet); err != nil {
 		return err
 	}
 
@@ -107,21 +109,19 @@ func (t *clusterComponentTransformer) reconcileComponents(transCtx *clusterTrans
 }
 
 func (t *clusterComponentTransformer) handleCompsCreate(transCtx *clusterTransformContext, dag *graph.DAG,
-	protoCompSpecMap map[string]*appsv1.ClusterComponentSpec, createCompSet sets.Set[string],
-	protoCompAnnotationsMap map[string]map[string]string) error {
-	handler := newCompHandler(transCtx, protoCompSpecMap, protoCompAnnotationsMap, createOp)
+	protoCompSpecMap map[string]*appsv1.ClusterComponentSpec, createCompSet sets.Set[string]) error {
+	handler := newCompHandler(transCtx, protoCompSpecMap, createOp)
 	return handleCompsInOrder(transCtx, dag, createCompSet, handler)
 }
 
 func (t *clusterComponentTransformer) handleCompsUpdate(transCtx *clusterTransformContext, dag *graph.DAG,
-	protoCompSpecMap map[string]*appsv1.ClusterComponentSpec, updateCompSet sets.Set[string],
-	protoCompAnnotationsMap map[string]map[string]string) error {
-	handler := newCompHandler(transCtx, protoCompSpecMap, protoCompAnnotationsMap, updateOp)
+	protoCompSpecMap map[string]*appsv1.ClusterComponentSpec, updateCompSet sets.Set[string]) error {
+	handler := newCompHandler(transCtx, protoCompSpecMap, updateOp)
 	return handleCompsInOrder(transCtx, dag, updateCompSet, handler)
 }
 
 func deleteCompsInOrder(transCtx *clusterTransformContext, dag *graph.DAG, deleteCompSet sets.Set[string], terminate bool) error {
-	handler := newCompHandler(transCtx, nil, nil, deleteOp)
+	handler := newCompHandler(transCtx, nil, deleteOp)
 	if h, ok := handler.(*parallelDeleteCompHandler); ok {
 		h.terminate = terminate
 	}
@@ -153,35 +153,33 @@ func handleCompsInOrder(transCtx *clusterTransformContext, dag *graph.DAG,
 	return nil
 }
 
-func checkAllCompsUpToDate(transCtx *clusterTransformContext, cluster *appsv1.Cluster) (bool, error) {
+func checkAllCompsUpToDate(ctx context.Context, cli client.Reader, cluster *appsv1.Cluster, expectedCompCount int, filter func(obj client.Object) bool) (bool, error) {
 	compList := &appsv1.ComponentList{}
 	labels := constant.GetClusterLabels(cluster.Name)
-	if err := transCtx.Client.List(transCtx.Context, compList, client.InNamespace(cluster.Namespace), client.MatchingLabels(labels)); err != nil {
+	if err := cli.List(ctx, compList, client.InNamespace(cluster.Namespace), client.MatchingLabels(labels)); err != nil {
 		return false, err
 	}
-	if len(compList.Items) != len(transCtx.ComponentSpecs) {
-		return false, nil
-	}
+	var validCompCount int
 	for _, comp := range compList.Items {
-		generation, ok := comp.Annotations[constant.KubeBlocksGenerationKey]
-		if !ok {
-			return false, nil
-		}
-		if comp.Generation != comp.Status.ObservedGeneration || generation != strconv.FormatInt(cluster.Generation, 10) {
-			return false, nil
+		if filter == nil || !filter(&comp) {
+			validCompCount++
+			generation, ok := comp.Annotations[constant.KubeBlocksGenerationKey]
+			if !ok || comp.Generation != comp.Status.ObservedGeneration || generation != strconv.FormatInt(cluster.Generation, 10) {
+				return false, nil
+			}
 		}
 	}
-	return true, nil
+	return validCompCount == expectedCompCount, nil
 }
 
 // getRunningCompObject gets the component object from cache snapshot
-func getRunningCompObject(transCtx *clusterTransformContext, cluster *appsv1.Cluster, compName string) (*appsv1.Component, error) {
+func getRunningCompObject(ctx context.Context, cli client.Reader, cluster *appsv1.Cluster, compName string) (*appsv1.Component, error) {
 	compKey := types.NamespacedName{
 		Namespace: cluster.Namespace,
 		Name:      component.FullName(cluster.Name, compName),
 	}
 	comp := &appsv1.Component{}
-	if err := transCtx.Client.Get(transCtx.Context, compKey, comp); err != nil {
+	if err := cli.Get(ctx, compKey, comp); err != nil {
 		return nil, err
 	}
 	return comp, nil
@@ -238,13 +236,12 @@ const (
 	updateOp int = 2
 )
 
-func newCompHandler(transCtx *clusterTransformContext, compSpecs map[string]*appsv1.ClusterComponentSpec,
-	annotations map[string]map[string]string, op int) compConditionalHandler {
+func newCompHandler(transCtx *clusterTransformContext, compSpecs map[string]*appsv1.ClusterComponentSpec, op int) compConditionalHandler {
 	orders := definedOrders(transCtx, op)
 	if len(orders) == 0 {
-		return newParallelHandler(compSpecs, annotations, op)
+		return newParallelHandler(compSpecs, op)
 	}
-	return newOrderedHandler(compSpecs, annotations, orders, op)
+	return newOrderedHandler(compSpecs, orders, op)
 }
 
 func definedOrders(transCtx *clusterTransformContext, op int) []string {
@@ -273,14 +270,12 @@ func definedOrders(transCtx *clusterTransformContext, op int) []string {
 	return nil
 }
 
-func newParallelHandler(compSpecs map[string]*appsv1.ClusterComponentSpec,
-	annotations map[string]map[string]string, op int) compConditionalHandler {
+func newParallelHandler(compSpecs map[string]*appsv1.ClusterComponentSpec, op int) compConditionalHandler {
 	switch op {
 	case createOp:
 		return &parallelCreateCompHandler{
 			createCompHandler: createCompHandler{
-				compSpecs:   compSpecs,
-				annotations: annotations,
+				compSpecs: compSpecs,
 			},
 		}
 	case deleteOp:
@@ -288,8 +283,7 @@ func newParallelHandler(compSpecs map[string]*appsv1.ClusterComponentSpec,
 	case updateOp:
 		return &parallelUpdateCompHandler{
 			updateCompHandler: updateCompHandler{
-				compSpecs:   compSpecs,
-				annotations: annotations,
+				compSpecs: compSpecs,
 			},
 		}
 	default:
@@ -297,8 +291,7 @@ func newParallelHandler(compSpecs map[string]*appsv1.ClusterComponentSpec,
 	}
 }
 
-func newOrderedHandler(compSpecs map[string]*appsv1.ClusterComponentSpec,
-	annotations map[string]map[string]string, orders []string, op int) compConditionalHandler {
+func newOrderedHandler(compSpecs map[string]*appsv1.ClusterComponentSpec, orders []string, op int) compConditionalHandler {
 	upworking := func(comp *appsv1.Component) bool {
 		target := appsv1.RunningClusterCompPhase
 		if comp.Spec.Stop != nil && *comp.Spec.Stop {
@@ -317,8 +310,7 @@ func newOrderedHandler(compSpecs map[string]*appsv1.ClusterComponentSpec,
 				phaseExpectation: upworking,
 			},
 			createCompHandler: createCompHandler{
-				compSpecs:   compSpecs,
-				annotations: annotations,
+				compSpecs: compSpecs,
 			},
 		}
 	case deleteOp:
@@ -341,8 +333,7 @@ func newOrderedHandler(compSpecs map[string]*appsv1.ClusterComponentSpec,
 				phaseExpectation: upworking,
 			},
 			updateCompHandler: updateCompHandler{
-				compSpecs:   compSpecs,
-				annotations: annotations,
+				compSpecs: compSpecs,
 			},
 		}
 	default:
@@ -478,14 +469,13 @@ func predecessors(orders []string, compName string) []string {
 }
 
 type createCompHandler struct {
-	compSpecs   map[string]*appsv1.ClusterComponentSpec
-	annotations map[string]map[string]string
+	compSpecs map[string]*appsv1.ClusterComponentSpec
 }
 
 func (h *createCompHandler) handle(transCtx *clusterTransformContext, dag *graph.DAG, compName string) error {
 	cluster := transCtx.Cluster
 	graphCli, _ := transCtx.Client.(model.GraphClient)
-	comp, err := component.BuildComponentExt(cluster, h.compSpecs[compName], shardingNameFromComp(transCtx, compName), h.annotations[compName])
+	comp, err := component.BuildComponent(cluster, h.compSpecs[compName])
 	if err != nil {
 		return err
 	}
@@ -508,7 +498,7 @@ type deleteCompHandler struct {
 func (h *deleteCompHandler) handle(transCtx *clusterTransformContext, dag *graph.DAG, compName string) error {
 	cluster := transCtx.Cluster
 	graphCli, _ := transCtx.Client.(model.GraphClient)
-	comp, err := getRunningCompObject(transCtx, cluster, compName)
+	comp, err := getRunningCompObject(transCtx.Context, transCtx.Client, cluster, compName)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
@@ -530,18 +520,17 @@ func (h *deleteCompHandler) handle(transCtx *clusterTransformContext, dag *graph
 }
 
 type updateCompHandler struct {
-	compSpecs   map[string]*appsv1.ClusterComponentSpec
-	annotations map[string]map[string]string
+	compSpecs map[string]*appsv1.ClusterComponentSpec
 }
 
 func (h *updateCompHandler) handle(transCtx *clusterTransformContext, dag *graph.DAG, compName string) error {
 	cluster := transCtx.Cluster
 	graphCli, _ := transCtx.Client.(model.GraphClient)
-	runningComp, getErr := getRunningCompObject(transCtx, cluster, compName)
+	runningComp, getErr := getRunningCompObject(transCtx.Context, transCtx.Client, cluster, compName)
 	if getErr != nil {
 		return getErr
 	}
-	comp, buildErr := component.BuildComponentExt(cluster, h.compSpecs[compName], shardingNameFromComp(transCtx, compName), h.annotations[compName])
+	comp, buildErr := component.BuildComponent(cluster, h.compSpecs[compName])
 	if buildErr != nil {
 		return buildErr
 	}
@@ -585,18 +574,6 @@ type orderedUpdateCompHandler struct {
 	compOrderedOrder
 	compPhasePrecondition
 	updateCompHandler
-}
-
-func shardingNameFromComp(transCtx *clusterTransformContext, compName string) string {
-	equal := func(spec *appsv1.ClusterComponentSpec) bool {
-		return spec.Name == compName
-	}
-	for shardingName, shardingComps := range transCtx.ShardingComponentSpecs {
-		if slices.IndexFunc(shardingComps, equal) >= 0 {
-			return shardingName
-		}
-	}
-	return ""
 }
 
 func setDiff(s1, s2 sets.Set[string]) (sets.Set[string], sets.Set[string], sets.Set[string]) {

@@ -21,33 +21,22 @@ package apps
 
 import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-// clusterOwnershipTransformer adds finalizer to all none cluster objects
-type clusterOwnershipTransformer struct{}
+type shardingInitTransformer struct {
+	cluster *appsv1.Cluster
+}
 
-var _ graph.Transformer = &clusterOwnershipTransformer{}
+var _ graph.Transformer = &shardingInitTransformer{}
 
-func (f *clusterOwnershipTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	transCtx, _ := ctx.(*clusterTransformContext)
+func (t *shardingInitTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+	transCtx, _ := ctx.(*shardingTransformContext)
+	transCtx.Cluster, transCtx.OrigCluster = t.cluster, t.cluster.DeepCopy()
 	graphCli, _ := transCtx.Client.(model.GraphClient)
-	cluster := transCtx.Cluster
 
-	objects := graphCli.FindAll(dag, &appsv1.Cluster{}, &model.HaveDifferentTypeWithOption{})
-
-	controllerutil.AddFinalizer(cluster, constant.DBClusterFinalizerName)
-	for _, object := range objects {
-		if err := intctrlutil.SetOwnership(cluster, object, rscheme, constant.DBClusterFinalizerName); err != nil {
-			if _, ok := err.(*controllerutil.AlreadyOwnedError); ok {
-				continue
-			}
-			return err
-		}
-	}
+	// init dag
+	graphCli.Root(dag, transCtx.OrigCluster, transCtx.Cluster, model.ActionStatusPtr())
 	return nil
 }

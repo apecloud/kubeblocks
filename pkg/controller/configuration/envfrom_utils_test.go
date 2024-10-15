@@ -81,7 +81,7 @@ var _ = Describe("ConfigEnvFrom test", func() {
 
 	Context("test config template inject envfrom", func() {
 		It("should inject success", func() {
-			comp, err := component.BuildComponent(cluster, &cluster.Spec.ComponentSpecs[0], nil, nil)
+			comp, err := component.BuildComponent(cluster, &cluster.Spec.ComponentSpecs[0])
 			Expect(err).Should(Succeed())
 
 			synthesizeComp, err := component.BuildSynthesizedComponent(ctx, testCtx.Cli, compDef, comp, cluster)
@@ -113,7 +113,7 @@ var _ = Describe("ConfigEnvFrom test", func() {
 			configSpec := compDef.Spec.Configs[0]
 			configSpec.Keys = []string{"env-config"}
 
-			comp, err := component.BuildComponent(cluster, &cluster.Spec.ComponentSpecs[0], nil, nil)
+			comp, err := component.BuildComponent(cluster, &cluster.Spec.ComponentSpecs[0])
 			Expect(err).Should(Succeed())
 
 			synthesizeComp, err := component.BuildSynthesizedComponent(ctx, testCtx.Cli, compDef, comp, cluster)
@@ -133,7 +133,7 @@ var _ = Describe("ConfigEnvFrom test", func() {
 		})
 
 		It("SyncEnvSourceObject abnormal test", func() {
-			comp, err := component.BuildComponent(cluster, &cluster.Spec.ComponentSpecs[0], nil, nil)
+			comp, err := component.BuildComponent(cluster, &cluster.Spec.ComponentSpecs[0])
 			Expect(err).Should(Succeed())
 
 			synthesizeComp, err := component.BuildSynthesizedComponent(ctx, testCtx.Cli, compDef, comp, cluster)

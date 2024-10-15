@@ -169,12 +169,16 @@ func (opsMgr *OpsManager) Reconcile(reqCtx intctrlutil.RequestCtx, cli client.Cl
 		err = initOpsDefAndValidate(reqCtx, cli, opsRes)
 		if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal) {
 			return requeueAfter, patchValidateErrorCondition(reqCtx.Ctx, cli, opsRes, err.Error())
-		} else if err != nil {
+		}
+		if err != nil {
 			return requeueAfter, err
 		}
 	}
 	if opsRequestPhase, requeueAfter, err = opsBehaviour.OpsHandler.ReconcileAction(reqCtx, cli, opsRes); err != nil &&
 		!isOpsRequestFailedPhase(opsRequestPhase) {
+		if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal) {
+			return requeueAfter, patchFatalFailErrorCondition(reqCtx.Ctx, cli, opsRes, err)
+		}
 		// if the opsRequest phase is not failed, skipped
 		return requeueAfter, err
 	}

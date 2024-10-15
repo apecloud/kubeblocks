@@ -461,6 +461,29 @@ addonHelmInstallOptions:
 ## For avoiding the addon CRs being upgraded when upgrade this chart, set this value to false.
 upgradeAddons: false
 
+## @param autoInstalledAddons - the list of auto-installed addons when install and upgrade.
+autoInstalledAddons:
+  - "apecloud-mysql"
+  - "etcd"
+  - "kafka"
+  - "llm"
+  - "mongodb"
+  - "mysql"
+  - "postgresql"
+  - "pulsar"
+  - "qdrant"
+  - "redis"
+  - "alertmanager-webhook-adaptor"
+  - "apecloud-otel-collector"
+  - "aws-load-balancer-controller"
+  - "kubeblocks-csi-driver"
+  - "csi-hostpath-driver"
+  - "csi-driver-nfs"
+  - "grafana"
+  - "prometheus"
+  - "snapshot-controller"
+  - "victoria-metrics-agent"
+
 ## Prometheus Addon
 ##
 prometheus:

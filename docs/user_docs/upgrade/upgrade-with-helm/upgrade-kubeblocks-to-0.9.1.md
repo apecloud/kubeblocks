@@ -38,6 +38,8 @@ If you are upgrading from v0.8 to v0.9, it's recommended to enable webhook to en
          helm repo add kubeblocks https://apecloud.github.io/helm-charts
          helm repo update kubeblocks
          helm -n kb-system upgrade kubeblocks kubeblocks/kubeblocks --version {VERSION} --set crd.enabled=false
+         
+         kubectl get addons -o name | xargs -I {} kubectl patch {} --type='json' -p='[{"op": "add", "path": "/metadata/annotations/helm.sh~1resource-policy", "value": "keep"}]'
          ```
 
          Replace `{VERSION}` with your current KubeBlocks version, such as 0.9.0.

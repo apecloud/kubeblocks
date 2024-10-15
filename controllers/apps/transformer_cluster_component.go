@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -78,7 +79,7 @@ func (t *clusterComponentTransformer) transform(transCtx *clusterTransformContex
 
 	createSet, deleteSet, updateSet := setDiff(runningSet, protoSet)
 
-	if err := deleteCompNShardingInOrder(transCtx, dag, deleteSet); err != nil {
+	if err := deleteCompNShardingInOrder(transCtx, dag, deleteSet, pointer.Bool(true)); err != nil {
 		return err
 	}
 
@@ -122,8 +123,14 @@ func (t *clusterComponentTransformer) handleUpdate(transCtx *clusterTransformCon
 	return handleCompNShardingInOrder(transCtx, dag, updateSet, handler)
 }
 
-func deleteCompNShardingInOrder(transCtx *clusterTransformContext, dag *graph.DAG, deleteSet sets.Set[string]) error {
+func deleteCompNShardingInOrder(transCtx *clusterTransformContext, dag *graph.DAG, deleteSet sets.Set[string], scaleIn *bool) error {
 	handler := newCompNShardingHandler(transCtx, deleteOp)
+	if h, ok := handler.(*clusterParallelHandler); ok {
+		h.scaleIn = scaleIn
+	}
+	if h, ok := handler.(*orderedDeleteHandler); ok {
+		h.scaleIn = scaleIn
+	}
 	return handleCompNShardingInOrder(transCtx, dag, deleteSet, handler)
 }
 
@@ -509,17 +516,17 @@ func (c *phasePrecondition) expected(comp *appsv1.Component) bool {
 }
 
 type clusterCompNShardingHandler struct {
-	op int
+	op      int
+	scaleIn *bool
 }
 
 func (h *clusterCompNShardingHandler) handle(transCtx *clusterTransformContext, dag *graph.DAG, name string) error {
 	if transCtx.sharding(name) {
-		handler := &clusterShardingHandler{}
+		handler := &clusterShardingHandler{scaleIn: h.scaleIn}
 		switch h.op {
 		case createOp:
 			return handler.create(transCtx, dag, name)
 		case deleteOp:
-			// TODO: scale-in flag
 			return handler.delete(transCtx, dag, name)
 		default:
 			return handler.update(transCtx, dag, name)
@@ -643,7 +650,9 @@ func (h *clusterComponentHandler) protoComp(transCtx *clusterTransformContext, n
 	return nil, fmt.Errorf("cluster component %s not found", name)
 }
 
-type clusterShardingHandler struct{}
+type clusterShardingHandler struct {
+	scaleIn *bool
+}
 
 func (h *clusterShardingHandler) create(transCtx *clusterTransformContext, dag *graph.DAG, name string) error {
 	protoComps, err := h.protoComps(transCtx, name)
@@ -675,16 +684,25 @@ func (h *clusterShardingHandler) delete(transCtx *clusterTransformContext, dag *
 
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	for i := range runningComps {
-		h.deleteComp(transCtx, graphCli, dag, &runningComps[i])
+		h.deleteComp(transCtx, graphCli, dag, &runningComps[i], nil)
 	}
 	return nil
 }
 
 func (h *clusterShardingHandler) deleteComp(transCtx *clusterTransformContext,
-	graphCli model.GraphClient, dag *graph.DAG, comp *appsv1.Component) {
+	graphCli model.GraphClient, dag *graph.DAG, comp *appsv1.Component, scaleIn *bool) {
 	if !model.IsObjectDeleting(comp) {
 		transCtx.Logger.Info(fmt.Sprintf("deleting sharding component %s", comp.Name))
-		graphCli.Delete(dag, comp)
+
+		vertex := graphCli.Do(dag, nil, comp, model.ActionDeletePtr(), nil)
+		if scaleIn != nil && *scaleIn {
+			compCopy := comp.DeepCopy()
+			if comp.Annotations == nil {
+				compCopy.Annotations = make(map[string]string)
+			}
+			compCopy.Annotations[constant.ComponentScaleInAnnotationKey] = trueVal
+			graphCli.Do(dag, compCopy, comp, model.ActionUpdatePtr(), vertex)
+		}
 	}
 }
 
@@ -737,7 +755,7 @@ func (h *clusterShardingHandler) deleteComps(transCtx *clusterTransformContext, 
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	for name := range deleteSet {
 		// TODO: shard pre-terminate
-		h.deleteComp(transCtx, graphCli, dag, runningComps[name])
+		h.deleteComp(transCtx, graphCli, dag, runningComps[name], h.scaleIn)
 	}
 }
 

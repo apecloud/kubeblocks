@@ -206,7 +206,7 @@ func deleteCompNShardingInOrder4Terminate(transCtx *clusterTransformContext, dag
 	if err = loadNCheckClusterDefinition(transCtx, transCtx.Cluster); err != nil {
 		return nil, err
 	}
-	err = deleteCompNShardingInOrder(transCtx, dag, nameSet)
+	err = deleteCompNShardingInOrder(transCtx, dag, nameSet, nil)
 	if err != nil {
 		return nil, err
 	}

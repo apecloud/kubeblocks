@@ -222,11 +222,6 @@ type ClusterStatus struct {
 	// +optional
 	Components map[string]ClusterComponentStatus `json:"components,omitempty"`
 
-	// Represents the generation number of the referenced ClusterDefinition.
-	//
-	// +optional
-	ClusterDefGeneration int64 `json:"clusterDefGeneration,omitempty"`
-
 	// Represents a list of detailed status of the Cluster object.
 	// Each condition in the list provides real-time information about certain aspect of the Cluster object.
 	//

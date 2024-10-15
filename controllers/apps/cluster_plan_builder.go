@@ -69,8 +69,8 @@ type clusterTransformContext struct {
 	shardingComps map[string][]*appsv1.ClusterComponentSpec // shardings
 	allComps      []*appsv1.ClusterComponentSpec            // all comps
 
-	// Annotations to be added to components, mapping with @allComps.
-	Annotations map[string]map[string]string
+	// TODO: remove this, annotations to be added to components for sharding, mapping with @allComps.
+	annotations map[string]map[string]string
 }
 
 // clusterPlanBuilder a graph.PlanBuilder implementation for Cluster reconciliation

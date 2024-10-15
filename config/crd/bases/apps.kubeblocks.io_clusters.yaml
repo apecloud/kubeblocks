@@ -15933,10 +15933,6 @@ spec:
           status:
             description: ClusterStatus defines the observed state of the Cluster.
             properties:
-              clusterDefGeneration:
-                description: Represents the generation number of the referenced ClusterDefinition.
-                format: int64
-                type: integer
               components:
                 additionalProperties:
                   description: ClusterComponentStatus records Component status.

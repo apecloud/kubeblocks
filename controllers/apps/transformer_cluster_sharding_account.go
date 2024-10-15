@@ -59,7 +59,7 @@ func (t *clusterShardingAccountTransformer) Transform(ctx graph.TransformContext
 func (t *clusterShardingAccountTransformer) reconcileShardingAccounts(transCtx *clusterTransformContext,
 	graphCli model.GraphClient, dag *graph.DAG) error {
 	for _, sharding := range transCtx.shardings {
-		shardDef, ok := transCtx.shardingDefs[sharding.Name]
+		shardDef, ok := transCtx.shardingDefs[sharding.ShardingDef]
 		if ok {
 			for _, account := range shardDef.Spec.SystemAccounts {
 				if account.Shared != nil && *account.Shared {

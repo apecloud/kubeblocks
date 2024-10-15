@@ -236,8 +236,11 @@ var _ = Describe("ClusterDefinition Controller", func() {
 		It("duplicate topology sharding", func() {
 			By("update cd to set all sharding names as same")
 			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj), func(cd *appsv1.ClusterDefinition) {
-				name := cd.Spec.Topologies[0].Shardings[0].Name
 				for i, topology := range cd.Spec.Topologies {
+					if len(topology.Shardings) == 0 {
+						continue
+					}
+					name := topology.Shardings[0].Name
 					for j := range topology.Shardings {
 						cd.Spec.Topologies[i].Shardings[j].Name = name
 					}
@@ -254,9 +257,7 @@ var _ = Describe("ClusterDefinition Controller", func() {
 		It("duplicate topology component and sharding", func() {
 			By("update cd to set the name of one component and sharding as same")
 			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj), func(cd *appsv1.ClusterDefinition) {
-				name := cd.Spec.Topologies[0].Shardings[0].Name
-				cd.Spec.Topologies[2].Components[0].Name = name
-				cd.Spec.Topologies[2].Shardings[0].Name = name
+				cd.Spec.Topologies[2].Shardings[0].Name = cd.Spec.Topologies[2].Components[0].Name
 			})()).Should(Succeed())
 
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj), func(g Gomega, cd *appsv1.ClusterDefinition) {
@@ -304,7 +305,7 @@ var _ = Describe("ClusterDefinition Controller", func() {
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(clusterDefObj), func(g Gomega, cd *appsv1.ClusterDefinition) {
 				g.Expect(cd.Status.ObservedGeneration).Should(Equal(cd.Generation))
 				g.Expect(cd.Status.Phase).Should(Equal(appsv1.UnavailablePhase))
-				g.Expect(cd.Status.Message).Should(ContainSubstring("there is no matched definitions found for the topology component"))
+				g.Expect(cd.Status.Message).Should(ContainSubstring("there is no matched definitions found for the component"))
 			})).Should(Succeed())
 		})
 

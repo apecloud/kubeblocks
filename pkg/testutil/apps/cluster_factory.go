@@ -93,6 +93,17 @@ func (factory *MockClusterFactory) AddMultipleTemplateComponent(compName string,
 	return factory
 }
 
+func (factory *MockClusterFactory) AddInstances(compName string, instance appsv1.InstanceTemplate) *MockClusterFactory {
+	for i, compSpec := range factory.Get().Spec.ComponentSpecs {
+		if compSpec.Name != compName {
+			continue
+		}
+		factory.Get().Spec.ComponentSpecs[i].Instances = append(factory.Get().Spec.ComponentSpecs[i].Instances, instance)
+		break
+	}
+	return factory
+}
+
 func (factory *MockClusterFactory) AddService(service appsv1.ClusterService) *MockClusterFactory {
 	services := factory.Get().Spec.Services
 	if len(services) == 0 {

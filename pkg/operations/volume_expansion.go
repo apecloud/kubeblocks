@@ -157,6 +157,7 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCt
 						expectCount:          int(ins.GetReplicas()),
 						vctName:              vct.Name,
 						offlineInstanceNames: compSpec.OfflineInstances,
+						templateName:         ins.Name,
 					})
 				}
 			}
@@ -239,7 +240,7 @@ func (ve volumeExpansionOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.Req
 		getLastVCTs := func(vcts []appsv1.ClusterComponentVolumeClaimTemplate, templateName string) []appsv1.ClusterComponentVolumeClaimTemplate {
 			lastVCTs := make([]appsv1.ClusterComponentVolumeClaimTemplate, 0)
 			for _, vct := range vcts {
-				key := getComponentVCTKey(comOps.GetComponentName(), comOps.GetComponentName(), templateName)
+				key := getComponentVCTKey(comOps.GetComponentName(), templateName, vct.Name)
 				if _, ok := storageMap[key]; !ok {
 					continue
 				}
@@ -256,6 +257,7 @@ func (ve volumeExpansionOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.Req
 					continue
 				}
 				instanceTemplates = append(instanceTemplates, appsv1.InstanceTemplate{
+					Name:                 v.Name,
 					VolumeClaimTemplates: getLastVCTs(ins.VolumeClaimTemplates, ins.Name),
 				})
 			}

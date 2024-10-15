@@ -435,10 +435,14 @@ func (r *componentWorkloadOps) expandVolume() error {
 	if err := r.expandVolumeClaimTemplates(r.runningITS.Spec.VolumeClaimTemplates, r.synthesizeComp.VolumeClaimTemplates, ""); err != nil {
 		return err
 	}
+	if len(r.runningITS.Spec.Instances) == 0 {
+		return nil
+	}
 	// 2. expand the volumes with instance template name.
 	for i := range r.runningITS.Spec.Instances {
-		runningInsTPL := r.runningITS.Spec.Instances[i].DeepCopy()
-		intctrlutil.MergeList(&runningInsTPL.VolumeClaimTemplates, &r.runningITS.Spec.VolumeClaimTemplates,
+		runningInsSpec := r.runningITS.Spec.DeepCopy()
+		runningInsTPL := runningInsSpec.Instances[i]
+		intctrlutil.MergeList(&runningInsTPL.VolumeClaimTemplates, &runningInsSpec.VolumeClaimTemplates,
 			func(item corev1.PersistentVolumeClaim) func(corev1.PersistentVolumeClaim) bool {
 				return func(claim corev1.PersistentVolumeClaim) bool {
 					return claim.Name == item.Name
@@ -446,10 +450,13 @@ func (r *componentWorkloadOps) expandVolume() error {
 			})
 
 		var protoVCTs []corev1.PersistentVolumeClaimTemplate
+		for j := range r.synthesizeComp.VolumeClaimTemplates {
+			protoVCTs = append(protoVCTs, r.synthesizeComp.VolumeClaimTemplates[j])
+		}
 		for _, v := range r.synthesizeComp.Instances {
 			if runningInsTPL.Name == v.Name {
-				protoVCTs = component.ToVolumeClaimTemplates(v.VolumeClaimTemplates)
-				intctrlutil.MergeList(&protoVCTs, &r.synthesizeComp.VolumeClaimTemplates,
+				insVCTs := component.ToVolumeClaimTemplates(v.VolumeClaimTemplates)
+				intctrlutil.MergeList(&insVCTs, &protoVCTs,
 					func(item corev1.PersistentVolumeClaimTemplate) func(corev1.PersistentVolumeClaimTemplate) bool {
 						return func(claim corev1.PersistentVolumeClaimTemplate) bool {
 							return claim.Name == item.Name
@@ -458,7 +465,7 @@ func (r *componentWorkloadOps) expandVolume() error {
 				break
 			}
 		}
-		if err := r.expandVolumeClaimTemplates(runningInsTPL.VolumeClaimTemplates, protoVCTs, runningInsTPL.Name); err != nil {
+		if err := r.expandVolumeClaimTemplates(runningInsSpec.VolumeClaimTemplates, protoVCTs, runningInsTPL.Name); err != nil {
 			return err
 		}
 	}

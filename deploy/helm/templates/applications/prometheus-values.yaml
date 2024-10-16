@@ -1,4 +1,5 @@
-{{- $imageRegistry := include "kubeblocks.imageRegistry" . }}
+{{- if has  "prometheus" .Values.autoInstalledAddons }}
+  {{- $imageRegistry := include "kubeblocks.imageRegistry" . }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -54,3 +55,4 @@ data:
     {{- $server = set $server "image" $serverImage }}
     {{- $prometheus = set $prometheus "server" $server }}
     {{- toYaml $prometheus | nindent 4 }}
+{{- end }}

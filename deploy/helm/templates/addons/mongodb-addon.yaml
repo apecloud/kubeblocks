@@ -1,3 +1,4 @@
+{{- if has "mongodb" .Values.autoInstalledAddons  }}
 {{- $selectorLabels := include "kubeblocks.selectorLabels" . }}
 {{- include "kubeblocks.buildAddonCR" (merge (dict
   "kbVersion" ">=0.7.0"
@@ -8,3 +9,4 @@
   "provider" "apecloud"
   "description" "MongoDB is a document database designed for ease of application development and scaling."
   "autoInstall" true) . ) -}}
+  {{- end }}

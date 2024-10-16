@@ -22,25 +22,26 @@ package trace
 import (
 	"context"
 	"fmt"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	batchv1 "k8s.io/api/batch/v1"
-	rbacv1 "k8s.io/api/rbac/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/golang/mock/gomock"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	tracev1 "github.com/apecloud/kubeblocks/apis/trace/v1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )

@@ -27,6 +27,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/types"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
@@ -95,6 +96,10 @@ var _ = Describe("cluster component transformer test", func() {
 		clusterTopologyNoOrders4Sharding            = "test-topology-no-orders-sharding"
 		clusterTopologyProvisionNUpdateOOD4Sharding = "test-topology-ood-sharding"
 		clusterTopologyStop4Sharding                = "test-topology-stop-sharding"
+		clusterTopologyCompNSharding                = "test-topology-comp-sharding"
+		clusterTopologyShardingNComp                = "test-topology-sharding-comp"
+		clusterTopologyCompNShardingOOD             = "test-topology-ood-comp-sharding"
+		clusterTopologyShardingNCompOOD             = "test-topology-ood-sharding-comp"
 		compDefName                                 = "test-compdef"
 		shardingDefName                             = "test-shardingdef"
 		clusterName                                 = "test-cluster"
@@ -328,6 +333,84 @@ var _ = Describe("cluster component transformer test", func() {
 				},
 				Orders: &appsv1.ClusterTopologyOrders{
 					Update: []string{sharding1aName, sharding2aName, sharding3aName},
+				},
+			}).
+			AddClusterTopology(appsv1.ClusterTopology{
+				Name: clusterTopologyCompNSharding,
+				Components: []appsv1.ClusterTopologyComponent{
+					{
+						Name:    comp1aName,
+						CompDef: compDefName,
+					},
+				},
+				Shardings: []appsv1.ClusterTopologySharding{
+					{
+						Name:        sharding1aName,
+						ShardingDef: shardingDefName,
+					},
+				},
+				Orders: &appsv1.ClusterTopologyOrders{
+					Provision: []string{comp1aName, sharding1aName},
+					Terminate: []string{sharding1aName, comp1aName},
+					Update:    []string{comp1aName, sharding1aName},
+				},
+			}).
+			AddClusterTopology(appsv1.ClusterTopology{
+				Name: clusterTopologyShardingNComp,
+				Components: []appsv1.ClusterTopologyComponent{
+					{
+						Name:    comp1aName,
+						CompDef: compDefName,
+					},
+				},
+				Shardings: []appsv1.ClusterTopologySharding{
+					{
+						Name:        sharding1aName,
+						ShardingDef: shardingDefName,
+					},
+				},
+				Orders: &appsv1.ClusterTopologyOrders{
+					Provision: []string{sharding1aName, comp1aName},
+					Terminate: []string{comp1aName, sharding1aName},
+					Update:    []string{sharding1aName, comp1aName},
+				},
+			}).
+			AddClusterTopology(appsv1.ClusterTopology{
+				Name: clusterTopologyCompNShardingOOD,
+				Components: []appsv1.ClusterTopologyComponent{
+					{
+						Name:    comp1aName,
+						CompDef: compDefName,
+					},
+				},
+				Shardings: []appsv1.ClusterTopologySharding{
+					{
+						Name:        sharding1aName,
+						ShardingDef: shardingDefName,
+					},
+				},
+				Orders: &appsv1.ClusterTopologyOrders{
+					Provision: []string{comp1aName, sharding1aName},
+					Update:    []string{sharding1aName, comp1aName},
+				},
+			}).
+			AddClusterTopology(appsv1.ClusterTopology{
+				Name: clusterTopologyShardingNCompOOD,
+				Components: []appsv1.ClusterTopologyComponent{
+					{
+						Name:    comp1aName,
+						CompDef: compDefName,
+					},
+				},
+				Shardings: []appsv1.ClusterTopologySharding{
+					{
+						Name:        sharding1aName,
+						ShardingDef: shardingDefName,
+					},
+				},
+				Orders: &appsv1.ClusterTopologyOrders{
+					Provision: []string{sharding1aName, comp1aName},
+					Update:    []string{comp1aName, sharding1aName},
 				},
 			}).
 			GetObject()
@@ -1250,6 +1333,256 @@ var _ = Describe("cluster component transformer test", func() {
 	})
 
 	Context("component and sharding orders", func() {
-		// TODO: impl
+		It("provision", func() {
+			for _, suit := range []struct {
+				topology                 string
+				errMatcher               types.GomegaMatcher
+				firstCreatedNameMatcher  types.GomegaMatcher
+				secondCreatedNameMatcher types.GomegaMatcher
+				mockObjects              func(*clusterTransformContext) []client.Object
+			}{
+				{
+					topology:                 clusterTopologyCompNSharding,
+					errMatcher:               ContainSubstring(sharding1aName),
+					firstCreatedNameMatcher:  Equal(comp1aName),
+					secondCreatedNameMatcher: HavePrefix(sharding1aName),
+					mockObjects: func(transCtx *clusterTransformContext) []client.Object {
+						return []client.Object{
+							mockCompObj(transCtx, comp1aName, func(comp *appsv1.Component) {
+								comp.Status.Phase = appsv1.RunningClusterCompPhase
+							}),
+						}
+					},
+				},
+				{
+					topology:                 clusterTopologyShardingNComp,
+					errMatcher:               ContainSubstring(comp1aName),
+					firstCreatedNameMatcher:  HavePrefix(sharding1aName),
+					secondCreatedNameMatcher: Equal(comp1aName),
+					mockObjects: func(transCtx *clusterTransformContext) []client.Object {
+						return []client.Object{
+							mockCompObj(transCtx, sharding1aName, func(comp *appsv1.Component) {
+								comp.Labels[constant.KBAppShardingNameLabelKey] = sharding1aName
+								comp.Status.Phase = appsv1.RunningClusterCompPhase
+							}),
+						}
+					},
+				},
+			} {
+				By(suit.topology)
+				transformer, transCtx, dag := newTransformerNCtx(suit.topology, func(f *testapps.MockClusterFactory) {
+					f.AddSharding(sharding1aName, "", "")
+				})
+				err := transformer.Transform(transCtx, dag)
+				Expect(err).ShouldNot(BeNil())
+				Expect(err.Error()).Should(And(ContainSubstring("retry later"), suit.errMatcher))
+
+				// check the first component
+				graphCli := transCtx.Client.(model.GraphClient)
+				objs := graphCli.FindAll(dag, &appsv1.Component{})
+				Expect(len(objs)).Should(Equal(1))
+				for _, obj := range objs {
+					comp := obj.(*appsv1.Component)
+					Expect(component.ShortName(transCtx.Cluster.Name, comp.Name)).Should(suit.firstCreatedNameMatcher)
+					Expect(graphCli.IsAction(dag, comp, model.ActionCreatePtr())).Should(BeTrue())
+				}
+
+				// mock first component status as running
+				reader := &mockReader{objs: suit.mockObjects(transCtx)}
+				transCtx.Client = model.NewGraphClient(reader)
+
+				// try again and check the last component
+				dag = newDAG(graphCli, transCtx.Cluster)
+				err = transformer.Transform(transCtx, dag)
+				Expect(err).Should(BeNil())
+
+				graphCli = transCtx.Client.(model.GraphClient)
+				objs = graphCli.FindAll(dag, &appsv1.Component{})
+				Expect(len(objs)).Should(Equal(1))
+				for _, obj := range objs {
+					comp := obj.(*appsv1.Component)
+					Expect(component.ShortName(transCtx.Cluster.Name, comp.Name)).Should(suit.secondCreatedNameMatcher)
+					Expect(graphCli.IsAction(dag, comp, model.ActionCreatePtr())).Should(BeTrue())
+				}
+			}
+		})
+
+		It("update", func() {
+			for _, suit := range []struct {
+				topology           string
+				errMatcher         types.GomegaMatcher
+				updatedNameMatcher types.GomegaMatcher
+			}{
+				{clusterTopologyCompNSharding, ContainSubstring(sharding1aName), Equal(comp1aName)},
+				{clusterTopologyShardingNComp, ContainSubstring(comp1aName), HavePrefix(sharding1aName)},
+			} {
+				By(suit.topology)
+				transformer, transCtx, dag := newTransformerNCtx(suit.topology, func(f *testapps.MockClusterFactory) {
+					f.AddSharding(sharding1aName, "", "")
+				})
+
+				reader := &mockReader{
+					objs: []client.Object{
+						mockCompObj(transCtx, comp1aName, func(comp *appsv1.Component) {
+							comp.Spec.Replicas = 2 // to update
+							comp.Status.Phase = appsv1.RunningClusterCompPhase
+						}),
+						mockCompObj(transCtx, sharding1aName, func(comp *appsv1.Component) {
+							comp.Labels[constant.KBAppShardingNameLabelKey] = sharding1aName
+							comp.Spec.Replicas = 2 // to update
+							comp.Status.Phase = appsv1.RunningClusterCompPhase
+						}),
+					},
+				}
+				transCtx.Client = model.NewGraphClient(reader)
+				transCtx.OrigCluster.Generation += 1 // mock cluster spec update
+
+				err := transformer.Transform(transCtx, dag)
+				Expect(err).ShouldNot(BeNil())
+				Expect(err.Error()).Should(And(ContainSubstring("retry later"), suit.errMatcher))
+
+				// check the updated component
+				graphCli := transCtx.Client.(model.GraphClient)
+				objs := graphCli.FindAll(dag, &appsv1.Component{})
+				Expect(len(objs)).Should(Equal(1))
+				comp := objs[0].(*appsv1.Component)
+				Expect(component.ShortName(transCtx.Cluster.Name, comp.Name)).Should(suit.updatedNameMatcher)
+				Expect(graphCli.IsAction(dag, comp, model.ActionUpdatePtr())).Should(BeTrue())
+			}
+		})
+
+		It("update - stop", func() {
+			for _, suit := range []struct {
+				topology           string
+				errMatcher         types.GomegaMatcher
+				updatedNameMatcher types.GomegaMatcher
+			}{
+				{clusterTopologyCompNSharding, ContainSubstring(sharding1aName), Equal(comp1aName)},
+				{clusterTopologyShardingNComp, ContainSubstring(comp1aName), HavePrefix(sharding1aName)},
+			} {
+				By(suit.topology)
+				transformer, transCtx, dag := newTransformerNCtx(suit.topology, func(f *testapps.MockClusterFactory) {
+					f.AddSharding(sharding1aName, "", "").
+						AddSharding(sharding2aName, "", "")
+				})
+
+				// mock to stop all components and shardings
+				reader := &mockReader{
+					objs: []client.Object{
+						mockCompObj(transCtx, comp1aName, func(comp *appsv1.Component) {
+							comp.Status.Phase = appsv1.RunningClusterCompPhase
+						}),
+						mockCompObj(transCtx, sharding1aName, func(comp *appsv1.Component) {
+							comp.Labels[constant.KBAppShardingNameLabelKey] = sharding1aName
+							comp.Status.Phase = appsv1.RunningClusterCompPhase
+						}),
+					},
+				}
+				transCtx.Client = model.NewGraphClient(reader)
+				for i := range transCtx.components {
+					transCtx.components[i].Stop = pointer.Bool(true)
+				}
+				for i, sharding := range transCtx.shardings {
+					transCtx.shardings[i].Template.Stop = pointer.Bool(true)
+					for j := range transCtx.shardingComps[sharding.Name] {
+						transCtx.shardingComps[sharding.Name][j].Stop = pointer.Bool(true)
+					}
+				}
+				transCtx.OrigCluster.Generation += 1 // mock cluster spec update
+
+				err := transformer.Transform(transCtx, dag)
+				Expect(err).ShouldNot(BeNil())
+				Expect(err.Error()).Should(And(ContainSubstring("retry later"), suit.errMatcher))
+
+				// should have the first component to update only
+				graphCli := transCtx.Client.(model.GraphClient)
+				objs := graphCli.FindAll(dag, &appsv1.Component{})
+				Expect(len(objs)).Should(Equal(1))
+				comp := objs[0].(*appsv1.Component)
+				Expect(component.ShortName(transCtx.Cluster.Name, comp.Name)).Should(suit.updatedNameMatcher)
+				Expect(graphCli.IsAction(dag, comp, model.ActionUpdatePtr())).Should(BeTrue())
+				Expect(comp.Spec.Stop).ShouldNot(BeNil())
+				Expect(*comp.Spec.Stop).Should(BeTrue())
+			}
+		})
+
+		It("provision & update OOD", func() {
+			for _, suit := range []struct {
+				topology           string
+				createdNameMatcher types.GomegaMatcher
+				firstMockObjects   func(*clusterTransformContext) []client.Object
+				secondMockObjects  func(*clusterTransformContext) []client.Object
+			}{
+				{
+					topology:           clusterTopologyCompNShardingOOD,
+					createdNameMatcher: HavePrefix(sharding1aName),
+					firstMockObjects: func(transCtx *clusterTransformContext) []client.Object {
+						return []client.Object{
+							mockCompObj(transCtx, comp1aName, func(comp *appsv1.Component) {
+								comp.Status.Phase = appsv1.RunningClusterCompPhase
+							}),
+						}
+					},
+					secondMockObjects: func(transCtx *clusterTransformContext) []client.Object {
+						return []client.Object{
+							mockCompObj(transCtx, sharding1aName, func(comp *appsv1.Component) {
+								comp.Labels[constant.KBAppShardingNameLabelKey] = sharding1aName
+								comp.Status.Phase = appsv1.RunningClusterCompPhase
+							}),
+						}
+					},
+				},
+				{
+					topology:           clusterTopologyShardingNCompOOD,
+					createdNameMatcher: Equal(comp1aName),
+					firstMockObjects: func(transCtx *clusterTransformContext) []client.Object {
+						return []client.Object{
+							mockCompObj(transCtx, sharding1aName, func(comp *appsv1.Component) {
+								comp.Labels[constant.KBAppShardingNameLabelKey] = sharding1aName
+								comp.Status.Phase = appsv1.RunningClusterCompPhase
+							}),
+						}
+					},
+					secondMockObjects: func(transCtx *clusterTransformContext) []client.Object {
+						return []client.Object{
+							mockCompObj(transCtx, comp1aName, func(comp *appsv1.Component) {
+								comp.Status.Phase = appsv1.RunningClusterCompPhase
+							}),
+						}
+					},
+				},
+			} {
+				By(suit.topology)
+				transformer, transCtx, dag := newTransformerNCtx(suit.topology, func(f *testapps.MockClusterFactory) {
+					f.AddSharding(sharding1aName, "", "")
+				})
+
+				// mock first component status as running
+				reader := &mockReader{objs: suit.firstMockObjects(transCtx)}
+				transCtx.Client = model.NewGraphClient(reader)
+
+				// sharding1aName(comp1aName) is not ready (exist) when updating comp1aName(sharding1aName)
+				err := transformer.Transform(transCtx, dag)
+				Expect(err).ShouldNot(BeNil())
+				Expect(ictrlutil.IsDelayedRequeueError(err)).Should(BeTrue())
+
+				// check another component under provisioning
+				graphCli := transCtx.Client.(model.GraphClient)
+				objs := graphCli.FindAll(dag, &appsv1.Component{})
+				Expect(len(objs)).Should(Equal(1))
+				for _, obj := range objs {
+					comp := obj.(*appsv1.Component)
+					Expect(component.ShortName(transCtx.Cluster.Name, comp.Name)).Should(suit.createdNameMatcher)
+					Expect(graphCli.IsAction(dag, comp, model.ActionCreatePtr())).Should(BeTrue())
+				}
+
+				// mock another component status as running
+				reader.objs = append(reader.objs, suit.secondMockObjects(transCtx)...)
+
+				// try again
+				err = transformer.Transform(transCtx, newDAG(graphCli, transCtx.Cluster))
+				Expect(err).Should(BeNil())
+			}
+		})
 	})
 })

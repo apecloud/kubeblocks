@@ -476,7 +476,6 @@ autoInstalledAddons:
   - "alertmanager-webhook-adaptor"
   - "apecloud-otel-collector"
   - "aws-load-balancer-controller"
-  - "kubeblocks-csi-driver"
   - "csi-hostpath-driver"
   - "csi-driver-nfs"
   - "grafana"

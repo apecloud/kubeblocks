@@ -24,7 +24,6 @@ import (
 	"strconv"
 	"sync/atomic"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -70,28 +69,32 @@ func (s *changeCaptureStore) Load(objects ...client.Object) error {
 }
 
 func (s *changeCaptureStore) Insert(object client.Object) error {
-	objectRef, err := getObjectRef(object, s.scheme)
+	obj := object.DeepCopyObject().(client.Object)
+	objectRef, err := getObjectRef(obj, s.scheme)
 	if err != nil {
 		return err
 	}
-	object.SetResourceVersion(s.applyRevision())
-	s.store[*objectRef] = object
+	obj.SetResourceVersion(s.applyRevision())
+	object.SetResourceVersion(obj.GetResourceVersion())
+	s.store[*objectRef] = obj
 
-	s.captureCreation(objectRef, object)
+	s.captureCreation(objectRef, obj)
 
 	return nil
 }
 
 func (s *changeCaptureStore) Update(object client.Object) error {
-	objectRef, err := getObjectRef(object, s.scheme)
+	newObj := object.DeepCopyObject().(client.Object)
+	objectRef, err := getObjectRef(newObj, s.scheme)
 	if err != nil {
 		return err
 	}
 	oldObj := s.store[*objectRef]
-	object.SetResourceVersion(s.applyRevision())
-	s.store[*objectRef] = object
+	newObj.SetResourceVersion(s.applyRevision())
+	object.SetResourceVersion(newObj.GetResourceVersion())
+	s.store[*objectRef] = newObj
 
-	s.captureUpdate(objectRef, oldObj, object)
+	s.captureUpdate(objectRef, oldObj, newObj)
 	return nil
 }
 
@@ -104,14 +107,8 @@ func (s *changeCaptureStore) Delete(object client.Object) error {
 	if !ok {
 		return nil
 	}
-	if obj.GetDeletionTimestamp() == nil {
-		ts := metav1.Now()
-		obj.SetDeletionTimestamp(&ts)
-	} else {
-		delete(s.store, *objectRef)
-	}
+	delete(s.store, *objectRef)
 
-	obj.SetResourceVersion(s.applyRevision())
 	s.captureDeletion(objectRef, obj)
 	return nil
 }

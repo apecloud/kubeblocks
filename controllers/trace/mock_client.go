@@ -27,6 +27,7 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -119,6 +120,19 @@ func (c *mockClient) Create(ctx context.Context, obj client.Object, opts ...clie
 }
 
 func (c *mockClient) Delete(ctx context.Context, obj client.Object, opts ...client.DeleteOption) error {
+	objectRef, err := getObjectRef(obj, c.realClient.Scheme())
+	if err != nil {
+		return err
+	}
+	object := c.store.Get(objectRef)
+	if object == nil {
+		return nil
+	}
+	if object.GetDeletionTimestamp() == nil {
+		ts := metav1.Now()
+		object.SetDeletionTimestamp(&ts)
+		return c.store.Update(object)
+	}
 	return c.store.Delete(obj)
 }
 

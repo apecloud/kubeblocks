@@ -20,7 +20,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"slices"
+	intctrlcomp "github.com/apecloud/kubeblocks/pkg/controller/component"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -377,6 +378,12 @@ func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, com
 	for _, v := range compSpec.Instances {
 		compInsTplMap[v.Name] = v.GetReplicas()
 	}
+	currPodSet, err := intctrlcomp.GenerateAllPodNamesToSet(compSpec.Replicas, compSpec.Instances, compSpec.OfflineInstances,
+		clusterName, compSpec.Name)
+	if err != nil {
+		return err
+	}
+	offlineInstances := sets.New(compSpec.OfflineInstances...)
 	// Rules:
 	// 1. length of offlineInstancesToOnline or onlineInstancesToOffline can't greater than the configured replicaChanges for the component.
 	// 2. replicaChanges for component must greater than or equal to the sum of replicaChanges configured in instance templates.
@@ -431,6 +438,11 @@ func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, com
 		}
 		return nil
 	}
+
+	// if instance not exist , return error
+	// then if not ignore strict validate:
+	//     if the instances specified in the request are not offline, return error.
+	//     if the instances duplicate in the request, return error.
 	if scaleIn != nil {
 		if err := validateHScaleOperation(scaleIn.ReplicaChanger, nil, scaleIn.OnlineInstancesToOffline, true); err != nil {
 			return err
@@ -438,17 +450,51 @@ func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, com
 		if scaleIn.ReplicaChanges != nil && *scaleIn.ReplicaChanges > compSpec.Replicas {
 			return fmt.Errorf(`"scaleIn.replicaChanges" can't be greater than %d for component "%s"`, compSpec.Replicas, hScale.ComponentName)
 		}
+		if onlinedInstance, _, notExistInstance := collectOnlineAndOfflineAndNotExistInstances(
+			scaleIn.OnlineInstancesToOffline,
+			offlineInstances,
+			currPodSet); notExistInstance.Len() > 0 {
+			return fmt.Errorf(fmt.Sprintf(`instances "%s" specified in the request is not exist`, strings.Join(notExistInstance.UnsortedList(), ", ")))
+		} else {
+			if policy, exist := r.Annotations[constant.HscaleValidatePolicyKey]; exist && policy != constant.HscaleValidatePolicyStrict {
+				return nil
+			}
+			unscalablePods := getMissingElementsInSetFromList(onlinedInstance, scaleIn.OnlineInstancesToOffline)
+			if unscalablePods == nil {
+				return intctrlutil.NewFatalError("instances specified in onlineInstancesToOffline has duplicates")
+			}
+			return intctrlutil.NewFatalError(fmt.Sprintf(`instances "%s" specified in onlineInstancesToOffline is not online or not exist`, strings.Join(unscalablePods, ", ")))
+		}
 	}
 	if scaleOut != nil {
 		if err := validateHScaleOperation(scaleOut.ReplicaChanger, scaleOut.NewInstances, scaleOut.OfflineInstancesToOnline, false); err != nil {
 			return err
 		}
-		if len(scaleOut.OfflineInstancesToOnline) > 0 {
-			offlineInstanceSet := sets.New(compSpec.OfflineInstances...)
-			for _, offlineInsName := range scaleOut.OfflineInstancesToOnline {
-				if _, ok := offlineInstanceSet[offlineInsName]; !ok {
-					return fmt.Errorf(`cannot find the offline instance "%s" in component "%s" for scaleOut operation`, offlineInsName, hScale.ComponentName)
-				}
+		if _, offlinedInstance, notExistInstance := collectOnlineAndOfflineAndNotExistInstances(
+			scaleOut.OfflineInstancesToOnline,
+			offlineInstances,
+			currPodSet); notExistInstance.Len() > 0 {
+			return fmt.Errorf(fmt.Sprintf(`instances "%s" specified in the request is not exist`, strings.Join(notExistInstance.UnsortedList(), ", ")))
+		} else {
+			if policy, exist := r.Annotations[constant.HscaleValidatePolicyKey]; exist && policy != constant.HscaleValidatePolicyStrict {
+				return nil
+			}
+			unscalablePods := getMissingElementsInSetFromList(offlinedInstance, scaleOut.OfflineInstancesToOnline)
+			if unscalablePods == nil {
+				return intctrlutil.NewFatalError("instances specified in onlineInstancesToOffline has duplicates")
+			}
+			return intctrlutil.NewFatalError(fmt.Sprintf(`instances "%s" specified in offlineInstancesToOnline is not offline or not exist`, strings.Join(unscalablePods, ", ")))
+		}
+	}
+	// instance cannot be both in OfflineInstancesToOnline and OnlineInstancesToOffline
+	if scaleIn != nil && scaleOut != nil {
+		offlineToOnlineSet := make(map[string]struct{})
+		for _, instance := range scaleIn.OnlineInstancesToOffline {
+			offlineToOnlineSet[instance] = struct{}{}
+		}
+		for _, instance := range scaleOut.OfflineInstancesToOnline {
+			if _, exists := offlineToOnlineSet[instance]; exists {
+				return fmt.Errorf(`instance "%s" cannot be both in "OfflineInstancesToOnline" and "OnlineInstancesToOffline"`, instance)
 			}
 		}
 	}
@@ -862,4 +908,36 @@ func getComponentDefByName(ctx context.Context, cli client.Client, compDefName s
 		return nil, err
 	}
 	return compDef, nil
+}
+
+// collect the online and offline instances specified in the request.
+func collectOnlineAndOfflineAndNotExistInstances(
+	instance []string,
+	offlineInstances sets.Set[string],
+	currPodSet map[string]string) (sets.Set[string], sets.Set[string], sets.Set[string]) {
+	offlinedInstanceFromOps := sets.Set[string]{}
+	onlinedInstanceFromOps := sets.Set[string]{}
+	notExistInstanceFromOps := sets.Set[string]{}
+	for _, insName := range instance {
+		if _, ok := offlineInstances[insName]; ok {
+			offlinedInstanceFromOps.Insert(insName)
+			continue
+		}
+		if _, ok := currPodSet[insName]; ok {
+			onlinedInstanceFromOps.Insert(insName)
+			continue
+		}
+		notExistInstanceFromOps.Insert(insName)
+	}
+	return onlinedInstanceFromOps, offlinedInstanceFromOps, notExistInstanceFromOps
+}
+
+func getMissingElementsInSetFromList(set sets.Set[string], list []string) []string {
+	var diff []string
+	for _, v := range list {
+		if !set.Has(v) {
+			diff = append(diff, v)
+		}
+	}
+	return diff
 }

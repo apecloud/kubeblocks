@@ -62,7 +62,7 @@ func NewGCReconciler(mgr ctrl.Manager) *GCReconciler {
 // taken care of. Other events will be filtered to decrease the load on the controller.
 func (r *GCReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	s := dputils.NewPeriodicalEnqueueSource(mgr.GetClient(), &dpv1alpha1.BackupList{}, r.frequency, dputils.PeriodicalEnqueueSourceOption{})
-	return intctrlutil.NewNamespacedControllerManagedBy(mgr).
+	return intctrlutil.NewControllerManagedBy(mgr).
 		For(&dpv1alpha1.Backup{}, builder.WithPredicates(predicate.NewPredicateFuncs(func(client.Object) bool { return false }))).
 		WatchesRawSource(s, nil).
 		Complete(r)

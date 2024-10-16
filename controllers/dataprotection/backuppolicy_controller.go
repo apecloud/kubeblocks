@@ -124,7 +124,7 @@ func (r *BackupPolicyReconciler) validateBackupPolicy(backupPolicy *dpv1alpha1.B
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *BackupPolicyReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return intctrlutil.NewNamespacedControllerManagedBy(mgr).
+	return intctrlutil.NewControllerManagedBy(mgr).
 		For(&dpv1alpha1.BackupPolicy{}).
 		Complete(r)
 }

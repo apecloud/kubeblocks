@@ -191,15 +191,20 @@ func (t *clusterNormalizationTransformer) resolveCompsNShardingsFromSpecified(tr
 func (t *clusterNormalizationTransformer) resolveDefinitions4Shardings(transCtx *clusterTransformContext) error {
 	if len(transCtx.shardings) != 0 {
 		transCtx.shardingDefs = make(map[string]*appsv1.ShardingDefinition)
+		if transCtx.componentDefs == nil {
+			transCtx.componentDefs = make(map[string]*appsv1.ComponentDefinition)
+		}
 		for i, sharding := range transCtx.shardings {
 			shardingDef, compDef, serviceVersion, err := t.resolveShardingNCompDefinition(transCtx, sharding)
 			if err != nil {
 				return err
 			}
-			transCtx.shardingDefs[shardingDef.Name] = shardingDef
+			if shardingDef != nil {
+				transCtx.shardingDefs[shardingDef.Name] = shardingDef
+				// set the shardingDef as resolved
+				transCtx.shardings[i].ShardingDef = shardingDef.Name
+			}
 			transCtx.componentDefs[compDef.Name] = compDef
-			// set the shardingDef as resolved
-			transCtx.shardings[i].ShardingDef = shardingDef.Name
 			// set the componentDef and serviceVersion of template as resolved
 			transCtx.shardings[i].Template.ComponentDef = compDef.Name
 			transCtx.shardings[i].Template.ServiceVersion = serviceVersion
@@ -215,10 +220,13 @@ func (t *clusterNormalizationTransformer) resolveShardingNCompDefinition(transCt
 		return nil, nil, "", err
 	}
 
+	var shardingDef *appsv1.ShardingDefinition
 	shardDefName := t.shardingDefinitionName(sharding, comp)
-	shardingDef, err := resolveShardingDefinition(transCtx.Context, transCtx.Client, shardDefName)
-	if err != nil {
-		return nil, nil, "", err
+	if len(shardDefName) > 0 {
+		shardingDef, err = resolveShardingDefinition(transCtx.Context, transCtx.Client, shardDefName)
+		if err != nil {
+			return nil, nil, "", err
+		}
 	}
 
 	spec := sharding.Template

@@ -1,3 +1,4 @@
+{{- if has "csi-driver-nfs" .Values.autoInstalledAddons  }}
 apiVersion: extensions.kubeblocks.io/v1alpha1
 kind: Addon
 metadata:
@@ -58,3 +59,4 @@ spec:
       {{- end }}
     {{- end }}
     autoInstall: {{ $autoInstall }}
+{{- end }}

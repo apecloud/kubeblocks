@@ -1,3 +1,4 @@
+{{- if has "alertmanager-webhook-adaptor" .Values.autoInstalledAddons  }}
 {{- $imageRegistry := include "kubeblocks.imageRegistry" . }}
 apiVersion: v1
 kind: ConfigMap
@@ -18,3 +19,4 @@ data:
      {{- end }}
      {{- $alertmanagerWebhookAdaptor = set $alertmanagerWebhookAdaptor "image" $image }}
      {{- toYaml $alertmanagerWebhookAdaptor | nindent 4 }}
+{{- end }}

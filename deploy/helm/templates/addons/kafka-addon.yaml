@@ -1,3 +1,4 @@
+{{- if has "kafka" .Values.autoInstalledAddons  }}
 {{- $selectorLabels := include "kubeblocks.selectorLabels" . }}
 {{- include "kubeblocks.buildAddonCR" (merge (dict
   "kbVersion" ">=0.7.0"
@@ -8,3 +9,4 @@
   "provider" "community"
   "description" "Apache Kafka is a distributed streaming platform designed to build real-time pipelines and can be used as a message broker or as a replacement for a log aggregation solution for big data applications."
   "autoInstall" true) . ) -}}
+{{- end }}

@@ -246,7 +246,9 @@ func getKBOwnershipRules() []OwnershipRule {
 }
 
 func initKBOwnershipRulesForTest(cfg *rest.Config) {
-	kbOwnershipRules = filterUnsupportedRules(fullKBOwnershipRules, cfg)
+	once.Do(func() {
+		kbOwnershipRules = filterUnsupportedRules(fullKBOwnershipRules, cfg)
+	})
 }
 
 func filterUnsupportedRules(ownershipRules []OwnershipRule, cfg *rest.Config) []OwnershipRule {

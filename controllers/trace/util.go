@@ -137,6 +137,38 @@ func getObjectReference(obj client.Object, scheme *runtime.Scheme) (*corev1.Obje
 	}, nil
 }
 
+func getObjectReferenceString(n *tracev1.ObjectTreeNode) string {
+	if n == nil {
+		return "nil"
+	}
+	return strings.Join([]string{
+		n.Primary.Kind,
+		n.Primary.Namespace,
+		n.Primary.Name,
+		n.Primary.APIVersion,
+	}, "")
+}
+
+func matchOwnerOf(owner *matchOwner, o client.Object) bool {
+	for _, ref := range o.GetOwnerReferences() {
+		if ref.UID == owner.ownerUID {
+			if !owner.controller {
+				return true
+			}
+			return ref.Controller != nil && *ref.Controller
+		}
+	}
+	return false
+}
+
+func parseRevision(revisionStr string) int64 {
+	revision, err := strconv.ParseInt(revisionStr, 10, 64)
+	if err != nil {
+		revision = 0
+	}
+	return revision
+}
+
 // getObjectsByGVK gets all objects of a specific GVK.
 // why not merge matchingFields into opts:
 // fields.Selector needs the underlying cache to build an Indexer on the specific field, which is too heavy.
@@ -184,63 +216,6 @@ func getObjectsByGVK(ctx context.Context, cli client.Client, gvk *schema.GroupVe
 	}
 
 	return objects, nil
-}
-
-func matchOwnerOf(owner *matchOwner, o client.Object) bool {
-	for _, ref := range o.GetOwnerReferences() {
-		if ref.UID == owner.ownerUID {
-			if !owner.controller {
-				return true
-			}
-			return ref.Controller != nil && *ref.Controller
-		}
-	}
-	return false
-}
-
-func parseRevision(revisionStr string) int64 {
-	revision, err := strconv.ParseInt(revisionStr, 10, 64)
-	if err != nil {
-		revision = 0
-	}
-	return revision
-}
-
-func parseField(obj client.Object, fieldPath string) (map[string]interface{}, error) {
-	unstructuredObj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert to unstructured: %w", err)
-	}
-
-	// Use the field path to find the field
-	pathParts := strings.Split(fieldPath, ".")
-	current := unstructuredObj
-	for i := 0; i < len(pathParts); i++ {
-		part := pathParts[i]
-		if next, ok := current[part].(map[string]interface{}); ok {
-			current = next
-		} else {
-			return nil, fmt.Errorf("field '%s' does not exist", fieldPath)
-		}
-	}
-	return current, nil
-}
-
-// parseSelector checks if a field exists in the object and returns it if it's a metav1.LabelSelector
-func parseSelector(obj client.Object, fieldPath string) (map[string]string, error) {
-	selectorField, err := parseField(obj, fieldPath)
-	if err != nil {
-		return nil, err
-	}
-	// Attempt to convert the final field to a LabelSelector
-	// TODO(free6om): handle metav1.LabelSelector
-	// labelSelector := &metav1.LabelSelector{}
-	labelSelector := make(map[string]string)
-	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(selectorField, &labelSelector); err != nil {
-		return nil, fmt.Errorf("failed to parse as LabelSelector: %w", err)
-	}
-
-	return labelSelector, nil
 }
 
 func getObjectTreeFromCache(ctx context.Context, cli client.Client, primary client.Object, ownershipRules []OwnershipRule) (*tracev1.ObjectTreeNode, error) {
@@ -291,18 +266,6 @@ func getObjectTreeFromCache(ctx context.Context, cli client.Client, primary clie
 	}
 
 	return tree, nil
-}
-
-func getObjectReferenceString(n *tracev1.ObjectTreeNode) string {
-	if n == nil {
-		return "nil"
-	}
-	return strings.Join([]string{
-		n.Primary.Kind,
-		n.Primary.Namespace,
-		n.Primary.Name,
-		n.Primary.APIVersion,
-	}, "")
 }
 
 func getObjectsFromCache(ctx context.Context, cli client.Client, root *kbappsv1.Cluster, ownershipRules []OwnershipRule) (map[model.GVKNObjKey]client.Object, error) {
@@ -395,6 +358,43 @@ func parseQueryOptions(primary client.Object, criteria *OwnershipCriteria) (*que
 		}
 	}
 	return opts, nil
+}
+
+// parseSelector checks if a field exists in the object and returns it if it's a metav1.LabelSelector
+func parseSelector(obj client.Object, fieldPath string) (map[string]string, error) {
+	selectorField, err := parseField(obj, fieldPath)
+	if err != nil {
+		return nil, err
+	}
+	// Attempt to convert the final field to a LabelSelector
+	// TODO(free6om): handle metav1.LabelSelector
+	// labelSelector := &metav1.LabelSelector{}
+	labelSelector := make(map[string]string)
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(selectorField, &labelSelector); err != nil {
+		return nil, fmt.Errorf("failed to parse as LabelSelector: %w", err)
+	}
+
+	return labelSelector, nil
+}
+
+func parseField(obj client.Object, fieldPath string) (map[string]interface{}, error) {
+	unstructuredObj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert to unstructured: %w", err)
+	}
+
+	// Use the field path to find the field
+	pathParts := strings.Split(fieldPath, ".")
+	current := unstructuredObj
+	for i := 0; i < len(pathParts); i++ {
+		part := pathParts[i]
+		if next, ok := current[part].(map[string]interface{}); ok {
+			current = next
+		} else {
+			return nil, fmt.Errorf("field '%s' does not exist", fieldPath)
+		}
+	}
+	return current, nil
 }
 
 func specMapToJSON(spec interface{}) []byte {
@@ -524,11 +524,13 @@ func buildChanges(oldObjectMap, newObjectMap map[model.GVKNObjKey]client.Object,
 
 	// build new slice of reconciliation changes from last round calculation
 	var changes []tracev1.ObjectChange
-	for changeType, changeSet := range map[tracev1.ObjectChangeType]sets.Set[model.GVKNObjKey]{
+	allObjectMap := map[tracev1.ObjectChangeType]sets.Set[model.GVKNObjKey]{
 		tracev1.ObjectCreationType: createSet,
 		tracev1.ObjectUpdateType:   updateSet,
 		tracev1.ObjectDeletionType: deleteSet,
-	} {
+	}
+	for _, changeType := range []tracev1.ObjectChangeType{tracev1.ObjectCreationType, tracev1.ObjectUpdateType, tracev1.ObjectDeletionType} {
+		changeSet := allObjectMap[changeType]
 		for key := range changeSet {
 			var oldObj, newObj client.Object
 			if oldObjectMap != nil {

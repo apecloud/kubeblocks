@@ -22,9 +22,15 @@ package trace
 import (
 	"context"
 	"fmt"
-
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	batchv1 "k8s.io/api/batch/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/golang/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
@@ -196,40 +202,6 @@ var _ = Describe("util test", func() {
 		})
 	})
 
-	Context("getObjectsByGVK", func() {
-		It("should work well", func() {
-			gvk := &schema.GroupVersionKind{
-				Group:   kbappsv1.GroupVersion.Group,
-				Version: kbappsv1.GroupVersion.Version,
-				Kind:    kbappsv1.ComponentKind,
-			}
-			opt := &queryOptions{
-				matchOwner: &matchOwner{
-					controller: true,
-					ownerUID:   uid,
-				},
-			}
-			owner := builder.NewClusterBuilder(namespace, name).SetUID(uid).GetObject()
-			compName := "hello"
-			fullCompName := fmt.Sprintf("%s-%s", owner.Name, compName)
-			owned := builder.NewComponentBuilder(namespace, fullCompName, "").
-				SetOwnerReferences(kbappsv1.APIVersion, kbappsv1.ClusterKind, owner).
-				GetObject()
-			k8sMock.EXPECT().Scheme().Return(scheme.Scheme).Times(1)
-			k8sMock.EXPECT().
-				List(gomock.Any(), &kbappsv1.ComponentList{}, gomock.Any()).
-				DoAndReturn(func(_ context.Context, list *kbappsv1.ComponentList, _ ...client.ListOption) error {
-					list.Items = []kbappsv1.Component{*owned}
-					return nil
-				}).Times(1)
-
-			objects, err := getObjectsByGVK(ctx, k8sMock, gvk, opt)
-			Expect(err).Should(BeNil())
-			Expect(objects).Should(HaveLen(1))
-			Expect(objects[0]).Should(Equal(owned))
-		})
-	})
-
 	Context("matchOwnerOf", func() {
 		It("should work well", func() {
 			owner := builder.NewClusterBuilder(namespace, name).SetUID(uid).GetObject()
@@ -310,6 +282,385 @@ var _ = Describe("util test", func() {
 			Expect(opt).ShouldNot(BeNil())
 			Expect(opt.matchOwner).ShouldNot(BeNil())
 			Expect(*opt.matchOwner).Should(Equal(matchOwner{ownerUID: primary.UID, controller: true}))
+		})
+	})
+
+	Context("getObjectsByGVK", func() {
+		It("should work well", func() {
+			gvk := &schema.GroupVersionKind{
+				Group:   kbappsv1.GroupVersion.Group,
+				Version: kbappsv1.GroupVersion.Version,
+				Kind:    kbappsv1.ComponentKind,
+			}
+			opt := &queryOptions{
+				matchOwner: &matchOwner{
+					controller: true,
+					ownerUID:   uid,
+				},
+			}
+			owner := builder.NewClusterBuilder(namespace, name).SetUID(uid).GetObject()
+			compName := "hello"
+			fullCompName := fmt.Sprintf("%s-%s", owner.Name, compName)
+			owned := builder.NewComponentBuilder(namespace, fullCompName, "").
+				SetOwnerReferences(kbappsv1.APIVersion, kbappsv1.ClusterKind, owner).
+				GetObject()
+			k8sMock.EXPECT().Scheme().Return(scheme.Scheme).Times(1)
+			k8sMock.EXPECT().
+				List(gomock.Any(), &kbappsv1.ComponentList{}, gomock.Any()).
+				DoAndReturn(func(_ context.Context, list *kbappsv1.ComponentList, _ ...client.ListOption) error {
+					list.Items = []kbappsv1.Component{*owned}
+					return nil
+				}).Times(1)
+
+			objects, err := getObjectsByGVK(ctx, k8sMock, gvk, opt)
+			Expect(err).Should(BeNil())
+			Expect(objects).Should(HaveLen(1))
+			Expect(objects[0]).Should(Equal(owned))
+		})
+	})
+
+	Context("get objects from cache", func() {
+		var (
+			primary     *kbappsv1.Cluster
+			secondaries []kbappsv1.Component
+		)
+		BeforeEach(func() {
+			primary = builder.NewClusterBuilder(namespace, name).SetUID(uid).SetResourceVersion(resourceVersion).GetObject()
+			compNames := []string{"hello", "world"}
+			secondaries = nil
+			for _, compName := range compNames {
+				fullCompName := fmt.Sprintf("%s-%s", primary.Name, compName)
+				secondary := builder.NewComponentBuilder(namespace, fullCompName, "").
+					SetOwnerReferences(kbappsv1.APIVersion, kbappsv1.ClusterKind, primary).
+					SetUID(uid).
+					GetObject()
+				secondary.ResourceVersion = resourceVersion
+				secondaries = append(secondaries, *secondary)
+			}
+			k8sMock.EXPECT().Scheme().Return(scheme.Scheme).AnyTimes()
+			k8sMock.EXPECT().
+				List(gomock.Any(), &kbappsv1.ComponentList{}, gomock.Any()).
+				DoAndReturn(func(_ context.Context, list *kbappsv1.ComponentList, _ ...client.ListOption) error {
+					list.Items = secondaries
+					return nil
+				}).Times(1)
+			k8sMock.EXPECT().
+				List(gomock.Any(), &corev1.ServiceList{}, gomock.Any()).
+				DoAndReturn(func(_ context.Context, list *corev1.ServiceList, _ ...client.ListOption) error {
+					return nil
+				}).Times(1)
+			k8sMock.EXPECT().
+				List(gomock.Any(), &corev1.SecretList{}, gomock.Any()).
+				DoAndReturn(func(_ context.Context, list *corev1.SecretList, _ ...client.ListOption) error {
+					return nil
+				}).Times(1)
+			componentSecondaries := []client.ObjectList{
+				&workloads.InstanceSetList{},
+				&corev1.ServiceList{},
+				&corev1.SecretList{},
+				&corev1.ConfigMapList{},
+				&corev1.PersistentVolumeClaimList{},
+				&rbacv1.ClusterRoleBindingList{},
+				&rbacv1.RoleBindingList{},
+				&corev1.ServiceAccountList{},
+				&batchv1.JobList{},
+				&dpv1alpha1.BackupList{},
+				&dpv1alpha1.RestoreList{},
+				&appsv1alpha1.ConfigurationList{},
+			}
+			for _, secondary := range componentSecondaries {
+				k8sMock.EXPECT().
+					List(gomock.Any(), secondary, gomock.Any()).
+					DoAndReturn(func(_ context.Context, list client.ObjectList, _ ...client.ListOption) error {
+						return nil
+					}).Times(2)
+			}
+		})
+
+		Context("getObjectTreeFromCache", func() {
+			It("should work well", func() {
+				tree, err := getObjectTreeFromCache(ctx, k8sMock, primary, getKBOwnershipRules())
+				Expect(err).Should(BeNil())
+				Expect(tree).ShouldNot(BeNil())
+				Expect(tree.Primary).Should(Equal(corev1.ObjectReference{
+					APIVersion:      kbappsv1.SchemeBuilder.GroupVersion.String(),
+					Kind:            kbappsv1.ClusterKind,
+					Namespace:       primary.Namespace,
+					Name:            primary.Name,
+					UID:             primary.UID,
+					ResourceVersion: primary.ResourceVersion,
+				}))
+				Expect(tree.Secondaries).Should(HaveLen(2))
+				for i := 0; i < len(secondaries); i++ {
+					Expect(tree.Secondaries[i].Primary).Should(Equal(corev1.ObjectReference{
+						APIVersion:      kbappsv1.SchemeBuilder.GroupVersion.String(),
+						Kind:            kbappsv1.ComponentKind,
+						Namespace:       secondaries[i].Namespace,
+						Name:            secondaries[i].Name,
+						UID:             secondaries[i].UID,
+						ResourceVersion: secondaries[i].ResourceVersion,
+					}))
+				}
+			})
+		})
+
+		Context("getObjectsFromCache", func() {
+			It("should work well", func() {
+				objects, err := getObjectsFromCache(ctx, k8sMock, primary, getKBOwnershipRules())
+				Expect(err).Should(BeNil())
+				Expect(objects).Should(HaveLen(3))
+				expectedObjects := make(map[model.GVKNObjKey]client.Object, len(objects))
+				for _, object := range []client.Object{primary, &secondaries[0], &secondaries[1]} {
+					objectRef, err := getObjectRef(object, k8sMock.Scheme())
+					Expect(err).Should(BeNil())
+					expectedObjects[*objectRef] = object
+				}
+				for key, object := range expectedObjects {
+					v, ok := objects[key]
+					Expect(ok).Should(BeTrue())
+					Expect(v).Should(Equal(object))
+				}
+			})
+		})
+	})
+
+	Context("Changes And Summary", func() {
+		var initialObjectMap, newObjectMap map[model.GVKNObjKey]client.Object
+		var objectList []client.Object
+
+		BeforeEach(func() {
+			initialObjectList := []client.Object{
+				builder.NewComponentBuilder(namespace, name+"-0", "").GetObject(),
+				builder.NewComponentBuilder(namespace, name+"-1", "").GetObject(),
+			}
+			newObjectList := []client.Object{
+				builder.NewComponentBuilder(namespace, name+"-0", "").GetObject(),
+				builder.NewComponentBuilder(namespace, name+"-2", "").GetObject(),
+			}
+			newObjectList[0].SetResourceVersion(resourceVersion)
+			objectList = []client.Object{newObjectList[1], newObjectList[0], initialObjectList[1]}
+
+			initialObjectMap = make(map[model.GVKNObjKey]client.Object, len(initialObjectList))
+			newObjectMap = make(map[model.GVKNObjKey]client.Object, len(newObjectList))
+			for _, object := range initialObjectList {
+				objectRef, err := getObjectRef(object, scheme.Scheme)
+				Expect(err).Should(BeNil())
+				initialObjectMap[*objectRef] = object
+			}
+			for _, object := range newObjectList {
+				objectRef, err := getObjectRef(object, scheme.Scheme)
+				Expect(err).Should(BeNil())
+				newObjectMap[*objectRef] = object
+			}
+		})
+
+		Context("buildObjectSummaries", func() {
+			It("should work well", func() {
+				summary := buildObjectSummaries(initialObjectMap, newObjectMap)
+				Expect(summary).Should(HaveLen(1))
+				Expect(summary[0].ObjectType).Should(Equal(tracev1.ObjectType{
+					APIVersion: kbappsv1.SchemeBuilder.GroupVersion.String(),
+					Kind:       kbappsv1.ComponentKind,
+				}))
+				Expect(summary[0].Total).Should(BeEquivalentTo(2))
+				Expect(summary[0].ChangeSummary).ShouldNot(BeNil())
+				Expect(summary[0].ChangeSummary.Added).ShouldNot(BeNil())
+				Expect(*summary[0].ChangeSummary.Added).Should(BeEquivalentTo(1))
+				Expect(summary[0].ChangeSummary.Updated).ShouldNot(BeNil())
+				Expect(*summary[0].ChangeSummary.Updated).Should(BeEquivalentTo(1))
+				Expect(summary[0].ChangeSummary.Deleted).ShouldNot(BeNil())
+				Expect(*summary[0].ChangeSummary.Deleted).Should(BeEquivalentTo(1))
+			})
+		})
+
+		Context("buildChanges", func() {
+			It("should work well", func() {
+				i18n := builder.NewConfigMapBuilder(namespace, name).SetData(
+					map[string]string{"en": "apps.kubeblocks.io/v1/Component/Creation=Component %s/%s is created."},
+				).GetObject()
+				changes := buildChanges(initialObjectMap, newObjectMap, buildDescriptionFormatter(i18n, defaultLocale, nil))
+				Expect(changes).Should(HaveLen(3))
+				Expect(changes[0]).Should(Equal(tracev1.ObjectChange{
+					ObjectReference: corev1.ObjectReference{
+						APIVersion:      kbappsv1.SchemeBuilder.GroupVersion.String(),
+						Kind:            kbappsv1.ComponentKind,
+						Namespace:       objectList[0].GetNamespace(),
+						Name:            objectList[0].GetName(),
+						UID:             objectList[0].GetUID(),
+						ResourceVersion: objectList[0].GetResourceVersion(),
+					},
+					ChangeType:  tracev1.ObjectCreationType,
+					Revision:    parseRevision(objectList[0].GetResourceVersion()),
+					Timestamp:   changes[0].Timestamp,
+					Description: fmt.Sprintf("Component %s/%s is created.", objectList[0].GetNamespace(), objectList[0].GetName()),
+				}))
+				Expect(changes[1]).Should(Equal(tracev1.ObjectChange{
+					ObjectReference: corev1.ObjectReference{
+						APIVersion:      kbappsv1.SchemeBuilder.GroupVersion.String(),
+						Kind:            kbappsv1.ComponentKind,
+						Namespace:       objectList[1].GetNamespace(),
+						Name:            objectList[1].GetName(),
+						UID:             objectList[1].GetUID(),
+						ResourceVersion: objectList[1].GetResourceVersion(),
+					},
+					ChangeType:  tracev1.ObjectUpdateType,
+					Revision:    parseRevision(objectList[1].GetResourceVersion()),
+					Timestamp:   changes[1].Timestamp,
+					Description: "Update",
+				}))
+				Expect(changes[2]).Should(Equal(tracev1.ObjectChange{
+					ObjectReference: corev1.ObjectReference{
+						APIVersion:      kbappsv1.SchemeBuilder.GroupVersion.String(),
+						Kind:            kbappsv1.ComponentKind,
+						Namespace:       objectList[2].GetNamespace(),
+						Name:            objectList[2].GetName(),
+						UID:             objectList[2].GetUID(),
+						ResourceVersion: objectList[2].GetResourceVersion(),
+					},
+					ChangeType:  tracev1.ObjectDeletionType,
+					Revision:    parseRevision(objectList[2].GetResourceVersion()),
+					Timestamp:   changes[2].Timestamp,
+					Description: "Deletion",
+				}))
+			})
+		})
+	})
+
+	Context("get objects from store", func() {
+		var (
+			primary     *kbappsv1.Cluster
+			secondaries []kbappsv1.Component
+			store       ObjectRevisionStore
+			reference   client.Object
+		)
+		BeforeEach(func() {
+			primary = builder.NewClusterBuilder(namespace, name).SetUID(uid).SetResourceVersion(resourceVersion).GetObject()
+			compNames := []string{"hello", "world"}
+			secondaries = nil
+			for _, compName := range compNames {
+				fullCompName := fmt.Sprintf("%s-%s", primary.Name, compName)
+				secondary := builder.NewComponentBuilder(namespace, fullCompName, "").
+					SetOwnerReferences(kbappsv1.APIVersion, kbappsv1.ClusterKind, primary).
+					AddLabels(constant.AppManagedByLabelKey, constant.AppName).
+					AddLabels(constant.AppInstanceLabelKey, primary.Name).
+					SetUID(uid).
+					GetObject()
+				secondary.ResourceVersion = resourceVersion
+				secondaries = append(secondaries, *secondary)
+			}
+
+			store = NewObjectStore(scheme.Scheme)
+			reference = &tracev1.ReconciliationTrace{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: namespace,
+					Name:      name,
+				},
+			}
+			Expect(store.Insert(primary, reference)).Should(Succeed())
+			Expect(store.Insert(&secondaries[0], reference)).Should(Succeed())
+			Expect(store.Insert(&secondaries[1], reference)).Should(Succeed())
+		})
+
+		Context("getObjectsFromTree", func() {
+			It("should work well", func() {
+				tree := &tracev1.ObjectTreeNode{
+					Primary: corev1.ObjectReference{
+						APIVersion:      kbappsv1.SchemeBuilder.GroupVersion.String(),
+						Kind:            kbappsv1.ClusterKind,
+						Namespace:       primary.Namespace,
+						Name:            primary.Name,
+						UID:             primary.UID,
+						ResourceVersion: primary.ResourceVersion,
+					},
+					Secondaries: []*tracev1.ObjectTreeNode{
+						{
+							Primary: corev1.ObjectReference{
+								APIVersion:      kbappsv1.SchemeBuilder.GroupVersion.String(),
+								Kind:            kbappsv1.ComponentKind,
+								Namespace:       secondaries[0].Namespace,
+								Name:            secondaries[0].Name,
+								UID:             secondaries[0].UID,
+								ResourceVersion: secondaries[0].ResourceVersion,
+							},
+						},
+						{
+							Primary: corev1.ObjectReference{
+								APIVersion:      kbappsv1.SchemeBuilder.GroupVersion.String(),
+								Kind:            kbappsv1.ComponentKind,
+								Namespace:       secondaries[1].Namespace,
+								Name:            secondaries[1].Name,
+								UID:             secondaries[1].UID,
+								ResourceVersion: secondaries[1].ResourceVersion,
+							},
+						},
+					},
+				}
+
+				objects, err := getObjectsFromTree(tree, store, scheme.Scheme)
+				Expect(err).Should(BeNil())
+				Expect(objects).Should(HaveLen(3))
+				expectedObjects := make(map[model.GVKNObjKey]client.Object, len(objects))
+				for _, object := range []client.Object{primary, &secondaries[0], &secondaries[1]} {
+					objectRef, err := getObjectRef(object, k8sMock.Scheme())
+					Expect(err).Should(BeNil())
+					expectedObjects[*objectRef] = object
+				}
+				for key, object := range expectedObjects {
+					v, ok := objects[key]
+					Expect(ok).Should(BeTrue())
+					Expect(v).Should(Equal(object))
+				}
+			})
+		})
+
+		Context("getObjectTreeWithRevision", func() {
+			It("should work well", func() {
+				revision := parseRevision(resourceVersion)
+				tree, err := getObjectTreeWithRevision(primary, getKBOwnershipRules(), store, revision, scheme.Scheme)
+				Expect(err).Should(BeNil())
+				Expect(tree).ShouldNot(BeNil())
+				Expect(tree.Primary).Should(Equal(corev1.ObjectReference{
+					APIVersion:      kbappsv1.SchemeBuilder.GroupVersion.String(),
+					Kind:            kbappsv1.ClusterKind,
+					Namespace:       primary.Namespace,
+					Name:            primary.Name,
+					UID:             primary.UID,
+					ResourceVersion: primary.ResourceVersion,
+				}))
+				Expect(tree.Secondaries).Should(HaveLen(2))
+				for i := 0; i < len(secondaries); i++ {
+					Expect(tree.Secondaries[i].Primary).Should(Equal(corev1.ObjectReference{
+						APIVersion:      kbappsv1.SchemeBuilder.GroupVersion.String(),
+						Kind:            kbappsv1.ComponentKind,
+						Namespace:       secondaries[i].Namespace,
+						Name:            secondaries[i].Name,
+						UID:             secondaries[i].UID,
+						ResourceVersion: secondaries[i].ResourceVersion,
+					}))
+				}
+			})
+		})
+
+		Context("deleteUnusedRevisions", func() {
+			It("should work well", func() {
+				changes := []tracev1.ObjectChange{{
+					ObjectReference: corev1.ObjectReference{
+						APIVersion:      kbappsv1.SchemeBuilder.GroupVersion.String(),
+						Kind:            kbappsv1.ClusterKind,
+						Namespace:       primary.GetNamespace(),
+						Name:            primary.GetName(),
+						UID:             primary.GetUID(),
+						ResourceVersion: primary.GetResourceVersion(),
+					},
+					Revision: parseRevision(primary.GetResourceVersion()),
+				}}
+				deleteUnusedRevisions(store, changes, reference)
+				Expect(store.List(&schema.GroupVersionKind{
+					Group:   kbappsv1.GroupVersion.Group,
+					Version: kbappsv1.GroupVersion.Version,
+					Kind:    kbappsv1.ClusterKind,
+				})).Should(HaveLen(0))
+			})
 		})
 	})
 })

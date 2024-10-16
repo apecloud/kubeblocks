@@ -488,9 +488,17 @@ func (c *phasePrecondition) shardingMatch(transCtx *clusterTransformContext, dag
 		return false
 	}
 
+	protoComps, ok := transCtx.shardingComps[name]
+	if !ok {
+		return false, fmt.Errorf("cluster sharding %s not found", name)
+	}
+
 	comps, err := ictrlutil.ListShardingComponents(transCtx.Context, transCtx.Client, transCtx.Cluster, name)
 	if err != nil {
 		return false, err
+	}
+	if len(comps) != len(protoComps) {
+		return false, nil
 	}
 	for _, comp := range comps {
 		if !c.expected(&comp) {

@@ -66,8 +66,8 @@ type clusterTransformContext struct {
 	components []*appsv1.ClusterComponentSpec
 	shardings  []*appsv1.ClusterSharding
 
-	shardingComps map[string][]*appsv1.ClusterComponentSpec // shardings
 	allComps      []*appsv1.ClusterComponentSpec            // all comps
+	shardingComps map[string][]*appsv1.ClusterComponentSpec // shardings
 
 	// TODO: remove this, annotations to be added to components for sharding, mapping with @allComps.
 	annotations map[string]map[string]string

@@ -601,9 +601,9 @@ type ClusterSharding struct {
 	//   This enables custom cleanup or data migration tasks to be executed before a shard is terminated.
 	//   Resources and data associated with the corresponding Component will also be deleted.
 	//
-	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=2048
+	// +kubebuilder:validation:Required
 	Shards int32 `json:"shards,omitempty"`
 }
 

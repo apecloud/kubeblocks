@@ -57,14 +57,15 @@ func (factory *MockClusterFactory) SetSchedulingPolicy(schedulingPolicy *appsv1.
 	return factory
 }
 
-func (factory *MockClusterFactory) AddSharding(shardingName string, compDefName string) *MockClusterFactory {
+func (factory *MockClusterFactory) AddSharding(shardingName string, shardingDefName, compDefName string) *MockClusterFactory {
 	sharding := appsv1.ClusterSharding{
+		Name:        shardingName,
+		ShardingDef: shardingDefName,
 		Template: appsv1.ClusterComponentSpec{
 			Name:         "fake",
 			ComponentDef: compDefName,
 			Replicas:     1,
 		},
-		Name:   shardingName,
 		Shards: 1,
 	}
 	factory.Get().Spec.Shardings = append(factory.Get().Spec.Shardings, sharding)

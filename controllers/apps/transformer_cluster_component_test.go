@@ -211,11 +211,18 @@ var _ = Describe("cluster component transformer test", func() {
 		return d
 	}
 
-	buildCompSpecs := func(clusterDef *appsv1.ClusterDefinition, cluster *appsv1.Cluster) []*appsv1.ClusterComponentSpec {
+	normalizeTransformContext := func(transCtx *clusterTransformContext) {
+		var (
+			clusterDef = transCtx.clusterDef
+			cluster    = transCtx.Cluster
+			err        error
+		)
 		transformer := clusterNormalizationTransformer{}
-		compSpecs, _, err := transformer.resolveCompsNShardingsFromTopology(clusterDef, cluster)
+		transCtx.components, transCtx.shardings, err = transformer.resolveCompsNShardingsFromTopology(clusterDef, cluster)
 		Expect(err).Should(BeNil())
-		return compSpecs
+
+		err = transformer.validateNBuildAllCompSpecs(transCtx, cluster)
+		Expect(err).Should(BeNil())
 	}
 
 	mockCompObj := func(transCtx *clusterTransformContext, compName string, setters ...func(*appsv1.Component)) *appsv1.Component {
@@ -255,8 +262,8 @@ var _ = Describe("cluster component transformer test", func() {
 			Cluster:       cluster,
 			OrigCluster:   cluster.DeepCopy(),
 			clusterDef:    clusterDef,
-			allComps:      buildCompSpecs(clusterDef, cluster),
 		}
+		normalizeTransformContext(transCtx)
 		return &clusterComponentTransformer{}, transCtx, newDAG(graphCli, cluster)
 	}
 

@@ -1745,8 +1745,6 @@ snapshot-controller:
             values:
             - "true"
 
-kubeblocks-csi-driver:
-  enabled: false
 
 alertmanager-webhook-adaptor:
   ## Linkage with prometheus.enabled

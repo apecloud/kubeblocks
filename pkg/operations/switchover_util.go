@@ -22,15 +22,18 @@ package operations
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
+	"github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 // switchover constants
@@ -57,14 +60,16 @@ func needDoSwitchover(ctx context.Context,
 	case KBSwitchoverCandidateInstanceForAnyPod:
 		return true, nil
 	default:
-		pods, err := component.ListOwnedPods(ctx, cli, synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name)
-		if err != nil {
+		targetPod := &corev1.Pod{}
+		if err := cli.Get(ctx, client.ObjectKey{Name: switchover.InstanceName, Namespace: synthesizedComp.Namespace}, targetPod); err != nil {
+			if apierrors.IsNotFound(err) {
+				return false, controllerutil.NewFatalError(err.Error())
+			}
 			return false, err
 		}
-		podParent, _ := instanceset.ParseParentNameAndOrdinal(pod.Name)
-		siParent, o := instanceset.ParseParentNameAndOrdinal(switchover.InstanceName)
-		if podParent != siParent || o < 0 || o >= len(pods) {
-			return false, errors.New("switchover.InstanceName is invalid")
+		// if targetPod
+		if targetPod.Labels[constant.AppInstanceLabelKey] != synthesizedComp.ClusterName || component.GetComponentNameFromObj(targetPod) != switchover.ComponentName {
+			return false, controllerutil.NewFatalError(fmt.Sprintf(`the pod "%s" not belongs to the component "%s"`, switchover.InstanceName, switchover.ComponentName))
 		}
 		// If the current instance is already the primary, then no switchover will be performed.
 		if pod.Name == switchover.InstanceName {

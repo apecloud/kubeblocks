@@ -159,12 +159,12 @@ func (r *RestoreManager) BuildContinuousRestoreManager(reqCtx intctrlutil.Reques
 	if err := checkRestoreTime(); err != nil {
 		return err
 	}
-
-	if baseBackupRequired := continuousBackupSet.ActionSet.Spec.Restore.BaseBackupRequired; boolptr.IsSetToFalse(baseBackupRequired) {
-		r.SetBackupSets(continuousBackupSet)
-		return nil
+	if continuousBackupSet.ActionSet.Spec.Restore != nil {
+		if baseBackupRequired := continuousBackupSet.ActionSet.Spec.Restore.BaseBackupRequired; boolptr.IsSetToFalse(baseBackupRequired) {
+			r.SetBackupSets(continuousBackupSet)
+			return nil
+		}
 	}
-
 	fullBackupSet, err := r.getFullBackupActionSetForContinuous(reqCtx, cli, continuousBackup, metav1.NewTime(restoreTime))
 	if err != nil || fullBackupSet == nil {
 		return err

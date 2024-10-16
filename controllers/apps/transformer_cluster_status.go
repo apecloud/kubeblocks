@@ -120,7 +120,7 @@ func (t *clusterStatusTransformer) reconcileClusterPhase(cluster *appsv1.Cluster
 		if !isPhaseIn(phase, appsv1.FailedClusterCompPhase) {
 			isAllComponentFailed = false
 		}
-		if isPhaseIn(phase, appsv1.AbnormalClusterCompPhase, appsv1.FailedClusterCompPhase) {
+		if isPhaseIn(phase, appsv1.FailedClusterCompPhase) {
 			hasComponentAbnormalOrFailed = true
 		}
 	}
@@ -213,12 +213,7 @@ func (t *clusterStatusTransformer) removeCompStatus(cluster *appsv1.Cluster, com
 func (t *clusterStatusTransformer) doAnalysisAndUpdateSynchronizer(cluster *appsv1.Cluster) {
 	// analysis the status of components and calculate the cluster phase.
 	for k, v := range cluster.Status.Components {
-		// if v.PodsReady == nil || !*v.PodsReady {
-		//	t.replicasNotReadyCompNames[k] = struct{}{}
-		//	t.notReadyCompNames[k] = struct{}{}
-		// }
-		switch v.Phase {
-		case appsv1.AbnormalClusterCompPhase, appsv1.FailedClusterCompPhase:
+		if v.Phase == appsv1.FailedClusterCompPhase {
 			t.notReadyCompNames[k] = struct{}{}
 		}
 	}

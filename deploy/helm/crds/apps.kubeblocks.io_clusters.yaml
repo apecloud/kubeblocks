@@ -15937,13 +15937,13 @@ spec:
                       description: Specifies the current state of the Component.
                       enum:
                       - Creating
-                      - Running
                       - Updating
                       - Stopping
-                      - Stopped
+                      - Starting
                       - Deleting
+                      - Running
+                      - Stopped
                       - Failed
-                      - Abnormal
                       type: string
                   type: object
                 description: Records the current status information of all Components

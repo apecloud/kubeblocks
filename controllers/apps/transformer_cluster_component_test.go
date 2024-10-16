@@ -472,7 +472,7 @@ var _ = Describe("cluster component transformer test", func() {
 			f.SetReplicas(1)
 		}
 		cluster := f.GetObject()
-		cluster.Generation = 1 // sharding depends on the generation
+
 		graphCli := model.NewGraphClient(k8sClient)
 		transCtx := &clusterTransformContext{
 			Context:       ctx,
@@ -484,6 +484,7 @@ var _ = Describe("cluster component transformer test", func() {
 			clusterDef:    clusterDef,
 		}
 		normalizeTransformContext(transCtx)
+
 		return &clusterComponentTransformer{}, transCtx, newDAG(graphCli, cluster)
 	}
 

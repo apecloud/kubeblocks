@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/pkg/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -89,9 +88,10 @@ func listNCheckShardingComponents(ctx context.Context, cli client.Reader,
 		}
 	}
 
-	if cluster.Generation == cluster.Status.ObservedGeneration && len(undeletedShardingComps) != int(sharding.Shards) {
-		return nil, nil, errors.New("sharding components are not correct when cluster is not updating")
-	}
+	// TODO: ???
+	// if cluster.Generation == cluster.Status.ObservedGeneration && len(undeletedShardingComps) != int(sharding.Shards) {
+	//	return nil, nil, errors.New("sharding components are not correct when cluster is not updating")
+	// }
 
 	return undeletedShardingComps, deletingShardingComps, nil
 }

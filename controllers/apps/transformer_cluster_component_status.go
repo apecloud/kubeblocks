@@ -22,15 +22,16 @@ package apps
 import (
 	"fmt"
 
+	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	"github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 // clusterComponentStatusTransformer transforms cluster components' status.
@@ -51,46 +52,114 @@ func (t *clusterComponentStatusTransformer) Transform(ctx graph.TransformContext
 }
 
 func (t *clusterComponentStatusTransformer) transform(transCtx *clusterTransformContext) error {
-	if err := t.transformComps(transCtx); err != nil {
+	comps, shardingComps, err := t.listClusterComponents(transCtx)
+	if err != nil {
 		return err
 	}
-	return t.transformShardings(transCtx)
-}
 
-func (t *clusterComponentStatusTransformer) transformComps(transCtx *clusterTransformContext) error {
-	var (
-		cluster = transCtx.Cluster
-	)
-	if len(transCtx.components) == 0 {
-		cluster.Status.Components = nil
-		return nil
-	}
+	t.transformCompStatus(transCtx, comps)
+	t.transformShardingStatus(transCtx, shardingComps)
 
-	if cluster.Status.Components == nil {
-		cluster.Status.Components = make(map[string]appsv1.ClusterComponentStatus)
-	}
-	for _, spec := range transCtx.components {
-		compKey := types.NamespacedName{
-			Namespace: cluster.Namespace,
-			Name:      component.FullName(cluster.Name, spec.Name),
-		}
-		comp := &appsv1.Component{}
-		if err := transCtx.Client.Get(transCtx.Context, compKey, comp); err != nil {
-			if apierrors.IsNotFound(err) {
-				continue
-			}
-			return err
-		}
-		cluster.Status.Components[spec.Name] = t.buildClusterCompStatus(transCtx, spec, comp)
-	}
 	return nil
 }
 
-func (t *clusterComponentStatusTransformer) buildClusterCompStatus(transCtx *clusterTransformContext,
-	spec *appsv1.ClusterComponentSpec, comp *appsv1.Component) appsv1.ClusterComponentStatus {
+func (t *clusterComponentStatusTransformer) listClusterComponents(
+	transCtx *clusterTransformContext) (map[string]*appsv1.Component, map[string][]*appsv1.Component, error) {
 	var (
 		cluster = transCtx.Cluster
-		status  = cluster.Status.Components[spec.Name]
+	)
+
+	compList := &appsv1.ComponentList{}
+	ml := client.MatchingLabels(constant.GetClusterLabels(cluster.Name))
+	if err := transCtx.Client.List(transCtx.Context, compList, client.InNamespace(cluster.Namespace), ml); err != nil {
+		return nil, nil, err
+	}
+
+	if len(compList.Items) == 0 {
+		return nil, nil, nil
+	}
+
+	comps := make(map[string]*appsv1.Component)
+	shardingComps := make(map[string][]*appsv1.Component)
+
+	sharding := func(comp *appsv1.Component) bool {
+		shardingName := shardingCompNName(comp)
+		if len(shardingName) == 0 {
+			return false
+		}
+
+		if _, ok := shardingComps[shardingName]; !ok {
+			shardingComps[shardingName] = []*appsv1.Component{comp}
+		} else {
+			shardingComps[shardingName] = append(shardingComps[shardingName], comp)
+		}
+		return true
+	}
+
+	for i, comp := range compList.Items {
+		if sharding(&compList.Items[i]) {
+			continue
+		}
+		compName, err := component.ShortName(cluster.Name, comp.Name)
+		if err != nil {
+			return nil, nil, err
+		}
+		if _, ok := comps[compName]; ok {
+			return nil, nil, fmt.Errorf("duplicate component name: %s", compName)
+		}
+		comps[compName] = &compList.Items[i]
+	}
+	return comps, shardingComps, nil
+}
+
+func (t *clusterComponentStatusTransformer) transformCompStatus(transCtx *clusterTransformContext, comps map[string]*appsv1.Component) {
+	var (
+		cluster = transCtx.Cluster
+	)
+
+	if len(transCtx.components) == 0 && len(comps) == 0 {
+		cluster.Status.Components = nil
+		return
+	}
+
+	runningSet := sets.New[string]()
+	if comps != nil {
+		runningSet.Insert(maps.Keys(comps)...)
+	}
+	protoSet := sets.New[string]()
+	for _, spec := range transCtx.components {
+		protoSet.Insert(spec.Name)
+	}
+	createSet, deleteSet, updateSet := setDiff(runningSet, protoSet)
+
+	// reset the status
+	cluster.Status.Components = make(map[string]appsv1.ClusterComponentStatus)
+	for name := range createSet {
+		cluster.Status.Components[name] = appsv1.ClusterComponentStatus{
+			Phase: "",
+			Message: map[string]string{
+				"reason": "the component to be created",
+			},
+		}
+	}
+	for name := range deleteSet {
+		cluster.Status.Components[name] = appsv1.ClusterComponentStatus{
+			Phase: appsv1.DeletingClusterCompPhase,
+			Message: map[string]string{
+				"reason": "the component is under deleting",
+			},
+		}
+	}
+	for name := range updateSet {
+		cluster.Status.Components[name] = t.buildClusterCompStatus(transCtx, name, comps[name])
+	}
+}
+
+func (t *clusterComponentStatusTransformer) buildClusterCompStatus(transCtx *clusterTransformContext,
+	compName string, comp *appsv1.Component) appsv1.ClusterComponentStatus {
+	var (
+		cluster = transCtx.Cluster
+		status  = cluster.Status.Components[compName]
 	)
 
 	phase := status.Phase
@@ -100,7 +169,7 @@ func (t *clusterComponentStatusTransformer) buildClusterCompStatus(transCtx *clu
 	}
 
 	if phase != status.Phase {
-		msg := clusterCompNShardingPhaseTransitionMsg("component", spec.Name, status.Phase)
+		msg := clusterCompNShardingPhaseTransitionMsg("component", compName, status.Phase)
 		if transCtx.GetRecorder() != nil && msg != "" {
 			transCtx.GetRecorder().Eventf(transCtx.Cluster, corev1.EventTypeNormal, componentPhaseTransition, msg)
 		}
@@ -110,33 +179,54 @@ func (t *clusterComponentStatusTransformer) buildClusterCompStatus(transCtx *clu
 	return status
 }
 
-func (t *clusterComponentStatusTransformer) transformShardings(transCtx *clusterTransformContext) error {
+func (t *clusterComponentStatusTransformer) transformShardingStatus(transCtx *clusterTransformContext, shardingComps map[string][]*appsv1.Component) {
 	var (
 		cluster = transCtx.Cluster
 	)
-	if len(transCtx.shardings) == 0 {
+
+	if len(transCtx.shardings) == 0 && len(shardingComps) == 0 {
 		cluster.Status.Shardings = nil
-		return nil
+		return
 	}
 
-	if cluster.Status.Shardings == nil {
-		cluster.Status.Shardings = make(map[string]appsv1.ClusterComponentStatus)
+	runningSet := sets.New[string]()
+	if shardingComps != nil {
+		runningSet.Insert(maps.Keys(shardingComps)...)
 	}
-	for _, sharding := range transCtx.shardings {
-		comps, err := controllerutil.ListShardingComponents(transCtx.Context, transCtx.Client, cluster, sharding.Name)
-		if err != nil {
-			return err
+	protoSet := sets.New[string]()
+	for _, spec := range transCtx.shardings {
+		protoSet.Insert(spec.Name)
+	}
+	createSet, deleteSet, updateSet := setDiff(runningSet, protoSet)
+
+	// reset the status
+	cluster.Status.Shardings = make(map[string]appsv1.ClusterComponentStatus)
+	for name := range createSet {
+		cluster.Status.Shardings[name] = appsv1.ClusterComponentStatus{
+			Phase: "",
+			Message: map[string]string{
+				"reason": "the sharding to be created",
+			},
 		}
-		cluster.Status.Shardings[sharding.Name] = t.buildClusterShardingStatus(transCtx, sharding, comps)
 	}
-	return nil
+	for name := range deleteSet {
+		cluster.Status.Shardings[name] = appsv1.ClusterComponentStatus{
+			Phase: appsv1.DeletingClusterCompPhase,
+			Message: map[string]string{
+				"reason": "the sharding is under deleting",
+			},
+		}
+	}
+	for name := range updateSet {
+		cluster.Status.Shardings[name] = t.buildClusterShardingStatus(transCtx, name, shardingComps[name])
+	}
 }
 
 func (t *clusterComponentStatusTransformer) buildClusterShardingStatus(transCtx *clusterTransformContext,
-	sharding *appsv1.ClusterSharding, comps []appsv1.Component) appsv1.ClusterComponentStatus {
+	shardingName string, comps []*appsv1.Component) appsv1.ClusterComponentStatus {
 	var (
 		cluster = transCtx.Cluster
-		status  = cluster.Status.Shardings[sharding.Name]
+		status  = cluster.Status.Shardings[shardingName]
 	)
 
 	phase := status.Phase
@@ -147,7 +237,7 @@ func (t *clusterComponentStatusTransformer) buildClusterShardingStatus(transCtx 
 	}
 
 	if phase != status.Phase {
-		msg := clusterCompNShardingPhaseTransitionMsg("sharding", sharding.Name, status.Phase)
+		msg := clusterCompNShardingPhaseTransitionMsg("sharding", shardingName, status.Phase)
 		if transCtx.GetRecorder() != nil && msg != "" {
 			transCtx.GetRecorder().Eventf(transCtx.Cluster, corev1.EventTypeNormal, componentPhaseTransition, msg)
 		}
@@ -157,7 +247,7 @@ func (t *clusterComponentStatusTransformer) buildClusterShardingStatus(transCtx 
 	return status
 }
 
-func (t *clusterComponentStatusTransformer) shardingPhaseNMessage(comps []appsv1.Component) (appsv1.ClusterComponentPhase, map[string]string) {
+func (t *clusterComponentStatusTransformer) shardingPhaseNMessage(comps []*appsv1.Component) (appsv1.ClusterComponentPhase, map[string]string) {
 	statusList := make([]appsv1.ClusterComponentStatus, 0)
 	phasedMessage := map[appsv1.ClusterComponentPhase]map[string]string{}
 	for _, comp := range comps {
@@ -169,7 +259,8 @@ func (t *clusterComponentStatusTransformer) shardingPhaseNMessage(comps []appsv1
 		statusList = append(statusList, appsv1.ClusterComponentStatus{Phase: phase})
 	}
 	if len(phasedMessage) == 0 {
-		return "", nil
+		// ???
+		return "", map[string]string{"reason": "the component objects are not found"}
 	}
 
 	phase := appsv1.ClusterComponentPhase(composeClusterPhase(statusList))

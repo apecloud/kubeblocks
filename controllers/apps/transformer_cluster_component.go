@@ -601,7 +601,7 @@ func (h *clusterComponentHandler) create(transCtx *clusterTransformContext, dag 
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	graphCli.Create(dag, proto)
 
-	initClusterCompNShardingStatus(transCtx, name)
+	// initClusterCompNShardingStatus(transCtx, name)
 
 	return nil
 }
@@ -614,9 +614,11 @@ func (h *clusterComponentHandler) delete(transCtx *clusterTransformContext, dag 
 	if apierrors.IsNotFound(err) || model.IsObjectDeleting(comp) {
 		return nil
 	}
+
 	transCtx.Logger.Info(fmt.Sprintf("deleting component %s", comp.Name))
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	graphCli.Delete(dag, comp)
+
 	return nil
 }
 
@@ -672,7 +674,7 @@ func (h *clusterShardingHandler) create(transCtx *clusterTransformContext, dag *
 		graphCli.Create(dag, protoComps[i])
 	}
 
-	initClusterCompNShardingStatus(transCtx, name)
+	// initClusterCompNShardingStatus(transCtx, name)
 
 	// TODO:
 	//  1. sharding post-provision
@@ -693,6 +695,7 @@ func (h *clusterShardingHandler) delete(transCtx *clusterTransformContext, dag *
 	for i := range runningComps {
 		h.deleteComp(transCtx, graphCli, dag, &runningComps[i], nil)
 	}
+
 	return nil
 }
 
@@ -808,19 +811,19 @@ func (h *clusterShardingHandler) protoComps(transCtx *clusterTransformContext, n
 	return nil, fmt.Errorf("cluster sharding %s not found", name)
 }
 
-func initClusterCompNShardingStatus(transCtx *clusterTransformContext, name string) {
-	var (
-		cluster = transCtx.Cluster
-	)
-	m := &cluster.Status.Components
-	if transCtx.sharding(name) {
-		m = &cluster.Status.Shardings
-	}
-	if *m == nil {
-		*m = make(map[string]appsv1.ClusterComponentStatus)
-	}
-	(*m)[name] = appsv1.ClusterComponentStatus{}
-}
+// func initClusterCompNShardingStatus(transCtx *clusterTransformContext, name string) {
+//	var (
+//		cluster = transCtx.Cluster
+//	)
+//	m := &cluster.Status.Components
+//	if transCtx.sharding(name) {
+//		m = &cluster.Status.Shardings
+//	}
+//	if *m == nil {
+//		*m = make(map[string]appsv1.ClusterComponentStatus)
+//	}
+//	(*m)[name] = appsv1.ClusterComponentStatus{}
+// }
 
 func clusterRunningCompNShardingSet(ctx context.Context, cli client.Reader, cluster *appsv1.Cluster) (sets.Set[string], error) {
 	compList := &appsv1.ComponentList{}

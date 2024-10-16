@@ -1,3 +1,4 @@
+{{- if has "grafana" .Values.autoInstalledAddons  }}
 apiVersion: extensions.kubeblocks.io/v1alpha1
 kind: Addon
 metadata:
@@ -66,3 +67,4 @@ spec:
 
   installable:
     autoInstall: {{ .Values.grafana.enabled }}
+{{- end }}

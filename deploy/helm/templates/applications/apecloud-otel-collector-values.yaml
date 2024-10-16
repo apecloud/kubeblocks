@@ -1,4 +1,5 @@
-{{- $imageRegistry := include "kubeblocks.imageRegistry" . }}
+{{- if has "apecloud-otel-collector" .Values.autoInstalledAddons  }}
+  {{- $imageRegistry := include "kubeblocks.imageRegistry" . }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -18,3 +19,4 @@ data:
     {{- end }}
     {{- $agamotto = set $agamotto "image" $image }}
     {{- toYaml $agamotto | nindent 4 }}
+{{- end }}

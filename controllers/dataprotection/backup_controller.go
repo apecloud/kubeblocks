@@ -847,6 +847,13 @@ func setEncryptedSystemAccountsAnnotation(request *dpbackup.Request, cluster *ap
 			continue
 		}
 		componentName := secretList.Items[i].Labels[constant.KBAppComponentLabelKey]
+		// Compatible the 0.8 api
+		if componentName == "" {
+			componentName = request.Labels[constant.KBAppComponentLabelKey]
+		}
+		if componentName == "" && len(cluster.Spec.ComponentSpecs) > 0 {
+			componentName = cluster.Spec.ComponentSpecs[0].Name
+		}
 		userName := string(secretList.Items[i].Data[usernameKey])
 		e := intctrlutil.NewEncryptor(viper.GetString(constant.CfgKeyDPEncryptionKey))
 		encryptedPwd, err := e.Encrypt(secretList.Items[i].Data[passwordKey])

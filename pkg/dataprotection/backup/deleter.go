@@ -325,10 +325,11 @@ func (d *Deleter) doPreDeleteAction(
 	if d.actionSet != nil {
 		envVars = append(envVars, d.actionSet.Spec.Env...)
 	}
+	image := common.Expand(preDeleteAction.Image, common.MappingFuncFor(utils.CovertEnvToMap(envVars)))
 	container := corev1.Container{
 		Name:            backup.Name,
 		Command:         preDeleteAction.Command,
-		Image:           common.Expand(preDeleteAction.Image, common.MappingFuncFor(utils.CovertEnvToMap(envVars))),
+		Image:           ctrlutil.ReplaceImageRegistry(image),
 		Env:             envVars,
 		ImagePullPolicy: corev1.PullPolicy(viper.GetString(constant.KBImagePullPolicy)),
 		SecurityContext: &corev1.SecurityContext{

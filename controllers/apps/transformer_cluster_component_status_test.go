@@ -83,7 +83,7 @@ var _ = Describe("cluster component status transformer", func() {
 		dag = newDag(transCtx.Client.(model.GraphClient))
 	})
 
-	FContext("component", func() {
+	Context("component", func() {
 		It("empty", func() {
 			transCtx.components = nil
 
@@ -362,7 +362,7 @@ var _ = Describe("cluster component status transformer", func() {
 		})
 	})
 
-	FContext("sharding", func() {
+	Context("sharding", func() {
 		It("empty", func() {
 			transCtx.shardings = nil
 

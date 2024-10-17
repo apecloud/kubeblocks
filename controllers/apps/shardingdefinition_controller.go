@@ -338,3 +338,18 @@ func listShardingDefinitionsWithPattern(ctx context.Context, cli client.Reader, 
 	}
 	return patternMatched, nil
 }
+
+func validateShardingShards(shardingDef *appsv1.ShardingDefinition, sharding *appsv1.ClusterSharding) error {
+	var (
+		limit  = shardingDef.Spec.ShardsLimit
+		shards = sharding.Shards
+	)
+	if limit == nil || (shards >= limit.MinShards && shards <= limit.MaxShards) {
+		return nil
+	}
+	return shardsOutOfLimitError(sharding.Name, shards, *limit)
+}
+
+func shardsOutOfLimitError(shardingName string, shards int32, limit appsv1.ShardsLimit) error {
+	return fmt.Errorf("shards %d out-of-limit [%d, %d], sharding: %s", shards, limit.MinShards, limit.MaxShards, shardingName)
+}

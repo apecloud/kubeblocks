@@ -342,7 +342,11 @@ func (t *clusterNormalizationTransformer) writeBackCompNShardingSpecs(transCtx *
 
 func (t *clusterNormalizationTransformer) validateNBuildAllCompSpecs(transCtx *clusterTransformContext, cluster *appsv1.Cluster) error {
 	var err error
-	if err = t.validateCompsNShardings(transCtx); err != nil {
+	if err = t.validateCompNShardingUnique(transCtx); err != nil {
+		return err
+	}
+
+	if err = t.validateShardingShards(transCtx); err != nil {
 		return err
 	}
 
@@ -363,7 +367,7 @@ func (t *clusterNormalizationTransformer) validateNBuildAllCompSpecs(transCtx *c
 	return nil
 }
 
-func (t *clusterNormalizationTransformer) validateCompsNShardings(transCtx *clusterTransformContext) error {
+func (t *clusterNormalizationTransformer) validateCompNShardingUnique(transCtx *clusterTransformContext) error {
 	if len(transCtx.shardings) == 0 || len(transCtx.components) == 0 {
 		return nil
 	}
@@ -375,6 +379,18 @@ func (t *clusterNormalizationTransformer) validateCompsNShardings(transCtx *clus
 	for _, sharding := range transCtx.shardings {
 		if names.Has(sharding.Name) {
 			return fmt.Errorf(`duplicate name "%s" between spec.compSpecs and spec.shardings`, sharding.Name)
+		}
+	}
+	return nil
+}
+
+func (t *clusterNormalizationTransformer) validateShardingShards(transCtx *clusterTransformContext) error {
+	for _, sharding := range transCtx.shardings {
+		shardingDef, ok := transCtx.shardingDefs[sharding.ShardingDef]
+		if ok && shardingDef != nil {
+			if err := validateShardingShards(shardingDef, sharding); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

@@ -67,7 +67,6 @@ func needDoSwitchover(ctx context.Context,
 			}
 			return false, err
 		}
-		// if targetPod
 		if targetPod.Labels[constant.AppInstanceLabelKey] != synthesizedComp.ClusterName || component.GetComponentNameFromObj(targetPod) != switchover.ComponentName {
 			return false, controllerutil.NewFatalError(fmt.Sprintf(`the pod "%s" not belongs to the component "%s"`, switchover.InstanceName, switchover.ComponentName))
 		}

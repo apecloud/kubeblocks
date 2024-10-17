@@ -25,7 +25,7 @@ KubeBlocks 0.9 is compatible with KubeBlocks 0.8 APIs, but compatibility with AP
 
 ## Upgrade from KubeBlocks v0.8
 
-1. Download kbcli v0.9.
+1. Download kbcli v0.9.0.
 
     ```bash
     curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash -s 0.9.0
@@ -68,7 +68,7 @@ kbcli addon index list
 # Update one index and the default index is kubeblocks
 kbcli addon index update kubeblocks
 
-#Search available Addon versions
+# Search available Addon versions
 kbcli addon search <addonName>
 
 # Install an Addon

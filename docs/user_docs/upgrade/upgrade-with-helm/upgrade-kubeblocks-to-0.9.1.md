@@ -22,7 +22,23 @@ If you are upgrading from v0.8 to v0.9, it's recommended to enable webhook to en
 
 ## Upgrade from KubeBlocks v0.9.0
 
-1. Install CRD.
+1. View Addon and check whether the `"helm.sh/resource-policy": "keep"` annotation exists.
+
+    KubeBlocks streamlines the default installed engines. Add the `"helm.sh/resource-policy": "keep"` annotation to avoid deleting Addon resources that are already in use during the upgrade.
+
+    Check whether the `"helm.sh/resource-policy": "keep"` annotation is added.
+
+    ```bash
+    kubectl get addon -o json | jq '.items[] | {name: .metadata.name, resource_policy: .metadata.annotations["helm.sh/resource-policy"]}'
+    ```
+
+    If the annotation doesn't exists, run the command below to add it. You can replace `-l app.kubernetes.io/name=kubeblocks` with your actual filter name.
+
+    ```bash
+    kubectl annotate addons.extensions.kubeblocks.io -l app.kubernetes.io/name=kubeblocks helm.sh/resource-policy=keep
+    ```
+
+2. Install CRD.
 
     To reduce the size of Helm chart, KubeBlocks v0.8 removes CRD from the Helm chart. Before upgrading, you need to install CRD.
 
@@ -30,7 +46,7 @@ If you are upgrading from v0.8 to v0.9, it's recommended to enable webhook to en
     kubectl replace -f https://github.com/apecloud/kubeblocks/releases/download/v0.9.1/kubeblocks_crds.yaml
     ```
 
-2. Upgrade KubeBlocks.
+3. Upgrade KubeBlocks.
 
     ```bash
     helm -n kb-system upgrade kubeblocks kubeblocks/kubeblocks --version 0.9.1 --set crd.enabled=false
@@ -44,8 +60,8 @@ If you are upgrading from v0.8 to v0.9, it's recommended to enable webhook to en
 
     ```bash
     helm -n kb-system upgrade kubeblocks kubeblocks/kubeblocks --version 0.9.1 \
-    --set upgradeAddons=true \
-    --set crd.enabled=false
+      --set upgradeAddons=true \
+      --set crd.enabled=false
     ```
 
     :::
@@ -98,8 +114,8 @@ If you are upgrading from v0.8 to v0.9, it's recommended to enable webhook to en
     helm repo update kubeblocks
 
     helm -n kb-system upgrade kubeblocks kubeblocks/kubeblocks --version 0.9.1 \
-    --set admissionWebhooks.enabled=true \
-    --set admissionWebhooks.ignoreReplicasCheck=true
+      --set admissionWebhooks.enabled=true \
+      --set admissionWebhooks.ignoreReplicasCheck=true
     ```
 
     :::warning
@@ -108,9 +124,9 @@ If you are upgrading from v0.8 to v0.9, it's recommended to enable webhook to en
 
     ```bash
     helm -n kb-system upgrade kubeblocks kubeblocks/kubeblocks --version 0.9.1 \
-    --set upgradeAddons=true \
-    --set admissionWebhooks.enabled=true \
-    --set admissionWebhooks.ignoreReplicasCheck=true 
+      --set upgradeAddons=true \
+      --set admissionWebhooks.enabled=true \
+      --set admissionWebhooks.ignoreReplicasCheck=true 
     ```
 
     :::

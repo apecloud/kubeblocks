@@ -19,13 +19,13 @@ To prevent an Addon from being deleted during a KubeBlocks upgrade via `kbcli` o
 
 ### View the Addon annotation
 
-Run the command below to view the annotations of an Addon.
+Run the command below to view the annotations of Addons.
 
 ```bash
 kubectl get addon -o json | jq '.items[] | {name: .metadata.name, annotations: .metadata.annotations}'
 ```
 
-### Manually add an annotation for an Addon
+### Manually add an annotation for Addons
 
 Replace `-l app.kubernetes.io/name=kubeblocks` with your actual filter and run the command below to add an annotation.
 
@@ -36,10 +36,10 @@ kubectl annotate addons.extensions.kubeblocks.io -l app.kubernetes.io/name=kubeb
 If you want to add the annotation for a specified Addon, replace `{addonName}` with the actual Addon name and run the command below.
 
 ```bash
-kubectl annotate http://addons.extensions.kubeblocks.io {addonName} helm.sh/resource-policy=keep
+kubectl annotate https://addons.extensions.kubeblocks.io {addonName} helm.sh/resource-policy=keep
 ```
 
-If you want to check whether the annotation for an Addon was added succeddfully, replace `{addonName}` with the actual Addon name and run the command below.
+If you want to check whether the annotation for an Addon was added successfully, replace `{addonName}` with the actual Addon name and run the command below.
 
 ```bash
 kubectl get addon {addonName} -o json | jq '{name: .metadata.name, annotations: .metadata.annotations}'
@@ -58,11 +58,11 @@ This is due to label modifications of KubeBlocks and KubeBlocks-Dataprotection i
 To resolve the issue, manually delete the `kubeblocks` and `kubeblocks-dataprotection` deployments, then run helm upgrade to complete the upgrade to v0.9.1.
 
 ```bash
-# scale to 0 replica
+# Scale to 0 replica
 kubectl -n kb-system scale deployment kubeblocks --replicas 0
 kubectl -n kb-system scale deployment kubeblocks-dataprotection --replicas 0
 
-# delete deployments
+# Delete deployments
 kubectl delete -n kb-system deployments.apps kubeblocks kubeblocks-dataprotection
 ```
 
@@ -78,11 +78,11 @@ When upgrading KubeBlocks, you can override the default image registry by specif
 
 ```bash
 kbcli kb upgrade --version 0.9.1 \ 
---set admissionWebhooks.enabled=true \
---set admissionWebhooks.ignoreReplicasCheck=true \
---set image.registry=docker.io \  # Set KubeBlocks image registry
---set dataProtection.image.registry=docker.io \ # Set KubeBlocks-Dataprotection image registry
---set addonChartsImage.registry=docker.io # Set Addon Charts image registry
+  --set admissionWebhooks.enabled=true \
+  --set admissionWebhooks.ignoreReplicasCheck=true \
+  --set image.registry=docker.io \
+  --set dataProtection.image.registry=docker.io \
+  --set addonChartsImage.registry=docker.io
 ```
 
 </TabItem>
@@ -91,13 +91,19 @@ kbcli kb upgrade --version 0.9.1 \
 
 ```bash
 helm -n kb-system upgrade kubeblocks kubeblocks/kubeblocks --version 0.9.1 \
---set admissionWebhooks.enabled=true \
---set admissionWebhooks.ignoreReplicasCheck=true \
---set image.registry=docker.io \  # Set KubeBlocks image registry
---set dataProtection.image.registry=docker.io \ # Set KubeBlocks-Dataprotection image registry
---set addonChartsImage.registry=docker.io # Set Addon Charts image registry
+  --set admissionWebhooks.enabled=true \
+  --set admissionWebhooks.ignoreReplicasCheck=true \
+  --set image.registry=docker.io \
+  --set dataProtection.image.registry=docker.io \
+  --set addonChartsImage.registry=docker.io
 ```
 
 </TabItem>
 
 </Tabs>
+
+Here is an introdution to the flags in the above command.
+
+- `--set image.registry=docker.io` specifies the KubeBlocks image registry.
+- `--set dataProtection.image.registry=docker.io` specifies the KubeBlocks-Dataprotection image registry.
+- `--set addonChartsImage.registry=docker.io` specifies Addon Charts image registry.

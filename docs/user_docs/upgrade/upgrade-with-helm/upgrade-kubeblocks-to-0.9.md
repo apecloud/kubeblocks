@@ -12,7 +12,7 @@ In this tutorial, you will learn how to upgrade to KubeBlocks v0.9.
 
 :::note
 
-Execute `helm -n kb-system list | grep kubeblocks` to check the current KubeBlocks version you are running, and then upgrade.
+Execute `helm -n kb-system list | grep kubeblocks` to check the current KubeBlocks version you are running, and then upgrade KubeBlocks.
 
 :::
 
@@ -22,11 +22,11 @@ KubeBlocks 0.9 is compatible with KubeBlocks 0.8 APIs, but compatibility with AP
 
 ## Upgrade from KubeBlocks v0.8
 
-1. Add the `"helm.sh/resource-policy": "keep"` for the Addon.
+1. Add the `"helm.sh/resource-policy": "keep"` for Addons.
 
     KubeBlocks v0.8 streamlines the default installed engines. To avoid deleting Addon resources that are already in use during the upgrade, execute the following commands first.
 
-    - Add the `"helm.sh/resource-policy": "keep"` for the Addon. You can replace `-l app.kubernetes.io/name=kubeblocks` with your actual filter name.
+    - Add the `"helm.sh/resource-policy": "keep"` for Addons. You can replace `-l app.kubernetes.io/name=kubeblocks` with your actual filter name.
 
          ```bash
          kubectl annotate addons.extensions.kubeblocks.io -l app.kubernetes.io/name=kubeblocks helm.sh/resource-policy=keep

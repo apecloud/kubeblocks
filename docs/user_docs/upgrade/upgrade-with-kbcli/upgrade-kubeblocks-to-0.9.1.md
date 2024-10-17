@@ -54,16 +54,20 @@ If you are upgrading from v0.8 to v0.9, it's recommended to enable webhook to en
     curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash -s 0.9.1
     ```
 
-2. Upgrade KubeBlocks. Make sure you're using kbcli v0.9.1 by checking the version.
+2. Upgrade KubeBlocks.
+
+    Check the kbcli version and make sure you're using kbcli v0.9.1.
+
+    ```bash
+    kbcli version
+    ```
 
     If the KubeBlocks you are running uses the image registry `infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com`, it is recommended to explicitly configure the image registry during the upgrade.
 
     ```bash
-    kbcli version
-
     kbcli kb upgrade --version 0.9.1 \
-    --set admissionWebhooks.enabled=true \
-    --set admissionWebhooks.ignoreReplicasCheck=true
+      --set admissionWebhooks.enabled=true \
+      --set admissionWebhooks.ignoreReplicasCheck=true
     ```
 
     :::warning
@@ -72,9 +76,9 @@ If you are upgrading from v0.8 to v0.9, it's recommended to enable webhook to en
 
     ```bash
     kbcli kb upgrade --version 0.9.1 \
-    --set upgradeAddons=true \
-    --set admissionWebhooks.enabled=true \
-    --set admissionWebhooks.ignoreReplicasCheck=true
+      --set upgradeAddons=true \
+      --set admissionWebhooks.enabled=true \
+      --set admissionWebhooks.ignoreReplicasCheck=true
     ```
 
     :::

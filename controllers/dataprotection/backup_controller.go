@@ -454,10 +454,20 @@ func (r *BackupReconciler) prepareRequestTargetInfo(reqCtx intctrlutil.RequestCt
 	}
 	targetPods, err := GetTargetPods(reqCtx, r.Client,
 		selectedPods, request.BackupPolicy, target, backupType)
-	if err != nil || len(targetPods) == 0 {
+	if err != nil {
+		return err
+	}
+	if len(targetPods) == 0 {
+		if backupType == dpv1alpha1.BackupTypeContinuous {
+			// stop the sts to un-bound the pvcs when the continuous backup is failed.
+			if err = dpbackup.StopStatefulSetsWhenFailed(reqCtx.Ctx, r.Client, request.Backup, target.Name); err != nil {
+				return err
+			}
+		}
 		return fmt.Errorf("failed to get target pods by backup policy %s/%s",
 			request.BackupPolicy.Namespace, request.BackupPolicy.Name)
 	}
+
 	request.TargetPods = targetPods
 	saName := target.ServiceAccountName
 	if saName == "" {

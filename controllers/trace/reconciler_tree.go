@@ -280,10 +280,6 @@ func (r *pvcReconciler) Reconcile(ctx context.Context, req reconcile.Request) (r
 			},
 		}
 
-		if err := controllerutil.SetControllerReference(pvc, pv, r.Scheme); err != nil {
-			return reconcile.Result{}, err
-		}
-
 		if err := r.Create(ctx, pv); err != nil {
 			return reconcile.Result{}, err
 		}
@@ -635,7 +631,11 @@ func (r *jobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	}
 
 	// Create Pods for the Job
-	for i := int32(0); i < *job.Spec.Completions; i++ {
+	number := int32(1)
+	if job.Spec.Parallelism != nil {
+		number = *job.Spec.Parallelism
+	}
+	for i := int32(0); i < number; i++ {
 		podName := fmt.Sprintf("%s-%d", job.Name, i)
 		pod := builder.NewPodBuilder(job.Namespace, podName).
 			AddLabelsInMap(job.Spec.Template.Labels).
@@ -664,8 +664,8 @@ func (r *jobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	}
 
 	// Cleanup logic: delete pods if job has succeeded or failed
-	if job.Status.Succeeded == *job.Spec.Completions || job.Status.Failed > 0 {
-		for i := int32(0); i < *job.Spec.Completions; i++ {
+	if job.Status.Succeeded == number || job.Status.Failed > 0 {
+		for i := int32(0); i < number; i++ {
 			podName := fmt.Sprintf("%s-%d", job.Name, i)
 			pod := &corev1.Pod{}
 			if err = r.Get(ctx, client.ObjectKey{Namespace: job.Namespace, Name: podName}, pod); err == nil {
@@ -850,6 +850,22 @@ func (r *podReconciler) Reconcile(ctx context.Context, req reconcile.Request) (r
 			}
 		}
 		pod.Status.Phase = corev1.PodRunning
+		if err = r.Status().Update(ctx, pod); err != nil {
+			return reconcile.Result{}, err
+		}
+	}
+
+	isJobPod := false
+	for _, reference := range pod.OwnerReferences {
+		if reference.Kind == "Job" {
+			isJobPod = true
+		}
+	}
+	if !isJobPod {
+		return reconcile.Result{}, err
+	}
+	if pod.Status.Phase != corev1.PodSucceeded {
+		pod.Status.Phase = corev1.PodSucceeded
 		if err = r.Status().Update(ctx, pod); err != nil {
 			return reconcile.Result{}, err
 		}

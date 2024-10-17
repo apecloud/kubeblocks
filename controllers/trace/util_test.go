@@ -305,7 +305,7 @@ var _ = Describe("util test", func() {
 			owned := builder.NewComponentBuilder(namespace, fullCompName, "").
 				SetOwnerReferences(kbappsv1.APIVersion, kbappsv1.ClusterKind, owner).
 				GetObject()
-			k8sMock.EXPECT().Scheme().Return(scheme.Scheme).Times(1)
+			k8sMock.EXPECT().Scheme().Return(scheme.Scheme).AnyTimes()
 			k8sMock.EXPECT().
 				List(gomock.Any(), &kbappsv1.ComponentList{}, gomock.Any()).
 				DoAndReturn(func(_ context.Context, list *kbappsv1.ComponentList, _ ...client.ListOption) error {

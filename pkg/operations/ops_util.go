@@ -342,7 +342,7 @@ func getComponentSpecOrShardingTemplate(cluster *appsv1.Cluster, componentName s
 			return &v
 		}
 	}
-	for _, v := range cluster.Spec.ShardingSpecs {
+	for _, v := range cluster.Spec.Shardings {
 		if v.Name == componentName {
 			return &v.Template
 		}

@@ -30,6 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
@@ -81,18 +82,21 @@ var _ = Describe("clusterDeletionTransformer", func() {
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: testCtx.DefaultNamespace,
 						Name:      "test-cluster-comp1",
+						Labels:    map[string]string{constant.AppInstanceLabelKey: cluster.Name},
 					},
 				},
 				&appsv1.Component{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: testCtx.DefaultNamespace,
 						Name:      "test-cluster-comp2",
+						Labels:    map[string]string{constant.AppInstanceLabelKey: cluster.Name},
 					},
 				},
 				&appsv1.Component{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: testCtx.DefaultNamespace,
 						Name:      "test-cluster-comp3",
+						Labels:    map[string]string{constant.AppInstanceLabelKey: cluster.Name},
 					},
 				},
 			},
@@ -105,7 +109,7 @@ var _ = Describe("clusterDeletionTransformer", func() {
 			Logger:        logger,
 			Cluster:       cluster.DeepCopy(),
 			OrigCluster:   cluster,
-			ClusterDef:    clusterDef,
+			clusterDef:    clusterDef,
 		}
 		dag = newDag(transCtx.Client.(model.GraphClient))
 	})

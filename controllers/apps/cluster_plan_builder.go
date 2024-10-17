@@ -54,16 +54,22 @@ type clusterTransformContext struct {
 	Client client.Reader
 	record.EventRecorder
 	logr.Logger
-	Cluster       *appsv1.Cluster
-	OrigCluster   *appsv1.Cluster
-	ClusterDef    *appsv1.ClusterDefinition
-	ComponentDefs map[string]*appsv1.ComponentDefinition
-	// ComponentSpecs includes all cluster component specs generated from ComponentSpecs and ShardingSpecs
-	ComponentSpecs []*appsv1.ClusterComponentSpec
-	// ShardingComponentSpecs includes all sharding component specs generated from ShardingSpecs
-	ShardingComponentSpecs map[string][]*appsv1.ClusterComponentSpec
-	// Annotations to be added to components, mapping with ComponentSpecs.
-	Annotations map[string]map[string]string
+
+	Cluster     *appsv1.Cluster
+	OrigCluster *appsv1.Cluster
+
+	clusterDef    *appsv1.ClusterDefinition
+	shardingDefs  map[string]*appsv1.ShardingDefinition
+	componentDefs map[string]*appsv1.ComponentDefinition
+
+	// consolidated components and shardings from topology and/or user-specified
+	components []*appsv1.ClusterComponentSpec
+	shardings  []*appsv1.ClusterSharding
+
+	shardingComps map[string][]*appsv1.ClusterComponentSpec // comp specs for each sharding
+
+	// TODO: remove this, annotations to be added to components for sharding, mapping with @allComps.
+	annotations map[string]map[string]string
 }
 
 // clusterPlanBuilder a graph.PlanBuilder implementation for Cluster reconciliation
@@ -102,6 +108,33 @@ func (c *clusterTransformContext) GetRecorder() record.EventRecorder {
 
 func (c *clusterTransformContext) GetLogger() logr.Logger {
 	return c.Logger
+}
+
+func (c *clusterTransformContext) sharding(name string) bool {
+	// hack: use shardingComps to determine if the entity is sharding or component
+	_, ok := c.shardingComps[name]
+	return ok
+}
+
+func (c *clusterTransformContext) total() int {
+	cnt := len(c.components)
+	for _, comps := range c.shardingComps {
+		cnt += len(comps)
+	}
+	return cnt
+}
+
+func (c *clusterTransformContext) traverse(f func(spec *appsv1.ClusterComponentSpec)) {
+	if f != nil {
+		for _, comp := range c.components {
+			f(comp)
+		}
+		for _, comps := range c.shardingComps {
+			for _, comp := range comps {
+				f(comp)
+			}
+		}
+	}
 }
 
 func init() {

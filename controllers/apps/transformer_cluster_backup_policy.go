@@ -129,7 +129,7 @@ func (r *clusterBackupPolicyTransformer) Transform(ctx graph.TransformContext, d
 	}
 
 	transformComponentBackupPolicy := func(compSpec *appsv1.ClusterComponentSpec, componentName string, isSharding bool) error {
-		compDef := r.ComponentDefs[compSpec.ComponentDef]
+		compDef := r.componentDefs[compSpec.ComponentDef]
 		if compDef == nil {
 			return nil
 		}
@@ -159,9 +159,9 @@ func (r *clusterBackupPolicyTransformer) Transform(ctx graph.TransformContext, d
 			return err
 		}
 	}
-	for i := range r.Cluster.Spec.ShardingSpecs {
-		shardingSpec := r.Cluster.Spec.ShardingSpecs[i]
-		if err := transformComponentBackupPolicy(&shardingSpec.Template, shardingSpec.Name, true); err != nil {
+	for i := range r.Cluster.Spec.Shardings {
+		spec := r.Cluster.Spec.Shardings[i]
+		if err := transformComponentBackupPolicy(&spec.Template, spec.Name, true); err != nil {
 			return err
 		}
 	}

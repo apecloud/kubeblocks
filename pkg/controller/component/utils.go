@@ -38,13 +38,13 @@ func inDataContext() *multicluster.ClientOption {
 	return multicluster.InDataContext()
 }
 
-func ValidateCompDefRegexp(compDefPattern string) error {
-	_, err := regexp.Compile(compDefPattern)
+func ValidateDefNameRegexp(defNamePattern string) error {
+	_, err := regexp.Compile(defNamePattern)
 	return err
 }
 
-func PrefixOrRegexMatched(compDef, compDefPattern string) bool {
-	if strings.HasPrefix(compDef, compDefPattern) {
+func PrefixOrRegexMatched(defName, defNamePattern string) bool {
+	if strings.HasPrefix(defName, defNamePattern) {
 		return true
 	}
 
@@ -54,17 +54,17 @@ func PrefixOrRegexMatched(compDef, compDefPattern string) bool {
 	}
 
 	isRegex := false
-	regex, err := regexp.Compile(compDefPattern)
+	regex, err := regexp.Compile(defNamePattern)
 	if err == nil {
 		// distinguishing between regular expressions and ordinary strings.
-		if isRegexpPattern(compDefPattern) {
+		if isRegexpPattern(defNamePattern) {
 			isRegex = true
 		}
 	}
 	if !isRegex {
 		return false
 	}
-	return regex.MatchString(compDef)
+	return regex.MatchString(defName)
 }
 
 func IsHostNetworkEnabled(synthesizedComp *SynthesizedComponent) bool {

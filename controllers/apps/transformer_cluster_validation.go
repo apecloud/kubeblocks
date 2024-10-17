@@ -31,12 +31,12 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/generics"
 )
 
-// clusterLoadRefResourcesTransformer loads and validates referenced resources (cd & cv).
-type clusterLoadRefResourcesTransformer struct{}
+// clusterValidationTransformer validates the cluster spec.
+type clusterValidationTransformer struct{}
 
-var _ graph.Transformer = &clusterLoadRefResourcesTransformer{}
+var _ graph.Transformer = &clusterValidationTransformer{}
 
-func (t *clusterLoadRefResourcesTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+func (t *clusterValidationTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*clusterTransformContext)
 	cluster := transCtx.Cluster
 
@@ -55,7 +55,7 @@ func (t *clusterLoadRefResourcesTransformer) Transform(ctx graph.TransformContex
 		return newRequeueError(requeueDuration, err.Error())
 	}
 
-	if err = t.checkAllCompDefinition(cluster); err != nil {
+	if err = t.checkDefinitionNamePattern(cluster); err != nil {
 		return newRequeueError(requeueDuration, err.Error())
 	}
 
@@ -69,39 +69,41 @@ func (t *clusterLoadRefResourcesTransformer) Transform(ctx graph.TransformContex
 	return nil
 }
 
-func (t *clusterLoadRefResourcesTransformer) apiValidation(cluster *appsv1.Cluster) error {
-	if withClusterTopology(cluster) ||
-		withClusterUserDefined(cluster) {
+func (t *clusterValidationTransformer) apiValidation(cluster *appsv1.Cluster) error {
+	if withClusterTopology(cluster) || withClusterUserDefined(cluster) {
 		return nil
 	}
 	return fmt.Errorf("cluster API validate error, clusterDef: %s, topology: %s, comps: %d",
 		cluster.Spec.ClusterDef, cluster.Spec.Topology, clusterCompCnt(cluster))
 }
 
-func (t *clusterLoadRefResourcesTransformer) checkAllCompDefinition(cluster *appsv1.Cluster) error {
-	validate := func(spec appsv1.ClusterComponentSpec) error {
-		if len(spec.ComponentDef) > 0 {
-			if err := component.ValidateCompDefRegexp(spec.ComponentDef); err != nil {
-				return errors.Wrapf(err, "invalid reference component definition name pattern: %s", spec.ComponentDef)
+func (t *clusterValidationTransformer) checkDefinitionNamePattern(cluster *appsv1.Cluster) error {
+	validate := func(name string) error {
+		if len(name) > 0 {
+			if err := component.ValidateDefNameRegexp(name); err != nil {
+				return errors.Wrapf(err, "invalid reference component/sharding definition name: %s", name)
 			}
 		}
 		return nil
 	}
 	for _, compSpec := range cluster.Spec.ComponentSpecs {
-		if err := validate(compSpec); err != nil {
+		if err := validate(compSpec.ComponentDef); err != nil {
 			return err
 		}
 	}
-	for _, shardingSpec := range cluster.Spec.ShardingSpecs {
-		if err := validate(shardingSpec.Template); err != nil {
+	for _, spec := range cluster.Spec.Shardings {
+		if err := validate(spec.ShardingDef); err != nil {
+			return err
+		}
+		if err := validate(spec.Template.ComponentDef); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (t *clusterLoadRefResourcesTransformer) checkNUpdateClusterTopology(transCtx *clusterTransformContext, cluster *appsv1.Cluster) error {
-	clusterTopology := referredClusterTopology(transCtx.ClusterDef, cluster.Spec.Topology)
+func (t *clusterValidationTransformer) checkNUpdateClusterTopology(transCtx *clusterTransformContext, cluster *appsv1.Cluster) error {
+	clusterTopology := referredClusterTopology(transCtx.clusterDef, cluster.Spec.Topology)
 	if clusterTopology == nil {
 		return fmt.Errorf("specified cluster topology not found: %s", cluster.Spec.Topology)
 	}
@@ -143,7 +145,7 @@ func loadNCheckClusterDefinition(transCtx *clusterTransformContext, cluster *app
 	if cd == nil {
 		cd = &appsv1.ClusterDefinition{}
 	}
-	transCtx.ClusterDef = cd
+	transCtx.clusterDef = cd
 	return nil
 }
 
@@ -165,7 +167,7 @@ func clusterCompCnt(cluster *appsv1.Cluster) int {
 
 func clusterCompCntWithFunc(cluster *appsv1.Cluster, match func(spec appsv1.ClusterComponentSpec) bool) int {
 	cnt := generics.CountFunc(cluster.Spec.ComponentSpecs, match)
-	for _, sharding := range cluster.Spec.ShardingSpecs {
+	for _, sharding := range cluster.Spec.Shardings {
 		if match(sharding.Template) {
 			cnt += int(sharding.Shards)
 		}

@@ -235,7 +235,8 @@ var _ = Describe("Cluster Controller", func() {
 
 	shardingComponentProcessorWrapper := func(compName, compDefName string, processor ...func(*testapps.MockClusterFactory)) func(f *testapps.MockClusterFactory) {
 		return func(f *testapps.MockClusterFactory) {
-			f.AddShardingSpec(compName, compDefName).SetShards(defaultShardCount)
+			f.AddSharding(compName, "", compDefName).
+				SetShards(defaultShardCount)
 			for _, p := range processor {
 				if p != nil {
 					p(f)
@@ -450,9 +451,9 @@ var _ = Describe("Cluster Controller", func() {
 
 		By("scale in the sharding component")
 		Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1.Cluster) {
-			for i := range cluster.Spec.ShardingSpecs {
-				if cluster.Spec.ShardingSpecs[i].Name == compName {
-					cluster.Spec.ShardingSpecs[i].Shards = int32(shards - 1)
+			for i := range cluster.Spec.Shardings {
+				if cluster.Spec.Shardings[i].Name == compName {
+					cluster.Spec.Shardings[i].Shards = int32(shards - 1)
 				}
 			}
 		})()).ShouldNot(HaveOccurred())

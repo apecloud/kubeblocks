@@ -80,8 +80,7 @@ const (
 const (
 	ConditionTypeProvisioningStarted = "ProvisioningStarted" // ConditionTypeProvisioningStarted the operator starts resource provisioning to create or change the cluster
 	ConditionTypeApplyResources      = "ApplyResources"      // ConditionTypeApplyResources the operator start to apply resources to create or change the cluster
-	ConditionTypeReplicasReady       = "ReplicasReady"       // ConditionTypeReplicasReady all pods of components are ready
-	ConditionTypeReady               = "Ready"               // ConditionTypeReady all components are running
+	ConditionTypeReady               = "Ready"               // ConditionTypeReady all components and shardings are running
 )
 
 type ServiceRef struct {

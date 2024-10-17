@@ -212,9 +212,9 @@ func (r restartOpsHandler) getCompReplicas(cluster *appsv1.Cluster, compName str
 	if compSpec != nil {
 		return compSpec.Replicas
 	}
-	shardingSpec := cluster.Spec.GetShardingByName(compName)
-	if shardingSpec != nil {
-		return shardingSpec.Template.Replicas
+	sharding := cluster.Spec.GetShardingByName(compName)
+	if sharding != nil {
+		return sharding.Template.Replicas
 	}
 	return 0
 }

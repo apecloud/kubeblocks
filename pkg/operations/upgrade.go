@@ -198,7 +198,7 @@ func (u upgradeOpsHandler) needUpdateCompDef(upgradeComp opsv1alpha1.UpgradeComp
 	if upgradeComp.ComponentDefinitionName == nil {
 		return false
 	}
-	// we will ignore the empty ComponentDefinitionName if cluster.Spec.ClusterDef is empty.
+	// we will ignore the empty ComponentDefinitionName if cluster.Spec.clusterDef is empty.
 	return *upgradeComp.ComponentDefinitionName != "" ||
 		(*upgradeComp.ComponentDefinitionName == "" && cluster.Spec.ClusterDef != "")
 }

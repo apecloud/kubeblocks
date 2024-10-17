@@ -27,9 +27,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/golang/mock/gomock"
-	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -37,10 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	tracev1 "github.com/apecloud/kubeblocks/apis/trace/v1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -326,56 +321,7 @@ var _ = Describe("util test", func() {
 			secondaries []kbappsv1.Component
 		)
 		BeforeEach(func() {
-			primary = builder.NewClusterBuilder(namespace, name).SetUID(uid).SetResourceVersion(resourceVersion).GetObject()
-			compNames := []string{"hello", "world"}
-			secondaries = nil
-			for _, compName := range compNames {
-				fullCompName := fmt.Sprintf("%s-%s", primary.Name, compName)
-				secondary := builder.NewComponentBuilder(namespace, fullCompName, "").
-					SetOwnerReferences(kbappsv1.APIVersion, kbappsv1.ClusterKind, primary).
-					SetUID(uid).
-					GetObject()
-				secondary.ResourceVersion = resourceVersion
-				secondaries = append(secondaries, *secondary)
-			}
-			k8sMock.EXPECT().Scheme().Return(scheme.Scheme).AnyTimes()
-			k8sMock.EXPECT().
-				List(gomock.Any(), &kbappsv1.ComponentList{}, gomock.Any()).
-				DoAndReturn(func(_ context.Context, list *kbappsv1.ComponentList, _ ...client.ListOption) error {
-					list.Items = secondaries
-					return nil
-				}).Times(1)
-			k8sMock.EXPECT().
-				List(gomock.Any(), &corev1.ServiceList{}, gomock.Any()).
-				DoAndReturn(func(_ context.Context, list *corev1.ServiceList, _ ...client.ListOption) error {
-					return nil
-				}).Times(1)
-			k8sMock.EXPECT().
-				List(gomock.Any(), &corev1.SecretList{}, gomock.Any()).
-				DoAndReturn(func(_ context.Context, list *corev1.SecretList, _ ...client.ListOption) error {
-					return nil
-				}).Times(1)
-			componentSecondaries := []client.ObjectList{
-				&workloads.InstanceSetList{},
-				&corev1.ServiceList{},
-				&corev1.SecretList{},
-				&corev1.ConfigMapList{},
-				&corev1.PersistentVolumeClaimList{},
-				&rbacv1.ClusterRoleBindingList{},
-				&rbacv1.RoleBindingList{},
-				&corev1.ServiceAccountList{},
-				&batchv1.JobList{},
-				&dpv1alpha1.BackupList{},
-				&dpv1alpha1.RestoreList{},
-				&appsv1alpha1.ConfigurationList{},
-			}
-			for _, secondary := range componentSecondaries {
-				k8sMock.EXPECT().
-					List(gomock.Any(), secondary, gomock.Any()).
-					DoAndReturn(func(_ context.Context, list client.ObjectList, _ ...client.ListOption) error {
-						return nil
-					}).Times(2)
-			}
+			primary, secondaries = mockObjects()
 		})
 
 		Context("getObjectTreeFromCache", func() {

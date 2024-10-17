@@ -23,6 +23,7 @@ resources:
 - bases/experimental.kubeblocks.io_nodecountscalers.yaml
 - bases/operations.kubeblocks.io_opsrequests.yaml
 - bases/operations.kubeblocks.io_opsdefinitions.yaml
+- bases/trace.kubeblocks.io_reconciliationtraces.yaml
 - bases/apps.kubeblocks.io_shardingdefinitions.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
 
@@ -52,6 +53,7 @@ patchesStrategicMerge:
 #- patches/webhook_in_opsdefinitions.yaml
 #- patches/webhook_in_componentversions.yaml
 #- patches/webhook_in_nodecountscalers.yaml
+#- patches/webhook_in_reconciliationtraces.yaml
 #- patches/webhook_in_shardingdefinitions.yaml
 #+kubebuilder:scaffold:crdkustomizewebhookpatch
 
@@ -80,6 +82,7 @@ patchesStrategicMerge:
 #- patches/cainjection_in_opsdefinitions.yaml
 #- patches/cainjection_in_componentversions.yaml
 #- patches/cainjection_in_nodecountscalers.yaml
+#- patches/cainjection_in_reconciliationtraces.yaml
 #- patches/cainjection_in_shardingdefinitions.yaml
 #+kubebuilder:scaffold:crdkustomizecainjectionpatch
 

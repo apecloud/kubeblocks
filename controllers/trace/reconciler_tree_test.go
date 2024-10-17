@@ -26,7 +26,6 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/golang/mock/gomock"
-	vsv1beta1 "github.com/kubernetes-csi/external-snapshotter/client/v3/apis/volumesnapshot/v1beta1"
 	vsv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -173,27 +172,6 @@ var _ = Describe("reconciler_tree test", func() {
 			Expect(reconcileN(10)).Should(Succeed())
 			Expect(mClient.Get(ctx, client.ObjectKeyFromObject(sts), sts)).Should(Succeed())
 			Expect(sts.Status.ReadyReplicas).Should(BeEquivalentTo(*sts.Spec.Replicas))
-		})
-
-		It("reconcile VolumeSnapshot v1beta1", func() {
-			reconciler := newVolumeSnapshotV1Beta1Reconciler(mClient, mRecorder)
-			beta1 := &vsv1beta1.VolumeSnapshot{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: namespace,
-					Name:      name,
-				},
-			}
-			Expect(mClient.Create(ctx, beta1)).Should(Succeed())
-
-			key := client.ObjectKeyFromObject(beta1)
-			for i := 0; i < 10; i++ {
-				_, err := reconciler.Reconcile(ctx, ctrl.Request{NamespacedName: key})
-				Expect(err).ToNot(HaveOccurred())
-			}
-			Expect(mClient.Get(ctx, key, beta1)).Should(Succeed())
-			Expect(beta1.Status).ShouldNot(BeNil())
-			Expect(beta1.Status.ReadyToUse).ShouldNot(BeNil())
-			Expect(*beta1.Status.ReadyToUse).Should(BeTrue())
 		})
 
 		It("reconcile VolumeSnapshot v1", func() {

@@ -847,7 +847,7 @@ func setEncryptedSystemAccountsAnnotation(request *dpbackup.Request, cluster *ap
 			continue
 		}
 		componentName := secretList.Items[i].Labels[constant.KBAppComponentLabelKey]
-		// Compatible the api of the 0.8
+		// Compatible the 0.8 api
 		if componentName == "" {
 			componentName = request.Labels[constant.KBAppComponentLabelKey]
 		}

@@ -251,7 +251,7 @@ func (t *clusterNormalizationTransformer) firstShardingComponent(transCtx *clust
 		constant.AppInstanceLabelKey:       cluster.Name,
 		constant.KBAppShardingNameLabelKey: sharding.Name,
 	}
-	if err := cli.List(ctx, compList, client.InNamespace(cluster.Namespace), ml); err != nil {
+	if err := cli.List(ctx, compList, client.InNamespace(cluster.Namespace), ml, client.Limit(1)); err != nil {
 		return nil, err
 	}
 	if len(compList.Items) == 0 {

@@ -756,8 +756,16 @@ func PatchBackupObjectMeta(
 		if err := setClusterSnapshotAnnotation(request, cluster); err != nil {
 			return false, err
 		}
-		if err := setEncryptedSystemAccountsAnnotation(request, cluster); err != nil {
-			return false, err
+		// compatible 0.8 api
+		if request.Target.ConnectionCredential != nil &&
+			request.Target.ConnectionCredential.SecretName == constant.GenerateDefaultConnCredential(cluster.Name) {
+			if err := setConnectionPasswordAnnotation(request); err != nil {
+				return false, err
+			}
+		} else {
+			if err := setEncryptedSystemAccountsAnnotation(request, cluster); err != nil {
+				return false, err
+			}
 		}
 		request.Labels[dptypes.ClusterUIDLabelKey] = string(cluster.UID)
 	}
@@ -824,6 +832,35 @@ func updateBackupStatusByActionStatus(backupStatus *dpv1alpha1.BackupStatus) {
 			backupStatus.TimeRange = act.TimeRange
 		}
 	}
+}
+
+// setConnectionPasswordAnnotation sets the encrypted password of the connection credential to the backup's annotations
+func setConnectionPasswordAnnotation(request *dpbackup.Request) error {
+	encryptPassword := func() (string, error) {
+		target := request.Target
+		if target == nil || target.ConnectionCredential == nil {
+			return "", nil
+		}
+		secret := &corev1.Secret{}
+		if err := request.Client.Get(request.Ctx, client.ObjectKey{Name: target.ConnectionCredential.SecretName, Namespace: request.Namespace}, secret); err != nil {
+			return "", err
+		}
+		e := intctrlutil.NewEncryptor(viper.GetString(constant.CfgKeyDPEncryptionKey))
+		ciphertext, err := e.Encrypt(secret.Data[target.ConnectionCredential.PasswordKey])
+		if err != nil {
+			return "", err
+		}
+		return ciphertext, nil
+	}
+	// save the connection credential password for cluster.
+	ciphertext, err := encryptPassword()
+	if err != nil {
+		return err
+	}
+	if ciphertext != "" {
+		request.Backup.Annotations[dptypes.ConnectionPasswordAnnotationKey] = ciphertext
+	}
+	return nil
 }
 
 func setEncryptedSystemAccountsAnnotation(request *dpbackup.Request, cluster *appsv1alpha1.Cluster) error {

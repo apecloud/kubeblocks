@@ -221,9 +221,9 @@ func (t *clusterNormalizationTransformer) resolveShardingNCompDefinition(transCt
 	}
 
 	var shardingDef *appsv1.ShardingDefinition
-	shardDefName := t.shardingDefinitionName(sharding, comp)
-	if len(shardDefName) > 0 {
-		shardingDef, err = resolveShardingDefinition(transCtx.Context, transCtx.Client, shardDefName)
+	shardingDefName := t.shardingDefinitionName(sharding, comp)
+	if len(shardingDefName) > 0 {
+		shardingDef, err = resolveShardingDefinition(transCtx.Context, transCtx.Client, shardingDefName)
 		if err != nil {
 			return nil, nil, "", err
 		}
@@ -261,14 +261,13 @@ func (t *clusterNormalizationTransformer) firstShardingComponent(transCtx *clust
 }
 
 func (t *clusterNormalizationTransformer) shardingDefinitionName(sharding *appsv1.ClusterSharding, comp *appsv1.Component) string {
-	if comp == nil {
-		return sharding.ShardingDef
+	if comp != nil {
+		shardingDefName, ok := comp.Labels[constant.ShardingDefLabelKey]
+		if ok {
+			return shardingDefName
+		}
 	}
-	shardingDef, ok := comp.Labels[constant.ShardingDefLabelKey]
-	if !ok {
-		return sharding.ShardingDef
-	}
-	return shardingDef
+	return sharding.ShardingDef
 }
 
 func (t *clusterNormalizationTransformer) resolveDefinitions4Components(transCtx *clusterTransformContext) error {

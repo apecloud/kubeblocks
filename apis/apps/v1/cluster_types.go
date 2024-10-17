@@ -571,7 +571,6 @@ type ClusterSharding struct {
 	// The full name or regular expression is supported to match the ShardingDefinition.
 	//
 	// +kubebuilder:validation:MaxLength=64
-	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\.\-]*[a-z0-9])?$`
 	// +optional
 	ShardingDef string `json:"shardingDef,omitempty"`
 

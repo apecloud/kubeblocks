@@ -8784,7 +8784,6 @@ spec:
 
                         The full name or regular expression is supported to match the ShardingDefinition.
                       maxLength: 64
-                      pattern: ^[a-z]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
                     shards:
                       description: |-

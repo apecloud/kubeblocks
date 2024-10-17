@@ -66,8 +66,7 @@ type clusterTransformContext struct {
 	components []*appsv1.ClusterComponentSpec
 	shardings  []*appsv1.ClusterSharding
 
-	allComps      []*appsv1.ClusterComponentSpec            // all comps
-	shardingComps map[string][]*appsv1.ClusterComponentSpec // shardings
+	shardingComps map[string][]*appsv1.ClusterComponentSpec // comp specs for each sharding
 
 	// TODO: remove this, annotations to be added to components for sharding, mapping with @allComps.
 	annotations map[string]map[string]string
@@ -115,6 +114,27 @@ func (c *clusterTransformContext) sharding(name string) bool {
 	// hack: use shardingComps to determine if the entity is sharding or component
 	_, ok := c.shardingComps[name]
 	return ok
+}
+
+func (c *clusterTransformContext) total() int {
+	cnt := len(c.components)
+	for _, comps := range c.shardingComps {
+		cnt += len(comps)
+	}
+	return cnt
+}
+
+func (c *clusterTransformContext) traverse(f func(spec *appsv1.ClusterComponentSpec)) {
+	if f != nil {
+		for _, comp := range c.components {
+			f(comp)
+		}
+		for _, comps := range c.shardingComps {
+			for _, comp := range comps {
+				f(comp)
+			}
+		}
+	}
 }
 
 func init() {

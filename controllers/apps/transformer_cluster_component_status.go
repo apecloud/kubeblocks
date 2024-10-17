@@ -45,7 +45,7 @@ func (t *clusterComponentStatusTransformer) Transform(ctx graph.TransformContext
 		return nil
 	}
 
-	if len(transCtx.allComps) == 0 || !transCtx.OrigCluster.IsStatusUpdating() {
+	if !transCtx.OrigCluster.IsStatusUpdating() {
 		return nil
 	}
 	return t.transform(transCtx)

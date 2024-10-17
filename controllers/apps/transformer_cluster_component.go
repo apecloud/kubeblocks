@@ -53,10 +53,6 @@ func (t *clusterComponentTransformer) Transform(ctx graph.TransformContext, dag 
 		return nil
 	}
 
-	if len(transCtx.allComps) == 0 {
-		return nil
-	}
-
 	updateToDate, err := checkAllCompsUpToDate(transCtx, transCtx.Cluster)
 	if err != nil {
 		return err
@@ -161,7 +157,7 @@ func checkAllCompsUpToDate(transCtx *clusterTransformContext, cluster *appsv1.Cl
 	if err := transCtx.Client.List(transCtx.Context, compList, client.InNamespace(cluster.Namespace), client.MatchingLabels(labels)); err != nil {
 		return false, err
 	}
-	if len(compList.Items) != len(transCtx.allComps) {
+	if len(compList.Items) != transCtx.total() {
 		return false, nil
 	}
 	for _, comp := range compList.Items {

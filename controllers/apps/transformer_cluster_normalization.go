@@ -354,16 +354,6 @@ func (t *clusterNormalizationTransformer) validateNBuildAllCompSpecs(transCtx *c
 	if err != nil {
 		return err
 	}
-
-	transCtx.allComps = make([]*appsv1.ClusterComponentSpec, 0)
-	if transCtx.components != nil {
-		transCtx.allComps = append(transCtx.allComps, transCtx.components...)
-	}
-	for _, comps := range transCtx.shardingComps {
-		if comps != nil {
-			transCtx.allComps = append(transCtx.allComps, comps...)
-		}
-	}
 	return nil
 }
 

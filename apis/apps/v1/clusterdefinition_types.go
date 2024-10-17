@@ -129,9 +129,12 @@ type ClusterTopology struct {
 // ClusterTopologyComponent defines a Component within a ClusterTopology.
 type ClusterTopologyComponent struct {
 	// Defines the unique identifier of the component within the cluster topology.
+	//
 	// It follows IANA Service naming rules and is used as part of the Service's DNS name.
 	// The name must start with a lowercase letter, can contain lowercase letters, numbers,
 	// and hyphens, and must end with a lowercase letter or number.
+	//
+	// If the @template field is set to true, the name will be used as a prefix to match the specific components dynamically created.
 	//
 	// Cannot be updated once set.
 	//
@@ -155,6 +158,12 @@ type ClusterTopologyComponent struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=64
 	CompDef string `json:"compDef"`
+
+	// Specifies whether the topology component will be considered as a template for instantiating
+	// multiple components upon user requests dynamically.
+	//
+	// +optional
+	Template *bool `json:"template,omitempty"`
 }
 
 // ClusterTopologyOrders manages the lifecycle of components within a cluster by defining their provisioning,

@@ -275,7 +275,7 @@ func checkNMergeImages(serviceVersion string, appsInDef, appsInVer map[string]ap
 		if len(ver.name) == 0 {
 			match, err := CompareServiceVersion(serviceVersion, def.version)
 			if err != nil {
-				def.err = err
+				def.err = fmt.Errorf("failed to compare service version: %v", err)
 			}
 			if !match && def.required {
 				def.err = fmt.Errorf("no matched image found for container %s with required version %s", name, serviceVersion)

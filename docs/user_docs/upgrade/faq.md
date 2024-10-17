@@ -27,7 +27,7 @@ kubectl get addon -o json | jq '.items[] | {name: .metadata.name, annotations: .
 
 ### Manually add an annotation for an Addon
 
-Replace `-l app.kubernetes.io/name=kubeblocks` with your acutal filter and run the command below to add an annotation.
+Replace `-l app.kubernetes.io/name=kubeblocks` with your actual filter and run the command below to add an annotation.
 
 ```bash
 kubectl annotate addons.extensions.kubeblocks.io -l app.kubernetes.io/name=kubeblocks helm.sh/resource-policy=keep

@@ -153,6 +153,9 @@ helm repo add kubeblocks-addons https://jihulab.com/api/v4/projects/150246/packa
 # Update helm repo
 helm repo update
 
+# Search the available Addon versions
+helm search repo kubeblocks-addons/{addon-name} --versions --devel 
+
 # Update addon version
 helm upgrade -i {addon-release-name} kubeblocks-addons/{addon-name} --version x.y.z -n kb-system   
 ```

@@ -22,7 +22,7 @@ To prevent an Addon from being deleted during a KubeBlocks upgrade via `kbcli` o
 Run the command below to view the annotations of Addons.
 
 ```bash
-kubectl get addon -o json | jq '.items[] | {name: .metadata.name, annotations: .metadata.annotations}'
+kubectl get addon -o json | jq '.items[] | {name: .metadata.name, resource_policy: .metadata.annotations["helm.sh/resource-policy"]}'
 ```
 
 ### Manually add an annotation for Addons
@@ -42,7 +42,7 @@ kubectl annotate addons.extensions.kubeblocks.io {addonName} helm.sh/resource-po
 If you want to check whether the annotation for an Addon was added successfully, replace `{addonName}` with the actual Addon name and run the command below.
 
 ```bash
-kubectl get addon {addonName} -o json | jq '{name: .metadata.name, annotations: .metadata.annotations}'
+kubectl get addon {addonName} -o json | jq '{name: .metadata.name, resource_policy: .metadata.annotations["helm.sh/resource-policy"]}'
 ```
 
 ## Fix "cannot patch 'kubeblocks-dataprotection' with kind Deployment" error

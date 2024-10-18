@@ -21,6 +21,7 @@ package apps
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -108,13 +109,26 @@ func (t *clusterValidationTransformer) checkNUpdateClusterTopology(transCtx *clu
 		return fmt.Errorf("specified cluster topology not found: %s", cluster.Spec.Topology)
 	}
 
-	comps := make(map[string]bool, 0)
-	for _, comp := range clusterTopology.Components {
-		comps[comp.Name] = true
+	matchComp := func(compName string) bool {
+		return slices.ContainsFunc(clusterTopology.Components, func(comp appsv1.ClusterTopologyComponent) bool {
+			return clusterTopologyCompMatched(comp, compName)
+		})
 	}
+
+	matchSharding := func(shardingName string) bool {
+		return slices.ContainsFunc(clusterTopology.Shardings, func(sharding appsv1.ClusterTopologySharding) bool {
+			return shardingName == sharding.Name
+		})
+	}
+
 	for _, comp := range cluster.Spec.ComponentSpecs {
-		if !comps[comp.Name] {
+		if !matchComp(comp.Name) {
 			return fmt.Errorf("component %s not defined in topology %s", comp.Name, clusterTopology.Name)
+		}
+	}
+	for _, sharding := range cluster.Spec.Shardings {
+		if !matchSharding(sharding.Name) {
+			return fmt.Errorf("sharding %s not defined in topology %s", sharding.Name, clusterTopology.Name)
 		}
 	}
 

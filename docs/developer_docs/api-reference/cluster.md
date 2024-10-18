@@ -2023,6 +2023,7 @@ string
 <p>For a specific cluster object, if there is any components provided by the component definition of @owner,
 the sidecar will be created and injected into the components which are provided by
 the component definition of @selectors automatically.</p>
+<p>This field is immutable.</p>
 </td>
 </tr>
 <tr>
@@ -2034,20 +2035,21 @@ the component definition of @selectors automatically.</p>
 </td>
 <td>
 <p>Specifies the component definition of components that the sidecar along with.</p>
+<p>This field is immutable.</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>runtime</code><br/>
+<code>containers</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#podspec-v1-core">
-Kubernetes core/v1.PodSpec
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#container-v1-core">
+[]Kubernetes core/v1.Container
 </a>
 </em>
 </td>
 <td>
-<p>Specifies the template used by the sidecar.</p>
-<p>This field is immutable and cannot be updated once set.</p>
+<p>List of containers for the sidecar.</p>
+<p>Cannot be updated.</p>
 </td>
 </tr>
 <tr>
@@ -10239,6 +10241,7 @@ string
 <p>For a specific cluster object, if there is any components provided by the component definition of @owner,
 the sidecar will be created and injected into the components which are provided by
 the component definition of @selectors automatically.</p>
+<p>This field is immutable.</p>
 </td>
 </tr>
 <tr>
@@ -10250,20 +10253,21 @@ the component definition of @selectors automatically.</p>
 </td>
 <td>
 <p>Specifies the component definition of components that the sidecar along with.</p>
+<p>This field is immutable.</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>runtime</code><br/>
+<code>containers</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#podspec-v1-core">
-Kubernetes core/v1.PodSpec
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#container-v1-core">
+[]Kubernetes core/v1.Container
 </a>
 </em>
 </td>
 <td>
-<p>Specifies the template used by the sidecar.</p>
-<p>This field is immutable and cannot be updated once set.</p>
+<p>List of containers for the sidecar.</p>
+<p>Cannot be updated.</p>
 </td>
 </tr>
 <tr>

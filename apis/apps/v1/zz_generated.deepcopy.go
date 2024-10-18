@@ -2905,7 +2905,13 @@ func (in *SidecarDefinitionSpec) DeepCopyInto(out *SidecarDefinitionSpec) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
-	in.Runtime.DeepCopyInto(&out.Runtime)
+	if in.Containers != nil {
+		in, out := &in.Containers, &out.Containers
+		*out = make([]corev1.Container, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 	if in.Vars != nil {
 		in, out := &in.Vars, &out.Vars
 		*out = make([]EnvVar, len(*in))

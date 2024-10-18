@@ -35,9 +35,6 @@ import (
 // +kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="status phase"
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
-
 // SidecarDefinition is the Schema for the sidecardefinitions API
 type SidecarDefinition struct {
 	metav1.TypeMeta   `json:",inline"`
@@ -68,22 +65,31 @@ type SidecarDefinitionSpec struct {
 	// the sidecar will be created and injected into the components which are provided by
 	// the component definition of @selectors automatically.
 	//
+	// This field is immutable.
+	//
 	// +kubebuilder:validation:Required
 	Owner string `json:"owner"`
 
+	// TODO: some control strategies
+	//   1. optional or required
+	//   2. dynamic or static
+	//   3. granularity: component or some features
+
 	// Specifies the component definition of components that the sidecar along with.
 	//
-	// +kubebuilder:validation:Required
+	// This field is immutable.
+	//
 	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:Required
 	Selectors []string `json:"selectors"`
 
-	// Specifies the template used by the sidecar.
+	// List of containers for the sidecar.
 	//
-	// This field is immutable and cannot be updated once set.
+	// Cannot be updated.
 	//
-	// +kubebuilder:pruning:PreserveUnknownFields
+	// +kubebuilder:validation:MinItems=1
 	// +kubebuilder:validation:Required
-	Runtime corev1.PodSpec `json:"runtime"`
+	Containers []corev1.Container `json:"containers"`
 
 	// Defines variables which are needed by the sidecar.
 	//
@@ -114,7 +120,9 @@ type SidecarDefinitionSpec struct {
 	// +optional
 	Scripts []ComponentTemplateSpec `json:"scripts,omitempty"`
 
-	// TODO: services, volumes, service-refs, etc.
+	// TODO:
+	//   1. services, volumes, service-refs, etc.
+	//   2. how to share resources from main container if needed?
 }
 
 // SidecarDefinitionStatus defines the observed state of SidecarDefinition

@@ -142,8 +142,8 @@ func (s *stateEvaluation) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx
 	generator := newPlanGenerator(s.ctx, s.cli, s.scheme,
 		treeObjectLoader(trace.Status.InitialObjectTree, s.store, s.scheme),
 		buildDescriptionFormatter(i18nResource, defaultLocale, trace.Spec.Locale))
-	patch := client.MergeFrom(root)
-	plan, err := generator.generatePlan(initialRoot, patch)
+	patch := client.MergeFrom(initialRoot)
+	plan, err := generator.generatePlan(root, patch)
 	if err != nil {
 		return kubebuilderx.Commit, err
 	}

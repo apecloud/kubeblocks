@@ -95,7 +95,7 @@ func (g *planGenerator) generatePlan(root *kbappsv1.Cluster, patch client.Patch)
 	var reconcileErr error
 	previousCount := len(store.GetChanges())
 	for {
-		if time.Since(startTime) > time.Second {
+		if time.Since(startTime) > 1000*time.Second {
 			timeout = true
 			break
 		}

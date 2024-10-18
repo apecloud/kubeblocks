@@ -53,7 +53,7 @@ func (t *clusterNormalizationTransformer) Transform(ctx graph.TransformContext, 
 	}()
 
 	// resolve all components and shardings from topology or specified
-	transCtx.components, transCtx.shardings, err = t.resolveCompsNShardings(transCtx, cluster)
+	transCtx.components, transCtx.shardings, err = t.resolveCompsNShardings(transCtx)
 	if err != nil {
 		return err
 	}
@@ -68,19 +68,26 @@ func (t *clusterNormalizationTransformer) Transform(ctx graph.TransformContext, 
 		return err
 	}
 
-	// write-back the resolved definitions and service versions to cluster spec.
-	t.writeBackCompNShardingSpecs(transCtx)
-
-	// build and validate all component specs for components and shardings
-	if err = t.validateNBuildAllCompSpecs(transCtx, cluster); err != nil {
+	// build component specs for shardings after resolving definitions
+	transCtx.shardingComps, err = t.buildShardingComps(transCtx)
+	if err != nil {
 		return err
 	}
+
+	if err = t.postcheck(transCtx); err != nil {
+		return err
+	}
+
+	// write-back the resolved definitions and service versions to cluster spec.
+	t.writeBackCompNShardingSpecs(transCtx)
 
 	return nil
 }
 
-func (t *clusterNormalizationTransformer) resolveCompsNShardings(transCtx *clusterTransformContext,
-	cluster *appsv1.Cluster) ([]*appsv1.ClusterComponentSpec, []*appsv1.ClusterSharding, error) {
+func (t *clusterNormalizationTransformer) resolveCompsNShardings(transCtx *clusterTransformContext) ([]*appsv1.ClusterComponentSpec, []*appsv1.ClusterSharding, error) {
+	var (
+		cluster = transCtx.Cluster
+	)
 	if withClusterTopology(cluster) {
 		return t.resolveCompsNShardingsFromTopology(transCtx.clusterDef, cluster)
 	}
@@ -111,32 +118,45 @@ func (t *clusterNormalizationTransformer) resolveCompsNShardingsFromTopology(clu
 
 func (t *clusterNormalizationTransformer) resolveCompsFromTopology(topology appsv1.ClusterTopology,
 	cluster *appsv1.Cluster) ([]*appsv1.ClusterComponentSpec, error) {
-	newCompSpec := func(comp appsv1.ClusterTopologyComponent) *appsv1.ClusterComponentSpec {
+	newComp := func(comp appsv1.ClusterTopologyComponent) *appsv1.ClusterComponentSpec {
+		if comp.Template != nil && *comp.Template {
+			return nil // don't new component spec for the template component automatically
+		}
 		return &appsv1.ClusterComponentSpec{
 			Name:         comp.Name,
 			ComponentDef: comp.CompDef,
 		}
 	}
 
-	mergeCompSpec := func(comp appsv1.ClusterTopologyComponent, compSpec *appsv1.ClusterComponentSpec) *appsv1.ClusterComponentSpec {
+	mergeComp := func(comp appsv1.ClusterTopologyComponent, compSpec *appsv1.ClusterComponentSpec) *appsv1.ClusterComponentSpec {
 		if len(compSpec.ComponentDef) == 0 {
 			compSpec.ComponentDef = comp.CompDef
 		}
 		return compSpec
 	}
 
-	specifiedCompSpecs := make(map[string]*appsv1.ClusterComponentSpec)
-	for i, compSpec := range cluster.Spec.ComponentSpecs {
-		specifiedCompSpecs[compSpec.Name] = cluster.Spec.ComponentSpecs[i].DeepCopy()
+	matchedComps := func(comp appsv1.ClusterTopologyComponent) []*appsv1.ClusterComponentSpec {
+		specs := make([]*appsv1.ClusterComponentSpec, 0)
+		for i, spec := range cluster.Spec.ComponentSpecs {
+			if clusterTopologyCompMatched(comp, spec.Name) {
+				specs = append(specs, cluster.Spec.ComponentSpecs[i].DeepCopy())
+			}
+		}
+		return specs
 	}
 
 	compSpecs := make([]*appsv1.ClusterComponentSpec, 0)
 	for i := range topology.Components {
 		comp := topology.Components[i]
-		if _, ok := specifiedCompSpecs[comp.Name]; ok {
-			compSpecs = append(compSpecs, mergeCompSpec(comp, specifiedCompSpecs[comp.Name]))
-		} else {
-			compSpecs = append(compSpecs, newCompSpec(comp))
+		specs := matchedComps(comp)
+		if len(specs) == 0 {
+			spec := newComp(comp)
+			if spec != nil {
+				specs = append(specs, spec)
+			}
+		}
+		for _, spec := range specs {
+			compSpecs = append(compSpecs, mergeComp(comp, spec))
 		}
 	}
 	return compSpecs, nil
@@ -322,35 +342,23 @@ func (t *clusterNormalizationTransformer) checkCompUpgrade(compSpec *appsv1.Clus
 	return compSpec.ServiceVersion != comp.Spec.ServiceVersion || compSpec.ComponentDef != comp.Spec.CompDef
 }
 
-func (t *clusterNormalizationTransformer) writeBackCompNShardingSpecs(transCtx *clusterTransformContext) {
-	if len(transCtx.components) > 0 {
-		comps := make([]appsv1.ClusterComponentSpec, 0)
-		for i := range transCtx.components {
-			comps = append(comps, *transCtx.components[i])
+func (t *clusterNormalizationTransformer) buildShardingComps(transCtx *clusterTransformContext) (map[string][]*appsv1.ClusterComponentSpec, error) {
+	shardingComps := make(map[string][]*appsv1.ClusterComponentSpec)
+	for _, sharding := range transCtx.shardings {
+		comps, err := controllerutil.GenShardingCompSpecList(transCtx.Context, transCtx.Client, transCtx.Cluster, sharding)
+		if err != nil {
+			return nil, err
 		}
-		transCtx.Cluster.Spec.ComponentSpecs = comps
+		shardingComps[sharding.Name] = comps
 	}
-	if len(transCtx.shardings) > 0 {
-		shardings := make([]appsv1.ClusterSharding, 0)
-		for i := range transCtx.shardings {
-			shardings = append(shardings, *transCtx.shardings[i])
-		}
-		transCtx.Cluster.Spec.Shardings = shardings
-	}
+	return shardingComps, nil
 }
 
-func (t *clusterNormalizationTransformer) validateNBuildAllCompSpecs(transCtx *clusterTransformContext, cluster *appsv1.Cluster) error {
-	var err error
-	if err = t.validateCompNShardingUnique(transCtx); err != nil {
+func (t *clusterNormalizationTransformer) postcheck(transCtx *clusterTransformContext) error {
+	if err := t.validateCompNShardingUnique(transCtx); err != nil {
 		return err
 	}
-
-	if err = t.validateShardingShards(transCtx); err != nil {
-		return err
-	}
-
-	transCtx.shardingComps, err = t.buildShardingComps(transCtx, cluster)
-	if err != nil {
+	if err := t.validateShardingShards(transCtx); err != nil {
 		return err
 	}
 	return nil
@@ -385,14 +393,19 @@ func (t *clusterNormalizationTransformer) validateShardingShards(transCtx *clust
 	return nil
 }
 
-func (t *clusterNormalizationTransformer) buildShardingComps(transCtx *clusterTransformContext, cluster *appsv1.Cluster) (map[string][]*appsv1.ClusterComponentSpec, error) {
-	shardingComps := make(map[string][]*appsv1.ClusterComponentSpec)
-	for _, sharding := range transCtx.shardings {
-		comps, err := controllerutil.GenShardingCompSpecList(transCtx.Context, transCtx.Client, cluster, sharding)
-		if err != nil {
-			return nil, err
+func (t *clusterNormalizationTransformer) writeBackCompNShardingSpecs(transCtx *clusterTransformContext) {
+	if len(transCtx.components) > 0 {
+		comps := make([]appsv1.ClusterComponentSpec, 0)
+		for i := range transCtx.components {
+			comps = append(comps, *transCtx.components[i])
 		}
-		shardingComps[sharding.Name] = comps
+		transCtx.Cluster.Spec.ComponentSpecs = comps
 	}
-	return shardingComps, nil
+	if len(transCtx.shardings) > 0 {
+		shardings := make([]appsv1.ClusterSharding, 0)
+		for i := range transCtx.shardings {
+			shardings = append(shardings, *transCtx.shardings[i])
+		}
+		transCtx.Cluster.Spec.Shardings = shardings
+	}
 }

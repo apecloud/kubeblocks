@@ -2,7 +2,7 @@
 title: Upgrade to KubeBlocks v0.8
 description: Upgrade to KubeBlocks v0.8, operation, tips and notes
 keywords: [upgrade, 0.8]
-sidebar_position: 2
+sidebar_position: 3
 sidebar_label: Upgrade to KubeBlocks v0.8
 ---
 
@@ -72,3 +72,7 @@ helm -n kb-system upgrade kubeblocks kubeblocks/kubeblocks --version 0.8.1 --set
 ```
 
 :::
+
+## FAQ
+
+Refer to the [FAQ](./../faq.md) to address common questions and issues that may arise when upgrading KubeBlocks. If your question isn't covered, you can [submit an issue](https://github.com/apecloud/kubeblocks/issues/new/choose) or [start a discussion](https://github.com/apecloud/kubeblocks/discussions) on upgrading in GitHub.

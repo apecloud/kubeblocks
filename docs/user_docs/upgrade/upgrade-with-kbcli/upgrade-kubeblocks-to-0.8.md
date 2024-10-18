@@ -2,7 +2,7 @@
 title: Upgrade to KubeBlocks v0.8
 description: Upgrade to KubeBlocks v0.8, operation, tips and notes
 keywords: [upgrade, 0.8]
-sidebar_position: 2
+sidebar_position: 3
 sidebar_label: Upgrade to KubeBlocks v0.8
 ---
 
@@ -53,3 +53,7 @@ If you are currently running KubeBlocks v0.6, please upgrade to v0.7.2 first.
     ```
 
     kbcli will automatically add the annotation `"helm.sh/resource-policy": "keep"` to ensure that existing addons are not deleted during the upgrade.
+
+## FAQ
+
+Refer to the [FAQ](./../faq.md) to address common questions and issues that may arise when upgrading KubeBlocks. If your question isn't covered, you can [submit an issue](https://github.com/apecloud/kubeblocks/issues/new/choose) or [start a discussion](https://github.com/apecloud/kubeblocks/discussions) on upgrading in GitHub.

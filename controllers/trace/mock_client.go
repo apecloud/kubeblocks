@@ -23,6 +23,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	jsonpatch "github.com/evanphx/json-patch/v5"
+	"github.com/google/go-cmp/cmp"
+	"k8s.io/apimachinery/pkg/types"
+	"reflect"
 	"strings"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -116,6 +120,7 @@ func (c *mockClient) Create(ctx context.Context, obj client.Object, opts ...clie
 	if o != nil {
 		return apierrors.NewAlreadyExists(objectRef.GroupVersion().WithResource(objectRef.Kind).GroupResource(), fmt.Sprintf("%s/%s", objectRef.Namespace, objectRef.Name))
 	}
+	obj.SetGeneration(1)
 	return c.store.Insert(obj)
 }
 
@@ -137,47 +142,89 @@ func (c *mockClient) Delete(ctx context.Context, obj client.Object, opts ...clie
 }
 
 func (c *mockClient) Update(ctx context.Context, obj client.Object, opts ...client.UpdateOption) error {
-	return c.store.Update(obj.DeepCopyObject().(client.Object))
+	objectRef, err := getObjectRef(obj, c.realClient.Scheme())
+	if err != nil {
+		return err
+	}
+	oldObj := c.store.Get(objectRef)
+	if oldObj == nil {
+		return apierrors.NewNotFound(objectRef.GroupVersion().WithResource(objectRef.Kind).GroupResource(), fmt.Sprintf("%s/%s", objectRef.Namespace, objectRef.Name))
+	}
+	increaseGeneration(oldObj, obj)
+	return c.store.Update(obj)
 }
 
 func (c *mockClient) Patch(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
-	return doPatch(obj, patch, c.store, c.realClient.Scheme())
+	return doPatch(obj, patch, c.store, c.realClient.Scheme(), true)
 }
 
-func doPatch(obj client.Object, patch client.Patch, store ChangeCaptureStore, scheme *runtime.Scheme) error {
+func doPatch(obj client.Object, patch client.Patch, store ChangeCaptureStore, scheme *runtime.Scheme, checkGeneration bool) error {
 	objectRef, err := getObjectRef(obj, scheme)
 	if err != nil {
 		return err
 	}
-	o := store.Get(objectRef)
-	if o == nil {
+	oldObj := store.Get(objectRef)
+	if oldObj == nil {
 		return apierrors.NewNotFound(objectRef.GroupVersion().WithResource(objectRef.Kind).GroupResource(), fmt.Sprintf("%s/%s", objectRef.Namespace, objectRef.Name))
 	}
-	// Apply the patch to the existing object
-	existingObjMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(o)
-	if err != nil {
-		return fmt.Errorf("failed to convert existing object to unstructured: %w", err)
-	}
-
 	patchData, err := patch.Data(obj)
 	if err != nil {
-		return fmt.Errorf("failed to get patch data: %w", err)
+		return err
+	}
+	newObj := oldObj.DeepCopyObject().(client.Object)
+	if err = applyPatch(newObj, patch.Type(), patchData); err != nil {
+		return err
+	}
+	if checkGeneration {
+		increaseGeneration(oldObj, newObj)
+	}
+	return store.Update(newObj)
+}
+
+func applyPatch(obj client.Object, patchType types.PatchType, patchData []byte) error {
+	// Convert the object to JSON
+	originalJSON, err := json.Marshal(obj)
+	if err != nil {
+		return fmt.Errorf("failed to marshal original object: %w", err)
 	}
 
-	patchedObjJSON, err := strategicpatch.StrategicMergePatch(specMapToJSON(existingObjMap), patchData, o)
+	// Apply the patch
+	var patchedJSON []byte
+	switch patchType {
+	case types.StrategicMergePatchType:
+		patchedJSON, err = strategicpatch.StrategicMergePatch(originalJSON, patchData, obj)
+	case types.MergePatchType:
+		patchedJSON, err = jsonpatch.MergePatch(originalJSON, patchData)
+	default:
+		return fmt.Errorf("unsupported patch type: %s", patchType)
+	}
 	if err != nil {
 		return fmt.Errorf("failed to apply patch: %w", err)
 	}
 
-	var patchedObjMap map[string]interface{}
-	if err := json.Unmarshal(patchedObjJSON, &patchedObjMap); err != nil {
-		return fmt.Errorf("failed to unmarshal patched object: %w", err)
-	}
+	// Unmarshal the patched JSON back into the object
+	return json.Unmarshal(patchedJSON, obj)
+}
 
-	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(patchedObjMap, o); err != nil {
-		return fmt.Errorf("failed to convert patched map to object: %w", err)
+func increaseGeneration(oldObj, newObj client.Object) {
+	oldObj, _ = normalize(oldObj)
+	newObj, _ = normalize(newObj)
+	if oldObj == nil || newObj == nil {
+		return
 	}
-	return store.Update(o)
+	oldSpec, _ := getSpecFieldAsStruct(oldObj)
+	newSpec, _ := getSpecFieldAsStruct(newObj)
+	if oldSpec == nil || newSpec == nil {
+		return
+	}
+	diff := cmp.Diff(oldSpec, newSpec)
+	if diff != "" {
+		same := reflect.DeepEqual(oldSpec, newSpec)
+		if same {
+			return
+		}
+		newObj.SetGeneration(newObj.GetGeneration() + 1)
+	}
 }
 
 func (c *mockClient) DeleteAllOf(ctx context.Context, obj client.Object, opts ...client.DeleteAllOfOption) error {
@@ -217,7 +264,7 @@ func (c *mockSubResourceClient) Update(ctx context.Context, obj client.Object, o
 }
 
 func (c *mockSubResourceClient) Patch(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error {
-	return doPatch(obj, patch, c.store, c.scheme)
+	return doPatch(obj, patch, c.store, c.scheme, false)
 }
 
 func newMockClient(realClient client.Client, store ChangeCaptureStore, rules []OwnershipRule) (client.Client, error) {
@@ -253,18 +300,11 @@ func newMockClient(realClient client.Client, store ChangeCaptureStore, rules []O
 }
 
 func copyObj(src, dst client.Object) error {
-	// Convert the source object to an unstructured map
-	srcMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(src)
+	srcJSON, err := json.Marshal(src)
 	if err != nil {
-		return fmt.Errorf("failed to convert source object to unstructured: %w", err)
+		return fmt.Errorf("failed to marshal src object: %w", err)
 	}
-
-	// Convert the unstructured map back to the destination object
-	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(srcMap, dst); err != nil {
-		return fmt.Errorf("failed to convert unstructured map to destination object: %w", err)
-	}
-
-	return nil
+	return json.Unmarshal(srcJSON, dst)
 }
 
 var _ client.Client = &mockClient{}

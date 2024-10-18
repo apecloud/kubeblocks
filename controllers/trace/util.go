@@ -24,6 +24,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -774,4 +775,44 @@ func deleteUnusedRevisions(store ObjectRevisionStore, changes []tracev1.ObjectCh
 		}
 		store.Delete(objectRef, reference, change.Revision)
 	}
+}
+
+// getSpecFieldAsStruct extracts the Spec field from a client.Object and returns it as an interface{}.
+func getSpecFieldAsStruct(obj client.Object) (interface{}, error) {
+	// Get the value of the object
+	objValue := reflect.ValueOf(obj)
+
+	// Check if the object is a pointer to a struct
+	if objValue.Kind() != reflect.Ptr || objValue.Elem().Kind() != reflect.Struct {
+		return nil, fmt.Errorf("obj must be a pointer to a struct")
+	}
+
+	// Get the Spec field
+	specField := objValue.Elem().FieldByName("Spec")
+	if !specField.IsValid() {
+		return nil, fmt.Errorf("spec field not found")
+	}
+
+	// Return the Spec field as an interface{}
+	return specField.Interface(), nil
+}
+
+func normalize(obj client.Object) (client.Object, error) {
+	if obj == nil {
+		return nil, nil
+	}
+	data, err := json.Marshal(obj)
+	if err != nil {
+		return nil, err
+	}
+	t := reflect.TypeOf(obj)
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+	newObj := reflect.New(t).Interface().(client.Object)
+	err = json.Unmarshal(data, newObj)
+	if err != nil {
+		return nil, err
+	}
+	return newObj, nil
 }

@@ -69,7 +69,12 @@ func (s *changeCaptureStore) Load(objects ...client.Object) error {
 }
 
 func (s *changeCaptureStore) Insert(object client.Object) error {
+	var err error
 	obj := object.DeepCopyObject().(client.Object)
+	obj, err = normalize(obj)
+	if err != nil {
+		return err
+	}
 	objectRef, err := getObjectRef(obj, s.scheme)
 	if err != nil {
 		return err
@@ -84,7 +89,12 @@ func (s *changeCaptureStore) Insert(object client.Object) error {
 }
 
 func (s *changeCaptureStore) Update(object client.Object) error {
+	var err error
 	newObj := object.DeepCopyObject().(client.Object)
+	newObj, err = normalize(newObj)
+	if err != nil {
+		return err
+	}
 	objectRef, err := getObjectRef(newObj, s.scheme)
 	if err != nil {
 		return err

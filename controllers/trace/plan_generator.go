@@ -21,18 +21,11 @@ package trace
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
-	"reflect"
 	"time"
 
-	jsonpatch "github.com/evanphx/json-patch/v5"
 	"github.com/google/go-cmp/cmp"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -41,7 +34,7 @@ import (
 )
 
 type PlanGenerator interface {
-	generatePlan(root *kbappsv1.Cluster, patch client.Patch) (*tracev1.DryRunResult, error)
+	generatePlan(desiredRoot *kbappsv1.Cluster) (*tracev1.DryRunResult, error)
 }
 
 type objectLoader func() (map[model.GVKNObjKey]client.Object, error)
@@ -55,7 +48,7 @@ type planGenerator struct {
 	formatter descriptionFormatter
 }
 
-func (g *planGenerator) generatePlan(root *kbappsv1.Cluster, patch client.Patch) (*tracev1.DryRunResult, error) {
+func (g *planGenerator) generatePlan(desiredRoot *kbappsv1.Cluster) (*tracev1.DryRunResult, error) {
 	// create mock client and mock event recorder
 	// kbagent client is running in dry-run mode by setting context key-value pair: dry-run=true
 	store := newChangeCaptureStore(g.scheme, g.formatter)
@@ -80,12 +73,17 @@ func (g *planGenerator) generatePlan(root *kbappsv1.Cluster, patch client.Patch)
 	}
 	initialObjectMap := store.GetAll()
 
-	// apply dryRun.desiredSpec to target cluster object
-	var specDiff string
-	if specDiff, err = applyPatch(root, patch); err != nil {
+	// get current root
+	currentRoot := &kbappsv1.Cluster{}
+	if err = mClient.Get(g.ctx, client.ObjectKeyFromObject(desiredRoot), currentRoot); err != nil {
 		return nil, err
 	}
-	if err = mClient.Update(g.ctx, root); err != nil {
+	// build spec diff
+	var specDiff string
+	if specDiff, err = buildSpecDiff(currentRoot, desiredRoot); err != nil {
+		return nil, err
+	}
+	if err = mClient.Update(g.ctx, desiredRoot); err != nil {
 		return nil, err
 	}
 
@@ -116,7 +114,7 @@ func (g *planGenerator) generatePlan(root *kbappsv1.Cluster, patch client.Patch)
 	// update dry-run result
 	// update spec info
 	dryRunResult := &tracev1.DryRunResult{}
-	dryRunResult.ObservedTargetGeneration = root.Generation
+	dryRunResult.ObservedTargetGeneration = desiredRoot.Generation
 	dryRunResult.SpecDiff = specDiff
 
 	// update phase
@@ -134,7 +132,7 @@ func (g *planGenerator) generatePlan(root *kbappsv1.Cluster, patch client.Patch)
 	}
 
 	// update plan
-	desiredTree, err := getObjectTreeFromCache(g.ctx, mClient, root, getKBOwnershipRules())
+	desiredTree, err := getObjectTreeFromCache(g.ctx, mClient, desiredRoot, getKBOwnershipRules())
 	if err != nil {
 		return nil, err
 	}
@@ -156,85 +154,19 @@ func newPlanGenerator(ctx context.Context, cli client.Client, scheme *runtime.Sc
 	}
 }
 
-func applyPatch(obj client.Object, patch client.Patch) (string, error) {
-	// Extract the current spec and apply the patch
-	currentSpec, err := getSpecFieldAsStruct(obj)
+func buildSpecDiff(current, desired client.Object) (string, error) {
+	// Extract the current spec
+	currentSpec, err := getSpecFieldAsStruct(current)
 	if err != nil {
 		return "", err
 	}
-
-	patchData, err := patch.Data(obj)
+	desiredSpec, err := getSpecFieldAsStruct(desired)
 	if err != nil {
 		return "", err
 	}
-	// Apply the patch to the current spec
-	var modifiedSpec []byte
-	if patch.Type() == types.StrategicMergePatchType {
-		modifiedSpec, err = strategicpatch.StrategicMergePatch(
-			specMapToJSON(currentSpec),
-			patchData,
-			currentSpec,
-		)
-		if err != nil {
-			return "", err
-		}
-	} else if patch.Type() == types.MergePatchType {
-		modifiedSpec, err = jsonpatch.MergePatch(specMapToJSON(currentSpec), patchData)
-		if err != nil {
-			return "", err
-		}
-	}
-	modifiedSpecMap := make(map[string]interface{})
-	if err = json.Unmarshal(modifiedSpec, &modifiedSpecMap); err != nil {
-		return "", err
-	}
-
-	// Convert the object to an unstructured map
-	objMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
-	if err != nil {
-		return "", err
-	}
-
-	// Extract the initial spec
-	initialSpec, _, err := unstructured.NestedMap(objMap, "spec")
-	if err != nil {
-		return "", err
-	}
-
-	// Update the spec in the object map
-	if err := unstructured.SetNestedField(objMap, modifiedSpecMap, "spec"); err != nil {
-		return "", err
-	}
-
-	// Convert the modified map back to the original object
-	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(objMap, obj); err != nil {
-		return "", err
-	}
-
 	// build the spec change
-	specChange := cmp.Diff(initialSpec, modifiedSpecMap)
-
+	specChange := cmp.Diff(currentSpec, desiredSpec)
 	return specChange, nil
-}
-
-// getSpecFieldAsStruct extracts the Spec field from a client.Object and returns it as an interface{}.
-func getSpecFieldAsStruct(obj client.Object) (interface{}, error) {
-	// Get the value of the object
-	objValue := reflect.ValueOf(obj)
-
-	// Check if the object is a pointer to a struct
-	if objValue.Kind() != reflect.Ptr || objValue.Elem().Kind() != reflect.Struct {
-		return nil, fmt.Errorf("obj must be a pointer to a struct")
-	}
-
-	// Get the Spec field
-	specField := objValue.Elem().FieldByName("Spec")
-	if !specField.IsValid() {
-		return nil, fmt.Errorf("spec field not found")
-	}
-
-	// Return the Spec field as an interface{}
-	return specField.Interface(), nil
 }
 
 func loadCurrentObjectTree(loader objectLoader, store ChangeCaptureStore) error {

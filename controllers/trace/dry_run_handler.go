@@ -21,12 +21,13 @@ package trace
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"hash/fnv"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -80,7 +81,11 @@ func (r *dryRunner) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Resul
 		cacheObjectLoader(r.ctx, r.cli, root, getKBOwnershipRules()),
 		buildDescriptionFormatter(i18nResource, defaultLocale, trace.Spec.Locale))
 
-	plan, err := generator.generatePlan(root, strategicMergeFrom(trace.Spec.DryRun.DesiredSpec))
+	desiredRoot, err := applySpec(root.DeepCopy(), trace.Spec.DryRun.DesiredSpec)
+	if err != nil {
+		return kubebuilderx.Commit, err
+	}
+	plan, err := generator.generatePlan(desiredRoot)
 	if err != nil {
 		return kubebuilderx.Commit, err
 	}
@@ -88,6 +93,62 @@ func (r *dryRunner) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Resul
 	trace.Status.DryRunResult = plan
 
 	return kubebuilderx.Continue, nil
+}
+
+func applySpec(current *kbappsv1.Cluster, desiredSpecStr string) (*kbappsv1.Cluster, error) {
+	// Convert the desiredSpec YAML string to a map
+	specMap := make(map[string]interface{})
+	if err := yaml.Unmarshal([]byte(desiredSpecStr), &specMap); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal desiredSpec: %w", err)
+	}
+
+	// Extract the current spec and apply the patch
+	currentSpec, err := getSpecFieldAsStruct(current)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get current spec: %w", err)
+	}
+
+	// Create a strategic merge patch
+	patchData, err := strategicpatch.CreateTwoWayMergePatch(
+		specMapToJSON(currentSpec),
+		specMapToJSON(specMap),
+		currentSpec,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	// Apply the patch to the current spec
+	modifiedSpec, err := strategicpatch.StrategicMergePatch(
+		specMapToJSON(currentSpec),
+		patchData,
+		currentSpec,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	modifiedSpecMap := make(map[string]interface{})
+	if err = json.Unmarshal(modifiedSpec, &modifiedSpecMap); err != nil {
+		return nil, err
+	}
+
+	// Convert the object to an unstructured map
+	objMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(current)
+	if err != nil {
+		return nil, err
+	}
+
+	// Update the spec in the object map
+	if err := unstructured.SetNestedField(objMap, modifiedSpecMap, "spec"); err != nil {
+		return nil, err
+	}
+
+	// Convert the modified map back to the original object
+	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(objMap, current); err != nil {
+		return nil, err
+	}
+	return current, nil
 }
 
 func dryRun(ctx context.Context, cli client.Client, scheme *runtime.Scheme) kubebuilderx.Reconciler {
@@ -121,38 +182,4 @@ func cacheObjectLoader(ctx context.Context, cli client.Client, root *kbappsv1.Cl
 	}
 }
 
-type stringStrategicMergeFromPatch struct {
-	from string
-}
-
-func (p *stringStrategicMergeFromPatch) Type() types.PatchType {
-	return types.StrategicMergePatchType
-}
-
-func (p *stringStrategicMergeFromPatch) Data(obj client.Object) ([]byte, error) {
-	// Convert the desiredSpec YAML string to a map
-	specMap := make(map[string]interface{})
-	if err := yaml.Unmarshal([]byte(p.from), &specMap); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal desiredSpec: %w", err)
-	}
-
-	// Extract the current spec and apply the patch
-	currentSpec, err := getSpecFieldAsStruct(obj)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get current spec: %w", err)
-	}
-
-	// Create a strategic merge patch
-	return strategicpatch.CreateTwoWayMergePatch(
-		specMapToJSON(currentSpec),
-		specMapToJSON(specMap),
-		currentSpec,
-	)
-}
-
-func strategicMergeFrom(desiredSpec string) client.Patch {
-	return &stringStrategicMergeFromPatch{from: desiredSpec}
-}
-
 var _ kubebuilderx.Reconciler = &dryRunner{}
-var _ client.Patch = &stringStrategicMergeFromPatch{}

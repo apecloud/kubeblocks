@@ -21,7 +21,10 @@ package trace
 
 import (
 	"context"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -66,6 +69,7 @@ var _ = Describe("desired_state_handler test", func() {
 					Phase:              kbappsv1.AvailablePhase,
 				},
 			}
+			serviceVersion := "1.0.0"
 			componentDefinition := &kbappsv1.ComponentDefinition{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace:  namespace,
@@ -73,7 +77,7 @@ var _ = Describe("desired_state_handler test", func() {
 					Generation: int64(1),
 				},
 				Spec: kbappsv1.ComponentDefinitionSpec{
-					ServiceVersion: "1.0",
+					ServiceVersion: serviceVersion,
 					Runtime: corev1.PodSpec{
 						Containers: []corev1.Container{{
 							Name:  name,
@@ -102,7 +106,7 @@ var _ = Describe("desired_state_handler test", func() {
 					}},
 					Releases: []kbappsv1.ComponentVersionRelease{{
 						Name:           name,
-						ServiceVersion: "1.0",
+						ServiceVersion: serviceVersion,
 						Images: map[string]string{
 							name: "busybox",
 						},
@@ -244,7 +248,27 @@ var _ = Describe("desired_state_handler test", func() {
 			k8sMock.EXPECT().
 				Get(gomock.Any(), gomock.Any(), &kbappsv1.Component{}, gomock.Any()).
 				DoAndReturn(func(_ context.Context, objKey client.ObjectKey, obj *kbappsv1.Component, _ ...client.GetOption) error {
-					return nil
+					return apierrors.NewNotFound(kbappsv1.Resource(kbappsv1.ComponentKind), objKey.Name)
+				}).AnyTimes()
+			k8sMock.EXPECT().
+				Get(gomock.Any(), gomock.Any(), &appsv1alpha1.Configuration{}, gomock.Any()).
+				DoAndReturn(func(_ context.Context, objKey client.ObjectKey, obj *appsv1alpha1.Configuration, _ ...client.GetOption) error {
+					return apierrors.NewNotFound(appsv1alpha1.Resource(constant.ConfigurationKind), objKey.Name)
+				}).AnyTimes()
+			k8sMock.EXPECT().
+				Get(gomock.Any(), gomock.Any(), &corev1.ConfigMap{}, gomock.Any()).
+				DoAndReturn(func(_ context.Context, objKey client.ObjectKey, obj *corev1.ConfigMap, _ ...client.GetOption) error {
+					return apierrors.NewNotFound(corev1.Resource(constant.ConfigMapKind), objKey.Name)
+				}).AnyTimes()
+			k8sMock.EXPECT().
+				Get(gomock.Any(), gomock.Any(), &corev1.PersistentVolumeClaim{}, gomock.Any()).
+				DoAndReturn(func(_ context.Context, objKey client.ObjectKey, obj *corev1.PersistentVolumeClaim, _ ...client.GetOption) error {
+					return apierrors.NewNotFound(corev1.Resource(constant.PersistentVolumeClaimKind), objKey.Name)
+				}).AnyTimes()
+			k8sMock.EXPECT().
+				Get(gomock.Any(), gomock.Any(), &corev1.PersistentVolume{}, gomock.Any()).
+				DoAndReturn(func(_ context.Context, objKey client.ObjectKey, obj *corev1.PersistentVolume, _ ...client.GetOption) error {
+					return apierrors.NewNotFound(corev1.Resource(constant.PersistentVolumeKind), objKey.Name)
 				}).AnyTimes()
 			k8sMock.EXPECT().Scheme().Return(scheme.Scheme).AnyTimes()
 

@@ -325,7 +325,7 @@ func isTimeInRange(t time.Time, start time.Time, end time.Time) bool {
 func GetRestoreFromBackupAnnotation(backup *dpv1alpha1.Backup, volumeRestorePolicy, restoreTime string, env []corev1.EnvVar, doReadyRestoreAfterClusterRunning bool) (string, error) {
 	componentName := component.GetComponentNameFromObj(backup)
 	if len(componentName) == 0 {
-		return "", fmt.Errorf("unable to obtain the name of the component to be recovered, please ensure that Backup.status.componentName exists")
+		return "", intctrlutil.NewFatalError("unable to obtain the name of the component to be recovered, please ensure that Backup.status.componentName exists")
 	}
 	restoreInfoMap := map[string]string{}
 	restoreInfoMap[constant.BackupNameKeyForRestore] = backup.Name

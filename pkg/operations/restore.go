@@ -75,6 +75,10 @@ func (r RestoreOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 
 	// create cluster
 	if err = cli.Create(reqCtx.Ctx, cluster); err != nil {
+		if apierrors.IsAlreadyExists(err) && opsRequest.Labels[constant.AppInstanceLabelKey] != "" {
+			// already create by this opsRequest
+			return nil
+		}
 		return err
 	}
 	opsRes.Cluster = cluster

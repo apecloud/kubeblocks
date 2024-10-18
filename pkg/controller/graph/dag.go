@@ -146,7 +146,7 @@ func (d *DAG) AddConnectRoot(v Vertex) bool {
 
 // WalkTopoOrder walks the DAG 'd' in topology order
 func (d *DAG) WalkTopoOrder(walkFunc WalkFunc, less func(v1, v2 Vertex) bool) error {
-	if err := d.validate(); err != nil {
+	if err := d.Validate(); err != nil {
 		return err
 	}
 	orders := d.topologicalOrder(false, less)
@@ -160,7 +160,7 @@ func (d *DAG) WalkTopoOrder(walkFunc WalkFunc, less func(v1, v2 Vertex) bool) er
 
 // WalkReverseTopoOrder walks the DAG 'd' in reverse topology order
 func (d *DAG) WalkReverseTopoOrder(walkFunc WalkFunc, less func(v1, v2 Vertex) bool) error {
-	if err := d.validate(); err != nil {
+	if err := d.Validate(); err != nil {
 		return err
 	}
 	orders := d.topologicalOrder(true, less)
@@ -178,7 +178,7 @@ func (d *DAG) WalkBFS(walkFunc WalkFunc) error {
 }
 
 func (d *DAG) bfs(walkFunc WalkFunc, less func(v1, v2 Vertex) bool) error {
-	if err := d.validate(); err != nil {
+	if err := d.Validate(); err != nil {
 		return err
 	}
 	queue := make([]Vertex, 0)
@@ -280,8 +280,8 @@ func (d *DAG) String() string {
 	return str
 }
 
-// validate 'd' has single Root and has no cycles
-func (d *DAG) validate() error {
+// Validate 'd' has single Root and has no cycles
+func (d *DAG) Validate() error {
 	// single Root validation
 	root := d.Root()
 	if root == nil {

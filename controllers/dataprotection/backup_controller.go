@@ -82,6 +82,10 @@ type BackupReconciler struct {
 // +kubebuilder:rbac:groups=core,resources=serviceaccounts,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings,verbs=get;list;watch;create;update;patch;delete
 
+// +kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=get;list;watch;create;update;patch;delete;deletecollection
+// +kubebuilder:rbac:groups=apps,resources=statefulsets/status,verbs=get
+// +kubebuilder:rbac:groups=apps,resources=statefulsets/finalizers,verbs=update
+
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the backup closer to the desired state.
 func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -450,10 +454,20 @@ func (r *BackupReconciler) prepareRequestTargetInfo(reqCtx intctrlutil.RequestCt
 	}
 	targetPods, err := GetTargetPods(reqCtx, r.Client,
 		selectedPods, request.BackupPolicy, target, backupType)
-	if err != nil || len(targetPods) == 0 {
+	if err != nil {
+		return err
+	}
+	if len(targetPods) == 0 {
+		if backupType == dpv1alpha1.BackupTypeContinuous {
+			// stop the sts to un-bound the pvcs when the continuous backup is failed.
+			if err = dpbackup.StopStatefulSetsWhenFailed(reqCtx.Ctx, r.Client, request.Backup, target.Name); err != nil {
+				return err
+			}
+		}
 		return fmt.Errorf("failed to get target pods by backup policy %s/%s",
 			request.BackupPolicy.Namespace, request.BackupPolicy.Name)
 	}
+
 	request.TargetPods = targetPods
 	saName := target.ServiceAccountName
 	if saName == "" {

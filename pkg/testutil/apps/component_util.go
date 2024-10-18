@@ -44,3 +44,12 @@ func GetComponentPhase(testCtx *testutil.TestContext, compKey types.NamespacedNa
 		return comp.Status.Phase
 	}
 }
+
+// ComponentReconciled checks if the testing component has been reconciled.
+func ComponentReconciled(testCtx *testutil.TestContext, compKey types.NamespacedName) func(gomega.Gomega) bool {
+	return func(g gomega.Gomega) bool {
+		comp := &appsv1.Component{}
+		g.Expect(testCtx.Cli.Get(testCtx.Ctx, compKey, comp)).Should(gomega.Succeed())
+		return comp.Status.ObservedGeneration > 0 && comp.Status.ObservedGeneration == comp.Generation
+	}
+}

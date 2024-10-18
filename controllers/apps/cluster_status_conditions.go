@@ -22,8 +22,8 @@ package apps
 import (
 	"fmt"
 	"slices"
+	"strings"
 
-	"golang.org/x/exp/maps"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -36,10 +36,8 @@ const (
 	ReasonPreCheckFailed        = "PreCheckFailed"        // ReasonPreCheckFailed preChecks failed for provisioning started
 	ReasonApplyResourcesFailed  = "ApplyResourcesFailed"  // ReasonApplyResourcesFailed applies resources failed to create or change the cluster
 	ReasonApplyResourcesSucceed = "ApplyResourcesSucceed" // ReasonApplyResourcesSucceed applies resources succeeded to create or change the cluster
-	ReasonReplicasNotReady      = "ReplicasNotReady"      // ReasonReplicasNotReady the pods of components are not ready
-	ReasonAllReplicasReady      = "AllReplicasReady"      // ReasonAllReplicasReady the pods of components are ready
-	ReasonComponentsNotReady    = "ComponentsNotReady"    // ReasonComponentsNotReady the components of cluster are not ready
 	ReasonClusterReady          = "ClusterReady"          // ReasonClusterReady the components of cluster are ready, the component phase is running
+	ReasonComponentsNotReady    = "ComponentsNotReady"    // ReasonComponentsNotReady the components of cluster are not ready
 )
 
 func setProvisioningStartedCondition(conditions *[]metav1.Condition, clusterName string, clusterGeneration int64, err error) {
@@ -93,7 +91,6 @@ func setApplyResourceCondition(conditions *[]metav1.Condition, clusterGeneration
 	meta.SetStatusCondition(conditions, condition)
 }
 
-// newApplyResourcesCondition creates a condition when applied resources succeed.
 func newApplyResourcesCondition(clusterGeneration int64) metav1.Condition {
 	return metav1.Condition{
 		Type:               appsv1.ConditionTypeApplyResources,
@@ -104,7 +101,6 @@ func newApplyResourcesCondition(clusterGeneration int64) metav1.Condition {
 	}
 }
 
-// newApplyResourcesCondition creates a condition when applied resources succeed.
 func newFailedApplyResourcesCondition(err error) metav1.Condition {
 	return metav1.Condition{
 		Type:    appsv1.ConditionTypeApplyResources,
@@ -114,46 +110,27 @@ func newFailedApplyResourcesCondition(err error) metav1.Condition {
 	}
 }
 
-// newAllReplicasPodsReadyConditions creates a condition when all pods of components are ready
-func newAllReplicasPodsReadyConditions() metav1.Condition {
-	return metav1.Condition{
-		Type:    appsv1.ConditionTypeReplicasReady,
-		Status:  metav1.ConditionTrue,
-		Message: "all pods of components are ready, waiting for the probe detection successful",
-		Reason:  ReasonAllReplicasReady,
-	}
-}
-
-// newReplicasNotReadyCondition creates a condition when pods of components are not ready
-func newReplicasNotReadyCondition(notReadyComponentNames map[string]struct{}) metav1.Condition {
-	cNameSlice := maps.Keys(notReadyComponentNames)
-	slices.Sort(cNameSlice)
-	return metav1.Condition{
-		Type:    appsv1.ConditionTypeReplicasReady,
-		Status:  metav1.ConditionFalse,
-		Message: fmt.Sprintf("pods are not ready in Components: %v, refer to related component message in Cluster.status.components", cNameSlice),
-		Reason:  ReasonReplicasNotReady,
-	}
-}
-
-// newClusterReadyCondition creates a condition when all components of cluster are running
 func newClusterReadyCondition(clusterName string) metav1.Condition {
 	return metav1.Condition{
 		Type:    appsv1.ConditionTypeReady,
 		Status:  metav1.ConditionTrue,
-		Message: fmt.Sprintf("Cluster: %s is ready, current phase is Running", clusterName),
+		Message: fmt.Sprintf("cluster %s is ready", clusterName),
 		Reason:  ReasonClusterReady,
 	}
 }
 
-// newComponentsNotReadyCondition creates a condition when components of cluster are not ready
-func newComponentsNotReadyCondition(notReadyComponentNames map[string]struct{}) metav1.Condition {
-	cNameSlice := maps.Keys(notReadyComponentNames)
-	slices.Sort(cNameSlice)
+func newClusterNotReadyCondition(clusterName string, kindNames map[string][]string) metav1.Condition {
+	messages := make([]string, 0)
+	for kind, names := range kindNames {
+		if len(names) > 0 {
+			slices.Sort(names)
+			messages = append(messages, fmt.Sprintf("unavailable %ss: %s", kind, strings.Join(names, ",")))
+		}
+	}
 	return metav1.Condition{
 		Type:    appsv1.ConditionTypeReady,
 		Status:  metav1.ConditionFalse,
-		Message: fmt.Sprintf("pods are unavailable in Components: %v, refer to related component message in Cluster.status.components", cNameSlice),
+		Message: fmt.Sprintf("cluster %s is NOT ready, %s", clusterName, strings.Join(messages, ",")),
 		Reason:  ReasonComponentsNotReady,
 	}
 }

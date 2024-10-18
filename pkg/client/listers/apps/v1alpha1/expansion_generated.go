@@ -18,10 +18,6 @@ limitations under the License.
 
 package v1alpha1
 
-// BackupPolicyTemplateListerExpansion allows custom methods to be added to
-// BackupPolicyTemplateLister.
-type BackupPolicyTemplateListerExpansion interface{}
-
 // ClusterListerExpansion allows custom methods to be added to
 // ClusterLister.
 type ClusterListerExpansion interface{}

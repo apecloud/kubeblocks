@@ -115,9 +115,13 @@ func PatchOpsStatus(ctx context.Context,
 
 // PatchClusterNotFound patches ClusterNotFound condition to the OpsRequest.status.conditions.
 func PatchClusterNotFound(ctx context.Context, cli client.Client, opsRes *OpsResource) error {
-	message := fmt.Sprintf("spec.clusterRef %s is not found", opsRes.OpsRequest.Spec.GetClusterName())
+	message := fmt.Sprintf("spec.clusterName %s is not found", opsRes.OpsRequest.Spec.GetClusterName())
 	condition := opsv1alpha1.NewValidateFailedCondition(opsv1alpha1.ReasonClusterNotFound, message)
-	return PatchOpsStatus(ctx, cli, opsRes, opsv1alpha1.OpsFailedPhase, condition)
+	opsPhase := opsv1alpha1.OpsFailedPhase
+	if opsRes.OpsRequest.IsComplete() {
+		opsPhase = opsRes.OpsRequest.Status.Phase
+	}
+	return PatchOpsStatus(ctx, cli, opsRes, opsPhase, condition)
 }
 
 // PatchOpsHandlerNotSupported patches OpsNotSupported condition to the OpsRequest.status.conditions.
@@ -338,7 +342,7 @@ func getComponentSpecOrShardingTemplate(cluster *appsv1.Cluster, componentName s
 			return &v
 		}
 	}
-	for _, v := range cluster.Spec.ShardingSpecs {
+	for _, v := range cluster.Spec.Shardings {
 		if v.Name == componentName {
 			return &v.Template
 		}

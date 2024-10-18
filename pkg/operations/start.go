@@ -63,8 +63,8 @@ func (start StartOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Cl
 	for i := range cluster.Spec.ComponentSpecs {
 		startComp(&cluster.Spec.ComponentSpecs[i])
 	}
-	for i := range cluster.Spec.ShardingSpecs {
-		startComp(&cluster.Spec.ShardingSpecs[i].Template)
+	for i := range cluster.Spec.Shardings {
+		startComp(&cluster.Spec.Shardings[i].Template)
 	}
 	return cli.Update(reqCtx.Ctx, cluster)
 }

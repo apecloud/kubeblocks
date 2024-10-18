@@ -38,7 +38,7 @@ var _ = Describe("component utils", func() {
 			}
 
 			for _, expr := range validExpressions {
-				err := ValidateCompDefRegexp(expr)
+				err := ValidateDefNameRegexp(expr)
 				Expect(err).Should(BeNil())
 			}
 		})
@@ -53,7 +53,7 @@ var _ = Describe("component utils", func() {
 			}
 
 			for _, expr := range invalidExpressions {
-				err := ValidateCompDefRegexp(expr)
+				err := ValidateDefNameRegexp(expr)
 				Expect(err).ShouldNot(BeNil())
 			}
 		})
@@ -148,7 +148,7 @@ var _ = Describe("component utils", func() {
 				want: false,
 			}}
 			for _, tt := range tests {
-				match := CompDefMatched(tt.fields.compDef, tt.fields.compDefPattern)
+				match := PrefixOrRegexMatched(tt.fields.compDef, tt.fields.compDefPattern)
 				Expect(match).Should(Equal(tt.want))
 			}
 		})

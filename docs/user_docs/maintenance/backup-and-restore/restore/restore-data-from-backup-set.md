@@ -6,43 +6,98 @@ sidebar_position: 1
 sidebar_label: Restore from backup set
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # Restore data from backup set
 
 KubeBlocks supports restoring clusters from backups with the following instructions.
 
 1. View backups.
 
-   For existing clusters, execute:
+     <Tabs>
 
-   ```shell
-   kbcli cluster list-backups mysql-cluster
-   ```
+     <TabItem value="kbcli" label="kbcli" default>
 
-   If the cluster has been deleted, execute:
+     For existing clusters, execute:
 
-   ```bash
-   kbcli dataprotection list-backups
-   ```
+     ```bash
+     kbcli cluster list-backups mysql-cluster
+     ```
+
+     If the cluster has been deleted, execute:
+
+     ```bash
+     kbcli dataprotection list-backups
+     ```
+
+     </TabItem>
+
+     <TabItem value="kubectl" label="kubectl">
+
+     ```bash
+     kubectl get backups
+     ```
+
+     </TabItem>
+
+     </Tabs>
 
 2. Restore clusters from a specific backup.
 
-    ```powershell
-    # Restore new cluster
-    kbcli cluster restore myrestore --backup mybackup
-    >
-    Cluster myrestore created
+     <Tabs>
 
-    # View the status of the restored cluster
-    kbcli cluster list myrestore
-    NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    CREATED-TIME
-    myrestore   default     apecloud-mysql       ac-mysql-8.0.30   Delete               Running   Oct 30,2023 16:26 UTC+0800
-    ```
+     <TabItem value="kbcli" label="kbcli" default>
 
+     ```bash
+     # Restore new cluster
+     kbcli cluster restore myrestore --backup mybackup
+     >
+     Cluster myrestore created
 
-3. Connect to the restored cluster for verification.
+     # View the status of the restored cluster
+     kbcli cluster list myrestore
+     >
+     NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    CREATED-TIME
+     myrestore   default     apecloud-mysql       ac-mysql-8.0.30   Delete               Running   Oct 30,2023 16:26 UTC+0800
+     ```
 
-    Once the cluster status is `Running`, run the following command to connect to the cluster for verification:
+     </TabItem>
 
-    ```bash
-    kbcli cluster connect myrestore
-    ```
+     <TabItem value="kubectl" label="kubectl">
+
+     You can set the `connectionPassword.annotations` of the restored cluster as that of the original cluster. The password of the original cluster can be accessed by viewing the annotation of `dataprotection.kubeblocks.io/connection-password` in the backup YAML file.
+
+     ```bash
+     kubectl apply -f - <<-'EOF'
+     apiVersion: apps.kubeblocks.io/v1alpha1
+     kind: Cluster
+     metadata:
+       name: myrestore
+       namespace: default
+       annotations:
+         kubeblocks.io/restore-from-backup: '{"mysql":{"name":"mybackup","namespace":"default","connectionPassword": "Bw1cR15mzfldc9hzGuK4m1BZQOzha6aBb1i9nlvoBdoE9to4"}}'
+     spec:
+       clusterDefinitionRef: apecloud-mysql
+       clusterVersionRef: ac-mysql-8.0.30
+       terminationPolicy: WipeOut
+       componentSpecs:
+         - name: mysql
+           componentDefRef: mysql
+           replicas: 1
+           volumeClaimTemplates:
+             - name: data
+               spec:
+                 accessModes:
+                   - ReadWriteOnce
+                 resources:
+                   requests:
+                     storage: 20Gi
+     EOF
+     ```
+
+     </TabItem>
+
+     </Tabs>
+
+3. Connect to the restored cluster for verification.  Once the cluster status is `Running`, [connect to the cluster](./../../../kubeblocks-for-apecloud-mysql/cluster-management/create-and-connect-an-apecloud-mysql-cluster.md#connect-to-a-cluster) for verification.

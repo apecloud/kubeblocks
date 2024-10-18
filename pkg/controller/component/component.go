@@ -25,7 +25,6 @@ import (
 	"strconv"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -162,35 +161,25 @@ func GetCompNCompDefByName(ctx context.Context, cli client.Reader, namespace, fu
 	return comp, compDef, nil
 }
 
-// ListClusterComponents lists the components of the cluster.
-func ListClusterComponents(ctx context.Context, cli client.Reader, cluster *appsv1.Cluster) ([]appsv1.Component, error) {
-	compList := &appsv1.ComponentList{}
-	if err := cli.List(ctx, compList, client.InNamespace(cluster.Namespace), client.MatchingLabels{constant.AppInstanceLabelKey: cluster.Name}); err != nil {
-		return nil, err
-	}
-	return compList.Items, nil
-}
-
-// GetClusterComponentShortNameSet gets the component short name set of the cluster.
-func GetClusterComponentShortNameSet(ctx context.Context, cli client.Reader, cluster *appsv1.Cluster) (sets.Set[string], error) {
-	compList, err := ListClusterComponents(ctx, cli, cluster)
-	if err != nil {
-		return nil, err
-	}
-	compSet := sets.Set[string]{}
-	for _, comp := range compList {
-		compShortName, err := ShortName(cluster.Name, comp.Name)
-		if err != nil {
-			return nil, err
-		}
-		compSet.Insert(compShortName)
-	}
-	return compSet, nil
-}
-
 func GetExporter(componentDef appsv1.ComponentDefinitionSpec) *common.Exporter {
 	if componentDef.Exporter != nil {
 		return &common.Exporter{Exporter: *componentDef.Exporter}
 	}
 	return nil
+}
+
+// GetComponentNameFromObj gets the component name from the k8s object.
+func GetComponentNameFromObj(obj client.Object) string {
+	if shardingName, ok := obj.GetLabels()[constant.KBAppShardingNameLabelKey]; ok {
+		return shardingName
+	}
+	return obj.GetLabels()[constant.KBAppComponentLabelKey]
+}
+
+// GetComponentNameLabelKey gets the component name label key.
+func GetComponentNameLabelKey(cluster *appsv1.Cluster, componentName string) string {
+	if cluster.Spec.GetShardingByName(componentName) != nil {
+		return constant.KBAppShardingNameLabelKey
+	}
+	return constant.KBAppComponentLabelKey
 }

@@ -36,6 +36,8 @@ type Interface interface {
 	ComponentVersions() ComponentVersionInformer
 	// ServiceDescriptors returns a ServiceDescriptorInformer.
 	ServiceDescriptors() ServiceDescriptorInformer
+	// ShardingDefinitions returns a ShardingDefinitionInformer.
+	ShardingDefinitions() ShardingDefinitionInformer
 }
 
 type version struct {
@@ -77,4 +79,9 @@ func (v *version) ComponentVersions() ComponentVersionInformer {
 // ServiceDescriptors returns a ServiceDescriptorInformer.
 func (v *version) ServiceDescriptors() ServiceDescriptorInformer {
 	return &serviceDescriptorInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// ShardingDefinitions returns a ShardingDefinitionInformer.
+func (v *version) ShardingDefinitions() ShardingDefinitionInformer {
+	return &shardingDefinitionInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }

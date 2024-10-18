@@ -72,11 +72,11 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 
 	// 2. validate the update set
-	newNameSet := sets.NewString()
+	newNameSet := sets.New[string]()
 	for name := range nameToTemplateMap {
 		newNameSet.Insert(name)
 	}
-	oldNameSet := sets.NewString()
+	oldNameSet := sets.New[string]()
 	oldInstanceMap := make(map[string]*corev1.Pod)
 	var oldPodList []*corev1.Pod
 	for _, object := range tree.List(&corev1.Pod{}) {

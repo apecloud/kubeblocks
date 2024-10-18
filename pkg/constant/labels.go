@@ -34,6 +34,7 @@ const (
 // labels defined by KubeBlocks
 const (
 	ClusterDefLabelKey            = "clusterdefinition.kubeblocks.io/name"
+	ShardingDefLabelKey           = "shardingdefinition.kubeblocks.io/name"
 	ComponentDefinitionLabelKey   = "componentdefinition.kubeblocks.io/name"
 	ComponentVersionLabelKey      = "componentversion.kubeblocks.io/name"
 	ServiceDescriptorNameLabelKey = "servicedescriptor.kubeblocks.io/name"

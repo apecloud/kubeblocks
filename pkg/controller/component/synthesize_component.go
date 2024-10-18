@@ -165,9 +165,9 @@ func buildComp2CompDefs(ctx context.Context, cli client.Reader, cluster *appsv1.
 		}
 	}
 
-	// build from shardingSpecs
-	for _, shardingSpec := range cluster.Spec.ShardingSpecs {
-		shardingComps, err := intctrlutil.ListShardingComponents(ctx, cli, cluster, shardingSpec.Name)
+	// build from shardings
+	for _, spec := range cluster.Spec.Shardings {
+		shardingComps, err := intctrlutil.ListShardingComponents(ctx, cli, cluster, spec.Name)
 		if err != nil {
 			return nil, err
 		}
@@ -250,7 +250,7 @@ func buildSchedulingPolicy(synthesizedComp *SynthesizedComponent, comp *appsv1.C
 
 func buildVolumeClaimTemplates(synthesizeComp *SynthesizedComponent, comp *appsv1.Component) {
 	if comp.Spec.VolumeClaimTemplates != nil {
-		synthesizeComp.VolumeClaimTemplates = toVolumeClaimTemplates(&comp.Spec)
+		synthesizeComp.VolumeClaimTemplates = ToVolumeClaimTemplates(comp.Spec.VolumeClaimTemplates)
 	}
 }
 
@@ -336,7 +336,7 @@ func limitSharedMemoryVolumeSize(synthesizeComp *SynthesizedComponent, comp *app
 	}
 }
 
-func toVolumeClaimTemplates(compSpec *appsv1.ComponentSpec) []corev1.PersistentVolumeClaimTemplate {
+func ToVolumeClaimTemplates(vcts []appsv1.ClusterComponentVolumeClaimTemplate) []corev1.PersistentVolumeClaimTemplate {
 	storageClassName := func(spec appsv1.PersistentVolumeClaimSpec, defaultStorageClass string) *string {
 		if spec.StorageClassName != nil && *spec.StorageClassName != "" {
 			return spec.StorageClassName
@@ -347,7 +347,7 @@ func toVolumeClaimTemplates(compSpec *appsv1.ComponentSpec) []corev1.PersistentV
 		return nil
 	}
 	var ts []corev1.PersistentVolumeClaimTemplate
-	for _, t := range compSpec.VolumeClaimTemplates {
+	for _, t := range vcts {
 		ts = append(ts, corev1.PersistentVolumeClaimTemplate{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: t.Name,

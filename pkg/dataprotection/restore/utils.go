@@ -37,6 +37,7 @@ import (
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
@@ -322,12 +323,9 @@ func isTimeInRange(t time.Time, start time.Time, end time.Time) bool {
 }
 
 func GetRestoreFromBackupAnnotation(backup *dpv1alpha1.Backup, volumeRestorePolicy, restoreTime string, env []corev1.EnvVar, doReadyRestoreAfterClusterRunning bool) (string, error) {
-	componentName := backup.Labels[constant.KBAppShardingNameLabelKey]
+	componentName := component.GetComponentNameFromObj(backup)
 	if len(componentName) == 0 {
-		componentName = backup.Labels[constant.KBAppComponentLabelKey]
-		if len(componentName) == 0 {
-			return "", fmt.Errorf("unable to obtain the name of the component to be recovered, please ensure that Backup.status.componentName exists")
-		}
+		return "", fmt.Errorf("unable to obtain the name of the component to be recovered, please ensure that Backup.status.componentName exists")
 	}
 	restoreInfoMap := map[string]string{}
 	restoreInfoMap[constant.BackupNameKeyForRestore] = backup.Name

@@ -122,8 +122,7 @@ var _ = Describe("Log Collection Controller", func() {
 				testdp.PatchK8sJobStatus(&testCtx, jobKey, batchv1.JobFailed)
 
 				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(backup), func(g Gomega, fetched *dpv1alpha1.Backup) {
-					// NOTE: env test can not create a real pod, so FailureReason will always empty
-					g.Expect(fetched.Status.FailureReason).Should(BeEmpty())
+					g.Expect(fetched.Status.FailureReason).Should(ContainSubstring("there are failed actions"))
 				})).Should(Succeed())
 			})
 		})

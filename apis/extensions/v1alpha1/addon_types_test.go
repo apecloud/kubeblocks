@@ -25,8 +25,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-
-	"github.com/apecloud/kubeblocks/pkg/testutil"
 )
 
 func TestSelectorRequirementString(t *testing.T) {
@@ -50,7 +48,7 @@ func TestSelectorRequirementNoOperator(t *testing.T) {
 func TestSelectorRequirementContains(t *testing.T) {
 	g := NewGomegaWithT(t)
 	const distro = "k3s"
-	testutil.SetKubeServerVersionWithDistro("1", "24", "0", distro)
+	SetKubeServerVersionWithDistro("1", "24", "0", distro)
 	r := SelectorRequirement{
 		Key:      KubeGitVersion,
 		Operator: Contains,
@@ -83,7 +81,7 @@ func TestSelectorRequirementContains(t *testing.T) {
 func TestSelectorRequirementNotContains(t *testing.T) {
 	g := NewGomegaWithT(t)
 	const distro = "k3s"
-	testutil.SetKubeServerVersionWithDistro("1", "24", "0", distro)
+	SetKubeServerVersionWithDistro("1", "24", "0", distro)
 	r := SelectorRequirement{
 		Key:      KubeGitVersion,
 		Operator: DoesNotContain,
@@ -115,7 +113,7 @@ func TestSelectorRequirementNotContains(t *testing.T) {
 func TestSelectorRequirementMatchRegex(t *testing.T) {
 	g := NewGomegaWithT(t)
 	const distro = "k3s"
-	testutil.SetKubeServerVersionWithDistro("1", "24", "0", distro)
+	SetKubeServerVersionWithDistro("1", "24", "0", distro)
 	r := SelectorRequirement{
 		Key:      KubeGitVersion,
 		Operator: MatchRegex,
@@ -150,7 +148,7 @@ func TestSelectorRequirementMatchRegex(t *testing.T) {
 		"^v?(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-((?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\\.(?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\\+([0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*))?$",
 	}
 	g.Expect(r.MatchesFromConfig()).Should(BeTrue())
-	testutil.SetKubeServerVersion("1", "24", "0")
+	SetKubeServerVersion("1", "24", "0")
 	g.Expect(r.MatchesFromConfig()).Should(BeTrue())
 
 	// pass KubeVersion
@@ -171,7 +169,7 @@ func TestSelectorRequirementMatchRegex(t *testing.T) {
 func TestSelectorRequirementNotMatchRegex(t *testing.T) {
 	g := NewGomegaWithT(t)
 	const distro = "k3s"
-	testutil.SetKubeServerVersionWithDistro("1", "24", "0", distro)
+	SetKubeServerVersionWithDistro("1", "24", "0", distro)
 	r := SelectorRequirement{
 		Key:      KubeGitVersion,
 		Operator: DoesNotMatchRegex,

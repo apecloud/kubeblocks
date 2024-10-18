@@ -28,17 +28,59 @@ The termination policy determines how a cluster is deleted.
 
 To check the termination policy, execute the following command.
 
+<Tabs>
+
+<TabItem value="kbcli" label="kbcli" default>
+
 ```bash
-kbcli cluster list redis-cluster
->
-NAME   	        NAMESPACE	CLUSTER-DEFINITION	VERSION        	TERMINATION-POLICY	STATUS 	     CREATED-TIME
-redis-cluster	default  	redis    	        redis-7.0.6	    Delete            	Running	     Apr 10,2023 20:27 UTC+0800
+kbcli cluster list mycluster -n demo
+NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION   TERMINATION-POLICY   STATUS    CREATED-TIME
+mycluster   demo        redis                          Delete               Running   Apr 10,2023 20:27 UTC+0800
 ```
+
+</TabItem>
+
+<TabItem value="kubectl" label="kubectl">
+
+```bash
+kubectl -n demo get cluster mycluster
+>
+NAME        CLUSTER-DEFINITION   VERSION       TERMINATION-POLICY   STATUS    AGE
+mycluster   redis                              Delete               Running   10m
+```
+
+</TabItem>
+
+</Tabs>
 
 ## Step
 
 Run the command below to delete a specified cluster.
 
+<Tabs>
+
+<TabItem value="kbcli" label="kbcli" default>
+
 ```bash
-kbcli cluster delete redis-cluster
+kbcli cluster delete mycluster -n demo
 ```
+
+</TabItem>
+
+<TabItem value="kubectl" label="kubectl">
+
+```bash
+kubectl delete cluster mycluster -n demo
+```
+
+If you want to delete a cluster and its all related resources, you can modify the termination policy to `WipeOut`, then delete the cluster.
+
+```bash
+kubectl patch -n demo cluster mycluster -p '{"spec":{"terminationPolicy":"WipeOut"}}' --type="merge"
+
+kubectl delete -n demo cluster mycluster
+```
+
+</TabItem>
+
+</Tabs>

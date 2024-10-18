@@ -152,7 +152,6 @@ type PodSelectionStrategy string
 
 const (
 	// PodSelectionStrategyAll selects all pods that match the labelsSelector.
-	// TODO: support PodSelectionStrategyAll
 	PodSelectionStrategyAll PodSelectionStrategy = "All"
 
 	// PodSelectionStrategyAny selects any one pod that match the labelsSelector.

@@ -57,17 +57,18 @@ func (factory *MockClusterFactory) SetSchedulingPolicy(schedulingPolicy *appsv1.
 	return factory
 }
 
-func (factory *MockClusterFactory) AddShardingSpec(shardingName string, compDefName string) *MockClusterFactory {
-	shardingSpec := appsv1.ShardingSpec{
+func (factory *MockClusterFactory) AddSharding(shardingName string, shardingDefName, compDefName string) *MockClusterFactory {
+	sharding := appsv1.ClusterSharding{
+		Name:        shardingName,
+		ShardingDef: shardingDefName,
 		Template: appsv1.ClusterComponentSpec{
 			Name:         "fake",
 			ComponentDef: compDefName,
 			Replicas:     1,
 		},
-		Name:   shardingName,
 		Shards: 1,
 	}
-	factory.Get().Spec.ShardingSpecs = append(factory.Get().Spec.ShardingSpecs, shardingSpec)
+	factory.Get().Spec.Shardings = append(factory.Get().Spec.Shardings, sharding)
 	return factory
 }
 
@@ -93,6 +94,17 @@ func (factory *MockClusterFactory) AddMultipleTemplateComponent(compName string,
 	return factory
 }
 
+func (factory *MockClusterFactory) AddInstances(compName string, instance appsv1.InstanceTemplate) *MockClusterFactory {
+	for i, compSpec := range factory.Get().Spec.ComponentSpecs {
+		if compSpec.Name != compName {
+			continue
+		}
+		factory.Get().Spec.ComponentSpecs[i].Instances = append(factory.Get().Spec.ComponentSpecs[i].Instances, instance)
+		break
+	}
+	return factory
+}
+
 func (factory *MockClusterFactory) AddService(service appsv1.ClusterService) *MockClusterFactory {
 	services := factory.Get().Spec.Services
 	if len(services) == 0 {
@@ -105,7 +117,7 @@ func (factory *MockClusterFactory) AddService(service appsv1.ClusterService) *Mo
 
 type updateFn func(comp *appsv1.ClusterComponentSpec)
 
-type shardingUpdateFn func(shardingSpec *appsv1.ShardingSpec)
+type shardingUpdateFn func(*appsv1.ClusterSharding)
 
 func (factory *MockClusterFactory) lastComponentRef(update updateFn) *MockClusterFactory {
 	comps := factory.Get().Spec.ComponentSpecs
@@ -116,18 +128,18 @@ func (factory *MockClusterFactory) lastComponentRef(update updateFn) *MockCluste
 	return factory
 }
 
-func (factory *MockClusterFactory) lastShardingSpec(update shardingUpdateFn) *MockClusterFactory {
-	shardingSpecs := factory.Get().Spec.ShardingSpecs
-	if len(shardingSpecs) > 0 {
-		update(&shardingSpecs[len(shardingSpecs)-1])
+func (factory *MockClusterFactory) lastSharding(update shardingUpdateFn) *MockClusterFactory {
+	shardings := factory.Get().Spec.Shardings
+	if len(shardings) > 0 {
+		update(&shardings[len(shardings)-1])
 	}
-	factory.Get().Spec.ShardingSpecs = shardingSpecs
+	factory.Get().Spec.Shardings = shardings
 	return factory
 }
 
 func (factory *MockClusterFactory) SetShards(shards int32) *MockClusterFactory {
-	return factory.lastShardingSpec(func(shardingSpec *appsv1.ShardingSpec) {
-		shardingSpec.Shards = shards
+	return factory.lastSharding(func(sharding *appsv1.ClusterSharding) {
+		sharding.Shards = shards
 	})
 }
 

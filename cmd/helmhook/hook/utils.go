@@ -66,6 +66,9 @@ func deleteDeployment(ctx context.Context, client *kubernetes.Clientset, ns, com
 	if err != nil {
 		return err
 	}
+	if deploy == nil {
+		return nil
+	}
 
 	// before delete deployment, output the deployment yaml, if deployment was deleted
 	// by mistake, we can recover it by apply the yaml.

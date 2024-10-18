@@ -541,21 +541,28 @@ func resolveServiceTypeRef(ctx context.Context, cli client.Reader, synthesizedCo
 func resolveServiceHostRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
 	defineKey string, selector appsv1.ServiceVarSelector) ([]*corev1.EnvVar, []*corev1.EnvVar, error) {
 	resolveHost := func(obj any) (*corev1.EnvVar, *corev1.EnvVar, error) {
-		return &corev1.EnvVar{Name: defineKey, Value: composeHostValueFromServices(obj)}, nil, nil
+		return &corev1.EnvVar{Name: defineKey, Value: composeHostValueFromServices(obj, false)}, nil, nil
 	}
 	return resolveServiceVarRefLow(ctx, cli, synthesizedComp, selector, selector.Host, resolveHost)
 }
 
-func composeHostValueFromServices(obj any) string {
+func composeHostValueFromServices(obj any, fqdn bool) string {
 	robj := obj.(*resolvedServiceObj)
 	services := []*corev1.Service{robj.service}
 	if robj.podServices != nil {
 		services = robj.podServices
 	}
 
+	svcName := func(svc *corev1.Service) string {
+		if !fqdn {
+			return svc.Name
+		}
+		return serviceFQDN(svc.Namespace, svc.Name)
+	}
+
 	svcNames := make([]string, 0)
 	for _, svc := range services {
-		svcNames = append(svcNames, svc.Name)
+		svcNames = append(svcNames, svcName(svc))
 	}
 	slices.Sort(svcNames)
 
@@ -683,7 +690,7 @@ func composeNamedValueFromServices(obj any, selector func([]*corev1.Service) map
 func resolveServiceHostOrLoadBalancerRefAdaptive(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
 	defineKey string, selector appsv1.ServiceVarSelector) ([]*corev1.EnvVar, []*corev1.EnvVar, error) {
 	host := func(obj any) (*corev1.EnvVar, *corev1.EnvVar, error) {
-		return &corev1.EnvVar{Name: defineKey, Value: composeHostValueFromServices(obj)}, nil, nil
+		return &corev1.EnvVar{Name: defineKey, Value: composeHostValueFromServices(obj, false)}, nil, nil
 	}
 	loadBalancer := func(obj any) (*corev1.EnvVar, *corev1.EnvVar, error) {
 		points := composeLoadBalancerValueFromServices(obj)
@@ -1245,13 +1252,13 @@ func resolveReferentObjects(synthesizedComp *SynthesizedComponent,
 
 func resolveReferentComponents(synthesizedComp *SynthesizedComponent, objRef appsv1.ClusterObjectReference) ([]string, error) {
 	// match the current component when the multiple cluster object option not set
-	if len(objRef.CompDef) == 0 || (CompDefMatched(synthesizedComp.CompDefName, objRef.CompDef) && objRef.MultipleClusterObjectOption == nil) {
+	if len(objRef.CompDef) == 0 || (PrefixOrRegexMatched(synthesizedComp.CompDefName, objRef.CompDef) && objRef.MultipleClusterObjectOption == nil) {
 		return []string{synthesizedComp.Name}, nil
 	}
 
 	compNames := make([]string, 0)
 	for k, v := range synthesizedComp.Comp2CompDefs {
-		if CompDefMatched(v, objRef.CompDef) {
+		if PrefixOrRegexMatched(v, objRef.CompDef) {
 			compNames = append(compNames, k)
 		}
 	}

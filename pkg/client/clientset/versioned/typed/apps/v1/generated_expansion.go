@@ -29,3 +29,5 @@ type ComponentDefinitionExpansion interface{}
 type ComponentVersionExpansion interface{}
 
 type ServiceDescriptorExpansion interface{}
+
+type ShardingDefinitionExpansion interface{}

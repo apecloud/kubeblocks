@@ -89,9 +89,9 @@ resources:
     namespaced: true
   controller: true
   domain: kubeblocks.io
-  group: apps
+  group: dataprotection
   kind: BackupPolicyTemplate
-  path: github.com/apecloud/kubeblocks/apis/apps/v1alpha1
+  path: github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1
   version: v1alpha1
 - api:
     crdVersion: v1
@@ -300,6 +300,14 @@ resources:
   kind: OpsDefinition
   path: github.com/apecloud/kubeblocks/apis/apps/v1alpha1
   version: v1alpha1
+- api:
+    crdVersion: v1
+  controller: true
+  domain: kubeblocks.io
+  group: apps
+  kind: ShardingDefinition
+  path: github.com/apecloud/kubeblocks/apis/apps/v1
+  version: v1
 - api:
     crdVersion: v1
   controller: true

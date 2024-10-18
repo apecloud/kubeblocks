@@ -156,3 +156,7 @@ helm repo update
 # Update addon version
 helm upgrade -i {addon-release-name} kubeblocks-addons/{addon-name} --version x.y.z -n kb-system   
 ```
+
+## FAQ
+
+Refer to the [FAQ](./../faq.md) to addresses common questions and issues that may arise when upgrading KubeBlocks. isn't covered, you can [submit an issue](https://github.com/apecloud/kubeblocks/issues/new/choose) or [start a discussion](https://github.com/apecloud/kubeblocks/discussions) on upgrading in GitHub.

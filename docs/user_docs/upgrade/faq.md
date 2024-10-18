@@ -36,7 +36,7 @@ kubectl annotate addons.extensions.kubeblocks.io -l app.kubernetes.io/name=kubeb
 If you want to add the annotation for a specified Addon, replace `{addonName}` with the actual Addon name and run the command below.
 
 ```bash
-kubectl annotate https://addons.extensions.kubeblocks.io {addonName} helm.sh/resource-policy=keep
+kubectl annotate addons.extensions.kubeblocks.io {addonName} helm.sh/resource-policy=keep
 ```
 
 If you want to check whether the annotation for an Addon was added successfully, replace `{addonName}` with the actual Addon name and run the command below.

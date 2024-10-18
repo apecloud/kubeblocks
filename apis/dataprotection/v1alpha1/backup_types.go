@@ -374,7 +374,7 @@ const (
 // +kubebuilder:printcolumn:name="STATUS",type=string,JSONPath=`.status.phase`
 // +kubebuilder:printcolumn:name="TOTAL-SIZE",type=string,JSONPath=`.status.totalSize`
 // +kubebuilder:printcolumn:name="DURATION",type=string,JSONPath=`.status.duration`
-// +kubebuilder:printcolumn:name="DURATION",type=string,JSONPath=`.spec.deletionPolicy`
+// +kubebuilder:printcolumn:name="DELETION-POLICY",type=string,JSONPath=`.spec.deletionPolicy`
 // +kubebuilder:printcolumn:name="CREATION-TIME",type=string,JSONPath=".metadata.creationTimestamp"
 // +kubebuilder:printcolumn:name="COMPLETION-TIME",type=string,JSONPath=`.status.completionTimestamp`
 // +kubebuilder:printcolumn:name="EXPIRATION-TIME",type=string,JSONPath=`.status.expiration`

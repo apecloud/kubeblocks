@@ -37,7 +37,7 @@ spec:
       name: DURATION
       type: string
     - jsonPath: .spec.deletionPolicy
-      name: DURATION
+      name: DELETION-POLICY
       type: string
     - jsonPath: .metadata.creationTimestamp
       name: CREATION-TIME

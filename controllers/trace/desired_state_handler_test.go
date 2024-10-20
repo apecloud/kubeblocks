@@ -213,25 +213,25 @@ var _ = Describe("desired_state_handler test", func() {
 			k8sMock.EXPECT().
 				Get(gomock.Any(), gomock.Any(), &kbappsv1.ClusterDefinition{}, gomock.Any()).
 				DoAndReturn(func(_ context.Context, objKey client.ObjectKey, obj *kbappsv1.ClusterDefinition, _ ...client.GetOption) error {
-					*obj = *clusterDefinition
+					*obj = *clusterDefinition.DeepCopy()
 					return nil
 				}).AnyTimes()
 			k8sMock.EXPECT().
 				Get(gomock.Any(), gomock.Any(), &kbappsv1.ComponentDefinition{}, gomock.Any()).
 				DoAndReturn(func(_ context.Context, objKey client.ObjectKey, obj *kbappsv1.ComponentDefinition, _ ...client.GetOption) error {
-					*obj = *componentDefinition
+					*obj = *componentDefinition.DeepCopy()
 					return nil
 				}).AnyTimes()
 			k8sMock.EXPECT().
 				List(gomock.Any(), &kbappsv1.ComponentDefinitionList{}, gomock.Any()).
 				DoAndReturn(func(_ context.Context, list *kbappsv1.ComponentDefinitionList, _ ...client.GetOption) error {
-					list.Items = []kbappsv1.ComponentDefinition{*componentDefinition}
+					list.Items = []kbappsv1.ComponentDefinition{*componentDefinition.DeepCopy()}
 					return nil
 				}).AnyTimes()
 			k8sMock.EXPECT().
 				List(gomock.Any(), &kbappsv1.ComponentVersionList{}, gomock.Any()).
 				DoAndReturn(func(_ context.Context, list *kbappsv1.ComponentVersionList, _ ...client.ListOption) error {
-					list.Items = []kbappsv1.ComponentVersion{*componentVersion}
+					list.Items = []kbappsv1.ComponentVersion{*componentVersion.DeepCopy()}
 					return nil
 				}).AnyTimes()
 			k8sMock.EXPECT().
@@ -242,7 +242,7 @@ var _ = Describe("desired_state_handler test", func() {
 			k8sMock.EXPECT().
 				Get(gomock.Any(), gomock.Any(), &kbappsv1.Cluster{}, gomock.Any()).
 				DoAndReturn(func(_ context.Context, objKey client.ObjectKey, obj *kbappsv1.Cluster, _ ...client.GetOption) error {
-					*obj = *primaryV2
+					*obj = *primaryV2.DeepCopy()
 					return nil
 				}).Times(1)
 			k8sMock.EXPECT().

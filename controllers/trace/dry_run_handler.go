@@ -103,7 +103,7 @@ func applySpec(current *kbappsv1.Cluster, desiredSpecStr string) (*kbappsv1.Clus
 	}
 
 	// Extract the current spec and apply the patch
-	currentSpec, err := getSpecFieldAsStruct(current)
+	currentSpec, err := getFieldAsStruct(current, specFieldName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get current spec: %w", err)
 	}

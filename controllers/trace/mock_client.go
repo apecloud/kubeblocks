@@ -150,8 +150,12 @@ func (c *mockClient) Update(ctx context.Context, obj client.Object, opts ...clie
 	if oldObj == nil {
 		return apierrors.NewNotFound(objectRef.GroupVersion().WithResource(objectRef.Kind).GroupResource(), fmt.Sprintf("%s/%s", objectRef.Namespace, objectRef.Name))
 	}
-	increaseGeneration(oldObj, obj)
-	return c.store.Update(obj)
+	metaChanged := checkMetadata(oldObj, obj)
+	specChanged := increaseGeneration(oldObj, obj)
+	if metaChanged || specChanged {
+		return c.store.Update(obj)
+	}
+	return nil
 }
 
 func (c *mockClient) Patch(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
@@ -175,10 +179,18 @@ func doPatch(obj client.Object, patch client.Patch, store ChangeCaptureStore, sc
 	if err = applyPatch(newObj, patch.Type(), patchData); err != nil {
 		return err
 	}
+	metaChanged := checkMetadata(oldObj, newObj)
+	specChanged := false
+	statusChanged := false
 	if checkGeneration {
-		increaseGeneration(oldObj, newObj)
+		specChanged = increaseGeneration(oldObj, newObj)
+	} else {
+		statusChanged = checkStatus(oldObj, newObj)
 	}
-	return store.Update(newObj)
+	if metaChanged || specChanged || statusChanged {
+		return store.Update(newObj)
+	}
+	return nil
 }
 
 func applyPatch(obj client.Object, patchType types.PatchType, patchData []byte) error {
@@ -206,25 +218,42 @@ func applyPatch(obj client.Object, patchType types.PatchType, patchData []byte) 
 	return json.Unmarshal(patchedJSON, obj)
 }
 
-func increaseGeneration(oldObj, newObj client.Object) {
-	oldObj, _ = normalize(oldObj)
-	newObj, _ = normalize(newObj)
-	if oldObj == nil || newObj == nil {
-		return
+func checkMetadata(oldObj client.Object, newObj client.Object) bool {
+	if !reflect.DeepEqual(oldObj.GetFinalizers(), newObj.GetFinalizers()) ||
+		!reflect.DeepEqual(oldObj.GetOwnerReferences(), newObj.GetOwnerReferences()) ||
+		!reflect.DeepEqual(oldObj.GetAnnotations(), newObj.GetAnnotations()) ||
+		!reflect.DeepEqual(oldObj.GetLabels(), newObj.GetLabels()) {
+		return true
 	}
-	oldSpec, _ := getSpecFieldAsStruct(oldObj)
-	newSpec, _ := getSpecFieldAsStruct(newObj)
+	return false
+}
+
+func increaseGeneration(oldObj, newObj client.Object) bool {
+	oldObjCopy, _ := normalize(oldObj)
+	newObjCopy, _ := normalize(newObj)
+	if oldObjCopy == nil || newObjCopy == nil {
+		return false
+	}
+	oldSpec, _ := getFieldAsStruct(oldObjCopy, specFieldName)
+	newSpec, _ := getFieldAsStruct(newObjCopy, specFieldName)
 	if oldSpec == nil || newSpec == nil {
-		return
+		return false
 	}
 	diff := cmp.Diff(oldSpec, newSpec)
-	if diff != "" {
-		same := reflect.DeepEqual(oldSpec, newSpec)
-		if same {
-			return
-		}
-		newObj.SetGeneration(newObj.GetGeneration() + 1)
+	if diff == "" {
+		return false
 	}
+	newObj.SetGeneration(newObj.GetGeneration() + 1)
+	return true
+}
+
+func checkStatus(oldObj client.Object, newObj client.Object) bool {
+	oldStatus, _ := getFieldAsStruct(oldObj, statusFieldName)
+	newStatus, _ := getFieldAsStruct(newObj, statusFieldName)
+	if oldStatus == nil || newStatus == nil {
+		return false
+	}
+	return reflect.DeepEqual(oldStatus, newStatus)
 }
 
 func (c *mockClient) DeleteAllOf(ctx context.Context, obj client.Object, opts ...client.DeleteAllOfOption) error {
@@ -260,7 +289,18 @@ func (c *mockSubResourceClient) Create(ctx context.Context, obj client.Object, s
 }
 
 func (c *mockSubResourceClient) Update(ctx context.Context, obj client.Object, opts ...client.SubResourceUpdateOption) error {
-	return c.store.Update(obj)
+	objectRef, err := getObjectRef(obj, c.scheme)
+	if err != nil {
+		return err
+	}
+	oldObj := c.store.Get(objectRef)
+	if oldObj == nil {
+		return apierrors.NewNotFound(objectRef.GroupVersion().WithResource(objectRef.Kind).GroupResource(), fmt.Sprintf("%s/%s", objectRef.Namespace, objectRef.Name))
+	}
+	if checkMetadata(oldObj, obj) {
+		return c.store.Update(obj)
+	}
+	return nil
 }
 
 func (c *mockSubResourceClient) Patch(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error {

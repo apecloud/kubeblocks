@@ -156,11 +156,11 @@ func newPlanGenerator(ctx context.Context, cli client.Client, scheme *runtime.Sc
 
 func buildSpecDiff(current, desired client.Object) (string, error) {
 	// Extract the current spec
-	currentSpec, err := getSpecFieldAsStruct(current)
+	currentSpec, err := getFieldAsStruct(current, specFieldName)
 	if err != nil {
 		return "", err
 	}
-	desiredSpec, err := getSpecFieldAsStruct(desired)
+	desiredSpec, err := getFieldAsStruct(desired, specFieldName)
 	if err != nil {
 		return "", err
 	}

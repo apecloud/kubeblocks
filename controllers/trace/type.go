@@ -51,6 +51,11 @@ import (
 
 const finalizer = "trace.kubeblocks.io/finalizer"
 
+const (
+	specFieldName   = "Spec"
+	statusFieldName = "Status"
+)
+
 var (
 	clusterCriteria = OwnershipCriteria{
 		LabelCriteria: map[string]string{

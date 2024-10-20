@@ -777,8 +777,8 @@ func deleteUnusedRevisions(store ObjectRevisionStore, changes []tracev1.ObjectCh
 	}
 }
 
-// getSpecFieldAsStruct extracts the Spec field from a client.Object and returns it as an interface{}.
-func getSpecFieldAsStruct(obj client.Object) (interface{}, error) {
+// getFieldAsStruct extracts the field with name of fieldName from a client.Object and returns it as an interface{}.
+func getFieldAsStruct(obj client.Object, fieldName string) (interface{}, error) {
 	// Get the value of the object
 	objValue := reflect.ValueOf(obj)
 
@@ -788,7 +788,7 @@ func getSpecFieldAsStruct(obj client.Object) (interface{}, error) {
 	}
 
 	// Get the Spec field
-	specField := objValue.Elem().FieldByName("Spec")
+	specField := objValue.Elem().FieldByName(fieldName)
 	if !specField.IsValid() {
 		return nil, fmt.Errorf("spec field not found")
 	}

@@ -297,7 +297,7 @@ func (c *mockSubResourceClient) Update(ctx context.Context, obj client.Object, o
 	if oldObj == nil {
 		return apierrors.NewNotFound(objectRef.GroupVersion().WithResource(objectRef.Kind).GroupResource(), fmt.Sprintf("%s/%s", objectRef.Namespace, objectRef.Name))
 	}
-	if checkMetadata(oldObj, obj) {
+	if checkStatus(oldObj, obj) {
 		return c.store.Update(obj)
 	}
 	return nil

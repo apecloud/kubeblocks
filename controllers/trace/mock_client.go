@@ -23,18 +23,18 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	jsonpatch "github.com/evanphx/json-patch/v5"
-	"github.com/google/go-cmp/cmp"
-	"k8s.io/apimachinery/pkg/types"
 	"reflect"
 	"strings"
 
+	jsonpatch "github.com/evanphx/json-patch/v5"
+	"github.com/google/go-cmp/cmp"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -253,7 +253,7 @@ func checkStatus(oldObj client.Object, newObj client.Object) bool {
 	if oldStatus == nil || newStatus == nil {
 		return false
 	}
-	return reflect.DeepEqual(oldStatus, newStatus)
+	return !reflect.DeepEqual(oldStatus, newStatus)
 }
 
 func (c *mockClient) DeleteAllOf(ctx context.Context, obj client.Object, opts ...client.DeleteAllOfOption) error {

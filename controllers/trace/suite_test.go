@@ -50,7 +50,6 @@ import (
 	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 	"github.com/apecloud/kubeblocks/pkg/testutil/k8s/mocks"
 )
 
@@ -58,12 +57,10 @@ import (
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
 var (
-	cfg        *rest.Config
-	controller *gomock.Controller
-	k8sMock    *mocks.MockClient
-	testEnv    *envtest.Environment
-	ctx        context.Context
-	cancel     context.CancelFunc
+	cfg     *rest.Config
+	testEnv *envtest.Environment
+	ctx     context.Context
+	cancel  context.CancelFunc
 
 	namespace       = "foo"
 	name            = "bar"
@@ -128,23 +125,19 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	model.AddScheme(tracev1.AddToScheme)
 
-	controller, k8sMock = testutil.SetupK8sMock()
-
 	go func() {
 		defer GinkgoRecover()
 	}()
 })
 
 var _ = AfterSuite(func() {
-	controller.Finish()
-
 	cancel()
 	By("tearing down the test environment")
 	err := testEnv.Stop()
 	Expect(err).NotTo(HaveOccurred())
 })
 
-func mockObjects() (*kbappsv1.Cluster, []kbappsv1.Component) {
+func mockObjects(k8sMock *mocks.MockClient) (*kbappsv1.Cluster, []kbappsv1.Component) {
 	primary := builder.NewClusterBuilder(namespace, name).SetUID(uid).SetResourceVersion(resourceVersion).GetObject()
 	compNames := []string{"hello", "world"}
 	var secondaries []kbappsv1.Component

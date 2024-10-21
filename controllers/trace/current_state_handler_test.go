@@ -35,15 +35,30 @@ import (
 	tracev1 "github.com/apecloud/kubeblocks/apis/trace/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
+	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
+	"github.com/apecloud/kubeblocks/pkg/testutil/k8s/mocks"
 )
 
 var _ = Describe("current_state_handler test", func() {
+	var (
+		k8sMock    *mocks.MockClient
+		controller *gomock.Controller
+	)
+
+	BeforeEach(func() {
+		controller, k8sMock = testutil.SetupK8sMock()
+	})
+
+	AfterEach(func() {
+		controller.Finish()
+	})
+
 	Context("Testing current_state_handler", func() {
 		It("should work well", func() {
 			store := NewObjectStore(scheme.Scheme)
 			reconciler := updateCurrentState(ctx, k8sMock, scheme.Scheme, store)
 
-			primary, _ := mockObjects()
+			primary, _ := mockObjects(k8sMock)
 			trace := &tracev1.ReconciliationTrace{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: namespace,

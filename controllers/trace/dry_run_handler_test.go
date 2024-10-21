@@ -41,9 +41,24 @@ import (
 	tracev1 "github.com/apecloud/kubeblocks/apis/trace/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
+	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
+	"github.com/apecloud/kubeblocks/pkg/testutil/k8s/mocks"
 )
 
 var _ = Describe("dry_run_handler test", func() {
+	var (
+		k8sMock    *mocks.MockClient
+		controller *gomock.Controller
+	)
+
+	BeforeEach(func() {
+		controller, k8sMock = testutil.SetupK8sMock()
+	})
+
+	AfterEach(func() {
+		controller.Finish()
+	})
+
 	Context("Testing dry_run_handler", func() {
 		It("should work well", func() {
 			clusterDefinition := &kbappsv1.ClusterDefinition{

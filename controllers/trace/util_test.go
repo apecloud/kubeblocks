@@ -39,9 +39,24 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
+	"github.com/apecloud/kubeblocks/pkg/testutil/k8s/mocks"
 )
 
 var _ = Describe("util test", func() {
+	var (
+		k8sMock    *mocks.MockClient
+		controller *gomock.Controller
+	)
+
+	BeforeEach(func() {
+		controller, k8sMock = testutil.SetupK8sMock()
+	})
+
+	AfterEach(func() {
+		controller.Finish()
+	})
+
 	Context("objectTypeToGVK", func() {
 		It("should work well", func() {
 			objType := &tracev1.ObjectType{
@@ -321,7 +336,7 @@ var _ = Describe("util test", func() {
 			secondaries []kbappsv1.Component
 		)
 		BeforeEach(func() {
-			primary, secondaries = mockObjects()
+			primary, secondaries = mockObjects(k8sMock)
 		})
 
 		Context("getObjectTreeFromCache", func() {
@@ -548,7 +563,7 @@ var _ = Describe("util test", func() {
 				Expect(objects).Should(HaveLen(3))
 				expectedObjects := make(map[model.GVKNObjKey]client.Object, len(objects))
 				for _, object := range []client.Object{primary, &secondaries[0], &secondaries[1]} {
-					objectRef, err := getObjectRef(object, k8sMock.Scheme())
+					objectRef, err := getObjectRef(object, scheme.Scheme)
 					Expect(err).Should(BeNil())
 					expectedObjects[*objectRef] = object
 				}

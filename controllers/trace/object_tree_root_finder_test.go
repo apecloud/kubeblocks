@@ -36,9 +36,24 @@ import (
 	tracev1 "github.com/apecloud/kubeblocks/apis/trace/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
+	"github.com/apecloud/kubeblocks/pkg/testutil/k8s/mocks"
 )
 
 var _ = Describe("object_tree_root_finder test", func() {
+	var (
+		k8sMock    *mocks.MockClient
+		controller *gomock.Controller
+	)
+
+	BeforeEach(func() {
+		controller, k8sMock = testutil.SetupK8sMock()
+	})
+
+	AfterEach(func() {
+		controller.Finish()
+	})
+
 	Context("Testing object_tree_root_finder", func() {
 		It("should work well", func() {
 			trace := &tracev1.ReconciliationTrace{

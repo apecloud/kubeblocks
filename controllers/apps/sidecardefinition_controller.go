@@ -24,15 +24,21 @@ import (
 	"encoding/json"
 	"fmt"
 	"hash/fnv"
+	"slices"
 	"strings"
 
+	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -104,7 +110,33 @@ func (r *SidecarDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.Re
 func (r *SidecarDefinitionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return intctrlutil.NewNamespacedControllerManagedBy(mgr).
 		For(&appsv1.SidecarDefinition{}).
+		Watches(&appsv1.ComponentDefinition{}, handler.EnqueueRequestsFromMapFunc(r.matchedCompDefinition)).
 		Complete(r)
+}
+
+func (r *SidecarDefinitionReconciler) matchedCompDefinition(ctx context.Context, obj client.Object) []reconcile.Request {
+	compDef, ok := obj.(*appsv1.ComponentDefinition)
+	if !ok {
+		return nil
+	}
+	sidecarDefs := &appsv1.SidecarDefinitionList{}
+	if err := r.Client.List(ctx, sidecarDefs); err != nil {
+		return nil
+	}
+	requests := make([]reconcile.Request, 0)
+	for _, sidecarDef := range sidecarDefs.Items {
+		names := append([]string{sidecarDef.Spec.Owner}, sidecarDef.Spec.Selectors...)
+		if slices.ContainsFunc(names, func(name string) bool {
+			return component.DefNameMatched(compDef.Name, name)
+		}) {
+			requests = append(requests, reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Name: sidecarDef.Name,
+				},
+			})
+		}
+	}
+	return requests
 }
 
 func (r *SidecarDefinitionReconciler) deletionHandler(rctx intctrlutil.RequestCtx, sidecarDef *appsv1.SidecarDefinition) func() (*ctrl.Result, error) {
@@ -242,4 +274,73 @@ func (r *SidecarDefinitionReconciler) immutableHash(cli client.Client, rctx intc
 	}
 	sidecarDef.Annotations[immutableHashAnnotationKey], _ = r.specHash(sidecarDef)
 	return cli.Patch(rctx.Ctx, sidecarDef, patch)
+}
+
+func matchedSidecarDef4CompDefs(ctx context.Context, cli client.Reader, compDefs []string) (map[string][]*appsv1.SidecarDefinition, error) {
+	sidecarList := &appsv1.SidecarDefinitionList{}
+	if err := cli.List(ctx, sidecarList); err != nil {
+		return nil, err
+	}
+
+	compDefsSet := sets.New[string](compDefs...)
+	match := func(sidecarDef *appsv1.SidecarDefinition) ([]string, error) {
+		owners := sets.New(strings.Split(sidecarDef.Status.Owners, ",")...)
+		selectors := sets.New(strings.Split(sidecarDef.Status.Selectors, ",")...)
+
+		owned := compDefsSet.Intersection(owners)
+		if len(owned) == 0 {
+			return nil, nil
+		}
+		hosted := compDefsSet.Intersection(selectors)
+		if len(hosted) == 0 {
+			return nil, nil
+		}
+
+		if hosted.Intersection(owned).Len() != 0 {
+			return nil, fmt.Errorf("owner and selectors should not be overlapped: %s",
+				strings.Join(sets.List(hosted.Intersection(owned)), ","))
+		}
+		return sets.List(hosted), nil
+	}
+
+	grouped := make(map[string]map[string]*appsv1.SidecarDefinition)
+	for i, sidecarDef := range sidecarList.Items {
+		defs, err := match(&sidecarDef)
+		if err != nil {
+			return nil, err
+		}
+		for _, def := range defs {
+			if _, ok := grouped[def]; !ok {
+				grouped[def] = map[string]*appsv1.SidecarDefinition{}
+			}
+			o, ok := grouped[def][sidecarDef.Spec.Name]
+			if !ok || sidecarDef.Name > o.Name {
+				grouped[def][sidecarDef.Spec.Name] = &sidecarList.Items[i]
+			}
+		}
+	}
+
+	available := func(sidecarDef *appsv1.SidecarDefinition) error {
+		if sidecarDef.Generation != sidecarDef.Status.ObservedGeneration {
+			return fmt.Errorf("the SidecarDefinition is not up to date: %s", sidecarDef.Name)
+		}
+		if sidecarDef.Status.Phase != appsv1.AvailablePhase {
+			return fmt.Errorf("the SidecarDefinition is unavailable: %s", sidecarDef.Name)
+		}
+		return nil
+	}
+
+	result := make(map[string][]*appsv1.SidecarDefinition)
+	for compDef, sidecarDefs := range grouped {
+		result[compDef] = make([]*appsv1.SidecarDefinition, 0, len(sidecarDefs))
+		names := maps.Keys(sidecarDefs)
+		slices.Sort(names)
+		for _, name := range names {
+			if err := available(sidecarDefs[name]); err != nil {
+				return nil, err
+			}
+			result[compDef] = append(result[compDef], sidecarDefs[name])
+		}
+	}
+	return result, nil
 }

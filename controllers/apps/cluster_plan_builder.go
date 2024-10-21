@@ -68,6 +68,8 @@ type clusterTransformContext struct {
 
 	shardingComps map[string][]*appsv1.ClusterComponentSpec // comp specs for each sharding
 
+	sidecars map[string][]*appsv1.SidecarDefinition // cmpd -> scds
+
 	// TODO: remove this, annotations to be added to components for sharding, mapping with @allComps.
 	annotations map[string]map[string]string
 }

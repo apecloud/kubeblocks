@@ -1588,6 +1588,9 @@ spec:
                   type: object
                 minItems: 1
                 type: array
+              name:
+                description: Specifies the name of the sidecar.
+                type: string
               owner:
                 description: |-
                   Specifies the component definition that the sidecar belongs to.
@@ -2323,6 +2326,7 @@ spec:
                 type: array
             required:
             - containers
+            - name
             - owner
             - selectors
             type: object
@@ -2337,6 +2341,8 @@ spec:
                   for the SidecarDefinition.
                 format: int64
                 type: integer
+              owners:
+                type: string
               phase:
                 description: |-
                   Represents the current status of the SidecarDefinition. Valid values include ``, `Available`, and `Unavailable`.
@@ -2344,6 +2350,8 @@ spec:
                 enum:
                 - Available
                 - Unavailable
+                type: string
+              selectors:
                 type: string
             type: object
         type: object

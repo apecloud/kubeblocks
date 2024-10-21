@@ -59,6 +59,11 @@ func init() {
 
 // SidecarDefinitionSpec defines the desired state of SidecarDefinition
 type SidecarDefinitionSpec struct {
+	// Specifies the name of the sidecar.
+	//
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
 	// Specifies the component definition that the sidecar belongs to.
 	//
 	// For a specific cluster object, if there is any components provided by the component definition of @owner,
@@ -142,4 +147,8 @@ type SidecarDefinitionStatus struct {
 	//
 	// +optional
 	Message string `json:"message,omitempty"`
+
+	Owners string `json:"owners,omitempty"`
+
+	Selectors string `json:"selectors,omitempty"`
 }

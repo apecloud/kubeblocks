@@ -284,6 +284,11 @@ type ComponentSpec struct {
 	//
 	// +optional
 	Stop *bool `json:"stop,omitempty"`
+
+	// Specifies the sidecars to be injected into the Component.
+	//
+	// +optional
+	Sidecars []Sidecar `json:"sidecars,omitempty"`
 }
 
 // ComponentStatus represents the observed state of a Component within the Cluster.

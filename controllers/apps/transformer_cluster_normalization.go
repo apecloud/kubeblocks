@@ -68,6 +68,12 @@ func (t *clusterNormalizationTransformer) Transform(ctx graph.TransformContext, 
 		return err
 	}
 
+	// resolve sidecars for all components and shardings
+	transCtx.sidecars, err = t.resolveSidecars(transCtx)
+	if err != nil {
+		return err
+	}
+
 	// write-back the resolved definitions and service versions to cluster spec.
 	t.writeBackCompNShardingSpecs(transCtx)
 
@@ -320,6 +326,18 @@ func (t *clusterNormalizationTransformer) resolveCompDefinitionNServiceVersionWi
 
 func (t *clusterNormalizationTransformer) checkCompUpgrade(compSpec *appsv1.ClusterComponentSpec, comp *appsv1.Component) bool {
 	return compSpec.ServiceVersion != comp.Spec.ServiceVersion || compSpec.ComponentDef != comp.Spec.CompDef
+}
+
+func (t *clusterNormalizationTransformer) resolveSidecars(transCtx *clusterTransformContext) (map[string][]*appsv1.SidecarDefinition, error) {
+	// component definitions used
+	compDefs := sets.New[string]()
+	for _, spec := range transCtx.components {
+		compDefs.Insert(spec.ComponentDef)
+	}
+	for _, spec := range transCtx.shardings {
+		compDefs.Insert(spec.Template.ComponentDef)
+	}
+	return matchedSidecarDef4CompDefs(transCtx.Context, transCtx.Client, sets.List(compDefs))
 }
 
 func (t *clusterNormalizationTransformer) writeBackCompNShardingSpecs(transCtx *clusterTransformContext) {

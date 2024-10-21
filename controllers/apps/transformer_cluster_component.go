@@ -186,6 +186,10 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1.Component) *appsv1.Com
 	compObjCopy.Labels = compProto.Labels
 
 	// merge spec
+	if compObjCopy.Spec.CompDef != compProto.Spec.CompDef {
+		// update sidecars only when the compDef changed
+		compObjCopy.Spec.Sidecars = compProto.Spec.Sidecars
+	}
 	compObjCopy.Spec.CompDef = compProto.Spec.CompDef
 	compObjCopy.Spec.ServiceVersion = compProto.Spec.ServiceVersion
 	compObjCopy.Spec.ServiceRefs = compProto.Spec.ServiceRefs
@@ -650,7 +654,7 @@ func (h *clusterComponentHandler) runningComp(transCtx *clusterTransformContext,
 func (h *clusterComponentHandler) protoComp(transCtx *clusterTransformContext, name string) (*appsv1.Component, error) {
 	for _, comp := range transCtx.components {
 		if comp.Name == name {
-			return component.BuildComponent(transCtx.Cluster, comp, nil, nil)
+			return buildComponentWrapper(transCtx, comp, nil, nil)
 		}
 	}
 	return nil, fmt.Errorf("cluster component %s not found", name)
@@ -790,7 +794,7 @@ func (h *clusterShardingHandler) protoComps(transCtx *clusterTransformContext, n
 			if transCtx.annotations != nil {
 				annotations = transCtx.annotations[spec.Name]
 			}
-			obj, err := component.BuildComponent(transCtx.Cluster, spec, labels, annotations)
+			obj, err := buildComponentWrapper(transCtx, spec, labels, annotations)
 			if err != nil {
 				return nil, err
 			}
@@ -859,4 +863,24 @@ func shardingCompNName(comp *appsv1.Component) string {
 		}
 	}
 	return ""
+}
+
+func buildComponentWrapper(transCtx *clusterTransformContext, spec *appsv1.ClusterComponentSpec, labels, annotations map[string]string) (*appsv1.Component, error) {
+	comp, err := component.BuildComponent(transCtx.Cluster, spec, labels, annotations)
+	if err != nil {
+		return nil, err
+	}
+	if transCtx.sidecars != nil {
+		sidecarDefs, ok := transCtx.sidecars[spec.ComponentDef]
+		if ok {
+			comp.Spec.Sidecars = make([]appsv1.Sidecar, 0)
+			for _, sidecarDef := range sidecarDefs {
+				comp.Spec.Sidecars = append(comp.Spec.Sidecars, appsv1.Sidecar{
+					Name:       sidecarDef.Spec.Name,
+					SidecarDef: sidecarDef.Name,
+				})
+			}
+		}
+	}
+	return comp, nil
 }

@@ -839,6 +839,20 @@ bool
 If set, all the computing resources will be released.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>sidecars</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Sidecar">
+[]Sidecar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the sidecars to be injected into the Component.</p>
+</td>
+</tr>
 </table>
 </td>
 </tr>
@@ -2011,6 +2025,17 @@ SidecarDefinitionSpec
 <br/>
 <br/>
 <table>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the name of the sidecar.</p>
+</td>
+</tr>
 <tr>
 <td>
 <code>owner</code><br/>
@@ -5740,6 +5765,20 @@ bool
 <em>(Optional)</em>
 <p>Stop the Component.
 If set, all the computing resources will be released.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>sidecars</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Sidecar">
+[]Sidecar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the sidecars to be injected into the Component.</p>
 </td>
 </tr>
 </tbody>
@@ -10213,6 +10252,46 @@ int32
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1.Sidecar">Sidecar
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Name specifies the unique name of the sidecar.</p>
+<p>The name will be used as the name of the sidecar container in the Pod.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>sidecarDef</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the sidecar definition CR to be used to create the sidecar.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1.SidecarDefinitionSpec">SidecarDefinitionSpec
 </h3>
 <p>
@@ -10229,6 +10308,17 @@ int32
 </tr>
 </thead>
 <tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the name of the sidecar.</p>
+</td>
+</tr>
 <tr>
 <td>
 <code>owner</code><br/>
@@ -10370,6 +10460,26 @@ string
 <td>
 <em>(Optional)</em>
 <p>Provides additional information about the current phase.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>owners</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>selectors</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
 </td>
 </tr>
 </tbody>

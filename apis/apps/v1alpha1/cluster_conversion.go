@@ -217,18 +217,27 @@ func (c *clusterConverter) fromCluster(cluster *Cluster) {
 			Monitor:                spec.Monitor,
 		}
 	}
-	for _, comp := range cluster.Spec.ComponentSpecs {
-		c.Spec.Components[comp.Name] = deletedComp(comp)
+	if len(cluster.Spec.ComponentSpecs) > 0 {
+		c.Spec.Components = make(map[string]clusterCompConverter)
+		for _, comp := range cluster.Spec.ComponentSpecs {
+			c.Spec.Components[comp.Name] = deletedComp(comp)
+		}
 	}
-	for _, sharding := range cluster.Spec.ShardingSpecs {
-		c.Spec.Shardings[sharding.Name] = deletedComp(sharding.Template)
+	if len(cluster.Spec.ShardingSpecs) > 0 {
+		c.Spec.Shardings = make(map[string]clusterCompConverter)
+		for _, sharding := range cluster.Spec.ShardingSpecs {
+			c.Spec.Shardings[sharding.Name] = deletedComp(sharding.Template)
+		}
 	}
 
-	for name, status := range cluster.Status.Components {
-		c.Status.Components[name] = clusterCompStatusConverter{
-			PodsReady:     status.PodsReady,
-			PodsReadyTime: status.PodsReadyTime,
-			MembersStatus: status.MembersStatus,
+	if len(cluster.Status.Components) > 0 {
+		c.Status.Components = make(map[string]clusterCompStatusConverter)
+		for name, status := range cluster.Status.Components {
+			c.Status.Components[name] = clusterCompStatusConverter{
+				PodsReady:     status.PodsReady,
+				PodsReadyTime: status.PodsReadyTime,
+				MembersStatus: status.MembersStatus,
+			}
 		}
 	}
 }

@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package trace
 
 import (
+	"time"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -44,6 +46,10 @@ var _ = Describe("deletion_handler test", func() {
 			}
 			tree := kubebuilderx.NewObjectTree()
 			tree.SetRoot(trace)
+
+			Expect(reconciler.PreCondition(tree)).To(Equal(kubebuilderx.ConditionUnsatisfied))
+			trace.DeletionTimestamp = &metav1.Time{Time: time.Now()}
+			Expect(reconciler.PreCondition(tree)).To(Equal(kubebuilderx.ConditionSatisfied))
 
 			res, err := reconciler.Reconcile(tree)
 			Expect(err).ToNot(HaveOccurred())

@@ -21,6 +21,7 @@ package trace
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
@@ -92,8 +93,9 @@ func (g *planGenerator) generatePlan(desiredRoot *kbappsv1.Cluster) (*tracev1.Dr
 	timeout := false
 	var reconcileErr error
 	previousCount := len(store.GetChanges())
+	timeoutPeriod := 5 * time.Second
 	for {
-		if time.Since(startTime) > 1000*time.Second {
+		if time.Since(startTime) > timeoutPeriod {
 			timeout = true
 			break
 		}
@@ -103,8 +105,14 @@ func (g *planGenerator) generatePlan(desiredRoot *kbappsv1.Cluster) (*tracev1.Dr
 			break
 		}
 
-		// no change means reconciliation cycle is done
-		currentCount := len(store.GetChanges())
+		// no change (other than Events) means reconciliation cycle is done
+		currentCount := 0
+		for _, change := range store.GetChanges() {
+			if change.ChangeType == tracev1.EventType {
+				continue
+			}
+			currentCount++
+		}
 		if currentCount == previousCount {
 			break
 		}
@@ -126,7 +134,7 @@ func (g *planGenerator) generatePlan(desiredRoot *kbappsv1.Cluster) (*tracev1.Dr
 	case timeout:
 		dryRunResult.Phase = tracev1.DryRunFailedPhase
 		dryRunResult.Reason = "Timeout"
-		dryRunResult.Message = "Can't generate the plan within one second"
+		dryRunResult.Message = fmt.Sprintf("Can't generate the plan within %d second", int(timeoutPeriod.Seconds()))
 	default:
 		dryRunResult.Phase = tracev1.DryRunSucceedPhase
 	}

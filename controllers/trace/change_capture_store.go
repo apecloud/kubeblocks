@@ -165,9 +165,6 @@ func (s *changeCaptureStore) applyRevision() string {
 }
 
 func (s *changeCaptureStore) captureCreation(objectRef *model.GVKNObjKey, object client.Object) {
-	if isEvent(&objectRef.GroupVersionKind) {
-		return
-	}
 	changes := buildChanges(
 		make(map[model.GVKNObjKey]client.Object),
 		map[model.GVKNObjKey]client.Object{*objectRef: object},

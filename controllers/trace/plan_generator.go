@@ -122,7 +122,7 @@ func (g *planGenerator) generatePlan(desiredRoot *kbappsv1.Cluster) (*tracev1.Dr
 	// update dry-run result
 	// update spec info
 	dryRunResult := &tracev1.DryRunResult{}
-	dryRunResult.ObservedTargetGeneration = desiredRoot.Generation
+	dryRunResult.ObservedTargetGeneration = currentRoot.Generation
 	dryRunResult.SpecDiff = specDiff
 
 	// update phase

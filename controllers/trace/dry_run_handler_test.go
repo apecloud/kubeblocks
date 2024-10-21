@@ -266,6 +266,7 @@ var _ = Describe("dry_run_handler test", func() {
 			k8sMock.EXPECT().Scheme().Return(scheme.Scheme).AnyTimes()
 
 			reconciler := dryRun(ctx, k8sMock, scheme.Scheme)
+			Expect(reconciler.PreCondition(tree)).To(Equal(kubebuilderx.ConditionSatisfied))
 			res, err := reconciler.Reconcile(tree)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(res).Should(Equal(kubebuilderx.Continue))

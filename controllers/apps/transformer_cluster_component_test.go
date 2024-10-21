@@ -91,6 +91,7 @@ var _ = Describe("cluster component transformer test", func() {
 		clusterTopologyNoOrders                     = "test-topology-no-orders"
 		clusterTopologyProvisionNUpdateOOD          = "test-topology-ood"
 		clusterTopologyStop                         = "test-topology-stop"
+		clusterTopologyTemplate                     = "test-topology-template"
 		clusterTopologyDefault4Sharding             = "test-topology-default-sharding"
 		clusterTopologyNoOrders4Sharding            = "test-topology-no-orders-sharding"
 		clusterTopologyProvisionNUpdateOOD4Sharding = "test-topology-ood-sharding"
@@ -225,6 +226,31 @@ var _ = Describe("cluster component transformer test", func() {
 				},
 				Orders: &appsv1.ClusterTopologyOrders{
 					Update: []string{comp1aName, comp2aName, comp3aName},
+				},
+			}).
+			AddClusterTopology(appsv1.ClusterTopology{
+				Name: clusterTopologyTemplate,
+				Components: []appsv1.ClusterTopologyComponent{
+					{
+						Name:    comp1aName,
+						CompDef: compDefName,
+					},
+					{
+						Name:     comp2aName,
+						CompDef:  compDefName,
+						Template: pointer.Bool(true),
+					},
+					{
+						Name:    comp2bName,
+						CompDef: compDefName,
+					},
+					{
+						Name:    comp3aName,
+						CompDef: compDefName,
+					},
+				},
+				Orders: &appsv1.ClusterTopologyOrders{
+					Provision: []string{comp1aName, fmt.Sprintf("%s,%s", comp2aName, comp2bName), comp3aName},
 				},
 			}).
 			AddClusterTopology(appsv1.ClusterTopology{
@@ -433,7 +459,7 @@ var _ = Describe("cluster component transformer test", func() {
 		transCtx.components, transCtx.shardings, err = transformer.resolveCompsNShardingsFromTopology(clusterDef, cluster)
 		Expect(err).Should(BeNil())
 
-		err = transformer.validateNBuildAllCompSpecs(transCtx, cluster)
+		transCtx.shardingComps, err = transformer.buildShardingComps(transCtx)
 		Expect(err).Should(BeNil())
 	}
 
@@ -875,6 +901,79 @@ var _ = Describe("cluster component transformer test", func() {
 			// try again
 			err = transformer.Transform(transCtx, newDAG(graphCli, transCtx.Cluster))
 			Expect(err).Should(BeNil())
+		})
+
+		It("template component - has no components instantiated", func() {
+			transformer, transCtx, dag := newTransformerNCtx(clusterTopologyTemplate)
+
+			// check the components created, no components should be instantiated from the template automatically
+			Expect(transCtx.components).Should(HaveLen(3))
+			Expect(transCtx.components[0].Name).Should(Equal(comp1aName))
+			Expect(transCtx.components[1].Name).Should(Equal(comp2bName))
+			Expect(transCtx.components[2].Name).Should(Equal(comp3aName))
+
+			// mock first component status as running
+			reader := &mockReader{
+				objs: []client.Object{
+					mockCompObj(transCtx, comp1aName, func(comp *appsv1.Component) {
+						comp.Status.Phase = appsv1.RunningClusterCompPhase
+					}),
+				},
+			}
+			transCtx.Client = model.NewGraphClient(reader)
+
+			err := transformer.Transform(transCtx, dag)
+			Expect(err).ShouldNot(BeNil())
+			Expect(err.Error()).Should(And(ContainSubstring("retry later"), ContainSubstring(comp3aName)))
+
+			// check other components
+			graphCli := transCtx.Client.(model.GraphClient)
+			objs := graphCli.FindAll(dag, &appsv1.Component{})
+			Expect(len(objs)).Should(Equal(1))
+			for _, obj := range objs {
+				comp := obj.(*appsv1.Component)
+				Expect(component.ShortName(transCtx.Cluster.Name, comp.Name)).Should(Equal(comp2bName))
+				Expect(graphCli.IsAction(dag, comp, model.ActionCreatePtr())).Should(BeTrue())
+			}
+		})
+
+		It("template component - has components instantiated", func() {
+			transformer, transCtx, dag := newTransformerNCtx(clusterTopologyTemplate, func(f *testapps.MockClusterFactory) {
+				f.AddComponent(fmt.Sprintf("%s-0", comp2aName), compDefName).
+					AddComponent(fmt.Sprintf("%s-1", comp2aName), compDefName)
+			})
+
+			// check the components created
+			Expect(transCtx.components).Should(HaveLen(5))
+			Expect(transCtx.components[0].Name).Should(Equal(comp1aName))
+			Expect(transCtx.components[1].Name).Should(HavePrefix(comp2aName))
+			Expect(transCtx.components[2].Name).Should(HavePrefix(comp2aName))
+			Expect(transCtx.components[3].Name).Should(Equal(comp2bName))
+			Expect(transCtx.components[4].Name).Should(Equal(comp3aName))
+
+			// mock first component status as running
+			reader := &mockReader{
+				objs: []client.Object{
+					mockCompObj(transCtx, comp1aName, func(comp *appsv1.Component) {
+						comp.Status.Phase = appsv1.RunningClusterCompPhase
+					}),
+				},
+			}
+			transCtx.Client = model.NewGraphClient(reader)
+
+			err := transformer.Transform(transCtx, dag)
+			Expect(err).ShouldNot(BeNil())
+			Expect(err.Error()).Should(And(ContainSubstring("retry later"), ContainSubstring(comp3aName)))
+
+			// check other components
+			graphCli := transCtx.Client.(model.GraphClient)
+			objs := graphCli.FindAll(dag, &appsv1.Component{})
+			Expect(len(objs)).Should(Equal(3))
+			for _, obj := range objs {
+				comp := obj.(*appsv1.Component)
+				Expect(component.ShortName(transCtx.Cluster.Name, comp.Name)).Should(Or(HavePrefix(comp2aName), Equal(comp2bName)))
+				Expect(graphCli.IsAction(dag, comp, model.ActionCreatePtr())).Should(BeTrue())
+			}
 		})
 	})
 

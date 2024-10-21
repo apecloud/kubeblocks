@@ -224,14 +224,14 @@ const (
 )
 
 func newCompNShardingHandler(transCtx *clusterTransformContext, op int) clusterConditionalHandler {
-	orders := definedOrders(transCtx, op)
+	topology, orders := definedOrders(transCtx, op)
 	if len(orders) == 0 {
 		return newParallelHandler(op)
 	}
-	return newOrderedHandler(orders, op)
+	return newOrderedHandler(topology, orders, op)
 }
 
-func definedOrders(transCtx *clusterTransformContext, op int) []string {
+func definedOrders(transCtx *clusterTransformContext, op int) (appsv1.ClusterTopology, []string) {
 	var (
 		cluster    = transCtx.Cluster
 		clusterDef = transCtx.clusterDef
@@ -242,11 +242,11 @@ func definedOrders(transCtx *clusterTransformContext, op int) []string {
 				if topology.Orders != nil {
 					switch op {
 					case createOp:
-						return topology.Orders.Provision
+						return topology, topology.Orders.Provision
 					case deleteOp:
-						return topology.Orders.Terminate
+						return topology, topology.Orders.Terminate
 					case updateOp:
-						return topology.Orders.Update
+						return topology, topology.Orders.Update
 					default:
 						panic("runtime error: unknown operation: " + strconv.Itoa(op))
 					}
@@ -254,7 +254,7 @@ func definedOrders(transCtx *clusterTransformContext, op int) []string {
 			}
 		}
 	}
-	return nil
+	return appsv1.ClusterTopology{}, nil
 }
 
 func newParallelHandler(op int) clusterConditionalHandler {
@@ -266,18 +266,30 @@ func newParallelHandler(op int) clusterConditionalHandler {
 	panic("runtime error: unknown operation: " + strconv.Itoa(op))
 }
 
-func newOrderedHandler(orders []string, op int) clusterConditionalHandler {
+func newOrderedHandler(topology appsv1.ClusterTopology, orders []string, op int) clusterConditionalHandler {
 	switch op {
 	case createOp, updateOp:
 		return &orderedCreateNUpdateHandler{
-			clusterOrderedOrder:         clusterOrderedOrder{orders: orders},
-			phasePrecondition:           phasePrecondition{orders: orders},
+			clusterOrderedOrder: clusterOrderedOrder{
+				topology: topology,
+				orders:   orders,
+			},
+			phasePrecondition: phasePrecondition{
+				topology: topology,
+				orders:   orders,
+			},
 			clusterCompNShardingHandler: clusterCompNShardingHandler{op: op},
 		}
 	case deleteOp:
 		return &orderedDeleteHandler{
-			clusterOrderedOrder:         clusterOrderedOrder{orders: orders},
-			notExistPrecondition:        notExistPrecondition{orders: orders},
+			clusterOrderedOrder: clusterOrderedOrder{
+				topology: topology,
+				orders:   orders,
+			},
+			notExistPrecondition: notExistPrecondition{
+				topology: topology,
+				orders:   orders,
+			},
 			clusterCompNShardingHandler: clusterCompNShardingHandler{op: op},
 		}
 	default:
@@ -298,16 +310,19 @@ func (o *clusterParallelOrder) ordered(names []string) []string {
 }
 
 type clusterOrderedOrder struct {
-	orders []string
+	topology appsv1.ClusterTopology
+	orders   []string
 }
 
 func (o *clusterOrderedOrder) ordered(names []string) []string {
 	result := make([]string, 0)
 	for _, order := range o.orders {
-		comps := strings.Split(order, ",")
-		for _, comp := range names {
-			if slices.Index(comps, comp) >= 0 {
-				result = append(result, comp)
+		entities := strings.Split(order, ",")
+		for _, name := range names {
+			if slices.ContainsFunc(entities, func(e string) bool {
+				return clusterTopologyEntityMatched(o.topology, e, name)
+			}) {
+				result = append(result, name)
 			}
 		}
 	}
@@ -324,11 +339,12 @@ func (c *dummyPrecondition) match(*clusterTransformContext, *graph.DAG, string) 
 }
 
 type notExistPrecondition struct {
-	orders []string
+	topology appsv1.ClusterTopology
+	orders   []string
 }
 
 func (c *notExistPrecondition) match(transCtx *clusterTransformContext, dag *graph.DAG, name string) (bool, error) {
-	for _, predecessor := range predecessors(c.orders, name) {
+	for _, predecessor := range predecessors(c.topology, c.orders, name) {
 		exist, err := c.predecessorExist(transCtx, dag, predecessor)
 		if err != nil {
 			return false, err
@@ -419,11 +435,12 @@ func (c *notExistPrecondition) shardingExist(transCtx *clusterTransformContext, 
 }
 
 type phasePrecondition struct {
-	orders []string
+	topology appsv1.ClusterTopology
+	orders   []string
 }
 
 func (c *phasePrecondition) match(transCtx *clusterTransformContext, dag *graph.DAG, name string) (bool, error) {
-	for _, predecessor := range predecessors(c.orders, name) {
+	for _, predecessor := range predecessors(c.topology, c.orders, name) {
 		match, err := c.predecessorMatch(transCtx, dag, predecessor)
 		if err != nil {
 			return false, err
@@ -548,16 +565,32 @@ func (h *clusterCompNShardingHandler) handle(transCtx *clusterTransformContext, 
 	}
 }
 
-func predecessors(orders []string, name string) []string {
+func predecessors(topology appsv1.ClusterTopology, orders []string, name string) []string {
 	var previous []string
 	for _, order := range orders {
-		names := strings.Split(order, ",")
-		if index := slices.Index(names, name); index >= 0 {
+		entities := strings.Split(order, ",")
+		if slices.ContainsFunc(entities, func(e string) bool {
+			return clusterTopologyEntityMatched(topology, e, name)
+		}) {
 			return previous
 		}
-		previous = names
+		previous = entities
 	}
 	panic("runtime error: cannot find predecessor for component or sharding " + name)
+}
+
+func clusterTopologyEntityMatched(topology appsv1.ClusterTopology, entityName, name string) bool {
+	for _, sharding := range topology.Shardings {
+		if sharding.Name == entityName {
+			return entityName == name // full match for sharding
+		}
+	}
+	for _, comp := range topology.Components {
+		if comp.Name == entityName {
+			return clusterTopologyCompMatched(comp, name)
+		}
+	}
+	return false // TODO: runtime error
 }
 
 type clusterParallelHandler struct {

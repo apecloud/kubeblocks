@@ -596,12 +596,10 @@ func newRestoreReconciler(c client.Client, recorder record.EventRecorder) reconc
 }
 
 func newBackupReconciler(c client.Client, recorder record.EventRecorder) reconcile.Reconciler {
-	config := intctrlutil.GeKubeRestConfig("kubeblocks-trace")
 	return &dataprotection.BackupReconciler{
-		Client:     c,
-		Scheme:     c.Scheme(),
-		Recorder:   recorder,
-		RestConfig: config,
+		Client:   c,
+		Scheme:   c.Scheme(),
+		Recorder: recorder,
 	}
 }
 

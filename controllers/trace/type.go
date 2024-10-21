@@ -244,16 +244,18 @@ var (
 )
 
 func getKBOwnershipRules() []OwnershipRule {
-	once.Do(func() {
-		kbOwnershipRules = filterUnsupportedRules(fullKBOwnershipRules, nil)
-	})
+	once.Do(initKBOwnershipRules(nil))
 	return kbOwnershipRules
 }
 
 func initKBOwnershipRulesForTest(cfg *rest.Config) {
-	once.Do(func() {
+	once.Do(initKBOwnershipRules(cfg))
+}
+
+func initKBOwnershipRules(cfg *rest.Config) func() {
+	return func() {
 		kbOwnershipRules = filterUnsupportedRules(fullKBOwnershipRules, cfg)
-	})
+	}
 }
 
 func filterUnsupportedRules(ownershipRules []OwnershipRule, cfg *rest.Config) []OwnershipRule {

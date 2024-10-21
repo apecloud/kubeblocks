@@ -767,7 +767,9 @@ func PatchBackupObjectMeta(
 	}
 
 	for _, v := range getClusterLabelKeys() {
-		request.Labels[v] = targetPod.Labels[v]
+		if labelValue, ok := targetPod.Labels[v]; ok {
+			request.Labels[v] = labelValue
+		}
 	}
 
 	if _, ok := request.Labels[constant.AppManagedByLabelKey]; !ok {

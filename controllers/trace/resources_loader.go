@@ -52,10 +52,7 @@ func (r *resourcesLoader) Load(ctx context.Context, reader client.Reader, req ct
 	i18n := &corev1.ConfigMap{}
 	i18nResourcesNamespace := viper.GetString(constant.CfgKeyCtrlrMgrNS)
 	i18nResourcesName := viper.GetString(constant.I18nResourcesName)
-	if err = reader.Get(ctx, types.NamespacedName{Namespace: i18nResourcesNamespace, Name: i18nResourcesName}, i18n); err != nil {
-		if apierrors.IsNotFound(err) {
-			return tree, nil
-		}
+	if err = reader.Get(ctx, types.NamespacedName{Namespace: i18nResourcesNamespace, Name: i18nResourcesName}, i18n); err != nil && !apierrors.IsNotFound(err) {
 		return nil, err
 	}
 	if err = tree.Add(i18n); err != nil {

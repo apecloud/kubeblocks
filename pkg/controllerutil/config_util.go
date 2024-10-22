@@ -31,6 +31,7 @@ import (
 
 	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/configuration/util"
 	"github.com/apecloud/kubeblocks/pkg/configuration/validate"
@@ -229,4 +230,8 @@ func filterImmutableParameters(parameters map[string]any, immutableParams []stri
 		}
 	}
 	return validParameters
+}
+
+func ParametersDefinitionTerminalPhases(status parametersv1alpha1.ParametersDefinitionStatus, generation int64) bool {
+	return status.ObservedGeneration == generation && status.Phase == parametersv1alpha1.PDAvailablePhase
 }

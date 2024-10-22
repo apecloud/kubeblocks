@@ -23,38 +23,52 @@ import (
 	"context"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 // ParameterDrivenConfigRenderReconciler reconciles a ParameterDrivenConfigRender object
 type ParameterDrivenConfigRenderReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme   *runtime.Scheme
+	Recorder record.EventRecorder
 }
 
-//+kubebuilder:rbac:groups=parameters.kubeblocks.io,resources=parameterdrivenconfigrenders,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=parameters.kubeblocks.io,resources=parameterdrivenconfigrenders/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=parameters.kubeblocks.io,resources=parameterdrivenconfigrenders/finalizers,verbs=update
+// +kubebuilder:rbac:groups=parameters.kubeblocks.io,resources=parameterdrivenconfigrenders,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=parameters.kubeblocks.io,resources=parameterdrivenconfigrenders/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=parameters.kubeblocks.io,resources=parameterdrivenconfigrenders/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
-// the ParameterDrivenConfigRender object against the actual cluster state, and then
-// perform operations to make the cluster state reflect the state specified by
-// the user.
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.4/pkg/reconcile
 func (r *ParameterDrivenConfigRenderReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
+	reqCtx := intctrlutil.RequestCtx{
+		Ctx:      ctx,
+		Req:      req,
+		Recorder: r.Recorder,
+		Log: log.FromContext(ctx).
+			WithName("ParameterDrivenConfigRenderReconciler").
+			WithValues("ParameterDrivenConfigRender", req.Name),
+	}
 
-	// TODO(user): your logic here
+	parameterTemplate := &parametersv1alpha1.ParameterDrivenConfigRender{}
+	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, parameterTemplate); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
 
-	return ctrl.Result{}, nil
+	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, parameterTemplate, constant.ConfigFinalizerName, r.deletionHandler(parameterTemplate, reqCtx))
+	if res != nil {
+		return *res, err
+	}
+	return r.reconcile(reqCtx, parameterTemplate)
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -62,4 +76,12 @@ func (r *ParameterDrivenConfigRenderReconciler) SetupWithManager(mgr ctrl.Manage
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&parametersv1alpha1.ParameterDrivenConfigRender{}).
 		Complete(r)
+}
+
+func (r *ParameterDrivenConfigRenderReconciler) deletionHandler(parameterTemplate *parametersv1alpha1.ParameterDrivenConfigRender, reqCtx intctrlutil.RequestCtx) func() (*ctrl.Result, error) {
+	panic("")
+}
+
+func (r *ParameterDrivenConfigRenderReconciler) reconcile(reqCtx intctrlutil.RequestCtx, parameterTemplate *parametersv1alpha1.ParameterDrivenConfigRender) (ctrl.Result, error) {
+	panic("")
 }

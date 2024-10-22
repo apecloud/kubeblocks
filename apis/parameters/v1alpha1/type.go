@@ -128,3 +128,13 @@ const (
 	PDPDefault ParameterDeletedMethod = "RestoreToDefault"
 	PDPReset   ParameterDeletedMethod = "Reset"
 )
+
+// RerenderResourceType defines the resource requirements for a component.
+// +enum
+// +kubebuilder:validation:Enum={vscale,hscale,tls}
+type RerenderResourceType string
+
+const (
+	ComponentVScaleType RerenderResourceType = "vscale"
+	ComponentHScaleType RerenderResourceType = "hscale"
+)

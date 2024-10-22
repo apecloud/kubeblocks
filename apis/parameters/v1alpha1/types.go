@@ -138,3 +138,37 @@ const (
 	ComponentVScaleType RerenderResourceType = "vscale"
 	ComponentHScaleType RerenderResourceType = "hscale"
 )
+
+// ConfigurationPhase defines the Configuration FSM phase
+// +enum
+// +kubebuilder:validation:Enum={Creating,Init,Running,Pending,Merged,MergeFailed,FailedAndPause,Upgrading,Deleting,FailedAndRetry,Finished}
+type ConfigurationPhase string
+
+const (
+	CCreatingPhase       ConfigurationPhase = "Creating"
+	CInitPhase           ConfigurationPhase = "Init"
+	CRunningPhase        ConfigurationPhase = "Running"
+	CPendingPhase        ConfigurationPhase = "Pending"
+	CFailedPhase         ConfigurationPhase = "FailedAndRetry"
+	CFailedAndPausePhase ConfigurationPhase = "FailedAndPause"
+	CMergedPhase         ConfigurationPhase = "Merged"
+	CMergeFailedPhase    ConfigurationPhase = "MergeFailed"
+	CDeletingPhase       ConfigurationPhase = "Deleting"
+	CUpgradingPhase      ConfigurationPhase = "Upgrading"
+	CFinishedPhase       ConfigurationPhase = "Finished"
+)
+
+type ParametersInFile struct {
+	// Holds the configuration keys and values. This field is a workaround for issues found in kubebuilder and code-generator.
+	// Refer to https://github.com/kubernetes-sigs/kubebuilder/issues/528 and https://github.com/kubernetes/code-generator/issues/50 for more details.
+	//
+	// Represents the content of the configuration file.
+	//
+	// +optional
+	Content *string `json:"content"`
+
+	// Represents the updated parameters for a single configuration file.
+	//
+	// +optional
+	Parameters map[string]*string `json:"parameters,omitempty"`
+}

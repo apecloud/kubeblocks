@@ -79,9 +79,9 @@ func buildSidecarContainers(sidecar appsv1.Sidecar, sidecarDef *appsv1.SidecarDe
 }
 
 func buildSidecarVars(sidecar appsv1.Sidecar, sidecarDef *appsv1.SidecarDefinition, synthesizedComp *SynthesizedComponent) error {
-	if sidecarDef.Spec.Vars != nil {
-		// synthesizedComp.Vars = append(synthesizedComp.Vars, sidecarDef.Spec.Vars...)
-	}
+	// if sidecarDef.Spec.Vars != nil {
+	//	// synthesizedComp.Vars = append(synthesizedComp.Vars, sidecarDef.Spec.Vars...)
+	// }
 	return nil
 }
 

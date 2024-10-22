@@ -186,10 +186,6 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1.Component) *appsv1.Com
 	compObjCopy.Labels = compProto.Labels
 
 	// merge spec
-	if compObjCopy.Spec.CompDef != compProto.Spec.CompDef {
-		// update sidecars only when the compDef changed
-		compObjCopy.Spec.Sidecars = compProto.Spec.Sidecars
-	}
 	compObjCopy.Spec.CompDef = compProto.Spec.CompDef
 	compObjCopy.Spec.ServiceVersion = compProto.Spec.ServiceVersion
 	compObjCopy.Spec.ServiceRefs = compProto.Spec.ServiceRefs
@@ -212,6 +208,7 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1.Component) *appsv1.Com
 	compObjCopy.Spec.RuntimeClassName = compProto.Spec.RuntimeClassName
 	compObjCopy.Spec.DisableExporter = compProto.Spec.DisableExporter
 	compObjCopy.Spec.Stop = compProto.Spec.Stop
+	compObjCopy.Spec.Sidecars = compProto.Spec.Sidecars
 
 	if reflect.DeepEqual(oldCompObj.Annotations, compObjCopy.Annotations) &&
 		reflect.DeepEqual(oldCompObj.Labels, compObjCopy.Labels) &&

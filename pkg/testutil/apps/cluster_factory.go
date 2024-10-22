@@ -58,6 +58,11 @@ func (factory *MockClusterFactory) SetClusterAffinity(affinity *appsv1alpha1.Aff
 	return factory
 }
 
+func (factory *MockClusterFactory) SetSchedulingPolicy(schedulingPolicy appsv1alpha1.SchedulingPolicy) *MockClusterFactory {
+	factory.Get().Spec.SchedulingPolicy = &schedulingPolicy
+	return factory
+}
+
 func (factory *MockClusterFactory) AddClusterToleration(toleration corev1.Toleration) *MockClusterFactory {
 	tolerations := factory.Get().Spec.Tolerations
 	if len(tolerations) == 0 {

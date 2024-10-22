@@ -892,6 +892,32 @@ rules:
 - apiGroups:
   - parameters.kubeblocks.io
   resources:
+  - parameters
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - parameters.kubeblocks.io
+  resources:
+  - parameters/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - parameters.kubeblocks.io
+  resources:
+  - parameters/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - parameters.kubeblocks.io
+  resources:
   - parametersdefinitions
   verbs:
   - create

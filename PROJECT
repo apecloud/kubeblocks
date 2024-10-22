@@ -333,4 +333,13 @@ resources:
   kind: ComponentParameter
   path: github.com/apecloud/kubeblocks/apis/parameters/v1alpha1
   version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: kubeblocks.io
+  group: parameters
+  kind: Parameter
+  path: github.com/apecloud/kubeblocks/apis/parameters/v1alpha1
+  version: v1alpha1
 version: "3"

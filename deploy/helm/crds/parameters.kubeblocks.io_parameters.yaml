@@ -1,0 +1,125 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.14.0
+  labels:
+    app.kubernetes.io/name: kubeblocks
+  name: parameters.parameters.kubeblocks.io
+spec:
+  group: parameters.kubeblocks.io
+  names:
+    categories:
+    - kubeblocks
+    kind: Parameter
+    listKind: ParameterList
+    plural: parameters
+    singular: parameter
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - description: cluster name
+      jsonPath: .spec.clusterName
+      name: CLUSTER
+      type: string
+    - description: config status phase.
+      jsonPath: .status.phase
+      name: STATUS
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: Parameter is the Schema for the parameters API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ParameterSpec defines the desired state of Parameter
+            properties:
+              clusterName:
+                description: Specifies the name of the Cluster resource that this
+                  operation is targeting.
+                type: string
+                x-kubernetes-validations:
+                - message: forbidden to update spec.clusterName
+                  rule: self == oldSelf
+              componentParameters:
+                description: Lists ComponentParametersSpec objects, each specifying
+                  a Component and its parameters and template updates.
+                items:
+                  properties:
+                    componentName:
+                      description: Specifies the name of the Component.
+                      type: string
+                    parameters:
+                      additionalProperties:
+                        type: string
+                      description: Specifies the user-defined configuration template
+                        or parameters.
+                      type: object
+                    userConfigTemplates:
+                      description: |-
+                        Specifies the user-defined configuration template.
+
+
+                        When provided, the `importTemplateRef` overrides the default configuration template
+                        specified in `configSpec.templateRef`.
+                        This allows users to customize the configuration template according to their specific requirements.
+                      properties:
+                        namespace:
+                          default: default
+                          description: |-
+                            Specifies the namespace of the referenced configuration template ConfigMap object.
+                            An empty namespace is equivalent to the "default" namespace.
+                          pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
+                          type: string
+                        policy:
+                          default: none
+                          description: Defines the strategy for merging externally
+                            imported templates into component templates.
+                          enum:
+                          - patch
+                          - replace
+                          - none
+                          type: string
+                        templateRef:
+                          description: Specifies the name of the referenced configuration
+                            template ConfigMap object.
+                          pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                          type: string
+                      required:
+                      - templateRef
+                      type: object
+                  required:
+                  - componentName
+                  type: object
+                type: array
+            required:
+            - componentParameters
+            type: object
+          status:
+            description: ParameterStatus defines the observed state of Parameter
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

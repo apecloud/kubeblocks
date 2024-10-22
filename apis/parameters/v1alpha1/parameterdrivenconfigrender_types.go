@@ -23,8 +23,38 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
+// +genclient
+// +k8s:openapi-gen=true
+// +genclient:nonNamespaced
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+// +kubebuilder:resource:scope=Cluster
+// +kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=paramstemplate
+// +kubebuilder:printcolumn:name="COMPD",type="string",JSONPath=".spec.componentDef",description="componentdefinition name"
+// +kubebuilder:printcolumn:name="PHASE",type="string",JSONPath=".status.phase",description="status phase"
+// +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
+
+// ParameterDrivenConfigRender is the Schema for the parameterdrivenconfigrenders API
+type ParameterDrivenConfigRender struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	Spec   ParameterDrivenConfigRenderSpec   `json:"spec,omitempty"`
+	Status ParameterDrivenConfigRenderStatus `json:"status,omitempty"`
+}
+
+// +kubebuilder:object:root=true
+
+// ParameterDrivenConfigRenderList contains a list of ParameterDrivenConfigRender
+type ParameterDrivenConfigRenderList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []ParameterDrivenConfigRender `json:"items"`
+}
+
+func init() {
+	SchemeBuilder.Register(&ParameterDrivenConfigRender{}, &ParameterDrivenConfigRenderList{})
+}
 
 // ParameterDrivenConfigRenderSpec defines the desired state of ParameterDrivenConfigRender
 type ParameterDrivenConfigRenderSpec struct {
@@ -108,39 +138,23 @@ type ComponentConfigDescription struct {
 
 // ParameterDrivenConfigRenderStatus defines the observed state of ParameterDrivenConfigRender
 type ParameterDrivenConfigRenderStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-}
+	// The most recent generation number of the ParamsDesc object that has been observed by the controller.
+	//
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
-// +genclient
-// +k8s:openapi-gen=true
-// +genclient:nonNamespaced
-// +kubebuilder:object:root=true
-// +kubebuilder:subresource:status
-// +kubebuilder:resource:scope=Cluster
-// +kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=paramstemplate
-// +kubebuilder:printcolumn:name="COMPD",type="string",JSONPath=".spec.componentDef",description="componentdefinition name"
-// +kubebuilder:printcolumn:name="PHASE",type="string",JSONPath=".status.phase",description="status phase"
-// +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
+	// Specifies the status of the configuration template.
+	// When set to PDAvailablePhase, the ParamsDesc can be referenced by ComponentDefinition.
+	//
+	// +optional
+	Phase ParametersDescPhase `json:"phase,omitempty"`
 
-// ParameterDrivenConfigRender is the Schema for the parameterdrivenconfigrenders API
-type ParameterDrivenConfigRender struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-
-	Spec   ParameterDrivenConfigRenderSpec   `json:"spec,omitempty"`
-	Status ParameterDrivenConfigRenderStatus `json:"status,omitempty"`
-}
-
-// +kubebuilder:object:root=true
-
-// ParameterDrivenConfigRenderList contains a list of ParameterDrivenConfigRender
-type ParameterDrivenConfigRenderList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []ParameterDrivenConfigRender `json:"items"`
-}
-
-func init() {
-	SchemeBuilder.Register(&ParameterDrivenConfigRender{}, &ParameterDrivenConfigRenderList{})
+	// Represents a list of detailed status of the ParametersDescription object.
+	//
+	// This field is crucial for administrators and developers to monitor and respond to changes within the ParametersDescription.
+	// It provides a history of state transitions and a snapshot of the current state that can be used for
+	// automated logic or direct inspection.
+	//
+	// +optional
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }

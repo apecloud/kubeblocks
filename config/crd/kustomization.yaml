@@ -27,6 +27,7 @@ resources:
 - bases/parameters.kubeblocks.io_parametersdefinitions.yaml
 - bases/parameters.kubeblocks.io_parameterdrivenconfigrenders.yaml
 - bases/parameters.kubeblocks.io_componentparameters.yaml
+- bases/parameters.kubeblocks.io_parameters.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
 
 patchesStrategicMerge:
@@ -59,6 +60,7 @@ patchesStrategicMerge:
 #- patches/webhook_in_parametersdefinitions.yaml
 #- patches/webhook_in_parameterdrivenconfigrenders.yaml
 #- patches/webhook_in_componentparameters.yaml
+#- patches/webhook_in_parameters.yaml
 #+kubebuilder:scaffold:crdkustomizewebhookpatch
 
 # [CERTMANAGER] To enable cert-manager, uncomment all the sections with [CERTMANAGER] prefix.
@@ -90,6 +92,7 @@ patchesStrategicMerge:
 #- patches/cainjection_in_parametersdefinitions.yaml
 #- patches/cainjection_in_parameterdrivenconfigrenders.yaml
 #- patches/cainjection_in_componentparameters.yaml
+#- patches/cainjection_in_parameters.yaml
 #+kubebuilder:scaffold:crdkustomizecainjectionpatch
 
 # the following config is for teaching kustomize how to do kustomization for CRDs.

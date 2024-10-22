@@ -82,8 +82,11 @@ jobs:
         run: |
           touch ${{ matrix.yaml }}
           crds_path="deploy/helm/crds"
-          crds_list=$(ls $crds_path/*.yaml)
+          crds_list=$(ls $crds_path)
           for crd in $(echo $crds_list); do
+              if [[ ! -f $crds_path/$crd ]]; then
+                  continue
+              fi
               echo "---" >> ${{ matrix.yaml }}
               cat $crds_path/$crd >> ${{ matrix.yaml }}
           done
@@ -98,8 +101,11 @@ jobs:
         run: |
           touch ${{ matrix.yaml }}
           crds_path="deploy/helm/crds/snapshot"
-          crds_list=$(ls $crds_path/*.yaml)
+          crds_list=$(ls $crds_path)
           for crd in $(echo $crds_list); do
+              if [[ ! -f $crds_path/$crd ]]; then
+                  continue
+              fi
               echo "---" >> ${{ matrix.yaml }}
               cat $crds_path/$crd >> ${{ matrix.yaml }}
           done

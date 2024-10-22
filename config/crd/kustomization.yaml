@@ -25,6 +25,7 @@ resources:
 - bases/operations.kubeblocks.io_opsdefinitions.yaml
 - bases/apps.kubeblocks.io_shardingdefinitions.yaml
 - bases/parameters.kubeblocks.io_parametersdefinitions.yaml
+- bases/parameters.kubeblocks.io_parameterdrivenconfigrenders.yaml
 - bases/apps.kubeblocks.io_sidecardefinitions.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
 
@@ -56,6 +57,7 @@ patchesStrategicMerge:
 #- patches/webhook_in_nodecountscalers.yaml
 #- patches/webhook_in_shardingdefinitions.yaml
 #- patches/webhook_in_parametersdefinitions.yaml
+#- patches/webhook_in_parameterdrivenconfigrenders.yaml
 #- patches/webhook_in_sidecardefinitions.yaml
 #+kubebuilder:scaffold:crdkustomizewebhookpatch
 
@@ -86,6 +88,7 @@ patchesStrategicMerge:
 #- patches/cainjection_in_nodecountscalers.yaml
 #- patches/cainjection_in_shardingdefinitions.yaml
 #- patches/cainjection_in_parametersdefinitions.yaml
+#- patches/cainjection_in_parameterdrivenconfigrenders.yaml
 #- patches/cainjection_in_sidecardefinitions.yaml
 #+kubebuilder:scaffold:crdkustomizecainjectionpatch
 

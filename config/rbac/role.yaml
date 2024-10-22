@@ -866,6 +866,32 @@ rules:
 - apiGroups:
   - parameters.kubeblocks.io
   resources:
+  - parameterdrivenconfigrenders
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - parameters.kubeblocks.io
+  resources:
+  - parameterdrivenconfigrenders/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - parameters.kubeblocks.io
+  resources:
+  - parameterdrivenconfigrenders/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - parameters.kubeblocks.io
+  resources:
   - parametersdefinitions
   verbs:
   - create

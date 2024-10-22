@@ -1,0 +1,197 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.14.0
+  labels:
+    app.kubernetes.io/name: kubeblocks
+  name: parameterdrivenconfigrenders.parameters.kubeblocks.io
+spec:
+  group: parameters.kubeblocks.io
+  names:
+    categories:
+    - kubeblocks
+    kind: ParameterDrivenConfigRender
+    listKind: ParameterDrivenConfigRenderList
+    plural: parameterdrivenconfigrenders
+    shortNames:
+    - paramstemplate
+    singular: parameterdrivenconfigrender
+  scope: Cluster
+  versions:
+  - additionalPrinterColumns:
+    - description: componentdefinition name
+      jsonPath: .spec.componentDef
+      name: COMPD
+      type: string
+    - description: status phase
+      jsonPath: .status.phase
+      name: PHASE
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: ParameterDrivenConfigRender is the Schema for the parameterdrivenconfigrenders
+          API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ParameterDrivenConfigRenderSpec defines the desired state
+              of ParameterDrivenConfigRender
+            properties:
+              componentDef:
+                description: Specifies the ComponentDefinition custom resource (CR)
+                  that defines the Component's characteristics and behavior.
+                type: string
+              configs:
+                description: Specifies the configuration files.
+                items:
+                  properties:
+                    fileFormatConfig:
+                      description: |-
+                        Specifies the format of the configuration file and any associated parameters that are specific to the chosen format.
+                        Supported formats include `ini`, `xml`, `yaml`, `json`, `hcl`, `dotenv`, `properties`, and `toml`.
+
+
+                        Each format may have its own set of parameters that can be configured.
+                        For instance, when using the `ini` format, you can specify the section name.
+
+
+                        Example:
+                        ```
+                        fileFormatConfig:
+                         format: ini
+                         iniConfig:
+                           sectionName: mysqld
+                        ```
+                      properties:
+                        format:
+                          description: |-
+                            The config file format. Valid values are `ini`, `xml`, `yaml`, `json`,
+                            `hcl`, `dotenv`, `properties` and `toml`. Each format has its own characteristics and use cases.
+
+
+                            - ini: is a text-based content with a structure and syntax comprising key–value pairs for properties, reference wiki: https://en.wikipedia.org/wiki/INI_file
+                            - xml: refers to wiki: https://en.wikipedia.org/wiki/XML
+                            - yaml: supports for complex data types and structures.
+                            - json: refers to wiki: https://en.wikipedia.org/wiki/JSON
+                            - hcl: The HashiCorp Configuration Language (HCL) is a configuration language authored by HashiCorp, reference url: https://www.linode.com/docs/guides/introduction-to-hcl/
+                            - dotenv: is a plain text file with simple key–value pairs, reference wiki: https://en.wikipedia.org/wiki/Configuration_file#MS-DOS
+                            - properties: a file extension mainly used in Java, reference wiki: https://en.wikipedia.org/wiki/.properties
+                            - toml: refers to wiki: https://en.wikipedia.org/wiki/TOML
+                            - props-plus: a file extension mainly used in Java, supports CamelCase(e.g: brokerMaxConnectionsPerIp)
+                          enum:
+                          - xml
+                          - ini
+                          - yaml
+                          - json
+                          - hcl
+                          - dotenv
+                          - toml
+                          - properties
+                          - redis
+                          - props-plus
+                          type: string
+                        iniConfig:
+                          description: Holds options specific to the 'ini' file format.
+                          properties:
+                            sectionName:
+                              description: A string that describes the name of the
+                                ini section.
+                              type: string
+                          type: object
+                      required:
+                      - format
+                      type: object
+                    injectEnvTo:
+                      description: |-
+                        Specifies the containers to inject the ConfigMap parameters as environment variables.
+
+
+                        This is useful when application images accept parameters through environment variables and
+                        generate the final configuration file in the startup script based on these variables.
+
+
+                        This field allows users to specify a list of container names, and KubeBlocks will inject the environment
+                        variables converted from the ConfigMap into these designated containers. This provides a flexible way to
+                        pass the configuration items from the ConfigMap to the container without modifying the image.
+                      items:
+                        type: string
+                      type: array
+                      x-kubernetes-list-type: set
+                    name:
+                      description: Specifies the config file name in the config template.
+                      type: string
+                    reRenderResourceTypes:
+                      description: |-
+                        Specifies whether the configuration needs to be re-rendered after v-scale or h-scale operations to reflect changes.
+
+
+                        In some scenarios, the configuration may need to be updated to reflect the changes in resource allocation
+                        or cluster topology. Examples:
+
+
+                        - Redis: adjust maxmemory after v-scale operation.
+                        - MySQL: increase max connections after v-scale operation.
+                        - Zookeeper: update zoo.cfg with new node addresses after h-scale operation.
+                      items:
+                        description: RerenderResourceType defines the resource requirements
+                          for a component.
+                        enum:
+                        - vscale
+                        - hscale
+                        - tls
+                        type: string
+                      type: array
+                      x-kubernetes-list-type: set
+                  required:
+                  - fileFormatConfig
+                  - name
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - name
+                x-kubernetes-list-type: map
+              parametersDefs:
+                description: Specifies the ParametersDefinition custom resource (CR)
+                  that defines the Component parameter's schema and behavior.
+                items:
+                  type: string
+                type: array
+              serviceVersion:
+                description: |-
+                  ServiceVersion specifies the version of the Service expected to be provisioned by this Component.
+                  The version should follow the syntax and semantics of the "Semantic Versioning" specification (http://semver.org/).
+                  If no version is specified, the latest available version will be used.
+                type: string
+            required:
+            - componentDef
+            type: object
+          status:
+            description: ParameterDrivenConfigRenderStatus defines the observed state
+              of ParameterDrivenConfigRender
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

@@ -65,23 +65,6 @@ type ParametersDefinitionSpec struct {
 	// +optional
 	FileName string `json:"fileName,omitempty"`
 
-	// Specifies the format of the configuration file and any associated parameters that are specific to the chosen format.
-	// Supported formats include `ini`, `xml`, `yaml`, `json`, `hcl`, `dotenv`, `properties`, and `toml`.
-	//
-	// Each format may have its own set of parameters that can be configured.
-	// For instance, when using the `ini` format, you can specify the section name.
-	//
-	// Example:
-	// ```
-	// fileFormatConfig:
-	//  format: ini
-	//  iniConfig:
-	//    sectionName: mysqld
-	// ```
-	//
-	// +kubebuilder:validation:Required
-	FileFormatConfig *FileFormatConfig `json:"fileFormatConfig"`
-
 	// Defines a list of parameters including their names, default values, descriptions,
 	// types, and constraints (permissible values or the range of valid values).
 	//

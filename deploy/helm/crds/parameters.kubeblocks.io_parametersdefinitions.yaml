@@ -220,61 +220,6 @@ spec:
                   type: string
                 type: array
                 x-kubernetes-list-type: set
-              fileFormatConfig:
-                description: |-
-                  Specifies the format of the configuration file and any associated parameters that are specific to the chosen format.
-                  Supported formats include `ini`, `xml`, `yaml`, `json`, `hcl`, `dotenv`, `properties`, and `toml`.
-
-
-                  Each format may have its own set of parameters that can be configured.
-                  For instance, when using the `ini` format, you can specify the section name.
-
-
-                  Example:
-                  ```
-                  fileFormatConfig:
-                   format: ini
-                   iniConfig:
-                     sectionName: mysqld
-                  ```
-                properties:
-                  format:
-                    description: |-
-                      The config file format. Valid values are `ini`, `xml`, `yaml`, `json`,
-                      `hcl`, `dotenv`, `properties` and `toml`. Each format has its own characteristics and use cases.
-
-
-                      - ini: is a text-based content with a structure and syntax comprising key–value pairs for properties, reference wiki: https://en.wikipedia.org/wiki/INI_file
-                      - xml: refers to wiki: https://en.wikipedia.org/wiki/XML
-                      - yaml: supports for complex data types and structures.
-                      - json: refers to wiki: https://en.wikipedia.org/wiki/JSON
-                      - hcl: The HashiCorp Configuration Language (HCL) is a configuration language authored by HashiCorp, reference url: https://www.linode.com/docs/guides/introduction-to-hcl/
-                      - dotenv: is a plain text file with simple key–value pairs, reference wiki: https://en.wikipedia.org/wiki/Configuration_file#MS-DOS
-                      - properties: a file extension mainly used in Java, reference wiki: https://en.wikipedia.org/wiki/.properties
-                      - toml: refers to wiki: https://en.wikipedia.org/wiki/TOML
-                      - props-plus: a file extension mainly used in Java, supports CamelCase(e.g: brokerMaxConnectionsPerIp)
-                    enum:
-                    - xml
-                    - ini
-                    - yaml
-                    - json
-                    - hcl
-                    - dotenv
-                    - toml
-                    - properties
-                    - redis
-                    - props-plus
-                    type: string
-                  iniConfig:
-                    description: Holds options specific to the 'ini' file format.
-                    properties:
-                      sectionName:
-                        description: A string that describes the name of the ini section.
-                        type: string
-                    type: object
-                required:
-                - format
-                type: object
               fileName:
                 description: Specifies the config file name in the config template.
                 type: string
@@ -669,8 +614,6 @@ spec:
                   type: string
                 type: array
                 x-kubernetes-list-type: set
-            required:
-            - fileFormatConfig
             type: object
           status:
             description: ParametersDefinitionStatus defines the observed state of

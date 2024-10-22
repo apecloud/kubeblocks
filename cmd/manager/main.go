@@ -46,6 +46,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
+	parameterscontrollers "github.com/apecloud/kubeblocks/controllers/parameters"
+
 	// +kubebuilder:scaffold:imports
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -116,6 +119,7 @@ func init() {
 	utilruntime.Must(workloadsv1.AddToScheme(scheme))
 	utilruntime.Must(experimentalv1alpha1.AddToScheme(scheme))
 
+	utilruntime.Must(parametersv1alpha1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 
 	viper.SetConfigName("config")                          // name of config file (without extension)
@@ -557,6 +561,13 @@ func main() {
 			setupLog.Error(err, "unable to create webhook", "webhook", "ServiceDescriptor")
 			os.Exit(1)
 		}
+	}
+	if err = (&parameterscontrollers.ParametersDefinitionReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "ParametersDefinition")
+		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder
 

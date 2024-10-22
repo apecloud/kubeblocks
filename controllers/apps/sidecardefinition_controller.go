@@ -27,7 +27,6 @@ import (
 	"slices"
 	"strings"
 
-	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -80,14 +79,14 @@ func (r *SidecarDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return *res, err
 	}
 
-	if sidecarDef.Status.ObservedGeneration == sidecarDef.Generation &&
-		sidecarDef.Status.Phase == appsv1.AvailablePhase {
-		return intctrlutil.Reconciled()
-	}
+	// if sidecarDef.Status.ObservedGeneration == sidecarDef.Generation &&
+	//	sidecarDef.Status.Phase == appsv1.AvailablePhase {
+	//	return intctrlutil.Reconciled()
+	// }
 
-	if err := r.validate(r.Client, reqCtx, sidecarDef); err != nil {
-		fmt.Printf("error: %v\n", err)
-		if err1 := r.unavailable(reqCtx, sidecarDef, err); err1 != nil {
+	sidecarDefCopy := sidecarDef.DeepCopy()
+	if err := r.validateNResolve(r.Client, reqCtx, sidecarDef); err != nil {
+		if err1 := r.unavailable(reqCtx, sidecarDefCopy, sidecarDef, err); err1 != nil {
 			return intctrlutil.CheckedRequeueWithError(err1, reqCtx.Log, "")
 		}
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
@@ -97,7 +96,7 @@ func (r *SidecarDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
-	if err := r.available(reqCtx, sidecarDef); err != nil {
+	if err := r.available(reqCtx, sidecarDefCopy, sidecarDef); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
@@ -153,40 +152,49 @@ func (r *SidecarDefinitionReconciler) deletionHandler(rctx intctrlutil.RequestCt
 	}
 }
 
-func (r *SidecarDefinitionReconciler) available(rctx intctrlutil.RequestCtx, sidecarDef *appsv1.SidecarDefinition) error {
-	return r.status(rctx, sidecarDef, appsv1.AvailablePhase, "")
+func (r *SidecarDefinitionReconciler) available(rctx intctrlutil.RequestCtx,
+	sidecarDefCopy, sidecarDef *appsv1.SidecarDefinition) error {
+	return r.status(rctx, sidecarDefCopy, sidecarDef, appsv1.AvailablePhase, "")
 }
 
-func (r *SidecarDefinitionReconciler) unavailable(rctx intctrlutil.RequestCtx, sidecarDef *appsv1.SidecarDefinition, err error) error {
+func (r *SidecarDefinitionReconciler) unavailable(rctx intctrlutil.RequestCtx,
+	sidecarDefCopy, sidecarDef *appsv1.SidecarDefinition, err error) error {
 	message := ""
 	if err != nil {
 		message = err.Error()
 	}
-	return r.status(rctx, sidecarDef, appsv1.UnavailablePhase, message)
+	return r.status(rctx, sidecarDefCopy, sidecarDef, appsv1.UnavailablePhase, message)
 }
 
 func (r *SidecarDefinitionReconciler) status(rctx intctrlutil.RequestCtx,
-	sidecarDef *appsv1.SidecarDefinition, phase appsv1.Phase, message string) error {
-	patch := client.MergeFrom(sidecarDef.DeepCopy())
+	sidecarDefCopy, sidecarDef *appsv1.SidecarDefinition, phase appsv1.Phase, message string) error {
+	patch := client.MergeFrom(sidecarDefCopy)
 	sidecarDef.Status.ObservedGeneration = sidecarDef.Generation
 	sidecarDef.Status.Phase = phase
 	sidecarDef.Status.Message = message
 	return r.Client.Status().Patch(rctx.Ctx, sidecarDef, patch)
 }
 
-func (r *SidecarDefinitionReconciler) validate(cli client.Client, rctx intctrlutil.RequestCtx, sidecarDef *appsv1.SidecarDefinition) error {
-	for _, validator := range []func(context.Context, client.Client, *appsv1.SidecarDefinition) error{
-		r.validateOwner,
-		r.validateSelectors,
+func (r *SidecarDefinitionReconciler) validateNResolve(cli client.Client, rctx intctrlutil.RequestCtx,
+	sidecarDef *appsv1.SidecarDefinition) error {
+	compDefList := &appsv1.ComponentDefinitionList{}
+	if err := cli.List(rctx.Ctx, compDefList); err != nil {
+		return err
+	}
+
+	for _, f := range []func([]appsv1.ComponentDefinition, *appsv1.SidecarDefinition) error{
+		r.validateNResolveOwner,
+		r.validateNResolveSelectors,
+		r.validateOwnerNSelectors,
 	} {
-		if err := validator(rctx.Ctx, cli, sidecarDef); err != nil {
+		if err := f(compDefList.Items, sidecarDef); err != nil {
 			return err
 		}
 	}
 	return r.immutableCheck(sidecarDef)
 }
 
-func (r *SidecarDefinitionReconciler) validateOwner(ctx context.Context, cli client.Client,
+func (r *SidecarDefinitionReconciler) validateNResolveOwner(compDefs []appsv1.ComponentDefinition,
 	sidecarDef *appsv1.SidecarDefinition) error {
 	owner := sidecarDef.Spec.Owner
 	if len(owner) == 0 {
@@ -196,25 +204,57 @@ func (r *SidecarDefinitionReconciler) validateOwner(ctx context.Context, cli cli
 		return err
 	}
 
-	compDefList := &appsv1.ComponentDefinitionList{}
-	if err := cli.List(ctx, compDefList); err != nil {
-		return err
-	}
-	for _, compDef := range compDefList.Items {
+	matched := make([]string, 0)
+	for _, compDef := range compDefs {
 		if component.DefNameMatched(compDef.Name, owner) {
-			return nil
+			matched = append(matched, compDef.Name)
 		}
 	}
-	return fmt.Errorf("no matched owner found: %s", owner)
+	if len(matched) == 0 {
+		return fmt.Errorf("no matched owner found: %s", owner)
+	}
+
+	// set the matched owners
+	sidecarDef.Status.Owners = strings.Join(matched, ",")
+
+	return nil
 }
 
-func (r *SidecarDefinitionReconciler) validateSelectors(ctx context.Context, cli client.Client,
+func (r *SidecarDefinitionReconciler) validateNResolveSelectors(compDefs []appsv1.ComponentDefinition,
 	sidecarDef *appsv1.SidecarDefinition) error {
 	selectors := sidecarDef.Spec.Selectors
 	for _, selector := range selectors {
 		if err := component.ValidateDefNameRegexp(selector); err != nil {
 			return err
 		}
+	}
+	matched := make([]string, 0)
+	for _, compDef := range compDefs {
+		if slices.ContainsFunc(selectors, func(selector string) bool {
+			return component.DefNameMatched(compDef.Name, selector)
+		}) {
+			matched = append(matched, compDef.Name)
+		}
+	}
+
+	// set the matched selectors
+	sidecarDef.Status.Selectors = strings.Join(matched, ",")
+
+	return nil
+}
+
+func (r *SidecarDefinitionReconciler) validateOwnerNSelectors(_ []appsv1.ComponentDefinition,
+	sidecarDef *appsv1.SidecarDefinition) error {
+	status := sidecarDef.Status
+	if len(status.Owners) == 0 || len(status.Selectors) == 0 {
+		return nil
+	}
+
+	owners := sets.New[string](strings.Split(status.Owners, ",")...)
+	selectors := sets.New[string](strings.Split(status.Selectors, ",")...)
+	intersected := owners.Intersection(selectors)
+	if intersected.Len() > 0 {
+		return fmt.Errorf("owner and selectors should not be overlapped: %s", strings.Join(sets.List(intersected), ","))
 	}
 	return nil
 }
@@ -274,73 +314,4 @@ func (r *SidecarDefinitionReconciler) immutableHash(cli client.Client, rctx intc
 	}
 	sidecarDef.Annotations[immutableHashAnnotationKey], _ = r.specHash(sidecarDef)
 	return cli.Patch(rctx.Ctx, sidecarDef, patch)
-}
-
-func matchedSidecarDef4CompDefs(ctx context.Context, cli client.Reader, compDefs []string) (map[string][]*appsv1.SidecarDefinition, error) {
-	sidecarList := &appsv1.SidecarDefinitionList{}
-	if err := cli.List(ctx, sidecarList); err != nil {
-		return nil, err
-	}
-
-	compDefsSet := sets.New[string](compDefs...)
-	match := func(sidecarDef *appsv1.SidecarDefinition) ([]string, error) {
-		owners := sets.New(strings.Split(sidecarDef.Status.Owners, ",")...)
-		selectors := sets.New(strings.Split(sidecarDef.Status.Selectors, ",")...)
-
-		owned := compDefsSet.Intersection(owners)
-		if len(owned) == 0 {
-			return nil, nil
-		}
-		hosted := compDefsSet.Intersection(selectors)
-		if len(hosted) == 0 {
-			return nil, nil
-		}
-
-		if hosted.Intersection(owned).Len() != 0 {
-			return nil, fmt.Errorf("owner and selectors should not be overlapped: %s",
-				strings.Join(sets.List(hosted.Intersection(owned)), ","))
-		}
-		return sets.List(hosted), nil
-	}
-
-	grouped := make(map[string]map[string]*appsv1.SidecarDefinition)
-	for i, sidecarDef := range sidecarList.Items {
-		defs, err := match(&sidecarDef)
-		if err != nil {
-			return nil, err
-		}
-		for _, def := range defs {
-			if _, ok := grouped[def]; !ok {
-				grouped[def] = map[string]*appsv1.SidecarDefinition{}
-			}
-			o, ok := grouped[def][sidecarDef.Spec.Name]
-			if !ok || sidecarDef.Name > o.Name {
-				grouped[def][sidecarDef.Spec.Name] = &sidecarList.Items[i]
-			}
-		}
-	}
-
-	available := func(sidecarDef *appsv1.SidecarDefinition) error {
-		if sidecarDef.Generation != sidecarDef.Status.ObservedGeneration {
-			return fmt.Errorf("the SidecarDefinition is not up to date: %s", sidecarDef.Name)
-		}
-		if sidecarDef.Status.Phase != appsv1.AvailablePhase {
-			return fmt.Errorf("the SidecarDefinition is unavailable: %s", sidecarDef.Name)
-		}
-		return nil
-	}
-
-	result := make(map[string][]*appsv1.SidecarDefinition)
-	for compDef, sidecarDefs := range grouped {
-		result[compDef] = make([]*appsv1.SidecarDefinition, 0, len(sidecarDefs))
-		names := maps.Keys(sidecarDefs)
-		slices.Sort(names)
-		for _, name := range names {
-			if err := available(sidecarDefs[name]); err != nil {
-				return nil, err
-			}
-			result[compDef] = append(result[compDef], sidecarDefs[name])
-		}
-	}
-	return result, nil
 }

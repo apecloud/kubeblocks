@@ -331,3 +331,24 @@ type ComponentStatus struct {
 	// +optional
 	Message map[string]string `json:"message,omitempty"`
 }
+
+type Sidecar struct {
+	// Name specifies the unique name of the sidecar.
+	//
+	// The name will be used as the name of the sidecar container in the Pod.
+	//
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// Specifies the exact component definition that the sidecar belongs to.
+	//
+	// A sidecar will be updated when the owner component definition is updated only.
+	//
+	// +kubebuilder:validation:Required
+	Owner string `json:"owner"`
+
+	// Specifies the sidecar definition CR to be used to create the sidecar.
+	//
+	// +kubebuilder:validation:Required
+	SidecarDef string `json:"sidecarDef"`
+}

@@ -5446,12 +5446,20 @@ spec:
 
                         The name will be used as the name of the sidecar container in the Pod.
                       type: string
+                    owner:
+                      description: |-
+                        Specifies the exact component definition that the sidecar belongs to.
+
+
+                        A sidecar will be updated when the owner component definition is updated only.
+                      type: string
                     sidecarDef:
                       description: Specifies the sidecar definition CR to be used
                         to create the sidecar.
                       type: string
                   required:
                   - name
+                  - owner
                   - sidecarDef
                   type: object
                 type: array

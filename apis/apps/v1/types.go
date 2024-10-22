@@ -696,17 +696,3 @@ type InstanceTemplate struct {
 	// +optional
 	VolumeClaimTemplates []ClusterComponentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
 }
-
-type Sidecar struct {
-	// Name specifies the unique name of the sidecar.
-	//
-	// The name will be used as the name of the sidecar container in the Pod.
-	//
-	// +kubebuilder:validation:Required
-	Name string `json:"name"`
-
-	// Specifies the sidecar definition CR to be used to create the sidecar.
-	//
-	// +kubebuilder:validation:Required
-	SidecarDef string `json:"sidecarDef"`
-}

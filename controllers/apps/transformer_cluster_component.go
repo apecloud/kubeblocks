@@ -594,7 +594,7 @@ func mapDiff[T interface{}](m1, m2 map[string]T) (sets.Set[string], sets.Set[str
 type clusterComponentHandler struct{}
 
 func (h *clusterComponentHandler) create(transCtx *clusterTransformContext, dag *graph.DAG, name string) error {
-	proto, err := h.protoComp(transCtx, name)
+	proto, err := h.protoComp(transCtx, name, nil)
 	if err != nil {
 		return err
 	}
@@ -627,7 +627,7 @@ func (h *clusterComponentHandler) update(transCtx *clusterTransformContext, dag 
 	if err1 != nil {
 		return err1
 	}
-	proto, err2 := h.protoComp(transCtx, name)
+	proto, err2 := h.protoComp(transCtx, name, running)
 	if err2 != nil {
 		return err2
 	}
@@ -651,10 +651,10 @@ func (h *clusterComponentHandler) runningComp(transCtx *clusterTransformContext,
 	return comp, nil
 }
 
-func (h *clusterComponentHandler) protoComp(transCtx *clusterTransformContext, name string) (*appsv1.Component, error) {
+func (h *clusterComponentHandler) protoComp(transCtx *clusterTransformContext, name string, running *appsv1.Component) (*appsv1.Component, error) {
 	for _, comp := range transCtx.components {
 		if comp.Name == name {
-			return buildComponentWrapper(transCtx, comp, nil, nil)
+			return buildComponentWrapper(transCtx, comp, nil, nil, running)
 		}
 	}
 	return nil, fmt.Errorf("cluster component %s not found", name)
@@ -665,7 +665,7 @@ type clusterShardingHandler struct {
 }
 
 func (h *clusterShardingHandler) create(transCtx *clusterTransformContext, dag *graph.DAG, name string) error {
-	protoComps, err := h.protoComps(transCtx, name)
+	protoComps, err := h.protoComps(transCtx, name, nil)
 	if err != nil {
 		return err
 	}
@@ -727,7 +727,11 @@ func (h *clusterShardingHandler) update(transCtx *clusterTransformContext, dag *
 		runningCompsMap[comp.Name] = &runningComps[i]
 	}
 
-	protoComps, err2 := h.protoComps(transCtx, name)
+	var running *appsv1.Component
+	if len(runningComps) > 0 {
+		running = &runningComps[0]
+	}
+	protoComps, err2 := h.protoComps(transCtx, name, running)
 	if err2 != nil {
 		return err2
 	}
@@ -776,7 +780,7 @@ func (h *clusterShardingHandler) updateComps(transCtx *clusterTransformContext, 
 	}
 }
 
-func (h *clusterShardingHandler) protoComps(transCtx *clusterTransformContext, name string) ([]*appsv1.Component, error) {
+func (h *clusterShardingHandler) protoComps(transCtx *clusterTransformContext, name string, running *appsv1.Component) ([]*appsv1.Component, error) {
 	build := func(sharding *appsv1.ClusterSharding) ([]*appsv1.Component, error) {
 		labels := map[string]string{
 			constant.KBAppShardingNameLabelKey: sharding.Name,
@@ -794,7 +798,7 @@ func (h *clusterShardingHandler) protoComps(transCtx *clusterTransformContext, n
 			if transCtx.annotations != nil {
 				annotations = transCtx.annotations[spec.Name]
 			}
-			obj, err := buildComponentWrapper(transCtx, spec, labels, annotations)
+			obj, err := buildComponentWrapper(transCtx, spec, labels, annotations, running)
 			if err != nil {
 				return nil, err
 			}
@@ -865,22 +869,150 @@ func shardingCompNName(comp *appsv1.Component) string {
 	return ""
 }
 
-func buildComponentWrapper(transCtx *clusterTransformContext, spec *appsv1.ClusterComponentSpec, labels, annotations map[string]string) (*appsv1.Component, error) {
+func buildComponentWrapper(transCtx *clusterTransformContext,
+	spec *appsv1.ClusterComponentSpec, labels, annotations map[string]string, running *appsv1.Component) (*appsv1.Component, error) {
 	comp, err := component.BuildComponent(transCtx.Cluster, spec, labels, annotations)
 	if err != nil {
 		return nil, err
 	}
-	if transCtx.sidecars != nil {
-		sidecarDefs, ok := transCtx.sidecars[spec.ComponentDef]
-		if ok {
-			comp.Spec.Sidecars = make([]appsv1.Sidecar, 0)
-			for _, sidecarDef := range sidecarDefs {
-				comp.Spec.Sidecars = append(comp.Spec.Sidecars, appsv1.Sidecar{
-					Name:       sidecarDef.Spec.Name,
-					SidecarDef: sidecarDef.Name,
-				})
+	if err = buildSidecars4Component(transCtx, comp, running); err != nil {
+		return nil, err
+	}
+	return comp, nil
+}
+
+func buildSidecars4Component(transCtx *clusterTransformContext, proto, running *appsv1.Component) error {
+	compDefs := func() sets.Set[string] {
+		defs := sets.New[string]()
+		for _, spec := range transCtx.components {
+			defs.Insert(spec.ComponentDef)
+		}
+		for _, spec := range transCtx.shardings {
+			defs.Insert(spec.Template.ComponentDef)
+		}
+		return defs
+	}()
+
+	sidecars, err := hostedSidecarsOfCompDef(transCtx.Context, transCtx.Client, compDefs, proto.Spec.CompDef)
+	if err != nil {
+		return err
+	}
+	if len(sidecars) > 0 {
+		for name, sidecar := range sidecars {
+			if err = buildSidecar4Component(proto, running, name, sidecar); err != nil {
+				return err
 			}
 		}
 	}
-	return comp, nil
+	return nil
+}
+
+func hostedSidecarsOfCompDef(ctx context.Context, cli client.Reader, compDefs sets.Set[string], compDef string) (map[string][]any, error) {
+	sidecarList := &appsv1.SidecarDefinitionList{}
+	if err := cli.List(ctx, sidecarList); err != nil {
+		return nil, err
+	}
+
+	match := func(sidecarDef *appsv1.SidecarDefinition) (any, error) {
+		owners := sets.New(strings.Split(sidecarDef.Status.Owners, ",")...)
+		selectors := sets.New(strings.Split(sidecarDef.Status.Selectors, ",")...)
+
+		owned := compDefs.Intersection(owners)
+		if len(owned) == 0 {
+			return nil, nil
+		}
+		selected := compDefs.Intersection(selectors)
+		if len(selected) == 0 {
+			return nil, nil
+		}
+		if !selected.Has(compDef) {
+			return nil, nil
+		}
+		if selected.Intersection(owned).Len() != 0 {
+			return nil, fmt.Errorf("owner and selectors should not be overlapped: %s",
+				strings.Join(sets.List(selected.Intersection(owned)), ","))
+		}
+		if !selected.Has(compDef) {
+			return nil, nil
+		}
+		ownerList := sets.List(owned)
+		slices.SortFunc(ownerList, func(a, b string) int {
+			return strings.Compare(a, b) * -1
+		})
+		return []any{sidecarDef, ownerList}, nil
+	}
+
+	result := make(map[string][]any)
+	for i, sidecarDef := range sidecarList.Items {
+		matched, err := match(&sidecarList.Items[i])
+		if err != nil {
+			return nil, err
+		}
+		if matched != nil {
+			sidecars, ok := result[sidecarDef.Spec.Name]
+			if !ok {
+				result[sidecarDef.Spec.Name] = []any{matched}
+			} else {
+				result[sidecarDef.Spec.Name] = append(sidecars, matched)
+			}
+		}
+	}
+
+	for name := range result {
+		sidecars := result[name]
+		slices.SortFunc(sidecars, func(a1, a2 any) int {
+			sidecarDef1 := a1.([]any)[0].(*appsv1.SidecarDefinition)
+			sidecarDef2 := a2.([]any)[0].(*appsv1.SidecarDefinition)
+			return strings.Compare(sidecarDef1.Name, sidecarDef2.Name) * -1
+		})
+		result[name] = sidecars
+	}
+	return result, nil
+}
+
+func buildSidecar4Component(proto, running *appsv1.Component, sidecarName string, ctx []any) error {
+	exist := func() int {
+		if running == nil {
+			return -1
+		}
+		return slices.IndexFunc(running.Spec.Sidecars, func(s appsv1.Sidecar) bool {
+			return s.Name == sidecarName
+		})
+	}()
+
+	checkedAppend := func(sidecar appsv1.Sidecar, sidecarDef *appsv1.SidecarDefinition) error {
+		if sidecarDef.Generation != sidecarDef.Status.ObservedGeneration {
+			return fmt.Errorf("the SidecarDefinition is not up to date: %s", sidecarDef.Name)
+		}
+		if sidecarDef.Status.Phase != appsv1.AvailablePhase {
+			return fmt.Errorf("the SidecarDefinition is unavailable: %s", sidecarDef.Name)
+		}
+		if proto.Spec.Sidecars == nil {
+			proto.Spec.Sidecars = make([]appsv1.Sidecar, 0)
+		}
+		proto.Spec.Sidecars = append(proto.Spec.Sidecars, sidecar)
+		return nil
+	}
+
+	if exist >= 0 {
+		sidecar := running.Spec.Sidecars[exist]
+		for _, a := range ctx {
+			sidecarDef, owners := a.([]any)[0].(*appsv1.SidecarDefinition), a.([]any)[1].([]string)
+			if sidecar.SidecarDef == sidecarDef.Name && slices.Contains(owners, sidecar.Owner) {
+				// has the fully matched owner comp-def and sidecar def, use it directly
+				if err := checkedAppend(sidecar, sidecarDef); err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	// otherwise, use the latest one
+	sidecarDef := ctx[0].([]any)[0].(*appsv1.SidecarDefinition)
+	sidecar := appsv1.Sidecar{
+		Name:       sidecarDef.Spec.Name,
+		Owner:      ctx[0].([]any)[1].([]string)[0],
+		SidecarDef: sidecarDef.Name,
+	}
+	return checkedAppend(sidecar, sidecarDef)
 }

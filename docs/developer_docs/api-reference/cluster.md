@@ -10281,6 +10281,18 @@ string
 </tr>
 <tr>
 <td>
+<code>owner</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the exact component definition that the sidecar belongs to.</p>
+<p>A sidecar will be updated when the owner component definition is updated only.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>sidecarDef</code><br/>
 <em>
 string
@@ -10470,6 +10482,8 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
+<p>Resolved owners of the SidecarDefinition.</p>
 </td>
 </tr>
 <tr>
@@ -10480,6 +10494,8 @@ string
 </em>
 </td>
 <td>
+<em>(Optional)</em>
+<p>Resolved selectors of the SidecarDefinition.</p>
 </td>
 </tr>
 </tbody>

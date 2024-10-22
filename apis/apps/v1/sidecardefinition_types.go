@@ -29,9 +29,9 @@ import (
 // +k8s:openapi-gen=true
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=scd
-// +kubebuilder:printcolumn:name="Owner",type="string",JSONPath=".spec.owner",description="owner"
-// +kubebuilder:printcolumn:name="Selector",type="string",JSONPath=".spec.selectors",description="selectors"
+// +kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=sdcd
+// +kubebuilder:printcolumn:name="Owner",type="string",JSONPath=".status.owners",description="owners"
+// +kubebuilder:printcolumn:name="Selector",type="string",JSONPath=".status.selectors",description="selectors"
 // +kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="status phase"
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
@@ -76,6 +76,7 @@ type SidecarDefinitionSpec struct {
 	Owner string `json:"owner"`
 
 	// TODO: some control strategies
+	//   0. always
 	//   1. optional or required
 	//   2. dynamic or static
 	//   3. granularity: component or some features
@@ -148,7 +149,13 @@ type SidecarDefinitionStatus struct {
 	// +optional
 	Message string `json:"message,omitempty"`
 
+	// Resolved owners of the SidecarDefinition.
+	//
+	// +optional
 	Owners string `json:"owners,omitempty"`
 
+	// Resolved selectors of the SidecarDefinition.
+	//
+	// +optional
 	Selectors string `json:"selectors,omitempty"`
 }

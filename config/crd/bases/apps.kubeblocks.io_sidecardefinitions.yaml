@@ -15,17 +15,17 @@ spec:
     listKind: SidecarDefinitionList
     plural: sidecardefinitions
     shortNames:
-    - scd
+    - sdcd
     singular: sidecardefinition
   scope: Cluster
   versions:
   - additionalPrinterColumns:
-    - description: owner
-      jsonPath: .spec.owner
+    - description: owners
+      jsonPath: .status.owners
       name: Owner
       type: string
     - description: selectors
-      jsonPath: .spec.selectors
+      jsonPath: .status.selectors
       name: Selector
       type: string
     - description: status phase
@@ -2342,6 +2342,7 @@ spec:
                 format: int64
                 type: integer
               owners:
+                description: Resolved owners of the SidecarDefinition.
                 type: string
               phase:
                 description: |-
@@ -2352,6 +2353,7 @@ spec:
                 - Unavailable
                 type: string
               selectors:
+                description: Resolved selectors of the SidecarDefinition.
                 type: string
             type: object
         type: object

@@ -41,7 +41,7 @@ var _ = Describe("object rbac transformer test.", func() {
 	const compDefName = "test-compdef"
 	const clusterName = "test-cluster"
 	const compName = "default"
-	var serviceAccountName = constant.GenerateDefaultServiceAccountName(clusterName)
+	var serviceAccountName = constant.GenerateDefaultServiceAccountName(clusterName, compName)
 
 	var transCtx graph.TransformContext
 	var dag *graph.DAG

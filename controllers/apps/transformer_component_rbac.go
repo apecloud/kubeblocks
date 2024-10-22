@@ -95,6 +95,7 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 	return nil
 }
 
+// TODO: it seems like kb-agent doesn't need kubeblocks-lorry-pod-role
 func isLifecycleActionsEnabled(compDef *appsv1.ComponentDefinition) bool {
 	return compDef.Spec.LifecycleActions != nil
 }
@@ -123,7 +124,7 @@ func isRoleBindingExist(transCtx *componentTransformContext, serviceAccountName 
 	synthesizedComp := transCtx.SynthesizeComponent
 	namespaceName := types.NamespacedName{
 		Namespace: synthesizedComp.Namespace,
-		Name:      constant.GenerateDefaultServiceAccountName(synthesizedComp.ClusterName),
+		Name:      constant.GenerateDefaultServiceAccountName(synthesizedComp.ClusterName, synthesizedComp.Name),
 	}
 	rb := &rbacv1.RoleBinding{}
 	if err := transCtx.Client.Get(transCtx.Context, namespaceName, rb, inDataContext4C()); err != nil {
@@ -160,7 +161,6 @@ func isRoleBindingExist(transCtx *componentTransformContext, serviceAccountName 
 // buildServiceAccount builds the service account for the component.
 func buildServiceAccount(transCtx *componentTransformContext) (*corev1.ServiceAccount, error) {
 	var (
-		cluster         = transCtx.Cluster
 		comp            = transCtx.Component
 		compDef         = transCtx.CompDef
 		synthesizedComp = transCtx.SynthesizeComponent
@@ -171,8 +171,7 @@ func buildServiceAccount(transCtx *componentTransformContext) (*corev1.ServiceAc
 		if !isLifecycleActionsEnabled(compDef) {
 			return nil, nil
 		}
-		// use cluster.name to keep compatible with existed clusters
-		serviceAccountName = constant.GenerateDefaultServiceAccountName(cluster.Name)
+		serviceAccountName = constant.GenerateDefaultServiceAccountName(synthesizedComp.ClusterName, synthesizedComp.Name)
 	}
 
 	if isRoleBindingExist(transCtx, serviceAccountName) && isServiceAccountExist(transCtx, serviceAccountName) {

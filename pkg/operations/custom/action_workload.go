@@ -194,7 +194,7 @@ func (w *WorkloadAction) buildPodSpec(actionCtx ActionContext,
 		podSpec.ServiceAccountName = w.Comp.ServiceAccountName
 	default:
 		saKey := client.ObjectKey{Namespace: w.Cluster.Namespace,
-			Name: constant.GenerateDefaultServiceAccountName(w.Cluster.Name)}
+			Name: constant.GenerateDefaultServiceAccountName(w.Cluster.Name, w.Comp.Name)}
 		if exists, _ := intctrlutil.CheckResourceExists(actionCtx.ReqCtx.Ctx, actionCtx.Client, saKey, &corev1.ServiceAccount{}); exists {
 			podSpec.ServiceAccountName = saKey.Name
 		}

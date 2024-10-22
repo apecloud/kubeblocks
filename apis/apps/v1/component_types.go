@@ -176,12 +176,9 @@ type ComponentSpec struct {
 	// with other Kubernetes resources, such as modifying Pod labels or sending events.
 	//
 	// Defaults:
-	// If not specified, KubeBlocks automatically assigns a default ServiceAccount named "kb-{cluster.name}",
-	// bound to a default role defined during KubeBlocks installation.
-	//
-	// Future Changes:
-	// Future versions might change the default ServiceAccount creation strategy to one per Component,
-	// potentially revising the naming to "kb-{cluster.name}-{component.name}".
+	// If not specified, KubeBlocks automatically creates a default ServiceAccount named
+	// "kb-{cluster.name}-{component.name}", bound to a role with rules defined in ComponentDefinition's
+	// `policyRules` field. If the field is empty, ServiceAccount will not be created.
 	//
 	// Users can override the automatic ServiceAccount assignment by explicitly setting the name of
 	// an existed ServiceAccount in this field.

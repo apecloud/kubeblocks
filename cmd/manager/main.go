@@ -92,6 +92,7 @@ const (
 	operationsFlagKey   flagName = "operations"
 	extensionsFlagKey   flagName = "extensions"
 	experimentalFlagKey flagName = "experimental"
+	parametersFlagKey   flagName = "parameters"
 
 	multiClusterKubeConfigFlagKey       flagName = "multi-cluster-kubeconfig"
 	multiClusterContextsFlagKey         flagName = "multi-cluster-contexts"
@@ -118,7 +119,6 @@ func init() {
 	utilruntime.Must(workloadsv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(workloadsv1.AddToScheme(scheme))
 	utilruntime.Must(experimentalv1alpha1.AddToScheme(scheme))
-
 	utilruntime.Must(parametersv1alpha1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 
@@ -181,6 +181,8 @@ func setupFlags() {
 		"Enable the extensions controller manager.")
 	flag.Bool(experimentalFlagKey.String(), false,
 		"Enable the experimental controller manager.")
+	flag.Bool(parametersFlagKey.String(), true,
+		"Enable the parameters controller manager.")
 
 	flag.String(multiClusterKubeConfigFlagKey.String(), "", "Paths to the kubeconfig for multi-cluster accessing.")
 	flag.String(multiClusterContextsFlagKey.String(), "", "Kube contexts the manager will talk to.")
@@ -562,33 +564,40 @@ func main() {
 			os.Exit(1)
 		}
 	}
-	if err = (&parameterscontrollers.ParametersDefinitionReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "ParametersDefinition")
-		os.Exit(1)
-	}
-	if err = (&parameterscontrollers.ParameterDrivenConfigRenderReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "ParameterDrivenConfigRender")
-		os.Exit(1)
-	}
-	if err = (&parameterscontrollers.ComponentParameterReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "ComponentParameter")
-		os.Exit(1)
-	}
-	if err = (&parameterscontrollers.ParameterReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "Parameter")
-		os.Exit(1)
+
+	if viper.GetBool(parametersFlagKey.viperName()) {
+		if err = (&parameterscontrollers.ParametersDefinitionReconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("parameters-definition-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "ParametersDefinition")
+			os.Exit(1)
+		}
+		if err = (&parameterscontrollers.ParameterDrivenConfigRenderReconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("parameters-driven-config-render-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "ParameterDrivenConfigRender")
+			os.Exit(1)
+		}
+		if err = (&parameterscontrollers.ComponentParameterReconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("component-parameter-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "ComponentParameter")
+			os.Exit(1)
+		}
+		if err = (&parameterscontrollers.ParameterReconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("parameter-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "Parameter")
+			os.Exit(1)
+		}
 	}
 	// +kubebuilder:scaffold:builder
 

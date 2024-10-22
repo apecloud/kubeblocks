@@ -24,11 +24,14 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/workqueue"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -62,6 +65,8 @@ type informerManager struct {
 	queue workqueue.RateLimitingInterface
 
 	scheme *runtime.Scheme
+
+	logger logr.Logger
 }
 
 func (m *informerManager) Start(ctx context.Context) error {
@@ -102,6 +107,7 @@ func (m *informerManager) processNextWorkItem() bool {
 	obj, shutdown := m.queue.Get()
 	if shutdown {
 		// Stop working
+		m.logger.Error(fmt.Errorf("informer queue is shutdown"), "")
 		return false
 	}
 
@@ -126,8 +132,9 @@ func (m *informerManager) processNextWorkItem() bool {
 		}
 		object, _ = ro.(client.Object)
 		err = m.cli.Get(context.Background(), client.ObjectKey{Namespace: evt.InvolvedObject.Namespace, Name: evt.InvolvedObject.Name}, object)
-		if err != nil {
-			return false
+		if err != nil && !apierrors.IsNotFound(err) {
+			m.logger.Error(err, "get involved object failed: %s", evt.InvolvedObject)
+			return true
 		}
 	}
 	if object != nil {
@@ -179,6 +186,7 @@ func NewInformerManager(cli client.Client, cache cache.Cache, scheme *runtime.Sc
 		queue: workqueue.NewRateLimitingQueueWithConfig(workqueue.DefaultControllerRateLimiter(), workqueue.RateLimitingQueueConfig{
 			Name: "informer-manager",
 		}),
+		logger: ctrl.Log.WithName("informer-manager"),
 	}
 }
 

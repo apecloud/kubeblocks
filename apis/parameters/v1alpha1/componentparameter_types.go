@@ -31,7 +31,7 @@ import (
 // +k8s:openapi-gen=true
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:categories={kubeblocks,all},shortName=config
+// +kubebuilder:resource:categories={kubeblocks}
 // +kubebuilder:printcolumn:name="CLUSTER",type="string",JSONPath=".spec.clusterName",description="cluster name"
 // +kubebuilder:printcolumn:name="COMPONENT",type="string",JSONPath=".spec.componentName",description="component name"
 // +kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="config status phase."
@@ -99,7 +99,7 @@ type ConfigTemplateItemDetail struct {
 	// It ensures that the configuration adheres to certain requirements and limitations.
 	//
 	// +optional
-	ConfigSpec *appsv1.ComponentConfigSpec `json:"configSpec,omitempty"`
+	ConfigSpec *appsv1.ComponentTemplateSpec `json:"configSpec,omitempty"`
 
 	// Specifies the user-defined configuration template.
 	//
@@ -108,7 +108,7 @@ type ConfigTemplateItemDetail struct {
 	// This allows users to customize the configuration template according to their specific requirements.
 	//
 	// +optional
-	UserConfigTemplates *appsv1.ConfigTemplateExtension `json:"userConfigTemplates,omitempty"`
+	CustomTemplates *appsv1.ConfigTemplateExtension `json:"userConfigTemplates,omitempty"`
 
 	// Specifies the user-defined configuration parameters.
 	//

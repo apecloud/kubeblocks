@@ -172,3 +172,5 @@ type ParametersInFile struct {
 	// +optional
 	Parameters map[string]*string `json:"parameters,omitempty"`
 }
+
+type ComponentParameters map[string]*string

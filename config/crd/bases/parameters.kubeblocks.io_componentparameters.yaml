@@ -11,12 +11,9 @@ spec:
   names:
     categories:
     - kubeblocks
-    - all
     kind: ComponentParameter
     listKind: ComponentParameterList
     plural: componentparameters
-    shortNames:
-    - config
     singular: componentparameter
   scope: Namespaced
   versions:
@@ -133,36 +130,6 @@ spec:
                         ConfigConstraint allows defining constraints and validation rules for configuration parameters.
                         It ensures that the configuration adheres to certain requirements and limitations.
                       properties:
-                        asEnvFrom:
-                          description: |-
-                            Specifies the containers to inject the ConfigMap parameters as environment variables.
-
-
-                            This is useful when application images accept parameters through environment variables and
-                            generate the final configuration file in the startup script based on these variables.
-
-
-                            This field allows users to specify a list of container names, and KubeBlocks will inject the environment
-                            variables converted from the ConfigMap into these designated containers. This provides a flexible way to
-                            pass the configuration items from the ConfigMap to the container without modifying the image.
-
-
-                            Deprecated: `asEnvFrom` has been deprecated since 0.9.0 and will be removed in 0.10.0.
-                            Use `injectEnvTo` instead.
-                          items:
-                            type: string
-                          type: array
-                          x-kubernetes-list-type: set
-                        asSecret:
-                          description: Whether to store the final rendered parameters
-                            as a secret.
-                          type: boolean
-                        constraintRef:
-                          description: Specifies the name of the referenced configuration
-                            constraints object.
-                          maxLength: 63
-                          pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
-                          type: string
                         defaultMode:
                           description: |-
                             The operator attempts to set default file permissions for scripts (0555) and configurations (0444).
@@ -183,80 +150,6 @@ spec:
                             Refers to documents of k8s.ConfigMapVolumeSource.defaultMode for more information.
                           format: int32
                           type: integer
-                        injectEnvTo:
-                          description: |-
-                            Specifies the containers to inject the ConfigMap parameters as environment variables.
-
-
-                            This is useful when application images accept parameters through environment variables and
-                            generate the final configuration file in the startup script based on these variables.
-
-
-                            This field allows users to specify a list of container names, and KubeBlocks will inject the environment
-                            variables converted from the ConfigMap into these designated containers. This provides a flexible way to
-                            pass the configuration items from the ConfigMap to the container without modifying the image.
-                          items:
-                            type: string
-                          type: array
-                          x-kubernetes-list-type: set
-                        keys:
-                          description: |-
-                            Specifies the configuration files within the ConfigMap that support dynamic updates.
-
-
-                            A configuration template (provided in the form of a ConfigMap) may contain templates for multiple
-                            configuration files.
-                            Each configuration file corresponds to a key in the ConfigMap.
-                            Some of these configuration files may support dynamic modification and reloading without requiring
-                            a pod restart.
-
-
-                            If empty or omitted, all configuration files in the ConfigMap are assumed to support dynamic updates,
-                            and ConfigConstraint applies to all keys.
-                          items:
-                            type: string
-                          type: array
-                          x-kubernetes-list-type: set
-                        legacyRenderedConfigSpec:
-                          description: |-
-                            Specifies the secondary rendered config spec for pod-specific customization.
-
-
-                            The template is rendered inside the pod (by the "config-manager" sidecar container) and merged with the main
-                            template's render result to generate the final configuration file.
-
-
-                            This field is intended to handle scenarios where different pods within the same Component have
-                            varying configurations. It allows for pod-specific customization of the configuration.
-
-
-                            Note: This field will be deprecated in future versions, and the functionality will be moved to
-                            `cluster.spec.componentSpecs[*].instances[*]`.
-                          properties:
-                            namespace:
-                              default: default
-                              description: |-
-                                Specifies the namespace of the referenced configuration template ConfigMap object.
-                                An empty namespace is equivalent to the "default" namespace.
-                              pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
-                              type: string
-                            policy:
-                              default: none
-                              description: Defines the strategy for merging externally
-                                imported templates into component templates.
-                              enum:
-                              - patch
-                              - replace
-                              - none
-                              type: string
-                            templateRef:
-                              description: Specifies the name of the referenced configuration
-                                template ConfigMap object.
-                              pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
-                              type: string
-                          required:
-                          - templateRef
-                          type: object
                         name:
                           description: Specifies the name of the configuration template.
                           maxLength: 63
@@ -270,28 +163,6 @@ spec:
                           maxLength: 63
                           pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
                           type: string
-                        reRenderResourceTypes:
-                          description: |-
-                            Specifies whether the configuration needs to be re-rendered after v-scale or h-scale operations to reflect changes.
-
-
-                            In some scenarios, the configuration may need to be updated to reflect the changes in resource allocation
-                            or cluster topology. Examples:
-
-
-                            - Redis: adjust maxmemory after v-scale operation.
-                            - MySQL: increase max connections after v-scale operation.
-                            - Zookeeper: update zoo.cfg with new node addresses after h-scale operation.
-                          items:
-                            description: RerenderResourceType defines the resource
-                              requirements for a component.
-                            enum:
-                            - vscale
-                            - hscale
-                            - tls
-                            type: string
-                          type: array
-                          x-kubernetes-list-type: set
                         templateRef:
                           description: Specifies the name of the referenced configuration
                             template ConfigMap object.

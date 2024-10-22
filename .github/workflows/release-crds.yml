@@ -54,7 +54,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        yaml: [ 'kubeblocks_crds.yaml', 'kubeblocks.yaml' ]
+        yaml: [ 'kubeblocks_crds.yaml', 'kubeblocks.yaml' , 'dataprotection.kubeblocks.io_storageproviders.yaml', 'snapshot.storage.k8s.yaml' ]
     name: Upload ${{ matrix.yaml }}
     runs-on: ubuntu-latest
     steps:
@@ -82,7 +82,23 @@ jobs:
         run: |
           touch ${{ matrix.yaml }}
           crds_path="deploy/helm/crds"
-          crds_list=$(ls $crds_path)
+          crds_list=$(ls $crds_path/*.yaml)
+          for crd in $(echo $crds_list); do
+              echo "---" >> ${{ matrix.yaml }}
+              cat $crds_path/$crd >> ${{ matrix.yaml }}
+          done
+
+      - name: release dataprotection.kubeblocks.io_storageproviders
+        if: ${{ matrix.yaml == 'dataprotection.kubeblocks.io_storageproviders.yaml' }}
+        run: |
+          cp -r deploy/helm/crds/${{ matrix.yaml }} ${{ matrix.yaml }}
+
+      - name: merge snapshot crds
+        if: ${{ matrix.yaml == 'snapshot.storage.k8s.yaml' }}
+        run: |
+          touch ${{ matrix.yaml }}
+          crds_path="deploy/helm/crds/snapshot"
+          crds_list=$(ls $crds_path/*.yaml)
           for crd in $(echo $crds_list); do
               echo "---" >> ${{ matrix.yaml }}
               cat $crds_path/$crd >> ${{ matrix.yaml }}

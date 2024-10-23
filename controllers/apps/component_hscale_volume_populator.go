@@ -270,7 +270,7 @@ func (d *baseDataClone) getBRLabels() map[string]string {
 	return map[string]string{
 		constant.AppInstanceLabelKey:    d.cluster.Name,
 		constant.KBAppComponentLabelKey: d.component.Name,
-		constant.KBManagedByKey:         constant.AppName, // the resources are managed by which controller
+		constant.AppManagedByLabelKey:   constant.AppName, // the resources are managed by which controller
 	}
 }
 

@@ -183,3 +183,12 @@ func GetComponentNameLabelKey(cluster *appsv1.Cluster, componentName string) str
 	}
 	return constant.KBAppComponentLabelKey
 }
+
+func GetComponentDefTemplates(componentDef appsv1.ComponentDefinitionSpec) []appsv1.ComponentTemplateSpec {
+	var templates []appsv1.ComponentTemplateSpec
+
+	for _, config := range componentDef.Configs {
+		templates = append(templates, config.ComponentTemplateSpec)
+	}
+	return append(templates, componentDef.Scripts...)
+}

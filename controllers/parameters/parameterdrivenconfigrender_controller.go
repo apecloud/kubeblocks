@@ -79,7 +79,10 @@ func (r *ParameterDrivenConfigRenderReconciler) SetupWithManager(mgr ctrl.Manage
 }
 
 func (r *ParameterDrivenConfigRenderReconciler) deletionHandler(parameterTemplate *parametersv1alpha1.ParameterDrivenConfigRender, reqCtx intctrlutil.RequestCtx) func() (*ctrl.Result, error) {
-	panic("")
+	return func() (*ctrl.Result, error) {
+		// TODO
+		return nil, DeleteConfigMapFinalizer(r.Client, reqCtx, nil)
+	}
 }
 
 func (r *ParameterDrivenConfigRenderReconciler) reconcile(reqCtx intctrlutil.RequestCtx, parameterTemplate *parametersv1alpha1.ParameterDrivenConfigRender) (ctrl.Result, error) {

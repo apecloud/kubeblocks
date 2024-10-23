@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package configuration
+package parameters
 
 import (
 	"fmt"
@@ -164,7 +164,7 @@ func initConfiguration(resourceCtx *configctrl.ResourceCtx,
 	}).
 		Prepare().
 		UpdateConfiguration(). // reconcile Configuration
-		Configuration().       // sync Configuration
+		Configuration(). // sync Configuration
 		CreateConfigTemplate().
 		UpdateConfigRelatedObject().
 		UpdateConfigurationStatus().

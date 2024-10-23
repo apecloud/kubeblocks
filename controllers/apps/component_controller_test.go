@@ -490,7 +490,7 @@ var _ = Describe("Component Controller", func() {
 			ml := client.MatchingLabels{
 				constant.AppInstanceLabelKey:    clusterKey.Name,
 				constant.KBAppComponentLabelKey: comp.Name,
-				constant.KBManagedByKey:         constant.AppName,
+				constant.AppManagedByLabelKey:   constant.AppName,
 			}
 			if bpt != nil {
 				By(fmt.Sprintf("Checking backup of component %s created", comp.Name))

@@ -1,10 +1,13 @@
+{{- if has "apecloud-mysql" .Values.autoInstalledAddons  }}
 {{- $selectorLabels := include "kubeblocks.selectorLabels" . }}
 {{- include "kubeblocks.buildAddonCR" (merge (dict
   "kbVersion" ">=0.7.0"
   "selectorLabels" $selectorLabels
   "name" "apecloud-mysql"
-  "version" "0.9.0-beta.10"
+  "version" "0.9.0"
   "model" "RDBMS"
   "provider" "apecloud"
   "description" "ApeCloud MySQL is a database that is compatible with MySQL syntax and achieves high availability through the utilization of the RAFT consensus protocol."
   "autoInstall" true ) .) -}}
+{{- end }}
+

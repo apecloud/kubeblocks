@@ -72,6 +72,7 @@ spec:
             description: ClusterDefinitionSpec defines the desired state of ClusterDefinition.
             properties:
               componentDefs:
+                default: []
                 description: |-
                   Provides the definitions for the cluster components.
 
@@ -9682,20 +9683,17 @@ spec:
                           within a ClusterTopology.
                         properties:
                           compDef:
-                            description: |-
-                              Specifies the name or prefix of the ComponentDefinition custom resource(CR) that
-                              defines the Component's characteristics and behavior.
-
-
-                              When a prefix is used, the system selects the ComponentDefinition CR with the latest version that matches the prefix.
-                              This approach allows:
-
-
-                              1. Precise selection by providing the exact name of a ComponentDefinition CR.
-                              2. Flexible and automatic selection of the most up-to-date ComponentDefinition CR by specifying a prefix.
-
-
-                              Once set, this field cannot be updated.
+                            description: "Specifies the exact name, name prefix, or
+                              regular expression pattern for matching the name of
+                              the ComponentDefinition\ncustom resource (CR) that defines
+                              the Component's characteristics and behavior.\n\n\nThe
+                              system selects the ComponentDefinition CR with the latest
+                              version that matches the pattern.\nThis approach allows:\n\n\n1.
+                              Precise selection by providing the exact name of a ComponentDefinition
+                              CR.\n2. Flexible and automatic selection of the most
+                              up-to-date ComponentDefinition CR\n\t  by specifying
+                              a name prefix or regular expression pattern.\n\n\nOnce
+                              set, this field cannot be updated."
                             maxLength: 64
                             type: string
                           name:

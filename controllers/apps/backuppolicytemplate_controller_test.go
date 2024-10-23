@@ -60,12 +60,22 @@ var _ = Describe("", func() {
 
 	Context("create a backuppolicytemplate", func() {
 		It("should be available", func() {
-			compDef1 := "compDef1"
-			compDef2 := "compDef2"
+			By("Create a componentDefinition obj")
+			compDef1 := "comp-def1"
+			compDef2 := "comp-def2"
+			compDefPrefix := "comp-def"
+			testapps.NewComponentDefinitionFactory(compDef1).
+				SetDefaultSpec().
+				Create(&testCtx).
+				GetObject()
+			testapps.NewComponentDefinitionFactory(compDef2).
+				SetDefaultSpec().
+				Create(&testCtx).
+				GetObject()
 			bpt := testapps.NewBackupPolicyTemplateFactory(BackupPolicyTemplateName).
 				SetClusterDefRef(ClusterDefName).
 				AddBackupPolicy(BackupPolicyName).
-				SetComponentDef(compDef1, compDef2).
+				SetComponentDef(compDefPrefix, compDef2).
 				AddBackupMethod(BackupMethod, false, ActionSetName).
 				SetBackupMethodVolumeMounts("data", "/data").
 				AddBackupMethod(VsBackupMethodName, true, "").

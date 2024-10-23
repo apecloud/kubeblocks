@@ -34,4 +34,5 @@ type Endpoint struct {
 type Request struct {
 	Data       interface{}    `json:"data,omitempty"`
 	Parameters map[string]any `json:"parameters,omitempty"`
+	Metadata   map[string]any `json:"metadata,omitempty"`
 }

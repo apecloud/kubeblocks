@@ -27,6 +27,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	appsv1 "k8s.io/api/apps/v1"
 
 	vsv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -149,7 +150,7 @@ var _ = Describe("Backup Controller test", func() {
 					g.Expect(fetched.Status.PersistentVolumeClaimName).Should(Equal(repoPVCName))
 					g.Expect(fetched.Status.Path).Should(Equal(dpbackup.BuildBaseBackupPath(fetched, "", backupPolicy.Spec.PathPrefix)))
 					g.Expect(fetched.Status.Phase).Should(Equal(dpv1alpha1.BackupPhaseRunning))
-					g.Expect(fetched.Annotations[dptypes.ConnectionPasswordAnnotationKey]).ShouldNot(BeEmpty())
+					g.Expect(fetched.Annotations[constant.EncryptedSystemAccountsAnnotationKey]).ShouldNot(BeEmpty())
 				})).Should(Succeed())
 
 				By("check backup job's nodeName equals pod's nodeName")
@@ -832,6 +833,35 @@ var _ = Describe("Backup Controller test", func() {
 					g.Expect(fetched.Status.Phase).Should(Equal(dpv1alpha1.BackupPhaseRunning))
 					g.Expect(fetched.Status.PersistentVolumeClaimName).Should(Equal(repoPVCName))
 				})).Should(Succeed())
+				By("mock no target pod found and expect backup is Failed")
+				Expect(testapps.ChangeObj(&testCtx, clusterInfo.TargetPod, func(pod *corev1.Pod) {
+					delete(clusterInfo.TargetPod.Labels, constant.RoleLabelKey)
+				}))
+				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
+					g.Expect(fetched.Status.Phase).Should(Equal(dpv1alpha1.BackupPhaseFailed))
+					g.Expect(fetched.Status.FailureReason).Should(ContainSubstring("failed to get target pods by backup policy"))
+				})).Should(Succeed())
+
+				By("expect the replicas of statefulSet is 0")
+				backup := &dpv1alpha1.Backup{}
+				Expect(k8sClient.Get(ctx, backupKey, backup)).Should(Succeed())
+				stsKey := client.ObjectKey{
+					Name:      dpbackup.GenerateBackupStatefulSetName(backup, "", dpbackup.BackupDataJobNamePrefix),
+					Namespace: testCtx.DefaultNamespace,
+				}
+				Eventually(testapps.CheckObj(&testCtx, stsKey, func(g Gomega, sts *appsv1.StatefulSet) {
+					g.Expect(*sts.Spec.Replicas).Should(BeEquivalentTo(0))
+				}))
+
+				By("mock target pod exists")
+				Expect(testapps.ChangeObj(&testCtx, clusterInfo.TargetPod, func(pod *corev1.Pod) {
+					clusterInfo.TargetPod.Labels[constant.RoleLabelKey] = constant.Leader
+				}))
+
+				By("expect the replicas of statefulSet is 1")
+				Eventually(testapps.CheckObj(&testCtx, stsKey, func(g Gomega, sts *appsv1.StatefulSet) {
+					g.Expect(*sts.Spec.Replicas).Should(BeEquivalentTo(1))
+				}))
 			})
 		})
 	})
@@ -1058,7 +1088,7 @@ var _ = Describe("Backup Controller test", func() {
 					g.Expect(fetched.Status.Path).Should(Equal(dpbackup.BuildBaseBackupPath(fetched, "", backupPolicy.Spec.PathPrefix)))
 					g.Expect(fetched.Status.KopiaRepoPath).Should(Equal(dpbackup.BuildKopiaRepoPath(fetched, "", backupPolicy.Spec.PathPrefix)))
 					g.Expect(fetched.Status.Phase).Should(Equal(dpv1alpha1.BackupPhaseRunning))
-					g.Expect(fetched.Annotations[dptypes.ConnectionPasswordAnnotationKey]).ShouldNot(BeEmpty())
+					g.Expect(fetched.Annotations[constant.EncryptedSystemAccountsAnnotationKey]).ShouldNot(BeEmpty())
 				})).Should(Succeed())
 
 				testdp.PatchK8sJobStatus(&testCtx, getJobKey(), batchv1.JobComplete)

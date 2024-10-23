@@ -1,3 +1,4 @@
+{{- if has "postgresql" .Values.autoInstalledAddons  }}
 {{- $selectorLabels := include "kubeblocks.selectorLabels" . }}
 {{- include "kubeblocks.buildAddonCR" (merge (dict
   "kbVersion" ">=0.7.0"
@@ -8,3 +9,4 @@
   "provider" "community"
   "description" "PostgreSQL (Postgres) is an open source object-relational database known for reliability and data integrity. ACID-compliant, it supports foreign keys, joins, views, triggers and stored procedures."
   "autoInstall" true) . ) -}}
+  {{- end }}

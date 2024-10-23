@@ -20,14 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
-	"context"
 	"fmt"
 	"time"
 
 	"github.com/pkg/errors"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	policyv1 "k8s.io/api/policy/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -108,25 +106,14 @@ func (t *componentDeletionTransformer) handleCompDeleteWhenScaleIn(transCtx *com
 // handleCompDeleteWhenClusterDelete handles the component deletion when the cluster is being deleted, the sub-resources owned by the component depends on the cluster's TerminationPolicy.
 func (t *componentDeletionTransformer) handleCompDeleteWhenClusterDelete(transCtx *componentTransformContext, graphCli model.GraphClient,
 	dag *graph.DAG, cluster *appsv1alpha1.Cluster, comp *appsv1alpha1.Component, matchLabels map[string]string) error {
-	var (
-		toPreserveKinds, toDeleteKinds []client.ObjectList
-	)
+	var toDeleteKinds []client.ObjectList
 	switch cluster.Spec.TerminationPolicy {
-	case appsv1alpha1.Halt:
-		toPreserveKinds = compOwnedPreserveKinds()
-		toDeleteKinds = kindsForCompHalt()
 	case appsv1alpha1.Delete:
 		toDeleteKinds = kindsForCompDelete()
 	case appsv1alpha1.WipeOut:
 		toDeleteKinds = kindsForCompWipeOut()
 	}
 
-	if len(toPreserveKinds) > 0 {
-		// preserve the objects owned by the component when the component is being deleted
-		if err := preserveCompObjects(transCtx.Context, transCtx.Client, graphCli, dag, comp, matchLabels, toPreserveKinds); err != nil {
-			return newRequeueError(requeueDuration, err.Error())
-		}
-	}
 	return t.deleteCompResources(transCtx, graphCli, dag, comp, matchLabels, toDeleteKinds)
 }
 
@@ -177,7 +164,6 @@ func (t *componentDeletionTransformer) getCluster(transCtx *componentTransformCo
 func compOwnedKinds() []client.ObjectList {
 	return []client.ObjectList{
 		&workloads.InstanceSetList{},
-		&policyv1.PodDisruptionBudgetList{},
 		&corev1.ServiceList{},
 		&corev1.ServiceAccountList{},
 		&rbacv1.RoleBindingList{},
@@ -214,10 +200,4 @@ func kindsForCompDelete() []client.ObjectList {
 
 func kindsForCompWipeOut() []client.ObjectList {
 	return kindsForCompDelete()
-}
-
-// preserveCompObjects preserves the objects owned by the component when the component is being deleted
-func preserveCompObjects(ctx context.Context, cli client.Reader, graphCli model.GraphClient, dag *graph.DAG,
-	comp *appsv1alpha1.Component, ml client.MatchingLabels, toPreserveKinds []client.ObjectList) error {
-	return preserveObjects(ctx, cli, graphCli, dag, comp, ml, toPreserveKinds, constant.DBComponentFinalizerName, constant.LastAppliedClusterAnnotationKey)
 }

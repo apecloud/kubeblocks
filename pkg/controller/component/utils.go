@@ -21,6 +21,7 @@ package component
 
 import (
 	"context"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -35,6 +36,35 @@ import (
 
 func inDataContext() *multicluster.ClientOption {
 	return multicluster.InDataContext()
+}
+
+func ValidateCompDefRegexp(compDefPattern string) error {
+	_, err := regexp.Compile(compDefPattern)
+	return err
+}
+
+func CompDefMatched(compDef, compDefPattern string) bool {
+	if strings.HasPrefix(compDef, compDefPattern) {
+		return true
+	}
+
+	isRegexpPattern := func(pattern string) bool {
+		escapedPattern := regexp.QuoteMeta(pattern)
+		return escapedPattern != pattern
+	}
+
+	isRegex := false
+	regex, err := regexp.Compile(compDefPattern)
+	if err == nil {
+		// distinguishing between regular expressions and ordinary strings.
+		if isRegexpPattern(compDefPattern) {
+			isRegex = true
+		}
+	}
+	if !isRegex {
+		return false
+	}
+	return regex.MatchString(compDef)
 }
 
 func IsHostNetworkEnabled(synthesizedComp *SynthesizedComponent) bool {

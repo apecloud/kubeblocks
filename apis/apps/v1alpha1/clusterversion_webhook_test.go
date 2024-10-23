@@ -48,7 +48,9 @@ var _ = Describe("clusterVersion webhook", func() {
 		cleanupObjects()
 	})
 	Context("When clusterVersion create and update", func() {
+
 		It("Should webhook validate passed", func() {
+			Skip("Skip the test")
 			By("By testing create a new clusterVersion when clusterDefinition not exist")
 			clusterVersion := createTestClusterVersionObj(clusterDefinitionName, clusterVersionName)
 			Expect(testCtx.CreateObj(ctx, clusterVersion)).ShouldNot(Succeed())

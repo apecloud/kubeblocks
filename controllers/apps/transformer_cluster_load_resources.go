@@ -22,10 +22,12 @@ package apps
 import (
 	"fmt"
 
+	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/types"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/apiconversion"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 )
@@ -69,14 +71,27 @@ func (t *clusterLoadRefResourcesTransformer) Transform(ctx graph.TransformContex
 }
 
 func (t *clusterLoadRefResourcesTransformer) apiValidation(cluster *appsv1alpha1.Cluster) error {
-	if withClusterTopology(cluster) ||
-		withClusterUserDefined(cluster) ||
-		withClusterLegacyDefinition(cluster) ||
-		withClusterSimplifiedAPI(cluster) {
-		return nil
+	if !withClusterTopology(cluster) &&
+		!withClusterUserDefined(cluster) &&
+		!withClusterLegacyDefinition(cluster) &&
+		!withClusterSimplifiedAPI(cluster) {
+		return fmt.Errorf("cluster API validate error, clusterDef: %s, topology: %s, comps: %d, legacy comps: %d, simplified API: %v",
+			cluster.Spec.ClusterDefRef, cluster.Spec.Topology, clusterCompCnt(cluster), legacyClusterCompCnt(cluster), withClusterSimplifiedAPI(cluster))
 	}
-	return fmt.Errorf("cluster API validate error, clusterDef: %s, topology: %s, comps: %d, legacy comps: %d, simplified API: %v",
-		cluster.Spec.ClusterDefRef, cluster.Spec.Topology, clusterCompCnt(cluster), legacyClusterCompCnt(cluster), withClusterSimplifiedAPI(cluster))
+
+	for _, compSpec := range cluster.Spec.ComponentSpecs {
+		if err := validateCompDef(&compSpec); err != nil {
+			return err
+		}
+	}
+
+	for _, shardingSpec := range cluster.Spec.ShardingSpecs {
+		if err := validateCompDef(&shardingSpec.Template); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (t *clusterLoadRefResourcesTransformer) checkNUpdateClusterTopology(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster) error {
@@ -97,6 +112,16 @@ func (t *clusterLoadRefResourcesTransformer) checkNUpdateClusterTopology(transCt
 
 	cluster.Spec.Topology = clusterTopology.Name
 
+	return nil
+}
+
+func validateCompDef(compSpec *appsv1alpha1.ClusterComponentSpec) error {
+	if len(compSpec.ComponentDef) == 0 {
+		return nil
+	}
+	if err := component.ValidateCompDefRegexp(compSpec.ComponentDef); err != nil {
+		return errors.Wrapf(err, "invalid reference component definition name pattern: %s", compSpec.ComponentDef)
+	}
 	return nil
 }
 

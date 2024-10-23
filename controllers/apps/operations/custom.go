@@ -279,7 +279,7 @@ func initOpsDefAndValidate(reqCtx intctrlutil.RequestCtx,
 			if len(opsDef.Spec.ComponentInfos) > 0 {
 				var componentDefMatched bool
 				for _, c := range opsDef.Spec.ComponentInfos {
-					if c.ComponentDefinitionName == compDef.Name {
+					if component.CompDefMatched(compDef.Name, c.ComponentDefinitionName) {
 						componentDefMatched = true
 						break
 					}

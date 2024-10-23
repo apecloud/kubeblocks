@@ -199,7 +199,8 @@ Choose a policy based on the desired level of resource cleanup and data preserva
 <ul>
 <li><code>DoNotTerminate</code>: Prevents deletion of the Cluster. This policy ensures that all resources remain intact.</li>
 <li><code>Halt</code>: Deletes Cluster resources like Pods and Services but retains Persistent Volume Claims (PVCs),
-allowing for data preservation while stopping other operations.</li>
+allowing for data preservation while stopping other operations.
+Warning: Halt policy is deprecated in 0.9.1 and will have same meaning as DoNotTerminate.</li>
 <li><code>Delete</code>: Extends the <code>Halt</code> policy by also removing PVCs, leading to a thorough cleanup while
 removing all persistent data.</li>
 <li><code>WipeOut</code>: An aggressive policy that deletes all Cluster resources, including volume snapshots and
@@ -291,6 +292,20 @@ This field helps control the placement of Pods on nodes within the Cluster.</p>
 <em>(Optional)</em>
 <p>An array that specifies tolerations attached to the Cluster&rsquo;s Pods,
 allowing them to be scheduled onto nodes with matching taints.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>schedulingPolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.SchedulingPolicy">
+SchedulingPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the scheduling policy for the cluster.</p>
 </td>
 </tr>
 <tr>
@@ -843,7 +858,7 @@ map[string]string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies Labels to override or add for underlying Pods.</p>
+<p>Specifies Labels to override or add for underlying Pods, PVCs, Account &amp; TLS Secrets, Services Owned by Component.</p>
 </td>
 </tr>
 <tr>
@@ -855,7 +870,7 @@ map[string]string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies Annotations to override or add for underlying Pods.</p>
+<p>Specifies Annotations to override or add for underlying Pods, PVCs, Account &amp; TLS Secrets, Services Owned by Component.</p>
 </td>
 </tr>
 <tr>
@@ -1102,6 +1117,20 @@ specified <code>key</code>, <code>value</code>, <code>effect</code>, and <code>o
 <li>The <code>operator</code> determines how the toleration matches the taint.</li>
 </ul>
 <p>Pods with matching tolerations are allowed to be scheduled on tainted nodes, typically reserved for specific purposes.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>schedulingPolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.SchedulingPolicy">
+SchedulingPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the scheduling policy for the component.</p>
 </td>
 </tr>
 <tr>
@@ -3941,10 +3970,14 @@ Existing usage should be updated to the current preferred approach to avoid comp
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies a list of names of ComponentDefinitions that the specified ClusterDefinition references.
-They should be different versions of definitions of the same component,
-thus allowing them to share a single BackupPolicy.
-Each name must adhere to the IANA Service Naming rule.</p>
+<p>Specifies the name of the ComponentDefinition.
+Each name in the list can represent an exact name, a name prefix, or a regular expression pattern.</p>
+<p>For example:</p>
+<ul>
+<li>&ldquo;mysql-8.0.30-v1alpha1&rdquo;: Matches the exact name &ldquo;mysql-8.0.30-v1alpha1&rdquo;</li>
+<li>&ldquo;mysql-8.0.30&rdquo;: Matches all names starting with &ldquo;mysql-8.0.30&rdquo;</li>
+<li>&rdquo;^mysql-8.0.\d&#123;1,2&#125;$&ldquo;: Matches all names starting with &ldquo;mysql-8.0.&rdquo; followed by one or two digits.</li>
+</ul>
 </td>
 </tr>
 <tr>
@@ -5096,9 +5129,9 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>References the name of a ComponentDefinition object.
-The ComponentDefinition specifies the behavior and characteristics of the Component.
-If both <code>componentDefRef</code> and <code>componentDef</code> are provided,
+<p>Specifies the exact name, name prefix, or regular expression pattern for matching the name of the ComponentDefinition
+custom resource (CR) that defines the Component&rsquo;s characteristics and behavior.</p>
+<p>If both <code>componentDefRef</code> and <code>componentDef</code> are provided,
 the <code>componentDef</code> will take precedence over <code>componentDefRef</code>.</p>
 </td>
 </tr>
@@ -5198,7 +5231,7 @@ map[string]string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies Labels to override or add for underlying Pods.</p>
+<p>Specifies Labels to override or add for underlying Pods, PVCs, Account &amp; TLS Secrets, Services Owned by Component.</p>
 </td>
 </tr>
 <tr>
@@ -5210,7 +5243,7 @@ map[string]string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies Annotations to override or add for underlying Pods.</p>
+<p>Specifies Annotations to override or add for underlying Pods, PVCs, Account &amp; TLS Secrets, Services Owned by Component.</p>
 </td>
 </tr>
 <tr>
@@ -5273,6 +5306,20 @@ specified <code>key</code>, <code>value</code>, <code>effect</code>, and <code>o
 <li>The <code>operator</code> determines how the toleration matches the taint.</li>
 </ul>
 <p>Pods with matching tolerations are allowed to be scheduled on tainted nodes, typically reserved for specific purposes.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>schedulingPolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.SchedulingPolicy">
+SchedulingPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the scheduling policy for the component.</p>
 </td>
 </tr>
 <tr>
@@ -6339,8 +6386,9 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>CompDef specifies the definition used by the component that the referent object resident in.
-If not specified, the component itself will be used.</p>
+<p>Specifies the exact name, name prefix, or regular expression pattern for matching the name of the ComponentDefinition
+custom resource (CR) used by the component that the referent object resident in.</p>
+<p>If not specified, the component itself will be used.</p>
 </td>
 </tr>
 <tr>
@@ -6674,7 +6722,8 @@ Choose a policy based on the desired level of resource cleanup and data preserva
 <ul>
 <li><code>DoNotTerminate</code>: Prevents deletion of the Cluster. This policy ensures that all resources remain intact.</li>
 <li><code>Halt</code>: Deletes Cluster resources like Pods and Services but retains Persistent Volume Claims (PVCs),
-allowing for data preservation while stopping other operations.</li>
+allowing for data preservation while stopping other operations.
+Warning: Halt policy is deprecated in 0.9.1 and will have same meaning as DoNotTerminate.</li>
 <li><code>Delete</code>: Extends the <code>Halt</code> policy by also removing PVCs, leading to a thorough cleanup while
 removing all persistent data.</li>
 <li><code>WipeOut</code>: An aggressive policy that deletes all Cluster resources, including volume snapshots and
@@ -6766,6 +6815,20 @@ This field helps control the placement of Pods on nodes within the Cluster.</p>
 <em>(Optional)</em>
 <p>An array that specifies tolerations attached to the Cluster&rsquo;s Pods,
 allowing them to be scheduled onto nodes with matching taints.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>schedulingPolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.SchedulingPolicy">
+SchedulingPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the scheduling policy for the cluster.</p>
 </td>
 </tr>
 <tr>
@@ -7177,13 +7240,14 @@ string
 </em>
 </td>
 <td>
-<p>Specifies the name or prefix of the ComponentDefinition custom resource(CR) that
-defines the Component&rsquo;s characteristics and behavior.</p>
-<p>When a prefix is used, the system selects the ComponentDefinition CR with the latest version that matches the prefix.
+<p>Specifies the exact name, name prefix, or regular expression pattern for matching the name of the ComponentDefinition
+custom resource (CR) that defines the Component&rsquo;s characteristics and behavior.</p>
+<p>The system selects the ComponentDefinition CR with the latest version that matches the pattern.
 This approach allows:</p>
 <ol>
 <li>Precise selection by providing the exact name of a ComponentDefinition CR.</li>
-<li>Flexible and automatic selection of the most up-to-date ComponentDefinition CR by specifying a prefix.</li>
+<li>Flexible and automatic selection of the most up-to-date ComponentDefinition CR
+by specifying a name prefix or regular expression pattern.</li>
 </ol>
 <p>Once set, this field cannot be updated.</p>
 </td>
@@ -8726,7 +8790,14 @@ string
 </em>
 </td>
 <td>
-<p>Specifies the name of the ComponentDefinition.</p>
+<p>Specifies the name of the ComponentDefinition.
+The name can represent an exact name, a name prefix, or a regular expression pattern.</p>
+<p>For example:</p>
+<ul>
+<li>&ldquo;mysql-8.0.30-v1alpha1&rdquo;: Matches the exact name &ldquo;mysql-8.0.30-v1alpha1&rdquo;</li>
+<li>&ldquo;mysql-8.0.30&rdquo;: Matches all names starting with &ldquo;mysql-8.0.30&rdquo;</li>
+<li>&rdquo;^mysql-8.0.\d&#123;1,2&#125;$&ldquo;: Matches all names starting with &ldquo;mysql-8.0.&rdquo; followed by one or two digits.</li>
+</ul>
 </td>
 </tr>
 <tr>
@@ -9546,7 +9617,7 @@ map[string]string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies Labels to override or add for underlying Pods.</p>
+<p>Specifies Labels to override or add for underlying Pods, PVCs, Account &amp; TLS Secrets, Services Owned by Component.</p>
 </td>
 </tr>
 <tr>
@@ -9558,7 +9629,7 @@ map[string]string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies Annotations to override or add for underlying Pods.</p>
+<p>Specifies Annotations to override or add for underlying Pods, PVCs, Account &amp; TLS Secrets, Services Owned by Component.</p>
 </td>
 </tr>
 <tr>
@@ -9805,6 +9876,20 @@ specified <code>key</code>, <code>value</code>, <code>effect</code>, and <code>o
 <li>The <code>operator</code> determines how the toleration matches the taint.</li>
 </ul>
 <p>Pods with matching tolerations are allowed to be scheduled on tainted nodes, typically reserved for specific purposes.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>schedulingPolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.SchedulingPolicy">
+SchedulingPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the scheduling policy for the component.</p>
 </td>
 </tr>
 <tr>
@@ -10479,11 +10564,12 @@ The value will be presented in the following format: FQDN1,FQDN2,&hellip;</p>
 </td>
 <td>
 <p>CompDefs specifies names for the component definitions associated with this ComponentVersion.
-Each name in the list can represent an exact name, or a name prefix.</p>
+Each name in the list can represent an exact name, a name prefix, or a regular expression pattern.</p>
 <p>For example:</p>
 <ul>
 <li>&ldquo;mysql-8.0.30-v1alpha1&rdquo;: Matches the exact name &ldquo;mysql-8.0.30-v1alpha1&rdquo;</li>
 <li>&ldquo;mysql-8.0.30&rdquo;: Matches all names starting with &ldquo;mysql-8.0.30&rdquo;</li>
+<li>&rdquo;^mysql-8.0.\d&#123;1,2&#125;$&ldquo;: Matches all names starting with &ldquo;mysql-8.0.&rdquo; followed by one or two digits.</li>
 </ul>
 </td>
 </tr>
@@ -13360,7 +13446,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>The instance will rebuild on the specified node when the instance uses local PersistentVolume as the storage disk.
+<p>The instance will rebuild on the specified node.
 If not set, it will rebuild on a random node.</p>
 </td>
 </tr>
@@ -18264,6 +18350,20 @@ Supported time formats:</p>
 </tr>
 <tr>
 <td>
+<code>env</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#envvar-v1-core">
+[]Kubernetes core/v1.EnvVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies a list of environment variables to be set in the container.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>volumeRestorePolicy</code><br/>
 <em>
 string
@@ -18663,10 +18763,9 @@ Sample duration format:</p>
 <h3 id="apps.kubeblocks.io/v1alpha1.SchedulingPolicy">SchedulingPolicy
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.InstanceTemplate">InstanceTemplate</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ClusterSpec">ClusterSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.ComponentSpec">ComponentSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.InstanceTemplate">InstanceTemplate</a>)
 </p>
 <div>
-<p>SchedulingPolicy the scheduling policy.</p>
 </div>
 <table>
 <thead>
@@ -18685,8 +18784,8 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>If specified, the Pod will be dispatched by specified scheduler.
-If not specified, the Pod will be dispatched by default scheduler.</p>
+<p>If specified, the pod will be dispatched by specified scheduler.
+If not specified, the pod will be dispatched by default scheduler.</p>
 </td>
 </tr>
 <tr>
@@ -18698,8 +18797,8 @@ map[string]string
 </td>
 <td>
 <em>(Optional)</em>
-<p>NodeSelector is a selector which must be true for the Pod to fit on a node.
-Selector which must match a node&rsquo;s labels for the Pod to be scheduled on that node.
+<p>NodeSelector is a selector which must be true for the pod to fit on a node.
+Selector which must match a node&rsquo;s labels for the pod to be scheduled on that node.
 More info: <a href="https://kubernetes.io/docs/concepts/configuration/assign-pod-node/">https://kubernetes.io/docs/concepts/configuration/assign-pod-node/</a></p>
 </td>
 </tr>
@@ -18712,8 +18811,8 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>NodeName is a request to schedule this Pod onto a specific node. If it is non-empty,
-the scheduler simply schedules this Pod onto that node, assuming that it fits resource
+<p>NodeName is a request to schedule this pod onto a specific node. If it is non-empty,
+the scheduler simply schedules this pod onto that node, assuming that it fits resource
 requirements.</p>
 </td>
 </tr>
@@ -18728,7 +18827,7 @@ Kubernetes core/v1.Affinity
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies a group of affinity scheduling rules of the Cluster, including NodeAffinity, PodAffinity, and PodAntiAffinity.</p>
+<p>If specified, the cluster&rsquo;s scheduling constraints.</p>
 </td>
 </tr>
 <tr>
@@ -18742,14 +18841,7 @@ Kubernetes core/v1.Affinity
 </td>
 <td>
 <em>(Optional)</em>
-<p>Allows Pods to be scheduled onto nodes with matching taints.
-Each toleration in the array allows the Pod to tolerate node taints based on
-specified <code>key</code>, <code>value</code>, <code>effect</code>, and <code>operator</code>.</p>
-<ul>
-<li>The <code>key</code>, <code>value</code>, and <code>effect</code> identify the taint that the toleration matches.</li>
-<li>The <code>operator</code> determines how the toleration matches the taint.</li>
-</ul>
-<p>Pods with matching tolerations are allowed to be scheduled on tainted nodes, typically reserved for specific purposes.</p>
+<p>Attached to tolerate any taint that matches the triple <code>key,value,effect</code> using the matching operator <code>operator</code>.</p>
 </td>
 </tr>
 <tr>
@@ -18763,8 +18855,8 @@ specified <code>key</code>, <code>value</code>, <code>effect</code>, and <code>o
 </td>
 <td>
 <em>(Optional)</em>
-<p>TopologySpreadConstraints describes how a group of Pods ought to spread across topology
-domains. Scheduler will schedule Pods in a way which abides by the constraints.
+<p>TopologySpreadConstraints describes how a group of pods ought to spread across topology
+domains. Scheduler will schedule pods in a way which abides by the constraints.
 All topologySpreadConstraints are ANDed.</p>
 </td>
 </tr>
@@ -21933,7 +22025,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the name of the ComponentDefinition.</p>
+<p>Specifies the name of the ComponentDefinition, only exact matches are supported.</p>
 </td>
 </tr>
 <tr>
@@ -22071,7 +22163,14 @@ use the latest available version in ComponentVersion.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Determine the appropriate version of the backup tool image from ComponentDefinition.</p>
+<p>Determine the appropriate version of the backup tool image from ComponentDefinition.
+Each name in the list can represent an exact name, a name prefix, or a regular expression pattern.</p>
+<p>For example:</p>
+<ul>
+<li>&ldquo;mysql-8.0.30-v1alpha1&rdquo;: Matches the exact name &ldquo;mysql-8.0.30-v1alpha1&rdquo;</li>
+<li>&ldquo;mysql-8.0.30&rdquo;: Matches all names starting with &ldquo;mysql-8.0.30&rdquo;</li>
+<li>&rdquo;^mysql-8.0.\d&#123;1,2&#125;$&ldquo;: Matches all names starting with &ldquo;mysql-8.0.&rdquo; followed by one or two digits.</li>
+</ul>
 </td>
 </tr>
 <tr>
@@ -22085,7 +22184,14 @@ use the latest available version in ComponentVersion.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Determine the appropriate version of the backup tool image from ServiceVersion.</p>
+<p>Determine the appropriate version of the backup tool image from ServiceVersion.
+Each service version in the list can represent an exact version, a version prefix, or a regular expression pattern.</p>
+<p>For example:</p>
+<ul>
+<li>&ldquo;8.0.33&rdquo;: Matches the exact version &ldquo;8.0.33&rdquo;</li>
+<li>&ldquo;8.0&rdquo;: Matches all versions starting with &ldquo;8.0&rdquo;</li>
+<li>&rdquo;^8.0.\d&#123;1,2&#125;$&ldquo;: Matches all versions starting with &ldquo;8.0.&rdquo; followed by one or two digits.</li>
+</ul>
 </td>
 </tr>
 </tbody>
@@ -22113,7 +22219,7 @@ use the latest available version in ComponentVersion.</p>
 </em>
 </td>
 <td>
-<p>Represents an array of names of ClusterVersion or ComponentDefinition that can be mapped to
+<p>Represents an array of names of ClusterVersion or ComponentDefinition or ServiceVersion that can be mapped to
 the appropriate version of the backup tool image.</p>
 <p>This mapping allows different versions of component images to correspond to specific versions of backup tool images.</p>
 </td>

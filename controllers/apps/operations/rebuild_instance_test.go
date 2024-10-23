@@ -31,8 +31,10 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	"github.com/apecloud/kubeblocks/pkg/generics"
@@ -48,6 +50,7 @@ var _ = Describe("OpsUtil functions", func() {
 		clusterDefinitionName = "cluster-definition-for-ops-" + randomStr
 		clusterVersionName    = "clusterversion-for-ops-" + randomStr
 		clusterName           = "cluster-for-ops-" + randomStr
+		targetNodeName        = "test-node-1"
 		rebuildInstanceCount  = 2
 	)
 
@@ -68,6 +71,7 @@ var _ = Describe("OpsUtil functions", func() {
 		testapps.ClearResources(&testCtx, generics.OpsRequestSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.BackupSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.RestoreSignature, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.InstanceSetSignature, true, inNS, ml)
 		// default GracePeriod is 30s
 		testapps.ClearResources(&testCtx, generics.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS, ml)
@@ -87,7 +91,8 @@ var _ = Describe("OpsUtil functions", func() {
 			var instances []appsv1alpha1.Instance
 			for _, insName := range instanceNames {
 				instances = append(instances, appsv1alpha1.Instance{
-					Name: insName,
+					Name:           insName,
+					TargetNodeName: targetNodeName,
 				})
 			}
 			ops.Spec.RebuildFrom = []appsv1alpha1.RebuildInstance{
@@ -110,8 +115,13 @@ var _ = Describe("OpsUtil functions", func() {
 			// fake to create the source pvc.
 			for i := range podList {
 				pvcName := fmt.Sprintf("%s-%s", testapps.DataVolumeName, podList[i].Name)
+				pvName := fmt.Sprintf("%s-%s", testapps.DataVolumeName, podList[i].Name)
+				testapps.NewPersistentVolumeFactory(podList[i].Namespace, pvName, pvcName).
+					SetStorage("20Gi").
+					SetPersistentVolumeReclaimPolicy(corev1.PersistentVolumeReclaimDelete).
+					Create(&testCtx)
 				testapps.NewPersistentVolumeClaimFactory(podList[i].Namespace, pvcName, clusterName, consensusComp, testapps.DataVolumeName).
-					SetStorage("20Gi").Create(&testCtx)
+					SetStorage("20Gi").SetVolumeName(pvName).Create(&testCtx)
 			}
 
 			By("Test the functions in ops_util.go")
@@ -135,8 +145,8 @@ var _ = Describe("OpsUtil functions", func() {
 			var pvs []*corev1.PersistentVolume
 			for i := range pvcList.Items {
 				pvc := &pvcList.Items[i]
-				_, ok := pvc.Annotations[rebuildFromAnnotation]
-				if !ok {
+				if _, ok := pvc.Annotations[rebuildFromAnnotation]; !ok {
+					// skip the pvc if it is not a tmp pvc.
 					continue
 				}
 				pvName := pvc.Name + "-pv"
@@ -193,10 +203,9 @@ var _ = Describe("OpsUtil functions", func() {
 		})
 
 		sourcePVCsShouldRebindPVs := func(reqCtx intctrlutil.RequestCtx, opsRes *OpsResource, pvcList *corev1.PersistentVolumeClaimList) {
-			// fake the pvs
+			// fake the pvs and bound them to the tmp pvcs
 			pvs := fakeTmpPVCBoundPV(pvcList)
 
-			// rebind the source pvcs and pvs
 			_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			for i := range pvs {
 				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(pvs[i]), func(g Gomega, pv *corev1.PersistentVolume) {
@@ -207,10 +216,21 @@ var _ = Describe("OpsUtil functions", func() {
 			}
 
 			Expect(k8sClient.List(ctx, pvcList, client.MatchingLabels{constant.KBAppComponentLabelKey: consensusComp}, client.InNamespace(opsRes.OpsRequest.Namespace))).Should(Succeed())
+			By("mock the restored pvs are bound")
+			for i := range pvs {
+				Expect(testapps.ChangeObjStatus(&testCtx, pvs[i], func() {
+					pvs[i].Status.Phase = corev1.VolumeBound
+				})).Should(Succeed())
+			}
+			// reconcile again to revert the reclaim policy
+			_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+
+			Expect(k8sClient.List(ctx, pvcList, client.MatchingLabels{constant.KBAppComponentLabelKey: consensusComp}, client.InNamespace(opsRes.OpsRequest.Namespace))).Should(Succeed())
 			reCreatePVCCount := 0
 			for i := range pvcList.Items {
 				pvc := &pvcList.Items[i]
 				rebuildFrom, ok := pvc.Annotations[rebuildFromAnnotation]
+				// the temporary PVCs have been deleted, leaving only the rebuilt PVCs.
 				if !ok {
 					continue
 				}
@@ -219,6 +239,12 @@ var _ = Describe("OpsUtil functions", func() {
 				Expect(pvc.Spec.VolumeName).Should(ContainSubstring("-pv"))
 			}
 			Expect(reCreatePVCCount).Should(Equal(rebuildInstanceCount))
+			By("expect to revert the reclaim policy to Delete")
+			for i := range pvs {
+				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(pvs[i]), func(g Gomega, pv *corev1.PersistentVolume) {
+					g.Expect(pv.Spec.PersistentVolumeReclaimPolicy).Should(Equal(corev1.PersistentVolumeReclaimDelete))
+				}))
+			}
 		}
 
 		waitForInstanceToAvailable := func(reqCtx intctrlutil.RequestCtx, opsRes *OpsResource, ignoreRoleCheck bool) {
@@ -246,6 +272,7 @@ var _ = Describe("OpsUtil functions", func() {
 		It("test rebuild instance with no backup", func() {
 			By("init operations resources ")
 			opsRes := prepareOpsRes("", true)
+			its := testapps.MockInstanceSetComponent(&testCtx, clusterName, consensusComp)
 			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsRunningPhase
 			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
 
@@ -287,8 +314,18 @@ var _ = Describe("OpsUtil functions", func() {
 			}))
 
 			By("expect to clean up the tmp pods")
-			_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			Expect(err).NotTo(HaveOccurred())
 			Eventually(testapps.List(&testCtx, generics.PodSignature, matchingLabels, client.InNamespace(opsRes.OpsRequest.Namespace))).Should(HaveLen(0))
+
+			By("check its' schedule once annotation")
+			podPrefix := constant.GenerateWorkloadNamePattern(clusterName, consensusComp)
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(its), func(g Gomega, its *workloads.InstanceSet) {
+				mapping, err := instanceset.ParseNodeSelectorOnceAnnotation(its)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(mapping).To(HaveKeyWithValue(podPrefix+"-0", targetNodeName))
+				g.Expect(mapping).To(HaveKeyWithValue(podPrefix+"-1", targetNodeName))
+			})).Should(Succeed())
 		})
 
 		testRebuildInstanceWithBackup := func(ignoreRoleCheck bool) {
@@ -314,6 +351,7 @@ var _ = Describe("OpsUtil functions", func() {
 				}
 			})).Should(Succeed())
 			opsRes := prepareOpsRes(backup.Name, true)
+			_ = testapps.MockInstanceSetComponent(&testCtx, clusterName, consensusComp)
 			if ignoreRoleCheck {
 				Expect(testapps.ChangeObj(&testCtx, opsRes.OpsRequest, func(request *appsv1alpha1.OpsRequest) {
 					if request.Annotations == nil {
@@ -422,8 +460,16 @@ var _ = Describe("OpsUtil functions", func() {
 			_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(opsRes.Cluster.Spec.GetComponentByName(consensusComp).Replicas).Should(BeEquivalentTo(5))
 
-			By("mock the new pods to available")
+			By("its have expected nodeSelector")
 			podPrefix := constant.GenerateWorkloadNamePattern(clusterName, consensusComp)
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(its), func(g Gomega, its *workloads.InstanceSet) {
+				mapping, err := instanceset.ParseNodeSelectorOnceAnnotation(its)
+				g.Expect(err).NotTo(HaveOccurred())
+				g.Expect(mapping).To(HaveKeyWithValue(podPrefix+"-3", targetNodeName))
+				g.Expect(mapping).To(HaveKeyWithValue(podPrefix+"-4", targetNodeName))
+			})).Should(Succeed())
+
+			By("mock the new pods to available")
 			testapps.MockInstanceSetPod(&testCtx, nil, clusterName, consensusComp, podPrefix+"-3", "follower", "Readonly")
 			testapps.MockInstanceSetPod(&testCtx, nil, clusterName, consensusComp, podPrefix+"-4", "follower", "Readonly")
 

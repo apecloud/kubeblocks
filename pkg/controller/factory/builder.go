@@ -109,6 +109,8 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, component
 
 	var vcts []corev1.PersistentVolumeClaim
 	for _, vct := range synthesizedComp.VolumeClaimTemplates {
+		intctrlutil.MergeMetadataMapInplace(synthesizedComp.UserDefinedLabels, &vct.ObjectMeta.Labels)
+		intctrlutil.MergeMetadataMapInplace(synthesizedComp.UserDefinedAnnotations, &vct.ObjectMeta.Annotations)
 		vcts = append(vcts, vctToPVC(vct))
 	}
 	itsBuilder.SetVolumeClaimTemplates(vcts...)
@@ -333,16 +335,51 @@ func GetRestorePassword(cluster *appsv1alpha1.Cluster, synthesizedComp *componen
 	return password
 }
 
+// GetRestoreSystemAccountPassword gets restore password if exists during recovery.
+func GetRestoreSystemAccountPassword(synthesizedComp *component.SynthesizedComponent, account appsv1alpha1.SystemAccount) string {
+	valueString := synthesizedComp.Annotations[constant.RestoreFromBackupAnnotationKey]
+	if len(valueString) == 0 {
+		return ""
+	}
+	backupMap := map[string]map[string]string{}
+	err := json.Unmarshal([]byte(valueString), &backupMap)
+	if err != nil {
+		return ""
+	}
+	backupSource, ok := backupMap[synthesizedComp.Name]
+	if !ok {
+		return ""
+	}
+	systemAccountsString, ok := backupSource[constant.EncryptedSystemAccounts]
+	if !ok {
+		return ""
+	}
+	systemAccountsMap := map[string]string{}
+	err = json.Unmarshal([]byte(systemAccountsString), &systemAccountsMap)
+	if err != nil {
+		return ""
+	}
+	e := intctrlutil.NewEncryptor(viper.GetString(constant.CfgKeyDPEncryptionKey))
+	encryptedPwd, ok := systemAccountsMap[account.Name]
+	if !ok {
+		return ""
+	}
+	password, _ := e.Decrypt([]byte(encryptedPwd))
+	return password
+}
+
 func BuildPVC(cluster *appsv1alpha1.Cluster,
-	component *component.SynthesizedComponent,
+	synthesizedComp *component.SynthesizedComponent,
 	vct *corev1.PersistentVolumeClaimTemplate,
 	pvcKey types.NamespacedName,
 	templateName,
 	snapshotName string) *corev1.PersistentVolumeClaim {
-	wellKnownLabels := constant.GetKBWellKnownLabels(component.ClusterDefName, cluster.Name, component.Name)
+	wellKnownLabels := constant.GetKBWellKnownLabels(synthesizedComp.ClusterDefName, cluster.Name, synthesizedComp.Name)
 	pvcBuilder := builder.NewPVCBuilder(pvcKey.Namespace, pvcKey.Name).
 		AddLabelsInMap(wellKnownLabels).
+		AddLabelsInMap(synthesizedComp.UserDefinedLabels).
 		AddLabels(constant.VolumeClaimTemplateNameLabelKey, vct.Name).
+		AddAnnotationsInMap(synthesizedComp.UserDefinedAnnotations).
 		SetAccessModes(vct.Spec.AccessModes).
 		SetResources(vct.Spec.Resources)
 	if vct.Spec.StorageClassName != nil {
@@ -357,12 +394,12 @@ func BuildPVC(cluster *appsv1alpha1.Cluster,
 		})
 	}
 	pvc := pvcBuilder.GetObject()
-	BuildPersistentVolumeClaimLabels(component, pvc, vct.Name, templateName)
+	BuildPersistentVolumeClaimLabels(synthesizedComp, pvc, vct.Name, templateName)
 	return pvc
 }
 
 func BuildBackup(cluster *appsv1alpha1.Cluster,
-	component *component.SynthesizedComponent,
+	synthesizedComp *component.SynthesizedComponent,
 	backupPolicyName string,
 	backupKey types.NamespacedName,
 	backupMethod string) *dpv1alpha1.Backup {
@@ -370,22 +407,22 @@ func BuildBackup(cluster *appsv1alpha1.Cluster,
 		AddLabels(dptypes.BackupMethodLabelKey, backupMethod).
 		AddLabels(dptypes.BackupPolicyLabelKey, backupPolicyName).
 		AddLabels(constant.KBManagedByKey, "cluster").
-		AddLabels(constant.AppNameLabelKey, component.ClusterDefName).
+		AddLabels(constant.AppNameLabelKey, synthesizedComp.ClusterDefName).
 		AddLabels(constant.AppInstanceLabelKey, cluster.Name).
 		AddLabels(constant.AppManagedByLabelKey, constant.AppName).
-		AddLabels(constant.KBAppComponentLabelKey, component.Name).
+		AddLabels(constant.KBAppComponentLabelKey, synthesizedComp.Name).
 		SetBackupPolicyName(backupPolicyName).
 		SetBackupMethod(backupMethod).
 		GetObject()
 }
 
 func BuildConfigMapWithTemplate(cluster *appsv1alpha1.Cluster,
-	component *component.SynthesizedComponent,
+	synthesizedComp *component.SynthesizedComponent,
 	configs map[string]string,
 	cmName string,
 	configTemplateSpec appsv1alpha1.ComponentTemplateSpec) *corev1.ConfigMap {
-	wellKnownLabels := constant.GetKBWellKnownLabels(component.ClusterDefName, cluster.Name, component.Name)
-	wellKnownLabels[constant.AppComponentLabelKey] = component.ClusterCompDefName
+	wellKnownLabels := constant.GetKBWellKnownLabels(synthesizedComp.ClusterDefName, cluster.Name, synthesizedComp.Name)
+	wellKnownLabels[constant.AppComponentLabelKey] = synthesizedComp.CompDefName
 	return builder.NewConfigMapBuilder(cluster.Namespace, cmName).
 		AddLabelsInMap(wellKnownLabels).
 		AddLabels(constant.CMConfigurationTypeLabelKey, constant.ConfigInstanceType).

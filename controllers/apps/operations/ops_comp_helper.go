@@ -261,16 +261,14 @@ func (c componentOpsHelper) reconcileActionWithComponentOps(reqCtx intctrlutil.R
 			componentPhase = compObj.Status.Phase
 		}
 		// conditions whether ops is running:
-		//  1. completedProgressCount is not equal to expectProgressCount when the ops do not need to wait component phase to a terminal phase.
-		//  2. the component phase is not a terminal phase and no completed progress.
-		if pgResource.noWaitComponentCompleted {
-			if expectCount != completedCount {
-				opsIsCompleted = false
-			}
-		} else {
-			if !slices.Contains(appsv1alpha1.GetComponentTerminalPhases(), componentPhase) || completedCount == 0 {
-				opsIsCompleted = false
-			}
+		//  1. completedProgressCount is not equal to expectProgressCount.
+		//  2. the component phase is not a terminal phase or no completed progress if the ops
+		//  needs to wait for the component phase to reach a terminal state.
+		if expectCount != completedCount {
+			opsIsCompleted = false
+		} else if !pgResource.noWaitComponentCompleted &&
+			(!slices.Contains(appsv1alpha1.GetComponentTerminalPhases(), componentPhase) || completedCount == 0) {
+			opsIsCompleted = false
 		}
 		opsRequest.Status.Components[pgResource.compOps.GetComponentName()] = opsCompStatus
 	}

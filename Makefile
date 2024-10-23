@@ -15,7 +15,7 @@
 # Variables                                                                    #
 ################################################################################
 APP_NAME = kubeblocks
-VERSION ?= 0.8.0-alpha.0
+VERSION ?= 0.9.0
 GITHUB_PROXY ?=
 INIT_ENV ?= false
 TEST_TYPE ?= wesql
@@ -275,6 +275,10 @@ manager: cue-fmt generate manager-go-generate test-go-generate build-checks ## B
 .PHONY: dataprotection
 dataprotection: generate test-go-generate build-checks ## Build dataprotection binary.
 	$(GO) build -ldflags=${LD_FLAGS} -o bin/dataprotection ./cmd/dataprotection/main.go
+
+.PHONY: helmhook
+helmhook:
+	$(GO) build -o bin/helmhook ./cmd/helmhook/main.go
 
 CERT_ROOT_CA ?= $(WEBHOOK_CERT_DIR)/rootCA.key
 .PHONY: webhook-cert

@@ -29,6 +29,7 @@ import (
 type OpsRequest struct {
 	Data       []byte         `json:"data,omitempty"`
 	Parameters map[string]any `json:"parameters,omitempty"`
+	Metadata   map[string]any `json:"metadata,omitempty"`
 }
 
 func (r *OpsRequest) GetString(key string) string {

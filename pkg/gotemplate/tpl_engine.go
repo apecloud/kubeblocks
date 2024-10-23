@@ -42,6 +42,8 @@ const (
 	buildInSystemFailedName = "failed"
 	buildInSystemImportName = "import"
 	buildInSystemCallName   = "call"
+
+	buildInSSHKeyGeneratorString = "sshKeyGen"
 )
 
 const (
@@ -199,6 +201,7 @@ func (t *TplEngine) initSystemFunMap(funcs template.FuncMap) {
 	funcs[goTemplateExtendBuildInRegexSubString] = regexStringSubmatch
 	funcs[goTemplateExtendBuildInFromYamlString] = fromYAML
 	funcs[goTemplateExtendBuildInFromYamlArrayString] = fromYAMLArray
+	funcs[buildInSSHKeyGeneratorString] = sshKeyGenerate
 
 	t.tpl.Option(DefaultTemplateOps)
 	t.tpl.Funcs(funcs)

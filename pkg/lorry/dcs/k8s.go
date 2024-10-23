@@ -599,7 +599,7 @@ func (store *KubernetesStore) GetSwitchover() (*Switchover, error) {
 	return switchOver, nil
 }
 
-func (store *KubernetesStore) CreateSwitchover(leader, candidate string) error {
+func (store *KubernetesStore) CreateSwitchover(leader, candidate string, metadata map[string]any) error {
 	switchoverName := store.getSwitchoverName()
 	switchover, _ := store.GetSwitchover()
 	if switchover != nil {
@@ -617,6 +617,13 @@ func (store *KubernetesStore) CreateSwitchover(leader, candidate string) error {
 		},
 	}
 
+	if len(metadata) > 0 {
+		meta, err := json.Marshal(metadata)
+		if err != nil {
+			return errors.Wrap(err, "marshal metadata failed")
+		}
+		swConfigMap.Annotations["metadata"] = string(meta)
+	}
 	err := store.createConfigMap(swConfigMap)
 	if err != nil {
 		store.logger.Error(err, "Create switchover configmap failed")

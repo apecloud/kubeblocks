@@ -1,3 +1,4 @@
+{{- if has "aws-load-balancer-controller" .Values.autoInstalledAddons  }}
 apiVersion: extensions.kubeblocks.io/v1alpha1
 kind: Addon
 metadata:
@@ -55,4 +56,5 @@ spec:
       operator: Contains
       values:
       - eks
+{{- end }}
 

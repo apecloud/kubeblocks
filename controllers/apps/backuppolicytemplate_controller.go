@@ -20,14 +20,17 @@ import (
 	"context"
 
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -58,10 +61,16 @@ func (r *BackupPolicyTemplateReconciler) Reconcile(ctx context.Context, req reco
 	if backupPolicyTemplate.Spec.ClusterDefRef != "" {
 		backupPolicyTemplate.Labels[constant.ClusterDefLabelKey] = backupPolicyTemplate.Spec.ClusterDefRef
 	}
-
+	compDefList := &appsv1alpha1.ComponentDefinitionList{}
+	if err := r.Client.List(ctx, compDefList); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
 	for _, backupPolicy := range backupPolicyTemplate.Spec.BackupPolicies {
 		for _, compDef := range backupPolicy.ComponentDefs {
-			backupPolicyTemplate.Labels[compDef] = compDef
+			matchedCompDefNames := r.getMatchedComponentDefs(compDefList, compDef)
+			for _, compDefName := range matchedCompDefNames {
+				backupPolicyTemplate.Labels[compDefName] = compDefName
+			}
 		}
 	}
 
@@ -72,9 +81,53 @@ func (r *BackupPolicyTemplateReconciler) Reconcile(ctx context.Context, req reco
 	return intctrlutil.Reconciled()
 }
 
+func (r *BackupPolicyTemplateReconciler) getMatchedComponentDefs(compDefList *appsv1alpha1.ComponentDefinitionList, compDef string) []string {
+	var compDefNames []string
+	for i, item := range compDefList.Items {
+		if component.CompDefMatched(item.Name, compDef) {
+			compDefNames = append(compDefNames, compDefList.Items[i].Name)
+		}
+	}
+	return compDefNames
+}
+
+func (r *BackupPolicyTemplateReconciler) isCompatibleWith(compDef appsv1alpha1.ComponentDefinition, bpt *appsv1alpha1.BackupPolicyTemplate) bool {
+	for _, bp := range bpt.Spec.BackupPolicies {
+		for _, compDefRegex := range bp.ComponentDefs {
+			if component.CompDefMatched(compDef.Name, compDefRegex) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (r *BackupPolicyTemplateReconciler) compatibleBackupPolicyTemplate(ctx context.Context, obj client.Object) []reconcile.Request {
+	compDef, ok := obj.(*appsv1alpha1.ComponentDefinition)
+	if !ok {
+		return nil
+	}
+	bpts := &appsv1alpha1.BackupPolicyTemplateList{}
+	if err := r.Client.List(ctx, bpts); err != nil {
+		return nil
+	}
+	requests := make([]reconcile.Request, 0)
+	for i := range bpts.Items {
+		if r.isCompatibleWith(*compDef, &bpts.Items[i]) {
+			requests = append(requests, reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Name: bpts.Items[i].Name,
+				},
+			})
+		}
+	}
+	return requests
+}
+
 // SetupWithManager sets up the controller with the Manager.
 func (r *BackupPolicyTemplateReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return intctrlutil.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.BackupPolicyTemplate{}).
+		Watches(&appsv1alpha1.ComponentDefinition{}, handler.EnqueueRequestsFromMapFunc(r.compatibleBackupPolicyTemplate)).
 		Complete(r)
 }

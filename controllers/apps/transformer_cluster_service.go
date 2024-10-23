@@ -36,6 +36,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	ctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 // clusterServiceTransformer handles cluster services.
@@ -318,6 +319,9 @@ func createOrUpdateService(ctx graph.TransformContext, dag *graph.DAG, graphCli 
 
 	objCopy := obj.DeepCopy()
 	objCopy.Spec = service.Spec
+
+	ctrlutil.MergeMetadataMapInplace(service.Labels, &objCopy.Labels)
+	ctrlutil.MergeMetadataMapInplace(service.Annotations, &objCopy.Annotations)
 
 	resolveServiceDefaultFields(&obj.Spec, &objCopy.Spec)
 

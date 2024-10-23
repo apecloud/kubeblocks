@@ -200,7 +200,7 @@ func ReadCacheSnapshot(transCtx graph.TransformContext, root client.Object, ml c
 	for _, list := range kinds {
 		if err := transCtx.GetClient().List(transCtx.GetContext(), list, inNS, ml); err != nil {
 			// check for policy/v1 discovery error, to support k8s clusters before 1.21.
-			if isPolicyV1DiscoveryNotFoundError(err) {
+			if IsPolicyV1DiscoveryNotFoundError(err) {
 				continue
 			}
 			return nil, err
@@ -222,8 +222,8 @@ func ReadCacheSnapshot(transCtx graph.TransformContext, root client.Object, ml c
 	return snapshot, nil
 }
 
-// isPolicyV1DiscoveryNotFoundError checks whether the @err is an error of type ErrGroupDiscoveryFailed for policy/v1 resource.
-func isPolicyV1DiscoveryNotFoundError(err error) bool {
+// IsPolicyV1DiscoveryNotFoundError checks whether the @err is an error of type ErrGroupDiscoveryFailed for policy/v1 resource.
+func IsPolicyV1DiscoveryNotFoundError(err error) bool {
 	wrappedErr := errors.Unwrap(err)
 	if wrappedErr != nil {
 		err = wrappedErr

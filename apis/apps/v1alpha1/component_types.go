@@ -78,12 +78,12 @@ type ComponentSpec struct {
 	// +optional
 	ServiceRefs []ServiceRef `json:"serviceRefs,omitempty"`
 
-	// Specifies Labels to override or add for underlying Pods.
+	// Specifies Labels to override or add for underlying Pods, PVCs, Account & TLS Secrets, Services Owned by Component.
 	//
 	// +optional
 	Labels map[string]string `json:"labels,omitempty"`
 
-	// Specifies Annotations to override or add for underlying Pods.
+	// Specifies Annotations to override or add for underlying Pods, PVCs, Account & TLS Secrets, Services Owned by Component.
 	//
 	// +optional
 	Annotations map[string]string `json:"annotations,omitempty"`
@@ -201,6 +201,7 @@ type ComponentSpec struct {
 	// Specifies a group of affinity scheduling rules for the Component.
 	// It allows users to control how the Component's Pods are scheduled onto nodes in the Cluster.
 	//
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.10.0"
 	// +optional
 	Affinity *Affinity `json:"affinity,omitempty"`
 
@@ -213,8 +214,14 @@ type ComponentSpec struct {
 	//
 	// Pods with matching tolerations are allowed to be scheduled on tainted nodes, typically reserved for specific purposes.
 	//
+	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.10.0"
 	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+
+	// Specifies the scheduling policy for the component.
+	//
+	// +optional
+	SchedulingPolicy *SchedulingPolicy `json:"schedulingPolicy,omitempty"`
 
 	// Specifies the TLS configuration for the Component, including:
 	//

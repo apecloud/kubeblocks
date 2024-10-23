@@ -39,6 +39,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/scheduling"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testdp "github.com/apecloud/kubeblocks/pkg/testutil/dataprotection"
@@ -631,14 +632,20 @@ var _ = Describe("Cluster Controller", func() {
 		})
 
 		By("Checking the Affinity and Toleration")
+		schedulingPolicy, err := scheduling.BuildSchedulingPolicy4Component(clusterObj.Name, compName, &affinity, []corev1.Toleration{toleration})
+		Expect(err).Should(BeNil())
+
 		compKey := types.NamespacedName{
 			Namespace: clusterObj.Namespace,
 			Name:      component.FullName(clusterObj.Name, compName),
 		}
 		Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *appsv1alpha1.Component) {
-			g.Expect(*comp.Spec.Affinity).Should(BeEquivalentTo(affinity))
-			g.Expect(comp.Spec.Tolerations).Should(HaveLen(2))
-			g.Expect(comp.Spec.Tolerations[0]).Should(BeEquivalentTo(toleration))
+			g.Expect(comp.Spec.Affinity).Should(BeNil())
+			g.Expect(comp.Spec.Tolerations).Should(HaveLen(0))
+			g.Expect(comp.Spec.SchedulingPolicy).ShouldNot(BeNil())
+			g.Expect(comp.Spec.SchedulingPolicy.Affinity).Should(BeEquivalentTo(schedulingPolicy.Affinity))
+			g.Expect(comp.Spec.SchedulingPolicy.Tolerations).Should(HaveLen(2))
+			g.Expect(comp.Spec.SchedulingPolicy.Tolerations[0]).Should(BeEquivalentTo(toleration))
 		})).Should(Succeed())
 	}
 
@@ -695,14 +702,72 @@ var _ = Describe("Cluster Controller", func() {
 		})
 
 		By("Checking the Affinity and Toleration")
+		schedulingPolicy, err := scheduling.BuildSchedulingPolicy4Component(clusterObj.Name, compName, &compAffinity, []corev1.Toleration{compToleration})
+		Expect(err).Should(BeNil())
+
 		compKey := types.NamespacedName{
 			Namespace: clusterObj.Namespace,
 			Name:      component.FullName(clusterObj.Name, compName),
 		}
 		Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *appsv1alpha1.Component) {
-			g.Expect(*comp.Spec.Affinity).Should(BeEquivalentTo(compAffinity))
-			g.Expect(comp.Spec.Tolerations).Should(HaveLen(2))
-			g.Expect(comp.Spec.Tolerations[0]).Should(BeEquivalentTo(compToleration))
+			g.Expect(comp.Spec.Affinity).Should(BeNil())
+			g.Expect(comp.Spec.Tolerations).Should(HaveLen(0))
+			g.Expect(comp.Spec.SchedulingPolicy).ShouldNot(BeNil())
+			g.Expect(comp.Spec.SchedulingPolicy.Affinity).Should(BeEquivalentTo(schedulingPolicy.Affinity))
+			g.Expect(comp.Spec.SchedulingPolicy.Tolerations).Should(HaveLen(2))
+			g.Expect(comp.Spec.SchedulingPolicy.Tolerations[0]).Should(BeEquivalentTo(compToleration))
+		})).Should(Succeed())
+	}
+
+	testClusterAffinityNToleration4Update := func(compName, compDefName string, createObj func(string, string, func(*testapps.MockClusterFactory))) {
+		const (
+			clusterTopologyKey     = "testClusterTopologyKey"
+			clusterLabelKey        = "testClusterNodeLabelKey"
+			clusterLabelValue      = "testClusterNodeLabelValue"
+			clusterTolerationKey   = "testClusterTolerationKey"
+			clusterTolerationValue = "testClusterTolerationValue"
+		)
+
+		Expect(compDefName).Should(BeElementOf(consensusCompDefName))
+
+		By("Creating a cluster w/o Affinity and Toleration")
+		createObj(compName, compDefName, nil)
+
+		By("update cluster to set Affinity and Toleration")
+		affinity := appsv1alpha1.Affinity{
+			PodAntiAffinity: appsv1alpha1.Required,
+			TopologyKeys:    []string{clusterTopologyKey},
+			NodeLabels: map[string]string{
+				clusterLabelKey: clusterLabelValue,
+			},
+			Tenancy: appsv1alpha1.SharedNode,
+		}
+		toleration := corev1.Toleration{
+			Key:      clusterTolerationKey,
+			Value:    clusterTolerationValue,
+			Operator: corev1.TolerationOpEqual,
+			Effect:   corev1.TaintEffectNoSchedule,
+		}
+		Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1alpha1.Cluster) {
+			cluster.Spec.Affinity = &affinity
+			cluster.Spec.Tolerations = []corev1.Toleration{toleration}
+		})()).ShouldNot(HaveOccurred())
+
+		By("Checking the Affinity and Toleration")
+		schedulingPolicy, err := scheduling.BuildSchedulingPolicy4Component(clusterObj.Name, compName, &affinity, []corev1.Toleration{toleration})
+		Expect(err).Should(BeNil())
+
+		compKey := types.NamespacedName{
+			Namespace: clusterObj.Namespace,
+			Name:      component.FullName(clusterObj.Name, compName),
+		}
+		Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *appsv1alpha1.Component) {
+			g.Expect(comp.Spec.Affinity).Should(BeNil())
+			g.Expect(comp.Spec.Tolerations).Should(HaveLen(0))
+			g.Expect(comp.Spec.SchedulingPolicy).ShouldNot(BeNil())
+			g.Expect(comp.Spec.SchedulingPolicy.Affinity).Should(BeEquivalentTo(schedulingPolicy.Affinity))
+			g.Expect(comp.Spec.SchedulingPolicy.Tolerations).Should(HaveLen(2))
+			g.Expect(comp.Spec.SchedulingPolicy.Tolerations[0]).Should(BeEquivalentTo(toleration))
 		})).Should(Succeed())
 	}
 
@@ -974,37 +1039,23 @@ var _ = Describe("Cluster Controller", func() {
 			Context: testCtx.Ctx,
 			Client:  testCtx.Cli,
 		}
-		preserveKinds := haltPreserveKinds()
-		preserveObjs, err := getOwningNamespacedObjects(transCtx.Context, transCtx.Client, clusterObj.Namespace, getAppInstanceML(*clusterObj), preserveKinds)
+		namespacedKinds, clusteredKinds := kindsForWipeOut()
+		allKinds := append(namespacedKinds, clusteredKinds...)
+		createdObjs, err := getOwningNamespacedObjects(transCtx.Context, transCtx.Client, clusterObj.Namespace, getAppInstanceML(*clusterObj), allKinds)
 		Expect(err).Should(Succeed())
-		for _, obj := range preserveObjs {
-			// Expect(obj.GetFinalizers()).Should(ContainElements(constant.DBClusterFinalizerName))
-			Expect(obj.GetAnnotations()).ShouldNot(HaveKey(constant.LastAppliedClusterAnnotationKey))
-		}
 
 		By("delete the cluster")
 		testapps.DeleteObject(&testCtx, clusterKey, &appsv1alpha1.Cluster{})
+		Consistently(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1alpha1.Cluster{}, true)).Should(Succeed())
 
-		By("wait for the cluster to terminate")
-		Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1alpha1.Cluster{}, false)).Should(Succeed())
-
-		By("check expected preserved objects")
-		keptObjs, err := getOwningNamespacedObjects(transCtx.Context, transCtx.Client, clusterObj.Namespace, getAppInstanceML(*clusterObj), preserveKinds)
+		By("check all cluster resources again")
+		objs, err := getOwningNamespacedObjects(transCtx.Context, transCtx.Client, clusterObj.Namespace, getAppInstanceML(*clusterObj), allKinds)
 		Expect(err).Should(Succeed())
-		for key, obj := range preserveObjs {
-			Expect(keptObjs).Should(HaveKey(key))
-			keptObj := keptObjs[key]
-			Expect(obj.GetUID()).Should(BeEquivalentTo(keptObj.GetUID()))
-			Expect(keptObj.GetFinalizers()).ShouldNot(ContainElements(constant.DBClusterFinalizerName))
-			Expect(keptObj.GetAnnotations()).Should(HaveKey(constant.LastAppliedClusterAnnotationKey))
+		// check all objects existed before cluster deletion still be there
+		for key, obj := range createdObjs {
+			Expect(objs).Should(HaveKey(key))
+			Expect(obj.GetUID()).Should(BeEquivalentTo(objs[key].GetUID()))
 		}
-
-		By("check all other resources deleted")
-		namespacedKinds, clusteredKinds := kindsForHalt()
-		kindsToDelete := append(namespacedKinds, clusteredKinds...)
-		otherObjs, err := getOwningNamespacedObjects(transCtx.Context, transCtx.Client, clusterObj.Namespace, getAppInstanceML(*clusterObj), kindsToDelete)
-		Expect(err).Should(Succeed())
-		Expect(otherObjs).Should(HaveLen(0))
 	}
 
 	testClusterHaltNRecovery := func(createObj func(appsv1alpha1.TerminationPolicyType)) {
@@ -1456,6 +1507,10 @@ var _ = Describe("Cluster Controller", func() {
 
 		It("with both cluster and component affinity and toleration set", func() {
 			testClusterComponentAffinityNToleration(consensusCompName, consensusCompDefName, createLegacyClusterObj)
+		})
+
+		It("with cluster affinity and toleration set - update component", func() {
+			testClusterAffinityNToleration4Update(consensusCompName, consensusCompDefName, createLegacyClusterObj)
 		})
 	})
 

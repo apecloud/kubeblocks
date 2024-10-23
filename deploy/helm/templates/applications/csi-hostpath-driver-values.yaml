@@ -1,3 +1,4 @@
+{{- if has "csi-hostpath-driver" .Values.autoInstalledAddons  }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -11,3 +12,4 @@ metadata:
 data:
   values-kubeblocks-override.yaml: |-
     {{- get ( .Values | toYaml | fromYaml ) "csi-hostpath-driver" | toYaml | nindent 4 }}
+{{- end }}

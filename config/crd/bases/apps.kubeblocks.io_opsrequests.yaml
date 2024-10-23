@@ -867,9 +867,8 @@ spec:
                                   Component.
                                 properties:
                                   affinity:
-                                    description: Specifies a group of affinity scheduling
-                                      rules of the Cluster, including NodeAffinity,
-                                      PodAffinity, and PodAntiAffinity.
+                                    description: If specified, the cluster's scheduling
+                                      constraints.
                                     properties:
                                       nodeAffinity:
                                         description: Describes node affinity scheduling
@@ -1677,36 +1676,28 @@ spec:
                                     type: object
                                   nodeName:
                                     description: |-
-                                      NodeName is a request to schedule this Pod onto a specific node. If it is non-empty,
-                                      the scheduler simply schedules this Pod onto that node, assuming that it fits resource
+                                      NodeName is a request to schedule this pod onto a specific node. If it is non-empty,
+                                      the scheduler simply schedules this pod onto that node, assuming that it fits resource
                                       requirements.
                                     type: string
                                   nodeSelector:
                                     additionalProperties:
                                       type: string
                                     description: |-
-                                      NodeSelector is a selector which must be true for the Pod to fit on a node.
-                                      Selector which must match a node's labels for the Pod to be scheduled on that node.
+                                      NodeSelector is a selector which must be true for the pod to fit on a node.
+                                      Selector which must match a node's labels for the pod to be scheduled on that node.
                                       More info: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
                                     type: object
                                     x-kubernetes-map-type: atomic
                                   schedulerName:
                                     description: |-
-                                      If specified, the Pod will be dispatched by specified scheduler.
-                                      If not specified, the Pod will be dispatched by default scheduler.
+                                      If specified, the pod will be dispatched by specified scheduler.
+                                      If not specified, the pod will be dispatched by default scheduler.
                                     type: string
                                   tolerations:
-                                    description: |-
-                                      Allows Pods to be scheduled onto nodes with matching taints.
-                                      Each toleration in the array allows the Pod to tolerate node taints based on
-                                      specified `key`, `value`, `effect`, and `operator`.
-
-
-                                      - The `key`, `value`, and `effect` identify the taint that the toleration matches.
-                                      - The `operator` determines how the toleration matches the taint.
-
-
-                                      Pods with matching tolerations are allowed to be scheduled on tainted nodes, typically reserved for specific purposes.
+                                    description: Attached to tolerate any taint that
+                                      matches the triple `key,value,effect` using
+                                      the matching operator `operator`.
                                     items:
                                       description: |-
                                         The pod this Toleration is attached to tolerates any taint that matches
@@ -1746,8 +1737,8 @@ spec:
                                     type: array
                                   topologySpreadConstraints:
                                     description: |-
-                                      TopologySpreadConstraints describes how a group of Pods ought to spread across topology
-                                      domains. Scheduler will schedule Pods in a way which abides by the constraints.
+                                      TopologySpreadConstraints describes how a group of pods ought to spread across topology
+                                      domains. Scheduler will schedule pods in a way which abides by the constraints.
                                       All topologySpreadConstraints are ANDed.
                                     items:
                                       description: TopologySpreadConstraint specifies
@@ -3844,7 +3835,7 @@ spec:
                             type: string
                           targetNodeName:
                             description: |-
-                              The instance will rebuild on the specified node when the instance uses local PersistentVolume as the storage disk.
+                              The instance will rebuild on the specified node.
                               If not set, it will rebuild on a random node.
                             type: string
                         required:
@@ -4226,6 +4217,122 @@ spec:
 
                       This setting is useful for coordinating PostReady operations across the Cluster for optimal cluster conditions.
                     type: boolean
+                  env:
+                    description: Specifies a list of environment variables to be set
+                      in the container.
+                    items:
+                      description: EnvVar represents an environment variable present
+                        in a Container.
+                      properties:
+                        name:
+                          description: Name of the environment variable. Must be a
+                            C_IDENTIFIER.
+                          type: string
+                        value:
+                          description: |-
+                            Variable references $(VAR_NAME) are expanded
+                            using the previously defined environment variables in the container and
+                            any service environment variables. If a variable cannot be resolved,
+                            the reference in the input string will be unchanged. Double $$ are reduced
+                            to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e.
+                            "$$(VAR_NAME)" will produce the string literal "$(VAR_NAME)".
+                            Escaped references will never be expanded, regardless of whether the variable
+                            exists or not.
+                            Defaults to "".
+                          type: string
+                        valueFrom:
+                          description: Source for the environment variable's value.
+                            Cannot be used if value is not empty.
+                          properties:
+                            configMapKeyRef:
+                              description: Selects a key of a ConfigMap.
+                              properties:
+                                key:
+                                  description: The key to select.
+                                  type: string
+                                name:
+                                  description: |-
+                                    Name of the referent.
+                                    More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                    TODO: Add other useful fields. apiVersion, kind, uid?
+                                  type: string
+                                optional:
+                                  description: Specify whether the ConfigMap or its
+                                    key must be defined
+                                  type: boolean
+                              required:
+                              - key
+                              type: object
+                              x-kubernetes-map-type: atomic
+                            fieldRef:
+                              description: |-
+                                Selects a field of the pod: supports metadata.name, metadata.namespace, `metadata.labels['<KEY>']`, `metadata.annotations['<KEY>']`,
+                                spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP, status.podIPs.
+                              properties:
+                                apiVersion:
+                                  description: Version of the schema the FieldPath
+                                    is written in terms of, defaults to "v1".
+                                  type: string
+                                fieldPath:
+                                  description: Path of the field to select in the
+                                    specified API version.
+                                  type: string
+                              required:
+                              - fieldPath
+                              type: object
+                              x-kubernetes-map-type: atomic
+                            resourceFieldRef:
+                              description: |-
+                                Selects a resource of the container: only resources limits and requests
+                                (limits.cpu, limits.memory, limits.ephemeral-storage, requests.cpu, requests.memory and requests.ephemeral-storage) are currently supported.
+                              properties:
+                                containerName:
+                                  description: 'Container name: required for volumes,
+                                    optional for env vars'
+                                  type: string
+                                divisor:
+                                  anyOf:
+                                  - type: integer
+                                  - type: string
+                                  description: Specifies the output format of the
+                                    exposed resources, defaults to "1"
+                                  pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                  x-kubernetes-int-or-string: true
+                                resource:
+                                  description: 'Required: resource to select'
+                                  type: string
+                              required:
+                              - resource
+                              type: object
+                              x-kubernetes-map-type: atomic
+                            secretKeyRef:
+                              description: Selects a key of a secret in the pod's
+                                namespace
+                              properties:
+                                key:
+                                  description: The key of the secret to select from.  Must
+                                    be a valid secret key.
+                                  type: string
+                                name:
+                                  description: |-
+                                    Name of the referent.
+                                    More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                    TODO: Add other useful fields. apiVersion, kind, uid?
+                                  type: string
+                                optional:
+                                  description: Specify whether the Secret or its key
+                                    must be defined
+                                  type: boolean
+                              required:
+                              - key
+                              type: object
+                              x-kubernetes-map-type: atomic
+                          type: object
+                      required:
+                      - name
+                      type: object
+                    type: array
+                    x-kubernetes-preserve-unknown-fields: true
                   restorePointInTime:
                     description: |-
                       Specifies the point in time to which the restore should be performed.
@@ -4273,6 +4380,122 @@ spec:
 
                       This setting is useful for coordinating PostReady operations across the Cluster for optimal cluster conditions.
                     type: boolean
+                  env:
+                    description: Specifies a list of environment variables to be set
+                      in the container.
+                    items:
+                      description: EnvVar represents an environment variable present
+                        in a Container.
+                      properties:
+                        name:
+                          description: Name of the environment variable. Must be a
+                            C_IDENTIFIER.
+                          type: string
+                        value:
+                          description: |-
+                            Variable references $(VAR_NAME) are expanded
+                            using the previously defined environment variables in the container and
+                            any service environment variables. If a variable cannot be resolved,
+                            the reference in the input string will be unchanged. Double $$ are reduced
+                            to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e.
+                            "$$(VAR_NAME)" will produce the string literal "$(VAR_NAME)".
+                            Escaped references will never be expanded, regardless of whether the variable
+                            exists or not.
+                            Defaults to "".
+                          type: string
+                        valueFrom:
+                          description: Source for the environment variable's value.
+                            Cannot be used if value is not empty.
+                          properties:
+                            configMapKeyRef:
+                              description: Selects a key of a ConfigMap.
+                              properties:
+                                key:
+                                  description: The key to select.
+                                  type: string
+                                name:
+                                  description: |-
+                                    Name of the referent.
+                                    More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                    TODO: Add other useful fields. apiVersion, kind, uid?
+                                  type: string
+                                optional:
+                                  description: Specify whether the ConfigMap or its
+                                    key must be defined
+                                  type: boolean
+                              required:
+                              - key
+                              type: object
+                              x-kubernetes-map-type: atomic
+                            fieldRef:
+                              description: |-
+                                Selects a field of the pod: supports metadata.name, metadata.namespace, `metadata.labels['<KEY>']`, `metadata.annotations['<KEY>']`,
+                                spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP, status.podIPs.
+                              properties:
+                                apiVersion:
+                                  description: Version of the schema the FieldPath
+                                    is written in terms of, defaults to "v1".
+                                  type: string
+                                fieldPath:
+                                  description: Path of the field to select in the
+                                    specified API version.
+                                  type: string
+                              required:
+                              - fieldPath
+                              type: object
+                              x-kubernetes-map-type: atomic
+                            resourceFieldRef:
+                              description: |-
+                                Selects a resource of the container: only resources limits and requests
+                                (limits.cpu, limits.memory, limits.ephemeral-storage, requests.cpu, requests.memory and requests.ephemeral-storage) are currently supported.
+                              properties:
+                                containerName:
+                                  description: 'Container name: required for volumes,
+                                    optional for env vars'
+                                  type: string
+                                divisor:
+                                  anyOf:
+                                  - type: integer
+                                  - type: string
+                                  description: Specifies the output format of the
+                                    exposed resources, defaults to "1"
+                                  pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                                  x-kubernetes-int-or-string: true
+                                resource:
+                                  description: 'Required: resource to select'
+                                  type: string
+                              required:
+                              - resource
+                              type: object
+                              x-kubernetes-map-type: atomic
+                            secretKeyRef:
+                              description: Selects a key of a secret in the pod's
+                                namespace
+                              properties:
+                                key:
+                                  description: The key of the secret to select from.  Must
+                                    be a valid secret key.
+                                  type: string
+                                name:
+                                  description: |-
+                                    Name of the referent.
+                                    More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                    TODO: Add other useful fields. apiVersion, kind, uid?
+                                  type: string
+                                optional:
+                                  description: Specify whether the Secret or its key
+                                    must be defined
+                                  type: boolean
+                              required:
+                              - key
+                              type: object
+                              x-kubernetes-map-type: atomic
+                          type: object
+                      required:
+                      - name
+                      type: object
+                    type: array
+                    x-kubernetes-preserve-unknown-fields: true
                   restorePointInTime:
                     description: |-
                       Specifies the point in time to which the restore should be performed.
@@ -4609,7 +4832,8 @@ spec:
                     items:
                       properties:
                         componentDefinitionName:
-                          description: Specifies the name of the ComponentDefinition.
+                          description: Specifies the name of the ComponentDefinition,
+                            only exact matches are supported.
                           maxLength: 64
                           type: string
                         componentName:
@@ -5408,9 +5632,8 @@ spec:
                                   Component.
                                 properties:
                                   affinity:
-                                    description: Specifies a group of affinity scheduling
-                                      rules of the Cluster, including NodeAffinity,
-                                      PodAffinity, and PodAntiAffinity.
+                                    description: If specified, the cluster's scheduling
+                                      constraints.
                                     properties:
                                       nodeAffinity:
                                         description: Describes node affinity scheduling
@@ -6218,36 +6441,28 @@ spec:
                                     type: object
                                   nodeName:
                                     description: |-
-                                      NodeName is a request to schedule this Pod onto a specific node. If it is non-empty,
-                                      the scheduler simply schedules this Pod onto that node, assuming that it fits resource
+                                      NodeName is a request to schedule this pod onto a specific node. If it is non-empty,
+                                      the scheduler simply schedules this pod onto that node, assuming that it fits resource
                                       requirements.
                                     type: string
                                   nodeSelector:
                                     additionalProperties:
                                       type: string
                                     description: |-
-                                      NodeSelector is a selector which must be true for the Pod to fit on a node.
-                                      Selector which must match a node's labels for the Pod to be scheduled on that node.
+                                      NodeSelector is a selector which must be true for the pod to fit on a node.
+                                      Selector which must match a node's labels for the pod to be scheduled on that node.
                                       More info: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
                                     type: object
                                     x-kubernetes-map-type: atomic
                                   schedulerName:
                                     description: |-
-                                      If specified, the Pod will be dispatched by specified scheduler.
-                                      If not specified, the Pod will be dispatched by default scheduler.
+                                      If specified, the pod will be dispatched by specified scheduler.
+                                      If not specified, the pod will be dispatched by default scheduler.
                                     type: string
                                   tolerations:
-                                    description: |-
-                                      Allows Pods to be scheduled onto nodes with matching taints.
-                                      Each toleration in the array allows the Pod to tolerate node taints based on
-                                      specified `key`, `value`, `effect`, and `operator`.
-
-
-                                      - The `key`, `value`, and `effect` identify the taint that the toleration matches.
-                                      - The `operator` determines how the toleration matches the taint.
-
-
-                                      Pods with matching tolerations are allowed to be scheduled on tainted nodes, typically reserved for specific purposes.
+                                    description: Attached to tolerate any taint that
+                                      matches the triple `key,value,effect` using
+                                      the matching operator `operator`.
                                     items:
                                       description: |-
                                         The pod this Toleration is attached to tolerates any taint that matches
@@ -6287,8 +6502,8 @@ spec:
                                     type: array
                                   topologySpreadConstraints:
                                     description: |-
-                                      TopologySpreadConstraints describes how a group of Pods ought to spread across topology
-                                      domains. Scheduler will schedule Pods in a way which abides by the constraints.
+                                      TopologySpreadConstraints describes how a group of pods ought to spread across topology
+                                      domains. Scheduler will schedule pods in a way which abides by the constraints.
                                       All topologySpreadConstraints are ANDed.
                                     items:
                                       description: TopologySpreadConstraint specifies

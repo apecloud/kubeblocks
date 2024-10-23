@@ -54,6 +54,7 @@ func buildHeadlessSvc(its workloads.InstanceSet, labels, selectors map[string]st
 	annotations := ParseAnnotationsOfScope(HeadlessServiceScope, its.Annotations)
 	hdlBuilder := builder.NewHeadlessServiceBuilder(its.Namespace, getHeadlessSvcName(its.Name)).
 		AddLabelsInMap(labels).
+		AddLabelsInMap(constant.GetKBKnownLabels()).
 		AddSelectorsInMap(selectors).
 		AddAnnotationsInMap(annotations).
 		SetPublishNotReadyAddresses(true)

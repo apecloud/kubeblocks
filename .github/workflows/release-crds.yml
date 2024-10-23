@@ -54,7 +54,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        yaml: [ 'kubeblocks_crds.yaml', 'kubeblocks.yaml' ]
+        yaml: [ 'kubeblocks_crds.yaml', 'kubeblocks.yaml' , 'dataprotection.kubeblocks.io_storageproviders.yaml' ]
     name: Upload ${{ matrix.yaml }}
     runs-on: ubuntu-latest
     steps:
@@ -87,6 +87,11 @@ jobs:
               echo "---" >> ${{ matrix.yaml }}
               cat $crds_path/$crd >> ${{ matrix.yaml }}
           done
+
+      - name: release dataprotection.kubeblocks.io_storageproviders
+        if: ${{ matrix.yaml == 'dataprotection.kubeblocks.io_storageproviders.yaml' }}
+        run: |
+          cp -r deploy/helm/crds/${{ matrix.yaml }} ${{ matrix.yaml }}
 
       - name: upload KubeBlocks yaml to jihulab
         run: |

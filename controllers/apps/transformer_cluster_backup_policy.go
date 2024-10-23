@@ -34,6 +34,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -458,27 +459,39 @@ func (r *clusterBackupPolicyTransformer) doEnvMapping(comp *appsv1alpha1.Cluster
 				Name:  v.Key,
 				Value: cv.MappingValue,
 			})
+			break
 		}
 		for _, cm := range v.ValueFrom.ComponentDef {
-			if !slices.Contains(cm.Names, comp.ComponentDef) {
+			if !r.matchMappingName(cm.Names, comp.ComponentDef) {
 				continue
 			}
 			env = append(env, corev1.EnvVar{
 				Name:  v.Key,
 				Value: cm.MappingValue,
 			})
+			break
 		}
 		for _, sv := range v.ValueFrom.ServiceVersion {
-			if !slices.Contains(sv.Names, comp.ServiceVersion) {
+			if !r.matchMappingName(sv.Names, comp.ServiceVersion) {
 				continue
 			}
 			env = append(env, corev1.EnvVar{
 				Name:  v.Key,
 				Value: sv.MappingValue,
 			})
+			break
 		}
 	}
 	return env
+}
+
+func (r *clusterBackupPolicyTransformer) matchMappingName(names []string, target string) bool {
+	for _, name := range names {
+		if component.CompDefMatched(target, name) {
+			return true
+		}
+	}
+	return false
 }
 
 func (r *clusterBackupPolicyTransformer) syncBackupPolicyTargetSpec(backupPolicy *dpv1alpha1.BackupPolicy, comp componentItem) {
@@ -679,9 +692,8 @@ func (r *clusterBackupPolicyTransformer) mergeClusterBackup(
 // getClusterComponentSpec returns the component which matches the componentDef or componentDefRef.
 func (r *clusterBackupPolicyTransformer) getClusterComponentItems() []componentItem {
 	matchedCompDef := func(compSpec appsv1alpha1.ClusterComponentSpec) bool {
-		// TODO: support to create bp when using cluster topology and componentDef is empty
 		return (compSpec.ComponentDefRef != "" && compSpec.ComponentDefRef == r.backupPolicy.ComponentDefRef) ||
-			(compSpec.ComponentDef != "" && slices.Contains(r.backupPolicy.ComponentDefs, compSpec.ComponentDef))
+			(compSpec.ComponentDef != "" && r.matchMappingName(r.backupPolicy.ComponentDefs, compSpec.ComponentDef))
 	}
 	var compSpecItems []componentItem
 	for i, v := range r.clusterTransformContext.Cluster.Spec.ComponentSpecs {

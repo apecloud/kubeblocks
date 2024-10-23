@@ -30,6 +30,9 @@ spec:
             candidate instance name(pod Name). if candidate is not empty, will promote it to primary. 
             otherwise promote a randomly selected pod to primary.
           type: string
+        metadata:
+          description: the metadata of the operation, it is the json of map[string]any
+          type: string
       type: object
   actions:
     - name: switchover
@@ -37,6 +40,7 @@ spec:
       parameters:
         - primary
         - candidate
+        - metadata
       workload:
         podInfoExtractorName: availablePod
         type: Job
@@ -53,7 +57,12 @@ spec:
                   set -e
                   # do switchover
                   url="http://${TARGET_POD_IP}:${LORRY_HTTP_PORT}/v1.0/switchover" 
-                  params="{\"parameters\": {\"primary\":\"${primary}\",\"candidate\":\"${candidate}\"}}"
+                  metadata=${metadata}
+                  if [ -z ${metadata} ]; then
+                    params="{\"parameters\": {\"primary\":\"${primary}\",\"candidate\":\"${candidate}\"}}"
+                  else
+                    params="{\"parameters\": {\"primary\":\"${primary}\",\"candidate\":\"${candidate}\"}, \"metadata\": ${metadata}}"
+                  fi
                   echo "curl ${url}, parameters: ${params}"
                   res=`curl -s -X POST -H 'Content-Type: application/json' "${url}" -d "${params}"`
                   echo "curl result: ${res}"

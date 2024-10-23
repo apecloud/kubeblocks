@@ -44,7 +44,7 @@ type DCS interface {
 
 	// manual switchover
 	GetSwitchover() (*Switchover, error)
-	CreateSwitchover(string, string) error
+	CreateSwitchover(string, string, map[string]any) error
 	DeleteSwitchover() error
 
 	// cluster scope leader lock

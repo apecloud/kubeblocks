@@ -321,7 +321,7 @@ func isTimeInRange(t time.Time, start time.Time, end time.Time) bool {
 	return !t.Before(start) && !t.After(end)
 }
 
-func GetRestoreFromBackupAnnotation(backup *dpv1alpha1.Backup, volumeRestorePolicy, restoreTime string, doReadyRestoreAfterClusterRunning bool) (string, error) {
+func GetRestoreFromBackupAnnotation(backup *dpv1alpha1.Backup, volumeRestorePolicy, restoreTime string, env []corev1.EnvVar, doReadyRestoreAfterClusterRunning bool) (string, error) {
 	componentName := backup.Labels[constant.KBAppShardingNameLabelKey]
 	if len(componentName) == 0 {
 		componentName = backup.Labels[constant.KBAppComponentLabelKey]
@@ -337,9 +337,27 @@ func GetRestoreFromBackupAnnotation(backup *dpv1alpha1.Backup, volumeRestorePoli
 	if restoreTime != "" {
 		restoreInfoMap[constant.RestoreTimeKeyForRestore] = restoreTime
 	}
+	if env != nil {
+		bytes, err := json.Marshal(env)
+		if err != nil {
+			return "", err
+		}
+		restoreInfoMap[constant.EnvForRestore] = string(bytes)
+	}
+
 	connectionPassword := backup.Annotations[dptypes.ConnectionPasswordAnnotationKey]
 	if connectionPassword != "" {
 		restoreInfoMap[constant.ConnectionPassword] = connectionPassword
+	}
+	encryptedSystemAccountsString := backup.Annotations[constant.EncryptedSystemAccountsAnnotationKey]
+	if encryptedSystemAccountsString != "" {
+		encryptedSystemAccountsMap := map[string]map[string]string{}
+		_ = json.Unmarshal([]byte(encryptedSystemAccountsString), &encryptedSystemAccountsMap)
+		// only set systemAccounts owned by this component
+		if encryptedSystemAccountsMap[componentName] != nil {
+			encryptedComponentSystemAccountsBytes, _ := json.Marshal(encryptedSystemAccountsMap[componentName])
+			restoreInfoMap[constant.EncryptedSystemAccounts] = string(encryptedComponentSystemAccountsBytes)
+		}
 	}
 	restoreForClusterMap := map[string]map[string]string{}
 	restoreForClusterMap[componentName] = restoreInfoMap

@@ -29,7 +29,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	policyv1 "k8s.io/api/policy/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -66,7 +65,9 @@ func (t *clusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 			"spec.terminationPolicy %s is preventing deletion.", cluster.Spec.TerminationPolicy)
 		return graph.ErrPrematureStop
 	case appsv1alpha1.Halt:
-		toDeleteNamespacedKinds, toDeleteNonNamespacedKinds = kindsForHalt()
+		transCtx.EventRecorder.Eventf(cluster, corev1.EventTypeWarning, "Halt",
+			"spec.terminationPolicy %s is preventing deletion. Halt policy is deprecated is 0.9.1 and will have same meaning as DoNotTerminate.", cluster.Spec.TerminationPolicy)
+		return graph.ErrPrematureStop
 	case appsv1alpha1.Delete:
 		toDeleteNamespacedKinds, toDeleteNonNamespacedKinds = kindsForDelete()
 	case appsv1alpha1.WipeOut:
@@ -153,8 +154,7 @@ func kindsForHalt() ([]client.ObjectList, []client.ObjectList) {
 	namespacedKindsPlus := []client.ObjectList{
 		&appsv1alpha1.ComponentList{},
 		&appsv1alpha1.OpsRequestList{},
-		&appsv1.StatefulSetList{},           // be compatible with 0.6 workloads.
-		&policyv1.PodDisruptionBudgetList{}, // be compatible with 0.6 workloads.
+		&appsv1.StatefulSetList{}, // be compatible with 0.6 workloads.
 		&corev1.ServiceList{},
 		&corev1.ServiceAccountList{}, // be backward compatible
 		&rbacv1.RoleBindingList{},    // be backward compatible

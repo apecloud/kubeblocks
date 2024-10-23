@@ -179,7 +179,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return intctrlutil.NewControllerManagedBy(mgr).
+	return intctrlutil.NewControllerManagedBy(mgr, &appsv1alpha1.Cluster{}, &appsv1alpha1.Component{}).
 		For(&appsv1alpha1.Cluster{}).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: int(math.Ceil(viper.GetFloat64(constant.CfgKBReconcileWorkers) / 4)),

@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package controllerutil
 
 import (
+	"fmt"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -30,33 +31,90 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
-	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	experimentalv1alpha1 "github.com/apecloud/kubeblocks/apis/experimental/v1alpha1"
-	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
-	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
 	workloadsv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 var (
-	managedNamespaces    *sets.Set[string]
-	supportedAPIVersions = sets.New[string](
+	//         pkg                   reconciler               resource                 sub-resources             operation
+	// experimentalv1alpha1 NodeCountScalerReconciler      NodeCountScaler          corev1.Node                      w
+	//                                                                              appsv1alpha1.Cluster             w
+	// extensionsv1alpha1   AddonReconciler                Addon                    batchv1.Job                      w
+	// corev1               EventReconciler                Event
+	// workloadsv1alpha1    InstanceSetReconciler          InstanceSet              corev1.Pod                       w
+	//                                                                              corev1.PersistentVolumeClaim     o
+	//	                                                                            batchv1.Job                      o
+	//		                                                                        corev1.Service                   o
+	//		                                                                        corev1.ConfigMap                 o
+	// appsv1beta1          ConfigConstraintReconciler     ConfigConstraint         corev1.ConfigMap                 o
+	// appsv1alpha1         OpsRequestReconciler           OpsRequest  		        appsv1alpha1.Cluster             w
+	//		                                                                        workloadsv1alpha1.InstanceSet    w
+	//																	            dpv1alpha1.Backup                w
+	//																	            corev1.PersistentVolumeClaim     w
+	//																	            corev1.Pod                       w
+	//																	            batchv1.Job                      o
+	//																	            dpv1alpha1.Restore               o
+	//                      ReconfigureReconciler 		   corev1.ConfigMap
+	//                      ConfigurationReconciler 	   Configuration            corev1.ConfigMap                 o
+	//                      ClusterReconciler 			   Cluster                  appsv1alpha1.Component           o
+	//																                corev1.Service                   o
+	//																                corev1.Secret                    o
+	//																                dpv1alpha1.BackupPolicy          o
+	//																                dpv1alpha1.BackupSchedule        o
+	//                      SystemAccountReconciler 	   Cluster                  corev1.Secret                    o
+	//																	            batchv1.Job                      w
+	//                      ComponentReconciler 		   Component                workloads.InstanceSet            o
+	//																                corev1.Service                   o
+	//																                corev1.Secret                    o
+	//																	            corev1.ConfigMap                 o
+	//																	            dpv1alpha1.Backup                o
+	//																	            dpv1alpha1.Restore               o
+	//																	            corev1.PersistentVolumeClaim     w
+	//																	            batchv1.Job                      o
+	//																	            appsv1alpha1.Configuration       w
+	//      															            rbacv1.ClusterRoleBinding        o/w
+	//																	            rbacv1.RoleBinding               o/w
+	//																	            corev1.ServiceAccount            o/w
+	//                      BackupPolicyTemplateReconciler BackupPolicyTemplate     appsv1alpha1.ComponentDefinition w
+	//                      ComponentClassReconciler 	   ComponentClassDefinition
+	//                      ClusterVersionReconciler 	   ClusterVersion
+	//                      ServiceDescriptorReconciler    ServiceDescriptor
+	//                      ClusterDefinitionReconciler    ClusterDefinition
+	//                      OpsDefinitionReconciler 	   OpsDefinition
+	//                      ComponentDefinitionReconciler  ComponentDefinition
+	//                      ComponentVersionReconciler 	   ComponentVersion 	    appsv1alpha1.ComponentDefinition w
+	//
+	// has new version： - filter by api version label/annotation
+	//    addon: ClusterDefinition, ComponentDefinition, ComponentVersion, BackupPolicyTemplate
+	//	  user：ServiceDescriptor, Cluster
+	//    controller: Component, InstanceSet
+	// unchanged：NodeCountScaler, Addon - the new operator will be responsible for these
+	// deleted：ClusterVersion, ComponentClassDefinition - nothing to do
+	// group changed：OpsRequest, OpsDefinition, ConfigConstraint, Configuration - nothing to do
+	// TODO:
+	//    EventReconciler.Event
+	//    configs & parameters
+	//    data protections
+
+	managedNamespaces       *sets.Set[string]
+	supportedCRDAPIVersions = sets.New[string](
+		// ClusterDefinition, ComponentDefinition, ComponentVersion, BackupPolicyTemplate
+		// ServiceDescriptor, Cluster, Component
 		appsv1alpha1.GroupVersion.String(),
-		appsv1beta1.GroupVersion.String(),
-		dpv1alpha1.GroupVersion.String(),
-		experimentalv1alpha1.GroupVersion.String(),
-		extensionsv1alpha1.GroupVersion.String(),
-		storagev1alpha1.GroupVersion.String(),
+		// InstanceSet
 		workloadsv1alpha1.GroupVersion.String(),
+		// TODO: corev1.Event
 	)
 )
 
-func NewControllerManagedBy(mgr manager.Manager) *builder.Builder {
-	return ctrl.NewControllerManagedBy(mgr).
-		WithEventFilter(predicate.NewPredicateFuncs(namespacePredicateFilter)).
-		WithEventFilter(predicate.NewPredicateFuncs(apiVersionPredicateFilter))
+func NewControllerManagedBy(mgr manager.Manager, objs ...client.Object) *builder.Builder {
+	b := ctrl.NewControllerManagedBy(mgr).
+		WithEventFilter(predicate.NewPredicateFuncs(namespacePredicateFilter))
+	if len(objs) > 0 {
+		b.WithEventFilter(predicate.NewPredicateFuncs(newAPIVersionPredicateFilter(objs)))
+	}
+	return b
 }
 
 func namespacePredicateFilter(object client.Object) bool {
@@ -74,14 +132,31 @@ func namespacePredicateFilter(object client.Object) bool {
 	return managedNamespaces.Has(object.GetNamespace())
 }
 
-func apiVersionPredicateFilter(object client.Object) bool {
-	annotations := object.GetAnnotations()
-	if annotations == nil {
+func newAPIVersionPredicateFilter(objs []client.Object) func(client.Object) bool {
+	return func(obj client.Object) bool {
+		annotations := obj.GetAnnotations()
+		if annotations == nil {
+			return true
+		}
+		apiVersion, ok := annotations[constant.CRDAPIVersionAnnotationKey]
+		if !ok {
+			return true
+		}
+		// as a fast path
+		if !supportedCRDAPIVersions.Has(apiVersion) {
+			return false
+		}
+		if len(objs) > 0 {
+			for _, o := range objs {
+				if o.GetObjectKind().GroupVersionKind().GroupKind() == obj.GetObjectKind().GroupVersionKind().GroupKind() {
+					return true
+				}
+			}
+			// has the api version set, but not in the object list?
+			// we cannot ignore the event silently, so panic here
+			panic(fmt.Sprintf("seen an event of an object with API version %s, "+
+				"but the object is not in the object list that controller expects, object: %v", apiVersion, obj))
+		}
 		return true
 	}
-	apiVersion, ok := annotations[constant.CRDAPIVersionAnnotationKey]
-	if !ok {
-		return true
-	}
-	return supportedAPIVersions.Has(apiVersion)
 }

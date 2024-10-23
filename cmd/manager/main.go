@@ -54,7 +54,6 @@ import (
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	experimentalv1alpha1 "github.com/apecloud/kubeblocks/apis/experimental/v1alpha1"
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
-	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
 	"github.com/apecloud/kubeblocks/apis/workloads/legacy"
 	workloadsv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	appscontrollers "github.com/apecloud/kubeblocks/controllers/apps"
@@ -84,8 +83,8 @@ const (
 
 	// switch flags key for API groups
 	appsFlagKey         flagName = "apps"
-	extensionsFlagKey   flagName = "extensions"
 	workloadsFlagKey    flagName = "workloads"
+	extensionsFlagKey   flagName = "extensions"
 	experimentalFlagKey flagName = "experimental"
 
 	multiClusterKubeConfigFlagKey       flagName = "multi-cluster-kubeconfig"
@@ -93,6 +92,10 @@ const (
 	multiClusterContextsDisabledFlagKey flagName = "multi-cluster-contexts-disabled"
 
 	userAgentFlagKey flagName = "user-agent"
+
+	// dual-operators-mode indicates whether the operator runs in dual-operators mode.
+	// If it's true, the operator will degrade to a secondary operator and only manage the resources dedicated to releases prior to v1.0.
+	dualOperatorsModeFlag flagName = "dual-operators-mode"
 )
 
 var (
@@ -109,7 +112,6 @@ func init() {
 	utilruntime.Must(snapshotv1beta1.AddToScheme(scheme))
 	utilruntime.Must(extensionsv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(workloadsv1alpha1.AddToScheme(scheme))
-	utilruntime.Must(storagev1alpha1.AddToScheme(scheme))
 	utilruntime.Must(appsv1beta1.AddToScheme(scheme))
 	utilruntime.Must(legacy.AddToScheme(scheme))
 	utilruntime.Must(apiextv1.AddToScheme(scheme))
@@ -173,10 +175,10 @@ func setupFlags() {
 
 	flag.Bool(appsFlagKey.String(), true,
 		"Enable the apps controller manager.")
-	flag.Bool(extensionsFlagKey.String(), true,
-		"Enable the extensions controller manager.")
 	flag.Bool(workloadsFlagKey.String(), true,
 		"Enable the workloads controller manager.")
+	flag.Bool(extensionsFlagKey.String(), true,
+		"Enable the extensions controller manager.")
 	flag.Bool(experimentalFlagKey.String(), false,
 		"Enable the experimental controller manager.")
 
@@ -188,6 +190,8 @@ func setupFlags() {
 		"The namespaces that the operator will manage, multiple namespaces are separated by commas.")
 
 	flag.String(userAgentFlagKey.String(), "", "User agent of the operator.")
+
+	flag.Bool(dualOperatorsModeFlag.String(), false, "Whether the operator runs in dual-operators mode.")
 
 	opts := zap.Options{
 		Development: false,
@@ -521,18 +525,6 @@ func main() {
 		}
 	}
 
-	if viper.GetBool(extensionsFlagKey.viperName()) {
-		if err = (&extensionscontrollers.AddonReconciler{
-			Client:     mgr.GetClient(),
-			Scheme:     mgr.GetScheme(),
-			Recorder:   mgr.GetEventRecorderFor("addon-controller"),
-			RestConfig: mgr.GetConfig(),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "Addon")
-			os.Exit(1)
-		}
-	}
-
 	if viper.GetBool(workloadsFlagKey.viperName()) {
 		if err = (&workloadscontrollers.InstanceSetReconciler{
 			Client:   client,
@@ -544,7 +536,21 @@ func main() {
 		}
 	}
 
-	if viper.GetBool(experimentalFlagKey.viperName()) {
+	dualOperatorsMode := viper.GetBool(dualOperatorsModeFlag.viperName())
+
+	if !dualOperatorsMode && viper.GetBool(extensionsFlagKey.viperName()) {
+		if err = (&extensionscontrollers.AddonReconciler{
+			Client:     mgr.GetClient(),
+			Scheme:     mgr.GetScheme(),
+			Recorder:   mgr.GetEventRecorderFor("addon-controller"),
+			RestConfig: mgr.GetConfig(),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "Addon")
+			os.Exit(1)
+		}
+	}
+
+	if !dualOperatorsMode && viper.GetBool(experimentalFlagKey.viperName()) {
 		if err = (&experimentalcontrollers.NodeCountScalerReconciler{
 			Client:   mgr.GetClient(),
 			Scheme:   mgr.GetScheme(),
@@ -554,6 +560,7 @@ func main() {
 			os.Exit(1)
 		}
 	}
+
 	// +kubebuilder:scaffold:builder
 
 	if viper.GetBool("enable_webhooks") {

@@ -22,7 +22,7 @@ package constant
 // annotations for kubeblocks
 const (
 	// CRDAPIVersionAnnotationKey indicates the CRD API version of the object.
-	CRDAPIVersionAnnotationKey = "apps.kubeblocks.io/crd-api-version"
+	CRDAPIVersionAnnotationKey = "kubeblocks.io/crd-api-version"
 
 	// SkipImmutableCheckAnnotationKey specifies to skip the mutation check for the object.
 	// The mutation check is only applied to the fields that are declared as immutable.

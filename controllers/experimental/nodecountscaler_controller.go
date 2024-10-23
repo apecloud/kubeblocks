@@ -70,7 +70,7 @@ func (r *NodeCountScalerReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *NodeCountScalerReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return intctrlutil.NewControllerManagedBy(mgr).
+	return intctrlutil.NewControllerManagedBy(mgr, &appsv1alpha1.Cluster{}).
 		For(&experimental.NodeCountScaler{}).
 		Watches(&corev1.Node{}, &nodeScalingHandler{r.Client}).
 		Watches(&appsv1alpha1.Cluster{}, &clusterHandler{r.Client}).

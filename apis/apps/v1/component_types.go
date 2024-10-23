@@ -175,13 +175,12 @@ type ComponentSpec struct {
 	// This ServiceAccount is used to grant necessary permissions for the Component's Pods to interact
 	// with other Kubernetes resources, such as modifying Pod labels or sending events.
 	//
-	// Defaults:
 	// If not specified, KubeBlocks automatically creates a default ServiceAccount named
 	// "kb-{cluster.name}-{component.name}", bound to a role with rules defined in ComponentDefinition's
 	// `policyRules` field. If the field is empty, ServiceAccount will not be created.
 	//
-	// Users can override the automatic ServiceAccount assignment by explicitly setting the name of
-	// an existed ServiceAccount in this field.
+	// If the field is not empty, the specified ServiceAccount will be used. And KubeBlocks will not
+	// create a ServiceAccount.
 	//
 	// +optional
 	ServiceAccountName string `json:"serviceAccountName,omitempty"`

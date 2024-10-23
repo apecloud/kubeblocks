@@ -404,17 +404,12 @@ type ClusterComponentSpec struct {
 	// This ServiceAccount is used to grant necessary permissions for the Component's Pods to interact
 	// with other Kubernetes resources, such as modifying Pod labels or sending events.
 	//
-	// Defaults:
-	// To perform certain operational tasks, agent sidecars running in Pods require specific RBAC permissions.
-	// The service account will be bound to a default role named "kubeblocks-cluster-pod-role" which is installed together with KubeBlocks.
-	// If not specified, KubeBlocks automatically assigns a default ServiceAccount named "kb-{cluster.name}"
+	// If not specified, KubeBlocks automatically creates a default ServiceAccount named
+	// "kb-{cluster.name}-{component.name}", bound to a role with rules defined in ComponentDefinition's
+	// `policyRules` field. If the field is empty, ServiceAccount will not be created.
 	//
-	// Future Changes:
-	// Future versions might change the default ServiceAccount creation strategy to one per Component,
-	// potentially revising the naming to "kb-{cluster.name}-{component.name}".
-	//
-	// Users can override the automatic ServiceAccount assignment by explicitly setting the name of
-	// an existed ServiceAccount in this field.
+	// If the field is not empty, the specified ServiceAccount will be used. And KubeBlocks will not
+	// create a ServiceAccount.
 	//
 	// +optional
 	ServiceAccountName string `json:"serviceAccountName,omitempty"`

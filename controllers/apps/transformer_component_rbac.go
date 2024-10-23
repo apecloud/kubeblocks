@@ -57,6 +57,15 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 		return nil
 	}
 
+	if transCtx.Component.Spec.ServiceAccountName != "" {
+		// user specifies a serviceaccount, nothing to do
+		return nil
+	}
+
+	if len(transCtx.CompDef.Spec.PolicyRules) == 0 {
+		return nil
+	}
+
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 
 	serviceAccount, err := buildServiceAccount(transCtx)
@@ -93,11 +102,6 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 	}
 
 	return nil
-}
-
-// TODO: it seems like kb-agent doesn't need kubeblocks-lorry-pod-role
-func isLifecycleActionsEnabled(compDef *appsv1.ComponentDefinition) bool {
-	return compDef.Spec.LifecycleActions != nil
 }
 
 func isServiceAccountExist(transCtx *componentTransformContext, serviceAccountName string) bool {
@@ -165,14 +169,8 @@ func buildServiceAccount(transCtx *componentTransformContext) (*corev1.ServiceAc
 		compDef         = transCtx.CompDef
 		synthesizedComp = transCtx.SynthesizeComponent
 	)
-	serviceAccountName := comp.Spec.ServiceAccountName
-	if serviceAccountName == "" {
-		// If lifecycle actions are disabled, then do not create a service account.
-		if !isLifecycleActionsEnabled(compDef) {
-			return nil, nil
-		}
-		serviceAccountName = constant.GenerateDefaultServiceAccountName(synthesizedComp.ClusterName, synthesizedComp.Name)
-	}
+
+	serviceAccountName := constant.GenerateDefaultServiceAccountName(synthesizedComp.ClusterName, synthesizedComp.Name)
 
 	if isRoleBindingExist(transCtx, serviceAccountName) && isServiceAccountExist(transCtx, serviceAccountName) {
 		return nil, nil

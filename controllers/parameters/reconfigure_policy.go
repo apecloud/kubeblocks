@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package configuration
+package parameters
 
 import (
 	"math"
@@ -60,8 +60,8 @@ const (
 )
 
 type ReturnedStatus struct {
-	Status        ExecStatus
-	SucceedCount  int32
+	Status       ExecStatus
+	SucceedCount int32
 	ExpectedCount int32
 }
 

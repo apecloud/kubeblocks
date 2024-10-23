@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package configuration
+package parameters
 
 import appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 

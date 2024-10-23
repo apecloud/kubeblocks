@@ -36,16 +36,6 @@ import (
 	testparameters "github.com/apecloud/kubeblocks/pkg/testutil/parameters"
 )
 
-const (
-	compDefName      = "test-compdef"
-	clusterName      = "test-cluster"
-	defaultCompName  = "mysql"
-	defaultITSName   = "mysql-statefulset"
-	configSpecName   = "mysql-config-tpl"
-	configVolumeName = "mysql-config"
-	cmName           = "mysql-tree-node-template-8.0"
-)
-
 var _ = Describe("ConfigConstraint Controller", func() {
 	cleanEnv := func() {
 		// must wait till resources deleted and no longer existed before the testcases start,

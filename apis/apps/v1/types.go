@@ -77,20 +77,10 @@ const (
 )
 
 const (
-	// ConditionTypeProvisioningStarted the operator starts resource provisioning to create or change the cluster.
-	ConditionTypeProvisioningStarted = "ProvisioningStarted"
-
-	// ConditionTypeApplyResources the operator start to apply resources to create or change the cluster.
-	ConditionTypeApplyResources = "ApplyResources"
-
-	// ConditionTypeReplicasReady all pods of components are ready.
-	ConditionTypeReplicasReady = "ReplicasReady"
-
-	// ConditionTypeReady all components are running.
-	ConditionTypeReady = "Ready"
-
-	// ConditionTypeAvailable indicates whether the target object is available for serving.
-	ConditionTypeAvailable = "Available"
+	ConditionTypeProvisioningStarted = "ProvisioningStarted" // ConditionTypeProvisioningStarted the operator starts resource provisioning to create or change the cluster
+	ConditionTypeApplyResources      = "ApplyResources"      // ConditionTypeApplyResources the operator start to apply resources to create or change the cluster
+	ConditionTypeReady               = "Ready"               // ConditionTypeReady all components and shardings are running
+	ConditionTypeAvailable           = "Available"           // ConditionTypeAvailable indicates whether the target object is available for serving.
 )
 
 type ServiceRef struct {

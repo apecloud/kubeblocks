@@ -24,6 +24,8 @@ type BackupExpansion interface{}
 
 type BackupPolicyExpansion interface{}
 
+type BackupPolicyTemplateExpansion interface{}
+
 type BackupRepoExpansion interface{}
 
 type BackupScheduleExpansion interface{}

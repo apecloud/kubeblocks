@@ -117,8 +117,8 @@ func (r *ClusterSpec) GetComponentByName(componentName string) *ClusterComponent
 	return nil
 }
 
-func (r *ClusterSpec) GetShardingByName(shardingName string) *ShardingSpec {
-	for _, v := range r.ShardingSpecs {
+func (r *ClusterSpec) GetShardingByName(shardingName string) *ClusterSharding {
+	for _, v := range r.Shardings {
 		if v.Name == shardingName {
 			return &v
 		}

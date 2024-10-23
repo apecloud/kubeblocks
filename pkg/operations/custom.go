@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -153,7 +154,10 @@ func (c CustomOpsHandler) checkExpression(reqCtx intctrlutil.RequestCtx,
 		return err
 	}
 	for _, comp := range comps {
-		params := covertParametersToMap(compCustomItem.Parameters)
+		params, err := covertParametersToMap(reqCtx.Ctx, cli, compCustomItem.Parameters, opsRes.OpsRequest.Namespace)
+		if err != nil {
+			return err
+		}
 		// get the built-in objects and covert the json tag
 		getBuiltInObjs := func() (map[string]interface{}, error) {
 			b, err := json.Marshal(map[string]interface{}{
@@ -231,12 +235,61 @@ func (c CustomOpsHandler) initCompActionStatusAndPreCheck(reqCtx intctrlutil.Req
 	return 0, true
 }
 
-func covertParametersToMap(parameters []opsv1alpha1.Parameter) map[string]string {
+func covertParametersToMap(ctx context.Context,
+	cli client.Client,
+	parameters []opsv1alpha1.Parameter,
+	opsNamespace string) (map[string]string, error) {
 	params := map[string]string{}
+	var err error
 	for _, v := range parameters {
-		params[v.Name] = v.Value
+		value := v.Value
+		if value == "" && v.ValueFrom != nil {
+			if value, err = resolveParameterValue(ctx, cli, v.ValueFrom, opsNamespace); err != nil {
+				return nil, err
+			}
+		}
+		params[v.Name] = value
 	}
-	return params
+	return params, nil
+}
+
+func resolveParameterValue(ctx context.Context,
+	cli client.Client,
+	valueFrom *opsv1alpha1.ParameterSource,
+	opsNamespace string) (string, error) {
+	resolveObjectKey := func(nativeObjRef corev1.LocalObjectReference, object client.Object, getValue func(obj client.Object) (string, error)) (string, error) {
+		if err := cli.Get(ctx, client.ObjectKey{Name: nativeObjRef.Name, Namespace: opsNamespace}, object); err != nil {
+			return "", err
+		}
+		return getValue(object)
+	}
+	switch {
+	case valueFrom.ConfigMapKeyRef != nil:
+		return resolveObjectKey(valueFrom.ConfigMapKeyRef.LocalObjectReference, &corev1.ConfigMap{}, func(obj client.Object) (string, error) {
+			cm := obj.(*corev1.ConfigMap)
+			key := valueFrom.ConfigMapKeyRef.Key
+			if v, ok := cm.Data[key]; ok {
+				return v, nil
+			}
+			if v, ok := cm.BinaryData[key]; ok {
+				return string(v), nil
+			}
+			return "", intctrlutil.NewFatalError(fmt.Sprintf(`key "%s" is not found in the ConfigMap "%s"`, key, valueFrom.ConfigMapKeyRef.Name))
+		})
+	case valueFrom.SecretKeyRef != nil:
+		return resolveObjectKey(valueFrom.SecretKeyRef.LocalObjectReference, &corev1.Secret{}, func(obj client.Object) (string, error) {
+			secret := obj.(*corev1.Secret)
+			key := valueFrom.SecretKeyRef.Key
+			if v, ok := secret.Data[key]; ok {
+				return string(v), nil
+			}
+			if v, ok := secret.StringData[key]; ok {
+				return v, nil
+			}
+			return "", intctrlutil.NewFatalError(fmt.Sprintf(`key "%s" is not found in the Secret "%s"`, key, valueFrom.SecretKeyRef.Name))
+		})
+	}
+	return "", nil
 }
 
 // initOpsDefAndValidate inits the opsDefinition to OpsResource and validates if the opsRequest is valid.
@@ -258,14 +311,18 @@ func initOpsDefAndValidate(reqCtx intctrlutil.RequestCtx,
 		return nil
 	}
 	for _, v := range customSpec.CustomOpsComponents {
-		// covert to type map[string]interface{}
-		params, err := common.CoverStringToInterfaceBySchemaType(parametersSchema.OpenAPIV3Schema, covertParametersToMap(v.Parameters))
+		paramsMap, err := covertParametersToMap(reqCtx.Ctx, cli, v.Parameters, opsRes.OpsRequest.Namespace)
 		if err != nil {
 			return err
 		}
+		// covert to type map[string]interface{}
+		params, err := common.CoverStringToInterfaceBySchemaType(parametersSchema.OpenAPIV3Schema, paramsMap)
+		if err != nil {
+			return intctrlutil.NewFatalError(err.Error())
+		}
 		if parametersSchema != nil && parametersSchema.OpenAPIV3Schema != nil {
 			if err = common.ValidateDataWithSchema(parametersSchema.OpenAPIV3Schema, params); err != nil {
-				return err
+				return intctrlutil.NewFatalError(err.Error())
 			}
 		}
 
@@ -280,7 +337,7 @@ func initOpsDefAndValidate(reqCtx intctrlutil.RequestCtx,
 			if len(opsDef.Spec.ComponentInfos) > 0 {
 				var componentDefMatched bool
 				for _, c := range opsDef.Spec.ComponentInfos {
-					if component.CompDefMatched(compDef.Name, c.ComponentDefinitionName) {
+					if component.PrefixOrRegexMatched(compDef.Name, c.ComponentDefinitionName) {
 						componentDefMatched = true
 						break
 					}

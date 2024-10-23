@@ -22,9 +22,9 @@ package operations
 import (
 	"context"
 	"fmt"
+	"slices"
 	"time"
 
-	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -115,9 +115,13 @@ func PatchOpsStatus(ctx context.Context,
 
 // PatchClusterNotFound patches ClusterNotFound condition to the OpsRequest.status.conditions.
 func PatchClusterNotFound(ctx context.Context, cli client.Client, opsRes *OpsResource) error {
-	message := fmt.Sprintf("spec.clusterRef %s is not found", opsRes.OpsRequest.Spec.GetClusterName())
+	message := fmt.Sprintf("spec.clusterName %s is not found", opsRes.OpsRequest.Spec.GetClusterName())
 	condition := opsv1alpha1.NewValidateFailedCondition(opsv1alpha1.ReasonClusterNotFound, message)
-	return PatchOpsStatus(ctx, cli, opsRes, opsv1alpha1.OpsFailedPhase, condition)
+	opsPhase := opsv1alpha1.OpsFailedPhase
+	if opsRes.OpsRequest.IsComplete() {
+		opsPhase = opsRes.OpsRequest.Status.Phase
+	}
+	return PatchOpsStatus(ctx, cli, opsRes, opsPhase, condition)
 }
 
 // PatchOpsHandlerNotSupported patches OpsNotSupported condition to the OpsRequest.status.conditions.
@@ -199,7 +203,7 @@ func updateReconfigureStatusByCM(reconfiguringStatus *opsv1alpha1.ReconfiguringS
 
 // validateOpsWaitingPhase validates whether the current cluster phase is expected, and whether the waiting time exceeds the limit.
 // only requests with `Pending` phase will be validated.
-func validateOpsWaitingPhase(cluster *appsv1.Cluster, ops *opsv1alpha1.OpsRequest, opsBehaviour OpsBehaviour) error {
+func validateOpsNeedWaitingClusterPhase(cluster *appsv1.Cluster, ops *opsv1alpha1.OpsRequest, opsBehaviour OpsBehaviour) error {
 	if ops.Force() {
 		return nil
 	}
@@ -213,6 +217,17 @@ func validateOpsWaitingPhase(cluster *appsv1.Cluster, ops *opsv1alpha1.OpsReques
 	if slices.Contains(opsBehaviour.FromClusterPhases, cluster.Status.Phase) {
 		return nil
 	}
+
+	opsRequestSlice, err := opsutil.GetOpsRequestSliceFromCluster(cluster)
+	if err != nil {
+		return intctrlutil.NewFatalError(err.Error())
+	}
+	// skip the preConditionDeadline check if the ops is in queue.
+	index, opsRecorder := GetOpsRecorderFromSlice(opsRequestSlice, ops.Name)
+	if index != -1 && opsRecorder.InQueue {
+		return nil
+	}
+
 	// check if entry-condition is met
 	// if the cluster is not in the expected phase, we should wait for it for up to TTLSecondsBeforeAbort seconds.
 	if !needWaitPreConditionDeadline(ops) {
@@ -226,11 +241,22 @@ func validateOpsWaitingPhase(cluster *appsv1.Cluster, ops *opsv1alpha1.OpsReques
 	}
 }
 
+func preConditionDeadlineSecondsIsSet(ops *opsv1alpha1.OpsRequest) bool {
+	return ops.Spec.PreConditionDeadlineSeconds != nil && *ops.Spec.PreConditionDeadlineSeconds != 0
+}
+
 func needWaitPreConditionDeadline(ops *opsv1alpha1.OpsRequest) bool {
-	if ops.Spec.PreConditionDeadlineSeconds == nil {
+	if !preConditionDeadlineSecondsIsSet(ops) {
 		return false
 	}
-	return time.Now().Before(ops.GetCreationTimestamp().Add(time.Duration(*ops.Spec.PreConditionDeadlineSeconds) * time.Second))
+	baseTime := ops.GetCreationTimestamp()
+	if queueEndTimeStr, ok := ops.Annotations[constant.QueueEndTimeAnnotationKey]; ok {
+		queueEndTime, _ := time.Parse(time.RFC3339, queueEndTimeStr)
+		if !queueEndTime.IsZero() {
+			baseTime = metav1.Time{Time: queueEndTime}
+		}
+	}
+	return time.Now().Before(baseTime.Add(time.Duration(*ops.Spec.PreConditionDeadlineSeconds) * time.Second))
 }
 
 func abortEarlierOpsRequestWithSameKind(reqCtx intctrlutil.RequestCtx,
@@ -316,7 +342,7 @@ func getComponentSpecOrShardingTemplate(cluster *appsv1.Cluster, componentName s
 			return &v
 		}
 	}
-	for _, v := range cluster.Spec.ShardingSpecs {
+	for _, v := range cluster.Spec.Shardings {
 		if v.Name == componentName {
 			return &v.Template
 		}

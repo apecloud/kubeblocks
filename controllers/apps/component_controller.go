@@ -58,20 +58,12 @@ type ComponentReconciler struct {
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=components/finalizers,verbs=update
 
 // owned workload API
-// +kubebuilder:rbac:groups=workloads.kubeblocks.io,resources=replicatedstatemachines,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=workloads.kubeblocks.io,resources=replicatedstatemachines/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=workloads.kubeblocks.io,resources=replicatedstatemachines/finalizers,verbs=update
-
 // +kubebuilder:rbac:groups=workloads.kubeblocks.io,resources=instancesets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=workloads.kubeblocks.io,resources=instancesets/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=workloads.kubeblocks.io,resources=instancesets/finalizers,verbs=update
 
 // owned K8s core API resources controller-gen RBAC marker
 // full access on core API resources
-// +kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=get;list;watch;create;update;patch;delete;deletecollection
-// +kubebuilder:rbac:groups=apps,resources=statefulsets/status,verbs=get
-// +kubebuilder:rbac:groups=apps,resources=statefulsets/finalizers,verbs=update
-
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete;deletecollection
 // +kubebuilder:rbac:groups=core,resources=secrets/finalizers,verbs=update
 
@@ -105,8 +97,6 @@ type ComponentReconciler struct {
 
 // +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings,verbs=get;list;watch
 // +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings/status,verbs=get
-
-// +kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=get;list;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -172,8 +162,6 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			&componentConfigurationTransformer{Client: r.Client},
 			// handle restore before workloads transform
 			&componentRestoreTransformer{Client: r.Client},
-			// handle upgrade from the legacy RSM API to the InstanceSet API
-			&componentWorkloadUpgradeTransformer{},
 			// handle the component workload
 			&componentWorkloadTransformer{Client: r.Client},
 			// handle RBAC for component workloads
@@ -219,7 +207,7 @@ func (r *ComponentReconciler) setupWithManager(mgr ctrl.Manager) error {
 		Owns(&corev1.Secret{}).
 		Owns(&corev1.ConfigMap{}).
 		Owns(&dpv1alpha1.Backup{}).
-		Owns(&dpv1alpha1.Restore{}).
+		Watches(&dpv1alpha1.Restore{}, handler.EnqueueRequestsFromMapFunc(r.filterComponentRestoreResources)).
 		Watches(&corev1.PersistentVolumeClaim{}, handler.EnqueueRequestsFromMapFunc(r.filterComponentResources)).
 		Watches(&appsv1alpha1.Configuration{}, handler.EnqueueRequestsFromMapFunc(r.configurationEventHandler))
 
@@ -242,7 +230,7 @@ func (r *ComponentReconciler) setupWithMultiClusterManager(mgr ctrl.Manager, mul
 		}).
 		Owns(&workloads.InstanceSet{}).
 		Owns(&dpv1alpha1.Backup{}).
-		Owns(&dpv1alpha1.Restore{}).
+		Watches(&dpv1alpha1.Restore{}, handler.EnqueueRequestsFromMapFunc(r.filterComponentRestoreResources)).
 		Watches(&appsv1alpha1.Configuration{}, handler.EnqueueRequestsFromMapFunc(r.configurationEventHandler))
 
 	eventHandler := handler.EnqueueRequestsFromMapFunc(r.filterComponentResources)
@@ -254,6 +242,28 @@ func (r *ComponentReconciler) setupWithMultiClusterManager(mgr ctrl.Manager, mul
 		Watch(b, &rbacv1.RoleBinding{}, eventHandler)
 
 	return b.Complete(r)
+}
+
+func (r *ComponentReconciler) filterComponentRestoreResources(ctx context.Context, obj client.Object) []reconcile.Request {
+	labels := obj.GetLabels()
+	if v, ok := labels[constant.AppManagedByLabelKey]; !ok || v != constant.AppName {
+		return []reconcile.Request{}
+	}
+	if _, ok := labels[constant.AppInstanceLabelKey]; !ok {
+		return []reconcile.Request{}
+	}
+	if _, ok := labels[constant.KBAppComponentLabelKey]; !ok {
+		return []reconcile.Request{}
+	}
+	fullCompName := constant.GenerateClusterComponentName(labels[constant.AppInstanceLabelKey], labels[constant.KBAppComponentLabelKey])
+	return []reconcile.Request{
+		{
+			NamespacedName: types.NamespacedName{
+				Namespace: obj.GetNamespace(),
+				Name:      fullCompName,
+			},
+		},
+	}
 }
 
 func (r *ComponentReconciler) filterComponentResources(ctx context.Context, obj client.Object) []reconcile.Request {

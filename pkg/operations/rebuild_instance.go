@@ -23,10 +23,10 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 	"time"
 
-	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -330,8 +330,8 @@ func (r rebuildInstanceOpsHandler) scaleOutRequiredInstances(reqCtx intctrlutil.
 	rebuildInstance opsv1alpha1.RebuildInstance,
 	compStatus *opsv1alpha1.OpsRequestComponentStatus) error {
 	// 1. sort the instances
-	slices.SortFunc(rebuildInstance.Instances, func(a, b opsv1alpha1.Instance) bool {
-		return a.Name < b.Name
+	slices.SortFunc(rebuildInstance.Instances, func(a, b opsv1alpha1.Instance) int {
+		return strings.Compare(a.Name, b.Name)
 	})
 
 	// 2. assemble the corresponding replicas and instances based on the template

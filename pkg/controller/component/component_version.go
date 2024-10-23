@@ -22,10 +22,13 @@ package component
 import (
 	"context"
 	"fmt"
+	"reflect"
+	"slices"
+	"strings"
 
 	"golang.org/x/exp/maps"
-	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/version"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -100,48 +103,72 @@ func UpdateCompDefinitionImages4ServiceVersion(ctx context.Context, cli client.R
 func resolveImagesWithCompVersions(compDef *appsv1.ComponentDefinition,
 	compVersions []*appsv1.ComponentVersion, serviceVersion string) error {
 	appsInDef := covertImagesFromCompDefinition(compDef)
-	appsByUser, err := findMatchedImagesFromCompVersions(compVersions, serviceVersion)
+	appsInVer, err := findMatchedImagesFromCompVersions(compVersions, serviceVersion)
 	if err != nil {
 		return err
 	}
 
-	apps := checkNMergeImages(serviceVersion, appsInDef, appsByUser)
+	apps := checkNMergeImages(serviceVersion, appsInDef, appsInVer)
 
-	checkNUpdateImage := func(c *corev1.Container) error {
-		var err error
-		app, ok := apps[c.Name]
-		switch {
-		case ok && app.err == nil:
-			c.Image = app.image
-		case ok:
-			err = app.err
-		default:
-			err = fmt.Errorf("no matched image found for container %s", c.Name)
+	if err = func() error {
+		checkNUpdateImage := func(c *corev1.Container) error {
+			var err error
+			app, ok := apps[c.Name]
+			switch {
+			case ok && app.err == nil:
+				c.Image = app.image
+			case ok:
+				err = app.err
+			default:
+				err = fmt.Errorf("no matched image found for container %s", c.Name)
+			}
+			return err
 		}
+		for i := range compDef.Spec.Runtime.InitContainers {
+			if err := checkNUpdateImage(&compDef.Spec.Runtime.InitContainers[i]); err != nil {
+				return err
+			}
+		}
+		for i := range compDef.Spec.Runtime.Containers {
+			if err := checkNUpdateImage(&compDef.Spec.Runtime.Containers[i]); err != nil {
+				return err
+			}
+		}
+		return nil
+	}(); err != nil {
 		return err
 	}
 
-	for i := range compDef.Spec.Runtime.InitContainers {
-		if err := checkNUpdateImage(&compDef.Spec.Runtime.InitContainers[i]); err != nil {
-			return err
+	if err = func() error {
+		for name, action := range actionsToResolveImage(compDef) {
+			if action != nil && action.Exec != nil {
+				if app, ok := apps[name]; ok {
+					if app.err != nil {
+						return app.err
+					}
+					action.Exec.Image = app.image
+				}
+			}
 		}
+		return nil
+	}(); err != nil {
+		return err
 	}
-	for i := range compDef.Spec.Runtime.Containers {
-		if err := checkNUpdateImage(&compDef.Spec.Runtime.Containers[i]); err != nil {
-			return err
-		}
-	}
+
 	return nil
 }
 
 func covertImagesFromCompDefinition(compDef *appsv1.ComponentDefinition) map[string]appNameVersionImage {
 	apps := make(map[string]appNameVersionImage)
+
+	// containers
 	checkNAdd := func(c *corev1.Container) {
 		if len(c.Image) > 0 {
 			apps[c.Name] = appNameVersionImage{
-				name:    c.Name,
-				version: compDef.Spec.ServiceVersion,
-				image:   c.Image,
+				name:     c.Name,
+				version:  compDef.Spec.ServiceVersion,
+				image:    c.Image,
+				required: true,
 			}
 		}
 	}
@@ -151,10 +178,63 @@ func covertImagesFromCompDefinition(compDef *appsv1.ComponentDefinition) map[str
 	for i := range compDef.Spec.Runtime.Containers {
 		checkNAdd(&compDef.Spec.Runtime.Containers[i])
 	}
+
+	// actions
+	for name, action := range actionsToResolveImage(compDef) {
+		if action != nil && action.Exec != nil {
+			apps[name] = appNameVersionImage{
+				name:     name,
+				version:  compDef.Spec.ServiceVersion,
+				image:    action.Exec.Image,
+				required: false,
+			}
+		}
+	}
+
 	return apps
 }
 
+func actionsToResolveImage(compDef *appsv1.ComponentDefinition) map[string]*appsv1.Action {
+	if compDef.Spec.LifecycleActions == nil {
+		return nil
+	}
+
+	normalize := strings.ToLower
+	actions := map[string]*appsv1.Action{
+		normalize("postProvision"):    compDef.Spec.LifecycleActions.PostProvision,
+		normalize("preTerminate"):     compDef.Spec.LifecycleActions.PreTerminate,
+		normalize("switchover"):       compDef.Spec.LifecycleActions.Switchover,
+		normalize("memberJoin"):       compDef.Spec.LifecycleActions.MemberJoin,
+		normalize("memberLeave"):      compDef.Spec.LifecycleActions.MemberLeave,
+		normalize("readonly"):         compDef.Spec.LifecycleActions.Readonly,
+		normalize("readwrite"):        compDef.Spec.LifecycleActions.Readwrite,
+		normalize("dataDump"):         compDef.Spec.LifecycleActions.DataDump,
+		normalize("dataLoad"):         compDef.Spec.LifecycleActions.DataLoad,
+		normalize("reconfigure"):      compDef.Spec.LifecycleActions.Reconfigure,
+		normalize("accountProvision"): compDef.Spec.LifecycleActions.AccountProvision,
+	}
+	if compDef.Spec.LifecycleActions.RoleProbe != nil {
+		actions[normalize("roleProbe")] = &compDef.Spec.LifecycleActions.RoleProbe.Action
+	}
+	return actions
+}
+
 func findMatchedImagesFromCompVersions(compVersions []*appsv1.ComponentVersion, serviceVersion string) (map[string]appNameVersionImage, error) {
+	normalize := func() func(string) (bool, string) {
+		names := sets.New[string]()
+		tp := reflect.TypeOf(appsv1.ComponentLifecycleActions{})
+		for i := 0; i < tp.NumField(); i++ {
+			names.Insert(strings.ToLower(tp.Field(i).Name))
+		}
+		return func(name string) (bool, string) {
+			l := strings.ToLower(name)
+			if names.Has(l) {
+				return true, l
+			}
+			return false, name
+		}
+	}()
+
 	appsWithReleases := make(map[string]map[string]appNameVersionImage)
 	for _, compVersion := range compVersions {
 		for _, release := range compVersion.Spec.Releases {
@@ -164,52 +244,56 @@ func findMatchedImagesFromCompVersions(compVersions []*appsv1.ComponentVersion, 
 			}
 			if match {
 				for name, image := range release.Images {
-					if _, ok := appsWithReleases[name]; !ok {
-						appsWithReleases[name] = make(map[string]appNameVersionImage)
+					isAction, appName := normalize(name)
+					if _, ok := appsWithReleases[appName]; !ok {
+						appsWithReleases[appName] = make(map[string]appNameVersionImage)
 					}
-					appsWithReleases[name][release.Name] = appNameVersionImage{
-						name:    name,
-						version: release.ServiceVersion,
-						image:   image,
+					appsWithReleases[appName][release.Name] = appNameVersionImage{
+						name:     appName,
+						version:  release.ServiceVersion,
+						image:    image,
+						required: !isAction,
 					}
 				}
 			}
 		}
 	}
+
 	apps := make(map[string]appNameVersionImage)
-	for name, releases := range appsWithReleases {
-		names := maps.Keys(releases)
-		slices.Sort(names)
+	for appName, releases := range appsWithReleases {
+		releaseNames := maps.Keys(releases)
+		slices.Sort(releaseNames)
 		// use the latest release
-		apps[name] = releases[names[len(names)-1]]
+		apps[appName] = releases[releaseNames[len(releaseNames)-1]]
 	}
 	return apps, nil
 }
 
-func checkNMergeImages(serviceVersion string, appsInDef, appsByUser map[string]appNameVersionImage) map[string]appNameVersionImage {
+func checkNMergeImages(serviceVersion string, appsInDef, appsInVer map[string]appNameVersionImage) map[string]appNameVersionImage {
 	apps := make(map[string]appNameVersionImage)
-	merge := func(name string, def, user appNameVersionImage) appNameVersionImage {
-		if len(user.name) == 0 {
+	merge := func(name string, def, ver appNameVersionImage) appNameVersionImage {
+		if len(ver.name) == 0 {
 			match, err := CompareServiceVersion(serviceVersion, def.version)
 			if err != nil {
-				def.err = err
+				def.err = fmt.Errorf("failed to compare service version (service version: %s, def version: %s): %w", serviceVersion, def.version, err)
 			}
-			if !match {
+			if !match && def.required {
 				def.err = fmt.Errorf("no matched image found for container %s with required version %s", name, serviceVersion)
 			}
 			return def
 		}
-		return user
+		return ver
 	}
-	for _, name := range append(maps.Keys(appsInDef), maps.Keys(appsByUser)...) {
-		apps[name] = merge(name, appsInDef[name], appsByUser[name])
+	for _, name := range append(maps.Keys(appsInDef), maps.Keys(appsInVer)...) {
+		apps[name] = merge(name, appsInDef[name], appsInVer[name])
 	}
 	return apps
 }
 
 type appNameVersionImage struct {
-	name    string
-	version string
-	image   string
-	err     error
+	name     string
+	version  string
+	image    string
+	err      error
+	required bool
 }

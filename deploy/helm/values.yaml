@@ -461,6 +461,28 @@ addonHelmInstallOptions:
 ## For avoiding the addon CRs being upgraded when upgrade this chart, set this value to false.
 upgradeAddons: false
 
+## @param autoInstalledAddons - the list of auto-installed addons when install and upgrade.
+autoInstalledAddons:
+  - "apecloud-mysql"
+  - "etcd"
+  - "kafka"
+  - "llm"
+  - "mongodb"
+  - "mysql"
+  - "postgresql"
+  - "pulsar"
+  - "qdrant"
+  - "redis"
+  - "alertmanager-webhook-adaptor"
+  - "apecloud-otel-collector"
+  - "aws-load-balancer-controller"
+  - "csi-hostpath-driver"
+  - "csi-driver-nfs"
+  - "grafana"
+  - "prometheus"
+  - "snapshot-controller"
+  - "victoria-metrics-agent"
+
 ## Prometheus Addon
 ##
 prometheus:
@@ -1531,48 +1553,6 @@ prometheus:
     ##
     enabled: false
 
-## loki settings for kubeblocks
-loki:
-  enabled: false
-  singleBinary:
-    replicas: 1
-  monitoring:
-    lokiCanary:
-      enabled: false
-    selfMonitoring:
-      enabled: false
-      grafanaAgent:
-        installOperator: false
-    dashboards:
-      enabled: false
-    rules:
-      enabled: false
-    serviceMonitor:
-      enabled: false
-  test:
-    enabled: false
-  loki:
-    auth_enabled: false
-    commonConfig:
-      replication_factor: 1
-    storage:
-      type: filesystem
-    podSecurityContext:
-      runAsNonRoot: false
-      runAsUser: 0
-    limits_config:
-      max_query_lookback: 72h
-      retention_period: 72h
-    compactor:
-      working_directory: /var/loki/retention
-      shared_store: filesystem
-      compaction_interval: 10m
-      retention_enabled: true
-      retention_delete_delay: 2h
-      retention_delete_worker_count: 150
-      delete_request_cancel_period: 2h
-
-
 grafana:
   ## If false, grafana sub-chart will not be installed
   ##
@@ -1765,8 +1745,6 @@ snapshot-controller:
             values:
             - "true"
 
-kubeblocks-csi-driver:
-  enabled: false
 
 alertmanager-webhook-adaptor:
   ## Linkage with prometheus.enabled
@@ -1913,6 +1891,8 @@ controllers:
     enabled: true
   workloads:
     enabled: true
+  operations:
+    enabled: true
   experimental:
     enabled: false
 
@@ -1924,8 +1904,6 @@ featureGates:
   componentReplicasAnnotation:
     enabled: true
   inPlacePodVerticalScaling:
-    enabled: false
-  noRSMEnv:
     enabled: false
 
 vmagent:

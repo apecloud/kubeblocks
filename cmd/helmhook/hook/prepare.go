@@ -37,6 +37,9 @@ func getVersionInfo(ctx context.Context, client *kubernetes.Clientset, namespace
 	if err != nil {
 		return nil, err
 	}
+	if deploy == nil {
+		return nil, fmt.Errorf("KubeBlocks operator-related deployment not found")
+	}
 
 	labels := deploy.GetLabels()
 	if len(labels) == 0 {

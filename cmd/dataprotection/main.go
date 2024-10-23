@@ -52,6 +52,7 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	dpcontrollers "github.com/apecloud/kubeblocks/controllers/dataprotection"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
@@ -93,6 +94,7 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(appsv1.AddToScheme(scheme))
 	utilruntime.Must(appsv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(opsv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(dpv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(snapshotv1.AddToScheme(scheme))
 	utilruntime.Must(snapshotv1beta1.AddToScheme(scheme))
@@ -325,6 +327,15 @@ func main() {
 		Recorder: mgr.GetEventRecorderFor("backup-schedule-controller"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "BackupSchedule")
+		os.Exit(1)
+	}
+
+	if err = (&dpcontrollers.BackupPolicyTemplateReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("backup-policy-template-controller"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "BackupPolicyTemplate")
 		os.Exit(1)
 	}
 

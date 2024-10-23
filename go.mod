@@ -13,7 +13,6 @@ require (
 	github.com/bhmj/jsonslice v1.1.2
 	github.com/charmbracelet/keygen v0.5.1
 	github.com/clbanning/mxj/v2 v2.5.7
-	github.com/containers/common v0.55.4
 	github.com/docker/docker v25.0.6+incompatible
 	github.com/evanphx/json-patch v5.6.0+incompatible
 	github.com/fasthttp/router v1.4.20
@@ -246,5 +245,3 @@ require (
 	sigs.k8s.io/kustomize/kyaml v0.14.3 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
 )
-
-replace golang.org/x/exp => golang.org/x/exp v0.0.0-20230711153332-06a737ee72cb

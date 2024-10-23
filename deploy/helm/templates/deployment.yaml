@@ -63,9 +63,10 @@ spec:
             {{- with .Values.loggerSettings.encoder }}
             - "--zap-encoder={{ . }}"
             {{- end }}
-            - "--extensions={{- default "true" ( include "kubeblocks.addonControllerEnabled" . ) }}"
             - "--apps={{ ne .Values.controllers.apps.enabled false }}"
             - "--workloads={{ ne .Values.controllers.workloads.enabled false }}"
+            - "--operations={{ ne .Values.controllers.operations.enabled false }}"
+            - "--extensions={{- default "true" ( include "kubeblocks.addonControllerEnabled" . ) }}"
             - "--experimental={{- default "false" .Values.controllers.experimental.enabled }}"
             {{- with .Values.managedNamespaces }}
             - "--managed-namespaces={{ . }}"
@@ -178,8 +179,6 @@ spec:
               value: {{ .Values.featureGates.componentReplicasAnnotation.enabled | quote }}
             - name: IN_PLACE_POD_VERTICAL_SCALING
               value: {{ .Values.featureGates.inPlacePodVerticalScaling.enabled | quote }}
-            - name: NO_RSM_ENV
-              value: {{ .Values.featureGates.noRSMEnv.enabled | quote }}
           {{- with .Values.securityContext }}
           securityContext:
             {{- toYaml . | nindent 12 }}

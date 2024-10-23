@@ -115,15 +115,14 @@ func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 	podApplyCompOps := func(
 		ops *opsv1alpha1.OpsRequest,
 		pod *corev1.Pod,
-		compOps ComponentOpsInterface,
-		insTemplateName string) bool {
-		upgradeComponent := compOps.(opsv1alpha1.UpgradeComponent)
-		lastCompConfiguration := opsRes.OpsRequest.Status.LastConfiguration.Components[compOps.GetComponentName()]
+		pgRes *progressResource) bool {
+		upgradeComponent := pgRes.compOps.(opsv1alpha1.UpgradeComponent)
+		lastCompConfiguration := opsRes.OpsRequest.Status.LastConfiguration.Components[upgradeComponent.GetComponentName()]
 		if !componentUpgraded(opsRes.Cluster, lastCompConfiguration, upgradeComponent) {
 			// if componentDefinition and serviceVersion no changes, return true
 			return true
 		}
-		compDef, ok := componentDefMap[compOps.GetComponentName()]
+		compDef, ok := componentDefMap[upgradeComponent.GetComponentName()]
 		if !ok {
 			return true
 		}
@@ -199,7 +198,7 @@ func (u upgradeOpsHandler) needUpdateCompDef(upgradeComp opsv1alpha1.UpgradeComp
 	if upgradeComp.ComponentDefinitionName == nil {
 		return false
 	}
-	// we will ignore the empty ComponentDefinitionName if cluster.Spec.ClusterDef is empty.
+	// we will ignore the empty ComponentDefinitionName if cluster.Spec.clusterDef is empty.
 	return *upgradeComp.ComponentDefinitionName != "" ||
 		(*upgradeComp.ComponentDefinitionName == "" && cluster.Spec.ClusterDef != "")
 }

@@ -25,10 +25,10 @@ import (
 	"fmt"
 	"hash/fnv"
 	"reflect"
+	"slices"
 	"strings"
 
 	"github.com/pkg/errors"
-	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -241,7 +241,7 @@ func (r *ComponentDefinitionReconciler) validateVars(cli client.Client, rctx int
 		if len(compDef) == 0 {
 			continue
 		}
-		if err := component.ValidateCompDefRegexp(compDef); err != nil {
+		if err := component.ValidateDefNameRegexp(compDef); err != nil {
 			return errors.Wrapf(err, "invalid reference to component definition name pattern: %s", compDef)
 		}
 	}
@@ -445,7 +445,7 @@ func listCompDefinitionsWithPattern(ctx context.Context, cli client.Reader, name
 		if item.Name == name {
 			compDefsFullyMatched = append(compDefsFullyMatched, &compDefList.Items[i])
 		}
-		if component.CompDefMatched(item.Name, name) {
+		if component.PrefixOrRegexMatched(item.Name, name) {
 			compDefsPatternMatched = append(compDefsPatternMatched, &compDefList.Items[i])
 		}
 	}

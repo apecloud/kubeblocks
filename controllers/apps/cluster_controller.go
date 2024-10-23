@@ -66,7 +66,7 @@ import (
 // +kubebuilder:rbac:groups=core,resources=pods/exec,verbs=create
 
 // dataprotection get list and delete
-// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=backuppolicytemplates,verbs=get;list
+// +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backuppolicytemplates,verbs=get;list
 // +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backuppolicies,verbs=get;list;create;update;patch;delete;deletecollection
 // +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backups,verbs=get;list;delete;deletecollection
 
@@ -129,14 +129,14 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		AddTransformer(
 			// handle cluster deletion
 			&clusterDeletionTransformer{},
-			// update finalizer and cd&cv labels
-			&clusterAssureMetaTransformer{},
-			// validate cd & cv's existence and availability
-			&clusterLoadRefResourcesTransformer{},
+			// update finalizer and definition labels
+			&clusterMetaTransformer{},
+			// validate the cluster spec
+			&clusterValidationTransformer{},
 			// handle cluster shared account
-			&clusterSharedAccountTransformer{},
-			// normalize the cluster and component API
-			&ClusterAPINormalizationTransformer{},
+			&clusterShardingAccountTransformer{},
+			// normalize the cluster spec
+			&clusterNormalizationTransformer{},
 			// placement replicas across data-plane k8s clusters
 			&clusterPlacementTransformer{multiClusterMgr: r.MultiClusterMgr},
 			// handle cluster services

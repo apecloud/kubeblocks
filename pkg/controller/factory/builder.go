@@ -270,7 +270,7 @@ func BuildBackup(cluster *appsv1.Cluster,
 	return builder.NewBackupBuilder(backupKey.Namespace, backupKey.Name).
 		AddLabels(dptypes.BackupMethodLabelKey, backupMethod).
 		AddLabels(dptypes.BackupPolicyLabelKey, backupPolicyName).
-		AddLabels(constant.KBManagedByKey, "cluster").
+		AddLabels(constant.AppManagedByLabelKey, constant.AppName).
 		AddLabels(constant.AppNameLabelKey, synthesizedComp.ClusterDefName).
 		AddLabels(constant.AppInstanceLabelKey, cluster.Name).
 		AddLabels(constant.AppManagedByLabelKey, constant.AppName).

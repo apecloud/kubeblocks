@@ -20,10 +20,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/pkg/errors"
-	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -75,15 +75,15 @@ func (r *OpsRequest) Validate(ctx context.Context,
 	cluster *appsv1.Cluster,
 	needCheckClusterPhase bool) error {
 	if needCheckClusterPhase {
-		if err := r.validateClusterPhase(cluster); err != nil {
+		if err := r.ValidateClusterPhase(cluster); err != nil {
 			return err
 		}
 	}
-	return r.validateOps(ctx, k8sClient, cluster)
+	return r.ValidateOps(ctx, k8sClient, cluster)
 }
 
-// validateClusterPhase validates whether the current cluster state supports the OpsRequest
-func (r *OpsRequest) validateClusterPhase(cluster *appsv1.Cluster) error {
+// ValidateClusterPhase validates whether the current cluster state supports the OpsRequest
+func (r *OpsRequest) ValidateClusterPhase(cluster *appsv1.Cluster) error {
 	opsBehaviour := OpsRequestBehaviourMapper[r.Spec.Type]
 	// if the OpsType has no cluster phases, ignore it
 	if len(opsBehaviour.FromClusterPhases) == 0 {
@@ -95,12 +95,12 @@ func (r *OpsRequest) validateClusterPhase(cluster *appsv1.Cluster) error {
 	// validate whether existing the same type OpsRequest
 	var (
 		opsRequestValue string
-		opsRecorder     []OpsRecorder
+		opsRecorders    []OpsRecorder
 		ok              bool
 	)
 	if opsRequestValue, ok = cluster.Annotations[opsRequestAnnotationKey]; ok {
 		// opsRequest annotation value in cluster to map
-		if err := json.Unmarshal([]byte(opsRequestValue), &opsRecorder); err != nil {
+		if err := json.Unmarshal([]byte(opsRequestValue), &opsRecorders); err != nil {
 			return err
 		}
 	}
@@ -108,16 +108,23 @@ func (r *OpsRequest) validateClusterPhase(cluster *appsv1.Cluster) error {
 	if slices.Contains(opsBehaviour.FromClusterPhases, cluster.Status.Phase) {
 		return nil
 	}
-	// check if this opsRequest needs to verify cluster phase before opsRequest starts running.
-	needCheck := len(opsRecorder) == 0 || (opsRecorder[0].Name == r.Name && opsRecorder[0].InQueue)
-	if !needCheck {
-		return nil
+	var opsRecord *OpsRecorder
+	for _, v := range opsRecorders {
+		if v.Name == r.Name {
+			opsRecord = &v
+			break
+		}
 	}
-	return fmt.Errorf("OpsRequest.spec.type=%s is forbidden when Cluster.status.phase=%s", r.Spec.Type, cluster.Status.Phase)
+	// check if this opsRequest needs to verify cluster phase before opsRequest starts running.
+	needCheck := len(opsRecorders) == 0 || (opsRecord != nil && !opsRecord.InQueue)
+	if needCheck {
+		return fmt.Errorf("OpsRequest.spec.type=%s is forbidden when Cluster.status.phase=%s", r.Spec.Type, cluster.Status.Phase)
+	}
+	return nil
 }
 
-// validateOps validates ops attributes
-func (r *OpsRequest) validateOps(ctx context.Context,
+// ValidateOps validates ops attributes
+func (r *OpsRequest) ValidateOps(ctx context.Context,
 	k8sClient client.Client,
 	cluster *appsv1.Cluster) error {
 	// Check whether the corresponding attribute is legal according to the operation type
@@ -337,9 +344,9 @@ func (r *OpsRequest) validateHorizontalScaling(_ context.Context, _ client.Clien
 			}
 		}
 	}
-	for _, shardingSpec := range cluster.Spec.ShardingSpecs {
-		if hScale, ok := hScaleMap[shardingSpec.Name]; ok {
-			if err := r.validateHorizontalScalingSpec(hScale, shardingSpec.Template, cluster.Name, true); err != nil {
+	for _, spec := range cluster.Spec.Shardings {
+		if hScale, ok := hScaleMap[spec.Name]; ok {
+			if err := r.validateHorizontalScalingSpec(hScale, spec.Template, cluster.Name, true); err != nil {
 				return err
 			}
 		}
@@ -496,11 +503,11 @@ func (r *OpsRequest) checkInstanceTemplate(cluster *appsv1.Cluster, componentOps
 			instanceNameMap[instances[i].Name] = sets.Empty{}
 		}
 	}
-	for _, shardingSpec := range cluster.Spec.ShardingSpecs {
-		if shardingSpec.Name != componentOps.ComponentName {
+	for _, spec := range cluster.Spec.Shardings {
+		if spec.Name != componentOps.ComponentName {
 			continue
 		}
-		setInstanceMap(shardingSpec.Template.Instances)
+		setInstanceMap(spec.Template.Instances)
 	}
 	for _, compSpec := range cluster.Spec.ComponentSpecs {
 		if compSpec.Name != componentOps.ComponentName {
@@ -526,8 +533,8 @@ func (r *OpsRequest) checkComponentExistence(cluster *appsv1.Cluster, compOpsLis
 	for _, compSpec := range cluster.Spec.ComponentSpecs {
 		compNameMap[compSpec.Name] = sets.Empty{}
 	}
-	for _, shardingSpec := range cluster.Spec.ShardingSpecs {
-		compNameMap[shardingSpec.Name] = sets.Empty{}
+	for _, spec := range cluster.Spec.Shardings {
+		compNameMap[spec.Name] = sets.Empty{}
 	}
 	var (
 		notFoundCompNames []string
@@ -608,7 +615,7 @@ func (r *OpsRequest) checkVolumesAllowExpansion(ctx context.Context, cli client.
 	for _, comp := range cluster.Spec.ComponentSpecs {
 		fillCompVols(comp, comp.Name, false)
 	}
-	for _, sharding := range cluster.Spec.ShardingSpecs {
+	for _, sharding := range cluster.Spec.Shardings {
 		fillCompVols(sharding.Template, sharding.Name, true)
 	}
 
@@ -687,10 +694,17 @@ func (r *OpsRequest) checkStorageClassAllowExpansion(ctx context.Context,
 // getSCNameByPvcAndCheckStorageSize gets the storageClassName by pvc and checks if the storage size is valid.
 func (r *OpsRequest) getSCNameByPvcAndCheckStorageSize(ctx context.Context,
 	cli client.Client,
-	componentName,
+	key,
 	vctName string,
 	isShardingComponent bool,
 	requestStorage resource.Quantity) (*string, error) {
+	componentName := key
+	targetInsTPLName := ""
+	if strings.Contains(key, ".") {
+		keyStrs := strings.Split(key, ".")
+		componentName = keyStrs[0]
+		targetInsTPLName = keyStrs[1]
+	}
 	matchingLabels := client.MatchingLabels{
 		constant.AppInstanceLabelKey:             r.Spec.GetClusterName(),
 		constant.VolumeClaimTemplateNameLabelKey: vctName,
@@ -704,10 +718,16 @@ func (r *OpsRequest) getSCNameByPvcAndCheckStorageSize(ctx context.Context,
 	if err := cli.List(ctx, pvcList, client.InNamespace(r.Namespace), matchingLabels); err != nil {
 		return nil, err
 	}
-	if len(pvcList.Items) == 0 {
+	var pvc *corev1.PersistentVolumeClaim
+	for _, pvcItem := range pvcList.Items {
+		if targetInsTPLName == pvcItem.Labels[constant.KBAppComponentInstanceTemplateLabelKey] {
+			pvc = &pvcItem
+			break
+		}
+	}
+	if pvc == nil {
 		return nil, nil
 	}
-	pvc := pvcList.Items[0]
 	previousValue := *pvc.Status.Capacity.Storage()
 	if requestStorage.Cmp(previousValue) < 0 {
 		return nil, fmt.Errorf(`requested storage size of volumeClaimTemplate "%s" can not less than status.capacity.storage "%s" `,

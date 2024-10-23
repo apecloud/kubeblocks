@@ -85,6 +85,15 @@ func GetClusterObservedGeneration(testCtx *testutil.TestContext, clusterKey type
 	}
 }
 
+// ClusterReconciled checks if the testing cluster has been reconciled.
+func ClusterReconciled(testCtx *testutil.TestContext, clusterKey types.NamespacedName) func(gomega.Gomega) bool {
+	return func(g gomega.Gomega) bool {
+		cluster := &appsv1.Cluster{}
+		g.Expect(testCtx.Cli.Get(testCtx.Ctx, clusterKey, cluster)).Should(gomega.Succeed())
+		return cluster.Status.ObservedGeneration > 0 && cluster.Status.ObservedGeneration == cluster.Generation
+	}
+}
+
 // NewPVCSpec creates appsv1alpha1.PersistentVolumeClaimSpec.
 func NewPVCSpec(size string) appsv1.PersistentVolumeClaimSpec {
 	return appsv1.PersistentVolumeClaimSpec{

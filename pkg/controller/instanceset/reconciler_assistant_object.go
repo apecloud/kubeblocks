@@ -57,18 +57,11 @@ func (a *assistantObjectReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (ku
 
 	svc := buildSvc(*its, labels, selectors)
 	headLessSvc := buildHeadlessSvc(*its, labels, headlessSelectors)
-	envConfig, err := buildEnvConfigMap(*its, labels)
-	if err != nil {
-		return kubebuilderx.Continue, err
-	}
 	var objects []client.Object
 	if svc != nil {
 		objects = append(objects, svc)
 	}
 	objects = append(objects, headLessSvc)
-	if envConfig != nil {
-		objects = append(objects, envConfig)
-	}
 	for _, object := range objects {
 		if err := intctrlutil.SetOwnership(its, object, model.GetScheme(), finalizer); err != nil {
 			return kubebuilderx.Continue, err

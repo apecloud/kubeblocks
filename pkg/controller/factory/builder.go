@@ -374,20 +374,26 @@ func BuildServiceAccount(synthesizedComp *component.SynthesizedComponent, saName
 		GetObject()
 }
 
-func BuildRoleBinding(synthesizedComp *component.SynthesizedComponent, saName string) *rbacv1.RoleBinding {
+func BuildRoleBinding(synthesizedComp *component.SynthesizedComponent, roleRef *rbacv1.RoleRef, saName string) *rbacv1.RoleBinding {
 	return builder.NewRoleBindingBuilder(synthesizedComp.Namespace, saName).
 		AddLabelsInMap(constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name)).
 		AddLabelsInMap(synthesizedComp.StaticLabels).
 		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
-		SetRoleRef(rbacv1.RoleRef{
-			APIGroup: rbacv1.GroupName,
-			Kind:     "ClusterRole",
-			Name:     constant.RBACRoleName,
-		}).
+		SetRoleRef(*roleRef).
 		AddSubjects(rbacv1.Subject{
 			Kind:      rbacv1.ServiceAccountKind,
 			Namespace: synthesizedComp.Namespace,
 			Name:      saName,
 		}).
+		GetObject()
+}
+
+func BuildComponentRole(synthesizedComp *component.SynthesizedComponent, cmpd *appsv1.ComponentDefinition, saName string) *rbacv1.Role {
+	rules := cmpd.Spec.PolicyRules
+	if len(rules) == 0 {
+		return nil
+	}
+	return builder.NewRoleBuilder(synthesizedComp.Namespace, saName).
+		AddPolicyRules(rules).
 		GetObject()
 }

@@ -21,6 +21,7 @@ package apps
 
 import (
 	"fmt"
+	"reflect"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -29,15 +30,14 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	ictrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/generics"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -62,43 +62,41 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 		return nil
 	}
 
-	if len(transCtx.CompDef.Spec.PolicyRules) == 0 {
-		return nil
-	}
-
 	graphCli, _ := transCtx.Client.(model.GraphClient)
+	synthesizedComp := transCtx.SynthesizeComponent
+	serviceAccountName := constant.GenerateDefaultServiceAccountName(synthesizedComp.ClusterName, synthesizedComp.Name)
 
-	serviceAccount, err := buildServiceAccount(transCtx)
-	if err != nil {
-		return err
-	}
-	if serviceAccount == nil {
-		transCtx.Logger.V(1).Info("buildServiceAccounts returns serviceAccount nil")
-		return nil
-	}
-
-	if isServiceAccountExist(transCtx, serviceAccount.Name) {
-		return nil
-	}
-
-	if !viper.GetBool(constant.EnableRBACManager) {
+	if !isServiceAccountExist(transCtx, serviceAccountName) &&
+		!viper.GetBool(constant.EnableRBACManager) {
 		transCtx.Logger.V(1).Info("rbac manager is disabled")
 		transCtx.EventRecorder.Event(transCtx.Cluster, corev1.EventTypeWarning,
-			string(ictrlutil.ErrorTypeNotFound), fmt.Sprintf("ServiceAccount %s is not exist", serviceAccount.Name))
-		return ictrlutil.NewRequeueError(time.Second, "RBAC manager is disabled, but service account is not exist")
+			string(ictrlutil.ErrorTypeNotFound), fmt.Sprintf("ServiceAccount %s does not exist", serviceAccountName))
+		return ictrlutil.NewRequeueError(time.Second, "RBAC manager is disabled, but service account does not exist")
 	}
 
-	rb, err := buildRoleBinding(transCtx.SynthesizeComponent, transCtx.Component, serviceAccount.Name)
+	sa, err := createOrUpdateServiceAccount(transCtx, serviceAccountName, graphCli, dag)
 	if err != nil {
 		return err
 	}
-	graphCli.Create(dag, rb, inDataContext4G())
 
-	createServiceAccount(serviceAccount, graphCli, dag, rb)
+	role, err := createOrUpdateRole(transCtx, sa.Name, graphCli, dag)
+	if err != nil {
+		return err
+	}
+
+	rbs, err := createOrUpdateRoleBinding(transCtx, role, sa.Name, graphCli, dag)
+	if err != nil {
+		return err
+	}
+
+	// serviceAccount should be created before roleBinding and role
+	for _, rb := range rbs {
+		graphCli.DependOn(dag, rb, sa, role)
+	}
+	// serviceAccount should be created before workload
 	itsList := graphCli.FindAll(dag, &workloads.InstanceSet{})
 	for _, its := range itsList {
-		// serviceAccount must be created before workload
-		graphCli.DependOn(dag, its, serviceAccount)
+		graphCli.DependOn(dag, its, sa)
 	}
 
 	return nil
@@ -124,75 +122,83 @@ func isServiceAccountExist(transCtx *componentTransformContext, serviceAccountNa
 	return true
 }
 
-func isRoleBindingExist(transCtx *componentTransformContext, serviceAccountName string) bool {
-	synthesizedComp := transCtx.SynthesizeComponent
-	namespaceName := types.NamespacedName{
-		Namespace: synthesizedComp.Namespace,
-		Name:      constant.GenerateDefaultServiceAccountName(synthesizedComp.ClusterName, synthesizedComp.Name),
-	}
-	rb := &rbacv1.RoleBinding{}
-	if err := transCtx.Client.Get(transCtx.Context, namespaceName, rb, inDataContext4C()); err != nil {
-		// KubeBlocks will create a role binding only if it has RBAC access priority and
-		// the role binding is not already present.
+func createOrUpdate[T any, PT generics.PObject[T]](
+	transCtx *componentTransformContext, obj PT, graphCli model.GraphClient, dag *graph.DAG, cmpFn func(oldObj, newObj PT) bool,
+) (PT, error) {
+	oldObj := PT(new(T))
+	if err := transCtx.Client.Get(transCtx.Context, client.ObjectKeyFromObject(obj), oldObj); err != nil {
 		if errors.IsNotFound(err) {
-			transCtx.Logger.V(1).Info("RoleBinding not exists", "namespaceName", namespaceName)
-			return false
+			graphCli.Create(dag, obj, inDataContext4G())
+			return obj, nil
 		}
-		transCtx.Logger.Error(err, fmt.Sprintf("get role binding failed: %s", namespaceName))
-		return false
+		return nil, err
 	}
-
-	if rb.RoleRef.Name != constant.RBACRoleName {
-		transCtx.Logger.V(1).Info("rbac manager: ClusterRole not match", "ClusterRole",
-			constant.RBACRoleName, "rolebinding.RoleRef", rb.RoleRef.Name)
+	if !cmpFn(oldObj, obj) {
+		graphCli.Update(dag, oldObj, obj, inDataContext4G())
 	}
-
-	isServiceAccountMatch := false
-	for _, sub := range rb.Subjects {
-		if sub.Kind == rbacv1.ServiceAccountKind && sub.Name == serviceAccountName {
-			isServiceAccountMatch = true
-			break
-		}
-	}
-
-	if !isServiceAccountMatch {
-		transCtx.Logger.V(1).Info("rbac manager: ServiceAccount not match", "ServiceAccount",
-			serviceAccountName, "rolebinding.Subjects", rb.Subjects)
-	}
-	return true
+	return obj, nil
 }
 
-// buildServiceAccount builds the service account for the component.
-func buildServiceAccount(transCtx *componentTransformContext) (*corev1.ServiceAccount, error) {
-	var (
-		comp            = transCtx.Component
-		compDef         = transCtx.CompDef
-		synthesizedComp = transCtx.SynthesizeComponent
-	)
+func createOrUpdateServiceAccount(transCtx *componentTransformContext, serviceAccountName string, graphCli model.GraphClient, dag *graph.DAG) (*corev1.ServiceAccount, error) {
+	synthesizedComp := transCtx.SynthesizeComponent
 
-	serviceAccountName := constant.GenerateDefaultServiceAccountName(synthesizedComp.ClusterName, synthesizedComp.Name)
+	sa := factory.BuildServiceAccount(synthesizedComp, serviceAccountName)
+	if err := setCompOwnershipNFinalizer(transCtx.Component, sa); err != nil {
+		return nil, err
+	}
 
-	if isRoleBindingExist(transCtx, serviceAccountName) && isServiceAccountExist(transCtx, serviceAccountName) {
+	return createOrUpdate(transCtx, sa, graphCli, dag, func(old, new *corev1.ServiceAccount) bool {
+		return reflect.DeepEqual(old.ImagePullSecrets, new.ImagePullSecrets) &&
+			reflect.DeepEqual(old.Secrets, new.Secrets) &&
+			*old.AutomountServiceAccountToken == *new.AutomountServiceAccountToken
+	})
+}
+
+func createOrUpdateRole(
+	transCtx *componentTransformContext, serviceAccountName string, graphCli model.GraphClient, dag *graph.DAG,
+) (*rbacv1.Role, error) {
+	role := factory.BuildComponentRole(transCtx.SynthesizeComponent, transCtx.CompDef, serviceAccountName)
+	if role == nil {
 		return nil, nil
 	}
-
-	saObj := factory.BuildServiceAccount(synthesizedComp, serviceAccountName)
-	if err := setCompOwnershipNFinalizer(comp, saObj); err != nil {
+	if err := setCompOwnershipNFinalizer(transCtx.Component, role); err != nil {
 		return nil, err
 	}
-	return saObj, nil
+	return createOrUpdate(transCtx, role, graphCli, dag, func(old, new *rbacv1.Role) bool {
+		return reflect.DeepEqual(old.Rules, new.Rules)
+	})
 }
 
-func buildRoleBinding(synthesizedComp *component.SynthesizedComponent, comp *appsv1.Component, serviceAccountName string) (*rbacv1.RoleBinding, error) {
-	roleBinding := factory.BuildRoleBinding(synthesizedComp, serviceAccountName)
-	if err := setCompOwnershipNFinalizer(comp, roleBinding); err != nil {
+func createOrUpdateRoleBinding(
+	transCtx *componentTransformContext, cmpdRole *rbacv1.Role, serviceAccountName string, graphCli model.GraphClient, dag *graph.DAG,
+) ([]*rbacv1.RoleBinding, error) {
+	cmpRoleBinding := func(old, new *rbacv1.RoleBinding) bool {
+		return reflect.DeepEqual(old.Subjects, new.Subjects) && reflect.DeepEqual(old.RoleRef, new.RoleRef)
+	}
+	res := make([]*rbacv1.RoleBinding, 0)
+
+	if cmpdRole != nil {
+		cmpdRoleBinding := factory.BuildRoleBinding(transCtx.SynthesizeComponent, &rbacv1.RoleRef{
+			APIGroup: rbacv1.GroupName,
+			Kind:     "ClusterRole",
+			Name:     cmpdRole.Name,
+		}, serviceAccountName)
+		rb, err := createOrUpdate(transCtx, cmpdRoleBinding, graphCli, dag, cmpRoleBinding)
+		if err != nil {
+			return nil, err
+		}
+		res = append(res, rb)
+	}
+
+	clusterPodRoleBinding := factory.BuildRoleBinding(transCtx.SynthesizeComponent, &rbacv1.RoleRef{
+		APIGroup: rbacv1.GroupName,
+		Kind:     "ClusterRole",
+		Name:     constant.RBACRoleName,
+	}, fmt.Sprintf("%v-pod", serviceAccountName))
+	rb, err := createOrUpdate(transCtx, clusterPodRoleBinding, graphCli, dag, cmpRoleBinding)
+	if err != nil {
 		return nil, err
 	}
-	return roleBinding, nil
-}
-
-func createServiceAccount(serviceAccount *corev1.ServiceAccount, graphCli model.GraphClient, dag *graph.DAG, parent client.Object) {
-	// serviceAccount must be created before roleBinding
-	graphCli.Create(dag, serviceAccount, inDataContext4G())
-	graphCli.DependOn(dag, parent, serviceAccount)
+	res = append(res, rb)
+	return res, nil
 }

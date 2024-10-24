@@ -85,29 +85,6 @@ func (t *clusterStatusTransformer) reconcileClusterStatus(transCtx *clusterTrans
 	return nil
 }
 
-// func (t *clusterStatusTransformer) removeDeletedCompNSharding(transCtx *clusterTransformContext, cluster *appsv1.Cluster) {
-//	func() {
-//		tmp := map[string]appsv1.ClusterComponentStatus{}
-//		compsStatus := cluster.Status.Components
-//		for _, v := range transCtx.components {
-//			if status, ok := compsStatus[v.Name]; ok {
-//				tmp[v.Name] = status
-//			}
-//		}
-//		cluster.Status.Components = tmp
-//	}()
-//	func() {
-//		tmp := map[string]appsv1.ClusterComponentStatus{}
-//		shardingsStatus := cluster.Status.Shardings
-//		for _, v := range transCtx.shardings {
-//			if status, ok := shardingsStatus[v.Name]; ok {
-//				tmp[v.Name] = status
-//			}
-//		}
-//		cluster.Status.Shardings = tmp
-//	}()
-// }
-
 func (t *clusterStatusTransformer) reconcileClusterPhase(cluster *appsv1.Cluster) appsv1.ClusterPhase {
 	statusList := make([]appsv1.ClusterComponentStatus, 0)
 	if cluster.Status.Components != nil {
@@ -137,7 +114,7 @@ func (t *clusterStatusTransformer) syncClusterConditions(cluster *appsv1.Cluster
 		"sharding":  cluster.Status.Shardings,
 	} {
 		for name, status := range statusMap {
-			if status.Phase == appsv1.AbnormalClusterCompPhase || status.Phase == appsv1.FailedClusterCompPhase {
+			if status.Phase == appsv1.FailedClusterCompPhase {
 				if _, ok := kindNames[kind]; !ok {
 					kindNames[kind] = []string{}
 				}
@@ -188,7 +165,7 @@ func composeClusterPhase(statusList []appsv1.ClusterComponentStatus) appsv1.Clus
 		if !isPhaseIn(phase, appsv1.FailedClusterCompPhase) {
 			isAllComponentFailed = false
 		}
-		if isPhaseIn(phase, appsv1.AbnormalClusterCompPhase, appsv1.FailedClusterCompPhase) {
+		if isPhaseIn(phase, appsv1.FailedClusterCompPhase) {
 			hasComponentAbnormalOrFailed = true
 		}
 	}

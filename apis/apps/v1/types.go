@@ -44,43 +44,43 @@ const (
 // ClusterComponentPhase defines the phase of a cluster component as represented in cluster.status.components.phase field.
 //
 // +enum
-// +kubebuilder:validation:Enum={Creating,Running,Updating,Stopping,Stopped,Deleting,Failed,Abnormal}
+// +kubebuilder:validation:Enum={Creating,Updating,Stopping,Starting,Deleting,Running,Stopped,Failed}
 type ClusterComponentPhase string
 
 const (
-	// CreatingClusterCompPhase indicates the component is being created.
+	// CreatingClusterCompPhase indicates the component is currently being created.
 	CreatingClusterCompPhase ClusterComponentPhase = "Creating"
 
-	// RunningClusterCompPhase indicates the component has more than zero replicas, and all pods are up-to-date and
-	// in a 'Running' state.
-	RunningClusterCompPhase ClusterComponentPhase = "Running"
-
-	// UpdatingClusterCompPhase indicates the component has more than zero replicas, and there are no failed pods,
-	// it is currently being updated.
+	// UpdatingClusterCompPhase indicates the component is currently being updated.
 	UpdatingClusterCompPhase ClusterComponentPhase = "Updating"
 
-	// StoppingClusterCompPhase indicates the component has zero replicas, and there are pods that are terminating.
+	// StoppingClusterCompPhase indicates the component is currently being stopped.
 	StoppingClusterCompPhase ClusterComponentPhase = "Stopping"
 
-	// StoppedClusterCompPhase indicates the component has zero replicas, and all pods have been deleted.
-	StoppedClusterCompPhase ClusterComponentPhase = "Stopped"
+	// StartingClusterCompPhase indicates the component is currently being started.
+	StartingClusterCompPhase ClusterComponentPhase = "Starting"
 
 	// DeletingClusterCompPhase indicates the component is currently being deleted.
 	DeletingClusterCompPhase ClusterComponentPhase = "Deleting"
 
-	// FailedClusterCompPhase indicates the component has more than zero replicas, but there are some failed pods.
-	// The component is not functioning.
-	FailedClusterCompPhase ClusterComponentPhase = "Failed"
+	// RecoveringClusterCompPhase indicates the component is currently being recovered from some passive exception.
+	RecoveringClusterCompPhase ClusterComponentPhase = "Recovering"
 
-	// AbnormalClusterCompPhase indicates the component has more than zero replicas, but there are some failed pods.
-	// The component is functioning, but it is in a fragile state.
-	AbnormalClusterCompPhase ClusterComponentPhase = "Abnormal"
+	// RunningClusterCompPhase indicates all resources of the component are up-to-date and running w/o any failure.
+	RunningClusterCompPhase ClusterComponentPhase = "Running"
+
+	// StoppedClusterCompPhase indicates the component has been stopped, all Pods belonging to the component are terminated.
+	StoppedClusterCompPhase ClusterComponentPhase = "Stopped"
+
+	// FailedClusterCompPhase indicates the component encountered some error and did not complete successfully.
+	FailedClusterCompPhase ClusterComponentPhase = "Failed"
 )
 
 const (
 	ConditionTypeProvisioningStarted = "ProvisioningStarted" // ConditionTypeProvisioningStarted the operator starts resource provisioning to create or change the cluster
 	ConditionTypeApplyResources      = "ApplyResources"      // ConditionTypeApplyResources the operator start to apply resources to create or change the cluster
 	ConditionTypeReady               = "Ready"               // ConditionTypeReady all components and shardings are running
+	ConditionTypeAvailable           = "Available"           // ConditionTypeAvailable indicates whether the target object is available for serving.
 )
 
 type ServiceRef struct {

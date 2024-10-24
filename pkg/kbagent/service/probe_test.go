@@ -49,7 +49,7 @@ var _ = Describe("probe", func() {
 					PeriodSeconds:       1,
 					SuccessThreshold:    1,
 					FailureThreshold:    1,
-					ReportPeriodSeconds: nil,
+					ReportPeriodSeconds: 0,
 				},
 			}
 
@@ -62,7 +62,6 @@ var _ = Describe("probe", func() {
 			Expect(err).Should(BeNil())
 		})
 
-		// func newProbeService(logger logr.Logger, actionService *actionService, probes []proto.Probe) (*probeService, error) {
 		It("new", func() {
 			service, err := newProbeService(logr.New(nil), actionSvc, probes)
 			Expect(err).Should(BeNil())

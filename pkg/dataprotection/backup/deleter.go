@@ -327,7 +327,7 @@ func (d *Deleter) doPreDeleteAction(
 		envVars = append(envVars, d.actionSet.Spec.Env...)
 	}
 	container := corev1.Container{
-		Name:            backup.Name,
+		Name:            deleteContainerName,
 		Command:         preDeleteAction.Command,
 		Image:           common.Expand(preDeleteAction.Image, common.MappingFuncFor(utils.CovertEnvToMap(envVars))),
 		Env:             envVars,

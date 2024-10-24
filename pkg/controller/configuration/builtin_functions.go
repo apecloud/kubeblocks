@@ -129,35 +129,24 @@ func calMysqlPoolSizeByResource(resource *ResourceDefinition, isShared bool) str
 	}
 
 	// small instance class
-	// mem_size <= 1G or
-	// core <= 2
-	if resource.MemorySize <= smallClassMemorySize {
+	// mem_size < 1G or core < 1
+	if resource.MemorySize < smallClassMemorySize || resource.CoreNum < 1 {
 		return defaultPoolSize
+	}
+
+	if resource.MemorySize == smallClassMemorySize || resource.CoreNum == 1 {
+		return fmt.Sprintf("%dM", minBufferSizeMB*4)
 	}
 
 	memSizeMB := resource.MemorySize / 1024 / 1024
-	maxBufferSize := int32(memSizeMB * 80 / 100)
 	totalMemorySize := memSizeMB
-
 	if !isShared {
 		reverseBuffer := calReverseRebaseBuffer(memSizeMB, resource.CoreNum)
 		totalMemorySize = memSizeMB - reverseBuffer
-
-		// for small instance class
-		if resource.CoreNum <= 2 {
-			totalMemorySize -= 128
-		}
-	}
-
-	if totalMemorySize <= minBufferSizeMB {
-		return defaultPoolSize
 	}
 
 	// (total_memory - reverseBuffer) * 75
 	bufferSize := int32(totalMemorySize * 75 / 100)
-	if bufferSize > maxBufferSize {
-		bufferSize = maxBufferSize
-	}
 
 	// https://dev.mysql.com/doc/refman/8.0/en/innodb-parameters.html#sysvar_innodb_buffer_pool_size
 	// Buffer size require aligned 128MB or 1G
@@ -165,7 +154,6 @@ func calMysqlPoolSizeByResource(resource *ResourceDefinition, isShared bool) str
 	if bufferSize > 1024 {
 		alignedSize = 1024
 	}
-
 	bufferSize /= alignedSize
 	bufferSize *= alignedSize
 	return fmt.Sprintf("%dM", bufferSize)

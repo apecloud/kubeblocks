@@ -128,21 +128,24 @@ func calMysqlPoolSizeByResource(resource *ResourceDefinition, isShared bool) str
 		return defaultPoolSize
 	}
 
-	// small instance class
-	// mem_size < 1G or core < 1
-	if resource.MemorySize < smallClassMemorySize || resource.CoreNum < 1 {
-		return defaultPoolSize
-	}
-
-	if resource.MemorySize == smallClassMemorySize || resource.CoreNum == 1 {
-		return fmt.Sprintf("%dM", minBufferSizeMB*4)
-	}
-
 	memSizeMB := resource.MemorySize / 1024 / 1024
 	totalMemorySize := memSizeMB
 	if !isShared {
 		reverseBuffer := calReverseRebaseBuffer(memSizeMB, resource.CoreNum)
 		totalMemorySize = memSizeMB - reverseBuffer
+	}
+
+	// small instance class
+	// mem_size < 1G
+	if resource.MemorySize < smallClassMemorySize || resource.CoreNum < 1 {
+		return defaultPoolSize
+	}
+
+	if resource.MemorySize == smallClassMemorySize || resource.CoreNum == 1 {
+		if isShared {
+			return fmt.Sprintf("%dM", minBufferSizeMB*4)
+		}
+		return fmt.Sprintf("%dM", minBufferSizeMB*2)
 	}
 
 	// (total_memory - reverseBuffer) * 75

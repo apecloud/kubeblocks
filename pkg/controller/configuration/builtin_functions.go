@@ -163,7 +163,7 @@ func calMysqlPoolSizeByResource(resource *ResourceDefinition, isShared bool) str
 }
 
 // calDBPoolSize for specific engine: mysql
-func calDBPoolSize(args interface{}) (string, error) {
+func calDBPoolSize(args interface{}, isShares ...bool) (string, error) {
 	container, err := fromJSONObject[corev1.Container](args)
 	if err != nil {
 		return "", err
@@ -175,7 +175,11 @@ func calDBPoolSize(args interface{}) (string, error) {
 		MemorySize: intctrlutil.GetMemorySize(*container),
 		CoreNum:    intctrlutil.GetCoreNum(*container),
 	}
-	return calMysqlPoolSizeByResource(&resource, false), nil
+	var isShared bool
+	if len(isShares) > 0 {
+		isShared = isShares[0]
+	}
+	return calMysqlPoolSizeByResource(&resource, isShared), nil
 
 }
 

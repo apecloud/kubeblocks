@@ -91,22 +91,34 @@ spec:
                               Precise selection by providing the exact name of a ComponentDefinition
                               CR.\n2. Flexible and automatic selection of the most
                               up-to-date ComponentDefinition CR\n\t  by specifying
-                              a name prefix or regular expression pattern.\n\n\nOnce
-                              set, this field cannot be updated."
+                              a name prefix or regular expression pattern.\n\n\nCannot
+                              be updated once set."
                             maxLength: 64
                             type: string
                           name:
                             description: |-
                               Defines the unique identifier of the component within the cluster topology.
+
+
                               It follows IANA Service naming rules and is used as part of the Service's DNS name.
                               The name must start with a lowercase letter, can contain lowercase letters, numbers,
                               and hyphens, and must end with a lowercase letter or number.
+
+
+                              If the @template field is set to true, the name will be used as a prefix to match the specific components dynamically created.
 
 
                               Cannot be updated once set.
                             maxLength: 16
                             pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
                             type: string
+                          template:
+                            description: |-
+                              Specifies whether the topology component will be considered as a template for instantiating components upon user requests dynamically.
+
+
+                              Cannot be updated once set.
+                            type: boolean
                         required:
                         - compDef
                         - name

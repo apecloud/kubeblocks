@@ -333,3 +333,7 @@ Define default storage class name, if cloud provider is known, specify a default
 {{- .Values.image.registry }}
 {{- end}}
 {{- end}}
+
+{{- define "kubeblocks.i18nResourcesName" -}}
+{{ include "kubeblocks.fullname" . }}-i18n-resources
+{{- end }}

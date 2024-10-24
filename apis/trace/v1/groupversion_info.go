@@ -17,28 +17,25 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package builder
+// Package v1 contains API Schema definitions for the trace v1 API group
+// +kubebuilder:object:generate=true
+// +groupName=trace.kubeblocks.io
+package v1
 
 import (
-	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"sigs.k8s.io/controller-runtime/pkg/scheme"
 )
 
-type ClusterBuilder struct {
-	BaseBuilder[appsv1.Cluster, *appsv1.Cluster, ClusterBuilder]
-}
+var (
+	// GroupVersion is group version used to register these objects
+	GroupVersion = schema.GroupVersion{Group: "trace.kubeblocks.io", Version: "v1"}
 
-func NewClusterBuilder(namespace, name string) *ClusterBuilder {
-	builder := &ClusterBuilder{}
-	builder.init(namespace, name, &appsv1.Cluster{}, builder)
-	return builder
-}
+	// SchemeBuilder is used to add go types to the GroupVersionKind scheme
+	SchemeBuilder = &scheme.Builder{GroupVersion: GroupVersion}
 
-func (builder *ClusterBuilder) SetComponentSpecs(specs []appsv1.ClusterComponentSpec) *ClusterBuilder {
-	builder.get().Spec.ComponentSpecs = specs
-	return builder
-}
+	// AddToScheme adds the types in this group-version to the given scheme.
+	AddToScheme = SchemeBuilder.AddToScheme
+)
 
-func (builder *ClusterBuilder) SetResourceVersion(resourceVersion string) *ClusterBuilder {
-	builder.get().ResourceVersion = resourceVersion
-	return builder
-}
+const Kind = "ReconciliationTrace"

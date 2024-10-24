@@ -34,10 +34,20 @@ const (
 )
 
 const (
-	StatefulSetKind    = "StatefulSet"
-	PodKind            = "Pod"
-	JobKind            = "Job"
-	VolumeSnapshotKind = "VolumeSnapshot"
+	StatefulSetKind           = "StatefulSet"
+	PodKind                   = "Pod"
+	JobKind                   = "Job"
+	VolumeSnapshotKind        = "VolumeSnapshot"
+	ServiceKind               = "Service"
+	SecretKind                = "Secret"
+	ConfigMapKind             = "ConfigMap"
+	PersistentVolumeClaimKind = "PersistentVolumeClaim"
+	PersistentVolumeKind      = "PersistentVolume"
+	ConfigurationKind         = "Configuration"
+	ClusterRoleBindingKind    = "ClusterRoleBinding"
+	RoleBindingKind           = "RoleBinding"
+	ServiceAccountKind        = "ServiceAccount"
+	EventKind                 = "Event"
 )
 
 // username and password are keys in created secrets for others to refer to.
@@ -67,3 +77,8 @@ const (
 const InvalidContainerPort int32 = 0
 
 const EmptyInsTemplateName = ""
+
+type Key string
+
+// DryRunContextKey tells the KB Controllers to do dry-run reconciliations
+const DryRunContextKey Key = "dry-run"

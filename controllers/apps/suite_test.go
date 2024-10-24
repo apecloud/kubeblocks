@@ -208,6 +208,13 @@ var _ = BeforeSuite(func() {
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
+	err = (&SidecarDefinitionReconciler{
+		Client:   k8sManager.GetClient(),
+		Scheme:   k8sManager.GetScheme(),
+		Recorder: k8sManager.GetEventRecorderFor("sidecar-definition-controller"),
+	}).SetupWithManager(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
 	clusterRecorder = k8sManager.GetEventRecorderFor("cluster-controller")
 	err = (&ClusterReconciler{
 		Client:   k8sManager.GetClient(),

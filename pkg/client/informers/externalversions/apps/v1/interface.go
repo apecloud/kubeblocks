@@ -38,6 +38,8 @@ type Interface interface {
 	ServiceDescriptors() ServiceDescriptorInformer
 	// ShardingDefinitions returns a ShardingDefinitionInformer.
 	ShardingDefinitions() ShardingDefinitionInformer
+	// SidecarDefinitions returns a SidecarDefinitionInformer.
+	SidecarDefinitions() SidecarDefinitionInformer
 }
 
 type version struct {
@@ -84,4 +86,9 @@ func (v *version) ServiceDescriptors() ServiceDescriptorInformer {
 // ShardingDefinitions returns a ShardingDefinitionInformer.
 func (v *version) ShardingDefinitions() ShardingDefinitionInformer {
 	return &shardingDefinitionInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+}
+
+// SidecarDefinitions returns a SidecarDefinitionInformer.
+func (v *version) SidecarDefinitions() SidecarDefinitionInformer {
+	return &sidecarDefinitionInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }

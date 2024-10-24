@@ -108,6 +108,10 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 		PodUpdatePolicy:                  comp.Spec.PodUpdatePolicy,
 	}
 
+	if err = buildSidecars(ctx, cli, comp, synthesizeComp); err != nil {
+		return nil, err
+	}
+
 	buildCompatibleHorizontalScalePolicy(compDefObj, synthesizeComp)
 
 	if err = mergeUserDefinedEnv(synthesizeComp, comp); err != nil {

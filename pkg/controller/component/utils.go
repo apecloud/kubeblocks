@@ -67,6 +67,30 @@ func PrefixOrRegexMatched(defName, defNamePattern string) bool {
 	return regex.MatchString(defName)
 }
 
+func DefNameMatched(defName, defNamePattern string) bool {
+	if defName == defNamePattern {
+		return true
+	}
+
+	isRegexpPattern := func(pattern string) bool {
+		escapedPattern := regexp.QuoteMeta(pattern)
+		return escapedPattern != pattern
+	}
+
+	isRegex := false
+	regex, err := regexp.Compile(defNamePattern)
+	if err == nil {
+		// distinguishing between regular expressions and ordinary strings.
+		if isRegexpPattern(defNamePattern) {
+			isRegex = true
+		}
+	}
+	if !isRegex {
+		return false
+	}
+	return regex.MatchString(defName)
+}
+
 func IsHostNetworkEnabled(synthesizedComp *SynthesizedComponent) bool {
 	if !hasHostNetworkCapability(synthesizedComp, nil) {
 		return false

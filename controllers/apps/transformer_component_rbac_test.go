@@ -20,10 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"fmt"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/types"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -41,7 +44,7 @@ var _ = Describe("object rbac transformer test.", func() {
 	const compDefName = "test-compdef"
 	const clusterName = "test-cluster"
 	const compName = "default"
-	var serviceAccountName = constant.GenerateDefaultServiceAccountName(clusterName)
+	var serviceAccountName = ""
 
 	var transCtx graph.TransformContext
 	var dag *graph.DAG
@@ -51,23 +54,36 @@ var _ = Describe("object rbac transformer test.", func() {
 	var compDefObj *appsv1.ComponentDefinition
 	var compObj *appsv1.Component
 	var synthesizedComp *component.SynthesizedComponent
-	var saKey types.NamespacedName
 	var allSettings map[string]interface{}
 
-	BeforeEach(func() {
+	init := func(enableLifecycleAction bool, enablePolicyRules bool) {
 		By("Create a component definition")
-		compDefObj = testapps.NewComponentDefinitionFactory(compDefName).
+		compDefFactory := testapps.NewComponentDefinitionFactory(compDefName).
 			WithRandomName().
 			SetDefaultSpec().
-			Create(&testCtx).
-			GetObject()
+			Create(&testCtx)
+
+		// default spec has some lifecycle actions
+		if !enableLifecycleAction {
+			compDefFactory.Get().Spec.LifecycleActions = nil
+		}
+
+		if enablePolicyRules {
+			compDefFactory.SetPolicyRules([]rbacv1.PolicyRule{
+				{
+					APIGroups: []string{""},
+					Resources: []string{"pod"},
+					Verbs:     []string{"get", "list", "watch"},
+				},
+			})
+		}
+		compDefObj = compDefFactory.GetObject()
 
 		By("Creating a cluster")
 		cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
 			WithRandomName().
 			AddComponent(compName, compDefName).
 			SetReplicas(1).
-			SetServiceAccountName(serviceAccountName).
 			GetObject()
 
 		By("Creating a component")
@@ -76,24 +92,19 @@ var _ = Describe("object rbac transformer test.", func() {
 			AddAnnotations(constant.KBAppClusterUIDKey, string(cluster.UID)).
 			AddLabels(constant.AppInstanceLabelKey, cluster.Name).
 			SetReplicas(1).
-			SetServiceAccountName(serviceAccountName).
 			GetObject()
-
-		saKey = types.NamespacedName{
-			Namespace: testCtx.DefaultNamespace,
-			Name:      serviceAccountName,
-		}
 
 		graphCli = model.NewGraphClient(k8sClient)
 
 		var err error
+		serviceAccountName = constant.GenerateDefaultServiceAccountName(cluster.Name, compName)
 		synthesizedComp, err = component.BuildSynthesizedComponent(ctx, k8sClient, compDefObj, compObj, cluster)
 		Expect(err).Should(Succeed())
 
 		transCtx = &componentTransformContext{
 			Context:             ctx,
 			Client:              graphCli,
-			EventRecorder:       nil,
+			EventRecorder:       clusterRecorder,
 			Logger:              logger,
 			Cluster:             cluster,
 			CompDef:             compDefObj,
@@ -104,6 +115,16 @@ var _ = Describe("object rbac transformer test.", func() {
 
 		dag = mockDAG(graphCli, cluster)
 		transformer = &componentRBACTransformer{}
+
+		saKey := types.NamespacedName{
+			Namespace: testCtx.DefaultNamespace,
+			Name:      serviceAccountName,
+		}
+		Eventually(testapps.CheckObjExists(&testCtx, saKey,
+			&corev1.ServiceAccount{}, false)).Should(Succeed())
+	}
+
+	BeforeEach(func() {
 		allSettings = viper.AllSettings()
 		viper.SetDefault(constant.EnableRBACManager, true)
 	})
@@ -117,18 +138,49 @@ var _ = Describe("object rbac transformer test.", func() {
 	})
 
 	Context("transformer rbac manager", func() {
-		It("create serviceaccount, rolebinding if not exist", func() {
-			Eventually(testapps.CheckObjExists(&testCtx, saKey,
-				&corev1.ServiceAccount{}, false)).Should(Succeed())
+		It("w/o any rolebindings", func() {
+			init(false, false)
 			Expect(transformer.Transform(transCtx, dag)).Should(BeNil())
+			// nothing should be created
+			dagExpected := mockDAG(graphCli, cluster)
+			Expect(dag.Equals(dagExpected, model.DefaultLess)).Should(BeTrue())
+		})
 
+		It("w/ lifecycle actions", func() {
+			init(true, false)
+			Expect(transformer.Transform(transCtx, dag)).Should(BeNil())
+			clusterPodRoleBinding := factory.BuildRoleBinding(synthesizedComp, fmt.Sprintf("%v-pod", serviceAccountName), &rbacv1.RoleRef{
+				APIGroup: rbacv1.GroupName,
+				Kind:     "ClusterRole",
+				Name:     constant.RBACRoleName,
+			}, serviceAccountName)
 			serviceAccount := factory.BuildServiceAccount(synthesizedComp, serviceAccountName)
-			roleBinding := factory.BuildRoleBinding(synthesizedComp, serviceAccount.Name)
-
 			dagExpected := mockDAG(graphCli, cluster)
 			graphCli.Create(dagExpected, serviceAccount)
-			graphCli.Create(dagExpected, roleBinding)
-			graphCli.DependOn(dagExpected, roleBinding, serviceAccount)
+			graphCli.Create(dagExpected, clusterPodRoleBinding)
+			graphCli.DependOn(dagExpected, clusterPodRoleBinding, serviceAccount)
+			itsList := graphCli.FindAll(dagExpected, &workloads.InstanceSet{})
+			for i := range itsList {
+				graphCli.DependOn(dagExpected, itsList[i], serviceAccount)
+			}
+			Expect(dag.Equals(dagExpected, model.DefaultLess)).Should(BeTrue())
+		})
+
+		It("w/ cmpd's PolicyRules", func() {
+			init(false, true)
+			Expect(transformer.Transform(transCtx, dag)).Should(BeNil())
+			cmpdRole := factory.BuildComponentRole(synthesizedComp, compDefObj, serviceAccountName)
+			cmpdRoleBinding := factory.BuildRoleBinding(synthesizedComp, serviceAccountName, &rbacv1.RoleRef{
+				APIGroup: rbacv1.GroupName,
+				Kind:     "Role",
+				Name:     constant.RBACRoleName,
+			}, serviceAccountName)
+			serviceAccount := factory.BuildServiceAccount(synthesizedComp, serviceAccountName)
+			dagExpected := mockDAG(graphCli, cluster)
+			graphCli.Create(dagExpected, serviceAccount)
+			graphCli.Create(dagExpected, cmpdRoleBinding)
+			graphCli.Create(dagExpected, cmpdRole)
+			graphCli.DependOn(dagExpected, cmpdRoleBinding, serviceAccount, cmpdRole)
 			itsList := graphCli.FindAll(dagExpected, &workloads.InstanceSet{})
 			for i := range itsList {
 				graphCli.DependOn(dagExpected, itsList[i], serviceAccount)

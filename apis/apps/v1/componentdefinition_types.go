@@ -469,8 +469,6 @@ type ComponentDefinitionSpec struct {
 	// for the Component based on the specified policy rules.
 	// This ensures that the Pods in the Component has appropriate permissions to function.
 	//
-	// Note: This field is currently non-functional and is reserved for future implementation.
-	//
 	// This field is immutable.
 	//
 	// +optional

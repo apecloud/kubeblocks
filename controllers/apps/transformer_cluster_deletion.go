@@ -21,13 +21,11 @@ package apps
 
 import (
 	"fmt"
-	"reflect"
 	"strings"
 	"time"
 
 	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
-	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -172,26 +170,6 @@ func shouldSkipObjOwnedByComp(obj client.Object, cluster kbappsv1.Cluster) bool 
 		return false
 	}
 
-	// Due to compatibility reasons, the component controller creates cluster-scoped RoleBinding and ServiceAccount objects in the following two scenarios:
-	// 1. When the user does not specify a ServiceAccount, KubeBlocks automatically creates a ServiceAccount and a RoleBinding with named pattern kb-{cluster.Name}.
-	// 2. When the user specifies a ServiceAccount that does not exist, KubeBlocks will automatically create a ServiceAccount and a RoleBinding with the same name.
-	// In both cases, the lifecycle of the RoleBinding and ServiceAccount should not be tied to the component. They should be deleted when the cluster is deleted.
-	doNotSkipTypes := []interface{}{
-		&rbacv1.RoleBinding{},
-		&corev1.ServiceAccount{},
-	}
-	for _, t := range doNotSkipTypes {
-		if objType, ok := obj.(interface{ GetName() string }); ok && reflect.TypeOf(obj) == reflect.TypeOf(t) {
-			if strings.EqualFold(objType.GetName(), constant.GenerateDefaultServiceAccountName(cluster.GetName())) {
-				return false
-			}
-			labels := obj.GetLabels()
-			value, ok := labels[constant.AppManagedByLabelKey]
-			if ok && value == constant.AppName {
-				return false
-			}
-		}
-	}
 	return true
 }
 

@@ -75,8 +75,8 @@ func GenerateClusterComponentEnvPattern(clusterName, compName string) string {
 }
 
 // GenerateDefaultServiceAccountName generates default service account name for a cluster.
-func GenerateDefaultServiceAccountName(name string) string {
-	return fmt.Sprintf("%s-%s", KBLowerPrefix, name)
+func GenerateDefaultServiceAccountName(clusterName, compName string) string {
+	return fmt.Sprintf("%s-%s-%s", KBLowerPrefix, clusterName, compName)
 }
 
 // GenerateWorkloadNamePattern generates the workload name pattern

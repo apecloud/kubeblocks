@@ -22,21 +22,19 @@ package apps
 import (
 	"fmt"
 	"reflect"
-	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	ictrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -45,6 +43,8 @@ import (
 type componentRBACTransformer struct{}
 
 var _ graph.Transformer = &componentRBACTransformer{}
+
+const EventReasonRBACManager = "RBACManager"
 
 func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*componentTransformContext)
@@ -57,6 +57,11 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 		return nil
 	}
 
+	if !viper.GetBool(constant.EnableRBACManager) {
+		transCtx.EventRecorder.Event(transCtx.Cluster, corev1.EventTypeWarning, EventReasonRBACManager, "RBAC manager is disabled")
+		return nil
+	}
+
 	if transCtx.Component.Spec.ServiceAccountName != "" {
 		// user specifies a serviceaccount, nothing to do
 		return nil
@@ -66,25 +71,25 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 	synthesizedComp := transCtx.SynthesizeComponent
 	serviceAccountName := constant.GenerateDefaultServiceAccountName(synthesizedComp.ClusterName, synthesizedComp.Name)
 
-	if !isServiceAccountExist(transCtx, serviceAccountName) &&
-		!viper.GetBool(constant.EnableRBACManager) {
-		transCtx.Logger.V(1).Info("rbac manager is disabled")
-		transCtx.EventRecorder.Event(transCtx.Cluster, corev1.EventTypeWarning,
-			string(ictrlutil.ErrorTypeNotFound), fmt.Sprintf("ServiceAccount %s does not exist", serviceAccountName))
-		return ictrlutil.NewRequeueError(time.Second, "RBAC manager is disabled, but service account does not exist")
+	role, err := createOrUpdateRole(transCtx, serviceAccountName, graphCli, dag)
+	if err != nil {
+		return err
+	}
+
+	rbs, err := createOrUpdateRoleBinding(transCtx, role, serviceAccountName, graphCli, dag)
+	if err != nil {
+		return err
+	}
+
+	if len(rbs) == 0 {
+		transCtx.EventRecorder.Event(
+			transCtx.Cluster, corev1.EventTypeNormal, EventReasonRBACManager,
+			"no rolebinding needed, serviceaccount won't be created",
+		)
+		return nil
 	}
 
 	sa, err := createOrUpdateServiceAccount(transCtx, serviceAccountName, graphCli, dag)
-	if err != nil {
-		return err
-	}
-
-	role, err := createOrUpdateRole(transCtx, sa.Name, graphCli, dag)
-	if err != nil {
-		return err
-	}
-
-	rbs, err := createOrUpdateRoleBinding(transCtx, role, sa.Name, graphCli, dag)
 	if err != nil {
 		return err
 	}
@@ -102,24 +107,8 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 	return nil
 }
 
-func isServiceAccountExist(transCtx *componentTransformContext, serviceAccountName string) bool {
-	synthesizedComp := transCtx.SynthesizeComponent
-	namespaceName := types.NamespacedName{
-		Namespace: synthesizedComp.Namespace,
-		Name:      serviceAccountName,
-	}
-	sa := &corev1.ServiceAccount{}
-	if err := transCtx.Client.Get(transCtx.Context, namespaceName, sa, inDataContext4C()); err != nil {
-		// KubeBlocks will create a rolebinding only if it has RBAC access priority and
-		// the rolebinding is not already present.
-		if errors.IsNotFound(err) {
-			transCtx.Logger.V(1).Info("ServiceAccount not exists", "namespaceName", namespaceName)
-			return false
-		}
-		transCtx.Logger.Error(err, "get ServiceAccount failed")
-		return false
-	}
-	return true
+func isLifecycleActionsEnabled(compDef *appsv1.ComponentDefinition) bool {
+	return compDef.Spec.LifecycleActions != nil
 }
 
 func createOrUpdate[T any, PT generics.PObject[T]](
@@ -190,15 +179,18 @@ func createOrUpdateRoleBinding(
 		res = append(res, rb)
 	}
 
-	clusterPodRoleBinding := factory.BuildRoleBinding(transCtx.SynthesizeComponent, &rbacv1.RoleRef{
-		APIGroup: rbacv1.GroupName,
-		Kind:     "ClusterRole",
-		Name:     constant.RBACRoleName,
-	}, fmt.Sprintf("%v-pod", serviceAccountName))
-	rb, err := createOrUpdate(transCtx, clusterPodRoleBinding, graphCli, dag, cmpRoleBinding)
-	if err != nil {
-		return nil, err
+	if isLifecycleActionsEnabled(transCtx.CompDef) {
+		clusterPodRoleBinding := factory.BuildRoleBinding(transCtx.SynthesizeComponent, &rbacv1.RoleRef{
+			APIGroup: rbacv1.GroupName,
+			Kind:     "ClusterRole",
+			Name:     constant.RBACRoleName,
+		}, fmt.Sprintf("%v-pod", serviceAccountName))
+		rb, err := createOrUpdate(transCtx, clusterPodRoleBinding, graphCli, dag, cmpRoleBinding)
+		if err != nil {
+			return nil, err
+		}
+		res = append(res, rb)
 	}
-	res = append(res, rb)
+
 	return res, nil
 }

@@ -149,7 +149,7 @@ var _ = Describe("object rbac transformer test.", func() {
 		It("w/ lifecycle actions", func() {
 			init(true, false)
 			Expect(transformer.Transform(transCtx, dag)).Should(BeNil())
-			clusterPodRoleBinding := factory.BuildRoleBinding(synthesizedComp, serviceAccountName, &rbacv1.RoleRef{
+			clusterPodRoleBinding := factory.BuildRoleBinding(synthesizedComp, fmt.Sprintf("%v-pod", serviceAccountName), &rbacv1.RoleRef{
 				APIGroup: rbacv1.GroupName,
 				Kind:     "ClusterRole",
 				Name:     constant.RBACRoleName,
@@ -166,11 +166,11 @@ var _ = Describe("object rbac transformer test.", func() {
 			Expect(dag.Equals(dagExpected, model.DefaultLess)).Should(BeTrue())
 		})
 
-		FIt("w/ cmpd's PolicyRules", func() {
+		It("w/ cmpd's PolicyRules", func() {
 			init(false, true)
 			Expect(transformer.Transform(transCtx, dag)).Should(BeNil())
 			cmpdRole := factory.BuildComponentRole(synthesizedComp, compDefObj, serviceAccountName)
-			cmpdRoleBinding := factory.BuildRoleBinding(synthesizedComp, fmt.Sprintf("%v-pod", serviceAccountName), &rbacv1.RoleRef{
+			cmpdRoleBinding := factory.BuildRoleBinding(synthesizedComp, serviceAccountName, &rbacv1.RoleRef{
 				APIGroup: rbacv1.GroupName,
 				Kind:     "Role",
 				Name:     constant.RBACRoleName,

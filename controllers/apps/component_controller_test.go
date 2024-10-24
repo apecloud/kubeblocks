@@ -50,6 +50,7 @@ import (
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/plan"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -1421,13 +1422,7 @@ var _ = Describe("Component Controller", func() {
 		Eventually(testapps.CheckObjExists(&testCtx, rbKey, &rbacv1.RoleBinding{}, expectExisted)).Should(Succeed())
 	}
 
-	testCompRBAC := func(compName, compDefName, saName string) {
-		By("update comp definition to enable lifecycle actions")
-		Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(compDefObj), func(compDef *kbappsv1.ComponentDefinition) {
-			compDef.Spec.LifecycleActions.Readonly = testapps.NewLifecycleAction("readonly")
-			compDef.Spec.LifecycleActions.Readwrite = testapps.NewLifecycleAction("readwrite")
-		})()).Should(Succeed())
-
+	testCompRBAC := func(compName, compDefName, saName string, rbacResourceCreated bool) {
 		By("creating a component with target service account name")
 		if len(saName) == 0 {
 			createClusterObj(compName, compDefName, nil)
@@ -1447,12 +1442,12 @@ var _ = Describe("Component Controller", func() {
 			g.Expect(its.Spec.Template.Spec.ServiceAccountName).To(Equal(saName))
 		})).Should(Succeed())
 
-		By("check the RBAC resources created")
-		checkRBACResourcesExistence(saName, fmt.Sprintf("%v-pod", saName), true)
+		By("check the RBAC resources status")
+		checkRBACResourcesExistence(saName, fmt.Sprintf("%v-pod", saName), rbacResourceCreated)
 	}
 
 	testRecreateCompWithRBACCreateByKubeBlocks := func(compName, compDefName string) {
-		testCompRBAC(compName, compDefName, "")
+		testCompRBAC(compName, compDefName, "", true)
 
 		By("delete the cluster(component)")
 		testapps.DeleteObject(&testCtx, clusterKey, &kbappsv1.Cluster{})
@@ -1463,35 +1458,36 @@ var _ = Describe("Component Controller", func() {
 		checkRBACResourcesExistence(saName, fmt.Sprintf("%v-pod", saName), false)
 
 		By("re-create cluster(component) with same name")
-		testCompRBAC(compName, compDefName, "")
+		testCompRBAC(compName, compDefName, "", true)
 	}
 
 	tesCreateCompWithRBACCreateByUser := func(compName, compDefName string) {
 		saName := "test-sa-exist" + randomStr()
 
-		testCompRBAC(compName, compDefName, saName)
+		testCompRBAC(compName, compDefName, saName, false)
 
-		saKey := types.NamespacedName{
-			Namespace: compObj.Namespace,
-			Name:      saName,
-		}
-		By("mock the ServiceAccount and RoleBinding created by user by setting annotations to nil")
-		Eventually(testapps.GetAndChangeObj(&testCtx, saKey, func(sa *corev1.ServiceAccount) {
-			sa.Annotations = nil
-		})).Should(Succeed())
-		rbKey := types.NamespacedName{
-			Namespace: compObj.Namespace,
-			Name:      saName,
-		}
-		Eventually(testapps.GetAndChangeObj(&testCtx, rbKey, func(rb *rbacv1.RoleBinding) {
-			rb.Annotations = nil
-		})).Should(Succeed())
+		By("user manually creates ServiceAccount and RoleBinding")
+		sa := builder.NewServiceAccountBuilder(compObj.Namespace, saName).GetObject()
+		testapps.CheckedCreateK8sResource(&testCtx, sa)
+		rb := builder.NewRoleBindingBuilder(compObj.Namespace, saName).
+			SetRoleRef(rbacv1.RoleRef{
+				APIGroup: rbacv1.GroupName,
+				Kind:     "Role",
+				Name:     constant.RBACRoleName,
+			}).
+			AddSubjects(rbacv1.Subject{
+				Kind:      rbacv1.ServiceAccountKind,
+				Namespace: compObj.Namespace,
+				Name:      saName,
+			}).
+			GetObject()
+		testapps.CheckedCreateK8sResource(&testCtx, rb)
 
 		By("delete the cluster(component)")
 		testapps.DeleteObject(&testCtx, clusterKey, &kbappsv1.Cluster{})
 		Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &kbappsv1.Cluster{}, true)).Should(Succeed())
 
-		By("check the RBAC resources deleted")
+		By("check the RBAC resources not deleted")
 		checkRBACResourcesExistence(saName, saName, true)
 	}
 
@@ -1794,7 +1790,7 @@ var _ = Describe("Component Controller", func() {
 		})
 
 		It("with component RBAC set", func() {
-			testCompRBAC(defaultCompName, compDefName, "")
+			testCompRBAC(defaultCompName, compDefName, "", true)
 		})
 
 		It("re-create component with custom RBAC which is not exist and auto created by KubeBlocks", func() {

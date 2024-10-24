@@ -41,7 +41,6 @@ import (
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
-	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
 	workloadsv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
@@ -121,7 +120,6 @@ func init() {
 	model.AddScheme(snapshotv1beta1.AddToScheme)
 	model.AddScheme(extensionsv1alpha1.AddToScheme)
 	model.AddScheme(workloadsv1alpha1.AddToScheme)
-	model.AddScheme(storagev1alpha1.AddToScheme)
 	model.AddScheme(appsv1beta1.AddToScheme)
 }
 

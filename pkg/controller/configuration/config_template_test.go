@@ -380,7 +380,7 @@ true
 				CoreNum:    2,
 			}, false)).Should(Equal("384M"))
 
-			// for shard
+			// for share
 			Expect(calMysqlPoolSizeByResource(&ResourceDefinition{
 				MemorySize: 1024 * 1024 * 0.5,
 				CoreNum:    1,

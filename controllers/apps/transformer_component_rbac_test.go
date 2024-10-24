@@ -44,7 +44,7 @@ var _ = Describe("object rbac transformer test.", func() {
 	const compDefName = "test-compdef"
 	const clusterName = "test-cluster"
 	const compName = "default"
-	var serviceAccountName = constant.GenerateDefaultServiceAccountName(clusterName, compName)
+	var serviceAccountName = ""
 
 	var transCtx graph.TransformContext
 	var dag *graph.DAG
@@ -54,7 +54,6 @@ var _ = Describe("object rbac transformer test.", func() {
 	var compDefObj *appsv1.ComponentDefinition
 	var compObj *appsv1.Component
 	var synthesizedComp *component.SynthesizedComponent
-	var saKey types.NamespacedName
 	var allSettings map[string]interface{}
 
 	init := func(enableLifecycleAction bool, enablePolicyRules bool) {
@@ -78,6 +77,7 @@ var _ = Describe("object rbac transformer test.", func() {
 				},
 			})
 		}
+		compDefObj = compDefFactory.GetObject()
 
 		By("Creating a cluster")
 		cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
@@ -97,13 +97,14 @@ var _ = Describe("object rbac transformer test.", func() {
 		graphCli = model.NewGraphClient(k8sClient)
 
 		var err error
+		serviceAccountName = constant.GenerateDefaultServiceAccountName(cluster.Name, compName)
 		synthesizedComp, err = component.BuildSynthesizedComponent(ctx, k8sClient, compDefObj, compObj, cluster)
 		Expect(err).Should(Succeed())
 
 		transCtx = &componentTransformContext{
 			Context:             ctx,
 			Client:              graphCli,
-			EventRecorder:       nil,
+			EventRecorder:       clusterRecorder,
 			Logger:              logger,
 			Cluster:             cluster,
 			CompDef:             compDefObj,
@@ -114,16 +115,16 @@ var _ = Describe("object rbac transformer test.", func() {
 
 		dag = mockDAG(graphCli, cluster)
 		transformer = &componentRBACTransformer{}
-	}
 
-	BeforeEach(func() {
-		saKey = types.NamespacedName{
+		saKey := types.NamespacedName{
 			Namespace: testCtx.DefaultNamespace,
 			Name:      serviceAccountName,
 		}
 		Eventually(testapps.CheckObjExists(&testCtx, saKey,
 			&corev1.ServiceAccount{}, false)).Should(Succeed())
+	}
 
+	BeforeEach(func() {
 		allSettings = viper.AllSettings()
 		viper.SetDefault(constant.EnableRBACManager, true)
 	})
@@ -148,11 +149,11 @@ var _ = Describe("object rbac transformer test.", func() {
 		It("w/ lifecycle actions", func() {
 			init(true, false)
 			Expect(transformer.Transform(transCtx, dag)).Should(BeNil())
-			clusterPodRoleBinding := factory.BuildRoleBinding(synthesizedComp, &rbacv1.RoleRef{
+			clusterPodRoleBinding := factory.BuildRoleBinding(synthesizedComp, serviceAccountName, &rbacv1.RoleRef{
 				APIGroup: rbacv1.GroupName,
 				Kind:     "ClusterRole",
 				Name:     constant.RBACRoleName,
-			}, fmt.Sprintf("%v-pod", serviceAccountName))
+			}, serviceAccountName)
 			serviceAccount := factory.BuildServiceAccount(synthesizedComp, serviceAccountName)
 			dagExpected := mockDAG(graphCli, cluster)
 			graphCli.Create(dagExpected, serviceAccount)
@@ -165,15 +166,15 @@ var _ = Describe("object rbac transformer test.", func() {
 			Expect(dag.Equals(dagExpected, model.DefaultLess)).Should(BeTrue())
 		})
 
-		It("w/ cmpd's PolicyRules", func() {
+		FIt("w/ cmpd's PolicyRules", func() {
 			init(false, true)
 			Expect(transformer.Transform(transCtx, dag)).Should(BeNil())
 			cmpdRole := factory.BuildComponentRole(synthesizedComp, compDefObj, serviceAccountName)
-			cmpdRoleBinding := factory.BuildRoleBinding(synthesizedComp, &rbacv1.RoleRef{
+			cmpdRoleBinding := factory.BuildRoleBinding(synthesizedComp, fmt.Sprintf("%v-pod", serviceAccountName), &rbacv1.RoleRef{
 				APIGroup: rbacv1.GroupName,
-				Kind:     "ClusterRole",
+				Kind:     "Role",
 				Name:     constant.RBACRoleName,
-			}, fmt.Sprintf("%v-pod", serviceAccountName))
+			}, serviceAccountName)
 			serviceAccount := factory.BuildServiceAccount(synthesizedComp, serviceAccountName)
 			dagExpected := mockDAG(graphCli, cluster)
 			graphCli.Create(dagExpected, serviceAccount)

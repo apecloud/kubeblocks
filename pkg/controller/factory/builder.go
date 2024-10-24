@@ -374,8 +374,8 @@ func BuildServiceAccount(synthesizedComp *component.SynthesizedComponent, saName
 		GetObject()
 }
 
-func BuildRoleBinding(synthesizedComp *component.SynthesizedComponent, roleRef *rbacv1.RoleRef, saName string) *rbacv1.RoleBinding {
-	return builder.NewRoleBindingBuilder(synthesizedComp.Namespace, saName).
+func BuildRoleBinding(synthesizedComp *component.SynthesizedComponent, name string, roleRef *rbacv1.RoleRef, saName string) *rbacv1.RoleBinding {
+	return builder.NewRoleBindingBuilder(synthesizedComp.Namespace, name).
 		AddLabelsInMap(constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name)).
 		AddLabelsInMap(synthesizedComp.StaticLabels).
 		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).

@@ -96,7 +96,11 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 
 	// serviceAccount should be created before roleBinding and role
 	for _, rb := range rbs {
-		graphCli.DependOn(dag, rb, sa, role)
+		if role == nil {
+			graphCli.DependOn(dag, rb, sa)
+		} else {
+			graphCli.DependOn(dag, rb, sa, role)
+		}
 	}
 	// serviceAccount should be created before workload
 	itsList := graphCli.FindAll(dag, &workloads.InstanceSet{})
@@ -167,7 +171,7 @@ func createOrUpdateRoleBinding(
 	res := make([]*rbacv1.RoleBinding, 0)
 
 	if cmpdRole != nil {
-		cmpdRoleBinding := factory.BuildRoleBinding(transCtx.SynthesizeComponent, &rbacv1.RoleRef{
+		cmpdRoleBinding := factory.BuildRoleBinding(transCtx.SynthesizeComponent, serviceAccountName, &rbacv1.RoleRef{
 			APIGroup: rbacv1.GroupName,
 			Kind:     "ClusterRole",
 			Name:     cmpdRole.Name,
@@ -180,11 +184,16 @@ func createOrUpdateRoleBinding(
 	}
 
 	if isLifecycleActionsEnabled(transCtx.CompDef) {
-		clusterPodRoleBinding := factory.BuildRoleBinding(transCtx.SynthesizeComponent, &rbacv1.RoleRef{
-			APIGroup: rbacv1.GroupName,
-			Kind:     "ClusterRole",
-			Name:     constant.RBACRoleName,
-		}, fmt.Sprintf("%v-pod", serviceAccountName))
+		clusterPodRoleBinding := factory.BuildRoleBinding(
+			transCtx.SynthesizeComponent,
+			fmt.Sprintf("%v-pod", serviceAccountName),
+			&rbacv1.RoleRef{
+				APIGroup: rbacv1.GroupName,
+				Kind:     "ClusterRole",
+				Name:     constant.RBACRoleName,
+			},
+			serviceAccountName,
+		)
 		rb, err := createOrUpdate(transCtx, clusterPodRoleBinding, graphCli, dag, cmpRoleBinding)
 		if err != nil {
 			return nil, err

@@ -1408,14 +1408,14 @@ var _ = Describe("Component Controller", func() {
 	testCompConfiguration := func(compName, compDefName string) {
 	}
 
-	checkRBACResourcesExistence := func(saName string, expectExisted bool) {
+	checkRBACResourcesExistence := func(saName, rbName string, expectExisted bool) {
 		saKey := types.NamespacedName{
 			Namespace: compObj.Namespace,
 			Name:      saName,
 		}
 		rbKey := types.NamespacedName{
 			Namespace: compObj.Namespace,
-			Name:      saName,
+			Name:      rbName,
 		}
 		Eventually(testapps.CheckObjExists(&testCtx, saKey, &corev1.ServiceAccount{}, expectExisted)).Should(Succeed())
 		Eventually(testapps.CheckObjExists(&testCtx, rbKey, &rbacv1.RoleBinding{}, expectExisted)).Should(Succeed())
@@ -1430,11 +1430,13 @@ var _ = Describe("Component Controller", func() {
 
 		By("creating a component with target service account name")
 		if len(saName) == 0 {
-			saName = "test-sa-" + randomStr()
+			createClusterObj(compName, compDefName, nil)
+			saName = constant.GenerateDefaultServiceAccountName(clusterObj.Name, compName)
+		} else {
+			createClusterObj(compName, compDefName, func(f *testapps.MockClusterFactory) {
+				f.SetServiceAccountName(saName)
+			})
 		}
-		createClusterObj(compName, compDefName, func(f *testapps.MockClusterFactory) {
-			f.SetServiceAccountName(saName)
-		})
 
 		By("check the service account used in Pod")
 		itsKey := types.NamespacedName{
@@ -1446,22 +1448,22 @@ var _ = Describe("Component Controller", func() {
 		})).Should(Succeed())
 
 		By("check the RBAC resources created")
-		checkRBACResourcesExistence(saName, true)
+		checkRBACResourcesExistence(saName, fmt.Sprintf("%v-pod", saName), true)
 	}
 
 	testRecreateCompWithRBACCreateByKubeBlocks := func(compName, compDefName string) {
-		saName := "test-sa-" + randomStr()
-		testCompRBAC(compName, compDefName, saName)
+		testCompRBAC(compName, compDefName, "")
 
 		By("delete the cluster(component)")
 		testapps.DeleteObject(&testCtx, clusterKey, &kbappsv1.Cluster{})
 		Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &kbappsv1.Cluster{}, false)).Should(Succeed())
 
 		By("check the RBAC resources deleted")
-		checkRBACResourcesExistence(saName, false)
+		saName := constant.GenerateDefaultServiceAccountName(clusterObj.Name, compName)
+		checkRBACResourcesExistence(saName, fmt.Sprintf("%v-pod", saName), false)
 
 		By("re-create cluster(component) with same name")
-		testCompRBAC(compName, compDefName, saName)
+		testCompRBAC(compName, compDefName, "")
 	}
 
 	tesCreateCompWithRBACCreateByUser := func(compName, compDefName string) {
@@ -1490,7 +1492,7 @@ var _ = Describe("Component Controller", func() {
 		Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &kbappsv1.Cluster{}, true)).Should(Succeed())
 
 		By("check the RBAC resources deleted")
-		checkRBACResourcesExistence(saName, true)
+		checkRBACResourcesExistence(saName, saName, true)
 	}
 
 	testThreeReplicas := func(compName, compDefName string) {

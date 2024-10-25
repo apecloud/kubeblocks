@@ -8,9 +8,9 @@ sidebar_label: 支持的数据库类型
 
 # 支持的数据库类型
 
-KubeBlocks 是基于 Kubernetes 的云原生数据基础设施，可以帮助用户轻松构建关系型、NoSQL、流计算和向量型数据库服务。而这些数据库类型通常以引擎（addon）的形式添加到 KubeBlocks 中。除了支持数据库引擎外，KubeBlocks 引擎还支持适配云环境的插件及其他应用。
+KubeBlocks 是基于 Kubernetes 的云原生数据基础设施，可以帮助用户轻松构建关系型、NoSQL、流计算和向量型数据库服务。而这些数据库类型通常以 Addon 的形式添加到 KubeBlocks 中。除了支持数据库引擎外，KubeBlocks Addon 还支持适配云环境的插件及其他应用。
 
-KubeBlocks 使用 Addons 扩展对各种数据库引擎的支持，目前 KubeBlocks 存储库中提供了超过 30 个 Addons，这些 Addons 分类如下。
+KubeBlocks 使用 Addon 扩展对各种数据库引擎的支持，目前 KubeBlocks 存储库中提供了超过 30 个 Addon，分类如下。
 
 KubeBlocks 默认安装并启用了部分 Addon，对于其他 Addon，您可通过 [kbcli](./../installation/install-with-kbcli/install-addons.md) 或者 [Helm](./../installation/install-with-helm/install-addons.md) 安装和启用。
 
@@ -32,8 +32,8 @@ MySQL 和 PostgreSQL 是两大最受欢迎的开源关系型数据库，有诸�
 | Addons          | 简介                      |
 |:----------------|:---------------------------------|
 | mysql           | MySQL Addon 采用了 Oracle 官方发布的社区版 MySQL 镜像。 |
-| apecloud-mysql  | ApeCloud MySQL 是一个免费的、完全兼容的 MySQL Community Edition 替代，通过 RAFT 协议复制插件提供增强高可用性。该镜像由 ApeCloud 提供。ApeCloud MySQL 还包括名为 WeScale 的开源代理，提供读写分离和连接池等功能。 |
-| mariadb         | MariaDB 是一个高性能的开源关系型数据库管理系统，广泛用于 Web 和应用服务器。                    |
+| apecloud-mysql  | ApeCloud MySQL 是免费的、完全兼容的 MySQL Community Edition 替代，通过 RAFT 协议复制插件提供增强高可用性。该镜像由 ApeCloud 提供。ApeCloud MySQL 还包括名为 WeScale 的开源代理，提供读写分离和连接池等功能。 |
+| mariadb         | MariaDB 是高性能的开源关系型数据库管理系统，广泛用于 Web 和应用服务器。                    |
 
 **功能列表**
 
@@ -50,7 +50,7 @@ MySQL 和 PostgreSQL 是两大最受欢迎的开源关系型数据库，有诸�
 | Addons          | 简介                                                                                                                                                                |
 |:----------------|:-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | postgresql      | PostgreSQL Addon 使用 Spilo 镜像和 Patroni 提供 PostgreSQL 服务，以实现高可用性（HA）。                                                                    |
-| apecloud-postgresql | ApeCloud PostgreSQL 是一免费的、完全兼容的 PostgreSQL 替代，通过 RAFT 协议复制插件提供增强的高可用性       |
+| apecloud-postgresql | ApeCloud PostgreSQL 是免费的、完全兼容的 PostgreSQL 替代，通过 RAFT 协议复制插件提供增强的高可用性。       |
 | official-postgresql | 该 Addon 包含原版 PostgreSQL，采用 PostgreSQL 社区的官方版本，未经任何第三方供应商的修改、优化或打包。|
 | oriolebd        | OrioleDB 是 PostgreSQL 的全新存储引擎，为该数据库平台带来了现代化的数据库容量、功能和性能。 |
 | neon            | Neon 是 Serverless 版的 Postgres。        |
@@ -71,9 +71,9 @@ MySQL 和 PostgreSQL 是两大最受欢迎的开源关系型数据库，有诸�
 
 | Addons          | 简介                                |
 |:----------------|:-------------------------------------|
-| mongodb         | MongoDB 是一个面向文档的 NoSQL 数据库，用于存储大量数据。  |
-| redis           | Redis 是一个开源的、高性能的、键值对内存数据库。  |
-| etcd            | etcd 是一个高度一致的分布式键值存储，它提供了一种可靠的方式来存储需要由分布式系统或机器集群访问的数据。         |
+| mongodb         | MongoDB 是面向文档的 NoSQL 数据库，用于存储大量数据。  |
+| redis           | Redis 是开源的、高性能的、键值对内存数据库。  |
+| etcd            | etcd 是高度一致的分布式键值存储，它提供了一种可靠的方式，存储需要由分布式系统或机器集群访问的数据。         |
 | zookeeper       | Apache ZooKeeper 是集中式服务，用于维护配置信息、命名、提供分布式同步以及提供组服务。                      |
 
 **功能列表**
@@ -112,8 +112,8 @@ MySQL 和 PostgreSQL 是两大最受欢迎的开源关系型数据库，有诸�
 | Addons          | 简介                                                                                                                                                                               |
 |:----------------|:------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | tidb            | TiDB 是一个与 MySQL 兼容的分布式数据库，SQL 层采用 Go 语言开发，存储层基于 RocksDB，事务模型使用 Percolator。由 PingCap 提供。|
-| oceanbase-ce    | OceanBase 社区版 是与 MySQL 兼容的分布式数据库，使用 C++ 开发。                           |
-| polardb-x       | PolarDB-X 社区版 是与 MySQL 兼容的分布式数据库，支持基于 MySQL 的水平伸缩，由阿里云提供，是其开源版本。             |
+| oceanbase-ce    | OceanBase 社区版是与 MySQL 兼容的分布式数据库，使用 C++ 开发。                           |
+| polardb-x       | PolarDB-X 社区版是与 MySQL 兼容的分布式数据库，支持基于 MySQL 的水平伸缩，由阿里云提供，是其开源版本。             |
 
 **功能列表**
 
@@ -129,9 +129,9 @@ MySQL 和 PostgreSQL 是两大最受欢迎的开源关系型数据库，有诸�
 
 | Addons          | 简介                                                                                                                   |
 |:----------------|:----------------------------------------------------------------------------------------------------------------------|
-| kafka           | Apache Kafka 是一个开源的分布式事件流平台，广泛应用于高性能数据流水线、流式分析、数据集成和关键应用程序等场景，目前已经被数千家公司采用。 |
-| rabbitmq        | RabbitMQ 是一个可靠且成熟的消息和流处理代理。                          |
-| pulsar          | Apache Pulsar 是一个开源的、分布式消息流平台。                      |
+| kafka           | Apache Kafka 是开源的分布式事件流平台，广泛应用于高性能数据流水线、流式分析、数据集成和关键应用程序等场景，目前已经被数千家公司采用。 |
+| rabbitmq        | RabbitMQ 是可靠且成熟的消息和流处理代理。                          |
+| pulsar          | Apache Pulsar 是开源的、分布式消息流平台。                      |
 
 **功能列表**
 
@@ -148,8 +148,8 @@ MySQL 和 PostgreSQL 是两大最受欢迎的开源关系型数据库，有诸�
 | Addons          | 简介                                             |
 |:----------------|:------------------------------------------------|
 | qdrant          | Qdrant 是向量相似性搜索引擎和向量数据库。             |
-| weaviate        | Weaviate 是一个开源的向量数据库。                   |
-| milvus          | Milvus 是一个灵活、可靠且高性能的云原生开源向量数据库。 |
+| weaviate        | Weaviate 是开源的向量数据库。                   |
+| milvus          | Milvus 是灵活、可靠且高性能的云原生开源向量数据库。 |
 
 **功能列表**
 
@@ -166,9 +166,9 @@ MySQL 和 PostgreSQL 是两大最受欢迎的开源关系型数据库，有诸�
 | Addons          | 简介                                                                                         |
 |:----------------|:--------------------------------------------------------------------------------------------|
 | influxdb        | InfluxDB 作为专用的时序数据库，可执行实时分析，优化大型时序数据工作负载的处理和扩展。                    |
-| victoria-metrics  |  VictoriaMetrics 是一个快速、经济高效且可扩展的监控解决方案和时间序列数据库。                       |
-| greptimedb      | GreptimeDB 是一个云原生时间序列数据库，具有分布式、可扩展和高效的特性。                               |
-| tdengine        | TDengine™ 是一个专为工业物联网而搭建的工业大数据平台，结合了时序数据库和流处理、数据订阅和缓存等重要功能。 |
+| victoria-metrics  |  VictoriaMetrics 是快速、经济高效且可扩展的监控解决方案和时间序列数据库。                       |
+| greptimedb      | GreptimeDB 是云原生时间序列数据库，具有分布式、可扩展和高效的特性。                               |
+| tdengine        | TDengine™ 是专为工业物联网而搭建的工业大数据平台，结合了时序数据库和流处理、数据订阅和缓存等重要功能。 |
 
 **功能列表**
 
@@ -185,7 +185,7 @@ MySQL 和 PostgreSQL 是两大最受欢迎的开源关系型数据库，有诸�
 
 | Addons          | 简介                                                                          |
 |:----------------|:------------------------------------------------------------------------------|
-| nebula          | NebulaGraph 是一个开源的分布式图数据库，擅长处理具有千亿个顶点和万亿条边的超大规模数据集。 |
+| nebula          | NebulaGraph 是开源的分布式图数据库，擅长处理具有千亿个顶点和万亿条边的超大规模数据集。 |
 
 **功能列表**
 

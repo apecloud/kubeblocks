@@ -7,9 +7,9 @@ sidebar_position: 2
 
 # 概念
 
-["统一 API 如何降低学习曲线"](./introduction.md#统一的-api-如何降低学习门槛)一节介绍了使用统一 API 表达各种数据库的优势。如果仔细查看这些示例，你会注意到示例 YAML 文件中包含两个关键概念：**Cluster（集群）** 和 **Component（组件）**。例如，`test-mysql` 是一个包含名为 `mysql` 组件的集群（组件定义为 `apecloud-mysql`）。类似地，`test-redis` 也是一个集群，包含两个组件：一个是 `redis`（组件定义为 `redis-7`），它有两个副本；另一个是 `redis-sentinel`（组件定义为 `redis-sentinel`），它有三个副本。
+["统一 API 如何降低学习曲线"](./introduction.md#统一的-api-如何降低学习门槛)一节介绍了使用统一 API 表达各种数据库的优势。如果仔细查看这些示例，您会注意到示例 YAML 文件中包含两个关键概念：**Cluster（集群）** 和 **Component（组件）**。例如，`test-mysql` 是一个包含名为 `mysql` 组件的集群（组件定义为 `apecloud-mysql`）。`test-redis` 也是一个集群，包含两个组件：一个是 `redis`（组件定义为 `redis-7`），有两个副本；另一个是 `redis-sentinel`（组件定义为 `redis-sentinel`），有三个副本。
 
-在本文档中，我们将解释这两个概念背后的原因，并简要介绍其背后的 API（即 CRD, Custome Resource Definition）。
+本文档将解释这两个概念背后的原因，并简要介绍其背后的 API（即 CRD, Custom Resource Definition）。
 
 ## KubeBlocks 分层 API 的设计动机
 
@@ -17,11 +17,11 @@ sidebar_position: 2
 
 我们观察到，生产环境中部署的数据库系统通常采用由多个组件组成的拓扑结构。例如，一个生产环境中的 MySQL 集群可能包括多个代理节点（如 ProxySQL、MaxScale、Vitess、WeScale 等）和多个 MySQL 服务器节点（如 MySQL 社区版、Percona、MariaDB、ApeCloud MySQL 等），以实现高可用性和读写分离。类似地，Redis 部署通常由一个主节点和多个只读副本组成，并通过 Sentinel 管理以确保高可用性。一些用户甚至使用 twemproxy 进行水平分片，以实现更大的容量和吞吐量。
 
-这种模块化方法在分布式数据库系统中尤为突出，整个系统被划分为职责明确的独立组件，如数据存储、查询处理、事务管理、日志记录和元数据管理等。这些组件通过网络进行交互，确保系统能够像单节点数据库一样提供强一致性和事务保障，并实现负载均衡、分布式事务以及具备故障切换能力的灾难恢复等复杂操作。
+这种模块化方法在分布式数据库系统中尤为常见，整个系统被划分为职责明确的独立组件，如数据存储、查询处理、事务管理、日志记录和元数据管理等。这些组件通过网络进行交互，确保系统能够像单节点数据库一样提供强一致性和事务保障，并实现负载均衡、分布式事务以及具备故障切换能力的灾难恢复等复杂操作。
 
-因此，KubeBlocks 采用了一种分层 API（即 CRD）的设计，由 **Cluster（集群）** 和 **Component（组件）** 组成，以适应数据库系统的多组件、高度可变的部署拓扑结构。这些抽象允许我们灵活地表达和管理部署在 Kubernetes 上的各种数据库系统拓扑，并根据所需拓扑轻松地将组件组装成集群。
+因此，KubeBlocks 采用了分层 API（即 CRD）的设计，由 **Cluster（集群）** 和 **Component（组件）** 组成，以适应数据库系统的多组件、高度可变的部署拓扑结构。这些抽象允许我们灵活地表达和管理部署在 Kubernetes 上的各种数据库系统拓扑，并根据所需拓扑轻松地将组件组装成集群。
 
-组件是集群的积木块。事实上，Addon 开发者可以在 ClusterDefinition 中定义如何将多个组件组装成不同的拓扑结构。如果你不是 Addon 开发者，则无需过度关注 ClusterDefinition 的细节；你只需要知道 Addon 可以提供不同的拓扑结构选择。例如，Redis Addon 提供了三种拓扑："standalone"（单机），"replication"（主从复制）和 "replication-twemproxy"（主从复制 + twemproxy）。你可以在创建集群时指定所需的拓扑。
+组件是组成集群的积木块。事实上，Addon 开发者可以在 ClusterDefinition 中定义如何将多个组件组装成不同的拓扑结构。如果您不是 Addon 开发者，则无需过度关注 ClusterDefinition 的细节；您只需要知道 Addon 可以提供不同的拓扑结构选择。例如，Redis Addon 提供了三种拓扑："standalone"（单机），"replication"（主从复制）和 "replication-twemproxy"（主从复制 + twemproxy）。您可以在创建集群时指定所需的拓扑。
 
 以下是通过 `clusterDefinitionRef` 和 `topology` 创建 Redis 集群的示例：
 
@@ -73,13 +73,13 @@ spec:
               storage: 10Gi
 ```
 
-仔细看上面这个 YAML 文件，可以发现，通过在集群中指定 `clusterDefinitionRef` 和 `topology`，则无需再为每个组件指定 componentDef。
+仔细看上面这个 YAML 文件，可以发现，通过在集群中指定 `clusterDefinitionRef` 和 `topology`，则无需再为每个组件指定 `componentDef`。
 
-通过 Component API，KubeBlocks 将数据库容器打包成标准化的积木块，这些积木块可以根据指定的拓扑组装成数据库集群，并运行在 Kubernetes 上。我们认为这个过程很像用乐高积木搭建东西，这也是 KubeBlocks 这一名字的来源。
+借助 Component API，KubeBlocks 将数据库容器打包成标准化的积木块，这些积木块可以根据指定的拓扑组装成数据库集群，并运行在 Kubernetes 上。我们认为这个过程很像用乐高积木搭建东西，这也是 KubeBlocks 这一名字的来源。
 
 ## 深入了解 KubeBlocks API
 
-下图展示了 KubeBlocks 的主要 CRD，这里特别强调了 API 的分层结构。其他重要的 API，如 OpsRequest、Backup 和 Restore，并未包含在此图中，以保持对分层结构的专注，使图表更加清晰。我们将在其他文档中解释这些 API。
+下图展示了 KubeBlocks 的主要 CRD，这里特别强调了 API 的分层结构。其他重要的 API，如 OpsRequest、Backup 和 Restore，并未包含在此图中，这里重点关注分层结构，图表表达更加清晰。我们将在其他文档中解释其他重要的 API。
 
 ![KubeBlocks API Layers](./../../img/kubeblocks-api-layers.png)
 
@@ -87,11 +87,11 @@ KubeBlocks 的 CRD 可分为两大类：用户使用的 CRD 和 Addon CRD。
 
 **用户使用的 CRD**
 
-用户使用的 CRD 包括 Cluster、Component 和 InstanceSet。当使用 KubeBlocks 创建数据库集群时，将生成以下 CR：
+用户使用的 CRD 包括 Cluster、Component 和 InstanceSet。使用 KubeBlocks 创建数据库集群时，将生成以下 CR：
 
-- Cluster 对象由用户创建。
-- Component 对象是 KubeBlocks 集群控制器（Cluster Controller）在检测到 Cluster 对象时递归创建的子资源。
-- InstanceSet 对象是 KubeBlocks 组件控制器（Component Controller）在检测到 Component 对象时递归创建的子资源。InstanceSet 控制器（InstanceSet Controller）随后递归创建 Pod 和 PVC 对象。
+- Cluster 对象：由用户创建。
+- Component 对象：KubeBlocks 集群控制器（Cluster Controller）在检测到 Cluster 对象时递归创建的子资源。
+- InstanceSet 对象：KubeBlocks 组件控制器（Component Controller）在检测到 Component 对象时递归创建的子资源。InstanceSet 控制器（InstanceSet Controller）随后递归创建 Pod 和 PVC 对象。
 
 **Addon CRD**
 
@@ -99,7 +99,7 @@ Addon 使用的 CRD 包括 ClusterDefinition、ComponentDefinition 和 Component
 
 :::note
 
-尽管你无需编写 ClusterDefinition 和 ComponentDefinition 的 CR，但需要使用这些 CR。如前面创建 Redis 集群的示例所示，创建集群时，要么在每个组件的 `componentDef` 中指定相应的 ComponentDefinition CR 名称，要么在 `clusterDefinitionRef` 中指定相应的 ClusterDefinition CR 名称，并选择所需的拓扑结构。
+尽管您无需编写 ClusterDefinition 和 ComponentDefinition 的 CR，但需要使用这些 CR。如前面创建 Redis 集群的示例所示，创建集群时，可以选择在每个组件的 `componentDef` 中指定相应的 ComponentDefinition CR 名称，或者在 `clusterDefinitionRef` 中指定相应的 ClusterDefinition CR 名称，并选择所需的拓扑结构。
 
 :::
 
@@ -107,15 +107,15 @@ Addon 使用的 CRD 包括 ClusterDefinition、ComponentDefinition 和 Component
 
 #### Cluster
 
-Cluster 对象表示由 KubeBlocks 管理的整个数据库集群。一个 Cluster 可以包含多个 Component，用户在此指定每个 Component 的配置，集群控制器将生成并调谐相应的 Component 对象。此外，集群控制器还管理在 Cluster 层暴露的所有服务地址。
+Cluster 对象表示由 KubeBlocks 管理的整个数据库集群。一个 Cluster 可以包含多个 Component，用户在 Cluster API 中指定每个 Component 的配置，集群控制器将生成并调谐相应的 Component 对象。此外，集群控制器还管理在 Cluster 层暴露的所有服务地址。
 
-对于像 Redis Cluster 这种采用无共享架构的分布式数据库，Cluster 支持管理多个分片（shard），每个分片由一个单独的 Component 管理。这种架构还支持动态分片（dynamic resharding）：如果需要扩展并添加新分片，只需添加一个新的 Component；反之，如果需要缩减分片数量，则移除相应的 Component。
+对于像 Redis Cluster 这种采用无共享架构的分布式数据库，Cluster 支持管理多个分片（shard），每个分片由一个单独的 Component 管理。这种架构还支持动态分片（dynamic resharding）：如果需要扩展并添加新分片，只需添加一个新的组件；反之，如果需要缩减分片数量，则移除相应的组件。
 
 #### Component
 
-Component 是 Cluster 对象的基本积木块。例如，一个 Redis 集群可以包含 redis、sentinel 和可能的代理组件如 twemproxy。
+Component 是 Cluster 对象的基本模块。例如，一个 Redis 集群可以包含 redis、sentinel，也可能包含代理组件，如 twemproxy。
 
-Component 对象负责管理组件内所有副本的生命周期，支持多种操作，包括实例的创建、停止、重启、终止、升级、配置变更、垂直和水平扩展、故障切换、主备切换、调度配置、服务暴露、系统账号管理等。
+Component 对象负责管理 Component 内所有副本的生命周期，支持多种操作，包括实例的创建、停止、重启、终止、升级、配置变更、垂直和水平扩展、故障切换、主备切换、调度配置、服务暴露、系统账号管理等。
 
 Component 是从用户提交的 Cluster 对象派生的内部子对象，主要供 KubeBlocks 控制器使用，不建议用户直接修改 Component 对象，应仅用于监控组件状态。
 

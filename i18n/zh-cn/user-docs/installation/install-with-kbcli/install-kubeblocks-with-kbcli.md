@@ -57,6 +57,12 @@ kbcli kubeblocks install
     kbcli kubeblocks list-versions
     ```
 
+    如需查看包含 alpha 和 beta 在内的版本，可执行以下命令。
+
+    ```bash
+    kbcli kb list-versions --devel --limit=100
+    ```
+
     或者，你可以在 [KubeBlocks Release 页面](https://github.com/apecloud/kubeblocks/releases/)中查看可用的版本。
 
 2. 使用 `--version` 指定版本。
@@ -67,9 +73,9 @@ kbcli kubeblocks install
 
     :::note
 
-    kbcli 默认安装最新版本。在安装 KubeBlocks 时，kbcli 会安装与之匹配的版本。请确保 kbcli 和 KubeBlocks 的主版本号相匹配。
+    kbcli 默认安装最新版本。如果您的环境中已有正在运行的 KubeBlocks 实例，则需要安装与之匹配的 kbcli 版本。
 
-    例如，你可以安装 kbcli v0.6.1 和 KubeBlocks v0.6.3。但是，如果安装的是 kbcli v0.5.0 和 KubeBlocks v0.6.0，就可能会报错，因为版本不匹配。
+    例如，如果您当前使用的 KubeBlocks 版本是 v0.8.3，kbcli 应安装对应的 v0.8.3，而不是更高版本（如 v0.9.0），否则系统将因版本不匹配产生报错。
 
     :::
 

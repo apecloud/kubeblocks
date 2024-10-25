@@ -23,7 +23,7 @@ Kubernetes 控制平面是 Kubernetes 的大脑和心脏。它负责管理整个
 
 :::note
 
-在某些文本中，同时讨论 Kubernetes 和数据库时，"节点" 一词可能会产生混淆。在 Kubernetes 中，"节点" 指的是集群中作为工作单元的物理或虚拟机器，用于运行容器化应用。而当数据库在 Kubernetes 中运行时，"数据库节点" 一般是指承载数据库实例的 Pod。
+在某些语境中，同时讨论 Kubernetes 和数据库时，"节点" 一词可能会产生混淆。在 Kubernetes 中，"节点" 指的是集群中作为工作单元的物理或虚拟机器，用于运行容器化应用。而在 Kubernetes 中运行数据库时，"数据库节点" 一般是指承载数据库实例的 Pod。
 
 在 KubeBlocks 文档中，"节点" 通常指的是数据库节点。如果我们指的是 Kubernetes 节点，我们将明确说明为 "K8s 节点" 以避免混淆。
 
@@ -85,11 +85,11 @@ Secret 用于存储敏感数据，例如密码、令牌或加密密钥。Secrets
 
 ## CRD
 
-如果您希望使用 Kubernetes 管理数据库对象，则需要扩展 Kubernetes API，以描述您正在管理的数据库对象。这就是 CRD（自定义资源定义）机制发挥作用的地方，CRD 支持定义特定用例的自定义资源，如数据库集群或备份，并以 K8s 原生的方式管理资源。
+如果您希望使用 Kubernetes 管理数据库对象，则需要扩展 Kubernetes API，以描述您正在管理的数据库对象。这就是 CRD（自定义资源定义）机制的用途所在，CRD 支持定义特定用例的自定义资源，如数据库集群或备份，并以 K8s 原生的方式管理资源。
 
 ## CR
 
-自定义资源（CR）是自定义资源定义（CRD）的实例。它表示扩展 Kubernetes API 的特定配置或对象。CR 允许您使用 Kubernetes 的原生工具定义和管理自定义资源，例如数据库或应用程序。一旦创建了 CR，Kubernetes 控制器或 Operator 会监视它，并执行操作以保持所需状态。
+自定义资源（CR）是自定义资源定义（CRD）的实例。它表示扩展 Kubernetes API 的特定配置或对象。CR 允许您使用 Kubernetes 的原生工具定义和管理自定义资源，例如数据库或应用程序。一旦创建了 CR，Kubernetes 控制器或 Operator 会开始监控，并执行操作以保持所需状态。
 
 CRD 和 CR 是开发 Kubernetes Operator 的基础。CRDs 通常用于实现自定义控制器或 Operator，允许持续监视 CR 的变化（例如，表示数据库集群的 CR），并自动执行相应的操作。
 

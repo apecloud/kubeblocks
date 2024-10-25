@@ -1,91 +1,91 @@
 ---
-title: Uninstall kbcli and KubeBlocks
-description: Handle exception and uninstall kbcli and KubeBlocks
-keywords: [kbcli, kubeblocks, exception, uninstall]
+title: 卸载 kbcli 和 KubeBlocks
+description: 卸载 kbcli 和 KubeBlocks
+keywords: [kbcli, kubeblocks, 卸载]
 sidebar_position: 4
-sidebar_label: Uninstall KubeBlocks and kbcli
+sidebar_label: 卸载 KubeBlocks 和 kbcli
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Uninstall KubeBlocks and kbcli
+# 卸载 KubeBlocks 和 kbcli
 
-Uninstallation order:
+卸载顺序：
 
-1. Delete your cluster if you have created a cluster.
+1. 如果已经创建了集群，请先删除集群。
 
-   ```bash
-   kbcli cluster delete <name>
-   ```
+    ```bash
+    kbcli cluster delete <name>
+    ```
 
-2. Uninstall KubeBlocks.
+2. 卸载 KubeBlocks。
 
-3. Uninstall kbcli.
+3. 卸载 kbcli。
 
-## Uninstall KubeBlocks
+## 卸载 KubeBlocks
 
-Uninstall KubeBlocks if you want to delete KubeBlocks after your trial.
+如果想在试用结束后删除 KubeBlocks，请执行以下操作：
 
 ```bash
 kbcli kubeblocks uninstall
 ```
 
-## Uninstall kbcli
+## 卸载 kbcli
 
-Uninstall kbcli if you want to delete kbcli after your trial. Use the same option as the way you install kbcli.
+如果想在试用结束后删除 kbcli，请选择与安装 kbcli 时所使用的相同选项。
 
 <Tabs>
+
 <TabItem value="macOS" label="macOS" default>
 
-For `curl`, run
+如果你使用的是 `curl`，执行以下命令：
 
 ```bash
 sudo rm /usr/local/bin/kbcli
 ```
 
-For `brew`, run
+如果你使用的是 `brew`，执行以下命令：
 
 ```bash
 brew uninstall kbcli
 ```
 
-kbcli creates a hidden folder named `~/.kbcli` under the HOME directory to store configuration information and temporary files. You can delete this folder after uninstalling kbcli.
+kbcli 会在 HOME 目录下创建一个名为 `~/.kbcli` 的隐藏文件夹，用于存储配置信息和临时文件。你可以在卸载 kbcli 后删除此文件夹。
 
 </TabItem>
 
 <TabItem value="Windows" label="Windows">
 
-1. Go to the `kbcli` installation path and delete the installation folder.
+1. 进入 `kbcli` 的安装路径，并删除安装文件夹。
+  
+    - 如果你通过脚本安装了 `kbcli`，请前往 `C:\Program Files` 并删除 `kbcli-windows-amd64` 文件夹。
+    - 如果你自定义了安装路径，请前往指定路径，并删除安装文件夹。
+  
+2. 删除环境变量。
+   1. 点击 Windows 图标，然后点击 **系统**。
+   2. 进入 **设置** -> **相关设置** -> **高级系统设置**。
+   3. 在 **高级** 标签页，点击 **环境变量**。
+   4. 在 **用户变量** 或 **系统变量** 列表中，双击 **Path**。
+       - 如果你通过脚本安装了 `kbcli`，双击 **用户变量** 中的 Path。
+       - 如果你自定义了安装路径，请根据之前创建变量的位置，双击相应的 **Path**。
+   5. 选择 `C:\Program Files\kbcli-windows-amd64` 或自定义的路径，并删除它。此操作需要二次确认。
 
-   * If you install `kbcli` by script, go to `C:\Program Files` and delete the `kbcli-windows-amd64` folder.
-   * If you customize the installation path, go to your specified path and delete the installation folder.
+3. 删除名为 `.kbcli` 的文件夹。
 
-2. Delete the environment variable.
-
-   1. Click the Windows icon and click **System**.
-   2. Go to **Settings** -> **Related Settings** -> **Advanced system settings**.
-   3. On the **Advanced** tab, click **Environment Variables**.
-   4. Double-click **Path** in **User variables** or **System variables** list.
-      * If you install `kbcli` by script, double-click **Path** in **User variables**.
-      * If you customize the installation path, double-click **Path** based on where you created the variable before.
-   5. Select `C:\Program Files\kbcli-windows-amd64` or your customized path and delete it. This operation requires double confirmation.
-
-3. Delete a folder named `.kbcli`.
-
-   kbcli creates a folder named `.kbcli` under the C:\Users\username directory to store configuration information and temporary files. You can delete this folder after uninstalling kbcli.
+    kbcli 会在 C:\Users\username 目录下创建一个名为 `.kbcli` 的文件夹，用于存储配置信息和临时文件。你可以在卸载 kbcli 后删除此文件夹。
 
 </TabItem>
 
 <TabItem value="Linux" label="Linux">
 
-Uninstall kbcli using the `curl` command.
+使用 `curl` 命令卸载 kbcli。
 
 ```bash
 sudo rm /usr/local/bin/kbcli
 ```
 
-kbcli creates a hidden folder named `~/.kbcli` under the HOME directory to store configuration information and temporary files. You can delete this folder after uninstalling kbcli.
+kbcli 会在 HOME 目录下创建一个名为 `~/.kbcli` 的隐藏文件夹，用于存储配置信息和临时文件。你可以在卸载 kbcli 后删除此文件夹。
 
 </TabItem>
 

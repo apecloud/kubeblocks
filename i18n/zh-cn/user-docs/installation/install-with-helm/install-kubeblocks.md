@@ -1,100 +1,102 @@
 ---
-title: Install KubeBlocks
-description: Install KubeBlocks on the existing Kubernetes clusters with Helm
-keywords: [taints, affinity, tolerance, install, kbcli, KubeBlocks]
+title: 安装 KubeBlocks
+description: 在现有的 Kubernetes 集群上使用 Helm 安装 KubeBlocks
+keywords: [污点, 亲和性, 容忍, 安装, kbcli, KubeBlocks]
 sidebar_position: 1
-sidebar_label: Install KubeBlocks
+sidebar_label: 安装 KubeBlocks
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Install KubeBlocks 
+# 安装 KubeBlocks 
 
-KubeBlocks is Kubernetes-native, you can use Helm or kubectl with a YAML file to install it.
+KubeBlocks 是 Kubernetes 原生 operator，可通过 Helm 或者 kubectl 应用 YAML 文件安装 KubeBlocks。
 
 :::note
 
-If you install KubeBlocks with Helm, to uninstall it, you have to use Helm too.
+如果您使用 Helm 安装 KubeBlocks，卸载时也需使用 Helm。
 
-Make sure you have [kubectl](https://kubernetes.io/docs/tasks/tools/) and [Helm](https://helm.sh/docs/intro/install/) installed.
+请确保您已安装 [kubectl](https://kubernetes.io/docs/tasks/tools/) 和 [Helm](https://helm.sh/docs/intro/install/)。
+
 :::
 
-## Environment preparation
+## 环境准备
 
 <table>
 	<tr>
-	    <th colspan="3">Resource Requirements</th>
+	    <th colspan="3">资源要求</th>
 	</tr >
 	<tr>
-	    <td >Control Plane</td>
-	    <td colspan="2">It is recommended to create 1 node with 4 cores, 4GB memory and 50GB storage. </td>
+	    <td >控制面</td>
+	    <td colspan="2">建议创建 1 个具有 4 核 CPU、4 GB 内存和 50 GB 存储空间的节点。</td>
 	</tr >
 	<tr >
-	    <td rowspan="4">Data Plane</td>
+	    <td rowspan="4">数据面</td>
 	    <td> MySQL </td>
-	    <td>It is recommended to create at least 3 nodes with 2 cores, 4GB memory and 50GB storage. </td>
+	    <td>建议至少创建 3 个具有 2 核 CPU、4 GB 内存和 50 GB 存储空间的节点。</td>
 	</tr>
 	<tr>
 	    <td> PostgreSQL </td>
-        <td>It is recommended to create at least 2 nodes with 2 cores, 4GB memory and 50GB storage.  </td>
+        <td>建议至少创建 2 个具有 2 核 CPU、4 GB 内存和 50 GB 存储空间的节点。</td>
 	</tr>
 	<tr>
 	    <td> Redis </td>
-        <td>It is recommended to create at least 2 nodes with 2 cores, 4GB memory and 50GB storage. </td>
+        <td>建议至少创建 2 个具有 2 核 CPU、4 GB 内存和 50 GB 存储空间的节点。</td>
 	</tr>
 	<tr>
 	    <td> MongoDB </td>
-	    <td>It is recommended to create at least 3 nodes with 2 cores, 4GB memory and 50GB storage. </td>
+	    <td>建议至少创建 3 个具有 2 核 CPU、4 GB 内存和 50 GB 存储空间的节点。</td>
 	</tr>
 </table>
 
-## Installation steps
+## 安装步骤
 
 <Tabs>
 
-<TabItem value="Helm" label="Install with Helm" default>
+<TabItem value="Helm" label="Helm" default>
 
-Use Helm and follow the steps below to install KubeBlocks.
+按照以下步骤使用 Helm 安装 KubeBlocks。
 
-1. Create dependent CRDs. Specify the version you want to install.
+1. 创建安装所依赖的 CRDs，并指定您想要安装的版本。
 
    ```bash
    kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/vx.x.x/kubeblocks_crds.yaml
    ```
-   You can view all versions of kubeblocks, including alpha and beta releases, on the [kubeblocks releases list](https://github.com/apecloud/kubeblocks/releases).
 
-   To get stable releases, use this command:
+   您可以通过 [KubeBlocks 发布列表](https://github.com/apecloud/kubeblocks/releases) 查看 KubeBlocks 的所有版本，包括 alpha 及 beta 版本。
+
+   也可通过执行以下命令，获取稳定版本：
+
    ```bash
    curl -s "https://api.github.com/repos/apecloud/kubeblocks/releases?per_page=100&page=1" | jq -r '.[] | select(.prerelease == false) | .tag_name' | sort -V
    ```
-   
 
-2. Add the KubeBlocks Helm repo.
+2. 添加 KubeBlocks 的 Helm 仓库。
 
    ```bash
    helm repo add kubeblocks https://apecloud.github.io/helm-charts
    helm repo update
    ```
 
-3. Install KubeBlocks.
+3. 安装 KubeBlocks。
 
    ```bash
    helm install kubeblocks kubeblocks/kubeblocks --namespace kb-system --create-namespace
    ```
 
-   If you want to install KubeBlocks with custom tolerations, you can use the following command:
+   如果您想要在安装 KubeBlocks 添加自定义容忍，可使用以下命令：
 
    ```bash
    helm install kubeblocks kubeblocks/kubeblocks --namespace kb-system --create-namespace \
-       --set-json 'tolerations=[ { "key": "control-plane-taint", "operator": "Equal", "effect": "NoSchedule", "value": "true" } ]' \
-       --set-json 'dataPlane.tolerations=[{ "key": "data-plane-taint", "operator": "Equal", "effect": "NoSchedule", "value": "true"    }]'
+     --set-json 'tolerations=[ { "key": "control-plane-taint", "operator": "Equal", "effect": "NoSchedule", "value": "true" } ]' \
+     --set-json 'dataPlane.tolerations=[{ "key": "data-plane-taint", "operator": "Equal", "effect": "NoSchedule", "value": "true"    }]'
    ```
 
-   If you want to install KubeBlocks with a specified version, follow the steps below.
+   如果您想要安装指定版本的 KubeBlocks，可执行如下步骤：
 
-   1. View the available versions in the [KubeBlocks Release](https://github.com/apecloud/kubeblocks/releases/).
-   2. Specify a version with `--version` and run the command below.
+   1. 在 [KubeBlocks Release](https://github.com/apecloud/kubeblocks/releases/) 中查看可用版本。
+   2. 使用 `--version` 指定版本，并执行以下命令。
 
       ```bash
       helm install kubeblocks kubeblocks/kubeblocks --namespace kb-system --create-namespace --version="x.x.x"
@@ -102,17 +104,17 @@ Use Helm and follow the steps below to install KubeBlocks.
 
      :::note
 
-     By default, the latest release version is installed.
+     如果不指定版本，默认安装最新版本。
 
      :::
 
 </TabItem>
 
-<TabItem value="kubectl" label="Install with kubectl">
+<TabItem value="kubectl" label="kubectl">
 
-KubeBlocks can be installed like any other resource in Kubernetes, through a YAML manifest applied via `kubectl`.
+KubeBlocks 可以像 Kubernetes 中的其他资源一样，通过 YAML 文件和 kubectl 命令进行安装。
 
-Run the following command to install the latest operator manifest for this minor release:
+执行以下命令，安装当前小版本发布的最新 operator。
 
  ```bash
  kubectl create -f \address.yaml
@@ -122,17 +124,17 @@ Run the following command to install the latest operator manifest for this minor
 
 </Tabs>
 
-## Verify KubeBlocks installation
+## 验证 KubeBlocks 安装
 
-Run the following command to check whether KubeBlocks is installed successfully.
+执行以下命令，检查 KubeBlocks 是否已成功安装。
 
 ```bash
 kubectl -n kb-system get pods
 ```
 
-***Result***
+***结果***
 
-If the KubeBlocks Workloads are all ready, KubeBlocks has been installed successfully.
+如果工作负载都显示已处于 Running 状态，则表明已成功安装 KubeBlocks。
 
 ```bash
 NAME                                                     READY   STATUS       AGE

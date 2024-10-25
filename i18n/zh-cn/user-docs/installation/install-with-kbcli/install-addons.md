@@ -1,94 +1,18 @@
 ---
-title: Install Addons
-description: Install KubeBlocks Addons
-keywords: [kbcli, kubeblocks, addons, install]
+title: 安装引擎
+description: 安装 KubeBlocks 引擎
+keywords: [kbcli, kubeblocks, addons, 安装，引擎]
 sidebar_position: 3
-sidebar_label: Install Addons
+sidebar_label: 安装引擎
 ---
 
-# Install Addons
-
-## Use the index to install an addon
-
-With the release of KubeBlocks v0.8.0, addons are decoupled from KubeBlocks and some addons are not installed by default. If you want to use these addons, add addons first by index.
-
-The official index repo is [KubeBlocks index](https://github.com/apecloud/block-index). The code of all addons is maintained in the [KubeBlocks addon repo](https://github.com/apecloud/kubeblocks-addons).
-
-1. View the index.
-
-   kbcli creates an index named `kubeblocks` by default and you can check whether this index is created by running `kbcli addon index list`.
-
-   ```bash
-   kbcli addon index list
-   >
-   INDEX        URL
-   kubeblocks   https://github.com/apecloud/block-index.git 
-   ```
-
-   If the list is empty or you want to add your index, you can add the index manually by using `kbcli addon index add <index-name> <source>`. For example,
-
-   ```bash
-   kbcli addon index add kubeblocks https://github.com/apecloud/block-index.git
-   ```
-
-   If you are not sure whether the kubeblocks index is the latest version, you can update it.
-
-   ```bash
-   kbcli addon index update kubeblocks
-   ```
-
-2. (Optional) Search whether the addon exists in the index.
-
-   ```bash
-   kbcli addon search mariadb
-   >
-   ADDON     VERSION   INDEX
-   mariadb   0.7.0     kubeblocks
-   ```
-
-3. Install the addon.
-
-   If there are multiple index sources and versions for an addon, you can specify them by adding flags. The system installs the latest version in the `kubeblocks` index by default.
-
-   ```bash
-   kbcli addon install mariadb --index kubeblocks --version 0.7.0
-   ```
-
-   **What's next**
-
-   After the addon is installed, you can list and enable it.
-
-## List addons
-
-To list supported addons, run `kbcli addon list` command.
-
-## Enable/Disable addons
-
-To manually enable or disable addons, follow the steps below.
-
-***Steps:***
-
-1. To enable an addon, use `kbcli addon enable`.
-
-   ***Example***
-
-   ```bash
-   kbcli addon enable snapshot-controller
-   ```
-
-   To disable an addon, use `kbcli addon disable`.
-
-2. List the addons again to check whether it is enabled.
-
-   ```bash
-   kbcli addon list
-   ```
+# 安装引擎
 
 ## 使用引擎
 
 ### 使用索引安装引擎
 
-KubeBlocks v0.8.0 发布后，引擎（addon）与 KubeBlocks 解耦，KubeBlocks 仅默认安装了部分引擎，如需体验其它引擎，需通过索引安装相关引擎。
+KubeBlocks v0.8.0 发布后，引擎（Addon）与 KubeBlocks 解耦，KubeBlocks 仅默认安装了部分引擎，如需体验其它引擎，需通过索引安装相关引擎。
 
 官网引擎索引仓库为 [KubeBlocks index](https://github.com/apecloud/block-index)。引擎代码维护在 [KubeBlocks addon repo](https://github.com/apecloud/kubeblocks-addons)。
 
@@ -109,7 +33,13 @@ KubeBlocks v0.8.0 发布后，引擎（addon）与 KubeBlocks 解耦，KubeBlock
    kbcli addon index add kubeblocks https://github.com/apecloud/block-index.git
    ```
 
-2. （可选）索引建立后，可以通过 `addon search` 命令检查想要安装的引擎是否在索引信息中存在
+   如果不确定索引是否为最新版本，可使用如下命令更新索引。
+
+   ```bash
+   kbcli addon index update kubeblocks
+   ```
+
+2. （可选）索引建立后，可以通过 `addon search` 命令检查想要安装的引擎是否在索引信息中存在。
 
    ```bash
    kbcli addon search mariadb

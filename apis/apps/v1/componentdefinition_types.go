@@ -401,6 +401,8 @@ type ComponentDefinitionSpec struct {
 	// +optional
 	ReplicasLimit *ReplicasLimit `json:"replicasLimit,omitempty"`
 
+	// Specifies the strategies for determining the available status of the Component.
+	//
 	// This field is immutable.
 	//
 	// +optional
@@ -1253,13 +1255,6 @@ type ComponentAvailable struct {
 	//
 	// +optional
 	WithPhases *string `json:"phases,omitempty"`
-
-	// Specifies the roles that the component will go through to be considered available.
-	//
-	// This field is immutable once set.
-	//
-	// +optional
-	WithRoles *string `json:"withRoles,omitempty"`
 
 	// Specifies the strategies for determining whether the component is available based on the available probe.
 	//

@@ -101,7 +101,11 @@ spec:
                   This field is immutable.
                 type: object
               available:
-                description: This field is immutable.
+                description: |-
+                  Specifies the strategies for determining the available status of the Component.
+
+
+                  This field is immutable.
                 properties:
                   phases:
                     description: |-
@@ -547,13 +551,6 @@ spec:
                         format: int32
                         type: integer
                     type: object
-                  withRoles:
-                    description: |-
-                      Specifies the roles that the component will go through to be considered available.
-
-
-                      This field is immutable once set.
-                    type: string
                 type: object
               configs:
                 description: |-

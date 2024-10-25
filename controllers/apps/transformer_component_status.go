@@ -22,10 +22,12 @@ package apps
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -116,7 +118,7 @@ func (t *componentStatusTransformer) init(transCtx *componentTransformContext, d
 // reconcileStatus reconciles component status.
 func (t *componentStatusTransformer) reconcileStatus(transCtx *componentTransformContext) error {
 	if t.runningITS == nil {
-		return nil
+		return t.reconcileStatusCondition(transCtx)
 	}
 
 	// check if the ITS is deleting
@@ -191,7 +193,7 @@ func (t *componentStatusTransformer) reconcileStatus(transCtx *componentTransfor
 		t.setComponentStatusPhase(transCtx, appsv1.AbnormalClusterCompPhase, nil, "component is Abnormal")
 	}
 
-	return nil
+	return t.reconcileStatusCondition(transCtx)
 }
 
 func (t *componentStatusTransformer) isWorkloadUpdated() bool {
@@ -428,5 +430,44 @@ func (t *componentStatusTransformer) updateComponentStatus(transCtx *componentTr
 			transCtx.EventRecorder.Eventf(t.comp, corev1.EventTypeNormal, componentPhaseTransition, phaseTransitionMsg)
 		}
 	}
+	return nil
+}
+
+func (t *componentStatusTransformer) reconcileStatusCondition(transCtx *componentTransformContext) error {
+	return t.reconcileAvailableCondition(transCtx)
+}
+
+func (t *componentStatusTransformer) reconcileAvailableCondition(transCtx *componentTransformContext) error {
+	policy := component.GetComponentAvailablePolicy(transCtx.CompDef)
+	if policy.WithPhases == nil {
+		return nil
+	}
+
+	var (
+		comp = transCtx.Component
+	)
+	status, reason, message := func() (metav1.ConditionStatus, string, string) {
+		if comp.Status.Phase == "" {
+			return metav1.ConditionUnknown, "Unknown", "component phase is unknown"
+		}
+		phases := sets.New[string](strings.Split(strings.ToLower(*policy.WithPhases), ",")...)
+		if phases.Has(strings.ToLower(string(comp.Status.Phase))) {
+			return metav1.ConditionTrue, "Available", fmt.Sprintf("component phase is %s", comp.Status.Phase)
+		}
+		return metav1.ConditionFalse, "Unavailable", fmt.Sprintf("component phase is %s", comp.Status.Phase)
+	}()
+
+	cond := metav1.Condition{
+		Type:               appsv1.ConditionTypeAvailable,
+		Status:             status,
+		ObservedGeneration: comp.Generation,
+		LastTransitionTime: metav1.Now(),
+		Reason:             reason,
+		Message:            message,
+	}
+	if meta.SetStatusCondition(&comp.Status.Conditions, cond) {
+		transCtx.EventRecorder.Event(comp, corev1.EventTypeNormal, reason, message)
+	}
+
 	return nil
 }

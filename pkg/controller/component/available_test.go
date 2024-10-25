@@ -46,7 +46,7 @@ var _ = Describe("Available", func() {
 		cleanEnv()
 	})
 
-	FContext("evaluate", func() {
+	Context("evaluate", func() {
 		It("all succeed - ok", func() {
 			h := &AvailableEventHandler{}
 

@@ -28,6 +28,7 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
@@ -94,8 +95,8 @@ func (h *AvailableEventHandler) unavailable(ctx context.Context, cli client.Clie
 
 func (h *AvailableEventHandler) status(ctx context.Context, cli client.Client, recorder record.EventRecorder,
 	comp *appsv1.Component, status metav1.ConditionStatus, reason, message string) error {
-	newCond := func() metav1.Condition {
-		return metav1.Condition{
+	var (
+		cond = metav1.Condition{
 			Type:               appsv1.ConditionTypeAvailable,
 			Status:             status,
 			ObservedGeneration: comp.Generation, // TODO: ???
@@ -103,34 +104,13 @@ func (h *AvailableEventHandler) status(ctx context.Context, cli client.Client, r
 			Reason:             reason,
 			Message:            message,
 		}
-	}()
-
-	idx := -1
-	for i, c := range comp.Status.Conditions {
-		if c.Type == appsv1.ConditionTypeAvailable {
-			idx = i
-			break
-		}
+		compCopy = comp.DeepCopy()
+	)
+	if meta.SetStatusCondition(&comp.Status.Conditions, cond) {
+		recorder.Event(comp, corev1.EventTypeNormal, reason, message)
+		return cli.Status().Patch(ctx, comp, client.MergeFrom(compCopy))
 	}
-	if idx >= 0 && h.condEqual(comp.Status.Conditions[idx], newCond) {
-		return nil
-	}
-
-	compCopy := comp.DeepCopy()
-	if idx < 0 {
-		comp.Status.Conditions = append(comp.Status.Conditions, newCond)
-	} else {
-		comp.Status.Conditions[idx] = newCond
-	}
-
-	recorder.Event(comp, corev1.EventTypeNormal, reason, message)
-
-	return cli.Status().Patch(ctx, comp, client.MergeFrom(compCopy))
-}
-
-func (h *AvailableEventHandler) condEqual(cond1, cond2 metav1.Condition) bool {
-	return cond1.Type == cond2.Type && cond1.Status == cond2.Status &&
-		cond1.ObservedGeneration == cond2.ObservedGeneration && cond1.Reason == cond2.Reason
+	return nil
 }
 
 func (h *AvailableEventHandler) handleEvent(ctx context.Context, cli client.Client,
@@ -140,9 +120,9 @@ func (h *AvailableEventHandler) handleEvent(ctx context.Context, cli client.Clie
 		return nil, "", err
 	}
 
-	policy := h.getComponentAvailablePolicy(cmpd)
+	policy := GetComponentAvailablePolicy(cmpd)
 	if policy.WithProbe == nil || policy.WithProbe.Condition == nil {
-		if policy.WithPhases != nil || policy.WithRoles != nil {
+		if policy.WithPhases != nil {
 			return nil, "", nil
 		}
 		return nil, "", fmt.Errorf("the referenced ComponentDefinition does not have available probe defined, but we got a probe event? %s", cmpd.Name)
@@ -173,31 +153,8 @@ func (h *AvailableEventHandler) getNCheckCompDefinition(ctx context.Context, cli
 	return compDef, nil
 }
 
-func (h *AvailableEventHandler) getComponentAvailablePolicy(cmpd *appsv1.ComponentDefinition) appsv1.ComponentAvailable {
-	if cmpd.Spec.Available != nil {
-		return *cmpd.Spec.Available
-	}
-	if cmpd.Spec.LifecycleActions != nil && cmpd.Spec.LifecycleActions.AvailableProbe != nil {
-		return appsv1.ComponentAvailable{
-			WithProbe: &appsv1.ComponentAvailableWithProbe{
-				TimeWindow: pointer.Int32(cmpd.Spec.LifecycleActions.AvailableProbe.PeriodSeconds),
-				Condition: &appsv1.ComponentAvailableCondition{
-					All: &appsv1.ComponentAvailableConditionX{
-						ActionCriteria: appsv1.ActionCriteria{
-							Succeed: pointer.Bool(true),
-						},
-					},
-				},
-			},
-		}
-	}
-	return appsv1.ComponentAvailable{
-		WithPhases: pointer.String(string(appsv1.RunningClusterCompPhase)),
-	}
-}
-
 func (h *AvailableEventHandler) pickupProbeEvents(event *corev1.Event, probeEvent *proto.ProbeEvent, comp *appsv1.Component) ([]proto.ProbeEvent, error) {
-
+	// TODO: impl
 	return nil, nil
 }
 
@@ -289,10 +246,7 @@ func (h *AvailableEventHandler) evaluateMajority(cond appsv1.ComponentAvailableC
 			count++
 		}
 	}
-	if int32(count) > replicas/2 {
-		return true
-	}
-	return false
+	return int32(count) > replicas/2
 }
 
 func (h *AvailableEventHandler) evaluateConditionX(cond appsv1.ComponentAvailableConditionX, replicas int32, events []proto.ProbeEvent) (bool, string, error) {
@@ -336,4 +290,28 @@ func (h *AvailableEventHandler) evaluateActionEvent(criteria appsv1.ActionCriter
 		}
 	}
 	return true
+}
+
+func GetComponentAvailablePolicy(cmpd *appsv1.ComponentDefinition) appsv1.ComponentAvailable {
+	if cmpd.Spec.Available != nil {
+		return *cmpd.Spec.Available
+	}
+	if cmpd.Spec.LifecycleActions != nil && cmpd.Spec.LifecycleActions.AvailableProbe != nil {
+		return appsv1.ComponentAvailable{
+			WithProbe: &appsv1.ComponentAvailableWithProbe{
+				TimeWindow: pointer.Int32(cmpd.Spec.LifecycleActions.AvailableProbe.PeriodSeconds),
+				Condition: &appsv1.ComponentAvailableCondition{
+					All: &appsv1.ComponentAvailableConditionX{
+						ActionCriteria: appsv1.ActionCriteria{
+							Succeed: pointer.Bool(true),
+						},
+					},
+				},
+			},
+		}
+	}
+	return appsv1.ComponentAvailable{
+		// TODO: replicas == 0, stopped, updating, abnormal?
+		WithPhases: pointer.String(string(appsv1.RunningClusterCompPhase)),
+	}
 }

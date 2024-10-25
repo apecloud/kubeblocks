@@ -1338,6 +1338,7 @@ ComponentAvailable
 </td>
 <td>
 <em>(Optional)</em>
+<p>Specifies the strategies for determining the available status of the Component.</p>
 <p>This field is immutable.</p>
 </td>
 </tr>
@@ -4136,19 +4137,6 @@ string
 </tr>
 <tr>
 <td>
-<code>withRoles</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the roles that the component will go through to be considered available.</p>
-<p>This field is immutable once set.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>withProbe</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.ComponentAvailableWithProbe">
@@ -4952,6 +4940,7 @@ ComponentAvailable
 </td>
 <td>
 <em>(Optional)</em>
+<p>Specifies the strategies for determining the available status of the Component.</p>
 <p>This field is immutable.</p>
 </td>
 </tr>

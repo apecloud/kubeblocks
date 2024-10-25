@@ -239,7 +239,7 @@ var _ = Describe("OpsRequest Controller", func() {
 		BeforeEach(func() {
 			By("Create a clusterDefinition obj")
 			clusterDefObj = testapps.NewClusterDefFactory(clusterDefName).
-				AddComponentDef(testapps.StatefulMySQLComponent, mysqlCompDefName).
+				AddComponentDef(testapps.ConsensusMySQLComponent, mysqlCompDefName).
 				Create(&testCtx).GetObject()
 
 			By("Create a clusterVersion obj")
@@ -253,7 +253,7 @@ var _ = Describe("OpsRequest Controller", func() {
 				source: corev1.ResourceRequirements{Requests: _1c1g, Limits: _1c1g},
 				target: corev1.ResourceRequirements{Requests: _2c4g, Limits: _2c4g},
 			}
-			testVerticalScaleCPUAndMemory(testapps.StatefulMySQLComponent, ctx)
+			testVerticalScaleCPUAndMemory(testapps.ConsensusMySQLComponent, ctx)
 		})
 	})
 

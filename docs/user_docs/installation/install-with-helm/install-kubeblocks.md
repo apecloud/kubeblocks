@@ -117,7 +117,7 @@ KubeBlocks can be installed like any other resource in Kubernetes, through a YAM
 Run the following command to install the latest operator manifest for this minor release:
 
  ```bash
- kubectl create -f \address.yaml
+ kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/vx.y.x/kubeblocks.yaml
  ```
 
 You can find the YAML file address from the [KubeBlocks release assets](https://github.com/apecloud/kubeblocks/releases).

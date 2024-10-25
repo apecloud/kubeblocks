@@ -27,7 +27,7 @@ The official index repo is [KubeBlocks index](https://github.com/apecloud/block-
    helm search repo kubeblocks/etcd --devel --versions
    ```
 
-3. Install the Addon (take etcs as example).
+3. Install the Addon (take etcd as example).
 
    ```bash
    helm install etcd kubeblocks/etcd --namespace kb-system --create-namespace --version 0.9.0

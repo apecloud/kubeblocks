@@ -8,7 +8,7 @@ sidebar_label: Install Addons
 
 # Install Addons
 
-## Use the index to install an addon
+## Use the index to install an Addon
 
 With the release of KubeBlocks v0.8.0, Addons are decoupled from KubeBlocks and some Addons are not installed by default. If you want to use these Addons, install Addons first by index. Or if you uninstalled some Addons, you can follow the steps in this tutorial to install them again.
 
@@ -39,49 +39,65 @@ The official index repo is [KubeBlocks index](https://github.com/apecloud/block-
    kbcli addon index update kubeblocks
    ```
 
-2. (Optional) Search whether the addon exists in the index.
+2. (Optional) Search whether the Addon exists in the index.
 
    ```bash
-   kbcli addon search mariadb
+   kbcli addon search etcd
    >
-   ADDON     VERSION   INDEX
-   mariadb   0.7.0     kubeblocks
+   ADDON   VERSION         INDEX
+   etcd    0.7.0           kubeblocks
+   etcd    0.8.0           kubeblocks
+   etcd    0.9.0           kubeblocks
    ```
 
-3. Install the addon.
+3. Install the Addon.
 
-   If there are multiple index sources and versions for an addon, you can specify them by adding flags. The system installs the latest version in the `kubeblocks` index by default.
+   If there are multiple index sources and versions for an Addon, you can specify them by adding flags. The system installs the latest version in the `kubeblocks` index by default.
 
    ```bash
-   kbcli addon install mariadb --index kubeblocks --version 0.7.0
+   kbcli addon install etcd --index kubeblocks --version 0.9.0
    ```
 
    **What's next**
 
-   After the addon is installed, you can list and enable it.
+   After the Addon is installed, you can list and enable it.
 
-## List addons
+## List Addons
 
-To list supported addons, run `kbcli addon list` command.
+To list supported Addons, run `kbcli addon list` command.
 
-## Enable/Disable addons
+## Enable/Disable Addons
 
-To manually enable or disable addons, follow the steps below.
+To manually enable or disable Addons, follow the steps below.
 
 ***Steps:***
 
-1. To enable an addon, use `kbcli addon enable`.
+1. To enable an Addon, use `kbcli addon enable`.
 
    ***Example***
 
    ```bash
-   kbcli addon enable qdrant
+   kbcli addon enable etcd
    ```
 
-   To disable an addon, use `kbcli addon disable`.
+   To disable an Addon, use `kbcli addon disable`.
 
-2. List the addons again to check whether it is enabled.
+2. List the Addons again to check whether it is enabled.
 
    ```bash
    kbcli addon list
    ```
+
+## Uninstall Addons
+
+You can also uninstall the Addons. If you have created a related cluster, delete the cluster first.
+
+```bash
+kbcli cluster delete <name>
+```
+
+Uninstall an Addon.
+
+```bash
+kbcli addon uninstall etcd
+```

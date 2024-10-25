@@ -121,7 +121,7 @@ KubeBlocks 可以像 Kubernetes 中的其他资源一样，通过 YAML 文件和
 执行以下命令，安装当前小版本发布的最新 operator。
 
  ```bash
- kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/v0.9.1/kubeblocks.yaml
+ kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/vx.y.x/kubeblocks.yaml
  ```
 
 您可通过 [KubeBlocks 发布页资产](https://github.com/apecloud/kubeblocks/releases) 中获取 YAML 文件地址。

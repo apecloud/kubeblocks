@@ -438,6 +438,9 @@ func buildServiceAccountName(synthesizeComp *SynthesizedComponent) {
 		synthesizeComp.PodSpec.ServiceAccountName = synthesizeComp.ServiceAccountName
 		return
 	}
+	if !viper.GetBool(constant.EnableRBACManager) {
+		return
+	}
 	synthesizeComp.ServiceAccountName = constant.GenerateDefaultServiceAccountName(synthesizeComp.ClusterName, synthesizeComp.Name)
 	synthesizeComp.PodSpec.ServiceAccountName = synthesizeComp.ServiceAccountName
 }

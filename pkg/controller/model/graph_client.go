@@ -174,7 +174,10 @@ func (r *realGraphClient) DependOn(dag *graph.DAG, object client.Object, depende
 		return
 	}
 	for _, d := range dependency {
-		if d == nil {
+		// d == nil can't tell if d is (*T)(nil)
+		// e.g. `var d *corev1.Pod`
+		value := reflect.ValueOf(d)
+		if d == nil || (value.Kind() == reflect.Ptr && value.IsNil()) {
 			continue
 		}
 		v := r.FindMatchedVertex(dag, d)

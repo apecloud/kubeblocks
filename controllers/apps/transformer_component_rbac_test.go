@@ -141,8 +141,11 @@ var _ = Describe("object rbac transformer test.", func() {
 		It("w/o any rolebindings", func() {
 			init(false, false)
 			Expect(transformer.Transform(transCtx, dag)).Should(BeNil())
-			// nothing should be created
+			// sa should be created
+			serviceAccount := factory.BuildServiceAccount(synthesizedComp, serviceAccountName)
 			dagExpected := mockDAG(graphCli, cluster)
+			graphCli.Create(dagExpected, serviceAccount)
+
 			Expect(dag.Equals(dagExpected, model.DefaultLess)).Should(BeTrue())
 		})
 

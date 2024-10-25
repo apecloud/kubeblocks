@@ -57,13 +57,13 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 		return nil
 	}
 
+	// If the user has disabled rbac manager or specified comp.Spec.ServiceAccountName, it is now the user's responsibility to
+	// provide appropriate serviceaccount, roles and rolebindings.
 	if !viper.GetBool(constant.EnableRBACManager) {
 		transCtx.EventRecorder.Event(transCtx.Cluster, corev1.EventTypeWarning, EventReasonRBACManager, "RBAC manager is disabled")
 		return nil
 	}
-
 	if transCtx.Component.Spec.ServiceAccountName != "" {
-		// user specifies a serviceaccount, nothing to do
 		return nil
 	}
 
@@ -81,14 +81,7 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 		return err
 	}
 
-	if len(rbs) == 0 {
-		transCtx.EventRecorder.Event(
-			transCtx.Cluster, corev1.EventTypeNormal, EventReasonRBACManager,
-			"no rolebinding needed, serviceaccount won't be created",
-		)
-		return nil
-	}
-
+	// if no rolebinding is needed, sa will be created anyway, because other modules may reference it.
 	sa, err := createOrUpdateServiceAccount(transCtx, serviceAccountName, graphCli, dag)
 	if err != nil {
 		return err
@@ -96,11 +89,7 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 
 	// serviceAccount should be created before roleBinding and role
 	for _, rb := range rbs {
-		if role == nil {
-			graphCli.DependOn(dag, rb, sa)
-		} else {
-			graphCli.DependOn(dag, rb, sa, role)
-		}
+		graphCli.DependOn(dag, rb, sa, role)
 	}
 	// serviceAccount should be created before workload
 	itsList := graphCli.FindAll(dag, &workloads.InstanceSet{})

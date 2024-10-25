@@ -180,7 +180,9 @@ type ComponentSpec struct {
 	// `policyRules` field. If the field is empty, ServiceAccount will not be created.
 	//
 	// If the field is not empty, the specified ServiceAccount will be used. And KubeBlocks will not
-	// create a ServiceAccount.
+	// create a ServiceAccount, nor create RoleBinding accordingly. In this case, user also needs to
+	// manually create a RoleBinding to `kubeblocks-cluster-pod-role`, so that roleProbe functionality
+	// can work properly.
 	//
 	// +optional
 	ServiceAccountName string `json:"serviceAccountName,omitempty"`

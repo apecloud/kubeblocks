@@ -136,10 +136,67 @@ var _ = Describe("ConfigurationOperatorTest", func() {
 				EXPECT().
 				Patch(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 				Return(nil)
-			// DoAndReturn(func(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error {
-			//	return nil
-			// })
+			Expect(createConfigReconcileTask().Reconcile()).Should(Succeed())
+		})
 
+		It("BuildConfigManagerNPETest", func() {
+			configConstraintNpe := &appsv1beta1.ConfigConstraint{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: mysqlConfigConstraintName + "_npe_test",
+				},
+				Spec: appsv1beta1.ConfigConstraintSpec{
+					ReloadAction: &appsv1beta1.ReloadAction{
+						ShellTrigger: &appsv1beta1.ShellTrigger{
+							Command: []string{"echo", "hello"},
+							Sync:    cfgutil.ToPointer(true),
+							ToolsSetup: &appsv1beta1.ToolsSetup{
+								MountPoint: "/kb_tools",
+								ToolConfigs: []appsv1beta1.ToolConfig{
+									{
+										Name:             "tools_name",
+										AsContainerImage: func() *bool { var b = true; return &b }(),
+										Image:            "apecloud/tools:1234",
+									},
+								},
+							},
+						},
+					},
+					FileFormatConfig: &appsv1beta1.FileFormatConfig{
+						Format: appsv1beta1.Ini,
+					},
+				},
+			}
+			synthesizedComponent.ConfigTemplates = append(synthesizedComponent.ConfigTemplates, synthesizedComponent.ConfigTemplates[0])
+			synthesizedComponent.ConfigTemplates[1].Name = "npe_test"
+			synthesizedComponent.ConfigTemplates[1].ConfigConstraintRef = configConstraintNpe.Name
+
+			k8sMockClient.MockGetMethod(testutil.WithGetReturned(testutil.WithConstructSimpleGetResult(
+				[]client.Object{
+					compDefObj,
+					clusterObj,
+					clusterObj,
+					scriptsObj,
+					configMapObj,
+					configConstraint,
+					configurationObj,
+					configConstraintNpe,
+				},
+			), testutil.WithAnyTimes()))
+			k8sMockClient.MockCreateMethod(testutil.WithCreateReturned(testutil.WithCreatedSucceedResult(), testutil.WithAnyTimes()))
+			k8sMockClient.MockPatchMethod(testutil.WithPatchReturned(func(obj client.Object, patch client.Patch) error {
+				switch v := obj.(type) {
+				case *appsv1alpha1.Configuration:
+					if client.ObjectKeyFromObject(obj) == client.ObjectKeyFromObject(configurationObj) {
+						configurationObj.Spec = *v.Spec.DeepCopy()
+						configurationObj.Status = *v.Status.DeepCopy()
+					}
+				}
+				return nil
+			}))
+			k8sMockClient.MockStatusMethod().
+				EXPECT().
+				Patch(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+				Return(nil)
 			Expect(createConfigReconcileTask().Reconcile()).Should(Succeed())
 		})
 

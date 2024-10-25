@@ -797,7 +797,7 @@ var _ = Describe("Backup Controller test", func() {
 				})).Should(Succeed())
 			})
 
-			It("continue reconcile when continuous backup is Failed after fixing the issue", func() {
+			FIt("continue reconcile when continuous backup is Failed after fixing the issue", func() {
 				By("create actionset and backupRepo for continuous backup")
 				actionSet := testdp.NewFakeActionSet(&testCtx)
 				Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(actionSet), func(fetched *dpv1alpha1.ActionSet) {
@@ -851,17 +851,17 @@ var _ = Describe("Backup Controller test", func() {
 				}
 				Eventually(testapps.CheckObj(&testCtx, stsKey, func(g Gomega, sts *appsv1.StatefulSet) {
 					g.Expect(*sts.Spec.Replicas).Should(BeEquivalentTo(0))
-				}))
+				})).Should(Succeed())
 
 				By("mock target pod exists")
 				Expect(testapps.ChangeObj(&testCtx, clusterInfo.TargetPod, func(pod *corev1.Pod) {
 					clusterInfo.TargetPod.Labels[constant.RoleLabelKey] = constant.Leader
-				}))
+				})).Should(Succeed())
 
 				By("expect the replicas of statefulSet is 1")
 				Eventually(testapps.CheckObj(&testCtx, stsKey, func(g Gomega, sts *appsv1.StatefulSet) {
 					g.Expect(*sts.Spec.Replicas).Should(BeEquivalentTo(1))
-				}))
+				})).Should(Succeed())
 			})
 		})
 	})

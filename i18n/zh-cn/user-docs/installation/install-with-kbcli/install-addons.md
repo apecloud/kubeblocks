@@ -55,7 +55,7 @@ KubeBlocks v0.8.0 发布后，引擎（Addon）与 KubeBlocks 解耦，KubeBlock
    当引擎有多个版本和索引源时，可使用 `--index` 指定索引源，`--version` 指定安装版本。系统默认以 `kubeblocks` 索引仓库 为索引源，安装最新版本。
 
    ```bash
-   kbcli addon install etcd --index kubeblocks --version 0.9.0
+   kbcli addon install etcd --index kubeblocks --version x.y.z
    ```
 
    **后续操作**

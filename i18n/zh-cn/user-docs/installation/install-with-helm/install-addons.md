@@ -27,10 +27,10 @@ KubeBlocks v0.8.0 发布后，引擎（Addon）与 KubeBlocks 解耦，KubeBlock
    helm search repo kubeblocks/etcd --devel --versions
    ```
 
-3. 安装引擎（以 etcd 为例）。
+3. 安装引擎（以 etcd 为例）。使用 `--version` 指定版本。
 
    ```bash
-   helm install mariadb kubeblocks/etcd --namespace kb-system --create-namespace --version 0.9.0
+   helm install mariadb kubeblocks/etcd --namespace kb-system --create-namespace --version x.y.z
    ```
 
 4. 验证该引擎是否安装成功。

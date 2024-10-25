@@ -52,10 +52,10 @@ The official index repo is [KubeBlocks index](https://github.com/apecloud/block-
 
 3. Install the Addon.
 
-   If there are multiple index sources and versions for an Addon, you can specify them by adding flags. The system installs the latest version in the `kubeblocks` index by default.
+   If there are multiple index sources and versions for an Addon, you can specify an index by `--index` and a version by `--version`. The system installs the latest version in the `kubeblocks` index by default.
 
    ```bash
-   kbcli addon install etcd --index kubeblocks --version 0.9.0
+   kbcli addon install etcd --index kubeblocks --version x.y.z
    ```
 
    **What's next**

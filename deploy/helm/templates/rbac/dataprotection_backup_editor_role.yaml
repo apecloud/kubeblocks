@@ -1,3 +1,5 @@
+{{- $backupRole := printf "%s-backup-editor-role" (include "kubeblocks.fullname" .) }}
+{{- if eq (include "kubeblocks.installClusterRole" (merge (dict "name" $backupRole) .)) "true" }}
 # permissions for end users to edit backups.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -24,3 +26,4 @@ rules:
   - backups/status
   verbs:
   - get
+{{- end }}

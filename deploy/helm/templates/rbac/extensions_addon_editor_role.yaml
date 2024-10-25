@@ -1,3 +1,5 @@
+{{- $addoneRole := printf "%s-editor-role" (include "kubeblocks.fullname" .) }}
+{{- if eq (include "kubeblocks.installClusterRole" (merge (dict "name" $addoneRole) .)) "true" }}
 # permissions for end users to edit addons.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -24,3 +26,4 @@ rules:
   - addons/status
   verbs:
   - get
+{{- end }}

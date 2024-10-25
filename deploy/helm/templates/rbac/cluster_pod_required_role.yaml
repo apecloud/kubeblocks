@@ -1,8 +1,10 @@
+{{- $clusterPodRole := printf "%s-cluster-pod-role" (include "kubeblocks.fullname" .) }}
+{{- if eq (include "kubeblocks.installClusterRole" (merge (dict "name" $clusterPodRole) .)) "true" }}
 # permissions for end users to edit clusters.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: kubeblocks-cluster-pod-role
+  name: {{ include "kubeblocks.fullname" . }}-cluster-pod-role
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
 aggregationRule:
@@ -10,11 +12,12 @@ aggregationRule:
   - matchLabels:
       {{- include "kubeblocks.selectorLabels" . | nindent 6 }}
       app.kubernetes.io/required-by: pod
+{{- end }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: kubeblocks-lorry-pod-role
+  name: {{ include "kubeblocks.fullname" . }}-agent-pod-role
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
     app.kubernetes.io/required-by: pod
@@ -64,10 +67,12 @@ rules:
   - get
   - patch
 ---
+{{- $patroniPodRole := printf "%s-patroni-pod-role" (include "kubeblocks.fullname" .) }}
+{{- if eq (include "kubeblocks.installClusterRole" (merge (dict "name" $patroniPodRole) .)) "true" }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: kubeblocks-patroni-pod-role
+  name: {{ include "kubeblocks.fullname" . }}-patroni-pod-role
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
     app.kubernetes.io/required-by: pod
@@ -110,27 +115,4 @@ rules:
   - patch
   - update
   - watch
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: kubeblocks-backup-pod-role
-  labels:
-    {{- include "kubeblocks.labels" . | nindent 4 }}
-    app.kubernetes.io/required-by: pod
-rules:
-- apiGroups:
-  - "dataprotection.kubeblocks.io"
-  resources:
-  - backups/status
-  verbs:
-  - get
-  - update
-  - patch
-- apiGroups:
-  - "dataprotection.kubeblocks.io"
-  resources:
-  - backups
-  verbs:
-  - create
-  - get
+{{- end }}

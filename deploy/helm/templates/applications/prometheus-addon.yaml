@@ -1,4 +1,6 @@
 {{- if has "prometheus" .Values.autoInstalledAddons  }}
+{{- $prometheusAddonName := (include "addon.prometheus.name" .) }}
+{{- if eq (include "kubeblocks.installAddons" (merge (dict "name" $prometheusAddonName) .)) "true" }}
 apiVersion: extensions.kubeblocks.io/v1alpha1
 kind: Addon
 metadata:
@@ -139,4 +141,5 @@ spec:
 
   installable:
     autoInstall: {{ .Values.prometheus.enabled }}
+{{- end }}
 {{- end }}

@@ -1,3 +1,4 @@
+{{- if eq (include "dataprotection.installStorageProvider" (merge (dict "name" "cos") .)) "true" }}
 # cos is a storage provider for [Tencent Cloud Object Storage](https://cloud.tencent.com/product/cos)
 apiVersion: dataprotection.kubeblocks.io/v1alpha1
 kind: StorageProvider
@@ -94,3 +95,4 @@ spec:
     credentialFields:
       - accessKeyId
       - secretAccessKey
+{{- end }}

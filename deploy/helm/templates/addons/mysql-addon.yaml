@@ -1,4 +1,5 @@
 {{- if has "mysql" .Values.autoInstalledAddons  }}
+{{- if eq (include "kubeblocks.installAddons" (merge (dict "name" "mysql") .)) "true" }}
 {{- $selectorLabels := include "kubeblocks.selectorLabels" . }}
 {{- include "kubeblocks.buildAddonCR" (merge (dict
   "kbVersion" ">=0.7.0"
@@ -9,4 +10,5 @@
   "provider" "community"
   "description" "MySQL is a widely used, open-source relational database management system (RDBMS)."
   "autoInstall" true) . ) -}}
+{{- end }}
 {{- end }}

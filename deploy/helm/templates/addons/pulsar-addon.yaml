@@ -1,4 +1,5 @@
 {{- if has "pulsar" .Values.autoInstalledAddons  }}
+{{- if eq (include "kubeblocks.installAddons" (merge (dict "name" "pulsar") .)) "true" }}
 {{- $selectorLabels := include "kubeblocks.selectorLabels" . }}
 {{- include "kubeblocks.buildAddonCR" (merge (dict
   "kbVersion" ">=0.7.0"
@@ -9,4 +10,5 @@
   "provider" "community"
   "description" "Apache® Pulsar™ is an open-source, distributed messaging and streaming platform built for the cloud."
   "autoInstall" true) . ) -}}
+{{- end }}
 {{- end }}

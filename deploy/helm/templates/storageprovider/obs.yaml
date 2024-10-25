@@ -1,3 +1,4 @@
+{{- if eq (include "dataprotection.installStorageProvider" (merge (dict "name" "obs") .)) "true" }}
 # obs is a storage provider for [Huawei OBS](https://www.huaweicloud.com/product/obs.html) object storage.
 apiVersion: dataprotection.kubeblocks.io/v1alpha1
 kind: StorageProvider
@@ -95,3 +96,4 @@ spec:
     credentialFields:
       - accessKeyId
       - secretAccessKey
+{{- end }}

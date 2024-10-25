@@ -1,3 +1,5 @@
+{{- $kubeblocksRoleName := (include "kubeblocks.fullname" .) }}
+{{- if eq (include "kubeblocks.installClusterRole" (merge (dict "name" $kubeblocksRoleName) .)) "true" }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -8,6 +10,10 @@ aggregationRule:
   clusterRoleSelectors:
   - matchLabels:
       {{- include "kubeblocks.selectorLabels" . | nindent 6 }}
+{{- end }}
+
+{{- $managerRole := printf "%s-manager-role" (include "kubeblocks.fullname" .) }}
+{{- if eq (include "kubeblocks.installClusterRole" (merge (dict "name" $managerRole) .)) "true" }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -23,7 +29,11 @@ rules:
   {{- end }}
   {{- if eq $line "rules:" }}{{- $doInclude = true }}{{- end }}
 {{- end }}
+{{- end }}
+
 {{- if .Values.dataProtection.enabled }}
+{{- $dataprotectionRole := (include "dataprotection.workerClusterRoleName" .) }}
+{{- if eq (include "kubeblocks.installClusterRole" (merge (dict "name" $dataprotectionRole) .)) "true" }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -51,7 +61,10 @@ rules:
   - patch
   - update
 {{- end }}
-{{- if .Values.crd.enabled }}
+{{- end }}
+{{- if .Values.webhooks.conversionEnabled }}
+{{- $helmHookRole := printf "%s-helmhook-role" (include "kubeblocks.fullname" .) }}
+{{- if eq (include "kubeblocks.installClusterRole" (merge (dict "name" $helmHookRole) .)) "true" }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -59,8 +72,6 @@ metadata:
   name: {{ include "kubeblocks.fullname" . }}-helmhook-role
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
-  annotations:
-    "helm.sh/hook": pre-upgrade
 rules:
   - apiGroups:
       - apiextensions.k8s.io
@@ -90,4 +101,5 @@ rules:
       - deployments/status
     verbs:
       - get
+{{- end }}
 {{- end }}

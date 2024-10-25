@@ -1,4 +1,5 @@
 {{- if has "llm" .Values.autoInstalledAddons  }}
+{{- if eq (include "kubeblocks.installAddons" (merge (dict "name" "llm") .)) "true" }}
 {{- $selectorLabels := include "kubeblocks.selectorLabels" . }}
 {{- include "kubeblocks.buildAddonCR" (merge (dict
   "kbVersion" ">=0.7.0"
@@ -10,3 +11,4 @@
   "description" "Large Language Models."
   "autoInstall" false) . ) -}}
   {{- end }}
+{{- end }}

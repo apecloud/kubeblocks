@@ -1,3 +1,4 @@
+{{- if eq (include "dataprotection.installStorageProvider" (merge (dict "name" "minio") .)) "true" }}
 apiVersion: dataprotection.kubeblocks.io/v1alpha1
 kind: StorageProvider
 metadata:
@@ -88,3 +89,4 @@ spec:
     credentialFields:
       - accessKeyId
       - secretAccessKey
+ {{- end }}

@@ -1,3 +1,5 @@
+{{- $nodecountscalerRole := printf "%s-nodecountscaler-editor-role" (include "kubeblocks.fullname" .) }}
+{{- if eq (include "kubeblocks.installClusterRole" (merge (dict "name" $nodecountscalerRole) .)) "true" }}
 # permissions for end users to edit restores.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -24,3 +26,4 @@ rules:
   - restores/status
   verbs:
   - get
+{{- end }}

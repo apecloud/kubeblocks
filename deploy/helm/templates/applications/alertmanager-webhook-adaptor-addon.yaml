@@ -1,4 +1,6 @@
 {{- if has "alertmanager-webhook-adaptor" .Values.autoInstalledAddons  }}
+{{- $webhookAdaptor := (include "addon.alertmanager-webhook-adaptor.name" .) }}
+{{- if eq (include "kubeblocks.installAddons" (merge (dict "name" $webhookAdaptor) .)) "true" }}
 apiVersion: extensions.kubeblocks.io/v1alpha1
 kind: Addon
 metadata:
@@ -48,5 +50,6 @@ spec:
 
   installable:
     autoInstall: {{ .Values.prometheus.enabled }}
+{{- end }}
 {{- end }}
 

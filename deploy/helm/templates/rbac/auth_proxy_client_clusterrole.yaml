@@ -1,3 +1,5 @@
+{{- $metricRole := printf "%s-metrics-reader" (include "kubeblocks.fullname" .) }}
+{{- if eq (include "kubeblocks.installClusterRole" (merge (dict "name" $metricRole) .)) "true" }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -9,3 +11,4 @@ rules:
   - "/metrics"
   verbs:
   - get
+{{- end }}

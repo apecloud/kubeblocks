@@ -26,13 +26,13 @@ import (
 	"github.com/golang/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
-	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
@@ -89,7 +89,7 @@ var _ = Describe("ConfigurationOperatorTest", func() {
 				ReloadAction: &appsv1beta1.ReloadAction{
 					ShellTrigger: &appsv1beta1.ShellTrigger{
 						Command: []string{"echo", "hello"},
-						Sync:    cfgutil.ToPointer(true),
+						Sync:    pointer.Bool(true),
 					},
 				},
 				FileFormatConfig: &appsv1beta1.FileFormatConfig{
@@ -148,13 +148,13 @@ var _ = Describe("ConfigurationOperatorTest", func() {
 					ReloadAction: &appsv1beta1.ReloadAction{
 						ShellTrigger: &appsv1beta1.ShellTrigger{
 							Command: []string{"echo", "hello"},
-							Sync:    cfgutil.ToPointer(true),
+							Sync:    pointer.Bool(true),
 							ToolsSetup: &appsv1beta1.ToolsSetup{
 								MountPoint: "/kb_tools",
 								ToolConfigs: []appsv1beta1.ToolConfig{
 									{
 										Name:             "tools_name",
-										AsContainerImage: func() *bool { var b = true; return &b }(),
+										AsContainerImage: pointer.Bool(true),
 										Image:            "apecloud/tools:1234",
 									},
 								},

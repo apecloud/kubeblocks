@@ -173,13 +173,9 @@ func kindsForWipeOut() ([]client.ObjectList, []client.ObjectList) {
 
 // shouldSkipObjOwnedByComp is used to judge whether the object owned by component should be skipped when deleting the cluster
 func shouldSkipObjOwnedByComp(obj client.Object, cluster kbappsv1.Cluster) bool {
+	// if the object is not owned by component, it should not be skipped
 	ownByComp := isOwnedByComp(obj)
-	if !ownByComp {
-		// if the object is not owned by component, it should not be skipped
-		return false
-	}
-
-	return true
+	return ownByComp
 }
 
 func deleteCompNShardingInOrder4Terminate(transCtx *clusterTransformContext, dag *graph.DAG) (sets.Set[string], error) {

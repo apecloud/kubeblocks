@@ -341,6 +341,10 @@ func customExecActionImageNContainer(synthesizedComp *SynthesizedComponent) (str
 		if c == nil {
 			return "", nil, fmt.Errorf("exec container %s not found", container)
 		}
+
+		if image == "" {
+			image = c.Image
+		}
 	}
 	return image, c, nil
 }

@@ -15947,13 +15947,13 @@ spec:
                       description: Specifies the current state of the Component.
                       enum:
                       - Creating
+                      - Running
                       - Updating
                       - Stopping
-                      - Starting
-                      - Deleting
-                      - Running
                       - Stopped
+                      - Deleting
                       - Failed
+                      - Abnormal
                       type: string
                   type: object
                 description: Records the current status information of all Components
@@ -16073,13 +16073,13 @@ spec:
                       description: Specifies the current state of the Component.
                       enum:
                       - Creating
+                      - Running
                       - Updating
                       - Stopping
-                      - Starting
-                      - Deleting
-                      - Running
                       - Stopped
+                      - Deleting
                       - Failed
+                      - Abnormal
                       type: string
                   type: object
                 description: Records the current status information of all shardings

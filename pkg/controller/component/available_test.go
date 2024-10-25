@@ -48,7 +48,7 @@ var _ = Describe("Available", func() {
 
 	FContext("evaluate", func() {
 		It("all succeed - ok", func() {
-			h := &AvailableProbeEventHandler{}
+			h := &AvailableEventHandler{}
 
 			cond := appsv1.ComponentAvailableCondition{
 				All: &appsv1.ComponentAvailableConditionX{
@@ -77,7 +77,7 @@ var _ = Describe("Available", func() {
 		})
 
 		It("all succeed - fail", func() {
-			h := &AvailableProbeEventHandler{}
+			h := &AvailableEventHandler{}
 
 			cond := appsv1.ComponentAvailableCondition{
 				All: &appsv1.ComponentAvailableConditionX{
@@ -106,7 +106,7 @@ var _ = Describe("Available", func() {
 		})
 
 		It("has leader - ok", func() {
-			h := &AvailableProbeEventHandler{}
+			h := &AvailableEventHandler{}
 
 			cond := appsv1.ComponentAvailableCondition{
 				Any: &appsv1.ComponentAvailableConditionX{
@@ -138,7 +138,7 @@ var _ = Describe("Available", func() {
 		})
 
 		It("has leader - fail", func() {
-			h := &AvailableProbeEventHandler{}
+			h := &AvailableEventHandler{}
 
 			cond := appsv1.ComponentAvailableCondition{
 				Any: &appsv1.ComponentAvailableConditionX{
@@ -170,7 +170,7 @@ var _ = Describe("Available", func() {
 		})
 
 		It("has leader, majority replicas have roles - ok", func() {
-			h := &AvailableProbeEventHandler{}
+			h := &AvailableEventHandler{}
 
 			cond := appsv1.ComponentAvailableCondition{
 				And: []appsv1.ComponentAvailableConditionX{
@@ -234,7 +234,7 @@ var _ = Describe("Available", func() {
 		})
 
 		It("has leader, majority replicas have roles - fail", func() {
-			h := &AvailableProbeEventHandler{}
+			h := &AvailableEventHandler{}
 
 			cond := appsv1.ComponentAvailableCondition{
 				And: []appsv1.ComponentAvailableConditionX{
@@ -298,7 +298,7 @@ var _ = Describe("Available", func() {
 		})
 
 		It("has leader, has no FATAL errors", func() {
-			h := &AvailableProbeEventHandler{}
+			h := &AvailableEventHandler{}
 
 			cond := appsv1.ComponentAvailableCondition{
 				And: []appsv1.ComponentAvailableConditionX{

@@ -2414,32 +2414,33 @@ Kubernetes core/v1.ConfigMapVolumeSource
 <th>Description</th>
 </tr>
 </thead>
-<tbody><tr><td><p>&#34;Creating&#34;</p></td>
-<td><p>CreatingClusterCompPhase indicates the component is currently being created.</p>
+<tbody><tr><td><p>&#34;Abnormal&#34;</p></td>
+<td><p>AbnormalClusterCompPhase indicates the component has more than zero replicas, but there are some failed pods.
+The component is functioning, but it is in a fragile state.</p>
+</td>
+</tr><tr><td><p>&#34;Creating&#34;</p></td>
+<td><p>CreatingClusterCompPhase indicates the component is being created.</p>
 </td>
 </tr><tr><td><p>&#34;Deleting&#34;</p></td>
 <td><p>DeletingClusterCompPhase indicates the component is currently being deleted.</p>
 </td>
 </tr><tr><td><p>&#34;Failed&#34;</p></td>
-<td><p>FailedClusterCompPhase indicates the component encountered some error and did not complete successfully.</p>
-</td>
-</tr><tr><td><p>&#34;Recovering&#34;</p></td>
-<td><p>RecoveringClusterCompPhase indicates the component is currently being recovered from some passive exception.</p>
+<td><p>FailedClusterCompPhase indicates the component has more than zero replicas, but there are some failed pods.
+The component is not functioning.</p>
 </td>
 </tr><tr><td><p>&#34;Running&#34;</p></td>
-<td><p>RunningClusterCompPhase indicates all resources of the component are up-to-date and running w/o any failure.</p>
-</td>
-</tr><tr><td><p>&#34;Starting&#34;</p></td>
-<td><p>StartingClusterCompPhase indicates the component is currently being started.</p>
+<td><p>RunningClusterCompPhase indicates the component has more than zero replicas, and all pods are up-to-date and
+in a &lsquo;Running&rsquo; state.</p>
 </td>
 </tr><tr><td><p>&#34;Stopped&#34;</p></td>
-<td><p>StoppedClusterCompPhase indicates the component has been stopped, all Pods belonging to the component are terminated.</p>
+<td><p>StoppedClusterCompPhase indicates the component has zero replicas, and all pods have been deleted.</p>
 </td>
 </tr><tr><td><p>&#34;Stopping&#34;</p></td>
-<td><p>StoppingClusterCompPhase indicates the component is currently being stopped.</p>
+<td><p>StoppingClusterCompPhase indicates the component has zero replicas, and there are pods that are terminating.</p>
 </td>
 </tr><tr><td><p>&#34;Updating&#34;</p></td>
-<td><p>UpdatingClusterCompPhase indicates the component is currently being updated.</p>
+<td><p>UpdatingClusterCompPhase indicates the component has more than zero replicas, and there are no failed pods,
+it is currently being updated.</p>
 </td>
 </tr></tbody>
 </table>

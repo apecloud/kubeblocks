@@ -4827,13 +4827,13 @@ spec:
                         Possible values include "Creating", "Running", "Updating", "Stopping", "Stopped", "Deleting", "Failed", "Abnormal".
                       enum:
                       - Creating
+                      - Running
                       - Updating
                       - Stopping
-                      - Starting
-                      - Deleting
-                      - Running
                       - Stopped
+                      - Deleting
                       - Failed
+                      - Abnormal
                       type: string
                     preCheck:
                       description: Records the result of the preConditions check of

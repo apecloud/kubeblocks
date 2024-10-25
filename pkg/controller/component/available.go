@@ -43,9 +43,9 @@ const (
 	availableProbe = "availableProbe"
 )
 
-type AvailableProbeEventHandler struct{}
+type AvailableEventHandler struct{}
 
-func (h *AvailableProbeEventHandler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) error {
+func (h *AvailableEventHandler) Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) error {
 	if !h.isAvailableEvent(event) {
 		return nil
 	}
@@ -77,22 +77,22 @@ func (h *AvailableProbeEventHandler) Handle(cli client.Client, reqCtx intctrluti
 	return h.unavailable(reqCtx.Ctx, cli, recorder, comp, message)
 }
 
-func (h *AvailableProbeEventHandler) isAvailableEvent(event *corev1.Event) bool {
+func (h *AvailableEventHandler) isAvailableEvent(event *corev1.Event) bool {
 	return event.ReportingController == proto.ProbeEventReportingController &&
 		event.Reason == availableProbe && event.InvolvedObject.FieldPath == proto.ProbeEventFieldPath
 }
 
-func (h *AvailableProbeEventHandler) available(ctx context.Context, cli client.Client,
+func (h *AvailableEventHandler) available(ctx context.Context, cli client.Client,
 	recorder record.EventRecorder, comp *appsv1.Component) error {
 	return h.status(ctx, cli, recorder, comp, metav1.ConditionTrue, "Available", "Component is available")
 }
 
-func (h *AvailableProbeEventHandler) unavailable(ctx context.Context, cli client.Client,
+func (h *AvailableEventHandler) unavailable(ctx context.Context, cli client.Client,
 	recorder record.EventRecorder, comp *appsv1.Component, message string) error {
 	return h.status(ctx, cli, recorder, comp, metav1.ConditionFalse, "Unavailable", message)
 }
 
-func (h *AvailableProbeEventHandler) status(ctx context.Context, cli client.Client, recorder record.EventRecorder,
+func (h *AvailableEventHandler) status(ctx context.Context, cli client.Client, recorder record.EventRecorder,
 	comp *appsv1.Component, status metav1.ConditionStatus, reason, message string) error {
 	newCond := func() metav1.Condition {
 		return metav1.Condition{
@@ -128,12 +128,12 @@ func (h *AvailableProbeEventHandler) status(ctx context.Context, cli client.Clie
 	return cli.Status().Patch(ctx, comp, client.MergeFrom(compCopy))
 }
 
-func (h *AvailableProbeEventHandler) condEqual(cond1, cond2 metav1.Condition) bool {
+func (h *AvailableEventHandler) condEqual(cond1, cond2 metav1.Condition) bool {
 	return cond1.Type == cond2.Type && cond1.Status == cond2.Status &&
 		cond1.ObservedGeneration == cond2.ObservedGeneration && cond1.Reason == cond2.Reason
 }
 
-func (h *AvailableProbeEventHandler) handleEvent(ctx context.Context, cli client.Client,
+func (h *AvailableEventHandler) handleEvent(ctx context.Context, cli client.Client,
 	event *corev1.Event, probeEvent *proto.ProbeEvent, comp *appsv1.Component) (*bool, string, error) {
 	cmpd, err := h.getNCheckCompDefinition(ctx, cli, comp.Spec.CompDef)
 	if err != nil {
@@ -156,7 +156,7 @@ func (h *AvailableProbeEventHandler) handleEvent(ctx context.Context, cli client
 	return &available, message, err
 }
 
-func (h *AvailableProbeEventHandler) getNCheckCompDefinition(ctx context.Context, cli client.Reader, name string) (*appsv1.ComponentDefinition, error) {
+func (h *AvailableEventHandler) getNCheckCompDefinition(ctx context.Context, cli client.Reader, name string) (*appsv1.ComponentDefinition, error) {
 	compKey := types.NamespacedName{
 		Name: name,
 	}
@@ -173,7 +173,7 @@ func (h *AvailableProbeEventHandler) getNCheckCompDefinition(ctx context.Context
 	return compDef, nil
 }
 
-func (h *AvailableProbeEventHandler) getComponentAvailablePolicy(cmpd *appsv1.ComponentDefinition) appsv1.ComponentAvailable {
+func (h *AvailableEventHandler) getComponentAvailablePolicy(cmpd *appsv1.ComponentDefinition) appsv1.ComponentAvailable {
 	if cmpd.Spec.Available != nil {
 		return *cmpd.Spec.Available
 	}
@@ -196,12 +196,12 @@ func (h *AvailableProbeEventHandler) getComponentAvailablePolicy(cmpd *appsv1.Co
 	}
 }
 
-func (h *AvailableProbeEventHandler) pickupProbeEvents(event *corev1.Event, probeEvent *proto.ProbeEvent, comp *appsv1.Component) ([]proto.ProbeEvent, error) {
+func (h *AvailableEventHandler) pickupProbeEvents(event *corev1.Event, probeEvent *proto.ProbeEvent, comp *appsv1.Component) ([]proto.ProbeEvent, error) {
 
 	return nil, nil
 }
 
-func (h *AvailableProbeEventHandler) evaluateCondition(cond appsv1.ComponentAvailableCondition, replicas int32, events []proto.ProbeEvent) (bool, string, error) {
+func (h *AvailableEventHandler) evaluateCondition(cond appsv1.ComponentAvailableCondition, replicas int32, events []proto.ProbeEvent) (bool, string, error) {
 	if len(cond.And) > 0 {
 		return h.evaluateAnd(cond.And, replicas, events), "", nil
 	}
@@ -226,7 +226,7 @@ func (h *AvailableProbeEventHandler) evaluateCondition(cond appsv1.ComponentAvai
 	return true, "", nil
 }
 
-func (h *AvailableProbeEventHandler) evaluateAnd(conditions []appsv1.ComponentAvailableConditionX, replicas int32, events []proto.ProbeEvent) bool {
+func (h *AvailableEventHandler) evaluateAnd(conditions []appsv1.ComponentAvailableConditionX, replicas int32, events []proto.ProbeEvent) bool {
 	for _, cond := range conditions {
 		ok, _, _ := h.evaluateConditionX(cond, replicas, events)
 		if !ok {
@@ -236,7 +236,7 @@ func (h *AvailableProbeEventHandler) evaluateAnd(conditions []appsv1.ComponentAv
 	return true
 }
 
-func (h *AvailableProbeEventHandler) evaluateOr(conditions []appsv1.ComponentAvailableConditionX, replicas int32, events []proto.ProbeEvent) bool {
+func (h *AvailableEventHandler) evaluateOr(conditions []appsv1.ComponentAvailableConditionX, replicas int32, events []proto.ProbeEvent) bool {
 	for _, cond := range conditions {
 		ok, _, _ := h.evaluateConditionX(cond, replicas, events)
 		if ok {
@@ -246,12 +246,12 @@ func (h *AvailableProbeEventHandler) evaluateOr(conditions []appsv1.ComponentAva
 	return false
 }
 
-func (h *AvailableProbeEventHandler) evaluateNot(cond appsv1.ComponentAvailableConditionX, replicas int32, events []proto.ProbeEvent) bool {
+func (h *AvailableEventHandler) evaluateNot(cond appsv1.ComponentAvailableConditionX, replicas int32, events []proto.ProbeEvent) bool {
 	ok, _, _ := h.evaluateConditionX(cond, replicas, events)
 	return !ok
 }
 
-func (h *AvailableProbeEventHandler) evaluateAll(cond appsv1.ComponentAvailableConditionX, replicas int32, events []proto.ProbeEvent) bool {
+func (h *AvailableEventHandler) evaluateAll(cond appsv1.ComponentAvailableConditionX, replicas int32, events []proto.ProbeEvent) bool {
 	for _, event := range events {
 		ok, _, _ := h.evaluateConditionX(cond, replicas, []proto.ProbeEvent{event})
 		if !ok {
@@ -261,7 +261,7 @@ func (h *AvailableProbeEventHandler) evaluateAll(cond appsv1.ComponentAvailableC
 	return true
 }
 
-func (h *AvailableProbeEventHandler) evaluateAny(cond appsv1.ComponentAvailableConditionX, replicas int32, events []proto.ProbeEvent) bool {
+func (h *AvailableEventHandler) evaluateAny(cond appsv1.ComponentAvailableConditionX, replicas int32, events []proto.ProbeEvent) bool {
 	for _, event := range events {
 		ok, _, _ := h.evaluateConditionX(cond, replicas, []proto.ProbeEvent{event})
 		if ok {
@@ -271,7 +271,7 @@ func (h *AvailableProbeEventHandler) evaluateAny(cond appsv1.ComponentAvailableC
 	return false
 }
 
-func (h *AvailableProbeEventHandler) evaluateNone(cond appsv1.ComponentAvailableConditionX, replicas int32, events []proto.ProbeEvent) bool {
+func (h *AvailableEventHandler) evaluateNone(cond appsv1.ComponentAvailableConditionX, replicas int32, events []proto.ProbeEvent) bool {
 	for _, event := range events {
 		ok, _, _ := h.evaluateConditionX(cond, replicas, []proto.ProbeEvent{event})
 		if ok {
@@ -281,7 +281,7 @@ func (h *AvailableProbeEventHandler) evaluateNone(cond appsv1.ComponentAvailable
 	return true
 }
 
-func (h *AvailableProbeEventHandler) evaluateMajority(cond appsv1.ComponentAvailableConditionX, replicas int32, events []proto.ProbeEvent) bool {
+func (h *AvailableEventHandler) evaluateMajority(cond appsv1.ComponentAvailableConditionX, replicas int32, events []proto.ProbeEvent) bool {
 	count := 0
 	for _, event := range events {
 		ok, _, _ := h.evaluateConditionX(cond, replicas, []proto.ProbeEvent{event})
@@ -295,7 +295,7 @@ func (h *AvailableProbeEventHandler) evaluateMajority(cond appsv1.ComponentAvail
 	return false
 }
 
-func (h *AvailableProbeEventHandler) evaluateConditionX(cond appsv1.ComponentAvailableConditionX, replicas int32, events []proto.ProbeEvent) (bool, string, error) {
+func (h *AvailableEventHandler) evaluateConditionX(cond appsv1.ComponentAvailableConditionX, replicas int32, events []proto.ProbeEvent) (bool, string, error) {
 	if cond.ActionCriteria != (appsv1.ActionCriteria{}) {
 		return h.evaluateAction(cond.ActionCriteria, events), "", nil
 	}
@@ -305,7 +305,7 @@ func (h *AvailableProbeEventHandler) evaluateConditionX(cond appsv1.ComponentAva
 	return true, "", nil
 }
 
-func (h *AvailableProbeEventHandler) evaluateAction(criteria appsv1.ActionCriteria, events []proto.ProbeEvent) bool {
+func (h *AvailableEventHandler) evaluateAction(criteria appsv1.ActionCriteria, events []proto.ProbeEvent) bool {
 	for _, event := range events {
 		if h.evaluateActionEvent(criteria, event) {
 			return true
@@ -315,7 +315,7 @@ func (h *AvailableProbeEventHandler) evaluateAction(criteria appsv1.ActionCriter
 
 }
 
-func (h *AvailableProbeEventHandler) evaluateActionEvent(criteria appsv1.ActionCriteria, event proto.ProbeEvent) bool {
+func (h *AvailableEventHandler) evaluateActionEvent(criteria appsv1.ActionCriteria, event proto.ProbeEvent) bool {
 	if criteria.Succeed != nil && *criteria.Succeed != (event.Code == 0) {
 		return false
 	}

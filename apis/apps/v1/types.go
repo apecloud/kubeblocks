@@ -44,36 +44,37 @@ const (
 // ClusterComponentPhase defines the phase of a cluster component as represented in cluster.status.components.phase field.
 //
 // +enum
-// +kubebuilder:validation:Enum={Creating,Updating,Stopping,Starting,Deleting,Running,Stopped,Failed}
+// +kubebuilder:validation:Enum={Creating,Running,Updating,Stopping,Stopped,Deleting,Failed,Abnormal}
 type ClusterComponentPhase string
 
 const (
-	// CreatingClusterCompPhase indicates the component is currently being created.
+	// CreatingClusterCompPhase indicates the component is being created.
 	CreatingClusterCompPhase ClusterComponentPhase = "Creating"
 
-	// UpdatingClusterCompPhase indicates the component is currently being updated.
+	// RunningClusterCompPhase indicates the component has more than zero replicas, and all pods are up-to-date and
+	// in a 'Running' state.
+	RunningClusterCompPhase ClusterComponentPhase = "Running"
+
+	// UpdatingClusterCompPhase indicates the component has more than zero replicas, and there are no failed pods,
+	// it is currently being updated.
 	UpdatingClusterCompPhase ClusterComponentPhase = "Updating"
 
-	// StoppingClusterCompPhase indicates the component is currently being stopped.
+	// StoppingClusterCompPhase indicates the component has zero replicas, and there are pods that are terminating.
 	StoppingClusterCompPhase ClusterComponentPhase = "Stopping"
 
-	// StartingClusterCompPhase indicates the component is currently being started.
-	StartingClusterCompPhase ClusterComponentPhase = "Starting"
+	// StoppedClusterCompPhase indicates the component has zero replicas, and all pods have been deleted.
+	StoppedClusterCompPhase ClusterComponentPhase = "Stopped"
 
 	// DeletingClusterCompPhase indicates the component is currently being deleted.
 	DeletingClusterCompPhase ClusterComponentPhase = "Deleting"
 
-	// RecoveringClusterCompPhase indicates the component is currently being recovered from some passive exception.
-	RecoveringClusterCompPhase ClusterComponentPhase = "Recovering"
-
-	// RunningClusterCompPhase indicates all resources of the component are up-to-date and running w/o any failure.
-	RunningClusterCompPhase ClusterComponentPhase = "Running"
-
-	// StoppedClusterCompPhase indicates the component has been stopped, all Pods belonging to the component are terminated.
-	StoppedClusterCompPhase ClusterComponentPhase = "Stopped"
-
-	// FailedClusterCompPhase indicates the component encountered some error and did not complete successfully.
+	// FailedClusterCompPhase indicates the component has more than zero replicas, but there are some failed pods.
+	// The component is not functioning.
 	FailedClusterCompPhase ClusterComponentPhase = "Failed"
+
+	// AbnormalClusterCompPhase indicates the component has more than zero replicas, but there are some failed pods.
+	// The component is functioning, but it is in a fragile state.
+	AbnormalClusterCompPhase ClusterComponentPhase = "Abnormal"
 )
 
 const (

@@ -193,6 +193,7 @@ func GetComponentTerminalPhases() []ClusterComponentPhase {
 		RunningClusterCompPhase,
 		StoppedClusterCompPhase,
 		FailedClusterCompPhase,
+		AbnormalClusterCompPhase,
 	}
 }
 
@@ -200,6 +201,7 @@ func GetReconfiguringRunningPhases() []ClusterPhase {
 	return []ClusterPhase{
 		RunningClusterPhase,
 		UpdatingClusterPhase, // enable partial running for reconfiguring
+		AbnormalClusterPhase,
 		FailedClusterPhase,
 	}
 }

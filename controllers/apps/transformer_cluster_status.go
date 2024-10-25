@@ -114,7 +114,7 @@ func (t *clusterStatusTransformer) syncClusterConditions(cluster *appsv1.Cluster
 		"sharding":  cluster.Status.Shardings,
 	} {
 		for name, status := range statusMap {
-			if status.Phase == appsv1.FailedClusterCompPhase {
+			if status.Phase == appsv1.AbnormalClusterCompPhase || status.Phase == appsv1.FailedClusterCompPhase {
 				if _, ok := kindNames[kind]; !ok {
 					kindNames[kind] = []string{}
 				}
@@ -165,7 +165,7 @@ func composeClusterPhase(statusList []appsv1.ClusterComponentStatus) appsv1.Clus
 		if !isPhaseIn(phase, appsv1.FailedClusterCompPhase) {
 			isAllComponentFailed = false
 		}
-		if isPhaseIn(phase, appsv1.FailedClusterCompPhase) {
+		if isPhaseIn(phase, appsv1.AbnormalClusterCompPhase, appsv1.FailedClusterCompPhase) {
 			hasComponentAbnormalOrFailed = true
 		}
 	}

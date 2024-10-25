@@ -310,6 +310,7 @@ var _ = Describe("Cluster Controller", func() {
 		backupPolicyKey := client.ObjectKey{Name: backupPolicyName, Namespace: clusterKey.Namespace}
 		Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, bp *dpv1alpha1.BackupPolicy) {
 			g.Expect(bp.Spec.Targets).Should(HaveLen(defaultShardCount))
+			g.Expect(bp.Spec.Targets[0].Name).ShouldNot(BeEmpty())
 		})).Should(Succeed())
 
 		By("checking backup schedule")
@@ -1068,6 +1069,9 @@ var _ = Describe("Cluster Controller", func() {
 						g.Expect(*policy.Spec.BackupRepoName).Should(BeEquivalentTo(backup.RepoName))
 					}
 					g.Expect(policy.Spec.BackupMethods).ShouldNot(BeEmpty())
+					g.Expect(policy.Spec.Targets).Should(HaveLen(0))
+					g.Expect(policy.Spec.Target).ShouldNot(BeNil())
+					g.Expect(policy.Spec.Target.Name).Should(BeEmpty())
 				}
 
 				By("checking backup policy")

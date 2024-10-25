@@ -1329,6 +1329,20 @@ This field allows you to set a limit on the scalability of the Component, preven
 </tr>
 <tr>
 <td>
+<code>available</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentAvailable">
+ComponentAvailable
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>roles</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.ReplicaRole">
@@ -2085,6 +2099,111 @@ This process does not affect the readiness state of the Component or the Cluster
 This execution does not alter the Component or the Cluster&rsquo;s state of readiness.</li>
 </ul>
 <p>This field cannot be updated.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ActionCriteria">ActionCriteria
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentAvailableConditionX">ComponentAvailableConditionX</a>)
+</p>
+<div>
+<p>ActionCriteria defines the custom criteria for evaluating the success or failure of an action.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>succeed</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Whether the action should succeed or fail.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>stdout</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ActionOutputMatcher">
+ActionOutputMatcher
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the stdout matcher for the action.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>stderr</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ActionOutputMatcher">
+ActionOutputMatcher
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the stderr matcher for the action.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ActionOutputMatcher">ActionOutputMatcher
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ActionCriteria">ActionCriteria</a>)
+</p>
+<div>
+<p>ActionOutputMatcher defines the matcher for the output of an action.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>equalTo</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The output of the action should be equal to the specified value.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>contains</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The output of the action should contain the specified value.</p>
+<p>This field is immutable once set.</p>
 </td>
 </tr>
 </tbody>
@@ -3985,6 +4104,278 @@ VarOption
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1.ComponentAvailable">ComponentAvailable
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
+</p>
+<div>
+<p>ComponentAvailable defines the strategies for determining whether the component is available.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>phases</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the phases that the component will go through to be considered available.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>withRoles</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the roles that the component will go through to be considered available.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>withProbe</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentAvailableWithProbe">
+ComponentAvailableWithProbe
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the strategies for determining whether the component is available based on the available probe.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ComponentAvailableCondition">ComponentAvailableCondition
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentAvailableConditionX">ComponentAvailableConditionX</a>, <a href="#apps.kubeblocks.io/v1.ComponentAvailableWithProbe">ComponentAvailableWithProbe</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>and</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentAvailableConditionX">
+[]ComponentAvailableConditionX
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Logical operator AND.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>or</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentAvailableConditionX">
+[]ComponentAvailableConditionX
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Logical operator OR.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>not</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentAvailableConditionX">
+ComponentAvailableConditionX
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Logical operator NOT.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>all</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentAvailableConditionX">
+ComponentAvailableConditionX
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Aggregate operator ALL.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>any</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentAvailableConditionX">
+ComponentAvailableConditionX
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Aggregate operator ANY.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>none</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentAvailableConditionX">
+ComponentAvailableConditionX
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Aggregate operator NONE.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>majority</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentAvailableConditionX">
+ComponentAvailableConditionX
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Aggregate operator MAJORITY.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ComponentAvailableConditionX">ComponentAvailableConditionX
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentAvailableCondition">ComponentAvailableCondition</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>ActionCriteria</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ActionCriteria">
+ActionCriteria
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>ActionCriteria</code> are embedded into this type.)
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>ComponentAvailableCondition</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentAvailableCondition">
+ComponentAvailableCondition
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>ComponentAvailableCondition</code> are embedded into this type.)
+</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ComponentAvailableWithProbe">ComponentAvailableWithProbe
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentAvailable">ComponentAvailable</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>timeWindow</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>condition</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentAvailableCondition">
+ComponentAvailableCondition
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the conditions that the component will go through to be considered available.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1.ComponentConfigSpec">ComponentConfigSpec
 </h3>
 <p>
@@ -4546,6 +4937,20 @@ ReplicasLimit
 <p>Defines the upper limit of the number of replicas supported by the Component.</p>
 <p>It defines the maximum number of replicas that can be created for the Component.
 This field allows you to set a limit on the scalability of the Component, preventing it from exceeding a certain number of replicas.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>available</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentAvailable">
+ComponentAvailable
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
 <p>This field is immutable.</p>
 </td>
 </tr>

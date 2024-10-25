@@ -401,6 +401,11 @@ type ComponentDefinitionSpec struct {
 	// +optional
 	ReplicasLimit *ReplicasLimit `json:"replicasLimit,omitempty"`
 
+	// This field is immutable.
+	//
+	// +optional
+	Available *ComponentAvailable `json:"available,omitempty"`
+
 	// Enumerate all possible roles assigned to each replica of the Component, influencing its behavior.
 	//
 	// A replica can have zero to multiple roles.
@@ -1240,6 +1245,100 @@ type ReplicasLimit struct {
 	MaxReplicas int32 `json:"maxReplicas"`
 }
 
+// ComponentAvailable defines the strategies for determining whether the component is available.
+type ComponentAvailable struct {
+	// Specifies the phases that the component will go through to be considered available.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	WithPhases *string `json:"phases,omitempty"`
+
+	// Specifies the roles that the component will go through to be considered available.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	WithRoles *string `json:"withRoles,omitempty"`
+
+	// Specifies the strategies for determining whether the component is available based on the available probe.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	WithProbe *ComponentAvailableWithProbe `json:"withProbe,omitempty"`
+}
+
+type ComponentAvailableWithProbe struct {
+	// This field is immutable once set.
+	//
+	// +optional
+	TimeWindow *int32 `json:"timeWindow,omitempty"`
+
+	// Specifies the conditions that the component will go through to be considered available.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	Condition *ComponentAvailableCondition `json:"condition,omitempty"`
+}
+
+type ComponentAvailableCondition struct {
+	// Logical operator AND.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	And []ComponentAvailableConditionX `json:"and,omitempty"`
+
+	// Logical operator OR.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	Or []ComponentAvailableConditionX `json:"or,omitempty"`
+
+	// Logical operator NOT.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	Not *ComponentAvailableConditionX `json:"not,omitempty"`
+
+	// Aggregate operator ALL.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	All *ComponentAvailableConditionX `json:"all,omitempty"`
+
+	// Aggregate operator ANY.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	Any *ComponentAvailableConditionX `json:"any,omitempty"`
+
+	// Aggregate operator NONE.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	None *ComponentAvailableConditionX `json:"none,omitempty"`
+
+	// Aggregate operator MAJORITY.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	Majority *ComponentAvailableConditionX `json:"majority,omitempty"`
+}
+
+type ComponentAvailableConditionX struct {
+	ActionCriteria              `json:",inline"`
+	ComponentAvailableCondition `json:",inline"`
+}
+
 // ReplicaRole represents a role that can be assumed by a component instance.
 type ReplicaRole struct {
 	// Defines the role's identifier. It is used to set the "apps.kubeblocks.io/role" label value
@@ -1791,6 +1890,47 @@ type Probe struct {
 	//
 	// +optional
 	FailureThreshold int32 `json:"failureThreshold,omitempty"`
+}
+
+// ActionCriteria defines the custom criteria for evaluating the success or failure of an action.
+type ActionCriteria struct {
+	// Whether the action should succeed or fail.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	Succeed *bool `json:"succeed,omitempty"`
+
+	// Specifies the stdout matcher for the action.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	Stdout *ActionOutputMatcher `json:"stdout,omitempty"`
+
+	// Specifies the stderr matcher for the action.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	Stderr *ActionOutputMatcher `json:"stderr,omitempty"`
+}
+
+// ActionOutputMatcher defines the matcher for the output of an action.
+type ActionOutputMatcher struct {
+	// The output of the action should be equal to the specified value.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	EqualTo *string `json:"equalTo,omitempty"`
+
+	// The output of the action should contain the specified value.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	Contains *string `json:"contains,omitempty"`
 }
 
 // ServiceRefDeclaration represents a reference to a service that can be either provided by a KubeBlocks Cluster

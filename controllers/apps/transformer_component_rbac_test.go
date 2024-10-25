@@ -37,7 +37,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
-	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 var _ = Describe("object rbac transformer test.", func() {
@@ -54,7 +53,6 @@ var _ = Describe("object rbac transformer test.", func() {
 	var compDefObj *appsv1.ComponentDefinition
 	var compObj *appsv1.Component
 	var synthesizedComp *component.SynthesizedComponent
-	var allSettings map[string]interface{}
 
 	init := func(enableLifecycleAction bool, enablePolicyRules bool) {
 		By("Create a component definition")
@@ -123,19 +121,6 @@ var _ = Describe("object rbac transformer test.", func() {
 		Eventually(testapps.CheckObjExists(&testCtx, saKey,
 			&corev1.ServiceAccount{}, false)).Should(Succeed())
 	}
-
-	BeforeEach(func() {
-		allSettings = viper.AllSettings()
-		viper.SetDefault(constant.EnableRBACManager, true)
-	})
-
-	AfterEach(func() {
-		viper.SetDefault(constant.EnableRBACManager, false)
-		if allSettings != nil {
-			Expect(viper.MergeConfigMap(allSettings)).ShouldNot(HaveOccurred())
-			allSettings = nil
-		}
-	})
 
 	Context("transformer rbac manager", func() {
 		It("w/o any rolebindings", func() {

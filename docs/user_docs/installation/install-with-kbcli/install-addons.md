@@ -10,9 +10,11 @@ sidebar_label: Install Addons
 
 ## Use the index to install an addon
 
-With the release of KubeBlocks v0.8.0, addons are decoupled from KubeBlocks and some addons are not installed by default. If you want to use these addons, add addons first by index.
+With the release of KubeBlocks v0.8.0, Addons are decoupled from KubeBlocks and some Addons are not installed by default. If you want to use these Addons, install Addons first by index. Or if you uninstalled some Addons, you can follow the steps in this tutorial to install them again.
 
-The official index repo is [KubeBlocks index](https://github.com/apecloud/block-index). The code of all addons is maintained in the [KubeBlocks addon repo](https://github.com/apecloud/kubeblocks-addons).
+This tutorial takes etcd as an example. You can replace etcd with the Addon you need.
+
+The official index repo is [KubeBlocks index](https://github.com/apecloud/block-index). The code of all Addons is maintained in the [KubeBlocks Addon repo](https://github.com/apecloud/kubeblocks-addons).
 
 1. View the index.
 
@@ -73,7 +75,7 @@ To manually enable or disable addons, follow the steps below.
    ***Example***
 
    ```bash
-   kbcli addon enable snapshot-controller
+   kbcli addon enable qdrant
    ```
 
    To disable an addon, use `kbcli addon disable`.

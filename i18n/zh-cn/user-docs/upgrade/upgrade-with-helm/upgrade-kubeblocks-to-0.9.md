@@ -92,7 +92,7 @@ helm repo add kubeblocks-addons https://jihulab.com/api/v4/projects/150246/packa
 helm repo update
 
 # 升级引擎
-helm upgrade -i xxx kubeblocks-addons/xxx --version x.x.x -n kb-system  
+helm upgrade -i xxx kubeblocks-addons/xxx --version x.y.z -n kb-system  
 ```
 
 ## FAQ

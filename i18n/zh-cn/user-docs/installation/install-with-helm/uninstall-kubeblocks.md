@@ -43,10 +43,10 @@ kubectl get crd -o name | grep kubeblocks.io | xargs kubectl delete
 
 <TabItem value="YAML" label="YAML">
 
-从 KubeBlocks chart 生成 YAML 文件，并使用 `kubectl` 进行卸载。
+从 KubeBlocks chart 生成 YAML 文件，并使用 `kubectl` 进行卸载。使用 `--version x.y.z` 指定版本，确保卸载的版本与安装的版本相同。
 
 ```bash
-helm template kubeblocks kubeblocks/kubeblocks --namespace kb-system | kubectl delete -f -
+helm template kubeblocks kubeblocks/kubeblocks --version x.y.z --namespace kb-system | kubectl delete -f -
 ```
 
 </TabItem>

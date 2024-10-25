@@ -40,7 +40,7 @@ kbcli 目前支持 macOS、Windows 和 Linux 系统。
       2. 使用 `-s` 指定版本，并执行以下命令。
         
           ```bash
-          curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash -s x.x.x
+          curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash -s x.y.z
           ```
 
          您可以通过 [kbcli 发布列表](https://github.com/apecloud/kbcli/releases) 查看 kbcli 的所有版本，包括 alpha 及 beta 版本。
@@ -48,7 +48,7 @@ kbcli 目前支持 macOS、Windows 和 Linux 系统。
          也可通过执行以下命令，获取稳定版本：
 
          ```bash
-         curl -s "https://api.github.com/repos/apecloud/kbcli/releases?per_page=100&page=1" | jq -r '.[] | select(.prerelease == false) | .tag_name' | sort -V
+         curl -s "https://api.github.com/repos/apecloud/kbcli/releases?per_page=100&page=1" | jq -r '.[] | select(.prerelease == false) | .tag_name' | sort -V -r
          ```
 
       :::note
@@ -88,7 +88,7 @@ kbcli 目前支持 macOS、Windows 和 Linux 系统。
       brew search kbcli
 
       # 安装指定版本
-      brew install kbcli@x.x.x
+      brew install kbcli@x.y.z
       ```
      
   3. 确认 kbcli 是否已成功安装。

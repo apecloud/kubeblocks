@@ -6,7 +6,13 @@ sidebar_position: 3
 sidebar_label: Install Addons
 ---
 
-# Install addons
+# Install Addons
+
+With the release of KubeBlocks v0.8.0, Addons are decoupled from KubeBlocks and some Addons are not installed by default. If you want to use these Addons, install Addons first by index. Or if you uninstalled some Addons, you can follow the steps in this tutorial to install them again.
+
+This tutorial takes etcd as an example. You can replace etcd with the Addon you need.
+
+The official index repo is [KubeBlocks index](https://github.com/apecloud/block-index). The code of all Addons is maintained in the [KubeBlocks Addon repo](https://github.com/apecloud/kubeblocks-addons).
 
 1. (Optional) Add the KubeBlocks repo. If you install KubeBlocks with Helm, just run `helm repo update`.
 
@@ -15,32 +21,32 @@ sidebar_label: Install Addons
    helm repo update
    ```
 
-2. View the addon versions.
+2. View the Addon versions.
 
    ```bash
-   helm search repo kubeblocks/mariadb --devel --versions
+   helm search repo kubeblocks/etcd --devel --versions
    ```
 
-3. Install the addon (take mariadb as example).
+3. Install the Addon (take etcs as example).
 
    ```bash
-   helm install mariadb kubeblocks/mariadb --namespace kb-system --create-namespace --version 0.9.0
+   helm install etcd kubeblocks/etcd --namespace kb-system --create-namespace --version 0.9.0
    ```
 
-4. Verify whether this addon is installed.
+4. Verify whether this Addon is installed.
 
-   The STATUS is `deployed` and this addon is installed successfully.
+   The STATUS is `deployed` and this Addon is installed successfully.
 
    ```bash
    helm list -A
    >
-   NAME                        	NAMESPACE	REVISION	UPDATED                                	STATUS  	CHART                       	APP VERSION
+   NAME                 NAMESPACE	REVISION	UPDATED                                	STATUS  	CHART              APP VERSION
    ......
-   mariadb                     	kb-system	1       	2024-05-08 17:41:29.112721 +0800 CST   	deployed	mariadb-0.9.0               	10.6.15
+   etcd               	kb-system	1       	2024-10-25 07:18:35.294326176 +0000 UTC	deployed	etcd-0.9.0         v3.5.6
    ```
 
-5. (Optional) You can run the command below to disable the addon.
+5. (Optional) You can run the command below to disable the Addon.
 
    ```bash
-   helm uninstall mariadb --namespace kb-system
+   helm uninstall etcd --namespace kb-system
    ```

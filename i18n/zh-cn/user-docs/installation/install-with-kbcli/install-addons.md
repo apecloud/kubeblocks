@@ -8,13 +8,13 @@ sidebar_label: 安装引擎
 
 # 安装引擎
 
-## 使用引擎
+KubeBlocks v0.8.0 发布后，引擎（Addon）与 KubeBlocks 解耦，KubeBlocks 默认安装了部分引擎，如需体验其它引擎，需通过索引安装相关引擎。如果您卸载了部分引擎，也可通过本文步骤，重新安装。
 
-### 使用索引安装引擎
-
-KubeBlocks v0.8.0 发布后，引擎（Addon）与 KubeBlocks 解耦，KubeBlocks 仅默认安装了部分引擎，如需体验其它引擎，需通过索引安装相关引擎。
+本文以 etcd 为例，可根据实际情况替换引擎名称。
 
 官网引擎索引仓库为 [KubeBlocks index](https://github.com/apecloud/block-index)。引擎代码维护在 [KubeBlocks addon repo](https://github.com/apecloud/kubeblocks-addons)。
+
+## 使用索引安装引擎
 
 1. 查看引擎仓库索引。
 
@@ -42,10 +42,12 @@ KubeBlocks v0.8.0 发布后，引擎（Addon）与 KubeBlocks 解耦，KubeBlock
 2. （可选）索引建立后，可以通过 `addon search` 命令检查想要安装的引擎是否在索引信息中存在。
 
    ```bash
-   kbcli addon search mariadb
+   kbcli addon search etcd
    >
-   ADDON     VERSION   INDEX
-   mariadb   0.7.0     kubeblocks
+   ADDON   VERSION         INDEX
+   etcd    0.7.0           kubeblocks
+   etcd    0.8.0           kubeblocks
+   etcd    0.9.0           kubeblocks
    ```
 
 3. 安装引擎。
@@ -53,18 +55,18 @@ KubeBlocks v0.8.0 发布后，引擎（Addon）与 KubeBlocks 解耦，KubeBlock
    当引擎有多个版本和索引源时，可使用 `--index` 指定索引源，`--version` 指定安装版本。系统默认以 `kubeblocks` 索引仓库 为索引源，安装最新版本。
 
    ```bash
-   kbcli addon install mariadb --index kubeblocks --version 0.7.0
+   kbcli addon install etcd --index kubeblocks --version 0.9.0
    ```
 
    **后续操作**
 
    引擎安装完成后，可查看引擎列表、启用引擎。
 
-### 查看引擎列表
+## 查看引擎列表
 
 执行 `kbcli addon list` 命令查看已经支持的引擎。
 
-### 启用/禁用引擎
+## 启用/禁用引擎
 
 请按照以下步骤手动启用或禁用引擎。
 
@@ -75,7 +77,7 @@ KubeBlocks v0.8.0 发布后，引擎（Addon）与 KubeBlocks 解耦，KubeBlock
    ***示例***
 
    ```bash
-   kbcli addon enable snapshot-controller
+   kbcli addon enable etcd
    ```
 
    执行 `kbcli addon disable` 禁用引擎。
@@ -85,3 +87,17 @@ KubeBlocks v0.8.0 发布后，引擎（Addon）与 KubeBlocks 解耦，KubeBlock
    ```bash
    kbcli addon list
    ```
+
+## 卸载引擎
+
+您也可卸载已安装的引擎。如果已经创建了相关集群，请先删除集群。
+
+```bash
+kbcli cluster delete <name>
+```
+
+卸载已安装的引擎。
+
+```bash
+kbcli addon uninstall etcd
+```

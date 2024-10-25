@@ -47,13 +47,13 @@ Kubernetes 动态管理 Pods，确保它们按指定的方式运行，并在失�
 
 ## PVC
 
-在 Kubernetes 中，持久卷声明（PVC）是用户对存储的请求。PVC 本质上是请求具有特定特性的存储的一种方式，例如存储类、大小和访问模式（如读写或只读）。PVC 使 Pods 能够使用存储，而无需了解底层基础设施的详细信息。
+在 Kubernetes 中，持久卷声明（PVC，Persisten Volume Claim）是用户对存储的请求。PVC 本质上是请求具有特定特性的存储的一种方式，例如存储类、大小和访问模式（如读写或只读）。PVC 使 Pods 能够使用存储，而无需了解底层基础设施的详细信息。
 
 在 K8s 中，为了使用存储，用户会创建 PVC。创建 PVC 时，Kubernetes 会查找与请求匹配的 StorageClass。如果找到匹配的 StorageClass，Kubernetes 将根据定义的参数自动配置存储，无论是 SSD、HDD、EBS 还是 NAS。如果 PVC 未指定 StorageClass，Kubernetes 将使用默认的 StorageClass（如果已配置）来配置存储。
 
 ## CSI
 
-在 Kubernetes 中，通过容器存储接口（CSI）提供各种存储类，CSI 负责为应用程序配置所需的底层存储“磁盘”。CSI 在 Kubernetes 中的功能类似于“磁盘驱动程序”，使平台能够适应并集成多种存储系统，如本地磁盘、AWS EBS 和 Ceph。这些存储类及其相关的存储资源由特定的 CSI 驱动程序提供，这些驱动程序处理与底层存储基础设施的交互。
+在 Kubernetes 中，通过容器存储接口（CSI，Container Storage Interface）提供各种存储类，CSI 负责为应用程序配置所需的底层存储“磁盘”。CSI 在 Kubernetes 中的功能类似于“磁盘驱动程序”，使平台能够适应并集成多种存储系统，如本地磁盘、AWS EBS 和 Ceph。这些存储类及其相关的存储资源由特定的 CSI 驱动程序提供，这些驱动程序处理与底层存储基础设施的交互。
 
 CSI 是标准 API，使 Kubernetes 能够以一致和可扩展的方式与各种存储系统进行交互。由存储供应商或 Kubernetes 社区创建的 CSI 驱动程序向 Kubernetes 暴露了动态配置、附加、挂载和快照等基本存储功能。
 
@@ -61,7 +61,7 @@ CSI 是标准 API，使 Kubernetes 能够以一致和可扩展的方式与各种
 
 ## PV
 
-在 Kubernetes 中，持久卷（PV）代表可以由多种系统（如本地磁盘、NFS 或基于云的存储，例如 AWS EBS、Google Cloud Persistent Disks）支持的存储资源，通常由不同的 CSI 驱动程序管理。
+在 Kubernetes 中，持久卷（PV，Persisten Volume）代表可以由多种系统（如本地磁盘、NFS 或基于云的存储，例如 AWS EBS、Google Cloud Persistent Disks）支持的存储资源，通常由不同的 CSI 驱动程序管理。
 
 PV 有自己独立于 Pod 的生命周期，由 Kubernetes 控制平面进行管理。即使关联的 Pod 被删除，PV 也允许数据持续存在。PV 与持久卷声明（PVC）绑定，PVC 请求特定的存储特性，如大小和访问模式，确保应用程序获得所需的存储。
 
@@ -85,11 +85,11 @@ Secret 用于存储敏感数据，例如密码、令牌或加密密钥。Secrets
 
 ## CRD
 
-如果您希望使用 Kubernetes 管理数据库对象，则需要扩展 Kubernetes API，以描述您正在管理的数据库对象。这就是 CRD（自定义资源定义）机制的用途所在，CRD 支持定义特定用例的自定义资源，如数据库集群或备份，并以 K8s 原生的方式管理资源。
+如果您希望使用 Kubernetes 管理数据库对象，则需要扩展 Kubernetes API，以描述您正在管理的数据库对象。这就是自定义资源定义（CRD，Custom Resource Definition）机制的用途所在，CRD 支持定义特定用例的自定义资源，如数据库集群或备份，并以 K8s 原生的方式管理资源。
 
 ## CR
 
-自定义资源（CR）是自定义资源定义（CRD）的实例。它表示扩展 Kubernetes API 的特定配置或对象。CR 允许您使用 Kubernetes 的原生工具定义和管理自定义资源，例如数据库或应用程序。一旦创建了 CR，Kubernetes 控制器或 Operator 会开始监控，并执行操作以保持所需状态。
+自定义资源（CR，Custom Resource）是自定义资源定义（CRD）的实例。它表示扩展 Kubernetes API 的特定配置或对象。CR 允许您使用 Kubernetes 的原生工具定义和管理自定义资源，例如数据库或应用程序。一旦创建了 CR，Kubernetes 控制器或 Operator 会开始监控，并执行操作以保持所需状态。
 
 CRD 和 CR 是开发 Kubernetes Operator 的基础。CRDs 通常用于实现自定义控制器或 Operator，允许持续监视 CR 的变化（例如，表示数据库集群的 CR），并自动执行相应的操作。
 

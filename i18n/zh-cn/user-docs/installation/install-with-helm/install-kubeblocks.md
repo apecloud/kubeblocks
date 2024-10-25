@@ -11,7 +11,9 @@ import TabItem from '@theme/TabItem';
 
 # 安装 KubeBlocks 
 
-KubeBlocks 是 Kubernetes 原生 operator，可通过 Helm 或者 kubectl 应用 YAML 文件安装 KubeBlocks。
+KubeBlocks 是 Kubernetes 原生 operator，可通过 Helm 或者 kubectl 应用 YAML 文件安装 KubeBlocks。本文将介绍如何在现有的 Kubernetes 集群上部署 KubeBlocks。
+
+如果您想要在本地环境试用 KubeBlocks，可通过 [Playground](./../../try-out-on-playground/try-kubeblocks-on-local-host.md) 试用，或者[先在本地创建 Kubernetes 测试集群](./../prerequisite/prepare-a-local-k8s-cluster.md)，然后按照本文操作步骤安装 KubeBlocks。
 
 :::note
 
@@ -22,6 +24,8 @@ KubeBlocks 是 Kubernetes 原生 operator，可通过 Helm 或者 kubectl 应用
 :::
 
 ## 环境准备
+
+准备一个可访问的 Kubernetes 集群，版本要求 1.22 及以上。该集群应满足如下要求。
 
 <table>
 	<tr>
@@ -61,7 +65,7 @@ KubeBlocks 是 Kubernetes 原生 operator，可通过 Helm 或者 kubectl 应用
 1. 创建安装所依赖的 CRDs，并指定您想要安装的版本。
 
    ```bash
-   kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/vx.x.x/kubeblocks_crds.yaml
+   kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/vx.y.z/kubeblocks_crds.yaml
    ```
 
    您可以通过 [KubeBlocks 发布列表](https://github.com/apecloud/kubeblocks/releases) 查看 KubeBlocks 的所有版本，包括 alpha 及 beta 版本。
@@ -69,7 +73,7 @@ KubeBlocks 是 Kubernetes 原生 operator，可通过 Helm 或者 kubectl 应用
    也可通过执行以下命令，获取稳定版本：
 
    ```bash
-   curl -s "https://api.github.com/repos/apecloud/kubeblocks/releases?per_page=100&page=1" | jq -r '.[] | select(.prerelease == false) | .tag_name' | sort -V
+   curl -s "https://api.github.com/repos/apecloud/kubeblocks/releases?per_page=100&page=1" | jq -r '.[] | select(.prerelease == false) | .tag_name' | sort -V -r
    ```
 
 2. 添加 KubeBlocks 的 Helm 仓库。
@@ -99,7 +103,7 @@ KubeBlocks 是 Kubernetes 原生 operator，可通过 Helm 或者 kubectl 应用
    2. 使用 `--version` 指定版本，并执行以下命令。
 
       ```bash
-      helm install kubeblocks kubeblocks/kubeblocks --namespace kb-system --create-namespace --version="x.x.x"
+      helm install kubeblocks kubeblocks/kubeblocks --namespace kb-system --create-namespace --version="x.y.z"
       ```
 
      :::note
@@ -117,8 +121,10 @@ KubeBlocks 可以像 Kubernetes 中的其他资源一样，通过 YAML 文件和
 执行以下命令，安装当前小版本发布的最新 operator。
 
  ```bash
- kubectl create -f \address.yaml
+ kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/v0.9.1/kubeblocks.yaml
  ```
+
+您可通过 [KubeBlocks 发布页资产](https://github.com/apecloud/kubeblocks/releases) 中获取 YAML 文件地址。
 
 </TabItem>
 
@@ -137,14 +143,15 @@ kubectl -n kb-system get pods
 如果工作负载都显示已处于 Running 状态，则表明已成功安装 KubeBlocks。
 
 ```bash
-NAME                                                     READY   STATUS       AGE
-kb-addon-snapshot-controller-7b447684d4-q86zf            1/1     Running      33d
-kb-addon-csi-hostpath-driver-0                           8/8     Running      33d
-kb-addon-grafana-54b9cbf65d-k8522                        3/3     Running      33d
-kb-addon-apecloud-otel-collector-j4thb                   1/1     Running      33d
-kubeblocks-5b5648bfd9-8jpvv                              1/1     Running      33d
-kubeblocks-dataprotection-f54c9486c-2nfmr                1/1     Running      33d
-kb-addon-alertmanager-webhook-adaptor-76b87f9df8-xb74g   2/2     Running      33d
-kb-addon-prometheus-server-0                             2/2     Running      33d
-kb-addon-prometheus-alertmanager-0                       2/2     Running      33d
+NAME                                             READY   STATUS    RESTARTS       AGE
+alertmanager-webhook-adaptor-8dfc4878d-svzrc     2/2     Running   0              3m56s
+grafana-77dfd6959-4gnhp                          1/1     Running   0              3m56s
+kb-addon-snapshot-controller-546f84b78d-8rjs4    1/1     Running   0              3m56s
+kubeblocks-7cf7745685-ddlwk                      1/1     Running   0              4m39s
+kubeblocks-dataprotection-95fbc79cc-b544l        1/1     Running   0              4m39s
+prometheus-alertmanager-5c9fc88996-qltrk         2/2     Running   0              3m56s
+prometheus-kube-state-metrics-5dbbf757f5-db9v6   1/1     Running   0              3m56s
+prometheus-node-exporter-r6kvl                   1/1     Running   0              3m56s
+prometheus-pushgateway-8555888c7d-xkgfc          1/1     Running   0              3m56s
+prometheus-server-5759b94fc8-686xp               2/2     Running   0              3m56s
 ```

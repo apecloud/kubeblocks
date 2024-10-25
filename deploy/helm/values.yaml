@@ -474,7 +474,6 @@ autoInstalledAddons:
   - "qdrant"
   - "redis"
   - "alertmanager-webhook-adaptor"
-  - "apecloud-otel-collector"
   - "aws-load-balancer-controller"
   - "csi-hostpath-driver"
   - "csi-driver-nfs"

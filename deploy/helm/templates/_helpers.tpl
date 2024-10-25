@@ -271,13 +271,6 @@ Define addon loki name
 {{- end }}
 
 {{/*
-Define addon apecloud-otel-collector name
-*/}}
-{{- define "addon.apecloud-otel-collector.name" -}}
-{{- print "apecloud-otel-collector" }}
-{{- end }}
-
-{{/*
 Get cloud provider, now support aws, gcp, aliyun and tencentCloud.
 TODO: For azure, we should get provider from node.Spec.ProviderID
 */}}

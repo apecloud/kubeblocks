@@ -797,7 +797,7 @@ var _ = Describe("Backup Controller test", func() {
 				})).Should(Succeed())
 			})
 
-			FIt("continue reconcile when continuous backup is Failed after fixing the issue", func() {
+			It("continue reconcile when continuous backup is Failed after fixing the issue", func() {
 				By("create actionset and backupRepo for continuous backup")
 				actionSet := testdp.NewFakeActionSet(&testCtx)
 				Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(actionSet), func(fetched *dpv1alpha1.ActionSet) {
@@ -833,6 +833,14 @@ var _ = Describe("Backup Controller test", func() {
 					g.Expect(fetched.Status.Phase).Should(Equal(dpv1alpha1.BackupPhaseRunning))
 					g.Expect(fetched.Status.PersistentVolumeClaimName).Should(Equal(repoPVCName))
 				})).Should(Succeed())
+
+				backup := &dpv1alpha1.Backup{}
+				Expect(k8sClient.Get(ctx, backupKey, backup)).Should(Succeed())
+				stsKey := client.ObjectKey{
+					Name:      dpbackup.GenerateBackupStatefulSetName(backup, "", dpbackup.BackupDataJobNamePrefix),
+					Namespace: testCtx.DefaultNamespace,
+				}
+				Eventually(testapps.CheckObjExists(&testCtx, backupKey, &appsv1.StatefulSet{}, true)).Should(Succeed())
 				By("mock no target pod found and expect backup is Failed")
 				Expect(testapps.ChangeObj(&testCtx, clusterInfo.TargetPod, func(pod *corev1.Pod) {
 					delete(clusterInfo.TargetPod.Labels, constant.RoleLabelKey)
@@ -843,12 +851,7 @@ var _ = Describe("Backup Controller test", func() {
 				})).Should(Succeed())
 
 				By("expect the replicas of statefulSet is 0")
-				backup := &dpv1alpha1.Backup{}
-				Expect(k8sClient.Get(ctx, backupKey, backup)).Should(Succeed())
-				stsKey := client.ObjectKey{
-					Name:      dpbackup.GenerateBackupStatefulSetName(backup, "", dpbackup.BackupDataJobNamePrefix),
-					Namespace: testCtx.DefaultNamespace,
-				}
+
 				Eventually(testapps.CheckObj(&testCtx, stsKey, func(g Gomega, sts *appsv1.StatefulSet) {
 					g.Expect(*sts.Spec.Replicas).Should(BeEquivalentTo(0))
 				})).Should(Succeed())

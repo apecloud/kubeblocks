@@ -663,11 +663,10 @@ This ServiceAccount is used to grant necessary permissions for the Component&rsq
 with other Kubernetes resources, such as modifying Pod labels or sending events.</p>
 <p>If not specified, KubeBlocks automatically creates a default ServiceAccount named
 &ldquo;kb-&#123;cluster.name&#125;-&#123;component.name&#125;&rdquo;, bound to a role with rules defined in ComponentDefinition&rsquo;s
-<code>policyRules</code> field. If the field is empty, ServiceAccount will not be created.</p>
+<code>policyRules</code> field. It will also be bound to a default role named &ldquo;kubeblocks-cluster-pod-role&rdquo;
+which is installed together with KubeBlocks.</p>
 <p>If the field is not empty, the specified ServiceAccount will be used. And KubeBlocks will not
-create a ServiceAccount, nor create RoleBinding accordingly. In this case, user also needs to
-manually create a RoleBinding to <code>kubeblocks-cluster-pod-role</code>, so that roleProbe functionality
-can work properly.</p>
+create a ServiceAccount, nor create RoleBinding accordingly.</p>
 </td>
 </tr>
 <tr>
@@ -2776,11 +2775,10 @@ This ServiceAccount is used to grant necessary permissions for the Component&rsq
 with other Kubernetes resources, such as modifying Pod labels or sending events.</p>
 <p>If not specified, KubeBlocks automatically creates a default ServiceAccount named
 &ldquo;kb-&#123;cluster.name&#125;-&#123;component.name&#125;&rdquo;, bound to a role with rules defined in ComponentDefinition&rsquo;s
-<code>policyRules</code> field. If the field is empty, ServiceAccount will not be created.</p>
+<code>policyRules</code> field. It will also be bound to a default role named &ldquo;kubeblocks-cluster-pod-role&rdquo;
+which is installed together with KubeBlocks.</p>
 <p>If the field is not empty, the specified ServiceAccount will be used. And KubeBlocks will not
-create a ServiceAccount, nor create RoleBinding accordingly. In this case, user also needs to
-manually create a RoleBinding to <code>kubeblocks-cluster-pod-role</code>, so that roleProbe functionality
-can work properly.</p>
+create a ServiceAccount, nor create RoleBinding accordingly.</p>
 </td>
 </tr>
 <tr>
@@ -5906,11 +5904,10 @@ This ServiceAccount is used to grant necessary permissions for the Component&rsq
 with other Kubernetes resources, such as modifying Pod labels or sending events.</p>
 <p>If not specified, KubeBlocks automatically creates a default ServiceAccount named
 &ldquo;kb-&#123;cluster.name&#125;-&#123;component.name&#125;&rdquo;, bound to a role with rules defined in ComponentDefinition&rsquo;s
-<code>policyRules</code> field. If the field is empty, ServiceAccount will not be created.</p>
+<code>policyRules</code> field. It will also be bound to a default role named &ldquo;kubeblocks-cluster-pod-role&rdquo;
+which is installed together with KubeBlocks.</p>
 <p>If the field is not empty, the specified ServiceAccount will be used. And KubeBlocks will not
-create a ServiceAccount, nor create RoleBinding accordingly. In this case, user also needs to
-manually create a RoleBinding to <code>kubeblocks-cluster-pod-role</code>, so that roleProbe functionality
-can work properly.</p>
+create a ServiceAccount, nor create RoleBinding accordingly.</p>
 </td>
 </tr>
 <tr>

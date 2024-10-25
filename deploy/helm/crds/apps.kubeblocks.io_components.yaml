@@ -4802,13 +4802,12 @@ spec:
 
                   If not specified, KubeBlocks automatically creates a default ServiceAccount named
                   "kb-{cluster.name}-{component.name}", bound to a role with rules defined in ComponentDefinition's
-                  `policyRules` field. If the field is empty, ServiceAccount will not be created.
+                  `policyRules` field. It will also be bound to a default role named "kubeblocks-cluster-pod-role"
+                  which is installed together with KubeBlocks.
 
 
                   If the field is not empty, the specified ServiceAccount will be used. And KubeBlocks will not
-                  create a ServiceAccount, nor create RoleBinding accordingly. In this case, user also needs to
-                  manually create a RoleBinding to `kubeblocks-cluster-pod-role`, so that roleProbe functionality
-                  can work properly.
+                  create a ServiceAccount, nor create RoleBinding accordingly.
                 type: string
               serviceRefs:
                 description: |-

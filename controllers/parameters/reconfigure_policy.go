@@ -60,8 +60,8 @@ const (
 )
 
 type ReturnedStatus struct {
-	Status       ExecStatus
-	SucceedCount int32
+	Status        ExecStatus
+	SucceedCount  int32
 	ExpectedCount int32
 }
 

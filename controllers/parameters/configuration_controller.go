@@ -37,6 +37,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
@@ -151,7 +152,7 @@ func (r *ConfigurationReconciler) runTasks(taskCtx TaskContext, tasks []Task) (e
 	var (
 		errs            []error
 		synthesizedComp *component.SynthesizedComponent
-		configuration   = taskCtx.configuration
+		configuration   = taskCtx.componentParameter
 	)
 
 	// build synthesized component for the component
@@ -203,12 +204,22 @@ func (r *ConfigurationReconciler) SetupWithManager(mgr ctrl.Manager, multiCluste
 	return b.Complete(r)
 }
 
-func fromItemStatus(ctx intctrlutil.RequestCtx, status *appsv1alpha1.ConfigurationStatus, item appsv1alpha1.ConfigurationItemDetail) *appsv1alpha1.ConfigurationItemDetailStatus {
+func generateReconcileTasks(reqCtx intctrlutil.RequestCtx, componentParameter *parametersv1alpha1.ComponentParameter) []Task {
+	tasks := make([]Task, 0, len(componentParameter.Spec.ConfigItemDetails))
+	for _, item := range componentParameter.Spec.ConfigItemDetails {
+		if status := fromItemStatus(reqCtx, &componentParameter.Status, item); status != nil {
+			tasks = append(tasks, NewTask(item, status))
+		}
+	}
+	return tasks
+}
+
+func fromItemStatus(ctx intctrlutil.RequestCtx, status *parametersv1alpha1.ComponentParameterStatus, item parametersv1alpha1.ConfigTemplateItemDetail) *parametersv1alpha1.ConfigTemplateItemDetailStatus {
 	if item.ConfigSpec == nil {
 		ctx.Log.V(1).WithName(item.Name).Info(fmt.Sprintf("configuration is creating and pass: %s", item.Name))
 		return nil
 	}
-	itemStatus := status.GetItemStatus(item.Name)
+	itemStatus := intctrlutil.GetItemStatus(status, item.Name)
 	if itemStatus == nil || itemStatus.Phase == "" {
 		ctx.Log.V(1).WithName(item.Name).Info(fmt.Sprintf("configuration cr is creating and pass: %v", item))
 		return nil
@@ -220,10 +231,10 @@ func fromItemStatus(ctx intctrlutil.RequestCtx, status *appsv1alpha1.Configurati
 	return itemStatus
 }
 
-func isReconcileStatus(phase appsv1alpha1.ConfigurationPhase) bool {
+func isReconcileStatus(phase parametersv1alpha1.ConfigurationPhase) bool {
 	return phase != "" &&
-		phase != appsv1alpha1.CCreatingPhase &&
-		phase != appsv1alpha1.CDeletingPhase
+		phase != parametersv1alpha1.CCreatingPhase &&
+		phase != parametersv1alpha1.CDeletingPhase
 }
 
 func isFinishStatus(phase appsv1alpha1.ConfigurationPhase) bool {

@@ -235,3 +235,13 @@ func filterImmutableParameters(parameters map[string]any, immutableParams []stri
 func ParametersDefinitionTerminalPhases(status parametersv1alpha1.ParametersDefinitionStatus, generation int64) bool {
 	return status.ObservedGeneration == generation && status.Phase == parametersv1alpha1.PDAvailablePhase
 }
+
+func GetItemStatus(status *parametersv1alpha1.ComponentParameterStatus, name string) *parametersv1alpha1.ConfigTemplateItemDetailStatus {
+	for i := range status.ConfigurationItemStatus {
+		itemStatus := &status.ConfigurationItemStatus[i]
+		if itemStatus.Name == name {
+			return itemStatus
+		}
+	}
+	return nil
+}

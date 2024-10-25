@@ -558,7 +558,7 @@ func main() {
 			Client:   mgr.GetClient(),
 			Scheme:   mgr.GetScheme(),
 			Recorder: mgr.GetEventRecorderFor("component-parameter-controller"),
-		}).SetupWithManager(mgr); err != nil {
+		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "ComponentParameter")
 			os.Exit(1)
 		}

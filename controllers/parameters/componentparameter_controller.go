@@ -21,16 +21,25 @@ package parameters
 
 import (
 	"context"
+	"fmt"
+	"math"
+	"strconv"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 // ComponentParameterReconciler reconciles a ComponentParameter object
@@ -72,12 +81,83 @@ func (r *ComponentParameterReconciler) Reconcile(ctx context.Context, req ctrl.R
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *ComponentParameterReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&parametersv1alpha1.ComponentParameter{}).
-		Complete(r)
+func (r *ComponentParameterReconciler) SetupWithManager(mgr ctrl.Manager, multiClusterMgr multicluster.Manager) error {
+	builder := intctrlutil.NewNamespacedControllerManagedBy(mgr).
+		For(&appsv1alpha1.Configuration{}).
+		WithOptions(controller.Options{
+			MaxConcurrentReconciles: int(math.Ceil(viper.GetFloat64(constant.CfgKBReconcileWorkers) / 2)),
+		}).
+		Owns(&corev1.ConfigMap{})
+	if multiClusterMgr != nil {
+		multiClusterMgr.Own(builder, &corev1.ConfigMap{}, &appsv1alpha1.Configuration{})
+	}
+	return builder.Complete(r)
 }
 
-func (r *ComponentParameterReconciler) reconcile(reqCtx intctrlutil.RequestCtx, componentParam *parametersv1alpha1.ComponentParameter) (ctrl.Result, error) {
-	panic("")
+func (r *ComponentParameterReconciler) reconcile(reqCtx intctrlutil.RequestCtx, componentParameter *parametersv1alpha1.ComponentParameter) (ctrl.Result, error) {
+	tasks := generateReconcileTasks(reqCtx, componentParameter)
+	if len(tasks) == 0 {
+		return intctrlutil.Reconciled()
+	}
+	fetcherTask, err := prepareReconcileTask(reqCtx, r.Client, componentParameter)
+	if err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to get related object.")
+	}
+	if !fetcherTask.ClusterObj.GetDeletionTimestamp().IsZero() {
+		reqCtx.Log.Info("cluster is deleting, skip reconcile")
+		return intctrlutil.Reconciled()
+	}
+	if fetcherTask.ClusterComObj == nil || fetcherTask.ComponentObj == nil {
+		return r.failWithInvalidComponent(componentParameter, reqCtx)
+	}
+
+	taskCtx, err := NewTaskContext(reqCtx.Ctx, r.Client, componentParameter, fetcherTask)
+	if err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to create task context.")
+	}
+	if err := r.runTasks(taskCtx, tasks); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to run configuration reconcile task.")
+	}
+	return intctrlutil.Reconciled()
+}
+
+func (r *ComponentParameterReconciler) failWithInvalidComponent(componentParam *parametersv1alpha1.ComponentParameter, reqCtx intctrlutil.RequestCtx) (ctrl.Result, error) {
+	msg := fmt.Sprintf("not found cluster component: [%s]", componentParam.Spec.ComponentName)
+
+	reqCtx.Log.Error(fmt.Errorf("%s", msg), "")
+	patch := client.MergeFrom(componentParam.DeepCopy())
+	componentParam.Status.Message = msg
+	if err := r.Client.Status().Patch(reqCtx.Ctx, componentParam, patch); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to update configuration status.")
+	}
+	return intctrlutil.Reconciled()
+}
+
+func (r *ComponentParameterReconciler) runTasks(taskCtx *TaskContext, tasks []Task) error {
+	var (
+		errs          []error
+		configuration = taskCtx.componentParameter
+	)
+
+	patch := client.MergeFrom(configuration.DeepCopy())
+	revision := strconv.FormatInt(configuration.GetGeneration(), 10)
+	for _, task := range tasks {
+		if err := task.Do(taskCtx.fetcher, taskCtx.component, revision); err != nil {
+			errs = append(errs, err)
+			continue
+		}
+	}
+
+	configuration.Status.Message = ""
+	if len(errs) > 0 {
+		configuration.Status.Message = utilerrors.NewAggregate(errs).Error()
+	}
+	if err := r.Client.Status().Patch(taskCtx.ctx, configuration, patch); err != nil {
+		errs = append(errs, err)
+	}
+	if len(errs) == 0 {
+		return nil
+	}
+	return utilerrors.NewAggregate(errs)
+
 }

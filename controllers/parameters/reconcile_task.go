@@ -25,9 +25,11 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
@@ -46,12 +48,32 @@ type Task struct {
 }
 
 type TaskContext struct {
-	configuration *appsv1alpha1.Configuration
-	ctx           context.Context
-	fetcher       *Task
+	componentParameter *parametersv1alpha1.ComponentParameter
+	ctx                context.Context
+	fetcher            *Task
+	component          *component.SynthesizedComponent
 }
 
-func NewTask(item appsv1alpha1.ConfigurationItemDetail, status *appsv1alpha1.ConfigurationItemDetailStatus) Task {
+func NewTaskContext(ctx context.Context, cli client.Client, componentParameter *parametersv1alpha1.ComponentParameter, fetchTask *Task) (*TaskContext, error) {
+	// build synthesized component for the component
+	synthesizedComp, err := component.BuildSynthesizedComponent(ctx, cli,
+		fetchTask.ComponentDefObj, fetchTask.ComponentObj, fetchTask.ClusterObj)
+	if err == nil {
+		err = buildTemplateVars(ctx, cli, fetchTask.ComponentDefObj, synthesizedComp)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return &TaskContext{
+		componentParameter: componentParameter,
+		ctx:                ctx,
+		fetcher:            fetchTask,
+		component:          synthesizedComp,
+	}, nil
+}
+
+func NewTask(item parametersv1alpha1.ConfigTemplateItemDetail, status *parametersv1alpha1.ConfigTemplateItemDetailStatus) Task {
 	return Task{
 		Name: item.Name,
 		Do: func(fetcher *Task, synComponent *component.SynthesizedComponent, revision string) error {
@@ -159,4 +181,19 @@ func updateRevision(revision ConfigurationRevision, status *appsv1alpha1.Configu
 			ErrMessage:      revision.Result.Message,
 		}
 	}
+}
+
+func prepareReconcileTask(reqCtx intctrlutil.RequestCtx, cli client.Client, componentParameter *parametersv1alpha1.ComponentParameter) (*Task, error) {
+	fetcherTask := &Task{}
+	err := fetcherTask.Init(&configctrl.ResourceCtx{
+		Context:       reqCtx.Ctx,
+		Client:        cli,
+		Namespace:     componentParameter.Namespace,
+		ClusterName:   componentParameter.Spec.ClusterName,
+		ComponentName: componentParameter.Spec.ComponentName,
+	}, fetcherTask).Cluster().
+		ComponentAndComponentDef().
+		ComponentSpec().
+		Complete()
+	return fetcherTask, err
 }

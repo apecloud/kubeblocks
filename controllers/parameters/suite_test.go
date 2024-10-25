@@ -129,7 +129,7 @@ var _ = BeforeSuite(func() {
 		Client:   k8sManager.GetClient(),
 		Scheme:   k8sManager.GetScheme(),
 		Recorder: k8sManager.GetEventRecorderFor("component-parameter-controller"),
-	}).SetupWithManager(k8sManager)
+	}).SetupWithManager(k8sManager, nil)
 	Expect(err).ToNot(HaveOccurred())
 
 	err = (&ParameterDrivenConfigRenderReconciler{

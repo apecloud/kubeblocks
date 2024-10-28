@@ -11,7 +11,7 @@ sidebar_position: 2
 
 :::note
 
-告警功能对所有数据库都是一样的。
+所有数据库的告警功能相同。
 
 :::
 
@@ -37,15 +37,7 @@ alert: PostgreSQLTooManyConnections
     description: "PostgreSQL has too many connections and the value is {{ $value }}. (instance: {{ $labels.pod }})"
 ```
 
-你可以在  **Prometheus 仪表盘**的 **Alerts** 选项卡中查看所有的告警规则。执行以下命令打开 Prometheus 仪表盘：
-
-```bash
-# 查看仪表盘列表
-kbcli dashboard list
-
-# 打开 Prometheus 仪表盘
-kbcli dashboard open kubeblocks-prometheus-server # 这是一个示例，请根据上述仪表盘列表中的实际名称填写
-```
+您可按需配置告警规则，详情可参考 [Prometheus 告警规则文档](https://prometheus.io/docs/prometheus/latest/configuration/alerting_rules/#defining-alerting-rules)。
 
 ## 通知
 

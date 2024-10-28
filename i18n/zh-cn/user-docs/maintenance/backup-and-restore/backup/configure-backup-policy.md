@@ -15,7 +15,7 @@ import TabItem from '@theme/TabItem';
 
 为了确保恢复的集群能够正常访问，KubeBlocks 在备份集群时会将集群的连接密码加密，并将其安全地存储在 Backup 对象的 Annotation 中。因此，为了保障您的数据安全，强烈建议谨慎分配备份对象的 Get/List 权限，并在安装或升级 KubeBlocks 时，务必指定加密密钥。这些措施将有助于确保你的数据得到妥善保护。
 
-KubeBlocks v0.9.0 版本集成了 datasafed 的数据加密功能，目前已支持 AES-128-CFB、AES-192-CFB 和 AES-256-CFB 等加密算法。在写入存储之前，备份数据会被加密。您的加密密钥不仅可以用于加密连接密码，还可以备份数据。用户可以根据实际需要，直接引用已有的 secret 对象，或给数据库集群创建不同的密钥，从而进行备份加密。
+KubeBlocks v0.9.0 版本集成了 datasafed 的数据加密功能，目前已支持 `AES-128-CFB`、`AES-192-CFB` 和 `AES-256-CFB` 等加密算法。在写入存储之前，备份数据会被加密。您的加密密钥不仅可以用于加密连接密码，还可以备份数据。用户可以根据实际需要，直接引用已有的 secret 对象，或给数据库集群创建不同的密钥，从而进行备份加密。
 
 ### 引用已有的 key
 
@@ -30,10 +30,30 @@ kubectl create secret generic dp-encryption-key \
 
 您可以在安装或升级 KubeBlocks 时引用该密钥。
 
+<Tabs>
+
+<TabItem value="kbcli" label="kbcli" default>
+
+```bash
+kbcli kubeblocks install \
+    --set dataProtection.encryptionKeySecretKeyRef.name="dp-encryption-key" \
+    --set dataProtection.encryptionKeySecretKeyRef.key="encryptionKey"
+# The above command is equivalent to:
+# kbcli kubeblocks install --set dataProtection.encryptionKey='S!B\*d$zDsb='
+```
+
+</TabItem>
+
+<TabItem value="kubectl" label="kubectl">
+
 ```bash
 helm install kubeblocks kubeblocks/kubeblocks --namespace kb-system --create-namespace --set dataProtection.encryptionKeySecretKeyRef.name="dp-encryption-key" \
     --set dataProtection.encryptionKeySecretKeyRef.key="encryptionKey"
 ```
+
+</TabItem>
+
+</Tabs>
 
 ### 创建新的 key
 
@@ -54,6 +74,20 @@ helm install kubeblocks kubeblocks/kubeblocks --namespace kb-system --create-nam
    kubectl --type merge patch backuppolicy mysqlcluster-mysql-backup-policy \
      -p '{"spec":{"encryptionConfig":{"algorithm":"AES-256-CFB","passPhraseSecretKeyRef":{"name":"backup-encryption","key":"secretKey"}}}}'
    ```
+
+:::note
+
+您也可以使用 `kbcli` 创建，操作更简单。
+
+```bash
+# 启用加密
+kbcli cluster edit-backup-policy <backup-policy-name> --set encryption.algorithm=AES-256-CFB --set encryption.passPhrase="SECRET!"
+      
+# 禁用加密
+kbcli cluster edit-backup-policy <backup-policy-name> --set encryption.disabled=true
+```
+
+:::
 
 配置完成。然后就可以照常执行备份和恢复操作了。
 
@@ -92,6 +126,10 @@ kbcli backuprepo list
 
 使用 KubeBlocks 创建数据库集群后，对于支持备份的数据库，会自动为其创建一个备份策略（BackupPolicy），可以执行如下命令查看集群的备份策略：
 
+<Tabs>
+
+<TabItem value="kbcli" label="kbcli" default>
+
 ```bash
 kbcli cluster list-backup-policy mysql-cluster
 >
@@ -100,7 +138,24 @@ mysql-cluster-mysql-backup-policy          default     true      mysql-cluster  
 mysql-cluster-mysql-backup-policy-hscale   default     false     mysql-cluster   Oct 30,2023 14:34 UTC+0800   Available
 ```
 
+</TabItem>
+
+<TabItem value="kubectl" label="kubectl">
+
+kubectl get backuppolicy | grep mycluster
+>
+mycluster-mysql-backup-policy                            Available   35m
+mycluster-mysql-backup-policy-hscale                     Available   35m
+
+</TabItem>
+
+</Tabs>
+
 备份策略中包含了该集群支持的备份方法，执行以下命令进行查看备份方法：
+
+<Tabs>
+
+<TabItem value="kbcli" label="kbcli" default>
 
 ```bash
 kbcli cluster describe-backup-policy mysql-cluster
@@ -117,5 +172,15 @@ NAME              ACTIONSET                           SNAPSHOT-VOLUMES
 xtrabackup        xtrabackup-for-apecloud-mysql       false
 volume-snapshot   volumesnapshot-for-apecloud-mysql   true
 ```
+
+</TabItem>
+
+<TabItem value="kubectl" label="kubectl">
+
+kubectl get backuppolicy mycluster-mysql-backup-policy -o yaml
+
+</TabItem>
+
+</Tabs>
 
 对于 MySQL 集群而言，默认支持两种备份方法：`xtrabackup` 和 `volume-snapshot`，前者使用备份工具 `xtrabackup` 将 MySQL 数据备份至对象存储中；后者则使用云存储的卷快照能力，通过快照方式对数据进行备份。创建备份时，可以指定要使用哪种备份方法进行备份。

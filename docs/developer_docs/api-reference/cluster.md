@@ -4320,7 +4320,7 @@ bool
 <tbody>
 <tr>
 <td>
-<code>timeWindow</code><br/>
+<code>timeWindowSeconds</code><br/>
 <em>
 int32
 </em>

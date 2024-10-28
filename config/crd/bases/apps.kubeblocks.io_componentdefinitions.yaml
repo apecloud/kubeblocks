@@ -595,7 +595,7 @@ spec:
                               type: object
                             type: array
                         type: object
-                      timeWindow:
+                      timeWindowSeconds:
                         description: This field is immutable once set.
                         format: int32
                         type: integer

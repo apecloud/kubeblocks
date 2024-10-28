@@ -25,7 +25,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
-	"slices"
+	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -134,12 +134,12 @@ func (h *AvailableEventHandler) handleEvent(event probeEvent, comp *appsv1.Compo
 		return nil, "", fmt.Errorf("the referenced ComponentDefinition does not have available probe defined, but we got a probe event? %s", compDef.Name)
 	}
 
-	events, err := h.pickupProbeEvents(event, *policy.WithProbe.TimeWindow, comp)
+	events, err := h.pickupProbeEvents(event, *policy.WithProbe.TimeWindowSeconds, comp)
 	if err != nil {
 		return nil, "", err
 	}
-	available, message, err := h.evaluateCondition(*policy.WithProbe.Condition, comp.Spec.Replicas, events)
-	return &available, message, err
+	available, message := h.evaluateCondition(*policy.WithProbe.Condition, comp.Spec.Replicas, events)
+	return &available, message, nil
 }
 
 func (h *AvailableEventHandler) getNCheckCompDefinition(ctx context.Context, cli client.Reader, name string) (*appsv1.ComponentDefinition, error) {
@@ -229,20 +229,15 @@ func (h *AvailableEventHandler) pickupProbeEvents(event probeEvent, timeWindow i
 
 	latest := func(events map[string][]probeEvent) []probeEvent {
 		result := make([]probeEvent, 0)
-		for _, podEvents := range events {
-			if len(podEvents) > 1 {
-				slices.SortFunc(podEvents, func(evt1, evt2 probeEvent) int {
-					switch {
-					case evt1.Timestamp.Before(evt2.Timestamp):
-						return 1
-					case evt1.Timestamp.After(evt2.Timestamp):
-						return -1
-					default:
-						return 0
-					}
-				})
+		for k := range events {
+			podEvents := events[k]
+			evt := podEvents[0]
+			for i := 1; i < len(podEvents); i++ {
+				if podEvents[i].Timestamp.After(evt.Timestamp) {
+					evt = podEvents[i]
+				}
 			}
-			result = append(result, podEvents[0])
+			result = append(result, evt)
 		}
 		return result
 	}
@@ -290,104 +285,122 @@ func (h *AvailableEventHandler) updateCachedEvents(comp *appsv1.Component, event
 	return nil
 }
 
-func (h *AvailableEventHandler) evaluateCondition(cond appsv1.ComponentAvailableCondition, replicas int32, events []probeEvent) (bool, string, error) {
+func (h *AvailableEventHandler) evaluateCondition(cond appsv1.ComponentAvailableCondition, replicas int32, events []probeEvent) (bool, string) {
 	if len(cond.And) > 0 {
-		return h.evaluateAnd(cond.And, replicas, events), "", nil
+		return h.evaluateAnd(cond.And, replicas, events)
 	}
 	if len(cond.Or) > 0 {
-		return h.evaluateOr(cond.Or, replicas, events), "", nil
+		return h.evaluateOr(cond.Or, replicas, events)
 	}
 	if cond.Not != nil {
-		return h.evaluateNot(*cond.Not, replicas, events), "", nil
+		return h.evaluateNot(*cond.Not, replicas, events)
 	}
 	if cond.All != nil {
-		return h.evaluateAll(*cond.All, replicas, events), "", nil
+		return h.evaluateAll(*cond.All, replicas, events)
 	}
 	if cond.Any != nil {
-		return h.evaluateAny(*cond.Any, replicas, events), "", nil
+		return h.evaluateAny(*cond.Any, replicas, events)
 	}
 	if cond.None != nil {
-		return h.evaluateNone(*cond.None, replicas, events), "", nil
+		return h.evaluateNone(*cond.None, replicas, events)
 	}
 	if cond.Majority != nil {
-		return h.evaluateMajority(*cond.Majority, replicas, events), "", nil
+		return h.evaluateMajority(*cond.Majority, replicas, events)
 	}
-	return true, "", nil
+	return true, ""
 }
 
-func (h *AvailableEventHandler) evaluateAnd(conditions []appsv1.ComponentAvailableConditionX, replicas int32, events []probeEvent) bool {
+func (h *AvailableEventHandler) evaluateAnd(conditions []appsv1.ComponentAvailableConditionX, replicas int32, events []probeEvent) (bool, string) {
 	for _, cond := range conditions {
-		ok, _, _ := h.evaluateConditionX(cond, replicas, events)
+		ok, msg := h.evaluateConditionX(cond, replicas, events)
 		if !ok {
-			return false
+			return false, msg
 		}
 	}
-	return true
+	return true, ""
 }
 
-func (h *AvailableEventHandler) evaluateOr(conditions []appsv1.ComponentAvailableConditionX, replicas int32, events []probeEvent) bool {
+func (h *AvailableEventHandler) evaluateOr(conditions []appsv1.ComponentAvailableConditionX, replicas int32, events []probeEvent) (bool, string) {
+	msgs := make([]string, 0)
 	for _, cond := range conditions {
-		ok, _, _ := h.evaluateConditionX(cond, replicas, events)
+		ok, msg := h.evaluateConditionX(cond, replicas, events)
 		if ok {
-			return true
+			return true, ""
+		}
+		if len(msg) > 0 {
+			msgs = append(msgs, msg)
 		}
 	}
-	return false
+	return false, strings.Join(msgs, ",")
 }
 
-func (h *AvailableEventHandler) evaluateNot(cond appsv1.ComponentAvailableConditionX, replicas int32, events []probeEvent) bool {
-	ok, _, _ := h.evaluateConditionX(cond, replicas, events)
-	return !ok
+func (h *AvailableEventHandler) evaluateNot(cond appsv1.ComponentAvailableConditionX, replicas int32, events []probeEvent) (bool, string) {
+	ok, msg := h.evaluateConditionX(cond, replicas, events)
+	if ok {
+		return false, msg
+	}
+	return true, ""
 }
 
-func (h *AvailableEventHandler) evaluateAll(cond appsv1.ComponentAvailableConditionX, replicas int32, events []probeEvent) bool {
+func (h *AvailableEventHandler) evaluateAll(cond appsv1.ComponentAvailableConditionX, replicas int32, events []probeEvent) (bool, string) {
 	if !h.strictCheck(cond, replicas, events) {
-		return false
+		return false, fmt.Sprintf("not all replicas are available: %d/%d", len(events), replicas)
 	}
 	for _, event := range events {
-		ok, _, _ := h.evaluateConditionX(cond, replicas, []probeEvent{event})
+		ok, msg := h.evaluateConditionX(cond, replicas, []probeEvent{event})
 		if !ok {
-			return false
+			return false, msg
 		}
 	}
-	return true
+	return true, ""
 }
 
-func (h *AvailableEventHandler) evaluateAny(cond appsv1.ComponentAvailableConditionX, replicas int32, events []probeEvent) bool {
+func (h *AvailableEventHandler) evaluateAny(cond appsv1.ComponentAvailableConditionX, replicas int32, events []probeEvent) (bool, string) {
 	if !h.strictCheck(cond, replicas, events) {
-		return false
+		return false, fmt.Sprintf("not all replicas are available: %d/%d", len(events), replicas)
+	}
+	msgs := make([]string, 0)
+	for _, event := range events {
+		ok, msg := h.evaluateConditionX(cond, replicas, []probeEvent{event})
+		if ok {
+			return true, ""
+		}
+		if len(msg) > 0 {
+			msgs = append(msgs, msg)
+		}
+	}
+	return false, strings.Join(msgs, ",")
+}
+
+func (h *AvailableEventHandler) evaluateNone(cond appsv1.ComponentAvailableConditionX, replicas int32, events []probeEvent) (bool, string) {
+	if !h.strictCheck(cond, replicas, events) {
+		return false, fmt.Sprintf("not all replicas are available: %d/%d", len(events), replicas)
 	}
 	for _, event := range events {
-		ok, _, _ := h.evaluateConditionX(cond, replicas, []probeEvent{event})
+		ok, msg := h.evaluateConditionX(cond, replicas, []probeEvent{event})
 		if ok {
-			return true
+			return false, msg
 		}
 	}
-	return false
+	return true, ""
 }
 
-func (h *AvailableEventHandler) evaluateNone(cond appsv1.ComponentAvailableConditionX, replicas int32, events []probeEvent) bool {
-	if !h.strictCheck(cond, replicas, events) {
-		return false
-	}
-	for _, event := range events {
-		ok, _, _ := h.evaluateConditionX(cond, replicas, []probeEvent{event})
-		if ok {
-			return false
-		}
-	}
-	return true
-}
-
-func (h *AvailableEventHandler) evaluateMajority(cond appsv1.ComponentAvailableConditionX, replicas int32, events []probeEvent) bool {
+func (h *AvailableEventHandler) evaluateMajority(cond appsv1.ComponentAvailableConditionX, replicas int32, events []probeEvent) (bool, string) {
 	count := 0
+	msgs := make([]string, 0)
 	for _, event := range events {
-		ok, _, _ := h.evaluateConditionX(cond, replicas, []probeEvent{event})
+		ok, msg := h.evaluateConditionX(cond, replicas, []probeEvent{event})
 		if ok {
 			count++
+		} else if len(msg) > 0 {
+			msgs = append(msgs, msg)
 		}
 	}
-	return int32(count) > replicas/2
+	ok := int32(count) > replicas/2
+	if ok {
+		return true, ""
+	}
+	return false, strings.Join(msgs, ",")
 }
 
 func (h *AvailableEventHandler) strictCheck(cond appsv1.ComponentAvailableConditionX, replicas int32, events []probeEvent) bool {
@@ -399,56 +412,67 @@ func (h *AvailableEventHandler) strictCheck(cond appsv1.ComponentAvailableCondit
 	return true
 }
 
-func (h *AvailableEventHandler) evaluateConditionX(cond appsv1.ComponentAvailableConditionX, replicas int32, events []probeEvent) (bool, string, error) {
+func (h *AvailableEventHandler) evaluateConditionX(cond appsv1.ComponentAvailableConditionX, replicas int32, events []probeEvent) (bool, string) {
 	if cond.ActionCriteria != (appsv1.ActionCriteria{}) {
-		return h.evaluateAction(cond.ActionCriteria, events), "", nil
+		return h.evaluateAction(cond.ActionCriteria, events)
 	}
 	if !reflect.DeepEqual(&cond.ComponentAvailableCondition, &appsv1.ComponentAvailableCondition{}) {
 		return h.evaluateCondition(cond.ComponentAvailableCondition, replicas, events)
 	}
-	return true, "", nil
+	return true, ""
 }
 
-func (h *AvailableEventHandler) evaluateAction(criteria appsv1.ActionCriteria, events []probeEvent) bool {
+func (h *AvailableEventHandler) evaluateAction(criteria appsv1.ActionCriteria, events []probeEvent) (bool, string) {
+	msgs := make([]string, 0)
 	for _, event := range events {
-		if h.evaluateActionEvent(criteria, event) {
-			return true
+		ok, msg := h.evaluateActionEvent(criteria, event)
+		if ok {
+			return true, ""
+		}
+		if len(msg) > 0 {
+			msgs = append(msgs, msg)
 		}
 	}
-	return false
+	return false, strings.Join(msgs, ",")
 
 }
 
-func (h *AvailableEventHandler) evaluateActionEvent(criteria appsv1.ActionCriteria, event probeEvent) bool {
+func (h *AvailableEventHandler) evaluateActionEvent(criteria appsv1.ActionCriteria, event probeEvent) (bool, string) {
 	if criteria.Succeed != nil && *criteria.Succeed != (event.Code == 0) {
-		return false
+		return false, fmt.Sprintf("code is not 0: %d", event.Code)
+	}
+	prefix16 := func(out string) string {
+		if len(out) <= 16 {
+			return out
+		}
+		return out[:16] + "..."
 	}
 	if criteria.Stdout != nil {
 		if criteria.Stdout.EqualTo != nil && !bytes.Equal(event.Stdout, []byte(*criteria.Stdout.EqualTo)) {
-			return false
+			return false, fmt.Sprintf("stdout is not match: %s", prefix16(*criteria.Stdout.EqualTo))
 		}
 		if criteria.Stdout.Contains != nil && !bytes.Contains(event.Stdout, []byte(*criteria.Stdout.Contains)) {
-			return false
+			return false, fmt.Sprintf("stdout does not contain: %s", prefix16(*criteria.Stdout.Contains))
 		}
 	}
 	if criteria.Stderr != nil {
 		if criteria.Stderr.EqualTo != nil && !bytes.Equal(event.Stderr, []byte(*criteria.Stderr.EqualTo)) {
-			return false
+			return false, fmt.Sprintf("stderr is not match: %s", prefix16(*criteria.Stderr.EqualTo))
 		}
 		if criteria.Stderr.Contains != nil && !bytes.Contains(event.Stderr, []byte(*criteria.Stderr.Contains)) {
-			return false
+			return false, fmt.Sprintf("stderr does not contain: %s", prefix16(*criteria.Stderr.Contains))
 		}
 	}
-	return true
+	return true, ""
 }
 
 func GetComponentAvailablePolicy(compDef *appsv1.ComponentDefinition) appsv1.ComponentAvailable {
 	if compDef.Spec.Available != nil {
 		policy := *compDef.Spec.Available
-		if policy.WithProbe != nil && policy.WithProbe.TimeWindow == nil {
-			policy.WithProbe.TimeWindow = pointer.Int32(defaultTimeWindow)
+		if policy.WithProbe != nil && policy.WithProbe.TimeWindowSeconds == nil {
+			policy.WithProbe.TimeWindowSeconds = pointer.Int32(defaultTimeWindow)
 			if compDef.Spec.LifecycleActions != nil && compDef.Spec.LifecycleActions.AvailableProbe != nil {
-				policy.WithProbe.TimeWindow = pointer.Int32(compDef.Spec.LifecycleActions.AvailableProbe.PeriodSeconds)
+				policy.WithProbe.TimeWindowSeconds = pointer.Int32(compDef.Spec.LifecycleActions.AvailableProbe.PeriodSeconds)
 			}
 		}
 		return policy
@@ -456,7 +480,7 @@ func GetComponentAvailablePolicy(compDef *appsv1.ComponentDefinition) appsv1.Com
 	if compDef.Spec.LifecycleActions != nil && compDef.Spec.LifecycleActions.AvailableProbe != nil {
 		return appsv1.ComponentAvailable{
 			WithProbe: &appsv1.ComponentAvailableWithProbe{
-				TimeWindow: pointer.Int32(compDef.Spec.LifecycleActions.AvailableProbe.PeriodSeconds),
+				TimeWindowSeconds: pointer.Int32(compDef.Spec.LifecycleActions.AvailableProbe.PeriodSeconds),
 				Condition: &appsv1.ComponentAvailableCondition{
 					All: &appsv1.ComponentAvailableConditionX{
 						ActionCriteria: appsv1.ActionCriteria{

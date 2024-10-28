@@ -64,7 +64,7 @@ var _ = Describe("Available", func() {
 				Spec: appsv1.ComponentDefinitionSpec{
 					Available: &appsv1.ComponentAvailable{
 						WithProbe: &appsv1.ComponentAvailableWithProbe{
-							TimeWindow: &availableTimeWindow,
+							TimeWindowSeconds: &availableTimeWindow,
 							// has the leader, and majority replicas have roles
 							Condition: &appsv1.ComponentAvailableCondition{
 								And: []appsv1.ComponentAvailableConditionX{
@@ -481,8 +481,7 @@ var _ = Describe("Available", func() {
 					Stdout: []byte("ok"),
 				},
 			}
-			available, _, err := h.evaluateCondition(cond, 1, events)
-			Expect(err).Should(Succeed())
+			available, _ := h.evaluateCondition(cond, 1, events)
 			Expect(available).Should(BeTrue())
 		})
 
@@ -510,8 +509,7 @@ var _ = Describe("Available", func() {
 					Stderr: []byte("command not found"),
 				},
 			}
-			available, _, err := h.evaluateCondition(cond, 1, events)
-			Expect(err).Should(Succeed())
+			available, _ := h.evaluateCondition(cond, 1, events)
 			Expect(available).Should(BeFalse())
 		})
 
@@ -542,8 +540,7 @@ var _ = Describe("Available", func() {
 					Stderr: []byte("host is unreachable"),
 				},
 			}
-			available, _, err := h.evaluateCondition(cond, 1, events)
-			Expect(err).Should(Succeed())
+			available, _ := h.evaluateCondition(cond, 1, events)
 			Expect(available).Should(BeTrue())
 		})
 
@@ -574,8 +571,7 @@ var _ = Describe("Available", func() {
 					Stderr: []byte("operation is timed-out"),
 				},
 			}
-			available, _, err := h.evaluateCondition(cond, 1, events)
-			Expect(err).Should(Succeed())
+			available, _ := h.evaluateCondition(cond, 1, events)
 			Expect(available).Should(BeFalse())
 		})
 
@@ -638,8 +634,7 @@ var _ = Describe("Available", func() {
 					Stdout: []byte("follower"),
 				},
 			}
-			available, _, err := h.evaluateCondition(cond, 1, events)
-			Expect(err).Should(Succeed())
+			available, _ := h.evaluateCondition(cond, 1, events)
 			Expect(available).Should(BeTrue())
 		})
 
@@ -702,8 +697,7 @@ var _ = Describe("Available", func() {
 					Stdout: []byte("learner"),
 				},
 			}
-			available, _, err := h.evaluateCondition(cond, 1, events)
-			Expect(err).Should(Succeed())
+			available, _ := h.evaluateCondition(cond, 1, events)
 			Expect(available).Should(BeFalse())
 		})
 
@@ -751,8 +745,7 @@ var _ = Describe("Available", func() {
 					Stderr: []byte("[xxxx] FATAL: detected data is conrputed at offset 0x1234"),
 				},
 			}
-			available, _, err := h.evaluateCondition(cond, 1, events)
-			Expect(err).Should(Succeed())
+			available, _ := h.evaluateCondition(cond, 1, events)
 			Expect(available).Should(BeFalse())
 		})
 	})

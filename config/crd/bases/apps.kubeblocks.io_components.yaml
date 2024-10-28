@@ -7487,12 +7487,12 @@ spec:
                   - Deleting: The Component is being deleted.
                 enum:
                 - Creating
-                - Running
+                - Deleting
                 - Updating
                 - Stopping
+                - Running
                 - Stopped
-                - Deleting
-                - Failed
+                - ',Failed'
                 - Abnormal
                 type: string
             type: object

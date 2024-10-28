@@ -114,7 +114,7 @@ func (t *clusterStatusTransformer) syncClusterConditions(cluster *appsv1.Cluster
 		"sharding":  cluster.Status.Shardings,
 	} {
 		for name, status := range statusMap {
-			if status.Phase == appsv1.AbnormalClusterCompPhase || status.Phase == appsv1.FailedClusterCompPhase {
+			if status.Phase == appsv1.AbnormalComponentPhase || status.Phase == appsv1.FailedComponentPhase {
 				if _, ok := kindNames[kind]; !ok {
 					kindNames[kind] = []string{}
 				}
@@ -137,7 +137,7 @@ func composeClusterPhase(statusList []appsv1.ClusterComponentStatus) appsv1.Clus
 		isAllComponentFailed         = true
 		hasComponentAbnormalOrFailed = false
 	)
-	isPhaseIn := func(phase appsv1.ClusterComponentPhase, phases ...appsv1.ClusterComponentPhase) bool {
+	isPhaseIn := func(phase appsv1.ComponentPhase, phases ...appsv1.ComponentPhase) bool {
 		for _, p := range phases {
 			if p == phase {
 				return true
@@ -147,25 +147,25 @@ func composeClusterPhase(statusList []appsv1.ClusterComponentStatus) appsv1.Clus
 	}
 	for _, status := range statusList {
 		phase := status.Phase
-		if !isPhaseIn(phase, appsv1.CreatingClusterCompPhase) {
+		if !isPhaseIn(phase, appsv1.CreatingComponentPhase) {
 			isAllComponentCreating = false
 		}
-		if !isPhaseIn(phase, appsv1.RunningClusterCompPhase) {
+		if !isPhaseIn(phase, appsv1.RunningComponentPhase) {
 			isAllComponentRunning = false
 		}
-		if !isPhaseIn(phase, appsv1.CreatingClusterCompPhase, appsv1.RunningClusterCompPhase, appsv1.UpdatingClusterCompPhase) {
+		if !isPhaseIn(phase, appsv1.CreatingComponentPhase, appsv1.RunningComponentPhase, appsv1.UpdatingComponentPhase) {
 			isAllComponentWorking = false
 		}
-		if isPhaseIn(phase, appsv1.StoppingClusterCompPhase) {
+		if isPhaseIn(phase, appsv1.StoppingComponentPhase) {
 			hasComponentStopping = true
 		}
-		if !isPhaseIn(phase, appsv1.StoppedClusterCompPhase) {
+		if !isPhaseIn(phase, appsv1.StoppedComponentPhase) {
 			isAllComponentStopped = false
 		}
-		if !isPhaseIn(phase, appsv1.FailedClusterCompPhase) {
+		if !isPhaseIn(phase, appsv1.FailedComponentPhase) {
 			isAllComponentFailed = false
 		}
-		if isPhaseIn(phase, appsv1.AbnormalClusterCompPhase, appsv1.FailedClusterCompPhase) {
+		if isPhaseIn(phase, appsv1.AbnormalComponentPhase, appsv1.FailedComponentPhase) {
 			hasComponentAbnormalOrFailed = true
 		}
 	}

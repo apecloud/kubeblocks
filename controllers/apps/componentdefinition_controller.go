@@ -367,14 +367,14 @@ func (r *ComponentDefinitionReconciler) validateAvailable(cli client.Client, rct
 func (r *ComponentDefinitionReconciler) validateAvailableWithPhases(cmpd *appsv1.ComponentDefinition) error {
 	phases := sets.New[string](strings.Split(strings.ToLower(*cmpd.Spec.Available.WithPhases), ",")...)
 	supported := sets.New[string](
-		strings.ToLower(string(appsv1.CreatingClusterCompPhase)),
-		strings.ToLower(string(appsv1.RunningClusterCompPhase)),
-		strings.ToLower(string(appsv1.UpdatingClusterCompPhase)),
-		strings.ToLower(string(appsv1.StoppingClusterCompPhase)),
-		strings.ToLower(string(appsv1.StoppedClusterCompPhase)),
-		strings.ToLower(string(appsv1.DeletingClusterCompPhase)),
-		strings.ToLower(string(appsv1.FailedClusterCompPhase)),
-		strings.ToLower(string(appsv1.AbnormalClusterCompPhase)),
+		strings.ToLower(string(appsv1.CreatingComponentPhase)),
+		strings.ToLower(string(appsv1.RunningComponentPhase)),
+		strings.ToLower(string(appsv1.UpdatingComponentPhase)),
+		strings.ToLower(string(appsv1.StoppingComponentPhase)),
+		strings.ToLower(string(appsv1.StoppedComponentPhase)),
+		strings.ToLower(string(appsv1.DeletingComponentPhase)),
+		strings.ToLower(string(appsv1.FailedComponentPhase)),
+		strings.ToLower(string(appsv1.AbnormalComponentPhase)),
 	)
 	result := phases.Difference(supported)
 	if result.Len() > 0 {

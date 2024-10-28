@@ -166,7 +166,7 @@ var _ = Describe("CustomOps", func() {
 
 			By("mock component is Running and opsRequest to Running")
 			Expect(testapps.ChangeObjStatus(&testCtx, compObj, func() {
-				compObj.Status.Phase = appsv1.RunningClusterCompPhase
+				compObj.Status.Phase = appsv1.RunningComponentPhase
 			})).Should(Succeed())
 			Expect(testapps.ChangeObjStatus(&testCtx, ops, func() {
 				ops.Status.Phase = opsv1alpha1.OpsRunningPhase
@@ -277,7 +277,7 @@ var _ = Describe("CustomOps", func() {
 
 			By("mock component is Running")
 			Expect(testapps.ChangeObjStatus(&testCtx, compObj, func() {
-				compObj.Status.Phase = appsv1.RunningClusterCompPhase
+				compObj.Status.Phase = appsv1.RunningComponentPhase
 			})).Should(Succeed())
 
 			By("job should be created successfully")

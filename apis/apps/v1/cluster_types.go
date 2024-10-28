@@ -720,7 +720,7 @@ const (
 // ClusterComponentStatus records Component status.
 type ClusterComponentStatus struct {
 	// Specifies the current state of the Component.
-	Phase ClusterComponentPhase `json:"phase,omitempty"`
+	Phase ComponentPhase `json:"phase,omitempty"`
 
 	// Records detailed information about the Component in its current phase.
 	// The keys are either podName, deployName, or statefulSetName, formatted as 'ObjectKind/Name'.

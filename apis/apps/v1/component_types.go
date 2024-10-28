@@ -315,7 +315,7 @@ type ComponentStatus struct {
 	// - Stopping: All Pods are being terminated, with current replica count at zero.
 	// - Stopped: All associated Pods have been successfully deleted.
 	// - Deleting: The Component is being deleted.
-	Phase ClusterComponentPhase `json:"phase,omitempty"`
+	Phase ComponentPhase `json:"phase,omitempty"`
 
 	// A map that stores detailed message about the Component.
 	// Each entry in the map provides insights into specific elements of the Component, such as Pods or workloads.
@@ -326,3 +326,34 @@ type ComponentStatus struct {
 	// +optional
 	Message map[string]string `json:"message,omitempty"`
 }
+
+// ComponentPhase defines the phase of the Component within the .status.phase field.
+//
+// +enum
+// +kubebuilder:validation:Enum={Creating,Deleting,Updating,Stopping,Running,Stopped,,Failed,Abnormal}
+type ComponentPhase string
+
+const (
+	// CreatingComponentPhase indicates the component is currently being created.
+	CreatingComponentPhase ComponentPhase = "Creating"
+
+	// DeletingComponentPhase indicates the component is currently being deleted.
+	DeletingComponentPhase ComponentPhase = "Deleting"
+
+	// UpdatingComponentPhase indicates the component is currently being updated.
+	UpdatingComponentPhase ComponentPhase = "Updating"
+
+	// StoppingComponentPhase indicates the component is currently being stopped.
+	StoppingComponentPhase ComponentPhase = "Stopping"
+
+	// RunningComponentPhase indicates all pods of the component are up-to-date and in a 'Running' state.
+	RunningComponentPhase ComponentPhase = "Running"
+
+	// StoppedComponentPhase indicates the component is stopped.
+	StoppedComponentPhase ComponentPhase = "Stopped"
+
+	// FailedComponentPhase indicates that there are some failed pods for the component.
+	FailedComponentPhase ComponentPhase = "Failed"
+
+	AbnormalComponentPhase ComponentPhase = "Abnormal"
+)

@@ -15947,12 +15947,12 @@ spec:
                       description: Specifies the current state of the Component.
                       enum:
                       - Creating
-                      - Running
+                      - Deleting
                       - Updating
                       - Stopping
+                      - Running
                       - Stopped
-                      - Deleting
-                      - Failed
+                      - ',Failed'
                       - Abnormal
                       type: string
                   type: object
@@ -16073,12 +16073,12 @@ spec:
                       description: Specifies the current state of the Component.
                       enum:
                       - Creating
-                      - Running
+                      - Deleting
                       - Updating
                       - Stopping
+                      - Running
                       - Stopped
-                      - Deleting
-                      - Failed
+                      - ',Failed'
                       - Abnormal
                       type: string
                   type: object

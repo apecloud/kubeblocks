@@ -167,7 +167,7 @@ func (t *componentStatusTransformer) reconcileStatus(transCtx *componentTransfor
 	// check if the component is in creating phase
 	isInCreatingPhase := func() bool {
 		phase := t.comp.Status.Phase
-		return phase == "" || phase == appsv1.CreatingClusterCompPhase
+		return phase == "" || phase == appsv1.CreatingComponentPhase
 	}()
 
 	transCtx.Logger.Info(
@@ -176,21 +176,21 @@ func (t *componentStatusTransformer) reconcileStatus(transCtx *componentTransfor
 
 	switch {
 	case isDeleting:
-		t.setComponentStatusPhase(transCtx, appsv1.DeletingClusterCompPhase, nil, "component is Deleting")
+		t.setComponentStatusPhase(transCtx, appsv1.DeletingComponentPhase, nil, "component is Deleting")
 	case stopped && hasRunningPods:
-		t.setComponentStatusPhase(transCtx, appsv1.StoppingClusterCompPhase, nil, "component is Stopping")
+		t.setComponentStatusPhase(transCtx, appsv1.StoppingComponentPhase, nil, "component is Stopping")
 	case stopped:
-		t.setComponentStatusPhase(transCtx, appsv1.StoppedClusterCompPhase, nil, "component is Stopped")
+		t.setComponentStatusPhase(transCtx, appsv1.StoppedComponentPhase, nil, "component is Stopped")
 	case isITSUpdatedNRunning && isAllConfigSynced && !hasRunningVolumeExpansion:
-		t.setComponentStatusPhase(transCtx, appsv1.RunningClusterCompPhase, nil, "component is Running")
+		t.setComponentStatusPhase(transCtx, appsv1.RunningComponentPhase, nil, "component is Running")
 	case !hasFailure && isInCreatingPhase:
-		t.setComponentStatusPhase(transCtx, appsv1.CreatingClusterCompPhase, nil, "component is Creating")
+		t.setComponentStatusPhase(transCtx, appsv1.CreatingComponentPhase, nil, "component is Creating")
 	case !hasFailure:
-		t.setComponentStatusPhase(transCtx, appsv1.UpdatingClusterCompPhase, nil, "component is Updating")
+		t.setComponentStatusPhase(transCtx, appsv1.UpdatingComponentPhase, nil, "component is Updating")
 	case !isComponentAvailable:
-		t.setComponentStatusPhase(transCtx, appsv1.FailedClusterCompPhase, messages, "component is Failed")
+		t.setComponentStatusPhase(transCtx, appsv1.FailedComponentPhase, messages, "component is Failed")
 	default:
-		t.setComponentStatusPhase(transCtx, appsv1.AbnormalClusterCompPhase, nil, "component is Abnormal")
+		t.setComponentStatusPhase(transCtx, appsv1.AbnormalComponentPhase, nil, "component is Abnormal")
 	}
 
 	return t.reconcileStatusCondition(transCtx)
@@ -394,7 +394,7 @@ func (t *componentStatusTransformer) hasFailedPod() (bool, appsv1alpha1.Componen
 
 // setComponentStatusPhase sets the component phase and messages conditionally.
 func (t *componentStatusTransformer) setComponentStatusPhase(transCtx *componentTransformContext,
-	phase appsv1.ClusterComponentPhase, statusMessage map[string]string, phaseTransitionMsg string) {
+	phase appsv1.ComponentPhase, statusMessage map[string]string, phaseTransitionMsg string) {
 	updateFn := func(status *appsv1.ComponentStatus) error {
 		if status.Phase == phase {
 			return nil

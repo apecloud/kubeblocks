@@ -143,7 +143,7 @@ func switchoverPreCheck(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes
 		}
 		if !needSwitchover {
 			opsRequest.Status.Components[switchover.ComponentName] = opsv1alpha1.OpsRequestComponentStatus{
-				Phase:           appsv1.RunningClusterCompPhase,
+				Phase:           appsv1.RunningComponentPhase,
 				Reason:          OpsReasonForSkipSwitchover,
 				Message:         fmt.Sprintf("This component %s is already in the expected state, skip the switchover operation", switchover.ComponentName),
 				ProgressDetails: []opsv1alpha1.ProgressStatusDetail{},
@@ -151,7 +151,7 @@ func switchoverPreCheck(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes
 			continue
 		} else {
 			opsRequest.Status.Components[switchover.ComponentName] = opsv1alpha1.OpsRequestComponentStatus{
-				Phase:           appsv1.UpdatingClusterCompPhase,
+				Phase:           appsv1.UpdatingComponentPhase,
 				ProgressDetails: []opsv1alpha1.ProgressStatusDetail{},
 			}
 		}
@@ -235,7 +235,7 @@ func handleSwitchover(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *
 	*completedCount++
 	detail.Message = fmt.Sprintf("do switchover for component %s succeeded", switchover.ComponentName)
 	detail.Status = opsv1alpha1.SucceedProgressStatus
-	setComponentSwitchoverProgressDetails(reqCtx.Recorder, opsRequest, appsv1.RunningClusterCompPhase, detail, switchover.ComponentName)
+	setComponentSwitchoverProgressDetails(reqCtx.Recorder, opsRequest, appsv1.RunningComponentPhase, detail, switchover.ComponentName)
 	return nil
 }
 
@@ -276,7 +276,7 @@ func doSwitchover(ctx context.Context, cli client.Reader, synthesizedComp *compo
 // setComponentSwitchoverProgressDetails sets component switchover progress details.
 func setComponentSwitchoverProgressDetails(recorder record.EventRecorder,
 	opsRequest *opsv1alpha1.OpsRequest,
-	phase appsv1.ClusterComponentPhase,
+	phase appsv1.ComponentPhase,
 	processDetail opsv1alpha1.ProgressStatusDetail,
 	componentName string) {
 	componentProcessDetails := opsRequest.Status.Components[componentName].ProgressDetails
@@ -301,6 +301,6 @@ func handleError(reqCtx intctrlutil.RequestCtx, opsRequest *opsv1alpha1.OpsReque
 	*failedCount++
 	detail.Message = fmt.Sprintf("component %s %s", componentName, errorMsg)
 	detail.Status = opsv1alpha1.FailedProgressStatus
-	setComponentSwitchoverProgressDetails(reqCtx.Recorder, opsRequest, appsv1.UpdatingClusterCompPhase, *detail, componentName)
+	setComponentSwitchoverProgressDetails(reqCtx.Recorder, opsRequest, appsv1.UpdatingComponentPhase, *detail, componentName)
 	return nil
 }

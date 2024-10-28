@@ -190,13 +190,13 @@ var _ = Describe("OpsUtil functions", func() {
 			By("expect for opsRequest phase is Failed if the phase of component is not matched")
 			_, _ = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(opsv1alpha1.OpsFailedPhase))
-			Expect(opsRes.OpsRequest.Status.Conditions[0].Message).Should(ContainSubstring(fmt.Sprintf(`the phase of component "%s" can not be %s`, defaultCompName, appsv1.RunningClusterCompPhase)))
+			Expect(opsRes.OpsRequest.Status.Conditions[0].Message).Should(ContainSubstring(fmt.Sprintf(`the phase of component "%s" can not be %s`, defaultCompName, appsv1.RunningComponentPhase)))
 
 			By("fake component phase to Abnormal")
 			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsCreatingPhase
 			Expect(testapps.ChangeObjStatus(&testCtx, opsRes.Cluster, func() {
 				compStatus := opsRes.Cluster.Status.Components[defaultCompName]
-				compStatus.Phase = appsv1.AbnormalClusterCompPhase
+				compStatus.Phase = appsv1.AbnormalComponentPhase
 				opsRes.Cluster.Status.Components[defaultCompName] = compStatus
 			})).Should(Succeed())
 
@@ -437,7 +437,7 @@ var _ = Describe("OpsUtil functions", func() {
 			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsCreatingPhase
 			Expect(testapps.ChangeObjStatus(&testCtx, opsRes.Cluster, func() {
 				compStatus := opsRes.Cluster.Status.Components[defaultCompName]
-				compStatus.Phase = appsv1.AbnormalClusterCompPhase
+				compStatus.Phase = appsv1.AbnormalComponentPhase
 				opsRes.Cluster.Status.Phase = appsv1.AbnormalClusterPhase
 				opsRes.Cluster.Status.Components[defaultCompName] = compStatus
 			})).Should(Succeed())

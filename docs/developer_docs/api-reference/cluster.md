@@ -2400,51 +2400,6 @@ Kubernetes core/v1.ConfigMapVolumeSource
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1.ClusterComponentPhase">ClusterComponentPhase
-(<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentStatus">ClusterComponentStatus</a>, <a href="#apps.kubeblocks.io/v1.ComponentStatus">ComponentStatus</a>)
-</p>
-<div>
-<p>ClusterComponentPhase defines the phase of a cluster component as represented in cluster.status.components.phase field.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>&#34;Abnormal&#34;</p></td>
-<td><p>AbnormalClusterCompPhase indicates the component has more than zero replicas, but there are some failed pods.
-The component is functioning, but it is in a fragile state.</p>
-</td>
-</tr><tr><td><p>&#34;Creating&#34;</p></td>
-<td><p>CreatingClusterCompPhase indicates the component is being created.</p>
-</td>
-</tr><tr><td><p>&#34;Deleting&#34;</p></td>
-<td><p>DeletingClusterCompPhase indicates the component is currently being deleted.</p>
-</td>
-</tr><tr><td><p>&#34;Failed&#34;</p></td>
-<td><p>FailedClusterCompPhase indicates the component has more than zero replicas, but there are some failed pods.
-The component is not functioning.</p>
-</td>
-</tr><tr><td><p>&#34;Running&#34;</p></td>
-<td><p>RunningClusterCompPhase indicates the component has more than zero replicas, and all pods are up-to-date and
-in a &lsquo;Running&rsquo; state.</p>
-</td>
-</tr><tr><td><p>&#34;Stopped&#34;</p></td>
-<td><p>StoppedClusterCompPhase indicates the component has zero replicas, and all pods have been deleted.</p>
-</td>
-</tr><tr><td><p>&#34;Stopping&#34;</p></td>
-<td><p>StoppingClusterCompPhase indicates the component has zero replicas, and there are pods that are terminating.</p>
-</td>
-</tr><tr><td><p>&#34;Updating&#34;</p></td>
-<td><p>UpdatingClusterCompPhase indicates the component has more than zero replicas, and there are no failed pods,
-it is currently being updated.</p>
-</td>
-</tr></tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1.ClusterComponentService">ClusterComponentService
 </h3>
 <p>
@@ -2974,8 +2929,8 @@ If set, all the computing resources will be released.</p>
 <td>
 <code>phase</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.ClusterComponentPhase">
-ClusterComponentPhase
+<a href="#apps.kubeblocks.io/v1.ComponentPhase">
+ComponentPhase
 </a>
 </em>
 </td>
@@ -5532,6 +5487,46 @@ and other administrative tasks.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1.ComponentPhase">ComponentPhase
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentStatus">ClusterComponentStatus</a>, <a href="#apps.kubeblocks.io/v1.ComponentStatus">ComponentStatus</a>)
+</p>
+<div>
+<p>ComponentPhase defines the phase of the Component within the .status.phase field.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Abnormal&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Creating&#34;</p></td>
+<td><p>CreatingComponentPhase indicates the component is currently being created.</p>
+</td>
+</tr><tr><td><p>&#34;Deleting&#34;</p></td>
+<td><p>DeletingComponentPhase indicates the component is currently being deleted.</p>
+</td>
+</tr><tr><td><p>&#34;Failed&#34;</p></td>
+<td><p>FailedComponentPhase indicates that there are some failed pods for the component.</p>
+</td>
+</tr><tr><td><p>&#34;Running&#34;</p></td>
+<td><p>RunningComponentPhase indicates all pods of the component are up-to-date and in a &lsquo;Running&rsquo; state.</p>
+</td>
+</tr><tr><td><p>&#34;Stopped&#34;</p></td>
+<td><p>StoppedComponentPhase indicates the component is stopped.</p>
+</td>
+</tr><tr><td><p>&#34;Stopping&#34;</p></td>
+<td><p>StoppingComponentPhase indicates the component is currently being stopped.</p>
+</td>
+</tr><tr><td><p>&#34;Updating&#34;</p></td>
+<td><p>UpdatingComponentPhase indicates the component is currently being updated.</p>
+</td>
+</tr></tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1.ComponentService">ComponentService
 </h3>
 <p>
@@ -6070,8 +6065,8 @@ automated logic or direct inspection.</p>
 <td>
 <code>phase</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.ClusterComponentPhase">
-ClusterComponentPhase
+<a href="#apps.kubeblocks.io/v1.ComponentPhase">
+ComponentPhase
 </a>
 </em>
 </td>

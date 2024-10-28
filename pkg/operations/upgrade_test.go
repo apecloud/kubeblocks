@@ -78,7 +78,7 @@ var _ = Describe("Upgrade OpsRequest", func() {
 		// do upgrade
 		_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 		Expect(err).ShouldNot(HaveOccurred())
-		mockComponentIsOperating(opsRes.Cluster, appsv1.UpdatingClusterCompPhase, defaultCompName)
+		mockComponentIsOperating(opsRes.Cluster, appsv1.UpdatingComponentPhase, defaultCompName)
 		Expect(testapps.ChangeObjStatus(&testCtx, opsRes.OpsRequest, func() {
 			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsRunningPhase
 		})).Should(Succeed())
@@ -89,7 +89,7 @@ var _ = Describe("Upgrade OpsRequest", func() {
 			clusterObject.Status.Phase = appsv1.RunningClusterPhase
 			clusterObject.Status.Components = map[string]appsv1.ClusterComponentStatus{
 				defaultCompName: {
-					Phase: appsv1.RunningClusterCompPhase,
+					Phase: appsv1.RunningComponentPhase,
 				},
 			}
 		})).Should(Succeed())
@@ -207,7 +207,7 @@ var _ = Describe("Upgrade OpsRequest", func() {
 
 	expectOpsSucceed := func(reqCtx intctrlutil.RequestCtx, opsRes *OpsResource, compNames ...string) {
 		// mock component to running
-		mockComponentIsOperating(opsRes.Cluster, appsv1.RunningClusterCompPhase, compNames...)
+		mockComponentIsOperating(opsRes.Cluster, appsv1.RunningComponentPhase, compNames...)
 		_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 		Expect(err).ShouldNot(HaveOccurred())
 		Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsSucceedPhase))
@@ -256,7 +256,7 @@ var _ = Describe("Upgrade OpsRequest", func() {
 			})).Should(Succeed())
 
 			By("the ops is expected to be Running when the component phase is in a terminal state but progress is not completed")
-			mockComponentIsOperating(opsRes.Cluster, appsv1.RunningClusterCompPhase, defaultCompName)
+			mockComponentIsOperating(opsRes.Cluster, appsv1.RunningComponentPhase, defaultCompName)
 			_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
 			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsRunningPhase))

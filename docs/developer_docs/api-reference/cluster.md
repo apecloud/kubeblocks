@@ -3866,10 +3866,11 @@ string
 </em>
 </td>
 <td>
-<p>Defines the unique identifier of the component within the cluster topology.
-It follows IANA Service naming rules and is used as part of the Service&rsquo;s DNS name.
+<p>Defines the unique identifier of the component within the cluster topology.</p>
+<p>It follows IANA Service naming rules and is used as part of the Service&rsquo;s DNS name.
 The name must start with a lowercase letter, can contain lowercase letters, numbers,
 and hyphens, and must end with a lowercase letter or number.</p>
+<p>If the @template field is set to true, the name will be used as a prefix to match the specific components dynamically created.</p>
 <p>Cannot be updated once set.</p>
 </td>
 </tr>
@@ -3890,7 +3891,20 @@ This approach allows:</p>
 <li>Flexible and automatic selection of the most up-to-date ComponentDefinition CR
 by specifying a name prefix or regular expression pattern.</li>
 </ol>
-<p>Once set, this field cannot be updated.</p>
+<p>Cannot be updated once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>template</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies whether the topology component will be considered as a template for instantiating components upon user requests dynamically.</p>
+<p>Cannot be updated once set.</p>
 </td>
 </tr>
 </tbody>

@@ -26,7 +26,6 @@ import (
 	"k8s.io/utils/pointer"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 )
 
 var _ = Describe("Available", func() {
@@ -80,18 +79,18 @@ var _ = Describe("Available", func() {
 					},
 				},
 			}
-			events := []proto.ProbeEvent{
+			events := []probeEvent{
 				{
 					Code:   0,
-					Output: []byte("ok"),
+					Stdout: []byte("ok"),
 				},
 				{
 					Code:   0,
-					Output: []byte("ok"),
+					Stdout: []byte("ok"),
 				},
 				{
 					Code:   0,
-					Output: []byte("ok"),
+					Stdout: []byte("ok"),
 				},
 			}
 			available, _, err := h.evaluateCondition(cond, 1, events)
@@ -109,18 +108,18 @@ var _ = Describe("Available", func() {
 					},
 				},
 			}
-			events := []proto.ProbeEvent{
+			events := []probeEvent{
 				{
 					Code:   0,
-					Output: []byte("ok"),
+					Stdout: []byte("ok"),
 				},
 				{
 					Code:   0,
-					Output: []byte("ok"),
+					Stdout: []byte("ok"),
 				},
 				{
-					Code:    -1,
-					Message: "command not found",
+					Code:   -1,
+					Stderr: []byte("command not found"),
 				},
 			}
 			available, _, err := h.evaluateCondition(cond, 1, events)
@@ -141,18 +140,18 @@ var _ = Describe("Available", func() {
 					},
 				},
 			}
-			events := []proto.ProbeEvent{
+			events := []probeEvent{
 				{
 					Code:   0,
-					Output: []byte("leader"),
+					Stdout: []byte("leader"),
 				},
 				{
 					Code:   0,
-					Output: []byte("follower"),
+					Stdout: []byte("follower"),
 				},
 				{
-					Code:    -1,
-					Message: "host is unreachable",
+					Code:   -1,
+					Stderr: []byte("host is unreachable"),
 				},
 			}
 			available, _, err := h.evaluateCondition(cond, 1, events)
@@ -173,18 +172,18 @@ var _ = Describe("Available", func() {
 					},
 				},
 			}
-			events := []proto.ProbeEvent{
+			events := []probeEvent{
 				{
 					Code:   0,
-					Output: []byte("follower"),
+					Stdout: []byte("follower"),
 				},
 				{
 					Code:   0,
-					Output: []byte("follower"),
+					Stdout: []byte("follower"),
 				},
 				{
-					Code:    -1,
-					Message: "operation is timed-out",
+					Code:   -1,
+					Stderr: []byte("operation is timed-out"),
 				},
 			}
 			available, _, err := h.evaluateCondition(cond, 1, events)
@@ -237,18 +236,18 @@ var _ = Describe("Available", func() {
 					},
 				},
 			}
-			events := []proto.ProbeEvent{
+			events := []probeEvent{
 				{
 					Code:   0,
-					Output: []byte("leader"),
+					Stdout: []byte("leader"),
 				},
 				{
 					Code:   0,
-					Output: []byte("follower"),
+					Stdout: []byte("follower"),
 				},
 				{
 					Code:   0,
-					Output: []byte("follower"),
+					Stdout: []byte("follower"),
 				},
 			}
 			available, _, err := h.evaluateCondition(cond, 1, events)
@@ -301,18 +300,18 @@ var _ = Describe("Available", func() {
 					},
 				},
 			}
-			events := []proto.ProbeEvent{
+			events := []probeEvent{
 				{
 					Code:   0,
-					Output: []byte("follower"),
+					Stdout: []byte("follower"),
 				},
 				{
 					Code:   0,
-					Output: []byte("follower"),
+					Stdout: []byte("follower"),
 				},
 				{
 					Code:   0,
-					Output: []byte("learner"),
+					Stdout: []byte("learner"),
 				},
 			}
 			available, _, err := h.evaluateCondition(cond, 1, events)
@@ -350,18 +349,18 @@ var _ = Describe("Available", func() {
 					},
 				},
 			}
-			events := []proto.ProbeEvent{
+			events := []probeEvent{
 				{
 					Code:   0,
-					Output: []byte("leader"),
+					Stdout: []byte("leader"),
 				},
 				{
 					Code:   0,
-					Output: []byte("follower"),
+					Stdout: []byte("follower"),
 				},
 				{
-					Code:    -1,
-					Message: "[xxxx] FATAL: detected data is conrputed at offset 0x1234",
+					Code:   -1,
+					Stderr: []byte("[xxxx] FATAL: detected data is conrputed at offset 0x1234"),
 				},
 			}
 			available, _, err := h.evaluateCondition(cond, 1, events)

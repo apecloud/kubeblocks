@@ -160,22 +160,22 @@ func (h *AvailableEventHandler) getNCheckCompDefinition(ctx context.Context, cli
 }
 
 type probeEvent struct {
-	podName   string    `json:"podName"`
-	podUID    types.UID `json:"podUID"`
-	timestamp time.Time `json:"timestamp"`
-	code      int32     `json:"code"`
-	stdout    []byte    `json:"stdout,omitempty"`
-	stderr    []byte    `json:"stderr,omitempty"`
+	PodName   string    `json:"podName"`
+	PodUID    types.UID `json:"podUID"`
+	Timestamp time.Time `json:"timestamp"`
+	Code      int32     `json:"code"`
+	Stdout    []byte    `json:"stdout,omitempty"`
+	Stderr    []byte    `json:"stderr,omitempty"`
 }
 
 func newProbeEvent(event *corev1.Event, ppEvent *proto.ProbeEvent) probeEvent {
 	return probeEvent{
-		podName:   event.InvolvedObject.Name,
-		podUID:    event.InvolvedObject.UID,
-		timestamp: event.LastTimestamp.Time,
-		code:      ppEvent.Code,
-		stdout:    ppEvent.Output,
-		stderr:    []byte(ppEvent.Message),
+		PodName:   event.InvolvedObject.Name,
+		PodUID:    event.InvolvedObject.UID,
+		Timestamp: event.LastTimestamp.Time,
+		Code:      ppEvent.Code,
+		Stdout:    ppEvent.Output,
+		Stderr:    []byte(ppEvent.Message),
 	}
 }
 
@@ -196,7 +196,7 @@ func (h *AvailableEventHandler) pickupProbeEvents(event probeEvent, timeWindow i
 	filterByTimeWindow := func(events []probeEvent) []probeEvent {
 		result := make([]probeEvent, 0)
 		for i, evt := range events {
-			if evt.timestamp.After(timestamp) {
+			if evt.Timestamp.After(timestamp) {
 				result = append(result, events[i])
 			}
 		}
@@ -217,11 +217,11 @@ func (h *AvailableEventHandler) pickupProbeEvents(event probeEvent, timeWindow i
 	groupByPod := func(events []probeEvent) map[string][]probeEvent {
 		result := make(map[string][]probeEvent)
 		for i, evt := range events {
-			podEvents, ok := result[evt.podName]
+			podEvents, ok := result[evt.PodName]
 			if ok {
-				result[evt.podName] = append(podEvents, events[i])
+				result[evt.PodName] = append(podEvents, events[i])
 			} else {
-				result[evt.podName] = []probeEvent{events[i]}
+				result[evt.PodName] = []probeEvent{events[i]}
 			}
 		}
 		return result
@@ -233,9 +233,9 @@ func (h *AvailableEventHandler) pickupProbeEvents(event probeEvent, timeWindow i
 			if len(podEvents) > 1 {
 				slices.SortFunc(podEvents, func(evt1, evt2 probeEvent) int {
 					switch {
-					case evt1.timestamp.Before(evt2.timestamp):
+					case evt1.Timestamp.Before(evt2.Timestamp):
 						return 1
-					case evt1.timestamp.After(evt2.timestamp):
+					case evt1.Timestamp.After(evt2.Timestamp):
 						return -1
 					default:
 						return 0
@@ -264,7 +264,7 @@ func (h *AvailableEventHandler) getCachedEvents(comp *appsv1.Component) ([]probe
 		return nil, nil
 	}
 	events := make([]probeEvent, 0)
-	err := json.Unmarshal([]byte(message), events)
+	err := json.Unmarshal([]byte(message), &events)
 	if err != nil {
 		return nil, err
 	}
@@ -276,7 +276,7 @@ func (h *AvailableEventHandler) updateCachedEvents(comp *appsv1.Component, event
 		return nil
 	}
 
-	out, err := json.Marshal(events)
+	out, err := json.Marshal(&events)
 	if err != nil {
 		return err
 	}
@@ -420,22 +420,22 @@ func (h *AvailableEventHandler) evaluateAction(criteria appsv1.ActionCriteria, e
 }
 
 func (h *AvailableEventHandler) evaluateActionEvent(criteria appsv1.ActionCriteria, event probeEvent) bool {
-	if criteria.Succeed != nil && *criteria.Succeed != (event.code == 0) {
+	if criteria.Succeed != nil && *criteria.Succeed != (event.Code == 0) {
 		return false
 	}
 	if criteria.Stdout != nil {
-		if criteria.Stdout.EqualTo != nil && !bytes.Equal(event.stdout, []byte(*criteria.Stdout.EqualTo)) {
+		if criteria.Stdout.EqualTo != nil && !bytes.Equal(event.Stdout, []byte(*criteria.Stdout.EqualTo)) {
 			return false
 		}
-		if criteria.Stdout.Contains != nil && !bytes.Contains(event.stdout, []byte(*criteria.Stdout.Contains)) {
+		if criteria.Stdout.Contains != nil && !bytes.Contains(event.Stdout, []byte(*criteria.Stdout.Contains)) {
 			return false
 		}
 	}
 	if criteria.Stderr != nil {
-		if criteria.Stderr.EqualTo != nil && !bytes.Equal(event.stderr, []byte(*criteria.Stderr.EqualTo)) {
+		if criteria.Stderr.EqualTo != nil && !bytes.Equal(event.Stderr, []byte(*criteria.Stderr.EqualTo)) {
 			return false
 		}
-		if criteria.Stderr.Contains != nil && !bytes.Contains(event.stderr, []byte(*criteria.Stderr.Contains)) {
+		if criteria.Stderr.Contains != nil && !bytes.Contains(event.Stderr, []byte(*criteria.Stderr.Contains)) {
 			return false
 		}
 	}

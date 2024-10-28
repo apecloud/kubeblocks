@@ -1268,7 +1268,7 @@ type ComponentAvailableWithProbe struct {
 	// This field is immutable once set.
 	//
 	// +optional
-	TimeWindow *int32 `json:"timeWindow,omitempty"`
+	TimeWindowSeconds *int32 `json:"timeWindowSeconds,omitempty"`
 
 	// Specifies the conditions that the component will go through to be considered available.
 	//

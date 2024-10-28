@@ -131,9 +131,7 @@ func GenerateAllPodNames(
 	compReplicas int32,
 	instances []appsv1.InstanceTemplate,
 	offlineInstances []string,
-	clusterName,
 	fullCompName string) ([]string, error) {
-	workloadName := constant.GenerateWorkloadNamePattern(clusterName, fullCompName)
 	var templates []instanceset.InstanceTemplate
 	for i := range instances {
 		templates = append(templates, &workloads.InstanceTemplate{
@@ -141,7 +139,7 @@ func GenerateAllPodNames(
 			Replicas: instances[i].Replicas,
 		})
 	}
-	return instanceset.GenerateAllInstanceNames(workloadName, compReplicas, templates, offlineInstances, workloads.Ordinals{})
+	return instanceset.GenerateAllInstanceNames(fullCompName, compReplicas, templates, offlineInstances, workloads.Ordinals{})
 }
 
 // GenerateAllPodNamesToSet generate all pod names for a component
@@ -152,7 +150,8 @@ func GenerateAllPodNamesToSet(
 	offlineInstances []string,
 	clusterName,
 	fullCompName string) (map[string]string, error) {
-	instanceNames, err := GenerateAllPodNames(compReplicas, instances, offlineInstances, clusterName, fullCompName)
+	compName := constant.GenerateClusterComponentName(clusterName, fullCompName)
+	instanceNames, err := GenerateAllPodNames(compReplicas, instances, offlineInstances, compName)
 	if err != nil {
 		return nil, err
 	}

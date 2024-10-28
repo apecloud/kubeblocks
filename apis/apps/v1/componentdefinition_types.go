@@ -1332,6 +1332,13 @@ type ComponentAvailableCondition struct {
 type ComponentAvailableConditionX struct {
 	ActionCriteria              `json:",inline"`
 	ComponentAvailableCondition `json:",inline"`
+
+	// Specifies whether apply the aggregation conditions strictly to all replicas.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	Strict *bool `json:"strict,omitempty"`
 }
 
 // ReplicaRole represents a role that can be assumed by a component instance.

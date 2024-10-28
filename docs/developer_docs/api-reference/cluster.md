@@ -4319,6 +4319,19 @@ ComponentAvailableCondition
 </p>
 </td>
 </tr>
+<tr>
+<td>
+<code>strict</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies whether apply the aggregation conditions strictly to all replicas.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1.ComponentAvailableWithProbe">ComponentAvailableWithProbe

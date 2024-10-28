@@ -179,6 +179,13 @@ spec:
                                       This field is immutable once set.
                                     type: string
                                 type: object
+                              strict:
+                                description: |-
+                                  Specifies whether apply the aggregation conditions strictly to all replicas.
+
+
+                                  This field is immutable once set.
+                                type: boolean
                               succeed:
                                 description: |-
                                   Whether the action should succeed or fail.
@@ -239,6 +246,13 @@ spec:
                                         This field is immutable once set.
                                       type: string
                                   type: object
+                                strict:
+                                  description: |-
+                                    Specifies whether apply the aggregation conditions strictly to all replicas.
+
+
+                                    This field is immutable once set.
+                                  type: boolean
                                 succeed:
                                   description: |-
                                     Whether the action should succeed or fail.
@@ -299,6 +313,13 @@ spec:
                                       This field is immutable once set.
                                     type: string
                                 type: object
+                              strict:
+                                description: |-
+                                  Specifies whether apply the aggregation conditions strictly to all replicas.
+
+
+                                  This field is immutable once set.
+                                type: boolean
                               succeed:
                                 description: |-
                                   Whether the action should succeed or fail.
@@ -358,6 +379,13 @@ spec:
                                       This field is immutable once set.
                                     type: string
                                 type: object
+                              strict:
+                                description: |-
+                                  Specifies whether apply the aggregation conditions strictly to all replicas.
+
+
+                                  This field is immutable once set.
+                                type: boolean
                               succeed:
                                 description: |-
                                   Whether the action should succeed or fail.
@@ -417,6 +445,13 @@ spec:
                                       This field is immutable once set.
                                     type: string
                                 type: object
+                              strict:
+                                description: |-
+                                  Specifies whether apply the aggregation conditions strictly to all replicas.
+
+
+                                  This field is immutable once set.
+                                type: boolean
                               succeed:
                                 description: |-
                                   Whether the action should succeed or fail.
@@ -476,6 +511,13 @@ spec:
                                       This field is immutable once set.
                                     type: string
                                 type: object
+                              strict:
+                                description: |-
+                                  Specifies whether apply the aggregation conditions strictly to all replicas.
+
+
+                                  This field is immutable once set.
+                                type: boolean
                               succeed:
                                 description: |-
                                   Whether the action should succeed or fail.
@@ -536,6 +578,13 @@ spec:
                                         This field is immutable once set.
                                       type: string
                                   type: object
+                                strict:
+                                  description: |-
+                                    Specifies whether apply the aggregation conditions strictly to all replicas.
+
+
+                                    This field is immutable once set.
+                                  type: boolean
                                 succeed:
                                   description: |-
                                     Whether the action should succeed or fail.

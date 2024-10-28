@@ -46,7 +46,30 @@ var _ = Describe("Available", func() {
 		cleanEnv()
 	})
 
-	Context("evaluate", func() {
+	Context("status", func() {
+		It("ok", func() {
+		})
+
+		It("has no event", func() {
+		})
+
+		It("more then one event", func() {
+		})
+
+		It("event expired", func() {
+		})
+
+		It("has no new event and keep", func() {
+		})
+
+		It("multiple replicas - ok", func() {
+		})
+
+		It("multiple replicas - group event", func() {
+		})
+	})
+
+	Context("evaluate condition", func() {
 		It("all succeed - ok", func() {
 			h := &AvailableEventHandler{}
 

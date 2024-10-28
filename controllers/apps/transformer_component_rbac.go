@@ -162,7 +162,7 @@ func createOrUpdateRoleBinding(
 	if cmpdRole != nil {
 		cmpdRoleBinding := factory.BuildRoleBinding(transCtx.SynthesizeComponent, serviceAccountName, &rbacv1.RoleRef{
 			APIGroup: rbacv1.GroupName,
-			Kind:     "ClusterRole",
+			Kind:     "Role",
 			Name:     cmpdRole.Name,
 		}, serviceAccountName)
 		rb, err := createOrUpdate(transCtx, cmpdRoleBinding, graphCli, dag, cmpRoleBinding)

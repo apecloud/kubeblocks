@@ -21,6 +21,7 @@ package apps
 
 import (
 	"fmt"
+	"reflect"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -161,7 +162,7 @@ var _ = Describe("object rbac transformer test.", func() {
 			cmpdRoleBinding := factory.BuildRoleBinding(synthesizedComp, serviceAccountName, &rbacv1.RoleRef{
 				APIGroup: rbacv1.GroupName,
 				Kind:     "Role",
-				Name:     constant.RBACRoleName,
+				Name:     cmpdRole.Name,
 			}, serviceAccountName)
 			serviceAccount := factory.BuildServiceAccount(synthesizedComp, serviceAccountName)
 			dagExpected := mockDAG(graphCli, cluster)
@@ -174,6 +175,11 @@ var _ = Describe("object rbac transformer test.", func() {
 				graphCli.DependOn(dagExpected, itsList[i], serviceAccount)
 			}
 			Expect(dag.Equals(dagExpected, model.DefaultLess)).Should(BeTrue())
+			// DefaultLess doesn't compare objs' contents
+			actualRoleBinding := graphCli.FindAll(dag, &rbacv1.RoleBinding{})
+			Expect(actualRoleBinding).To(HaveLen(1))
+			rb := actualRoleBinding[0].(*rbacv1.RoleBinding)
+			Expect(reflect.DeepEqual(rb, cmpdRoleBinding)).To(BeTrue())
 		})
 	})
 })

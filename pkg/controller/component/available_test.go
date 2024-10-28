@@ -20,12 +20,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
+	"encoding/json"
+	"time"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/pointer"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 )
 
 var _ = Describe("Available", func() {
@@ -45,26 +52,407 @@ var _ = Describe("Available", func() {
 		cleanEnv()
 	})
 
-	Context("status", func() {
+	Context("handle event", func() {
+		var (
+			compDef             *appsv1.ComponentDefinition
+			comp                *appsv1.Component
+			availableTimeWindow = int32(10)
+		)
+
+		BeforeEach(func() {
+			compDef = &appsv1.ComponentDefinition{
+				Spec: appsv1.ComponentDefinitionSpec{
+					Available: &appsv1.ComponentAvailable{
+						WithProbe: &appsv1.ComponentAvailableWithProbe{
+							TimeWindow: &availableTimeWindow,
+							// has the leader, and majority replicas have roles
+							Condition: &appsv1.ComponentAvailableCondition{
+								And: []appsv1.ComponentAvailableConditionX{
+									{
+										ComponentAvailableCondition: appsv1.ComponentAvailableCondition{
+											Majority: &appsv1.ComponentAvailableConditionX{
+												ComponentAvailableCondition: appsv1.ComponentAvailableCondition{
+													Or: []appsv1.ComponentAvailableConditionX{
+														{
+															ActionCriteria: appsv1.ActionCriteria{
+																Succeed: pointer.Bool(true),
+																Stdout: &appsv1.ActionOutputMatcher{
+																	EqualTo: pointer.String("leader"),
+																},
+															},
+														},
+														{
+															ActionCriteria: appsv1.ActionCriteria{
+																Succeed: pointer.Bool(true),
+																Stdout: &appsv1.ActionOutputMatcher{
+																	EqualTo: pointer.String("follower"),
+																},
+															},
+														},
+													},
+												},
+											},
+										},
+									},
+									{
+										ComponentAvailableCondition: appsv1.ComponentAvailableCondition{
+											Any: &appsv1.ComponentAvailableConditionX{
+												ActionCriteria: appsv1.ActionCriteria{
+													Succeed: pointer.Bool(true),
+													Stdout: &appsv1.ActionOutputMatcher{
+														EqualTo: pointer.String("leader"),
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					LifecycleActions: &appsv1.ComponentLifecycleActions{
+						AvailableProbe: &appsv1.Probe{
+							Action: appsv1.Action{
+								Exec: &appsv1.ExecAction{
+									Command: []string{"echo", "available"},
+								},
+							},
+						},
+					},
+				},
+			}
+			comp = &appsv1.Component{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-cluster-comp",
+				},
+				Spec: appsv1.ComponentSpec{
+					Replicas: 3,
+				},
+				Status: appsv1.ComponentStatus{},
+			}
+		})
+
+		reqCtx := func() intctrlutil.RequestCtx {
+			return intctrlutil.RequestCtx{
+				Ctx:      ctx,
+				Log:      logger,
+				Recorder: recorder,
+			}
+		}()
+
+		statusMessageWithProbeEvents := func(events []probeEvent) {
+			message, ok := json.Marshal(&events)
+			Expect(ok).Should(BeNil())
+			comp.Status.Message = map[string]string{
+				availableProbeEvents: string(message),
+			}
+		}
+
+		It("not probe event", func() {
+			h := &AvailableEventHandler{}
+
+			event := &corev1.Event{
+				InvolvedObject: corev1.ObjectReference{
+					FieldPath: proto.ProbeEventFieldPath,
+				},
+				Reason:              "roleProbe",
+				ReportingController: proto.ProbeEventReportingController,
+			}
+			err := h.Handle(k8sClient, reqCtx, reqCtx.Recorder, event)
+			Expect(err).Should(Succeed())
+		})
+
 		It("ok", func() {
+			h := &AvailableEventHandler{}
+
+			statusMessageWithProbeEvents([]probeEvent{
+				{
+					PodName:   "test-cluster-comp-0",
+					Timestamp: time.Now().Add(-5 * time.Second),
+					Code:      0,
+					Stdout:    []byte("leader"),
+				},
+				{
+					PodName:   "test-cluster-comp-1",
+					Timestamp: time.Now().Add(-5 * -time.Second),
+					Code:      0,
+					Stdout:    []byte(""), // has no role
+				},
+			})
+			event := probeEvent{
+				PodName:   "test-cluster-comp-2",
+				Timestamp: time.Now().Add(-1 * -time.Second),
+				Code:      0,
+				Stdout:    []byte("follower"),
+			}
+			available, _, err := h.handleEvent(event, comp, compDef)
+			Expect(err).Should(Succeed())
+			Expect(*available).Should(BeTrue())
 		})
 
 		It("has no event", func() {
+			h := &AvailableEventHandler{}
+
+			event := probeEvent{}
+			available, _, err := h.handleEvent(event, comp, compDef)
+			Expect(err).Should(Succeed())
+			Expect(*available).Should(BeFalse())
 		})
 
-		It("more then one event", func() {
+		It("duplicate events", func() {
+			h := &AvailableEventHandler{}
+
+			statusMessageWithProbeEvents([]probeEvent{
+				{
+					PodName:   "test-cluster-comp-0",
+					Timestamp: time.Now().Add(-5 * time.Second),
+					Code:      0,
+					Stdout:    []byte("leader"),
+				},
+				{
+					PodName:   "test-cluster-comp-1",
+					Timestamp: time.Now().Add(-5 * -time.Second),
+					Code:      0,
+					Stdout:    []byte("follower"),
+				},
+				{
+					PodName:   "test-cluster-comp-2",
+					Timestamp: time.Now().Add(-5 * -time.Second),
+					Code:      0,
+					Stdout:    []byte("follower"),
+				},
+			})
+			event := probeEvent{
+				PodName:   "test-cluster-comp-2",
+				Timestamp: time.Now().Add(-1 * -time.Second),
+				Code:      0,
+				Stdout:    []byte("follower"), // duplicate event
+			}
+			available, _, err := h.handleEvent(event, comp, compDef)
+			Expect(err).Should(Succeed())
+			Expect(*available).Should(BeTrue())
 		})
 
 		It("event expired", func() {
+			h := &AvailableEventHandler{}
+
+			statusMessageWithProbeEvents([]probeEvent{
+				{
+					PodName:   "test-cluster-comp-0",
+					Timestamp: time.Now().Add(-15 * time.Second), // expired
+					Code:      0,
+					Stdout:    []byte("leader"),
+				},
+				{
+					PodName:   "test-cluster-comp-1",
+					Timestamp: time.Now().Add(-15 * -time.Second), // expired
+					Code:      0,
+					Stdout:    []byte("follower"),
+				},
+				{
+					PodName:   "test-cluster-comp-2",
+					Timestamp: time.Now().Add(-15 * -time.Second), // expired
+					Code:      0,
+					Stdout:    []byte("follower"),
+				},
+			})
+			event := probeEvent{
+				PodName:   "test-cluster-comp-2",
+				Timestamp: time.Now().Add(-1 * -time.Second),
+				Code:      0,
+				Stdout:    []byte("follower"),
+			}
+			available, _, err := h.handleEvent(event, comp, compDef)
+			Expect(err).Should(Succeed())
+			Expect(*available).Should(BeFalse())
 		})
 
-		It("has no new event and keep", func() {
+		It("has new event and keep", func() {
+			h := &AvailableEventHandler{}
+
+			statusMessageWithProbeEvents([]probeEvent{
+				{
+					PodName:   "test-cluster-comp-0",
+					Timestamp: time.Now().Add(-5 * time.Second),
+					Code:      0,
+					Stdout:    []byte("leader"),
+				},
+				{
+					PodName:   "test-cluster-comp-1",
+					Timestamp: time.Now().Add(-5 * -time.Second),
+					Code:      0,
+					Stdout:    []byte("follower"),
+				},
+				{
+					PodName:   "test-cluster-comp-2",
+					Timestamp: time.Now().Add(-15 * -time.Second), // expired
+					Code:      0,
+					Stdout:    []byte("follower"),
+				},
+			})
+			event := probeEvent{
+				PodName:   "test-cluster-comp-2",
+				Timestamp: time.Now().Add(-1 * -time.Second),
+				Code:      0,
+				Stdout:    []byte("follower"), // new event
+			}
+			available, _, err := h.handleEvent(event, comp, compDef)
+			Expect(err).Should(Succeed())
+			Expect(*available).Should(BeTrue())
 		})
 
-		It("multiple replicas - ok", func() {
+		It("status message", func() {
+			h := &AvailableEventHandler{}
+
+			statusMessageWithProbeEvents([]probeEvent{
+				{
+					PodName:   "test-cluster-comp-0",
+					Timestamp: time.Now().Add(-5 * time.Second),
+					Code:      0,
+					Stdout:    []byte("leader"),
+				},
+			})
+			Expect(comp.Status.Message).ShouldNot(BeNil())
+			Expect(comp.Status.Message[availableProbeEvents]).ShouldNot(BeEmpty())
+			message := comp.Status.Message[availableProbeEvents]
+
+			event := probeEvent{
+				PodName:   "test-cluster-comp-2",
+				Timestamp: time.Now().Add(-3 * -time.Second),
+				Code:      0,
+				Stdout:    []byte("follower"),
+			}
+			available, _, err := h.handleEvent(event, comp, compDef)
+			Expect(err).Should(Succeed())
+			Expect(*available).Should(BeTrue())
+
+			Expect(comp.Status.Message[availableProbeEvents]).ShouldNot(Equal(message))
+			events := make([]probeEvent, 0)
+			Expect(json.Unmarshal([]byte(comp.Status.Message[availableProbeEvents]), &events)).Should(Succeed())
+			Expect(events).Should(HaveLen(2))
+			Expect(events[0].PodName).Should(Or(Equal("test-cluster-comp-0"), Equal("test-cluster-comp-2")))
+			Expect(events[1].PodName).Should(Or(Equal("test-cluster-comp-0"), Equal("test-cluster-comp-2")))
 		})
 
-		It("multiple replicas - group event", func() {
+		It("strict all", func() {
+			h := &AvailableEventHandler{}
+
+			// all has leader or follower
+			compDef.Spec.Available.WithProbe.Condition = &appsv1.ComponentAvailableCondition{
+				All: &appsv1.ComponentAvailableConditionX{
+					ComponentAvailableCondition: appsv1.ComponentAvailableCondition{
+						Or: []appsv1.ComponentAvailableConditionX{
+							{
+								ActionCriteria: appsv1.ActionCriteria{
+									Succeed: pointer.Bool(true),
+									Stdout: &appsv1.ActionOutputMatcher{
+										EqualTo: pointer.String("leader"),
+									},
+								},
+							},
+							{
+								ActionCriteria: appsv1.ActionCriteria{
+									Succeed: pointer.Bool(true),
+									Stdout: &appsv1.ActionOutputMatcher{
+										EqualTo: pointer.String("follower"),
+									},
+								},
+							},
+						},
+					},
+					Strict: pointer.Bool(true),
+				},
+			}
+			statusMessageWithProbeEvents([]probeEvent{
+				{
+					PodName:   "test-cluster-comp-0",
+					Timestamp: time.Now().Add(-5 * time.Second),
+					Code:      0,
+					Stdout:    []byte("leader"),
+				},
+			})
+			event := probeEvent{
+				PodName:   "test-cluster-comp-1",
+				Timestamp: time.Now().Add(-3 * -time.Second),
+				Code:      0,
+				Stdout:    []byte("follower"),
+			}
+			available, _, err := h.handleEvent(event, comp, compDef)
+			Expect(err).Should(Succeed())
+			Expect(*available).Should(BeFalse())
+
+			// new event for last replica
+			event = probeEvent{
+				PodName:   "test-cluster-comp-2",
+				Timestamp: time.Now().Add(-1 * -time.Second),
+				Code:      0,
+				Stdout:    []byte("follower"),
+			}
+			available, _, err = h.handleEvent(event, comp, compDef)
+			Expect(err).Should(Succeed())
+			Expect(*available).Should(BeTrue())
+		})
+
+		It("deleted replicas - available", func() {
+			h := &AvailableEventHandler{}
+
+			statusMessageWithProbeEvents([]probeEvent{
+				{
+					PodName:   "test-cluster-comp-0",
+					Timestamp: time.Now().Add(-5 * time.Second),
+					Code:      0,
+					Stdout:    []byte("leader"),
+				},
+				{
+					PodName:   "test-cluster-comp-1",
+					Timestamp: time.Now().Add(-5 * -time.Second),
+					Code:      0,
+					Stdout:    []byte("follower"),
+				},
+				{
+					PodName:   "test-cluster-comp-3", // replica 3 is deleted
+					Timestamp: time.Now().Add(-5 * -time.Second),
+					Code:      0,
+					Stdout:    []byte("follower"),
+				},
+			})
+			event := probeEvent{
+				PodName:   "test-cluster-comp-2",
+				Timestamp: time.Now().Add(-1 * -time.Second),
+				Code:      0,
+				Stdout:    []byte("follower"),
+			}
+			available, _, err := h.handleEvent(event, comp, compDef)
+			Expect(err).Should(Succeed())
+			Expect(*available).Should(BeTrue())
+		})
+
+		It("deleted replicas - unavailable", func() {
+			h := &AvailableEventHandler{}
+
+			statusMessageWithProbeEvents([]probeEvent{
+				{
+					PodName:   "test-cluster-comp-0",
+					Timestamp: time.Now().Add(-5 * time.Second),
+					Code:      0,
+					Stdout:    []byte("leader"),
+				},
+				{
+					PodName:   "test-cluster-comp-3", // replica 3 is deleted
+					Timestamp: time.Now().Add(-5 * -time.Second),
+					Code:      0,
+					Stdout:    []byte("follower"),
+				},
+			})
+			event := probeEvent{
+				PodName:   "test-cluster-comp-2",
+				Timestamp: time.Now().Add(-1 * -time.Second),
+				Code:      0,
+				Stdout:    []byte(""), // has no role
+			}
+			available, _, err := h.handleEvent(event, comp, compDef)
+			Expect(err).Should(Succeed())
+			Expect(*available).Should(BeFalse())
 		})
 	})
 

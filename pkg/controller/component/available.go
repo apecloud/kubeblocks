@@ -70,7 +70,12 @@ func (h *AvailableEventHandler) Handle(cli client.Client, reqCtx intctrlutil.Req
 	}
 	compCopy := comp.DeepCopy()
 
-	available, message, err := h.handleEvent(reqCtx.Ctx, cli, newProbeEvent(event, ppEvent), comp)
+	compDef, err := h.getNCheckCompDefinition(reqCtx.Ctx, cli, comp.Spec.CompDef)
+	if err != nil {
+		return err
+	}
+
+	available, message, err := h.handleEvent(newProbeEvent(event, ppEvent), comp, compDef)
 	if err != nil {
 		return err
 	}
@@ -120,18 +125,13 @@ func (h *AvailableEventHandler) status(ctx context.Context, cli client.Client, r
 	return nil
 }
 
-func (h *AvailableEventHandler) handleEvent(ctx context.Context, cli client.Client, event probeEvent, comp *appsv1.Component) (*bool, string, error) {
-	cmpd, err := h.getNCheckCompDefinition(ctx, cli, comp.Spec.CompDef)
-	if err != nil {
-		return nil, "", err
-	}
-
-	policy := GetComponentAvailablePolicy(cmpd)
+func (h *AvailableEventHandler) handleEvent(event probeEvent, comp *appsv1.Component, compDef *appsv1.ComponentDefinition) (*bool, string, error) {
+	policy := GetComponentAvailablePolicy(compDef)
 	if policy.WithProbe == nil || policy.WithProbe.Condition == nil {
 		if policy.WithPhases != nil {
 			return nil, "", nil
 		}
-		return nil, "", fmt.Errorf("the referenced ComponentDefinition does not have available probe defined, but we got a probe event? %s", cmpd.Name)
+		return nil, "", fmt.Errorf("the referenced ComponentDefinition does not have available probe defined, but we got a probe event? %s", compDef.Name)
 	}
 
 	events, err := h.pickupProbeEvents(event, *policy.WithProbe.TimeWindow, comp)
@@ -442,21 +442,21 @@ func (h *AvailableEventHandler) evaluateActionEvent(criteria appsv1.ActionCriter
 	return true
 }
 
-func GetComponentAvailablePolicy(cmpd *appsv1.ComponentDefinition) appsv1.ComponentAvailable {
-	if cmpd.Spec.Available != nil {
-		policy := *cmpd.Spec.Available
+func GetComponentAvailablePolicy(compDef *appsv1.ComponentDefinition) appsv1.ComponentAvailable {
+	if compDef.Spec.Available != nil {
+		policy := *compDef.Spec.Available
 		if policy.WithProbe != nil && policy.WithProbe.TimeWindow == nil {
 			policy.WithProbe.TimeWindow = pointer.Int32(defaultTimeWindow)
-			if cmpd.Spec.LifecycleActions != nil && cmpd.Spec.LifecycleActions.AvailableProbe != nil {
-				policy.WithProbe.TimeWindow = pointer.Int32(cmpd.Spec.LifecycleActions.AvailableProbe.PeriodSeconds)
+			if compDef.Spec.LifecycleActions != nil && compDef.Spec.LifecycleActions.AvailableProbe != nil {
+				policy.WithProbe.TimeWindow = pointer.Int32(compDef.Spec.LifecycleActions.AvailableProbe.PeriodSeconds)
 			}
 		}
 		return policy
 	}
-	if cmpd.Spec.LifecycleActions != nil && cmpd.Spec.LifecycleActions.AvailableProbe != nil {
+	if compDef.Spec.LifecycleActions != nil && compDef.Spec.LifecycleActions.AvailableProbe != nil {
 		return appsv1.ComponentAvailable{
 			WithProbe: &appsv1.ComponentAvailableWithProbe{
-				TimeWindow: pointer.Int32(cmpd.Spec.LifecycleActions.AvailableProbe.PeriodSeconds),
+				TimeWindow: pointer.Int32(compDef.Spec.LifecycleActions.AvailableProbe.PeriodSeconds),
 				Condition: &appsv1.ComponentAvailableCondition{
 					All: &appsv1.ComponentAvailableConditionX{
 						ActionCriteria: appsv1.ActionCriteria{

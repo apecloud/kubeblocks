@@ -1035,7 +1035,7 @@ var _ = Describe("cluster component transformer test", func() {
 						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
 					mockShardingCompObj(transCtx, sharding1bName, func(comp *appsv1.Component) {
-						comp.Status.Phase = appsv1.RunningComponentPhase
+						comp.Status.Phase = appsv1.CreatingComponentPhase
 					}),
 				},
 			}

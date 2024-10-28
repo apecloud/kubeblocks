@@ -387,20 +387,30 @@ true
 
 			// for small instance class
 			Expect(calMysqlPoolSizeByResource(&ResourceDefinition{
-				MemorySize: 1024 * 1024 * 1024,
+				MemorySize: 1024 * 1024 * 0.5,
 				CoreNum:    1,
 			}, false)).Should(Equal("128M"))
 
 			Expect(calMysqlPoolSizeByResource(&ResourceDefinition{
-				MemorySize: 2 * 1024 * 1024 * 1024,
-				CoreNum:    2,
+				MemorySize: 1024 * 1024 * 1024,
+				CoreNum:    1,
 			}, false)).Should(Equal("256M"))
 
-			// for shard
 			Expect(calMysqlPoolSizeByResource(&ResourceDefinition{
 				MemorySize: 2 * 1024 * 1024 * 1024,
 				CoreNum:    2,
-			}, true)).Should(Equal("1024M"))
+			}, false)).Should(Equal("384M"))
+
+			// for share
+			Expect(calMysqlPoolSizeByResource(&ResourceDefinition{
+				MemorySize: 1024 * 1024 * 0.5,
+				CoreNum:    1,
+			}, true)).Should(Equal("128M"))
+
+			Expect(calMysqlPoolSizeByResource(&ResourceDefinition{
+				MemorySize: 1024 * 1024 * 1024,
+				CoreNum:    1,
+			}, true)).Should(Equal("512M"))
 
 			insClassTest := []insClassType{
 				// for 2 core

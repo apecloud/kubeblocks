@@ -3253,8 +3253,8 @@ If not provided, an error will be raised when handling multiple matches.</p>
 </tr>
 </thead>
 <tbody><tr><td><p>&#34;Abnormal&#34;</p></td>
-<td><p>AbnormalClusterPhase represents some components are in <code>Failed</code> or <code>Abnormal</code> phase, indicates that the cluster
-is in a fragile state and troubleshooting is required.</p>
+<td><p>AbnormalClusterPhase represents some components are in <code>Failed</code> phase, indicates that the cluster is in
+a fragile state and troubleshooting is required.</p>
 </td>
 </tr><tr><td><p>&#34;Creating&#34;</p></td>
 <td><p>CreatingClusterPhase represents all components are in <code>Creating</code> phase.</p>
@@ -5502,19 +5502,17 @@ and other administrative tasks.</p>
 <th>Description</th>
 </tr>
 </thead>
-<tbody><tr><td><p>&#34;Abnormal&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;Creating&#34;</p></td>
+<tbody><tr><td><p>&#34;Creating&#34;</p></td>
 <td><p>CreatingComponentPhase indicates the component is currently being created.</p>
 </td>
 </tr><tr><td><p>&#34;Deleting&#34;</p></td>
 <td><p>DeletingComponentPhase indicates the component is currently being deleted.</p>
 </td>
 </tr><tr><td><p>&#34;Failed&#34;</p></td>
-<td><p>FailedComponentPhase indicates that there are some failed pods for the component.</p>
+<td><p>FailedComponentPhase indicates that there are some pods of the component not in a &lsquo;Running&rsquo; state.</p>
 </td>
 </tr><tr><td><p>&#34;Running&#34;</p></td>
-<td><p>RunningComponentPhase indicates all pods of the component are up-to-date and in a &lsquo;Running&rsquo; state.</p>
+<td><p>RunningComponentPhase indicates that all pods of the component are up-to-date and in a &lsquo;Running&rsquo; state.</p>
 </td>
 </tr><tr><td><p>&#34;Stopped&#34;</p></td>
 <td><p>StoppedComponentPhase indicates the component is stopped.</p>
@@ -6074,12 +6072,9 @@ ComponentPhase
 <p>Indicates the current phase of the Component, with each phase indicating specific conditions:</p>
 <ul>
 <li>Creating: The initial phase for new Components, transitioning from &lsquo;empty&rsquo;(&ldquo;&rdquo;).</li>
-<li>Running: All Pods in a Running state.</li>
+<li>Running: All Pods are up-to-date and in a Running state.</li>
 <li>Updating: The Component is currently being updated, with no failed Pods present.</li>
-<li>Abnormal: Some Pods have failed, indicating a potentially unstable state.
-However, the cluster remains available as long as a quorum of members is functioning.</li>
-<li>Failed: A significant number of Pods or critical Pods have failed
-The cluster may be non-functional or may offer only limited services (e.g, read-only).</li>
+<li>Failed: A significant number of Pods have failed.</li>
 <li>Stopping: All Pods are being terminated, with current replica count at zero.</li>
 <li>Stopped: All associated Pods have been successfully deleted.</li>
 <li>Deleting: The Component is being deleted.</li>

@@ -161,9 +161,6 @@ func (t *componentStatusTransformer) reconcileStatus(transCtx *componentTransfor
 		return hasFailedPod || isScaleOutFailed || hasFailedVolumeExpansion
 	}()
 
-	// check if the component is available
-	isComponentAvailable := t.isComponentAvailable()
-
 	// check if the component is in creating phase
 	isInCreatingPhase := func() bool {
 		phase := t.comp.Status.Phase
@@ -171,8 +168,8 @@ func (t *componentStatusTransformer) reconcileStatus(transCtx *componentTransfor
 	}()
 
 	transCtx.Logger.Info(
-		fmt.Sprintf("status conditions, creating: %v, available: %v, its running: %v, has failure: %v, updating: %v, config synced: %v",
-			isInCreatingPhase, isComponentAvailable, isITSUpdatedNRunning, hasFailure, hasRunningVolumeExpansion, isAllConfigSynced))
+		fmt.Sprintf("status conditions, creating: %v, its running: %v, has failure: %v, updating: %v, config synced: %v",
+			isInCreatingPhase, isITSUpdatedNRunning, hasFailure, hasRunningVolumeExpansion, isAllConfigSynced))
 
 	switch {
 	case isDeleting:
@@ -187,10 +184,8 @@ func (t *componentStatusTransformer) reconcileStatus(transCtx *componentTransfor
 		t.setComponentStatusPhase(transCtx, appsv1.CreatingComponentPhase, nil, "component is Creating")
 	case !hasFailure:
 		t.setComponentStatusPhase(transCtx, appsv1.UpdatingComponentPhase, nil, "component is Updating")
-	case !isComponentAvailable:
-		t.setComponentStatusPhase(transCtx, appsv1.FailedComponentPhase, messages, "component is Failed")
 	default:
-		t.setComponentStatusPhase(transCtx, appsv1.AbnormalComponentPhase, nil, "component is Abnormal")
+		t.setComponentStatusPhase(transCtx, appsv1.FailedComponentPhase, messages, "component is Failed")
 	}
 
 	return t.reconcileStatusCondition(transCtx)
@@ -202,31 +197,6 @@ func (t *componentStatusTransformer) isWorkloadUpdated() bool {
 	}
 	generation := t.runningITS.GetAnnotations()[constant.KubeBlocksGenerationKey]
 	return generation == strconv.FormatInt(t.comp.Generation, 10)
-}
-
-// isComponentAvailable tells whether the component is basically available, ether working well or in a fragile state:
-// 1. at least one pod is available
-// 2. with latest revision
-// 3. and with leader role label set
-func (t *componentStatusTransformer) isComponentAvailable() bool {
-	if !t.isWorkloadUpdated() {
-		return false
-	}
-	if t.runningITS.Status.CurrentRevision != t.runningITS.Status.UpdateRevision {
-		return false
-	}
-	if t.runningITS.Status.AvailableReplicas <= 0 {
-		return false
-	}
-	if len(t.synthesizeComp.Roles) == 0 {
-		return true
-	}
-	for _, status := range t.runningITS.Status.MembersStatus {
-		if status.ReplicaRole.IsLeader {
-			return true
-		}
-	}
-	return false
 }
 
 // isRunning checks if the component underlying workload is running.

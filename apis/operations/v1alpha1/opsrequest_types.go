@@ -1090,11 +1090,10 @@ type LastConfiguration struct {
 
 type OpsRequestComponentStatus struct {
 	// Records the current phase of the Component, mirroring `cluster.status.components[componentName].phase`.
-	// Possible values include "Creating", "Running", "Updating", "Stopping", "Stopped", "Deleting", "Failed", "Abnormal".
 	// +optional
 	Phase appsv1.ComponentPhase `json:"phase,omitempty"`
 
-	// Records the timestamp when the Component last transitioned to a "Failed" or "Abnormal" phase.
+	// Records the timestamp when the Component last transitioned to a "Failed" phase.
 	// +optional
 	LastFailedTime metav1.Time `json:"lastFailedTime,omitempty"`
 

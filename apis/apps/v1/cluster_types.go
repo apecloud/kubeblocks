@@ -712,8 +712,8 @@ const (
 	// FailedClusterPhase represents all components are in `Failed` phase, indicates that the cluster is unavailable.
 	FailedClusterPhase ClusterPhase = "Failed"
 
-	// AbnormalClusterPhase represents some components are in `Failed` or `Abnormal` phase, indicates that the cluster
-	// is in a fragile state and troubleshooting is required.
+	// AbnormalClusterPhase represents some components are in `Failed` phase, indicates that the cluster is in
+	// a fragile state and troubleshooting is required.
 	AbnormalClusterPhase ClusterPhase = "Abnormal"
 )
 

@@ -114,7 +114,7 @@ func (t *clusterStatusTransformer) syncClusterConditions(cluster *appsv1.Cluster
 		"sharding":  cluster.Status.Shardings,
 	} {
 		for name, status := range statusMap {
-			if status.Phase == appsv1.AbnormalComponentPhase || status.Phase == appsv1.FailedComponentPhase {
+			if status.Phase == appsv1.FailedComponentPhase {
 				if _, ok := kindNames[kind]; !ok {
 					kindNames[kind] = []string{}
 				}
@@ -129,13 +129,13 @@ func (t *clusterStatusTransformer) syncClusterConditions(cluster *appsv1.Cluster
 
 func composeClusterPhase(statusList []appsv1.ClusterComponentStatus) appsv1.ClusterPhase {
 	var (
-		isAllComponentCreating       = true
-		isAllComponentRunning        = true
-		isAllComponentWorking        = true
-		hasComponentStopping         = false
-		isAllComponentStopped        = true
-		isAllComponentFailed         = true
-		hasComponentAbnormalOrFailed = false
+		isAllComponentCreating = true
+		isAllComponentRunning  = true
+		isAllComponentWorking  = true
+		hasComponentStopping   = false
+		isAllComponentStopped  = true
+		isAllComponentFailed   = true
+		hasComponentFailed     = false
 	)
 	isPhaseIn := func(phase appsv1.ComponentPhase, phases ...appsv1.ComponentPhase) bool {
 		for _, p := range phases {
@@ -165,8 +165,8 @@ func composeClusterPhase(statusList []appsv1.ClusterComponentStatus) appsv1.Clus
 		if !isPhaseIn(phase, appsv1.FailedComponentPhase) {
 			isAllComponentFailed = false
 		}
-		if isPhaseIn(phase, appsv1.AbnormalComponentPhase, appsv1.FailedComponentPhase) {
-			hasComponentAbnormalOrFailed = true
+		if isPhaseIn(phase, appsv1.FailedComponentPhase) {
+			hasComponentFailed = true
 		}
 	}
 
@@ -183,7 +183,7 @@ func composeClusterPhase(statusList []appsv1.ClusterComponentStatus) appsv1.Clus
 		return appsv1.StoppingClusterPhase
 	case isAllComponentFailed:
 		return appsv1.FailedClusterPhase
-	case hasComponentAbnormalOrFailed:
+	case hasComponentFailed:
 		return appsv1.AbnormalClusterPhase
 	default:
 		return ""

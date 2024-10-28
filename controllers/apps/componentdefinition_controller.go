@@ -374,7 +374,6 @@ func (r *ComponentDefinitionReconciler) validateAvailableWithPhases(cmpd *appsv1
 		strings.ToLower(string(appsv1.StoppedComponentPhase)),
 		strings.ToLower(string(appsv1.DeletingComponentPhase)),
 		strings.ToLower(string(appsv1.FailedComponentPhase)),
-		strings.ToLower(string(appsv1.AbnormalComponentPhase)),
 	)
 	result := phases.Difference(supported)
 	if result.Len() > 0 {

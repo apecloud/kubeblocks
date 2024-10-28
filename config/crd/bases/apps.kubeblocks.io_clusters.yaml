@@ -15952,8 +15952,7 @@ spec:
                       - Stopping
                       - Running
                       - Stopped
-                      - ',Failed'
-                      - Abnormal
+                      - Failed
                       type: string
                   type: object
                 description: Records the current status information of all Components
@@ -16078,8 +16077,7 @@ spec:
                       - Stopping
                       - Running
                       - Stopped
-                      - ',Failed'
-                      - Abnormal
+                      - Failed
                       type: string
                   type: object
                 description: Records the current status information of all shardings

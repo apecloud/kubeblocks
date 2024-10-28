@@ -306,12 +306,9 @@ type ComponentStatus struct {
 	// Indicates the current phase of the Component, with each phase indicating specific conditions:
 	//
 	// - Creating: The initial phase for new Components, transitioning from 'empty'("").
-	// - Running: All Pods in a Running state.
+	// - Running: All Pods are up-to-date and in a Running state.
 	// - Updating: The Component is currently being updated, with no failed Pods present.
-	// - Abnormal: Some Pods have failed, indicating a potentially unstable state.
-	//   However, the cluster remains available as long as a quorum of members is functioning.
-	// - Failed: A significant number of Pods or critical Pods have failed
-	//   The cluster may be non-functional or may offer only limited services (e.g, read-only).
+	// - Failed: A significant number of Pods have failed.
 	// - Stopping: All Pods are being terminated, with current replica count at zero.
 	// - Stopped: All associated Pods have been successfully deleted.
 	// - Deleting: The Component is being deleted.
@@ -330,7 +327,7 @@ type ComponentStatus struct {
 // ComponentPhase defines the phase of the Component within the .status.phase field.
 //
 // +enum
-// +kubebuilder:validation:Enum={Creating,Deleting,Updating,Stopping,Running,Stopped,,Failed,Abnormal}
+// +kubebuilder:validation:Enum={Creating,Deleting,Updating,Stopping,Running,Stopped,Failed}
 type ComponentPhase string
 
 const (
@@ -346,14 +343,12 @@ const (
 	// StoppingComponentPhase indicates the component is currently being stopped.
 	StoppingComponentPhase ComponentPhase = "Stopping"
 
-	// RunningComponentPhase indicates all pods of the component are up-to-date and in a 'Running' state.
+	// RunningComponentPhase indicates that all pods of the component are up-to-date and in a 'Running' state.
 	RunningComponentPhase ComponentPhase = "Running"
 
 	// StoppedComponentPhase indicates the component is stopped.
 	StoppedComponentPhase ComponentPhase = "Stopped"
 
-	// FailedComponentPhase indicates that there are some failed pods for the component.
+	// FailedComponentPhase indicates that there are some pods of the component not in a 'Running' state.
 	FailedComponentPhase ComponentPhase = "Failed"
-
-	AbnormalComponentPhase ComponentPhase = "Abnormal"
 )

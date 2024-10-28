@@ -298,6 +298,5 @@ func componentTerminalPhases() []appsv1.ComponentPhase {
 		appsv1.RunningComponentPhase,
 		appsv1.StoppedComponentPhase,
 		appsv1.FailedComponentPhase,
-		appsv1.AbnormalComponentPhase,
 	}
 }

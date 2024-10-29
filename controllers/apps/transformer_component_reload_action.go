@@ -23,6 +23,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
@@ -30,14 +31,14 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/plan"
 )
 
-// componentConfigurationTransformer handles component configuration render
-type componentConfigurationTransformer struct {
+// componentReloadActionSidecarTransformer handles component configuration render
+type componentReloadActionSidecarTransformer struct {
 	client.Client
 }
 
-var _ graph.Transformer = &componentConfigurationTransformer{}
+var _ graph.Transformer = &componentReloadActionSidecarTransformer{}
 
-func (t *componentConfigurationTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+func (t *componentReloadActionSidecarTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*componentTransformContext)
 
 	comp := transCtx.Component
@@ -52,6 +53,11 @@ func (t *componentConfigurationTransformer) Transform(ctx graph.TransformContext
 		transCtx.V(1).Info("Component is in compact mode, no need to create configuration related objects",
 			"component", client.ObjectKeyFromObject(transCtx.ComponentOrig))
 		return nil
+	}
+
+	var componentParameterObj = &parametersv1alpha1.ComponentParameter{}
+	if err := transCtx.Client.Get(transCtx, client.ObjectKey{Name: comp.Name, Namespace: comp.Namespace}, componentParameterObj); err != nil {
+		return client.IgnoreNotFound(err)
 	}
 
 	// get dependOnObjs which will be used in configuration render
@@ -69,7 +75,7 @@ func (t *componentConfigurationTransformer) Transform(ctx graph.TransformContext
 	}
 
 	// configuration render
-	if err := plan.RenderConfigNScriptFiles(
+	if err := plan.BuildReloadActionContainer(
 		&configctrl.ResourceCtx{
 			Context:       transCtx.Context,
 			Client:        t.Client,
@@ -81,6 +87,7 @@ func (t *componentConfigurationTransformer) Transform(ctx graph.TransformContext
 		comp,
 		synthesizeComp,
 		synthesizeComp.PodSpec,
+		componentParameterObj,
 		dependOnObjs); err != nil {
 		return err
 	}

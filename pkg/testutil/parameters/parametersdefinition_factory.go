@@ -41,6 +41,11 @@ func (f *MockParametersDefinitionFactory) Schema(cue string) *MockParametersDefi
 	return f
 }
 
+func (f *MockParametersDefinitionFactory) SetConfigFile(name string) *MockParametersDefinitionFactory {
+	f.Get().Spec.FileName = name
+	return f
+}
+
 func (f *MockParametersDefinitionFactory) StaticParameters(params []string) *MockParametersDefinitionFactory {
 	f.Get().Spec.StaticParameters = params
 	return f

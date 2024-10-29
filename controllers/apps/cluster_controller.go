@@ -143,6 +143,8 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			&clusterServiceTransformer{},
 			// handle the restore for cluster
 			&clusterRestoreTransformer{},
+			// rerender parameters after v-scale and h-scale
+			&clusterParametersTransformer{},
 			// create all cluster components objects
 			&clusterComponentTransformer{},
 			// update cluster components' status
@@ -178,7 +180,7 @@ func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		}).
 		Owns(&appsv1.Component{}).
 		Owns(&corev1.Service{}). // cluster services
-		Owns(&corev1.Secret{}).  // sharding account secret
+		Owns(&corev1.Secret{}). // sharding account secret
 		Owns(&dpv1alpha1.BackupPolicy{}).
 		Owns(&dpv1alpha1.BackupSchedule{}).
 		Complete(r)

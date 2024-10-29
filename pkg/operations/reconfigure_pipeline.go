@@ -81,14 +81,14 @@ func newPipeline(ctx reconfigureContext) *pipeline {
 
 func (p *pipeline) Validate() *pipeline {
 	validateFn := func() error {
-		if p.ConfigurationObj == nil {
+		if p.ComponentParameterObj == nil {
 			return cfgcore.MakeError("failed to found configuration of component[%s] in the cluster[%s]",
 				p.reconfigureContext.componentName,
 				p.reconfigureContext.clusterName,
 			)
 		}
 
-		item := p.ConfigurationObj.Spec.GetConfigurationItem(p.config.Name)
+		item := p.ComponentParameterObj.Spec.GetConfigurationItem(p.config.Name)
 		if item == nil || item.ConfigSpec == nil {
 			p.isFailed = true
 			return cfgcore.MakeError("failed to reconfigure, not existed config[%s]", p.config.Name)
@@ -138,7 +138,7 @@ func (p *pipeline) ConfigConstraints() *pipeline {
 }
 
 func (p *pipeline) doMergeImpl(parameters opsv1alpha1.ConfigurationItem) error {
-	newConfigObj := p.ConfigurationObj.DeepCopy()
+	newConfigObj := p.ComponentParameterObj.DeepCopy()
 
 	item := newConfigObj.Spec.GetConfigurationItem(p.config.Name)
 	if item == nil {
@@ -194,7 +194,7 @@ func (p *pipeline) createUpdatePatch(item *appsv1alpha1.ConfigurationItemDetail,
 }
 
 func (p *pipeline) doMerge() error {
-	if p.ConfigurationObj == nil {
+	if p.ComponentParameterObj == nil {
 		return cfgcore.MakeError("not found config: %s",
 			cfgcore.GenerateComponentConfigurationName(p.clusterName, p.componentName))
 	}
@@ -226,7 +226,7 @@ func (p *pipeline) UpdateOpsLabel() *pipeline {
 
 func (p *pipeline) Sync() *pipeline {
 	return p.Wrap(func() error {
-		return p.Client.Patch(p.reqCtx.Ctx, p.updatedObject, client.MergeFrom(p.ConfigurationObj))
+		return p.Client.Patch(p.reqCtx.Ctx, p.updatedObject, client.MergeFrom(p.ComponentParameterObj))
 	})
 }
 

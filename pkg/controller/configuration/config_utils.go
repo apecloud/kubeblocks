@@ -32,6 +32,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	cfgcm "github.com/apecloud/kubeblocks/pkg/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
@@ -269,7 +270,7 @@ func findPortByPortName(container corev1.Container) (int32, bool) {
 }
 
 // UpdateConfigPayload updates the configuration payload
-func UpdateConfigPayload(config *appsv1alpha1.ConfigurationSpec, component *component.SynthesizedComponent) (bool, error) {
+func UpdateConfigPayload(config *parametersv1alpha1.ComponentParameterSpec, component *component.SynthesizedComponent) (bool, error) {
 	updated := false
 	for i := range config.ConfigItemDetails {
 		configSpec := &config.ConfigItemDetails[i]

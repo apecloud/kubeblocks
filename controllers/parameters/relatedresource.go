@@ -65,7 +65,7 @@ func prepareRelatedResource(reqCtx intctrlutil.RequestCtx, client client.Client,
 	if fetcher.Configuration(); fetcher.Err != nil {
 		return nil, fetcher.Err
 	}
-	if fetcher.ConfigurationObj == nil {
+	if fetcher.ComponentParameterObj == nil {
 		return nil, fmt.Errorf("not found configuration object for configmap: %s", cm.Name)
 	}
 	if err := prepareCC(&configResources, fetcher, cm); err != nil {
@@ -80,9 +80,9 @@ func prepareCC(resources *reconfigureRelatedResource, fetcher *configctrl.Fetche
 		return nil
 	}
 
-	configSpec := fetcher.ConfigurationObj.Spec.GetConfigSpec(configSpecName)
+	configSpec := fetcher.ComponentParameterObj.Spec.GetConfigSpec(configSpecName)
 	if configSpec == nil {
-		return fmt.Errorf("not found config spec: %s in configuration[%s]", configSpecName, fetcher.ConfigurationObj.Name)
+		return fmt.Errorf("not found config spec: %s in configuration[%s]", configSpecName, fetcher.ComponentParameterObj.Name)
 	}
 	if configSpec.ConfigConstraintRef == "" {
 		return nil

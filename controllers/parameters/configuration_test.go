@@ -155,7 +155,7 @@ func initConfiguration(resourceCtx *configctrl.ResourceCtx,
 	synthesizedComponent *component.SynthesizedComponent,
 	clusterObj *appsv1.Cluster,
 	componentObj *appsv1.Component) error {
-	return configctrl.NewCreatePipeline(configctrl.ReconcileCtx{
+	return configctrl.NewReloadActionBuilderHelper(configctrl.ReconcileCtx{
 		ResourceCtx:          resourceCtx,
 		Component:            componentObj,
 		SynthesizedComponent: synthesizedComponent,

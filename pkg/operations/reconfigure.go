@@ -193,8 +193,8 @@ func (r *reconfigureAction) doSyncReconfigureStatus(params reconfigureParams) (o
 		return "", err
 	}
 
-	item := resource.ConfigurationObj.Spec.GetConfigurationItem(configSpec.Name)
-	itemStatus := resource.ConfigurationObj.Status.GetItemStatus(configSpec.Name)
+	item := resource.ComponentParameterObj.Spec.GetConfigurationItem(configSpec.Name)
+	itemStatus := resource.ComponentParameterObj.Status.GetItemStatus(configSpec.Name)
 	if item == nil || itemStatus == nil {
 		return opsv1alpha1.OpsRunningPhase, nil
 	}

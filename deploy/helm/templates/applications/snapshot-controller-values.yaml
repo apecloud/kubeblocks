@@ -1,3 +1,4 @@
+{{- if has "snapshot-controller" .Values.autoInstalledAddons  }}
 {{- $imageRegistry := include "kubeblocks.imageRegistry" . }}
 apiVersion: v1
 kind: ConfigMap
@@ -18,3 +19,4 @@ data:
     {{- end }}
     {{- $snapshotController = set $snapshotController "image" $image }}
     {{- toYaml $snapshotController | nindent 4 }}
+{{- end }}

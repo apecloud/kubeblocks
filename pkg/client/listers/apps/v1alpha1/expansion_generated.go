@@ -18,10 +18,6 @@ limitations under the License.
 
 package v1alpha1
 
-// BackupPolicyTemplateListerExpansion allows custom methods to be added to
-// BackupPolicyTemplateLister.
-type BackupPolicyTemplateListerExpansion interface{}
-
 // ClusterListerExpansion allows custom methods to be added to
 // ClusterLister.
 type ClusterListerExpansion interface{}
@@ -53,18 +49,6 @@ type ComponentVersionListerExpansion interface{}
 // ConfigConstraintListerExpansion allows custom methods to be added to
 // ConfigConstraintLister.
 type ConfigConstraintListerExpansion interface{}
-
-// OpsDefinitionListerExpansion allows custom methods to be added to
-// OpsDefinitionLister.
-type OpsDefinitionListerExpansion interface{}
-
-// OpsRequestListerExpansion allows custom methods to be added to
-// OpsRequestLister.
-type OpsRequestListerExpansion interface{}
-
-// OpsRequestNamespaceListerExpansion allows custom methods to be added to
-// OpsRequestNamespaceLister.
-type OpsRequestNamespaceListerExpansion interface{}
 
 // ServiceDescriptorListerExpansion allows custom methods to be added to
 // ServiceDescriptorLister.

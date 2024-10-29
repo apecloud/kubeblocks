@@ -21,11 +21,13 @@ package externalversions
 import (
 	"fmt"
 
+	v1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	v1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	v1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
-	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
+	operationsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
+	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	workloadsv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	cache "k8s.io/client-go/tools/cache"
@@ -57,9 +59,23 @@ func (f *genericInformer) Lister() cache.GenericLister {
 // TODO extend this to unknown resources with a client pool
 func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource) (GenericInformer, error) {
 	switch resource {
-	// Group=apps.kubeblocks.io, Version=v1alpha1
-	case v1alpha1.SchemeGroupVersion.WithResource("backuppolicytemplates"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1alpha1().BackupPolicyTemplates().Informer()}, nil
+	// Group=apps.kubeblocks.io, Version=v1
+	case v1.SchemeGroupVersion.WithResource("clusters"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1().Clusters().Informer()}, nil
+	case v1.SchemeGroupVersion.WithResource("clusterdefinitions"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1().ClusterDefinitions().Informer()}, nil
+	case v1.SchemeGroupVersion.WithResource("components"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1().Components().Informer()}, nil
+	case v1.SchemeGroupVersion.WithResource("componentdefinitions"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1().ComponentDefinitions().Informer()}, nil
+	case v1.SchemeGroupVersion.WithResource("componentversions"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1().ComponentVersions().Informer()}, nil
+	case v1.SchemeGroupVersion.WithResource("servicedescriptors"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1().ServiceDescriptors().Informer()}, nil
+	case v1.SchemeGroupVersion.WithResource("shardingdefinitions"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1().ShardingDefinitions().Informer()}, nil
+
+		// Group=apps.kubeblocks.io, Version=v1alpha1
 	case v1alpha1.SchemeGroupVersion.WithResource("clusters"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1alpha1().Clusters().Informer()}, nil
 	case v1alpha1.SchemeGroupVersion.WithResource("clusterdefinitions"):
@@ -72,10 +88,6 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1alpha1().ComponentVersions().Informer()}, nil
 	case v1alpha1.SchemeGroupVersion.WithResource("configconstraints"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1alpha1().ConfigConstraints().Informer()}, nil
-	case v1alpha1.SchemeGroupVersion.WithResource("opsdefinitions"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1alpha1().OpsDefinitions().Informer()}, nil
-	case v1alpha1.SchemeGroupVersion.WithResource("opsrequests"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1alpha1().OpsRequests().Informer()}, nil
 	case v1alpha1.SchemeGroupVersion.WithResource("servicedescriptors"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1alpha1().ServiceDescriptors().Informer()}, nil
 
@@ -90,6 +102,8 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Dataprotection().V1alpha1().Backups().Informer()}, nil
 	case dataprotectionv1alpha1.SchemeGroupVersion.WithResource("backuppolicies"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Dataprotection().V1alpha1().BackupPolicies().Informer()}, nil
+	case dataprotectionv1alpha1.SchemeGroupVersion.WithResource("backuppolicytemplates"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Dataprotection().V1alpha1().BackupPolicyTemplates().Informer()}, nil
 	case dataprotectionv1alpha1.SchemeGroupVersion.WithResource("backuprepos"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Dataprotection().V1alpha1().BackupRepos().Informer()}, nil
 	case dataprotectionv1alpha1.SchemeGroupVersion.WithResource("backupschedules"):
@@ -103,9 +117,15 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 	case extensionsv1alpha1.SchemeGroupVersion.WithResource("addons"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Extensions().V1alpha1().Addons().Informer()}, nil
 
-		// Group=storage.kubeblocks.io, Version=v1alpha1
-	case storagev1alpha1.SchemeGroupVersion.WithResource("storageproviders"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Storage().V1alpha1().StorageProviders().Informer()}, nil
+		// Group=operations, Version=v1alpha1
+	case operationsv1alpha1.SchemeGroupVersion.WithResource("opsdefinitions"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Operations().V1alpha1().OpsDefinitions().Informer()}, nil
+	case operationsv1alpha1.SchemeGroupVersion.WithResource("opsrequests"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Operations().V1alpha1().OpsRequests().Informer()}, nil
+
+		// Group=workloads.kubeblocks.io, Version=v1
+	case workloadsv1.SchemeGroupVersion.WithResource("instancesets"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Workloads().V1().InstanceSets().Informer()}, nil
 
 		// Group=workloads.kubeblocks.io, Version=v1alpha1
 	case workloadsv1alpha1.SchemeGroupVersion.WithResource("instancesets"):

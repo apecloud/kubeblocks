@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -57,15 +57,11 @@ func (a *assistantObjectReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (ku
 
 	svc := buildSvc(*its, labels, selectors)
 	headLessSvc := buildHeadlessSvc(*its, labels, headlessSelectors)
-	envConfig, err := buildEnvConfigMap(*its, labels)
-	if err != nil {
-		return kubebuilderx.Continue, err
-	}
 	var objects []client.Object
 	if svc != nil {
 		objects = append(objects, svc)
 	}
-	objects = append(objects, headLessSvc, envConfig)
+	objects = append(objects, headLessSvc)
 	for _, object := range objects {
 		if err := intctrlutil.SetOwnership(its, object, model.GetScheme(), finalizer); err != nil {
 			return kubebuilderx.Continue, err

@@ -30,7 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	ctrlcomp "github.com/apecloud/kubeblocks/pkg/controller/component"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
@@ -177,7 +177,7 @@ single_thread_memory = 294912
 				"default",
 				nil, nil)
 
-			cfgBuilder.injectBuiltInObjectsAndFunctions(podSpec, component, nil, &appsv1alpha1.Cluster{
+			cfgBuilder.injectBuiltInObjectsAndFunctions(podSpec, component, nil, &appsv1.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "my_test",
 					Namespace: "default",
@@ -202,7 +202,7 @@ single_thread_memory = 294912
 			viper.Set(constant.KubernetesClusterDomainEnv, "test-domain")
 
 			cfgBuilder.injectBuiltInObjectsAndFunctions(podSpec, component, nil,
-				&appsv1alpha1.Cluster{
+				&appsv1.Cluster{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "my_test",
 						Namespace: "default",
@@ -269,7 +269,7 @@ single_thread_memory = 294912
 			)
 
 			cfgBuilder.injectBuiltInObjectsAndFunctions(podSpec, component, nil,
-				&appsv1alpha1.Cluster{
+				&appsv1.Cluster{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "my_test",
 						Namespace: "default",
@@ -366,16 +366,31 @@ true
 
 			// for small instance class
 			Expect(calMysqlPoolSizeByResource(&ResourceDefinition{
-				MemorySize: 1024 * 1024 * 1024,
+				MemorySize: 1024 * 1024 * 0.5,
 				CoreNum:    1,
 			}, false)).Should(Equal("128M"))
 
 			Expect(calMysqlPoolSizeByResource(&ResourceDefinition{
-				MemorySize: 2 * 1024 * 1024 * 1024,
-				CoreNum:    2,
+				MemorySize: 1024 * 1024 * 1024,
+				CoreNum:    1,
 			}, false)).Should(Equal("256M"))
 
-			// for shard
+			Expect(calMysqlPoolSizeByResource(&ResourceDefinition{
+				MemorySize: 2 * 1024 * 1024 * 1024,
+				CoreNum:    2,
+			}, false)).Should(Equal("384M"))
+
+			// for share
+			Expect(calMysqlPoolSizeByResource(&ResourceDefinition{
+				MemorySize: 1024 * 1024 * 0.5,
+				CoreNum:    1,
+			}, true)).Should(Equal("128M"))
+
+			Expect(calMysqlPoolSizeByResource(&ResourceDefinition{
+				MemorySize: 1024 * 1024 * 1024,
+				CoreNum:    1,
+			}, true)).Should(Equal("512M"))
+
 			Expect(calMysqlPoolSizeByResource(&ResourceDefinition{
 				MemorySize: 2 * 1024 * 1024 * 1024,
 				CoreNum:    2,

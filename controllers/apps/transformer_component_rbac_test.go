@@ -26,14 +26,13 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -48,9 +47,10 @@ var _ = Describe("object rbac transformer test.", func() {
 	var dag *graph.DAG
 	var graphCli model.GraphClient
 	var transformer graph.Transformer
-	var cluster *appsv1alpha1.Cluster
-	var compDefObj *appsv1alpha1.ComponentDefinition
-	var compObj *appsv1alpha1.Component
+	var cluster *appsv1.Cluster
+	var compDefObj *appsv1.ComponentDefinition
+	var compObj *appsv1.Component
+	var synthesizedComp *component.SynthesizedComponent
 	var saKey types.NamespacedName
 	var allSettings map[string]interface{}
 
@@ -73,8 +73,8 @@ var _ = Describe("object rbac transformer test.", func() {
 		By("Creating a component")
 		fullCompName := constant.GenerateClusterComponentName(cluster.Name, compName)
 		compObj = testapps.NewComponentFactory(testCtx.DefaultNamespace, fullCompName, compDefName).
+			AddAnnotations(constant.KBAppClusterUIDKey, string(cluster.UID)).
 			AddLabels(constant.AppInstanceLabelKey, cluster.Name).
-			AddLabels(constant.KBAppClusterUIDLabelKey, string(cluster.UID)).
 			SetReplicas(1).
 			SetServiceAccountName(serviceAccountName).
 			GetObject()
@@ -86,11 +86,8 @@ var _ = Describe("object rbac transformer test.", func() {
 
 		graphCli = model.NewGraphClient(k8sClient)
 
-		reqCtx := intctrlutil.RequestCtx{
-			Ctx: ctx,
-			Log: logger,
-		}
-		synthesizedComponent, err := component.BuildSynthesizedComponent(reqCtx, k8sClient, cluster, compDefObj, compObj)
+		var err error
+		synthesizedComp, err = component.BuildSynthesizedComponent(ctx, k8sClient, compDefObj, compObj, cluster)
 		Expect(err).Should(Succeed())
 
 		transCtx = &componentTransformContext{
@@ -102,7 +99,7 @@ var _ = Describe("object rbac transformer test.", func() {
 			CompDef:             compDefObj,
 			Component:           compObj,
 			ComponentOrig:       compObj.DeepCopy(),
-			SynthesizeComponent: synthesizedComponent,
+			SynthesizeComponent: synthesizedComp,
 		}
 
 		dag = mockDAG(graphCli, cluster)
@@ -119,28 +116,14 @@ var _ = Describe("object rbac transformer test.", func() {
 		}
 	})
 
-	disableVolumeProtection := func() {
-		for i := range compDefObj.Spec.Volumes {
-			compDefObj.Spec.Volumes[i].HighWatermark = 0
-		}
-	}
-
-	enableVolumeProtection := func() {
-		for i := range compDefObj.Spec.Volumes {
-			compDefObj.Spec.Volumes[i].HighWatermark = 85
-		}
-	}
-
 	Context("transformer rbac manager", func() {
 		It("create serviceaccount, rolebinding if not exist", func() {
-			disableVolumeProtection()
-
 			Eventually(testapps.CheckObjExists(&testCtx, saKey,
 				&corev1.ServiceAccount{}, false)).Should(Succeed())
 			Expect(transformer.Transform(transCtx, dag)).Should(BeNil())
 
-			serviceAccount := factory.BuildServiceAccount(cluster, serviceAccountName)
-			roleBinding := factory.BuildRoleBinding(cluster, serviceAccount.Name)
+			serviceAccount := factory.BuildServiceAccount(synthesizedComp, serviceAccountName)
+			roleBinding := factory.BuildRoleBinding(synthesizedComp, serviceAccount.Name)
 
 			dagExpected := mockDAG(graphCli, cluster)
 			graphCli.Create(dagExpected, serviceAccount)
@@ -152,34 +135,10 @@ var _ = Describe("object rbac transformer test.", func() {
 			}
 			Expect(dag.Equals(dagExpected, model.DefaultLess)).Should(BeTrue())
 		})
-
-		It("create clusterrolebinding if volumeprotection enabled", func() {
-			enableVolumeProtection()
-
-			Eventually(testapps.CheckObjExists(&testCtx, saKey,
-				&corev1.ServiceAccount{}, false)).Should(Succeed())
-			Expect(transformer.Transform(transCtx, dag)).Should(BeNil())
-
-			serviceAccount := factory.BuildServiceAccount(cluster, serviceAccountName)
-			roleBinding := factory.BuildRoleBinding(cluster, serviceAccount.Name)
-			clusterRoleBinding := factory.BuildClusterRoleBinding(cluster, serviceAccount.Name)
-
-			dagExpected := mockDAG(graphCli, cluster)
-			graphCli.Create(dagExpected, serviceAccount)
-			graphCli.Create(dagExpected, roleBinding)
-			graphCli.Create(dagExpected, clusterRoleBinding)
-			graphCli.DependOn(dagExpected, roleBinding, clusterRoleBinding)
-			graphCli.DependOn(dagExpected, clusterRoleBinding, serviceAccount)
-			itsList := graphCli.FindAll(dagExpected, &workloads.InstanceSet{})
-			for i := range itsList {
-				graphCli.DependOn(dagExpected, itsList[i], serviceAccount)
-			}
-			Expect(dag.Equals(dagExpected, model.DefaultLess)).Should(BeTrue())
-		})
 	})
 })
 
-func mockDAG(graphCli model.GraphClient, cluster *appsv1alpha1.Cluster) *graph.DAG {
+func mockDAG(graphCli model.GraphClient, cluster *appsv1.Cluster) *graph.DAG {
 	d := graph.NewDAG()
 	graphCli.Root(d, cluster, cluster, model.ActionStatusPtr())
 	its := &workloads.InstanceSet{}

@@ -28,7 +28,7 @@ const kubeblocksVersionLabelName = "app.kubernetes.io/version"
 func PrepareFor(ctx *UpgradeContext) (err error) {
 	ctx.From, err = getVersionInfo(ctx, ctx.K8sClient, ctx.Namespace)
 
-	Log("kubeblock upgrade: [from: %v --> to: %v]", ctx.From, ctx.To)
+	Log("kubeblocks upgrade: [from: %v --> to: %v]", ctx.From, ctx.To)
 	return
 }
 
@@ -36,6 +36,9 @@ func getVersionInfo(ctx context.Context, client *kubernetes.Clientset, namespace
 	deploy, err := GetKubeBlocksDeploy(ctx, client, namespace, kubeblocksAppComponent)
 	if err != nil {
 		return nil, err
+	}
+	if deploy == nil {
+		return nil, fmt.Errorf("KubeBlocks operator-related deployment not found")
 	}
 
 	labels := deploy.GetLabels()

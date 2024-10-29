@@ -11,6 +11,7 @@ spec:
   {{- end }}
   selector:
     matchLabels:
+      app.kubernetes.io/component: "apps"
       {{- include "kubeblocks.selectorLabels" . | nindent 6 }}
       {{- with .Values.extraLabels }}
         {{- toYaml . | nindent 6 }}
@@ -26,6 +27,7 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       labels:
+        app.kubernetes.io/component: "apps"
         {{- include "kubeblocks.selectorLabels" . | nindent 8 }}
         {{- with .Values.extraLabels }}
           {{- toYaml . | nindent 8 }}
@@ -61,9 +63,10 @@ spec:
             {{- with .Values.loggerSettings.encoder }}
             - "--zap-encoder={{ . }}"
             {{- end }}
-            - "--extensions={{- default "true" ( include "kubeblocks.addonControllerEnabled" . ) }}"
             - "--apps={{ ne .Values.controllers.apps.enabled false }}"
             - "--workloads={{ ne .Values.controllers.workloads.enabled false }}"
+            - "--operations={{ ne .Values.controllers.operations.enabled false }}"
+            - "--extensions={{- default "true" ( include "kubeblocks.addonControllerEnabled" . ) }}"
             - "--experimental={{- default "false" .Values.controllers.experimental.enabled }}"
             {{- with .Values.managedNamespaces }}
             - "--managed-namespaces={{ . }}"

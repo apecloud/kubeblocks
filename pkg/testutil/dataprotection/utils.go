@@ -20,7 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package dataprotection
 
 import (
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 
 	vsv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -28,6 +31,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/generics"
 	"github.com/apecloud/kubeblocks/pkg/testutil"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
@@ -57,4 +62,90 @@ func PatchBackupStatus(testCtx *testutil.TestContext, key client.ObjectKey, stat
 	Eventually(testapps.GetAndChangeObjStatus(testCtx, key, func(fetched *dpv1alpha1.Backup) {
 		fetched.Status = status
 	})).Should(Succeed())
+}
+
+func fakeActionSet(testCtx *testutil.TestContext, clusterDefName string) *dpv1alpha1.ActionSet {
+	actionSet := &dpv1alpha1.ActionSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   ActionSetName,
+			Labels: map[string]string{},
+		},
+		Spec: dpv1alpha1.ActionSetSpec{
+			Env: []corev1.EnvVar{
+				{
+					Name:  "test-name",
+					Value: "test-value",
+				},
+			},
+			BackupType: dpv1alpha1.BackupTypeFull,
+			Backup: &dpv1alpha1.BackupActionSpec{
+				BackupData: &dpv1alpha1.BackupDataActionSpec{
+					JobActionSpec: dpv1alpha1.JobActionSpec{
+						BaseJobActionSpec: dpv1alpha1.BaseJobActionSpec{
+							Image:   "xtrabackup",
+							Command: []string{""},
+						},
+					},
+				},
+			},
+			Restore: &dpv1alpha1.RestoreActionSpec{
+				PrepareData: &dpv1alpha1.JobActionSpec{
+					BaseJobActionSpec: dpv1alpha1.BaseJobActionSpec{
+						Image: "xtrabackup",
+						Command: []string{
+							"sh",
+							"-c",
+							"/backup_scripts.sh",
+						},
+					},
+				},
+			},
+		},
+	}
+	if len(clusterDefName) > 0 {
+		actionSet.Labels[constant.ClusterDefLabelKey] = clusterDefName
+	}
+	testapps.CheckedCreateK8sResource(testCtx, actionSet)
+	return actionSet
+}
+
+func CreateBackupPolicyTpl(testCtx *testutil.TestContext, compDef string) *dpv1alpha1.BackupPolicyTemplate {
+	By("create actionSet")
+	fakeActionSet(testCtx, "")
+
+	By("Creating a BackupPolicyTemplate")
+	ttl := "7d"
+	return NewBackupPolicyTemplateFactory(BackupPolicyTPLName).AddBackupMethod(BackupMethodName, false, ActionSetName).
+		SetBackupMethodVolumeMounts("data", "/data").
+		SetCompDefs(compDef).
+		AddBackupMethod(VSBackupMethodName, true, "").
+		SetBackupMethodVolumes([]string{"data"}).
+		AddSchedule(BackupMethodName, "0 0 * * *", ttl, true).
+		AddSchedule(VSBackupMethodName, "0 0 * * *", ttl, true).
+		Create(testCtx).Get()
+}
+
+func CheckRestoreAndSetCompleted(testCtx *testutil.TestContext, clusterKey types.NamespacedName, compName string, scaleOutReplicas int) {
+	By("Checking restore CR created")
+	ml := client.MatchingLabels{
+		constant.AppInstanceLabelKey:    clusterKey.Name,
+		constant.KBAppComponentLabelKey: compName,
+		constant.AppManagedByLabelKey:   constant.AppName,
+	}
+	Eventually(testapps.List(testCtx, generics.RestoreSignature,
+		ml, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(scaleOutReplicas))
+
+	By("Mocking restore phase to succeeded")
+	MockRestoreCompleted(testCtx, ml)
+}
+
+func MockRestoreCompleted(testCtx *testutil.TestContext, ml client.MatchingLabels) {
+	restoreList := dpv1alpha1.RestoreList{}
+	Expect(testCtx.Cli.List(testCtx.Ctx, &restoreList, ml)).Should(Succeed())
+	for _, rs := range restoreList.Items {
+		err := testapps.GetAndChangeObjStatus(testCtx, client.ObjectKeyFromObject(&rs), func(res *dpv1alpha1.Restore) {
+			res.Status.Phase = dpv1alpha1.RestorePhaseCompleted
+		})()
+		Expect(err).ShouldNot(HaveOccurred())
+	}
 }

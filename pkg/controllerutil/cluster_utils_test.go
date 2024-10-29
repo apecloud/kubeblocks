@@ -25,7 +25,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
@@ -63,7 +63,7 @@ var _ = Describe("cluster utils test", func() {
 		)
 
 		var (
-			cluster *appsv1alpha1.Cluster
+			cluster *appsv1.Cluster
 		)
 
 		BeforeEach(func() {
@@ -73,33 +73,33 @@ var _ = Describe("cluster utils test", func() {
 			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
 				SetUID(clusterName).
 				AddComponent(mysqlCompName, compDefName).
-				AddShardingSpec(mysqlShardingName, compDefName).
+				AddSharding(mysqlShardingName, "", compDefName).
 				SetShards(0).
 				Create(&testCtx).GetObject()
 		})
 
 		It("get original or generated cluster component spec test", func() {
-			compSpec, err := GetOriginalOrGeneratedComponentSpecByName(testCtx.Ctx, k8sClient, cluster, mysqlCompName)
+			compSpec, err := GetComponentSpecByName(testCtx.Ctx, k8sClient, cluster, mysqlCompName)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(compSpec).ShouldNot(BeNil())
 			Expect(compSpec.Name).Should(Equal(mysqlCompName))
 
-			compSpec, err = GetOriginalOrGeneratedComponentSpecByName(testCtx.Ctx, k8sClient, cluster, "fakeCompName")
+			compSpec, err = GetComponentSpecByName(testCtx.Ctx, k8sClient, cluster, "fakeCompName")
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(compSpec).Should(BeNil())
 
 			By("create mock sharding component object")
 			mockCompObj := testapps.NewComponentFactory(testCtx.DefaultNamespace, cluster.Name+"-"+mysqlShardingCompName, "").
+				AddAnnotations(constant.KBAppClusterUIDKey, string(cluster.UID)).
 				AddLabels(constant.AppInstanceLabelKey, cluster.Name).
-				AddLabels(constant.KBAppClusterUIDLabelKey, string(cluster.UID)).
 				AddLabels(constant.KBAppShardingNameLabelKey, mysqlShardingName).
 				SetReplicas(1).
 				Create(&testCtx).
 				GetObject()
 			compKey := client.ObjectKeyFromObject(mockCompObj)
-			Eventually(testapps.CheckObjExists(&testCtx, compKey, &appsv1alpha1.Component{}, true)).Should(Succeed())
+			Eventually(testapps.CheckObjExists(&testCtx, compKey, &appsv1.Component{}, true)).Should(Succeed())
 
-			compSpec, err = GetOriginalOrGeneratedComponentSpecByName(testCtx.Ctx, k8sClient, cluster, mysqlShardingCompName)
+			compSpec, err = GetComponentSpecByName(testCtx.Ctx, k8sClient, cluster, mysqlShardingCompName)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(compSpec).ShouldNot(BeNil())
 			Expect(compSpec.Name).Should(Equal(mysqlShardingCompName))

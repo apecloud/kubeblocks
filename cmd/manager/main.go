@@ -34,7 +34,6 @@ import (
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	"github.com/spf13/pflag"
 	corev1 "k8s.io/api/core/v1"
-	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	discoverycli "k8s.io/client-go/discovery"
@@ -49,19 +48,21 @@ import (
 
 	// +kubebuilder:scaffold:imports
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	experimentalv1alpha1 "github.com/apecloud/kubeblocks/apis/experimental/v1alpha1"
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
-	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
-	"github.com/apecloud/kubeblocks/apis/workloads/legacy"
+	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
+	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	workloadsv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	appscontrollers "github.com/apecloud/kubeblocks/controllers/apps"
 	"github.com/apecloud/kubeblocks/controllers/apps/configuration"
 	experimentalcontrollers "github.com/apecloud/kubeblocks/controllers/experimental"
 	extensionscontrollers "github.com/apecloud/kubeblocks/controllers/extensions"
 	k8scorecontrollers "github.com/apecloud/kubeblocks/controllers/k8score"
+	opscontrollers "github.com/apecloud/kubeblocks/controllers/operations"
 	workloadscontrollers "github.com/apecloud/kubeblocks/controllers/workloads"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
@@ -84,8 +85,9 @@ const (
 
 	// switch flags key for API groups
 	appsFlagKey         flagName = "apps"
-	extensionsFlagKey   flagName = "extensions"
 	workloadsFlagKey    flagName = "workloads"
+	operationsFlagKey   flagName = "operations"
+	extensionsFlagKey   flagName = "extensions"
 	experimentalFlagKey flagName = "experimental"
 
 	multiClusterKubeConfigFlagKey       flagName = "multi-cluster-kubeconfig"
@@ -102,18 +104,18 @@ var (
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-
 	utilruntime.Must(appsv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(appsv1beta1.AddToScheme(scheme))
+	utilruntime.Must(appsv1.AddToScheme(scheme))
+	utilruntime.Must(opsv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(dpv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(snapshotv1.AddToScheme(scheme))
 	utilruntime.Must(snapshotv1beta1.AddToScheme(scheme))
 	utilruntime.Must(extensionsv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(workloadsv1alpha1.AddToScheme(scheme))
-	utilruntime.Must(storagev1alpha1.AddToScheme(scheme))
-	utilruntime.Must(appsv1beta1.AddToScheme(scheme))
-	utilruntime.Must(legacy.AddToScheme(scheme))
-	utilruntime.Must(apiextv1.AddToScheme(scheme))
+	utilruntime.Must(workloadsv1.AddToScheme(scheme))
 	utilruntime.Must(experimentalv1alpha1.AddToScheme(scheme))
+
 	// +kubebuilder:scaffold:scheme
 
 	viper.SetConfigName("config")                          // name of config file (without extension)
@@ -141,7 +143,6 @@ func init() {
 	viper.SetDefault(intctrlutil.FeatureGateEnableRuntimeMetrics, false)
 	viper.SetDefault(constant.CfgKBReconcileWorkers, 8)
 	viper.SetDefault(constant.FeatureGateIgnoreConfigTemplateDefaultMode, false)
-	viper.SetDefault(constant.FeatureGateComponentReplicasAnnotation, true)
 	viper.SetDefault(constant.FeatureGateInPlacePodVerticalScaling, false)
 }
 
@@ -168,10 +169,12 @@ func setupFlags() {
 
 	flag.Bool(appsFlagKey.String(), true,
 		"Enable the apps controller manager.")
-	flag.Bool(extensionsFlagKey.String(), true,
-		"Enable the extensions controller manager.")
 	flag.Bool(workloadsFlagKey.String(), true,
 		"Enable the workloads controller manager.")
+	flag.Bool(operationsFlagKey.String(), true,
+		"Enable the operations controller manager.")
+	flag.Bool(extensionsFlagKey.String(), true,
+		"Enable the extensions controller manager.")
 	flag.Bool(experimentalFlagKey.String(), false,
 		"Enable the experimental controller manager.")
 
@@ -370,16 +373,6 @@ func main() {
 	}
 
 	if viper.GetBool(appsFlagKey.viperName()) {
-		if err = (&appscontrollers.ClusterReconciler{
-			Client:          client,
-			Scheme:          mgr.GetScheme(),
-			Recorder:        mgr.GetEventRecorderFor("cluster-controller"),
-			MultiClusterMgr: multiClusterMgr,
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "Cluster")
-			os.Exit(1)
-		}
-
 		if err = (&appscontrollers.ClusterDefinitionReconciler{
 			Client:   mgr.GetClient(),
 			Scheme:   mgr.GetScheme(),
@@ -389,12 +382,12 @@ func main() {
 			os.Exit(1)
 		}
 
-		if err = (&appscontrollers.ComponentReconciler{
-			Client:   client,
+		if err = (&appscontrollers.ShardingDefinitionReconciler{
+			Client:   mgr.GetClient(),
 			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("component-controller"),
-		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "Component")
+			Recorder: mgr.GetEventRecorderFor("sharding-definition-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "ShardingDefinition")
 			os.Exit(1)
 		}
 
@@ -416,57 +409,22 @@ func main() {
 			os.Exit(1)
 		}
 
-		if err = (&appscontrollers.OpsDefinitionReconciler{
-			Client:   mgr.GetClient(),
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("ops-definition-controller"),
+		if err = (&appscontrollers.ClusterReconciler{
+			Client:          client,
+			Scheme:          mgr.GetScheme(),
+			Recorder:        mgr.GetEventRecorderFor("cluster-controller"),
+			MultiClusterMgr: multiClusterMgr,
 		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "OpsDefinition")
+			setupLog.Error(err, "unable to create controller", "controller", "Cluster")
 			os.Exit(1)
 		}
 
-		if err = (&appscontrollers.OpsRequestReconciler{
-			Client:   mgr.GetClient(),
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("ops-request-controller"),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "OpsRequest")
-			os.Exit(1)
-		}
-
-		if err = (&configuration.ConfigConstraintReconciler{
-			Client:   mgr.GetClient(),
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("config-constraint-controller"),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "ConfigConstraint")
-			os.Exit(1)
-		}
-
-		if err = (&configuration.ReconfigureReconciler{
+		if err = (&appscontrollers.ComponentReconciler{
 			Client:   client,
 			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("reconfigure-controller"),
+			Recorder: mgr.GetEventRecorderFor("component-controller"),
 		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "ReconfigureRequest")
-			os.Exit(1)
-		}
-
-		if err = (&configuration.ConfigurationReconciler{
-			Client:   client,
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("configuration-controller"),
-		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "Configuration")
-			os.Exit(1)
-		}
-
-		if err = (&k8scorecontrollers.EventReconciler{
-			Client:   client,
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("event-controller"),
-		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "Event")
+			setupLog.Error(err, "unable to create controller", "controller", "Component")
 			os.Exit(1)
 		}
 
@@ -479,12 +437,70 @@ func main() {
 			os.Exit(1)
 		}
 
-		if err = (&appscontrollers.BackupPolicyTemplateReconciler{
+		if err = (&k8scorecontrollers.EventReconciler{
+			Client:   client,
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("event-controller"),
+		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "Event")
+			os.Exit(1)
+		}
+
+		if err = (&configuration.ConfigConstraintReconciler{
 			Client:   mgr.GetClient(),
 			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("backup-policy-template-controller"),
+			Recorder: mgr.GetEventRecorderFor("config-constraint-controller"),
 		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "BackupPolicyTemplate")
+			setupLog.Error(err, "unable to create controller", "controller", "ConfigConstraint")
+			os.Exit(1)
+		}
+
+		if err = (&configuration.ConfigurationReconciler{
+			Client:   client,
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("configuration-controller"),
+		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "Configuration")
+			os.Exit(1)
+		}
+
+		if err = (&configuration.ReconfigureReconciler{
+			Client:   client,
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("reconfigure-controller"),
+		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "ReconfigureRequest")
+			os.Exit(1)
+		}
+	}
+
+	if viper.GetBool(workloadsFlagKey.viperName()) {
+		if err = (&workloadscontrollers.InstanceSetReconciler{
+			Client:   client,
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("instance-set-controller"),
+		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "InstanceSet")
+			os.Exit(1)
+		}
+	}
+
+	if viper.GetBool(operationsFlagKey.viperName()) {
+		if err = (&opscontrollers.OpsDefinitionReconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("ops-definition-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "OpsDefinition")
+			os.Exit(1)
+		}
+
+		if err = (&opscontrollers.OpsRequestReconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("ops-request-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "OpsRequest")
 			os.Exit(1)
 		}
 	}
@@ -501,17 +517,6 @@ func main() {
 		}
 	}
 
-	if viper.GetBool(workloadsFlagKey.viperName()) {
-		if err = (&workloadscontrollers.InstanceSetReconciler{
-			Client:   client,
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("instance-set-controller"),
-		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "InstanceSet")
-			os.Exit(1)
-		}
-	}
-
 	if viper.GetBool(experimentalFlagKey.viperName()) {
 		if err = (&experimentalcontrollers.NodeCountScalerReconciler{
 			Client:   mgr.GetClient(),
@@ -519,6 +524,37 @@ func main() {
 			Recorder: mgr.GetEventRecorderFor("node-count-scaler-controller"),
 		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "NodeCountScaler")
+			os.Exit(1)
+		}
+	}
+
+	if os.Getenv("ENABLE_WEBHOOKS") == "true" {
+		if err = (&appsv1.ClusterDefinition{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "ClusterDefinition")
+			os.Exit(1)
+		}
+		if err = (&appsv1.ComponentDefinition{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "ComponentDefinition")
+			os.Exit(1)
+		}
+		if err = (&appsv1.ComponentVersion{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "ComponentVersion")
+			os.Exit(1)
+		}
+		if err = (&appsv1.Cluster{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "Cluster")
+			os.Exit(1)
+		}
+		if err = (&appsv1.Component{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "Component")
+			os.Exit(1)
+		}
+		if err = (&workloadsv1.InstanceSet{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "InstanceSet")
+			os.Exit(1)
+		}
+		if err = (&appsv1.ServiceDescriptor{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "ServiceDescriptor")
 			os.Exit(1)
 		}
 	}

@@ -30,7 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -84,6 +84,11 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		template2TotalReplicas[template.Name] = templateReplicas
 	}
 
+	podToNodeMapping, err := ParseNodeSelectorOnceAnnotation(its)
+	if err != nil {
+		return kubebuilderx.Continue, err
+	}
+
 	for _, pod := range podList {
 		parentName, _ := ParseParentNameAndOrdinal(pod.Name)
 		templateName, _ := strings.CutPrefix(parentName, its.Name)
@@ -124,6 +129,15 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			default:
 				updatedReplicas++
 				template2TemplatesStatus[templateName].UpdatedReplicas++
+			}
+		}
+
+		if nodeName, ok := podToNodeMapping[pod.Name]; ok {
+			// there's chance that a pod is currently running and wait to be deleted so that it can be rescheduled
+			if pod.Spec.NodeName == nodeName {
+				if err := deleteNodeSelectorOnceAnnotation(its, pod.Name); err != nil {
+					return kubebuilderx.Continue, err
+				}
 			}
 		}
 	}

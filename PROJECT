@@ -20,12 +20,35 @@ resources:
   version: v1alpha1
 - api:
     crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: kubeblocks.io
+  group: apps
+  kind: Cluster
+  path: github.com/apecloud/kubeblocks/apis/apps/v1
+  version: v1
+  webhooks:
+    conversion: true
+    webhookVersion: v1
+- api:
+    crdVersion: v1
   controller: true
   domain: kubeblocks.io
   group: apps
   kind: ClusterDefinition
   path: github.com/apecloud/kubeblocks/apis/apps/v1alpha1
   version: v1alpha1
+- api:
+    crdVersion: v1
+  controller: true
+  domain: kubeblocks.io
+  group: apps
+  kind: ClusterDefinition
+  path: github.com/apecloud/kubeblocks/apis/apps/v1
+  version: v1
+  webhooks:
+    conversion: true
+    webhookVersion: v1
 - api:
     crdVersion: v1
   controller: true
@@ -66,18 +89,9 @@ resources:
     namespaced: true
   controller: true
   domain: kubeblocks.io
-  group: apps
+  group: dataprotection
   kind: BackupPolicyTemplate
-  path: github.com/apecloud/kubeblocks/apis/apps/v1alpha1
-  version: v1alpha1
-- api:
-    crdVersion: v1
-    namespaced: true
-  controller: true
-  domain: kubeblocks.io
-  group: apps
-  kind: OpsRequest
-  path: github.com/apecloud/kubeblocks/apis/apps/v1alpha1
+  path: github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1
   version: v1alpha1
 - api:
     crdVersion: v1
@@ -121,12 +135,16 @@ resources:
   version: v1alpha1
 - api:
     crdVersion: v1
+    namespaced: true
   controller: true
   domain: kubeblocks.io
-  group: storage
-  kind: StorageProvider
-  path: github.com/apecloud/kubeblocks/apis/storage/v1alpha1
-  version: v1alpha1
+  group: workloads
+  kind: InstanceSet
+  path: github.com/apecloud/kubeblocks/apis/workloads/v1
+  version: v1
+  webhooks:
+    conversion: true
+    webhookVersion: v1
 - api:
     crdVersion: v1
   controller: true
@@ -166,6 +184,18 @@ resources:
     namespaced: true
   controller: true
   domain: kubeblocks.io
+  group: apps
+  kind: ServiceDescriptor
+  path: github.com/apecloud/kubeblocks/apis/apps/v1
+  version: v1
+  webhooks:
+    conversion: true
+    webhookVersion: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: kubeblocks.io
   group: dataprotection
   kind: Restore
   path: github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1
@@ -180,6 +210,17 @@ resources:
   version: v1alpha1
 - api:
     crdVersion: v1
+  controller: true
+  domain: kubeblocks.io
+  group: apps
+  kind: ComponentDefinition
+  path: github.com/apecloud/kubeblocks/apis/apps/v1
+  version: v1
+  webhooks:
+    conversion: true
+    webhookVersion: v1
+- api:
+    crdVersion: v1
     namespaced: true
   controller: true
   domain: kubeblocks.io
@@ -189,12 +230,16 @@ resources:
   version: v1alpha1
 - api:
     crdVersion: v1
+    namespaced: true
   controller: true
   domain: kubeblocks.io
   group: apps
-  kind: OpsDefinition
-  path: github.com/apecloud/kubeblocks/apis/apps/v1alpha1
-  version: v1alpha1
+  kind: Component
+  path: github.com/apecloud/kubeblocks/apis/apps/v1
+  version: v1
+  webhooks:
+    conversion: true
+    webhookVersion: v1
 - api:
     crdVersion: v1
   controller: true
@@ -203,6 +248,17 @@ resources:
   kind: ComponentVersion
   path: github.com/apecloud/kubeblocks/apis/apps/v1alpha1
   version: v1alpha1
+- api:
+    crdVersion: v1
+  controller: true
+  domain: kubeblocks.io
+  group: apps
+  kind: ComponentVersion
+  path: github.com/apecloud/kubeblocks/apis/apps/v1
+  version: v1
+  webhooks:
+    conversion: true
+    webhookVersion: v1
 - api:
     crdVersion: v1
   domain: kubeblocks.io
@@ -227,4 +283,29 @@ resources:
   kind: NodeCountScaler
   path: github.com/apecloud/kubeblocks/apis/experimental/v1alpha1
   version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: kubeblocks.io
+  group: operations
+  kind: OpsRequest
+  path: github.com/apecloud/kubeblocks/apis/operations/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+  controller: true
+  domain: kubeblocks.io
+  group: operations
+  kind: OpsDefinition
+  path: github.com/apecloud/kubeblocks/apis/apps/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+  controller: true
+  domain: kubeblocks.io
+  group: apps
+  kind: ShardingDefinition
+  path: github.com/apecloud/kubeblocks/apis/apps/v1
+  version: v1
 version: "3"

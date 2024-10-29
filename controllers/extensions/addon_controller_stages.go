@@ -23,12 +23,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/Masterminds/semver/v3"
 	ctrlerihandler "github.com/authzed/controller-idioms/handler"
-	"golang.org/x/exp/slices"
 	v1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -40,7 +40,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -186,7 +186,7 @@ func (r *fetchNDeletionCheckStage) Handle(ctx context.Context) {
 				"Addon is used by cluster, please check")
 		}
 		if res, err := intctrlutil.ValidateReferenceCR(*r.reqCtx, r.reconciler.Client, addon, constant.ClusterDefLabelKey,
-			recordEvent, &appsv1alpha1.ClusterList{}); res != nil || err != nil {
+			recordEvent, &appsv1.ClusterList{}); res != nil || err != nil {
 			r.updateResultNErr(res, err)
 			return
 		}
@@ -1101,8 +1101,8 @@ func logFailedJobPodToCondError(ctx context.Context, stageCtx *stageCtx, addon *
 	}
 
 	// sort pod with latest creation place front
-	slices.SortFunc(podList.Items, func(a, b corev1.Pod) bool {
-		return b.CreationTimestamp.Before(&(a.CreationTimestamp))
+	slices.SortFunc(podList.Items, func(a, b corev1.Pod) int {
+		return b.CreationTimestamp.Compare(a.CreationTimestamp.Time)
 	})
 
 podsloop:

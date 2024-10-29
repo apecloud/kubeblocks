@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"slices"
@@ -30,9 +31,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
@@ -40,7 +42,7 @@ import (
 	ictrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-// clusterComponentTransformer transforms all cluster.Spec.ComponentSpecs to mapping Component objects
+// clusterComponentTransformer transforms components and shardings to mapping Component objects
 type clusterComponentTransformer struct{}
 
 var _ graph.Transformer = &clusterComponentTransformer{}
@@ -51,101 +53,95 @@ func (t *clusterComponentTransformer) Transform(ctx graph.TransformContext, dag 
 		return nil
 	}
 
-	if len(transCtx.ComponentSpecs) == 0 {
-		return nil
-	}
-
-	allCompsUpToDate, err := checkAllCompsUpToDate(transCtx, transCtx.Cluster)
+	updateToDate, err := checkAllCompsUpToDate(transCtx, transCtx.Cluster)
 	if err != nil {
 		return err
 	}
 
 	// if the cluster is not updating and all components are up-to-date, skip the reconciliation
-	if !transCtx.OrigCluster.IsUpdating() && allCompsUpToDate {
+	if !transCtx.OrigCluster.IsUpdating() && updateToDate {
 		return nil
 	}
 
-	return t.reconcileComponents(transCtx, dag)
+	return t.transform(transCtx, dag)
 }
 
-func (t *clusterComponentTransformer) reconcileComponents(transCtx *clusterTransformContext, dag *graph.DAG) error {
-	cluster := transCtx.Cluster
-
-	protoCompSpecMap := make(map[string]*appsv1alpha1.ClusterComponentSpec)
-	for _, compSpec := range transCtx.ComponentSpecs {
-		protoCompSpecMap[compSpec.Name] = compSpec
-	}
-
-	protoCompSet := sets.KeySet(protoCompSpecMap)
-	runningCompSet, err := component.GetClusterComponentShortNameSet(transCtx.Context, transCtx.Client, cluster)
+func (t *clusterComponentTransformer) transform(transCtx *clusterTransformContext, dag *graph.DAG) error {
+	runningSet, err := t.runningSet(transCtx)
 	if err != nil {
 		return err
 	}
+	protoSet := t.protoSet(transCtx)
 
-	createCompSet := protoCompSet.Difference(runningCompSet)
-	updateCompSet := protoCompSet.Intersection(runningCompSet)
-	deleteCompSet := runningCompSet.Difference(protoCompSet)
+	createSet, deleteSet, updateSet := setDiff(runningSet, protoSet)
 
-	// component objects to be deleted (scale-in)
-	if err := deleteCompsInOrder(transCtx, dag, deleteCompSet, false); err != nil {
+	if err := deleteCompNShardingInOrder(transCtx, dag, deleteSet, pointer.Bool(true)); err != nil {
 		return err
 	}
 
-	// component objects to be updated
 	var delayedErr error
-	if err := t.handleCompsUpdate(transCtx, dag, protoCompSpecMap, updateCompSet, transCtx.Labels, transCtx.Annotations); err != nil {
+	if err := t.handleUpdate(transCtx, dag, updateSet); err != nil {
 		if !ictrlutil.IsDelayedRequeueError(err) {
 			return err
 		}
 		delayedErr = err
 	}
 
-	// component objects to be created
-	if err := t.handleCompsCreate(transCtx, dag, protoCompSpecMap, createCompSet, transCtx.Labels, transCtx.Annotations); err != nil {
+	if err := t.handleCreate(transCtx, dag, createSet); err != nil {
 		return err
 	}
 
 	return delayedErr
 }
 
-func (t *clusterComponentTransformer) handleCompsCreate(transCtx *clusterTransformContext, dag *graph.DAG,
-	protoCompSpecMap map[string]*appsv1alpha1.ClusterComponentSpec, createCompSet sets.Set[string],
-	protoCompLabelsMap, protoCompAnnotationsMap map[string]map[string]string) error {
-	handler := newCompHandler(transCtx, protoCompSpecMap, protoCompLabelsMap, protoCompAnnotationsMap, createOp)
-	return handleCompsInOrder(transCtx, dag, createCompSet, handler)
+func (t *clusterComponentTransformer) runningSet(transCtx *clusterTransformContext) (sets.Set[string], error) {
+	return clusterRunningCompNShardingSet(transCtx.Context, transCtx.Client, transCtx.Cluster)
 }
 
-func (t *clusterComponentTransformer) handleCompsUpdate(transCtx *clusterTransformContext, dag *graph.DAG,
-	protoCompSpecMap map[string]*appsv1alpha1.ClusterComponentSpec, updateCompSet sets.Set[string],
-	protoCompLabelsMap, protoCompAnnotationsMap map[string]map[string]string) error {
-	handler := newCompHandler(transCtx, protoCompSpecMap, protoCompLabelsMap, protoCompAnnotationsMap, updateOp)
-	return handleCompsInOrder(transCtx, dag, updateCompSet, handler)
-}
-
-func deleteCompsInOrder(transCtx *clusterTransformContext, dag *graph.DAG, deleteCompSet sets.Set[string], terminate bool) error {
-	handler := newCompHandler(transCtx, nil, nil, nil, deleteOp)
-	if h, ok := handler.(*parallelDeleteCompHandler); ok {
-		h.terminate = terminate
+func (t *clusterComponentTransformer) protoSet(transCtx *clusterTransformContext) sets.Set[string] {
+	names := sets.Set[string]{}
+	for _, comp := range transCtx.components {
+		names.Insert(comp.Name)
 	}
-	if h, ok := handler.(*orderedDeleteCompHandler); ok {
-		h.terminate = terminate
+	for _, sharding := range transCtx.shardings {
+		names.Insert(sharding.Name)
 	}
-	return handleCompsInOrder(transCtx, dag, deleteCompSet, handler)
+	return names
 }
 
-func handleCompsInOrder(transCtx *clusterTransformContext, dag *graph.DAG,
-	compNameSet sets.Set[string], handler compConditionalHandler) error {
+func (t *clusterComponentTransformer) handleCreate(transCtx *clusterTransformContext, dag *graph.DAG, createSet sets.Set[string]) error {
+	handler := newCompNShardingHandler(transCtx, createOp)
+	return handleCompNShardingInOrder(transCtx, dag, createSet, handler)
+}
+
+func (t *clusterComponentTransformer) handleUpdate(transCtx *clusterTransformContext, dag *graph.DAG, updateSet sets.Set[string]) error {
+	handler := newCompNShardingHandler(transCtx, updateOp)
+	return handleCompNShardingInOrder(transCtx, dag, updateSet, handler)
+}
+
+func deleteCompNShardingInOrder(transCtx *clusterTransformContext, dag *graph.DAG, deleteSet sets.Set[string], scaleIn *bool) error {
+	handler := newCompNShardingHandler(transCtx, deleteOp)
+	if h, ok := handler.(*clusterParallelHandler); ok {
+		h.scaleIn = scaleIn
+	}
+	if h, ok := handler.(*orderedDeleteHandler); ok {
+		h.scaleIn = scaleIn
+	}
+	return handleCompNShardingInOrder(transCtx, dag, deleteSet, handler)
+}
+
+func handleCompNShardingInOrder(transCtx *clusterTransformContext, dag *graph.DAG, nameSet sets.Set[string], handler clusterConditionalHandler) error {
 	unmatched := ""
-	for _, compName := range handler.ordered(sets.List(compNameSet)) {
-		ok, err := handler.match(transCtx, dag, compName)
+	for _, name := range handler.ordered(sets.List(nameSet)) {
+		ok, err := handler.match(transCtx, dag, name)
 		if err != nil {
 			return err
 		}
 		if !ok {
-			unmatched = compName
+			unmatched = name
 			break
 		}
-		if err = handler.handle(transCtx, dag, compName); err != nil {
+		if err = handler.handle(transCtx, dag, name); err != nil {
 			return err
 		}
 	}
@@ -155,44 +151,31 @@ func handleCompsInOrder(transCtx *clusterTransformContext, dag *graph.DAG,
 	return nil
 }
 
-func checkAllCompsUpToDate(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster) (bool, error) {
-	compList := &appsv1alpha1.ComponentList{}
-	labels := constant.GetClusterWellKnownLabels(cluster.Name)
+func checkAllCompsUpToDate(transCtx *clusterTransformContext, cluster *appsv1.Cluster) (bool, error) {
+	compList := &appsv1.ComponentList{}
+	labels := constant.GetClusterLabels(cluster.Name)
 	if err := transCtx.Client.List(transCtx.Context, compList, client.InNamespace(cluster.Namespace), client.MatchingLabels(labels)); err != nil {
 		return false, err
 	}
-	if len(compList.Items) != len(transCtx.ComponentSpecs) {
+	if len(compList.Items) != transCtx.total() {
 		return false, nil
 	}
 	for _, comp := range compList.Items {
-		kbGeneration, ok := comp.Annotations[constant.KubeBlocksGenerationKey]
+		generation, ok := comp.Annotations[constant.KubeBlocksGenerationKey]
 		if !ok {
 			return false, nil
 		}
-		if comp.Generation != comp.Status.ObservedGeneration || kbGeneration != strconv.FormatInt(cluster.Generation, 10) {
+		if comp.Generation != comp.Status.ObservedGeneration || generation != strconv.FormatInt(cluster.Generation, 10) {
 			return false, nil
 		}
 	}
 	return true, nil
 }
 
-// getRunningCompObject gets the component object from cache snapshot
-func getRunningCompObject(transCtx *clusterTransformContext, cluster *appsv1alpha1.Cluster, compName string) (*appsv1alpha1.Component, error) {
-	compKey := types.NamespacedName{
-		Namespace: cluster.Namespace,
-		Name:      component.FullName(cluster.Name, compName),
-	}
-	comp := &appsv1alpha1.Component{}
-	if err := transCtx.Client.Get(transCtx.Context, compKey, comp); err != nil {
-		return nil, err
-	}
-	return comp, nil
-}
-
 // copyAndMergeComponent merges two component objects for updating:
 // 1. new a component object targetCompObj by copying from oldCompObj
 // 2. merge all fields can be updated from newCompObj into targetCompObj
-func copyAndMergeComponent(oldCompObj, newCompObj *appsv1alpha1.Component) *appsv1alpha1.Component {
+func copyAndMergeComponent(oldCompObj, newCompObj *appsv1.Component) *appsv1.Component {
 	compObjCopy := oldCompObj.DeepCopy()
 	compProto := newCompObj
 
@@ -215,13 +198,10 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1alpha1.Component) *apps
 	compObjCopy.Spec.Services = compProto.Spec.Services
 	compObjCopy.Spec.Replicas = compProto.Spec.Replicas
 	compObjCopy.Spec.Configs = compProto.Spec.Configs
-	// compObjCopy.Spec.Monitor = compProto.Spec.Monitor
-	compObjCopy.Spec.EnabledLogs = compProto.Spec.EnabledLogs
 	compObjCopy.Spec.ServiceAccountName = compProto.Spec.ServiceAccountName
 	compObjCopy.Spec.ParallelPodManagementConcurrency = compProto.Spec.ParallelPodManagementConcurrency
 	compObjCopy.Spec.PodUpdatePolicy = compProto.Spec.PodUpdatePolicy
-	compObjCopy.Spec.Affinity = compProto.Spec.Affinity
-	compObjCopy.Spec.Tolerations = compProto.Spec.Tolerations
+	compObjCopy.Spec.SchedulingPolicy = compProto.Spec.SchedulingPolicy
 	compObjCopy.Spec.TLSConfig = compProto.Spec.TLSConfig
 	compObjCopy.Spec.Instances = compProto.Spec.Instances
 	compObjCopy.Spec.OfflineInstances = compProto.Spec.OfflineInstances
@@ -243,19 +223,18 @@ const (
 	updateOp int = 2
 )
 
-func newCompHandler(transCtx *clusterTransformContext, compSpecs map[string]*appsv1alpha1.ClusterComponentSpec,
-	labels, annotations map[string]map[string]string, op int) compConditionalHandler {
-	orders := definedOrders(transCtx, op)
+func newCompNShardingHandler(transCtx *clusterTransformContext, op int) clusterConditionalHandler {
+	topology, orders := definedOrders(transCtx, op)
 	if len(orders) == 0 {
-		return newParallelHandler(compSpecs, labels, annotations, op)
+		return newParallelHandler(op)
 	}
-	return newOrderedHandler(compSpecs, labels, annotations, orders, op)
+	return newOrderedHandler(topology, orders, op)
 }
 
-func definedOrders(transCtx *clusterTransformContext, op int) []string {
+func definedOrders(transCtx *clusterTransformContext, op int) (appsv1.ClusterTopology, []string) {
 	var (
 		cluster    = transCtx.Cluster
-		clusterDef = transCtx.ClusterDef
+		clusterDef = transCtx.clusterDef
 	)
 	if len(cluster.Spec.Topology) != 0 && clusterDef != nil {
 		for _, topology := range clusterDef.Spec.Topologies {
@@ -263,156 +242,145 @@ func definedOrders(transCtx *clusterTransformContext, op int) []string {
 				if topology.Orders != nil {
 					switch op {
 					case createOp:
-						return topology.Orders.Provision
+						return topology, topology.Orders.Provision
 					case deleteOp:
-						return topology.Orders.Terminate
+						return topology, topology.Orders.Terminate
 					case updateOp:
-						return topology.Orders.Update
+						return topology, topology.Orders.Update
 					default:
-						panic("runtime error: unknown component op: " + strconv.Itoa(op))
+						panic("runtime error: unknown operation: " + strconv.Itoa(op))
 					}
 				}
 			}
 		}
 	}
-	return nil
+	return appsv1.ClusterTopology{}, nil
 }
 
-func newParallelHandler(compSpecs map[string]*appsv1alpha1.ClusterComponentSpec,
-	labels, annotations map[string]map[string]string, op int) compConditionalHandler {
+func newParallelHandler(op int) clusterConditionalHandler {
+	if op == createOp || op == deleteOp || op == updateOp {
+		return &clusterParallelHandler{
+			clusterCompNShardingHandler: clusterCompNShardingHandler{op: op},
+		}
+	}
+	panic("runtime error: unknown operation: " + strconv.Itoa(op))
+}
+
+func newOrderedHandler(topology appsv1.ClusterTopology, orders []string, op int) clusterConditionalHandler {
 	switch op {
-	case createOp:
-		return &parallelCreateCompHandler{
-			createCompHandler: createCompHandler{
-				compSpecs:   compSpecs,
-				labels:      labels,
-				annotations: annotations,
+	case createOp, updateOp:
+		return &orderedCreateNUpdateHandler{
+			clusterOrderedOrder: clusterOrderedOrder{
+				topology: topology,
+				orders:   orders,
 			},
+			phasePrecondition: phasePrecondition{
+				topology: topology,
+				orders:   orders,
+			},
+			clusterCompNShardingHandler: clusterCompNShardingHandler{op: op},
 		}
 	case deleteOp:
-		return &parallelDeleteCompHandler{}
-	case updateOp:
-		return &parallelUpdateCompHandler{
-			updateCompHandler: updateCompHandler{
-				compSpecs:   compSpecs,
-				labels:      labels,
-				annotations: annotations,
+		return &orderedDeleteHandler{
+			clusterOrderedOrder: clusterOrderedOrder{
+				topology: topology,
+				orders:   orders,
 			},
+			notExistPrecondition: notExistPrecondition{
+				topology: topology,
+				orders:   orders,
+			},
+			clusterCompNShardingHandler: clusterCompNShardingHandler{op: op},
 		}
 	default:
-		panic("runtime error: unknown component op: " + strconv.Itoa(op))
+		panic("runtime error: unknown operation: " + strconv.Itoa(op))
 	}
 }
 
-func newOrderedHandler(compSpecs map[string]*appsv1alpha1.ClusterComponentSpec,
-	labels, annotations map[string]map[string]string, orders []string, op int) compConditionalHandler {
-	upworking := func(comp *appsv1alpha1.Component) bool {
-		target := appsv1alpha1.RunningClusterCompPhase
-		if comp.Spec.Stop != nil && *comp.Spec.Stop {
-			target = appsv1alpha1.StoppedClusterCompPhase
-		}
-		return comp.Status.Phase == target
-	}
-	switch op {
-	case createOp:
-		return &orderedCreateCompHandler{
-			compOrderedOrder: compOrderedOrder{
-				orders: orders,
-			},
-			compPhasePrecondition: compPhasePrecondition{
-				orders:           orders,
-				phaseExpectation: upworking,
-			},
-			createCompHandler: createCompHandler{
-				compSpecs:   compSpecs,
-				labels:      labels,
-				annotations: annotations,
-			},
-		}
-	case deleteOp:
-		return &orderedDeleteCompHandler{
-			compOrderedOrder: compOrderedOrder{
-				orders: orders,
-			},
-			compNotExistPrecondition: compNotExistPrecondition{
-				orders: orders,
-			},
-			deleteCompHandler: deleteCompHandler{},
-		}
-	case updateOp:
-		return &orderedUpdateCompHandler{
-			compOrderedOrder: compOrderedOrder{
-				orders: orders,
-			},
-			compPhasePrecondition: compPhasePrecondition{
-				orders:           orders,
-				phaseExpectation: upworking,
-			},
-			updateCompHandler: updateCompHandler{
-				compSpecs:   compSpecs,
-				labels:      labels,
-				annotations: annotations,
-			},
-		}
-	default:
-		panic("runtime error: unknown component op: " + strconv.Itoa(op))
-	}
-}
-
-type compConditionalHandler interface {
+type clusterConditionalHandler interface {
 	ordered([]string) []string
-	match(transCtx *clusterTransformContext, dag *graph.DAG, compName string) (bool, error)
-	handle(transCtx *clusterTransformContext, dag *graph.DAG, compName string) error
+	match(transCtx *clusterTransformContext, dag *graph.DAG, name string) (bool, error)
+	handle(transCtx *clusterTransformContext, dag *graph.DAG, name string) error
 }
 
-type compParallelOrder struct{}
+type clusterParallelOrder struct{}
 
-func (o *compParallelOrder) ordered(compNames []string) []string {
-	return compNames
+func (o *clusterParallelOrder) ordered(names []string) []string {
+	return names
 }
 
-type compOrderedOrder struct {
-	orders []string
+type clusterOrderedOrder struct {
+	topology appsv1.ClusterTopology
+	orders   []string
 }
 
-func (o *compOrderedOrder) ordered(compNames []string) []string {
+func (o *clusterOrderedOrder) ordered(names []string) []string {
 	result := make([]string, 0)
 	for _, order := range o.orders {
-		comps := strings.Split(order, ",")
-		for _, comp := range compNames {
-			if slices.Index(comps, comp) >= 0 {
-				result = append(result, comp)
+		entities := strings.Split(order, ",")
+		for _, name := range names {
+			if slices.ContainsFunc(entities, func(e string) bool {
+				return clusterTopologyEntityMatched(o.topology, e, name)
+			}) {
+				result = append(result, name)
 			}
 		}
 	}
-	if len(result) != len(compNames) {
-		panic("runtime error: cannot find order for components " + strings.Join(compNames, ","))
+	if len(result) != len(names) {
+		panic("runtime error: cannot find order for components and shardings " + strings.Join(names, ","))
 	}
 	return result
 }
 
-type compDummyPrecondition struct{}
+type dummyPrecondition struct{}
 
-func (c *compDummyPrecondition) match(*clusterTransformContext, *graph.DAG, string) (bool, error) {
+func (c *dummyPrecondition) match(*clusterTransformContext, *graph.DAG, string) (bool, error) {
 	return true, nil
 }
 
-type compNotExistPrecondition struct {
-	orders []string
+type notExistPrecondition struct {
+	topology appsv1.ClusterTopology
+	orders   []string
 }
 
-func (c *compNotExistPrecondition) match(transCtx *clusterTransformContext, dag *graph.DAG, compName string) (bool, error) {
-	get := func(compKey types.NamespacedName) (bool, error) {
-		comp := &appsv1alpha1.Component{}
+func (c *notExistPrecondition) match(transCtx *clusterTransformContext, dag *graph.DAG, name string) (bool, error) {
+	for _, predecessor := range predecessors(c.topology, c.orders, name) {
+		exist, err := c.predecessorExist(transCtx, dag, predecessor)
+		if err != nil {
+			return false, err
+		}
+		if exist {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+func (c *notExistPrecondition) predecessorExist(transCtx *clusterTransformContext, dag *graph.DAG, name string) (bool, error) {
+	if transCtx.sharding(name) {
+		return c.shardingExist(transCtx, dag, name)
+	}
+	return c.compExist(transCtx, dag, name)
+}
+
+func (c *notExistPrecondition) compExist(transCtx *clusterTransformContext, dag *graph.DAG, name string) (bool, error) {
+	var (
+		compKey = types.NamespacedName{
+			Namespace: transCtx.Cluster.Namespace,
+			Name:      component.FullName(transCtx.Cluster.Name, name),
+		}
+	)
+	get := func() (bool, error) {
+		comp := &appsv1.Component{}
 		err := transCtx.Client.Get(transCtx.Context, compKey, comp)
 		if err != nil && !apierrors.IsNotFound(err) {
 			return false, err
 		}
 		return err == nil, nil
 	}
-	dagCreate := func(compKey types.NamespacedName) bool {
+	dagCreate := func() bool {
 		graphCli, _ := transCtx.Client.(model.GraphClient)
-		comp := &appsv1alpha1.Component{
+		comp := &appsv1.Component{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: compKey.Namespace,
 				Name:      compKey.Name,
@@ -420,180 +388,508 @@ func (c *compNotExistPrecondition) match(transCtx *clusterTransformContext, dag 
 		}
 		return graphCli.IsAction(dag, comp, model.ActionCreatePtr())
 	}
-	for _, predecessor := range predecessors(c.orders, compName) {
-		compKey := types.NamespacedName{
-			Namespace: transCtx.Cluster.Namespace,
-			Name:      component.FullName(transCtx.Cluster.Name, predecessor),
-		}
-		exist, err := get(compKey)
+
+	exist, err := get()
+	if err != nil {
+		return false, err
+	}
+	if exist {
+		return true, nil
+	}
+	if dagCreate() {
+		return true, nil
+	}
+	return false, nil
+}
+
+func (c *notExistPrecondition) shardingExist(transCtx *clusterTransformContext, dag *graph.DAG, name string) (bool, error) {
+	list := func() (bool, error) {
+		comps, err := ictrlutil.ListShardingComponents(transCtx.Context, transCtx.Client, transCtx.Cluster, name)
 		if err != nil {
 			return false, err
 		}
-		if exist {
-			return false, nil
-		}
-		if dagCreate(compKey) {
-			return false, nil
-		}
+		return len(comps) > 0, nil
 	}
-	return true, nil
-}
-
-type compPhasePrecondition struct {
-	orders           []string
-	phaseExpectation func(component2 *appsv1alpha1.Component) bool
-}
-
-func (c *compPhasePrecondition) match(transCtx *clusterTransformContext, dag *graph.DAG, compName string) (bool, error) {
-	dagGet := func(compKey types.NamespacedName) bool {
+	dagCreate := func() bool {
 		graphCli, _ := transCtx.Client.(model.GraphClient)
-		for _, obj := range graphCli.FindAll(dag, &appsv1alpha1.Component{}) {
-			if client.ObjectKeyFromObject(obj) == compKey {
+		for _, obj := range graphCli.FindAll(dag, &appsv1.Component{}) {
+			if shardingCompWithName(obj.(*appsv1.Component), name) &&
+				graphCli.IsAction(dag, obj, model.ActionCreatePtr()) {
 				return true
 			}
 		}
 		return false
 	}
-	for _, predecessor := range predecessors(c.orders, compName) {
-		comp := &appsv1alpha1.Component{}
-		compKey := types.NamespacedName{
-			Namespace: transCtx.Cluster.Namespace,
-			Name:      component.FullName(transCtx.Cluster.Name, predecessor),
+
+	exist, err := list()
+	if err != nil {
+		return false, err
+	}
+	if exist {
+		return true, nil
+	}
+	if dagCreate() {
+		return true, nil
+	}
+	return false, nil
+}
+
+type phasePrecondition struct {
+	topology appsv1.ClusterTopology
+	orders   []string
+}
+
+func (c *phasePrecondition) match(transCtx *clusterTransformContext, dag *graph.DAG, name string) (bool, error) {
+	for _, predecessor := range predecessors(c.topology, c.orders, name) {
+		match, err := c.predecessorMatch(transCtx, dag, predecessor)
+		if err != nil {
+			return false, err
 		}
-		if err := transCtx.Client.Get(transCtx.Context, compKey, comp); err != nil {
-			return false, client.IgnoreNotFound(err)
-		}
-		if comp.Generation != comp.Status.ObservedGeneration || !c.phaseExpectation(comp) {
-			return false, nil
-		}
-		// create or update if exists in DAG
-		if dagGet(compKey) {
+		if !match {
 			return false, nil
 		}
 	}
 	return true, nil
 }
 
-func predecessors(orders []string, compName string) []string {
+func (c *phasePrecondition) predecessorMatch(transCtx *clusterTransformContext, dag *graph.DAG, name string) (bool, error) {
+	if transCtx.sharding(name) {
+		return c.shardingMatch(transCtx, dag, name)
+	}
+	return c.compMatch(transCtx, dag, name)
+}
+
+func (c *phasePrecondition) compMatch(transCtx *clusterTransformContext, dag *graph.DAG, name string) (bool, error) {
+	var (
+		compKey = types.NamespacedName{
+			Namespace: transCtx.Cluster.Namespace,
+			Name:      component.FullName(transCtx.Cluster.Name, name),
+		}
+	)
+	dagGet := func() bool {
+		graphCli, _ := transCtx.Client.(model.GraphClient)
+		for _, obj := range graphCli.FindAll(dag, &appsv1.Component{}) {
+			if client.ObjectKeyFromObject(obj) == compKey {
+				return true // TODO: should check the action?
+			}
+		}
+		return false
+	}
+
+	comp := &appsv1.Component{}
+	if err := transCtx.Client.Get(transCtx.Context, compKey, comp); err != nil {
+		return false, client.IgnoreNotFound(err)
+	}
+	if !c.expected(comp) {
+		return false, nil
+	}
+	// create or update in DAG?
+	if dagGet() {
+		return false, nil
+	}
+	return true, nil
+}
+
+func (c *phasePrecondition) shardingMatch(transCtx *clusterTransformContext, dag *graph.DAG, name string) (bool, error) {
+	dagList := func() bool {
+		graphCli, _ := transCtx.Client.(model.GraphClient)
+		for _, obj := range graphCli.FindAll(dag, &appsv1.Component{}) {
+			if shardingCompWithName(obj.(*appsv1.Component), name) {
+				return true // TODO: should check the action?
+			}
+		}
+		return false
+	}
+
+	protoComps, ok := transCtx.shardingComps[name]
+	if !ok {
+		return false, fmt.Errorf("cluster sharding %s not found", name)
+	}
+
+	comps, err := ictrlutil.ListShardingComponents(transCtx.Context, transCtx.Client, transCtx.Cluster, name)
+	if err != nil {
+		return false, err
+	}
+	if len(comps) != len(protoComps) {
+		return false, nil
+	}
+	for _, comp := range comps {
+		if !c.expected(&comp) {
+			return false, nil
+		}
+	}
+	// create or update in DAG?
+	if dagList() {
+		return false, nil
+	}
+	return true, nil
+}
+
+func (c *phasePrecondition) expected(comp *appsv1.Component) bool {
+	if comp.Generation == comp.Status.ObservedGeneration {
+		expect := appsv1.RunningClusterCompPhase
+		if comp.Spec.Stop != nil && *comp.Spec.Stop {
+			expect = appsv1.StoppedClusterCompPhase
+		}
+		return comp.Status.Phase == expect
+	}
+	return false
+}
+
+type clusterCompNShardingHandler struct {
+	op      int
+	scaleIn *bool
+}
+
+func (h *clusterCompNShardingHandler) handle(transCtx *clusterTransformContext, dag *graph.DAG, name string) error {
+	if transCtx.sharding(name) {
+		handler := &clusterShardingHandler{scaleIn: h.scaleIn}
+		switch h.op {
+		case createOp:
+			return handler.create(transCtx, dag, name)
+		case deleteOp:
+			return handler.delete(transCtx, dag, name)
+		default:
+			return handler.update(transCtx, dag, name)
+		}
+	} else {
+		handler := &clusterComponentHandler{}
+		switch h.op {
+		case createOp:
+			return handler.create(transCtx, dag, name)
+		case deleteOp:
+			return handler.delete(transCtx, dag, name)
+		default:
+			return handler.update(transCtx, dag, name)
+		}
+	}
+}
+
+func predecessors(topology appsv1.ClusterTopology, orders []string, name string) []string {
 	var previous []string
-	for _, comps := range orders {
-		compNames := strings.Split(comps, ",")
-		if index := slices.Index(compNames, compName); index >= 0 {
+	for _, order := range orders {
+		entities := strings.Split(order, ",")
+		if slices.ContainsFunc(entities, func(e string) bool {
+			return clusterTopologyEntityMatched(topology, e, name)
+		}) {
 			return previous
 		}
-		previous = compNames
+		previous = entities
 	}
-	panic("runtime error: cannot find predecessor for component " + compName)
+	panic("runtime error: cannot find predecessor for component or sharding " + name)
 }
 
-type createCompHandler struct {
-	compSpecs   map[string]*appsv1alpha1.ClusterComponentSpec
-	labels      map[string]map[string]string
-	annotations map[string]map[string]string
+func clusterTopologyEntityMatched(topology appsv1.ClusterTopology, entityName, name string) bool {
+	for _, sharding := range topology.Shardings {
+		if sharding.Name == entityName {
+			return entityName == name // full match for sharding
+		}
+	}
+	for _, comp := range topology.Components {
+		if comp.Name == entityName {
+			return clusterTopologyCompMatched(comp, name)
+		}
+	}
+	return false // TODO: runtime error
 }
 
-func (h *createCompHandler) handle(transCtx *clusterTransformContext, dag *graph.DAG, compName string) error {
-	cluster := transCtx.Cluster
-	graphCli, _ := transCtx.Client.(model.GraphClient)
-	comp, err := component.BuildComponent(cluster, h.compSpecs[compName], h.labels[compName], h.annotations[compName])
+type clusterParallelHandler struct {
+	clusterParallelOrder
+	dummyPrecondition
+	clusterCompNShardingHandler
+}
+
+type orderedCreateNUpdateHandler struct {
+	clusterOrderedOrder
+	phasePrecondition
+	clusterCompNShardingHandler
+}
+
+type orderedDeleteHandler struct {
+	clusterOrderedOrder
+	notExistPrecondition
+	clusterCompNShardingHandler
+}
+
+func setDiff(s1, s2 sets.Set[string]) (sets.Set[string], sets.Set[string], sets.Set[string]) {
+	return s2.Difference(s1), s1.Difference(s2), s1.Intersection(s2)
+}
+
+func mapDiff[T interface{}](m1, m2 map[string]T) (sets.Set[string], sets.Set[string], sets.Set[string]) {
+	s1, s2 := sets.KeySet(m1), sets.KeySet(m2)
+	return setDiff(s1, s2)
+}
+
+type clusterComponentHandler struct{}
+
+func (h *clusterComponentHandler) create(transCtx *clusterTransformContext, dag *graph.DAG, name string) error {
+	proto, err := h.protoComp(transCtx, name)
 	if err != nil {
 		return err
 	}
-	graphCli.Create(dag, comp)
-	h.initClusterCompStatus(cluster, compName)
+	graphCli, _ := transCtx.Client.(model.GraphClient)
+	graphCli.Create(dag, proto)
+
+	// initClusterCompNShardingStatus(transCtx, name)
+
 	return nil
 }
 
-func (h *createCompHandler) initClusterCompStatus(cluster *appsv1alpha1.Cluster, compName string) {
-	if cluster.Status.Components == nil {
-		cluster.Status.Components = make(map[string]appsv1alpha1.ClusterComponentStatus)
-	}
-	cluster.Status.Components[compName] = appsv1alpha1.ClusterComponentStatus{}
-}
-
-type deleteCompHandler struct {
-	terminate bool // vs scale-in
-}
-
-func (h *deleteCompHandler) handle(transCtx *clusterTransformContext, dag *graph.DAG, compName string) error {
-	cluster := transCtx.Cluster
-	graphCli, _ := transCtx.Client.(model.GraphClient)
-	comp, err := getRunningCompObject(transCtx, cluster, compName)
+func (h *clusterComponentHandler) delete(transCtx *clusterTransformContext, dag *graph.DAG, name string) error {
+	comp, err := h.runningComp(transCtx, name)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
 	if apierrors.IsNotFound(err) || model.IsObjectDeleting(comp) {
 		return nil
 	}
+
 	transCtx.Logger.Info(fmt.Sprintf("deleting component %s", comp.Name))
-	deleteCompVertex := graphCli.Do(dag, nil, comp, model.ActionDeletePtr(), nil)
-	if !h.terminate { // scale-in
-		compCopy := comp.DeepCopy()
-		if comp.Annotations == nil {
-			comp.Annotations = make(map[string]string)
-		}
-		// update the scale-in annotation to component before deleting
-		comp.Annotations[constant.ComponentScaleInAnnotationKey] = trueVal
-		graphCli.Do(dag, compCopy, comp, model.ActionUpdatePtr(), deleteCompVertex)
-	}
-	return nil
-}
-
-type updateCompHandler struct {
-	compSpecs   map[string]*appsv1alpha1.ClusterComponentSpec
-	labels      map[string]map[string]string
-	annotations map[string]map[string]string
-}
-
-func (h *updateCompHandler) handle(transCtx *clusterTransformContext, dag *graph.DAG, compName string) error {
-	cluster := transCtx.Cluster
 	graphCli, _ := transCtx.Client.(model.GraphClient)
-	runningComp, getErr := getRunningCompObject(transCtx, cluster, compName)
-	if getErr != nil {
-		return getErr
+	graphCli.Delete(dag, comp)
+
+	return nil
+}
+
+func (h *clusterComponentHandler) update(transCtx *clusterTransformContext, dag *graph.DAG, name string) error {
+	running, err1 := h.runningComp(transCtx, name)
+	if err1 != nil {
+		return err1
 	}
-	comp, buildErr := component.BuildComponent(cluster, h.compSpecs[compName], h.labels[compName], h.annotations[compName])
-	if buildErr != nil {
-		return buildErr
+	proto, err2 := h.protoComp(transCtx, name)
+	if err2 != nil {
+		return err2
 	}
-	if newCompObj := copyAndMergeComponent(runningComp, comp); newCompObj != nil {
-		graphCli.Update(dag, runningComp, newCompObj)
+
+	if obj := copyAndMergeComponent(running, proto); obj != nil {
+		graphCli, _ := transCtx.Client.(model.GraphClient)
+		graphCli.Update(dag, running, obj)
 	}
 	return nil
 }
 
-type parallelCreateCompHandler struct {
-	compParallelOrder
-	compDummyPrecondition
-	createCompHandler
+func (h *clusterComponentHandler) runningComp(transCtx *clusterTransformContext, name string) (*appsv1.Component, error) {
+	compKey := types.NamespacedName{
+		Namespace: transCtx.Cluster.Namespace,
+		Name:      component.FullName(transCtx.Cluster.Name, name),
+	}
+	comp := &appsv1.Component{}
+	if err := transCtx.Client.Get(transCtx.Context, compKey, comp); err != nil {
+		return nil, err
+	}
+	return comp, nil
 }
 
-type parallelDeleteCompHandler struct {
-	compParallelOrder
-	compDummyPrecondition
-	deleteCompHandler
+func (h *clusterComponentHandler) protoComp(transCtx *clusterTransformContext, name string) (*appsv1.Component, error) {
+	for _, comp := range transCtx.components {
+		if comp.Name == name {
+			return component.BuildComponent(transCtx.Cluster, comp, nil, nil)
+		}
+	}
+	return nil, fmt.Errorf("cluster component %s not found", name)
 }
 
-type parallelUpdateCompHandler struct {
-	compParallelOrder
-	compDummyPrecondition
-	updateCompHandler
+type clusterShardingHandler struct {
+	scaleIn *bool
 }
 
-type orderedCreateCompHandler struct {
-	compOrderedOrder
-	compPhasePrecondition
-	createCompHandler
+func (h *clusterShardingHandler) create(transCtx *clusterTransformContext, dag *graph.DAG, name string) error {
+	protoComps, err := h.protoComps(transCtx, name)
+	if err != nil {
+		return err
+	}
+	graphCli, _ := transCtx.Client.(model.GraphClient)
+	for i := range protoComps {
+		graphCli.Create(dag, protoComps[i])
+	}
+
+	// initClusterCompNShardingStatus(transCtx, name)
+
+	// TODO:
+	//  1. sharding post-provision
+	//  2. provision strategy
+
+	return nil
 }
 
-type orderedDeleteCompHandler struct {
-	compOrderedOrder
-	compNotExistPrecondition
-	deleteCompHandler
+func (h *clusterShardingHandler) delete(transCtx *clusterTransformContext, dag *graph.DAG, name string) error {
+	runningComps, err := ictrlutil.ListShardingComponents(transCtx.Context, transCtx.Client, transCtx.Cluster, name)
+	if err != nil {
+		return err
+	}
+
+	// TODO: sharding pre-terminate
+
+	graphCli, _ := transCtx.Client.(model.GraphClient)
+	for i := range runningComps {
+		h.deleteComp(transCtx, graphCli, dag, &runningComps[i], nil)
+	}
+
+	return nil
 }
 
-type orderedUpdateCompHandler struct {
-	compOrderedOrder
-	compPhasePrecondition
-	updateCompHandler
+func (h *clusterShardingHandler) deleteComp(transCtx *clusterTransformContext,
+	graphCli model.GraphClient, dag *graph.DAG, comp *appsv1.Component, scaleIn *bool) {
+	if !model.IsObjectDeleting(comp) {
+		transCtx.Logger.Info(fmt.Sprintf("deleting sharding component %s", comp.Name))
+
+		vertex := graphCli.Do(dag, nil, comp, model.ActionDeletePtr(), nil)
+		if scaleIn != nil && *scaleIn {
+			compCopy := comp.DeepCopy()
+			if comp.Annotations == nil {
+				compCopy.Annotations = make(map[string]string)
+			}
+			compCopy.Annotations[constant.ComponentScaleInAnnotationKey] = trueVal
+			graphCli.Do(dag, compCopy, comp, model.ActionUpdatePtr(), vertex)
+		}
+	}
+}
+
+func (h *clusterShardingHandler) update(transCtx *clusterTransformContext, dag *graph.DAG, name string) error {
+	runningComps, err1 := ictrlutil.ListShardingComponents(transCtx.Context, transCtx.Client, transCtx.Cluster, name)
+	if err1 != nil {
+		return err1
+	}
+
+	runningCompsMap := make(map[string]*appsv1.Component)
+	for i, comp := range runningComps {
+		runningCompsMap[comp.Name] = &runningComps[i]
+	}
+
+	protoComps, err2 := h.protoComps(transCtx, name)
+	if err2 != nil {
+		return err2
+	}
+	protoCompsMap := make(map[string]*appsv1.Component)
+	for i, comp := range protoComps {
+		protoCompsMap[comp.Name] = protoComps[i]
+	}
+
+	toCreate, toDelete, toUpdate := mapDiff(runningCompsMap, protoCompsMap)
+
+	// TODO: update strategy
+
+	h.deleteComps(transCtx, dag, runningCompsMap, toDelete)
+	h.updateComps(transCtx, dag, runningCompsMap, protoCompsMap, toUpdate)
+	h.createComps(transCtx, dag, protoCompsMap, toCreate)
+
+	return nil
+}
+
+func (h *clusterShardingHandler) createComps(transCtx *clusterTransformContext, dag *graph.DAG,
+	protoComps map[string]*appsv1.Component, createSet sets.Set[string]) {
+	graphCli, _ := transCtx.Client.(model.GraphClient)
+	for name := range createSet {
+		graphCli.Create(dag, protoComps[name])
+		// TODO: shard post-provision
+	}
+}
+
+func (h *clusterShardingHandler) deleteComps(transCtx *clusterTransformContext, dag *graph.DAG,
+	runningComps map[string]*appsv1.Component, deleteSet sets.Set[string]) {
+	graphCli, _ := transCtx.Client.(model.GraphClient)
+	for name := range deleteSet {
+		// TODO: shard pre-terminate
+		h.deleteComp(transCtx, graphCli, dag, runningComps[name], h.scaleIn)
+	}
+}
+
+func (h *clusterShardingHandler) updateComps(transCtx *clusterTransformContext, dag *graph.DAG,
+	runningComps map[string]*appsv1.Component, protoComps map[string]*appsv1.Component, updateSet sets.Set[string]) {
+	graphCli, _ := transCtx.Client.(model.GraphClient)
+	for name := range updateSet {
+		running, proto := runningComps[name], protoComps[name]
+		if obj := copyAndMergeComponent(running, proto); obj != nil {
+			graphCli.Update(dag, running, obj)
+		}
+	}
+}
+
+func (h *clusterShardingHandler) protoComps(transCtx *clusterTransformContext, name string) ([]*appsv1.Component, error) {
+	build := func(sharding *appsv1.ClusterSharding) ([]*appsv1.Component, error) {
+		labels := map[string]string{
+			constant.KBAppShardingNameLabelKey: sharding.Name,
+		}
+		if len(sharding.ShardingDef) > 0 {
+			labels[constant.ShardingDefLabelKey] = sharding.ShardingDef
+		}
+
+		objs := make([]*appsv1.Component, 0)
+
+		shardingComps := transCtx.shardingComps[sharding.Name]
+		for i := range shardingComps {
+			spec := shardingComps[i]
+			var annotations map[string]string
+			if transCtx.annotations != nil {
+				annotations = transCtx.annotations[spec.Name]
+			}
+			obj, err := component.BuildComponent(transCtx.Cluster, spec, labels, annotations)
+			if err != nil {
+				return nil, err
+			}
+			objs = append(objs, obj)
+		}
+		return objs, nil
+	}
+
+	for _, sharding := range transCtx.shardings {
+		if sharding.Name == name {
+			return build(sharding)
+		}
+	}
+	return nil, fmt.Errorf("cluster sharding %s not found", name)
+}
+
+// func initClusterCompNShardingStatus(transCtx *clusterTransformContext, name string) {
+//	var (
+//		cluster = transCtx.Cluster
+//	)
+//	m := &cluster.Status.Components
+//	if transCtx.sharding(name) {
+//		m = &cluster.Status.Shardings
+//	}
+//	if *m == nil {
+//		*m = make(map[string]appsv1.ClusterComponentStatus)
+//	}
+//	(*m)[name] = appsv1.ClusterComponentStatus{}
+// }
+
+func clusterRunningCompNShardingSet(ctx context.Context, cli client.Reader, cluster *appsv1.Cluster) (sets.Set[string], error) {
+	compList := &appsv1.ComponentList{}
+	ml := client.MatchingLabels{constant.AppInstanceLabelKey: cluster.Name}
+	if err := cli.List(ctx, compList, client.InNamespace(cluster.Namespace), ml); err != nil {
+		return nil, err
+	}
+
+	names := sets.Set[string]{}
+	for _, comp := range compList.Items {
+		if shardingName := shardingCompNName(&comp); len(shardingName) > 0 {
+			names.Insert(shardingName)
+		} else {
+			name, err := component.ShortName(cluster.Name, comp.Name)
+			if err != nil {
+				return nil, err
+			}
+			names.Insert(name)
+		}
+	}
+	return names, nil
+}
+
+func shardingCompWithName(comp *appsv1.Component, shardingName string) bool {
+	if comp == nil || comp.Labels == nil {
+		return false
+	}
+	name, ok := comp.Labels[constant.KBAppShardingNameLabelKey]
+	return ok && name == shardingName
+}
+
+func shardingCompNName(comp *appsv1.Component) string {
+	if comp != nil && comp.Labels != nil {
+		name, ok := comp.Labels[constant.KBAppShardingNameLabelKey]
+		if ok {
+			return name
+		}
+	}
+	return ""
 }

@@ -32,7 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
@@ -66,7 +66,7 @@ import (
 // +kubebuilder:rbac:groups=core,resources=pods/exec,verbs=create
 
 // dataprotection get list and delete
-// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=backuppolicytemplates,verbs=get;list
+// +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backuppolicytemplates,verbs=get;list
 // +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backuppolicies,verbs=get;list;create;update;patch;delete;deletecollection
 // +kubebuilder:rbac:groups=dataprotection.kubeblocks.io,resources=backups,verbs=get;list;delete;deletecollection
 
@@ -127,18 +127,16 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// TODO: transformers are vertices, theirs' dependencies are edges, make plan Build stage a DAG.
 	plan, errBuild := planBuilder.
 		AddTransformer(
-			// handle cluster halt first
-			&clusterHaltTransformer{},
 			// handle cluster deletion
 			&clusterDeletionTransformer{},
-			// check is recovering from halted cluster
-			&clusterHaltRecoveryTransformer{},
-			// update finalizer and cd&cv labels
-			&clusterAssureMetaTransformer{},
-			// validate cd & cv's existence and availability
-			&clusterLoadRefResourcesTransformer{},
-			// normalize the cluster and component API
-			&ClusterAPINormalizationTransformer{},
+			// update finalizer and definition labels
+			&clusterMetaTransformer{},
+			// validate the cluster spec
+			&clusterValidationTransformer{},
+			// handle cluster shared account
+			&clusterShardingAccountTransformer{},
+			// normalize the cluster spec
+			&clusterNormalizationTransformer{},
 			// placement replicas across data-plane k8s clusters
 			&clusterPlacementTransformer{multiClusterMgr: r.MultiClusterMgr},
 			// handle cluster services
@@ -153,8 +151,6 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			&clusterBackupPolicyTransformer{},
 			// add our finalizer to all objects
 			&clusterOwnershipTransformer{},
-			// make all workload objects depending on credential secret
-			&clusterSecretTransformer{},
 			// update cluster status
 			&clusterStatusTransformer{},
 			// always safe to put your transformer below
@@ -176,13 +172,13 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 // SetupWithManager sets up the controller with the Manager.
 func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return intctrlutil.NewNamespacedControllerManagedBy(mgr).
-		For(&appsv1alpha1.Cluster{}).
+		For(&appsv1.Cluster{}).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: int(math.Ceil(viper.GetFloat64(constant.CfgKBReconcileWorkers) / 4)),
 		}).
-		Owns(&appsv1alpha1.Component{}).
+		Owns(&appsv1.Component{}).
 		Owns(&corev1.Service{}). // cluster services
-		Owns(&corev1.Secret{}).  // cluster conn-credential secret
+		Owns(&corev1.Secret{}).  // sharding account secret
 		Owns(&dpv1alpha1.BackupPolicy{}).
 		Owns(&dpv1alpha1.BackupSchedule{}).
 		Complete(r)

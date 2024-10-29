@@ -29,11 +29,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 )
 
 // Object a generic representation of various resource object types
@@ -68,10 +70,6 @@ var PersistentVolumeSignature = func(_ corev1.PersistentVolume, _ *corev1.Persis
 var PodSignature = func(_ corev1.Pod, _ *corev1.Pod, _ corev1.PodList, _ *corev1.PodList) {}
 var EventSignature = func(_ corev1.Event, _ *corev1.Event, _ corev1.EventList, _ *corev1.EventList) {}
 var ConfigMapSignature = func(_ corev1.ConfigMap, _ *corev1.ConfigMap, _ corev1.ConfigMapList, _ *corev1.ConfigMapList) {}
-var EndpointsSignature = func(_ corev1.Endpoints, _ *corev1.Endpoints, _ corev1.EndpointsList, _ *corev1.EndpointsList) {}
-
-var InstanceSetSignature = func(_ workloads.InstanceSet, _ *workloads.InstanceSet, _ workloads.InstanceSetList, _ *workloads.InstanceSetList) {
-}
 
 var JobSignature = func(_ batchv1.Job, _ *batchv1.Job, _ batchv1.JobList, _ *batchv1.JobList) {}
 var CronJobSignature = func(_ batchv1.CronJob, _ *batchv1.CronJob, _ batchv1.CronJobList, _ *batchv1.CronJobList) {}
@@ -86,24 +84,30 @@ var VolumeSnapshotSignature = func(_ snapshotv1.VolumeSnapshot, _ *snapshotv1.Vo
 var VolumeSnapshotClassSignature = func(_ snapshotv1.VolumeSnapshotClass, _ *snapshotv1.VolumeSnapshotClass, _ snapshotv1.VolumeSnapshotClassList, _ *snapshotv1.VolumeSnapshotClassList) {
 }
 
-var ClusterSignature = func(_ appsv1alpha1.Cluster, _ *appsv1alpha1.Cluster, _ appsv1alpha1.ClusterList, _ *appsv1alpha1.ClusterList) {
+var ClusterDefinitionSignature = func(_ appsv1.ClusterDefinition, _ *appsv1.ClusterDefinition, _ appsv1.ClusterDefinitionList, _ *appsv1.ClusterDefinitionList) {
 }
-var ClusterDefinitionSignature = func(_ appsv1alpha1.ClusterDefinition, _ *appsv1alpha1.ClusterDefinition, _ appsv1alpha1.ClusterDefinitionList, _ *appsv1alpha1.ClusterDefinitionList) {
+var ShardingDefinitionSignature = func(appsv1.ShardingDefinition, *appsv1.ShardingDefinition, appsv1.ShardingDefinitionList, *appsv1.ShardingDefinitionList) {
 }
-var ComponentSignature = func(appsv1alpha1.Component, *appsv1alpha1.Component, appsv1alpha1.ComponentList, *appsv1alpha1.ComponentList) {
+var ComponentDefinitionSignature = func(appsv1.ComponentDefinition, *appsv1.ComponentDefinition, appsv1.ComponentDefinitionList, *appsv1.ComponentDefinitionList) {
 }
-var ComponentDefinitionSignature = func(appsv1alpha1.ComponentDefinition, *appsv1alpha1.ComponentDefinition, appsv1alpha1.ComponentDefinitionList, *appsv1alpha1.ComponentDefinitionList) {
+var ComponentVersionSignature = func(appsv1.ComponentVersion, *appsv1.ComponentVersion, appsv1.ComponentVersionList, *appsv1.ComponentVersionList) {
 }
-var ComponentVersionSignature = func(appsv1alpha1.ComponentVersion, *appsv1alpha1.ComponentVersion, appsv1alpha1.ComponentVersionList, *appsv1alpha1.ComponentVersionList) {
+var ClusterSignature = func(_ appsv1.Cluster, _ *appsv1.Cluster, _ appsv1.ClusterList, _ *appsv1.ClusterList) {
 }
-var OpsDefinitionSignature = func(_ appsv1alpha1.OpsDefinition, _ *appsv1alpha1.OpsDefinition, _ appsv1alpha1.OpsDefinitionList, _ *appsv1alpha1.OpsDefinitionList) {
+var ComponentSignature = func(appsv1.Component, *appsv1.Component, appsv1.ComponentList, *appsv1.ComponentList) {
 }
-var OpsRequestSignature = func(_ appsv1alpha1.OpsRequest, _ *appsv1alpha1.OpsRequest, _ appsv1alpha1.OpsRequestList, _ *appsv1alpha1.OpsRequestList) {
+var InstanceSetSignature = func(_ workloads.InstanceSet, _ *workloads.InstanceSet, _ workloads.InstanceSetList, _ *workloads.InstanceSetList) {
+}
+var OpsDefinitionSignature = func(_ opsv1alpha1.OpsDefinition, _ *opsv1alpha1.OpsDefinition, _ opsv1alpha1.OpsDefinitionList, _ *opsv1alpha1.OpsDefinitionList) {
+}
+var OpsRequestSignature = func(_ opsv1alpha1.OpsRequest, _ *opsv1alpha1.OpsRequest, _ opsv1alpha1.OpsRequestList, _ *opsv1alpha1.OpsRequestList) {
 }
 var ConfigConstraintSignature = func(_ appsv1beta1.ConfigConstraint, _ *appsv1beta1.ConfigConstraint, _ appsv1beta1.ConfigConstraintList, _ *appsv1beta1.ConfigConstraintList) {
 }
+var ConfigurationSignature = func(_ appsv1alpha1.Configuration, _ *appsv1alpha1.Configuration, _ appsv1alpha1.ConfigurationList, _ *appsv1alpha1.ConfigurationList) {
+}
 
-var BackupPolicyTemplateSignature = func(_ appsv1alpha1.BackupPolicyTemplate, _ *appsv1alpha1.BackupPolicyTemplate, _ appsv1alpha1.BackupPolicyTemplateList, _ *appsv1alpha1.BackupPolicyTemplateList) {
+var BackupPolicyTemplateSignature = func(_ dpv1alpha1.BackupPolicyTemplate, _ *dpv1alpha1.BackupPolicyTemplate, _ dpv1alpha1.BackupPolicyTemplateList, _ *dpv1alpha1.BackupPolicyTemplateList) {
 }
 var BackupPolicySignature = func(_ dpv1alpha1.BackupPolicy, _ *dpv1alpha1.BackupPolicy, _ dpv1alpha1.BackupPolicyList, _ *dpv1alpha1.BackupPolicyList) {
 }
@@ -117,17 +121,10 @@ var ActionSetSignature = func(_ dpv1alpha1.ActionSet, _ *dpv1alpha1.ActionSet, _
 }
 var BackupRepoSignature = func(_ dpv1alpha1.BackupRepo, _ *dpv1alpha1.BackupRepo, _ dpv1alpha1.BackupRepoList, _ *dpv1alpha1.BackupRepoList) {
 }
-
-var AddonSignature = func(_ extensionsv1alpha1.Addon, _ *extensionsv1alpha1.Addon, _ extensionsv1alpha1.AddonList, _ *extensionsv1alpha1.AddonList) {
-}
-
 var StorageProviderSignature = func(_ dpv1alpha1.StorageProvider, _ *dpv1alpha1.StorageProvider, _ dpv1alpha1.StorageProviderList, _ *dpv1alpha1.StorageProviderList) {
 }
 
-var ConfigurationSignature = func(_ appsv1alpha1.Configuration, _ *appsv1alpha1.Configuration, _ appsv1alpha1.ConfigurationList, _ *appsv1alpha1.ConfigurationList) {
-}
-
-var ServiceDescriptorSignature = func(_ appsv1alpha1.ServiceDescriptor, _ *appsv1alpha1.ServiceDescriptor, _ appsv1alpha1.ServiceDescriptorList, _ *appsv1alpha1.ServiceDescriptorList) {
+var AddonSignature = func(_ extensionsv1alpha1.Addon, _ *extensionsv1alpha1.Addon, _ extensionsv1alpha1.AddonList, _ *extensionsv1alpha1.AddonList) {
 }
 
 func ToGVK(object client.Object) schema.GroupVersionKind {

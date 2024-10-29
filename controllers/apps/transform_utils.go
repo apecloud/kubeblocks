@@ -21,26 +21,18 @@ package apps
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
 	"reflect"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/graph"
-	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -62,7 +54,7 @@ func getGVKName(object client.Object, scheme *runtime.Scheme) (*gvkNObjKey, erro
 	}, nil
 }
 
-func getAppInstanceML(cluster appsv1alpha1.Cluster) client.MatchingLabels {
+func getAppInstanceML(cluster appsv1.Cluster) client.MatchingLabels {
 	return client.MatchingLabels{
 		constant.AppInstanceLabelKey: cluster.Name,
 	}
@@ -92,10 +84,6 @@ func getOwningObjectsWithOptions(ctx context.Context,
 	objs := make(owningObjects)
 	for _, list := range kinds {
 		if err := cli.List(ctx, list, opts...); err != nil {
-			// check for policy/v1 discovery error, to support k8s clusters before 1.21.
-			if isPolicyV1DiscoveryNotFoundError(err) {
-				continue
-			}
 			return nil, err
 		}
 		// reflect get list.Items
@@ -151,7 +139,7 @@ func isResourceEqual(a, b corev1.ResourceList) bool {
 	return true
 }
 
-func isVolumeClaimTemplatesEqual(a, b []appsv1alpha1.ClusterComponentVolumeClaimTemplate) bool {
+func isVolumeClaimTemplatesEqual(a, b []appsv1.ClusterComponentVolumeClaimTemplate) bool {
 	if len(a) != len(b) {
 		return false
 	}
@@ -174,79 +162,10 @@ func isVolumeClaimTemplatesEqual(a, b []appsv1alpha1.ClusterComponentVolumeClaim
 	return true
 }
 
-// isPolicyV1DiscoveryNotFoundError checks whether the @err is an error of type ErrGroupDiscoveryFailed for policy/v1 resource.
-func isPolicyV1DiscoveryNotFoundError(err error) bool {
-	wrappedErr := errors.Unwrap(err)
-	if wrappedErr != nil {
-		err = wrappedErr
-	}
-	if !discovery.IsGroupDiscoveryFailedError(err) {
-		return false
-	}
-	discoveryErr, _ := err.(*discovery.ErrGroupDiscoveryFailed)
-	statusErr := discoveryErr.Groups[schema.GroupVersion{Group: "policy", Version: "v1"}]
-	if statusErr == nil {
-		return false
-	}
-	return apierrors.IsNotFound(statusErr)
-}
-
-func preserveObjects[T client.Object](ctx context.Context, cli client.Reader, graphCli model.GraphClient, dag *graph.DAG,
-	obj T, ml client.MatchingLabels, toPreserveKinds []client.ObjectList, finalizerName string, lastApplyAnnotationKey string) error {
-	if len(toPreserveKinds) == 0 {
-		return nil
-	}
-
-	objs, err := getOwningNamespacedObjects(ctx, cli, obj.GetNamespace(), ml, toPreserveKinds)
-	if err != nil {
-		return err
-	}
-
-	objSpec := obj.DeepCopyObject().(client.Object)
-	objSpec.SetNamespace("")
-	objSpec.SetName(obj.GetName())
-	objSpec.SetUID(obj.GetUID())
-	objSpec.SetResourceVersion("")
-	objSpec.SetGeneration(0)
-	objSpec.SetManagedFields(nil)
-
-	b, err := json.Marshal(objSpec)
-	if err != nil {
-		return err
-	}
-	objJSON := string(b)
-
-	for _, o := range objs {
-		origObj := o.DeepCopyObject().(client.Object)
-		controllerutil.RemoveFinalizer(o, finalizerName)
-		removeOwnerRefOfType(o, obj.GetObjectKind().GroupVersionKind())
-
-		annot := o.GetAnnotations()
-		if annot == nil {
-			annot = make(map[string]string)
-		}
-		annot[lastApplyAnnotationKey] = objJSON
-		o.SetAnnotations(annot)
-		graphCli.Update(dag, origObj, o)
-	}
-	return nil
-}
-
-func removeOwnerRefOfType(obj client.Object, gvk schema.GroupVersionKind) {
-	ownerRefs := obj.GetOwnerReferences()
-	for i, ref := range ownerRefs {
-		if ref.Kind == gvk.Kind && ref.APIVersion == gvk.GroupVersion().String() {
-			ownerRefs = append(ownerRefs[:i], ownerRefs[i+1:]...)
-			break
-		}
-	}
-	obj.SetOwnerReferences(ownerRefs)
-}
-
 // isOwnedByComp is used to judge if the obj is owned by Component.
 func isOwnedByComp(obj client.Object) bool {
 	for _, ref := range obj.GetOwnerReferences() {
-		if ref.Kind == appsv1alpha1.ComponentKind && ref.Controller != nil && *ref.Controller {
+		if ref.Kind == appsv1.ComponentKind && ref.Controller != nil && *ref.Controller {
 			return true
 		}
 	}

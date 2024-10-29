@@ -31,7 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/integer"
 
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
@@ -131,7 +131,7 @@ func IsInstanceSetReady(its *workloads.InstanceSet) bool {
 	}
 
 	// check whether role probe has done
-	if its.Spec.Roles == nil || its.Spec.RoleProbe == nil {
+	if len(its.Spec.Roles) == 0 && its.Spec.RoleProbe == nil {
 		return true
 	}
 	membersStatus := its.Status.MembersStatus
@@ -189,10 +189,6 @@ func ParseAnnotationsOfScope(scope AnnotationScope, scopedAnnotations map[string
 	return annotations
 }
 
-func GetEnvConfigMapName(itsName string) string {
-	return fmt.Sprintf("%s-rsm-env", itsName)
-}
-
 func composeRoleMap(its workloads.InstanceSet) map[string]workloads.ReplicaRole {
 	roleMap := make(map[string]workloads.ReplicaRole)
 	for _, role := range its.Spec.Roles {
@@ -215,8 +211,9 @@ func mergeMap[K comparable, V any](src, dst *map[K]V) {
 
 func getMatchLabels(name string) map[string]string {
 	return map[string]string{
-		WorkloadsManagedByLabelKey: workloads.Kind,
-		WorkloadsInstanceLabelKey:  name,
+		constant.AppManagedByLabelKey: constant.AppName,
+		WorkloadsManagedByLabelKey:    workloads.Kind,
+		WorkloadsInstanceLabelKey:     name,
 	}
 }
 

@@ -31,6 +31,7 @@ import (
 	"github.com/fsnotify/fsnotify"
 	"github.com/pkg/errors"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
@@ -451,8 +452,8 @@ func createDownwardHandler(meta *ConfigSpecInfo) (map[string]ConfigHandler, erro
 
 	handlers := make(map[string]ConfigHandler)
 	for _, field := range meta.DownwardAPIOptions {
-		mockConfigSpec := &ConfigSpecInfo{ConfigSpec: appsv1alpha1.ComponentConfigSpec{
-			ComponentTemplateSpec: appsv1alpha1.ComponentTemplateSpec{
+		mockConfigSpec := &ConfigSpecInfo{ConfigSpec: appsv1.ComponentConfigSpec{
+			ComponentTemplateSpec: appsv1.ComponentTemplateSpec{
 				Name:       strings.Join([]string{meta.ConfigSpec.Name, field.Name}, "."),
 				VolumeName: field.MountPoint,
 			}}}

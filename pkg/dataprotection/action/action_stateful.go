@@ -91,6 +91,7 @@ func (s *StatefulSetAction) Execute(ctx ActionContext) (actionStatus *dpv1alpha1
 			StartTimestamp: &metav1.Time{Time: time.Now()},
 		}, nil
 	}
+	sts.Spec.Replicas = s.Replicas
 	sts.Spec.Template.Spec = *s.PodSpec
 
 	// update the statefulSet

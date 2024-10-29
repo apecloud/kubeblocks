@@ -23,7 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
@@ -52,22 +52,22 @@ func (c *clusterRestoreTransformer) Transform(ctx graph.TransformContext, dag *g
 
 	// when restoring a sharded cluster, it is essential to specify the 'sourceTarget' from which data should be restored for each sharded component.
 	// to achieve this, we allocate the source target for each component using annotations.
-	for i := range c.Cluster.Spec.ShardingSpecs {
-		shardingSpec := c.Cluster.Spec.ShardingSpecs[i]
-		backupSource, ok := backupMap[shardingSpec.Name]
+	for i := range c.Cluster.Spec.Shardings {
+		spec := c.Cluster.Spec.Shardings[i]
+		backupSource, ok := backupMap[spec.Name]
 		if !ok {
 			continue
 		}
-		backup, err := plan.GetBackupFromClusterAnnotation(c.Context, c.Client, backupSource, shardingSpec.Name, c.Cluster.Namespace)
+		backup, err := plan.GetBackupFromClusterAnnotation(c.Context, c.Client, backupSource, spec.Name, c.Cluster.Namespace)
 		if err != nil {
 			return err
 		}
-		if len(backup.Status.Targets) > int(shardingSpec.Shards) {
+		if len(backup.Status.Targets) > int(spec.Shards) {
 			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRestoreFailed,
 				`the source targets count of the backup "%s" must be equal to or greater than the count of the shard components "%s"`,
-				backup.Name, shardingSpec.Name)
+				backup.Name, spec.Name)
 		}
-		shardComponents, err := intctrlutil.ListShardingComponents(c.Context, c.Client, c.Cluster, shardingSpec.Name)
+		shardComponents, err := intctrlutil.ListShardingComponents(c.Context, c.Client, c.Cluster, spec.Name)
 		if err != nil {
 			return err
 		}
@@ -84,12 +84,12 @@ func (c *clusterRestoreTransformer) Transform(ctx graph.TransformContext, dag *g
 			if targetName, ok := v.Annotations[constant.BackupSourceTargetAnnotationKey]; ok {
 				compName := v.Labels[constant.KBAppComponentLabelKey]
 				allocateTargetMap[targetName] = compName
-				c.Annotations[compName][constant.BackupSourceTargetAnnotationKey] = targetName
+				c.annotations[compName][constant.BackupSourceTargetAnnotationKey] = targetName
 			}
 		}
 		if len(allocateTargetMap) == len(backup.Status.Targets) {
 			// check if the restore is completed when all source target have allocated.
-			if err = c.cleanupRestoreAnnotationForSharding(dag, shardingSpec.Name, restoreDoneForShardComponents); err != nil {
+			if err = c.cleanupRestoreAnnotationForSharding(dag, spec.Name, restoreDoneForShardComponents); err != nil {
 				return err
 			}
 			continue
@@ -98,17 +98,17 @@ func (c *clusterRestoreTransformer) Transform(ctx graph.TransformContext, dag *g
 			if _, ok = allocateTargetMap[target.Name]; ok {
 				continue
 			}
-			for _, compSpec := range c.ShardingComponentSpecs[shardingSpec.Name] {
-				if _, ok = c.Annotations[compSpec.Name][constant.BackupSourceTargetAnnotationKey]; ok {
+			for _, compSpec := range c.shardingComps[spec.Name] {
+				if _, ok = c.annotations[compSpec.Name][constant.BackupSourceTargetAnnotationKey]; ok {
 					continue
 				}
-				c.Annotations[compSpec.Name][constant.BackupSourceTargetAnnotationKey] = target.Name
+				c.annotations[compSpec.Name][constant.BackupSourceTargetAnnotationKey] = target.Name
 				break
 			}
 		}
 	}
 	// if component needs to do post ready restore after cluster is running, annotate component
-	if c.Cluster.Status.Phase == appsv1alpha1.RunningClusterPhase {
+	if c.Cluster.Status.Phase == appsv1.RunningClusterPhase {
 		for _, compSpec := range c.Cluster.Spec.ComponentSpecs {
 			backupSource, ok := backupMap[compSpec.Name]
 			if !ok {
@@ -118,7 +118,7 @@ func (c *clusterRestoreTransformer) Transform(ctx graph.TransformContext, dag *g
 				continue
 			}
 			compObjName := component.FullName(c.Cluster.Name, compSpec.Name)
-			compObj := &appsv1alpha1.Component{}
+			compObj := &appsv1.Component{}
 			if err = c.Client.Get(c.GetContext(), client.ObjectKey{Name: compObjName, Namespace: c.Cluster.Namespace}, compObj); err != nil {
 				return err
 			}
@@ -132,7 +132,7 @@ func (c *clusterRestoreTransformer) Transform(ctx graph.TransformContext, dag *g
 func (c *clusterRestoreTransformer) cleanupRestoreAnnotationForSharding(dag *graph.DAG,
 	shardName string,
 	restoreDoneForShardComponents bool) error {
-	if c.Cluster.Status.Phase != appsv1alpha1.RunningClusterPhase {
+	if c.Cluster.Status.Phase != appsv1.RunningClusterPhase {
 		return nil
 	}
 	if !restoreDoneForShardComponents {
@@ -149,7 +149,7 @@ func (c *clusterRestoreTransformer) cleanupRestoreAnnotationForSharding(dag *gra
 	return nil
 }
 
-func (c *clusterRestoreTransformer) annotateComponent(dag *graph.DAG, compObj *appsv1alpha1.Component) {
+func (c *clusterRestoreTransformer) annotateComponent(dag *graph.DAG, compObj *appsv1.Component) {
 	// annotate component to reconcile for postReady restore.
 	compObj.Labels[constant.ReconcileAnnotationKey] = "DoPostReadyRestore"
 	graphCli, _ := c.Client.(model.GraphClient)

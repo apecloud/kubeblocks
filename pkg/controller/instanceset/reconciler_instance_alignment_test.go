@@ -21,17 +21,17 @@ package instanceset
 
 import (
 	"fmt"
+	"slices"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"golang.org/x/exp/slices"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 )
@@ -159,6 +159,27 @@ var _ = Describe("replicas alignment reconciler test", func() {
 					expectedPVCName := fmt.Sprintf("%s-%s", volumeClaimTemplates[0].Name, object.GetName())
 					return expectedPVCName == item.GetName()
 				})).Should(BeNumerically(">=", 0))
+			}
+		})
+
+		It("handles nodeSelectorOnce Annotation", func() {
+			tree := kubebuilderx.NewObjectTree()
+			tree.SetRoot(its)
+			name := "bar-1"
+			node := "test-1"
+			Expect(MergeNodeSelectorOnceAnnotation(its, map[string]string{name: node})).To(Succeed())
+
+			res, err := reconciler.Reconcile(tree)
+			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
+			pods := tree.List(&corev1.Pod{})
+			for _, obj := range pods {
+				pod := obj.(*corev1.Pod)
+				if pod.Name == name {
+					Expect(pod.Spec.NodeSelector).To(Equal(map[string]string{
+						corev1.LabelHostname: node,
+					}))
+				}
 			}
 		})
 	})

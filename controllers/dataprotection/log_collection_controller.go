@@ -22,10 +22,10 @@ package dataprotection
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/spf13/viper"
-	"golang.org/x/exp/slices"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
@@ -42,6 +42,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dprestore "github.com/apecloud/kubeblocks/pkg/dataprotection/restore"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
@@ -135,8 +136,8 @@ func (r *LogCollectionReconciler) collectErrorLogs(reqCtx intctrlutil.RequestCtx
 		return "", nil
 	}
 	// sort pod with oldest creation place front
-	slices.SortFunc(podList.Items, func(a, b corev1.Pod) bool {
-		return !b.CreationTimestamp.Before(&(a.CreationTimestamp))
+	slices.SortFunc(podList.Items, func(a, b corev1.Pod) int {
+		return b.CreationTimestamp.Compare(a.CreationTimestamp.Time)
 	})
 	oldestPod := podList.Items[0]
 	clientset, err := corev1client.NewForConfig(r.RestConfig)
@@ -171,18 +172,28 @@ func (r *LogCollectionReconciler) patchBackupStatus(reqCtx intctrlutil.RequestCt
 	if err := r.Client.Get(reqCtx.Ctx, client.ObjectKey{Name: backupName, Namespace: reqCtx.Req.Namespace}, backup); err != nil {
 		return err
 	}
-	if backup.Status.FailureReason != "" {
-		return nil
+	for i := range backup.Status.Actions {
+		action := &backup.Status.Actions[i]
+		if action.ObjectRef == nil {
+			continue
+		}
+		if action.ObjectRef.Kind != constant.JobKind || action.ObjectRef.Name != job.Name {
+			continue
+		}
+		if strings.HasPrefix(action.FailureReason, dptypes.LogCollectorOutput) {
+			return nil
+		}
+		errorLogs, err := r.collectErrorLogs(reqCtx, job)
+		if err != nil {
+			return fmt.Errorf("collect error logs failed: %s", err.Error())
+		}
+		if errorLogs == "" {
+			return nil
+		}
+		action.FailureReason = fmt.Sprintf("%s: %s", dptypes.LogCollectorOutput, errorLogs)
+		return r.Client.Status().Update(reqCtx.Ctx, backup)
 	}
-	errorLogs, err := r.collectErrorLogs(reqCtx, job)
-	if err != nil {
-		return fmt.Errorf("collect error logs failed: %s", err.Error())
-	}
-	if errorLogs == "" {
-		return nil
-	}
-	backup.Status.FailureReason = errorLogs
-	return r.Client.Status().Update(reqCtx.Ctx, backup)
+	return nil
 }
 
 func (r *LogCollectionReconciler) patchRestoreStatus(reqCtx intctrlutil.RequestCtx, job *batchv1.Job, restoreName string) error {

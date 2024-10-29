@@ -20,15 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instanceset
 
 import (
-	"fmt"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 )
@@ -46,73 +44,6 @@ var _ = Describe("object generation transformer test.", func() {
 			SetTemplate(template).
 			SetCustomHandler(observeActions).
 			GetObject()
-	})
-
-	Context("buildEnvConfigData function", func() {
-		It("should work well", func() {
-			By("build env config data")
-			its.Status.MembersStatus = []workloads.MemberStatus{
-				{
-					PodName:     getPodName(its.Name, 1),
-					ReplicaRole: &workloads.ReplicaRole{Name: "leader", IsLeader: true},
-				},
-				{
-					PodName:     getPodName(its.Name, 0),
-					ReplicaRole: &workloads.ReplicaRole{Name: "follower", CanVote: true},
-				},
-				{
-					PodName:     getPodName(its.Name, 2),
-					ReplicaRole: &workloads.ReplicaRole{Name: "follower", CanVote: true},
-				},
-			}
-			requiredKeys := []string{
-				"KB_REPLICA_COUNT",
-				"KB_0_HOSTNAME",
-			}
-			cfg, err := buildEnvConfigData(*its)
-			Expect(err).Should(BeNil())
-			By("builds Env Config correctly")
-			Expect(cfg).ShouldNot(BeNil())
-			for _, k := range requiredKeys {
-				_, ok := cfg[k]
-				Expect(ok).Should(BeTrue())
-			}
-
-			By("builds Env Config with ConsensusSet status correctly")
-			toCheckKeys := append(requiredKeys, []string{
-				"KB_LEADER",
-				"KB_FOLLOWERS",
-			}...)
-			for _, k := range toCheckKeys {
-				_, ok := cfg[k]
-				Expect(ok).Should(BeTrue())
-			}
-		})
-
-		It("non-sequential ordinal", func() {
-			By("build env config data")
-			its.Spec.OfflineInstances = []string{
-				getPodName(its.Name, 1),
-			}
-			hostname := func(i int) string {
-				return fmt.Sprintf("%s.%s", getPodName(its.Name, i), getHeadlessSvcName(its.Name))
-			}
-			requiredKeys := map[string]string{
-				"KB_REPLICA_COUNT": "3",
-				"KB_0_HOSTNAME":    hostname(0),
-				"KB_2_HOSTNAME":    hostname(2),
-				"KB_3_HOSTNAME":    hostname(3),
-			}
-			cfg, err := buildEnvConfigData(*its)
-			Expect(err).Should(BeNil())
-
-			By("builds Env Config correctly")
-			Expect(cfg).ShouldNot(BeNil())
-			for k, v := range requiredKeys {
-				Expect(cfg).Should(HaveKeyWithValue(k, v))
-			}
-			Expect(cfg).ShouldNot(HaveKey("KB_1_HOSTNAME"))
-		})
 	})
 
 	Context("well-known service labels", func() {

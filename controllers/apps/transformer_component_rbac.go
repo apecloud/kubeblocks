@@ -21,7 +21,6 @@ package apps
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -30,15 +29,15 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	ictrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -60,7 +59,7 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 
-	serviceAccount, needCRB, err := buildServiceAccount(transCtx)
+	serviceAccount, err := buildServiceAccount(transCtx)
 	if err != nil {
 		return err
 	}
@@ -80,21 +79,13 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 		return ictrlutil.NewRequeueError(time.Second, "RBAC manager is disabled, but service account is not exist")
 	}
 
-	var parent client.Object
-	rb, err := buildRoleBinding(transCtx.Cluster, transCtx.Component, serviceAccount.Name)
+	rb, err := buildRoleBinding(transCtx.SynthesizeComponent, transCtx.Component, serviceAccount.Name)
 	if err != nil {
 		return err
 	}
 	graphCli.Create(dag, rb, inDataContext4G())
-	parent = rb
-	if needCRB {
-		crb := factory.BuildClusterRoleBinding(transCtx.Cluster, serviceAccount.Name)
-		graphCli.Create(dag, crb, inDataContext4G())
-		graphCli.DependOn(dag, parent, crb)
-		parent = crb
-	}
 
-	createServiceAccount(serviceAccount, graphCli, dag, parent)
+	createServiceAccount(serviceAccount, graphCli, dag, rb)
 	itsList := graphCli.FindAll(dag, &workloads.InstanceSet{})
 	for _, its := range itsList {
 		// serviceAccount must be created before workload
@@ -104,30 +95,8 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 	return nil
 }
 
-func isLifecycleActionsEnabled(compDef *appsv1alpha1.ComponentDefinition) bool {
+func isLifecycleActionsEnabled(compDef *appsv1.ComponentDefinition) bool {
 	return compDef.Spec.LifecycleActions != nil
-}
-
-func isDataProtectionEnabled(backupTpl *appsv1alpha1.BackupPolicyTemplate, cluster *appsv1alpha1.Cluster, comp *appsv1alpha1.Component) bool {
-	if backupTpl != nil && len(comp.Spec.CompDef) > 0 {
-		for _, policy := range backupTpl.Spec.BackupPolicies {
-			for _, compDef := range policy.ComponentDefs {
-				if strings.HasPrefix(comp.Spec.CompDef, compDef) {
-					return true
-				}
-			}
-		}
-	}
-	return false
-}
-
-func isVolumeProtectionEnabled(compDef *appsv1alpha1.ComponentDefinition) bool {
-	for _, vol := range compDef.Spec.Volumes {
-		if vol.HighWatermark > 0 && vol.HighWatermark < 100 {
-			return true
-		}
-	}
-	return false
 }
 
 func isServiceAccountExist(transCtx *componentTransformContext, serviceAccountName string) bool {
@@ -146,44 +115,6 @@ func isServiceAccountExist(transCtx *componentTransformContext, serviceAccountNa
 		}
 		transCtx.Logger.Error(err, "get ServiceAccount failed")
 		return false
-	}
-	return true
-}
-
-func isClusterRoleBindingExist(transCtx *componentTransformContext, serviceAccountName string) bool {
-	synthesizedComp := transCtx.SynthesizeComponent
-	namespaceName := types.NamespacedName{
-		Namespace: synthesizedComp.Namespace,
-		Name:      constant.GenerateDefaultServiceAccountName(synthesizedComp.ClusterName),
-	}
-	crb := &rbacv1.ClusterRoleBinding{}
-	if err := transCtx.Client.Get(transCtx.Context, namespaceName, crb, inDataContext4C()); err != nil {
-		// KubeBlocks will create a cluster role binding only if it has RBAC access priority and
-		// the cluster role binding is not already present.
-		if errors.IsNotFound(err) {
-			transCtx.Logger.V(1).Info("ClusterRoleBinding not exists", "namespaceName", namespaceName)
-			return false
-		}
-		transCtx.Logger.Error(err, fmt.Sprintf("get cluster role binding failed: %s", namespaceName))
-		return false
-	}
-
-	if crb.RoleRef.Name != constant.RBACClusterRoleName {
-		transCtx.Logger.V(1).Info("rbac manager: ClusterRole not match", "ClusterRole",
-			constant.RBACClusterRoleName, "clusterrolebinding.RoleRef", crb.RoleRef.Name)
-	}
-
-	isServiceAccountMatch := false
-	for _, sub := range crb.Subjects {
-		if sub.Kind == rbacv1.ServiceAccountKind && sub.Name == serviceAccountName {
-			isServiceAccountMatch = true
-			break
-		}
-	}
-
-	if !isServiceAccountMatch {
-		transCtx.Logger.V(1).Info("rbac manager: ServiceAccount not match", "ServiceAccount",
-			serviceAccountName, "clusterrolebinding.Subjects", crb.Subjects)
 	}
 	return true
 }
@@ -226,65 +157,37 @@ func isRoleBindingExist(transCtx *componentTransformContext, serviceAccountName 
 	return true
 }
 
-func getDefaultBackupPolicyTemplate(transCtx *componentTransformContext, clusterDefName string) (*appsv1alpha1.BackupPolicyTemplate, error) {
-	backupPolicyTPLs := &appsv1alpha1.BackupPolicyTemplateList{}
-	if err := transCtx.Client.List(transCtx.Context, backupPolicyTPLs, client.MatchingLabels{constant.ClusterDefLabelKey: clusterDefName}); err != nil {
-		return nil, err
-	}
-	if len(backupPolicyTPLs.Items) == 0 {
-		return nil, nil
-	}
-	for _, item := range backupPolicyTPLs.Items {
-		if item.Annotations[dptypes.DefaultBackupPolicyTemplateAnnotationKey] == trueVal {
-			return &item, nil
-		}
-	}
-	return &backupPolicyTPLs.Items[0], nil
-}
-
-// buildServiceAccount builds the service account for the component and returns serviceAccount, needCRB(need create ClusterRoleBinding), error.
-func buildServiceAccount(transCtx *componentTransformContext) (*corev1.ServiceAccount, bool, error) {
+// buildServiceAccount builds the service account for the component.
+func buildServiceAccount(transCtx *componentTransformContext) (*corev1.ServiceAccount, error) {
 	var (
-		cluster = transCtx.Cluster
-		comp    = transCtx.Component
-		compDef = transCtx.CompDef
+		cluster         = transCtx.Cluster
+		comp            = transCtx.Component
+		compDef         = transCtx.CompDef
+		synthesizedComp = transCtx.SynthesizeComponent
 	)
-
-	// TODO(component): dependency on cluster definition
-	backupPolicyTPL, err := getDefaultBackupPolicyTemplate(transCtx, cluster.Spec.ClusterDefRef)
-	if err != nil {
-		return nil, false, err
-	}
-
 	serviceAccountName := comp.Spec.ServiceAccountName
-	volumeProtectionEnable := isVolumeProtectionEnabled(compDef)
-	dataProtectionEnable := isDataProtectionEnabled(backupPolicyTPL, cluster, comp)
 	if serviceAccountName == "" {
-		// If probe, volume protection, and data protection are disabled at the same tme, then do not create a service account.
-		if !isLifecycleActionsEnabled(compDef) && !volumeProtectionEnable && !dataProtectionEnable {
-			return nil, false, nil
+		// If lifecycle actions are disabled, then do not create a service account.
+		if !isLifecycleActionsEnabled(compDef) {
+			return nil, nil
 		}
 		// use cluster.name to keep compatible with existed clusters
 		serviceAccountName = constant.GenerateDefaultServiceAccountName(cluster.Name)
 	}
 
 	if isRoleBindingExist(transCtx, serviceAccountName) && isServiceAccountExist(transCtx, serviceAccountName) {
-		// Volume protection requires the clusterRoleBinding permission, if volume protection is not enabled or the corresponding clusterRoleBinding already exists, then skip.
-		if !volumeProtectionEnable || isClusterRoleBindingExist(transCtx, serviceAccountName) {
-			return nil, false, nil
-		}
+		return nil, nil
 	}
 
-	saObj := factory.BuildServiceAccount(cluster, serviceAccountName)
+	saObj := factory.BuildServiceAccount(synthesizedComp, serviceAccountName)
 	if err := setCompOwnershipNFinalizer(comp, saObj); err != nil {
-		return nil, false, err
+		return nil, err
 	}
-	// if volume protection is enabled, the service account needs to be bound to the clusterRoleBinding.
-	return saObj, volumeProtectionEnable, nil
+	return saObj, nil
 }
 
-func buildRoleBinding(cluster *appsv1alpha1.Cluster, comp *appsv1alpha1.Component, serviceAccountName string) (*rbacv1.RoleBinding, error) {
-	roleBinding := factory.BuildRoleBinding(cluster, serviceAccountName)
+func buildRoleBinding(synthesizedComp *component.SynthesizedComponent, comp *appsv1.Component, serviceAccountName string) (*rbacv1.RoleBinding, error) {
+	roleBinding := factory.BuildRoleBinding(synthesizedComp, serviceAccountName)
 	if err := setCompOwnershipNFinalizer(comp, roleBinding); err != nil {
 		return nil, err
 	}
@@ -292,7 +195,7 @@ func buildRoleBinding(cluster *appsv1alpha1.Cluster, comp *appsv1alpha1.Componen
 }
 
 func createServiceAccount(serviceAccount *corev1.ServiceAccount, graphCli model.GraphClient, dag *graph.DAG, parent client.Object) {
-	// serviceAccount must be created before roleBinding and clusterRoleBinding
+	// serviceAccount must be created before roleBinding
 	graphCli.Create(dag, serviceAccount, inDataContext4G())
 	graphCli.DependOn(dag, parent, serviceAccount)
 }

@@ -28,10 +28,6 @@ type FakeAppsV1alpha1 struct {
 	*testing.Fake
 }
 
-func (c *FakeAppsV1alpha1) BackupPolicyTemplates() v1alpha1.BackupPolicyTemplateInterface {
-	return &FakeBackupPolicyTemplates{c}
-}
-
 func (c *FakeAppsV1alpha1) Clusters(namespace string) v1alpha1.ClusterInterface {
 	return &FakeClusters{c, namespace}
 }
@@ -54,14 +50,6 @@ func (c *FakeAppsV1alpha1) ComponentVersions() v1alpha1.ComponentVersionInterfac
 
 func (c *FakeAppsV1alpha1) ConfigConstraints() v1alpha1.ConfigConstraintInterface {
 	return &FakeConfigConstraints{c}
-}
-
-func (c *FakeAppsV1alpha1) OpsDefinitions() v1alpha1.OpsDefinitionInterface {
-	return &FakeOpsDefinitions{c}
-}
-
-func (c *FakeAppsV1alpha1) OpsRequests(namespace string) v1alpha1.OpsRequestInterface {
-	return &FakeOpsRequests{c, namespace}
 }
 
 func (c *FakeAppsV1alpha1) ServiceDescriptors(namespace string) v1alpha1.ServiceDescriptorInterface {

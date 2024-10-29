@@ -22,18 +22,17 @@ package kubebuilderx
 import (
 	"context"
 	"reflect"
+	"slices"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	"github.com/golang/mock/gomock"
-	"golang.org/x/exp/slices"
-	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -73,30 +72,6 @@ var _ = Describe("plan builder test", func() {
 					Expect(obj.Namespace).Should(Equal(its.Namespace))
 					Expect(obj.Name).Should(Equal(its.Name))
 					Expect(obj.Finalizers).Should(Equal(its.Finalizers))
-					return nil
-				}).Times(1)
-			Expect(planBuilder.defaultWalkFunc(v)).Should(Succeed())
-		})
-
-		It("should update sts object", func() {
-			stsOrig := builder.NewStatefulSetBuilder(namespace, name).SetReplicas(3).GetObject()
-			sts := stsOrig.DeepCopy()
-			replicas := int32(5)
-			sts.Spec.Replicas = &replicas
-			v := &model.ObjectVertex{
-				OriObj: stsOrig,
-				Obj:    sts,
-				Action: model.ActionUpdatePtr(),
-			}
-			k8sMock.EXPECT().
-				Update(gomock.Any(), gomock.Any(), gomock.Any()).
-				DoAndReturn(func(_ context.Context, obj *apps.StatefulSet, _ ...client.UpdateOption) error {
-					Expect(obj).ShouldNot(BeNil())
-					Expect(obj.Namespace).Should(Equal(sts.Namespace))
-					Expect(obj.Name).Should(Equal(sts.Name))
-					Expect(obj.Spec.Replicas).Should(Equal(sts.Spec.Replicas))
-					Expect(obj.Spec.Template).Should(Equal(sts.Spec.Template))
-					Expect(obj.Spec.UpdateStrategy).Should(Equal(sts.Spec.UpdateStrategy))
 					return nil
 				}).Times(1)
 			Expect(planBuilder.defaultWalkFunc(v)).Should(Succeed())

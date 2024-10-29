@@ -12,14 +12,6 @@ rules:
   - list
   - watch
 - apiGroups:
-  - apiextensions.k8s.io
-  resources:
-  - customresourcedefinitions
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
   - apps
   resources:
   - deployments
@@ -51,32 +43,6 @@ rules:
   - statefulsets/status
   verbs:
   - get
-- apiGroups:
-  - apps.kubeblocks.io
-  resources:
-  - backuppolicytemplates
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - apps.kubeblocks.io
-  resources:
-  - backuppolicytemplates/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - apps.kubeblocks.io
-  resources:
-  - backuppolicytemplates/status
-  verbs:
-  - get
-  - patch
-  - update
 - apiGroups:
   - apps.kubeblocks.io
   resources:
@@ -263,58 +229,6 @@ rules:
 - apiGroups:
   - apps.kubeblocks.io
   resources:
-  - opsdefinitions
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - apps.kubeblocks.io
-  resources:
-  - opsdefinitions/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - apps.kubeblocks.io
-  resources:
-  - opsdefinitions/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - apps.kubeblocks.io
-  resources:
-  - opsrequests
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - apps.kubeblocks.io
-  resources:
-  - opsrequests/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - apps.kubeblocks.io
-  resources:
-  - opsrequests/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - apps.kubeblocks.io
-  resources:
   - servicedescriptors
   verbs:
   - create
@@ -334,6 +248,32 @@ rules:
   - apps.kubeblocks.io
   resources:
   - servicedescriptors/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - apps.kubeblocks.io
+  resources:
+  - shardingdefinitions
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps.kubeblocks.io
+  resources:
+  - shardingdefinitions/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - apps.kubeblocks.io
+  resources:
+  - shardingdefinitions/status
   verbs:
   - get
   - patch
@@ -639,6 +579,32 @@ rules:
 - apiGroups:
   - dataprotection.kubeblocks.io
   resources:
+  - backuppolicytemplates
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - dataprotection.kubeblocks.io
+  resources:
+  - backuppolicytemplates/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - dataprotection.kubeblocks.io
+  resources:
+  - backuppolicytemplates/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - dataprotection.kubeblocks.io
+  resources:
   - backuprepos
   verbs:
   - create
@@ -820,38 +786,57 @@ rules:
   - patch
   - update
 - apiGroups:
-  - policy
+  - operations.kubeblocks.io
   resources:
-  - poddisruptionbudgets
+  - opsdefinitions
   verbs:
   - create
   - delete
-  - deletecollection
   - get
   - list
   - patch
   - update
   - watch
 - apiGroups:
-  - policy
+  - operations.kubeblocks.io
   resources:
-  - poddisruptionbudgets/finalizers
+  - opsdefinitions/finalizers
   verbs:
   - update
 - apiGroups:
-  - rbac.authorization.k8s.io
+  - operations.kubeblocks.io
   resources:
-  - clusterrolebindings
+  - opsdefinitions/status
   verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - operations.kubeblocks.io
+  resources:
+  - opsrequests
+  verbs:
+  - create
+  - delete
   - get
   - list
+  - patch
+  - update
   - watch
 - apiGroups:
-  - rbac.authorization.k8s.io
+  - operations.kubeblocks.io
   resources:
-  - clusterrolebindings/status
+  - opsrequests/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - operations.kubeblocks.io
+  resources:
+  - opsrequests/status
   verbs:
   - get
+  - patch
+  - update
 - apiGroups:
   - rbac.authorization.k8s.io
   resources:
@@ -927,32 +912,6 @@ rules:
   - list
   - watch
 - apiGroups:
-  - storage.kubeblocks.io
-  resources:
-  - storageproviders
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - storage.kubeblocks.io
-  resources:
-  - storageproviders/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - storage.kubeblocks.io
-  resources:
-  - storageproviders/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
   - workloads.kubeblocks.io
   resources:
   - instancesets
@@ -974,32 +933,6 @@ rules:
   - workloads.kubeblocks.io
   resources:
   - instancesets/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - workloads.kubeblocks.io
-  resources:
-  - replicatedstatemachines
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - workloads.kubeblocks.io
-  resources:
-  - replicatedstatemachines/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - workloads.kubeblocks.io
-  resources:
-  - replicatedstatemachines/status
   verbs:
   - get
   - patch

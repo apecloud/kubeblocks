@@ -59,7 +59,7 @@ jobs:
     secrets: inherit
 
   release-addons-cluster-chart:
-    needs: [ release-chart ]
+    needs: [ release-addons-chart ]
     uses: apecloud/apecloud-cd/.github/workflows/trigger-workflow.yml@v0.1.62
     with:
       GITHUB_REPO: "apecloud/kubeblocks-addons"
@@ -170,7 +170,7 @@ jobs:
     secrets: inherit
 
   release-addons-chart-ent:
-    needs: [ release-addons-chart ]
+    needs: [ release-chart ]
     uses: apecloud/apecloud-cd/.github/workflows/release-charts-enterprise.yml@v0.1.53
     with:
       GITHUB_REPO: "apecloud/apecloud-addons"

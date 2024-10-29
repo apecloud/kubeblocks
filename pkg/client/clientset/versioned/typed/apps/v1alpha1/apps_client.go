@@ -28,25 +28,18 @@ import (
 
 type AppsV1alpha1Interface interface {
 	RESTClient() rest.Interface
-	BackupPolicyTemplatesGetter
 	ClustersGetter
 	ClusterDefinitionsGetter
 	ComponentsGetter
 	ComponentDefinitionsGetter
 	ComponentVersionsGetter
 	ConfigConstraintsGetter
-	OpsDefinitionsGetter
-	OpsRequestsGetter
 	ServiceDescriptorsGetter
 }
 
 // AppsV1alpha1Client is used to interact with features provided by the apps.kubeblocks.io group.
 type AppsV1alpha1Client struct {
 	restClient rest.Interface
-}
-
-func (c *AppsV1alpha1Client) BackupPolicyTemplates() BackupPolicyTemplateInterface {
-	return newBackupPolicyTemplates(c)
 }
 
 func (c *AppsV1alpha1Client) Clusters(namespace string) ClusterInterface {
@@ -71,14 +64,6 @@ func (c *AppsV1alpha1Client) ComponentVersions() ComponentVersionInterface {
 
 func (c *AppsV1alpha1Client) ConfigConstraints() ConfigConstraintInterface {
 	return newConfigConstraints(c)
-}
-
-func (c *AppsV1alpha1Client) OpsDefinitions() OpsDefinitionInterface {
-	return newOpsDefinitions(c)
-}
-
-func (c *AppsV1alpha1Client) OpsRequests(namespace string) OpsRequestInterface {
-	return newOpsRequests(c, namespace)
 }
 
 func (c *AppsV1alpha1Client) ServiceDescriptors(namespace string) ServiceDescriptorInterface {

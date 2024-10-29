@@ -22,12 +22,12 @@ package apps
 import (
 	"fmt"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 )
 
 var (
-	defaultReplicasLimit = appsv1alpha1.ReplicasLimit{
+	defaultReplicasLimit = appsv1.ReplicasLimit{
 		MinReplicas: 1,
 		MaxReplicas: 16384,
 	}
@@ -47,9 +47,6 @@ func (t *componentValidationTransformer) Transform(ctx graph.TransformContext, d
 		setProvisioningStartedCondition(&comp.Status.Conditions, comp.Name, comp.Generation, err)
 	}()
 
-	if err = validateEnabledLogs(comp, transCtx.CompDef); err != nil {
-		return newRequeueError(requeueDuration, err.Error())
-	}
 	if err = validateCompReplicas(comp, transCtx.CompDef); err != nil {
 		return newRequeueError(requeueDuration, err.Error())
 	}
@@ -59,35 +56,7 @@ func (t *componentValidationTransformer) Transform(ctx graph.TransformContext, d
 	return nil
 }
 
-func validateEnabledLogs(comp *appsv1alpha1.Component, compDef *appsv1alpha1.ComponentDefinition) error {
-	invalidLogNames := validateEnabledLogConfigs(compDef, comp.Spec.EnabledLogs)
-	if len(invalidLogNames) > 0 {
-		return fmt.Errorf("logs %s are not defined in the definition", invalidLogNames)
-	}
-	return nil
-}
-
-func validateEnabledLogConfigs(compDef *appsv1alpha1.ComponentDefinition, enabledLogs []string) []string {
-	invalidLogNames := make([]string, 0, len(enabledLogs))
-	logTypes := make(map[string]struct{})
-
-	for _, logConfig := range compDef.Spec.LogConfigs {
-		logTypes[logConfig.Name] = struct{}{}
-	}
-
-	// imply that all values in enabledLogs config are invalid.
-	if len(logTypes) == 0 {
-		return enabledLogs
-	}
-	for _, name := range enabledLogs {
-		if _, ok := logTypes[name]; !ok {
-			invalidLogNames = append(invalidLogNames, name)
-		}
-	}
-	return invalidLogNames
-}
-
-func validateCompReplicas(comp *appsv1alpha1.Component, compDef *appsv1alpha1.ComponentDefinition) error {
+func validateCompReplicas(comp *appsv1.Component, compDef *appsv1.ComponentDefinition) error {
 	replicasLimit := &defaultReplicasLimit
 	// always respect the replicas limit if set.
 	if compDef.Spec.ReplicasLimit != nil {
@@ -101,6 +70,6 @@ func validateCompReplicas(comp *appsv1alpha1.Component, compDef *appsv1alpha1.Co
 	return replicasOutOfLimitError(replicas, *replicasLimit)
 }
 
-func replicasOutOfLimitError(replicas int32, replicasLimit appsv1alpha1.ReplicasLimit) error {
+func replicasOutOfLimitError(replicas int32, replicasLimit appsv1.ReplicasLimit) error {
 	return fmt.Errorf("replicas %d out-of-limit [%d, %d]", replicas, replicasLimit.MinReplicas, replicasLimit.MaxReplicas)
 }

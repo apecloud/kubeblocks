@@ -30,11 +30,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
-	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -45,10 +44,10 @@ type componentTransformContext struct {
 	Client client.Reader
 	record.EventRecorder
 	logr.Logger
-	Cluster             *appsv1alpha1.Cluster
-	CompDef             *appsv1alpha1.ComponentDefinition
-	Component           *appsv1alpha1.Component
-	ComponentOrig       *appsv1alpha1.Component
+	Cluster             *appsv1.Cluster
+	CompDef             *appsv1.ComponentDefinition
+	Component           *appsv1.Component
+	ComponentOrig       *appsv1.Component
 	SynthesizeComponent *component.SynthesizedComponent
 	RunningWorkload     client.Object
 	ProtoWorkload       client.Object
@@ -90,7 +89,7 @@ var _ graph.PlanBuilder = &componentPlanBuilder{}
 var _ graph.Plan = &componentPlan{}
 
 func (c *componentPlanBuilder) Init() error {
-	comp := &appsv1alpha1.Component{}
+	comp := &appsv1.Component{}
 	if err := c.cli.Get(c.transCtx.Context, c.req.NamespacedName, comp); err != nil {
 		return err
 	}
@@ -116,7 +115,7 @@ func (c *componentPlanBuilder) Build() (graph.Plan, error) {
 	dag := graph.NewDAG()
 	err := c.transformers.ApplyTo(c.transCtx, dag)
 	if err != nil {
-		c.transCtx.Logger.V(1).Info(fmt.Sprintf("build error: %s", err.Error()))
+		c.transCtx.Logger.Info(fmt.Sprintf("build error: %s", err.Error()))
 	}
 	c.transCtx.Logger.V(1).Info(fmt.Sprintf("DAG: %s", dag))
 
@@ -131,7 +130,7 @@ func (c *componentPlanBuilder) Build() (graph.Plan, error) {
 func (p *componentPlan) Execute() error {
 	err := p.dag.WalkReverseTopoOrder(p.walkFunc, nil)
 	if err != nil {
-		p.transCtx.Logger.V(1).Info(fmt.Sprintf("execute error: %s", err.Error()))
+		p.transCtx.Logger.Info(fmt.Sprintf("execute error: %s", err.Error()))
 	}
 	return err
 }
@@ -155,7 +154,7 @@ func (c *componentPlanBuilder) defaultWalkFuncWithLogging(vertex graph.Vertex) e
 	err := c.defaultWalkFunc(vertex)
 	switch {
 	case err == nil:
-		c.transCtx.Logger.V(1).Info(fmt.Sprintf("reconcile object %T with action %s OK", node.Obj, *node.Action))
+		c.transCtx.Logger.Info(fmt.Sprintf("reconcile object %T with action %s OK", node.Obj, *node.Action))
 		return err
 	case !ok:
 		c.transCtx.Logger.Error(err, "")
@@ -223,15 +222,7 @@ func (c *componentPlanBuilder) reconcileDeleteObject(ctx context.Context, vertex
 	// The additional removal of DBClusterFinalizerName in the component controller is to backward compatibility.
 	// In versions prior to 0.9.0, the component object's finalizers includes DBClusterFinalizerName.
 	// Therefore, it is necessary to remove DBClusterFinalizerName when the component is scaled-in independently.
-	//
-	// Why remove RSM finalizer here:
-	// The RSM API has been replaced by the InstanceSet API starting from version 0.9.0.
-	// An automated upgrade process is performed in the component controller.
-	// As part of the upgrade, the RSM object and some of its secondary objects are deleted.
-	// These secondary objects are protected by the RSM finalizer to ensure their proper cleanup.
-	// By removing the RSM finalizer here, we allow the automated upgrade process to delete the RSM object
-	// and perform the necessary cleanup of its associated resources.
-	finalizers := []string{constant.DBComponentFinalizerName, constant.DBClusterFinalizerName, instanceset.LegacyRSMFinalizerName}
+	finalizers := []string{constant.DBComponentFinalizerName, constant.DBClusterFinalizerName}
 	for _, finalizer := range finalizers {
 		if controllerutil.RemoveFinalizer(vertex.Obj, finalizer) {
 			err := c.cli.Update(ctx, vertex.Obj, clientOption(vertex))

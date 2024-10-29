@@ -109,7 +109,7 @@ else
 ifeq ($(TAG_LATEST), true)
 	$(DOCKER) buildx build . $(DOCKER_BUILD_ARGS) --file $(DOCKERFILE_DIR)/Dockerfile-tools --platform $(BUILDX_PLATFORMS) --tag ${TOOL_IMG}:latest
 else
-	$(DOCKER) buildx build . $(DOCKER_BUILD_ARGS) --file $(DOCKERFILE_DIR)/Dockerfile-tools --platform $(BUILDX_PLATFORMS) --tag ${TOOL_IMG}:${VERSION}
+	$(DOCKER) buildx build . $(DOCKER_BUILD_ARGS) --file $(DOCKERFILE_DIR)/Dockerfile-tools --platform linux/arm64 --tag ${TOOL_IMG}:${VERSION} --load
 endif
 endif
 

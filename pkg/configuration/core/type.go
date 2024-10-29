@@ -27,7 +27,7 @@ import (
 	"github.com/go-logr/logr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 )
@@ -163,7 +163,7 @@ func GenerateConstraintsUniqLabelKeyWithConfig(configKey string) string {
 	return GenerateUniqKeyWithConfig(constant.ConfigurationConstraintsLabelPrefixKey, configKey)
 }
 
-func GetInstanceCMName(obj client.Object, tpl *appsv1alpha1.ComponentTemplateSpec) string {
+func GetInstanceCMName(obj client.Object, tpl *appsv1.ComponentTemplateSpec) string {
 	return getInstanceCfgCMName(obj.GetName(), tpl.Name)
 }
 

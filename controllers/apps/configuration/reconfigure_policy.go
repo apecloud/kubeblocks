@@ -28,9 +28,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	configmanager "github.com/apecloud/kubeblocks/pkg/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgproto "github.com/apecloud/kubeblocks/pkg/configuration/proto"
@@ -99,10 +100,10 @@ type reconfigureParams struct {
 	Client client.Client
 	Ctx    intctrlutil.RequestCtx
 
-	Cluster *appsv1alpha1.Cluster
+	Cluster *appsv1.Cluster
 
 	// Associated component for cluster.
-	ClusterComponent *appsv1alpha1.ClusterComponentSpec
+	ClusterComponent *appsv1.ClusterComponentSpec
 
 	// Associated component for component and component definition.
 	SynthesizedComponent *component.SynthesizedComponent
@@ -183,9 +184,9 @@ func (param *reconfigureParams) maxRollingReplicas() int32 {
 	if isPercentage {
 		r = int32(math.Floor(float64(v) * float64(replicas) / 100))
 	} else {
-		r = util.Safe2Int32(util.Min(v, param.getTargetReplicas()))
+		r = util.Safe2Int32(min(v, param.getTargetReplicas()))
 	}
-	return util.Max(r, defaultRolling)
+	return max(r, defaultRolling)
 }
 
 func (param *reconfigureParams) getTargetReplicas() int {
@@ -194,7 +195,7 @@ func (param *reconfigureParams) getTargetReplicas() int {
 
 func (param *reconfigureParams) podMinReadySeconds() int32 {
 	minReadySeconds := param.SynthesizedComponent.MinReadySeconds
-	return util.Max(minReadySeconds, viper.GetInt32(constant.PodMinReadySecondsEnv))
+	return max(minReadySeconds, viper.GetInt32(constant.PodMinReadySecondsEnv))
 }
 
 func RegisterPolicy(policy appsv1alpha1.UpgradePolicy, action reconfigurePolicy) {

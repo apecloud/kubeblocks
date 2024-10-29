@@ -24,11 +24,11 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 
 	"github.com/spf13/viper"
 	"golang.org/x/exp/maps"
-	"golang.org/x/exp/slices"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -36,8 +36,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/component/lifecycle"
@@ -57,7 +57,7 @@ type componentWorkloadTransformer struct {
 type componentWorkloadOps struct {
 	cli            client.Client
 	reqCtx         intctrlutil.RequestCtx
-	cluster        *appsv1alpha1.Cluster
+	cluster        *appsv1.Cluster
 	synthesizeComp *component.SynthesizedComponent
 	dag            *graph.DAG
 
@@ -139,10 +139,10 @@ func (t *componentWorkloadTransformer) runningInstanceSetObject(ctx graph.Transf
 }
 
 func (t *componentWorkloadTransformer) reconcileWorkload(synthesizedComp *component.SynthesizedComponent,
-	comp *appsv1alpha1.Component, runningITS, protoITS *workloads.InstanceSet) error {
+	comp *appsv1.Component, runningITS, protoITS *workloads.InstanceSet) error {
 	if runningITS != nil {
 		*protoITS.Spec.Selector = *runningITS.Spec.Selector
-		protoITS.Spec.Template.Labels = intctrlutil.MergeMetadataMaps(runningITS.Spec.Template.Labels, synthesizedComp.UserDefinedLabels)
+		protoITS.Spec.Template.Labels = intctrlutil.MergeMetadataMaps(runningITS.Spec.Template.Labels, synthesizedComp.DynamicLabels)
 	}
 
 	buildInstanceSetPlacementAnnotation(comp, protoITS)
@@ -172,7 +172,7 @@ func (t *componentWorkloadTransformer) stopWorkload(protoITS *workloads.Instance
 }
 
 func (t *componentWorkloadTransformer) handleUpdate(reqCtx intctrlutil.RequestCtx, cli model.GraphClient, dag *graph.DAG,
-	cluster *appsv1alpha1.Cluster, synthesizeComp *component.SynthesizedComponent, runningITS, protoITS *workloads.InstanceSet) error {
+	cluster *appsv1.Cluster, synthesizeComp *component.SynthesizedComponent, runningITS, protoITS *workloads.InstanceSet) error {
 	if !isCompStopped(synthesizeComp) {
 		// postpone the update of the workload until the component is back to running.
 		if err := t.handleWorkloadUpdate(reqCtx, dag, cluster, synthesizeComp, runningITS, protoITS); err != nil {
@@ -189,7 +189,7 @@ func (t *componentWorkloadTransformer) handleUpdate(reqCtx intctrlutil.RequestCt
 }
 
 func (t *componentWorkloadTransformer) handleWorkloadUpdate(reqCtx intctrlutil.RequestCtx, dag *graph.DAG,
-	cluster *appsv1alpha1.Cluster, synthesizeComp *component.SynthesizedComponent, obj, its *workloads.InstanceSet) error {
+	cluster *appsv1.Cluster, synthesizeComp *component.SynthesizedComponent, obj, its *workloads.InstanceSet) error {
 	cwo, err := newComponentWorkloadOps(reqCtx, t.Client, cluster, synthesizeComp, obj, its, dag)
 	if err != nil {
 		return err
@@ -408,13 +408,12 @@ func checkNRollbackProtoImages(itsObj, itsProto *workloads.InstanceSet) {
 	}
 }
 
-// expandVolume handles workload expand volume
-func (r *componentWorkloadOps) expandVolume() error {
-	for _, vct := range r.runningITS.Spec.VolumeClaimTemplates {
+func (r *componentWorkloadOps) expandVolumeClaimTemplates(runningVCTs []corev1.PersistentVolumeClaim, protoVCTs []corev1.PersistentVolumeClaimTemplate, insTPLName string) error {
+	for _, vct := range runningVCTs {
 		var proto *corev1.PersistentVolumeClaimTemplate
-		for i, v := range r.synthesizeComp.VolumeClaimTemplates {
+		for i, v := range protoVCTs {
 			if v.Name == vct.Name {
-				proto = &r.synthesizeComp.VolumeClaimTemplates[i]
+				proto = &protoVCTs[i]
 				break
 			}
 		}
@@ -423,7 +422,48 @@ func (r *componentWorkloadOps) expandVolume() error {
 			continue
 		}
 
-		if err := r.expandVolumes(vct.Name, proto); err != nil {
+		if err := r.expandVolumes(insTPLName, vct.Name, proto); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// expandVolume handles workload expand volume
+func (r *componentWorkloadOps) expandVolume() error {
+	// 1. expand the volumes without instance template name.
+	if err := r.expandVolumeClaimTemplates(r.runningITS.Spec.VolumeClaimTemplates, r.synthesizeComp.VolumeClaimTemplates, ""); err != nil {
+		return err
+	}
+	if len(r.runningITS.Spec.Instances) == 0 {
+		return nil
+	}
+	// 2. expand the volumes with instance template name.
+	for i := range r.runningITS.Spec.Instances {
+		runningInsSpec := r.runningITS.Spec.DeepCopy()
+		runningInsTPL := runningInsSpec.Instances[i]
+		intctrlutil.MergeList(&runningInsTPL.VolumeClaimTemplates, &runningInsSpec.VolumeClaimTemplates,
+			func(item corev1.PersistentVolumeClaim) func(corev1.PersistentVolumeClaim) bool {
+				return func(claim corev1.PersistentVolumeClaim) bool {
+					return claim.Name == item.Name
+				}
+			})
+
+		var protoVCTs []corev1.PersistentVolumeClaimTemplate
+		protoVCTs = append(protoVCTs, r.synthesizeComp.VolumeClaimTemplates...)
+		for _, v := range r.synthesizeComp.Instances {
+			if runningInsTPL.Name == v.Name {
+				insVCTs := component.ToVolumeClaimTemplates(v.VolumeClaimTemplates)
+				intctrlutil.MergeList(&insVCTs, &protoVCTs,
+					func(item corev1.PersistentVolumeClaimTemplate) func(corev1.PersistentVolumeClaimTemplate) bool {
+						return func(claim corev1.PersistentVolumeClaimTemplate) bool {
+							return claim.Name == item.Name
+						}
+					})
+				break
+			}
+		}
+		if err := r.expandVolumeClaimTemplates(runningInsSpec.VolumeClaimTemplates, protoVCTs, runningInsTPL.Name); err != nil {
 			return err
 		}
 	}
@@ -679,7 +719,7 @@ func (r *componentWorkloadOps) deletePVCs4ScaleIn(itsObj *workloads.InstanceSet)
 	return nil
 }
 
-func (r *componentWorkloadOps) expandVolumes(vctName string, proto *corev1.PersistentVolumeClaimTemplate) error {
+func (r *componentWorkloadOps) expandVolumes(insTPLName string, vctName string, proto *corev1.PersistentVolumeClaimTemplate) error {
 	for _, pod := range r.runningItsPodNames {
 		pvc := &corev1.PersistentVolumeClaim{}
 		pvcKey := types.NamespacedName{
@@ -694,7 +734,9 @@ func (r *componentWorkloadOps) expandVolumes(vctName string, proto *corev1.Persi
 				return err
 			}
 		}
-
+		if insTPLName != pvc.Labels[constant.KBAppComponentInstanceTemplateLabelKey] {
+			continue
+		}
 		if !pvcNotFound {
 			quantity := pvc.Spec.Resources.Requests.Storage()
 			newQuantity := proto.Spec.Resources.Requests.Storage()
@@ -905,7 +947,7 @@ func getRunningVolumes(ctx context.Context, cli client.Client, synthesizedComp *
 	return matchedPVCs, nil
 }
 
-func buildInstanceSetPlacementAnnotation(comp *appsv1alpha1.Component, its *workloads.InstanceSet) {
+func buildInstanceSetPlacementAnnotation(comp *appsv1.Component, its *workloads.InstanceSet) {
 	p := placement(comp)
 	if len(p) > 0 {
 		if its.Annotations == nil {
@@ -917,7 +959,7 @@ func buildInstanceSetPlacementAnnotation(comp *appsv1alpha1.Component, its *work
 
 func newComponentWorkloadOps(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
+	cluster *appsv1.Cluster,
 	synthesizeComp *component.SynthesizedComponent,
 	runningITS *workloads.InstanceSet,
 	protoITS *workloads.InstanceSet,

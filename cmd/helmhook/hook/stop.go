@@ -33,9 +33,9 @@ type StopOperator struct {
 
 func (p *StopOperator) Handle(ctx *UpgradeContext) error {
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		if err := stopKubeBlocksDeploy(ctx, ctx.K8sClient, ctx.Namespace, kubeblocksAppComponent, GetKubeBlocksDeploy); err != nil {
+		if err := deleteDeployment(ctx, ctx.K8sClient, ctx.Namespace, kubeblocksAppComponent, GetKubeBlocksDeploy); err != nil {
 			return err
 		}
-		return stopKubeBlocksDeploy(ctx, ctx.K8sClient, ctx.Namespace, dataprotectionAppComponent, GetKubeBlocksDeploy)
+		return deleteDeployment(ctx, ctx.K8sClient, ctx.Namespace, dataprotectionAppComponent, GetKubeBlocksDeploy)
 	})
 }

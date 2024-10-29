@@ -22,11 +22,13 @@ import (
 	"fmt"
 	"net/http"
 
+	appsv1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/apps/v1beta1"
 	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/dataprotection/v1alpha1"
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/extensions/v1alpha1"
-	storagev1alpha1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/storage/v1alpha1"
+	operationsv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/operations/v1alpha1"
+	workloadsv1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/workloads/v1"
 	workloadsv1alpha1 "github.com/apecloud/kubeblocks/pkg/client/clientset/versioned/typed/workloads/v1alpha1"
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
@@ -37,10 +39,12 @@ type Interface interface {
 	Discovery() discovery.DiscoveryInterface
 	AppsV1alpha1() appsv1alpha1.AppsV1alpha1Interface
 	AppsV1beta1() appsv1beta1.AppsV1beta1Interface
+	AppsV1() appsv1.AppsV1Interface
 	DataprotectionV1alpha1() dataprotectionv1alpha1.DataprotectionV1alpha1Interface
 	ExtensionsV1alpha1() extensionsv1alpha1.ExtensionsV1alpha1Interface
-	StorageV1alpha1() storagev1alpha1.StorageV1alpha1Interface
+	OperationsV1alpha1() operationsv1alpha1.OperationsV1alpha1Interface
 	WorkloadsV1alpha1() workloadsv1alpha1.WorkloadsV1alpha1Interface
+	WorkloadsV1() workloadsv1.WorkloadsV1Interface
 }
 
 // Clientset contains the clients for groups.
@@ -48,10 +52,12 @@ type Clientset struct {
 	*discovery.DiscoveryClient
 	appsV1alpha1           *appsv1alpha1.AppsV1alpha1Client
 	appsV1beta1            *appsv1beta1.AppsV1beta1Client
+	appsV1                 *appsv1.AppsV1Client
 	dataprotectionV1alpha1 *dataprotectionv1alpha1.DataprotectionV1alpha1Client
 	extensionsV1alpha1     *extensionsv1alpha1.ExtensionsV1alpha1Client
-	storageV1alpha1        *storagev1alpha1.StorageV1alpha1Client
+	operationsV1alpha1     *operationsv1alpha1.OperationsV1alpha1Client
 	workloadsV1alpha1      *workloadsv1alpha1.WorkloadsV1alpha1Client
+	workloadsV1            *workloadsv1.WorkloadsV1Client
 }
 
 // AppsV1alpha1 retrieves the AppsV1alpha1Client
@@ -64,6 +70,11 @@ func (c *Clientset) AppsV1beta1() appsv1beta1.AppsV1beta1Interface {
 	return c.appsV1beta1
 }
 
+// AppsV1 retrieves the AppsV1Client
+func (c *Clientset) AppsV1() appsv1.AppsV1Interface {
+	return c.appsV1
+}
+
 // DataprotectionV1alpha1 retrieves the DataprotectionV1alpha1Client
 func (c *Clientset) DataprotectionV1alpha1() dataprotectionv1alpha1.DataprotectionV1alpha1Interface {
 	return c.dataprotectionV1alpha1
@@ -74,14 +85,19 @@ func (c *Clientset) ExtensionsV1alpha1() extensionsv1alpha1.ExtensionsV1alpha1In
 	return c.extensionsV1alpha1
 }
 
-// StorageV1alpha1 retrieves the StorageV1alpha1Client
-func (c *Clientset) StorageV1alpha1() storagev1alpha1.StorageV1alpha1Interface {
-	return c.storageV1alpha1
+// OperationsV1alpha1 retrieves the OperationsV1alpha1Client
+func (c *Clientset) OperationsV1alpha1() operationsv1alpha1.OperationsV1alpha1Interface {
+	return c.operationsV1alpha1
 }
 
 // WorkloadsV1alpha1 retrieves the WorkloadsV1alpha1Client
 func (c *Clientset) WorkloadsV1alpha1() workloadsv1alpha1.WorkloadsV1alpha1Interface {
 	return c.workloadsV1alpha1
+}
+
+// WorkloadsV1 retrieves the WorkloadsV1Client
+func (c *Clientset) WorkloadsV1() workloadsv1.WorkloadsV1Interface {
+	return c.workloadsV1
 }
 
 // Discovery retrieves the DiscoveryClient
@@ -136,6 +152,10 @@ func NewForConfigAndClient(c *rest.Config, httpClient *http.Client) (*Clientset,
 	if err != nil {
 		return nil, err
 	}
+	cs.appsV1, err = appsv1.NewForConfigAndClient(&configShallowCopy, httpClient)
+	if err != nil {
+		return nil, err
+	}
 	cs.dataprotectionV1alpha1, err = dataprotectionv1alpha1.NewForConfigAndClient(&configShallowCopy, httpClient)
 	if err != nil {
 		return nil, err
@@ -144,11 +164,15 @@ func NewForConfigAndClient(c *rest.Config, httpClient *http.Client) (*Clientset,
 	if err != nil {
 		return nil, err
 	}
-	cs.storageV1alpha1, err = storagev1alpha1.NewForConfigAndClient(&configShallowCopy, httpClient)
+	cs.operationsV1alpha1, err = operationsv1alpha1.NewForConfigAndClient(&configShallowCopy, httpClient)
 	if err != nil {
 		return nil, err
 	}
 	cs.workloadsV1alpha1, err = workloadsv1alpha1.NewForConfigAndClient(&configShallowCopy, httpClient)
+	if err != nil {
+		return nil, err
+	}
+	cs.workloadsV1, err = workloadsv1.NewForConfigAndClient(&configShallowCopy, httpClient)
 	if err != nil {
 		return nil, err
 	}
@@ -175,10 +199,12 @@ func New(c rest.Interface) *Clientset {
 	var cs Clientset
 	cs.appsV1alpha1 = appsv1alpha1.New(c)
 	cs.appsV1beta1 = appsv1beta1.New(c)
+	cs.appsV1 = appsv1.New(c)
 	cs.dataprotectionV1alpha1 = dataprotectionv1alpha1.New(c)
 	cs.extensionsV1alpha1 = extensionsv1alpha1.New(c)
-	cs.storageV1alpha1 = storagev1alpha1.New(c)
+	cs.operationsV1alpha1 = operationsv1alpha1.New(c)
 	cs.workloadsV1alpha1 = workloadsv1alpha1.New(c)
+	cs.workloadsV1 = workloadsv1.New(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &cs

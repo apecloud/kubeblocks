@@ -27,7 +27,6 @@ import (
 	"github.com/go-logr/logr"
 	snapshotv1beta1 "github.com/kubernetes-csi/external-snapshotter/client/v3/apis/volumesnapshot/v1beta1"
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -37,22 +36,16 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
-	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
-	workloadsv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-)
-
-const (
-	defaultWeight int = iota
-	workloadWeight
-	clusterWeight
 )
 
 // clusterTransformContext a graph.TransformContext implementation for Cluster reconciliation
@@ -61,18 +54,22 @@ type clusterTransformContext struct {
 	Client client.Reader
 	record.EventRecorder
 	logr.Logger
-	Cluster       *appsv1alpha1.Cluster
-	OrigCluster   *appsv1alpha1.Cluster
-	ClusterDef    *appsv1alpha1.ClusterDefinition
-	ComponentDefs map[string]*appsv1alpha1.ComponentDefinition
-	// ComponentSpecs includes all cluster component specs generated from ComponentSpecs and ShardingSpecs
-	ComponentSpecs []*appsv1alpha1.ClusterComponentSpec
-	// ShardingComponentSpecs includes all sharding component specs generated from ShardingSpecs
-	ShardingComponentSpecs map[string][]*appsv1alpha1.ClusterComponentSpec
-	// Labels to be added to components, mapping with ComponentSpecs.
-	Labels map[string]map[string]string
-	// Annotations to be added to components, mapping with ComponentSpecs.
-	Annotations map[string]map[string]string
+
+	Cluster     *appsv1.Cluster
+	OrigCluster *appsv1.Cluster
+
+	clusterDef    *appsv1.ClusterDefinition
+	shardingDefs  map[string]*appsv1.ShardingDefinition
+	componentDefs map[string]*appsv1.ComponentDefinition
+
+	// consolidated components and shardings from topology and/or user-specified
+	components []*appsv1.ClusterComponentSpec
+	shardings  []*appsv1.ClusterSharding
+
+	shardingComps map[string][]*appsv1.ClusterComponentSpec // comp specs for each sharding
+
+	// TODO: remove this, annotations to be added to components for sharding, mapping with @allComps.
+	annotations map[string]map[string]string
 }
 
 // clusterPlanBuilder a graph.PlanBuilder implementation for Cluster reconciliation
@@ -113,21 +110,48 @@ func (c *clusterTransformContext) GetLogger() logr.Logger {
 	return c.Logger
 }
 
+func (c *clusterTransformContext) sharding(name string) bool {
+	// hack: use shardingComps to determine if the entity is sharding or component
+	_, ok := c.shardingComps[name]
+	return ok
+}
+
+func (c *clusterTransformContext) total() int {
+	cnt := len(c.components)
+	for _, comps := range c.shardingComps {
+		cnt += len(comps)
+	}
+	return cnt
+}
+
+func (c *clusterTransformContext) traverse(f func(spec *appsv1.ClusterComponentSpec)) {
+	if f != nil {
+		for _, comp := range c.components {
+			f(comp)
+		}
+		for _, comps := range c.shardingComps {
+			for _, comp := range comps {
+				f(comp)
+			}
+		}
+	}
+}
+
 func init() {
 	model.AddScheme(appsv1alpha1.AddToScheme)
+	model.AddScheme(appsv1beta1.AddToScheme)
+	model.AddScheme(appsv1.AddToScheme)
 	model.AddScheme(dpv1alpha1.AddToScheme)
 	model.AddScheme(snapshotv1.AddToScheme)
 	model.AddScheme(snapshotv1beta1.AddToScheme)
 	model.AddScheme(extensionsv1alpha1.AddToScheme)
-	model.AddScheme(workloadsv1alpha1.AddToScheme)
-	model.AddScheme(storagev1alpha1.AddToScheme)
-	model.AddScheme(appsv1beta1.AddToScheme)
+	model.AddScheme(workloadsv1.AddToScheme)
 }
 
 // PlanBuilder implementation
 
 func (c *clusterPlanBuilder) Init() error {
-	cluster := &appsv1alpha1.Cluster{}
+	cluster := &appsv1.Cluster{}
 	if err := c.cli.Get(c.transCtx.Context, c.req.NamespacedName, cluster); err != nil {
 		return err
 	}
@@ -154,7 +178,7 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 		if c.transCtx.Cluster.IsDeleting() {
 			return
 		}
-		preCheckCondition := meta.FindStatusCondition(c.transCtx.Cluster.Status.Conditions, appsv1alpha1.ConditionTypeProvisioningStarted)
+		preCheckCondition := meta.FindStatusCondition(c.transCtx.Cluster.Status.Conditions, appsv1.ConditionTypeProvisioningStarted)
 		if preCheckCondition == nil {
 			// this should not happen
 			return
@@ -186,24 +210,7 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 // Plan implementation
 
 func (p *clusterPlan) Execute() error {
-	less := func(v1, v2 graph.Vertex) bool {
-		getWeight := func(v graph.Vertex) int {
-			lifecycleVertex, ok := v.(*model.ObjectVertex)
-			if !ok {
-				return defaultWeight
-			}
-			switch lifecycleVertex.Obj.(type) {
-			case *appsv1alpha1.Cluster:
-				return clusterWeight
-			case *appsv1.StatefulSet, *appsv1.Deployment:
-				return workloadWeight
-			default:
-				return defaultWeight
-			}
-		}
-		return getWeight(v1) <= getWeight(v2)
-	}
-	err := p.dag.WalkReverseTopoOrder(p.walkFunc, less)
+	err := p.dag.WalkReverseTopoOrder(p.walkFunc, nil)
 	if err != nil {
 		if hErr := p.handlePlanExecutionError(err); hErr != nil {
 			return hErr
@@ -263,7 +270,7 @@ func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex) error {
 	}
 
 	// cluster object has more business to do, handle them here
-	if _, ok = node.Obj.(*appsv1alpha1.Cluster); ok {
+	if _, ok = node.Obj.(*appsv1.Cluster); ok {
 		if err := c.reconcileCluster(node); err != nil {
 			return err
 		}
@@ -272,8 +279,8 @@ func (c *clusterPlanBuilder) defaultWalkFunc(vertex graph.Vertex) error {
 }
 
 func (c *clusterPlanBuilder) reconcileCluster(node *model.ObjectVertex) error {
-	cluster := node.Obj.(*appsv1alpha1.Cluster).DeepCopy()
-	origCluster := node.OriObj.(*appsv1alpha1.Cluster)
+	cluster := node.Obj.(*appsv1.Cluster).DeepCopy()
+	origCluster := node.OriObj.(*appsv1.Cluster)
 	switch *node.Action {
 	// cluster.meta and cluster.spec might change
 	case model.STATUS:
@@ -351,7 +358,7 @@ func (c *clusterPlanBuilder) reconcileDeleteObject(ctx context.Context, node *mo
 		return nil
 	}
 	// delete secondary objects
-	if _, ok := node.Obj.(*appsv1alpha1.Cluster); !ok {
+	if _, ok := node.Obj.(*appsv1.Cluster); !ok {
 		err := backgroundDeleteObject()
 		if err != nil && !apierrors.IsNotFound(err) {
 			return err
@@ -366,8 +373,8 @@ func (c *clusterPlanBuilder) reconcileStatusObject(ctx context.Context, node *mo
 		return err
 	}
 	// handle condition and phase changing triggered events
-	if newCluster, ok := node.Obj.(*appsv1alpha1.Cluster); ok {
-		oldCluster, _ := node.OriObj.(*appsv1alpha1.Cluster)
+	if newCluster, ok := node.Obj.(*appsv1.Cluster); ok {
+		oldCluster, _ := node.OriObj.(*appsv1.Cluster)
 		c.emitConditionUpdatingEvent(oldCluster.Status.Conditions, newCluster.Status.Conditions)
 		c.emitStatusUpdatingEvent(oldCluster.Status, newCluster.Status)
 	}
@@ -395,7 +402,7 @@ func (c *clusterPlanBuilder) emitConditionUpdatingEvent(oldConditions, newCondit
 	}
 }
 
-func (c *clusterPlanBuilder) emitStatusUpdatingEvent(oldStatus, newStatus appsv1alpha1.ClusterStatus) {
+func (c *clusterPlanBuilder) emitStatusUpdatingEvent(oldStatus, newStatus appsv1.ClusterStatus) {
 	cluster := c.transCtx.Cluster
 	newPhase := newStatus.Phase
 	if newPhase == oldStatus.Phase {
@@ -404,11 +411,11 @@ func (c *clusterPlanBuilder) emitStatusUpdatingEvent(oldStatus, newStatus appsv1
 	eType := corev1.EventTypeNormal
 	message := ""
 	switch newPhase {
-	case appsv1alpha1.RunningClusterPhase:
+	case appsv1.RunningClusterPhase:
 		message = fmt.Sprintf("Cluster: %s is ready, current phase is %s", cluster.Name, newPhase)
-	case appsv1alpha1.StoppedClusterPhase:
+	case appsv1.StoppedClusterPhase:
 		message = fmt.Sprintf("Cluster: %s stopped successfully.", cluster.Name)
-	case appsv1alpha1.FailedClusterPhase, appsv1alpha1.AbnormalClusterPhase:
+	case appsv1.FailedClusterPhase, appsv1.AbnormalClusterPhase:
 		message = fmt.Sprintf("Cluster: %s is %s, check according to the components message", cluster.Name, newPhase)
 		eType = corev1.EventTypeWarning
 	}

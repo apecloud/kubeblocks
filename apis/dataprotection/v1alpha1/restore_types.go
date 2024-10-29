@@ -484,7 +484,7 @@ type RestoreStatus struct {
 // +k8s:openapi-gen=true
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:categories={kubeblocks,all}
+// +kubebuilder:resource:categories={kubeblocks}
 // +kubebuilder:printcolumn:name="BACKUP",type="string",JSONPath=".spec.backup.name"
 // +kubebuilder:printcolumn:name="RESTORE-TIME",type="string",JSONPath=".spec.restoreTime",description="Point in time for restoring"
 // +kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="Restore Status."

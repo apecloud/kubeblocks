@@ -18,8 +18,6 @@ limitations under the License.
 
 package v1alpha1
 
-type BackupPolicyTemplateExpansion interface{}
-
 type ClusterExpansion interface{}
 
 type ClusterDefinitionExpansion interface{}
@@ -31,9 +29,5 @@ type ComponentDefinitionExpansion interface{}
 type ComponentVersionExpansion interface{}
 
 type ConfigConstraintExpansion interface{}
-
-type OpsDefinitionExpansion interface{}
-
-type OpsRequestExpansion interface{}
 
 type ServiceDescriptorExpansion interface{}

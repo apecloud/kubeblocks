@@ -6,6 +6,9 @@ sidebar_position: 1
 sidebar_label: Create
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 ## Introduction
 
 KubeBlocks can quickly integrate new engines through good abstraction. The functions tested in KubeBlocks include Pulsar cluster creation and deletion, vertical and horizontal scaling of Pulsar cluster components, storage expansion, restart, and configuration changes.
@@ -23,6 +26,54 @@ Refer to the [Pulsar official document](https://pulsar.apache.org/docs/3.1.x/) f
 |        broker          |      at least 1, for production environment, 3 replicas recommended       |
 | recovery (Optional)    | 1; if autoRecovery is not enabled for bookie, at least 3 replicas needed  |
 |   proxy (Optional)     |           1; and for production environment, 3 replicas needed            |
+
+## Before you start
+
+* Install KubeBlocks [by kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) or [by Helm](../../../user_docs/installation/install-with-helm/install-kubeblocks.md).
+* Check whether the Pulsar Addon is enabled. If this Addon is disabled, [enable it](./../../installation/install-with-kbcli/install-addons.md#enabledisable-addons) first.
+* View all the database types and versions available for creating a cluster.
+
+  <Tabs>
+
+  <TabItem value="kbcli" label="kbcli" default>
+
+  ```bash
+  kbcli clusterdefinition list
+  kbcli clusterversion list
+  ```
+
+  </TabItem>
+
+  <TabItem value="kubectl" label="kubectl">
+
+  ```bash
+  kubectl get clusterdefinition pulsar
+  >
+  NAME    TOPOLOGIES                                        SERVICEREFS    STATUS      AGE
+  pulsar  pulsar-basic-cluster,pulsar-enhanced-cluster                     Available   16m
+  ```
+
+  View all available versions for creating a cluster.
+
+  ```bash
+  kubectl get clusterversions -l clusterdefinition.kubeblocks.io/name=pulsar
+  >
+  NAME            CLUSTER-DEFINITION   STATUS      AGE
+  pulsar-2.11.2   pulsar               Available   16m
+  pulsar-3.0.2    pulsar               Available   16m
+  ```
+
+  </TabItem>
+
+  </Tabs>
+
+* To keep things isolated, create a separate namespace called `demo`.
+
+  ```bash
+  kubectl create namespace demo
+  >
+  namespace/demo created
+  ```
 
 ## Create Pulsar cluster
 
@@ -75,49 +126,53 @@ Refer to the [Pulsar official document](https://pulsar.apache.org/docs/3.1.x/) f
          memory: 8Gi
    ```
 
-2. Create cluster.
+2. Create a cluster.
 
    - **Option 1**: (**Recommended**) Create pulsar cluster by `values-production.yaml` and enable monitor.
-    Configuration:
-     - broker: 3 replicas
-     - bookies: 4 replicas
-     - zookeeper: 3 replicas
+  
+     Configuration:
+      - broker: 3 replicas
+      - bookies: 4 replicas
+      - zookeeper: 3 replicas
 
      ```bash
-     helm install pulsar kubeblocks/pulsar-cluster --version "x.x.x" -f values-production.yaml --set monitor.enabled=true
+     helm install mycluster kubeblocks/pulsar-cluster --version "x.x.x" -f values-production.yaml --set monitor.enabled=true --namespace=demo
      ```
 
    - **Option 2**: Create pulsar cluster with proxy.
-   Configuration:
-     - proxy: 3 replicas
-     - broker: 3 replicas
-     - bookies: 4 replicas
-     - zookeeper: 3 replicas
+   
+     Configuration:
+      - proxy: 3 replicas
+      - broker: 3 replicas
+      - bookies: 4 replicas
+      - zookeeper: 3 replicas
 
      ```bash
-     helm install pulsar kubeblocks/pulsar-cluster --version "x.x.x" -f values-production.yaml --set proxy.enable=true  --set monitor.enabled=true  
+     helm install mycluster kubeblocks/pulsar-cluster --version "x.x.x" -f values-production.yaml --set proxy.enable=true  --set monitor.enabled=true --namespace=demo
      ```
 
    - **Option 3**:  Create pulsar cluster with proxy and deploy `bookies-recovery` component.  
-   Configuration:
-     - proxy: 3 replicas
-     - broker: 3 replicas
-     - bookies: 4 replicas
-     - zookeeper: 3 replicas
-     - bookies-recovery: 3 replicas
+     
+     Configuration:
+      - proxy: 3 replicas
+      - broker: 3 replicas
+      - bookies: 4 replicas
+      - zookeeper: 3 replicas
+      - bookies-recovery: 3 replicas
 
      ```bash
-     helm install pulsar kubeblocks/pulsar-cluster --version "x.x.x" -f values-production.yaml --set proxy.enable=true --set bookiesRecovery.enable=true --set monitor.enabled=true 
+     helm install mycluster kubeblocks/pulsar-cluster --version "x.x.x" -f values-production.yaml --set proxy.enable=true --set bookiesRecovery.enable=true --set monitor.enabled=true --namespace=demo 
      ```
 
    - **Option 4**: Create pulsar cluster and specify bookies and zookeeper storage parameters.
-   Configuration:
-     - broker: 3 replicas
-     - bookies: 4 replicas
-     - zookeeper: 3 replicas
+
+     Configuration:
+      - broker: 3 replicas
+      - bookies: 4 replicas
+      - zookeeper: 3 replicas
 
      ```bash
-     helm install pulsar kubeblocks/pulsar-cluster --version "x.x.x" -f values-production.yaml --set bookies.persistence.data.storageClassName=<sc name>,bookies.persistence.log.storageClassName=<sc name>,zookeeper.persistence.data.storageClassName=<sc name>,zookeeper.persistence.log.storageClassName=<sc name> --set monitor.enabled=true
+     helm install mycluster kubeblocks/pulsar-cluster --version "x.x.x" -f values-production.yaml --set bookies.persistence.data.storageClassName=<sc name>,bookies.persistence.log.storageClassName=<sc name>,zookeeper.persistence.data.storageClassName=<sc name>,zookeeper.persistence.log.storageClassName=<sc name> --set monitor.enabled=true --namespace=demo
      ```
 
    You can specify the storage name `<sc name>`.
@@ -125,7 +180,7 @@ Refer to the [Pulsar official document](https://pulsar.apache.org/docs/3.1.x/) f
 3. Verify the cluster created.
 
     ```bash
-    kubectl get cluster pulsar
+    kubectl get cluster mycluster -n demo
     ```
 
     When the status is Running, the cluster is created successfully.

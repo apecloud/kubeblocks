@@ -29,7 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	experimental "github.com/apecloud/kubeblocks/apis/experimental/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 )
@@ -72,6 +72,6 @@ func (r *NodeCountScalerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&experimental.NodeCountScaler{}).
 		Watches(&corev1.Node{}, &nodeScalingHandler{r.Client}).
-		Watches(&appsv1alpha1.Cluster{}, &clusterHandler{r.Client}).
+		Watches(&appsv1.Cluster{}, &clusterHandler{r.Client}).
 		Complete(r)
 }

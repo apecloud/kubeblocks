@@ -22,7 +22,6 @@ package util
 import (
 	"context"
 	"fmt"
-	"os"
 	"sync"
 
 	"github.com/go-logr/logr"
@@ -33,8 +32,6 @@ import (
 	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/record"
 	ctlruntime "sigs.k8s.io/controller-runtime"
-
-	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 const (
@@ -44,9 +41,6 @@ const (
 
 var (
 	once      sync.Once
-	namespace string
-	podName   string
-	nodeName  string
 	recorder  record.EventRecorder
 	clientSet *kubernetes.Clientset
 )
@@ -54,9 +48,6 @@ var (
 func SendEventWithMessage(logger *logr.Logger, reason string, message string) {
 	go func() {
 		once.Do(func() {
-			namespace = os.Getenv(constant.KBEnvNamespace)
-			podName = os.Getenv(constant.KBEnvPodName)
-			nodeName = os.Getenv(constant.KBEnvNodeName)
 			err := initEventRecorder()
 			if logger != nil && err != nil {
 				logger.Error(err, "init event recorder failed")
@@ -91,7 +82,7 @@ func initEventRecorder() error {
 		scheme.Scheme,
 		corev1.EventSource{
 			Component: "kbagent",
-			Host:      nodeName,
+			Host:      nodeName(),
 		},
 	)
 	return nil
@@ -129,7 +120,7 @@ func getPodObject() (*corev1.Pod, error) {
 		}
 	}
 
-	pod, err := clientSet.CoreV1().Pods(namespace).Get(context.TODO(), podName, metav1.GetOptions{})
+	pod, err := clientSet.CoreV1().Pods(namespace()).Get(context.TODO(), podName(), metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get pod: %v", err)
 	}

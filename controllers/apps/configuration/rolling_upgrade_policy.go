@@ -27,7 +27,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/configuration/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	podutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
@@ -151,7 +150,7 @@ func markDynamicCursor(pods []corev1.Pod, podsStats *componentPodStats, configKe
 		podsStats.updated[pod.Name] = pod
 	}
 
-	podWindows.begin = util.Max[int](podWindows.end-int(rollingReplicas), 0)
+	podWindows.begin = max(podWindows.end-int(rollingReplicas), 0)
 	for i := podWindows.begin; i < podWindows.end; i++ {
 		pod := &pods[i]
 		if podutil.IsMatchConfigVersion(pod, configKey, currentVersion) {

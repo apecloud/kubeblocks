@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -129,11 +129,11 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 	// set kb-agent container ports to host network
 	if synthesizedComp.HostNetwork != nil {
 		if synthesizedComp.HostNetwork.ContainerPorts == nil {
-			synthesizedComp.HostNetwork.ContainerPorts = make([]appsv1alpha1.HostNetworkContainerPort, 0)
+			synthesizedComp.HostNetwork.ContainerPorts = make([]appsv1.HostNetworkContainerPort, 0)
 		}
 		synthesizedComp.HostNetwork.ContainerPorts = append(
 			synthesizedComp.HostNetwork.ContainerPorts,
-			appsv1alpha1.HostNetworkContainerPort{
+			appsv1.HostNetworkContainerPort{
 				Container: container.Name,
 				Ports:     []string{kbagent.DefaultPortName},
 			})
@@ -147,7 +147,7 @@ func mergedActionEnv4KBAgent(synthesizedComp *SynthesizedComponent) []corev1.Env
 	env := make([]corev1.EnvVar, 0)
 	envSet := sets.New[string]()
 
-	checkedAppend := func(action *appsv1alpha1.Action) {
+	checkedAppend := func(action *appsv1.Action) {
 		if action != nil && action.Exec != nil {
 			for _, e := range action.Exec.Env {
 				if !envSet.Has(e.Name) {
@@ -158,7 +158,7 @@ func mergedActionEnv4KBAgent(synthesizedComp *SynthesizedComponent) []corev1.Env
 		}
 	}
 
-	for _, action := range []*appsv1alpha1.Action{
+	for _, action := range []*appsv1.Action{
 		synthesizedComp.LifecycleActions.PostProvision,
 		synthesizedComp.LifecycleActions.PreTerminate,
 		synthesizedComp.LifecycleActions.Switchover,
@@ -228,7 +228,7 @@ func buildKBAgentStartupEnvs(synthesizedComp *SynthesizedComponent) ([]corev1.En
 	return kbagent.BuildStartupEnv(actions, probes)
 }
 
-func buildAction4KBAgent(action *appsv1alpha1.Action, name string) *proto.Action {
+func buildAction4KBAgent(action *appsv1.Action, name string) *proto.Action {
 	if action == nil || action.Exec == nil {
 		return nil
 	}
@@ -249,7 +249,7 @@ func buildAction4KBAgent(action *appsv1alpha1.Action, name string) *proto.Action
 	return a
 }
 
-func buildProbe4KBAgent(probe *appsv1alpha1.Probe, name string) (*proto.Action, *proto.Probe) {
+func buildProbe4KBAgent(probe *appsv1.Probe, name string) (*proto.Action, *proto.Probe) {
 	if probe == nil || probe.Exec == nil {
 		return nil, nil
 	}
@@ -270,17 +270,16 @@ func adaptKBAgentIfCustomImageNContainerDefined(synthesizedComp *SynthesizedComp
 	if err != nil {
 		return err
 	}
-	if len(image) == 0 {
-		return nil
+
+	if len(image) > 0 {
+		// init-container to copy binaries to the shared mount point /kubeblocks
+		initContainer := buildKBAgentInitContainer()
+		synthesizedComp.PodSpec.InitContainers = append(synthesizedComp.PodSpec.InitContainers, *initContainer)
+
+		container.Image = image
+		container.Command[0] = kbAgentCommandOnSharedMount
+		container.VolumeMounts = append(container.VolumeMounts, sharedVolumeMount)
 	}
-
-	// init-container to copy binaries to the shared mount point /kubeblocks
-	initContainer := buildKBAgentInitContainer()
-	synthesizedComp.PodSpec.InitContainers = append(synthesizedComp.PodSpec.InitContainers, *initContainer)
-
-	container.Image = image
-	container.Command[0] = kbAgentCommandOnSharedMount
-	container.VolumeMounts = append(container.VolumeMounts, sharedVolumeMount)
 
 	// TODO: share more container resources
 	if c != nil {
@@ -295,7 +294,7 @@ func customExecActionImageNContainer(synthesizedComp *SynthesizedComponent) (str
 		return "", nil, nil
 	}
 
-	actions := []*appsv1alpha1.Action{
+	actions := []*appsv1.Action{
 		synthesizedComp.LifecycleActions.PostProvision,
 		synthesizedComp.LifecycleActions.PreTerminate,
 		synthesizedComp.LifecycleActions.Switchover,
@@ -342,15 +341,6 @@ func customExecActionImageNContainer(synthesizedComp *SynthesizedComponent) (str
 		if c == nil {
 			return "", nil, fmt.Errorf("exec container %s not found", container)
 		}
-	}
-	if len(image) > 0 && len(container) > 0 {
-		if c.Image == image {
-			return image, c, nil
-		}
-		return "", nil, fmt.Errorf("exec image and container must be the same")
-	}
-	if len(image) == 0 && len(container) > 0 {
-		image = c.Image
 	}
 	return image, c, nil
 }

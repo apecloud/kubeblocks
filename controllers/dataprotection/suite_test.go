@@ -45,9 +45,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	"github.com/apecloud/kubeblocks/pkg/testutil"
@@ -119,13 +118,10 @@ var _ = BeforeSuite(func() {
 	err = vsv1beta1.AddToScheme(scheme)
 	Expect(err).NotTo(HaveOccurred())
 
-	err = appsv1alpha1.AddToScheme(scheme)
+	err = appsv1.AddToScheme(scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	err = dpv1alpha1.AddToScheme(scheme)
-	Expect(err).NotTo(HaveOccurred())
-
-	err = storagev1alpha1.AddToScheme(scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	// +kubebuilder:scaffold:scheme
@@ -159,35 +155,43 @@ var _ = BeforeSuite(func() {
 	Expect(err).ToNot(HaveOccurred())
 
 	err = (&BackupReconciler{
-		Client:   k8sManager.GetClient(),
+		Client:   k8sClient,
 		Scheme:   k8sManager.GetScheme(),
 		Recorder: k8sManager.GetEventRecorderFor("backup-controller"),
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
+	if err = (&BackupPolicyTemplateReconciler{
+		Client:   k8sClient,
+		Scheme:   k8sManager.GetScheme(),
+		Recorder: k8sManager.GetEventRecorderFor("backup-policy-template-controller"),
+	}).SetupWithManager(k8sManager); err != nil {
+		os.Exit(1)
+	}
+
 	err = (&BackupScheduleReconciler{
-		Client:   k8sManager.GetClient(),
+		Client:   k8sClient,
 		Scheme:   k8sManager.GetScheme(),
 		Recorder: k8sManager.GetEventRecorderFor("backup-schedule-controller"),
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
 	err = (&BackupPolicyReconciler{
-		Client:   k8sManager.GetClient(),
+		Client:   k8sClient,
 		Scheme:   k8sManager.GetScheme(),
 		Recorder: k8sManager.GetEventRecorderFor("backup-policy-controller"),
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
 	err = (&ActionSetReconciler{
-		Client:   k8sManager.GetClient(),
+		Client:   k8sClient,
 		Scheme:   k8sManager.GetScheme(),
 		Recorder: k8sManager.GetEventRecorderFor("actionset-controller"),
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
 	err = (&BackupRepoReconciler{
-		Client:     k8sManager.GetClient(),
+		Client:     k8sClient,
 		Scheme:     k8sManager.GetScheme(),
 		Recorder:   k8sManager.GetEventRecorderFor("backup-repo-controller"),
 		RestConfig: k8sManager.GetConfig(),
@@ -195,21 +199,21 @@ var _ = BeforeSuite(func() {
 	Expect(err).ToNot(HaveOccurred())
 
 	err = (&RestoreReconciler{
-		Client:   k8sManager.GetClient(),
+		Client:   k8sClient,
 		Scheme:   k8sManager.GetScheme(),
 		Recorder: k8sManager.GetEventRecorderFor("restore-controller"),
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
 	err = (&VolumePopulatorReconciler{
-		Client:   k8sManager.GetClient(),
+		Client:   k8sClient,
 		Scheme:   k8sManager.GetScheme(),
 		Recorder: k8sManager.GetEventRecorderFor("volume-populate-controller"),
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
 	if err = (&LogCollectionReconciler{
-		Client:     k8sManager.GetClient(),
+		Client:     k8sClient,
 		Scheme:     k8sManager.GetScheme(),
 		Recorder:   k8sManager.GetEventRecorderFor("log-collection-controller"),
 		RestConfig: k8sManager.GetConfig(),

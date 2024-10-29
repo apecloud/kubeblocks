@@ -24,6 +24,7 @@ import (
 	"slices"
 	"strings"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -92,8 +93,8 @@ func (t *clusterPlacementTransformer) assign(transCtx *clusterTransformContext) 
 
 func (t *clusterPlacementTransformer) maxReplicas(transCtx *clusterTransformContext) int {
 	replicas := 0
-	for _, comp := range transCtx.ComponentSpecs {
-		replicas = max(replicas, int(comp.Replicas))
-	}
+	transCtx.traverse(func(spec *appsv1.ClusterComponentSpec) {
+		replicas = max(replicas, int(spec.Replicas))
+	})
 	return replicas
 }

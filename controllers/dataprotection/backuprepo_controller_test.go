@@ -24,10 +24,10 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -39,7 +39,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	storagev1alpha1 "github.com/apecloud/kubeblocks/apis/storage/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	"github.com/apecloud/kubeblocks/pkg/generics"
@@ -63,11 +62,6 @@ var _ = Describe("BackupRepo controller", func() {
 		testapps.ClearResources(&testCtx, generics.StorageProviderSignature, ml)
 		testapps.ClearResources(&testCtx, generics.CSIDriverSignature, ml)
 		testapps.ClearResources(&testCtx, generics.StorageClassSignature, ml)
-
-		// TODO: to be removed
-		var legacyStorageProviderSignature = func(_ storagev1alpha1.StorageProvider, _ *storagev1alpha1.StorageProvider, _ storagev1alpha1.StorageProviderList, _ *storagev1alpha1.StorageProviderList) {
-		}
-		testapps.ClearResources(&testCtx, legacyStorageProviderSignature, ml)
 
 		// namespaced
 		inNS := client.InNamespace(viper.GetString(constant.CfgKeyCtrlrMgrNS))
@@ -1304,58 +1298,6 @@ new-item=new-value
 				Namespace: namespace2,
 			}
 			Eventually(testapps.CheckObjExists(&testCtx, pvcKey, &corev1.PersistentVolumeClaim{}, true)).Should(Succeed())
-		})
-
-		It("should convert legacy storageProvider to the new one", func() {
-			By("creating a legacy storageProvider")
-			sp := &storagev1alpha1.StorageProvider{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "my-sp",
-				},
-				Spec: storagev1alpha1.StorageProviderSpec{
-					CSIDriverName:                 "CSIDriverName",
-					CSIDriverSecretTemplate:       "CSIDriverSecretTemplate",
-					StorageClassTemplate:          "StorageClassTemplate",
-					PersistentVolumeClaimTemplate: "PersistentVolumeClaimTemplate",
-					DatasafedConfigTemplate:       "DatasafedConfigTemplate",
-					ParametersSchema: &storagev1alpha1.ParametersSchema{
-						OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
-							Type: "object",
-							Properties: map[string]apiextensionsv1.JSONSchemaProps{
-								"field1": {Type: "string"},
-								"field2": {Type: "integer"},
-							},
-						},
-						CredentialFields: []string{"field1"},
-					},
-				},
-			}
-			testapps.CreateK8sResource(&testCtx, sp)
-
-			By("creating a backupRepo")
-			repo := createBackupRepoSpec(func(repo *dpv1alpha1.BackupRepo) {
-				repo.Spec.StorageProviderRef = sp.Name
-			})
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(repo), func(g Gomega, repo *dpv1alpha1.BackupRepo) {
-				g.Expect(repo.Status.Phase, dpv1alpha1.BackupRepoFailed)
-				cond := meta.FindStatusCondition(repo.Status.Conditions, ConditionTypeStorageProviderReady)
-				g.Expect(cond).NotTo(BeNil())
-				g.Expect(cond.Status).Should(BeEquivalentTo(corev1.ConditionFalse))
-			})).Should(Succeed())
-
-			By("checking the new storageProvider")
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(sp),
-				func(g Gomega, newSp *dpv1alpha1.StorageProvider) {
-					g.Expect(newSp.Spec.CSIDriverName).To(BeEquivalentTo(sp.Spec.CSIDriverName))
-					g.Expect(newSp.Spec.CSIDriverSecretTemplate).To(BeEquivalentTo(sp.Spec.CSIDriverSecretTemplate))
-					g.Expect(newSp.Spec.StorageClassTemplate).To(BeEquivalentTo(sp.Spec.StorageClassTemplate))
-					g.Expect(newSp.Spec.PersistentVolumeClaimTemplate).To(BeEquivalentTo(sp.Spec.PersistentVolumeClaimTemplate))
-					g.Expect(newSp.Spec.DatasafedConfigTemplate).To(BeEquivalentTo(sp.Spec.DatasafedConfigTemplate))
-					g.Expect(newSp.Spec.ParametersSchema).NotTo(BeNil())
-					g.Expect(newSp.Spec.ParametersSchema.OpenAPIV3Schema).To(BeEquivalentTo(sp.Spec.ParametersSchema.OpenAPIV3Schema))
-					g.Expect(newSp.Spec.ParametersSchema.CredentialFields).To(BeEquivalentTo(sp.Spec.ParametersSchema.CredentialFields))
-				}),
-			).Should(Succeed())
 		})
 	})
 })

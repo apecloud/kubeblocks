@@ -45,15 +45,15 @@ var (
 	clientSet *kubernetes.Clientset
 )
 
-func SendEventWithMessage(logger logr.Logger, reason, message string) {
+func SendEventWithMessage(logger *logr.Logger, reason, message string) {
 	once.Do(func() {
-		if err := initEventRecorder(); err != nil {
+		if err := initEventRecorder(); err != nil && logger != nil {
 			logger.Error(err, "Failed to initialize event recorder")
 		}
 	})
 
 	go func() {
-		if err := sendEvent(reason, message); err != nil {
+		if err := sendEvent(reason, message); err != nil && logger != nil {
 			logger.Error(err, "Failed to send event")
 		}
 	}()

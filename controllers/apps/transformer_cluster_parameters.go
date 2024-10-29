@@ -163,7 +163,7 @@ func buildComponentParameter(transCtx *clusterTransformContext, cluster *appsv1.
 func resolveCmpdParametersDefs(ctx context.Context, reader client.Reader, cmpd *appsv1.ComponentDefinition) (map[string]*corev1.ConfigMap, []*parametersv1alpha1.ParametersDefinition, error) {
 	var paramsDefs []*parametersv1alpha1.ParametersDefinition
 
-	configRender, err := resolveCmpdConfigRender(ctx, reader, cmpd)
+	configRender, err := resolveComponentConfigRender(ctx, reader, cmpd)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -189,7 +189,7 @@ func resolveCmpdParametersDefs(ctx context.Context, reader client.Reader, cmpd *
 	return tpls, paramsDefs, nil
 }
 
-func resolveCmpdConfigRender(ctx context.Context, reader client.Reader, cmpd *appsv1.ComponentDefinition) (*parametersv1alpha1.ParameterDrivenConfigRender, error) {
+func resolveComponentConfigRender(ctx context.Context, reader client.Reader, cmpd *appsv1.ComponentDefinition) (*parametersv1alpha1.ParameterDrivenConfigRender, error) {
 	configDefList := &parametersv1alpha1.ParameterDrivenConfigRenderList{}
 	if err := reader.List(ctx, configDefList); err != nil {
 		return nil, err

@@ -169,7 +169,7 @@ func GetConfigSpecReconcilePhase(configMap *corev1.ConfigMap,
 	return status.Phase
 }
 
-func CheckAndPatchPayload(item *v1alpha1.ConfigurationItemDetail, payloadID string, payload interface{}) (bool, error) {
+func CheckAndPatchPayload(item *parametersv1alpha1.ConfigTemplateItemDetail, payloadID string, payload interface{}) (bool, error) {
 	if item == nil {
 		return false, nil
 	}
@@ -230,18 +230,4 @@ func filterImmutableParameters(parameters map[string]any, immutableParams []stri
 		}
 	}
 	return validParameters
-}
-
-func ParametersDefinitionTerminalPhases(status parametersv1alpha1.ParametersDefinitionStatus, generation int64) bool {
-	return status.ObservedGeneration == generation && status.Phase == parametersv1alpha1.PDAvailablePhase
-}
-
-func GetItemStatus(status *parametersv1alpha1.ComponentParameterStatus, name string) *parametersv1alpha1.ConfigTemplateItemDetailStatus {
-	for i := range status.ConfigurationItemStatus {
-		itemStatus := &status.ConfigurationItemStatus[i]
-		if itemStatus.Name == name {
-			return itemStatus
-		}
-	}
-	return nil
 }

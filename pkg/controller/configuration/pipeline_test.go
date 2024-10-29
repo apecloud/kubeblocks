@@ -134,7 +134,7 @@ max_connections = '1000'
 			synthesizedComponent.ConfigTemplates[0].Keys = []string{testConfigFile}
 
 			By("create configuration resource")
-			createPipeline := NewCreatePipeline(ReconcileCtx{
+			createPipeline := NewReloadActionBuilderHelper(ReconcileCtx{
 				ResourceCtx: &ResourceCtx{
 					Client:        k8sMockClient.Client(),
 					Context:       ctx,
@@ -164,7 +164,7 @@ max_connections = '1000'
 
 			err := createPipeline.Prepare().
 				UpdateConfiguration(). // reconcile Configuration
-				Configuration().       // sync Configuration
+				Configuration(). // sync Configuration
 				CreateConfigTemplate().
 				UpdatePodVolumes().
 				BuildConfigManagerSidecar().
@@ -201,7 +201,7 @@ max_connections = '1000'
 				PrepareForTemplate().
 				RerenderTemplate().
 				ApplyParameters().
-				UpdateConfigVersion(strconv.FormatInt(reconcileTask.ConfigurationObj.GetGeneration(), 10)).
+				UpdateConfigVersion(strconv.FormatInt(reconcileTask.ComponentParameterObj.GetGeneration(), 10)).
 				Sync().
 				SyncStatus().
 				Complete()
@@ -216,7 +216,7 @@ max_connections = '1000'
 				PrepareForTemplate().
 				RerenderTemplate().
 				ApplyParameters().
-				UpdateConfigVersion(strconv.FormatInt(reconcileTask.ConfigurationObj.GetGeneration(), 10)).
+				UpdateConfigVersion(strconv.FormatInt(reconcileTask.ComponentParameterObj.GetGeneration(), 10)).
 				Sync().
 				SyncStatus().
 				Complete()

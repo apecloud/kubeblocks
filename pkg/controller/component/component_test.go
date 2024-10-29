@@ -212,10 +212,9 @@ func TestGetConfigSpecByName(t *testing.T) {
 		name: "test",
 		args: args{
 			component: &SynthesizedComponent{
-				ConfigTemplates: []appsv1.ComponentConfigSpec{{
-					ComponentTemplateSpec: appsv1.ComponentTemplateSpec{
-						Name: "test",
-					}}},
+				ConfigTemplates: []appsv1.ComponentTemplateSpec{{
+					Name: "test",
+				}},
 			},
 			configSpec: "for-test",
 		},
@@ -224,10 +223,9 @@ func TestGetConfigSpecByName(t *testing.T) {
 		name: "test",
 		args: args{
 			component: &SynthesizedComponent{
-				ConfigTemplates: []appsv1.ComponentConfigSpec{{
-					ComponentTemplateSpec: appsv1.ComponentTemplateSpec{
-						Name: "for-test",
-					}}},
+				ConfigTemplates: []appsv1.ComponentTemplateSpec{{
+					Name: "for-test",
+				}},
 			},
 			configSpec: "for-test",
 		},

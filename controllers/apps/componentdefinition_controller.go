@@ -190,7 +190,7 @@ func (r *ComponentDefinitionReconciler) validate(cli client.Client, rctx intctrl
 		r.validateVolumes,
 		r.validateHostNetwork,
 		r.validateServices,
-		r.validateConfigs,
+		r.validateComponentTemplate,
 		r.validateSystemAccounts,
 		r.validateReplicasLimit,
 		r.validateAvailable,
@@ -327,7 +327,7 @@ func (r *ComponentDefinitionReconciler) validateServices(cli client.Client, rctx
 	return nil
 }
 
-func (r *ComponentDefinitionReconciler) validateConfigs(cli client.Client, rctx intctrlutil.RequestCtx,
+func (r *ComponentDefinitionReconciler) validateComponentTemplate(cli client.Client, rctx intctrlutil.RequestCtx,
 	compd *appsv1.ComponentDefinition) error {
 	validateObject := func(objectKey client.ObjectKey) error {
 		configObj := &corev1.ConfigMap{}
@@ -339,9 +339,11 @@ func (r *ComponentDefinitionReconciler) validateConfigs(cli client.Client, rctx 
 		}
 		return nil
 	}
-	for _, config := range component.GetComponentDefTemplates(compd.Spec) {
-		if err := validateTemplate(config); err != nil {
-			return err
+	for _, tpls := range [][]appsv1.ComponentTemplateSpec{compd.Spec.Configs, compd.Spec.Scripts} {
+		for _, tpl := range tpls {
+			if err := validateTemplate(tpl); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

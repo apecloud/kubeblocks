@@ -24,23 +24,50 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/configuration"
 )
 
-// RenderConfigNScriptFiles generates volumes for PodTemplate, volumeMount for container, rendered configTemplate and scriptTemplate,
+type reloadActionContainerBuilder struct {
+	configuration.ReconcileCtx
+}
+
+func (c *reloadActionContainerBuilder) Do() error {
+	if len(c.SynthesizedComponent.ConfigTemplates) == 0 && len(c.SynthesizedComponent.ScriptTemplates) == 0 {
+		return nil
+	}
+
+	return configuration.NewReloadActionBuilderHelper(c.ReconcileCtx).
+		Prepare().
+		RenderScriptTemplate().
+		Configuration().
+		InitConfigRelatedObject().
+		UpdatePodVolumes().
+		BuildConfigManagerSidecar().
+		Complete()
+}
+
+// BuildReloadActionContainer generates volumes for PodTemplate, volumeMount for container, rendered configTemplate and scriptTemplate,
 // and generates configManager sidecar for the reconfigure operation.
-func RenderConfigNScriptFiles(resourceCtx *configuration.ResourceCtx,
+func BuildReloadActionContainer(resourceCtx *configuration.ResourceCtx,
 	cluster *appsv1.Cluster,
 	component *appsv1.Component,
 	synthesizedComponent *component.SynthesizedComponent,
 	podSpec *corev1.PodSpec,
+	paramsObj *parametersv1alpha1.ComponentParameter,
 	localObjs []client.Object) error {
-	return configuration.NewConfigReconcileTask(
-		resourceCtx,
-		cluster,
-		component,
-		synthesizedComponent,
-		podSpec,
-		localObjs).Reconcile()
+
+	builder := reloadActionContainerBuilder{
+		configuration.ReconcileCtx{
+			ResourceCtx:          resourceCtx,
+			Cluster:              cluster,
+			Component:            component,
+			SynthesizedComponent: synthesizedComponent,
+			PodSpec:              podSpec,
+			Cache:                localObjs,
+			ComponentParameter:   paramsObj,
+		},
+	}
+	return builder.Do()
 }

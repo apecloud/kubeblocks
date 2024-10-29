@@ -378,3 +378,5 @@ const (
 	// FailedComponentPhase indicates that there are some pods of the component not in a 'Running' state.
 	FailedComponentPhase ComponentPhase = "Failed"
 )
+
+type ComponentParameters map[string]*string

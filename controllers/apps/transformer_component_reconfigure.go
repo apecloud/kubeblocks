@@ -60,22 +60,7 @@ func (t *componentReloadActionSidecarTransformer) Transform(ctx graph.TransformC
 		return client.IgnoreNotFound(err)
 	}
 
-	// get dependOnObjs which will be used in configuration render
-	var dependOnObjs []client.Object
-	for _, vertex := range dag.Vertices() {
-		v, _ := vertex.(*model.ObjectVertex)
-		if cm, ok := v.Obj.(*corev1.ConfigMap); ok {
-			dependOnObjs = append(dependOnObjs, cm)
-			continue
-		}
-		if secret, ok := v.Obj.(*corev1.Secret); ok {
-			dependOnObjs = append(dependOnObjs, secret)
-			continue
-		}
-	}
-
-	// configuration render
-	if err := plan.BuildReloadActionContainer(
+	return plan.BuildReloadActionContainer(
 		&configctrl.ResourceCtx{
 			Context:       transCtx.Context,
 			Client:        t.Client,
@@ -88,8 +73,21 @@ func (t *componentReloadActionSidecarTransformer) Transform(ctx graph.TransformC
 		synthesizeComp,
 		synthesizeComp.PodSpec,
 		componentParameterObj,
-		dependOnObjs); err != nil {
-		return err
+		resolveRerenderDependOnObjects(dag))
+}
+
+func resolveRerenderDependOnObjects(dag *graph.DAG) []client.Object {
+	var dependOnObjs []client.Object
+	for _, vertex := range dag.Vertices() {
+		v, _ := vertex.(*model.ObjectVertex)
+		if cm, ok := v.Obj.(*corev1.ConfigMap); ok {
+			dependOnObjs = append(dependOnObjs, cm)
+			continue
+		}
+		if secret, ok := v.Obj.(*corev1.Secret); ok {
+			dependOnObjs = append(dependOnObjs, secret)
+			continue
+		}
 	}
-	return nil
+	return dependOnObjs
 }

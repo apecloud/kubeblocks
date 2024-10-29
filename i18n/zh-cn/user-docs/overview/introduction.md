@@ -22,9 +22,9 @@ KubeBlocks 是一个开源的 Kubernetes 数据库 operator，能够帮助用户
 
 ![](./../../img/kubeblocks-general-purpose-arch.png)
 
-在上图中，Cluster、Component 和 InstanceSet 都是 KubeBlocks 提供的 CRD（Custom Resource Definition）。可参阅 [KubeBlocks 概念文档](./concept.md)，了解更多细节。
+在上图中，Cluster、Component 和 InstanceSet 都是 KubeBlocks 提供的 CRD（自定义资源定义，Custom Resource Definition）。可参阅 [KubeBlocks 概念文档](./concept.md)，了解更多细节。
 
-KubeBlocks 提供了 Addon API，支持集成各种数据库。例如，我们目前提供了以下 KubeBlocks Addon，支持各类主流开源数据库引擎：
+KubeBlocks 提供了插件（Addon）API，支持集成各种数据库。例如，我们目前提供了以下 KubeBlocks 引擎插件，支持各类主流开源数据库引擎：
 
 - MySQL
 - PostgreSQL
@@ -41,7 +41,7 @@ KubeBlocks 提供了 Addon API，支持集成各种数据库。例如，我们�
 - etcd
 - ...
 
-您可参阅 [KubeBlocks 支持的 Addon 表格](./database-engines-supported.md)，查看 Addon 及其功能的详细信息。
+您可参阅 [KubeBlocks 支持的数据库引擎插件表格](./database-engines-supported.md)，查看支持的引擎及其功能的详细信息。
 
 凭借统一的 API，KubeBlocks 成为在 Kubernetes 上运行多种数据库的绝佳选择，可显著降低掌握多个 operator 所需的学习门槛。
 
@@ -207,7 +207,7 @@ spec:
 
 - 创建和销毁数据库集群。
 - 启动、停止和重启数据库集群。
-- 创建集群时，支持选择引擎 Addon 提供的部署拓扑结构，例如，Redis 提供了基于 Sentinel 的读写分离或 Redis 集群拓扑；MySQL 提供了 Proxy 拓扑，可实现读写分离和高可用解决方案，如内置的 Raft 共识插件、外部 etcd 作为协调器，或 Orchestrator。
+- 创建集群时，支持选择引擎插件提供的部署拓扑结构，例如，Redis 提供了基于 Sentinel 的读写分离或 Redis 集群拓扑；MySQL 提供了 Proxy 拓扑，可实现读写分离和高可用解决方案，如内置的 Raft 共识插件、外部 etcd 作为协调器，或 Orchestrator。
 - 支持在单个数据库集群中为多个副本分别配置不同的资源。例如，在一个 MySQL 集群中，主实例使用 8 个 CPU，而读副本使用 4 个 CPU。反观 Kubernetes 的 StatefulSet 则不支持这一能力。
 - 灵活的网络管理：
   - 以动态的方式将数据库访问端点暴露为服务（ClusterIP、LoadBalancer、NodePort）。
@@ -236,6 +236,6 @@ Kubernetes 应部署在节点间可以通过网络相互通信的环境中（例
 
 在生产环境中，我们建议将 KubeBlocks operator 与数据库部署在不同的节点上（如果您也安装了Prometheus 和 Grafana，建议同样操作）。默认情况下，KubeBlocks 使用反亲和性规则调度数据库集群的多个副本，实现副本在不同节点上运行，以确保高可用性。用户还可以配置可用区（AZ）级别的反亲和性，以便将数据库副本分布在不同的可用区中，从而增强灾难恢复能力。
 
-每个数据库副本在各自的 Pod 中运行。除了运行数据库进程的容器外，Pod 还包括几个辅助容器：一个名为 `lorry` 的容器（从 KubeBlocks v1.0 开始将更名为 kbagent），用于执行 KubeBlocks controller 的 Action 命令；另一个名为 `config-manager` 的容器（从 KubeBlocks v1.0 开始会合并到 kbagent中），用于管理数据库配置文件并支持热更新。此外，数据库引擎 Addon 也可能会有一个 exporter 容器，用于收集 Prometheus 监控所需的指标。
+每个数据库副本在各自的 Pod 中运行。除了运行数据库进程的容器外，Pod 还包括几个辅助容器：一个名为 `lorry` 的容器（从 KubeBlocks v1.0 开始将更名为 kbagent），用于执行 KubeBlocks 控制器（controller）的 Action 命令；另一个名为 `config-manager` 的容器（从 KubeBlocks v1.0 开始会合并到 kbagent 中），用于管理数据库配置文件并支持热更新。此外，数据库引擎插件也可能会有一个 exporter 容器，用于收集 Prometheus 监控所需的指标。
 
 ![KubeBlocks 架构图](./../../img/kubeblocks-architecture-ha.png)

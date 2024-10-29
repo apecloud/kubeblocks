@@ -1,14 +1,14 @@
 ---
-title: 如何创建数据库引擎
-description: 如何创建数据库引擎
+title: 如何创建数据库集群
+description: 如何创建数据库集群
 keywords: [创建数据库, KubeBlocks]
 sidebar_position: 1
 sidebar_label: Overview
 ---
 
-# 创建数据库引擎
+# 创建数据库集群
 
-部署 KubeBlocks 后，您可以使用 KubeBlocks 创建各种数据库，例如 MySQL、PostgreSQL、Redis、MongoDB、Kafka、Pulsar、RabbitMQ、Elasticsearch、Qdrant 等。KubeBlocks 通过 Addon 机制支持这些数据库。具体创建步骤可参考相应的文档。
+KubeBlocks 通过插件（Addon）机制支持多种数据库引擎。部署 KubeBlocks 后，您可以使用 KubeBlocks 创建各种数据库集群，例如 MySQL、PostgreSQL、Redis、MongoDB、Kafka、Pulsar、RabbitMQ、Elasticsearch、Qdrant 等。具体创建步骤可参考相应的文档。
 
 - [ApeCloud MySQL](./../kubeblocks-for-apecloud-mysql/cluster-management/create-and-connect-an-apecloud-mysql-cluster.md)
 - [MySQL 社区版](./../kubeblocks-for-mysql-community-edition/cluster-management/create-and-connect-a-mysql-cluster.md)

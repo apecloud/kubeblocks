@@ -15,7 +15,7 @@ sidebar_position: 3
 
 ## K8s 控制平面（Control Plane）
 
-Kubernetes 控制平面是 Kubernetes 的大脑和心脏。它负责管理整个集群的运行，包括处理 API 请求、存储配置数据以及确保集群处于期望的状态。关键组件包括 API 服务器（负责通信）、etcd（存储所有集群数据）、控制器管理器（强制执行期望状态）、调度器（将工作负载分配给节点）以及云控制器管理器（管理与云平台的集成，如负载均衡、存储和网络）。这些组件共同协调容器在集群中的部署、扩展和管理。
+Kubernetes 控制平面是 Kubernetes 的大脑和心脏。它负责管理整个集群的运行，包括处理 API 请求、存储配置数据以及确保集群处于期望的状态。关键组件包括 API 服务器（API Server，负责通信）、etcd（存储所有集群数据）、控制器管理器（Controller Manager，确保集群处于期望的状态）、调度器（Scheduler，将工作负载分配给节点）以及云控制器管理器（Cloud Controller Manager，管理与云平台的集成，如负载均衡、存储和网络）。这些组件共同协调容器在集群中的部署、扩展和管理。
 
 ## 节点（Node）
 
@@ -23,9 +23,9 @@ Kubernetes 控制平面是 Kubernetes 的大脑和心脏。它负责管理整个
 
 :::note
 
-在某些语境中，同时讨论 Kubernetes 和数据库时，"节点" 一词可能会产生混淆。在 Kubernetes 中，"节点" 指的是集群中作为工作单元的物理或虚拟机器，用于运行容器化应用。而在 Kubernetes 中运行数据库时，"数据库节点" 一般是指承载数据库实例的 Pod。
+在某些语境中，同时讨论 Kubernetes 和数据库时，“节点”一词可能会产生混淆。在 Kubernetes 中，“节点”指的是集群中作为工作单元的物理或虚拟机器，用于运行容器化应用。而在 Kubernetes 中运行数据库时，“数据库节点”一般是指承载数据库实例的 Pod。
 
-在 KubeBlocks 文档中，"节点" 通常指的是数据库节点。如果我们指的是 Kubernetes 节点，我们将明确说明为 "K8s 节点" 以避免混淆。
+在 KubeBlocks 文档中，“节点”通常指的是数据库节点。如果我们指的是 Kubernetes 节点，我们将明确说明为“K8s 节点”以避免混淆。
 
 :::
 
@@ -41,17 +41,17 @@ Pod 代表一个或多个紧密耦合且需要协同工作的容器，以及共�
 
 Kubernetes 动态管理 Pods，确保它们按指定的方式运行，并在失败时自动重启或替换 Pods。Pods 可以分布在多个节点上以实现冗余，因此在 Kubernetes 中部署和管理容器化应用（包括数据库）时，Pods 是基础构件。
 
-## Storage Class
+## 存储类（Storage Class）
 
-在为 Pod 内的工作负载（例如数据库）创建磁盘时，您可能需要指定磁盘介质的类型，无论是 HDD 还是 SSD。在云环境中，通常会有更多的选项可供选择。例如，AWS EBS 提供多种卷类型，如通用 SSD（gp2/gp3）、预配置 IOPS SSD（io1/io2）和优化吞吐量的 HDD（st1）。在 Kubernetes 中，您可以通过 StorageClass 选择所需的磁盘类型。
+在为 Pod 内的工作负载（例如数据库）创建磁盘时，您可能需要指定磁盘介质的类型，无论是 HDD 还是 SSD。在云环境中，通常会有更多的选项可供选择。例如，AWS EBS 提供多种卷类型，如通用 SSD（gp2/gp3）、预配置 IOPS SSD（io1/io2）和优化吞吐量的 HDD（st1）。在 Kubernetes 中，您可以通过存储类（StorageClass）选择所需的磁盘类型。
 
-## PVC
+## 持久卷声明（PVC）
 
 在 Kubernetes 中，持久卷声明（PVC，Persisten Volume Claim）是用户对存储的请求。PVC 本质上是请求具有特定特性的存储的一种方式，例如存储类、大小和访问模式（如读写或只读）。PVC 使 Pods 能够使用存储，而无需了解底层基础设施的详细信息。
 
 在 K8s 中，为了使用存储，用户会创建 PVC。创建 PVC 时，Kubernetes 会查找与请求匹配的 StorageClass。如果找到匹配的 StorageClass，Kubernetes 将根据定义的参数自动配置存储，无论是 SSD、HDD、EBS 还是 NAS。如果 PVC 未指定 StorageClass，Kubernetes 将使用默认的 StorageClass（如果已配置）来配置存储。
 
-## CSI
+## 容器存储接口（CSI）
 
 在 Kubernetes 中，通过容器存储接口（CSI，Container Storage Interface）提供各种存储类，CSI 负责为应用程序配置所需的底层存储“磁盘”。CSI 在 Kubernetes 中的功能类似于“磁盘驱动程序”，使平台能够适应并集成多种存储系统，如本地磁盘、AWS EBS 和 Ceph。这些存储类及其相关的存储资源由特定的 CSI 驱动程序提供，这些驱动程序处理与底层存储基础设施的交互。
 
@@ -59,7 +59,7 @@ CSI 是标准 API，使 Kubernetes 能够以一致和可扩展的方式与各种
 
 当您在 Kubernetes 中定义一个 StorageClass 时，它通常会指定一个 CSI 驱动程序作为其配置器。这个驱动程序会根据 StorageClass 和相关持久卷声明（PVC）中的参数自动配置持久卷（PV），确保为您的应用程序提供适当类型和配置的存储，无论是 SSD、HDD 还是其他类型。
 
-## PV
+## 持久卷（PV）
 
 在 Kubernetes 中，持久卷（PV，Persisten Volume）代表可以由多种系统（如本地磁盘、NFS 或基于云的存储，例如 AWS EBS、Google Cloud Persistent Disks）支持的存储资源，通常由不同的 CSI 驱动程序管理。
 
@@ -67,11 +67,11 @@ PV 有自己独立于 Pod 的生命周期，由 Kubernetes 控制平面进行管
 
 总之，PV 是实际的存储资源，而 PVC 是对存储的请求。通过 PVC 中的 StorageClass，PVC 可以绑定到由不同 CSI 驱动程序配置的 PV。
 
-## Service
+## 服务（Service）
 
-在 Kubernetes 中，Service 充当负载均衡器。它定义了一组逻辑上的 Pods，并提供了访问这些 Pods 的策略。由于 Pods 是短暂的，可能会动态创建和销毁，因此它们的 IP 地址并不稳定。Service 通过提供一个稳定的网络端点（虚拟 IP 地址，称为 ClusterIP）解决了这个问题，该地址保持不变，使其他 Pods 或外部客户端能够与 Service 后面的 Pods 通信，而无需知道它们的具体 IP 地址。
+在 Kubernetes 中，服务（Service）充当负载均衡器。它定义了一组逻辑上的 Pods，并提供了访问这些 Pods 的策略。由于 Pods 是短暂的，可能会动态创建和销毁，因此它们的 IP 地址并不稳定。服务通过提供一个稳定的网络端点（虚拟 IP 地址，称为 ClusterIP）解决了这个问题，该地址保持不变，使其他 Pods 或外部客户端能够与服务后面的 Pods 通信，而无需知道它们的具体 IP 地址。
 
-Service 支持不同类型：ClusterIP（内部集群访问）、NodePort（通过 `<NodeIP>:<NodePort>` 进行外部访问）、LoadBalancer（使用云提供商的负载均衡器公开 Service）、ExternalName（将 Service 映射到外部 DNS）。
+服务支持不同类型：ClusterIP（内部集群访问）、NodePort（通过 `<NodeIP>:<NodePort>` 进行外部访问）、LoadBalancer（使用云提供商的负载均衡器公开服务）、ExternalName（将服务映射到外部 DNS）。
 
 ## ConfigMap
 
@@ -83,13 +83,13 @@ Secret 用于存储敏感数据，例如密码、令牌或加密密钥。Secrets
 
 但 Secrets 默认情况下并不加密，它们只是进行 Base64 编码，并不能提供真正的加密。因此，仍需谨慎使用，确保适当的访问控制到位。
 
-## CRD
+## Custom Resource Definition (CRD)
 
-如果您希望使用 Kubernetes 管理数据库对象，则需要扩展 Kubernetes API，以描述您正在管理的数据库对象。这就是自定义资源定义（CRD，Custom Resource Definition）机制的用途所在，CRD 支持定义特定用例的自定义资源，如数据库集群或备份，并以 K8s 原生的方式管理资源。
+如果您希望使用 Kubernetes 管理数据库对象，则需要扩展 Kubernetes API，以描述您正在管理的数据库对象。这就是 CRD（Custom Resource Definition）机制的用途所在，CRD 支持定义特定用例的自定义资源，如数据库集群或备份，并以 K8s 原生的方式管理资源。
 
-## CR
+## 自定义资源（CR）
 
-自定义资源（CR，Custom Resource）是自定义资源定义（CRD）的实例。它表示扩展 Kubernetes API 的特定配置或对象。CR 允许您使用 Kubernetes 的原生工具定义和管理自定义资源，例如数据库或应用程序。一旦创建了 CR，Kubernetes 控制器或 Operator 会开始监控，并执行操作以保持所需状态。
+自定义资源（CR，Custom Resource）是 CRD 的实例。它表示扩展 Kubernetes API 的特定配置或对象。CR 允许您使用 Kubernetes 的原生工具定义和管理自定义资源，例如数据库或应用程序。一旦创建了 CR，Kubernetes 控制器或 Operator 会开始监控，并执行操作以保持所需状态。
 
 CRD 和 CR 是开发 Kubernetes Operator 的基础。CRDs 通常用于实现自定义控制器或 Operator，允许持续监视 CR 的变化（例如，表示数据库集群的 CR），并自动执行相应的操作。
 

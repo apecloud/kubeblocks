@@ -23,7 +23,7 @@ import TabItem from '@theme/TabItem';
 
 1. 设置 keepAddons。
 
-    KubeBlocks v0.8 精简了默认安装的引擎，将引擎从 KubeBlocks operator 分离到了 KubeBlocks Addons 代码仓库中，例如 greptime，influxdb，neon，oracle-mysql，orioledb，tdengine，mariadb，nebula，risingwave，starrocks，tidb，zookeeper。为避免升级时将已经在使用的引擎资源删除，请先执行如下命令。
+    KubeBlocks v0.8 精简了默认安装的引擎，将引擎从 KubeBlocks operator 分离到了 KubeBlocks 引擎插件代码仓库中，例如 greptime，influxdb，neon，oracle-mysql，orioledb，tdengine，mariadb，nebula，risingwave，starrocks，tidb，zookeeper。为避免升级时将已经在使用的引擎资源删除，请先执行如下命令。
 
     - 查看当前 KubeBlocks 版本。
 
@@ -31,22 +31,18 @@ import TabItem from '@theme/TabItem';
        helm -n kb-system list | grep kubeblocks
        ```
 
-    - 设置 keepAddons 参数为 true。
+    - 查看并添加引擎注解。
 
-        ```bash
-        helm repo add kubeblocks https://apecloud.github.io/helm-charts
-        helm repo update kubeblocks
-        helm -n kb-system upgrade kubeblocks kubeblocks/kubeblocks --version {VERSION} --set keepAddons=true
-        ```
-
-        请将以上 `{VERSION}` 替换为当前 KubeBlocks 的版本，比如 0.7.2。
-
-    - 查看引擎。
-
-        执行如下命令，确保 addon annotations 中添加了 `"helm.sh/resource-policy": "keep"`。
+        执行如下命令，查看引擎注解中是否添加了 `"helm.sh/resource-policy": "keep"`。
 
         ```bash
         kubectl get addon -o json | jq '.items[] | {name: .metadata.name, annotations: .metadata.annotations}'
+        ```
+
+        如果没有该注解，可以手动执行以下命令，为引擎添加注解。可以将 `-l app.kubernetes.io/name=kubeblocks` 替换为您所需的过滤条件。
+
+        ```bash
+        kubectl annotate addons.extensions.kubeblocks.io -l app.kubernetes.io/name=kubeblocks helm.sh/resource-policy=keep
         ```
 
 2. 安装 CRD。

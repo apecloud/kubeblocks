@@ -120,7 +120,7 @@ Run the following command to install the latest operator manifest for this minor
  kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/vx.y.x/kubeblocks.yaml
  ```
 
-You can find the YAML file address from the [KubeBlocks release assets](https://github.com/apecloud/kubeblocks/releases).
+You can find the YAML file URL from the [KubeBlocks release assets](https://github.com/apecloud/kubeblocks/releases).
 
 </TabItem>
 

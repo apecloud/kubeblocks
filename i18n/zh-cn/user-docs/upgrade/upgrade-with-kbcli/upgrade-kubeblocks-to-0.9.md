@@ -21,7 +21,7 @@ import TabItem from '@theme/TabItem';
 
 ## 兼容性说明
 
-KubeBlocks v0.9 可以兼容 KubeBlocks v0.8 的 API，但不保证兼容 v0.8 之前版本的 API，如果您正在使用 KubeBlocks v0.7 或者更老版本的 Addon（版本号为 `0.7.x`, `0.6.x`），请务必参考 [v0.8 升级文档](./upgrade-kubeblocks-to-0.8.md)将 KubeBlocks 升级至 v0.8 并将所有引擎（addon）升级至 v0.8，以确保升级至 v0.9 后服务的可用性。
+KubeBlocks v0.9 可以兼容 KubeBlocks v0.8 的 API，但不保证兼容 v0.8 之前版本的 API，如果您正在使用 KubeBlocks v0.7 或者更老版本的引擎（版本号为 `0.7.x`, `0.6.x`），请务必参考 [v0.8 升级文档](./upgrade-kubeblocks-to-0.8.md)将 KubeBlocks 升级至 v0.8 并将所有引擎升级至 v0.8，以确保升级至 v0.9 后服务的可用性。
 
 ## 从 0.8 版本升级
 
@@ -51,13 +51,13 @@ KubeBlocks v0.9 可以兼容 KubeBlocks v0.8 的 API，但不保证兼容 v0.8 �
 
 ## 升级引擎
 
-如果您在上述步骤中，没有将 `upgradeAddons` 指定为 `true`，或者您想要使用的引擎不在默认 addon 列表中，但您想要使用 v0.9.0 API，可使用如下方式升级引擎。
+如果您在上述步骤中，没有将 `upgradeAddons` 指定为 `true`，或者您想要使用的引擎不在默认列表中，但您想要使用 v0.9.0 API，可使用如下方式升级引擎。
 
 :::note
 
-- 如果您想要升级的引擎是 `mysql`，您需要升级 addon 并重启集群。否则使用 KubeBlocks v0.8 创建的集群将无法在 v0.9 中使用。
+- 如果您想要升级的引擎是 `mysql`，您需要升级引擎并重启集群。否则使用 KubeBlocks v0.8 创建的集群将无法在 v0.9 中使用。
 
-- 如果您想要升级 `clickhouse/milvus/elasticsearch/llm`，您需要先升级 KubeBlocks，再升级 addon，否在将无法在 v0.9 中正常使用。
+- 如果您想要升级 `clickhouse/milvus/elasticsearch/llm`，您需要先升级 KubeBlocks，再升级引擎，否在将无法在 v0.9 中正常使用。
 
 :::
 

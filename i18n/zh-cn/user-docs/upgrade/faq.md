@@ -15,7 +15,7 @@ import TabItem from '@theme/TabItem';
 
 ## 手动标记引擎
 
-为引擎添加 `"helm.sh/resource-policy": "keep"`注解，可以确保在使用 kbcli 和 Helm 升级过程中引擎不会被删除。
+KubeBlocks 早期版本在 Helm chart 中预装了一些引擎，但在新版本中，部分预装引擎可能被移除。此时，如果基于早期版本直接升级至最新版本，这些被移除引擎的 CR 也会被 Helm 移除，这些引擎创建的数据库集群也将受到影响。因此，升级 KubeBlocks 时，可通过为引擎添加 `"helm.sh/resource-policy": "keep"` 注解，确保相关引擎在升级过程中不会被移除。
 
 ### 查看引擎注解
 
@@ -102,7 +102,7 @@ helm -n kb-system upgrade kubeblocks kubeblocks/kubeblocks --version 0.9.1 \
 
 </Tabs>
 
-以下为上述命令中 flag 的说明：
+以下为上述命令的参数说明：
 
 - `--set image.registry=docker.io` 设置KubeBlocks 镜像仓库。
 - `--set dataProtection.image.registry=docker.io` 设置 KubeBlocks-Dataprotection 镜像仓库。

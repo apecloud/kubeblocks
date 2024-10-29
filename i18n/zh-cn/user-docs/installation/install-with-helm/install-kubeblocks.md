@@ -89,7 +89,7 @@ KubeBlocks 是 Kubernetes 原生 operator，可通过 Helm 或者 kubectl 应用
    helm install kubeblocks kubeblocks/kubeblocks --namespace kb-system --create-namespace
    ```
 
-   如果您想要在安装 KubeBlocks 添加自定义容忍，可使用以下命令：
+   如果您想要在安装 KubeBlocks 添加自定义容忍度，可使用以下命令：
 
    ```bash
    helm install kubeblocks kubeblocks/kubeblocks --namespace kb-system --create-namespace \
@@ -116,15 +116,15 @@ KubeBlocks 是 Kubernetes 原生 operator，可通过 Helm 或者 kubectl 应用
 
 <TabItem value="kubectl" label="kubectl">
 
-KubeBlocks 可以像 Kubernetes 中的其他资源一样，通过 YAML 文件和 kubectl 命令进行安装。
+与 Kubernetes 中的其他资源相同，KubeBlocks 也可以通过 YAML 文件和 kubectl 命令进行安装。
 
 执行以下命令，安装当前小版本发布的最新 operator。
 
- ```bash
- kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/vx.y.x/kubeblocks.yaml
- ```
+```bash
+kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/vx.y.x/kubeblocks.yaml
+```
 
-您可通过 [KubeBlocks 发布页资产](https://github.com/apecloud/kubeblocks/releases) 中获取 YAML 文件地址。
+您可通过 [KubeBlocks 发布页资源](https://github.com/apecloud/kubeblocks/releases) 中获取 YAML 文件地址。
 
 </TabItem>
 

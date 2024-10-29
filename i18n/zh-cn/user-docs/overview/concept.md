@@ -7,7 +7,7 @@ sidebar_position: 2
 
 # 概念
 
-["统一 API 如何降低学习曲线"](./introduction.md#统一的-api-如何降低学习门槛)一节介绍了使用统一 API 表达各种数据库的优势。如果仔细查看这些示例，您会注意到示例 YAML 文件中包含两个关键概念：**Cluster（集群）** 和 **Component（组件）**。例如，`test-mysql` 是一个包含名为 `mysql` 组件的集群（组件定义为 `apecloud-mysql`）。`test-redis` 也是一个集群，包含两个组件：一个是 `redis`（组件定义为 `redis-7`），有两个副本；另一个是 `redis-sentinel`（组件定义为 `redis-sentinel`），有三个副本。
+["统一 API 如何降低学习曲线"](./introduction.md#统一的-api-如何降低学习门槛)一节介绍了使用统一 API 表达各种数据库的优势。如果仔细查看这些示例，您会发现示例 YAML 文件中包含两个关键概念：**Cluster（集群）** 和 **Component（组件）**。例如，`test-mysql` 是一个包含名为 `mysql` 组件的集群（组件定义为 `apecloud-mysql`）。`test-redis` 也是一个集群，包含两个组件：一个是 `redis`（组件定义为 `redis-7`），有两个副本；另一个是 `redis-sentinel`（组件定义为 `redis-sentinel`），有三个副本。
 
 本文档将解释这两个概念背后的原因，并简要介绍其背后的 API（即 CRD, Custom Resource Definition）。
 
@@ -21,7 +21,7 @@ sidebar_position: 2
 
 因此，KubeBlocks 采用了分层 API（即 CRD）的设计，由 **Cluster（集群）** 和 **Component（组件）** 组成，以适应数据库系统的多组件、高度可变的部署拓扑结构。这些抽象允许我们灵活地表达和管理部署在 Kubernetes 上的各种数据库系统拓扑，并根据所需拓扑轻松地将组件组装成集群。
 
-组件是组成集群的积木块。事实上，Addon 开发者可以在 ClusterDefinition 中定义如何将多个组件组装成不同的拓扑结构。如果您不是 Addon 开发者，则无需过度关注 ClusterDefinition 的细节；您只需要知道 Addon 可以提供不同的拓扑结构选择。例如，Redis Addon 提供了三种拓扑："standalone"（单机），"replication"（主从复制）和 "replication-twemproxy"（主从复制 + twemproxy）。您可以在创建集群时指定所需的拓扑。
+组件是组成集群的积木块。事实上，数据库引擎插件开发者可以在 ClusterDefinition 中定义如何将多个组件组装成不同的拓扑结构。如果您只是普通用户，则无需过度关注 ClusterDefinition 的细节；您只需要知道 KubeBlocks 的插件可以提供不同的拓扑结构选择。例如，Redis 引擎插件支持三种拓扑："standalone"（单机），"replication"（主从复制）和 "replication-twemproxy"（主从复制 + twemproxy）。您可以在创建集群时指定所需的拓扑。
 
 以下是通过 `clusterDefinitionRef` 和 `topology` 创建 Redis 集群的示例：
 
@@ -79,11 +79,11 @@ spec:
 
 ## 深入了解 KubeBlocks API
 
-下图展示了 KubeBlocks 的主要 CRD，这里特别强调了 API 的分层结构。其他重要的 API，如 OpsRequest、Backup 和 Restore，并未包含在此图中，这里重点关注分层结构，图表表达更加清晰。我们将在其他文档中解释其他重要的 API。
+下图展示了 KubeBlocks 的主要 CRD，这里特别强调了 API 的分层结构。其他重要的 API，如 OpsRequest、Backup 和 Restore，并未包含在此图中。下图重点关注分层结构，图表展示更加清晰。我们将在其他文档中解释其他重要的 API。
 
 ![KubeBlocks API Layers](./../../img/kubeblocks-api-layers.png)
 
-KubeBlocks 的 CRD 可分为两大类：用户使用的 CRD 和 Addon CRD。
+KubeBlocks 的 CRD 可分为两大类：用户使用的 CRD 和 插件 CRD。
 
 **用户使用的 CRD**
 
@@ -93,13 +93,13 @@ KubeBlocks 的 CRD 可分为两大类：用户使用的 CRD 和 Addon CRD。
 - Component 对象：KubeBlocks 集群控制器（Cluster Controller）在检测到 Cluster 对象时递归创建的子资源。
 - InstanceSet 对象：KubeBlocks 组件控制器（Component Controller）在检测到 Component 对象时递归创建的子资源。InstanceSet 控制器（InstanceSet Controller）随后递归创建 Pod 和 PVC 对象。
 
-**Addon CRD**
+**插件 CRD**
 
-Addon 使用的 CRD 包括 ClusterDefinition、ComponentDefinition 和 ComponentVersion。这些 CR 由 Addon 开发者编写，并捆绑在 Addon 的 Helm chart 中。
+插件使用的 CRD 包括 ClusterDefinition、ComponentDefinition 和 ComponentVersion。这些 CR 由数据库引擎插件开发者编写，并捆绑在插件的 Helm chart 中。
 
 :::note
 
-尽管您无需编写 ClusterDefinition 和 ComponentDefinition 的 CR，但需要使用这些 CR。如前面创建 Redis 集群的示例所示，创建集群时，可以选择在每个组件的 `componentDef` 中指定相应的 ComponentDefinition CR 名称，或者在 `clusterDefinitionRef` 中指定相应的 ClusterDefinition CR 名称，并选择所需的拓扑结构。
+您无需编写 ClusterDefinition 和 ComponentDefinition 的 CR，但仍需要使用这些 CR。如前面创建 Redis Cluster 所示，创建集群时，可以选择在每个组件的 `componentDef` 中指定相应的 ComponentDefinition CR 名称，或者在 `clusterDefinitionRef` 中指定相应的 ClusterDefinition CR 名称，并选择所需的拓扑结构。
 
 :::
 
@@ -107,17 +107,17 @@ Addon 使用的 CRD 包括 ClusterDefinition、ComponentDefinition 和 Component
 
 #### Cluster
 
-Cluster 对象表示由 KubeBlocks 管理的整个数据库集群。一个 Cluster 可以包含多个 Component，用户在 Cluster API 中指定每个 Component 的配置，集群控制器将生成并调谐相应的 Component 对象。此外，集群控制器还管理在 Cluster 层暴露的所有服务地址。
+Cluster 对象表示由 KubeBlocks 管理的整个数据库集群。一个集群可以包含多个 Component，用户在 Cluster API 中指定每个 Component 的配置，集群控制器将生成并调谐相应的 Component 对象。此外，集群控制器还管理在集群层暴露的所有服务地址。
 
-对于像 Redis Cluster 这种采用无共享架构的分布式数据库，Cluster 支持管理多个分片（shard），每个分片由一个单独的 Component 管理。这种架构还支持动态分片（dynamic resharding）：如果需要扩展并添加新分片，只需添加一个新的组件；反之，如果需要缩减分片数量，则移除相应的组件。
+对于像 Redis Cluster 这种采用无共享架构的分布式数据库，集群对象支持管理多个分片（shard），每个分片由一个单独的 Component 管理。这种架构还支持动态分片（dynamic resharding）：如果需要扩展并添加新分片，只需添加一个新的 Component；反之，如果需要缩减分片数量，则移除相应的 Component。
 
 #### Component
 
-Component 是 Cluster 对象的基本模块。例如，一个 Redis 集群可以包含 redis、sentinel，也可能包含代理组件，如 twemproxy。
+Component 是集群对象的基本模块。例如，一个 Redis 集群可以包含 redis、sentinel，也可能包含代理组件，如 twemproxy。
 
 Component 对象负责管理 Component 内所有副本的生命周期，支持多种操作，包括实例的创建、停止、重启、终止、升级、配置变更、垂直和水平扩展、故障切换、主备切换、调度配置、服务暴露、系统账号管理等。
 
-Component 是从用户提交的 Cluster 对象派生的内部子对象，主要供 KubeBlocks 控制器使用，不建议用户直接修改 Component 对象，应仅用于监控组件状态。
+Component 是从用户提交的 Cluster 对象派生的内部子对象，主要供 KubeBlocks 控制器使用，不建议用户直接修改 Component 对象，应仅用于监控 Component 状态。
 
 #### InstanceSet
 
@@ -129,7 +129,7 @@ Component 是从用户提交的 Cluster 对象派生的内部子对象，主要�
 
 :::note
 
-只有 Addon 开发者需要了解 ClusterDefinition 和 ComponentDefinition API，普通用户可以跳过这部分内容。
+只有引擎插件开发者需要了解 ClusterDefinition 和 ComponentDefinition API，普通用户可以跳过这部分内容。
 
 :::
 
@@ -137,7 +137,7 @@ Component 是从用户提交的 Cluster 对象派生的内部子对象，主要�
 
 ClusterDefinition 是用于定义数据库集群所有可用拓扑的 API，提供了多种拓扑配置以满足不同的部署需求和场景。
 
-每个拓扑都包含一个 Component 列表，每个 Component 都关联到一个 ComponentDefinition，提升了复用性并减少了冗余。例如，常用组件如 etcd 和 ZooKeeper 的 ComponentDefinition 可以只定义一次，实现在多个 ClusterDefinition 中复用，从而简化新系统的设置。
+每个拓扑都包含一个组件列表，每个组件都关联到一个 ComponentDefinition，提升了复用性并减少了冗余。例如，常用组件如 etcd 和 ZooKeeper 的 ComponentDefinition 可以只定义一次，实现在多个 ClusterDefinition 中复用，从而简化新系统的设置。
 
 此外，ClusterDefinition 还指定了组件的启动、升级和关闭顺序，确保组件生命周期的可控管理。
 
@@ -157,10 +157,10 @@ ComponentDefinition 可以定义的关键内容包括：
 
 ComponentDefinition 还支持定义组件对事件的响应行为，例如成员加入/离开、组件添加/删除、角色变更、切换等。这使得可以自动处理事件，从而封装组件的复杂行为。
 
-## Addon 是什么
+## 插件（Addon）是什么
 
-KubeBlocks 使用 Addon 来扩展对不同数据库引擎的支持。Addon 是某个特定数据库引擎的扩展，例如 MySQL Addon、PostgreSQL Addon、Redis Addon、MongoDB Addon 和 Kafka Addon。目前 KubeBlocks 仓库中提供了超过 30 种 Addon。
+KubeBlocks 使用插件（Addon）机制来扩展对不同数据库引擎的支持。插件是某个特定数据库引擎的扩展，例如 MySQL Addon、PostgreSQL Addon、Redis Addon、MongoDB Addon 和 Kafka Addon。目前 KubeBlocks 提供了超过 30 种数据库引擎插件。
 
-一个 Addon 包含基于 ClusterDefinition、ComponentDefinition 和 ComponentVersion CRD 的 CR（自定义资源），以及一些 ConfigMap（用作配置模板或脚本文件模板）、脚本文件、定义备份和恢复操作的 CR 和 Grafana 仪表板 JSON 对象。
+一个引擎插件包含基于 ClusterDefinition、ComponentDefinition 和 ComponentVersion CRD 的自定义资源（CR），以及一些 ConfigMap（用作配置模板或脚本文件模板）、脚本文件、定义备份和恢复操作的自定义资源和 Grafana 仪表板 JSON 对象。
 
-Addon 将以 Helm chart 的形式打包和安装。用户安装某个数据库引擎的 Addon 后，可以在创建集群时引用该 Addon 中包含的 ClusterDefinition CR 和 ComponentDefinition CR，从而创建相应数据库引擎的集群。
+KubeBlocks 的引擎插件将以 Helm chart 的形式打包和安装。用户安装某个数据库引擎插件后，可以在创建集群时引用该插件中包含的 ClusterDefinition CR 和 ComponentDefinition CR，从而创建相应数据库引擎的集群。

@@ -22,85 +22,81 @@ package util
 import (
 	"context"
 	"fmt"
-	"time"
+	"sync"
 
 	"github.com/go-logr/logr"
-	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
+	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/tools/record"
 	ctlruntime "sigs.k8s.io/controller-runtime"
 )
 
 const (
-	sendEventMaxAttempts   = 30
-	sendEventRetryInterval = 10 * time.Second
+	sendQPS       = 30
+	sendBurstSize = 25
 )
 
-func SendEventWithMessage(logger *logr.Logger, reason string, message string) {
+var (
+	once      sync.Once
+	recorder  record.EventRecorder
+	clientSet *kubernetes.Clientset
+)
+
+func SendEventWithMessage(logger logr.Logger, reason, message string) {
+	once.Do(func() {
+		if err := initEventRecorder(); err != nil {
+			logger.Error(err, "Failed to initialize event recorder")
+		}
+	})
+
 	go func() {
-		event := createEvent(reason, message)
-		err := sendEvent(event)
-		if logger != nil && err != nil {
-			logger.Error(err, "send event failed")
+		if err := sendEvent(reason, message); err != nil {
+			logger.Error(err, "Failed to send event")
 		}
 	}()
 }
 
-func createEvent(reason string, message string) *corev1.Event {
-	return &corev1.Event{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s.%s", podName(), rand.String(16)),
-			Namespace: namespace(),
+func initEventRecorder() error {
+	if err := initializeClientSet(); err != nil {
+		return fmt.Errorf("failed to get k8s clientset: %w", err)
+	}
+
+	eventBroadcaster := record.NewBroadcasterWithCorrelatorOptions(
+		record.CorrelatorOptions{
+			QPS:       sendQPS,
+			BurstSize: sendBurstSize,
 		},
-		InvolvedObject: corev1.ObjectReference{
-			Kind:      "Pod",
-			Namespace: namespace(),
-			Name:      podName(),
-			UID:       types.UID(podUID()),
-			FieldPath: "spec.containers{kbagent}",
+	)
+	eventBroadcaster.StartRecordingToSink(
+		&typedcorev1.EventSinkImpl{
+			Interface: clientSet.CoreV1().Events(""),
 		},
-		Reason:  reason,
-		Message: message,
-		Source: corev1.EventSource{
+	)
+
+	recorder = eventBroadcaster.NewRecorder(
+		scheme.Scheme,
+		corev1.EventSource{
 			Component: "kbagent",
 			Host:      nodeName(),
 		},
-		FirstTimestamp:      metav1.Now(),
-		LastTimestamp:       metav1.Now(),
-		EventTime:           metav1.NowMicro(),
-		ReportingController: "kbagent",
-		ReportingInstance:   podName(),
-		Action:              reason,
-		Type:                "Normal",
-	}
+	)
+	return nil
 }
 
-func sendEvent(event *corev1.Event) error {
-	clientSet, err := getK8sClientSet()
+func sendEvent(reason, message string) error {
+	pod, err := clientSet.CoreV1().Pods(namespace()).Get(context.TODO(), podName(), metav1.GetOptions{})
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get pod: %w", err)
 	}
-	for i := 0; i < sendEventMaxAttempts; i++ {
-		_, err = clientSet.CoreV1().Events(namespace()).Create(context.Background(), event, metav1.CreateOptions{})
-		if err == nil {
-			return nil
-		}
-		time.Sleep(sendEventRetryInterval)
-	}
+	recorder.Event(pod, corev1.EventTypeNormal, reason, message)
+	return nil
+}
+
+func initializeClientSet() error {
+	var err error
+	clientSet, err = kubernetes.NewForConfig(ctlruntime.GetConfigOrDie())
 	return err
-}
-
-func getK8sClientSet() (*kubernetes.Clientset, error) {
-	restConfig, err := ctlruntime.GetConfig()
-	if err != nil {
-		return nil, errors.Wrap(err, "get kubeConfig failed")
-	}
-	clientSet, err := kubernetes.NewForConfig(restConfig)
-	if err != nil {
-		return nil, err
-	}
-	return clientSet, nil
 }

@@ -78,14 +78,6 @@ spec:
           spec:
             description: ReconciliationTraceSpec defines the desired state of ReconciliationTrace
             properties:
-              depth:
-                default: 0
-                description: |-
-                  Depth of the object tree.
-                  Default is 0, means all the primary object and secondary objects.
-                format: int32
-                minimum: 0
-                type: integer
               dryRun:
                 description: |-
                   DryRun tells the Controller to simulate the reconciliation process with a new desired spec of the TargetObject.
@@ -153,7 +145,7 @@ spec:
                   that is the reconciliation process from the end of last reconciliation cycle until now.
                 properties:
                   changes:
-                    description: Changes describes the detail reconciliation progress.
+                    description: Changes describes the detail reconciliation process.
                     items:
                       description: ObjectChange defines a detailed change of an object.
                       properties:
@@ -384,7 +376,7 @@ spec:
                   cycle.
                 properties:
                   changes:
-                    description: Changes describes the detail reconciliation progress.
+                    description: Changes describes the detail reconciliation process.
                     items:
                       description: ObjectChange defines a detailed change of an object.
                       properties:
@@ -639,7 +631,7 @@ spec:
                       if the DesiredSpec is applied.
                     properties:
                       changes:
-                        description: Changes describes the detail reconciliation progress.
+                        description: Changes describes the detail reconciliation process.
                         items:
                           description: ObjectChange defines a detailed change of an
                             object.

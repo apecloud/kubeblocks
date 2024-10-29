@@ -49,14 +49,6 @@ type ReconciliationTraceSpec struct {
 	// +optional
 	StateEvaluationExpression *StateEvaluationExpression `json:"stateEvaluationExpression,omitempty"`
 
-	// Depth of the object tree.
-	// Default is 0, means all the primary object and secondary objects.
-	//
-	// +kubebuilder:default=0
-	// +kubebuilder:validation:Minimum=0
-	// +optional
-	Depth *int32 `json:"depth,omitempty"`
-
 	// Locale specifies the locale to use when localizing the reconciliation trace.
 	//
 	// +optional
@@ -339,7 +331,7 @@ type ReconciliationCycleState struct {
 	//
 	ObjectTree *ObjectTreeNode `json:"objectTree"`
 
-	// Changes describes the detail reconciliation progress.
+	// Changes describes the detail reconciliation process.
 	//
 	Changes []ObjectChange `json:"changes"`
 }

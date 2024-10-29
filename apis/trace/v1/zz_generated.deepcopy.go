@@ -353,11 +353,6 @@ func (in *ReconciliationTraceSpec) DeepCopyInto(out *ReconciliationTraceSpec) {
 		*out = new(StateEvaluationExpression)
 		(*in).DeepCopyInto(*out)
 	}
-	if in.Depth != nil {
-		in, out := &in.Depth, &out.Depth
-		*out = new(int32)
-		**out = **in
-	}
 	if in.Locale != nil {
 		in, out := &in.Locale, &out.Locale
 		*out = new(string)

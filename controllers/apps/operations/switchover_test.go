@@ -22,6 +22,8 @@ package operations
 import (
 	"fmt"
 
+	utilrand "k8s.io/apimachinery/pkg/util/rand"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -45,15 +47,25 @@ var (
 
 var _ = Describe("", func() {
 	var (
-		randomStr          = testCtx.GetRandomStr()
-		clusterVersionName = "cluster-version-for-ops-" + randomStr
-		clusterName        = "cluster-for-ops-" + randomStr
+		randomStr             = testCtx.GetRandomStr()
+		clusterVersionName    = "cluster-version-for-ops-" + randomStr
+		clusterName           = "cluster-for-ops-" + randomStr
+		shardingComponentName = "shard-cmp-" + randomStr
+		shardingClusterName   = "shard-cluster-" + randomStr
 	)
 
 	defaultRole := func(index int32) string {
 		role := constant.Follower
 		if index == 0 {
 			role = constant.Leader
+		}
+		return role
+	}
+
+	defaultReplicationRole := func(index int32) string {
+		role := constant.Primary
+		if index == 0 {
+			role = constant.Secondary
 		}
 		return role
 	}
@@ -237,6 +249,145 @@ var _ = Describe("", func() {
 			})).Should(Succeed())
 			Expect(testapps.ChangeObj(&testCtx, followerPod, func(pod *corev1.Pod) {
 				pod.Labels[constant.RoleLabelKey] = constant.Leader
+			})).Should(Succeed())
+			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+		})
+	})
+
+	Context("Test OpsRequest switchover with sharding", func() {
+		BeforeEach(func() {
+			By("Create a sharding clusterDefinition obj with switchoverSpec.")
+			switchoverSpec := &appsv1alpha1.ComponentSwitchover{
+				WithCandidate: &appsv1alpha1.Action{
+					Image: testapps.DefaultRedisImageName,
+					Exec: &appsv1alpha1.ExecAction{
+						Command: []string{"echo", "hello"},
+					},
+				},
+				ScriptSpecSelectors: []appsv1alpha1.ScriptSpecSelector{{Name: "redis-cluster-script"}},
+			}
+			testapps.NewComponentDefinitionFactory(shardingComponentName).AddRole("primary", true, true).
+				AddRole("secondary", false, false).SetLifecycleAction("switchover", switchoverSpec).
+				SetRuntime(nil).
+				Create(&testCtx).GetObject()
+		})
+		It("Test sharding switchover OpsRequest", func() {
+			reqCtx := intctrlutil.RequestCtx{
+				Ctx:      testCtx.Ctx,
+				Recorder: k8sManager.GetEventRecorderFor("opsrequest-controller"),
+			}
+			By("Creating a cluster with sharding .")
+			shardingName := "shard"
+			shardClusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, shardingClusterName,
+				"", "").
+				AddShardingSpecV2(shardingName, shardingComponentName).
+				SetShards(3).
+				SetShardReplicas(2).
+				Create(&testCtx).GetObject()
+
+			By("Creating shard instanceset.")
+			container := corev1.Container{
+				Name:            "mock-container-name",
+				Image:           testapps.ApeCloudMySQLImage,
+				ImagePullPolicy: corev1.PullIfNotPresent,
+			}
+			rand := utilrand.String(3)
+			shardCmpSpecName := shardingName + "-" + rand
+			cmpName := shardClusterObj.Name + "-" + shardCmpSpecName
+			component := testapps.NewComponentFactory(testCtx.DefaultNamespace, cmpName, shardingComponentName).
+				AddAppInstanceLabel(shardClusterObj.Name).
+				AddShardNameLabel(shardingName).
+				AddClusterUIDLabel(string(shardClusterObj.UID)).
+				Create(&testCtx).GetObject()
+			its := testapps.NewInstanceSetFactory(testCtx.DefaultNamespace,
+				component.Name, shardClusterObj.Name, component.Name).
+				AddFinalizers([]string{constant.DBClusterFinalizerName}).
+				AddContainer(container).
+				AddAppInstanceLabel(shardClusterObj.Name).
+				AddAppComponentLabel(shardCmpSpecName).
+				AddAppManagedByLabel().
+				SetReplicas(2).
+				Create(&testCtx).GetObject()
+			By("Creating Pods of replication workloadType.")
+			var (
+				leaderPod   *corev1.Pod
+				followerPod *corev1.Pod
+			)
+			for i := int32(0); i < *its.Spec.Replicas; i++ {
+				pod := testapps.NewPodFactory(testCtx.DefaultNamespace, fmt.Sprintf("%s-%d", its.Name, i)).
+					AddContainer(container).
+					AddLabelsInMap(its.Labels).
+					AddRoleLabel(defaultReplicationRole(i)).
+					Create(&testCtx).GetObject()
+				if pod.Labels[constant.RoleLabelKey] == constant.Primary {
+					leaderPod = pod
+				} else {
+					followerPod = pod
+				}
+			}
+			opsRes := &OpsResource{
+				Cluster:  shardClusterObj,
+				Recorder: k8sManager.GetEventRecorderFor("opsrequest-controller"),
+			}
+			By("mock cluster is Running and the status operations")
+			Expect(testapps.ChangeObjStatus(&testCtx, shardClusterObj, func() {
+				shardClusterObj.Status.Phase = appsv1alpha1.RunningClusterPhase
+				shardClusterObj.Status.Components = map[string]appsv1alpha1.ClusterComponentStatus{
+					consensusComp: {
+						Phase: appsv1alpha1.RunningClusterCompPhase,
+					},
+				}
+			})).Should(Succeed())
+			opsRes.Cluster = shardClusterObj
+
+			By("create switchover opsRequest")
+			ops := testapps.NewOpsRequestObj("ops-switchover-"+randomStr, testCtx.DefaultNamespace,
+				shardClusterObj.Name, appsv1alpha1.SwitchoverType)
+			ops.Spec.SwitchoverList = []appsv1alpha1.Switchover{
+				{
+					ComponentOps: appsv1alpha1.ComponentOps{ComponentName: shardingName},
+					InstanceName: followerPod.Name,
+				},
+			}
+			opsRes.OpsRequest = testapps.CreateOpsRequest(ctx, testCtx, ops)
+			// set ops phase to Pending
+			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsPendingPhase
+
+			By("mock switchover OpsRequest phase is Creating")
+			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(appsv1alpha1.OpsCreatingPhase))
+
+			// do switchover action
+			By("do switchover action")
+			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+
+			By("do reconcile switchoverAction failed because switchover job status failed")
+			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			Expect(err).Should(HaveOccurred())
+			Expect(err.Error()).Should(ContainSubstring("requeue to waiting for job"))
+
+			By("mock job status to success.")
+			jobName := fmt.Sprintf("%s-%s-%d", KBSwitchoverJobNamePrefix, cmpName, opsRes.Cluster.Generation)
+			key := types.NamespacedName{
+				Name:      jobName,
+				Namespace: shardClusterObj.Namespace,
+			}
+			patchK8sJobStatus(batchv1.JobComplete, key)
+
+			By("do reconcile switchoverAction failed because pod role label is not consistency")
+			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			Expect(err).Should(HaveOccurred())
+			Expect(err.Error()).Should(ContainSubstring("requeue to waiting for pod role label consistency"))
+
+			By("mock pod role label changed.")
+			Expect(testapps.ChangeObj(&testCtx, leaderPod, func(pod *corev1.Pod) {
+				pod.Labels[constant.RoleLabelKey] = constant.Secondary
+			})).Should(Succeed())
+			Expect(testapps.ChangeObj(&testCtx, followerPod, func(pod *corev1.Pod) {
+				pod.Labels[constant.RoleLabelKey] = constant.Primary
 			})).Should(Succeed())
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())

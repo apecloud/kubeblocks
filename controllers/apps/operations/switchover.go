@@ -65,16 +65,36 @@ func (r switchoverOpsHandler) ActionStartedCondition(reqCtx intctrlutil.RequestC
 	switchoverMessageMap := make(map[string]SwitchoverMessage)
 	for _, switchover := range opsRes.OpsRequest.Spec.SwitchoverList {
 		compSpec := opsRes.Cluster.Spec.GetComponentByName(switchover.ComponentName)
-		synthesizedComp, err := buildSynthesizedComp(reqCtx, cli, opsRes, compSpec)
-		if err != nil {
-			return nil, err
+		shardingSpec := opsRes.Cluster.Spec.GetShardingByName(switchover.ComponentName)
+		var synthesizedComp *component.SynthesizedComponent
+		var err error
+		if nil != compSpec {
+			synthesizedComp, err = buildSynthesizedComp(reqCtx, cli, opsRes, compSpec)
+			if err != nil {
+				return nil, err
+			}
+		}
+		if nil != shardingSpec {
+			synthesizedComp, err = buildSynthesizedShardComp(reqCtx, cli, opsRes, shardingSpec, switchover)
+			if err != nil {
+				return nil, err
+			}
 		}
 		pod, err := getServiceableNWritablePod(reqCtx.Ctx, cli, *opsRes.Cluster, *synthesizedComp)
 		if err != nil {
 			return nil, err
 		}
-		switchoverMessageMap[switchover.ComponentName] = SwitchoverMessage{
-			Switchover: switchover,
+		var switchoverCopy = switchover
+		var mapKey = switchover.ComponentName
+		if nil != shardingSpec {
+			// in sharding API, update component name
+			switchoverCopy = *switchover.DeepCopy()
+			switchoverCopy.ComponentName = synthesizedComp.Name
+			// need to replace key too or multiple switchover may override each others
+			mapKey = synthesizedComp.Name
+		}
+		switchoverMessageMap[mapKey] = SwitchoverMessage{
+			Switchover: switchoverCopy,
 			OldPrimary: pod.Name,
 			Cluster:    opsRes.Cluster.Name,
 		}
@@ -131,9 +151,20 @@ func doSwitchoverComponents(reqCtx intctrlutil.RequestCtx, cli client.Client, op
 	}
 	for _, switchover := range switchoverList {
 		compSpec := opsRes.Cluster.Spec.GetComponentByName(switchover.ComponentName)
-		synthesizedComp, err := buildSynthesizedComp(reqCtx, cli, opsRes, compSpec)
-		if err != nil {
-			return err
+		shardingSpec := opsRes.Cluster.Spec.GetShardingByName(switchover.ComponentName)
+		var synthesizedComp *component.SynthesizedComponent
+		var err error
+		if nil != compSpec {
+			synthesizedComp, err = buildSynthesizedComp(reqCtx, cli, opsRes, compSpec)
+			if err != nil {
+				return err
+			}
+		}
+		if nil != shardingSpec {
+			synthesizedComp, err = buildSynthesizedShardComp(reqCtx, cli, opsRes, shardingSpec, switchover)
+			if err != nil {
+				return err
+			}
 		}
 		needSwitchover, err := needDoSwitchover(reqCtx.Ctx, cli, opsRes.Cluster, synthesizedComp, &switchover)
 		if err != nil {
@@ -195,8 +226,30 @@ func handleSwitchoverProgress(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 			completedCount += 1
 			continue
 		}
+		compSpec := opsRes.Cluster.Spec.GetComponentByName(switchover.ComponentName)
+		shardingSpec := opsRes.Cluster.Spec.GetShardingByName(switchover.ComponentName)
+		var synthesizedComp *component.SynthesizedComponent
+		var errBuild error
+		if nil != compSpec {
+			synthesizedComp, errBuild = buildSynthesizedComp(reqCtx, cli, opsRes, compSpec)
+		}
+		if nil != shardingSpec {
+			synthesizedComp, errBuild = buildSynthesizedShardComp(reqCtx, cli, opsRes, shardingSpec, switchover)
+		}
+		// check the current component pod role label whether correct
+		checkRoleLabelProcessDetail := appsv1alpha1.ProgressStatusDetail{
+			ObjectKey: getProgressObjectKey(KBSwitchoverCheckRoleLabelKey, switchover.ComponentName),
+			Status:    appsv1alpha1.ProcessingProgressStatus,
+			Message:   fmt.Sprintf("waiting for component %s pod role label consistency after switchover", switchover.ComponentName),
+		}
+		if errBuild != nil {
+			checkRoleLabelProcessDetail.Message = fmt.Sprintf("handleSwitchoverProgress build synthesizedComponent %s failed", switchover.ComponentName)
+			checkRoleLabelProcessDetail.Status = appsv1alpha1.FailedProgressStatus
+			setComponentSwitchoverProgressDetails(reqCtx.Recorder, opsRequest, appsv1alpha1.UpdatingClusterCompPhase, checkRoleLabelProcessDetail, switchover.ComponentName)
+			continue
+		}
 		// check the current component switchoverJob whether succeed
-		jobName := genSwitchoverJobName(opsRes.Cluster.Name, switchover.ComponentName, switchoverCondition.ObservedGeneration)
+		jobName := genSwitchoverJobName(opsRes.Cluster.Name, synthesizedComp.Name, switchoverCondition.ObservedGeneration)
 		checkJobProcessDetail := appsv1alpha1.ProgressStatusDetail{
 			ObjectKey: getProgressObjectKey(KBSwitchoverCheckJobKey, jobName),
 			Status:    appsv1alpha1.ProcessingProgressStatus,
@@ -216,21 +269,6 @@ func handleSwitchoverProgress(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 			checkJobProcessDetail.Message = fmt.Sprintf("switchover job %s is succeed", jobName)
 			checkJobProcessDetail.Status = appsv1alpha1.SucceedProgressStatus
 			setComponentSwitchoverProgressDetails(reqCtx.Recorder, opsRequest, appsv1alpha1.UpdatingClusterCompPhase, checkJobProcessDetail, switchover.ComponentName)
-		}
-
-		// check the current component pod role label whether correct
-		checkRoleLabelProcessDetail := appsv1alpha1.ProgressStatusDetail{
-			ObjectKey: getProgressObjectKey(KBSwitchoverCheckRoleLabelKey, switchover.ComponentName),
-			Status:    appsv1alpha1.ProcessingProgressStatus,
-			Message:   fmt.Sprintf("waiting for component %s pod role label consistency after switchover", switchover.ComponentName),
-		}
-		compSpec := opsRes.Cluster.Spec.GetComponentByName(switchover.ComponentName)
-		synthesizedComp, errBuild := component.BuildSynthesizedComponentWrapper(reqCtx, cli, opsRes.Cluster, compSpec)
-		if errBuild != nil {
-			checkRoleLabelProcessDetail.Message = fmt.Sprintf("handleSwitchoverProgress build synthesizedComponent %s failed", switchover.ComponentName)
-			checkRoleLabelProcessDetail.Status = appsv1alpha1.FailedProgressStatus
-			setComponentSwitchoverProgressDetails(reqCtx.Recorder, opsRequest, appsv1alpha1.UpdatingClusterCompPhase, checkRoleLabelProcessDetail, switchover.ComponentName)
-			continue
 		}
 		consistency, err = checkPodRoleLabelConsistency(reqCtx.Ctx, cli, opsRes.Cluster, *synthesizedComp, &switchover, switchoverCondition)
 		if err != nil {
@@ -311,4 +349,18 @@ func buildSynthesizedComp(reqCtx intctrlutil.RequestCtx, cli client.Client, opsR
 	}
 	// build synthesized component for generated component
 	return component.BuildSynthesizedComponentWrapper(reqCtx, cli, opsRes.Cluster, clusterCompSpec)
+}
+
+// buildSynthesizedShardComp builds synthesized component for generated component.
+func buildSynthesizedShardComp(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource, shardingSpec *appsv1alpha1.ShardingSpec, switchover appsv1alpha1.Switchover) (*component.SynthesizedComponent, error) {
+	if len(shardingSpec.Template.ComponentDef) > 0 {
+		compObj, compDefObj, err := component.GetCompNCompDefByShardName(reqCtx.Ctx, cli,
+			opsRes.Cluster.Namespace, opsRes.Cluster.Name, shardingSpec.Name, switchover.InstanceName)
+		if err != nil {
+			return nil, err
+		}
+		// build synthesized component for native component
+		return component.BuildSynthesizedComponent(reqCtx, cli, opsRes.Cluster, compDefObj, compObj)
+	}
+	return nil, errors.New("sharding spec should have component definition.")
 }

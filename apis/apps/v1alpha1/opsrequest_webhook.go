@@ -1021,13 +1021,21 @@ func validateSwitchoverResourceList(ctx context.Context, cli client.Client, clus
 		}
 
 		compSpec := cluster.Spec.GetComponentByName(switchover.ComponentName)
-		if compSpec == nil {
-			return fmt.Errorf("component %s not found", switchover.ComponentName)
+		shardingSpec := cluster.Spec.GetShardingByName(switchover.ComponentName)
+		if compSpec == nil && shardingSpec == nil {
+			return fmt.Errorf("component or sharding %s not found", switchover.ComponentName)
 		}
-		if compSpec.ComponentDef != "" {
-			return validateBaseOnCompDef(compSpec.ComponentDef)
-		} else {
-			return validateBaseOnClusterCompDef(cluster.Spec.GetComponentDefRefName(switchover.ComponentName))
+		if compSpec != nil {
+			if compSpec.ComponentDef != "" {
+				return validateBaseOnCompDef(compSpec.ComponentDef)
+			} else {
+				return validateBaseOnClusterCompDef(cluster.Spec.GetComponentDefRefName(switchover.ComponentName))
+			}
+		}
+		if shardingSpec != nil {
+			if shardingSpec.Template.ComponentDef != "" {
+				return validateBaseOnCompDef(shardingSpec.Template.ComponentDef)
+			}
 		}
 	}
 	return nil

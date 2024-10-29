@@ -38,12 +38,14 @@ import (
 var _ = Describe("OpsRequest webhook", func() {
 	const (
 		componentName      = "replicasets"
+		shardName          = "shard"
 		proxyComponentName = "proxy"
 	)
 	var (
 		randomStr                    = testCtx.GetRandomStr()
 		clusterDefinitionName        = "opswebhook-mysql-definition-" + randomStr
 		componentDefinitionName      = "opswk-compdef-" + randomStr
+		shardComponentDefinitionName = "opswk-shard-compdef-" + randomStr
 		clusterVersionName           = "opswebhook-mysql-clusterversion-" + randomStr
 		clusterVersionNameForUpgrade = "opswebhook-mysql-upgrade-" + randomStr
 		clusterName                  = "opswebhook-mysql-" + randomStr
@@ -683,6 +685,250 @@ var _ = Describe("OpsRequest webhook", func() {
 		Expect(testCtx.CheckedCreateObj(ctx, opsRequest)).Should(Succeed())
 	}
 
+	testSwitchoverWithSharding := func(_ *ClusterDefinition, compDef *ComponentDefinition, cluster *Cluster) {
+		switchoverList := []Switchover{
+			{
+				ComponentOps: ComponentOps{ComponentName: "switchover-component-not-exist"},
+				InstanceName: "*",
+			},
+			{
+				ComponentOps: ComponentOps{ComponentName: componentName},
+				InstanceName: "",
+			},
+			{
+				ComponentOps: ComponentOps{ComponentName: shardName},
+				InstanceName: "",
+			},
+			{
+				ComponentOps: ComponentOps{ComponentName: shardName},
+				InstanceName: "switchover-instance-name-not-exist",
+			},
+			{
+				ComponentOps: ComponentOps{ComponentName: shardName},
+				InstanceName: "*",
+			},
+			{
+				ComponentOps: ComponentOps{ComponentName: shardName},
+				InstanceName: fmt.Sprintf("%s-%s-0", cluster.Name, shardName),
+			},
+			{
+				ComponentOps: ComponentOps{ComponentName: shardName},
+				InstanceName: fmt.Sprintf("%s-%s-0", cluster.Name, "unexpected"),
+			},
+		}
+
+		patch := client.MergeFrom(cluster.DeepCopy())
+		cluster.Spec.ShardingSpecs[0].Template.ComponentDef = compDef.Name
+		Expect(k8sClient.Patch(ctx, cluster, patch)).Should(Succeed())
+
+		By("By testing switchover - target component not exist")
+		opsRequest := createTestOpsRequest(clusterName, opsRequestName, SwitchoverType)
+		opsRequest.Spec.SwitchoverList = []Switchover{switchoverList[0]}
+		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring(notFoundComponentsString("switchover-component-not-exist")))
+
+		By("By testing switchover - target switchover.ComponentName with componentSpecs not exist")
+		opsRequest = createTestOpsRequest(clusterName, opsRequestName, SwitchoverType)
+		opsRequest.Spec.SwitchoverList = []Switchover{switchoverList[1]}
+		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring(notFoundComponentsString(componentName)))
+
+		By("By testing switchover - target switchover.Instance cannot be empty")
+		opsRequest = createTestOpsRequest(clusterName, opsRequestName, SwitchoverType)
+		opsRequest.Spec.SwitchoverList = []Switchover{switchoverList[2]}
+		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("switchover.instanceName"))
+
+		By("By testing switchover - componentDefinition has no ComponentSwitchover and do not support switchover")
+		opsRequest = createTestOpsRequest(clusterName, opsRequestName, SwitchoverType)
+		opsRequest.Spec.SwitchoverList = []Switchover{switchoverList[3]}
+		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("does not support switchover"))
+
+		By("By testing switchover - target switchover.Instance cannot be empty")
+		patch = client.MergeFrom(compDef.DeepCopy())
+		commandExecutorEnvItem := &CommandExecutorEnvItem{
+			Image: "test-image",
+			Env:   []corev1.EnvVar{},
+		}
+		commandExecutorItem := &CommandExecutorItem{
+			Command: []string{"echo", "hello"},
+			Args:    []string{},
+		}
+		scriptSpecSelectors := []ScriptSpecSelector{
+			{
+				Name: "test-mock-cm",
+			},
+			{
+				Name: "test-mock-cm-2",
+			},
+		}
+		lifeCycleAction := &ComponentLifecycleActions{
+			Switchover: &ComponentSwitchover{
+				ScriptSpecSelectors: scriptSpecSelectors,
+			},
+		}
+
+		compDef.Spec.LifecycleActions = lifeCycleAction
+		Expect(k8sClient.Patch(ctx, compDef, patch)).Should(Succeed())
+		tmp := &ComponentDefinition{}
+		_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: compDef.Name}, tmp)
+		Expect(tmp.Spec.LifecycleActions.Switchover).ShouldNot(BeNil())
+
+		By("By testing switchover - switchover.InstanceName is specific with no withCandidate should not success ")
+		opsRequest = createTestOpsRequest(clusterName, opsRequestName, SwitchoverType)
+		opsRequest.Spec.SwitchoverList = []Switchover{switchoverList[3]}
+		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("does not support specifying an instance for promote"))
+
+		compDef.Spec.LifecycleActions.Switchover.WithCandidate = &Action{
+			Image: commandExecutorEnvItem.Image,
+			Env:   commandExecutorEnvItem.Env,
+			Exec: &ExecAction{
+				Command: commandExecutorItem.Command,
+				Args:    commandExecutorItem.Args,
+			},
+		}
+		Expect(k8sClient.Patch(ctx, compDef, patch)).Should(Succeed())
+		tmp = &ComponentDefinition{}
+		_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: compDef.Name}, tmp)
+		Expect(tmp.Spec.LifecycleActions.Switchover).ShouldNot(BeNil())
+
+		By("By testing switchover - switchover.InstanceName is * with no withoutCandidate should not success ")
+		opsRequest = createTestOpsRequest(clusterName, opsRequestName, SwitchoverType)
+		opsRequest.Spec.SwitchoverList = []Switchover{switchoverList[4]}
+		Expect(testCtx.CreateObj(ctx, opsRequest).Error()).To(ContainSubstring("does not support promote without specifying an instance"))
+
+		compDef.Spec.LifecycleActions.Switchover.WithoutCandidate = &Action{
+			Image: commandExecutorEnvItem.Image,
+			Env:   commandExecutorEnvItem.Env,
+			Exec: &ExecAction{
+				Command: commandExecutorItem.Command,
+				Args:    commandExecutorItem.Args,
+			},
+		}
+		Expect(k8sClient.Patch(ctx, compDef, patch)).Should(Succeed())
+		tmp = &ComponentDefinition{}
+		_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: compDef.Name}, tmp)
+		Expect(tmp.Spec.LifecycleActions.Switchover).ShouldNot(BeNil())
+
+		By("By testing switchover - switchover.InstanceName is * and should succeed ")
+		opsRequest = createTestOpsRequest(clusterName, opsRequestName, SwitchoverType)
+		opsRequest.Spec.SwitchoverList = []Switchover{switchoverList[4]}
+		Expect(testCtx.CheckedCreateObj(ctx, opsRequest)).Should(Succeed())
+
+		By("By testing switchover - switchover.InstanceName is specific but no role")
+		opsRequest = createTestOpsRequest(clusterName, opsRequestName, SwitchoverType)
+		opsRequest.Spec.SwitchoverList = []Switchover{switchoverList[3]}
+		Expect(testCtx.CheckedCreateObj(ctx, opsRequest).Error()).Should(ContainSubstring("component has no roles definition"))
+
+		targetRole := "primary"
+		secondary := "secondary"
+		roles := []ReplicaRole{
+			{
+				Name:        targetRole,
+				Serviceable: true,
+				Writable:    true,
+			},
+			{
+				Name:        secondary,
+				Serviceable: true,
+				Writable:    true,
+			},
+		}
+		compDef.Spec.Roles = roles
+		Expect(k8sClient.Patch(ctx, compDef, patch)).Should(Succeed())
+		tmp = &ComponentDefinition{}
+		_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: compDef.Name}, tmp)
+		Expect(tmp.Spec.LifecycleActions.Switchover).ShouldNot(BeNil())
+
+		By("By testing switchover - switchover.InstanceName is specific but more than role is serviceable and writable")
+		opsRequest = createTestOpsRequest(clusterName, opsRequestName, SwitchoverType)
+		opsRequest.Spec.SwitchoverList = []Switchover{switchoverList[3]}
+		Expect(testCtx.CheckedCreateObj(ctx, opsRequest).Error()).Should(ContainSubstring("more than role is serviceable and writable"))
+
+		roles = []ReplicaRole{
+			{
+				Name:        targetRole,
+				Serviceable: false,
+				Writable:    false,
+			},
+			{
+				Name:        secondary,
+				Serviceable: false,
+				Writable:    false,
+			},
+		}
+		compDef.Spec.Roles = roles
+		Expect(k8sClient.Patch(ctx, compDef, patch)).Should(Succeed())
+		tmp = &ComponentDefinition{}
+		_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: compDef.Name}, tmp)
+		Expect(tmp.Spec.LifecycleActions.Switchover).ShouldNot(BeNil())
+
+		By("By testing switchover - switchover.InstanceName is specific but no role is serviceable and writable")
+		opsRequest = createTestOpsRequest(clusterName, opsRequestName, SwitchoverType)
+		opsRequest.Spec.SwitchoverList = []Switchover{switchoverList[3]}
+		Expect(testCtx.CheckedCreateObj(ctx, opsRequest).Error()).Should(ContainSubstring("has no role is serviceable and writable"))
+
+		roles = []ReplicaRole{
+			{
+				Name:        targetRole,
+				Serviceable: true,
+				Writable:    true,
+			},
+			{
+				Name:        secondary,
+				Serviceable: false,
+				Writable:    false,
+			},
+		}
+		compDef.Spec.Roles = roles
+		Expect(k8sClient.Patch(ctx, compDef, patch)).Should(Succeed())
+		tmp = &ComponentDefinition{}
+		_ = k8sClient.Get(context.Background(), client.ObjectKey{Name: compDef.Name}, tmp)
+		Expect(tmp.Spec.LifecycleActions.Switchover).ShouldNot(BeNil())
+
+		By("By testing switchover - switchover.InstanceName is specific but no pod found")
+		opsRequest = createTestOpsRequest(clusterName, opsRequestName, SwitchoverType)
+		opsRequest.Spec.SwitchoverList = []Switchover{switchoverList[3]}
+		Expect(testCtx.CheckedCreateObj(ctx, opsRequest).Error()).Should(ContainSubstring("and check the validity of the instanceName using"))
+
+		pod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Namespace: cluster.Namespace, Name: switchoverList[5].InstanceName},
+			Spec: corev1.PodSpec{Containers: []corev1.Container{
+				{Name: "nginx", Image: "nginx:1.14.2"},
+			}},
+		}
+		Expect(k8sClient.Create(context.Background(), pod)).Should(BeNil())
+
+		By("By testing switchover - switchover.InstanceName is specific but pod role label unexpected")
+		opsRequest = createTestOpsRequest(clusterName, opsRequestName, SwitchoverType)
+		opsRequest.Spec.SwitchoverList = []Switchover{switchoverList[5]}
+		Expect(testCtx.CheckedCreateObj(ctx, opsRequest).Error()).Should(ContainSubstring("cannot be promoted because it had a invalid role label"))
+
+		pod.Labels = map[string]string{
+			constant.RoleLabelKey: targetRole,
+		}
+		Expect(k8sClient.Update(context.Background(), pod)).Should(BeNil())
+
+		By("By testing switchover - switchover.InstanceName is specific but pod role label is already expected")
+		opsRequest = createTestOpsRequest(clusterName, opsRequestName, SwitchoverType)
+		opsRequest.Spec.SwitchoverList = []Switchover{switchoverList[5]}
+		Expect(testCtx.CheckedCreateObj(ctx, opsRequest).Error()).Should(ContainSubstring("annot be promoted because it is already the primary or leader instance"))
+
+		Expect(k8sClient.Create(context.Background(), &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: cluster.Namespace, Name: switchoverList[6].InstanceName, Labels: map[string]string{constant.RoleLabelKey: secondary}}, Spec: corev1.PodSpec{Containers: []corev1.Container{{Name: "nginx", Image: "nginx:1.14.2"}}}})).Should(BeNil())
+
+		By("By testing switchover - switchover.InstanceName is specific but pod does not belong to the current component")
+		opsRequest = createTestOpsRequest(clusterName, opsRequestName, SwitchoverType)
+		opsRequest.Spec.SwitchoverList = []Switchover{switchoverList[6]}
+		Expect(testCtx.CheckedCreateObj(ctx, opsRequest).Error()).Should(ContainSubstring("does not belong to the current component, please check the validity of the instance using"))
+
+		pod.Labels = map[string]string{
+			constant.RoleLabelKey: secondary,
+		}
+		Expect(k8sClient.Update(context.Background(), pod)).Should(BeNil())
+
+		By("By testing switchover - switchover.InstanceName is specific and should succeed ")
+		opsRequest = createTestOpsRequest(clusterName, opsRequestName, SwitchoverType)
+		opsRequest.Spec.SwitchoverList = []Switchover{switchoverList[5]}
+		Expect(testCtx.CheckedCreateObj(ctx, opsRequest)).Should(Succeed())
+	}
+
 	testWhenClusterDeleted := func(cluster *Cluster, opsRequest *OpsRequest) {
 		By("delete cluster")
 		newCluster := &Cluster{}
@@ -809,6 +1055,30 @@ var _ = Describe("OpsRequest webhook", func() {
 			Expect(testCtx.CheckedCreateObj(ctx, cluster)).Should(Succeed())
 
 			testSwitchoverWithCompDef(clusterDef, compDef, cluster)
+		})
+
+		It("test switchover with sharding cluster", func() {
+			// wait until ClusterDefinition and ClusterVersion created
+			By("By create a clusterDefinition")
+			clusterDef, _ := createTestClusterDefinitionObj(clusterDefinitionName)
+			Expect(testCtx.CheckedCreateObj(ctx, clusterDef)).Should(Succeed())
+			By("By creating a clusterVersion")
+			clusterVersion := createTestClusterVersionObj(clusterDefinitionName, clusterVersionName)
+			Expect(testCtx.CheckedCreateObj(ctx, clusterVersion)).Should(Succeed())
+			By("By creating a sharding componentDefinition")
+			shardCompDef := createTestComponentDefObj(shardComponentDefinitionName)
+			Expect(testCtx.CheckedCreateObj(ctx, shardCompDef)).Should(Succeed())
+
+			opsRequest := createTestOpsRequest(clusterName, opsRequestName, UpgradeType)
+
+			// create Cluster
+			By("By testing spec.clusterDef is legal")
+			Expect(testCtx.CheckedCreateObj(ctx, opsRequest)).Should(HaveOccurred())
+			By("By create a new cluster ")
+			cluster, _ := createTestShardingCluster(clusterDefinitionName, clusterVersionName, clusterName)
+			Expect(testCtx.CheckedCreateObj(ctx, cluster)).Should(Succeed())
+
+			testSwitchoverWithSharding(clusterDef, shardCompDef, cluster)
 		})
 
 		It("check datascript opts", func() {

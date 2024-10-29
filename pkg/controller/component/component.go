@@ -246,6 +246,18 @@ func GetComponentByName(ctx context.Context, cli client.Reader, namespace, fullC
 	return comp, nil
 }
 
+func GetComponentsByLabel(ctx context.Context, cli client.Reader, namespace, shardingName, clusterName string) (*appsv1alpha1.ComponentList, error) {
+	comps := &appsv1alpha1.ComponentList{}
+	labels := map[string]string{
+		constant.AppInstanceLabelKey:       clusterName,
+		constant.KBAppShardingNameLabelKey: shardingName,
+	}
+	if err := cli.List(ctx, comps, client.InNamespace(namespace), client.MatchingLabels(labels)); err != nil {
+		return nil, err
+	}
+	return comps, nil
+}
+
 func GetCompNCompDefByName(ctx context.Context, cli client.Reader, namespace, fullCompName string) (*appsv1alpha1.Component, *appsv1alpha1.ComponentDefinition, error) {
 	comp, err := GetComponentByName(ctx, cli, namespace, fullCompName)
 	if err != nil {
@@ -256,6 +268,30 @@ func GetCompNCompDefByName(ctx context.Context, cli client.Reader, namespace, fu
 		return nil, nil, err
 	}
 	return comp, compDef, nil
+}
+
+func GetCompNCompDefByShardName(ctx context.Context, cli client.Reader, namespace, cluster, shardName, instanceName string) (*appsv1alpha1.Component, *appsv1alpha1.ComponentDefinition, error) {
+	comps, err := GetComponentsByLabel(ctx, cli, namespace, shardName, cluster)
+	if err != nil {
+		return nil, nil, err
+	}
+	if nil == comps || len(comps.Items) == 0 {
+		return nil, nil, fmt.Errorf("component of cluster[%s] and shard[%s] not found", cluster, shardName)
+	}
+	var component *appsv1alpha1.Component
+	for i := 0; i < len(comps.Items); i++ {
+		cmp := &comps.Items[i]
+		// here we use instanceName's prefix to find the corresponding component
+		if strings.HasPrefix(instanceName, cmp.Name) {
+			component = cmp
+			break
+		}
+	}
+	compDef, err := GetCompDefByName(ctx, cli, component.Spec.CompDef)
+	if err != nil {
+		return nil, nil, err
+	}
+	return component, compDef, nil
 }
 
 // CheckAndGetClusterComponents checks if all components have created and gets the created components.

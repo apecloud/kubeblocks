@@ -96,6 +96,14 @@ func (factory *BaseFactory[T, PT, F]) AddAppInstanceLabel(value string) *F {
 	return factory.AddLabels(constant.AppInstanceLabelKey, value)
 }
 
+func (factory *BaseFactory[T, PT, F]) AddShardNameLabel(value string) *F {
+	return factory.AddLabels(constant.KBAppShardingNameLabelKey, value)
+}
+
+func (factory *BaseFactory[T, PT, F]) AddClusterUIDLabel(value string) *F {
+	return factory.AddLabels(constant.KBAppClusterUIDLabelKey, value)
+}
+
 func (factory *BaseFactory[T, PT, F]) AddAppComponentLabel(value string) *F {
 	return factory.AddLabels(constant.KBAppComponentLabelKey, value)
 }

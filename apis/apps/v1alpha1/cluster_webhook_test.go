@@ -219,3 +219,33 @@ spec:
 	cluster.Spec.TerminationPolicy = WipeOut
 	return cluster, err
 }
+
+func createTestShardingCluster(clusterDefinitionName, clusterVersionName, clusterName string) (*Cluster, error) {
+	clusterYaml := fmt.Sprintf(`
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: %s
+  namespace: default
+spec:
+  clusterVersionRef: %s
+  shardingSpecs:
+  - name: shard
+    shards: 3
+    template:
+      componentDef: replicasets
+      replicas: 2
+      name: redis
+      volumeClaimTemplates:
+      - name: data
+        spec:
+          storageClassName: standard
+          resources:
+            requests:
+              storage: 1Gi
+`, clusterName, clusterVersionName)
+	cluster := &Cluster{}
+	err := yaml.Unmarshal([]byte(clusterYaml), cluster)
+	cluster.Spec.TerminationPolicy = WipeOut
+	return cluster, err
+}

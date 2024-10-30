@@ -99,7 +99,7 @@ KubeBlocks 是 Kubernetes 原生 operator，可通过 Helm 或者 kubectl 应用
 
    如果您想要安装指定版本的 KubeBlocks，可执行如下步骤：
 
-   1. 在 [KubeBlocks Release](https://github.com/apecloud/kubeblocks/releases/) 中查看可用版本。
+   1. 在 [KubeBlocks 发布列表](https://github.com/apecloud/kubeblocks/releases/) 中查看可用版本。
    2. 使用 `--version` 指定版本，并执行以下命令。
 
       ```bash
@@ -118,13 +118,13 @@ KubeBlocks 是 Kubernetes 原生 operator，可通过 Helm 或者 kubectl 应用
 
 与 Kubernetes 中的其他资源相同，KubeBlocks 也可以通过 YAML 文件和 kubectl 命令进行安装。
 
-执行以下命令，安装当前小版本发布的最新 operator。
+1. 从对应版本的 [KubeBlocks 发布列表](https://github.com/apecloud/kubeblocks/releases) 中的资产部分获取 `kubeblocks.yaml` 文件地址。
 
-```bash
-kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/vx.y.x/kubeblocks.yaml
-```
+2. 替换 YAML 文件地址，执行以下命令，安装 KubeBlocks。
 
-您可通过 [KubeBlocks 发布页资源](https://github.com/apecloud/kubeblocks/releases) 中获取 YAML 文件地址。
+     ```bash
+     kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/vx.y.x/kubeblocks.yaml
+     ```
 
 </TabItem>
 

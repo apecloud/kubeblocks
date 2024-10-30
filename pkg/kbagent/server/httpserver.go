@@ -176,7 +176,7 @@ func (s *server) logAspect(reqCtx *fasthttp.RequestCtx, respCtx context.Context,
 	reqLogger.Info("HTTP API Called",
 		"method", method,
 		"path", path,
-		"action", respCtx.Value("action"),
+		"action", respCtx.Value(service.ActionKey),
 		"status code", statusCode,
 		"cost", elapsed,
 	)

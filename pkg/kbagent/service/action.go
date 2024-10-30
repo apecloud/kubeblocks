@@ -33,6 +33,10 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 )
 
+type contextKey string
+
+const ActionKey contextKey = "action"
+
 func newActionService(logger logr.Logger, actions []proto.Action) (*actionService, error) {
 	sa := &actionService{
 		logger:         logger,
@@ -78,7 +82,7 @@ func (s *actionService) HandleRequest(ctx context.Context, payload []byte) ([]by
 	if err != nil {
 		return s.encode(nil, err), nil, nil
 	}
-	respCtx := context.WithValue(ctx, "action", req.Action)
+	respCtx := context.WithValue(ctx, ActionKey, req.Action)
 	return s.encode(s.handleRequest(ctx, req)), respCtx, nil
 }
 

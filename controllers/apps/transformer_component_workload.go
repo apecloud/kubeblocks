@@ -205,6 +205,10 @@ func (t *componentWorkloadTransformer) handleWorkloadUpdate(reqCtx intctrlutil.R
 		return err
 	}
 
+	if err := cwo.checkAndDoMemberJoin(); err != nil {
+		return err
+	}
+
 	// dag = cwo.dag
 
 	return nil
@@ -522,6 +526,11 @@ func (r *componentWorkloadOps) scaleOut(itsObj *workloads.InstanceSet) error {
 	if *itsObj.Spec.Replicas == 0 {
 		return nil
 	}
+
+	if err := r.recordPodForMemberJoin(); err != nil {
+		return err
+	}
+
 	graphCli := model.NewGraphClient(r.cli)
 	graphCli.Noop(r.dag, r.protoITS)
 	d, err := newDataClone(r.reqCtx, r.cli, r.cluster, r.synthesizeComp, itsObj, r.protoITS, backupKey)
@@ -537,11 +546,7 @@ func (r *componentWorkloadOps) scaleOut(itsObj *workloads.InstanceSet) error {
 			return err
 		}
 	}
-	if succeed {
-		// pvcs are ready, ITS.replicas should be updated
-		graphCli.Update(r.dag, nil, r.protoITS)
-		return r.postScaleOut(itsObj)
-	} else {
+	if !succeed {
 		graphCli.Noop(r.dag, r.protoITS)
 		// update objs will trigger reconcile, no need to requeue error
 		objs1, objs2, err := d.CloneData(d)
@@ -556,6 +561,22 @@ func (r *componentWorkloadOps) scaleOut(itsObj *workloads.InstanceSet) error {
 		}
 		return nil
 	}
+
+	// pvcs are ready, ITS.replicas should be updated
+	graphCli.Update(r.dag, nil, r.protoITS)
+	return r.postScaleOut(itsObj)
+}
+
+func (r *componentWorkloadOps) recordPodForMemberJoin() error {
+	var podToMemberjoin []string
+	for podName := range r.desiredCompPodNameSet {
+		if _, ok := r.runningItsPodNameSet[podName]; ok {
+			continue
+		}
+		podToMemberjoin = append(podToMemberjoin, podName)
+	}
+	r.protoITS.Annotations[constant.MemberJoinStatusAnnotationKey] = strings.Join(podToMemberjoin, ",")
+	return nil
 }
 
 func getHealthyLorryClient(pods []*corev1.Pod) (lorry.Client, error) {
@@ -913,6 +934,58 @@ func updateVolumes(reqCtx intctrlutil.RequestCtx, cli client.Client, synthesizeC
 }
 
 // getRunningVolumes gets the running volumes of the ITS.
+func (r *componentWorkloadOps) checkAndDoMemberJoin() error {
+	pods, err := component.ListOwnedPods(r.reqCtx.Ctx, r.cli, r.cluster.Namespace, r.cluster.Name, r.synthesizeComp.Name)
+	if err != nil {
+		return err
+	}
+	memberJoinStatus := r.runningITS.Annotations[constant.MemberJoinStatusAnnotationKey]
+	if memberJoinStatus == "" {
+		return nil
+	}
+
+	podsToMemberJoin := sets.New(strings.Split(memberJoinStatus, ",")...)
+	for _, pod := range pods {
+		if _, ok := podsToMemberJoin[pod.Name]; !ok {
+			continue
+		}
+		if pod.Status.Phase != corev1.PodRunning {
+			continue
+		}
+		lorryCli, err1 := lorry.NewClient(*pod)
+		if err1 != nil {
+			// try another pod
+			lorryCli, err1 = getHealthyLorryClient(pods)
+			if err1 != nil {
+				if err == nil {
+					err = err1
+				}
+				continue
+			}
+		}
+
+		if intctrlutil.IsNil(lorryCli) {
+			// no lorry in the pod
+			continue
+		}
+
+		if err2 := lorryCli.LeaveMember(r.reqCtx.Ctx, pod.Name); err2 != nil {
+			// For the purpose of upgrade compatibility, if the version of Lorry is 0.7 and
+			// the version of KB is upgraded to 0.8 or newer, lorry client will return an NotImplemented error,
+			// in this case, here just ignore it.
+			if err2 == lorry.NotImplemented {
+				r.reqCtx.Log.Info("lorry leave join api is not implemented")
+			} else if err == nil {
+				err = err2
+			}
+		} else {
+			podsToMemberJoin.Delete(pod.Name)
+		}
+	}
+	r.protoITS.Annotations[constant.MemberJoinStatusAnnotationKey] = strings.Join(podsToMemberJoin.UnsortedList(), ",")
+	return err
+}
+
 func getRunningVolumes(ctx context.Context, cli client.Client, synthesizedComp *component.SynthesizedComponent,
 	itsObj *workloads.InstanceSet, vctName string) ([]*corev1.PersistentVolumeClaim, error) {
 	labels := constant.GetComponentWellKnownLabels(synthesizedComp.ClusterName, synthesizedComp.Name)

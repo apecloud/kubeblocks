@@ -1,12 +1,12 @@
 ---
-title: Supported addons 
+title: Supported Addons 
 description: Addons supported by KubeBlocks
 keywords: [addons, enable, KubeBlocks, prometheus, s3, alertmanager,]
 sidebar_position: 4
 sidebar_label: Supported addons 
 ---
 
-# Supported addons
+# Supported Addons
 
 KubeBlocks, as a cloud-native data infrastructure based on Kubernetes, provides management and control for relational databases, NoSQL databases, vector databases, and stream computing systems; and these databases can be all added as addons. Besides databases, the KubeBlocks addon now also supports plugins for cloud environments and applications.
 

@@ -73,13 +73,13 @@ func (s *actionService) Start() error {
 	return nil
 }
 
-func (s *actionService) HandleRequest(ctx context.Context, payload []byte) ([]byte, error, context.Context) {
+func (s *actionService) HandleRequest(ctx context.Context, payload []byte) ([]byte, context.Context, error) {
 	req, err := s.decode(payload)
 	if err != nil {
 		return s.encode(nil, err), nil, nil
 	}
 	respCtx := context.WithValue(ctx, "action", req.Action)
-	return s.encode(s.handleRequest(ctx, req)), nil, respCtx
+	return s.encode(s.handleRequest(ctx, req)), respCtx, nil
 }
 
 func (s *actionService) decode(payload []byte) (*proto.ActionRequest, error) {

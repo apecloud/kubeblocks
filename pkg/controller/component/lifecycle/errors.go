@@ -24,13 +24,14 @@ import (
 )
 
 var (
-	ErrActionNotDefined     = errors.New("action is not defined")
-	ErrActionNotImplemented = errors.New("action is not implemented")
-	ErrActionInProgress     = errors.New("action is in progress")
-	ErrActionBusy           = errors.New("action is busy")
-	ErrActionTimedOut       = errors.New("action timed-out")
-	ErrActionFailed         = errors.New("action failed")
-	ErrActionInternalError  = errors.New("action internal error")
+	ErrActionNotDefined             = errors.New("action is not defined")
+	ErrActionNotImplemented         = errors.New("action is not implemented")
+	ErrActionInProgress             = errors.New("action is in progress")
+	ErrActionBusy                   = errors.New("action is busy")
+	ErrActionTimedOut               = errors.New("action timed-out")
+	ErrActionFailed                 = errors.New("action failed")
+	ErrActionInternalError          = errors.New("action internal error")
+	ErrActionPreconditionProcessing = errors.New("action's precondition is processing")
 )
 
 func IgnoreNotDefined(err error) error {

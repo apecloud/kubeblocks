@@ -174,7 +174,6 @@ func (t *componentWorkloadTransformer) handleCreate(_ intctrlutil.RequestCtx, cl
 	}
 
 	cli.Create(dag, protoITS)
-	// TODO(kubejocker): update initial pod memberLeave status
 
 	return nil
 }
@@ -688,6 +687,7 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
 
 	// TODO: Move memberLeave to the ITS controller. Instead of performing a switchover, we can directly scale down the non-leader nodes. This is because the pod ordinal is not guaranteed to be continuous.
 	podsToMemberLeave := make([]*corev1.Pod, 0)
+	podsToMemberJoinSet := sets.New(strings.Split(r.runningITS.Annotations[constant.MemberJoinStatusAnnotationKey], ",")...)
 	for _, pod := range pods {
 		// if the pod not exists in the generated pod names, it should be a member that needs to leave
 		if _, ok := r.desiredCompPodNameSet[pod.Name]; ok {
@@ -698,6 +698,13 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
 	for _, pod := range podsToMemberLeave {
 		if !(isLeader(pod) || // if the pod is leader, it needs to call switchover
 			(r.synthesizeComp.LifecycleActions != nil && r.synthesizeComp.LifecycleActions.MemberLeave != nil)) { // if the memberLeave action is defined, it needs to call it
+			continue
+		}
+
+		if _, ok := podsToMemberJoinSet[pod.Name]; ok {
+			if err == nil {
+				err = lifecycle.ErrActionPreconditionProcessing
+			}
 			continue
 		}
 

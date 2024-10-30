@@ -139,7 +139,7 @@ func (s *server) dispatcher(svc service.Service) func(*fasthttp.RequestCtx) {
 		ctx := context.Background()
 		body := reqCtx.PostBody()
 
-		output, err, respCtx := svc.HandleRequest(ctx, body)
+		output, respCtx, err := svc.HandleRequest(ctx, body)
 		statusCode := fasthttp.StatusOK
 		if err != nil {
 			statusCode = fasthttp.StatusInternalServerError

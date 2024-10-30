@@ -159,13 +159,18 @@ func (r *probeRunner) launchReportLoop(probe *proto.Probe) {
 		ticker := time.NewTicker(time.Duration(probe.ReportPeriodSeconds) * time.Second)
 		defer ticker.Stop()
 
+		var latestReportedEvent *proto.ProbeEvent
 		for range ticker.C {
 			latestEvent := gather(r.latestEvent)
+			if latestEvent == nil && latestReportedEvent != nil {
+				latestEvent = latestReportedEvent
+			}
 			if latestEvent != nil {
-				r.logger.Info("send probe event periodically", "probe", latestEvent.Probe,
+				r.logger.Info("report probe event periodically",
 					"code", latestEvent.Code, "output", outputPrefix(latestEvent.Output), "message", latestEvent.Message)
 				r.sendEvent(latestEvent)
 			}
+			latestReportedEvent = latestEvent
 		}
 	}()
 }

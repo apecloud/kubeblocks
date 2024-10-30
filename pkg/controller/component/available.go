@@ -43,9 +43,9 @@ import (
 )
 
 const (
-	availableProbe             = "availableProbe"
-	defaultTimeWindow    int32 = 10
-	availableProbeEvents       = "availableProbeEvents"
+	availableProbe               = "availableProbe"
+	defaultTimeWindow      int32 = 30
+	availableProbeEventKey       = "apps.kubeblocks.io/available-probe-event"
 )
 
 type AvailableEventHandler struct{}
@@ -114,13 +114,25 @@ func (h *AvailableEventHandler) status(ctx context.Context, cli client.Client, r
 			Reason:             reason,
 			Message:            message,
 		}
+		// backup the available probe events
+		probeEvents, ok = comp.Annotations[availableProbeEventKey]
 	)
 	if meta.SetStatusCondition(&comp.Status.Conditions, cond) {
 		recorder.Event(comp, corev1.EventTypeNormal, reason, message)
-		return cli.Status().Patch(ctx, comp, client.MergeFrom(compCopy))
+		if err := cli.Status().Patch(ctx, comp, client.MergeFrom(compCopy)); err != nil {
+			return err
+		}
+		compCopy = comp.DeepCopy() // update the compCopy since the comp is updated
 	}
-	if !reflect.DeepEqual(comp.Status.Message, compCopy.Status.Message) {
-		return cli.Status().Patch(ctx, comp, client.MergeFrom(compCopy))
+
+	if ok {
+		if comp.Annotations == nil {
+			comp.Annotations = make(map[string]string)
+		}
+		comp.Annotations[availableProbeEventKey] = probeEvents
+	}
+	if !reflect.DeepEqual(comp.Annotations, compCopy.Annotations) {
+		return cli.Patch(ctx, comp, client.MergeFrom(compCopy))
 	}
 	return nil
 }
@@ -242,19 +254,18 @@ func (h *AvailableEventHandler) pickupProbeEvents(event probeEvent, timeWindow i
 		return result
 	}
 
-	events = latest(filterByPodNames(groupByPod(filterByTimeWindow(events))))
-	if err = h.updateCachedEvents(comp, events); err != nil {
+	pickedEvents := latest(filterByPodNames(groupByPod(filterByTimeWindow(events))))
+	if err = h.updateCachedEvents(comp, pickedEvents); err != nil {
 		return nil, err
 	}
-	return events, nil
+	return pickedEvents, nil
 }
 
 func (h *AvailableEventHandler) getCachedEvents(comp *appsv1.Component) ([]probeEvent, error) {
-	if comp.Status.Message == nil {
+	if comp.Annotations == nil {
 		return nil, nil
 	}
-	// TODO: fix me
-	message, ok := comp.Status.Message[availableProbeEvents]
+	message, ok := comp.Annotations[availableProbeEventKey]
 	if !ok {
 		return nil, nil
 	}
@@ -267,7 +278,7 @@ func (h *AvailableEventHandler) getCachedEvents(comp *appsv1.Component) ([]probe
 }
 
 func (h *AvailableEventHandler) updateCachedEvents(comp *appsv1.Component, events []probeEvent) error {
-	if comp.Status.Message == nil && len(events) == 0 {
+	if comp.Annotations == nil && len(events) == 0 {
 		return nil
 	}
 
@@ -276,11 +287,10 @@ func (h *AvailableEventHandler) updateCachedEvents(comp *appsv1.Component, event
 		return err
 	}
 
-	if comp.Status.Message == nil {
-		comp.Status.Message = make(map[string]string)
+	if comp.Annotations == nil {
+		comp.Annotations = make(map[string]string)
 	}
-	// TODO: fix me
-	comp.Status.Message[availableProbeEvents] = string(out)
+	comp.Annotations[availableProbeEventKey] = string(out)
 
 	return nil
 }
@@ -331,7 +341,7 @@ func (h *AvailableEventHandler) evaluateOr(conditions []appsv1.ComponentAvailabl
 			msgs = append(msgs, msg)
 		}
 	}
-	return false, strings.Join(msgs, ",")
+	return false, strings.Join(h.distinct(msgs), ",")
 }
 
 func (h *AvailableEventHandler) evaluateNot(cond appsv1.ComponentAvailableConditionX, replicas int32, events []probeEvent) (bool, string) {
@@ -369,7 +379,7 @@ func (h *AvailableEventHandler) evaluateAny(cond appsv1.ComponentAvailableCondit
 			msgs = append(msgs, msg)
 		}
 	}
-	return false, strings.Join(msgs, ",")
+	return false, strings.Join(h.distinct(msgs), ",")
 }
 
 func (h *AvailableEventHandler) evaluateNone(cond appsv1.ComponentAvailableConditionX, replicas int32, events []probeEvent) (bool, string) {
@@ -400,7 +410,7 @@ func (h *AvailableEventHandler) evaluateMajority(cond appsv1.ComponentAvailableC
 	if ok {
 		return true, ""
 	}
-	return false, strings.Join(msgs, ",")
+	return false, strings.Join(h.distinct(msgs), ",")
 }
 
 func (h *AvailableEventHandler) strictCheck(cond appsv1.ComponentAvailableConditionX, replicas int32, events []probeEvent) bool {
@@ -433,13 +443,13 @@ func (h *AvailableEventHandler) evaluateAction(criteria appsv1.ActionCriteria, e
 			msgs = append(msgs, msg)
 		}
 	}
-	return false, strings.Join(msgs, ",")
+	return false, strings.Join(h.distinct(msgs), ",")
 
 }
 
 func (h *AvailableEventHandler) evaluateActionEvent(criteria appsv1.ActionCriteria, event probeEvent) (bool, string) {
 	if criteria.Succeed != nil && *criteria.Succeed != (event.Code == 0) {
-		return false, fmt.Sprintf("code is not 0: %d", event.Code)
+		return false, fmt.Sprintf("probe code is not 0: %d", event.Code)
 	}
 	prefix16 := func(out string) string {
 		if len(out) <= 16 {
@@ -449,21 +459,33 @@ func (h *AvailableEventHandler) evaluateActionEvent(criteria appsv1.ActionCriter
 	}
 	if criteria.Stdout != nil {
 		if criteria.Stdout.EqualTo != nil && !bytes.Equal(event.Stdout, []byte(*criteria.Stdout.EqualTo)) {
-			return false, fmt.Sprintf("stdout is not match: %s", prefix16(*criteria.Stdout.EqualTo))
+			return false, fmt.Sprintf("probe stdout is not match: %s", prefix16(*criteria.Stdout.EqualTo))
 		}
 		if criteria.Stdout.Contains != nil && !bytes.Contains(event.Stdout, []byte(*criteria.Stdout.Contains)) {
-			return false, fmt.Sprintf("stdout does not contain: %s", prefix16(*criteria.Stdout.Contains))
+			return false, fmt.Sprintf("probe stdout does not contain: %s", prefix16(*criteria.Stdout.Contains))
 		}
 	}
 	if criteria.Stderr != nil {
 		if criteria.Stderr.EqualTo != nil && !bytes.Equal(event.Stderr, []byte(*criteria.Stderr.EqualTo)) {
-			return false, fmt.Sprintf("stderr is not match: %s", prefix16(*criteria.Stderr.EqualTo))
+			return false, fmt.Sprintf("probe stderr is not match: %s", prefix16(*criteria.Stderr.EqualTo))
 		}
 		if criteria.Stderr.Contains != nil && !bytes.Contains(event.Stderr, []byte(*criteria.Stderr.Contains)) {
-			return false, fmt.Sprintf("stderr does not contain: %s", prefix16(*criteria.Stderr.Contains))
+			return false, fmt.Sprintf("probe stderr does not contain: %s", prefix16(*criteria.Stderr.Contains))
 		}
 	}
 	return true, ""
+}
+
+func (h *AvailableEventHandler) distinct(msgs []string) []string {
+	seen := make(map[string]bool)
+	result := make([]string, 0)
+	for _, msg := range msgs {
+		if !seen[msg] {
+			seen[msg] = true
+			result = append(result, msg)
+		}
+	}
+	return result
 }
 
 func GetComponentAvailablePolicy(compDef *appsv1.ComponentDefinition) appsv1.ComponentAvailable {
@@ -472,7 +494,7 @@ func GetComponentAvailablePolicy(compDef *appsv1.ComponentDefinition) appsv1.Com
 		if policy.WithProbe != nil && policy.WithProbe.TimeWindowSeconds == nil {
 			policy.WithProbe.TimeWindowSeconds = pointer.Int32(defaultTimeWindow)
 			if compDef.Spec.LifecycleActions != nil && compDef.Spec.LifecycleActions.AvailableProbe != nil {
-				policy.WithProbe.TimeWindowSeconds = pointer.Int32(compDef.Spec.LifecycleActions.AvailableProbe.PeriodSeconds)
+				policy.WithProbe.TimeWindowSeconds = pointer.Int32(compDef.Spec.LifecycleActions.AvailableProbe.PeriodSeconds * 2)
 			}
 		}
 		return policy

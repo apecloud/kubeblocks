@@ -85,8 +85,8 @@ func (s *probeService) Start() error {
 	return nil
 }
 
-func (s *probeService) HandleRequest(ctx context.Context, payload []byte) ([]byte, error) {
-	return nil, errors.Wrapf(proto.ErrNotImplemented, "service %s does not support request handling", s.Kind())
+func (s *probeService) HandleRequest(ctx context.Context, payload []byte) ([]byte, error, context.Context) {
+	return nil, errors.Wrapf(proto.ErrNotImplemented, "service %s does not support request handling", s.Kind()), nil
 }
 
 type probeRunner struct {

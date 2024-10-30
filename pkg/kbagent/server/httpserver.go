@@ -61,9 +61,6 @@ func (s *server) StartNonBlocking() error {
 	}
 
 	handler := s.router()
-	if s.config.Logging {
-		handler = s.apiLogger(handler)
-	}
 
 	var listeners []net.Listener
 	if s.config.UnixDomainSocket != "" {
@@ -124,21 +121,6 @@ func (s *server) Close() error {
 	return errors.Join()
 }
 
-func (s *server) apiLogger(next fasthttp.RequestHandler) fasthttp.RequestHandler {
-	return func(ctx *fasthttp.RequestCtx) {
-		reqLogger := s.logger
-		if userAgent := string(ctx.Request.Header.Peek("User-Agent")); userAgent != "" {
-			reqLogger = s.logger.WithValues("useragent", userAgent)
-		}
-		start := time.Now()
-		path := string(ctx.Path())
-		reqLogger.Info("HTTP API Called", "method", string(ctx.Method()), "path", path)
-		next(ctx)
-		elapsed := float64(time.Since(start) / time.Millisecond)
-		reqLogger.Info("HTTP API Called", "status code", ctx.Response.StatusCode(), "cost", elapsed)
-	}
-}
-
 func (s *server) router() fasthttp.RequestHandler {
 	router := fasthttprouter.New()
 	for i := range s.services {
@@ -157,12 +139,16 @@ func (s *server) dispatcher(svc service.Service) func(*fasthttp.RequestCtx) {
 		ctx := context.Background()
 		body := reqCtx.PostBody()
 
-		output, err := svc.HandleRequest(ctx, body)
+		output, err, respCtx := svc.HandleRequest(ctx, body)
 		statusCode := fasthttp.StatusOK
 		if err != nil {
 			statusCode = fasthttp.StatusInternalServerError
 		}
 		respond(reqCtx, statusCode, output, err)
+
+		if s.config.Logging {
+			s.logAspect(reqCtx, respCtx, statusCode)
+		}
 	}
 }
 
@@ -175,4 +161,23 @@ func respond(ctx *fasthttp.RequestCtx, code int, body []byte, err error) {
 	case body != nil:
 		ctx.Response.SetBody(body)
 	}
+}
+
+func (s *server) logAspect(reqCtx *fasthttp.RequestCtx, respCtx context.Context, statusCode int) {
+	reqLogger := s.logger
+	if userAgent := string(reqCtx.Request.Header.Peek("User-Agent")); userAgent != "" {
+		reqLogger = reqLogger.WithValues("useragent", userAgent)
+	}
+
+	method := string(reqCtx.Method())
+	path := string(reqCtx.Path())
+	elapsed := float64(time.Since(reqCtx.Time()).Milliseconds())
+
+	reqLogger.Info("HTTP API Called",
+		"method", method,
+		"path", path,
+		"action", respCtx.Value("action"),
+		"status code", statusCode,
+		"cost", elapsed,
+	)
 }

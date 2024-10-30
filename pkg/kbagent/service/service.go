@@ -33,7 +33,7 @@ type Service interface {
 
 	Start() error
 
-	HandleRequest(ctx context.Context, payload []byte) ([]byte, error)
+	HandleRequest(ctx context.Context, payload []byte) ([]byte, error, context.Context)
 }
 
 func New(logger logr.Logger, actions []proto.Action, probes []proto.Probe) ([]Service, error) {

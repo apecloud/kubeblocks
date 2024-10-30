@@ -84,7 +84,7 @@ var _ = Describe("probe", func() {
 			Expect(err).Should(BeNil())
 			Expect(service).ShouldNot(BeNil())
 
-			_, err = service.HandleRequest(ctx, nil)
+			_, err, _ = service.HandleRequest(ctx, nil)
 			Expect(err).ShouldNot(BeNil())
 			Expect(errors.Is(err, proto.ErrNotImplemented)).Should(BeTrue())
 		})

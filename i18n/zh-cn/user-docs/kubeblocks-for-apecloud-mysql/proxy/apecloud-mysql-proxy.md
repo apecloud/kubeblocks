@@ -23,7 +23,7 @@ import TabItem from '@theme/TabItem';
    kbcli playground init
 
    # 使用--version 指定版本
-   kbcli playground init --version='x.x.x'
+   kbcli playground init --version='x.y.z'
    ```
 
    如果已经有 Kubernetes 集群，可以通过 [kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) 安装 KubeBlocks。

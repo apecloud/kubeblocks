@@ -1,7 +1,7 @@
 ---
 title: 卸载 kbcli 和 KubeBlocks
-description: 处理异常并卸载 kbcli 和 KubeBlocks
-keywords: [kbcli, kubeblocks, 异常, 卸载]
+description: 卸载 kbcli 和 KubeBlocks
+keywords: [kbcli, kubeblocks, 卸载]
 sidebar_position: 4
 sidebar_label: 卸载 KubeBlocks 和 kbcli
 ---
@@ -14,9 +14,11 @@ import TabItem from '@theme/TabItem';
 卸载顺序：
 
 1. 如果已经创建了集群，请先删除集群。
+
     ```bash
     kbcli cluster delete <name>
     ```
+
 2. 卸载 KubeBlocks。
 
 3. 卸载 kbcli。
@@ -34,6 +36,7 @@ kbcli kubeblocks uninstall
 如果想在试用结束后删除 kbcli，请选择与安装 kbcli 时所使用的相同选项。
 
 <Tabs>
+
 <TabItem value="macOS" label="macOS" default>
 
 如果你使用的是 `curl`，执行以下命令：
@@ -56,16 +59,16 @@ kbcli 会在 HOME 目录下创建一个名为 `~/.kbcli` 的隐藏文件夹，�
 
 1. 进入 `kbcli` 的安装路径，并删除安装文件夹。
   
-  - 如果你通过脚本安装了 `kbcli`，请前往 `C:\Program Files` 并删除 `kbcli-windows-amd64` 文件夹。
-  - 如果你自定义了安装路径，请前往指定路径，并删除安装文件夹。
+    - 如果你通过脚本安装了 `kbcli`，请前往 `C:\Program Files` 并删除 `kbcli-windows-amd64` 文件夹。
+    - 如果你自定义了安装路径，请前往指定路径，并删除安装文件夹。
   
 2. 删除环境变量。
    1. 点击 Windows 图标，然后点击 **系统**。
    2. 进入 **设置** -> **相关设置** -> **高级系统设置**。
    3. 在 **高级** 标签页，点击 **环境变量**。
    4. 在 **用户变量** 或 **系统变量** 列表中，双击 **Path**。
-    - 如果你通过脚本安装了 `kbcli`，双击 **用户变量** 中的 Path。
-    - 如果你自定义了安装路径，请根据之前创建变量的位置，双击相应的 **Path**。
+       - 如果你通过脚本安装了 `kbcli`，双击 **用户变量** 中的 Path。
+       - 如果你自定义了安装路径，请根据之前创建变量的位置，双击相应的 **Path**。
    5. 选择 `C:\Program Files\kbcli-windows-amd64` 或自定义的路径，并删除它。此操作需要二次确认。
 
 3. 删除名为 `.kbcli` 的文件夹。

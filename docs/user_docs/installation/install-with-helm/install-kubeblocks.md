@@ -13,6 +13,8 @@ import TabItem from '@theme/TabItem';
 
 KubeBlocks is Kubernetes-native, you can use Helm or kubectl with a YAML file to install it.
 
+To try out KubeBlocks on your local host, you can use the [Playground](./../../try-out-on-playground/try-kubeblocks-on-your-laptop.md) or [create a local Kubernetes test cluster first](./../prerequisite/prepare-a-local-k8s-cluster.md) and then follow the steps in this tutorial to install KubeBlocks.
+
 :::note
 
 If you install KubeBlocks with Helm, to uninstall it, you have to use Helm too.
@@ -60,15 +62,14 @@ Use Helm and follow the steps below to install KubeBlocks.
 1. Create dependent CRDs. Specify the version you want to install.
 
    ```bash
-   kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/vx.x.x/kubeblocks_crds.yaml
+   kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/vx.y.z/kubeblocks_crds.yaml
    ```
    You can view all versions of kubeblocks, including alpha and beta releases, on the [kubeblocks releases list](https://github.com/apecloud/kubeblocks/releases).
 
    To get stable releases, use this command:
    ```bash
-   curl -s "https://api.github.com/repos/apecloud/kubeblocks/releases?per_page=100&page=1" | jq -r '.[] | select(.prerelease == false) | .tag_name' | sort -V
+   curl -s "https://api.github.com/repos/apecloud/kubeblocks/releases?per_page=100&page=1" | jq -r '.[] | select(.prerelease == false) | .tag_name' | sort -V -r
    ```
-   
 
 2. Add the KubeBlocks Helm repo.
 
@@ -97,7 +98,7 @@ Use Helm and follow the steps below to install KubeBlocks.
    2. Specify a version with `--version` and run the command below.
 
       ```bash
-      helm install kubeblocks kubeblocks/kubeblocks --namespace kb-system --create-namespace --version="x.x.x"
+      helm install kubeblocks kubeblocks/kubeblocks --namespace kb-system --create-namespace --version="x.y.z"
       ```
 
      :::note
@@ -110,13 +111,14 @@ Use Helm and follow the steps below to install KubeBlocks.
 
 <TabItem value="kubectl" label="Install with kubectl">
 
-KubeBlocks can be installed like any other resource in Kubernetes, through a YAML manifest applied via `kubectl`.
+Like any other resource in Kubernetes, KubeBlocks can be installed through a YAML manifest applied via `kubectl`.
 
-Run the following command to install the latest operator manifest for this minor release:
+1. Copy the URL of the `kubeblocks.yaml file` for the version you need from the Assets on the [KubeBlocks Release page](https://github.com/apecloud/kubeblocks/releases).
+2. Replace the YAML file URL in the command below and run this command to install KubeBlocks.
 
- ```bash
- kubectl create -f \address.yaml
- ```
+     ```bash
+     kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/vx.y.x/kubeblocks.yaml
+     ```
 
 </TabItem>
 
@@ -135,14 +137,15 @@ kubectl -n kb-system get pods
 If the KubeBlocks Workloads are all ready, KubeBlocks has been installed successfully.
 
 ```bash
-NAME                                                     READY   STATUS       AGE
-kb-addon-snapshot-controller-7b447684d4-q86zf            1/1     Running      33d
-kb-addon-csi-hostpath-driver-0                           8/8     Running      33d
-kb-addon-grafana-54b9cbf65d-k8522                        3/3     Running      33d
-kb-addon-apecloud-otel-collector-j4thb                   1/1     Running      33d
-kubeblocks-5b5648bfd9-8jpvv                              1/1     Running      33d
-kubeblocks-dataprotection-f54c9486c-2nfmr                1/1     Running      33d
-kb-addon-alertmanager-webhook-adaptor-76b87f9df8-xb74g   2/2     Running      33d
-kb-addon-prometheus-server-0                             2/2     Running      33d
-kb-addon-prometheus-alertmanager-0                       2/2     Running      33d
+NAME                                             READY   STATUS    RESTARTS       AGE
+alertmanager-webhook-adaptor-8dfc4878d-svzrc     2/2     Running   0              3m56s
+grafana-77dfd6959-4gnhp                          1/1     Running   0              3m56s
+kb-addon-snapshot-controller-546f84b78d-8rjs4    1/1     Running   0              3m56s
+kubeblocks-7cf7745685-ddlwk                      1/1     Running   0              4m39s
+kubeblocks-dataprotection-95fbc79cc-b544l        1/1     Running   0              4m39s
+prometheus-alertmanager-5c9fc88996-qltrk         2/2     Running   0              3m56s
+prometheus-kube-state-metrics-5dbbf757f5-db9v6   1/1     Running   0              3m56s
+prometheus-node-exporter-r6kvl                   1/1     Running   0              3m56s
+prometheus-pushgateway-8555888c7d-xkgfc          1/1     Running   0              3m56s
+prometheus-server-5759b94fc8-686xp               2/2     Running   0              3m56s
 ```

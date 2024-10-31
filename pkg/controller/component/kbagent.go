@@ -47,6 +47,7 @@ const (
 	kbAgentDefaultPort = 3501
 
 	defaultProbeReportPeriodSeconds = 60
+	minProbeReportPeriodSeconds     = 15
 )
 
 var (
@@ -228,12 +229,22 @@ func buildKBAgentStartupEnvs(synthesizedComp *SynthesizedComponent) ([]corev1.En
 	}
 	// TODO: how to schedule the execution of probes?
 	if a, p := buildProbe4KBAgent(synthesizedComp.LifecycleActions.AvailableProbe, availableProbe, synthesizedComp.FullCompName); a != nil && p != nil {
-		p.ReportPeriodSeconds = max(defaultProbeReportPeriodSeconds, p.PeriodSeconds)
+		p.ReportPeriodSeconds = probeReportPeriodSeconds(p.PeriodSeconds)
 		actions = append(actions, *a)
 		probes = append(probes, *p)
 	}
 
 	return kbagent.BuildStartupEnv(actions, probes)
+}
+
+func probeReportPeriodSeconds(periodSeconds int32) int32 {
+	if periodSeconds <= 0 {
+		return defaultProbeReportPeriodSeconds
+	}
+	if periodSeconds < minProbeReportPeriodSeconds {
+		return minProbeReportPeriodSeconds
+	}
+	return periodSeconds
 }
 
 func buildAction4KBAgent(action *appsv1.Action, name string) *proto.Action {

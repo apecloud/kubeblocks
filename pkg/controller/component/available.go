@@ -43,9 +43,8 @@ import (
 )
 
 const (
-	availableProbe               = "availableProbe"
-	defaultTimeWindow      int32 = 30
-	availableProbeEventKey       = "apps.kubeblocks.io/available-probe-event"
+	availableProbe         = "availableProbe"
+	availableProbeEventKey = "apps.kubeblocks.io/available-probe-event"
 )
 
 type AvailableEventHandler struct{}
@@ -83,7 +82,7 @@ func (h *AvailableEventHandler) Handle(cli client.Client, reqCtx intctrlutil.Req
 		return nil // w/o available probe
 	}
 	if *available {
-		return h.available(reqCtx.Ctx, cli, recorder, compCopy, comp)
+		return h.available(reqCtx.Ctx, cli, recorder, compCopy, comp, message)
 	}
 	return h.unavailable(reqCtx.Ctx, cli, recorder, compCopy, comp, message)
 }
@@ -94,8 +93,8 @@ func (h *AvailableEventHandler) isAvailableEvent(event *corev1.Event) bool {
 }
 
 func (h *AvailableEventHandler) available(ctx context.Context, cli client.Client,
-	recorder record.EventRecorder, compCopy, comp *appsv1.Component) error {
-	return h.status(ctx, cli, recorder, compCopy, comp, metav1.ConditionTrue, "Available", "Component is available")
+	recorder record.EventRecorder, compCopy, comp *appsv1.Component, message string) error {
+	return h.status(ctx, cli, recorder, compCopy, comp, metav1.ConditionTrue, "Available", message)
 }
 
 func (h *AvailableEventHandler) unavailable(ctx context.Context, cli client.Client,
@@ -150,7 +149,13 @@ func (h *AvailableEventHandler) handleEvent(event probeEvent, comp *appsv1.Compo
 	if err != nil {
 		return nil, "", err
 	}
-	available, message := h.evaluateCondition(*policy.WithProbe.Condition, comp.Spec.Replicas, events)
+	available, message := h.evalCond(*policy.WithProbe.Condition, comp.Spec.Replicas, events)
+	if available {
+		message = "Component is available"
+		if len(policy.WithProbe.Description) > 0 {
+			message = policy.WithProbe.Description
+		}
+	}
 	return &available, message, nil
 }
 
@@ -295,34 +300,22 @@ func (h *AvailableEventHandler) updateCachedEvents(comp *appsv1.Component, event
 	return nil
 }
 
-func (h *AvailableEventHandler) evaluateCondition(cond appsv1.ComponentAvailableCondition, replicas int32, events []probeEvent) (bool, string) {
+func (h *AvailableEventHandler) evalCond(cond appsv1.ComponentAvailableCondition, replicas int32, events []probeEvent) (bool, string) {
 	if len(cond.And) > 0 {
-		return h.evaluateAnd(cond.And, replicas, events)
+		return h.evalCondAnd(cond.And, replicas, events)
 	}
 	if len(cond.Or) > 0 {
-		return h.evaluateOr(cond.Or, replicas, events)
+		return h.evalCondOr(cond.Or, replicas, events)
 	}
 	if cond.Not != nil {
-		return h.evaluateNot(*cond.Not, replicas, events)
+		return h.evalCondNot(*cond.Not, replicas, events)
 	}
-	if cond.All != nil {
-		return h.evaluateAll(*cond.All, replicas, events)
-	}
-	if cond.Any != nil {
-		return h.evaluateAny(*cond.Any, replicas, events)
-	}
-	if cond.None != nil {
-		return h.evaluateNone(*cond.None, replicas, events)
-	}
-	if cond.Majority != nil {
-		return h.evaluateMajority(*cond.Majority, replicas, events)
-	}
-	return true, ""
+	return h.evalExpr(cond.ComponentAvailableExpression, replicas, events)
 }
 
-func (h *AvailableEventHandler) evaluateAnd(conditions []appsv1.ComponentAvailableConditionX, replicas int32, events []probeEvent) (bool, string) {
-	for _, cond := range conditions {
-		ok, msg := h.evaluateConditionX(cond, replicas, events)
+func (h *AvailableEventHandler) evalCondAnd(expressions []appsv1.ComponentAvailableExpression, replicas int32, events []probeEvent) (bool, string) {
+	for _, expr := range expressions {
+		ok, msg := h.evalExpr(expr, replicas, events)
 		if !ok {
 			return false, msg
 		}
@@ -330,10 +323,10 @@ func (h *AvailableEventHandler) evaluateAnd(conditions []appsv1.ComponentAvailab
 	return true, ""
 }
 
-func (h *AvailableEventHandler) evaluateOr(conditions []appsv1.ComponentAvailableConditionX, replicas int32, events []probeEvent) (bool, string) {
+func (h *AvailableEventHandler) evalCondOr(expressions []appsv1.ComponentAvailableExpression, replicas int32, events []probeEvent) (bool, string) {
 	msgs := make([]string, 0)
-	for _, cond := range conditions {
-		ok, msg := h.evaluateConditionX(cond, replicas, events)
+	for _, expr := range expressions {
+		ok, msg := h.evalExpr(expr, replicas, events)
 		if ok {
 			return true, ""
 		}
@@ -344,20 +337,36 @@ func (h *AvailableEventHandler) evaluateOr(conditions []appsv1.ComponentAvailabl
 	return false, strings.Join(h.distinct(msgs), ",")
 }
 
-func (h *AvailableEventHandler) evaluateNot(cond appsv1.ComponentAvailableConditionX, replicas int32, events []probeEvent) (bool, string) {
-	ok, msg := h.evaluateConditionX(cond, replicas, events)
+func (h *AvailableEventHandler) evalCondNot(expr appsv1.ComponentAvailableExpression, replicas int32, events []probeEvent) (bool, string) {
+	ok, msg := h.evalExpr(expr, replicas, events)
 	if ok {
 		return false, msg
 	}
 	return true, ""
 }
 
-func (h *AvailableEventHandler) evaluateAll(cond appsv1.ComponentAvailableConditionX, replicas int32, events []probeEvent) (bool, string) {
-	if !h.strictCheck(cond, replicas, events) {
+func (h *AvailableEventHandler) evalExpr(expr appsv1.ComponentAvailableExpression, replicas int32, events []probeEvent) (bool, string) {
+	if expr.All != nil {
+		return h.evalAssertionAll(*expr.All, replicas, events)
+	}
+	if expr.Any != nil {
+		return h.evalAssertionAny(*expr.Any, replicas, events)
+	}
+	if expr.None != nil {
+		return h.evalAssertionNone(*expr.None, replicas, events)
+	}
+	if expr.Majority != nil {
+		return h.evalAssertionMajority(*expr.Majority, replicas, events)
+	}
+	return true, ""
+}
+
+func (h *AvailableEventHandler) evalAssertionAll(assertion appsv1.ComponentAvailableProbeAssertion, replicas int32, events []probeEvent) (bool, string) {
+	if !h.strictCheck(assertion, replicas, events) {
 		return false, fmt.Sprintf("not all replicas are available: %d/%d", len(events), replicas)
 	}
 	for _, event := range events {
-		ok, msg := h.evaluateConditionX(cond, replicas, []probeEvent{event})
+		ok, msg := h.evalAssertion(assertion, []probeEvent{event})
 		if !ok {
 			return false, msg
 		}
@@ -365,13 +374,13 @@ func (h *AvailableEventHandler) evaluateAll(cond appsv1.ComponentAvailableCondit
 	return true, ""
 }
 
-func (h *AvailableEventHandler) evaluateAny(cond appsv1.ComponentAvailableConditionX, replicas int32, events []probeEvent) (bool, string) {
-	if !h.strictCheck(cond, replicas, events) {
+func (h *AvailableEventHandler) evalAssertionAny(assertion appsv1.ComponentAvailableProbeAssertion, replicas int32, events []probeEvent) (bool, string) {
+	if !h.strictCheck(assertion, replicas, events) {
 		return false, fmt.Sprintf("not all replicas are available: %d/%d", len(events), replicas)
 	}
 	msgs := make([]string, 0)
 	for _, event := range events {
-		ok, msg := h.evaluateConditionX(cond, replicas, []probeEvent{event})
+		ok, msg := h.evalAssertion(assertion, []probeEvent{event})
 		if ok {
 			return true, ""
 		}
@@ -382,12 +391,12 @@ func (h *AvailableEventHandler) evaluateAny(cond appsv1.ComponentAvailableCondit
 	return false, strings.Join(h.distinct(msgs), ",")
 }
 
-func (h *AvailableEventHandler) evaluateNone(cond appsv1.ComponentAvailableConditionX, replicas int32, events []probeEvent) (bool, string) {
-	if !h.strictCheck(cond, replicas, events) {
+func (h *AvailableEventHandler) evalAssertionNone(assertion appsv1.ComponentAvailableProbeAssertion, replicas int32, events []probeEvent) (bool, string) {
+	if !h.strictCheck(assertion, replicas, events) {
 		return false, fmt.Sprintf("not all replicas are available: %d/%d", len(events), replicas)
 	}
 	for _, event := range events {
-		ok, msg := h.evaluateConditionX(cond, replicas, []probeEvent{event})
+		ok, msg := h.evalAssertion(assertion, []probeEvent{event})
 		if ok {
 			return false, msg
 		}
@@ -395,11 +404,11 @@ func (h *AvailableEventHandler) evaluateNone(cond appsv1.ComponentAvailableCondi
 	return true, ""
 }
 
-func (h *AvailableEventHandler) evaluateMajority(cond appsv1.ComponentAvailableConditionX, replicas int32, events []probeEvent) (bool, string) {
+func (h *AvailableEventHandler) evalAssertionMajority(assertion appsv1.ComponentAvailableProbeAssertion, replicas int32, events []probeEvent) (bool, string) {
 	count := 0
 	msgs := make([]string, 0)
 	for _, event := range events {
-		ok, msg := h.evaluateConditionX(cond, replicas, []probeEvent{event})
+		ok, msg := h.evalAssertion(assertion, []probeEvent{event})
 		if ok {
 			count++
 		} else if len(msg) > 0 {
@@ -413,8 +422,8 @@ func (h *AvailableEventHandler) evaluateMajority(cond appsv1.ComponentAvailableC
 	return false, strings.Join(h.distinct(msgs), ",")
 }
 
-func (h *AvailableEventHandler) strictCheck(cond appsv1.ComponentAvailableConditionX, replicas int32, events []probeEvent) bool {
-	if cond.Strict != nil && *cond.Strict {
+func (h *AvailableEventHandler) strictCheck(assertion appsv1.ComponentAvailableProbeAssertion, replicas int32, events []probeEvent) bool {
+	if assertion.Strict != nil && *assertion.Strict {
 		if replicas != int32(len(events)) {
 			return false
 		}
@@ -422,20 +431,55 @@ func (h *AvailableEventHandler) strictCheck(cond appsv1.ComponentAvailableCondit
 	return true
 }
 
-func (h *AvailableEventHandler) evaluateConditionX(cond appsv1.ComponentAvailableConditionX, replicas int32, events []probeEvent) (bool, string) {
-	if cond.ActionCriteria != (appsv1.ActionCriteria{}) {
-		return h.evaluateAction(cond.ActionCriteria, events)
+func (h *AvailableEventHandler) evalAssertion(assertion appsv1.ComponentAvailableProbeAssertion, events []probeEvent) (bool, string) {
+	if assertion.ActionAssertion != (appsv1.ActionAssertion{}) {
+		return h.evalAction(assertion.ActionAssertion, events)
 	}
-	if !reflect.DeepEqual(&cond.ComponentAvailableCondition, &appsv1.ComponentAvailableCondition{}) {
-		return h.evaluateCondition(cond.ComponentAvailableCondition, replicas, events)
+	if len(assertion.And) > 0 {
+		return h.evalActionAnd(assertion.And, events)
+	}
+	if assertion.Or != nil {
+		return h.evalActionOr(assertion.Or, events)
+	}
+	if assertion.Not != nil {
+		return h.evalActionNot(*assertion.Not, events)
 	}
 	return true, ""
 }
 
-func (h *AvailableEventHandler) evaluateAction(criteria appsv1.ActionCriteria, events []probeEvent) (bool, string) {
+func (h *AvailableEventHandler) evalActionAnd(assertions []appsv1.ActionAssertion, events []probeEvent) (bool, string) {
+	for _, assertion := range assertions {
+		ok, msg := h.evalAction(assertion, events)
+		if !ok {
+			return false, msg
+		}
+	}
+	return true, ""
+}
+
+func (h *AvailableEventHandler) evalActionOr(assertions []appsv1.ActionAssertion, events []probeEvent) (bool, string) {
+	msgs := make([]string, 0)
+	for _, assertion := range assertions {
+		ok, msg := h.evalAction(assertion, events)
+		if ok {
+			return true, ""
+		}
+		if len(msg) > 0 {
+			msgs = append(msgs, msg)
+		}
+	}
+	return false, strings.Join(h.distinct(msgs), ",")
+}
+
+func (h *AvailableEventHandler) evalActionNot(assertion appsv1.ActionAssertion, events []probeEvent) (bool, string) {
+	ok, msg := h.evalAction(assertion, events)
+	return !ok, msg
+}
+
+func (h *AvailableEventHandler) evalAction(assertion appsv1.ActionAssertion, events []probeEvent) (bool, string) {
 	msgs := make([]string, 0)
 	for _, event := range events {
-		ok, msg := h.evaluateActionEvent(criteria, event)
+		ok, msg := h.evalActionEvent(assertion, event)
 		if ok {
 			return true, ""
 		}
@@ -447,8 +491,8 @@ func (h *AvailableEventHandler) evaluateAction(criteria appsv1.ActionCriteria, e
 
 }
 
-func (h *AvailableEventHandler) evaluateActionEvent(criteria appsv1.ActionCriteria, event probeEvent) (bool, string) {
-	if criteria.Succeed != nil && *criteria.Succeed != (event.Code == 0) {
+func (h *AvailableEventHandler) evalActionEvent(assertion appsv1.ActionAssertion, event probeEvent) (bool, string) {
+	if assertion.Succeed != nil && *assertion.Succeed != (event.Code == 0) {
 		return false, fmt.Sprintf("probe code is not 0: %d", event.Code)
 	}
 	prefix16 := func(out string) string {
@@ -457,20 +501,20 @@ func (h *AvailableEventHandler) evaluateActionEvent(criteria appsv1.ActionCriter
 		}
 		return out[:16] + "..."
 	}
-	if criteria.Stdout != nil {
-		if criteria.Stdout.EqualTo != nil && !bytes.Equal(event.Stdout, []byte(*criteria.Stdout.EqualTo)) {
-			return false, fmt.Sprintf("probe stdout is not match: %s", prefix16(*criteria.Stdout.EqualTo))
+	if assertion.Stdout != nil {
+		if assertion.Stdout.EqualTo != nil && !bytes.Equal(event.Stdout, []byte(*assertion.Stdout.EqualTo)) {
+			return false, fmt.Sprintf("probe stdout is not match: %s", prefix16(*assertion.Stdout.EqualTo))
 		}
-		if criteria.Stdout.Contains != nil && !bytes.Contains(event.Stdout, []byte(*criteria.Stdout.Contains)) {
-			return false, fmt.Sprintf("probe stdout does not contain: %s", prefix16(*criteria.Stdout.Contains))
+		if assertion.Stdout.Contains != nil && !bytes.Contains(event.Stdout, []byte(*assertion.Stdout.Contains)) {
+			return false, fmt.Sprintf("probe stdout does not contain: %s", prefix16(*assertion.Stdout.Contains))
 		}
 	}
-	if criteria.Stderr != nil {
-		if criteria.Stderr.EqualTo != nil && !bytes.Equal(event.Stderr, []byte(*criteria.Stderr.EqualTo)) {
-			return false, fmt.Sprintf("probe stderr is not match: %s", prefix16(*criteria.Stderr.EqualTo))
+	if assertion.Stderr != nil {
+		if assertion.Stderr.EqualTo != nil && !bytes.Equal(event.Stderr, []byte(*assertion.Stderr.EqualTo)) {
+			return false, fmt.Sprintf("probe stderr is not match: %s", prefix16(*assertion.Stderr.EqualTo))
 		}
-		if criteria.Stderr.Contains != nil && !bytes.Contains(event.Stderr, []byte(*criteria.Stderr.Contains)) {
-			return false, fmt.Sprintf("probe stderr does not contain: %s", prefix16(*criteria.Stderr.Contains))
+		if assertion.Stderr.Contains != nil && !bytes.Contains(event.Stderr, []byte(*assertion.Stderr.Contains)) {
+			return false, fmt.Sprintf("probe stderr does not contain: %s", prefix16(*assertion.Stderr.Contains))
 		}
 	}
 	return true, ""
@@ -492,10 +536,11 @@ func GetComponentAvailablePolicy(compDef *appsv1.ComponentDefinition) appsv1.Com
 	if compDef.Spec.Available != nil {
 		policy := *compDef.Spec.Available
 		if policy.WithProbe != nil && policy.WithProbe.TimeWindowSeconds == nil {
-			policy.WithProbe.TimeWindowSeconds = pointer.Int32(defaultTimeWindow)
+			periodSeconds := int32(0)
 			if compDef.Spec.LifecycleActions != nil && compDef.Spec.LifecycleActions.AvailableProbe != nil {
-				policy.WithProbe.TimeWindowSeconds = pointer.Int32(compDef.Spec.LifecycleActions.AvailableProbe.PeriodSeconds * 2)
+				periodSeconds = compDef.Spec.LifecycleActions.AvailableProbe.PeriodSeconds
 			}
+			policy.WithProbe.TimeWindowSeconds = pointer.Int32(probeReportPeriodSeconds(periodSeconds) * 2)
 		}
 		return policy
 	}
@@ -504,9 +549,11 @@ func GetComponentAvailablePolicy(compDef *appsv1.ComponentDefinition) appsv1.Com
 			WithProbe: &appsv1.ComponentAvailableWithProbe{
 				TimeWindowSeconds: pointer.Int32(compDef.Spec.LifecycleActions.AvailableProbe.PeriodSeconds),
 				Condition: &appsv1.ComponentAvailableCondition{
-					All: &appsv1.ComponentAvailableConditionX{
-						ActionCriteria: appsv1.ActionCriteria{
-							Succeed: pointer.Bool(true),
+					ComponentAvailableExpression: appsv1.ComponentAvailableExpression{
+						All: &appsv1.ComponentAvailableProbeAssertion{
+							ActionAssertion: appsv1.ActionAssertion{
+								Succeed: pointer.Bool(true),
+							},
 						},
 					},
 				},

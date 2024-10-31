@@ -1276,64 +1276,93 @@ type ComponentAvailableWithProbe struct {
 	//
 	// +optional
 	Condition *ComponentAvailableCondition `json:"condition,omitempty"`
+
+	// A brief description for the condition when the component is available.
+	//
+	// +optional
+	Description string `json:"description,omitempty"`
 }
 
 type ComponentAvailableCondition struct {
-	// Logical operator AND.
-	//
-	// This field is immutable once set.
-	//
-	// +optional
-	And []ComponentAvailableConditionX `json:"and,omitempty"`
+	ComponentAvailableExpression `json:",inline"`
 
-	// Logical operator OR.
+	// Logical And to combine multiple expressions.
 	//
 	// This field is immutable once set.
 	//
 	// +optional
-	Or []ComponentAvailableConditionX `json:"or,omitempty"`
+	And []ComponentAvailableExpression `json:"and,omitempty"`
 
-	// Logical operator NOT.
+	// Logical Or to combine multiple expressions.
 	//
 	// This field is immutable once set.
 	//
 	// +optional
-	Not *ComponentAvailableConditionX `json:"not,omitempty"`
+	Or []ComponentAvailableExpression `json:"or,omitempty"`
 
-	// Aggregate operator ALL.
+	// Logical Not to negate the expression.
 	//
 	// This field is immutable once set.
 	//
 	// +optional
-	All *ComponentAvailableConditionX `json:"all,omitempty"`
-
-	// Aggregate operator ANY.
-	//
-	// This field is immutable once set.
-	//
-	// +optional
-	Any *ComponentAvailableConditionX `json:"any,omitempty"`
-
-	// Aggregate operator NONE.
-	//
-	// This field is immutable once set.
-	//
-	// +optional
-	None *ComponentAvailableConditionX `json:"none,omitempty"`
-
-	// Aggregate operator MAJORITY.
-	//
-	// This field is immutable once set.
-	//
-	// +optional
-	Majority *ComponentAvailableConditionX `json:"majority,omitempty"`
+	Not *ComponentAvailableExpression `json:"not,omitempty"`
 }
 
-type ComponentAvailableConditionX struct {
-	ActionCriteria              `json:",inline"`
-	ComponentAvailableCondition `json:",inline"`
+type ComponentAvailableExpression struct {
+	// All replicas must satisfy the assertion.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	All *ComponentAvailableProbeAssertion `json:"all,omitempty"`
 
-	// Specifies whether apply the aggregation conditions strictly to all replicas.
+	// At least one replica must satisfy the assertion.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	Any *ComponentAvailableProbeAssertion `json:"any,omitempty"`
+
+	// None of the replicas must satisfy the assertion.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	None *ComponentAvailableProbeAssertion `json:"none,omitempty"`
+
+	// Majority replicas must satisfy the assertion.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	Majority *ComponentAvailableProbeAssertion `json:"majority,omitempty"`
+}
+
+type ComponentAvailableProbeAssertion struct {
+	ActionAssertion `json:",inline"`
+
+	// Logical And to combine multiple assertions.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	And []ActionAssertion `json:"and,omitempty"`
+
+	// Logical Or to combine multiple assertions.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	Or []ActionAssertion `json:"or,omitempty"`
+
+	// Logical Not to negate the assertions.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	Not *ActionAssertion `json:"not,omitempty"`
+
+	// Specifies whether apply the assertions strictly to all replicas.
 	//
 	// This field is immutable once set.
 	//
@@ -1894,8 +1923,8 @@ type Probe struct {
 	FailureThreshold int32 `json:"failureThreshold,omitempty"`
 }
 
-// ActionCriteria defines the custom criteria for evaluating the success or failure of an action.
-type ActionCriteria struct {
+// ActionAssertion defines the custom assertions for evaluating the success or failure of an action.
+type ActionAssertion struct {
 	// Whether the action should succeed or fail.
 	//
 	// This field is immutable once set.

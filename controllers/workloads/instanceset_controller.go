@@ -112,7 +112,7 @@ func (r *InstanceSetReconciler) SetupWithManager(mgr ctrl.Manager, multiClusterM
 func (r *InstanceSetReconciler) setupWithManager(mgr ctrl.Manager, ctx *handler.FinderContext) error {
 	itsFinder := handler.NewLabelFinder(&workloads.InstanceSet{}, instanceset.WorkloadsManagedByLabelKey, workloads.Kind, instanceset.WorkloadsInstanceLabelKey)
 	podHandler := handler.NewBuilder(ctx).AddFinder(itsFinder).Build()
-	return intctrlutil.NewNamespacedControllerManagedBy(mgr).
+	return intctrlutil.NewControllerManagedBy(mgr, &workloads.InstanceSet{}).
 		For(&workloads.InstanceSet{}).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: viper.GetInt(constant.CfgKBReconcileWorkers),
@@ -132,7 +132,7 @@ func (r *InstanceSetReconciler) setupWithMultiClusterManager(mgr ctrl.Manager,
 	// TODO: modify handler.getObjectFromKey to support running Job in data clusters
 	jobHandler := handler.NewBuilder(ctx).AddFinder(delegatorFinder).Build()
 
-	b := intctrlutil.NewNamespacedControllerManagedBy(mgr).
+	b := intctrlutil.NewControllerManagedBy(mgr, &workloads.InstanceSet{}).
 		For(&workloads.InstanceSet{}).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: viper.GetInt(constant.CfgKBReconcileWorkers),

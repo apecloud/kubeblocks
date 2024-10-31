@@ -82,6 +82,10 @@ const (
 	multiClusterContextsDisabledFlagKey flagName = "multi-cluster-contexts-disabled"
 
 	userAgentFlagKey flagName = "user-agent"
+
+	// dual-operators-mode indicates whether the operator runs in dual-operators mode.
+	// If it's true, the operator will degrade to a secondary operator and only manage the resources dedicated to releases prior to v1.0.
+	dualOperatorsModeFlag flagName = "dual-operators-mode"
 )
 
 var (
@@ -147,6 +151,8 @@ func main() {
 	flag.String(multiClusterContextsDisabledFlagKey.String(), "", "Kube contexts that mark as disabled.")
 
 	flag.String(userAgentFlagKey.String(), "", "User agent of the operator.")
+
+	flag.Bool(dualOperatorsModeFlag.String(), false, "Whether the operator runs in dual-operators mode.")
 
 	flag.String(constant.ManagedNamespacesFlag, "",
 		"The namespaces that the operator will manage, multiple namespaces are separated by commas.")
@@ -273,105 +279,108 @@ func main() {
 		client = multiClusterMgr.GetClient()
 	}
 
-	if err = (&dpcontrollers.ActionSetReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("actionset-controller"),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "ActionSet")
-		os.Exit(1)
-	}
+	dualOperatorsMode := viper.GetBool(dualOperatorsModeFlag.viperName())
+	if !dualOperatorsMode {
+		if err = (&dpcontrollers.ActionSetReconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("actionset-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "ActionSet")
+			os.Exit(1)
+		}
 
-	if err = (&dpcontrollers.BackupReconciler{
-		Client:     mgr.GetClient(),
-		Scheme:     mgr.GetScheme(),
-		Recorder:   mgr.GetEventRecorderFor("backup-controller"),
-		RestConfig: mgr.GetConfig(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "Backup")
-		os.Exit(1)
-	}
+		if err = (&dpcontrollers.BackupReconciler{
+			Client:     mgr.GetClient(),
+			Scheme:     mgr.GetScheme(),
+			Recorder:   mgr.GetEventRecorderFor("backup-controller"),
+			RestConfig: mgr.GetConfig(),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "Backup")
+			os.Exit(1)
+		}
 
-	if err = (&dpcontrollers.RestoreReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("restore-controller"),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "Restore")
-		os.Exit(1)
-	}
+		if err = (&dpcontrollers.RestoreReconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("restore-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "Restore")
+			os.Exit(1)
+		}
 
-	if err = (&dpcontrollers.VolumePopulatorReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("volume-populator-controller"),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "VolumePopulator")
-		os.Exit(1)
-	}
+		if err = (&dpcontrollers.VolumePopulatorReconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("volume-populator-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "VolumePopulator")
+			os.Exit(1)
+		}
 
-	if err = (&dpcontrollers.BackupPolicyReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("backup-policy-controller"),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "BackupPolicy")
-		os.Exit(1)
-	}
+		if err = (&dpcontrollers.BackupPolicyReconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("backup-policy-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "BackupPolicy")
+			os.Exit(1)
+		}
 
-	if err = (&dpcontrollers.BackupScheduleReconciler{
-		Client:   dputils.NewCompatClient(mgr.GetClient()),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("backup-schedule-controller"),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "BackupSchedule")
-		os.Exit(1)
-	}
+		if err = (&dpcontrollers.BackupScheduleReconciler{
+			Client:   dputils.NewCompatClient(mgr.GetClient()),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("backup-schedule-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "BackupSchedule")
+			os.Exit(1)
+		}
 
-	if err = (&dpcontrollers.BackupRepoReconciler{
-		Client:          client,
-		Scheme:          mgr.GetScheme(),
-		Recorder:        mgr.GetEventRecorderFor("backup-repo-controller"),
-		RestConfig:      mgr.GetConfig(),
-		MultiClusterMgr: multiClusterMgr,
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "BackupRepo")
-		os.Exit(1)
-	}
+		if err = (&dpcontrollers.BackupRepoReconciler{
+			Client:          client,
+			Scheme:          mgr.GetScheme(),
+			Recorder:        mgr.GetEventRecorderFor("backup-repo-controller"),
+			RestConfig:      mgr.GetConfig(),
+			MultiClusterMgr: multiClusterMgr,
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "BackupRepo")
+			os.Exit(1)
+		}
 
-	if err = (&storagecontrollers.StorageProviderReconciler{
-		Client:          client,
-		Scheme:          mgr.GetScheme(),
-		Recorder:        mgr.GetEventRecorderFor("storage-provider-controller"),
-		MultiClusterMgr: multiClusterMgr,
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "StorageProvider")
-		os.Exit(1)
-	}
+		if err = (&storagecontrollers.StorageProviderReconciler{
+			Client:          client,
+			Scheme:          mgr.GetScheme(),
+			Recorder:        mgr.GetEventRecorderFor("storage-provider-controller"),
+			MultiClusterMgr: multiClusterMgr,
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "StorageProvider")
+			os.Exit(1)
+		}
 
-	if err = (&dpcontrollers.StorageProviderReconciler{
-		Client:          client,
-		Scheme:          mgr.GetScheme(),
-		Recorder:        mgr.GetEventRecorderFor("storage-provider-controller"),
-		MultiClusterMgr: multiClusterMgr,
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "StorageProvider")
-		os.Exit(1)
-	}
+		if err = (&dpcontrollers.StorageProviderReconciler{
+			Client:          client,
+			Scheme:          mgr.GetScheme(),
+			Recorder:        mgr.GetEventRecorderFor("storage-provider-controller"),
+			MultiClusterMgr: multiClusterMgr,
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "StorageProvider")
+			os.Exit(1)
+		}
 
-	if err = (&dpcontrollers.LogCollectionReconciler{
-		Client:     mgr.GetClient(),
-		Scheme:     mgr.GetScheme(),
-		Recorder:   mgr.GetEventRecorderFor("log-collection-controller"),
-		RestConfig: mgr.GetConfig(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "logCollectionController")
-		os.Exit(1)
-	}
+		if err = (&dpcontrollers.LogCollectionReconciler{
+			Client:     mgr.GetClient(),
+			Scheme:     mgr.GetScheme(),
+			Recorder:   mgr.GetEventRecorderFor("log-collection-controller"),
+			RestConfig: mgr.GetConfig(),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "logCollectionController")
+			os.Exit(1)
+		}
 
-	if err = dpcontrollers.NewGCReconciler(mgr).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "GarbageCollection")
-		os.Exit(1)
+		if err = dpcontrollers.NewGCReconciler(mgr).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "GarbageCollection")
+			os.Exit(1)
+		}
 	}
 
 	// +kubebuilder:scaffold:builder

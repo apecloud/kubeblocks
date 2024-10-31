@@ -4093,7 +4093,7 @@ VarOption
 <tbody>
 <tr>
 <td>
-<code>phases</code><br/>
+<code>withPhases</code><br/>
 <em>
 string
 </em>

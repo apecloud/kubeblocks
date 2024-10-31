@@ -418,13 +418,13 @@ func (t *componentStatusTransformer) reconcileAvailableCondition(transCtx *compo
 	)
 	status, reason, message := func() (metav1.ConditionStatus, string, string) {
 		if comp.Status.Phase == "" {
-			return metav1.ConditionUnknown, "Unknown", "component phase is unknown"
+			return metav1.ConditionUnknown, "Unknown", "the component phase is unknown"
 		}
 		phases := sets.New[string](strings.Split(strings.ToLower(*policy.WithPhases), ",")...)
 		if phases.Has(strings.ToLower(string(comp.Status.Phase))) {
-			return metav1.ConditionTrue, "Available", fmt.Sprintf("component phase is %s", comp.Status.Phase)
+			return metav1.ConditionTrue, "Available", fmt.Sprintf("the component phase is %s", comp.Status.Phase)
 		}
-		return metav1.ConditionFalse, "Unavailable", fmt.Sprintf("component phase is %s", comp.Status.Phase)
+		return metav1.ConditionFalse, "Unavailable", fmt.Sprintf("the component phase is %s", comp.Status.Phase)
 	}()
 
 	cond := metav1.Condition{

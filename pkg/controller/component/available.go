@@ -151,7 +151,7 @@ func (h *AvailableEventHandler) handleEvent(event probeEvent, comp *appsv1.Compo
 	}
 	available, message := h.evalCond(*policy.WithProbe.Condition, comp.Spec.Replicas, events)
 	if available {
-		message = "Component is available"
+		message = "the available conditions are met"
 		if len(policy.WithProbe.Description) > 0 {
 			message = policy.WithProbe.Description
 		}
@@ -533,33 +533,44 @@ func (h *AvailableEventHandler) distinct(msgs []string) []string {
 }
 
 func GetComponentAvailablePolicy(compDef *appsv1.ComponentDefinition) appsv1.ComponentAvailable {
+	timeWindowSeconds := func() *int32 {
+		periodSeconds := int32(0)
+		if compDef.Spec.LifecycleActions != nil && compDef.Spec.LifecycleActions.AvailableProbe != nil {
+			periodSeconds = compDef.Spec.LifecycleActions.AvailableProbe.PeriodSeconds
+		}
+		return pointer.Int32(probeReportPeriodSeconds(periodSeconds) * 2)
+	}
+
+	// has available policy defined
 	if compDef.Spec.Available != nil {
 		policy := *compDef.Spec.Available
 		if policy.WithProbe != nil && policy.WithProbe.TimeWindowSeconds == nil {
-			periodSeconds := int32(0)
-			if compDef.Spec.LifecycleActions != nil && compDef.Spec.LifecycleActions.AvailableProbe != nil {
-				periodSeconds = compDef.Spec.LifecycleActions.AvailableProbe.PeriodSeconds
-			}
-			policy.WithProbe.TimeWindowSeconds = pointer.Int32(probeReportPeriodSeconds(periodSeconds) * 2)
+			policy.WithProbe.TimeWindowSeconds = timeWindowSeconds()
 		}
 		return policy
 	}
+
+	// has available probe defined
 	if compDef.Spec.LifecycleActions != nil && compDef.Spec.LifecycleActions.AvailableProbe != nil {
 		return appsv1.ComponentAvailable{
 			WithProbe: &appsv1.ComponentAvailableWithProbe{
-				TimeWindowSeconds: pointer.Int32(compDef.Spec.LifecycleActions.AvailableProbe.PeriodSeconds),
+				TimeWindowSeconds: timeWindowSeconds(),
 				Condition: &appsv1.ComponentAvailableCondition{
 					ComponentAvailableExpression: appsv1.ComponentAvailableExpression{
 						All: &appsv1.ComponentAvailableProbeAssertion{
 							ActionAssertion: appsv1.ActionAssertion{
 								Succeed: pointer.Bool(true),
 							},
+							Strict: pointer.Bool(true),
 						},
 					},
 				},
+				Description: "all replicas are available",
 			},
 		}
 	}
+
+	// use phases as default policy
 	return appsv1.ComponentAvailable{
 		// TODO: replicas == 0, stopped, updating, abnormal?
 		WithPhases: pointer.String(string(appsv1.RunningComponentPhase)),

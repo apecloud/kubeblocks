@@ -38,17 +38,6 @@ var _ = Describe("InstanceSet Controller", func() {
 		It("should reconcile well", func() {
 			name := "test-instance-set"
 			port := int32(12345)
-			service := &corev1.Service{
-				Spec: corev1.ServiceSpec{
-					Ports: []corev1.ServicePort{
-						{
-							Name:     "foo",
-							Protocol: corev1.ProtocolTCP,
-							Port:     port,
-						},
-					},
-				},
-			}
 			commonLabels := map[string]string{
 				constant.AppManagedByLabelKey:   constant.AppName,
 				constant.AppNameLabelKey:        "ClusterDefName",
@@ -79,7 +68,6 @@ var _ = Describe("InstanceSet Controller", func() {
 			}
 			its := builder.NewInstanceSetBuilder(testCtx.DefaultNamespace, name).
 				AddMatchLabelsInMap(commonLabels).
-				SetService(service).
 				SetTemplate(template).
 				AddCustomHandler(action).
 				GetObject()

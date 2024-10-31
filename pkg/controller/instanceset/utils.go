@@ -51,21 +51,7 @@ func ComposeRolePriorityMap(roles []workloads.ReplicaRole) map[string]int {
 	rolePriorityMap[""] = emptyPriority
 	for _, role := range roles {
 		roleName := strings.ToLower(role.Name)
-		switch {
-		case role.IsLeader:
-			rolePriorityMap[roleName] = leaderPriority
-		case role.CanVote:
-			switch role.AccessMode {
-			case workloads.NoneMode:
-				rolePriorityMap[roleName] = followerNonePriority
-			case workloads.ReadonlyMode:
-				rolePriorityMap[roleName] = followerReadonlyPriority
-			case workloads.ReadWriteMode:
-				rolePriorityMap[roleName] = followerReadWritePriority
-			}
-		default:
-			rolePriorityMap[roleName] = learnerPriority
-		}
+		rolePriorityMap[roleName] = role.UpdatePriority
 	}
 
 	return rolePriorityMap
@@ -141,14 +127,28 @@ func IsInstanceSetReady(its *workloads.InstanceSet) bool {
 	if its.Status.ReadyWithoutPrimary {
 		return true
 	}
-	hasLeader := false
-	for _, status := range membersStatus {
-		if status.ReplicaRole != nil && status.ReplicaRole.IsLeader {
-			hasLeader = true
-			break
+
+	return IsAllRequiredRolesExist(its)
+}
+
+func IsAllRequiredRolesExist(its *workloads.InstanceSet) bool {
+	requiredRoleExist := make(map[string]bool)
+	for _, role := range its.Spec.Roles {
+		if role.Required {
+			requiredRoleExist[role.Name] = false
 		}
 	}
-	return hasLeader
+	for _, status := range its.Status.MembersStatus {
+		if status.ReplicaRole != nil && status.ReplicaRole.Required {
+			requiredRoleExist[status.ReplicaRole.Name] = true
+		}
+	}
+	for _, exist := range requiredRoleExist {
+		if exist == false {
+			return false
+		}
+	}
+	return true
 }
 
 // AddAnnotationScope will add AnnotationScope defined by 'scope' to all keys in map 'annotations'.

@@ -602,7 +602,7 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
 	if err != nil {
 		return err
 	}
-	isLeader := func(pod *corev1.Pod) bool {
+	needSwitchover := func(pod *corev1.Pod) bool {
 		if pod == nil || len(pod.Labels) == 0 {
 			return false
 		}
@@ -612,7 +612,7 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
 		}
 
 		for _, replicaRole := range r.runningITS.Spec.Roles {
-			if roleName == replicaRole.Name && replicaRole.IsLeader {
+			if roleName == replicaRole.Name && replicaRole.SwitchoverBeforeUpdate {
 				return true
 			}
 		}
@@ -621,7 +621,7 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
 
 	tryToSwitchover := func(lfa lifecycle.Lifecycle, pod *corev1.Pod) error {
 		// if pod is not leader/primary, no need to switchover
-		if !isLeader(pod) {
+		if !needSwitchover(pod) {
 			return nil
 		}
 		// if HA functionality is not enabled, no need to switchover
@@ -645,7 +645,7 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
 		podsToMemberLeave = append(podsToMemberLeave, pod)
 	}
 	for _, pod := range podsToMemberLeave {
-		if !(isLeader(pod) || // if the pod is leader, it needs to call switchover
+		if !(needSwitchover(pod) || // if the pod is leader, it needs to call switchover
 			(r.synthesizeComp.LifecycleActions != nil && r.synthesizeComp.LifecycleActions.MemberLeave != nil)) { // if the memberLeave action is defined, it needs to call it
 			continue
 		}

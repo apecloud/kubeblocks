@@ -143,16 +143,18 @@ var _ = Describe("Event Controller", func() {
 			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(its), func(tmpITS *workloads.InstanceSet) {
 				tmpITS.Spec.Roles = []workloads.ReplicaRole{
 					{
-						Name:       "leader",
-						IsLeader:   true,
-						AccessMode: workloads.ReadWriteMode,
-						CanVote:    true,
+						Name:                   "leader",
+						Required:               true,
+						SwitchoverBeforeUpdate: true,
+						ParticipatesInQuorum:   true,
+						UpdatePriority:         5,
 					},
 					{
-						Name:       "follower",
-						IsLeader:   false,
-						AccessMode: workloads.ReadonlyMode,
-						CanVote:    true,
+						Name:                   "follower",
+						Required:               false,
+						SwitchoverBeforeUpdate: false,
+						ParticipatesInQuorum:   true,
+						UpdatePriority:         4,
 					},
 				}
 			})()).Should(Succeed())

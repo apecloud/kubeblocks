@@ -108,7 +108,8 @@ var _ = Describe("Job Utils Test", func() {
 			Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(job), func(job *batchv1.Job) {
 				job.Status.Conditions = []batchv1.JobCondition{
 					{
-						Type: batchv1.JobComplete,
+						Type:   batchv1.JobComplete,
+						Status: corev1.ConditionTrue,
 					},
 				}
 			})()).ShouldNot(HaveOccurred())

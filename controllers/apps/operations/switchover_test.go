@@ -67,7 +67,7 @@ var _ = Describe("", func() {
 				}
 			}
 			if !found {
-				jobCondition := batchv1.JobCondition{Type: jobStatus}
+				jobCondition := batchv1.JobCondition{Type: jobStatus, Status: corev1.ConditionTrue}
 				job.Status.Conditions = append(job.Status.Conditions, jobCondition)
 			}
 		})).Should(Succeed())

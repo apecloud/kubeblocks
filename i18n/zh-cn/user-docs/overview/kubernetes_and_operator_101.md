@@ -1,7 +1,7 @@
 ---
 title: Kubernetes 及 Operator 入门
 description: K8s 入门知识 
-keywords: [K8s, operator, concept]
+keywords: [K8s, operator, 概念]
 sidebar_position: 3
 ---
 

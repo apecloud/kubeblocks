@@ -59,11 +59,11 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 
 	// If the user has disabled rbac manager or specified comp.Spec.ServiceAccountName, it is now the user's responsibility to
 	// provide appropriate serviceaccount, roles and rolebindings.
-	if !viper.GetBool(constant.EnableRBACManager) {
-		transCtx.EventRecorder.Event(transCtx.Cluster, corev1.EventTypeWarning, EventReasonRBACManager, "RBAC manager is disabled")
+	if transCtx.Component.Spec.ServiceAccountName != "" {
 		return nil
 	}
-	if transCtx.Component.Spec.ServiceAccountName != "" {
+	if !viper.GetBool(constant.EnableRBACManager) {
+		transCtx.EventRecorder.Event(transCtx.Cluster, corev1.EventTypeWarning, EventReasonRBACManager, "RBAC manager is disabled")
 		return nil
 	}
 

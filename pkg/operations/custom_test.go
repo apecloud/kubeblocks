@@ -33,6 +33,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
@@ -268,7 +269,7 @@ var _ = Describe("CustomOps", func() {
 			Expect(ops.Status.Phase).Should(Equal(opsv1alpha1.OpsFailedPhase))
 		})
 
-		It("Test custom ops when workload job completed ", func() {
+		testCustomOps := func() {
 			By("create custom Ops")
 			params := []opsv1alpha1.Parameter{
 				{Name: requiredParam, Value: "select 1"},
@@ -300,7 +301,66 @@ var _ = Describe("CustomOps", func() {
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsResource)
 			Expect(err).ShouldNot(HaveOccurred())
 			Expect(opsResource.OpsRequest.Status.Phase).Should(Equal(opsv1alpha1.OpsSucceedPhase))
+		}
+
+		It("Test custom ops when workload job completed ", func() {
+			testCustomOps()
 		})
 
+		It("Should failed when creating ops with  a sharding component ahd the opsDef misses podInfoExtractors", func() {
+			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, "", "").
+				WithRandomName().AddSharding(defaultCompName, "", compDefName).Create(&testCtx).GetObject()
+
+			params := []opsv1alpha1.Parameter{
+				{Name: "sql", Value: "select 1"},
+			}
+			ops := createCustomOps(defaultCompName, params)
+			opsResource.Cluster = cluster
+			By("validate pass for json schema")
+			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsResource)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(ops.Status.Phase).Should(Equal(opsv1alpha1.OpsFailedPhase))
+		})
+
+		It("Test custom ops with sharding cluster", func() {
+			By("init environment for sharding cluster")
+			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, "", "").
+				WithRandomName().AddSharding(defaultCompName, "", compDefName).Create(&testCtx).GetObject()
+
+			opsResource.Cluster = cluster
+
+			Expect(testapps.ChangeObj(&testCtx, opsDef, func(obj *opsv1alpha1.OpsDefinition) {
+				podExtraInfoName := "running-pod"
+				obj.Spec.PodInfoExtractors = []opsv1alpha1.PodInfoExtractor{
+					{
+						Name: podExtraInfoName,
+						PodSelector: opsv1alpha1.PodSelector{
+							MultiPodSelectionPolicy: opsv1alpha1.Any,
+						},
+					},
+				}
+				obj.Spec.Actions[0].Workload.PodInfoExtractorName = podExtraInfoName
+			})).Should(Succeed())
+
+			// create a sharding component
+			shardingNamePrefix := constant.GenerateClusterComponentName(cluster.Name, defaultCompName)
+			shardingCompName := common.SimpleNameGenerator.GenerateName(shardingNamePrefix)
+			compObj = testapps.NewComponentFactory(testCtx.DefaultNamespace, shardingCompName, compDefName).
+				AddLabels(constant.AppInstanceLabelKey, cluster.Name).
+				AddLabels(constant.KBAppClusterUIDKey, string(cluster.UID)).
+				AddLabels(constant.KBAppShardingNameLabelKey, defaultCompName).
+				AddLabels(constant.KBAppComponentLabelKey, shardingCompName).
+				SetReplicas(1).
+				Create(&testCtx).
+				GetObject()
+
+			// create a pod which belongs to the sharding component
+			pod := testapps.MockInstanceSetPod(&testCtx, nil, cluster.Name, defaultCompName, fmt.Sprintf(shardingCompName+"-0"), "", "")
+			Expect(testapps.ChangeObj(&testCtx, pod, func(obj *corev1.Pod) {
+				pod.Labels[constant.KBAppShardingNameLabelKey] = defaultCompName
+			})).Should(Succeed())
+
+			testCustomOps()
+		})
 	})
 })

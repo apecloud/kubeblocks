@@ -1,28 +1,28 @@
 ---
-title: 多 k8s 部署
-description: 如何使用 KubeBlocks 实现多 k8s 部署
+title: 多 K8s 部署
+description: 如何使用 KubeBlocks 实现多 K8s 部署
 keywords: [cross k8s deployment]
 sidebar_position: 1
-sidebar_label: 使用 KubeBlocks 实现多 k8s 部署
+sidebar_label: 使用 KubeBlocks 实现多 K8s 部署
 ---
 
-# 使用 KubeBlocks 实现多 k8s 部署
+# 使用 KubeBlocks 实现多 K8s 部署
 
-KubeBlocks 支持管理多个 Kubernetes 集群，为用户在实例容灾、k8s 集群管理等方面提供新的选项。为支持多 K8s 管理，KubeBlocks 引入了 control plane 和 data plane。
+KubeBlocks 支持管理多个 Kubernetes 集群，为用户在实例容灾、K8s 集群管理等方面提供新的选项。为支持多 K8s 管理，KubeBlocks 引入了控制面（control plane ）和数据面（data plane）。
 
-* Control plane：一个独立的 k8s 集群，KubeBlocks operator 运行在该集群当中，KubeBlocks 定义的相关对象大都存放在这个集群（比如 definition、cluster、backup、ops 等）。用户通过跟这个集群的 API 进行交互来实现对多集群实例的管理。
-* Data plane：用于运行最终 workload 的 k8s 集群，数量可以是一到多个。这些集群当中会 hosting 实例相关的计算、存储、网络等资源，如 pod、pvc、service、sa、cm、secret、jobs 等，而 KubeBlocks operator 目前（v0.9.0）不会运行在当中。
+* 控制面：一个独立的 K8s 集群，KubeBlocks operator 运行在该集群当中，KubeBlocks 定义的相关对象大都存放在这个集群（比如 Definition、Cluster、Backup、Ops 等）。用户通过跟这个集群的 API 进行交互来实现对多集群实例的管理。
+* 数据面：用于运行最终工作负载的 K8s 集群，数量可以是一到多个。这些集群当中会 hosting 实例相关的计算、存储、网络等资源，如 Pod、PVC、Service、SA、CM、Secret、Jobs 等，而 KubeBlocks operator 目前（v0.9.0）不会在这些集群中运行。
 
-实际物理部署上，control plane 可以选择部署在单个 AZ，简单灵活；也可以选择部署在多个不同 AZ，提供更高的可用性保证；也可以复用某个 data plane 集群，以更低成本的方式运行。
+实际物理部署上，控制面可以选择部署在单个 AZ，简单灵活；也可以选择部署在多个不同 AZ，提供更高的可用性保证；也可以复用某个数据面集群，以更低成本的方式运行。
 
 ## 环境准备
 
-准备 K8s 集群，并准备部署 KubeBlocks 所需的配置信息。本文示例准备了三个 data plane 集群，context 分别命名为：k8s-1、k8s-2、k8s-3。
+准备 K8s 集群，并准备部署 KubeBlocks 所需的配置信息。本文示例准备了三个数据面集群，context 分别命名为：`k8s-1`、`k8s-2`、`k8s-3`。
 
-* 准备 K8s 集群：1 个设定为 control plane，其他几个设定为 data plane，确保这些 data plane 集群的 API server 在 control plane 集群中可以联通。这里的联通包含两个层面：一是网络连通，二是访问配置。
-* 准备 KubeBlocks operator 访问 data plane 所需的配置信息，以 secret 形式放置在 control plane 集群当中，部署 KubeBlocks operator 时需要传入。其中，secret key 要求为 “kubeconfig”，value 为标准 kubeconfig 内容格式。示例如下：
+* 准备 K8s 集群：1 个设定为控制面，其他几个设定为数据面，确保这些数据面集群的 API server 在控制面集群中可以联通。这里的联通包含两个层面：一是网络连通，二是访问配置。
+* 准备 KubeBlocks 访问数据面所需的配置信息，以 secret 形式放置在控制面集群当中，部署 KubeBlocks 时需要传入。其中，secret key 要求为 “kubeconfig”，value 为标准 kubeconfig 内容格式。示例如下：
 
-   ```bash
+   ```yaml
    apiVersion: v1
    kind: Secret
    metadata:
@@ -43,15 +43,15 @@ KubeBlocks 支持管理多个 Kubernetes 集群，为用户在实例容灾、k8s
 
 ## 部署多 K8s 集群
 
-### 部署 Kubeblocks operator
+### 部署 Kubeblocks
 
-在 control plane 安装 KubeBlocks。
+在控制面安装 KubeBlocks。
 
-1. 安装 KubeBlocks.
+1. 安装 KubeBlocks。
 
    ```bash
-   # multiCluster.kubeConfig 指定存放 data plane k8s kubeconfig 信息的 secret
-   # multiCluster.contexts 指定 data plane K8s contexts
+   # multiCluster.kubeConfig 指定存放数据面 k8s kubeconfig 信息的 secret
+   # multiCluster.contexts 指定数据面 K8s contexts
    kbcli kubeblocks install --version=0.9.0 --set multiCluster.kubeConfig=<secret-name> --set multiCluster.contexts=<contexts>
    ```
 
@@ -59,19 +59,27 @@ KubeBlocks 支持管理多个 Kubernetes 集群，为用户在实例容灾、k8s
 
    ```bash
    kbcli kubeblocks status
+   >
+   KubeBlocks is deployed in namespace: kb-system,version: 0.9.0
+
+   KubeBlocks Workloads:
+   NAMESPACE   KIND          NAME                                    READY PODS   CPU(CORES)   MEMORY(BYTES)   CREATED-AT
+   kb-system   Deployment    kb-addon-snapshot-controller            1/1          N/A          N/A             Oct 25,2024 15:18 UTC+0800
+   kb-system   Deployment    kubeblocks                              1/1          N/A          N/A             Oct 25,2024 15:18 UTC+0800
+   kb-system   Deployment    kubeblocks-dataprotection               1/1          N/A          N/A             Oct 25,2024 15:18 UTC+0800
    ```
 
 ### RBAC
 
-实例 workload 在 data plane 中运行时，需要特定的 RBAC 资源进行管理动作，因此需要预先在各 data plane 集群单独安装 KubeBlocks 所需的 RBAC 资源。
+实例工作负载在数据面中运行时，需要特定的 RBAC 资源进行管理动作，因此需要预先在各数据面集群单独安装 KubeBlocks 所需的 RBAC 资源。
 
 ```bash
-# 1. 从 control plane dump 所需的 clusterrole 资源：kubeblocks-cluster-pod-role
+# 1. 从控制面 dump 所需的 clusterrole 资源：kubeblocks-cluster-pod-role
 kubectl get clusterrole kubeblocks-cluster-pod-role -o yaml > /tmp/kubeblocks-cluster-pod-role.yaml
 
 # 2. 编辑文件内容，去除不必要的 meta 信息（比如 UID、resource version），保留其他内容
 
-# 3. Apply 文件内容到其他 data plane 集群
+# 3. 将文件内容应用到其他数据面集群
 kubectl apply -f /tmp/kubeblocks-cluster-pod-role.yaml --context=k8s-1
 kubectl apply -f /tmp/kubeblocks-cluster-pod-role.yaml --context=k8s-2
 kubectl apply -f /tmp/kubeblocks-cluster-pod-role.yaml --context=k8s-3
@@ -91,9 +99,9 @@ KubeBlocks 基于 K8s service 抽象来提供内外部的服务访问。对于 s
 
 ##### 自建方案
 
-东西向互访的自建方案以 Cillium Cluster Mesh 为例来进行说明，Cillium 的部署选择 overlay 模式，各 data plane 集群配置如下：
+东西向互访的自建方案以 Cillium Cluster Mesh 为例来进行说明，Cillium 的部署选择 overlay 模式，各数据面集群配置如下：
 
-| Cluster | Context | Name  | ID | CIDR        |
+| 集群     | Context | 名称  | ID | CIDR        |
 |:-------:|:-------:|:-----:|:--:|:-----------:|
 | 1       | k8s-1   | k8s-1 | 1  | 10.1.0.0/16 |
 | 2       | k8s-2   | k8s-2 | 2  | 10.2.0.0/16 |
@@ -109,7 +117,7 @@ KubeBlocks 基于 K8s service 抽象来提供内外部的服务访问。对于 s
 
 下述操作步骤相关命令，可以在各个集群分别执行（不需要指定 `--context` 参数），也可以在有三个 context 信息的环境里统一执行（分别指定 `--context` 参数）。
 
-1. 安装 cilium，指定 cluster ID/name 和 cluster pool pod CIDR。可参考官方文档：[Specify the Cluster Name and ID](https://docs.cilium.io/en/stable/network/clustermesh/clustermesh/#specify-the-cluster-name-and-id)。
+1. 安装 Cilium，指定集群 ID/名称和 Pool Pod CIDR。可参考官方文档：[指定集群名称和 ID](https://docs.cilium.io/en/stable/network/clustermesh/clustermesh/#specify-the-cluster-name-and-id)。
 
    ```bash
    cilium install --set cluster.name=k8s-1 --set cluster.id=1 --set ipam.operator.clusterPoolIPv4PodCIDRList=10.1.0.0/16 —context k8s-1
@@ -117,7 +125,7 @@ KubeBlocks 基于 K8s service 抽象来提供内外部的服务访问。对于 s
    cilium install --set cluster.name=k8s-3 --set cluster.id=3 --set ipam.operator.clusterPoolIPv4PodCIDRList=10.3.0.0/16 —context k8s-3
    ```
 
-2. 开启 Cilium Cluster Mesh，并等待其状态为 ready。这里以 NodePort 方式提供对 cluster mesh control plane 的访问，其他可选方式及具体信息请参考官方文档：[Enable Cluster Mesh](https://docs.cilium.io/en/stable/network/clustermesh/clustermesh/#enable-cluster-mesh)。
+2. 开启 Cilium Cluster Mesh，并等待其状态为 `ready`。这里以 NodePort 方式提供对 Cluster Mesh 控制面的访问，其他可选方式及具体信息请参考官方文档：[启用 Cluster Mesh](https://docs.cilium.io/en/stable/network/clustermesh/clustermesh/#enable-cluster-mesh)。
 
    ```bash
    cilium clustermesh enable --service-type NodePort —context k8s-1
@@ -128,7 +136,7 @@ KubeBlocks 基于 K8s service 抽象来提供内外部的服务访问。对于 s
    cilium clustermesh status —wait —context k8s-3
    ```
 
-3. 打通各集群，并等待集群状态为 ready。具体可参考官方文档：[Connect Clusters](https://docs.cilium.io/en/stable/network/clustermesh/clustermesh/#connect-clusters)。
+3. 打通各集群，并等待集群状态为 `ready`。具体可参考官方文档：[连接集群](https://docs.cilium.io/en/stable/network/clustermesh/clustermesh/#connect-clusters)。
 
    ```bash
    cilium clustermesh connect --context k8s-1 --destination-context k8s-2
@@ -145,38 +153,38 @@ KubeBlocks 基于 K8s service 抽象来提供内外部的服务访问。对于 s
    cilium-dbg bpf tunnel list
    ```
 
-5. （可选）集群连通性测试，可参考官方文档：[Test Pod Connectivity Between Clusters](https://docs.cilium.io/en/stable/network/clustermesh/clustermesh/#test-pod-connectivity-between-clusters)。
+5. （可选）集群连通性测试，可参考官方文档：[测试集群间 Pod 连通性](https://docs.cilium.io/en/stable/network/clustermesh/clustermesh/#test-pod-connectivity-between-clusters)。
 
 #### 南北向流量
 
-南北向流量为客户端提供服务，需要每个 data plane 的 Pod 都有对外的连接地址，这个地址的实现可以是 NodePort、LoadBalancer 或者其他方案，我们以 NodePort 和 LoadBalancer 为例介绍。
+南北向流量为客户端提供服务，需要每个数据面的 Pod 都有对外的连接地址，这个地址的实现可以是 NodePort、LoadBalancer 或者其他方案，我们以 NodePort 和 LoadBalancer 为例介绍。
 
 如果客户端不具备读写路由能力，那在 Pod 地址之上，还需要提供读写分离地址，实现上可以用七层的 Proxy，四层的 SDN VIP，或者纯粹的 DNS。为了简化问题，此处先假设客户端具备读写路由能力，可以直接配置所有 Pod 连接地址。
 
 ##### NodePort
 
-为每个 data plane 集群的 Pod 创建 NodePort Service，客户端使用用主机网络 IP 和 NodePort 即可连接。
+为每个数据面集群的 Pod 创建 NodePort Service，客户端使用用主机网络 IP 和 NodePort 即可连接。
 
 ##### LoadBalancer
 
 此处以 MetalLB 提供 LoadBalancer Service 为例。
 
-1. 准备 data plane 的 LB 网段，该网段需要跟客户端路由可达，并且不同 K8s 集群要错开
+1. 准备数据面的 LB 网段，该网段需要跟客户端路由可达，并且不同 K8s 集群要错开。
 
-   | Cluster | Context | Name  | ID | CIDR        |
+   | 集群    | Context | 名称  | ID | CIDR        |
    |:-------:|:-------:|:-----:|:--:|:-----------:|
    | 1       | k8s-1   | k8s-1 | 1  | 10.4.0.0/16 |
    | 2       | k8s-2   | k8s-2 | 2  | 10.5.0.0/16 |
    | 3       | k8s-3   | k8s-3 | 3  | 10.6.0.0/16 |
 
-2. 在所有 data plane 部署 MetalLB。
+2. 在所有数据面部署 MetalLB。
 
    ```bash
    helm repo add metallb https://metallb.github.io/metallb
    helm install metallb metallb/metallb
    ```
 
-3. 等待相关 Pod 状态变为 ready。
+3. 等待相关 Pod 状态变为 `ready`。
 
    ```bash
    kubectl wait --namespace metallb-system --for=condition=ready pod --selector=app=metallb --timeout=90s
@@ -201,7 +209,7 @@ KubeBlocks 基于 K8s service 抽象来提供内外部的服务访问。对于 s
      namespace: metallb-system
    ```
 
-5. 为每个data plane 集群的 Pod 创建 LoadBalancer Service，拿到所有 VIP，即可供客户端连接。
+5. 为每个数据面集群的 Pod 创建 LoadBalancer Service，拿到所有 VIP，即可供客户端连接。
 
 ## 验证
 

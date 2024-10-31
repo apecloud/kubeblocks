@@ -14,7 +14,7 @@ KubeBlocks 提供了强大的可观测性能力。您可以实时观察数据库
 
 ## Playground/演示场景
 
-KubeBlocks 以 Addon 形式集成了许多开源监控组件，如 Prometheus、AlertManager 和 Grafana，并采用定制的 `apecloud-otel-collector` 组件收集数据库和宿主机的监控指标。您可以在测试或演示环境中使用以下监控引擎。
+KubeBlocks 以插件（Addon）形式集成了许多开源监控组件，如 Prometheus、AlertManager 和 Grafana，并采用定制的 `apecloud-otel-collector` 组件收集数据库和宿主机的监控指标。您可以在测试或演示环境中使用以下监控引擎。
 
 - `prometheus`：包括 Prometheus 和 AlertManager 两个监控组件。
 - `grafana`：包括 Grafana 的监控组件。

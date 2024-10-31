@@ -18,6 +18,7 @@ import TabItem from '@theme/TabItem';
 - 场景 3：Client3 和数据库位于不同的 VPC，例如其他 VPC 或公共网络。如果要连接 Client3 和数据库，请参考[暴露 VPC 公网地址方案](#场景-3-连接在其他-vpc-或公共网络中的客户端)。
 
 参考下面的网络位置关系图。
+
 ![Example](../img/../../img/connect-to-database-in-production-env-network-locations.jpg)
 
 ## 场景 1. 连接在同一个 Kubernetes 集群中的客户端

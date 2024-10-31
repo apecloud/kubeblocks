@@ -142,10 +142,12 @@ mysql-cluster-mysql-backup-policy-hscale   default     false     mysql-cluster  
 
 <TabItem value="kubectl" label="kubectl">
 
+```bash
 kubectl get backuppolicy | grep mycluster
 >
 mycluster-mysql-backup-policy                            Available   35m
 mycluster-mysql-backup-policy-hscale                     Available   35m
+```
 
 </TabItem>
 
@@ -177,7 +179,9 @@ volume-snapshot   volumesnapshot-for-apecloud-mysql   true
 
 <TabItem value="kubectl" label="kubectl">
 
+```bash
 kubectl get backuppolicy mycluster-mysql-backup-policy -o yaml
+```
 
 </TabItem>
 

@@ -38,10 +38,10 @@ KubeBlocks 已支持对 MySQL 和 PostgreSQL 等数据库的 PITR 功能。
     <TabItem value="kubectl" label="kubectl">
 
     ```bash
-    # 1. Get all backup objects for the current cluster
+    # 1. 获取当前集群的全部备份对象（backup objects）
     kubectl get backup -l app.kubernetes.io/instance=pg-cluster
     
-    # 2. Get the backup time range for Continuous Backup
+    # 2. 获取持续备份的备份实践范围
     kubectl get backup -l app.kubernetes.io/instance=pg-cluster -l dataprotection.kubeblocks.io/backup-type=Continuous -o yaml
     ...
     status:

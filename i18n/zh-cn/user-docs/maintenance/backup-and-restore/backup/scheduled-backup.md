@@ -19,8 +19,8 @@ KubeBlocks 支持为集群配置自动备份。
 
 ```bash
 kbcli cluster update mysql-cluster --backup-enabled=true \
---backup-method=xtrabackup --backup-repo-name=my-repo \
---backup-retention-period=7d --backup-cron-expression="0 18 * * *"
+  --backup-method=xtrabackup --backup-repo-name=my-repo \
+  --backup-retention-period=7d --backup-cron-expression="0 18 * * *"
 ```
 
 - `--backup-enabled` 表示是否开启自动备份。

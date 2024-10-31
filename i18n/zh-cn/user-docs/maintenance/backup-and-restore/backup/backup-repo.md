@@ -24,7 +24,7 @@ BackupRepo 是备份数据的存储仓库，支持配置 OSS（阿里云对象�
 * [安装 kbcli](./../../../installation/install-with-kbcli/install-kbcli.md)。
 * [安装 kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl)。
 * [安装 Helm](https://helm.sh/docs/intro/install/)。
-* 安装 KubeBlocks。如果未安装，可通过 [kbcli](./../../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) 或 [Helm](./../../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) 进行安装。
+* 安装 KubeBlocks。如果未安装，可通过 [kbcli](./../../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) 或 [Helm](./../../../installation/install-with-helm/install-kubeblocks.md) 进行安装。
 
 ## 安装 MinIO
 

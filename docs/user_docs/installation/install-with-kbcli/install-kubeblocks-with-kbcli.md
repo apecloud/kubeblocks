@@ -10,6 +10,8 @@ sidebar_label: Install KubeBlocks
 
 The quickest way to try out KubeBlocks is to create a new Kubernetes cluster and install KubeBlocks using the playground. However, production environments are more complex, with applications running in different namespaces and with resource or permission limitations. This document explains how to deploy KubeBlocks on an existing Kubernetes cluster.
 
+To try out KubeBlocks on your local host, you can use the [Playground](./../../try-out-on-playground/try-kubeblocks-on-your-laptop.md) or [create a local Kubernetes test cluster first](./../prerequisite/prepare-a-local-k8s-cluster.md) and then follow the steps in this tutorial to install KubeBlocks.
+
 ## Environment preparation
 
 Prepare an accessible Kubernetes cluster with the version 1.22 or above, and this cluster should meet the following requirements.
@@ -66,7 +68,7 @@ If you want to install KubeBlocks with a specified version, follow the steps bel
 2. Specify a version with `--version` and run the command below.
 
    ```bash
-   kbcli kubeblocks install --version=x.x.x
+   kbcli kubeblocks install --version=x.y.z
    ```
   :::note
 
@@ -89,7 +91,7 @@ kbcli kubeblocks status
 If the KubeBlocks Workloads are all ready, KubeBlocks has been installed successfully.
 
 ```bash
-KubeBlocks is deployed in namespace: kb-system,version: x.x.x
+KubeBlocks is deployed in namespace: kb-system,version: x.y.z
 >
 KubeBlocks Workloads:
 NAMESPACE   KIND         NAME                           READY PODS   CPU(CORES)   MEMORY(BYTES)   CREATED-AT

@@ -40,13 +40,13 @@ You can install kbcli with `curl` or `brew`.
    2. Specify a version with `-s` and run the command below.
 
       ```bash
-      curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash -s x.x.x
+      curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash -s x.y.z
       ```
    You can view all versions of kbcli, including alpha and beta releases, on the [kbcli releases list](https://github.com/apecloud/kbcli/releases).
 
    To get stable releases, use this command:
    ```bash
-   curl -s "https://api.github.com/repos/apecloud/kbcli/releases?per_page=100&page=1" | jq -r '.[] | select(.prerelease == false) | .tag_name' | sort -V
+   curl -s "https://api.github.com/repos/apecloud/kbcli/releases?per_page=100&page=1" | jq -r '.[] | select(.prerelease == false) | .tag_name' | sort -V -r
    ```
 
   :::note
@@ -86,7 +86,7 @@ You can install kbcli with `curl` or `brew`.
    brew search kbcli
 
    # Specify a version
-   brew install kbcli@x.x.x
+   brew install kbcli@x.y.z
    ```
 
 3. Verify that kbcli is successfully installed.

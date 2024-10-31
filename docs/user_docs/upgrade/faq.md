@@ -15,7 +15,7 @@ This guide addresses common questions and issues that may arise when upgrading K
 
 ## Manually mark Addons
 
-To prevent an Addon from being deleted during a KubeBlocks upgrade via `kbcli` or Helm, add the `"helm.sh/resource-policy": "keep"` annotation.
+In earlier versions, KubeBlocks pre-installed some Addons in the Helm chart, but some of these Addons have been removed in the new version. Consequently, if you upgrade ddirectly from an older version to the latest, Helm will remove the CRs of these removed Addons, affecting the clusters created by these Addons. To prevent this, it is recommended to add the `"helm.sh/resource-policy": "keep"` annotation for Addons to ensure they remain during upgraing.
 
 ### View the Addon annotation
 

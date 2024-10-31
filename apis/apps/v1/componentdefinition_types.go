@@ -1372,8 +1372,13 @@ type ComponentAvailableProbeAssertion struct {
 
 // ReplicaRole represents a role that can be assumed by a component instance.
 type ReplicaRole struct {
-	// Defines the role's identifier. It is used to set the "apps.kubeblocks.io/role" label value
-	// on the corresponding object.
+	// Name defines the role's unique identifier. This value is used to set the "apps.kubeblocks.io/role" label
+	// on the corresponding object to identify its role.
+	//
+	// For example, common role names include:
+	// - "leader": The primary/master instance that handles write operations
+	// - "follower": Secondary/replica instances that replicate data from the leader
+	// - "learner": Read-only instances that don't participate in elections
 	//
 	// This field is immutable once set.
 	//
@@ -1382,9 +1387,61 @@ type ReplicaRole struct {
 	// +kubebuilder:validation:Pattern=`^.*[^\s]+.*$`
 	Name string `json:"name"`
 
+	// Required indicates if at least one replica with this role must exist for the component to be considered
+	// operationally running. For example, a leader role may be required for the component to function.
+	//
+	// This field is immutable once set.
+	//
+	// +kubebuilder:default=false
+	// +optional
+	Required bool `json:"required"`
+
+	// UpdatePriority determines the order in which pods with different roles are updated.
+	// Pods are sorted by this priority (higher numbers = higher priority) and updated accordingly.
+	// Roles with the highest priority will be updated last.
+	//
+	// For example:
+	// - Leader role may have priority 2 (updated last)
+	// - Follower role may have priority 1 (updated before leader)
+	// - Learner role may have priority 0 (updated first)
+	//
+	// This field is immutable once set.
+	//
+	// +kubebuilder:default=0
+	// +optional
+	UpdatePriority int `json:"updatePriorit"`
+
+	// ParticipatesInQuorum indicates if pods with this role are counted when determining quorum.
+	// This affects update strategies that need to maintain quorum for availability.
+	//
+	// For example, in a 5-pod component where:
+	// - 2 learner pods (participatesInQuorum=false)
+	// - 2 follower pods (participatesInQuorum=true)
+	// - 1 leader pod (participatesInQuorum=true)
+	// The quorum size would be 3 (based on the 3 participating pods), allowing parallel updates
+	// of 2 learners and 1 follower while maintaining quorum.
+	//
+	// This field is immutable once set.
+	//
+	// +kubebuilder:default=false
+	// +optional
+	ParticipatesInQuorum bool `json:"participatesInQuorum bool"`
+
+	// SwitchoverBeforeUpdate indicates if a role switchover operation should be performed before
+	// updating or scaling in pods with this role. This is typically used for leader roles to
+	// ensure minimal disruption during updates.
+	//
+	// This field is immutable once set.
+	//
+	// +kubebuilder:default=false
+	// +optional
+	SwitchoverBeforeUpdate bool `json:"switchoverBeforeUpdate"`
+
 	// Indicates whether a replica assigned this role is capable of providing services.
 	//
 	// This field is immutable once set.
+	//
+	// Deprecated: use other fields
 	//
 	// +kubebuilder:default=false
 	// +optional
@@ -1395,6 +1452,8 @@ type ReplicaRole struct {
 	//
 	// This field is immutable once set.
 	//
+	// Deprecated: use other fields
+	//
 	// +kubebuilder:default=false
 	// +optional
 	Writable bool `json:"writable,omitempty"`
@@ -1404,6 +1463,8 @@ type ReplicaRole struct {
 	// configuration changes, or other processes that require a quorum.
 	//
 	// This field is immutable once set.
+	//
+	// Deprecated: use other fields
 	//
 	// +kubebuilder:default=false
 	// +optional

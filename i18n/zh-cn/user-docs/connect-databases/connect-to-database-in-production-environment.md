@@ -23,7 +23,7 @@ import TabItem from '@theme/TabItem';
 
 ## 场景 1. 连接在同一个 Kubernetes 集群中的客户端
 
-你可以使用数据库的 ClusterIP 或域名进行连接。
+您可以使用数据库的 ClusterIP 或域名进行连接。
 
 <Tabs>
 
@@ -72,7 +72,7 @@ kubectl get service mycluster-mysql
 
 ## 场景 2. 连接在 Kubernetes 集群之外但与 Kubernetes 集群位于同一 VPC 中的客户
 
-使用一个稳定的域名以实现长期连接。你可以使用云厂商提供的内部负载均衡器来实现这一目的。
+使用一个稳定的域名以实现长期连接。您可以使用云厂商提供的内部负载均衡器来实现这一目的。
 
 :::note
 

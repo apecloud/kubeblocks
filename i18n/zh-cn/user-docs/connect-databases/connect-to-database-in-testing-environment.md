@@ -17,7 +17,7 @@ import TabItem from '@theme/TabItem';
 
 ## 方案 1. 使用 kbcli cluster connect 命令
 
-你可以使用 `kbcli cluster connect` 命令并指定要连接的集群名称。
+您可以使用 `kbcli cluster connect` 命令并指定要连接的集群名称。
 
 ```bash
 kbcli cluster connect ${cluster-name}
@@ -53,7 +53,7 @@ kbcli cluster connect --show-example --show-password ${cluster-name}
 
 ## 步骤 1. 获取数据库凭证
 
-在连接运行在 Kubernetes 集群内的 MySQL 数据库之前，您需要从 Kubernetes Secret 中获取用户名和密码。Kubernetes 中的 Secret 通常是经过 base64 编码的，因此您需要将其解码以获得实际的凭据。以下是使用 kubectl 获取凭据的方法。
+在连接运行在 Kubernetes 集群内的 MySQL 数据库之前，您需要从 Kubernetes Secret 中获取用户名和密码。Kubernetes 中的 Secret 通常是经过 base64 编码的，因此您需要将其解码以获得实际的凭据。以下是使用 kubectl 获取凭证的方法。
 
 1. 获取 `username`。
 

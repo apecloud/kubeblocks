@@ -2104,13 +2104,13 @@ This execution does not alter the Component or the Cluster&rsquo;s state of read
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1.ActionCriteria">ActionCriteria
+<h3 id="apps.kubeblocks.io/v1.ActionAssertion">ActionAssertion
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentAvailableConditionX">ComponentAvailableConditionX</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentAvailableProbeAssertion">ComponentAvailableProbeAssertion</a>)
 </p>
 <div>
-<p>ActionCriteria defines the custom criteria for evaluating the success or failure of an action.</p>
+<p>ActionAssertion defines the custom assertions for evaluating the success or failure of an action.</p>
 </div>
 <table>
 <thead>
@@ -2168,7 +2168,7 @@ ActionOutputMatcher
 <h3 id="apps.kubeblocks.io/v1.ActionOutputMatcher">ActionOutputMatcher
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ActionCriteria">ActionCriteria</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ActionAssertion">ActionAssertion</a>)
 </p>
 <div>
 <p>ActionOutputMatcher defines the matcher for the output of an action.</p>
@@ -4124,7 +4124,7 @@ ComponentAvailableWithProbe
 <h3 id="apps.kubeblocks.io/v1.ComponentAvailableCondition">ComponentAvailableCondition
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentAvailableConditionX">ComponentAvailableConditionX</a>, <a href="#apps.kubeblocks.io/v1.ComponentAvailableWithProbe">ComponentAvailableWithProbe</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentAvailableWithProbe">ComponentAvailableWithProbe</a>)
 </p>
 <div>
 </div>
@@ -4138,16 +4138,31 @@ ComponentAvailableWithProbe
 <tbody>
 <tr>
 <td>
+<code>ComponentAvailableExpression</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentAvailableExpression">
+ComponentAvailableExpression
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>ComponentAvailableExpression</code> are embedded into this type.)
+</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>and</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.ComponentAvailableConditionX">
-[]ComponentAvailableConditionX
+<a href="#apps.kubeblocks.io/v1.ComponentAvailableExpression">
+[]ComponentAvailableExpression
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Logical operator AND.</p>
+<p>Logical And to combine multiple expressions.</p>
 <p>This field is immutable once set.</p>
 </td>
 </tr>
@@ -4155,14 +4170,14 @@ ComponentAvailableWithProbe
 <td>
 <code>or</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.ComponentAvailableConditionX">
-[]ComponentAvailableConditionX
+<a href="#apps.kubeblocks.io/v1.ComponentAvailableExpression">
+[]ComponentAvailableExpression
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Logical operator OR.</p>
+<p>Logical Or to combine multiple expressions.</p>
 <p>This field is immutable once set.</p>
 </td>
 </tr>
@@ -4170,80 +4185,20 @@ ComponentAvailableWithProbe
 <td>
 <code>not</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.ComponentAvailableConditionX">
-ComponentAvailableConditionX
+<a href="#apps.kubeblocks.io/v1.ComponentAvailableExpression">
+ComponentAvailableExpression
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Logical operator NOT.</p>
-<p>This field is immutable once set.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>all</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.ComponentAvailableConditionX">
-ComponentAvailableConditionX
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Aggregate operator ALL.</p>
-<p>This field is immutable once set.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>any</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.ComponentAvailableConditionX">
-ComponentAvailableConditionX
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Aggregate operator ANY.</p>
-<p>This field is immutable once set.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>none</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.ComponentAvailableConditionX">
-ComponentAvailableConditionX
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Aggregate operator NONE.</p>
-<p>This field is immutable once set.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>majority</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.ComponentAvailableConditionX">
-ComponentAvailableConditionX
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Aggregate operator MAJORITY.</p>
+<p>Logical Not to negate the expression.</p>
 <p>This field is immutable once set.</p>
 </td>
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1.ComponentAvailableConditionX">ComponentAvailableConditionX
+<h3 id="apps.kubeblocks.io/v1.ComponentAvailableExpression">ComponentAvailableExpression
 </h3>
 <p>
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentAvailableCondition">ComponentAvailableCondition</a>)
@@ -4260,32 +4215,139 @@ ComponentAvailableConditionX
 <tbody>
 <tr>
 <td>
-<code>ActionCriteria</code><br/>
+<code>all</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.ActionCriteria">
-ActionCriteria
+<a href="#apps.kubeblocks.io/v1.ComponentAvailableProbeAssertion">
+ComponentAvailableProbeAssertion
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>All replicas must satisfy the assertion.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>any</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentAvailableProbeAssertion">
+ComponentAvailableProbeAssertion
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>At least one replica must satisfy the assertion.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>none</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentAvailableProbeAssertion">
+ComponentAvailableProbeAssertion
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>None of the replicas must satisfy the assertion.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>majority</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentAvailableProbeAssertion">
+ComponentAvailableProbeAssertion
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Majority replicas must satisfy the assertion.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ComponentAvailableProbeAssertion">ComponentAvailableProbeAssertion
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentAvailableExpression">ComponentAvailableExpression</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>ActionAssertion</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ActionAssertion">
+ActionAssertion
 </a>
 </em>
 </td>
 <td>
 <p>
-(Members of <code>ActionCriteria</code> are embedded into this type.)
+(Members of <code>ActionAssertion</code> are embedded into this type.)
 </p>
 </td>
 </tr>
 <tr>
 <td>
-<code>ComponentAvailableCondition</code><br/>
+<code>and</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.ComponentAvailableCondition">
-ComponentAvailableCondition
+<a href="#apps.kubeblocks.io/v1.ActionAssertion">
+[]ActionAssertion
 </a>
 </em>
 </td>
 <td>
-<p>
-(Members of <code>ComponentAvailableCondition</code> are embedded into this type.)
-</p>
+<em>(Optional)</em>
+<p>Logical And to combine multiple assertions.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>or</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ActionAssertion">
+[]ActionAssertion
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Logical Or to combine multiple assertions.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>not</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ActionAssertion">
+ActionAssertion
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Logical Not to negate the assertions.</p>
+<p>This field is immutable once set.</p>
 </td>
 </tr>
 <tr>
@@ -4297,7 +4359,7 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies whether apply the aggregation conditions strictly to all replicas.</p>
+<p>Specifies whether apply the assertions strictly to all replicas.</p>
 <p>This field is immutable once set.</p>
 </td>
 </tr>
@@ -4343,6 +4405,18 @@ ComponentAvailableCondition
 <em>(Optional)</em>
 <p>Specifies the conditions that the component will go through to be considered available.</p>
 <p>This field is immutable once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>description</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>A brief description for the condition when the component is available.</p>
 </td>
 </tr>
 </tbody>

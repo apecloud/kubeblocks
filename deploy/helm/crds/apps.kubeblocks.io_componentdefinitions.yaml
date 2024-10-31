@@ -130,11 +130,198 @@ spec:
                         properties:
                           all:
                             description: |-
-                              Aggregate operator ALL.
+                              All replicas must satisfy the assertion.
 
 
                               This field is immutable once set.
                             properties:
+                              and:
+                                description: |-
+                                  Logical And to combine multiple assertions.
+
+
+                                  This field is immutable once set.
+                                items:
+                                  description: ActionAssertion defines the custom
+                                    assertions for evaluating the success or failure
+                                    of an action.
+                                  properties:
+                                    stderr:
+                                      description: |-
+                                        Specifies the stderr matcher for the action.
+
+
+                                        This field is immutable once set.
+                                      properties:
+                                        contains:
+                                          description: |-
+                                            The output of the action should contain the specified value.
+
+
+                                            This field is immutable once set.
+                                          type: string
+                                        equalTo:
+                                          description: |-
+                                            The output of the action should be equal to the specified value.
+
+
+                                            This field is immutable once set.
+                                          type: string
+                                      type: object
+                                    stdout:
+                                      description: |-
+                                        Specifies the stdout matcher for the action.
+
+
+                                        This field is immutable once set.
+                                      properties:
+                                        contains:
+                                          description: |-
+                                            The output of the action should contain the specified value.
+
+
+                                            This field is immutable once set.
+                                          type: string
+                                        equalTo:
+                                          description: |-
+                                            The output of the action should be equal to the specified value.
+
+
+                                            This field is immutable once set.
+                                          type: string
+                                      type: object
+                                    succeed:
+                                      description: |-
+                                        Whether the action should succeed or fail.
+
+
+                                        This field is immutable once set.
+                                      type: boolean
+                                  type: object
+                                type: array
+                              not:
+                                description: |-
+                                  Logical Not to negate the assertions.
+
+
+                                  This field is immutable once set.
+                                properties:
+                                  stderr:
+                                    description: |-
+                                      Specifies the stderr matcher for the action.
+
+
+                                      This field is immutable once set.
+                                    properties:
+                                      contains:
+                                        description: |-
+                                          The output of the action should contain the specified value.
+
+
+                                          This field is immutable once set.
+                                        type: string
+                                      equalTo:
+                                        description: |-
+                                          The output of the action should be equal to the specified value.
+
+
+                                          This field is immutable once set.
+                                        type: string
+                                    type: object
+                                  stdout:
+                                    description: |-
+                                      Specifies the stdout matcher for the action.
+
+
+                                      This field is immutable once set.
+                                    properties:
+                                      contains:
+                                        description: |-
+                                          The output of the action should contain the specified value.
+
+
+                                          This field is immutable once set.
+                                        type: string
+                                      equalTo:
+                                        description: |-
+                                          The output of the action should be equal to the specified value.
+
+
+                                          This field is immutable once set.
+                                        type: string
+                                    type: object
+                                  succeed:
+                                    description: |-
+                                      Whether the action should succeed or fail.
+
+
+                                      This field is immutable once set.
+                                    type: boolean
+                                type: object
+                              or:
+                                description: |-
+                                  Logical Or to combine multiple assertions.
+
+
+                                  This field is immutable once set.
+                                items:
+                                  description: ActionAssertion defines the custom
+                                    assertions for evaluating the success or failure
+                                    of an action.
+                                  properties:
+                                    stderr:
+                                      description: |-
+                                        Specifies the stderr matcher for the action.
+
+
+                                        This field is immutable once set.
+                                      properties:
+                                        contains:
+                                          description: |-
+                                            The output of the action should contain the specified value.
+
+
+                                            This field is immutable once set.
+                                          type: string
+                                        equalTo:
+                                          description: |-
+                                            The output of the action should be equal to the specified value.
+
+
+                                            This field is immutable once set.
+                                          type: string
+                                      type: object
+                                    stdout:
+                                      description: |-
+                                        Specifies the stdout matcher for the action.
+
+
+                                        This field is immutable once set.
+                                      properties:
+                                        contains:
+                                          description: |-
+                                            The output of the action should contain the specified value.
+
+
+                                            This field is immutable once set.
+                                          type: string
+                                        equalTo:
+                                          description: |-
+                                            The output of the action should be equal to the specified value.
+
+
+                                            This field is immutable once set.
+                                          type: string
+                                      type: object
+                                    succeed:
+                                      description: |-
+                                        Whether the action should succeed or fail.
+
+
+                                        This field is immutable once set.
+                                      type: boolean
+                                  type: object
+                                type: array
                               stderr:
                                 description: |-
                                   Specifies the stderr matcher for the action.
@@ -181,7 +368,7 @@ spec:
                                 type: object
                               strict:
                                 description: |-
-                                  Specifies whether apply the aggregation conditions strictly to all replicas.
+                                  Specifies whether apply the assertions strictly to all replicas.
 
 
                                   This field is immutable once set.
@@ -196,79 +383,1220 @@ spec:
                             type: object
                           and:
                             description: |-
-                              Logical operator AND.
+                              Logical And to combine multiple expressions.
 
 
                               This field is immutable once set.
                             items:
                               properties:
-                                stderr:
+                                all:
                                   description: |-
-                                    Specifies the stderr matcher for the action.
+                                    All replicas must satisfy the assertion.
 
 
                                     This field is immutable once set.
                                   properties:
-                                    contains:
+                                    and:
                                       description: |-
-                                        The output of the action should contain the specified value.
+                                        Logical And to combine multiple assertions.
 
 
                                         This field is immutable once set.
-                                      type: string
-                                    equalTo:
+                                      items:
+                                        description: ActionAssertion defines the custom
+                                          assertions for evaluating the success or
+                                          failure of an action.
+                                        properties:
+                                          stderr:
+                                            description: |-
+                                              Specifies the stderr matcher for the action.
+
+
+                                              This field is immutable once set.
+                                            properties:
+                                              contains:
+                                                description: |-
+                                                  The output of the action should contain the specified value.
+
+
+                                                  This field is immutable once set.
+                                                type: string
+                                              equalTo:
+                                                description: |-
+                                                  The output of the action should be equal to the specified value.
+
+
+                                                  This field is immutable once set.
+                                                type: string
+                                            type: object
+                                          stdout:
+                                            description: |-
+                                              Specifies the stdout matcher for the action.
+
+
+                                              This field is immutable once set.
+                                            properties:
+                                              contains:
+                                                description: |-
+                                                  The output of the action should contain the specified value.
+
+
+                                                  This field is immutable once set.
+                                                type: string
+                                              equalTo:
+                                                description: |-
+                                                  The output of the action should be equal to the specified value.
+
+
+                                                  This field is immutable once set.
+                                                type: string
+                                            type: object
+                                          succeed:
+                                            description: |-
+                                              Whether the action should succeed or fail.
+
+
+                                              This field is immutable once set.
+                                            type: boolean
+                                        type: object
+                                      type: array
+                                    not:
                                       description: |-
-                                        The output of the action should be equal to the specified value.
+                                        Logical Not to negate the assertions.
 
 
                                         This field is immutable once set.
-                                      type: string
+                                      properties:
+                                        stderr:
+                                          description: |-
+                                            Specifies the stderr matcher for the action.
+
+
+                                            This field is immutable once set.
+                                          properties:
+                                            contains:
+                                              description: |-
+                                                The output of the action should contain the specified value.
+
+
+                                                This field is immutable once set.
+                                              type: string
+                                            equalTo:
+                                              description: |-
+                                                The output of the action should be equal to the specified value.
+
+
+                                                This field is immutable once set.
+                                              type: string
+                                          type: object
+                                        stdout:
+                                          description: |-
+                                            Specifies the stdout matcher for the action.
+
+
+                                            This field is immutable once set.
+                                          properties:
+                                            contains:
+                                              description: |-
+                                                The output of the action should contain the specified value.
+
+
+                                                This field is immutable once set.
+                                              type: string
+                                            equalTo:
+                                              description: |-
+                                                The output of the action should be equal to the specified value.
+
+
+                                                This field is immutable once set.
+                                              type: string
+                                          type: object
+                                        succeed:
+                                          description: |-
+                                            Whether the action should succeed or fail.
+
+
+                                            This field is immutable once set.
+                                          type: boolean
+                                      type: object
+                                    or:
+                                      description: |-
+                                        Logical Or to combine multiple assertions.
+
+
+                                        This field is immutable once set.
+                                      items:
+                                        description: ActionAssertion defines the custom
+                                          assertions for evaluating the success or
+                                          failure of an action.
+                                        properties:
+                                          stderr:
+                                            description: |-
+                                              Specifies the stderr matcher for the action.
+
+
+                                              This field is immutable once set.
+                                            properties:
+                                              contains:
+                                                description: |-
+                                                  The output of the action should contain the specified value.
+
+
+                                                  This field is immutable once set.
+                                                type: string
+                                              equalTo:
+                                                description: |-
+                                                  The output of the action should be equal to the specified value.
+
+
+                                                  This field is immutable once set.
+                                                type: string
+                                            type: object
+                                          stdout:
+                                            description: |-
+                                              Specifies the stdout matcher for the action.
+
+
+                                              This field is immutable once set.
+                                            properties:
+                                              contains:
+                                                description: |-
+                                                  The output of the action should contain the specified value.
+
+
+                                                  This field is immutable once set.
+                                                type: string
+                                              equalTo:
+                                                description: |-
+                                                  The output of the action should be equal to the specified value.
+
+
+                                                  This field is immutable once set.
+                                                type: string
+                                            type: object
+                                          succeed:
+                                            description: |-
+                                              Whether the action should succeed or fail.
+
+
+                                              This field is immutable once set.
+                                            type: boolean
+                                        type: object
+                                      type: array
+                                    stderr:
+                                      description: |-
+                                        Specifies the stderr matcher for the action.
+
+
+                                        This field is immutable once set.
+                                      properties:
+                                        contains:
+                                          description: |-
+                                            The output of the action should contain the specified value.
+
+
+                                            This field is immutable once set.
+                                          type: string
+                                        equalTo:
+                                          description: |-
+                                            The output of the action should be equal to the specified value.
+
+
+                                            This field is immutable once set.
+                                          type: string
+                                      type: object
+                                    stdout:
+                                      description: |-
+                                        Specifies the stdout matcher for the action.
+
+
+                                        This field is immutable once set.
+                                      properties:
+                                        contains:
+                                          description: |-
+                                            The output of the action should contain the specified value.
+
+
+                                            This field is immutable once set.
+                                          type: string
+                                        equalTo:
+                                          description: |-
+                                            The output of the action should be equal to the specified value.
+
+
+                                            This field is immutable once set.
+                                          type: string
+                                      type: object
+                                    strict:
+                                      description: |-
+                                        Specifies whether apply the assertions strictly to all replicas.
+
+
+                                        This field is immutable once set.
+                                      type: boolean
+                                    succeed:
+                                      description: |-
+                                        Whether the action should succeed or fail.
+
+
+                                        This field is immutable once set.
+                                      type: boolean
                                   type: object
-                                stdout:
+                                any:
                                   description: |-
-                                    Specifies the stdout matcher for the action.
+                                    At least one replica must satisfy the assertion.
 
 
                                     This field is immutable once set.
                                   properties:
-                                    contains:
+                                    and:
                                       description: |-
-                                        The output of the action should contain the specified value.
+                                        Logical And to combine multiple assertions.
 
 
                                         This field is immutable once set.
-                                      type: string
-                                    equalTo:
+                                      items:
+                                        description: ActionAssertion defines the custom
+                                          assertions for evaluating the success or
+                                          failure of an action.
+                                        properties:
+                                          stderr:
+                                            description: |-
+                                              Specifies the stderr matcher for the action.
+
+
+                                              This field is immutable once set.
+                                            properties:
+                                              contains:
+                                                description: |-
+                                                  The output of the action should contain the specified value.
+
+
+                                                  This field is immutable once set.
+                                                type: string
+                                              equalTo:
+                                                description: |-
+                                                  The output of the action should be equal to the specified value.
+
+
+                                                  This field is immutable once set.
+                                                type: string
+                                            type: object
+                                          stdout:
+                                            description: |-
+                                              Specifies the stdout matcher for the action.
+
+
+                                              This field is immutable once set.
+                                            properties:
+                                              contains:
+                                                description: |-
+                                                  The output of the action should contain the specified value.
+
+
+                                                  This field is immutable once set.
+                                                type: string
+                                              equalTo:
+                                                description: |-
+                                                  The output of the action should be equal to the specified value.
+
+
+                                                  This field is immutable once set.
+                                                type: string
+                                            type: object
+                                          succeed:
+                                            description: |-
+                                              Whether the action should succeed or fail.
+
+
+                                              This field is immutable once set.
+                                            type: boolean
+                                        type: object
+                                      type: array
+                                    not:
                                       description: |-
-                                        The output of the action should be equal to the specified value.
+                                        Logical Not to negate the assertions.
 
 
                                         This field is immutable once set.
-                                      type: string
+                                      properties:
+                                        stderr:
+                                          description: |-
+                                            Specifies the stderr matcher for the action.
+
+
+                                            This field is immutable once set.
+                                          properties:
+                                            contains:
+                                              description: |-
+                                                The output of the action should contain the specified value.
+
+
+                                                This field is immutable once set.
+                                              type: string
+                                            equalTo:
+                                              description: |-
+                                                The output of the action should be equal to the specified value.
+
+
+                                                This field is immutable once set.
+                                              type: string
+                                          type: object
+                                        stdout:
+                                          description: |-
+                                            Specifies the stdout matcher for the action.
+
+
+                                            This field is immutable once set.
+                                          properties:
+                                            contains:
+                                              description: |-
+                                                The output of the action should contain the specified value.
+
+
+                                                This field is immutable once set.
+                                              type: string
+                                            equalTo:
+                                              description: |-
+                                                The output of the action should be equal to the specified value.
+
+
+                                                This field is immutable once set.
+                                              type: string
+                                          type: object
+                                        succeed:
+                                          description: |-
+                                            Whether the action should succeed or fail.
+
+
+                                            This field is immutable once set.
+                                          type: boolean
+                                      type: object
+                                    or:
+                                      description: |-
+                                        Logical Or to combine multiple assertions.
+
+
+                                        This field is immutable once set.
+                                      items:
+                                        description: ActionAssertion defines the custom
+                                          assertions for evaluating the success or
+                                          failure of an action.
+                                        properties:
+                                          stderr:
+                                            description: |-
+                                              Specifies the stderr matcher for the action.
+
+
+                                              This field is immutable once set.
+                                            properties:
+                                              contains:
+                                                description: |-
+                                                  The output of the action should contain the specified value.
+
+
+                                                  This field is immutable once set.
+                                                type: string
+                                              equalTo:
+                                                description: |-
+                                                  The output of the action should be equal to the specified value.
+
+
+                                                  This field is immutable once set.
+                                                type: string
+                                            type: object
+                                          stdout:
+                                            description: |-
+                                              Specifies the stdout matcher for the action.
+
+
+                                              This field is immutable once set.
+                                            properties:
+                                              contains:
+                                                description: |-
+                                                  The output of the action should contain the specified value.
+
+
+                                                  This field is immutable once set.
+                                                type: string
+                                              equalTo:
+                                                description: |-
+                                                  The output of the action should be equal to the specified value.
+
+
+                                                  This field is immutable once set.
+                                                type: string
+                                            type: object
+                                          succeed:
+                                            description: |-
+                                              Whether the action should succeed or fail.
+
+
+                                              This field is immutable once set.
+                                            type: boolean
+                                        type: object
+                                      type: array
+                                    stderr:
+                                      description: |-
+                                        Specifies the stderr matcher for the action.
+
+
+                                        This field is immutable once set.
+                                      properties:
+                                        contains:
+                                          description: |-
+                                            The output of the action should contain the specified value.
+
+
+                                            This field is immutable once set.
+                                          type: string
+                                        equalTo:
+                                          description: |-
+                                            The output of the action should be equal to the specified value.
+
+
+                                            This field is immutable once set.
+                                          type: string
+                                      type: object
+                                    stdout:
+                                      description: |-
+                                        Specifies the stdout matcher for the action.
+
+
+                                        This field is immutable once set.
+                                      properties:
+                                        contains:
+                                          description: |-
+                                            The output of the action should contain the specified value.
+
+
+                                            This field is immutable once set.
+                                          type: string
+                                        equalTo:
+                                          description: |-
+                                            The output of the action should be equal to the specified value.
+
+
+                                            This field is immutable once set.
+                                          type: string
+                                      type: object
+                                    strict:
+                                      description: |-
+                                        Specifies whether apply the assertions strictly to all replicas.
+
+
+                                        This field is immutable once set.
+                                      type: boolean
+                                    succeed:
+                                      description: |-
+                                        Whether the action should succeed or fail.
+
+
+                                        This field is immutable once set.
+                                      type: boolean
                                   type: object
-                                strict:
+                                majority:
                                   description: |-
-                                    Specifies whether apply the aggregation conditions strictly to all replicas.
+                                    Majority replicas must satisfy the assertion.
 
 
                                     This field is immutable once set.
-                                  type: boolean
-                                succeed:
+                                  properties:
+                                    and:
+                                      description: |-
+                                        Logical And to combine multiple assertions.
+
+
+                                        This field is immutable once set.
+                                      items:
+                                        description: ActionAssertion defines the custom
+                                          assertions for evaluating the success or
+                                          failure of an action.
+                                        properties:
+                                          stderr:
+                                            description: |-
+                                              Specifies the stderr matcher for the action.
+
+
+                                              This field is immutable once set.
+                                            properties:
+                                              contains:
+                                                description: |-
+                                                  The output of the action should contain the specified value.
+
+
+                                                  This field is immutable once set.
+                                                type: string
+                                              equalTo:
+                                                description: |-
+                                                  The output of the action should be equal to the specified value.
+
+
+                                                  This field is immutable once set.
+                                                type: string
+                                            type: object
+                                          stdout:
+                                            description: |-
+                                              Specifies the stdout matcher for the action.
+
+
+                                              This field is immutable once set.
+                                            properties:
+                                              contains:
+                                                description: |-
+                                                  The output of the action should contain the specified value.
+
+
+                                                  This field is immutable once set.
+                                                type: string
+                                              equalTo:
+                                                description: |-
+                                                  The output of the action should be equal to the specified value.
+
+
+                                                  This field is immutable once set.
+                                                type: string
+                                            type: object
+                                          succeed:
+                                            description: |-
+                                              Whether the action should succeed or fail.
+
+
+                                              This field is immutable once set.
+                                            type: boolean
+                                        type: object
+                                      type: array
+                                    not:
+                                      description: |-
+                                        Logical Not to negate the assertions.
+
+
+                                        This field is immutable once set.
+                                      properties:
+                                        stderr:
+                                          description: |-
+                                            Specifies the stderr matcher for the action.
+
+
+                                            This field is immutable once set.
+                                          properties:
+                                            contains:
+                                              description: |-
+                                                The output of the action should contain the specified value.
+
+
+                                                This field is immutable once set.
+                                              type: string
+                                            equalTo:
+                                              description: |-
+                                                The output of the action should be equal to the specified value.
+
+
+                                                This field is immutable once set.
+                                              type: string
+                                          type: object
+                                        stdout:
+                                          description: |-
+                                            Specifies the stdout matcher for the action.
+
+
+                                            This field is immutable once set.
+                                          properties:
+                                            contains:
+                                              description: |-
+                                                The output of the action should contain the specified value.
+
+
+                                                This field is immutable once set.
+                                              type: string
+                                            equalTo:
+                                              description: |-
+                                                The output of the action should be equal to the specified value.
+
+
+                                                This field is immutable once set.
+                                              type: string
+                                          type: object
+                                        succeed:
+                                          description: |-
+                                            Whether the action should succeed or fail.
+
+
+                                            This field is immutable once set.
+                                          type: boolean
+                                      type: object
+                                    or:
+                                      description: |-
+                                        Logical Or to combine multiple assertions.
+
+
+                                        This field is immutable once set.
+                                      items:
+                                        description: ActionAssertion defines the custom
+                                          assertions for evaluating the success or
+                                          failure of an action.
+                                        properties:
+                                          stderr:
+                                            description: |-
+                                              Specifies the stderr matcher for the action.
+
+
+                                              This field is immutable once set.
+                                            properties:
+                                              contains:
+                                                description: |-
+                                                  The output of the action should contain the specified value.
+
+
+                                                  This field is immutable once set.
+                                                type: string
+                                              equalTo:
+                                                description: |-
+                                                  The output of the action should be equal to the specified value.
+
+
+                                                  This field is immutable once set.
+                                                type: string
+                                            type: object
+                                          stdout:
+                                            description: |-
+                                              Specifies the stdout matcher for the action.
+
+
+                                              This field is immutable once set.
+                                            properties:
+                                              contains:
+                                                description: |-
+                                                  The output of the action should contain the specified value.
+
+
+                                                  This field is immutable once set.
+                                                type: string
+                                              equalTo:
+                                                description: |-
+                                                  The output of the action should be equal to the specified value.
+
+
+                                                  This field is immutable once set.
+                                                type: string
+                                            type: object
+                                          succeed:
+                                            description: |-
+                                              Whether the action should succeed or fail.
+
+
+                                              This field is immutable once set.
+                                            type: boolean
+                                        type: object
+                                      type: array
+                                    stderr:
+                                      description: |-
+                                        Specifies the stderr matcher for the action.
+
+
+                                        This field is immutable once set.
+                                      properties:
+                                        contains:
+                                          description: |-
+                                            The output of the action should contain the specified value.
+
+
+                                            This field is immutable once set.
+                                          type: string
+                                        equalTo:
+                                          description: |-
+                                            The output of the action should be equal to the specified value.
+
+
+                                            This field is immutable once set.
+                                          type: string
+                                      type: object
+                                    stdout:
+                                      description: |-
+                                        Specifies the stdout matcher for the action.
+
+
+                                        This field is immutable once set.
+                                      properties:
+                                        contains:
+                                          description: |-
+                                            The output of the action should contain the specified value.
+
+
+                                            This field is immutable once set.
+                                          type: string
+                                        equalTo:
+                                          description: |-
+                                            The output of the action should be equal to the specified value.
+
+
+                                            This field is immutable once set.
+                                          type: string
+                                      type: object
+                                    strict:
+                                      description: |-
+                                        Specifies whether apply the assertions strictly to all replicas.
+
+
+                                        This field is immutable once set.
+                                      type: boolean
+                                    succeed:
+                                      description: |-
+                                        Whether the action should succeed or fail.
+
+
+                                        This field is immutable once set.
+                                      type: boolean
+                                  type: object
+                                none:
                                   description: |-
-                                    Whether the action should succeed or fail.
+                                    None of the replicas must satisfy the assertion.
 
 
                                     This field is immutable once set.
-                                  type: boolean
+                                  properties:
+                                    and:
+                                      description: |-
+                                        Logical And to combine multiple assertions.
+
+
+                                        This field is immutable once set.
+                                      items:
+                                        description: ActionAssertion defines the custom
+                                          assertions for evaluating the success or
+                                          failure of an action.
+                                        properties:
+                                          stderr:
+                                            description: |-
+                                              Specifies the stderr matcher for the action.
+
+
+                                              This field is immutable once set.
+                                            properties:
+                                              contains:
+                                                description: |-
+                                                  The output of the action should contain the specified value.
+
+
+                                                  This field is immutable once set.
+                                                type: string
+                                              equalTo:
+                                                description: |-
+                                                  The output of the action should be equal to the specified value.
+
+
+                                                  This field is immutable once set.
+                                                type: string
+                                            type: object
+                                          stdout:
+                                            description: |-
+                                              Specifies the stdout matcher for the action.
+
+
+                                              This field is immutable once set.
+                                            properties:
+                                              contains:
+                                                description: |-
+                                                  The output of the action should contain the specified value.
+
+
+                                                  This field is immutable once set.
+                                                type: string
+                                              equalTo:
+                                                description: |-
+                                                  The output of the action should be equal to the specified value.
+
+
+                                                  This field is immutable once set.
+                                                type: string
+                                            type: object
+                                          succeed:
+                                            description: |-
+                                              Whether the action should succeed or fail.
+
+
+                                              This field is immutable once set.
+                                            type: boolean
+                                        type: object
+                                      type: array
+                                    not:
+                                      description: |-
+                                        Logical Not to negate the assertions.
+
+
+                                        This field is immutable once set.
+                                      properties:
+                                        stderr:
+                                          description: |-
+                                            Specifies the stderr matcher for the action.
+
+
+                                            This field is immutable once set.
+                                          properties:
+                                            contains:
+                                              description: |-
+                                                The output of the action should contain the specified value.
+
+
+                                                This field is immutable once set.
+                                              type: string
+                                            equalTo:
+                                              description: |-
+                                                The output of the action should be equal to the specified value.
+
+
+                                                This field is immutable once set.
+                                              type: string
+                                          type: object
+                                        stdout:
+                                          description: |-
+                                            Specifies the stdout matcher for the action.
+
+
+                                            This field is immutable once set.
+                                          properties:
+                                            contains:
+                                              description: |-
+                                                The output of the action should contain the specified value.
+
+
+                                                This field is immutable once set.
+                                              type: string
+                                            equalTo:
+                                              description: |-
+                                                The output of the action should be equal to the specified value.
+
+
+                                                This field is immutable once set.
+                                              type: string
+                                          type: object
+                                        succeed:
+                                          description: |-
+                                            Whether the action should succeed or fail.
+
+
+                                            This field is immutable once set.
+                                          type: boolean
+                                      type: object
+                                    or:
+                                      description: |-
+                                        Logical Or to combine multiple assertions.
+
+
+                                        This field is immutable once set.
+                                      items:
+                                        description: ActionAssertion defines the custom
+                                          assertions for evaluating the success or
+                                          failure of an action.
+                                        properties:
+                                          stderr:
+                                            description: |-
+                                              Specifies the stderr matcher for the action.
+
+
+                                              This field is immutable once set.
+                                            properties:
+                                              contains:
+                                                description: |-
+                                                  The output of the action should contain the specified value.
+
+
+                                                  This field is immutable once set.
+                                                type: string
+                                              equalTo:
+                                                description: |-
+                                                  The output of the action should be equal to the specified value.
+
+
+                                                  This field is immutable once set.
+                                                type: string
+                                            type: object
+                                          stdout:
+                                            description: |-
+                                              Specifies the stdout matcher for the action.
+
+
+                                              This field is immutable once set.
+                                            properties:
+                                              contains:
+                                                description: |-
+                                                  The output of the action should contain the specified value.
+
+
+                                                  This field is immutable once set.
+                                                type: string
+                                              equalTo:
+                                                description: |-
+                                                  The output of the action should be equal to the specified value.
+
+
+                                                  This field is immutable once set.
+                                                type: string
+                                            type: object
+                                          succeed:
+                                            description: |-
+                                              Whether the action should succeed or fail.
+
+
+                                              This field is immutable once set.
+                                            type: boolean
+                                        type: object
+                                      type: array
+                                    stderr:
+                                      description: |-
+                                        Specifies the stderr matcher for the action.
+
+
+                                        This field is immutable once set.
+                                      properties:
+                                        contains:
+                                          description: |-
+                                            The output of the action should contain the specified value.
+
+
+                                            This field is immutable once set.
+                                          type: string
+                                        equalTo:
+                                          description: |-
+                                            The output of the action should be equal to the specified value.
+
+
+                                            This field is immutable once set.
+                                          type: string
+                                      type: object
+                                    stdout:
+                                      description: |-
+                                        Specifies the stdout matcher for the action.
+
+
+                                        This field is immutable once set.
+                                      properties:
+                                        contains:
+                                          description: |-
+                                            The output of the action should contain the specified value.
+
+
+                                            This field is immutable once set.
+                                          type: string
+                                        equalTo:
+                                          description: |-
+                                            The output of the action should be equal to the specified value.
+
+
+                                            This field is immutable once set.
+                                          type: string
+                                      type: object
+                                    strict:
+                                      description: |-
+                                        Specifies whether apply the assertions strictly to all replicas.
+
+
+                                        This field is immutable once set.
+                                      type: boolean
+                                    succeed:
+                                      description: |-
+                                        Whether the action should succeed or fail.
+
+
+                                        This field is immutable once set.
+                                      type: boolean
+                                  type: object
                               type: object
                             type: array
                           any:
                             description: |-
-                              Aggregate operator ANY.
+                              At least one replica must satisfy the assertion.
 
 
                               This field is immutable once set.
                             properties:
+                              and:
+                                description: |-
+                                  Logical And to combine multiple assertions.
+
+
+                                  This field is immutable once set.
+                                items:
+                                  description: ActionAssertion defines the custom
+                                    assertions for evaluating the success or failure
+                                    of an action.
+                                  properties:
+                                    stderr:
+                                      description: |-
+                                        Specifies the stderr matcher for the action.
+
+
+                                        This field is immutable once set.
+                                      properties:
+                                        contains:
+                                          description: |-
+                                            The output of the action should contain the specified value.
+
+
+                                            This field is immutable once set.
+                                          type: string
+                                        equalTo:
+                                          description: |-
+                                            The output of the action should be equal to the specified value.
+
+
+                                            This field is immutable once set.
+                                          type: string
+                                      type: object
+                                    stdout:
+                                      description: |-
+                                        Specifies the stdout matcher for the action.
+
+
+                                        This field is immutable once set.
+                                      properties:
+                                        contains:
+                                          description: |-
+                                            The output of the action should contain the specified value.
+
+
+                                            This field is immutable once set.
+                                          type: string
+                                        equalTo:
+                                          description: |-
+                                            The output of the action should be equal to the specified value.
+
+
+                                            This field is immutable once set.
+                                          type: string
+                                      type: object
+                                    succeed:
+                                      description: |-
+                                        Whether the action should succeed or fail.
+
+
+                                        This field is immutable once set.
+                                      type: boolean
+                                  type: object
+                                type: array
+                              not:
+                                description: |-
+                                  Logical Not to negate the assertions.
+
+
+                                  This field is immutable once set.
+                                properties:
+                                  stderr:
+                                    description: |-
+                                      Specifies the stderr matcher for the action.
+
+
+                                      This field is immutable once set.
+                                    properties:
+                                      contains:
+                                        description: |-
+                                          The output of the action should contain the specified value.
+
+
+                                          This field is immutable once set.
+                                        type: string
+                                      equalTo:
+                                        description: |-
+                                          The output of the action should be equal to the specified value.
+
+
+                                          This field is immutable once set.
+                                        type: string
+                                    type: object
+                                  stdout:
+                                    description: |-
+                                      Specifies the stdout matcher for the action.
+
+
+                                      This field is immutable once set.
+                                    properties:
+                                      contains:
+                                        description: |-
+                                          The output of the action should contain the specified value.
+
+
+                                          This field is immutable once set.
+                                        type: string
+                                      equalTo:
+                                        description: |-
+                                          The output of the action should be equal to the specified value.
+
+
+                                          This field is immutable once set.
+                                        type: string
+                                    type: object
+                                  succeed:
+                                    description: |-
+                                      Whether the action should succeed or fail.
+
+
+                                      This field is immutable once set.
+                                    type: boolean
+                                type: object
+                              or:
+                                description: |-
+                                  Logical Or to combine multiple assertions.
+
+
+                                  This field is immutable once set.
+                                items:
+                                  description: ActionAssertion defines the custom
+                                    assertions for evaluating the success or failure
+                                    of an action.
+                                  properties:
+                                    stderr:
+                                      description: |-
+                                        Specifies the stderr matcher for the action.
+
+
+                                        This field is immutable once set.
+                                      properties:
+                                        contains:
+                                          description: |-
+                                            The output of the action should contain the specified value.
+
+
+                                            This field is immutable once set.
+                                          type: string
+                                        equalTo:
+                                          description: |-
+                                            The output of the action should be equal to the specified value.
+
+
+                                            This field is immutable once set.
+                                          type: string
+                                      type: object
+                                    stdout:
+                                      description: |-
+                                        Specifies the stdout matcher for the action.
+
+
+                                        This field is immutable once set.
+                                      properties:
+                                        contains:
+                                          description: |-
+                                            The output of the action should contain the specified value.
+
+
+                                            This field is immutable once set.
+                                          type: string
+                                        equalTo:
+                                          description: |-
+                                            The output of the action should be equal to the specified value.
+
+
+                                            This field is immutable once set.
+                                          type: string
+                                      type: object
+                                    succeed:
+                                      description: |-
+                                        Whether the action should succeed or fail.
+
+
+                                        This field is immutable once set.
+                                      type: boolean
+                                  type: object
+                                type: array
                               stderr:
                                 description: |-
                                   Specifies the stderr matcher for the action.
@@ -315,7 +1643,7 @@ spec:
                                 type: object
                               strict:
                                 description: |-
-                                  Specifies whether apply the aggregation conditions strictly to all replicas.
+                                  Specifies whether apply the assertions strictly to all replicas.
 
 
                                   This field is immutable once set.
@@ -330,11 +1658,198 @@ spec:
                             type: object
                           majority:
                             description: |-
-                              Aggregate operator MAJORITY.
+                              Majority replicas must satisfy the assertion.
 
 
                               This field is immutable once set.
                             properties:
+                              and:
+                                description: |-
+                                  Logical And to combine multiple assertions.
+
+
+                                  This field is immutable once set.
+                                items:
+                                  description: ActionAssertion defines the custom
+                                    assertions for evaluating the success or failure
+                                    of an action.
+                                  properties:
+                                    stderr:
+                                      description: |-
+                                        Specifies the stderr matcher for the action.
+
+
+                                        This field is immutable once set.
+                                      properties:
+                                        contains:
+                                          description: |-
+                                            The output of the action should contain the specified value.
+
+
+                                            This field is immutable once set.
+                                          type: string
+                                        equalTo:
+                                          description: |-
+                                            The output of the action should be equal to the specified value.
+
+
+                                            This field is immutable once set.
+                                          type: string
+                                      type: object
+                                    stdout:
+                                      description: |-
+                                        Specifies the stdout matcher for the action.
+
+
+                                        This field is immutable once set.
+                                      properties:
+                                        contains:
+                                          description: |-
+                                            The output of the action should contain the specified value.
+
+
+                                            This field is immutable once set.
+                                          type: string
+                                        equalTo:
+                                          description: |-
+                                            The output of the action should be equal to the specified value.
+
+
+                                            This field is immutable once set.
+                                          type: string
+                                      type: object
+                                    succeed:
+                                      description: |-
+                                        Whether the action should succeed or fail.
+
+
+                                        This field is immutable once set.
+                                      type: boolean
+                                  type: object
+                                type: array
+                              not:
+                                description: |-
+                                  Logical Not to negate the assertions.
+
+
+                                  This field is immutable once set.
+                                properties:
+                                  stderr:
+                                    description: |-
+                                      Specifies the stderr matcher for the action.
+
+
+                                      This field is immutable once set.
+                                    properties:
+                                      contains:
+                                        description: |-
+                                          The output of the action should contain the specified value.
+
+
+                                          This field is immutable once set.
+                                        type: string
+                                      equalTo:
+                                        description: |-
+                                          The output of the action should be equal to the specified value.
+
+
+                                          This field is immutable once set.
+                                        type: string
+                                    type: object
+                                  stdout:
+                                    description: |-
+                                      Specifies the stdout matcher for the action.
+
+
+                                      This field is immutable once set.
+                                    properties:
+                                      contains:
+                                        description: |-
+                                          The output of the action should contain the specified value.
+
+
+                                          This field is immutable once set.
+                                        type: string
+                                      equalTo:
+                                        description: |-
+                                          The output of the action should be equal to the specified value.
+
+
+                                          This field is immutable once set.
+                                        type: string
+                                    type: object
+                                  succeed:
+                                    description: |-
+                                      Whether the action should succeed or fail.
+
+
+                                      This field is immutable once set.
+                                    type: boolean
+                                type: object
+                              or:
+                                description: |-
+                                  Logical Or to combine multiple assertions.
+
+
+                                  This field is immutable once set.
+                                items:
+                                  description: ActionAssertion defines the custom
+                                    assertions for evaluating the success or failure
+                                    of an action.
+                                  properties:
+                                    stderr:
+                                      description: |-
+                                        Specifies the stderr matcher for the action.
+
+
+                                        This field is immutable once set.
+                                      properties:
+                                        contains:
+                                          description: |-
+                                            The output of the action should contain the specified value.
+
+
+                                            This field is immutable once set.
+                                          type: string
+                                        equalTo:
+                                          description: |-
+                                            The output of the action should be equal to the specified value.
+
+
+                                            This field is immutable once set.
+                                          type: string
+                                      type: object
+                                    stdout:
+                                      description: |-
+                                        Specifies the stdout matcher for the action.
+
+
+                                        This field is immutable once set.
+                                      properties:
+                                        contains:
+                                          description: |-
+                                            The output of the action should contain the specified value.
+
+
+                                            This field is immutable once set.
+                                          type: string
+                                        equalTo:
+                                          description: |-
+                                            The output of the action should be equal to the specified value.
+
+
+                                            This field is immutable once set.
+                                          type: string
+                                      type: object
+                                    succeed:
+                                      description: |-
+                                        Whether the action should succeed or fail.
+
+
+                                        This field is immutable once set.
+                                      type: boolean
+                                  type: object
+                                type: array
                               stderr:
                                 description: |-
                                   Specifies the stderr matcher for the action.
@@ -381,7 +1896,7 @@ spec:
                                 type: object
                               strict:
                                 description: |-
-                                  Specifies whether apply the aggregation conditions strictly to all replicas.
+                                  Specifies whether apply the assertions strictly to all replicas.
 
 
                                   This field is immutable once set.
@@ -396,11 +1911,198 @@ spec:
                             type: object
                           none:
                             description: |-
-                              Aggregate operator NONE.
+                              None of the replicas must satisfy the assertion.
 
 
                               This field is immutable once set.
                             properties:
+                              and:
+                                description: |-
+                                  Logical And to combine multiple assertions.
+
+
+                                  This field is immutable once set.
+                                items:
+                                  description: ActionAssertion defines the custom
+                                    assertions for evaluating the success or failure
+                                    of an action.
+                                  properties:
+                                    stderr:
+                                      description: |-
+                                        Specifies the stderr matcher for the action.
+
+
+                                        This field is immutable once set.
+                                      properties:
+                                        contains:
+                                          description: |-
+                                            The output of the action should contain the specified value.
+
+
+                                            This field is immutable once set.
+                                          type: string
+                                        equalTo:
+                                          description: |-
+                                            The output of the action should be equal to the specified value.
+
+
+                                            This field is immutable once set.
+                                          type: string
+                                      type: object
+                                    stdout:
+                                      description: |-
+                                        Specifies the stdout matcher for the action.
+
+
+                                        This field is immutable once set.
+                                      properties:
+                                        contains:
+                                          description: |-
+                                            The output of the action should contain the specified value.
+
+
+                                            This field is immutable once set.
+                                          type: string
+                                        equalTo:
+                                          description: |-
+                                            The output of the action should be equal to the specified value.
+
+
+                                            This field is immutable once set.
+                                          type: string
+                                      type: object
+                                    succeed:
+                                      description: |-
+                                        Whether the action should succeed or fail.
+
+
+                                        This field is immutable once set.
+                                      type: boolean
+                                  type: object
+                                type: array
+                              not:
+                                description: |-
+                                  Logical Not to negate the assertions.
+
+
+                                  This field is immutable once set.
+                                properties:
+                                  stderr:
+                                    description: |-
+                                      Specifies the stderr matcher for the action.
+
+
+                                      This field is immutable once set.
+                                    properties:
+                                      contains:
+                                        description: |-
+                                          The output of the action should contain the specified value.
+
+
+                                          This field is immutable once set.
+                                        type: string
+                                      equalTo:
+                                        description: |-
+                                          The output of the action should be equal to the specified value.
+
+
+                                          This field is immutable once set.
+                                        type: string
+                                    type: object
+                                  stdout:
+                                    description: |-
+                                      Specifies the stdout matcher for the action.
+
+
+                                      This field is immutable once set.
+                                    properties:
+                                      contains:
+                                        description: |-
+                                          The output of the action should contain the specified value.
+
+
+                                          This field is immutable once set.
+                                        type: string
+                                      equalTo:
+                                        description: |-
+                                          The output of the action should be equal to the specified value.
+
+
+                                          This field is immutable once set.
+                                        type: string
+                                    type: object
+                                  succeed:
+                                    description: |-
+                                      Whether the action should succeed or fail.
+
+
+                                      This field is immutable once set.
+                                    type: boolean
+                                type: object
+                              or:
+                                description: |-
+                                  Logical Or to combine multiple assertions.
+
+
+                                  This field is immutable once set.
+                                items:
+                                  description: ActionAssertion defines the custom
+                                    assertions for evaluating the success or failure
+                                    of an action.
+                                  properties:
+                                    stderr:
+                                      description: |-
+                                        Specifies the stderr matcher for the action.
+
+
+                                        This field is immutable once set.
+                                      properties:
+                                        contains:
+                                          description: |-
+                                            The output of the action should contain the specified value.
+
+
+                                            This field is immutable once set.
+                                          type: string
+                                        equalTo:
+                                          description: |-
+                                            The output of the action should be equal to the specified value.
+
+
+                                            This field is immutable once set.
+                                          type: string
+                                      type: object
+                                    stdout:
+                                      description: |-
+                                        Specifies the stdout matcher for the action.
+
+
+                                        This field is immutable once set.
+                                      properties:
+                                        contains:
+                                          description: |-
+                                            The output of the action should contain the specified value.
+
+
+                                            This field is immutable once set.
+                                          type: string
+                                        equalTo:
+                                          description: |-
+                                            The output of the action should be equal to the specified value.
+
+
+                                            This field is immutable once set.
+                                          type: string
+                                      type: object
+                                    succeed:
+                                      description: |-
+                                        Whether the action should succeed or fail.
+
+
+                                        This field is immutable once set.
+                                      type: boolean
+                                  type: object
+                                type: array
                               stderr:
                                 description: |-
                                   Specifies the stderr matcher for the action.
@@ -447,7 +2149,7 @@ spec:
                                 type: object
                               strict:
                                 description: |-
-                                  Specifies whether apply the aggregation conditions strictly to all replicas.
+                                  Specifies whether apply the assertions strictly to all replicas.
 
 
                                   This field is immutable once set.
@@ -462,139 +2164,2051 @@ spec:
                             type: object
                           not:
                             description: |-
-                              Logical operator NOT.
+                              Logical Not to negate the expression.
 
 
                               This field is immutable once set.
                             properties:
-                              stderr:
+                              all:
                                 description: |-
-                                  Specifies the stderr matcher for the action.
+                                  All replicas must satisfy the assertion.
 
 
                                   This field is immutable once set.
                                 properties:
-                                  contains:
+                                  and:
                                     description: |-
-                                      The output of the action should contain the specified value.
+                                      Logical And to combine multiple assertions.
 
 
                                       This field is immutable once set.
-                                    type: string
-                                  equalTo:
+                                    items:
+                                      description: ActionAssertion defines the custom
+                                        assertions for evaluating the success or failure
+                                        of an action.
+                                      properties:
+                                        stderr:
+                                          description: |-
+                                            Specifies the stderr matcher for the action.
+
+
+                                            This field is immutable once set.
+                                          properties:
+                                            contains:
+                                              description: |-
+                                                The output of the action should contain the specified value.
+
+
+                                                This field is immutable once set.
+                                              type: string
+                                            equalTo:
+                                              description: |-
+                                                The output of the action should be equal to the specified value.
+
+
+                                                This field is immutable once set.
+                                              type: string
+                                          type: object
+                                        stdout:
+                                          description: |-
+                                            Specifies the stdout matcher for the action.
+
+
+                                            This field is immutable once set.
+                                          properties:
+                                            contains:
+                                              description: |-
+                                                The output of the action should contain the specified value.
+
+
+                                                This field is immutable once set.
+                                              type: string
+                                            equalTo:
+                                              description: |-
+                                                The output of the action should be equal to the specified value.
+
+
+                                                This field is immutable once set.
+                                              type: string
+                                          type: object
+                                        succeed:
+                                          description: |-
+                                            Whether the action should succeed or fail.
+
+
+                                            This field is immutable once set.
+                                          type: boolean
+                                      type: object
+                                    type: array
+                                  not:
                                     description: |-
-                                      The output of the action should be equal to the specified value.
+                                      Logical Not to negate the assertions.
 
 
                                       This field is immutable once set.
-                                    type: string
+                                    properties:
+                                      stderr:
+                                        description: |-
+                                          Specifies the stderr matcher for the action.
+
+
+                                          This field is immutable once set.
+                                        properties:
+                                          contains:
+                                            description: |-
+                                              The output of the action should contain the specified value.
+
+
+                                              This field is immutable once set.
+                                            type: string
+                                          equalTo:
+                                            description: |-
+                                              The output of the action should be equal to the specified value.
+
+
+                                              This field is immutable once set.
+                                            type: string
+                                        type: object
+                                      stdout:
+                                        description: |-
+                                          Specifies the stdout matcher for the action.
+
+
+                                          This field is immutable once set.
+                                        properties:
+                                          contains:
+                                            description: |-
+                                              The output of the action should contain the specified value.
+
+
+                                              This field is immutable once set.
+                                            type: string
+                                          equalTo:
+                                            description: |-
+                                              The output of the action should be equal to the specified value.
+
+
+                                              This field is immutable once set.
+                                            type: string
+                                        type: object
+                                      succeed:
+                                        description: |-
+                                          Whether the action should succeed or fail.
+
+
+                                          This field is immutable once set.
+                                        type: boolean
+                                    type: object
+                                  or:
+                                    description: |-
+                                      Logical Or to combine multiple assertions.
+
+
+                                      This field is immutable once set.
+                                    items:
+                                      description: ActionAssertion defines the custom
+                                        assertions for evaluating the success or failure
+                                        of an action.
+                                      properties:
+                                        stderr:
+                                          description: |-
+                                            Specifies the stderr matcher for the action.
+
+
+                                            This field is immutable once set.
+                                          properties:
+                                            contains:
+                                              description: |-
+                                                The output of the action should contain the specified value.
+
+
+                                                This field is immutable once set.
+                                              type: string
+                                            equalTo:
+                                              description: |-
+                                                The output of the action should be equal to the specified value.
+
+
+                                                This field is immutable once set.
+                                              type: string
+                                          type: object
+                                        stdout:
+                                          description: |-
+                                            Specifies the stdout matcher for the action.
+
+
+                                            This field is immutable once set.
+                                          properties:
+                                            contains:
+                                              description: |-
+                                                The output of the action should contain the specified value.
+
+
+                                                This field is immutable once set.
+                                              type: string
+                                            equalTo:
+                                              description: |-
+                                                The output of the action should be equal to the specified value.
+
+
+                                                This field is immutable once set.
+                                              type: string
+                                          type: object
+                                        succeed:
+                                          description: |-
+                                            Whether the action should succeed or fail.
+
+
+                                            This field is immutable once set.
+                                          type: boolean
+                                      type: object
+                                    type: array
+                                  stderr:
+                                    description: |-
+                                      Specifies the stderr matcher for the action.
+
+
+                                      This field is immutable once set.
+                                    properties:
+                                      contains:
+                                        description: |-
+                                          The output of the action should contain the specified value.
+
+
+                                          This field is immutable once set.
+                                        type: string
+                                      equalTo:
+                                        description: |-
+                                          The output of the action should be equal to the specified value.
+
+
+                                          This field is immutable once set.
+                                        type: string
+                                    type: object
+                                  stdout:
+                                    description: |-
+                                      Specifies the stdout matcher for the action.
+
+
+                                      This field is immutable once set.
+                                    properties:
+                                      contains:
+                                        description: |-
+                                          The output of the action should contain the specified value.
+
+
+                                          This field is immutable once set.
+                                        type: string
+                                      equalTo:
+                                        description: |-
+                                          The output of the action should be equal to the specified value.
+
+
+                                          This field is immutable once set.
+                                        type: string
+                                    type: object
+                                  strict:
+                                    description: |-
+                                      Specifies whether apply the assertions strictly to all replicas.
+
+
+                                      This field is immutable once set.
+                                    type: boolean
+                                  succeed:
+                                    description: |-
+                                      Whether the action should succeed or fail.
+
+
+                                      This field is immutable once set.
+                                    type: boolean
                                 type: object
-                              stdout:
+                              any:
                                 description: |-
-                                  Specifies the stdout matcher for the action.
+                                  At least one replica must satisfy the assertion.
 
 
                                   This field is immutable once set.
                                 properties:
-                                  contains:
+                                  and:
                                     description: |-
-                                      The output of the action should contain the specified value.
+                                      Logical And to combine multiple assertions.
 
 
                                       This field is immutable once set.
-                                    type: string
-                                  equalTo:
+                                    items:
+                                      description: ActionAssertion defines the custom
+                                        assertions for evaluating the success or failure
+                                        of an action.
+                                      properties:
+                                        stderr:
+                                          description: |-
+                                            Specifies the stderr matcher for the action.
+
+
+                                            This field is immutable once set.
+                                          properties:
+                                            contains:
+                                              description: |-
+                                                The output of the action should contain the specified value.
+
+
+                                                This field is immutable once set.
+                                              type: string
+                                            equalTo:
+                                              description: |-
+                                                The output of the action should be equal to the specified value.
+
+
+                                                This field is immutable once set.
+                                              type: string
+                                          type: object
+                                        stdout:
+                                          description: |-
+                                            Specifies the stdout matcher for the action.
+
+
+                                            This field is immutable once set.
+                                          properties:
+                                            contains:
+                                              description: |-
+                                                The output of the action should contain the specified value.
+
+
+                                                This field is immutable once set.
+                                              type: string
+                                            equalTo:
+                                              description: |-
+                                                The output of the action should be equal to the specified value.
+
+
+                                                This field is immutable once set.
+                                              type: string
+                                          type: object
+                                        succeed:
+                                          description: |-
+                                            Whether the action should succeed or fail.
+
+
+                                            This field is immutable once set.
+                                          type: boolean
+                                      type: object
+                                    type: array
+                                  not:
                                     description: |-
-                                      The output of the action should be equal to the specified value.
+                                      Logical Not to negate the assertions.
 
 
                                       This field is immutable once set.
-                                    type: string
+                                    properties:
+                                      stderr:
+                                        description: |-
+                                          Specifies the stderr matcher for the action.
+
+
+                                          This field is immutable once set.
+                                        properties:
+                                          contains:
+                                            description: |-
+                                              The output of the action should contain the specified value.
+
+
+                                              This field is immutable once set.
+                                            type: string
+                                          equalTo:
+                                            description: |-
+                                              The output of the action should be equal to the specified value.
+
+
+                                              This field is immutable once set.
+                                            type: string
+                                        type: object
+                                      stdout:
+                                        description: |-
+                                          Specifies the stdout matcher for the action.
+
+
+                                          This field is immutable once set.
+                                        properties:
+                                          contains:
+                                            description: |-
+                                              The output of the action should contain the specified value.
+
+
+                                              This field is immutable once set.
+                                            type: string
+                                          equalTo:
+                                            description: |-
+                                              The output of the action should be equal to the specified value.
+
+
+                                              This field is immutable once set.
+                                            type: string
+                                        type: object
+                                      succeed:
+                                        description: |-
+                                          Whether the action should succeed or fail.
+
+
+                                          This field is immutable once set.
+                                        type: boolean
+                                    type: object
+                                  or:
+                                    description: |-
+                                      Logical Or to combine multiple assertions.
+
+
+                                      This field is immutable once set.
+                                    items:
+                                      description: ActionAssertion defines the custom
+                                        assertions for evaluating the success or failure
+                                        of an action.
+                                      properties:
+                                        stderr:
+                                          description: |-
+                                            Specifies the stderr matcher for the action.
+
+
+                                            This field is immutable once set.
+                                          properties:
+                                            contains:
+                                              description: |-
+                                                The output of the action should contain the specified value.
+
+
+                                                This field is immutable once set.
+                                              type: string
+                                            equalTo:
+                                              description: |-
+                                                The output of the action should be equal to the specified value.
+
+
+                                                This field is immutable once set.
+                                              type: string
+                                          type: object
+                                        stdout:
+                                          description: |-
+                                            Specifies the stdout matcher for the action.
+
+
+                                            This field is immutable once set.
+                                          properties:
+                                            contains:
+                                              description: |-
+                                                The output of the action should contain the specified value.
+
+
+                                                This field is immutable once set.
+                                              type: string
+                                            equalTo:
+                                              description: |-
+                                                The output of the action should be equal to the specified value.
+
+
+                                                This field is immutable once set.
+                                              type: string
+                                          type: object
+                                        succeed:
+                                          description: |-
+                                            Whether the action should succeed or fail.
+
+
+                                            This field is immutable once set.
+                                          type: boolean
+                                      type: object
+                                    type: array
+                                  stderr:
+                                    description: |-
+                                      Specifies the stderr matcher for the action.
+
+
+                                      This field is immutable once set.
+                                    properties:
+                                      contains:
+                                        description: |-
+                                          The output of the action should contain the specified value.
+
+
+                                          This field is immutable once set.
+                                        type: string
+                                      equalTo:
+                                        description: |-
+                                          The output of the action should be equal to the specified value.
+
+
+                                          This field is immutable once set.
+                                        type: string
+                                    type: object
+                                  stdout:
+                                    description: |-
+                                      Specifies the stdout matcher for the action.
+
+
+                                      This field is immutable once set.
+                                    properties:
+                                      contains:
+                                        description: |-
+                                          The output of the action should contain the specified value.
+
+
+                                          This field is immutable once set.
+                                        type: string
+                                      equalTo:
+                                        description: |-
+                                          The output of the action should be equal to the specified value.
+
+
+                                          This field is immutable once set.
+                                        type: string
+                                    type: object
+                                  strict:
+                                    description: |-
+                                      Specifies whether apply the assertions strictly to all replicas.
+
+
+                                      This field is immutable once set.
+                                    type: boolean
+                                  succeed:
+                                    description: |-
+                                      Whether the action should succeed or fail.
+
+
+                                      This field is immutable once set.
+                                    type: boolean
                                 type: object
-                              strict:
+                              majority:
                                 description: |-
-                                  Specifies whether apply the aggregation conditions strictly to all replicas.
+                                  Majority replicas must satisfy the assertion.
 
 
                                   This field is immutable once set.
-                                type: boolean
-                              succeed:
+                                properties:
+                                  and:
+                                    description: |-
+                                      Logical And to combine multiple assertions.
+
+
+                                      This field is immutable once set.
+                                    items:
+                                      description: ActionAssertion defines the custom
+                                        assertions for evaluating the success or failure
+                                        of an action.
+                                      properties:
+                                        stderr:
+                                          description: |-
+                                            Specifies the stderr matcher for the action.
+
+
+                                            This field is immutable once set.
+                                          properties:
+                                            contains:
+                                              description: |-
+                                                The output of the action should contain the specified value.
+
+
+                                                This field is immutable once set.
+                                              type: string
+                                            equalTo:
+                                              description: |-
+                                                The output of the action should be equal to the specified value.
+
+
+                                                This field is immutable once set.
+                                              type: string
+                                          type: object
+                                        stdout:
+                                          description: |-
+                                            Specifies the stdout matcher for the action.
+
+
+                                            This field is immutable once set.
+                                          properties:
+                                            contains:
+                                              description: |-
+                                                The output of the action should contain the specified value.
+
+
+                                                This field is immutable once set.
+                                              type: string
+                                            equalTo:
+                                              description: |-
+                                                The output of the action should be equal to the specified value.
+
+
+                                                This field is immutable once set.
+                                              type: string
+                                          type: object
+                                        succeed:
+                                          description: |-
+                                            Whether the action should succeed or fail.
+
+
+                                            This field is immutable once set.
+                                          type: boolean
+                                      type: object
+                                    type: array
+                                  not:
+                                    description: |-
+                                      Logical Not to negate the assertions.
+
+
+                                      This field is immutable once set.
+                                    properties:
+                                      stderr:
+                                        description: |-
+                                          Specifies the stderr matcher for the action.
+
+
+                                          This field is immutable once set.
+                                        properties:
+                                          contains:
+                                            description: |-
+                                              The output of the action should contain the specified value.
+
+
+                                              This field is immutable once set.
+                                            type: string
+                                          equalTo:
+                                            description: |-
+                                              The output of the action should be equal to the specified value.
+
+
+                                              This field is immutable once set.
+                                            type: string
+                                        type: object
+                                      stdout:
+                                        description: |-
+                                          Specifies the stdout matcher for the action.
+
+
+                                          This field is immutable once set.
+                                        properties:
+                                          contains:
+                                            description: |-
+                                              The output of the action should contain the specified value.
+
+
+                                              This field is immutable once set.
+                                            type: string
+                                          equalTo:
+                                            description: |-
+                                              The output of the action should be equal to the specified value.
+
+
+                                              This field is immutable once set.
+                                            type: string
+                                        type: object
+                                      succeed:
+                                        description: |-
+                                          Whether the action should succeed or fail.
+
+
+                                          This field is immutable once set.
+                                        type: boolean
+                                    type: object
+                                  or:
+                                    description: |-
+                                      Logical Or to combine multiple assertions.
+
+
+                                      This field is immutable once set.
+                                    items:
+                                      description: ActionAssertion defines the custom
+                                        assertions for evaluating the success or failure
+                                        of an action.
+                                      properties:
+                                        stderr:
+                                          description: |-
+                                            Specifies the stderr matcher for the action.
+
+
+                                            This field is immutable once set.
+                                          properties:
+                                            contains:
+                                              description: |-
+                                                The output of the action should contain the specified value.
+
+
+                                                This field is immutable once set.
+                                              type: string
+                                            equalTo:
+                                              description: |-
+                                                The output of the action should be equal to the specified value.
+
+
+                                                This field is immutable once set.
+                                              type: string
+                                          type: object
+                                        stdout:
+                                          description: |-
+                                            Specifies the stdout matcher for the action.
+
+
+                                            This field is immutable once set.
+                                          properties:
+                                            contains:
+                                              description: |-
+                                                The output of the action should contain the specified value.
+
+
+                                                This field is immutable once set.
+                                              type: string
+                                            equalTo:
+                                              description: |-
+                                                The output of the action should be equal to the specified value.
+
+
+                                                This field is immutable once set.
+                                              type: string
+                                          type: object
+                                        succeed:
+                                          description: |-
+                                            Whether the action should succeed or fail.
+
+
+                                            This field is immutable once set.
+                                          type: boolean
+                                      type: object
+                                    type: array
+                                  stderr:
+                                    description: |-
+                                      Specifies the stderr matcher for the action.
+
+
+                                      This field is immutable once set.
+                                    properties:
+                                      contains:
+                                        description: |-
+                                          The output of the action should contain the specified value.
+
+
+                                          This field is immutable once set.
+                                        type: string
+                                      equalTo:
+                                        description: |-
+                                          The output of the action should be equal to the specified value.
+
+
+                                          This field is immutable once set.
+                                        type: string
+                                    type: object
+                                  stdout:
+                                    description: |-
+                                      Specifies the stdout matcher for the action.
+
+
+                                      This field is immutable once set.
+                                    properties:
+                                      contains:
+                                        description: |-
+                                          The output of the action should contain the specified value.
+
+
+                                          This field is immutable once set.
+                                        type: string
+                                      equalTo:
+                                        description: |-
+                                          The output of the action should be equal to the specified value.
+
+
+                                          This field is immutable once set.
+                                        type: string
+                                    type: object
+                                  strict:
+                                    description: |-
+                                      Specifies whether apply the assertions strictly to all replicas.
+
+
+                                      This field is immutable once set.
+                                    type: boolean
+                                  succeed:
+                                    description: |-
+                                      Whether the action should succeed or fail.
+
+
+                                      This field is immutable once set.
+                                    type: boolean
+                                type: object
+                              none:
                                 description: |-
-                                  Whether the action should succeed or fail.
+                                  None of the replicas must satisfy the assertion.
 
 
                                   This field is immutable once set.
-                                type: boolean
+                                properties:
+                                  and:
+                                    description: |-
+                                      Logical And to combine multiple assertions.
+
+
+                                      This field is immutable once set.
+                                    items:
+                                      description: ActionAssertion defines the custom
+                                        assertions for evaluating the success or failure
+                                        of an action.
+                                      properties:
+                                        stderr:
+                                          description: |-
+                                            Specifies the stderr matcher for the action.
+
+
+                                            This field is immutable once set.
+                                          properties:
+                                            contains:
+                                              description: |-
+                                                The output of the action should contain the specified value.
+
+
+                                                This field is immutable once set.
+                                              type: string
+                                            equalTo:
+                                              description: |-
+                                                The output of the action should be equal to the specified value.
+
+
+                                                This field is immutable once set.
+                                              type: string
+                                          type: object
+                                        stdout:
+                                          description: |-
+                                            Specifies the stdout matcher for the action.
+
+
+                                            This field is immutable once set.
+                                          properties:
+                                            contains:
+                                              description: |-
+                                                The output of the action should contain the specified value.
+
+
+                                                This field is immutable once set.
+                                              type: string
+                                            equalTo:
+                                              description: |-
+                                                The output of the action should be equal to the specified value.
+
+
+                                                This field is immutable once set.
+                                              type: string
+                                          type: object
+                                        succeed:
+                                          description: |-
+                                            Whether the action should succeed or fail.
+
+
+                                            This field is immutable once set.
+                                          type: boolean
+                                      type: object
+                                    type: array
+                                  not:
+                                    description: |-
+                                      Logical Not to negate the assertions.
+
+
+                                      This field is immutable once set.
+                                    properties:
+                                      stderr:
+                                        description: |-
+                                          Specifies the stderr matcher for the action.
+
+
+                                          This field is immutable once set.
+                                        properties:
+                                          contains:
+                                            description: |-
+                                              The output of the action should contain the specified value.
+
+
+                                              This field is immutable once set.
+                                            type: string
+                                          equalTo:
+                                            description: |-
+                                              The output of the action should be equal to the specified value.
+
+
+                                              This field is immutable once set.
+                                            type: string
+                                        type: object
+                                      stdout:
+                                        description: |-
+                                          Specifies the stdout matcher for the action.
+
+
+                                          This field is immutable once set.
+                                        properties:
+                                          contains:
+                                            description: |-
+                                              The output of the action should contain the specified value.
+
+
+                                              This field is immutable once set.
+                                            type: string
+                                          equalTo:
+                                            description: |-
+                                              The output of the action should be equal to the specified value.
+
+
+                                              This field is immutable once set.
+                                            type: string
+                                        type: object
+                                      succeed:
+                                        description: |-
+                                          Whether the action should succeed or fail.
+
+
+                                          This field is immutable once set.
+                                        type: boolean
+                                    type: object
+                                  or:
+                                    description: |-
+                                      Logical Or to combine multiple assertions.
+
+
+                                      This field is immutable once set.
+                                    items:
+                                      description: ActionAssertion defines the custom
+                                        assertions for evaluating the success or failure
+                                        of an action.
+                                      properties:
+                                        stderr:
+                                          description: |-
+                                            Specifies the stderr matcher for the action.
+
+
+                                            This field is immutable once set.
+                                          properties:
+                                            contains:
+                                              description: |-
+                                                The output of the action should contain the specified value.
+
+
+                                                This field is immutable once set.
+                                              type: string
+                                            equalTo:
+                                              description: |-
+                                                The output of the action should be equal to the specified value.
+
+
+                                                This field is immutable once set.
+                                              type: string
+                                          type: object
+                                        stdout:
+                                          description: |-
+                                            Specifies the stdout matcher for the action.
+
+
+                                            This field is immutable once set.
+                                          properties:
+                                            contains:
+                                              description: |-
+                                                The output of the action should contain the specified value.
+
+
+                                                This field is immutable once set.
+                                              type: string
+                                            equalTo:
+                                              description: |-
+                                                The output of the action should be equal to the specified value.
+
+
+                                                This field is immutable once set.
+                                              type: string
+                                          type: object
+                                        succeed:
+                                          description: |-
+                                            Whether the action should succeed or fail.
+
+
+                                            This field is immutable once set.
+                                          type: boolean
+                                      type: object
+                                    type: array
+                                  stderr:
+                                    description: |-
+                                      Specifies the stderr matcher for the action.
+
+
+                                      This field is immutable once set.
+                                    properties:
+                                      contains:
+                                        description: |-
+                                          The output of the action should contain the specified value.
+
+
+                                          This field is immutable once set.
+                                        type: string
+                                      equalTo:
+                                        description: |-
+                                          The output of the action should be equal to the specified value.
+
+
+                                          This field is immutable once set.
+                                        type: string
+                                    type: object
+                                  stdout:
+                                    description: |-
+                                      Specifies the stdout matcher for the action.
+
+
+                                      This field is immutable once set.
+                                    properties:
+                                      contains:
+                                        description: |-
+                                          The output of the action should contain the specified value.
+
+
+                                          This field is immutable once set.
+                                        type: string
+                                      equalTo:
+                                        description: |-
+                                          The output of the action should be equal to the specified value.
+
+
+                                          This field is immutable once set.
+                                        type: string
+                                    type: object
+                                  strict:
+                                    description: |-
+                                      Specifies whether apply the assertions strictly to all replicas.
+
+
+                                      This field is immutable once set.
+                                    type: boolean
+                                  succeed:
+                                    description: |-
+                                      Whether the action should succeed or fail.
+
+
+                                      This field is immutable once set.
+                                    type: boolean
+                                type: object
                             type: object
                           or:
                             description: |-
-                              Logical operator OR.
+                              Logical Or to combine multiple expressions.
 
 
                               This field is immutable once set.
                             items:
                               properties:
-                                stderr:
+                                all:
                                   description: |-
-                                    Specifies the stderr matcher for the action.
+                                    All replicas must satisfy the assertion.
 
 
                                     This field is immutable once set.
                                   properties:
-                                    contains:
+                                    and:
                                       description: |-
-                                        The output of the action should contain the specified value.
+                                        Logical And to combine multiple assertions.
 
 
                                         This field is immutable once set.
-                                      type: string
-                                    equalTo:
+                                      items:
+                                        description: ActionAssertion defines the custom
+                                          assertions for evaluating the success or
+                                          failure of an action.
+                                        properties:
+                                          stderr:
+                                            description: |-
+                                              Specifies the stderr matcher for the action.
+
+
+                                              This field is immutable once set.
+                                            properties:
+                                              contains:
+                                                description: |-
+                                                  The output of the action should contain the specified value.
+
+
+                                                  This field is immutable once set.
+                                                type: string
+                                              equalTo:
+                                                description: |-
+                                                  The output of the action should be equal to the specified value.
+
+
+                                                  This field is immutable once set.
+                                                type: string
+                                            type: object
+                                          stdout:
+                                            description: |-
+                                              Specifies the stdout matcher for the action.
+
+
+                                              This field is immutable once set.
+                                            properties:
+                                              contains:
+                                                description: |-
+                                                  The output of the action should contain the specified value.
+
+
+                                                  This field is immutable once set.
+                                                type: string
+                                              equalTo:
+                                                description: |-
+                                                  The output of the action should be equal to the specified value.
+
+
+                                                  This field is immutable once set.
+                                                type: string
+                                            type: object
+                                          succeed:
+                                            description: |-
+                                              Whether the action should succeed or fail.
+
+
+                                              This field is immutable once set.
+                                            type: boolean
+                                        type: object
+                                      type: array
+                                    not:
                                       description: |-
-                                        The output of the action should be equal to the specified value.
+                                        Logical Not to negate the assertions.
 
 
                                         This field is immutable once set.
-                                      type: string
+                                      properties:
+                                        stderr:
+                                          description: |-
+                                            Specifies the stderr matcher for the action.
+
+
+                                            This field is immutable once set.
+                                          properties:
+                                            contains:
+                                              description: |-
+                                                The output of the action should contain the specified value.
+
+
+                                                This field is immutable once set.
+                                              type: string
+                                            equalTo:
+                                              description: |-
+                                                The output of the action should be equal to the specified value.
+
+
+                                                This field is immutable once set.
+                                              type: string
+                                          type: object
+                                        stdout:
+                                          description: |-
+                                            Specifies the stdout matcher for the action.
+
+
+                                            This field is immutable once set.
+                                          properties:
+                                            contains:
+                                              description: |-
+                                                The output of the action should contain the specified value.
+
+
+                                                This field is immutable once set.
+                                              type: string
+                                            equalTo:
+                                              description: |-
+                                                The output of the action should be equal to the specified value.
+
+
+                                                This field is immutable once set.
+                                              type: string
+                                          type: object
+                                        succeed:
+                                          description: |-
+                                            Whether the action should succeed or fail.
+
+
+                                            This field is immutable once set.
+                                          type: boolean
+                                      type: object
+                                    or:
+                                      description: |-
+                                        Logical Or to combine multiple assertions.
+
+
+                                        This field is immutable once set.
+                                      items:
+                                        description: ActionAssertion defines the custom
+                                          assertions for evaluating the success or
+                                          failure of an action.
+                                        properties:
+                                          stderr:
+                                            description: |-
+                                              Specifies the stderr matcher for the action.
+
+
+                                              This field is immutable once set.
+                                            properties:
+                                              contains:
+                                                description: |-
+                                                  The output of the action should contain the specified value.
+
+
+                                                  This field is immutable once set.
+                                                type: string
+                                              equalTo:
+                                                description: |-
+                                                  The output of the action should be equal to the specified value.
+
+
+                                                  This field is immutable once set.
+                                                type: string
+                                            type: object
+                                          stdout:
+                                            description: |-
+                                              Specifies the stdout matcher for the action.
+
+
+                                              This field is immutable once set.
+                                            properties:
+                                              contains:
+                                                description: |-
+                                                  The output of the action should contain the specified value.
+
+
+                                                  This field is immutable once set.
+                                                type: string
+                                              equalTo:
+                                                description: |-
+                                                  The output of the action should be equal to the specified value.
+
+
+                                                  This field is immutable once set.
+                                                type: string
+                                            type: object
+                                          succeed:
+                                            description: |-
+                                              Whether the action should succeed or fail.
+
+
+                                              This field is immutable once set.
+                                            type: boolean
+                                        type: object
+                                      type: array
+                                    stderr:
+                                      description: |-
+                                        Specifies the stderr matcher for the action.
+
+
+                                        This field is immutable once set.
+                                      properties:
+                                        contains:
+                                          description: |-
+                                            The output of the action should contain the specified value.
+
+
+                                            This field is immutable once set.
+                                          type: string
+                                        equalTo:
+                                          description: |-
+                                            The output of the action should be equal to the specified value.
+
+
+                                            This field is immutable once set.
+                                          type: string
+                                      type: object
+                                    stdout:
+                                      description: |-
+                                        Specifies the stdout matcher for the action.
+
+
+                                        This field is immutable once set.
+                                      properties:
+                                        contains:
+                                          description: |-
+                                            The output of the action should contain the specified value.
+
+
+                                            This field is immutable once set.
+                                          type: string
+                                        equalTo:
+                                          description: |-
+                                            The output of the action should be equal to the specified value.
+
+
+                                            This field is immutable once set.
+                                          type: string
+                                      type: object
+                                    strict:
+                                      description: |-
+                                        Specifies whether apply the assertions strictly to all replicas.
+
+
+                                        This field is immutable once set.
+                                      type: boolean
+                                    succeed:
+                                      description: |-
+                                        Whether the action should succeed or fail.
+
+
+                                        This field is immutable once set.
+                                      type: boolean
                                   type: object
-                                stdout:
+                                any:
                                   description: |-
-                                    Specifies the stdout matcher for the action.
+                                    At least one replica must satisfy the assertion.
 
 
                                     This field is immutable once set.
                                   properties:
-                                    contains:
+                                    and:
                                       description: |-
-                                        The output of the action should contain the specified value.
+                                        Logical And to combine multiple assertions.
 
 
                                         This field is immutable once set.
-                                      type: string
-                                    equalTo:
+                                      items:
+                                        description: ActionAssertion defines the custom
+                                          assertions for evaluating the success or
+                                          failure of an action.
+                                        properties:
+                                          stderr:
+                                            description: |-
+                                              Specifies the stderr matcher for the action.
+
+
+                                              This field is immutable once set.
+                                            properties:
+                                              contains:
+                                                description: |-
+                                                  The output of the action should contain the specified value.
+
+
+                                                  This field is immutable once set.
+                                                type: string
+                                              equalTo:
+                                                description: |-
+                                                  The output of the action should be equal to the specified value.
+
+
+                                                  This field is immutable once set.
+                                                type: string
+                                            type: object
+                                          stdout:
+                                            description: |-
+                                              Specifies the stdout matcher for the action.
+
+
+                                              This field is immutable once set.
+                                            properties:
+                                              contains:
+                                                description: |-
+                                                  The output of the action should contain the specified value.
+
+
+                                                  This field is immutable once set.
+                                                type: string
+                                              equalTo:
+                                                description: |-
+                                                  The output of the action should be equal to the specified value.
+
+
+                                                  This field is immutable once set.
+                                                type: string
+                                            type: object
+                                          succeed:
+                                            description: |-
+                                              Whether the action should succeed or fail.
+
+
+                                              This field is immutable once set.
+                                            type: boolean
+                                        type: object
+                                      type: array
+                                    not:
                                       description: |-
-                                        The output of the action should be equal to the specified value.
+                                        Logical Not to negate the assertions.
 
 
                                         This field is immutable once set.
-                                      type: string
+                                      properties:
+                                        stderr:
+                                          description: |-
+                                            Specifies the stderr matcher for the action.
+
+
+                                            This field is immutable once set.
+                                          properties:
+                                            contains:
+                                              description: |-
+                                                The output of the action should contain the specified value.
+
+
+                                                This field is immutable once set.
+                                              type: string
+                                            equalTo:
+                                              description: |-
+                                                The output of the action should be equal to the specified value.
+
+
+                                                This field is immutable once set.
+                                              type: string
+                                          type: object
+                                        stdout:
+                                          description: |-
+                                            Specifies the stdout matcher for the action.
+
+
+                                            This field is immutable once set.
+                                          properties:
+                                            contains:
+                                              description: |-
+                                                The output of the action should contain the specified value.
+
+
+                                                This field is immutable once set.
+                                              type: string
+                                            equalTo:
+                                              description: |-
+                                                The output of the action should be equal to the specified value.
+
+
+                                                This field is immutable once set.
+                                              type: string
+                                          type: object
+                                        succeed:
+                                          description: |-
+                                            Whether the action should succeed or fail.
+
+
+                                            This field is immutable once set.
+                                          type: boolean
+                                      type: object
+                                    or:
+                                      description: |-
+                                        Logical Or to combine multiple assertions.
+
+
+                                        This field is immutable once set.
+                                      items:
+                                        description: ActionAssertion defines the custom
+                                          assertions for evaluating the success or
+                                          failure of an action.
+                                        properties:
+                                          stderr:
+                                            description: |-
+                                              Specifies the stderr matcher for the action.
+
+
+                                              This field is immutable once set.
+                                            properties:
+                                              contains:
+                                                description: |-
+                                                  The output of the action should contain the specified value.
+
+
+                                                  This field is immutable once set.
+                                                type: string
+                                              equalTo:
+                                                description: |-
+                                                  The output of the action should be equal to the specified value.
+
+
+                                                  This field is immutable once set.
+                                                type: string
+                                            type: object
+                                          stdout:
+                                            description: |-
+                                              Specifies the stdout matcher for the action.
+
+
+                                              This field is immutable once set.
+                                            properties:
+                                              contains:
+                                                description: |-
+                                                  The output of the action should contain the specified value.
+
+
+                                                  This field is immutable once set.
+                                                type: string
+                                              equalTo:
+                                                description: |-
+                                                  The output of the action should be equal to the specified value.
+
+
+                                                  This field is immutable once set.
+                                                type: string
+                                            type: object
+                                          succeed:
+                                            description: |-
+                                              Whether the action should succeed or fail.
+
+
+                                              This field is immutable once set.
+                                            type: boolean
+                                        type: object
+                                      type: array
+                                    stderr:
+                                      description: |-
+                                        Specifies the stderr matcher for the action.
+
+
+                                        This field is immutable once set.
+                                      properties:
+                                        contains:
+                                          description: |-
+                                            The output of the action should contain the specified value.
+
+
+                                            This field is immutable once set.
+                                          type: string
+                                        equalTo:
+                                          description: |-
+                                            The output of the action should be equal to the specified value.
+
+
+                                            This field is immutable once set.
+                                          type: string
+                                      type: object
+                                    stdout:
+                                      description: |-
+                                        Specifies the stdout matcher for the action.
+
+
+                                        This field is immutable once set.
+                                      properties:
+                                        contains:
+                                          description: |-
+                                            The output of the action should contain the specified value.
+
+
+                                            This field is immutable once set.
+                                          type: string
+                                        equalTo:
+                                          description: |-
+                                            The output of the action should be equal to the specified value.
+
+
+                                            This field is immutable once set.
+                                          type: string
+                                      type: object
+                                    strict:
+                                      description: |-
+                                        Specifies whether apply the assertions strictly to all replicas.
+
+
+                                        This field is immutable once set.
+                                      type: boolean
+                                    succeed:
+                                      description: |-
+                                        Whether the action should succeed or fail.
+
+
+                                        This field is immutable once set.
+                                      type: boolean
                                   type: object
-                                strict:
+                                majority:
                                   description: |-
-                                    Specifies whether apply the aggregation conditions strictly to all replicas.
+                                    Majority replicas must satisfy the assertion.
 
 
                                     This field is immutable once set.
-                                  type: boolean
-                                succeed:
+                                  properties:
+                                    and:
+                                      description: |-
+                                        Logical And to combine multiple assertions.
+
+
+                                        This field is immutable once set.
+                                      items:
+                                        description: ActionAssertion defines the custom
+                                          assertions for evaluating the success or
+                                          failure of an action.
+                                        properties:
+                                          stderr:
+                                            description: |-
+                                              Specifies the stderr matcher for the action.
+
+
+                                              This field is immutable once set.
+                                            properties:
+                                              contains:
+                                                description: |-
+                                                  The output of the action should contain the specified value.
+
+
+                                                  This field is immutable once set.
+                                                type: string
+                                              equalTo:
+                                                description: |-
+                                                  The output of the action should be equal to the specified value.
+
+
+                                                  This field is immutable once set.
+                                                type: string
+                                            type: object
+                                          stdout:
+                                            description: |-
+                                              Specifies the stdout matcher for the action.
+
+
+                                              This field is immutable once set.
+                                            properties:
+                                              contains:
+                                                description: |-
+                                                  The output of the action should contain the specified value.
+
+
+                                                  This field is immutable once set.
+                                                type: string
+                                              equalTo:
+                                                description: |-
+                                                  The output of the action should be equal to the specified value.
+
+
+                                                  This field is immutable once set.
+                                                type: string
+                                            type: object
+                                          succeed:
+                                            description: |-
+                                              Whether the action should succeed or fail.
+
+
+                                              This field is immutable once set.
+                                            type: boolean
+                                        type: object
+                                      type: array
+                                    not:
+                                      description: |-
+                                        Logical Not to negate the assertions.
+
+
+                                        This field is immutable once set.
+                                      properties:
+                                        stderr:
+                                          description: |-
+                                            Specifies the stderr matcher for the action.
+
+
+                                            This field is immutable once set.
+                                          properties:
+                                            contains:
+                                              description: |-
+                                                The output of the action should contain the specified value.
+
+
+                                                This field is immutable once set.
+                                              type: string
+                                            equalTo:
+                                              description: |-
+                                                The output of the action should be equal to the specified value.
+
+
+                                                This field is immutable once set.
+                                              type: string
+                                          type: object
+                                        stdout:
+                                          description: |-
+                                            Specifies the stdout matcher for the action.
+
+
+                                            This field is immutable once set.
+                                          properties:
+                                            contains:
+                                              description: |-
+                                                The output of the action should contain the specified value.
+
+
+                                                This field is immutable once set.
+                                              type: string
+                                            equalTo:
+                                              description: |-
+                                                The output of the action should be equal to the specified value.
+
+
+                                                This field is immutable once set.
+                                              type: string
+                                          type: object
+                                        succeed:
+                                          description: |-
+                                            Whether the action should succeed or fail.
+
+
+                                            This field is immutable once set.
+                                          type: boolean
+                                      type: object
+                                    or:
+                                      description: |-
+                                        Logical Or to combine multiple assertions.
+
+
+                                        This field is immutable once set.
+                                      items:
+                                        description: ActionAssertion defines the custom
+                                          assertions for evaluating the success or
+                                          failure of an action.
+                                        properties:
+                                          stderr:
+                                            description: |-
+                                              Specifies the stderr matcher for the action.
+
+
+                                              This field is immutable once set.
+                                            properties:
+                                              contains:
+                                                description: |-
+                                                  The output of the action should contain the specified value.
+
+
+                                                  This field is immutable once set.
+                                                type: string
+                                              equalTo:
+                                                description: |-
+                                                  The output of the action should be equal to the specified value.
+
+
+                                                  This field is immutable once set.
+                                                type: string
+                                            type: object
+                                          stdout:
+                                            description: |-
+                                              Specifies the stdout matcher for the action.
+
+
+                                              This field is immutable once set.
+                                            properties:
+                                              contains:
+                                                description: |-
+                                                  The output of the action should contain the specified value.
+
+
+                                                  This field is immutable once set.
+                                                type: string
+                                              equalTo:
+                                                description: |-
+                                                  The output of the action should be equal to the specified value.
+
+
+                                                  This field is immutable once set.
+                                                type: string
+                                            type: object
+                                          succeed:
+                                            description: |-
+                                              Whether the action should succeed or fail.
+
+
+                                              This field is immutable once set.
+                                            type: boolean
+                                        type: object
+                                      type: array
+                                    stderr:
+                                      description: |-
+                                        Specifies the stderr matcher for the action.
+
+
+                                        This field is immutable once set.
+                                      properties:
+                                        contains:
+                                          description: |-
+                                            The output of the action should contain the specified value.
+
+
+                                            This field is immutable once set.
+                                          type: string
+                                        equalTo:
+                                          description: |-
+                                            The output of the action should be equal to the specified value.
+
+
+                                            This field is immutable once set.
+                                          type: string
+                                      type: object
+                                    stdout:
+                                      description: |-
+                                        Specifies the stdout matcher for the action.
+
+
+                                        This field is immutable once set.
+                                      properties:
+                                        contains:
+                                          description: |-
+                                            The output of the action should contain the specified value.
+
+
+                                            This field is immutable once set.
+                                          type: string
+                                        equalTo:
+                                          description: |-
+                                            The output of the action should be equal to the specified value.
+
+
+                                            This field is immutable once set.
+                                          type: string
+                                      type: object
+                                    strict:
+                                      description: |-
+                                        Specifies whether apply the assertions strictly to all replicas.
+
+
+                                        This field is immutable once set.
+                                      type: boolean
+                                    succeed:
+                                      description: |-
+                                        Whether the action should succeed or fail.
+
+
+                                        This field is immutable once set.
+                                      type: boolean
+                                  type: object
+                                none:
                                   description: |-
-                                    Whether the action should succeed or fail.
+                                    None of the replicas must satisfy the assertion.
 
 
                                     This field is immutable once set.
-                                  type: boolean
+                                  properties:
+                                    and:
+                                      description: |-
+                                        Logical And to combine multiple assertions.
+
+
+                                        This field is immutable once set.
+                                      items:
+                                        description: ActionAssertion defines the custom
+                                          assertions for evaluating the success or
+                                          failure of an action.
+                                        properties:
+                                          stderr:
+                                            description: |-
+                                              Specifies the stderr matcher for the action.
+
+
+                                              This field is immutable once set.
+                                            properties:
+                                              contains:
+                                                description: |-
+                                                  The output of the action should contain the specified value.
+
+
+                                                  This field is immutable once set.
+                                                type: string
+                                              equalTo:
+                                                description: |-
+                                                  The output of the action should be equal to the specified value.
+
+
+                                                  This field is immutable once set.
+                                                type: string
+                                            type: object
+                                          stdout:
+                                            description: |-
+                                              Specifies the stdout matcher for the action.
+
+
+                                              This field is immutable once set.
+                                            properties:
+                                              contains:
+                                                description: |-
+                                                  The output of the action should contain the specified value.
+
+
+                                                  This field is immutable once set.
+                                                type: string
+                                              equalTo:
+                                                description: |-
+                                                  The output of the action should be equal to the specified value.
+
+
+                                                  This field is immutable once set.
+                                                type: string
+                                            type: object
+                                          succeed:
+                                            description: |-
+                                              Whether the action should succeed or fail.
+
+
+                                              This field is immutable once set.
+                                            type: boolean
+                                        type: object
+                                      type: array
+                                    not:
+                                      description: |-
+                                        Logical Not to negate the assertions.
+
+
+                                        This field is immutable once set.
+                                      properties:
+                                        stderr:
+                                          description: |-
+                                            Specifies the stderr matcher for the action.
+
+
+                                            This field is immutable once set.
+                                          properties:
+                                            contains:
+                                              description: |-
+                                                The output of the action should contain the specified value.
+
+
+                                                This field is immutable once set.
+                                              type: string
+                                            equalTo:
+                                              description: |-
+                                                The output of the action should be equal to the specified value.
+
+
+                                                This field is immutable once set.
+                                              type: string
+                                          type: object
+                                        stdout:
+                                          description: |-
+                                            Specifies the stdout matcher for the action.
+
+
+                                            This field is immutable once set.
+                                          properties:
+                                            contains:
+                                              description: |-
+                                                The output of the action should contain the specified value.
+
+
+                                                This field is immutable once set.
+                                              type: string
+                                            equalTo:
+                                              description: |-
+                                                The output of the action should be equal to the specified value.
+
+
+                                                This field is immutable once set.
+                                              type: string
+                                          type: object
+                                        succeed:
+                                          description: |-
+                                            Whether the action should succeed or fail.
+
+
+                                            This field is immutable once set.
+                                          type: boolean
+                                      type: object
+                                    or:
+                                      description: |-
+                                        Logical Or to combine multiple assertions.
+
+
+                                        This field is immutable once set.
+                                      items:
+                                        description: ActionAssertion defines the custom
+                                          assertions for evaluating the success or
+                                          failure of an action.
+                                        properties:
+                                          stderr:
+                                            description: |-
+                                              Specifies the stderr matcher for the action.
+
+
+                                              This field is immutable once set.
+                                            properties:
+                                              contains:
+                                                description: |-
+                                                  The output of the action should contain the specified value.
+
+
+                                                  This field is immutable once set.
+                                                type: string
+                                              equalTo:
+                                                description: |-
+                                                  The output of the action should be equal to the specified value.
+
+
+                                                  This field is immutable once set.
+                                                type: string
+                                            type: object
+                                          stdout:
+                                            description: |-
+                                              Specifies the stdout matcher for the action.
+
+
+                                              This field is immutable once set.
+                                            properties:
+                                              contains:
+                                                description: |-
+                                                  The output of the action should contain the specified value.
+
+
+                                                  This field is immutable once set.
+                                                type: string
+                                              equalTo:
+                                                description: |-
+                                                  The output of the action should be equal to the specified value.
+
+
+                                                  This field is immutable once set.
+                                                type: string
+                                            type: object
+                                          succeed:
+                                            description: |-
+                                              Whether the action should succeed or fail.
+
+
+                                              This field is immutable once set.
+                                            type: boolean
+                                        type: object
+                                      type: array
+                                    stderr:
+                                      description: |-
+                                        Specifies the stderr matcher for the action.
+
+
+                                        This field is immutable once set.
+                                      properties:
+                                        contains:
+                                          description: |-
+                                            The output of the action should contain the specified value.
+
+
+                                            This field is immutable once set.
+                                          type: string
+                                        equalTo:
+                                          description: |-
+                                            The output of the action should be equal to the specified value.
+
+
+                                            This field is immutable once set.
+                                          type: string
+                                      type: object
+                                    stdout:
+                                      description: |-
+                                        Specifies the stdout matcher for the action.
+
+
+                                        This field is immutable once set.
+                                      properties:
+                                        contains:
+                                          description: |-
+                                            The output of the action should contain the specified value.
+
+
+                                            This field is immutable once set.
+                                          type: string
+                                        equalTo:
+                                          description: |-
+                                            The output of the action should be equal to the specified value.
+
+
+                                            This field is immutable once set.
+                                          type: string
+                                      type: object
+                                    strict:
+                                      description: |-
+                                        Specifies whether apply the assertions strictly to all replicas.
+
+
+                                        This field is immutable once set.
+                                      type: boolean
+                                    succeed:
+                                      description: |-
+                                        Whether the action should succeed or fail.
+
+
+                                        This field is immutable once set.
+                                      type: boolean
+                                  type: object
                               type: object
                             type: array
                         type: object
+                      description:
+                        description: A brief description for the condition when the
+                          component is available.
+                        type: string
                       timeWindowSeconds:
                         description: This field is immutable once set.
                         format: int32

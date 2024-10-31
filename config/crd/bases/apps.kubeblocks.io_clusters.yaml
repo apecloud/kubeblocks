@@ -20,12 +20,8 @@ spec:
   versions:
   - additionalPrinterColumns:
     - description: ClusterDefinition referenced by cluster.
-      jsonPath: .spec.clusterDefinitionRef
+      jsonPath: .spec.clusterDef
       name: CLUSTER-DEFINITION
-      type: string
-    - description: Cluster Application Version.
-      jsonPath: .spec.clusterVersionRef
-      name: VERSION
       type: string
     - description: Cluster termination policy.
       jsonPath: .spec.terminationPolicy

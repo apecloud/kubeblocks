@@ -67,41 +67,31 @@ var _ = Describe("Available", func() {
 							TimeWindowSeconds: &availableTimeWindow,
 							// has the leader, and majority replicas have roles
 							Condition: &appsv1.ComponentAvailableCondition{
-								And: []appsv1.ComponentAvailableConditionX{
+								And: []appsv1.ComponentAvailableExpression{
 									{
-										ComponentAvailableCondition: appsv1.ComponentAvailableCondition{
-											Majority: &appsv1.ComponentAvailableConditionX{
-												ComponentAvailableCondition: appsv1.ComponentAvailableCondition{
-													Or: []appsv1.ComponentAvailableConditionX{
-														{
-															ActionCriteria: appsv1.ActionCriteria{
-																Succeed: pointer.Bool(true),
-																Stdout: &appsv1.ActionOutputMatcher{
-																	EqualTo: pointer.String("leader"),
-																},
-															},
-														},
-														{
-															ActionCriteria: appsv1.ActionCriteria{
-																Succeed: pointer.Bool(true),
-																Stdout: &appsv1.ActionOutputMatcher{
-																	EqualTo: pointer.String("follower"),
-																},
-															},
-														},
+										Majority: &appsv1.ComponentAvailableProbeAssertion{
+											Or: []appsv1.ActionAssertion{
+												{
+													Succeed: pointer.Bool(true),
+													Stdout: &appsv1.ActionOutputMatcher{
+														EqualTo: pointer.String("leader"),
+													},
+												},
+												{
+													Succeed: pointer.Bool(true),
+													Stdout: &appsv1.ActionOutputMatcher{
+														EqualTo: pointer.String("follower"),
 													},
 												},
 											},
 										},
 									},
 									{
-										ComponentAvailableCondition: appsv1.ComponentAvailableCondition{
-											Any: &appsv1.ComponentAvailableConditionX{
-												ActionCriteria: appsv1.ActionCriteria{
-													Succeed: pointer.Bool(true),
-													Stdout: &appsv1.ActionOutputMatcher{
-														EqualTo: pointer.String("leader"),
-													},
+										Any: &appsv1.ComponentAvailableProbeAssertion{
+											ActionAssertion: appsv1.ActionAssertion{
+												Succeed: pointer.Bool(true),
+												Stdout: &appsv1.ActionOutputMatcher{
+													EqualTo: pointer.String("leader"),
 												},
 											},
 										},
@@ -140,11 +130,11 @@ var _ = Describe("Available", func() {
 			}
 		}()
 
-		statusMessageWithProbeEvents := func(events []probeEvent) {
+		annotationWithProbeEvents := func(events []probeEvent) {
 			message, ok := json.Marshal(&events)
 			Expect(ok).Should(BeNil())
-			comp.Status.Message = map[string]string{
-				availableProbeEvents: string(message),
+			comp.Annotations = map[string]string{
+				availableProbeEventKey: string(message),
 			}
 		}
 
@@ -165,7 +155,7 @@ var _ = Describe("Available", func() {
 		It("ok", func() {
 			h := &AvailableEventHandler{}
 
-			statusMessageWithProbeEvents([]probeEvent{
+			annotationWithProbeEvents([]probeEvent{
 				{
 					PodName:   "test-cluster-comp-0",
 					Timestamp: time.Now().Add(-5 * time.Second),
@@ -202,7 +192,7 @@ var _ = Describe("Available", func() {
 		It("duplicate events", func() {
 			h := &AvailableEventHandler{}
 
-			statusMessageWithProbeEvents([]probeEvent{
+			annotationWithProbeEvents([]probeEvent{
 				{
 					PodName:   "test-cluster-comp-0",
 					Timestamp: time.Now().Add(-5 * time.Second),
@@ -236,7 +226,7 @@ var _ = Describe("Available", func() {
 		It("event expired", func() {
 			h := &AvailableEventHandler{}
 
-			statusMessageWithProbeEvents([]probeEvent{
+			annotationWithProbeEvents([]probeEvent{
 				{
 					PodName:   "test-cluster-comp-0",
 					Timestamp: time.Now().Add(-15 * time.Second), // expired
@@ -270,7 +260,7 @@ var _ = Describe("Available", func() {
 		It("has new event and keep", func() {
 			h := &AvailableEventHandler{}
 
-			statusMessageWithProbeEvents([]probeEvent{
+			annotationWithProbeEvents([]probeEvent{
 				{
 					PodName:   "test-cluster-comp-0",
 					Timestamp: time.Now().Add(-5 * time.Second),
@@ -301,10 +291,10 @@ var _ = Describe("Available", func() {
 			Expect(*available).Should(BeTrue())
 		})
 
-		It("status message", func() {
+		It("probe event in annotation", func() {
 			h := &AvailableEventHandler{}
 
-			statusMessageWithProbeEvents([]probeEvent{
+			annotationWithProbeEvents([]probeEvent{
 				{
 					PodName:   "test-cluster-comp-0",
 					Timestamp: time.Now().Add(-5 * time.Second),
@@ -312,9 +302,9 @@ var _ = Describe("Available", func() {
 					Stdout:    []byte("leader"),
 				},
 			})
-			Expect(comp.Status.Message).ShouldNot(BeNil())
-			Expect(comp.Status.Message[availableProbeEvents]).ShouldNot(BeEmpty())
-			message := comp.Status.Message[availableProbeEvents]
+			Expect(comp.Annotations).ShouldNot(BeNil())
+			Expect(comp.Annotations[availableProbeEventKey]).ShouldNot(BeEmpty())
+			message := comp.Annotations[availableProbeEventKey]
 
 			event := probeEvent{
 				PodName:   "test-cluster-comp-2",
@@ -326,9 +316,9 @@ var _ = Describe("Available", func() {
 			Expect(err).Should(Succeed())
 			Expect(*available).Should(BeTrue())
 
-			Expect(comp.Status.Message[availableProbeEvents]).ShouldNot(Equal(message))
+			Expect(comp.Annotations[availableProbeEventKey]).ShouldNot(Equal(message))
 			events := make([]probeEvent, 0)
-			Expect(json.Unmarshal([]byte(comp.Status.Message[availableProbeEvents]), &events)).Should(Succeed())
+			Expect(json.Unmarshal([]byte(comp.Annotations[availableProbeEventKey]), &events)).Should(Succeed())
 			Expect(events).Should(HaveLen(2))
 			Expect(events[0].PodName).Should(Or(Equal("test-cluster-comp-0"), Equal("test-cluster-comp-2")))
 			Expect(events[1].PodName).Should(Or(Equal("test-cluster-comp-0"), Equal("test-cluster-comp-2")))
@@ -339,31 +329,27 @@ var _ = Describe("Available", func() {
 
 			// all has leader or follower
 			compDef.Spec.Available.WithProbe.Condition = &appsv1.ComponentAvailableCondition{
-				All: &appsv1.ComponentAvailableConditionX{
-					ComponentAvailableCondition: appsv1.ComponentAvailableCondition{
-						Or: []appsv1.ComponentAvailableConditionX{
+				ComponentAvailableExpression: appsv1.ComponentAvailableExpression{
+					All: &appsv1.ComponentAvailableProbeAssertion{
+						Or: []appsv1.ActionAssertion{
 							{
-								ActionCriteria: appsv1.ActionCriteria{
-									Succeed: pointer.Bool(true),
-									Stdout: &appsv1.ActionOutputMatcher{
-										EqualTo: pointer.String("leader"),
-									},
+								Succeed: pointer.Bool(true),
+								Stdout: &appsv1.ActionOutputMatcher{
+									EqualTo: pointer.String("leader"),
 								},
 							},
 							{
-								ActionCriteria: appsv1.ActionCriteria{
-									Succeed: pointer.Bool(true),
-									Stdout: &appsv1.ActionOutputMatcher{
-										EqualTo: pointer.String("follower"),
-									},
+								Succeed: pointer.Bool(true),
+								Stdout: &appsv1.ActionOutputMatcher{
+									EqualTo: pointer.String("follower"),
 								},
 							},
 						},
+						Strict: pointer.Bool(true),
 					},
-					Strict: pointer.Bool(true),
 				},
 			}
-			statusMessageWithProbeEvents([]probeEvent{
+			annotationWithProbeEvents([]probeEvent{
 				{
 					PodName:   "test-cluster-comp-0",
 					Timestamp: time.Now().Add(-5 * time.Second),
@@ -396,7 +382,7 @@ var _ = Describe("Available", func() {
 		It("deleted replicas - available", func() {
 			h := &AvailableEventHandler{}
 
-			statusMessageWithProbeEvents([]probeEvent{
+			annotationWithProbeEvents([]probeEvent{
 				{
 					PodName:   "test-cluster-comp-0",
 					Timestamp: time.Now().Add(-5 * time.Second),
@@ -430,7 +416,7 @@ var _ = Describe("Available", func() {
 		It("deleted replicas - unavailable", func() {
 			h := &AvailableEventHandler{}
 
-			statusMessageWithProbeEvents([]probeEvent{
+			annotationWithProbeEvents([]probeEvent{
 				{
 					PodName:   "test-cluster-comp-0",
 					Timestamp: time.Now().Add(-5 * time.Second),
@@ -456,14 +442,16 @@ var _ = Describe("Available", func() {
 		})
 	})
 
-	Context("evaluate condition", func() {
+	Context("eval condition", func() {
 		It("all succeed - ok", func() {
 			h := &AvailableEventHandler{}
 
 			cond := appsv1.ComponentAvailableCondition{
-				All: &appsv1.ComponentAvailableConditionX{
-					ActionCriteria: appsv1.ActionCriteria{
-						Succeed: pointer.Bool(true),
+				ComponentAvailableExpression: appsv1.ComponentAvailableExpression{
+					All: &appsv1.ComponentAvailableProbeAssertion{
+						ActionAssertion: appsv1.ActionAssertion{
+							Succeed: pointer.Bool(true),
+						},
 					},
 				},
 			}
@@ -481,7 +469,7 @@ var _ = Describe("Available", func() {
 					Stdout: []byte("ok"),
 				},
 			}
-			available, _ := h.evaluateCondition(cond, 1, events)
+			available, _ := h.evalCond(cond, 1, events)
 			Expect(available).Should(BeTrue())
 		})
 
@@ -489,9 +477,11 @@ var _ = Describe("Available", func() {
 			h := &AvailableEventHandler{}
 
 			cond := appsv1.ComponentAvailableCondition{
-				All: &appsv1.ComponentAvailableConditionX{
-					ActionCriteria: appsv1.ActionCriteria{
-						Succeed: pointer.Bool(true),
+				ComponentAvailableExpression: appsv1.ComponentAvailableExpression{
+					All: &appsv1.ComponentAvailableProbeAssertion{
+						ActionAssertion: appsv1.ActionAssertion{
+							Succeed: pointer.Bool(true),
+						},
 					},
 				},
 			}
@@ -509,7 +499,7 @@ var _ = Describe("Available", func() {
 					Stderr: []byte("command not found"),
 				},
 			}
-			available, _ := h.evaluateCondition(cond, 1, events)
+			available, _ := h.evalCond(cond, 1, events)
 			Expect(available).Should(BeFalse())
 		})
 
@@ -517,11 +507,13 @@ var _ = Describe("Available", func() {
 			h := &AvailableEventHandler{}
 
 			cond := appsv1.ComponentAvailableCondition{
-				Any: &appsv1.ComponentAvailableConditionX{
-					ActionCriteria: appsv1.ActionCriteria{
-						Succeed: pointer.Bool(true),
-						Stdout: &appsv1.ActionOutputMatcher{
-							EqualTo: pointer.String("leader"),
+				ComponentAvailableExpression: appsv1.ComponentAvailableExpression{
+					Any: &appsv1.ComponentAvailableProbeAssertion{
+						ActionAssertion: appsv1.ActionAssertion{
+							Succeed: pointer.Bool(true),
+							Stdout: &appsv1.ActionOutputMatcher{
+								EqualTo: pointer.String("leader"),
+							},
 						},
 					},
 				},
@@ -540,7 +532,7 @@ var _ = Describe("Available", func() {
 					Stderr: []byte("host is unreachable"),
 				},
 			}
-			available, _ := h.evaluateCondition(cond, 1, events)
+			available, _ := h.evalCond(cond, 1, events)
 			Expect(available).Should(BeTrue())
 		})
 
@@ -548,11 +540,13 @@ var _ = Describe("Available", func() {
 			h := &AvailableEventHandler{}
 
 			cond := appsv1.ComponentAvailableCondition{
-				Any: &appsv1.ComponentAvailableConditionX{
-					ActionCriteria: appsv1.ActionCriteria{
-						Succeed: pointer.Bool(true),
-						Stdout: &appsv1.ActionOutputMatcher{
-							EqualTo: pointer.String("leader"),
+				ComponentAvailableExpression: appsv1.ComponentAvailableExpression{
+					Any: &appsv1.ComponentAvailableProbeAssertion{
+						ActionAssertion: appsv1.ActionAssertion{
+							Succeed: pointer.Bool(true),
+							Stdout: &appsv1.ActionOutputMatcher{
+								EqualTo: pointer.String("leader"),
+							},
 						},
 					},
 				},
@@ -571,7 +565,7 @@ var _ = Describe("Available", func() {
 					Stderr: []byte("operation is timed-out"),
 				},
 			}
-			available, _ := h.evaluateCondition(cond, 1, events)
+			available, _ := h.evalCond(cond, 1, events)
 			Expect(available).Should(BeFalse())
 		})
 
@@ -579,41 +573,31 @@ var _ = Describe("Available", func() {
 			h := &AvailableEventHandler{}
 
 			cond := appsv1.ComponentAvailableCondition{
-				And: []appsv1.ComponentAvailableConditionX{
+				And: []appsv1.ComponentAvailableExpression{
 					{
-						ComponentAvailableCondition: appsv1.ComponentAvailableCondition{
-							Majority: &appsv1.ComponentAvailableConditionX{
-								ComponentAvailableCondition: appsv1.ComponentAvailableCondition{
-									Or: []appsv1.ComponentAvailableConditionX{
-										{
-											ActionCriteria: appsv1.ActionCriteria{
-												Succeed: pointer.Bool(true),
-												Stdout: &appsv1.ActionOutputMatcher{
-													EqualTo: pointer.String("leader"),
-												},
-											},
-										},
-										{
-											ActionCriteria: appsv1.ActionCriteria{
-												Succeed: pointer.Bool(true),
-												Stdout: &appsv1.ActionOutputMatcher{
-													EqualTo: pointer.String("follower"),
-												},
-											},
-										},
+						Majority: &appsv1.ComponentAvailableProbeAssertion{
+							Or: []appsv1.ActionAssertion{
+								{
+									Succeed: pointer.Bool(true),
+									Stdout: &appsv1.ActionOutputMatcher{
+										EqualTo: pointer.String("leader"),
+									},
+								},
+								{
+									Succeed: pointer.Bool(true),
+									Stdout: &appsv1.ActionOutputMatcher{
+										EqualTo: pointer.String("follower"),
 									},
 								},
 							},
 						},
 					},
 					{
-						ComponentAvailableCondition: appsv1.ComponentAvailableCondition{
-							Any: &appsv1.ComponentAvailableConditionX{
-								ActionCriteria: appsv1.ActionCriteria{
-									Succeed: pointer.Bool(true),
-									Stdout: &appsv1.ActionOutputMatcher{
-										EqualTo: pointer.String("leader"),
-									},
+						Any: &appsv1.ComponentAvailableProbeAssertion{
+							ActionAssertion: appsv1.ActionAssertion{
+								Succeed: pointer.Bool(true),
+								Stdout: &appsv1.ActionOutputMatcher{
+									EqualTo: pointer.String("leader"),
 								},
 							},
 						},
@@ -634,7 +618,7 @@ var _ = Describe("Available", func() {
 					Stdout: []byte("follower"),
 				},
 			}
-			available, _ := h.evaluateCondition(cond, 1, events)
+			available, _ := h.evalCond(cond, 1, events)
 			Expect(available).Should(BeTrue())
 		})
 
@@ -642,41 +626,31 @@ var _ = Describe("Available", func() {
 			h := &AvailableEventHandler{}
 
 			cond := appsv1.ComponentAvailableCondition{
-				And: []appsv1.ComponentAvailableConditionX{
+				And: []appsv1.ComponentAvailableExpression{
 					{
-						ComponentAvailableCondition: appsv1.ComponentAvailableCondition{
-							Majority: &appsv1.ComponentAvailableConditionX{
-								ComponentAvailableCondition: appsv1.ComponentAvailableCondition{
-									Or: []appsv1.ComponentAvailableConditionX{
-										{
-											ActionCriteria: appsv1.ActionCriteria{
-												Succeed: pointer.Bool(true),
-												Stdout: &appsv1.ActionOutputMatcher{
-													EqualTo: pointer.String("leader"),
-												},
-											},
-										},
-										{
-											ActionCriteria: appsv1.ActionCriteria{
-												Succeed: pointer.Bool(true),
-												Stdout: &appsv1.ActionOutputMatcher{
-													EqualTo: pointer.String("follower"),
-												},
-											},
-										},
+						Majority: &appsv1.ComponentAvailableProbeAssertion{
+							Or: []appsv1.ActionAssertion{
+								{
+									Succeed: pointer.Bool(true),
+									Stdout: &appsv1.ActionOutputMatcher{
+										EqualTo: pointer.String("leader"),
+									},
+								},
+								{
+									Succeed: pointer.Bool(true),
+									Stdout: &appsv1.ActionOutputMatcher{
+										EqualTo: pointer.String("follower"),
 									},
 								},
 							},
 						},
 					},
 					{
-						ComponentAvailableCondition: appsv1.ComponentAvailableCondition{
-							Any: &appsv1.ComponentAvailableConditionX{
-								ActionCriteria: appsv1.ActionCriteria{
-									Succeed: pointer.Bool(true),
-									Stdout: &appsv1.ActionOutputMatcher{
-										EqualTo: pointer.String("leader"),
-									},
+						Any: &appsv1.ComponentAvailableProbeAssertion{
+							ActionAssertion: appsv1.ActionAssertion{
+								Succeed: pointer.Bool(true),
+								Stdout: &appsv1.ActionOutputMatcher{
+									EqualTo: pointer.String("leader"),
 								},
 							},
 						},
@@ -697,7 +671,7 @@ var _ = Describe("Available", func() {
 					Stdout: []byte("learner"),
 				},
 			}
-			available, _ := h.evaluateCondition(cond, 1, events)
+			available, _ := h.evalCond(cond, 1, events)
 			Expect(available).Should(BeFalse())
 		})
 
@@ -705,26 +679,22 @@ var _ = Describe("Available", func() {
 			h := &AvailableEventHandler{}
 
 			cond := appsv1.ComponentAvailableCondition{
-				And: []appsv1.ComponentAvailableConditionX{
+				And: []appsv1.ComponentAvailableExpression{
 					{
-						ComponentAvailableCondition: appsv1.ComponentAvailableCondition{
-							Any: &appsv1.ComponentAvailableConditionX{
-								ActionCriteria: appsv1.ActionCriteria{
-									Succeed: pointer.Bool(true),
-									Stdout: &appsv1.ActionOutputMatcher{
-										EqualTo: pointer.String("leader"),
-									},
+						Any: &appsv1.ComponentAvailableProbeAssertion{
+							ActionAssertion: appsv1.ActionAssertion{
+								Succeed: pointer.Bool(true),
+								Stdout: &appsv1.ActionOutputMatcher{
+									EqualTo: pointer.String("leader"),
 								},
 							},
 						},
 					},
 					{
-						ComponentAvailableCondition: appsv1.ComponentAvailableCondition{
-							None: &appsv1.ComponentAvailableConditionX{
-								ActionCriteria: appsv1.ActionCriteria{
-									Stderr: &appsv1.ActionOutputMatcher{
-										Contains: pointer.String("FATAL"),
-									},
+						None: &appsv1.ComponentAvailableProbeAssertion{
+							ActionAssertion: appsv1.ActionAssertion{
+								Stderr: &appsv1.ActionOutputMatcher{
+									Contains: pointer.String("FATAL"),
 								},
 							},
 						},
@@ -745,7 +715,7 @@ var _ = Describe("Available", func() {
 					Stderr: []byte("[xxxx] FATAL: detected data is conrputed at offset 0x1234"),
 				},
 			}
-			available, _ := h.evaluateCondition(cond, 1, events)
+			available, _ := h.evalCond(cond, 1, events)
 			Expect(available).Should(BeFalse())
 		})
 	})

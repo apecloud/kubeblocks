@@ -43,10 +43,10 @@ kubectl get crd -o name | grep kubeblocks.io | xargs kubectl delete
 
 <TabItem value="YAML" label="YAML">
 
-You can generate YAMLs from the KubeBlocks chart and uninstall using `kubectl`.
+You can generate YAMLs from the KubeBlocks chart and uninstall using `kubectl`. Use `--version x.y.z` to specify a version and make sure the uninstalled version is the same as the installed one.
 
 ```bash
-helm template kubeblocks kubeblocks/kubeblocks --namespace kb-system | kubectl delete -f -
+helm template kubeblocks kubeblocks/kubeblocks --namespace kb-system --version x.y.z | kubectl delete -f -
 ```
 
 </TabItem>

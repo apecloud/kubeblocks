@@ -103,7 +103,7 @@ func (r *reconfigureAction) syncDependResources(reqCtx intctrlutil.RequestCtx, c
 
 	fetcher.ClusterObj = opsRes.Cluster
 	err := fetcher.
-		Configuration().
+		ComponentParameter().
 		ConfigMap(configSpec.Name).
 		Complete()
 	if err != nil {
@@ -241,7 +241,7 @@ func (r *reconfigureAction) doReconfiguring(params reconfigureParams) error {
 	})
 
 	result := opsPipeline.
-		Configuration().
+		ComponentParameter().
 		Validate().
 		ConfigMap(item.Name).
 		ConfigConstraints().

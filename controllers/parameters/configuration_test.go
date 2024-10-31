@@ -82,7 +82,7 @@ func mockConfigResource() (*corev1.ConfigMap, *appsv1beta1.ConfigConstraint) {
 
 	By("Create a configuration obj")
 	// test-cluster-mysql-mysql-config-tpl
-	configuration := builder.NewConfigurationBuilder(testCtx.DefaultNamespace, core.GenerateComponentConfigurationName(clusterName, defaultCompName)).
+	configuration := builder.NewConfigurationBuilder(testCtx.DefaultNamespace, core.GenerateComponentParameterName(clusterName, defaultCompName)).
 		ClusterRef(clusterName).
 		Component(defaultCompName).
 		AddConfigurationItem(appsv1.ComponentConfigSpec{
@@ -163,11 +163,8 @@ func initConfiguration(resourceCtx *configctrl.ResourceCtx,
 		PodSpec:              synthesizedComponent.PodSpec,
 	}).
 		Prepare().
-		UpdateConfiguration(). // reconcile Configuration
-		Configuration(). // sync Configuration
-		CreateConfigTemplate().
-		UpdateConfigRelatedObject().
-		UpdateConfigurationStatus().
+		ComponentParameter(). // sync Configuration
+		InitConfigRelatedObject().
 		Complete()
 }
 

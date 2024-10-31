@@ -65,18 +65,26 @@ func createConfigObjects(cli client.Client, ctx context.Context, objs []client.O
 	return nil
 }
 
-// buildConfigManagerWithComponent build the configmgr sidecar container and update it
+// BuildReloadActionContainer build the configmgr sidecar container and update it
 // into PodSpec if configuration reload option is on
-func buildConfigManagerWithComponent(podSpec *corev1.PodSpec, configSpecs []appsv1.ComponentConfigSpec,
-	ctx context.Context, cli client.Client, cluster *appsv1.Cluster, synthesizedComp *component.SynthesizedComponent) error {
-	var err error
-	var buildParams *cfgcm.CfgManagerBuildParams
+func BuildReloadActionContainer(resourceCtx *ResourceCtx,
+	cluster *appsv1.Cluster,
+	synthesizedComp *component.SynthesizedComponent,
+	componentParameter *parametersv1alpha1.ComponentParameter,
+	configRender *parametersv1alpha1.ParameterDrivenConfigRender) error {
+	var (
+		err         error
+		buildParams *cfgcm.CfgManagerBuildParams
+
+		podSpec     = synthesizedComp.PodSpec
+		configSpecs = synthesizedComp.ConfigTemplates
+	)
 
 	volumeDirs, usingConfigSpecs := getUsingVolumesByConfigSpecs(podSpec, configSpecs)
 	if len(volumeDirs) == 0 {
 		return nil
 	}
-	configSpecMetas, err := cfgcm.GetSupportReloadConfigSpecs(usingConfigSpecs, cli, ctx)
+	configSpecMetas, err := cfgcm.GetSupportReloadConfigSpecs(usingConfigSpecs, resourceCtx.Client, resourceCtx)
 	if err != nil {
 		return err
 	}
@@ -86,7 +94,7 @@ func buildConfigManagerWithComponent(podSpec *corev1.PodSpec, configSpecs []apps
 	if len(configSpecMetas) == 0 {
 		return nil
 	}
-	if buildParams, err = buildConfigManagerParams(cli, ctx, cluster, synthesizedComp, configSpecMetas, volumeDirs, podSpec); err != nil {
+	if buildParams, err = buildConfigManagerParams(resourceCtx.Client, resourceCtx, cluster, synthesizedComp, configSpecMetas, volumeDirs, podSpec); err != nil {
 		return err
 	}
 	if buildParams == nil {
@@ -171,9 +179,9 @@ func updateCfgManagerVolumes(podSpec *corev1.PodSpec, configManager *cfgcm.CfgMa
 	}
 }
 
-func getUsingVolumesByConfigSpecs(podSpec *corev1.PodSpec, configSpecs []appsv1.ComponentConfigSpec) ([]corev1.VolumeMount, []appsv1.ComponentConfigSpec) {
+func getUsingVolumesByConfigSpecs(podSpec *corev1.PodSpec, configSpecs []appsv1.ComponentTemplateSpec) ([]corev1.VolumeMount, []appsv1.ComponentConfigSpec) {
 	// Ignore useless configTemplate
-	usingConfigSpecs := make([]appsv1.ComponentConfigSpec, 0, len(configSpecs))
+	usingConfigSpecs := make([]appsv1.ComponentTemplateSpec, 0, len(configSpecs))
 	config2Containers := make(map[string][]*corev1.Container)
 	for _, configSpec := range configSpecs {
 		usingContainers := intctrlutil.GetPodContainerWithVolumeMount(podSpec, configSpec.VolumeName)
@@ -307,7 +315,7 @@ func enableVScaleTrigger(configSpec *appsv1alpha1.ComponentConfigSpec) bool {
 	return validRerenderResources(configSpec) && slices.Contains(configSpec.ReRenderResourceTypes, appsv1alpha1.ComponentVScaleType)
 }
 
-func configSetFromComponent(templates []appsv1.ComponentConfigSpec) []string {
+func configSetFromComponent(templates []appsv1.ComponentTemplateSpec) []string {
 	configSet := make([]string, 0)
 	for _, template := range templates {
 		configSet = append(configSet, template.Name)

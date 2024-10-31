@@ -21,11 +21,12 @@ package configuration
 
 import (
 	"context"
+	"fmt"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 )
 
@@ -39,9 +40,10 @@ type TemplateMerger interface {
 }
 
 type mergeContext struct {
-	template   appsv1.ConfigTemplateExtension
-	configSpec appsv1.ComponentConfigSpec
-	ccSpec     *appsv1beta1.ConfigConstraintSpec
+	template     appsv1.ConfigTemplateExtension
+	configSpec   appsv1.ComponentTemplateSpec
+	paramsDefs   []*parametersv1alpha1.ParametersDefinition
+	configRender *parametersv1alpha1.ParameterDrivenConfigRender
 
 	builder *configTemplateBuilder
 	ctx     context.Context
@@ -58,7 +60,7 @@ func (m *mergeContext) renderTemplate() (map[string]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := validateRawData(configs, m.configSpec, m.ccSpec); err != nil {
+	if err := validateRenderedData(configs, m.paramsDefs, m.configRender); err != nil {
 		return nil, err
 	}
 	return configs, nil
@@ -85,8 +87,10 @@ type configOnlyAddMerger struct {
 }
 
 func (c *configPatcher) Merge(baseData map[string]string, updatedData map[string]string) (map[string]string, error) {
-	formatter := c.ccSpec.FileFormatConfig
-	configPatch, err := core.TransformConfigPatchFromData(updatedData, formatter.Format, c.configSpec.Keys)
+	if c.configRender == nil {
+		return nil, fmt.Errorf("not support patch merge policy")
+	}
+	configPatch, err := core.TransformConfigPatchFromData(updatedData, c.configRender.Spec)
 	if err != nil {
 		return nil, err
 	}
@@ -94,19 +98,25 @@ func (c *configPatcher) Merge(baseData map[string]string, updatedData map[string
 		return baseData, nil
 	}
 
+	params := core.GenerateVisualizedParamsList(configPatch, c.configRender.Spec)
 	mergedData := copyMap(baseData)
-	params := core.GenerateVisualizedParamsList(configPatch, formatter, nil)
 	for key, patch := range splitParameters(params) {
 		v, ok := baseData[key]
 		if !ok {
 			mergedData[key] = updatedData[key]
 			continue
 		}
-		newConfig, err := core.ApplyConfigPatch([]byte(v), patch, formatter)
+		newConfig, err := core.ApplyConfigPatch([]byte(v), patch, core.ResolveConfigFormat(c.configRender.Spec, key))
 		if err != nil {
 			return nil, err
 		}
 		mergedData[key] = newConfig
+	}
+
+	for key, content := range updatedData {
+		if _, ok := mergedData[key]; !ok {
+			mergedData[key] = content
+		}
 	}
 	return mergedData, err
 }
@@ -119,14 +129,22 @@ func (c *configOnlyAddMerger) Merge(baseData map[string]string, updatedData map[
 	return nil, core.MakeError("not implemented")
 }
 
-func NewTemplateMerger(template appsv1.ConfigTemplateExtension, ctx context.Context, cli client.Client, builder *configTemplateBuilder, configSpec appsv1.ComponentConfigSpec, ccSpec *appsv1beta1.ConfigConstraintSpec) (TemplateMerger, error) {
+func NewTemplateMerger(template appsv1.ConfigTemplateExtension,
+	ctx context.Context,
+	cli client.Client,
+	builder *configTemplateBuilder,
+	configSpec appsv1.ComponentTemplateSpec,
+	paramsDefs []*parametersv1alpha1.ParametersDefinition,
+	configRender *parametersv1alpha1.ParameterDrivenConfigRender,
+) (TemplateMerger, error) {
 	templateData := &mergeContext{
-		configSpec: configSpec,
-		template:   template,
-		ctx:        ctx,
-		client:     cli,
-		builder:    builder,
-		ccSpec:     ccSpec,
+		configSpec:   configSpec,
+		template:     template,
+		ctx:          ctx,
+		client:       cli,
+		builder:      builder,
+		paramsDefs:   paramsDefs,
+		configRender: configRender,
 	}
 
 	var merger TemplateMerger
@@ -147,25 +165,12 @@ func NewTemplateMerger(template appsv1.ConfigTemplateExtension, ctx context.Cont
 
 func mergerConfigTemplate(template *appsv1.LegacyRenderedTemplateSpec,
 	builder *configTemplateBuilder,
-	configSpec appsv1.ComponentConfigSpec,
+	configSpec appsv1.ComponentTemplateSpec,
 	baseData map[string]string,
+	paramsDefs []*parametersv1alpha1.ParametersDefinition,
+	configRender *parametersv1alpha1.ParameterDrivenConfigRender,
 	ctx context.Context, cli client.Client) (map[string]string, error) {
-	if configSpec.ConfigConstraintRef == "" {
-		return nil, core.MakeError("ConfigConstraintRef require not empty, configSpec[%v]", configSpec.Name)
-	}
-	ccObj := &appsv1beta1.ConfigConstraint{}
-	ccKey := client.ObjectKey{
-		Namespace: "",
-		Name:      configSpec.ConfigConstraintRef,
-	}
-	if err := cli.Get(ctx, ccKey, ccObj); err != nil {
-		return nil, core.WrapError(err, "failed to get ConfigConstraint, key[%v]", configSpec)
-	}
-	if ccObj.Spec.FileFormatConfig == nil {
-		return nil, core.MakeError("importedConfigTemplate require ConfigConstraint.Spec.FileFormatConfig, configSpec[%v]", configSpec)
-	}
-
-	templateMerger, err := NewTemplateMerger(template.ConfigTemplateExtension, ctx, cli, builder, configSpec, &ccObj.Spec)
+	templateMerger, err := NewTemplateMerger(template.ConfigTemplateExtension, ctx, cli, builder, configSpec, paramsDefs, configRender)
 	if err != nil {
 		return nil, err
 	}

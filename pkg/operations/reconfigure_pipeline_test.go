@@ -67,7 +67,7 @@ var _ = Describe("Reconfigure util test", func() {
 			testapps.WithNamespacedName(tpl.ConfigConstraintRef, tpl.Namespace))
 
 		configuration := builder.NewConfigurationBuilder(testCtx.DefaultNamespace,
-			core.GenerateComponentConfigurationName(clusterName, componentName)).
+			core.GenerateComponentParameterName(clusterName, componentName)).
 			ClusterRef(clusterName).
 			Component(componentName).
 			AddConfigurationItem(tpl).

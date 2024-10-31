@@ -47,17 +47,16 @@ type configTemplateBuilder struct {
 
 const defaultTemplateName = "KbTemplate"
 
-func newTemplateBuilder(
-	clusterName, namespace string,
-	ctx context.Context,
-	cli client.Reader) *configTemplateBuilder {
-	return &configTemplateBuilder{
-		namespace:    namespace,
-		clusterName:  clusterName,
+func NewTemplateBuilder(reconcileCtx *ReconcileCtx) *configTemplateBuilder {
+	builder := &configTemplateBuilder{
+		namespace:    reconcileCtx.Namespace,
+		clusterName:  reconcileCtx.ClusterName,
 		templateName: defaultTemplateName,
-		ctx:          ctx,
-		cli:          cli,
+		ctx:          reconcileCtx.ResourceCtx,
+		cli:          reconcileCtx.Client,
 	}
+	builder.injectBuiltInObjectsAndFunctions(reconcileCtx.PodSpec, reconcileCtx.SynthesizedComponent, reconcileCtx.Cache, reconcileCtx.Cluster)
+	return builder
 }
 
 func (c *configTemplateBuilder) setTemplateName(templateName string) {

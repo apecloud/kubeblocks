@@ -29,7 +29,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
@@ -130,9 +129,9 @@ func (r *ResourceFetcher[T]) ComponentSpec() *T {
 	})
 }
 
-func (r *ResourceFetcher[T]) Configuration() *T {
+func (r *ResourceFetcher[T]) ComponentParameter() *T {
 	configKey := client.ObjectKey{
-		Name:      cfgcore.GenerateComponentConfigurationName(r.ClusterName, r.ComponentName),
+		Name:      cfgcore.GenerateComponentParameterName(r.ClusterName, r.ComponentName),
 		Namespace: r.Namespace,
 	}
 	return r.Wrap(func() (err error) {

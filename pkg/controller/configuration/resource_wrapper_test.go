@@ -82,7 +82,7 @@ var _ = Describe("resource Fetcher", func() {
 				ComponentSpec().
 				ConfigMap(mysqlConfigName).
 				ConfigConstraints(mysqlConfigName).
-				Configuration().
+				ComponentParameter().
 				Complete()
 			Expect(err).Should(Succeed())
 		})

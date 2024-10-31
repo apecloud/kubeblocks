@@ -146,13 +146,17 @@ func buildComponentParameter(transCtx *clusterTransformContext, cluster *appsv1.
 	if cmpd = transCtx.componentDefs[comp.ComponentDef]; cmpd == nil || len(cmpd.Spec.Configs) == 0 {
 		return nil, nil
 	}
-	tpls, paramsDefs, err := resolveCmpdParametersDefs(transCtx, transCtx.Client, cmpd)
+	_, paramsDefs, err := resolveCmpdParametersDefs(transCtx, transCtx.Client, cmpd)
+	if err != nil {
+		return nil, err
+	}
+	tpls, err := resolveComponentTemplate(transCtx, transCtx.Client, cmpd)
 	if err != nil {
 		return nil, err
 	}
 	items = configuration.ClassifyParamsFromConfigTemplate(comp.InitParameters, cmpd, paramsDefs, tpls)
 	return builder.NewComponentParameterBuilder(cluster.Namespace,
-		core.GenerateComponentConfigurationName(cluster.Name, compName)).
+		core.GenerateComponentParameterName(cluster.Name, compName)).
 		AddLabelsInMap(constant.GetCompLabelsWithDef(cluster.Name, compName, comp.ComponentDef)).
 		ClusterRef(cluster.Name).
 		Component(compName).
@@ -160,7 +164,19 @@ func buildComponentParameter(transCtx *clusterTransformContext, cluster *appsv1.
 		GetObject(), nil
 }
 
-func resolveCmpdParametersDefs(ctx context.Context, reader client.Reader, cmpd *appsv1.ComponentDefinition) (map[string]*corev1.ConfigMap, []*parametersv1alpha1.ParametersDefinition, error) {
+func resolveComponentTemplate(ctx context.Context, reader client.Reader, cmpd *appsv1.ComponentDefinition) (map[string]*corev1.ConfigMap, error) {
+	tpls := make(map[string]*corev1.ConfigMap, len(cmpd.Spec.Configs))
+	for _, config := range cmpd.Spec.Configs {
+		cm := &corev1.ConfigMap{}
+		if err := reader.Get(ctx, client.ObjectKey{Name: config.TemplateRef, Namespace: config.Namespace}, cm); err != nil {
+			return nil, err
+		}
+		tpls[config.Name] = cm
+	}
+	return tpls, nil
+}
+
+func resolveCmpdParametersDefs(ctx context.Context, reader client.Reader, cmpd *appsv1.ComponentDefinition) (*parametersv1alpha1.ParameterDrivenConfigRender, []*parametersv1alpha1.ParametersDefinition, error) {
 	var paramsDefs []*parametersv1alpha1.ParametersDefinition
 
 	configRender, err := resolveComponentConfigRender(ctx, reader, cmpd)
@@ -168,7 +184,7 @@ func resolveCmpdParametersDefs(ctx context.Context, reader client.Reader, cmpd *
 		return nil, nil, err
 	}
 	if configRender == nil || len(configRender.Spec.ParametersDefs) == 0 {
-		return nil, nil, nil
+		return configRender, nil, nil
 	}
 	for _, defName := range configRender.Spec.ParametersDefs {
 		paramsDef := &parametersv1alpha1.ParametersDefinition{}
@@ -177,16 +193,7 @@ func resolveCmpdParametersDefs(ctx context.Context, reader client.Reader, cmpd *
 		}
 		paramsDefs = append(paramsDefs, paramsDef)
 	}
-
-	tpls := make(map[string]*corev1.ConfigMap, len(cmpd.Spec.Configs))
-	for _, config := range cmpd.Spec.Configs {
-		cm := &corev1.ConfigMap{}
-		if err = reader.Get(ctx, client.ObjectKey{Name: config.TemplateRef, Namespace: config.Namespace}, cm); err != nil {
-			return nil, nil, err
-		}
-		tpls[config.Name] = cm
-	}
-	return tpls, paramsDefs, nil
+	return configRender, paramsDefs, nil
 }
 
 func resolveComponentConfigRender(ctx context.Context, reader client.Reader, cmpd *appsv1.ComponentDefinition) (*parametersv1alpha1.ParameterDrivenConfigRender, error) {

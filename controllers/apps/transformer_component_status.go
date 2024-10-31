@@ -223,7 +223,7 @@ func (t *componentStatusTransformer) isAllConfigSynced(transCtx *componentTransf
 
 	configurationKey := client.ObjectKey{
 		Namespace: t.cluster.Namespace,
-		Name:      cfgcore.GenerateComponentConfigurationName(t.cluster.Name, t.synthesizeComp.Name),
+		Name:      cfgcore.GenerateComponentParameterName(t.cluster.Name, t.synthesizeComp.Name),
 	}
 	configuration := &appsv1alpha1.Configuration{}
 	if err := t.Client.Get(transCtx.Context, configurationKey, configuration); err != nil {

@@ -99,6 +99,7 @@ func (r *ComponentParameterReconciler) reconcile(reqCtx intctrlutil.RequestCtx, 
 	if len(tasks) == 0 {
 		return intctrlutil.Reconciled()
 	}
+
 	fetcherTask, err := prepareReconcileTask(reqCtx, r.Client, componentParameter)
 	if err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to get related object.")
@@ -115,7 +116,7 @@ func (r *ComponentParameterReconciler) reconcile(reqCtx intctrlutil.RequestCtx, 
 	if err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to create task context.")
 	}
-	if err := r.runTasks(taskCtx, tasks); err != nil {
+	if err := r.runTasks(taskCtx, tasks, fetcherTask); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to run configuration reconcile task.")
 	}
 	return intctrlutil.Reconciled()
@@ -133,7 +134,7 @@ func (r *ComponentParameterReconciler) failWithInvalidComponent(componentParam *
 	return intctrlutil.Reconciled()
 }
 
-func (r *ComponentParameterReconciler) runTasks(taskCtx *TaskContext, tasks []Task) error {
+func (r *ComponentParameterReconciler) runTasks(taskCtx *TaskContext, tasks []Task, resource *Task) error {
 	var (
 		errs          []error
 		configuration = taskCtx.componentParameter
@@ -142,7 +143,7 @@ func (r *ComponentParameterReconciler) runTasks(taskCtx *TaskContext, tasks []Ta
 	patch := client.MergeFrom(configuration.DeepCopy())
 	revision := strconv.FormatInt(configuration.GetGeneration(), 10)
 	for _, task := range tasks {
-		if err := task.Do(taskCtx.fetcher, taskCtx.component, revision); err != nil {
+		if err := task.Do(resource, taskCtx, revision); err != nil {
 			errs = append(errs, err)
 			continue
 		}

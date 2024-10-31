@@ -24,6 +24,7 @@ import (
 	"errors"
 
 	batchv1 "k8s.io/api/batch/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -124,15 +125,15 @@ func CheckJobSucceed(ctx context.Context,
 	if !exists {
 		return errors.New("job not exist, pls check")
 	}
-	jobStatusConditions := currentJob.Status.Conditions
-	if len(jobStatusConditions) > 0 {
-		switch jobStatusConditions[0].Type {
+	for _, v := range currentJob.Status.Conditions {
+		if v.Status != corev1.ConditionTrue {
+			continue
+		}
+		switch v.Type {
 		case batchv1.JobComplete:
 			return nil
 		case batchv1.JobFailed:
 			return intctrlutil.NewFatalError("job failed, pls check")
-		default:
-			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeExpectedInProcess, "requeue to waiting for job %s finished.", key.Name)
 		}
 	}
 	return intctrlutil.NewErrorf(intctrlutil.ErrorTypeExpectedInProcess, "requeue to waiting for job %s finished.", key.Name)

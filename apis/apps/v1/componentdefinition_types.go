@@ -1254,7 +1254,7 @@ type ComponentAvailable struct {
 	// This field is immutable once set.
 	//
 	// +optional
-	WithPhases *string `json:"phases,omitempty"`
+	WithPhases *string `json:"withPhases,omitempty"`
 
 	// Specifies the strategies for determining whether the component is available based on the available probe.
 	//

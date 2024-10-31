@@ -107,7 +107,7 @@ spec:
 
                   This field is immutable.
                 properties:
-                  phases:
+                  withPhases:
                     description: |-
                       Specifies the phases that the component will go through to be considered available.
 

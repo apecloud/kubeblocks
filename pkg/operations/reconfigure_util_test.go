@@ -40,7 +40,7 @@ func testUpdateConfigConfigmapResource(
 		config:        config,
 		clusterName:   clusterName,
 		componentName: componentName,
-	}).Configuration().
+	}).ComponentParameter().
 		Validate().
 		ConfigMap(config.Name).
 		ConfigConstraints().

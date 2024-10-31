@@ -20,15 +20,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"context"
+
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/common"
+	"github.com/apecloud/kubeblocks/pkg/configuration/core"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	"github.com/apecloud/kubeblocks/pkg/controller/plan"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 // componentReloadActionSidecarTransformer handles component configuration render
@@ -55,25 +61,65 @@ func (t *componentReloadActionSidecarTransformer) Transform(ctx graph.TransformC
 		return nil
 	}
 
+	reconcileCtx := &configctrl.ResourceCtx{
+		Context:       transCtx.Context,
+		Client:        t.Client,
+		Namespace:     comp.GetNamespace(),
+		ClusterName:   synthesizeComp.ClusterName,
+		ComponentName: synthesizeComp.Name,
+	}
+
+	var configmaps []*corev1.ConfigMap
+	cachedObjs := resolveRerenderDependOnObjects(dag)
+	for _, tpls := range [][]appsv1.ComponentTemplateSpec{synthesizeComp.ScriptTemplates, synthesizeComp.ConfigTemplates} {
+		objects, err := configctrl.RenderTemplate(reconcileCtx, cluster, synthesizeComp, comp, cachedObjs, tpls)
+		if err != nil {
+			return err
+		}
+		configmaps = append(configmaps, objects...)
+	}
+
+	graphCli, _ := transCtx.Client.(model.GraphClient)
+	if err := checkAndCreateConfigRelatedObjs(transCtx, graphCli, dag, configmaps...); err != nil {
+		return err
+	}
+	if err := updatePodVolumes(synthesizeComp.PodSpec, synthesizeComp); err != nil {
+		return err
+	}
+	if len(synthesizeComp.ConfigTemplates) == 0 {
+		return nil
+	}
+
 	var componentParameterObj = &parametersv1alpha1.ComponentParameter{}
 	if err := transCtx.Client.Get(transCtx, client.ObjectKey{Name: comp.Name, Namespace: comp.Namespace}, componentParameterObj); err != nil {
 		return client.IgnoreNotFound(err)
 	}
 
-	return plan.BuildReloadActionContainer(
-		&configctrl.ResourceCtx{
-			Context:       transCtx.Context,
-			Client:        t.Client,
-			Namespace:     comp.GetNamespace(),
-			ClusterName:   synthesizeComp.ClusterName,
-			ComponentName: synthesizeComp.Name,
-		},
-		cluster,
-		comp,
-		synthesizeComp,
-		synthesizeComp.PodSpec,
-		componentParameterObj,
-		resolveRerenderDependOnObjects(dag))
+	configRender, err := resolveComponentConfigRender(transCtx, transCtx.Client, transCtx.CompDef)
+	if err != nil {
+		return err
+	}
+	envObjs, err := configctrl.InjectTemplateEnvFrom(synthesizeComp, synthesizeComp.PodSpec, configRender, configmaps)
+	if err != nil {
+		return err
+	}
+	if err = checkAndCreateConfigRelatedObjs(transCtx, graphCli, dag, envObjs...); err != nil {
+		return err
+	}
+	return configctrl.BuildReloadActionContainer(reconcileCtx, cluster, synthesizeComp, componentParameterObj, configRender)
+}
+
+func checkAndCreateConfigRelatedObjs(ctx context.Context, cli model.GraphClient, dag *graph.DAG, configmaps ...*corev1.ConfigMap) error {
+	for _, configmap := range configmaps {
+		var cm = &corev1.ConfigMap{}
+		if err := cli.Get(ctx, client.ObjectKeyFromObject(configmap), cm); err != nil {
+			if apierrors.IsNotFound(err) {
+				cli.Create(dag, cm, inDataContext4G())
+			}
+			return err
+		}
+	}
+	return nil
 }
 
 func resolveRerenderDependOnObjects(dag *graph.DAG) []client.Object {
@@ -90,4 +136,23 @@ func resolveRerenderDependOnObjects(dag *graph.DAG) []client.Object {
 		}
 	}
 	return dependOnObjs
+}
+
+func updatePodVolumes(podSpec *corev1.PodSpec, component *component.SynthesizedComponent) error {
+	volumes := make(map[string]appsv1.ComponentTemplateSpec, len(component.ConfigTemplates))
+	for _, tpls := range [][]appsv1.ComponentTemplateSpec{component.ConfigTemplates, component.ScriptTemplates} {
+		for _, tpl := range tpls {
+			cmName := core.GetComponentCfgName(component.ClusterName, component.Name, tpl.Name)
+			volumes[cmName] = tpl
+		}
+	}
+	return intctrlutil.CreateOrUpdatePodVolumes(podSpec, volumes, configSetsFromComponent(component.ConfigTemplates))
+}
+
+func configSetsFromComponent(templates []appsv1.ComponentTemplateSpec) []string {
+	configSet := make([]string, 0, len(templates))
+	for _, template := range templates {
+		configSet = append(configSet, template.Name)
+	}
+	return configSet
 }

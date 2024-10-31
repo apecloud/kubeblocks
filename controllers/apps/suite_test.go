@@ -250,10 +250,10 @@ var _ = BeforeSuite(func() {
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
-	err = (&parameters.ConfigurationReconciler{
+	err = (&parameters.ComponentParameterReconciler{
 		Client:   k8sManager.GetClient(),
 		Scheme:   k8sManager.GetScheme(),
-		Recorder: k8sManager.GetEventRecorderFor("configuration-controller"),
+		Recorder: k8sManager.GetEventRecorderFor("component-parameter-controller"),
 	}).SetupWithManager(k8sManager, nil)
 	Expect(err).ToNot(HaveOccurred())
 

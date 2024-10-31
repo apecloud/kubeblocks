@@ -33,7 +33,7 @@ func TestGetInstanceName(t *testing.T) {
 	require.Equal(t, "config.kubeblocks.io/constraints-test", GenerateConstraintsUniqLabelKeyWithConfig("test"))
 	require.Equal(t, "mytest-mysql-config-template", GetComponentCfgName("mytest", "mysql", "config-template"))
 	require.Equal(t, "mytest-envfrom", GenerateEnvFromName("mytest"))
-	require.Equal(t, "mytest-mysql", GenerateComponentConfigurationName("mytest", "mysql"))
+	require.Equal(t, "mytest-mysql", GenerateComponentParameterName("mytest", "mysql"))
 	require.Equal(t, "config.kubeblocks.io/revision-reconcile-phase-100", GenerateRevisionPhaseKey("100"))
 	require.Equal(t, "mycluster-mysql-config", GetInstanceCMName(&appsv1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{

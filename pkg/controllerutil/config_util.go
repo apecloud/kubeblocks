@@ -116,7 +116,7 @@ func fromUpdatedConfig(m map[string]string, sets *set.LinkedHashSetString) map[s
 }
 
 // IsApplyConfigChanged checks if the configuration is changed
-func IsApplyConfigChanged(configMap *corev1.ConfigMap, item v1alpha1.ConfigurationItemDetail) bool {
+func IsApplyConfigChanged(configMap *corev1.ConfigMap, item parametersv1alpha1.ConfigTemplateItemDetail) bool {
 	if configMap == nil {
 		return false
 	}
@@ -125,7 +125,7 @@ func IsApplyConfigChanged(configMap *corev1.ConfigMap, item v1alpha1.Configurati
 	if !ok {
 		return false
 	}
-	var target v1alpha1.ConfigurationItemDetail
+	var target parametersv1alpha1.ConfigTemplateItemDetail
 	if err := json.Unmarshal([]byte(lastAppliedVersion), &target); err != nil {
 		return false
 	}
@@ -134,18 +134,15 @@ func IsApplyConfigChanged(configMap *corev1.ConfigMap, item v1alpha1.Configurati
 }
 
 // IsRerender checks if the configuration template is changed
-func IsRerender(configMap *corev1.ConfigMap, item v1alpha1.ConfigurationItemDetail) bool {
+func IsRerender(configMap *corev1.ConfigMap, item parametersv1alpha1.ConfigTemplateItemDetail) bool {
 	if configMap == nil {
 		return true
 	}
-	if item.Version == "" && item.Payload.Data == nil && item.ImportTemplateRef == nil {
+	if item.Payload.Data == nil && item.CustomTemplates == nil {
 		return false
 	}
-	if version := configMap.Annotations[constant.CMConfigurationTemplateVersion]; version != item.Version {
-		return true
-	}
 
-	var updatedVersion v1alpha1.ConfigurationItemDetail
+	var updatedVersion parametersv1alpha1.ConfigTemplateItemDetail
 	updatedVersionStr, ok := configMap.Annotations[constant.ConfigAppliedVersionAnnotationKey]
 	if ok && updatedVersionStr != "" {
 		if err := json.Unmarshal([]byte(updatedVersionStr), &updatedVersion); err != nil {
@@ -153,13 +150,13 @@ func IsRerender(configMap *corev1.ConfigMap, item v1alpha1.ConfigurationItemDeta
 		}
 	}
 	return !reflect.DeepEqual(updatedVersion.Payload, item.Payload) ||
-		!reflect.DeepEqual(updatedVersion.ImportTemplateRef, item.ImportTemplateRef)
+		!reflect.DeepEqual(updatedVersion.CustomTemplates, item.CustomTemplates)
 }
 
 // GetConfigSpecReconcilePhase gets the configuration phase
 func GetConfigSpecReconcilePhase(configMap *corev1.ConfigMap,
-	item v1alpha1.ConfigurationItemDetail,
-	status *v1alpha1.ConfigurationItemDetailStatus) v1alpha1.ConfigurationPhase {
+	item parametersv1alpha1.ConfigTemplateItemDetail,
+	status *parametersv1alpha1.ConfigTemplateItemDetailStatus) v1alpha1.ConfigurationPhase {
 	if status == nil || status.Phase == "" {
 		return v1alpha1.CCreatingPhase
 	}

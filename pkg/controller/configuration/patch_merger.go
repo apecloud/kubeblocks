@@ -20,14 +20,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package configuration
 
 import (
+	"fmt"
+
+	corev1 "k8s.io/api/core/v1"
+
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-func DoMerge(baseData map[string]string, patch map[string]appsv1alpha1.ConfigParams, cc *appsv1beta1.ConfigConstraint, configSpec appsv1.ComponentConfigSpec) (map[string]string, error) {
+func ApplyParameters(item parametersv1alpha1.ConfigTemplateItemDetail, orig *corev1.ConfigMap, configRender *parametersv1alpha1.ParameterDrivenConfigRender, paramsDefs []*parametersv1alpha1.ParametersDefinition, revision string) (*corev1.ConfigMap, error) {
+	if configRender == nil || len(configRender.Spec.Configs) == 0 {
+		return nil, fmt.Errorf("not support parameter reconfigure")
+	}
+
+	newData, err := DoMerge(orig.Data, item.ConfigFileParams, paramsDefs, configRender.Spec.Configs, *item.ConfigSpec)
+	if err != nil {
+		return nil, err
+	}
+
+	expected := orig.DeepCopy()
+	expected.Data = newData
+	if err := updateConfigMetaForCM(expected, item, revision); err != nil {
+		return nil, err
+	}
+	return expected, nil
+}
+
+func DoMerge(baseData map[string]string, patch map[string]parametersv1alpha1.ParametersInFile, paramsDefs []*parametersv1alpha1.ParametersDefinition, configDescs []parametersv1alpha1.ComponentConfigDescription, configSpec appsv1.ComponentTemplateSpec) (map[string]string, error) {
 	var (
 		updatedFiles  = make(map[string]string, len(patch))
 		updatedParams = make([]core.ParamPairs, 0, len(patch))

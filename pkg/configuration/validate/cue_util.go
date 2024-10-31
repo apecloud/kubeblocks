@@ -24,6 +24,7 @@ import (
 	"cuelang.org/go/cue/cuecontext"
 
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/unstructured"
 )
@@ -56,16 +57,16 @@ func CueValidate(cueTpl string) error {
 	return tpl.Validate()
 }
 
-func ValidateConfigurationWithCue(cueString string, cfgType appsv1beta1.CfgFileFormat, rawData string) error {
+func ValidateConfigWithCue(cueString string, cfgType parametersv1alpha1.CfgFileFormat, rawData string) error {
 	parameters, err := LoadConfigObjectFromContent(cfgType, rawData)
 	if err != nil {
 		return core.WrapError(err, "failed to load configuration [%s]", rawData)
 	}
 
-	return unstructuredDataValidateByCue(cueString, parameters, cfgType == appsv1beta1.Properties || cfgType == appsv1beta1.PropertiesPlus)
+	return unstructuredDataValidateByCue(cueString, parameters, cfgType == parametersv1alpha1.Properties || cfgType == parametersv1alpha1.PropertiesPlus)
 }
 
-func LoadConfigObjectFromContent(cfgType appsv1beta1.CfgFileFormat, rawData string) (map[string]interface{}, error) {
+func LoadConfigObjectFromContent(cfgType parametersv1alpha1.CfgFileFormat, rawData string) (map[string]interface{}, error) {
 	configObject, err := unstructured.LoadConfig("validate", rawData, cfgType)
 	if err != nil {
 		return nil, err

@@ -196,7 +196,7 @@ func (p *pipeline) createUpdatePatch(item *appsv1alpha1.ConfigurationItemDetail,
 func (p *pipeline) doMerge() error {
 	if p.ComponentParameterObj == nil {
 		return cfgcore.MakeError("not found config: %s",
-			cfgcore.GenerateComponentConfigurationName(p.clusterName, p.componentName))
+			cfgcore.GenerateComponentParameterName(p.clusterName, p.componentName))
 	}
 	return p.doMergeImpl(p.config)
 }

@@ -31,7 +31,7 @@ var _ = Describe("configuration builder", func() {
 			componentName = "mysql"
 			ns            = "default"
 		)
-		name := core.GenerateComponentConfigurationName(clusterName, componentName)
+		name := core.GenerateComponentParameterName(clusterName, componentName)
 		config := NewComponentParameterBuilder(ns, name).
 			ClusterRef(clusterName).
 			Component(componentName).

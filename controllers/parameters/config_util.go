@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"strconv"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
@@ -33,11 +34,13 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	cfgcm "github.com/apecloud/kubeblocks/pkg/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/configuration/openapi"
 	"github.com/apecloud/kubeblocks/pkg/configuration/validate"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
@@ -406,4 +409,54 @@ func updateConfigSchema(cc *appsv1beta1.ConfigConstraint, cli client.Client, ctx
 	ccPatch := client.MergeFrom(cc.DeepCopy())
 	cc.Spec.ParametersSchema.SchemaInJSON = openAPISchema
 	return cli.Patch(ctx, cc, ccPatch)
+}
+
+func generateReconcileTasks(reqCtx intctrlutil.RequestCtx, componentParameter *parametersv1alpha1.ComponentParameter) []Task {
+	tasks := make([]Task, 0, len(componentParameter.Spec.ConfigItemDetails))
+	for _, item := range componentParameter.Spec.ConfigItemDetails {
+		if status := fromItemStatus(reqCtx, &componentParameter.Status, item, componentParameter.GetGeneration()); status != nil {
+			tasks = append(tasks, NewTask(item, status))
+		}
+	}
+	return tasks
+}
+
+func fromItemStatus(ctx intctrlutil.RequestCtx, status *parametersv1alpha1.ComponentParameterStatus, item parametersv1alpha1.ConfigTemplateItemDetail, generation int64) *parametersv1alpha1.ConfigTemplateItemDetailStatus {
+	if item.ConfigSpec == nil {
+		ctx.Log.V(1).WithName(item.Name).Info(fmt.Sprintf("configuration is creating and pass: %s", item.Name))
+		return nil
+	}
+	itemStatus := intctrlutil.GetItemStatus(status, item.Name)
+	if itemStatus == nil || itemStatus.Phase == "" {
+		ctx.Log.WithName(item.Name).Info(fmt.Sprintf("ComponentParameters cr is creating: %v", item))
+		status.ConfigurationItemStatus = append(status.ConfigurationItemStatus, parametersv1alpha1.ConfigTemplateItemDetailStatus{
+			Name:           item.Name,
+			Phase:          parametersv1alpha1.CInitPhase,
+			UpdateRevision: strconv.FormatInt(generation, 10),
+		})
+		itemStatus = intctrlutil.GetItemStatus(status, item.Name)
+	}
+	if !isReconcileStatus(itemStatus.Phase) {
+		ctx.Log.V(1).WithName(item.Name).Info(fmt.Sprintf("configuration cr is creating or deleting and pass: %v", itemStatus))
+		return nil
+	}
+	return itemStatus
+}
+
+func isReconcileStatus(phase parametersv1alpha1.ConfigurationPhase) bool {
+	return phase != "" &&
+		phase != parametersv1alpha1.CCreatingPhase &&
+		phase != parametersv1alpha1.CDeletingPhase
+}
+
+func buildTemplateVars(ctx context.Context, cli client.Reader,
+	compDef *appsv1.ComponentDefinition, synthesizedComp *component.SynthesizedComponent) error {
+	if compDef != nil && len(compDef.Spec.Vars) > 0 {
+		templateVars, _, err := component.ResolveTemplateNEnvVars(ctx, cli, synthesizedComp, compDef.Spec.Vars)
+		if err != nil {
+			return err
+		}
+		synthesizedComp.TemplateVars = templateVars
+	}
+	return nil
 }

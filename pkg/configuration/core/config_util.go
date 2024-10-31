@@ -30,6 +30,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
 )
 
@@ -96,7 +97,7 @@ func FromStringPointerMap(m map[string]string) map[string]*string {
 	return r
 }
 
-func ApplyConfigPatch(baseCfg []byte, updatedParameters map[string]*string, formatConfig *appsv1beta1.FileFormatConfig) (string, error) {
+func ApplyConfigPatch(baseCfg []byte, updatedParameters map[string]*string, formatConfig *parametersv1alpha1.FileFormatConfig) (string, error) {
 	configLoaderOption := CfgOption{
 		Type:    CfgRawType,
 		Log:     log.FromContext(context.TODO()),

@@ -289,6 +289,7 @@ func BuildConfigMapWithTemplate(cluster *appsv1.Cluster,
 		AddLabelsInMap(constant.GetCompLabels(cluster.Name, synthesizedComp.Name)).
 		AddLabels(constant.CMConfigurationTypeLabelKey, constant.ConfigInstanceType).
 		AddLabels(constant.CMTemplateNameLabelKey, configTemplateSpec.TemplateRef).
+		AddLabels(constant.CMConfigurationSpecProviderLabelKey, configTemplateSpec.Name).
 		AddLabelsInMap(synthesizedComp.StaticLabels).
 		AddAnnotations(constant.DisableUpgradeInsConfigurationAnnotationKey, strconv.FormatBool(false)).
 		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).

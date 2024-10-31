@@ -62,7 +62,7 @@ func prepareRelatedResource(reqCtx intctrlutil.RequestCtx, client client.Client,
 		ClusterName:   configResources.clusterName,
 		ComponentName: configResources.componentName,
 	})
-	if fetcher.Configuration(); fetcher.Err != nil {
+	if fetcher.ComponentParameter(); fetcher.Err != nil {
 		return nil, fetcher.Err
 	}
 	if fetcher.ComponentParameterObj == nil {

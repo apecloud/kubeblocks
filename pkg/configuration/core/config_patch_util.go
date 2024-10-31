@@ -21,21 +21,27 @@ package core
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/StudioSol/set"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/util"
 	"github.com/apecloud/kubeblocks/pkg/unstructured"
 )
 
 // CreateConfigPatch creates a patch for configuration files with different version.
-func CreateConfigPatch(oldVersion, newVersion map[string]string, format appsv1beta1.CfgFileFormat, keys []string, comparableAllFiles bool) (*ConfigPatchInfo, bool, error) {
+func CreateConfigPatch(oldVersion, newVersion map[string]string, configRender parametersv1alpha1.ParameterDrivenConfigRenderSpec, comparableAllFiles bool) (*ConfigPatchInfo, bool, error) {
 	var hasFilesUpdated = false
+	var keys = resolveConfigFiles(configRender)
 
 	if comparableAllFiles && len(keys) > 0 {
 		hasFilesUpdated = checkExcludeConfigDifference(oldVersion, newVersion, keys)
+	}
+
+	fileFormatFn := func(file string) *parametersv1alpha1.FileFormatConfig {
+		return ResolveConfigFormat(configRender, file)
 	}
 
 	cmKeySet := FromCMKeysSelector(keys)
@@ -43,11 +49,19 @@ func CreateConfigPatch(oldVersion, newVersion map[string]string, format appsv1be
 		FromConfigData(oldVersion, cmKeySet),
 		FromConfigData(newVersion, cmKeySet),
 		CfgOption{
-			CfgType: format,
-			Type:    CfgTplType,
-			Log:     log.FromContext(context.TODO()),
+			FileFormatFn: fileFormatFn,
+			Type:         CfgTplType,
+			Log:          log.FromContext(context.TODO()),
 		})
 	return patch, hasFilesUpdated, err
+}
+
+func resolveConfigFiles(configRender parametersv1alpha1.ParameterDrivenConfigRenderSpec) []string {
+	var keys []string
+	for _, config := range configRender.Configs {
+		keys = append(keys, config.Name)
+	}
+	return keys
 }
 
 func checkExcludeConfigDifference(oldVersion map[string]string, newVersion map[string]string, keys []string) bool {
@@ -67,7 +81,7 @@ func checkExcludeConfigDifference(oldVersion map[string]string, newVersion map[s
 	return false
 }
 
-func LoadRawConfigObject(data map[string]string, formatConfig *appsv1beta1.FileFormatConfig, keys []string) (map[string]unstructured.ConfigObject, error) {
+func LoadRawConfigObject(data map[string]string, formatConfig *parametersv1alpha1.FileFormatConfig, keys []string) (map[string]unstructured.ConfigObject, error) {
 	r := make(map[string]unstructured.ConfigObject)
 	cmKeySet := FromCMKeysSelector(keys)
 	for key, val := range data {
@@ -83,7 +97,7 @@ func LoadRawConfigObject(data map[string]string, formatConfig *appsv1beta1.FileF
 	return r, nil
 }
 
-func FromConfigObject(name, config string, formatConfig *appsv1beta1.FileFormatConfig) (unstructured.ConfigObject, error) {
+func FromConfigObject(name, config string, formatConfig *parametersv1alpha1.FileFormatConfig) (unstructured.ConfigObject, error) {
 	configObject, err := unstructured.LoadConfig(name, config, formatConfig.Format)
 	if err != nil {
 		return nil, err
@@ -97,19 +111,23 @@ func FromConfigObject(name, config string, formatConfig *appsv1beta1.FileFormatC
 // TransformConfigFileToKeyValueMap transforms a config file in appsv1alpha1.CfgFileFormat format to a map in which the key is config name and the value is config value
 // sectionName means the desired section of config file, such as [mysqld] section.
 // If config file has no section structure, sectionName should be default to get all values in this config file.
-func TransformConfigFileToKeyValueMap(fileName string, formatterConfig *appsv1beta1.FileFormatConfig, configData []byte) (map[string]string, error) {
+func TransformConfigFileToKeyValueMap(fileName string, configRender parametersv1alpha1.ParameterDrivenConfigRenderSpec, configData []byte) (map[string]string, error) {
+	formatterConfig := ResolveConfigFormat(configRender, fileName)
+	if formatterConfig == nil {
+		return nil, fmt.Errorf("not found file formatter config: [%s]", fileName)
+	}
+
 	oldData := map[string]string{
 		fileName: "",
 	}
 	newData := map[string]string{
 		fileName: string(configData),
 	}
-	keys := []string{fileName}
-	patchInfo, _, err := CreateConfigPatch(oldData, newData, formatterConfig.Format, keys, false)
+	patchInfo, _, err := CreateConfigPatch(oldData, newData, configRender, false)
 	if err != nil {
 		return nil, err
 	}
-	params := GenerateVisualizedParamsList(patchInfo, formatterConfig, nil)
+	params := GenerateVisualizedParamsList(patchInfo, configRender)
 	result := make(map[string]string)
 	for _, param := range params {
 		if param.Key != fileName {
@@ -122,4 +140,13 @@ func TransformConfigFileToKeyValueMap(fileName string, formatterConfig *appsv1be
 		}
 	}
 	return result, nil
+}
+
+func ResolveConfigFormat(configRender parametersv1alpha1.ParameterDrivenConfigRenderSpec, file string) *parametersv1alpha1.FileFormatConfig {
+	for _, config := range configRender.Configs {
+		if config.Name == file {
+			return config.FileFormatConfig
+		}
+	}
+	return nil
 }

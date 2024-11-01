@@ -171,12 +171,12 @@ func updateCfgManagerVolumes(podSpec *corev1.PodSpec, configManager *cfgcm.CfgMa
 	}
 	podSpec.Volumes = podVolumes
 
-	for volumeName, volume := range configManager.ConfigLazyRenderedVolumes {
-		usingContainers := intctrlutil.GetPodContainerWithVolumeMount(podSpec, volumeName)
-		for _, container := range usingContainers {
-			container.VolumeMounts = append(container.VolumeMounts, volume)
-		}
-	}
+	// for volumeName, volume := range configManager.ConfigLazyRenderedVolumes {
+	// 	usingContainers := intctrlutil.GetPodContainerWithVolumeMount(podSpec, volumeName)
+	// 	for _, container := range usingContainers {
+	// 		container.VolumeMounts = append(container.VolumeMounts, volume)
+	// 	}
+	// }
 }
 
 func getUsingVolumesByConfigSpecs(podSpec *corev1.PodSpec, configSpecs []appsv1.ComponentTemplateSpec) ([]corev1.VolumeMount, []appsv1.ComponentConfigSpec) {
@@ -219,14 +219,14 @@ func getUsingVolumesByConfigSpecs(podSpec *corev1.PodSpec, configSpecs []appsv1.
 
 func buildConfigManagerParams(cli client.Client, ctx context.Context, cluster *appsv1.Cluster, comp *component.SynthesizedComponent, configSpecBuildParams []cfgcm.ConfigSpecMeta, volumeDirs []corev1.VolumeMount, podSpec *corev1.PodSpec) (*cfgcm.CfgManagerBuildParams, error) {
 	cfgManagerParams := &cfgcm.CfgManagerBuildParams{
-		ManagerName:               constant.ConfigSidecarName,
-		ComponentName:             comp.Name,
-		Image:                     viper.GetString(constant.KBToolsImage),
-		Volumes:                   volumeDirs,
-		Cluster:                   cluster,
-		ConfigSpecsBuildParams:    configSpecBuildParams,
-		ConfigLazyRenderedVolumes: make(map[string]corev1.VolumeMount),
-		ContainerPort:             viper.GetInt32(constant.ConfigManagerGPRCPortEnv),
+		ManagerName:            constant.ConfigSidecarName,
+		ComponentName:          comp.Name,
+		Image:                  viper.GetString(constant.KBToolsImage),
+		Volumes:                volumeDirs,
+		Cluster:                cluster,
+		ConfigSpecsBuildParams: configSpecBuildParams,
+		ContainerPort:          viper.GetInt32(constant.ConfigManagerGPRCPortEnv),
+		// ConfigLazyRenderedVolumes: make(map[string]corev1.VolumeMount),
 	}
 
 	if podSpec.HostNetwork {

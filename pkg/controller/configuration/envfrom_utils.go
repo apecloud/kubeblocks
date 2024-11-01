@@ -28,7 +28,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
@@ -191,27 +190,27 @@ func resolveParametersFromFileContent(format *parametersv1alpha1.FileFormatConfi
 	return envMap, nil
 }
 
-func fromConfigSpec(configSpec appsv1.ComponentConfigSpec, cm *corev1.ConfigMap) []string {
-	keys := configSpec.Keys
-	if len(keys) == 0 {
-		keys = cfgutil.ToSet(cm.Data).AsSlice()
-	}
-	return keys
-}
+// func fromConfigSpec(configSpec appsv1.ComponentConfigSpec, cm *corev1.ConfigMap) []string {
+// 	keys := configSpec.Keys
+// 	if len(keys) == 0 {
+// 		keys = cfgutil.ToSet(cm.Data).AsSlice()
+// 	}
+// 	return keys
+// }
 
-func SyncEnvSourceObject(configSpec appsv1.ComponentConfigSpec, cmObj *corev1.ConfigMap, cc *appsv1beta1.ConfigConstraintSpec, cli client.Client, ctx context.Context, cluster *appsv1.Cluster, component *component.SynthesizedComponent) error {
-	if !InjectEnvEnabled(configSpec) || cc == nil || cc.FileFormatConfig == nil {
-		return nil
-	}
-	envMap, err := fromConfigmapFiles(fromConfigSpec(configSpec, cmObj), cmObj, cc.FileFormatConfig)
-	if err != nil {
-		return err
-	}
-	if len(envMap) != 0 {
-		_, err = createOrUpdateResourceFromConfigTemplate(cluster, component, configSpec, client.ObjectKeyFromObject(cmObj), envMap, ctx, cli, false)
-	}
-	return err
-}
+// func SyncEnvSourceObject(configSpec appsv1.ComponentConfigSpec, cmObj *corev1.ConfigMap, cc *appsv1beta1.ConfigConstraintSpec, cli client.Client, ctx context.Context, cluster *appsv1.Cluster, component *component.SynthesizedComponent) error {
+// 	if !InjectEnvEnabled(configSpec) || cc == nil || cc.FileFormatConfig == nil {
+// 		return nil
+// 	}
+// 	envMap, err := fromConfigmapFiles(fromConfigSpec(configSpec, cmObj), cmObj, cc.FileFormatConfig)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	if len(envMap) != 0 {
+// 		_, err = createOrUpdateResourceFromConfigTemplate(cluster, component, configSpec, client.ObjectKeyFromObject(cmObj), envMap, ctx, cli, false)
+// 	}
+// 	return err
+// }
 
 func InjectEnvEnabled(spec appsv1.ComponentConfigSpec) bool {
 	return len(spec.AsEnvFrom) > 0 || len(spec.InjectEnvTo) > 0

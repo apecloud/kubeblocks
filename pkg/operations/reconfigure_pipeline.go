@@ -60,7 +60,7 @@ type pipeline struct {
 
 	updatedObject    *appsv1alpha1.Configuration
 	configConstraint *appsv1beta1.ConfigConstraint
-	configSpec       *appsv1.ComponentConfigSpec
+	configSpec       *appsv1.ComponentTemplateSpec
 
 	reconfigureContext
 	configctrl.ResourceFetcher[pipeline]
@@ -88,13 +88,13 @@ func (p *pipeline) Validate() *pipeline {
 			)
 		}
 
-		item := p.ComponentParameterObj.Spec.GetConfigurationItem(p.config.Name)
+		item := intctrlutil.GetConfigTemplateItem(&p.ComponentParameterObj.Spec, p.config.Name)
 		if item == nil || item.ConfigSpec == nil {
 			p.isFailed = true
 			return cfgcore.MakeError("failed to reconfigure, not existed config[%s]", p.config.Name)
 		}
 
-		p.configSpec = builder.ToV1ConfigSpec(item.ConfigSpec)
+		p.configSpec = item.ConfigSpec
 		return nil
 	}
 

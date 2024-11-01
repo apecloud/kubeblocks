@@ -52,10 +52,10 @@ type CfgManagerBuildParams struct {
 	ConfigSpecsBuildParams []ConfigSpecMeta
 
 	// init tools container
-	ToolsContainers           []corev1.Container
-	DownwardAPIVolumes        []corev1.VolumeMount
-	CMConfigVolumes           []corev1.Volume
-	ConfigLazyRenderedVolumes map[string]corev1.VolumeMount
+	ToolsContainers    []corev1.Container
+	DownwardAPIVolumes []corev1.VolumeMount
+	CMConfigVolumes    []corev1.Volume
+	// ConfigLazyRenderedVolumes map[string]corev1.VolumeMount
 
 	// support custom config manager sidecar
 	ConfigManagerReloadPath string `json:"configManagerReloadPath"`

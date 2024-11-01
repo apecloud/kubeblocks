@@ -38,8 +38,9 @@ type ConfigSpecInfo struct {
 	*appsv1beta1.ReloadAction `json:",inline"`
 
 	ReloadType      appsv1beta1.DynamicReloadType `json:"reloadType"`
-	ConfigSpec      appsv1.ComponentConfigSpec    `json:"configSpec"`
+	ConfigSpec      appsv1.ComponentTemplateSpec  `json:"configSpec"`
 	FormatterConfig appsv1beta1.FileFormatConfig  `json:"formatterConfig"`
+	ConfigFile      string                        `json:"configFile"`
 
 	DownwardAPIOptions []appsv1beta1.DownwardAPIChangeTriggeredAction `json:"downwardAPIOptions"`
 

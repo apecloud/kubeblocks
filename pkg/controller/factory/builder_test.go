@@ -231,10 +231,9 @@ var _ = Describe("builder", func() {
 		It("builds cfg manager tools  correctly", func() {
 			_, cluster, _ := newClusterObjs(nil)
 			cfgManagerParams := &cfgcm.CfgManagerBuildParams{
-				ManagerName:               constant.ConfigSidecarName,
-				Image:                     viper.GetString(constant.KBToolsImage),
-				Cluster:                   cluster,
-				ConfigLazyRenderedVolumes: make(map[string]corev1.VolumeMount),
+				ManagerName: constant.ConfigSidecarName,
+				Image:       viper.GetString(constant.KBToolsImage),
+				Cluster:     cluster,
 			}
 			toolContainers := []appsv1beta1.ToolConfig{
 				{Name: "test-tool", Image: "test-image", Command: []string{"sh"}},

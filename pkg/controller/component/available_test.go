@@ -130,11 +130,11 @@ var _ = Describe("Available", func() {
 			}
 		}()
 
-		annotationWithProbeEvents := func(events []probeEvent) {
+		statusMessageWithProbeEvents := func(events []probeEvent) {
 			message, ok := json.Marshal(&events)
 			Expect(ok).Should(BeNil())
-			comp.Annotations = map[string]string{
-				availableProbeEventKey: string(message),
+			comp.Status.Message = map[string]string{
+				availableProbeMessageKey: string(message),
 			}
 		}
 
@@ -155,7 +155,7 @@ var _ = Describe("Available", func() {
 		It("ok", func() {
 			h := &AvailableEventHandler{}
 
-			annotationWithProbeEvents([]probeEvent{
+			statusMessageWithProbeEvents([]probeEvent{
 				{
 					PodName:   "test-cluster-comp-0",
 					Timestamp: time.Now().Add(-5 * time.Second),
@@ -192,7 +192,7 @@ var _ = Describe("Available", func() {
 		It("duplicate events", func() {
 			h := &AvailableEventHandler{}
 
-			annotationWithProbeEvents([]probeEvent{
+			statusMessageWithProbeEvents([]probeEvent{
 				{
 					PodName:   "test-cluster-comp-0",
 					Timestamp: time.Now().Add(-5 * time.Second),
@@ -226,7 +226,7 @@ var _ = Describe("Available", func() {
 		It("event expired", func() {
 			h := &AvailableEventHandler{}
 
-			annotationWithProbeEvents([]probeEvent{
+			statusMessageWithProbeEvents([]probeEvent{
 				{
 					PodName:   "test-cluster-comp-0",
 					Timestamp: time.Now().Add(-15 * time.Second), // expired
@@ -260,7 +260,7 @@ var _ = Describe("Available", func() {
 		It("has new event and keep", func() {
 			h := &AvailableEventHandler{}
 
-			annotationWithProbeEvents([]probeEvent{
+			statusMessageWithProbeEvents([]probeEvent{
 				{
 					PodName:   "test-cluster-comp-0",
 					Timestamp: time.Now().Add(-5 * time.Second),
@@ -294,7 +294,7 @@ var _ = Describe("Available", func() {
 		It("probe event in annotation", func() {
 			h := &AvailableEventHandler{}
 
-			annotationWithProbeEvents([]probeEvent{
+			statusMessageWithProbeEvents([]probeEvent{
 				{
 					PodName:   "test-cluster-comp-0",
 					Timestamp: time.Now().Add(-5 * time.Second),
@@ -302,9 +302,9 @@ var _ = Describe("Available", func() {
 					Stdout:    []byte("leader"),
 				},
 			})
-			Expect(comp.Annotations).ShouldNot(BeNil())
-			Expect(comp.Annotations[availableProbeEventKey]).ShouldNot(BeEmpty())
-			message := comp.Annotations[availableProbeEventKey]
+			Expect(comp.Status.Message).ShouldNot(BeNil())
+			Expect(comp.Status.Message[availableProbeMessageKey]).ShouldNot(BeEmpty())
+			message := comp.Status.Message[availableProbeMessageKey]
 
 			event := probeEvent{
 				PodName:   "test-cluster-comp-2",
@@ -316,9 +316,9 @@ var _ = Describe("Available", func() {
 			Expect(err).Should(Succeed())
 			Expect(*available).Should(BeTrue())
 
-			Expect(comp.Annotations[availableProbeEventKey]).ShouldNot(Equal(message))
+			Expect(comp.Status.Message[availableProbeMessageKey]).ShouldNot(Equal(message))
 			events := make([]probeEvent, 0)
-			Expect(json.Unmarshal([]byte(comp.Annotations[availableProbeEventKey]), &events)).Should(Succeed())
+			Expect(json.Unmarshal([]byte(comp.Status.Message[availableProbeMessageKey]), &events)).Should(Succeed())
 			Expect(events).Should(HaveLen(2))
 			Expect(events[0].PodName).Should(Or(Equal("test-cluster-comp-0"), Equal("test-cluster-comp-2")))
 			Expect(events[1].PodName).Should(Or(Equal("test-cluster-comp-0"), Equal("test-cluster-comp-2")))
@@ -349,7 +349,7 @@ var _ = Describe("Available", func() {
 					},
 				},
 			}
-			annotationWithProbeEvents([]probeEvent{
+			statusMessageWithProbeEvents([]probeEvent{
 				{
 					PodName:   "test-cluster-comp-0",
 					Timestamp: time.Now().Add(-5 * time.Second),
@@ -382,7 +382,7 @@ var _ = Describe("Available", func() {
 		It("deleted replicas - available", func() {
 			h := &AvailableEventHandler{}
 
-			annotationWithProbeEvents([]probeEvent{
+			statusMessageWithProbeEvents([]probeEvent{
 				{
 					PodName:   "test-cluster-comp-0",
 					Timestamp: time.Now().Add(-5 * time.Second),
@@ -416,7 +416,7 @@ var _ = Describe("Available", func() {
 		It("deleted replicas - unavailable", func() {
 			h := &AvailableEventHandler{}
 
-			annotationWithProbeEvents([]probeEvent{
+			statusMessageWithProbeEvents([]probeEvent{
 				{
 					PodName:   "test-cluster-comp-0",
 					Timestamp: time.Now().Add(-5 * time.Second),

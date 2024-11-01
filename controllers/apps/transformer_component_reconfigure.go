@@ -27,7 +27,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -90,12 +89,7 @@ func (t *componentReloadActionSidecarTransformer) Transform(ctx graph.TransformC
 		return nil
 	}
 
-	var componentParameterObj = &parametersv1alpha1.ComponentParameter{}
-	if err := transCtx.Client.Get(transCtx, client.ObjectKey{Name: comp.Name, Namespace: comp.Namespace}, componentParameterObj); err != nil {
-		return client.IgnoreNotFound(err)
-	}
-
-	configRender, err := resolveComponentConfigRender(transCtx, transCtx.Client, transCtx.CompDef)
+	configRender, paramsDefs, err := resolveCmpdParametersDefs(transCtx, transCtx.Client, transCtx.CompDef)
 	if err != nil {
 		return err
 	}
@@ -106,7 +100,7 @@ func (t *componentReloadActionSidecarTransformer) Transform(ctx graph.TransformC
 	if err = checkAndCreateConfigRelatedObjs(transCtx, graphCli, dag, envObjs...); err != nil {
 		return err
 	}
-	return configctrl.BuildReloadActionContainer(reconcileCtx, cluster, synthesizeComp, componentParameterObj, configRender)
+	return configctrl.BuildReloadActionContainer(reconcileCtx, cluster, synthesizeComp, configRender, paramsDefs)
 }
 
 func checkAndCreateConfigRelatedObjs(ctx context.Context, cli model.GraphClient, dag *graph.DAG, configmaps ...*corev1.ConfigMap) error {

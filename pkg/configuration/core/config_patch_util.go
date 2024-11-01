@@ -34,34 +34,22 @@ import (
 // CreateConfigPatch creates a patch for configuration files with different version.
 func CreateConfigPatch(oldVersion, newVersion map[string]string, configRender parametersv1alpha1.ParameterDrivenConfigRenderSpec, comparableAllFiles bool) (*ConfigPatchInfo, bool, error) {
 	var hasFilesUpdated = false
-	var keys = resolveConfigFiles(configRender)
+	var keys = ResolveConfigFiles(configRender.Configs)
 
 	if comparableAllFiles && len(keys) > 0 {
 		hasFilesUpdated = checkExcludeConfigDifference(oldVersion, newVersion, keys)
 	}
 
-	fileFormatFn := func(file string) *parametersv1alpha1.FileFormatConfig {
-		return ResolveConfigFormat(configRender, file)
-	}
-
-	cmKeySet := FromCMKeysSelector(keys)
+	cmKeyFilter := NewConfigFileFilter(configRender.Configs)
 	patch, err := CreateMergePatch(
-		FromConfigData(oldVersion, cmKeySet),
-		FromConfigData(newVersion, cmKeySet),
+		FromConfigData(oldVersion, cmKeyFilter),
+		FromConfigData(newVersion, cmKeyFilter),
 		CfgOption{
-			FileFormatFn: fileFormatFn,
+			FileFormatFn: WithConfigFileFormat(configRender.Configs),
 			Type:         CfgTplType,
 			Log:          log.FromContext(context.TODO()),
 		})
 	return patch, hasFilesUpdated, err
-}
-
-func resolveConfigFiles(configRender parametersv1alpha1.ParameterDrivenConfigRenderSpec) []string {
-	var keys []string
-	for _, config := range configRender.Configs {
-		keys = append(keys, config.Name)
-	}
-	return keys
 }
 
 func checkExcludeConfigDifference(oldVersion map[string]string, newVersion map[string]string, keys []string) bool {
@@ -112,7 +100,7 @@ func FromConfigObject(name, config string, formatConfig *parametersv1alpha1.File
 // sectionName means the desired section of config file, such as [mysqld] section.
 // If config file has no section structure, sectionName should be default to get all values in this config file.
 func TransformConfigFileToKeyValueMap(fileName string, configRender parametersv1alpha1.ParameterDrivenConfigRenderSpec, configData []byte) (map[string]string, error) {
-	formatterConfig := ResolveConfigFormat(configRender, fileName)
+	formatterConfig := ResolveConfigFormat(configRender.Configs, fileName)
 	if formatterConfig == nil {
 		return nil, fmt.Errorf("not found file formatter config: [%s]", fileName)
 	}
@@ -142,11 +130,29 @@ func TransformConfigFileToKeyValueMap(fileName string, configRender parametersv1
 	return result, nil
 }
 
-func ResolveConfigFormat(configRender parametersv1alpha1.ParameterDrivenConfigRenderSpec, file string) *parametersv1alpha1.FileFormatConfig {
-	for _, config := range configRender.Configs {
+func ResolveConfigFormat(descriptions []parametersv1alpha1.ComponentConfigDescription, file string) *parametersv1alpha1.FileFormatConfig {
+	for _, config := range descriptions {
 		if config.Name == file {
 			return config.FileFormatConfig
 		}
 	}
 	return nil
+}
+
+func WithConfigFileFormat(descriptions []parametersv1alpha1.ComponentConfigDescription) func(file string) *parametersv1alpha1.FileFormatConfig {
+	return func(file string) *parametersv1alpha1.FileFormatConfig {
+		return ResolveConfigFormat(descriptions, file)
+	}
+}
+
+func ResolveConfigFiles(descriptions []parametersv1alpha1.ComponentConfigDescription) []string {
+	var keys []string
+	for _, config := range descriptions {
+		keys = append(keys, config.Name)
+	}
+	return keys
+}
+
+func NewConfigFileFilter(descriptions []parametersv1alpha1.ComponentConfigDescription) *util.Sets {
+	return util.NewSet(ResolveConfigFiles(descriptions)...)
 }

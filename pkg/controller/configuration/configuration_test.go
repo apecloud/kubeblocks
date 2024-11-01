@@ -42,7 +42,6 @@ const (
 	mysqlConfigName           = "mysql-component-config"
 	mysqlConfigConstraintName = "mysql8.0-config-constraints"
 	mysqlScriptsTemplateName  = "apecloud-mysql-scripts"
-	testConfigContent         = "test-config-content"
 )
 
 func allFieldsCompDefObj(create bool) *appsv1.ComponentDefinition {
@@ -86,10 +85,6 @@ func newAllFieldsSynthesizedComponent(compDef *appsv1.ComponentDefinition, clust
 	Expect(err).Should(Succeed())
 	Expect(synthesizeComp).ShouldNot(BeNil())
 	addTestVolumeMount(synthesizeComp.PodSpec, mysqlCompName)
-	if len(synthesizeComp.ConfigTemplates) > 0 {
-		configSpec := &synthesizeComp.ConfigTemplates[0]
-		configSpec.ReRenderResourceTypes = []appsv1.RerenderResourceType{appsv1.ComponentVScaleType, appsv1.ComponentHScaleType}
-	}
 	return synthesizeComp
 }
 

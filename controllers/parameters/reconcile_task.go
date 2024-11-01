@@ -135,18 +135,18 @@ func syncImpl(taskCtx *TaskContext,
 		return nil
 	}
 
+	failStatus := func(err error) error {
+		status.Message = pointer.String(err.Error())
+		status.Phase = parametersv1alpha1.CMergeFailedPhase
+		return err
+	}
+
 	reconcileCtx := &configctrl.ReconcileCtx{
 		ResourceCtx:          fetcher.ResourceCtx,
 		Cluster:              fetcher.ClusterObj,
 		Component:            fetcher.ComponentObj,
 		SynthesizedComponent: taskCtx.component,
 		PodSpec:              taskCtx.component.PodSpec,
-	}
-
-	failStatus := func(err error) error {
-		status.Message = pointer.String(err.Error())
-		status.Phase = parametersv1alpha1.CMergeFailedPhase
-		return err
 	}
 
 	var baseConfig = configMap

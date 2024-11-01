@@ -122,13 +122,16 @@ func init() {
 		var err error
 		var index = 0
 		var v unstructured.ConfigObject
+		var format parametersv1alpha1.CfgFileFormat
 		for fileName, content := range ctx.ConfigData {
 			if ctx.CMKeys != nil && !ctx.CMKeys.InArray(fileName) {
 				continue
 			}
-			fileType := configType(fileName)
-			if v, err = unstructured.LoadConfig(fileName, content, fileType); err != nil {
-				return nil, WrapError(err, "failed to load config: filename[%s], type[%s]", fileName, fileType)
+			if format = configType(fileName); format == "" {
+				continue
+			}
+			if v, err = unstructured.LoadConfig(fileName, content, format); err != nil {
+				return nil, WrapError(err, "failed to load config: filename[%s], type[%s]", fileName, format)
 			}
 			meta.indexer[fileName] = v
 			meta.v[index] = v
@@ -321,9 +324,9 @@ func GenerateVisualizedParamsList(configPatch *ConfigPatchInfo, configRender par
 		return nil
 	}
 
-	sets := util.NewSet(resolveConfigFiles(configRender)...)
+	sets := NewConfigFileFilter(configRender.Configs)
 	resolveParameterPrefix := func(file string) string {
-		fileConfig := ResolveConfigFormat(configRender, file)
+		fileConfig := ResolveConfigFormat(configRender.Configs, file)
 		if fileConfig == nil {
 			return ""
 		}

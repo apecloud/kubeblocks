@@ -284,6 +284,11 @@ func (f *MockComponentDefinitionFactory) SetPodManagementPolicy(policy *appsv1.P
 	return f
 }
 
+func (f *MockComponentDefinitionFactory) SetAvailable(available *kbappsv1.ComponentAvailable) *MockComponentDefinitionFactory {
+	f.Get().Spec.Available = available
+	return f
+}
+
 func (f *MockComponentDefinitionFactory) AddRole(name string, serviceable, writable bool) *MockComponentDefinitionFactory {
 	role := kbappsv1.ReplicaRole{
 		Name:        name,

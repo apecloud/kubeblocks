@@ -25,17 +25,15 @@ import (
 	"reflect"
 	"slices"
 
-	"github.com/StudioSol/set"
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
-	"github.com/apecloud/kubeblocks/pkg/configuration/util"
 	"github.com/apecloud/kubeblocks/pkg/configuration/validate"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/generics"
 )
 
 type Result struct {
@@ -53,22 +51,22 @@ type Result struct {
 }
 
 // MergeAndValidateConfigs merges and validates configuration files
-func MergeAndValidateConfigs(configConstraint appsv1beta1.ConfigConstraintSpec, baseConfigs map[string]string, cmKey []string, updatedParams []core.ParamPairs) (map[string]string, error) {
+func MergeAndValidateConfigs(baseConfigs map[string]string,
+	updatedParams []core.ParamPairs,
+	paramsDefs []*parametersv1alpha1.ParametersDefinition,
+	configDescs []parametersv1alpha1.ComponentConfigDescription) (map[string]string, error) {
 	var (
-		err error
-		fc  = configConstraint.FileFormatConfig
-
-		newCfg         map[string]string
-		configOperator core.ConfigOperator
-		updatedKeys    = util.NewSet()
+		err             error
+		newCfg          map[string]string
+		configOperator  core.ConfigOperator
+		updatedFileList []string
 	)
 
-	cmKeySet := core.FromCMKeysSelector(cmKey)
 	configLoaderOption := core.CfgOption{
 		Type:           core.CfgCmType,
 		Log:            log.FromContext(context.TODO()),
-		CfgType:        fc.Format,
-		ConfigResource: core.FromConfigData(baseConfigs, cmKeySet),
+		FileFormatFn:   core.WithConfigFileFormat(configDescs),
+		ConfigResource: core.FromConfigData(baseConfigs, core.NewConfigFileFilter(configDescs)),
 	}
 	if configOperator, err = core.NewConfigLoader(configLoaderOption); err != nil {
 		return nil, err
@@ -76,14 +74,18 @@ func MergeAndValidateConfigs(configConstraint appsv1beta1.ConfigConstraintSpec, 
 
 	// merge param to config file
 	for _, params := range updatedParams {
-		validUpdatedParameters := filterImmutableParameters(params.UpdatedParams, configConstraint.ImmutableParameters)
+		validUpdatedParameters := filterImmutableParameters(params.UpdatedParams, params.Key, paramsDefs)
 		if len(validUpdatedParameters) == 0 {
 			continue
 		}
-		if err := configOperator.MergeFrom(validUpdatedParameters, core.NewCfgOptions(params.Key, core.WithFormatterConfig(fc))); err != nil {
+		fc := core.ResolveConfigFormat(configDescs, params.Key)
+		if fc == nil {
+			continue
+		}
+		if err = configOperator.MergeFrom(validUpdatedParameters, core.NewCfgOptions(params.Key, core.WithFormatterConfig(fc))); err != nil {
 			return nil, err
 		}
-		updatedKeys.Add(params.Key)
+		updatedFileList = append(updatedFileList, params.Key)
 	}
 
 	if newCfg, err = configOperator.ToCfgContent(); err != nil {
@@ -93,26 +95,23 @@ func MergeAndValidateConfigs(configConstraint appsv1beta1.ConfigConstraintSpec, 
 	// The ToCfgContent interface returns the file contents of all keys, the configuration file is encoded and decoded into keys,
 	// the content may be different with the original file, such as comments, blank lines, etc,
 	// in order to minimize the impact on the original file, only update the changed part.
-	updatedCfg := fromUpdatedConfig(newCfg, updatedKeys)
-	if err = validate.NewConfigValidator(&configConstraint, validate.WithKeySelector(cmKey)).Validate(updatedCfg); err != nil {
-		return nil, core.WrapError(err, "failed to validate updated config")
-	}
-	return core.MergeUpdatedConfig(baseConfigs, updatedCfg), nil
-}
-
-// fromUpdatedConfig filters out changed file contents.
-func fromUpdatedConfig(m map[string]string, sets *set.LinkedHashSetString) map[string]string {
-	if sets.Length() == 0 {
-		return map[string]string{}
-	}
-
-	r := make(map[string]string, sets.Length())
-	for key, v := range m {
-		if sets.InArray(key) {
-			r[key] = v
+	updatedCfgFiles := make(map[string]string, len(updatedFileList))
+	for _, key := range updatedFileList {
+		updatedCfgFiles[key] = newCfg[key]
+		paramsDef := resolveParametersDef(paramsDefs, key)
+		if paramsDef == nil {
+			continue
+		}
+		fc := core.ResolveConfigFormat(configDescs, key)
+		if fc == nil {
+			continue
+		}
+		if err = validate.NewConfigValidator(paramsDef.Spec.ParametersSchema, fc).Validate(updatedCfgFiles[key]); err != nil {
+			return nil, core.WrapError(err, "failed to validate updated config")
 		}
 	}
-	return r
+
+	return core.MergeUpdatedConfig(baseConfigs, updatedCfgFiles), nil
 }
 
 // IsApplyConfigChanged checks if the configuration is changed
@@ -156,12 +155,12 @@ func IsRerender(configMap *corev1.ConfigMap, item parametersv1alpha1.ConfigTempl
 // GetConfigSpecReconcilePhase gets the configuration phase
 func GetConfigSpecReconcilePhase(configMap *corev1.ConfigMap,
 	item parametersv1alpha1.ConfigTemplateItemDetail,
-	status *parametersv1alpha1.ConfigTemplateItemDetailStatus) v1alpha1.ConfigurationPhase {
+	status *parametersv1alpha1.ConfigTemplateItemDetailStatus) parametersv1alpha1.ConfigurationPhase {
 	if status == nil || status.Phase == "" {
-		return v1alpha1.CCreatingPhase
+		return parametersv1alpha1.CCreatingPhase
 	}
 	if !IsApplyConfigChanged(configMap, item) {
-		return v1alpha1.CPendingPhase
+		return parametersv1alpha1.CPendingPhase
 	}
 	return status.Phase
 }
@@ -215,11 +214,23 @@ func ResourcesPayloadForComponent(resources corev1.ResourceRequirements) any {
 	}
 }
 
-func filterImmutableParameters(parameters map[string]any, immutableParams []string) map[string]any {
-	if len(immutableParams) == 0 || len(parameters) == 0 {
+func resolveParametersDef(paramsDefs []*parametersv1alpha1.ParametersDefinition, fileName string) *parametersv1alpha1.ParametersDefinition {
+	pos := generics.FindFirstFunc(paramsDefs, func(paramsDef *parametersv1alpha1.ParametersDefinition) bool {
+		return paramsDef.Spec.FileName == fileName
+	})
+	if pos >= 0 {
+		return paramsDefs[pos]
+	}
+	return nil
+}
+
+func filterImmutableParameters(parameters map[string]any, fileName string, paramsDefs []*parametersv1alpha1.ParametersDefinition) map[string]any {
+	paramsDef := resolveParametersDef(paramsDefs, fileName)
+	if paramsDef == nil || len(paramsDef.Spec.ImmutableParameters) == 0 {
 		return parameters
 	}
 
+	immutableParams := paramsDef.Spec.ImmutableParameters
 	validParameters := make(map[string]any, len(parameters))
 	for key, val := range parameters {
 		if !slices.Contains(immutableParams, key) {

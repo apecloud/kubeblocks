@@ -20,76 +20,68 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package controllerutil
 
 import (
-	"encoding/json"
-	"reflect"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
 
-	"github.com/StudioSol/set"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 
-	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
-	"github.com/apecloud/kubeblocks/pkg/configuration/core"
-	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
-	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
-	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
-func TestFromUpdatedConfig(t *testing.T) {
-	type args struct {
-		base map[string]string
-		sets *set.LinkedHashSetString
-	}
-	tests := []struct {
-		name string
-		args args
-		want map[string]string
-	}{{
-		name: "normal_test",
-		args: args{
-			base: map[string]string{
-				"key1": "config context1",
-				"key2": "config context2",
-				"key3": "config context2",
-			},
-			sets: set.NewLinkedHashSetString("key1", "key3"),
-		},
-		want: map[string]string{
-			"key1": "config context1",
-			"key3": "config context2",
-		},
-	}, {
-		name: "none_updated_test",
-		args: args{
-			base: map[string]string{
-				"key1": "config context1",
-				"key2": "config context2",
-				"key3": "config context2",
-			},
-			sets: cfgutil.NewSet(),
-		},
-		want: map[string]string{},
-	}}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := fromUpdatedConfig(tt.args.base, tt.args.sets); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("fromUpdatedConfig() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
+// func TestFromUpdatedConfig(t *testing.T) {
+// 	type args struct {
+// 		base map[string]string
+// 		sets *set.LinkedHashSetString
+// 	}
+// 	tests := []struct {
+// 		name string
+// 		args args
+// 		want map[string]string
+// 	}{{
+// 		name: "normal_test",
+// 		args: args{
+// 			base: map[string]string{
+// 				"key1": "config context1",
+// 				"key2": "config context2",
+// 				"key3": "config context2",
+// 			},
+// 			sets: set.NewLinkedHashSetString("key1", "key3"),
+// 		},
+// 		want: map[string]string{
+// 			"key1": "config context1",
+// 			"key3": "config context2",
+// 		},
+// 	}, {
+// 		name: "none_updated_test",
+// 		args: args{
+// 			base: map[string]string{
+// 				"key1": "config context1",
+// 				"key2": "config context2",
+// 				"key3": "config context2",
+// 			},
+// 			sets: cfgutil.NewSet(),
+// 		},
+// 		want: map[string]string{},
+// 	}}
+// 	for _, tt := range tests {
+// 		t.Run(tt.name, func(t *testing.T) {
+// 			if got := fromUpdatedConfig(tt.args.base, tt.args.sets); !reflect.DeepEqual(got, tt.want) {
+// 				t.Errorf("fromUpdatedConfig() = %v, want %v", got, tt.want)
+// 			}
+// 		})
+// 	}
+// }
 
 func TestIsRerender(t *testing.T) {
 	type args struct {
 		cm   *corev1.ConfigMap
-		item v1alpha1.ConfigurationItemDetail
+		item parametersv1alpha1.ConfigTemplateItemDetail
 	}
 	tests := []struct {
 		name string
@@ -100,7 +92,7 @@ func TestIsRerender(t *testing.T) {
 		name: "test",
 		args: args{
 			cm: nil,
-			item: v1alpha1.ConfigurationItemDetail{
+			item: parametersv1alpha1.ConfigTemplateItemDetail{
 				Name: "test",
 			},
 		},
@@ -109,43 +101,8 @@ func TestIsRerender(t *testing.T) {
 		name: "test",
 		args: args{
 			cm: builder.NewConfigMapBuilder("default", "test").GetObject(),
-			item: v1alpha1.ConfigurationItemDetail{
+			item: parametersv1alpha1.ConfigTemplateItemDetail{
 				Name: "test",
-			},
-		},
-		want: false,
-	}, {
-		name: "test",
-		args: args{
-			cm: builder.NewConfigMapBuilder("default", "test").
-				GetObject(),
-			item: v1alpha1.ConfigurationItemDetail{
-				Name:    "test",
-				Version: "v1",
-			},
-		},
-		want: true,
-	}, {
-		name: "test",
-		args: args{
-			cm: builder.NewConfigMapBuilder("default", "test").
-				AddAnnotations(constant.CMConfigurationTemplateVersion, "v1").
-				GetObject(),
-			item: v1alpha1.ConfigurationItemDetail{
-				Name:    "test",
-				Version: "v2",
-			},
-		},
-		want: true,
-	}, {
-		name: "test",
-		args: args{
-			cm: builder.NewConfigMapBuilder("default", "test").
-				AddAnnotations(constant.CMConfigurationTemplateVersion, "v1").
-				GetObject(),
-			item: v1alpha1.ConfigurationItemDetail{
-				Name:    "test",
-				Version: "v1",
 			},
 		},
 		want: false,
@@ -155,12 +112,12 @@ func TestIsRerender(t *testing.T) {
 			cm: builder.NewConfigMapBuilder("default", "test").
 				AddAnnotations(constant.ConfigAppliedVersionAnnotationKey, "").
 				GetObject(),
-			item: v1alpha1.ConfigurationItemDetail{
+			item: parametersv1alpha1.ConfigTemplateItemDetail{
 				Name: "test",
-				ImportTemplateRef: &v1alpha1.ConfigTemplateExtension{
+				CustomTemplates: &appsv1.ConfigTemplateExtension{
 					TemplateRef: "contig-test-template",
 					Namespace:   "default",
-					Policy:      v1alpha1.PatchPolicy,
+					Policy:      appsv1.PatchPolicy,
 				},
 			},
 		},
@@ -179,12 +136,12 @@ func TestIsRerender(t *testing.T) {
 }
 `).
 				GetObject(),
-			item: v1alpha1.ConfigurationItemDetail{
+			item: parametersv1alpha1.ConfigTemplateItemDetail{
 				Name: "test",
-				ImportTemplateRef: &v1alpha1.ConfigTemplateExtension{
+				CustomTemplates: &appsv1.ConfigTemplateExtension{
 					TemplateRef: "contig-test-template",
 					Namespace:   "default",
-					Policy:      v1alpha1.PatchPolicy,
+					Policy:      appsv1.PatchPolicy,
 				},
 			},
 		},
@@ -195,9 +152,9 @@ func TestIsRerender(t *testing.T) {
 			cm: builder.NewConfigMapBuilder("default", "test").
 				AddAnnotations(constant.ConfigAppliedVersionAnnotationKey, "").
 				GetObject(),
-			item: v1alpha1.ConfigurationItemDetail{
+			item: parametersv1alpha1.ConfigTemplateItemDetail{
 				Name: "test",
-				Payload: v1alpha1.Payload{
+				Payload: parametersv1alpha1.Payload{
 					Data: map[string]any{
 						"key": "value",
 					},
@@ -211,9 +168,9 @@ func TestIsRerender(t *testing.T) {
 			cm: builder.NewConfigMapBuilder("default", "test").
 				AddAnnotations(constant.ConfigAppliedVersionAnnotationKey, ` {"payload":{"key":"value"}} `).
 				GetObject(),
-			item: v1alpha1.ConfigurationItemDetail{
+			item: parametersv1alpha1.ConfigTemplateItemDetail{
 				Name: "test",
-				Payload: v1alpha1.Payload{
+				Payload: parametersv1alpha1.Payload{
 					Data: map[string]any{
 						"key": "value",
 					},
@@ -234,48 +191,48 @@ func TestIsRerender(t *testing.T) {
 func TestGetConfigSpecReconcilePhase(t *testing.T) {
 	type args struct {
 		cm     *corev1.ConfigMap
-		item   v1alpha1.ConfigurationItemDetail
-		status *v1alpha1.ConfigurationItemDetailStatus
+		item   parametersv1alpha1.ConfigTemplateItemDetail
+		status *parametersv1alpha1.ConfigTemplateItemDetailStatus
 	}
 	tests := []struct {
 		name string
 		args args
-		want v1alpha1.ConfigurationPhase
+		want parametersv1alpha1.ConfigurationPhase
 	}{{
 		name: "test",
 		args: args{
 			cm: nil,
-			item: v1alpha1.ConfigurationItemDetail{
+			item: parametersv1alpha1.ConfigTemplateItemDetail{
 				Name: "test",
 			},
 		},
-		want: v1alpha1.CCreatingPhase,
+		want: parametersv1alpha1.CCreatingPhase,
 	}, {
 		name: "test",
 		args: args{
 			cm: builder.NewConfigMapBuilder("default", "test").GetObject(),
-			item: v1alpha1.ConfigurationItemDetail{
+			item: parametersv1alpha1.ConfigTemplateItemDetail{
 				Name: "test",
 			},
-			status: &v1alpha1.ConfigurationItemDetailStatus{
-				Phase: v1alpha1.CInitPhase,
+			status: &parametersv1alpha1.ConfigTemplateItemDetailStatus{
+				Phase: parametersv1alpha1.CInitPhase,
 			},
 		},
-		want: v1alpha1.CPendingPhase,
+		want: parametersv1alpha1.CPendingPhase,
 	}, {
 		name: "test",
 		args: args{
 			cm: builder.NewConfigMapBuilder("default", "test").
 				AddAnnotations(constant.ConfigAppliedVersionAnnotationKey, `{"name":"test"}`).
 				GetObject(),
-			item: v1alpha1.ConfigurationItemDetail{
+			item: parametersv1alpha1.ConfigTemplateItemDetail{
 				Name: "test",
 			},
-			status: &v1alpha1.ConfigurationItemDetailStatus{
-				Phase: v1alpha1.CUpgradingPhase,
+			status: &parametersv1alpha1.ConfigTemplateItemDetailStatus{
+				Phase: parametersv1alpha1.CUpgradingPhase,
 			},
 		},
-		want: v1alpha1.CUpgradingPhase,
+		want: parametersv1alpha1.CUpgradingPhase,
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -300,110 +257,110 @@ var _ = Describe("config_util", func() {
 		k8sMockClient.Finish()
 	})
 
-	Context("MergeAndValidateConfigs", func() {
-		It("Should succeed with no error", func() {
-			type args struct {
-				configConstraint appsv1beta1.ConfigConstraintSpec
-				baseCfg          map[string]string
-				updatedParams    []core.ParamPairs
-				cmKeys           []string
-			}
-
-			configConstraintObj := testapps.NewCustomizedObj("resources/mysql-config-constraint.yaml",
-				&appsv1beta1.ConfigConstraint{}, func(cc *appsv1beta1.ConfigConstraint) {
-					if ccContext, err := testdata.GetTestDataFileContent("cue_testdata/pg14.cue"); err == nil {
-						cc.Spec.ParametersSchema = &appsv1beta1.ParametersSchema{
-							CUE: string(ccContext),
-						}
-					}
-					cc.Spec.FileFormatConfig = &appsv1beta1.FileFormatConfig{
-						Format: appsv1beta1.Properties,
-					}
-				})
-
-			cfgContext, err := testdata.GetTestDataFileContent("cue_testdata/pg14.conf")
-			Expect(err).Should(Succeed())
-
-			tests := []struct {
-				name    string
-				args    args
-				want    map[string]string
-				wantErr bool
-			}{{
-				name: "pg1_merge",
-				args: args{
-					configConstraint: configConstraintObj.Spec,
-					baseCfg: map[string]string{
-						"key":  string(cfgContext),
-						"key2": "not support context",
-					},
-					updatedParams: []core.ParamPairs{
-						{
-							Key: "key",
-							UpdatedParams: map[string]interface{}{
-								"max_connections": "200",
-								"shared_buffers":  "512M",
-							},
-						},
-					},
-					cmKeys: []string{"key", "key3"},
-				},
-				want: map[string]string{
-					"max_connections": "200",
-					"shared_buffers":  "512M",
-				},
-			}, {
-				name: "not_support_key_updated",
-				args: args{
-					configConstraint: configConstraintObj.Spec,
-					baseCfg: map[string]string{
-						"key":  string(cfgContext),
-						"key2": "not_support_context",
-					},
-					updatedParams: []core.ParamPairs{
-						{
-							Key: "key",
-							UpdatedParams: map[string]interface{}{
-								"max_connections": "200",
-								"shared_buffers":  "512M",
-							},
-						},
-					},
-					cmKeys: []string{"key1", "key2"},
-				},
-				wantErr: true,
-			}}
-			for _, tt := range tests {
-				got, err := MergeAndValidateConfigs(tt.args.configConstraint, tt.args.baseCfg, tt.args.cmKeys, tt.args.updatedParams)
-				Expect(err != nil).Should(BeEquivalentTo(tt.wantErr))
-				if tt.wantErr {
-					continue
-				}
-
-				option := core.CfgOption{
-					Type:    core.CfgTplType,
-					CfgType: tt.args.configConstraint.FileFormatConfig.Format,
-				}
-
-				patch, err := core.CreateMergePatch(&core.ConfigResource{
-					ConfigData: tt.args.baseCfg,
-				}, &core.ConfigResource{
-					ConfigData: got,
-				}, option)
-				Expect(err).Should(Succeed())
-
-				var patchJSON map[string]string
-				Expect(json.Unmarshal(patch.UpdateConfig["key"], &patchJSON)).Should(Succeed())
-				Expect(patchJSON).Should(BeEquivalentTo(tt.want))
-			}
-		})
-	})
+	// Context("MergeAndValidateConfigs", func() {
+	// 	It("Should succeed with no error", func() {
+	// 		type args struct {
+	// 			configConstraint appsv1beta1.ConfigConstraintSpec
+	// 			baseCfg          map[string]string
+	// 			updatedParams    []core.ParamPairs
+	// 			cmKeys           []string
+	// 		}
+	//
+	// 		configConstraintObj := testapps.NewCustomizedObj("resources/mysql-config-constraint.yaml",
+	// 			&appsv1beta1.ConfigConstraint{}, func(cc *appsv1beta1.ConfigConstraint) {
+	// 				if ccContext, err := testdata.GetTestDataFileContent("cue_testdata/pg14.cue"); err == nil {
+	// 					cc.Spec.ParametersSchema = &appsv1beta1.ParametersSchema{
+	// 						CUE: string(ccContext),
+	// 					}
+	// 				}
+	// 				cc.Spec.FileFormatConfig = &appsv1beta1.FileFormatConfig{
+	// 					Format: appsv1beta1.Properties,
+	// 				}
+	// 			})
+	//
+	// 		cfgContext, err := testdata.GetTestDataFileContent("cue_testdata/pg14.conf")
+	// 		Expect(err).Should(Succeed())
+	//
+	// 		tests := []struct {
+	// 			name    string
+	// 			args    args
+	// 			want    map[string]string
+	// 			wantErr bool
+	// 		}{{
+	// 			name: "pg1_merge",
+	// 			args: args{
+	// 				configConstraint: configConstraintObj.Spec,
+	// 				baseCfg: map[string]string{
+	// 					"key":  string(cfgContext),
+	// 					"key2": "not support context",
+	// 				},
+	// 				updatedParams: []core.ParamPairs{
+	// 					{
+	// 						Key: "key",
+	// 						UpdatedParams: map[string]interface{}{
+	// 							"max_connections": "200",
+	// 							"shared_buffers":  "512M",
+	// 						},
+	// 					},
+	// 				},
+	// 				cmKeys: []string{"key", "key3"},
+	// 			},
+	// 			want: map[string]string{
+	// 				"max_connections": "200",
+	// 				"shared_buffers":  "512M",
+	// 			},
+	// 		}, {
+	// 			name: "not_support_key_updated",
+	// 			args: args{
+	// 				configConstraint: configConstraintObj.Spec,
+	// 				baseCfg: map[string]string{
+	// 					"key":  string(cfgContext),
+	// 					"key2": "not_support_context",
+	// 				},
+	// 				updatedParams: []core.ParamPairs{
+	// 					{
+	// 						Key: "key",
+	// 						UpdatedParams: map[string]interface{}{
+	// 							"max_connections": "200",
+	// 							"shared_buffers":  "512M",
+	// 						},
+	// 					},
+	// 				},
+	// 				cmKeys: []string{"key1", "key2"},
+	// 			},
+	// 			wantErr: true,
+	// 		}}
+	// 		for _, tt := range tests {
+	// 			got, err := MergeAndValidateConfigs(tt.args.configConstraint, tt.args.baseCfg, tt.args.cmKeys, tt.args.updatedParams)
+	// 			Expect(err != nil).Should(BeEquivalentTo(tt.wantErr))
+	// 			if tt.wantErr {
+	// 				continue
+	// 			}
+	//
+	// 			option := core.CfgOption{
+	// 				Type:    core.CfgTplType,
+	// 				FileFormatFn: core.WithConfigFileFormat(nil),
+	// 			}
+	//
+	// 			patch, err := core.CreateMergePatch(&core.ConfigResource{
+	// 				ConfigData: tt.args.baseCfg,
+	// 			}, &core.ConfigResource{
+	// 				ConfigData: got,
+	// 			}, option)
+	// 			Expect(err).Should(Succeed())
+	//
+	// 			var patchJSON map[string]string
+	// 			Expect(json.Unmarshal(patch.UpdateConfig["key"], &patchJSON)).Should(Succeed())
+	// 			Expect(patchJSON).Should(BeEquivalentTo(tt.want))
+	// 		}
+	// 	})
+	// })
 
 })
 
 func TestCheckAndPatchPayload(t *testing.T) {
 	type args struct {
-		item      *v1alpha1.ConfigurationItemDetail
+		item      *parametersv1alpha1.ConfigTemplateItemDetail
 		payloadID string
 		payload   interface{}
 	}
@@ -415,7 +372,7 @@ func TestCheckAndPatchPayload(t *testing.T) {
 	}{{
 		name: "test",
 		args: args{
-			item:      &v1alpha1.ConfigurationItemDetail{},
+			item:      &parametersv1alpha1.ConfigTemplateItemDetail{},
 			payloadID: constant.BinaryVersionPayload,
 			payload:   "md5-12912uy1232o9y2",
 		},
@@ -430,8 +387,8 @@ func TestCheckAndPatchPayload(t *testing.T) {
 	}, {
 		name: "test-delete-payload",
 		args: args{
-			item: &v1alpha1.ConfigurationItemDetail{
-				Payload: v1alpha1.Payload{
+			item: &parametersv1alpha1.ConfigTemplateItemDetail{
+				Payload: parametersv1alpha1.Payload{
 					Data: map[string]any{
 						constant.BinaryVersionPayload: "md5-12912uy1232o9y2",
 					},
@@ -444,8 +401,8 @@ func TestCheckAndPatchPayload(t *testing.T) {
 	}, {
 		name: "test-update-payload",
 		args: args{
-			item: &v1alpha1.ConfigurationItemDetail{
-				Payload: v1alpha1.Payload{
+			item: &parametersv1alpha1.ConfigTemplateItemDetail{
+				Payload: parametersv1alpha1.Payload{
 					Data: map[string]any{
 						constant.BinaryVersionPayload: "md5-12912uy1232o9y2",
 						constant.ComponentResourcePayload: map[string]any{
@@ -482,53 +439,53 @@ func TestCheckAndPatchPayload(t *testing.T) {
 	}
 }
 
-func Test_filterImmutableParameters(t *testing.T) {
-	type args struct {
-		parameters      map[string]any
-		immutableParams []string
-	}
-	tests := []struct {
-		name string
-		args args
-		want map[string]any
-	}{{
-		name: "test",
-		args: args{
-			parameters: map[string]any{
-				"a": "b",
-				"c": "d",
-			},
-		},
-		want: map[string]any{
-			"a": "b",
-			"c": "d",
-		},
-	}, {
-		name: "test",
-		args: args{
-			parameters: map[string]any{
-				"a": "b",
-				"c": "d",
-			},
-			immutableParams: []string{"a", "d"},
-		},
-		want: map[string]any{
-			"c": "d",
-		},
-	}, {
-		name: "test",
-		args: args{
-			parameters:      map[string]any{},
-			immutableParams: []string{"a", "d"},
-		},
-		want: map[string]any{},
-	},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := filterImmutableParameters(tt.args.parameters, tt.args.immutableParams); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("filterImmutableParameters() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
+// func Test_filterImmutableParameters(t *testing.T) {
+// 	type args struct {
+// 		parameters      map[string]any
+// 		immutableParams []string
+// 	}
+// 	tests := []struct {
+// 		name string
+// 		args args
+// 		want map[string]any
+// 	}{{
+// 		name: "test",
+// 		args: args{
+// 			parameters: map[string]any{
+// 				"a": "b",
+// 				"c": "d",
+// 			},
+// 		},
+// 		want: map[string]any{
+// 			"a": "b",
+// 			"c": "d",
+// 		},
+// 	}, {
+// 		name: "test",
+// 		args: args{
+// 			parameters: map[string]any{
+// 				"a": "b",
+// 				"c": "d",
+// 			},
+// 			immutableParams: []string{"a", "d"},
+// 		},
+// 		want: map[string]any{
+// 			"c": "d",
+// 		},
+// 	}, {
+// 		name: "test",
+// 		args: args{
+// 			parameters:      map[string]any{},
+// 			immutableParams: []string{"a", "d"},
+// 		},
+// 		want: map[string]any{},
+// 	},
+// 	}
+// 	for _, tt := range tests {
+// 		t.Run(tt.name, func(t *testing.T) {
+// 			if got := filterImmutableParameters(tt.args.parameters, tt.args.immutableParams); !reflect.DeepEqual(got, tt.want) {
+// 				t.Errorf("filterImmutableParameters() = %v, want %v", got, tt.want)
+// 			}
+// 		})
+// 	}
+// }

@@ -24,8 +24,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -36,7 +34,7 @@ func ApplyParameters(item parametersv1alpha1.ConfigTemplateItemDetail, orig *cor
 		return nil, fmt.Errorf("not support parameter reconfigure")
 	}
 
-	newData, err := DoMerge(orig.Data, item.ConfigFileParams, paramsDefs, configRender.Spec.Configs, *item.ConfigSpec)
+	newData, err := DoMerge(orig.Data, item.ConfigFileParams, paramsDefs, configRender.Spec.Configs)
 	if err != nil {
 		return nil, err
 	}
@@ -49,7 +47,7 @@ func ApplyParameters(item parametersv1alpha1.ConfigTemplateItemDetail, orig *cor
 	return expected, nil
 }
 
-func DoMerge(baseData map[string]string, patch map[string]parametersv1alpha1.ParametersInFile, paramsDefs []*parametersv1alpha1.ParametersDefinition, configDescs []parametersv1alpha1.ComponentConfigDescription, configSpec appsv1.ComponentTemplateSpec) (map[string]string, error) {
+func DoMerge(baseData map[string]string, patch map[string]parametersv1alpha1.ParametersInFile, paramsDefs []*parametersv1alpha1.ParametersDefinition, configDescs []parametersv1alpha1.ComponentConfigDescription) (map[string]string, error) {
 	var (
 		updatedFiles  = make(map[string]string, len(patch))
 		updatedParams = make([]core.ParamPairs, 0, len(patch))
@@ -66,22 +64,22 @@ func DoMerge(baseData map[string]string, patch map[string]parametersv1alpha1.Par
 			})
 		}
 	}
-	return mergeUpdatedParams(baseData, updatedFiles, updatedParams, cc, configSpec)
+	return mergeUpdatedParams(baseData, updatedFiles, updatedParams, paramsDefs, configDescs)
 }
 
 func mergeUpdatedParams(base map[string]string,
 	updatedFiles map[string]string,
 	updatedParams []core.ParamPairs,
-	cc *appsv1beta1.ConfigConstraint,
-	tpl appsv1.ComponentConfigSpec) (map[string]string, error) {
+	paramsDefs []*parametersv1alpha1.ParametersDefinition,
+	configDescs []parametersv1alpha1.ComponentConfigDescription) (map[string]string, error) {
 	updatedConfig := base
 
 	// merge updated files into configmap
 	if len(updatedFiles) != 0 {
 		updatedConfig = core.MergeUpdatedConfig(base, updatedFiles)
 	}
-	if cc == nil {
+	if len(configDescs) == 0 {
 		return updatedConfig, nil
 	}
-	return intctrlutil.MergeAndValidateConfigs(cc.Spec, updatedConfig, tpl.Keys, updatedParams)
+	return intctrlutil.MergeAndValidateConfigs(updatedConfig, updatedParams, paramsDefs, configDescs)
 }

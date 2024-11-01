@@ -160,5 +160,4 @@ func (r *ComponentParameterReconciler) runTasks(taskCtx *TaskContext, tasks []Ta
 		return nil
 	}
 	return utilerrors.NewAggregate(errs)
-
 }

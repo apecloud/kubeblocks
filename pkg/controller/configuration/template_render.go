@@ -75,21 +75,28 @@ func RenderTemplate(resourceCtx *ResourceCtx,
 }
 
 func RerenderParametersTemplate(reconcileCtx *ReconcileCtx, item parametersv1alpha1.ConfigTemplateItemDetail, configRender *parametersv1alpha1.ParameterDrivenConfigRender, defs []*parametersv1alpha1.ParametersDefinition) (*corev1.ConfigMap, error) {
+	parametersValidate := func(m map[string]string) error {
+		return validateRenderedData(m, defs, configRender)
+	}
+
 	tplBuilder := NewTemplateBuilder(reconcileCtx)
-	cmName := core.GetComponentCfgName(reconcileCtx.SynthesizedComponent.ClusterName, reconcileCtx.SynthesizedComponent.Name, item.ConfigSpec.Name)
-	newCMObj, err := generateConfigMapFromTemplate(reconcileCtx.Cluster, reconcileCtx.SynthesizedComponent, tplBuilder,
-		cmName, *item.ConfigSpec, reconcileCtx, reconcileCtx.Client, func(m map[string]string) error {
-			return validateRenderedData(m, defs, configRender)
-		})
+	cmObj, err := generateConfigMapFromTemplate(reconcileCtx.Cluster,
+		reconcileCtx.SynthesizedComponent,
+		tplBuilder,
+		core.GetComponentCfgName(reconcileCtx.SynthesizedComponent.ClusterName, reconcileCtx.SynthesizedComponent.Name, item.ConfigSpec.Name),
+		*item.ConfigSpec,
+		reconcileCtx,
+		reconcileCtx.Client,
+		parametersValidate)
 	if err != nil {
 		return nil, err
 	}
 	if item.CustomTemplates != nil {
-		newData, err := mergerConfigTemplate(*item.CustomTemplates, tplBuilder, *item.ConfigSpec, newCMObj.Data, defs, configRender, reconcileCtx, reconcileCtx.Client)
+		newData, err := mergerConfigTemplate(*item.CustomTemplates, tplBuilder, *item.ConfigSpec, cmObj.Data, defs, configRender, reconcileCtx, reconcileCtx.Client)
 		if err != nil {
 			return nil, err
 		}
-		newCMObj.Data = newData
+		cmObj.Data = newData
 	}
-	return newCMObj, nil
+	return cmObj, nil
 }

@@ -36,7 +36,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
@@ -82,17 +81,14 @@ func mockConfigResource() (*corev1.ConfigMap, *appsv1beta1.ConfigConstraint) {
 
 	By("Create a configuration obj")
 	// test-cluster-mysql-mysql-config-tpl
-	configuration := builder.NewConfigurationBuilder(testCtx.DefaultNamespace, core.GenerateComponentParameterName(clusterName, defaultCompName)).
+	configuration := builder.NewComponentParameterBuilder(testCtx.DefaultNamespace, core.GenerateComponentParameterName(clusterName, defaultCompName)).
 		ClusterRef(clusterName).
 		Component(defaultCompName).
-		AddConfigurationItem(appsv1.ComponentConfigSpec{
-			ComponentTemplateSpec: appsv1.ComponentTemplateSpec{
-				Name:        configSpecName,
-				TemplateRef: configmap.Name,
-				Namespace:   configmap.Namespace,
-				VolumeName:  configVolumeName,
-			},
-			ConfigConstraintRef: constraint.Name,
+		AddConfigurationItem(appsv1.ComponentTemplateSpec{
+			Name:        configSpecName,
+			TemplateRef: configmap.Name,
+			Namespace:   configmap.Namespace,
+			VolumeName:  configVolumeName,
 		}).
 		GetObject()
 	Expect(testCtx.CreateObj(testCtx.Ctx, configuration)).Should(Succeed())
@@ -151,22 +147,22 @@ func mockReconcileResource() (*corev1.ConfigMap, *appsv1beta1.ConfigConstraint, 
 	return configmap, constraint, clusterObj, compObj, synthesizedComp
 }
 
-func initConfiguration(resourceCtx *configctrl.ResourceCtx,
-	synthesizedComponent *component.SynthesizedComponent,
-	clusterObj *appsv1.Cluster,
-	componentObj *appsv1.Component) error {
-	return configctrl.NewReloadActionBuilderHelper(configctrl.ReconcileCtx{
-		ResourceCtx:          resourceCtx,
-		Component:            componentObj,
-		SynthesizedComponent: synthesizedComponent,
-		Cluster:              clusterObj,
-		PodSpec:              synthesizedComponent.PodSpec,
-	}).
-		Prepare().
-		ComponentParameter(). // sync Configuration
-		InitConfigRelatedObject().
-		Complete()
-}
+// func initConfiguration(resourceCtx *configctrl.ResourceCtx,
+// 	synthesizedComponent *component.SynthesizedComponent,
+// 	clusterObj *appsv1.Cluster,
+// 	componentObj *appsv1.Component) error {
+// 	return configctrl.NewReloadActionBuilderHelper(configctrl.ReconcileCtx{
+// 		ResourceCtx:          resourceCtx,
+// 		Component:            componentObj,
+// 		SynthesizedComponent: synthesizedComponent,
+// 		Cluster:              clusterObj,
+// 		PodSpec:              synthesizedComponent.PodSpec,
+// 	}).
+// 		Prepare().
+// 		ComponentParameter(). // sync Configuration
+// 		InitConfigRelatedObject().
+// 		Complete()
+// }
 
 func cleanEnv() {
 	// must wait till resources deleted and no longer existed before the testcases start,

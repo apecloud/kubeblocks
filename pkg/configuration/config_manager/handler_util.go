@@ -23,6 +23,7 @@ import (
 	"context"
 	"path/filepath"
 	"regexp"
+	"slices"
 
 	"github.com/fsnotify/fsnotify"
 	corev1 "k8s.io/api/core/v1"
@@ -30,6 +31,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 )
 
@@ -64,31 +66,31 @@ type CfgManagerBuildParams struct {
 	ContainerPort int32 `json:"containerPort"`
 }
 
-func IsSupportReload(reload *appsv1beta1.ReloadAction) bool {
+func IsSupportReload(reload *parametersv1alpha1.ReloadAction) bool {
 	return reload != nil && isValidReloadPolicy(*reload)
 }
 
-func isValidReloadPolicy(reload appsv1beta1.ReloadAction) bool {
+func isValidReloadPolicy(reload parametersv1alpha1.ReloadAction) bool {
 	return reload.AutoTrigger != nil ||
 		reload.ShellTrigger != nil ||
 		reload.TPLScriptTrigger != nil ||
 		reload.UnixSignalTrigger != nil
 }
 
-func IsAutoReload(reload *appsv1beta1.ReloadAction) bool {
+func IsAutoReload(reload *parametersv1alpha1.ReloadAction) bool {
 	return reload != nil && reload.AutoTrigger != nil
 }
 
-func FromReloadTypeConfig(reloadAction *appsv1beta1.ReloadAction) appsv1beta1.DynamicReloadType {
+func FromReloadTypeConfig(reloadAction *parametersv1alpha1.ReloadAction) parametersv1alpha1.DynamicReloadType {
 	switch {
 	case reloadAction.UnixSignalTrigger != nil:
-		return appsv1beta1.UnixSignalType
+		return parametersv1alpha1.UnixSignalType
 	case reloadAction.ShellTrigger != nil:
-		return appsv1beta1.ShellType
+		return parametersv1alpha1.ShellType
 	case reloadAction.TPLScriptTrigger != nil:
-		return appsv1beta1.TPLScriptType
+		return parametersv1alpha1.TPLScriptType
 	case reloadAction.AutoTrigger != nil:
-		return appsv1beta1.AutoType
+		return parametersv1alpha1.AutoType
 	}
 	return ""
 }
@@ -155,34 +157,82 @@ func CreateValidConfigMapFilter() NotifyEventFilter {
 	}
 }
 
-func GetSupportReloadConfigSpecs(configSpecs []appsv1.Component, cli client.Client, ctx context.Context) ([]ConfigSpecMeta, error) {
+func actionToolsImage(reloadAction *parametersv1alpha1.ReloadAction) *parametersv1alpha1.ToolsSetup {
+	if reloadAction != nil && reloadAction.ShellTrigger != nil {
+		return reloadAction.ShellTrigger.ToolsSetup
+	}
+	return nil
+}
+
+func actionToolsScripts(paramDef parametersv1alpha1.ParametersDefinitionSpec) []parametersv1alpha1.ScriptConfig {
+	uniqueSlice := func(items []parametersv1alpha1.ScriptConfig) []parametersv1alpha1.ScriptConfig {
+		var uniqItems []parametersv1alpha1.ScriptConfig
+		for _, item := range items {
+			if !slices.Contains(uniqItems, item) {
+				uniqItems = append(uniqItems, item)
+			}
+		}
+		return uniqItems
+	}
+
+	scriptConfigs := make([]parametersv1alpha1.ScriptConfig, 0)
+	for _, action := range paramDef.DownwardAPIChangeTriggeredActions {
+		if action.ScriptConfig != nil {
+			scriptConfigs = append(scriptConfigs, *action.ScriptConfig)
+		}
+	}
+	if paramDef.ReloadAction == nil {
+		return uniqueSlice(scriptConfigs)
+	}
+	if paramDef.ReloadAction.ShellTrigger != nil && paramDef.ReloadAction.ShellTrigger.ScriptConfig != nil {
+		scriptConfigs = append(scriptConfigs, *paramDef.ReloadAction.ShellTrigger.ScriptConfig)
+	}
+	return uniqueSlice(scriptConfigs)
+}
+
+func GetSupportReloadConfigSpecs(configSpecs []appsv1.ComponentTemplateSpec,
+	configDescs []parametersv1alpha1.ComponentConfigDescription,
+	paramsDefs []*parametersv1alpha1.ParametersDefinition) ([]ConfigSpecMeta, error) {
+	resolveReloadAction := func(fileName string) *parametersv1alpha1.ParametersDefinition {
+		for _, paramsDef := range paramsDefs {
+			if paramsDef.Spec.FileName == fileName {
+				return paramsDef
+			}
+		}
+		return nil
+	}
+	resolveConfigTemplate := func(name string) *appsv1.ComponentTemplateSpec {
+		for i, configSpec := range configSpecs {
+			if configSpec.Name == name {
+				return &configSpecs[i]
+			}
+		}
+		return nil
+	}
+
 	var reloadConfigSpecMeta []ConfigSpecMeta
-	for _, configSpec := range configSpecs {
-		// pass if support change and reload ConfigMap when parameters change
-		if !core.NeedReloadVolume(configSpec) {
+	for _, desc := range configDescs {
+		paramsDef := resolveReloadAction(desc.Name)
+		if paramsDef == nil || paramsDef.Spec.ReloadAction == nil || desc.FileFormatConfig == nil {
 			continue
 		}
-		ccKey := client.ObjectKey{
-			Namespace: "",
-			Name:      configSpec.ConfigConstraintRef,
+		configSpec := resolveConfigTemplate(desc.TemplateName)
+		if configSpec == nil {
+			continue
 		}
-		cc := &appsv1beta1.ConfigConstraint{}
-		if err := cli.Get(ctx, ccKey, cc); err != nil {
-			return nil, core.WrapError(err, "failed to get ConfigConstraint, key[%v]", ccKey)
-		}
-		reloadOptions := cc.Spec.ReloadAction
-		if !IsSupportReload(reloadOptions) || IsAutoReload(reloadOptions) {
+		action := paramsDef.Spec.ReloadAction
+		if !IsSupportReload(action) || IsAutoReload(action) {
 			continue
 		}
 		reloadConfigSpecMeta = append(reloadConfigSpecMeta, ConfigSpecMeta{
-			ToolsImageSpec: cc.Spec.GetToolsSetup(),
-			ScriptConfig:   cc.Spec.GetScriptConfigs(),
+			ToolsImageSpec: actionToolsImage(action),
+			ScriptConfig:   actionToolsScripts(paramsDef.Spec),
 			ConfigSpecInfo: ConfigSpecInfo{
-				ReloadAction:       cc.Spec.ReloadAction,
-				ConfigSpec:         configSpec,
-				ReloadType:         FromReloadTypeConfig(reloadOptions),
-				DownwardAPIOptions: cc.Spec.DownwardAPIChangeTriggeredActions,
-				FormatterConfig:    *cc.Spec.FileFormatConfig,
+				ReloadAction:       action,
+				FormatterConfig:    *desc.FileFormatConfig,
+				ConfigSpec:         *configSpec,
+				ReloadType:         FromReloadTypeConfig(action),
+				DownwardAPIOptions: paramsDef.Spec.DownwardAPIChangeTriggeredActions,
 			},
 		})
 	}

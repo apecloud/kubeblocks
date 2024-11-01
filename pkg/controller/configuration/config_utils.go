@@ -70,8 +70,8 @@ func createConfigObjects(cli client.Client, ctx context.Context, objs []client.O
 func BuildReloadActionContainer(resourceCtx *ResourceCtx,
 	cluster *appsv1.Cluster,
 	synthesizedComp *component.SynthesizedComponent,
-	componentParameter *parametersv1alpha1.ComponentParameter,
-	configRender *parametersv1alpha1.ParameterDrivenConfigRender) error {
+	configRender *parametersv1alpha1.ParameterDrivenConfigRender,
+	paramsDefs []*parametersv1alpha1.ParametersDefinition) error {
 	var (
 		err         error
 		buildParams *cfgcm.CfgManagerBuildParams
@@ -80,11 +80,15 @@ func BuildReloadActionContainer(resourceCtx *ResourceCtx,
 		configSpecs = synthesizedComp.ConfigTemplates
 	)
 
+	if configRender == nil || len(configRender.Spec.Configs) == 0 {
+		return nil
+	}
+
 	volumeDirs, usingConfigSpecs := getUsingVolumesByConfigSpecs(podSpec, configSpecs)
 	if len(volumeDirs) == 0 {
 		return nil
 	}
-	configSpecMetas, err := cfgcm.GetSupportReloadConfigSpecs(usingConfigSpecs, resourceCtx.Client, resourceCtx)
+	configSpecMetas, err := cfgcm.GetSupportReloadConfigSpecs(usingConfigSpecs, configRender.Spec.Configs, paramsDefs)
 	if err != nil {
 		return err
 	}
@@ -179,7 +183,7 @@ func updateCfgManagerVolumes(podSpec *corev1.PodSpec, configManager *cfgcm.CfgMa
 	// }
 }
 
-func getUsingVolumesByConfigSpecs(podSpec *corev1.PodSpec, configSpecs []appsv1.ComponentTemplateSpec) ([]corev1.VolumeMount, []appsv1.ComponentConfigSpec) {
+func getUsingVolumesByConfigSpecs(podSpec *corev1.PodSpec, configSpecs []appsv1.ComponentTemplateSpec) ([]corev1.VolumeMount, []appsv1.ComponentTemplateSpec) {
 	// Ignore useless configTemplate
 	usingConfigSpecs := make([]appsv1.ComponentTemplateSpec, 0, len(configSpecs))
 	config2Containers := make(map[string][]*corev1.Container)
@@ -201,10 +205,6 @@ func getUsingVolumesByConfigSpecs(podSpec *corev1.PodSpec, configSpecs []appsv1.
 	// Find out which configurations are used by the container
 	volumeDirs := make([]corev1.VolumeMount, 0, len(configSpecs)+1)
 	for _, configSpec := range usingConfigSpecs {
-		// Ignore config template, e.g scripts configmap
-		if !core.NeedReloadVolume(configSpec) {
-			continue
-		}
 		sets := cfgutil.NewSet()
 		for _, container := range config2Containers[configSpec.Name] {
 			volume := intctrlutil.GetVolumeMountByVolume(container, configSpec.VolumeName)
@@ -278,30 +278,30 @@ func findPortByPortName(container corev1.Container) (int32, bool) {
 }
 
 // UpdateConfigPayload updates the configuration payload
-func UpdateConfigPayload(config *parametersv1alpha1.ComponentParameterSpec, component *component.SynthesizedComponent) (bool, error) {
-	updated := false
-	for i := range config.ConfigItemDetails {
-		configSpec := &config.ConfigItemDetails[i]
-		// check v-scale operation
-		if enableVScaleTrigger(configSpec.ConfigSpec) {
-			resourcePayload := intctrlutil.ResourcesPayloadForComponent(component.Resources)
-			ret, err := intctrlutil.CheckAndPatchPayload(configSpec, constant.ComponentResourcePayload, resourcePayload)
-			if err != nil {
-				return false, err
-			}
-			updated = updated || ret
-		}
-		// check h-scale operation
-		if enableHScaleTrigger(configSpec.ConfigSpec) {
-			ret, err := intctrlutil.CheckAndPatchPayload(configSpec, constant.ReplicasPayload, component.Replicas)
-			if err != nil {
-				return false, err
-			}
-			updated = updated || ret
-		}
-	}
-	return updated, nil
-}
+// func UpdateConfigPayload(config *parametersv1alpha1.ComponentParameterSpec, component *appsv1.ComponentTemplateSpec) (bool, error) {
+// 	updated := false
+// 	for i := range config.ConfigItemDetails {
+// 		configSpec := &config.ConfigItemDetails[i]
+// 		// check v-scale operation
+// 		if enableVScaleTrigger(configSpec.ConfigSpec) {
+// 			resourcePayload := intctrlutil.ResourcesPayloadForComponent(component.Resources)
+// 			ret, err := intctrlutil.CheckAndPatchPayload(configSpec, constant.ComponentResourcePayload, resourcePayload)
+// 			if err != nil {
+// 				return false, err
+// 			}
+// 			updated = updated || ret
+// 		}
+// 		// check h-scale operation
+// 		if enableHScaleTrigger(configSpec.ConfigSpec) {
+// 			ret, err := intctrlutil.CheckAndPatchPayload(configSpec, constant.ReplicasPayload, component.Replicas)
+// 			if err != nil {
+// 				return false, err
+// 			}
+// 			updated = updated || ret
+// 		}
+// 	}
+// 	return updated, nil
+// }
 
 func validRerenderResources(configSpec *appsv1alpha1.ComponentConfigSpec) bool {
 	return configSpec != nil && len(configSpec.ReRenderResourceTypes) != 0

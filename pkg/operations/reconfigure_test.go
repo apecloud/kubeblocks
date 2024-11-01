@@ -99,7 +99,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 		}
 
 		By("create configuration cr")
-		configuration := builder.NewConfigurationBuilder(testCtx.DefaultNamespace, core.GenerateComponentParameterName(clusterName, componentName)).
+		configuration := builder.NewComponentParameterBuilder(testCtx.DefaultNamespace, core.GenerateComponentParameterName(clusterName, componentName)).
 			ClusterRef(clusterName).
 			Component(componentName)
 		for _, configSpec := range compDef.Spec.Configs {

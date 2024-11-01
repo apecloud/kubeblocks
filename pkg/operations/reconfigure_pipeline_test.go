@@ -31,9 +31,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -56,7 +56,7 @@ var _ = Describe("Reconfigure util test", func() {
 		componentName = "mysql"
 	)
 
-	mockCfgTplObj := func(tpl appsv1.ComponentConfigSpec) (*corev1.ConfigMap, *appsv1beta1.ConfigConstraint, *appsv1alpha1.Configuration) {
+	mockCfgTplObj := func(tpl appsv1.ComponentConfigSpec) (*corev1.ConfigMap, *appsv1beta1.ConfigConstraint, *parametersv1alpha1.ComponentParameter) {
 		By("By assure an cm obj")
 
 		cfgCM := testapps.NewCustomizedObj("operations_config/config-template.yaml",
@@ -66,12 +66,12 @@ var _ = Describe("Reconfigure util test", func() {
 			&appsv1beta1.ConfigConstraint{},
 			testapps.WithNamespacedName(tpl.ConfigConstraintRef, tpl.Namespace))
 
-		configuration := builder.NewConfigurationBuilder(testCtx.DefaultNamespace,
+		configuration := builder.NewComponentParameterBuilder(testCtx.DefaultNamespace,
 			core.GenerateComponentParameterName(clusterName, componentName)).
 			ClusterRef(clusterName).
 			Component(componentName).
-			AddConfigurationItem(tpl).
-			AddConfigurationItem(tpl2)
+			AddConfigurationItem(tpl.ComponentTemplateSpec).
+			AddConfigurationItem(tpl2.ComponentTemplateSpec)
 		return cfgCM, cfgTpl, configuration.GetObject()
 	}
 

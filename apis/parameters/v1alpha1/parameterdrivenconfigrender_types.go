@@ -91,6 +91,11 @@ type ComponentConfigDescription struct {
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
+	// Specifies the name of the referenced componentTemplateSpec.
+	//
+	// +kubebuilder:validation:Required
+	TemplateName string `json:"templateName"`
+
 	// Specifies the format of the configuration file and any associated parameters that are specific to the chosen format.
 	// Supported formats include `ini`, `xml`, `yaml`, `json`, `hcl`, `dotenv`, `properties`, and `toml`.
 	//

@@ -29,6 +29,7 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -78,6 +79,7 @@ var _ = Describe("cluster component transformer test", func() {
 		clusterTopologyNoOrders            = "test-topology-no-orders"
 		clusterTopologyProvisionNUpdateOOD = "test-topology-ood"
 		clusterTopology4Stop               = "test-topology-stop"
+		clusterTopologyTemplate            = "test-topology-template"
 		compDefName                        = "test-compdef"
 		clusterName                        = "test-cluster"
 		comp1aName                         = "comp-1a"
@@ -200,6 +202,31 @@ var _ = Describe("cluster component transformer test", func() {
 					Update: []string{comp1aName, comp2aName, comp3aName},
 				},
 			}).
+			AddClusterTopology(appsv1alpha1.ClusterTopology{
+				Name: clusterTopologyTemplate,
+				Components: []appsv1alpha1.ClusterTopologyComponent{
+					{
+						Name:    comp1aName,
+						CompDef: compDefName,
+					},
+					{
+						Name:     comp2aName,
+						CompDef:  compDefName,
+						Template: pointer.Bool(true),
+					},
+					{
+						Name:    comp2bName,
+						CompDef: compDefName,
+					},
+					{
+						Name:    comp3aName,
+						CompDef: compDefName,
+					},
+				},
+				Orders: &appsv1alpha1.ClusterTopologyOrders{
+					Provision: []string{comp1aName, fmt.Sprintf("%s,%s", comp2aName, comp2bName), comp3aName},
+				},
+			}).
 			GetObject()
 	})
 
@@ -240,12 +267,18 @@ var _ = Describe("cluster component transformer test", func() {
 		return comp
 	}
 
-	newTransformerNCtx := func(topology string) (graph.Transformer, *clusterTransformContext, *graph.DAG) {
-		cluster := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, "").
+	newTransformerNCtx := func(topology string, processors ...func(*testapps.MockClusterFactory)) (graph.Transformer, *clusterTransformContext, *graph.DAG) {
+		f := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName, "").
 			WithRandomName().
-			SetTopology(topology).
-			SetReplicas(1).
-			GetObject()
+			SetTopology(topology)
+		if len(processors) > 0 {
+			for _, processor := range processors {
+				processor(f)
+			}
+		} else {
+			f.SetReplicas(1)
+		}
+		cluster := f.GetObject()
 		graphCli := model.NewGraphClient(k8sClient)
 		transCtx := &clusterTransformContext{
 			Context:        ctx,
@@ -633,6 +666,79 @@ var _ = Describe("cluster component transformer test", func() {
 			// try again
 			err = transformer.Transform(transCtx, dag)
 			Expect(err).Should(BeNil())
+		})
+
+		It("template component - has no components instantiated", func() {
+			transformer, transCtx, dag := newTransformerNCtx(clusterTopologyTemplate)
+
+			// check the components created, no components should be instantiated from the template automatically
+			Expect(transCtx.ComponentSpecs).Should(HaveLen(3))
+			Expect(transCtx.ComponentSpecs[0].Name).Should(Equal(comp1aName))
+			Expect(transCtx.ComponentSpecs[1].Name).Should(Equal(comp2bName))
+			Expect(transCtx.ComponentSpecs[2].Name).Should(Equal(comp3aName))
+
+			// mock first component status as running
+			reader := &mockReader{
+				objs: []client.Object{
+					mockCompObj(transCtx, comp1aName, func(comp *appsv1alpha1.Component) {
+						comp.Status.Phase = appsv1alpha1.RunningClusterCompPhase
+					}),
+				},
+			}
+			transCtx.Client = model.NewGraphClient(reader)
+
+			err := transformer.Transform(transCtx, dag)
+			Expect(err).ShouldNot(BeNil())
+			Expect(err.Error()).Should(And(ContainSubstring("retry later"), ContainSubstring(comp3aName)))
+
+			// check other components
+			graphCli := transCtx.Client.(model.GraphClient)
+			objs := graphCli.FindAll(dag, &appsv1alpha1.Component{})
+			Expect(len(objs)).Should(Equal(1))
+			for _, obj := range objs {
+				comp := obj.(*appsv1alpha1.Component)
+				Expect(component.ShortName(transCtx.Cluster.Name, comp.Name)).Should(Equal(comp2bName))
+				Expect(graphCli.IsAction(dag, comp, model.ActionCreatePtr())).Should(BeTrue())
+			}
+		})
+
+		It("template component - has components instantiated", func() {
+			transformer, transCtx, dag := newTransformerNCtx(clusterTopologyTemplate, func(f *testapps.MockClusterFactory) {
+				f.AddComponent(fmt.Sprintf("%s-0", comp2aName), compDefName).
+					AddComponent(fmt.Sprintf("%s-1", comp2aName), compDefName)
+			})
+
+			// check the components created
+			Expect(transCtx.ComponentSpecs).Should(HaveLen(5))
+			Expect(transCtx.ComponentSpecs[0].Name).Should(Equal(comp1aName))
+			Expect(transCtx.ComponentSpecs[1].Name).Should(HavePrefix(comp2aName))
+			Expect(transCtx.ComponentSpecs[2].Name).Should(HavePrefix(comp2aName))
+			Expect(transCtx.ComponentSpecs[3].Name).Should(Equal(comp2bName))
+			Expect(transCtx.ComponentSpecs[4].Name).Should(Equal(comp3aName))
+
+			// mock first component status as running
+			reader := &mockReader{
+				objs: []client.Object{
+					mockCompObj(transCtx, comp1aName, func(comp *appsv1alpha1.Component) {
+						comp.Status.Phase = appsv1alpha1.RunningClusterCompPhase
+					}),
+				},
+			}
+			transCtx.Client = model.NewGraphClient(reader)
+
+			err := transformer.Transform(transCtx, dag)
+			Expect(err).ShouldNot(BeNil())
+			Expect(err.Error()).Should(And(ContainSubstring("retry later"), ContainSubstring(comp3aName)))
+
+			// check other components
+			graphCli := transCtx.Client.(model.GraphClient)
+			objs := graphCli.FindAll(dag, &appsv1alpha1.Component{})
+			Expect(len(objs)).Should(Equal(3))
+			for _, obj := range objs {
+				comp := obj.(*appsv1alpha1.Component)
+				Expect(component.ShortName(transCtx.Cluster.Name, comp.Name)).Should(Or(HavePrefix(comp2aName), Equal(comp2bName)))
+				Expect(graphCli.IsAction(dag, comp, model.ActionCreatePtr())).Should(BeTrue())
+			}
 		})
 	})
 })

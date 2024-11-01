@@ -23,7 +23,6 @@ import (
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/cuecontext"
 
-	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/unstructured"

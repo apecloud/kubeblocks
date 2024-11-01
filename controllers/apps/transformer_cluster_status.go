@@ -85,29 +85,6 @@ func (t *clusterStatusTransformer) reconcileClusterStatus(transCtx *clusterTrans
 	return nil
 }
 
-// func (t *clusterStatusTransformer) removeDeletedCompNSharding(transCtx *clusterTransformContext, cluster *appsv1.Cluster) {
-//	func() {
-//		tmp := map[string]appsv1.ClusterComponentStatus{}
-//		compsStatus := cluster.Status.Components
-//		for _, v := range transCtx.components {
-//			if status, ok := compsStatus[v.Name]; ok {
-//				tmp[v.Name] = status
-//			}
-//		}
-//		cluster.Status.Components = tmp
-//	}()
-//	func() {
-//		tmp := map[string]appsv1.ClusterComponentStatus{}
-//		shardingsStatus := cluster.Status.Shardings
-//		for _, v := range transCtx.shardings {
-//			if status, ok := shardingsStatus[v.Name]; ok {
-//				tmp[v.Name] = status
-//			}
-//		}
-//		cluster.Status.Shardings = tmp
-//	}()
-// }
-
 func (t *clusterStatusTransformer) reconcileClusterPhase(cluster *appsv1.Cluster) appsv1.ClusterPhase {
 	statusList := make([]appsv1.ClusterComponentStatus, 0)
 	if cluster.Status.Components != nil {

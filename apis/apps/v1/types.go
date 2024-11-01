@@ -81,6 +81,7 @@ const (
 	ConditionTypeProvisioningStarted = "ProvisioningStarted" // ConditionTypeProvisioningStarted the operator starts resource provisioning to create or change the cluster
 	ConditionTypeApplyResources      = "ApplyResources"      // ConditionTypeApplyResources the operator start to apply resources to create or change the cluster
 	ConditionTypeReady               = "Ready"               // ConditionTypeReady all components and shardings are running
+	ConditionTypeAvailable           = "Available"           // ConditionTypeAvailable indicates whether the target object is available for serving.
 )
 
 type ServiceRef struct {

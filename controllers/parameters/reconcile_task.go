@@ -149,18 +149,21 @@ func syncImpl(taskCtx *TaskContext,
 		return err
 	}
 
-	var cm *corev1.ConfigMap
+	var baseConfig = configMap
+	var updatedConfig *corev1.ConfigMap
 	if intctrlutil.IsRerender(configMap, item) {
-		if cm, err = configctrl.RerenderParametersTemplate(reconcileCtx, *item.ConfigSpec, taskCtx.configRender, taskCtx.paramsDefs); err != nil {
+		if baseConfig, err = configctrl.RerenderParametersTemplate(reconcileCtx, item, taskCtx.configRender, taskCtx.paramsDefs); err != nil {
 			return failStatus(err)
 		}
-	} else if len(item.ConfigFileParams) != 0 {
-		if cm, err = configctrl.ApplyParameters(item, configMap, taskCtx.configRender, taskCtx.paramsDefs, revision); err != nil {
+		updatedConfig = baseConfig
+	}
+	if len(item.ConfigFileParams) != 0 {
+		if updatedConfig, err = configctrl.ApplyParameters(item, baseConfig, taskCtx.configRender, taskCtx.paramsDefs, revision); err != nil {
 			return failStatus(err)
 		}
 	}
 
-	if err = mergeAndUpdate(fetcher.ResourceCtx, cm, configMap, fetcher.ComponentParameterObj); err != nil {
+	if err = mergeAndUpdate(fetcher.ResourceCtx, updatedConfig, configMap, fetcher.ComponentParameterObj); err != nil {
 		return failStatus(err)
 	}
 

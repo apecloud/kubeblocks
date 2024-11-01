@@ -92,23 +92,20 @@ var _ = Describe("ToolsImageBuilderTest", func() {
 						},
 					},
 				}},
-				ConfigLazyRenderedVolumes: make(map[string]corev1.VolumeMount),
 			}
 			cfgManagerParams.ConfigSpecsBuildParams[0].ConfigSpec.VolumeName = "data"
-			cfgManagerParams.ConfigSpecsBuildParams[0].ConfigSpec.LegacyRenderedConfigSpec = &appsv1.LegacyRenderedTemplateSpec{
-				ConfigTemplateExtension: appsv1.ConfigTemplateExtension{
-					Namespace:   testCtx.DefaultNamespace,
-					TemplateRef: "secondary_template",
-					Policy:      appsv1.NoneMergePolicy,
-				},
-			}
+			// cfgManagerParams.ConfigSpecsBuildParams[0].ConfigSpec.LegacyRenderedConfigSpec = &appsv1.LegacyRenderedTemplateSpec{
+			// 	ConfigTemplateExtension: appsv1.ConfigTemplateExtension{
+			// 		Namespace:   testCtx.DefaultNamespace,
+			// 		TemplateRef: "secondary_template",
+			// 		Policy:      appsv1.NoneMergePolicy,
+			// 	},
+			// }
 			Expect(buildReloadToolsContainer(cfgManagerParams, &its.Spec.Template.Spec)).Should(Succeed())
-			Expect(4).Should(BeEquivalentTo(len(cfgManagerParams.ToolsContainers)))
+			Expect(3).Should(BeEquivalentTo(len(cfgManagerParams.ToolsContainers)))
 			Expect("test_images").Should(BeEquivalentTo(cfgManagerParams.ToolsContainers[0].Image))
 			Expect(its.Spec.Template.Spec.Containers[0].Image).Should(BeEquivalentTo(cfgManagerParams.ToolsContainers[1].Image))
 			Expect(kbToolsImage).Should(BeEquivalentTo(cfgManagerParams.ToolsContainers[2].Image))
-			Expect(kbToolsImage).Should(BeEquivalentTo(cfgManagerParams.ToolsContainers[3].Image))
-			Expect(initSecRenderedToolContainerName).Should(BeEquivalentTo(cfgManagerParams.ToolsContainers[3].Name))
 		})
 	})
 

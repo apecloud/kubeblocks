@@ -163,14 +163,14 @@ func NewTemplateMerger(template appsv1.ConfigTemplateExtension,
 	return merger, nil
 }
 
-func mergerConfigTemplate(template *appsv1.LegacyRenderedTemplateSpec,
+func mergerConfigTemplate(template appsv1.ConfigTemplateExtension,
 	builder *configTemplateBuilder,
 	configSpec appsv1.ComponentTemplateSpec,
 	baseData map[string]string,
 	paramsDefs []*parametersv1alpha1.ParametersDefinition,
 	configRender *parametersv1alpha1.ParameterDrivenConfigRender,
 	ctx context.Context, cli client.Client) (map[string]string, error) {
-	templateMerger, err := NewTemplateMerger(template.ConfigTemplateExtension, ctx, cli, builder, configSpec, paramsDefs, configRender)
+	templateMerger, err := NewTemplateMerger(template, ctx, cli, builder, configSpec, paramsDefs, configRender)
 	if err != nil {
 		return nil, err
 	}

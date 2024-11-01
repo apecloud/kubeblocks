@@ -118,11 +118,9 @@ var _ = Describe("Config Builder Test", func() {
 		return []ConfigSpecMeta{
 			{
 				ConfigSpecInfo: ConfigSpecInfo{
-					ConfigSpec: appsv1.ComponentConfigSpec{
-						ComponentTemplateSpec: appsv1.ComponentTemplateSpec{
-							Name:       "pg_config",
-							VolumeName: "pg_config",
-						},
+					ConfigSpec: appsv1.ComponentTemplateSpec{
+						Name:       "pg_config",
+						VolumeName: "pg_config",
 					},
 				},
 			},
@@ -137,11 +135,10 @@ var _ = Describe("Config Builder Test", func() {
 					Namespace: "default",
 				},
 			},
-			ComponentName:             "test",
-			Volumes:                   newVolumeMounts(),
-			ConfigSpecsBuildParams:    newConfigSpecMeta(),
-			ConfigLazyRenderedVolumes: make(map[string]corev1.VolumeMount),
-			DownwardAPIVolumes:        make([]corev1.VolumeMount, 0),
+			ComponentName:          "test",
+			Volumes:                newVolumeMounts(),
+			ConfigSpecsBuildParams: newConfigSpecMeta(),
+			DownwardAPIVolumes:     make([]corev1.VolumeMount, 0),
 		}
 		if hasScripts {
 			param.ConfigSpecsBuildParams[0].ScriptConfig = []appsv1beta1.ScriptConfig{
@@ -277,12 +274,6 @@ formatterConfig:
 				buildParam := &param.ConfigSpecsBuildParams[i]
 				buildParam.ReloadAction = reloadOptions
 				buildParam.ReloadType = appsv1beta1.TPLScriptType
-				buildParam.ConfigSpec.LegacyRenderedConfigSpec = &appsv1.LegacyRenderedTemplateSpec{
-					ConfigTemplateExtension: appsv1.ConfigTemplateExtension{
-						Namespace:   scriptsNS,
-						TemplateRef: lazyRenderedTemplateName,
-					},
-				}
 			}
 			Expect(BuildConfigManagerContainerParams(mockK8sCli.Client(), context.TODO(), param, newVolumeMounts())).Should(Succeed())
 			for _, buildParam := range param.ConfigSpecsBuildParams {

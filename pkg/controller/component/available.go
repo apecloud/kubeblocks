@@ -43,8 +43,8 @@ import (
 )
 
 const (
-	availableProbe         = "availableProbe"
-	availableProbeEventKey = "apps.kubeblocks.io/available-probe-event"
+	availableProbe           = "availableProbe"
+	availableProbeMessageKey = "Event/available-probe"
 )
 
 type AvailableEventHandler struct{}
@@ -113,25 +113,13 @@ func (h *AvailableEventHandler) status(ctx context.Context, cli client.Client, r
 			Reason:             reason,
 			Message:            message,
 		}
-		// backup the available probe events
-		probeEvents, ok = comp.Annotations[availableProbeEventKey]
 	)
-	if meta.SetStatusCondition(&comp.Status.Conditions, cond) {
-		recorder.Event(comp, corev1.EventTypeNormal, reason, message)
-		if err := cli.Status().Patch(ctx, comp, client.MergeFrom(compCopy)); err != nil {
-			return err
+	changed := meta.SetStatusCondition(&comp.Status.Conditions, cond)
+	if changed || !reflect.DeepEqual(comp.Status.Message, compCopy.Status.Message) {
+		if changed {
+			recorder.Event(comp, corev1.EventTypeNormal, reason, message)
 		}
-		compCopy = comp.DeepCopy() // update the compCopy since the comp is updated
-	}
-
-	if ok {
-		if comp.Annotations == nil {
-			comp.Annotations = make(map[string]string)
-		}
-		comp.Annotations[availableProbeEventKey] = probeEvents
-	}
-	if !reflect.DeepEqual(comp.Annotations, compCopy.Annotations) {
-		return cli.Patch(ctx, comp, client.MergeFrom(compCopy))
+		return cli.Status().Patch(ctx, comp, client.MergeFrom(compCopy))
 	}
 	return nil
 }
@@ -267,10 +255,10 @@ func (h *AvailableEventHandler) pickupProbeEvents(event probeEvent, timeWindow i
 }
 
 func (h *AvailableEventHandler) getCachedEvents(comp *appsv1.Component) ([]probeEvent, error) {
-	if comp.Annotations == nil {
+	if comp.Status.Message == nil {
 		return nil, nil
 	}
-	message, ok := comp.Annotations[availableProbeEventKey]
+	message, ok := comp.Status.Message[availableProbeMessageKey]
 	if !ok {
 		return nil, nil
 	}
@@ -283,7 +271,7 @@ func (h *AvailableEventHandler) getCachedEvents(comp *appsv1.Component) ([]probe
 }
 
 func (h *AvailableEventHandler) updateCachedEvents(comp *appsv1.Component, events []probeEvent) error {
-	if comp.Annotations == nil && len(events) == 0 {
+	if comp.Status.Message == nil && len(events) == 0 {
 		return nil
 	}
 
@@ -292,10 +280,10 @@ func (h *AvailableEventHandler) updateCachedEvents(comp *appsv1.Component, event
 		return err
 	}
 
-	if comp.Annotations == nil {
-		comp.Annotations = make(map[string]string)
+	if comp.Status.Message == nil {
+		comp.Status.Message = make(map[string]string)
 	}
-	comp.Annotations[availableProbeEventKey] = string(out)
+	comp.Status.Message[availableProbeMessageKey] = string(out)
 
 	return nil
 }

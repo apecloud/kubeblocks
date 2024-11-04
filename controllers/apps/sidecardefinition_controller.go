@@ -145,7 +145,7 @@ func (r *SidecarDefinitionReconciler) deletionHandler(rctx intctrlutil.RequestCt
 				"cannot be deleted because of existing referencing Cluster")
 		}
 		if res, err := intctrlutil.ValidateReferenceCR(rctx, r.Client, sidecarDef, constant.SidecarDefLabelKey,
-			recordEvent, &appsv1.ClusterList{}); res != nil || err != nil {
+			recordEvent, &appsv1.ComponentList{}); res != nil || err != nil {
 			return res, err
 		}
 		return nil, nil
@@ -210,11 +210,13 @@ func (r *SidecarDefinitionReconciler) validateNResolveOwner(compDefs []appsv1.Co
 			matched = append(matched, compDef.Name)
 		}
 	}
+	// a valid owner is required
 	if len(matched) == 0 {
 		return fmt.Errorf("no matched owner found: %s", owner)
 	}
 
 	// set the matched owners
+	slices.Sort(matched)
 	sidecarDef.Status.Owners = strings.Join(matched, ",")
 
 	return nil
@@ -238,6 +240,7 @@ func (r *SidecarDefinitionReconciler) validateNResolveSelectors(compDefs []appsv
 	}
 
 	// set the matched selectors
+	slices.Sort(matched)
 	sidecarDef.Status.Selectors = strings.Join(matched, ",")
 
 	return nil

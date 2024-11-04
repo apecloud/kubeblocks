@@ -901,17 +901,19 @@ func shardingCompNName(comp *appsv1.Component) string {
 
 func buildComponentWrapper(transCtx *clusterTransformContext,
 	spec *appsv1.ClusterComponentSpec, labels, annotations map[string]string, running *appsv1.Component) (*appsv1.Component, error) {
+	// cluster.spec.components[*] has no sidecars defined, so we need to build sidecars for it here
 	comp, err := component.BuildComponent(transCtx.Cluster, spec, labels, annotations)
 	if err != nil {
 		return nil, err
 	}
-	if err = buildSidecars4Component(transCtx, comp, running); err != nil {
+	if err = buildComponentSidecars(transCtx, comp, running); err != nil {
 		return nil, err
 	}
 	return comp, nil
 }
 
-func buildSidecars4Component(transCtx *clusterTransformContext, proto, running *appsv1.Component) error {
+func buildComponentSidecars(transCtx *clusterTransformContext, proto, running *appsv1.Component) error {
+	// component definitions used by all components and shardings of the cluster
 	compDefs := func() sets.Set[string] {
 		defs := sets.New[string]()
 		for _, spec := range transCtx.components {
@@ -929,10 +931,14 @@ func buildSidecars4Component(transCtx *clusterTransformContext, proto, running *
 	}
 	if len(sidecars) > 0 {
 		for name, sidecar := range sidecars {
-			if err = buildSidecar4Component(proto, running, name, sidecar); err != nil {
+			if err = buildComponentSidecar(proto, running, name, sidecar); err != nil {
 				return err
 			}
 		}
+		// keep the sidecars ordered
+		slices.SortFunc(proto.Spec.Sidecars, func(a, b appsv1.Sidecar) int {
+			return strings.Compare(a.Name, b.Name)
+		})
 	}
 	return nil
 }
@@ -953,25 +959,25 @@ func hostedSidecarsOfCompDef(ctx context.Context, cli client.Reader, compDefs se
 		}
 		selected := compDefs.Intersection(selectors)
 		if len(selected) == 0 {
-			return nil, nil
+			return nil, fmt.Errorf("no comp-def selected by sidecar definition: %s", sidecarDef.Name)
 		}
-		if !selected.Has(compDef) {
-			return nil, nil
-		}
+		// double check
 		if selected.Intersection(owned).Len() != 0 {
 			return nil, fmt.Errorf("owner and selectors should not be overlapped: %s",
 				strings.Join(sets.List(selected.Intersection(owned)), ","))
 		}
 		if !selected.Has(compDef) {
-			return nil, nil
+			return nil, nil // it's not me
 		}
 		ownerList := sets.List(owned)
 		slices.SortFunc(ownerList, func(a, b string) int {
 			return strings.Compare(a, b) * -1
 		})
+		// tuple<sidecarDef, owners>
 		return []any{sidecarDef, ownerList}, nil
 	}
 
+	// sidecarName -> []tuple<sidecarDef, owners>
 	result := make(map[string][]any)
 	for i, sidecarDef := range sidecarList.Items {
 		matched, err := match(&sidecarList.Items[i])
@@ -990,6 +996,7 @@ func hostedSidecarsOfCompDef(ctx context.Context, cli client.Reader, compDefs se
 
 	for name := range result {
 		sidecars := result[name]
+		// ordered by sidecarDef.Name from latest to oldest
 		slices.SortFunc(sidecars, func(a1, a2 any) int {
 			sidecarDef1 := a1.([]any)[0].(*appsv1.SidecarDefinition)
 			sidecarDef2 := a2.([]any)[0].(*appsv1.SidecarDefinition)
@@ -1000,7 +1007,7 @@ func hostedSidecarsOfCompDef(ctx context.Context, cli client.Reader, compDefs se
 	return result, nil
 }
 
-func buildSidecar4Component(proto, running *appsv1.Component, sidecarName string, ctx []any) error {
+func buildComponentSidecar(proto, running *appsv1.Component, sidecarName string, ctx []any) error {
 	exist := func() int {
 		if running == nil {
 			return -1
@@ -1021,6 +1028,10 @@ func buildSidecar4Component(proto, running *appsv1.Component, sidecarName string
 			proto.Spec.Sidecars = make([]appsv1.Sidecar, 0)
 		}
 		proto.Spec.Sidecars = append(proto.Spec.Sidecars, sidecar)
+		if proto.Annotations == nil {
+			proto.Annotations = make(map[string]string)
+		}
+		proto.Annotations[constant.SidecarDefLabelKey] = sidecar.SidecarDef
 		return nil
 	}
 
@@ -1030,14 +1041,12 @@ func buildSidecar4Component(proto, running *appsv1.Component, sidecarName string
 			sidecarDef, owners := a.([]any)[0].(*appsv1.SidecarDefinition), a.([]any)[1].([]string)
 			if sidecar.SidecarDef == sidecarDef.Name && slices.Contains(owners, sidecar.Owner) {
 				// has the fully matched owner comp-def and sidecar def, use it directly
-				if err := checkedAppend(sidecar, sidecarDef); err != nil {
-					return err
-				}
+				return checkedAppend(sidecar, sidecarDef)
 			}
 		}
 	}
 
-	// otherwise, use the latest one
+	// otherwise, use the latest one, new created or upgraded
 	sidecarDef := ctx[0].([]any)[0].(*appsv1.SidecarDefinition)
 	sidecar := appsv1.Sidecar{
 		Name:       sidecarDef.Spec.Name,

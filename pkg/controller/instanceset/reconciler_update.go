@@ -135,8 +135,20 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			break
 		}
 
+		if !isImageMatched(pod) {
+			tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on update as the image(s) of pod %s is not matched", its.Namespace, its.Name, pod.Name))
+			break
+		}
 		if !isHealthy(pod) {
-			tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on scale-in as the pod %s is not healthy", its.Namespace, its.Name, pod.Name))
+			tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on update as the pod %s is not healthy", its.Namespace, its.Name, pod.Name))
+			break
+		}
+		if !isRunningAndAvailable(pod, its.Spec.MinReadySeconds) {
+			tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on update as the pod %s is not available", its.Namespace, its.Name, pod.Name))
+			break
+		}
+		if !isRoleReady(pod, its.Spec.Roles) {
+			tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on update as the role of pod %s is not ready", its.Namespace, its.Name, pod.Name))
 			break
 		}
 
@@ -145,7 +157,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			return kubebuilderx.Continue, err
 		}
 		if its.Spec.PodUpdatePolicy == workloads.StrictInPlacePodUpdatePolicyType && updatePolicy == RecreatePolicy {
-			message := fmt.Sprintf("InstanceSet %s/%s blocks on scale-in as the PodUpdatePolicy is %s and the pod %s can not inplace update",
+			message := fmt.Sprintf("InstanceSet %s/%s blocks on update as the PodUpdatePolicy is %s and the pod %s can not inplace update",
 				its.Namespace, its.Name, workloads.StrictInPlacePodUpdatePolicyType, pod.Name)
 			if tree != nil && tree.EventRecorder != nil {
 				tree.EventRecorder.Eventf(its, corev1.EventTypeWarning, EventReasonStrictInPlace, message)

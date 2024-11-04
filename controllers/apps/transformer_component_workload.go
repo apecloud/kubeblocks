@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/spf13/viper"
 	"golang.org/x/exp/maps"
@@ -527,6 +528,12 @@ func (r *componentWorkloadOps) scaleOut(itsObj *workloads.InstanceSet) error {
 	if *itsObj.Spec.Replicas == 0 {
 		return nil
 	}
+
+	err := r.annotatePodForMemberJoin()
+	if err != nil {
+		return err
+	}
+
 	graphCli := model.NewGraphClient(r.cli)
 	graphCli.Noop(r.dag, r.protoITS)
 	d, err := newDataClone(r.reqCtx, r.cli, r.cluster, r.synthesizeComp, itsObj, r.protoITS, backupKey)
@@ -602,10 +609,38 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
 	if err != nil {
 		return err
 	}
+
+	// TODO: Move memberLeave to the ITS controller. Instead of performing a switchover, we can directly scale down the non-leader nodes. This is because the pod ordinal is not guaranteed to be continuous.
+	podsToMemberLeave := make([]*corev1.Pod, 0)
+
 	memberJoinStatus := r.runningITS.Annotations[constant.MemberJoinStatusAnnotationKey]
 	podsList := strings.Split(memberJoinStatus, ",")
 	podsToMemberjoin := sets.New(podsList...)
 
+	var leaveErrors []error
+	for _, pod := range pods {
+		// if the pod not exists in the generated pod names, it should be a member that needs to leave
+		if _, ok := r.desiredCompPodNameSet[pod.Name]; ok {
+			continue
+		}
+		podsToMemberLeave = append(podsToMemberLeave, pod)
+	}
+	for _, pod := range podsToMemberLeave {
+		if podsToMemberjoin.Has(pod.Name) {
+			leaveErrors = append(leaveErrors, fmt.Errorf("pod %s is in memberjoin process", pod.Name))
+			continue
+		}
+		if err := r.leaveMemberForPod(pod, pods); err != nil {
+			leaveErrors = append(leaveErrors, err)
+		}
+	}
+	if len(leaveErrors) > 0 {
+		return NewRequeueError(leaveErrors, 1*time.Second)
+	}
+	return nil
+}
+
+func (r *componentWorkloadOps) leaveMemberForPod(pod *corev1.Pod, pods []*corev1.Pod) error {
 	tryToSwitchover := func(lorryCli lorry.Client, pod *corev1.Pod) error {
 		if pod == nil || len(pod.Labels) == 0 {
 			return nil
@@ -645,55 +680,27 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
 		return err
 	}
 
-	// TODO: Move memberLeave to the ITS controller. Instead of performing a switchover, we can directly scale down the non-leader nodes. This is because the pod ordinal is not guaranteed to be continuous.
-	podsToMemberLeave := make([]*corev1.Pod, 0)
-	for _, pod := range pods {
-		// if the pod not exists in the generated pod names, it should be a member that needs to leave
-		if _, ok := r.desiredCompPodNameSet[pod.Name]; ok {
-			continue
-		}
-		podsToMemberLeave = append(podsToMemberLeave, pod)
-	}
-	for _, pod := range podsToMemberLeave {
-		if _, ok := podsToMemberjoin[pod.Name]; ok {
-			continue
-		}
-
-		// try the pod to leave first
-		lorryCli, err1 := lorry.NewClient(*pod)
-		if err1 != nil {
-			// try another pod
-			lorryCli, err1 = getHealthyLorryClient(pods)
-			if err1 != nil {
-				if err == nil {
-					err = err1
-				}
-				continue
-			}
-		}
-
-		if intctrlutil.IsNil(lorryCli) {
-			// no lorry in the pod
-			continue
-		}
-
-		// switchover if the leaving pod is leader
-		if switchoverErr := tryToSwitchover(lorryCli, pod); switchoverErr != nil {
-			return switchoverErr
-		}
-
-		if err2 := lorryCli.LeaveMember(r.reqCtx.Ctx, pod.Name); err2 != nil {
-			// For the purpose of upgrade compatibility, if the version of Lorry is 0.7 and
-			// the version of KB is upgraded to 0.8 or newer, lorry client will return an NotImplemented error,
-			// in this case, here just ignore it.
-			if err2 == lorry.NotImplemented {
-				r.reqCtx.Log.Info("lorry leave member api is not implemented")
-			} else if err == nil {
-				err = err2
-			}
+	// try the pod to leave first
+	lorryCli, err := lorry.NewClient(*pod)
+	if err != nil {
+		// try another pod
+		lorryCli, err = getHealthyLorryClient(pods)
+		if err != nil {
+			return err
 		}
 	}
-	return err // TODO: use requeue-after
+
+	if intctrlutil.IsNil(lorryCli) {
+		// no lorry in the pod
+		return nil
+	}
+
+	// switchover if the leaving pod is leader
+	if switchoverErr := tryToSwitchover(lorryCli, pod); switchoverErr != nil {
+		return switchoverErr
+	}
+
+	return nil
 }
 
 func (r *componentWorkloadOps) checkAndDoMemberJoin() error {
@@ -726,6 +733,7 @@ func (r *componentWorkloadOps) doMemberJoin(podSet sets.Set[string]) error {
 		}
 
 		if pod.Status.Phase != corev1.PodRunning {
+			joinErrors = append(joinErrors, fmt.Errorf(" waiting for pod %s to run", pod.Name))
 			continue
 		}
 
@@ -735,7 +743,7 @@ func (r *componentWorkloadOps) doMemberJoin(podSet sets.Set[string]) error {
 	}
 
 	if len(joinErrors) > 0 {
-		return fmt.Errorf("member join errors: %v", joinErrors)
+		return NewRequeueError(joinErrors, 1*time.Second)
 	}
 	return nil
 }
@@ -754,13 +762,13 @@ func (r *componentWorkloadOps) joinMemberForPod(pod *corev1.Pod, podSet sets.Set
 	if err = lorryCli.JoinMember(r.reqCtx.Ctx); err != nil {
 		if err == lorry.NotImplemented {
 			r.reqCtx.Log.Info("lorry join member API not implemented", "pod", pod.Name)
+			podSet.Clear()
 			return nil
 		}
 		return fmt.Errorf("join member failed: %w", err)
 	}
 
 	podSet.Delete(pod.Name)
-	r.reqCtx.Log.Info("successfully joined member", "pod", pod.Name)
 	return nil
 }
 

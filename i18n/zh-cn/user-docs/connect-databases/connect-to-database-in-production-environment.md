@@ -14,7 +14,7 @@ import TabItem from '@theme/TabItem';
 在生产环境中，使用 CLI 和 SDK 客户端连接数据库是很常见的。主要有以下三种场景：
 
 - 场景 1：Client1 和数据库位于同一个 Kubernetes 集群中。如果要连接 Client1 和数据库，请参考[使用 ClusterIP 方案](#场景-1-连接在同一个-kubernetes-集群中的客户端)。
-- 场景 2：Client2 在 Kubernetes 集群之外，但与数据库位于同一个 VPC 中。如果要连接 Client2 和数据库，请参考[暴露 VPC 私有地址方案](#场景-2-连接在-kubernetes-集群之外但与-kubernetes-集群位于同一-vpc-中的客户)。
+- 场景 2：Client2 在 Kubernetes 集群之外，但与数据库位于同一个 VPC 中。如果要连接 Client2 和数据库，请参考[暴露 VPC 内网地址方案](#场景-2-连接在-kubernetes-集群之外但与-kubernetes-集群位于同一-vpc-中的客户)。
 - 场景 3：Client3 和数据库位于不同的 VPC，例如其他 VPC 或公共网络。如果要连接 Client3 和数据库，请参考[暴露 VPC 公网地址方案](#场景-3-连接在其他-vpc-或公共网络中的客户端)。
 
 参考下面的网络位置关系图。

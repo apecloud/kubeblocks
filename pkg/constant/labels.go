@@ -54,8 +54,6 @@ const (
 	BackupProtectionLabelKey = "kubeblocks.io/backup-protection" // BackupProtectionLabelKey Backup delete protection policy label
 	AccessModeLabelKey       = "workloads.kubeblocks.io/access-mode"
 	ReadyWithoutPrimaryKey   = "kubeblocks.io/ready-without-primary"
-
-	KBManagedByKey = "apps.kubeblocks.io/managed-by" // KBManagedByKey marks resources that auto created
 )
 
 func GetClusterLabels(clusterName string, labels ...map[string]string) map[string]string {

@@ -45,6 +45,7 @@ import (
 
 const (
 	deleteBackupFilesJobNamePrefix = "delete-"
+	deleteContainerName            = "deleter"
 )
 
 type DeletionStatus string
@@ -227,7 +228,7 @@ func (d *Deleter) createDeleteBackupFilesJob(
 
 	runAsUser := int64(0)
 	container := corev1.Container{
-		Name:            backup.Name,
+		Name:            deleteContainerName,
 		Command:         []string{"sh", "-c"},
 		Args:            []string{d.buildDeleteBackupFilesScript(backup.Status.Path)},
 		Image:           viper.GetString(constant.KBToolsImage),
@@ -326,7 +327,7 @@ func (d *Deleter) doPreDeleteAction(
 		envVars = append(envVars, d.actionSet.Spec.Env...)
 	}
 	container := corev1.Container{
-		Name:            backup.Name,
+		Name:            deleteContainerName,
 		Command:         preDeleteAction.Command,
 		Image:           common.Expand(preDeleteAction.Image, common.MappingFuncFor(utils.CovertEnvToMap(envVars))),
 		Env:             envVars,

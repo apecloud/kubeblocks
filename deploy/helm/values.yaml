@@ -342,6 +342,7 @@ dataProtection:
   encryptionKeySecretKeyRef:
     name: ""
     key: ""
+    skipValidation: false
   enableBackupEncryption: false
   backupEncryptionAlgorithm: ""
   gcFrequencySeconds: 3600

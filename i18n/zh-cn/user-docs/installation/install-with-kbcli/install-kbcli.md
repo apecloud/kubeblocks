@@ -36,18 +36,26 @@ kbcli 目前支持 macOS、Windows 和 Linux 系统。
 
       如果想安装 kbcli 的指定版本，请按照以下步骤进行操作：
       
-      1. 在 [kbcli Release 页面](https://github.com/apecloud/kbcli/releases/)中查看可用版本。
+      1. 在 [kbcli 发布页面](https://github.com/apecloud/kbcli/releases/)中查看可用版本。
       2. 使用 `-s` 指定版本，并执行以下命令。
         
           ```bash
-          curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash -s x.x.x
+          curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash -s x.y.z
           ```
-    
+
+         您可以通过 [kbcli 发布列表](https://github.com/apecloud/kbcli/releases) 查看 kbcli 的所有版本，包括 alpha 及 beta 版本。
+
+         也可通过执行以下命令，获取稳定版本：
+
+         ```bash
+         curl -s "https://api.github.com/repos/apecloud/kbcli/releases?per_page=100&page=1" | jq -r '.[] | select(.prerelease == false) | .tag_name' | sort -V -r
+         ```
+
       :::note
 
-      kbcli 默认安装最新版本。在安装 KubeBlocks 时，kbcli 会安装与之匹配的版本。请确保 kbcli 和 KubeBlocks 的主版本号相匹配。
+      kbcli 默认安装最新版本。如果您的环境中已有正在运行的 KubeBlocks 实例，则需要安装与之匹配的 kbcli 版本。
 
-      例如，你可以安装 kbcli v0.6.1 和 KubeBlocks v0.6.3。但是，如果安装的是 kbcli v0.5.0 和 KubeBlocks v0.6.0，就可能会报错，因为版本不匹配。
+      例如，如果您当前使用的 KubeBlocks 版本是 v0.8.3，kbcli 应安装对应的 v0.8.3，而不是更高版本（如 v0.9.0），否则系统将因版本不匹配产生报错。
 
       :::
 
@@ -80,7 +88,7 @@ kbcli 目前支持 macOS、Windows 和 Linux 系统。
       brew search kbcli
 
       # 安装指定版本
-      brew install kbcli@x.x.x
+      brew install kbcli@x.y.z
       ```
      
   3. 确认 kbcli 是否已成功安装。

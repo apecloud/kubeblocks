@@ -23,7 +23,7 @@ import TabItem from '@theme/TabItem';
    kbcli playground init
 
    # Use --version to specify a version
-   kbcli playground init --version='x.x.x'
+   kbcli playground init --version='x.y.z'
    ```
 
    Or if you already have a Kubernetes cluster, you can install KubeBlocks [by kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) or [by Helm](./../../installation/install-with-helm/install-kubeblocks.md) directly.

@@ -21,12 +21,12 @@ on:
       CLOUD_PROVIDER:
         description: 'cloud provider'
         required: true
-        default: 'vke'
+        default: 'eks'
         type: choice
         options:
+          - eks
           - vke
           - gke
-          - eks
           - aks
           - aks-cn
       CLUSTER_VERSION:

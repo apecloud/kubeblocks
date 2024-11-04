@@ -535,7 +535,9 @@ func (r *backupPolicyBuilder) buildBackupTarget(
 			MatchLabels: r.buildTargetPodLabels(targetTpl.FallbackRole, fullCompName),
 		}
 	}
-	target.Name = fullCompName
+	if r.isSharding {
+		target.Name = fullCompName
+	}
 	// build the target connection credential
 	if targetTpl.Account != "" {
 		target.ConnectionCredential = &dpv1alpha1.ConnectionCredential{

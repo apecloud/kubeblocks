@@ -880,6 +880,14 @@ var _ = Describe("Backup Controller test", func() {
 					g.Expect(fetched.Status.PersistentVolumeClaimName).Should(Equal(repoPVCName))
 				})).Should(Succeed())
 
+				backup := &dpv1alpha1.Backup{}
+				Expect(k8sClient.Get(ctx, backupKey, backup)).Should(Succeed())
+				stsKey := client.ObjectKey{
+					Name:      dpbackup.GenerateBackupStatefulSetName(backup, "", dpbackup.BackupDataJobNamePrefix),
+					Namespace: testCtx.DefaultNamespace,
+				}
+				Eventually(testapps.CheckObjExists(&testCtx, backupKey, &appsv1.StatefulSet{}, true)).Should(Succeed())
+
 				By("mock no target pod found and expect backup is Failed")
 				Expect(testapps.ChangeObj(&testCtx, clusterInfo.TargetPod, func(pod *corev1.Pod) {
 					delete(clusterInfo.TargetPod.Labels, constant.RoleLabelKey)
@@ -890,25 +898,19 @@ var _ = Describe("Backup Controller test", func() {
 				})).Should(Succeed())
 
 				By("expect the replicas of statefulSet is 0")
-				backup := &dpv1alpha1.Backup{}
-				Expect(k8sClient.Get(ctx, backupKey, backup)).Should(Succeed())
-				stsKey := client.ObjectKey{
-					Name:      dpbackup.GenerateBackupStatefulSetName(backup, "", dpbackup.BackupDataJobNamePrefix),
-					Namespace: testCtx.DefaultNamespace,
-				}
 				Eventually(testapps.CheckObj(&testCtx, stsKey, func(g Gomega, sts *appsv1.StatefulSet) {
 					g.Expect(*sts.Spec.Replicas).Should(BeEquivalentTo(0))
-				}))
+				})).Should(Succeed())
 
 				By("mock target pod exists")
 				Expect(testapps.ChangeObj(&testCtx, clusterInfo.TargetPod, func(pod *corev1.Pod) {
 					clusterInfo.TargetPod.Labels[constant.RoleLabelKey] = constant.Leader
-				}))
+				})).Should(Succeed())
 
 				By("expect the replicas of statefulSet is 1")
 				Eventually(testapps.CheckObj(&testCtx, stsKey, func(g Gomega, sts *appsv1.StatefulSet) {
 					g.Expect(*sts.Spec.Replicas).Should(BeEquivalentTo(1))
-				}))
+				})).Should(Succeed())
 			})
 		})
 	})

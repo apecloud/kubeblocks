@@ -45,6 +45,9 @@ const (
 	minAvailablePort   = 1025
 	maxAvailablePort   = 65535
 	kbAgentDefaultPort = 3501
+
+	defaultProbeReportPeriodSeconds = 60
+	minProbeReportPeriodSeconds     = 15
 )
 
 var (
@@ -220,12 +223,28 @@ func buildKBAgentStartupEnvs(synthesizedComp *SynthesizedComponent) ([]corev1.En
 		actions = append(actions, *a)
 	}
 
-	if a, p := buildProbe4KBAgent(synthesizedComp.LifecycleActions.RoleProbe, "roleProbe"); a != nil && p != nil {
+	if a, p := buildProbe4KBAgent(synthesizedComp.LifecycleActions.RoleProbe, "roleProbe", synthesizedComp.FullCompName); a != nil && p != nil {
+		actions = append(actions, *a)
+		probes = append(probes, *p)
+	}
+	// TODO: how to schedule the execution of probes?
+	if a, p := buildProbe4KBAgent(synthesizedComp.LifecycleActions.AvailableProbe, availableProbe, synthesizedComp.FullCompName); a != nil && p != nil {
+		p.ReportPeriodSeconds = probeReportPeriodSeconds(p.PeriodSeconds)
 		actions = append(actions, *a)
 		probes = append(probes, *p)
 	}
 
 	return kbagent.BuildStartupEnv(actions, probes)
+}
+
+func probeReportPeriodSeconds(periodSeconds int32) int32 {
+	if periodSeconds <= 0 {
+		return defaultProbeReportPeriodSeconds
+	}
+	if periodSeconds < minProbeReportPeriodSeconds {
+		return minProbeReportPeriodSeconds
+	}
+	return periodSeconds
 }
 
 func buildAction4KBAgent(action *appsv1.Action, name string) *proto.Action {
@@ -249,7 +268,7 @@ func buildAction4KBAgent(action *appsv1.Action, name string) *proto.Action {
 	return a
 }
 
-func buildProbe4KBAgent(probe *appsv1.Probe, name string) (*proto.Action, *proto.Probe) {
+func buildProbe4KBAgent(probe *appsv1.Probe, name, instance string) (*proto.Action, *proto.Probe) {
 	if probe == nil || probe.Exec == nil {
 		return nil, nil
 	}
@@ -260,7 +279,7 @@ func buildProbe4KBAgent(probe *appsv1.Probe, name string) (*proto.Action, *proto
 		PeriodSeconds:       probe.PeriodSeconds,
 		SuccessThreshold:    probe.SuccessThreshold,
 		FailureThreshold:    probe.FailureThreshold,
-		ReportPeriodSeconds: nil, // TODO: impl
+		Instance:            instance,
 	}
 	return a, p
 }

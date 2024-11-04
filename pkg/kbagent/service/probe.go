@@ -78,6 +78,7 @@ func (s *probeService) Start() error {
 		runner := &probeRunner{
 			logger:        s.logger.WithValues("probe", name),
 			actionService: s.actionService,
+			latestEvent:   make(chan proto.ProbeEvent, 1),
 		}
 		go runner.run(s.probes[name])
 		s.runners[name] = runner
@@ -96,6 +97,7 @@ type probeRunner struct {
 	succeedCount  int64
 	failedCount   int64
 	latestOutput  []byte
+	latestEvent   chan proto.ProbeEvent
 }
 
 func (r *probeRunner) run(probe *proto.Probe) {
@@ -105,6 +107,13 @@ func (r *probeRunner) run(probe *proto.Probe) {
 		time.Sleep(time.Duration(probe.InitialDelaySeconds) * time.Second)
 	}
 
+	// launch report loop first
+	r.launchReportLoop(probe)
+
+	r.launchRunLoop(probe)
+}
+
+func (r *probeRunner) launchRunLoop(probe *proto.Probe) {
 	if probe.PeriodSeconds <= 0 {
 		probe.PeriodSeconds = defaultProbePeriodSeconds
 	}
@@ -115,8 +124,12 @@ func (r *probeRunner) run(probe *proto.Probe) {
 }
 
 func (r *probeRunner) runLoop(probe *proto.Probe) {
+	runOnce := func() ([]byte, error) {
+		return r.actionService.handleRequest(context.Background(), &proto.ActionRequest{Action: probe.Action})
+	}
+
 	for range r.ticker.C {
-		output, err := r.runOnce(probe)
+		output, err := runOnce()
 		if err == nil {
 			r.succeedCount++
 			r.failedCount = 0
@@ -133,18 +146,54 @@ func (r *probeRunner) runLoop(probe *proto.Probe) {
 	}
 }
 
-func (r *probeRunner) runOnce(probe *proto.Probe) ([]byte, error) {
-	return r.actionService.handleRequest(context.Background(), &proto.ActionRequest{Action: probe.Action})
+func (r *probeRunner) launchReportLoop(probe *proto.Probe) {
+	if probe.ReportPeriodSeconds <= 0 {
+		return
+	}
+
+	if probe.ReportPeriodSeconds < probe.PeriodSeconds {
+		probe.ReportPeriodSeconds = probe.PeriodSeconds
+	}
+
+	go func() {
+		ticker := time.NewTicker(time.Duration(probe.ReportPeriodSeconds) * time.Second)
+		defer ticker.Stop()
+
+		var latestReportedEvent *proto.ProbeEvent
+		for range ticker.C {
+			latestEvent := gather(r.latestEvent)
+			if latestEvent == nil && latestReportedEvent != nil {
+				latestEvent = latestReportedEvent
+			}
+			if latestEvent != nil {
+				r.logger.Info("report probe event periodically",
+					"code", latestEvent.Code, "output", outputPrefix(latestEvent.Output), "message", latestEvent.Message)
+				r.sendEvent(latestEvent)
+			}
+			latestReportedEvent = latestEvent
+		}
+	}()
 }
 
 func (r *probeRunner) report(probe *proto.Probe, output []byte, err error) {
+	var latestEvent *proto.ProbeEvent
+
 	succeed, thresholdPoint := r.succeed(probe)
 	if succeed && thresholdPoint ||
 		succeed && !thresholdPoint && !reflect.DeepEqual(output, r.latestOutput) {
-		r.sendEvent(probe.Action, 0, output, "")
+		latestEvent = r.buildNSendEvent(probe.Instance, probe.Action, 0, output, "")
 	}
 	if r.fail(probe) {
-		r.sendEvent(probe.Action, -1, r.latestOutput, err.Error())
+		latestEvent = r.buildNSendEvent(probe.Instance, probe.Action, -1, r.latestOutput, err.Error())
+	}
+
+	if latestEvent != nil {
+		select {
+		case r.latestEvent <- *latestEvent:
+		default:
+			gather(r.latestEvent) // drain the channel
+			r.latestEvent <- *latestEvent
+		}
 	}
 }
 
@@ -170,20 +219,29 @@ func (r *probeRunner) fail(probe *proto.Probe) bool {
 	return false
 }
 
-func (r *probeRunner) sendEvent(probe string, code int32, output []byte, message string) {
-	prefixLen := min(len(output), 32)
-	r.logger.Info("send probe event", "code", code, "output", string(output[:prefixLen]), "message", message)
+func (r *probeRunner) buildNSendEvent(instance, probe string, code int32, output []byte, message string) *proto.ProbeEvent {
+	r.logger.Info("send probe event", "probe", probe, "code", code, "output", outputPrefix(output), "message", message)
+	event := &proto.ProbeEvent{
+		Instance: instance,
+		Probe:    probe,
+		Code:     code,
+		Output:   output,
+		Message:  message,
+	}
+	r.sendEvent(event)
+	return event
+}
 
-	eventMsg := &proto.ProbeEvent{
-		Probe:   probe,
-		Code:    code,
-		Message: message,
-		Output:  output,
+func (r *probeRunner) sendEvent(event *proto.ProbeEvent) {
+	msg, err := json.Marshal(&event)
+	if err == nil {
+		util.SendEventWithMessage(&r.logger, event.Probe, string(msg))
+	} else {
+		r.logger.Error(err, fmt.Sprintf("failed to marshal probe event, probe: %s", event.Probe))
 	}
-	msg, err := json.Marshal(&eventMsg)
-	if err != nil {
-		r.logger.Error(err, "failed to marshal probe event")
-		return
-	}
-	util.SendEventWithMessage(&r.logger, probe, string(msg))
+}
+
+func outputPrefix(output []byte) string {
+	prefixLen := min(len(output), 32)
+	return string(output[:prefixLen])
 }

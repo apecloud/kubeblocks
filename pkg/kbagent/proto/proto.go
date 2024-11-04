@@ -55,17 +55,25 @@ type ActionResponse struct {
 // TODO: define the event spec for probe or async action
 
 type Probe struct {
+	Instance            string `json:"instance"`
 	Action              string `json:"action"`
 	InitialDelaySeconds int32  `json:"initialDelaySeconds,omitempty"`
 	PeriodSeconds       int32  `json:"periodSeconds,omitempty"`
 	SuccessThreshold    int32  `json:"successThreshold,omitempty"`
 	FailureThreshold    int32  `json:"failureThreshold,omitempty"`
-	ReportPeriodSeconds *int32 `json:"reportPeriodSeconds,omitempty"`
+	ReportPeriodSeconds int32  `json:"reportPeriodSeconds,omitempty"`
 }
 
 type ProbeEvent struct {
-	Probe   string `json:"probe,omitempty"`
-	Code    int32  `json:"code,omitempty"`
-	Output  []byte `json:"output,omitempty"`
-	Message string `json:"message,omitempty"`
+	Instance string `json:"instance"`
+	Probe    string `json:"probe"`
+	Code     int32  `json:"code"`
+	Output   []byte `json:"output,omitempty"`  // output of the probe on success, or latest succeed output on failure
+	Message  string `json:"message,omitempty"` // message of the probe on failure
 }
+
+const (
+	ProbeEventFieldPath           = "spec.containers{kbagent}"
+	ProbeEventReportingController = "kbagent"
+	ProbeEventSourceComponent     = "kbagent"
+)

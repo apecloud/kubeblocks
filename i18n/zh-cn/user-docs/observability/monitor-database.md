@@ -281,7 +281,7 @@ kubectl patch cluster mycluster -n namespace --type "json" -p '[{"op":"add","pat
 
 远程写为可选操作，您可根据实际需要开启。
 
-KubeBlocks 支持 victoria-metrics-agent 引擎，支持用户将数据远程写入虚拟机中，相较于 Prometheus 原生应用，[vmagent](https://docs.victoriametrics.com/vmagent.html) 更轻量。
+KubeBlocks 支持 victoria-metrics-agent 引擎，支持用户将数据远程写入 VictoriaMetrics 中，相较于 Prometheus 原生应用，[vmagent](https://docs.victoriametrics.com/vmagent.html) 更轻量。
 
 <Tabs>
 

@@ -23,6 +23,8 @@ import TabItem from '@theme/TabItem';
 
 ## 场景 1. 连接在同一个 Kubernetes 集群中的客户端
 
+客户端和数据库在同一个 Kubernetes 集群内运行，客户端可以通过数据库 Endpoint 获取域名进行访问。
+
 您可以使用数据库的 ClusterIP 或域名进行连接。
 
 <Tabs>
@@ -92,6 +94,8 @@ kbcli cluster expose ${cluster-name} --type vpc --enable=true
 
 <TabItem value="kubectl" label="kubeclt">
 
+此处以 MySQL 集群为例，在阿里云上为集群暴露公网访问地址的方式如下：
+
 ```bash
 kubectl apply -f - <<EOF
 apiVersion: apps.kubeblocks.io/v1alpha1
@@ -104,7 +108,7 @@ spec:
   - componentName: mysql
     services:
     - annotations:
-        service.beta.kubernetes.io/alibaba-cloud-loadbalancer-address-type: intranet
+        service.beta.kubernetes.io/alibaba-cloud-loadbalancer-address-type: internet
       ipFamilyPolicy: PreferDualStack
       name: vpc
       serviceType: LoadBalancer
@@ -144,7 +148,7 @@ spec:
   - componentName: mysql
     services:
     - annotations:
-        service.beta.kubernetes.io/alibaba-cloud-loadbalancer-address-type: intranet
+        service.beta.kubernetes.io/alibaba-cloud-loadbalancer-address-type: internet
       ipFamilyPolicy: PreferDualStack
       name: vpc
       serviceType: LoadBalancer
@@ -166,7 +170,11 @@ EOF
 
 ## 场景 3. 连接在其他 VPC 或公共网络中的客户端
 
-您可开启云厂商的外部负载均衡器。
+<Tabs>
+
+<TabItem value="kbcli" label="kbcli" default>
+
+客户端和数据库在不同的 VPC 中，需要走公网访问，您可使用云厂商的外部负载均衡器，开启方法如下：
 
 :::note
 
@@ -174,17 +182,15 @@ EOF
 
 :::
 
-<Tabs>
-
-<TabItem value="kbcli" label="kbcli" default>
-
 ```bash
-kbcli cluster expose ${cluster-name} --type vpc --enable=true
+kbcli cluster expose ${cluster-name} --type internet --enable=true
 ```
 
 </TabItem>
 
 <TabItem value="kubectl" label="kubeclt">
+
+以 MySQL 集群为例，在阿里云上为集群暴露 VPC 访问地址的方式如下：
 
 ```bash
 kubectl apply -f - <<EOF
@@ -195,17 +201,17 @@ metadata:
 spec:
   clusterRef: mycluster
   expose:
-    - componentName: mysql
-      services:
-        - annotations:
-            service.beta.kubernetes.io/alibaba-cloud-loadbalancer-address-type: internet
-          ipFamilyPolicy: PreferDualStack
-          name: vpc
-          serviceType: LoadBalancer
-      switch: Enable
+  - componentName: mysql
+    services:
+    - annotations:
+        service.beta.kubernetes.io/alibaba-cloud-loadbalancer-address-type: intranet
+      ipFamilyPolicy: PreferDualStack
+      name: vpc
+      serviceType: LoadBalancer
+    switch: Enable
   ttlSecondsBeforeAbort: 0
   type: Expose
-  EOF
+EOF
 ```
 
 </TabItem>
@@ -244,7 +250,7 @@ spec:
   - componentName: mysql
     services:
     - annotations:
-        service.beta.kubernetes.io/alibaba-cloud-loadbalancer-address-type: internet
+        service.beta.kubernetes.io/alibaba-cloud-loadbalancer-address-type: intranet
       ipFamilyPolicy: PreferDualStack
       name: vpc
       serviceType: LoadBalancer

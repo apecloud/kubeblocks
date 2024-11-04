@@ -91,7 +91,7 @@ The K8s services provided by the cloud providers include both internal and exter
 
 ##### For the self-host environment
 
-This tutorial takes Cillium Cluster Mesh as an example. Deploy Cillium as the overlay mode and the cluster configuration for each data plane clusters is as follows:
+This tutorial takes Cilium Cluster Mesh as an example. Deploy Cilium as the overlay mode and the cluster configuration for each data plane clusters is as follows:
 
 | Cluster | Context | Name  | ID | CIDR        |
 |:-------:|:-------:|:-----:|:--:|:-----------:|
@@ -109,7 +109,7 @@ The CIDR mentioned here refers to the address of the Cilium Overlay network. Whe
 
 The following steps can be performed separately in each cluster (without the `--context` parameter) or collectively in an environment with the information of three contexts (by specifying the `--context` parameter for each).
 
-1. Install Cilium, specifying the cluster ID/name and the cluster pool pod CIDR. Refer to the Cillium doc for details: [Specify the Cluster Name and ID](https://docs.cilium.io/en/stable/network/clustermesh/clustermesh/#specify-the-cluster-name-and-id).
+1. Install Cilium, specifying the cluster ID/name and the cluster pool pod CIDR. Refer to the Cilium doc for details: [Specify the Cluster Name and ID](https://docs.cilium.io/en/stable/network/clustermesh/clustermesh/#specify-the-cluster-name-and-id).
 
    ```bash
    cilium install --set cluster.name=k8s-1 --set cluster.id=1 --set ipam.operator.clusterPoolIPv4PodCIDRList=10.1.0.0/16 —context k8s-1
@@ -139,7 +139,7 @@ The following steps can be performed separately in each cluster (without the `--
    cilium clustermesh status —wait —context k8s-3
    ```
 
-4. (Optional) Check the status of the tunnels between cluster by using the cilliun-dbg tool. Refer to [the official doc](https://docs.cilium.io/en/stable/cmdref/cilium-dbg/) for details.
+4. (Optional) Check the status of the tunnels between cluster by using the ciliun-dbg tool. Refer to [the official doc](https://docs.cilium.io/en/stable/cmdref/cilium-dbg/) for details.
 
    ```bash
    cilium-dbg bpf tunnel list

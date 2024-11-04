@@ -60,7 +60,7 @@ kbcli cluster connect --show-example --show-password ${cluster-name}
    使用 `kubectl get secrects` 命令，从 demo 命名空间中名为 `mycluster-conn-credential` 的 secret 中提取用户名。
 
    ```bash
-   kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\username}' | base64 -d
+   kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.username}' | base64 -d
    >
    root
    ```
@@ -71,7 +71,7 @@ kbcli cluster connect --show-example --show-password ${cluster-name}
 2. 获取 `password`。
 
    ```bash
-   kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\password}' | base64 -d
+   kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.password}' | base64 -d
    >
    2gvztbvz
    ```
@@ -108,10 +108,10 @@ kubectl get secrets -n demo | grep mycluster
    kubectl exec -ti -n demo mycluster-mysql-0 -- bash
    ```
 
-   - `-ti`：打开交互式终端会话（`-t` 分配一个伪 TTY，`-i` 保持会话打开）。
+   - `-ti`：打开交互式终端会话（`-t` 分配一个 TTY，`-i` 将伪 TTY 传输给容器）。
    - `-n demo`：指定 Pod 所在的命名空间 demo。
    - `mycluster-mysql-0`：MySQL Pod 的名称。如果名称与您的实际情况不同，请确保替换为实际的 Pod 名称。
-   - `--bash`：在 Pod 内打开一个 Bash shell。如果容器中没有 Bash，也可以使用 sh。
+   - `-- bash`：在 Pod 内打开一个 Bash shell。如果容器中没有 Bash，也可以使用 sh。
 
 2. 连接集群。
 

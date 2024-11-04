@@ -502,7 +502,7 @@ BackupRepo 是备份数据的存储仓库，支持配置 OSS（阿里云对象�
         annotations:
           dataprotection.kubeblocks.io/is-default-repo: "true"
       spec:
-        storageProviderRef: gcs
+        storageProviderRef: gcs-s3comp
         accessMethod: Tool
         pvReclaimPolicy: Retain
         volumeCapacity: 100Gi

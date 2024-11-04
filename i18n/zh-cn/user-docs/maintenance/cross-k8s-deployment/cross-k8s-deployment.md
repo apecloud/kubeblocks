@@ -99,7 +99,7 @@ KubeBlocks 基于 K8s service 抽象来提供内外部的服务访问。对于 s
 
 ##### 自建方案
 
-东西向互访的自建方案以 Cillium Cluster Mesh 为例来进行说明，Cillium 的部署选择 overlay 模式，各数据面集群配置如下：
+东西向互访的自建方案以 Cilium Cluster Mesh 为例来进行说明，Cilium 的部署选择 overlay 模式，各数据面集群配置如下：
 
 | 集群     | Context | 名称  | ID | CIDR        |
 |:-------:|:-------:|:-----:|:--:|:-----------:|

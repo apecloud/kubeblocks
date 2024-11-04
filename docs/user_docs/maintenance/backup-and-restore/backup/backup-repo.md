@@ -499,7 +499,7 @@ If you do not configure the BackupRepo information when installing KubeBlocks, y
      annotations:
        dataprotection.kubeblocks.io/is-default-repo: "true"
    spec:
-     storageProviderRef: gcs
+     storageProviderRef: gcs-s3comp
      accessMethod: Tool
      pvReclaimPolicy: Retain
      volumeCapacity: 100Gi

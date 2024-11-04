@@ -206,13 +206,7 @@ func isImageMatched(pod *corev1.Pod) bool {
 		if len(specTag) != 0 && specTag != statusTag {
 			return false
 		}
-		// if registry and/or namespace present in spec, it must be same in status
-		specSlashIndex := strings.Index(specName, "/")
-		if specSlashIndex != -1 && specName != statusName {
-			return false
-		}
-		// otherwise, specName only contains the repository part, it should be suffix of statusName.
-		// e.g.: specName: nginx, statusName: docker.io/nginx
+		// otherwise, statusName should be same as or has suffix of specName
 		if !strings.HasSuffix(statusName, specName) {
 			return false
 		}

@@ -574,21 +574,25 @@ func getHealthyLorryClient(pods []*corev1.Pod) (lorry.Client, error) {
 }
 
 func (r *componentWorkloadOps) annotatePodForMemberJoin() error {
-	memberJoinStatus := r.runningITS.Annotations[constant.MemberJoinStatusAnnotationKey]
-	podsList := strings.Split(memberJoinStatus, ",")
-	podsToMemberjoin := sets.New(podsList...)
+	podsToMemberjoin := sets.New[string]()
+	if memberJoinStatus := r.runningITS.Annotations[constant.MemberJoinStatusAnnotationKey]; memberJoinStatus != "" {
+		podsToMemberjoin.Insert(strings.Split(memberJoinStatus, ",")...)
+	}
 
 	var podToMemberjoin []string
 	for podName := range r.desiredCompPodNameSet {
-		if _, ok := r.runningItsPodNameSet[podName]; ok {
+		if r.runningItsPodNameSet.Has(podName) {
 			continue
 		}
-		if _, ok := podsToMemberjoin[podName]; !ok {
-			podToMemberjoin = append(podToMemberjoin, podName)
+		if podsToMemberjoin.Has(podName) {
+			continue
 		}
+		podToMemberjoin = append(podToMemberjoin, podName)
 	}
 
-	r.protoITS.Annotations[constant.MemberJoinStatusAnnotationKey] = strings.Join(podToMemberjoin, ",")
+	if len(podToMemberjoin) > 0 {
+		r.protoITS.Annotations[constant.MemberJoinStatusAnnotationKey] = strings.Join(podToMemberjoin, ",")
+	}
 	return nil
 }
 
@@ -710,44 +714,54 @@ func (r *componentWorkloadOps) checkAndDoMemberJoin() error {
 
 func (r *componentWorkloadOps) doMemberJoin(podSet sets.Set[string]) error {
 	labels := constant.GetComponentWellKnownLabels(r.synthesizeComp.ClusterName, r.synthesizeComp.Name)
-	runnningPods, err := component.ListPodOwnedByComponent(r.reqCtx.Ctx, r.cli, r.synthesizeComp.Namespace, labels, inDataContext4C())
+	runningPods, err := component.ListPodOwnedByComponent(r.reqCtx.Ctx, r.cli, r.synthesizeComp.Namespace, labels, inDataContext4C())
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to list pods: %w", err)
 	}
 
-	var finalErr error
-	for _, pod := range runnningPods {
-		if _, ok := podSet[pod.Name]; !ok {
+	var joinErrors []error
+	for _, pod := range runningPods {
+		if !podSet.Has(pod.Name) {
 			continue
 		}
+
 		if pod.Status.Phase != corev1.PodRunning {
 			continue
 		}
 
-		lorryCli, err := lorry.NewClient(*pod)
-		if err != nil {
-			if finalErr == nil {
-				finalErr = err
-			}
-			continue
-		}
-
-		if intctrlutil.IsNil(lorryCli) {
-			continue
-		}
-
-		if err = lorryCli.JoinMember(r.reqCtx.Ctx); err != nil {
-			if err == lorry.NotImplemented {
-				r.reqCtx.Log.Info("lorry leave member api is not implemented")
-			}
-		} else {
-			if finalErr == nil {
-				finalErr = err
-			}
-			podSet.Delete(pod.Name)
+		if err := r.joinMemberForPod(pod, podSet); err != nil {
+			joinErrors = append(joinErrors, fmt.Errorf("pod %s: %w", pod.Name, err))
 		}
 	}
-	return finalErr
+
+	if len(joinErrors) > 0 {
+		return fmt.Errorf("member join errors: %v", joinErrors)
+	}
+	return nil
+}
+
+func (r *componentWorkloadOps) joinMemberForPod(pod *corev1.Pod, podSet sets.Set[string]) error {
+	lorryCli, err := lorry.NewClient(*pod)
+	if err != nil {
+		return fmt.Errorf("failed to create lorry client: %w", err)
+	}
+
+	if intctrlutil.IsNil(lorryCli) {
+		r.reqCtx.Log.Info("skipping pod with nil lorry client", "pod", pod.Name)
+		return nil
+	}
+
+	if err = lorryCli.JoinMember(r.reqCtx.Ctx); err != nil {
+		if err == lorry.NotImplemented {
+			r.reqCtx.Log.Info("lorry join member API not implemented", "pod", pod.Name)
+			return nil
+		}
+		return fmt.Errorf("join member failed: %w", err)
+	}
+
+	podSet.Delete(pod.Name)
+	r.reqCtx.Log.Info("successfully joined member", "pod", pod.Name)
+	return nil
 }
 
 func (r *componentWorkloadOps) deletePVCs4ScaleIn(itsObj *workloads.InstanceSet) error {

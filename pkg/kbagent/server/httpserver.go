@@ -147,6 +147,7 @@ func (s *server) dispatcher(svc service.Service) func(*fasthttp.RequestCtx) {
 		respond(reqCtx, statusCode, output, err)
 		if s.config.Logging {
 			s.logger.Info("HTTP API Called",
+				"user-agent", string(reqCtx.Request.Header.UserAgent()),
 				"method", string(reqCtx.Method()),
 				"path", string(reqCtx.Path()),
 				"status code", statusCode,

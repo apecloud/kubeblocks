@@ -83,7 +83,7 @@ func (s *actionService) HandleRequest(ctx context.Context, payload []byte) ([]by
 	if err != nil {
 		result = err.Error()
 	}
-	s.logger.Info("Action Executed", "Action", req.Action, "result", result)
+	s.logger.Info("Action Executed", "action", req.Action, "result", result)
 	return s.encode(resp, err), nil
 }
 

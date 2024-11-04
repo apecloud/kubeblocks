@@ -145,14 +145,14 @@ func (s *server) dispatcher(svc service.Service) func(*fasthttp.RequestCtx) {
 			statusCode = fasthttp.StatusInternalServerError
 		}
 		respond(reqCtx, statusCode, output, err)
-
-		s.logger.Info("HTTP API Called",
-			"user-agent", string(reqCtx.UserAgent()),
-			"method", string(reqCtx.Method()),
-			"path", string(reqCtx.Path()),
-			"status code", statusCode,
-			"cost", time.Since(reqCtx.Time()).Milliseconds(),
-		)
+		if s.config.Logging {
+			s.logger.Info("HTTP API Called",
+				"method", string(reqCtx.Method()),
+				"path", string(reqCtx.Path()),
+				"status code", statusCode,
+				"cost", time.Since(reqCtx.Time()).Milliseconds(),
+			)
+		}
 	}
 }
 

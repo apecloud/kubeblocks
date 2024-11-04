@@ -346,7 +346,7 @@ KubeBlocks supports configuring cluster parameters by editing the configuration 
 
 :::note
 
-Just in case you cannot find the configuration file of your cluster, you can switch to the `kbcli` tab and use relavant commands to view the current configuration file of a cluster.
+Just in case you cannot find the configuration file of your cluster, you can switch to the `kbcli` tab and use relevant commands to view the current configuration file of a cluster.
 
 :::
 
@@ -432,7 +432,7 @@ KubeBlocks supports configuring cluster parameters with an OpsRequest.
 
 :::note
 
-Just in case you cannot find the configuration file of your cluster, you can switch to the `kbcli` tab and use relavant commands to view the current configuration file of a cluster.
+Just in case you cannot find the configuration file of your cluster, you can switch to the `kbcli` tab and use relevant commands to view the current configuration file of a cluster.
 
 :::
 

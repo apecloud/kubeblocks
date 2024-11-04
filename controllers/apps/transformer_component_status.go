@@ -28,13 +28,11 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -292,48 +290,8 @@ func (t *componentStatusTransformer) isScaleOutFailed(transCtx *componentTransfo
 		return false, nil
 	}
 
-	reqCtx := intctrlutil.RequestCtx{
-		Ctx:      transCtx.Context,
-		Log:      transCtx.Logger,
-		Recorder: transCtx.EventRecorder,
-	}
-	backupKey := types.NamespacedName{
-		Namespace: t.runningITS.Namespace,
-		Name:      constant.GenerateResourceNameWithScalingSuffix(t.runningITS.Name),
-	}
-	d, err := newDataClone(reqCtx, t.Client, t.cluster, t.synthesizeComp, t.runningITS, t.protoITS, backupKey)
-	if err != nil {
-		return false, err
-	}
-	if status, err := d.CheckBackupStatus(); err != nil {
-		return false, err
-	} else if status == backupStatusFailed {
-		return true, nil
-	}
-	desiredPodNames, err := generatePodNames(t.synthesizeComp)
-	if err != nil {
-		return false, err
-	}
-	currentPodNames, err := generatePodNamesByITS(t.runningITS)
-	if err != nil {
-		return false, err
-	}
-	currentPodNameSet := sets.New(currentPodNames...)
-	for _, podName := range desiredPodNames {
-		if _, ok := currentPodNameSet[podName]; ok {
-			continue
-		}
-		// backup's ready, then start to check restore
-		templateName, index, err := component.GetTemplateNameAndOrdinal(t.runningITS.Name, podName)
-		if err != nil {
-			return false, err
-		}
-		if status, err := d.CheckRestoreStatus(templateName, index); err != nil {
-			return false, err
-		} else if status == dpv1alpha1.RestorePhaseFailed {
-			return true, nil
-		}
-	}
+	// TODO: impl
+
 	return false, nil
 }
 

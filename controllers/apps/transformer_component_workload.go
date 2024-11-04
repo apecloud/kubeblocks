@@ -529,30 +529,7 @@ func (r *componentWorkloadOps) postScaleIn() error {
 }
 
 func (r *componentWorkloadOps) postScaleOut(itsObj *workloads.InstanceSet) error {
-	var (
-		snapshotKey = types.NamespacedName{
-			Namespace: itsObj.Namespace,
-			Name:      constant.GenerateResourceNameWithScalingSuffix(itsObj.Name),
-		}
-	)
-
-	d, err := newDataClone(r.reqCtx, r.cli, r.cluster, r.synthesizeComp, itsObj, itsObj, snapshotKey)
-	if err != nil {
-		return err
-	}
-	if d != nil {
-		// clean backup resources.
-		// there will not be any backup resources other than scale out.
-		tmpObjs, err := d.GetTmpResources()
-		if err != nil {
-			return err
-		}
-		graphCli := model.NewGraphClient(r.cli)
-		for _, obj := range tmpObjs {
-			graphCli.Do(r.dag, nil, obj, model.ActionDeletePtr(), nil)
-		}
-	}
-
+	// TODO: impl
 	return nil
 }
 
@@ -572,51 +549,8 @@ func (r *componentWorkloadOps) scaleIn(itsObj *workloads.InstanceSet) error {
 }
 
 func (r *componentWorkloadOps) scaleOut(itsObj *workloads.InstanceSet) error {
-	var (
-		backupKey = types.NamespacedName{
-			Namespace: itsObj.Namespace,
-			Name:      constant.GenerateResourceNameWithScalingSuffix(itsObj.Name),
-		}
-	)
-
-	// its's replicas=0 means it's starting not scaling, skip all the scaling work.
-	if *itsObj.Spec.Replicas == 0 {
-		return nil
-	}
-	graphCli := model.NewGraphClient(r.cli)
-	graphCli.Noop(r.dag, r.protoITS)
-	d, err := newDataClone(r.reqCtx, r.cli, r.cluster, r.synthesizeComp, itsObj, r.protoITS, backupKey)
-	if err != nil {
-		return err
-	}
-	var succeed bool
-	if d == nil {
-		succeed = true
-	} else {
-		succeed, err = d.Succeed()
-		if err != nil {
-			return err
-		}
-	}
-	if succeed {
-		// pvcs are ready, ITS.replicas should be updated
-		graphCli.Update(r.dag, nil, r.protoITS)
-		return r.postScaleOut(itsObj)
-	} else {
-		graphCli.Noop(r.dag, r.protoITS)
-		// update objs will trigger reconcile, no need to requeue error
-		objs1, objs2, err := d.CloneData(d)
-		if err != nil {
-			return err
-		}
-		for _, obj := range objs1 {
-			graphCli.Do(r.dag, nil, obj, model.ActionCreatePtr(), nil)
-		}
-		for _, obj := range objs2 {
-			graphCli.Do(r.dag, nil, obj, model.ActionCreatePtr(), nil, inDataContext4G())
-		}
-		return nil
-	}
+	// TODO: impl
+	return nil
 }
 
 func (r *componentWorkloadOps) leaveMember4ScaleIn() error {

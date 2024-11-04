@@ -174,9 +174,6 @@ var _ = Describe("Cluster Controller", func() {
 			Create(&testCtx).
 			GetObject()
 
-		By("Create a bpt obj")
-		testdp.CreateBackupPolicyTpl(&testCtx, compDefObj.Name)
-
 		By("Wait objects available")
 		Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(compDefObj),
 			func(g Gomega, compDef *appsv1.ComponentDefinition) {

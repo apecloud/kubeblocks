@@ -48,10 +48,9 @@ const (
 	BackupRetention         = "7d"
 	StartingDeadlineMinutes = 10
 
-	KBToolImage         = "apecloud/kubeblocks-tool:latest"
-	BackupPVCName       = "test-backup-pvc"
-	ImageTag            = "latest"
-	BackupPolicyTPLName = "test-backup-policy-template-mysql"
+	KBToolImage   = "apecloud/kubeblocks-tool:latest"
+	BackupPVCName = "test-backup-pvc"
+	ImageTag      = "latest"
 )
 
 // Restore

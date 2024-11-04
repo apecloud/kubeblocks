@@ -89,17 +89,7 @@ func GeneratePodName(clusterName, compName string, ordinal int) string {
 	return fmt.Sprintf("%s-%d", GenerateClusterComponentName(clusterName, compName), ordinal)
 }
 
-// GenerateResourceNameWithScalingSuffix generates name with '-scaling' suffix.
-func GenerateResourceNameWithScalingSuffix(name string) string {
-	return fmt.Sprintf("%s-%s", name, SlashScalingLowerSuffix)
-}
-
 // GenerateShardingNamePrefix generates sharding name prefix.
 func GenerateShardingNamePrefix(shardingName string) string {
 	return fmt.Sprintf("%s-", shardingName)
-}
-
-// GenerateShardingNameSvcPrefix generates sharding service name prefix.
-func GenerateShardingNameSvcPrefix(shardingSvcName string) string {
-	return fmt.Sprintf("%s-", shardingSvcName)
 }

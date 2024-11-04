@@ -129,21 +129,7 @@ func (r *clusterBackupPolicyTransformer) Transform(ctx graph.TransformContext, d
 	}
 
 	transformComponentBackupPolicy := func(compSpec *appsv1.ClusterComponentSpec, componentName string, isSharding bool) error {
-		compDef := r.componentDefs[compSpec.ComponentDef]
-		if compDef == nil {
-			return nil
-		}
-		hScaleBPTName := compDef.Annotations[constant.HorizontalScaleBackupPolicyTemplateKey]
-		if hScaleBPTName != "" {
-			bpt := &dpv1alpha1.BackupPolicyTemplate{}
-			if err := r.Client.Get(ctx.GetContext(), client.ObjectKey{Name: hScaleBPTName}, bpt); err != nil {
-				return err
-			}
-			if err := transformBackupPolicyAndSchedule(bpt, compSpec, componentName, isSharding, true); err != nil {
-				return err
-			}
-		}
-		bpt, err := r.getBackupPolicyTemplate(compSpec.ComponentDef, hScaleBPTName)
+		bpt, err := r.getBackupPolicyTemplate(compSpec.ComponentDef)
 		if err != nil {
 			return err
 		}
@@ -168,18 +154,15 @@ func (r *clusterBackupPolicyTransformer) Transform(ctx graph.TransformContext, d
 	return nil
 }
 
-func (r *clusterBackupPolicyTransformer) getBackupPolicyTemplate(componentDef string, hScaleBPTName string) (*dpv1alpha1.BackupPolicyTemplate, error) {
+func (r *clusterBackupPolicyTransformer) getBackupPolicyTemplate(componentDef string) (*dpv1alpha1.BackupPolicyTemplate, error) {
 	bptList := &dpv1alpha1.BackupPolicyTemplateList{}
 	if err := r.Client.List(r.Context, bptList, client.MatchingLabels{
 		componentDef: componentDef,
 	}); err != nil {
 		return nil, err
 	}
-	for _, v := range bptList.Items {
-		if v.Name == hScaleBPTName {
-			continue
-		}
-		return &v, nil
+	if len(bptList.Items) > 0 {
+		return &bptList.Items[0], nil
 	}
 	return nil, nil
 }

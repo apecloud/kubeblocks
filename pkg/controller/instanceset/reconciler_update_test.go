@@ -46,7 +46,6 @@ var _ = Describe("update reconciler test", func() {
 			SetTemplate(template).
 			SetVolumeClaimTemplates(volumeClaimTemplates...).
 			SetMinReadySeconds(minReadySeconds).
-			SetRoles(roles).
 			GetObject()
 	})
 

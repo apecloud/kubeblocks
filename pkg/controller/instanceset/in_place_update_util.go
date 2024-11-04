@@ -144,10 +144,14 @@ func mergeInPlaceFields(src, dst *corev1.Pod) {
 		}
 	}
 	ignorePodVerticalScaling := viper.GetBool(FeatureGateIgnorePodVerticalScaling)
+	isImageUpdated := false
 	for _, container := range src.Spec.Containers {
 		for i, c := range dst.Spec.Containers {
 			if container.Name == c.Name {
-				dst.Spec.Containers[i].Image = container.Image
+				if dst.Spec.Containers[i].Image != container.Image {
+					dst.Spec.Containers[i].Image = container.Image
+					isImageUpdated = true
+				}
 				if !ignorePodVerticalScaling {
 					requests, limits := copyRequestsNLimitsFields(&container)
 					mergeResources(&requests, &dst.Spec.Containers[i].Resources.Requests)
@@ -156,6 +160,10 @@ func mergeInPlaceFields(src, dst *corev1.Pod) {
 				break
 			}
 		}
+	}
+	// remove role label if images are updated
+	if isImageUpdated {
+		delete(dst.Labels, constant.RoleLabelKey)
 	}
 }
 

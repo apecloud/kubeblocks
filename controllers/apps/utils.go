@@ -130,13 +130,13 @@ func clientOption(v *model.ObjectVertex) *multicluster.ClientOption {
 	return multicluster.InControlContext()
 }
 
-// RequeueError is an error that requires the controller to requeue after a certain duration.
+// TransformerError is an error that requires the controller to requeue after a certain duration.
 type TransformerError struct {
 	errs         []error
 	requeueAfter time.Duration
 }
 
-// IsRequeueError checks if the error is a RequeueError.
+// IsTransformerError checks if the error is a RequeueError.
 func IsTransformerError(err error) (time.Duration, bool) {
 	if err == nil {
 		return 0, false

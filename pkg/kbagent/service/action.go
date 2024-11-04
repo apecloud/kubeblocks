@@ -33,10 +33,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 )
 
-type ReqCtx string
-
-const ReqCtxKey ReqCtx = "reqCtx"
-
 func newActionService(logger logr.Logger, actions []proto.Action) (*actionService, error) {
 	sa := &actionService{
 		logger:         logger,

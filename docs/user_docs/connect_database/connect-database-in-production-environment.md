@@ -168,7 +168,7 @@ The following command creates a LoadBalancer instance for the database instance,
 
 :::
 
-<Tabs>s
+<Tabs>
 <TabItem value="kbcli" label="kbcli" default>
 
 ```bash

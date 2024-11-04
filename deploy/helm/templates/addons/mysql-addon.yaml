@@ -4,7 +4,7 @@
   "kbVersion" ">=0.7.0"
   "selectorLabels" $selectorLabels
   "name" "mysql"
-  "version" "0.9.3"
+  "version" "0.9.1"
   "model" "RDBMS"
   "provider" "community"
   "description" "MySQL is a widely used, open-source relational database management system (RDBMS)."

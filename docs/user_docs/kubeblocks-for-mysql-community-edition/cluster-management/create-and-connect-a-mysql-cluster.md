@@ -265,7 +265,7 @@ KubeBlocks operator creates a new Secret called `mycluster-conn-credential` to s
 2. Exec into the Pod `mycluster-mysql-0` and connect to the database using username and password.
 
    ```bash
-   kubectl exec -ti mycluster-mysql-0 -- bash
+   kubectl exec -ti mycluster-mysql-0 -n demo -- bash
 
    mysql -u root -p b8wvrwlm
    ```

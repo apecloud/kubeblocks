@@ -422,11 +422,7 @@ VTGate, VTConsensus, and VTTablet support parameter configuration. You can confi
 
 </TabItem>
 
-<TabItem value="kubectl" label="kubectl">
-
-VTGate, VTConsensus, and VTTablet support parameter configuration. You can configure the proxy cluster by editing the configuration file or by performing an OpsRequest.
-
-### Option 1. Edit the config file
+<TabItem value="Edit Config File" label="Edit Config File">
 
 1. Get the configuration file of this cluster.
 
@@ -478,7 +474,9 @@ VTGate, VTConsensus, and VTTablet support parameter configuration. You can confi
       1 row in set (0.00 sec)
       ```
 
-### Option 2. Apply an OpsRequest
+</TabItem>
+
+<TabItem value="OpsRequest" label="OpsRequest">
 
 Apply an OpsRequest to the specified cluster. Configure the parameters according to your needs.
 

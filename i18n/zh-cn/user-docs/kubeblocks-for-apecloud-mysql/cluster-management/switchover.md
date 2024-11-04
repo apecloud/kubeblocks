@@ -16,6 +16,33 @@ import TabItem from '@theme/TabItem';
 ## 开始之前
 
 * 确保集群正常运行。
+
+   <Tabs>
+
+   <TabItem value="kbcli" label="kbcli" default>
+
+   ```bash
+   kbcli cluster list mycluster -n demo
+   >
+   NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    CREATED-TIME
+   mycluster   demo        apecloud-mysql       ac-mysql-8.0.30   Delete               Running   Sep 19,2024 16:01 UTC+0800
+   ```
+
+   </TabItem>
+
+   <TabItem value="kubectl" label="kubectl">
+
+   ```bash
+   kubectl get cluster mycluster -n demo
+   >
+   NAME        CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    AGE
+   mycluster   apecloud-mysql       ac-mysql-8.0.30   Delete               Running   27m
+   ```
+
+   </TabItem>
+
+   </Tabs>
+
 * 检查以下角色探针参数是否存在，确认是否已启用探针。
 
    ```bash
@@ -32,31 +59,95 @@ import TabItem from '@theme/TabItem';
 
 将 ApeCloud MySQL 集群版集群的一个 Follower 切换为 Leader，并将原 Leader 实例切换为 Follower。
 
+<Tabs>
+
+<TabItem value="kbcli" label="kbcli" default>
+
 * 不指定 Leader 实例进行切换。
 
     ```bash
-    kbcli cluster promote mycluster
+    kbcli cluster promote mycluster -n demo
     ```
 
 * 指定一个新的 Leader 实例进行切换。
 
     ```bash
-    kbcli cluster promote mycluster --instance='mycluster-mysql-2'
+    kbcli cluster promote mycluster --instance='mycluster-mysql-2' -n demo
     ```
 
 * 如果有多个组件，可以使用 `--components` 参数指定一个组件。
 
     ```bash
-    kbcli cluster promote mycluster --instance='mycluster-mysql-2' --components='apecloud-mysql'
+    kbcli cluster promote mycluster --instance='mycluster-mysql-2' --components='apecloud-mysql' -n demo
     ```
+
+</TabItem>
+
+<TabItem value="kubectl" label="kubectl">
+
+* 不指定 Leader 实例进行切换。
+
+  ```yaml
+  kubectl apply -f -<<EOF
+  apiVersion: apps.kubeblocks.io/v1alpha1
+  kind: OpsRequest
+  metadata:
+    name: mycluster-switchover
+    namespace: demo
+  spec:
+    clusterName: mycluster
+    type: Switchover
+    switchover:
+    - componentName: apecloud-mysql
+      instanceName: '*'
+  EOF
+  ```
+
+* 指定一个新的 Leader 实例进行切换。
+
+  ```yaml
+  kubectl apply -f -<<EOF
+  apiVersion: apps.kubeblocks.io/v1alpha1
+  kind: OpsRequest
+  metadata:
+    name: mycluster-switchover
+    namespace: demo
+  spec:
+    clusterName: mycluster
+    type: Switchover
+    switchover:
+    - componentName: apecloud-mysql
+      instanceName: 'mycluster-mysql-2'
+  EOF
+  ```
+
+</TabItem>
+
+</Tabs>
 
 ## 验证集群切换
 
 查看实例状态，验证切换是否成功。
 
+<Tabs>
+
+<TabItem value="kbcli" label="kbcli" default>
+
 ```bash
-kbcli cluster list-instances
+kbcli cluster list-instances -n demo
 ```
+
+</TabItem>
+
+<TabItem value="kubectl" label="kubectl">
+
+```bash
+kubectl get pods -n demo
+```
+
+</TabItem>
+
+</Tabs>
 
 ## 处理异常情况
 

@@ -178,7 +178,7 @@ The example below takes configuring `max_connections` and `innodb_buffer_pool_si
    The whole searching process has a 30-second delay since it takes some time for kubelet to synchronize modifications to the volume of the pod.
 
    ```bash
-   kbcli cluster connect mycluster
+   kbcli cluster connect mycluster -n demo
    ```
 
    ```bash
@@ -219,7 +219,7 @@ The following steps take configuring MySQL Standalone as an example.
 
    :::note
 
-   * Since ApeCloud MySQL currently supports multiple templates, it is required to use `--config-spec` to specify a configuration template. You can run `kbcli cluster describe-config mycluster` to view all template names.
+   * Since ApeCloud MySQL currently supports multiple templates, it is required to use `--config-spec` to specify a configuration template. You can run `kbcli cluster describe-config mycluster -n demo` to view all template names.
    * If there are multiple components in a cluster, use `--components` to specify a component.
 
    :::
@@ -233,7 +233,7 @@ The following steps take configuring MySQL Standalone as an example.
 3. Connect to the database to verify whether the parameters are configured as expected.
 
    ```bash
-   kbcli cluster connect mycluster
+   kbcli cluster connect mycluster -n demo
    ```
 
    :::note
@@ -344,6 +344,12 @@ KubeBlocks supports configuring cluster parameters by editing the configuration 
       1 row in set (0.00 sec)
       ```
 
+:::note
+
+Just in case you cannot find the configuration file of your cluster, you can switch to the `kbcli` tab and use relavant commands to view the current configuration file of a cluster.
+
+:::
+
 </TabItem>
 
 <TabItem value="OpsRequest" label="OpsRequest">
@@ -426,60 +432,7 @@ KubeBlocks supports configuring cluster parameters with an OpsRequest.
 
 :::note
 
-Just in case you cannot find the configuration file of your cluster, you can use `kbcli` to view the current configuration file of a cluster.
-
-```bash
-kbcli cluster describe-config mycluster -n demo
-```
-
-From the meta information, the cluster `mycluster` has a configuration file named `my.cnf`.
-
-You can also view the details of this configuration file and parameters.
-
-* View the details of the current configuration file.
-
-   ```bash
-   kbcli cluster describe-config mycluster --show-detail -n demo
-   ```
-
-* View the parameter description.
-
-   ```bash
-   kbcli cluster explain-config mycluster -n demo | head -n 20
-   ```
-
-* View the user guide of a specified parameter.
-  
-   ```bash
-   kbcli cluster explain-config mycluster --param=innodb_buffer_pool_size --config-specs=mysql-consensusset-config -n demo
-   ```
-
-   `--config-specs` is required to specify a configuration template since ApeCloud MySQL currently supports multiple templates. You can run `kbcli cluster describe-config mycluster` to view the all template names.
-
-  <details>
-
-  <summary>Output</summary>
-
-  ```bash
-  template meta:
-    ConfigSpec: mysql-consensusset-config        ComponentName: mysql        ClusterName: mycluster
-
-  Configure Constraint:
-    Parameter Name:     innodb_buffer_pool_size
-    Allowed Values:     [5242880-18446744073709552000]
-    Scope:              Global
-    Dynamic:            false
-    Type:               integer
-    Description:        The size in bytes of the memory buffer innodb uses to cache data and indexes of its tables  
-  ```
-  
-  </details>
-
-  * Allowed Values: It defines the valid value range of this parameter.
-  * Dynamic: The value of `Dynamic` in `Configure Constraint` defines how the parameter configuration takes effect. There are two different configuration strategies based on the effectiveness type of modified parameters, i.e. **dynamic** and **static**.
-    * When `Dynamic` is `true`, it means the effectiveness type of parameters is **dynamic** and can be configured online.
-    * When `Dynamic` is `false`, it means the effectiveness type of parameters is **static** and a pod restarting is required to make the configuration effective.
-  * Description: It describes the parameter definition.
+Just in case you cannot find the configuration file of your cluster, you can switch to the `kbcli` tab and use relavant commands to view the current configuration file of a cluster.
 
 :::
 

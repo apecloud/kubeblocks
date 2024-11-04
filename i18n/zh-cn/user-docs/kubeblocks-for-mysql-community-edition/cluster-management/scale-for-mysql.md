@@ -6,6 +6,9 @@ sidebar_position: 2
 sidebar_label: 扩缩容
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # MySQL 集群扩缩容
 
 KubeBlocks 支持对 MySQL 集群进行垂直扩缩容和水平扩缩容。
@@ -24,23 +27,46 @@ KubeBlocks 支持对 MySQL 集群进行垂直扩缩容和水平扩缩容。
 
 确保集群处于 `Running` 状态，否则以下操作可能会失败。
 
+<Tabs>
+
+<TabItem value="kbcli" label="kbcli" default>
+
 ```bash
-kbcli cluster list mycluster
+kbcli cluster list mycluster -n demo
 >
 NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    CREATED-TIME
-mycluster   default     mysql                mysql-8.0.33   Delete               Running   Jul 05,2024 19:06 UTC+0800
+mycluster   demo        mysql                mysql-8.0.33   Delete               Running   Jul 05,2024 18:46 UTC+0800
 ```
+
+</TabItem>
+
+<TabItem value="kubectl" label="kubectl">
+
+```bash
+kubectl get cluster mycluster
+>
+NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    AGE
+mycluster   mysql                mysql-8.0.33   Delete               Running   18m
+```
+
+</TabItem>
+
+</Tabs>
 
 ### 步骤
 
-1. 更改配置
+<Tabs>
+
+<TabItem value="kbcli" label="kbcli" default>
+
+1. 更改配置。
 
     配置参数 `--components`、`--memory` 和 `--cpu`，并执行以下命令。
 
     ```bash
-    kbcli cluster vscale mycluster \
-    --components="mysql" \
-    --memory="4Gi" --cpu="2" \
+    kbcli cluster vscale mycluster -n demo\
+      --components="mysql" \
+      --memory="4Gi" --cpu="2" \
     ```
 
     - `--components` 表示可进行垂直扩容的组件名称。
@@ -49,23 +75,32 @@ mycluster   default     mysql                mysql-8.0.33   Delete              
 
 2. 查看集群状态，以验证垂直扩容是否成功。
 
-    ```bash
-    kbcli cluster list mycluster
-    >
-    NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS     CREATED-TIME
-    mycluster   default     mysql                mysql-8.0.33   Delete               Updating   Jul 05,2024 19:11 UTC+0800
-    ```
+    - 查看 OpsRequest 进程。
 
-   - STATUS=Updating 表示正在进行垂直扩容。
-   - STATUS=Running 表示垂直扩容已完成。
-   - STATUS=Abnormal 表示垂直扩容异常。原因可能是正常实例的数量少于总实例数，或者 Leader 实例正常运行而其他实例异常。
-     > 你可以手动检查是否由于资源不足而导致报错。如果 Kubernetes 集群支持 AutoScaling，系统在资源充足的情况下会执行自动恢复。或者你也可以创建足够的资源，并使用 `kubectl describe` 命令进行故障排除。
+        执行磁盘扩容命令后，KubeBlocks 会自动输出查看 OpsRequest 进程的命令，可通过该命令查看 OpsRequest 进程的细节，包括 OpsRequest 的状态、Pod 状态等。当 OpsRequest 的状态为 `Succeed` 时，表明这一进程已完成。
+    - 查看集群状态。
+
+        ```bash
+        kbcli cluster list mycluster -n demo
+        >
+        NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS     CREATED-TIME
+        mycluster   demo        mysql                mysql-8.0.33   Delete               Updating   Jul 05,2024 19:11 UTC+0800
+        ```
+
+        - STATUS=Updating 表示正在进行垂直扩容。
+        - STATUS=Running 表示垂直扩容已完成。
+        - STATUS=Abnormal 表示垂直扩容异常。原因可能是正常实例的数量少于总实例数，或者 Leader 实例正常运行而其他实例异常。
+          > 你可以手动检查是否由于资源不足而导致报错。如果 Kubernetes 集群支持 AutoScaling，系统在资源充足的情况下会执行自动恢复。或者你也可以创建足够的资源，并使用 `kubectl describe` 命令进行故障排除。
 
 3. 检查资源规格是否已变更。
 
     ```bash
-    kbcli cluster describe mycluster
+    kbcli cluster describe mycluster -n demo
     ```
+
+</TabItem>
+
+<TabItem value="OpsRequest" label="OpsRequest">
 
 ## 水平扩缩容
 

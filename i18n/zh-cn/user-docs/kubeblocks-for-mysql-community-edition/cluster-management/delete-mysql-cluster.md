@@ -6,6 +6,9 @@ sidebar_position: 7
 sidebar_label: 删除保护
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # 删除集群
 
 ## 终止策略
@@ -23,19 +26,62 @@ sidebar_label: 删除保护
 | `Delete`              | `Delete` 删除工作负载资源和 PVC，但保留备份。 |
 | `WipeOut`             | `WipeOut` 删除工作负载资源、PVC 和所有相关资源（包括备份）。 |
 
-执行以下命令查看终止策略。
+执行以下命令查看当前集群的终止策略。
+
+<Tabs>
+
+<TabItem value="kbcli" label="kbcli" default>
 
 ```bash
-kbcli cluster list mycluster
+kbcli cluster list mycluster -n demo
 >
 NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    CREATED-TIME
-mycluster   default     mysql                mysql-8.0.33   Delete               Running   Jul 05,2024 18:46 UTC+0800
+mycluster   demo        mysql                mysql-8.0.33   Delete               Running   Jul 05,2024 18:46 UTC+0800
 ```
+
+</TabItem>
+
+<TabItem value="kubectl" label="kubectl">
+
+```bash
+kubectl -n demo get cluster mycluster
+>
+NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    AGE
+mycluster   mysql                mysql-8.0.30   Delete               Running   67m
+```
+
+</TabItem>
+
+</Tabs>
 
 ## 步骤
 
 执行以下命令，删除集群。
 
+<Tabs>
+
+<TabItem value="kbcli" label="kbcli" default>
+
 ```bash
-kbcli cluster delete mycluster
+kbcli cluster delete mycluster -n demo
 ```
+
+</TabItem>
+
+<TabItem value="kubectl" label="kubectl">
+
+```bash
+kubectl delete cluster mycluster -n demo
+```
+
+如果想删除集群和所有相关资源，可以将终止策略修改为 `WipeOut`，然后再删除该集群。
+
+```bash
+kubectl patch -n demo cluster mycluster -p '{"spec":{"terminationPolicy":"WipeOut"}}' --type="merge"
+
+kubectl delete -n demo cluster mycluster
+```
+
+</TabItem>
+
+</Tabs>

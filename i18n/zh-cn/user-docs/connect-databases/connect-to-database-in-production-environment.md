@@ -94,14 +94,14 @@ kbcli cluster expose ${cluster-name} --type vpc --enable=true
 
 <TabItem value="kubectl" label="kubeclt">
 
-此处以 MySQL 集群为例，在阿里云上为集群暴露公网访问地址的方式如下：
+此处以 MySQL 集群为例，在阿里云上为集群暴露 VPC 访问地址的方式如下：
 
 ```bash
 kubectl apply -f - <<EOF
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
-  name: ops-expose
+  name: ops-expose-enable
 spec:
   clusterRef: mycluster
   expose:
@@ -141,7 +141,7 @@ kubectl apply -f - <<EOF
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
-  name: ops-expose
+  name: ops-expose-disable
 spec:
   clusterRef: mycluster
   expose:
@@ -190,14 +190,14 @@ kbcli cluster expose ${cluster-name} --type internet --enable=true
 
 <TabItem value="kubectl" label="kubeclt">
 
-以 MySQL 集群为例，在阿里云上为集群暴露 VPC 访问地址的方式如下：
+以 MySQL 集群为例，在阿里云上为集群暴露公网访问地址的方式如下：
 
 ```bash
 kubectl apply -f - <<EOF
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
-  name: ops-expose
+  name: ops-expose-enable
 spec:
   clusterRef: mycluster
   expose:
@@ -206,7 +206,7 @@ spec:
     - annotations:
         service.beta.kubernetes.io/alibaba-cloud-loadbalancer-address-type: internet
       ipFamilyPolicy: PreferDualStack
-      name: vpc
+      name: internet
       serviceType: LoadBalancer
     switch: Enable
   ttlSecondsBeforeAbort: 0
@@ -231,7 +231,7 @@ EOF
 <TabItem value="kbcli" label="kbcli" default>
 
 ```bash
-kbcli cluster expose ${cluster-name} --type vpc --enable=false
+kbcli cluster expose ${cluster-name} --type internet --enable=false
 ```
 
 </TabItem>
@@ -243,16 +243,16 @@ kubectl apply -f - <<EOF
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
-  name: ops-expose
+  name: ops-expose-disable
 spec:
   clusterRef: mycluster
   expose:
   - componentName: mysql
     services:
     - annotations:
-        service.beta.kubernetes.io/alibaba-cloud-loadbalancer-address-type: intrernet
+        service.beta.kubernetes.io/alibaba-cloud-loadbalancer-address-type: internet
       ipFamilyPolicy: PreferDualStack
-      name: vpc
+      name: internet
       serviceType: LoadBalancer
     switch: Disable
   ttlSecondsBeforeAbort: 0

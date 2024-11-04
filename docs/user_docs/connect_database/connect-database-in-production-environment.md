@@ -14,7 +14,7 @@ import TabItem from '@theme/TabItem';
 In the production environment, it is normal to connect a database with CLI and SDK clients. There are three scenarios.
 
 - Scenario 1: Client1 and the database are in the same Kubernetes cluster. To connect client1 and the database, see [Use ClusterIP](#scenario-1-connect-database-in-the-same-kubernetes-cluster).
-- Scenario 2: Client2 is outside the Kubernetes cluster, but it is in the same VPC as the database. To connect client2 and the database, see [Expose VPC Private Address](#scenario-2-client-outside-the-kubernetes-cluster-but-in-the-same-vpc-as-the-kubernetes-cluster).
+- Scenario 2: Client2 is outside the Kubernetes cluster, but it is in the same VPC as the database. To connect client2 and the database, see [Expose VPC Address](#scenario-2-client-outside-the-kubernetes-cluster-but-in-the-same-vpc-as-the-kubernetes-cluster).
 - Scenario 3: Client3 and the database are in different VPCs, such as other VPCs or the public network. To connect client3 and the database, see [Expose VPC Public Address](#scenario-3-connect-database-with-clients-in-other-vpcs-or-public-networks).
 
 See the figure below to get a clear image of the network location.
@@ -88,14 +88,14 @@ kbcli cluster expose ${cluster-name} --type vpc --enable=true
 </TabItem>
 <TabItem value="kubectl" label="kubectl">
 
-This example uses a MySQL cluster to demonstrate how to expose a public access address on Alibaba Cloud.
+This example uses a MySQL cluster to demonstrate how to expose a VPC address on Alibaba Cloud.
 
 ```yaml
 kubectl apply -f - <<EOF
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
-  name: ops-expose
+  name: ops-expose-enable
 spec:
   clusterRef: mycluster
   expose:
@@ -138,7 +138,7 @@ kubectl apply -f - <<EOF
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
-  name: ops-expose
+  name: ops-expose-disable
 spec:
   clusterRef: mycluster
   expose:
@@ -168,7 +168,7 @@ The following command creates a LoadBalancer instance for the database instance,
 
 :::
 
-<Tabs>
+<Tabs>s
 <TabItem value="kbcli" label="kbcli" default>
 
 ```bash
@@ -178,14 +178,14 @@ kbcli cluster expose ${cluster-name} --type internet --enable=true
 </TabItem>
 <TabItem value="kubectl" label="kubectl">
 
-The example uses MySQL to demonstrate how to expose the VPC address on Alibaba Cloud.
+The example uses MySQL to demonstrate how to expose the public address on Alibaba Cloud.
 
 ```yaml
 kubectl apply -f - <<EOF
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
-  name: ops-expose
+  name: ops-expose-enable
 spec:
   clusterRef: mycluster
   expose:
@@ -194,7 +194,7 @@ spec:
     - annotations:
         service.beta.kubernetes.io/alibaba-cloud-loadbalancer-address-type: internet
       ipFamilyPolicy: PreferDualStack
-      name: vpc
+      name: internet
       serviceType: LoadBalancer
     switch: Enable
   ttlSecondsBeforeAbort: 0
@@ -222,7 +222,7 @@ kubectl apply -f - <<EOF
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
-  name: ops-expose
+  name: ops-expose-disable
 spec:
   clusterRef: mycluster
   expose:
@@ -231,7 +231,7 @@ spec:
     - annotations:
         service.beta.kubernetes.io/alibaba-cloud-loadbalancer-address-type: internet
       ipFamilyPolicy: PreferDualStack
-      name: vpc
+      name: internet
       serviceType: LoadBalancer
     switch: Disable
   ttlSecondsBeforeAbort: 0

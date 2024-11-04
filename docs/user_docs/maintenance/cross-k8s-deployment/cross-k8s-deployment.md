@@ -139,7 +139,7 @@ The following steps can be performed separately in each cluster (without the `--
    cilium clustermesh status —wait —context k8s-3
    ```
 
-4. (Optional) Check the status of the tunnels between cluster by using the ciliun-dbg tool. Refer to [the official doc](https://docs.cilium.io/en/stable/cmdref/cilium-dbg/) for details.
+4. (Optional) Check the status of the tunnels between cluster by using the cilium-dbg tool. Refer to [the official doc](https://docs.cilium.io/en/stable/cmdref/cilium-dbg/) for details.
 
    ```bash
    cilium-dbg bpf tunnel list

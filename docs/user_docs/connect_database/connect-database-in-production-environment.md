@@ -102,7 +102,7 @@ spec:
   - componentName: mysql
     services:
     - annotations:
-        service.beta.kubernetes.io/alibaba-cloud-loadbalancer-address-type: internet
+        service.beta.kubernetes.io/alibaba-cloud-loadbalancer-address-type: intranet
       ipFamilyPolicy: PreferDualStack
       name: vpc
       serviceType: LoadBalancer
@@ -145,7 +145,7 @@ spec:
   - componentName: mysql
     services:
     - annotations:
-        service.beta.kubernetes.io/alibaba-cloud-loadbalancer-address-type: internet
+        service.beta.kubernetes.io/alibaba-cloud-loadbalancer-address-type: intranet
       ipFamilyPolicy: PreferDualStack
       name: vpc
       serviceType: LoadBalancer
@@ -192,7 +192,7 @@ spec:
   - componentName: mysql
     services:
     - annotations:
-        service.beta.kubernetes.io/alibaba-cloud-loadbalancer-address-type: intranet
+        service.beta.kubernetes.io/alibaba-cloud-loadbalancer-address-type: internet
       ipFamilyPolicy: PreferDualStack
       name: vpc
       serviceType: LoadBalancer
@@ -229,7 +229,7 @@ spec:
   - componentName: mysql
     services:
     - annotations:
-        service.beta.kubernetes.io/alibaba-cloud-loadbalancer-address-type: intranet
+        service.beta.kubernetes.io/alibaba-cloud-loadbalancer-address-type: internet
       ipFamilyPolicy: PreferDualStack
       name: vpc
       serviceType: LoadBalancer

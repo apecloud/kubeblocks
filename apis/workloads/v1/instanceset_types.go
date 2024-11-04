@@ -507,7 +507,7 @@ type ReplicaRole struct {
 	//
 	// +kubebuilder:default=0
 	// +optional
-	UpdatePriority int `json:"updatePriorit"`
+	UpdatePriority int `json:"updatePriority"`
 
 	// ParticipatesInQuorum indicates if pods with this role are counted when determining quorum.
 	// This affects update strategies that need to maintain quorum for availability.

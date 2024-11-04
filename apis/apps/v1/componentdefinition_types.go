@@ -1409,7 +1409,7 @@ type ReplicaRole struct {
 	//
 	// +kubebuilder:default=0
 	// +optional
-	UpdatePriority int `json:"updatePriorit"`
+	UpdatePriority int `json:"updatePriority"`
 
 	// ParticipatesInQuorum indicates if pods with this role are counted when determining quorum.
 	// This affects update strategies that need to maintain quorum for availability.
@@ -1425,7 +1425,7 @@ type ReplicaRole struct {
 	//
 	// +kubebuilder:default=false
 	// +optional
-	ParticipatesInQuorum bool `json:"participatesInQuorum bool"`
+	ParticipatesInQuorum bool `json:"participatesInQuorum"`
 
 	// SwitchoverBeforeUpdate indicates if a role switchover operation should be performed before
 	// updating or scaling in pods with this role. This is typically used for leader roles to

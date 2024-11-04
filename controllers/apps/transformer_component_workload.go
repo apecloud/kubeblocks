@@ -635,7 +635,7 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
 		}
 	}
 	if len(leaveErrors) > 0 {
-		return NewRequeueError(leaveErrors, 1*time.Second)
+		return NewTransformerError(leaveErrors, 1*time.Second)
 	}
 	return nil
 }
@@ -743,7 +743,7 @@ func (r *componentWorkloadOps) doMemberJoin(podSet sets.Set[string]) error {
 	}
 
 	if len(joinErrors) > 0 {
-		return NewRequeueError(joinErrors, 1*time.Second)
+		return NewTransformerError(joinErrors, 1*time.Second)
 	}
 	return nil
 }

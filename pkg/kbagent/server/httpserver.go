@@ -139,16 +139,20 @@ func (s *server) dispatcher(svc service.Service) func(*fasthttp.RequestCtx) {
 		ctx := context.Background()
 		body := reqCtx.PostBody()
 
-		output, respCtx, err := svc.HandleRequest(ctx, body)
+		output, err := svc.HandleRequest(ctx, body)
 		statusCode := fasthttp.StatusOK
 		if err != nil {
 			statusCode = fasthttp.StatusInternalServerError
 		}
 		respond(reqCtx, statusCode, output, err)
 
-		if s.config.Logging {
-			s.logAspect(reqCtx, respCtx, statusCode)
-		}
+		s.logger.Info("HTTP API Called",
+			"user-agent", string(reqCtx.UserAgent()),
+			"method", string(reqCtx.Method()),
+			"path", string(reqCtx.Path()),
+			"status code", statusCode,
+			"cost", time.Since(reqCtx.Time()).Milliseconds(),
+		)
 	}
 }
 
@@ -161,23 +165,4 @@ func respond(ctx *fasthttp.RequestCtx, code int, body []byte, err error) {
 	case body != nil:
 		ctx.Response.SetBody(body)
 	}
-}
-
-func (s *server) logAspect(reqCtx *fasthttp.RequestCtx, respCtx context.Context, statusCode int) {
-	reqLogger := s.logger
-	if userAgent := string(reqCtx.Request.Header.Peek("User-Agent")); userAgent != "" {
-		reqLogger = reqLogger.WithValues("useragent", userAgent)
-	}
-
-	method := string(reqCtx.Method())
-	path := string(reqCtx.Path())
-	elapsed := float64(time.Since(reqCtx.Time()).Milliseconds())
-
-	reqLogger.Info("HTTP API Called",
-		"method", method,
-		"path", path,
-		"action", respCtx.Value(service.ActionKey),
-		"status code", statusCode,
-		"cost", elapsed,
-	)
 }

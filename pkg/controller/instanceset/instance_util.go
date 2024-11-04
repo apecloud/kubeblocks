@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubectl/pkg/util/podutils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/kustomize/api/image"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -171,6 +172,46 @@ func isTerminating(pod *corev1.Pod) bool {
 // isHealthy returns true if pod is running and ready and has not been terminated
 func isHealthy(pod *corev1.Pod) bool {
 	return isRunningAndReady(pod) && !isTerminating(pod)
+}
+
+// isRoleReady returns true if pod has role label
+func isRoleReady(pod *corev1.Pod, roles []workloads.ReplicaRole) bool {
+	if len(roles) == 0 {
+		return true
+	}
+	_, ok := pod.Labels[constant.RoleLabelKey]
+	return ok
+}
+
+// isImageMatched returns true if all container statuses have same image as defined in pod spec
+func isImageMatched(pod *corev1.Pod) bool {
+	for _, container := range pod.Spec.Containers {
+		index := slices.IndexFunc(pod.Status.ContainerStatuses, func(status corev1.ContainerStatus) bool {
+			return status.Name == container.Name
+		})
+		if index == -1 {
+			continue
+		}
+		specImage := container.Image
+		statusImage := pod.Status.ContainerStatuses[index].Image
+		// Image in status may not match the image used in the PodSpec.
+		// More info: https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/pod-v1/#PodStatus
+		specName, specTag, specDigest := image.Split(specImage)
+		statusName, statusTag, statusDigest := image.Split(statusImage)
+		// if digest presents in spec, it must be same in status
+		if len(specDigest) != 0 && specDigest != statusDigest {
+			return false
+		}
+		// if tag presents in spec, it must be same in status
+		if len(specTag) != 0 && specTag != statusTag {
+			return false
+		}
+		// otherwise, statusName should be same as or has suffix of specName
+		if !strings.HasSuffix(statusName, specName) {
+			return false
+		}
+	}
+	return true
 }
 
 // getPodRevision gets the revision of Pod by inspecting the StatefulSetRevisionLabel. If pod has no revision the empty

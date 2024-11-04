@@ -1388,4 +1388,52 @@ var _ = Describe("instance util test", func() {
 			Expect(medianDuration).To(BeNumerically("<", time.Millisecond))
 		})
 	})
+
+	Context("isImageMatched", func() {
+		It("should work well", func() {
+			pod := builder.NewPodBuilder(namespace, name).GetObject()
+
+			By("spec: image name, status: hostname, image name, tag, digest")
+			pod.Spec.Containers = []corev1.Container{{
+				Name:  name,
+				Image: "nginx",
+			}}
+			pod.Status.ContainerStatuses = []corev1.ContainerStatus{{
+				Name:  name,
+				Image: "docker.io/nginx:latest@0f37a86c04f8",
+			}}
+			Expect(isImageMatched(pod)).Should(BeTrue())
+
+			By("digest not matches")
+			pod.Spec.Containers = []corev1.Container{{
+				Name:  name,
+				Image: "nginx:latest@xxxxxxxxx",
+			}}
+			Expect(isImageMatched(pod)).Should(BeFalse())
+
+			By("tag not matches")
+			pod.Spec.Containers = []corev1.Container{{
+				Name:  name,
+				Image: "nginx:xxxx@0f37a86c04f8",
+			}}
+			Expect(isImageMatched(pod)).Should(BeFalse())
+
+			By("hostname not matches")
+			pod.Spec.Containers = []corev1.Container{{
+				Name:  name,
+				Image: "apecloud.com/nginx",
+			}}
+			Expect(isImageMatched(pod)).Should(BeFalse())
+		})
+	})
+
+	Context("isRoleReady", func() {
+		It("should work well", func() {
+			pod := builder.NewPodBuilder(namespace, name).GetObject()
+			Expect(isRoleReady(pod, nil)).Should(BeTrue())
+			Expect(isRoleReady(pod, roles)).Should(BeFalse())
+			pod.Labels = map[string]string{constant.RoleLabelKey: "leader"}
+			Expect(isRoleReady(pod, roles)).Should(BeTrue())
+		})
+	})
 })

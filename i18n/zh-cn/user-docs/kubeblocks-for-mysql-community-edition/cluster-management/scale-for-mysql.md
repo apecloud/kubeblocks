@@ -73,7 +73,7 @@ mycluster   mysql                mysql-8.0.33   Delete               Running   1
     - `--memory` 表示组件请求和限制的内存大小。
     - `--cpu` 表示组件请求和限制的 CPU 大小。
 
-2. 查看集群状态，以验证垂直扩容是否成功。
+2. 通过以下任意一种方式验证垂直扩容是否成功。
 
     - 查看 OpsRequest 进程。
 
@@ -102,6 +102,95 @@ mycluster   mysql                mysql-8.0.33   Delete               Running   1
 
 <TabItem value="OpsRequest" label="OpsRequest">
 
+1. 对指定的集群应用 OpsRequest，可根据您的需求配置参数。
+
+   ```bash
+   kubectl apply -f - <<EOF
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: OpsRequest
+   metadata:
+     name: ops-vertical-scaling
+     namespace: demo
+   spec:
+     clusterName: mycluster
+     type: VerticalScaling 
+     verticalScaling:
+     - componentName: mysql
+       requests:
+         memory: "2Gi"
+         cpu: "1"
+       limits:
+         memory: "4Gi"
+         cpu: "2"
+   EOF
+   ```
+
+2. 查看运维任务状态，验证垂直扩缩容操作是否成功。
+
+   ```bash
+   kubectl get ops -n demo
+   >
+   NAMESPACE   NAME                   TYPE              CLUSTER     STATUS    PROGRESS   AGE
+   demo        ops-vertical-scaling   VerticalScaling   mycluster   Succeed   3/3        6m
+   ```
+
+   如果有报错，可执行 `kubectl describe ops -n demo` 命令查看该运维操作的相关事件，协助排障。
+
+3. 查看相应资源是否变更。
+
+    ```bash
+    kubectl describe cluster mycluster -n demo
+    ```
+
+</TabItem>
+
+<TabItem value="编辑集群 YAML 文件" label="编辑集群 YAML 文件">
+
+1. 修改 YAML 文件中 `spec.componentSpecs.resources` 的配置。`spec.componentSpecs.resources` 控制资源的请求值和限制值，修改参数值将触发垂直扩缩容。
+
+   ```yaml
+   kubectl edit cluster mycluster -n demo
+   >
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: Cluster
+   metadata:
+     name: mycluster
+     namespace: demo
+   spec:
+     clusterDefinitionRef: mysql
+     clusterVersionRef: mysql-8.0.30
+     componentSpecs:
+     - name: mysql
+       componentDefRef: mysql
+       replicas: 2
+       resources: # 修改资源参数值
+         requests:
+           memory: "2Gi"
+           cpu: "1"
+         limits:
+           memory: "4Gi"
+           cpu: "2"
+       volumeClaimTemplates:
+       - name: data
+         spec:
+           accessModes:
+             - ReadWriteOnce
+           resources:
+             requests:
+               storage: 40Gi
+     terminationPolicy: Delete
+   ```
+
+2. 查看相应资源是否变更。
+
+    ```bash
+    kubectl describe cluster mycluster -n demo
+    ```
+
+</TabItem>
+
+</Tabs>
+
 ## 水平扩缩容
 
 水平扩缩容会改变 Pod 的数量。例如，你可以应用水平扩容将 Pod 的数量从三个增加到五个。
@@ -112,43 +201,179 @@ mycluster   mysql                mysql-8.0.33   Delete               Running   1
 
 确保集群处于 `Running` 状态，否则以下操作可能会失败。
 
+<Tabs>
+
+<TabItem value="kbcli" label="kbcli" default>
+
 ```bash
-kbcli cluster list mycluster
+kbcli cluster list mycluster -n demo
 >
 NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    CREATED-TIME
-mycluster   default     mysql                mysql-8.0.33   Delete               Running   Jul 05,2024 18:46 UTC+0800
+mycluster   demo        mysql                mysql-8.0.33   Delete               Running   Jul 05,2024 18:46 UTC+0800
 ```
 
+</TabItem>
+
+<TabItem value="kubectl" label="kubectl">
+
+```bash
+kubectl get cluster mycluster
+>
+NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    AGE
+mycluster   mysql                mysql-8.0.33   Delete               Running   18m
+```
+
+</TabItem>
+
+</Tabs>
+
 ### 步骤
+
+<Tabs>
+
+<TabItem value="kbcli" label="kbcli" default>
 
 1. 更改配置。
 
     配置参数 `--components` 和 `--replicas`，并执行以下命令。
 
     ```bash
-    kbcli cluster hscale mycluster \
-    --components="mysql" --replicas=3
+    kbcli cluster hscale mycluster -n demo\
+      --components="mysql" --replicas=3
     ```
 
     - `--components` 表示准备进行水平扩容的组件名称。
     - `--replicas` 表示指定组件的副本数。可按需修改该参数值，对应执行扩缩容操作。
 
-2. 验证水平扩容。
+2. 通过以下任意一种方式验证水平扩容是否成功。
 
-   检查集群状态，确定水平扩容的情况。
+   - 查看 OpsRequest 进程。
+
+       执行磁盘扩容命令后，KubeBlocks 会自动输出查看 OpsRequest 进程的命令，可通过该命令查看 OpsRequest 进程的细节，包括 OpsRequest 的状态、Pod 状态等。当 OpsRequest 的状态为 `Succeed` 时，表明这一进程已完成。
+
+       ```bash
+       kbcli cluster describe-ops mycluster-horizontalscaling-g67k9 -n demo
+       ```
+
+   - 查看集群状态。
+
+       ```bash
+       kbcli cluster list mycluster -n demo
+       ```
+
+       - STATUS=Updating 表示正在进行水平扩容。
+       - STATUS=Running 表示水平扩容已完成。
+
+3. 当 OpsRequest 状态为 `Succeed` 或集群状态再次回到 `Running` 后，检查相关资源规格是否已变更。
 
     ```bash
-    kbcli cluster list mycluster
+    kbcli cluster describe mycluster -n demo
     ```
 
-    - STATUS=Updating 表示正在进行水平扩容。
-    - STATUS=Running 表示水平扩容已完成。
+</TabItem>
 
-3. 检查相关资源规格是否已变更。
+<TabItem value="OpsRequest" label="OpsRequest">
 
-    ```bash
-    kbcli cluster describe mycluster
-    ```
+1. 对指定的集群应用 OpsRequest，可根据您的需求配置参数。
+  
+   以下示例演示了增加 2 个副本。
+
+   ```bash
+   kubectl apply -f - <<EOF
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: OpsRequest
+   metadata:
+     name: ops-horizontal-scaling
+     namespace: demo
+   spec:
+     clusterName: mycluster
+     type: HorizontalScaling
+     horizontalScaling:
+     - componentName: mysql
+       scaleOut:
+         replicaChanges: 2
+   EOF
+   ```
+
+   如果您想要缩容，可将 `scaleOut` 替换为 `scaleIn`。
+
+   以下示例演示了删除 2 个副本。
+
+   ```bash
+   kubectl apply -f - <<EOF
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: OpsRequest
+   metadata:
+     name: ops-horizontal-scaling
+     namespace: demo
+   spec:
+     clusterName: mycluster
+     type: HorizontalScaling
+     horizontalScaling:
+     - componentName: mysql
+       scaleIn:
+         replicaChanges: 2
+   EOF
+   ```
+
+2. 查看运维操作状态，验证水平扩缩容是否成功。
+
+   ```bash
+   kubectl get ops -n demo
+   >
+   NAMESPACE   NAME                     TYPE                CLUSTER     STATUS    PROGRESS   AGE
+   demo        ops-horizontal-scaling   HorizontalScaling   mycluster   Succeed   3/3        6m
+   ```
+
+   如果有报错，可执行 `kubectl describe ops -n demo` 命令查看该运维操作的相关事件，协助排障。
+
+3. 查看相应资源是否变更。
+
+   ```bash
+   kubectl describe cluster mycluster -n demo
+   ```
+
+</TabItem>
+
+<TabItem value="编辑集群 YAML 文件" label="编辑集群 YAML 文件">
+
+1. 修改 YAML 文件中 `spec.componentSpecs.replicas` 的配置。`spec.componentSpecs.replicas` 定义了 pod 数量，修改该参数将触发集群水平扩缩容。
+
+   ```yaml
+   kubectl edit cluster mycluster -n demo
+   >
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: Cluster
+   metadata:
+     name: mycluster
+     namespace: demo
+   spec:
+     clusterDefinitionRef: mysql
+     clusterVersionRef: mysql-8.0.30
+     componentSpecs:
+     - name: mysql
+       componentDefRef: mysql
+       replicas: 1 # 修改该参数值
+       volumeClaimTemplates:
+       - name: data
+         spec:
+           accessModes:
+             - ReadWriteOnce
+           resources:
+             requests:
+               storage: 1Gi
+    terminationPolicy: Delete
+   ```
+
+2. 查看相关资源是否变更。
+
+   ```bash
+   kubectl describe cluster mycluster -n demo
+   ```
+
+</TabItem>
+
+</Tabs>
 
 ### 处理快照异常
 
@@ -191,9 +416,9 @@ Status:
 2. 删除错误的备份和 volumesnapshot 资源。
 
     ```bash
-    kubectl delete backup -l app.kubernetes.io/instance=mycluster
+    kubectl delete backup -l app.kubernetes.io/instance=mycluster -n demo
    
-    kubectl delete volumesnapshot -l app.kubernetes.io/instance=mycluster
+    kubectl delete volumesnapshot -l app.kubernetes.io/instance=mycluster -n demo
     ```
 
 ***结果***

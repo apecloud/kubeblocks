@@ -281,7 +281,7 @@ innodb_buffer_pool_size   512M                            512M
 
 </TabItem>
 
-<TabItem value="Edit config file" label="Edit config file">
+<TabItem value="修改配置文件" label="修改配置文件">
 
 1. 获取集群的配置文件。
 

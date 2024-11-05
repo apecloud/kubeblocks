@@ -398,7 +398,7 @@ KubeBlocks supports configuring cluster parameters with OpsRequest.
 2. Apply the configuration opsRequest.
 
    ```bash
-   kubectl apply -f mycluster-configuring-demo.yaml
+   kubectl apply -f mycluster-configuring-demo.yaml -n demo
    ```
 
 3. Connect to this cluster to verify whether the configuration takes effect.

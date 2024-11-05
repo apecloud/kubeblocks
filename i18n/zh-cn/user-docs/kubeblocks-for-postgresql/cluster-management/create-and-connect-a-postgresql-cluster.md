@@ -17,8 +17,8 @@ import TabItem from '@theme/TabItem';
 
 ### 开始之前
 
-* [安装 kbcli](./../../installation/install-with-kbcli/install-kbcli.md)。
-* [安装 KubeBlocks](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md)。
+* 如果您想通过 `kbcli` 创建并连接 ApeCloud MySQL 集群，请先[安装 kbcli](./../../installation/install-with-kbcli/install-kbcli.md)。
+* 安装 KubeBlocks，[](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md)。
 * 确保 PostgreSQL 引擎已启用。
   
   ```bash

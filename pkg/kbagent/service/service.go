@@ -21,6 +21,8 @@ package service
 
 import (
 	"context"
+	"fmt"
+	"time"
 
 	"github.com/go-logr/logr"
 
@@ -45,5 +47,31 @@ func New(logger logr.Logger, actions []proto.Action, probes []proto.Probe) ([]Se
 	if err != nil {
 		return nil, err
 	}
-	return []Service{sa, sp}, nil
+	sdp, err := newDataPipeService(logger, sa)
+	if err != nil {
+		return nil, err
+	}
+	return []Service{sa, sp, sdp}, nil
+}
+
+func RunInPipeMode(services []Service, payload string) error {
+	var sdp *dataPipeService
+	for _, s := range services {
+		if s.Kind() == proto.ServiceDataPipe.Kind {
+			sdp = s.(*dataPipeService)
+		}
+	}
+	if sdp == nil {
+		return fmt.Errorf("service %s not found", proto.ServiceDataPipe.Kind)
+	}
+
+	var err error
+	if err = sdp.Start(); err != nil {
+		return err
+	}
+	_, err = sdp.HandleRequest(context.Background(), []byte(payload))
+	if err != nil {
+		time.Sleep(3600 * time.Second)
+	}
+	return err
 }

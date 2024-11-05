@@ -23,7 +23,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"k8s.io/utils/pointer"
 	"reflect"
 	"slices"
 	"strings"
@@ -471,26 +470,23 @@ func (r *componentWorkloadOps) expandVolume() error {
 	return nil
 }
 
-// horizontalScale handles workload horizontal scale
 func (r *componentWorkloadOps) horizontalScale() error {
-	its := r.runningITS
-	doScaleOut, doScaleIn := r.horizontalScaling()
-	if !doScaleOut && !doScaleIn {
-		if err := r.postScaleIn(); err != nil {
-			return err
-		}
-		if err := r.postScaleOut(its); err != nil {
-			return err
-		}
+	var (
+		in  = r.runningItsPodNameSet.Difference(r.desiredCompPodNameSet)
+		out = r.desiredCompPodNameSet.Difference(r.runningItsPodNameSet)
+	)
+	if in.Len() == 0 && out.Len() == 0 {
 		return nil
 	}
-	if doScaleIn {
-		if err := r.scaleIn(its); err != nil {
+
+	if in.Len() > 0 {
+		if err := r.scaleIn(); err != nil {
 			return err
 		}
 	}
-	if doScaleOut {
-		if err := r.scaleOut(its); err != nil {
+
+	if out.Len() > 0 {
+		if err := r.scaleOut(); err != nil {
 			return err
 		}
 	}
@@ -499,42 +495,12 @@ func (r *componentWorkloadOps) horizontalScale() error {
 		corev1.EventTypeNormal,
 		"HorizontalScale",
 		"start horizontal scale component %s of cluster %s from %d to %d",
-		r.synthesizeComp.Name, r.cluster.Name, int(*its.Spec.Replicas), r.synthesizeComp.Replicas)
+		r.synthesizeComp.Name, r.cluster.Name, int(*r.runningITS.Spec.Replicas), r.synthesizeComp.Replicas)
 
 	return nil
 }
 
-// < 0 for scale in, > 0 for scale out, and == 0 for nothing
-func (r *componentWorkloadOps) horizontalScaling() (bool, bool) {
-	var (
-		doScaleOut bool
-		doScaleIn  bool
-	)
-	for _, podName := range r.desiredCompPodNames {
-		if _, ok := r.runningItsPodNameSet[podName]; !ok {
-			doScaleOut = true
-			break
-		}
-	}
-	for _, podName := range r.runningItsPodNames {
-		if _, ok := r.desiredCompPodNameSet[podName]; !ok {
-			doScaleIn = true
-			break
-		}
-	}
-	return doScaleOut, doScaleIn
-}
-
-func (r *componentWorkloadOps) postScaleIn() error {
-	return nil
-}
-
-func (r *componentWorkloadOps) postScaleOut(itsObj *workloads.InstanceSet) error {
-	// TODO: impl
-	return nil
-}
-
-func (r *componentWorkloadOps) scaleIn(itsObj *workloads.InstanceSet) error {
+func (r *componentWorkloadOps) scaleIn() error {
 	// if scale in to 0, do not delete pvcs
 	if r.synthesizeComp.Replicas == 0 {
 		r.reqCtx.Log.Info("scale in to 0, keep all PVCs")
@@ -546,42 +512,7 @@ func (r *componentWorkloadOps) scaleIn(itsObj *workloads.InstanceSet) error {
 		r.reqCtx.Log.Info(fmt.Sprintf("leave member at scaling-in error, retry later: %s", err.Error()))
 		return err
 	}
-	return r.deletePVCs4ScaleIn(itsObj)
-}
-
-func (r *componentWorkloadOps) scaleOut(itsObj *workloads.InstanceSet) error {
-	pods, err := component.ListOwnedPods(r.reqCtx.Ctx, r.cli, r.cluster.Namespace, r.cluster.Name, r.synthesizeComp.Name)
-	if err != nil {
-		return err
-	}
-
-	nameOfPodsToCreate := r.desiredCompPodNameSet.Difference(r.runningItsPodNameSet)
-	return r.scaleOutReplicas(itsObj, pods, sets.List(nameOfPodsToCreate))
-}
-
-func (r *componentWorkloadOps) scaleOutReplicas(itsObj *workloads.InstanceSet, pods []*corev1.Pod, podNames []string) error {
-	lifecycleActions := r.synthesizeComp.LifecycleActions
-	if lifecycleActions == nil || lifecycleActions.DataDump == nil || lifecycleActions.DataLoad == nil {
-		return nil
-	}
-
-	lfa, err := lifecycle.New(r.synthesizeComp, nil, pods...)
-	if err != nil {
-		return err
-	}
-
-	opts := &lifecycle.Options{NonBlocking: pointer.Bool(true)}
-	if err = lfa.DataDump(r.reqCtx.Ctx, r.cli, opts, podNames); err != nil {
-		return err
-	}
-
-	if err = lfa.DataLoad(r.reqCtx.Ctx, r.cli, opts, podNames); err != nil {
-		return err
-	}
-
-	// TODO: pass new replica names into workload
-
-	return nil
+	return r.deletePVCs4ScaleIn(r.runningITS)
 }
 
 func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
@@ -682,6 +613,66 @@ func (r *componentWorkloadOps) deletePVCs4ScaleIn(itsObj *workloads.InstanceSet)
 		}
 	}
 	return nil
+}
+
+func (r *componentWorkloadOps) scaleOut() error {
+	if r.synthesizeComp.LifecycleActions == nil {
+		return nil
+	}
+	dataDump := r.synthesizeComp.LifecycleActions.DataDump
+	dataLoad := r.synthesizeComp.LifecycleActions.DataLoad
+	if dataDump == nil || dataDump.Exec == nil || dataLoad == nil || dataLoad.Exec == nil {
+		return nil
+	}
+
+	// TODO: remove it
+	source, err := r.sourceReplica()
+	if err != nil {
+		return err
+	}
+
+	newReplicas := r.desiredCompPodNameSet.Difference(r.runningItsPodNameSet)
+	c, err := component.BuildKBAgentContainer4DataPipeReader(r.synthesizeComp, source, newReplicas.UnsortedList())
+	if err != nil {
+		return err
+	}
+
+	r.protoITS.Spec.Template.Spec.InitContainers = append(r.protoITS.Spec.Template.Spec.InitContainers, *c)
+
+	// update workload to set the new replicas
+	graphCli := model.NewGraphClient(r.cli)
+	graphCli.Update(r.dag, nil, r.protoITS)
+
+	return nil
+}
+
+func (r *componentWorkloadOps) sourceReplica() (*corev1.Pod, error) {
+	isLeader := func(pod *corev1.Pod) bool {
+		if pod == nil || len(pod.Labels) == 0 {
+			return false
+		}
+		roleName, ok := pod.Labels[constant.RoleLabelKey]
+		if !ok {
+			return false
+		}
+
+		for _, replicaRole := range r.runningITS.Spec.Roles {
+			if roleName == replicaRole.Name && replicaRole.IsLeader {
+				return true
+			}
+		}
+		return false
+	}
+	pods, err := component.ListOwnedPods(r.reqCtx.Ctx, r.cli, r.cluster.Namespace, r.cluster.Name, r.synthesizeComp.Name)
+	if err != nil {
+		return nil, err
+	}
+	for _, pod := range pods {
+		if isLeader(pod) {
+			return pod, nil
+		}
+	}
+	return nil, fmt.Errorf("no availble pod to dump data")
 }
 
 func (r *componentWorkloadOps) expandVolumes(insTPLName string, vctName string, proto *corev1.PersistentVolumeClaimTemplate) error {

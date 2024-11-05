@@ -37,6 +37,7 @@ import (
 
 	kbagent "github.com/apecloud/kubeblocks/pkg/kbagent"
 	"github.com/apecloud/kubeblocks/pkg/kbagent/server"
+	"github.com/apecloud/kubeblocks/pkg/kbagent/service"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -56,6 +57,8 @@ func init() {
 	pflag.IntVar(&serverConfig.Concurrency, "max-concurrency", defaultMaxConcurrency,
 		fmt.Sprintf("The maximum number of concurrent connections the Server may serve, use the default value %d if <=0.", defaultMaxConcurrency))
 	pflag.BoolVar(&serverConfig.Logging, "api-logging", true, "Enable api logging for kb-agent request.")
+	pflag.BoolVar(&serverConfig.PipeMode, "pipe-mode", false, "Running in pipe mode as a reader.")
+	pflag.StringVar(&serverConfig.PipeModeData, "pipe-mode-data", "", "Request payload for pipe mode.")
 }
 
 func main() {
@@ -87,6 +90,13 @@ func main() {
 	services, err := kbagent.Initialize(logger, os.Environ())
 	if err != nil {
 		panic(errors.Wrap(err, "init action handlers failed"))
+	}
+
+	if serverConfig.PipeMode {
+		if err = service.RunInPipeMode(services, serverConfig.PipeModeData); err != nil {
+			panic(errors.Wrap(err, "failed to run in pipe mode"))
+		}
+		return
 	}
 
 	// start HTTP Server

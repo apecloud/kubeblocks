@@ -54,6 +54,12 @@ type ActionResponse struct {
 
 // TODO: define the event spec for probe or async action
 
+const (
+	ProbeEventFieldPath           = "spec.containers{kbagent}"
+	ProbeEventReportingController = "kbagent"
+	ProbeEventSourceComponent     = "kbagent"
+)
+
 type Probe struct {
 	Instance            string `json:"instance"`
 	Action              string `json:"action"`
@@ -72,8 +78,18 @@ type ProbeEvent struct {
 	Message  string `json:"message,omitempty"` // message of the probe on failure
 }
 
-const (
-	ProbeEventFieldPath           = "spec.containers{kbagent}"
-	ProbeEventReportingController = "kbagent"
-	ProbeEventSourceComponent     = "kbagent"
-)
+type DataPipeRequest struct {
+	Peer           string            `json:"peer"`
+	Port           int32             `json:"port,omitempty"`
+	Write          bool              `json:"write"`
+	Replicas       string            `json:"replicas"`
+	Streaming      bool              `json:"streaming"`
+	Parameters     map[string]string `json:"parameters,omitempty"`
+	TimeoutSeconds *int32            `json:"timeoutSeconds,omitempty"`
+}
+
+type DataPipeResponse struct {
+	Error   string `json:"error,omitempty"`
+	Message string `json:"message,omitempty"`
+	Output  []byte `json:"output,omitempty"`
+}

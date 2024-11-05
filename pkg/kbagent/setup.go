@@ -31,9 +31,10 @@ import (
 )
 
 const (
-	ContainerName     = "kbagent"
-	InitContainerName = "init-kbagent"
-	DefaultPortName   = "http"
+	ContainerName              = "kbagent"
+	InitContainerName          = "init-kbagent"
+	InitContainerName4DataPipe = "init-kbagent-pipe"
+	DefaultPortName            = "http"
 
 	actionEnvName = "KB_AGENT_ACTION"
 	probeEnvName  = "KB_AGENT_PROBE"

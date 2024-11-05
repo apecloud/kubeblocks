@@ -91,6 +91,49 @@ func UpdateKBAgentContainer4HostNetwork(synthesizedComp *SynthesizedComponent) {
 	synthesizedComp.PodSpec.Containers[idx] = *c
 }
 
+func BuildKBAgentContainer4DataPipeReader(synthesizedComp *SynthesizedComponent, source *corev1.Pod, replicas []string) (*corev1.Container, error) {
+	envVars, err := buildKBAgentStartupEnvs(synthesizedComp)
+	if err != nil {
+		return nil, err
+	}
+
+	req := proto.DataPipeRequest{
+		Peer:     source.Status.PodIP,
+		Write:    false,
+		Replicas: strings.Join(replicas, ","),
+	}
+	data, err := json.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+
+	container := builder.NewContainerBuilder(kbagent.InitContainerName4DataPipe).
+		SetImage(viper.GetString(constant.KBToolsImage)).
+		SetImagePullPolicy(corev1.PullIfNotPresent).
+		AddCommands(kbAgentCommand).
+		AddArgs("--pipe-mode", "true", "--pipe-mode-data", string(data)).
+		AddEnv(envVars...).
+		AddEnv(corev1.EnvVar{
+			Name: "KB_POD_NAME",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					FieldPath: "metadata.name",
+				},
+			},
+		}).
+		SetSecurityContext(corev1.SecurityContext{
+			RunAsGroup: &[]int64{1000}[0],
+		}).
+		GetObject()
+
+	if err = adaptKBAgentIfCustomImageNContainerDefined(synthesizedComp, container); err != nil {
+		return nil, err
+	}
+
+	synthesizedComp.PodSpec.InitContainers = append(synthesizedComp.PodSpec.InitContainers, *container)
+	return nil, nil
+}
+
 func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 	if synthesizedComp.LifecycleActions == nil {
 		return nil
@@ -118,6 +161,9 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 			ContainerPort: int32(port),
 			Name:          kbagent.DefaultPortName,
 			Protocol:      "TCP",
+		}).
+		SetSecurityContext(corev1.SecurityContext{
+			RunAsGroup: &[]int64{1000}[0],
 		}).
 		SetStartupProbe(corev1.Probe{
 			ProbeHandler: corev1.ProbeHandler{

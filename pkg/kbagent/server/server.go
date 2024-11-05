@@ -39,6 +39,8 @@ type Config struct {
 	Port             int
 	Concurrency      int
 	Logging          bool
+	PipeMode         bool
+	PipeModeData     string
 }
 
 // NewHTTPServer returns a new HTTP server.

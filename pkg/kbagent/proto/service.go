@@ -36,4 +36,9 @@ var (
 		Version: "v1.0",
 		URI:     "/v1.0/probe",
 	}
+	ServiceDataPipe = &Service{
+		Kind:    "DataPipe",
+		Version: "v1.0",
+		URI:     "/v1.0/data-pipe",
+	}
 )

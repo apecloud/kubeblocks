@@ -325,7 +325,7 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 			By("Reconfigure configure")
 			_, _ = opsManager.Reconcile(reqCtx, k8sClient, opsRes)
 			// mock cluster.status.component.phase to Updating
-			mockClusterCompPhase := func(clusterObj *appsv1.Cluster, phase appsv1.ClusterComponentPhase) {
+			mockClusterCompPhase := func(clusterObj *appsv1.Cluster, phase appsv1.ComponentPhase) {
 				clusterObject := clusterObj.DeepCopy()
 				patch := client.MergeFrom(clusterObject.DeepCopy())
 				compStatus := clusterObject.Status.Components[defaultCompName]
@@ -333,20 +333,20 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 				clusterObject.Status.Components[defaultCompName] = compStatus
 				Expect(k8sClient.Status().Patch(ctx, clusterObject, patch)).Should(Succeed())
 			}
-			mockClusterCompPhase(opsRes.Cluster, appsv1.UpdatingClusterCompPhase)
+			mockClusterCompPhase(opsRes.Cluster, appsv1.UpdatingComponentPhase)
 			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(opsRes.Cluster), opsRes.Cluster)).Should(Succeed())
 
 			By("check cluster.status.components[*].phase == Reconfiguring")
 			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(opsRes.OpsRequest), opsRes.OpsRequest)).Should(Succeed())
-			Expect(opsRes.Cluster.Status.Components[defaultCompName].Phase).Should(Equal(appsv1.UpdatingClusterCompPhase)) // appsv1.ReconfiguringPhase
+			Expect(opsRes.Cluster.Status.Components[defaultCompName].Phase).Should(Equal(appsv1.UpdatingComponentPhase)) // appsv1.ReconfiguringPhase
 			// TODO: add status condition expect
 			_, _ = opsManager.Reconcile(reqCtx, k8sClient, opsRes)
 			// mock cluster.status.component.phase to Running
-			mockClusterCompPhase(opsRes.Cluster, appsv1.RunningClusterCompPhase)
+			mockClusterCompPhase(opsRes.Cluster, appsv1.RunningComponentPhase)
 
 			By("check cluster.status.components[*].phase == Running")
 			Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(opsRes.Cluster), opsRes.Cluster)).Should(Succeed())
-			Expect(opsRes.Cluster.Status.Components[defaultCompName].Phase).Should(Equal(appsv1.RunningClusterCompPhase))
+			Expect(opsRes.Cluster.Status.Components[defaultCompName].Phase).Should(Equal(appsv1.RunningComponentPhase))
 		})
 	})
 })

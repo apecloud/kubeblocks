@@ -159,36 +159,31 @@ func (t *componentStatusTransformer) reconcileStatus(transCtx *componentTransfor
 		return hasFailedPod || isScaleOutFailed || hasFailedVolumeExpansion
 	}()
 
-	// check if the component is available
-	isComponentAvailable := t.isComponentAvailable()
-
 	// check if the component is in creating phase
 	isInCreatingPhase := func() bool {
 		phase := t.comp.Status.Phase
-		return phase == "" || phase == appsv1.CreatingClusterCompPhase
+		return phase == "" || phase == appsv1.CreatingComponentPhase
 	}()
 
 	transCtx.Logger.Info(
-		fmt.Sprintf("status conditions, creating: %v, available: %v, its running: %v, has failure: %v, updating: %v, config synced: %v",
-			isInCreatingPhase, isComponentAvailable, isITSUpdatedNRunning, hasFailure, hasRunningVolumeExpansion, isAllConfigSynced))
+		fmt.Sprintf("status conditions, creating: %v, its running: %v, has failure: %v, updating: %v, config synced: %v",
+			isInCreatingPhase, isITSUpdatedNRunning, hasFailure, hasRunningVolumeExpansion, isAllConfigSynced))
 
 	switch {
 	case isDeleting:
-		t.setComponentStatusPhase(transCtx, appsv1.DeletingClusterCompPhase, nil, "component is Deleting")
+		t.setComponentStatusPhase(transCtx, appsv1.DeletingComponentPhase, nil, "component is Deleting")
 	case stopped && hasRunningPods:
-		t.setComponentStatusPhase(transCtx, appsv1.StoppingClusterCompPhase, nil, "component is Stopping")
+		t.setComponentStatusPhase(transCtx, appsv1.StoppingComponentPhase, nil, "component is Stopping")
 	case stopped:
-		t.setComponentStatusPhase(transCtx, appsv1.StoppedClusterCompPhase, nil, "component is Stopped")
+		t.setComponentStatusPhase(transCtx, appsv1.StoppedComponentPhase, nil, "component is Stopped")
 	case isITSUpdatedNRunning && isAllConfigSynced && !hasRunningVolumeExpansion:
-		t.setComponentStatusPhase(transCtx, appsv1.RunningClusterCompPhase, nil, "component is Running")
+		t.setComponentStatusPhase(transCtx, appsv1.RunningComponentPhase, nil, "component is Running")
 	case !hasFailure && isInCreatingPhase:
-		t.setComponentStatusPhase(transCtx, appsv1.CreatingClusterCompPhase, nil, "component is Creating")
+		t.setComponentStatusPhase(transCtx, appsv1.CreatingComponentPhase, nil, "component is Creating")
 	case !hasFailure:
-		t.setComponentStatusPhase(transCtx, appsv1.UpdatingClusterCompPhase, nil, "component is Updating")
-	case !isComponentAvailable:
-		t.setComponentStatusPhase(transCtx, appsv1.FailedClusterCompPhase, messages, "component is Failed")
+		t.setComponentStatusPhase(transCtx, appsv1.UpdatingComponentPhase, nil, "component is Updating")
 	default:
-		t.setComponentStatusPhase(transCtx, appsv1.AbnormalClusterCompPhase, nil, "component is Abnormal")
+		t.setComponentStatusPhase(transCtx, appsv1.FailedComponentPhase, messages, "component is Failed")
 	}
 
 	return t.reconcileStatusCondition(transCtx)
@@ -200,31 +195,6 @@ func (t *componentStatusTransformer) isWorkloadUpdated() bool {
 	}
 	generation := t.runningITS.GetAnnotations()[constant.KubeBlocksGenerationKey]
 	return generation == strconv.FormatInt(t.comp.Generation, 10)
-}
-
-// isComponentAvailable tells whether the component is basically available, ether working well or in a fragile state:
-// 1. at least one pod is available
-// 2. with latest revision
-// 3. and with leader role label set
-func (t *componentStatusTransformer) isComponentAvailable() bool {
-	if !t.isWorkloadUpdated() {
-		return false
-	}
-	if t.runningITS.Status.CurrentRevision != t.runningITS.Status.UpdateRevision {
-		return false
-	}
-	if t.runningITS.Status.AvailableReplicas <= 0 {
-		return false
-	}
-	if len(t.synthesizeComp.Roles) == 0 {
-		return true
-	}
-	for _, status := range t.runningITS.Status.MembersStatus {
-		if status.ReplicaRole.IsLeader {
-			return true
-		}
-	}
-	return false
 }
 
 // isRunning checks if the component underlying workload is running.
@@ -352,7 +322,7 @@ func (t *componentStatusTransformer) hasFailedPod() (bool, appsv1alpha1.Componen
 
 // setComponentStatusPhase sets the component phase and messages conditionally.
 func (t *componentStatusTransformer) setComponentStatusPhase(transCtx *componentTransformContext,
-	phase appsv1.ClusterComponentPhase, statusMessage map[string]string, phaseTransitionMsg string) {
+	phase appsv1.ComponentPhase, statusMessage map[string]string, phaseTransitionMsg string) {
 	updateFn := func(status *appsv1.ComponentStatus) error {
 		if status.Phase == phase {
 			return nil

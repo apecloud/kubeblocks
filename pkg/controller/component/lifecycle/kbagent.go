@@ -182,7 +182,7 @@ func (a *kbagent) clusterReadyCheck(ctx context.Context, cli client.Reader) erro
 func (a *kbagent) compReadyCheck(ctx context.Context, cli client.Reader) error {
 	ready := func(object client.Object) bool {
 		comp := object.(*appsv1.Component)
-		return comp.Status.Phase == appsv1.RunningClusterCompPhase
+		return comp.Status.Phase == appsv1.RunningComponentPhase
 	}
 	compName := constant.GenerateClusterComponentName(a.synthesizedComp.ClusterName, a.synthesizedComp.Name)
 	return a.readyCheck(ctx, cli, compName, "component", &appsv1.Component{}, ready)

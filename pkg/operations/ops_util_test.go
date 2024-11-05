@@ -110,7 +110,7 @@ var _ = Describe("OpsUtil functions", func() {
 
 			By("mock component failed")
 			clusterComp := opsRes.Cluster.Status.Components[defaultCompName]
-			clusterComp.Phase = appsv1.FailedClusterCompPhase
+			clusterComp.Phase = appsv1.FailedComponentPhase
 			opsRes.Cluster.Status.SetComponentStatus(defaultCompName, clusterComp)
 
 			By("expect for opsRequest is running")

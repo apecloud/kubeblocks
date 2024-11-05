@@ -711,15 +711,15 @@ const (
 	// FailedClusterPhase represents all components are in `Failed` phase, indicates that the cluster is unavailable.
 	FailedClusterPhase ClusterPhase = "Failed"
 
-	// AbnormalClusterPhase represents some components are in `Failed` or `Abnormal` phase, indicates that the cluster
-	// is in a fragile state and troubleshooting is required.
+	// AbnormalClusterPhase represents some components are in `Failed` phase, indicates that the cluster is in
+	// a fragile state and troubleshooting is required.
 	AbnormalClusterPhase ClusterPhase = "Abnormal"
 )
 
 // ClusterComponentStatus records Component status.
 type ClusterComponentStatus struct {
 	// Specifies the current state of the Component.
-	Phase ClusterComponentPhase `json:"phase,omitempty"`
+	Phase ComponentPhase `json:"phase,omitempty"`
 
 	// Records detailed information about the Component in its current phase.
 	// The keys are either podName, deployName, or statefulSetName, formatted as 'ObjectKind/Name'.

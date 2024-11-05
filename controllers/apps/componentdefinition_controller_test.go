@@ -385,7 +385,7 @@ var _ = Describe("ComponentDefinition Controller", func() {
 				SetRuntime(nil).
 				SetAvailable(&kbappsv1.ComponentAvailable{
 					WithPhases: pointer.String(fmt.Sprintf("%s,%s",
-						string(kbappsv1.RunningClusterCompPhase), string(kbappsv1.UpdatingClusterCompPhase))),
+						string(kbappsv1.RunningComponentPhase), string(kbappsv1.UpdatingComponentPhase))),
 				}).
 				Create(&testCtx).
 				GetObject()
@@ -399,7 +399,7 @@ var _ = Describe("ComponentDefinition Controller", func() {
 				SetRuntime(nil).
 				SetAvailable(&kbappsv1.ComponentAvailable{
 					// empty phase
-					WithPhases: pointer.String(fmt.Sprintf("%s,%s", string(kbappsv1.RunningClusterCompPhase), "")),
+					WithPhases: pointer.String(fmt.Sprintf("%s,%s", string(kbappsv1.RunningComponentPhase), "")),
 				}).
 				Create(&testCtx).
 				GetObject()

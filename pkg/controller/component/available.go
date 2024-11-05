@@ -561,6 +561,6 @@ func GetComponentAvailablePolicy(compDef *appsv1.ComponentDefinition) appsv1.Com
 	// use phases as default policy
 	return appsv1.ComponentAvailable{
 		// TODO: replicas == 0, stopped, updating, abnormal?
-		WithPhases: pointer.String(string(appsv1.RunningClusterCompPhase)),
+		WithPhases: pointer.String(string(appsv1.RunningComponentPhase)),
 	}
 }

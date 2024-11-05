@@ -178,7 +178,7 @@ func initOperationsResources(compDefName, clusterName string) (*OpsResource, *ap
 		clusterObject.Status.Phase = appsv1.RunningClusterPhase
 		clusterObject.Status.Components = map[string]appsv1.ClusterComponentStatus{
 			defaultCompName: {
-				Phase: appsv1.RunningClusterCompPhase,
+				Phase: appsv1.RunningComponentPhase,
 			},
 		}
 	})).Should(Succeed())
@@ -236,13 +236,13 @@ func initOperationsResourcesWithTopology(clusterDefName, compDefName, clusterNam
 		clusterObject.Status.Phase = appsv1.RunningClusterPhase
 		clusterObject.Status.Components = map[string]appsv1.ClusterComponentStatus{
 			defaultCompName: {
-				Phase: appsv1.RunningClusterCompPhase,
+				Phase: appsv1.RunningComponentPhase,
 			},
 			secondaryCompName: {
-				Phase: appsv1.RunningClusterCompPhase,
+				Phase: appsv1.RunningComponentPhase,
 			},
 			thirdCompName: {
-				Phase: appsv1.RunningClusterCompPhase,
+				Phase: appsv1.RunningComponentPhase,
 			},
 		}
 	})).Should(Succeed())
@@ -265,7 +265,7 @@ func initInstanceSetPods(ctx context.Context, cli client.Client, opsRes *OpsReso
 	return pods
 }
 
-func mockComponentIsOperating(cluster *appsv1.Cluster, expectPhase appsv1.ClusterComponentPhase, compNames ...string) {
+func mockComponentIsOperating(cluster *appsv1.Cluster, expectPhase appsv1.ComponentPhase, compNames ...string) {
 	Expect(testapps.ChangeObjStatus(&testCtx, cluster, func() {
 		for _, v := range compNames {
 			compStatus := cluster.Status.Components[v]

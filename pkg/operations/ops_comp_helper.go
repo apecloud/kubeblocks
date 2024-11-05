@@ -268,7 +268,7 @@ func (c componentOpsHelper) reconcileActionWithComponentOps(reqCtx intctrlutil.R
 		if expectCount != completedCount {
 			opsIsCompleted = false
 		} else if !pgResource.noWaitComponentCompleted &&
-			(!slices.Contains(appsv1.GetComponentTerminalPhases(), componentPhase) || completedCount == 0) {
+			(!slices.Contains(componentTerminalPhases(), componentPhase) || completedCount == 0) {
 			opsIsCompleted = false
 		}
 		opsRequest.Status.Components[pgResource.compOps.GetComponentName()] = opsCompStatus
@@ -291,4 +291,12 @@ func (c componentOpsHelper) reconcileActionWithComponentOps(reqCtx intctrlutil.R
 		return opsv1alpha1.OpsFailedPhase, 0, nil
 	}
 	return opsv1alpha1.OpsSucceedPhase, 0, nil
+}
+
+func componentTerminalPhases() []appsv1.ComponentPhase {
+	return []appsv1.ComponentPhase{
+		appsv1.RunningComponentPhase,
+		appsv1.StoppedComponentPhase,
+		appsv1.FailedComponentPhase,
+	}
 }

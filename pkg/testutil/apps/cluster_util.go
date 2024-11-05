@@ -49,8 +49,8 @@ func CheckedCreateK8sResource(testCtx *testutil.TestContext, obj client.Object) 
 }
 
 // GetClusterComponentPhase gets the component phase of testing cluster for verification.
-func GetClusterComponentPhase(testCtx *testutil.TestContext, clusterKey types.NamespacedName, componentName string) func(g gomega.Gomega) appsv1.ClusterComponentPhase {
-	return func(g gomega.Gomega) appsv1.ClusterComponentPhase {
+func GetClusterComponentPhase(testCtx *testutil.TestContext, clusterKey types.NamespacedName, componentName string) func(g gomega.Gomega) appsv1.ComponentPhase {
+	return func(g gomega.Gomega) appsv1.ComponentPhase {
 		tmpCluster := &appsv1.Cluster{}
 		g.Expect(testCtx.Cli.Get(context.Background(), client.ObjectKey{Name: clusterKey.Name,
 			Namespace: clusterKey.Namespace}, tmpCluster)).Should(gomega.Succeed())

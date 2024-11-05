@@ -104,7 +104,7 @@ var _ = Describe("Ops ProgressDetails", func() {
 
 			By("create restart ops and pods of component")
 			opsRes.OpsRequest = createRestartOpsObj(clusterName, "restart-"+randomStr)
-			mockComponentIsOperating(opsRes.Cluster, appsv1.UpdatingClusterCompPhase, defaultCompName)
+			mockComponentIsOperating(opsRes.Cluster, appsv1.UpdatingComponentPhase, defaultCompName)
 			podList := initInstanceSetPods(ctx, k8sClient, opsRes)
 
 			By("mock restart OpsRequest is Running")
@@ -132,7 +132,7 @@ var _ = Describe("Ops ProgressDetails", func() {
 					},
 				},
 			})
-			mockComponentIsOperating(opsRes.Cluster, appsv1.UpdatingClusterCompPhase, defaultCompName) // appsv1.HorizontalScalingPhase
+			mockComponentIsOperating(opsRes.Cluster, appsv1.UpdatingComponentPhase, defaultCompName) // appsv1.HorizontalScalingPhase
 			initClusterForOps(opsRes)
 
 			By("mock HorizontalScaling OpsRequest phase is running")
@@ -189,7 +189,7 @@ var _ = Describe("Ops ProgressDetails", func() {
 					},
 				},
 			})
-			mockComponentIsOperating(opsRes.Cluster, appsv1.UpdatingClusterCompPhase, defaultCompName) // appsv1.HorizontalScalingPhase
+			mockComponentIsOperating(opsRes.Cluster, appsv1.UpdatingComponentPhase, defaultCompName) // appsv1.HorizontalScalingPhase
 			initClusterForOps(opsRes)
 
 			By("mock HorizontalScaling OpsRequest phase is running")

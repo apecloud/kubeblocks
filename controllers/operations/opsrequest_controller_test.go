@@ -118,13 +118,13 @@ var _ = Describe("OpsRequest Controller", func() {
 					fetched.Status.Components = map[string]appsv1.ClusterComponentStatus{}
 					for _, v := range fetched.Spec.ComponentSpecs {
 						fetched.Status.SetComponentStatus(v.Name, appsv1.ClusterComponentStatus{
-							Phase: appsv1.RunningClusterCompPhase,
+							Phase: appsv1.RunningComponentPhase,
 						})
 					}
 					return
 				}
 				for componentKey, componentStatus := range fetched.Status.Components {
-					componentStatus.Phase = appsv1.RunningClusterCompPhase
+					componentStatus.Phase = appsv1.RunningComponentPhase
 					fetched.Status.SetComponentStatus(componentKey, componentStatus)
 				}
 			})()).ShouldNot(HaveOccurred())
@@ -187,13 +187,13 @@ var _ = Describe("OpsRequest Controller", func() {
 
 		By("check cluster & component phase as updating")
 		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1.UpdatingClusterPhase))
-		Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, mysqlCompName)).Should(Equal(appsv1.UpdatingClusterCompPhase))
+		Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, mysqlCompName)).Should(Equal(appsv1.UpdatingComponentPhase))
 
 		By("mock bring Cluster and changed component back to running status")
 		Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(mysqlIts), func(tmpIts *workloads.InstanceSet) {
 			testk8s.MockInstanceSetReady(tmpIts, pod)
 		})()).ShouldNot(HaveOccurred())
-		Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, mysqlCompName)).Should(Equal(appsv1.RunningClusterCompPhase))
+		Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, mysqlCompName)).Should(Equal(appsv1.RunningComponentPhase))
 		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1.RunningClusterPhase))
 
 		By("notice opsrequest controller to run")
@@ -309,7 +309,7 @@ var _ = Describe("OpsRequest Controller", func() {
 				testk8s.MockInstanceSetReady(its, mockPods...)
 			})).ShouldNot(HaveOccurred())
 
-			Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, mysqlCompName)).Should(Equal(appsv1.RunningClusterCompPhase))
+			Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, mysqlCompName)).Should(Equal(appsv1.RunningComponentPhase))
 		}
 
 		createMysqlCluster := func(replicas int32) {
@@ -361,7 +361,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1.Cluster) {
 				g.Expect(cluster.Status.ObservedGeneration).Should(Equal(cluster.Generation))
 				g.Expect(cluster.Status.Phase).Should(Equal(appsv1.RunningClusterPhase))
-				g.Expect(cluster.Status.Components[mysqlCompName].Phase).Should(Equal(appsv1.RunningClusterCompPhase))
+				g.Expect(cluster.Status.Components[mysqlCompName].Phase).Should(Equal(appsv1.RunningComponentPhase))
 			})).Should(Succeed())
 		}
 
@@ -424,7 +424,7 @@ var _ = Describe("OpsRequest Controller", func() {
 				g.Expect(fetched.Generation > fetched.Status.ObservedGeneration).Should(BeTrue())
 				g.Expect(fetched.Status.Phase).Should(Equal(appsv1.UpdatingClusterPhase))
 				// when snapshot is not supported, the expected component phase is running.
-				g.Expect(fetched.Status.Components[mysqlCompName].Phase).Should(Equal(appsv1.RunningClusterCompPhase))
+				g.Expect(fetched.Status.Components[mysqlCompName].Phase).Should(Equal(appsv1.RunningComponentPhase))
 				// expect preCheckFailed condition to occur.
 				condition := meta.FindStatusCondition(fetched.Status.Conditions, appsv1.ConditionTypeProvisioningStarted)
 				g.Expect(condition).ShouldNot(BeNil())
@@ -458,7 +458,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1.Cluster) {
 				g.Expect(cluster.Generation == 2).Should(BeTrue())
 				g.Expect(cluster.Status.ObservedGeneration == 2).Should(BeTrue())
-				g.Expect(cluster.Status.Components[mysqlCompName].Phase).Should(Equal(appsv1.UpdatingClusterCompPhase))
+				g.Expect(cluster.Status.Components[mysqlCompName].Phase).Should(Equal(appsv1.UpdatingComponentPhase))
 				// the expected cluster phase is Updating during Hscale.
 				g.Expect(cluster.Status.Phase).Should(Equal(appsv1.UpdatingClusterPhase))
 			})).Should(Succeed())
@@ -472,7 +472,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			testdp.MockBackupStatusMethod(backup, testdp.BackupMethodName, testapps.DataVolumeName, testdp.ActionSetName)
 			Expect(k8sClient.Status().Update(testCtx.Ctx, backup)).Should(Succeed())
 			Consistently(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1.Cluster) {
-				g.Expect(cluster.Status.Components[mysqlCompName].Phase).Should(Equal(appsv1.UpdatingClusterCompPhase))
+				g.Expect(cluster.Status.Components[mysqlCompName].Phase).Should(Equal(appsv1.UpdatingComponentPhase))
 				g.Expect(cluster.Status.Phase).Should(Equal(appsv1.UpdatingClusterPhase))
 			})).Should(Succeed())
 
@@ -559,7 +559,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			By("mock component workload is running and expect cluster and component are running")
 			mockCompRunning(expectReplicas, false)
 			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1.Cluster) {
-				g.Expect(cluster.Status.Components[mysqlCompName].Phase).Should(Equal(appsv1.RunningClusterCompPhase))
+				g.Expect(cluster.Status.Components[mysqlCompName].Phase).Should(Equal(appsv1.RunningComponentPhase))
 				g.Expect(cluster.Status.Phase).Should(Equal(appsv1.RunningClusterPhase))
 			})).Should(Succeed())
 			Eventually(testops.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(opsv1alpha1.OpsSucceedPhase))
@@ -596,7 +596,7 @@ var _ = Describe("OpsRequest Controller", func() {
 
 			By("wait for cluster and component phase are Updating")
 			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1.Cluster) {
-				g.Expect(cluster.Status.Components[mysqlCompName].Phase).Should(Equal(appsv1.UpdatingClusterCompPhase))
+				g.Expect(cluster.Status.Components[mysqlCompName].Phase).Should(Equal(appsv1.UpdatingComponentPhase))
 				g.Expect(cluster.Status.Phase).Should(Equal(appsv1.UpdatingClusterPhase))
 			})).Should(Succeed())
 

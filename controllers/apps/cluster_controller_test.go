@@ -200,10 +200,10 @@ var _ = Describe("Cluster Controller", func() {
 		cluster := &appsv1.Cluster{}
 		Eventually(testapps.CheckObjExists(&testCtx, clusterKey, cluster, true)).Should(Succeed())
 		for _, compName := range compNames {
-			compPhase := appsv1.CreatingClusterCompPhase
+			compPhase := appsv1.CreatingComponentPhase
 			for _, spec := range cluster.Spec.ComponentSpecs {
 				if spec.Name == compName && spec.Replicas == 0 {
-					compPhase = appsv1.StoppedClusterCompPhase
+					compPhase = appsv1.StoppedComponentPhase
 				}
 			}
 			Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, compName)).Should(Equal(compPhase))

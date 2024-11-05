@@ -155,9 +155,29 @@ var _ = Describe("object generation transformer test.", func() {
 		})
 	})
 
-	Context("getHeadlessSvcName function", func() {
-		It("should work well", func() {
+	Context("headless service", func() {
+		It("getHeadlessSvcName", func() {
 			Expect(getHeadlessSvcName(its.Name)).Should(Equal("bar-headless"))
+		})
+
+		It("buildHeadlessSvc - duplicate port names", func() {
+			port := its.Spec.Template.Spec.Containers[0].Ports[0]
+			its.Spec.Template.Spec.Containers = append(its.Spec.Template.Spec.Containers, corev1.Container{
+				Name:  "duplicate-port-name",
+				Image: "image",
+				Ports: []corev1.ContainerPort{
+					{
+						Name:          port.Name,
+						Protocol:      port.Protocol,
+						ContainerPort: port.ContainerPort + 1,
+					},
+				},
+			})
+			svc := buildHeadlessSvc(*its, nil, nil)
+			Expect(svc).ShouldNot(BeNil())
+			Expect(len(svc.Spec.Ports)).Should(Equal(2))
+			Expect(svc.Spec.Ports[0].Name).Should(Equal(port.Name))
+			Expect(svc.Spec.Ports[1].Name).ShouldNot(Equal(port.Name))
 		})
 	})
 

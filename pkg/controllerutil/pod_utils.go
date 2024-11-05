@@ -38,7 +38,7 @@ import (
 )
 
 const (
-	// PodContainerFailedTimeout the timeout for container of pod failures, the component phase will be set to Failed/Abnormal after this time.
+	// PodContainerFailedTimeout the timeout for container of pod failures, the component phase will be set to Failed after this time.
 	PodContainerFailedTimeout = 10 * time.Second
 )
 

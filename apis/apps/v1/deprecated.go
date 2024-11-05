@@ -188,15 +188,6 @@ func GetClusterUpRunningPhases() []ClusterPhase {
 	}
 }
 
-func GetComponentTerminalPhases() []ClusterComponentPhase {
-	return []ClusterComponentPhase{
-		RunningClusterCompPhase,
-		StoppedClusterCompPhase,
-		FailedClusterCompPhase,
-		AbnormalClusterCompPhase,
-	}
-}
-
 func GetReconfiguringRunningPhases() []ClusterPhase {
 	return []ClusterPhase{
 		RunningClusterPhase,

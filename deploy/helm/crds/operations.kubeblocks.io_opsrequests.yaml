@@ -4809,7 +4809,7 @@ spec:
                   properties:
                     lastFailedTime:
                       description: Records the timestamp when the Component last transitioned
-                        to a "Failed" or "Abnormal" phase.
+                        to a "Failed" phase.
                       format: date-time
                       type: string
                     message:
@@ -4818,18 +4818,16 @@ spec:
                       maxLength: 32768
                       type: string
                     phase:
-                      description: |-
-                        Records the current phase of the Component, mirroring `cluster.status.components[componentName].phase`.
-                        Possible values include "Creating", "Running", "Updating", "Stopping", "Stopped", "Deleting", "Failed", "Abnormal".
+                      description: Records the current phase of the Component, mirroring
+                        `cluster.status.components[componentName].phase`.
                       enum:
                       - Creating
-                      - Running
+                      - Deleting
                       - Updating
                       - Stopping
+                      - Running
                       - Stopped
-                      - Deleting
                       - Failed
-                      - Abnormal
                       type: string
                     preCheck:
                       description: Records the result of the preConditions check of

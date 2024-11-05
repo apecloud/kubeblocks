@@ -78,7 +78,13 @@ func (s *actionService) HandleRequest(ctx context.Context, payload []byte) ([]by
 	if err != nil {
 		return s.encode(nil, err), nil
 	}
-	return s.encode(s.handleRequest(ctx, req)), nil
+	resp, err := s.handleRequest(ctx, req)
+	result := string(resp)
+	if err != nil {
+		result = err.Error()
+	}
+	s.logger.Info("Action Executed", "action", req.Action, "result", result)
+	return s.encode(resp, err), nil
 }
 
 func (s *actionService) decode(payload []byte) (*proto.ActionRequest, error) {

@@ -86,41 +86,6 @@ func clientOption(v *model.ObjectVertex) *multicluster.ClientOption {
 	}
 	return multicluster.InControlContext()
 }
-
-// TransformerError is an error that requires the controller to requeue after a certain duration.
-type TransformerError struct {
-	errs         []error
-	requeueAfter time.Duration
-}
-
-// IsTransformerError checks if the error is a RequeueError.
-func IsTransformerError(err error) (time.Duration, bool) {
-	if err == nil {
-		return 0, false
-	}
-	if reqErr, ok := err.(*TransformerError); ok {
-		return reqErr.requeueAfter, true
-	}
-	return 0, false
-}
-
-func (e *TransformerError) Error() string {
-	return fmt.Sprintf("%v", e.errs)
-}
-
-func (e *TransformerError) RequeueAfter() time.Duration { return e.requeueAfter }
-
-func NewTransformerError(errs []error, requeueAfter time.Duration) *TransformerError {
-	if len(errs) == 0 {
-		return nil
-	}
-
-	return &TransformerError{
-		errs:         errs,
-		requeueAfter: requeueAfter,
-	}
-}
-
 func resolveServiceDefaultFields(oldSpec, newSpec *corev1.ServiceSpec) {
 	var exist *corev1.ServicePort
 	for i, port := range newSpec.Ports {

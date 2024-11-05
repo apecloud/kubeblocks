@@ -568,7 +568,7 @@ func (r *componentWorkloadOps) scaleOut(itsObj *workloads.InstanceSet) error {
 		return nil
 	}
 
-	err := r.annotatePodForMemberJoin()
+	err := r.annotateInstanceSetForMemberJoin()
 	if err != nil {
 		return err
 	}
@@ -609,13 +609,9 @@ func (r *componentWorkloadOps) scaleOut(itsObj *workloads.InstanceSet) error {
 	}
 }
 
-func (r *componentWorkloadOps) annotatePodForMemberJoin() error {
-	podsToMemberjoin := sets.New[string]()
-	if memberJoinStatus := r.runningITS.Annotations[constant.MemberJoinStatusAnnotationKey]; memberJoinStatus != "" {
-		podsToMemberjoin.Insert(strings.Split(memberJoinStatus, ",")...)
-	}
+func (r *componentWorkloadOps) annotateInstanceSetForMemberJoin() error {
+	podsToMemberjoin := getPodsToMemberJoinFromAnno(r.runningITS)
 
-	var podToMemberjoin []string
 	for podName := range r.desiredCompPodNameSet {
 		if r.runningItsPodNameSet.Has(podName) {
 			continue
@@ -623,13 +619,29 @@ func (r *componentWorkloadOps) annotatePodForMemberJoin() error {
 		if podsToMemberjoin.Has(podName) {
 			continue
 		}
-		podToMemberjoin = append(podToMemberjoin, podName)
+		podsToMemberjoin.Insert(podName)
 	}
 
-	if len(podToMemberjoin) > 0 {
-		r.protoITS.Annotations[constant.MemberJoinStatusAnnotationKey] = strings.Join(podToMemberjoin, ",")
-	}
+	r.protoITS.Annotations[constant.MemberJoinStatusAnnotationKey] = strings.Join(podsToMemberjoin.UnsortedList(), ",")
+
 	return nil
+}
+
+func getPodsToMemberJoinFromAnno(instanceSet *workloads.InstanceSet) sets.Set[string] {
+	podsToMemberjoin := sets.New[string]()
+	if instanceSet == nil {
+		return podsToMemberjoin
+	}
+
+	if instanceSet.Annotations == nil {
+		return nil
+	}
+
+	if memberJoinStatus := instanceSet.Annotations[constant.MemberJoinStatusAnnotationKey]; memberJoinStatus != "" {
+		podsToMemberjoin.Insert(strings.Split(memberJoinStatus, ",")...)
+	}
+
+	return podsToMemberjoin
 }
 
 func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
@@ -641,9 +653,7 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
 	// TODO: Move memberLeave to the ITS controller. Instead of performing a switchover, we can directly scale down the non-leader nodes. This is because the pod ordinal is not guaranteed to be continuous.
 	podsToMemberLeave := make([]*corev1.Pod, 0)
 
-	memberJoinStatus := r.runningITS.Annotations[constant.MemberJoinStatusAnnotationKey]
-	podsList := strings.Split(memberJoinStatus, ",")
-	podsToMemberjoin := sets.New(podsList...)
+	podsToMemberjoin := getPodsToMemberJoinFromAnno(r.runningITS)
 	for _, pod := range pods {
 		// if the pod not exists in the generated pod names, it should be a member that needs to leave
 		if _, ok := r.desiredCompPodNameSet[pod.Name]; ok {
@@ -666,8 +676,9 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
 
 	}
 	if len(leaveErrors) > 0 {
-		return NewTransformerError(leaveErrors, 1*time.Second)
+		return newRequeueError(time.Second, fmt.Sprintf("%v", leaveErrors))
 	}
+
 	return nil
 }
 
@@ -729,13 +740,7 @@ func (r *componentWorkloadOps) leaveMemberForPod(pod *corev1.Pod, pods []*corev1
 }
 
 func (r *componentWorkloadOps) checkAndDoMemberJoin() error {
-	memberJoinStatus := r.runningITS.Annotations[constant.MemberJoinStatusAnnotationKey]
-	if memberJoinStatus == "" {
-		return nil
-	}
-
-	podsList := strings.Split(memberJoinStatus, ",")
-	podsToMemberjoin := sets.New(podsList...)
+	podsToMemberjoin := getPodsToMemberJoinFromAnno(r.runningITS)
 
 	if r.synthesizeComp.LifecycleActions == nil && r.synthesizeComp.LifecycleActions.MemberJoin == nil {
 		podsToMemberjoin.Clear()
@@ -778,7 +783,7 @@ func (r *componentWorkloadOps) doMemberJoin(podSet sets.Set[string]) error {
 	}
 
 	if len(joinErrors) > 0 {
-		return NewTransformerError(joinErrors, 1*time.Second)
+		return newRequeueError(time.Second, fmt.Sprintf("%v", joinErrors))
 	}
 	return nil
 }

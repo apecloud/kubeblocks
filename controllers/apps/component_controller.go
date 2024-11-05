@@ -122,9 +122,6 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		if re, ok := err.(intctrlutil.RequeueError); ok {
 			return intctrlutil.RequeueAfter(re.RequeueAfter(), reqCtx.Log, re.Reason())
 		}
-		if requeueAfter, ok := IsTransformerError(err); ok {
-			return intctrlutil.RequeueAfter(requeueAfter, reqCtx.Log, err.Error())
-		}
 		if apierrors.IsConflict(err) {
 			return intctrlutil.Requeue(reqCtx.Log, err.Error())
 		}

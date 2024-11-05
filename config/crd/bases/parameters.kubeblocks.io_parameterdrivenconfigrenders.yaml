@@ -163,9 +163,13 @@ spec:
                         type: string
                       type: array
                       x-kubernetes-list-type: set
+                    templateName:
+                      description: Specifies the name of the referenced componentTemplateSpec.
+                      type: string
                   required:
                   - fileFormatConfig
                   - name
+                  - templateName
                   type: object
                 type: array
                 x-kubernetes-list-map-keys:

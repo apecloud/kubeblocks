@@ -3,7 +3,7 @@ title: 如何创建数据库集群
 description: 如何创建数据库集群
 keywords: [创建数据库, KubeBlocks]
 sidebar_position: 1
-sidebar_label: Overview
+sidebar_label: 概览
 ---
 
 # 创建数据库集群

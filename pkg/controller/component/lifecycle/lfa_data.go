@@ -25,7 +25,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-type dataDump struct{}
+type dataDump struct {
+	replicas []string
+}
 
 var _ lifecycleAction = &dataDump{}
 
@@ -37,7 +39,9 @@ func (a *dataDump) parameters(ctx context.Context, cli client.Reader) (map[strin
 	return nil, nil
 }
 
-type dataLoad struct{}
+type dataLoad struct {
+	replicas []string
+}
 
 var _ lifecycleAction = &dataLoad{}
 

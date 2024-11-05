@@ -23,6 +23,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"k8s.io/utils/pointer"
 	"reflect"
 	"slices"
 	"strings"
@@ -549,7 +550,37 @@ func (r *componentWorkloadOps) scaleIn(itsObj *workloads.InstanceSet) error {
 }
 
 func (r *componentWorkloadOps) scaleOut(itsObj *workloads.InstanceSet) error {
-	// TODO: impl
+	pods, err := component.ListOwnedPods(r.reqCtx.Ctx, r.cli, r.cluster.Namespace, r.cluster.Name, r.synthesizeComp.Name)
+	if err != nil {
+		return err
+	}
+
+	nameOfPodsToCreate := r.desiredCompPodNameSet.Difference(r.runningItsPodNameSet)
+	return r.scaleOutReplicas(itsObj, pods, sets.List(nameOfPodsToCreate))
+}
+
+func (r *componentWorkloadOps) scaleOutReplicas(itsObj *workloads.InstanceSet, pods []*corev1.Pod, podNames []string) error {
+	lifecycleActions := r.synthesizeComp.LifecycleActions
+	if lifecycleActions == nil || lifecycleActions.DataDump == nil || lifecycleActions.DataLoad == nil {
+		return nil
+	}
+
+	lfa, err := lifecycle.New(r.synthesizeComp, nil, pods...)
+	if err != nil {
+		return err
+	}
+
+	opts := &lifecycle.Options{NonBlocking: pointer.Bool(true)}
+	if err = lfa.DataDump(r.reqCtx.Ctx, r.cli, opts, podNames); err != nil {
+		return err
+	}
+
+	if err = lfa.DataLoad(r.reqCtx.Ctx, r.cli, opts, podNames); err != nil {
+		return err
+	}
+
+	// TODO: pass new replica names into workload
+
 	return nil
 }
 

@@ -108,13 +108,17 @@ func (a *kbagent) MemberLeave(ctx context.Context, cli client.Reader, opts *Opti
 	return a.ignoreOutput(a.checkedCallAction(ctx, cli, a.synthesizedComp.LifecycleActions.MemberLeave, lfa, opts))
 }
 
-func (a *kbagent) DataDump(ctx context.Context, cli client.Reader, opts *Options) error {
-	lfa := &dataDump{}
+func (a *kbagent) DataDump(ctx context.Context, cli client.Reader, opts *Options, replicas []string) error {
+	lfa := &dataDump{
+		replicas: replicas,
+	}
 	return a.ignoreOutput(a.checkedCallAction(ctx, cli, a.synthesizedComp.LifecycleActions.DataDump, lfa, opts))
 }
 
-func (a *kbagent) DataLoad(ctx context.Context, cli client.Reader, opts *Options) error {
-	lfa := &dataLoad{}
+func (a *kbagent) DataLoad(ctx context.Context, cli client.Reader, opts *Options, replicas []string) error {
+	lfa := &dataLoad{
+		replicas: replicas,
+	}
 	return a.ignoreOutput(a.checkedCallAction(ctx, cli, a.synthesizedComp.LifecycleActions.DataLoad, lfa, opts))
 }
 

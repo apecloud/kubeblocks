@@ -6,6 +6,9 @@ sidebar_position: 1
 sidebar_label: 异常处理
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # 异常处理
 
 发生异常时，你可以按照以下步骤解决问题。
@@ -14,9 +17,25 @@ sidebar_label: 异常处理
 
 1. 检查集群状态。
 
+    <Tabs>
+
+    <TabItem value="kbcli" label="kbcli" default>
+
     ```bash
     kbcli cluster list mycluster
     ```
+
+    </TabItem>
+
+    <TabItem value="kubectl" label="kubeclt">
+
+    ```bash
+    kubectl describe cluster mycluster
+    ```
+
+    </TabItem>
+
+    </Tabs>
 
 2. 根据状态信息进行处理。
 

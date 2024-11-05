@@ -9,7 +9,7 @@ sidebar_label: 卸载 KubeBlocks
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Uninstall KubeBlocks
+# 卸载 KubeBlocks
 
 卸载顺序：
 

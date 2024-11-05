@@ -27,6 +27,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -58,6 +59,7 @@ func buildHeadlessSvc(its workloads.InstanceSet, labels, selectors map[string]st
 		AddAnnotationsInMap(annotations).
 		SetPublishNotReadyAddresses(true)
 
+	portNames := sets.New[string]()
 	for _, container := range its.Spec.Template.Spec.Containers {
 		for _, port := range container.Ports {
 			servicePort := corev1.ServicePort{
@@ -65,12 +67,11 @@ func buildHeadlessSvc(its workloads.InstanceSet, labels, selectors map[string]st
 				Port:     port.ContainerPort,
 			}
 			switch {
-			case len(port.Name) > 0:
+			case len(port.Name) > 0 && !portNames.Has(port.Name):
+				portNames.Insert(port.Name)
 				servicePort.Name = port.Name
-				servicePort.TargetPort = intstr.FromString(port.Name)
 			default:
 				servicePort.Name = fmt.Sprintf("%s-%d", strings.ToLower(string(port.Protocol)), port.ContainerPort)
-				servicePort.TargetPort = intstr.FromInt(int(port.ContainerPort))
 			}
 			hdlBuilder.AddPorts(servicePort)
 		}

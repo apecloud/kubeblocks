@@ -568,10 +568,10 @@ var _ = Describe("cluster component transformer test", func() {
 			reader := &mockReader{
 				objs: []client.Object{
 					mockCompObj(transCtx, comp1aName, func(comp *appsv1.Component) {
-						comp.Status.Phase = appsv1.RunningClusterCompPhase
+						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
 					mockCompObj(transCtx, comp1bName, func(comp *appsv1.Component) {
-						comp.Status.Phase = appsv1.CreatingClusterCompPhase
+						comp.Status.Phase = appsv1.CreatingComponentPhase
 					}),
 				},
 			}
@@ -594,7 +594,7 @@ var _ = Describe("cluster component transformer test", func() {
 			reader := &mockReader{
 				objs: []client.Object{
 					mockCompObj(transCtx, comp1aName, func(comp *appsv1.Component) {
-						comp.Status.Phase = appsv1.RunningClusterCompPhase
+						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
 				},
 			}
@@ -620,10 +620,10 @@ var _ = Describe("cluster component transformer test", func() {
 			reader := &mockReader{
 				objs: []client.Object{
 					mockCompObj(transCtx, comp1aName, func(comp *appsv1.Component) {
-						comp.Status.Phase = appsv1.RunningClusterCompPhase
+						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
 					mockCompObj(transCtx, comp1bName, func(comp *appsv1.Component) {
-						comp.Status.Phase = appsv1.RunningClusterCompPhase
+						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
 				},
 			}
@@ -651,10 +651,10 @@ var _ = Describe("cluster component transformer test", func() {
 				objs: []client.Object{
 					mockCompObj(transCtx, comp1aName, func(comp *appsv1.Component) {
 						comp.Spec.Replicas = 2 // to update
-						comp.Status.Phase = appsv1.RunningClusterCompPhase
+						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
 					mockCompObj(transCtx, comp1bName, func(comp *appsv1.Component) {
-						comp.Status.Phase = appsv1.RunningClusterCompPhase
+						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
 				},
 			}
@@ -680,17 +680,17 @@ var _ = Describe("cluster component transformer test", func() {
 			reader := &mockReader{
 				objs: []client.Object{
 					mockCompObj(transCtx, comp1aName, func(comp *appsv1.Component) {
-						comp.Status.Phase = appsv1.CreatingClusterCompPhase // not ready
+						comp.Status.Phase = appsv1.CreatingComponentPhase // not ready
 					}),
 					mockCompObj(transCtx, comp1bName, func(comp *appsv1.Component) {
-						comp.Status.Phase = appsv1.RunningClusterCompPhase
+						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
 					mockCompObj(transCtx, comp2aName, func(comp *appsv1.Component) {
 						comp.Spec.Replicas = 2 // to update
-						comp.Status.Phase = appsv1.RunningClusterCompPhase
+						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
 					mockCompObj(transCtx, comp2bName, func(comp *appsv1.Component) {
-						comp.Status.Phase = appsv1.RunningClusterCompPhase
+						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
 				},
 			}
@@ -715,17 +715,17 @@ var _ = Describe("cluster component transformer test", func() {
 				objs: []client.Object{
 					mockCompObj(transCtx, comp1aName, func(comp *appsv1.Component) {
 						comp.Spec.Replicas = 2 // to update
-						comp.Status.Phase = appsv1.RunningClusterCompPhase
+						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
 					mockCompObj(transCtx, comp1bName, func(comp *appsv1.Component) {
-						comp.Status.Phase = appsv1.RunningClusterCompPhase
+						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
 					mockCompObj(transCtx, comp2aName, func(comp *appsv1.Component) {
 						comp.Spec.Replicas = 2 // to update
-						comp.Status.Phase = appsv1.RunningClusterCompPhase
+						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
 					mockCompObj(transCtx, comp2bName, func(comp *appsv1.Component) {
-						comp.Status.Phase = appsv1.RunningClusterCompPhase
+						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
 				},
 			}
@@ -752,17 +752,17 @@ var _ = Describe("cluster component transformer test", func() {
 			reader := &mockReader{
 				objs: []client.Object{
 					mockCompObj(transCtx, comp1aName, func(comp *appsv1.Component) {
-						comp.Status.Phase = appsv1.RunningClusterCompPhase
+						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
 					mockCompObj(transCtx, comp1bName, func(comp *appsv1.Component) {
-						comp.Status.Phase = appsv1.RunningClusterCompPhase
+						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
 					mockCompObj(transCtx, comp2aName, func(comp *appsv1.Component) {
 						comp.Spec.Replicas = 2 // to update
-						comp.Status.Phase = appsv1.RunningClusterCompPhase
+						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
 					mockCompObj(transCtx, comp2bName, func(comp *appsv1.Component) {
-						comp.Status.Phase = appsv1.RunningClusterCompPhase
+						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
 				},
 			}
@@ -787,13 +787,13 @@ var _ = Describe("cluster component transformer test", func() {
 			reader := &mockReader{
 				objs: []client.Object{
 					mockCompObj(transCtx, comp1aName, func(comp *appsv1.Component) {
-						comp.Status.Phase = appsv1.RunningClusterCompPhase
+						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
 					mockCompObj(transCtx, comp2aName, func(comp *appsv1.Component) {
-						comp.Status.Phase = appsv1.RunningClusterCompPhase
+						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
 					mockCompObj(transCtx, comp3aName, func(comp *appsv1.Component) {
-						comp.Status.Phase = appsv1.RunningClusterCompPhase
+						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
 				},
 			}
@@ -826,13 +826,13 @@ var _ = Describe("cluster component transformer test", func() {
 				objs: []client.Object{
 					mockCompObj(transCtx, comp1aName, func(comp *appsv1.Component) {
 						comp.Spec.Stop = pointer.Bool(true)
-						comp.Status.Phase = appsv1.StoppedClusterCompPhase
+						comp.Status.Phase = appsv1.StoppedComponentPhase
 					}),
 					mockCompObj(transCtx, comp2aName, func(comp *appsv1.Component) {
-						comp.Status.Phase = appsv1.RunningClusterCompPhase
+						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
 					mockCompObj(transCtx, comp3aName, func(comp *appsv1.Component) {
-						comp.Status.Phase = appsv1.RunningClusterCompPhase
+						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
 				},
 			}
@@ -864,10 +864,10 @@ var _ = Describe("cluster component transformer test", func() {
 			reader := &mockReader{
 				objs: []client.Object{
 					mockCompObj(transCtx, comp1aName, func(comp *appsv1.Component) {
-						comp.Status.Phase = appsv1.RunningClusterCompPhase
+						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
 					mockCompObj(transCtx, comp1bName, func(comp *appsv1.Component) {
-						comp.Status.Phase = appsv1.RunningClusterCompPhase
+						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
 				},
 			}
@@ -891,10 +891,10 @@ var _ = Describe("cluster component transformer test", func() {
 			// mock last two components status as running
 			reader.objs = append(reader.objs, []client.Object{
 				mockCompObj(transCtx, comp2aName, func(comp *appsv1.Component) {
-					comp.Status.Phase = appsv1.RunningClusterCompPhase
+					comp.Status.Phase = appsv1.RunningComponentPhase
 				}),
 				mockCompObj(transCtx, comp2bName, func(comp *appsv1.Component) {
-					comp.Status.Phase = appsv1.RunningClusterCompPhase
+					comp.Status.Phase = appsv1.RunningComponentPhase
 				}),
 			}...)
 
@@ -916,7 +916,7 @@ var _ = Describe("cluster component transformer test", func() {
 			reader := &mockReader{
 				objs: []client.Object{
 					mockCompObj(transCtx, comp1aName, func(comp *appsv1.Component) {
-						comp.Status.Phase = appsv1.RunningClusterCompPhase
+						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
 				},
 			}
@@ -955,7 +955,7 @@ var _ = Describe("cluster component transformer test", func() {
 			reader := &mockReader{
 				objs: []client.Object{
 					mockCompObj(transCtx, comp1aName, func(comp *appsv1.Component) {
-						comp.Status.Phase = appsv1.RunningClusterCompPhase
+						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
 				},
 			}
@@ -1032,10 +1032,10 @@ var _ = Describe("cluster component transformer test", func() {
 			reader := &mockReader{
 				objs: []client.Object{
 					mockShardingCompObj(transCtx, sharding1aName, func(comp *appsv1.Component) {
-						comp.Status.Phase = appsv1.RunningClusterCompPhase
+						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
 					mockShardingCompObj(transCtx, sharding1bName, func(comp *appsv1.Component) {
-						comp.Status.Phase = appsv1.CreatingClusterCompPhase
+						comp.Status.Phase = appsv1.CreatingComponentPhase
 					}),
 				},
 			}
@@ -1063,7 +1063,7 @@ var _ = Describe("cluster component transformer test", func() {
 			reader := &mockReader{
 				objs: []client.Object{
 					mockShardingCompObj(transCtx, sharding1aName, func(comp *appsv1.Component) {
-						comp.Status.Phase = appsv1.RunningClusterCompPhase
+						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
 				},
 			}
@@ -1094,10 +1094,10 @@ var _ = Describe("cluster component transformer test", func() {
 			reader := &mockReader{
 				objs: []client.Object{
 					mockShardingCompObj(transCtx, sharding1aName, func(comp *appsv1.Component) {
-						comp.Status.Phase = appsv1.RunningClusterCompPhase
+						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
 					mockShardingCompObj(transCtx, sharding1bName, func(comp *appsv1.Component) {
-						comp.Status.Phase = appsv1.RunningClusterCompPhase
+						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
 				},
 			}
@@ -1130,10 +1130,10 @@ var _ = Describe("cluster component transformer test", func() {
 				objs: []client.Object{
 					mockShardingCompObj(transCtx, sharding1aName, func(comp *appsv1.Component) {
 						comp.Spec.Replicas = 2 // to update
-						comp.Status.Phase = appsv1.RunningClusterCompPhase
+						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
 					mockShardingCompObj(transCtx, sharding1bName, func(comp *appsv1.Component) {
-						comp.Status.Phase = appsv1.RunningClusterCompPhase
+						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
 				},
 			}
@@ -1164,17 +1164,17 @@ var _ = Describe("cluster component transformer test", func() {
 			reader := &mockReader{
 				objs: []client.Object{
 					mockShardingCompObj(transCtx, sharding1aName, func(comp *appsv1.Component) {
-						comp.Status.Phase = appsv1.CreatingClusterCompPhase // not ready
+						comp.Status.Phase = appsv1.CreatingComponentPhase // not ready
 					}),
 					mockShardingCompObj(transCtx, sharding1bName, func(comp *appsv1.Component) {
-						comp.Status.Phase = appsv1.RunningClusterCompPhase
+						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
 					mockShardingCompObj(transCtx, sharding2aName, func(comp *appsv1.Component) {
 						comp.Spec.Replicas = 2 // to update
-						comp.Status.Phase = appsv1.RunningClusterCompPhase
+						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
 					mockShardingCompObj(transCtx, sharding2bName, func(comp *appsv1.Component) {
-						comp.Status.Phase = appsv1.RunningClusterCompPhase
+						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
 				},
 			}
@@ -1204,17 +1204,17 @@ var _ = Describe("cluster component transformer test", func() {
 				objs: []client.Object{
 					mockShardingCompObj(transCtx, sharding1aName, func(comp *appsv1.Component) {
 						comp.Spec.Replicas = 2 // to update
-						comp.Status.Phase = appsv1.RunningClusterCompPhase
+						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
 					mockShardingCompObj(transCtx, sharding1bName, func(comp *appsv1.Component) {
-						comp.Status.Phase = appsv1.RunningClusterCompPhase
+						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
 					mockShardingCompObj(transCtx, sharding2aName, func(comp *appsv1.Component) {
 						comp.Spec.Replicas = 2 // to update
-						comp.Status.Phase = appsv1.RunningClusterCompPhase
+						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
 					mockShardingCompObj(transCtx, sharding2bName, func(comp *appsv1.Component) {
-						comp.Status.Phase = appsv1.RunningClusterCompPhase
+						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
 				},
 			}
@@ -1246,17 +1246,17 @@ var _ = Describe("cluster component transformer test", func() {
 			reader := &mockReader{
 				objs: []client.Object{
 					mockShardingCompObj(transCtx, sharding1aName, func(comp *appsv1.Component) {
-						comp.Status.Phase = appsv1.RunningClusterCompPhase
+						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
 					mockShardingCompObj(transCtx, sharding1bName, func(comp *appsv1.Component) {
-						comp.Status.Phase = appsv1.RunningClusterCompPhase
+						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
 					mockShardingCompObj(transCtx, sharding2aName, func(comp *appsv1.Component) {
 						comp.Spec.Replicas = 2 // to update
-						comp.Status.Phase = appsv1.RunningClusterCompPhase
+						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
 					mockShardingCompObj(transCtx, sharding2bName, func(comp *appsv1.Component) {
-						comp.Status.Phase = appsv1.RunningClusterCompPhase
+						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
 				},
 			}
@@ -1285,13 +1285,13 @@ var _ = Describe("cluster component transformer test", func() {
 			reader := &mockReader{
 				objs: []client.Object{
 					mockShardingCompObj(transCtx, sharding1aName, func(comp *appsv1.Component) {
-						comp.Status.Phase = appsv1.RunningClusterCompPhase
+						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
 					mockShardingCompObj(transCtx, sharding2aName, func(comp *appsv1.Component) {
-						comp.Status.Phase = appsv1.RunningClusterCompPhase
+						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
 					mockShardingCompObj(transCtx, sharding3aName, func(comp *appsv1.Component) {
-						comp.Status.Phase = appsv1.RunningClusterCompPhase
+						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
 				},
 			}
@@ -1331,13 +1331,13 @@ var _ = Describe("cluster component transformer test", func() {
 				objs: []client.Object{
 					mockShardingCompObj(transCtx, sharding1aName, func(comp *appsv1.Component) {
 						comp.Spec.Stop = pointer.Bool(true)
-						comp.Status.Phase = appsv1.StoppedClusterCompPhase
+						comp.Status.Phase = appsv1.StoppedComponentPhase
 					}),
 					mockShardingCompObj(transCtx, sharding2aName, func(comp *appsv1.Component) {
-						comp.Status.Phase = appsv1.RunningClusterCompPhase
+						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
 					mockShardingCompObj(transCtx, sharding3aName, func(comp *appsv1.Component) {
-						comp.Status.Phase = appsv1.RunningClusterCompPhase
+						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
 				},
 			}
@@ -1377,10 +1377,10 @@ var _ = Describe("cluster component transformer test", func() {
 			reader := &mockReader{
 				objs: []client.Object{
 					mockShardingCompObj(transCtx, sharding1aName, func(comp *appsv1.Component) {
-						comp.Status.Phase = appsv1.RunningClusterCompPhase
+						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
 					mockShardingCompObj(transCtx, sharding1bName, func(comp *appsv1.Component) {
-						comp.Status.Phase = appsv1.RunningClusterCompPhase
+						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
 				},
 			}
@@ -1404,10 +1404,10 @@ var _ = Describe("cluster component transformer test", func() {
 			// mock last two components status as running
 			reader.objs = append(reader.objs, []client.Object{
 				mockShardingCompObj(transCtx, sharding2aName, func(comp *appsv1.Component) {
-					comp.Status.Phase = appsv1.RunningClusterCompPhase
+					comp.Status.Phase = appsv1.RunningComponentPhase
 				}),
 				mockShardingCompObj(transCtx, sharding2bName, func(comp *appsv1.Component) {
-					comp.Status.Phase = appsv1.RunningClusterCompPhase
+					comp.Status.Phase = appsv1.RunningComponentPhase
 				}),
 			}...)
 
@@ -1434,7 +1434,7 @@ var _ = Describe("cluster component transformer test", func() {
 					mockObjects: func(transCtx *clusterTransformContext) []client.Object {
 						return []client.Object{
 							mockCompObj(transCtx, comp1aName, func(comp *appsv1.Component) {
-								comp.Status.Phase = appsv1.RunningClusterCompPhase
+								comp.Status.Phase = appsv1.RunningComponentPhase
 							}),
 						}
 					},
@@ -1447,7 +1447,7 @@ var _ = Describe("cluster component transformer test", func() {
 					mockObjects: func(transCtx *clusterTransformContext) []client.Object {
 						return []client.Object{
 							mockShardingCompObj(transCtx, sharding1aName, func(comp *appsv1.Component) {
-								comp.Status.Phase = appsv1.RunningClusterCompPhase
+								comp.Status.Phase = appsv1.RunningComponentPhase
 							}),
 						}
 					},
@@ -1509,11 +1509,11 @@ var _ = Describe("cluster component transformer test", func() {
 					objs: []client.Object{
 						mockCompObj(transCtx, comp1aName, func(comp *appsv1.Component) {
 							comp.Spec.Replicas = 2 // to update
-							comp.Status.Phase = appsv1.RunningClusterCompPhase
+							comp.Status.Phase = appsv1.RunningComponentPhase
 						}),
 						mockShardingCompObj(transCtx, sharding1aName, func(comp *appsv1.Component) {
 							comp.Spec.Replicas = 2 // to update
-							comp.Status.Phase = appsv1.RunningClusterCompPhase
+							comp.Status.Phase = appsv1.RunningComponentPhase
 						}),
 					},
 				}
@@ -1553,10 +1553,10 @@ var _ = Describe("cluster component transformer test", func() {
 				reader := &mockReader{
 					objs: []client.Object{
 						mockCompObj(transCtx, comp1aName, func(comp *appsv1.Component) {
-							comp.Status.Phase = appsv1.RunningClusterCompPhase
+							comp.Status.Phase = appsv1.RunningComponentPhase
 						}),
 						mockShardingCompObj(transCtx, sharding1aName, func(comp *appsv1.Component) {
-							comp.Status.Phase = appsv1.RunningClusterCompPhase
+							comp.Status.Phase = appsv1.RunningComponentPhase
 						}),
 					},
 				}
@@ -1601,14 +1601,14 @@ var _ = Describe("cluster component transformer test", func() {
 					firstMockObjects: func(transCtx *clusterTransformContext) []client.Object {
 						return []client.Object{
 							mockCompObj(transCtx, comp1aName, func(comp *appsv1.Component) {
-								comp.Status.Phase = appsv1.RunningClusterCompPhase
+								comp.Status.Phase = appsv1.RunningComponentPhase
 							}),
 						}
 					},
 					secondMockObjects: func(transCtx *clusterTransformContext) []client.Object {
 						return []client.Object{
 							mockShardingCompObj(transCtx, sharding1aName, func(comp *appsv1.Component) {
-								comp.Status.Phase = appsv1.RunningClusterCompPhase
+								comp.Status.Phase = appsv1.RunningComponentPhase
 							}),
 						}
 					},
@@ -1619,14 +1619,14 @@ var _ = Describe("cluster component transformer test", func() {
 					firstMockObjects: func(transCtx *clusterTransformContext) []client.Object {
 						return []client.Object{
 							mockShardingCompObj(transCtx, sharding1aName, func(comp *appsv1.Component) {
-								comp.Status.Phase = appsv1.RunningClusterCompPhase
+								comp.Status.Phase = appsv1.RunningComponentPhase
 							}),
 						}
 					},
 					secondMockObjects: func(transCtx *clusterTransformContext) []client.Object {
 						return []client.Object{
 							mockCompObj(transCtx, comp1aName, func(comp *appsv1.Component) {
-								comp.Status.Phase = appsv1.RunningClusterCompPhase
+								comp.Status.Phase = appsv1.RunningComponentPhase
 							}),
 						}
 					},

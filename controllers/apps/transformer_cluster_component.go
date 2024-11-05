@@ -528,9 +528,9 @@ func (c *phasePrecondition) shardingMatch(transCtx *clusterTransformContext, dag
 
 func (c *phasePrecondition) expected(comp *appsv1.Component) bool {
 	if comp.Generation == comp.Status.ObservedGeneration {
-		expect := appsv1.RunningClusterCompPhase
+		expect := appsv1.RunningComponentPhase
 		if comp.Spec.Stop != nil && *comp.Spec.Stop {
-			expect = appsv1.StoppedClusterCompPhase
+			expect = appsv1.StoppedComponentPhase
 		}
 		return comp.Status.Phase == expect
 	}

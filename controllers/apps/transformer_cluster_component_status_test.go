@@ -109,7 +109,7 @@ var _ = Describe("cluster component status transformer", func() {
 							},
 						},
 						Status: appsv1.ComponentStatus{
-							Phase: appsv1.RunningClusterCompPhase,
+							Phase: appsv1.RunningComponentPhase,
 						},
 					},
 				},
@@ -121,19 +121,19 @@ var _ = Describe("cluster component status transformer", func() {
 			Expect(err).Should(BeNil())
 			Expect(transCtx.Cluster.Status.Components).Should(HaveLen(2))
 			Expect(transCtx.Cluster.Status.Components).Should(HaveKey("comp1"))
-			Expect(transCtx.Cluster.Status.Components["comp1"].Phase).Should(Equal(appsv1.RunningClusterCompPhase))
+			Expect(transCtx.Cluster.Status.Components["comp1"].Phase).Should(Equal(appsv1.RunningComponentPhase))
 			Expect(transCtx.Cluster.Status.Components).Should(HaveKey("comp2"))
-			Expect(transCtx.Cluster.Status.Components["comp2"].Phase).Should(Equal(appsv1.ClusterComponentPhase("")))
+			Expect(transCtx.Cluster.Status.Components["comp2"].Phase).Should(Equal(appsv1.ComponentPhase("")))
 		})
 
 		It("comp spec deleted", func() {
 			// have seen the comp1 and comp2 objects in the cluster
 			transCtx.Cluster.Status.Components = map[string]appsv1.ClusterComponentStatus{
 				"comp1": {
-					Phase: appsv1.RunningClusterCompPhase,
+					Phase: appsv1.RunningComponentPhase,
 				},
 				"comp2": {
-					Phase: appsv1.RunningClusterCompPhase,
+					Phase: appsv1.RunningComponentPhase,
 				},
 			}
 
@@ -149,7 +149,7 @@ var _ = Describe("cluster component status transformer", func() {
 							},
 						},
 						Status: appsv1.ComponentStatus{
-							Phase: appsv1.RunningClusterCompPhase,
+							Phase: appsv1.RunningComponentPhase,
 						},
 					},
 					&appsv1.Component{
@@ -162,7 +162,7 @@ var _ = Describe("cluster component status transformer", func() {
 							},
 						},
 						Status: appsv1.ComponentStatus{
-							Phase: appsv1.RunningClusterCompPhase,
+							Phase: appsv1.RunningComponentPhase,
 						},
 					},
 				},
@@ -177,19 +177,19 @@ var _ = Describe("cluster component status transformer", func() {
 			Expect(err).Should(BeNil())
 			Expect(transCtx.Cluster.Status.Components).Should(HaveLen(2))
 			Expect(transCtx.Cluster.Status.Components).Should(HaveKey("comp1"))
-			Expect(transCtx.Cluster.Status.Components["comp1"].Phase).Should(Equal(appsv1.RunningClusterCompPhase))
+			Expect(transCtx.Cluster.Status.Components["comp1"].Phase).Should(Equal(appsv1.RunningComponentPhase))
 			Expect(transCtx.Cluster.Status.Components).Should(HaveKey("comp2"))
-			Expect(transCtx.Cluster.Status.Components["comp2"].Phase).Should(Equal(appsv1.DeletingClusterCompPhase))
+			Expect(transCtx.Cluster.Status.Components["comp2"].Phase).Should(Equal(appsv1.DeletingComponentPhase))
 		})
 
 		It("comp object deleted", func() {
 			// have seen the comp1 and comp2 objects in the cluster
 			transCtx.Cluster.Status.Components = map[string]appsv1.ClusterComponentStatus{
 				"comp1": {
-					Phase: appsv1.RunningClusterCompPhase,
+					Phase: appsv1.RunningComponentPhase,
 				},
 				"comp2": {
-					Phase: appsv1.RunningClusterCompPhase,
+					Phase: appsv1.RunningComponentPhase,
 				},
 			}
 
@@ -206,7 +206,7 @@ var _ = Describe("cluster component status transformer", func() {
 							},
 						},
 						Status: appsv1.ComponentStatus{
-							Phase: appsv1.RunningClusterCompPhase,
+							Phase: appsv1.RunningComponentPhase,
 						},
 					},
 				},
@@ -218,19 +218,19 @@ var _ = Describe("cluster component status transformer", func() {
 			Expect(err).Should(BeNil())
 			Expect(transCtx.Cluster.Status.Components).Should(HaveLen(2))
 			Expect(transCtx.Cluster.Status.Components).Should(HaveKey("comp1"))
-			Expect(transCtx.Cluster.Status.Components["comp1"].Phase).Should(Equal(appsv1.RunningClusterCompPhase))
+			Expect(transCtx.Cluster.Status.Components["comp1"].Phase).Should(Equal(appsv1.RunningComponentPhase))
 			Expect(transCtx.Cluster.Status.Components).Should(HaveKey("comp2"))
-			Expect(transCtx.Cluster.Status.Components["comp2"].Phase).Should(Equal(appsv1.ClusterComponentPhase("")))
+			Expect(transCtx.Cluster.Status.Components["comp2"].Phase).Should(Equal(appsv1.ComponentPhase("")))
 		})
 
 		It("comp deleted", func() {
 			// have seen the comp1 and comp2 objects in the cluster
 			transCtx.Cluster.Status.Components = map[string]appsv1.ClusterComponentStatus{
 				"comp1": {
-					Phase: appsv1.RunningClusterCompPhase,
+					Phase: appsv1.RunningComponentPhase,
 				},
 				"comp2": {
-					Phase: appsv1.RunningClusterCompPhase,
+					Phase: appsv1.RunningComponentPhase,
 				},
 			}
 
@@ -247,7 +247,7 @@ var _ = Describe("cluster component status transformer", func() {
 							},
 						},
 						Status: appsv1.ComponentStatus{
-							Phase: appsv1.RunningClusterCompPhase,
+							Phase: appsv1.RunningComponentPhase,
 						},
 					},
 				},
@@ -262,7 +262,7 @@ var _ = Describe("cluster component status transformer", func() {
 			Expect(err).Should(BeNil())
 			Expect(transCtx.Cluster.Status.Components).Should(HaveLen(1))
 			Expect(transCtx.Cluster.Status.Components).Should(HaveKey("comp1"))
-			Expect(transCtx.Cluster.Status.Components["comp1"].Phase).Should(Equal(appsv1.RunningClusterCompPhase))
+			Expect(transCtx.Cluster.Status.Components["comp1"].Phase).Should(Equal(appsv1.RunningComponentPhase))
 			Expect(transCtx.Cluster.Status.Components).ShouldNot(HaveKey("comp2"))
 		})
 
@@ -279,7 +279,7 @@ var _ = Describe("cluster component status transformer", func() {
 							},
 						},
 						Status: appsv1.ComponentStatus{
-							Phase: appsv1.RunningClusterCompPhase,
+							Phase: appsv1.RunningComponentPhase,
 						},
 					},
 					&appsv1.Component{
@@ -292,7 +292,7 @@ var _ = Describe("cluster component status transformer", func() {
 							},
 						},
 						Status: appsv1.ComponentStatus{
-							Phase: appsv1.CreatingClusterCompPhase,
+							Phase: appsv1.CreatingComponentPhase,
 						},
 					},
 				},
@@ -304,18 +304,18 @@ var _ = Describe("cluster component status transformer", func() {
 			Expect(err).Should(BeNil())
 			Expect(transCtx.Cluster.Status.Components).Should(HaveLen(2))
 			Expect(transCtx.Cluster.Status.Components).Should(HaveKey("comp1"))
-			Expect(transCtx.Cluster.Status.Components["comp1"].Phase).Should(Equal(appsv1.RunningClusterCompPhase))
+			Expect(transCtx.Cluster.Status.Components["comp1"].Phase).Should(Equal(appsv1.RunningComponentPhase))
 			Expect(transCtx.Cluster.Status.Components).Should(HaveKey("comp2"))
-			Expect(transCtx.Cluster.Status.Components["comp2"].Phase).Should(Equal(appsv1.CreatingClusterCompPhase))
+			Expect(transCtx.Cluster.Status.Components["comp2"].Phase).Should(Equal(appsv1.CreatingComponentPhase))
 		})
 
 		It("phase changed", func() {
 			transCtx.Cluster.Status.Components = map[string]appsv1.ClusterComponentStatus{
 				"comp1": {
-					Phase: appsv1.RunningClusterCompPhase,
+					Phase: appsv1.RunningComponentPhase,
 				},
 				"comp2": {
-					Phase: appsv1.RunningClusterCompPhase,
+					Phase: appsv1.RunningComponentPhase,
 				},
 			}
 
@@ -331,7 +331,7 @@ var _ = Describe("cluster component status transformer", func() {
 							},
 						},
 						Status: appsv1.ComponentStatus{
-							Phase: appsv1.UpdatingClusterCompPhase,
+							Phase: appsv1.UpdatingComponentPhase,
 						},
 					},
 					&appsv1.Component{
@@ -344,7 +344,7 @@ var _ = Describe("cluster component status transformer", func() {
 							},
 						},
 						Status: appsv1.ComponentStatus{
-							Phase: appsv1.DeletingClusterCompPhase,
+							Phase: appsv1.DeletingComponentPhase,
 						},
 					},
 				},
@@ -356,9 +356,9 @@ var _ = Describe("cluster component status transformer", func() {
 			Expect(err).Should(BeNil())
 			Expect(transCtx.Cluster.Status.Components).Should(HaveLen(2))
 			Expect(transCtx.Cluster.Status.Components).Should(HaveKey("comp1"))
-			Expect(transCtx.Cluster.Status.Components["comp1"].Phase).Should(Equal(appsv1.UpdatingClusterCompPhase))
+			Expect(transCtx.Cluster.Status.Components["comp1"].Phase).Should(Equal(appsv1.UpdatingComponentPhase))
 			Expect(transCtx.Cluster.Status.Components).Should(HaveKey("comp2"))
-			Expect(transCtx.Cluster.Status.Components["comp2"].Phase).Should(Equal(appsv1.DeletingClusterCompPhase))
+			Expect(transCtx.Cluster.Status.Components["comp2"].Phase).Should(Equal(appsv1.DeletingComponentPhase))
 		})
 	})
 
@@ -389,7 +389,7 @@ var _ = Describe("cluster component status transformer", func() {
 							},
 						},
 						Status: appsv1.ComponentStatus{
-							Phase: appsv1.RunningClusterCompPhase,
+							Phase: appsv1.RunningComponentPhase,
 						},
 					},
 				},
@@ -401,19 +401,19 @@ var _ = Describe("cluster component status transformer", func() {
 			Expect(err).Should(BeNil())
 			Expect(transCtx.Cluster.Status.Shardings).Should(HaveLen(2))
 			Expect(transCtx.Cluster.Status.Shardings).Should(HaveKey("sharding1"))
-			Expect(transCtx.Cluster.Status.Shardings["sharding1"].Phase).Should(Equal(appsv1.RunningClusterCompPhase))
+			Expect(transCtx.Cluster.Status.Shardings["sharding1"].Phase).Should(Equal(appsv1.RunningComponentPhase))
 			Expect(transCtx.Cluster.Status.Shardings).Should(HaveKey("sharding2"))
-			Expect(transCtx.Cluster.Status.Shardings["sharding2"].Phase).Should(Equal(appsv1.ClusterComponentPhase("")))
+			Expect(transCtx.Cluster.Status.Shardings["sharding2"].Phase).Should(Equal(appsv1.ComponentPhase("")))
 		})
 
 		It("sharding spec deleted", func() {
 			// have seen the sharding1 and sharding2 objects in the cluster
 			transCtx.Cluster.Status.Shardings = map[string]appsv1.ClusterComponentStatus{
 				"sharding1": {
-					Phase: appsv1.RunningClusterCompPhase,
+					Phase: appsv1.RunningComponentPhase,
 				},
 				"sharding2": {
-					Phase: appsv1.RunningClusterCompPhase,
+					Phase: appsv1.RunningComponentPhase,
 				},
 			}
 
@@ -430,7 +430,7 @@ var _ = Describe("cluster component status transformer", func() {
 							},
 						},
 						Status: appsv1.ComponentStatus{
-							Phase: appsv1.RunningClusterCompPhase,
+							Phase: appsv1.RunningComponentPhase,
 						},
 					},
 					&appsv1.Component{
@@ -444,7 +444,7 @@ var _ = Describe("cluster component status transformer", func() {
 							},
 						},
 						Status: appsv1.ComponentStatus{
-							Phase: appsv1.RunningClusterCompPhase,
+							Phase: appsv1.RunningComponentPhase,
 						},
 					},
 				},
@@ -459,19 +459,19 @@ var _ = Describe("cluster component status transformer", func() {
 			Expect(err).Should(BeNil())
 			Expect(transCtx.Cluster.Status.Shardings).Should(HaveLen(2))
 			Expect(transCtx.Cluster.Status.Shardings).Should(HaveKey("sharding1"))
-			Expect(transCtx.Cluster.Status.Shardings["sharding1"].Phase).Should(Equal(appsv1.RunningClusterCompPhase))
+			Expect(transCtx.Cluster.Status.Shardings["sharding1"].Phase).Should(Equal(appsv1.RunningComponentPhase))
 			Expect(transCtx.Cluster.Status.Shardings).Should(HaveKey("sharding2"))
-			Expect(transCtx.Cluster.Status.Shardings["sharding2"].Phase).Should(Equal(appsv1.DeletingClusterCompPhase))
+			Expect(transCtx.Cluster.Status.Shardings["sharding2"].Phase).Should(Equal(appsv1.DeletingComponentPhase))
 		})
 
 		It("sharding object deleted", func() {
 			// have seen the sharding1 and sharding2 objects in the cluster
 			transCtx.Cluster.Status.Shardings = map[string]appsv1.ClusterComponentStatus{
 				"sharding1": {
-					Phase: appsv1.RunningClusterCompPhase,
+					Phase: appsv1.RunningComponentPhase,
 				},
 				"sharding2": {
-					Phase: appsv1.RunningClusterCompPhase,
+					Phase: appsv1.RunningComponentPhase,
 				},
 			}
 
@@ -489,7 +489,7 @@ var _ = Describe("cluster component status transformer", func() {
 							},
 						},
 						Status: appsv1.ComponentStatus{
-							Phase: appsv1.RunningClusterCompPhase,
+							Phase: appsv1.RunningComponentPhase,
 						},
 					},
 				},
@@ -501,19 +501,19 @@ var _ = Describe("cluster component status transformer", func() {
 			Expect(err).Should(BeNil())
 			Expect(transCtx.Cluster.Status.Shardings).Should(HaveLen(2))
 			Expect(transCtx.Cluster.Status.Shardings).Should(HaveKey("sharding1"))
-			Expect(transCtx.Cluster.Status.Shardings["sharding1"].Phase).Should(Equal(appsv1.RunningClusterCompPhase))
+			Expect(transCtx.Cluster.Status.Shardings["sharding1"].Phase).Should(Equal(appsv1.RunningComponentPhase))
 			Expect(transCtx.Cluster.Status.Shardings).Should(HaveKey("sharding2"))
-			Expect(transCtx.Cluster.Status.Shardings["sharding2"].Phase).Should(Equal(appsv1.ClusterComponentPhase("")))
+			Expect(transCtx.Cluster.Status.Shardings["sharding2"].Phase).Should(Equal(appsv1.ComponentPhase("")))
 		})
 
 		It("sharding deleted", func() {
 			// have seen the sharding1 and sharding2 objects in the cluster
 			transCtx.Cluster.Status.Shardings = map[string]appsv1.ClusterComponentStatus{
 				"sharding1": {
-					Phase: appsv1.RunningClusterCompPhase,
+					Phase: appsv1.RunningComponentPhase,
 				},
 				"sharding2": {
-					Phase: appsv1.RunningClusterCompPhase,
+					Phase: appsv1.RunningComponentPhase,
 				},
 			}
 
@@ -531,7 +531,7 @@ var _ = Describe("cluster component status transformer", func() {
 							},
 						},
 						Status: appsv1.ComponentStatus{
-							Phase: appsv1.RunningClusterCompPhase,
+							Phase: appsv1.RunningComponentPhase,
 						},
 					},
 				},
@@ -546,7 +546,7 @@ var _ = Describe("cluster component status transformer", func() {
 			Expect(err).Should(BeNil())
 			Expect(transCtx.Cluster.Status.Shardings).Should(HaveLen(1))
 			Expect(transCtx.Cluster.Status.Shardings).Should(HaveKey("sharding1"))
-			Expect(transCtx.Cluster.Status.Shardings["sharding1"].Phase).Should(Equal(appsv1.RunningClusterCompPhase))
+			Expect(transCtx.Cluster.Status.Shardings["sharding1"].Phase).Should(Equal(appsv1.RunningComponentPhase))
 			Expect(transCtx.Cluster.Status.Components).ShouldNot(HaveKey("sharding2"))
 		})
 
@@ -564,7 +564,7 @@ var _ = Describe("cluster component status transformer", func() {
 							},
 						},
 						Status: appsv1.ComponentStatus{
-							Phase: appsv1.RunningClusterCompPhase,
+							Phase: appsv1.RunningComponentPhase,
 						},
 					},
 					&appsv1.Component{
@@ -578,7 +578,7 @@ var _ = Describe("cluster component status transformer", func() {
 							},
 						},
 						Status: appsv1.ComponentStatus{
-							Phase: appsv1.CreatingClusterCompPhase,
+							Phase: appsv1.CreatingComponentPhase,
 						},
 					},
 				},
@@ -590,9 +590,9 @@ var _ = Describe("cluster component status transformer", func() {
 			Expect(err).Should(BeNil())
 			Expect(transCtx.Cluster.Status.Shardings).Should(HaveLen(2))
 			Expect(transCtx.Cluster.Status.Shardings).Should(HaveKey("sharding1"))
-			Expect(transCtx.Cluster.Status.Shardings["sharding1"].Phase).Should(Equal(appsv1.RunningClusterCompPhase))
+			Expect(transCtx.Cluster.Status.Shardings["sharding1"].Phase).Should(Equal(appsv1.RunningComponentPhase))
 			Expect(transCtx.Cluster.Status.Shardings).Should(HaveKey("sharding2"))
-			Expect(transCtx.Cluster.Status.Shardings["sharding2"].Phase).Should(Equal(appsv1.CreatingClusterCompPhase))
+			Expect(transCtx.Cluster.Status.Shardings["sharding2"].Phase).Should(Equal(appsv1.CreatingComponentPhase))
 		})
 
 		It("compose phases", func() {
@@ -609,7 +609,7 @@ var _ = Describe("cluster component status transformer", func() {
 							},
 						},
 						Status: appsv1.ComponentStatus{
-							Phase: appsv1.RunningClusterCompPhase,
+							Phase: appsv1.RunningComponentPhase,
 						},
 					},
 					&appsv1.Component{
@@ -623,7 +623,7 @@ var _ = Describe("cluster component status transformer", func() {
 							},
 						},
 						Status: appsv1.ComponentStatus{
-							Phase: appsv1.CreatingClusterCompPhase,
+							Phase: appsv1.CreatingComponentPhase,
 						},
 					},
 				},
@@ -635,15 +635,15 @@ var _ = Describe("cluster component status transformer", func() {
 			Expect(err).Should(BeNil())
 			Expect(transCtx.Cluster.Status.Shardings).Should(HaveLen(2))
 			Expect(transCtx.Cluster.Status.Shardings).Should(HaveKey("sharding1"))
-			Expect(transCtx.Cluster.Status.Shardings["sharding1"].Phase).Should(Equal(appsv1.UpdatingClusterCompPhase))
+			Expect(transCtx.Cluster.Status.Shardings["sharding1"].Phase).Should(Equal(appsv1.UpdatingComponentPhase))
 			Expect(transCtx.Cluster.Status.Shardings).Should(HaveKey("sharding2"))
-			Expect(transCtx.Cluster.Status.Shardings["sharding2"].Phase).Should(Equal(appsv1.ClusterComponentPhase("")))
+			Expect(transCtx.Cluster.Status.Shardings["sharding2"].Phase).Should(Equal(appsv1.ComponentPhase("")))
 		})
 
 		It("phase changed", func() {
 			transCtx.Cluster.Status.Shardings = map[string]appsv1.ClusterComponentStatus{
 				"sharding1": {
-					Phase: appsv1.CreatingClusterCompPhase,
+					Phase: appsv1.CreatingComponentPhase,
 				},
 			}
 
@@ -660,7 +660,7 @@ var _ = Describe("cluster component status transformer", func() {
 							},
 						},
 						Status: appsv1.ComponentStatus{
-							Phase: appsv1.RunningClusterCompPhase,
+							Phase: appsv1.RunningComponentPhase,
 						},
 					},
 					&appsv1.Component{
@@ -674,7 +674,7 @@ var _ = Describe("cluster component status transformer", func() {
 							},
 						},
 						Status: appsv1.ComponentStatus{
-							Phase: appsv1.RunningClusterCompPhase,
+							Phase: appsv1.RunningComponentPhase,
 						},
 					},
 				},
@@ -686,9 +686,9 @@ var _ = Describe("cluster component status transformer", func() {
 			Expect(err).Should(BeNil())
 			Expect(transCtx.Cluster.Status.Shardings).Should(HaveLen(2))
 			Expect(transCtx.Cluster.Status.Shardings).Should(HaveKey("sharding1"))
-			Expect(transCtx.Cluster.Status.Shardings["sharding1"].Phase).Should(Equal(appsv1.RunningClusterCompPhase))
+			Expect(transCtx.Cluster.Status.Shardings["sharding1"].Phase).Should(Equal(appsv1.RunningComponentPhase))
 			Expect(transCtx.Cluster.Status.Shardings).Should(HaveKey("sharding2"))
-			Expect(transCtx.Cluster.Status.Shardings["sharding2"].Phase).Should(Equal(appsv1.ClusterComponentPhase("")))
+			Expect(transCtx.Cluster.Status.Shardings["sharding2"].Phase).Should(Equal(appsv1.ComponentPhase("")))
 		})
 	})
 })

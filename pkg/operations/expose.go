@@ -105,7 +105,7 @@ func (e ExposeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cli
 		opsRequest.Status.Components = make(map[string]opsv1alpha1.OpsRequestComponentStatus)
 		for _, v := range opsRequest.Spec.ExposeList {
 			opsRequest.Status.Components[v.ComponentName] = opsv1alpha1.OpsRequestComponentStatus{
-				Phase: appsv1.UpdatingClusterCompPhase, // appsv1.ExposingPhase,
+				Phase: appsv1.UpdatingComponentPhase, // appsv1.ExposingPhase,
 			}
 		}
 	}
@@ -125,7 +125,7 @@ func (e ExposeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cli
 		// update component status if completed
 		if actualCount == expectCount {
 			p := opsRequest.Status.Components[v.ComponentName]
-			p.Phase = appsv1.RunningClusterCompPhase
+			p.Phase = appsv1.RunningComponentPhase
 		}
 	}
 	opsRequest.Status.Progress = fmt.Sprintf("%d/%d", actualProgressCount, expectProgressCount)

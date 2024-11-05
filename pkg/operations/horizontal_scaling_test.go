@@ -102,7 +102,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			opsRes.OpsRequest = createHorizontalScaling(clusterName, horizontalScaling)
 			// set ops phase to Pending
 			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsPendingPhase
-			mockComponentIsOperating(opsRes.Cluster, appsv1.UpdatingClusterCompPhase, defaultCompName)
+			mockComponentIsOperating(opsRes.Cluster, appsv1.UpdatingComponentPhase, defaultCompName)
 
 			By("expect for opsRequest phase is Creating after doing action")
 			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
@@ -467,7 +467,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			opsRes.OpsRequest.Spec.Force = true
 			// set ops phase to Pending
 			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsPendingPhase
-			mockComponentIsOperating(opsRes.Cluster, appsv1.UpdatingClusterCompPhase, defaultCompName)
+			mockComponentIsOperating(opsRes.Cluster, appsv1.UpdatingComponentPhase, defaultCompName)
 
 			By("expect for opsRequest phase is Creating after doing action")
 			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
@@ -566,6 +566,6 @@ func cancelOpsRequest(reqCtx intctrlutil.RequestCtx, opsRes *OpsResource, cancel
 func mockConsensusCompToRunning(opsRes *OpsResource) {
 	// mock consensus component is Running
 	compStatus := opsRes.Cluster.Status.Components[defaultCompName]
-	compStatus.Phase = appsv1.RunningClusterCompPhase
+	compStatus.Phase = appsv1.RunningComponentPhase
 	opsRes.Cluster.Status.Components[defaultCompName] = compStatus
 }

@@ -59,8 +59,8 @@ func (t *componentDeletionTransformer) Transform(ctx graph.TransformContext, dag
 	}
 
 	// step1: update the component status to deleting
-	if comp.Status.Phase != appsv1.DeletingClusterCompPhase {
-		comp.Status.Phase = appsv1.DeletingClusterCompPhase
+	if comp.Status.Phase != appsv1.DeletingComponentPhase {
+		comp.Status.Phase = appsv1.DeletingComponentPhase
 		graphCli.Status(dag, comp, transCtx.Component)
 		return newRequeueError(time.Second*1, "updating component status to deleting")
 	}

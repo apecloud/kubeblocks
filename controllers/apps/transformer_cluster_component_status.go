@@ -144,7 +144,7 @@ func (t *clusterComponentStatusTransformer) transformCompStatus(transCtx *cluste
 	}
 	for name := range deleteSet {
 		cluster.Status.Components[name] = appsv1.ClusterComponentStatus{
-			Phase: appsv1.DeletingClusterCompPhase,
+			Phase: appsv1.DeletingComponentPhase,
 			Message: map[string]string{
 				"reason": "the component is under deleting",
 			},
@@ -211,7 +211,7 @@ func (t *clusterComponentStatusTransformer) transformShardingStatus(transCtx *cl
 	}
 	for name := range deleteSet {
 		cluster.Status.Shardings[name] = appsv1.ClusterComponentStatus{
-			Phase: appsv1.DeletingClusterCompPhase,
+			Phase: appsv1.DeletingComponentPhase,
 			Message: map[string]string{
 				"reason": "the sharding is under deleting",
 			},
@@ -247,9 +247,9 @@ func (t *clusterComponentStatusTransformer) buildClusterShardingStatus(transCtx 
 	return status
 }
 
-func (t *clusterComponentStatusTransformer) shardingPhaseNMessage(comps []*appsv1.Component) (appsv1.ClusterComponentPhase, map[string]string) {
+func (t *clusterComponentStatusTransformer) shardingPhaseNMessage(comps []*appsv1.Component) (appsv1.ComponentPhase, map[string]string) {
 	statusList := make([]appsv1.ClusterComponentStatus, 0)
-	phasedMessage := map[appsv1.ClusterComponentPhase]map[string]string{}
+	phasedMessage := map[appsv1.ComponentPhase]map[string]string{}
 	for _, comp := range comps {
 		phase := comp.Status.Phase
 		message := comp.Status.Message
@@ -263,11 +263,11 @@ func (t *clusterComponentStatusTransformer) shardingPhaseNMessage(comps []*appsv
 		return "", map[string]string{"reason": "the component objects are not found"}
 	}
 
-	phase := appsv1.ClusterComponentPhase(composeClusterPhase(statusList))
+	phase := appsv1.ComponentPhase(composeClusterPhase(statusList))
 	return phase, phasedMessage[phase]
 }
 
-func clusterCompNShardingPhaseTransitionMsg(kind, name string, phase appsv1.ClusterComponentPhase) string {
+func clusterCompNShardingPhaseTransitionMsg(kind, name string, phase appsv1.ComponentPhase) string {
 	if len(phase) == 0 {
 		return ""
 	}

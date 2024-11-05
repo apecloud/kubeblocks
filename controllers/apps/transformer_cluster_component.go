@@ -248,14 +248,14 @@ const (
 
 func newCompHandler(transCtx *clusterTransformContext, compSpecs map[string]*appsv1alpha1.ClusterComponentSpec,
 	labels, annotations map[string]map[string]string, op int) compConditionalHandler {
-	orders := definedOrders(transCtx, op)
+	topology, orders := definedOrders(transCtx, op)
 	if len(orders) == 0 {
 		return newParallelHandler(compSpecs, labels, annotations, op)
 	}
-	return newOrderedHandler(compSpecs, labels, annotations, orders, op)
+	return newOrderedHandler(compSpecs, labels, annotations, topology, orders, op)
 }
 
-func definedOrders(transCtx *clusterTransformContext, op int) []string {
+func definedOrders(transCtx *clusterTransformContext, op int) (appsv1alpha1.ClusterTopology, []string) {
 	var (
 		cluster    = transCtx.Cluster
 		clusterDef = transCtx.ClusterDef
@@ -266,11 +266,11 @@ func definedOrders(transCtx *clusterTransformContext, op int) []string {
 				if topology.Orders != nil {
 					switch op {
 					case createOp:
-						return topology.Orders.Provision
+						return topology, topology.Orders.Provision
 					case deleteOp:
-						return topology.Orders.Terminate
+						return topology, topology.Orders.Terminate
 					case updateOp:
-						return topology.Orders.Update
+						return topology, topology.Orders.Update
 					default:
 						panic("runtime error: unknown component op: " + strconv.Itoa(op))
 					}
@@ -278,7 +278,7 @@ func definedOrders(transCtx *clusterTransformContext, op int) []string {
 			}
 		}
 	}
-	return nil
+	return appsv1alpha1.ClusterTopology{}, nil
 }
 
 func newParallelHandler(compSpecs map[string]*appsv1alpha1.ClusterComponentSpec,
@@ -308,7 +308,7 @@ func newParallelHandler(compSpecs map[string]*appsv1alpha1.ClusterComponentSpec,
 }
 
 func newOrderedHandler(compSpecs map[string]*appsv1alpha1.ClusterComponentSpec,
-	labels, annotations map[string]map[string]string, orders []string, op int) compConditionalHandler {
+	labels, annotations map[string]map[string]string, topology appsv1alpha1.ClusterTopology, orders []string, op int) compConditionalHandler {
 	upworking := func(comp *appsv1alpha1.Component) bool {
 		target := appsv1alpha1.RunningClusterCompPhase
 		if comp.Spec.Stop != nil && *comp.Spec.Stop {
@@ -320,9 +320,11 @@ func newOrderedHandler(compSpecs map[string]*appsv1alpha1.ClusterComponentSpec,
 	case createOp:
 		return &orderedCreateCompHandler{
 			compOrderedOrder: compOrderedOrder{
-				orders: orders,
+				topology: topology,
+				orders:   orders,
 			},
 			compPhasePrecondition: compPhasePrecondition{
+				topology:         topology,
 				orders:           orders,
 				phaseExpectation: upworking,
 			},
@@ -335,19 +337,23 @@ func newOrderedHandler(compSpecs map[string]*appsv1alpha1.ClusterComponentSpec,
 	case deleteOp:
 		return &orderedDeleteCompHandler{
 			compOrderedOrder: compOrderedOrder{
-				orders: orders,
+				topology: topology,
+				orders:   orders,
 			},
 			compNotExistPrecondition: compNotExistPrecondition{
-				orders: orders,
+				topology: topology,
+				orders:   orders,
 			},
 			deleteCompHandler: deleteCompHandler{},
 		}
 	case updateOp:
 		return &orderedUpdateCompHandler{
 			compOrderedOrder: compOrderedOrder{
-				orders: orders,
+				topology: topology,
+				orders:   orders,
 			},
 			compPhasePrecondition: compPhasePrecondition{
+				topology:         topology,
 				orders:           orders,
 				phaseExpectation: upworking,
 			},
@@ -375,7 +381,8 @@ func (o *compParallelOrder) ordered(compNames []string) []string {
 }
 
 type compOrderedOrder struct {
-	orders []string
+	topology appsv1alpha1.ClusterTopology
+	orders   []string
 }
 
 func (o *compOrderedOrder) ordered(compNames []string) []string {
@@ -383,7 +390,9 @@ func (o *compOrderedOrder) ordered(compNames []string) []string {
 	for _, order := range o.orders {
 		comps := strings.Split(order, ",")
 		for _, comp := range compNames {
-			if slices.Index(comps, comp) >= 0 {
+			if slices.ContainsFunc(comps, func(e string) bool {
+				return clusterTopologyEntityMatched(o.topology, e, comp)
+			}) {
 				result = append(result, comp)
 			}
 		}
@@ -401,7 +410,8 @@ func (c *compDummyPrecondition) match(*clusterTransformContext, *graph.DAG, stri
 }
 
 type compNotExistPrecondition struct {
-	orders []string
+	topology appsv1alpha1.ClusterTopology
+	orders   []string
 }
 
 func (c *compNotExistPrecondition) match(transCtx *clusterTransformContext, dag *graph.DAG, compName string) (bool, error) {
@@ -423,7 +433,7 @@ func (c *compNotExistPrecondition) match(transCtx *clusterTransformContext, dag 
 		}
 		return graphCli.IsAction(dag, comp, model.ActionCreatePtr())
 	}
-	for _, predecessor := range predecessors(c.orders, compName) {
+	for _, predecessor := range predecessors(c.topology, c.orders, compName) {
 		compKey := types.NamespacedName{
 			Namespace: transCtx.Cluster.Namespace,
 			Name:      component.FullName(transCtx.Cluster.Name, predecessor),
@@ -443,6 +453,7 @@ func (c *compNotExistPrecondition) match(transCtx *clusterTransformContext, dag 
 }
 
 type compPhasePrecondition struct {
+	topology         appsv1alpha1.ClusterTopology
 	orders           []string
 	phaseExpectation func(component2 *appsv1alpha1.Component) bool
 }
@@ -457,7 +468,7 @@ func (c *compPhasePrecondition) match(transCtx *clusterTransformContext, dag *gr
 		}
 		return false
 	}
-	for _, predecessor := range predecessors(c.orders, compName) {
+	for _, predecessor := range predecessors(c.topology, c.orders, compName) {
 		comp := &appsv1alpha1.Component{}
 		compKey := types.NamespacedName{
 			Namespace: transCtx.Cluster.Namespace,
@@ -477,16 +488,27 @@ func (c *compPhasePrecondition) match(transCtx *clusterTransformContext, dag *gr
 	return true, nil
 }
 
-func predecessors(orders []string, compName string) []string {
+func predecessors(topology appsv1alpha1.ClusterTopology, orders []string, compName string) []string {
 	var previous []string
 	for _, comps := range orders {
 		compNames := strings.Split(comps, ",")
-		if index := slices.Index(compNames, compName); index >= 0 {
+		if slices.ContainsFunc(compNames, func(e string) bool {
+			return clusterTopologyEntityMatched(topology, e, compName)
+		}) {
 			return previous
 		}
 		previous = compNames
 	}
 	panic("runtime error: cannot find predecessor for component " + compName)
+}
+
+func clusterTopologyEntityMatched(topology appsv1alpha1.ClusterTopology, entityName, name string) bool {
+	for _, comp := range topology.Components {
+		if comp.Name == entityName {
+			return clusterTopologyCompMatched(comp, name)
+		}
+	}
+	return false // TODO: runtime error
 }
 
 type createCompHandler struct {

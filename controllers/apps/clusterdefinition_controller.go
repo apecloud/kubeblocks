@@ -310,3 +310,13 @@ func referredClusterTopology(clusterDef *appsv1alpha1.ClusterDefinition, name st
 	}
 	return nil
 }
+
+func clusterTopologyCompMatched(comp appsv1alpha1.ClusterTopologyComponent, compName string) bool {
+	if comp.Name == compName {
+		return true
+	}
+	if comp.Template != nil && *comp.Template {
+		return strings.HasPrefix(compName, comp.Name)
+	}
+	return false
+}

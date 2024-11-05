@@ -108,14 +108,17 @@ func (t *ClusterAPINormalizationTransformer) buildCompSpecs(transCtx *clusterTra
 
 func (t *ClusterAPINormalizationTransformer) buildCompSpecs4Topology(clusterDef *appsv1alpha1.ClusterDefinition,
 	cluster *appsv1alpha1.Cluster) ([]*appsv1alpha1.ClusterComponentSpec, error) {
-	newCompSpec := func(comp appsv1alpha1.ClusterTopologyComponent) *appsv1alpha1.ClusterComponentSpec {
+	newComp := func(comp appsv1alpha1.ClusterTopologyComponent) *appsv1alpha1.ClusterComponentSpec {
+		if comp.Template != nil && *comp.Template {
+			return nil // don't new component spec for the template component automatically
+		}
 		return &appsv1alpha1.ClusterComponentSpec{
 			Name:         comp.Name,
 			ComponentDef: comp.CompDef,
 		}
 	}
 
-	mergeCompSpec := func(comp appsv1alpha1.ClusterTopologyComponent, compSpec *appsv1alpha1.ClusterComponentSpec) *appsv1alpha1.ClusterComponentSpec {
+	mergeComp := func(comp appsv1alpha1.ClusterTopologyComponent, compSpec *appsv1alpha1.ClusterComponentSpec) *appsv1alpha1.ClusterComponentSpec {
 		if len(compSpec.ComponentDef) == 0 {
 			compSpec.ComponentDef = comp.CompDef
 		}
@@ -127,18 +130,28 @@ func (t *ClusterAPINormalizationTransformer) buildCompSpecs4Topology(clusterDef 
 		return nil, fmt.Errorf("referred cluster topology not found : %s", cluster.Spec.Topology)
 	}
 
-	specifiedCompSpecs := make(map[string]*appsv1alpha1.ClusterComponentSpec)
-	for i, compSpec := range cluster.Spec.ComponentSpecs {
-		specifiedCompSpecs[compSpec.Name] = cluster.Spec.ComponentSpecs[i].DeepCopy()
+	matchedComps := func(comp appsv1alpha1.ClusterTopologyComponent) []*appsv1alpha1.ClusterComponentSpec {
+		specs := make([]*appsv1alpha1.ClusterComponentSpec, 0)
+		for i, spec := range cluster.Spec.ComponentSpecs {
+			if clusterTopologyCompMatched(comp, spec.Name) {
+				specs = append(specs, cluster.Spec.ComponentSpecs[i].DeepCopy())
+			}
+		}
+		return specs
 	}
 
 	compSpecs := make([]*appsv1alpha1.ClusterComponentSpec, 0)
 	for i := range clusterTopology.Components {
 		comp := clusterTopology.Components[i]
-		if _, ok := specifiedCompSpecs[comp.Name]; ok {
-			compSpecs = append(compSpecs, mergeCompSpec(comp, specifiedCompSpecs[comp.Name]))
-		} else {
-			compSpecs = append(compSpecs, newCompSpec(comp))
+		specs := matchedComps(comp)
+		if len(specs) == 0 {
+			spec := newComp(comp)
+			if spec != nil {
+				specs = append(specs, spec)
+			}
+		}
+		for _, spec := range specs {
+			compSpecs = append(compSpecs, mergeComp(comp, spec))
 		}
 	}
 	return compSpecs, nil

@@ -21,7 +21,6 @@ package apps
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -181,13 +180,6 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 	// execute the plan first, delay error handling
 	if errExec := plan.Execute(); errExec != nil {
 		return requeueError(errExec)
-	}
-	var errss []error
-	errss = append(errss, fmt.Errorf("test"))
-	errBuild = error(NewTransformerError(errss, 1))
-	transformerError, b := IsTransformerError(errBuild)
-	if b {
-		transformerError.String()
 	}
 	if errBuild != nil {
 		return requeueError(errBuild)

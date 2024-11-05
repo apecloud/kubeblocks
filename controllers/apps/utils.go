@@ -108,6 +108,8 @@ func (e *TransformerError) Error() string {
 	return fmt.Sprintf("%v", e.errs)
 }
 
+func (e *TransformerError) RequeueAfter() time.Duration { return e.requeueAfter }
+
 func NewTransformerError(errs []error, requeueAfter time.Duration) *TransformerError {
 	if len(errs) == 0 {
 		return nil

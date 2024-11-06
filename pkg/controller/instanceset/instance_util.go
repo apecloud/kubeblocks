@@ -27,6 +27,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/klauspost/compress/zstd"
 	appsv1 "k8s.io/api/apps/v1"
@@ -159,6 +160,19 @@ func isRunningAndAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
 	return podutils.IsPodAvailable(pod, minReadySeconds, metav1.Now())
 }
 
+func isContainersAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
+	if minReadySeconds == 0 {
+		return true
+	}
+	minReadySecondsDuration := time.Duration(minReadySeconds) * time.Second
+	for _, status := range pod.Status.ContainerStatuses {
+		if status.State.Running != nil && status.State.Running.StartedAt.Add(minReadySecondsDuration).After(time.Now()) {
+			return false
+		}
+	}
+	return true
+}
+
 // isCreated returns true if pod has been created and is maintained by the API server
 func isCreated(pod *corev1.Pod) bool {
 	return pod.Status.Phase != ""
@@ -207,7 +221,7 @@ func isImageMatched(pod *corev1.Pod) bool {
 			return false
 		}
 		// otherwise, statusName should be same as or has suffix of specName
-		if !strings.HasSuffix(statusName, specName) {
+		if !strings.HasSuffix(statusName, specName) && !strings.HasSuffix(specName, statusName) {
 			return false
 		}
 	}

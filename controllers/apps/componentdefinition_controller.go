@@ -472,6 +472,7 @@ func (r *ComponentDefinitionReconciler) cmpdHash(cmpd *appsv1alpha1.ComponentDef
 	objCopy.Spec.Description = ""
 	objCopy.Spec.Exporter = nil
 	objCopy.Spec.PodManagementPolicy = nil
+	objCopy.Spec.MinReadySeconds = 0
 
 	// TODO: bpt
 

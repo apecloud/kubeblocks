@@ -17,9 +17,12 @@ limitations under the License.
 package controllerutil
 
 import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/openapi"
+	"github.com/apecloud/kubeblocks/pkg/generics"
 )
 
 type ParameterMeta struct {
@@ -55,21 +58,46 @@ func ParametersDefinitionTerminalPhases(status parametersv1alpha1.ParametersDefi
 }
 
 func GetItemStatus(status *parametersv1alpha1.ComponentParameterStatus, name string) *parametersv1alpha1.ConfigTemplateItemDetailStatus {
-	for i := range status.ConfigurationItemStatus {
-		itemStatus := &status.ConfigurationItemStatus[i]
-		if itemStatus.Name == name {
-			return itemStatus
-		}
+	match := func(status parametersv1alpha1.ConfigTemplateItemDetailStatus) bool {
+		return status.Name == name
 	}
+
+	if index := generics.FindFirstFunc(status.ConfigurationItemStatus, match); index >= 0 {
+		return &status.ConfigurationItemStatus[index]
+	}
+
 	return nil
 }
 
 func GetConfigTemplateItem(parameterSpec *parametersv1alpha1.ComponentParameterSpec, name string) *parametersv1alpha1.ConfigTemplateItemDetail {
-	for i := range parameterSpec.ConfigItemDetails {
-		item := &parameterSpec.ConfigItemDetails[i]
-		if item.Name == name {
-			return item
-		}
+	match := func(spec parametersv1alpha1.ConfigTemplateItemDetail) bool {
+		return spec.Name == name
+	}
+
+	if index := generics.FindFirstFunc(parameterSpec.ConfigItemDetails, match); index >= 0 {
+		return &parameterSpec.ConfigItemDetails[index]
 	}
 	return nil
+}
+
+func GetComponentConfigDescription(pdcr *parametersv1alpha1.ParameterDrivenConfigRenderSpec, name string) *parametersv1alpha1.ComponentConfigDescription {
+	match := func(desc parametersv1alpha1.ComponentConfigDescription) bool {
+		return desc.Name == name
+	}
+
+	if index := generics.FindFirstFunc(pdcr.Configs, match); index >= 0 {
+		return &pdcr.Configs[index]
+	}
+	return nil
+}
+
+func GetPodSelector(pd *parametersv1alpha1.ParametersDefinitionSpec) *metav1.LabelSelector {
+	if pd.ReloadAction != nil {
+		return pd.ReloadAction.TargetPodSelector
+	}
+	return nil
+}
+
+func AsSidecarContainerImage(toolImage parametersv1alpha1.ToolConfig) bool {
+	return toolImage.AsContainerImage != nil && *toolImage.AsContainerImage
 }

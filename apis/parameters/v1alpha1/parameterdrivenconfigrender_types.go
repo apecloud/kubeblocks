@@ -148,18 +148,14 @@ type ParameterDrivenConfigRenderStatus struct {
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
+	// Provides additional information about the current phase.
+	//
+	// +optional
+	Message string `json:"message,omitempty"`
+
 	// Specifies the status of the configuration template.
 	// When set to PDAvailablePhase, the ParamsDesc can be referenced by ComponentDefinition.
 	//
 	// +optional
 	Phase ParametersDescPhase `json:"phase,omitempty"`
-
-	// Represents a list of detailed status of the ParametersDescription object.
-	//
-	// This field is crucial for administrators and developers to monitor and respond to changes within the ParametersDescription.
-	// It provides a history of state transitions and a snapshot of the current state that can be used for
-	// automated logic or direct inspection.
-	//
-	// +optional
-	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }

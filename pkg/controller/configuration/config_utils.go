@@ -98,7 +98,7 @@ func BuildReloadActionContainer(resourceCtx *ResourceCtx,
 	if len(configSpecMetas) == 0 {
 		return nil
 	}
-	if buildParams, err = buildConfigManagerParams(resourceCtx.Client, resourceCtx, cluster, synthesizedComp, configSpecMetas, volumeDirs, podSpec); err != nil {
+	if buildParams, err = buildConfigManagerParams(resourceCtx.Client, resourceCtx.Context, cluster, synthesizedComp, configSpecMetas, volumeDirs, podSpec); err != nil {
 		return err
 	}
 	if buildParams == nil {

@@ -127,11 +127,15 @@ func mockReconcileResource() (*corev1.ConfigMap, *appsv1beta1.ConfigConstraint, 
 		SetReplicas(1).
 		Create(&testCtx).GetObject()
 
-	container := *builder.NewContainerBuilder("mock-container").
-		AddVolumeMounts(corev1.VolumeMount{
-			Name:      configVolumeName,
-			MountPath: "/mnt/config",
-		}).GetObject()
+	container := corev1.Container{
+		Name: "mock-container",
+		VolumeMounts: []corev1.VolumeMount{
+			{
+				Name:      configVolumeName,
+				MountPath: "/mnt/config",
+			},
+		},
+	}
 	_ = testapps.NewInstanceSetFactory(testCtx.DefaultNamespace, defaultITSName, clusterObj.Name, defaultCompName).
 		AddConfigmapVolume(configVolumeName, configmap.Name).
 		AddContainer(container).

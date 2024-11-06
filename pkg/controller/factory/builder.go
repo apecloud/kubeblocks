@@ -30,8 +30,8 @@ import (
 	"k8s.io/klog/v2"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	cfgcm "github.com/apecloud/kubeblocks/pkg/configuration/config_manager"
@@ -338,7 +338,7 @@ func getSidecarBinaryPath(buildParams *cfgcm.CfgManagerBuildParams) string {
 	return constant.ConfigManagerToolPath
 }
 
-func BuildCfgManagerToolsContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams, toolsMetas []appsv1beta1.ToolConfig, toolsMap map[string]cfgcm.ConfigSpecMeta) ([]corev1.Container, error) {
+func BuildCfgManagerToolsContainer(sidecarRenderedParam *cfgcm.CfgManagerBuildParams, toolsMetas []parametersv1alpha1.ToolConfig, toolsMap map[string]cfgcm.ConfigSpecMeta) ([]corev1.Container, error) {
 	toolContainers := make([]corev1.Container, 0, len(toolsMetas))
 	for _, toolConfig := range toolsMetas {
 		toolContainerBuilder := builder.NewContainerBuilder(toolConfig.Name).

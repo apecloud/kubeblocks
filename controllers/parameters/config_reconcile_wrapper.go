@@ -20,21 +20,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package parameters
 
 import (
-	"context"
-
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 )
 
-type configReconcileContext struct {
-	configctrl.ResourceFetcher[configReconcileContext]
-
-	ctx              context.Context
+type ReconcileContext struct {
+	configctrl.ResourceFetcher[ReconcileContext]
+	intctrlutil.RequestCtx
 	Name             string
 	MatchingLabels   client.MatchingLabels
 	ConfigMap        *corev1.ConfigMap
@@ -42,15 +41,18 @@ type configReconcileContext struct {
 
 	Containers      []string
 	InstanceSetList []workloads.InstanceSet
+
+	ConfigRender   *parametersv1alpha1.ParameterDrivenConfigRender
+	ParametersDefs map[string]*parametersv1alpha1.ParametersDefinition
 }
 
-func newConfigReconcileContext(ctx context.Context,
+func newConfigReconcileContext(reqCtx intctrlutil.RequestCtx,
 	resourceCtx *configctrl.ResourceCtx,
 	cm *corev1.ConfigMap,
 	configSpecName string,
-	matchingLabels client.MatchingLabels) *configReconcileContext {
-	configContext := configReconcileContext{
-		ctx:            ctx,
+	matchingLabels client.MatchingLabels) *ReconcileContext {
+	configContext := ReconcileContext{
+		RequestCtx:     reqCtx,
 		ConfigMap:      cm,
 		Name:           configSpecName,
 		MatchingLabels: matchingLabels,
@@ -58,16 +60,17 @@ func newConfigReconcileContext(ctx context.Context,
 	return configContext.Init(resourceCtx, &configContext)
 }
 
-func (c *configReconcileContext) GetRelatedObjects() error {
+func (c *ReconcileContext) GetRelatedObjects() error {
 	return c.Cluster().
 		ComponentAndComponentDef().
 		ComponentSpec().
 		Workload().
 		SynthesizedComponent().
+		ParametersDefinitions().
 		Complete()
 }
 
-func (c *configReconcileContext) Workload() *configReconcileContext {
+func (c *ReconcileContext) Workload() *ReconcileContext {
 	stsFn := func() (err error) {
 		c.InstanceSetList, c.Containers, err = retrieveRelatedComponentsByConfigmap(
 			c.Client,
@@ -82,10 +85,27 @@ func (c *configReconcileContext) Workload() *configReconcileContext {
 	return c.Wrap(stsFn)
 }
 
-func (c *configReconcileContext) SynthesizedComponent() *configReconcileContext {
+func (c *ReconcileContext) SynthesizedComponent() *ReconcileContext {
 	return c.Wrap(func() (err error) {
 		// build synthesized component for the component
-		c.BuiltinComponent, err = component.BuildSynthesizedComponent(c.ctx, c.Client, c.ComponentDefObj, c.ComponentObj, c.ClusterObj)
+		c.BuiltinComponent, err = component.BuildSynthesizedComponent(c.Ctx, c.Client, c.ComponentDefObj, c.ComponentObj, c.ClusterObj)
 		return err
+	})
+}
+
+func (c *ReconcileContext) ParametersDefinitions() *ReconcileContext {
+	return c.Wrap(func() (err error) {
+		configRender, paramsDefs, err := intctrlutil.ResolveCmpdParametersDefs(c.Context, c.Client, c.ComponentDefObj)
+		if err != nil {
+			return err
+		}
+
+		paramsDefMap := make(map[string]*parametersv1alpha1.ParametersDefinition)
+		for _, paramsDef := range paramsDefs {
+			paramsDefMap[paramsDef.Spec.FileName] = paramsDef
+		}
+		c.ConfigRender = configRender
+		c.ParametersDefs = paramsDefMap
+		return nil
 	})
 }

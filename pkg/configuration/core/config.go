@@ -319,14 +319,14 @@ func FromCMKeysSelector(keys []string) *set.LinkedHashSetString {
 	return cmKeySet
 }
 
-func GenerateVisualizedParamsList(configPatch *ConfigPatchInfo, configRender parametersv1alpha1.ParameterDrivenConfigRenderSpec) []VisualizedParam {
+func GenerateVisualizedParamsList(configPatch *ConfigPatchInfo, configDescs []parametersv1alpha1.ComponentConfigDescription) []VisualizedParam {
 	if !configPatch.IsModify {
 		return nil
 	}
 
-	sets := NewConfigFileFilter(configRender.Configs)
+	sets := NewConfigFileFilter(configDescs)
 	resolveParameterPrefix := func(file string) string {
-		fileConfig := ResolveConfigFormat(configRender.Configs, file)
+		fileConfig := ResolveConfigFormat(configDescs, file)
 		if fileConfig == nil {
 			return ""
 		}

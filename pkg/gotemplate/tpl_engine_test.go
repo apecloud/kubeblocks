@@ -31,7 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/configuration/validate"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
@@ -101,7 +101,7 @@ public_key={{ $key.PublicKey | quote }}
 			}, nil, tplString)
 			Expect(err).NotTo(HaveOccurred())
 
-			keyValue, err := validate.LoadConfigObjectFromContent(appsv1beta1.Dotenv, context)
+			keyValue, err := validate.LoadConfigObjectFromContent(parametersv1alpha1.Dotenv, context)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(keyValue).To(HaveKey("private_key"))
 			Expect(keyValue).To(HaveKey("public_key"))

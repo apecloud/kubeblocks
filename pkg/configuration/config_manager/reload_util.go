@@ -31,7 +31,7 @@ import (
 	"strings"
 	"text/template/parse"
 
-	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
 	"github.com/apecloud/kubeblocks/pkg/gotemplate"
@@ -51,7 +51,7 @@ const (
 // for testing
 var newCommandChannel = NewCommandChannel
 
-func OnlineUpdateParamsHandle(tplScriptPath string, formatConfig *appsv1beta1.FileFormatConfig, dataType, dsn string) (DynamicUpdater, error) {
+func OnlineUpdateParamsHandle(tplScriptPath string, formatConfig *parametersv1alpha1.FileFormatConfig, dataType, dsn string) (DynamicUpdater, error) {
 	tplContent, err := os.ReadFile(tplScriptPath)
 	if err != nil {
 		return nil, err
@@ -81,7 +81,7 @@ func checkTPLScript(tplName string, tplContent string) error {
 	return err
 }
 
-func wrapGoTemplateRun(ctx context.Context, tplScriptPath string, tplContent string, updatedParams map[string]string, formatConfig *appsv1beta1.FileFormatConfig, dataType string, dsn string) error {
+func wrapGoTemplateRun(ctx context.Context, tplScriptPath string, tplContent string, updatedParams map[string]string, formatConfig *parametersv1alpha1.FileFormatConfig, dataType string, dsn string) error {
 	var (
 		err            error
 		commandChannel DynamicParamUpdater
@@ -103,7 +103,7 @@ func wrapGoTemplateRun(ctx context.Context, tplScriptPath string, tplContent str
 	return err
 }
 
-func constructReloadBuiltinFuncs(ctx context.Context, cc DynamicParamUpdater, formatConfig *appsv1beta1.FileFormatConfig) *gotemplate.BuiltInObjectsFunc {
+func constructReloadBuiltinFuncs(ctx context.Context, cc DynamicParamUpdater, formatConfig *parametersv1alpha1.FileFormatConfig) *gotemplate.BuiltInObjectsFunc {
 	return &gotemplate.BuiltInObjectsFunc{
 		builtInExecFunctionName: func(command string, args ...string) (string, error) {
 			execCommand := exec.CommandContext(ctx, command, args...)
@@ -137,7 +137,7 @@ func constructReloadBuiltinFuncs(ctx context.Context, cc DynamicParamUpdater, fo
 	}
 }
 
-func createUpdatedParamsPatch(newVersion []string, oldVersion []string, formatCfg *appsv1beta1.FileFormatConfig) (map[string]string, error) {
+func createUpdatedParamsPatch(newVersion []string, oldVersion []string, formatCfg *parametersv1alpha1.FileFormatConfig) (map[string]string, error) {
 	patchOption := core.CfgOption{
 		Type:    core.CfgTplType,
 		CfgType: formatCfg.Format,
@@ -158,7 +158,7 @@ func createUpdatedParamsPatch(newVersion []string, oldVersion []string, formatCf
 		return nil, err
 	}
 
-	params := core.GenerateVisualizedParamsList(patch, formatCfg, nil)
+	params := core.GenerateVisualizedParamsList(patch, ToV1ConfigDescription(newVersion, formatCfg))
 	r := make(map[string]string)
 	for _, key := range params {
 		if key.UpdateType != core.DeletedType {
@@ -317,12 +317,20 @@ func copyFileContents(src, dst string) error {
 
 func NeedSharedProcessNamespace(configSpecs []ConfigSpecMeta) bool {
 	for _, configSpec := range configSpecs {
-		if configSpec.ConfigSpec.ConfigConstraintRef == "" {
-			continue
-		}
-		if configSpec.ReloadType == appsv1beta1.UnixSignalType {
+		if configSpec.ReloadType == parametersv1alpha1.UnixSignalType {
 			return true
 		}
 	}
 	return false
+}
+
+func ToV1ConfigDescription(keys []string, format *parametersv1alpha1.FileFormatConfig) []parametersv1alpha1.ComponentConfigDescription {
+	var configs []parametersv1alpha1.ComponentConfigDescription
+	for _, key := range keys {
+		configs = append(configs, parametersv1alpha1.ComponentConfigDescription{
+			Name:             key,
+			FileFormatConfig: format,
+		})
+	}
+	return configs
 }

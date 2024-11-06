@@ -98,7 +98,7 @@ func (c *configPatcher) Merge(baseData map[string]string, updatedData map[string
 		return baseData, nil
 	}
 
-	params := core.GenerateVisualizedParamsList(configPatch, c.configRender.Spec)
+	params := core.GenerateVisualizedParamsList(configPatch, c.configRender.Spec.Configs)
 	mergedData := copyMap(baseData)
 	for key, patch := range splitParameters(params) {
 		v, ok := baseData[key]
@@ -106,7 +106,7 @@ func (c *configPatcher) Merge(baseData map[string]string, updatedData map[string
 			mergedData[key] = updatedData[key]
 			continue
 		}
-		newConfig, err := core.ApplyConfigPatch([]byte(v), patch, core.ResolveConfigFormat(c.configRender.Spec, key))
+		newConfig, err := core.ApplyConfigPatch([]byte(v), patch, core.ResolveConfigFormat(c.configRender.Spec.Configs, key))
 		if err != nil {
 			return nil, err
 		}

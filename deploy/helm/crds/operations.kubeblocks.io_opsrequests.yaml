@@ -4149,89 +4149,15 @@ spec:
                     componentName:
                       description: Specifies the name of the Component.
                       type: string
-                    configurations:
-                      description: |-
-                        Contains a list of ConfigurationItem objects, specifying the Component's configuration template name,
-                        upgrade policy, and parameter key-value pairs to be updated.
-                      items:
-                        properties:
-                          keys:
-                            description: |-
-                              Sets the configuration files and their associated parameters that need to be updated.
-                              It should contain at least one item.
-                            items:
-                              properties:
-                                fileContent:
-                                  description: |-
-                                    Specifies the content of the entire configuration file.
-                                    This field is used to update the complete configuration file.
-
-
-                                    Either the `parameters` field or the `fileContent` field must be set, but not both.
-                                  type: string
-                                key:
-                                  description: |-
-                                    Represents a key in the configuration template(as ConfigMap).
-                                    Each key in the ConfigMap corresponds to a specific configuration file.
-                                  type: string
-                                parameters:
-                                  description: |-
-                                    Specifies a list of key-value pairs representing parameters and their corresponding values
-                                    within a single configuration file.
-                                    This field is used to override or set the values of parameters without modifying the entire configuration file.
-
-
-                                    Either the `parameters` field or the `fileContent` field must be set, but not both.
-                                  items:
-                                    properties:
-                                      key:
-                                        description: Represents the name of the parameter
-                                          that is to be updated.
-                                        type: string
-                                      value:
-                                        description: |-
-                                          Represents the parameter values that are to be updated.
-                                          If set to nil, the parameter defined by the Key field will be removed from the configuration file.
-                                        type: string
-                                    required:
-                                    - key
-                                    type: object
-                                  type: array
-                              required:
-                              - key
-                              type: object
-                            minItems: 1
-                            type: array
-                            x-kubernetes-list-map-keys:
-                            - key
-                            x-kubernetes-list-type: map
-                          name:
-                            description: Specifies the name of the configuration template.
-                            maxLength: 63
-                            pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
-                            type: string
-                          policy:
-                            description: Defines the upgrade policy for the configuration.
-                            enum:
-                            - simple
-                            - parallel
-                            - rolling
-                            - autoReload
-                            - operatorSyncUpdate
-                            - dynamicReloadBeginRestart
-                            type: string
-                        required:
-                        - keys
-                        - name
-                        type: object
-                      minItems: 1
-                      type: array
-                      x-kubernetes-list-map-keys:
-                      - name
-                      x-kubernetes-list-type: map
+                    parameters:
+                      additionalProperties:
+                        type: string
+                      description: Specifies a list of key-value pairs representing
+                        parameters for the component.
+                      type: object
                   required:
                   - componentName
-                  - configurations
+                  - parameters
                   type: object
                 type: array
                 x-kubernetes-list-map-keys:

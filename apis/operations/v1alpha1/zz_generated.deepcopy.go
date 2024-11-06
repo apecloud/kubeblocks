@@ -1244,11 +1244,20 @@ func (in *RebuildInstance) DeepCopy() *RebuildInstance {
 func (in *Reconfigure) DeepCopyInto(out *Reconfigure) {
 	*out = *in
 	out.ComponentOps = in.ComponentOps
-	if in.Configurations != nil {
-		in, out := &in.Configurations, &out.Configurations
-		*out = make([]ConfigurationItem, len(*in))
-		for i := range *in {
-			(*in)[i].DeepCopyInto(&(*out)[i])
+	if in.Parameters != nil {
+		in, out := &in.Parameters, &out.Parameters
+		*out = make(appsv1.ComponentParameters, len(*in))
+		for key, val := range *in {
+			var outVal *string
+			if val == nil {
+				(*out)[key] = nil
+			} else {
+				inVal := (*in)[key]
+				in, out := &inVal, &outVal
+				*out = new(string)
+				**out = **in
+			}
+			(*out)[key] = outVal
 		}
 	}
 }

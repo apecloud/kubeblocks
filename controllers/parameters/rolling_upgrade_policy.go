@@ -26,7 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	podutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
@@ -42,22 +42,22 @@ type rollingUpgradePolicy struct {
 }
 
 func init() {
-	RegisterPolicy(appsv1alpha1.RollingPolicy, &rollingUpgradePolicy{})
+	RegisterPolicy(parametersv1alpha1.RollingPolicy, &rollingUpgradePolicy{})
 	if err := viper.BindEnv(constant.PodMinReadySecondsEnv); err != nil {
 		os.Exit(-1)
 	}
 	viper.SetDefault(constant.PodMinReadySecondsEnv, defaultMinReadySeconds)
 }
 
-func (r *rollingUpgradePolicy) Upgrade(params reconfigureParams) (ReturnedStatus, error) {
+func (r *rollingUpgradePolicy) Upgrade(params reconfigureContext) (ReturnedStatus, error) {
 	return performRollingUpgrade(params, GetInstanceSetRollingUpgradeFuncs())
 }
 
 func (r *rollingUpgradePolicy) GetPolicyName() string {
-	return string(appsv1alpha1.RollingPolicy)
+	return string(parametersv1alpha1.RollingPolicy)
 }
 
-func canPerformUpgrade(pods []corev1.Pod, params reconfigureParams) bool {
+func canPerformUpgrade(pods []corev1.Pod, params reconfigureContext) bool {
 	target := params.getTargetReplicas()
 	// TODO(xingran&zhangtao): review this logic
 	return len(pods) == target
@@ -71,7 +71,7 @@ func canPerformUpgrade(pods []corev1.Pod, params reconfigureParams) bool {
 	*/
 }
 
-func performRollingUpgrade(params reconfigureParams, funcs RollingUpgradeFuncs) (ReturnedStatus, error) {
+func performRollingUpgrade(params reconfigureContext, funcs RollingUpgradeFuncs) (ReturnedStatus, error) {
 	pods, err := funcs.GetPodsFunc(params)
 	if err != nil {
 		return makeReturnedStatus(ESFailedAndRetry), err
@@ -90,7 +90,7 @@ func performRollingUpgrade(params reconfigureParams, funcs RollingUpgradeFuncs) 
 	podStats := staticPodStats(pods, params.getTargetReplicas(), params.podMinReadySeconds())
 	podWins := markDynamicCursor(pods, podStats, configKey, configVersion, rollingReplicas)
 	if !validPodState(podWins) {
-		params.Ctx.Log.Info("wait for pod stat ready.")
+		params.Log.Info("wait for pod stat ready.")
 		return makeReturnedStatus(ESRetry), nil
 	}
 
@@ -101,13 +101,13 @@ func performRollingUpgrade(params reconfigureParams, funcs RollingUpgradeFuncs) 
 
 	for _, pod := range waitRollingPods {
 		if podStats.isUpdating(&pod) {
-			params.Ctx.Log.Info("pod is in rolling update.", "pod name", pod.Name)
+			params.Log.Info("pod is in rolling update.", "pod name", pod.Name)
 			continue
 		}
-		if err := funcs.RestartContainerFunc(&pod, params.Ctx.Ctx, params.ContainerNames, params.ReconfigureClientFactory); err != nil {
+		if err := funcs.RestartContainerFunc(&pod, params.Ctx, params.ContainerNames, params.ReconfigureClientFactory); err != nil {
 			return makeReturnedStatus(ESFailedAndRetry), err
 		}
-		if err := updatePodLabelsWithConfigVersion(&pod, configKey, configVersion, params.Client, params.Ctx.Ctx); err != nil {
+		if err := updatePodLabelsWithConfigVersion(&pod, configKey, configVersion, params.Client, params.Ctx); err != nil {
 			return makeReturnedStatus(ESFailedAndRetry), err
 		}
 	}

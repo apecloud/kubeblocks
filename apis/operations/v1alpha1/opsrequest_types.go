@@ -515,31 +515,11 @@ type Reconfigure struct {
 	// Specifies the name of the Component.
 	ComponentOps `json:",inline"`
 
-	// Contains a list of ConfigurationItem objects, specifying the Component's configuration template name,
-	// upgrade policy, and parameter key-value pairs to be updated.
+	// Specifies a list of key-value pairs representing parameters for the component.
 	//
+	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MinItems=1
-	// +patchMergeKey=name
-	// +patchStrategy=merge,retainKeys
-	// +listType=map
-	// +listMapKey=name
-	Configurations []ConfigurationItem `json:"configurations" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
-
-	// Indicates the duration for which the parameter changes are valid.
-	// +optional
-	// TTL *int64 `json:"ttl,omitempty"`
-
-	// Specifies the time when the parameter changes should be applied.
-	// +kubebuilder:validation:MaxLength=19
-	// +kubebuilder:validation:MinLength=19
-	// +kubebuilder:validation:Pattern:=`^([0-9]{2})/([0-9]{2})/([0-9]{4}) ([0-9]{2}):([0-9]{2}):([0-9]{2})$`
-	// +optional
-	// TriggeringTime *string `json:"triggeringTime,omitempty"`
-
-	//  Identifies the component to be reconfigured.
-	// +optional
-	// Selector *metav1.LabelSelector `json:"selector,omitempty"`
+	Parameters appsv1.ComponentParameters `json:"parameters"`
 }
 
 type ConfigurationItem struct {

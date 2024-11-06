@@ -38,7 +38,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -98,9 +98,9 @@ func getWatchedVolume(volumeDirs []corev1.VolumeMount, buildParams []ConfigSpecM
 				continue
 			}
 			switch param.ReloadType {
-			case appsv1beta1.TPLScriptType:
+			case parametersv1alpha1.TPLScriptType:
 				return core.IsWatchModuleForTplTrigger(param.ReloadAction.TPLScriptTrigger)
-			case appsv1beta1.ShellType:
+			case parametersv1alpha1.ShellType:
 				return core.IsWatchModuleForShellTrigger(param.ReloadAction.ShellTrigger)
 			default:
 				return true
@@ -224,7 +224,7 @@ func buildConfigSpecHandleMeta(cli client.Client, ctx context.Context, buildPara
 			return err
 		}
 	}
-	if buildParam.ReloadType == appsv1beta1.TPLScriptType {
+	if buildParam.ReloadType == parametersv1alpha1.TPLScriptType {
 		return buildTPLScriptCM(buildParam, cmBuildParam, cli, ctx)
 	}
 	return nil
@@ -262,7 +262,7 @@ func buildTPLScriptCM(configSpecBuildMeta *ConfigSpecMeta, manager *CfgManagerBu
 	return nil
 }
 
-func buildDownwardAPIVolume(manager *CfgManagerBuildParams, fieldInfo appsv1beta1.DownwardAPIChangeTriggeredAction) {
+func buildDownwardAPIVolume(manager *CfgManagerBuildParams, fieldInfo parametersv1alpha1.DownwardAPIChangeTriggeredAction) {
 	manager.DownwardAPIVolumes = append(manager.DownwardAPIVolumes, corev1.VolumeMount{
 		Name:      fieldInfo.Name,
 		MountPath: fieldInfo.MountPoint,
@@ -353,7 +353,7 @@ func mergeWithOverride(dst, src interface{}) {
 	_ = mergo.Merge(dst, src, mergo.WithOverride)
 }
 
-func checkAndUpdateReloadYaml(data map[string]string, reloadConfig string, formatterConfig appsv1beta1.FileFormatConfig) (map[string]string, error) {
+func checkAndUpdateReloadYaml(data map[string]string, reloadConfig string, formatterConfig parametersv1alpha1.FileFormatConfig) (map[string]string, error) {
 	configObject := make(map[string]interface{})
 	if content, ok := data[reloadConfig]; ok {
 		if err := yaml.Unmarshal([]byte(content), &configObject); err != nil {
@@ -379,7 +379,7 @@ func checkAndUpdateReloadYaml(data map[string]string, reloadConfig string, forma
 	return data, nil
 }
 
-func buildCfgManagerScripts(options appsv1beta1.ScriptConfig, manager *CfgManagerBuildParams, cli client.Client, ctx context.Context, configSpec appsv1.ComponentTemplateSpec) error {
+func buildCfgManagerScripts(options parametersv1alpha1.ScriptConfig, manager *CfgManagerBuildParams, cli client.Client, ctx context.Context, configSpec appsv1.ComponentTemplateSpec) error {
 	mountPoint := filepath.Join(KBScriptVolumePath, configSpec.Name)
 	referenceCMKey := client.ObjectKey{
 		Namespace: options.Namespace,

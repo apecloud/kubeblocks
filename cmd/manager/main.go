@@ -587,14 +587,6 @@ func main() {
 			setupLog.Error(err, "unable to create controller", "controller", "ReconfigureRequest")
 			os.Exit(1)
 		}
-		if err = (&parameterscontrollers.ConfigConstraintReconciler{
-			Client:   mgr.GetClient(),
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("config-constraint-controller"),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "ConfigConstraint")
-			os.Exit(1)
-		}
 	}
 	// +kubebuilder:scaffold:builder
 

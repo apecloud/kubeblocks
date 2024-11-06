@@ -35,6 +35,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 type clusterParametersTransformer struct {
@@ -146,7 +147,7 @@ func buildComponentParameter(transCtx *clusterTransformContext, cluster *appsv1.
 	if cmpd = transCtx.componentDefs[comp.ComponentDef]; cmpd == nil || len(cmpd.Spec.Configs) == 0 {
 		return nil, nil
 	}
-	_, paramsDefs, err := resolveCmpdParametersDefs(transCtx, transCtx.Client, cmpd)
+	_, paramsDefs, err := intctrlutil.ResolveCmpdParametersDefs(transCtx, transCtx.Client, cmpd)
 	if err != nil {
 		return nil, err
 	}
@@ -174,41 +175,4 @@ func resolveComponentTemplate(ctx context.Context, reader client.Reader, cmpd *a
 		tpls[config.Name] = cm
 	}
 	return tpls, nil
-}
-
-func resolveCmpdParametersDefs(ctx context.Context, reader client.Reader, cmpd *appsv1.ComponentDefinition) (*parametersv1alpha1.ParameterDrivenConfigRender, []*parametersv1alpha1.ParametersDefinition, error) {
-	var paramsDefs []*parametersv1alpha1.ParametersDefinition
-
-	configRender, err := resolveComponentConfigRender(ctx, reader, cmpd)
-	if err != nil {
-		return nil, nil, err
-	}
-	if configRender == nil || len(configRender.Spec.ParametersDefs) == 0 {
-		return configRender, nil, nil
-	}
-	for _, defName := range configRender.Spec.ParametersDefs {
-		paramsDef := &parametersv1alpha1.ParametersDefinition{}
-		if err = reader.Get(ctx, client.ObjectKey{Name: defName}, paramsDef); err != nil {
-			return nil, nil, err
-		}
-		paramsDefs = append(paramsDefs, paramsDef)
-	}
-	return configRender, paramsDefs, nil
-}
-
-func resolveComponentConfigRender(ctx context.Context, reader client.Reader, cmpd *appsv1.ComponentDefinition) (*parametersv1alpha1.ParameterDrivenConfigRender, error) {
-	configDefList := &parametersv1alpha1.ParameterDrivenConfigRenderList{}
-	if err := reader.List(ctx, configDefList); err != nil {
-		return nil, err
-	}
-
-	for i, item := range configDefList.Items {
-		if item.Spec.ComponentDef != cmpd.Name {
-			continue
-		}
-		if item.Spec.ServiceVersion == "" || item.Spec.ServiceVersion == cmpd.Spec.ServiceVersion {
-			return &configDefList.Items[i], nil
-		}
-	}
-	return nil, nil
 }

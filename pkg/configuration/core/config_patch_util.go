@@ -115,7 +115,7 @@ func TransformConfigFileToKeyValueMap(fileName string, configRender parametersv1
 	if err != nil {
 		return nil, err
 	}
-	params := GenerateVisualizedParamsList(patchInfo, configRender)
+	params := GenerateVisualizedParamsList(patchInfo, configRender.Configs)
 	result := make(map[string]string)
 	for _, param := range params {
 		if param.Key != fileName {

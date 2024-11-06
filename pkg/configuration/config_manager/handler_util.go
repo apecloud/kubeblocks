@@ -30,7 +30,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 )
@@ -66,6 +65,18 @@ type CfgManagerBuildParams struct {
 	ContainerPort int32 `json:"containerPort"`
 }
 
+func NeedRestart(paramsDefs map[string]*parametersv1alpha1.ParametersDefinition, patch *core.ConfigPatchInfo) bool {
+	if patch == nil {
+		return false
+	}
+	for key := range patch.UpdateConfig {
+		if paramsDef, ok := paramsDefs[key]; !ok || !IsSupportReload(paramsDef.Spec.ReloadAction) {
+			return true
+		}
+	}
+	return false
+}
+
 func IsSupportReload(reload *parametersv1alpha1.ReloadAction) bool {
 	return reload != nil && isValidReloadPolicy(*reload)
 }
@@ -95,7 +106,7 @@ func FromReloadTypeConfig(reloadAction *parametersv1alpha1.ReloadAction) paramet
 	return ""
 }
 
-func ValidateReloadOptions(reloadAction *appsv1beta1.ReloadAction, cli client.Client, ctx context.Context) error {
+func ValidateReloadOptions(reloadAction *parametersv1alpha1.ReloadAction, cli client.Client, ctx context.Context) error {
 	switch {
 	case reloadAction.UnixSignalTrigger != nil:
 		return checkSignalTrigger(reloadAction.UnixSignalTrigger)
@@ -109,7 +120,7 @@ func ValidateReloadOptions(reloadAction *appsv1beta1.ReloadAction, cli client.Cl
 	return core.MakeError("require special reload type!")
 }
 
-func checkTPLScriptTrigger(options *appsv1beta1.TPLScriptTrigger, cli client.Client, ctx context.Context) error {
+func checkTPLScriptTrigger(options *parametersv1alpha1.TPLScriptTrigger, cli client.Client, ctx context.Context) error {
 	cm := corev1.ConfigMap{}
 	return cli.Get(ctx, client.ObjectKey{
 		Namespace: options.Namespace,
@@ -117,14 +128,14 @@ func checkTPLScriptTrigger(options *appsv1beta1.TPLScriptTrigger, cli client.Cli
 	}, &cm)
 }
 
-func checkShellTrigger(options *appsv1beta1.ShellTrigger) error {
+func checkShellTrigger(options *parametersv1alpha1.ShellTrigger) error {
 	if len(options.Command) == 0 {
 		return core.MakeError("required shell trigger")
 	}
 	return nil
 }
 
-func checkSignalTrigger(options *appsv1beta1.UnixSignalTrigger) error {
+func checkSignalTrigger(options *parametersv1alpha1.UnixSignalTrigger) error {
 	signal := options.Signal
 	if !IsValidUnixSignal(signal) {
 		return core.MakeError("this special signal [%s] is not supported now.", signal)
@@ -273,6 +284,6 @@ func isSubPathMount(v *corev1.VolumeMount) bool {
 
 func isSyncReloadAction(meta ConfigSpecInfo) bool {
 	// If synchronous reloadAction is supported, kubelet limitations can be ignored.
-	return meta.ReloadType == appsv1beta1.TPLScriptType && !core.IsWatchModuleForTplTrigger(meta.TPLScriptTrigger) ||
-		meta.ReloadType == appsv1beta1.ShellType && !core.IsWatchModuleForShellTrigger(meta.ShellTrigger)
+	return meta.ReloadType == parametersv1alpha1.TPLScriptType && !core.IsWatchModuleForTplTrigger(meta.TPLScriptTrigger) ||
+		meta.ReloadType == parametersv1alpha1.ShellType && !core.IsWatchModuleForShellTrigger(meta.ShellTrigger)
 }

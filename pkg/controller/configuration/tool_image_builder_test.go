@@ -26,7 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	cfgcm "github.com/apecloud/kubeblocks/pkg/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -67,12 +67,12 @@ var _ = Describe("ToolsImageBuilderTest", func() {
 				ConfigSpecsBuildParams: []cfgcm.ConfigSpecMeta{{
 					ConfigSpecInfo: cfgcm.ConfigSpecInfo{
 						ConfigSpec:      clusterComponent.ConfigTemplates[0],
-						ReloadType:      appsv1beta1.TPLScriptType,
-						FormatterConfig: appsv1beta1.FileFormatConfig{},
+						ReloadType:      parametersv1alpha1.TPLScriptType,
+						FormatterConfig: parametersv1alpha1.FileFormatConfig{},
 					},
-					ToolsImageSpec: &appsv1beta1.ToolsSetup{
+					ToolsImageSpec: &parametersv1alpha1.ToolsSetup{
 						MountPoint: "/opt/tools",
-						ToolConfigs: []appsv1beta1.ToolConfig{
+						ToolConfigs: []parametersv1alpha1.ToolConfig{
 							{
 								Name:    "test",
 								Image:   "test_images",

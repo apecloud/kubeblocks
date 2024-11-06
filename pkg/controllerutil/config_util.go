@@ -26,9 +26,10 @@ import (
 	"slices"
 
 	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/configuration/validate"
@@ -37,10 +38,10 @@ import (
 )
 
 type Result struct {
-	Phase      v1alpha1.ConfigurationPhase `json:"phase"`
-	Revision   string                      `json:"revision"`
-	Policy     string                      `json:"policy"`
-	ExecResult string                      `json:"execResult"`
+	Phase      parametersv1alpha1.ConfigurationPhase `json:"phase"`
+	Revision   string                                `json:"revision"`
+	Policy     string                                `json:"policy"`
+	ExecResult string                                `json:"execResult"`
 
 	SucceedCount  int32 `json:"succeedCount"`
 	ExpectedCount int32 `json:"expectedCount"`
@@ -238,4 +239,55 @@ func filterImmutableParameters(parameters map[string]any, fileName string, param
 		}
 	}
 	return validParameters
+}
+
+func ResolveCmpdParametersDefs(ctx context.Context, reader client.Reader, cmpd *appsv1.ComponentDefinition) (*parametersv1alpha1.ParameterDrivenConfigRender, []*parametersv1alpha1.ParametersDefinition, error) {
+	var paramsDefs []*parametersv1alpha1.ParametersDefinition
+
+	configRender, err := ResolveComponentConfigRender(ctx, reader, cmpd)
+	if err != nil {
+		return nil, nil, err
+	}
+	if configRender == nil || len(configRender.Spec.ParametersDefs) == 0 {
+		return configRender, nil, nil
+	}
+	for _, defName := range configRender.Spec.ParametersDefs {
+		paramsDef := &parametersv1alpha1.ParametersDefinition{}
+		if err = reader.Get(ctx, client.ObjectKey{Name: defName}, paramsDef); err != nil {
+			return nil, nil, err
+		}
+		paramsDefs = append(paramsDefs, paramsDef)
+	}
+	return configRender, paramsDefs, nil
+}
+
+func ResolveComponentConfigRender(ctx context.Context, reader client.Reader, cmpd *appsv1.ComponentDefinition) (*parametersv1alpha1.ParameterDrivenConfigRender, error) {
+	configDefList := &parametersv1alpha1.ParameterDrivenConfigRenderList{}
+	if err := reader.List(ctx, configDefList); err != nil {
+		return nil, err
+	}
+
+	for i, item := range configDefList.Items {
+		if item.Spec.ComponentDef != cmpd.Name {
+			continue
+		}
+		if item.Spec.ServiceVersion == "" || item.Spec.ServiceVersion == cmpd.Spec.ServiceVersion {
+			return &configDefList.Items[i], nil
+		}
+	}
+	return nil, nil
+}
+
+func NeedDynamicReloadAction(pd *parametersv1alpha1.ParametersDefinitionSpec) bool {
+	if pd.MergeReloadAndRestart != nil {
+		return !*pd.MergeReloadAndRestart
+	}
+	return false
+}
+
+func ReloadStaticParameters(pd *parametersv1alpha1.ParametersDefinitionSpec) bool {
+	if pd.ReloadStaticParamsBeforeRestart != nil {
+		return *pd.ReloadStaticParamsBeforeRestart
+	}
+	return false
 }

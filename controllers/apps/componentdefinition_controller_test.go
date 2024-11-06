@@ -175,8 +175,8 @@ var _ = Describe("ComponentDefinition Controller", func() {
 				SetRuntime(nil).
 				AddService("default", "", 3306, "leader").
 				AddService("readonly", "readonly", 3306, "follower").
-				AddRole("leader", true, true).
-				AddRole("follower", true, false).
+				AddRole("leader").
+				AddRole("follower").
 				Create(&testCtx).GetObject()
 
 			checkObjectStatus(componentDefObj, kbappsv1.AvailablePhase)
@@ -188,8 +188,8 @@ var _ = Describe("ComponentDefinition Controller", func() {
 				SetRuntime(nil).
 				AddService("default", "", 3306, "leader").
 				AddService("default", "readonly", 3306, "follower").
-				AddRole("leader", true, true).
-				AddRole("follower", true, false).
+				AddRole("leader").
+				AddRole("follower").
 				Create(&testCtx).GetObject()
 
 			checkObjectStatus(componentDefObj, kbappsv1.UnavailablePhase)
@@ -201,8 +201,8 @@ var _ = Describe("ComponentDefinition Controller", func() {
 				SetRuntime(nil).
 				AddService("default", "default", 3306, "leader").
 				AddService("readonly", "default", 3306, "follower").
-				AddRole("leader", true, true).
-				AddRole("follower", true, false).
+				AddRole("leader").
+				AddRole("follower").
 				Create(&testCtx).GetObject()
 
 			checkObjectStatus(componentDefObj, kbappsv1.UnavailablePhase)
@@ -214,8 +214,8 @@ var _ = Describe("ComponentDefinition Controller", func() {
 				SetRuntime(nil).
 				AddService("default", "", 3306, "leader").
 				AddService("readonly", "", 3306, "follower").
-				AddRole("leader", true, true).
-				AddRole("follower", true, false).
+				AddRole("leader").
+				AddRole("follower").
 				Create(&testCtx).GetObject()
 
 			checkObjectStatus(componentDefObj, kbappsv1.UnavailablePhase)
@@ -226,8 +226,8 @@ var _ = Describe("ComponentDefinition Controller", func() {
 			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
 				SetRuntime(nil).
 				AddServiceExt("default", "", corev1.ServiceSpec{}, "leader").
-				AddRole("leader", true, true).
-				AddRole("follower", true, false).
+				AddRole("leader").
+				AddRole("follower").
 				Create(&testCtx).GetObject()
 
 			checkObjectStatus(componentDefObj, kbappsv1.UnavailablePhase)
@@ -240,8 +240,8 @@ var _ = Describe("ComponentDefinition Controller", func() {
 				AddService("default", "", 3306, "leader").
 				AddService("readonly", "readonly", 3306, "follower").
 				AddService("undefined", "undefined", 3306, "undefined").
-				AddRole("leader", true, true).
-				AddRole("follower", true, false).
+				AddRole("leader").
+				AddRole("follower").
 				Create(&testCtx).GetObject()
 
 			checkObjectStatus(componentDefObj, kbappsv1.UnavailablePhase)
@@ -441,9 +441,9 @@ var _ = Describe("ComponentDefinition Controller", func() {
 			By("create a ComponentDefinition obj")
 			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
 				SetRuntime(nil).
-				AddRole("leader", true, true).
-				AddRole("follower", true, false).
-				AddRole("learner", false, false).
+				AddRole("leader").
+				AddRole("follower").
+				AddRole("learner").
 				Create(&testCtx).GetObject()
 
 			checkObjectStatus(componentDefObj, kbappsv1.AvailablePhase)
@@ -453,10 +453,10 @@ var _ = Describe("ComponentDefinition Controller", func() {
 			By("create a ComponentDefinition obj")
 			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
 				SetRuntime(nil).
-				AddRole("leader", true, true).
-				AddRole("follower", true, false).
-				AddRole("learner", false, false).
-				AddRole("learner", true, false).
+				AddRole("leader").
+				AddRole("follower").
+				AddRole("learner").
+				AddRole("learner").
 				Create(&testCtx).GetObject()
 
 			checkObjectStatus(componentDefObj, kbappsv1.UnavailablePhase)

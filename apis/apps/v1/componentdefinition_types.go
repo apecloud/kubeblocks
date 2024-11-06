@@ -1436,39 +1436,6 @@ type ReplicaRole struct {
 	// +kubebuilder:default=false
 	// +optional
 	SwitchoverBeforeUpdate bool `json:"switchoverBeforeUpdate"`
-
-	// Indicates whether a replica assigned this role is capable of providing services.
-	//
-	// This field is immutable once set.
-	//
-	// Deprecated: use other fields
-	//
-	// +kubebuilder:default=false
-	// +optional
-	Serviceable bool `json:"serviceable,omitempty"`
-
-	// Determines if a replica in this role has the authority to perform write operations.
-	// A writable replica can modify data, handle update operations.
-	//
-	// This field is immutable once set.
-	//
-	// Deprecated: use other fields
-	//
-	// +kubebuilder:default=false
-	// +optional
-	Writable bool `json:"writable,omitempty"`
-
-	// Specifies whether a replica with this role has voting rights.
-	// In distributed systems, this typically means the replica can participate in consensus decisions,
-	// configuration changes, or other processes that require a quorum.
-	//
-	// This field is immutable once set.
-	//
-	// Deprecated: use other fields
-	//
-	// +kubebuilder:default=false
-	// +optional
-	Votable bool `json:"votable,omitempty"`
 }
 
 // UpdateStrategy defines the update strategy for cluster components. This strategy determines how updates are applied

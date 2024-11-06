@@ -348,29 +348,14 @@ func ConvertSynthesizeCompRoleToInstanceSetRole(synthesizedComp *SynthesizedComp
 		return nil
 	}
 
-	accessMode := func(role kbappsv1.ReplicaRole) workloads.AccessMode {
-		switch {
-		case role.Serviceable && role.Writable:
-			return workloads.ReadWriteMode
-		case role.Serviceable:
-			return workloads.ReadonlyMode
-		default:
-			return workloads.NoneMode
-		}
-	}
 	itsReplicaRoles := make([]workloads.ReplicaRole, 0)
 	for _, role := range synthesizedComp.Roles {
 		itsReplicaRole := workloads.ReplicaRole{
-			Name:       role.Name,
-			AccessMode: accessMode(role),
-			CanVote:    role.Votable,
-			// HACK: Since the InstanceSet relies on IsLeader field to determine whether a workload is available, we are using
-			// such a workaround to combine these two fields to provide the information.
-			// However, the condition will be broken if a service with multiple different roles that can be writable
-			// at the same time, such as Zookeeper.
-			// TODO: We need to discuss further whether we should rely on the concept of "Leader" in the case
-			//  where the KB controller does not provide HA functionality.
-			IsLeader: role.Serviceable && role.Writable,
+			Name:                   role.Name,
+			Required:               role.Required,
+			UpdatePriority:         role.UpdatePriority,
+			ParticipatesInQuorum:   role.ParticipatesInQuorum,
+			SwitchoverBeforeUpdate: role.SwitchoverBeforeUpdate,
 		}
 		itsReplicaRoles = append(itsReplicaRoles, itsReplicaRole)
 	}

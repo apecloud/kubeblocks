@@ -568,10 +568,7 @@ func (r *componentWorkloadOps) scaleOut(itsObj *workloads.InstanceSet) error {
 		return nil
 	}
 
-	err := r.annotateInstanceSetForMemberJoin()
-	if err != nil {
-		return err
-	}
+	r.annotateInstanceSetForMemberJoin()
 
 	graphCli := model.NewGraphClient(r.cli)
 	graphCli.Noop(r.dag, r.protoITS)
@@ -609,7 +606,11 @@ func (r *componentWorkloadOps) scaleOut(itsObj *workloads.InstanceSet) error {
 	}
 }
 
-func (r *componentWorkloadOps) annotateInstanceSetForMemberJoin() error {
+func (r *componentWorkloadOps) annotateInstanceSetForMemberJoin() {
+	if r.synthesizeComp.LifecycleActions.MemberJoin == nil {
+		return
+	}
+
 	podsToMemberjoin := getPodsToMemberJoinFromAnno(r.runningITS)
 
 	for podName := range r.desiredCompPodNameSet {
@@ -622,9 +623,11 @@ func (r *componentWorkloadOps) annotateInstanceSetForMemberJoin() error {
 		podsToMemberjoin.Insert(podName)
 	}
 
-	r.protoITS.Annotations[constant.MemberJoinStatusAnnotationKey] = strings.Join(podsToMemberjoin.UnsortedList(), ",")
+	if podsToMemberjoin.Len() > 0 {
+		r.protoITS.Annotations[constant.MemberJoinStatusAnnotationKey] = strings.Join(podsToMemberjoin.UnsortedList(), ",")
+	}
 
-	return nil
+	return
 }
 
 func getPodsToMemberJoinFromAnno(instanceSet *workloads.InstanceSet) sets.Set[string] {
@@ -634,7 +637,7 @@ func getPodsToMemberJoinFromAnno(instanceSet *workloads.InstanceSet) sets.Set[st
 	}
 
 	if instanceSet.Annotations == nil {
-		return nil
+		return podsToMemberjoin
 	}
 
 	if memberJoinStatus := instanceSet.Annotations[constant.MemberJoinStatusAnnotationKey]; memberJoinStatus != "" {
@@ -750,7 +753,11 @@ func (r *componentWorkloadOps) checkAndDoMemberJoin() error {
 		return err
 	}
 
-	r.protoITS.Annotations[constant.MemberJoinStatusAnnotationKey] = strings.Join(podsToMemberjoin.UnsortedList(), ",")
+	if podsToMemberjoin.Len() == 0 {
+		delete(r.protoITS.Annotations, constant.MemberJoinStatusAnnotationKey)
+	} else {
+		r.protoITS.Annotations[constant.MemberJoinStatusAnnotationKey] = strings.Join(podsToMemberjoin.UnsortedList(), ",")
+	}
 	return nil
 }
 

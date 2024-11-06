@@ -501,6 +501,7 @@ var _ = Describe("ComponentDefinition Controller", func() {
 				cmpd.Spec.Description = "v0.0.2"
 				parallel := appsv1.ParallelPodManagement
 				cmpd.Spec.PodManagementPolicy = &parallel
+				cmpd.Spec.MinReadySeconds = 10
 			})()).Should(Succeed())
 
 			By(fmt.Sprintf("checking the updated object as %s", strings.ToLower(string(kbappsv1.AvailablePhase))))

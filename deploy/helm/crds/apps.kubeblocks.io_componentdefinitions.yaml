@@ -8472,8 +8472,8 @@ spec:
 
                   This field is immutable.
                 items:
-                  description: ReplicaRole represents a role that can be assumed by
-                    a component instance.
+                  description: ReplicaRole represents a role that can be assigned
+                    to a component instance, defining its behavior and responsibilities.
                   properties:
                     name:
                       description: |-
@@ -8491,7 +8491,7 @@ spec:
                       maxLength: 32
                       pattern: ^.*[^\s]+.*$
                       type: string
-                    participatesInQuorum:
+                    participatesInQuorum bool:
                       default: false
                       description: |-
                         ParticipatesInQuorum indicates if pods with this role are counted when determining quorum.
@@ -8533,6 +8533,7 @@ spec:
                         UpdatePriority determines the order in which pods with different roles are updated.
                         Pods are sorted by this priority (higher numbers = higher priority) and updated accordingly.
                         Roles with the highest priority will be updated last.
+                        The default priority is 0.
 
 
                         For example:

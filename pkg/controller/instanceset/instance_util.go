@@ -223,7 +223,7 @@ func isImageMatched(pod *corev1.Pod) bool {
 		// otherwise, statusName should be same as or has suffix of specName
 		// remove registry and repository in specName (if presents)
 		names := strings.Split(specName, "/")
-		if !strings.HasSuffix(statusName, names[len(names)-1]) {
+		if !strings.HasSuffix(statusName, "/"+names[len(names)-1]) {
 			return false
 		}
 	}

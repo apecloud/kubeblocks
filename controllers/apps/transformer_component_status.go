@@ -199,27 +199,6 @@ func (t *componentStatusTransformer) isWorkloadUpdated() bool {
 	return generation == strconv.FormatInt(t.comp.Generation, 10)
 }
 
-// isComponentAvailable tells whether the component is basically available, ether working well or in a fragile state:
-// 1. at least one pod is available
-// 2. with latest revision
-// 3. and with leader role label set
-func (t *componentStatusTransformer) isComponentAvailable() bool {
-	if !t.isWorkloadUpdated() {
-		return false
-	}
-	if t.runningITS.Status.CurrentRevision != t.runningITS.Status.UpdateRevision {
-		return false
-	}
-	if t.runningITS.Status.AvailableReplicas <= 0 {
-		return false
-	}
-	if len(t.synthesizeComp.Roles) == 0 {
-		return true
-	}
-
-	return instanceset.IsAllRequiredRolesExist(t.runningITS)
-}
-
 // isRunning checks if the component's underlying workload is running.
 func (t *componentStatusTransformer) isInstanceSetRunning() bool {
 	if t.runningITS == nil {

@@ -129,17 +129,6 @@ var _ = Describe("instance_set builder", func() {
 			Command: []string{"bar-2"},
 		}
 		memberUpdateStrategy := workloads.BestEffortParallelUpdateStrategy
-		service := &corev1.Service{
-			Spec: corev1.ServiceSpec{
-				Ports: []corev1.ServicePort{
-					{
-						Name:     "foo",
-						Protocol: corev1.ProtocolTCP,
-						Port:     port,
-					},
-				},
-			},
-		}
 		paused := true
 		credential := workloads.Credential{
 			Username: workloads.CredentialVar{Value: "foo"},
@@ -175,7 +164,6 @@ var _ = Describe("instance_set builder", func() {
 			SetCustomHandler(actions).
 			AddCustomHandler(action).
 			SetMemberUpdateStrategy(&memberUpdateStrategy).
-			SetService(service).
 			SetPaused(paused).
 			SetCredential(credential).
 			SetInstances(instances).
@@ -215,8 +203,6 @@ var _ = Describe("instance_set builder", func() {
 		Expect(its.Spec.RoleProbe.CustomHandler[1]).Should(Equal(action))
 		Expect(its.Spec.MemberUpdateStrategy).ShouldNot(BeNil())
 		Expect(*its.Spec.MemberUpdateStrategy).Should(Equal(memberUpdateStrategy))
-		Expect(its.Spec.Service).ShouldNot(BeNil())
-		Expect(its.Spec.Service).Should(BeEquivalentTo(service))
 		Expect(its.Spec.Paused).Should(Equal(paused))
 		Expect(its.Spec.Credential).ShouldNot(BeNil())
 		Expect(*its.Spec.Credential).Should(Equal(credential))

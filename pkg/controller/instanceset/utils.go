@@ -217,17 +217,8 @@ func getMatchLabels(name string) map[string]string {
 	}
 }
 
-func getSvcSelector(its *workloads.InstanceSet, headless bool) map[string]string {
+func getHeadlessSvcSelector(its *workloads.InstanceSet) map[string]string {
 	selectors := make(map[string]string)
-
-	if !headless {
-		for _, role := range its.Spec.Roles {
-			if role.IsLeader && len(role.Name) > 0 {
-				selectors[constant.RoleLabelKey] = role.Name
-				break
-			}
-		}
-	}
 
 	for k, v := range its.Spec.Selector.MatchLabels {
 		selectors[k] = v

@@ -220,7 +220,7 @@ func (t *componentStatusTransformer) isComponentAvailable() bool {
 	return instanceset.IsAllRequiredRolesExist(t.runningITS)
 }
 
-// isRunning checks if the componentbo underlying workload is running.
+// isRunning checks if the component's underlying workload is running.
 func (t *componentStatusTransformer) isInstanceSetRunning() bool {
 	if t.runningITS == nil {
 		return false

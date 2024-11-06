@@ -39,13 +39,13 @@ import TabItem from '@theme/TabItem';
 * 不指定主节点实例进行切换。
 
     ```bash
-    kbcli cluster promote mycluster --instance='mycluster-mysql-1'
+    kbcli cluster promote mycluster --instance='mycluster-mysql-1' -n demo
     ```
 
 * 如果有多个组件，可以使用 `--components` 参数指定一个组件。
 
     ```bash
-    kbcli cluster promote mycluster --instance='mycluster-mysql-1' --components='apecloud-mysql'
+    kbcli cluster promote mycluster --instance='mycluster-mysql-1' --components='apecloud-mysql' -n demo
     ```
 
 </TabItem>

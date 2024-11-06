@@ -117,7 +117,7 @@ KubeBlocks 支持创建两种类型的 ApeCloud MySQL 集群：单机版（Stand
    kbcli cluster create apecloud-mysql -h
    ```
 
-   例如，您可以使用 `--replcas` 指定副本数，创建集群版集群。
+   例如，您可以使用 `--replicas` 指定副本数，创建集群版集群。
 
    ```bash
    kbcli cluster create mycluster --cluster-definition apecloud-mysql --set replicas=3 --namespace demo
@@ -200,7 +200,7 @@ KubeBlocks 支持创建两种类型的 ApeCloud MySQL 集群：单机版（Stand
    |---------------------------------------|--------------------------------------|
    | `spec.clusterDefinitionRef`           | 集群定义 CRD 的名称，用来定义集群组件。  |
    | `spec.clusterVersionRef`              | 集群版本 CRD 的名称，用来定义集群版本。 |
-   | `spec.terminationPolicy`              | 集群的终止策略，默认值为 `Delete`，有效值为 `DoNotTerminate`、`Halt`、`Delete` 和 `WipeOut`。 <p> - `DoNotTerminate` 会阻止删除操作。 </p><p> - `Halt` 会删除工作负载资源，如 statefulset 和 deployment 等，但是保留了 PVC 。  </p><p> - `Delete` 在 `Halt` 的基础上进一步删除了 PVC。 </p><p> - `WipeOut` 在 `Delete` 的基础上从备份存储的位置完全删除所有卷快照和快照数据。 </p>|
+   | `spec.terminationPolicy`              | 集群的终止策略，默认值为 `Delete`，有效值为 `DoNotTerminate`、`Delete` 和 `WipeOut`。具体定义可参考 [终止策略](./delete-mysql-cluster.md#终止策略)。 |
    | `spec.affinity`                       | 为集群的 Pods 定义了一组节点亲和性调度规则。该字段可控制 Pods 在集群中节点上的分布。 |
    | `spec.affinity.podAntiAffinity`       | 定义了不在同一 component 中的 Pods 的反亲和性水平。该字段决定了 Pods 以何种方式跨节点分布，以提升可用性和性能。 |
    | `spec.affinity.topologyKeys`          | 用于定义 Pod 反亲和性和 Pod 分布约束的拓扑域的节点标签值。 |
@@ -218,7 +218,7 @@ KubeBlocks 支持创建两种类型的 ApeCloud MySQL 集群：单机版（Stand
    kubectl get all,secret,rolebinding,serviceaccount -l app.kubernetes.io/instance=mycluster -n demo
    ```
 
-   执行以下命令，查看已创建的 ApeCloud MySQL 集群：
+   执行以下命令，查看已创建的 ApeCloud MySQL 集群的 YAML 文件：
 
    ```bash
    kubectl get cluster mycluster -n demo -o yaml
@@ -253,13 +253,13 @@ kbcli cluster connect mycluster  -n demo
 
 使用 `kubectl exec` 命令进入 Pod 并连接到数据库。
 
-KubeBlocks operator 会创建一个名为 `mycluster-conn-credential` 的新的 Secret 来存储 MySQL 集群的连接凭证。该 Secret 包含以下 key：
+KubeBlocks operator 会创建一个名为 `mycluster-conn-credential` 的新的 Secret 来存储集群的连接凭证。该 Secret 包含以下 key：
 
-* `username`：MySQL 集群的根用户名。
+* `username`：集群的根用户名。
 * `password`：根用户的密码。
-* `port`：MySQL 集群的端口。
-* `host`：MySQL 集群的主机。
-* `endpoint`：MySQL 集群的终端节点，与 `host:port` 相同。
+* `port`：集群的端口。
+* `host`：集群的主机。
+* `endpoint`：集群的终端节点，与 `host:port` 相同。
 
 1. 获取用于 `kubectl exec` 命令的 `username` 和 `password`。
 

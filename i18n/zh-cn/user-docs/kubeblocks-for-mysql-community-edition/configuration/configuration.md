@@ -53,7 +53,7 @@ kbcli cluster describe-config mycluster -n demo
   kbcli cluster explain-config mycluster --param=innodb_buffer_pool_size --config-specs=mysql-replication-config -n demo
   ```
 
-  MySQL 目前支持多个模板，可通过 `--config-specs` 来指定一个配置模板。执行 `kbcli cluster describe-config mysql-cluster` 查看所有模板的名称。
+  MySQL 目前支持多个模板，可通过 `--config-specs` 来指定一个配置模板。执行 `kbcli cluster describe-config mycluster -n demo` 查看所有模板的名称。
 
   <details>
 

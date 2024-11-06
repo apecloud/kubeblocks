@@ -21,7 +21,7 @@ KubeBlocks 支持 Pod 存储磁盘扩容。
 <TabItem value="kbcli" label="kbcli" default>
 
 ```bash
-kbcli cluster list mycluster
+kbcli cluster list mycluster -n demo
 >
 NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    CREATED-TIME
 mycluster   demo        mysql                mysql-8.0.33   Delete               Running   Jul 05,2024 18:46 UTC+0800
@@ -60,7 +60,7 @@ mycluster   mysql                mysql-8.0.33   Delete               Running   4
     - `--volume-claim-templates` 表示组件中的 VolumeClaimTemplate 名称。
     - `--storage` 表示磁盘需扩容至的大小。
 
-2. 验证扩容操作是否成功。
+2. 可通过以下任意一种方式验证扩容操作是否完成。
 
    - 查看 OpsRequest 进程。
 

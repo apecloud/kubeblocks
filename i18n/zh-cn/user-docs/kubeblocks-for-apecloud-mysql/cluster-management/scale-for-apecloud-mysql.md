@@ -21,7 +21,7 @@ KubeBlocks 支持对 ApeCloud MySQL 集群进行垂直扩缩容和水平扩缩�
 
 ## 垂直扩缩容
 
-你可以通过更改资源需求和限制（CPU 和存储）来垂直扩展集群。例如，可通过垂直扩容将资源类别从 1C2G 调整为 2C4G。
+您可以通过更改资源需求和限制（CPU 和存储）来垂直扩展集群。例如，可通过垂直扩容将资源类别从 1C2G 调整为 2C4G。
 
 ### 开始之前
 
@@ -94,7 +94,7 @@ mycluster   apecloud-mysql       ac-mysql-8.0.30   Delete               Running 
        - STATUS=Running 表示垂直扩容已完成。
        - STATUS=Abnormal 表示垂直扩容异常。原因可能是正常实例的数量少于总实例数，或者 Leader 实例正常运行而其他实例异常。
 
-         > 你可以手动检查是否由于资源不足而导致报错。如果 Kubernetes 集群支持 AutoScaling，系统在资源充足的情况下会执行自动恢复。或者你也可以创建足够的资源，并使用 `kubectl describe` 命令进行故障排除。
+         > 您可以手动检查是否由于资源不足而导致报错。如果 Kubernetes 集群支持 AutoScaling，系统在资源充足的情况下会执行自动恢复。或者您也可以创建足够的资源，并使用 `kubectl describe` 命令进行故障排除。
 
 3. 当 OpsRequest 状态为 `Succeed` 或集群状态再次回到 `Running` 后，检查资源规格是否已按要求变更。
 
@@ -197,7 +197,7 @@ mycluster   apecloud-mysql       ac-mysql-8.0.30   Delete               Running 
 
 ## 水平扩缩容
 
-水平扩缩容会改变 Pod 的数量。例如，你可以应用水平扩容将 Pod 的数量从三个增加到五个。扩容过程包括数据的备份和恢复。
+水平扩缩容会改变 Pod 的数量。例如，您可以应用水平扩容将 Pod 的数量从三个增加到五个。扩容过程包括数据的备份和恢复。
 
 从 v0.9.0 开始，KubeBlocks 支持指定实例水平扩缩容，可参考 [水平扩缩容](./../../../api-docs/maintenance/scale/horizontal-scale.md)，查看详细介绍及示例。
 
@@ -380,7 +380,7 @@ mycluster   apecloud-mysql       ac-mysql-8.0.30   Delete               Running 
 
 ### 处理快照异常
 
-如果在水平扩容过程中出现 `STATUS=ConditionsError`，你可以从 `cluster.status.condition.message` 中找到原因并进行故障排除。如下所示，该例子中发生了快照异常。
+如果在水平扩容过程中出现 `STATUS=ConditionsError`，您可以从 `cluster.status.condition.message` 中找到原因并进行故障排除。如下所示，该例子中发生了快照异常。
 
 ```bash
 Status:

@@ -20,7 +20,7 @@ KubeBlocks 支持 Pod 存储磁盘扩容。
 
 ## 开始之前
 
-确保集群处于 `Running` 状态，否则以下操作可能会失败。
+确保集群处于 `Running` 状态，否则后续操作可能会失败。
 
 <Tabs>
 
@@ -66,7 +66,7 @@ mycluster   apecloud-mysql       ac-mysql-8.0.30   Delete               Running 
     - `--volume-claim-templates` 表示组件中的 VolumeClaimTemplate 名称。
     - `--storage` 表示磁盘需扩容至的大小。
 
-2. 验证扩容操作是否成功。
+2. 可通过以下任意一种方式验证扩容操作是否完成。
 
    - 查看 OpsRequest 进程。
 

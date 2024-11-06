@@ -343,6 +343,16 @@ innodb_buffer_pool_size   512M                            512M
       1 row in set (0.00 sec)
       ```
 
+:::note
+
+如果您无法找到集群的配置文件，您可以切换到 `kbcli` 页签，使用相关命令查看集群当前的配置文件。
+
+```bash
+kbcli cluster describe-config mycluster -n demo
+```
+
+:::
+
 </TabItem>
 
 <TabItem value="OpsRequest" label="OpsRequest">

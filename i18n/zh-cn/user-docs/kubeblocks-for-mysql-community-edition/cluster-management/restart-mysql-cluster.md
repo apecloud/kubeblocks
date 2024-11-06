@@ -40,7 +40,7 @@ KubeBlocks 支持重启集群中的所有 Pod。当数据库出现异常时，�
 2. 检查集群状态，验证重启操作是否成功。
 
    ```bash
-   kbcli cluster list mycluster
+   kbcli cluster list mycluster -n demo
    >
    NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS     CREATED-TIME
    mycluster   default     mysql                mysql-8.0.33   Delete               Updating   Jul 05,2024 19:01 UTC+0800

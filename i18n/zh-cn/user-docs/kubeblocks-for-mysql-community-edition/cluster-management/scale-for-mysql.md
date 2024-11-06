@@ -15,7 +15,7 @@ KubeBlocks 支持对 MySQL 集群进行垂直扩缩容和水平扩缩容。
 
 :::note
 
-集群垂直或水平扩缩容后，KubeBlocks 会根据新的规格自动匹配合适的配置模板。这因为 KubeBlocks 在 v0.9.0 中引入了动态配置功能。该功能简化了配置参数的过程，节省了时间和精力，并减少了由于配置错误引起的性能问题。有关详细说明，请参阅[配置](./../configuration/configuration.md)。
+集群垂直或水平扩缩容后，KubeBlocks 会根据新的规格自动匹配合适的配置模板。这是因为 KubeBlocks 在 v0.9.0 中引入了动态配置功能。该功能简化了配置参数的过程，节省了时间和精力，并减少了由于配置错误引起的性能问题。有关详细说明，请参阅[配置](./../configuration/configuration.md)。
 
 :::
 
@@ -43,7 +43,7 @@ mycluster   demo        mysql                mysql-8.0.33   Delete              
 <TabItem value="kubectl" label="kubectl">
 
 ```bash
-kubectl get cluster mycluster
+kubectl get cluster mycluster -n demo
 >
 NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    AGE
 mycluster   mysql                mysql-8.0.33   Delete               Running   18m
@@ -73,7 +73,7 @@ mycluster   mysql                mysql-8.0.33   Delete               Running   1
     - `--memory` 表示组件请求和限制的内存大小。
     - `--cpu` 表示组件请求和限制的 CPU 大小。
 
-2. 通过以下任意一种方式验证垂直扩容是否成功。
+2. 通过以下任意一种方式验证垂直扩容是否完成。
 
     - 查看 OpsRequest 进程。
 
@@ -136,7 +136,7 @@ mycluster   mysql                mysql-8.0.33   Delete               Running   1
 
    如果有报错，可执行 `kubectl describe ops -n demo` 命令查看该运维操作的相关事件，协助排障。
 
-3. 查看相应资源是否变更。
+3. 当 OpsRequest 状态为 `Succeed` 或集群状态再次回到 `Running` 后，查看相应资源是否变更。
 
     ```bash
     kubectl describe cluster mycluster -n demo
@@ -181,7 +181,7 @@ mycluster   mysql                mysql-8.0.33   Delete               Running   1
      terminationPolicy: Delete
    ```
 
-2. 查看相应资源是否变更。
+2. 当集群状态再次回到 `Running` 后。查看相应资源是否变更。
 
     ```bash
     kubectl describe cluster mycluster -n demo
@@ -217,7 +217,7 @@ mycluster   demo        mysql                mysql-8.0.33   Delete              
 <TabItem value="kubectl" label="kubectl">
 
 ```bash
-kubectl get cluster mycluster
+kubectl get cluster mycluster -n demo
 >
 NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    AGE
 mycluster   mysql                mysql-8.0.33   Delete               Running   18m
@@ -327,7 +327,7 @@ mycluster   mysql                mysql-8.0.33   Delete               Running   1
 
    如果有报错，可执行 `kubectl describe ops -n demo` 命令查看该运维操作的相关事件，协助排障。
 
-3. 查看相应资源是否变更。
+3. 当 OpsRequest 状态为 `Succeed` 或集群状态再次回到 `Running` 后，查看相应资源是否变更。
 
    ```bash
    kubectl describe cluster mycluster -n demo
@@ -365,7 +365,7 @@ mycluster   mysql                mysql-8.0.33   Delete               Running   1
     terminationPolicy: Delete
    ```
 
-2. 查看相关资源是否变更。
+2. 当集群状态再次回到 `Running` 后，查看相关资源是否变更。
 
    ```bash
    kubectl describe cluster mycluster -n demo

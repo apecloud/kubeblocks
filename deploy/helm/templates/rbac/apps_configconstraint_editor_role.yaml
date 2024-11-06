@@ -1,5 +1,3 @@
-{{- $ccRoleName := printf "%s-configconstraint-editor-role" (include "kubeblocks.fullname" .) }}
-{{- if eq (include "kubeblocks.installClusterRole" (merge (dict "name" $ccRoleName) .)) "true" }}
 # permissions for end users to edit configconstraints.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -26,4 +24,3 @@ rules:
   - configconstraints/status
   verbs:
   - get
-{{- end }}

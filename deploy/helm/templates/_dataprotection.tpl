@@ -63,19 +63,3 @@ Render the algorithm for backup encryption, empty if not specified or invalid.
     {{ "" | quote }}
   {{- end -}}
 {{- end }}
-
-
-{{/*
-Check whether to create storage provider.
-*/}}
-{{- define "dataprotection.installStorageProvider" -}}
-{{- include "kubeblocks.installCR" (merge (dict "groupVersion" "dataprotection.kubeblocks.io/v1alpha1" "kind" "StorageProvider") .) -}}
-{{- end -}}
-
-
-{{/*
-Check whether to create backupRepo.
-*/}}
-{{- define "dataprotection.installBackupRepo" -}}
-{{- include "kubeblocks.installCR" (merge (dict "groupVersion" "dataprotection.kubeblocks.io/v1alpha1" "kind" "BackupRepo") .) -}}
-{{- end -}}

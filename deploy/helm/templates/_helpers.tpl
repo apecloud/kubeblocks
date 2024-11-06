@@ -337,29 +337,3 @@ Define the replica count for kubeblocks.
 {{- .Values.replicaCount }}
 {{- end }}
 {{- end }}
-
-{{/*
-Check whether to create CR.
-*/}}
-{{- define "kubeblocks.installCR" -}}
-{{- $existingCR := lookup .groupVersion .kind "" .name -}}
-{{- if and .Release.IsInstall $existingCR .Values.webhooks.conversionEnabled }}
-{{- false }}
-{{- else -}}
-{{- true }}
-{{- end -}}
-{{- end -}}
-
-{{/*
-Check whether to create Cluster Role.
-*/}}
-{{- define "kubeblocks.installClusterRole" -}}
-{{- include "kubeblocks.installCR" (merge (dict "groupVersion" "rbac.authorization.k8s.io/v1" "kind" "ClusterRole") .) -}}
-{{- end -}}
-
-{{/*
-Check whether to create addons.
-*/}}
-{{- define "kubeblocks.installAddons" -}}
-{{- include "kubeblocks.installCR" (merge (dict "groupVersion" "extensions.kubeblocks.io/v1alpha1" "kind" "Addon") .) -}}
-{{- end -}}

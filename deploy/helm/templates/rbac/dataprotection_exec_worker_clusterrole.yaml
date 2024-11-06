@@ -1,5 +1,3 @@
-{{- $execWorkerRoleName := (include "dataprotection.execWorkerRoleName" .) }}
-{{- if eq (include "kubeblocks.installClusterRole" (merge (dict "name" $execWorkerRoleName) .)) "true" }}
 # permissions for dataprotection workers to run "kubectl exec".
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -20,4 +18,3 @@ rules:
   - pods/exec
   verbs:
   - create
-{{- end }}

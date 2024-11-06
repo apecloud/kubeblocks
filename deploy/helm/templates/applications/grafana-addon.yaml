@@ -1,5 +1,4 @@
 {{- if has "grafana" .Values.autoInstalledAddons  }}
-{{- if eq (include "kubeblocks.installAddons" (merge (dict "name" "grafana") .)) "true" }}
 apiVersion: extensions.kubeblocks.io/v1alpha1
 kind: Addon
 metadata:
@@ -68,5 +67,4 @@ spec:
 
   installable:
     autoInstall: {{ .Values.grafana.enabled }}
-{{- end }}
 {{- end }}

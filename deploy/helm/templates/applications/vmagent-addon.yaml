@@ -1,5 +1,4 @@
 {{- if has "victoria-metrics-agent" .Values.autoInstalledAddons  }}
-{{- if eq (include "kubeblocks.installAddons" (merge (dict "name" "victoria-metrics-agent") .)) "true" }}
 apiVersion: extensions.kubeblocks.io/v1alpha1
 kind: Addon
 metadata:
@@ -49,5 +48,4 @@ spec:
 
   installable:
     autoInstall: false 
-{{- end }}
 {{- end }}

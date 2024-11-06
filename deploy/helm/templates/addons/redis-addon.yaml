@@ -1,5 +1,4 @@
 {{- if has "redis" .Values.autoInstalledAddons  }}
-{{- if eq (include "kubeblocks.installAddons" (merge (dict "name" "redis") .)) "true" }}
 {{- $selectorLabels := include "kubeblocks.selectorLabels" . }}
 {{- include "kubeblocks.buildAddonCR" (merge (dict
   "kbVersion" ">=0.7.0"
@@ -10,5 +9,4 @@
   "provider" "community"
   "description" "Redis is an open source (BSD licensed), in-memory data structure store, used as a database, cache and message broker."
   "autoInstall" true) . ) -}}
-{{- end }}
 {{- end }}

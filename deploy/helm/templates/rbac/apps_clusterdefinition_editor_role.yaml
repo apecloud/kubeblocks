@@ -1,5 +1,3 @@
-{{- $cdRoleName := printf "%s-clusterdefinition-editor-role" (include "kubeblocks.fullname" .) }}
-{{- if eq (include "kubeblocks.installClusterRole" (merge (dict "name" $cdRoleName) .)) "true" }}
 # permissions for end users to edit clusterdefinitions.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -26,4 +24,3 @@ rules:
   - clusterdefinitions/status
   verbs:
   - get
-{{- end }}

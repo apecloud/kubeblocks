@@ -1,4 +1,3 @@
-{{- if eq (include "dataprotection.installStorageProvider" (merge (dict "name" "gcs-s3comp") .)) "true" }}
 # gcs-s3comp is a storage provider for [Google Cloud Storage](https://cloud.google.com/storage/), by using its S3-compatible API.
 apiVersion: dataprotection.kubeblocks.io/v1alpha1
 kind: StorageProvider
@@ -95,4 +94,3 @@ spec:
     credentialFields:
       - accessKeyId
       - secretAccessKey
-{{- end }}

@@ -1,5 +1,4 @@
-{{- if eq (include "dataprotection.installStorageProvider" (merge (dict "name" "nfs") .)) "true" }}
-apiVersion: dataprotection.kubeblocks.io/v1alpha1
+xapiVersion: dataprotection.kubeblocks.io/v1alpha1
 kind: StorageProvider
 metadata:
   name: nfs
@@ -40,4 +39,3 @@ spec:
 
       required:
         - nfsServer
-{{- end }}

@@ -1,5 +1,3 @@
-{{- $leaderElectionRole := printf "%s-leader-election-role" (include "kubeblocks.fullname" .) }}
-{{- if eq (include "kubeblocks.installClusterRole" (merge (dict "name" $leaderElectionRole) .)) "true" }}
 # permissions to do leader election.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
@@ -39,4 +37,3 @@ rules:
   verbs:
   - create
   - patch
-{{- end }}

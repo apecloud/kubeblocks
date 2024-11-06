@@ -1,5 +1,4 @@
 {{- if has "snapshot-controller" .Values.autoInstalledAddons  }}
-{{- if eq (include "kubeblocks.installAddons" (merge (dict "name" "snapshot-controller") .)) "true" }}
 apiVersion: extensions.kubeblocks.io/v1alpha1
 kind: Addon
 metadata:
@@ -93,5 +92,4 @@ spec:
         values:
           - huaweiCloud
           - azure
-{{- end }}
 {{- end }}

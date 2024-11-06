@@ -1,4 +1,3 @@
-{{- if eq (include "dataprotection.installStorageProvider" (merge (dict "name" "pvc") .)) "true" }}
 apiVersion: dataprotection.kubeblocks.io/v1alpha1
 kind: StorageProvider
 metadata:
@@ -31,4 +30,3 @@ spec:
           description: "the volume mode used to create the PVC"
           default: "Filesystem"
           enum: ["Filesystem", "Block"]
-{{- end }}

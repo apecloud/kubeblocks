@@ -12,7 +12,6 @@ stringData:
   {{- .Values.backupRepo.secrets | toYaml | nindent 2 }}
 
 {{- $backupRepoName := printf "%s-backuprepo" (include "kubeblocks.fullname" .) }}
-{{- if eq (include "dataprotection.installBackupRepo" (merge (dict "name" $backupRepoName) .)) "true" }}
 ---
 apiVersion: dataprotection.kubeblocks.io/v1alpha1
 kind: BackupRepo
@@ -35,5 +34,4 @@ spec:
     name: {{ include "kubeblocks.fullname" . }}-backuprepo-secret
     namespace: {{ .Release.Namespace }}
 ---
-{{ end }}
 {{ end }}

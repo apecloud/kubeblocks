@@ -1,5 +1,4 @@
 {{- if has "qdrant" .Values.autoInstalledAddons  }}
-{{- if eq (include "kubeblocks.installAddons" (merge (dict "name" "qdrant") .)) "true" }}
 {{- $selectorLabels := include "kubeblocks.selectorLabels" . }}
 {{- include "kubeblocks.buildAddonCR" (merge (dict
   "kbVersion" ">=0.7.0"
@@ -10,5 +9,4 @@
   "provider" "community"
   "description" "Qdrant is an open source (Apache-2.0 licensed), vector similarity search engine and vector database."
   "autoInstall" false) . ) -}}
-{{- end }}
 {{- end }}

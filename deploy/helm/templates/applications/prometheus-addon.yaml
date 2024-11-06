@@ -139,4 +139,4 @@ spec:
 
   installable:
     autoInstall: {{ .Values.prometheus.enabled }}
-  {{- end }}
+{{- end }}

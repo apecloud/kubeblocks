@@ -1,5 +1,4 @@
 {{- if has "csi-driver-nfs" .Values.autoInstalledAddons  }}
-{{- if eq (include "kubeblocks.installAddons" (merge (dict "name" "csi-driver-nfs") .)) "true" }}
 apiVersion: extensions.kubeblocks.io/v1alpha1
 kind: Addon
 metadata:
@@ -60,5 +59,4 @@ spec:
       {{- end }}
     {{- end }}
     autoInstall: {{ $autoInstall }}
-{{- end }}
 {{- end }}

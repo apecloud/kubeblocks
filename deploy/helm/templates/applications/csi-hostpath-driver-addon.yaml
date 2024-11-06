@@ -1,5 +1,4 @@
 {{- if has "csi-hostpath-driver"  .Values.autoInstalledAddons }}
-{{- if eq (include "kubeblocks.installAddons" (merge (dict "name" "csi-hostpath-driver") .)) "true" }}
 apiVersion: extensions.kubeblocks.io/v1alpha1
 kind: Addon
 metadata:
@@ -47,5 +46,4 @@ spec:
           - gke
           - tke
           - aks
-{{- end }}
 {{- end }}

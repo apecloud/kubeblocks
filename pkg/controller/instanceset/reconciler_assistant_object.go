@@ -52,15 +52,10 @@ func (a *assistantObjectReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (ku
 
 	// generate objects by current spec
 	labels := getMatchLabels(its.Name)
-	selectors := getSvcSelector(its, false)
-	headlessSelectors := getSvcSelector(its, true)
+	headlessSelectors := getHeadlessSvcSelector(its)
 
-	svc := buildSvc(*its, labels, selectors)
 	headLessSvc := buildHeadlessSvc(*its, labels, headlessSelectors)
 	var objects []client.Object
-	if svc != nil {
-		objects = append(objects, svc)
-	}
 	objects = append(objects, headLessSvc)
 	for _, object := range objects {
 		if err := intctrlutil.SetOwnership(its, object, model.GetScheme(), finalizer); err != nil {

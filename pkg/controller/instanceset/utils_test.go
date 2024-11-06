@@ -35,7 +35,6 @@ import (
 var _ = Describe("utils test", func() {
 	BeforeEach(func() {
 		its = builder.NewInstanceSetBuilder(namespace, name).
-			SetService(&corev1.Service{}).
 			SetRoles(roles).
 			GetObject()
 		priorityMap = ComposeRolePriorityMap(its.Spec.Roles)
@@ -177,7 +176,6 @@ var _ = Describe("utils test", func() {
 			By("set its to not initialized")
 			replicas := int32(3)
 			its = builder.NewInstanceSetBuilder(namespace, name).
-				SetService(&corev1.Service{}).
 				SetRoles(roles).
 				SetReplicas(replicas).
 				GetObject()

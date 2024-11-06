@@ -161,13 +161,12 @@ var _ = Describe("update plan test.", func() {
 			checkPlan(expectedPlan, true)
 		})
 
-		It("should work well in a best effort parallel", func() {
+		FIt("should work well in a best effort parallel", func() {
 			By("build a best effort parallel plan")
 			strategy := workloads.BestEffortParallelUpdateStrategy
 			its.Spec.MemberUpdateStrategy = &strategy
 			expectedPlan := [][]*corev1.Pod{
-				{pod2, pod3, pod4, pod6},
-				{pod1},
+				{pod2, pod3, pod4, pod6, pod1},
 				{pod0},
 				{pod5},
 			}

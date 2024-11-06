@@ -497,6 +497,7 @@ type ReplicaRole struct {
 	// UpdatePriority determines the order in which pods with different roles are updated.
 	// Pods are sorted by this priority (higher numbers = higher priority) and updated accordingly.
 	// Roles with the highest priority will be updated last.
+	// The default priority is 0.
 	//
 	// For example:
 	// - Leader role may have priority 2 (updated last)

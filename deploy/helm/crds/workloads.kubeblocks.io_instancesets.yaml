@@ -4256,29 +4256,79 @@ spec:
               roles:
                 description: A list of roles defined in the system.
                 items:
+                  description: ReplicaRole represents a role that can be assigned
+                    to a component instance, defining its behavior and responsibilities.
                   properties:
-                    accessMode:
-                      default: ReadWrite
-                      description: Specifies the service capabilities of this member.
-                      enum:
-                      - None
-                      - Readonly
-                      - ReadWrite
-                      type: string
-                    canVote:
-                      default: true
-                      description: Indicates if this member has voting rights.
-                      type: boolean
-                    isLeader:
-                      default: false
-                      description: Determines if this member is the leader.
-                      type: boolean
                     name:
-                      default: leader
-                      description: Defines the role name of the replica.
+                      description: |-
+                        Name defines the role's unique identifier. This value is used to set the "apps.kubeblocks.io/role" label
+                        on the corresponding object to identify its role.
+
+
+                        For example, common role names include:
+                        - "leader": The primary/master instance that handles write operations
+                        - "follower": Secondary/replica instances that replicate data from the leader
+                        - "learner": Read-only instances that don't participate in elections
+
+
+                        This field is immutable once set.
+                      maxLength: 32
+                      pattern: ^.*[^\s]+.*$
                       type: string
+                    participatesInQuorum bool:
+                      default: false
+                      description: |-
+                        ParticipatesInQuorum indicates if pods with this role are counted when determining quorum.
+                        This affects update strategies that need to maintain quorum for availability.
+
+
+                        For example, in a 5-pod component where:
+                        - 2 learner pods (participatesInQuorum=false)
+                        - 2 follower pods (participatesInQuorum=true)
+                        - 1 leader pod (participatesInQuorum=true)
+                        The quorum size would be 3 (based on the 3 participating pods), allowing parallel updates
+                        of 2 learners and 1 follower while maintaining quorum.
+
+
+                        This field is immutable once set.
+                      type: boolean
+                    required:
+                      default: false
+                      description: |-
+                        Required indicates if at least one replica with this role must exist for the component to be considered
+                        operationally running. For example, a leader role may be required for the component to function.
+
+
+                        This field is immutable once set.
+                      type: boolean
+                    switchoverBeforeUpdate:
+                      default: false
+                      description: |-
+                        SwitchoverBeforeUpdate indicates if a role switchover operation should be performed before
+                        updating or scaling in pods with this role. This is typically used for leader roles to
+                        ensure minimal disruption during updates.
+
+
+                        This field is immutable once set.
+                      type: boolean
+                    updatePriority:
+                      default: 0
+                      description: |-
+                        UpdatePriority determines the order in which pods with different roles are updated.
+                        Pods are sorted by this priority (higher numbers = higher priority) and updated accordingly.
+                        Roles with the highest priority will be updated last.
+                        The default priority is 0.
+
+
+                        For example:
+                        - Leader role may have priority 2 (updated last)
+                        - Follower role may have priority 1 (updated before leader)
+                        - Learner role may have priority 0 (updated first)
+
+
+                        This field is immutable once set.
+                      type: integer
                   required:
-                  - accessMode
                   - name
                   type: object
                 type: array
@@ -12430,29 +12480,76 @@ spec:
                     role:
                       description: Defines the role of the replica in the cluster.
                       properties:
-                        accessMode:
-                          default: ReadWrite
-                          description: Specifies the service capabilities of this
-                            member.
-                          enum:
-                          - None
-                          - Readonly
-                          - ReadWrite
-                          type: string
-                        canVote:
-                          default: true
-                          description: Indicates if this member has voting rights.
-                          type: boolean
-                        isLeader:
-                          default: false
-                          description: Determines if this member is the leader.
-                          type: boolean
                         name:
-                          default: leader
-                          description: Defines the role name of the replica.
+                          description: |-
+                            Name defines the role's unique identifier. This value is used to set the "apps.kubeblocks.io/role" label
+                            on the corresponding object to identify its role.
+
+
+                            For example, common role names include:
+                            - "leader": The primary/master instance that handles write operations
+                            - "follower": Secondary/replica instances that replicate data from the leader
+                            - "learner": Read-only instances that don't participate in elections
+
+
+                            This field is immutable once set.
+                          maxLength: 32
+                          pattern: ^.*[^\s]+.*$
                           type: string
+                        participatesInQuorum bool:
+                          default: false
+                          description: |-
+                            ParticipatesInQuorum indicates if pods with this role are counted when determining quorum.
+                            This affects update strategies that need to maintain quorum for availability.
+
+
+                            For example, in a 5-pod component where:
+                            - 2 learner pods (participatesInQuorum=false)
+                            - 2 follower pods (participatesInQuorum=true)
+                            - 1 leader pod (participatesInQuorum=true)
+                            The quorum size would be 3 (based on the 3 participating pods), allowing parallel updates
+                            of 2 learners and 1 follower while maintaining quorum.
+
+
+                            This field is immutable once set.
+                          type: boolean
+                        required:
+                          default: false
+                          description: |-
+                            Required indicates if at least one replica with this role must exist for the component to be considered
+                            operationally running. For example, a leader role may be required for the component to function.
+
+
+                            This field is immutable once set.
+                          type: boolean
+                        switchoverBeforeUpdate:
+                          default: false
+                          description: |-
+                            SwitchoverBeforeUpdate indicates if a role switchover operation should be performed before
+                            updating or scaling in pods with this role. This is typically used for leader roles to
+                            ensure minimal disruption during updates.
+
+
+                            This field is immutable once set.
+                          type: boolean
+                        updatePriority:
+                          default: 0
+                          description: |-
+                            UpdatePriority determines the order in which pods with different roles are updated.
+                            Pods are sorted by this priority (higher numbers = higher priority) and updated accordingly.
+                            Roles with the highest priority will be updated last.
+                            The default priority is 0.
+
+
+                            For example:
+                            - Leader role may have priority 2 (updated last)
+                            - Follower role may have priority 1 (updated before leader)
+                            - Learner role may have priority 0 (updated first)
+
+
+                            This field is immutable once set.
+                          type: integer
                       required:
-                      - accessMode
                       - name
                       type: object
                   required:

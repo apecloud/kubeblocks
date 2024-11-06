@@ -673,6 +673,9 @@ func (r *clusterBackupPolicyTransformer) mergeClusterBackup(
 		if as.Spec.BackupType == dpv1alpha1.BackupTypeContinuous && backup.PITREnabled != nil && !hasSyncPITRMethod {
 			// auto-sync the first continuous backup for the 'pirtEnable' option.
 			backupSchedule.Spec.Schedules[i].Enabled = backup.PITREnabled
+			if backup.RetentionPeriod.String() != "" {
+				backupSchedule.Spec.Schedules[i].RetentionPeriod = backup.RetentionPeriod
+			}
 			hasSyncPITRMethod = true
 		}
 		if as.Spec.BackupType == dpv1alpha1.BackupTypeFull && enableAutoBackup {

@@ -1346,7 +1346,7 @@ ComponentAvailable
 <td>
 <code>roles</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.ReplicaRole">
+<a href="#workloads.kubeblocks.io/v1.ReplicaRole">
 []ReplicaRole
 </a>
 </em>
@@ -5004,7 +5004,7 @@ ComponentAvailable
 <td>
 <code>roles</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.ReplicaRole">
+<a href="#workloads.kubeblocks.io/v1.ReplicaRole">
 []ReplicaRole
 </a>
 </em>
@@ -8497,79 +8497,6 @@ string
 </td>
 <td>
 <p>The namespace where the secret is located.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1.ReplicaRole">ReplicaRole
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
-</p>
-<div>
-<p>ReplicaRole represents a role that can be assumed by a component instance.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>name</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Defines the role&rsquo;s identifier. It is used to set the &ldquo;apps.kubeblocks.io/role&rdquo; label value
-on the corresponding object.</p>
-<p>This field is immutable once set.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>serviceable</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Indicates whether a replica assigned this role is capable of providing services.</p>
-<p>This field is immutable once set.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>writable</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Determines if a replica in this role has the authority to perform write operations.
-A writable replica can modify data, handle update operations.</p>
-<p>This field is immutable once set.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>votable</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies whether a replica with this role has voting rights.
-In distributed systems, this typically means the replica can participate in consensus decisions,
-configuration changes, or other processes that require a quorum.</p>
-<p>This field is immutable once set.</p>
 </td>
 </tr>
 </tbody>
@@ -28363,9 +28290,6 @@ InstanceSetStatus
 </table>
 <h3 id="workloads.kubeblocks.io/v1.AccessMode">AccessMode
 (<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.ReplicaRole">ReplicaRole</a>)
-</p>
 <div>
 <p>AccessMode defines SVC access mode enums.</p>
 </div>
@@ -29652,9 +29576,10 @@ int32
 <h3 id="workloads.kubeblocks.io/v1.ReplicaRole">ReplicaRole
 </h3>
 <p>
-(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>, <a href="#workloads.kubeblocks.io/v1.MemberStatus">MemberStatus</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>, <a href="#workloads.kubeblocks.io/v1.MemberStatus">MemberStatus</a>)
 </p>
 <div>
+<p>ReplicaRole represents a role that can be assigned to a component instance, defining its behavior and responsibilities.</p>
 </div>
 <table>
 <thead>
@@ -29672,44 +29597,82 @@ string
 </em>
 </td>
 <td>
-<p>Defines the role name of the replica.</p>
+<p>Name defines the role&rsquo;s unique identifier. This value is used to set the &ldquo;apps.kubeblocks.io/role&rdquo; label
+on the corresponding object to identify its role.</p>
+<p>For example, common role names include:
+- &ldquo;leader&rdquo;: The primary/master instance that handles write operations
+- &ldquo;follower&rdquo;: Secondary/replica instances that replicate data from the leader
+- &ldquo;learner&rdquo;: Read-only instances that don&rsquo;t participate in elections</p>
+<p>This field is immutable once set.</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>accessMode</code><br/>
-<em>
-<a href="#workloads.kubeblocks.io/v1.AccessMode">
-AccessMode
-</a>
-</em>
-</td>
-<td>
-<p>Specifies the service capabilities of this member.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>canVote</code><br/>
+<code>required</code><br/>
 <em>
 bool
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Indicates if this member has voting rights.</p>
+<p>Required indicates if at least one replica with this role must exist for the component to be considered
+operationally running. For example, a leader role may be required for the component to function.</p>
+<p>This field is immutable once set.</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>isLeader</code><br/>
+<code>updatePriority</code><br/>
+<em>
+int
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>UpdatePriority determines the order in which pods with different roles are updated.
+Pods are sorted by this priority (higher numbers = higher priority) and updated accordingly.
+Roles with the highest priority will be updated last.
+The default priority is 0.</p>
+<p>For example:
+- Leader role may have priority 2 (updated last)
+- Follower role may have priority 1 (updated before leader)
+- Learner role may have priority 0 (updated first)</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>participatesInQuorum bool</code><br/>
 <em>
 bool
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Determines if this member is the leader.</p>
+<p>ParticipatesInQuorum indicates if pods with this role are counted when determining quorum.
+This affects update strategies that need to maintain quorum for availability.</p>
+<p>For example, in a 5-pod component where:
+- 2 learner pods (participatesInQuorum=false)
+- 2 follower pods (participatesInQuorum=true)
+- 1 leader pod (participatesInQuorum=true)
+The quorum size would be 3 (based on the 3 participating pods), allowing parallel updates
+of 2 learners and 1 follower while maintaining quorum.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>switchoverBeforeUpdate</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>SwitchoverBeforeUpdate indicates if a role switchover operation should be performed before
+updating or scaling in pods with this role. This is typically used for leader roles to
+ensure minimal disruption during updates.</p>
+<p>This field is immutable once set.</p>
 </td>
 </tr>
 </tbody>

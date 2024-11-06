@@ -178,7 +178,7 @@ func MockInstanceSetPod(
 		AddAppComponentLabel(consensusCompName).
 		AddAppManagedByLabel().
 		AddRoleLabel(podRole).
-		AddAccessModeLabel(accessMode).
+		// AddAccessModeLabel(accessMode).
 		AddControllerRevisionHashLabel(stsUpdateRevision).
 		AddLabelsInMap(ml).
 		AddVolume(corev1.Volume{

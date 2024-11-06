@@ -18,7 +18,7 @@ import TabItem from '@theme/TabItem';
 ### 开始之前
 
 * 如果您想通过 `kbcli` 创建并连接 ApeCloud MySQL 集群，请先[安装 kbcli](./../../installation/install-with-kbcli/install-kbcli.md)。
-* 安装 KubeBlocks，可通过 [kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) 或者 [Helm](./../../installation/install-with-helm/install-kubeblocks.md)。
+* 安装 KubeBlocks，可通过 [kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) 或者 [Helm](./../../installation/install-with-helm/install-kubeblocks.md) 安装。
 * 确保 ApeCloud MySQL 引擎已启用。KubeBlocks 默认已安装 ApeCloud MySQL，如果您在安装 KubeBlcoks 关闭/卸载了该引擎，可参考相关文档，再次启用/安装该引擎，可通过 [kbcli](./../../installation/install-with-kbcli/install-addons.md) 或者 [Helm](./../../installation/install-with-helm/install-addons.md) 操作。
   
   <Tabs>
@@ -117,7 +117,7 @@ KubeBlocks 支持创建两种类型的 ApeCloud MySQL 集群：单机版（Stand
    kbcli cluster create apecloud-mysql -h
    ```
 
-   例如，您可以使用 `--replcias` 指定副本数，创建集群版集群。
+   例如，您可以使用 `--replcas` 指定副本数，创建集群版集群。
 
    ```bash
    kbcli cluster create mycluster --cluster-definition apecloud-mysql --set replicas=3 --namespace demo

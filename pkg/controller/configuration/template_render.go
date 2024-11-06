@@ -61,7 +61,7 @@ func RenderTemplate(resourceCtx *ResourceCtx,
 	tplBuilder := NewTemplateBuilder(reconcileCtx)
 	for _, tpl := range tpls {
 		configCMName := core.GetComponentCfgName(cluster.Name, comp.Name, tpl.Name)
-		if configCM, err = generateConfigMapFromTemplate(cluster, synthesizedComponent, tplBuilder, configCMName, tpl, resourceCtx, reconcileCtx.Client, nil); err != nil {
+		if configCM, err = generateConfigMapFromTemplate(cluster, synthesizedComponent, tplBuilder, configCMName, tpl, resourceCtx.Context, reconcileCtx.Client, nil); err != nil {
 		}
 		if err != nil {
 			return nil, err
@@ -85,14 +85,14 @@ func RerenderParametersTemplate(reconcileCtx *ReconcileCtx, item parametersv1alp
 		tplBuilder,
 		core.GetComponentCfgName(reconcileCtx.SynthesizedComponent.ClusterName, reconcileCtx.SynthesizedComponent.Name, item.ConfigSpec.Name),
 		*item.ConfigSpec,
-		reconcileCtx,
+		reconcileCtx.Context,
 		reconcileCtx.Client,
 		parametersValidate)
 	if err != nil {
 		return nil, err
 	}
 	if item.CustomTemplates != nil {
-		newData, err := mergerConfigTemplate(*item.CustomTemplates, tplBuilder, *item.ConfigSpec, cmObj.Data, defs, configRender, reconcileCtx, reconcileCtx.Client)
+		newData, err := mergerConfigTemplate(*item.CustomTemplates, tplBuilder, *item.ConfigSpec, cmObj.Data, defs, configRender, reconcileCtx.Context, reconcileCtx.Client)
 		if err != nil {
 			return nil, err
 		}

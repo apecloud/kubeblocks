@@ -89,7 +89,7 @@ func (t *componentReloadActionSidecarTransformer) Transform(ctx graph.TransformC
 		return nil
 	}
 
-	configRender, paramsDefs, err := resolveCmpdParametersDefs(transCtx, transCtx.Client, transCtx.CompDef)
+	configRender, paramsDefs, err := intctrlutil.ResolveCmpdParametersDefs(transCtx, transCtx.Client, transCtx.CompDef)
 	if err != nil {
 		return err
 	}

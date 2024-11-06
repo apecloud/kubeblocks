@@ -22,7 +22,7 @@ package parameters
 import (
 	corev1 "k8s.io/api/core/v1"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	podutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -30,10 +30,10 @@ type parallelUpgradePolicy struct {
 }
 
 func init() {
-	RegisterPolicy(appsv1alpha1.RestartPolicy, &parallelUpgradePolicy{})
+	RegisterPolicy(parametersv1alpha1.RestartPolicy, &parallelUpgradePolicy{})
 }
 
-func (p *parallelUpgradePolicy) Upgrade(params reconfigureParams) (ReturnedStatus, error) {
+func (p *parallelUpgradePolicy) Upgrade(params reconfigureContext) (ReturnedStatus, error) {
 	funcs := GetInstanceSetRollingUpgradeFuncs()
 	pods, err := funcs.GetPodsFunc(params)
 	if err != nil {
@@ -44,10 +44,10 @@ func (p *parallelUpgradePolicy) Upgrade(params reconfigureParams) (ReturnedStatu
 }
 
 func (p *parallelUpgradePolicy) GetPolicyName() string {
-	return string(appsv1alpha1.RestartPolicy)
+	return string(parametersv1alpha1.RestartPolicy)
 }
 
-func (p *parallelUpgradePolicy) restartPods(params reconfigureParams, pods []corev1.Pod, funcs RollingUpgradeFuncs) (ReturnedStatus, error) {
+func (p *parallelUpgradePolicy) restartPods(params reconfigureContext, pods []corev1.Pod, funcs RollingUpgradeFuncs) (ReturnedStatus, error) {
 	var configKey = params.getConfigKey()
 	var configVersion = params.getTargetVersionHash()
 
@@ -55,10 +55,10 @@ func (p *parallelUpgradePolicy) restartPods(params reconfigureParams, pods []cor
 		if podutil.IsMatchConfigVersion(&pod, configKey, configVersion) {
 			continue
 		}
-		if err := funcs.RestartContainerFunc(&pod, params.Ctx.Ctx, params.ContainerNames, params.ReconfigureClientFactory); err != nil {
+		if err := funcs.RestartContainerFunc(&pod, params.Ctx, params.ContainerNames, params.ReconfigureClientFactory); err != nil {
 			return makeReturnedStatus(ESFailedAndRetry), err
 		}
-		if err := updatePodLabelsWithConfigVersion(&pod, configKey, configVersion, params.Client, params.Ctx.Ctx); err != nil {
+		if err := updatePodLabelsWithConfigVersion(&pod, configKey, configVersion, params.Client, params.Ctx); err != nil {
 			return makeReturnedStatus(ESFailedAndRetry), err
 		}
 	}

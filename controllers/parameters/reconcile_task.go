@@ -27,7 +27,6 @@ import (
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -114,10 +113,10 @@ func NewTask(item parametersv1alpha1.ConfigTemplateItemDetail, status *parameter
 			switch intctrlutil.GetConfigSpecReconcilePhase(configMap, item, status) {
 			default:
 				return syncStatus(configMap, status)
-			case appsv1alpha1.CPendingPhase,
-				appsv1alpha1.CMergeFailedPhase:
+			case parametersv1alpha1.CPendingPhase,
+				parametersv1alpha1.CMergeFailedPhase:
 				return syncImpl(taskCtx, resource, item, status, revision, configMap)
-			case appsv1alpha1.CCreatingPhase:
+			case parametersv1alpha1.CCreatingPhase:
 				return nil
 			}
 		},
@@ -185,7 +184,7 @@ func mergeAndUpdate(resourceCtx *configctrl.ResourceCtx, expected *corev1.Config
 	if err := intctrlutil.SetControllerReference(owner, configmapDeep); err != nil {
 		return err
 	}
-	return resourceCtx.Client.Patch(resourceCtx, expected, client.MergeFrom(running))
+	return resourceCtx.Client.Patch(resourceCtx.Context, expected, client.MergeFrom(running))
 }
 
 func syncStatus(configMap *corev1.ConfigMap, status *parametersv1alpha1.ConfigTemplateItemDetailStatus) (err error) {

@@ -24,6 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 )
 
@@ -31,20 +32,20 @@ type simplePolicy struct {
 }
 
 func init() {
-	RegisterPolicy(appsv1alpha1.NormalPolicy, &simplePolicy{})
+	RegisterPolicy(parametersv1alpha1.NormalPolicy, &simplePolicy{})
 }
 
-func (s *simplePolicy) Upgrade(params reconfigureParams) (ReturnedStatus, error) {
-	params.Ctx.Log.V(1).Info("simple policy begin....")
+func (s *simplePolicy) Upgrade(params reconfigureContext) (ReturnedStatus, error) {
+	params.Log.V(1).Info("simple policy begin....")
 
 	return restartAndCheckComponent(params, GetInstanceSetRollingUpgradeFuncs(), fromWorkloadObjects(params))
 }
 
 func (s *simplePolicy) GetPolicyName() string {
-	return string(appsv1alpha1.NormalPolicy)
+	return string(parametersv1alpha1.NormalPolicy)
 }
 
-func restartAndCheckComponent(param reconfigureParams, funcs RollingUpgradeFuncs, objs []client.Object) (ReturnedStatus, error) {
+func restartAndCheckComponent(param reconfigureContext, funcs RollingUpgradeFuncs, objs []client.Object) (ReturnedStatus, error) {
 	var (
 		newVersion = param.getTargetVersionHash()
 		configKey  = param.getConfigKey()
@@ -54,12 +55,12 @@ func restartAndCheckComponent(param reconfigureParams, funcs RollingUpgradeFuncs
 	)
 
 	recordEvent := func(obj client.Object) {
-		param.Ctx.Recorder.Eventf(obj,
+		param.Recorder.Eventf(obj,
 			corev1.EventTypeNormal, appsv1alpha1.ReasonReconfigureRestart,
 			"restarting component[%s] in cluster[%s], version: %s", param.ClusterComponent.Name, param.Cluster.Name, newVersion)
 	}
-	if obj, err := funcs.RestartComponent(param.Client, param.Ctx, configKey, newVersion, objs, recordEvent); err != nil {
-		param.Ctx.Recorder.Eventf(obj,
+	if obj, err := funcs.RestartComponent(param.Client, param.RequestCtx, configKey, newVersion, objs, recordEvent); err != nil {
+		param.Recorder.Eventf(obj,
 			corev1.EventTypeWarning, appsv1alpha1.ReasonReconfigureRestartFailed,
 			"failed to  restart component[%s] in cluster[%s], version: %s", client.ObjectKeyFromObject(obj), param.Cluster.Name, newVersion)
 		return makeReturnedStatus(ESFailedAndRetry), err

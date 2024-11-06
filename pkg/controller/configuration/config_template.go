@@ -52,7 +52,7 @@ func NewTemplateBuilder(reconcileCtx *ReconcileCtx) *configTemplateBuilder {
 		namespace:    reconcileCtx.Namespace,
 		clusterName:  reconcileCtx.ClusterName,
 		templateName: defaultTemplateName,
-		ctx:          reconcileCtx.ResourceCtx,
+		ctx:          reconcileCtx.Context,
 		cli:          reconcileCtx.Client,
 	}
 	builder.injectBuiltInObjectsAndFunctions(reconcileCtx.PodSpec, reconcileCtx.SynthesizedComponent, reconcileCtx.Cache, reconcileCtx.Cluster)

@@ -38,7 +38,7 @@ import (
 	"go.uber.org/zap"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/gotemplate"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
@@ -53,7 +53,7 @@ func TestCreateUpdatedParamsPatch(t *testing.T) {
 	type args struct {
 		newVersion string
 		oldVersion string
-		formatCfg  *appsv1beta1.FileFormatConfig
+		formatCfg  *parametersv1alpha1.FileFormatConfig
 	}
 	tests := []struct {
 		name    string
@@ -65,9 +65,9 @@ func TestCreateUpdatedParamsPatch(t *testing.T) {
 		args: args{
 			newVersion: filepath.Join(rootPath, "currentVersion"),
 			oldVersion: filepath.Join(rootPath, "lastVersion"),
-			formatCfg: &appsv1beta1.FileFormatConfig{
-				Format: appsv1beta1.Ini,
-				FormatterAction: appsv1beta1.FormatterAction{IniConfig: &appsv1beta1.IniConfig{
+			formatCfg: &parametersv1alpha1.FileFormatConfig{
+				Format: parametersv1alpha1.Ini,
+				FormatterAction: parametersv1alpha1.FormatterAction{IniConfig: &parametersv1alpha1.IniConfig{
 					SectionName: "mysqld",
 				}},
 			}},
@@ -139,7 +139,7 @@ func TestOnlineUpdateParamsHandle(t *testing.T) {
 
 	type args struct {
 		tplScriptPath string
-		formatConfig  *appsv1beta1.FileFormatConfig
+		formatConfig  *parametersv1alpha1.FileFormatConfig
 		dataType      string
 		dsn           string
 	}
@@ -152,8 +152,8 @@ func TestOnlineUpdateParamsHandle(t *testing.T) {
 		name: "online_update_params_handle_test",
 		args: args{
 			tplScriptPath: filepath.Join(tmpTestData, partroniPath),
-			formatConfig: &appsv1beta1.FileFormatConfig{
-				Format: appsv1beta1.Properties,
+			formatConfig: &parametersv1alpha1.FileFormatConfig{
+				Format: parametersv1alpha1.Properties,
 			},
 			dsn:      server.URL,
 			dataType: "patroni",
@@ -238,13 +238,13 @@ var _ = Describe("ReloadUtil Test", func() {
 	AfterEach(func() {
 	})
 
-	createIniFormatter := func(sectionName string) *appsv1beta1.FileFormatConfig {
-		return &appsv1beta1.FileFormatConfig{
-			FormatterAction: appsv1beta1.FormatterAction{
-				IniConfig: &appsv1beta1.IniConfig{
+	createIniFormatter := func(sectionName string) *parametersv1alpha1.FileFormatConfig {
+		return &parametersv1alpha1.FileFormatConfig{
+			FormatterAction: parametersv1alpha1.FormatterAction{
+				IniConfig: &parametersv1alpha1.IniConfig{
 					SectionName: sectionName,
 				}},
-			Format: appsv1beta1.Ini,
+			Format: parametersv1alpha1.Ini,
 		}
 	}
 
@@ -335,11 +335,10 @@ var _ = Describe("ReloadUtil Test", func() {
 				name: "test2",
 				args: []ConfigSpecMeta{{
 					ConfigSpecInfo: ConfigSpecInfo{
-						ConfigSpec: appsv1.ComponentConfigSpec{
-							ComponentTemplateSpec: appsv1.ComponentTemplateSpec{
-								Name:        "test",
-								TemplateRef: "test_cm",
-							}},
+						ConfigSpec: appsv1.ComponentTemplateSpec{
+							Name:        "test",
+							TemplateRef: "test_cm",
+						},
 					}},
 				},
 				want: false,
@@ -347,50 +346,38 @@ var _ = Describe("ReloadUtil Test", func() {
 				name: "test3",
 				args: []ConfigSpecMeta{{
 					ConfigSpecInfo: ConfigSpecInfo{
-						ConfigSpec: appsv1.ComponentConfigSpec{
-							ComponentTemplateSpec: appsv1.ComponentTemplateSpec{
-								Name:        "test",
-								TemplateRef: "test_cm",
-							},
-							ConfigConstraintRef: "cc2",
+						ConfigSpec: appsv1.ComponentTemplateSpec{
+							Name:        "test",
+							TemplateRef: "test_cm",
 						},
-						ReloadType: appsv1beta1.ShellType,
+						ReloadType: parametersv1alpha1.ShellType,
 					},
 				}, {
 					ConfigSpecInfo: ConfigSpecInfo{
-						ConfigSpec: appsv1.ComponentConfigSpec{
-							ComponentTemplateSpec: appsv1.ComponentTemplateSpec{
-								Name:        "test2",
-								TemplateRef: "test_cm",
-							},
-							ConfigConstraintRef: "cc3",
+						ConfigSpec: appsv1.ComponentTemplateSpec{
+							Name:        "test2",
+							TemplateRef: "test_cm",
 						},
-						ReloadType: appsv1beta1.TPLScriptType,
+						ReloadType: parametersv1alpha1.TPLScriptType,
 					}}},
 				want: false,
 			}, {
 				name: "test4",
 				args: []ConfigSpecMeta{{
 					ConfigSpecInfo: ConfigSpecInfo{
-						ConfigSpec: appsv1.ComponentConfigSpec{
-							ComponentTemplateSpec: appsv1.ComponentTemplateSpec{
-								Name:        "test",
-								TemplateRef: "test_cm",
-							},
-							ConfigConstraintRef: "cc1",
+						ConfigSpec: appsv1.ComponentTemplateSpec{
+							Name:        "test",
+							TemplateRef: "test_cm",
 						},
-						ReloadType: appsv1beta1.UnixSignalType,
+						ReloadType: parametersv1alpha1.UnixSignalType,
 					},
 				}, {
 					ConfigSpecInfo: ConfigSpecInfo{
-						ConfigSpec: appsv1.ComponentConfigSpec{
-							ComponentTemplateSpec: appsv1.ComponentTemplateSpec{
-								Name:        "test2",
-								TemplateRef: "test_cm",
-							},
-							ConfigConstraintRef: "cc3",
+						ConfigSpec: appsv1.ComponentTemplateSpec{
+							Name:        "test2",
+							TemplateRef: "test_cm",
 						},
-						ReloadType: appsv1beta1.TPLScriptType,
+						ReloadType: parametersv1alpha1.TPLScriptType,
 					}}},
 				want: true,
 			}}

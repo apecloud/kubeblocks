@@ -19,33 +19,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package operations
 
-import (
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-)
-
-func testUpdateConfigConfigmapResource(
-	reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
-	resource *OpsResource,
-	config opsv1alpha1.ConfigurationItem,
-	clusterName, componentName string) reconfiguringResult {
-
-	return newPipeline(reconfigureContext{
-		cli:           cli,
-		reqCtx:        reqCtx,
-		resource:      resource,
-		config:        config,
-		clusterName:   clusterName,
-		componentName: componentName,
-	}).ComponentParameter().
-		Validate().
-		ConfigMap(config.Name).
-		ConfigConstraints().
-		Merge().
-		UpdateOpsLabel().
-		Sync().
-		Complete()
-}
+// import (
+// 	"sigs.k8s.io/controller-runtime/pkg/client"
+//
+// 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
+// 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+// )
+//
+// func testUpdateConfigConfigmapResource(
+// 	reqCtx intctrlutil.RequestCtx,
+// 	cli client.Client,
+// 	resource *OpsResource,
+// 	config opsv1alpha1.ConfigurationItem,
+// 	clusterName, componentName string) reconfiguringResult {
+//
+// 	return newPipeline(reconfigureContext{
+// 		cli:           cli,
+// 		reqCtx:        reqCtx,
+// 		resource:      resource,
+// 		config:        config,
+// 		clusterName:   clusterName,
+// 		componentName: componentName,
+// 	}).ComponentParameter().
+// 		Validate().
+// 		ConfigMap(config.Name).
+// 		ConfigConstraints().
+// 		Merge().
+// 		UpdateOpsLabel().
+// 		Sync().
+// 		Complete()
+// }

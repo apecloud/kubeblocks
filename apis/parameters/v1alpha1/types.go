@@ -174,3 +174,18 @@ type ParametersInFile struct {
 }
 
 type ComponentParameters map[string]*string
+
+// ReloadPolicy defines the policy of reconfiguring.
+// +enum
+// +kubebuilder:validation:Enum={simple,parallel,rolling,autoReload,operatorSyncUpdate,dynamicReloadBeginRestart}
+type ReloadPolicy string
+
+const (
+	NonePolicy                    ReloadPolicy = "none"
+	NormalPolicy                  ReloadPolicy = "simple"
+	RestartPolicy                 ReloadPolicy = "parallel"
+	RollingPolicy                 ReloadPolicy = "rolling"
+	AsyncDynamicReloadPolicy      ReloadPolicy = "autoReload"
+	SyncDynamicReloadPolicy       ReloadPolicy = "operatorSyncUpdate"
+	DynamicReloadAndRestartPolicy ReloadPolicy = "dynamicReloadBeginRestart"
+)

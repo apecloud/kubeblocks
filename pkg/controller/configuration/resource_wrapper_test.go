@@ -81,7 +81,7 @@ var _ = Describe("resource Fetcher", func() {
 				Cluster().
 				ComponentSpec().
 				ConfigMap(mysqlConfigName).
-				ConfigConstraints(mysqlConfigName).
+				// ConfigConstraints(mysqlConfigName).
 				ComponentParameter().
 				Complete()
 			Expect(err).Should(Succeed())

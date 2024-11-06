@@ -24,7 +24,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	cfgcm "github.com/apecloud/kubeblocks/pkg/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
@@ -48,7 +48,7 @@ func buildReloadToolsContainer(cfgManagerParams *cfgcm.CfgManagerBuildParams, po
 
 	var toolsPath string
 	var sidecarImage string
-	var toolContainers []appsv1beta1.ToolConfig
+	var toolContainers []parametersv1alpha1.ToolConfig
 	for _, buildParam := range cfgManagerParams.ConfigSpecsBuildParams {
 		if buildParam.ToolsImageSpec == nil {
 			continue
@@ -59,7 +59,7 @@ func buildReloadToolsContainer(cfgManagerParams *cfgcm.CfgManagerBuildParams, po
 			}
 			toolsImageMap[toolImage.Name] = buildParam
 			replaceToolsImageHolder(&toolImage, podSpec, buildParam.ConfigSpec.VolumeName)
-			if toolImage.AsSidecarContainerImage() && sidecarImage == "" {
+			if intctrlutil.AsSidecarContainerImage(toolImage) && sidecarImage == "" {
 				sidecarImage = toolImage.Image
 			} else {
 				toolContainers = append(toolContainers, toolImage)
@@ -86,7 +86,7 @@ func buildReloadToolsContainer(cfgManagerParams *cfgcm.CfgManagerBuildParams, po
 	return err
 }
 
-func checkAndInstallToolsImageVolume(toolContainers []appsv1beta1.ToolConfig, buildParams []cfgcm.ConfigSpecMeta, useBuiltinSidecarImage bool) ([]appsv1beta1.ToolConfig, string) {
+func checkAndInstallToolsImageVolume(toolContainers []parametersv1alpha1.ToolConfig, buildParams []cfgcm.ConfigSpecMeta, useBuiltinSidecarImage bool) ([]parametersv1alpha1.ToolConfig, string) {
 	var configManagerBinaryPath string
 	for _, buildParam := range buildParams {
 		if buildParam.ToolsImageSpec == nil {
@@ -100,19 +100,19 @@ func checkAndInstallToolsImageVolume(toolContainers []appsv1beta1.ToolConfig, bu
 	return toolContainers, configManagerBinaryPath
 }
 
-func containerExists(containers []appsv1beta1.ToolConfig, containerName string) bool {
-	return generics.CountFunc(containers, func(container appsv1beta1.ToolConfig) bool {
+func containerExists(containers []parametersv1alpha1.ToolConfig, containerName string) bool {
+	return generics.CountFunc(containers, func(container parametersv1alpha1.ToolConfig) bool {
 		return container.Name == containerName
 	}) != 0
 }
 
-func checkAndCreateConfigManagerToolsContainer(toolContainers []appsv1beta1.ToolConfig, mountPoint string) []appsv1beta1.ToolConfig {
+func checkAndCreateConfigManagerToolsContainer(toolContainers []parametersv1alpha1.ToolConfig, mountPoint string) []parametersv1alpha1.ToolConfig {
 	if containerExists(toolContainers, installConfigMangerToolContainerName) {
 		return toolContainers
 	}
 
 	kbToolsImage := viper.GetString(constant.KBToolsImage)
-	toolContainers = append(toolContainers, appsv1beta1.ToolConfig{
+	toolContainers = append(toolContainers, parametersv1alpha1.ToolConfig{
 		Name:    installConfigMangerToolContainerName,
 		Image:   kbToolsImage,
 		Command: []string{"cp", constant.ConfigManagerToolPath, mountPoint},
@@ -120,7 +120,7 @@ func checkAndCreateConfigManagerToolsContainer(toolContainers []appsv1beta1.Tool
 	return toolContainers
 }
 
-func replaceToolsImageHolder(toolConfig *appsv1beta1.ToolConfig, podSpec *corev1.PodSpec, volumeName string) {
+func replaceToolsImageHolder(toolConfig *parametersv1alpha1.ToolConfig, podSpec *corev1.PodSpec, volumeName string) {
 	switch {
 	case toolConfig.Image == kbToolsImagePlaceHolder:
 		toolConfig.Image = viper.GetString(constant.KBToolsImage)

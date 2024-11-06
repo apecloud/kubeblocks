@@ -21,6 +21,8 @@ package parameters
 
 import (
 	"context"
+	"fmt"
+	"slices"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
@@ -28,9 +30,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/generics"
 )
 
 // ParameterDrivenConfigRenderReconciler reconciles a ParameterDrivenConfigRender object
@@ -64,7 +68,7 @@ func (r *ParameterDrivenConfigRenderReconciler) Reconcile(ctx context.Context, r
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
-	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, parameterTemplate, constant.ConfigFinalizerName, r.deletionHandler(parameterTemplate, reqCtx))
+	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, parameterTemplate, constant.ConfigFinalizerName, nil)
 	if res != nil {
 		return *res, err
 	}
@@ -78,13 +82,82 @@ func (r *ParameterDrivenConfigRenderReconciler) SetupWithManager(mgr ctrl.Manage
 		Complete(r)
 }
 
-func (r *ParameterDrivenConfigRenderReconciler) deletionHandler(parameterTemplate *parametersv1alpha1.ParameterDrivenConfigRender, reqCtx intctrlutil.RequestCtx) func() (*ctrl.Result, error) {
-	return func() (*ctrl.Result, error) {
-		// TODO
-		return nil, DeleteConfigMapFinalizer(r.Client, reqCtx, nil)
+func (r *ParameterDrivenConfigRenderReconciler) reconcile(reqCtx intctrlutil.RequestCtx, parameterTemplate *parametersv1alpha1.ParameterDrivenConfigRender) (ctrl.Result, error) {
+	if parameterTemplate.Status.ObservedGeneration == parameterTemplate.Generation &&
+		slices.Contains([]parametersv1alpha1.ParametersDescPhase{parametersv1alpha1.PDAvailablePhase}, parameterTemplate.Status.Phase) {
+		return intctrlutil.Reconciled()
 	}
+
+	if err := r.validate(reqCtx, r.Client, &parameterTemplate.Spec); err != nil {
+		if err1 := r.unavailable(reqCtx.Ctx, r.Client, parameterTemplate, err); err1 != nil {
+			return intctrlutil.CheckedRequeueWithError(err1, reqCtx.Log, "")
+		}
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
+
+	if err := r.available(reqCtx.Ctx, r.Client, parameterTemplate); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
+
+	intctrlutil.RecordCreatedEvent(r.Recorder, parameterTemplate)
+	return intctrlutil.Reconciled()
 }
 
-func (r *ParameterDrivenConfigRenderReconciler) reconcile(reqCtx intctrlutil.RequestCtx, parameterTemplate *parametersv1alpha1.ParameterDrivenConfigRender) (ctrl.Result, error) {
-	panic("")
+func (r *ParameterDrivenConfigRenderReconciler) validate(ctx intctrlutil.RequestCtx, cli client.Client, parameterTemplate *parametersv1alpha1.ParameterDrivenConfigRenderSpec) error {
+	cmpd := &appsv1.ComponentDefinition{}
+	if err := cli.Get(ctx.Ctx, client.ObjectKey{Name: parameterTemplate.ComponentDef}, cmpd); err != nil {
+		return err
+	}
+	if err := validateParametersDefs(ctx, cli, parameterTemplate.ParametersDefs); err != nil {
+		return err
+	}
+	if err := validateParametersConfigs(parameterTemplate.Configs, cmpd.Spec.Configs); err != nil {
+		return err
+	}
+	return nil
+}
+
+func validateParametersConfigs(configs []parametersv1alpha1.ComponentConfigDescription, templates []appsv1.ComponentTemplateSpec) error {
+	for _, config := range configs {
+		match := func(spec appsv1.ComponentTemplateSpec) bool {
+			return config.TemplateName == spec.Name
+		}
+		if len(generics.FindFunc(templates, match)) == 0 {
+			return fmt.Errorf("")
+		}
+	}
+	return nil
+}
+
+func validateParametersDefs(reqCtx intctrlutil.RequestCtx, cli client.Client, paramsDefs []string) error {
+	paramsDefObjs := make(map[string]*parametersv1alpha1.ParametersDefinition, len(paramsDefs))
+	for _, paramsDef := range paramsDefs {
+		obj := &parametersv1alpha1.ParametersDefinition{}
+		if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: paramsDef}, obj); err != nil {
+			return err
+		}
+		if def, ok := paramsDefObjs[obj.Spec.FileName]; ok {
+			return fmt.Errorf("config file[%s] has been defined in other parametersdefinition[%s]", obj.Spec.FileName, def.Name)
+		}
+	}
+	return nil
+}
+
+func (r *ParameterDrivenConfigRenderReconciler) available(ctx context.Context, cli client.Client, parameterTemplate *parametersv1alpha1.ParameterDrivenConfigRender) error {
+	return r.status(ctx, cli, parameterTemplate, parametersv1alpha1.PDAvailablePhase, nil)
+}
+
+func (r *ParameterDrivenConfigRenderReconciler) unavailable(ctx context.Context, cli client.Client, parameterTemplate *parametersv1alpha1.ParameterDrivenConfigRender, err error) error {
+	return r.status(ctx, cli, parameterTemplate, parametersv1alpha1.PDUnavailablePhase, err)
+}
+
+func (r *ParameterDrivenConfigRenderReconciler) status(ctx context.Context, cli client.Client, parameterRender *parametersv1alpha1.ParameterDrivenConfigRender, phase parametersv1alpha1.ParametersDescPhase, err error) error {
+	patch := client.MergeFrom(parameterRender.DeepCopy())
+	parameterRender.Status.ObservedGeneration = parameterRender.Generation
+	parameterRender.Status.Phase = phase
+	parameterRender.Status.Message = ""
+	if err != nil {
+		parameterRender.Status.Message = err.Error()
+	}
+	return cli.Status().Patch(ctx, parameterRender, patch)
 }

@@ -47,8 +47,8 @@ var _ OpsHandler = switchoverOpsHandler{}
 // SwitchoverMessage is the OpsRequest.Status.Condition.Message for switchover.
 type SwitchoverMessage struct {
 	opsv1alpha1.Switchover
-	OldPrimary string
-	Cluster    string
+	OldPod  string
+	Cluster string
 }
 
 func init() {
@@ -72,13 +72,13 @@ func (r switchoverOpsHandler) ActionStartedCondition(reqCtx intctrlutil.RequestC
 		if err != nil {
 			return nil, err
 		}
-		pod, err := getServiceableNWritablePod(reqCtx.Ctx, cli, *synthesizedComp)
+		pod, err := getPodToPerformSwitchover(reqCtx.Ctx, cli, synthesizedComp)
 		if err != nil {
 			return nil, err
 		}
 		switchoverMessageMap[switchover.ComponentName] = SwitchoverMessage{
 			Switchover: switchover,
-			OldPrimary: pod.Name,
+			OldPod:     pod.Name,
 			Cluster:    opsRes.Cluster.Name,
 		}
 	}

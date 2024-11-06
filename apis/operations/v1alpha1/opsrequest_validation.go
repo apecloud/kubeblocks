@@ -795,9 +795,10 @@ func validateSwitchoverResourceList(ctx context.Context, cli client.Client, clus
 					return targetRole, errors.New("component has no roles definition, does not support switchover")
 				}
 				for _, role := range roles {
-					if role.Serviceable && role.Writable {
+					// FIXME: the assumption that only one role supports switchover may change in the future
+					if role.SwitchoverBeforeUpdate {
 						if targetRole != "" {
-							return targetRole, errors.New("componentDefinition has more than role is serviceable and writable, does not support switchover")
+							return targetRole, errors.New("componentDefinition has more than role that needs switchover before, does not support switchover")
 						}
 						targetRole = role.Name
 					}

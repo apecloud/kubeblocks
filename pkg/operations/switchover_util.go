@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -49,7 +50,7 @@ func needDoSwitchover(ctx context.Context,
 	synthesizedComp *component.SynthesizedComponent,
 	switchover *opsv1alpha1.Switchover) (bool, error) {
 	// get the Pod object whose current role label is already serviceable and writable
-	pod, err := getServiceableNWritablePod(ctx, cli, *synthesizedComp)
+	pod, err := getPodToPerformSwitchover(ctx, cli, synthesizedComp)
 	if err != nil {
 		return false, err
 	}
@@ -87,7 +88,7 @@ func checkPodRoleLabelConsistency(ctx context.Context,
 	if switchover == nil || switchoverCondition == nil {
 		return false, nil
 	}
-	pod, err := getServiceableNWritablePod(ctx, cli, synthesizedComp)
+	pod, err := getPodToPerformSwitchover(ctx, cli, &synthesizedComp)
 	if err != nil {
 		return false, err
 	}
@@ -105,7 +106,7 @@ func checkPodRoleLabelConsistency(ctx context.Context,
 		}
 		switch switchoverMessage.Switchover.InstanceName {
 		case KBSwitchoverCandidateInstanceForAnyPod:
-			if pod.Name != switchoverMessage.OldPrimary {
+			if pod.Name != switchoverMessage.OldPod {
 				return true, nil
 			}
 		default:
@@ -117,25 +118,16 @@ func checkPodRoleLabelConsistency(ctx context.Context,
 	return false, nil
 }
 
-// getServiceableNWritablePod returns the serviceable and writable pod of the component.
-func getServiceableNWritablePod(ctx context.Context, cli client.Reader, synthesizeComp component.SynthesizedComponent) (*corev1.Pod, error) {
-	if synthesizeComp.Roles == nil {
-		return nil, errors.New("component does not support switchover")
+func getPodToPerformSwitchover(ctx context.Context, cli client.Reader, synthesizedComp *component.SynthesizedComponent) (*corev1.Pod, error) {
+	role, err := getTargetRoleName(synthesizedComp.Roles)
+	if err != nil {
+		return nil, err
 	}
+	pod, err := getPodByRole(ctx, cli, synthesizedComp, role)
+	return pod, err
+}
 
-	targetRole := ""
-	for _, role := range synthesizeComp.Roles {
-		if role.Serviceable && role.Writable {
-			if targetRole != "" {
-				return nil, errors.New("component has more than role is serviceable and writable, does not support switchover")
-			}
-			targetRole = role.Name
-		}
-	}
-	if targetRole == "" {
-		return nil, errors.New("component has no role is serviceable and writable, does not support switchover")
-	}
-
+func getPodByRole(ctx context.Context, cli client.Reader, synthesizeComp *component.SynthesizedComponent, targetRole string) (*corev1.Pod, error) {
 	pods, err := component.ListOwnedPodsWithRole(ctx, cli, synthesizeComp.Namespace, synthesizeComp.ClusterName, synthesizeComp.Name, targetRole)
 	if err != nil {
 		return nil, err
@@ -144,4 +136,23 @@ func getServiceableNWritablePod(ctx context.Context, cli client.Reader, synthesi
 		return nil, errors.New("component pod list is empty or has more than one serviceable and writable pod")
 	}
 	return pods[0], nil
+}
+
+// getTargetRole returns the role on which the switchover is performed
+// FIXME: the assumption that only one role supports switchover may change in the future
+func getTargetRoleName(roles []appsv1.ReplicaRole) (string, error) {
+	targetRole := ""
+	if len(roles) == 0 {
+		return targetRole, errors.New("component has no roles definition, does not support switchover")
+	}
+	for _, role := range roles {
+		// FIXME: the assumption that only one role supports switchover may change in the future
+		if role.SwitchoverBeforeUpdate {
+			if targetRole != "" {
+				return targetRole, errors.New("componentDefinition has more than role that needs switchover before, does not support switchover")
+			}
+			targetRole = role.Name
+		}
+	}
+	return targetRole, nil
 }

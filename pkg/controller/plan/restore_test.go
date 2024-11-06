@@ -157,16 +157,17 @@ var _ = Describe("Restore", func() {
 				Replicas:             1,
 				Roles: []appsv1.ReplicaRole{
 					{
-						Name:        "leader",
-						Serviceable: true,
-						Writable:    true,
-						Votable:     true,
+						Name: "leader",
+						// FIXME
+						// Serviceable: true,
+						// Writable:    true,
+						// Votable:     true,
 					},
 					{
-						Name:        "follower",
-						Serviceable: true,
-						Writable:    false,
-						Votable:     true,
+						Name: "follower",
+						// Serviceable: true,
+						// Writable:    false,
+						// Votable:     true,
 					},
 				},
 			}

@@ -477,7 +477,7 @@ type tplScriptHandler struct {
 }
 
 func (u *tplScriptHandler) OnlineUpdate(ctx context.Context, name string, updatedParams map[string]string) error {
-	logger.V(1).Info(fmt.Sprintf("online update[%v]", updatedParams))
+	logger.V(1).Info(fmt.Sprintf("online update[%v]", updatedParams), "file", name)
 	return wrapGoTemplateRun(ctx,
 		u.tplScripts,
 		u.tplContent,
@@ -595,7 +595,11 @@ func CreateCombinedHandler(config string, backupPath string) (ConfigHandler, err
 		if err != nil {
 			return nil, err
 		}
-		mHandler.handlers[configMeta.ConfigSpec.Name] = h
+		hkey := configMeta.ConfigSpec.Name
+		if configMeta.ConfigFile == "" {
+			hkey = hkey + "/" + configMeta.ConfigFile
+		}
+		mHandler.handlers[hkey] = h
 	}
 	return mHandler, nil
 }

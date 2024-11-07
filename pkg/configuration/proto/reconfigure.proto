@@ -21,6 +21,7 @@ message StopContainerResponse {
 message OnlineUpgradeParamsRequest {
   string configSpec = 1;
   map<string, string> params = 2;
+  optional string configFile = 3;
 }
 
 message OnlineUpgradeParamsResponse {

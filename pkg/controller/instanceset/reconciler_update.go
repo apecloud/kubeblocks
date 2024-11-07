@@ -139,6 +139,10 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on update as the image(s) of pod %s is not matched", its.Namespace, its.Name, pod.Name))
 			break
 		}
+		if !isContainersAvailable(pod, its.Spec.MinReadySeconds) {
+			tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on update as some the container(s) of pod %s are not started at least for %d seconds", its.Namespace, its.Name, pod.Name, its.Spec.MinReadySeconds))
+			break
+		}
 		if !isHealthy(pod) {
 			tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on update as the pod %s is not healthy", its.Namespace, its.Name, pod.Name))
 			break

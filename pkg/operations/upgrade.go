@@ -163,17 +163,18 @@ func (u upgradeOpsHandler) podImageApplied(pod *corev1.Pod, expectContainers []c
 	if len(expectContainers) == 0 {
 		return true
 	}
-	imageEqual := func(sourceImage, targetImage string) bool {
-		return sourceImage[strings.LastIndex(sourceImage, "/"):] == targetImage[strings.LastIndex(targetImage, "/"):]
+	imageName := func(image string) string {
+		images := strings.Split(image, "/")
+		return images[len(images)-1]
 	}
 	for _, v := range expectContainers {
 		for _, cs := range pod.Status.ContainerStatuses {
-			if cs.Name == v.Name && !imageEqual(cs.Image, v.Image) {
+			if cs.Name == v.Name && imageName(cs.Image) != imageName(v.Image) {
 				return false
 			}
 		}
 		for _, c := range pod.Spec.Containers {
-			if c.Name == v.Name && !imageEqual(c.Image, v.Image) {
+			if c.Name == v.Name && imageName(c.Image) != imageName(v.Image) {
 				return false
 			}
 		}

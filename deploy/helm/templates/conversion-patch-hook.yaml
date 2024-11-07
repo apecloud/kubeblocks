@@ -44,14 +44,21 @@ spec:
                 old_kb_json=$(kubectl get deployment ${name} -n ${namespace} -o json)
                 version=$(echo ${old_kb_json} | jq '.metadata.labels["app.kubernetes.io/version"]' | tr -d '"')
                 replicas=$(echo ${old_kb_json} | jq '.spec.replicas')
+                if echo "$version" | grep -q '^0\.9'; then
+                    # TODO: add it when released 0.9.2
+                    # patch_num=$(echo $version | awk -F. '{print $3}' | awk -F- '{print $1}')
+                    # if [  "$version" != "0.9.2" ] && [ $patch_num -le 2 ]; then
+                    #    echo "ERROR: the installed KubeBlocks version must greater and equal to 0.9.2"
+                    #    exit 1
+                    # fi
+                else
+                    echo "ERROR: can not upgrade KubeBlocks from $version to {{ .Chart.AppVersion }}"
+                    exit 1
+                fi
                 if [ $replicas -ne 0 ]; then
                     echo "ERROR: You must stop the existing ${namespace}/${name} version (${version}) before installing version 1.0."
                     exit 1
                 fi
-                #if echo "$version" | grep -q '^0\.'; then
-                #    echo "ERROR: can not upgrade KubeBlocks from $version to {{ .Chart.AppVersion }}"
-                #    exit 1
-                #fi
               done
               IFS=$OLD_IFS
               # 2. patch crds
@@ -67,7 +74,7 @@ spec:
               # ${patch_crd_cmd} "configconstraints.apps.kubeblocks.io"
               ${patch_crd_cmd} "configurations.apps.kubeblocks.io"
               
-              # 4. start KubeBlocks
+              # 3. start KubeBlocks
               kubectl patch deployment {{ include "kubeblocks.fullname" . }} -n {{ .Release.Namespace }} -p '{"spec":{"replicas":{{ .Values.replicaCount }}}}'
               kubectl patch deployment {{ include "kubeblocks.fullname" . }}-dataprotection -n {{ .Release.Namespace }} -p '{"spec":{"replicas":{{ .Values.replicaCount }}}}'
           volumeMounts:

@@ -22,7 +22,7 @@ on:
       CLUSTER_VERSION:
         description: 'k8s cluster version'
         required: false
-        default: '1.27'
+        default: '1.30'
         type: choice
         options:
           - 1.29

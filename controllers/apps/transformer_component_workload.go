@@ -480,6 +480,11 @@ func (r *componentWorkloadOps) horizontalScale() error {
 }
 
 func (r *componentWorkloadOps) scaleIn() error {
+	deleteReplicas := r.runningItsPodNameSet.Difference(r.desiredCompPodNameSet).UnsortedList()
+	if err := component.DeleteReplicas(r.component, deleteReplicas); err != nil {
+		return err
+	}
+
 	// if scale in to 0, do not delete pvcs
 	if r.synthesizeComp.Replicas == 0 {
 		r.reqCtx.Log.Info("scale in to 0, keep all PVCs")
@@ -604,38 +609,44 @@ func (r *componentWorkloadOps) scaleOut() error {
 		return nil
 	}
 
-	// TODO: select the source replicas to dump data
-	source, err := r.sourceReplica()
-	if err != nil {
-		return err
-	}
-
-	newReplicas := r.desiredCompPodNameSet.Difference(r.runningItsPodNameSet)
-	parameters, err := component.BuildKBAgentTask4NewReplica(r.synthesizeComp.Generation, source, newReplicas.UnsortedList())
-	if err != nil {
-		return err
-	}
-
-	// apply the updated env to the env CM
-	transCtx := &componentTransformContext{
-		Context:             r.reqCtx.Ctx,
-		Client:              r.cli,
-		SynthesizeComponent: r.synthesizeComp,
-		Component:           r.component,
-	}
-	if err = createOrUpdateEnvConfigMap(transCtx, r.dag, nil, parameters); err != nil {
-		return err
-	}
-
-	// TODO: create or update the env CM before the workload
-
 	// update replicas of the workload
 	graphCli := model.NewGraphClient(r.cli)
-	graphCli.Update(r.dag, nil, r.protoITS)
+	v := graphCli.Do(r.dag, nil, r.protoITS, model.ActionUpdatePtr(), nil)
 
-	// TODO: update comp status to record the scale-out replicas
+	newReplicas := r.desiredCompPodNameSet.Difference(r.runningItsPodNameSet).UnsortedList()
+	if err := func() error {
+		// TODO: select the source replicas to dump data
+		source, err := r.sourceReplica()
+		if err != nil {
+			return err
+		}
 
-	return nil
+		task, err := component.NewReplicaTask(r.synthesizeComp.FullCompName, r.synthesizeComp.Generation, source, newReplicas)
+		if err != nil {
+			return err
+		}
+		parameters, err := component.BuildKBAgentTaskEnv(task)
+		if err != nil {
+			return err
+		}
+
+		// apply the updated env to the env CM
+		transCtx := &componentTransformContext{
+			Context:             r.reqCtx.Ctx,
+			Client:              r.cli,
+			SynthesizeComponent: r.synthesizeComp,
+			Component:           r.component,
+		}
+		// create or update the env CM before workloads
+		if err = createOrUpdateEnvConfigMap(transCtx, r.dag, nil, v, parameters); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return err
+	}
+
+	return component.NewReplicas(r.component, newReplicas)
 }
 
 func (r *componentWorkloadOps) sourceReplica() (*corev1.Pod, error) {

@@ -70,7 +70,7 @@ func (t *componentVarsTransformer) Transform(ctx graph.TransformContext, dag *gr
 	envVars2, envData := buildEnvVarsNData(envVars)
 	setTemplateNEnvVars(synthesizedComp, templateVars, envVars2)
 
-	if err := createOrUpdateEnvConfigMap(ctx, dag, envData); err != nil {
+	if err := createOrUpdateEnvConfigMap(ctx, dag, envData, nil); err != nil {
 		return err
 	}
 	return nil
@@ -114,7 +114,7 @@ func envConfigMapSource(clusterName, compName string) corev1.EnvFromSource {
 }
 
 func createOrUpdateEnvConfigMap(ctx graph.TransformContext, dag *graph.DAG,
-	data map[string]string, patches ...map[string]string) error {
+	data map[string]string, parent *model.ObjectVertex, patches ...map[string]string) error {
 	var (
 		transCtx, _     = ctx.(*componentTransformContext)
 		synthesizedComp = transCtx.SynthesizeComponent
@@ -176,14 +176,14 @@ func createOrUpdateEnvConfigMap(ctx graph.TransformContext, dag *graph.DAG,
 		if err := setCompOwnershipNFinalizer(transCtx.Component, obj); err != nil {
 			return err
 		}
-		graphCli.Create(dag, obj, inDataContext4G())
+		graphCli.Do(dag, nil, obj, model.ActionCreatePtr(), parent, inDataContext4G())
 		return nil
 	}
 
 	if !reflect.DeepEqual(envObj.Data, newData) {
 		envObjCopy := envObj.DeepCopy()
 		envObjCopy.Data = newData
-		graphCli.Update(dag, envObj, envObjCopy, inDataContext4G())
+		graphCli.Do(dag, envObj, envObjCopy, model.ActionUpdatePtr(), parent, inDataContext4G())
 		return nil
 	}
 	return nil

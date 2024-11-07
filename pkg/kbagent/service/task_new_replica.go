@@ -26,50 +26,54 @@ import (
 	"net"
 
 	"github.com/go-logr/logr"
-	"github.com/pkg/errors"
 
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 )
 
 const (
-	dataDump = "dataDump"
-	dataLoad = "dataLoad"
+	newReplicaDataDump = "dataDump"
+	newReplicaDataLoad = "dataLoad"
 )
 
-type dataLoadTask struct {
+type newReplicaTask struct {
 	logger        logr.Logger
 	actionService *actionService
+	task          *proto.NewReplicaTask
 }
 
-func (s *dataLoadTask) run(ctx context.Context, task *proto.DataLoadTask) error {
-	action, ok := s.actionService.actions[dataLoad]
+var _ task = &newReplicaTask{}
+
+func (s *newReplicaTask) run(ctx context.Context) (chan error, error) {
+	action, ok := s.actionService.actions[newReplicaDataLoad]
 	if !ok {
-		return fmt.Errorf("%s is not supported", dataLoad)
+		return nil, fmt.Errorf("%s is not supported", newReplicaDataLoad)
 	}
 
-	conn, err := s.handshake(ctx, task)
+	conn, err := s.handshake(ctx)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return s.streamingLoad(ctx, task, action, conn)
+	return runCommandX(ctx, action.Exec, s.task.Parameters, s.task.TimeoutSeconds, conn, nil, nil)
 }
 
-// TODO: implement status to query the load progress
-// func (s *dataLoadTask) status(ctx context.Context) error {
-//	return nil
-// }
+func (s *newReplicaTask) status(ctx context.Context, event *proto.TaskEvent) {
+	// TODO: query the progress
+	event.Code = 0
+	event.Output = nil
+	event.Message = ""
+}
 
-func (s *dataLoadTask) handshake(ctx context.Context, task *proto.DataLoadTask) (net.Conn, error) {
-	conn, err := s.connectToRemote(ctx, task)
+func (s *newReplicaTask) handshake(ctx context.Context) (net.Conn, error) {
+	conn, err := s.connectToRemote(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	req := proto.ActionRequest{
-		Action:         dataDump,
-		Parameters:     task.Parameters,
-		TimeoutSeconds: task.TimeoutSeconds,
+		Action:         newReplicaDataDump,
+		Parameters:     s.task.Parameters,
+		TimeoutSeconds: s.task.TimeoutSeconds,
 	}
 	data, err := json.Marshal(req)
 	if err != nil {
@@ -90,26 +94,14 @@ func (s *dataLoadTask) handshake(ctx context.Context, task *proto.DataLoadTask) 
 	return conn, nil
 }
 
-func (s *dataLoadTask) connectToRemote(ctx context.Context, task *proto.DataLoadTask) (net.Conn, error) {
-	if len(task.Remote) == 0 {
+func (s *newReplicaTask) connectToRemote(ctx context.Context) (net.Conn, error) {
+	if len(s.task.Remote) == 0 {
 		return nil, fmt.Errorf("remote server is required")
 	}
-	if task.Port == nil || *task.Port == 0 {
+	if s.task.Port == 0 {
 		return nil, fmt.Errorf("remote port is required")
 	}
 	// TODO: connect timeout
 	dialer := &net.Dialer{}
-	return dialer.Dial("tcp", fmt.Sprintf("%s:%d", task.Remote, *task.Port))
-}
-
-func (s *dataLoadTask) streamingLoad(ctx context.Context, task *proto.DataLoadTask, action *proto.Action, conn net.Conn) error {
-	errChan, err1 := runCommandX(ctx, action.Exec, task.Parameters, task.TimeoutSeconds, conn, nil, nil)
-	if err1 != nil {
-		return err1
-	}
-	err2, ok := <-errChan
-	if !ok {
-		err2 = errors.New("runtime error: error chan closed unexpectedly")
-	}
-	return err2
+	return dialer.Dial("tcp", fmt.Sprintf("%s:%d", s.task.Remote, s.task.Port))
 }

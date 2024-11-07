@@ -23,18 +23,16 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
-	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/utils/pointer"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	kbagent "github.com/apecloud/kubeblocks/pkg/kbagent"
+	"github.com/apecloud/kubeblocks/pkg/kbagent"
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -51,8 +49,6 @@ const (
 
 	defaultProbeReportPeriodSeconds = 60
 	minProbeReportPeriodSeconds     = 15
-
-	defaultDataLoadTaskReportPeriodSeconds = 60
 )
 
 var (
@@ -101,22 +97,8 @@ func UpdateKBAgentContainer4HostNetwork(synthesizedComp *SynthesizedComponent) {
 	synthesizedComp.PodSpec.Containers[idx] = *c
 }
 
-func BuildKBAgentTask4NewReplica(uid string, source *corev1.Pod, replicas []string) (map[string]string, error) {
-	port, err := intctrlutil.GetPortByName(*source, kbagent.ContainerName, kbagent.DefaultStreamingPortName)
-	if err != nil {
-		return nil, err
-	}
-	dataLoadTask := proto.Task{
-		UID:                 uid,
-		NotifyAtFinish:      pointer.Bool(true),
-		ReportPeriodSeconds: pointer.Int32(defaultDataLoadTaskReportPeriodSeconds),
-		DataLoad: &proto.DataLoadTask{
-			Remote:   source.Status.PodIP,
-			Port:     pointer.Int32(port),
-			Replicas: strings.Join(replicas, ","),
-		},
-	}
-	envVars, err := kbagent.BuildEnv4Worker([]proto.Task{dataLoadTask})
+func BuildKBAgentTaskEnv(task proto.Task) (map[string]string, error) {
+	envVars, err := kbagent.BuildEnv4Worker([]proto.Task{task})
 	if err != nil {
 		return nil, err
 	}

@@ -21,8 +21,6 @@ package proto
 
 import (
 	"time"
-
-	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 type Action struct {
@@ -78,59 +76,37 @@ type ProbeEvent struct {
 	Instance string `json:"instance"`
 	Probe    string `json:"probe"`
 	Code     int32  `json:"code"`
-
-	// output of the probe on success, or latest succeed output on failure
-	Output []byte `json:"output,omitempty"`
-
-	// message of the probe on failure
-	Message string `json:"message,omitempty"`
+	Output   []byte `json:"output,omitempty"`  // output of the probe on success, or latest succeed output on failure
+	Message  string `json:"message,omitempty"` // message of the probe on failure
 }
 
 type Task struct {
-	// the unique identifier of the task
-	UID string `json:"UID"`
-
-	// whether to notify the controller when the task is finished
-	NotifyAtFinish *bool `json:"notifyAtFinish,omitempty"`
-
-	// the period to report the progress of the task
-	ReportPeriodSeconds *int32 `json:"reportPeriodSeconds,omitempty"`
-
-	DataLoad *DataLoadTask `json:"dataLoad,omitempty"`
+	Instance            string          `json:"instance"`
+	Task                string          `json:"task"`
+	UID                 string          `json:"UID"`                           // the unique identifier of the task
+	Replicas            string          `json:"replicas"`                      // target replicas to run the task
+	Payload             string          `json:"payload"`                       // the payload for the specific action
+	NotifyAtFinish      bool            `json:"notifyAtFinish,omitempty"`      // whether to notify the controller when the task is finished
+	ReportPeriodSeconds int32           `json:"reportPeriodSeconds,omitempty"` // the period to report the progress of the task
+	NewReplica          *NewReplicaTask `json:"newReplica,omitempty"`
 }
 
 type TaskEvent struct {
-	Instance string `json:"instance"`
-
-	Code  int32  `json:"code"`
-	Error string `json:"error,omitempty"`
-
-	// output of the task on success
-	Output []byte `json:"output,omitempty"`
-
-	// message of the task on failure
-	Message string `json:"message,omitempty"`
-
-	DataLoad *DataLoadEvent `json:"dataLoad,omitempty"`
+	Instance  string    `json:"instance"`
+	Task      string    `json:"task"`
+	UID       string    `json:"UID"`
+	Replica   string    `json:"replica"`
+	StartTime time.Time `json:"startTime"`
+	EndTime   time.Time `json:"endTime"`
+	Code      int32     `json:"code"`
+	Output    []byte    `json:"output,omitempty"`  // output of the task on success
+	Message   string    `json:"message,omitempty"` // message of the task on failure
 }
 
-type DataLoadTask struct {
-	// the remote address of the data source
-	Remote string `json:"remote"`
-
-	Port *int32 `json:"port,omitempty"`
-
-	// replicas to load the data
-	Replicas string `json:"replicas"`
-
-	// parameters for data dump and load
-	Parameters     map[string]string `json:"parameters,omitempty"`
+type NewReplicaTask struct {
+	Remote         string            `json:"remote"` // the remote address of the data source
+	Port           int32             `json:"port"`
+	Replicas       string            `json:"replicas"`             // replicas to load the data
+	Parameters     map[string]string `json:"parameters,omitempty"` // parameters for data dump and load
 	TimeoutSeconds *int32            `json:"timeoutSeconds,omitempty"`
-}
-
-type DataLoadEvent struct {
-	UID       string             `json:"UID"`
-	StartTime time.Time          `json:"startTime"`
-	EndTime   time.Time          `json:"endTime"`
-	Progress  intstr.IntOrString `json:"progress"`
 }

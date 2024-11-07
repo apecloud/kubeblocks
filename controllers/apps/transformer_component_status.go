@@ -115,6 +115,10 @@ func (t *componentStatusTransformer) init(transCtx *componentTransformContext, d
 
 // reconcileStatus reconciles component status.
 func (t *componentStatusTransformer) reconcileStatus(transCtx *componentTransformContext) error {
+	if err := t.reconcileReplicasStatus(transCtx); err != nil {
+		return err
+	}
+
 	if t.runningITS == nil {
 		return t.reconcileStatusCondition(transCtx)
 	}
@@ -397,5 +401,12 @@ func (t *componentStatusTransformer) reconcileAvailableCondition(transCtx *compo
 		transCtx.EventRecorder.Event(comp, corev1.EventTypeNormal, reason, message)
 	}
 
+	return nil
+}
+
+func (t *componentStatusTransformer) reconcileReplicasStatus(transCtx *componentTransformContext) error {
+	var (
+	// comp = transCtx.Component
+	)
 	return nil
 }

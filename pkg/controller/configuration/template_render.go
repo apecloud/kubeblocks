@@ -60,7 +60,7 @@ func RenderTemplate(resourceCtx *ResourceCtx,
 
 	tplBuilder := NewTemplateBuilder(reconcileCtx)
 	for _, tpl := range tpls {
-		configCMName := core.GetComponentCfgName(cluster.Name, comp.Name, tpl.Name)
+		configCMName := core.GetComponentCfgName(cluster.Name, synthesizedComponent.Name, tpl.Name)
 		if configCM, err = generateConfigMapFromTemplate(cluster, synthesizedComponent, tplBuilder, configCMName, tpl, resourceCtx.Context, reconcileCtx.Client, nil); err != nil {
 		}
 		if err != nil {

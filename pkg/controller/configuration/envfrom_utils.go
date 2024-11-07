@@ -79,24 +79,6 @@ func InjectTemplateEnvFrom(component *component.SynthesizedComponent,
 	return envObjs, nil
 }
 
-// func fromConfigmapFiles(keys []string, cm *corev1.ConfigMap, formatter *parametersv1alpha1.FileFormatConfig) (map[string]string, error) {
-// 	mergeMap := func(dst, src map[string]string) {
-// 		for key, val := range src {
-// 			dst[key] = val
-// 		}
-// 	}
-//
-// 	gEnvMap := make(map[string]string)
-// 	for _, file := range keys {
-// 		envMap, err := resolveParametersFromFileContent(formatter, cm.Data[file])
-// 		if err != nil {
-// 			return nil, err
-// 		}
-// 		mergeMap(gEnvMap, envMap)
-// 	}
-// 	return gEnvMap, nil
-// }
-
 func resolveConfigMap(localObjs []*corev1.ConfigMap, key string) *corev1.ConfigMap {
 	for _, obj := range localObjs {
 		if _, ok := obj.Data[key]; ok {
@@ -105,48 +87,6 @@ func resolveConfigMap(localObjs []*corev1.ConfigMap, key string) *corev1.ConfigM
 	}
 	return nil
 }
-
-// func createOrUpdateResourceFromConfigTemplate(cluster *appsv1.Cluster, component *component.SynthesizedComponent, template appsv1.ComponentConfigSpec, originKey client.ObjectKey, envMap map[string]string, ctx context.Context, cli client.Client, createOnly bool) (client.Object, error) {
-// 	cmKey := client.ObjectKey{
-// 		Name:      core.GenerateEnvFromName(originKey.Name),
-// 		Namespace: originKey.Namespace,
-// 	}
-//
-// 	updateObjectMeta := func(obj client.Object) {
-// 		obj.SetLabels(constant.GetConfigurationLabels(component.ClusterName, component.Name, template.Name))
-// 		_ = intctrlutil.SetOwnerReference(cluster, obj)
-// 	}
-//
-// 	if toSecret(template) {
-// 		return updateOrCreateEnvObject(ctx, cli, &corev1.Secret{}, cmKey, func(c *corev1.Secret) {
-// 			c.StringData = envMap
-// 			updateObjectMeta(c)
-// 		}, createOnly)
-// 	}
-// 	return updateOrCreateEnvObject(ctx, cli, &corev1.ConfigMap{}, cmKey, func(c *corev1.ConfigMap) {
-// 		c.Data = envMap
-// 		updateObjectMeta(c)
-// 	}, createOnly)
-// }
-
-// func updateOrCreateEnvObject[T generics.Object, PT generics.PObject[T]](ctx context.Context, cli client.Client, obj PT, objKey client.ObjectKey, updater func(PT), createOnly bool) (client.Object, error) {
-// 	err := cli.Get(ctx, objKey, obj, inDataContext())
-// 	switch {
-// 	case err != nil:
-// 		if !apierrors.IsNotFound(err) {
-// 			return nil, err
-// 		}
-// 		obj.SetName(objKey.Name)
-// 		obj.SetNamespace(objKey.Namespace)
-// 		updater(obj)
-// 		return obj, cli.Create(ctx, obj, inDataContext())
-// 	case createOnly:
-// 		return obj, nil
-// 	default:
-// 		updater(obj)
-// 		return obj, cli.Update(ctx, obj, inDataContext())
-// 	}
-// }
 
 func CheckEnvFrom(container *corev1.Container, cmName string) bool {
 	for i := range container.EnvFrom {
@@ -182,33 +122,3 @@ func resolveParametersFromFileContent(format *parametersv1alpha1.FileFormatConfi
 	}
 	return envMap, nil
 }
-
-// func fromConfigSpec(configSpec appsv1.ComponentConfigSpec, cm *corev1.ConfigMap) []string {
-// 	keys := configSpec.Keys
-// 	if len(keys) == 0 {
-// 		keys = cfgutil.ToSet(cm.Data).AsSlice()
-// 	}
-// 	return keys
-// }
-
-// func SyncEnvSourceObject(configSpec appsv1.ComponentConfigSpec, cmObj *corev1.ConfigMap, cc *appsv1beta1.ConfigConstraintSpec, cli client.Client, ctx context.Context, cluster *appsv1.Cluster, component *component.SynthesizedComponent) error {
-// 	if !InjectEnvEnabled(configSpec) || cc == nil || cc.FileFormatConfig == nil {
-// 		return nil
-// 	}
-// 	envMap, err := fromConfigmapFiles(fromConfigSpec(configSpec, cmObj), cmObj, cc.FileFormatConfig)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	if len(envMap) != 0 {
-// 		_, err = createOrUpdateResourceFromConfigTemplate(cluster, component, configSpec, client.ObjectKeyFromObject(cmObj), envMap, ctx, cli, false)
-// 	}
-// 	return err
-// }
-//
-// func InjectEnvEnabled(spec appsv1.ComponentConfigSpec) bool {
-// 	return len(spec.AsEnvFrom) > 0 || len(spec.InjectEnvTo) > 0
-// }
-//
-// func toSecret(spec appsv1.ComponentConfigSpec) bool {
-// 	return spec.AsSecret != nil && *spec.AsSecret
-// }

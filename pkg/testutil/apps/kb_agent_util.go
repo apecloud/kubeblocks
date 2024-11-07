@@ -83,3 +83,73 @@ func MockKBAgentClient4HScale(testCtx *testutil.TestContext, clusterKey types.Na
 		}).AnyTimes()
 	})
 }
+
+func MockKBAgentClient4Workload(testCtx *testutil.TestContext, pods []*corev1.Pod) {
+	const (
+		memberJoinCompoletedLabel  = "test.kubeblock.io/memberjoin-completed"
+		memberLeaveCompoletedLabel = "test.kubeblock.io/memberleave-completed"
+	)
+
+	rsp := kbagentproto.ActionResponse{Message: "mock success"}
+	handleMemberLeave := func(podName string) (kbagentproto.ActionResponse, error) {
+		for _, pod := range pods {
+			if pod.Name != podName {
+				continue
+			}
+			pod.Labels[memberLeaveCompoletedLabel] = "true"
+			testCtx.Cli.Update(testCtx.Ctx, pod)
+		}
+		return rsp, nil
+	}
+
+	handleMemberJoin := func(podName string) (kbagentproto.ActionResponse, error) {
+		for _, pod := range pods {
+			if pod.Name != podName {
+				continue
+			}
+			pod.Labels[memberJoinCompoletedLabel] = "true"
+			testCtx.Cli.Update(testCtx.Ctx, pod)
+		}
+		return rsp, nil
+	}
+
+	handleSwitchOver := func(podName string) (kbagentproto.ActionResponse, error) {
+		for _, pod := range pods {
+			if pod.Name != podName {
+				continue
+			}
+			if pod.Labels[constant.RoleLabelKey] != "leader" {
+				return rsp, nil
+			}
+			pod.Labels[constant.RoleLabelKey] = "follower"
+			testCtx.Cli.Update(testCtx.Ctx, pod)
+		}
+
+		for _, pod := range pods {
+			if pod.Name == podName {
+				continue
+			}
+			pod.Labels[constant.RoleLabelKey] = "leader"
+			testCtx.Cli.Update(testCtx.Ctx, pod)
+		}
+		return rsp, nil
+	}
+
+	MockKBAgentClient(func(recorder *kbagent.MockClientMockRecorder) {
+		recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+			switch req.Action {
+			case "memberLeave":
+				podName := req.Parameters["KB_LEAVE_MEMBER_POD_NAME"]
+				return handleMemberLeave(podName)
+			case "memberJoin":
+				podName := req.Parameters["KB_JOIN_MEMBER_POD_NAME"]
+				return handleMemberJoin(podName)
+			case "switchover":
+				podName := req.Parameters["KB_SWITCHOVER_CANDIDATE_NAME"]
+				return handleSwitchOver(podName)
+			default:
+				return rsp, nil
+			}
+		}).AnyTimes()
+	})
+}

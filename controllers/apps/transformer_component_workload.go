@@ -801,7 +801,7 @@ func (r *componentWorkloadOps) joinMemberForPod(pod *corev1.Pod, pods []*corev1.
 		return err
 	}
 
-	if err = lfa.MemberLeave(r.reqCtx.Ctx, r.cli, nil); err != nil {
+	if err = lfa.MemberJoin(r.reqCtx.Ctx, r.cli, nil); err != nil {
 		if !errors.Is(err, lifecycle.ErrActionNotDefined) && err == nil {
 			return err
 		}

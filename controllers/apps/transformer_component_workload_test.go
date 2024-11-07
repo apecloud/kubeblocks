@@ -16,11 +16,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
-	"fmt"
-	"time"
-
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	testk8s "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,8 +37,9 @@ import (
 
 var _ = Describe("Component Workload Operations Test", func() {
 	const (
-		clusterName = "test-cluster"
-		compName    = "test-component"
+		clusterName    = "test-cluster"
+		compName       = "test-comp"
+		kubeblocksName = "kubeblocks"
 	)
 
 	var (
@@ -71,91 +73,200 @@ var _ = Describe("Component Workload Operations Test", func() {
 			Namespace:   testCtx.DefaultNamespace,
 			ClusterName: clusterName,
 			Name:        compName,
+			Roles: []kbappsv1.ReplicaRole{
+				{Name: "leader", Serviceable: true, Writable: true, Votable: true},
+				{Name: "follower", Serviceable: false, Writable: false, Votable: false},
+			},
+			LifecycleActions: &kbappsv1.ComponentLifecycleActions{
+				MemberJoin: &kbappsv1.Action{
+					Exec: &kbappsv1.ExecAction{
+						Image: "test-image",
+					},
+				},
+				MemberLeave: &kbappsv1.Action{
+					Exec: &kbappsv1.ExecAction{
+						Image: "test-image",
+					},
+				},
+				Switchover: &kbappsv1.Action{
+					Exec: &kbappsv1.ExecAction{
+						Image: "test-image",
+					},
+				},
+			},
 		}
 
 		graphCli := model.NewGraphClient(reader)
 		dag = newDAG(graphCli, comp)
 	})
 
-	Context("TransformerError", func() {
-		It("should handle error creation and checking", func() {
-			// create test errors
-			testErrs := []error{
-				fmt.Errorf("test error 1"),
-				fmt.Errorf("test error 2"),
-			}
-			requeueAfter := 5 * time.Second
-
-			By("creating TransformerError")
-			batchErr := NewTransformerError(testErrs, requeueAfter)
-			Expect(batchErr).ShouldNot(BeNil())
-			Expect(batchErr.Error()).Should(And(
-				ContainSubstring("test error 1"),
-				ContainSubstring("test error 2"),
-			))
-
-			By("checking error type and requeue duration")
-			duration, ok := IsTransformerError(batchErr)
-			Expect(ok).Should(BeTrue())
-			Expect(duration).Should(Equal(requeueAfter))
-
-			By("handling nil errors")
-			Expect(NewTransformerError(nil, requeueAfter)).Should(BeNil())
-			Expect(NewTransformerError([]error{}, requeueAfter)).Should(BeNil())
-		})
-	})
-
 	Context("Member Leave Operations", func() {
 		var (
-			ops *componentWorkloadOps
-			pod *corev1.Pod
+			ops  *componentWorkloadOps
+			pod0 *corev1.Pod
+			pod1 *corev1.Pod
+			pods []*corev1.Pod
 		)
 
 		BeforeEach(func() {
-			pod = testapps.NewPodFactory(testCtx.DefaultNamespace, "test-pod").
+			pod0 = testapps.NewPodFactory(testCtx.DefaultNamespace, "test-pod-0").
 				AddAnnotations(constant.MemberJoinStatusAnnotationKey, "test-pod").
+				AddContainer(corev1.Container{
+					Image: "test-image",
+					Name:  "test-container",
+				}).
+				AddLabels(
+					constant.AppManagedByLabelKey, kubeblocksName,
+					constant.AppInstanceLabelKey, clusterName,
+					constant.KBAppComponentLabelKey, compName,
+				).
 				GetObject()
+
+			pod1 = testapps.NewPodFactory(testCtx.DefaultNamespace, "test-pod-1").
+				AddAnnotations(constant.MemberJoinStatusAnnotationKey, "test-pod").
+				AddContainer(corev1.Container{
+					Image: "test-image",
+					Name:  "test-container",
+				}).
+				AddLabels(
+					constant.AppManagedByLabelKey, kubeblocksName,
+					constant.AppInstanceLabelKey, clusterName,
+					constant.KBAppComponentLabelKey, compName,
+				).
+				GetObject()
+
+			pods = []*corev1.Pod{}
+			pods = append(pods, pod0)
+			pods = append(pods, pod1)
+
+			container := corev1.Container{
+				Name:            "mock-container-name",
+				Image:           testapps.ApeCloudMySQLImage,
+				ImagePullPolicy: corev1.PullIfNotPresent,
+			}
+
+			mockITS := testapps.NewInstanceSetFactory(testCtx.DefaultNamespace,
+				"test-its", clusterName, compName).
+				AddFinalizers([]string{constant.DBClusterFinalizerName}).
+				AddContainer(container).
+				AddAppInstanceLabel(clusterName).
+				AddAppComponentLabel(compName).
+				AddAppManagedByLabel().
+				AddAnnotations(constant.MemberJoinStatusAnnotationKey, "").
+				SetReplicas(2).
+				SetRoles([]workloads.ReplicaRole{
+					{Name: "leader", AccessMode: workloads.ReadWriteMode, CanVote: true, IsLeader: true},
+					{Name: "follower", AccessMode: workloads.ReadonlyMode, CanVote: true, IsLeader: false},
+				}).
+				Create(&testCtx).GetObject()
+
+			mockCluster := testapps.NewClusterFactory(testCtx.DefaultNamespace, "test-cluster", "test-def").
+				Create(&testCtx).GetObject()
 
 			ops = &componentWorkloadOps{
 				cli:            k8sClient,
 				reqCtx:         intctrlutil.RequestCtx{Ctx: ctx, Log: logger},
 				synthesizeComp: synthesizeComp,
+				cluster:        mockCluster,
+				runningITS:     mockITS,
+				protoITS:       mockITS,
 				dag:            dag,
 			}
+
+			testapps.MockKBAgentClient4Workload(&testCtx, pods)
 		})
 
-		It("should handle member join process correctly", func() {
+		It("should handle member leave process correctly", func() {
+			for _, pod := range pods {
+				Expect(ops.cli.Create(ctx, pod)).Should(BeNil())
+			}
+
+			ops.desiredCompPodNameSet = make(sets.Set[string])
+			ops.desiredCompPodNameSet.Insert(pod0.Name)
+
 			By("setting up member join status")
-			ops.runningITS.Annotations[constant.MemberJoinStatusAnnotationKey] = pod.Name
+			ops.runningITS.Annotations[constant.MemberJoinStatusAnnotationKey] = ""
+
+			By("executing leave member operation")
+			err := ops.leaveMember4ScaleIn()
+			Expect(err).Should(BeNil())
+			Expect(pod0.Labels["test.kubeblock.io/memberleave-completed"]).Should(Equal(""))
+			Expect(pod1.Labels["test.kubeblock.io/memberleave-completed"]).ShouldNot(Equal(""))
+
+		})
+
+		It("should return requeueError when exec memberleave with memberjoin processing ", func() {
+			for _, pod := range pods {
+				Expect(ops.cli.Create(ctx, pod)).Should(BeNil())
+			}
+
+			ops.desiredCompPodNameSet = make(sets.Set[string])
+			ops.desiredCompPodNameSet.Insert(pod0.Name)
+
+			By("setting up member join status")
+			ops.runningITS.Annotations[constant.MemberJoinStatusAnnotationKey] = pod1.Name
 
 			By("executing leave member operation")
 			err := ops.leaveMember4ScaleIn()
 			Expect(err).ShouldNot(BeNil())
+			Expect(pod0.Labels["test.kubeblock.io/memberleave-completed"]).Should(Equal(""))
+			Expect(pod1.Labels["test.kubeblock.io/memberleave-completed"]).Should(Equal(""))
 
-			By("verifying error type and message")
-			reqErr, ok := err.(*TransformerError)
-			Expect(ok).Should(BeTrue())
-			Expect(reqErr.Error()).Should(ContainSubstring("is in memberjoin process"))
-		})
-
-		It("should handle lorry client errors", func() {
-			By("creating test pod")
-			Expect(k8sClient.Create(ctx, pod)).Should(Succeed())
-
-			By("executing leave member with NotImplemented error")
-			err := ops.leaveMemberForPod(pod, []*corev1.Pod{pod})
-			Expect(err).Should(BeNil())
 		})
 
 		It("should handle switchover for leader pod", func() {
 			By("setting up leader pod")
-			pod.Labels[constant.RoleLabelKey] = "leader"
-			Expect(k8sClient.Create(ctx, pod)).Should(Succeed())
+			pod1.Labels[constant.RoleLabelKey] = "follower"
+			pod1.Labels[constant.RoleLabelKey] = "leader"
+
+			for _, pod := range pods {
+				Expect(ops.cli.Create(ctx, pod)).Should(BeNil())
+			}
+
+			ops.desiredCompPodNameSet = make(sets.Set[string])
+			ops.desiredCompPodNameSet.Insert(pod0.Name)
 
 			By("executing leave member for leader")
-			err := ops.leaveMemberForPod(pod, []*corev1.Pod{pod})
+			err := ops.leaveMemberForPod(pod1, []*corev1.Pod{pod1})
 			Expect(err).ShouldNot(BeNil())
-			Expect(err.Error()).Should(ContainSubstring("wait role label to be updated"))
+			Expect(pod0.Labels[constant.RoleLabelKey]).Should(Equal("leader"))
+			Expect(pod1.Labels[constant.RoleLabelKey]).ShouldNot(Equal("leader"))
+		})
+
+		It("should handle member join process correctly", func() {
+
+			for _, pod := range pods {
+				Expect(ops.cli.Create(ctx, pod)).Should(BeNil())
+			}
+
+			ops.desiredCompPodNameSet = make(sets.Set[string])
+			ops.desiredCompPodNameSet.Insert(pod0.Name)
+
+			By("setting up pod status")
+			ops.runningITS.Annotations[constant.MemberJoinStatusAnnotationKey] = pod1.Name
+			testk8s.MockPodIsRunning(ctx, testCtx, pod1)
+
+			By("executing leave member operation")
+			err := ops.checkAndDoMemberJoin()
+			Expect(err).Should(BeNil())
+			Expect(pod0.Labels["test.kubeblock.io/memberjoin-completed"]).Should(Equal(""))
+			Expect(pod1.Labels["test.kubeblock.io/memberjoin-completed"]).ShouldNot(Equal(""))
+			Expect(ops.protoITS.Annotations[constant.MemberJoinStatusAnnotationKey]).Should(Equal(""))
+		})
+
+		It("should annotate instance for member join correctly", func() {
+			Expect(ops.cli.Create(ctx, pod0)).Should(BeNil())
+
+			ops.desiredCompPodNameSet = make(sets.Set[string])
+			ops.desiredCompPodNameSet.Insert(pod0.Name)
+			ops.desiredCompPodNameSet.Insert(pod1.Name)
+
+			ops.runningItsPodNameSet = make(sets.Set[string])
+			ops.runningItsPodNameSet.Insert(pod0.Name)
+
+			ops.annotateInstanceSetForMemberJoin()
+
+			Expect(ops.protoITS.Annotations[constant.MemberJoinStatusAnnotationKey]).Should(Equal(pod1.Name))
 		})
 	})
 })

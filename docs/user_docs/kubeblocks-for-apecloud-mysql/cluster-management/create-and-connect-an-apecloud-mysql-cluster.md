@@ -264,11 +264,11 @@ KubeBlocks operator creates a new Secret called `mycluster-conn-credential` to s
 1. Run the command below to get the `username` and `password` for the `kubectl exec` command.
 
    ```bash
-   kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\username}' | base64 -d
+   kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.username}' | base64 -d
    >
    root
 
-   kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\password}' | base64 -d
+   kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.password}' | base64 -d
    >
    2gvztbvz
    ```

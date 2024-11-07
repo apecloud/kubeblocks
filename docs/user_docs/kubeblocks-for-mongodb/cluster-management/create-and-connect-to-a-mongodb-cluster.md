@@ -242,11 +242,11 @@ KubeBlocks operator has created a new Secret called `mycluster-conn-credential` 
 1. Get the `username` and `password` to connect to this MongoDB cluster for the `kubectl exec` command.
 
    ```bash
-   kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\username}' | base64 -d
+   kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.username}' | base64 -d
    >
    root
 
-   kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\password}' | base64 -d
+   kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.password}' | base64 -d
    >
    266zfqx5
    ```

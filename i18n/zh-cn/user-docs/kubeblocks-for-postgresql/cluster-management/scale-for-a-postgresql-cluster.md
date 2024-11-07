@@ -381,7 +381,7 @@ mycluster   postgresql           postgresql-14.8.0   Delete               Runnin
      componentSpecs:
      - name: postgresql
        componentDefRef: postgresql
-       replicas: 1 # Change the amount
+       replicas: 1 # 修改该参数值
        volumeClaimTemplates:
        - name: data
          spec:

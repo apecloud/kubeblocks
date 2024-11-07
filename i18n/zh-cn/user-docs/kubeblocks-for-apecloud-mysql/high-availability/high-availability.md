@@ -115,11 +115,11 @@ import TabItem from '@theme/TabItem';
     连接到该集群，检查 pod 角色和状态。该集群可在几秒内连接成功。
 
     ```bash
-    kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\username}' | base64 -d
+    kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.username}' | base64 -d
     >
     root
 
-    kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\password}' | base64 -d
+    kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.password}' | base64 -d
     >
     pt2mmdlp4
 

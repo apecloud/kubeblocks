@@ -64,7 +64,7 @@ mycluster   mysql                mysql-8.0.33   Delete               Running   1
     配置参数 `--components`、`--memory` 和 `--cpu`，并执行以下命令。
 
     ```bash
-    kbcli cluster vscale mycluster -n demo\
+    kbcli cluster vscale mycluster -n demo \
       --components="mysql" \
       --memory="4Gi" --cpu="2" \
     ```
@@ -238,7 +238,7 @@ mycluster   mysql                mysql-8.0.33   Delete               Running   1
     配置参数 `--components` 和 `--replicas`，并执行以下命令。
 
     ```bash
-    kbcli cluster hscale mycluster -n demo\
+    kbcli cluster hscale mycluster -n demo \
       --components="mysql" --replicas=3
     ```
 

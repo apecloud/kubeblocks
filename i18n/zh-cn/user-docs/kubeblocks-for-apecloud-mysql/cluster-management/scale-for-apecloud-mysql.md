@@ -71,7 +71,7 @@ mycluster   apecloud-mysql       ac-mysql-8.0.30   Delete               Running 
    - `--memory` 表示组件请求和限制的内存大小。
    - `--cpu` 表示组件请求和限制的 CPU 大小。
 
-2. 通过以下任意一种方式验证垂直扩容是否成功。
+2. 通过以下任意一种方式验证垂直扩容是否完成。
 
    - 查看 OpsRequest 进程。
 

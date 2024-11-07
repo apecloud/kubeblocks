@@ -280,11 +280,11 @@ maxclients      20000                           40000
    1. Get the username and password.
 
       ```bash
-      kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\username}' | base64 -d
+      kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.username}' | base64 -d
       >
       default
 
-      kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\password}' | base64 -d
+      kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.password}' | base64 -d
       >
       kpz77mcs
       ```
@@ -360,11 +360,11 @@ Just in case you cannot find the configuration file of your cluster, you can swi
    1. Get the username and password.
 
       ```bash
-      kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\username}' | base64 -d
+      kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.username}' | base64 -d
       >
       default
 
-      kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\password}' | base64 -d
+      kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.password}' | base64 -d
       >
       kpz77mcs
       ```

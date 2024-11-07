@@ -319,11 +319,11 @@ KubeBlocks supports configuring cluster parameters by editing the configuration 
    1. Get the username and password.
 
       ```bash
-      kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\username}' | base64 -d
+      kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.username}' | base64 -d
       >
       root
 
-      kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\password}' | base64 -d
+      kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.password}' | base64 -d
       >
       2gvztbvz
       ```
@@ -405,11 +405,11 @@ KubeBlocks supports configuring cluster parameters with an OpsRequest.
    1. Get the username and password.
 
       ```bash
-      kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\username}' | base64 -d
+      kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.username}' | base64 -d
       >
       root
 
-      kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\password}' | base64 -d
+      kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.password}' | base64 -d
       >
       2gvztbvz
       ```

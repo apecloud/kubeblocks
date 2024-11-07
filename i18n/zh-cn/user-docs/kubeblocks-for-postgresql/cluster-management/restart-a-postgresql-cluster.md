@@ -30,7 +30,7 @@ KubeBlocks 支持重启集群中的所有 Pod。当数据库出现异常时，�
    配置 `--components` 和 `--ttlSecondsAfterSucceed` 的值，重启指定集群。
 
    ```bash
-   kbcli cluster restart mycluster --components="postgresql" -n demo\
+   kbcli cluster restart mycluster --components="postgresql" -n demo \
      --ttlSecondsAfterSucceed=30
    ```
 

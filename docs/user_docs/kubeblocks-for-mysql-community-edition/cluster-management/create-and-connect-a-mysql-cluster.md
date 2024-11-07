@@ -251,13 +251,13 @@ KubeBlocks operator creates a new Secret called `mycluster-conn-credential` to s
 1. Run the command below to get the `username` and `password` for the `kubectl exec` command.
 
    ```bash
-   kubectl get secrets mycluster-conn-credential -n demo -o jsonpath='{.data.\username}' | base64 -d
+   kubectl get secrets mycluster-conn-credential -n demo -o jsonpath='{.data.username}' | base64 -d
    >
    root
    ```
 
    ```bash
-   kubectl get secrets mycluster-conn-credential -n demo -o jsonpath='{.data.\password}' | base64 -d
+   kubectl get secrets mycluster-conn-credential -n demo -o jsonpath='{.data.password}' | base64 -d
    >
    b8wvrwlm
    ```

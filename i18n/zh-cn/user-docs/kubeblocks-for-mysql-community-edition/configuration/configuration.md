@@ -176,7 +176,7 @@ kbcli cluster describe-config mycluster -n demo
 
 4. 连接到数据库，验证参数是否按预期配置。
 
-   整体搜索过程有 30 秒的延迟，因为 kubelet 需要一些时间同步对 Pod 卷的修改。
+   整体生效过程有 30 秒的延迟，因为 kubelet 需要一些时间同步对 Pod 卷的修改。
 
    ```bash
    kbcli cluster connect mycluster -n demo
@@ -319,11 +319,11 @@ innodb_buffer_pool_size   512M                            1G
    1. 获取用户名和密码。
 
       ```bash
-      kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\username}' | base64 -d
+      kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.username}' | base64 -d
       >
       root
 
-      kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\password}' | base64 -d
+      kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.password}' | base64 -d
       >
       2gvztbvz
       ```
@@ -408,11 +408,11 @@ kbcli cluster describe-config mycluster -n demo
    1. 获取用户名和密码。
 
       ```bash
-      kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\username}' | base64 -d
+      kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.username}' | base64 -d
       >
       root
 
-      kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\password}' | base64 -d
+      kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.password}' | base64 -d
       >
       2gvztbvz
       ```

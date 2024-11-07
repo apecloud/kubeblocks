@@ -19,7 +19,7 @@ import TabItem from '@theme/TabItem';
 
 * 如果您想通过 `kbcli` 创建并连接 ApeCloud MySQL 集群，请先[安装 kbcli](./../../installation/install-with-kbcli/install-kbcli.md)。
 * 安装 KubeBlocks，可通过 [kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) 或 [Helm](./../../installation/install-with-helm/install-kubeblocks.md) 安装。
-* 确保 MySQL 引擎已启用。KubeBlocks 默认已安装 MySQL，如果您在安装 KubeBlcoks 关闭/卸载了该引擎，可参考相关文档，再次启用/安装该引擎，可通过 [kbcli](./../../installation/install-with-kbcli/install-addons.md) 或者 [Helm](./../../installation/install-with-helm/install-addons.md) 操作。
+* 确保 MySQL 引擎已启用。KubeBlocks 默认已安装 MySQL，如果您在安装 KubeBlocks 关闭/卸载了该引擎，可参考相关文档，再次启用/安装该引擎，可通过 [kbcli](./../../installation/install-with-kbcli/install-addons.md) 或者 [Helm](./../../installation/install-with-helm/install-addons.md) 操作。
   
   <Tabs>
 
@@ -263,13 +263,13 @@ KubeBlocks operator 会创建一个名为 `mycluster-conn-credential` 的新的 
 1. 获取用于 `kubectl exec` 命令的 `username` 和 `password`。
 
    ```bash
-   kubectl get secrets mycluster-conn-credential -o jsonpath='{.data.\username}' | base64 -d
+   kubectl get secrets mycluster-conn-credential -o jsonpath='{.data.username}' | base64 -d
    >
    root
    ```
 
    ```bash
-   kubectl get secrets mycluster-conn-credential -o jsonpath='{.data.\password}' | base64 -d
+   kubectl get secrets mycluster-conn-credential -o jsonpath='{.data.password}' | base64 -d
    >
    b8wvrwlm
    ```

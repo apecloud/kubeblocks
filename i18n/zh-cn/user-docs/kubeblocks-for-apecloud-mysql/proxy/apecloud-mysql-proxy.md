@@ -39,7 +39,7 @@ import TabItem from '@theme/TabItem';
 
 1. 启用 etcd 引擎，创建 etcd 集群。
 
-   1. 安装并启用 etcd 引擎。ectd 引擎默认未安装，需安装后在进行后续操作。可参考[使用引擎](./../../installation/install-with-kbcli/install-addons.md)文档。
+   1. 安装并启用 etcd 引擎。etcd 引擎默认未安装，需安装后在进行后续操作。可参考[使用引擎](./../../installation/install-with-kbcli/install-addons.md)文档。
 
        ```bash
        # 1. 查看是否已添加 KubeBlocks 引擎索引
@@ -197,7 +197,7 @@ import TabItem from '@theme/TabItem';
 
 :::note
 
-如果您只有一个节点可用于部署集群版，可在创建集群时将 `extra.availability-policy` 设置为 `none`。
+如果您只有一个节点可用于部署集群版，可在创建集群时将 `extra.availabilityPolicy` 设置为 `none`。
 
 ```bash
 helm install myproxy kubeblocks/apecloud-mysql-cluster --version=v0.9.0 --set mode=raftGroup,proxyEnabled=true,etcd.serviceReference.endpoint="etcd-cluster-etcd.default.svc.cluster.local:2379" --set extra.availabilityPolicy=none
@@ -647,12 +647,11 @@ ls /vtdataroot
 
 1. 启用监控引擎。
 
-   对于测试或演示环境，可执行以下命令，启用 KubeBlocks 提供的监控引擎。
+   对于测试或演示环境，可执行以下命令，启用 KubeBlocks 提供的监控引擎。您可将 `prometheus` 替换为其他需要开启的监控引擎名称。
 
    ```bash
    helm install prometheus kubeblocks/prometheus --namespace kb-system --create-namespace
-   helm install prometheus kubeblocks/prometheus --namespace kb-system --create-namespace
-   helm install prometheus kubeblocks/prometheus --namespace kb-system --create-namespace
+   helm install grafana kubeblocks/grafana --namespace kb-system --create-namespace
    ```
 
    对于生产环境，您可以集成监控组件。可参考监控工具提供的相关文档查看集成细节。
@@ -676,17 +675,17 @@ ls /vtdataroot
    对于测试或演示环境，可执行以下命令查看 Grafana 大盘。
 
    ```bash
-   # 1. Get the username and password 
+   # 1. 获取用户名及密码 
    kubectl get secret grafana -n kb-system -o jsonpath='{.data.admin-user}' |base64 -d
 
    kubectl get secret grafana -n kb-system -o jsonpath='{.data.admin-password}' |base64 -d
 
-   # 2. Connect to the Grafana dashboard
+   # 2. 连接至 Grafana 大盘
    kubectl port-forward svc/grafana -n kb-system 3000:8
 
-   # 3. Open the web browser and enter the address 127.0.0.1:3000 to visit the dashboard.
+   # 3. 打开浏览器，输入地址 127.0.0.1:3000，查看大盘
 
-   # 4. Enter the username and password obtained from step 1.
+   # 4. 输入步骤 1 中获取的用户名及密码
    ```
 
    对于生产环境，您可以通过 Grafana Web 控制台查看对应集群的大盘。可查看 [Grafana 大盘文档](https://grafana.com/docs/grafana/latest/dashboards/) 查看配置细节。

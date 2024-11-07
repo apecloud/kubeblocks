@@ -179,11 +179,11 @@ KubeBlocks 集成[开源的 Patroni 方案](https://patroni.readthedocs.io/en/la
 4. 连接到 PostgreSQL 集群，查看集群信息。
 
    ```bash
-   kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\username}' | base64 -d
+   kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.username}' | base64 -d
    >
    postgres
 
-   kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\password}' | base64 -d
+   kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.password}' | base64 -d
    >
    shgkz4z9
 

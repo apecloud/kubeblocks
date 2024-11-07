@@ -60,7 +60,7 @@ mycluster   postgresql           postgresql-14.8.0   Delete               Runnin
     配置参数 `--components`、`--volume-claim-templates` 和 `--storage`，并执行以下命令。
 
     ```bash
-    kbcli cluster volume-expand mycluster --components="postgresql" -n demo\
+    kbcli cluster volume-expand mycluster --components="postgresql" -n demo \
       --volume-claim-templates="data" --storage="40Gi"
     ```
 

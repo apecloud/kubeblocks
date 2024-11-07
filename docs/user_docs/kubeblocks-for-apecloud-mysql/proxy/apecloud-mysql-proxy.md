@@ -197,7 +197,7 @@ It is recommended to use kbcli to create an ApeCloud MySQL Proxy Cluster.
 
 :::note
 
-If you only have one node for deploying a RaftGroup Cluster, set the `extra.availability-policy` as `none` when creating a RaftGroup Cluster.
+If you only have one node for deploying a RaftGroup Cluster, set the `extra.availabilityPolicy` as `none` when creating a RaftGroup Cluster.
 
 ```bash
 helm install myproxy kubeblocks/apecloud-mysql-cluster --version=v0.9.0 --set mode=raftGroup,proxyEnabled=true,etcd.serviceReference.endpoint="etcd-cluster-etcd.default.svc.cluster.local:2379" --set extra.availabilityPolicy=none

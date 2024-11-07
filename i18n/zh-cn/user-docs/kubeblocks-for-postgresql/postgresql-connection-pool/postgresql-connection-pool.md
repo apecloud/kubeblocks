@@ -119,11 +119,11 @@ PostgreSQL 是多进程架构，它会为每个用户连接创建一个单独的
 3. 获取 `kubectl exec` 命令所需的 `username` 和 `password`。
 
     ```bash
-    kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\username}' | base64 -d
+    kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.username}' | base64 -d
     >
     postgres
 
-    kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\password}' | base64 -d
+    kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.password}' | base64 -d
     >
     shgkz4z9
    ```

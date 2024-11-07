@@ -118,7 +118,7 @@ mycluster   apecloud-mysql       ac-mysql-8.0.30   Delete               Running 
     EOF
     ```
 
-2. 验证磁盘扩容操作是否成功。
+2. 可通过以下任意一种方式验证磁盘扩容操作是否完成。
 
     ```bash
     kubectl get ops -n demo
@@ -163,7 +163,7 @@ mycluster   apecloud-mysql       ac-mysql-8.0.30   Delete               Running 
              - ReadWriteOnce
            resources:
              requests:
-               storage: 40Gi # Change the volume storage size.
+               storage: 40Gi # 修改磁盘容量值
      terminationPolicy: Delete
    ```
 

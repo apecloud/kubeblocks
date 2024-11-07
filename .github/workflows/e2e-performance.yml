@@ -35,15 +35,16 @@ on:
       K8S_VERSION:
         description: 'eks version'
         required: false
-        default: '1.30'
+        default: "1.30"
         type: choice
         options:
-          - 1.29
-          - 1.28
-          - 1.27
-          - 1.26
-          - 1.25
-          - 1.24
+          - "1.30"
+          - "1.29"
+          - "1.28"
+          - "1.27"
+          - "1.26"
+          - "1.25"
+          - "1.24"
 
 run-name: performance mysql ${{ inputs.NODE_TYPE }} ${{ inputs.PERFORMANCE_TYPE }}
 

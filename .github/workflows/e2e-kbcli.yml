@@ -32,16 +32,16 @@ on:
       CLUSTER_VERSION:
         description: 'k8s cluster version'
         required: false
-        default: '1.30'
+        default: "1.30"
         type: choice
         options:
-          - 1.30
-          - 1.29
-          - 1.28
-          - 1.27
-          - 1.26
-          - 1.25
-          - 1.24
+          - "1.30"
+          - "1.29"
+          - "1.28"
+          - "1.27"
+          - "1.26"
+          - "1.25"
+          - "1.24"
       INSTANCE_TYPE:
         description: 'node instance types (e.g. amd64/arm64)'
         required: false

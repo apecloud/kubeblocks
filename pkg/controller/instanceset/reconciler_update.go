@@ -21,6 +21,7 @@ package instanceset
 
 import (
 	"fmt"
+	"time"
 
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -120,6 +121,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	updatedPods := 0
 	priorities := ComposeRolePriorityMap(its.Spec.Roles)
 	isBlocked := false
+	needRetry := false
 	sortObjects(oldPodList, priorities, false)
 	for _, pod := range oldPodList {
 		if updatingPods >= updateCount || updatingPods >= unavailable {
@@ -135,6 +137,8 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		}
 		if !isContainersAvailable(pod, its.Spec.MinReadySeconds) {
 			tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on update as some the container(s) of pod %s are not started at least for %d seconds", its.Namespace, its.Name, pod.Name, its.Spec.MinReadySeconds))
+			// as no further event triggers the next reconciliation, we need a retry
+			needRetry = true
 			break
 		}
 		if !isHealthy(pod) {
@@ -186,6 +190,9 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 	if !isBlocked {
 		meta.RemoveStatusCondition(&its.Status.Conditions, string(workloads.InstanceUpdateRestricted))
+	}
+	if needRetry {
+		return kubebuilderx.RetryAfter(2 * time.Second), nil
 	}
 	return kubebuilderx.Continue, nil
 }

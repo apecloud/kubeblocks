@@ -6,9 +6,12 @@ sidebar_position: 5
 sidebar_label: 停止/启动
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # 停止/启动集群
 
-你可以停止/启动集群以释放计算资源。当集群被停止时，其计算资源将被释放，也就是说 Kubernetes 的 Pod 将被释放，但其存储资源仍将被保留。如果你希望通过快照从原始存储中恢复集群资源，请重新启动该集群。
+您可以停止/启动集群以释放计算资源。停止集群时，其计算资源将被释放，也就是说 Kubernetes 的 Pod 将被释放，但其存储资源仍将被保留。如果您希望通过快照从原始存储中恢复集群资源，请再次启动该集群。
 
 ## 停止集群
 
@@ -16,26 +19,172 @@ sidebar_label: 停止/启动
 
 1. 配置集群名称，并执行以下命令来停止该集群。
 
+    <Tabs>
+
+    <TabItem value="kbcli" label="kbcli" default>
+
     ```bash
-    kbcli cluster stop mongodb-cluster
+    kbcli cluster stop mycluster -n demo
     ```
+
+    </TabItem>
+
+    <TabItem value="OpsRequest" label="OpsRequest">
+
+    ```bash
+    kubectl apply -f - <<EOF
+    apiVersion: apps.kubeblocks.io/v1alpha1
+    kind: OpsRequest
+    metadata:
+      name: ops-stop
+      namespace: demo
+    spec:
+      clusterName: mycluster
+      type: Stop
+    EOF
+    ```
+
+    </TabItem>
+
+    <TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
+
+    将 replicas 设为 0，删除 Pods。
+
+    ```yaml
+    apiVersion: apps.kubeblocks.io/v1alpha1
+    kind: Cluster
+    metadata:
+      name: mycluster
+      namespace: demo
+    spec:
+      clusterDefinitionRef: mongodb
+      clusterVersionRef: mongodb-5.0
+      terminationPolicy: Delete
+      componentSpecs:
+      - name: mongodb
+        componentDefRef: mongodb
+        disableExporter: true  
+        replicas: 0
+        volumeClaimTemplates:
+        - name: data
+          spec:
+            storageClassName: standard
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 20Gi
+    ```
+
+    </TabItem>
+
+    </Tabs>
 
 2. 检查集群的状态，查看其是否已停止。
 
+    <Tabs>
+
+    <TabItem value="kbcli" label="kbcli" default>
+
     ```bash
-    kbcli cluster list
+    kbcli cluster list mycluster -n demo
     ```
+
+    </TabItem>
+
+    <TabItem value="kubectl" label="kubectl">
+
+    ```bash
+    kubectl get cluster mycluster -n demo
+    ```
+
+    </TabItem>
+
+    </Tabs>
 
 ## 启动集群
   
 1. 配置集群名称，并执行以下命令来启动该集群。
 
+    <Tabs>
+
+    <TabItem value="kbcli" label="kbcli" default>
+
    ```bash
-   kbcli cluster start mongodb-cluster
+   kbcli cluster start mycluster -n demo
    ```
+
+    </TabItem>
+
+    <TabItem value="OpsRequest" label="OpsRequest">
+
+    ```bash
+    kubectl apply -f - <<EOF
+    apiVersion: apps.kubeblocks.io/v1alpha1
+    kind: OpsRequest
+    metadata:
+      name:ops-start
+      namespace: demo
+    spec:
+      clusterName: mycluster
+      type: Start
+    EOF 
+    ```
+
+    </TabItem>
+
+    <TabItem value="Edit cluster YAML file" label="Edit cluster YAML File">
+
+    将 replicas 数值调整为停止集群前的数量，再次启动集群。
+
+    ```yaml
+    apiVersion: apps.kubeblocks.io/v1alpha1
+    kind: Cluster
+    metadata:
+      name: mycluster
+      namespace: demo
+    spec:
+      clusterDefinitionRef: mongodb
+      clusterVersionRef: mongodb-5.0
+      terminationPolicy: Delete
+      componentSpecs:
+      - name: mongodb
+        componentDefRef: mongodb
+        disableExporter: true  
+        replicas: 1
+        volumeClaimTemplates:
+        - name: data
+          spec:
+            storageClassName: standard
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 20Gi
+    ```
+
+    </TabItem>
+
+    </Tabs>
 
 2. 查看集群状态，确认集群是否再次启动。
 
-   ```bash
-   kbcli cluster list
-   ```
+    <Tabs>
+
+    <TabItem value="kbcli" label="kbcli" default>
+
+    ```bash
+    kbcli cluster list mycluster -n demo
+    ```
+
+    </TabItem>
+
+    <TabItem value="kubectl" label="kubectl">
+
+    ```bash
+    kubectl get cluster mycluster -n demo
+    ```
+
+    </TabItem>
+
+    </Tabs>

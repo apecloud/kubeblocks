@@ -27,6 +27,7 @@ import (
 	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -94,7 +95,7 @@ func getPodsForOnlineUpdate(params reconfigureContext) ([]corev1.Pod, error) {
 }
 
 // TODO commonOnlineUpdateWithPod migrate to sql command pipeline
-func commonOnlineUpdateWithPod(pod *corev1.Pod, ctx context.Context, createClient createReconfigureClient, configSpec string, updatedParams map[string]string) error {
+func commonOnlineUpdateWithPod(pod *corev1.Pod, ctx context.Context, createClient createReconfigureClient, configSpec string, configFile string, updatedParams map[string]string) error {
 	address, err := cfgManagerGrpcURL(pod)
 	if err != nil {
 		return err
@@ -107,6 +108,7 @@ func commonOnlineUpdateWithPod(pod *corev1.Pod, ctx context.Context, createClien
 	response, err := client.OnlineUpgradeParams(ctx, &cfgproto.OnlineUpgradeParamsRequest{
 		ConfigSpec: configSpec,
 		Params:     updatedParams,
+		ConfigFile: pointer.String(configFile),
 	})
 	if err != nil {
 		return err
@@ -247,9 +249,7 @@ type ReloadAction interface {
 
 type reconfigureTask struct {
 	parametersv1alpha1.ReloadPolicy
-
-	taskCtx    reconfigureContext
-	configDesc *parametersv1alpha1.ComponentConfigDescription
+	taskCtx reconfigureContext
 }
 
 func (r reconfigureTask) ReloadType() string {

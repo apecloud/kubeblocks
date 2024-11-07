@@ -243,6 +243,7 @@ func GetSupportReloadConfigSpecs(configSpecs []appsv1.ComponentTemplateSpec,
 				FormatterConfig:    *desc.FileFormatConfig,
 				ConfigSpec:         *configSpec,
 				ReloadType:         FromReloadTypeConfig(action),
+				ConfigFile:         desc.Name,
 				DownwardAPIOptions: paramsDef.Spec.DownwardAPIChangeTriggeredActions,
 			},
 		})

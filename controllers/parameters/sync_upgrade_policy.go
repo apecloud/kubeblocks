@@ -88,6 +88,7 @@ func sync(params reconfigureContext, updatedParameters map[string]string, pods [
 		configKey   = params.getConfigKey()
 		versionHash = params.getTargetVersionHash()
 		selector    = intctrlutil.GetPodSelector(params.ParametersDef)
+		fileName    string
 	)
 
 	if selector != nil {
@@ -100,6 +101,9 @@ func sync(params reconfigureContext, updatedParameters map[string]string, pods [
 		params.Log.Info(fmt.Sprintf("no pods to update, and retry, selector: %v", selector))
 		return makeReturnedStatus(ESRetry), nil
 	}
+	if params.ConfigDescription != nil {
+		fileName = params.ConfigDescription.Name
+	}
 
 	requireUpdatedCount := int32(len(pods))
 	for _, pod := range pods {
@@ -111,7 +115,7 @@ func sync(params reconfigureContext, updatedParameters map[string]string, pods [
 		if !intctrlutil.PodIsReady(&pod) {
 			continue
 		}
-		err = funcs.OnlineUpdatePodFunc(&pod, ctx, params.ReconfigureClientFactory, params.ConfigSpecName, updatedParameters)
+		err = funcs.OnlineUpdatePodFunc(&pod, ctx, params.ReconfigureClientFactory, params.ConfigSpecName, fileName, updatedParameters)
 		if err != nil {
 			return makeReturnedStatus(ESFailedAndRetry), err
 		}

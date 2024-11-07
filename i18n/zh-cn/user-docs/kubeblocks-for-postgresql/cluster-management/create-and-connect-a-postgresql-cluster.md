@@ -249,7 +249,7 @@ kbcli cluster connect mycluster  --namespace demo
 
 </TabItem>
 
-<TabItem value="kubectl" label="kubectl" default>
+<TabItem value="kubectl" label="kubectl">
 
 使用 `kubectl exec` 命令进入 Pod 并连接到数据库。
 

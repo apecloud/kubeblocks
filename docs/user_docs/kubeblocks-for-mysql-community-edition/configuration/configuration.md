@@ -176,7 +176,7 @@ The example below takes configuring `max_connections` and `innodb_buffer_pool_si
 
 4. Connect to the database to verify whether the parameters are configured as expected.
 
-   The whole searching process has a 30-second delay since it takes some time for kubelet to synchronize modifications to the volume of the pod.
+   It takes about 30 seconds for the configuration to take effect because the kubelet requires some time to sync changes in the ConfigMap to the Pod's volume.
 
    ```bash
    kbcli cluster connect mycluster -n demo

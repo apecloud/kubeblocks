@@ -161,7 +161,7 @@ error: failed to validate updated config: [failed to cue template render configu
 
 4. Connect to the database to verify whether the parameter is configured as expected.
 
-   The whole searching process has a 30-second delay since it takes some time for kubelet to synchronize modifications to the volume of the pod.
+   It takes about 30 seconds for the configuration to take effect because the kubelet requires some time to sync changes in the ConfigMap to the Pod's volume.
 
    ```bash
    kbcli cluster connect mycluster -n demo

@@ -161,7 +161,7 @@ kbcli cluster describe-config mycluster -n demo
 
 4. 连接至数据库，验证参数是否按预期配置。
 
-   整体生效过程有 30 秒的延迟，kubelet 需要一些时间同步对 Pod 卷的修改。
+   配置生效过程约需要 30 秒，这是由于 kubelet 需要一定时间才能将对 ConfigMap 的修改同步到 Pod 的卷。
 
    ```bash
    kbcli cluster connect mycluster -n demo

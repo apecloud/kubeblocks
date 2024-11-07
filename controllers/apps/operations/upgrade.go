@@ -22,6 +22,7 @@ package operations
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -118,18 +119,6 @@ func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 			return opsRes.OpsRequest.Status.Phase, 0, err
 		}
 	}
-	componentUpgraded := func(cluster *appsv1alpha1.Cluster,
-		lastCompConfiguration appsv1alpha1.LastComponentConfiguration,
-		upgradeComp appsv1alpha1.UpgradeComponent) bool {
-		if u.needUpdateCompDef(upgradeComp, opsRes.Cluster) &&
-			lastCompConfiguration.ComponentDefinitionName != *upgradeComp.ComponentDefinitionName {
-			return true
-		}
-		if upgradeComp.ServiceVersion != nil && lastCompConfiguration.ServiceVersion != *upgradeComp.ServiceVersion {
-			return true
-		}
-		return false
-	}
 	podApplyCompOps := func(
 		ops *appsv1alpha1.OpsRequest,
 		pod *corev1.Pod,
@@ -146,12 +135,6 @@ func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 				return true
 			}
 			return u.podImageApplied(pod, compVersion.VersionsCtx.Containers)
-		}
-		upgradeComponent := compOps.(appsv1alpha1.UpgradeComponent)
-		lastCompConfiguration := opsRes.OpsRequest.Status.LastConfiguration.Components[compOps.GetComponentName()]
-		if !componentUpgraded(opsRes.Cluster, lastCompConfiguration, upgradeComponent) {
-			// if componentDefinition and serviceVersion no changes, return true
-			return true
 		}
 		compDef, ok := componentDefMap[compOps.GetComponentName()]
 		if !ok {
@@ -236,14 +219,18 @@ func (u upgradeOpsHandler) podImageApplied(pod *corev1.Pod, expectContainers []c
 	if len(expectContainers) == 0 {
 		return true
 	}
+	imageName := func(image string) string {
+		images := strings.Split(image, "/")
+		return images[len(images)-1]
+	}
 	for _, v := range expectContainers {
 		for _, cs := range pod.Status.ContainerStatuses {
-			if cs.Name == v.Name && cs.Image != v.Image {
+			if cs.Name == v.Name && imageName(cs.Image) != imageName(v.Image) {
 				return false
 			}
 		}
 		for _, c := range pod.Spec.Containers {
-			if c.Name == v.Name && c.Image != v.Image {
+			if c.Name == v.Name && imageName(c.Image) != imageName(v.Image) {
 				return false
 			}
 		}

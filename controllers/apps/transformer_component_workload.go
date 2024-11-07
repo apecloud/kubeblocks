@@ -626,8 +626,6 @@ func (r *componentWorkloadOps) annotateInstanceSetForMemberJoin() {
 	if podsToMemberjoin.Len() > 0 {
 		r.protoITS.Annotations[constant.MemberJoinStatusAnnotationKey] = strings.Join(podsToMemberjoin.UnsortedList(), ",")
 	}
-
-	return
 }
 
 func getPodsToMemberJoinFromAnno(instanceSet *workloads.InstanceSet) sets.Set[string] {

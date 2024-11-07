@@ -226,7 +226,6 @@ func buildConfigManagerParams(cli client.Client, ctx context.Context, cluster *a
 		Cluster:                cluster,
 		ConfigSpecsBuildParams: configSpecBuildParams,
 		ContainerPort:          viper.GetInt32(constant.ConfigManagerGPRCPortEnv),
-		// ConfigLazyRenderedVolumes: make(map[string]corev1.VolumeMount),
 	}
 
 	if podSpec.HostNetwork {

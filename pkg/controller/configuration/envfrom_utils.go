@@ -20,14 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package configuration
 
 import (
-	"context"
-
 	"github.com/spf13/cast"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
@@ -35,8 +30,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	"github.com/apecloud/kubeblocks/pkg/generics"
 )
 
 func InjectTemplateEnvFrom(component *component.SynthesizedComponent,
@@ -86,23 +79,23 @@ func InjectTemplateEnvFrom(component *component.SynthesizedComponent,
 	return envObjs, nil
 }
 
-func fromConfigmapFiles(keys []string, cm *corev1.ConfigMap, formatter *parametersv1alpha1.FileFormatConfig) (map[string]string, error) {
-	mergeMap := func(dst, src map[string]string) {
-		for key, val := range src {
-			dst[key] = val
-		}
-	}
-
-	gEnvMap := make(map[string]string)
-	for _, file := range keys {
-		envMap, err := resolveParametersFromFileContent(formatter, cm.Data[file])
-		if err != nil {
-			return nil, err
-		}
-		mergeMap(gEnvMap, envMap)
-	}
-	return gEnvMap, nil
-}
+// func fromConfigmapFiles(keys []string, cm *corev1.ConfigMap, formatter *parametersv1alpha1.FileFormatConfig) (map[string]string, error) {
+// 	mergeMap := func(dst, src map[string]string) {
+// 		for key, val := range src {
+// 			dst[key] = val
+// 		}
+// 	}
+//
+// 	gEnvMap := make(map[string]string)
+// 	for _, file := range keys {
+// 		envMap, err := resolveParametersFromFileContent(formatter, cm.Data[file])
+// 		if err != nil {
+// 			return nil, err
+// 		}
+// 		mergeMap(gEnvMap, envMap)
+// 	}
+// 	return gEnvMap, nil
+// }
 
 func resolveConfigMap(localObjs []*corev1.ConfigMap, key string) *corev1.ConfigMap {
 	for _, obj := range localObjs {
@@ -113,47 +106,47 @@ func resolveConfigMap(localObjs []*corev1.ConfigMap, key string) *corev1.ConfigM
 	return nil
 }
 
-func createOrUpdateResourceFromConfigTemplate(cluster *appsv1.Cluster, component *component.SynthesizedComponent, template appsv1.ComponentConfigSpec, originKey client.ObjectKey, envMap map[string]string, ctx context.Context, cli client.Client, createOnly bool) (client.Object, error) {
-	cmKey := client.ObjectKey{
-		Name:      core.GenerateEnvFromName(originKey.Name),
-		Namespace: originKey.Namespace,
-	}
+// func createOrUpdateResourceFromConfigTemplate(cluster *appsv1.Cluster, component *component.SynthesizedComponent, template appsv1.ComponentConfigSpec, originKey client.ObjectKey, envMap map[string]string, ctx context.Context, cli client.Client, createOnly bool) (client.Object, error) {
+// 	cmKey := client.ObjectKey{
+// 		Name:      core.GenerateEnvFromName(originKey.Name),
+// 		Namespace: originKey.Namespace,
+// 	}
+//
+// 	updateObjectMeta := func(obj client.Object) {
+// 		obj.SetLabels(constant.GetConfigurationLabels(component.ClusterName, component.Name, template.Name))
+// 		_ = intctrlutil.SetOwnerReference(cluster, obj)
+// 	}
+//
+// 	if toSecret(template) {
+// 		return updateOrCreateEnvObject(ctx, cli, &corev1.Secret{}, cmKey, func(c *corev1.Secret) {
+// 			c.StringData = envMap
+// 			updateObjectMeta(c)
+// 		}, createOnly)
+// 	}
+// 	return updateOrCreateEnvObject(ctx, cli, &corev1.ConfigMap{}, cmKey, func(c *corev1.ConfigMap) {
+// 		c.Data = envMap
+// 		updateObjectMeta(c)
+// 	}, createOnly)
+// }
 
-	updateObjectMeta := func(obj client.Object) {
-		obj.SetLabels(constant.GetConfigurationLabels(component.ClusterName, component.Name, template.Name))
-		_ = intctrlutil.SetOwnerReference(cluster, obj)
-	}
-
-	if toSecret(template) {
-		return updateOrCreateEnvObject(ctx, cli, &corev1.Secret{}, cmKey, func(c *corev1.Secret) {
-			c.StringData = envMap
-			updateObjectMeta(c)
-		}, createOnly)
-	}
-	return updateOrCreateEnvObject(ctx, cli, &corev1.ConfigMap{}, cmKey, func(c *corev1.ConfigMap) {
-		c.Data = envMap
-		updateObjectMeta(c)
-	}, createOnly)
-}
-
-func updateOrCreateEnvObject[T generics.Object, PT generics.PObject[T]](ctx context.Context, cli client.Client, obj PT, objKey client.ObjectKey, updater func(PT), createOnly bool) (client.Object, error) {
-	err := cli.Get(ctx, objKey, obj, inDataContext())
-	switch {
-	case err != nil:
-		if !apierrors.IsNotFound(err) {
-			return nil, err
-		}
-		obj.SetName(objKey.Name)
-		obj.SetNamespace(objKey.Namespace)
-		updater(obj)
-		return obj, cli.Create(ctx, obj, inDataContext())
-	case createOnly:
-		return obj, nil
-	default:
-		updater(obj)
-		return obj, cli.Update(ctx, obj, inDataContext())
-	}
-}
+// func updateOrCreateEnvObject[T generics.Object, PT generics.PObject[T]](ctx context.Context, cli client.Client, obj PT, objKey client.ObjectKey, updater func(PT), createOnly bool) (client.Object, error) {
+// 	err := cli.Get(ctx, objKey, obj, inDataContext())
+// 	switch {
+// 	case err != nil:
+// 		if !apierrors.IsNotFound(err) {
+// 			return nil, err
+// 		}
+// 		obj.SetName(objKey.Name)
+// 		obj.SetNamespace(objKey.Namespace)
+// 		updater(obj)
+// 		return obj, cli.Create(ctx, obj, inDataContext())
+// 	case createOnly:
+// 		return obj, nil
+// 	default:
+// 		updater(obj)
+// 		return obj, cli.Update(ctx, obj, inDataContext())
+// 	}
+// }
 
 func CheckEnvFrom(container *corev1.Container, cmName string) bool {
 	for i := range container.EnvFrom {
@@ -211,11 +204,11 @@ func resolveParametersFromFileContent(format *parametersv1alpha1.FileFormatConfi
 // 	}
 // 	return err
 // }
-
-func InjectEnvEnabled(spec appsv1.ComponentConfigSpec) bool {
-	return len(spec.AsEnvFrom) > 0 || len(spec.InjectEnvTo) > 0
-}
-
-func toSecret(spec appsv1.ComponentConfigSpec) bool {
-	return spec.AsSecret != nil && *spec.AsSecret
-}
+//
+// func InjectEnvEnabled(spec appsv1.ComponentConfigSpec) bool {
+// 	return len(spec.AsEnvFrom) > 0 || len(spec.InjectEnvTo) > 0
+// }
+//
+// func toSecret(spec appsv1.ComponentConfigSpec) bool {
+// 	return spec.AsSecret != nil && *spec.AsSecret
+// }

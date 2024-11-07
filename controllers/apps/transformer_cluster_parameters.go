@@ -90,7 +90,7 @@ func (c *clusterParametersTransformer) reconcile(transCtx *clusterTransformConte
 
 func (c *clusterParametersTransformer) mergeComponentParameter(expected *parametersv1alpha1.ComponentParameter, existing *parametersv1alpha1.ComponentParameter) *parametersv1alpha1.ComponentParameter {
 	return configuration.MergeComponentParameter(expected, existing, func(dest, expected *parametersv1alpha1.ConfigTemplateItemDetail) {
-		if len(dest.ConfigFileParams) != 0 {
+		if len(dest.ConfigFileParams) == 0 && len(expected.ConfigFileParams) != 0 {
 			dest.ConfigFileParams = expected.ConfigFileParams
 		}
 	})
@@ -104,7 +104,7 @@ func createComponentParameters(transCtx *clusterTransformContext, cluster *appsv
 		if err != nil {
 			return nil, err
 		}
-		expectedObjects[comp.Name] = parameter
+		expectedObjects[parameter.Name] = parameter
 	}
 
 	for _, shardingComponents := range transCtx.shardingComps {
@@ -113,7 +113,7 @@ func createComponentParameters(transCtx *clusterTransformContext, cluster *appsv
 			if err != nil {
 				return nil, err
 			}
-			expectedObjects[componentSpec.Name] = parameter
+			expectedObjects[parameter.Name] = parameter
 		}
 	}
 	return expectedObjects, nil
@@ -139,7 +139,6 @@ func runningComponentParameters(transCtx *clusterTransformContext, cluster *apps
 
 func buildComponentParameter(transCtx *clusterTransformContext, cluster *appsv1.Cluster, compName string, comp *appsv1.ClusterComponentSpec) (*parametersv1alpha1.ComponentParameter, error) {
 	var cmpd *appsv1.ComponentDefinition
-	var items []parametersv1alpha1.ConfigTemplateItemDetail
 
 	if comp.ComponentDef == "" {
 		return nil, nil
@@ -155,13 +154,12 @@ func buildComponentParameter(transCtx *clusterTransformContext, cluster *appsv1.
 	if err != nil {
 		return nil, err
 	}
-	items = configuration.ClassifyParamsFromConfigTemplate(comp.InitParameters, cmpd, paramsDefs, tpls)
 	return builder.NewComponentParameterBuilder(cluster.Namespace,
 		core.GenerateComponentParameterName(cluster.Name, compName)).
 		AddLabelsInMap(constant.GetCompLabelsWithDef(cluster.Name, compName, comp.ComponentDef)).
 		ClusterRef(cluster.Name).
 		Component(compName).
-		SetConfigurationItem(items).
+		SetConfigurationItem(configuration.ClassifyParamsFromConfigTemplate(comp.InitParameters, cmpd, paramsDefs, tpls)).
 		GetObject(), nil
 }
 

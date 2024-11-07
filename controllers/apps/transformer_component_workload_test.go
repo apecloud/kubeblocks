@@ -159,10 +159,10 @@ var _ = Describe("Component Workload Operations Test", func() {
 					{Name: "leader", AccessMode: workloads.ReadWriteMode, CanVote: true, IsLeader: true},
 					{Name: "follower", AccessMode: workloads.ReadonlyMode, CanVote: true, IsLeader: false},
 				}).
-				Create(&testCtx).GetObject()
+				GetObject()
 
 			mockCluster := testapps.NewClusterFactory(testCtx.DefaultNamespace, "test-cluster", "test-def").
-				Create(&testCtx).GetObject()
+				GetObject()
 
 			ops = &componentWorkloadOps{
 				cli:            k8sClient,
@@ -194,6 +194,10 @@ var _ = Describe("Component Workload Operations Test", func() {
 			Expect(pod0.Labels["test.kubeblock.io/memberleave-completed"]).Should(Equal(""))
 			Expect(pod1.Labels["test.kubeblock.io/memberleave-completed"]).ShouldNot(Equal(""))
 
+			for _, pod := range pods {
+				Expect(ops.cli.Delete(ctx, pod)).Should(BeNil())
+			}
+
 		})
 
 		It("should return requeueError when exec memberleave with memberjoin processing ", func() {
@@ -213,6 +217,9 @@ var _ = Describe("Component Workload Operations Test", func() {
 			Expect(pod0.Labels["test.kubeblock.io/memberleave-completed"]).Should(Equal(""))
 			Expect(pod1.Labels["test.kubeblock.io/memberleave-completed"]).Should(Equal(""))
 
+			for _, pod := range pods {
+				Expect(ops.cli.Delete(ctx, pod)).Should(BeNil())
+			}
 		})
 
 		It("should handle switchover for leader pod", func() {
@@ -232,6 +239,10 @@ var _ = Describe("Component Workload Operations Test", func() {
 			Expect(err).ShouldNot(BeNil())
 			Expect(pod0.Labels[constant.RoleLabelKey]).Should(Equal("leader"))
 			Expect(pod1.Labels[constant.RoleLabelKey]).ShouldNot(Equal("leader"))
+
+			for _, pod := range pods {
+				Expect(ops.cli.Delete(ctx, pod)).Should(BeNil())
+			}
 		})
 
 		It("should handle member join process correctly", func() {
@@ -253,6 +264,10 @@ var _ = Describe("Component Workload Operations Test", func() {
 			Expect(pod0.Labels["test.kubeblock.io/memberjoin-completed"]).Should(Equal(""))
 			Expect(pod1.Labels["test.kubeblock.io/memberjoin-completed"]).ShouldNot(Equal(""))
 			Expect(ops.protoITS.Annotations[constant.MemberJoinStatusAnnotationKey]).Should(Equal(""))
+
+			for _, pod := range pods {
+				Expect(ops.cli.Delete(ctx, pod)).Should(BeNil())
+			}
 		})
 
 		It("should annotate instance for member join correctly", func() {
@@ -268,6 +283,9 @@ var _ = Describe("Component Workload Operations Test", func() {
 			ops.annotateInstanceSetForMemberJoin()
 
 			Expect(ops.protoITS.Annotations[constant.MemberJoinStatusAnnotationKey]).Should(Equal(pod1.Name))
+
+			Expect(ops.cli.Delete(ctx, pod0)).Should(BeNil())
+
 		})
 	})
 })

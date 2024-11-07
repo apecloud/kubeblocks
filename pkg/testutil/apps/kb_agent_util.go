@@ -157,7 +157,7 @@ func MockKBAgentClient4Workload(testCtx *testutil.TestContext, pods []*corev1.Po
 				podName := req.Parameters["KB_JOIN_MEMBER_POD_NAME"]
 				return handleMemberJoin(podName)
 			case "switchover":
-				podName := req.Parameters["KB_SWITCHOVER_CANDIDATE_NAME"]
+				podName := req.Parameters["KB_LEADER_POD_NAME"]
 				return handleSwitchOver(podName)
 			default:
 				return rsp, nil

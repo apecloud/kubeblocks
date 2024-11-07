@@ -165,11 +165,6 @@ func (in *InstanceSetSpec) DeepCopyInto(out *InstanceSetSpec) {
 		*out = new(metav1.LabelSelector)
 		(*in).DeepCopyInto(*out)
 	}
-	if in.Service != nil {
-		in, out := &in.Service, &out.Service
-		*out = new(corev1.Service)
-		(*in).DeepCopyInto(*out)
-	}
 	in.Template.DeepCopyInto(&out.Template)
 	if in.Instances != nil {
 		in, out := &in.Instances, &out.Instances

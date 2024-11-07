@@ -34,7 +34,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
@@ -83,13 +82,13 @@ func (r *ComponentParameterReconciler) Reconcile(ctx context.Context, req ctrl.R
 // SetupWithManager sets up the controller with the Manager.
 func (r *ComponentParameterReconciler) SetupWithManager(mgr ctrl.Manager, multiClusterMgr multicluster.Manager) error {
 	builder := intctrlutil.NewNamespacedControllerManagedBy(mgr).
-		For(&appsv1alpha1.Configuration{}).
+		For(&parametersv1alpha1.ComponentParameter{}).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: int(math.Ceil(viper.GetFloat64(constant.CfgKBReconcileWorkers) / 2)),
 		}).
 		Owns(&corev1.ConfigMap{})
 	if multiClusterMgr != nil {
-		multiClusterMgr.Own(builder, &corev1.ConfigMap{}, &appsv1alpha1.Configuration{})
+		multiClusterMgr.Own(builder, &corev1.ConfigMap{}, &parametersv1alpha1.ComponentParameter{})
 	}
 	return builder.Complete(r)
 }

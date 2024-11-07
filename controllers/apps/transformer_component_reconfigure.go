@@ -27,6 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -93,24 +94,36 @@ func (t *componentReloadActionSidecarTransformer) Transform(ctx graph.TransformC
 	if err != nil {
 		return err
 	}
-	envObjs, err := configctrl.InjectTemplateEnvFrom(synthesizeComp, synthesizeComp.PodSpec, configRender, configmaps)
-	if err != nil {
-		return err
-	}
-	if err = checkAndCreateConfigRelatedObjs(transCtx, graphCli, dag, envObjs...); err != nil {
+	if err = handleInjectEnv(transCtx, graphCli, dag, synthesizeComp, configRender, configmaps); err != nil {
 		return err
 	}
 	return configctrl.BuildReloadActionContainer(reconcileCtx, cluster, synthesizeComp, configRender, paramsDefs)
+}
+
+func handleInjectEnv(ctx context.Context,
+	graphCli model.GraphClient,
+	dag *graph.DAG,
+	comp *component.SynthesizedComponent,
+	configRender *parametersv1alpha1.ParameterDrivenConfigRender,
+	configmaps []*corev1.ConfigMap) error {
+	envObjs, err := configctrl.InjectTemplateEnvFrom(comp, comp.PodSpec, configRender, configmaps)
+	if err != nil {
+		return err
+	}
+	if len(envObjs) == 0 {
+		return nil
+	}
+	return checkAndCreateConfigRelatedObjs(ctx, graphCli, dag, envObjs...)
 }
 
 func checkAndCreateConfigRelatedObjs(ctx context.Context, cli model.GraphClient, dag *graph.DAG, configmaps ...*corev1.ConfigMap) error {
 	for _, configmap := range configmaps {
 		var cm = &corev1.ConfigMap{}
 		if err := cli.Get(ctx, client.ObjectKeyFromObject(configmap), cm); err != nil {
-			if apierrors.IsNotFound(err) {
-				cli.Create(dag, cm, inDataContext4G())
+			if !apierrors.IsNotFound(err) {
+				return err
 			}
-			return err
+			cli.Create(dag, configmap, inDataContext4G())
 		}
 	}
 	return nil

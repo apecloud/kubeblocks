@@ -47,13 +47,16 @@ func generateConfigTemplateItem(configParams map[string]map[string]*parametersv1
 		ConfigSpec: template.DeepCopy(),
 	}
 
-	if configParams != nil {
-		itemDetail.ConfigFileParams = derefMapValues(configParams[template.Name])
+	if tls, ok := configParams[template.Name]; ok {
+		itemDetail.ConfigFileParams = derefMapValues(tls)
 	}
 	return itemDetail
 }
 
-func classifyComponentParameters(parameters appsv1.ComponentParameters, parametersDefs []*parametersv1alpha1.ParametersDefinition, templates []appsv1.ComponentTemplateSpec, tpls map[string]*corev1.ConfigMap) map[string]map[string]*parametersv1alpha1.ParametersInFile {
+func classifyComponentParameters(parameters appsv1.ComponentParameters,
+	parametersDefs []*parametersv1alpha1.ParametersDefinition,
+	templates []appsv1.ComponentTemplateSpec,
+	tpls map[string]*corev1.ConfigMap) map[string]map[string]*parametersv1alpha1.ParametersInFile {
 	if len(parameters) == 0 || len(parametersDefs) == 0 {
 		return nil
 	}
@@ -69,7 +72,10 @@ func classifyComponentParameters(parameters appsv1.ComponentParameters, paramete
 	return classifyParams
 }
 
-func updateConfigParameter(paramKey string, paramValue *string, parametersMap map[string]*controllerutil.ParameterMeta, classifyParams map[string]map[string]*parametersv1alpha1.ParametersInFile) {
+func updateConfigParameter(paramKey string,
+	paramValue *string,
+	parametersMap map[string]*controllerutil.ParameterMeta,
+	classifyParams map[string]map[string]*parametersv1alpha1.ParametersInFile) {
 
 	deRefParamInTemplate := func(name string) map[string]*parametersv1alpha1.ParametersInFile {
 		if _, ok := classifyParams[name]; !ok {
@@ -95,7 +101,9 @@ func updateConfigParameter(paramKey string, paramValue *string, parametersMap ma
 	deRefParamInFile(meta.ConfigTemplateName, meta.FileName).Parameters[paramKey] = paramValue
 }
 
-func resolveSchemaFromParametersDefinition(parametersDefs []*parametersv1alpha1.ParametersDefinition, templates []appsv1.ComponentTemplateSpec, tpls map[string]*corev1.ConfigMap) map[string]*controllerutil.ParameterMeta {
+func resolveSchemaFromParametersDefinition(parametersDefs []*parametersv1alpha1.ParametersDefinition,
+	templates []appsv1.ComponentTemplateSpec,
+	tpls map[string]*corev1.ConfigMap) map[string]*controllerutil.ParameterMeta {
 	paramMeta := make(map[string]*controllerutil.ParameterMeta)
 	mergeParams := func(params map[string]*controllerutil.ParameterMeta) {
 		for key, meta := range params {
@@ -111,7 +119,10 @@ func resolveSchemaFromParametersDefinition(parametersDefs []*parametersv1alpha1.
 	return paramMeta
 }
 
-func transformParametersInFile(paramDef *parametersv1alpha1.ParametersDefinition, templates []appsv1.ComponentTemplateSpec, parameters appsv1.ComponentParameters, tpls map[string]*corev1.ConfigMap) map[string]map[string]*parametersv1alpha1.ParametersInFile {
+func transformParametersInFile(paramDef *parametersv1alpha1.ParametersDefinition,
+	templates []appsv1.ComponentTemplateSpec,
+	parameters appsv1.ComponentParameters,
+	tpls map[string]*corev1.ConfigMap) map[string]map[string]*parametersv1alpha1.ParametersInFile {
 	configSpec := resolveConfigSpecFromParametersDefinition(templates, paramDef, tpls)
 	if configSpec == nil {
 		ctrl.Log.Info(fmt.Sprintf("not found config template: [%v]", paramDef))
@@ -125,7 +136,9 @@ func transformParametersInFile(paramDef *parametersv1alpha1.ParametersDefinition
 	}
 }
 
-func resolveConfigSpecFromParametersDefinition(templates []appsv1.ComponentTemplateSpec, paramDef *parametersv1alpha1.ParametersDefinition, tpls map[string]*corev1.ConfigMap) *appsv1.ComponentTemplateSpec {
+func resolveConfigSpecFromParametersDefinition(templates []appsv1.ComponentTemplateSpec,
+	paramDef *parametersv1alpha1.ParametersDefinition,
+	tpls map[string]*corev1.ConfigMap) *appsv1.ComponentTemplateSpec {
 	for i, item := range templates {
 		tpl, ok := tpls[item.Name]
 		if !ok {

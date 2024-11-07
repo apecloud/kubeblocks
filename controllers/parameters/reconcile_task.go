@@ -21,16 +21,21 @@ package parameters
 
 import (
 	"context"
+	"encoding/json"
 	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
+	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -157,12 +162,12 @@ func syncImpl(taskCtx *TaskContext,
 		updatedConfig = baseConfig
 	}
 	if len(item.ConfigFileParams) != 0 {
-		if updatedConfig, err = configctrl.ApplyParameters(item, baseConfig, taskCtx.configRender, taskCtx.paramsDefs, revision); err != nil {
+		if updatedConfig, err = configctrl.ApplyParameters(item, baseConfig, taskCtx.configRender, taskCtx.paramsDefs); err != nil {
 			return failStatus(err)
 		}
 	}
 
-	if err = mergeAndUpdate(fetcher.ResourceCtx, updatedConfig, configMap, fetcher.ComponentParameterObj); err != nil {
+	if err = mergeAndUpdate(fetcher.ResourceCtx, updatedConfig, configMap, fetcher.ComponentParameterObj, item, revision); err != nil {
 		return failStatus(err)
 	}
 
@@ -172,19 +177,48 @@ func syncImpl(taskCtx *TaskContext,
 	return nil
 }
 
-func mergeAndUpdate(resourceCtx *configctrl.ResourceCtx, expected *corev1.ConfigMap, running *corev1.ConfigMap, owner client.Object) error {
+func mergeAndUpdate(resourceCtx *configctrl.ResourceCtx, expected *corev1.ConfigMap, running *corev1.ConfigMap, owner client.Object, item parametersv1alpha1.ConfigTemplateItemDetail, revision string) error {
 	if expected == nil {
-		return nil
+		expected = running
 	}
 
 	configmapDeep := running.DeepCopy()
 	configmapDeep.Data = expected.Data
 	configmapDeep.Labels = intctrlutil.MergeMetadataMaps(expected.Labels, running.Labels)
 	configmapDeep.Annotations = intctrlutil.MergeMetadataMaps(expected.Annotations, running.Annotations)
-	if err := intctrlutil.SetControllerReference(owner, configmapDeep); err != nil {
+	if err := updateConfigMeta(configmapDeep, item, revision); err != nil {
 		return err
 	}
-	return resourceCtx.Client.Patch(resourceCtx.Context, expected, client.MergeFrom(running))
+	if !controllerutil.ContainsFinalizer(configmapDeep, constant.ConfigFinalizerName) {
+		controllerutil.AddFinalizer(configmapDeep, constant.ConfigFinalizerName)
+	}
+	if !model.IsOwnerOf(owner, configmapDeep) {
+		if err := intctrlutil.SetControllerReference(owner, configmapDeep); err != nil {
+			return err
+		}
+	}
+	return resourceCtx.Client.Patch(resourceCtx.Context, configmapDeep, client.MergeFrom(running))
+}
+
+func updateConfigMeta(obj *corev1.ConfigMap, item parametersv1alpha1.ConfigTemplateItemDetail, revision string) error {
+	if obj.Annotations == nil {
+		obj.Annotations = make(map[string]string)
+	}
+	b, err := json.Marshal(item)
+	if err != nil {
+		return err
+	}
+	obj.Annotations[constant.ConfigAppliedVersionAnnotationKey] = string(b)
+	obj.Annotations[constant.ConfigurationRevision] = revision
+
+	if obj.Labels == nil {
+		obj.Labels = make(map[string]string)
+	}
+	hash, _ := cfgutil.ComputeHash(obj.Data)
+	obj.Labels[constant.CMInsConfigurationHashLabelKey] = hash
+	obj.Labels[constant.CMConfigurationSpecProviderLabelKey] = item.Name
+	obj.Labels[constant.CMConfigurationTemplateNameLabelKey] = item.ConfigSpec.TemplateRef
+	return nil
 }
 
 func syncStatus(configMap *corev1.ConfigMap, status *parametersv1alpha1.ConfigTemplateItemDetailStatus) (err error) {
@@ -235,5 +269,6 @@ func prepareReconcileTask(reqCtx intctrlutil.RequestCtx, cli client.Client, comp
 		ComponentAndComponentDef().
 		ComponentSpec().
 		Complete()
+	fetcherTask.ComponentParameterObj = componentParameter
 	return fetcherTask, err
 }

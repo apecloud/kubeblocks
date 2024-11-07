@@ -21,7 +21,6 @@ package configuration
 
 import (
 	"context"
-	"encoding/json"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -31,9 +30,7 @@ import (
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
-	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
 	"github.com/apecloud/kubeblocks/pkg/configuration/validate"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/generics"
@@ -144,24 +141,24 @@ type templateRenderValidator = func(map[string]string) error
 // 	}
 // 	return strconv.FormatInt(componentParameter.GetGeneration(), 10)
 // }
-
-func updateConfigMetaForCM(newCMObj *corev1.ConfigMap, item parametersv1alpha1.ConfigTemplateItemDetail, revision string) (err error) {
-	annotations := newCMObj.GetAnnotations()
-	if annotations == nil {
-		annotations = make(map[string]string)
-	}
-	b, err := json.Marshal(item)
-	if err != nil {
-		return err
-	}
-	annotations[constant.ConfigAppliedVersionAnnotationKey] = string(b)
-	hash, _ := cfgutil.ComputeHash(newCMObj.Data)
-	annotations[constant.CMInsCurrentConfigurationHashLabelKey] = hash
-	annotations[constant.ConfigurationRevision] = revision
-	newCMObj.Annotations = annotations
-	return
-}
-
+//
+// func updateConfigMetaForCM(newCMObj *corev1.ConfigMap, item parametersv1alpha1.ConfigTemplateItemDetail, revision string) (err error) {
+// 	annotations := newCMObj.GetAnnotations()
+// 	if annotations == nil {
+// 		annotations = make(map[string]string)
+// 	}
+// 	b, err := json.Marshal(item)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	annotations[constant.ConfigAppliedVersionAnnotationKey] = string(b)
+// 	hash, _ := cfgutil.ComputeHash(newCMObj.Data)
+// 	annotations[constant.CMInsCurrentConfigurationHashLabelKey] = hash
+// 	annotations[constant.ConfigurationRevision] = revision
+// 	newCMObj.Annotations = annotations
+// 	return
+// }
+//
 // func applyUpdatedParameters(item *appsv1alpha1.ConfigurationItemDetail, cm *corev1.ConfigMap, configSpec appsv1.ComponentConfigSpec, cli client.Client, ctx context.Context) (err error) {
 // 	var newData map[string]string
 // 	var configConstraint *appsv1beta1.ConfigConstraint

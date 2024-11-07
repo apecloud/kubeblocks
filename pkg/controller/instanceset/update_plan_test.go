@@ -161,7 +161,7 @@ var _ = Describe("update plan test.", func() {
 			checkPlan(expectedPlan, true)
 		})
 
-		FIt("should work well in a best effort parallel", func() {
+		It("should work well in a best effort parallel", func() {
 			By("build a best effort parallel plan")
 			strategy := workloads.BestEffortParallelUpdateStrategy
 			its.Spec.MemberUpdateStrategy = &strategy

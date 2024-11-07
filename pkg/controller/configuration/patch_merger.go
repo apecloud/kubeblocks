@@ -29,7 +29,7 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-func ApplyParameters(item parametersv1alpha1.ConfigTemplateItemDetail, orig *corev1.ConfigMap, configRender *parametersv1alpha1.ParameterDrivenConfigRender, paramsDefs []*parametersv1alpha1.ParametersDefinition, revision string) (*corev1.ConfigMap, error) {
+func ApplyParameters(item parametersv1alpha1.ConfigTemplateItemDetail, orig *corev1.ConfigMap, configRender *parametersv1alpha1.ParameterDrivenConfigRender, paramsDefs []*parametersv1alpha1.ParametersDefinition) (*corev1.ConfigMap, error) {
 	if configRender == nil || len(configRender.Spec.Configs) == 0 {
 		return nil, fmt.Errorf("not support parameter reconfigure")
 	}
@@ -41,9 +41,6 @@ func ApplyParameters(item parametersv1alpha1.ConfigTemplateItemDetail, orig *cor
 
 	expected := orig.DeepCopy()
 	expected.Data = newData
-	if err := updateConfigMetaForCM(expected, item, revision); err != nil {
-		return nil, err
-	}
 	return expected, nil
 }
 

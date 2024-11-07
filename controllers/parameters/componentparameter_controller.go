@@ -32,7 +32,9 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -72,7 +74,7 @@ func (r *ComponentParameterReconciler) Reconcile(ctx context.Context, req ctrl.R
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
-	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, componentParam, constant.ConfigFinalizerName, nil)
+	res, err := intctrlutil.HandleCRDeletion(reqCtx, r, componentParam, constant.ConfigFinalizerName, r.deletionHandler(reqCtx, componentParam))
 	if res != nil {
 		return *res, err
 	}
@@ -159,4 +161,32 @@ func (r *ComponentParameterReconciler) runTasks(taskCtx *TaskContext, tasks []Ta
 		return nil
 	}
 	return utilerrors.NewAggregate(errs)
+}
+
+func (r *ComponentParameterReconciler) deletionHandler(reqCtx intctrlutil.RequestCtx, componentParameter *parametersv1alpha1.ComponentParameter) func() (*ctrl.Result, error) {
+	return func() (*ctrl.Result, error) {
+		var cms = &corev1.ConfigMapList{}
+		matchLabels := client.MatchingLabels(constant.GetCompLabels(componentParameter.Spec.ClusterName, componentParameter.Spec.ComponentName))
+		if err := r.Client.List(reqCtx.Ctx, cms, client.InNamespace(componentParameter.Name), matchLabels); err != nil {
+			return &reconcile.Result{}, err
+		}
+		if err := removeConfigRelatedFinalizer(reqCtx.Ctx, r.Client, cms.Items); err != nil {
+			return &reconcile.Result{}, err
+		}
+		return nil, nil
+	}
+}
+
+func removeConfigRelatedFinalizer(ctx context.Context, cli client.Client, objs []corev1.ConfigMap) error {
+	for _, obj := range objs {
+		if !controllerutil.ContainsFinalizer(&obj, constant.ConfigFinalizerName) {
+			continue
+		}
+		patch := client.MergeFrom(obj.DeepCopy())
+		controllerutil.RemoveFinalizer(&obj, constant.ConfigFinalizerName)
+		if err := cli.Patch(ctx, &obj, patch); err != nil {
+			return err
+		}
+	}
+	return nil
 }

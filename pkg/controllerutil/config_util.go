@@ -125,12 +125,8 @@ func IsApplyConfigChanged(configMap *corev1.ConfigMap, item parametersv1alpha1.C
 	if !ok {
 		return false
 	}
-	var target parametersv1alpha1.ConfigTemplateItemDetail
-	if err := json.Unmarshal([]byte(lastAppliedVersion), &target); err != nil {
-		return false
-	}
-
-	return reflect.DeepEqual(target, item)
+	b, err := json.Marshal(item)
+	return err == nil && string(b) == lastAppliedVersion
 }
 
 // IsRerender checks if the configuration template is changed

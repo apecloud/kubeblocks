@@ -106,14 +106,12 @@ func (r *ReconfigureReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	reqCtx.Log = reqCtx.Log.
 		WithValues("ClusterName", config.Labels[constant.AppInstanceLabelKey]).
 		WithValues("ComponentName", config.Labels[constant.KBAppComponentLabelKey])
-	if hash, ok := config.Labels[constant.CMInsConfigurationHashLabelKey]; ok && hash == config.ResourceVersion {
-		return intctrlutil.Reconciled()
-	}
 
 	isAppliedConfigs, err := checkAndApplyConfigsChanged(r.Client, reqCtx, config)
 	if err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "failed to check last-applied-configuration")
-	} else if isAppliedConfigs {
+	}
+	if isAppliedConfigs {
 		return updateConfigPhase(r.Client, reqCtx, config, parametersv1alpha1.CFinishedPhase, configurationNoChangedMessage)
 	}
 
@@ -246,9 +244,8 @@ func (r *ReconfigureReconciler) performUpgrade(rctx *ReconcileContext, reloadTas
 	rctx.Recorder.Eventf(rctx.ConfigMap,
 		corev1.EventTypeNormal,
 		appsv1alpha1.ReasonReconfigureSucceed,
-		"the reconfigure[%s] request[%s] has been processed successfully",
-		reloadType,
-		getOpsRequestID(rctx.ConfigMap))
+		"the reconfigure[%s] has been processed successfully",
+		reloadType)
 
 	result := reconciled(returnedStatus, reloadType, parametersv1alpha1.CFinishedPhase)
 	return r.updateConfigCMStatus(rctx.RequestCtx, rctx.ConfigMap, reloadType, &result)
@@ -292,17 +289,10 @@ func (r *ReconfigureReconciler) status(rctx *ReconcileContext, returnedStatus Re
 			rctx.ConfigMap,
 			corev1.EventTypeNormal,
 			appsv1alpha1.ReasonReconfigureSucceed,
-			"the reconfigure[%s] request[%s] has been processed successfully",
+			"the reconfigure[%s] has been processed successfully",
 			policy,
-			getOpsRequestID(rctx.ConfigMap))
+		)
 		result := reconciled(returnedStatus, policy, parametersv1alpha1.CFinishedPhase)
 		return r.updateConfigCMStatus(rctx.RequestCtx, rctx.ConfigMap, policy, &result)
 	}
-}
-
-func getOpsRequestID(cm *corev1.ConfigMap) string {
-	if len(cm.Annotations) != 0 {
-		return cm.Annotations[constant.LastAppliedOpsCRAnnotationKey]
-	}
-	return ""
 }

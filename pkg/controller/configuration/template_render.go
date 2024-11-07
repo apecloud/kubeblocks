@@ -66,7 +66,7 @@ func RenderTemplate(resourceCtx *ResourceCtx,
 		if err != nil {
 			return nil, err
 		}
-		if err = intctrlutil.SetControllerReference(comp, configCM); err != nil {
+		if err = intctrlutil.SetOwnerReference(comp, configCM); err != nil {
 			return nil, err
 		}
 		configMaps = append(configMaps, configCM)

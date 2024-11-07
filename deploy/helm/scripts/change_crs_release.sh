@@ -29,11 +29,13 @@ clusterRoles=(
     "leader-election-role"
     "rbac-manager-role"
     "instanceset-editor-role"
+    "cluster-pod-role"
 )
 
 for role in "${clusterRoles[@]}"; do
     updateRelease ClusterRole "${release}-${role}"
 done
+updateRelease ClusterRole "${release}"
 
 # 2. change addons
 addons=(

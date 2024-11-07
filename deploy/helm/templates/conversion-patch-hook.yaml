@@ -45,13 +45,13 @@ spec:
                 version=$(echo ${old_kb_json} | jq '.metadata.labels["app.kubernetes.io/version"]' | tr -d '"')
                 replicas=$(echo ${old_kb_json} | jq '.spec.replicas')
                 if echo "$version" | grep -q '^0\.9'; then
-                    # TODO: add it when released 0.9.2
+                    echo "TODO: add it when released 0.9.2"
                     # patch_num=$(echo $version | awk -F. '{print $3}' | awk -F- '{print $1}')
                     # if [  "$version" != "0.9.2" ] && [ $patch_num -le 2 ]; then
                     #    echo "ERROR: the installed KubeBlocks version must greater and equal to 0.9.2"
                     #    exit 1
                     # fi
-                else
+                elif echo "$version" | grep -q '^0\.'; then
                     echo "ERROR: can not upgrade KubeBlocks from $version to {{ .Chart.AppVersion }}"
                     exit 1
                 fi

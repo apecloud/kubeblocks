@@ -97,7 +97,10 @@ func MockKBAgentClient4Workload(testCtx *testutil.TestContext, pods []*corev1.Po
 				continue
 			}
 			pod.Labels[memberLeaveCompoletedLabel] = "true"
-			testCtx.Cli.Update(testCtx.Ctx, pod)
+			err := testCtx.Cli.Update(testCtx.Ctx, pod)
+			if err != nil {
+				return kbagentproto.ActionResponse{}, err
+			}
 		}
 		return rsp, nil
 	}
@@ -108,7 +111,10 @@ func MockKBAgentClient4Workload(testCtx *testutil.TestContext, pods []*corev1.Po
 				continue
 			}
 			pod.Labels[memberJoinCompoletedLabel] = "true"
-			testCtx.Cli.Update(testCtx.Ctx, pod)
+			err := testCtx.Cli.Update(testCtx.Ctx, pod)
+			if err != nil {
+				return kbagentproto.ActionResponse{}, err
+			}
 		}
 		return rsp, nil
 	}
@@ -122,7 +128,10 @@ func MockKBAgentClient4Workload(testCtx *testutil.TestContext, pods []*corev1.Po
 				return rsp, nil
 			}
 			pod.Labels[constant.RoleLabelKey] = "follower"
-			testCtx.Cli.Update(testCtx.Ctx, pod)
+			err := testCtx.Cli.Update(testCtx.Ctx, pod)
+			if err != nil {
+				return kbagentproto.ActionResponse{}, err
+			}
 		}
 
 		for _, pod := range pods {
@@ -130,7 +139,10 @@ func MockKBAgentClient4Workload(testCtx *testutil.TestContext, pods []*corev1.Po
 				continue
 			}
 			pod.Labels[constant.RoleLabelKey] = "leader"
-			testCtx.Cli.Update(testCtx.Ctx, pod)
+			err := testCtx.Cli.Update(testCtx.Ctx, pod)
+			if err != nil {
+				return kbagentproto.ActionResponse{}, err
+			}
 		}
 		return rsp, nil
 	}

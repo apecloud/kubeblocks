@@ -33,7 +33,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
-	cfgcm "github.com/apecloud/kubeblocks/pkg/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/pkg/configuration/util"
 )
 
@@ -282,7 +281,7 @@ func TestGenerateVisualizedParamsList(t *testing.T) {
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := GenerateVisualizedParamsList(tt.args.configPatch, cfgcm.ToV1ConfigDescription(tt.args.sets.AsSlice(), tt.args.formatConfig))
+			got := GenerateVisualizedParamsList(tt.args.configPatch, ToV1ConfigDescription(tt.args.sets.AsSlice(), tt.args.formatConfig))
 			sortParams(got)
 			sortParams(tt.want)
 			require.Equal(t, got, tt.want)

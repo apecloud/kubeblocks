@@ -158,7 +158,7 @@ func createUpdatedParamsPatch(newVersion []string, oldVersion []string, formatCf
 		return nil, err
 	}
 
-	params := core.GenerateVisualizedParamsList(patch, ToV1ConfigDescription(newVersion, formatCfg))
+	params := core.GenerateVisualizedParamsList(patch, core.ToV1ConfigDescription(newVersion, formatCfg))
 	r := make(map[string]string)
 	for _, key := range params {
 		if key.UpdateType != core.DeletedType {
@@ -322,15 +322,4 @@ func NeedSharedProcessNamespace(configSpecs []ConfigSpecMeta) bool {
 		}
 	}
 	return false
-}
-
-func ToV1ConfigDescription(keys []string, format *parametersv1alpha1.FileFormatConfig) []parametersv1alpha1.ComponentConfigDescription {
-	var configs []parametersv1alpha1.ComponentConfigDescription
-	for _, key := range keys {
-		configs = append(configs, parametersv1alpha1.ComponentConfigDescription{
-			Name:             key,
-			FileFormatConfig: format,
-		})
-	}
-	return configs
 }

@@ -1211,8 +1211,8 @@ and bind Services at Cluster creation time with <code>clusterComponentSpec.Servi
 <td>
 <code>configs</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.ComponentConfigSpec">
-[]ComponentConfigSpec
+<a href="#apps.kubeblocks.io/v1.ComponentTemplateSpec">
+[]ComponentTemplateSpec
 </a>
 </em>
 </td>
@@ -2907,6 +2907,20 @@ bool
 If set, all the computing resources will be released.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>initParameters</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentParameters">
+ComponentParameters
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the initialization parameters.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1.ClusterComponentStatus">ClusterComponentStatus
@@ -4423,9 +4437,6 @@ string
 </table>
 <h3 id="apps.kubeblocks.io/v1.ComponentConfigSpec">ComponentConfigSpec
 </h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
-</p>
 <div>
 </div>
 <table>
@@ -4468,26 +4479,6 @@ Some of these configuration files may support dynamic modification and reloading
 a pod restart.</p>
 <p>If empty or omitted, all configuration files in the ConfigMap are assumed to support dynamic updates,
 and ConfigConstraint applies to all keys.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>legacyRenderedConfigSpec</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.LegacyRenderedTemplateSpec">
-LegacyRenderedTemplateSpec
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the secondary rendered config spec for pod-specific customization.</p>
-<p>The template is rendered inside the pod (by the &ldquo;config-manager&rdquo; sidecar container) and merged with the main
-template&rsquo;s render result to generate the final configuration file.</p>
-<p>This field is intended to handle scenarios where different pods within the same Component have
-varying configurations. It allows for pod-specific customization of the configuration.</p>
-<p>Note: This field will be deprecated in future versions, and the functionality will be moved to
-<code>cluster.spec.componentSpecs[*].instances[*]</code>.</p>
 </td>
 </tr>
 <tr>
@@ -4869,8 +4860,8 @@ and bind Services at Cluster creation time with <code>clusterComponentSpec.Servi
 <td>
 <code>configs</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.ComponentConfigSpec">
-[]ComponentConfigSpec
+<a href="#apps.kubeblocks.io/v1.ComponentTemplateSpec">
+[]ComponentTemplateSpec
 </a>
 </em>
 </td>
@@ -5561,6 +5552,13 @@ and other administrative tasks.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1.ComponentParameters">ComponentParameters
+(<code>map[string]*string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>)
+</p>
+<div>
+</div>
 <h3 id="apps.kubeblocks.io/v1.ComponentPhase">ComponentPhase
 (<code>string</code> alias)</h3>
 <p>
@@ -6781,9 +6779,6 @@ as defined in <code>componentDefinition.spec.lifecycleActions.readWrite</code>, 
 </table>
 <h3 id="apps.kubeblocks.io/v1.ConfigTemplateExtension">ConfigTemplateExtension
 </h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.LegacyRenderedTemplateSpec">LegacyRenderedTemplateSpec</a>)
-</p>
 <div>
 </div>
 <table>
@@ -7761,41 +7756,6 @@ It is required when the issuer is set to <code>UserProvided</code>.</p>
 <td><p>IssuerUserProvided indicates that the user has provided their own CA-signed certificates.</p>
 </td>
 </tr></tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1.LegacyRenderedTemplateSpec">LegacyRenderedTemplateSpec
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentConfigSpec">ComponentConfigSpec</a>)
-</p>
-<div>
-<p>LegacyRenderedTemplateSpec describes the configuration extension for the lazy rendered template.
-Deprecated: LegacyRenderedTemplateSpec has been deprecated since 0.9.0 and will be removed in 0.10.0</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>ConfigTemplateExtension</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.ConfigTemplateExtension">
-ConfigTemplateExtension
-</a>
-</em>
-</td>
-<td>
-<p>
-(Members of <code>ConfigTemplateExtension</code> are embedded into this type.)
-</p>
-<p>Extends the configuration template.</p>
-</td>
-</tr>
-</tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1.LetterCase">LetterCase
 (<code>string</code> alias)</h3>

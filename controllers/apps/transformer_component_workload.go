@@ -280,27 +280,6 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet, synthesizeComp *comp
 		}
 	}
 
-	// be compatible with existed cluster
-	updateService := func(itsObj, itsProto *workloads.InstanceSet) *corev1.Service {
-		if itsProto.Spec.Service != nil {
-			return itsProto.Spec.Service
-		}
-		if itsObj.Spec.Service == nil {
-			return nil
-		}
-		defaultServiceName := itsObj.Name
-		for _, svc := range synthesizeComp.ComponentServices {
-			if svc.PodService != nil && *svc.PodService || svc.DisableAutoProvision != nil && *svc.DisableAutoProvision {
-				continue
-			}
-			serviceName := constant.GenerateComponentServiceName(synthesizeComp.ClusterName, synthesizeComp.Name, svc.ServiceName)
-			if defaultServiceName == serviceName {
-				return itsObj.Spec.Service
-			}
-		}
-		return nil
-	}
-
 	itsObjCopy := oldITS.DeepCopy()
 	itsProto := newITS
 
@@ -321,7 +300,6 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet, synthesizeComp *comp
 	mergeMetadataMap(itsObjCopy.Spec.Template.Annotations, &itsProto.Spec.Template.Annotations)
 	itsObjCopy.Spec.Template = *itsProto.Spec.Template.DeepCopy()
 	itsObjCopy.Spec.Replicas = itsProto.Spec.Replicas
-	itsObjCopy.Spec.Service = updateService(itsObjCopy, itsProto)
 	itsObjCopy.Spec.Roles = itsProto.Spec.Roles
 	itsObjCopy.Spec.RoleProbe = itsProto.Spec.RoleProbe
 	itsObjCopy.Spec.MembershipReconfiguration = itsProto.Spec.MembershipReconfiguration

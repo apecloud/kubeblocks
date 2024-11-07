@@ -160,13 +160,24 @@ func isRunningAndAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
 	return podutils.IsPodAvailable(pod, minReadySeconds, metav1.Now())
 }
 
-func isContainersAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
-	if minReadySeconds == 0 {
-		return true
+func isContainersReady(pod *corev1.Pod) bool {
+	index := slices.IndexFunc(pod.Status.Conditions, func(condition corev1.PodCondition) bool {
+		return condition.Type == corev1.ContainersReady
+	})
+	if index < 0 {
+		return false
 	}
-	minReadySecondsDuration := time.Duration(minReadySeconds) * time.Second
+	if pod.Status.Conditions[index].Status != corev1.ConditionTrue {
+		return false
+	}
+	containersReadyTime := pod.Status.Conditions[index].LastTransitionTime.Time
+	twoSecondsAgo := metav1.Now().Add(-2 * time.Second)
 	for _, status := range pod.Status.ContainerStatuses {
-		if status.State.Running != nil && status.State.Running.StartedAt.Add(minReadySecondsDuration).After(time.Now()) {
+		if status.State.Running == nil {
+			continue
+		}
+		startedAt := status.State.Running.StartedAt
+		if startedAt.After(containersReadyTime) && startedAt.After(twoSecondsAgo) {
 			return false
 		}
 	}

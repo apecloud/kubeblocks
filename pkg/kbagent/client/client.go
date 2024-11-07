@@ -34,8 +34,6 @@ const (
 
 type Client interface {
 	Action(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error)
-
-	DataPipe(ctx context.Context, req proto.DataPipeRequest) error
 }
 
 // HACK: for unit test only.

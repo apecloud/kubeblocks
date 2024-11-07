@@ -53,10 +53,6 @@ type Lifecycle interface {
 
 	// Readwrite(ctx context.Context, cli client.Reader, opts *Options) error
 
-	DataDump(ctx context.Context, cli client.Reader, opts *Options, replicas []string) error
-
-	DataLoad(ctx context.Context, cli client.Reader, opts *Options, replicas []string) error
-
 	// Reconfigure(ctx context.Context, cli client.Reader, opts *Options) error
 
 	AccountProvision(ctx context.Context, cli client.Reader, opts *Options, statement, user, password string) error

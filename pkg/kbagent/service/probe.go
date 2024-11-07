@@ -23,6 +23,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"reflect"
 	"strings"
 	"time"
@@ -83,6 +84,10 @@ func (s *probeService) Start() error {
 		go runner.run(s.probes[name])
 		s.runners[name] = runner
 	}
+	return nil
+}
+
+func (s *probeService) HandleConn(ctx context.Context, conn net.Conn) error {
 	return nil
 }
 

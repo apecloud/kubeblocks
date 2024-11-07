@@ -38,27 +38,18 @@ const (
 	jsonContentTypeHeader = "application/json"
 )
 
-type server struct {
+type httpServer struct {
 	logger   logr.Logger
 	config   Config
 	services []service.Service
 	servers  []*fasthttp.Server
 }
 
-var _ Server = &server{}
+var _ Server = &httpServer{}
 
 // StartNonBlocking starts a new server in a goroutine.
-func (s *server) StartNonBlocking() error {
-	s.logger.Info("starting HTTP server")
-
-	// start all services first
-	for i := range s.services {
-		if err := s.services[i].Start(); err != nil {
-			s.logger.Error(err, fmt.Sprintf("start service %s failed", s.services[i].Kind()))
-			return err
-		}
-		s.logger.Info(fmt.Sprintf("service %s started...", s.services[i].Kind()))
-	}
+func (s *httpServer) StartNonBlocking() error {
+	s.logger.Info("starting the HTTP server")
 
 	handler := s.router()
 
@@ -107,7 +98,7 @@ func (s *server) StartNonBlocking() error {
 	return nil
 }
 
-func (s *server) Close() error {
+func (s *httpServer) Close() error {
 	errs := make([]error, len(s.servers))
 
 	for i, ln := range s.servers {
@@ -121,7 +112,7 @@ func (s *server) Close() error {
 	return errors.Join()
 }
 
-func (s *server) router() fasthttp.RequestHandler {
+func (s *httpServer) router() fasthttp.RequestHandler {
 	router := fasthttprouter.New()
 	for i := range s.services {
 		s.registerService(router, s.services[i])
@@ -129,12 +120,12 @@ func (s *server) router() fasthttp.RequestHandler {
 	return router.Handler
 }
 
-func (s *server) registerService(router *fasthttprouter.Router, svc service.Service) {
+func (s *httpServer) registerService(router *fasthttprouter.Router, svc service.Service) {
 	router.Handle(fasthttp.MethodPost, svc.URI(), s.dispatcher(svc))
 	s.logger.Info("register service to server", "service", svc.Kind(), "method", fasthttp.MethodPost, "uri", svc.URI())
 }
 
-func (s *server) dispatcher(svc service.Service) func(*fasthttp.RequestCtx) {
+func (s *httpServer) dispatcher(svc service.Service) func(*fasthttp.RequestCtx) {
 	return func(reqCtx *fasthttp.RequestCtx) {
 		ctx := context.Background()
 		body := reqCtx.PostBody()
@@ -144,7 +135,7 @@ func (s *server) dispatcher(svc service.Service) func(*fasthttp.RequestCtx) {
 		if err != nil {
 			statusCode = fasthttp.StatusInternalServerError
 		}
-		respond(reqCtx, statusCode, output, err)
+		httpRespond(reqCtx, statusCode, output, err)
 		if s.config.Logging {
 			s.logger.Info("HTTP API Called",
 				"user-agent", string(reqCtx.Request.Header.UserAgent()),
@@ -157,7 +148,7 @@ func (s *server) dispatcher(svc service.Service) func(*fasthttp.RequestCtx) {
 	}
 }
 
-func respond(ctx *fasthttp.RequestCtx, code int, body []byte, err error) {
+func httpRespond(ctx *fasthttp.RequestCtx, code int, body []byte, err error) {
 	ctx.Response.Header.SetContentType(jsonContentTypeHeader)
 	ctx.Response.SetStatusCode(code)
 	switch {

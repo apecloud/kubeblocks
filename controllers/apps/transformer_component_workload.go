@@ -58,6 +58,7 @@ type componentWorkloadOps struct {
 	cli            client.Client
 	reqCtx         intctrlutil.RequestCtx
 	cluster        *appsv1.Cluster
+	component      *appsv1.Component
 	synthesizeComp *component.SynthesizedComponent
 	dag            *graph.DAG
 
@@ -119,7 +120,7 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 		if protoITS == nil {
 			graphCli.Delete(dag, runningITS)
 		} else {
-			err = t.handleUpdate(reqCtx, graphCli, dag, cluster, synthesizeComp, runningITS, protoITS)
+			err = t.handleUpdate(reqCtx, graphCli, dag, cluster, synthesizeComp, transCtx.Component, runningITS, protoITS)
 		}
 	}
 	return err
@@ -172,10 +173,10 @@ func (t *componentWorkloadTransformer) stopWorkload(protoITS *workloads.Instance
 }
 
 func (t *componentWorkloadTransformer) handleUpdate(reqCtx intctrlutil.RequestCtx, cli model.GraphClient, dag *graph.DAG,
-	cluster *appsv1.Cluster, synthesizeComp *component.SynthesizedComponent, runningITS, protoITS *workloads.InstanceSet) error {
+	cluster *appsv1.Cluster, synthesizeComp *component.SynthesizedComponent, comp *appsv1.Component, runningITS, protoITS *workloads.InstanceSet) error {
 	if !isCompStopped(synthesizeComp) {
 		// postpone the update of the workload until the component is back to running.
-		if err := t.handleWorkloadUpdate(reqCtx, dag, cluster, synthesizeComp, runningITS, protoITS); err != nil {
+		if err := t.handleWorkloadUpdate(reqCtx, dag, cluster, synthesizeComp, comp, runningITS, protoITS); err != nil {
 			return err
 		}
 	}
@@ -189,8 +190,8 @@ func (t *componentWorkloadTransformer) handleUpdate(reqCtx intctrlutil.RequestCt
 }
 
 func (t *componentWorkloadTransformer) handleWorkloadUpdate(reqCtx intctrlutil.RequestCtx, dag *graph.DAG,
-	cluster *appsv1.Cluster, synthesizeComp *component.SynthesizedComponent, obj, its *workloads.InstanceSet) error {
-	cwo, err := newComponentWorkloadOps(reqCtx, t.Client, cluster, synthesizeComp, obj, its, dag)
+	cluster *appsv1.Cluster, synthesizeComp *component.SynthesizedComponent, comp *appsv1.Component, obj, its *workloads.InstanceSet) error {
+	cwo, err := newComponentWorkloadOps(reqCtx, t.Client, cluster, synthesizeComp, comp, obj, its, dag)
 	if err != nil {
 		return err
 	}
@@ -603,23 +604,36 @@ func (r *componentWorkloadOps) scaleOut() error {
 		return nil
 	}
 
-	// TODO: remove it
+	// TODO: select the source replicas to dump data
 	source, err := r.sourceReplica()
 	if err != nil {
 		return err
 	}
 
 	newReplicas := r.desiredCompPodNameSet.Difference(r.runningItsPodNameSet)
-	c, err := component.BuildKBAgentContainer4DataPipeReader(r.synthesizeComp, source, newReplicas.UnsortedList())
+	parameters, err := component.BuildKBAgentTask4NewReplica(r.synthesizeComp.Generation, source, newReplicas.UnsortedList())
 	if err != nil {
 		return err
 	}
 
-	r.protoITS.Spec.Template.Spec.InitContainers = append(r.protoITS.Spec.Template.Spec.InitContainers, *c)
+	// apply the updated env to the env CM
+	transCtx := &componentTransformContext{
+		Context:             r.reqCtx.Ctx,
+		Client:              r.cli,
+		SynthesizeComponent: r.synthesizeComp,
+		Component:           r.component,
+	}
+	if err = createOrUpdateEnvConfigMap(transCtx, r.dag, nil, parameters); err != nil {
+		return err
+	}
 
-	// update workload to set the new replicas
+	// TODO: create or update the env CM before the workload
+
+	// update replicas of the workload
 	graphCli := model.NewGraphClient(r.cli)
 	graphCli.Update(r.dag, nil, r.protoITS)
+
+	// TODO: update comp status to record the scale-out replicas
 
 	return nil
 }
@@ -650,7 +664,7 @@ func (r *componentWorkloadOps) sourceReplica() (*corev1.Pod, error) {
 			return pod, nil
 		}
 	}
-	return nil, fmt.Errorf("no availble pod to dump data")
+	return nil, fmt.Errorf("no available pod to dump data")
 }
 
 func (r *componentWorkloadOps) expandVolumes(insTPLName string, vctName string, proto *corev1.PersistentVolumeClaimTemplate) error {
@@ -895,6 +909,7 @@ func newComponentWorkloadOps(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	cluster *appsv1.Cluster,
 	synthesizeComp *component.SynthesizedComponent,
+	comp *appsv1.Component,
 	runningITS *workloads.InstanceSet,
 	protoITS *workloads.InstanceSet,
 	dag *graph.DAG) (*componentWorkloadOps, error) {
@@ -910,6 +925,7 @@ func newComponentWorkloadOps(reqCtx intctrlutil.RequestCtx,
 		cli:                   cli,
 		reqCtx:                reqCtx,
 		cluster:               cluster,
+		component:             comp,
 		synthesizeComp:        synthesizeComp,
 		runningITS:            runningITS,
 		protoITS:              protoITS,

@@ -31,7 +31,7 @@ import (
 var _ = Describe("service", func() {
 	Context("new", func() {
 		It("empty", func() {
-			services, err := New(logr.New(nil), nil, nil)
+			services, err := New(logr.New(nil), nil, nil, nil)
 			Expect(err).Should(BeNil())
 			Expect(services).Should(HaveLen(2))
 			Expect(services[0]).ShouldNot(BeNil())
@@ -44,7 +44,7 @@ var _ = Describe("service", func() {
 					Name: "action",
 				},
 			}
-			services, err := New(logr.New(nil), actions, nil)
+			services, err := New(logr.New(nil), actions, nil, nil)
 			Expect(err).Should(BeNil())
 			Expect(services).Should(HaveLen(2))
 			Expect(services[0]).ShouldNot(BeNil())
@@ -62,7 +62,7 @@ var _ = Describe("service", func() {
 					Action: "action",
 				},
 			}
-			services, err := New(logr.New(nil), actions, probes)
+			services, err := New(logr.New(nil), actions, probes, nil)
 			Expect(err).Should(BeNil())
 			Expect(services).Should(HaveLen(2))
 			Expect(services[0]).ShouldNot(BeNil())
@@ -83,7 +83,7 @@ var _ = Describe("service", func() {
 					Action: "not-defined",
 				},
 			}
-			_, err := New(logr.New(nil), actions, probes)
+			_, err := New(logr.New(nil), actions, probes, nil)
 			Expect(err).ShouldNot(BeNil())
 		})
 	})

@@ -17,38 +17,40 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package lifecycle
+package service
 
 import (
 	"context"
 
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	"github.com/go-logr/logr"
+
+	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 )
 
-type dataDump struct {
-	replicas []string
+type taskService struct {
+	logger        logr.Logger
+	actionService *actionService
+	tasks         []proto.Task
 }
 
-var _ lifecycleAction = &dataDump{}
-
-func (a *dataDump) name() string {
-	return "dataDump"
+func (s *taskService) runTasks(ctx context.Context) error {
+	for _, task := range s.tasks {
+		if err := s.runTask(ctx, task); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
-func (a *dataDump) parameters(ctx context.Context, cli client.Reader) (map[string]string, error) {
-	return nil, nil
-}
-
-type dataLoad struct {
-	replicas []string
-}
-
-var _ lifecycleAction = &dataLoad{}
-
-func (a *dataLoad) name() string {
-	return "dataLoad"
-}
-
-func (a *dataLoad) parameters(ctx context.Context, cli client.Reader) (map[string]string, error) {
-	return nil, nil
+func (s *taskService) runTask(ctx context.Context, task proto.Task) error {
+	// TODO: report task status to controller
+	switch {
+	case task.DataLoad != nil:
+		return (&dataLoadTask{
+			logger:        s.logger,
+			actionService: s.actionService,
+		}).run(ctx, task.DataLoad)
+	default:
+		return nil
+	}
 }

@@ -128,13 +128,13 @@ var _ = Describe("kb-agent", func() {
 			c := kbAgentContainer()
 			Expect(c).ShouldNot(BeNil())
 			Expect(c.Ports).Should(HaveLen(1))
-			Expect(c.Ports[0].ContainerPort).Should(Equal(int32(kbAgentDefaultPort)))
+			Expect(c.Ports[0].ContainerPort).Should(Equal(int32(kbAgentDefaultHTTPPort)))
 		})
 
 		It("port - in use", func() {
 			synthesizedComp.PodSpec.Containers[0].Ports = []corev1.ContainerPort{
 				{
-					ContainerPort: kbAgentDefaultPort,
+					ContainerPort: kbAgentDefaultHTTPPort,
 				},
 			}
 			err := buildKBAgentContainer(synthesizedComp)
@@ -143,7 +143,7 @@ var _ = Describe("kb-agent", func() {
 			c := kbAgentContainer()
 			Expect(c).ShouldNot(BeNil())
 			Expect(c.Ports).Should(HaveLen(1))
-			Expect(c.Ports[0].ContainerPort).Should(Equal(int32(kbAgentDefaultPort + 1)))
+			Expect(c.Ports[0].ContainerPort).Should(Equal(int32(kbAgentDefaultHTTPPort + 1)))
 		})
 
 		It("startup env", func() {

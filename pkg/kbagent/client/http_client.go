@@ -24,7 +24,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/valyala/fasthttp"
 	"io"
 	"net/http"
 
@@ -59,17 +58,6 @@ func (c *httpClient) Action(ctx context.Context, req proto.ActionRequest) (proto
 
 	defer payload.Close()
 	return decode(payload, &rsp)
-}
-
-func (c *httpClient) DataPipe(ctx context.Context, req proto.DataPipeRequest) error {
-	data, err := json.Marshal(req)
-	if err != nil {
-		return err
-	}
-
-	url := fmt.Sprintf(urlTemplate, c.host, c.port, proto.ServiceDataPipe.URI)
-	_, err = c.request(ctx, fasthttp.MethodPost, url, bytes.NewReader(data))
-	return err
 }
 
 func (c *httpClient) request(ctx context.Context, method, url string, body io.Reader) (io.ReadCloser, error) {

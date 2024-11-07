@@ -21,8 +21,7 @@ package service
 
 import (
 	"context"
-	"fmt"
-	"time"
+	"net"
 
 	"github.com/go-logr/logr"
 
@@ -35,10 +34,12 @@ type Service interface {
 
 	Start() error
 
+	HandleConn(ctx context.Context, conn net.Conn) error
+
 	HandleRequest(ctx context.Context, payload []byte) ([]byte, error)
 }
 
-func New(logger logr.Logger, actions []proto.Action, probes []proto.Probe) ([]Service, error) {
+func New(logger logr.Logger, actions []proto.Action, probes []proto.Probe, streaming []string) ([]Service, error) {
 	sa, err := newActionService(logger, actions)
 	if err != nil {
 		return nil, err
@@ -47,31 +48,18 @@ func New(logger logr.Logger, actions []proto.Action, probes []proto.Probe) ([]Se
 	if err != nil {
 		return nil, err
 	}
-	sdp, err := newDataPipeService(logger, sa)
+	ss, err := newStreamingService(logger, sa, streaming)
 	if err != nil {
 		return nil, err
 	}
-	return []Service{sa, sp, sdp}, nil
+	return []Service{sa, sp, ss}, nil
 }
 
-func RunInPipeMode(services []Service, payload string) error {
-	var sdp *dataPipeService
-	for _, s := range services {
-		if s.Kind() == proto.ServiceDataPipe.Kind {
-			sdp = s.(*dataPipeService)
-		}
+func RunTasks(logger logr.Logger, service Service, tasks []proto.Task) error {
+	st := &taskService{
+		logger:        logger,
+		actionService: service.(*actionService),
+		tasks:         tasks,
 	}
-	if sdp == nil {
-		return fmt.Errorf("service %s not found", proto.ServiceDataPipe.Kind)
-	}
-
-	var err error
-	if err = sdp.Start(); err != nil {
-		return err
-	}
-	_, err = sdp.HandleRequest(context.Background(), []byte(payload))
-	if err != nil {
-		time.Sleep(3600 * time.Second)
-	}
-	return err
+	return st.runTasks(context.Background())
 }

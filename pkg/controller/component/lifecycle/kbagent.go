@@ -108,20 +108,6 @@ func (a *kbagent) MemberLeave(ctx context.Context, cli client.Reader, opts *Opti
 	return a.ignoreOutput(a.checkedCallAction(ctx, cli, a.synthesizedComp.LifecycleActions.MemberLeave, lfa, opts))
 }
 
-func (a *kbagent) DataDump(ctx context.Context, cli client.Reader, opts *Options, replicas []string) error {
-	lfa := &dataDump{
-		replicas: replicas,
-	}
-	return a.ignoreOutput(a.checkedCallAction(ctx, cli, a.synthesizedComp.LifecycleActions.DataDump, lfa, opts))
-}
-
-func (a *kbagent) DataLoad(ctx context.Context, cli client.Reader, opts *Options, replicas []string) error {
-	lfa := &dataLoad{
-		replicas: replicas,
-	}
-	return a.ignoreOutput(a.checkedCallAction(ctx, cli, a.synthesizedComp.LifecycleActions.DataLoad, lfa, opts))
-}
-
 func (a *kbagent) AccountProvision(ctx context.Context, cli client.Reader, opts *Options, statement, user, password string) error {
 	lfa := &accountProvision{
 		statement: statement,
@@ -354,7 +340,7 @@ func (a *kbagent) selectTargetPods(spec *appsv1.Action) ([]*corev1.Pod, error) {
 }
 
 func (a *kbagent) serverEndpoint(pod *corev1.Pod) (string, int32, error) {
-	port, err := intctrlutil.GetPortByName(*pod, kbagt.ContainerName, kbagt.DefaultPortName)
+	port, err := intctrlutil.GetPortByName(*pod, kbagt.ContainerName, kbagt.DefaultHTTPPortName)
 	if err != nil {
 		// has no kb-agent defined
 		return "", 0, nil

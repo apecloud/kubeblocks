@@ -37,12 +37,12 @@ import (
 
 	kbagent "github.com/apecloud/kubeblocks/pkg/kbagent"
 	"github.com/apecloud/kubeblocks/pkg/kbagent/server"
-	"github.com/apecloud/kubeblocks/pkg/kbagent/service"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 const (
-	defaultPort           = 3501
+	defaultHTTPPort       = 3501
+	defaultStreamingPort  = 3502
 	defaultMaxConcurrency = 8
 )
 
@@ -51,14 +51,14 @@ var serverConfig server.Config
 func init() {
 	viper.AutomaticEnv()
 
+	pflag.BoolVar(&serverConfig.Server, "server", true, "Run as a server.")
 	pflag.StringVar(&serverConfig.Address, "address", "0.0.0.0", "The HTTP Server listen address for kb-agent service.")
 	pflag.StringVar(&serverConfig.UnixDomainSocket, "unix-socket", "", "The path of the Unix Domain Socket for kb-agent service.")
-	pflag.IntVar(&serverConfig.Port, "port", defaultPort, "The HTTP Server listen port for kb-agent service.")
+	pflag.IntVar(&serverConfig.Port, "port", defaultHTTPPort, "The HTTP Server listen port for kb-agent service.")
+	pflag.IntVar(&serverConfig.StreamingPort, "streaming-port", defaultStreamingPort, "The listen port used by kb-agent to stream data.")
 	pflag.IntVar(&serverConfig.Concurrency, "max-concurrency", defaultMaxConcurrency,
 		fmt.Sprintf("The maximum number of concurrent connections the Server may serve, use the default value %d if <=0.", defaultMaxConcurrency))
 	pflag.BoolVar(&serverConfig.Logging, "api-logging", true, "Enable api logging for kb-agent request.")
-	pflag.BoolVar(&serverConfig.PipeMode, "pipe-mode", false, "Running in pipe mode as a reader.")
-	pflag.StringVar(&serverConfig.PipeModeData, "pipe-mode-data", "", "Request payload for pipe mode.")
 }
 
 func main() {
@@ -86,27 +86,13 @@ func main() {
 	logger := kzap.New(kopts...)
 	ctrl.SetLogger(logger)
 
-	// initialize kb-agent
-	services, err := kbagent.Initialize(logger, os.Environ())
+	serving, err := kbagent.Launch(logger, serverConfig)
 	if err != nil {
-		panic(errors.Wrap(err, "init action handlers failed"))
+		panic(err)
 	}
-
-	if serverConfig.PipeMode {
-		if err = service.RunInPipeMode(services, serverConfig.PipeModeData); err != nil {
-			panic(errors.Wrap(err, "failed to run in pipe mode"))
-		}
-		return
+	if serving {
+		stop := make(chan os.Signal, 1)
+		signal.Notify(stop, syscall.SIGTERM, os.Interrupt)
+		<-stop
 	}
-
-	// start HTTP Server
-	server := server.NewHTTPServer(logger, serverConfig, services)
-	err = server.StartNonBlocking()
-	if err != nil {
-		panic(errors.Wrap(err, "failed to start HTTP server"))
-	}
-
-	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, syscall.SIGTERM, os.Interrupt)
-	<-stop
 }

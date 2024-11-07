@@ -36,9 +36,9 @@ var (
 		Version: "v1.0",
 		URI:     "/v1.0/probe",
 	}
-	ServiceDataPipe = &Service{
-		Kind:    "DataPipe",
+	ServiceStreaming = &Service{
+		Kind:    "Streaming",
 		Version: "v1.0",
-		URI:     "/v1.0/data-pipe",
+		URI:     "/v1.0/streaming",
 	}
 )

@@ -22,13 +22,6 @@ package instanceset
 import (
 	"encoding/json"
 	"fmt"
-	"reflect"
-	"slices"
-	"sort"
-	"strconv"
-	"strings"
-	"time"
-
 	"github.com/klauspost/compress/zstd"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -37,9 +30,14 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/util/podutils"
+	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/kustomize/api/image"
+	"slices"
+	"sort"
+	"strconv"
+	"strings"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -160,29 +158,9 @@ func isRunningAndAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
 	return podutils.IsPodAvailable(pod, minReadySeconds, metav1.Now())
 }
 
-func isContainersReady(pod *corev1.Pod) bool {
-	index := slices.IndexFunc(pod.Status.Conditions, func(condition corev1.PodCondition) bool {
-		return condition.Type == corev1.ContainersReady
-	})
-	if index < 0 {
-		return false
-	}
-	if pod.Status.Conditions[index].Status != corev1.ConditionTrue {
-		return false
-	}
-	containersReadyTime := pod.Status.Conditions[index].LastTransitionTime.Time
-	twoSecondsAgo := metav1.Now().Add(-2 * time.Second)
+func isContainersRunning(pod *corev1.Pod) bool {
 	for _, status := range pod.Status.ContainerStatuses {
 		if status.State.Running == nil {
-			continue
-		}
-		startedAt := status.State.Running.StartedAt
-		// Under normal circumstances, after a container restarts, the lastTransitionTime in the pod's ContainersReady condition will be updated,
-		// which means it will be later than the container's startedAt time. However, in extreme cases,
-		// if the container completes its restart almost instantaneously, the kubelet may not be able to detect this change process,
-		// and the lastTransitionTime in the ContainersReady condition will remain unchanged.
-		// To address this issue, we wait for container startedAt + 2 seconds.
-		if startedAt.After(containersReadyTime) && startedAt.After(twoSecondsAgo) {
 			return false
 		}
 	}

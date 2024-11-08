@@ -2,7 +2,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ include "kubeblocks.fullname" . }}-cluster-pod-role
+  name: kubeblocks-cluster-pod-role
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
 aggregationRule:

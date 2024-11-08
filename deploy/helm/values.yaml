@@ -317,11 +317,10 @@ dataPlane:
 # Add extra pod labels to KubeBlocks Deployment
 extraLabels: {}
 
-## AdmissionWebhooks settings
+## webhooks settings
 ##
-## @param admissionWebhooks.enabled
-## @param admissionWebhooks.createSelfSignedCert
-## @param admissionWebhooks.ignoreReplicasCheck
+## @param webhooks.conversionEnabled
+## @param webhooks.createSelfSignedCert
 webhooks:
   conversionEnabled: false
   createSelfSignedCert: true

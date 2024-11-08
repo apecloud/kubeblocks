@@ -624,7 +624,7 @@ func (r *componentWorkloadOps) annotateInstanceSetForMemberJoin() {
 	}
 
 	if podsToMemberjoin.Len() > 0 {
-		r.protoITS.Annotations[constant.MemberJoinStatusAnnotationKey] = strings.Join(podsToMemberjoin.UnsortedList(), ",")
+		r.protoITS.Annotations[constant.MemberJoinStatusAnnotationKey] = strings.Join(sets.List(podsToMemberjoin), ",")
 	}
 }
 
@@ -743,7 +743,7 @@ func (r *componentWorkloadOps) leaveMemberForPod(pod *corev1.Pod, pods []*corev1
 func (r *componentWorkloadOps) checkAndDoMemberJoin() error {
 	podsToMemberjoin := getPodsToMemberJoinFromAnno(r.runningITS)
 
-	if r.synthesizeComp.LifecycleActions == nil && r.synthesizeComp.LifecycleActions.MemberJoin == nil {
+	if r.synthesizeComp.LifecycleActions == nil || r.synthesizeComp.LifecycleActions.MemberJoin == nil {
 		podsToMemberjoin.Clear()
 	}
 	err := r.doMemberJoin(podsToMemberjoin)
@@ -754,7 +754,7 @@ func (r *componentWorkloadOps) checkAndDoMemberJoin() error {
 	if podsToMemberjoin.Len() == 0 {
 		delete(r.protoITS.Annotations, constant.MemberJoinStatusAnnotationKey)
 	} else {
-		r.protoITS.Annotations[constant.MemberJoinStatusAnnotationKey] = strings.Join(podsToMemberjoin.UnsortedList(), ",")
+		r.protoITS.Annotations[constant.MemberJoinStatusAnnotationKey] = strings.Join(sets.List(podsToMemberjoin), ",")
 	}
 	return nil
 }
@@ -800,7 +800,7 @@ func (r *componentWorkloadOps) joinMemberForPod(pod *corev1.Pod, pods []*corev1.
 	}
 
 	if err = lfa.MemberJoin(r.reqCtx.Ctx, r.cli, nil); err != nil {
-		if !errors.Is(err, lifecycle.ErrActionNotDefined) && err == nil {
+		if !errors.Is(err, lifecycle.ErrActionNotDefined) {
 			return err
 		}
 	}

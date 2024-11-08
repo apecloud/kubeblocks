@@ -177,6 +177,11 @@ func isContainersReady(pod *corev1.Pod) bool {
 			continue
 		}
 		startedAt := status.State.Running.StartedAt
+		// Under normal circumstances, after a container restarts, the lastTransitionTime in the pod's ContainersReady condition will be updated,
+		// which means it will be later than the container's startedAt time. However, in extreme cases,
+		// if the container completes its restart almost instantaneously, the kubelet may not be able to detect this change process,
+		// and the lastTransitionTime in the ContainersReady condition will remain unchanged.
+		// To address this issue, we wait for container startedAt + 2 seconds.
 		if startedAt.After(containersReadyTime) && startedAt.After(twoSecondsAgo) {
 			return false
 		}

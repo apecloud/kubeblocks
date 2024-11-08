@@ -443,12 +443,16 @@ func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, com
 		if err := validateHScaleOperation(scaleOut.ReplicaChanger, scaleOut.NewInstances, scaleOut.OfflineInstancesToOnline, false); err != nil {
 			return err
 		}
-		if len(scaleOut.OfflineInstancesToOnline) > 0 {
-			offlineInstanceSet := sets.New(compSpec.OfflineInstances...)
-			for _, offlineInsName := range scaleOut.OfflineInstancesToOnline {
-				if _, ok := offlineInstanceSet[offlineInsName]; !ok {
-					return fmt.Errorf(`cannot find the offline instance "%s" in component "%s" for scaleOut operation`, offlineInsName, hScale.ComponentName)
-				}
+	}
+	// instance cannot be both in OfflineInstancesToOnline and OnlineInstancesToOffline
+	if scaleIn != nil && scaleOut != nil {
+		offlineToOnlineSet := make(map[string]struct{})
+		for _, instance := range scaleIn.OnlineInstancesToOffline {
+			offlineToOnlineSet[instance] = struct{}{}
+		}
+		for _, instance := range scaleOut.OfflineInstancesToOnline {
+			if _, exists := offlineToOnlineSet[instance]; exists {
+				return fmt.Errorf(`instance "%s" cannot be both in "OfflineInstancesToOnline" and "OnlineInstancesToOffline"`, instance)
 			}
 		}
 	}

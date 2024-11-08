@@ -288,7 +288,7 @@ func (c *itsRolesConvertor) convert(args ...any) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	return ConvertSynthesizeCompRoleToInstanceSetRole(synthesizeComp), nil
+	return synthesizeComp.Roles, nil
 }
 
 // itsRoleProbeConvertor converts the ComponentDefinition.Spec.LifecycleActions.RoleProbe into InstanceSet.Spec.RoleProbe.
@@ -340,17 +340,4 @@ func (c *itsCredentialConvertor) convert(args ...any) (any, error) {
 func (c *itsMembershipReconfigurationConvertor) convert(args ...any) (any, error) {
 	// synthesizeComp, err := parseITSConvertorArgs(args...)
 	return "", nil // TODO
-}
-
-// ConvertSynthesizeCompRoleToInstanceSetRole converts the component.SynthesizedComponent.Roles to workloads.ReplicaRole.
-func ConvertSynthesizeCompRoleToInstanceSetRole(synthesizedComp *SynthesizedComponent) []workloads.ReplicaRole {
-	if synthesizedComp.Roles == nil {
-		return nil
-	}
-
-	itsReplicaRoles := make([]workloads.ReplicaRole, 0)
-	for _, role := range synthesizedComp.Roles {
-		itsReplicaRoles = append(itsReplicaRoles, *role.DeepCopy())
-	}
-	return itsReplicaRoles
 }

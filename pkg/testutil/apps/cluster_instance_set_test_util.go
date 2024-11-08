@@ -138,14 +138,11 @@ func MockInstanceSetPods(
 		if its != nil && len(its.Spec.Roles) > 0 {
 			if i == 0 {
 				podRole = leaderRole.Name
-				// accessMode = string(leaderRole.AccessMode)
 			} else {
 				podRole = noneLeaderRole.Name
-				// accessMode = string(noneLeaderRole.AccessMode)
 			}
 		}
-		// FIXME: is access mode label needed?
-		pod := MockInstanceSetPod(testCtx, its, cluster.Name, compName, pName, podRole, "foo")
+		pod := MockInstanceSetPod(testCtx, its, cluster.Name, compName, pName, podRole, "")
 		annotations := pod.Annotations
 		if annotations == nil {
 			annotations = make(map[string]string)

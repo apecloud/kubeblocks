@@ -210,19 +210,21 @@ func (builder *ComponentDefinitionBuilder) SetUpdateStrategy(strategy *appsv1.Up
 	return builder
 }
 
-// FIXME: currently not used
-// func (builder *ComponentDefinitionBuilder) AddRole(name string, serviceable, writable bool) *ComponentDefinitionBuilder {
-// 	role := appsv1.ReplicaRole{
-// 		Name:        name,
-// 		Serviceable: serviceable,
-// 		Writable:    writable,
-// 	}
-// 	if builder.get().Spec.Roles == nil {
-// 		builder.get().Spec.Roles = make([]appsv1.ReplicaRole, 0)
-// 	}
-// 	builder.get().Spec.Roles = append(builder.get().Spec.Roles, role)
-// 	return builder
-// }
+func (builder *ComponentDefinitionBuilder) AddRole(
+	name string, updatePriority int, participatesInQuorum bool, switchoverBeforeUpdate bool,
+) *ComponentDefinitionBuilder {
+	role := appsv1.ReplicaRole{
+		Name:                   name,
+		UpdatePriority:         updatePriority,
+		ParticipatesInQuorum:   participatesInQuorum,
+		SwitchoverBeforeUpdate: switchoverBeforeUpdate,
+	}
+	if builder.get().Spec.Roles == nil {
+		builder.get().Spec.Roles = make([]appsv1.ReplicaRole, 0)
+	}
+	builder.get().Spec.Roles = append(builder.get().Spec.Roles, role)
+	return builder
+}
 
 func (builder *ComponentDefinitionBuilder) SetLifecycleAction(name string, val interface{}) *ComponentDefinitionBuilder {
 	obj := &builder.get().Spec.LifecycleActions

@@ -293,6 +293,9 @@ type InstanceSetStatus struct {
 
 	// Indicates whether it is required for the InstanceSet to have at least one primary instance ready.
 	//
+	// Deprecated: since instanceset no longer checks a "primary" role when doing ready check, this
+	// field is no longer needed and will be removed in the future.
+	//
 	// +optional
 	ReadyWithoutPrimary bool `json:"readyWithoutPrimary,omitempty"`
 

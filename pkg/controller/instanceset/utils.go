@@ -99,9 +99,21 @@ func IsInstancesReady(its *workloads.InstanceSet) bool {
 	return true
 }
 
-// IsInstanceSetReady gives InstanceSet level 'ready' state when all instances are available
+// IsInstanceSetReady gives InstanceSet level 'ready' state:
+// 1. all instances are available
+// 2. and all members have role set (if they are role-ful)
 func IsInstanceSetReady(its *workloads.InstanceSet) bool {
-	return IsInstancesReady(its)
+	instancesReady := IsInstancesReady(its)
+	if !instancesReady {
+		return false
+	}
+
+	// check whether role probe has done
+	if len(its.Spec.Roles) == 0 && its.Spec.RoleProbe == nil {
+		return true
+	}
+	membersStatus := its.Status.MembersStatus
+	return len(membersStatus) == int(*its.Spec.Replicas)
 }
 
 // AddAnnotationScope will add AnnotationScope defined by 'scope' to all keys in map 'annotations'.

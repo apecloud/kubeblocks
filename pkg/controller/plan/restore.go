@@ -22,6 +22,7 @@ package plan
 import (
 	"context"
 	"fmt"
+	"math"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -232,7 +233,7 @@ func (r *RestoreManager) DoPostReady(comp *component.SynthesizedComponent,
 	jobActionLabels := constant.GetCompLabels(r.Cluster.Name, comp.Name)
 	if len(comp.Roles) > 0 {
 		// HACK: assume the role with highest priority to be writable
-		highestPriority := 0
+		highestPriority := math.MinInt
 		var role *appsv1.ReplicaRole
 		for _, r := range comp.Roles {
 			if r.UpdatePriority > highestPriority {

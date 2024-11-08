@@ -26,11 +26,11 @@ The termination policy determines how a cluster is deleted. Set the policy when 
 | `Delete`               | `Delete` deletes workload resources and PVCs but keep backups. |
 | `WipeOut`              | `WipeOut` deletes workload resources, PVCs and all relevant resources included backups. |
 
+To check the termination policy, execute the following command.
+
 <Tabs>
 
 <TabItem value="kbcli" label="kbcli" default>
-
-To check the termination policy, execute the following command.
 
 ```bash
 kbcli cluster list mycluster -n demo
@@ -56,11 +56,11 @@ mycluster      kafka                kafka-3.3.2    Delete               Running 
 
 ## Steps
 
+Run the command below to delete a specified cluster.
+
 <Tabs>
 
 <TabItem value="kbcli" label="kbcli" default>
-
-Run the command below to delete a specified cluster.
 
 ```bash
 kbcli cluster delete mycluster
@@ -69,8 +69,6 @@ kbcli cluster delete mycluster
 </TabItem>
 
 <TabItem value="kubectl" label="kubectl">
-
-Run the command below to delete a specified cluster.
 
 ```bash
 kubectl delete -n demo cluster mycluster

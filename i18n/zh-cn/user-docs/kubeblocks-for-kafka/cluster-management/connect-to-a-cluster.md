@@ -93,14 +93,64 @@ import TabItem from '@theme/TabItem';
 
 1. 将 `host-network-accessible` 的值设置为 true。
 
-    ```bash
-    kbcli cluster create kafka --host-network-accessible=true
-    ```
+   <Tabs>
+
+   <TabItem value="kbcli" label="kbcli" default>
+
+   ```bash
+   kbcli cluster create kafka mycluster --host-network-accessible=true -n demo
+   ```
+
+   </TabItem>
+
+   <TabItem value="kubectl" label="kubectl">
+
+   ```bash
+   kubectl apply -f - <<EOF
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: Cluster
+   metadata:
+     name: mycluster
+     namespace: demo
+   spec:
+     affinity:
+       podAntiAffinity: Preferred
+       topologyKeys:
+       - kubernetes.io/hostname
+     clusterDefinitionRef: kafka
+     clusterVersionRef: kafka-3.3.2
+     componentSpecs:
+     - componentDefRef: kafka-server
+       disableExporter: true
+       name: broker
+       replicas: 1
+       resources:
+         limits:
+           cpu: "1"
+           memory: 1Gi
+         requests:
+           cpu: "1"
+           memory: 1Gi
+       serviceAccountName: kb-sa-kafka
+       services:
+       - annotations: 
+           service.beta.kubernetes.io/aws-load-balancer-type: nlb
+           service.beta.kubernetes.io/aws-load-balancer-internal: "true"
+         name: vpc
+         serviceType: LoadBalancer
+       tls: false
+     terminationPolicy: Delete
+   EOF
+   ```
+
+   </TabItem>
+
+   </Tabs>
 
 2. 获取相应的 ELB 地址。
 
    ```bash
-   kubectl get svc 
+   kubectl get svc -n demo
    ```
 
    ![获取 ELB 地址](../../../img/connect-to-a-kafka-cluster-gain-elb-address.png)
@@ -127,15 +177,67 @@ import TabItem from '@theme/TabItem';
 
 1. 将 `--publicly-accessible` 的值设置为 true。
 
-    ```bash
-    kbcli cluster create kafka --publicly-accessible=true
-    ```
+   <Tabs>
+
+   <TabItem value="kbcli" label="kbcli" default>
+
+   ```bash
+   kbcli cluster create kafka mycluster --publicly-accessible=true -n demo
+   ```
+
+   </TabItem>
+
+   <TabItem value="kubectl" label="kubectl">
+
+   ```bash
+   kubectl apply -f - <<EOF
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: Cluster
+   metadata:
+     name: mycluster
+     namespace: demo
+   spec:
+     affinity:
+       podAntiAffinity: Preferred
+       topologyKeys:
+       - kubernetes.io/hostname
+     clusterDefinitionRef: kafka
+     clusterVersionRef: kafka-3.3.2
+     componentSpecs:
+     - componentDefRef: kafka-server
+       disableExporter: true
+       name: broker
+       replicas: 1
+       resources:
+         limits:
+           cpu: "1"
+           memory: 1Gi
+         requests:
+           cpu: "1"
+           memory: 1Gi
+       serviceAccountName: kb-sa-kafka
+       services:
+       - annotations: 
+           service.beta.kubernetes.io/aws-load-balancer-type: nlb
+           service.beta.kubernetes.io/aws-load-balancer-internal: "false"
+         name: vpc
+         serviceType: LoadBalancer
+       tls: false
+     terminationPolicy: Delete
+   EOF
+   ```
+
+   </TabItem>
+
+   </Tabs>
 
 2. 获取实例对应的 ELB 地址。
 
    ```bash
-   kubectl get svc
+   kubectl get svc -n demo
    ```
+
+   下图为查看 ELB 地址的示例。
 
    ![获取 ELB 地址](./../../../img/kafka-connect-cross-vpc.png)
 
@@ -146,6 +248,7 @@ import TabItem from '@theme/TabItem';
   :::
 
 3. 配置 hostname 映射。
+
    1. 登录远程机器。
    2. 查看 ELB 地址 IP。
 

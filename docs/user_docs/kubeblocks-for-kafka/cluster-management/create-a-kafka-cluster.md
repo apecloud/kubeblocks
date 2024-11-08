@@ -19,14 +19,33 @@ This document shows how to create a Kafka cluster.
 * Install KubeBlocks [by kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) or [by Helm](./../../installation/install-with-helm/install-kubeblocks.md).
 * Make sure Kafka Addon is enabled with `kbcli addon list`. If this Addon is not enabled, enable it first. Both [kbccli](./../../installation/install-with-kbcli/install-addons.md) and [Helm](./../../installation/install-with-helm/install-addons.md) options are available.
 
+  <Tabs>
+
+  <TabItem value="kbcli" label="kbcli" default>
+
   ```bash
   kbcli addon list
   >
-  NAME                           VERSION         PROVIDER    STATUS     AUTO-INSTALL
+  NAME                           TYPE   STATUS     EXTRAS         AUTO-INSTALL  
   ...
-  kafka                          0.9.0           community   Enabled    true
+  kafka                          Helm   Enabled                   true
   ...
   ```
+
+  </TabItem>
+
+  <TabItem value="kubectl" label="kubectl">
+
+  ```bash
+  kubectl get addons.extensions.kubeblocks.io kafka
+  >
+  NAME    TYPE   VERSION   PROVIDER   STATUS    AGE
+  kafka   Helm                        Enabled   13m
+  ```
+
+  </TabItem>
+
+  </Tabs>
 
 * To keep things isolated, create a separate namespace called `demo` throughout this tutorial.
 

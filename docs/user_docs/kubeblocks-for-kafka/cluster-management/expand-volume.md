@@ -71,7 +71,7 @@ mycluster      kafka                kafka-3.3.2    Delete               Running 
     - View the cluster status.
 
       ```bash
-      kbcli cluster list mycluster
+      kbcli cluster list mycluster -n demo
       >
       NAME             NAMESPACE     CLUSTER-DEFINITION        VERSION                  TERMINATION-POLICY        STATUS          CREATED-TIME
       mycluster        demo          kafka                     kafka-3.3.2              Delete                    Updating        Sep 27,2024 15:27 UTC+0800

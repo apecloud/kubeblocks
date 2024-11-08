@@ -73,6 +73,7 @@ var _ = Describe("Switchover Util", func() {
 		// namespaced resources
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.InstanceSetSignature, true, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
+		testapps.ClearResources(&testCtx, generics.OpsRequestSignature, inNS, ml)
 	}
 
 	BeforeEach(cleanAll)
@@ -188,7 +189,11 @@ var _ = Describe("Switchover Util", func() {
 		synthesizedComp, err := component.BuildSynthesizedComponentWrapper(reqCtx, k8sClient, clusterObj, compSpec)
 		Expect(err).Should(Succeed())
 		Expect(synthesizedComp).ShouldNot(BeNil())
-		err = createSwitchoverJob(reqCtx, k8sClient, clusterObj, synthesizedComp, opsSwitchover)
+		opsRequest := testapps.NewOpsRequestObj("switchover-ops", testCtx.DefaultNamespace,
+			clusterName, appsv1alpha1.SwitchoverType)
+		opsRequest.Spec.SwitchoverList = []appsv1alpha1.Switchover{*opsSwitchover}
+		testapps.CreateOpsRequest(ctx, testCtx, opsRequest)
+		err = createSwitchoverJob(reqCtx, k8sClient, clusterObj, opsRequest, synthesizedComp, opsSwitchover)
 		Expect(err).Should(Succeed())
 	}
 

@@ -153,7 +153,7 @@ func doSwitchoverComponents(reqCtx intctrlutil.RequestCtx, cli client.Client, op
 				ProgressDetails: []appsv1alpha1.ProgressStatusDetail{},
 			}
 		}
-		if err := createSwitchoverJob(reqCtx, cli, opsRes.Cluster, synthesizedComp, &switchover); err != nil {
+		if err := createSwitchoverJob(reqCtx, cli, opsRes.Cluster, opsRes.OpsRequest, synthesizedComp, &switchover); err != nil {
 			return err
 		}
 	}
@@ -207,6 +207,8 @@ func handleSwitchoverProgress(reqCtx intctrlutil.RequestCtx, cli client.Client, 
 				completedCount += 1
 				failedCount += 1
 				checkJobProcessDetail.Status = appsv1alpha1.FailedProgressStatus
+				err = nil
+			} else if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeExpectedInProcess) {
 				err = nil
 			}
 			checkJobProcessDetail.Message = fmt.Sprintf("switchover job %s is not succeed", jobName)

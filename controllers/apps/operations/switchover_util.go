@@ -37,6 +37,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
 )
 
 // switchover constants
@@ -108,6 +109,7 @@ func needDoSwitchover(ctx context.Context,
 func createSwitchoverJob(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
+	opsRequest *appsv1alpha1.OpsRequest,
 	synthesizedComp *component.SynthesizedComponent,
 	switchover *appsv1alpha1.Switchover) error {
 	switchoverJob, err := renderSwitchoverCmdJob(reqCtx.Ctx, cli, cluster, synthesizedComp, switchover)
@@ -130,6 +132,10 @@ func createSwitchoverJob(reqCtx intctrlutil.RequestCtx,
 			if err := component.CleanJobWithLabels(reqCtx.Ctx, cli, cluster, ml); err != nil {
 				return err
 			}
+		}
+		scheme, _ := appsv1alpha1.SchemeBuilder.Build()
+		if err = utils.SetControllerReference(opsRequest, switchoverJob, scheme); err != nil {
+			return err
 		}
 		// create the current generation switchoverJob
 		if err := cli.Create(reqCtx.Ctx, switchoverJob); err != nil {

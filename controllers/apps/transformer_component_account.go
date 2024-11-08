@@ -134,7 +134,7 @@ func (t *componentAccountTransformer) getPasswordFromSecret(ctx graph.TransformC
 
 func (t *componentAccountTransformer) buildPassword(ctx *componentTransformContext, account appsv1alpha1.SystemAccount) []byte {
 	// get restore password if exists during recovery.
-	password := factory.GetRestoreSystemAccountPassword(ctx.SynthesizeComponent, account)
+	password := factory.GetRestoreSystemAccountPassword(ctx.SynthesizeComponent.Annotations, ctx.SynthesizeComponent.Name, account.Name)
 	if account.InitAccount && password == "" {
 		// initAccount can also restore from factory.GetRestoreSystemAccountPassword(ctx.SynthesizeComponent, account).
 		// This is compatibility processing.

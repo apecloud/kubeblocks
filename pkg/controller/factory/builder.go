@@ -336,8 +336,8 @@ func GetRestorePassword(cluster *appsv1alpha1.Cluster, synthesizedComp *componen
 }
 
 // GetRestoreSystemAccountPassword gets restore password if exists during recovery.
-func GetRestoreSystemAccountPassword(synthesizedComp *component.SynthesizedComponent, account appsv1alpha1.SystemAccount) string {
-	valueString := synthesizedComp.Annotations[constant.RestoreFromBackupAnnotationKey]
+func GetRestoreSystemAccountPassword(annotations map[string]string, componentName, accountName string) string {
+	valueString := annotations[constant.RestoreFromBackupAnnotationKey]
 	if len(valueString) == 0 {
 		return ""
 	}
@@ -346,7 +346,7 @@ func GetRestoreSystemAccountPassword(synthesizedComp *component.SynthesizedCompo
 	if err != nil {
 		return ""
 	}
-	backupSource, ok := backupMap[synthesizedComp.Name]
+	backupSource, ok := backupMap[componentName]
 	if !ok {
 		return ""
 	}
@@ -360,7 +360,7 @@ func GetRestoreSystemAccountPassword(synthesizedComp *component.SynthesizedCompo
 		return ""
 	}
 	e := intctrlutil.NewEncryptor(viper.GetString(constant.CfgKeyDPEncryptionKey))
-	encryptedPwd, ok := systemAccountsMap[account.Name]
+	encryptedPwd, ok := systemAccountsMap[accountName]
 	if !ok {
 		return ""
 	}

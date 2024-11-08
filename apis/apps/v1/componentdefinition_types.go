@@ -1372,6 +1372,7 @@ type ComponentAvailableProbeAssertion struct {
 	Strict *bool `json:"strict,omitempty"`
 }
 
+// ReplicaRole represents a role that can be assigned to a component instance, defining its behavior and responsibilities.
 // +kubebuilder:object:generate=false
 type ReplicaRole = basev1.ReplicaRole
 

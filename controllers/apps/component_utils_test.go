@@ -74,7 +74,6 @@ var _ = Describe("Component Utils", func() {
 				AddAppComponentLabel(compName).
 				AddAppManagedByLabel().
 				AddRoleLabel(role).
-				AddAccessModeLabel(mode).
 				AddControllerRevisionHashLabel("").
 				AddVolume(corev1.Volume{
 					Name: testapps.DataVolumeName,

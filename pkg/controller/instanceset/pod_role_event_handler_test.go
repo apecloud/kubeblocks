@@ -96,8 +96,6 @@ var _ = Describe("pod role label event handler test", func() {
 					Expect(pd).ShouldNot(BeNil())
 					Expect(pd.Labels).ShouldNot(BeNil())
 					Expect(pd.Labels[RoleLabelKey]).Should(Equal(role.Name))
-					// FIXME: find out why this label is needed
-					// Expect(pd.Labels[AccessModeLabelKey]).Should(BeEquivalentTo(role.AccessMode))
 					return nil
 				}).Times(1)
 			k8sMock.EXPECT().

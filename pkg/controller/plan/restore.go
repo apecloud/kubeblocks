@@ -33,7 +33,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -232,7 +231,16 @@ func (r *RestoreManager) DoPostReady(comp *component.SynthesizedComponent,
 	backupObj *dpv1alpha1.Backup) error {
 	jobActionLabels := constant.GetCompLabels(r.Cluster.Name, comp.Name)
 	if len(comp.Roles) > 0 {
-		jobActionLabels[instanceset.AccessModeLabelKey] = string(appsv1alpha1.ReadWrite)
+		// HACK: assume the role with highest priority to be writable
+		highestPriority := 0
+		var role *appsv1.ReplicaRole
+		for _, r := range comp.Roles {
+			if r.UpdatePriority > highestPriority {
+				highestPriority = r.UpdatePriority
+				role = &r
+			}
+		}
+		jobActionLabels[instanceset.RoleLabelKey] = role.Name
 	}
 	sourceTargetName := compObj.Annotations[constant.BackupSourceTargetAnnotationKey]
 	restore := &dpv1alpha1.Restore{

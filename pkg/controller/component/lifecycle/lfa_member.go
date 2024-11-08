@@ -172,6 +172,7 @@ func hackParameters4Switchover(ctx context.Context, cli client.Reader, namespace
 }
 
 func leaderRole(roles []appsv1.ReplicaRole) (string, error) {
+	// HACK: assume the role with highest priority to be leader
 	highestPriority := 0
 	var role *appsv1.ReplicaRole
 	for _, r := range roles {

@@ -250,11 +250,8 @@ func updatePodRoleLabel(cli client.Client, reqCtx intctrlutil.RequestCtx,
 	switch ok {
 	case true:
 		pod.Labels[RoleLabelKey] = role.Name
-		// FIXME: find out why this label is needed
-		// pod.Labels[AccessModeLabelKey] = string(role.AccessMode)
 	case false:
 		delete(pod.Labels, RoleLabelKey)
-		delete(pod.Labels, AccessModeLabelKey)
 	}
 
 	if pod.Annotations == nil {

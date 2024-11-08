@@ -157,6 +157,7 @@ func MockInstanceSetPods(
 }
 
 // MockInstanceSetPod mocks to create the pod of the InstanceSet, just using in envTest
+// TODO: remove accessMode
 func MockInstanceSetPod(
 	testCtx *testutil.TestContext,
 	its *workloads.InstanceSet,
@@ -164,7 +165,8 @@ func MockInstanceSetPod(
 	consensusCompName,
 	podName,
 	podRole, accessMode string,
-	resources ...corev1.ResourceRequirements) *corev1.Pod {
+	resources ...corev1.ResourceRequirements,
+) *corev1.Pod {
 	var stsUpdateRevision string
 	if its != nil {
 		stsUpdateRevision = its.Status.UpdateRevision
@@ -183,7 +185,6 @@ func MockInstanceSetPod(
 		AddAppComponentLabel(consensusCompName).
 		AddAppManagedByLabel().
 		AddRoleLabel(podRole).
-		// AddAccessModeLabel(accessMode).
 		AddControllerRevisionHashLabel(stsUpdateRevision).
 		AddLabelsInMap(ml).
 		AddVolume(corev1.Volume{

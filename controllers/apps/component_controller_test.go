@@ -1326,21 +1326,18 @@ var _ = Describe("Component Controller", func() {
 		targetRoles := []workloads.ReplicaRole{
 			{
 				Name:                   "leader",
-				Required:               true,
 				SwitchoverBeforeUpdate: true,
 				ParticipatesInQuorum:   true,
 				UpdatePriority:         5,
 			},
 			{
 				Name:                   "follower",
-				Required:               false,
 				SwitchoverBeforeUpdate: false,
 				ParticipatesInQuorum:   true,
 				UpdatePriority:         4,
 			},
 			{
 				Name:                   "learner",
-				Required:               false,
 				SwitchoverBeforeUpdate: false,
 				ParticipatesInQuorum:   false,
 				UpdatePriority:         2,

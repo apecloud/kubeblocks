@@ -49,7 +49,6 @@ func needDoSwitchover(ctx context.Context,
 	cli client.Client,
 	synthesizedComp *component.SynthesizedComponent,
 	switchover *opsv1alpha1.Switchover) (bool, error) {
-	// get the Pod object whose current role label is already serviceable and writable
 	pod, err := getPodToPerformSwitchover(ctx, cli, synthesizedComp)
 	if err != nil {
 		return false, err
@@ -118,6 +117,7 @@ func checkPodRoleLabelConsistency(ctx context.Context,
 	return false, nil
 }
 
+// get the Pod object whose current role needs to be transferred to another pod
 func getPodToPerformSwitchover(ctx context.Context, cli client.Reader, synthesizedComp *component.SynthesizedComponent) (*corev1.Pod, error) {
 	role, err := getTargetRoleName(synthesizedComp.Roles)
 	if err != nil {

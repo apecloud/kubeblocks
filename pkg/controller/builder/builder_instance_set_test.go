@@ -51,7 +51,6 @@ var _ = Describe("instance_set builder", func() {
 		selectors := map[string]string{selectorKey4: selectorValue4}
 		role := workloads.ReplicaRole{
 			Name:                   "foo",
-			Required:               true,
 			SwitchoverBeforeUpdate: true,
 			ParticipatesInQuorum:   true,
 			UpdatePriority:         1,

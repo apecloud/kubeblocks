@@ -56,7 +56,6 @@ var _ = Describe("pod role label event handler test", func() {
 			}
 			role := workloads.ReplicaRole{
 				Name:                   "leader",
-				Required:               true,
 				SwitchoverBeforeUpdate: true,
 				ParticipatesInQuorum:   true,
 				UpdatePriority:         5,

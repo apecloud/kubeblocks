@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package v1
 
 import (
-	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	basev1 "github.com/apecloud/kubeblocks/apis/base/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -1189,7 +1189,7 @@ func (in *ComponentDefinitionSpec) DeepCopyInto(out *ComponentDefinitionSpec) {
 	}
 	if in.Roles != nil {
 		in, out := &in.Roles, &out.Roles
-		*out = make([]workloadsv1.ReplicaRole, len(*in))
+		*out = make([]basev1.ReplicaRole, len(*in))
 		copy(*out, *in)
 	}
 	if in.UpdateStrategy != nil {

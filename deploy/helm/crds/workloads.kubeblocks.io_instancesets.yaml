@@ -4292,15 +4292,6 @@ spec:
 
                         This field is immutable once set.
                       type: boolean
-                    required:
-                      default: false
-                      description: |-
-                        Required indicates if at least one replica with this role must exist for the component to be considered
-                        operationally running. For example, a leader role may be required for the component to function.
-
-
-                        This field is immutable once set.
-                      type: boolean
                     switchoverBeforeUpdate:
                       default: false
                       description: |-
@@ -12509,15 +12500,6 @@ spec:
                             - 1 leader pod (participatesInQuorum=true)
                             The quorum size would be 3 (based on the 3 participating pods), allowing parallel updates
                             of 2 learners and 1 follower while maintaining quorum.
-
-
-                            This field is immutable once set.
-                          type: boolean
-                        required:
-                          default: false
-                          description: |-
-                            Required indicates if at least one replica with this role must exist for the component to be considered
-                            operationally running. For example, a leader role may be required for the component to function.
 
 
                             This field is immutable once set.

@@ -350,14 +350,7 @@ func ConvertSynthesizeCompRoleToInstanceSetRole(synthesizedComp *SynthesizedComp
 
 	itsReplicaRoles := make([]workloads.ReplicaRole, 0)
 	for _, role := range synthesizedComp.Roles {
-		itsReplicaRole := workloads.ReplicaRole{
-			Name:                   role.Name,
-			Required:               role.Required,
-			UpdatePriority:         role.UpdatePriority,
-			ParticipatesInQuorum:   role.ParticipatesInQuorum,
-			SwitchoverBeforeUpdate: role.SwitchoverBeforeUpdate,
-		}
-		itsReplicaRoles = append(itsReplicaRoles, itsReplicaRole)
+		itsReplicaRoles = append(itsReplicaRoles, *role.DeepCopy())
 	}
 	return itsReplicaRoles
 }

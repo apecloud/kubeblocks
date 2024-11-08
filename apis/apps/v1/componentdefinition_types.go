@@ -27,7 +27,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	basev1 "github.com/apecloud/kubeblocks/apis/base/v1"
 )
 
 // +genclient
@@ -1372,9 +1372,8 @@ type ComponentAvailableProbeAssertion struct {
 	Strict *bool `json:"strict,omitempty"`
 }
 
-// ReplicaRole represents a role that can be assumed by a component instance.
 // +kubebuilder:object:generate=false
-type ReplicaRole = workloads.ReplicaRole
+type ReplicaRole = basev1.ReplicaRole
 
 // UpdateStrategy defines the update strategy for cluster components. This strategy determines how updates are applied
 // across the cluster.

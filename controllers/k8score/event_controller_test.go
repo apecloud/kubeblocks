@@ -144,14 +144,12 @@ var _ = Describe("Event Controller", func() {
 				tmpITS.Spec.Roles = []workloads.ReplicaRole{
 					{
 						Name:                   "leader",
-						Required:               true,
 						SwitchoverBeforeUpdate: true,
 						ParticipatesInQuorum:   true,
 						UpdatePriority:         5,
 					},
 					{
 						Name:                   "follower",
-						Required:               false,
 						SwitchoverBeforeUpdate: false,
 						ParticipatesInQuorum:   true,
 						UpdatePriority:         4,

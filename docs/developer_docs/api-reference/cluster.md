@@ -1346,9 +1346,7 @@ ComponentAvailable
 <td>
 <code>roles</code><br/>
 <em>
-<a href="#workloads.kubeblocks.io/v1.ReplicaRole">
-[]ReplicaRole
-</a>
+[]github.com/apecloud/kubeblocks/apis/base/v1.ReplicaRole
 </em>
 </td>
 <td>
@@ -5004,9 +5002,7 @@ ComponentAvailable
 <td>
 <code>roles</code><br/>
 <em>
-<a href="#workloads.kubeblocks.io/v1.ReplicaRole">
-[]ReplicaRole
-</a>
+[]github.com/apecloud/kubeblocks/apis/base/v1.ReplicaRole
 </em>
 </td>
 <td>
@@ -28187,9 +28183,7 @@ UpdateStrategy.Type will be set to appsv1.OnDeleteStatefulSetStrategyType if Mem
 <td>
 <code>roles</code><br/>
 <em>
-<a href="#workloads.kubeblocks.io/v1.ReplicaRole">
-[]ReplicaRole
-</a>
+[]github.com/apecloud/kubeblocks/apis/base/v1.ReplicaRole
 </em>
 </td>
 <td>
@@ -28715,9 +28709,7 @@ UpdateStrategy.Type will be set to appsv1.OnDeleteStatefulSetStrategyType if Mem
 <td>
 <code>roles</code><br/>
 <em>
-<a href="#workloads.kubeblocks.io/v1.ReplicaRole">
-[]ReplicaRole
-</a>
+[]github.com/apecloud/kubeblocks/apis/base/v1.ReplicaRole
 </em>
 </td>
 <td>
@@ -29337,9 +29329,7 @@ string
 <td>
 <code>role</code><br/>
 <em>
-<a href="#workloads.kubeblocks.io/v1.ReplicaRole">
-ReplicaRole
-</a>
+github.com/apecloud/kubeblocks/apis/base/v1.ReplicaRole
 </em>
 </td>
 <td>
@@ -29569,110 +29559,6 @@ int32
 </em>
 </td>
 <td>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="workloads.kubeblocks.io/v1.ReplicaRole">ReplicaRole
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>, <a href="#workloads.kubeblocks.io/v1.MemberStatus">MemberStatus</a>)
-</p>
-<div>
-<p>ReplicaRole represents a role that can be assigned to a component instance, defining its behavior and responsibilities.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>name</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Name defines the role&rsquo;s unique identifier. This value is used to set the &ldquo;apps.kubeblocks.io/role&rdquo; label
-on the corresponding object to identify its role.</p>
-<p>For example, common role names include:
-- &ldquo;leader&rdquo;: The primary/master instance that handles write operations
-- &ldquo;follower&rdquo;: Secondary/replica instances that replicate data from the leader
-- &ldquo;learner&rdquo;: Read-only instances that don&rsquo;t participate in elections</p>
-<p>This field is immutable once set.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>required</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Required indicates if at least one replica with this role must exist for the component to be considered
-operationally running. For example, a leader role may be required for the component to function.</p>
-<p>This field is immutable once set.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>updatePriority</code><br/>
-<em>
-int
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>UpdatePriority determines the order in which pods with different roles are updated.
-Pods are sorted by this priority (higher numbers = higher priority) and updated accordingly.
-Roles with the highest priority will be updated last.
-The default priority is 0.</p>
-<p>For example:
-- Leader role may have priority 2 (updated last)
-- Follower role may have priority 1 (updated before leader)
-- Learner role may have priority 0 (updated first)</p>
-<p>This field is immutable once set.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>participatesInQuorum bool</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>ParticipatesInQuorum indicates if pods with this role are counted when determining quorum.
-This affects update strategies that need to maintain quorum for availability.</p>
-<p>For example, in a 5-pod component where:
-- 2 learner pods (participatesInQuorum=false)
-- 2 follower pods (participatesInQuorum=true)
-- 1 leader pod (participatesInQuorum=true)
-The quorum size would be 3 (based on the 3 participating pods), allowing parallel updates
-of 2 learners and 1 follower while maintaining quorum.</p>
-<p>This field is immutable once set.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>switchoverBeforeUpdate</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>SwitchoverBeforeUpdate indicates if a role switchover operation should be performed before
-updating or scaling in pods with this role. This is typically used for leader roles to
-ensure minimal disruption during updates.</p>
-<p>This field is immutable once set.</p>
 </td>
 </tr>
 </tbody>

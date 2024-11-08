@@ -165,14 +165,12 @@ func newMockReconfigureParams(testName string, cli client.Client, paramOps ...Pa
 			Roles: []appsv1.ReplicaRole{
 				{
 					Name:                   "leader",
-					Required:               true,
 					SwitchoverBeforeUpdate: true,
 					ParticipatesInQuorum:   true,
 					UpdatePriority:         5,
 				},
 				{
 					Name:                   "follower",
-					Required:               false,
 					SwitchoverBeforeUpdate: false,
 					ParticipatesInQuorum:   true,
 					UpdatePriority:         4,

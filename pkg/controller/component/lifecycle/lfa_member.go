@@ -172,17 +172,13 @@ func hackParameters4Switchover(ctx context.Context, cli client.Reader, namespace
 }
 
 func leaderRole(roles []appsv1.ReplicaRole) (string, error) {
-	targetRole := ""
-	for _, role := range roles {
-		if role.Required && role.ParticipatesInQuorum {
-			if targetRole != "" {
-				return "", fmt.Errorf("more than one role defined as leader: %s,%s", targetRole, role.Name)
-			}
-			targetRole = role.Name
+	highestPriority := 0
+	var role *appsv1.ReplicaRole
+	for _, r := range roles {
+		if r.UpdatePriority > highestPriority {
+			highestPriority = r.UpdatePriority
+			role = &r
 		}
 	}
-	if targetRole == "" {
-		return "", fmt.Errorf("%s", "has no appropriate role defined as leader")
-	}
-	return targetRole, nil
+	return role.Name, nil
 }

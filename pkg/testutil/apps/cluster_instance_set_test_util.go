@@ -23,6 +23,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 
 	"github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -77,14 +78,12 @@ func MockInstanceSetComponent(
 		SetRoles([]workloads.ReplicaRole{
 			{
 				Name:                   "leader",
-				Required:               true,
 				SwitchoverBeforeUpdate: true,
 				ParticipatesInQuorum:   true,
 				UpdatePriority:         5,
 			},
 			{
 				Name:                   "follower",
-				Required:               false,
 				SwitchoverBeforeUpdate: false,
 				ParticipatesInQuorum:   true,
 				UpdatePriority:         4,
@@ -108,23 +107,29 @@ func MockInstanceSetPods(
 		if its == nil {
 			return nil
 		}
-		for i := range its.Spec.Roles {
-			if its.Spec.Roles[i].Required {
-				return &its.Spec.Roles[i]
+		highestPriority := 0
+		var role *workloads.ReplicaRole
+		for i, r := range its.Spec.Roles {
+			if its.Spec.Roles[i].UpdatePriority > highestPriority {
+				highestPriority = r.UpdatePriority
+				role = &r
 			}
 		}
-		return nil
+		return role
 	}()
 	noneLeaderRole := func() *workloads.ReplicaRole {
 		if its == nil {
 			return nil
 		}
-		for i := range its.Spec.Roles {
-			if !its.Spec.Roles[i].Required {
-				return &its.Spec.Roles[i]
+		lowestPriority := math.MaxInt
+		var role *workloads.ReplicaRole
+		for i, r := range its.Spec.Roles {
+			if its.Spec.Roles[i].UpdatePriority < lowestPriority {
+				lowestPriority = r.UpdatePriority
+				role = &r
 			}
 		}
-		return nil
+		return role
 	}()
 	podList := make([]*corev1.Pod, getReplicas())
 	podNames := generatePodNames(cluster, compName)

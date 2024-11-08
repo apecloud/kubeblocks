@@ -8508,15 +8508,6 @@ spec:
 
                         This field is immutable once set.
                       type: boolean
-                    required:
-                      default: false
-                      description: |-
-                        Required indicates if at least one replica with this role must exist for the component to be considered
-                        operationally running. For example, a leader role may be required for the component to function.
-
-
-                        This field is immutable once set.
-                      type: boolean
                     switchoverBeforeUpdate:
                       default: false
                       description: |-

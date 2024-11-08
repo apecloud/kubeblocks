@@ -30,7 +30,7 @@ import TabItem from '@theme/TabItem';
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
+<TabItem value="kbcli" label="kbcli">
 
 ```bash
 kbcli cluster list mycluster -n demo
@@ -38,7 +38,7 @@ kbcli cluster list mycluster -n demo
 
 </TabItem>
 
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 ```bash
 kubectl get cluster mycluster -n demo
@@ -57,7 +57,7 @@ mycluster   mongodb              mongodb-5.0   Delete               Running   17
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
+<TabItem value="kbcli" label="kbcli">
 
 ```bash
 kbcli cluster delete mycluster -n demo
@@ -65,7 +65,7 @@ kbcli cluster delete mycluster -n demo
 
 </TabItem>
 
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 ```bash
 kubectl delete -n demo cluster mycluster

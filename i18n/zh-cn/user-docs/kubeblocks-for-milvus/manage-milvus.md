@@ -34,7 +34,7 @@ Milvus 是高度灵活、可靠且速度极快的云原生开源矢量数据库�
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
+<TabItem value="kbcli" label="kbcli">
 
 1. 创建一个 Milvus 集群。
 
@@ -113,7 +113,7 @@ Milvus 是高度灵活、可靠且速度极快的云原生开源矢量数据库�
 
 </TabItem>
 
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 KubeBlocks 通过 `Cluster` 定义集群。以下是创建 Milvus 集群的示例。Pod 默认分布在不同节点。但如果您只有一个节点可用于部署集群，可将 `spec.affinity.topologyKeys` 设置为 `null`。
 
@@ -349,7 +349,7 @@ kubectl get cluster mycluster -n demo -o yaml
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
+<TabItem value="kbcli" label="kbcli">
 
 ```bash
 kbcli cluster list mycluster -n demo
@@ -360,7 +360,7 @@ mycluster   demo        milvus-2.3.2                           Delete           
 
 </TabItem>
 
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 ```bash
 kubectl get cluster mycluster -n demo
@@ -377,47 +377,7 @@ mycluster   milvus-2.3.2                                  Delete               R
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-1. 配置参数 `--components`、`--memory` 和 `--cpu`，并执行以下命令。
-
-    ```bash
-    kbcli cluster vscale milvus -n demo --cpu=1 --memory=1Gi --components=milvus 
-    ```
-
-2. 通过以下任意一种方式验证垂直扩容是否完成。
-
-   - 查看 OpsRequest 进程。
-
-       执行磁盘扩容命令后，KubeBlocks 会自动输出查看 OpsRequest 进程的命令，可通过该命令查看 OpsRequest 进程的细节，包括 OpsRequest 的状态、Pod 状态等。当 OpsRequest 的状态为 `Succeed` 时，表明这一进程已完成。
-
-       ```bash
-       kbcli cluster describe-ops milvus-verticalscaling-rpw2l -n demo
-       ```
-
-   - 查看集群状态。
-
-       ```bash
-       kbcli cluster list mycluster -n demo
-       >
-       NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS     CREATED-TIME
-       mycluster   demo                                               Delete               Updating   Jul 05,2024 17:35 UTC+0800
-       ```
-
-       - STATUS=VerticalScaling 表示正在进行垂直扩容。
-       - STATUS=Running 表示垂直扩容已完成。
-       - STATUS=Abnormal 表示垂直扩容异常。原因可能是正常实例的数量少于总实例数，或者 Leader 实例正常运行而其他实例异常。
-          > 您可以手动检查是否由于资源不足而导致报错。如果 Kubernetes 集群支持 AutoScaling，系统在资源充足的情况下会执行自动恢复。或者你也可以创建足够的资源，并使用 `kubectl describe` 命令进行故障排除。
-
-3. 当 OpsRequest 状态为 `Succeed` 或集群状态再次回到 `Running` 后，检查资源规格是否已变更。
-
-    ```bash
-    kbcli cluster describe mycluster -n demo
-    ```
-
-</TabItem>
-
-<TabItem value="OpsRequest" label="OpsRequest">
+<TabItem value="OpsRequest" label="OpsRequest" default>
 
 1. 对指定的集群应用 OpsRequest，可根据您的需求配置参数。
 
@@ -504,6 +464,46 @@ mycluster   milvus-2.3.2                                  Delete               R
 
 </TabItem>
 
+<TabItem value="kbcli" label="kbcli">
+
+1. 配置参数 `--components`、`--memory` 和 `--cpu`，并执行以下命令。
+
+    ```bash
+    kbcli cluster vscale milvus -n demo --cpu=1 --memory=1Gi --components=milvus 
+    ```
+
+2. 通过以下任意一种方式验证垂直扩容是否完成。
+
+   - 查看 OpsRequest 进程。
+
+       执行磁盘扩容命令后，KubeBlocks 会自动输出查看 OpsRequest 进程的命令，可通过该命令查看 OpsRequest 进程的细节，包括 OpsRequest 的状态、Pod 状态等。当 OpsRequest 的状态为 `Succeed` 时，表明这一进程已完成。
+
+       ```bash
+       kbcli cluster describe-ops milvus-verticalscaling-rpw2l -n demo
+       ```
+
+   - 查看集群状态。
+
+       ```bash
+       kbcli cluster list mycluster -n demo
+       >
+       NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS     CREATED-TIME
+       mycluster   demo                                               Delete               Updating   Jul 05,2024 17:35 UTC+0800
+       ```
+
+       - STATUS=VerticalScaling 表示正在进行垂直扩容。
+       - STATUS=Running 表示垂直扩容已完成。
+       - STATUS=Abnormal 表示垂直扩容异常。原因可能是正常实例的数量少于总实例数，或者 Leader 实例正常运行而其他实例异常。
+          > 您可以手动检查是否由于资源不足而导致报错。如果 Kubernetes 集群支持 AutoScaling，系统在资源充足的情况下会执行自动恢复。或者你也可以创建足够的资源，并使用 `kubectl describe` 命令进行故障排除。
+
+3. 当 OpsRequest 状态为 `Succeed` 或集群状态再次回到 `Running` 后，检查资源规格是否已变更。
+
+    ```bash
+    kbcli cluster describe mycluster -n demo
+    ```
+
+</TabItem>
+
 </Tabs>
 
 ## 磁盘扩容
@@ -514,7 +514,7 @@ mycluster   milvus-2.3.2                                  Delete               R
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
+<TabItem value="kbcli" label="kbcli">
 
 ```bash
 kbcli cluster list mycluster -n demo
@@ -525,7 +525,7 @@ mycluster   demo        milvus-2.3.2                           Delete           
 
 </TabItem>
 
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 ```bash
 kubectl get cluster mycluster -n demo
@@ -542,46 +542,7 @@ mycluster   milvus-2.3.2                                  Delete               R
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-1. 更改配置。配置参数 `--components`、`--volume-claim-templates` 和 `--storage`，并执行以下命令。
-
-   ```bash
-   kbcli cluster volume-expand milvus --storage=40Gi --components=milvus
-   ```
-
-   - `--components` 表示需扩容的组件名称。
-   - `--volume-claim-templates` 表示组件中的 VolumeClaimTemplate 名称。
-   - `--storage` 表示磁盘需扩容至的大小。
-
-2. 可通过以下任意一种方式验证扩容操作是否完成。
-
-    - 查看 OpsRequest 进程。
-
-       执行磁盘扩容命令后，KubeBlocks 会自动输出查看 OpsRequest 进程的命令，可通过该命令查看 OpsRequest 进程的细节，包括 OpsRequest 的状态、Pod 状态等。当 OpsRequest 的状态为 `Succeed` 时，表明这一进程已完成。
-
-       ```bash
-       kbcli cluster describe-ops milvus-volumeexpansion-5pbd2 -n demo
-       ```
-
-    - 查看集群状态。
-
-       ```bash
-       kbcli cluster list mycluster -n demo
-       ```
-
-       - STATUS=Updating 表示扩容正在进行中。
-       - STATUS=Running 表示扩容已完成。
-
-3. 当 OpsRequest 状态为 `Succeed` 或集群状态再次回到 `Running` 后，检查资源规格是否已按要求变更。
-
-   ```bash
-   kbcli cluster describe mycluster -n demo
-   ```
-
-</TabItem>
-
-<TabItem value="OpsRequest" label="OpsRequest">
+<TabItem value="OpsRequest" label="OpsRequest" default>
 
 1. 应用 OpsRequest。根据需求更改 storage 的值，并执行以下命令来更改集群的存储容量。
 
@@ -647,7 +608,7 @@ mycluster   milvus-2.3.2                                  Delete               R
              - ReadWriteOnce
            resources:
              requests:
-               storage: 1Gi # Change the volume storage size.
+               storage: 40Gi # 修改磁盘容量
      terminationPolicy: Delete
    ```
 
@@ -659,13 +620,52 @@ mycluster   milvus-2.3.2                                  Delete               R
 
 </TabItem>
 
+<TabItem value="kbcli" label="kbcli">
+
+1. 更改配置。配置参数 `--components`、`--volume-claim-templates` 和 `--storage`，并执行以下命令。
+
+   ```bash
+   kbcli cluster volume-expand milvus --storage=40Gi --components=milvus
+   ```
+
+   - `--components` 表示需扩容的组件名称。
+   - `--volume-claim-templates` 表示组件中的 VolumeClaimTemplate 名称。
+   - `--storage` 表示磁盘需扩容至的大小。
+
+2. 可通过以下任意一种方式验证扩容操作是否完成。
+
+    - 查看 OpsRequest 进程。
+
+       执行磁盘扩容命令后，KubeBlocks 会自动输出查看 OpsRequest 进程的命令，可通过该命令查看 OpsRequest 进程的细节，包括 OpsRequest 的状态、Pod 状态等。当 OpsRequest 的状态为 `Succeed` 时，表明这一进程已完成。
+
+       ```bash
+       kbcli cluster describe-ops milvus-volumeexpansion-5pbd2 -n demo
+       ```
+
+    - 查看集群状态。
+
+       ```bash
+       kbcli cluster list mycluster -n demo
+       ```
+
+       - STATUS=Updating 表示扩容正在进行中。
+       - STATUS=Running 表示扩容已完成。
+
+3. 当 OpsRequest 状态为 `Succeed` 或集群状态再次回到 `Running` 后，检查资源规格是否已按要求变更。
+
+   ```bash
+   kbcli cluster describe mycluster -n demo
+   ```
+
+</TabItem>
+
 </Tabs>
 
 ## 重启
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
+<TabItem value="kbcli" label="kbcli">
 
 1. 重启集群。
 
@@ -695,7 +695,7 @@ mycluster   milvus-2.3.2                                  Delete               R
 
 </TabItem>
 
-<TabItem value="OpsRequest" label="OpsRequest">
+<TabItem value="OpsRequest" label="OpsRequest" default>
 
 1. 执行以下命令，重启集群。
 
@@ -743,15 +743,7 @@ mycluster   milvus-2.3.2                                  Delete               R
 
     <Tabs>
 
-    <TabItem value="kbcli" label="kbcli" default>
-
-    ```bash
-    kbcli cluster stop mycluster -n demo
-    ```
-
-    </TabItem>
-
-    <TabItem value="OpsRequest" label="OpsRequest">
+    <TabItem value="OpsRequest" label="OpsRequest" default>
 
     ```bash
     kubectl apply -f - <<EOF
@@ -792,13 +784,21 @@ mycluster   milvus-2.3.2                                  Delete               R
 
     </TabItem>
 
+    <TabItem value="kbcli" label="kbcli">
+
+    ```bash
+    kbcli cluster stop mycluster -n demo
+    ```
+
+    </TabItem>
+
     </Tabs>
 
 2. 查看集群状态，确认集群是否已停止。
 
     <Tabs>
 
-    <TabItem value="kbcli" label="kbcli" default>
+    <TabItem value="kbcli" label="kbcli">
 
     ```bash
     kbcli cluster list mycluster -n demo
@@ -806,7 +806,7 @@ mycluster   milvus-2.3.2                                  Delete               R
 
     </TabItem>
 
-    <TabItem value="kubectl" label="kubectl">
+    <TabItem value="kubectl" label="kubectl" default>
 
     ```bash
     kubectl get cluster mycluster -n demo
@@ -822,15 +822,7 @@ mycluster   milvus-2.3.2                                  Delete               R
 
     <Tabs>
 
-    <TabItem value="kbcli" label="kbcli" default>
-
-     ```bash
-     kbcli cluster start mycluster -n demo
-     ```
-
-    </TabItem>
-
-    <TabItem value="OpsRequest" label="OpsRequest">
+    <TabItem value="OpsRequest" label="OpsRequest" default>
 
     ```bash
     kubectl apply -f - <<EOF
@@ -871,13 +863,21 @@ mycluster   milvus-2.3.2                                  Delete               R
 
     </TabItem>
 
+    <TabItem value="kbcli" label="kbcli">
+
+    ```bash
+    kbcli cluster start mycluster -n demo
+    ```
+
+    </TabItem>
+
     </Tabs>
 
 2. 查看集群状态，确认集群是否已再次运行。
 
     <Tabs>
 
-    <TabItem value="kbcli" label="kbcli" default>
+    <TabItem value="kbcli" label="kbcli">
 
     ```bash
     kbcli cluster list mycluster -n demo
@@ -885,7 +885,7 @@ mycluster   milvus-2.3.2                                  Delete               R
 
     </TabItem>
 
-    <TabItem value="kubectl" label="kubectl">
+    <TabItem value="kubectl" label="kubectl" default>
 
     ```bash
     kubectl get cluster mycluster -n demo
@@ -916,7 +916,7 @@ mycluster   milvus-2.3.2                                  Delete               R
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
+<TabItem value="kbcli" label="kbcli">
 
 ```bash
 kbcli cluster list mycluster -n demo
@@ -927,7 +927,7 @@ mycluster   demo        milvus-2.3.2                           Delete           
 
 </TabItem>
 
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 ```bash
 kubectl -n demo get cluster mycluster
@@ -946,7 +946,7 @@ mycluster   milvus-2.3.2                                  Delete               R
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
+<TabItem value="kbcli" label="kbcli">
 
 ```bash
 kbcli cluster delete mycluster -n demo
@@ -954,7 +954,7 @@ kbcli cluster delete mycluster -n demo
 
 </TabItem>
 
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 ```bash
 kubectl delete cluster mycluster -n demo

@@ -50,7 +50,7 @@ Redis Sentinel 是 Redis 官方推荐的主备集群高可用性解决方案，�
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
+<TabItem value="kbcli" label="kbcli">
 
 1. 查看 Redis 集群的初始状态。
 
@@ -113,7 +113,7 @@ Redis Sentinel 是 Redis 官方推荐的主备集群高可用性解决方案，�
 
 </TabItem>
 
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 1. 查看 Redis 集群的初始状态。
 

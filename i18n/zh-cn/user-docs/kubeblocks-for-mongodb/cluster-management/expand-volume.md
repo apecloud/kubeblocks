@@ -19,7 +19,7 @@ KubeBlocks 支持 Pod 存储磁盘扩容。
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
+<TabItem value="kbcli" label="kbcli">
 
 ```bash
 kbcli cluster list mycluster -n demo
@@ -30,7 +30,7 @@ mycluster        demo             mongodb               mongodb-5.0        Delet
 
 </TabItem>
 
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 ```bash
 kubectl get cluster mycluster -n demo
@@ -45,49 +45,9 @@ mycluster   mongodb              mongodb-5.0   Delete               Running   27
 
 ## 步骤
 
-1. 更改配置。
+<Tabs>
 
-    配置参数 `--components`、`--volume-claim-templates` 和 `--storage`，并执行以下命令。
-
-    ```bash
-    kbcli cluster volume-expand mycluster -n demo --components="mongodb" --volume-claim-templates="data" --storage="30Gi"
-    ```
-
-    - `--components` 表示需扩容的组件名称。
-    - `--volume-claim-templates` 表示组件中的 VolumeClaimTemplate 名称。
-    - `--storage` 表示磁盘需扩容至的大小。
-
-2. 可通过以下任意一种方式验证扩容操作是否完成。
-
-    - 查看 OpsRequest 进程。
-
-       执行磁盘扩容命令后，KubeBlocks 会自动输出查看 OpsRequest 进程的命令，可通过该命令查看 OpsRequest 进程的细节，包括 OpsRequest 的状态、PVC 状态等。当 OpsRequest 的状态为 `Succeed` 时，表明这一进程已完成。
-
-       ```bash
-       kbcli cluster describe-ops mycluster-volumeexpansion-8257f -n demo
-       ```
-
-    - 查看集群状态。
-
-       ```bash
-       kbcli cluster list mycluster
-       >
-       NAME              NAMESPACE        CLUSTER-DEFINITION        VERSION            TERMINATION-POLICY        STATUS          CREATED-TIME
-       mycluster         demo             mongodb                   mongodb-5.0        Delete                    Updating        Apr 10,2023 16:27 UTC+0800
-       ```
-
-       * STATUS=Updating 表示扩容正在进行中。
-       * STATUS=Running 表示扩容已完成。
-
-3. 当 OpsRequest 状态为 `Succeed` 或集群状态再次回到 `Running` 后，检查资源规格是否已变更。
-
-    ```bash
-    kbcli cluster describe mycluster -n demo
-    ```
-
-</TabItem>
-
-<TabItem value="OpsRequest" label="OpsRequest">
+<TabItem value="OpsRequest" label="OpsRequest" default>
 
 1. 应用 OpsRequest。根据需求更改 storage 的值，并执行以下命令来更改集群的存储容量。
 
@@ -181,6 +141,50 @@ mycluster   mongodb              mongodb-5.0   Delete               Running   27
           Requests:
             Storage:   40Gi
    ```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+1. 更改配置。
+
+    配置参数 `--components`、`--volume-claim-templates` 和 `--storage`，并执行以下命令。
+
+    ```bash
+    kbcli cluster volume-expand mycluster -n demo --components="mongodb" --volume-claim-templates="data" --storage="30Gi"
+    ```
+
+    - `--components` 表示需扩容的组件名称。
+    - `--volume-claim-templates` 表示组件中的 VolumeClaimTemplate 名称。
+    - `--storage` 表示磁盘需扩容至的大小。
+
+2. 可通过以下任意一种方式验证扩容操作是否完成。
+
+    - 查看 OpsRequest 进程。
+
+       执行磁盘扩容命令后，KubeBlocks 会自动输出查看 OpsRequest 进程的命令，可通过该命令查看 OpsRequest 进程的细节，包括 OpsRequest 的状态、PVC 状态等。当 OpsRequest 的状态为 `Succeed` 时，表明这一进程已完成。
+
+       ```bash
+       kbcli cluster describe-ops mycluster-volumeexpansion-8257f -n demo
+       ```
+
+    - 查看集群状态。
+
+       ```bash
+       kbcli cluster list mycluster
+       >
+       NAME              NAMESPACE        CLUSTER-DEFINITION        VERSION            TERMINATION-POLICY        STATUS          CREATED-TIME
+       mycluster         demo             mongodb                   mongodb-5.0        Delete                    Updating        Apr 10,2023 16:27 UTC+0800
+       ```
+
+       * STATUS=Updating 表示扩容正在进行中。
+       * STATUS=Running 表示扩容已完成。
+
+3. 当 OpsRequest 状态为 `Succeed` 或集群状态再次回到 `Running` 后，检查资源规格是否已变更。
+
+    ```bash
+    kbcli cluster describe mycluster -n demo
+    ```
 
 </TabItem>
 

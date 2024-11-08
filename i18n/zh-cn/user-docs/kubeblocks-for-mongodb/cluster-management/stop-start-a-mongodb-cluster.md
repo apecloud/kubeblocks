@@ -21,15 +21,7 @@ import TabItem from '@theme/TabItem';
 
     <Tabs>
 
-    <TabItem value="kbcli" label="kbcli" default>
-
-    ```bash
-    kbcli cluster stop mycluster -n demo
-    ```
-
-    </TabItem>
-
-    <TabItem value="OpsRequest" label="OpsRequest">
+    <TabItem value="OpsRequest" label="OpsRequest" default>
 
     ```bash
     kubectl apply -f - <<EOF
@@ -46,7 +38,7 @@ import TabItem from '@theme/TabItem';
 
     </TabItem>
 
-    <TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
+    <TabItem value="编辑集群 YAML 文件" label="编辑集群 YAML 文件">
 
     将 replicas 设为 0，删除 Pods。
 
@@ -78,13 +70,21 @@ import TabItem from '@theme/TabItem';
 
     </TabItem>
 
+    <TabItem value="kbcli" label="kbcli">
+
+    ```bash
+    kbcli cluster stop mycluster -n demo
+    ```
+
+    </TabItem>
+
     </Tabs>
 
 2. 检查集群的状态，查看其是否已停止。
 
     <Tabs>
 
-    <TabItem value="kbcli" label="kbcli" default>
+    <TabItem value="kbcli" label="kbcli">
 
     ```bash
     kbcli cluster list mycluster -n demo
@@ -92,7 +92,7 @@ import TabItem from '@theme/TabItem';
 
     </TabItem>
 
-    <TabItem value="kubectl" label="kubectl">
+    <TabItem value="kubectl" label="kubectl" default>
 
     ```bash
     kubectl get cluster mycluster -n demo
@@ -108,15 +108,7 @@ import TabItem from '@theme/TabItem';
 
     <Tabs>
 
-    <TabItem value="kbcli" label="kbcli" default>
-
-   ```bash
-   kbcli cluster start mycluster -n demo
-   ```
-
-    </TabItem>
-
-    <TabItem value="OpsRequest" label="OpsRequest">
+    <TabItem value="OpsRequest" label="OpsRequest" default>
 
     ```bash
     kubectl apply -f - <<EOF
@@ -133,7 +125,7 @@ import TabItem from '@theme/TabItem';
 
     </TabItem>
 
-    <TabItem value="Edit cluster YAML file" label="Edit cluster YAML File">
+    <TabItem value="编辑集群 YAML 文件" label="编辑集群 YAML 文件">
 
     将 replicas 数值调整为停止集群前的数量，再次启动集群。
 
@@ -165,13 +157,21 @@ import TabItem from '@theme/TabItem';
 
     </TabItem>
 
+    <TabItem value="kbcli" label="kbcli">
+
+   ```bash
+   kbcli cluster start mycluster -n demo
+   ```
+
+    </TabItem>
+
     </Tabs>
 
 2. 查看集群状态，确认集群是否再次启动。
 
     <Tabs>
 
-    <TabItem value="kbcli" label="kbcli" default>
+    <TabItem value="kbcli" label="kbcli">
 
     ```bash
     kbcli cluster list mycluster -n demo
@@ -179,7 +179,7 @@ import TabItem from '@theme/TabItem';
 
     </TabItem>
 
-    <TabItem value="kubectl" label="kubectl">
+    <TabItem value="kubectl" label="kubectl" default>
 
     ```bash
     kubectl get cluster mycluster -n demo

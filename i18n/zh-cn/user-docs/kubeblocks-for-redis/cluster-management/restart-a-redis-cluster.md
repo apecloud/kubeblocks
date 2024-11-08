@@ -23,7 +23,7 @@ KubeBlocks 支持重启集群中的所有 Pod。当数据库出现异常时，�
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
+<TabItem value="kbcli" label="kbcli">
 
 1. 重启集群。
 
@@ -53,7 +53,7 @@ KubeBlocks 支持重启集群中的所有 Pod。当数据库出现异常时，�
 
 </TabItem>
 
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 1. 创建 OpsRequest 重启集群。
 

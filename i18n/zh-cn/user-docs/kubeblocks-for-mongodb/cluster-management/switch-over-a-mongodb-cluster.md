@@ -34,7 +34,7 @@ import TabItem from '@theme/TabItem';
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
+<TabItem value="kbcli" label="kbcli">
 
 * 不指定主节点实例进行切换。
 
@@ -56,7 +56,7 @@ import TabItem from '@theme/TabItem';
 
 </TabItem>
 
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 `instanceName` 字段的值定义了本次切换是否指定了新的主节点实例。
 
@@ -106,7 +106,7 @@ import TabItem from '@theme/TabItem';
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
+<TabItem value="kbcli" label="kbcli">
 
 ```bash
 kbcli cluster list-instances -n demo
@@ -114,7 +114,7 @@ kbcli cluster list-instances -n demo
 
 </TabItem>
 
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 ```bash
 kubectl get pods -n demo

@@ -16,7 +16,159 @@ KubeBlocks 提供了一套默认的配置生成策略，适用于在 KubeBlocks 
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
+<TabItem value="编辑配置文件" label="编辑配置文件" default>
+
+1. 获取集群的配置文件。
+
+   ```bash
+   kubectl edit configurations.apps.kubeblocks.io mycluster-redis -n demo
+   ```
+
+2. 按需配置参数。以下实例中添加了 `spec.configFileParams`，用于配置 `acllog-max-len` 参数。
+
+    ```yaml
+    spec:
+      clusterRef: mycluster
+      componentName: redis
+      configItemDetails:
+      - configSpec:
+          constraintRef: redis7-config-constraints
+          name: redis-replication-config
+          namespace: kb-system
+          reRenderResourceTypes:
+          - vscale
+          templateRef: redis7-config-template
+          volumeName: redis-config
+      - configFileParams:
+          redis.conf:
+            parameters:
+              acllog-max-len: "256"
+        name: mycluster-redis-redis-replication-config
+    ```
+
+3. 连接集群，确认配置是否生效。
+
+   1. 获取用户名和密码。
+
+      ```bash
+      kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.username}' | base64 -d
+      >
+      default
+
+      kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.password}' | base64 -d
+      >
+      kpz77mcs
+      ```
+
+   2. 连接集群，验证参数是否按预期配置。
+
+      ```bash
+      kubectl exec -ti -n demo mycluster-redis-0 -- bash
+
+      root@mycluster-redis-0:/# redis-cli -a kpz77mcs  --user default
+
+      127.0.0.1:6379> config get parameter acllog-max-len
+      1) "acllog-max-len"
+      2) "256"
+      ```
+
+:::note
+
+如果您无法找到集群的配置文件，您可以切换到 `kbcli` 页签，使用相关命令查看集群当前的配置文件。
+
+```bash
+kbcli cluster describe-config mycluster -n demo
+```
+
+:::
+
+</TabItem>
+
+<TabItem value="OpsRequest" label="OpsRequest">
+
+1. 在名为 `mycluster-configuring-demo.yaml` 的 YAML 文件中定义 OpsRequest，并修改参数。如下示例中，`acllog-max-len` 参数修改为 `256`。
+
+    ```yaml
+    apiVersion: apps.kubeblocks.io/v1alpha1
+    kind: OpsRequest
+    metadata:
+      name: mycluster-configuring-demo
+      namespace: demo
+    spec:
+      clusterName: mycluster
+      reconfigure:
+        componentName: redis
+        configurations:
+        - keys:
+          - key: redis.conf
+            parameters:
+            - key: acllog-max-len
+              value: "256"
+          name: redis-replication-config
+      preConditionDeadlineSeconds: 0
+      type: Reconfiguring
+    ```
+
+   | 字段                                                    | 定义     |
+   |--------------------------------------------------------|--------------------------------|
+   | `metadata.name`                                        | 定义了 Opsrequest 的名称。 |
+   | `metadata.namespace`                                   | 定义了集群所在的 namespace。 |
+   | `spec.clusterName`                                     | 定义了本次运维操作指向的集群名称。 |
+   | `spec.reconfigure`                                     | 定义了需配置的 component 及相关配置更新内容。 |
+   | `spec.reconfigure.componentName`                       | 定义了改集群的 component 名称。  |
+   | `spec.configurations`                                  | 包含一系列 ConfigurationItem 对象，定义了 component 的配置模板名称、更新策略、参数键值对。 |
+   | `spec.reconfigure.configurations.keys.key`             | 定义了 configuration map。 |
+   | `spec.reconfigure.configurations.keys.parameters`      | 定义了单个参数文件的键值对列表。 |
+   | `spec.reconfigure.configurations.keys.parameter.key`   | 代表您需要编辑的参数名称。|
+   | `spec.reconfigure.configurations.keys.parameter.value` | 代表了将要更新的参数值。如果设置为 nil，Key 字段定义的参数将会被移出配置文件。  |
+   | `spec.reconfigure.configurations.name`                 | 定义了配置模板名称。  |
+   | `preConditionDeadlineSeconds`                          | 定义了本次 OpsRequest 中止之前，满足其启动条件的最长等待时间（单位为秒）。如果设置为 0（默认），则必须立即满足启动条件，OpsRequest 才能继续。|
+
+2. 应用配置 OpsRequest。
+
+   ```bash
+   kubectl apply -f mycluster-configuring-demo.yaml
+   ```
+
+3. 连接集群，确认配置是否生效。
+
+   1. 获取用户名和密码。
+
+      ```bash
+      kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.username}' | base64 -d
+      >
+      default
+
+      kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.password}' | base64 -d
+      >
+      kpz77mcs
+      ```
+
+   2. 连接集群，验证参数是否按预期配置。
+
+      ```bash
+      kubectl exec -ti -n demo mycluster-redis-0 -- bash
+
+      root@mycluster-redis-0:/# redis-cli -a kpz77mcs  --user default
+      
+      127.0.0.1:6379> config get parameter acllog-max-len
+      1) "acllog-max-len"
+      2) "256"
+      ```
+
+:::note
+
+如果您无法找到集群的配置文件，您可以切换到 `kbcli` 页签，使用相关命令查看集群当前的配置文件。
+
+```bash
+kbcli cluster describe-config mycluster -n demo
+```
+
+:::
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
 
 ## 查看参数信息
 
@@ -242,158 +394,6 @@ DIFF-CONFIG RESULT:
 PARAMETERNAME   MYCLUSTER-RECONFIGURING-ZRKQ7   MYCLUSTER-RECONFIGURING-MWBNW
 maxclients      20000                           40000
 ```
-
-</TabItem>
-
-<TabItem value="Edit config file" label="Edit config file">
-
-1. 获取集群的配置文件。
-
-   ```bash
-   kubectl edit configurations.apps.kubeblocks.io mycluster-redis -n demo
-   ```
-
-2. 按需配置参数。以下实例中添加了 `spec.configFileParams`，用于配置 `acllog-max-len` 参数。
-
-    ```yaml
-    spec:
-      clusterRef: mycluster
-      componentName: redis
-      configItemDetails:
-      - configSpec:
-          constraintRef: redis7-config-constraints
-          name: redis-replication-config
-          namespace: kb-system
-          reRenderResourceTypes:
-          - vscale
-          templateRef: redis7-config-template
-          volumeName: redis-config
-      - configFileParams:
-          redis.conf:
-            parameters:
-              acllog-max-len: "256"
-        name: mycluster-redis-redis-replication-config
-    ```
-
-3. 连接集群，确认配置是否生效。
-
-   1. 获取用户名和密码。
-
-      ```bash
-      kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.username}' | base64 -d
-      >
-      default
-
-      kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.password}' | base64 -d
-      >
-      kpz77mcs
-      ```
-
-   2. 连接集群，验证参数是否按预期配置。
-
-      ```bash
-      kubectl exec -ti -n demo mycluster-redis-0 -- bash
-
-      root@mycluster-redis-0:/# redis-cli -a kpz77mcs  --user default
-
-      127.0.0.1:6379> config get parameter acllog-max-len
-      1) "acllog-max-len"
-      2) "256"
-      ```
-
-:::note
-
-如果您无法找到集群的配置文件，您可以切换到 `kbcli` 页签，使用相关命令查看集群当前的配置文件。
-
-```bash
-kbcli cluster describe-config mycluster -n demo
-```
-
-:::
-
-</TabItem>
-
-<TabItem value="OpsRequest" label="OpsRequest">
-
-1. 在名为 `mycluster-configuring-demo.yaml` 的 YAML 文件中定义 OpsRequest，并修改参数。如下示例中，`acllog-max-len` 参数修改为 `256`。
-
-    ```yaml
-    apiVersion: apps.kubeblocks.io/v1alpha1
-    kind: OpsRequest
-    metadata:
-      name: mycluster-configuring-demo
-      namespace: demo
-    spec:
-      clusterName: mycluster
-      reconfigure:
-        componentName: redis
-        configurations:
-        - keys:
-          - key: redis.conf
-            parameters:
-            - key: acllog-max-len
-              value: "256"
-          name: redis-replication-config
-      preConditionDeadlineSeconds: 0
-      type: Reconfiguring
-    ```
-
-   | 字段                                                    | 定义     |
-   |--------------------------------------------------------|--------------------------------|
-   | `metadata.name`                                        | 定义了 Opsrequest 的名称。 |
-   | `metadata.namespace`                                   | 定义了集群所在的 namespace。 |
-   | `spec.clusterName`                                     | 定义了本次运维操作指向的集群名称。 |
-   | `spec.reconfigure`                                     | 定义了需配置的 component 及相关配置更新内容。 |
-   | `spec.reconfigure.componentName`                       | 定义了改集群的 component 名称。  |
-   | `spec.configurations`                                  | 包含一系列 ConfigurationItem 对象，定义了 component 的配置模板名称、更新策略、参数键值对。 |
-   | `spec.reconfigure.configurations.keys.key`             | 定义了 configuration map。 |
-   | `spec.reconfigure.configurations.keys.parameters`      | 定义了单个参数文件的键值对列表。 |
-   | `spec.reconfigure.configurations.keys.parameter.key`   | 代表您需要编辑的参数名称。|
-   | `spec.reconfigure.configurations.keys.parameter.value` | 代表了将要更新的参数值。如果设置为 nil，Key 字段定义的参数将会被移出配置文件。  |
-   | `spec.reconfigure.configurations.name`                 | 定义了配置模板名称。  |
-   | `preConditionDeadlineSeconds`                          | 定义了本次 OpsRequest 中止之前，满足其启动条件的最长等待时间（单位为秒）。如果设置为 0（默认），则必须立即满足启动条件，OpsRequest 才能继续。|
-
-2. 应用配置 OpsRequest。
-
-   ```bash
-   kubectl apply -f mycluster-configuring-demo.yaml
-   ```
-
-3. 连接集群，确认配置是否生效。
-
-   1. 获取用户名和密码。
-
-      ```bash
-      kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.username}' | base64 -d
-      >
-      default
-
-      kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.password}' | base64 -d
-      >
-      kpz77mcs
-      ```
-
-   2. 连接集群，验证参数是否按预期配置。
-
-      ```bash
-      kubectl exec -ti -n demo mycluster-redis-0 -- bash
-
-      root@mycluster-redis-0:/# redis-cli -a kpz77mcs  --user default
-      
-      127.0.0.1:6379> config get parameter acllog-max-len
-      1) "acllog-max-len"
-      2) "256"
-      ```
-
-:::note
-
-如果您无法找到集群的配置文件，您可以切换到 `kbcli` 页签，使用相关命令查看集群当前的配置文件。
-
-```bash
-kbcli cluster describe-config mycluster -n demo
-```
-
-:::
 
 </TabItem>
 

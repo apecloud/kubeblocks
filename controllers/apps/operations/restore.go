@@ -234,5 +234,4 @@ func (r RestoreOpsHandler) rebuildShardAccountSecrets(cluster *appsv1alpha1.Clus
 			account.SecretRef = nil
 		}
 	}
-	return
 }

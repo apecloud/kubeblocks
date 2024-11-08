@@ -19,7 +19,7 @@ PostgreSQL 是多进程架构，它会为每个用户连接创建一个单独的
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
+<TabItem value="kbcli" label="kbcli">
 
 1. 查看 PostgreSQL 集群的状态，确保为 `Running`。
 
@@ -97,7 +97,7 @@ PostgreSQL 是多进程架构，它会为每个用户连接创建一个单独的
 
 </TabItem>
 
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 1. 查看 PostgreSQL 集群的状态，确保为 `Running`。
 

@@ -29,7 +29,7 @@ KubeBlocks 支持对 MySQL 集群进行垂直扩缩容和水平扩缩容。
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
+<TabItem value="kbcli" label="kbcli">
 
 ```bash
 kbcli cluster list mycluster -n demo
@@ -40,7 +40,7 @@ mycluster   demo        mysql                mysql-8.0.33   Delete              
 
 </TabItem>
 
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 ```bash
 kubectl get cluster mycluster -n demo
@@ -57,50 +57,7 @@ mycluster   mysql                mysql-8.0.33   Delete               Running   1
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-1. 更改配置。
-
-    配置参数 `--components`、`--memory` 和 `--cpu`，并执行以下命令。
-
-    ```bash
-    kbcli cluster vscale mycluster -n demo \
-      --components="mysql" \
-      --memory="4Gi" --cpu="2" \
-    ```
-
-    - `--components` 表示可进行垂直扩容的组件名称。
-    - `--memory` 表示组件请求和限制的内存大小。
-    - `--cpu` 表示组件请求和限制的 CPU 大小。
-
-2. 通过以下任意一种方式验证垂直扩容是否完成。
-
-    - 查看 OpsRequest 进程。
-
-        执行磁盘扩容命令后，KubeBlocks 会自动输出查看 OpsRequest 进程的命令，可通过该命令查看 OpsRequest 进程的细节，包括 OpsRequest 的状态、Pod 状态等。当 OpsRequest 的状态为 `Succeed` 时，表明这一进程已完成。
-    - 查看集群状态。
-
-        ```bash
-        kbcli cluster list mycluster -n demo
-        >
-        NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS     CREATED-TIME
-        mycluster   demo        mysql                mysql-8.0.33   Delete               Updating   Jul 05,2024 19:11 UTC+0800
-        ```
-
-        - STATUS=Updating 表示正在进行垂直扩容。
-        - STATUS=Running 表示垂直扩容已完成。
-        - STATUS=Abnormal 表示垂直扩容异常。原因可能是正常实例的数量少于总实例数，或者 Leader 实例正常运行而其他实例异常。
-          > 你可以手动检查是否由于资源不足而导致报错。如果 Kubernetes 集群支持 AutoScaling，系统在资源充足的情况下会执行自动恢复。或者你也可以创建足够的资源，并使用 `kubectl describe` 命令进行故障排除。
-
-3. 检查资源规格是否已变更。
-
-    ```bash
-    kbcli cluster describe mycluster -n demo
-    ```
-
-</TabItem>
-
-<TabItem value="OpsRequest" label="OpsRequest">
+<TabItem value="OpsRequest" label="OpsRequest" default>
 
 1. 对指定的集群应用 OpsRequest，可根据您的需求配置参数。
 
@@ -189,6 +146,49 @@ mycluster   mysql                mysql-8.0.33   Delete               Running   1
 
 </TabItem>
 
+<TabItem value="kbcli" label="kbcli">
+
+1. 更改配置。
+
+    配置参数 `--components`、`--memory` 和 `--cpu`，并执行以下命令。
+
+    ```bash
+    kbcli cluster vscale mycluster -n demo \
+      --components="mysql" \
+      --memory="4Gi" --cpu="2" \
+    ```
+
+    - `--components` 表示可进行垂直扩容的组件名称。
+    - `--memory` 表示组件请求和限制的内存大小。
+    - `--cpu` 表示组件请求和限制的 CPU 大小。
+
+2. 通过以下任意一种方式验证垂直扩容是否完成。
+
+    - 查看 OpsRequest 进程。
+
+        执行磁盘扩容命令后，KubeBlocks 会自动输出查看 OpsRequest 进程的命令，可通过该命令查看 OpsRequest 进程的细节，包括 OpsRequest 的状态、Pod 状态等。当 OpsRequest 的状态为 `Succeed` 时，表明这一进程已完成。
+    - 查看集群状态。
+
+        ```bash
+        kbcli cluster list mycluster -n demo
+        >
+        NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS     CREATED-TIME
+        mycluster   demo        mysql                mysql-8.0.33   Delete               Updating   Jul 05,2024 19:11 UTC+0800
+        ```
+
+        - STATUS=Updating 表示正在进行垂直扩容。
+        - STATUS=Running 表示垂直扩容已完成。
+        - STATUS=Abnormal 表示垂直扩容异常。原因可能是正常实例的数量少于总实例数，或者 Leader 实例正常运行而其他实例异常。
+          > 你可以手动检查是否由于资源不足而导致报错。如果 Kubernetes 集群支持 AutoScaling，系统在资源充足的情况下会执行自动恢复。或者你也可以创建足够的资源，并使用 `kubectl describe` 命令进行故障排除。
+
+3. 检查资源规格是否已变更。
+
+    ```bash
+    kbcli cluster describe mycluster -n demo
+    ```
+
+</TabItem>
+
 </Tabs>
 
 ## 水平扩缩容
@@ -203,7 +203,7 @@ mycluster   mysql                mysql-8.0.33   Delete               Running   1
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
+<TabItem value="kbcli" label="kbcli">
 
 ```bash
 kbcli cluster list mycluster -n demo
@@ -214,7 +214,7 @@ mycluster   demo        mysql                mysql-8.0.33   Delete              
 
 </TabItem>
 
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 ```bash
 kubectl get cluster mycluster -n demo
@@ -231,48 +231,7 @@ mycluster   mysql                mysql-8.0.33   Delete               Running   1
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-1. 更改配置。
-
-    配置参数 `--components` 和 `--replicas`，并执行以下命令。
-
-    ```bash
-    kbcli cluster hscale mycluster -n demo \
-      --components="mysql" --replicas=3
-    ```
-
-    - `--components` 表示准备进行水平扩容的组件名称。
-    - `--replicas` 表示指定组件的副本数。可按需修改该参数值，对应执行扩缩容操作。
-
-2. 通过以下任意一种方式验证水平扩容是否成功。
-
-   - 查看 OpsRequest 进程。
-
-       执行磁盘扩容命令后，KubeBlocks 会自动输出查看 OpsRequest 进程的命令，可通过该命令查看 OpsRequest 进程的细节，包括 OpsRequest 的状态、Pod 状态等。当 OpsRequest 的状态为 `Succeed` 时，表明这一进程已完成。
-
-       ```bash
-       kbcli cluster describe-ops mycluster-horizontalscaling-g67k9 -n demo
-       ```
-
-   - 查看集群状态。
-
-       ```bash
-       kbcli cluster list mycluster -n demo
-       ```
-
-       - STATUS=Updating 表示正在进行水平扩容。
-       - STATUS=Running 表示水平扩容已完成。
-
-3. 当 OpsRequest 状态为 `Succeed` 或集群状态再次回到 `Running` 后，检查相关资源规格是否已变更。
-
-    ```bash
-    kbcli cluster describe mycluster -n demo
-    ```
-
-</TabItem>
-
-<TabItem value="OpsRequest" label="OpsRequest">
+<TabItem value="OpsRequest" label="OpsRequest" default>
 
 1. 对指定的集群应用 OpsRequest，可根据您的需求配置参数。
   
@@ -370,6 +329,47 @@ mycluster   mysql                mysql-8.0.33   Delete               Running   1
    ```bash
    kubectl describe cluster mycluster -n demo
    ```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+1. 更改配置。
+
+    配置参数 `--components` 和 `--replicas`，并执行以下命令。
+
+    ```bash
+    kbcli cluster hscale mycluster -n demo \
+      --components="mysql" --replicas=3
+    ```
+
+    - `--components` 表示准备进行水平扩容的组件名称。
+    - `--replicas` 表示指定组件的副本数。可按需修改该参数值，对应执行扩缩容操作。
+
+2. 通过以下任意一种方式验证水平扩容是否成功。
+
+   - 查看 OpsRequest 进程。
+
+       执行磁盘扩容命令后，KubeBlocks 会自动输出查看 OpsRequest 进程的命令，可通过该命令查看 OpsRequest 进程的细节，包括 OpsRequest 的状态、Pod 状态等。当 OpsRequest 的状态为 `Succeed` 时，表明这一进程已完成。
+
+       ```bash
+       kbcli cluster describe-ops mycluster-horizontalscaling-g67k9 -n demo
+       ```
+
+   - 查看集群状态。
+
+       ```bash
+       kbcli cluster list mycluster -n demo
+       ```
+
+       - STATUS=Updating 表示正在进行水平扩容。
+       - STATUS=Running 表示水平扩容已完成。
+
+3. 当 OpsRequest 状态为 `Succeed` 或集群状态再次回到 `Running` 后，检查相关资源规格是否已变更。
+
+    ```bash
+    kbcli cluster describe mycluster -n demo
+    ```
 
 </TabItem>
 

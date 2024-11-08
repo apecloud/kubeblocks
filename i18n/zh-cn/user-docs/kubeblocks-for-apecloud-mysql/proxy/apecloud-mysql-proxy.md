@@ -35,7 +35,7 @@ import TabItem from '@theme/TabItem';
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
+<TabItem value="kbcli" label="kbcli">
 
 1. 启用 etcd 引擎，创建 etcd 集群。
 
@@ -108,7 +108,7 @@ import TabItem from '@theme/TabItem';
 
 </TabItem>
 
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 1. 添加 KubeBlocks 仓库。
 
@@ -245,7 +245,7 @@ ApeCloud MySQL 代理通过 `vtgate` 组件进行路由，MySQL 服务器访问 
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
+<TabItem value="kbcli" label="kbcli">
 
 执行以下命令连接到代理集群。
 
@@ -263,7 +263,7 @@ kbcli cluster connect myproxy --components vtgate
 
 </TabItem>
 
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 1. 将 VTGate 的端口映射到本地主机，使本地主机可以访问代理。
 
@@ -285,7 +285,7 @@ kbcli cluster connect myproxy --components vtgate
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
+<TabItem value="kbcli" label="kbcli">
 
 执行以下命令，连接至 MySQL 服务器。
 
@@ -295,7 +295,7 @@ kbcli cluster connect myproxy
 
 </TabItem>
 
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 1. 将 MySQL 服务器的端口暴露到本地主机，使本地主机可以访问 MySQL 服务器。
 
@@ -335,102 +335,7 @@ while true; do date; kubectl port-forward svc/vt-mysql 3306:3306; sleep 0.5; don
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-VTGate、VTConsensus 和 VTTablet 都支持参数配置。你可以使用 `--components` 参数指定组件来配置 VTGate 和 VTConsensus，使用 `--components=mysql --config-specs=vttablet-config` 同时指定组件和配置文件模板来配置 VTTablet，因为 VTTablet 是 MySQL 组件的附属组件。
-
-### 查看参数详情
-
-* 查看当前配置文件的详细信息。
-
-   ```bash
-   # vtgate
-   kbcli cluster describe-config myproxy --components vtgate --show-detai
-   
-   # vtcontroller
-   kbcli cluster describe-config myproxy --components vtcontroller --show-detail
-   
-   # vttablet
-   kbcli cluster describe-config myproxy --component mysql --show-detail --config-specs vttablet-config
-   ```
-
-* 查看参数描述。
-
-   ```bash
-   # vtgate
-   kbcli cluster explain-config myproxy --components vtgate
-
-   # vttablet
-   kbcli cluster explain-config myproxy --components mysql --config-specs=vttablet-config
-   ```
-
-* 查看指定参数的定义。
-
-   ```bash
-   kbcli cluster explain-config myproxy --components vtgate --param=healthcheck_timeout
-   ```
-
-### 配置参数
-
-1. 查看 MySQL 服务器中的当前值。
-
-   ```bash
-   kbcli cluster connect myproxy --components=vtgate
-   ```
-
-   ```bash
-   mysql> show variables like '%healthcheck_timeout%';
-   ```
-
-   ```bash
-   mysql> show variables like '%health_check_interval%';
-   ```
-
-2. 配置 VTGate 的 `healthcheck_timeout` 和 VTTablet 的 `health_check_interval`。
-
-   你可以通过使用 `--set` 或编辑参数配置文件进行配置。
-
-   * 使用 `--set`。
-
-      ```bash
-      # vtgate
-      kbcli cluster configure myproxy --components vtgate --set=healthcheck_timeout=2s
-
-      # vttablet
-      kbcli cluster configure myproxy --set=health_check_interval=4s --components=mysql --config-spec=vttablet-config
-      ```
-
-   * 编辑参数配置文件。
-
-      ```bash
-      kbcli cluster edit-config myproxy --components vtgate
-      ```
-
-    :::note
-
-    执行 `vtgate` 参数配置命令后，会启动一个新的 vtgate Pod，并终止旧的 vtgate Pod。你可以执行以下命令监视旧 Pod 是否被终止。
-
-    ```bash
-    kubectl get pod <vtgate-pod-name> -w
-    ```
-
-    :::
-
-3. 执行以下命令查看配置状态。比如，
-
-   ```bash
-   kbcli cluster describe-ops myproxy -reconfiguring-lth8d -n default
-   ```
-
-   :::note
-
-   关于参数配置的更多信息，请参考[配置](./../configuration/configuration.md)。
-
-   :::
-
-</TabItem>
-
-<TabItem value="编辑配置文件" label="编辑配置文件">
+<TabItem value="编辑配置文件" label="编辑配置文件" default>
 
 1. 查看当前配置文件的详细信息。
 
@@ -538,6 +443,101 @@ VTGate、VTConsensus 和 VTTablet 都支持参数配置。你可以使用 `--com
 
 </TabItem>
 
+<TabItem value="kbcli" label="kbcli">
+
+VTGate、VTConsensus 和 VTTablet 都支持参数配置。你可以使用 `--components` 参数指定组件来配置 VTGate 和 VTConsensus，使用 `--components=mysql --config-specs=vttablet-config` 同时指定组件和配置文件模板来配置 VTTablet，因为 VTTablet 是 MySQL 组件的附属组件。
+
+### 查看参数详情
+
+* 查看当前配置文件的详细信息。
+
+   ```bash
+   # vtgate
+   kbcli cluster describe-config myproxy --components vtgate --show-detai
+   
+   # vtcontroller
+   kbcli cluster describe-config myproxy --components vtcontroller --show-detail
+   
+   # vttablet
+   kbcli cluster describe-config myproxy --component mysql --show-detail --config-specs vttablet-config
+   ```
+
+* 查看参数描述。
+
+   ```bash
+   # vtgate
+   kbcli cluster explain-config myproxy --components vtgate
+
+   # vttablet
+   kbcli cluster explain-config myproxy --components mysql --config-specs=vttablet-config
+   ```
+
+* 查看指定参数的定义。
+
+   ```bash
+   kbcli cluster explain-config myproxy --components vtgate --param=healthcheck_timeout
+   ```
+
+### 配置参数
+
+1. 查看 MySQL 服务器中的当前值。
+
+   ```bash
+   kbcli cluster connect myproxy --components=vtgate
+   ```
+
+   ```bash
+   mysql> show variables like '%healthcheck_timeout%';
+   ```
+
+   ```bash
+   mysql> show variables like '%health_check_interval%';
+   ```
+
+2. 配置 VTGate 的 `healthcheck_timeout` 和 VTTablet 的 `health_check_interval`。
+
+   你可以通过使用 `--set` 或编辑参数配置文件进行配置。
+
+   * 使用 `--set`。
+
+      ```bash
+      # vtgate
+      kbcli cluster configure myproxy --components vtgate --set=healthcheck_timeout=2s
+
+      # vttablet
+      kbcli cluster configure myproxy --set=health_check_interval=4s --components=mysql --config-spec=vttablet-config
+      ```
+
+   * 编辑参数配置文件。
+
+      ```bash
+      kbcli cluster edit-config myproxy --components vtgate
+      ```
+
+    :::note
+
+    执行 `vtgate` 参数配置命令后，会启动一个新的 vtgate Pod，并终止旧的 vtgate Pod。你可以执行以下命令监视旧 Pod 是否被终止。
+
+    ```bash
+    kubectl get pod <vtgate-pod-name> -w
+    ```
+
+    :::
+
+3. 执行以下命令查看配置状态。比如，
+
+   ```bash
+   kbcli cluster describe-ops myproxy -reconfiguring-lth8d -n default
+   ```
+
+   :::note
+
+   关于参数配置的更多信息，请参考[配置](./../configuration/configuration.md)。
+
+   :::
+
+</TabItem>
+
 </Tabs>
 
 ## 日志
@@ -546,7 +546,7 @@ VTGate、VTConsensus 和 VTTablet 都支持参数配置。你可以使用 `--com
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
+<TabItem value="kbcli" label="kbcli">
 
 查看不同组件的日志。
 
@@ -571,7 +571,7 @@ kbcli cluster logs myproxy --instance myproxy-mysql-0 -c vttablet
 
 </TabItem>
 
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 查看 VTGate 日志。
 
@@ -613,7 +613,7 @@ ls /vtdataroot
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
+<TabItem value="kbcli" label="kbcli">
 
 1. 启用监控功能。
 
@@ -643,7 +643,7 @@ ls /vtdataroot
 
 </TabItem>
 
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 1. 启用监控引擎。
 
@@ -710,7 +710,7 @@ ls /vtdataroot
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
+<TabItem value="kbcli" label="kbcli">
 
 ```bash
 kbcli cluster configure myproxy --components vtgate --set=read_write_splitting_policy=random
@@ -730,7 +730,7 @@ show workload;
 
 </TabItem>
 
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 1. 获取当前集群的配置文件。
 
@@ -790,7 +790,7 @@ spec:
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
+<TabItem value="kbcli" label="kbcli">
 
 ```bash
 kbcli cluster configure myproxy --components vtgate --set=enable_buffer=true
@@ -798,7 +798,7 @@ kbcli cluster configure myproxy --components vtgate --set=enable_buffer=true
 
 </TabItem>
 
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 1. 获取集群的配置文件。
 

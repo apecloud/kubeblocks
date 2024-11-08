@@ -30,7 +30,7 @@ import TabItem from '@theme/TabItem';
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
+<TabItem value="kbcli" label="kbcli">
 
 ```bash
 kbcli cluster list mycluster -n demo
@@ -41,7 +41,7 @@ mycluster   demo        postgresql           postgresql-14.8.0   Delete         
 
 </TabItem>
 
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 ```bash
 kubectl -n demo get cluster mycluster
@@ -60,7 +60,7 @@ mycluster   postgresql           postgresql-14.8.0   Delete               Runnin
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
+<TabItem value="kbcli" label="kbcli">
 
 ```bash
 kbcli cluster delete mycluster -n demo
@@ -68,7 +68,7 @@ kbcli cluster delete mycluster -n demo
 
 </TabItem>
 
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 ```bash
 kubectl delete cluster mycluster -n demo

@@ -23,7 +23,7 @@ import TabItem from '@theme/TabItem';
   
   <Tabs>
 
-  <TabItem value="kbcli" label="kbcli" default>
+  <TabItem value="kbcli" label="kbcli">
 
   ```bash
   kbcli addon list
@@ -36,7 +36,7 @@ import TabItem from '@theme/TabItem';
 
   </TabItem>
 
-  <TabItem value="kubectl" label="kubectl">
+  <TabItem value="kubectl" label="kubectl" default>
 
   ```bash
   kubectl get addons.extensions.kubeblocks.io postgresql
@@ -53,7 +53,7 @@ import TabItem from '@theme/TabItem';
 
   <Tabs>
 
-  <TabItem value="kbcli" label="kbcli" default>
+  <TabItem value="kbcli" label="kbcli">
 
   ```bash
   kbcli clusterdefinition list
@@ -62,7 +62,7 @@ import TabItem from '@theme/TabItem';
 
   </TabItem>
 
-  <TabItem value="kubectl" label="kubectl">
+  <TabItem value="kubectl" label="kubectl" default>
 
   确认 `postgresql` cluster definition 是否已安装。
   
@@ -104,7 +104,7 @@ KubeBlocks 支持创建两种 PostgreSQL 集群：单机版（Standalone）和�
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
+<TabItem value="kbcli" label="kbcli">
 
 1. 创建 PostgreSQL 集群。
 
@@ -145,7 +145,7 @@ KubeBlocks 支持创建两种 PostgreSQL 集群：单机版（Standalone）和�
 
 </TabItem>
 
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 1. 创建 PostgreSQL 集群。
 
@@ -241,15 +241,7 @@ KubeBlocks 支持创建两种 PostgreSQL 集群：单机版（Standalone）和�
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-```bash
-kbcli cluster connect mycluster  --namespace demo
-```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 使用 `kubectl exec` 命令进入 Pod 并连接到数据库。
 
@@ -300,6 +292,14 @@ KubeBlocks operator 会创建一个名为 `mycluster-conn-credential` 的新的 
    root@mycluster-postgresql-0:/home/postgres# psql -U postgres -W
    Password: h62rg2kl
    ```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+```bash
+kbcli cluster connect mycluster  --namespace demo
+```
 
 </TabItem>
 

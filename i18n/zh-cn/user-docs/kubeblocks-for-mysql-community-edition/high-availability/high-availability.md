@@ -42,7 +42,7 @@ import TabItem from '@theme/TabItem';
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
+<TabItem value="kbcli" label="kbcli">
 
 1. 查看集群信息。可在 `Topology` 中查看主节点的名称，在如下例子中，主节点为 `mycluster-mysql-0`。
 
@@ -74,7 +74,7 @@ import TabItem from '@theme/TabItem';
 
 </TabItem>
 
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 1. 查看 MySQL 主备版 pod 角色。在本示例中，主节点为 `mycluster-mysql-0`。
 
@@ -114,7 +114,7 @@ import TabItem from '@theme/TabItem';
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
+<TabItem value="kbcli" label="kbcli">
 
 1. 查看集群信息。可在 `Topology` 中查看备节点的名称，在如下例子中，备节点为 `mycluster-mysql-0`。
 
@@ -140,7 +140,7 @@ import TabItem from '@theme/TabItem';
 
 </TabItem>
 
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 1. 查看 pod 角色，如下示例中备节点为 `mycluster-mysql-0`。
 
@@ -167,6 +167,7 @@ import TabItem from '@theme/TabItem';
     再次查看 pod 角色。
 
     ![describe_cluster_secondary](./../../../img/api-mysql-ha-secondary-pod-grep-role-after.png)
+
 </TabItem>
 
 </Tabs>
@@ -181,7 +182,7 @@ import TabItem from '@theme/TabItem';
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
+<TabItem value="kbcli" label="kbcli">
 
 1. 查看集群信息，在 `Topology` 中查看节点名称。
 
@@ -207,7 +208,7 @@ import TabItem from '@theme/TabItem';
 
 </TabItem>
 
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 1. 查看 pod 角色。
 

@@ -30,7 +30,7 @@ import TabItem from '@theme/TabItem';
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
+<TabItem value="kbcli" label="kbcli">
 
 ```bash
 kbcli cluster list -n demo
@@ -41,7 +41,7 @@ mycluster   demo        apecloud-mysql       ac-mysql-8.0.30   Delete           
 
 </TabItem>
 
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 ```bash
 kubectl get cluster mycluster -n demo
@@ -60,7 +60,7 @@ mycluster   apecloud-mysql       ac-mysql-8.0.30   Delete               Running 
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
+<TabItem value="kbcli" label="kbcli">
 
 ```bash
 kbcli cluster delete mycluster -n demo
@@ -68,7 +68,7 @@ kbcli cluster delete mycluster -n demo
 
 </TabItem>
 
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 如果想删除集群和所有相关资源，可以将终止策略修改为 `WipeOut`，然后再删除该集群。
 

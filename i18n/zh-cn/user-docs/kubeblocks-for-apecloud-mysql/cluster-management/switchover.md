@@ -19,7 +19,7 @@ import TabItem from '@theme/TabItem';
 
    <Tabs>
 
-   <TabItem value="kbcli" label="kbcli" default>
+   <TabItem value="kbcli" label="kbcli">
 
    ```bash
    kbcli cluster list mycluster -n demo
@@ -30,7 +30,7 @@ import TabItem from '@theme/TabItem';
 
    </TabItem>
 
-   <TabItem value="kubectl" label="kubectl">
+   <TabItem value="kubectl" label="kubectl" default>
 
    ```bash
    kubectl get cluster mycluster -n demo
@@ -61,7 +61,7 @@ import TabItem from '@theme/TabItem';
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
+<TabItem value="kbcli" label="kbcli">
 
 * 不指定 Leader 实例进行切换。
 
@@ -83,7 +83,7 @@ import TabItem from '@theme/TabItem';
 
 </TabItem>
 
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 * 不指定 Leader 实例进行切换。
 
@@ -131,7 +131,7 @@ import TabItem from '@theme/TabItem';
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
+<TabItem value="kbcli" label="kbcli">
 
 ```bash
 kbcli cluster list-instances -n demo
@@ -139,7 +139,7 @@ kbcli cluster list-instances -n demo
 
 </TabItem>
 
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 ```bash
 kubectl get pods -n demo

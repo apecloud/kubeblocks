@@ -46,7 +46,7 @@ KubeBlocks 集成[开源的 Patroni 方案](https://patroni.readthedocs.io/en/la
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
+<TabItem value="kbcli" label="kbcli">
 
 1. 查看 PostgreSQL 集群的初始状态。
 
@@ -123,7 +123,7 @@ KubeBlocks 集成[开源的 Patroni 方案](https://patroni.readthedocs.io/en/la
 
 </TabItem>
 
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 1. 查看 PostgreSQL 集群的初始状态。
 

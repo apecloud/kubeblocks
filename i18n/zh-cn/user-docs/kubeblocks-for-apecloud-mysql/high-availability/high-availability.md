@@ -42,7 +42,7 @@ import TabItem from '@theme/TabItem';
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
+<TabItem value="kbcli" label="kbcli">
 
 1. 查看 ApeCloud MySQL 集群版。
 
@@ -86,7 +86,7 @@ import TabItem from '@theme/TabItem';
 
 </TabItem>
 
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 1. 查看 ApeCloud MySQL 集群版 pod 角色。在本示例中，Leader 节点为 `mycluster-1`。
 
@@ -144,7 +144,7 @@ import TabItem from '@theme/TabItem';
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
+<TabItem value="kbcli" label="kbcli">
 
 1. 查看 ApeCloud MySQL 集群版。
 
@@ -182,7 +182,7 @@ import TabItem from '@theme/TabItem';
 
 </TabItem>
 
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 1. 查看 pod 角色，如下示例中 follower 节点为 `mycluster-mysql-1` and `mycluster-mysql-2`。
 
@@ -236,7 +236,7 @@ import TabItem from '@theme/TabItem';
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
+<TabItem value="kbcli" label="kbcli">
 
 1. 查看 ApeCloud MySQL 集群版。
 
@@ -271,7 +271,7 @@ import TabItem from '@theme/TabItem';
 
 </TabItem>
 
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 1. 查看 Pod 状态。如下示例中，follower 节点为 `mycluster-mysql-1` 和 `mycluster-mysql-2`。
 
@@ -327,7 +327,7 @@ import TabItem from '@theme/TabItem';
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
+<TabItem value="kbcli" label="kbcli">
 
 1. 查看 ApeCloud MySQL 集群版。
 
@@ -362,7 +362,7 @@ import TabItem from '@theme/TabItem';
 
 </TabItem>
 
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 1. 查看节点角色。
 

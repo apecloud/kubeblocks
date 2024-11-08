@@ -324,5 +324,16 @@ Define default storage class name, if cloud provider is known, specify a default
 {{- "apecloud-registry.cn-zhangjiakou.cr.aliyuncs.com" }}
 {{- else }}
 {{- .Values.image.registry }}
-{{- end}}
-{{- end}}
+{{- end }}
+{{- end }}
+
+{{/*
+Define the replica count for kubeblocks.
+*/}}
+{{- define "kubeblocks.replicaCount" }}
+{{- if and .Values.webhooks.conversionEnabled .Release.IsInstall }}
+{{- print 0 }}
+{{- else }}
+{{- .Values.replicaCount }}
+{{- end }}
+{{- end }}

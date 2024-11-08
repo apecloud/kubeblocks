@@ -218,5 +218,21 @@ func (r RestoreOpsHandler) getClusterObjFromBackup(backup *dpv1alpha1.Backup, op
 	for i := range cluster.Spec.ComponentSpecs {
 		cluster.Spec.ComponentSpecs[i].OfflineInstances = nil
 	}
+	r.rebuildShardAccountSecrets(cluster)
 	return cluster, nil
+}
+
+func (r RestoreOpsHandler) rebuildShardAccountSecrets(cluster *appsv1alpha1.Cluster) {
+	if len(cluster.Spec.ShardingSpecs) == 0 {
+		return
+	}
+	for i := range cluster.Spec.ShardingSpecs {
+		shardingSpec := &cluster.Spec.ShardingSpecs[i]
+		template := &shardingSpec.Template
+		for j := range template.SystemAccounts {
+			account := &template.SystemAccounts[j]
+			account.SecretRef = nil
+		}
+	}
+	return
 }

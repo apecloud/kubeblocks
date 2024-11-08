@@ -31,6 +31,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
@@ -92,7 +93,7 @@ func (t *clusterSharedAccountTransformer) needCreateSharedAccount(transCtx *clus
 
 	// if seed is not set, we consider it does not need to share the same account secret
 	// TODO: wo may support another way to judge if the need to create shared account secret in the future
-	if account.PasswordConfig != nil && len(account.PasswordConfig.Seed) == 0 {
+	if account.PasswordConfig == nil || len(account.PasswordConfig.Seed) == 0 {
 		return false, nil
 	}
 
@@ -145,7 +146,10 @@ func (t *clusterSharedAccountTransformer) checkShardingSharedAccountSecretExist(
 
 func (t *clusterSharedAccountTransformer) buildAccountSecret(cluster *appsv1alpha1.Cluster,
 	account appsv1alpha1.ComponentSystemAccount, shardingName, secretName string) (*corev1.Secret, error) {
-	password := t.generatePassword(account)
+	password := []byte(factory.GetRestoreSystemAccountPassword(cluster.Annotations, shardingName, account.Name))
+	if len(password) == 0 {
+		password = t.generatePassword(account)
+	}
 	return t.buildAccountSecretWithPassword(cluster, account, shardingName, secretName, password)
 }
 

@@ -199,7 +199,7 @@ mycluster   apecloud-mysql       ac-mysql-8.0.30   Delete               Running 
 
 水平扩缩容会改变 Pod 的数量。例如，您可以应用水平扩容将 Pod 的数量从三个增加到五个。扩容过程包括数据的备份和恢复。
 
-从 v0.9.0 开始，KubeBlocks 支持指定实例水平扩缩容，可参考 [水平扩缩容](./../../../api-docs/maintenance/scale/horizontal-scale.md)，查看详细介绍及示例。
+从 v0.9.0 开始，KubeBlocks 支持指定实例水平扩缩容，可参考 [水平扩缩容](./../../maintenance/scale/horizontal-scale.md)，查看详细介绍及示例。
 
 ### 开始之前
 

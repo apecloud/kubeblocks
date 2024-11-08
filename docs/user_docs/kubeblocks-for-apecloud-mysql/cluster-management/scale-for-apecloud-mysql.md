@@ -196,7 +196,7 @@ mycluster   apecloud-mysql       ac-mysql-8.0.30   Delete               Running 
 
 Horizontal scaling changes the amount of pods. For example, you can scale out replicas from three to five. The scaling process includes the backup and restore of data.
 
-From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out instances, refer to [Horizontal Scale](./../../../api_docs/maintenance/scale/horizontal-scale.md) in API docs for more details and examples.
+From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out instances, refer to [Horizontal Scale](./../../maintenance/scale/horizontal-scale.md) in API docs for more details and examples.
 
 ### Before you start
 

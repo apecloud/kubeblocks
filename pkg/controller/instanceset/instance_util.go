@@ -22,6 +22,12 @@ package instanceset
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
+	"slices"
+	"sort"
+	"strconv"
+	"strings"
+
 	"github.com/klauspost/compress/zstd"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -30,14 +36,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/util/podutils"
-	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/kustomize/api/image"
-	"slices"
-	"sort"
-	"strconv"
-	"strings"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"

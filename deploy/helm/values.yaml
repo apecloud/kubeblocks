@@ -317,16 +317,13 @@ dataPlane:
 # Add extra pod labels to KubeBlocks Deployment
 extraLabels: {}
 
-## AdmissionWebhooks settings
+## webhooks settings
 ##
-## @param admissionWebhooks.enabled
-## @param admissionWebhooks.createSelfSignedCert
-## @param admissionWebhooks.ignoreReplicasCheck
-admissionWebhooks:
-  enabled: false
-  conversionEnabled: true
+## @param webhooks.conversionEnabled
+## @param webhooks.createSelfSignedCert
+webhooks:
+  conversionEnabled: false
   createSelfSignedCert: true
-  ignoreReplicasCheck: false
 
 ## Data protection settings
 ##
@@ -1928,8 +1925,5 @@ vmagent:
           - source_labels: [ __meta_kubernetes_pod_phase ]
             regex: Pending|Succeeded|Failed|Completed
             action: drop
-
-crd:
-  enabled: true
 
 userAgent: kubeblocks

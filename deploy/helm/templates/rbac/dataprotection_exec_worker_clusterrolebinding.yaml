@@ -1,7 +1,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: {{ include "kubeblocks.fullname" . }}-dataprotection-exec-worker-rolebinding
+  name: {{ include "kubeblocks.fullname" . }}-dataprotection-exec-worker
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
 roleRef:

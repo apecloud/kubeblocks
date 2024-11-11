@@ -1,4 +1,4 @@
-{{- if and .Release.IsUpgrade .Values.crd.enabled }}
+{{- if .Release.IsUpgrade }}
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -9,6 +9,7 @@ metadata:
     "helm.sh/hook": pre-upgrade
     "helm.sh/hook-delete-policy": "before-hook-creation,hook-succeeded"
 spec:
+  backoffLimit: 2
   ttlSecondsAfterFinished: 3600
   template:
     metadata:
@@ -23,16 +24,23 @@ spec:
       serviceAccountName: {{ include "kubeblocks.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
-      restartPolicy: OnFailure
+      restartPolicy: Never
       containers:
         - name: pre-upgrade-job
           image: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.tools.repository }}:{{ .Values.image.tag | default .Chart.Version }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command:
-            - /bin/helm_hook
-          args:
-            - --version={{ .Chart.Version }}
-            - --namespace={{ .Release.Namespace }}
+            - sh
+            - -c
+            - |
+              set -e
+              kb_json=$(kubectl get deployments.apps -n {{ .Release.Namespace }} {{ .Release.Name }} -ojson )
+              version=$(echo $kb_json | jq '.metadata.labels["app.kubernetes.io/version"]' | tr -d '"')
+              echo "Current KubeBlocks Version: $version"
+              if echo "$version" | grep -q '^0\.'; then
+                 echo "ERROR: can not upgrade KubeBlocks from $version to {{ .Chart.AppVersion }}"
+                 exit 1
+              fi
       {{- with .Values.topologySpreadConstraints }}
       topologySpreadConstraints:
         {{- toYaml . | nindent 8 }}

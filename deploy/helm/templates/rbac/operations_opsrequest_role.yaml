@@ -1,15 +1,15 @@
-# permissions for end users to edit replicatedstatemachines.
+# permissions for end users to edit opsrequests.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
+  name: {{ include "kubeblocks.fullname" . }}-opsrequest-role
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
-  name: {{ include "kubeblocks.fullname" . }}-replicatedstatemachine-editor-role
 rules:
 - apiGroups:
-  - workloads.kubeblocks.io
+  - operations.kubeblocks.io
   resources:
-  - replicatedstatemachines
+  - opsrequests
   verbs:
   - create
   - delete
@@ -19,8 +19,8 @@ rules:
   - update
   - watch
 - apiGroups:
-  - workloads.kubeblocks.io
+  - operations.kubeblocks.io
   resources:
-  - replicatedstatemachines/status
+  - opsrequests/status
   verbs:
   - get

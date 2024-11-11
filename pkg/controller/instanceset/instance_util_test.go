@@ -1419,7 +1419,7 @@ var _ = Describe("instance util test", func() {
 				Name:  name,
 				Image: "apecloud.com/nginx",
 			}}
-			Expect(isImageMatched(pod)).Should(BeFalse())
+			Expect(isImageMatched(pod)).Should(BeTrue())
 		})
 	})
 

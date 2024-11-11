@@ -9,7 +9,7 @@ metadata:
     app.kubernetes.io/component: "dataprotection"
 spec:
   {{- if not .Values.autoscaling.enabled }}
-  replicas: {{ .Values.replicaCount }}
+  replicas: {{ include "kubeblocks.replicaCount" . }}
   {{- end }}
   selector:
     matchLabels:
@@ -111,7 +111,7 @@ spec:
             - name: VOLUMESNAPSHOT_API_BETA
               value: "true"
             {{- end }}
-            {{- if .Values.admissionWebhooks.enabled }}
+            {{- if .Values.webhooks.enabled }}
             - name: ENABLE_WEBHOOKS
               value: "true"
             {{- end }}
@@ -176,7 +176,7 @@ spec:
           volumeMounts:
             - mountPath: /etc/kubeblocks
               name: manager-config
-            {{- if .Values.admissionWebhooks.enabled }}
+            {{- if .Values.webhooks.conversionEnabled }}
             - mountPath: /tmp/k8s-webhook-server/serving-certs
               name: cert
               readOnly: true
@@ -213,7 +213,7 @@ spec:
         - name: manager-config
           configMap:
             name: {{ include "kubeblocks.fullname" . }}-manager-config
-        {{- if .Values.admissionWebhooks.enabled }}
+        {{- if .Values.webhooks.conversionEnabled }}
         - name: cert
           secret:
             defaultMode: 420

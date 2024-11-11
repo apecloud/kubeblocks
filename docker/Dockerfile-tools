@@ -51,13 +51,6 @@ RUN --mount=type=bind,target=. \
     --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg/mod \
     go env && \
-    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o /out/helm_hook cmd/helmhook/main.go
-
-# Build
-RUN --mount=type=bind,target=. \
-    --mount=type=cache,target=/root/.cache/go-build \
-    --mount=type=cache,target=/go/pkg/mod \
-    go env && \
     CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="${LD_FLAGS}" -a -o /out/killer cmd/reloader/container_killer/killer.go
 
 RUN --mount=type=bind,target=. \
@@ -91,7 +84,6 @@ COPY --from=builder /out/killer /bin
 COPY --from=builder /out/reloader /bin
 COPY --from=builder /out/config_render /bin
 COPY --from=builder /out/kbagent /bin
-COPY --from=builder /out/helm_hook /bin
 
 # mkdir kbcli config dir and helm cache dir.
 RUN mkdir /.cache && chown -R 65532:65532 /.cache

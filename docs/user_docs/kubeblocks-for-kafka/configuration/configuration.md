@@ -148,7 +148,7 @@ You can also view the details of this configuration file and parameters.
 
 4. View the configuration file to verify whether the parameter is configured as expected.
 
-   The whole searching process has a 30-second delay.
+   It takes about 30 seconds for the configuration to take effect because the kubelet requires some time to sync changes in the ConfigMap to the Pod's volume.
 
    ```bash
    kbcli cluster describe-config mycluster -n demo --show-detail | grep log.cleanup.policy

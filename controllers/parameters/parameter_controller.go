@@ -122,7 +122,7 @@ func (r *ParameterReconciler) generateParameterTaskContext(reqCtx intctrlutil.Re
 	var rctxs []*ReconcileContext
 	var params []appsv1.ComponentParameters
 	for _, component := range parameter.Spec.ComponentParameters {
-		params = append(params, component.ComponentParameters)
+		params = append(params, component.Parameters)
 		rctxs = append(rctxs, newParameterReconcileContext(reqCtx,
 			&configctrl.ResourceCtx{
 				Context:       reqCtx.Ctx,

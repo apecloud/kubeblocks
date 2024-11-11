@@ -189,4 +189,7 @@ func cleanEnv() {
 	testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.SecretSignature, true, inNS)
 	testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.InstanceSetSignature, true, inNS, ml)
 	testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ConfigurationSignature, false, inNS, ml)
+	testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ParametersDefinitionSignature, false, inNS, ml)
+	testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ComponentParameterSignature, false, inNS, ml)
+	testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ParameterDrivenConfigRenderSignature, false, inNS, ml)
 }

@@ -39,6 +39,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 )
 
 // clusterDeletionTransformer handles cluster deletion
@@ -88,9 +89,12 @@ func (t *clusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 	toDeleteObjs := func(objs owningObjects) []client.Object {
 		var delObjs []client.Object
 		for _, obj := range objs {
-			// retain backup for data protection even if the cluster is wiped out.
-			if strings.EqualFold(obj.GetLabels()[constant.BackupProtectionLabelKey], constant.BackupRetain) {
-				continue
+			if obj.GetObjectKind().GroupVersionKind().Kind == dptypes.BackupKind {
+				backupObj := obj.(*dpv1alpha1.Backup)
+				// retain backup for data protection even if the cluster is wiped out.
+				if backupObj.Spec.DeletionPolicy == dpv1alpha1.BackupDeletionPolicyRetain {
+					continue
+				}
 			}
 			delObjs = append(delObjs, obj)
 		}
@@ -102,6 +106,11 @@ func (t *clusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 	if err != nil {
 		// PDB or CRDs that not present in data-plane clusters
 		if !strings.Contains(err.Error(), "the server could not find the requested resource") {
+			return err
+		}
+	}
+	if cluster.Spec.TerminationPolicy != appsv1alpha1.WipeOut {
+		if err = getFailedBackups(transCtx.Context, transCtx.Client, cluster.Namespace, ml, namespacedObjs); err != nil {
 			return err
 		}
 	}

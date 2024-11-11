@@ -139,9 +139,23 @@ func renderActionCmdJob(ctx context.Context, cli client.Reader, actionCtx *Actio
 	if podList == nil || len(podList.Items) == 0 {
 		return nil, errors.New("component pods not found")
 	}
-	pods := podList.Items
-	tplPod := podList.Items[0]
 
+	var tplPod *corev1.Pod
+	if action.TargetPodSelector == appsv1alpha1.RoleSelector && len(action.MatchingKey) > 0 {
+		for _, pod := range podList.Items {
+			if pod.Labels[constant.RoleLabelKey] == action.MatchingKey {
+				tplPod = &pod
+				break
+			}
+		}
+	} else {
+		tplPod = &podList.Items[0]
+	}
+	if tplPod == nil {
+		return nil, fmt.Errorf("target pod selector not found for component %s", actionCtx.component.Name)
+	}
+
+	pods := podList.Items
 	renderJobPodVolumes := func() ([]corev1.Volume, []corev1.VolumeMount) {
 		volumes := make([]corev1.Volume, 0)
 		volumeMounts := make([]corev1.VolumeMount, 0)
@@ -227,10 +241,19 @@ func renderActionCmdJob(ctx context.Context, cli client.Reader, actionCtx *Actio
 		if customAction.RetryPolicy != nil && customAction.RetryPolicy.MaxRetries > 0 {
 			jobObj.Spec.BackoffLimit = pointer.Int32(int32(customAction.RetryPolicy.MaxRetries))
 		}
+
+		// HACK: Use targetPodSelector to determine the host nodes on which the job needs to run
+		// this is hack for some special cases which need to run on the same node as the target pod
+		if action.TargetPodSelector == appsv1alpha1.RoleSelector && len(action.MatchingKey) > 0 {
+			jobObj.Spec.Template.Spec.NodeSelector = map[string]string{
+				corev1.LabelHostname: tplPod.Spec.NodeName,
+			}
+		}
+
 		return jobObj, nil
 	}
 
-	envs, envFroms, err := buildLifecycleActionEnvs(ctx, cli, actionCtx, action, pods, &tplPod)
+	envs, envFroms, err := buildLifecycleActionEnvs(ctx, cli, actionCtx, action, pods, tplPod)
 	if err != nil {
 		return nil, err
 	}

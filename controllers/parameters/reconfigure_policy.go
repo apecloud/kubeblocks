@@ -89,15 +89,6 @@ type reconfigureContext struct {
 	// List of InstanceSet using this config template.
 	InstanceSetUnits []workloads.InstanceSet
 
-	// Only supports restart pod or container.
-	Restart bool
-
-	// Name is a config template name.
-	ConfigSpecName string
-
-	// Configuration files patch.
-	ConfigPatch *core.ConfigPatchInfo
-
 	// Configmap object of the configuration template instance in the component.
 	ConfigMap *corev1.ConfigMap
 
@@ -139,7 +130,7 @@ func GetClientFactory() createReconfigureClient {
 }
 
 func (param *reconfigureContext) getConfigKey() string {
-	return param.ConfigSpecName
+	return param.ConfigTemplate.Name
 }
 
 func (param *reconfigureContext) getTargetVersionHash() string {

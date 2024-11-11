@@ -43,11 +43,6 @@ func (o *syncPolicy) GetPolicyName() string {
 }
 
 func (o *syncPolicy) Upgrade(params reconfigureContext) (ReturnedStatus, error) {
-	configPatch := params.ConfigPatch
-	if !configPatch.IsModify {
-		return makeReturnedStatus(ESNone), nil
-	}
-
 	updatedParameters := params.UpdatedParameters
 	if len(updatedParameters) == 0 {
 		return makeReturnedStatus(ESNone), nil
@@ -115,7 +110,7 @@ func sync(params reconfigureContext, updatedParameters map[string]string, pods [
 		if !intctrlutil.PodIsReady(&pod) {
 			continue
 		}
-		err = funcs.OnlineUpdatePodFunc(&pod, ctx, params.ReconfigureClientFactory, params.ConfigSpecName, fileName, updatedParameters)
+		err = funcs.OnlineUpdatePodFunc(&pod, ctx, params.ReconfigureClientFactory, params.ConfigTemplate.Name, fileName, updatedParameters)
 		if err != nil {
 			return makeReturnedStatus(ESFailedAndRetry), err
 		}

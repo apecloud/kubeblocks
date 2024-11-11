@@ -118,18 +118,6 @@ func (r *ParameterReconciler) reconcile(reqCtx intctrlutil.RequestCtx, parameter
 	return updateParameterStatus(reqCtx, r.Client, parameter, patch)
 }
 
-func updateParameterStatus(reqCtx intctrlutil.RequestCtx, cli client.Client, parameter *parametersv1alpha1.Parameter, patch *parametersv1alpha1.Parameter) (ctrl.Result, error) {
-	finished := syncParameterStatus(&parameter.Status)
-	parameter.Status.ObservedGeneration = parameter.Generation
-	if err := cli.Patch(reqCtx.Ctx, parameter, client.MergeFrom(patch)); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
-	}
-	if finished {
-		return intctrlutil.Reconciled()
-	}
-	return intctrlutil.RequeueAfter(ConfigReconcileInterval, reqCtx.Log, "")
-}
-
 func (r *ParameterReconciler) generateParameterTaskContext(reqCtx intctrlutil.RequestCtx, parameter *parametersv1alpha1.Parameter) ([]*ReconcileContext, []appsv1.ComponentParameters) {
 	var rctxs []*ReconcileContext
 	var params []appsv1.ComponentParameters
@@ -145,4 +133,35 @@ func (r *ParameterReconciler) generateParameterTaskContext(reqCtx intctrlutil.Re
 			}, nil, "", nil))
 	}
 	return rctxs, params
+}
+
+func updateParameterStatus(reqCtx intctrlutil.RequestCtx, cli client.Client, parameter *parametersv1alpha1.Parameter, patch *parametersv1alpha1.Parameter) (ctrl.Result, error) {
+	finished := syncParameterStatus(&parameter.Status)
+	parameter.Status.ObservedGeneration = parameter.Generation
+	if err := cli.Status().Patch(reqCtx.Ctx, parameter, client.MergeFrom(patch)); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
+	if finished {
+		return intctrlutil.Reconciled()
+	}
+	return intctrlutil.RequeueAfter(ConfigReconcileInterval, reqCtx.Log, "")
+}
+
+func syncParameterStatus(parameterStatus *parametersv1alpha1.ParameterStatus) bool {
+	var finished = true
+
+	for _, status := range parameterStatus.ReconfiguringStatus {
+		switch {
+		case status.Phase == parametersv1alpha1.CMergeFailedPhase:
+			parameterStatus.Phase = parametersv1alpha1.CMergeFailedPhase
+			return true
+		case status.Phase == parametersv1alpha1.CFailedAndPausePhase:
+			parameterStatus.Phase = parametersv1alpha1.CFailedAndPausePhase
+			return true
+		case status.Phase != parametersv1alpha1.CFinishedPhase:
+			parameterStatus.Phase = parametersv1alpha1.CRunningPhase
+			finished = false
+		}
+	}
+	return finished
 }

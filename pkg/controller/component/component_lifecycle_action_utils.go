@@ -246,7 +246,7 @@ func renderActionCmdJob(ctx context.Context, cli client.Reader, actionCtx *Actio
 		// this is hack for some special cases which need to run on the same node as the target pod
 		if action.TargetPodSelector == appsv1alpha1.RoleSelector && len(action.MatchingKey) > 0 {
 			jobObj.Spec.Template.Spec.NodeSelector = map[string]string{
-				"kubernetes.io/hostname": tplPod.Spec.NodeName,
+				corev1.LabelHostname: tplPod.Spec.NodeName,
 			}
 		}
 

@@ -36,12 +36,15 @@ import (
 )
 
 const (
-	InitContainerName        = "init-kbagent"
-	InitContainerName4Worker = "init-kbagent-worker"
-	ContainerName            = "kbagent"
+	ContainerName        = "kbagent"
+	ContainerName4Worker = "kbagent-worker"
+	InitContainerName    = "init-kbagent"
 
 	DefaultHTTPPortName      = "http"
 	DefaultStreamingPortName = "streaming"
+
+	DefaultHTTPPort      = 3501
+	DefaultStreamingPort = 3502
 
 	actionEnvName    = "KB_AGENT_ACTION"
 	probeEnvName     = "KB_AGENT_PROBE"
@@ -70,16 +73,50 @@ func BuildEnv4Server(actions []proto.Action, probes []proto.Probe, streamings []
 	}...), nil
 }
 
-func BuildEnv4Worker(tasks []proto.Task) ([]corev1.EnvVar, error) {
+func BuildEnv4Worker(tasks []proto.Task) (*corev1.EnvVar, error) {
 	dt, err := serializeTask(tasks)
 	if err != nil {
 		return nil, err
 	}
-	return []corev1.EnvVar{
-		{
-			Name:  taskEnvName,
-			Value: dt,
-		},
+	return &corev1.EnvVar{
+		Name:  taskEnvName,
+		Value: dt,
+	}, nil
+}
+
+func UpdateEnv4Worker(envVars map[string]string, f func(proto.Task) *proto.Task) (*corev1.EnvVar, error) {
+	if envVars == nil {
+		return nil, nil
+	}
+	dt, ok := envVars[taskEnvName]
+	if !ok || len(dt) == 0 {
+		return nil, nil // has no task
+	}
+
+	tasks, err := deserializeTask(dt)
+	if err != nil {
+		return nil, err
+	}
+
+	for i := 0; i < len(tasks); i++ {
+		if f != nil {
+			task := f(tasks[i])
+			if task != nil {
+				tasks[i] = *task
+			} else {
+				tasks = append(tasks[:i], tasks[i+1:]...)
+				i--
+			}
+		}
+	}
+
+	dt, err = serializeTask(tasks)
+	if err != nil {
+		return nil, err
+	}
+	return &corev1.EnvVar{
+		Name:  taskEnvName,
+		Value: dt,
 	}, nil
 }
 
@@ -152,6 +189,10 @@ func deserializeActionNProbe(da, dp string) ([]proto.Action, []proto.Probe, erro
 }
 
 func runAsServer(logger logr.Logger, config server.Config, services []service.Service) error {
+	if config.Port == config.StreamingPort {
+		return errors.New("HTTP port and streaming port are the same")
+	}
+
 	// start all services first
 	for i := range services {
 		if err := services[i].Start(); err != nil {
@@ -182,6 +223,8 @@ func runAsWorker(logger logr.Logger, services []service.Service, envVars map[str
 	if !ok || len(dt) == 0 {
 		return nil // has no task
 	}
+
+	logger.Info(fmt.Sprintf("running as worker, tasks: %s", dt))
 
 	tasks, err := deserializeTask(dt)
 	if err != nil {

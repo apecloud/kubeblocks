@@ -21,6 +21,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -49,20 +50,29 @@ func (s *streamingServer) StartNonBlocking() error {
 		return nil
 	}
 
-	var err error
-	s.listener, err = net.Listen("tcp", fmt.Sprintf("%s:%v", s.config.Address, s.config.StreamingPort))
-	if err != nil {
-		s.logger.Error(err, "listen address", s.config.Address, "port", s.config.StreamingPort)
-		return err
+	var err1 error
+	s.listener, err1 = net.Listen("tcp", fmt.Sprintf("%s:%v", s.config.Address, s.config.StreamingPort))
+	if err1 != nil {
+		s.logger.Error(err1, "listen address", s.config.Address, "port", s.config.StreamingPort)
+		return err1
 	}
 
 	go func() {
+		var tempErr error
 		for {
-			conn, err1 := s.listener.Accept()
-			if err1 != nil {
-				s.logger.Error(err1, "accept new connection error")
-				continue
+			conn, err2 := s.listener.Accept()
+			if err2 != nil {
+				var netErr net.Error
+				if errors.As(errors.Unwrap(err2), &netErr) && netErr.Temporary() {
+					if tempErr == nil || !errors.Is(err2, tempErr) {
+						s.logger.Error(err2, "accept new connection error")
+					}
+					tempErr = err2
+					continue // TODO: back-off
+				}
+				panic(fmt.Sprintf("accept new connection error: %v", err2))
 			}
+			tempErr = nil
 			go s.handleConn(conn)
 		}
 	}()

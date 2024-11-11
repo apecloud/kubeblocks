@@ -147,7 +147,7 @@ func (t *componentStatusTransformer) reconcileStatus(transCtx *componentTransfor
 	hasFailedPod, messages := t.hasFailedPod()
 
 	// check if the component scale out failed
-	isScaleOutFailed, err := t.isScaleOutFailed(transCtx)
+	hasRunningScaleOut, hasFailedScaleOut, err := t.hasScaleOutRunning(transCtx)
 	if err != nil {
 		return err
 	}
@@ -160,7 +160,7 @@ func (t *componentStatusTransformer) reconcileStatus(transCtx *componentTransfor
 
 	// calculate if the component has failure
 	hasFailure := func() bool {
-		return hasFailedPod || isScaleOutFailed || hasFailedVolumeExpansion
+		return hasFailedPod || hasFailedScaleOut || hasFailedVolumeExpansion
 	}()
 
 	// check if the component is in creating phase
@@ -171,7 +171,7 @@ func (t *componentStatusTransformer) reconcileStatus(transCtx *componentTransfor
 
 	transCtx.Logger.Info(
 		fmt.Sprintf("status conditions, creating: %v, its running: %v, has failure: %v, updating: %v, config synced: %v",
-			isInCreatingPhase, isITSUpdatedNRunning, hasFailure, hasRunningVolumeExpansion, isAllConfigSynced))
+			isInCreatingPhase, isITSUpdatedNRunning, hasFailure, hasRunningScaleOut || hasRunningVolumeExpansion, isAllConfigSynced))
 
 	switch {
 	case isDeleting:
@@ -180,7 +180,7 @@ func (t *componentStatusTransformer) reconcileStatus(transCtx *componentTransfor
 		t.setComponentStatusPhase(transCtx, appsv1.StoppingComponentPhase, nil, "component is Stopping")
 	case stopped:
 		t.setComponentStatusPhase(transCtx, appsv1.StoppedComponentPhase, nil, "component is Stopped")
-	case isITSUpdatedNRunning && isAllConfigSynced && !hasRunningVolumeExpansion:
+	case isITSUpdatedNRunning && isAllConfigSynced && !hasRunningScaleOut && !hasRunningVolumeExpansion:
 		t.setComponentStatusPhase(transCtx, appsv1.RunningComponentPhase, nil, "component is Running")
 	case !hasFailure && isInCreatingPhase:
 		t.setComponentStatusPhase(transCtx, appsv1.CreatingComponentPhase, nil, "component is Creating")
@@ -252,29 +252,27 @@ func (t *componentStatusTransformer) isAllConfigSynced(transCtx *componentTransf
 	return true, nil
 }
 
-// isScaleOutFailed checks if the component scale out failed.
-func (t *componentStatusTransformer) isScaleOutFailed(transCtx *componentTransformContext) (bool, error) {
-	if t.runningITS == nil {
-		return false, nil
-	}
-	if t.runningITS.Spec.Replicas == nil {
-		return false, nil
-	}
-	if t.synthesizeComp.Replicas <= *t.runningITS.Spec.Replicas {
-		return false, nil
+// hasScaleOutRunning checks if the scale out is running.
+func (t *componentStatusTransformer) hasScaleOutRunning(transCtx *componentTransformContext) (running bool, failed bool, err error) {
+	if t.runningITS == nil || t.runningITS.Spec.Replicas == nil {
+		return false, false, nil
 	}
 
-	// TODO: impl
+	running, err = component.HasReplicasInCreating(transCtx.Component)
+	if err != nil {
+		return false, false, err
+	}
+	if !running {
+		return false, false, nil
+	}
 
-	return false, nil
+	// TODO: scale-out failed
+
+	return true, false, nil
 }
 
 // hasVolumeExpansionRunning checks if the volume expansion is running.
-func (t *componentStatusTransformer) hasVolumeExpansionRunning(transCtx *componentTransformContext) (bool, bool, error) {
-	var (
-		running bool
-		failed  bool
-	)
+func (t *componentStatusTransformer) hasVolumeExpansionRunning(transCtx *componentTransformContext) (running bool, failed bool, err error) {
 	for _, vct := range t.runningITS.Spec.VolumeClaimTemplates {
 		volumes, err := getRunningVolumes(transCtx.Context, t.Client, t.synthesizeComp, t.runningITS, vct.Name)
 		if err != nil {
@@ -405,8 +403,5 @@ func (t *componentStatusTransformer) reconcileAvailableCondition(transCtx *compo
 }
 
 func (t *componentStatusTransformer) reconcileReplicasStatus(transCtx *componentTransformContext) error {
-	var (
-	// comp = transCtx.Component
-	)
-	return nil
+	return component.StatusReplicas(transCtx.Context, t.Client, t.synthesizeComp, t.comp)
 }

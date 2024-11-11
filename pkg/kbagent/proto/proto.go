@@ -85,7 +85,6 @@ type Task struct {
 	Task                string          `json:"task"`
 	UID                 string          `json:"UID"`                           // the unique identifier of the task
 	Replicas            string          `json:"replicas"`                      // target replicas to run the task
-	Payload             string          `json:"payload"`                       // the payload for the specific action
 	NotifyAtFinish      bool            `json:"notifyAtFinish,omitempty"`      // whether to notify the controller when the task is finished
 	ReportPeriodSeconds int32           `json:"reportPeriodSeconds,omitempty"` // the period to report the progress of the task
 	NewReplica          *NewReplicaTask `json:"newReplica,omitempty"`

@@ -70,7 +70,7 @@ func (t *componentVarsTransformer) Transform(ctx graph.TransformContext, dag *gr
 	envVars2, envData := buildEnvVarsNData(envVars)
 	setTemplateNEnvVars(synthesizedComp, templateVars, envVars2)
 
-	if err := createOrUpdateEnvConfigMap(ctx, dag, envData, nil); err != nil {
+	if err := createOrUpdateEnvConfigMap(ctx, dag, nil, nil, envData); err != nil {
 		return err
 	}
 	return nil
@@ -113,6 +113,7 @@ func envConfigMapSource(clusterName, compName string) corev1.EnvFromSource {
 	}
 }
 
+// TODO: remove the deleted env vars from the ConfigMap
 func createOrUpdateEnvConfigMap(ctx graph.TransformContext, dag *graph.DAG,
 	data map[string]string, parent *model.ObjectVertex, patches ...map[string]string) error {
 	var (
@@ -125,7 +126,7 @@ func createOrUpdateEnvConfigMap(ctx graph.TransformContext, dag *graph.DAG,
 		graphCli, _ = transCtx.Client.(model.GraphClient)
 	)
 
-	envObj, err := func() (*corev1.ConfigMap, error) {
+	envObj, envObjVertex, err := func() (*corev1.ConfigMap, graph.Vertex, error) {
 		// look up in graph first
 		if v := graphCli.FindMatchedVertex(dag, &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
@@ -133,15 +134,15 @@ func createOrUpdateEnvConfigMap(ctx graph.TransformContext, dag *graph.DAG,
 				Name:      envKey.Name,
 			},
 		}); v != nil {
-			return v.(*model.ObjectVertex).Obj.(*corev1.ConfigMap), nil
+			return v.(*model.ObjectVertex).Obj.(*corev1.ConfigMap), v, nil
 		}
 
 		obj := &corev1.ConfigMap{}
 		err := transCtx.Client.Get(transCtx.Context, envKey, obj, inDataContext4C())
 		if err != nil {
-			return nil, client.IgnoreNotFound(err)
+			return nil, nil, client.IgnoreNotFound(err)
 		}
-		return obj, nil
+		return obj, nil, nil
 	}()
 	if err != nil {
 		return err
@@ -161,7 +162,7 @@ func createOrUpdateEnvConfigMap(ctx graph.TransformContext, dag *graph.DAG,
 			return mergeWith(data)
 		}
 		if envObj != nil {
-			return mergeWith(envObj.Data)
+			return mergeWith(maps.Clone(envObj.Data))
 		}
 		return mergeWith(nil)
 	}()
@@ -181,9 +182,16 @@ func createOrUpdateEnvConfigMap(ctx graph.TransformContext, dag *graph.DAG,
 	}
 
 	if !reflect.DeepEqual(envObj.Data, newData) {
-		envObjCopy := envObj.DeepCopy()
-		envObjCopy.Data = newData
-		graphCli.Do(dag, envObj, envObjCopy, model.ActionUpdatePtr(), parent, inDataContext4G())
+		if envObjVertex != nil {
+			envObj.Data = newData // in-place update
+			if parent != nil {
+				dag.Connect(parent, envObjVertex)
+			}
+		} else {
+			envObjCopy := envObj.DeepCopy()
+			envObjCopy.Data = newData
+			graphCli.Do(dag, envObj, envObjCopy, model.ActionUpdatePtr(), parent, inDataContext4G())
+		}
 		return nil
 	}
 	return nil

@@ -42,10 +42,8 @@ const (
 	kbAgentSharedMountPath      = "/kubeblocks"
 	kbAgentCommandOnSharedMount = "/kubeblocks/kbagent"
 
-	minAvailablePort            = 1025
-	maxAvailablePort            = 65535
-	kbAgentDefaultHTTPPort      = 3501
-	kbAgentDefaultStreamingPort = 3502
+	minAvailablePort = 1025
+	maxAvailablePort = 65535
 
 	defaultProbeReportPeriodSeconds = 60
 	minProbeReportPeriodSeconds     = 15
@@ -56,7 +54,7 @@ var (
 )
 
 func IsKBAgentContainer(c *corev1.Container) bool {
-	return c.Name == kbagent.ContainerName || c.Name == kbagent.InitContainerName || c.Name == kbagent.InitContainerName4Worker
+	return c.Name == kbagent.ContainerName || c.Name == kbagent.ContainerName4Worker || c.Name == kbagent.InitContainerName
 }
 
 func UpdateKBAgentContainer4HostNetwork(synthesizedComp *SynthesizedComponent) {
@@ -97,17 +95,27 @@ func UpdateKBAgentContainer4HostNetwork(synthesizedComp *SynthesizedComponent) {
 	synthesizedComp.PodSpec.Containers[idx] = *c
 }
 
-func BuildKBAgentTaskEnv(task proto.Task) (map[string]string, error) {
-	envVars, err := kbagent.BuildEnv4Worker([]proto.Task{task})
+func buildKBAgentTaskEnv(task proto.Task) (map[string]string, error) {
+	envVar, err := kbagent.BuildEnv4Worker([]proto.Task{task})
 	if err != nil {
 		return nil, err
 	}
+	return map[string]string{
+		envVar.Name: envVar.Value,
+	}, nil
+}
 
-	m := make(map[string]string)
-	for _, v := range envVars {
-		m[v.Name] = v.Value
+func updateKBAgentTaskEnv(envVars map[string]string, f func(proto.Task) *proto.Task) (map[string]string, error) {
+	envVar, err := kbagent.UpdateEnv4Worker(envVars, f)
+	if err != nil {
+		return nil, err
 	}
-	return m, nil
+	if envVar == nil {
+		return nil, nil
+	}
+	return map[string]string{
+		envVar.Name: envVar.Value,
+	}, nil
 }
 
 func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
@@ -140,7 +148,7 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 
 	container, err := newContainer(kbagent.ContainerName, func(b *builder.ContainerBuilder) error {
 		ports, err1 := getAvailablePorts(synthesizedComp.PodSpec.Containers,
-			[]int32{int32(kbAgentDefaultHTTPPort), int32(kbAgentDefaultStreamingPort)})
+			[]int32{int32(kbagent.DefaultHTTPPort), int32(kbagent.DefaultStreamingPort)})
 		if err1 != nil {
 			return err1
 		}
@@ -151,12 +159,12 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 				corev1.ContainerPort{
 					ContainerPort: int32(httpPort),
 					Name:          kbagent.DefaultHTTPPortName,
-					Protocol:      "TCP",
+					Protocol:      corev1.ProtocolTCP,
 				},
 				corev1.ContainerPort{
 					ContainerPort: int32(streamingPort),
 					Name:          kbagent.DefaultStreamingPortName,
-					Protocol:      "TCP",
+					Protocol:      corev1.ProtocolTCP,
 				}).
 			SetStartupProbe(corev1.Probe{
 				ProbeHandler: corev1.ProbeHandler{
@@ -164,19 +172,19 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 				}})
 		return nil
 	})
-	if err == nil {
+	if err != nil {
 		return err
 	}
 
-	initContainer, err := newContainer(kbagent.InitContainerName4Worker, func(b *builder.ContainerBuilder) error {
-		b.AddArgs("--server", "false") // run as a worker
+	workerContainer, err := newContainer(kbagent.ContainerName4Worker, func(b *builder.ContainerBuilder) error {
+		b.AddArgs("--server=false") // run as a worker
 		return nil
 	})
 	if err != nil {
 		return err
 	}
 
-	if err = handleCustomImageNContainerDefined(synthesizedComp, container, initContainer); err != nil {
+	if err = handleCustomImageNContainerDefined(synthesizedComp, container, workerContainer); err != nil {
 		return err
 	}
 
@@ -200,7 +208,7 @@ func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
 	}
 
 	synthesizedComp.PodSpec.Containers = append(synthesizedComp.PodSpec.Containers, *container)
-	synthesizedComp.PodSpec.InitContainers = append(synthesizedComp.PodSpec.InitContainers, *initContainer)
+	synthesizedComp.PodSpec.InitContainers = append(synthesizedComp.PodSpec.InitContainers, *workerContainer)
 
 	return nil
 }

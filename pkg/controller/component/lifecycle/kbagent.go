@@ -299,44 +299,7 @@ func (a *kbagent) callActionWithSelector(ctx context.Context, spec *appsv1.Actio
 }
 
 func (a *kbagent) selectTargetPods(spec *appsv1.Action) ([]*corev1.Pod, error) {
-	if spec.Exec == nil || len(spec.Exec.TargetPodSelector) == 0 {
-		return []*corev1.Pod{a.pod}, nil
-	}
-
-	anyPod := func() []*corev1.Pod {
-		i := rand.Int() % len(a.pods)
-		return []*corev1.Pod{a.pods[i]}
-	}
-
-	allPods := func() []*corev1.Pod {
-		return a.pods
-	}
-
-	podsWithRole := func() []*corev1.Pod {
-		roleName := spec.Exec.MatchingKey
-		var pods []*corev1.Pod
-		for i, pod := range a.pods {
-			if len(pod.Labels) != 0 {
-				if pod.Labels[constant.RoleLabelKey] == roleName {
-					pods = append(pods, a.pods[i])
-				}
-			}
-		}
-		return pods
-	}
-
-	switch spec.Exec.TargetPodSelector {
-	case appsv1.AnyReplica:
-		return anyPod(), nil
-	case appsv1.AllReplicas:
-		return allPods(), nil
-	case appsv1.RoleSelector:
-		return podsWithRole(), nil
-	case appsv1.OrdinalSelector:
-		return nil, fmt.Errorf("ordinal selector is not supported")
-	default:
-		return nil, fmt.Errorf("unknown pod selector: %s", spec.Exec.TargetPodSelector)
-	}
+	return SelectTargetPods(a.pods, a.pod, spec)
 }
 
 func (a *kbagent) serverEndpoint(pod *corev1.Pod) (string, int32, error) {
@@ -378,5 +341,46 @@ func (a *kbagent) formatError(lfa lifecycleAction, rsp proto.ActionResponse) err
 		return wrapError(ErrActionInternalError)
 	default:
 		return wrapError(err)
+	}
+}
+
+func SelectTargetPods(pods []*corev1.Pod, pod *corev1.Pod, spec *appsv1.Action) ([]*corev1.Pod, error) {
+	if spec.Exec == nil || len(spec.Exec.TargetPodSelector) == 0 {
+		return []*corev1.Pod{pod}, nil
+	}
+
+	anyPod := func() []*corev1.Pod {
+		i := rand.Int() % len(pods)
+		return []*corev1.Pod{pods[i]}
+	}
+
+	allPods := func() []*corev1.Pod {
+		return pods
+	}
+
+	podsWithRole := func() []*corev1.Pod {
+		roleName := spec.Exec.MatchingKey
+		var rolePods []*corev1.Pod
+		for i, pod := range pods {
+			if len(pod.Labels) != 0 {
+				if pod.Labels[constant.RoleLabelKey] == roleName {
+					rolePods = append(rolePods, pods[i])
+				}
+			}
+		}
+		return rolePods
+	}
+
+	switch spec.Exec.TargetPodSelector {
+	case appsv1.AnyReplica:
+		return anyPod(), nil
+	case appsv1.AllReplicas:
+		return allPods(), nil
+	case appsv1.RoleSelector:
+		return podsWithRole(), nil
+	case appsv1.OrdinalSelector:
+		return nil, fmt.Errorf("ordinal selector is not supported")
+	default:
+		return nil, fmt.Errorf("unknown pod selector: %s", spec.Exec.TargetPodSelector)
 	}
 }

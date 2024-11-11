@@ -615,25 +615,19 @@ func (r *componentWorkloadOps) scaleOut() error {
 
 	newReplicas := r.desiredCompPodNameSet.Difference(r.runningItsPodNameSet).UnsortedList()
 	if err := func() error {
-		// TODO: select the source replicas to dump data
-		source, err := r.sourceReplica()
+		source, err := r.sourceReplica(dataDump)
 		if err != nil {
 			return err
 		}
 
-		task, err := component.NewReplicaTask(r.synthesizeComp.FullCompName, r.synthesizeComp.Generation, source, newReplicas)
+		parameters, err := component.NewReplicaTask(r.synthesizeComp.FullCompName, r.synthesizeComp.Generation, source, newReplicas)
 		if err != nil {
 			return err
 		}
-		parameters, err := component.BuildKBAgentTaskEnv(task)
-		if err != nil {
-			return err
-		}
-
 		// apply the updated env to the env CM
 		transCtx := &componentTransformContext{
 			Context:             r.reqCtx.Ctx,
-			Client:              r.cli,
+			Client:              model.NewGraphClient(r.cli),
 			SynthesizeComponent: r.synthesizeComp,
 			Component:           r.component,
 		}
@@ -649,30 +643,21 @@ func (r *componentWorkloadOps) scaleOut() error {
 	return component.NewReplicas(r.component, newReplicas)
 }
 
-func (r *componentWorkloadOps) sourceReplica() (*corev1.Pod, error) {
-	isLeader := func(pod *corev1.Pod) bool {
-		if pod == nil || len(pod.Labels) == 0 {
-			return false
-		}
-		roleName, ok := pod.Labels[constant.RoleLabelKey]
-		if !ok {
-			return false
-		}
-
-		for _, replicaRole := range r.runningITS.Spec.Roles {
-			if roleName == replicaRole.Name && replicaRole.IsLeader {
-				return true
-			}
-		}
-		return false
-	}
+func (r *componentWorkloadOps) sourceReplica(dataDump *appsv1.Action) (*corev1.Pod, error) {
 	pods, err := component.ListOwnedPods(r.reqCtx.Ctx, r.cli, r.cluster.Namespace, r.cluster.Name, r.synthesizeComp.Name)
 	if err != nil {
 		return nil, err
 	}
-	for _, pod := range pods {
-		if isLeader(pod) {
-			return pod, nil
+	if len(pods) > 0 {
+		if len(dataDump.Exec.TargetPodSelector) == 0 {
+			dataDump.Exec.TargetPodSelector = appsv1.AnyReplica
+		}
+		pods, err = lifecycle.SelectTargetPods(pods, nil, dataDump)
+		if err != nil {
+			return nil, err
+		}
+		if len(pods) > 0 {
+			return pods[0], nil
 		}
 	}
 	return nil, fmt.Errorf("no available pod to dump data")

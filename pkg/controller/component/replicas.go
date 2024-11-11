@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"slices"
@@ -27,8 +28,11 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/kbagent"
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
@@ -96,12 +100,49 @@ func DeleteReplicas(comp *appsv1.Component, replicas []string) error {
 	})
 }
 
-func NewReplicaTask(compName string, uid string, source *corev1.Pod, replicas []string) (proto.Task, error) {
+func StatusReplicas(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent, comp *appsv1.Component) error {
+	pods, err := ListOwnedPods(ctx, cli, synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name)
+	if err != nil {
+		return err
+	}
+	return updateReplicasStatusFunc(comp, func(status *replicasStatus) error {
+		status.Replicas = comp.Spec.Replicas
+		for _, pod := range pods {
+			if slices.ContainsFunc(status.Status, func(s replicaStatus) bool {
+				return s.Name == pod.Name
+			}) {
+				continue
+			}
+			status.Status = append(status.Status, replicaStatus{
+				Name:              pod.Name,
+				Generation:        comp.Generation,
+				CreationTimestamp: pod.CreationTimestamp.Time,
+				Phase:             replicaPhaseRunning,
+			})
+		}
+		return nil
+	})
+}
+
+func HasReplicasInCreating(comp *appsv1.Component) (bool, error) {
+	status, err := getReplicasStatus(comp)
+	if err != nil {
+		return false, err
+	}
+	for _, s := range status.Status {
+		if s.Phase == replicaPhaseCreating || s.Phase == replicaPhasePending {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func NewReplicaTask(compName string, uid string, source *corev1.Pod, replicas []string) (map[string]string, error) {
 	port, err := intctrlutil.GetPortByName(*source, kbagent.ContainerName, kbagent.DefaultStreamingPortName)
 	if err != nil {
-		return proto.Task{}, err
+		return nil, err
 	}
-	return proto.Task{
+	task := proto.Task{
 		Instance:            compName,
 		Task:                newReplicaTask,
 		UID:                 uid,
@@ -113,7 +154,8 @@ func NewReplicaTask(compName string, uid string, source *corev1.Pod, replicas []
 			Port:     port,
 			Replicas: strings.Join(replicas, ","),
 		},
-	}, nil
+	}
+	return buildKBAgentTaskEnv(task)
 }
 
 func getReplicasStatus(comp *appsv1.Component) (replicasStatus, error) {
@@ -131,13 +173,6 @@ func getReplicasStatus(comp *appsv1.Component) (replicasStatus, error) {
 	}
 	return *status, nil
 }
-
-// func updateReplicasStatus(comp *appsv1.Component, status replicasStatus) error {
-//	return updateReplicasStatusFunc(comp, func(s *replicasStatus) error {
-//		*s = status
-//		return nil
-//	})
-// }
 
 func updateReplicasStatusFunc(comp *appsv1.Component, f func(status *replicasStatus) error) error {
 	if f == nil {
@@ -180,17 +215,62 @@ func updateReplicaStatus(comp *appsv1.Component, name string, f func(*replicaSta
 	})
 }
 
-func handleNewReplicaTaskEvent(comp *appsv1.Component, event proto.TaskEvent) error {
-	if !event.EndTime.IsZero() && event.Code == 0 {
-		return handleNewReplicaTaskEvent4Finished(comp, event)
+func handleNewReplicaTaskEvent(ctx context.Context, cli client.Client, comp *appsv1.Component, event proto.TaskEvent) error {
+	finished := !event.EndTime.IsZero()
+	if finished && event.Code == 0 {
+		return handleNewReplicaTaskEvent4Finished(ctx, cli, comp, event)
 	}
-	if !event.EndTime.IsZero() {
-		return handleNewReplicaTaskEvent4Unfinished(comp, event)
+	if finished {
+		return handleNewReplicaTaskEvent4Failed(comp, event)
 	}
-	return handleNewReplicaTaskEvent4Failed(comp, event)
+	return handleNewReplicaTaskEvent4Unfinished(comp, event)
 }
 
-func handleNewReplicaTaskEvent4Finished(comp *appsv1.Component, event proto.TaskEvent) error {
+func handleNewReplicaTaskEvent4Finished(ctx context.Context, cli client.Client, comp *appsv1.Component, event proto.TaskEvent) error {
+	if err := func() error {
+		envKey := types.NamespacedName{
+			Namespace: comp.Namespace,
+			Name:      constant.GetCompEnvCMName(comp.Name),
+		}
+		obj := &corev1.ConfigMap{}
+		err := cli.Get(ctx, envKey, obj, inDataContext())
+		if err != nil {
+			return err
+		}
+
+		parameters, err := updateKBAgentTaskEnv(obj.Data, func(task proto.Task) *proto.Task {
+			if task.Task == newReplicaTask {
+				replicas := strings.Split(task.Replicas, ",")
+				replicas = slices.DeleteFunc(replicas, func(r string) bool {
+					return r == event.Replica
+				})
+				if len(replicas) == 0 {
+					return nil
+				}
+				task.Replicas = strings.Join(replicas, ",")
+				if task.NewReplica != nil {
+					task.NewReplica.Replicas = task.Replicas
+				}
+			}
+			return &task
+		})
+		if err != nil {
+			return err
+		}
+		if parameters == nil {
+			return nil // do nothing
+		}
+
+		if obj.Data == nil {
+			obj.Data = make(map[string]string)
+		}
+		for k, v := range parameters {
+			obj.Data[k] = v
+		}
+		return cli.Update(ctx, obj, inDataContext())
+	}(); err != nil {
+		return err
+	}
 	return updateReplicaStatus(comp, event.Replica, func(status *replicaStatus) error {
 		status.Generation = comp.Generation // TODO: generation
 		status.Phase = replicaPhaseRunning

@@ -50,9 +50,12 @@ func (s *taskService) runTasks(ctx context.Context) error {
 	for _, task := range s.tasks {
 		// run tasks one by one
 		if slices.Contains(strings.Split(task.Replicas, ","), util.PodName()) {
+			start := time.Now()
 			if err := s.runTask(ctx, task); err != nil {
+				s.logger.Error(err, fmt.Sprintf("failed to run task: %v, time elapsed: %s", task, time.Since(start)))
 				return err
 			}
+			s.logger.Info(fmt.Sprintf("succeed to run task: %v, time elapsed: %s", task, time.Since(start)))
 		}
 	}
 	return nil
@@ -72,10 +75,10 @@ func (s *taskService) runTask(ctx context.Context, task proto.Task) error {
 		StartTime: time.Now(),
 	}
 
-	notify := func(err error, signals ...chan struct{}) error {
-		if len(signals) > 0 && signals[0] != nil {
-			close(signals[0])
-			<-signals[1]
+	notify := func(err error, exit, exited chan struct{}) error {
+		if exit != nil && exited != nil {
+			close(exit)
+			<-exited
 		}
 		if task.NotifyAtFinish {
 			event.EndTime = time.Now()
@@ -85,14 +88,17 @@ func (s *taskService) runTask(ctx context.Context, task proto.Task) error {
 				event.Code = -1
 				event.Message = err.Error()
 			}
-			s.notify(task, event)
+			err1 := s.notify(task, event, true)
+			if err == nil { // the run error takes precedence
+				err = err1
+			}
 		}
 		return err
 	}
 
 	ch, err1 := t.run(ctx)
 	if err1 != nil {
-		return notify(err1)
+		return notify(err1, nil, nil)
 	}
 
 	exit, exited := s.report(ctx, task, t, event)
@@ -126,7 +132,7 @@ func (s *taskService) report(ctx context.Context, task proto.Task, t task, event
 					eventCopy := event
 					t.status(ctx, &event)
 					if !reflect.DeepEqual(event, eventCopy) {
-						s.notify(task, event)
+						_ = s.notify(task, event, false)
 					}
 				}
 			}
@@ -147,11 +153,12 @@ func (s *taskService) wait(ch chan error) error {
 	return nil
 }
 
-func (s *taskService) notify(task proto.Task, event proto.TaskEvent) {
+func (s *taskService) notify(task proto.Task, event proto.TaskEvent, sync bool) error {
 	msg, err := json.Marshal(&event)
 	if err == nil {
-		util.SendEventWithMessage(&s.logger, "task", string(msg))
+		return util.SendEventWithMessage(&s.logger, "task", string(msg), sync)
 	} else {
 		s.logger.Error(err, fmt.Sprintf("failed to marshal task event, task: %v", task))
+		return err
 	}
 }

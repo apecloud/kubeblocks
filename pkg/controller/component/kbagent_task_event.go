@@ -56,7 +56,7 @@ func (h *KBAgentTaskEventHandler) Handle(cli client.Client, reqCtx intctrlutil.R
 	}
 	compCopy := comp.DeepCopy()
 
-	err := h.handleEvent(*taskEvent, comp)
+	err := h.handleEvent(reqCtx.Ctx, cli, *taskEvent, comp)
 	if err != nil {
 		return err
 	}
@@ -68,9 +68,9 @@ func (h *KBAgentTaskEventHandler) isTaskEvent(event *corev1.Event) bool {
 		event.Reason == "task" && event.InvolvedObject.FieldPath == proto.ProbeEventFieldPath
 }
 
-func (h *KBAgentTaskEventHandler) handleEvent(event proto.TaskEvent, comp *appsv1.Component) error {
+func (h *KBAgentTaskEventHandler) handleEvent(ctx context.Context, cli client.Client, event proto.TaskEvent, comp *appsv1.Component) error {
 	if event.Task == newReplicaTask {
-		return handleNewReplicaTaskEvent(comp, event)
+		return handleNewReplicaTaskEvent(ctx, cli, comp, event)
 	}
 	return fmt.Errorf("unsupported kind of task event: %s", event.Task)
 }

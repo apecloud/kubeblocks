@@ -64,7 +64,7 @@ func (s *httpServer) StartNonBlocking() error {
 	} else {
 		l, err := net.Listen("tcp", fmt.Sprintf("%s:%v", s.config.Address, s.config.Port))
 		if err != nil {
-			s.logger.Error(err, "listen address", s.config.Address, "port", s.config.Port)
+			s.logger.Error(err, "listen HTTP server error", "address", s.config.Address, "port", s.config.Port)
 		} else {
 			listeners = append(listeners, l)
 		}
@@ -104,7 +104,7 @@ func (s *httpServer) Close() error {
 	for i, ln := range s.servers {
 		// This calls `Close()` on the underlying listener.
 		if err := ln.Shutdown(); err != nil {
-			s.logger.Error(err, "server close failed")
+			s.logger.Error(err, "close the HTTP server failed")
 			errs[i] = err
 		}
 	}

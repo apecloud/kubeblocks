@@ -88,18 +88,10 @@ func (s *streamingService) HandleRequest(ctx context.Context, payload []byte) ([
 }
 
 func (s *streamingService) handshake(ctx context.Context, conn net.Conn) (*proto.ActionRequest, error) {
-	buf := make([]byte, maxStreamingHandshakePacketSize)
-	ret, err := conn.Read(buf)
-	if err != nil {
-		return nil, err
-	}
-	if ret == 0 {
-		return nil, errors.New("no data received")
-	}
-
 	req := &proto.ActionRequest{}
-	if err = json.Unmarshal(buf, req); err != nil {
-		return nil, errors.Wrapf(proto.ErrBadRequest, "unmarshal action request error: %s", err.Error())
+	decoder := json.NewDecoder(conn)
+	if err := decoder.Decode(req); err != nil {
+		return nil, errors.Wrapf(proto.ErrBadRequest, "read and unmarshal action request error: %s", err.Error())
 	}
 	return req, nil
 }

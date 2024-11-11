@@ -24,6 +24,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"time"
 
 	"github.com/go-logr/logr"
 
@@ -31,8 +32,9 @@ import (
 )
 
 const (
-	newReplicaDataDump = "dataDump"
-	newReplicaDataLoad = "dataLoad"
+	newReplicaDataDump              = "dataDump"
+	newReplicaDataLoad              = "dataLoad"
+	newReplicaConnectTimeoutSeconds = 10
 )
 
 type newReplicaTask struct {
@@ -101,7 +103,8 @@ func (s *newReplicaTask) connectToRemote(ctx context.Context) (net.Conn, error) 
 	if s.task.Port == 0 {
 		return nil, fmt.Errorf("remote port is required")
 	}
-	// TODO: connect timeout
-	dialer := &net.Dialer{}
+	dialer := &net.Dialer{
+		Timeout: newReplicaConnectTimeoutSeconds * time.Second,
+	}
 	return dialer.Dial("tcp", fmt.Sprintf("%s:%d", s.task.Remote, s.task.Port))
 }

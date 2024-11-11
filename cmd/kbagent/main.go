@@ -41,8 +41,6 @@ import (
 )
 
 const (
-	defaultHTTPPort       = 3501
-	defaultStreamingPort  = 3502
 	defaultMaxConcurrency = 8
 )
 
@@ -54,8 +52,8 @@ func init() {
 	pflag.BoolVar(&serverConfig.Server, "server", true, "Run as a server.")
 	pflag.StringVar(&serverConfig.Address, "address", "0.0.0.0", "The HTTP Server listen address for kb-agent service.")
 	pflag.StringVar(&serverConfig.UnixDomainSocket, "unix-socket", "", "The path of the Unix Domain Socket for kb-agent service.")
-	pflag.IntVar(&serverConfig.Port, "port", defaultHTTPPort, "The HTTP Server listen port for kb-agent service.")
-	pflag.IntVar(&serverConfig.StreamingPort, "streaming-port", defaultStreamingPort, "The listen port used by kb-agent to stream data.")
+	pflag.IntVar(&serverConfig.Port, "port", kbagent.DefaultHTTPPort, "The HTTP Server listen port for kb-agent service.")
+	pflag.IntVar(&serverConfig.StreamingPort, "streaming-port", kbagent.DefaultStreamingPort, "The listen port used by kb-agent to stream data.")
 	pflag.IntVar(&serverConfig.Concurrency, "max-concurrency", defaultMaxConcurrency,
 		fmt.Sprintf("The maximum number of concurrent connections the Server may serve, use the default value %d if <=0.", defaultMaxConcurrency))
 	pflag.BoolVar(&serverConfig.Logging, "api-logging", true, "Enable api logging for kb-agent request.")

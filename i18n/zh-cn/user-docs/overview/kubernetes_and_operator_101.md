@@ -47,7 +47,7 @@ Kubernetes 动态管理 Pods，确保它们按指定的方式运行，并在失�
 
 ## 持久卷声明（PVC）
 
-在 Kubernetes 中，持久卷声明（PVC，Persisten Volume Claim）是用户对存储的请求。PVC 本质上是请求具有特定特性的存储的一种方式，例如存储类、大小和访问模式（如读写或只读）。PVC 使 Pods 能够使用存储，而无需了解底层基础设施的详细信息。
+在 Kubernetes 中，持久卷声明（PVC，Persistent Volume Claim）是用户对存储的请求。PVC 本质上是请求具有特定特性的存储的一种方式，例如存储类、大小和访问模式（如读写或只读）。PVC 使 Pods 能够使用存储，而无需了解底层基础设施的详细信息。
 
 在 K8s 中，为了使用存储，用户会创建 PVC。创建 PVC 时，Kubernetes 会查找与请求匹配的 StorageClass。如果找到匹配的 StorageClass，Kubernetes 将根据定义的参数自动配置存储，无论是 SSD、HDD、EBS 还是 NAS。如果 PVC 未指定 StorageClass，Kubernetes 将使用默认的 StorageClass（如果已配置）来配置存储。
 
@@ -61,7 +61,7 @@ CSI 是标准 API，使 Kubernetes 能够以一致和可扩展的方式与各种
 
 ## 持久卷（PV）
 
-在 Kubernetes 中，持久卷（PV，Persisten Volume）代表可以由多种系统（如本地磁盘、NFS 或基于云的存储，例如 AWS EBS、Google Cloud Persistent Disks）支持的存储资源，通常由不同的 CSI 驱动程序管理。
+在 Kubernetes 中，持久卷（PV，Persistent Volume）代表可以由多种系统（如本地磁盘、NFS 或基于云的存储，例如 AWS EBS、Google Cloud Persistent Disks）支持的存储资源，通常由不同的 CSI 驱动程序管理。
 
 PV 有自己独立于 Pod 的生命周期，由 Kubernetes 控制平面进行管理。即使关联的 Pod 被删除，PV 也允许数据持续存在。PV 与持久卷声明（PVC）绑定，PVC 请求特定的存储特性，如大小和访问模式，确保应用程序获得所需的存储。
 

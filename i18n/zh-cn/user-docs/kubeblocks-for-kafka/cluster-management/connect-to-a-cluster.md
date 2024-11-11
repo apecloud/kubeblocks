@@ -95,7 +95,7 @@ import TabItem from '@theme/TabItem';
 
    <Tabs>
 
-   <TabItem value="kbcli" label="kbcli" default>
+   <TabItem value="kbcli" label="kbcli">
 
    ```bash
    kbcli cluster create kafka mycluster --host-network-accessible=true -n demo
@@ -103,7 +103,7 @@ import TabItem from '@theme/TabItem';
 
    </TabItem>
 
-   <TabItem value="kubectl" label="kubectl">
+   <TabItem value="kubectl" label="kubectl" default>
 
    ```bash
    kubectl apply -f - <<EOF
@@ -179,7 +179,7 @@ import TabItem from '@theme/TabItem';
 
    <Tabs>
 
-   <TabItem value="kbcli" label="kbcli" default>
+   <TabItem value="kbcli" label="kbcli">
 
    ```bash
    kbcli cluster create kafka mycluster --publicly-accessible=true -n demo
@@ -187,7 +187,7 @@ import TabItem from '@theme/TabItem';
 
    </TabItem>
 
-   <TabItem value="kubectl" label="kubectl">
+   <TabItem value="kubectl" label="kubectl" default>
 
    ```bash
    kubectl apply -f - <<EOF

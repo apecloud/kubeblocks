@@ -30,7 +30,7 @@ import TabItem from '@theme/TabItem';
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
+<TabItem value="kbcli" label="kbcli">
 
 ```bash
 kbcli cluster list mycluster -n demo
@@ -41,7 +41,7 @@ mycluster   demo        kafka                kafka-3.3.2   Delete               
 
 </TabItem>
 
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 ```bash
 kubectl -n demo get cluster mycluster
@@ -60,7 +60,7 @@ mycluster      kafka                kafka-3.3.2    Delete               Running 
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
+<TabItem value="kbcli" label="kbcli">
 
 ```bash
 kbcli cluster delete mycluster
@@ -68,7 +68,7 @@ kbcli cluster delete mycluster
 
 </TabItem>
 
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 ```bash
 kubectl delete -n demo cluster mycluster

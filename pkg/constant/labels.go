@@ -48,11 +48,10 @@ const (
 	VolumeClaimTemplateNameLabelKey        = "apps.kubeblocks.io/vct-name"
 	KBAppPodNameLabelKey                   = "apps.kubeblocks.io/pod-name"
 
-	RoleLabelKey             = "kubeblocks.io/role" // RoleLabelKey consensusSet and replicationSet role label key
-	KBAppServiceVersionKey   = "apps.kubeblocks.io/service-version"
-	BackupProtectionLabelKey = "kubeblocks.io/backup-protection" // BackupProtectionLabelKey Backup delete protection policy label
-	AccessModeLabelKey       = "workloads.kubeblocks.io/access-mode"
-	ReadyWithoutPrimaryKey   = "kubeblocks.io/ready-without-primary"
+	RoleLabelKey           = "kubeblocks.io/role" // RoleLabelKey consensusSet and replicationSet role label key
+	KBAppServiceVersionKey = "apps.kubeblocks.io/service-version"
+	AccessModeLabelKey     = "workloads.kubeblocks.io/access-mode"
+	ReadyWithoutPrimaryKey = "kubeblocks.io/ready-without-primary"
 )
 
 func GetClusterLabels(clusterName string, labels ...map[string]string) map[string]string {

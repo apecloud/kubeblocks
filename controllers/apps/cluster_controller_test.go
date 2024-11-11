@@ -767,7 +767,7 @@ var _ = Describe("Cluster Controller", func() {
 		}
 	}
 
-	deleteClusterWithBackup := func(terminationPolicy appsv1.TerminationPolicyType, backupRetainPolicy string) {
+	deleteClusterWithBackup := func(terminationPolicy appsv1.TerminationPolicyType) {
 		By("mocking a retained backup")
 		backupPolicyName := "test-backup-policy"
 		backupName := "test-backup"
@@ -776,9 +776,8 @@ var _ = Describe("Cluster Controller", func() {
 			SetBackupPolicyName(backupPolicyName).
 			SetBackupMethod(backupMethod).
 			SetLabels(map[string]string{
-				constant.AppManagedByLabelKey:     constant.AppName,
-				constant.AppInstanceLabelKey:      clusterObj.Name,
-				constant.BackupProtectionLabelKey: backupRetainPolicy,
+				constant.AppManagedByLabelKey: constant.AppName,
+				constant.AppInstanceLabelKey:  clusterObj.Name,
 			}).
 			WithRandomName().
 			Create(&testCtx).GetObject()
@@ -792,7 +791,7 @@ var _ = Describe("Cluster Controller", func() {
 		Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1.Cluster{}, false)).Should(Succeed())
 
 		By(fmt.Sprintf("checking the backup with TerminationPolicyType=%s", terminationPolicy))
-		if terminationPolicy == appsv1.WipeOut && backupRetainPolicy == constant.BackupDelete {
+		if terminationPolicy == appsv1.WipeOut {
 			Eventually(testapps.CheckObjExists(&testCtx, backupKey, &dpv1alpha1.Backup{}, false)).Should(Succeed())
 		} else {
 			Consistently(testapps.CheckObjExists(&testCtx, backupKey, &dpv1alpha1.Backup{}, true)).Should(Succeed())
@@ -804,7 +803,7 @@ var _ = Describe("Cluster Controller", func() {
 			Client:  testCtx.Cli,
 		}
 		var namespacedKinds, clusteredKinds []client.ObjectList
-		if terminationPolicy == appsv1.WipeOut && backupRetainPolicy == constant.BackupDelete {
+		if terminationPolicy == appsv1.WipeOut {
 			namespacedKinds, clusteredKinds = kindsForWipeOut()
 		} else {
 			namespacedKinds, clusteredKinds = kindsForDelete()
@@ -817,12 +816,12 @@ var _ = Describe("Cluster Controller", func() {
 
 	testDeleteClusterWithDelete := func(createObj func(appsv1.TerminationPolicyType)) {
 		createObj(appsv1.Delete)
-		deleteClusterWithBackup(appsv1.Delete, constant.BackupRetain)
+		deleteClusterWithBackup(appsv1.Delete)
 	}
 
-	testDeleteClusterWithWipeOut := func(createObj func(appsv1.TerminationPolicyType), backupRetainPolicy string) {
+	testDeleteClusterWithWipeOut := func(createObj func(appsv1.TerminationPolicyType)) {
 		createObj(appsv1.WipeOut)
-		deleteClusterWithBackup(appsv1.WipeOut, backupRetainPolicy)
+		deleteClusterWithBackup(appsv1.WipeOut)
 	}
 
 	Context("cluster provisioning", func() {
@@ -909,13 +908,10 @@ var _ = Describe("Cluster Controller", func() {
 			testDeleteClusterWithDelete(createObj)
 		})
 
-		It("delete cluster with terminationPolicy=WipeOut and backupRetainPolicy=Delete", func() {
-			testDeleteClusterWithWipeOut(createObj, constant.BackupDelete)
+		It("delete cluster with terminationPolicy=WipeOut", func() {
+			testDeleteClusterWithWipeOut(createObj)
 		})
 
-		It("delete cluster with terminationPolicy=WipeOut and backupRetainPolicy=Retain", func() {
-			testDeleteClusterWithWipeOut(createObj, constant.BackupRetain)
-		})
 	})
 
 	Context("cluster status", func() {

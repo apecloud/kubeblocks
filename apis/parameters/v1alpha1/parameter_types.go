@@ -71,16 +71,6 @@ type ParameterSpec struct {
 
 // ParameterStatus defines the observed state of Parameter
 type ParameterStatus struct {
-	// Describes the reconfiguring detail status.
-	// Possible condition types include "Creating", "Init", "Running", "Pending", "Merged", "MergeFailed", "FailedAndPause",
-	// "Upgrading", "Deleting", "FailedAndRetry", "Finished", "ReconfigurePersisting", "ReconfigurePersisted".
-	// +optional
-	// +patchMergeKey=type
-	// +patchStrategy=merge
-	// +listType=map
-	// +listMapKey=type
-	Conditions []metav1.Condition `json:"conditions,omitempty"`
-
 	// Provides a description of any abnormal status.
 	// +optional
 	Message string `json:"message,omitempty"`
@@ -113,7 +103,7 @@ type ComponentParametersSpec struct {
 	// Specifies the user-defined configuration template or parameters.
 	//
 	// +optional
-	ComponentParameters appsv1.ComponentParameters `json:"parameters,omitempty"`
+	Parameters appsv1.ComponentParameters `json:"parameters,omitempty"`
 
 	// Specifies the user-defined configuration template.
 	//

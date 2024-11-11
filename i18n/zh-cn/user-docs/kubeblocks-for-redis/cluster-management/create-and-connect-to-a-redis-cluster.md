@@ -23,6 +23,17 @@ import TabItem from '@theme/TabItem';
   
   <Tabs>
 
+  <TabItem value="kubectl" label="kubectl" default>
+
+  ```bash
+  kubectl get addons.extensions.kubeblocks.io redis
+  >
+  NAME      TYPE   VERSION   PROVIDER   STATUS    AGE
+  redis     Helm                        Enabled   61m
+  ```
+
+  </TabItem>
+
   <TabItem value="kbcli" label="kbcli">
 
   ```bash
@@ -36,39 +47,11 @@ import TabItem from '@theme/TabItem';
 
   </TabItem>
 
-  <TabItem value="kubectl" label="kubectl" default>
-
-  ```bash
-  kubectl get addons.extensions.kubeblocks.io redis
-  >
-  NAME      TYPE   VERSION   PROVIDER   STATUS    AGE
-  redis     Helm                        Enabled   61m
-  ```
-
-  </TabItem>
-
   </Tabs>
 
 * 查看可用于创建集群的数据库类型和版本。
 
   <Tabs>
-
-  <TabItem value="kbcli" label="kbcli">
-
-  ```bash
-  kbcli clusterdefinition list
-  >
-  NAME               TOPOLOGIES                                              SERVICEREFS   STATUS      AGE
-  redis              replication,replication-twemproxy,standalone                          Available   16m
-
-  kbcli clusterversion list
-  >
-  NAME                 CLUSTER-DEFINITION   STATUS      IS-DEFAULT   CREATED-TIME
-  redis-7.0.6          redis                Available   false        Sep 27,2024 11:36 UTC+0800
-  redis-7.2.4          redis                Available   false        Sep 27,2024 11:36 UTC+0800
-  ```
-
-  </TabItem>
 
   <TabItem value="kubectl" label="kubectl" default>
 
@@ -89,6 +72,23 @@ import TabItem from '@theme/TabItem';
 
   </TabItem>
 
+  <TabItem value="kbcli" label="kbcli">
+
+  ```bash
+  kbcli clusterdefinition list
+  >
+  NAME               TOPOLOGIES                                              SERVICEREFS   STATUS      AGE
+  redis              replication,replication-twemproxy,standalone                          Available   16m
+
+  kbcli clusterversion list
+  >
+  NAME                 CLUSTER-DEFINITION   STATUS      IS-DEFAULT   CREATED-TIME
+  redis-7.0.6          redis                Available   false        Sep 27,2024 11:36 UTC+0800
+  redis-7.2.4          redis                Available   false        Sep 27,2024 11:36 UTC+0800
+  ```
+
+  </TabItem>
+
   </Tabs>
 
 * 为了保持隔离，本文档中创建一个名为 `demo` 的独立命名空间。
@@ -104,33 +104,6 @@ import TabItem from '@theme/TabItem';
 KubeBlocks 支持创建两种 Redis 集群：单机版（Standalone）和主备版（Replication）。Redis 单机版仅支持一个副本，适用于对可用性要求较低的场景。 对于高可用性要求较高的场景，建议创建主备版集群，以支持自动故障切换。为了确保高可用性，所有的副本都默认分布在不同的节点上。
 
 <Tabs>
-
-<TabItem value="kbcli" label="kbcli">
-
-1. 创建 Redis 集群。
-
-   ```bash
-   kbcli cluster create redis mycluster -n demo
-   ```
-
-   如果您需要自定义集群规格，kbcli 也提供了诸多参数，如支持设置引擎版本、终止策略、CPU、内存规格。您可通过在命令结尾添加 `--help` 或 `-h` 来查看具体说明。比如，
-
-   ```bash
-   kbcli cluster create redis --help
-
-   kbcli cluster create redis -h
-   ```
-
-2. 验证集群是否创建成功。
-
-   ```bash
-   kbcli cluster list -n demo
-   >
-   NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION   TERMINATION-POLICY   STATUS     CREATED-TIME
-   mycluster   demo        redis                          Delete               Running    Sep 29,2024 09:46 UTC+0800
-   ```
-
-</TabItem>
 
 <TabItem value="kubectl" label="kubectl" default>
 
@@ -216,6 +189,33 @@ KubeBlocks 支持创建两种 Redis 集群：单机版（Standalone）和主备�
 
    ```bash
    kubectl get cluster mycluster -n demo
+   ```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+1. 创建 Redis 集群。
+
+   ```bash
+   kbcli cluster create redis mycluster -n demo
+   ```
+
+   如果您需要自定义集群规格，kbcli 也提供了诸多参数，如支持设置引擎版本、终止策略、CPU、内存规格。您可通过在命令结尾添加 `--help` 或 `-h` 来查看具体说明。比如，
+
+   ```bash
+   kbcli cluster create redis --help
+
+   kbcli cluster create redis -h
+   ```
+
+2. 验证集群是否创建成功。
+
+   ```bash
+   kbcli cluster list -n demo
+   >
+   NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION   TERMINATION-POLICY   STATUS     CREATED-TIME
+   mycluster   demo        redis                          Delete               Running    Sep 29,2024 09:46 UTC+0800
    ```
 
 </TabItem>

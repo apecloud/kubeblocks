@@ -30,17 +30,6 @@ import TabItem from '@theme/TabItem';
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli">
-
-```bash
-kbcli cluster list mycluster -n demo
->
-NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION   TERMINATION-POLICY   STATUS     CREATED-TIME
-mycluster   demo        redis                          Delete               Running    Sep 29,2024 09:46 UTC+0800
-```
-
-</TabItem>
-
 <TabItem value="kubectl" label="kubectl" default>
 
 ```bash
@@ -52,6 +41,17 @@ mycluster   redis                              Delete               Running   10
 
 </TabItem>
 
+<TabItem value="kbcli" label="kbcli">
+
+```bash
+kbcli cluster list mycluster -n demo
+>
+NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION   TERMINATION-POLICY   STATUS     CREATED-TIME
+mycluster   demo        redis                          Delete               Running    Sep 29,2024 09:46 UTC+0800
+```
+
+</TabItem>
+
 </Tabs>
 
 ## 步骤
@@ -59,14 +59,6 @@ mycluster   redis                              Delete               Running   10
 执行以下命令，删除集群。
 
 <Tabs>
-
-<TabItem value="kbcli" label="kbcli">
-
-```bash
-kbcli cluster delete mycluster -n demo
-```
-
-</TabItem>
 
 <TabItem value="kubectl" label="kubectl" default>
 
@@ -80,6 +72,14 @@ kubectl delete cluster mycluster -n demo
 kubectl patch -n demo cluster mycluster -p '{"spec":{"terminationPolicy":"WipeOut"}}' --type="merge"
 
 kubectl delete -n demo cluster mycluster
+```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+```bash
+kbcli cluster delete mycluster -n demo
 ```
 
 </TabItem>

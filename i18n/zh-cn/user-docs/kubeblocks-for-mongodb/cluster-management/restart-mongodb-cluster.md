@@ -17,37 +17,6 @@ KubeBlocks 支持重启集群中的所有 Pod。当数据库出现异常时，�
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli">
-
-1. 使用 `kbcli cluster restart` 命令重启集群，然后再次输入集群名称。
-
-    ```bash
-    kbcli cluster restart mycluster -n demo
-    >
-    OpsRequest mongodb-cluster-restart-pzsbj created successfully, you can view the progress:
-          kbcli cluster describe-ops mongodb-cluster-restart-pzsbj -n demo
-    ```
-
-2. 查看集群状态，验证重启操作。
-
-   ```bash
-   kbcli cluster list mycluster -n demo
-   >
-   NAME                   NAMESPACE        CLUSTER-DEFINITION        VERSION            TERMINATION-POLICY        STATUS         CREATED-TIME
-   mongodb-cluster        default          mongodb                   mongodb-5.0        Delete                    Running        Apr 26,2023 12:50 UTC+0800
-   ```
-
-   - STATUS=Updating 表示集群正在重启中。
-   - STATUS=Running 表示集群已重启。
-
-   您也可以使用在步骤 1 中随机生成的请求代码（本例中为 `pzsbj`）验证重启操作是否成功。
-
-    ```bash
-    kbcli cluster describe-ops mycluster-restart-pzsbj -n demo
-    ```
-
-</TabItem>
-
 <TabItem value="kubectl" label="kubectl" default>
 
 1. 创建 OpsRequest 重启集群。
@@ -87,6 +56,37 @@ KubeBlocks 支持重启集群中的所有 Pod。当数据库出现异常时，�
    - STATUS=Running：表示集群已重启。
 
    如果操作过程中出现报错，可通过 `kubectl describe ops -n demo` 查看该操作的事件，协助排障。
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+1. 使用 `kbcli cluster restart` 命令重启集群，然后再次输入集群名称。
+
+    ```bash
+    kbcli cluster restart mycluster -n demo
+    >
+    OpsRequest mongodb-cluster-restart-pzsbj created successfully, you can view the progress:
+          kbcli cluster describe-ops mongodb-cluster-restart-pzsbj -n demo
+    ```
+
+2. 查看集群状态，验证重启操作。
+
+   ```bash
+   kbcli cluster list mycluster -n demo
+   >
+   NAME                   NAMESPACE        CLUSTER-DEFINITION        VERSION            TERMINATION-POLICY        STATUS         CREATED-TIME
+   mongodb-cluster        default          mongodb                   mongodb-5.0        Delete                    Running        Apr 26,2023 12:50 UTC+0800
+   ```
+
+   - STATUS=Updating 表示集群正在重启中。
+   - STATUS=Running 表示集群已重启。
+
+   您也可以使用在步骤 1 中随机生成的请求代码（本例中为 `pzsbj`）验证重启操作是否成功。
+
+    ```bash
+    kbcli cluster describe-ops mycluster-restart-pzsbj -n demo
+    ```
 
 </TabItem>
 

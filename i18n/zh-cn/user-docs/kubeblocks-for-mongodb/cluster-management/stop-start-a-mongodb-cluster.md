@@ -84,18 +84,18 @@ import TabItem from '@theme/TabItem';
 
     <Tabs>
 
-    <TabItem value="kbcli" label="kbcli">
-
-    ```bash
-    kbcli cluster list mycluster -n demo
-    ```
-
-    </TabItem>
-
     <TabItem value="kubectl" label="kubectl" default>
 
     ```bash
     kubectl get cluster mycluster -n demo
+    ```
+
+    </TabItem>
+
+    <TabItem value="kbcli" label="kbcli">
+
+    ```bash
+    kbcli cluster list mycluster -n demo
     ```
 
     </TabItem>
@@ -171,18 +171,18 @@ import TabItem from '@theme/TabItem';
 
     <Tabs>
 
-    <TabItem value="kbcli" label="kbcli">
-
-    ```bash
-    kbcli cluster list mycluster -n demo
-    ```
-
-    </TabItem>
-
     <TabItem value="kubectl" label="kubectl" default>
 
     ```bash
     kubectl get cluster mycluster -n demo
+    ```
+
+    </TabItem>
+
+    <TabItem value="kbcli" label="kbcli">
+
+    ```bash
+    kbcli cluster list mycluster -n demo
     ```
 
     </TabItem>

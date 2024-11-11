@@ -30,14 +30,6 @@ import TabItem from '@theme/TabItem';
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli">
-
-```bash
-kbcli cluster list mycluster -n demo
-```
-
-</TabItem>
-
 <TabItem value="kubectl" label="kubectl" default>
 
 ```bash
@@ -49,6 +41,14 @@ mycluster   mongodb              mongodb-5.0   Delete               Running   17
 
 </TabItem>
 
+<TabItem value="kbcli" label="kbcli">
+
+```bash
+kbcli cluster list mycluster -n demo
+```
+
+</TabItem>
+
 </Tabs>
 
 ## 步骤
@@ -56,14 +56,6 @@ mycluster   mongodb              mongodb-5.0   Delete               Running   17
 执行以下命令，删除集群。
 
 <Tabs>
-
-<TabItem value="kbcli" label="kbcli">
-
-```bash
-kbcli cluster delete mycluster -n demo
-```
-
-</TabItem>
 
 <TabItem value="kubectl" label="kubectl" default>
 
@@ -77,6 +69,14 @@ kubectl delete -n demo cluster mycluster
 kubectl patch -n demo cluster mycluster -p '{"spec":{"terminationPolicy":"WipeOut"}}' --type="merge"
 
 kubectl delete -n demo cluster mycluster
+```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+```bash
+kbcli cluster delete mycluster -n demo
 ```
 
 </TabItem>

@@ -23,17 +23,6 @@ KubeBlocks 支持对 Redis 集群进行垂直扩缩容和水平扩缩容。
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli">
-
-```bash
-kbcli cluster list mycluster -n demo
->
-NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION   TERMINATION-POLICY   STATUS    CREATED-TIME
-mycluster   demo        redis                          Delete               Running   Sep 29,2024 09:46 UTC+0800
-```
-
-</TabItem>
-
 <TabItem value="kubectl" label="kubectl" default>
 
 ```bash
@@ -45,13 +34,24 @@ mycluster      redis                               Delete               Running 
 
 </TabItem>
 
+<TabItem value="kbcli" label="kbcli">
+
+```bash
+kbcli cluster list mycluster -n demo
+>
+NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION   TERMINATION-POLICY   STATUS    CREATED-TIME
+mycluster   demo        redis                          Delete               Running   Sep 29,2024 09:46 UTC+0800
+```
+
+</TabItem>
+
 </Tabs>
 
 ### 步骤
 
 <Tabs>
 
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 1. 对指定的集群应用 OpsRequest，可根据您的需求配置参数。
 
@@ -208,17 +208,6 @@ mycluster      redis                               Delete               Running 
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli">
-
-```bash
-kbcli cluster list mycluster -n demo
->
-NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION   TERMINATION-POLICY   STATUS    CREATED-TIME
-mycluster   demo        redis                          Delete               Running   Sep 29,2024 09:46 UTC+0800
-```
-
-</TabItem>
-
 <TabItem value="kubectl" label="kubectl" default>
 
 ```bash
@@ -226,6 +215,17 @@ kubectl -n demo get cluster mycluster
 >
 NAME           CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS     AGE
 mycluster      redis                               Delete               Running    19m
+```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+```bash
+kbcli cluster list mycluster -n demo
+>
+NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION   TERMINATION-POLICY   STATUS    CREATED-TIME
+mycluster   demo        redis                          Delete               Running   Sep 29,2024 09:46 UTC+0800
 ```
 
 </TabItem>

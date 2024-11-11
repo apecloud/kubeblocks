@@ -50,69 +50,6 @@ Redis Sentinel 是 Redis 官方推荐的主备集群高可用性解决方案，�
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli">
-
-1. 查看 Redis 集群的初始状态。
-
-   ```bash
-   kbcli cluster describe redis-cluster
-   ```
-
-   ![Redis cluster original status](./../../../img/redis-high-availability-initial-status.png)
-
-   当前 `redis-cluster-redis-0` 是主节点，`redis-cluster-redis-1` 是从节点。
-
-2. 模拟主节点异常。
-
-   ```bash
-   # 进入主节点
-   kubectl exec -it redis-cluster-redis-0  -- bash
-
-   # 执行 debug sleep 命令，模拟主节点异常
-   root@redis-redis-0:/# redis-cli debug sleep 30
-   ```
-
-3. 打开 Redis Sentinel 日志，查看故障切换情况。
-
-   ```bash
-   kubectl logs redis-cluster-redis-sentinel-0
-   ```
-
-   在日志中可以看到高可用性切换发生的时间。
-
-   ```bash
-   1:X 18 Apr 2023 06:13:17.072 # +switch-master redis-cluster-redis-sentinel redis-cluster-redis-0.redis-cluster-redis-headless.default.svc 6379 redis-cluster-redis-1.redis-cluster-redis-headless.default.svc 6379
-   1:X 18 Apr 2023 06:13:17.074 * +slave slave redis-cluster-redis-0.redis-cluster-redis-headless.default.svc:6379 redis-cluster-redis-0.redis-cluster-redis-headless.default.svc 6379 @ redis-cluster-redis-sentinel redis-cluster-redis-1.redis-cluster-redis-headless.default.svc 6379
-   1:X 18 Apr 2023 06:13:17.077 * Sentinel new configuration saved on disk
-   ```
-
-4. 连接到 Redis 集群，查看异常发生后的主节点信息。
-
-   ```bash
-   kbcli cluster connect redis-cluster
-   ```
-
-   ```bash
-   # 查看当前的主节点
-   127.0.0.1:6379> info replication
-   ```
-
-   ![Redis info replication](./../../../img/redis-high-availability-status-after-exception.png)
-
-   从输出可以看到，`redis-cluster-redis-1` 是主节点。
-
-5. 查看集群，检查实例角色。
-
-   ```bash
-   kbcli cluster describe redis-cluster
-   ```
-
-   ![Redis cluster status after HA](./../../../img/redis-high-availability-role.png)
-
-   故障切换后，`redis-cluster-redis-0` 变成了从节点，`redis-cluster-redis-1` 变成了主节点。
-
-</TabItem>
-
 <TabItem value="kubectl" label="kubectl" default>
 
 1. 查看 Redis 集群的初始状态。
@@ -181,6 +118,69 @@ Redis Sentinel 是 Redis 官方推荐的主备集群高可用性解决方案，�
    ```
 
    故障切换后，`mycluster-redis-0` 变成了从节点，`mycluster-redis-1` 变成了主节点。
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+1. 查看 Redis 集群的初始状态。
+
+   ```bash
+   kbcli cluster describe redis-cluster
+   ```
+
+   ![Redis cluster original status](./../../../img/redis-high-availability-initial-status.png)
+
+   当前 `redis-cluster-redis-0` 是主节点，`redis-cluster-redis-1` 是从节点。
+
+2. 模拟主节点异常。
+
+   ```bash
+   # 进入主节点
+   kubectl exec -it redis-cluster-redis-0  -- bash
+
+   # 执行 debug sleep 命令，模拟主节点异常
+   root@redis-redis-0:/# redis-cli debug sleep 30
+   ```
+
+3. 打开 Redis Sentinel 日志，查看故障切换情况。
+
+   ```bash
+   kubectl logs redis-cluster-redis-sentinel-0
+   ```
+
+   在日志中可以看到高可用性切换发生的时间。
+
+   ```bash
+   1:X 18 Apr 2023 06:13:17.072 # +switch-master redis-cluster-redis-sentinel redis-cluster-redis-0.redis-cluster-redis-headless.default.svc 6379 redis-cluster-redis-1.redis-cluster-redis-headless.default.svc 6379
+   1:X 18 Apr 2023 06:13:17.074 * +slave slave redis-cluster-redis-0.redis-cluster-redis-headless.default.svc:6379 redis-cluster-redis-0.redis-cluster-redis-headless.default.svc 6379 @ redis-cluster-redis-sentinel redis-cluster-redis-1.redis-cluster-redis-headless.default.svc 6379
+   1:X 18 Apr 2023 06:13:17.077 * Sentinel new configuration saved on disk
+   ```
+
+4. 连接到 Redis 集群，查看异常发生后的主节点信息。
+
+   ```bash
+   kbcli cluster connect redis-cluster
+   ```
+
+   ```bash
+   # 查看当前的主节点
+   127.0.0.1:6379> info replication
+   ```
+
+   ![Redis info replication](./../../../img/redis-high-availability-status-after-exception.png)
+
+   从输出可以看到，`redis-cluster-redis-1` 是主节点。
+
+5. 查看集群，检查实例角色。
+
+   ```bash
+   kbcli cluster describe redis-cluster
+   ```
+
+   ![Redis cluster status after HA](./../../../img/redis-high-availability-role.png)
+
+   故障切换后，`redis-cluster-redis-0` 变成了从节点，`redis-cluster-redis-1` 变成了主节点。
 
 </TabItem>
 

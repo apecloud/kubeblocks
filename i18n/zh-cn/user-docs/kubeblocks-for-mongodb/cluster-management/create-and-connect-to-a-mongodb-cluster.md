@@ -23,6 +23,17 @@ import TabItem from '@theme/TabItem';
 
    <Tabs>
 
+   <TabItem value="kubectl" label="kubectl" default>
+
+   ```bash
+   kubectl get addons.extensions.kubeblocks.io mongodb
+   >
+   NAME      TYPE   VERSION   PROVIDER   STATUS    AGE
+   mongodb   Helm                        Enabled   23m
+   ```
+
+   </TabItem>
+
    <TabItem value="kbcli" label="kbcli">
 
    ```bash
@@ -36,32 +47,11 @@ import TabItem from '@theme/TabItem';
 
    </TabItem>
 
-   <TabItem value="kubectl" label="kubectl" default>
-
-   ```bash
-   kubectl get addons.extensions.kubeblocks.io mongodb
-   >
-   NAME      TYPE   VERSION   PROVIDER   STATUS    AGE
-   mongodb   Helm                        Enabled   23m
-   ```
-
-   </TabItem>
-
    </Tabs>
 
 * 查看可用于创建集群的数据库类型和版本。
 
    <Tabs>
-
-   <TabItem value="kbcli" label="kbcli">
-
-   ```bash
-   kbcli clusterdefinition list
-
-   kbcli clusterversion list
-   ```
-
-   </TabItem>
 
    <TabItem value="kubectl" label="kubectl" default>
 
@@ -74,6 +64,16 @@ import TabItem from '@theme/TabItem';
 
    ```bash
    kubectl get clusterversions -l clusterdefinition.kubeblocks.io/name=mongodb
+   ```
+
+   </TabItem>
+
+   <TabItem value="kbcli" label="kbcli">
+
+   ```bash
+   kbcli clusterdefinition list
+
+   kbcli clusterversion list
    ```
 
    </TabItem>
@@ -93,44 +93,6 @@ import TabItem from '@theme/TabItem';
 KubeBlocks 支持创建两种 MongoDB 集群：单机版（Standalone）和主备版（ReplicaSet）。MongoDB 单机版仅支持一个副本，适用于对可用性要求较低的场景。对于高可用性要求较高的场景，建议创建主备版集群，以支持自动故障切换。为了确保高可用性，所有的副本都默认分布在不同的节点上。
 
 <Tabs>
-
-<TabItem value="kbcli" label="kbcli">
-
-1. 创建 MongoDB 集群。
-
-   ```bash
-   kbcli cluster create mongodb mycluster -n demo
-   ```
-
-   如果您需要自定义集群规格，kbcli 也提供了诸多参数，如支持设置引擎版本、终止策略、CPU、内存规格。您可通过在命令结尾添加 `--help` 或 `-h` 来查看具体说明。比如，
-
-   ```bash
-   kbcli cluster create mongodb --help
-   kbcli cluster create mongodb -h
-   ```
-
-   例如，您可使用 `--mode` 指定集群形态，创建 MongoDB 主备版。
-
-   ```bash
-   kbcli cluster create mongodb mycluster --mode replicaset -n demo
-   ```
-
-   如果只有一个节点用于部署主备版集群，请在创建集群时将 `availability-policy` 设置为 `none`。但需要注意的是，生产环境中，不建议将所有副本部署在同一个节点上，因为这可能会降低集群的可用性。
-
-   ```bash
-   kbcli cluster create mongodb mycluster --mode replicaset --availability-policy none -n demo
-   ```
-
-2. 验证集群是否创建成功。
-
-   ```bash
-   kbcli cluster list -n demo
-   >
-   NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    CREATED-TIME
-   mycluster   demo        mongodb              mongodb-7.0.12    Delete               Running   Sep 19,2024 16:01 UTC+0800
-   ```
-
-</TabItem>
 
 <TabItem value="kubectl" label="kubectl" default>
 
@@ -216,6 +178,44 @@ KubeBlocks 支持创建两种 MongoDB 集群：单机版（Standalone）和主�
 
    ```bash
    kubectl get cluster mycluster -n demo
+   ```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+1. 创建 MongoDB 集群。
+
+   ```bash
+   kbcli cluster create mongodb mycluster -n demo
+   ```
+
+   如果您需要自定义集群规格，kbcli 也提供了诸多参数，如支持设置引擎版本、终止策略、CPU、内存规格。您可通过在命令结尾添加 `--help` 或 `-h` 来查看具体说明。比如，
+
+   ```bash
+   kbcli cluster create mongodb --help
+   kbcli cluster create mongodb -h
+   ```
+
+   例如，您可使用 `--mode` 指定集群形态，创建 MongoDB 主备版。
+
+   ```bash
+   kbcli cluster create mongodb mycluster --mode replicaset -n demo
+   ```
+
+   如果只有一个节点用于部署主备版集群，请在创建集群时将 `availability-policy` 设置为 `none`。但需要注意的是，生产环境中，不建议将所有副本部署在同一个节点上，因为这可能会降低集群的可用性。
+
+   ```bash
+   kbcli cluster create mongodb mycluster --mode replicaset --availability-policy none -n demo
+   ```
+
+2. 验证集群是否创建成功。
+
+   ```bash
+   kbcli cluster list -n demo
+   >
+   NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    CREATED-TIME
+   mycluster   demo        mongodb              mongodb-7.0.12    Delete               Running   Sep 19,2024 16:01 UTC+0800
    ```
 
 </TabItem>

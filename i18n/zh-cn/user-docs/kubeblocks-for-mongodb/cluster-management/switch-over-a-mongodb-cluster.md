@@ -34,28 +34,6 @@ import TabItem from '@theme/TabItem';
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli">
-
-* 不指定主节点实例进行切换。
-
-    ```bash
-    kbcli cluster promote mycluster -n demo
-    ```
-
-* 指定一个新的主节点实例进行切换。
-
-    ```bash
-    kbcli cluster promote mycluster --instance='mycluster-mongodb-2' -n demo
-    ```
-
-* 如果有多个组件，可以使用 `--components` 参数指定一个组件。
-
-    ```bash
-    kbcli cluster promote mycluster --instance='mycluster-mongodb-2' --components='mongodb' -n demo
-    ```
-
-</TabItem>
-
 <TabItem value="kubectl" label="kubectl" default>
 
 `instanceName` 字段的值定义了本次切换是否指定了新的主节点实例。
@@ -98,6 +76,28 @@ import TabItem from '@theme/TabItem';
 
 </TabItem>
 
+<TabItem value="kbcli" label="kbcli">
+
+* 不指定主节点实例进行切换。
+
+    ```bash
+    kbcli cluster promote mycluster -n demo
+    ```
+
+* 指定一个新的主节点实例进行切换。
+
+    ```bash
+    kbcli cluster promote mycluster --instance='mycluster-mongodb-2' -n demo
+    ```
+
+* 如果有多个组件，可以使用 `--components` 参数指定一个组件。
+
+    ```bash
+    kbcli cluster promote mycluster --instance='mycluster-mongodb-2' --components='mongodb' -n demo
+    ```
+
+</TabItem>
+
 </Tabs>
 
 ## 验证集群切换
@@ -106,18 +106,18 @@ import TabItem from '@theme/TabItem';
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli">
-
-```bash
-kbcli cluster list-instances -n demo
-```
-
-</TabItem>
-
 <TabItem value="kubectl" label="kubectl" default>
 
 ```bash
 kubectl get pods -n demo
+```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+```bash
+kbcli cluster list-instances -n demo
 ```
 
 </TabItem>

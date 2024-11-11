@@ -23,17 +23,6 @@ KubeBlocks 支持对 MongoDB 集群进行垂直扩缩容。
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli">
-
-```bash
-kbcli cluster list mycluster -n demo
->
-NAME             NAMESPACE        CLUSTER-DEFINITION    VERSION            TERMINATION-POLICY        STATUS         CREATED-TIME
-mycluster        demo             mongodb               mongodb-5.0        Delete                    Running        Apr 10,2023 16:20 UTC+0800
-```
-
-</TabItem>
-
 <TabItem value="kubectl" label="kubectl" default>
 
 ```bash
@@ -41,6 +30,17 @@ kubectl get cluster mycluster -n demo
 >
 NAME        CLUSTER-DEFINITION   VERSION       TERMINATION-POLICY   STATUS    AGE
 mycluster   mongodb              mongodb-5.0   Delete               Running   27m
+```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+```bash
+kbcli cluster list mycluster -n demo
+>
+NAME             NAMESPACE        CLUSTER-DEFINITION    VERSION            TERMINATION-POLICY        STATUS         CREATED-TIME
+mycluster        demo             mongodb               mongodb-5.0        Delete                    Running        Apr 10,2023 16:20 UTC+0800
 ```
 
 </TabItem>
@@ -234,17 +234,6 @@ mycluster   mongodb              mongodb-5.0   Delete               Running   27
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli">
-
-```bash
-kbcli cluster list mycluster -n demo
->
-NAME          NAMESPACE     CLUSTER-DEFINITION    VERSION          TERMINATION-POLICY        STATUS         CREATED-TIME
-mycluster     demo          mongodb               mongodb-5.0      Delete                    Running        April 26,2023 12:00 UTC+0800
-```
-
-</TabItem>
-
 <TabItem value="kubectl" label="kubectl" default>
 
 ```bash
@@ -252,6 +241,17 @@ kubectl get cluster mycluster -n demo
 >
 NAME        CLUSTER-DEFINITION   VERSION       TERMINATION-POLICY     STATUS    AGE
 mycluster   mongodb              mongodb-5.0   Delete                 Running   47m
+```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+```bash
+kbcli cluster list mycluster -n demo
+>
+NAME          NAMESPACE     CLUSTER-DEFINITION    VERSION          TERMINATION-POLICY        STATUS         CREATED-TIME
+mycluster     demo          mongodb               mongodb-5.0      Delete                    Running        April 26,2023 12:00 UTC+0800
 ```
 
 </TabItem>

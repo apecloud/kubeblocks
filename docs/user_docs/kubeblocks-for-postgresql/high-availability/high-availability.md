@@ -167,11 +167,11 @@ KubeBlocks integrates [the open-source Patroni solution](https://patroni.readthe
 4. Connect to the PostgreSQL cluster to view the replication information.
 
    ```bash
-   kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\username}' | base64 -d
+   kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.username}' | base64 -d
    >
    postgres
 
-   kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\password}' | base64 -d
+   kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.password}' | base64 -d
    >
    shgkz4z9
 

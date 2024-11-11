@@ -27,7 +27,7 @@ KubeBlocks v0.8.0 发布后，数据库引擎插件（Addon）与 KubeBlocks 解
    helm search repo kubeblocks/etcd --devel --versions
    ```
 
-3. 以 ectd 为例，安装引擎。使用 `--version` 指定版本。
+3. 以 etcd 为例，安装引擎。使用 `--version` 指定版本。
 
    ```bash
    helm install etcd kubeblocks/etcd --namespace kb-system --create-namespace --version x.y.z

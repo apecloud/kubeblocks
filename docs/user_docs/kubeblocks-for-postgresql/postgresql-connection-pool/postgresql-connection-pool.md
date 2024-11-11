@@ -119,11 +119,11 @@ When creating a PostgreSQL cluster with KubeBlocks, PgBouncer is installed by de
 3. Run the command below to get the `username` and `password` for the `kubectl exec` command.
 
     ```bash
-    kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\username}' | base64 -d
+    kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.username}' | base64 -d
     >
     postgres
 
-    kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\password}' | base64 -d
+    kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.password}' | base64 -d
     >
     shgkz4z9
    ```

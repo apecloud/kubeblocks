@@ -24,7 +24,7 @@ You can restart all pods of the cluster. When an exception occurs in a database,
    Configure the values of `components` and `ttlSecondsAfterSucceed` and run the command below to restart a specified cluster.
 
    ```bash
-   kbcli cluster restart <name> --components="mysql" --ttlSecondsAfterSucceed=30
+   kbcli cluster restart mycluster --components="mysql" --ttlSecondsAfterSucceed=30 -n demo
    ```
 
    - `components` describes the component name that needs to be restarted.
@@ -33,7 +33,7 @@ You can restart all pods of the cluster. When an exception occurs in a database,
 2. Check the cluster status to validate the restarting.
 
    ```bash
-   kbcli cluster list mycluster
+   kbcli cluster list mycluster -n demo
    >
    NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    CREATED-TIME
    mycluster   demo        apecloud-mysql       ac-mysql-8.0.30   Delete               Running   Sep 19,2024 16:01 UTC+0800

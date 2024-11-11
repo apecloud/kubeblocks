@@ -1,7 +1,7 @@
 ---
 title: 删除集群
 description: 如何删除集群
-keywords: [kafka, 删除集群, 删除保护]
+keywords: [pulsar, 删除集群, 删除保护]
 sidebar_position: 7
 sidebar_label: 删除保护
 ---
@@ -30,13 +30,10 @@ import TabItem from '@theme/TabItem';
 
 <Tabs>
 
-<TabItem value="kubectl" label="kubectl" default>
+<TabItem value="kubectl" label="kubectl"  default>
 
 ```bash
-kubectl -n demo get cluster mycluster
->
-NAME           CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS     AGE
-mycluster      kafka                kafka-3.3.2    Delete               Running    19m
+kubectl get cluster mycluster -n demo
 ```
 
 </TabItem>
@@ -45,9 +42,6 @@ mycluster      kafka                kafka-3.3.2    Delete               Running 
 
 ```bash
 kbcli cluster list mycluster -n demo
->
-NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION       TERMINATION-POLICY   STATUS    CREATED-TIME
-mycluster   demo        kafka                kafka-3.3.2   Delete               Running   Sep 27,2024 15:15 UTC+0800
 ```
 
 </TabItem>

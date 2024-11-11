@@ -19,17 +19,6 @@ KubeBlocks 支持 Pod 磁盘存储扩容。
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli">
-
-```bash
-kbcli cluster list mycluster -n demo
->
-NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION       TERMINATION-POLICY   STATUS    CREATED-TIME
-mycluster   demo        kafka                kafka-3.3.2   Delete               Running   Sep 27,2024 15:15 UTC+0800
-```
-
-</TabItem>
-
 <TabItem value="kubectl" label="kubectl" default>
 
 ```bash
@@ -37,6 +26,17 @@ kubectl -n demo get cluster mycluster
 >
 NAME           CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS     AGE
 mycluster      kafka                kafka-3.3.2    Delete               Running    19m
+```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+```bash
+kbcli cluster list mycluster -n demo
+>
+NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION       TERMINATION-POLICY   STATUS    CREATED-TIME
+mycluster   demo        kafka                kafka-3.3.2   Delete               Running   Sep 27,2024 15:15 UTC+0800
 ```
 
 </TabItem>

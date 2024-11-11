@@ -30,8 +30,6 @@ import TabItem from '@theme/TabItem';
 
 <TabItem value="编辑配置文件" label="编辑配置文件">
 
-## 通过编辑配置文件配置参数
-
 1. 编辑 Pulsar 集群的 `broker.conf` 文件。本文实例修改了名为 `pulsar-broker-broker-config` 的文件。
 
    ```bash
@@ -137,9 +135,9 @@ kbcli cluster describe-config mycluster -n demo
 
 * 查看集群的当前配置文件。
 
-```bash
-kbcli cluster describe-config mycluster -n demo 
-```
+  ```bash
+  kbcli cluster describe-config mycluster -n demo 
+  ```
 
 * 查看当前配置文件的详细信息。
 

@@ -183,7 +183,7 @@ kubectl get cluster mycluster -n demo -o yaml
 
 </Tabs>
 
-## 连接到向量数据库集群
+## 连接到 Qdrant 集群
 
 Qdrant 提供两种客户端访问协议：HTTP 和 gRPC，它们分别使用端口 6333 和 6334 进行通信。根据客户端所在的位置，你可以使用不同的方法连接到 Qdrant 集群。
 
@@ -215,17 +215,6 @@ Qdrant 的监控功能与其他引擎相同，可查看[监控文档](./../obser
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli">
-
-```bash
-kbcli cluster list mycluster -n demo
->
-NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION   TERMINATION-POLICY   STATUS    CREATED-TIME
-mycluster   demo        qdrant                         Delete               Running   Aug 15,2023 23:03 UTC+0800
-```
-
-</TabItem>
-
 <TabItem value="kubectl" label="kubectl" default>
 
 ```bash
@@ -233,6 +222,17 @@ kubectl get cluster mycluster -n demo
 >
 NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY     STATUS    AGE
 mycluster   qdrant                              Delete                 Running   47m
+```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+```bash
+kbcli cluster list mycluster -n demo
+>
+NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION   TERMINATION-POLICY   STATUS    CREATED-TIME
+mycluster   demo        qdrant                         Delete               Running   Aug 15,2023 23:03 UTC+0800
 ```
 
 </TabItem>
@@ -298,7 +298,7 @@ mycluster   qdrant                              Delete                 Running  
 
    如果有报错，可执行 `kubectl describe ops -n demo` 命令查看该运维操作的相关事件，协助排障。
 
-3. 查看相应资源是否变更。
+3. 当 OpsRequest 状态为 `Succeed` 或集群状态再次回到 `Running` 后，查看相应资源是否变更。
 
     ```bash
     kubectl describe cluster mycluster -n demo
@@ -335,7 +335,7 @@ mycluster   qdrant                              Delete                 Running  
     terminationPolicy: Delete
    ```
 
-2. 查看相关资源是否变更。
+2. 当集群状态再次回到 `Running` 后，查看相关资源是否变更。
 
     ```bash
     kubectl describe cluster mycluster -n demo
@@ -398,17 +398,6 @@ mycluster   qdrant                              Delete                 Running  
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli">
-
-```bash
-kbcli cluster list mycluster -n demo
->
-NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION   TERMINATION-POLICY   STATUS    CREATED-TIME
-mycluster   demo        qdrant                         Delete               Running   Aug 15,2023 23:03 UTC+0800
-```
-
-</TabItem>
-
 <TabItem value="kubectl" label="kubectl"  default>
 
 ```bash
@@ -416,6 +405,17 @@ kubectl get cluster mycluster -n demo
 >
 NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY     STATUS    AGE
 mycluster   qdrant                              Delete                 Running   47m
+```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+```bash
+kbcli cluster list mycluster -n demo
+>
+NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION   TERMINATION-POLICY   STATUS    CREATED-TIME
+mycluster   demo        qdrant                         Delete               Running   Aug 15,2023 23:03 UTC+0800
 ```
 
 </TabItem>
@@ -462,7 +462,7 @@ mycluster   qdrant                              Delete                 Running  
 
    如果有报错，可执行 `kubectl describe ops -n demo` 命令查看该运维操作的相关事件，协助排障。
 
-3. 查看相应资源是否变更。
+3. 当 OpsRequest 状态为 `Succeed` 或集群状态再次回到 `Running` 后，查看相应资源是否变更。
 
     ```bash
     kubectl describe cluster mycluster -n demo
@@ -505,7 +505,7 @@ mycluster   qdrant                              Delete                 Running  
      terminationPolicy: Delete
    ```
 
-2. 查看相应资源是否变更。
+2. 当集群状态再次回到 `Running` 后，查看相应资源是否变更。
 
     ```bash
     kubectl describe cluster mycluster -n demo
@@ -541,7 +541,7 @@ mycluster   qdrant                              Delete                 Running  
      - STATUS=VerticalScaling 表示正在进行垂直扩容。
      - STATUS=Running 表示垂直扩容已完成。
      - STATUS=Abnormal 表示垂直扩容异常。原因可能是正常实例的数量少于总实例数，或者 Leader 实例正常运行而其他实例异常。
-       > 你可以手动检查是否由于资源不足而导致报错。如果 Kubernetes 集群支持 AutoScaling，系统在资源充足的情况下会执行自动恢复。或者你也可以创建足够的资源，并使用 `kubectl describe` 命令进行故障排除。
+       > 您可以手动检查是否由于资源不足而导致报错。如果 Kubernetes 集群支持 AutoScaling，系统在资源充足的情况下会执行自动恢复。或者你也可以创建足够的资源，并使用 `kubectl describe` 命令进行故障排除。
 
 3. 当 OpsRequest 状态为 `Succeed` 或集群状态再次回到 `Running` 后，查看扩缩容是否已经完成。
 
@@ -561,17 +561,6 @@ mycluster   qdrant                              Delete                 Running  
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli">
-
-```bash
-kbcli cluster list mycluster -n demo
->
-NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION   TERMINATION-POLICY   STATUS    CREATED-TIME
-mycluster   demo        qdrant                         Delete               Running   Aug 15,2023 23:03 UTC+0800
-```
-
-</TabItem>
-
 <TabItem value="kubectl" label="kubectl"  default>
 
 ```bash
@@ -579,6 +568,17 @@ kubectl get cluster mycluster -n demo
 >
 NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY     STATUS    AGE
 mycluster   qdrant                              Delete                 Running   47m
+```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+```bash
+kbcli cluster list mycluster -n demo
+>
+NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION   TERMINATION-POLICY   STATUS    CREATED-TIME
+mycluster   demo        qdrant                         Delete               Running   Aug 15,2023 23:03 UTC+0800
 ```
 
 </TabItem>
@@ -809,7 +809,7 @@ mycluster   qdrant                              Delete                 Running  
 
    </TabItem>
 
-   <TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
+   <TabItem value="编辑集群 YAML 文件" label="编辑集群 YAML 文件">
 
    将 replicas 设为 0，删除 pods。
 
@@ -890,7 +890,7 @@ mycluster   qdrant                              Delete                 Running  
 
    </TabItem>
 
-   <TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
+   <TabItem value="编辑集群 YAML 文件" label="编辑集群 YAML 文件">
 
    将 replicas 修改为停止集群前的数量，再次启动集群。
 

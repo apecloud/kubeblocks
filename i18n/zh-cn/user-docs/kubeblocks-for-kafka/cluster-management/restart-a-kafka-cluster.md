@@ -23,6 +23,43 @@ KubeBlocks 支持重启集群中的所有 Pod。当数据库出现异常时，�
 
 <Tabs>
 
+<TabItem value="kubectl" label="kubectl" default>
+
+1. 创建 OpsRequest，重启集群。
+
+   ```bash
+   kubectl apply -f - <<EOF
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: OpsRequest
+   metadata:
+     name: ops-restart
+     namespace: demo
+   spec:
+     clusterName: mycluster
+     type: Restart 
+     restart:
+     - componentName: broker
+   EOF
+   ```
+
+2. 查看 pod 和运维操作状态，验证重启操作。
+
+   ```bash
+   kubectl get pod -n demo
+
+   kubectl get ops ops-restart -n demo
+   >
+   NAME          TYPE      CLUSTER     STATUS    PROGRESS   AGE
+   ops-restart   Restart   mycluster   Succeed   1/1        3m26s
+   ```
+
+   重启过程中，Pod 有如下两种状态：
+
+   - STATUS=Terminating：表示集群正在重启。
+   - STATUS=Running：表示集群已重启。
+
+</TabItem>
+
 <TabItem value="kbcli" label="kbcli">
 
 1. 重启集群。
@@ -42,12 +79,6 @@ KubeBlocks 支持重启集群中的所有 Pod。当数据库出现异常时，�
    执行以下命令，检查集群状态，验证重启操作。
 
    ```bash
-   kbcli cluster list <name>
-   ```
-
-   ***示例***
-
-   ```bash
    kbcli cluster list mycluster -n demo
    >
    NAME    CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS     AGE
@@ -56,43 +87,6 @@ KubeBlocks 支持重启集群中的所有 Pod。当数据库出现异常时，�
 
    * STATUS=Updating 表示集群正在重启中。
    * STATUS=Running 表示集群已重启。
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl" default>
-
-1. 创建 OpsRequest，重启集群。
-
-  ```bash
-  kubectl apply -f - <<EOF
-  apiVersion: apps.kubeblocks.io/v1alpha1
-  kind: OpsRequest
-  metadata:
-    name: ops-restart
-    namespace: demo
-  spec:
-    clusterName: mycluster
-    type: Restart 
-    restart:
-    - componentName: broker
-  EOF
-  ```
-
-2. 查看 pod 和运维操作状态，验证重启操作。
-
-   ```bash
-   kubectl get pod -n demo
-
-   kubectl get ops ops-restart -n demo
-   >
-   NAME          TYPE      CLUSTER     STATUS    PROGRESS   AGE
-   ops-restart   Restart   mycluster   Succeed   1/1        3m26s
-   ```
-
-   重启过程中，Pod 有如下两种状态：
-
-   - STATUS=Terminating：表示集群正在重启。
-   - STATUS=Running：表示集群已重启。
 
 </TabItem>
 

@@ -18,18 +18,18 @@ KubeBlocks 支持 Pod 存储磁盘扩容。
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli">
-
-```bash
-kbcli cluster list mycluster -n demo
-```
-
-</TabItem>
-
 <TabItem value="kubectl" label="kubectl" default>
 
 ```bash
 kubectl get cluster mycluster -n demo
+```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+```bash
+kbcli cluster list mycluster -n demo
 ```
 
 </TabItem>
@@ -75,7 +75,7 @@ kubectl get cluster mycluster -n demo
 
    如果操作过程中出现报错，可通过 `kubectl describe ops -n demo` 查看该操作的事件，协助排障。
 
-3. 查看对应的集群资源是否变更。
+3. 当 OpsRequest 状态为 `Succeed` 或集群状态再次回到 `Running` 后，查看对应的集群资源是否变更。
 
     ```bash
     kubectl describe cluster mycluster -n demo
@@ -111,7 +111,7 @@ kubectl get cluster mycluster -n demo
      terminationPolicy: Delete
    ```
 
-2. 查看对应的集群资源是否变更。
+2. 当集群状态再次回到 `Running` 后，查看对应的集群资源是否变更。
 
     ```bash
     kubectl describe cluster mycluster -n demo

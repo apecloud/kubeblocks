@@ -95,14 +95,6 @@ import TabItem from '@theme/TabItem';
 
    <Tabs>
 
-   <TabItem value="kbcli" label="kbcli">
-
-   ```bash
-   kbcli cluster create kafka mycluster --host-network-accessible=true -n demo
-   ```
-
-   </TabItem>
-
    <TabItem value="kubectl" label="kubectl" default>
 
    ```bash
@@ -145,6 +137,14 @@ import TabItem from '@theme/TabItem';
 
    </TabItem>
 
+   <TabItem value="kbcli" label="kbcli">
+
+   ```bash
+   kbcli cluster create kafka mycluster --host-network-accessible=true -n demo
+   ```
+
+   </TabItem>
+
    </Tabs>
 
 2. 获取相应的 ELB 地址。
@@ -178,14 +178,6 @@ import TabItem from '@theme/TabItem';
 1. 将 `--publicly-accessible` 的值设置为 true。
 
    <Tabs>
-
-   <TabItem value="kbcli" label="kbcli">
-
-   ```bash
-   kbcli cluster create kafka mycluster --publicly-accessible=true -n demo
-   ```
-
-   </TabItem>
 
    <TabItem value="kubectl" label="kubectl" default>
 
@@ -225,6 +217,14 @@ import TabItem from '@theme/TabItem';
        tls: false
      terminationPolicy: Delete
    EOF
+   ```
+
+   </TabItem>
+
+   <TabItem value="kbcli" label="kbcli">
+
+   ```bash
+   kbcli cluster create kafka mycluster --publicly-accessible=true -n demo
    ```
 
    </TabItem>

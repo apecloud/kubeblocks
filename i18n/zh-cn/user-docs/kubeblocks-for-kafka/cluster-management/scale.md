@@ -23,17 +23,6 @@ KubeBlocks 支持对 Kafka 集群进行垂直扩缩容和水平扩缩容。
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli">
-
-```bash
-kbcli cluster list mycluster -n demo
->
-NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION       TERMINATION-POLICY   STATUS    CREATED-TIME
-mycluster   demo        kafka                kafka-3.3.2   Delete               Running   Sep 27,2024 15:15 UTC+0800
-```
-
-</TabItem>
-
 <TabItem value="kubectl" label="kubectl" default>
 
 ```bash
@@ -41,6 +30,17 @@ kubectl -n demo get cluster mycluster
 >
 NAME           CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS     AGE
 mycluster      kafka                kafka-3.3.2    Delete               Running    19m
+```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+```bash
+kbcli cluster list mycluster -n demo
+>
+NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION       TERMINATION-POLICY   STATUS    CREATED-TIME
+mycluster   demo        kafka                kafka-3.3.2   Delete               Running   Sep 27,2024 15:15 UTC+0800
 ```
 
 </TabItem>
@@ -87,7 +87,7 @@ mycluster      kafka                kafka-3.3.2    Delete               Running 
 
    如果有报错，可执行 `kubectl describe ops -n demo` 命令查看该运维操作的相关事件，协助排障。
 
-3. 查看相应资源是否变更。
+3. 当 OpsRequest 状态为 `Succeed` 或集群状态再次回到 `Running` 后，查看相应资源是否变更。
 
    ```bash
    kubectl describe cluster mycluster -n demo
@@ -146,7 +146,7 @@ mycluster      kafka                kafka-3.3.2    Delete               Running 
      terminationPolicy: Delete
    ```
 
-2. 查看相应资源是否变更。
+2. 当集群状态再次回到 `Running` 后，查看相应资源是否变更。
 
    ```bash
    kubectl describe cluster mycluster -n demo
@@ -208,7 +208,7 @@ mycluster      kafka                kafka-3.3.2    Delete               Running 
      - STATUS=Updating 表示正在进行垂直扩容。
      - STATUS=Running 表示垂直扩容已完成。
      - STATUS=Abnormal 表示垂直扩容异常。原因可能是正常实例的数量少于总实例数，或者 Leader 实例正常运行而其他实例异常。
-       > 你可以手动检查是否由于资源不足而导致报错。如果 Kubernetes 集群支持 AutoScaling，系统在资源充足的情况下会执行自动恢复。或者你也可以创建足够的资源，并使用 `kubectl describe` 命令进行故障排除。
+       > 您可以手动检查是否由于资源不足而导致报错。如果 Kubernetes 集群支持 AutoScaling，系统在资源充足的情况下会执行自动恢复。或者你也可以创建足够的资源，并使用 `kubectl describe` 命令进行故障排除。
 
    :::note
 
@@ -238,17 +238,6 @@ mycluster      kafka                kafka-3.3.2    Delete               Running 
 
    <Tabs>
 
-   <TabItem value="kbcli" label="kbcli">
-
-   ```bash
-   kbcli cluster list mycluster -n demo
-   >
-   NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION       TERMINATION-POLICY   STATUS    CREATED-TIME
-   mycluster   demo        kafka                kafka-3.3.2   Delete               Running   Sep 27,2024 15:15 UTC+0800
-   ```
-
-   </TabItem>
-
    <TabItem value="kubectl" label="kubectl" default>
 
    ```bash
@@ -256,6 +245,17 @@ mycluster      kafka                kafka-3.3.2    Delete               Running 
    >
    NAME           CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS     AGE
    mycluster      kafka                kafka-3.3.2    Delete               Running    19m
+   ```
+
+   </TabItem>
+
+   <TabItem value="kbcli" label="kbcli">
+
+   ```bash
+   kbcli cluster list mycluster -n demo
+   >
+   NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION       TERMINATION-POLICY   STATUS    CREATED-TIME
+   mycluster   demo        kafka                kafka-3.3.2   Delete               Running   Sep 27,2024 15:15 UTC+0800
    ```
 
    </TabItem>
@@ -310,6 +310,7 @@ mycluster      kafka                kafka-3.3.2    Delete               Running 
        scaleIn:
          replicaChanges: 2
    EOF
+   ```
 
 2. 查看运维操作状态，验证水平扩缩容是否成功。
 
@@ -322,7 +323,7 @@ mycluster      kafka                kafka-3.3.2    Delete               Running 
 
    如果有报错，可执行 `kubectl describe ops -n demo` 命令查看该运维操作的相关事件，协助排障。
 
-3. 查看相应资源是否变更。
+3. 当 OpsRequest 状态为 `Succeed` 或集群状态再次回到 `Running` 后，查看相应资源是否变更。
 
    ```bash
    kubectl describe cluster mycluster -n demo
@@ -376,7 +377,7 @@ mycluster      kafka                kafka-3.3.2    Delete               Running 
     terminationPolicy: Delete
    ```
 
-2. 查看相关资源是否变更。
+2. 当集群状态再次回到 `Running` 后，查看相关资源是否变更。
 
    ```bash
    kubectl describe cluster mycluster -n demo
@@ -439,9 +440,9 @@ mycluster      kafka                kafka-3.3.2    Delete               Running 
 
 3. 当 OpsRequest 状态为 `Succeed` 或集群状态再次回到 `Running` 后，检查相关资源规格是否已变更。
 
-    ```bash
-    kbcli cluster describe mycluster -n demo
-    ```
+   ```bash
+   kbcli cluster describe mycluster -n demo
+   ```
 
 </TabItem>
 
@@ -491,7 +492,6 @@ Status:
    kubectl delete backup -l app.kubernetes.io/instance=mycluster -n demo
    
    kubectl delete volumesnapshot -l app.kubernetes.io/instance=mycluster -n demo
-
    ```
 
 ***结果***

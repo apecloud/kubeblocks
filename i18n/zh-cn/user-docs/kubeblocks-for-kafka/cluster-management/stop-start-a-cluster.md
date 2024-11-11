@@ -72,21 +72,21 @@ import TabItem from '@theme/TabItem';
 
    </TabItem>
 
+   <TabItem value="kbcli" label="kbcli">
+
+   ```bash
+   kbcli cluster stop mycluster -n demo
+   ```
+
+   </TabItem>
+
    </Tabs>
 
 2. 检查集群的状态，查看其是否已停止。
 
    <Tabs>
 
-   <TabItem value="kbcli" label="kbcli" default>
-
-   ```bash
-   kbcli cluster list -n demo
-   ```
-
-   </TabItem>
-
-   <TabItem value="kubectl" label="kubectl">
+   <TabItem value="kubectl" label="kubectl" default>
 
    ```bash
    kubectl get cluster mycluster -n demo
@@ -97,7 +97,7 @@ import TabItem from '@theme/TabItem';
    <TabItem value="kbcli" label="kbcli">
 
    ```bash
-   kbcli cluster stop mycluster -n demo
+   kbcli cluster list -n demo
    ```
 
    </TabItem>
@@ -175,18 +175,18 @@ import TabItem from '@theme/TabItem';
 
    <Tabs>
 
-   <TabItem value="kbcli" label="kbcli">
-
-   ```bash
-   kbcli cluster list -n demo
-   ```
-
-   </TabItem>
-
    <TabItem value="kubectl" label="kubectl" default>
 
    ```bash
    kubectl get cluster mycluster -n demo
+   ```
+
+   </TabItem>
+
+   <TabItem value="kbcli" label="kbcli">
+
+   ```bash
+   kbcli cluster list -n demo
    ```
 
    </TabItem>

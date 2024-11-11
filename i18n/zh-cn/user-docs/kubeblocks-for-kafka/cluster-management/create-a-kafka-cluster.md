@@ -21,7 +21,18 @@ import TabItem from '@theme/TabItem';
 
   <Tabs>
 
-  <TabItem value="kbcli" label="kbcli" default>
+  <TabItem value="kubectl" label="kubectl" default>
+
+  ```bash
+  kubectl get addons.extensions.kubeblocks.io kafka
+  >
+  NAME    TYPE   VERSION   PROVIDER   STATUS    AGE
+  kafka   Helm                        Enabled   13m
+  ```
+
+  </TabItem>
+
+  <TabItem value="kbcli" label="kbcli">
 
   ```bash
   kbcli addon list
@@ -30,17 +41,6 @@ import TabItem from '@theme/TabItem';
   ...
   kafka                          Helm   Enabled                   true
   ...
-  ```
-
-  </TabItem>
-
-  <TabItem value="kubectl" label="kubectl">
-
-  ```bash
-  kubectl get addons.extensions.kubeblocks.io kafka
-  >
-  NAME    TYPE   VERSION   PROVIDER   STATUS    AGE
-  kafka   Helm                        Enabled   13m
   ```
 
   </TabItem>
@@ -65,35 +65,7 @@ import TabItem from '@theme/TabItem';
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-1. 创建 Kafka 集群。
-
-   使用 `kbcli cluster create` 命令创建集群。您还可以使用 `--set` 参数自定义集群资源。
-
-   ```bash
-   kbcli cluster create kafka mycluster -n demo
-   ```
-
-   如果您需要自定义集群规格，kbcli 也提供了诸多参数，如支持设置引擎版本、终止策略、CPU、内存规格。您可通过在命令结尾添加 `--help` 或 `-h` 来查看具体说明。比如，
-
-   ```bash
-   kbcli cluster create kafka --help
-   kbcli cluster create kafka -h
-   ```
-
-2. 验证集群是否创建成功。
-
-   ```bash
-   kbcli cluster list -n demo
-   >
-   NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION       TERMINATION-POLICY   STATUS    CREATED-TIME
-   mycluster   demo        kafka                kafka-3.3.2   Delete               Running   Sep 27,2024 15:15 UTC+0800
-   ```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 1. 创建 Kafka 集群。
 
@@ -104,7 +76,7 @@ import TabItem from '@theme/TabItem';
    * 创建组合模式的 Kafka 集群。
 
      ```yaml
-     # create kafka in combined mode 
+     # 组合模式
      kubectl apply -f - <<EOF
      apiVersion: apps.kubeblocks.io/v1alpha1
      kind: Cluster
@@ -305,6 +277,34 @@ import TabItem from '@theme/TabItem';
    >
    NAME        CLUSTER-DEFINITION   VERSION       TERMINATION-POLICY   STATUS    AGE
    mycluster   kafka                kafka-3.3.2   Delete               Running   2m2s
+   ```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+1. 创建 Kafka 集群。
+
+   使用 `kbcli cluster create` 命令创建集群。您还可以使用 `--set` 参数自定义集群资源。
+
+   ```bash
+   kbcli cluster create kafka mycluster -n demo
+   ```
+
+   如果您需要自定义集群规格，kbcli 也提供了诸多参数，如支持设置引擎版本、终止策略、CPU、内存规格。您可通过在命令结尾添加 `--help` 或 `-h` 来查看具体说明。比如，
+
+   ```bash
+   kbcli cluster create kafka --help
+   kbcli cluster create kafka -h
+   ```
+
+2. 验证集群是否创建成功。
+
+   ```bash
+   kbcli cluster list -n demo
+   >
+   NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION       TERMINATION-POLICY   STATUS    CREATED-TIME
+   mycluster   demo        kafka                kafka-3.3.2   Delete               Running   Sep 27,2024 15:15 UTC+0800
    ```
 
 </TabItem>

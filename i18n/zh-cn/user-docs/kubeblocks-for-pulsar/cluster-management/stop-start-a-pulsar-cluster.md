@@ -21,8 +21,6 @@ import TabItem from '@theme/TabItem';
 
     <TabItem value="OpsRequest" label="OpsRequest" default>
 
-    Apply an OpsRequest to stop a cluster.
-
     ```bash
     kubectl apply -f - <<EOF
     apiVersion: apps.kubeblocks.io/v1alpha1
@@ -102,8 +100,6 @@ import TabItem from '@theme/TabItem';
 
     <TabItem value="OpsRequest" label="OpsRequest" default>
 
-    Apply an OpsRequest to start a cluster.
-
     ```bash
     kubectl apply -f - <<EOF
     apiVersion: apps.kubeblocks.io/v1alpha1
@@ -121,7 +117,7 @@ import TabItem from '@theme/TabItem';
 
     <TabItem value="编辑集群 YAML 文件" label="编辑集群 YAML 文件">
 
-    Change replicas back to the original amount to start this cluster again.
+    将 replicas 数值改为停止集群前的数值，再次启动集群。
 
     ```yaml
     apiVersion: apps.kubeblocks.io/v1alpha1
@@ -157,18 +153,18 @@ import TabItem from '@theme/TabItem';
 
     <Tabs>
 
-    <TabItem value="kbcli" label="kbcli">
-
-    ```bash
-    kbcli cluster list mycluster -n demo
-    ```
-
-    </TabItem>
-
     <TabItem value="kubectl" label="kubectl" default>
 
     ```bash
     kubectl get cluster mycluster -n demo
+    ```
+
+    </TabItem>
+
+    <TabItem value="kbcli" label="kbcli">
+
+    ```bash
+    kbcli cluster list mycluster -n demo
     ```
 
     </TabItem>

@@ -43,25 +43,6 @@ func syncComponentParametersStatus(configmaps map[string]*corev1.ConfigMap) func
 	}
 }
 
-func syncParameterStatus(parameterStatus *parametersv1alpha1.ParameterStatus) bool {
-	var finished = true
-
-	for _, status := range parameterStatus.ReconfiguringStatus {
-		switch {
-		case status.Phase == parametersv1alpha1.CMergeFailedPhase:
-			parameterStatus.Phase = parametersv1alpha1.CMergeFailedPhase
-			return true
-		case status.Phase == parametersv1alpha1.CFailedAndPausePhase:
-			parameterStatus.Phase = parametersv1alpha1.CFailedAndPausePhase
-			return true
-		case status.Phase != parametersv1alpha1.CFinishedPhase:
-			parameterStatus.Phase = parametersv1alpha1.CRunningPhase
-			finished = false
-		}
-	}
-	return finished
-}
-
 func syncComponentParameterStatus(rctx *ReconcileContext, status *parametersv1alpha1.ComponentReconfiguringStatus, configmaps map[string]*corev1.ConfigMap) {
 	var finished = true
 

@@ -19,15 +19,6 @@ import TabItem from '@theme/TabItem';
 * 安装 KubeBlocks，可通过 [kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) 或 [Helm](./../../installation/install-with-helm/install-kubeblocks.md) 安装。
 * 确保 Kafka 引擎 已启用。如果引擎未启用，可参考相关文档，启用该引擎，可通过 [kbcli](./../../installation/install-with-kbcli/install-addons.md) 或 [Helm](./../../installation/install-with-kbcli/install-addons.md) 操作。
 
-  ```bash
-  kbcli addon list
-  >
-  NAME                           TYPE   STATUS     EXTRAS         AUTO-INSTALL  
-  ...
-  kafka                        Helm   Enabled                   true
-  ...
-  ```
-
   <Tabs>
 
   <TabItem value="kbcli" label="kbcli" default>

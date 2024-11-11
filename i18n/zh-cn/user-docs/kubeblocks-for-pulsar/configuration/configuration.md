@@ -5,6 +5,9 @@ keywords: [pulsar, 参数, 配置, 再配置]
 sidebar_position: 1
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # 配置集群参数
 
 从 v0.6.0 版本开始，KubeBlocks 支持使用 `kbcli cluster configure` 和 `kbcli cluster edit-config` 两种方式来配置参数。它们的区别在于，`kbcli cluster configure `可以自动配置参数，而 `kbcli cluster edit-config` 则允许以可视化的方式直接编辑参数。
@@ -23,24 +26,131 @@ sidebar_position: 1
 
 :::
 
+<Tabs>
+
+<TabItem value="编辑配置文件" label="编辑配置文件">
+
+## 通过编辑配置文件配置参数
+
+1. 编辑 Pulsar 集群的 `broker.conf` 文件。本文实例修改了名为 `pulsar-broker-broker-config` 的文件。
+
+   ```bash
+   kubectl edit cm pulsar-broker-broker-config -n demo
+   ```
+
+2. 按需配置参数。
+
+3. 查看配置是否生效。
+
+   ```bash
+   kubectl get pod -l app.kubernetes.io/name=pulsar-broker
+   ```
+
+:::note
+
+如果您无法找到集群的配置文件，您可以使用 `kbcli` 查看集群当前的配置文件。
+
+```bash
+kbcli cluster describe-config mycluster -n demo
+```
+
+:::
+
+</TabItem>
+
+<TabItem value="OpsRequest" label="OpsRequest">
+
+1. 在名为 `mycluster-configuring-demo.yaml` 的 YAML 文件中定义 OpsRequest，并修改参数。如下示例中，`lostBookieRecoveryDelay` 参数修改为 `1000`。
+
+   ```bash
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: OpsRequest
+   metadata:
+     name: mycluster-configuring-demo
+     namespace: demo
+   spec:
+     clusterName: mycluster
+     reconfigure:
+       componentName: bookies
+       configurations:
+       - keys:
+         - key: bookkeeper.conf
+           parameters:
+           - key: lostBookieRecoveryDelay
+             value: "1000"
+         name: bookies-config
+     preConditionDeadlineSeconds: 0
+     type: Reconfiguring
+   EOF
+   ```
+
+   | 字段                                                    | 定义     |
+   |--------------------------------------------------------|--------------------------------|
+   | `metadata.name`                                        | 定义了 Opsrequest 的名称。 |
+   | `metadata.namespace`                                   | 定义了集群所在的 namespace。 |
+   | `spec.clusterName`                                     | 定义了本次运维操作指向的集群名称。 |
+   | `spec.reconfigure`                                     | 定义了需配置的 component 及相关配置更新内容。 |
+   | `spec.reconfigure.componentName`                       | 定义了改集群的 component 名称。  |
+   | `spec.configurations`                                  | 包含一系列 ConfigurationItem 对象，定义了 component 的配置模板名称、更新策略、参数键值对。 |
+   | `spec.reconfigure.configurations.keys.key`             | 定义了 configuration map。 |
+   | `spec.reconfigure.configurations.keys.parameters`      | 定义了单个参数文件的键值对列表。 |
+   | `spec.reconfigure.configurations.keys.parameter.key`   | 代表您需要编辑的参数名称。|
+   | `spec.reconfigure.configurations.keys.parameter.value` | 代表了将要更新的参数值。如果设置为 nil，Key 字段定义的参数将会被移出配置文件。  |
+   | `spec.reconfigure.configurations.name`                 | 定义了配置模板名称。  |
+   | `preConditionDeadlineSeconds`                          | 定义了本次 OpsRequest 中止之前，满足其启动条件的最长等待时间（单位为秒）。如果设置为 0（默认），则必须立即满足启动条件，OpsRequest 才能继续。|
+
+2. 应用配置 OpsRequest。
+
+   ```bash
+   kubectl apply -f mycluster-configuring-demo.yaml -n demo
+   ```
+
+3. 确认配置是否生效。
+
+   1. 查看配置进度。
+
+      ```bash
+      kubectl get ops -n demo
+      ```
+
+   2. 查看配置是否生效。
+
+      ```bash
+      kubectl get pod -l app.kubernetes.io/name=pulsar -n demo
+      ```
+
+:::note
+
+如果您无法找到集群的配置文件，您可以使用 `kbcli` 查看集群当前的配置文件。
+
+```bash
+kbcli cluster describe-config mycluster -n demo
+```
+
+:::
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
 ## 查看参数信息
 
 * 查看集群的当前配置文件。
 
 ```bash
-kbcli cluster describe-config pulsar  
+kbcli cluster describe-config mycluster -n demo 
 ```
 
 * 查看当前配置文件的详细信息。
 
   ```bash
-  kbcli cluster describe-config pulsar --show-detail
+  kbcli cluster describe-config mycluster -n demo --show-detail
   ```
 
 * 查看参数描述。
 
   ```bash
-  kbcli cluster explain-config pulsar | head -n 20
+  kbcli cluster explain-config mycluster -n demo | head -n 20
   ```
 
 ## 配置参数
@@ -54,20 +164,14 @@ kbcli cluster describe-config pulsar
 1. 获取 Pulsar 集群组件名称，配置参数。
 
    ```bash
-   kbcli cluster list-components pulsar 
-   ```
-
-   ***示例***
-
-   ```bash
-   kbcli cluster list-components pulsar 
-
-   NAME               NAMESPACE   CLUSTER   TYPE               IMAGE
-   proxy              default     pulsar    pulsar-proxy       docker.io/apecloud/pulsar:2.11.2
-   broker             default     pulsar    pulsar-broker      docker.io/apecloud/pulsar:2.11.2
-   bookies-recovery   default     pulsar    bookies-recovery   docker.io/apecloud/pulsar:2.11.2
-   bookies            default     pulsar    bookies            docker.io/apecloud/pulsar:2.11.2
-   zookeeper          default     pulsar    zookeeper          docker.io/apecloud/pulsar:2.11.2
+   kbcli cluster list-components mycluster -n demo 
+   >
+   NAME               NAMESPACE   CLUSTER      TYPE               IMAGE
+   proxy              demo        mycluster    pulsar-proxy       docker.io/apecloud/pulsar:2.11.2
+   broker             demo        mycluster    pulsar-broker      docker.io/apecloud/pulsar:2.11.2
+   bookies-recovery   demo        mycluster    bookies-recovery   docker.io/apecloud/pulsar:2.11.2
+   bookies            demo        mycluster    bookies            docker.io/apecloud/pulsar:2.11.2
+   zookeeper          demo        mycluster    zookeeper          docker.io/apecloud/pulsar:2.11.2
    ```
 
 2. 配置参数。
@@ -75,7 +179,7 @@ kbcli cluster describe-config pulsar
    下面以 `zookeeper` 为例。
 
    ```bash
-   kbcli cluster configure pulsar --components=zookeeper --set PULSAR_MEM="-XX:MinRAMPercentage=50 -XX:MaxRAMPercentage=70" 
+   kbcli cluster configure mycluster -n demo --components=zookeeper --set PULSAR_MEM="-XX:MinRAMPercentage=50 -XX:MaxRAMPercentage=70"  
    ```
 
 3. 验证配置。
@@ -83,13 +187,13 @@ kbcli cluster describe-config pulsar
    a. 检查配置进度。
 
    ```bash
-   kubectl get ops 
+   kubectl get ops -n demo
    ```
 
    b. 检查配置是否完成。
 
    ```bash
-   kubectl get pod -l app.kubernetes.io/name=pulsar
+   kubectl get pod -l app.kubernetes.io/name=pulsar -n demo
    ```
 
 #### 配置其他参数
@@ -101,24 +205,24 @@ kbcli cluster describe-config pulsar
 1. 获取配置信息。
 
    ```bash
-   kbcli cluster desc-config pulsar --components=broker
-   
+   kbcli cluster desc-config mycluster -n demo --components=broker
+   >
    ConfigSpecs Meta:
-   CONFIG-SPEC-NAME         FILE                   ENABLED   TEMPLATE                   CONSTRAINT                   RENDERED                               COMPONENT   CLUSTER
-   agamotto-configuration   agamotto-config.yaml   false     pulsar-agamotto-conf-tpl                                pulsar-broker-agamotto-configuration   broker      pulsar
-   broker-env               conf                   true      pulsar-broker-env-tpl      pulsar-env-constraints       pulsar-broker-broker-env               broker      pulsar
-   broker-config            broker.conf            true      pulsar-broker-config-tpl   brokers-config-constraints   pulsar-broker-broker-config            broker      pulsar
+   CONFIG-SPEC-NAME         FILE                   ENABLED   TEMPLATE                   CONSTRAINT                   RENDERED                                  COMPONENT   CLUSTER
+   agamotto-configuration   agamotto-config.yaml   false     pulsar-agamotto-conf-tpl                                mycluster-broker-agamotto-configuration   broker      mycluster
+   broker-env               conf                   true      pulsar-broker-env-tpl      pulsar-env-constraints       mycluster-broker-broker-env               broker      mycluster
+   broker-config            broker.conf            true      pulsar-broker-config-tpl   brokers-config-constraints   mycluster-broker-broker-config            broker      mycluster
    ```
 
 2. 配置参数。
 
    ```bash
-   kbcli cluster configure pulsar --components=broker --config-spec=broker-config --set brokerShutdownTimeoutMs=66600
+   kbcli cluster configure mycluster -n demo --components=broker --config-specs=broker-config --set brokerShutdownTimeoutMs=66600
    >
    Will updated configure file meta:
-     ConfigSpec: broker-config          ConfigFile: broker.conf        ComponentName: broker        ClusterName: pulsar
-   OpsRequest pulsar-reconfiguring-qxw8s created successfully, you can view the progress:
-           kbcli cluster describe-ops pulsar-reconfiguring-qxw8s -n default
+     ConfigSpec: broker-config          ConfigFile: broker.conf        ComponentName: broker        ClusterName: mycluster
+   OpsRequest mycluster-reconfiguring-qxw8s created successfully, you can view the progress:
+           kbcli cluster describe-ops mycluster-reconfiguring-qxw8s -n demo
    ```
 
 3. 检查配置进度。
@@ -126,13 +230,13 @@ kbcli cluster describe-config pulsar
    使用上述命令打印的 ops name 进行检查。
 
    ```bash
-   kbcli cluster describe-ops pulsar-reconfiguring-qxw8s -n default
+   kbcli cluster describe-ops mycluster-reconfiguring-qxw8s -n demo
    >
    Spec:
-     Name: pulsar-reconfiguring-qxw8s        NameSpace: default        Cluster: pulsar        Type: Reconfiguring
+     Name: mycluster-reconfiguring-qxw8s        NameSpace: demo        Cluster: mycluster        Type: Reconfiguring
 
    Command:
-     kbcli cluster configure pulsar --components=broker --config-spec=broker-config --config-file=broker.conf --set brokerShutdownTimeoutMs=66600 --namespace=default
+     kbcli cluster configure mycluster --components=broker --config-specs=broker-config --config-file=broker.conf --set brokerShutdownTimeoutMs=66600 --namespace=demo
 
    Status:
      Start Time:         Jul 20,2023 09:53 UTC+0800
@@ -152,7 +256,7 @@ Linux 和 macOS 系统可以使用 vi 编辑器编辑配置文件，Windows 系�
 1. 编辑配置文件。
 
    ```bash
-   kbcli cluster edit-config pulsar
+   kbcli cluster edit-config mycluster -n demo
    ```
 
    :::note
@@ -164,13 +268,13 @@ Linux 和 macOS 系统可以使用 vi 编辑器编辑配置文件，Windows 系�
 2. 查看参数配置状态。
 
    ```bash
-   kbcli cluster describe-ops xxx -n default
+   kbcli cluster describe-ops mycluster-reconfiguring-nqxw8s -n demo
    ```
 
 3. 连接到数据库，验证参数是否按预期配置。
 
    ```bash
-   kbcli cluster connect pulsar
+   kbcli cluster connect mycluster -n demo
    ```
 
    :::note
@@ -180,28 +284,24 @@ Linux 和 macOS 系统可以使用 vi 编辑器编辑配置文件，Windows 系�
 
    :::
 
-### 使用 kubectl 配置参数
+## 查看历史记录并比较参数差异
 
-使用 kubectl 配置 Pulsar 集群时，需要修改配置文件。
+配置完成后，你可以搜索历史配置并比较参数差异。
 
-***步骤：***
+查看参数配置历史记录。
 
-1. 获取包含配置文件的 configMap。下面以 `broker` 组件为例。
-   
-    ```bash
-    kbcli cluster desc-config pulsar --components=broker
+```bash
+kbcli cluster describe-config mycluster -n demo --components=zookeeper               
+```
 
-    ConfigSpecs Meta:
-    CONFIG-SPEC-NAME         FILE                   ENABLED   TEMPLATE                   CONSTRAINT                   RENDERED                               COMPONENT   CLUSTER
-    agamotto-configuration   agamotto-config.yaml   false     pulsar-agamotto-conf-tpl                                pulsar-broker-agamotto-configuration   broker      pulsar
-    broker-env               conf                   true      pulsar-broker-env-tpl      pulsar-env-constraints       pulsar-broker-broker-env               broker      pulsar
-    broker-config            broker.conf            true      pulsar-broker-config-tpl   brokers-config-constraints   pulsar-broker-broker-config            broker      pulsar
-    ```
+从上面可以看到，有三个参数被修改过。
 
-    在上述输出的 RENDERED 列中，可以看到 broker 的 configMap 名称为 `pulsar-broker-broker-config`。
+比较这些改动，查看不同版本中配置的参数和参数值。
 
-2. 修改 `broker.conf` 文件。在本例中，就是 `pulsar-broker-broker-config`。
-   
-    ```bash
-    kubectl edit cm pulsar-broker-broker-config
-    ```
+```bash
+kbcli cluster diff-config mycluster-reconfiguring-qxw8s mycluster-reconfiguring-mwbnw
+```
+
+</TabItem>
+
+</Tabs>

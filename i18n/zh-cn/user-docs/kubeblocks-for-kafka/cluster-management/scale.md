@@ -418,7 +418,7 @@ mycluster      kafka                kafka-3.3.2    Delete               Running 
    - `--cpu` 表示组件请求和限制的 CPU 大小。
    - `--replicas` 表示指定组件的副本数。
 
-2. 验证水平扩容。
+2. 验证水平扩容是否完成。
 
    - 查看 OpsRequest 进程。
 
@@ -430,12 +430,12 @@ mycluster      kafka                kafka-3.3.2    Delete               Running 
 
    - 查看集群状态。
 
-   ```bash
-   kbcli cluster list mycluster -n demo
-   ```
+     ```bash
+     kbcli cluster list mycluster -n demo
+     ```
 
-   - STATUS=Updating 表示正在进行水平扩容。
-   - STATUS=Running 表示水平扩容已完成。
+     - STATUS=Updating 表示正在进行水平扩容。
+     - STATUS=Running 表示水平扩容已完成。
 
 3. 当 OpsRequest 状态为 `Succeed` 或集群状态再次回到 `Running` 后，检查相关资源规格是否已变更。
 

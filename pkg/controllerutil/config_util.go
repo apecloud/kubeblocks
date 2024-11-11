@@ -38,10 +38,10 @@ import (
 )
 
 type Result struct {
-	Phase      parametersv1alpha1.ConfigurationPhase `json:"phase"`
-	Revision   string                                `json:"revision"`
-	Policy     string                                `json:"policy"`
-	ExecResult string                                `json:"execResult"`
+	Phase      parametersv1alpha1.ParameterPhase `json:"phase"`
+	Revision   string                            `json:"revision"`
+	Policy     string                            `json:"policy"`
+	ExecResult string                            `json:"execResult"`
 
 	SucceedCount  int32 `json:"succeedCount"`
 	ExpectedCount int32 `json:"expectedCount"`
@@ -152,7 +152,7 @@ func IsRerender(configMap *corev1.ConfigMap, item parametersv1alpha1.ConfigTempl
 // GetConfigSpecReconcilePhase gets the configuration phase
 func GetConfigSpecReconcilePhase(configMap *corev1.ConfigMap,
 	item parametersv1alpha1.ConfigTemplateItemDetail,
-	status *parametersv1alpha1.ConfigTemplateItemDetailStatus) parametersv1alpha1.ConfigurationPhase {
+	status *parametersv1alpha1.ConfigTemplateItemDetailStatus) parametersv1alpha1.ParameterPhase {
 	if status == nil || status.Phase == "" {
 		return parametersv1alpha1.CCreatingPhase
 	}

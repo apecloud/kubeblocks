@@ -76,6 +76,32 @@ spec:
                         or parameters.
                       type: object
                     userConfigTemplates:
+                      additionalProperties:
+                        properties:
+                          namespace:
+                            default: default
+                            description: |-
+                              Specifies the namespace of the referenced configuration template ConfigMap object.
+                              An empty namespace is equivalent to the "default" namespace.
+                            pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
+                            type: string
+                          policy:
+                            default: none
+                            description: Defines the strategy for merging externally
+                              imported templates into component templates.
+                            enum:
+                            - patch
+                            - replace
+                            - none
+                            type: string
+                          templateRef:
+                            description: Specifies the name of the referenced configuration
+                              template ConfigMap object.
+                            pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                            type: string
+                        required:
+                        - templateRef
+                        type: object
                       description: |-
                         Specifies the user-defined configuration template.
 
@@ -83,30 +109,6 @@ spec:
                         When provided, the `importTemplateRef` overrides the default configuration template
                         specified in `configSpec.templateRef`.
                         This allows users to customize the configuration template according to their specific requirements.
-                      properties:
-                        namespace:
-                          default: default
-                          description: |-
-                            Specifies the namespace of the referenced configuration template ConfigMap object.
-                            An empty namespace is equivalent to the "default" namespace.
-                          pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
-                          type: string
-                        policy:
-                          default: none
-                          description: Defines the strategy for merging externally
-                            imported templates into component templates.
-                          enum:
-                          - patch
-                          - replace
-                          - none
-                          type: string
-                        templateRef:
-                          description: Specifies the name of the referenced configuration
-                            template ConfigMap object.
-                          pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
-                          type: string
-                      required:
-                      - templateRef
                       type: object
                   required:
                   - componentName
@@ -117,6 +119,281 @@ spec:
             type: object
           status:
             description: ParameterStatus defines the observed state of Parameter
+            properties:
+              componentReconfiguringStatus:
+                description: Records the status of a reconfiguring operation if `opsRequest.spec.type`
+                  equals to "Reconfiguring".
+                items:
+                  properties:
+                    componentName:
+                      description: Specifies the name of the Component.
+                      type: string
+                    parameterStatus:
+                      description: Describes the status of the component reconfiguring.
+                      items:
+                        properties:
+                          lastDoneRevision:
+                            description: Represents the last completed revision of
+                              the configuration item. This field is optional.
+                            type: string
+                          message:
+                            description: Provides a description of any abnormal status.
+                              This field is optional.
+                            type: string
+                          name:
+                            description: |-
+                              Specifies the name of the configuration template. It is a required field and must be a string of maximum 63 characters.
+                              The name should only contain lowercase alphanumeric characters, hyphens, or periods. It should start and end with an alphanumeric character.
+                            maxLength: 63
+                            pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                            type: string
+                          phase:
+                            description: |-
+                              Indicates the current status of the configuration item.
+
+
+                              Possible values include "Creating", "Init", "Running", "Pending", "Merged", "MergeFailed", "FailedAndPause",
+                              "Upgrading", "Deleting", "FailedAndRetry", "Finished".
+                            enum:
+                            - Creating
+                            - Init
+                            - Running
+                            - Pending
+                            - Merged
+                            - MergeFailed
+                            - FailedAndPause
+                            - Upgrading
+                            - Deleting
+                            - FailedAndRetry
+                            - Finished
+                            type: string
+                          reconcileDetail:
+                            description: Provides detailed information about the execution
+                              of the configuration change. This field is optional.
+                            properties:
+                              currentRevision:
+                                description: Represents the current revision of the
+                                  configuration item.
+                                type: string
+                              errMessage:
+                                description: Represents the error message generated
+                                  when the execution of configuration changes fails.
+                                type: string
+                              execResult:
+                                description: Represents the outcome of the most recent
+                                  execution.
+                                type: string
+                              expectedCount:
+                                default: -1
+                                description: Represents the total number of pods that
+                                  require execution of configuration changes.
+                                format: int32
+                                type: integer
+                              policy:
+                                description: Represents the policy applied during
+                                  the most recent execution.
+                                type: string
+                              succeedCount:
+                                default: -1
+                                description: Represents the number of pods where configuration
+                                  changes were successfully applied.
+                                format: int32
+                                type: integer
+                            type: object
+                          updateRevision:
+                            description: Represents the updated revision of the configuration
+                              item. This field is optional.
+                            type: string
+                          updatedParameters:
+                            additionalProperties:
+                              properties:
+                                content:
+                                  description: |-
+                                    Holds the configuration keys and values. This field is a workaround for issues found in kubebuilder and code-generator.
+                                    Refer to https://github.com/kubernetes-sigs/kubebuilder/issues/528 and https://github.com/kubernetes/code-generator/issues/50 for more details.
+
+
+                                    Represents the content of the configuration file.
+                                  type: string
+                                parameters:
+                                  additionalProperties:
+                                    type: string
+                                  description: Represents the updated parameters for
+                                    a single configuration file.
+                                  type: object
+                              type: object
+                            description: Contains the updated parameters.
+                            type: object
+                          userConfigTemplates:
+                            description: |-
+                              Specifies the user-defined configuration template.
+
+
+                              When provided, the `importTemplateRef` overrides the default configuration template
+                              specified in `configSpec.templateRef`.
+                              This allows users to customize the configuration template according to their specific requirements.
+                            properties:
+                              namespace:
+                                default: default
+                                description: |-
+                                  Specifies the namespace of the referenced configuration template ConfigMap object.
+                                  An empty namespace is equivalent to the "default" namespace.
+                                pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
+                                type: string
+                              policy:
+                                default: none
+                                description: Defines the strategy for merging externally
+                                  imported templates into component templates.
+                                enum:
+                                - patch
+                                - replace
+                                - none
+                                type: string
+                              templateRef:
+                                description: Specifies the name of the referenced
+                                  configuration template ConfigMap object.
+                                pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                                type: string
+                            required:
+                            - templateRef
+                            type: object
+                        required:
+                        - name
+                        type: object
+                      type: array
+                      x-kubernetes-list-map-keys:
+                      - name
+                      x-kubernetes-list-type: map
+                    phase:
+                      description: |-
+                        Indicates the current status of the configuration item.
+
+
+                        Possible values include "Creating", "Init", "Running", "Pending", "Merged", "MergeFailed", "FailedAndPause",
+                        "Upgrading", "Deleting", "FailedAndRetry", "Finished".
+                      enum:
+                      - Creating
+                      - Init
+                      - Running
+                      - Pending
+                      - Merged
+                      - MergeFailed
+                      - FailedAndPause
+                      - Upgrading
+                      - Deleting
+                      - FailedAndRetry
+                      - Finished
+                      type: string
+                  required:
+                  - componentName
+                  type: object
+                type: array
+              conditions:
+                description: |-
+                  Describes the reconfiguring detail status.
+                  Possible condition types include "Creating", "Init", "Running", "Pending", "Merged", "MergeFailed", "FailedAndPause",
+                  "Upgrading", "Deleting", "FailedAndRetry", "Finished", "ReconfigurePersisting", "ReconfigurePersisted".
+                items:
+                  description: "Condition contains details for one aspect of the current
+                    state of this API Resource.\n---\nThis struct is intended for
+                    direct use as an array at the field path .status.conditions.  For
+                    example,\n\n\n\ttype FooStatus struct{\n\t    // Represents the
+                    observations of a foo's current state.\n\t    // Known .status.conditions.type
+                    are: \"Available\", \"Progressing\", and \"Degraded\"\n\t    //
+                    +patchMergeKey=type\n\t    // +patchStrategy=merge\n\t    // +listType=map\n\t
+                    \   // +listMapKey=type\n\t    Conditions []metav1.Condition `json:\"conditions,omitempty\"
+                    patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"`\n\n\n\t
+                    \   // other fields\n\t}"
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: |-
+                        type of condition in CamelCase or in foo.example.com/CamelCase.
+                        ---
+                        Many .condition.type values are consistent across resources like Available, but because arbitrary conditions can be
+                        useful (see .node.status.conditions), the ability to deconflict is important.
+                        The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+                x-kubernetes-list-map-keys:
+                - type
+                x-kubernetes-list-type: map
+              message:
+                description: Provides a description of any abnormal status.
+                type: string
+              observedGeneration:
+                description: |-
+                  Represents the latest generation observed for this
+                  ClusterDefinition. It corresponds to the ConfigConstraint's generation, which is
+                  updated by the API Server.
+                format: int64
+                type: integer
+              phase:
+                description: |-
+                  Indicates the current status of the configuration item.
+
+
+                  Possible values include "Creating", "Init", "Running", "Pending", "Merged", "MergeFailed", "FailedAndPause",
+                  "Upgrading", "Deleting", "FailedAndRetry", "Finished".
+                enum:
+                - Creating
+                - Init
+                - Running
+                - Pending
+                - Merged
+                - MergeFailed
+                - FailedAndPause
+                - Upgrading
+                - Deleting
+                - FailedAndRetry
+                - Finished
+                type: string
             type: object
         type: object
     served: true

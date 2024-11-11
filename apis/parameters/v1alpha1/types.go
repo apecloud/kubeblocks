@@ -139,23 +139,23 @@ const (
 	ComponentHScaleType RerenderResourceType = "hscale"
 )
 
-// ConfigurationPhase defines the Configuration FSM phase
+// ParameterPhase defines the Configuration FSM phase
 // +enum
 // +kubebuilder:validation:Enum={Creating,Init,Running,Pending,Merged,MergeFailed,FailedAndPause,Upgrading,Deleting,FailedAndRetry,Finished}
-type ConfigurationPhase string
+type ParameterPhase string
 
 const (
-	CCreatingPhase       ConfigurationPhase = "Creating"
-	CInitPhase           ConfigurationPhase = "Init"
-	CRunningPhase        ConfigurationPhase = "Running"
-	CPendingPhase        ConfigurationPhase = "Pending"
-	CFailedPhase         ConfigurationPhase = "FailedAndRetry"
-	CFailedAndPausePhase ConfigurationPhase = "FailedAndPause"
-	CMergedPhase         ConfigurationPhase = "Merged"
-	CMergeFailedPhase    ConfigurationPhase = "MergeFailed"
-	CDeletingPhase       ConfigurationPhase = "Deleting"
-	CUpgradingPhase      ConfigurationPhase = "Upgrading"
-	CFinishedPhase       ConfigurationPhase = "Finished"
+	CCreatingPhase       ParameterPhase = "Creating"
+	CInitPhase           ParameterPhase = "Init"
+	CRunningPhase        ParameterPhase = "Running"
+	CPendingPhase        ParameterPhase = "Pending"
+	CFailedPhase         ParameterPhase = "FailedAndRetry"
+	CFailedAndPausePhase ParameterPhase = "FailedAndPause"
+	CMergedPhase         ParameterPhase = "Merged"
+	CMergeFailedPhase    ParameterPhase = "MergeFailed"
+	CDeletingPhase       ParameterPhase = "Deleting"
+	CUpgradingPhase      ParameterPhase = "Upgrading"
+	CFinishedPhase       ParameterPhase = "Finished"
 )
 
 type ParametersInFile struct {
@@ -172,8 +172,6 @@ type ParametersInFile struct {
 	// +optional
 	Parameters map[string]*string `json:"parameters,omitempty"`
 }
-
-type ComponentParameters map[string]*string
 
 // ReloadPolicy defines the policy of reconfiguring.
 // +enum

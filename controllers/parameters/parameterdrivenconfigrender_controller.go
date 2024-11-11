@@ -22,7 +22,6 @@ package parameters
 import (
 	"context"
 	"fmt"
-	"slices"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
@@ -83,14 +82,13 @@ func (r *ParameterDrivenConfigRenderReconciler) SetupWithManager(mgr ctrl.Manage
 }
 
 func (r *ParameterDrivenConfigRenderReconciler) reconcile(reqCtx intctrlutil.RequestCtx, parameterTemplate *parametersv1alpha1.ParameterDrivenConfigRender) (ctrl.Result, error) {
-	if parameterTemplate.Status.ObservedGeneration == parameterTemplate.Generation &&
-		slices.Contains([]parametersv1alpha1.ParametersDescPhase{parametersv1alpha1.PDAvailablePhase}, parameterTemplate.Status.Phase) {
+	if intctrlutil.ParametersDrivenConfigRenderTerminalPhases(parameterTemplate.Status, parameterTemplate.Generation) {
 		return intctrlutil.Reconciled()
 	}
 
 	if err := r.validate(reqCtx, r.Client, &parameterTemplate.Spec); err != nil {
-		if err1 := r.unavailable(reqCtx.Ctx, r.Client, parameterTemplate, err); err1 != nil {
-			return intctrlutil.CheckedRequeueWithError(err1, reqCtx.Log, "")
+		if uErr := r.unavailable(reqCtx.Ctx, r.Client, parameterTemplate, err); uErr != nil {
+			return intctrlutil.CheckedRequeueWithError(uErr, reqCtx.Log, "")
 		}
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}

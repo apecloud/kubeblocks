@@ -28,8 +28,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -78,6 +80,69 @@ func (r *ParameterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
+func (r *ParameterReconciler) handleComponent(rctx *ReconcileContext, updatedParameters appsv1.ComponentParameters, parameter *parametersv1alpha1.Parameter) error {
+	configmaps, err := resolveComponentRefConfigMap(rctx)
+	if err != nil {
+		return err
+	}
+
+	handles := []reconfigureReconcileHandle{
+		prepareResources,
+		classifyParameters(updatedParameters, configmaps),
+		updateCustomTemplates,
+		updateParameters,
+		syncComponentParametersStatus(configmaps),
+	}
+
+	for _, handle := range handles {
+		if err := handle(rctx, parameter); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (r *ParameterReconciler) reconcile(reqCtx intctrlutil.RequestCtx, parameter *parametersv1alpha1.Parameter) (ctrl.Result, error) {
-	panic("")
+	if intctrlutil.ParametersTerminalPhases(parameter.Status, parameter.Generation) {
+		return intctrlutil.Reconciled()
+	}
+
+	patch := parameter.DeepCopy()
+	rctxs, params := r.generateParameterTaskContext(reqCtx, parameter)
+	for i, rctx := range rctxs {
+		if err := r.handleComponent(rctx, params[i], parameter); err != nil {
+			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		}
+	}
+
+	return updateParameterStatus(reqCtx, r.Client, parameter, patch)
+}
+
+func updateParameterStatus(reqCtx intctrlutil.RequestCtx, cli client.Client, parameter *parametersv1alpha1.Parameter, patch *parametersv1alpha1.Parameter) (ctrl.Result, error) {
+	finished := syncParameterStatus(&parameter.Status)
+	parameter.Status.ObservedGeneration = parameter.Generation
+	if err := cli.Patch(reqCtx.Ctx, parameter, client.MergeFrom(patch)); err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+	}
+	if finished {
+		return intctrlutil.Reconciled()
+	}
+	return intctrlutil.RequeueAfter(ConfigReconcileInterval, reqCtx.Log, "")
+}
+
+func (r *ParameterReconciler) generateParameterTaskContext(reqCtx intctrlutil.RequestCtx, parameter *parametersv1alpha1.Parameter) ([]*ReconcileContext, []appsv1.ComponentParameters) {
+	var rctxs []*ReconcileContext
+	var params []appsv1.ComponentParameters
+	for _, component := range parameter.Spec.ComponentParameters {
+		params = append(params, component.ComponentParameters)
+		rctxs = append(rctxs, newParameterReconcileContext(reqCtx,
+			&configctrl.ResourceCtx{
+				Context:       reqCtx.Ctx,
+				Client:        r.Client,
+				Namespace:     parameter.Namespace,
+				ClusterName:   parameter.Spec.ClusterName,
+				ComponentName: component.ComponentName,
+			}, nil, "", nil))
+	}
+	return rctxs, params
 }

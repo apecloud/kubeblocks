@@ -46,7 +46,7 @@ type ReconcileContext struct {
 	ParametersDefs map[string]*parametersv1alpha1.ParametersDefinition
 }
 
-func newConfigReconcileContext(reqCtx intctrlutil.RequestCtx,
+func newParameterReconcileContext(reqCtx intctrlutil.RequestCtx,
 	resourceCtx *configctrl.ResourceCtx,
 	cm *corev1.ConfigMap,
 	configSpecName string,

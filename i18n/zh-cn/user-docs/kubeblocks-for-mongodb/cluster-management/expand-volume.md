@@ -171,7 +171,7 @@ mycluster   mongodb              mongodb-5.0   Delete               Running   27
     - 查看集群状态。
 
        ```bash
-       kbcli cluster list mycluster
+       kbcli cluster list mycluster -n demo
        >
        NAME              NAMESPACE        CLUSTER-DEFINITION        VERSION            TERMINATION-POLICY        STATUS          CREATED-TIME
        mycluster         demo             mongodb                   mongodb-5.0        Delete                    Updating        Apr 10,2023 16:27 UTC+0800

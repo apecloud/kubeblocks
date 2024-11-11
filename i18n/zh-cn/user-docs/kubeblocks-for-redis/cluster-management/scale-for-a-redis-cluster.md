@@ -6,7 +6,7 @@ sidebar_position: 2
 sidebar_label: 扩缩容
 ---
 
-import Tabs from '@theme/Tabs';
+import Tabs from '@theme/Tabs'; 
 import TabItem from '@theme/TabItem';
 
 # Redis 集群扩缩容

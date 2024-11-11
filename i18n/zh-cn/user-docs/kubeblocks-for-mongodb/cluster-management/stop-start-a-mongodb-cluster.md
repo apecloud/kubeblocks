@@ -159,9 +159,9 @@ import TabItem from '@theme/TabItem';
 
     <TabItem value="kbcli" label="kbcli">
 
-   ```bash
-   kbcli cluster start mycluster -n demo
-   ```
+    ```bash
+    kbcli cluster start mycluster -n demo
+    ```
 
     </TabItem>
 

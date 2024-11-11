@@ -15,6 +15,8 @@ import TabItem from '@theme/TabItem';
 
 Milvus 是高度灵活、可靠且速度极快的云原生开源矢量数据库。它为 embedding 相似性搜索和 AI 应用程序提供支持，并努力使每个组织都可以访问矢量数据库。 Milvus 可以存储、索引和管理由深度神经网络和其他机器学习 (ML) 模型生成的十亿级别以上的 embedding 向量。
 
+本文档展示了如何通过 kbcli、kubectl 或 YAML 文件等当时创建和管理  Milvus 集群。您可以在 [GitHub 仓库](https://github.com/apecloud/kubeblocks-addons/tree/release-0.9/examples/milvus)查看 YAML 示例。
+
 ## 开始之前
 
 - 如果您想通过 `kbcli` 创建并连接 Milvus 集群，请先[安装 kbcli](./../installation/install-with-kbcli/install-kbcli.md)。
@@ -476,25 +478,25 @@ mycluster   milvus-2.3.2                                  Delete               R
 
    - 查看 OpsRequest 进程。
 
-       执行磁盘扩容命令后，KubeBlocks 会自动输出查看 OpsRequest 进程的命令，可通过该命令查看 OpsRequest 进程的细节，包括 OpsRequest 的状态、Pod 状态等。当 OpsRequest 的状态为 `Succeed` 时，表明这一进程已完成。
+     执行磁盘扩容命令后，KubeBlocks 会自动输出查看 OpsRequest 进程的命令，可通过该命令查看 OpsRequest 进程的细节，包括 OpsRequest 的状态、Pod 状态等。当 OpsRequest 的状态为 `Succeed` 时，表明这一进程已完成。
 
-       ```bash
-       kbcli cluster describe-ops milvus-verticalscaling-rpw2l -n demo
-       ```
+     ```bash
+     kbcli cluster describe-ops milvus-verticalscaling-rpw2l -n demo
+     ```
 
    - 查看集群状态。
 
-       ```bash
-       kbcli cluster list mycluster -n demo
-       >
-       NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS     CREATED-TIME
-       mycluster   demo                                               Delete               Updating   Jul 05,2024 17:35 UTC+0800
-       ```
+     ```bash
+     kbcli cluster list mycluster -n demo
+     >
+     NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS     CREATED-TIME
+     mycluster   demo                                               Delete               Updating   Jul 05,2024 17:35 UTC+0800
+     ```
 
-       - STATUS=VerticalScaling 表示正在进行垂直扩容。
-       - STATUS=Running 表示垂直扩容已完成。
-       - STATUS=Abnormal 表示垂直扩容异常。原因可能是正常实例的数量少于总实例数，或者 Leader 实例正常运行而其他实例异常。
-          > 您可以手动检查是否由于资源不足而导致报错。如果 Kubernetes 集群支持 AutoScaling，系统在资源充足的情况下会执行自动恢复。或者你也可以创建足够的资源，并使用 `kubectl describe` 命令进行故障排除。
+     - STATUS=VerticalScaling 表示正在进行垂直扩容。
+     - STATUS=Running 表示垂直扩容已完成。
+     - STATUS=Abnormal 表示垂直扩容异常。原因可能是正常实例的数量少于总实例数，或者 Leader 实例正常运行而其他实例异常。
+       > 您可以手动检查是否由于资源不足而导致报错。如果 Kubernetes 集群支持 AutoScaling，系统在资源充足的情况下会执行自动恢复。或者你也可以创建足够的资源，并使用 `kubectl describe` 命令进行故障排除。
 
 3. 当 OpsRequest 状态为 `Succeed` 或集群状态再次回到 `Running` 后，检查资源规格是否已变更。
 

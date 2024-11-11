@@ -96,8 +96,7 @@ const (
 	ZoneLabelKey         = "topology.kubernetes.io/zone"
 
 	// kubeblocks.io labels
-	BackupProtectionLabelKey                 = "kubeblocks.io/backup-protection" // BackupProtectionLabelKey Backup delete protection policy label
-	RoleLabelKey                             = "kubeblocks.io/role"              // RoleLabelKey consensusSet and replicationSet role label key
+	RoleLabelKey                             = "kubeblocks.io/role" // RoleLabelKey consensusSet and replicationSet role label key
 	AccessModeLabelKey                       = "workloads.kubeblocks.io/access-mode"
 	ReadyWithoutPrimaryKey                   = "kubeblocks.io/ready-without-primary"
 	VolumeTypeLabelKey                       = "kubeblocks.io/volume-type"
@@ -229,17 +228,6 @@ const (
 	ServiceKind               = "Service"
 	ConfigMapKind             = "ConfigMap"
 	DaemonSetKind             = "DaemonSet"
-)
-
-const (
-	// BackupRetain always retained, unless manually deleted by the user
-	BackupRetain = "Retain"
-
-	// BackupRetainUntilExpired retains backup till it expires
-	BackupRetainUntilExpired = "RetainUntilExpired"
-
-	// BackupDelete (default) deletes backup immediately when cluster's terminationPolicy is WipeOut
-	BackupDelete = "Delete"
 )
 
 const (

@@ -212,9 +212,8 @@ func getDefaultBackupPolicy(reqCtx intctrlutil.RequestCtx, cli client.Client, cl
 
 func getBackupLabels(cluster, request string) map[string]string {
 	return map[string]string{
-		constant.AppInstanceLabelKey:      cluster,
-		constant.BackupProtectionLabelKey: constant.BackupRetain,
-		constant.OpsRequestNameLabelKey:   request,
-		constant.OpsRequestTypeLabelKey:   string(appsv1alpha1.BackupType),
+		constant.AppInstanceLabelKey:    cluster,
+		constant.OpsRequestNameLabelKey: request,
+		constant.OpsRequestTypeLabelKey: string(appsv1alpha1.BackupType),
 	}
 }

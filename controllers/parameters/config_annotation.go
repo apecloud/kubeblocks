@@ -37,7 +37,7 @@ import (
 
 type options = func(*intctrlutil.Result)
 
-func reconciled(status ReturnedStatus, policy string, phase parametersv1alpha1.ConfigurationPhase, options ...options) intctrlutil.Result {
+func reconciled(status ReturnedStatus, policy string, phase parametersv1alpha1.ParameterPhase, options ...options) intctrlutil.Result {
 	result := intctrlutil.Result{
 		Policy:        policy,
 		Phase:         phase,
@@ -52,7 +52,7 @@ func reconciled(status ReturnedStatus, policy string, phase parametersv1alpha1.C
 	return result
 }
 
-func unReconciled(phase parametersv1alpha1.ConfigurationPhase, revision string, message string) intctrlutil.Result {
+func unReconciled(phase parametersv1alpha1.ParameterPhase, revision string, message string) intctrlutil.Result {
 	return intctrlutil.Result{
 		Phase:         phase,
 		Revision:      revision,
@@ -95,7 +95,7 @@ func checkEnableCfgUpgrade(object client.Object) bool {
 	return true
 }
 
-func updateConfigPhase(cli client.Client, ctx intctrlutil.RequestCtx, config *corev1.ConfigMap, phase parametersv1alpha1.ConfigurationPhase, message string) (ctrl.Result, error) {
+func updateConfigPhase(cli client.Client, ctx intctrlutil.RequestCtx, config *corev1.ConfigMap, phase parametersv1alpha1.ParameterPhase, message string) (ctrl.Result, error) {
 	return updateConfigPhaseWithResult(cli, ctx, config, unReconciled(phase, "", message))
 }
 

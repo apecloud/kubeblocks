@@ -495,7 +495,6 @@ type Reconfigure struct {
 
 	// Specifies a list of key-value pairs representing parameters for the component.
 	//
-	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:validation:Required
 	Parameters appsv1.ComponentParameters `json:"parameters"`
 }

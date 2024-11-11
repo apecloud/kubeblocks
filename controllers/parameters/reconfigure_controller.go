@@ -162,7 +162,7 @@ func checkConfigurationObject(object client.Object) bool {
 }
 
 func (r *ReconfigureReconciler) sync(reqCtx intctrlutil.RequestCtx, configMap *corev1.ConfigMap, resources *reconfigureRelatedResource) (ctrl.Result, error) {
-	reconcileContext := newConfigReconcileContext(reqCtx,
+	reconcileContext := newParameterReconcileContext(reqCtx,
 		&configctrl.ResourceCtx{
 			Context:       reqCtx.Ctx,
 			Client:        r.Client,

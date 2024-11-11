@@ -197,7 +197,7 @@ func TestGetConfigSpecReconcilePhase(t *testing.T) {
 	tests := []struct {
 		name string
 		args args
-		want parametersv1alpha1.ConfigurationPhase
+		want parametersv1alpha1.ParameterPhase
 	}{{
 		name: "test",
 		args: args{

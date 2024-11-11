@@ -417,7 +417,7 @@ func fromItemStatus(ctx intctrlutil.RequestCtx, status *parametersv1alpha1.Compo
 	return itemStatus
 }
 
-func isReconcileStatus(phase parametersv1alpha1.ConfigurationPhase) bool {
+func isReconcileStatus(phase parametersv1alpha1.ParameterPhase) bool {
 	return phase != "" &&
 		phase != parametersv1alpha1.CCreatingPhase &&
 		phase != parametersv1alpha1.CDeletingPhase

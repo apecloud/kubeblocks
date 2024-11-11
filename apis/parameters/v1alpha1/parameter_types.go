@@ -71,10 +71,37 @@ type ParameterSpec struct {
 
 // ParameterStatus defines the observed state of Parameter
 type ParameterStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// Describes the reconfiguring detail status.
+	// Possible condition types include "Creating", "Init", "Running", "Pending", "Merged", "MergeFailed", "FailedAndPause",
+	// "Upgrading", "Deleting", "FailedAndRetry", "Finished", "ReconfigurePersisting", "ReconfigurePersisted".
+	// +optional
+	// +patchMergeKey=type
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=type
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 
-	// TODO:
+	// Provides a description of any abnormal status.
+	// +optional
+	Message string `json:"message,omitempty"`
+
+	// Indicates the current status of the configuration item.
+	//
+	// Possible values include "Creating", "Init", "Running", "Pending", "Merged", "MergeFailed", "FailedAndPause",
+	// "Upgrading", "Deleting", "FailedAndRetry", "Finished".
+	//
+	// +optional
+	Phase ParameterPhase `json:"phase,omitempty"`
+
+	// Represents the latest generation observed for this
+	// ClusterDefinition. It corresponds to the ConfigConstraint's generation, which is
+	// updated by the API Server.
+	// +optional
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+
+	// Records the status of a reconfiguring operation if `opsRequest.spec.type` equals to "Reconfiguring".
+	// +optional
+	ReconfiguringStatus []ComponentReconfiguringStatus `json:"componentReconfiguringStatus"`
 }
 
 type ComponentParametersSpec struct {
@@ -86,7 +113,7 @@ type ComponentParametersSpec struct {
 	// Specifies the user-defined configuration template or parameters.
 	//
 	// +optional
-	ComponentParameters ComponentParameters `json:"parameters,omitempty"`
+	ComponentParameters appsv1.ComponentParameters `json:"parameters,omitempty"`
 
 	// Specifies the user-defined configuration template.
 	//
@@ -95,5 +122,45 @@ type ComponentParametersSpec struct {
 	// This allows users to customize the configuration template according to their specific requirements.
 	//
 	// +optional
-	CustomTemplates *appsv1.ConfigTemplateExtension `json:"userConfigTemplates,omitempty"`
+	CustomTemplates map[string]appsv1.ConfigTemplateExtension `json:"userConfigTemplates,omitempty"`
+}
+
+type ComponentReconfiguringStatus struct {
+	// Specifies the name of the Component.
+	// +kubebuilder:validation:Required
+	ComponentName string `json:"componentName"`
+
+	// Indicates the current status of the configuration item.
+	//
+	// Possible values include "Creating", "Init", "Running", "Pending", "Merged", "MergeFailed", "FailedAndPause",
+	// "Upgrading", "Deleting", "FailedAndRetry", "Finished".
+	//
+	// +optional
+	Phase ParameterPhase `json:"phase,omitempty"`
+
+	// Describes the status of the component reconfiguring.
+	// +kubebuilder:validation:Required
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
+	ParameterStatus []ReconfiguringStatus `json:"parameterStatus,omitempty"`
+}
+
+type ReconfiguringStatus struct {
+	ConfigTemplateItemDetailStatus `json:",inline"`
+
+	// Contains the updated parameters.
+	//
+	// +optional
+	UpdatedParameters map[string]ParametersInFile `json:"updatedParameters,omitempty"`
+
+	// Specifies the user-defined configuration template.
+	//
+	// When provided, the `importTemplateRef` overrides the default configuration template
+	// specified in `configSpec.templateRef`.
+	// This allows users to customize the configuration template according to their specific requirements.
+	//
+	// +optional
+	CustomTemplate *appsv1.ConfigTemplateExtension `json:"userConfigTemplates,omitempty"`
 }

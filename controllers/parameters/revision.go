@@ -36,7 +36,7 @@ import (
 type ConfigurationRevision struct {
 	Revision    int64
 	StrRevision string
-	Phase       parametersv1alpha1.ConfigurationPhase
+	Phase       parametersv1alpha1.ParameterPhase
 	Result      intctrlutil.Result
 }
 
@@ -115,7 +115,7 @@ func parseResult(data string, revision string) intctrlutil.Result {
 	}
 	err := json.Unmarshal([]byte(data), &result)
 	if err != nil {
-		result.Phase = parametersv1alpha1.ConfigurationPhase(data)
+		result.Phase = parametersv1alpha1.ParameterPhase(data)
 	}
 	return result
 }

@@ -205,7 +205,7 @@ type ConfigTemplateItemDetailStatus struct {
 	// "Upgrading", "Deleting", "FailedAndRetry", "Finished".
 	//
 	// +optional
-	Phase ConfigurationPhase `json:"phase,omitempty"`
+	Phase ParameterPhase `json:"phase,omitempty"`
 
 	// Represents the last completed revision of the configuration item. This field is optional.
 	//
@@ -248,7 +248,7 @@ type ComponentParameterStatus struct {
 	// "Upgrading", "Deleting", "FailedAndRetry", "Finished".
 	//
 	// +optional
-	Phase ConfigurationPhase `json:"phase,omitempty"`
+	Phase ParameterPhase `json:"phase,omitempty"`
 
 	// Represents the latest generation observed for this
 	// ClusterDefinition. It corresponds to the ConfigConstraint's generation, which is

@@ -34,7 +34,7 @@ func ClassifyParamsFromConfigTemplate(params appsv1.ComponentParameters,
 	tpls map[string]*corev1.ConfigMap) []parametersv1alpha1.ConfigTemplateItemDetail {
 	var itemDetails []parametersv1alpha1.ConfigTemplateItemDetail
 
-	classifyParams := classifyComponentParameters(params, paramsDefs, cmpd.Spec.Configs, tpls)
+	classifyParams := ClassifyComponentParameters(params, paramsDefs, cmpd.Spec.Configs, tpls)
 	for _, template := range cmpd.Spec.Configs {
 		itemDetails = append(itemDetails, generateConfigTemplateItem(classifyParams, template))
 	}
@@ -48,12 +48,12 @@ func generateConfigTemplateItem(configParams map[string]map[string]*parametersv1
 	}
 
 	if tls, ok := configParams[template.Name]; ok {
-		itemDetail.ConfigFileParams = derefMapValues(tls)
+		itemDetail.ConfigFileParams = DerefMapValues(tls)
 	}
 	return itemDetail
 }
 
-func classifyComponentParameters(parameters appsv1.ComponentParameters,
+func ClassifyComponentParameters(parameters appsv1.ComponentParameters,
 	parametersDefs []*parametersv1alpha1.ParametersDefinition,
 	templates []appsv1.ComponentTemplateSpec,
 	tpls map[string]*corev1.ConfigMap) map[string]map[string]*parametersv1alpha1.ParametersInFile {
@@ -151,7 +151,7 @@ func resolveConfigSpecFromParametersDefinition(templates []appsv1.ComponentTempl
 	return nil
 }
 
-func derefMapValues(m map[string]*parametersv1alpha1.ParametersInFile) map[string]parametersv1alpha1.ParametersInFile {
+func DerefMapValues(m map[string]*parametersv1alpha1.ParametersInFile) map[string]parametersv1alpha1.ParametersInFile {
 	if len(m) == 0 {
 		return nil
 	}

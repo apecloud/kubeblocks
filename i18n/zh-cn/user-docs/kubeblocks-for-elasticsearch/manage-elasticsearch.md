@@ -10,93 +10,136 @@ sidebar_label: 用 KubeBlocks 管理 Elasticsearch
 
 Elasticsearch 是一个分布式、RESTful 风格的搜索和数据分析引擎，能够解决不断涌现出的各种用例。作为 Elastic Stack 的核心，Elasticsearch 会集中存储您的数据，让您飞快完成搜索，微调相关性，进行强大的分析，并轻松缩放规模。
 
+本文档展示了如何通过 kbcli、kubectl 或 YAML 文件等当时创建和管理 Kafka 集群。您可以在 [GitHub 仓库](https://github.com/apecloud/kubeblocks-addons/tree/release-0.9/examples/elasticsearch)查看 YAML 示例。
+
 ## 开始之前
 
-- [安装 kbcli](./../installation/install-with-kbcli/install-kbcli.md)。
-- [安装 KubeBlocks](./../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md)。
-- [安装并启用 elasticsearch 引擎](./../overview/database-engines-supported.md#使用引擎)。
+- 如果您想通过 `kbcli` 创建并连接 ApeCloud MySQL 集群，请先[安装 kbcli](./../installation/install-with-kbcli/install-kbcli.md)。
+- 安装 KubeBlocks，可通过 [Kbcli](./../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) 或 [Helm](./../installation/install-with-helm/install-kubeblocks.md) 安装。
+- 安装并启用 elasticsearch 引擎，可通过 [kbcli](./../installation/install-with-kbcli/install-addons.md) 或 [Helm](./../installation/install-with-helm/install-addons.md) 操作。
 
 ## 创建集群
 
 ***步骤***
 
-1. 创建集群。
+<Tabs>
 
-   ```bash
-   kbcli cluster create elasticsearch elasticsearch
-   ```
+<TabItem value="kubectl" label="kubectl" default>
+
+KubeBlocks 通过 `Cluster` 定义集群。以下是创建 Elasticsearch 集群的示例。Pod 默认分布在不同节点。但如果您只有一个节点可用于部署集群，可将 `spec.affinity.topologyKeys` 设置为 `null`。
 
 :::note
 
-执行以下命令，查看更多集群创建的选项和默认值。
-  
-```bash
-kbcli cluster create --help
-```
+生产环境中，不建议将所有副本部署在同一个节点上，因为这可能会降低集群的可用性。
 
 :::
+
+```yaml
+cat <<EOF | kubectl apply -f -
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  annotations:
+    kubeblocks.io/extra-env: '{"mdit-roles":"master,data,ingest,transform","mode":"multi-node"}'
+  labels:
+    app.kubernetes.io/instance: mycluster
+    app.kubernetes.io/version: 8.8.2
+    helm.sh/chart: elasticsearch-cluster-0.9.0
+  name: test
+  namespace: kubeblocks-cloud-ns
+spec:
+  affinity:
+    podAntiAffinity: Required
+    topologyKeys:
+    - kubernetes.io/hostname
+  componentSpecs:
+  - componentDef: elasticsearch-8.8
+    disableExporter: true
+    name: mdit
+    replicas: 3
+    resources:
+      limits:
+        cpu: "1"
+        memory: 2Gi
+      requests:
+        cpu: "1"
+        memory: 2Gi
+    serviceAccountName: kb-mycluster
+    volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi
+  terminationPolicy: Delete
+EOF
+```
+
+| 字段                                   | 定义  |
+|---------------------------------------|--------------------------------------|
+| `spec.clusterDefinitionRef`           | 集群定义 CRD 的名称，用来定义集群组件。  |
+| `spec.clusterVersionRef`              | 集群版本 CRD 的名称，用来定义集群版本。 |
+| `spec.terminationPolicy`              | 集群的终止策略，默认值为 `Delete`，有效值为 `DoNotTerminate`、`Halt`、`Delete` 和 `WipeOut`。 <p> - `DoNotTerminate` 会阻止删除操作。 </p><p> - `Halt` 会删除工作负载资源，如 statefulset 和 deployment 等，但是保留了 PVC 。  </p><p> - `Delete` 在 `Halt` 的基础上进一步删除了 PVC。 </p><p> - `WipeOut` 在 `Delete` 的基础上从备份存储的位置完全删除所有卷快照和快照数据。 </p>|
+| `spec.affinity`                       | 为集群的 Pods 定义了一组节点亲和性调度规则。该字段可控制 Pods 在集群中节点上的分布。 |
+| `spec.affinity.podAntiAffinity`       | 定义了不在同一 component 中的 Pods 的反亲和性水平。该字段决定了 Pods 以何种方式跨节点分布，以提升可用性和性能。 |
+| `spec.affinity.topologyKeys`          | 用于定义 Pod 反亲和性和 Pod 分布约束的拓扑域的节点标签值。 |
+| `spec.tolerations`                    | 该字段为数组，用于定义集群中 Pods 的容忍，确保 Pod 可被调度到具有匹配污点的节点上。 |
+| `spec.componentSpecs`                 | 集群 components 列表，定义了集群 components。该字段允许对集群中的每个 component 进行自定义配置。 |
+| `spec.componentSpecs.componentDefRef` | 表示 cluster definition 中定义的 component definition 的名称，可通过执行 `kubectl get clusterdefinition elasticsearch -o json \| jq '.spec.componentDefs[].name'` 命令获取 component definition 名称。 |
+| `spec.componentSpecs.name`            | 定义了 component 的名称。  |
+| `spec.componentSpecs.disableExporter` | 定义了是否开启监控功能。 |
+| `spec.componentSpecs.replicas`        | 定义了 component 中 replicas 的数量。 |
+| `spec.componentSpecs.resources`       | 定义了 component 的资源要求。  |
+
+KubeBlocks operator 监控 `Cluster` CRD 并创建集群和全部依赖资源。您可执行以下命令获取集群创建的所有资源信息。
+
+```bash
+kubectl get all,secret,rolebinding,serviceaccount -l app.kubernetes.io/instance=mycluster -n demo
+```
+
+执行以下命令，查看已创建的 Elasticsearch 集群：
+
+```bash
+kubectl get cluster mycluster -n demo -o yaml
+```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+1. 创建集群。
+
+   ```bash
+   kbcli cluster create elasticsearch mycluster -n demo
+   ```
+
+   如果您需要自定义集群规格，kbcli 也提供了诸多参数，如支持设置引擎版本、终止策略、CPU、内存规格。您可通过在命令结尾添加 --help 或 -h 来查看具体说明。比如，
+
+   ```bash
+   kbcli cluster create elasticsearch --help
+   kbcli cluster create elasticsearch -h
+   ```
 
 2. 查看集群是否已创建。
 
    ```bash
-   kbcli cluster list
+   kbcli cluster list -n demo
    >
-   NAME            NAMESPACE   CLUSTER-DEFINITION   VERSION               TERMINATION-POLICY   STATUS            CREATED-TIME
-   elasticsearch   default     elasticsearch        elasticsearch-8.8.2   Delete               Running          Jul 05,2024 16:51 UTC+0800   
+   NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION   TERMINATION-POLICY   STATUS     CREATED-TIME
+   mycluster   demo                                       Delete               Creating   Sep 27,2024 11:42 UTC+0800  
    ```
 
 3. 查看集群信息。
 
    ```bash
-   kbcli cluster describe elasticsearch
-   >
-   Name: elasticsearch	 Created Time: Jul 05,2024 16:51 UTC+0800
-   NAMESPACE   CLUSTER-DEFINITION   VERSION               STATUS    TERMINATION-POLICY   
-   default     elasticsearch        elasticsearch-8.8.2   Running   Delete               
-
-   Endpoints:
-   COMPONENT       MODE        INTERNAL                                                     EXTERNAL   
-   elasticsearch   ReadWrite   elasticsearch-elasticsearch.default.svc.cluster.local:9200   <none>     
-                            elasticsearch-elasticsearch.default.svc.cluster.local:9300              
-                            elasticsearch-elasticsearch.default.svc.cluster.local:9114              
-    coordinating    ReadWrite   elasticsearch-coordinating.default.svc.cluster.local:9200    <none>     
-                            elasticsearch-coordinating.default.svc.cluster.local:9300               
-    ingest          ReadWrite   elasticsearch-ingest.default.svc.cluster.local:9200          <none>     
-                            elasticsearch-ingest.default.svc.cluster.local:9300                     
-    data            ReadWrite   elasticsearch-data.default.svc.cluster.local:9200            <none>     
-                            elasticsearch-data.default.svc.cluster.local:9300                       
-    master          ReadWrite   elasticsearch-master.default.svc.cluster.local:9200          <none>     
-                            elasticsearch-master.default.svc.cluster.local:9300                     
-
-    Topology:
-    COMPONENT       INSTANCE                        ROLE     STATUS    AZ       NODE     CREATED-TIME                 
-    master          elasticsearch-master-0          <none>   Running   <none>   <none>   Jul 05,2024 16:51 UTC+0800   
-    data            elasticsearch-data-0            <none>   Running   <none>   <none>   Jul 05,2024 16:51 UTC+0800   
-    ingest          elasticsearch-ingest-0          <none>   Running   <none>   <none>   Jul 05,2024 16:51 UTC+0800   
-    elasticsearch   elasticsearch-elasticsearch-0   <none>   Running   <none>   <none>   Jul 05,2024 16:51 UTC+0800   
-    coordinating    elasticsearch-coordinating-0    <none>   Running   <none>   <none>   Jul 05,2024 16:51 UTC+0800   
-
-    Resources Allocation:
-    COMPONENT       DEDICATED   CPU(REQUEST/LIMIT)   MEMORY(REQUEST/LIMIT)   STORAGE-SIZE   STORAGE-CLASS     
-    elasticsearch   false       1 / 1                1Gi / 1Gi               data:20Gi      csi-hostpath-sc   
-    coordinating    false       1 / 1                1Gi / 1Gi               data:20Gi      csi-hostpath-sc   
-    ingest          false       1 / 1                1Gi / 1Gi               data:20Gi      csi-hostpath-sc   
-    data            false       1 / 1                1Gi / 1Gi               data:20Gi      csi-hostpath-sc   
-    master          false       1 / 1                1Gi / 1Gi               data:20Gi      csi-hostpath-sc   
-
-    Images:
-    COMPONENT       TYPE            IMAGE                                   
-    elasticsearch   elasticsearch   docker.io/bitnami/elasticsearch:8.8.2   
-    coordinating    coordinating    docker.io/bitnami/elasticsearch:8.8.2   
-    ingest          ingest          docker.io/bitnami/elasticsearch:8.8.2   
-    data            data            docker.io/bitnami/elasticsearch:8.8.2   
-    master          master          docker.io/bitnami/elasticsearch:8.8.2   
-
-    Data Protection:
-    BACKUP-REPO   AUTO-BACKUP   BACKUP-SCHEDULE   BACKUP-METHOD   BACKUP-RETENTION   
-
-    Show cluster events: kbcli cluster list-events -n default elasticsearch
+   kbcli cluster describe mycluster -n demo
    ```
+
+</TabItem>
+
+</Tabs>
 
 ## 连接集群
 
@@ -108,60 +151,7 @@ curl http://127.0.0.1:9200/_cat/nodes?v
 
 ## 监控集群
 
-测试环境中，可执行以下命令，打开 Grafana 监控大盘。
-
-1. 查看 KubeBlocks 内置引擎，确保监控相关引擎已开启。如果监控引擎未启用，可参考[该文档](./../overview/database-engines-supported.md#使用引擎)，启用引擎。
-
-   ```bash
-   # View all addons supported
-   kbcli addon list
-   ...
-   grafana                        Helm   Enabled                   true                                                                                    
-   alertmanager-webhook-adaptor   Helm   Enabled                   true                                                                                    
-   prometheus                     Helm   Enabled    alertmanager   true 
-   ...
-   ```
-
-2. 查看集群监控功能是否开启。可通过查看集群 YAML 文件中是否显示 `disableExporter: false`，如果有该字段，则说明集群监控功能已开启。
-
-   ```bash
-   kubectl get cluster elasticsearch -o yaml
-   >
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: Cluster
-   metadata:
-   ......
-   spec:
-     ......
-     componentSpecs:
-     ......
-       disableExporter: false
-   ```
-
-   如果输出结果未显示 `disableExporter: false`，则说明集群未开启监控功能，可执行以下命令，开启该功能。
-
-   ```bash
-   kbcli cluster update elasticssearch --disable-exporter=false
-   ```
-
-3. 查看大盘列表。
-
-   ```bash
-   kbcli dashboard list
-   >
-   NAME                                 NAMESPACE   PORT    CREATED-TIME
-   kubeblocks-grafana                   kb-system   13000   Jul 24,2023 11:38 UTC+0800
-   kubeblocks-prometheus-alertmanager   kb-system   19093   Jul 24,2023 11:38 UTC+0800
-   kubeblocks-prometheus-server         kb-system   19090   Jul 24,2023 11:38 UTC+0800
-   ```
-
-4. 打开监控大盘网页控制台。
-
-   ```bash
-   kbcli dashboard open kubeblocks-grafana
-   ```
-
-对于生产环境，强烈建议您搭建专属监控系统或者购买第三方监控服务，详情可参考[监控文档](./../observability/monitor-database.md#for-production-environment)。
+Elasticsearch 的监控功能与其他引擎相同，可参考[监控文档](./../observability/monitor-database.md)，了解功能细节。
 
 ## 扩缩容
 
@@ -169,61 +159,347 @@ curl http://127.0.0.1:9200/_cat/nodes?v
 
 水平扩展改变 Pod 的数量。例如，您可以将副本从三个扩展到五个。
 
-从 v0.9.0 开始，KubeBlocks 还支持了指定实例扩缩容。可通过 [水平扩缩容 API 文档](./../../api-docs/maintenance/scale/horizontal-scale.md) 文档了解更多细节和示例。
+从 v0.9.0 开始，KubeBlocks 还支持了指定实例扩缩容。可通过 [水平扩缩容文档](./../maintenance/scale/horizontal-scale.md) 文档了解更多细节和示例。
 
 #### 开始之前
 
 确认集群状态是否为 `Running`。否则，后续相关操作可能会失败。
 
+<Tabs>
+
+<TabItem value="kubectl" label="kubectl" default>
+
 ```bash
-kbcli cluster list mycluster
+kubectl get cluster mycluster -n demo
 >
-NAME        CLUSTER-DEFINITION          VERSION               TERMINATION-POLICY    STATUS    AGE
-mycluster   elasticsearch               elasticsearch-8.8.2   Delete                Running   47m
+NAME        CLUSTER-DEFINITION   VERSION                  TERMINATION-POLICY   STATUS    AGE
+mycluster                                                 Delete               Running   4m29s
 ```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+```bash
+kbcli cluster list mycluster -n demo
+>
+NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    CREATED-TIME
+mycluster   demo                                               Delete               Running   Sep 27,2024 11:42 UTC+0800
+```
+
+</TabItem>
+
+</Tabs>
 
 #### 步骤
 
-执行以下命令进行水平扩缩容。
+<Tabs>
 
-```bash
-kbcli cluster hscale elasticsearch --replicas=2 --components=elasticsearch
-```
+<TabItem value="OpsRequest" label="OpsRequest" default>
 
-- `--components` 表示准备进行水平扩容的组件名称。
-- `--replicas` 表示指定组件的副本数。 根据需要设定数值，进行扩缩容。
+1. 对指定的集群应用 OpsRequest，可根据您的需求配置参数。
 
-执行 `kbcli cluster hscale` 后会输出一条 ops 相关命令，可使用该命令查看扩缩容任务进度。
+   以下示例演示了增加 2 个副本。
 
-```bash
-kbcli cluster describe-ops elasticsearch-horizontalscaling-xpdwz -n demo
-```
+   ```bash
+   kubectl apply -f - <<EOF
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: OpsRequest
+   metadata:
+     name: ops-horizontal-scaling
+     namespace: demo
+   spec:
+     clusterName: mycluster
+     type: HorizontalScaling
+     horizontalScaling:
+     - componentName: elasticsearch
+       scaleOut:
+         replicaChanges: 2
+   EOF
+   ```
 
-也可通过以下命令，查看扩缩容任务是否完成。
+   如果您想要缩容，可将 `scaleOut` 替换为 `scaleIn`。
 
-```bash
-kbcli cluster describe elasticsearch
-```
+   以下示例演示了删除 2 个副本。
+
+   ```bash
+   kubectl apply -f - <<EOF
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: OpsRequest
+   metadata:
+     name: ops-horizontal-scaling
+     namespace: demo
+   spec:
+     clusterName: mycluster
+     type: HorizontalScaling
+     horizontalScaling:
+     - componentName: elasticsearch
+       scaleIn:
+         replicaChanges: 2
+   EOF
+   ```
+
+2. 查看运维操作状态，验证水平扩缩容是否成功。
+
+   ```bash
+   kubectl get ops -n demo
+   >
+   NAMESPACE   NAME                     TYPE                CLUSTER     STATUS    PROGRESS   AGE
+   demo        ops-horizontal-scaling   HorizontalScaling   mycluster   Succeed   3/3        6m
+   ```
+
+   如果有报错，可执行 `kubectl describe ops -n demo` 命令查看该运维操作的相关事件，协助排障。
+
+3. 当 OpsRequest 状态为 `Succeed` 或集群状态再次回到 `Running` 后，查看相应资源是否变更。
+
+    ```bash
+    kubectl describe cluster mycluster -n demo
+    ```
+
+</TabItem>
+  
+<TabItem value="编辑集群 YAML 文件" label="编辑集群 YAML 文件">
+
+1. 修改 YAML 文件中 `spec.componentSpecs.replicas` 的配置。`spec.componentSpecs.replicas` 定义了 pod 数量，修改该参数将触发集群水平扩缩容。
+
+   ```yaml
+   kubectl edit cluster mycluster -n demo
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: Cluster
+   metadata:
+     name: mycluster
+     namespace: demo
+   spec:
+     clusterDefinitionRef: elasticsearch
+     clusterVersionRef: elasticsearch-8.8.2
+     componentSpecs:
+     - name: elasticsearch
+       componentDefRef: elasticsearch
+       replicas: 1 # 修改该参数值
+       volumeClaimTemplates:
+       - name: data
+         spec:
+           accessModes:
+             - ReadWriteOnce
+           resources:
+             requests:
+               storage: 1Gi
+    terminationPolicy: Delete
+   ```
+
+2. 当集群状态再次回到 `Running` 后，查看相关资源是否变更。
+
+    ```bash
+    kubectl describe cluster mycluster -n demo
+    ```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+1. 更改配置。
+
+    配置参数 `--components` 和 `--replicas`，并执行以下命令。
+
+    ```bash
+    kbcli cluster hscale elasticsearch --replicas=2 --components=elasticsearch
+    ```
+
+    - `--components` 表示准备进行水平扩容的组件名称。
+    - `--replicas` 表示指定组件的副本数。 根据需要设定数值，进行扩缩容。
+
+2. 通过以下任意一种方式验证水平扩容是否完成。
+
+    - 查看 OpsRequest 进程。
+
+       执行磁盘扩容命令后，KubeBlocks 会自动输出查看 OpsRequest 进程的命令，可通过该命令查看 OpsRequest 进程的细节，包括 OpsRequest 的状态、Pod 状态等。当 OpsRequest 的状态为 Succeed 时，表明这一进程已完成。
+
+       ```bash
+       kbcli cluster describe-ops elasticsearch-horizontalscaling-xpdwz -n demo
+       ```
+
+    - 查看集群状态。
+  
+       ```bash
+       kbcli cluster list mycluster -n demo
+       ```
+
+       - STATUS=Updating 表示正在进行水平扩容。
+       - STATUS=Running 表示水平扩容已完成。
+
+3. 当 OpsRequest 状态为 `Succeed` 或集群状态再次回到 `Running` 后，查看相应资源是否变更。
+
+    ```bash
+    kbcli cluster describe mycluster -n demo
+    ```
+
+</TabItem>
+
+</Tabs>
 
 ### 垂直扩缩容
 
-执行以下命令进行垂直扩缩容。
+#### 开始之前
+
+确认集群状态是否为 `Running`。否则，后续相关操作可能会失败。
+
+<Tabs>
+
+<TabItem value="kubectl" label="kubectl" default>
 
 ```bash
-kbcli cluster vscale elasticsearch --cpu=2 --memory=3Gi --components=elasticsearch 
+kubectl get cluster mycluster -n demo
+>
+NAME        CLUSTER-DEFINITION   VERSION                  TERMINATION-POLICY   STATUS    AGE
+mycluster                                                 Delete               Running   4m29s
 ```
 
-执行 `kbcli cluster vscale` 后会输出一条 ops 相关命令，可使用该命令查看扩缩容任务进度。
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
 
 ```bash
-kbcli cluster describe-ops elasticsearch-verticalscaling-rpw2l
+kbcli cluster list mycluster -n demo
+>
+NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    CREATED-TIME
+mycluster   demo                                               Delete               Running   Sep 27,2024 11:42 UTC+0800
 ```
 
-也可通过以下命令，查看扩缩容任务是否完成。
+</TabItem>
 
-```bash
-kbcli cluster describe elasticsearch
-```
+</Tabs>
+
+#### 步骤
+
+<Tabs>
+
+<TabItem value="OpsRequest" label="OpsRequest" default>
+
+1. 对指定的集群应用 OpsRequest，可根据您的需求配置参数。
+
+   ```bash
+   kubectl apply -f - <<EOF
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: OpsRequest
+   metadata:
+     name: ops-vertical-scaling
+     namespace: demo
+   spec:
+     clusterName: mycluster
+     type: VerticalScaling
+     verticalScaling:
+     - componentName: elasticsearch
+       requests:
+         memory: "2Gi"
+         cpu: "1"
+       limits:
+         memory: "4Gi"
+         cpu: "2"
+   EOF
+   ```
+
+2. 查看运维任务状态，验证垂直扩缩容操作是否成功。
+
+   ```bash
+   kubectl get ops -n demo
+   >
+   NAMESPACE   NAME                   TYPE              CLUSTER     STATUS    PROGRESS   AGE
+   demo        ops-vertical-scaling   VerticalScaling   mycluster   Succeed   3/3        6m
+   ```
+
+   如果有报错，可执行 `kubectl describe ops -n demo` 命令查看该运维操作的相关事件，协助排障。
+
+3. 当 OpsRequest 状态为 `Succeed` 或集群状态再次回到 `Running` 后，查看相应资源是否变更。
+
+    ```bash
+    kubectl describe cluster mycluster -n demo
+    ```
+
+</TabItem>
+
+<TabItem value="修改集群 YAML 文件" label="修改集群 YAML 文件">
+
+1. 修改 YAML 文件中 `spec.componentSpecs.resources` 的配置。`spec.componentSpecs.resources` 控制资源的请求值和限制值，修改参数值将触发垂直扩缩容。
+
+   ```yaml
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: Cluster
+   metadata:
+     name: mycluster
+     namespace: demo
+   spec:
+     clusterDefinitionRef: elasticsearch
+     clusterVersionRef: elasticsearch-8.8.2
+     componentSpecs:
+     - name: elasticsearch
+       componentDefRef: elasticsearch
+       replicas: 1
+       resources: # Change the values of resources.
+         requests:
+           memory: "2Gi"
+           cpu: "1"
+         limits:
+           memory: "4Gi"
+           cpu: "2"
+       volumeClaimTemplates:
+       - name: data
+         spec:
+           accessModes:
+             - ReadWriteOnce
+           resources:
+             requests:
+               storage: 1Gi
+     terminationPolicy: Delete
+   ```
+
+2. 当集群状态再次回到 `Running` 后，查看相应资源是否变更。
+
+    ```bash
+    kubectl describe cluster mycluster -n demo
+    ```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+1. 更改配置。
+
+    配置参数 `--components`、`--memory` 和 `--cpu`，并执行以下命令。
+
+    ```bash
+    kbcli cluster vscale mycluster --cpu=2 --memory=3Gi --components=elasticsearch -n demo
+    ```
+
+2. 通过以下任意一种方式验证垂直扩容是否完成。
+
+    - 查看 OpsRequest 进程。
+
+       执行垂直扩容命令后，KubeBlocks 会自动输出查看 OpsRequest 进程的命令，可通过该命令查看 OpsRequest 进程的细节，包括 OpsRequest 的状态、Pod 状态等。当 OpsRequest 的状态为 Succeed 时，表明这一进程已完成。
+
+       ```bash
+       kbcli cluster describe-ops elasticsearch-verticalscaling-rpw2l -n demo
+       ```
+
+    - 查看集群状态。
+
+       ```bash
+       kbcli cluster list mycluster -n demo
+       ```
+
+       - STATUS=Updating 表示正在进行垂直扩容。
+       - STATUS=Running 表示垂直扩容已完成。
+       - STATUS=Abnormal 表示垂直扩容异常。原因可能是正常实例的数量少于总实例数，或者 Leader 实例正常运行而其他实例异常。
+          > 您可以手动检查是否由于资源不足而导致报错。如果 Kubernetes 集群支持 AutoScaling，系统在资源充足的情况下会执行自动恢复。或者您也可以创建足够的资源，并使用 `kubectl describe` 命令进行故障排除。
+
+3. 当 OpsRequest 状态为 `Succeed` 或集群状态再次回到 `Running` 后，检查资源规格是否已变更。
+
+    ```bash
+    kbcli cluster describe mycluster -n demo
+    ```
+
+</TabItem>
+
+</Tabs>
 
 ## 磁盘扩容
 

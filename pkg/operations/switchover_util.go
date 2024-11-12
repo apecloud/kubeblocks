@@ -133,7 +133,7 @@ func getPodByRole(ctx context.Context, cli client.Reader, synthesizeComp *compon
 		return nil, err
 	}
 	if len(pods) != 1 {
-		return nil, errors.New("component pod list is empty or has more than one serviceable and writable pod")
+		return nil, errors.New("target pod list is empty or has more than one pod")
 	}
 	return pods[0], nil
 }
@@ -146,7 +146,6 @@ func getTargetRoleName(roles []appsv1.ReplicaRole) (string, error) {
 		return targetRole, errors.New("component has no roles definition, does not support switchover")
 	}
 	for _, role := range roles {
-		// FIXME: the assumption that only one role supports switchover may change in the future
 		if role.SwitchoverBeforeUpdate {
 			if targetRole != "" {
 				return targetRole, errors.New("componentDefinition has more than role that needs switchover before, does not support switchover")

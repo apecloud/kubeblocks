@@ -410,6 +410,11 @@ type ComponentDefinitionSpec struct {
 	// +optional
 	Available *ComponentAvailable `json:"available,omitempty"`
 
+	// FIXME: there's a bug in CEL's cost estimation when chaining .filter() and .map().
+	// It was fixed in k8s 1.30, see: https://github.com/kubernetes/kubernetes/pull/123562.
+	// Maybe we can add this back later.
+	// TODO +kubebuilder:validation:XValidation:rule="self.filter(x, x.participatesInQuorum == true).map(x, x.updatePriority).min() > self.filter(x, x.participatesInQuorum == false).map(x, x.updatePriority).max()",message="Roles participate in quorum should have higher update priority than roles do not participate in quorum."
+
 	// Enumerate all possible roles assigned to each replica of the Component, influencing its behavior.
 	//
 	// A replica can have zero or one role.
@@ -426,7 +431,6 @@ type ComponentDefinitionSpec struct {
 	// This field is immutable.
 	//
 	// +kubebuilder:validation:MaxItems=128
-	// +kubebuilder:validation:XValidation:rule="self.filter(x, x.participatesInQuorum == true).map(x, x.updatePriority).min() > self.filter(x, x.participatesInQuorum == false).map(x, x.updatePriority).max()",message="Roles participate in quorum should have higher update priority than roles do not participate in quorum."
 	// +optional
 	Roles []ReplicaRole `json:"roles,omitempty"`
 

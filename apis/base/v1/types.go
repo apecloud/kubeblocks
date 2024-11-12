@@ -20,8 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package v1
 
 // ReplicaRole represents a role that can be assigned to a component instance, defining its behavior and responsibilities.
-//
-// +kubebuilder:validation:XValidation:rule="self.filter(x, x.participatesInQuorum == true).map(x, x.updatePriority).min() > self.filter(x, x.participatesInQuorum == false).map(x, x.updatePriority).max()",message="Roles participate in quorum should have higher update priority than roles do not participate in quorum."
 type ReplicaRole struct {
 	// Name defines the role's unique identifier. This value is used to set the "apps.kubeblocks.io/role" label
 	// on the corresponding object to identify its role.

@@ -8541,12 +8541,12 @@ spec:
                   required:
                   - name
                   type: object
-                  x-kubernetes-validations:
-                  - message: Roles participate in quorum should have higher update
-                      priority than roles do not participate in quorum.
-                    rule: self.filter(x, x.participatesInQuorum == true).map(x, x.updatePriority).min()
-                      > self.filter(x, x.participatesInQuorum == false).map(x, x.updatePriority).max()
                 type: array
+                x-kubernetes-validations:
+                - message: Roles participate in quorum should have higher update priority
+                    than roles do not participate in quorum.
+                  rule: self.filter(x, x.participatesInQuorum == true).map(x, x.updatePriority).min()
+                    > self.filter(x, x.participatesInQuorum == false).map(x, x.updatePriority).max()
               runtime:
                 description: |-
                   Specifies the PodSpec template used in the Component.

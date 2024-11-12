@@ -170,7 +170,7 @@ var _ = Describe("Component Workload Operations Test", func() {
 				synthesizeComp: synthesizeComp,
 				cluster:        mockCluster,
 				runningITS:     mockITS,
-				protoITS:       mockITS,
+				protoITS:       mockITS.DeepCopy(),
 				dag:            dag,
 			}
 

@@ -68,7 +68,7 @@ type ReplicaRole struct {
 	//
 	// +kubebuilder:default=false
 	// +optional
-	ParticipatesInQuorum bool `json:"participatesInQuorum bool"`
+	ParticipatesInQuorum bool `json:"participatesInQuorum"`
 
 	// SwitchoverBeforeUpdate indicates if a role switchover operation should be performed before
 	// updating or scaling in pods with this role. This is typically used for leader roles to

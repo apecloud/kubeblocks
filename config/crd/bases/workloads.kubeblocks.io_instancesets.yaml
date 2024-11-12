@@ -4275,7 +4275,7 @@ spec:
                       maxLength: 32
                       pattern: ^.*[^\s]+.*$
                       type: string
-                    participatesInQuorum bool:
+                    participatesInQuorum:
                       default: false
                       description: |-
                         ParticipatesInQuorum indicates if pods with this role are counted when determining quorum.
@@ -12490,7 +12490,7 @@ spec:
                           maxLength: 32
                           pattern: ^.*[^\s]+.*$
                           type: string
-                        participatesInQuorum bool:
+                        participatesInQuorum:
                           default: false
                           description: |-
                             ParticipatesInQuorum indicates if pods with this role are counted when determining quorum.

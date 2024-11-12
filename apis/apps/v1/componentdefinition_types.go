@@ -425,6 +425,7 @@ type ComponentDefinitionSpec struct {
 	//
 	// This field is immutable.
 	//
+	// +kubebuilder:validation:MaxItems=128
 	// +kubebuilder:validation:XValidation:rule="self.filter(x, x.participatesInQuorum == true).map(x, x.updatePriority).min() > self.filter(x, x.participatesInQuorum == false).map(x, x.updatePriority).max()",message="Roles participate in quorum should have higher update priority than roles do not participate in quorum."
 	// +optional
 	Roles []ReplicaRole `json:"roles,omitempty"`

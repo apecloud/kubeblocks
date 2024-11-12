@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package v1
 
 // ReplicaRole represents a role that can be assigned to a component instance, defining its behavior and responsibilities.
+//
+// +kubebuilder:validation:XValidation:rule="self.filter(x, x.participatesInQuorum == true).map(x, x.updatePriority).min() > self.filter(x, x.participatesInQuorum == false).map(x, x.updatePriority).max()",message="Roles participate in quorum should have higher update priority than roles do not participate in quorum."
 type ReplicaRole struct {
 	// Name defines the role's unique identifier. This value is used to set the "apps.kubeblocks.io/role" label
 	// on the corresponding object to identify its role.
@@ -53,7 +55,9 @@ type ReplicaRole struct {
 	UpdatePriority int `json:"updatePriority"`
 
 	// ParticipatesInQuorum indicates if pods with this role are counted when determining quorum.
-	// This affects update strategies that need to maintain quorum for availability.
+	// This affects update strategies that need to maintain quorum for availability. Roles participate
+	// in quorum should have higher update priority than roles do not participate in quorum.
+	// The default value is false.
 	//
 	// For example, in a 5-pod component where:
 	// - 2 learner pods (participatesInQuorum=false)
@@ -71,6 +75,7 @@ type ReplicaRole struct {
 	// SwitchoverBeforeUpdate indicates if a role switchover operation should be performed before
 	// updating or scaling in pods with this role. This is typically used for leader roles to
 	// ensure minimal disruption during updates.
+	// The default value is false.
 	//
 	// This field is immutable once set.
 	//

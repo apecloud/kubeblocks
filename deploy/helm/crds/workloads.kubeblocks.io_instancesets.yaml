@@ -4279,7 +4279,9 @@ spec:
                       default: false
                       description: |-
                         ParticipatesInQuorum indicates if pods with this role are counted when determining quorum.
-                        This affects update strategies that need to maintain quorum for availability.
+                        This affects update strategies that need to maintain quorum for availability. Roles participate
+                        in quorum should have higher update priority than roles do not participate in quorum.
+                        The default value is false.
 
 
                         For example, in a 5-pod component where:
@@ -4298,6 +4300,7 @@ spec:
                         SwitchoverBeforeUpdate indicates if a role switchover operation should be performed before
                         updating or scaling in pods with this role. This is typically used for leader roles to
                         ensure minimal disruption during updates.
+                        The default value is false.
 
 
                         This field is immutable once set.
@@ -4322,6 +4325,11 @@ spec:
                   required:
                   - name
                   type: object
+                  x-kubernetes-validations:
+                  - message: Roles participate in quorum should have higher update
+                      priority than roles do not participate in quorum.
+                    rule: self.filter(c, c.participatesInQuorum == true).min() > self.filter(c,
+                      c.participatesInQuorum == true).max()
                 type: array
               selector:
                 description: |-
@@ -12491,7 +12499,9 @@ spec:
                           default: false
                           description: |-
                             ParticipatesInQuorum indicates if pods with this role are counted when determining quorum.
-                            This affects update strategies that need to maintain quorum for availability.
+                            This affects update strategies that need to maintain quorum for availability. Roles participate
+                            in quorum should have higher update priority than roles do not participate in quorum.
+                            The default value is false.
 
 
                             For example, in a 5-pod component where:
@@ -12510,6 +12520,7 @@ spec:
                             SwitchoverBeforeUpdate indicates if a role switchover operation should be performed before
                             updating or scaling in pods with this role. This is typically used for leader roles to
                             ensure minimal disruption during updates.
+                            The default value is false.
 
 
                             This field is immutable once set.
@@ -12534,6 +12545,11 @@ spec:
                       required:
                       - name
                       type: object
+                      x-kubernetes-validations:
+                      - message: Roles participate in quorum should have higher update
+                          priority than roles do not participate in quorum.
+                        rule: self.filter(c, c.participatesInQuorum == true).min()
+                          > self.filter(c, c.participatesInQuorum == true).max()
                   required:
                   - podName
                   type: object

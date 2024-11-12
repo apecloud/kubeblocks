@@ -25,6 +25,7 @@ import (
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -70,6 +71,10 @@ var PersistentVolumeSignature = func(_ corev1.PersistentVolume, _ *corev1.Persis
 var PodSignature = func(_ corev1.Pod, _ *corev1.Pod, _ corev1.PodList, _ *corev1.PodList) {}
 var EventSignature = func(_ corev1.Event, _ *corev1.Event, _ corev1.EventList, _ *corev1.EventList) {}
 var ConfigMapSignature = func(_ corev1.ConfigMap, _ *corev1.ConfigMap, _ corev1.ConfigMapList, _ *corev1.ConfigMapList) {}
+var ServiceAccountSignature = func(_ corev1.ServiceAccount, _ *corev1.ServiceAccount, _ corev1.ServiceAccountList, _ *corev1.ServiceAccountList) {
+}
+var RoleBindingSignature = func(_ rbacv1.RoleBinding, _ *rbacv1.RoleBinding, _ rbacv1.RoleBindingList, _ *rbacv1.RoleBindingList) {
+}
 
 var JobSignature = func(_ batchv1.Job, _ *batchv1.Job, _ batchv1.JobList, _ *batchv1.JobList) {}
 var CronJobSignature = func(_ batchv1.CronJob, _ *batchv1.CronJob, _ batchv1.CronJobList, _ *batchv1.CronJobList) {}

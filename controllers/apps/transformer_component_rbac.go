@@ -26,12 +26,14 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -69,8 +71,12 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	synthesizedComp := transCtx.SynthesizeComponent
-	serviceAccountName := constant.GenerateDefaultServiceAccountName(synthesizedComp.ClusterName, synthesizedComp.Name)
 
+	if err := cleanOldResource(transCtx, graphCli, dag, synthesizedComp); err != nil {
+		return err
+	}
+
+	serviceAccountName := constant.GenerateDefaultServiceAccountName(synthesizedComp.ClusterName, synthesizedComp.Name)
 	role, err := createOrUpdateRole(transCtx, serviceAccountName, graphCli, dag)
 	if err != nil {
 		return err
@@ -95,6 +101,34 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 	itsList := graphCli.FindAll(dag, &workloads.InstanceSet{})
 	for _, its := range itsList {
 		graphCli.DependOn(dag, its, sa)
+	}
+
+	return nil
+}
+
+// since serviceaccount and rolebinding's naming rule has changed, need to clean old resources
+// TODO: remove this function after 1.0
+func cleanOldResource(transCtx *componentTransformContext, graphCli model.GraphClient, dag *graph.DAG, synthesizedComp *component.SynthesizedComponent) error {
+	oldSaName := fmt.Sprintf("%s-%s", constant.KBLowerPrefix, synthesizedComp.ClusterName)
+	sa := &corev1.ServiceAccount{}
+	err := transCtx.Client.Get(transCtx.Context, types.NamespacedName{Namespace: synthesizedComp.Namespace, Name: oldSaName}, sa)
+	if err != nil {
+		if !errors.IsNotFound(err) {
+			return err
+		}
+	} else {
+		graphCli.Delete(dag, sa, inDataContext4G())
+	}
+
+	oldRbName := oldSaName
+	rb := &rbacv1.RoleBinding{}
+	err = transCtx.Client.Get(transCtx.Context, types.NamespacedName{Namespace: synthesizedComp.Namespace, Name: oldRbName}, rb)
+	if err != nil {
+		if !errors.IsNotFound(err) {
+			return err
+		}
+	} else {
+		graphCli.Delete(dag, rb, inDataContext4G())
 	}
 
 	return nil

@@ -25,6 +25,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -37,6 +38,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
 
@@ -54,6 +56,12 @@ var _ = Describe("object rbac transformer test.", func() {
 	var compDefObj *appsv1.ComponentDefinition
 	var compObj *appsv1.Component
 	var synthesizedComp *component.SynthesizedComponent
+
+	AfterEach(func() {
+		inNS := client.InNamespace(testCtx.DefaultNamespace)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ServiceAccountSignature, true, inNS)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.RoleBindingSignature, true, inNS)
+	})
 
 	init := func(enableLifecycleAction bool, enablePolicyRules bool) {
 		By("Create a component definition")
@@ -180,6 +188,29 @@ var _ = Describe("object rbac transformer test.", func() {
 			Expect(actualRoleBinding).To(HaveLen(1))
 			rb := actualRoleBinding[0].(*rbacv1.RoleBinding)
 			Expect(reflect.DeepEqual(rb, cmpdRoleBinding)).To(BeTrue())
+		})
+
+		It("cleans old resources", func() {
+			init(false, false)
+			oldSaName := fmt.Sprintf("%v-%v", constant.KBLowerPrefix, synthesizedComp.ClusterName)
+			sa := factory.BuildServiceAccount(synthesizedComp, oldSaName)
+			rb := factory.BuildRoleBinding(synthesizedComp, oldSaName, &rbacv1.RoleRef{
+				APIGroup: rbacv1.GroupName,
+				Kind:     "ClusterRole",
+				Name:     constant.RBACRoleName,
+			}, oldSaName)
+			Expect(testCtx.CreateObj(testCtx.Ctx, sa)).Should(Succeed())
+			Expect(testCtx.CreateObj(testCtx.Ctx, rb)).Should(Succeed())
+			Eventually(func(g Gomega) {
+				dag = mockDAG(graphCli, cluster)
+				g.Expect(transformer.Transform(transCtx, dag)).Should(BeNil())
+				saVertex, ok := graphCli.FindMatchedVertex(dag, sa).(*model.ObjectVertex)
+				g.Expect(ok).Should(BeTrue())
+				g.Expect(*saVertex.Action).Should(Equal(model.DELETE))
+				rbVertex, ok := graphCli.FindMatchedVertex(dag, rb).(*model.ObjectVertex)
+				g.Expect(ok).Should(BeTrue())
+				g.Expect(*rbVertex.Action).Should(Equal(model.DELETE))
+			}).Should(Succeed())
 		})
 	})
 })

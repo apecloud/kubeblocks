@@ -412,9 +412,9 @@ type ComponentDefinitionSpec struct {
 
 	// Enumerate all possible roles assigned to each replica of the Component, influencing its behavior.
 	//
-	// A replica can have zero to multiple roles.
-	// KubeBlocks operator determines the roles of each replica by invoking the `lifecycleActions.roleProbe` method.
-	// This action returns a list of roles for each replica, and the returned roles must be predefined in the `roles` field.
+	// A replica can have zero or one role.
+	// KubeBlocks operator determines the role of each replica by invoking the `lifecycleActions.roleProbe` method.
+	// This action returns the role for each replica, and the returned role must be predefined here.
 	//
 	// The roles assigned to a replica can influence various aspects of the Component's behavior, such as:
 	//

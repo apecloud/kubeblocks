@@ -1352,9 +1352,9 @@ ComponentAvailable
 <td>
 <em>(Optional)</em>
 <p>Enumerate all possible roles assigned to each replica of the Component, influencing its behavior.</p>
-<p>A replica can have zero to multiple roles.
-KubeBlocks operator determines the roles of each replica by invoking the <code>lifecycleActions.roleProbe</code> method.
-This action returns a list of roles for each replica, and the returned roles must be predefined in the <code>roles</code> field.</p>
+<p>A replica can have zero or one role.
+KubeBlocks operator determines the role of each replica by invoking the <code>lifecycleActions.roleProbe</code> method.
+This action returns the role for each replica, and the returned role must be predefined here.</p>
 <p>The roles assigned to a replica can influence various aspects of the Component&rsquo;s behavior, such as:</p>
 <ul>
 <li>Service selection: The Component&rsquo;s exposed Services may target replicas based on their roles using <code>roleSelector</code>.</li>
@@ -5008,9 +5008,9 @@ ComponentAvailable
 <td>
 <em>(Optional)</em>
 <p>Enumerate all possible roles assigned to each replica of the Component, influencing its behavior.</p>
-<p>A replica can have zero to multiple roles.
-KubeBlocks operator determines the roles of each replica by invoking the <code>lifecycleActions.roleProbe</code> method.
-This action returns a list of roles for each replica, and the returned roles must be predefined in the <code>roles</code> field.</p>
+<p>A replica can have zero or one role.
+KubeBlocks operator determines the role of each replica by invoking the <code>lifecycleActions.roleProbe</code> method.
+This action returns the role for each replica, and the returned role must be predefined here.</p>
 <p>The roles assigned to a replica can influence various aspects of the Component&rsquo;s behavior, such as:</p>
 <ul>
 <li>Service selection: The Component&rsquo;s exposed Services may target replicas based on their roles using <code>roleSelector</code>.</li>

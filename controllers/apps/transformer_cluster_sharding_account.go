@@ -32,6 +32,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
@@ -126,7 +127,7 @@ func (t *clusterShardingAccountTransformer) newSystemAccountSecret(transCtx *clu
 			return nil, err
 		}
 	default:
-		password = t.buildPassword(account)
+		password = t.buildPassword(transCtx, account, sharding.Name)
 	}
 	return t.newAccountSecretWithPassword(transCtx, sharding, accountName, password)
 }
@@ -179,9 +180,12 @@ func (t *clusterShardingAccountTransformer) getPasswordFromSecret(ctx graph.Tran
 	return secret.Data[constant.AccountPasswdForSecret], nil
 }
 
-func (t *clusterShardingAccountTransformer) buildPassword(account appsv1.SystemAccount) []byte {
-	// TODO: restore
-	return t.generatePassword(account)
+func (t *clusterShardingAccountTransformer) buildPassword(transCtx *clusterTransformContext, account appsv1.SystemAccount, shardingName string) []byte {
+	password := []byte(factory.GetRestoreSystemAccountPassword(transCtx.Cluster.Annotations, shardingName, account.Name))
+	if len(password) == 0 {
+		password = t.generatePassword(account)
+	}
+	return password
 }
 
 func (t *clusterShardingAccountTransformer) generatePassword(account appsv1.SystemAccount) []byte {

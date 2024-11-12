@@ -741,6 +741,11 @@ func (r *componentWorkloadOps) leaveMemberForPod(pod *corev1.Pod, pods []*corev1
 }
 
 func (r *componentWorkloadOps) checkAndDoMemberJoin() error {
+	// just wait for memberjoin anno to be updated
+	if r.protoITS.Annotations[constant.MemberJoinStatusAnnotationKey] != "" {
+		return nil
+	}
+
 	podsToMemberjoin := getPodsToMemberJoinFromAnno(r.runningITS)
 
 	if r.synthesizeComp.LifecycleActions == nil || r.synthesizeComp.LifecycleActions.MemberJoin == nil {

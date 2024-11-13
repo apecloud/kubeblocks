@@ -52,7 +52,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/plan"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
-	kbagent "github.com/apecloud/kubeblocks/pkg/kbagent/client"
+	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testdp "github.com/apecloud/kubeblocks/pkg/testutil/dataprotection"
 	testk8s "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
@@ -113,7 +113,6 @@ var _ = Describe("Component Controller", func() {
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PodSignature, true, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupSignature, true, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupPolicySignature, true, inNS, ml)
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.VolumeSnapshotSignature, true, inNS)
 		// non-namespaced
 		testapps.ClearResources(&testCtx, generics.BackupPolicyTemplateSignature, ml)
 		testapps.ClearResources(&testCtx, generics.ActionSetSignature, ml)
@@ -436,10 +435,13 @@ var _ = Describe("Component Controller", func() {
 					},
 				},
 				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{{
-						Name:  "mock-container",
-						Image: "mock-container",
-					}},
+					Containers: []corev1.Container{
+						{
+							Name:  "mock-container",
+							Image: "mock-image",
+						},
+						testapps.MockKBAgentContainer(),
+					},
 				},
 			}
 			pods = append(pods, *pod)
@@ -573,7 +575,7 @@ var _ = Describe("Component Controller", func() {
 	}
 
 	horizontalScale := func(updatedReplicas int, storageClassName string, compDefNames ...string) {
-		defer kbagent.UnsetMockClient()
+		defer kbacli.UnsetMockClient()
 
 		initialGeneration, cluster := getStableClusterObservedGeneration(clusterKey, nil)
 
@@ -602,9 +604,6 @@ var _ = Describe("Component Controller", func() {
 				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 				AddVolumeClaimTemplate(testapps.LogVolumeName, pvcSpec)
 		})
-
-		// REVIEW: this test flow, wait for running phase?
-		testk8s.MockEnableVolumeSnapshot(&testCtx, testk8s.DefaultStorageClassName)
 
 		horizontalScale(int(updatedReplicas), testk8s.DefaultStorageClassName, compDefName)
 	}
@@ -1557,11 +1556,6 @@ var _ = Describe("Component Controller", func() {
 		})).ShouldNot(HaveOccurred())
 		Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, compName)).Should(Equal(kbappsv1.RunningComponentPhase))
 
-		By("the restore container has been removed from init containers")
-		Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(its), func(g Gomega, tmpIts *workloads.InstanceSet) {
-			g.Expect(tmpIts.Spec.Template.Spec.InitContainers).Should(BeEmpty())
-		})).Should(Succeed())
-
 		By("clean up annotations after cluster running")
 		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, tmpCluster *kbappsv1.Cluster) {
 			g.Expect(tmpCluster.Status.Phase).Should(Equal(kbappsv1.RunningClusterPhase))
@@ -1746,7 +1740,7 @@ var _ = Describe("Component Controller", func() {
 			testHorizontalScale(defaultCompName, compDefObj.Name, 3, 0)
 		})
 
-		Context("with different backup methods", func() {
+		Context("scale-out multiple components", func() {
 			createNWaitClusterObj := func(components map[string]string,
 				processor func(compName string, factory *testapps.MockClusterFactory),
 				withFixedName ...bool) {
@@ -1773,7 +1767,13 @@ var _ = Describe("Component Controller", func() {
 				waitForCreatingResourceCompletely(clusterKey, compNames...)
 			}
 
-			testMultiCompHScale := func() {
+			It("h-scale with data actions", func() {
+				By("update cmpd to enable data actions")
+				Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(compDefObj), func(cmpd *kbappsv1.ComponentDefinition) {
+					cmpd.Spec.LifecycleActions.DataDump = testapps.NewLifecycleAction("data-dump")
+					cmpd.Spec.LifecycleActions.DataLoad = testapps.NewLifecycleAction("data-load")
+				})()).Should(Succeed())
+
 				compNameNDef := map[string]string{
 					fmt.Sprintf("%s-0", defaultCompName): compDefObj.Name,
 					fmt.Sprintf("%s-1", defaultCompName): compDefObj.Name,
@@ -1790,17 +1790,6 @@ var _ = Describe("Component Controller", func() {
 				}, false)
 
 				horizontalScale(int(updatedReplicas), testk8s.DefaultStorageClassName, compDefObj.Name)
-			}
-
-			It("h-scale with volume snapshot", func() {
-				testk8s.MockEnableVolumeSnapshot(&testCtx, testk8s.DefaultStorageClassName)
-				testMultiCompHScale()
-			})
-
-			// TODO
-			It("h-scale with data actions", func() {
-				testk8s.MockDisableVolumeSnapshot(&testCtx, testk8s.DefaultStorageClassName)
-				testMultiCompHScale()
 			})
 		})
 	})
@@ -1825,7 +1814,6 @@ var _ = Describe("Component Controller", func() {
 
 		It("scale-out", func() {
 			testVolumeExpansion(compDefObj, defaultCompName, mockStorageClass)
-			testk8s.MockEnableVolumeSnapshot(&testCtx, mockStorageClass.Name)
 			horizontalScale(5, mockStorageClass.Name, compDefObj.Name)
 		})
 	})

@@ -174,6 +174,9 @@ var _ = Describe("Cluster Controller", func() {
 			Create(&testCtx).
 			GetObject()
 
+		By("Create a bpt obj")
+		testdp.CreateBackupPolicyTpl(&testCtx, compDefObj.Name)
+
 		By("Wait objects available")
 		Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(compDefObj),
 			func(g Gomega, compDef *appsv1.ComponentDefinition) {
@@ -303,7 +306,7 @@ var _ = Describe("Cluster Controller", func() {
 			ml, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(defaultShardCount))
 
 		By("checking backup policy")
-		backupPolicyName := generateBackupPolicyName(clusterKey.Name, compTplName, false)
+		backupPolicyName := generateBackupPolicyName(clusterKey.Name, compTplName)
 		backupPolicyKey := client.ObjectKey{Name: backupPolicyName, Namespace: clusterKey.Namespace}
 		Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, bp *dpv1alpha1.BackupPolicy) {
 			g.Expect(bp.Spec.Targets).Should(HaveLen(defaultShardCount))
@@ -1068,7 +1071,7 @@ var _ = Describe("Cluster Controller", func() {
 				}
 
 				By("checking backup policy")
-				backupPolicyName := generateBackupPolicyName(clusterKey.Name, defaultCompName, false)
+				backupPolicyName := generateBackupPolicyName(clusterKey.Name, defaultCompName)
 				backupPolicyKey := client.ObjectKey{Name: backupPolicyName, Namespace: clusterKey.Namespace}
 				backupPolicy := &dpv1alpha1.BackupPolicy{}
 				Eventually(testapps.CheckObjExists(&testCtx, backupPolicyKey, backupPolicy, true)).Should(Succeed())

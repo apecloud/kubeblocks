@@ -70,7 +70,13 @@ const (
 	replicaPhaseDeleting replicaPhase = "Deleting"
 )
 
-func NewReplicas(comp *appsv1.Component, replicas []string) error {
+func NewReplicas(comp *appsv1.Component, replicas []string, hasDataReplication bool) error {
+	initReplicaPhase := func() replicaPhase {
+		if hasDataReplication {
+			return replicaPhasePending
+		}
+		return replicaPhaseRunning
+	}()
 	return updateReplicasStatusFunc(comp, func(status *replicasStatus) error {
 		status.Replicas = comp.Spec.Replicas
 		for _, name := range replicas {
@@ -83,7 +89,7 @@ func NewReplicas(comp *appsv1.Component, replicas []string) error {
 				Name:              name,
 				Generation:        comp.Generation,
 				CreationTimestamp: time.Now(),
-				Phase:             replicaPhasePending,
+				Phase:             initReplicaPhase,
 			})
 		}
 		return nil

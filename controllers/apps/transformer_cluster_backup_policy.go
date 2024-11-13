@@ -89,10 +89,6 @@ func (r *clusterBackupPolicyTransformer) Transform(ctx graph.TransformContext, d
 		if backupPolicy == nil {
 			return
 		}
-		if bpBuilder.isHScaleTPL {
-			r.V(1).Info("Skip creating backup schedule for the h-scale backup policy template", "template", bpBuilder.backupPolicyTPL.Name)
-			return
-		}
 		// build the data protection backup schedule from the template.
 		oldBackupSchedule, newBackupSchedule := bpBuilder.transformBackupSchedule(backupPolicy)
 		// merge cluster backup configuration into the backup schedule.
@@ -120,8 +116,8 @@ func (r *clusterBackupPolicyTransformer) Transform(ctx graph.TransformContext, d
 		graphCli.DependOn(dag, backupPolicy, comps...)
 	}
 
-	transformBackupPolicyAndSchedule := func(bpt *dpv1alpha1.BackupPolicyTemplate, compSpec *appsv1.ClusterComponentSpec, componentName string, isSharding, isHScaleTPL bool) error {
-		bpBuilder := newBackupPolicyBuilder(r, compSpec, bpt, componentName, isSharding, isHScaleTPL)
+	transformBackupPolicyAndSchedule := func(bpt *dpv1alpha1.BackupPolicyTemplate, compSpec *appsv1.ClusterComponentSpec, componentName string, isSharding bool) error {
+		bpBuilder := newBackupPolicyBuilder(r, compSpec, bpt, componentName, isSharding)
 		policy := transformBackupPolicy(bpBuilder)
 		// only merge the first backupSchedule for the cluster backup.
 		transformBackupSchedule(bpBuilder, policy)
@@ -136,7 +132,7 @@ func (r *clusterBackupPolicyTransformer) Transform(ctx graph.TransformContext, d
 		if bpt == nil {
 			return nil
 		}
-		return transformBackupPolicyAndSchedule(bpt, compSpec, componentName, isSharding, false)
+		return transformBackupPolicyAndSchedule(bpt, compSpec, componentName, isSharding)
 	}
 
 	for i := range r.Cluster.Spec.ComponentSpecs {
@@ -173,7 +169,6 @@ type backupPolicyBuilder struct {
 	record.EventRecorder
 	logr.Logger
 	Cluster         *appsv1.Cluster
-	isHScaleTPL     bool
 	backupPolicyTPL *dpv1alpha1.BackupPolicyTemplate
 	compSpec        *appsv1.ClusterComponentSpec
 	componentName   string
@@ -184,8 +179,7 @@ func newBackupPolicyBuilder(r *clusterBackupPolicyTransformer,
 	compSpec *appsv1.ClusterComponentSpec,
 	backupPolicyTPL *dpv1alpha1.BackupPolicyTemplate,
 	componentName string,
-	isSharding,
-	isHScaleTPL bool) *backupPolicyBuilder {
+	isSharding bool) *backupPolicyBuilder {
 	return &backupPolicyBuilder{
 		Context:         r.Context,
 		Client:          r.Client,
@@ -195,14 +189,13 @@ func newBackupPolicyBuilder(r *clusterBackupPolicyTransformer,
 		compSpec:        compSpec,
 		backupPolicyTPL: backupPolicyTPL,
 		componentName:   componentName,
-		isHScaleTPL:     isHScaleTPL,
 		isSharding:      isSharding,
 	}
 }
 
 // transformBackupPolicy transforms backup policy template to backup policy.
 func (r *backupPolicyBuilder) transformBackupPolicy() (*dpv1alpha1.BackupPolicy, *dpv1alpha1.BackupPolicy) {
-	backupPolicyName := generateBackupPolicyName(r.Cluster.Name, r.componentName, r.isHScaleTPL)
+	backupPolicyName := generateBackupPolicyName(r.Cluster.Name, r.componentName)
 	backupPolicy := &dpv1alpha1.BackupPolicy{}
 	if err := r.Client.Get(r.Context, client.ObjectKey{
 		Namespace: r.Cluster.Namespace,
@@ -639,16 +632,9 @@ func (r *backupPolicyBuilder) mergeClusterBackup(
 	return backupSchedule
 }
 
-func (r *backupPolicyBuilder) defaultPolicyAnnotationValue() string {
-	if r.isHScaleTPL {
-		return "false"
-	}
-	return trueVal
-}
-
 func (r *backupPolicyBuilder) buildAnnotations() map[string]string {
 	annotations := map[string]string{
-		dptypes.DefaultBackupPolicyAnnotationKey:   r.defaultPolicyAnnotationValue(),
+		dptypes.DefaultBackupPolicyAnnotationKey:   trueVal,
 		constant.BackupPolicyTemplateAnnotationKey: r.backupPolicyTPL.Name,
 	}
 	if r.backupPolicyTPL.Annotations[dptypes.ReconfigureRefAnnotationKey] != "" {
@@ -691,10 +677,7 @@ func (r *backupPolicyBuilder) buildTargetPodLabels(role string, fullCompName str
 }
 
 // generateBackupPolicyName generates the backup policy name which is created from backup policy template.
-func generateBackupPolicyName(clusterName, componentName string, isHScaleTPL bool) string {
-	if isHScaleTPL {
-		return fmt.Sprintf("%s-%s-backup-policy-hscale", clusterName, componentName)
-	}
+func generateBackupPolicyName(clusterName, componentName string) string {
 	return fmt.Sprintf("%s-%s-backup-policy", clusterName, componentName)
 }
 

@@ -42,8 +42,11 @@ func newStreamingService(logger logr.Logger, actionService *actionService, strea
 		logger:           logger,
 		streamingActions: make(map[string]*proto.Action),
 	}
-	for _, action := range streamingActions {
-		ss.streamingActions[action] = actionService.actions[action]
+	for _, a := range streamingActions {
+		if _, ok := actionService.actions[a]; !ok {
+			return nil, fmt.Errorf("action %s has not defined", a)
+		}
+		ss.streamingActions[a] = actionService.actions[a]
 	}
 	logger.Info(fmt.Sprintf("create service %s", ss.Kind()),
 		"actions", strings.Join(maps.Keys(ss.streamingActions), ","))

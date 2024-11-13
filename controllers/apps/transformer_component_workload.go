@@ -587,6 +587,9 @@ func (r *componentWorkloadOps) deletePVCs4ScaleIn(itsObj *workloads.InstanceSet)
 			}
 			pvc := corev1.PersistentVolumeClaim{}
 			if err := r.cli.Get(r.reqCtx.Ctx, pvcKey, &pvc, inDataContext4C()); err != nil {
+				if apierrors.IsNotFound(err) {
+					continue // the pvc is already deleted or not created
+				}
 				return err
 			}
 			// Since there are no order guarantee between updating ITS and deleting PVCs, if there is any error occurred
@@ -600,32 +603,43 @@ func (r *componentWorkloadOps) deletePVCs4ScaleIn(itsObj *workloads.InstanceSet)
 }
 
 func (r *componentWorkloadOps) scaleOut() error {
-	if r.synthesizeComp.LifecycleActions == nil {
-		return nil
-	}
-	dataDump := r.synthesizeComp.LifecycleActions.DataDump
-	dataLoad := r.synthesizeComp.LifecycleActions.DataLoad
-	if dataDump == nil || dataDump.Exec == nil || dataLoad == nil || dataLoad.Exec == nil {
-		return nil
-	}
-
+	// replicas in provisioning
 	provisioningReplicas, err := component.ReplicasInProvisioning(r.component)
 	if err != nil {
 		return err
 	}
 
+	// replicas to be created
+	newReplicas := r.desiredCompPodNameSet.Difference(r.runningItsPodNameSet).UnsortedList()
+
 	// update replicas of the workload
 	graphCli := model.NewGraphClient(r.cli)
 	v := graphCli.Do(r.dag, nil, r.protoITS, model.ActionUpdatePtr(), nil)
 
-	newReplicas := r.desiredCompPodNameSet.Difference(r.runningItsPodNameSet).UnsortedList()
+	hasDataActionDefined := func() bool {
+		if r.synthesizeComp.LifecycleActions == nil {
+			return false
+		}
+		dataDump := r.synthesizeComp.LifecycleActions.DataDump
+		dataLoad := r.synthesizeComp.LifecycleActions.DataLoad
+		if dataDump == nil || dataDump.Exec == nil || dataLoad == nil || dataLoad.Exec == nil {
+			return false
+		}
+		return true
+	}()
+
+	// build and assign data replication tasks
 	if err := func() error {
-		source, err := r.sourceReplica(dataDump)
+		if !hasDataActionDefined {
+			return nil
+		}
+
+		source, err := r.sourceReplica(r.synthesizeComp.LifecycleActions.DataDump)
 		if err != nil {
 			return err
 		}
 
-		replicas := append(newReplicas, provisioningReplicas...)
+		replicas := append(slices.Clone(newReplicas), provisioningReplicas...)
 		parameters, err := component.NewReplicaTask(r.synthesizeComp.FullCompName, r.synthesizeComp.Generation, source, replicas)
 		if err != nil {
 			return err
@@ -646,7 +660,7 @@ func (r *componentWorkloadOps) scaleOut() error {
 		return err
 	}
 
-	return component.NewReplicas(r.component, newReplicas)
+	return component.NewReplicas(r.component, newReplicas, hasDataActionDefined)
 }
 
 func (r *componentWorkloadOps) sourceReplica(dataDump *appsv1.Action) (*corev1.Pod, error) {

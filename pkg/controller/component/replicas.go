@@ -124,17 +124,18 @@ func StatusReplicas(ctx context.Context, cli client.Reader, synthesizedComp *Syn
 	})
 }
 
-func HasReplicasInCreating(comp *appsv1.Component) (bool, error) {
+func ReplicasInProvisioning(comp *appsv1.Component) ([]string, error) {
 	status, err := getReplicasStatus(comp)
 	if err != nil {
-		return false, err
+		return nil, err
 	}
+	replicas := make([]string, 0)
 	for _, s := range status.Status {
 		if s.Phase == replicaPhaseCreating || s.Phase == replicaPhasePending {
-			return true, nil
+			replicas = append(replicas, s.Name)
 		}
 	}
-	return false, nil
+	return replicas, nil
 }
 
 func NewReplicaTask(compName string, uid string, source *corev1.Pod, replicas []string) (map[string]string, error) {

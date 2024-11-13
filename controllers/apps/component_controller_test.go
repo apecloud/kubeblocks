@@ -1797,7 +1797,8 @@ var _ = Describe("Component Controller", func() {
 				testMultiCompHScale()
 			})
 
-			It("h-scale with backup tool", func() {
+			// TODO
+			It("h-scale with data actions", func() {
 				testk8s.MockDisableVolumeSnapshot(&testCtx, testk8s.DefaultStorageClassName)
 				testMultiCompHScale()
 			})

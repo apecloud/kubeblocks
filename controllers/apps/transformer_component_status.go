@@ -258,11 +258,11 @@ func (t *componentStatusTransformer) hasScaleOutRunning(transCtx *componentTrans
 		return false, false, nil
 	}
 
-	running, err = component.HasReplicasInCreating(transCtx.Component)
+	replicas, err := component.ReplicasInProvisioning(transCtx.Component)
 	if err != nil {
 		return false, false, err
 	}
-	if !running {
+	if len(replicas) == 0 {
 		return false, false, nil
 	}
 

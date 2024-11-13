@@ -609,6 +609,11 @@ func (r *componentWorkloadOps) scaleOut() error {
 		return nil
 	}
 
+	provisioningReplicas, err := component.ReplicasInProvisioning(r.component)
+	if err != nil {
+		return err
+	}
+
 	// update replicas of the workload
 	graphCli := model.NewGraphClient(r.cli)
 	v := graphCli.Do(r.dag, nil, r.protoITS, model.ActionUpdatePtr(), nil)
@@ -620,7 +625,8 @@ func (r *componentWorkloadOps) scaleOut() error {
 			return err
 		}
 
-		parameters, err := component.NewReplicaTask(r.synthesizeComp.FullCompName, r.synthesizeComp.Generation, source, newReplicas)
+		replicas := append(newReplicas, provisioningReplicas...)
+		parameters, err := component.NewReplicaTask(r.synthesizeComp.FullCompName, r.synthesizeComp.Generation, source, replicas)
 		if err != nil {
 			return err
 		}

@@ -211,17 +211,11 @@ func (hs horizontalScalingOpsHandler) getCreateAndDeletePodSet(opsRes *OpsResour
 // Cancel this function defines the cancel horizontalScaling action.
 func (hs horizontalScalingOpsHandler) Cancel(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.HorizontalScalingList)
-	if err := compOpsHelper.cancelComponentOps(reqCtx.Ctx, cli, opsRes, func(lastConfig *opsv1alpha1.LastComponentConfiguration, comp *appsv1.ClusterComponentSpec) {
+	return compOpsHelper.cancelComponentOps(reqCtx.Ctx, cli, opsRes, func(lastConfig *opsv1alpha1.LastComponentConfiguration, comp *appsv1.ClusterComponentSpec) {
 		comp.Replicas = *lastConfig.Replicas
 		comp.Instances = lastConfig.Instances
 		comp.OfflineInstances = lastConfig.OfflineInstances
-	}); err != nil {
-		return err
-	}
-
-	// TODO: impl
-
-	return nil
+	})
 }
 
 // checkIntersectionWithEarlierOps checks if the pod deleted by the current ops is a pod created by another ops

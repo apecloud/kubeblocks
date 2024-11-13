@@ -452,6 +452,10 @@ func (r *componentWorkloadOps) expandVolume() error {
 // horizontalScale handles workload horizontal scale
 func (r *componentWorkloadOps) horizontalScale() error {
 	its := r.runningITS
+	// handle memberjoin lifecycle action
+	if err := r.checkAndDoMemberJoin(); err != nil {
+		return err
+	}
 	doScaleOut, doScaleIn := r.horizontalScaling()
 	if !doScaleOut && !doScaleIn {
 		if err := r.postScaleIn(); err != nil {
@@ -471,11 +475,6 @@ func (r *componentWorkloadOps) horizontalScale() error {
 		if err := r.scaleOut(its); err != nil {
 			return err
 		}
-	}
-
-	// handle memberjoin lifecycle action
-	if err := r.checkAndDoMemberJoin(); err != nil {
-		return err
 	}
 
 	r.reqCtx.Recorder.Eventf(r.cluster,
@@ -747,6 +746,9 @@ func (r *componentWorkloadOps) checkAndDoMemberJoin() error {
 	}
 
 	podsToMemberjoin := getPodsToMemberJoinFromAnno(r.runningITS)
+	if len(podsToMemberjoin) == 0 {
+		return nil
+	}
 
 	if r.synthesizeComp.LifecycleActions == nil || r.synthesizeComp.LifecycleActions.MemberJoin == nil {
 		podsToMemberjoin.Clear()
@@ -757,7 +759,9 @@ func (r *componentWorkloadOps) checkAndDoMemberJoin() error {
 	}
 
 	if podsToMemberjoin.Len() == 0 {
+		// Anno will be merged later, so it should be deleted from both protoITS and runningITS
 		delete(r.protoITS.Annotations, constant.MemberJoinStatusAnnotationKey)
+		delete(r.runningITS.Annotations, constant.MemberJoinStatusAnnotationKey)
 	} else {
 		r.protoITS.Annotations[constant.MemberJoinStatusAnnotationKey] = strings.Join(sets.List(podsToMemberjoin), ",")
 	}

@@ -89,6 +89,7 @@ func BuildComponent(cluster *appsv1.Cluster, compSpec *appsv1.ClusterComponentSp
 		SetSystemAccounts(compSpec.SystemAccounts).
 		SetStop(compSpec.Stop).
 		SetSidecars(nil)
+		SetInitParameters(compSpec.InitParameters).
 	return compBuilder.GetObject(), nil
 }
 

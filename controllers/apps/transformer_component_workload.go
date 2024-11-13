@@ -780,11 +780,6 @@ func (r *componentWorkloadOps) doMemberJoin(podSet sets.Set[string]) error {
 			continue
 		}
 
-		if pod.Status.Phase != corev1.PodRunning {
-			joinErrors = append(joinErrors, fmt.Errorf(" waiting for pod %s to run", pod.Name))
-			continue
-		}
-
 		if err := r.joinMemberForPod(pod, runningPods); err != nil {
 			joinErrors = append(joinErrors, fmt.Errorf("pod %s: %w", pod.Name, err))
 		} else {

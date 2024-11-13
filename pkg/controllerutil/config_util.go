@@ -22,6 +22,7 @@ package controllerutil
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"slices"
 
@@ -252,6 +253,9 @@ func ResolveCmpdParametersDefs(ctx context.Context, reader client.Reader, cmpd *
 		if err = reader.Get(ctx, client.ObjectKey{Name: defName}, paramsDef); err != nil {
 			return nil, nil, err
 		}
+		if paramsDef.Status.Phase != parametersv1alpha1.PDAvailablePhase {
+			return nil, nil, fmt.Errorf("the referenced ParametersDefinition is unavailable: %s", paramsDef.Name)
+		}
 		paramsDefs = append(paramsDefs, paramsDef)
 	}
 	return configRender, paramsDefs, nil
@@ -263,12 +267,19 @@ func ResolveComponentConfigRender(ctx context.Context, reader client.Reader, cmp
 		return nil, err
 	}
 
+	checkAvailable := func(configDef parametersv1alpha1.ParameterDrivenConfigRender) error {
+		if configDef.Status.Phase != parametersv1alpha1.PDAvailablePhase {
+			return fmt.Errorf("the referenced ParameterDrivenConfigRender is unavailable: %s", configDef.Name)
+		}
+		return nil
+	}
+
 	for i, item := range configDefList.Items {
 		if item.Spec.ComponentDef != cmpd.Name {
 			continue
 		}
 		if item.Spec.ServiceVersion == "" || item.Spec.ServiceVersion == cmpd.Spec.ServiceVersion {
-			return &configDefList.Items[i], nil
+			return &configDefList.Items[i], checkAvailable(item)
 		}
 	}
 	return nil, nil

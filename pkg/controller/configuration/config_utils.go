@@ -291,41 +291,51 @@ func findPortByPortName(container corev1.Container) (int32, bool) {
 }
 
 // UpdateConfigPayload updates the configuration payload
-// func UpdateConfigPayload(config *parametersv1alpha1.ComponentParameterSpec, component *appsv1.ComponentTemplateSpec) (bool, error) {
-// 	updated := false
-// 	for i := range config.ConfigItemDetails {
-// 		configSpec := &config.ConfigItemDetails[i]
-// 		// check v-scale operation
-// 		if enableVScaleTrigger(configSpec.ConfigSpec) {
-// 			resourcePayload := intctrlutil.ResourcesPayloadForComponent(component.Resources)
-// 			ret, err := intctrlutil.CheckAndPatchPayload(configSpec, constant.ComponentResourcePayload, resourcePayload)
-// 			if err != nil {
-// 				return false, err
-// 			}
-// 			updated = updated || ret
-// 		}
-// 		// check h-scale operation
-// 		if enableHScaleTrigger(configSpec.ConfigSpec) {
-// 			ret, err := intctrlutil.CheckAndPatchPayload(configSpec, constant.ReplicasPayload, component.Replicas)
-// 			if err != nil {
-// 				return false, err
-// 			}
-// 			updated = updated || ret
-// 		}
-// 	}
-// 	return updated, nil
-// }
+func UpdateConfigPayload(config *parametersv1alpha1.ComponentParameterSpec, component *appsv1.ComponentSpec, configRender *parametersv1alpha1.ParameterDrivenConfigRenderSpec) (bool, error) {
+	if len(configRender.Configs) == 0 {
+		return false, nil
+	}
 
-func validRerenderResources(configSpec *appsv1alpha1.ComponentConfigSpec) bool {
-	return configSpec != nil && len(configSpec.ReRenderResourceTypes) != 0
+	var updated = false
+	for i, item := range config.ConfigItemDetails {
+		configDescs := intctrlutil.GetComponentConfigDescriptions(configRender, item.Name)
+		configSpec := &config.ConfigItemDetails[i]
+		// check v-scale operation
+		if enableVScaleTrigger(configDescs) {
+			resourcePayload := intctrlutil.ResourcesPayloadForComponent(component.Resources)
+			ret, err := intctrlutil.CheckAndPatchPayload(configSpec, constant.ComponentResourcePayload, resourcePayload)
+			if err != nil {
+				return false, err
+			}
+			updated = updated || ret
+		}
+		// check h-scale operation
+		if enableHScaleTrigger(configDescs) {
+			ret, err := intctrlutil.CheckAndPatchPayload(configSpec, constant.ReplicasPayload, component.Replicas)
+			if err != nil {
+				return false, err
+			}
+			updated = updated || ret
+		}
+	}
+	return updated, nil
 }
 
-func enableHScaleTrigger(configSpec *appsv1alpha1.ComponentConfigSpec) bool {
-	return validRerenderResources(configSpec) && slices.Contains(configSpec.ReRenderResourceTypes, appsv1alpha1.ComponentHScaleType)
+func rerenderConfigEnabled(configDescs []parametersv1alpha1.ComponentConfigDescription, rerenderType parametersv1alpha1.RerenderResourceType) bool {
+	for _, desc := range configDescs {
+		if slices.Contains(desc.ReRenderResourceTypes, rerenderType) {
+			return true
+		}
+	}
+	return false
 }
 
-func enableVScaleTrigger(configSpec *appsv1alpha1.ComponentConfigSpec) bool {
-	return validRerenderResources(configSpec) && slices.Contains(configSpec.ReRenderResourceTypes, appsv1alpha1.ComponentVScaleType)
+func enableHScaleTrigger(configDescs []parametersv1alpha1.ComponentConfigDescription) bool {
+	return rerenderConfigEnabled(configDescs, parametersv1alpha1.ComponentHScaleType)
+}
+
+func enableVScaleTrigger(configDescs []parametersv1alpha1.ComponentConfigDescription) bool {
+	return rerenderConfigEnabled(configDescs, parametersv1alpha1.ComponentVScaleType)
 }
 
 func configSetFromComponent(templates []appsv1.ComponentTemplateSpec) []string {

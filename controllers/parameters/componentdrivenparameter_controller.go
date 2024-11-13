@@ -21,6 +21,7 @@ package parameters
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 
 	corev1 "k8s.io/api/core/v1"
@@ -37,7 +38,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	"github.com/apecloud/kubeblocks/pkg/controller/configuration"
+	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -130,7 +131,7 @@ func (r *ComponentDrivenParameterReconciler) delete(reqCtx intctrlutil.RequestCt
 	return intctrlutil.Reconciled()
 }
 
-func (r *ComponentDrivenParameterReconciler) update(reqCtx intctrlutil.RequestCtx, existing, expected *parametersv1alpha1.ComponentParameter) (ctrl.Result, error) {
+func (r *ComponentDrivenParameterReconciler) update(reqCtx intctrlutil.RequestCtx, expected, existing *parametersv1alpha1.ComponentParameter) (ctrl.Result, error) {
 	mergedObject := r.mergeComponentParameter(expected, existing)
 	if reflect.DeepEqual(mergedObject, existing) {
 		return intctrlutil.Reconciled()
@@ -165,6 +166,9 @@ func getCompDefinition(ctx context.Context, cli client.Reader, comp *appsv1.Comp
 	if err := cli.Get(ctx, compKey, cmpd); err != nil {
 		return nil, err
 	}
+	if cmpd.Status.Phase != appsv1.AvailablePhase {
+		return nil, fmt.Errorf("the referenced ComponentDefinition is unavailable: %s", cmpd.Name)
+	}
 	return cmpd, nil
 }
 
@@ -179,7 +183,7 @@ func buildComponentParameter(reqCtx intctrlutil.RequestCtx, reader client.Reader
 		return nil, nil
 	}
 
-	_, paramsDefs, err := intctrlutil.ResolveCmpdParametersDefs(reqCtx.Ctx, reader, cmpd)
+	configRender, paramsDefs, err := intctrlutil.ResolveCmpdParametersDefs(reqCtx.Ctx, reader, cmpd)
 	if err != nil {
 		return nil, err
 	}
@@ -189,18 +193,19 @@ func buildComponentParameter(reqCtx intctrlutil.RequestCtx, reader client.Reader
 	}
 
 	clusterName, _ := component.GetClusterName(comp)
-	compName, _ := component.ShortName(clusterName, comp.Name)
-	object := builder.NewComponentParameterBuilder(comp.Namespace,
-		configcore.GenerateComponentParameterName(clusterName, compName)).
-		AddLabelsInMap(constant.GetCompLabelsWithDef(clusterName, compName, cmpd.Name)).
+	componentName, _ := component.ShortName(clusterName, comp.Name)
+	parameterObj := builder.NewComponentParameterBuilder(comp.Namespace,
+		configcore.GenerateComponentParameterName(clusterName, componentName)).
+		AddLabelsInMap(constant.GetCompLabelsWithDef(clusterName, componentName, cmpd.Name)).
 		ClusterRef(clusterName).
-		Component(compName).
-		SetConfigurationItem(configuration.ClassifyParamsFromConfigTemplate(comp.Spec.InitParameters, cmpd, paramsDefs, tpls)).
+		Component(componentName).
+		SetConfigurationItem(configctrl.ClassifyParamsFromConfigTemplate(comp.Spec.InitParameters, cmpd, paramsDefs, tpls)).
 		GetObject()
-	if err = intctrlutil.SetOwnerReference(comp, object); err != nil {
+	if err = intctrlutil.SetOwnerReference(comp, parameterObj); err != nil {
 		return nil, err
 	}
-	return object, nil
+	_, err = configctrl.UpdateConfigPayload(&parameterObj.Spec, &comp.Spec, &configRender.Spec)
+	return parameterObj, err
 }
 
 func resolveComponentTemplate(ctx context.Context, reader client.Reader, cmpd *appsv1.ComponentDefinition) (map[string]*corev1.ConfigMap, error) {
@@ -216,7 +221,7 @@ func resolveComponentTemplate(ctx context.Context, reader client.Reader, cmpd *a
 }
 
 func (r *ComponentDrivenParameterReconciler) mergeComponentParameter(expected *parametersv1alpha1.ComponentParameter, existing *parametersv1alpha1.ComponentParameter) *parametersv1alpha1.ComponentParameter {
-	return configuration.MergeComponentParameter(expected, existing, func(dest, expected *parametersv1alpha1.ConfigTemplateItemDetail) {
+	return configctrl.MergeComponentParameter(expected, existing, func(dest, expected *parametersv1alpha1.ConfigTemplateItemDetail) {
 		if len(dest.ConfigFileParams) == 0 && len(expected.ConfigFileParams) != 0 {
 			dest.ConfigFileParams = expected.ConfigFileParams
 		}

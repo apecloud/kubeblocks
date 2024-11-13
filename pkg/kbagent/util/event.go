@@ -22,6 +22,7 @@ package util
 import (
 	"context"
 	"fmt"
+	"hash/fnv"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -29,7 +30,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/kubernetes"
 	ctlruntime "sigs.k8s.io/controller-runtime"
 
@@ -44,17 +44,20 @@ const (
 func SendEventWithMessage(logger *logr.Logger, reason string, message string) {
 	go func() {
 		event := createEvent(reason, message)
-		err := sendEvent(event)
+		err := sendOrUpdateEvent(logger, event)
 		if logger != nil && err != nil {
-			logger.Error(err, fmt.Sprintf("send event failed, reason: %s, message: %s", reason, message))
+			logger.Error(err, "failed to send event",
+				"reason", reason,
+				"message", message)
 		}
 	}()
 }
 
 func createEvent(reason string, message string) *corev1.Event {
+	now := metav1.Now()
 	return &corev1.Event{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s.%s", podName(), rand.String(16)),
+			Name:      generateEventName(reason, message),
 			Namespace: namespace(),
 		},
 		InvolvedObject: corev1.ObjectReference{
@@ -70,26 +73,40 @@ func createEvent(reason string, message string) *corev1.Event {
 			Component: proto.ProbeEventSourceComponent,
 			Host:      nodeName(),
 		},
-		FirstTimestamp:      metav1.Now(),
-		LastTimestamp:       metav1.Now(),
+		FirstTimestamp:      now,
+		LastTimestamp:       now,
 		EventTime:           metav1.NowMicro(),
 		ReportingController: proto.ProbeEventReportingController,
 		ReportingInstance:   podName(),
 		Action:              reason,
 		Type:                "Normal",
+		Count:               1,
 	}
 }
 
-func sendEvent(event *corev1.Event) error {
+func sendOrUpdateEvent(logger *logr.Logger, event *corev1.Event) error {
 	clientSet, err := getK8sClientSet()
 	if err != nil {
 		return err
 	}
+	eventsClient := clientSet.CoreV1().Events(namespace())
 	for i := 0; i < sendEventMaxAttempts; i++ {
-		_, err = clientSet.CoreV1().Events(namespace()).Create(context.Background(), event, metav1.CreateOptions{})
-		if err == nil {
-			return nil
+		existingEvent, getErr := eventsClient.Get(context.Background(), event.Name, metav1.GetOptions{})
+		if getErr != nil {
+			_, createErr := eventsClient.Create(context.Background(), event, metav1.CreateOptions{})
+			if createErr == nil {
+				return nil
+			}
+		} else {
+			existingEvent.Count++
+			existingEvent.LastTimestamp = metav1.Now()
+			existingEvent.EventTime = metav1.NowMicro()
+			_, updateErr := eventsClient.Update(context.Background(), existingEvent, metav1.UpdateOptions{})
+			if updateErr == nil {
+				return nil
+			}
 		}
+
 		time.Sleep(sendEventRetryInterval)
 	}
 	return err
@@ -105,4 +122,10 @@ func getK8sClientSet() (*kubernetes.Clientset, error) {
 		return nil, err
 	}
 	return clientSet, nil
+}
+
+func generateEventName(reason, message string) string {
+	hash := fnv.New32a()
+	hash.Write([]byte(fmt.Sprintf("%s.%s.%s", podName(), reason, message)))
+	return fmt.Sprintf("%s.%x", podName(), hash.Sum32())
 }

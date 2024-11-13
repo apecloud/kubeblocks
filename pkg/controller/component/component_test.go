@@ -200,7 +200,7 @@ func TestGetConfigSpecByName(t *testing.T) {
 	tests := []struct {
 		name string
 		args args
-		want *appsv1.ComponentConfigSpec
+		want *appsv1.ComponentTemplateSpec
 	}{{
 		name: "test",
 		args: args{
@@ -229,10 +229,9 @@ func TestGetConfigSpecByName(t *testing.T) {
 			},
 			configSpec: "for-test",
 		},
-		want: &appsv1.ComponentConfigSpec{
-			ComponentTemplateSpec: appsv1.ComponentTemplateSpec{
-				Name: "for-test",
-			}},
+		want: &appsv1.ComponentTemplateSpec{
+			Name: "for-test",
+		},
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

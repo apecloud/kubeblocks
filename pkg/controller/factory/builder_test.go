@@ -180,15 +180,12 @@ var _ = Describe("builder", func() {
 		It("builds ConfigMap with template correctly", func() {
 			config := map[string]string{}
 			_, cluster, synthesizedComponent := newClusterObjs(nil)
-			tplCfg := appsv1.ComponentConfigSpec{
-				ComponentTemplateSpec: appsv1.ComponentTemplateSpec{
-					Name:        "test-config-tpl",
-					TemplateRef: "test-config-tpl",
-				},
-				ConfigConstraintRef: "test-config-constraint",
+			tplCfg := appsv1.ComponentTemplateSpec{
+				Name:        "test-config-tpl",
+				TemplateRef: "test-config-tpl",
 			}
 			configmap := BuildConfigMapWithTemplate(cluster, synthesizedComponent, config,
-				"test-cm", tplCfg.ComponentTemplateSpec)
+				"test-cm", tplCfg)
 			Expect(configmap).ShouldNot(BeNil())
 		})
 

@@ -396,10 +396,6 @@ func buildCfgManagerScripts(options parametersv1alpha1.ScriptConfig, manager *Cf
 	return nil
 }
 
-func GetConfigMountPoint(configSpec appsv1.ComponentConfigSpec) string {
-	return filepath.Join(KBConfigVolumePath, configSpec.Name)
-}
-
 func GetScriptsMountPoint(configSpec appsv1.ComponentTemplateSpec) string {
 	return filepath.Join(KBScriptVolumePath, configSpec.Name)
 }

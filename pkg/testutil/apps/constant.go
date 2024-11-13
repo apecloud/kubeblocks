@@ -251,17 +251,6 @@ var (
 		},
 	}
 
-	DefaultCompDefConfigs = []appsv1.ComponentConfigSpec{
-		{
-			ComponentTemplateSpec: appsv1.ComponentTemplateSpec{
-				Name:        DefaultConfigSpecName,
-				TemplateRef: DefaultConfigSpecTplRef,
-				VolumeName:  DefaultConfigSpecVolumeName,
-			},
-			ConfigConstraintRef: DefaultConfigSpecConstraintRef,
-		},
-	}
-
 	DefaultCompDefScripts = []appsv1.ComponentTemplateSpec{
 		{
 			Name:        DefaultScriptSpecName,

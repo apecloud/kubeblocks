@@ -281,12 +281,26 @@ func TestGenerateVisualizedParamsList(t *testing.T) {
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := GenerateVisualizedParamsList(tt.args.configPatch, ToV1ConfigDescription(tt.args.sets.AsSlice(), tt.args.formatConfig))
+			got := GenerateVisualizedParamsList(tt.args.configPatch, ToV1ConfigDescription(resolveKey(tt.args.configPatch), tt.args.formatConfig))
 			sortParams(got)
 			sortParams(tt.want)
 			require.Equal(t, got, tt.want)
 		})
 	}
+}
+
+func resolveKey(patch *ConfigPatchInfo) []string {
+	var keys []string
+	if len(patch.AddConfig) != 0 {
+		keys = append(keys, util.ToSet(patch.AddConfig).AsSlice()...)
+	}
+	if len(patch.UpdateConfig) != 0 {
+		keys = append(keys, util.ToSet(patch.UpdateConfig).AsSlice()...)
+	}
+	if len(patch.DeleteConfig) != 0 {
+		keys = append(keys, util.ToSet(patch.DeleteConfig).AsSlice()...)
+	}
+	return keys
 }
 
 func sortParams(param []VisualizedParam) {

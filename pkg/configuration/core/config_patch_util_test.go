@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package core
 
 import (
+	"slices"
 	"testing"
 
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
@@ -291,13 +292,15 @@ max_connections=666
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var configs []parametersv1alpha1.ComponentConfigDescription
-			for _, key := range tt.args.keys {
-				configs = append(configs, parametersv1alpha1.ComponentConfigDescription{
-					Name: key,
-					FileFormatConfig: &parametersv1alpha1.FileFormatConfig{
-						Format: tt.args.format,
-					},
-				})
+			for k := range tt.args.oldVersion {
+				if len(tt.args.keys) == 0 || slices.Contains(tt.args.keys, k) {
+					configs = append(configs, parametersv1alpha1.ComponentConfigDescription{
+						Name: k,
+						FileFormatConfig: &parametersv1alpha1.FileFormatConfig{
+							Format: tt.args.format,
+						},
+					})
+				}
 			}
 			configRender := parametersv1alpha1.ParameterDrivenConfigRenderSpec{Configs: configs}
 			got, excludeDiff, err := CreateConfigPatch(tt.args.oldVersion, tt.args.newVersion, configRender, tt.args.enableExcludeDiff)

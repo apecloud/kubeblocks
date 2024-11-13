@@ -43,8 +43,8 @@ const (
 
 func SendEventWithMessage(logger *logr.Logger, reason string, message string) {
 	go func() {
-		event := createEvent(reason, message)
-		err := sendOrUpdateEvent(event)
+		event := newEvent(reason, message)
+		err := createOrUpdateEvent(event)
 		if logger != nil && err != nil {
 			logger.Error(err, "failed to send event",
 				"reason", reason,
@@ -53,7 +53,7 @@ func SendEventWithMessage(logger *logr.Logger, reason string, message string) {
 	}()
 }
 
-func createEvent(reason string, message string) *corev1.Event {
+func newEvent(reason string, message string) *corev1.Event {
 	now := metav1.Now()
 	return &corev1.Event{
 		ObjectMeta: metav1.ObjectMeta{
@@ -84,7 +84,7 @@ func createEvent(reason string, message string) *corev1.Event {
 	}
 }
 
-func sendOrUpdateEvent(event *corev1.Event) error {
+func createOrUpdateEvent(event *corev1.Event) error {
 	clientSet, err := getK8sClientSet()
 	if err != nil {
 		return err

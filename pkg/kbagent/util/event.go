@@ -44,7 +44,7 @@ const (
 func SendEventWithMessage(logger *logr.Logger, reason string, message string) {
 	go func() {
 		event := createEvent(reason, message)
-		err := sendOrUpdateEvent(logger, event)
+		err := sendOrUpdateEvent(event)
 		if logger != nil && err != nil {
 			logger.Error(err, "failed to send event",
 				"reason", reason,
@@ -84,7 +84,7 @@ func createEvent(reason string, message string) *corev1.Event {
 	}
 }
 
-func sendOrUpdateEvent(logger *logr.Logger, event *corev1.Event) error {
+func sendOrUpdateEvent(event *corev1.Event) error {
 	clientSet, err := getK8sClientSet()
 	if err != nil {
 		return err

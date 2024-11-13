@@ -64,11 +64,3 @@ type TPLScriptConfig struct {
 
 	FormatterConfig parametersv1alpha1.FileFormatConfig `json:"formatterConfig"`
 }
-
-type ConfigLazyRenderedMeta struct {
-	*appsv1.ComponentConfigSpec `json:",inline"`
-
-	// secondary template path
-	Templates       []string                            `json:"templates"`
-	FormatterConfig parametersv1alpha1.FileFormatConfig `json:"formatterConfig"`
-}

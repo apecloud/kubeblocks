@@ -546,6 +546,14 @@ func main() {
 			setupLog.Error(err, "unable to create controller", "controller", "ParametersDefinition")
 			os.Exit(1)
 		}
+		if err = (&parameterscontrollers.ComponentDrivenParameterReconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("component-parameter-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "Component")
+			os.Exit(1)
+		}
 		if err = (&parameterscontrollers.ParameterDrivenConfigRenderReconciler{
 			Client:   mgr.GetClient(),
 			Scheme:   mgr.GetScheme(),

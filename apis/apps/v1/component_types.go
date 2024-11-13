@@ -284,6 +284,11 @@ type ComponentSpec struct {
 	//
 	// +optional
 	Stop *bool `json:"stop,omitempty"`
+
+	// Specifies the initialization parameters.
+	//
+	// +optional
+	InitParameters ComponentParameters `json:"initParameters,omitempty"`
 }
 
 // ComponentStatus represents the observed state of a Component within the Cluster.

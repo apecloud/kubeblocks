@@ -180,3 +180,8 @@ func (builder *ComponentBuilder) SetStop(stop *bool) *ComponentBuilder {
 	builder.get().Spec.Stop = stop
 	return builder
 }
+
+func (builder *ComponentBuilder) SetInitParameters(params appsv1.ComponentParameters) *ComponentBuilder {
+	builder.get().Spec.InitParameters = params
+	return builder
+}

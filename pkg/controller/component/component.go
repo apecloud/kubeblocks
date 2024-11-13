@@ -87,6 +87,7 @@ func BuildComponent(cluster *appsv1.Cluster, compSpec *appsv1.ClusterComponentSp
 		SetOfflineInstances(compSpec.OfflineInstances).
 		SetRuntimeClassName(cluster.Spec.RuntimeClassName).
 		SetSystemAccounts(compSpec.SystemAccounts).
+		SetInitParameters(compSpec.InitParameters).
 		SetStop(compSpec.Stop)
 	return compBuilder.GetObject(), nil
 }

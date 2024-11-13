@@ -43,51 +43,30 @@ import (
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
-func createConfigObjects(cli client.Client, ctx context.Context, objs []client.Object, excludeObjs []client.Object) error {
-	for _, obj := range objs {
-		if slices.Contains(excludeObjs, obj) {
-			continue
-		}
-		if err := cli.Create(ctx, obj, inDataContext()); err != nil {
-
-			if !apierrors.IsAlreadyExists(err) {
-				return err
-			}
-			// for update script cm
-			if core.IsSchedulableConfigResource(obj) {
-				continue
-			}
-			if err := cli.Update(ctx, obj, inDataContext()); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
 // BuildReloadActionContainer build the configmgr sidecar container and update it
 // into PodSpec if configuration reload option is on
-func BuildReloadActionContainer(resourceCtx *ResourceCtx,
-	cluster *appsv1.Cluster,
-	synthesizedComp *component.SynthesizedComponent,
-	configRender *parametersv1alpha1.ParameterDrivenConfigRender,
-	paramsDefs []*parametersv1alpha1.ParametersDefinition) error {
+func BuildReloadActionContainer(resourceCtx *ResourceCtx, cluster *appsv1.Cluster, synthesizedComp *component.SynthesizedComponent, cmpd *appsv1.ComponentDefinition, configmaps []*corev1.ConfigMap) error {
 	var (
 		err         error
 		buildParams *cfgcm.CfgManagerBuildParams
 
-		podSpec     = synthesizedComp.PodSpec
-		configSpecs = synthesizedComp.ConfigTemplates
+		podSpec      = synthesizedComp.PodSpec
+		configSpecs  = synthesizedComp.ConfigTemplates
+		configRender *parametersv1alpha1.ParameterDrivenConfigRender
+		paramsDefs   []*parametersv1alpha1.ParametersDefinition
 	)
-
-	if configRender == nil || len(configRender.Spec.Configs) == 0 {
-		return nil
-	}
 
 	volumeDirs, usingConfigSpecs := getUsingVolumesByConfigSpecs(podSpec, configSpecs)
 	if len(volumeDirs) == 0 {
 		return nil
 	}
+	if configRender, paramsDefs, err = resolveComponentParameterDefs(resourceCtx.Context, resourceCtx.Client, cmpd, configmaps, synthesizedComp); err != nil {
+		return err
+	}
+	if configRender == nil || len(configRender.Spec.Configs) == 0 {
+		return nil
+	}
+
 	configSpecMetas, err := cfgcm.GetSupportReloadConfigSpecs(usingConfigSpecs, configRender.Spec.Configs, paramsDefs)
 	if err != nil {
 		return err
@@ -130,12 +109,47 @@ func BuildReloadActionContainer(resourceCtx *ResourceCtx,
 	return nil
 }
 
+func resolveComponentParameterDefs(ctx context.Context, cli client.Client, cmpd *appsv1.ComponentDefinition, configmaps []*corev1.ConfigMap, comp *component.SynthesizedComponent) (*parametersv1alpha1.ParameterDrivenConfigRender, []*parametersv1alpha1.ParametersDefinition, error) {
+	configRender, paramsDefs, err := intctrlutil.ResolveCmpdParametersDefs(ctx, cli, cmpd)
+	if err != nil {
+		return nil, nil, err
+	}
+	if err = handleInjectEnv(ctx, cli, comp, configRender, configmaps); err != nil {
+		return nil, nil, err
+	}
+	return configRender, paramsDefs, nil
+}
+
 func checkAndUpdateSharProcessNamespace(podSpec *corev1.PodSpec, buildParams *cfgcm.CfgManagerBuildParams, configSpecMetas []cfgcm.ConfigSpecMeta) {
 	shared := cfgcm.NeedSharedProcessNamespace(configSpecMetas)
 	if shared {
 		podSpec.ShareProcessNamespace = cfgutil.ToPointer(true)
 	}
 	buildParams.ShareProcessNamespace = shared
+}
+
+func handleInjectEnv(ctx context.Context,
+	cli client.Client,
+	comp *component.SynthesizedComponent,
+	configRender *parametersv1alpha1.ParameterDrivenConfigRender,
+	configmaps []*corev1.ConfigMap) error {
+	envObjs, err := InjectTemplateEnvFrom(comp, comp.PodSpec, configRender, configmaps)
+	if err != nil {
+		return err
+	}
+
+	for _, obj := range envObjs {
+		var cm = &corev1.ConfigMap{}
+		if err := cli.Get(ctx, client.ObjectKeyFromObject(obj), cm, inDataContext()); err != nil {
+			if !apierrors.IsNotFound(err) {
+				return err
+			}
+			if err := cli.Create(ctx, obj); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func updateEnvPath(container *corev1.Container, params *cfgcm.CfgManagerBuildParams) {

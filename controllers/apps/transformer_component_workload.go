@@ -413,6 +413,10 @@ func (r *componentWorkloadOps) expandVolume() error {
 // horizontalScale handles workload horizontal scale
 func (r *componentWorkloadOps) horizontalScale() error {
 	its := r.runningITS
+	// handle memberjoin lifecycle action
+	if err := r.checkAndDoMemberJoin(); err != nil {
+		return err
+	}
 	doScaleOut, doScaleIn := r.horizontalScaling()
 	if !doScaleOut && !doScaleIn {
 		if err := r.postScaleIn(); err != nil {
@@ -432,11 +436,6 @@ func (r *componentWorkloadOps) horizontalScale() error {
 		if err := r.scaleOut(its); err != nil {
 			return err
 		}
-	}
-
-	// handle memberjoin lifecycle action
-	if err := r.checkAndDoMemberJoin(); err != nil {
-		return err
 	}
 
 	r.reqCtx.Recorder.Eventf(r.cluster,
@@ -529,10 +528,7 @@ func (r *componentWorkloadOps) scaleOut(itsObj *workloads.InstanceSet) error {
 		return nil
 	}
 
-	err := r.annotatePodForMemberJoin()
-	if err != nil {
-		return err
-	}
+	r.annotateInstanceSetForMemberJoin()
 
 	graphCli := model.NewGraphClient(r.cli)
 	graphCli.Noop(r.dag, r.protoITS)
@@ -580,13 +576,13 @@ func getHealthyLorryClient(pods []*corev1.Pod) (lorry.Client, error) {
 	return nil, fmt.Errorf("no health lorry client found")
 }
 
-func (r *componentWorkloadOps) annotatePodForMemberJoin() error {
-	podsToMemberjoin := sets.New[string]()
-	if memberJoinStatus := r.runningITS.Annotations[constant.MemberJoinStatusAnnotationKey]; memberJoinStatus != "" {
-		podsToMemberjoin.Insert(strings.Split(memberJoinStatus, ",")...)
+func (r *componentWorkloadOps) annotateInstanceSetForMemberJoin() {
+	if r.synthesizeComp.LifecycleActions.MemberJoin == nil {
+		return
 	}
 
-	var podToMemberjoin []string
+	podsToMemberjoin := getPodsToMemberJoinFromAnno(r.runningITS)
+
 	for podName := range r.desiredCompPodNameSet {
 		if r.runningItsPodNameSet.Has(podName) {
 			continue
@@ -594,13 +590,29 @@ func (r *componentWorkloadOps) annotatePodForMemberJoin() error {
 		if podsToMemberjoin.Has(podName) {
 			continue
 		}
-		podToMemberjoin = append(podToMemberjoin, podName)
+		podsToMemberjoin.Insert(podName)
 	}
 
-	if len(podToMemberjoin) > 0 {
-		r.protoITS.Annotations[constant.MemberJoinStatusAnnotationKey] = strings.Join(podToMemberjoin, ",")
+	if podsToMemberjoin.Len() > 0 {
+		r.protoITS.Annotations[constant.MemberJoinStatusAnnotationKey] = strings.Join(sets.List(podsToMemberjoin), ",")
 	}
-	return nil
+}
+
+func getPodsToMemberJoinFromAnno(instanceSet *workloads.InstanceSet) sets.Set[string] {
+	podsToMemberjoin := sets.New[string]()
+	if instanceSet == nil {
+		return podsToMemberjoin
+	}
+
+	if instanceSet.Annotations == nil {
+		return podsToMemberjoin
+	}
+
+	if memberJoinStatus := instanceSet.Annotations[constant.MemberJoinStatusAnnotationKey]; memberJoinStatus != "" {
+		podsToMemberjoin.Insert(strings.Split(memberJoinStatus, ",")...)
+	}
+
+	return podsToMemberjoin
 }
 
 func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
@@ -613,11 +625,7 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
 	// TODO: Move memberLeave to the ITS controller. Instead of performing a switchover, we can directly scale down the non-leader nodes. This is because the pod ordinal is not guaranteed to be continuous.
 	podsToMemberLeave := make([]*corev1.Pod, 0)
 
-	memberJoinStatus := r.runningITS.Annotations[constant.MemberJoinStatusAnnotationKey]
-	podsList := strings.Split(memberJoinStatus, ",")
-	podsToMemberjoin := sets.New(podsList...)
-
-	var leaveErrors []error
+	podsToMemberjoin := getPodsToMemberJoinFromAnno(r.runningITS)
 	for _, pod := range pods {
 		// if the pod not exists in the generated pod names, it should be a member that needs to leave
 		if _, ok := r.desiredCompPodNameSet[pod.Name]; ok {
@@ -625,6 +633,8 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
 		}
 		podsToMemberLeave = append(podsToMemberLeave, pod)
 	}
+
+	var leaveErrors []error
 	for _, pod := range podsToMemberLeave {
 		if podsToMemberjoin.Has(pod.Name) {
 			leaveErrors = append(leaveErrors, fmt.Errorf("pod %s is in memberjoin process", pod.Name))
@@ -635,7 +645,7 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
 		}
 	}
 	if len(leaveErrors) > 0 {
-		return NewTransformerError(leaveErrors, 1*time.Second)
+		return newRequeueError(time.Second, fmt.Sprintf("%v", leaveErrors))
 	}
 	return nil
 }
@@ -700,26 +710,48 @@ func (r *componentWorkloadOps) leaveMemberForPod(pod *corev1.Pod, pods []*corev1
 		return switchoverErr
 	}
 
+	if err = lorryCli.LeaveMember(r.reqCtx.Ctx, pod.Name); err != nil {
+		if err != lorry.NotImplemented {
+			return err
+		}
+	}
 	return nil
 }
 
 func (r *componentWorkloadOps) checkAndDoMemberJoin() error {
-	memberJoinStatus := r.runningITS.Annotations[constant.MemberJoinStatusAnnotationKey]
-	if memberJoinStatus == "" {
+	// just wait for memberjoin anno to be updated
+	if r.protoITS.Annotations[constant.MemberJoinStatusAnnotationKey] != "" {
 		return nil
 	}
-	podsList := strings.Split(memberJoinStatus, ",")
-	podsToMemberjoin := sets.New(podsList...)
+
+	podsToMemberjoin := getPodsToMemberJoinFromAnno(r.runningITS)
+	if len(podsToMemberjoin) == 0 {
+		return nil
+	}
+
+	if r.synthesizeComp.LifecycleActions == nil || r.synthesizeComp.LifecycleActions.MemberJoin == nil {
+		podsToMemberjoin.Clear()
+	}
 	err := r.doMemberJoin(podsToMemberjoin)
 	if err != nil {
 		return err
 	}
 
-	r.protoITS.Annotations[constant.MemberJoinStatusAnnotationKey] = strings.Join(podsToMemberjoin.UnsortedList(), ",")
+	if podsToMemberjoin.Len() == 0 {
+		// Anno will be merged later, so it should be deleted from both protoITS and runningITS
+		delete(r.protoITS.Annotations, constant.MemberJoinStatusAnnotationKey)
+		delete(r.runningITS.Annotations, constant.MemberJoinStatusAnnotationKey)
+	} else {
+		r.protoITS.Annotations[constant.MemberJoinStatusAnnotationKey] = strings.Join(sets.List(podsToMemberjoin), ",")
+	}
 	return nil
 }
 
 func (r *componentWorkloadOps) doMemberJoin(podSet sets.Set[string]) error {
+	if len(podSet) == 0 {
+		return nil
+	}
+
 	labels := constant.GetComponentWellKnownLabels(r.synthesizeComp.ClusterName, r.synthesizeComp.Name)
 	runningPods, err := component.ListPodOwnedByComponent(r.reqCtx.Ctx, r.cli, r.synthesizeComp.Namespace, labels, inDataContext4C())
 	if err != nil {
@@ -732,18 +764,15 @@ func (r *componentWorkloadOps) doMemberJoin(podSet sets.Set[string]) error {
 			continue
 		}
 
-		if pod.Status.Phase != corev1.PodRunning {
-			joinErrors = append(joinErrors, fmt.Errorf(" waiting for pod %s to run", pod.Name))
-			continue
-		}
-
 		if err := r.joinMemberForPod(pod, podSet); err != nil {
 			joinErrors = append(joinErrors, fmt.Errorf("pod %s: %w", pod.Name, err))
+		} else {
+			podSet.Delete(pod.Name)
 		}
 	}
 
 	if len(joinErrors) > 0 {
-		return NewTransformerError(joinErrors, 1*time.Second)
+		return newRequeueError(time.Second, fmt.Sprintf("%v", joinErrors))
 	}
 	return nil
 }
@@ -762,13 +791,11 @@ func (r *componentWorkloadOps) joinMemberForPod(pod *corev1.Pod, podSet sets.Set
 	if err = lorryCli.JoinMember(r.reqCtx.Ctx); err != nil {
 		if err == lorry.NotImplemented {
 			r.reqCtx.Log.Info("lorry join member API not implemented", "pod", pod.Name)
-			podSet.Clear()
 			return nil
 		}
 		return fmt.Errorf("join member failed: %w", err)
 	}
 
-	podSet.Delete(pod.Name)
 	return nil
 }
 

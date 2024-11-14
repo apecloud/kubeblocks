@@ -410,10 +410,10 @@ func getNameFromObjectKey(objectKey string) string {
 }
 
 func getTolerations(cluster *appsv1.Cluster, compSpec *appsv1.ClusterComponentSpec) []corev1.Toleration {
-	if compSpec.SchedulingPolicy != nil {
+	if compSpec != nil && compSpec.SchedulingPolicy != nil {
 		return compSpec.SchedulingPolicy.Tolerations
 	}
-	if cluster.Spec.SchedulingPolicy != nil {
+	if cluster != nil && cluster.Spec.SchedulingPolicy != nil {
 		return cluster.Spec.SchedulingPolicy.Tolerations
 	}
 	return nil

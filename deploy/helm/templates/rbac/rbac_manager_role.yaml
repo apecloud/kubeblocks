@@ -5,6 +5,8 @@ metadata:
   name: {{ include "kubeblocks.fullname" . }}-rbac-manager-role
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
+  annotations:
+    {{- include "kubeblocks.keepResource" . | nindent 4 }}
 rules:
 - apiGroups:
   - ""

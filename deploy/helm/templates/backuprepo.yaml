@@ -17,8 +17,9 @@ metadata:
   name: {{ include "kubeblocks.fullname" . }}-backuprepo
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
-  {{- if .Values.backupRepo.default }}
   annotations:
+    {{- include "kubeblocks.keepResource" . | nindent 4 }}
+  {{- if .Values.backupRepo.default }}
     dataprotection.kubeblocks.io/is-default-repo: "true"
   {{- end }}
 spec:

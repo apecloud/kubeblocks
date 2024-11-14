@@ -428,6 +428,8 @@ addonController:
 ## @param keepAddons - keep Addon CR objects when delete this chart.
 keepAddons: true
 
+keepGlobalResources: false
+
 ## @param addonChartLocationBase - KubeBlocks official addon's chart location base, to be released in an air-gapped environment.
 ## if url has prefix "file://", KubeBlocks will use the helm charts copied from the addonChartsImage.
 ##

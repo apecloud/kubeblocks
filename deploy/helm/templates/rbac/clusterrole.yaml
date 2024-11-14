@@ -4,6 +4,8 @@ metadata:
   name: {{ include "kubeblocks.fullname" . }}
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
+  annotations:
+    {{- include "kubeblocks.keepResource" . | nindent 4 }}
 aggregationRule:
   clusterRoleSelectors:
   - matchLabels:
@@ -15,6 +17,8 @@ metadata:
   name: {{ include "kubeblocks.fullname" . }}-manager-role
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
+  annotations:
+    {{- include "kubeblocks.keepResource" . | nindent 4 }}
 rules:
 {{- $doInclude := false }}
 {{- range $i, $line := .Files.Lines "config/rbac/role.yaml" }}
@@ -31,6 +35,8 @@ metadata:
   name: {{ include "dataprotection.workerClusterRoleName" . }}
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
+  annotations:
+    {{- include "kubeblocks.keepResource" . | nindent 4 }}
 rules:
 # need to run "kubectl patch backup" inside a worker pod to update the status
 - apiGroups:
@@ -60,6 +66,7 @@ metadata:
     {{- include "kubeblocks.labels" . | nindent 4 }}
   annotations:
     "helm.sh/hook": pre-upgrade
+    {{- include "kubeblocks.keepResource" . | nindent 4 }}
 rules:
   - apiGroups:
       - apiextensions.k8s.io

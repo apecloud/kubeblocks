@@ -4,6 +4,8 @@ kind: ClusterRole
 metadata:
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
+  annotations:
+    {{- include "kubeblocks.keepResource" . | nindent 4 }}
   name: {{ include "kubeblocks.fullname" . }}-instanceset-editor-role
 rules:
 - apiGroups:

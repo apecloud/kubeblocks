@@ -333,3 +333,10 @@ Define default storage class name, if cloud provider is known, specify a default
 {{- .Values.image.registry }}
 {{- end}}
 {{- end}}
+
+
+{{- define "kubeblocks.keepResource" }}
+{{- if .Values.keepGlobalResources }}
+helm.sh/resource-policy: keep
+{{- end}}
+{{- end}}

@@ -4,7 +4,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ include "kubeblocks.fullname" . }}-dataprotection
-  {{- with .Values.deployAnnotations }}
+  {{- with .Values.dataProtection.deployAnnotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
   {{- end }}
@@ -150,14 +150,8 @@ spec:
               value: {{ .Values.dataProtection.worker.serviceAccount.annotations | toJson | quote }}
             - name: WORKER_CLUSTER_ROLE_NAME
               value: {{ include "dataprotection.workerClusterRoleName" . }}
-            {{- range .Values.extraEnvs }}
-            - name: {{ .name }}
-              {{- if .value }}
-              value: {{ .value | quote }}
-              {{- else if .valueFrom }}
-              valueFrom:
-              {{- toYaml .valueFrom | nindent 16 }}
-              {{- end }}
+            {{- if .Values.dataProtection.extraEnvs }}
+            {{- toYaml .Values.dataProtection.extraEnvs | nindent 12 }}
             {{- end }}
           {{- with .Values.securityContext }}
           securityContext:

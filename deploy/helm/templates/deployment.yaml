@@ -196,14 +196,8 @@ spec:
               value: {{ .Values.featureGates.inPlacePodVerticalScaling.enabled | quote }}
             - name: NO_RSM_ENV
               value: {{ .Values.featureGates.noRSMEnv.enabled | quote }}
-            {{- range .Values.extraEnvs }}
-            - name: {{ .name }}
-              {{- if .value }}
-              value: {{ .value | quote }}
-              {{- else if .valueFrom }}
-              valueFrom:
-              {{- toYaml .valueFrom | nindent 16 }}
-              {{- end }}
+            {{- if .Values.extraEnvs }}
+            {{- toYaml .Values.extraEnvs | nindent 12 }}
             {{- end }}
           {{- with .Values.securityContext }}
           securityContext:

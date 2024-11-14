@@ -108,6 +108,20 @@ BackupType
 </tr>
 <tr>
 <td>
+<code>parametersSchema</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.SelectiveParametersSchema">
+SelectiveParametersSchema
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the schema of parameters in backups and restores before their usage.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>env</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#envvar-v1-core">
@@ -318,6 +332,21 @@ string
 <td>
 <em>(Optional)</em>
 <p>Determines the parent backup name for incremental or differential backup.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>parameters</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.ParameterPair">
+[]ParameterPair
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies a list of pairs representing parameters and their corresponding values.
+Parameters match the schema specified in the <code>actionset.spec.parametersSchema</code></p>
 </td>
 </tr>
 </table>
@@ -976,6 +1005,21 @@ int32
 <p>Specifies the number of retries before marking the restore failed.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>parameters</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.ParameterPair">
+[]ParameterPair
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies a list of pairs representing parameters and their corresponding values.
+Parameters match the schema specified in the <code>actionset.spec.parametersSchema</code></p>
+</td>
+</tr>
 </table>
 </td>
 </tr>
@@ -1270,6 +1314,20 @@ BackupType
 <li><code>Continuous</code> back up transaction logs continuously, such as MySQL binlog, PostgreSQL WAL, etc.</li>
 </ul>
 <p>Continuous backup is essential for implementing Point-in-Time Recovery (PITR).</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>parametersSchema</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.SelectiveParametersSchema">
+SelectiveParametersSchema
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the schema of parameters in backups and restores before their usage.</p>
 </td>
 </tr>
 <tr>
@@ -1705,6 +1763,18 @@ BaseJobActionSpec
 <em>(Optional)</em>
 <p>Represents a custom deletion action that can be executed before the built-in deletion action.
 Note: The preDelete action job will ignore the env/envFrom.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>withParameters</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the parameters used by the backup action</p>
 </td>
 </tr>
 </tbody>
@@ -3137,6 +3207,21 @@ string
 <p>Determines the parent backup name for incremental or differential backup.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>parameters</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.ParameterPair">
+[]ParameterPair
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies a list of pairs representing parameters and their corresponding values.
+Parameters match the schema specified in the <code>actionset.spec.parametersSchema</code></p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="dataprotection.kubeblocks.io/v1alpha1.BackupStatus">BackupStatus
@@ -4320,6 +4405,45 @@ The default value is empty.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="dataprotection.kubeblocks.io/v1alpha1.ParameterPair">ParameterPair
+</h3>
+<p>
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.BackupSpec">BackupSpec</a>, <a href="#dataprotection.kubeblocks.io/v1alpha1.RestoreSpec">RestoreSpec</a>, <a href="#dataprotection.kubeblocks.io/v1alpha1.SchedulePolicy">SchedulePolicy</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Represents the name of the parameter.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>value</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Represents the parameter values.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="dataprotection.kubeblocks.io/v1alpha1.ParametersSchema">ParametersSchema
 </h3>
 <p>
@@ -4871,6 +4995,18 @@ bool
 <p>Determines if a base backup is required during restoration.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>withParameters</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the parameters used by the restore action</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="dataprotection.kubeblocks.io/v1alpha1.RestoreActionStatus">RestoreActionStatus
@@ -5094,6 +5230,21 @@ int32
 <td>
 <em>(Optional)</em>
 <p>Specifies the number of retries before marking the restore failed.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>parameters</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.ParameterPair">
+[]ParameterPair
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies a list of pairs representing parameters and their corresponding values.
+Parameters match the schema specified in the <code>actionset.spec.parametersSchema</code></p>
 </td>
 </tr>
 </tbody>
@@ -5574,6 +5725,18 @@ bool
 </tr>
 <tr>
 <td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the name of the schedule.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>backupMethod</code><br/>
 <em>
 string
@@ -5618,6 +5781,21 @@ Sample duration format:</p>
 <li>minutes: 	30m</li>
 </ul>
 <p>You can also combine the above durations. For example: 30d12h30m</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>parameters</code><br/>
+<em>
+<a href="#dataprotection.kubeblocks.io/v1alpha1.ParameterPair">
+[]ParameterPair
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies a list of pairs representing parameters and their corresponding values.
+Parameters match the schema specified in the <code>actionset.spec.parametersSchema</code></p>
 </td>
 </tr>
 </tbody>
@@ -5793,6 +5971,42 @@ string
 <em>(Optional)</em>
 <p>Specifies the scheduler to dispatch the pod.
 If not specified, the pod will be dispatched by the default scheduler.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="dataprotection.kubeblocks.io/v1alpha1.SelectiveParametersSchema">SelectiveParametersSchema
+</h3>
+<p>
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.ActionSetSpec">ActionSetSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>openAPIV3Schema</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#jsonschemaprops-v1-apiextensions-k8s-io">
+Kubernetes api extensions v1.JSONSchemaProps
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the schema for parameters using the OpenAPI v3.
+The supported property types include:
+- string
+- number
+- integer
+- array: Note that only items of string type are supported.</p>
 </td>
 </tr>
 </tbody>

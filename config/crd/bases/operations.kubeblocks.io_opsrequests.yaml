@@ -91,6 +91,18 @@ spec:
                     - Delete
                     - Retain
                     type: string
+                  parameters:
+                    additionalProperties:
+                      type: string
+                    description: |-
+                      Specifies parameters and their corresponding values.
+                      Parameters match the schema specified in the `actionset.spec.parametersSchema`
+                    maxProperties: 30
+                    type: object
+                    x-kubernetes-validations:
+                    - message: forbidden to update spec.parameters
+                      rule: size(self) == size(oldSelf) && oldSelf.all(key, key in
+                        self && self[key] == oldSelf[key])
                   parentBackupName:
                     description: If the specified BackupMethod is incremental, `parentBackupName`
                       is required.
@@ -121,6 +133,9 @@ spec:
                       Otherwise, only the Backup custom resource will be deleted.
                     type: string
                 type: object
+                x-kubernetes-validations:
+                - message: forbidden to update backup.parameters
+                  rule: has(oldSelf.parameters) == has(self.parameters)
               cancel:
                 description: |-
                   Indicates whether the current operation should be canceled and terminated gracefully if it's in the
@@ -4396,6 +4411,18 @@ spec:
                       type: object
                     type: array
                     x-kubernetes-preserve-unknown-fields: true
+                  parameters:
+                    additionalProperties:
+                      type: string
+                    description: |-
+                      Specifies parameters and their corresponding values.
+                      Parameters match the schema specified in the `actionset.spec.parametersSchema`
+                    maxProperties: 30
+                    type: object
+                    x-kubernetes-validations:
+                    - message: forbidden to update spec.parameters
+                      rule: size(self) == size(oldSelf) && oldSelf.all(key, key in
+                        self && self[key] == oldSelf[key])
                   restorePointInTime:
                     description: |-
                       Specifies the point in time to which the restore should be performed.
@@ -4422,6 +4449,9 @@ spec:
                 required:
                 - backupName
                 type: object
+                x-kubernetes-validations:
+                - message: forbidden to update restore.parameters
+                  rule: has(oldSelf.parameters) == has(self.parameters)
               switchover:
                 description: Lists Switchover objects, each specifying a Component
                   to perform the switchover operation.

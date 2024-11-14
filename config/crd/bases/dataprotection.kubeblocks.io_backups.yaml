@@ -110,6 +110,18 @@ spec:
                     the backup CR but retaining the backup contents in backup repository.
                     The current implementation only prevent accidental deletion of backup data.
                 type: string
+              parameters:
+                additionalProperties:
+                  type: string
+                description: |-
+                  Specifies parameters and their corresponding values.
+                  Parameters match the schema specified in the `actionset.spec.parametersSchema`
+                maxProperties: 30
+                type: object
+                x-kubernetes-validations:
+                - message: forbidden to update spec.parameters
+                  rule: size(self) == size(oldSelf) && oldSelf.all(key, key in self
+                    && self[key] == oldSelf[key])
               parentBackupName:
                 description: Determines the parent backup name for incremental or
                   differential backup.
@@ -130,6 +142,9 @@ spec:
             - backupMethod
             - backupPolicyName
             type: object
+            x-kubernetes-validations:
+            - message: forbidden to update spec.parameters
+              rule: has(oldSelf.parameters) == has(self.parameters)
           status:
             description: BackupStatus defines the observed state of Backup.
             properties:

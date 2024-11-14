@@ -359,6 +359,17 @@ spec:
                       description: Specifies whether the backup schedule is enabled
                         or not.
                       type: boolean
+                    name:
+                      description: Specifies the name of the schedule.
+                      type: string
+                    parameters:
+                      additionalProperties:
+                        type: string
+                      description: |-
+                        Specifies parameters and their corresponding values.
+                        Parameters match the schema specified in the `actionset.spec.parametersSchema`
+                      maxProperties: 30
+                      type: object
                     retentionPeriod:
                       default: 7d
                       description: "Determines the duration for which the backup should

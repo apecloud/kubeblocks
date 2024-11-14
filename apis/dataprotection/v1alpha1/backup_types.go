@@ -22,6 +22,7 @@ import (
 )
 
 // BackupSpec defines the desired state of Backup.
+// +kubebuilder:validation:XValidation:rule="has(oldSelf.parameters) == has(self.parameters)",message="forbidden to update spec.parameters"
 type BackupSpec struct {
 	// Specifies the backup policy to be applied for this backup.
 	//
@@ -74,6 +75,14 @@ type BackupSpec struct {
 	// +optional
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.parentBackupName"
 	ParentBackupName string `json:"parentBackupName,omitempty"`
+
+	// Specifies parameters and their corresponding values.
+	// Parameters match the schema specified in the `actionset.spec.parametersSchema`
+	//
+	// +kubebuilder:validation:MaxProperties=30
+	// +kubebuilder:validation:XValidation:rule="size(self) == size(oldSelf) && oldSelf.all(key, key in self && self[key] == oldSelf[key])",message="forbidden to update spec.parameters"
+	// +optional
+	Parameters map[string]string `json:"parameters,omitempty"`
 }
 
 // BackupStatus defines the observed state of Backup.

@@ -49,6 +49,11 @@ type SchedulePolicy struct {
 	// +optional
 	Enabled *bool `json:"enabled,omitempty"`
 
+	// Specifies the name of the schedule.
+	//
+	// +optional
+	Name string `json:"name,omitempty"`
+
 	// Specifies the backup method name that is defined in backupPolicy.
 	//
 	// +kubebuilder:validation:Required
@@ -76,6 +81,13 @@ type SchedulePolicy struct {
 	// +optional
 	// +kubebuilder:default="7d"
 	RetentionPeriod RetentionPeriod `json:"retentionPeriod,omitempty"`
+
+	// Specifies parameters and their corresponding values.
+	// Parameters match the schema specified in the `actionset.spec.parametersSchema`
+	//
+	// +kubebuilder:validation:MaxProperties=30
+	// +optional
+	Parameters map[string]string `json:"parameters,omitempty"`
 }
 
 // BackupScheduleStatus defines the observed state of BackupSchedule.

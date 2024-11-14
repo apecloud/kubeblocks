@@ -20,10 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package utils
 
 import (
+	corev1 "k8s.io/api/core/v1"
+
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
-	corev1 "k8s.io/api/core/v1"
 )
 
 func BuildEnvByTarget(pod *corev1.Pod, credential *dpv1alpha1.ConnectionCredential, containerPort *dpv1alpha1.ContainerPort) ([]corev1.EnvVar, error) {
@@ -71,4 +72,12 @@ func buildEnvBySecretKey(name, secretName, key string) corev1.EnvVar {
 			},
 		},
 	}
+}
+
+func BuildEnvByParameters(parameters map[string]string) []corev1.EnvVar {
+	env := []corev1.EnvVar{}
+	for parameter, value := range parameters {
+		env = append(env, corev1.EnvVar{Name: parameter, Value: value})
+	}
+	return env
 }

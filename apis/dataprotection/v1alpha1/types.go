@@ -24,6 +24,7 @@ import (
 	"unicode"
 
 	corev1 "k8s.io/api/core/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 )
 
 // Phase defines the BackupPolicy and ActionSet CR .status.phase
@@ -260,4 +261,19 @@ type EncryptionConfig struct {
 	//
 	// +kubebuilder:validation:Required
 	PassPhraseSecretKeyRef *corev1.SecretKeySelector `json:"passPhraseSecretKeyRef"`
+}
+
+type SelectiveParametersSchema struct {
+	// Defines the schema for parameters using the OpenAPI v3.
+	// The supported property types include:
+	// - string
+	// - number
+	// - integer
+	// - array: Note that only items of string type are supported.
+	// +kubebuilder:validation:Schemaless
+	// +kubebuilder:validation:Type=object
+	// +kubebuilder:pruning:PreserveUnknownFields
+	// +k8s:conversion-gen=false
+	// +optional
+	OpenAPIV3Schema *apiextensionsv1.JSONSchemaProps `json:"openAPIV3Schema,omitempty"`
 }

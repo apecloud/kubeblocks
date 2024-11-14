@@ -22,9 +22,10 @@ package dataprotection
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
+	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testdp "github.com/apecloud/kubeblocks/pkg/testutil/dataprotection"
@@ -56,6 +57,51 @@ var _ = Describe("ActionSet Controller test", func() {
 		It("should be available", func() {
 			as := testdp.NewFakeActionSet(&testCtx)
 			Expect(as).ShouldNot(BeNil())
+		})
+	})
+
+	Context("validate a actionSet", func() {
+		It("validate withParameters", func() {
+			as := testdp.NewFakeActionSet(&testCtx)
+			Expect(as).ShouldNot(BeNil())
+			By("update to invalid withParameters and schema")
+			Expect(testapps.ChangeObj(&testCtx, as, func(action *v1alpha1.ActionSet) {
+				as.Spec.ParametersSchema = &v1alpha1.SelectiveParametersSchema{
+					OpenAPIV3Schema: &v1.JSONSchemaProps{
+						Properties: map[string]v1.JSONSchemaProps{
+							"test1": {
+								Type: "string",
+							},
+						},
+					},
+				}
+				as.Spec.Backup.WithParameters = []string{"test"}
+			})).Should(Succeed())
+			By("should be unavailable with invlid withParameters")
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(as),
+				func(g Gomega, as *v1alpha1.ActionSet) {
+					g.Expect(as.Status.Phase).Should(BeEquivalentTo(v1alpha1.UnavailablePhase))
+					g.Expect(as.Status.Message).ShouldNot(BeEmpty())
+				})).Should(Succeed())
+			By("update to correct schema")
+			Expect(testapps.ChangeObj(&testCtx, as, func(action *v1alpha1.ActionSet) {
+				as.Spec.ParametersSchema = &v1alpha1.SelectiveParametersSchema{
+					OpenAPIV3Schema: &v1.JSONSchemaProps{
+						Properties: map[string]v1.JSONSchemaProps{
+							"test": {
+								Type: "string",
+							},
+						},
+					},
+				}
+				as.Spec.Backup.WithParameters = []string{"test"}
+			})).Should(Succeed())
+			By("should be available")
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(as),
+				func(g Gomega, as *v1alpha1.ActionSet) {
+					g.Expect(as.Status.Phase).Should(BeEquivalentTo(v1alpha1.AvailablePhase))
+					g.Expect(as.Status.Message).Should(BeEmpty())
+				})).Should(Succeed())
 		})
 	})
 })

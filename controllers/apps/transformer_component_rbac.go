@@ -50,6 +50,7 @@ const EventReasonRBACManager = "RBACManager"
 
 func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*componentTransformContext)
+	synthesizedComp := transCtx.SynthesizeComponent
 	if model.IsObjectDeleting(transCtx.ComponentOrig) {
 		return nil
 	}
@@ -61,7 +62,13 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 
 	// If the user has disabled rbac manager or specified comp.Spec.ServiceAccountName, it is now the user's responsibility to
 	// provide appropriate serviceaccount, roles and rolebindings.
-	if transCtx.Component.Spec.ServiceAccountName != "" {
+	if userSaName := transCtx.Component.Spec.ServiceAccountName; userSaName != "" {
+		// if user provided serviceaccount does not exist, raise error
+		sa := &corev1.ServiceAccount{}
+		if err := transCtx.Client.Get(transCtx.Context, types.NamespacedName{Namespace: synthesizedComp.Namespace, Name: userSaName}, sa); err != nil {
+			return err
+		}
+
 		return nil
 	}
 	if !viper.GetBool(constant.EnableRBACManager) {
@@ -70,7 +77,6 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 	}
 
 	graphCli, _ := transCtx.Client.(model.GraphClient)
-	synthesizedComp := transCtx.SynthesizeComponent
 
 	if err := cleanOldResource(transCtx, graphCli, dag, synthesizedComp); err != nil {
 		return err

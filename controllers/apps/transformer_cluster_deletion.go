@@ -126,7 +126,7 @@ func (t *clusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 	delKindMap := map[string]sets.Empty{}
 	for _, o := range delObjs {
 		// skip the objects owned by the component and InstanceSet controller
-		if shouldSkipObjOwnedByComp(o, *cluster) || isOwnedByInstanceSet(o) {
+		if isOwnedByComp(o) || isOwnedByInstanceSet(o) {
 			continue
 		}
 		graphCli.Delete(dag, o, inUniversalContext4G())
@@ -169,13 +169,6 @@ func kindsForWipeOut() ([]client.ObjectList, []client.ObjectList) {
 		&dpv1alpha1.BackupList{},
 	}
 	return append(namespacedKinds, namespacedKindsPlus...), nonNamespacedKinds
-}
-
-// shouldSkipObjOwnedByComp is used to judge whether the object owned by component should be skipped when deleting the cluster
-func shouldSkipObjOwnedByComp(obj client.Object, cluster kbappsv1.Cluster) bool {
-	// if the object is not owned by component, it should not be skipped
-	ownByComp := isOwnedByComp(obj)
-	return ownByComp
 }
 
 func deleteCompNShardingInOrder4Terminate(transCtx *clusterTransformContext, dag *graph.DAG) (sets.Set[string], error) {

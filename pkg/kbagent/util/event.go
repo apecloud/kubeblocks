@@ -28,6 +28,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
@@ -90,26 +91,34 @@ func createOrUpdateEvent(event *corev1.Event) error {
 		return err
 	}
 	eventsClient := clientSet.CoreV1().Events(namespace())
+
+	var lastErr error
 	for i := 0; i < sendEventMaxAttempts; i++ {
 		existingEvent, getErr := eventsClient.Get(context.Background(), event.Name, metav1.GetOptions{})
 		if getErr != nil {
-			_, err = eventsClient.Create(context.Background(), event, metav1.CreateOptions{})
-			if err == nil {
-				return nil
+			if k8serrors.IsNotFound(getErr) {
+				_, createErr := eventsClient.Create(context.Background(), event, metav1.CreateOptions{})
+				if createErr == nil {
+					return nil
+				}
+				lastErr = errors.Wrapf(createErr, "failed to create event %s", event.Name)
+			} else {
+				lastErr = errors.Wrapf(getErr, "failed to get event %s", event.Name)
 			}
 		} else {
 			existingEvent.Count++
 			existingEvent.LastTimestamp = metav1.Now()
 			existingEvent.EventTime = metav1.NowMicro()
-			_, err = eventsClient.Update(context.Background(), existingEvent, metav1.UpdateOptions{})
-			if err == nil {
+			_, updateErr := eventsClient.Update(context.Background(), existingEvent, metav1.UpdateOptions{})
+			if updateErr == nil {
 				return nil
 			}
+			lastErr = errors.Wrapf(updateErr, "failed to update event %s", event.Name)
 		}
 
 		time.Sleep(sendEventRetryInterval)
 	}
-	return errors.Wrapf(err, "failed to create or update events after %d attempts", sendEventMaxAttempts)
+	return errors.Wrapf(lastErr, "failed to create or update events after %d attempts", sendEventMaxAttempts)
 }
 
 func getK8sClientSet() (*kubernetes.Clientset, error) {

@@ -383,3 +383,23 @@ func getNameFromObjectKey(objectKey string) string {
 	}
 	return objectKey
 }
+
+func getTolerations(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.ClusterComponentSpec) []corev1.Toleration {
+	if compSpec != nil {
+		if compSpec.SchedulingPolicy != nil {
+			return compSpec.SchedulingPolicy.Tolerations
+		}
+		if len(compSpec.Tolerations) > 0 {
+			return compSpec.Tolerations
+		}
+	}
+	if cluster != nil {
+		if cluster.Spec.SchedulingPolicy != nil {
+			return cluster.Spec.SchedulingPolicy.Tolerations
+		}
+		if len(cluster.Spec.Tolerations) > 0 {
+			return cluster.Spec.Tolerations
+		}
+	}
+	return nil
+}

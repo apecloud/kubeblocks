@@ -66,6 +66,9 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 		// if user provided serviceaccount does not exist, raise error
 		sa := &corev1.ServiceAccount{}
 		if err := transCtx.Client.Get(transCtx.Context, types.NamespacedName{Namespace: synthesizedComp.Namespace, Name: userSaName}, sa); err != nil {
+			if errors.IsNotFound(err) {
+				transCtx.EventRecorder.Event(transCtx.Cluster, corev1.EventTypeWarning, EventReasonRBACManager, fmt.Sprintf("serviceaccount %v not found", userSaName))
+			}
 			return err
 		}
 

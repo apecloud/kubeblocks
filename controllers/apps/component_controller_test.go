@@ -1422,7 +1422,7 @@ var _ = Describe("Component Controller", func() {
 		Eventually(testapps.CheckObjExists(&testCtx, rbKey, &rbacv1.RoleBinding{}, expectExisted)).Should(Succeed())
 	}
 
-	testCompRBAC := func(compName, compDefName, saName string, rbacResourceCreated bool) {
+	testCompRBAC := func(compName, compDefName, saName string) {
 		By("creating a component with target service account name")
 		if len(saName) == 0 {
 			createClusterObj(compName, compDefName, nil)
@@ -1443,11 +1443,11 @@ var _ = Describe("Component Controller", func() {
 		})).Should(Succeed())
 
 		By("check the RBAC resources status")
-		checkRBACResourcesExistence(saName, fmt.Sprintf("%v-pod", saName), rbacResourceCreated)
+		checkRBACResourcesExistence(saName, fmt.Sprintf("%v-pod", saName), true)
 	}
 
 	testRecreateCompWithRBACCreateByKubeBlocks := func(compName, compDefName string) {
-		testCompRBAC(compName, compDefName, "", true)
+		testCompRBAC(compName, compDefName, "")
 
 		By("delete the cluster(component)")
 		testapps.DeleteObject(&testCtx, clusterKey, &kbappsv1.Cluster{})
@@ -1458,18 +1458,26 @@ var _ = Describe("Component Controller", func() {
 		checkRBACResourcesExistence(saName, fmt.Sprintf("%v-pod", saName), false)
 
 		By("re-create cluster(component) with same name")
-		testCompRBAC(compName, compDefName, "", true)
+		testCompRBAC(compName, compDefName, "")
 	}
 
-	tesCreateCompWithRBACCreateByUser := func(compName, compDefName string) {
+	testCreateCompWithNonExistRBAC := func(compName, compDefName string) {
+		saName := "test-sa-non-exist" + randomStr()
+
+		// component controller won't complete reconcilation, so the phase will be empty
+		createClusterObjWithPhase(compName, compDefName, func(f *testapps.MockClusterFactory) {
+			f.SetServiceAccountName(saName)
+		}, kbappsv1.ClusterPhase(""))
+		Consistently(testapps.GetComponentPhase(&testCtx, compKey)).Should(Equal(kbappsv1.ComponentPhase("")))
+	}
+
+	testCreateCompWithRBACCreateByUser := func(compName, compDefName string) {
 		saName := "test-sa-exist" + randomStr()
 
-		testCompRBAC(compName, compDefName, saName, false)
-
 		By("user manually creates ServiceAccount and RoleBinding")
-		sa := builder.NewServiceAccountBuilder(compObj.Namespace, saName).GetObject()
+		sa := builder.NewServiceAccountBuilder(testCtx.DefaultNamespace, saName).GetObject()
 		testapps.CheckedCreateK8sResource(&testCtx, sa)
-		rb := builder.NewRoleBindingBuilder(compObj.Namespace, saName).
+		rb := builder.NewRoleBindingBuilder(testCtx.DefaultNamespace, saName+"-pod").
 			SetRoleRef(rbacv1.RoleRef{
 				APIGroup: rbacv1.GroupName,
 				Kind:     "Role",
@@ -1477,18 +1485,20 @@ var _ = Describe("Component Controller", func() {
 			}).
 			AddSubjects(rbacv1.Subject{
 				Kind:      rbacv1.ServiceAccountKind,
-				Namespace: compObj.Namespace,
+				Namespace: testCtx.DefaultNamespace,
 				Name:      saName,
 			}).
 			GetObject()
 		testapps.CheckedCreateK8sResource(&testCtx, rb)
+
+		testCompRBAC(compName, compDefName, saName)
 
 		By("delete the cluster(component)")
 		testapps.DeleteObject(&testCtx, clusterKey, &kbappsv1.Cluster{})
 		Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &kbappsv1.Cluster{}, true)).Should(Succeed())
 
 		By("check the RBAC resources not deleted")
-		checkRBACResourcesExistence(saName, saName, true)
+		checkRBACResourcesExistence(saName, rb.Name, true)
 	}
 
 	testThreeReplicas := func(compName, compDefName string) {
@@ -1790,15 +1800,19 @@ var _ = Describe("Component Controller", func() {
 		})
 
 		It("with component RBAC set", func() {
-			testCompRBAC(defaultCompName, compDefName, "", true)
+			testCompRBAC(defaultCompName, compDefName, "")
 		})
 
 		It("re-create component with custom RBAC which is not exist and auto created by KubeBlocks", func() {
 			testRecreateCompWithRBACCreateByKubeBlocks(defaultCompName, compDefName)
 		})
 
+		It("creates component with non-exist serviceaccount", func() {
+			testCreateCompWithNonExistRBAC(defaultCompName, compDefName)
+		})
+
 		It("create component with custom RBAC which is already exist created by User", func() {
-			tesCreateCompWithRBACCreateByUser(defaultCompName, compDefName)
+			testCreateCompWithRBACCreateByUser(defaultCompName, compDefName)
 		})
 
 		It("update kubeblocks-tools image", func() {

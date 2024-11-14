@@ -93,23 +93,23 @@ func createOrUpdateEvent(event *corev1.Event) error {
 	for i := 0; i < sendEventMaxAttempts; i++ {
 		existingEvent, getErr := eventsClient.Get(context.Background(), event.Name, metav1.GetOptions{})
 		if getErr != nil {
-			_, createErr := eventsClient.Create(context.Background(), event, metav1.CreateOptions{})
-			if createErr == nil {
+			_, err = eventsClient.Create(context.Background(), event, metav1.CreateOptions{})
+			if err == nil {
 				return nil
 			}
 		} else {
 			existingEvent.Count++
 			existingEvent.LastTimestamp = metav1.Now()
 			existingEvent.EventTime = metav1.NowMicro()
-			_, updateErr := eventsClient.Update(context.Background(), existingEvent, metav1.UpdateOptions{})
-			if updateErr == nil {
+			_, err = eventsClient.Update(context.Background(), existingEvent, metav1.UpdateOptions{})
+			if err == nil {
 				return nil
 			}
 		}
 
 		time.Sleep(sendEventRetryInterval)
 	}
-	return err
+	return errors.Wrapf(err, "failed to create or update events after %d attempts", sendEventMaxAttempts)
 }
 
 func getK8sClientSet() (*kubernetes.Clientset, error) {

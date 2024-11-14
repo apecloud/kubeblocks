@@ -2,6 +2,10 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ include "kubeblocks.fullname" . }}
+  {{- with .Values.deployAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
     app.kubernetes.io/component: "apps"
@@ -192,6 +196,15 @@ spec:
               value: {{ .Values.featureGates.inPlacePodVerticalScaling.enabled | quote }}
             - name: NO_RSM_ENV
               value: {{ .Values.featureGates.noRSMEnv.enabled | quote }}
+            {{- range .Values.extraEnvs }}
+            - name: {{ .name }}
+              {{- if .value }}
+              value: {{ .value | quote }}
+              {{- else if .valueFrom }}
+              valueFrom:
+              {{- toYaml .valueFrom | nindent 16 }}
+              {{- end }}
+            {{- end }}
           {{- with .Values.securityContext }}
           securityContext:
             {{- toYaml . | nindent 12 }}

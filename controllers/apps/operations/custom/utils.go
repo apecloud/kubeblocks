@@ -35,6 +35,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/scheduling"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -384,22 +385,13 @@ func getNameFromObjectKey(objectKey string) string {
 	return objectKey
 }
 
-func getTolerations(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.ClusterComponentSpec) []corev1.Toleration {
-	if compSpec != nil {
-		if compSpec.SchedulingPolicy != nil {
-			return compSpec.SchedulingPolicy.Tolerations
-		}
-		if len(compSpec.Tolerations) > 0 {
-			return compSpec.Tolerations
-		}
+func getTolerations(cluster *appsv1alpha1.Cluster, compSpec *appsv1alpha1.ClusterComponentSpec) ([]corev1.Toleration, error) {
+	schedulePolicy, err := scheduling.BuildSchedulingPolicy(cluster, compSpec)
+	if err != nil {
+		return nil, err
 	}
-	if cluster != nil {
-		if cluster.Spec.SchedulingPolicy != nil {
-			return cluster.Spec.SchedulingPolicy.Tolerations
-		}
-		if len(cluster.Spec.Tolerations) > 0 {
-			return cluster.Spec.Tolerations
-		}
+	if schedulePolicy == nil {
+		return nil, nil
 	}
-	return nil
+	return schedulePolicy.Tolerations, nil
 }

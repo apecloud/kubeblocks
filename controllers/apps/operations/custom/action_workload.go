@@ -182,7 +182,11 @@ func (w *WorkloadAction) buildPodSpec(actionCtx ActionContext,
 		podSpec.RestartPolicy = corev1.RestartPolicyNever
 	}
 	if len(podSpec.Tolerations) == 0 {
-		podSpec.Tolerations = getTolerations(w.Cluster, w.Comp)
+		toleration, err := getTolerations(w.Cluster, w.Comp)
+		if err != nil {
+			return nil, err
+		}
+		podSpec.Tolerations = toleration
 	}
 	switch {
 	case w.OpsRequest.Spec.CustomOps.ServiceAccountName != nil:

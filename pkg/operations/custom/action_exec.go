@@ -169,14 +169,10 @@ func (e *ExecAction) buildExecPodSpec(actionCtx ActionContext,
 		}, execAction.Command...),
 	}
 	intctrlutil.InjectZeroResourcesLimitsIfEmpty(container)
-	var tolerations []corev1.Toleration
-	if e.Comp.SchedulingPolicy != nil {
-		tolerations = e.Comp.SchedulingPolicy.Tolerations
-	}
 	return &corev1.PodSpec{
 		Containers: []corev1.Container{*container},
 		// tolerate all taints
-		Tolerations:      tolerations,
+		Tolerations:      getTolerations(e.Cluster, e.Comp),
 		ImagePullSecrets: intctrlutil.BuildImagePullSecrets(),
 	}, nil
 }

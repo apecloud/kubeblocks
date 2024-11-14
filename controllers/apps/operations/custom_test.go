@@ -108,6 +108,11 @@ var _ = Describe("CustomOps", func() {
 				GetObject()
 
 			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefinitionName, clusterVersionName).
+				SetSchedulingPolicy(appsv1alpha1.SchedulingPolicy{
+					Tolerations: []corev1.Toleration{
+						{Operator: corev1.TolerationOpExists, Key: "test"},
+					},
+				}).
 				WithRandomName().AddComponentV2(consensusComp, componentDefObj.Name).SetReplicas(1).Create(&testCtx).GetObject()
 
 			fullCompName := constant.GenerateClusterComponentName(cluster.Name, consensusComp)
@@ -201,6 +206,8 @@ var _ = Describe("CustomOps", func() {
 
 			By("mock job is completed, expect for ops phase is Succeed")
 			job := &jobList.Items[0]
+			Expect(job.Spec.Template.Spec.Tolerations).Should(HaveLen(1))
+			Expect(job.Spec.Template.Spec.Tolerations[0].Key).Should(Equal("test"))
 			patchJobPhase(job, batchv1.JobComplete)
 			By("reconcile once and make the action succeed")
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsResource)
@@ -235,6 +242,11 @@ var _ = Describe("CustomOps", func() {
 		It("Test custom ops with sharding cluster", func() {
 			By("init environment for sharding cluster")
 			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, "", "", "").
+				SetSchedulingPolicy(appsv1alpha1.SchedulingPolicy{
+					Tolerations: []corev1.Toleration{
+						{Operator: corev1.TolerationOpExists, Key: "test"},
+					},
+				}).
 				WithRandomName().AddShardingSpecV2(consensusComp, compDefName).Create(&testCtx).GetObject()
 			opsResource.Cluster = cluster
 

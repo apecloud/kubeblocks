@@ -22,6 +22,7 @@ package parameters
 import (
 	"context"
 	"encoding/json"
+	"reflect"
 	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
@@ -111,14 +112,15 @@ func NewTask(item parametersv1alpha1.ConfigTemplateItemDetail, status *parameter
 				return core.MakeError("not found config spec: %s", item.Name)
 			}
 			if err := resource.ConfigMap(item.Name).Complete(); err != nil {
-				return err
+				return syncImpl(taskCtx, resource, item, status, revision, nil)
 			}
 			// Do reconcile for config template
 			configMap := resource.ConfigMapObj
 			switch intctrlutil.GetConfigSpecReconcilePhase(configMap, item, status) {
 			default:
 				return syncStatus(configMap, status)
-			case parametersv1alpha1.CPendingPhase,
+			case parametersv1alpha1.CInitPhase,
+				parametersv1alpha1.CPendingPhase,
 				parametersv1alpha1.CMergeFailedPhase:
 				return syncImpl(taskCtx, resource, item, status, revision, configMap)
 			case parametersv1alpha1.CCreatingPhase:
@@ -177,34 +179,76 @@ func syncImpl(taskCtx *TaskContext,
 	return nil
 }
 
-func mergeAndUpdate(resourceCtx *configctrl.ResourceCtx, expected *corev1.ConfigMap, running *corev1.ConfigMap, owner client.Object, item parametersv1alpha1.ConfigTemplateItemDetail, revision string) error {
-	if expected == nil {
-		expected = running
+func mergeAndUpdate(resourceCtx *configctrl.ResourceCtx,
+	expected *corev1.ConfigMap,
+	running *corev1.ConfigMap,
+	owner client.Object,
+	item parametersv1alpha1.ConfigTemplateItemDetail,
+	revision string) error {
+	switch {
+	case expected == nil: // not update
+		return update(resourceCtx.Context, resourceCtx.Client, running, running, updateReconcileObject(item, owner, revision))
+	case running == nil: // cm been deleted
+		return create(resourceCtx.Context, resourceCtx.Client, expected, updateReconcileObject(item, owner, revision))
+	default:
+		return update(resourceCtx.Context, resourceCtx.Client, running, running, mergedConfigmap(expected, updateReconcileObject(item, owner, revision)))
 	}
-
-	configmapDeep := running.DeepCopy()
-	configmapDeep.Data = expected.Data
-	configmapDeep.Labels = intctrlutil.MergeMetadataMaps(expected.Labels, running.Labels)
-	configmapDeep.Annotations = intctrlutil.MergeMetadataMaps(expected.Annotations, running.Annotations)
-	if err := updateConfigMeta(configmapDeep, item, revision); err != nil {
-		return err
-	}
-	if !controllerutil.ContainsFinalizer(configmapDeep, constant.ConfigFinalizerName) {
-		controllerutil.AddFinalizer(configmapDeep, constant.ConfigFinalizerName)
-	}
-	if !model.IsOwnerOf(owner, configmapDeep) {
-		if err := intctrlutil.SetControllerReference(owner, configmapDeep); err != nil {
-			return err
-		}
-	}
-	return resourceCtx.Client.Patch(resourceCtx.Context, configmapDeep, client.MergeFrom(running))
 }
 
-func updateConfigMeta(obj *corev1.ConfigMap, item parametersv1alpha1.ConfigTemplateItemDetail, revision string) error {
+func mergedConfigmap(expected *corev1.ConfigMap, setter func(*corev1.ConfigMap) error) func(*corev1.ConfigMap) error {
+	return func(cmObj *corev1.ConfigMap) error {
+		cmObj.Data = expected.Data
+		cmObj.Labels = intctrlutil.MergeMetadataMaps(expected.Labels, cmObj.Labels)
+		cmObj.Annotations = intctrlutil.MergeMetadataMaps(expected.Annotations, cmObj.Annotations)
+		return setter(cmObj)
+	}
+}
+
+func update(ctx context.Context, cli client.Client, expected, origin *corev1.ConfigMap, setter func(*corev1.ConfigMap) error) error {
+	objectDeep := expected.DeepCopy()
+	if err := setter(objectDeep); err != nil {
+		return err
+	}
+	if reflect.DeepEqual(objectDeep.Data, origin.Data) &&
+		reflect.DeepEqual(objectDeep.Annotations, origin.Annotations) &&
+		reflect.DeepEqual(objectDeep.Labels, origin.Labels) &&
+		reflect.DeepEqual(objectDeep.Finalizers, origin.Finalizers) &&
+		reflect.DeepEqual(objectDeep.OwnerReferences, origin.OwnerReferences) {
+		return nil
+	}
+	return cli.Patch(ctx, objectDeep, client.MergeFrom(origin))
+}
+
+func create(ctx context.Context, cli client.Client, expected *corev1.ConfigMap, setter func(*corev1.ConfigMap) error) error {
+	if err := setter(expected); err != nil {
+		return err
+	}
+	return cli.Create(ctx, expected)
+}
+
+func updateReconcileObject(item parametersv1alpha1.ConfigTemplateItemDetail,
+	owner client.Object,
+	revision string) func(*corev1.ConfigMap) error {
+	return func(cmObj *corev1.ConfigMap) error {
+		if !controllerutil.ContainsFinalizer(cmObj, constant.ConfigFinalizerName) {
+			controllerutil.AddFinalizer(cmObj, constant.ConfigFinalizerName)
+		}
+		if !model.IsOwnerOf(owner, cmObj) {
+			if err := intctrlutil.SetControllerReference(owner, cmObj); err != nil {
+				return err
+			}
+		}
+		return updateConfigLabels(cmObj, item, revision)
+	}
+}
+
+func updateConfigLabels(obj *corev1.ConfigMap,
+	item parametersv1alpha1.ConfigTemplateItemDetail,
+	revision string) error {
 	if obj.Annotations == nil {
 		obj.Annotations = make(map[string]string)
 	}
-	b, err := json.Marshal(item)
+	b, err := json.Marshal(&item)
 	if err != nil {
 		return err
 	}

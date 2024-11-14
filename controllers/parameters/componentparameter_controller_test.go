@@ -27,9 +27,10 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
 
@@ -47,30 +48,21 @@ var _ = Describe("ComponentParameter Controller", func() {
 				Name:      core.GenerateComponentParameterName(clusterName, defaultCompName),
 				Namespace: testCtx.DefaultNamespace,
 			}
-			checkCfgStatus := func(phase appsv1alpha1.ConfigurationPhase) func() bool {
+			checkCfgStatus := func(phase parametersv1alpha1.ParameterPhase) func() bool {
 				return func() bool {
-					cfg := &appsv1alpha1.Configuration{}
+					cfg := &parametersv1alpha1.ComponentParameter{}
 					Expect(k8sClient.Get(ctx, cfgKey, cfg)).Should(Succeed())
-					itemStatus := cfg.Status.GetItemStatus(configSpecName)
+					itemStatus := intctrlutil.GetItemStatus(&cfg.Status, configSpecName)
 					return itemStatus != nil && itemStatus.Phase == phase
 				}
 			}
 
-			By("wait for configuration status to be init phase.")
-			Eventually(checkCfgStatus(appsv1alpha1.CInitPhase)).Should(BeFalse())
-			// Expect(initConfiguration(&configctrl.ResourceCtx{
-			// 	Client:        k8sClient,
-			// 	Context:       ctx,
-			// 	Namespace:     testCtx.DefaultNamespace,
-			// 	ClusterName:   clusterName,
-			// 	ComponentName: defaultCompName,
-			// }, synthesizedComp, clusterObj, componentObj)).Should(Succeed())
-
-			Eventually(checkCfgStatus(appsv1alpha1.CFinishedPhase)).Should(BeTrue())
+			Eventually(checkCfgStatus(parametersv1alpha1.CFinishedPhase)).Should(BeTrue())
 
 			By("reconfiguring parameters.")
-			Eventually(testapps.GetAndChangeObj(&testCtx, cfgKey, func(cfg *appsv1alpha1.Configuration) {
-				cfg.Spec.GetConfigurationItem(configSpecName).ConfigFileParams = map[string]appsv1alpha1.ConfigParams{
+			Eventually(testapps.GetAndChangeObj(&testCtx, cfgKey, func(cfg *parametersv1alpha1.ComponentParameter) {
+				item := intctrlutil.GetConfigTemplateItem(&cfg.Spec, configSpecName)
+				item.ConfigFileParams = map[string]parametersv1alpha1.ParametersInFile{
 					"my.cnf": {
 						Parameters: map[string]*string{
 							"max_connections": cfgutil.ToPointer("1000"),
@@ -81,37 +73,15 @@ var _ = Describe("ComponentParameter Controller", func() {
 			})).Should(Succeed())
 
 			Eventually(func(g Gomega) {
-				cfg := &appsv1alpha1.Configuration{}
+				cfg := &parametersv1alpha1.ComponentParameter{}
 				g.Expect(k8sClient.Get(ctx, cfgKey, cfg)).Should(Succeed())
-				itemStatus := cfg.Status.GetItemStatus(configSpecName)
+				itemStatus := intctrlutil.GetItemStatus(&cfg.Status, configSpecName)
 				g.Expect(itemStatus).ShouldNot(BeNil())
 				g.Expect(itemStatus.UpdateRevision).Should(BeEquivalentTo("2"))
-				g.Expect(itemStatus.Phase).Should(BeEquivalentTo(appsv1alpha1.CFinishedPhase))
+				g.Expect(itemStatus.Phase).Should(BeEquivalentTo(parametersv1alpha1.CFinishedPhase))
 			}, time.Second*60, time.Second*1).Should(Succeed())
 		})
 
-		It("Invalid component test", func() {
-			mockReconcileResource()
-
-			cfgKey := client.ObjectKey{
-				Name:      core.GenerateComponentParameterName(clusterName, "invalid-component"),
-				Namespace: testCtx.DefaultNamespace,
-			}
-
-			// Expect(initConfiguration(&configctrl.ResourceCtx{
-			// 	Client:        k8sClient,
-			// 	Context:       ctx,
-			// 	Namespace:     testCtx.DefaultNamespace,
-			// 	ClusterName:   clusterName,
-			// 	ComponentName: "invalid-component",
-			// }, synthesizedComp, clusterObj, componentObj)).Should(Succeed())
-
-			Eventually(func(g Gomega) {
-				cfg := &appsv1alpha1.Configuration{}
-				g.Expect(k8sClient.Get(ctx, cfgKey, cfg)).Should(Succeed())
-				g.Expect(cfg.Status.Message).Should(ContainSubstring("not found cluster component"))
-			}, time.Second*60, time.Second*1).Should(Succeed())
-		})
 	})
 
 	// Context("When updating configuration with injectEnvTo", func() {

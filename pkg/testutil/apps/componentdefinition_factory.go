@@ -169,8 +169,7 @@ func (f *MockComponentDefinitionFactory) AddServiceExt(name, serviceName string,
 	return f
 }
 
-func (f *MockComponentDefinitionFactory) AddConfigTemplate(name, configTemplateRef, configConstraintRef,
-	namespace, volumeName string, injectEnvTo ...string) *MockComponentDefinitionFactory {
+func (f *MockComponentDefinitionFactory) AddConfigTemplate(name, configTemplateRef, namespace, volumeName string) *MockComponentDefinitionFactory {
 	config := kbappsv1.ComponentTemplateSpec{
 		Name:        name,
 		TemplateRef: configTemplateRef,

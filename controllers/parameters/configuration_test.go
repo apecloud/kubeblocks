@@ -30,14 +30,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	testparameters "github.com/apecloud/kubeblocks/pkg/testutil/parameters"
 )
 
 const (
@@ -47,15 +47,15 @@ const (
 	defaultITSName   = "mysql-statefulset"
 	configSpecName   = "mysql-config-tpl"
 	configVolumeName = "mysql-config"
+	paramsDefName    = "mysql-params-def"
+	pdcrName         = "config-test-pdcr"
 	cmName           = "mysql-tree-node-template-8.0"
 )
 
-func mockConfigResource() (*corev1.ConfigMap, *appsv1beta1.ConfigConstraint) {
+func mockConfigResource() (*corev1.ConfigMap, *parametersv1alpha1.ParametersDefinition) {
 	By("Create a config template obj")
-	configmap := testapps.CreateCustomizedObj(&testCtx,
-		"resources/mysql-config-template.yaml", &corev1.ConfigMap{},
-		testCtx.UseDefaultNamespace(),
-		testapps.WithLabels(
+	configmap := testparameters.NewComponentTemplateFactory(configSpecName, testCtx.DefaultNamespace).
+		AddLabels(
 			constant.AppNameLabelKey, clusterName,
 			constant.AppInstanceLabelKey, clusterName,
 			constant.KBAppComponentLabelKey, defaultCompName,
@@ -63,21 +63,19 @@ func mockConfigResource() (*corev1.ConfigMap, *appsv1beta1.ConfigConstraint) {
 			constant.CMConfigurationConstraintsNameLabelKey, cmName,
 			constant.CMConfigurationSpecProviderLabelKey, configSpecName,
 			constant.CMConfigurationTypeLabelKey, constant.ConfigInstanceType,
-		),
-		testapps.WithAnnotations(
+		).
+		AddAnnotations(
 			constant.KBParameterUpdateSourceAnnotationKey, constant.ReconfigureManagerSource,
 			constant.ConfigurationRevision, "1",
-			constant.CMInsEnableRerenderTemplateKey, "true"))
+			constant.CMInsEnableRerenderTemplateKey, "true").
+		Create(&testCtx).
+		GetObject()
 
-	By("Create a config constraint obj")
-	constraint := testapps.CreateCustomizedObj(&testCtx,
-		"resources/mysql-config-constraint.yaml",
-		&appsv1beta1.ConfigConstraint{})
-
-	By("check config constraint")
-	Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(constraint), func(g Gomega, tpl *appsv1beta1.ConfigConstraint) {
-		g.Expect(tpl.Status.Phase).Should(BeEquivalentTo(appsv1alpha1.AvailablePhase))
-	})).Should(Succeed())
+	By("Create a parameters definition obj")
+	paramsdef := testparameters.NewParametersDefinitionFactory(paramsDefName).
+		SetReloadAction(testparameters.WithNoneAction()).
+		Create(&testCtx).
+		GetObject()
 
 	By("Create a configuration obj")
 	// test-cluster-mysql-mysql-config-tpl
@@ -93,24 +91,28 @@ func mockConfigResource() (*corev1.ConfigMap, *appsv1beta1.ConfigConstraint) {
 		GetObject()
 	Expect(testCtx.CreateObj(testCtx.Ctx, configuration)).Should(Succeed())
 
-	return configmap, constraint
+	return configmap, paramsdef
 }
 
-func mockReconcileResource() (*corev1.ConfigMap, *appsv1beta1.ConfigConstraint, *appsv1.Cluster, *appsv1.Component, *component.SynthesizedComponent) {
-	configmap, constraint := mockConfigResource()
+func mockReconcileResource() (*corev1.ConfigMap, *parametersv1alpha1.ParametersDefinition, *appsv1.Cluster, *appsv1.Component, *component.SynthesizedComponent) {
+	configmap, paramsDef := mockConfigResource()
 
 	By("Create a component definition obj and mock to available")
 	compDefObj := testapps.NewComponentDefinitionFactory(compDefName).
 		WithRandomName().
 		SetDefaultSpec().
-		AddConfigTemplate(configSpecName, configmap.Name, constraint.Name, testCtx.DefaultNamespace, configVolumeName).
-		AddLabels(core.GenerateTPLUniqLabelKeyWithConfig(configSpecName), configmap.Name,
-			core.GenerateConstraintsUniqLabelKeyWithConfig(constraint.Name), constraint.Name).
+		AddConfigTemplate(configSpecName, configmap.Name, testCtx.DefaultNamespace, configVolumeName).
 		Create(&testCtx).
 		GetObject()
 	Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(compDefObj), func(obj *appsv1.ComponentDefinition) {
 		obj.Status.Phase = appsv1.AvailablePhase
 	})()).Should(Succeed())
+
+	testparameters.NewParametersDrivenConfigFactory(pdcrName).
+		SetParametersDefs(paramsDef.Name).
+		SetComponentDefinition(compDefObj.GetName()).
+		SetTemplateName(configSpecName).
+		Create(&testCtx)
 
 	By("Creating a cluster")
 	clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
@@ -148,25 +150,8 @@ func mockReconcileResource() (*corev1.ConfigMap, *appsv1beta1.ConfigConstraint, 
 	synthesizedComp, err := component.BuildSynthesizedComponent(testCtx.Ctx, testCtx.Cli, compDefObj, compObj, clusterObj)
 	Expect(err).ShouldNot(HaveOccurred())
 
-	return configmap, constraint, clusterObj, compObj, synthesizedComp
+	return configmap, paramsDef, clusterObj, compObj, synthesizedComp
 }
-
-// func initConfiguration(resourceCtx *configctrl.ResourceCtx,
-// 	synthesizedComponent *component.SynthesizedComponent,
-// 	clusterObj *appsv1.Cluster,
-// 	componentObj *appsv1.Component) error {
-// 	return configctrl.NewReloadActionBuilderHelper(configctrl.ReconcileCtx{
-// 		ResourceCtx:          resourceCtx,
-// 		Component:            componentObj,
-// 		SynthesizedComponent: synthesizedComponent,
-// 		Cluster:              clusterObj,
-// 		PodSpec:              synthesizedComponent.PodSpec,
-// 	}).
-// 		Prepare().
-// 		ComponentParameter(). // sync Configuration
-// 		InitConfigRelatedObject().
-// 		Complete()
-// }
 
 func cleanEnv() {
 	// must wait till resources deleted and no longer existed before the testcases start,
@@ -183,6 +168,8 @@ func cleanEnv() {
 	ml := client.HasLabels{testCtx.TestObjLabelKey}
 	// non-namespaced
 	testapps.ClearResources(&testCtx, generics.ConfigConstraintSignature, ml)
+	testapps.ClearResources(&testCtx, generics.ParametersDefinitionSignature, ml)
+	testapps.ClearResources(&testCtx, generics.ParameterDrivenConfigRenderSignature, ml)
 	// namespaced
 	testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ComponentSignature, true, inNS, ml)
 	testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ConfigMapSignature, true, inNS)
@@ -190,6 +177,6 @@ func cleanEnv() {
 	testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.InstanceSetSignature, true, inNS, ml)
 	testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ConfigurationSignature, false, inNS, ml)
 	testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ParametersDefinitionSignature, false, inNS, ml)
-	testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ComponentParameterSignature, false, inNS, ml)
-	testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ParameterDrivenConfigRenderSignature, false, inNS, ml)
+	testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ComponentParameterSignature, true, inNS, ml)
+	testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ParameterSignature, true, inNS, ml)
 }

@@ -273,7 +273,7 @@ KubeBlocks operator 会创建一个名为 `mycluster-conn-credential` 的新的 
 2. 在新的终端窗口中执行以下命令，连接到数据库。
 
    ```bash
-   root@mycluster-redis-0:/# redis-cli -a 5bv7czc4  --user default
+   redis-cli -a 5bv7czc4  --user default
    ```
 
 </TabItem>

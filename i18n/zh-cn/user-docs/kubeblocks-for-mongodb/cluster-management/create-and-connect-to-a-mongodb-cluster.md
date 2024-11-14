@@ -105,36 +105,34 @@ KubeBlocks 支持创建两种 MongoDB 集群：单机版（Standalone）和主�
    apiVersion: apps.kubeblocks.io/v1alpha1
    kind: Cluster
    metadata:
+     annotations:
+     finalizers:
+     - cluster.kubeblocks.io/finalizer
+     labels:
+       app.kubernetes.io/instance: mycluster
+       app.kubernetes.io/managed-by: Helm
+       app.kubernetes.io/version: 5.0.14
+       helm.sh/chart: mongodb-cluster-0.9.1
      name: mycluster
      namespace: demo
    spec:
-     clusterDefinitionRef: mongodb
-     clusterVersionRef: mongodb-6.0
-     terminationPolicy: Delete
      affinity:
        podAntiAffinity: Preferred
+       tenancy: SharedNode
        topologyKeys:
        - kubernetes.io/hostname
-     tolerations:
-       - key: kb-data
-         operator: Equal
-         value: 'true'
-         effect: NoSchedule
      componentSpecs:
-     - name: mongodb
-       componentDefRef: mongodb
-       enabledLogs:
-       - running
-       disableExporter: true
-       serviceAccountName: kb-mongo-cluster
-       replicas: 1
+     - componentDef: mongodb
+       name: mongodb
+       replicas: 3
        resources:
          limits:
-           cpu: '0.5'
+           cpu: "0.5"
            memory: 0.5Gi
          requests:
-           cpu: '0.5'
+           cpu: "0.5"
            memory: 0.5Gi
+       serviceVersion: 6.0.16
        volumeClaimTemplates:
        - name: data
          spec:
@@ -142,14 +140,13 @@ KubeBlocks 支持创建两种 MongoDB 集群：单机版（Standalone）和主�
            - ReadWriteOnce
            resources:
              requests:
-               storage: 2Gi
+               storage: 20Gi
+     terminationPolicy: Delete
    EOF
    ```
 
    | 字段                                   | 定义  |
    |---------------------------------------|--------------------------------------|
-   | `spec.clusterDefinitionRef`           | 集群定义 CRD 的名称，用来定义集群组件。  |
-   | `spec.clusterVersionRef`              | 集群版本 CRD 的名称，用来定义集群版本。 |
    | `spec.terminationPolicy`              | 集群的终止策略，默认值为 `Delete`，有效值为 `DoNotTerminate`、`Halt`、`Delete` 和 `WipeOut`。具体定义可参考 [终止策略](./delete-a-mongodb-cluster.md#终止策略)。|
    | `spec.affinity`                       | 为集群的 Pods 定义了一组节点亲和性调度规则。该字段可控制 Pods 在集群中节点上的分布。 |
    | `spec.affinity.podAntiAffinity`       | 定义了不在同一 component 中的 Pods 的反亲和性水平。该字段决定了 Pods 以何种方式跨节点分布，以提升可用性和性能。 |
@@ -158,7 +155,6 @@ KubeBlocks 支持创建两种 MongoDB 集群：单机版（Standalone）和主�
    | `spec.componentSpecs`                 | 集群 components 列表，定义了集群 components。该字段允许对集群中的每个 component 进行自定义配置。 |
    | `spec.componentSpecs.componentDefRef` | 表示 cluster definition 中定义的 component definition 的名称，可通过执行 `kubectl get clusterdefinition mongodb -o json \| jq '.spec.componentDefs[].name'` 命令获取 component definition 名称。 |
    | `spec.componentSpecs.name`            | 定义了 component 的名称。  |
-   | `spec.componentSpecs.disableExporter` | 定义了是否开启监控功能。 |
    | `spec.componentSpecs.replicas`        | 定义了 component 中 replicas 的数量。 |
    | `spec.componentSpecs.resources`       | 定义了 component 的资源要求。  |
 

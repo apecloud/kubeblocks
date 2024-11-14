@@ -476,9 +476,9 @@ mycluster   demo        milvus-2.3.2                           Delete           
 
 2. 通过以下任意一种方式验证垂直扩容是否完成。
 
-   - 查看 OpsRequest 进程。
+   - 查看 OpsRequest 进度。
 
-     执行磁盘扩容命令后，KubeBlocks 会自动输出查看 OpsRequest 进程的命令，可通过该命令查看 OpsRequest 进程的细节，包括 OpsRequest 的状态、Pod 状态等。当 OpsRequest 的状态为 `Succeed` 时，表明这一进程已完成。
+     执行命令后，KubeBlocks 会自动输出查看 OpsRequest 进度的命令，可通过该命令查看 OpsRequest 进度的细节，包括 OpsRequest 的状态、Pod 状态等。当 OpsRequest 的状态为 `Succeed` 时，表明这一任务已完成。
 
      ```bash
      kbcli cluster describe-ops milvus-verticalscaling-rpw2l -n demo
@@ -636,9 +636,9 @@ mycluster   demo        milvus-2.3.2                           Delete           
 
 2. 可通过以下任意一种方式验证扩容操作是否完成。
 
-    - 查看 OpsRequest 进程。
+    - 查看 OpsRequest 进度。
 
-       执行磁盘扩容命令后，KubeBlocks 会自动输出查看 OpsRequest 进程的命令，可通过该命令查看 OpsRequest 进程的细节，包括 OpsRequest 的状态、Pod 状态等。当 OpsRequest 的状态为 `Succeed` 时，表明这一进程已完成。
+       执行磁盘扩容命令后，KubeBlocks 会自动输出查看 OpsRequest 进度的命令，可通过该命令查看 OpsRequest 进度的细节，包括 OpsRequest 的状态、Pod 状态等。当 OpsRequest 的状态为 `Succeed` 时，表明这一任务已完成。
 
        ```bash
        kbcli cluster describe-ops milvus-volumeexpansion-5pbd2 -n demo
@@ -737,7 +737,7 @@ mycluster   demo        milvus-2.3.2                           Delete           
 
 ## 停止/启动集群
 
-你可以停止/启动集群以释放计算资源。当集群被停止时，其计算资源将被释放，也就是说 Kubernetes 的 Pod 将被释放，但其存储资源仍将被保留。如果你希望通过快照从原始存储中恢复集群资源，请重新启动该集群。
+您可以停止/启动集群以释放计算资源。停止集群后，其计算资源将被释放，也就是说 Kubernetes 的 Pod 将被释放，但其存储资源仍将被保留。您也可以重新启动该集群，使其恢复到停止集群前的状态。
 
 ### 停止集群
 

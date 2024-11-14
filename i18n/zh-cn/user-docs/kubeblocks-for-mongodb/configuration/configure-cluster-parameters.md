@@ -48,13 +48,11 @@ KubeBlocks 提供了一套默认的配置生成策略，适用于在 KubeBlocks 
 
 3. 连接集群，确认配置是否生效。
 
-      ```bash
-      kubectl exec -ti -n demo mycluster-mongodb-0 -- bash
-
-      root@mycluster-mongodb-0:/# cat etc/mongodb/mongodb.conf |grep verbosity
-      >
-        verbosity: 1
-      ```
+    ```bash
+    kubectl exec -n demo mycluster-mongodb-0 -- bash -c "cat /etc/mongodb/mongodb.conf | grep verbosity"
+    >
+      verbosity: 1
+    ```
 
 :::note
 
@@ -117,11 +115,9 @@ kbcli cluster describe-config mycluster -n demo
 3. 连接集群，确认配置是否生效。
 
    ```bash
-   kubectl exec -ti -n demo mycluster-mongodb-0 -- bash
-
-   root@mycluster-mongodb-0:/# cat etc/mongodb/mongodb.conf |grep verbosity
-   >
-     verbosity: 1
+    kubectl exec -n demo mycluster-mongodb-0 -- bash -c "cat /etc/mongodb/mongodb.conf | grep verbosity"
+    >
+      verbosity: 1
    ```
 
 :::note
@@ -204,8 +200,9 @@ OPS-NAME   CLUSTER   COMPONENT   CONFIG-SPEC-NAME   FILE   STATUS   POLICY   PRO
 3. 验证配置结果。
 
    ```bash
-    root@mycluster-mongodb-0:/# cat etc/mongodb/mongodb.conf |grep verbosity
-    verbosity: "1"
+   kubectl exec -n demo mycluster-mongodb-0 -- bash -c "cat /etc/mongodb/mongodb.conf | grep verbosity"
+   >
+     verbosity: 1
    ```
 
 ### 使用 edit-config 命令配置参数

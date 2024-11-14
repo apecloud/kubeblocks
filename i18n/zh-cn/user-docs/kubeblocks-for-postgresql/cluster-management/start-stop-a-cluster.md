@@ -11,7 +11,7 @@ import TabItem from '@theme/TabItem';
 
 # 停止/启动集群
 
-您可以停止/启动集群以释放计算资源。当集群被停止时，其计算资源将被释放，也就是说 Kubernetes 的 Pod 将被释放，但其存储资源仍将被保留。如果你希望通过快照从原始存储中恢复集群资源，可再次启动该集群。
+您可以停止/启动集群以释放计算资源。停止集群后，其计算资源将被释放，也就是说 Kubernetes 的 Pod 将被释放，但其存储资源仍将被保留。您也可以重新启动该集群，使其恢复到停止集群前的状态。
 
 ## 停止集群
 
@@ -74,18 +74,18 @@ import TabItem from '@theme/TabItem';
 
    <Tabs>
 
-   <TabItem value="kbcli" label="kbcli">
-
-   ```bash
-   kbcli cluster list -n demo
-   ```
-
-   </TabItem>
-
    <TabItem value="kubectl" label="kubectl" default>
 
    ```bash
    kubectl get cluster mycluster -n demo
+   ```
+
+   </TabItem>
+
+   <TabItem value="kbcli" label="kbcli">
+
+   ```bash
+   kbcli cluster list -n demo
    ```
 
    </TabItem>
@@ -154,18 +154,18 @@ import TabItem from '@theme/TabItem';
 
    <Tabs>
 
-   <TabItem value="kbcli" label="kbcli">
-
-   ```bash
-   kbcli cluster list -n demo
-   ```
-
-   </TabItem>
-
    <TabItem value="kubectl" label="kubectl" default>
 
    ```bash
    kubectl get cluster mycluster -n demo
+   ```
+
+   </TabItem>
+
+   <TabItem value="kbcli" label="kbcli">
+
+   ```bash
+   kbcli cluster list -n demo
    ```
 
    </TabItem>

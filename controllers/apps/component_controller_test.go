@@ -1464,7 +1464,7 @@ var _ = Describe("Component Controller", func() {
 	testCreateCompWithNonExistRBAC := func(compName, compDefName string) {
 		saName := "test-sa-non-exist" + randomStr()
 
-		// component controller won't complete reconcilation, so the phase will be empty
+		// component controller won't complete reconciliation, so the phase will be empty
 		createClusterObjWithPhase(compName, compDefName, func(f *testapps.MockClusterFactory) {
 			f.SetServiceAccountName(saName)
 		}, kbappsv1.ClusterPhase(""))

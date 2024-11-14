@@ -272,11 +272,14 @@ func (a *kbagent) callActionWithSelector(ctx context.Context, spec *appsv1.Actio
 	//  - timeout
 	var output []byte
 	for _, pod := range pods {
-		host, port, err := a.serverEndpoint(pod)
-		if err != nil {
-			return nil, errors.Wrapf(err, "pod %s is unavailable to execute action %s", pod.Name, lfa.name())
+		endpoint := func() (string, int32, error) {
+			host, port, err := a.serverEndpoint(pod)
+			if err != nil {
+				return "", 0, errors.Wrapf(err, "pod %s is unavailable to execute action %s", pod.Name, lfa.name())
+			}
+			return host, port, nil
 		}
-		cli, err := kbacli.NewClient(host, port)
+		cli, err := kbacli.NewClient(endpoint)
 		if err != nil {
 			return nil, err // mock client error
 		}

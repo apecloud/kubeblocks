@@ -4,6 +4,8 @@ metadata:
   name: ftp
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
+  annotations:
+    {{- include "kubeblocks.keepResource" . | nindent 4 }}
 spec:
   datasafedConfigTemplate: |
     [storage]

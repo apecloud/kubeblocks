@@ -5,6 +5,8 @@ metadata:
   name: obs
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
+  annotations:
+    {{- include "kubeblocks.keepResource" . | nindent 4 }}
 spec:
   csiDriverName: ru.yandex.s3.csi
   csiDriverSecretTemplate: |

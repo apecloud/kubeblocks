@@ -47,7 +47,7 @@ const (
 func allFieldsCompDefObj(create bool) *appsv1.ComponentDefinition {
 	compDef := testapps.NewComponentDefinitionFactory(compDefName).
 		SetDefaultSpec().
-		AddConfigTemplate(configTemplateName, mysqlConfigName, mysqlConfigConstraintName, testCtx.DefaultNamespace, testapps.ConfVolumeName).
+		AddConfigTemplate(configTemplateName, mysqlConfigName, testCtx.DefaultNamespace, testapps.ConfVolumeName).
 		AddScriptTemplate(scriptTemplateName, mysqlScriptsTemplateName, testCtx.DefaultNamespace, testapps.ScriptsVolumeName, nil).
 		GetObject()
 	if create {

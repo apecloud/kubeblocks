@@ -117,6 +117,7 @@ func (r *ComponentDrivenParameterReconciler) create(reqCtx intctrlutil.RequestCt
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 	reqCtx.Log.Info("ComponentParameter created")
+	intctrlutil.RecordCreatedEvent(r.Recorder, object)
 	return intctrlutil.Reconciled()
 }
 
@@ -204,7 +205,9 @@ func buildComponentParameter(reqCtx intctrlutil.RequestCtx, reader client.Reader
 	if err = intctrlutil.SetOwnerReference(comp, parameterObj); err != nil {
 		return nil, err
 	}
-	_, err = configctrl.UpdateConfigPayload(&parameterObj.Spec, &comp.Spec, &configRender.Spec)
+	if configRender != nil {
+		_, err = configctrl.UpdateConfigPayload(&parameterObj.Spec, &comp.Spec, &configRender.Spec)
+	}
 	return parameterObj, err
 }
 
@@ -225,5 +228,18 @@ func (r *ComponentDrivenParameterReconciler) mergeComponentParameter(expected *p
 		if len(dest.ConfigFileParams) == 0 && len(expected.ConfigFileParams) != 0 {
 			dest.ConfigFileParams = expected.ConfigFileParams
 		}
+		payload := expected.Payload
+		// TODO: removed tls
+		if tls, ok := dest.Payload.Data[constant.TLSPayload]; ok {
+			mergeTLSPayload(&payload, tls)
+		}
+		dest.Payload = payload
 	})
+}
+
+func mergeTLSPayload(payload *parametersv1alpha1.Payload, tls interface{}) {
+	if payload.Data == nil {
+		payload.Data = make(map[string]interface{})
+	}
+	payload.Data[constant.TLSPayload] = tls
 }

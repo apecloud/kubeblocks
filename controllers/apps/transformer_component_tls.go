@@ -51,6 +51,10 @@ func (t *componentTLSTransformer) Transform(ctx graph.TransformContext, dag *gra
 	transCtx, _ := ctx.(*componentTransformContext)
 	synthesizedComp := transCtx.SynthesizeComponent
 
+	if model.IsObjectDeleting(transCtx.ComponentOrig) {
+		return nil
+	}
+
 	// update podSpec tls volume and volumeMount
 	if err := updateTLSVolumeAndVolumeMount(synthesizedComp.PodSpec, synthesizedComp.ClusterName, *synthesizedComp); err != nil {
 		return err
@@ -61,6 +65,7 @@ func (t *componentTLSTransformer) Transform(ctx graph.TransformContext, dag *gra
 		return err
 	}
 
+	// TODO: removed
 	if err := checkAndTriggerReRender(transCtx.Context, *synthesizedComp, t.Client); err != nil {
 		return err
 	}

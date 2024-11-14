@@ -26,12 +26,10 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	cfgcm "github.com/apecloud/kubeblocks/pkg/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
@@ -137,16 +135,9 @@ func handleInjectEnv(ctx context.Context,
 	if err != nil {
 		return err
 	}
-
 	for _, obj := range envObjs {
-		var cm = &corev1.ConfigMap{}
-		if err := cli.Get(ctx, client.ObjectKeyFromObject(obj), cm, inDataContext()); err != nil {
-			if !apierrors.IsNotFound(err) {
-				return err
-			}
-			if err := cli.Create(ctx, obj); err != nil {
-				return err
-			}
+		if err = intctrlutil.IgnoreIsAlreadyExists(cli.Create(ctx, obj)); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -188,13 +179,6 @@ func updateCfgManagerVolumes(podSpec *corev1.PodSpec, configManager *cfgcm.CfgMa
 		}
 	}
 	podSpec.Volumes = podVolumes
-
-	// for volumeName, volume := range configManager.ConfigLazyRenderedVolumes {
-	// 	usingContainers := intctrlutil.GetPodContainerWithVolumeMount(podSpec, volumeName)
-	// 	for _, container := range usingContainers {
-	// 		container.VolumeMounts = append(container.VolumeMounts, volume)
-	// 	}
-	// }
 }
 
 func getUsingVolumesByConfigSpecs(podSpec *corev1.PodSpec, configSpecs []appsv1.ComponentTemplateSpec) ([]corev1.VolumeMount, []appsv1.ComponentTemplateSpec) {
@@ -336,12 +320,4 @@ func enableHScaleTrigger(configDescs []parametersv1alpha1.ComponentConfigDescrip
 
 func enableVScaleTrigger(configDescs []parametersv1alpha1.ComponentConfigDescription) bool {
 	return rerenderConfigEnabled(configDescs, parametersv1alpha1.ComponentVScaleType)
-}
-
-func configSetFromComponent(templates []appsv1.ComponentTemplateSpec) []string {
-	configSet := make([]string, 0)
-	for _, template := range templates {
-		configSet = append(configSet, template.Name)
-	}
-	return configSet
 }

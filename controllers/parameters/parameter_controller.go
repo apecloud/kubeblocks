@@ -22,7 +22,10 @@ package parameters
 import (
 	"context"
 
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -88,10 +91,11 @@ func (r *ParameterReconciler) handleComponent(rctx *ReconcileContext, updatedPar
 
 	handles := []reconfigureReconcileHandle{
 		prepareResources,
+		syncComponentParameterStatus,
 		classifyParameters(updatedParameters, configmaps),
 		updateCustomTemplates,
 		updateParameters,
-		syncComponentParametersStatus(configmaps),
+		updateComponentParameterStatus(configmaps),
 	}
 
 	for _, handle := range handles {
@@ -107,15 +111,18 @@ func (r *ParameterReconciler) reconcile(reqCtx intctrlutil.RequestCtx, parameter
 		return intctrlutil.Reconciled()
 	}
 
+	if err := r.validate(parameter, reqCtx.Ctx); err != nil {
+		return r.fail(reqCtx, parameter, err)
+	}
 	patch := parameter.DeepCopy()
 	rctxs, params := r.generateParameterTaskContext(reqCtx, parameter)
 	for i, rctx := range rctxs {
 		if err := r.handleComponent(rctx, params[i], parameter); err != nil {
-			return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+			return r.fail(reqCtx, parameter, err)
 		}
 	}
-
-	return updateParameterStatus(reqCtx, r.Client, parameter, patch)
+	finished := syncParameterStatus(&parameter.Status)
+	return updateParameterStatus(reqCtx, r.Client, parameter, patch, finished)
 }
 
 func (r *ParameterReconciler) generateParameterTaskContext(reqCtx intctrlutil.RequestCtx, parameter *parametersv1alpha1.Parameter) ([]*ReconcileContext, []appsv1.ComponentParameters) {
@@ -135,8 +142,50 @@ func (r *ParameterReconciler) generateParameterTaskContext(reqCtx intctrlutil.Re
 	return rctxs, params
 }
 
-func updateParameterStatus(reqCtx intctrlutil.RequestCtx, cli client.Client, parameter *parametersv1alpha1.Parameter, patch *parametersv1alpha1.Parameter) (ctrl.Result, error) {
-	finished := syncParameterStatus(&parameter.Status)
+func (r *ParameterReconciler) validate(parameter *parametersv1alpha1.Parameter, ctx context.Context) error {
+	if len(parameter.Spec.ComponentParameters) == 0 {
+		return intctrlutil.NewFatalError("required component parameters")
+	}
+
+	for _, component := range parameter.Spec.ComponentParameters {
+		if len(component.Parameters) == 0 && len(component.CustomTemplates) == 0 {
+			return intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "required parameters or custom templates for component[%s]", component.ComponentName)
+		}
+		if err := validateCustomTemplate(ctx, r.Client, component.CustomTemplates); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateCustomTemplate(ctx context.Context, cli client.Client, templates map[string]appsv1.ConfigTemplateExtension) error {
+	for configSpec, custom := range templates {
+		var cm = &corev1.ConfigMap{}
+		if err := cli.Get(ctx, types.NamespacedName{Name: custom.TemplateRef, Namespace: custom.Namespace}, cm); err != nil {
+			if apierrors.IsNotFound(err) {
+				return intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "not found configmap[%s] for custom template: %s", custom.TemplateRef, configSpec)
+			}
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *ParameterReconciler) failWithTerminalReconcile(reqCtx intctrlutil.RequestCtx, parameter *parametersv1alpha1.Parameter, err error) (ctrl.Result, error) {
+	patch := parameter.DeepCopy()
+	parameter.Status.Phase = parametersv1alpha1.CMergeFailedPhase
+	parameter.Status.Message = err.Error()
+	return updateParameterStatus(reqCtx, r.Client, parameter, patch, true)
+}
+
+func (r *ParameterReconciler) fail(reqCtx intctrlutil.RequestCtx, parameter *parametersv1alpha1.Parameter, err error) (ctrl.Result, error) {
+	if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeFatal) {
+		return r.failWithTerminalReconcile(reqCtx, parameter, err)
+	}
+	return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+}
+
+func updateParameterStatus(reqCtx intctrlutil.RequestCtx, cli client.Client, parameter *parametersv1alpha1.Parameter, patch *parametersv1alpha1.Parameter, finished bool) (ctrl.Result, error) {
 	parameter.Status.ObservedGeneration = parameter.Generation
 	if err := cli.Status().Patch(reqCtx.Ctx, parameter, client.MergeFrom(patch)); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
@@ -149,6 +198,12 @@ func updateParameterStatus(reqCtx intctrlutil.RequestCtx, cli client.Client, par
 
 func syncParameterStatus(parameterStatus *parametersv1alpha1.ParameterStatus) bool {
 	var finished = true
+
+	defer func() {
+		if finished && !intctrlutil.IsFailedPhase(parameterStatus.Phase) {
+			parameterStatus.Phase = parametersv1alpha1.CFinishedPhase
+		}
+	}()
 
 	for _, status := range parameterStatus.ReconfiguringStatus {
 		switch {

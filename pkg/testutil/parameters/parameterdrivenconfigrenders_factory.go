@@ -35,6 +35,11 @@ func NewParametersDrivenConfigFactory(name string) *MockParametersDrivenConfigFa
 					Name: MysqlConfigFile,
 					FileFormatConfig: &parametersv1alpha1.FileFormatConfig{
 						Format: parametersv1alpha1.Ini,
+						FormatterAction: parametersv1alpha1.FormatterAction{
+							IniConfig: &parametersv1alpha1.IniConfig{
+								SectionName: "mysqld",
+							},
+						},
 					},
 				},
 			},

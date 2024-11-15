@@ -75,6 +75,13 @@ func IsParameterFinished(phase parametersv1alpha1.ParameterPhase) bool {
 	}, phase)
 }
 
+func IsFailedPhase(phase parametersv1alpha1.ParameterPhase) bool {
+	return slices.Contains([]parametersv1alpha1.ParameterPhase{
+		parametersv1alpha1.CMergeFailedPhase,
+		parametersv1alpha1.CFailedAndPausePhase,
+	}, phase)
+}
+
 func GetItemStatus(status *parametersv1alpha1.ComponentParameterStatus, name string) *parametersv1alpha1.ConfigTemplateItemDetailStatus {
 	match := func(status parametersv1alpha1.ConfigTemplateItemDetailStatus) bool {
 		return status.Name == name

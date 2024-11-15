@@ -275,41 +275,38 @@ func findPortByPortName(container corev1.Container) (int32, bool) {
 }
 
 // UpdateConfigPayload updates the configuration payload
-func UpdateConfigPayload(config *parametersv1alpha1.ComponentParameterSpec, component *appsv1.ComponentSpec, configRender *parametersv1alpha1.ParameterDrivenConfigRenderSpec) (bool, error) {
+func UpdateConfigPayload(config *parametersv1alpha1.ComponentParameterSpec, component *appsv1.ComponentSpec, configRender *parametersv1alpha1.ParameterDrivenConfigRenderSpec) error {
 	if len(configRender.Configs) == 0 {
-		return false, nil
+		return nil
 	}
 
-	var updated = false
 	for i, item := range config.ConfigItemDetails {
 		configDescs := intctrlutil.GetComponentConfigDescriptions(configRender, item.Name)
 		configSpec := &config.ConfigItemDetails[i]
 		// check v-scale operation
 		if enableVScaleTrigger(configDescs) {
 			resourcePayload := intctrlutil.ResourcesPayloadForComponent(component.Resources)
-			ret, err := intctrlutil.CheckAndPatchPayload(configSpec, constant.ComponentResourcePayload, resourcePayload)
-			if err != nil {
-				return false, err
+			if _, err := intctrlutil.CheckAndPatchPayload(configSpec, constant.ComponentResourcePayload, resourcePayload); err != nil {
+				return err
 			}
-			updated = updated || ret
 		}
 		// check h-scale operation
 		if enableHScaleTrigger(configDescs) {
-			ret, err := intctrlutil.CheckAndPatchPayload(configSpec, constant.ReplicasPayload, component.Replicas)
-			if err != nil {
-				return false, err
+			if _, err := intctrlutil.CheckAndPatchPayload(configSpec, constant.ReplicasPayload, component.Replicas); err != nil {
+				return err
 			}
-			updated = updated || ret
 		}
+		// check tls
 		if enableTLSTrigger(configDescs) {
-			ret, err := intctrlutil.CheckAndPatchPayload(configSpec, constant.TLSPayload, component.TLSConfig)
-			if err != nil {
-				return false, err
+			if component.TLSConfig == nil {
+				continue
 			}
-			updated = updated || ret
+			if _, err := intctrlutil.CheckAndPatchPayload(configSpec, constant.TLSPayload, component.TLSConfig); err != nil {
+				return err
+			}
 		}
 	}
-	return updated, nil
+	return nil
 }
 
 func rerenderConfigEnabled(configDescs []parametersv1alpha1.ComponentConfigDescription, rerenderType parametersv1alpha1.RerenderResourceType) bool {

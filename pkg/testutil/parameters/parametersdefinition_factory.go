@@ -28,7 +28,12 @@ type MockParametersDefinitionFactory struct {
 
 func NewParametersDefinitionFactory(name string) *MockParametersDefinitionFactory {
 	f := &MockParametersDefinitionFactory{}
-	f.Init("", name, &parametersv1alpha1.ParametersDefinition{}, f)
+	f.Init("", name, &parametersv1alpha1.ParametersDefinition{
+		Spec: parametersv1alpha1.ParametersDefinitionSpec{
+			FileName:     MysqlConfigFile,
+			ReloadAction: WithNoneAction(),
+		},
+	}, f)
 	return f
 }
 

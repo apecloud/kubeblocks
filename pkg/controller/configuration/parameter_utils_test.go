@@ -56,10 +56,6 @@ var _ = Describe("resource Fetcher", func() {
 		// clusterObj, _, _ = newAllFieldsClusterObj(compDefObj, false)
 	})
 
-	AfterEach(func() {
-		DeferCleanup()
-	})
-
 	Context("ClassifyParamsFromConfigTemplate", func() {
 		It("Should succeed with no error with one paramDef", func() {
 			parameters := appsv1.ComponentParameters{

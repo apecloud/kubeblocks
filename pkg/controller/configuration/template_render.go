@@ -62,8 +62,6 @@ func RenderTemplate(resourceCtx *ResourceCtx,
 	for _, tpl := range tpls {
 		configCMName := core.GetComponentCfgName(cluster.Name, synthesizedComponent.Name, tpl.Name)
 		if configCM, err = generateConfigMapFromTemplate(cluster, synthesizedComponent, tplBuilder, configCMName, tpl, resourceCtx.Context, reconcileCtx.Client, nil); err != nil {
-		}
-		if err != nil {
 			return nil, err
 		}
 		if err = intctrlutil.SetOwnerReference(comp, configCM); err != nil {

@@ -128,7 +128,7 @@ func TestIsRerender(t *testing.T) {
 			cm: builder.NewConfigMapBuilder("default", "test").
 				AddAnnotations(constant.ConfigAppliedVersionAnnotationKey, `
 {
-  "importTemplateRef": {
+  "userConfigTemplates": {
     "templateRef": "contig-test-template",
     "namespace": "default",
     "policy": "patch"

@@ -34,14 +34,13 @@ import (
 )
 
 const (
-	compDefName               = "test-compdef"
-	clusterName               = "test-cluster"
-	configTemplateName        = "test-config-template"
-	scriptTemplateName        = "test-script-template"
-	mysqlCompName             = "mysql"
-	mysqlConfigName           = "mysql-component-config"
-	mysqlConfigConstraintName = "mysql8.0-config-constraints"
-	mysqlScriptsTemplateName  = "apecloud-mysql-scripts"
+	compDefName              = "test-compdef"
+	clusterName              = "test-cluster"
+	configTemplateName       = "test-config-template"
+	scriptTemplateName       = "test-script-template"
+	mysqlCompName            = "mysql"
+	mysqlConfigName          = "mysql-component-config"
+	mysqlScriptsTemplateName = "apecloud-mysql-scripts"
 )
 
 func allFieldsCompDefObj(create bool) *appsv1.ComponentDefinition {
@@ -86,11 +85,6 @@ func newAllFieldsSynthesizedComponent(compDef *appsv1.ComponentDefinition, clust
 	Expect(synthesizeComp).ShouldNot(BeNil())
 	addTestVolumeMount(synthesizeComp.PodSpec, mysqlCompName)
 	return synthesizeComp
-}
-
-func newAllFieldsComponent(cluster *appsv1.Cluster) *appsv1.Component {
-	comp, _ := component.BuildComponent(cluster, &cluster.Spec.ComponentSpecs[0], nil, nil)
-	return comp
 }
 
 func addTestVolumeMount(spec *corev1.PodSpec, containerName string) {

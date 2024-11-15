@@ -149,11 +149,11 @@ func classifyParameters(updatedParameters appsv1.ComponentParameters, configmaps
 	}
 }
 
-func validateComponentParameter(parametersDefs []*parametersv1alpha1.ParametersDefinition, descs []parametersv1alpha1.ComponentConfigDescription, paramters map[string]*parametersv1alpha1.ParametersInFile) error {
+func validateComponentParameter(parametersDefs []*parametersv1alpha1.ParametersDefinition, descs []parametersv1alpha1.ComponentConfigDescription, parameters map[string]*parametersv1alpha1.ParametersInFile) error {
 	if len(parametersDefs) == 0 || len(descs) == 0 {
 		return nil
 	}
-	_, err := configctrl.DoMerge(resolveBaseData(paramters), configctrl.DerefMapValues(paramters), parametersDefs, descs)
+	_, err := configctrl.DoMerge(resolveBaseData(parameters), configctrl.DerefMapValues(parameters), parametersDefs, descs)
 	return err
 }
 

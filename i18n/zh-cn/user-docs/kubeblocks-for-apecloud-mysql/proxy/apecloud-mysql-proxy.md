@@ -774,7 +774,7 @@ kbcli cluster configure myproxy --components vtgate --set=read_write_splitting_p
 kbcli cluster configure myproxy --components vtgate --set=read_write_splitting_ratio=70
 ```
 
-此外，你还可以[使用 Grafana](#监控) 或执行 `show workload` 来查看流量分布。
+此外，你还可以[使用 Grafana](#监控) 或在 VTGate 终端中执行 `show workload` 来查看流量分布。
 
 ```bash
 show workload;

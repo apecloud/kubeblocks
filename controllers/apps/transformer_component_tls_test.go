@@ -113,6 +113,7 @@ var _ = Describe("TLS self-signed cert function", func() {
 				SetParametersDefs(paramsdef.Name).
 				SetComponentDefinition(compDefObj.GetName()).
 				SetTemplateName(configTemplateName).
+				TLSEnabled().
 				Create(&testCtx)
 		})
 

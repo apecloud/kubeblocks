@@ -30,14 +30,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
-	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/plan"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 // componentTLSTransformer handles component configuration render
@@ -61,51 +58,7 @@ func (t *componentTLSTransformer) Transform(ctx graph.TransformContext, dag *gra
 	}
 
 	// build tls cert
-	if err := buildTLSCert(transCtx.Context, transCtx.Client, *synthesizedComp, dag); err != nil {
-		return err
-	}
-
-	// TODO: removed
-	if err := checkAndTriggerReRender(transCtx.Context, *synthesizedComp, t.Client); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// a hack way to notify the configuration controller to re-render config
-func checkAndTriggerReRender(ctx context.Context, synthesizedComp component.SynthesizedComponent, cli client.Client) error {
-	tls := synthesizedComp.TLSConfig
-	conf := &appsv1alpha1.Configuration{}
-	confKey := types.NamespacedName{Namespace: synthesizedComp.Namespace, Name: cfgcore.GenerateComponentConfigurationName(synthesizedComp.ClusterName, synthesizedComp.Name)}
-	if err := cli.Get(ctx, confKey, conf); err != nil {
-		return client.IgnoreNotFound(err)
-	}
-	// update payload for tls
-	confCopy := conf.DeepCopy()
-	// confCopy.Spec.ConfigItemDetails[0].Version = fmt.Sprint(time.Now().UnixMilli())
-	if len(confCopy.Spec.ConfigItemDetails) == 0 {
-		return nil
-	}
-	updated, err := intctrlutil.CheckAndPatchPayload(&confCopy.Spec.ConfigItemDetails[0], constant.TLSPayload, tls)
-	if err != nil {
-		return err
-	}
-	if !updated {
-		return nil
-	}
-	// NOTE: The check logic may have bugs, the configuration requires that it can only be updated through patch
-	// bad case:
-	// thread1: fetch latest configuration(id: 1000)  // e.g cluster reconcile thread
-	// thread2: fetch latest configuration(id: 1000), // e.g reconfiguring operation
-	// thread1: update payload without submit
-	// thread2: update configuration.Spec.ConfigItemDetails[*].configFileParams[*]
-	// thread2: patch configuration(id: 1001)
-	// thread1: submit configuration
-	// result: thread2's update will be lost
-	// graphCli, _ := cli.(model.GraphClient)
-	// graphCli.Update(dag, conf, confCopy)
-	return cli.Patch(ctx, confCopy, client.MergeFrom(conf.DeepCopy()))
+	return buildTLSCert(transCtx.Context, transCtx.Client, *synthesizedComp, dag)
 }
 
 func buildTLSCert(ctx context.Context, cli client.Reader, synthesizedComp component.SynthesizedComponent, dag *graph.DAG) error {

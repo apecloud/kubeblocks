@@ -168,7 +168,7 @@ var _ = BeforeSuite(func() {
 		Metrics: server.Options{BindAddress: "0"},
 		Client: client.Options{
 			Cache: &client.CacheOptions{
-				DisableFor: append(unCachedObjs, &dpv1alpha1.Restore{}),
+				DisableFor: append(unCachedObjs, &dpv1alpha1.Restore{}, &parametersv1alpha1.ComponentParameter{}),
 			},
 		},
 	})

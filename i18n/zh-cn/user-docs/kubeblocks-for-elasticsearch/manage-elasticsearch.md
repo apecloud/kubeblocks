@@ -6,16 +6,19 @@ sidebar_position: 1
 sidebar_label: 用 KubeBlocks 管理 Elasticsearch
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # 用 KubeBlocks 管理 Elasticsearch
 
 Elasticsearch 是一个分布式、RESTful 风格的搜索和数据分析引擎，能够解决不断涌现出的各种用例。作为 Elastic Stack 的核心，Elasticsearch 会集中存储您的数据，让您飞快完成搜索，微调相关性，进行强大的分析，并轻松缩放规模。
 
-本文档展示了如何通过 kbcli、kubectl 或 YAML 文件等当时创建和管理 Kafka 集群。您可以在 [GitHub 仓库](https://github.com/apecloud/kubeblocks-addons/tree/release-0.9/examples/elasticsearch)查看 YAML 示例。
+本文档展示了如何通过 kbcli、kubectl 或 YAML 文件等当时创建和管理 Elasticsearch 集群。您可以在 [GitHub 仓库](https://github.com/apecloud/kubeblocks-addons/tree/release-0.9/examples/elasticsearch)查看 YAML 示例。
 
 ## 开始之前
 
 - 如果您想通过 `kbcli` 创建并连接 ApeCloud MySQL 集群，请先[安装 kbcli](./../installation/install-with-kbcli/install-kbcli.md)。
-- 安装 KubeBlocks，可通过 [Kbcli](./../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) 或 [Helm](./../installation/install-with-helm/install-kubeblocks.md) 安装。
+- 安装 KubeBlocks，可通过 [kbcli](./../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) 或 [Helm](./../installation/install-with-helm/install-kubeblocks.md) 安装。
 - 安装并启用 elasticsearch 引擎，可通过 [kbcli](./../installation/install-with-kbcli/install-addons.md) 或 [Helm](./../installation/install-with-helm/install-addons.md) 操作。
 
 ## 创建集群
@@ -302,7 +305,7 @@ mycluster   demo                                               Delete           
     配置参数 `--components` 和 `--replicas`，并执行以下命令。
 
     ```bash
-    kbcli cluster hscale elasticsearch --replicas=2 --components=elasticsearch
+    kbcli cluster hscale elasticsearch --replicas=2 --components=elasticsearch -n demo
     ```
 
     - `--components` 表示准备进行水平扩容的组件名称。
@@ -310,12 +313,12 @@ mycluster   demo                                               Delete           
 
 2. 通过以下任意一种方式验证水平扩容是否完成。
 
-    - 查看 OpsRequest 进程。
+    - 查看 OpsRequest 进度。
 
-       执行磁盘扩容命令后，KubeBlocks 会自动输出查看 OpsRequest 进程的命令，可通过该命令查看 OpsRequest 进程的细节，包括 OpsRequest 的状态、Pod 状态等。当 OpsRequest 的状态为 Succeed 时，表明这一进程已完成。
+       执行命令后，KubeBlocks 会自动输出查看 OpsRequest 进度的命令，可通过该命令查看 OpsRequest 进度的细节，包括 OpsRequest 的状态、Pod 状态等。当 OpsRequest 的状态为 Succeed 时，表明这一任务已完成。
 
        ```bash
-       kbcli cluster describe-ops elasticsearch-horizontalscaling-xpdwz -n demo
+       kbcli cluster describe-ops mycluster-horizontalscaling-xpdwz -n demo
        ```
 
     - 查看集群状态。
@@ -434,7 +437,7 @@ mycluster   demo                                               Delete           
      - name: elasticsearch
        componentDefRef: elasticsearch
        replicas: 1
-       resources: # Change the values of resources.
+       resources: # 修改 resources 下的参数值
          requests:
            memory: "2Gi"
            cpu: "1"
@@ -472,12 +475,12 @@ mycluster   demo                                               Delete           
 
 2. 通过以下任意一种方式验证垂直扩容是否完成。
 
-    - 查看 OpsRequest 进程。
+    - 查看 OpsRequest 进度。
 
-       执行垂直扩容命令后，KubeBlocks 会自动输出查看 OpsRequest 进程的命令，可通过该命令查看 OpsRequest 进程的细节，包括 OpsRequest 的状态、Pod 状态等。当 OpsRequest 的状态为 Succeed 时，表明这一进程已完成。
+       执行命令后，KubeBlocks 会自动输出查看 OpsRequest 进度的命令，可通过该命令查看 OpsRequest 进度的细节，包括 OpsRequest 的状态、Pod 状态等。当 OpsRequest 的状态为 Succeed 时，表明这一任务已完成。
 
        ```bash
-       kbcli cluster describe-ops elasticsearch-verticalscaling-rpw2l -n demo
+       kbcli cluster describe-ops mycluster-verticalscaling-rpw2l -n demo
        ```
 
     - 查看集群状态。
@@ -503,27 +506,413 @@ mycluster   demo                                               Delete           
 
 ## 磁盘扩容
 
-***步骤：***
+### 开始之前
+
+确认集群状态是否为 `Running`。否则，后续相关操作可能会失败。
+
+<Tabs>
+
+<TabItem value="kubectl" label="kubectl" default>
 
 ```bash
-kbcli cluster volume-expand elasticsearch --storage=40Gi --components=elasticsearch -t data
+kubectl get cluster mycluster -n demo
+>
+NAME        CLUSTER-DEFINITION   VERSION                  TERMINATION-POLICY   STATUS    AGE
+mycluster                                                 Delete               Running   49m
 ```
 
-执行磁盘扩容任务可能需要几分钟。
+</TabItem>
 
-执行 `kbcli cluster volume-expand` 后会输出一条 ops 相关命令，可使用该命令查看扩缩容任务进度。
+<TabItem value="kbcli" label="kbcli">
 
 ```bash
-kbcli cluster describe-ops elasticsearch-volumeexpansion-5pbd2 -n default
+kbcli cluster list mycluster -n demo
+>
+NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    CREATED-TIME
+mycluster   demo                                               Delete               Running   Sep 27,2024 11:42 UTC+0800
 ```
 
-也可通过以下命令，查看磁盘扩容任务是否完成。
+</TabItem>
 
-```bash
-kbcli cluster describe elasticsearch
-```
+</Tabs>
+
+### 步骤
+
+<Tabs>
+
+<TabItem value="OpsRequest" label="OpsRequest" default>
+
+1. 对指定的集群应用 OpsRequest，可根据您的需求配置参数。
+
+   以下示例演示了增加 2 个副本。
+
+   ```bash
+   kubectl apply -f - <<EOF
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: OpsRequest
+   metadata:
+     name: ops-horizontal-scaling
+     namespace: demo
+   spec:
+     clusterName: mycluster
+     type: HorizontalScaling
+     horizontalScaling:
+     - componentName: elasticsearch
+       scaleOut:
+         replicaChanges: 2
+   EOF
+   ```
+
+   如果您想要缩容，可将 `scaleOut` 替换为 `scaleIn`。
+
+   以下示例演示了删除 2 个副本。
+
+   ```bash
+   kubectl apply -f - <<EOF
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: OpsRequest
+   metadata:
+     name: ops-horizontal-scaling
+     namespace: demo
+   spec:
+     clusterName: mycluster
+     type: HorizontalScaling
+     horizontalScaling:
+     - componentName: elasticsearch
+       scaleIn:
+         replicaChanges: 2
+   EOF
+   ```
+
+2. 查看运维操作状态，验证水平扩缩容是否成功。
+
+   ```bash
+   kubectl get ops -n demo
+   >
+   NAMESPACE   NAME                     TYPE                CLUSTER     STATUS    PROGRESS   AGE
+   demo        ops-horizontal-scaling   HorizontalScaling   mycluster   Succeed   3/3        6m
+   ```
+
+   如果有报错，可执行 `kubectl describe ops -n demo` 命令查看该运维操作的相关事件，协助排障。
+
+3. 当 OpsRequest 状态为 `Succeed` 或集群状态再次回到 `Running` 后，查看相应资源是否变更。
+
+    ```bash
+    kubectl describe cluster mycluster -n demo
+    ```
+
+</TabItem>
+  
+<TabItem value="编辑集群 YAML 文件" label="编辑集群 YAML 文件">
+
+1. 修改 YAML 文件中 `spec.componentSpecs.replicas` 的配置。`spec.componentSpecs.replicas` 定义了 pod 数量，修改该参数将触发集群水平扩缩容。
+
+   ```yaml
+   kubectl edit cluster mycluster -n demo
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: Cluster
+   metadata:
+     name: mycluster
+     namespace: demo
+   spec:
+     clusterDefinitionRef: elasticsearch
+     clusterVersionRef: elasticsearch-8.8.2
+     componentSpecs:
+     - name: elasticsearch
+       componentDefRef: elasticsearch
+       replicas: 1 # Change the amount
+       volumeClaimTemplates:
+       - name: data
+         spec:
+           accessModes:
+             - ReadWriteOnce
+           resources:
+             requests:
+               storage: 1Gi
+    terminationPolicy: Delete
+   ```
+
+2. 当集群状态再次回到 `Running` 后，查看相关资源是否变更。
+
+    ```bash
+    kubectl describe cluster mycluster -n demo
+    ```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+1. 更改配置。
+
+    配置参数 `--components`、`--volume-claim-templates` 和 `--storage`，并执行以下命令。
+
+    ```bash
+    kbcli cluster volume-expand elasticsearch --storage=40Gi --components=elasticsearch -t data -n demo
+    ```
+
+    - `--components` 表示需扩容的组件名称。
+    - `--volume-claim-templates` 表示组件中的 VolumeClaimTemplate 名称。
+    - `--storage` 表示磁盘需扩容至的大小。
+
+2. 可通过以下任意一种方式验证扩容操作是否完成。
+
+    - 查看 OpsRequest 进度。
+
+       执行磁盘扩容命令后，KubeBlocks 会自动输出查看 OpsRequest 进度的命令，可通过该命令查看 OpsRequest 进度的细节，包括 OpsRequest 的状态、PVC 状态等。当 OpsRequest 的状态为 `Succeed` 时，表明这一任务已完成。
+
+       ```bash
+       kbcli cluster describe-ops elasticsearch-volumeexpansion-5pbd2 -n demo
+       ```
+
+    - 查看集群状态。
+
+       ```bash
+       kbcli cluster list mycluster -n demo
+       >
+       NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS      CREATED-TIME
+       mycluster   demo                                               Delete               Updating    Sep 27,2024 11:42 UTC+0800
+       ```
+
+       * STATUS=Updating 表示扩容正在进行中。
+       * STATUS=Running 表示扩容已完成。
+
+3. 当 OpsRequest 状态为 `Succeed` 或集群状态再次回到 `Running` 后，检查资源规格是否已按要求变更。
+
+    ```bash
+    kbcli cluster describe mycluster -n demo
+    ```
+
+</TabItem>
+
+</Tabs>
+
+## 停止/启动集群
+
+您可以停止/启动集群以释放计算资源。当集群停止时，其计算资源将被释放，也就是说 Kubernetes 的 Pod 将被释放，但其存储资源仍将被保留。您也可以重新启动该集群，使其恢复到停止集群前的状态。
+
+### 停止集群
+
+1. 配置集群名称，并执行以下命令来停止该集群。
+
+    <Tabs>
+
+    <TabItem value="OpsRequest" label="OpsRequest" default>
+
+    ```bash
+    kubectl apply -f - <<EOF
+    apiVersion: apps.kubeblocks.io/v1alpha1
+    kind: OpsRequest
+    metadata:
+      name: ops-stop
+      namespace: demo
+    spec:
+      clusterName: mycluster
+      type: Stop
+    EOF
+    ```
+
+    </TabItem>
+
+    <TabItem value="修改集群 YAML 文件" label="修改集群 YAML 文件">
+
+    将 replicas 的值修改为 0，删除 pod。
+
+    ```yaml
+    apiVersion: apps.kubeblocks.io/v1alpha1
+    kind: Cluster
+    metadata:
+      name: mycluster
+      namespace: demo
+    spec:
+      clusterDefinitionRef: elasticsearch
+      clusterVersionRef: elasticsearch-8.8.2
+      terminationPolicy: Delete
+      componentSpecs:
+      - name: elasticsearch
+        componentDefRef: elasticsearch
+        disableExporter: true  
+        replicas: 0
+        volumeClaimTemplates:
+        - name: data
+          spec:
+            storageClassName: standard
+            accessModes:
+             - ReadWriteOnce
+            resources:
+              requests:
+                storage: 20Gi
+    ```
+
+    </TabItem>
+
+    <TabItem value="kbcli" label="kbcli">
+
+    ```bash
+    kbcli cluster stop mycluster -n demo
+    ```
+
+    </TabItem>
+
+    </Tabs>
+
+2. 查看集群状态，确认集群是否已停止。
+
+    <Tabs>
+
+    <TabItem value="kubectl" label="kubectl" default>
+
+    ```bash
+    kubectl get cluster mycluster -n demo
+    ```
+
+    </TabItem>
+
+    <TabItem value="kbcli" label="kbcli">
+
+    ```bash
+    kbcli cluster list mycluster -n demo
+    ```
+
+    </TabItem>
+
+    </Tabs>
+
+### 启动集群
+
+1. 配置集群名称，并执行以下命令来启动该集群。
+  
+    <Tabs>
+
+    <TabItem value="OpsRequest" label="OpsRequest" default>
+
+    ```bash
+    kubectl apply -f - <<EOF
+    apiVersion: apps.kubeblocks.io/v1alpha1
+    kind: OpsRequest
+    metadata:
+      name: ops-start
+      namespace: demo
+    spec:
+      clusterName: mycluster
+      type: Start
+    EOF 
+    ```
+
+    </TabItem>
+
+    <TabItem value="修改集群 YAML 文件" label="修改集群 YAML 文件">
+
+    将 replicas 数值修改为初始值，启动集群。
+
+    ```yaml
+    apiVersion: apps.kubeblocks.io/v1alpha1
+    kind: Cluster
+    metadata:
+      name: mycluster
+      namespace: demo
+    spec:
+      clusterDefinitionRef: elasticsearch
+      clusterVersionRef: elasticsearch-8.8.2
+      terminationPolicy: Delete
+      componentSpecs:
+      - name: elasticsearch
+        componentDefRef: elasticsearch
+        disableExporter: true  
+        replicas: 1
+        volumeClaimTemplates:
+        - name: data
+          spec:
+            storageClassName: standard
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 20Gi
+    ```
+
+    </TabItem>
+
+    <TabItem value="kbcli" label="kbcli">
+
+    ```bash
+    kbcli cluster start mycluster -n demo
+    ```
+
+    </TabItem>
+
+    </Tabs>
+
+2. 查看集群状态，确认集群是否再次启动。
+
+    <Tabs>
+
+    <TabItem value="kubectl" label="kubectl" default>
+
+    ```bash
+    kubectl get cluster mycluster -n demo
+    ```
+
+    </TabItem>
+
+    <TabItem value="kbcli" label="kbcli">
+
+    ```bash
+    kbcli cluster list mycluster -n demo
+    ```
+
+    </TabItem>
+
+    </Tabs>
 
 ## 重启集群
+
+KubeBlocks 支持重启集群中的所有 Pod。当数据库出现异常时，也可以尝试重启集群。
+
+:::note
+
+集群重启后，主节点可能会发生变化。
+
+:::
+
+<Tabs>
+
+<TabItem value="kubectl" label="kubectl" default>
+
+1. 执行以下命令，重启集群。
+
+   ```bash
+   kubectl apply -f - <<EOF
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: OpsRequest
+   metadata:
+     name: ops-restart
+     namespace: demo
+   spec:
+     clusterName: mycluster
+     type: Restart 
+     restart:
+     - componentName: elasticsearch
+   EOF
+   ```
+
+2. 查看 pod 和运维操作状态，验证重启操作是否成功。
+
+   ```bash
+   kubectl get pod -n demo
+
+   kubectl get ops ops-restart -n demo
+   ```
+
+   重启过程中，Pod 有如下两种状态：
+
+   - STATUS=Terminating：表示集群正在重启。
+   - STATUS=Running：表示集群已重启。
+
+   如果操作过程中出现报错，可通过 `kubectl describe ops -n demo` 查看该操作的事件，协助排障。
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
 
 1. 执行以下命令，重启集群。
 
@@ -550,3 +939,7 @@ kbcli cluster describe elasticsearch
 
    - STATUS=Updating 表示集群正在重启中。
    - STATUS=Running 表示集群已重启。
+
+</TabItem>
+
+</Tabs>

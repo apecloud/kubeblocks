@@ -155,7 +155,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		}
 
 		// the final update policy will act:
-		// PodUpdateStrategy\supportedUpdatePolicy
+		// PodUpdatePolicy  \   supportedUpdatePolicy
 		//                      In-Place		Recreate		NoOps
 		//  StrictInPlace       In-Place		X(Warning)		NoOps
 		//  PreferInPlace       In-Place		Recreate		NoOps

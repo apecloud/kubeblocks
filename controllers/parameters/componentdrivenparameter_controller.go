@@ -228,18 +228,6 @@ func (r *ComponentDrivenParameterReconciler) mergeComponentParameter(expected *p
 		if len(dest.ConfigFileParams) == 0 && len(expected.ConfigFileParams) != 0 {
 			dest.ConfigFileParams = expected.ConfigFileParams
 		}
-		payload := expected.Payload
-		// TODO: removed tls
-		if tls, ok := dest.Payload.Data[constant.TLSPayload]; ok {
-			mergeTLSPayload(&payload, tls)
-		}
-		dest.Payload = payload
+		dest.Payload = expected.Payload
 	})
-}
-
-func mergeTLSPayload(payload *parametersv1alpha1.Payload, tls interface{}) {
-	if payload.Data == nil {
-		payload.Data = make(map[string]interface{})
-	}
-	payload.Data[constant.TLSPayload] = tls
 }

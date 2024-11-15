@@ -16,17 +16,6 @@ limitations under the License.
 
 package v1alpha1
 
-// ConfigConstraintPhase defines the ConfigConstraint  CR .status.phase
-// +enum
-// +kubebuilder:validation:Enum={Available,Unavailable, Deleting}
-type ConfigConstraintPhase string
-
-const (
-	CCAvailablePhase   ConfigConstraintPhase = "Available"
-	CCUnavailablePhase ConfigConstraintPhase = "Unavailable"
-	CCDeletingPhase    ConfigConstraintPhase = "Deleting"
-)
-
 // DynamicParameterSelectedPolicy determines how to select the parameters of dynamic reload actions
 //
 // +enum
@@ -137,6 +126,7 @@ type RerenderResourceType string
 const (
 	ComponentVScaleType RerenderResourceType = "vscale"
 	ComponentHScaleType RerenderResourceType = "hscale"
+	ComponentTLSType    RerenderResourceType = "tls"
 )
 
 // ParameterPhase defines the Configuration FSM phase

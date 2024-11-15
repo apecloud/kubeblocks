@@ -301,6 +301,13 @@ func UpdateConfigPayload(config *parametersv1alpha1.ComponentParameterSpec, comp
 			}
 			updated = updated || ret
 		}
+		if enableTLSTrigger(configDescs) {
+			ret, err := intctrlutil.CheckAndPatchPayload(configSpec, constant.TLSPayload, component.TLSConfig)
+			if err != nil {
+				return false, err
+			}
+			updated = updated || ret
+		}
 	}
 	return updated, nil
 }
@@ -320,4 +327,8 @@ func enableHScaleTrigger(configDescs []parametersv1alpha1.ComponentConfigDescrip
 
 func enableVScaleTrigger(configDescs []parametersv1alpha1.ComponentConfigDescription) bool {
 	return rerenderConfigEnabled(configDescs, parametersv1alpha1.ComponentVScaleType)
+}
+
+func enableTLSTrigger(configDescs []parametersv1alpha1.ComponentConfigDescription) bool {
+	return rerenderConfigEnabled(configDescs, parametersv1alpha1.ComponentTLSType)
 }

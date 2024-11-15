@@ -83,6 +83,12 @@ func (f *MockParametersDrivenConfigFactory) HScaleEnabled() *MockParametersDrive
 	return f
 }
 
+func (f *MockParametersDrivenConfigFactory) TLSEnabled() *MockParametersDrivenConfigFactory {
+	desc := f.safeGetConfigDescription(MysqlConfigFile)
+	desc.ReRenderResourceTypes = append(desc.ReRenderResourceTypes, parametersv1alpha1.ComponentTLSType)
+	return f
+}
+
 func (f *MockParametersDrivenConfigFactory) VScaleEnabled() *MockParametersDrivenConfigFactory {
 	desc := f.safeGetConfigDescription(MysqlConfigFile)
 	desc.ReRenderResourceTypes = append(desc.ReRenderResourceTypes, parametersv1alpha1.ComponentVScaleType)

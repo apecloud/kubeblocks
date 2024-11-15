@@ -74,7 +74,7 @@ func InjectTemplateEnvFrom(component *component.SynthesizedComponent,
 		if err != nil {
 			return nil, err
 		}
-		envObjs = append(envObjs, injectConfigmap(envMap, cm.Labels[constant.CMConfigurationSpecProviderLabelKey], config.InjectEnvTo))
+		envObjs = append(envObjs, injectConfigmap(envMap, config.TemplateName, config.InjectEnvTo))
 	}
 	return envObjs, nil
 }

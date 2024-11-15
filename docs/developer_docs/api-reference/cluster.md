@@ -1078,7 +1078,8 @@ PodUpdatePolicyType
 <li><code>StrictInPlace</code> indicates that only allows in-place upgrades.
 Any attempt to modify other fields will be rejected.</li>
 <li><code>PreferInPlace</code> indicates that we will first attempt an in-place upgrade of the Pod.
-If that fails, it will fall back to the ReCreate, where pod will be recreated.
+If that fails, it will fall back to the ReCreate, where pod will be recreated.</li>
+<li><code>Recreate</code> indicates that recreate the Pod no matter what fields being updated.
 Default value is &ldquo;PreferInPlace&rdquo;</li>
 </ul>
 </td>
@@ -5536,7 +5537,8 @@ PodUpdatePolicyType
 <li><code>StrictInPlace</code> indicates that only allows in-place upgrades.
 Any attempt to modify other fields will be rejected.</li>
 <li><code>PreferInPlace</code> indicates that we will first attempt an in-place upgrade of the Pod.
-If that fails, it will fall back to the ReCreate, where pod will be recreated.
+If that fails, it will fall back to the ReCreate, where pod will be recreated.</li>
+<li><code>Recreate</code> indicates that recreate the Pod no matter what fields being updated.
 Default value is &ldquo;PreferInPlace&rdquo;</li>
 </ul>
 </td>
@@ -9851,7 +9853,8 @@ PodUpdatePolicyType
 <li><code>StrictInPlace</code> indicates that only allows in-place upgrades.
 Any attempt to modify other fields will be rejected.</li>
 <li><code>PreferInPlace</code> indicates that we will first attempt an in-place upgrade of the Pod.
-If that fails, it will fall back to the ReCreate, where pod will be recreated.
+If that fails, it will fall back to the ReCreate, where pod will be recreated.</li>
+<li><code>Recreate</code> indicates that recreate the Pod no matter what fields being updated.
 Default value is &ldquo;PreferInPlace&rdquo;</li>
 </ul>
 </td>
@@ -24476,7 +24479,8 @@ PodUpdatePolicyType
 <li><code>StrictInPlace</code> indicates that only allows in-place upgrades.
 Any attempt to modify other fields will be rejected.</li>
 <li><code>PreferInPlace</code> indicates that we will first attempt an in-place upgrade of the Pod.
-If that fails, it will fall back to the ReCreate, where pod will be recreated.
+If that fails, it will fall back to the ReCreate, where pod will be recreated.</li>
+<li><code>Recreate</code> indicates that recreate the Pod no matter what fields being updated.
 Default value is &ldquo;PreferInPlace&rdquo;</li>
 </ul>
 </td>
@@ -25022,7 +25026,8 @@ PodUpdatePolicyType
 <li><code>StrictInPlace</code> indicates that only allows in-place upgrades.
 Any attempt to modify other fields will be rejected.</li>
 <li><code>PreferInPlace</code> indicates that we will first attempt an in-place upgrade of the Pod.
-If that fails, it will fall back to the ReCreate, where pod will be recreated.
+If that fails, it will fall back to the ReCreate, where pod will be recreated.</li>
+<li><code>Recreate</code> indicates that recreate the Pod no matter what fields being updated.
 Default value is &ldquo;PreferInPlace&rdquo;</li>
 </ul>
 </td>
@@ -25931,6 +25936,9 @@ If the Image is not configured, the Image from the previous non-nil action will 
 <tbody><tr><td><p>&#34;PreferInPlace&#34;</p></td>
 <td><p>PreferInPlacePodUpdatePolicyType indicates that we will first attempt an in-place upgrade of the Pod.
 If that fails, it will fall back to the ReCreate, where pod will be recreated.</p>
+</td>
+</tr><tr><td><p>&#34;Recreate&#34;</p></td>
+<td><p>RecreatePodUpdatePolicyType indicates that recreate the Pod no matter what fields being updated.</p>
 </td>
 </tr><tr><td><p>&#34;StrictInPlace&#34;</p></td>
 <td><p>StrictInPlacePodUpdatePolicyType indicates that only allows in-place upgrades.

@@ -10,7 +10,7 @@ import TabItem from '@theme/TabItem';
 
 # 配置集群参数
 
-从 v0.6.0 版本开始，KubeBlocks 支持使用 `kbcli cluster configure` 和 `kbcli cluster edit-config` 两种方式来配置参数。它们的区别在于，`kbcli cluster configure `可以自动配置参数，而 `kbcli cluster edit-config` 则允许以可视化的方式直接编辑参数。
+从 v0.6.0 版本开始，KubeBlocks 支持使用 `kbcli cluster configure` 和 `kbcli cluster edit-config` 两种方式来配置参数。它们的区别在于，`kbcli cluster configure ` 可以自动配置参数，而 `kbcli cluster edit-config` 则允许以可视化的方式直接编辑参数。
 
 一共有 3 类参数：
 

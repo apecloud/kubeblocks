@@ -159,31 +159,31 @@ mycluster   demo        kafka                kafka-3.3.2   Delete               
 
 2. 验证磁盘扩容操作是否成功。
 
-    - 查看 OpsRequest 进程。
+   - 查看 OpsRequest 进度。
 
-       执行磁盘扩容命令后，KubeBlocks 会自动输出查看 OpsRequest 进程的命令，可通过该命令查看 OpsRequest 进程的细节，包括 OpsRequest 的状态、PVC 状态等。当 OpsRequest 的状态为 `Succeed` 时，表明这一进程已完成。
+     执行磁盘扩容命令后，KubeBlocks 会自动输出查看 OpsRequest 进度的命令，可通过该命令查看 OpsRequest 进度的细节，包括 OpsRequest 的状态、PVC 状态等。当 OpsRequest 的状态为 `Succeed` 时，表明这一任务已完成。
 
-       ```bash
-       kbcli cluster describe-ops mycluster-volumeexpansion-8257f -n demo
-       ```
+     ```bash
+     kbcli cluster describe-ops mycluster-volumeexpansion-8257f -n demo
+     ```
 
-    - 查看集群状态。
+   - 查看集群状态。
 
-       ```bash
-       kbcli cluster list mycluster -n demo
-       >
-       NAME             NAMESPACE     CLUSTER-DEFINITION        VERSION                  TERMINATION-POLICY        STATUS          CREATED-TIME
-       mycluster        demo          kafka                     kafka-3.3.2              Delete                    Updating        Sep 27,2024 15:27 UTC+0800
-       ```
+     ```bash
+     kbcli cluster list mycluster -n demo
+     >
+     NAME             NAMESPACE     CLUSTER-DEFINITION        VERSION                  TERMINATION-POLICY        STATUS          CREATED-TIME
+     mycluster        demo          kafka                     kafka-3.3.2              Delete                    Updating        Sep 27,2024 15:27 UTC+0800
+     ```
 
-       * STATUS=Updating 表示扩容正在进行中。
-       * STATUS=Running 表示扩容已完成。
+     * STATUS=Updating 表示扩容正在进行中。
+     * STATUS=Running 表示扩容已完成。
 
 3. 当 OpsRequest 状态为 `Succeed` 或集群状态再次回到 `Running` 后，检查资源规格是否已变更。
 
-    ```bash
-    kbcli cluster describe mycluster -n demo
-    ```
+   ```bash
+   kbcli cluster describe mycluster -n demo
+   ```
 
 </TabItem>
 

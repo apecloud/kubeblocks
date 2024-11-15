@@ -197,10 +197,6 @@ Qdrant 提供两种客户端访问协议：HTTP 和 gRPC，它们分别使用端
 - 如果客户端在 K8s 集群外部但在同一 VPC 内，执行 `kbcli cluster expose qdrant --enable=true --type=vpc` 命令获取数据库集群的 VPC 负载均衡器地址。
 - 如果客户端在 VPC 外部，执行 `kbcli cluster expose qdrant --enable=true --type=internet` 命令打开数据库集群的公共网络可达地址。
 
-## 监控集群
-
-Qdrant 的监控功能与其他引擎相同，可查看[监控文档](./../observability/monitor-database.md)了解细节。
-
 ## 扩缩容
 
 ### 水平扩缩容
@@ -355,12 +351,12 @@ mycluster   demo        qdrant                         Delete               Runn
 
 2. 验证水平扩容是否完成。
 
-    - 查看 OpsRequest 进程。
+    - 查看 OpsRequest 进度。
 
-       执行磁盘扩容命令后，KubeBlocks 会自动输出查看 OpsRequest 进程的命令，可通过该命令查看 OpsRequest 进程的细节，包括 OpsRequest 的状态、Pod 状态等。当 OpsRequest 的状态为 `Succeed` 时，表明这一进程已完成。
+       执行命令后，KubeBlocks 会自动输出查看 OpsRequest 进度的命令，可通过该命令查看 OpsRequest 进度的细节，包括 OpsRequest 的状态、Pod 状态等。当 OpsRequest 的状态为 `Succeed` 时，表明这一任务已完成。
 
        ```bash
-       kubectl get ops mycluster-horizontalscaling-xpdwz
+       kubectl get ops mycluster-horizontalscaling-xpdwz -n demo
        >
        NAME                                TYPE                CLUSTER      STATUS    PROGRESS   AGE
        mycluster-horizontalscaling-xpdwz   HorizontalScaling   mycluster    Running   0/2        16s
@@ -525,12 +521,12 @@ mycluster   demo        qdrant                         Delete               Runn
 
 2. 验证垂直扩缩容。
 
-   - 查看 OpsRequest 进程。
+   - 查看 OpsRequest 进度。
 
-     执行磁盘扩容命令后，KubeBlocks 会自动输出查看 OpsRequest 进程的命令，可通过该命令查看 OpsRequest 进程的细节，包括 OpsRequest 的状态、Pod 状态等。当 OpsRequest 的状态为 `Succeed` 时，表明这一进程已完成。
+     执行命令后，KubeBlocks 会自动输出查看 OpsRequest 进度的命令，可通过该命令查看 OpsRequest 进度的细节，包括 OpsRequest 的状态、Pod 状态等。当 OpsRequest 的状态为 `Succeed` 时，表明这一任务已完成。
 
      ```bash
-     kubectl get ops qdrant-verticalscaling-rpw2l
+     kubectl get ops qdrant-verticalscaling-rpw2l -n demo
      >
      NAME                              TYPE              CLUSTER      STATUS    PROGRESS   AGE
      mycluster-verticalscaling-rpw2l   VerticalScaling   mycluster    Running   1/5        44s
@@ -681,12 +677,12 @@ mycluster   demo        qdrant                         Delete               Runn
 
 2. 验证扩容操作是否成功。
 
-   - 查看 OpsRequest 进程。
+   - 查看 OpsRequest 进度。
 
-     执行磁盘扩容命令后，KubeBlocks 会自动输出查看 OpsRequest 进程的命令，可通过该命令查看 OpsRequest 进程的细节，包括 OpsRequest 的状态、PVC 状态等。当 OpsRequest 的状态为 `Succeed` 时，表明这一进程已完成。
+     执行磁盘扩容命令后，KubeBlocks 会自动输出查看 OpsRequest 进度的命令，可通过该命令查看 OpsRequest 进度的细节，包括 OpsRequest 的状态、PVC 状态等。当 OpsRequest 的状态为 `Succeed` 时，表明这一任务已完成。
 
      ```bash
-     kubectl get ops mycluster-volumeexpansion-5pbd2
+     kubectl get ops mycluster-volumeexpansion-5pbd2 -n demo
      >
      NAME                              TYPE              CLUSTER      STATUS   PROGRESS   AGE
      mycluster-volumeexpansion-5pbd2   VolumeExpansion   mycluster    Succeed  1/1        67s
@@ -784,7 +780,7 @@ mycluster   demo        qdrant                         Delete               Runn
 
 ## 停止/启动集群
 
-你可以停止/启动集群以释放计算资源。当集群被停止时，其计算资源将被释放，也就是说 Kubernetes 的 Pod 将被释放，但其存储资源仍将被保留。如果你希望通过快照从原始存储中恢复集群资源，请重新启动该集群。
+您可以停止/启动集群以释放计算资源。停止集群后，其计算资源将被释放，也就是说 Kubernetes 的 Pod 将被释放，但其存储资源仍将被保留。您也可以重新启动该集群，使其恢复到停止集群前的状态。
 
 ### 停止集群
 

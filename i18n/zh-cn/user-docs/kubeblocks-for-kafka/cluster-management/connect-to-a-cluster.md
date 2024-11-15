@@ -16,7 +16,7 @@ import TabItem from '@theme/TabItem';
 在连接 Kafka 集群之前，请检查网络环境，并确认连接场景。一般来说，有三种连接场景：
 
 - 在 Kubernetes 集群内连接到 Kafka 集群。
-- 在 Kubernetes 集群外同一 VPC 下连接到 Kafka 集群
+- 在 Kubernetes 集群外同一 VPC 下连接到 Kafka 集群。
 - 在公共互联网连接到 Kafka 集群。
 
 ## 在 Kubernetes 集群内连接到 Kafka 集群

@@ -188,13 +188,13 @@ mycluster   demo        kafka                kafka-3.3.2   Delete               
   
 2. 通过以下任意一种方式验证垂直扩容是否完成。
 
-   - 查看 OpsRequest 进程。
+   - 查看 OpsRequest 进度。
 
-       执行磁盘扩容命令后，KubeBlocks 会自动输出查看 OpsRequest 进程的命令，可通过该命令查看 OpsRequest 进程的细节，包括 OpsRequest 的状态、Pod 状态等。当 OpsRequest 的状态为 `Succeed` 时，表明这一进程已完成。
+     执行命令后，KubeBlocks 会自动输出查看 OpsRequest 进度的命令，可通过该命令查看 OpsRequest 进度的细节，包括 OpsRequest 的状态、Pod 状态等。当 OpsRequest 的状态为 `Succeed` 时，表明这一任务已完成。
 
-       ```bash
-       kbcli cluster describe-ops mycluster-verticalscaling-g67k9 -n demo
-       ```
+     ```bash
+     kbcli cluster describe-ops mycluster-verticalscaling-g67k9 -n demo
+     ```
 
    - 查看集群状态。
 
@@ -421,9 +421,9 @@ mycluster   demo        kafka                kafka-3.3.2   Delete               
 
 2. 验证水平扩容是否完成。
 
-   - 查看 OpsRequest 进程。
+   - 查看 OpsRequest 进度。
 
-     执行磁盘扩容命令后，KubeBlocks 会自动输出查看 OpsRequest 进程的命令，可通过该命令查看 OpsRequest 进程的细节，包括 OpsRequest 的状态、Pod 状态等。当 OpsRequest 的状态为 `Succeed` 时，表明这一进程已完成。
+     执行命令后，KubeBlocks 会自动输出查看 OpsRequest 进度的命令，可通过该命令查看 OpsRequest 进度的细节，包括 OpsRequest 的状态、Pod 状态等。当 OpsRequest 的状态为 `Succeed` 时，表明这一任务已完成。
 
      ```bash
      kbcli cluster describe-ops mycluster-horizontalscaling-ffp9p -n demo

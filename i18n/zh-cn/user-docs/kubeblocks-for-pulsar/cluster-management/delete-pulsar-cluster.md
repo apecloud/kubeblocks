@@ -73,7 +73,7 @@ kubectl delete -n demo cluster mycluster
 <TabItem value="kbcli" label="kbcli">
 
 ```bash
-kbcli cluster delete mycluster
+kbcli cluster delete mycluster -n demo
 ```
 
 </TabItem>

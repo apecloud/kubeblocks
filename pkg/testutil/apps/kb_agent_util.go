@@ -85,6 +85,88 @@ func MockKBAgentClient4HScale(testCtx *testutil.TestContext, clusterKey types.Na
 	})
 }
 
+func MockKBAgentClient4Workload(testCtx *testutil.TestContext, pods []*corev1.Pod) {
+	const (
+		memberJoinCompletedLabel  = "test.kubeblock.io/memberjoin-completed"
+		memberLeaveCompletedLabel = "test.kubeblock.io/memberleave-completed"
+	)
+
+	rsp := kbagentproto.ActionResponse{Message: "mock success"}
+	handleMemberLeave := func(podName string) (kbagentproto.ActionResponse, error) {
+		for _, pod := range pods {
+			if pod.Name != podName {
+				continue
+			}
+			pod.Labels[memberLeaveCompletedLabel] = "true"
+			err := testCtx.Cli.Update(testCtx.Ctx, pod)
+			if err != nil {
+				return kbagentproto.ActionResponse{}, err
+			}
+		}
+		return rsp, nil
+	}
+
+	handleMemberJoin := func(podName string) (kbagentproto.ActionResponse, error) {
+		for _, pod := range pods {
+			if pod.Name != podName {
+				continue
+			}
+			pod.Labels[memberJoinCompletedLabel] = "true"
+			err := testCtx.Cli.Update(testCtx.Ctx, pod)
+			if err != nil {
+				return kbagentproto.ActionResponse{}, err
+			}
+		}
+		return rsp, nil
+	}
+
+	handleSwitchOver := func(podName string) (kbagentproto.ActionResponse, error) {
+		for _, pod := range pods {
+			if pod.Name != podName {
+				continue
+			}
+			if pod.Labels[constant.RoleLabelKey] != "leader" {
+				return rsp, nil
+			}
+			pod.Labels[constant.RoleLabelKey] = "follower"
+			err := testCtx.Cli.Update(testCtx.Ctx, pod)
+			if err != nil {
+				return kbagentproto.ActionResponse{}, err
+			}
+		}
+
+		for _, pod := range pods {
+			if pod.Name == podName {
+				continue
+			}
+			pod.Labels[constant.RoleLabelKey] = "leader"
+			err := testCtx.Cli.Update(testCtx.Ctx, pod)
+			if err != nil {
+				return kbagentproto.ActionResponse{}, err
+			}
+		}
+		return rsp, nil
+	}
+
+	MockKBAgentClient(func(recorder *kbagent.MockClientMockRecorder) {
+		recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+			switch req.Action {
+			case "memberLeave":
+				podName := req.Parameters["KB_LEAVE_MEMBER_POD_NAME"]
+				return handleMemberLeave(podName)
+			case "memberJoin":
+				podName := req.Parameters["KB_JOIN_MEMBER_POD_NAME"]
+				return handleMemberJoin(podName)
+			case "switchover":
+				podName := req.Parameters["KB_LEADER_POD_NAME"]
+				return handleSwitchOver(podName)
+			default:
+				return rsp, nil
+			}
+		}).AnyTimes()
+	})
+}
+
 func MockKBAgentContainer() corev1.Container {
 	return corev1.Container{
 		Name:  kbagent.ContainerName,

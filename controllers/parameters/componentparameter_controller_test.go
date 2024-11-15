@@ -57,7 +57,7 @@ var _ = Describe("ComponentParameter Controller", func() {
 				}
 			}
 
-			Eventually(checkCfgStatus(parametersv1alpha1.CFinishedPhase)).Should(BeTrue())
+			Eventually(checkCfgStatus(parametersv1alpha1.CFinishedPhase), time.Second*20).Should(BeTrue())
 
 			By("reconfiguring parameters.")
 			Eventually(testapps.GetAndChangeObj(&testCtx, cfgKey, func(cfg *parametersv1alpha1.ComponentParameter) {

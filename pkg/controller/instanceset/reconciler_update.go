@@ -154,11 +154,17 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			break
 		}
 
-		updatePolicy, err := getPodUpdatePolicy(its, pod)
+		// the final update policy will act:
+		// PodUpdatePolicy  \   supportedUpdatePolicy
+		//                      In-Place		Recreate		NoOps
+		//  StrictInPlace       In-Place		X(Blocked)		NoOps
+		//  PreferInPlace       In-Place		Recreate		NoOps
+		//  Recreate            Recreate		Recreate		NoOps
+		supportedUpdatePolicy, err := getPodUpdatePolicy(its, pod)
 		if err != nil {
 			return kubebuilderx.Continue, err
 		}
-		if its.Spec.PodUpdatePolicy == workloads.StrictInPlacePodUpdatePolicyType && updatePolicy == RecreatePolicy {
+		if its.Spec.PodUpdatePolicy == workloads.StrictInPlacePodUpdatePolicyType && supportedUpdatePolicy == RecreatePolicy {
 			message := fmt.Sprintf("InstanceSet %s/%s blocks on update as the PodUpdatePolicy is %s and the pod %s can not inplace update",
 				its.Namespace, its.Name, workloads.StrictInPlacePodUpdatePolicyType, pod.Name)
 			if tree != nil && tree.EventRecorder != nil {
@@ -168,7 +174,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			isBlocked = true
 			break
 		}
-		if updatePolicy == InPlaceUpdatePolicy {
+		if its.Spec.PodUpdatePolicy != workloads.RecreatePodUpdatePolicyType && supportedUpdatePolicy == InPlaceUpdatePolicy {
 			newInstance, err := buildInstanceByTemplate(pod.Name, nameToTemplateMap[pod.Name], its, getPodRevision(pod))
 			if err != nil {
 				return kubebuilderx.Continue, err
@@ -178,7 +184,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 				return kubebuilderx.Continue, err
 			}
 			updatingPods++
-		} else if updatePolicy == RecreatePolicy {
+		} else if supportedUpdatePolicy != NoOpsPolicy {
 			if !isTerminating(pod) {
 				if err = tree.Delete(pod); err != nil {
 					return kubebuilderx.Continue, err

@@ -347,6 +347,7 @@ type InstanceSetSpec struct {
 	// Any attempt to modify other fields will be rejected.
 	// - `PreferInPlace` indicates that we will first attempt an in-place upgrade of the Pod.
 	// If that fails, it will fall back to the ReCreate, where pod will be recreated.
+	// - `Recreate` indicates that recreate the Pod no matter what fields being updated.
 	// Default value is "PreferInPlace"
 	//
 	// +optional
@@ -527,6 +528,9 @@ const (
 	// PreferInPlacePodUpdatePolicyType indicates that we will first attempt an in-place upgrade of the Pod.
 	// If that fails, it will fall back to the ReCreate, where pod will be recreated.
 	PreferInPlacePodUpdatePolicyType PodUpdatePolicyType = "PreferInPlace"
+
+	// RecreatePodUpdatePolicyType indicates that recreate the Pod no matter what fields being updated.
+	RecreatePodUpdatePolicyType PodUpdatePolicyType = "Recreate"
 )
 
 type ReplicaRole struct {

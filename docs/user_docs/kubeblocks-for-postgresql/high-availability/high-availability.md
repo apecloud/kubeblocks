@@ -43,7 +43,7 @@ KubeBlocks integrates [the open-source Patroni solution](https://patroni.readthe
 
    ![PostgreSQL cluster original status](../../../img/pgsql-ha-before.png)
 
-   Currently, `pg-cluster-postgresql-1` is the primary pod and `pg-cluster-postgresql-0` is the secondary pod.
+   Currently, `mycluster-postgresql-1` is the primary pod and `mycluster-postgresql-0` is the secondary pod.
 
 2. Simulate a primary pod exception.
 
@@ -52,7 +52,7 @@ KubeBlocks integrates [the open-source Patroni solution](https://patroni.readthe
    kubectl exec -it mycluster-postgresql-1  -n demo -- bash
 
    # Delete the data directory of PostgreSQL to simulate an exception
-   root@postgres-postgresql-0:/home/postgres# rm -fr /home/postgres/pgdata/pgroot/data
+   root@mycluster-postgresql-0:/home/postgres# rm -fr /home/postgres/pgdata/pgroot/data
    ```
 
 3. View logs to observe how the roles of pods switch when an exception occurs.
@@ -97,7 +97,7 @@ KubeBlocks integrates [the open-source Patroni solution](https://patroni.readthe
 
    ![PostgreSQL replication info](../../../img/pgsql-ha-pg_stat_replication.png)
 
-   From the output, `pg-cluster-postgresql-0` has been assigned as the secondary pod.
+   From the output, `mycluster-postgresql-1` has been assigned as the secondary pod.
 
 5. Describe the cluster and check the instance role.
 
@@ -107,7 +107,7 @@ KubeBlocks integrates [the open-source Patroni solution](https://patroni.readthe
 
    ![PostgreSQL cluster status after HA](../../../img/pgsql-ha-after.png)
 
-   After the failover, `pg-cluster-postgresql-0` becomes the secondary pod and `pg-cluster-postgresql-1` becomes the primary pod.
+   After the failover, `mycluster-postgresql-1` becomes the secondary pod and `mycluster-postgresql-0` becomes the primary pod.
 
 </TabItem>
 

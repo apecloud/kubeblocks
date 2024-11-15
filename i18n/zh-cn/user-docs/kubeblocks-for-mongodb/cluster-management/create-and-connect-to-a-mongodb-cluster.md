@@ -105,14 +105,6 @@ KubeBlocks 支持创建两种 MongoDB 集群：单机版（Standalone）和主�
    apiVersion: apps.kubeblocks.io/v1alpha1
    kind: Cluster
    metadata:
-     annotations:
-     finalizers:
-     - cluster.kubeblocks.io/finalizer
-     labels:
-       app.kubernetes.io/instance: mycluster
-       app.kubernetes.io/managed-by: Helm
-       app.kubernetes.io/version: 5.0.14
-       helm.sh/chart: mongodb-cluster-0.9.1
      name: mycluster
      namespace: demo
    spec:

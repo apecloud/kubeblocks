@@ -20,7 +20,7 @@ KubeBlocks 集成[开源的 Patroni 方案](https://patroni.readthedocs.io/en/la
   * 检查切换策略是否为 `Noop`。
 
     ```bash
-    kubectl get cluster pg-cluster -o yaml
+    kubectl get cluster mycluster -o yaml
     >
     spec:
       componentSpecs:
@@ -148,7 +148,7 @@ KubeBlocks 集成[开源的 Patroni 方案](https://patroni.readthedocs.io/en/la
 
    ![PostgreSQL 集群原始状态](./../../../img/pgsql-ha-before.png)
 
-   当前 `pg-cluster-postgresql-1` 是主节点，`pg-cluster-postgresql-0` 是从节点。
+   当前 `mycluster-postgresql-1` 是主节点，`mycluster-postgresql-0` 是从节点。
 
 2. 模拟主节点异常。
 
@@ -157,7 +157,7 @@ KubeBlocks 集成[开源的 Patroni 方案](https://patroni.readthedocs.io/en/la
    kubectl exec -it mycluster-postgresql-1  -n demo -- bash
 
    # 删除 PostgreSQL 的数据目录，模拟异常
-   root@postgres-postgresql-0:/home/postgres# rm -fr /home/postgres/pgdata/pgroot/data
+   root@mycluster-postgresql-0:/home/postgres# rm -fr /home/postgres/pgdata/pgroot/data
    ```
 
 3. 查看日志，检查发生异常情况时节点角色的切换情况。
@@ -201,7 +201,7 @@ KubeBlocks 集成[开源的 Patroni 方案](https://patroni.readthedocs.io/en/la
 
    ![PostgreSQL 集群信息](./../../../img/pgsql-ha-pg_stat_replication.png)
 
-   从输出可以看到，`pg-cluster-postgresql-0` 被指定为从节点。
+   从输出可以看到，`mycluster-postgresql-1` 被指定为从节点。
 
 5. 查看集群，检查实例角色。
 
@@ -211,7 +211,7 @@ KubeBlocks 集成[开源的 Patroni 方案](https://patroni.readthedocs.io/en/la
 
    ![PostgreSQL 高可用切换后集群状态](../../../img/pgsql-ha-after.png)
 
-   故障切换后，`pg-cluster-postgresql-0` 变成了从节点，`pg-cluster-postgresql-1` 变成了主节点。
+   故障切换后，`mycluster-postgresql-1` 变成了从节点，`mycluster-postgresql-0` 变成了主节点。
 
 </TabItem>
 

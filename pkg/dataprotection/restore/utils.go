@@ -257,6 +257,17 @@ func ValidateAndInitRestoreMGR(reqCtx intctrlutil.RequestCtx,
 		return err
 	}
 
+	// validate rstore parameters
+	if backupSet.ActionSet != nil {
+		withParameters := []string{}
+		if backupSet.ActionSet.Spec.Restore != nil {
+			withParameters = backupSet.ActionSet.Spec.Restore.WithParameters
+		}
+		if err := utils.ValidateParameters(backupSet.ActionSet.Spec.ParametersSchema, withParameters, restoreMgr.Restore.Spec.Parameters); err != nil {
+			return fmt.Errorf("fails to validate parameters with actionset %s: %v", backupSet.ActionSet.Name, err)
+		}
+	}
+
 	// TODO: check if there is permission for cross namespace recovery.
 
 	// check if the backup is completed exclude continuous backup.

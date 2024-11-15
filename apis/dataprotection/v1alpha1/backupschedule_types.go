@@ -49,8 +49,9 @@ type SchedulePolicy struct {
 	// +optional
 	Enabled *bool `json:"enabled,omitempty"`
 
-	// Specifies the name of the schedule.
+	// Specifies the name of the schedule. Names cannot be duplicated
 	//
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	// +optional
 	Name string `json:"name,omitempty"`
 

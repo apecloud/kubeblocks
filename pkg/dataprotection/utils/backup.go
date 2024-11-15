@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package utils
 
 import (
+	"fmt"
+
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils/boolptr"
@@ -52,4 +54,22 @@ func GetBackupMethodsFromBackupPolicy(backupPolicyList *dpv1alpha1.BackupPolicyL
 		}
 	}
 	return defaultBackupMethod, backupMethodsMap
+}
+
+func ValidateScheduleNames(schedules []dpv1alpha1.SchedulePolicy) error {
+	if len(schedules) == 0 {
+		return nil
+	}
+	nameMap := map[string]bool{}
+	for _, sp := range schedules {
+		if len(sp.Name) == 0 {
+			continue
+		}
+		// names cannot be duplicated
+		if nameMap[sp.Name] {
+			return fmt.Errorf("schedule name %s is duplicated", sp.Name)
+		}
+		nameMap[sp.Name] = true
+	}
+	return nil
 }

@@ -32,6 +32,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/pointer"
@@ -99,6 +100,7 @@ var _ = Describe("Backup Controller test", func() {
 
 	When("with default settings", func() {
 		var (
+			actionSet    *dpv1alpha1.ActionSet
 			backupPolicy *dpv1alpha1.BackupPolicy
 			repoPVCName  string
 			cluster      *kbappsv1.Cluster
@@ -108,7 +110,7 @@ var _ = Describe("Backup Controller test", func() {
 
 		BeforeEach(func() {
 			By("creating an actionSet")
-			actionSet := testdp.NewFakeActionSet(&testCtx)
+			actionSet = testdp.NewFakeActionSet(&testCtx)
 
 			By("creating storage provider")
 			_ = testdp.NewFakeStorageProvider(&testCtx, nil)
@@ -481,6 +483,97 @@ var _ = Describe("Backup Controller test", func() {
 				// image should be expanded by env
 				g.Expect(getDPDBPortEnv(&fetched.Spec.Template.Spec.Containers[0]).Value).Should(Equal(strconv.Itoa(testdp.PortNum)))
 			})).Should(Succeed())
+		})
+		Context("creates backups with parameters", func() {
+			const (
+				parameter        = "test"
+				parameterValue   = "value"
+				invalidParameter = "invalid"
+				parameterType    = "string"
+			)
+			It("should succeed if parameters are invalid", func() {
+				By("update backup parameters and schema in acitionSet")
+				Expect(testapps.ChangeObj(&testCtx, actionSet, func(as *dpv1alpha1.ActionSet) {
+					as.Spec.ParametersSchema = &dpv1alpha1.SelectiveParametersSchema{
+						OpenAPIV3Schema: &v1.JSONSchemaProps{
+							Properties: map[string]v1.JSONSchemaProps{
+								parameter: {
+									Type: parameterType,
+								},
+							},
+						},
+					}
+					as.Spec.Backup.WithParameters = []string{parameter}
+				})).Should(Succeed())
+				By("the actionSet should be available")
+				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(actionSet),
+					func(g Gomega, as *dpv1alpha1.ActionSet) {
+						g.Expect(as.Status.Phase).Should(BeEquivalentTo(dpv1alpha1.AvailablePhase))
+						g.Expect(as.Status.Message).Should(BeEmpty())
+					})).Should(Succeed())
+				By("create a backup with invalid parameters")
+				backup := testdp.NewFakeBackup(&testCtx, func(bp *dpv1alpha1.Backup) {
+					bp.Spec.Parameters = map[string]string{
+						invalidParameter: parameterValue,
+					}
+				})
+				By("check the backup")
+				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(backup), func(g Gomega, fetched *dpv1alpha1.Backup) {
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseFailed))
+				})).Should(Succeed())
+
+			})
+			It("should succeed if parameters are valid", func() {
+				By("update backup parameters and schema in acitionSet")
+				Expect(testapps.ChangeObj(&testCtx, actionSet, func(as *dpv1alpha1.ActionSet) {
+					as.Spec.ParametersSchema = &dpv1alpha1.SelectiveParametersSchema{
+						OpenAPIV3Schema: &v1.JSONSchemaProps{
+							Properties: map[string]v1.JSONSchemaProps{
+								parameter: {
+									Type: "string",
+								},
+							},
+						},
+					}
+					as.Spec.Backup.WithParameters = []string{parameter}
+				})).Should(Succeed())
+				By("the actionSet should be available")
+				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(actionSet),
+					func(g Gomega, as *dpv1alpha1.ActionSet) {
+						g.Expect(as.Status.Phase).Should(BeEquivalentTo(dpv1alpha1.AvailablePhase))
+						g.Expect(as.Status.Message).Should(BeEmpty())
+					})).Should(Succeed())
+				By("create a backup with parameters")
+				backup := testdp.NewFakeBackup(&testCtx, func(bp *dpv1alpha1.Backup) {
+					bp.Spec.Parameters = map[string]string{
+						parameter: parameterValue,
+					}
+				})
+				By("check the backup")
+				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(backup), func(g Gomega, fetched *dpv1alpha1.Backup) {
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseRunning))
+				})).Should(Succeed())
+
+				By("check the backup job and env")
+				getJobKey := func(index int) client.ObjectKey {
+					return client.ObjectKey{
+						Name:      dpbackup.GenerateBackupJobName(backup, fmt.Sprintf("%s-%d", dpbackup.BackupDataJobNamePrefix, index)),
+						Namespace: backup.Namespace,
+					}
+				}
+				Eventually(testapps.CheckObj(&testCtx, getJobKey(0), func(g Gomega, job *batchv1.Job) {
+					g.Expect(len(job.Spec.Template.Spec.Containers)).ShouldNot(BeZero())
+					for _, c := range job.Spec.Template.Spec.Containers {
+						exist := false
+						for _, env := range c.Env {
+							if env.Name == parameter && env.Value == parameterValue {
+								exist = true
+							}
+						}
+						g.Expect(exist).To(BeTrue())
+					}
+				})).Should(Succeed())
+			})
 		})
 		Context("creates a backup with encryption", func() {
 			const (

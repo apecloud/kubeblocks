@@ -69,23 +69,43 @@ func (s *Scheduler) Schedule() error {
 
 // validate validates the backup schedule.
 func (s *Scheduler) validate() error {
-	methodInBackupPolicy := func(name string) bool {
-		for _, method := range s.BackupPolicy.Spec.BackupMethods {
+	methodInBackupPolicy := func(name string) *dpv1alpha1.BackupMethod {
+		for i, method := range s.BackupPolicy.Spec.BackupMethods {
 			if method.Name == name {
-				return true
+				return &s.BackupPolicy.Spec.BackupMethods[i]
 			}
 		}
-		return false
+		return nil
+	}
+
+	// validate schedule names
+	if err := dputils.ValidateScheduleNames(s.BackupSchedule.Spec.Schedules); err != nil {
+		return err
 	}
 
 	for _, sp := range s.BackupSchedule.Spec.Schedules {
-		if methodInBackupPolicy(sp.BackupMethod) {
-			continue
+		method := methodInBackupPolicy(sp.BackupMethod)
+		if method == nil {
+			// backup method name is not in backup policy
+			return fmt.Errorf("backup method %s is not in backup policy %s/%s",
+				sp.BackupMethod, s.BackupPolicy.Namespace, s.BackupPolicy.Name)
 		}
-		// backup method name is not in backup policy
-		return fmt.Errorf("backup method %s is not in backup policy %s/%s",
-			sp.BackupMethod, s.BackupPolicy.Namespace, s.BackupPolicy.Name)
+		// validate schedule parameters
+		if len(method.ActionSetName) > 0 && len(sp.Parameters) > 0 {
+			actionSet, err := dputils.GetActionSetByName(s.RequestCtx, s.Client, method.ActionSetName)
+			if err != nil {
+				return err
+			}
+			withParameters := []string{}
+			if actionSet.Spec.Backup != nil {
+				withParameters = actionSet.Spec.Backup.WithParameters
+			}
+			if err := dputils.ValidateParameters(actionSet.Spec.ParametersSchema, withParameters, sp.Parameters); err != nil {
+				return fmt.Errorf("fails to validate parameters of backupMethod %s: %v", sp.BackupMethod, err)
+			}
+		}
 	}
+
 	return nil
 }
 
@@ -189,10 +209,11 @@ spec:
   backupPolicyName: %s
   backupMethod: %s
   retentionPeriod: %s
+%s
 EOF
 `, s.BackupSchedule.Name, s.generateBackupName(schedulePolicy), s.BackupSchedule.Namespace,
 		s.BackupPolicy.Name, schedulePolicy.BackupMethod,
-		schedulePolicy.RetentionPeriod)
+		schedulePolicy.RetentionPeriod, buildParametersManifest(schedulePolicy.Parameters))
 
 	container := corev1.Container{
 		Name:            "backup-schedule",

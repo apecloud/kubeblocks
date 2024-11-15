@@ -69,11 +69,13 @@ spec:
                         see https://en.wikipedia.org/wiki/Cron.
                       type: string
                     enabled:
-                      description: Specifies whether the backup schedule is enabled
-                        or not.
+                      description: |-
+                        Specifies whether the backup schedule is enabled or not.
+                        For the same backupMethod, only one name can be empty, and the other names cannot be duplicated
                       type: boolean
                     name:
                       description: Specifies the name of the schedule.
+                      pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
                     parameters:
                       additionalProperties:

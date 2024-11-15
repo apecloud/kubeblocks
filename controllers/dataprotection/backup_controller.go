@@ -414,11 +414,13 @@ func (r *BackupReconciler) prepareBackupRequest(
 		}
 
 		// validate parameters
+		withParameters := []string{}
 		if actionSet.Spec.Backup != nil {
-			if err := validateParameters(actionSet.Spec.ParametersSchema, actionSet.Spec.Backup.WithParameters, backup.Spec.Parameters); err != nil {
-				return nil, fmt.Errorf("fails to validate parameters with actionset %s: %v", actionSet.Name, err)
-			}
+			withParameters = actionSet.Spec.Backup.WithParameters
 
+		}
+		if err := dputils.ValidateParameters(actionSet.Spec.ParametersSchema, withParameters, backup.Spec.Parameters); err != nil {
+			return nil, fmt.Errorf("fails to validate parameters with actionset %s: %v", actionSet.Name, err)
 		}
 	}
 

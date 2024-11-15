@@ -302,3 +302,15 @@ func StopStatefulSetsWhenFailed(ctx context.Context, cli client.Client, backup *
 	sts.Spec.Replicas = pointer.Int32(0)
 	return cli.Update(ctx, sts)
 }
+
+func buildParametersManifest(parameters map[string]string) string {
+	var res string
+	if len(parameters) == 0 {
+		return res
+	}
+	for k, v := range parameters {
+		res += fmt.Sprintf("    %s: %s\n", k, v)
+	}
+	str := fmt.Sprintf("  parameters:\n%s", res)
+	return strings.Trim(str, "\n")
+}

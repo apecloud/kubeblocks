@@ -42,7 +42,6 @@ import (
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -580,37 +579,6 @@ func fromFlattenName(flatten string) (name string, namespace string) {
 		name = flatten
 	}
 	return
-}
-
-func validateParameters(schema *dpv1alpha1.SelectiveParametersSchema, withParameters []string, parameters map[string]string) error {
-	if len(parameters) == 0 {
-		return nil
-	}
-	if len(withParameters) == 0 {
-		return fmt.Errorf("withParameters is empty")
-	}
-	// check whether the parameter is declared in withParameters
-	withParametersMap := map[string]bool{}
-	for _, v := range withParameters {
-		withParametersMap[v] = true
-	}
-	for parameter := range parameters {
-		if !withParametersMap[parameter] {
-			return fmt.Errorf("using undeclared parameters")
-		}
-	}
-	// convert to type map[string]interface{} and validate the schema
-	params, err := common.CoverStringToInterfaceBySchemaType(schema.OpenAPIV3Schema, parameters)
-	if err != nil {
-		return intctrlutil.NewFatalError(err.Error())
-	}
-	if schema == nil || schema.OpenAPIV3Schema == nil || len(schema.OpenAPIV3Schema.Properties) == 0{
-		return fmt.Errorf("the parametersSchema is invalid")
-	}
-	if err = common.ValidateDataWithSchema(schema.OpenAPIV3Schema, params); err != nil {
-		return intctrlutil.NewFatalError(err.Error())
-	}
-	return nil
 }
 
 // restore functions

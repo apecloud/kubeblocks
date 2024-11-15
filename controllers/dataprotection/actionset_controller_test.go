@@ -62,6 +62,11 @@ var _ = Describe("ActionSet Controller test", func() {
 
 	Context("validate a actionSet", func() {
 		It("validate withParameters", func() {
+			const (
+				parameter        = "test"
+				invalidParameter = "invalid"
+				parameterType    = "string"
+			)
 			as := testdp.NewFakeActionSet(&testCtx)
 			Expect(as).ShouldNot(BeNil())
 			By("update to invalid withParameters and schema")
@@ -69,13 +74,13 @@ var _ = Describe("ActionSet Controller test", func() {
 				as.Spec.ParametersSchema = &v1alpha1.SelectiveParametersSchema{
 					OpenAPIV3Schema: &v1.JSONSchemaProps{
 						Properties: map[string]v1.JSONSchemaProps{
-							"test1": {
-								Type: "string",
+							parameter: {
+								Type: parameterType,
 							},
 						},
 					},
 				}
-				as.Spec.Backup.WithParameters = []string{"test"}
+				as.Spec.Backup.WithParameters = []string{invalidParameter}
 			})).Should(Succeed())
 			By("should be unavailable with invlid withParameters")
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(as),
@@ -83,18 +88,9 @@ var _ = Describe("ActionSet Controller test", func() {
 					g.Expect(as.Status.Phase).Should(BeEquivalentTo(v1alpha1.UnavailablePhase))
 					g.Expect(as.Status.Message).ShouldNot(BeEmpty())
 				})).Should(Succeed())
-			By("update to correct schema")
+			By("update to correct parameters")
 			Expect(testapps.ChangeObj(&testCtx, as, func(action *v1alpha1.ActionSet) {
-				as.Spec.ParametersSchema = &v1alpha1.SelectiveParametersSchema{
-					OpenAPIV3Schema: &v1.JSONSchemaProps{
-						Properties: map[string]v1.JSONSchemaProps{
-							"test": {
-								Type: "string",
-							},
-						},
-					},
-				}
-				as.Spec.Backup.WithParameters = []string{"test"}
+				as.Spec.Backup.WithParameters = []string{parameter}
 			})).Should(Succeed())
 			By("should be available")
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(as),

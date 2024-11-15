@@ -68,7 +68,7 @@ KubeBlocks 支持重启集群中的所有 Pod。当数据库出现异常时，�
 
    ```bash
    kbcli cluster restart mycluster -n demo --components="kafka" \
-   --ttlSecondsAfterSucceed=30
+     --ttlSecondsAfterSucceed=30
    ```
 
    - `components` 表示需要重启的组件名称。

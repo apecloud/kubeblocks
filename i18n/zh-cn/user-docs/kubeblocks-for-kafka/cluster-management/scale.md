@@ -409,7 +409,7 @@ mycluster   demo        kafka                kafka-3.3.2   Delete               
 
    ```bash
    kbcli cluster hscale mycluster -n demo \
-   --components="broker" --replicas=3
+     --components="broker" --replicas=3
    ```
 
    - `--components` - 的值可以是 `broker` 或 `controller`。

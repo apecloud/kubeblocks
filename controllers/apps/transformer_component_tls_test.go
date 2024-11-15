@@ -31,8 +31,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/configuration/core"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
+	configcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
@@ -185,11 +185,11 @@ var _ = Describe("TLS self-signed cert function", func() {
 				Eventually(testapps.ClusterReconciled(&testCtx, clusterKey)).Should(BeTrue())
 				Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1.CreatingClusterPhase))
 				cfgKey := client.ObjectKey{
-					Name:      core.GenerateComponentConfigurationName(clusterObj.Name, defaultCompName),
+					Name:      configcore.GenerateComponentParameterName(clusterObj.Name, defaultCompName),
 					Namespace: testCtx.DefaultNamespace,
 				}
 				hasTLSSettings := func() bool {
-					conf := &appsv1alpha1.Configuration{}
+					conf := &parametersv1alpha1.ComponentParameter{}
 					Expect(k8sClient.Get(ctx, cfgKey, conf)).Should(Succeed())
 					item := &conf.Spec.ConfigItemDetails[0]
 					if item.Payload.Data == nil {

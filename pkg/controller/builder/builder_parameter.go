@@ -19,7 +19,6 @@ package builder
 import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 type ParameterBuilder struct {
@@ -38,29 +37,29 @@ func (c *ParameterBuilder) ClusterRef(clusterName string) *ParameterBuilder {
 }
 
 func (c *ParameterBuilder) SetComponentParameters(component string, parameters appsv1.ComponentParameters) *ParameterBuilder {
-	componentSpec := intctrlutil.GetParameter(&c.get().Spec, component)
-	if componentSpec != nil {
-		componentSpec.Parameters = parameters
-		return c
-	}
-	c.get().Spec.ComponentParameters = append(c.get().Spec.ComponentParameters, parametersv1alpha1.ComponentParametersSpec{
-		ComponentName: component,
-		Parameters:    parameters,
-	})
+	componentSpec := safeGetComponentSpec(&c.get().Spec, component)
+	componentSpec.Parameters = parameters
 	return c
 }
 
 func (c *ParameterBuilder) AddCustomTemplate(component string, tpl string, customTemplates appsv1.ConfigTemplateExtension) *ParameterBuilder {
-	componentSpec := intctrlutil.GetParameter(&c.get().Spec, component)
-	if componentSpec == nil {
-		c.get().Spec.ComponentParameters = append(c.get().Spec.ComponentParameters, parametersv1alpha1.ComponentParametersSpec{
-			ComponentName: component,
-		})
-	}
-	componentSpec = intctrlutil.GetParameter(&c.get().Spec, component)
+	componentSpec := safeGetComponentSpec(&c.get().Spec, component)
 	if componentSpec.CustomTemplates == nil {
 		componentSpec.CustomTemplates = make(map[string]appsv1.ConfigTemplateExtension)
 	}
 	componentSpec.CustomTemplates[tpl] = customTemplates
 	return c
+}
+
+func safeGetComponentSpec(spec *parametersv1alpha1.ParameterSpec, component string) *parametersv1alpha1.ComponentParametersSpec {
+	for i, parameter := range spec.ComponentParameters {
+		if parameter.ComponentName == component {
+			return &spec.ComponentParameters[i]
+		}
+	}
+	var size = len(spec.ComponentParameters)
+	spec.ComponentParameters = append(spec.ComponentParameters, parametersv1alpha1.ComponentParametersSpec{
+		ComponentName: component,
+	})
+	return &spec.ComponentParameters[size]
 }

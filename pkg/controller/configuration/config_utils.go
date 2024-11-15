@@ -136,7 +136,7 @@ func handleInjectEnv(ctx context.Context,
 		return err
 	}
 	for _, obj := range envObjs {
-		if err = intctrlutil.IgnoreIsAlreadyExists(cli.Create(ctx, obj)); err != nil {
+		if err = intctrlutil.IgnoreIsAlreadyExists(cli.Create(ctx, obj, inDataContext())); err != nil {
 			return err
 		}
 	}

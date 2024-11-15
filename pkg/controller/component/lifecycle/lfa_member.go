@@ -22,6 +22,7 @@ package lifecycle
 import (
 	"context"
 	"fmt"
+	"math"
 
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -173,13 +174,13 @@ func hackParameters4Switchover(ctx context.Context, cli client.Reader, namespace
 
 func leaderRole(roles []appsv1.ReplicaRole) (string, error) {
 	// HACK: assume the role with highest priority to be leader
-	highestPriority := 0
-	var role *appsv1.ReplicaRole
+	highestPriority := math.MinInt
+	var role string
 	for _, r := range roles {
 		if r.UpdatePriority > highestPriority {
 			highestPriority = r.UpdatePriority
-			role = &r
+			role = r.Name
 		}
 	}
-	return role.Name, nil
+	return role, nil
 }

@@ -486,24 +486,37 @@ var _ = Describe("Backup Controller test", func() {
 		})
 		Context("creates backups with parameters", func() {
 			const (
-				parameter        = "test"
-				parameterValue   = "value"
-				invalidParameter = "invalid"
-				parameterType    = "string"
+				invalidParameter    = "invalid"
+				parameterString     = "testString"
+				parameterStringType = "string"
+				parameterArray      = "testArray"
+				parameterArrayType  = "array"
 			)
-			It("should succeed if parameters are invalid", func() {
-				By("update backup parameters and schema in acitionSet")
+			testParameters := map[string]string{
+				parameterString: "stringValue",
+				parameterArray:  "v1,v2",
+			}
+			BeforeEach(func() {
+				By("set backup parameters and schema in acitionSet")
 				Expect(testapps.ChangeObj(&testCtx, actionSet, func(as *dpv1alpha1.ActionSet) {
 					as.Spec.ParametersSchema = &dpv1alpha1.SelectiveParametersSchema{
 						OpenAPIV3Schema: &v1.JSONSchemaProps{
 							Properties: map[string]v1.JSONSchemaProps{
-								parameter: {
-									Type: parameterType,
+								parameterString: {
+									Type: parameterStringType,
+								},
+								parameterArray: {
+									Type: parameterArrayType,
+									Items: &v1.JSONSchemaPropsOrArray{
+										Schema: &v1.JSONSchemaProps{
+											Type: parameterStringType,
+										},
+									},
 								},
 							},
 						},
 					}
-					as.Spec.Backup.WithParameters = []string{parameter}
+					as.Spec.Backup.WithParameters = []string{parameterString, parameterArray}
 				})).Should(Succeed())
 				By("the actionSet should be available")
 				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(actionSet),
@@ -511,10 +524,12 @@ var _ = Describe("Backup Controller test", func() {
 						g.Expect(as.Status.Phase).Should(BeEquivalentTo(dpv1alpha1.AvailablePhase))
 						g.Expect(as.Status.Message).Should(BeEmpty())
 					})).Should(Succeed())
+			})
+			It("should succeed if parameters are invalid", func() {
 				By("create a backup with invalid parameters")
 				backup := testdp.NewFakeBackup(&testCtx, func(bp *dpv1alpha1.Backup) {
 					bp.Spec.Parameters = map[string]string{
-						invalidParameter: parameterValue,
+						invalidParameter: invalidParameter,
 					}
 				})
 				By("check the backup")
@@ -524,30 +539,9 @@ var _ = Describe("Backup Controller test", func() {
 
 			})
 			It("should succeed if parameters are valid", func() {
-				By("update backup parameters and schema in acitionSet")
-				Expect(testapps.ChangeObj(&testCtx, actionSet, func(as *dpv1alpha1.ActionSet) {
-					as.Spec.ParametersSchema = &dpv1alpha1.SelectiveParametersSchema{
-						OpenAPIV3Schema: &v1.JSONSchemaProps{
-							Properties: map[string]v1.JSONSchemaProps{
-								parameter: {
-									Type: "string",
-								},
-							},
-						},
-					}
-					as.Spec.Backup.WithParameters = []string{parameter}
-				})).Should(Succeed())
-				By("the actionSet should be available")
-				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(actionSet),
-					func(g Gomega, as *dpv1alpha1.ActionSet) {
-						g.Expect(as.Status.Phase).Should(BeEquivalentTo(dpv1alpha1.AvailablePhase))
-						g.Expect(as.Status.Message).Should(BeEmpty())
-					})).Should(Succeed())
 				By("create a backup with parameters")
 				backup := testdp.NewFakeBackup(&testCtx, func(bp *dpv1alpha1.Backup) {
-					bp.Spec.Parameters = map[string]string{
-						parameter: parameterValue,
-					}
+					bp.Spec.Parameters = testParameters
 				})
 				By("check the backup")
 				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(backup), func(g Gomega, fetched *dpv1alpha1.Backup) {
@@ -563,14 +557,15 @@ var _ = Describe("Backup Controller test", func() {
 				}
 				Eventually(testapps.CheckObj(&testCtx, getJobKey(0), func(g Gomega, job *batchv1.Job) {
 					g.Expect(len(job.Spec.Template.Spec.Containers)).ShouldNot(BeZero())
+					expectedEnv := []string{parameterString, parameterArray}
 					for _, c := range job.Spec.Template.Spec.Containers {
-						exist := false
+						count := 0
 						for _, env := range c.Env {
-							if env.Name == parameter && env.Value == parameterValue {
-								exist = true
+							if v, ok := testParameters[env.Name]; ok && v == env.Value {
+								count++
 							}
 						}
-						g.Expect(exist).To(BeTrue())
+						g.Expect(count).To(Equal(len(expectedEnv)))
 					}
 				})).Should(Succeed())
 			})

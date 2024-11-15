@@ -21,7 +21,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
+	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -47,6 +47,7 @@ var _ = Describe("", func() {
 
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.BackupPolicyTemplateSignature, true, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.ActionSetSignature, true, ml)
 	}
 
 	BeforeEach(func() {
@@ -77,8 +78,8 @@ var _ = Describe("", func() {
 				SetBackupMethodVolumeMounts("data", "/data").
 				AddBackupMethod(VsBackupMethodName, true, "").
 				SetBackupMethodVolumeMounts("data", "/data").
-				AddSchedule(BackupMethod, "0 0 * * *", ttl, true).
-				AddSchedule(VsBackupMethodName, "0 0 * * *", ttl, true).
+				AddSchedule(BackupMethod, "0 0 * * *", ttl, true, "", nil).
+				AddSchedule(VsBackupMethodName, "0 0 * * *", ttl, true, "", nil).
 				Create(&testCtx).GetObject()
 			key := client.ObjectKeyFromObject(bpt)
 
@@ -97,6 +98,76 @@ var _ = Describe("", func() {
 
 			By("should be available")
 			testdp.NewFakeActionSet(&testCtx)
+			Eventually(testapps.CheckObj(&testCtx, key, func(g Gomega, pobj *dpv1alpha1.BackupPolicyTemplate) {
+				g.Expect(pobj.Status.ObservedGeneration).To(Equal(bpt.Generation))
+				g.Expect(pobj.Status.Phase).To(Equal(dpv1alpha1.AvailablePhase))
+				g.Expect(pobj.Status.Message).To(BeEmpty())
+			})).Should(Succeed())
+		})
+		It("test BackupPolicyTemplate schedule parameters", func() {
+			const (
+				invalidParameter    = "invalid"
+				parameterString     = "testString"
+				parameterStringType = "string"
+				parameterArray      = "testArray"
+				parameterArrayType  = "array"
+				scheduleName1       = "name1"
+				scheduleName2       = "name2"
+			)
+			var (
+				testParameters = map[string]string{
+					parameterString: "stringValue",
+					parameterArray:  "v1,v2",
+				}
+			)
+			actionSet := testdp.NewFakeActionSet(&testCtx)
+			By("set backup parameters and schema in acitionSet")
+			Expect(testapps.ChangeObj(&testCtx, actionSet, func(as *dpv1alpha1.ActionSet) {
+				as.Spec.ParametersSchema = &dpv1alpha1.SelectiveParametersSchema{
+					OpenAPIV3Schema: &v1.JSONSchemaProps{
+						Properties: map[string]v1.JSONSchemaProps{
+							parameterString: {
+								Type: parameterStringType,
+							},
+							parameterArray: {
+								Type: parameterArrayType,
+								Items: &v1.JSONSchemaPropsOrArray{
+									Schema: &v1.JSONSchemaProps{
+										Type: parameterStringType,
+									},
+								},
+							},
+						},
+					},
+				}
+				as.Spec.Backup.WithParameters = []string{parameterString, parameterArray}
+			})).Should(Succeed())
+			By("the actionSet should be available")
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(actionSet),
+				func(g Gomega, as *dpv1alpha1.ActionSet) {
+					g.Expect(as.Status.Phase).Should(BeEquivalentTo(dpv1alpha1.AvailablePhase))
+					g.Expect(as.Status.Message).Should(BeEmpty())
+				})).Should(Succeed())
+			bpt := testdp.NewBackupPolicyTemplateFactory(BackupPolicyTemplateName).
+				AddBackupMethod(BackupMethod, false, testdp.ActionSetName).
+				SetBackupMethodVolumeMounts("data", "/data").
+				AddSchedule(BackupMethod, "0 0 * * *", ttl, true, scheduleName1, map[string]string{
+					invalidParameter: invalidParameter,
+				}).
+				AddSchedule(BackupMethod, "0 0 * * *", ttl, true, scheduleName2, testParameters).
+				AddSchedule(BackupMethod, "0 0 * * *", ttl, true, "", nil).
+				Create(&testCtx).GetObject()
+			key := client.ObjectKeyFromObject(bpt)
+			By("should be unavailable")
+			Eventually(testapps.CheckObj(&testCtx, key, func(g Gomega, pobj *dpv1alpha1.BackupPolicyTemplate) {
+				g.Expect(pobj.Status.ObservedGeneration).To(Equal(bpt.Generation))
+				g.Expect(pobj.Status.Phase).To(Equal(dpv1alpha1.UnavailablePhase))
+				g.Expect(pobj.Status.Message).To(ContainSubstring(fmt.Sprintf(`fails to validate parameters of backupMethod "%s"`, BackupMethod)))
+			})).Should(Succeed())
+			By("should be available")
+			Expect(testapps.ChangeObj(&testCtx, bpt, func(pobj *dpv1alpha1.BackupPolicyTemplate) {
+				bpt.Spec.Schedules[0].Parameters = testParameters
+			})).Should(Succeed())
 			Eventually(testapps.CheckObj(&testCtx, key, func(g Gomega, pobj *dpv1alpha1.BackupPolicyTemplate) {
 				g.Expect(pobj.Status.ObservedGeneration).To(Equal(bpt.Generation))
 				g.Expect(pobj.Status.Phase).To(Equal(dpv1alpha1.AvailablePhase))

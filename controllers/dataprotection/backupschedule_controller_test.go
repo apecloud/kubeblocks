@@ -24,10 +24,11 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
 	batchv1 "k8s.io/api/batch/v1"
+	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	dpbackup "github.com/apecloud/kubeblocks/pkg/dataprotection/backup"
@@ -85,19 +86,20 @@ var _ = Describe("Backup Schedule Controller", func() {
 	When("creating backup schedule with default settings", func() {
 		var (
 			backupPolicy *dpv1alpha1.BackupPolicy
+			actionSet    *dpv1alpha1.ActionSet
 		)
 
 		getCronjobKey := func(backupSchedule *dpv1alpha1.BackupSchedule,
-			method string) client.ObjectKey {
+			method string, name string) client.ObjectKey {
 			return client.ObjectKey{
-				Name:      dpbackup.GenerateCRNameByBackupSchedule(backupSchedule, method),
+				Name:      dpbackup.GenerateCRNameByBackupScheduleAndScheduleName(backupSchedule, method, name),
 				Namespace: backupPolicy.Namespace,
 			}
 		}
 
 		BeforeEach(func() {
 			By("creating an actionSet")
-			actionSet := testdp.NewFakeActionSet(&testCtx)
+			actionSet = testdp.NewFakeActionSet(&testCtx)
 
 			By("creating storage provider")
 			_ = testdp.NewFakeStorageProvider(&testCtx, nil)
@@ -130,16 +132,16 @@ var _ = Describe("Backup Schedule Controller", func() {
 				})).Should(Succeed())
 
 				By("checking cronjob, should not exist because all schedule policies of methods are disabled")
-				Eventually(testapps.CheckObjExists(&testCtx, getCronjobKey(backupSchedule, testdp.BackupMethodName),
+				Eventually(testapps.CheckObjExists(&testCtx, getCronjobKey(backupSchedule, testdp.BackupMethodName, ""),
 					&batchv1.CronJob{}, false)).Should(Succeed())
-				Eventually(testapps.CheckObjExists(&testCtx, getCronjobKey(backupSchedule, testdp.VSBackupMethodName),
+				Eventually(testapps.CheckObjExists(&testCtx, getCronjobKey(backupSchedule, testdp.VSBackupMethodName, ""),
 					&batchv1.CronJob{}, false)).Should(Succeed())
 
 				By(fmt.Sprintf("enabling %s method schedule", testdp.BackupMethodName))
 				testdp.EnableBackupSchedule(&testCtx, backupSchedule, testdp.BackupMethodName)
 
 				By("checking cronjob, should exist one cronjob to create backup")
-				Eventually(testapps.CheckObj(&testCtx, getCronjobKey(backupSchedule, testdp.BackupMethodName), func(g Gomega, fetched *batchv1.CronJob) {
+				Eventually(testapps.CheckObj(&testCtx, getCronjobKey(backupSchedule, testdp.BackupMethodName, ""), func(g Gomega, fetched *batchv1.CronJob) {
 					schedulePolicy := dpbackup.GetSchedulePolicyByMethod(backupSchedule, testdp.BackupMethodName)
 					timeZone, cronExpr := dpbackup.BuildCronJobSchedule(schedulePolicy.CronExpression)
 					g.Expect(fetched.Labels[constant.AppManagedByLabelKey]).Should(Equal(dptypes.AppName))
@@ -189,6 +191,93 @@ var _ = Describe("Backup Schedule Controller", func() {
 			It("should fail", func() {
 				Eventually(testapps.CheckObj(&testCtx, backupScheduleKey, func(g Gomega, fetched *dpv1alpha1.BackupSchedule) {
 					g.Expect(fetched.Status.Phase).NotTo(Equal(dpv1alpha1.BackupSchedulePhaseAvailable))
+				})).Should(Succeed())
+			})
+		})
+
+		Context("create a backup schedule with parameters", func() {
+			const (
+				invalidParameter    = "invalid"
+				parameterString     = "testString"
+				parameterStringType = "string"
+				parameterArray      = "testArray"
+				parameterArrayType  = "array"
+				scheduleName        = "test"
+			)
+			testParameters := map[string]string{
+				parameterString: "stringValue",
+				parameterArray:  "v1,v2",
+			}
+			BeforeEach(func() {
+				By("set backup parameters and schema in acitionSet")
+				Expect(testapps.ChangeObj(&testCtx, actionSet, func(as *dpv1alpha1.ActionSet) {
+					as.Spec.ParametersSchema = &dpv1alpha1.SelectiveParametersSchema{
+						OpenAPIV3Schema: &v1.JSONSchemaProps{
+							Properties: map[string]v1.JSONSchemaProps{
+								parameterString: {
+									Type: parameterStringType,
+								},
+								parameterArray: {
+									Type: parameterArrayType,
+									Items: &v1.JSONSchemaPropsOrArray{
+										Schema: &v1.JSONSchemaProps{
+											Type: parameterStringType,
+										},
+									},
+								},
+							},
+						},
+					}
+					as.Spec.Backup.WithParameters = []string{parameterString, parameterArray}
+				})).Should(Succeed())
+				By("the actionSet should be available")
+				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(actionSet),
+					func(g Gomega, as *dpv1alpha1.ActionSet) {
+						g.Expect(as.Status.Phase).Should(BeEquivalentTo(dpv1alpha1.AvailablePhase))
+						g.Expect(as.Status.Message).Should(BeEmpty())
+					})).Should(Succeed())
+			})
+			It("with parameters", func() {
+				By("creating a backupSchedule with invalid parameters")
+				backupSchedule := testdp.NewFakeBackupSchedule(&testCtx, func(schedule *dpv1alpha1.BackupSchedule) {
+					schedule.Spec.Schedules[1].BackupMethod = testdp.BackupMethodName
+					schedule.Spec.Schedules[1].Name = scheduleName
+					schedule.Spec.Schedules[1].Parameters = map[string]string{
+						invalidParameter: invalidParameter,
+					}
+				})
+				backupScheduleKey := client.ObjectKeyFromObject(backupSchedule)
+				By("the backupSchedule should fail ")
+				Eventually(testapps.CheckObj(&testCtx, backupScheduleKey, func(g Gomega, fetched *dpv1alpha1.BackupSchedule) {
+					g.Expect(fetched.Status.Phase).NotTo(Equal(dpv1alpha1.BackupSchedulePhaseAvailable))
+				})).Should(Succeed())
+				By("set valid parameters")
+				Expect(testapps.ChangeObj(&testCtx, backupSchedule, func(bs *v1alpha1.BackupSchedule) {
+					backupSchedule.Spec.Schedules[1].Parameters = testParameters
+				})).Should(Succeed())
+				By("checking backupSchedule status, should be available")
+				Eventually(testapps.CheckObj(&testCtx, backupScheduleKey, func(g Gomega, fetched *dpv1alpha1.BackupSchedule) {
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupSchedulePhaseAvailable))
+				})).Should(Succeed())
+
+				By("checking cronjob, should not exist because all schedule policies of methods are disabled")
+				Eventually(testapps.CheckObjExists(&testCtx, getCronjobKey(backupSchedule, testdp.BackupMethodName, ""),
+					&batchv1.CronJob{}, false)).Should(Succeed())
+				Eventually(testapps.CheckObjExists(&testCtx, getCronjobKey(backupSchedule, testdp.BackupMethodName, scheduleName),
+					&batchv1.CronJob{}, false)).Should(Succeed())
+				By(fmt.Sprintf("enabling %s method schedule", testdp.BackupMethodName))
+				testdp.EnableBackupSchedule(&testCtx, backupSchedule, testdp.BackupMethodName)
+
+				By("checking cronjob, should exist one cronjob to create backup")
+				Eventually(testapps.CheckObj(&testCtx, getCronjobKey(backupSchedule, testdp.BackupMethodName, scheduleName), func(g Gomega, fetched *batchv1.CronJob) {
+					g.Expect(fetched.Spec.StartingDeadlineSeconds).ShouldNot(BeNil())
+					g.Expect(*fetched.Spec.StartingDeadlineSeconds).To(Equal(getStartingDeadlineSeconds(backupSchedule)))
+					g.Expect(fetched.Spec.JobTemplate.Spec.Template.Spec.ServiceAccountName).To(Equal(viper.GetString(dptypes.CfgKeyWorkerServiceAccountName)))
+					By("check parameters manifest")
+					g.Expect(fetched.Spec.JobTemplate.Spec.Template.Spec.Containers).Should(HaveLen(1))
+					args := fetched.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Args
+					g.Expect(args).Should(HaveLen(1))
+					g.Expect(args[0]).Should(ContainSubstring(dpbackup.BuildParametersManifest(testParameters)))
 				})).Should(Succeed())
 			})
 		})

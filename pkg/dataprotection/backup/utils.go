@@ -177,7 +177,7 @@ func generateBaseCRNameByBackupSchedule(uniqueNameWithBackupSchedule, backupSche
 	return fmt.Sprintf("%s-%s", name, method)
 }
 
-// GenerateCRNameByBackupSchedule generate a CR name which is created by BackupSchedule, such as CronJob Backup.
+// GenerateCRNameByBackupSchedule generate a CR name which is created by BackupSchedule, such as Continuous Backup.
 func GenerateCRNameByBackupSchedule(backupSchedule *dpv1alpha1.BackupSchedule, method string) string {
 	uid := backupSchedule.UID[:8]
 	if len(backupSchedule.OwnerReferences) > 0 {
@@ -185,6 +185,15 @@ func GenerateCRNameByBackupSchedule(backupSchedule *dpv1alpha1.BackupSchedule, m
 	}
 	uniqueNameWithBackupSchedule := fmt.Sprintf("%s-%s", uid, backupSchedule.Name)
 	return generateBaseCRNameByBackupSchedule(uniqueNameWithBackupSchedule, backupSchedule.Namespace, method)
+}
+
+// GenerateCRNameByBackupScheduleAndScheduleName generate a CR name which is created by BackupSchedule, such as CronJob Backup.
+func GenerateCRNameByBackupScheduleAndScheduleName(backupSchedule *dpv1alpha1.BackupSchedule, method string, name string) string {
+	genName := GenerateCRNameByBackupSchedule(backupSchedule, method)
+	if len(name) > 0 {
+		return fmt.Sprintf("%s-%s", genName, name)
+	}
+	return genName
 }
 
 // GenerateLegacyCRNameByBackupSchedule generate a legacy CR name which is created by BackupSchedule, such as CronJob Backup.
@@ -303,7 +312,7 @@ func StopStatefulSetsWhenFailed(ctx context.Context, cli client.Client, backup *
 	return cli.Update(ctx, sts)
 }
 
-func buildParametersManifest(parameters map[string]string) string {
+func BuildParametersManifest(parameters map[string]string) string {
 	var res string
 	if len(parameters) == 0 {
 		return res

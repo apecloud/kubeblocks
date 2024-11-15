@@ -333,7 +333,14 @@ func isTimeInRange(t time.Time, start time.Time, end time.Time) bool {
 	return !t.Before(start) && !t.After(end)
 }
 
-func GetRestoreFromBackupAnnotation(backup *dpv1alpha1.Backup, volumeRestorePolicy, restoreTime string, env []corev1.EnvVar, doReadyRestoreAfterClusterRunning bool) (string, error) {
+func GetRestoreFromBackupAnnotation(
+	backup *dpv1alpha1.Backup,
+	volumeRestorePolicy string,
+	restoreTime string,
+	env []corev1.EnvVar,
+	doReadyRestoreAfterClusterRunning bool,
+	parameters map[string]string,
+) (string, error) {
 	componentName := component.GetComponentNameFromObj(backup)
 	if len(componentName) == 0 {
 		return "", intctrlutil.NewFatalError("unable to obtain the name of the component to be recovered, please ensure that Backup.status.componentName exists")
@@ -353,7 +360,13 @@ func GetRestoreFromBackupAnnotation(backup *dpv1alpha1.Backup, volumeRestorePoli
 		}
 		restoreInfoMap[constant.EnvForRestore] = string(bytes)
 	}
-
+	if len(parameters) > 0 {
+		bytes, err := json.Marshal(parameters)
+		if err != nil {
+			return "", err
+		}
+		restoreInfoMap[constant.ParametersForRestore] = string(bytes)
+	}
 	connectionPassword := backup.Annotations[dptypes.ConnectionPasswordAnnotationKey]
 	if connectionPassword != "" {
 		restoreInfoMap[constant.ConnectionPassword] = connectionPassword

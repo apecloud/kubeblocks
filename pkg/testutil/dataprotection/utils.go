@@ -20,14 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package dataprotection
 
 import (
+	vsv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
-
-	vsv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -120,8 +119,8 @@ func CreateBackupPolicyTpl(testCtx *testutil.TestContext, compDef string) *dpv1a
 		SetCompDefs(compDef).
 		AddBackupMethod(VSBackupMethodName, true, "").
 		SetBackupMethodVolumes([]string{"data"}).
-		AddSchedule(BackupMethodName, "0 0 * * *", ttl, true).
-		AddSchedule(VSBackupMethodName, "0 0 * * *", ttl, true).
+		AddSchedule(BackupMethodName, "0 0 * * *", ttl, true, "", nil).
+		AddSchedule(VSBackupMethodName, "0 0 * * *", ttl, true, "", nil).
 		Create(testCtx).Get()
 }
 

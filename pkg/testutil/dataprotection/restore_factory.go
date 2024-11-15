@@ -112,6 +112,11 @@ func (f *MockRestoreFactory) buildRestoreVolumeClaim(name, volumeSource, mountPa
 	}
 }
 
+func (f *MockRestoreFactory) SetParameters(parameters map[string]string) *MockRestoreFactory {
+	f.Get().Spec.Parameters = parameters
+	return f
+}
+
 func (f *MockRestoreFactory) SetVolumeClaimRestorePolicy(policy dpv1alpha1.VolumeClaimRestorePolicy) *MockRestoreFactory {
 	f.initPrepareDataConfig()
 	f.Get().Spec.PrepareDataConfig.VolumeClaimRestorePolicy = policy

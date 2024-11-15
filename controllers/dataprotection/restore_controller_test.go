@@ -26,9 +26,9 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -119,6 +119,16 @@ var _ = Describe("Restore Controller test", func() {
 			nodeName    = "minikube"
 		)
 
+		const (
+			parameterString     = "testString"
+			parameterStringType = "string"
+			parameterArray      = "testArray"
+			parameterArrayType  = "array"
+		)
+		testParameters := map[string]string{
+			parameterString: "stringValue",
+			parameterArray:  "v1,v2",
+		}
 		BeforeEach(func() {
 			By("creating an actionSet")
 			actionSet = testdp.NewFakeActionSet(&testCtx)
@@ -235,7 +245,57 @@ var _ = Describe("Restore Controller test", func() {
 			By("mock jobs are completed and wait for restore is completed")
 			mockAndCheckRestoreCompleted(restore)
 		}
+		mockActionSetWithSchema := func() {
 
+			By("set backup parameters and schema in acitionSet")
+			Expect(testapps.ChangeObj(&testCtx, actionSet, func(as *dpv1alpha1.ActionSet) {
+				as.Spec.ParametersSchema = &dpv1alpha1.SelectiveParametersSchema{
+					OpenAPIV3Schema: &v1.JSONSchemaProps{
+						Properties: map[string]v1.JSONSchemaProps{
+							parameterString: {
+								Type: parameterStringType,
+							},
+							parameterArray: {
+								Type: parameterArrayType,
+								Items: &v1.JSONSchemaPropsOrArray{
+									Schema: &v1.JSONSchemaProps{
+										Type: parameterStringType,
+									},
+								},
+							},
+						},
+					},
+				}
+				as.Spec.Restore.WithParameters = []string{parameterString, parameterArray}
+			})).Should(Succeed())
+			By("the actionSet should be available")
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(actionSet),
+				func(g Gomega, as *dpv1alpha1.ActionSet) {
+					g.Expect(as.Status.Phase).Should(BeEquivalentTo(dpv1alpha1.AvailablePhase))
+					g.Expect(as.Status.Message).Should(BeEmpty())
+				})).Should(Succeed())
+		}
+		checkJobParametersEnv := func(restore *dpv1alpha1.Restore) {
+
+			By("check parameters env in restore jobs")
+			jobList := &batchv1.JobList{}
+			Expect(k8sClient.List(ctx, jobList,
+				client.MatchingLabels{dprestore.DataProtectionRestoreLabelKey: restore.Name},
+				client.InNamespace(testCtx.DefaultNamespace))).Should(Succeed())
+			for _, job := range jobList.Items {
+				Expect(len(job.Spec.Template.Spec.Containers)).ShouldNot(BeZero())
+				expectedEnv := []string{parameterString, parameterArray}
+				for _, c := range job.Spec.Template.Spec.Containers {
+					count := 0
+					for _, env := range c.Env {
+						if v, ok := testParameters[env.Name]; ok && v == env.Value {
+							count++
+						}
+					}
+					Expect(count).To(Equal(len(expectedEnv)))
+				}
+			}
+		}
 		Context("with restore fails", func() {
 			It("test restore is Failed when backup is not completed", func() {
 				By("expect for restore is Failed ")
@@ -307,7 +367,25 @@ var _ = Describe("Restore Controller test", func() {
 			It("test volumeClaimsTemplate when startingIndex is 1", func() {
 				testRestoreWithVolumeClaimsTemplate(2, 1)
 			})
+			It("test restore parameters", func() {
+				By("set schema and parameters in actionSet")
+				mockActionSetWithSchema()
+				replicas := 3
+				startingIndex := 0
+				restore := initResourcesAndWaitRestore(true, false, false, dpv1alpha1.RestorePhaseRunning,
+					func(f *testdp.MockRestoreFactory) {
+						f.SetVolumeClaimsTemplate(testdp.MysqlTemplateName, testdp.DataVolumeName,
+							testdp.DataVolumeMountPath, "", int32(replicas), int32(startingIndex), nil)
+						// Note: should ignore this policy when podSelectionStrategy is Any of the source target.
+						f.SetPrepareDataRequiredPolicy(dpv1alpha1.OneToOneRestorePolicy, "")
+						f.SetParameters(testParameters)
+					}, nil)
 
+				By("expect restore jobs and pvcs are created")
+				checkJobAndPVCSCount(restore, replicas, replicas, startingIndex)
+				By("expect parameters env in restore jobs")
+				checkJobParametersEnv(restore)
+			})
 			It("test volumeClaimsTemplate when volumeClaimRestorePolicy is Serial", func() {
 				replicas := 2
 				startingIndex := 1
@@ -509,7 +587,6 @@ var _ = Describe("Restore Controller test", func() {
 					}
 					return corev1.EnvVar{}
 				}
-
 				By("wait for creating two exec jobs with the matchLabels")
 				a := testapps.List(&testCtx, generics.JobSignature,
 					client.MatchingLabels{dprestore.DataProtectionRestoreLabelKey: restore.Name},
@@ -531,6 +608,28 @@ var _ = Describe("Restore Controller test", func() {
 					g.Expect(getDPDBPortEnv(&fetched.Spec.Template.Spec.Containers[0]).Value).Should(Equal(strconv.Itoa(testdp.PortNum)))
 				})).Should(Succeed())
 
+			})
+			It("test parameters env", func() {
+				By("set schema and parameters in actionSet")
+				mockActionSetWithSchema()
+				By("remove the prepareData stage for testing post ready actions")
+				Expect(testapps.ChangeObj(&testCtx, actionSet, func(set *dpv1alpha1.ActionSet) {
+					set.Spec.Restore.PrepareData = nil
+				})).Should(Succeed())
+
+				matchLabels := map[string]string{
+					constant.AppInstanceLabelKey: testdp.ClusterName,
+				}
+
+				restore := initResourcesAndWaitRestore(true, false, false, dpv1alpha1.RestorePhaseRunning,
+					func(f *testdp.MockRestoreFactory) {
+						f.SetJobActionConfig(matchLabels).SetExecActionConfig(matchLabels)
+						f.SetParameters(testParameters)
+					}, func(b *dpv1alpha1.Backup) {
+						b.Status.Target.ConnectionCredential = nil
+					})
+				By("expect parameters env in restore jobs")
+				checkJobParametersEnv(restore)
 			})
 		})
 

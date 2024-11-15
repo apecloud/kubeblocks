@@ -69,7 +69,7 @@ var _ = Describe("ActionSet Controller test", func() {
 			)
 			as := testdp.NewFakeActionSet(&testCtx)
 			Expect(as).ShouldNot(BeNil())
-			By("update to invalid withParameters and schema")
+			By("set invalid withParameters and schema")
 			Expect(testapps.ChangeObj(&testCtx, as, func(action *v1alpha1.ActionSet) {
 				as.Spec.ParametersSchema = &v1alpha1.SelectiveParametersSchema{
 					OpenAPIV3Schema: &v1.JSONSchemaProps{
@@ -85,16 +85,18 @@ var _ = Describe("ActionSet Controller test", func() {
 			By("should be unavailable with invlid withParameters")
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(as),
 				func(g Gomega, as *v1alpha1.ActionSet) {
+					g.Expect(as.Status.ObservedGeneration).Should(Equal(as.Generation))
 					g.Expect(as.Status.Phase).Should(BeEquivalentTo(v1alpha1.UnavailablePhase))
 					g.Expect(as.Status.Message).ShouldNot(BeEmpty())
 				})).Should(Succeed())
-			By("update to correct parameters")
+			By("set valid parameters")
 			Expect(testapps.ChangeObj(&testCtx, as, func(action *v1alpha1.ActionSet) {
 				as.Spec.Backup.WithParameters = []string{parameter}
 			})).Should(Succeed())
 			By("should be available")
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(as),
 				func(g Gomega, as *v1alpha1.ActionSet) {
+					g.Expect(as.Status.ObservedGeneration).Should(Equal(as.Generation))
 					g.Expect(as.Status.Phase).Should(BeEquivalentTo(v1alpha1.AvailablePhase))
 					g.Expect(as.Status.Message).Should(BeEmpty())
 				})).Should(Succeed())

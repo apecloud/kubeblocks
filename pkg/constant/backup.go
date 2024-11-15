@@ -26,6 +26,7 @@ const (
 	DoReadyRestoreAfterClusterRunning = "doReadyRestoreAfterClusterRunning"
 	RestoreTimeKeyForRestore          = "restoreTime"
 	EnvForRestore                     = "restoreEnv"
+	ParametersForRestore              = "restoreParameters"
 	ConnectionPassword                = "connectionPassword"
 	EncryptedSystemAccounts           = "encryptedSystemAccounts"
 )

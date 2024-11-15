@@ -145,7 +145,7 @@ func (s *Scheduler) buildCronJob(schedulePolicy *dpv1alpha1.SchedulePolicy, cron
 	)
 
 	if cronJobName == "" {
-		cronJobName = GenerateCRNameByBackupSchedule(s.BackupSchedule, schedulePolicy.BackupMethod)
+		cronJobName = GenerateCRNameByBackupScheduleAndScheduleName(s.BackupSchedule, schedulePolicy.BackupMethod, schedulePolicy.Name)
 	}
 
 	podSpec, err := s.buildPodSpec(schedulePolicy)
@@ -213,7 +213,7 @@ spec:
 EOF
 `, s.BackupSchedule.Name, s.generateBackupName(schedulePolicy), s.BackupSchedule.Namespace,
 		s.BackupPolicy.Name, schedulePolicy.BackupMethod,
-		schedulePolicy.RetentionPeriod, buildParametersManifest(schedulePolicy.Parameters))
+		schedulePolicy.RetentionPeriod, BuildParametersManifest(schedulePolicy.Parameters))
 
 	container := corev1.Container{
 		Name:            "backup-schedule",
@@ -249,7 +249,14 @@ func (s *Scheduler) reconcileCronJob(schedulePolicy *dpv1alpha1.SchedulePolicy) 
 	); err != nil {
 		return err
 	} else if len(cronJobList.Items) > 0 {
-		cronJob = &cronJobList.Items[0]
+		// the schedulePolicy name can be empty
+		targetCronJobName := GenerateCRNameByBackupScheduleAndScheduleName(s.BackupSchedule, schedulePolicy.BackupMethod, schedulePolicy.Name)
+		for i, item := range cronJobList.Items {
+			if item.Name == targetCronJobName {
+				cronJob = &cronJobList.Items[i]
+				break
+			}
+		}
 	}
 
 	// schedule is disabled, delete cronjob if exists
@@ -305,6 +312,9 @@ func (s *Scheduler) generateBackupName(schedulePolicy *dpv1alpha1.SchedulePolicy
 	// if cluster name can not be found, use backup schedule name as backup name prefix
 	if backupNamePrefix == "" {
 		backupNamePrefix = s.BackupSchedule.Name
+	}
+	if len(schedulePolicy.Name) > 0 {
+		backupNamePrefix = fmt.Sprintf("%s-%s", backupNamePrefix, schedulePolicy.Name)
 	}
 	return backupNamePrefix + "-$(date -u +'%Y%m%d%H%M%S')"
 }

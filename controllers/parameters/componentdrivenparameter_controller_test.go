@@ -17,8 +17,6 @@ limitations under the License.
 package parameters
 
 import (
-	"fmt"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -85,7 +83,7 @@ var _ = Describe("ComponentParameterGenerator Controller", func() {
 		fullCompName := constant.GenerateClusterComponentName(clusterName, defaultCompName)
 		compObj := testapps.NewComponentFactory(testCtx.DefaultNamespace, fullCompName, compDefObj.Name).
 			AddLabels(constant.AppInstanceLabelKey, clusterName).
-			SetUID(types.UID(fmt.Sprintf("test-uid"))).
+			SetUID(types.UID("test-uid")).
 			SetReplicas(1).
 			SetResources(corev1.ResourceRequirements{Limits: corev1.ResourceList{"memory": resource.MustParse("2Gi")}}).
 			Create(&testCtx).

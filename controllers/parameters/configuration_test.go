@@ -38,6 +38,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testparameters "github.com/apecloud/kubeblocks/pkg/testutil/parameters"
+	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
 const (
@@ -51,6 +52,11 @@ const (
 	pdcrName         = "config-test-pdcr"
 	cmName           = "mysql-tree-node-template-8.0"
 )
+
+func mockSchemaData() string {
+	cue, _ := testdata.GetTestDataFileContent("cue_testdata/wesql.cue")
+	return string(cue)
+}
 
 func mockConfigResource() (*corev1.ConfigMap, *parametersv1alpha1.ParametersDefinition) {
 	By("Create a config template obj")
@@ -74,6 +80,7 @@ func mockConfigResource() (*corev1.ConfigMap, *parametersv1alpha1.ParametersDefi
 	By("Create a parameters definition obj")
 	paramsdef := testparameters.NewParametersDefinitionFactory(paramsDefName).
 		SetReloadAction(testparameters.WithNoneAction()).
+		Schema(mockSchemaData()).
 		Create(&testCtx).
 		GetObject()
 
@@ -176,7 +183,6 @@ func cleanEnv() {
 	testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.SecretSignature, true, inNS)
 	testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.InstanceSetSignature, true, inNS, ml)
 	testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ConfigurationSignature, false, inNS, ml)
-	testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ParametersDefinitionSignature, false, inNS, ml)
 	testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ComponentParameterSignature, true, inNS, ml)
 	testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ParameterSignature, true, inNS, ml)
 }

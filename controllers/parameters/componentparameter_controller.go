@@ -138,11 +138,11 @@ func (r *ComponentParameterReconciler) failWithInvalidComponent(componentParam *
 func (r *ComponentParameterReconciler) runTasks(taskCtx *TaskContext, tasks []Task, resource *Task) error {
 	var (
 		errs          []error
-		configuration = taskCtx.componentParameter
+		compParameter = taskCtx.componentParameter
 	)
 
-	patch := client.MergeFrom(configuration.DeepCopy())
-	revision := strconv.FormatInt(configuration.GetGeneration(), 10)
+	patch := client.MergeFrom(compParameter.DeepCopy())
+	revision := strconv.FormatInt(compParameter.GetGeneration(), 10)
 	for _, task := range tasks {
 		if err := task.Do(resource, taskCtx, revision); err != nil {
 			errs = append(errs, err)
@@ -150,17 +150,36 @@ func (r *ComponentParameterReconciler) runTasks(taskCtx *TaskContext, tasks []Ta
 		}
 	}
 
-	configuration.Status.Message = ""
-	if len(errs) > 0 {
-		configuration.Status.Message = utilerrors.NewAggregate(errs).Error()
-	}
-	if err := r.Client.Status().Patch(taskCtx.ctx, configuration, patch); err != nil {
+	updateCompParamStatus(&compParameter.Status, errs, compParameter.Generation)
+	if err := r.Client.Status().Patch(taskCtx.ctx, compParameter, patch); err != nil {
 		errs = append(errs, err)
 	}
 	if len(errs) == 0 {
 		return nil
 	}
 	return utilerrors.NewAggregate(errs)
+}
+
+func updateCompParamStatus(status *parametersv1alpha1.ComponentParameterStatus, errs []error, generation int64) {
+	aggregatePhase := func(ss []parametersv1alpha1.ConfigTemplateItemDetailStatus) parametersv1alpha1.ParameterPhase {
+		var phase = parametersv1alpha1.CFinishedPhase
+		for _, s := range ss {
+			switch {
+			case intctrlutil.IsFailedPhase(s.Phase):
+				return s.Phase
+			case !intctrlutil.IsParameterFinished(s.Phase):
+				phase = parametersv1alpha1.CRunningPhase
+			}
+		}
+		return phase
+	}
+
+	status.ObservedGeneration = generation
+	status.Message = ""
+	status.Phase = aggregatePhase(status.ConfigurationItemStatus)
+	if len(errs) > 0 {
+		status.Message = utilerrors.NewAggregate(errs).Error()
+	}
 }
 
 func (r *ComponentParameterReconciler) deletionHandler(reqCtx intctrlutil.RequestCtx, componentParameter *parametersv1alpha1.ComponentParameter) func() (*ctrl.Result, error) {

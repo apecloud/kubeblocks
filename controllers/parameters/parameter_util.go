@@ -33,17 +33,17 @@ import (
 
 type reconfigureReconcileHandle func(*ReconcileContext, *parametersv1alpha1.Parameter) error
 
-func syncComponentParametersStatus(configmaps map[string]*corev1.ConfigMap) func(rctx *ReconcileContext, parameter *parametersv1alpha1.Parameter) error {
+func updateComponentParameterStatus(configmaps map[string]*corev1.ConfigMap) func(rctx *ReconcileContext, parameter *parametersv1alpha1.Parameter) error {
 	return func(rctx *ReconcileContext, parameter *parametersv1alpha1.Parameter) error {
 		status := safeResolveComponentStatus(&parameter.Status, rctx.ComponentName)
 		if !intctrlutil.IsParameterFinished(status.Phase) {
-			syncComponentParameterStatus(rctx, status, configmaps)
+			syncReconfiguringPhase(rctx, status, configmaps)
 		}
 		return nil
 	}
 }
 
-func syncComponentParameterStatus(rctx *ReconcileContext, status *parametersv1alpha1.ComponentReconfiguringStatus, configmaps map[string]*corev1.ConfigMap) {
+func syncReconfiguringPhase(rctx *ReconcileContext, status *parametersv1alpha1.ComponentReconfiguringStatus, configmaps map[string]*corev1.ConfigMap) {
 	var finished = true
 
 	updateStatus := func() {
@@ -140,10 +140,37 @@ func classifyParameters(updatedParameters appsv1.ComponentParameters, configmaps
 			if len(configDescs) == 0 {
 				return fmt.Errorf("not found config description from pdcr: %s", tpl)
 			}
+			if err := validateComponentParameter(toArray(rctx.ParametersDefs), configDescs, m); err != nil {
+				return intctrlutil.NewFatalError(err.Error())
+			}
 			safeUpdateComponentParameterStatus(&parameter.Status, rctx.ComponentName, tpl, m)
 		}
 		return nil
 	}
+}
+
+func validateComponentParameter(parametersDefs []*parametersv1alpha1.ParametersDefinition, descs []parametersv1alpha1.ComponentConfigDescription, paramters map[string]*parametersv1alpha1.ParametersInFile) error {
+	if len(parametersDefs) == 0 || len(descs) == 0 {
+		return nil
+	}
+	_, err := configctrl.DoMerge(resolveBaseData(paramters), configctrl.DerefMapValues(paramters), parametersDefs, descs)
+	return err
+}
+
+func resolveBaseData(updatedParameters map[string]*parametersv1alpha1.ParametersInFile) map[string]string {
+	baseData := make(map[string]string)
+	for key := range updatedParameters {
+		baseData[key] = ""
+	}
+	return baseData
+}
+
+func toArray(paramsDefs map[string]*parametersv1alpha1.ParametersDefinition) []*parametersv1alpha1.ParametersDefinition {
+	var defs []*parametersv1alpha1.ParametersDefinition
+	for _, def := range paramsDefs {
+		defs = append(defs, def)
+	}
+	return defs
 }
 
 func safeResolveComponentStatus(status *parametersv1alpha1.ParameterStatus, componentName string) *parametersv1alpha1.ComponentReconfiguringStatus {
@@ -211,4 +238,20 @@ func prepareResources(rctx *ReconcileContext, _ *parametersv1alpha1.Parameter) e
 		ComponentParameter().
 		ParametersDefinitions().
 		Complete()
+}
+
+func syncComponentParameterStatus(rctx *ReconcileContext, parameter *parametersv1alpha1.Parameter) error {
+	syncConfigTemplateStatus := func(status *parametersv1alpha1.ComponentReconfiguringStatus, compParamStatus *parametersv1alpha1.ComponentParameterStatus) {
+		for i, parameterStatus := range status.ParameterStatus {
+			itemStatus := intctrlutil.GetItemStatus(compParamStatus, parameterStatus.Name)
+			if itemStatus != nil {
+				status.ParameterStatus[i].ConfigTemplateItemDetailStatus = *itemStatus
+			}
+		}
+	}
+
+	for i := range parameter.Status.ReconfiguringStatus {
+		syncConfigTemplateStatus(&parameter.Status.ReconfiguringStatus[i], &rctx.ComponentParameterObj.Status)
+	}
+	return nil
 }

@@ -42,7 +42,7 @@ const (
 
 	// NodeSelectorOnceAnnotationKey adds nodeSelector in podSpec for one pod exactly once
 	NodeSelectorOnceAnnotationKey = "workloads.kubeblocks.io/node-selector-once"
-	MemberJoinStatusAnnotationKey = "workloads.kubeblocks.io/memberjoin-pod-list"
+	// MemberJoinStatusAnnotationKey = "workloads.kubeblocks.io/memberjoin-pod-list"
 )
 
 // annotations for multi-cluster

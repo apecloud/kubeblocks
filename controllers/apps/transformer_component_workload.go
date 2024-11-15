@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -451,17 +452,12 @@ func (r *componentWorkloadOps) expandVolume() error {
 }
 
 func (r *componentWorkloadOps) horizontalScale() error {
-	// handle memberjoin lifecycle action
-	if err := r.checkAndDoMemberJoin(); err != nil {
-		return err
-	}
-
 	var (
 		in  = r.runningItsPodNameSet.Difference(r.desiredCompPodNameSet)
 		out = r.desiredCompPodNameSet.Difference(r.runningItsPodNameSet)
 	)
 	if in.Len() == 0 && out.Len() == 0 {
-		return nil
+		return r.postHorizontalScale() // TODO: how about consecutive horizontal scales?
 	}
 
 	if in.Len() > 0 {
@@ -487,59 +483,54 @@ func (r *componentWorkloadOps) horizontalScale() error {
 
 func (r *componentWorkloadOps) scaleIn() error {
 	deleteReplicas := r.runningItsPodNameSet.Difference(r.desiredCompPodNameSet).UnsortedList()
-	if err := component.DeleteReplicas(r.component, deleteReplicas); err != nil {
+	joinedReplicas, err := component.DeleteReplicas(r.component, deleteReplicas)
+	if err != nil {
 		return err
 	}
 
-	// if scale in to 0, do not delete pvcs
+	// TODO: check the component definition to determine whether we need to call leave member before deleting replicas.
+	if err := r.leaveMember4ScaleIn(deleteReplicas, joinedReplicas); err != nil {
+		r.reqCtx.Log.Info(fmt.Sprintf("leave member at scaling-in error, retry later: %s", err.Error()))
+		return err
+	}
+
+	// TODO: if scale in to 0, do not delete pvcs, remove this later
 	if r.synthesizeComp.Replicas == 0 {
 		r.reqCtx.Log.Info("scale in to 0, keep all PVCs")
 		return nil
 	}
-	// TODO: check the component definition to determine whether we need to call leave member before deleting replicas.
-	err := r.leaveMember4ScaleIn()
-	if err != nil {
-		r.reqCtx.Log.Info(fmt.Sprintf("leave member at scaling-in error, retry later: %s", err.Error()))
-		return err
-	}
+
 	return r.deletePVCs4ScaleIn(r.runningITS)
 }
 
-func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
+func (r *componentWorkloadOps) leaveMember4ScaleIn(deleteReplicas, joinedReplicas []string) error {
 	pods, err := component.ListOwnedPods(r.reqCtx.Ctx, r.cli, r.cluster.Namespace, r.cluster.Name, r.synthesizeComp.Name)
 	if err != nil {
 		return err
 	}
 
-	// TODO: Move memberLeave to the ITS controller. Instead of performing a switchover, we can directly scale down the non-leader nodes. This is because the pod ordinal is not guaranteed to be continuous.
-	podsToMemberLeave := make([]*corev1.Pod, 0)
-
-	podsToMemberjoin := getPodsToMemberJoinFromAnno(r.runningITS)
+	deleteReplicasSet := sets.New(deleteReplicas...)
+	joinedReplicasSet := sets.New(joinedReplicas...)
+	leaveErrors := make([]error, 0)
 	for _, pod := range pods {
-		// if the pod not exists in the generated pod names, it should be a member that needs to leave
-		if _, ok := r.desiredCompPodNameSet[pod.Name]; ok {
-			continue
+		if deleteReplicasSet.Has(pod.Name) {
+			if joinedReplicasSet.Has(pod.Name) { // else: hasn't joined yet, no need to leave
+				if err = r.leaveMemberForPod(pod, pods); err != nil {
+					leaveErrors = append(leaveErrors, err)
+				}
+				joinedReplicasSet.Delete(pod.Name)
+			}
+			deleteReplicasSet.Delete(pod.Name)
 		}
-		podsToMemberLeave = append(podsToMemberLeave, pod)
 	}
 
-	var leaveErrors []error
-	for _, pod := range podsToMemberLeave {
-
-		if podsToMemberjoin.Has(pod.Name) {
-			leaveErrors = append(leaveErrors, fmt.Errorf("pod %s is in memberjoin process", pod.Name))
-			continue
-		}
-
-		if err := r.leaveMemberForPod(pod, pods); err != nil {
-			leaveErrors = append(leaveErrors, err)
-		}
-
+	if len(joinedReplicasSet) > 0 {
+		leaveErrors = append(leaveErrors,
+			fmt.Errorf("some replicas have joined but not leaved since the Pod object is not exist: %v", sets.List(joinedReplicasSet)))
 	}
 	if len(leaveErrors) > 0 {
 		return newRequeueError(time.Second, fmt.Sprintf("%v", leaveErrors))
 	}
-
 	return nil
 }
 
@@ -600,79 +591,6 @@ func (r *componentWorkloadOps) leaveMemberForPod(pod *corev1.Pod, pods []*corev1
 	return nil
 }
 
-func (r *componentWorkloadOps) checkAndDoMemberJoin() error {
-	// just wait for memberjoin anno to be updated
-	if r.protoITS.Annotations[constant.MemberJoinStatusAnnotationKey] != "" {
-		return nil
-	}
-
-	podsToMemberjoin := getPodsToMemberJoinFromAnno(r.runningITS)
-	if len(podsToMemberjoin) == 0 {
-		return nil
-	}
-
-	if r.synthesizeComp.LifecycleActions == nil || r.synthesizeComp.LifecycleActions.MemberJoin == nil {
-		podsToMemberjoin.Clear()
-	}
-	err := r.doMemberJoin(podsToMemberjoin)
-	if err != nil {
-		return err
-	}
-
-	if podsToMemberjoin.Len() == 0 {
-		// Anno will be merged later, so it should be deleted from both protoITS and runningITS
-		delete(r.protoITS.Annotations, constant.MemberJoinStatusAnnotationKey)
-		delete(r.runningITS.Annotations, constant.MemberJoinStatusAnnotationKey)
-	} else {
-		r.protoITS.Annotations[constant.MemberJoinStatusAnnotationKey] = strings.Join(sets.List(podsToMemberjoin), ",")
-	}
-	return nil
-}
-
-func (r *componentWorkloadOps) doMemberJoin(podSet sets.Set[string]) error {
-	if len(podSet) == 0 {
-		return nil
-	}
-
-	runningPods, err := component.ListOwnedPods(r.reqCtx.Ctx, r.cli, r.cluster.Namespace, r.cluster.Name, r.synthesizeComp.Name)
-	if err != nil {
-		return err
-	}
-
-	var joinErrors []error
-	for _, pod := range runningPods {
-		if !podSet.Has(pod.Name) {
-			continue
-		}
-
-		if err := r.joinMemberForPod(pod, runningPods); err != nil {
-			joinErrors = append(joinErrors, fmt.Errorf("pod %s: %w", pod.Name, err))
-		} else {
-			podSet.Delete(pod.Name)
-		}
-	}
-
-	if len(joinErrors) > 0 {
-		return newRequeueError(time.Second, fmt.Sprintf("%v", joinErrors))
-	}
-	return nil
-}
-
-func (r *componentWorkloadOps) joinMemberForPod(pod *corev1.Pod, pods []*corev1.Pod) error {
-	lfa, err := lifecycle.New(r.synthesizeComp, pod, pods...)
-	if err != nil {
-		return err
-	}
-
-	if err = lfa.MemberJoin(r.reqCtx.Ctx, r.cli, nil); err != nil {
-		if !errors.Is(err, lifecycle.ErrActionNotDefined) {
-			return err
-		}
-	}
-
-	return nil
-}
-
 func (r *componentWorkloadOps) deletePVCs4ScaleIn(itsObj *workloads.InstanceSet) error {
 	graphCli := model.NewGraphClient(r.cli)
 	for _, podName := range r.runningItsPodNames {
@@ -702,8 +620,6 @@ func (r *componentWorkloadOps) deletePVCs4ScaleIn(itsObj *workloads.InstanceSet)
 }
 
 func (r *componentWorkloadOps) scaleOut() error {
-	r.annotateInstanceSetForMemberJoin()
-
 	// replicas in provisioning
 	provisioningReplicas, err := component.ReplicasInProvisioning(r.component)
 	if err != nil {
@@ -717,18 +633,24 @@ func (r *componentWorkloadOps) scaleOut() error {
 	graphCli := model.NewGraphClient(r.cli)
 	v := graphCli.Do(r.dag, nil, r.protoITS, model.ActionUpdatePtr(), nil)
 
+	hasActionDefined := func(actions []*appsv1.Action) bool {
+		for _, action := range actions {
+			if action == nil || action.Exec == nil {
+				return false
+			}
+		}
+		return true
+	}
+
 	hasDataActionDefined := func() bool {
 		if r.synthesizeComp.LifecycleActions == nil {
 			return false
 		}
-		dataDump := r.synthesizeComp.LifecycleActions.DataDump
-		dataLoad := r.synthesizeComp.LifecycleActions.DataLoad
-		if dataDump == nil || dataDump.Exec == nil || dataLoad == nil || dataLoad.Exec == nil {
-			return false
-		}
-		return true
+		return hasActionDefined([]*appsv1.Action{
+			r.synthesizeComp.LifecycleActions.DataDump,
+			r.synthesizeComp.LifecycleActions.DataLoad,
+		})
 	}()
-
 	// build and assign data replication tasks
 	if err := func() error {
 		if !hasDataActionDefined {
@@ -761,46 +683,16 @@ func (r *componentWorkloadOps) scaleOut() error {
 		return err
 	}
 
-	return component.NewReplicas(r.component, newReplicas, hasDataActionDefined)
-}
-
-func (r *componentWorkloadOps) annotateInstanceSetForMemberJoin() {
-	if r.synthesizeComp.LifecycleActions.MemberJoin == nil {
-		return
-	}
-
-	podsToMemberjoin := getPodsToMemberJoinFromAnno(r.runningITS)
-
-	for podName := range r.desiredCompPodNameSet {
-		if r.runningItsPodNameSet.Has(podName) {
-			continue
+	hasMemberActionDefined := func() bool {
+		if r.synthesizeComp.LifecycleActions == nil {
+			return false
 		}
-		if podsToMemberjoin.Has(podName) {
-			continue
-		}
-		podsToMemberjoin.Insert(podName)
-	}
+		return hasActionDefined([]*appsv1.Action{
+			r.synthesizeComp.LifecycleActions.MemberJoin,
+		})
+	}()
 
-	if podsToMemberjoin.Len() > 0 {
-		r.protoITS.Annotations[constant.MemberJoinStatusAnnotationKey] = strings.Join(sets.List(podsToMemberjoin), ",")
-	}
-}
-
-func getPodsToMemberJoinFromAnno(instanceSet *workloads.InstanceSet) sets.Set[string] {
-	podsToMemberjoin := sets.New[string]()
-	if instanceSet == nil {
-		return podsToMemberjoin
-	}
-
-	if instanceSet.Annotations == nil {
-		return podsToMemberjoin
-	}
-
-	if memberJoinStatus := instanceSet.Annotations[constant.MemberJoinStatusAnnotationKey]; memberJoinStatus != "" {
-		podsToMemberjoin.Insert(strings.Split(memberJoinStatus, ",")...)
-	}
-
-	return podsToMemberjoin
+	return component.NewReplicas(r.component, newReplicas, hasDataActionDefined, hasMemberActionDefined)
 }
 
 func (r *componentWorkloadOps) sourceReplica(dataDump *appsv1.Action) (*corev1.Pod, error) {
@@ -821,6 +713,74 @@ func (r *componentWorkloadOps) sourceReplica(dataDump *appsv1.Action) (*corev1.P
 		}
 	}
 	return nil, fmt.Errorf("no available pod to dump data")
+}
+
+func (r *componentWorkloadOps) postHorizontalScale() error {
+	if err := r.joinMember4ScaleOut(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *componentWorkloadOps) joinMember4ScaleOut() error {
+	pods, err := component.ListOwnedPods(r.reqCtx.Ctx, r.cli, r.cluster.Namespace, r.cluster.Name, r.synthesizeComp.Name)
+	if err != nil {
+		return err
+	}
+
+	joinErrors := make([]error, 0)
+	if err = component.UpdateReplicasStatusFunc(r.component, func(replicas *component.ReplicasStatus) error {
+		for _, pod := range pods {
+			i := slices.IndexFunc(replicas.Status, func(r component.ReplicaStatus) bool {
+				return r.Name == pod.Name
+			})
+			if i < 0 {
+				continue
+			}
+
+			status := replicas.Status[i]
+			if status.Joined == nil || *status.Joined {
+				continue
+			}
+
+			if err := r.joinMemberForPod(pod, pods); err != nil {
+				joinErrors = append(joinErrors, fmt.Errorf("pod %s: %w", pod.Name, err))
+			} else {
+				replicas.Status[i].Joined = ptr.To(true)
+			}
+		}
+
+		notJoinedReplicas := make([]string, 0)
+		for _, r := range replicas.Status {
+			if r.Joined != nil && !*r.Joined {
+				notJoinedReplicas = append(notJoinedReplicas, r.Name)
+			}
+		}
+		if len(notJoinedReplicas) > 0 {
+			joinErrors = append(joinErrors, fmt.Errorf("some replicas have not joined: %v", notJoinedReplicas))
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	if len(joinErrors) > 0 {
+		return newRequeueError(time.Second, fmt.Sprintf("%v", joinErrors))
+	}
+	return nil
+}
+
+func (r *componentWorkloadOps) joinMemberForPod(pod *corev1.Pod, pods []*corev1.Pod) error {
+	lfa, err := lifecycle.New(r.synthesizeComp, pod, pods...)
+	if err != nil {
+		return err
+	}
+	if err = lfa.MemberJoin(r.reqCtx.Ctx, r.cli, nil); err != nil {
+		if !errors.Is(err, lifecycle.ErrActionNotDefined) {
+			return err
+		}
+	}
+	return nil
 }
 
 func (r *componentWorkloadOps) expandVolumes(insTPLName string, vctName string, proto *corev1.PersistentVolumeClaimTemplate) error {

@@ -314,7 +314,7 @@ func MockInstanceSetStatus(testCtx testutil.TestContext, cluster *appsv1.Cluster
 		if _, ok := pod.Labels[constant.RoleLabelKey]; !ok {
 			continue
 		}
-		role := &workloads.ReplicaRole{}
+		var role *workloads.ReplicaRole
 		for _, r := range its.Spec.Roles {
 			if r.Name == pod.Labels[constant.RoleLabelKey] {
 				role = r.DeepCopy()

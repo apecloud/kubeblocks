@@ -317,6 +317,12 @@ dataPlane:
 # Add extra pod labels to KubeBlocks Deployment
 extraLabels: {}
 
+# Add extra annotations to KubeBlocks Deployment
+deployAnnotations: {}
+
+# Add extra pod envs to KubeBlocks Deployment
+extraEnvs: []
+
 ## webhooks settings
 ##
 ## @param webhooks.conversionEnabled
@@ -391,6 +397,16 @@ dataProtection:
 
   # Add extra pod labels to KubeBlocks-DataProtection Deployment
   extraLabels: {}
+
+  # Add extra annotations to KubeBlocks-DataProtection Deployment
+  deployAnnotations: {}
+
+  # Add extra pod envs to KubeBlocks-DataProtection Deployment
+  extraEnvs: []
+
+  ## @param podAnnotations
+  ##
+  podAnnotations: {}
 
 ## BackupRepo settings
 ##

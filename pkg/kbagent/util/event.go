@@ -93,41 +93,48 @@ func createOrUpdateEvent(reason, message string) error {
 	eventName := generateEventName(reason, message)
 
 	var event *corev1.Event
+	var getErr error
+	getEvent := func() error {
+		event, getErr = eventsClient.Get(context.Background(), eventName, metav1.GetOptions{})
+		if getErr == nil || k8serrors.IsNotFound(getErr) {
+			return nil
+		}
+		return getErr
+	}
+	if err = retryOperation(getEvent); err != nil {
+		return err
+	}
+
+	if k8serrors.IsNotFound(getErr) {
+		// create
+		event = newEvent(reason, message)
+		createEvent := func() error {
+			_, createErr := eventsClient.Create(context.Background(), event, metav1.CreateOptions{})
+			return createErr
+		}
+		return retryOperation(createEvent)
+	}
+
+	// update
+	event.Count++
+	event.LastTimestamp = metav1.Now()
+	updateEvent := func() error {
+		_, updateErr := eventsClient.Update(context.Background(), event, metav1.UpdateOptions{})
+		return updateErr
+	}
+	return retryOperation(updateEvent)
+}
+
+func retryOperation(op func() error) error {
+	var err error
 	for i := 0; i < maxRetryAttempts; i++ {
-		event, err = eventsClient.Get(context.Background(), eventName, metav1.GetOptions{})
-		if err == nil || k8serrors.IsNotFound(err) {
-			break
+		err = op()
+		if err == nil {
+			return nil
 		}
 		time.Sleep(retryInterval)
 	}
-
-	if err == nil && event != nil {
-		// update
-		event.Count++
-		event.LastTimestamp = metav1.Now()
-		for i := 0; i < maxRetryAttempts; i++ {
-			_, err = eventsClient.Update(context.Background(), event, metav1.UpdateOptions{})
-			if err == nil {
-				return nil
-			}
-			time.Sleep(retryInterval)
-		}
-		return errors.Wrapf(err, "failed to update event %s after %d attempts", eventName, maxRetryAttempts)
-	}
-
-	if k8serrors.IsNotFound(err) {
-		// create
-		event = newEvent(reason, message)
-		for i := 0; i < maxRetryAttempts; i++ {
-			_, err = eventsClient.Create(context.Background(), event, metav1.CreateOptions{})
-			if err == nil {
-				return nil
-			}
-			time.Sleep(retryInterval)
-		}
-		return errors.Wrapf(err, "failed to create event %s after %d attempts", eventName, maxRetryAttempts)
-	}
-	return errors.Wrapf(err, "failed to get event %s after %d attempts", eventName, maxRetryAttempts)
+	return errors.Wrapf(err, "failed to handle event after %d attempts", maxRetryAttempts)
 }
 
 func getK8sClientSet() (*kubernetes.Clientset, error) {

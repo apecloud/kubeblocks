@@ -136,7 +136,7 @@ func DeleteReplicasStatus(its *workloads.InstanceSet, replicas []string, f func(
 	})
 }
 
-func StatusReplicasStatus(its *workloads.InstanceSet, pods []*corev1.Pod, hasMemberJoin, hasDataAction bool) error {
+func StatusReplicasStatus(its *workloads.InstanceSet, replicas []string, hasMemberJoin, hasDataAction bool) error {
 	loaded := func() *bool {
 		if hasDataAction {
 			return ptr.To(true)
@@ -154,15 +154,15 @@ func StatusReplicasStatus(its *workloads.InstanceSet, pods []*corev1.Pod, hasMem
 		if status.Status == nil {
 			status.Status = make([]ReplicaStatus, 0)
 		}
-		for _, pod := range pods {
+		for _, replica := range replicas {
 			i := slices.IndexFunc(status.Status, func(s ReplicaStatus) bool {
-				return s.Name == pod.Name
+				return s.Name == replica
 			})
 			if i >= 0 {
 				status.Status[i].Provisioned = true
 			} else {
 				status.Status = append(status.Status, ReplicaStatus{
-					Name:              pod.Name,
+					Name:              replica,
 					Generation:        compGenerationFromITS(its),
 					CreationTimestamp: its.CreationTimestamp.Time,
 					Provisioned:       true,
@@ -278,9 +278,17 @@ func setReplicasStatus(its *workloads.InstanceSet, status ReplicasStatus) error 
 	return nil
 }
 
-func handleNewReplicaTaskEvent(ctx context.Context, cli client.Client, comp *appsv1.Component, event proto.TaskEvent) error {
+func handleNewReplicaTaskEvent(ctx context.Context, cli client.Client, namespace string, event proto.TaskEvent) error {
+	key := types.NamespacedName{
+		Namespace: namespace,
+		Name:      event.Instance,
+	}
+	comp := &appsv1.Component{}
+	if err := cli.Get(ctx, key, comp); err != nil {
+		return err
+	}
 	its := &workloads.InstanceSet{}
-	if err := cli.Get(ctx, client.ObjectKeyFromObject(comp), its); err != nil {
+	if err := cli.Get(ctx, key, its); err != nil {
 		return err
 	}
 
@@ -289,9 +297,9 @@ func handleNewReplicaTaskEvent(ctx context.Context, cli client.Client, comp *app
 		return handleNewReplicaTaskEvent4Finished(ctx, cli, comp, its, event)
 	}
 	if finished {
-		return handleNewReplicaTaskEvent4Failed(comp, its, event)
+		return handleNewReplicaTaskEvent4Failed(ctx, cli, comp, its, event)
 	}
-	return handleNewReplicaTaskEvent4Unfinished(comp, its, event)
+	return handleNewReplicaTaskEvent4Unfinished(ctx, cli, comp, its, event)
 }
 
 func handleNewReplicaTaskEvent4Finished(ctx context.Context, cli client.Client,
@@ -340,7 +348,7 @@ func handleNewReplicaTaskEvent4Finished(ctx context.Context, cli client.Client,
 	}(); err != nil {
 		return err
 	}
-	return updateReplicaStatusFunc(its, event.Replica, func(status *ReplicaStatus) error {
+	return updateReplicaStatusFunc(ctx, cli, its, event.Replica, func(status *ReplicaStatus) error {
 		status.Generation = strconv.FormatInt(comp.Generation, 10) // TODO: generation
 		status.Message = event.Message
 		status.DataLoaded = ptr.To(true)
@@ -348,24 +356,27 @@ func handleNewReplicaTaskEvent4Finished(ctx context.Context, cli client.Client,
 	})
 }
 
-func handleNewReplicaTaskEvent4Unfinished(comp *appsv1.Component, its *workloads.InstanceSet, event proto.TaskEvent) error {
-	return updateReplicaStatusFunc(its, event.Replica, func(status *ReplicaStatus) error {
+func handleNewReplicaTaskEvent4Unfinished(ctx context.Context, cli client.Client,
+	comp *appsv1.Component, its *workloads.InstanceSet, event proto.TaskEvent) error {
+	return updateReplicaStatusFunc(ctx, cli, its, event.Replica, func(status *ReplicaStatus) error {
 		status.Generation = strconv.FormatInt(comp.Generation, 10) // TODO: generation
 		status.DataLoaded = ptr.To(false)
 		return nil
 	})
 }
 
-func handleNewReplicaTaskEvent4Failed(comp *appsv1.Component, its *workloads.InstanceSet, event proto.TaskEvent) error {
-	return updateReplicaStatusFunc(its, event.Replica, func(status *ReplicaStatus) error {
+func handleNewReplicaTaskEvent4Failed(ctx context.Context, cli client.Client,
+	comp *appsv1.Component, its *workloads.InstanceSet, event proto.TaskEvent) error {
+	return updateReplicaStatusFunc(ctx, cli, its, event.Replica, func(status *ReplicaStatus) error {
 		status.Generation = strconv.FormatInt(comp.Generation, 10) // TODO: generation
 		status.Message = event.Message
 		return nil
 	})
 }
 
-func updateReplicaStatusFunc(its *workloads.InstanceSet, replicaName string, f func(*ReplicaStatus) error) error {
-	return UpdateReplicasStatusFunc(its, func(status *ReplicasStatus) error {
+func updateReplicaStatusFunc(ctx context.Context, cli client.Client,
+	its *workloads.InstanceSet, replicaName string, f func(*ReplicaStatus) error) error {
+	if err := UpdateReplicasStatusFunc(its, func(status *ReplicasStatus) error {
 		for i := range status.Status {
 			if status.Status[i].Name == replicaName {
 				if f != nil {
@@ -375,5 +386,8 @@ func updateReplicaStatusFunc(its *workloads.InstanceSet, replicaName string, f f
 			}
 		}
 		return fmt.Errorf("replica %s not found", replicaName)
-	})
+	}); err != nil {
+		return err
+	}
+	return cli.Update(ctx, its)
 }

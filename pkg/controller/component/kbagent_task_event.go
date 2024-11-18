@@ -25,11 +25,9 @@ import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 )
@@ -46,21 +44,7 @@ func (h *KBAgentTaskEventHandler) Handle(cli client.Client, reqCtx intctrlutil.R
 		return err
 	}
 
-	compKey := types.NamespacedName{
-		Namespace: event.InvolvedObject.Namespace,
-		Name:      taskEvent.Instance,
-	}
-	comp := &appsv1.Component{}
-	if err := cli.Get(reqCtx.Ctx, compKey, comp); err != nil {
-		return err
-	}
-	compCopy := comp.DeepCopy()
-
-	err := h.handleEvent(reqCtx.Ctx, cli, *taskEvent, comp)
-	if err != nil {
-		return err
-	}
-	return h.status(reqCtx.Ctx, cli, compCopy, comp)
+	return h.handleEvent(reqCtx.Ctx, cli, event.InvolvedObject.Namespace, *taskEvent)
 }
 
 func (h *KBAgentTaskEventHandler) isTaskEvent(event *corev1.Event) bool {
@@ -68,13 +52,9 @@ func (h *KBAgentTaskEventHandler) isTaskEvent(event *corev1.Event) bool {
 		event.Reason == "task" && event.InvolvedObject.FieldPath == proto.ProbeEventFieldPath
 }
 
-func (h *KBAgentTaskEventHandler) handleEvent(ctx context.Context, cli client.Client, event proto.TaskEvent, comp *appsv1.Component) error {
+func (h *KBAgentTaskEventHandler) handleEvent(ctx context.Context, cli client.Client, namespace string, event proto.TaskEvent) error {
 	if event.Task == newReplicaTask {
-		return handleNewReplicaTaskEvent(ctx, cli, comp, event)
+		return handleNewReplicaTaskEvent(ctx, cli, namespace, event)
 	}
 	return fmt.Errorf("unsupported kind of task event: %s", event.Task)
-}
-
-func (h *KBAgentTaskEventHandler) status(ctx context.Context, cli client.Client, compCopy, comp *appsv1.Component) error {
-	return cli.Status().Patch(ctx, comp, client.MergeFrom(compCopy))
 }

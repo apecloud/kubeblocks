@@ -152,7 +152,7 @@ func (t *componentWorkloadTransformer) reconcileWorkload(ctx context.Context, cl
 
 	buildInstanceSetPlacementAnnotation(comp, protoITS)
 
-	if err := reconcileReplicasStatus(ctx, cli, synthesizedComp, runningITS, protoITS); err != nil {
+	if err := t.reconcileReplicasStatus(ctx, cli, synthesizedComp, runningITS, protoITS); err != nil {
 		return err
 	}
 
@@ -165,6 +165,71 @@ func (t *componentWorkloadTransformer) reconcileWorkload(ctx context.Context, cl
 	}
 
 	return nil
+}
+
+func (t *componentWorkloadTransformer) reconcileReplicasStatus(ctx context.Context, cli client.Reader,
+	synthesizedComp *component.SynthesizedComponent, runningITS, protoITS *workloads.InstanceSet) error {
+	var (
+		namespace   = synthesizedComp.Namespace
+		clusterName = synthesizedComp.ClusterName
+		compName    = synthesizedComp.Name
+	)
+
+	// HACK: sync replicas status from runningITS to protoITS
+	component.BuildReplicasStatus(runningITS, protoITS)
+
+	replicas, err := func() ([]string, error) {
+		pods, err := component.ListOwnedPods(ctx, cli, namespace, clusterName, compName)
+		if err != nil {
+			return nil, err
+		}
+		podNameSet := sets.New[string]()
+		for _, pod := range pods {
+			podNameSet.Insert(pod.Name)
+		}
+
+		desiredPodNames, err := generatePodNames(synthesizedComp)
+		if err != nil {
+			return nil, err
+		}
+		desiredPodNameSet := sets.New(desiredPodNames...)
+
+		return desiredPodNameSet.Intersection(podNameSet).UnsortedList(), nil
+	}()
+	if err != nil {
+		return err
+	}
+
+	hasMemberJoinDefined, hasDataActionDefined := func() (bool, bool) {
+		hasActionDefined := func(actions []*appsv1.Action) bool {
+			for _, action := range actions {
+				if action == nil || action.Exec == nil {
+					return false
+				}
+			}
+			return true
+		}
+		hasMemberJoinDefined := func() bool {
+			if synthesizedComp.LifecycleActions == nil {
+				return false
+			}
+			return hasActionDefined([]*appsv1.Action{
+				synthesizedComp.LifecycleActions.MemberJoin,
+			})
+		}()
+		hasDataActionDefined := func() bool {
+			if synthesizedComp.LifecycleActions == nil {
+				return false
+			}
+			return hasActionDefined([]*appsv1.Action{
+				synthesizedComp.LifecycleActions.DataDump,
+				synthesizedComp.LifecycleActions.DataLoad,
+			})
+		}()
+
+		return hasMemberJoinDefined, hasDataActionDefined
+	}()
+	return component.StatusReplicasStatus(protoITS, replicas, hasMemberJoinDefined, hasDataActionDefined)
 }
 
 func isCompStopped(synthesizedComp *component.SynthesizedComponent) bool {
@@ -1072,51 +1137,4 @@ func newComponentWorkloadOps(reqCtx intctrlutil.RequestCtx,
 		desiredCompPodNameSet: sets.New(compPodNames...),
 		runningItsPodNameSet:  sets.New(itsPodNames...),
 	}, nil
-}
-
-func reconcileReplicasStatus(ctx context.Context, cli client.Reader,
-	synthesizedComp *component.SynthesizedComponent, runningITS, protoITS *workloads.InstanceSet) error {
-	var (
-		namespace   = synthesizedComp.Namespace
-		clusterName = synthesizedComp.ClusterName
-		compName    = synthesizedComp.Name
-	)
-
-	// HACK: sync replicas status from runningITS to protoITS
-	component.BuildReplicasStatus(runningITS, protoITS)
-
-	pods, err := component.ListOwnedPods(ctx, cli, namespace, clusterName, compName)
-	if err != nil {
-		return err
-	}
-	hasMemberJoinDefined, hasDataActionDefined := func() (bool, bool) {
-		hasActionDefined := func(actions []*appsv1.Action) bool {
-			for _, action := range actions {
-				if action == nil || action.Exec == nil {
-					return false
-				}
-			}
-			return true
-		}
-		hasMemberJoinDefined := func() bool {
-			if synthesizedComp.LifecycleActions == nil {
-				return false
-			}
-			return hasActionDefined([]*appsv1.Action{
-				synthesizedComp.LifecycleActions.MemberJoin,
-			})
-		}()
-		hasDataActionDefined := func() bool {
-			if synthesizedComp.LifecycleActions == nil {
-				return false
-			}
-			return hasActionDefined([]*appsv1.Action{
-				synthesizedComp.LifecycleActions.DataDump,
-				synthesizedComp.LifecycleActions.DataLoad,
-			})
-		}()
-
-		return hasMemberJoinDefined, hasDataActionDefined
-	}()
-	return component.StatusReplicasStatus(protoITS, pods, hasMemberJoinDefined, hasDataActionDefined)
 }

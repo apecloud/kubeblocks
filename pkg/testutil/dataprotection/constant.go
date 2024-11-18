@@ -59,3 +59,16 @@ const (
 	RestoreName       = "test-restore"
 	MysqlTemplateName = "data-mysql-mysql"
 )
+
+const (
+	InvalidParameter    = "invalid"
+	ParameterString     = "testString"
+	ParameterStringType = "string"
+	ParameterArray      = "testArray"
+	ParameterArrayType  = "array"
+)
+
+var TestParameters = map[string]string{
+	ParameterString: "stringValue",
+	ParameterArray:  "v1,v2",
+}

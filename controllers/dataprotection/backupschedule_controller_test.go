@@ -25,7 +25,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	batchv1 "k8s.io/api/batch/v1"
-	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -197,45 +196,11 @@ var _ = Describe("Backup Schedule Controller", func() {
 
 		Context("create a backup schedule with parameters", func() {
 			const (
-				invalidParameter    = "invalid"
-				parameterString     = "testString"
-				parameterStringType = "string"
-				parameterArray      = "testArray"
-				parameterArrayType  = "array"
-				scheduleName        = "test"
+				scheduleName = "test"
 			)
-			testParameters := map[string]string{
-				parameterString: "stringValue",
-				parameterArray:  "v1,v2",
-			}
 			BeforeEach(func() {
 				By("set backup parameters and schema in acitionSet")
-				Expect(testapps.ChangeObj(&testCtx, actionSet, func(as *dpv1alpha1.ActionSet) {
-					as.Spec.ParametersSchema = &dpv1alpha1.SelectiveParametersSchema{
-						OpenAPIV3Schema: &v1.JSONSchemaProps{
-							Properties: map[string]v1.JSONSchemaProps{
-								parameterString: {
-									Type: parameterStringType,
-								},
-								parameterArray: {
-									Type: parameterArrayType,
-									Items: &v1.JSONSchemaPropsOrArray{
-										Schema: &v1.JSONSchemaProps{
-											Type: parameterStringType,
-										},
-									},
-								},
-							},
-						},
-					}
-					as.Spec.Backup.WithParameters = []string{parameterString, parameterArray}
-				})).Should(Succeed())
-				By("the actionSet should be available")
-				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(actionSet),
-					func(g Gomega, as *dpv1alpha1.ActionSet) {
-						g.Expect(as.Status.Phase).Should(BeEquivalentTo(dpv1alpha1.AvailablePhase))
-						g.Expect(as.Status.Message).Should(BeEmpty())
-					})).Should(Succeed())
+				testdp.MockActionSetWithSchema(&testCtx, actionSet)
 			})
 			It("with parameters", func() {
 				By("creating a backupSchedule with invalid parameters")
@@ -243,7 +208,7 @@ var _ = Describe("Backup Schedule Controller", func() {
 					schedule.Spec.Schedules[1].BackupMethod = testdp.BackupMethodName
 					schedule.Spec.Schedules[1].Name = scheduleName
 					schedule.Spec.Schedules[1].Parameters = map[string]string{
-						invalidParameter: invalidParameter,
+						testdp.InvalidParameter: testdp.InvalidParameter,
 					}
 				})
 				backupScheduleKey := client.ObjectKeyFromObject(backupSchedule)
@@ -253,7 +218,7 @@ var _ = Describe("Backup Schedule Controller", func() {
 				})).Should(Succeed())
 				By("set valid parameters")
 				Expect(testapps.ChangeObj(&testCtx, backupSchedule, func(bs *v1alpha1.BackupSchedule) {
-					backupSchedule.Spec.Schedules[1].Parameters = testParameters
+					backupSchedule.Spec.Schedules[1].Parameters = testdp.TestParameters
 				})).Should(Succeed())
 				By("checking backupSchedule status, should be available")
 				Eventually(testapps.CheckObj(&testCtx, backupScheduleKey, func(g Gomega, fetched *dpv1alpha1.BackupSchedule) {
@@ -277,7 +242,7 @@ var _ = Describe("Backup Schedule Controller", func() {
 					g.Expect(fetched.Spec.JobTemplate.Spec.Template.Spec.Containers).Should(HaveLen(1))
 					args := fetched.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Args
 					g.Expect(args).Should(HaveLen(1))
-					g.Expect(args[0]).Should(ContainSubstring(dpbackup.BuildParametersManifest(testParameters)))
+					g.Expect(args[0]).Should(ContainSubstring(dpbackup.BuildParametersManifest(testdp.TestParameters)))
 				})).Should(Succeed())
 			})
 		})

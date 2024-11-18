@@ -25,6 +25,7 @@ import (
 	. "github.com/onsi/gomega"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -147,4 +148,34 @@ func MockRestoreCompleted(testCtx *testutil.TestContext, ml client.MatchingLabel
 		})()
 		Expect(err).ShouldNot(HaveOccurred())
 	}
+}
+
+func MockActionSetWithSchema(testCtx *testutil.TestContext, actionSet *dpv1alpha1.ActionSet) {
+	Expect(testapps.ChangeObj(testCtx, actionSet, func(as *dpv1alpha1.ActionSet) {
+		as.Spec.ParametersSchema = &dpv1alpha1.SelectiveParametersSchema{
+			OpenAPIV3Schema: &v1.JSONSchemaProps{
+				Properties: map[string]v1.JSONSchemaProps{
+					ParameterString: {
+						Type: ParameterStringType,
+					},
+					ParameterArray: {
+						Type: ParameterArrayType,
+						Items: &v1.JSONSchemaPropsOrArray{
+							Schema: &v1.JSONSchemaProps{
+								Type: ParameterStringType,
+							},
+						},
+					},
+				},
+			},
+		}
+		as.Spec.Backup.WithParameters = []string{ParameterString, ParameterArray}
+		as.Spec.Restore.WithParameters = []string{ParameterString, ParameterArray}
+	})).Should(Succeed())
+	By("the actionSet should be available")
+	Eventually(testapps.CheckObj(testCtx, client.ObjectKeyFromObject(actionSet),
+		func(g Gomega, as *dpv1alpha1.ActionSet) {
+			g.Expect(as.Status.Phase).Should(BeEquivalentTo(dpv1alpha1.AvailablePhase))
+			g.Expect(as.Status.Message).Should(BeEmpty())
+		})).Should(Succeed())
 }

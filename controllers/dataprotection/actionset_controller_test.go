@@ -62,11 +62,6 @@ var _ = Describe("ActionSet Controller test", func() {
 
 	Context("validate a actionSet", func() {
 		It("validate withParameters", func() {
-			const (
-				parameter        = "test"
-				invalidParameter = "invalid"
-				parameterType    = "string"
-			)
 			as := testdp.NewFakeActionSet(&testCtx)
 			Expect(as).ShouldNot(BeNil())
 			By("set invalid withParameters and schema")
@@ -74,13 +69,21 @@ var _ = Describe("ActionSet Controller test", func() {
 				as.Spec.ParametersSchema = &v1alpha1.SelectiveParametersSchema{
 					OpenAPIV3Schema: &v1.JSONSchemaProps{
 						Properties: map[string]v1.JSONSchemaProps{
-							parameter: {
-								Type: parameterType,
+							testdp.ParameterString: {
+								Type: testdp.ParameterStringType,
+							},
+							testdp.ParameterArray: {
+								Type: testdp.ParameterArrayType,
+								Items: &v1.JSONSchemaPropsOrArray{
+									Schema: &v1.JSONSchemaProps{
+										Type: testdp.ParameterStringType,
+									},
+								},
 							},
 						},
 					},
 				}
-				as.Spec.Backup.WithParameters = []string{invalidParameter}
+				as.Spec.Backup.WithParameters = []string{testdp.InvalidParameter}
 			})).Should(Succeed())
 			By("should be unavailable with invlid withParameters")
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(as),
@@ -91,7 +94,7 @@ var _ = Describe("ActionSet Controller test", func() {
 				})).Should(Succeed())
 			By("set valid parameters")
 			Expect(testapps.ChangeObj(&testCtx, as, func(action *v1alpha1.ActionSet) {
-				as.Spec.Backup.WithParameters = []string{parameter}
+				as.Spec.Backup.WithParameters = []string{testdp.ParameterString, testdp.ParameterArray}
 			})).Should(Succeed())
 			By("should be available")
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(as),

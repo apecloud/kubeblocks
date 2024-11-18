@@ -293,6 +293,15 @@ func (c componentOpsHelper) reconcileActionWithComponentOps(reqCtx intctrlutil.R
 	return opsv1alpha1.OpsSucceedPhase, 0, nil
 }
 
+func hasIntersectionCompOpsList[T ComponentOpsInterface, S ComponentOpsInterface](currCompOpsMap map[string]T, list []S) bool {
+	for _, comp := range list {
+		if _, ok := currCompOpsMap[comp.GetComponentName()]; ok {
+			return true
+		}
+	}
+	return false
+}
+
 func componentTerminalPhases() []appsv1.ComponentPhase {
 	return []appsv1.ComponentPhase{
 		appsv1.RunningComponentPhase,

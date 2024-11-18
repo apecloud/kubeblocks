@@ -56,7 +56,8 @@ func (stop StopOpsHandler) ActionStartedCondition(reqCtx intctrlutil.RequestCtx,
 // Action modifies Cluster.spec.components[*].replicas from the opsRequest
 func (stop StopOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	var (
-		cluster = opsRes.Cluster
+		cluster  = opsRes.Cluster
+		stopList = opsRes.OpsRequest.Spec.StopList
 	)
 
 	// if the cluster is already stopping or stopped, return
@@ -64,25 +65,44 @@ func (stop StopOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		appsv1.StoppingClusterPhase}, opsRes.Cluster.Status.Phase) {
 		return nil
 	}
-
-	// abort earlier running vertical scaling opsRequest.
+	compOpsHelper := newComponentOpsHelper(stopList)
+	// abort earlier running opsRequests.
 	if err := abortEarlierOpsRequestWithSameKind(reqCtx, cli, opsRes, []opsv1alpha1.OpsType{opsv1alpha1.HorizontalScalingType,
 		opsv1alpha1.StartType, opsv1alpha1.RestartType, opsv1alpha1.VerticalScalingType},
 		func(earlierOps *opsv1alpha1.OpsRequest) (bool, error) {
-			return true, nil
+			if len(stopList) == 0 {
+				// stop all components
+				return true, nil
+			}
+			switch earlierOps.Spec.Type {
+			case opsv1alpha1.RestartType:
+				return hasIntersectionCompOpsList(compOpsHelper.componentOpsSet, earlierOps.Spec.RestartList), nil
+			case opsv1alpha1.VerticalScalingType:
+				return hasIntersectionCompOpsList(compOpsHelper.componentOpsSet, earlierOps.Spec.VerticalScalingList), nil
+			case opsv1alpha1.HorizontalScalingType:
+				return hasIntersectionCompOpsList(compOpsHelper.componentOpsSet, earlierOps.Spec.HorizontalScalingList), nil
+			case opsv1alpha1.StartType:
+				return len(earlierOps.Spec.StartList) == 0 || hasIntersectionCompOpsList(compOpsHelper.componentOpsSet, earlierOps.Spec.StartList), nil
+			}
+			return false, nil
 		}); err != nil {
 		return err
 	}
 
-	stopComp := func(compSpec *appsv1.ClusterComponentSpec) {
+	stopComp := func(compSpec *appsv1.ClusterComponentSpec, clusterCompName string) {
+		if len(stopList) > 0 {
+			if _, ok := compOpsHelper.componentOpsSet[clusterCompName]; !ok {
+				return
+			}
+		}
 		compSpec.Stop = func() *bool { b := true; return &b }()
 	}
 
-	for i := range cluster.Spec.ComponentSpecs {
-		stopComp(&cluster.Spec.ComponentSpecs[i])
+	for i, v := range cluster.Spec.ComponentSpecs {
+		stopComp(&cluster.Spec.ComponentSpecs[i], v.Name)
 	}
-	for i := range cluster.Spec.Shardings {
-		stopComp(&cluster.Spec.Shardings[i].Template)
+	for i, v := range cluster.Spec.Shardings {
+		stopComp(&cluster.Spec.Shardings[i].Template, v.Name)
 	}
 	return cli.Update(reqCtx.Ctx, cluster)
 }
@@ -107,7 +127,7 @@ func (stop StopOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 		}
 		return expectProgressCount, completedCount, nil
 	}
-	compOpsHelper := newComponentOpsHelper([]opsv1alpha1.ComponentOps{})
+	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.StopList)
 	return compOpsHelper.reconcileActionWithComponentOps(reqCtx, cli, opsRes, "stop", handleComponentProgress)
 }
 

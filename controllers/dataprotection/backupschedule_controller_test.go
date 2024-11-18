@@ -27,7 +27,6 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	dpbackup "github.com/apecloud/kubeblocks/pkg/dataprotection/backup"
@@ -217,7 +216,7 @@ var _ = Describe("Backup Schedule Controller", func() {
 					g.Expect(fetched.Status.Phase).NotTo(Equal(dpv1alpha1.BackupSchedulePhaseAvailable))
 				})).Should(Succeed())
 				By("set valid parameters")
-				Expect(testapps.ChangeObj(&testCtx, backupSchedule, func(bs *v1alpha1.BackupSchedule) {
+				Expect(testapps.ChangeObj(&testCtx, backupSchedule, func(bs *dpv1alpha1.BackupSchedule) {
 					backupSchedule.Spec.Schedules[1].Parameters = testdp.TestParameters
 				})).Should(Succeed())
 				By("checking backupSchedule status, should be available")

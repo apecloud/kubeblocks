@@ -515,9 +515,12 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			}, true)
 			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
 			Expect(opsRes.Cluster.Spec.GetComponentByName(defaultCompName).Replicas).Should(BeEquivalentTo(3))
+			By("expect for opsRequest phase is Succeed after pods has been scaled and component phase is Running")
+			checkOpsRequestPhaseIsSucceed(reqCtx, opsRes)
+			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("1/1"), fmt.Sprintf("info: %v", opsRes.OpsRequest))
 		})
 
-		It("test offline two specified pods with same pod name with ignore policy", func() {
+		It("test offline two specified pods with same pod name with ignore validate", func() {
 			By("init operations resources with CLusterDefinition/ClusterVersion/Hybrid components Cluster/consensus Pods")
 			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
 			testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
@@ -539,7 +542,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			checkOpsRequestPhaseIsSucceed(reqCtx, opsRes)
 		})
 
-		It("test online two specified pods with same pod name with ignore policy", func() {
+		It("test online two specified pods with same pod name with ignore validate", func() {
 			By("init operations resources with CLusterDefinition/ClusterVersion/Hybrid components Cluster/consensus Pods")
 			By("init operations resources with CLusterDefinition/ClusterVersion/Hybrid components Cluster/consensus Pods")
 			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
@@ -564,7 +567,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 
 		})
 
-		It("test offline and online two pods in the same time with the ignore policy", func() {
+		It("test offline and online two pods in the same time with the ignore validate", func() {
 			onlinePodName := fmt.Sprintf("%s-%s-1", clusterName, defaultCompName)
 			offlinePodName := fmt.Sprintf("%s-%s-%s-0", clusterName, defaultCompName, insTplName)
 			opsRes := testHScaleWithSpecifiedPod(func(cluster *appsv1.Cluster) {

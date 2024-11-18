@@ -296,7 +296,7 @@ func filterHorizontalScalingSpec(
 				onlinedInstanceFromOps.Insert(insName)
 			}
 		}
-		horizontalScaling.ScaleIn.OnlineInstancesToOffline = onlinedInstanceFromOps.UnsortedList()
+		horizontalScaling.ScaleIn.OnlineInstancesToOffline = sets.List(onlinedInstanceFromOps)
 	}
 	if horizontalScaling.ScaleOut != nil && len(horizontalScaling.ScaleOut.OfflineInstancesToOnline) > 0 {
 		offlinedInstanceFromOps := sets.Set[string]{}
@@ -305,7 +305,7 @@ func filterHorizontalScalingSpec(
 				offlinedInstanceFromOps.Insert(insName)
 			}
 		}
-		horizontalScaling.ScaleOut.OfflineInstancesToOnline = offlinedInstanceFromOps.UnsortedList()
+		horizontalScaling.ScaleOut.OfflineInstancesToOnline = sets.List(offlinedInstanceFromOps)
 	}
 	return horizontalScaling, nil
 
@@ -441,8 +441,8 @@ func (hs horizontalScalingOpsHandler) getCompExpectedOfflineInstances(
 	return compOfflineInstances
 }
 
-// validate if there is any instance specified in the request that is not exist, return error.
-// if ignoreStrictHorizontalValidation is empty, it would validate the instances if they are already offlined or onlined.
+// validateHorizontalScaling validates the horizontal scaling if they are already offlined or onlined.
+// if ignoreHscaleValidateAnnoKey is 'true', it would ignore and skip this validation.
 func (hs horizontalScalingOpsHandler) validateHorizontalScaling(
 	opsRes *OpsResource,
 	lastCompConfiguration opsv1alpha1.LastComponentConfiguration,
@@ -484,7 +484,7 @@ func (hs horizontalScalingOpsHandler) validateOnlineInstancesToOffline(
 	}
 	for _, onlineIns := range onlineInstancesToOffline {
 		if _, ok := currPodSet[onlineIns]; !ok {
-			return intctrlutil.NewFatalError(fmt.Sprintf(`instance "%s" specified in onlineInstancesToOffline is not onlinee`, onlineIns))
+			return intctrlutil.NewFatalError(fmt.Sprintf(`instance "%s" specified in onlineInstancesToOffline is not online`, onlineIns))
 		}
 	}
 	return nil

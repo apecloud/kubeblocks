@@ -253,8 +253,8 @@ func (r *SidecarDefinitionReconciler) validateOwnerNSelectors(_ []appsv1.Compone
 		return nil
 	}
 
-	owners := sets.New[string](strings.Split(status.Owners, ",")...)
-	selectors := sets.New[string](strings.Split(status.Selectors, ",")...)
+	owners := sets.New(strings.Split(status.Owners, ",")...)
+	selectors := sets.New(strings.Split(status.Selectors, ",")...)
 	intersected := owners.Intersection(selectors)
 	if intersected.Len() > 0 {
 		return fmt.Errorf("owner and selectors should not be overlapped: %s", strings.Join(sets.List(intersected), ","))

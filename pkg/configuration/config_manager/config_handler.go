@@ -596,7 +596,7 @@ func CreateCombinedHandler(config string, backupPath string) (ConfigHandler, err
 			return nil, err
 		}
 		hkey := configMeta.ConfigSpec.Name
-		if configMeta.ConfigFile == "" {
+		if configMeta.ConfigFile != "" {
 			hkey = hkey + "/" + configMeta.ConfigFile
 		}
 		mHandler.handlers[hkey] = h

@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package validate
 
 import (
-	"github.com/StudioSol/set"
 	apiext "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/kube-openapi/pkg/validation/errors"
 	kubeopenapispec "k8s.io/kube-openapi/pkg/validation/spec"
@@ -37,33 +36,10 @@ type ConfigValidator interface {
 	Validate(data string) error
 }
 
-type cmKeySelector struct {
-	// A ConfigMap object may contain multiple configuration files and only some of them can be parsed and verified by kubeblocks,
-	// such as postgresql, there are two files pg_hba.conf & postgresql.conf in the ConfigMap, and we can only validate postgresql.conf,
-	// so pg_hba.conf file needs to be ignored during when doing verification.
-	// keySelector filters the keys in the configmap.
-	keySelector []ValidatorOptions
-}
-
 type configCueValidator struct {
-	cmKeySelector
-
 	// cue describes configuration template
 	cueScript string
 	cfgType   parametersv1alpha1.CfgFileFormat
-}
-
-func (s *cmKeySelector) filter(key string) bool {
-	if len(s.keySelector) == 0 {
-		return false
-	}
-
-	for _, option := range s.keySelector {
-		if !option(key) {
-			return true
-		}
-	}
-	return false
 }
 
 func (c *configCueValidator) Validate(content string) error {
@@ -74,8 +50,6 @@ func (c *configCueValidator) Validate(content string) error {
 }
 
 type schemaValidator struct {
-	cmKeySelector
-
 	typeName string
 	schema   *apiext.JSONSchemaProps
 	cfgType  parametersv1alpha1.CfgFileFormat
@@ -101,16 +75,6 @@ type emptyValidator struct {
 
 func (e emptyValidator) Validate(_ string) error {
 	return nil
-}
-
-func WithKeySelector(keys []string) ValidatorOptions {
-	var sets *set.LinkedHashSetString
-	if len(keys) > 0 {
-		sets = core.FromCMKeysSelector(keys)
-	}
-	return func(key string) bool {
-		return sets == nil || sets.InArray(key)
-	}
 }
 
 func NewConfigValidator(paramsSchema *parametersv1alpha1.ParametersSchema, fileFormat *parametersv1alpha1.FileFormatConfig) ConfigValidator {

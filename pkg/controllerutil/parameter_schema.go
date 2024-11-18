@@ -43,7 +43,7 @@ func ResolveConfigParameterSchema(paramDef *parametersv1alpha1.ParametersDefinit
 	}
 
 	paramMeta := &ParameterMeta{
-		FileName:           paramDef.Name,
+		FileName:           paramDef.Spec.FileName,
 		ConfigTemplateName: configTemplate.Name,
 	}
 	props := openapi.FlattenSchema(schema.Properties[openapi.DefaultSchemaName]).Properties

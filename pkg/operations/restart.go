@@ -65,7 +65,7 @@ func (r restartOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		return fmt.Errorf("status.startTimestamp can not be null")
 	}
 	r.compOpsHelper = newComponentOpsHelper(opsRes.OpsRequest.Spec.RestartList)
-	// abort earlier running vertical scaling opsRequest.
+	// abort earlier running 'Restart' opsRequest.
 	if err := abortEarlierOpsRequestWithSameKind(reqCtx, cli, opsRes, []opsv1alpha1.OpsType{opsv1alpha1.RestartType},
 		func(earlierOps *opsv1alpha1.OpsRequest) (bool, error) {
 			return hasIntersectionCompOpsList(r.compOpsHelper.componentOpsSet, earlierOps.Spec.RestartList), nil

@@ -60,6 +60,7 @@ type componentWorkloadOps struct {
 	reqCtx         intctrlutil.RequestCtx
 	cluster        *appsv1.Cluster
 	synthesizeComp *component.SynthesizedComponent
+	comp           *appsv1.Component
 	dag            *graph.DAG
 
 	// runningITS is a snapshot of the InstanceSet that is already running
@@ -82,6 +83,7 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 
 	cluster := transCtx.Cluster
 	compDef := transCtx.CompDef
+	comp := transCtx.Component
 	synthesizeComp := transCtx.SynthesizeComponent
 	reqCtx := intctrlutil.RequestCtx{
 		Ctx:      transCtx.Context,
@@ -103,14 +105,14 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 	}
 	transCtx.ProtoWorkload = protoITS
 
-	if err = t.reconcileWorkload(synthesizeComp, transCtx.Component, runningITS, protoITS); err != nil {
+	if err = t.reconcileWorkload(synthesizeComp, comp, runningITS, protoITS); err != nil {
 		return err
 	}
 
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	if runningITS == nil {
 		if protoITS != nil {
-			if err := setCompOwnershipNFinalizer(transCtx.Component, protoITS); err != nil {
+			if err := setCompOwnershipNFinalizer(comp, protoITS); err != nil {
 				return err
 			}
 			graphCli.Create(dag, protoITS)
@@ -120,7 +122,7 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 		if protoITS == nil {
 			graphCli.Delete(dag, runningITS)
 		} else {
-			err = t.handleUpdate(reqCtx, graphCli, dag, cluster, synthesizeComp, runningITS, protoITS)
+			err = t.handleUpdate(reqCtx, graphCli, dag, cluster, synthesizeComp, comp, runningITS, protoITS)
 		}
 	}
 	return err
@@ -173,10 +175,10 @@ func (t *componentWorkloadTransformer) stopWorkload(protoITS *workloads.Instance
 }
 
 func (t *componentWorkloadTransformer) handleUpdate(reqCtx intctrlutil.RequestCtx, cli model.GraphClient, dag *graph.DAG,
-	cluster *appsv1.Cluster, synthesizeComp *component.SynthesizedComponent, runningITS, protoITS *workloads.InstanceSet) error {
+	cluster *appsv1.Cluster, synthesizeComp *component.SynthesizedComponent, comp *appsv1.Component, runningITS, protoITS *workloads.InstanceSet) error {
 	if !isCompStopped(synthesizeComp) {
 		// postpone the update of the workload until the component is back to running.
-		if err := t.handleWorkloadUpdate(reqCtx, dag, cluster, synthesizeComp, runningITS, protoITS); err != nil {
+		if err := t.handleWorkloadUpdate(reqCtx, dag, cluster, synthesizeComp, comp, runningITS, protoITS); err != nil {
 			return err
 		}
 	}
@@ -190,8 +192,8 @@ func (t *componentWorkloadTransformer) handleUpdate(reqCtx intctrlutil.RequestCt
 }
 
 func (t *componentWorkloadTransformer) handleWorkloadUpdate(reqCtx intctrlutil.RequestCtx, dag *graph.DAG,
-	cluster *appsv1.Cluster, synthesizeComp *component.SynthesizedComponent, obj, its *workloads.InstanceSet) error {
-	cwo, err := newComponentWorkloadOps(reqCtx, t.Client, cluster, synthesizeComp, obj, its, dag)
+	cluster *appsv1.Cluster, synthesizeComp *component.SynthesizedComponent, comp *appsv1.Component, obj, its *workloads.InstanceSet) error {
+	cwo, err := newComponentWorkloadOps(reqCtx, t.Client, cluster, synthesizeComp, comp, obj, its, dag)
 	if err != nil {
 		return err
 	}
@@ -596,6 +598,9 @@ func (r *componentWorkloadOps) scaleOut(itsObj *workloads.InstanceSet) error {
 			return err
 		}
 		for _, obj := range objs1 {
+			if err := setCompOwnershipNFinalizer(r.comp, obj); err != nil {
+				return err
+			}
 			graphCli.Do(r.dag, nil, obj, model.ActionCreatePtr(), nil)
 		}
 		for _, obj := range objs2 {
@@ -1079,6 +1084,7 @@ func newComponentWorkloadOps(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	cluster *appsv1.Cluster,
 	synthesizeComp *component.SynthesizedComponent,
+	comp *appsv1.Component,
 	runningITS *workloads.InstanceSet,
 	protoITS *workloads.InstanceSet,
 	dag *graph.DAG) (*componentWorkloadOps, error) {
@@ -1094,6 +1100,7 @@ func newComponentWorkloadOps(reqCtx intctrlutil.RequestCtx,
 		cli:                   cli,
 		reqCtx:                reqCtx,
 		cluster:               cluster,
+		comp:                  comp,
 		synthesizeComp:        synthesizeComp,
 		runningITS:            runningITS,
 		protoITS:              protoITS,

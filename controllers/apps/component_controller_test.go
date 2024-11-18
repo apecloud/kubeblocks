@@ -285,6 +285,11 @@ var _ = Describe("Component Controller", func() {
 	}
 
 	testChangeReplicas := func(compName, compDefName string) {
+		compDefKey := client.ObjectKeyFromObject(compDefObj)
+		Eventually(testapps.GetAndChangeObj(&testCtx, compDefKey, func(compDef *kbappsv1.ComponentDefinition) {
+			compDef.Spec.LifecycleActions.MemberLeave = nil
+		})).Should(Succeed())
+
 		createClusterObj(compName, compDefName, nil)
 		replicasSeq := []int32{5, 3, 1, 2, 4}
 		expectedOG := int64(1)
@@ -462,7 +467,6 @@ var _ = Describe("Component Controller", func() {
 		for _, pod := range pods {
 			Expect(testCtx.CheckedCreateObj(testCtx.Ctx, &pod)).Should(Succeed())
 			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(&pod), func(p *corev1.Pod) {
-				// mock the status to pass the isReady(pod) check in consensus_set
 				p.Status.Conditions = []corev1.PodCondition{{
 					Type:   corev1.PodReady,
 					Status: corev1.ConditionTrue,

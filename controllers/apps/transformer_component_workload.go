@@ -32,6 +32,7 @@ import (
 	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -105,7 +106,7 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 	}
 	transCtx.ProtoWorkload = protoITS
 
-	if err = t.reconcileWorkload(synthesizeComp, transCtx.Component, runningITS, protoITS); err != nil {
+	if err = t.reconcileWorkload(transCtx.Context, t.Client, synthesizeComp, transCtx.Component, runningITS, protoITS); err != nil {
 		return err
 	}
 
@@ -141,14 +142,18 @@ func (t *componentWorkloadTransformer) runningInstanceSetObject(ctx graph.Transf
 	return objs[0], nil
 }
 
-func (t *componentWorkloadTransformer) reconcileWorkload(synthesizedComp *component.SynthesizedComponent,
-	comp *appsv1.Component, runningITS, protoITS *workloads.InstanceSet) error {
+func (t *componentWorkloadTransformer) reconcileWorkload(ctx context.Context, cli client.Reader,
+	synthesizedComp *component.SynthesizedComponent, comp *appsv1.Component, runningITS, protoITS *workloads.InstanceSet) error {
 	if runningITS != nil {
 		*protoITS.Spec.Selector = *runningITS.Spec.Selector
 		protoITS.Spec.Template.Labels = intctrlutil.MergeMetadataMaps(runningITS.Spec.Template.Labels, synthesizedComp.DynamicLabels)
 	}
 
 	buildInstanceSetPlacementAnnotation(comp, protoITS)
+
+	if err := reconcileReplicasStatus(ctx, cli, synthesizedComp, runningITS, protoITS); err != nil {
+		return err
+	}
 
 	// build configuration template annotations to workload
 	configuration.BuildConfigTemplateAnnotations(protoITS, synthesizedComp)
@@ -183,9 +188,16 @@ func (t *componentWorkloadTransformer) handleUpdate(reqCtx intctrlutil.RequestCt
 		}
 	}
 
-	objCopy := copyAndMergeITS(runningITS, protoITS, synthesizeComp)
-	if objCopy != nil && !cli.IsAction(dag, objCopy, model.ActionNoopPtr()) {
+	objCopy := copyAndMergeITS(runningITS, protoITS)
+	if objCopy != nil {
 		cli.Update(dag, nil, objCopy, &model.ReplaceIfExistingOption{})
+		// make sure the workload is updated after the env CM
+		cli.DependOn(dag, &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: synthesizeComp.Namespace,
+				Name:      constant.GenerateClusterComponentEnvPattern(synthesizeComp.ClusterName, synthesizeComp.Name),
+			},
+		})
 	}
 
 	return nil
@@ -250,7 +262,7 @@ func buildPodSpecVolumeMounts(synthesizeComp *component.SynthesizedComponent) {
 // copyAndMergeITS merges two ITS objects for updating:
 //  1. new an object targetObj by copying from oldObj
 //  2. merge all fields can be updated from newObj into targetObj
-func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet, synthesizeComp *component.SynthesizedComponent) *workloads.InstanceSet {
+func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet) *workloads.InstanceSet {
 	// mergeAnnotations keeps the original annotations.
 	mergeMetadataMap := func(originalMap map[string]string, targetMap *map[string]string) {
 		if targetMap == nil || originalMap == nil {
@@ -483,7 +495,13 @@ func (r *componentWorkloadOps) horizontalScale() error {
 
 func (r *componentWorkloadOps) scaleIn() error {
 	deleteReplicas := r.runningItsPodNameSet.Difference(r.desiredCompPodNameSet).UnsortedList()
-	joinedReplicas, err := component.DeleteReplicas(r.component, deleteReplicas)
+	joinedReplicas := make([]string, 0)
+	err := component.DeleteReplicasStatus(r.protoITS, deleteReplicas, func(s component.ReplicaStatus) {
+		// has no member join defined or has joined successfully
+		if s.Provisioned && (s.MemberJoined == nil || *s.MemberJoined) {
+			joinedReplicas = append(joinedReplicas, s.Name)
+		}
+	})
 	if err != nil {
 		return err
 	}
@@ -524,7 +542,8 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn(deleteReplicas, joinedReplica
 		}
 	}
 
-	if len(joinedReplicasSet) > 0 {
+	hasMemberLeaveDefined := r.synthesizeComp.LifecycleActions != nil && r.synthesizeComp.LifecycleActions.MemberLeave != nil
+	if hasMemberLeaveDefined && len(joinedReplicasSet) > 0 {
 		leaveErrors = append(leaveErrors,
 			fmt.Errorf("some replicas have joined but not leaved since the Pod object is not exist: %v", sets.List(joinedReplicasSet)))
 	}
@@ -620,8 +639,10 @@ func (r *componentWorkloadOps) deletePVCs4ScaleIn(itsObj *workloads.InstanceSet)
 }
 
 func (r *componentWorkloadOps) scaleOut() error {
-	// replicas in provisioning
-	provisioningReplicas, err := component.ReplicasInProvisioning(r.component)
+	// replicas in provisioning that the data has not been loaded
+	provisioningReplicas, err := component.GetReplicasStatusFunc(r.protoITS, func(s component.ReplicaStatus) bool {
+		return s.DataLoaded != nil && !*s.DataLoaded
+	})
 	if err != nil {
 		return err
 	}
@@ -629,28 +650,35 @@ func (r *componentWorkloadOps) scaleOut() error {
 	// replicas to be created
 	newReplicas := r.desiredCompPodNameSet.Difference(r.runningItsPodNameSet).UnsortedList()
 
-	// update replicas of the workload
-	graphCli := model.NewGraphClient(r.cli)
-	v := graphCli.Do(r.dag, nil, r.protoITS, model.ActionUpdatePtr(), nil)
-
-	hasActionDefined := func(actions []*appsv1.Action) bool {
-		for _, action := range actions {
-			if action == nil || action.Exec == nil {
+	hasMemberJoinDefined, hasDataActionDefined := func() (bool, bool) {
+		hasActionDefined := func(actions []*appsv1.Action) bool {
+			for _, action := range actions {
+				if action == nil || action.Exec == nil {
+					return false
+				}
+			}
+			return true
+		}
+		hasMemberJoinDefined := func() bool {
+			if r.synthesizeComp.LifecycleActions == nil {
 				return false
 			}
-		}
-		return true
-	}
-
-	hasDataActionDefined := func() bool {
-		if r.synthesizeComp.LifecycleActions == nil {
-			return false
-		}
-		return hasActionDefined([]*appsv1.Action{
-			r.synthesizeComp.LifecycleActions.DataDump,
-			r.synthesizeComp.LifecycleActions.DataLoad,
-		})
+			return hasActionDefined([]*appsv1.Action{
+				r.synthesizeComp.LifecycleActions.MemberJoin,
+			})
+		}()
+		hasDataActionDefined := func() bool {
+			if r.synthesizeComp.LifecycleActions == nil {
+				return false
+			}
+			return hasActionDefined([]*appsv1.Action{
+				r.synthesizeComp.LifecycleActions.DataDump,
+				r.synthesizeComp.LifecycleActions.DataLoad,
+			})
+		}()
+		return hasMemberJoinDefined, hasDataActionDefined
 	}()
+
 	// build and assign data replication tasks
 	if err := func() error {
 		if !hasDataActionDefined {
@@ -674,8 +702,7 @@ func (r *componentWorkloadOps) scaleOut() error {
 			SynthesizeComponent: r.synthesizeComp,
 			Component:           r.component,
 		}
-		// create or update the env CM before workloads
-		if err = createOrUpdateEnvConfigMap(transCtx, r.dag, nil, v, parameters); err != nil {
+		if err = createOrUpdateEnvConfigMap(transCtx, r.dag, nil, parameters); err != nil {
 			return err
 		}
 		return nil
@@ -683,16 +710,7 @@ func (r *componentWorkloadOps) scaleOut() error {
 		return err
 	}
 
-	hasMemberActionDefined := func() bool {
-		if r.synthesizeComp.LifecycleActions == nil {
-			return false
-		}
-		return hasActionDefined([]*appsv1.Action{
-			r.synthesizeComp.LifecycleActions.MemberJoin,
-		})
-	}()
-
-	return component.NewReplicas(r.component, newReplicas, hasDataActionDefined, hasMemberActionDefined)
+	return component.NewReplicasStatus(r.protoITS, newReplicas, hasMemberJoinDefined, hasDataActionDefined)
 }
 
 func (r *componentWorkloadOps) sourceReplica(dataDump *appsv1.Action) (*corev1.Pod, error) {
@@ -729,30 +747,32 @@ func (r *componentWorkloadOps) joinMember4ScaleOut() error {
 	}
 
 	joinErrors := make([]error, 0)
-	if err = component.UpdateReplicasStatusFunc(r.component, func(replicas *component.ReplicasStatus) error {
+	if err = component.UpdateReplicasStatusFunc(r.protoITS, func(replicas *component.ReplicasStatus) error {
 		for _, pod := range pods {
 			i := slices.IndexFunc(replicas.Status, func(r component.ReplicaStatus) bool {
 				return r.Name == pod.Name
 			})
 			if i < 0 {
-				continue
+				continue // the pod is not in the replicas status?
 			}
 
 			status := replicas.Status[i]
-			if status.Joined == nil || *status.Joined {
-				continue
+			if status.MemberJoined == nil || *status.MemberJoined {
+				continue // no need to join or already joined
 			}
+
+			// TODO: should wait for the data to be loaded before joining the member?
 
 			if err := r.joinMemberForPod(pod, pods); err != nil {
 				joinErrors = append(joinErrors, fmt.Errorf("pod %s: %w", pod.Name, err))
 			} else {
-				replicas.Status[i].Joined = ptr.To(true)
+				replicas.Status[i].MemberJoined = ptr.To(true)
 			}
 		}
 
 		notJoinedReplicas := make([]string, 0)
 		for _, r := range replicas.Status {
-			if r.Joined != nil && !*r.Joined {
+			if r.MemberJoined != nil && !*r.MemberJoined {
 				notJoinedReplicas = append(notJoinedReplicas, r.Name)
 			}
 		}
@@ -1051,4 +1071,51 @@ func newComponentWorkloadOps(reqCtx intctrlutil.RequestCtx,
 		desiredCompPodNameSet: sets.New(compPodNames...),
 		runningItsPodNameSet:  sets.New(itsPodNames...),
 	}, nil
+}
+
+func reconcileReplicasStatus(ctx context.Context, cli client.Reader,
+	synthesizedComp *component.SynthesizedComponent, runningITS, protoITS *workloads.InstanceSet) error {
+	var (
+		namespace   = synthesizedComp.Namespace
+		clusterName = synthesizedComp.ClusterName
+		compName    = synthesizedComp.Name
+	)
+
+	// HACK: sync replicas status from runningITS to protoITS
+	component.BuildReplicasStatus(runningITS, protoITS)
+
+	pods, err := component.ListOwnedPods(ctx, cli, namespace, clusterName, compName)
+	if err != nil {
+		return err
+	}
+	hasMemberJoinDefined, hasDataActionDefined := func() (bool, bool) {
+		hasActionDefined := func(actions []*appsv1.Action) bool {
+			for _, action := range actions {
+				if action == nil || action.Exec == nil {
+					return false
+				}
+			}
+			return true
+		}
+		hasMemberJoinDefined := func() bool {
+			if synthesizedComp.LifecycleActions == nil {
+				return false
+			}
+			return hasActionDefined([]*appsv1.Action{
+				synthesizedComp.LifecycleActions.MemberJoin,
+			})
+		}()
+		hasDataActionDefined := func() bool {
+			if synthesizedComp.LifecycleActions == nil {
+				return false
+			}
+			return hasActionDefined([]*appsv1.Action{
+				synthesizedComp.LifecycleActions.DataDump,
+				synthesizedComp.LifecycleActions.DataLoad,
+			})
+		}()
+
+		return hasMemberJoinDefined, hasDataActionDefined
+	}()
+	return component.StatusReplicasStatus(protoITS, pods, hasMemberJoinDefined, hasDataActionDefined)
 }

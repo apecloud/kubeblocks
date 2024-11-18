@@ -24,6 +24,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -33,6 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/kbagent"
@@ -40,7 +42,7 @@ import (
 )
 
 const (
-	replicaStatusMessageKey = "Replica/status"
+	replicaStatusAnnotationKey = "apps.kubeblocks.io/replicas-status"
 
 	// new replicas task & event
 	newReplicaTask                           = "newReplica"
@@ -53,40 +55,52 @@ type ReplicasStatus struct {
 }
 
 type ReplicaStatus struct {
-	Name              string       `json:"name"`
-	Generation        int64        `json:"generation"`
-	CreationTimestamp time.Time    `json:"creationTimestamp"`
-	DeletionTimestamp *time.Time   `json:"deletionTimestamp,omitempty"`
-	Phase             replicaPhase `json:"phase"`
-	Message           string       `json:"message,omitempty"`
-	Joined            *bool        `json:"joined,omitempty"`
+	Name              string     `json:"name"`
+	Generation        string     `json:"generation"`
+	CreationTimestamp time.Time  `json:"creationTimestamp"`
+	DeletionTimestamp *time.Time `json:"deletionTimestamp,omitempty"`
+	Message           string     `json:"message,omitempty"`
+	Provisioned       bool       `json:"provisioned,omitempty"`
+	DataLoaded        *bool      `json:"dataLoaded,omitempty"`
+	MemberJoined      *bool      `json:"memberJoined,omitempty"`
 }
 
-type replicaPhase string
+func BuildReplicasStatus(running, proto *workloads.InstanceSet) {
+	if running == nil || proto == nil {
+		return
+	}
+	annotations := running.Annotations
+	if annotations == nil {
+		return
+	}
+	message, ok := annotations[replicaStatusAnnotationKey]
+	if !ok {
+		return
+	}
+	if proto.Annotations == nil {
+		proto.Annotations = make(map[string]string)
+	}
+	proto.Annotations[replicaStatusAnnotationKey] = message
+}
 
-const (
-	replicaPhasePending  replicaPhase = "Pending"
-	replicaPhaseCreating replicaPhase = "Creating"
-	replicaPhaseRunning  replicaPhase = "Running"
-	replicaPhaseUpdating replicaPhase = "Updating"
-	replicaPhaseDeleting replicaPhase = "Deleting"
-)
-
-func NewReplicas(comp *appsv1.Component, replicas []string, hasDataReplication, hasMemberRole bool) error {
-	initReplicaPhase := func() replicaPhase {
-		if hasDataReplication {
-			return replicaPhasePending
-		}
-		return replicaPhaseRunning
-	}()
-	joined := func() *bool {
-		if hasMemberRole {
+func NewReplicasStatus(its *workloads.InstanceSet, replicas []string, hasMemberJoin, hasDataAction bool) error {
+	loaded := func() *bool {
+		if hasDataAction {
 			return ptr.To(false)
 		}
 		return nil
 	}()
-	return UpdateReplicasStatusFunc(comp, func(status *ReplicasStatus) error {
-		status.Replicas = comp.Spec.Replicas
+	joined := func() *bool {
+		if hasMemberJoin {
+			return ptr.To(false)
+		}
+		return nil
+	}()
+	return UpdateReplicasStatusFunc(its, func(status *ReplicasStatus) error {
+		status.Replicas = *its.Spec.Replicas
+		if status.Status == nil {
+			status.Status = make([]ReplicaStatus, 0)
+		}
 		for _, name := range replicas {
 			if slices.ContainsFunc(status.Status, func(s ReplicaStatus) bool {
 				return s.Name == name
@@ -95,66 +109,78 @@ func NewReplicas(comp *appsv1.Component, replicas []string, hasDataReplication, 
 			}
 			status.Status = append(status.Status, ReplicaStatus{
 				Name:              name,
-				Generation:        comp.Generation,
+				Generation:        compGenerationFromITS(its),
 				CreationTimestamp: time.Now(),
-				Phase:             initReplicaPhase,
-				Joined:            joined,
+				Provisioned:       false,
+				DataLoaded:        loaded,
+				MemberJoined:      joined,
 			})
 		}
 		return nil
 	})
 }
 
-func DeleteReplicas(comp *appsv1.Component, replicas []string) ([]string, error) {
-	joined := make([]string, 0)
-	if err := UpdateReplicasStatusFunc(comp, func(status *ReplicasStatus) error {
-		status.Replicas = comp.Spec.Replicas
+func DeleteReplicasStatus(its *workloads.InstanceSet, replicas []string, f func(status ReplicaStatus)) error {
+	return UpdateReplicasStatusFunc(its, func(status *ReplicasStatus) error {
+		status.Replicas = *its.Spec.Replicas
 		status.Status = slices.DeleteFunc(status.Status, func(s ReplicaStatus) bool {
 			if slices.Contains(replicas, s.Name) {
-				if s.Joined != nil && *s.Joined {
-					joined = append(joined, s.Name)
+				if f != nil {
+					f(s)
 				}
 				return true
 			}
 			return false
 		})
 		return nil
-	}); err != nil {
-		return nil, err
-	}
-	return joined, nil
+	})
 }
 
-func StatusReplicas(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent, comp *appsv1.Component) error {
-	pods, err := ListOwnedPods(ctx, cli, synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name)
-	if err != nil {
-		return err
-	}
-	return UpdateReplicasStatusFunc(comp, func(status *ReplicasStatus) error {
-		status.Replicas = comp.Spec.Replicas
+func StatusReplicasStatus(its *workloads.InstanceSet, pods []*corev1.Pod, hasMemberJoin, hasDataAction bool) error {
+	loaded := func() *bool {
+		if hasDataAction {
+			return ptr.To(true)
+		}
+		return nil
+	}()
+	joined := func() *bool {
+		if hasMemberJoin {
+			return ptr.To(true)
+		}
+		return nil
+	}()
+	return UpdateReplicasStatusFunc(its, func(status *ReplicasStatus) error {
+		status.Replicas = *its.Spec.Replicas
+		if status.Status == nil {
+			status.Status = make([]ReplicaStatus, 0)
+		}
 		for _, pod := range pods {
-			if slices.ContainsFunc(status.Status, func(s ReplicaStatus) bool {
+			i := slices.IndexFunc(status.Status, func(s ReplicaStatus) bool {
 				return s.Name == pod.Name
-			}) {
-				continue
-			}
-			status.Status = append(status.Status, ReplicaStatus{
-				Name:              pod.Name,
-				Generation:        comp.Generation,
-				CreationTimestamp: pod.CreationTimestamp.Time,
-				Phase:             replicaPhaseRunning,
 			})
+			if i >= 0 {
+				status.Status[i].Provisioned = true
+			} else {
+				status.Status = append(status.Status, ReplicaStatus{
+					Name:              pod.Name,
+					Generation:        compGenerationFromITS(its),
+					CreationTimestamp: its.CreationTimestamp.Time,
+					Provisioned:       true,
+					DataLoaded:        loaded,
+					MemberJoined:      joined,
+				})
+			}
 		}
 		return nil
 	})
 }
 
-func UpdateReplicasStatusFunc(comp *appsv1.Component, f func(status *ReplicasStatus) error) error {
+func UpdateReplicasStatusFunc(its *workloads.InstanceSet, f func(status *ReplicasStatus) error) error {
 	if f == nil {
 		return nil
 	}
 
-	status, err := getReplicasStatus(comp)
+	status, err := getReplicasStatus(its)
 	if err != nil {
 		return err
 	}
@@ -163,34 +189,27 @@ func UpdateReplicasStatusFunc(comp *appsv1.Component, f func(status *ReplicasSta
 		return err
 	}
 
-	out, err := json.Marshal(&status)
-	if err != nil {
-		return err
-	}
-
-	if comp.Status.Message == nil {
-		comp.Status.Message = make(map[string]string)
-	}
-	comp.Status.Message[replicaStatusMessageKey] = string(out)
-
-	return nil
+	return setReplicasStatus(its, status)
 }
 
-func ReplicasInProvisioning(comp *appsv1.Component) ([]string, error) {
-	status, err := getReplicasStatus(comp)
+func GetReplicasStatusFunc(its *workloads.InstanceSet, f func(ReplicaStatus) bool) ([]string, error) {
+	if f == nil {
+		return nil, nil
+	}
+	status, err := getReplicasStatus(its)
 	if err != nil {
 		return nil, err
 	}
 	replicas := make([]string, 0)
 	for _, s := range status.Status {
-		if s.Phase == replicaPhaseCreating || s.Phase == replicaPhasePending {
+		if f(s) {
 			replicas = append(replicas, s.Name)
 		}
 	}
 	return replicas, nil
 }
 
-func NewReplicaTask(compName string, uid string, source *corev1.Pod, replicas []string) (map[string]string, error) {
+func NewReplicaTask(compName, uid string, source *corev1.Pod, replicas []string) (map[string]string, error) {
 	port, err := intctrlutil.GetPortByName(*source, kbagent.ContainerName, kbagent.DefaultStreamingPortName)
 	if err != nil {
 		return nil, err
@@ -211,11 +230,26 @@ func NewReplicaTask(compName string, uid string, source *corev1.Pod, replicas []
 	return buildKBAgentTaskEnv(task)
 }
 
-func getReplicasStatus(comp *appsv1.Component) (ReplicasStatus, error) {
-	if comp.Status.Message == nil {
+func compGenerationFromITS(its *workloads.InstanceSet) string {
+	if its == nil {
+		return ""
+	}
+	annotations := its.Annotations
+	if annotations == nil {
+		return ""
+	}
+	return annotations[constant.KubeBlocksGenerationKey]
+}
+
+func getReplicasStatus(its *workloads.InstanceSet) (ReplicasStatus, error) {
+	if its == nil {
 		return ReplicasStatus{}, nil
 	}
-	message, ok := comp.Status.Message[replicaStatusMessageKey]
+	annotations := its.GetAnnotations()
+	if annotations == nil {
+		return ReplicasStatus{}, nil
+	}
+	message, ok := annotations[replicaStatusAnnotationKey]
 	if !ok {
 		return ReplicasStatus{}, nil
 	}
@@ -227,32 +261,41 @@ func getReplicasStatus(comp *appsv1.Component) (ReplicasStatus, error) {
 	return *status, nil
 }
 
-func updateReplicaStatus(comp *appsv1.Component, name string, f func(*ReplicaStatus) error) error {
-	return UpdateReplicasStatusFunc(comp, func(status *ReplicasStatus) error {
-		for i := range status.Status {
-			if status.Status[i].Name == name {
-				if f != nil {
-					return f(&status.Status[i])
-				}
-				return nil
-			}
-		}
-		return fmt.Errorf("replica %s not found", name)
-	})
+func setReplicasStatus(its *workloads.InstanceSet, status ReplicasStatus) error {
+	if its == nil {
+		return nil
+	}
+	out, err := json.Marshal(&status)
+	if err != nil {
+		return err
+	}
+	annotations := its.GetAnnotations()
+	if annotations == nil {
+		annotations = make(map[string]string)
+	}
+	annotations[replicaStatusAnnotationKey] = string(out)
+	its.SetAnnotations(annotations)
+	return nil
 }
 
 func handleNewReplicaTaskEvent(ctx context.Context, cli client.Client, comp *appsv1.Component, event proto.TaskEvent) error {
+	its := &workloads.InstanceSet{}
+	if err := cli.Get(ctx, client.ObjectKeyFromObject(comp), its); err != nil {
+		return err
+	}
+
 	finished := !event.EndTime.IsZero()
 	if finished && event.Code == 0 {
-		return handleNewReplicaTaskEvent4Finished(ctx, cli, comp, event)
+		return handleNewReplicaTaskEvent4Finished(ctx, cli, comp, its, event)
 	}
 	if finished {
-		return handleNewReplicaTaskEvent4Failed(comp, event)
+		return handleNewReplicaTaskEvent4Failed(comp, its, event)
 	}
-	return handleNewReplicaTaskEvent4Unfinished(comp, event)
+	return handleNewReplicaTaskEvent4Unfinished(comp, its, event)
 }
 
-func handleNewReplicaTaskEvent4Finished(ctx context.Context, cli client.Client, comp *appsv1.Component, event proto.TaskEvent) error {
+func handleNewReplicaTaskEvent4Finished(ctx context.Context, cli client.Client,
+	comp *appsv1.Component, its *workloads.InstanceSet, event proto.TaskEvent) error {
 	if err := func() error {
 		envKey := types.NamespacedName{
 			Namespace: comp.Namespace,
@@ -297,26 +340,40 @@ func handleNewReplicaTaskEvent4Finished(ctx context.Context, cli client.Client, 
 	}(); err != nil {
 		return err
 	}
-	return updateReplicaStatus(comp, event.Replica, func(status *ReplicaStatus) error {
-		status.Generation = comp.Generation // TODO: generation
-		status.Phase = replicaPhaseRunning
+	return updateReplicaStatusFunc(its, event.Replica, func(status *ReplicaStatus) error {
+		status.Generation = strconv.FormatInt(comp.Generation, 10) // TODO: generation
+		status.Message = event.Message
+		status.DataLoaded = ptr.To(true)
+		return nil
+	})
+}
+
+func handleNewReplicaTaskEvent4Unfinished(comp *appsv1.Component, its *workloads.InstanceSet, event proto.TaskEvent) error {
+	return updateReplicaStatusFunc(its, event.Replica, func(status *ReplicaStatus) error {
+		status.Generation = strconv.FormatInt(comp.Generation, 10) // TODO: generation
+		status.DataLoaded = ptr.To(false)
+		return nil
+	})
+}
+
+func handleNewReplicaTaskEvent4Failed(comp *appsv1.Component, its *workloads.InstanceSet, event proto.TaskEvent) error {
+	return updateReplicaStatusFunc(its, event.Replica, func(status *ReplicaStatus) error {
+		status.Generation = strconv.FormatInt(comp.Generation, 10) // TODO: generation
 		status.Message = event.Message
 		return nil
 	})
 }
 
-func handleNewReplicaTaskEvent4Unfinished(comp *appsv1.Component, event proto.TaskEvent) error {
-	return updateReplicaStatus(comp, event.Replica, func(status *ReplicaStatus) error {
-		status.Generation = comp.Generation // TODO: generation
-		status.Phase = replicaPhaseCreating
-		return nil
-	})
-}
-
-func handleNewReplicaTaskEvent4Failed(comp *appsv1.Component, event proto.TaskEvent) error {
-	return updateReplicaStatus(comp, event.Replica, func(status *ReplicaStatus) error {
-		status.Generation = comp.Generation // TODO: generation
-		status.Message = event.Message
-		return nil
+func updateReplicaStatusFunc(its *workloads.InstanceSet, replicaName string, f func(*ReplicaStatus) error) error {
+	return UpdateReplicasStatusFunc(its, func(status *ReplicasStatus) error {
+		for i := range status.Status {
+			if status.Status[i].Name == replicaName {
+				if f != nil {
+					return f(&status.Status[i])
+				}
+				return nil
+			}
+		}
+		return fmt.Errorf("replica %s not found", replicaName)
 	})
 }

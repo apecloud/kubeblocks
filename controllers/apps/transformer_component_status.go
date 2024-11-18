@@ -93,14 +93,9 @@ func (t *componentStatusTransformer) Transform(ctx graph.TransformContext, dag *
 	}
 
 	graphCli, _ := transCtx.Client.(model.GraphClient)
-	if vertex := graphCli.FindMatchedVertex(dag, comp); vertex != nil {
-		// check if the component needs to do other action.
-		ov, _ := vertex.(*model.ObjectVertex)
-		if ov.Action != model.ActionNoopPtr() {
-			return nil
-		}
+	if v := graphCli.FindMatchedVertex(dag, comp); v == nil {
+		graphCli.Status(dag, transCtx.ComponentOrig, comp)
 	}
-	graphCli.Status(dag, transCtx.ComponentOrig, comp)
 	return nil
 }
 
@@ -115,10 +110,6 @@ func (t *componentStatusTransformer) init(transCtx *componentTransformContext, d
 
 // reconcileStatus reconciles component status.
 func (t *componentStatusTransformer) reconcileStatus(transCtx *componentTransformContext) error {
-	if err := t.reconcileReplicasStatus(transCtx); err != nil {
-		return err
-	}
-
 	if t.runningITS == nil {
 		return t.reconcileStatusCondition(transCtx)
 	}
@@ -258,7 +249,10 @@ func (t *componentStatusTransformer) hasScaleOutRunning(transCtx *componentTrans
 		return false, false, nil
 	}
 
-	replicas, err := component.ReplicasInProvisioning(transCtx.Component)
+	replicas, err := component.GetReplicasStatusFunc(t.protoITS, func(status component.ReplicaStatus) bool {
+		return status.DataLoaded != nil && !*status.DataLoaded ||
+			status.MemberJoined != nil && !*status.MemberJoined
+	})
 	if err != nil {
 		return false, false, err
 	}
@@ -400,8 +394,4 @@ func (t *componentStatusTransformer) reconcileAvailableCondition(transCtx *compo
 	}
 
 	return nil
-}
-
-func (t *componentStatusTransformer) reconcileReplicasStatus(transCtx *componentTransformContext) error {
-	return component.StatusReplicas(transCtx.Context, t.Client, t.synthesizeComp, t.comp)
 }

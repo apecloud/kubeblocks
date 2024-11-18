@@ -312,6 +312,8 @@ func (r *backupPolicyBuilder) buildBackupSchedule(
 			CronExpression:  s.CronExpression,
 			Enabled:         s.Enabled,
 			RetentionPeriod: s.RetentionPeriod,
+			Name:            s.Name,
+			Parameters:      s.Parameters,
 		})
 	}
 	backupSchedule.Spec.Schedules = schedules
@@ -320,8 +322,12 @@ func (r *backupPolicyBuilder) buildBackupSchedule(
 
 func (r *backupPolicyBuilder) syncBackupSchedule(backupSchedule *dpv1alpha1.BackupSchedule) {
 	scheduleMethodMap := map[string]struct{}{}
+	scheduleNameMap := map[string]bool{}
 	for _, s := range backupSchedule.Spec.Schedules {
 		scheduleMethodMap[s.BackupMethod] = struct{}{}
+		if len(s.Name) > 0 {
+			scheduleNameMap[s.Name] = true
+		}
 	}
 	mergeMap(backupSchedule.Annotations, r.buildAnnotations())
 	// update backupSchedule annotation to reconcile it.
@@ -329,13 +335,18 @@ func (r *backupPolicyBuilder) syncBackupSchedule(backupSchedule *dpv1alpha1.Back
 	// sync the newly added schedule policies.
 	for _, s := range r.backupPolicyTPL.Spec.Schedules {
 		if _, ok := scheduleMethodMap[s.BackupMethod]; ok {
-			continue
+			// resolve name conflict
+			if len(s.Name) == 0 || scheduleNameMap[s.Name] {
+				continue
+			}
 		}
 		backupSchedule.Spec.Schedules = append(backupSchedule.Spec.Schedules, dpv1alpha1.SchedulePolicy{
 			BackupMethod:    s.BackupMethod,
 			CronExpression:  s.CronExpression,
 			Enabled:         s.Enabled,
 			RetentionPeriod: s.RetentionPeriod,
+			Name:            s.Name,
+			Parameters:      s.Parameters,
 		})
 	}
 }

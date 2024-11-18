@@ -95,7 +95,7 @@ kbcli cluster describe-config mycluster -n demo
 
    | 字段                                                    | 定义     |
    |--------------------------------------------------------|--------------------------------|
-   | `metadata.name`                                        | 定义了 Opsrequest 的名称。 |
+   | `metadata.name`                                        | 定义了 OpsRequest 的名称。 |
    | `metadata.namespace`                                   | 定义了集群所在的 namespace。 |
    | `spec.clusterName`                                     | 定义了本次运维操作指向的集群名称。 |
    | `spec.reconfigure`                                     | 定义了需配置的 component 及相关配置更新内容。 |

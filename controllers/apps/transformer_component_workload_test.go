@@ -23,8 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 
-	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -44,10 +43,11 @@ var _ = Describe("Component Workload Operations Test", func() {
 	var (
 		reader         *mockReader
 		dag            *graph.DAG
+		comp           *appsv1.Component
 		synthesizeComp *component.SynthesizedComponent
 	)
 
-	newDAG := func(graphCli model.GraphClient, comp *appsv1alpha1.Component) *graph.DAG {
+	newDAG := func(graphCli model.GraphClient, comp *appsv1.Component) *graph.DAG {
 		d := graph.NewDAG()
 		graphCli.Root(d, comp, comp, model.ActionStatusPtr())
 		return d
@@ -55,7 +55,7 @@ var _ = Describe("Component Workload Operations Test", func() {
 
 	BeforeEach(func() {
 		reader = &mockReader{}
-		comp := &appsv1alpha1.Component{
+		comp = &appsv1.Component{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: testCtx.DefaultNamespace,
 				Name:      constant.GenerateClusterComponentName(clusterName, compName),
@@ -65,30 +65,30 @@ var _ = Describe("Component Workload Operations Test", func() {
 					constant.KBAppComponentLabelKey: compName,
 				},
 			},
-			Spec: appsv1alpha1.ComponentSpec{},
+			Spec: appsv1.ComponentSpec{},
 		}
 
 		synthesizeComp = &component.SynthesizedComponent{
 			Namespace:   testCtx.DefaultNamespace,
 			ClusterName: clusterName,
 			Name:        compName,
-			Roles: []kbappsv1.ReplicaRole{
+			Roles: []appsv1.ReplicaRole{
 				{Name: "leader", Serviceable: true, Writable: true, Votable: true},
 				{Name: "follower", Serviceable: false, Writable: false, Votable: false},
 			},
-			LifecycleActions: &kbappsv1.ComponentLifecycleActions{
-				MemberJoin: &kbappsv1.Action{
-					Exec: &kbappsv1.ExecAction{
+			LifecycleActions: &appsv1.ComponentLifecycleActions{
+				MemberJoin: &appsv1.Action{
+					Exec: &appsv1.ExecAction{
 						Image: "test-image",
 					},
 				},
-				MemberLeave: &kbappsv1.Action{
-					Exec: &kbappsv1.ExecAction{
+				MemberLeave: &appsv1.Action{
+					Exec: &appsv1.ExecAction{
 						Image: "test-image",
 					},
 				},
-				Switchover: &kbappsv1.Action{
-					Exec: &kbappsv1.ExecAction{
+				Switchover: &appsv1.Action{
+					Exec: &appsv1.ExecAction{
 						Image: "test-image",
 					},
 				},
@@ -162,8 +162,9 @@ var _ = Describe("Component Workload Operations Test", func() {
 			ops = &componentWorkloadOps{
 				cli:            k8sClient,
 				reqCtx:         intctrlutil.RequestCtx{Ctx: ctx, Log: logger},
-				synthesizeComp: synthesizeComp,
 				cluster:        mockCluster,
+				component:      comp,
+				synthesizeComp: synthesizeComp,
 				runningITS:     mockITS,
 				protoITS:       mockITS.DeepCopy(),
 				dag:            dag,

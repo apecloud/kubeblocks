@@ -85,6 +85,7 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 
 	cluster := transCtx.Cluster
 	compDef := transCtx.CompDef
+	comp := transCtx.Component
 	synthesizeComp := transCtx.SynthesizeComponent
 	reqCtx := intctrlutil.RequestCtx{
 		Ctx:      transCtx.Context,
@@ -106,14 +107,14 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 	}
 	transCtx.ProtoWorkload = protoITS
 
-	if err = t.reconcileWorkload(transCtx.Context, t.Client, synthesizeComp, transCtx.Component, runningITS, protoITS); err != nil {
+	if err = t.reconcileWorkload(transCtx.Context, t.Client, synthesizeComp, comp, runningITS, protoITS); err != nil {
 		return err
 	}
 
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	if runningITS == nil {
 		if protoITS != nil {
-			if err := setCompOwnershipNFinalizer(transCtx.Component, protoITS); err != nil {
+			if err := setCompOwnershipNFinalizer(comp, protoITS); err != nil {
 				return err
 			}
 			graphCli.Create(dag, protoITS)
@@ -123,7 +124,7 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 		if protoITS == nil {
 			graphCli.Delete(dag, runningITS)
 		} else {
-			err = t.handleUpdate(reqCtx, graphCli, dag, cluster, synthesizeComp, transCtx.Component, runningITS, protoITS)
+			err = t.handleUpdate(reqCtx, graphCli, dag, cluster, synthesizeComp, comp, runningITS, protoITS)
 		}
 	}
 	return err

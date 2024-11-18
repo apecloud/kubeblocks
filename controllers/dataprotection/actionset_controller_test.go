@@ -85,7 +85,7 @@ var _ = Describe("ActionSet Controller test", func() {
 				}
 				as.Spec.Backup.WithParameters = []string{testdp.InvalidParameter}
 			})).Should(Succeed())
-			By("should be unavailable with invlid withParameters")
+			By("should be unavailable with invalid withParameters")
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(as),
 				func(g Gomega, as *v1alpha1.ActionSet) {
 					g.Expect(as.Status.ObservedGeneration).Should(Equal(as.Generation))

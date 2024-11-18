@@ -86,7 +86,6 @@ func clientOption(v *model.ObjectVertex) *multicluster.ClientOption {
 	}
 	return multicluster.InControlContext()
 }
-
 func resolveServiceDefaultFields(oldSpec, newSpec *corev1.ServiceSpec) {
 	var exist *corev1.ServicePort
 	for i, port := range newSpec.Ports {

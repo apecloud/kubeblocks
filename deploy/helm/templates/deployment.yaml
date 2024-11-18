@@ -2,12 +2,16 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ include "kubeblocks.fullname" . }}
+  {{- with .Values.deployAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
     app.kubernetes.io/component: "apps"
 spec:
   {{- if not .Values.autoscaling.enabled }}
-  replicas: {{ .Values.replicaCount }}
+  replicas: {{ include "kubeblocks.replicaCount" . }}
   {{- end }}
   selector:
     matchLabels:
@@ -125,7 +129,7 @@ spec:
             - name: VOLUMESNAPSHOT_API_BETA
               value: "true"
             {{- end }}
-            {{- if .Values.admissionWebhooks.enabled }}
+            {{- if .Values.webhooks.conversionEnabled }}
             - name: ENABLE_WEBHOOKS
               value: "true"
             {{- end }}
@@ -179,6 +183,9 @@ spec:
               value: {{ .Values.featureGates.componentReplicasAnnotation.enabled | quote }}
             - name: IN_PLACE_POD_VERTICAL_SCALING
               value: {{ .Values.featureGates.inPlacePodVerticalScaling.enabled | quote }}
+            {{- if .Values.extraEnvs }}
+            {{- toYaml .Values.extraEnvs | nindent 12 }}
+            {{- end }}
           {{- with .Values.securityContext }}
           securityContext:
             {{- toYaml . | nindent 12 }}
@@ -212,7 +219,7 @@ spec:
           volumeMounts:
             - mountPath: /etc/kubeblocks
               name: manager-config
-            {{- if .Values.admissionWebhooks.enabled }}
+            {{- if .Values.webhooks.conversionEnabled }}
             - mountPath: /tmp/k8s-webhook-server/serving-certs
               name: cert
               readOnly: true
@@ -249,7 +256,7 @@ spec:
         - name: manager-config
           configMap:
             name: {{ include "kubeblocks.fullname" . }}-manager-config
-        {{- if .Values.admissionWebhooks.enabled }}
+        {{- if .Values.webhooks.conversionEnabled }}
         - name: cert
           secret:
             defaultMode: 420

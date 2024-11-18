@@ -91,6 +91,12 @@ func MockPodIsFailed(ctx context.Context, testCtx testutil.TestContext, pod *cor
 	gomega.Expect(testCtx.Cli.Status().Patch(ctx, pod, patch)).Should(gomega.Succeed())
 }
 
+func MockPodIsRunning(ctx context.Context, testCtx testutil.TestContext, pod *corev1.Pod) {
+	patch := client.MergeFrom(pod.DeepCopy())
+	pod.Status.Phase = corev1.PodRunning
+	gomega.Expect(testCtx.Cli.Status().Patch(ctx, pod, patch)).Should(gomega.Succeed())
+}
+
 // RemovePodFinalizer removes the pod finalizer to delete the pod finally.
 func RemovePodFinalizer(ctx context.Context, testCtx testutil.TestContext, pod *corev1.Pod) {
 	patch := client.MergeFrom(pod.DeepCopy())

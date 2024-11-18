@@ -35,7 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/rand"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -137,28 +136,6 @@ var (
 					Requests: map[corev1.ResourceName]resource.Quantity{
 						corev1.ResourceStorage: resource.MustParse("2G"),
 					},
-				},
-			},
-		},
-	}
-
-	service = &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Labels: map[string]string{
-				constant.AppManagedByLabelKey:   constant.AppName,
-				constant.AppNameLabelKey:        "foo-cluster-definition",
-				constant.AppInstanceLabelKey:    "foo-cluster",
-				constant.KBAppComponentLabelKey: name,
-				constant.AppComponentLabelKey:   name + "def",
-			},
-		},
-		Spec: corev1.ServiceSpec{
-			Ports: []corev1.ServicePort{
-				{
-					Name:       "svc",
-					Protocol:   corev1.ProtocolTCP,
-					Port:       12345,
-					TargetPort: intstr.FromString("my-svc"),
 				},
 			},
 		},

@@ -159,6 +159,15 @@ func isRunningAndAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
 	return podutils.IsPodAvailable(pod, minReadySeconds, metav1.Now())
 }
 
+func isContainersRunning(pod *corev1.Pod) bool {
+	for _, status := range pod.Status.ContainerStatuses {
+		if status.State.Running == nil {
+			return false
+		}
+	}
+	return true
+}
+
 // isCreated returns true if pod has been created and is maintained by the API server
 func isCreated(pod *corev1.Pod) bool {
 	return pod.Status.Phase != ""
@@ -207,7 +216,9 @@ func isImageMatched(pod *corev1.Pod) bool {
 			return false
 		}
 		// otherwise, statusName should be same as or has suffix of specName
-		if !strings.HasSuffix(statusName, specName) {
+		// remove registry and repository in specName (if presents)
+		names := strings.Split(specName, "/")
+		if !strings.HasSuffix(statusName, "/"+names[len(names)-1]) {
 			return false
 		}
 	}

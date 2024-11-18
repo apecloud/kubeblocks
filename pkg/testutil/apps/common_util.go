@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
@@ -333,7 +334,8 @@ func ClearResourcesWithRemoveFinalizerOption[T intctrlutil.Object, PT intctrluti
 		for _, obj := range items {
 			pobj := PT(&obj)
 			if pobj.GetDeletionTimestamp().IsZero() {
-				panic("expected DeletionTimestamp is not nil")
+				d, _ := json.Marshal(pobj)
+				panic("expected DeletionTimestamp is not nil, obj: " + string(d))
 			}
 			finalizers := pobj.GetFinalizers()
 			if len(finalizers) > 0 {

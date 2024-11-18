@@ -44,7 +44,6 @@ import (
 var _ = Describe("instance util test", func() {
 	BeforeEach(func() {
 		its = builder.NewInstanceSetBuilder(namespace, name).
-			SetService(&corev1.Service{}).
 			SetReplicas(3).
 			SetTemplate(template).
 			SetVolumeClaimTemplates(volumeClaimTemplates...).
@@ -1420,7 +1419,7 @@ var _ = Describe("instance util test", func() {
 				Name:  name,
 				Image: "apecloud.com/nginx",
 			}}
-			Expect(isImageMatched(pod)).Should(BeFalse())
+			Expect(isImageMatched(pod)).Should(BeTrue())
 		})
 	})
 

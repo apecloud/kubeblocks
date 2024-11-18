@@ -368,7 +368,7 @@ func buildKBAgentInitContainer() *corev1.Container {
 	return builder.NewContainerBuilder(kbagent.InitContainerName).
 		SetImage(viper.GetString(constant.KBToolsImage)).
 		SetImagePullPolicy(corev1.PullIfNotPresent).
-		AddCommands([]string{"cp", "-r", kbAgentCommand, "/bin/curl", kbAgentSharedMountPath + "/"}...).
+		AddCommands([]string{"cp", "-r", kbAgentCommand, kbAgentSharedMountPath + "/"}...).
 		AddVolumeMounts(sharedVolumeMount).
 		GetObject()
 }

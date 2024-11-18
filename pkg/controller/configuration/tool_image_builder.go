@@ -90,7 +90,10 @@ func buildReloadToolsContainer(cfgManagerParams *cfgcm.CfgManagerBuildParams, po
 func checkAndInstallToolsImageVolume(toolContainers []appsv1beta1.ToolConfig, buildParams []cfgcm.ConfigSpecMeta, useBuiltinSidecarImage bool) ([]appsv1beta1.ToolConfig, string) {
 	var configManagerBinaryPath string
 	for _, buildParam := range buildParams {
-		if buildParam.ToolsImageSpec != nil && buildParam.ConfigSpec.LegacyRenderedConfigSpec != nil {
+		if buildParam.ToolsImageSpec == nil {
+			continue
+		}
+		if buildParam.ConfigSpec.LegacyRenderedConfigSpec != nil {
 			// auto install config_render tool
 			toolContainers = checkAndCreateRenderedInitContainer(toolContainers, buildParam.ToolsImageSpec.MountPoint)
 		}

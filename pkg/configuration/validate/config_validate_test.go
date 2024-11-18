@@ -48,7 +48,6 @@ func TestSchemaValidatorWithCue(t *testing.T) {
 		cueFile    string
 		configFile string
 		format     parametersv1alpha1.CfgFileFormat
-		options    []ValidatorOptions
 	}
 	tests := []struct {
 		name string
@@ -112,9 +111,8 @@ mysqld.innodb_autoinc_lock_mode: conflicting values 2 and 100:
 		name: "configmap_key_filter",
 		args: args{
 			cueFile:    "cue_testdata/mysql.cue",
-			configFile: "cue_testdata/mysql_err.cnf",
+			configFile: "cue_testdata/mysql.cnf",
 			format:     parametersv1alpha1.Ini,
-			options:    []ValidatorOptions{WithKeySelector([]string{"key2", "key3"})},
 		},
 	}}
 
@@ -127,62 +125,44 @@ mysqld.innodb_autoinc_lock_mode: conflicting values 2 and 100:
 	}
 }
 
-// func TestSchemaValidatorWithSelector(t *testing.T) {
-// 	validator := NewConfigValidator(newFakeConfigSchema("cue_testdata/mysql.cue", appsv1beta1.Ini))
-// 	require.NotNil(t, validator)
-// 	require.ErrorContains(t, validator.Validate(
-// 		map[string]string{
-// 			"normal_key":   fromTestData("cue_testdata/mysql.cnf"),
-// 			"abnormal_key": fromTestData("cue_testdata/mysql_err.cnf"),
-// 		}), "[mysqld.innodb_autoinc_lock_mode: 3 errors in empty disjunction")
-//
-// 	validator = NewConfigValidator(newFakeConfigSchema("cue_testdata/mysql.cue", appsv1beta1.Ini), WithKeySelector([]string{}))
-// 	require.NotNil(t, validator)
-// 	require.ErrorContains(t, validator.Validate(
-// 		map[string]string{
-// 			"normal_key":   fromTestData("cue_testdata/mysql.cnf"),
-// 			"abnormal_key": fromTestData("cue_testdata/mysql_err.cnf"),
-// 		}), "[mysqld.innodb_autoinc_lock_mode: 3 errors in empty disjunction")
-//
-// 	validator = NewConfigValidator(newFakeConfigSchema("cue_testdata/mysql.cue", appsv1beta1.Ini), WithKeySelector([]string{"normal_key"}))
-// 	require.NotNil(t, validator)
-// 	require.Nil(t, validator.Validate(
-// 		map[string]string{
-// 			"normal_key":   fromTestData("cue_testdata/mysql.cnf"),
-// 			"abnormal_key": fromTestData("cue_testdata/mysql_err.cnf"),
-// 		}))
-// }
+func TestSchemaValidatorWithSelector(t *testing.T) {
+	validator := NewConfigValidator(newFakeConfigSchema("cue_testdata/mysql.cue"), &parametersv1alpha1.FileFormatConfig{Format: parametersv1alpha1.Ini})
+	require.NotNil(t, validator)
+	require.ErrorContains(t, validator.Validate(
+		fromTestData("cue_testdata/mysql_err.cnf"),
+	), "[mysqld.innodb_autoinc_lock_mode: 3 errors in empty disjunction")
+}
 
-// func TestSchemaValidatorWithOpenSchema(t *testing.T) {
-// 	type args struct {
-// 		cueFile        string
-// 		configFile     string
-// 		format         parametersv1alpha1.CfgFileFormat
-// 		SchemaTypeName string
-// 	}
-// 	tests := []struct {
-// 		name string
-// 		args args
-// 		err  error
-// 	}{{
-// 		name: "test_wesql",
-// 		args: args{
-// 			cueFile:    "cue_testdata/mysql.cue",
-// 			configFile: "cue_testdata/mysql.cnf",
-// 			format:     parametersv1alpha1.Ini,
-// 		},
-// 		err: nil,
-// 	}}
-//
-// 	for _, tt := range tests {
-// 		t.Run(tt.name, func(t *testing.T) {
-// 			tplConstraint := newFakeConfigSchema(tt.args.cueFile)
-// 			validator := &schemaValidator{
-// 				typeName: tt.args.SchemaTypeName,
-// 				cfgType:  tt.args.format,
-// 				schema:   tplConstraint.ParametersSchema.SchemaInJSON,
-// 			}
-// 			require.Equal(t, tt.err, validator.Validate(fromTestData(tt.args.configFile)))
-// 		})
-// 	}
-// }
+func TestSchemaValidatorWithOpenSchema(t *testing.T) {
+	type args struct {
+		cueFile        string
+		configFile     string
+		format         parametersv1alpha1.CfgFileFormat
+		SchemaTypeName string
+	}
+	tests := []struct {
+		name string
+		args args
+		err  error
+	}{{
+		name: "test_wesql",
+		args: args{
+			cueFile:    "cue_testdata/mysql.cue",
+			configFile: "cue_testdata/mysql.cnf",
+			format:     parametersv1alpha1.Ini,
+		},
+		err: nil,
+	}}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			configSchema := newFakeConfigSchema(tt.args.cueFile)
+			validator := &schemaValidator{
+				typeName: tt.args.SchemaTypeName,
+				cfgType:  tt.args.format,
+				schema:   configSchema.SchemaInJSON,
+			}
+			require.Equal(t, tt.err, validator.Validate(fromTestData(tt.args.configFile)))
+		})
+	}
+}

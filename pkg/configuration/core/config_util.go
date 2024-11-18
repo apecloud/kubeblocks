@@ -21,6 +21,7 @@ package core
 
 import (
 	"context"
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -133,7 +134,7 @@ func ToV1ConfigDescription(keys []string, format *parametersv1alpha1.FileFormatC
 	var configs []parametersv1alpha1.ComponentConfigDescription
 	for _, key := range keys {
 		configs = append(configs, parametersv1alpha1.ComponentConfigDescription{
-			Name:             key,
+			Name:             filepath.Base(key),
 			FileFormatConfig: format,
 		})
 	}

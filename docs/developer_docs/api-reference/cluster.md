@@ -853,6 +853,20 @@ If set, all the computing resources will be released.</p>
 <p>Specifies the sidecars to be injected into the Component.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>initParameters</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentParameters">
+ComponentParameters
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the initialization parameters.</p>
+</td>
+</tr>
 </table>
 </td>
 </tr>
@@ -4620,135 +4634,6 @@ string
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1.ComponentConfigSpec">ComponentConfigSpec
-</h3>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>ComponentTemplateSpec</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.ComponentTemplateSpec">
-ComponentTemplateSpec
-</a>
-</em>
-</td>
-<td>
-<p>
-(Members of <code>ComponentTemplateSpec</code> are embedded into this type.)
-</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>keys</code><br/>
-<em>
-[]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the configuration files within the ConfigMap that support dynamic updates.</p>
-<p>A configuration template (provided in the form of a ConfigMap) may contain templates for multiple
-configuration files.
-Each configuration file corresponds to a key in the ConfigMap.
-Some of these configuration files may support dynamic modification and reloading without requiring
-a pod restart.</p>
-<p>If empty or omitted, all configuration files in the ConfigMap are assumed to support dynamic updates,
-and ConfigConstraint applies to all keys.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>constraintRef</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the name of the referenced configuration constraints object.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>asEnvFrom</code><br/>
-<em>
-[]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the containers to inject the ConfigMap parameters as environment variables.</p>
-<p>This is useful when application images accept parameters through environment variables and
-generate the final configuration file in the startup script based on these variables.</p>
-<p>This field allows users to specify a list of container names, and KubeBlocks will inject the environment
-variables converted from the ConfigMap into these designated containers. This provides a flexible way to
-pass the configuration items from the ConfigMap to the container without modifying the image.</p>
-<p>Deprecated: <code>asEnvFrom</code> has been deprecated since 0.9.0 and will be removed in 0.10.0.
-Use <code>injectEnvTo</code> instead.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>injectEnvTo</code><br/>
-<em>
-[]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the containers to inject the ConfigMap parameters as environment variables.</p>
-<p>This is useful when application images accept parameters through environment variables and
-generate the final configuration file in the startup script based on these variables.</p>
-<p>This field allows users to specify a list of container names, and KubeBlocks will inject the environment
-variables converted from the ConfigMap into these designated containers. This provides a flexible way to
-pass the configuration items from the ConfigMap to the container without modifying the image.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>reRenderResourceTypes</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.RerenderResourceType">
-[]RerenderResourceType
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies whether the configuration needs to be re-rendered after v-scale or h-scale operations to reflect changes.</p>
-<p>In some scenarios, the configuration may need to be updated to reflect the changes in resource allocation
-or cluster topology. Examples:</p>
-<ul>
-<li>Redis: adjust maxmemory after v-scale operation.</li>
-<li>MySQL: increase max connections after v-scale operation.</li>
-<li>Zookeeper: update zoo.cfg with new node addresses after h-scale operation.</li>
-</ul>
-</td>
-</tr>
-<tr>
-<td>
-<code>asSecret</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Whether to store the final rendered parameters as a secret.</p>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec
 </h3>
 <p>
@@ -5744,7 +5629,7 @@ and other administrative tasks.</p>
 <h3 id="apps.kubeblocks.io/v1.ComponentParameters">ComponentParameters
 (<code>map[string]*string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>)
 </p>
 <div>
 </div>
@@ -6286,6 +6171,20 @@ If set, all the computing resources will be released.</p>
 <p>Specifies the sidecars to be injected into the Component.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>initParameters</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentParameters">
+ComponentParameters
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the initialization parameters.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1.ComponentStatus">ComponentStatus
@@ -6434,7 +6333,7 @@ ProvisionSecretRef
 <h3 id="apps.kubeblocks.io/v1.ComponentTemplateSpec">ComponentTemplateSpec
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentConfigSpec">ComponentConfigSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>, <a href="#apps.kubeblocks.io/v1.SidecarDefinitionSpec">SidecarDefinitionSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>, <a href="#apps.kubeblocks.io/v1.SidecarDefinitionSpec">SidecarDefinitionSpec</a>)
 </p>
 <div>
 </div>
@@ -8779,9 +8678,6 @@ int32
 </table>
 <h3 id="apps.kubeblocks.io/v1.RerenderResourceType">RerenderResourceType
 (<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentConfigSpec">ComponentConfigSpec</a>)
-</p>
 <div>
 <p>RerenderResourceType defines the resource requirements for a component.</p>
 </div>

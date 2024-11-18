@@ -266,21 +266,6 @@ formatterConfig:
 			}
 		})
 
-		It("builds secondary render correctly", func() {
-			mockTplScriptCM()
-			param := newCMBuildParams(false)
-			reloadOptions := newReloadOptions(parametersv1alpha1.TPLScriptType, syncFn(false))
-			for i := range param.ConfigSpecsBuildParams {
-				buildParam := &param.ConfigSpecsBuildParams[i]
-				buildParam.ReloadAction = reloadOptions
-				buildParam.ReloadType = parametersv1alpha1.TPLScriptType
-			}
-			Expect(BuildConfigManagerContainerParams(mockK8sCli.Client(), context.TODO(), param, newVolumeMounts())).Should(Succeed())
-			for _, buildParam := range param.ConfigSpecsBuildParams {
-				Expect(FindVolumeMount(param.Volumes, GetConfigVolumeName(buildParam.ConfigSpec))).ShouldNot(BeNil())
-			}
-		})
-
 		It("builds downwardAPI correctly", func() {
 			mockTplScriptCM()
 			param := newCMBuildParams(false)

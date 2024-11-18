@@ -46,52 +46,47 @@ metadata:
   namespace: demo
 spec:
   clusterDefinitionRef: starrocks-ce
+  clusterVersionRef: starrocks-ce-3.1.1
   terminationPolicy: Delete
-  topology: shared-nothing
+  affinity:
+    podAntiAffinity: Preferred
+    topologyKeys:
+    - kubernetes.io/hostname
   tolerations:
     - key: kb-data
       operator: Equal
       value: 'true'
       effect: NoSchedule
   componentSpecs:
-    - name: fe
-      componentDef: starrocks-ce-fe
-      serviceVersion: 3.3.0
-      replicas: 1
-      resources:
-        limits:
-          cpu: "1"
-          memory: "1Gi"
-        requests:
-          cpu: "1"
-          memory: "1Gi"
-      volumeClaimTemplates:
-        - name: data # ref clusterDefinition components.containers.volumeMounts.name
-          spec:
-            accessModes:
-              - ReadWriteOnce
-            resources:
-              requests:
-                storage: 20Gi
-    - name: be
-      componentDef: starrocks-ce-be
-      serviceVersion: 3.3.0
-      replicas: 1
-      resources:
-        limits:
-          cpu: "1"
-          memory: "1Gi"
-        requests:
-          cpu: "1"
-          memory: "1Gi"
-      volumeClaimTemplates:
-      - name: data
-        spec:
-          accessModes:
-          - ReadWriteOnce
-          resources:
-            requests:
-              storage: "20Gi"
+  - name: fe
+    componentDefRef: fe
+    serviceAccountName: kb-starrocks-cluster
+    replicas: 1
+    resources:
+      limits:
+        cpu: '0.5'
+        memory: 0.5Gi
+      requests:
+        cpu: '0.5'
+        memory: 0.5Gi
+  - name: be
+    componentDefRef: be
+    replicas: 2
+    resources:
+      limits:
+        cpu: '0.5'
+        memory: 0.5Gi
+      requests:
+        cpu: '0.5'
+        memory: 0.5Gi
+    volumeClaimTemplates:
+    - name: be-storage
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi
 EOF
 ```
 

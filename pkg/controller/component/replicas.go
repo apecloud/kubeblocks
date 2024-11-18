@@ -24,7 +24,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
@@ -349,8 +348,7 @@ func handleNewReplicaTaskEvent4Finished(ctx context.Context, cli client.Client,
 		return err
 	}
 	return updateReplicaStatusFunc(ctx, cli, its, event.Replica, func(status *ReplicaStatus) error {
-		status.Generation = strconv.FormatInt(comp.Generation, 10) // TODO: generation
-		status.Message = event.Message
+		status.Message = ""
 		status.DataLoaded = ptr.To(true)
 		return nil
 	})
@@ -359,7 +357,7 @@ func handleNewReplicaTaskEvent4Finished(ctx context.Context, cli client.Client,
 func handleNewReplicaTaskEvent4Unfinished(ctx context.Context, cli client.Client,
 	comp *appsv1.Component, its *workloads.InstanceSet, event proto.TaskEvent) error {
 	return updateReplicaStatusFunc(ctx, cli, its, event.Replica, func(status *ReplicaStatus) error {
-		status.Generation = strconv.FormatInt(comp.Generation, 10) // TODO: generation
+		status.Message = event.Message
 		status.DataLoaded = ptr.To(false)
 		return nil
 	})
@@ -368,7 +366,6 @@ func handleNewReplicaTaskEvent4Unfinished(ctx context.Context, cli client.Client
 func handleNewReplicaTaskEvent4Failed(ctx context.Context, cli client.Client,
 	comp *appsv1.Component, its *workloads.InstanceSet, event proto.TaskEvent) error {
 	return updateReplicaStatusFunc(ctx, cli, its, event.Replica, func(status *ReplicaStatus) error {
-		status.Generation = strconv.FormatInt(comp.Generation, 10) // TODO: generation
 		status.Message = event.Message
 		return nil
 	})

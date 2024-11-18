@@ -21,6 +21,7 @@ package k8score
 
 import (
 	"context"
+	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -35,6 +36,10 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+)
+
+const (
+	eventHandledAnnotationKey = "kubeblocks.io/event-handled"
 )
 
 type eventHandler interface {
@@ -70,6 +75,10 @@ func (r *EventReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "getEventError")
 	}
 
+	if r.isEventHanded(event) {
+		return intctrlutil.Reconciled()
+	}
+
 	handlers := []eventHandler{
 		&instanceset.PodRoleEventHandler{},
 		&component.AvailableEventHandler{},
@@ -79,6 +88,10 @@ func (r *EventReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		if err := handler.Handle(r.Client, reqCtx, r.Recorder, event); err != nil && !apierrors.IsNotFound(err) {
 			return intctrlutil.RequeueWithError(err, reqCtx.Log, "handleEventError")
 		}
+	}
+
+	if err := r.eventHanded(ctx, event); err != nil {
+		return intctrlutil.RequeueWithError(err, reqCtx.Log, "eventHandledError")
 	}
 	return intctrlutil.Reconciled()
 }
@@ -93,4 +106,22 @@ func (r *EventReconciler) SetupWithManager(mgr ctrl.Manager, multiClusterMgr mul
 	}
 
 	return b.Complete(r)
+}
+
+func (r *EventReconciler) isEventHanded(event *corev1.Event) bool {
+	count := fmt.Sprintf("%d", event.Count)
+	annotations := event.GetAnnotations()
+	if annotations != nil && annotations[eventHandledAnnotationKey] == count {
+		return true
+	}
+	return false
+}
+
+func (r *EventReconciler) eventHanded(ctx context.Context, event *corev1.Event) error {
+	patch := client.MergeFrom(event.DeepCopy())
+	if event.Annotations == nil {
+		event.Annotations = make(map[string]string, 0)
+	}
+	event.Annotations[eventHandledAnnotationKey] = fmt.Sprintf("%d", event.Count)
+	return r.Client.Patch(ctx, event, patch, multicluster.InDataContextUnspecified())
 }

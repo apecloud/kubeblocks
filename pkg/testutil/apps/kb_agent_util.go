@@ -148,7 +148,7 @@ func MockKBAgentClient4Workload(testCtx *testutil.TestContext, pods []*corev1.Po
 		return rsp, nil
 	}
 
-	MockKBAgentClient(func(recorder *kbagent.MockClientMockRecorder) {
+	MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
 		recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
 			switch req.Action {
 			case "memberLeave":

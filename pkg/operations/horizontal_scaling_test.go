@@ -515,7 +515,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			}, true)
 			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
 			Expect(opsRes.Cluster.Spec.GetComponentByName(defaultCompName).Replicas).Should(BeEquivalentTo(3))
-			By("expect for opsRequest phase is Succeed after pods has been scaled and component phase is Running")
+			By("expect for opsRequest phase is Succeed after pods has been scaled and progress is 1/1")
 			checkOpsRequestPhaseIsSucceed(reqCtx, opsRes)
 			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("1/1"), fmt.Sprintf("info: %v", opsRes.OpsRequest))
 		})
@@ -543,7 +543,6 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 		})
 
 		It("test online two specified pods with same pod name with ignore validate", func() {
-			By("init operations resources with CLusterDefinition/ClusterVersion/Hybrid components Cluster/consensus Pods")
 			By("init operations resources with CLusterDefinition/ClusterVersion/Hybrid components Cluster/consensus Pods")
 			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
 			testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)

@@ -280,8 +280,7 @@ spec:
                 type: object
                 x-kubernetes-validations:
                 - message: forbidden to update spec.parameters
-                  rule: size(self) == size(oldSelf) && oldSelf.all(key, key in self
-                    && self[key] == oldSelf[key])
+                  rule: self == oldSelf
               prepareDataConfig:
                 description: |-
                   Configuration for the action of "prepareData" phase, including the persistent volume claims

@@ -120,8 +120,7 @@ spec:
                 type: object
                 x-kubernetes-validations:
                 - message: forbidden to update spec.parameters
-                  rule: size(self) == size(oldSelf) && oldSelf.all(key, key in self
-                    && self[key] == oldSelf[key])
+                  rule: self == oldSelf
               parentBackupName:
                 description: Determines the parent backup name for incremental or
                   differential backup.

@@ -80,7 +80,7 @@ type BackupSpec struct {
 	// Parameters match the schema specified in the `actionset.spec.parametersSchema`
 	//
 	// +kubebuilder:validation:MaxProperties=30
-	// +kubebuilder:validation:XValidation:rule="size(self) == size(oldSelf) && oldSelf.all(key, key in self && self[key] == oldSelf[key])",message="forbidden to update spec.parameters"
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.parameters"
 	// +optional
 	Parameters map[string]string `json:"parameters,omitempty"`
 }

@@ -101,8 +101,7 @@ spec:
                     type: object
                     x-kubernetes-validations:
                     - message: forbidden to update spec.parameters
-                      rule: size(self) == size(oldSelf) && oldSelf.all(key, key in
-                        self && self[key] == oldSelf[key])
+                      rule: self == oldSelf
                   parentBackupName:
                     description: If the specified BackupMethod is incremental, `parentBackupName`
                       is required.
@@ -4421,8 +4420,7 @@ spec:
                     type: object
                     x-kubernetes-validations:
                     - message: forbidden to update spec.parameters
-                      rule: size(self) == size(oldSelf) && oldSelf.all(key, key in
-                        self && self[key] == oldSelf[key])
+                      rule: self == oldSelf
                   restorePointInTime:
                     description: |-
                       Specifies the point in time to which the restore should be performed.

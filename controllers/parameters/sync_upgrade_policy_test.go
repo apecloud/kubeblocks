@@ -30,7 +30,7 @@ import (
 
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	cfgproto "github.com/apecloud/kubeblocks/pkg/configuration/proto"
-	mock_proto "github.com/apecloud/kubeblocks/pkg/configuration/proto/mocks"
+	mockproto "github.com/apecloud/kubeblocks/pkg/configuration/proto/mocks"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 )
 
@@ -40,12 +40,12 @@ var _ = Describe("Reconfigure OperatorSyncPolicy", func() {
 
 	var (
 		k8sMockClient     *testutil.K8sClientMockHelper
-		reconfigureClient *mock_proto.MockReconfigureClient
+		reconfigureClient *mockproto.MockReconfigureClient
 	)
 
 	BeforeEach(func() {
 		k8sMockClient = testutil.NewK8sMockClient()
-		reconfigureClient = mock_proto.NewMockReconfigureClient(k8sMockClient.Controller())
+		reconfigureClient = mockproto.NewMockReconfigureClient(k8sMockClient.Controller())
 	})
 
 	AfterEach(func() {

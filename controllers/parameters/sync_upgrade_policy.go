@@ -31,29 +31,30 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-type syncPolicy struct {
-}
+var syncPolicyInstance = &syncPolicy{}
+
+type syncPolicy struct{}
 
 func init() {
-	RegisterPolicy(parametersv1alpha1.SyncDynamicReloadPolicy, &syncPolicy{})
+	RegisterPolicy(parametersv1alpha1.SyncDynamicReloadPolicy, syncPolicyInstance)
 }
 
 func (o *syncPolicy) GetPolicyName() string {
 	return string(parametersv1alpha1.SyncDynamicReloadPolicy)
 }
 
-func (o *syncPolicy) Upgrade(params reconfigureContext) (ReturnedStatus, error) {
-	updatedParameters := params.UpdatedParameters
+func (o *syncPolicy) Upgrade(rctx reconfigureContext) (ReturnedStatus, error) {
+	updatedParameters := rctx.UpdatedParameters
 	if len(updatedParameters) == 0 {
 		return makeReturnedStatus(ESNone), nil
 	}
 
 	funcs := GetInstanceSetRollingUpgradeFuncs()
-	pods, err := funcs.GetPodsFunc(params)
+	pods, err := funcs.GetPodsFunc(rctx)
 	if err != nil {
 		return makeReturnedStatus(ESFailedAndRetry), err
 	}
-	return sync(params, updatedParameters, pods, funcs)
+	return sync(rctx, updatedParameters, pods, funcs)
 }
 
 func matchLabel(pods []corev1.Pod, selector *metav1.LabelSelector) ([]corev1.Pod, error) {
@@ -71,18 +72,18 @@ func matchLabel(pods []corev1.Pod, selector *metav1.LabelSelector) ([]corev1.Pod
 	return result, nil
 }
 
-func sync(params reconfigureContext, updatedParameters map[string]string, pods []corev1.Pod, funcs RollingUpgradeFuncs) (ReturnedStatus, error) {
+func sync(rctx reconfigureContext, updatedParameters map[string]string, pods []corev1.Pod, funcs RollingUpgradeFuncs) (ReturnedStatus, error) {
 	var (
 		r        = ESNone
 		total    = int32(len(pods))
-		replicas = int32(params.getTargetReplicas())
+		replicas = int32(rctx.getTargetReplicas())
 		progress = core.NotStarted
 
 		err         error
-		ctx         = params.Ctx
-		configKey   = params.getConfigKey()
-		versionHash = params.getTargetVersionHash()
-		selector    = intctrlutil.GetPodSelector(params.ParametersDef)
+		ctx         = rctx.Ctx
+		configKey   = rctx.getConfigKey()
+		versionHash = rctx.getTargetVersionHash()
+		selector    = intctrlutil.GetPodSelector(rctx.ParametersDef)
 		fileName    string
 	)
 
@@ -93,16 +94,16 @@ func sync(params reconfigureContext, updatedParameters map[string]string, pods [
 		return makeReturnedStatus(ESFailedAndRetry), err
 	}
 	if len(pods) == 0 {
-		params.Log.Info(fmt.Sprintf("no pods to update, and retry, selector: %v", selector))
+		rctx.Log.Info(fmt.Sprintf("no pods to update, and retry, selector: %v", selector))
 		return makeReturnedStatus(ESRetry), nil
 	}
-	if params.ConfigDescription != nil {
-		fileName = params.ConfigDescription.Name
+	if rctx.ConfigDescription != nil {
+		fileName = rctx.ConfigDescription.Name
 	}
 
 	requireUpdatedCount := int32(len(pods))
 	for _, pod := range pods {
-		params.Log.V(1).Info(fmt.Sprintf("sync pod: %s", pod.Name))
+		rctx.Log.V(1).Info(fmt.Sprintf("sync pod: %s", pod.Name))
 		if intctrlutil.IsMatchConfigVersion(&pod, configKey, versionHash) {
 			progress++
 			continue
@@ -110,11 +111,11 @@ func sync(params reconfigureContext, updatedParameters map[string]string, pods [
 		if !intctrlutil.PodIsReady(&pod) {
 			continue
 		}
-		err = funcs.OnlineUpdatePodFunc(&pod, ctx, params.ReconfigureClientFactory, params.ConfigTemplate.Name, fileName, updatedParameters)
+		err = funcs.OnlineUpdatePodFunc(&pod, ctx, rctx.ReconfigureClientFactory, rctx.ConfigTemplate.Name, fileName, updatedParameters)
 		if err != nil {
 			return makeReturnedStatus(ESFailedAndRetry), err
 		}
-		err = updatePodLabelsWithConfigVersion(&pod, configKey, versionHash, params.Client, ctx)
+		err = updatePodLabelsWithConfigVersion(&pod, configKey, versionHash, rctx.Client, ctx)
 		if err != nil {
 			return makeReturnedStatus(ESFailedAndRetry), err
 		}

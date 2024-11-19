@@ -21,7 +21,7 @@ package parameters
 
 import (
 	"context"
-	"os"
+	"log"
 
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -33,24 +33,24 @@ import (
 )
 
 const (
-	// StatefulSetSpec.Spec.MinReadySeconds
-	// units: s
 	defaultMinReadySeconds = 10
 )
 
-type rollingUpgradePolicy struct {
-}
+var rollingUpgradePolicyInstance = &rollingUpgradePolicy{}
+
+type rollingUpgradePolicy struct{}
 
 func init() {
-	RegisterPolicy(parametersv1alpha1.RollingPolicy, &rollingUpgradePolicy{})
+	RegisterPolicy(parametersv1alpha1.RollingPolicy, rollingUpgradePolicyInstance)
 	if err := viper.BindEnv(constant.PodMinReadySecondsEnv); err != nil {
-		os.Exit(-1)
+		log.Fatalf("failed to bind environment variable: %v", err)
 	}
 	viper.SetDefault(constant.PodMinReadySecondsEnv, defaultMinReadySeconds)
 }
 
-func (r *rollingUpgradePolicy) Upgrade(params reconfigureContext) (ReturnedStatus, error) {
-	return performRollingUpgrade(params, GetInstanceSetRollingUpgradeFuncs())
+// Upgrade performs a rolling upgrade based on the provided parameters.
+func (r *rollingUpgradePolicy) Upgrade(rctx reconfigureContext) (ReturnedStatus, error) {
+	return performRollingUpgrade(rctx, GetInstanceSetRollingUpgradeFuncs())
 }
 
 func (r *rollingUpgradePolicy) GetPolicyName() string {
@@ -61,26 +61,26 @@ func canPerformUpgrade(pods []corev1.Pod, params reconfigureContext) bool {
 	return len(pods) == params.getTargetReplicas()
 }
 
-func performRollingUpgrade(params reconfigureContext, funcs RollingUpgradeFuncs) (ReturnedStatus, error) {
-	pods, err := funcs.GetPodsFunc(params)
+func performRollingUpgrade(rctx reconfigureContext, funcs RollingUpgradeFuncs) (ReturnedStatus, error) {
+	pods, err := funcs.GetPodsFunc(rctx)
 	if err != nil {
 		return makeReturnedStatus(ESFailedAndRetry), err
 	}
 
 	var (
-		rollingReplicas = params.maxRollingReplicas()
-		configKey       = params.getConfigKey()
-		configVersion   = params.getTargetVersionHash()
+		rollingReplicas = rctx.maxRollingReplicas()
+		configKey       = rctx.getConfigKey()
+		configVersion   = rctx.getTargetVersionHash()
 	)
 
-	if !canPerformUpgrade(pods, params) {
+	if !canPerformUpgrade(pods, rctx) {
 		return makeReturnedStatus(ESRetry), nil
 	}
 
-	podStats := classifyPodByStats(pods, params.getTargetReplicas(), params.podMinReadySeconds())
+	podStats := classifyPodByStats(pods, rctx.getTargetReplicas(), rctx.podMinReadySeconds())
 	podSwitchWindow := markDynamicSwitchWindow(pods, podStats, configKey, configVersion, rollingReplicas)
 	if !canSafeUpdatePods(podSwitchWindow) {
-		params.Log.Info("wait for pod stat ready.")
+		rctx.Log.Info("wait for pod stat ready.")
 		return makeReturnedStatus(ESRetry), nil
 	}
 
@@ -91,13 +91,13 @@ func performRollingUpgrade(params reconfigureContext, funcs RollingUpgradeFuncs)
 
 	for _, pod := range waitUpgradingPods {
 		if podStats.isUpdating(&pod) {
-			params.Log.Info("pod is in rolling update.", "pod name", pod.Name)
+			rctx.Log.Info("pod is in rolling update.", "pod name", pod.Name)
 			continue
 		}
-		if err := funcs.RestartContainerFunc(&pod, params.Ctx, params.ContainerNames, params.ReconfigureClientFactory); err != nil {
+		if err := funcs.RestartContainerFunc(&pod, rctx.Ctx, rctx.ContainerNames, rctx.ReconfigureClientFactory); err != nil {
 			return makeReturnedStatus(ESFailedAndRetry), err
 		}
-		if err := updatePodLabelsWithConfigVersion(&pod, configKey, configVersion, params.Client, params.Ctx); err != nil {
+		if err := updatePodLabelsWithConfigVersion(&pod, configKey, configVersion, rctx.Client, rctx.Ctx); err != nil {
 			return makeReturnedStatus(ESFailedAndRetry), err
 		}
 	}
@@ -125,7 +125,6 @@ func markDynamicSwitchWindow(pods []corev1.Pod, podsStats *componentPodStats, co
 		componentPodStats: podsStats,
 	}
 
-	// find update last
 	for i := podsStats.targetReplica - 1; i >= 0; i-- {
 		pod := &pods[i]
 		if !podutil.IsMatchConfigVersion(pod, configKey, currentVersion) {
@@ -173,15 +172,10 @@ func classifyPodByStats(pods []corev1.Pod, targetReplicas int, minReadySeconds i
 }
 
 type componentPodStats struct {
-	// failed to start pod
-	ready     map[string]*corev1.Pod
-	available map[string]*corev1.Pod
-
-	// updated pod count
-	updated  map[string]*corev1.Pod
-	updating map[string]*corev1.Pod
-
-	// expected pod
+	ready         map[string]*corev1.Pod
+	available     map[string]*corev1.Pod
+	updated       map[string]*corev1.Pod
+	updating      map[string]*corev1.Pod
 	targetReplica int
 }
 
@@ -203,8 +197,7 @@ func (s *componentPodStats) isUpdating(pod *corev1.Pod) bool {
 type switchWindow struct {
 	begin int
 	end   int
-
-	pods []corev1.Pod
+	pods  []corev1.Pod
 	*componentPodStats
 }
 

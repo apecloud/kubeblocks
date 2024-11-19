@@ -23,24 +23,29 @@ import (
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 )
 
+var combineUpgradePolicyInstance = &combineUpgradePolicy{
+	policyExecutors: []reconfigurePolicy{
+		syncPolicyInstance,
+		simplePolicyInstance,
+	},
+}
+
 type combineUpgradePolicy struct {
 	policyExecutors []reconfigurePolicy
 }
 
 func init() {
-	RegisterPolicy(parametersv1alpha1.DynamicReloadAndRestartPolicy, &combineUpgradePolicy{
-		policyExecutors: []reconfigurePolicy{&syncPolicy{}, &simplePolicy{}},
-	})
+	RegisterPolicy(parametersv1alpha1.DynamicReloadAndRestartPolicy, combineUpgradePolicyInstance)
 }
 
 func (h *combineUpgradePolicy) GetPolicyName() string {
 	return string(parametersv1alpha1.DynamicReloadAndRestartPolicy)
 }
 
-func (h *combineUpgradePolicy) Upgrade(params reconfigureContext) (ReturnedStatus, error) {
+func (h *combineUpgradePolicy) Upgrade(rctx reconfigureContext) (ReturnedStatus, error) {
 	var ret ReturnedStatus
 	for _, executor := range h.policyExecutors {
-		retStatus, err := executor.Upgrade(params)
+		retStatus, err := executor.Upgrade(rctx)
 		if err != nil {
 			return retStatus, err
 		}

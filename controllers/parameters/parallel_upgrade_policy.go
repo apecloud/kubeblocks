@@ -26,39 +26,40 @@ import (
 	podutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-type parallelUpgradePolicy struct {
-}
+var parallelUpgradePolicyInstance = &parallelUpgradePolicy{}
+
+type parallelUpgradePolicy struct{}
 
 func init() {
-	RegisterPolicy(parametersv1alpha1.RestartPolicy, &parallelUpgradePolicy{})
+	RegisterPolicy(parametersv1alpha1.RestartPolicy, parallelUpgradePolicyInstance)
 }
 
-func (p *parallelUpgradePolicy) Upgrade(params reconfigureContext) (ReturnedStatus, error) {
+func (p *parallelUpgradePolicy) Upgrade(rctx reconfigureContext) (ReturnedStatus, error) {
 	funcs := GetInstanceSetRollingUpgradeFuncs()
-	pods, err := funcs.GetPodsFunc(params)
+	pods, err := funcs.GetPodsFunc(rctx)
 	if err != nil {
 		return makeReturnedStatus(ESFailedAndRetry), err
 	}
 
-	return p.restartPods(params, pods, funcs)
+	return p.restartPods(rctx, pods, funcs)
 }
 
 func (p *parallelUpgradePolicy) GetPolicyName() string {
 	return string(parametersv1alpha1.RestartPolicy)
 }
 
-func (p *parallelUpgradePolicy) restartPods(params reconfigureContext, pods []corev1.Pod, funcs RollingUpgradeFuncs) (ReturnedStatus, error) {
-	var configKey = params.getConfigKey()
-	var configVersion = params.getTargetVersionHash()
+func (p *parallelUpgradePolicy) restartPods(rctx reconfigureContext, pods []corev1.Pod, funcs RollingUpgradeFuncs) (ReturnedStatus, error) {
+	var configKey = rctx.getConfigKey()
+	var configVersion = rctx.getTargetVersionHash()
 
 	for _, pod := range pods {
 		if podutil.IsMatchConfigVersion(&pod, configKey, configVersion) {
 			continue
 		}
-		if err := funcs.RestartContainerFunc(&pod, params.Ctx, params.ContainerNames, params.ReconfigureClientFactory); err != nil {
+		if err := funcs.RestartContainerFunc(&pod, rctx.Ctx, rctx.ContainerNames, rctx.ReconfigureClientFactory); err != nil {
 			return makeReturnedStatus(ESFailedAndRetry), err
 		}
-		if err := updatePodLabelsWithConfigVersion(&pod, configKey, configVersion, params.Client, params.Ctx); err != nil {
+		if err := updatePodLabelsWithConfigVersion(&pod, configKey, configVersion, rctx.Client, rctx.Ctx); err != nil {
 			return makeReturnedStatus(ESFailedAndRetry), err
 		}
 	}

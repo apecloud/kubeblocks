@@ -65,7 +65,7 @@ type ReturnedStatus struct {
 
 type reconfigurePolicy interface {
 	// Upgrade is to enable the configuration to take effect.
-	Upgrade(params reconfigureContext) (ReturnedStatus, error)
+	Upgrade(rctx reconfigureContext) (ReturnedStatus, error)
 
 	// GetPolicyName returns name of policy.
 	GetPolicyName() string

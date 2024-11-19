@@ -199,7 +199,7 @@ var _ = Describe("instance util test", func() {
 			Expect(err).Should(BeNil())
 			Expect(policy).Should(Equal(NoOpsPolicy))
 
-			By("build a pod without revision updated, with IgnorePodVerticalScaling disabled")
+			By("simulating a webhook to add an unknown container to the pod, with IgnorePodVerticalScaling disabled, it should use the in-place update policy")
 			pod6 := pod1.DeepCopy()
 			pod6.Spec.Containers = append(pod6.Spec.Containers, corev1.Container{
 				Name:  "sidecar1",

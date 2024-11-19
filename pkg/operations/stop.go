@@ -24,6 +24,7 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -95,7 +96,7 @@ func (stop StopOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 				return
 			}
 		}
-		compSpec.Stop = func() *bool { b := true; return &b }()
+		compSpec.Stop = pointer.Bool(true)
 	}
 
 	for i, v := range cluster.Spec.ComponentSpecs {

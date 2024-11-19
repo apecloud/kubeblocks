@@ -36,7 +36,7 @@ type StartOpsHandler struct{}
 var _ OpsHandler = StartOpsHandler{}
 
 func init() {
-	stopBehaviour := OpsBehaviour{
+	starBehaviour := OpsBehaviour{
 		FromClusterPhases: append(appsv1.GetClusterUpRunningPhases(), appsv1.UpdatingClusterPhase,
 			appsv1.StoppedClusterPhase, appsv1.StoppingClusterPhase),
 		ToClusterPhase: appsv1.UpdatingClusterPhase,
@@ -45,7 +45,7 @@ func init() {
 	}
 
 	opsMgr := GetOpsManager()
-	opsMgr.RegisterOps(opsv1alpha1.StartType, stopBehaviour)
+	opsMgr.RegisterOps(opsv1alpha1.StartType, starBehaviour)
 }
 
 // ActionStartedCondition the started condition when handling the start request.

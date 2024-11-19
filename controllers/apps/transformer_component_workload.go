@@ -200,36 +200,24 @@ func (t *componentWorkloadTransformer) reconcileReplicasStatus(ctx context.Conte
 		return err
 	}
 
-	hasMemberJoinDefined, hasDataActionDefined := func() (bool, bool) {
-		hasActionDefined := func(actions []*appsv1.Action) bool {
-			for _, action := range actions {
-				if action == nil || action.Exec == nil {
-					return false
-				}
-			}
-			return true
-		}
-		hasMemberJoinDefined := func() bool {
-			if synthesizedComp.LifecycleActions == nil {
-				return false
-			}
-			return hasActionDefined([]*appsv1.Action{
-				synthesizedComp.LifecycleActions.MemberJoin,
-			})
-		}()
-		hasDataActionDefined := func() bool {
-			if synthesizedComp.LifecycleActions == nil {
-				return false
-			}
-			return hasActionDefined([]*appsv1.Action{
-				synthesizedComp.LifecycleActions.DataDump,
-				synthesizedComp.LifecycleActions.DataLoad,
-			})
-		}()
-
-		return hasMemberJoinDefined, hasDataActionDefined
-	}()
+	hasMemberJoinDefined, hasDataActionDefined := hasMemberJoinNDataActionDefined(synthesizedComp.LifecycleActions)
 	return component.StatusReplicasStatus(protoITS, replicas, hasMemberJoinDefined, hasDataActionDefined)
+}
+
+func hasMemberJoinNDataActionDefined(lifecycleActions *appsv1.ComponentLifecycleActions) (bool, bool) {
+	if lifecycleActions == nil {
+		return false, false
+	}
+	hasActionDefined := func(actions []*appsv1.Action) bool {
+		for _, action := range actions {
+			if action == nil || action.Exec == nil {
+				return false
+			}
+		}
+		return true
+	}
+	return hasActionDefined([]*appsv1.Action{lifecycleActions.MemberJoin}),
+		hasActionDefined([]*appsv1.Action{lifecycleActions.DataDump, lifecycleActions.DataLoad})
 }
 
 func isCompStopped(synthesizedComp *component.SynthesizedComponent) bool {
@@ -720,34 +708,7 @@ func (r *componentWorkloadOps) scaleOut() error {
 	// replicas to be created
 	newReplicas := r.desiredCompPodNameSet.Difference(r.runningItsPodNameSet).UnsortedList()
 
-	hasMemberJoinDefined, hasDataActionDefined := func() (bool, bool) {
-		hasActionDefined := func(actions []*appsv1.Action) bool {
-			for _, action := range actions {
-				if action == nil || action.Exec == nil {
-					return false
-				}
-			}
-			return true
-		}
-		hasMemberJoinDefined := func() bool {
-			if r.synthesizeComp.LifecycleActions == nil {
-				return false
-			}
-			return hasActionDefined([]*appsv1.Action{
-				r.synthesizeComp.LifecycleActions.MemberJoin,
-			})
-		}()
-		hasDataActionDefined := func() bool {
-			if r.synthesizeComp.LifecycleActions == nil {
-				return false
-			}
-			return hasActionDefined([]*appsv1.Action{
-				r.synthesizeComp.LifecycleActions.DataDump,
-				r.synthesizeComp.LifecycleActions.DataLoad,
-			})
-		}()
-		return hasMemberJoinDefined, hasDataActionDefined
-	}()
+	hasMemberJoinDefined, hasDataActionDefined := hasMemberJoinNDataActionDefined(r.synthesizeComp.LifecycleActions)
 
 	// build and assign data replication tasks
 	if err := func() error {

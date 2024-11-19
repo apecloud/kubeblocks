@@ -75,7 +75,7 @@ func (r *EventReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "getEventError")
 	}
 
-	if r.isEventHanded(event) {
+	if r.isEventHandled(event) {
 		return intctrlutil.Reconciled()
 	}
 
@@ -90,7 +90,7 @@ func (r *EventReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		}
 	}
 
-	if err := r.eventHanded(ctx, event); err != nil {
+	if err := r.eventHandled(ctx, event); err != nil {
 		return intctrlutil.RequeueWithError(err, reqCtx.Log, "eventHandledError")
 	}
 	return intctrlutil.Reconciled()
@@ -108,7 +108,7 @@ func (r *EventReconciler) SetupWithManager(mgr ctrl.Manager, multiClusterMgr mul
 	return b.Complete(r)
 }
 
-func (r *EventReconciler) isEventHanded(event *corev1.Event) bool {
+func (r *EventReconciler) isEventHandled(event *corev1.Event) bool {
 	count := fmt.Sprintf("%d", event.Count)
 	annotations := event.GetAnnotations()
 	if annotations != nil && annotations[eventHandledAnnotationKey] == count {
@@ -117,7 +117,7 @@ func (r *EventReconciler) isEventHanded(event *corev1.Event) bool {
 	return false
 }
 
-func (r *EventReconciler) eventHanded(ctx context.Context, event *corev1.Event) error {
+func (r *EventReconciler) eventHandled(ctx context.Context, event *corev1.Event) error {
 	patch := client.MergeFrom(event.DeepCopy())
 	if event.Annotations == nil {
 		event.Annotations = make(map[string]string, 0)

@@ -20714,6 +20714,34 @@ that requires storage expansion.</p>
 </tr>
 <tr>
 <td>
+<code>start</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ComponentOps">
+[]ComponentOps
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Lists Components to be started. If empty, all components will be started.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>stop</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.ComponentOps">
+[]ComponentOps
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Lists Components to be stopped. If empty, all components will be stopped.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>restart</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.ComponentOps">

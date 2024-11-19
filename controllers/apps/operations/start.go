@@ -35,15 +35,16 @@ type StartOpsHandler struct{}
 var _ OpsHandler = StartOpsHandler{}
 
 func init() {
-	stopBehaviour := OpsBehaviour{
-		FromClusterPhases: []appsv1alpha1.ClusterPhase{appsv1alpha1.StoppedClusterPhase},
-		ToClusterPhase:    appsv1alpha1.UpdatingClusterPhase,
-		QueueByCluster:    true,
-		OpsHandler:        StartOpsHandler{},
+	startBehaviour := OpsBehaviour{
+		FromClusterPhases: append(appsv1alpha1.GetClusterUpRunningPhases(), appsv1alpha1.UpdatingClusterPhase,
+			appsv1alpha1.StoppedClusterPhase, appsv1alpha1.StoppingClusterPhase),
+		ToClusterPhase: appsv1alpha1.UpdatingClusterPhase,
+		QueueByCluster: true,
+		OpsHandler:     StartOpsHandler{},
 	}
 
 	opsMgr := GetOpsManager()
-	opsMgr.RegisterOps(appsv1alpha1.StartType, stopBehaviour)
+	opsMgr.RegisterOps(appsv1alpha1.StartType, startBehaviour)
 }
 
 // ActionStartedCondition the started condition when handling the start request.
@@ -55,15 +56,33 @@ func (start StartOpsHandler) ActionStartedCondition(reqCtx intctrlutil.RequestCt
 func (start StartOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	var (
 		cluster   = opsRes.Cluster
-		startComp = func(compSpec *appsv1alpha1.ClusterComponentSpec) {
-			compSpec.Stop = nil
-		}
+		startList = opsRes.OpsRequest.Spec.StartList
 	)
-	for i := range cluster.Spec.ComponentSpecs {
-		startComp(&cluster.Spec.ComponentSpecs[i])
+	compOpsHelper := newComponentOpsHelper(startList)
+	// abort earlier running opsRequests.
+	if err := abortEarlierOpsRequestWithSameKind(reqCtx, cli, opsRes, []appsv1alpha1.OpsType{appsv1alpha1.StopType},
+		func(earlierOps *appsv1alpha1.OpsRequest) (bool, error) {
+			if len(startList) == 0 {
+				// start all components
+				return true, nil
+			}
+			return len(earlierOps.Spec.StopList) == 0 || hasIntersectionCompOpsList(compOpsHelper.componentOpsSet, earlierOps.Spec.StopList), nil
+		}); err != nil {
+		return err
 	}
-	for i := range cluster.Spec.ShardingSpecs {
-		startComp(&cluster.Spec.ShardingSpecs[i].Template)
+	startComp := func(compSpec *appsv1alpha1.ClusterComponentSpec, clusterCompName string) {
+		if len(startList) > 0 {
+			if _, ok := compOpsHelper.componentOpsSet[clusterCompName]; !ok {
+				return
+			}
+		}
+		compSpec.Stop = nil
+	}
+	for i, v := range cluster.Spec.ComponentSpecs {
+		startComp(&cluster.Spec.ComponentSpecs[i], v.Name)
+	}
+	for i, v := range cluster.Spec.ShardingSpecs {
+		startComp(&cluster.Spec.ShardingSpecs[i].Template, v.Name)
 	}
 	return cli.Update(reqCtx.Ctx, cluster)
 }
@@ -84,7 +103,7 @@ func (start StartOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli 
 		}
 		return handleComponentProgressForScalingReplicas(reqCtx, cli, opsRes, pgRes, compStatus)
 	}
-	compOpsHelper := newComponentOpsHelper([]appsv1alpha1.ComponentOps{})
+	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.StartList)
 	return compOpsHelper.reconcileActionWithComponentOps(reqCtx, cli, opsRes, "start", handleComponentProgress)
 }
 

@@ -110,12 +110,20 @@ var _ = Describe("Restart OpsRequest", func() {
 	})
 })
 
-func createRestartOpsObj(clusterName, restartOpsName string) *appsv1alpha1.OpsRequest {
+func createRestartOpsObj(clusterName, restartOpsName string, componentNames ...string) *appsv1alpha1.OpsRequest {
 	ops := testapps.NewOpsRequestObj(restartOpsName, testCtx.DefaultNamespace,
 		clusterName, appsv1alpha1.RestartType)
-	ops.Spec.RestartList = []appsv1alpha1.ComponentOps{
-		{ComponentName: consensusComp},
-		{ComponentName: statelessComp},
+	if len(componentNames) == 0 {
+		ops.Spec.RestartList = []appsv1alpha1.ComponentOps{
+			{ComponentName: consensusComp},
+			{ComponentName: statelessComp},
+		}
+	} else {
+		for _, compName := range componentNames {
+			ops.Spec.RestartList = append(ops.Spec.RestartList, appsv1alpha1.ComponentOps{
+				ComponentName: compName,
+			})
+		}
 	}
 	opsRequest := testapps.CreateOpsRequest(ctx, testCtx, ops)
 	opsRequest.Status.Phase = appsv1alpha1.OpsPendingPhase

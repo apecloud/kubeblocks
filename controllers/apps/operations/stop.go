@@ -24,6 +24,7 @@ import (
 
 	"golang.org/x/exp/slices"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -55,7 +56,8 @@ func (stop StopOpsHandler) ActionStartedCondition(reqCtx intctrlutil.RequestCtx,
 // Action modifies Cluster.spec.components[*].replicas from the opsRequest
 func (stop StopOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	var (
-		cluster = opsRes.Cluster
+		cluster  = opsRes.Cluster
+		stopList = opsRes.OpsRequest.Spec.StopList
 	)
 
 	// if the cluster is already stopping or stopped, return
@@ -64,24 +66,46 @@ func (stop StopOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		return nil
 	}
 
+	compOpsHelper := newComponentOpsHelper(stopList)
+	// abort earlier running opsRequests.
+
 	// abort earlier running vertical scaling opsRequest.
 	if err := abortEarlierOpsRequestWithSameKind(reqCtx, cli, opsRes, []appsv1alpha1.OpsType{appsv1alpha1.HorizontalScalingType,
 		appsv1alpha1.StartType, appsv1alpha1.RestartType, appsv1alpha1.VerticalScalingType},
 		func(earlierOps *appsv1alpha1.OpsRequest) (bool, error) {
-			return true, nil
+			if len(stopList) == 0 {
+				// stop all components
+				return true, nil
+			}
+			switch earlierOps.Spec.Type {
+			case appsv1alpha1.RestartType:
+				return hasIntersectionCompOpsList(compOpsHelper.componentOpsSet, earlierOps.Spec.RestartList), nil
+			case appsv1alpha1.VerticalScalingType:
+				return hasIntersectionCompOpsList(compOpsHelper.componentOpsSet, earlierOps.Spec.VerticalScalingList), nil
+			case appsv1alpha1.HorizontalScalingType:
+				return hasIntersectionCompOpsList(compOpsHelper.componentOpsSet, earlierOps.Spec.HorizontalScalingList), nil
+			case appsv1alpha1.StartType:
+				return len(earlierOps.Spec.StartList) == 0 || hasIntersectionCompOpsList(compOpsHelper.componentOpsSet, earlierOps.Spec.StartList), nil
+			}
+			return false, nil
 		}); err != nil {
 		return err
 	}
 
-	stopComp := func(compSpec *appsv1alpha1.ClusterComponentSpec) {
-		compSpec.Stop = func() *bool { b := true; return &b }()
+	stopComp := func(compSpec *appsv1alpha1.ClusterComponentSpec, clusterCompName string) {
+		if len(stopList) > 0 {
+			if _, ok := compOpsHelper.componentOpsSet[clusterCompName]; !ok {
+				return
+			}
+		}
+		compSpec.Stop = pointer.Bool(true)
 	}
 
-	for i := range cluster.Spec.ComponentSpecs {
-		stopComp(&cluster.Spec.ComponentSpecs[i])
+	for i, v := range cluster.Spec.ComponentSpecs {
+		stopComp(&cluster.Spec.ComponentSpecs[i], v.Name)
 	}
-	for i := range cluster.Spec.ShardingSpecs {
-		stopComp(&cluster.Spec.ShardingSpecs[i].Template)
+	for i, v := range cluster.Spec.ShardingSpecs {
+		stopComp(&cluster.Spec.ShardingSpecs[i].Template, v.Name)
 	}
 	return cli.Update(reqCtx.Ctx, cluster)
 }
@@ -106,7 +130,7 @@ func (stop StopOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 		}
 		return expectProgressCount, completedCount, nil
 	}
-	compOpsHelper := newComponentOpsHelper([]appsv1alpha1.ComponentOps{})
+	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.StopList)
 	return compOpsHelper.reconcileActionWithComponentOps(reqCtx, cli, opsRes, "stop", handleComponentProgress)
 }
 

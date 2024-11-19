@@ -91,6 +91,7 @@ func (s *streamingService) HandleRequest(ctx context.Context, payload []byte) ([
 }
 
 func (s *streamingService) handshake(ctx context.Context, conn net.Conn) (*proto.ActionRequest, error) {
+	// reuse the action request as the handshake packet, define a new one when needed
 	req := &proto.ActionRequest{}
 	decoder := json.NewDecoder(conn)
 	if err := decoder.Decode(req); err != nil {

@@ -29,12 +29,15 @@ import (
 	"github.com/go-logr/logr"
 
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
+	"github.com/apecloud/kubeblocks/pkg/kbagent/util"
 )
 
 const (
 	newReplicaDataDump              = "dataDump"
 	newReplicaDataLoad              = "dataLoad"
 	newReplicaConnectTimeoutSeconds = 10
+
+	targetPodNameEnv = "KB_TARGET_POD_NAME"
 )
 
 type newReplicaTask struct {
@@ -72,11 +75,16 @@ func (s *newReplicaTask) handshake(ctx context.Context) (net.Conn, error) {
 		return nil, err
 	}
 
+	// reuse the action request as the handshake packet, define a new one when needed
 	req := proto.ActionRequest{
 		Action:         newReplicaDataDump,
 		Parameters:     s.task.Parameters,
 		TimeoutSeconds: s.task.TimeoutSeconds,
 	}
+	if req.Parameters == nil {
+		req.Parameters = make(map[string]string)
+	}
+	req.Parameters[targetPodNameEnv] = util.PodName()
 	data, err := json.Marshal(req)
 	if err != nil {
 		return nil, err

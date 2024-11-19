@@ -33,7 +33,6 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -283,12 +282,6 @@ func handleNewReplicaTaskEvent(logger logr.Logger, ctx context.Context, cli clie
 		Namespace: namespace,
 		Name:      event.Instance,
 	}
-	comp := &appsv1.Component{}
-	if err := cli.Get(ctx, key, comp); err != nil {
-		logger.Error(err, "get component failed when handle new replica task event",
-			"code", event.Code, "finished", !event.EndTime.IsZero(), "message", event.Message)
-		return err
-	}
 	its := &workloads.InstanceSet{}
 	if err := cli.Get(ctx, key, its); err != nil {
 		logger.Error(err, "get ITS failed when handle new replica task event",
@@ -300,11 +293,11 @@ func handleNewReplicaTaskEvent(logger logr.Logger, ctx context.Context, cli clie
 	finished := !event.EndTime.IsZero()
 	switch {
 	case finished && event.Code == 0:
-		err = handleNewReplicaTaskEvent4Finished(ctx, cli, comp, its, event)
+		err = handleNewReplicaTaskEvent4Finished(ctx, cli, its, event)
 	case finished:
-		err = handleNewReplicaTaskEvent4Failed(ctx, cli, comp, its, event)
+		err = handleNewReplicaTaskEvent4Failed(ctx, cli, its, event)
 	default:
-		err = handleNewReplicaTaskEvent4Unfinished(ctx, cli, comp, its, event)
+		err = handleNewReplicaTaskEvent4Unfinished(ctx, cli, its, event)
 	}
 	if err != nil {
 		logger.Error(err, "handle new replica task event failed",
@@ -316,12 +309,11 @@ func handleNewReplicaTaskEvent(logger logr.Logger, ctx context.Context, cli clie
 	return err
 }
 
-func handleNewReplicaTaskEvent4Finished(ctx context.Context, cli client.Client,
-	comp *appsv1.Component, its *workloads.InstanceSet, event proto.TaskEvent) error {
+func handleNewReplicaTaskEvent4Finished(ctx context.Context, cli client.Client, its *workloads.InstanceSet, event proto.TaskEvent) error {
 	if err := func() error {
 		envKey := types.NamespacedName{
-			Namespace: comp.Namespace,
-			Name:      constant.GetCompEnvCMName(comp.Name),
+			Namespace: its.Namespace,
+			Name:      constant.GetCompEnvCMName(its.Name),
 		}
 		obj := &corev1.ConfigMap{}
 		err := cli.Get(ctx, envKey, obj, inDataContext())
@@ -364,24 +356,25 @@ func handleNewReplicaTaskEvent4Finished(ctx context.Context, cli client.Client,
 	}
 	return updateReplicaStatusFunc(ctx, cli, its, event.Replica, func(status *ReplicaStatus) error {
 		status.Message = ""
+		status.Provisioned = true
 		status.DataLoaded = ptr.To(true)
 		return nil
 	})
 }
 
-func handleNewReplicaTaskEvent4Unfinished(ctx context.Context, cli client.Client,
-	comp *appsv1.Component, its *workloads.InstanceSet, event proto.TaskEvent) error {
+func handleNewReplicaTaskEvent4Unfinished(ctx context.Context, cli client.Client, its *workloads.InstanceSet, event proto.TaskEvent) error {
 	return updateReplicaStatusFunc(ctx, cli, its, event.Replica, func(status *ReplicaStatus) error {
 		status.Message = event.Message
+		status.Provisioned = true
 		status.DataLoaded = ptr.To(false)
 		return nil
 	})
 }
 
-func handleNewReplicaTaskEvent4Failed(ctx context.Context, cli client.Client,
-	comp *appsv1.Component, its *workloads.InstanceSet, event proto.TaskEvent) error {
+func handleNewReplicaTaskEvent4Failed(ctx context.Context, cli client.Client, its *workloads.InstanceSet, event proto.TaskEvent) error {
 	return updateReplicaStatusFunc(ctx, cli, its, event.Replica, func(status *ReplicaStatus) error {
 		status.Message = event.Message
+		status.Provisioned = true
 		return nil
 	})
 }

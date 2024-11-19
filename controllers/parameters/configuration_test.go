@@ -33,7 +33,6 @@ import (
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
@@ -51,6 +50,7 @@ const (
 	paramsDefName    = "mysql-params-def"
 	pdcrName         = "config-test-pdcr"
 	cmName           = "mysql-tree-node-template-8.0"
+	envTestFileKey   = "env_test"
 )
 
 func mockSchemaData() string {
@@ -74,6 +74,7 @@ func mockConfigResource() (*corev1.ConfigMap, *parametersv1alpha1.ParametersDefi
 			constant.KBParameterUpdateSourceAnnotationKey, constant.ReconfigureManagerSource,
 			constant.ConfigurationRevision, "1",
 			constant.CMInsEnableRerenderTemplateKey, "true").
+		AddConfigFile(envTestFileKey, "abcde=1234").
 		Create(&testCtx).
 		GetObject()
 
@@ -84,19 +85,9 @@ func mockConfigResource() (*corev1.ConfigMap, *parametersv1alpha1.ParametersDefi
 		Create(&testCtx).
 		GetObject()
 
-	By("Create a configuration obj")
-	// test-cluster-mysql-mysql-config-tpl
-	configuration := builder.NewComponentParameterBuilder(testCtx.DefaultNamespace, core.GenerateComponentParameterName(clusterName, defaultCompName)).
-		ClusterRef(clusterName).
-		Component(defaultCompName).
-		AddConfigurationItem(appsv1.ComponentTemplateSpec{
-			Name:        configSpecName,
-			TemplateRef: configmap.Name,
-			Namespace:   configmap.Namespace,
-			VolumeName:  configVolumeName,
-		}).
-		GetObject()
-	Expect(testCtx.CreateObj(testCtx.Ctx, configuration)).Should(Succeed())
+	Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(paramsdef), func(g Gomega, def *parametersv1alpha1.ParametersDefinition) {
+		g.Expect(def.Status.Phase).Should(BeEquivalentTo(parametersv1alpha1.PDAvailablePhase))
+	})).Should(Succeed())
 
 	return configmap, paramsdef
 }
@@ -115,11 +106,15 @@ func mockReconcileResource() (*corev1.ConfigMap, *parametersv1alpha1.ParametersD
 		obj.Status.Phase = appsv1.AvailablePhase
 	})()).Should(Succeed())
 
-	testparameters.NewParametersDrivenConfigFactory(pdcrName).
+	pdcr := testparameters.NewParametersDrivenConfigFactory(pdcrName).
 		SetParametersDefs(paramsDef.Name).
 		SetComponentDefinition(compDefObj.GetName()).
 		SetTemplateName(configSpecName).
-		Create(&testCtx)
+		Create(&testCtx).
+		GetObject()
+	Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(pdcr), func(g Gomega, def *parametersv1alpha1.ParameterDrivenConfigRender) {
+		g.Expect(def.Status.Phase).Should(BeEquivalentTo(parametersv1alpha1.PDAvailablePhase))
+	})).Should(Succeed())
 
 	By("Creating a cluster")
 	clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").

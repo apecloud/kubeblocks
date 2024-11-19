@@ -87,19 +87,19 @@ func performRollingUpgrade(params reconfigureContext, funcs RollingUpgradeFuncs)
 		return makeReturnedStatus(ESRetry), nil
 	}
 
-	podStats := staticPodStats(pods, params.getTargetReplicas(), params.podMinReadySeconds())
-	podWins := markDynamicCursor(pods, podStats, configKey, configVersion, rollingReplicas)
-	if !validPodState(podWins) {
+	podStats := classifyPodByStats(pods, params.getTargetReplicas(), params.podMinReadySeconds())
+	podSwitchWindow := markDynamicSwitchWindow(pods, podStats, configKey, configVersion, rollingReplicas)
+	if !validPodState(podSwitchWindow) {
 		params.Log.Info("wait for pod stat ready.")
 		return makeReturnedStatus(ESRetry), nil
 	}
 
-	waitRollingPods := podWins.getWaitRollingPods()
-	if len(waitRollingPods) == 0 {
+	waitUpgradingPods := podSwitchWindow.getWaitUpgradePods()
+	if len(waitUpgradingPods) == 0 {
 		return makeReturnedStatus(ESNone, withSucceed(int32(podStats.targetReplica)), withExpected(int32(podStats.targetReplica))), nil
 	}
 
-	for _, pod := range waitRollingPods {
+	for _, pod := range waitUpgradingPods {
 		if podStats.isUpdating(&pod) {
 			params.Log.Info("pod is in rolling update.", "pod name", pod.Name)
 			continue
@@ -127,7 +127,7 @@ func validPodState(wind switchWindow) bool {
 	return true
 }
 
-func markDynamicCursor(pods []corev1.Pod, podsStats *componentPodStats, configKey, currentVersion string, rollingReplicas int32) switchWindow {
+func markDynamicSwitchWindow(pods []corev1.Pod, podsStats *componentPodStats, configKey, currentVersion string, rollingReplicas int32) switchWindow {
 	podWindows := switchWindow{
 		end:               0,
 		begin:             len(pods),
@@ -160,7 +160,7 @@ func markDynamicCursor(pods []corev1.Pod, podsStats *componentPodStats, configKe
 	return podWindows
 }
 
-func staticPodStats(pods []corev1.Pod, targetReplicas int, minReadySeconds int32) *componentPodStats {
+func classifyPodByStats(pods []corev1.Pod, targetReplicas int, minReadySeconds int32) *componentPodStats {
 	podsStats := &componentPodStats{
 		updated:       make(map[string]*corev1.Pod),
 		updating:      make(map[string]*corev1.Pod),
@@ -218,7 +218,7 @@ type switchWindow struct {
 	*componentPodStats
 }
 
-func (w *switchWindow) getWaitRollingPods() []corev1.Pod {
+func (w *switchWindow) getWaitUpgradePods() []corev1.Pod {
 	return w.pods[w.begin:w.end]
 }
 

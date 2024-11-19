@@ -22,10 +22,13 @@ package parameters
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"reflect"
 	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -168,8 +171,7 @@ func syncImpl(taskCtx *TaskContext,
 			return failStatus(err)
 		}
 	}
-
-	if err = mergeAndUpdate(fetcher.ResourceCtx, updatedConfig, configMap, fetcher.ComponentParameterObj, item, revision); err != nil {
+	if err = persistUpdatedParameters(fetcher.ResourceCtx, taskCtx.component, taskCtx.configRender, updatedConfig, configMap, fetcher.ComponentParameterObj, item, revision); err != nil {
 		return failStatus(err)
 	}
 
@@ -177,6 +179,59 @@ func syncImpl(taskCtx *TaskContext,
 	status.Phase = parametersv1alpha1.CMergedPhase
 	status.UpdateRevision = revision
 	return nil
+}
+
+func persistUpdatedParameters(rctx *configctrl.ResourceCtx,
+	comp *component.SynthesizedComponent,
+	configRender *parametersv1alpha1.ParameterDrivenConfigRender,
+	updatedConfig *corev1.ConfigMap,
+	original *corev1.ConfigMap,
+	owner client.Object,
+	item parametersv1alpha1.ConfigTemplateItemDetail,
+	revision string) error {
+	if err := mergeAndUpdate(rctx, updatedConfig, original, owner, item, revision); err != nil {
+		return err
+	}
+	if updatedConfig == nil {
+		return nil
+	}
+	return checkAndUpdateInjectedEnv(rctx, comp, configRender, updatedConfig, owner, item, revision)
+}
+
+func checkAndUpdateInjectedEnv(rctx *configctrl.ResourceCtx,
+	comp *component.SynthesizedComponent,
+	configRender *parametersv1alpha1.ParameterDrivenConfigRender,
+	config *corev1.ConfigMap,
+	owner client.Object,
+	item parametersv1alpha1.ConfigTemplateItemDetail,
+	revision string) error {
+	getOriginal := func(key types.NamespacedName) (*corev1.ConfigMap, error) {
+		var err error
+		var cmObj = &corev1.ConfigMap{}
+		err = rctx.Client.Get(rctx.Context, key, cmObj)
+		if err != nil && apierrors.IsNotFound(err) {
+			return nil, nil
+		}
+		return cmObj, err
+	}
+
+	envObjs, err := configctrl.InjectTemplateEnvFrom(comp, nil, configRender, []*corev1.ConfigMap{config})
+	if err != nil {
+		return err
+	}
+
+	var original *corev1.ConfigMap
+	for _, obj := range envObjs {
+		if original, err = getOriginal(client.ObjectKeyFromObject(obj)); err != nil {
+			return err
+		}
+		if original == nil {
+			err = errors.Join(err, create(rctx.Context, rctx.Client, obj, updateReconcileObject(item, owner, revision)))
+		} else {
+			err = errors.Join(err, update(rctx.Context, rctx.Client, original, original, mergedConfigmap(obj, updateReconcileObject(item, owner, revision))))
+		}
+	}
+	return err
 }
 
 func mergeAndUpdate(resourceCtx *configctrl.ResourceCtx,

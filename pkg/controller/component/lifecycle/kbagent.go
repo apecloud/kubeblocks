@@ -53,6 +53,8 @@ type kbagent struct {
 
 var _ Lifecycle = &kbagent{}
 
+const kbaDevMode = true
+
 func (a *kbagent) PostProvision(ctx context.Context, cli client.Reader, opts *Options) error {
 	lfa := &postProvision{
 		namespace:   a.synthesizedComp.Namespace,
@@ -277,6 +279,12 @@ func (a *kbagent) callActionWithSelector(ctx context.Context, spec *appsv1.Actio
 		return nil, fmt.Errorf("no available pod to execute action %s", lfa.name())
 	}
 
+	var manager *component.PortForwardManager
+	if kbaDevMode {
+		manager = component.NewPortForwardManager()
+		defer manager.CloseAll()
+	}
+
 	// TODO: impl
 	//  - back-off to retry
 	//  - timeout
@@ -286,6 +294,21 @@ func (a *kbagent) callActionWithSelector(ctx context.Context, spec *appsv1.Actio
 		if err != nil {
 			return nil, errors.Wrapf(err, "pod %s is unavailable to execute action %s", pod.Name, lfa.name())
 		}
+		if manager != nil {
+			forwardPort, errChan, err := manager.NewPortForwarder(pod.Namespace, pod.Name, port)
+			if err != nil {
+				return nil, errors.Wrapf(err, "failed to create port forwarder for pod %s", pod.Name)
+			}
+			select {
+			case <-errChan:
+				continue
+			default:
+				break
+			}
+			port = forwardPort
+			host = "localhost"
+		}
+
 		cli, err := kbacli.NewClient(host, port)
 		if err != nil {
 			return nil, err // mock client error

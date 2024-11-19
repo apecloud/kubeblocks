@@ -4422,6 +4422,48 @@ spec:
                 required:
                 - backupName
                 type: object
+              start:
+                description: Lists Components to be started. If empty, all components
+                  will be started.
+                items:
+                  description: ComponentOps specifies the Component to be operated
+                    on.
+                  properties:
+                    componentName:
+                      description: Specifies the name of the Component.
+                      type: string
+                  required:
+                  - componentName
+                  type: object
+                maxItems: 1024
+                type: array
+                x-kubernetes-list-map-keys:
+                - componentName
+                x-kubernetes-list-type: map
+                x-kubernetes-validations:
+                - message: forbidden to update spec.start
+                  rule: self == oldSelf
+              stop:
+                description: Lists Components to be stopped. If empty, all components
+                  will be stopped.
+                items:
+                  description: ComponentOps specifies the Component to be operated
+                    on.
+                  properties:
+                    componentName:
+                      description: Specifies the name of the Component.
+                      type: string
+                  required:
+                  - componentName
+                  type: object
+                maxItems: 1024
+                type: array
+                x-kubernetes-list-map-keys:
+                - componentName
+                x-kubernetes-list-type: map
+                x-kubernetes-validations:
+                - message: forbidden to update spec.stop
+                  rule: self == oldSelf
               switchover:
                 description: Lists Switchover objects, each specifying a Component
                   to perform the switchover operation.

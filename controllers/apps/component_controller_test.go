@@ -419,10 +419,10 @@ var _ = Describe("Component Controller", func() {
 		}
 	}
 
-	mockPodsForTest := func(cluster *kbappsv1.Cluster, componentName, compDefName string, number int) []corev1.Pod {
+	mockPodsForTest := func(cluster *kbappsv1.Cluster, componentName, compDefName string, number int) []*corev1.Pod {
 		clusterName := cluster.Name
 		itsName := cluster.Name + "-" + componentName
-		pods := make([]corev1.Pod, 0)
+		pods := make([]*corev1.Pod, 0)
 		for i := 0; i < number; i++ {
 			pod := &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -449,7 +449,7 @@ var _ = Describe("Component Controller", func() {
 					},
 				},
 			}
-			pods = append(pods, *pod)
+			pods = append(pods, pod)
 		}
 		return pods
 	}
@@ -464,15 +464,28 @@ var _ = Describe("Component Controller", func() {
 
 		By("Creating mock pods in InstanceSet")
 		pods := mockPodsForTest(clusterObj, comp.Name, comp.ComponentDef, int(comp.Replicas))
-		for _, pod := range pods {
-			Expect(testCtx.CheckedCreateObj(testCtx.Ctx, &pod)).Should(Succeed())
-			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(&pod), func(p *corev1.Pod) {
-				p.Status.Conditions = []corev1.PodCondition{{
-					Type:   corev1.PodReady,
-					Status: corev1.ConditionTrue,
-				}}
-			})).Should(Succeed())
+		for i := range pods {
+			if i == 0 {
+				pods[i].Labels[constant.RoleLabelKey] = leader
+			} else {
+				pods[i].Labels[constant.RoleLabelKey] = follower
+			}
+			pods[i].Status.Conditions = []corev1.PodCondition{{
+				Type:   corev1.PodReady,
+				Status: corev1.ConditionTrue,
+			}}
+			Expect(testCtx.CheckedCreateObj(testCtx.Ctx, pods[i])).Should(Succeed())
 		}
+		Expect(testapps.ChangeObjStatus(&testCtx, &itsList.Items[0], func() {
+			testk8s.MockInstanceSetReady(&itsList.Items[0], pods...)
+		})).ShouldNot(HaveOccurred())
+
+		By("Waiting for the component enter Running phase")
+		compKey := types.NamespacedName{
+			Namespace: clusterKey.Namespace,
+			Name:      fmt.Sprintf("%s-%s", clusterKey.Name, comp.Name),
+		}
+		Eventually(testapps.GetComponentPhase(&testCtx, compKey)).Should(Equal(kbappsv1.RunningComponentPhase))
 
 		By(fmt.Sprintf("Changing replicas to %d", updatedReplicas))
 		changeCompReplicas(clusterKey, int32(updatedReplicas), comp)
@@ -1426,24 +1439,24 @@ var _ = Describe("Component Controller", func() {
 		}).Should(Succeed())
 
 		By("Creating mock pods in InstanceSet, and set controller reference")
-		pods := mockPodsForTest(clusterObj, compName, compDefName, replicas)
-		for i, pod := range pods {
-			Expect(controllerutil.SetControllerReference(its, &pod, scheme.Scheme)).Should(Succeed())
-			Expect(testCtx.CreateObj(testCtx.Ctx, &pod)).Should(Succeed())
+		mockPods := mockPodsForTest(clusterObj, compName, compDefName, replicas)
+		for i, pod := range mockPods {
+			Expect(controllerutil.SetControllerReference(its, pod, scheme.Scheme)).Should(Succeed())
+			Expect(testCtx.CreateObj(testCtx.Ctx, pod)).Should(Succeed())
 			patch := client.MergeFrom(pod.DeepCopy())
 			// mock the status to pass the isReady(pod) check in consensus_set
 			pod.Status.Conditions = []corev1.PodCondition{{
 				Type:   corev1.PodReady,
 				Status: corev1.ConditionTrue,
 			}}
-			Eventually(k8sClient.Status().Patch(ctx, &pod, patch)).Should(Succeed())
+			Eventually(k8sClient.Status().Patch(ctx, pod, patch)).Should(Succeed())
 			role := "follower"
 			if i == 0 {
 				role = "leader"
 			}
 			patch = client.MergeFrom(pod.DeepCopy())
 			pod.Labels[constant.RoleLabelKey] = role
-			Eventually(k8sClient.Patch(ctx, &pod, patch)).Should(Succeed())
+			Eventually(k8sClient.Patch(ctx, pod, patch)).Should(Succeed())
 		}
 
 		By("Checking pods' role are changed accordingly")

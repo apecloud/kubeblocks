@@ -32,6 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -91,6 +92,7 @@ var _ = Describe("cluster service transformer test", func() {
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: testCtx.DefaultNamespace,
 				Name:      clusterServiceName(clusterName, testapps.ServiceNodePortName),
+				Labels:    constant.GetClusterLabels(clusterName),
 			},
 			Spec: corev1.ServiceSpec{
 				Type: corev1.ServiceTypeNodePort,
@@ -102,7 +104,6 @@ var _ = Describe("cluster service transformer test", func() {
 	}
 
 	Context("cluster service", func() {
-
 		It("deletion", func() {
 			reader.objs = append(reader.objs, clusterNodePortService())
 			// remove cluster services
@@ -157,5 +158,4 @@ var _ = Describe("cluster service transformer test", func() {
 			Expect(graphCli.IsAction(dag, svc, model.ActionUpdatePtr())).Should(BeTrue())
 		}
 	})
-
 })

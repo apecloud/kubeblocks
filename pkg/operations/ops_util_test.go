@@ -110,7 +110,7 @@ var _ = Describe("OpsUtil functions", func() {
 
 			By("mock component failed")
 			clusterComp := opsRes.Cluster.Status.Components[defaultCompName]
-			clusterComp.Phase = appsv1.FailedClusterCompPhase
+			clusterComp.Phase = appsv1.FailedComponentPhase
 			opsRes.Cluster.Status.SetComponentStatus(defaultCompName, clusterComp)
 
 			By("expect for opsRequest is running")
@@ -120,7 +120,7 @@ var _ = Describe("OpsUtil functions", func() {
 				pgRes *progressResource,
 				compStatus *opsv1alpha1.OpsRequestComponentStatus) (expectProgressCount int32, completedCount int32, err error) {
 				return handleComponentStatusProgress(reqCtx, cli, opsRes, pgRes, compStatus,
-					func(ops *opsv1alpha1.OpsRequest, pod *corev1.Pod, compOps ComponentOpsInterface, s string) bool {
+					func(ops *opsv1alpha1.OpsRequest, pod *corev1.Pod, pgRes *progressResource) bool {
 						return !pod.CreationTimestamp.Before(&ops.Status.StartTimestamp)
 					})
 			}

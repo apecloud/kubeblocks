@@ -21,7 +21,6 @@ package apps
 
 import (
 	"context"
-	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -32,15 +31,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
-	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/plan"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
-	testk8s "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 )
 
 var _ = Describe("TLS self-signed cert function", func() {
@@ -170,24 +169,24 @@ var _ = Describe("TLS self-signed cert function", func() {
 					GetObject()
 				clusterKey := client.ObjectKeyFromObject(clusterObj)
 				Eventually(k8sClient.Get(ctx, clusterKey, clusterObj)).Should(Succeed())
-				Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+				Eventually(testapps.ClusterReconciled(&testCtx, clusterKey)).Should(BeTrue())
 				Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1.CreatingClusterPhase))
-
-				itsList := testk8s.ListAndCheckInstanceSet(&testCtx, clusterKey)
-				its := itsList.Items[0]
-				cmName := cfgcore.GetInstanceCMName(&its, &compDefObj.Spec.Configs[0].ComponentTemplateSpec)
-				cmKey := client.ObjectKey{Namespace: its.Namespace, Name: cmName}
+				cfgKey := client.ObjectKey{
+					Name:      core.GenerateComponentConfigurationName(clusterObj.Name, defaultCompName),
+					Namespace: testCtx.DefaultNamespace,
+				}
 				hasTLSSettings := func() bool {
-					cm := &corev1.ConfigMap{}
-					Expect(k8sClient.Get(ctx, cmKey, cm)).Should(Succeed())
-					tlsKeyWord := plan.GetTLSKeyWord(serviceKind)
-					for _, cfgFile := range cm.Data {
-						index := strings.Index(cfgFile, tlsKeyWord)
-						if index >= 0 {
-							return true
-						}
+					conf := &appsv1alpha1.Configuration{}
+					Expect(k8sClient.Get(ctx, cfgKey, conf)).Should(Succeed())
+					item := &conf.Spec.ConfigItemDetails[0]
+					if item.Payload.Data == nil {
+						return false
 					}
-					return false
+					payload, ok := item.Payload.Data[constant.TLSPayload]
+					if !ok || payload == nil {
+						return false
+					}
+					return true
 				}
 
 				Eventually(hasTLSSettings).Should(BeFalse())

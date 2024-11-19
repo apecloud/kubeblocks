@@ -85,29 +85,17 @@ var _ = Describe("TLSUtilsTest", func() {
 			err := CheckTLSSecretRef(ctx, k8sMock, namespace, secretRef)
 			Expect(apierrors.IsNotFound(err)).Should(BeTrue())
 
-			By("set stringData to nil")
+			By("set empty CA in map Data")
 			k8sMock.EXPECT().
 				Get(gomock.Any(), gomock.Any(), &corev1.Secret{}, gomock.Any()).
 				DoAndReturn(func(_ context.Context, objKey client.ObjectKey, obj *corev1.Secret, _ ...client.GetOption) error {
 					Expect(obj).ShouldNot(BeNil())
 					obj.Namespace = objKey.Namespace
 					obj.Name = objKey.Name
-					return nil
-				}).Times(1)
-			err = CheckTLSSecretRef(ctx, k8sMock, namespace, secretRef)
-			Expect(err).ShouldNot(BeNil())
-			Expect(err.Error()).Should(ContainSubstring("tls secret's data field shouldn't be nil"))
-
-			By("set no CA key in map stringData")
-			k8sMock.EXPECT().
-				Get(gomock.Any(), gomock.Any(), &corev1.Secret{}, gomock.Any()).
-				DoAndReturn(func(_ context.Context, objKey client.ObjectKey, obj *corev1.Secret, _ ...client.GetOption) error {
-					Expect(obj).ShouldNot(BeNil())
-					obj.Namespace = objKey.Namespace
-					obj.Name = objKey.Name
-					obj.StringData = map[string]string{
-						secretRef.Cert: "foo",
-						secretRef.Key:  "bar",
+					obj.Data = map[string][]byte{
+						secretRef.Cert: []byte("foo"),
+						secretRef.Key:  []byte("bar"),
+						secretRef.CA:   []byte(""),
 					}
 					return nil
 				}).Times(1)
@@ -122,32 +110,14 @@ var _ = Describe("TLSUtilsTest", func() {
 					Expect(obj).ShouldNot(BeNil())
 					obj.Namespace = objKey.Namespace
 					obj.Name = objKey.Name
-					obj.StringData = map[string]string{
-						secretRef.Cert: "foo",
-						secretRef.Key:  "bar",
-						secretRef.CA:   "ca",
+					obj.Data = map[string][]byte{
+						secretRef.Cert: []byte("foo"),
+						secretRef.Key:  []byte("bar"),
+						secretRef.CA:   []byte("ca"),
 					}
 					return nil
 				}).Times(1)
 			Expect(CheckTLSSecretRef(ctx, k8sMock, namespace, secretRef)).Should(Succeed())
-		})
-
-		Context("GetTLSKeyWord function", func() {
-			It("should work well", func() {
-				suite := []struct {
-					input    string
-					expected string
-				}{
-					{input: "mysql", expected: "ssl_cert"},
-					{input: "postgresql", expected: "ssl_cert_file"},
-					{input: "redis", expected: "tls-cert-file"},
-					{input: "others", expected: "unsupported-character-type"},
-				}
-
-				for _, s := range suite {
-					Expect(GetTLSKeyWord(s.input)).Should(Equal(s.expected))
-				}
-			})
 		})
 	})
 })

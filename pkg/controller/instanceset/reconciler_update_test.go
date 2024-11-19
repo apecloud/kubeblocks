@@ -46,7 +46,6 @@ var _ = Describe("update reconciler test", func() {
 			SetTemplate(template).
 			SetVolumeClaimTemplates(volumeClaimTemplates...).
 			SetMinReadySeconds(minReadySeconds).
-			SetRoles(roles).
 			GetObject()
 	})
 
@@ -104,7 +103,12 @@ var _ = Describe("update reconciler test", func() {
 
 			By("update all pods to ready with outdated revision")
 			pods := tree.List(&corev1.Pod{})
-			condition := corev1.PodCondition{
+			containersReadyCondition := corev1.PodCondition{
+				Type:               corev1.ContainersReady,
+				Status:             corev1.ConditionTrue,
+				LastTransitionTime: metav1.NewTime(time.Now().Add(-1 * minReadySeconds * time.Second)),
+			}
+			readyCondition := corev1.PodCondition{
 				Type:               corev1.PodReady,
 				Status:             corev1.ConditionTrue,
 				LastTransitionTime: metav1.NewTime(time.Now().Add(-1 * minReadySeconds * time.Second)),
@@ -112,7 +116,7 @@ var _ = Describe("update reconciler test", func() {
 			makePodAvailableWithOldRevision := func(pod *corev1.Pod) {
 				pod.Labels[appsv1.ControllerRevisionHashLabelKey] = "old-revision"
 				pod.Status.Phase = corev1.PodRunning
-				pod.Status.Conditions = append(pod.Status.Conditions, condition)
+				pod.Status.Conditions = append(pod.Status.Conditions, readyCondition, containersReadyCondition)
 			}
 			for _, object := range pods {
 				pod, ok := object.(*corev1.Pod)

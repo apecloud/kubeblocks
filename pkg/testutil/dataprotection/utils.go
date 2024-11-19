@@ -130,7 +130,7 @@ func CheckRestoreAndSetCompleted(testCtx *testutil.TestContext, clusterKey types
 	ml := client.MatchingLabels{
 		constant.AppInstanceLabelKey:    clusterKey.Name,
 		constant.KBAppComponentLabelKey: compName,
-		constant.KBManagedByKey:         "cluster",
+		constant.AppManagedByLabelKey:   constant.AppName,
 	}
 	Eventually(testapps.List(testCtx, generics.RestoreSignature,
 		ml, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(scaleOutReplicas))

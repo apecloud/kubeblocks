@@ -75,6 +75,10 @@ func (r RestoreOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 
 	// create cluster
 	if err = cli.Create(reqCtx.Ctx, cluster); err != nil {
+		if apierrors.IsAlreadyExists(err) && opsRequest.Labels[constant.AppInstanceLabelKey] != "" {
+			// already create by this opsRequest
+			return nil
+		}
 		return err
 	}
 	opsRes.Cluster = cluster
@@ -219,5 +223,20 @@ func (r RestoreOpsHandler) getClusterObjFromBackup(backup *dpv1alpha1.Backup, op
 	for i := range cluster.Spec.ComponentSpecs {
 		cluster.Spec.ComponentSpecs[i].OfflineInstances = nil
 	}
+	r.rebuildShardAccountSecrets(cluster)
 	return cluster, nil
+}
+
+func (r RestoreOpsHandler) rebuildShardAccountSecrets(cluster *appsv1.Cluster) {
+	if len(cluster.Spec.Shardings) == 0 {
+		return
+	}
+	for i := range cluster.Spec.Shardings {
+		shardingSpec := &cluster.Spec.Shardings[i]
+		template := &shardingSpec.Template
+		for j := range template.SystemAccounts {
+			account := &template.SystemAccounts[j]
+			account.SecretRef = nil
+		}
+	}
 }

@@ -39,11 +39,13 @@ Render the secret key reference of the encryptionKey.
 name: {{ include "kubeblocks.fullname" . }}-secret
 key: dataProtectionEncryptionKey
   {{- else -}}
-    {{- $secret := lookup "v1" "Secret" .Release.Namespace $ref.name -}}
-    {{- if not $secret -}}
-      {{- fail (printf "Invalid value \".Values.dataProtection.encryptionKeySecretKeyRef\", secret %q is not found from the namespace %q." $ref.name .Release.Namespace) -}}
-    {{- else if not (hasKey $secret.data $ref.key) -}}
-      {{- fail (printf "Invalid value \".Values.dataProtection.encryptionKeySecretKeyRef\", secret %q doesn't have key %q." $ref.name $ref.key) -}}
+    {{- if not .Values.dataProtection.encryptionKeySecretKeyRef.skipValidation -}}
+      {{- $secret := lookup "v1" "Secret" .Release.Namespace $ref.name -}}
+      {{- if not $secret -}}
+        {{- fail (printf "Invalid value \".Values.dataProtection.encryptionKeySecretKeyRef\", secret %q is not found from the namespace %q." $ref.name .Release.Namespace) -}}
+      {{- else if not (hasKey $secret.data $ref.key) -}}
+        {{- fail (printf "Invalid value \".Values.dataProtection.encryptionKeySecretKeyRef\", secret %q doesn't have key %q." $ref.name $ref.key) -}}
+      {{- end -}}
     {{- end -}}
 name: {{ $ref.name }}
 key:  {{ $ref.key }}

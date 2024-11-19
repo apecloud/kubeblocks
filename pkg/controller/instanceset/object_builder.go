@@ -26,7 +26,7 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -34,21 +34,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
-
-func buildSvc(its workloads.InstanceSet, labels, selectors map[string]string) *corev1.Service {
-	if its.Spec.Service == nil {
-		return nil
-	}
-	annotations := ParseAnnotationsOfScope(ServiceScope, its.Annotations)
-	return builder.NewServiceBuilder(its.Namespace, its.Name).
-		AddAnnotationsInMap(annotations).
-		AddLabelsInMap(labels).
-		AddLabelsInMap(its.Spec.Service.Labels).
-		AddSelectorsInMap(selectors).
-		AddPorts(its.Spec.Service.Spec.Ports...).
-		SetType(its.Spec.Service.Spec.Type).
-		GetObject()
-}
 
 func buildHeadlessSvc(its workloads.InstanceSet, labels, selectors map[string]string) *corev1.Service {
 	annotations := ParseAnnotationsOfScope(HeadlessServiceScope, its.Annotations)
@@ -58,6 +43,7 @@ func buildHeadlessSvc(its workloads.InstanceSet, labels, selectors map[string]st
 		AddAnnotationsInMap(annotations).
 		SetPublishNotReadyAddresses(true)
 
+	portNames := sets.New[string]()
 	for _, container := range its.Spec.Template.Spec.Containers {
 		for _, port := range container.Ports {
 			servicePort := corev1.ServicePort{
@@ -65,12 +51,11 @@ func buildHeadlessSvc(its workloads.InstanceSet, labels, selectors map[string]st
 				Port:     port.ContainerPort,
 			}
 			switch {
-			case len(port.Name) > 0:
+			case len(port.Name) > 0 && !portNames.Has(port.Name):
+				portNames.Insert(port.Name)
 				servicePort.Name = port.Name
-				servicePort.TargetPort = intstr.FromString(port.Name)
 			default:
 				servicePort.Name = fmt.Sprintf("%s-%d", strings.ToLower(string(port.Protocol)), port.ContainerPort)
-				servicePort.TargetPort = intstr.FromInt(int(port.ContainerPort))
 			}
 			hdlBuilder.AddPorts(servicePort)
 		}
@@ -185,15 +170,6 @@ func injectRoleProbeBaseContainer(its *workloads.InstanceSet, template *corev1.P
 			Name:  actionSvcListVarName,
 			Value: actionSvcList,
 		})
-	// find service port of th db engine
-	servicePort := findSvcPort(its)
-	if servicePort > 0 {
-		env = append(env,
-			corev1.EnvVar{
-				Name:  servicePortVarName,
-				Value: strconv.Itoa(servicePort),
-			})
-	}
 
 	// inject role update mechanism env
 	env = append(env,
@@ -254,22 +230,6 @@ func injectRoleProbeBaseContainer(its *workloads.InstanceSet, template *corev1.P
 
 	// inject role probe container
 	template.Spec.Containers = append(template.Spec.Containers, *container)
-}
-
-func findSvcPort(its *workloads.InstanceSet) int {
-	if its.Spec.Service == nil || len(its.Spec.Service.Spec.Ports) == 0 {
-		return 0
-	}
-	port := its.Spec.Service.Spec.Ports[0]
-	for _, c := range its.Spec.Template.Spec.Containers {
-		for _, p := range c.Ports {
-			if port.TargetPort.Type == intstr.String && p.Name == port.TargetPort.StrVal ||
-				port.TargetPort.Type == intstr.Int && p.ContainerPort == port.TargetPort.IntVal {
-				return int(p.ContainerPort)
-			}
-		}
-	}
-	return 0
 }
 
 func injectCustomRoleProbeContainer(its *workloads.InstanceSet, template *corev1.PodTemplateSpec, actionSvcPorts []int32, credentialEnv []corev1.EnvVar) {

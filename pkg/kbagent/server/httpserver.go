@@ -61,9 +61,6 @@ func (s *server) StartNonBlocking() error {
 	}
 
 	handler := s.router()
-	if s.config.Logging {
-		handler = s.apiLogger(handler)
-	}
 
 	var listeners []net.Listener
 	if s.config.UnixDomainSocket != "" {
@@ -124,21 +121,6 @@ func (s *server) Close() error {
 	return errors.Join()
 }
 
-func (s *server) apiLogger(next fasthttp.RequestHandler) fasthttp.RequestHandler {
-	return func(ctx *fasthttp.RequestCtx) {
-		reqLogger := s.logger
-		if userAgent := string(ctx.Request.Header.Peek("User-Agent")); userAgent != "" {
-			reqLogger = s.logger.WithValues("useragent", userAgent)
-		}
-		start := time.Now()
-		path := string(ctx.Path())
-		reqLogger.Info("HTTP API Called", "method", string(ctx.Method()), "path", path)
-		next(ctx)
-		elapsed := float64(time.Since(start) / time.Millisecond)
-		reqLogger.Info("HTTP API Called", "status code", ctx.Response.StatusCode(), "cost", elapsed)
-	}
-}
-
 func (s *server) router() fasthttp.RequestHandler {
 	router := fasthttprouter.New()
 	for i := range s.services {
@@ -163,6 +145,15 @@ func (s *server) dispatcher(svc service.Service) func(*fasthttp.RequestCtx) {
 			statusCode = fasthttp.StatusInternalServerError
 		}
 		respond(reqCtx, statusCode, output, err)
+		if s.config.Logging {
+			s.logger.Info("HTTP API Called",
+				"user-agent", string(reqCtx.Request.Header.UserAgent()),
+				"method", string(reqCtx.Method()),
+				"path", string(reqCtx.Path()),
+				"status code", statusCode,
+				"cost", time.Since(reqCtx.Time()).Milliseconds(),
+			)
+		}
 	}
 }
 

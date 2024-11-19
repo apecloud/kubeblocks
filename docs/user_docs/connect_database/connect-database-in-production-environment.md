@@ -78,8 +78,6 @@ The following command creates a LoadBalancer instance for the database instance,
 
 :::
 
-:::
-
 <Tabs>
 <TabItem value="kbcli" label="kbcli" default>
 
@@ -90,12 +88,14 @@ kbcli cluster expose ${cluster-name} --type vpc --enable=true
 </TabItem>
 <TabItem value="kubectl" label="kubectl">
 
+This example uses a MySQL cluster to demonstrate how to expose a VPC address on Alibaba Cloud.
+
 ```yaml
 kubectl apply -f - <<EOF
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
-  name: ops-expose
+  name: ops-expose-enable
 spec:
   clusterRef: mycluster
   expose:
@@ -138,7 +138,7 @@ kubectl apply -f - <<EOF
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
-  name: ops-expose
+  name: ops-expose-disable
 spec:
   clusterRef: mycluster
   expose:
@@ -158,10 +158,9 @@ EOF
 </TabItem>
 </Tabs>
 
-
 ## Scenario 3. Connect database with clients in other VPCs or public networks
 
-You can enable the External LoadBalancer of the cloud vendor.
+If the client is in a different VPC and requires public access, you can enable the cloud vendor's External LoadBalancer.
 
 :::note
 
@@ -179,6 +178,8 @@ kbcli cluster expose ${cluster-name} --type internet --enable=true
 </TabItem>
 <TabItem value="kubectl" label="kubectl">
 
+The example uses MySQL to demonstrate how to expose the public address on Alibaba Cloud.
+
 ```yaml
 kubectl apply -f - <<EOF
 apiVersion: apps.kubeblocks.io/v1alpha1
@@ -188,22 +189,21 @@ metadata:
 spec:
   clusterRef: mycluster
   expose:
-    - componentName: mysql
-      services:
-        - annotations:
-            service.beta.kubernetes.io/alibaba-cloud-loadbalancer-address-type: internet
-          ipFamilyPolicy: PreferDualStack
-          name: vpc
-          serviceType: LoadBalancer
-      switch: Enable
+  - componentName: mysql
+    services:
+    - annotations:
+        service.beta.kubernetes.io/alibaba-cloud-loadbalancer-address-type: internet
+      ipFamilyPolicy: PreferDualStack
+      name: internet
+      serviceType: LoadBalancer
+    switch: Enable
   ttlSecondsBeforeAbort: 0
   type: Expose
-  EOF
+EOF
 ```
 
 </TabItem>
 </Tabs>
-
 
 To disable the LoadBalancer instance, execute the following command.
 
@@ -231,7 +231,7 @@ spec:
     - annotations:
         service.beta.kubernetes.io/alibaba-cloud-loadbalancer-address-type: internet
       ipFamilyPolicy: PreferDualStack
-      name: vpc
+      name: internet
       serviceType: LoadBalancer
     switch: Disable
   ttlSecondsBeforeAbort: 0

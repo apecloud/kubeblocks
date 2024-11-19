@@ -124,6 +124,10 @@ You can specify the BackupRepo information in a YAML configuration file when ins
 
 2. Specify the configuration file when installing KubeBlocks.
 
+   <Tabs>
+
+   <TabItem value="kbcli" label="kbcli" default>
+
    ```bash
    kbcli kubeblocks install -f backuprepo.yaml
    ```
@@ -134,9 +138,31 @@ You can specify the BackupRepo information in a YAML configuration file when ins
    kbcli backuprepo list
    ```
 
+   </TabItem>
+
+   <TabItem value="kubectl" label="kubectl">
+
+   ```bash
+   kubectl create -f backuprepo.yaml
+   ```
+
+   Use the command below to check the BackupRepo after installation.
+
+   ```bash
+   kubectl get backuprepo
+   ```
+
+   </TabItem>
+
+   </Tabs> 
+
 ### Manual BackupRepo configuration
 
 If you do not configure the BackupRepo information when installing KubeBlocks, you can manually configure it by the following instructions.
+
+<Tabs>
+
+<TabItem value="kbcli" label="kbcli" default>
 
 1. Install the S3 CSI driver (only used in the Mount method).
 
@@ -294,3 +320,244 @@ If you do not configure the BackupRepo information when installing KubeBlocks, y
    ```bash
    kbcli backuprepo list
    ```
+
+</TabItem>
+
+<TabItem value="kubectl" label="kubectl">
+
+1. Install the S3 CSI driver (only used in the Mount method).
+
+    ```bash
+    helm repo add kubeblocks https://jihulab.com/api/v4/projects/85949/packages/helm/stable
+    helm install csi-s3 kubeblocks/csi-s3 --version=0.7.0 -n kb-system
+
+    # You can add flags to customize the installation of this addon
+    # CSI-S3 installs a daemonSet Pod on all nodes by default and you can set tolerations to install it on the specified node
+    --set-json tolerations='[{"key":"taintkey","operator":"Equal","effect":"NoSchedule","value":"taintValue"}]'
+    --set-json daemonsetTolerations='[{"key":"taintkey","operator":"Equal","effect":"NoSchedule","value":"taintValue"}]'
+    ```
+
+2. Create BackupRepo.
+
+   <Tabs>
+
+   <TabItem value="S3" label="S3" default>
+
+   ```bash
+   # Create a secret to save the access key for S3
+   kubectl create secret generic s3-credential-for-backuprepo \
+     -n kb-system \
+     --from-literal=accessKeyId=<ACCESS KEY> \
+     --from-literal=secretAccessKey=<SECRET KEY>
+
+   # Create the BackupRepo resource
+   kubectl apply -f - <<-'EOF'
+   apiVersion: dataprotection.kubeblocks.io/v1alpha1
+   kind: BackupRepo
+   metadata:
+     name: my-repo
+     annotations:
+       dataprotection.kubeblocks.io/is-default-repo: "true"
+   spec:
+     storageProviderRef: s3
+     accessMethod: Tool
+     pvReclaimPolicy: Retain
+     volumeCapacity: 100Gi
+     config:
+       bucket: test-kb-backup
+       endpoint: ""
+       mountOptions: --memory-limit 1000 --dir-mode 0777 --file-mode 0666
+       region: cn-northwest-1
+     credential:
+       name: s3-credential-for-backuprepo
+       namespace: kb-system
+   EOF
+   ```
+
+   </TabItem>
+
+   <TabItem value="OSS" label="OSS">
+
+   ```bash
+   # Create a secret to save the access key for OSS
+   kubectl create secret generic oss-credential-for-backuprepo \
+     -n kb-system \
+     --from-literal=accessKeyId=<ACCESS KEY> \
+     --from-literal=secretAccessKey=<SECRET KEY>
+
+   # Create the BackupRepo resource
+   kubectl apply -f - <<-'EOF'
+   apiVersion: dataprotection.kubeblocks.io/v1alpha1
+   kind: BackupRepo
+   metadata:
+     name: my-repo
+     annotations:
+       dataprotection.kubeblocks.io/is-default-repo: "true"
+   spec:
+     storageProviderRef: oss
+     accessMethod: Tool
+     pvReclaimPolicy: Retain
+     volumeCapacity: 100Gi
+     config:
+       bucket: test-kb-backup
+       mountOptions: ""
+       endpoint: ""
+       region: cn-zhangjiakou
+     credential:
+       name: oss-credential-for-backuprepo
+       namespace: kb-system
+   EOF
+   ```
+
+   </TabItem>
+
+   <TabItem value="OBS" label="OBS">
+
+   ```bash
+   # Create a secret to save the access key for OBS
+   kubectl create secret generic obs-credential-for-backuprepo \
+   -n kb-system \
+   --from-literal=accessKeyId=<ACCESS KEY> \
+   --from-literal=secretAccessKey=<SECRET KEY>
+
+   # Create the BackupRepo resource
+   kubectl apply -f - <<-'EOF'
+   apiVersion: dataprotection.kubeblocks.io/v1alpha1
+   kind: BackupRepo
+   metadata:
+     name: my-repo
+     annotations:
+       dataprotection.kubeblocks.io/is-default-repo: "true"
+   spec:
+     storageProviderRef: obs
+     accessMethod: Tool
+     pvReclaimPolicy: Retain
+     volumeCapacity: 100Gi
+     config:
+       bucket: test-kb-backup
+       mountOptions: ""
+       endpoint: ""
+       region: cn-north-4
+     credential:
+       name: obs-credential-for-backuprepo
+       namespace: kb-system
+   EOF
+   ```
+
+   </TabItem>
+
+   <TabItem value="COS" label="COS">
+
+   ```bash
+   # Create a secret to save the access key for COS
+   kubectl create secret generic cos-credential-for-backuprepo \
+     -n kb-system \
+     --from-literal=accessKeyId=<ACCESS KEY> \
+     --from-literal=secretAccessKey=<SECRET KEY>
+
+   # Create the BackupRepo resource
+   kubectl apply -f - <<-'EOF'
+   apiVersion: dataprotection.kubeblocks.io/v1alpha1
+   kind: BackupRepo
+   metadata:
+     name: my-repo
+     annotations:
+       dataprotection.kubeblocks.io/is-default-repo: "true"
+   spec:
+     storageProviderRef: cos
+     accessMethod: Tool
+     pvReclaimPolicy: Retain
+     volumeCapacity: 100Gi
+     config:
+       bucket: test-kb-backup
+       mountOptions: ""
+       endpoint: ""
+       region: ap-guangzhou
+     credential:
+       name: cos-credential-for-backuprepo
+       namespace: kb-system
+   EOF
+   ```
+
+   </TabItem>
+
+   <TabItem value="GCS" label="GCS">
+
+   ```bash
+   # Create a secret to save the access key for GCS
+   kubectl create secret generic gcs-credential-for-backuprepo \
+     -n kb-system \
+     --from-literal=accessKeyId=<ACCESS KEY> \
+     --from-literal=secretAccessKey=<SECRET KEY>
+
+   # Create the BackupRepo resource
+   kubectl apply -f - <<-'EOF'
+   apiVersion: dataprotection.kubeblocks.io/v1alpha1
+   kind: BackupRepo
+   metadata:
+     name: my-repo
+     annotations:
+       dataprotection.kubeblocks.io/is-default-repo: "true"
+   spec:
+     storageProviderRef: gcs-s3comp
+     accessMethod: Tool
+     pvReclaimPolicy: Retain
+     volumeCapacity: 100Gi
+     config:
+       bucket: test-kb-backup
+       mountOptions: ""
+       endpoint: ""
+       region: auto
+     credential:
+       name: gcs-credential-for-backuprepo
+       namespace: kb-system
+   EOF
+   ```
+
+   </TabItem>
+
+   <TabItem value="MinIO" label="MinIO">
+
+   ```bash
+   # Create a secret to save the access key for MinIO
+   kubectl create secret generic minio-credential-for-backuprepo \
+     -n kb-system \
+     --from-literal=accessKeyId=<ACCESS KEY> \
+     --from-literal=secretAccessKey=<SECRET KEY>
+
+   # Create the BackupRepo resource
+   kubectl apply -f - <<-'EOF'
+   apiVersion: dataprotection.kubeblocks.io/v1alpha1
+   kind: BackupRepo
+   metadata:
+     name: my-repo
+     annotations:
+       dataprotection.kubeblocks.io/is-default-repo: "true"
+   spec:
+     storageProviderRef: minio
+     accessMethod: Tool
+     pvReclaimPolicy: Retain
+     volumeCapacity: 100Gi
+     config:
+       bucket: test-kb-backup
+       mountOptions: ""
+       endpoint: <ip:port>
+     credential:
+       name: minio-credential-for-backuprepo
+       namespace: kb-system
+   EOF
+   ```
+
+   </TabItem>
+
+   </Tabs>
+
+3. View the BackupRepo and its status. If the status is `Ready`, the BackupRepo is ready.
+
+   ```bash
+   kubectl get backuprepo
+   ```
+
+</TabItem>
+
+</Tabs>

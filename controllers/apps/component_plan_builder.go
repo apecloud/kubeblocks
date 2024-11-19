@@ -115,7 +115,7 @@ func (c *componentPlanBuilder) Build() (graph.Plan, error) {
 	dag := graph.NewDAG()
 	err := c.transformers.ApplyTo(c.transCtx, dag)
 	if err != nil {
-		c.transCtx.Logger.V(1).Info(fmt.Sprintf("build error: %s", err.Error()))
+		c.transCtx.Logger.Info(fmt.Sprintf("build error: %s", err.Error()))
 	}
 	c.transCtx.Logger.V(1).Info(fmt.Sprintf("DAG: %s", dag))
 
@@ -130,7 +130,7 @@ func (c *componentPlanBuilder) Build() (graph.Plan, error) {
 func (p *componentPlan) Execute() error {
 	err := p.dag.WalkReverseTopoOrder(p.walkFunc, nil)
 	if err != nil {
-		p.transCtx.Logger.V(1).Info(fmt.Sprintf("execute error: %s", err.Error()))
+		p.transCtx.Logger.Info(fmt.Sprintf("execute error: %s", err.Error()))
 	}
 	return err
 }
@@ -154,7 +154,7 @@ func (c *componentPlanBuilder) defaultWalkFuncWithLogging(vertex graph.Vertex) e
 	err := c.defaultWalkFunc(vertex)
 	switch {
 	case err == nil:
-		c.transCtx.Logger.V(1).Info(fmt.Sprintf("reconcile object %T with action %s OK", node.Obj, *node.Action))
+		c.transCtx.Logger.Info(fmt.Sprintf("reconcile object %T with action %s OK", node.Obj, *node.Action))
 		return err
 	case !ok:
 		c.transCtx.Logger.Error(err, "")

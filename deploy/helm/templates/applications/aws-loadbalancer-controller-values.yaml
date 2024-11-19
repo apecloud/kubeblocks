@@ -1,3 +1,4 @@
+{{- if has "aws-load-balancer-controller" .Values.autoInstalledAddons  }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -11,3 +12,4 @@ metadata:
 data:
   values-kubeblocks-override.yaml: |-
      {{- get ( .Values | toYaml | fromYaml ) "aws-load-balancer-controller" | toYaml | nindent 4 }}
+{{- end }}

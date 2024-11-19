@@ -199,8 +199,8 @@ func GetRestorePassword(synthesizedComp *component.SynthesizedComponent) string 
 }
 
 // GetRestoreSystemAccountPassword gets restore password if exists during recovery.
-func GetRestoreSystemAccountPassword(synthesizedComp *component.SynthesizedComponent, account appsv1.SystemAccount) string {
-	valueString := synthesizedComp.Annotations[constant.RestoreFromBackupAnnotationKey]
+func GetRestoreSystemAccountPassword(annotations map[string]string, componentName, accountName string) string {
+	valueString := annotations[constant.RestoreFromBackupAnnotationKey]
 	if len(valueString) == 0 {
 		return ""
 	}
@@ -209,7 +209,7 @@ func GetRestoreSystemAccountPassword(synthesizedComp *component.SynthesizedCompo
 	if err != nil {
 		return ""
 	}
-	backupSource, ok := backupMap[synthesizedComp.Name]
+	backupSource, ok := backupMap[componentName]
 	if !ok {
 		return ""
 	}
@@ -223,7 +223,7 @@ func GetRestoreSystemAccountPassword(synthesizedComp *component.SynthesizedCompo
 		return ""
 	}
 	e := intctrlutil.NewEncryptor(viper.GetString(constant.CfgKeyDPEncryptionKey))
-	encryptedPwd, ok := systemAccountsMap[account.Name]
+	encryptedPwd, ok := systemAccountsMap[accountName]
 	if !ok {
 		return ""
 	}
@@ -270,7 +270,7 @@ func BuildBackup(cluster *appsv1.Cluster,
 	return builder.NewBackupBuilder(backupKey.Namespace, backupKey.Name).
 		AddLabels(dptypes.BackupMethodLabelKey, backupMethod).
 		AddLabels(dptypes.BackupPolicyLabelKey, backupPolicyName).
-		AddLabels(constant.KBManagedByKey, "cluster").
+		AddLabels(constant.AppManagedByLabelKey, constant.AppName).
 		AddLabels(constant.AppNameLabelKey, synthesizedComp.ClusterDefName).
 		AddLabels(constant.AppInstanceLabelKey, cluster.Name).
 		AddLabels(constant.AppManagedByLabelKey, constant.AppName).

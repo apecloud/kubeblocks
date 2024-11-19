@@ -37,10 +37,19 @@ func GetComponentObservedGeneration(testCtx *testutil.TestContext, compKey types
 }
 
 // GetComponentPhase gets the testing component's phase in status for verification.
-func GetComponentPhase(testCtx *testutil.TestContext, compKey types.NamespacedName) func(gomega.Gomega) appsv1.ClusterComponentPhase {
-	return func(g gomega.Gomega) appsv1.ClusterComponentPhase {
+func GetComponentPhase(testCtx *testutil.TestContext, compKey types.NamespacedName) func(gomega.Gomega) appsv1.ComponentPhase {
+	return func(g gomega.Gomega) appsv1.ComponentPhase {
 		comp := &appsv1.Component{}
 		g.Expect(testCtx.Cli.Get(testCtx.Ctx, compKey, comp)).Should(gomega.Succeed())
 		return comp.Status.Phase
+	}
+}
+
+// ComponentReconciled checks if the testing component has been reconciled.
+func ComponentReconciled(testCtx *testutil.TestContext, compKey types.NamespacedName) func(gomega.Gomega) bool {
+	return func(g gomega.Gomega) bool {
+		comp := &appsv1.Component{}
+		g.Expect(testCtx.Cli.Get(testCtx.Ctx, compKey, comp)).Should(gomega.Succeed())
+		return comp.Status.ObservedGeneration > 0 && comp.Status.ObservedGeneration == comp.Generation
 	}
 }

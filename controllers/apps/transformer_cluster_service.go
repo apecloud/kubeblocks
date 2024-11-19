@@ -118,7 +118,7 @@ func (t *clusterServiceTransformer) shardingService(cluster *appsv1.Cluster, ser
 	if len(service.ComponentSelector) == 0 {
 		return false, nil
 	}
-	for _, spec := range cluster.Spec.ShardingSpecs {
+	for _, spec := range cluster.Spec.Shardings {
 		if spec.Name == service.ComponentSelector {
 			return true, nil
 		}
@@ -170,14 +170,14 @@ func (t *clusterServiceTransformer) checkComponentDef(transCtx *clusterTransform
 	selector := service.ComponentSelector
 
 	checkedCompDef := func(compDefName string) (*appsv1.ComponentDefinition, error) {
-		compDef, ok := transCtx.ComponentDefs[compDefName]
+		compDef, ok := transCtx.componentDefs[compDefName]
 		if !ok {
 			return nil, fmt.Errorf("the component definition of service selector is not defined, service: %s, component: %s", service.Name, selector)
 		}
 		return compDef, nil
 	}
 
-	for _, spec := range cluster.Spec.ShardingSpecs {
+	for _, spec := range cluster.Spec.Shardings {
 		if spec.Name == selector {
 			return checkedCompDef(spec.Template.ComponentDef)
 		}

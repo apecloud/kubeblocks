@@ -28,6 +28,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -308,33 +309,6 @@ var _ = Describe("ComponentDefinition Controller", func() {
 		})
 	})
 
-	Context("replica roles", func() {
-		It("ok", func() {
-			By("create a ComponentDefinition obj")
-			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
-				SetRuntime(nil).
-				AddRole("leader", true, true).
-				AddRole("follower", true, false).
-				AddRole("learner", false, false).
-				Create(&testCtx).GetObject()
-
-			checkObjectStatus(componentDefObj, kbappsv1.AvailablePhase)
-		})
-
-		It("duplicate roles", func() {
-			By("create a ComponentDefinition obj")
-			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
-				SetRuntime(nil).
-				AddRole("leader", true, true).
-				AddRole("follower", true, false).
-				AddRole("learner", false, false).
-				AddRole("learner", true, false).
-				Create(&testCtx).GetObject()
-
-			checkObjectStatus(componentDefObj, kbappsv1.UnavailablePhase)
-		})
-	})
-
 	Context("vars", func() {
 		It("ok", func() {
 			By("create a ComponentDefinition obj")
@@ -404,6 +378,91 @@ var _ = Describe("ComponentDefinition Controller", func() {
 		})
 	})
 
+	Context("available", func() {
+		It("with phases - ok", func() {
+			By("create a ComponentDefinition obj")
+			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
+				SetRuntime(nil).
+				SetAvailable(&kbappsv1.ComponentAvailable{
+					WithPhases: pointer.String(fmt.Sprintf("%s,%s",
+						string(kbappsv1.RunningComponentPhase), string(kbappsv1.UpdatingComponentPhase))),
+				}).
+				Create(&testCtx).
+				GetObject()
+
+			checkObjectStatus(componentDefObj, kbappsv1.AvailablePhase)
+		})
+
+		It("with phases - fail", func() {
+			By("create a ComponentDefinition obj")
+			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
+				SetRuntime(nil).
+				SetAvailable(&kbappsv1.ComponentAvailable{
+					// empty phase
+					WithPhases: pointer.String(fmt.Sprintf("%s,%s", string(kbappsv1.RunningComponentPhase), "")),
+				}).
+				Create(&testCtx).
+				GetObject()
+
+			checkObjectStatus(componentDefObj, kbappsv1.UnavailablePhase)
+		})
+
+		It("with probe - ok", func() {
+			By("create a ComponentDefinition obj")
+			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
+				SetRuntime(nil).
+				SetAvailable(&kbappsv1.ComponentAvailable{
+					WithProbe: &kbappsv1.ComponentAvailableWithProbe{},
+				}).
+				SetLifecycleAction("availableProbe", &kbappsv1.Probe{}).
+				Create(&testCtx).
+				GetObject()
+
+			checkObjectStatus(componentDefObj, kbappsv1.AvailablePhase)
+		})
+
+		It("with probe - fail", func() {
+			By("create a ComponentDefinition obj")
+			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
+				SetRuntime(nil).
+				SetAvailable(&kbappsv1.ComponentAvailable{
+					WithProbe: &kbappsv1.ComponentAvailableWithProbe{},
+				}).
+				// without available probe
+				Create(&testCtx).
+				GetObject()
+
+			checkObjectStatus(componentDefObj, kbappsv1.UnavailablePhase)
+		})
+	})
+
+	Context("replica roles", func() {
+		It("ok", func() {
+			By("create a ComponentDefinition obj")
+			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
+				SetRuntime(nil).
+				AddRole("leader", true, true).
+				AddRole("follower", true, false).
+				AddRole("learner", false, false).
+				Create(&testCtx).GetObject()
+
+			checkObjectStatus(componentDefObj, kbappsv1.AvailablePhase)
+		})
+
+		It("duplicate roles", func() {
+			By("create a ComponentDefinition obj")
+			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
+				SetRuntime(nil).
+				AddRole("leader", true, true).
+				AddRole("follower", true, false).
+				AddRole("learner", false, false).
+				AddRole("learner", true, false).
+				Create(&testCtx).GetObject()
+
+			checkObjectStatus(componentDefObj, kbappsv1.UnavailablePhase)
+		})
+	})
+
 	Context("immutable", func() {
 		newCmpdFn := func(processor func(*testapps.MockComponentDefinitionFactory)) *kbappsv1.ComponentDefinition {
 			By("create a ComponentDefinition obj")
@@ -442,6 +501,7 @@ var _ = Describe("ComponentDefinition Controller", func() {
 				cmpd.Spec.Description = "v0.0.2"
 				parallel := appsv1.ParallelPodManagement
 				cmpd.Spec.PodManagementPolicy = &parallel
+				cmpd.Spec.MinReadySeconds = 10
 			})()).Should(Succeed())
 
 			By(fmt.Sprintf("checking the updated object as %s", strings.ToLower(string(kbappsv1.AvailablePhase))))

@@ -401,6 +401,13 @@ type ComponentDefinitionSpec struct {
 	// +optional
 	ReplicasLimit *ReplicasLimit `json:"replicasLimit,omitempty"`
 
+	// Specifies the strategies for determining the available status of the Component.
+	//
+	// This field is immutable.
+	//
+	// +optional
+	Available *ComponentAvailable `json:"available,omitempty"`
+
 	// Enumerate all possible roles assigned to each replica of the Component, influencing its behavior.
 	//
 	// A replica can have zero to multiple roles.
@@ -1240,6 +1247,129 @@ type ReplicasLimit struct {
 	MaxReplicas int32 `json:"maxReplicas"`
 }
 
+// ComponentAvailable defines the strategies for determining whether the component is available.
+type ComponentAvailable struct {
+	// Specifies the phases that the component will go through to be considered available.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	WithPhases *string `json:"withPhases,omitempty"`
+
+	// Specifies the strategies for determining whether the component is available based on the available probe.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	WithProbe *ComponentAvailableWithProbe `json:"withProbe,omitempty"`
+}
+
+type ComponentAvailableWithProbe struct {
+	// This field is immutable once set.
+	//
+	// +optional
+	TimeWindowSeconds *int32 `json:"timeWindowSeconds,omitempty"`
+
+	// Specifies the conditions that the component will go through to be considered available.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	Condition *ComponentAvailableCondition `json:"condition,omitempty"`
+
+	// A brief description for the condition when the component is available.
+	//
+	// +optional
+	Description string `json:"description,omitempty"`
+}
+
+type ComponentAvailableCondition struct {
+	ComponentAvailableExpression `json:",inline"`
+
+	// Logical And to combine multiple expressions.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	And []ComponentAvailableExpression `json:"and,omitempty"`
+
+	// Logical Or to combine multiple expressions.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	Or []ComponentAvailableExpression `json:"or,omitempty"`
+
+	// Logical Not to negate the expression.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	Not *ComponentAvailableExpression `json:"not,omitempty"`
+}
+
+type ComponentAvailableExpression struct {
+	// All replicas must satisfy the assertion.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	All *ComponentAvailableProbeAssertion `json:"all,omitempty"`
+
+	// At least one replica must satisfy the assertion.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	Any *ComponentAvailableProbeAssertion `json:"any,omitempty"`
+
+	// None of the replicas must satisfy the assertion.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	None *ComponentAvailableProbeAssertion `json:"none,omitempty"`
+
+	// Majority replicas must satisfy the assertion.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	Majority *ComponentAvailableProbeAssertion `json:"majority,omitempty"`
+}
+
+type ComponentAvailableProbeAssertion struct {
+	ActionAssertion `json:",inline"`
+
+	// Logical And to combine multiple assertions.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	And []ActionAssertion `json:"and,omitempty"`
+
+	// Logical Or to combine multiple assertions.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	Or []ActionAssertion `json:"or,omitempty"`
+
+	// Logical Not to negate the assertions.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	Not *ActionAssertion `json:"not,omitempty"`
+
+	// Specifies whether apply the assertions strictly to all replicas.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	Strict *bool `json:"strict,omitempty"`
+}
+
 // ReplicaRole represents a role that can be assumed by a component instance.
 type ReplicaRole struct {
 	// Defines the role's identifier. It is used to set the "apps.kubeblocks.io/role" label value
@@ -1368,6 +1498,13 @@ type ComponentLifecycleActions struct {
 	//
 	// +optional
 	RoleProbe *Probe `json:"roleProbe,omitempty"`
+
+	// Defines the procedure which is invoked regularly to assess the availability of the component.
+	//
+	// Note: This field is immutable once it has been set.
+	//
+	// +optional
+	AvailableProbe *Probe `json:"availableProbe,omitempty"`
 
 	// Defines the procedure for a controlled transition of leadership from the current leader to a new replica.
 	// This approach aims to minimize downtime and maintain availability in systems with a leader-follower topology,
@@ -1784,6 +1921,47 @@ type Probe struct {
 	//
 	// +optional
 	FailureThreshold int32 `json:"failureThreshold,omitempty"`
+}
+
+// ActionAssertion defines the custom assertions for evaluating the success or failure of an action.
+type ActionAssertion struct {
+	// Whether the action should succeed or fail.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	Succeed *bool `json:"succeed,omitempty"`
+
+	// Specifies the stdout matcher for the action.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	Stdout *ActionOutputMatcher `json:"stdout,omitempty"`
+
+	// Specifies the stderr matcher for the action.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	Stderr *ActionOutputMatcher `json:"stderr,omitempty"`
+}
+
+// ActionOutputMatcher defines the matcher for the output of an action.
+type ActionOutputMatcher struct {
+	// The output of the action should be equal to the specified value.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	EqualTo *string `json:"equalTo,omitempty"`
+
+	// The output of the action should contain the specified value.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	Contains *string `json:"contains,omitempty"`
 }
 
 // ServiceRefDeclaration represents a reference to a service that can be either provided by a KubeBlocks Cluster

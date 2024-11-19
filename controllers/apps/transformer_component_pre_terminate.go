@@ -44,7 +44,7 @@ var _ graph.Transformer = &componentPreTerminateTransformer{}
 func (t *componentPreTerminateTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*componentTransformContext)
 	comp := transCtx.Component
-	if comp.GetDeletionTimestamp().IsZero() || comp.Status.Phase != appsv1.DeletingClusterCompPhase {
+	if comp.GetDeletionTimestamp().IsZero() || comp.Status.Phase != appsv1.DeletingComponentPhase {
 		return nil
 	}
 

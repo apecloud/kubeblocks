@@ -165,6 +165,52 @@ spec:
                                   Holds the data associated with the parameter.
                                   If the parameter type is an array, the format should be "v1,v2,v3".
                                 type: string
+                              valueFrom:
+                                description: Source for the parameter's value. Cannot
+                                  be used if value is not empty.
+                                properties:
+                                  configMapKeyRef:
+                                    description: Selects a key of a ConfigMap.
+                                    properties:
+                                      key:
+                                        description: The key to select.
+                                        type: string
+                                      name:
+                                        description: |-
+                                          Name of the referent.
+                                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                          TODO: Add other useful fields. apiVersion, kind, uid?
+                                        type: string
+                                      optional:
+                                        description: Specify whether the ConfigMap
+                                          or its key must be defined
+                                        type: boolean
+                                    required:
+                                    - key
+                                    type: object
+                                    x-kubernetes-map-type: atomic
+                                  secretKeyRef:
+                                    description: Selects a key of a Secret.
+                                    properties:
+                                      key:
+                                        description: The key of the secret to select
+                                          from.  Must be a valid secret key.
+                                        type: string
+                                      name:
+                                        description: |-
+                                          Name of the referent.
+                                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                          TODO: Add other useful fields. apiVersion, kind, uid?
+                                        type: string
+                                      optional:
+                                        description: Specify whether the Secret or
+                                          its key must be defined
+                                        type: boolean
+                                    required:
+                                    - key
+                                    type: object
+                                    x-kubernetes-map-type: atomic
+                                type: object
                             required:
                             - name
                             - value
@@ -4376,6 +4422,48 @@ spec:
                 required:
                 - backupName
                 type: object
+              start:
+                description: Lists Components to be started. If empty, all components
+                  will be started.
+                items:
+                  description: ComponentOps specifies the Component to be operated
+                    on.
+                  properties:
+                    componentName:
+                      description: Specifies the name of the Component.
+                      type: string
+                  required:
+                  - componentName
+                  type: object
+                maxItems: 1024
+                type: array
+                x-kubernetes-list-map-keys:
+                - componentName
+                x-kubernetes-list-type: map
+                x-kubernetes-validations:
+                - message: forbidden to update spec.start
+                  rule: self == oldSelf
+              stop:
+                description: Lists Components to be stopped. If empty, all components
+                  will be stopped.
+                items:
+                  description: ComponentOps specifies the Component to be operated
+                    on.
+                  properties:
+                    componentName:
+                      description: Specifies the name of the Component.
+                      type: string
+                  required:
+                  - componentName
+                  type: object
+                maxItems: 1024
+                type: array
+                x-kubernetes-list-map-keys:
+                - componentName
+                x-kubernetes-list-type: map
+                x-kubernetes-validations:
+                - message: forbidden to update spec.stop
+                  rule: self == oldSelf
               switchover:
                 description: Lists Switchover objects, each specifying a Component
                   to perform the switchover operation.
@@ -4394,15 +4482,11 @@ spec:
 
                         1. "*" (wildcard value):
                         - Indicates no specific instance is designated as the primary or leader.
-                        - Executes the switchover action from `clusterDefinition.componentDefs[*].switchoverSpec.withoutCandidate`.
-                        - `clusterDefinition.componentDefs[x].switchoverSpec.withoutCandidate` must be defined when using "*".
 
 
                         2. A valid instance name (pod name):
                         - Designates a specific instance (pod) as the primary or leader.
                         - The name must match one of the pods in the component. Any non-valid pod name is considered invalid.
-                        - Executes the switchover action from `clusterDefinition.componentDefs[*].switchoverSpec.withCandidate`.
-                        - `clusterDefinition.componentDefs[*].switchoverSpec.withCandidate` must be defined when specifying a valid instance name.
                       type: string
                   required:
                   - componentName
@@ -4767,7 +4851,7 @@ spec:
                   properties:
                     lastFailedTime:
                       description: Records the timestamp when the Component last transitioned
-                        to a "Failed" or "Abnormal" phase.
+                        to a "Failed" phase.
                       format: date-time
                       type: string
                     message:
@@ -4776,18 +4860,16 @@ spec:
                       maxLength: 32768
                       type: string
                     phase:
-                      description: |-
-                        Records the current phase of the Component, mirroring `cluster.status.components[componentName].phase`.
-                        Possible values include "Creating", "Running", "Updating", "Stopping", "Stopped", "Deleting", "Failed", "Abnormal".
+                      description: Records the current phase of the Component, mirroring
+                        `cluster.status.components[componentName].phase`.
                       enum:
                       - Creating
-                      - Running
+                      - Deleting
                       - Updating
                       - Stopping
+                      - Running
                       - Stopped
-                      - Deleting
                       - Failed
-                      - Abnormal
                       type: string
                     preCheck:
                       description: Records the result of the preConditions check of

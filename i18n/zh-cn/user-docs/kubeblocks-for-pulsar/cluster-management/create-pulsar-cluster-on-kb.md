@@ -115,7 +115,7 @@ KubeBlocks 可以通过良好的抽象快速集成新引擎，并支持 Pulsar �
      - 3 节点 zookeeper
 
      ```bash
-     helm install pulsar kubeblocks/pulsar-cluster --version "x.x.x" -f values-production.yaml --set monitor.enabled=true
+     helm install pulsar kubeblocks/pulsar-cluster --version "x.y.z" -f values-production.yaml --set monitor.enabled=true
      ```
 
    - **选项 2.** 创建带 proxy 的 Pulsar 集群。
@@ -126,7 +126,7 @@ KubeBlocks 可以通过良好的抽象快速集成新引擎，并支持 Pulsar �
      - 3 节点 zookeeper
 
      ```bash
-     helm install pulsar kubeblocks/pulsar-cluster --version "x.x.x" -f values-production.yaml --set proxy.enable=true  --set monitor.enabled=true  
+     helm install pulsar kubeblocks/pulsar-cluster --version "x.y.z" -f values-production.yaml --set proxy.enable=true  --set monitor.enabled=true  
      ```
 
    - **选项 3.** 创建带 proxy 的 Pulsar 集群，并部署独立的 `bookies-recovery` 组件。
@@ -138,7 +138,7 @@ KubeBlocks 可以通过良好的抽象快速集成新引擎，并支持 Pulsar �
      - 3 节点 bookies-recovery
 
      ```bash
-     helm install pulsar kubeblocks/pulsar-cluster --version "x.x.x" -f values-production.yaml --set proxy.enable=true --set bookiesRecovery.enable=true --set monitor.enabled=true 
+     helm install pulsar kubeblocks/pulsar-cluster --version "x.y.z" -f values-production.yaml --set proxy.enable=true --set bookiesRecovery.enable=true --set monitor.enabled=true 
      ```
 
    - **选项 4.** 创建 Pulsar 集群并指定 bookies 和 zookeeper 的存储参数。
@@ -148,7 +148,7 @@ KubeBlocks 可以通过良好的抽象快速集成新引擎，并支持 Pulsar �
      - 3 节点 zookeeper
 
      ```bash
-     helm install pulsar kubeblocks/pulsar-cluster --version "x.x.x" -f values-production.yaml --set bookies.persistence.data.storageClassName=<sc name>,bookies.persistence.log.storageClassName=<sc name>,zookeeper.persistence.data.storageClassName=<sc name>,zookeeper.persistence.log.storageClassName=<sc name> --set monitor.enabled=true
+     helm install pulsar kubeblocks/pulsar-cluster --version "x.y.z" -f values-production.yaml --set bookies.persistence.data.storageClassName=<sc name>,bookies.persistence.log.storageClassName=<sc name>,zookeeper.persistence.data.storageClassName=<sc name>,zookeeper.persistence.log.storageClassName=<sc name> --set monitor.enabled=true
      ```
 
    你可以指定存储名称 `<sc name>`。

@@ -33,8 +33,7 @@ import (
 // +kubebuilder:subresource:status
 // +kubebuilder:storageversion
 // +kubebuilder:resource:categories={kubeblocks,all}
-// +kubebuilder:printcolumn:name="CLUSTER-DEFINITION",type="string",JSONPath=".spec.clusterDefinitionRef",description="ClusterDefinition referenced by cluster."
-// +kubebuilder:printcolumn:name="VERSION",type="string",JSONPath=".spec.clusterVersionRef",description="Cluster Application Version."
+// +kubebuilder:printcolumn:name="CLUSTER-DEFINITION",type="string",JSONPath=".spec.clusterDef",description="ClusterDefinition referenced by cluster."
 // +kubebuilder:printcolumn:name="TERMINATION-POLICY",type="string",JSONPath=".spec.terminationPolicy",description="Cluster termination policy."
 // +kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.phase",description="Cluster Status."
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
@@ -146,7 +145,7 @@ type ClusterSpec struct {
 	// Specifies a list of ClusterComponentSpec objects used to define the individual Components that make up a Cluster.
 	// This field allows for detailed configuration of each Component within the Cluster.
 	//
-	// Note: `shardingSpecs` and `componentSpecs` cannot both be empty; at least one must be defined to configure a Cluster.
+	// Note: `shardings` and `componentSpecs` cannot both be empty; at least one must be defined to configure a Cluster.
 	//
 	// +kubebuilder:validation:MinItems=1
 	// +kubebuilder:validation:MaxItems=128
@@ -155,14 +154,14 @@ type ClusterSpec struct {
 	// +optional
 	ComponentSpecs []ClusterComponentSpec `json:"componentSpecs,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
-	// Specifies a list of ShardingSpec objects that manage the sharding topology for Cluster Components.
-	// Each ShardingSpec organizes components into shards, with each shard corresponding to a Component.
+	// Specifies a list of ClusterSharding objects that manage the sharding topology for Cluster Components.
+	// Each ClusterSharding organizes components into shards, with each shard corresponding to a Component.
 	// Components within a shard are all based on a common ClusterComponentSpec template, ensuring uniform configurations.
 	//
 	// This field supports dynamic resharding by facilitating the addition or removal of shards
-	// through the `shards` field in ShardingSpec.
+	// through the `shards` field in ClusterSharding.
 	//
-	// Note: `shardingSpecs` and `componentSpecs` cannot both be empty; at least one must be defined to configure a Cluster.
+	// Note: `shardings` and `componentSpecs` cannot both be empty; at least one must be defined to configure a Cluster.
 	//
 	// +patchMergeKey=name
 	// +patchStrategy=merge,retainKeys
@@ -171,7 +170,7 @@ type ClusterSpec struct {
 	// +kubebuilder:validation:MinItems=1
 	// +kubebuilder:validation:MaxItems=128
 	// +optional
-	ShardingSpecs []ShardingSpec `json:"shardingSpecs,omitempty"`
+	Shardings []ClusterSharding `json:"shardings,omitempty"`
 
 	// Specifies runtimeClassName for all Pods managed by this Cluster.
 	//
@@ -184,7 +183,7 @@ type ClusterSpec struct {
 	SchedulingPolicy *SchedulingPolicy `json:"schedulingPolicy,omitempty"`
 
 	// Defines a list of additional Services that are exposed by a Cluster.
-	// This field allows Services of selected Components, either from `componentSpecs` or `shardingSpecs` to be exposed,
+	// This field allows Services of selected Components, either from `componentSpecs` or `shardings` to be exposed,
 	// alongside Services defined with ComponentService.
 	//
 	// Services defined here can be referenced by other clusters using the ServiceRefClusterSelector.
@@ -222,10 +221,10 @@ type ClusterStatus struct {
 	// +optional
 	Components map[string]ClusterComponentStatus `json:"components,omitempty"`
 
-	// Represents the generation number of the referenced ClusterDefinition.
+	// Records the current status information of all shardings within the Cluster.
 	//
 	// +optional
-	ClusterDefGeneration int64 `json:"clusterDefGeneration,omitempty"`
+	Shardings map[string]ClusterComponentStatus `json:"shardings,omitempty"`
 
 	// Represents a list of detailed status of the Cluster object.
 	// Each condition in the list provides real-time information about certain aspect of the Cluster object.
@@ -259,7 +258,7 @@ const (
 type ClusterComponentSpec struct {
 	// Specifies the Component's name.
 	// It's part of the Service DNS name and must comply with the IANA service naming rule.
-	// The name is optional when ClusterComponentSpec is used as a template (e.g., in `shardingSpec`),
+	// The name is optional when ClusterComponentSpec is used as a template (e.g., in `clusterSharding`),
 	// but required otherwise.
 	//
 	// +kubebuilder:validation:MaxLength=22
@@ -542,22 +541,23 @@ type ClusterComponentService struct {
 	PodService *bool `json:"podService,omitempty"`
 }
 
-// ShardingSpec defines how KubeBlocks manage dynamic provisioned shards.
+// ClusterSharding defines how KubeBlocks manage dynamic provisioned shards.
 // A typical design pattern for distributed databases is to distribute data across multiple shards,
 // with each shard consisting of multiple replicas.
 // Therefore, KubeBlocks supports representing a shard with a Component and dynamically instantiating Components
 // using a template when shards are added.
 // When shards are removed, the corresponding Components are also deleted.
-type ShardingSpec struct {
+type ClusterSharding struct {
 	// Represents the common parent part of all shard names.
+	//
 	// This identifier is included as part of the Service DNS name and must comply with IANA service naming rules.
-	// It is used to generate the names of underlying Components following the pattern `$(shardingSpec.name)-$(ShardID)`.
+	// It is used to generate the names of underlying Components following the pattern `$(clusterSharding.name)-$(ShardID)`.
 	// ShardID is a random string that is appended to the Name to generate unique identifiers for each shard.
 	// For example, if the sharding specification name is "my-shard" and the ShardID is "abc", the resulting Component name
 	// would be "my-shard-abc".
 	//
-	// Note that the name defined in Component template(`shardingSpec.template.name`) will be disregarded
-	// when generating the Component names of the shards. The `shardingSpec.name` field takes precedence.
+	// Note that the name defined in Component template(`clusterSharding.template.name`) will be disregarded
+	// when generating the Component names of the shards. The `clusterSharding.name` field takes precedence.
 	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=15
@@ -565,10 +565,19 @@ type ShardingSpec struct {
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="name is immutable"
 	Name string `json:"name"`
 
+	// Specifies the ShardingDefinition custom resource (CR) that defines the sharding's characteristics and behavior.
+	//
+	// The full name or regular expression is supported to match the ShardingDefinition.
+	//
+	// +kubebuilder:validation:MaxLength=64
+	// +optional
+	ShardingDef string `json:"shardingDef,omitempty"`
+
 	// The template for generating Components for shards, where each shard consists of one Component.
+	//
 	// This field is of type ClusterComponentSpec, which encapsulates all the required details and
 	// definitions for creating and managing the Components.
-	// KubeBlocks uses this template to generate a set of identical Components or shards.
+	// KubeBlocks uses this template to generate a set of identical Components of shards.
 	// All the generated Components will have the same specifications and definitions as specified in the `template` field.
 	//
 	// This allows for the creation of multiple Components with consistent configurations,
@@ -578,20 +587,21 @@ type ShardingSpec struct {
 	Template ClusterComponentSpec `json:"template"`
 
 	// Specifies the desired number of shards.
+	//
 	// Users can declare the desired number of shards through this field.
 	// KubeBlocks dynamically creates and deletes Components based on the difference
 	// between the desired and actual number of shards.
 	// KubeBlocks provides lifecycle management for sharding, including:
 	//
-	// - Executing the postProvision Action defined in the ComponentDefinition when the number of shards increases.
+	// - Executing the shardProvision Action defined in the ShardingDefinition when the number of shards increases.
 	//   This allows for custom actions to be performed after a new shard is provisioned.
-	// - Executing the preTerminate Action defined in the ComponentDefinition when the number of shards decreases.
+	// - Executing the shardTerminate Action defined in the ShardingDefinition when the number of shards decreases.
 	//   This enables custom cleanup or data migration tasks to be executed before a shard is terminated.
 	//   Resources and data associated with the corresponding Component will also be deleted.
 	//
-	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=2048
+	// +kubebuilder:validation:Required
 	Shards int32 `json:"shards,omitempty"`
 }
 
@@ -701,15 +711,15 @@ const (
 	// FailedClusterPhase represents all components are in `Failed` phase, indicates that the cluster is unavailable.
 	FailedClusterPhase ClusterPhase = "Failed"
 
-	// AbnormalClusterPhase represents some components are in `Failed` or `Abnormal` phase, indicates that the cluster
-	// is in a fragile state and troubleshooting is required.
+	// AbnormalClusterPhase represents some components are in `Failed` phase, indicates that the cluster is in
+	// a fragile state and troubleshooting is required.
 	AbnormalClusterPhase ClusterPhase = "Abnormal"
 )
 
 // ClusterComponentStatus records Component status.
 type ClusterComponentStatus struct {
 	// Specifies the current state of the Component.
-	Phase ClusterComponentPhase `json:"phase,omitempty"`
+	Phase ComponentPhase `json:"phase,omitempty"`
 
 	// Records detailed information about the Component in its current phase.
 	// The keys are either podName, deployName, or statefulSetName, formatted as 'ObjectKind/Name'.

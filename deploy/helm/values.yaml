@@ -317,16 +317,19 @@ dataPlane:
 # Add extra pod labels to KubeBlocks Deployment
 extraLabels: {}
 
-## AdmissionWebhooks settings
+# Add extra annotations to KubeBlocks Deployment
+deployAnnotations: {}
+
+# Add extra pod envs to KubeBlocks Deployment
+extraEnvs: []
+
+## webhooks settings
 ##
-## @param admissionWebhooks.enabled
-## @param admissionWebhooks.createSelfSignedCert
-## @param admissionWebhooks.ignoreReplicasCheck
-admissionWebhooks:
-  enabled: false
-  conversionEnabled: true
+## @param webhooks.conversionEnabled
+## @param webhooks.createSelfSignedCert
+webhooks:
+  conversionEnabled: false
   createSelfSignedCert: true
-  ignoreReplicasCheck: false
 
 ## Data protection settings
 ##
@@ -342,6 +345,7 @@ dataProtection:
   encryptionKeySecretKeyRef:
     name: ""
     key: ""
+    skipValidation: false
   enableBackupEncryption: false
   backupEncryptionAlgorithm: ""
   gcFrequencySeconds: 3600
@@ -393,6 +397,16 @@ dataProtection:
 
   # Add extra pod labels to KubeBlocks-DataProtection Deployment
   extraLabels: {}
+
+  # Add extra annotations to KubeBlocks-DataProtection Deployment
+  deployAnnotations: {}
+
+  # Add extra pod envs to KubeBlocks-DataProtection Deployment
+  extraEnvs: []
+
+  ## @param podAnnotations
+  ##
+  podAnnotations: {}
 
 ## BackupRepo settings
 ##
@@ -460,6 +474,27 @@ addonHelmInstallOptions:
 ## @param upgradeAddons - upgrade addons when upgrade this chart.
 ## For avoiding the addon CRs being upgraded when upgrade this chart, set this value to false.
 upgradeAddons: false
+
+## @param autoInstalledAddons - the list of auto-installed addons when install and upgrade.
+autoInstalledAddons:
+  - "apecloud-mysql"
+  - "etcd"
+  - "kafka"
+  - "llm"
+  - "mongodb"
+  - "mysql"
+  - "postgresql"
+  - "pulsar"
+  - "qdrant"
+  - "redis"
+  - "alertmanager-webhook-adaptor"
+  - "aws-load-balancer-controller"
+  - "csi-hostpath-driver"
+  - "csi-driver-nfs"
+  - "grafana"
+  - "prometheus"
+  - "snapshot-controller"
+  - "victoria-metrics-agent"
 
 ## Prometheus Addon
 ##
@@ -1453,9 +1488,6 @@ prometheus:
         - source_labels: [__meta_kubernetes_service_label_app_kubernetes_io_managed_by]
           action: keep
           regex: kubeblocks
-        - source_labels: [__meta_kubernetes_service_label_monitor_kubeblocks_io_managed_by]
-          action: drop
-          regex: agamotto
         - source_labels: [__meta_kubernetes_service_annotation_monitor_kubeblocks_io_scrape]
           action: keep
           regex: true
@@ -1493,85 +1525,10 @@ prometheus:
           regex: Succeeded|Failed|Completed
           action: drop
 
-      - job_name: 'kubeblocks-agamotto'
-        honor_labels: true
-
-        kubernetes_sd_configs:
-        - role: endpoints
-
-        relabel_configs:
-        - source_labels: [__meta_kubernetes_service_label_monitor_kubeblocks_io_managed_by]
-          action: keep
-          regex: agamotto
-        - source_labels: [__meta_kubernetes_service_annotation_monitor_kubeblocks_io_scrape]
-          action: keep
-          regex: true
-        - source_labels: [__meta_kubernetes_service_annotation_monitor_kubeblocks_io_scheme]
-          action: replace
-          target_label: __scheme__
-          regex: (https?)
-        - source_labels: [__meta_kubernetes_service_annotation_monitor_kubeblocks_io_path]
-          action: replace
-          target_label: __metrics_path__
-          regex: (.+)
-        - source_labels: [__address__, __meta_kubernetes_service_annotation_monitor_kubeblocks_io_port]
-          action: replace
-          target_label: __address__
-          regex: (.+?)(?::\d+)?;(\d+)
-          replacement: $1:$2
-        - action: labelmap
-          regex: __meta_kubernetes_service_annotation_monitor_kubeblocks_io_param_(.+)
-          replacement: __param_$1
-        - source_labels: [__meta_kubernetes_pod_phase]
-          regex: Pending|Succeeded|Failed|Completed
-          action: drop
-
   pushgateway:
     ## If false, pushgateway will not be installed
     ##
     enabled: false
-
-## loki settings for kubeblocks
-loki:
-  enabled: false
-  singleBinary:
-    replicas: 1
-  monitoring:
-    lokiCanary:
-      enabled: false
-    selfMonitoring:
-      enabled: false
-      grafanaAgent:
-        installOperator: false
-    dashboards:
-      enabled: false
-    rules:
-      enabled: false
-    serviceMonitor:
-      enabled: false
-  test:
-    enabled: false
-  loki:
-    auth_enabled: false
-    commonConfig:
-      replication_factor: 1
-    storage:
-      type: filesystem
-    podSecurityContext:
-      runAsNonRoot: false
-      runAsUser: 0
-    limits_config:
-      max_query_lookback: 72h
-      retention_period: 72h
-    compactor:
-      working_directory: /var/loki/retention
-      shared_store: filesystem
-      compaction_interval: 10m
-      retention_enabled: true
-      retention_delete_delay: 2h
-      retention_delete_worker_count: 150
-      delete_request_cancel_period: 2h
-
 
 grafana:
   ## If false, grafana sub-chart will not be installed
@@ -1765,8 +1722,6 @@ snapshot-controller:
             values:
             - "true"
 
-kubeblocks-csi-driver:
-  enabled: false
 
 alertmanager-webhook-adaptor:
   ## Linkage with prometheus.enabled
@@ -1839,13 +1794,6 @@ enabledAlphaFeatureGates:
   recoverVolumeExpansionFailure: false
 
 
-agamotto:
-  enabled: false
-  image:
-    # if the value of agamotto.image.registry is not specified using `--set`, it will be set to the value of 'image.registry' by default
-    registry: ""
-
-
 provider: "" # cloud be "aws","gcp","aliyun","tencentCloud", "huaweiCloud", "azure"
 validProviders:
  - "aws"
@@ -1913,6 +1861,8 @@ controllers:
     enabled: true
   workloads:
     enabled: true
+  operations:
+    enabled: true
   experimental:
     enabled: false
 
@@ -1955,9 +1905,6 @@ vmagent:
           - source_labels: [ __meta_kubernetes_service_label_app_kubernetes_io_managed_by ]
             action: keep
             regex: kubeblocks
-          - source_labels: [ __meta_kubernetes_service_label_monitor_kubeblocks_io_managed_by ]
-            action: drop
-            regex: agamotto
           - source_labels: [ __meta_kubernetes_service_annotation_monitor_kubeblocks_io_scrape ]
             action: keep
             regex: true
@@ -1994,41 +1941,5 @@ vmagent:
           - source_labels: [ __meta_kubernetes_pod_phase ]
             regex: Pending|Succeeded|Failed|Completed
             action: drop
-
-      - job_name: 'kubeblocks-agamotto'
-        honor_labels: true
-
-        kubernetes_sd_configs:
-          - role: endpoints
-
-        relabel_configs:
-          - source_labels: [ __meta_kubernetes_service_label_monitor_kubeblocks_io_managed_by ]
-            action: keep
-            regex: agamotto
-          - source_labels: [ __meta_kubernetes_service_annotation_monitor_kubeblocks_io_scrape ]
-            action: keep
-            regex: true
-          - source_labels: [ __meta_kubernetes_service_annotation_monitor_kubeblocks_io_scheme ]
-            action: replace
-            target_label: __scheme__
-            regex: (https?)
-          - source_labels: [ __meta_kubernetes_service_annotation_monitor_kubeblocks_io_path ]
-            action: replace
-            target_label: __metrics_path__
-            regex: (.+)
-          - source_labels: [ __address__, __meta_kubernetes_service_annotation_monitor_kubeblocks_io_port ]
-            action: replace
-            target_label: __address__
-            regex: (.+?)(?::\d+)?;(\d+)
-            replacement: $1:$2
-          - action: labelmap
-            regex: __meta_kubernetes_service_annotation_monitor_kubeblocks_io_param_(.+)
-            replacement: __param_$1
-          - source_labels: [ __meta_kubernetes_pod_phase ]
-            regex: Pending|Succeeded|Failed|Completed
-            action: drop
-
-crd:
-  enabled: true
 
 userAgent: kubeblocks

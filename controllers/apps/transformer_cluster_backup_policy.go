@@ -129,7 +129,7 @@ func (r *clusterBackupPolicyTransformer) Transform(ctx graph.TransformContext, d
 	}
 
 	transformComponentBackupPolicy := func(compSpec *appsv1.ClusterComponentSpec, componentName string, isSharding bool) error {
-		compDef := r.ComponentDefs[compSpec.ComponentDef]
+		compDef := r.componentDefs[compSpec.ComponentDef]
 		if compDef == nil {
 			return nil
 		}
@@ -159,9 +159,9 @@ func (r *clusterBackupPolicyTransformer) Transform(ctx graph.TransformContext, d
 			return err
 		}
 	}
-	for i := range r.Cluster.Spec.ShardingSpecs {
-		shardingSpec := r.Cluster.Spec.ShardingSpecs[i]
-		if err := transformComponentBackupPolicy(&shardingSpec.Template, shardingSpec.Name, true); err != nil {
+	for i := range r.Cluster.Spec.Shardings {
+		spec := r.Cluster.Spec.Shardings[i]
+		if err := transformComponentBackupPolicy(&spec.Template, spec.Name, true); err != nil {
 			return err
 		}
 	}
@@ -535,7 +535,9 @@ func (r *backupPolicyBuilder) buildBackupTarget(
 			MatchLabels: r.buildTargetPodLabels(targetTpl.FallbackRole, fullCompName),
 		}
 	}
-	target.Name = fullCompName
+	if r.isSharding {
+		target.Name = fullCompName
+	}
 	// build the target connection credential
 	if targetTpl.Account != "" {
 		target.ConnectionCredential = &dpv1alpha1.ConnectionCredential{
@@ -635,6 +637,9 @@ func (r *backupPolicyBuilder) mergeClusterBackup(
 		if as.Spec.BackupType == dpv1alpha1.BackupTypeContinuous && backup.PITREnabled != nil && !hasSyncPITRMethod {
 			// auto-sync the first continuous backup for the 'pirtEnable' option.
 			backupSchedule.Spec.Schedules[i].Enabled = backup.PITREnabled
+			if backup.RetentionPeriod.String() != "" {
+				backupSchedule.Spec.Schedules[i].RetentionPeriod = backup.RetentionPeriod
+			}
 			hasSyncPITRMethod = true
 		}
 		if as.Spec.BackupType == dpv1alpha1.BackupTypeFull && enableAutoBackup {

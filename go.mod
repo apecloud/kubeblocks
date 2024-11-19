@@ -13,7 +13,6 @@ require (
 	github.com/bhmj/jsonslice v1.1.2
 	github.com/charmbracelet/keygen v0.5.1
 	github.com/clbanning/mxj/v2 v2.5.7
-	github.com/containers/common v0.55.4
 	github.com/docker/docker v25.0.6+incompatible
 	github.com/evanphx/json-patch v5.6.0+incompatible
 	github.com/fasthttp/router v1.4.20
@@ -75,6 +74,7 @@ require (
 	k8s.io/kubectl v0.29.0
 	k8s.io/utils v0.0.0-20231127182322-b307cd553661
 	sigs.k8s.io/controller-runtime v0.17.2
+	sigs.k8s.io/kustomize/api v0.13.5-0.20230601165947-6ce0bf390ce3
 	sigs.k8s.io/yaml v1.4.0
 )
 
@@ -242,7 +242,6 @@ require (
 	k8s.io/metrics v0.29.0 // indirect
 	oras.land/oras-go v1.2.5 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
-	sigs.k8s.io/kustomize/api v0.13.5-0.20230601165947-6ce0bf390ce3 // indirect
 	sigs.k8s.io/kustomize/kyaml v0.14.3 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
 )

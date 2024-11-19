@@ -246,7 +246,7 @@ func (r *ComponentReconciler) setupWithMultiClusterManager(mgr ctrl.Manager, mul
 
 func (r *ComponentReconciler) filterComponentRestoreResources(ctx context.Context, obj client.Object) []reconcile.Request {
 	labels := obj.GetLabels()
-	if v, ok := labels[constant.KBManagedByKey]; !ok || v != "cluster" {
+	if v, ok := labels[constant.AppManagedByLabelKey]; !ok || v != constant.AppName {
 		return []reconcile.Request{}
 	}
 	if _, ok := labels[constant.AppInstanceLabelKey]; !ok {

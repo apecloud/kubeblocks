@@ -34,9 +34,9 @@ import (
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 )
 
 // clusterDeletionTransformer handles cluster deletion
@@ -71,14 +71,14 @@ func (t *clusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 	transCtx.EventRecorder.Eventf(cluster, corev1.EventTypeNormal, constant.ReasonDeletingCR, "Deleting %s: %s",
 		strings.ToLower(cluster.GetObjectKind().GroupVersionKind().Kind), cluster.GetName())
 
-	// firstly, delete components in the order that topology defined.
-	deleteCompSet, err := deleteCompsInOrder4Terminate(transCtx, dag)
+	// firstly, delete components and shardings in the order that topology defined.
+	deleteSet, err := deleteCompNShardingInOrder4Terminate(transCtx, dag)
 	if err != nil {
 		return err
 	}
-	if len(deleteCompSet) > 0 {
+	if len(deleteSet) > 0 {
 		// wait for the components to be deleted to trigger the next reconcile
-		transCtx.Logger.Info(fmt.Sprintf("wait for the components to be deleted: %v", deleteCompSet))
+		transCtx.Logger.Info(fmt.Sprintf("wait for the components and shardings to be deleted: %v", deleteSet))
 		return nil
 	}
 
@@ -88,9 +88,12 @@ func (t *clusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 	toDeleteObjs := func(objs owningObjects) []client.Object {
 		var delObjs []client.Object
 		for _, obj := range objs {
-			// retain backup for data protection even if the cluster is wiped out.
-			if strings.EqualFold(obj.GetLabels()[constant.BackupProtectionLabelKey], constant.BackupRetain) {
-				continue
+			if obj.GetObjectKind().GroupVersionKind().Kind == dptypes.BackupKind {
+				backupObj := obj.(*dpv1alpha1.Backup)
+				// retain backup for data protection even if the cluster is wiped out.
+				if backupObj.Spec.DeletionPolicy == dpv1alpha1.BackupDeletionPolicyRetain {
+					continue
+				}
 			}
 			delObjs = append(delObjs, obj)
 		}
@@ -102,6 +105,11 @@ func (t *clusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 	if err != nil {
 		// PDB or CRDs that not present in data-plane clusters
 		if !strings.Contains(err.Error(), "the server could not find the requested resource") {
+			return err
+		}
+	}
+	if cluster.Spec.TerminationPolicy != kbappsv1.WipeOut {
+		if err = getFailedBackups(transCtx.Context, transCtx.Client, cluster.Namespace, ml, namespacedObjs); err != nil {
 			return err
 		}
 	}
@@ -196,20 +204,20 @@ func shouldSkipObjOwnedByComp(obj client.Object, cluster kbappsv1.Cluster) bool 
 	return true
 }
 
-func deleteCompsInOrder4Terminate(transCtx *clusterTransformContext, dag *graph.DAG) (sets.Set[string], error) {
-	compNameSet, err := component.GetClusterComponentShortNameSet(transCtx.Context, transCtx.Client, transCtx.Cluster)
+func deleteCompNShardingInOrder4Terminate(transCtx *clusterTransformContext, dag *graph.DAG) (sets.Set[string], error) {
+	nameSet, err := clusterRunningCompNShardingSet(transCtx.Context, transCtx.Client, transCtx.Cluster)
 	if err != nil {
 		return nil, err
 	}
-	if len(compNameSet) == 0 {
+	if len(nameSet) == 0 {
 		return nil, nil
 	}
 	if err = loadNCheckClusterDefinition(transCtx, transCtx.Cluster); err != nil {
 		return nil, err
 	}
-	err = deleteCompsInOrder(transCtx, dag, compNameSet, true)
+	err = deleteCompNShardingInOrder(transCtx, dag, nameSet, nil)
 	if err != nil {
 		return nil, err
 	}
-	return compNameSet, nil
+	return nameSet, nil
 }

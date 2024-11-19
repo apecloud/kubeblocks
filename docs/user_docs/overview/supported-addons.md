@@ -1,12 +1,12 @@
 ---
-title: Supported addons 
+title: Supported Addons 
 description: Addons supported by KubeBlocks
 keywords: [addons, enable, KubeBlocks, prometheus, s3, alertmanager,]
 sidebar_position: 4
 sidebar_label: Supported addons 
 ---
 
-# Supported addons
+# Supported Addons
 
 KubeBlocks uses Addons to extend support for various database engines,
 And there are currently over 30 Addons available in the KubeBlocks repository.

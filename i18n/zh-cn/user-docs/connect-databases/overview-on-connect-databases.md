@@ -8,15 +8,6 @@ sidebar_label: 简介
 
 # 简介
 
-在部署完 KubeBlocks 并创建集群之后，数据库在 Kubernetes 上以 Pod 的形式运行。
+部署 KubeBlocks 并创建集群后，对应的数据库会在 Kubernetes 上运行，每个副本都在 Pod 中运行，InstanceSet 将管理这些 Pod。您可以通过暴露的数据库服务地址（ClusterIP、LoadBalancer 或 NodePort），使用客户端工具或 SDK 连接到数据库。详见[在生产环境中连接数据库](./connect-to-database-in-production-environment.md)。
 
-在 KubeBlocks 上创建数据库只需运行以下命令（本章节以创建一个 MySQL 集群为例进行演示。创建其他数据库引擎的操作是类似的，细节上的差别请参加各引擎文档）。
-    
-  ```bash
-  kbcli cluster create 
-  ```
-
-你可以通过客户端界面或 `kbcli` 连接到数据库。如下图所示，首先你需要明确连接数据库的目的是什么。
-- 如果你想试用 KubeBlocks、测试数据库功能或进行低流量基准测试，请参阅[在测试环境中连接数据库](./connect-to-database-in-testing-environment.md)。
-- 如果你想在生产环境中连接数据库或进行高流量压力测试，请参阅[在生产环境中连接数据库](./connect-to-database-in-production-environment.md)。
-![overview](./../../img/create-and-connect-databases-overview.jpg)
+如果您在 Playground 或测试环境中使用 KubeBlocks 创建数据库集群，也可以使用 `kubectl port-forward` 将数据库服务地址映射到本地机器的端口。然后，您可以使用客户端工具或集成在 `kbcli` 中的通用数据库客户端连接数据库。不过，请注意这种方法仅适用于测试和调试，不应在生产环境中使用。详见[在测试环境中连接数据库](./connect-to-database-in-testing-environment.md)。

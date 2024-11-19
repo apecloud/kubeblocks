@@ -163,6 +163,11 @@ func (r *OpsRequestReconciler) fetchCluster(reqCtx intctrlutil.RequestCtx, opsRe
 	}, cluster); err != nil {
 		if apierrors.IsNotFound(err) {
 			_ = operations.PatchClusterNotFound(reqCtx.Ctx, r.Client, opsRes)
+			if !opsRes.OpsRequest.DeletionTimestamp.IsZero() {
+				return intctrlutil.HandleCRDeletion(reqCtx, r, opsRes.OpsRequest, constant.OpsRequestFinalizerName, func() (*ctrl.Result, error) {
+					return nil, r.deleteCreatedPodsInKBNamespace(reqCtx, opsRes.OpsRequest)
+				})
+			}
 		}
 		return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
 	}

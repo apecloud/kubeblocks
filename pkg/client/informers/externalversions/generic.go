@@ -72,6 +72,8 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1().ComponentVersions().Informer()}, nil
 	case v1.SchemeGroupVersion.WithResource("servicedescriptors"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1().ServiceDescriptors().Informer()}, nil
+	case v1.SchemeGroupVersion.WithResource("shardingdefinitions"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Apps().V1().ShardingDefinitions().Informer()}, nil
 
 		// Group=apps.kubeblocks.io, Version=v1alpha1
 	case v1alpha1.SchemeGroupVersion.WithResource("clusters"):

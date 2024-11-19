@@ -329,7 +329,9 @@ func MockInstanceSetStatus(testCtx testutil.TestContext, cluster *appsv1alpha1.C
 				CanVote:    true,
 			},
 		}
-		if memberStatus.ReplicaRole.AccessMode == workloads.ReadWriteMode {
+		if memberStatus.ReplicaRole.AccessMode == "" {
+			memberStatus.ReplicaRole.AccessMode = workloads.NoneMode
+		} else if memberStatus.ReplicaRole.AccessMode == workloads.ReadWriteMode {
 			memberStatus.ReplicaRole.IsLeader = true
 		}
 		newMembersStatus = append(newMembersStatus, memberStatus)

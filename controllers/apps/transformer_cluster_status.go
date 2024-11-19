@@ -82,13 +82,13 @@ func (t *clusterStatusTransformer) markClusterDagStatusAction(graphCli model.Gra
 
 func (t *clusterStatusTransformer) reconcileClusterPhase(cluster *appsv1alpha1.Cluster) {
 	var (
-		isAllComponentCreating       = true
-		isAllComponentRunning        = true
-		isAllComponentWorking        = true
-		hasComponentStopping         = false
-		isAllComponentStopped        = true
-		isAllComponentFailed         = true
-		hasComponentAbnormalOrFailed = false
+		isAllComponentCreating         = true
+		isAllComponentRunningOrStopped = true
+		isAllComponentWorking          = true
+		hasComponentStopping           = false
+		isAllComponentStopped          = true
+		isAllComponentFailed           = true
+		hasComponentAbnormalOrFailed   = false
 	)
 	isPhaseIn := func(phase appsv1alpha1.ClusterComponentPhase, phases ...appsv1alpha1.ClusterComponentPhase) bool {
 		for _, p := range phases {
@@ -103,8 +103,8 @@ func (t *clusterStatusTransformer) reconcileClusterPhase(cluster *appsv1alpha1.C
 		if !isPhaseIn(phase, appsv1alpha1.CreatingClusterCompPhase) {
 			isAllComponentCreating = false
 		}
-		if !isPhaseIn(phase, appsv1alpha1.RunningClusterCompPhase) {
-			isAllComponentRunning = false
+		if !isPhaseIn(phase, appsv1alpha1.RunningClusterCompPhase, appsv1alpha1.StoppedClusterCompPhase) {
+			isAllComponentRunningOrStopped = false
 		}
 		if !isPhaseIn(phase, appsv1alpha1.CreatingClusterCompPhase,
 			appsv1alpha1.RunningClusterCompPhase,
@@ -126,7 +126,11 @@ func (t *clusterStatusTransformer) reconcileClusterPhase(cluster *appsv1alpha1.C
 	}
 
 	switch {
-	case isAllComponentRunning:
+	case isAllComponentStopped:
+		if cluster.Status.Phase != appsv1alpha1.StoppedClusterPhase {
+			t.syncClusterPhaseToStopped(cluster)
+		}
+	case isAllComponentRunningOrStopped:
 		if cluster.Status.Phase != appsv1alpha1.RunningClusterPhase {
 			t.syncClusterPhaseToRunning(cluster)
 		}
@@ -134,10 +138,6 @@ func (t *clusterStatusTransformer) reconcileClusterPhase(cluster *appsv1alpha1.C
 		cluster.Status.Phase = appsv1alpha1.CreatingClusterPhase
 	case isAllComponentWorking:
 		cluster.Status.Phase = appsv1alpha1.UpdatingClusterPhase
-	case isAllComponentStopped:
-		if cluster.Status.Phase != appsv1alpha1.StoppedClusterPhase {
-			t.syncClusterPhaseToStopped(cluster)
-		}
 	case hasComponentStopping:
 		cluster.Status.Phase = appsv1alpha1.StoppingClusterPhase
 	case isAllComponentFailed:

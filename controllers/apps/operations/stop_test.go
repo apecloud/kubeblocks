@@ -29,6 +29,7 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	testk8s "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 )
 
 var _ = Describe("Stop OpsRequest", func() {
@@ -37,6 +38,7 @@ var _ = Describe("Stop OpsRequest", func() {
 		clusterDefinitionName = "cluster-definition-for-ops-" + randomStr
 		clusterVersionName    = "clusterversion-for-ops-" + randomStr
 		clusterName           = "cluster-for-ops-" + randomStr
+		clusterDefName        = "test-clusterdef-" + randomStr
 	)
 
 	cleanEnv := func() {
@@ -47,7 +49,7 @@ var _ = Describe("Stop OpsRequest", func() {
 		By("clean resources")
 
 		// delete cluster(and all dependent sub-resources), clusterversion and clusterdef
-		testapps.ClearClusterResources(&testCtx)
+		testapps.ClearClusterResourcesWithRemoveFinalizerOption(&testCtx)
 
 		// delete rest resources
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
@@ -55,6 +57,8 @@ var _ = Describe("Stop OpsRequest", func() {
 		// namespaced
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.InstanceSetSignature, true, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.OpsRequestSignature, inNS, ml)
+		// default GracePeriod is 30s
+		testapps.ClearResources(&testCtx, generics.PodSignature, inNS, ml, client.GracePeriodSeconds(0))
 	}
 
 	BeforeEach(cleanEnv)
@@ -68,20 +72,13 @@ var _ = Describe("Stop OpsRequest", func() {
 			testapps.MockInstanceSetComponent(&testCtx, clusterName, consensusComp)
 			testapps.MockInstanceSetComponent(&testCtx, clusterName, statelessComp)
 			testapps.MockInstanceSetComponent(&testCtx, clusterName, statefulComp)
-			By("create Stop opsRequest")
-			ops := testapps.NewOpsRequestObj("stop-ops-"+randomStr, testCtx.DefaultNamespace,
-				clusterName, appsv1alpha1.StopType)
-			opsRes.OpsRequest = testapps.CreateOpsRequest(ctx, testCtx, ops)
-			// set ops phase to Pending
-			opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsPendingPhase
+			By("create 'Stop' opsRequest")
+			createStopOpsRequest(opsRes)
 
-			By("test stop action and reconcile function")
-			// update ops phase to running first
-			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
-			Expect(err).ShouldNot(HaveOccurred())
-			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(appsv1alpha1.OpsCreatingPhase))
+			By("test top action and reconcile function")
+			runAction(reqCtx, opsRes, appsv1alpha1.OpsCreatingPhase)
 			// do stop cluster
-			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
 			for _, v := range opsRes.Cluster.Spec.ComponentSpecs {
 				Expect(v.Stop).ShouldNot(BeNil())
@@ -90,5 +87,108 @@ var _ = Describe("Stop OpsRequest", func() {
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err == nil).Should(BeTrue())
 		})
+
+		It("Test stop specific components OpsRequest", func() {
+			By("init operations resources with topology")
+			opsRes, _, _ := initOperationsResourcesWithTopology(clusterDefName, clusterDefName, clusterName)
+			pods := testapps.MockInstanceSetPods(&testCtx, nil, opsRes.Cluster, defaultCompName)
+
+			By("create 'Stop' opsRequest for specific components")
+			createStopOpsRequest(opsRes, defaultCompName)
+
+			By("mock 'Stop' OpsRequest to Creating phase")
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+			runAction(reqCtx, opsRes, appsv1alpha1.OpsCreatingPhase)
+
+			By("test stop action")
+			stopHandler := StopOpsHandler{}
+			err := stopHandler.Action(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+
+			By("verify components are being stopped")
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.Cluster), func(g Gomega, pobj *appsv1alpha1.Cluster) {
+				for _, v := range pobj.Spec.ComponentSpecs {
+					if v.Name == defaultCompName {
+						Expect(v.Stop).ShouldNot(BeNil())
+						Expect(*v.Stop).Should(BeTrue())
+					} else {
+						Expect(v.Stop).Should(BeNil())
+					}
+				}
+			})).Should(Succeed())
+
+			By("mock components stopped successfully")
+			for i := range pods {
+				testk8s.MockPodIsTerminating(ctx, testCtx, pods[i])
+				testk8s.RemovePodFinalizer(ctx, testCtx, pods[i])
+			}
+			testapps.MockInstanceSetStatus(testCtx, opsRes.Cluster, defaultCompName)
+
+			By("test reconcile")
+			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+
+			By("verify ops request completed")
+			Eventually(testapps.GetOpsRequestPhase(&testCtx,
+				client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(appsv1alpha1.OpsSucceedPhase))
+		})
+
+		It("Test abort other running opsRequests", func() {
+			By("init operations resources with topology")
+			opsRes, _, _ := initOperationsResourcesWithTopology(clusterDefName, clusterDefName, clusterName)
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+
+			By("create a 'Restart' opsRequest with intersection component")
+			ops1 := createRestartOpsObj(clusterName, "restart-ops"+randomStr, defaultCompName)
+			opsRes.OpsRequest = ops1
+			runAction(reqCtx, opsRes, appsv1alpha1.OpsCreatingPhase)
+
+			By("create a 'Restart' opsRequest with non-intersection component")
+			ops2 := createRestartOpsObj(clusterName, "restart-ops2"+randomStr, secondaryCompName)
+			ops2.Spec.Force = true
+			opsRes.OpsRequest = ops2
+			runAction(reqCtx, opsRes, appsv1alpha1.OpsCreatingPhase)
+
+			By("create a 'Start' opsRequest")
+			ops3 := testapps.CreateOpsRequest(ctx, testCtx, testapps.NewOpsRequestObj("start-ops-"+randomStr, testCtx.DefaultNamespace,
+				clusterName, appsv1alpha1.StartType))
+			opsRes.OpsRequest = ops3
+			Expect(testapps.ChangeObjStatus(&testCtx, ops3, func() {
+				ops3.Status.Phase = appsv1alpha1.OpsPendingPhase
+			})).Should(Succeed())
+			runAction(reqCtx, opsRes, appsv1alpha1.OpsPendingPhase)
+
+			By("create 'Stop' opsRequest for all components")
+			createStopOpsRequest(opsRes, defaultCompName)
+			stopHandler := StopOpsHandler{}
+			err := stopHandler.Action(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+
+			By("expect the 'Restart' opsRequest with intersection component to be Aborted")
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops1))).Should(Equal(appsv1alpha1.OpsAbortedPhase))
+
+			By("expect the 'Restart' opsRequest with non-intersection component  to be Creating")
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops2))).Should(Equal(appsv1alpha1.OpsCreatingPhase))
+
+			By("expect the 'Start' opsRequest to be Aborted")
+			Eventually(testapps.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(ops1))).Should(Equal(appsv1alpha1.OpsAbortedPhase))
+		})
 	})
 })
+
+func createStopOpsRequest(opsRes *OpsResource, stopCompNames ...string) *appsv1alpha1.OpsRequest {
+	By("create Stop opsRequest")
+	ops := testapps.NewOpsRequestObj("stop-ops-"+testCtx.GetRandomStr(), testCtx.DefaultNamespace,
+		opsRes.Cluster.Name, appsv1alpha1.StopType)
+	var stopList []appsv1alpha1.ComponentOps
+	for _, stopCompName := range stopCompNames {
+		stopList = append(stopList, appsv1alpha1.ComponentOps{
+			ComponentName: stopCompName,
+		})
+	}
+	ops.Spec.StopList = stopList
+	opsRes.OpsRequest = testapps.CreateOpsRequest(ctx, testCtx, ops)
+	// set ops phase to Pending
+	opsRes.OpsRequest.Status.Phase = appsv1alpha1.OpsPendingPhase
+	return ops
+}

@@ -51,6 +51,7 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/testutil"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	testops "github.com/apecloud/kubeblocks/pkg/testutil/operations"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -273,4 +274,10 @@ func mockComponentIsOperating(cluster *appsv1.Cluster, expectPhase appsv1.Compon
 			cluster.Status.Components[v] = compStatus
 		}
 	})).Should(Succeed())
+}
+
+func runAction(reqCtx intctrlutil.RequestCtx, opsRes *OpsResource, expectPhase opsv1alpha1.OpsPhase) {
+	_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+	Expect(err).ShouldNot(HaveOccurred())
+	Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(expectPhase))
 }

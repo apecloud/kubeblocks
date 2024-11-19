@@ -58,17 +58,7 @@ func (r *rollingUpgradePolicy) GetPolicyName() string {
 }
 
 func canPerformUpgrade(pods []corev1.Pod, params reconfigureContext) bool {
-	target := params.getTargetReplicas()
-	// TODO(xingran&zhangtao): review this logic
-	return len(pods) == target
-
-	/*
-		if len(pods) < target {
-			params.Ctx.Log.Info(fmt.Sprintf("component pods are not all ready, %d pods are ready, which is less than the expected replicas(%d).", len(pods), target))
-			return false
-		}
-		return true
-	*/
+	return len(pods) == params.getTargetReplicas()
 }
 
 func performRollingUpgrade(params reconfigureContext, funcs RollingUpgradeFuncs) (ReturnedStatus, error) {
@@ -89,7 +79,7 @@ func performRollingUpgrade(params reconfigureContext, funcs RollingUpgradeFuncs)
 
 	podStats := classifyPodByStats(pods, params.getTargetReplicas(), params.podMinReadySeconds())
 	podSwitchWindow := markDynamicSwitchWindow(pods, podStats, configKey, configVersion, rollingReplicas)
-	if !validPodState(podSwitchWindow) {
+	if !canSafeUpdatePods(podSwitchWindow) {
 		params.Log.Info("wait for pod stat ready.")
 		return makeReturnedStatus(ESRetry), nil
 	}
@@ -117,7 +107,7 @@ func performRollingUpgrade(params reconfigureContext, funcs RollingUpgradeFuncs)
 		withSucceed(int32(len(podStats.updated)+len(podStats.updating)))), nil
 }
 
-func validPodState(wind switchWindow) bool {
+func canSafeUpdatePods(wind switchWindow) bool {
 	for i := 0; i < wind.begin; i++ {
 		pod := &wind.pods[i]
 		if !wind.isReady(pod) {

@@ -71,7 +71,7 @@ func (c *ReconcileContext) GetRelatedObjects() error {
 }
 
 func (c *ReconcileContext) Workload() *ReconcileContext {
-	stsFn := func() (err error) {
+	instanceSetFn := func() (err error) {
 		c.InstanceSetList, c.Containers, err = retrieveRelatedComponentsByConfigmap(
 			c.Client,
 			c.Context,
@@ -82,7 +82,7 @@ func (c *ReconcileContext) Workload() *ReconcileContext {
 			c.MatchingLabels)
 		return
 	}
-	return c.Wrap(stsFn)
+	return c.Wrap(instanceSetFn)
 }
 
 func (c *ReconcileContext) SynthesizedComponent() *ReconcileContext {

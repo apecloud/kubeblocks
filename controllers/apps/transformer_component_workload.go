@@ -574,7 +574,7 @@ func (r *componentWorkloadOps) scaleIn() error {
 
 	// TODO: check the component definition to determine whether we need to call leave member before deleting replicas.
 	if err := r.leaveMember4ScaleIn(deleteReplicas, joinedReplicas); err != nil {
-		r.reqCtx.Log.Info(fmt.Sprintf("leave member at scaling-in error, retry later: %s", err.Error()))
+		r.reqCtx.Log.Error(err, "leave member at scaling-in error")
 		return err
 	}
 
@@ -595,6 +595,10 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn(deleteReplicas, joinedReplica
 
 	deleteReplicasSet := sets.New(deleteReplicas...)
 	joinedReplicasSet := sets.New(joinedReplicas...)
+	hasMemberLeaveDefined := r.synthesizeComp.LifecycleActions != nil && r.synthesizeComp.LifecycleActions.MemberLeave != nil
+	r.reqCtx.Log.Info("leave member at scaling-in", "delete replicas", deleteReplicas,
+		"joined replicas", joinedReplicas, "has member-leave action defined", hasMemberLeaveDefined)
+
 	leaveErrors := make([]error, 0)
 	for _, pod := range pods {
 		if deleteReplicasSet.Has(pod.Name) {
@@ -608,7 +612,6 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn(deleteReplicas, joinedReplica
 		}
 	}
 
-	hasMemberLeaveDefined := r.synthesizeComp.LifecycleActions != nil && r.synthesizeComp.LifecycleActions.MemberLeave != nil
 	if hasMemberLeaveDefined && len(joinedReplicasSet) > 0 {
 		leaveErrors = append(leaveErrors,
 			fmt.Errorf("some replicas have joined but not leaved since the Pod object is not exist: %v", sets.List(joinedReplicasSet)))
@@ -673,6 +676,7 @@ func (r *componentWorkloadOps) leaveMemberForPod(pod *corev1.Pod, pods []*corev1
 			return err
 		}
 	}
+	r.reqCtx.Log.Info("succeed to leave member for pod", "pod", pod.Name)
 	return nil
 }
 
@@ -866,6 +870,7 @@ func (r *componentWorkloadOps) joinMemberForPod(pod *corev1.Pod, pods []*corev1.
 			return err
 		}
 	}
+	r.reqCtx.Log.Info("succeed to join member for pod", "pod", pod.Name)
 	return nil
 }
 

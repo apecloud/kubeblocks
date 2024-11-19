@@ -27,6 +27,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
@@ -277,28 +278,42 @@ func setReplicasStatus(its *workloads.InstanceSet, status ReplicasStatus) error 
 	return nil
 }
 
-func handleNewReplicaTaskEvent(ctx context.Context, cli client.Client, namespace string, event proto.TaskEvent) error {
+func handleNewReplicaTaskEvent(logger logr.Logger, ctx context.Context, cli client.Client, namespace string, event proto.TaskEvent) error {
 	key := types.NamespacedName{
 		Namespace: namespace,
 		Name:      event.Instance,
 	}
 	comp := &appsv1.Component{}
 	if err := cli.Get(ctx, key, comp); err != nil {
+		logger.Error(err, "get component failed when handle new replica task event",
+			"code", event.Code, "finished", !event.EndTime.IsZero(), "message", event.Message)
 		return err
 	}
 	its := &workloads.InstanceSet{}
 	if err := cli.Get(ctx, key, its); err != nil {
+		logger.Error(err, "get ITS failed when handle new replica task event",
+			"code", event.Code, "finished", !event.EndTime.IsZero(), "message", event.Message)
 		return err
 	}
 
+	var err error
 	finished := !event.EndTime.IsZero()
-	if finished && event.Code == 0 {
-		return handleNewReplicaTaskEvent4Finished(ctx, cli, comp, its, event)
+	switch {
+	case finished && event.Code == 0:
+		err = handleNewReplicaTaskEvent4Finished(ctx, cli, comp, its, event)
+	case finished:
+		err = handleNewReplicaTaskEvent4Failed(ctx, cli, comp, its, event)
+	default:
+		err = handleNewReplicaTaskEvent4Unfinished(ctx, cli, comp, its, event)
 	}
-	if finished {
-		return handleNewReplicaTaskEvent4Failed(ctx, cli, comp, its, event)
+	if err != nil {
+		logger.Error(err, "handle new replica task event failed",
+			"code", event.Code, "finished", finished, "message", event.Message)
+	} else {
+		logger.Info("handle new replica task event success",
+			"code", event.Code, "finished", finished, "message", event.Message)
 	}
-	return handleNewReplicaTaskEvent4Unfinished(ctx, cli, comp, its, event)
+	return err
 }
 
 func handleNewReplicaTaskEvent4Finished(ctx context.Context, cli client.Client,

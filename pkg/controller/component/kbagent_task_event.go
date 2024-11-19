@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 
@@ -44,7 +43,7 @@ func (h *KBAgentTaskEventHandler) Handle(cli client.Client, reqCtx intctrlutil.R
 		return err
 	}
 
-	return h.handleEvent(reqCtx.Ctx, cli, event.InvolvedObject.Namespace, *taskEvent)
+	return h.handleEvent(reqCtx, cli, event.InvolvedObject.Namespace, *taskEvent)
 }
 
 func (h *KBAgentTaskEventHandler) isTaskEvent(event *corev1.Event) bool {
@@ -52,9 +51,9 @@ func (h *KBAgentTaskEventHandler) isTaskEvent(event *corev1.Event) bool {
 		event.Reason == "task" && event.InvolvedObject.FieldPath == proto.ProbeEventFieldPath
 }
 
-func (h *KBAgentTaskEventHandler) handleEvent(ctx context.Context, cli client.Client, namespace string, event proto.TaskEvent) error {
+func (h *KBAgentTaskEventHandler) handleEvent(reqCtx intctrlutil.RequestCtx, cli client.Client, namespace string, event proto.TaskEvent) error {
 	if event.Task == newReplicaTask {
-		return handleNewReplicaTaskEvent(ctx, cli, namespace, event)
+		return handleNewReplicaTaskEvent(reqCtx.Log, reqCtx.Ctx, cli, namespace, event)
 	}
 	return fmt.Errorf("unsupported kind of task event: %s", event.Task)
 }

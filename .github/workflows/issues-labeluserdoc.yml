@@ -19,7 +19,7 @@ jobs:
          actions: 'update-issue'
          token: ${{ env.GITHUB_TOKEN }}
          state: 'open'
-         assignees: 'TalktoCrystal,michelle-0808'  
+         assignees: 'michelle-0808'
      - name: Get project data
        env:
          ORGANIZATION: apecloud

@@ -9,7 +9,7 @@ on:
 
 env:
   GITHUB_TOKEN: ${{ secrets.KUBEBLOCKS_TOKEN }}
-  REVIEWERS: 'realzyy,fireworm2002'
+  REVIEWERS: 'fireworm2002'
   REPO: 'kubeblocks'
   ISINTERACTION: ''
 

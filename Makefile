@@ -575,7 +575,7 @@ else ifeq ($(TEST_TYPE), oceanbase)
 else ifeq ($(TEST_TYPE), vanilla-postgresql)
 	$(HELM) dependency build $(addonsPath)/vanilla-postgresql-cluster --skip-refresh
 	$(HELM) upgrade --install vanilla-postgresql $(addonsPath)/vanilla-postgresql
-	$(HELM) template official-pg $(addonsPath)/vanilla-postgresql-cluster > test/e2e/testdata/smoketest/vanilla-postgresql/00_official_pgcluster.yaml
+	$(HELM) template vanilla-pg $(addonsPath)/vanilla-postgresql-cluster > test/e2e/testdata/smoketest/vanilla-postgresql/00_official_pgcluster.yaml
 else ifeq ($(TEST_TYPE), openldap)
 	$(HELM) dependency build $(addonsPath)/openldap-cluster --skip-refresh
 	$(HELM) upgrade --install openldap $(addonsPath)/openldap

@@ -28,6 +28,7 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
+	"github.com/apecloud/kubeblocks/pkg/controller/render"
 )
 
 type TemplateMerger interface {
@@ -45,9 +46,9 @@ type mergeContext struct {
 	paramsDefs   []*parametersv1alpha1.ParametersDefinition
 	configRender *parametersv1alpha1.ParameterDrivenConfigRender
 
-	builder *configTemplateBuilder
-	ctx     context.Context
-	client  client.Client
+	templateRender render.TemplateRender
+	ctx            context.Context
+	client         client.Client
 }
 
 func (m *mergeContext) renderTemplate() (map[string]string, error) {
@@ -56,7 +57,7 @@ func (m *mergeContext) renderTemplate() (map[string]string, error) {
 		Namespace:   m.template.Namespace,
 		TemplateRef: m.template.TemplateRef,
 	}
-	configs, err := renderConfigMapTemplate(m.builder, templateSpec, m.ctx, m.client)
+	configs, err := render.RenderConfigMapTemplate(m.templateRender, templateSpec, m.ctx, m.client)
 	if err != nil {
 		return nil, err
 	}
@@ -132,19 +133,19 @@ func (c *configOnlyAddMerger) Merge(baseData map[string]string, updatedData map[
 func NewTemplateMerger(template appsv1.ConfigTemplateExtension,
 	ctx context.Context,
 	cli client.Client,
-	builder *configTemplateBuilder,
+	templateRender render.TemplateRender,
 	configSpec appsv1.ComponentTemplateSpec,
 	paramsDefs []*parametersv1alpha1.ParametersDefinition,
 	configRender *parametersv1alpha1.ParameterDrivenConfigRender,
 ) (TemplateMerger, error) {
 	templateData := &mergeContext{
-		configSpec:   configSpec,
-		template:     template,
-		ctx:          ctx,
-		client:       cli,
-		builder:      builder,
-		paramsDefs:   paramsDefs,
-		configRender: configRender,
+		configSpec:     configSpec,
+		template:       template,
+		ctx:            ctx,
+		client:         cli,
+		templateRender: templateRender,
+		paramsDefs:     paramsDefs,
+		configRender:   configRender,
 	}
 
 	var merger TemplateMerger
@@ -164,13 +165,13 @@ func NewTemplateMerger(template appsv1.ConfigTemplateExtension,
 }
 
 func mergerConfigTemplate(template appsv1.ConfigTemplateExtension,
-	builder *configTemplateBuilder,
+	templateRender render.TemplateRender,
 	configSpec appsv1.ComponentTemplateSpec,
 	baseData map[string]string,
 	paramsDefs []*parametersv1alpha1.ParametersDefinition,
 	configRender *parametersv1alpha1.ParameterDrivenConfigRender,
 	ctx context.Context, cli client.Client) (map[string]string, error) {
-	templateMerger, err := NewTemplateMerger(template, ctx, cli, builder, configSpec, paramsDefs, configRender)
+	templateMerger, err := NewTemplateMerger(template, ctx, cli, templateRender, configSpec, paramsDefs, configRender)
 	if err != nil {
 		return nil, err
 	}

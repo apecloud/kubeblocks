@@ -33,6 +33,7 @@ import (
 	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/render"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -60,7 +61,7 @@ func (t *componentReloadActionSidecarTransformer) Transform(ctx graph.TransformC
 		return nil
 	}
 
-	reconcileCtx := &configctrl.ResourceCtx{
+	reconcileCtx := &render.ResourceCtx{
 		Context:       transCtx.Context,
 		Client:        t.Client,
 		Namespace:     comp.GetNamespace(),
@@ -71,7 +72,7 @@ func (t *componentReloadActionSidecarTransformer) Transform(ctx graph.TransformC
 	var configmaps []*corev1.ConfigMap
 	cachedObjs := resolveRerenderDependOnObjects(dag)
 	for _, tpls := range [][]appsv1.ComponentTemplateSpec{synthesizeComp.ScriptTemplates, synthesizeComp.ConfigTemplates} {
-		objects, err := configctrl.RenderTemplate(reconcileCtx, cluster, synthesizeComp, comp, cachedObjs, tpls)
+		objects, err := render.RenderTemplate(reconcileCtx, cluster, synthesizeComp, comp, cachedObjs, tpls)
 		if err != nil {
 			return err
 		}

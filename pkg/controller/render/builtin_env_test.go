@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package configuration
+package render
 
 import (
 	"fmt"
@@ -223,7 +223,7 @@ bootstrap:
 					ResourceCtx: &ResourceCtx{
 						Context:   ctx,
 						Client:    mockClient.Client(),
-						Namespace: testCtx.DefaultNamespace,
+						Namespace: "default",
 					},
 					Cluster:              testapps.NewClusterFactory("my_test", "default", "cmpd").GetObject(),
 					SynthesizedComponent: component,

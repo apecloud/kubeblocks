@@ -18,69 +18,21 @@ package configuration
 
 import (
 	corev1 "k8s.io/api/core/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
-	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/controller/render"
 )
 
-type ReconcileCtx struct {
-	*ResourceCtx
-
-	Cluster              *appsv1.Cluster
-	Component            *appsv1.Component
-	SynthesizedComponent *component.SynthesizedComponent
-	PodSpec              *corev1.PodSpec
-	ComponentParameter   *parametersv1alpha1.ComponentParameter
-
-	Cache []client.Object
-}
-
-func RenderTemplate(resourceCtx *ResourceCtx,
-	cluster *appsv1.Cluster,
-	synthesizedComponent *component.SynthesizedComponent,
-	comp *appsv1.Component,
-	localObjs []client.Object,
-	tpls []appsv1.ComponentTemplateSpec) ([]*corev1.ConfigMap, error) {
-	var err error
-	var configCM *corev1.ConfigMap
-	var configMaps []*corev1.ConfigMap
-
-	reconcileCtx := &ReconcileCtx{
-		ResourceCtx:          resourceCtx,
-		Cluster:              cluster,
-		Component:            comp,
-		SynthesizedComponent: synthesizedComponent,
-		PodSpec:              synthesizedComponent.PodSpec,
-		Cache:                localObjs,
-	}
-
-	tplBuilder := NewTemplateBuilder(reconcileCtx)
-	for _, tpl := range tpls {
-		configCMName := core.GetComponentCfgName(cluster.Name, synthesizedComponent.Name, tpl.Name)
-		if configCM, err = generateConfigMapFromTemplate(cluster, synthesizedComponent, tplBuilder, configCMName, tpl, resourceCtx.Context, reconcileCtx.Client, nil); err != nil {
-			return nil, err
-		}
-		if err = intctrlutil.SetOwnerReference(comp, configCM); err != nil {
-			return nil, err
-		}
-		configMaps = append(configMaps, configCM)
-	}
-	return configMaps, nil
-}
-
-func RerenderParametersTemplate(reconcileCtx *ReconcileCtx, item parametersv1alpha1.ConfigTemplateItemDetail, configRender *parametersv1alpha1.ParameterDrivenConfigRender, defs []*parametersv1alpha1.ParametersDefinition) (*corev1.ConfigMap, error) {
+func RerenderParametersTemplate(reconcileCtx *render.ReconcileCtx, item parametersv1alpha1.ConfigTemplateItemDetail, configRender *parametersv1alpha1.ParameterDrivenConfigRender, defs []*parametersv1alpha1.ParametersDefinition) (*corev1.ConfigMap, error) {
 	parametersValidate := func(m map[string]string) error {
 		return validateRenderedData(m, defs, configRender)
 	}
 
-	tplBuilder := NewTemplateBuilder(reconcileCtx)
-	cmObj, err := generateConfigMapFromTemplate(reconcileCtx.Cluster,
+	templateRender := render.NewTemplateBuilder(reconcileCtx)
+	cmObj, err := render.RenderComponentTemplate(reconcileCtx.Cluster,
 		reconcileCtx.SynthesizedComponent,
-		tplBuilder,
+		templateRender,
 		core.GetComponentCfgName(reconcileCtx.SynthesizedComponent.ClusterName, reconcileCtx.SynthesizedComponent.Name, item.ConfigSpec.Name),
 		*item.ConfigSpec,
 		reconcileCtx.Context,
@@ -90,7 +42,7 @@ func RerenderParametersTemplate(reconcileCtx *ReconcileCtx, item parametersv1alp
 		return nil, err
 	}
 	if item.CustomTemplates != nil {
-		newData, err := mergerConfigTemplate(*item.CustomTemplates, tplBuilder, *item.ConfigSpec, cmObj.Data, defs, configRender, reconcileCtx.Context, reconcileCtx.Client)
+		newData, err := mergerConfigTemplate(*item.CustomTemplates, templateRender, *item.ConfigSpec, cmObj.Data, defs, configRender, reconcileCtx.Context, reconcileCtx.Client)
 		if err != nil {
 			return nil, err
 		}

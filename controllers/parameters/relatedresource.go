@@ -29,6 +29,7 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
+	"github.com/apecloud/kubeblocks/pkg/controller/render"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -52,7 +53,7 @@ func prepareRelatedResource(reqCtx intctrlutil.RequestCtx, client client.Client,
 		componentName: cm.Labels[constant.KBAppComponentLabelKey],
 	}
 
-	fetcher := configctrl.NewResourceFetcher(&configctrl.ResourceCtx{
+	fetcher := configctrl.NewResourceFetcher(&render.ResourceCtx{
 		Context:       reqCtx.Ctx,
 		Client:        client,
 		Namespace:     cm.Namespace,

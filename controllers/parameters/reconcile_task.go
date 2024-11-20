@@ -40,6 +40,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/render"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -150,7 +151,7 @@ func syncImpl(taskCtx *TaskContext,
 		return err
 	}
 
-	reconcileCtx := &configctrl.ReconcileCtx{
+	reconcileCtx := &render.ReconcileCtx{
 		ResourceCtx:          fetcher.ResourceCtx,
 		Cluster:              fetcher.ClusterObj,
 		Component:            fetcher.ComponentObj,
@@ -185,7 +186,7 @@ func syncImpl(taskCtx *TaskContext,
 // It first calls mergeAndApplyConfig to merge and update the configmap.
 // If the updatedConfig is nil, it returns nil. Otherwise, it calls updateInjectedEnvVars
 // to check and update the injected environment variables.
-func persistUpdatedParameters(rctx *configctrl.ResourceCtx,
+func persistUpdatedParameters(rctx *render.ResourceCtx,
 	comp *component.SynthesizedComponent,
 	configRender *parametersv1alpha1.ParameterDrivenConfigRender,
 	updatedConfig *corev1.ConfigMap,
@@ -202,7 +203,7 @@ func persistUpdatedParameters(rctx *configctrl.ResourceCtx,
 	return updateInjectedEnvVars(rctx, comp, configRender, updatedConfig, owner, item, revision)
 }
 
-func updateInjectedEnvVars(rctx *configctrl.ResourceCtx,
+func updateInjectedEnvVars(rctx *render.ResourceCtx,
 	comp *component.SynthesizedComponent,
 	configRender *parametersv1alpha1.ParameterDrivenConfigRender,
 	config *corev1.ConfigMap,
@@ -238,7 +239,7 @@ func updateInjectedEnvVars(rctx *configctrl.ResourceCtx,
 	return err
 }
 
-func mergeAndApplyConfig(resourceCtx *configctrl.ResourceCtx,
+func mergeAndApplyConfig(resourceCtx *render.ResourceCtx,
 	expected *corev1.ConfigMap,
 	running *corev1.ConfigMap,
 	owner client.Object,
@@ -362,7 +363,7 @@ func updateRevision(revision ConfigurationRevision, status *parametersv1alpha1.C
 
 func prepareReconcileTask(reqCtx intctrlutil.RequestCtx, cli client.Client, componentParameter *parametersv1alpha1.ComponentParameter) (*Task, error) {
 	fetcherTask := &Task{}
-	err := fetcherTask.Init(&configctrl.ResourceCtx{
+	err := fetcherTask.Init(&render.ResourceCtx{
 		Context:       reqCtx.Ctx,
 		Client:        cli,
 		Namespace:     componentParameter.Namespace,

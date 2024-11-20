@@ -36,6 +36,7 @@ import (
 const (
 	toolsVolumeName                      = "kb-tools"
 	installConfigMangerToolContainerName = "install-config-manager-tool"
+	kbToolsImagePlaceHolder              = "$(KUBEBLOCKS_TOOLS_IMAGE)"
 )
 
 func buildReloadToolsContainer(cfgManagerParams *cfgcm.CfgManagerBuildParams, podSpec *corev1.PodSpec) error {

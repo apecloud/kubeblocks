@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package configuration
 
 import (
-	"context"
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
@@ -32,23 +31,13 @@ import (
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/render"
 	"github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-type ResourceCtx struct {
-	context.Context
-
-	Err    error
-	Client client.Client
-
-	Namespace     string
-	ClusterName   string
-	ComponentName string
-}
-
 type ResourceFetcher[T any] struct {
 	obj *T
-	*ResourceCtx
+	*render.ResourceCtx
 
 	ClusterObj      *appsv1.Cluster
 	ComponentObj    *appsv1.Component
@@ -59,7 +48,7 @@ type ResourceFetcher[T any] struct {
 	ComponentParameterObj *parametersv1alpha1.ComponentParameter
 }
 
-func (r *ResourceFetcher[T]) Init(ctx *ResourceCtx, object *T) *T {
+func (r *ResourceFetcher[T]) Init(ctx *render.ResourceCtx, object *T) *T {
 	r.obj = object
 	r.ResourceCtx = ctx
 	return r.obj
@@ -162,7 +151,7 @@ type Fetcher struct {
 	ResourceFetcher[Fetcher]
 }
 
-func NewResourceFetcher(resourceCtx *ResourceCtx) *Fetcher {
+func NewResourceFetcher(resourceCtx *render.ResourceCtx) *Fetcher {
 	f := &Fetcher{}
 	return f.Init(resourceCtx, f)
 }

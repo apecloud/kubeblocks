@@ -20,85 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package configuration
 
 import (
-	"context"
-
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/configuration/validate"
-	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	"github.com/apecloud/kubeblocks/pkg/controller/factory"
-	"github.com/apecloud/kubeblocks/pkg/generics"
 )
-
-type templateRenderValidator = func(map[string]string) error
-
-func findMatchedLocalObject(localObjs []client.Object, objKey client.ObjectKey, gvk schema.GroupVersionKind) client.Object {
-	for _, obj := range localObjs {
-		if obj.GetName() == objKey.Name && obj.GetNamespace() == objKey.Namespace {
-			if generics.ToGVK(obj) == gvk {
-				return obj
-			}
-		}
-	}
-	return nil
-}
-
-// generateConfigMapFromTemplate renders config file by config template provided by provider.
-func generateConfigMapFromTemplate(cluster *appsv1.Cluster,
-	component *component.SynthesizedComponent,
-	tplBuilder *configTemplateBuilder,
-	cmName string,
-	templateSpec appsv1.ComponentTemplateSpec,
-	ctx context.Context,
-	cli client.Client, dataValidator templateRenderValidator) (*corev1.ConfigMap, error) {
-	// Render config template by TplEngine
-	// The template namespace must be the same as the ClusterDefinition namespace
-	configs, err := renderConfigMapTemplate(tplBuilder, templateSpec, ctx, cli)
-	if err != nil {
-		return nil, err
-	}
-
-	if dataValidator != nil {
-		if err = dataValidator(configs); err != nil {
-			return nil, err
-		}
-	}
-
-	// Using ConfigMap cue template render to configmap of config
-	return factory.BuildConfigMapWithTemplate(cluster, component, configs, cmName, templateSpec), nil
-}
-
-// renderConfigMapTemplate renders config file using template engine
-func renderConfigMapTemplate(
-	templateBuilder *configTemplateBuilder,
-	templateSpec appsv1.ComponentTemplateSpec,
-	ctx context.Context,
-	cli client.Client) (map[string]string, error) {
-	cmObj := &corev1.ConfigMap{}
-	//  Require template configmap exist
-	if err := cli.Get(ctx, client.ObjectKey{
-		Namespace: templateSpec.Namespace,
-		Name:      templateSpec.TemplateRef,
-	}, cmObj); err != nil {
-		return nil, err
-	}
-
-	if len(cmObj.Data) == 0 {
-		return map[string]string{}, nil
-	}
-
-	templateBuilder.setTemplateName(templateSpec.TemplateRef)
-	renderedData, err := templateBuilder.render(cmObj.Data)
-	if err != nil {
-		return nil, core.WrapError(err, "failed to render configmap")
-	}
-	return renderedData, nil
-}
 
 // validateRenderedData validates config file against constraint
 func validateRenderedData(renderedData map[string]string, paramsDefs []*parametersv1alpha1.ParametersDefinition, configRender *parametersv1alpha1.ParameterDrivenConfigRender) error {

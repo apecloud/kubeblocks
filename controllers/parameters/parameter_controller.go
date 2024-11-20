@@ -34,7 +34,7 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
+	"github.com/apecloud/kubeblocks/pkg/controller/render"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -131,7 +131,7 @@ func (r *ParameterReconciler) generateParameterTaskContext(reqCtx intctrlutil.Re
 	for _, component := range parameter.Spec.ComponentParameters {
 		params = append(params, component.Parameters)
 		rctxs = append(rctxs, newParameterReconcileContext(reqCtx,
-			&configctrl.ResourceCtx{
+			&render.ResourceCtx{
 				Context:       reqCtx.Ctx,
 				Client:        r.Client,
 				Namespace:     parameter.Namespace,

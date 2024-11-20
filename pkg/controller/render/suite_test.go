@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package core
+package render
 
 import (
 	"context"
@@ -26,17 +26,19 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/spf13/viper"
 	"go.uber.org/zap/zapcore"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-
-	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
+
+// These tests use Ginkgo (BDD-style Go testing framework). Refer to
+// http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
 var ctx context.Context
 var cancel context.CancelFunc
 
-func TestConfigCore(t *testing.T) {
+func TestTemplateRender(t *testing.T) {
 	RegisterFailHandler(Fail)
 
 	RunSpecs(t, "TPL Test Suite")

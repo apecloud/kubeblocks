@@ -36,7 +36,6 @@ Redis Cluster 还提供集群的节点间通信和数据迁移机制。当集群
 * 确保 Redis 引擎已启用。
 * 查看可用于创建集群的数据库类型和版本。
 
-  Make sure you can get the redis `componentdefinition`. It is used to describe and define the components in a database cluster, and usually presents basic information such as the name, type, version, status, etc.
   查看 redis 组件定义是否可用。组件定义用于描述和定义数据库集群的组件，通常呈现诸如名称、类型、版本、状态等基本信息。
 
   ```bash
@@ -275,10 +274,10 @@ b695dbac46efd9ec24ea608358f92dfd749e8e71 172.18.0.3:31603@30000,redisc-shard-kr2
 使用 kubectl patch 更新 shards 字段，对分片进行扩缩容。
 
 ```bash
-# 扩容成4分片
+# 扩容成 4 分片
 kubectl patch cluster redisc --type='json' -p='[{"op": "replace", "path": "/spec/shardingSpecs/0/shards", "value":4}]' -n demo
 
-# 重新缩容成3分片
+# 重新缩容成 3 分片
 kubectl patch cluster redisc --type='json' -p='[{"op": "replace", "path": "/spec/shardingSpecs/0/shards", "value":3}]' -n demo
 ```
 
@@ -307,7 +306,7 @@ kubectl edit cluster redisc
 使用 `kubectl patch` 更新 `replicas` 字段，对分片副本进行扩缩容。
 
 ```bash
-# Scale to 3 replicas (1 master and 2 replicas per shard)
+# 扩容至 3 副本（每个分片中含有一主两备）
 kubectl patch cluster redisc --type='json' -p='[{"op": "replace", "path": "/spec/shardingSpecs/0/template/replicas", "value": 3}]' -n default
 ```
 
@@ -315,7 +314,6 @@ kubectl patch cluster redisc --type='json' -p='[{"op": "replace", "path": "/spec
 
 <TabItem value="修改集群 YAML 文件" label="修改集群 YAML 文件">
 
-You can Use `kubectl edit` to directly edit the cluster YAML and modify the value of `spec.shardingSpecs[0].template.replicas`.
 使用 `kubectl edit` 直接编辑集群 YAML 文件，修改 `spec.ShardingSpecs[0].template.replicas` 字段的值。
 
 ```bash

@@ -113,7 +113,7 @@ type SidecarDefinitionSpec struct {
 	// +listType=map
 	// +listMapKey=name
 	// +optional
-	Configs []ComponentConfigSpec `json:"configs,omitempty"`
+	Configs []ComponentTemplateSpec `json:"configs,omitempty"`
 
 	// Specifies the scripts used by the Sidecar.
 	//

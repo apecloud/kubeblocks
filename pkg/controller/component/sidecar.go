@@ -43,13 +43,13 @@ func buildSidecar(ctx context.Context, cli client.Reader, sidecar appsv1.Sidecar
 	if err != nil {
 		return err
 	}
-	for _, builder := range []func(appsv1.Sidecar, *appsv1.SidecarDefinition, *SynthesizedComponent) error{
+	for _, builder := range []func(*appsv1.SidecarDefinition, *SynthesizedComponent) error{
 		buildSidecarContainers,
 		buildSidecarVars,
 		buildSidecarConfigs,
 		buildSidecarScripts,
 	} {
-		if err := builder(sidecar, sidecarDef, synthesizedComp); err != nil {
+		if err := builder(sidecarDef, synthesizedComp); err != nil {
 			return err
 		}
 	}
@@ -73,26 +73,40 @@ func getNCheckSidecarDefinition(ctx context.Context, cli client.Reader, name str
 	return sidecarDef, nil
 }
 
-func buildSidecarContainers(sidecar appsv1.Sidecar, sidecarDef *appsv1.SidecarDefinition, synthesizedComp *SynthesizedComponent) error {
+func buildSidecarContainers(sidecarDef *appsv1.SidecarDefinition, synthesizedComp *SynthesizedComponent) error {
 	synthesizedComp.PodSpec.Containers = append(synthesizedComp.PodSpec.Containers, sidecarDef.Spec.Containers...)
 	return nil
 }
 
-func buildSidecarVars(sidecar appsv1.Sidecar, sidecarDef *appsv1.SidecarDefinition, synthesizedComp *SynthesizedComponent) error {
-	// if sidecarDef.Spec.Vars != nil {
-	//	// synthesizedComp.Vars = append(synthesizedComp.Vars, sidecarDef.Spec.Vars...)
-	// }
-	return nil
-}
-
-func buildSidecarConfigs(sidecar appsv1.Sidecar, sidecarDef *appsv1.SidecarDefinition, synthesizedComp *SynthesizedComponent) error {
-	if sidecarDef.Spec.Configs != nil {
-		synthesizedComp.ConfigTemplates = append(synthesizedComp.ConfigTemplates, sidecarDef.Spec.Configs...)
+func buildSidecarVars(sidecarDef *appsv1.SidecarDefinition, synthesizedComp *SynthesizedComponent) error {
+	if sidecarDef.Spec.Vars != nil {
+		if synthesizedComp.SidecarVars == nil {
+			synthesizedComp.SidecarVars = make([]appsv1.EnvVar, 0)
+		}
+		// already checked for duplication in the definition controller
+		synthesizedComp.SidecarVars = append(synthesizedComp.SidecarVars, sidecarDef.Spec.Vars...)
 	}
 	return nil
 }
 
-func buildSidecarScripts(sidecar appsv1.Sidecar, sidecarDef *appsv1.SidecarDefinition, synthesizedComp *SynthesizedComponent) error {
+func buildSidecarConfigs(sidecarDef *appsv1.SidecarDefinition, synthesizedComp *SynthesizedComponent) error {
+	if sidecarDef.Spec.Configs != nil {
+		templateToConfig := func() []appsv1.ComponentConfigSpec {
+			if len(sidecarDef.Spec.Configs) == 0 {
+				return nil
+			}
+			l := make([]appsv1.ComponentConfigSpec, 0)
+			for i := range sidecarDef.Spec.Configs {
+				l = append(l, appsv1.ComponentConfigSpec{ComponentTemplateSpec: sidecarDef.Spec.Configs[i]})
+			}
+			return l
+		}
+		synthesizedComp.ConfigTemplates = append(synthesizedComp.ConfigTemplates, templateToConfig()...)
+	}
+	return nil
+}
+
+func buildSidecarScripts(sidecarDef *appsv1.SidecarDefinition, synthesizedComp *SynthesizedComponent) error {
 	if sidecarDef.Spec.Scripts != nil {
 		synthesizedComp.ScriptTemplates = append(synthesizedComp.ScriptTemplates, sidecarDef.Spec.Scripts...)
 	}

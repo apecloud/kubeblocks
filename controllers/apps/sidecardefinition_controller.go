@@ -40,6 +40,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	appsconfig "github.com/apecloud/kubeblocks/controllers/apps/configuration"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -182,20 +183,74 @@ func (r *SidecarDefinitionReconciler) validateNResolve(cli client.Client, rctx i
 		return err
 	}
 
-	for _, f := range []func([]appsv1.ComponentDefinition, *appsv1.SidecarDefinition) error{
+	for _, f := range []func(client.Client, intctrlutil.RequestCtx, *appsv1.SidecarDefinition, []appsv1.ComponentDefinition) error{
+		r.validateContainer,
+		r.validateVars,
+		r.validateConfigNScript,
 		r.validateNResolveOwner,
 		r.validateNResolveSelectors,
 		r.validateOwnerNSelectors,
 	} {
-		if err := f(compDefList.Items, sidecarDef); err != nil {
+		if err := f(cli, rctx, sidecarDef, compDefList.Items); err != nil {
 			return err
 		}
 	}
 	return r.immutableCheck(sidecarDef)
 }
 
-func (r *SidecarDefinitionReconciler) validateNResolveOwner(compDefs []appsv1.ComponentDefinition,
-	sidecarDef *appsv1.SidecarDefinition) error {
+func (r *SidecarDefinitionReconciler) validateContainer(_ client.Client, _ intctrlutil.RequestCtx,
+	sidecarDef *appsv1.SidecarDefinition, _ []appsv1.ComponentDefinition) error {
+	if !checkUniqueItemWithValue(sidecarDef.Spec.Containers, "Name", nil) {
+		return fmt.Errorf("duplicate names of containers are not allowed")
+	}
+	return nil
+}
+
+func (r *SidecarDefinitionReconciler) validateVars(_ client.Client, _ intctrlutil.RequestCtx,
+	sidecarDef *appsv1.SidecarDefinition, _ []appsv1.ComponentDefinition) error {
+	if !checkUniqueItemWithValue(sidecarDef.Spec.Vars, "Name", nil) {
+		return fmt.Errorf("duplicate names of vars are not allowed")
+	}
+	return nil
+}
+
+func (r *SidecarDefinitionReconciler) validateConfigNScript(cli client.Client, rctx intctrlutil.RequestCtx,
+	sidecarDef *appsv1.SidecarDefinition, _ []appsv1.ComponentDefinition) error {
+	templates := sidecarDef.Spec.Configs
+	if len(sidecarDef.Spec.Scripts) > 0 {
+		if templates == nil {
+			templates = sidecarDef.Spec.Scripts
+		} else {
+			templates = append(templates, sidecarDef.Spec.Scripts...)
+		}
+	}
+	if !checkUniqueItemWithValue(templates, "Name", nil) {
+		return fmt.Errorf("duplicate names of configs/scripts are not allowed")
+	}
+
+	configs := func() []appsv1.ComponentConfigSpec {
+		if len(sidecarDef.Spec.Configs) == 0 {
+			return nil
+		}
+		configs := make([]appsv1.ComponentConfigSpec, 0)
+		for i := range sidecarDef.Spec.Configs {
+			configs = append(configs, appsv1.ComponentConfigSpec{
+				ComponentTemplateSpec: sidecarDef.Spec.Configs[i],
+			})
+		}
+		return configs
+	}
+	compDef := &appsv1.ComponentDefinition{
+		Spec: appsv1.ComponentDefinitionSpec{
+			Configs: configs(),
+			Scripts: sidecarDef.Spec.Scripts,
+		},
+	}
+	return appsconfig.ReconcileConfigSpecsForReferencedCR(cli, rctx, compDef)
+}
+
+func (r *SidecarDefinitionReconciler) validateNResolveOwner(_ client.Client, _ intctrlutil.RequestCtx,
+	sidecarDef *appsv1.SidecarDefinition, compDefs []appsv1.ComponentDefinition) error {
 	owner := sidecarDef.Spec.Owner
 	if len(owner) == 0 {
 		return fmt.Errorf("owner is required")
@@ -222,8 +277,8 @@ func (r *SidecarDefinitionReconciler) validateNResolveOwner(compDefs []appsv1.Co
 	return nil
 }
 
-func (r *SidecarDefinitionReconciler) validateNResolveSelectors(compDefs []appsv1.ComponentDefinition,
-	sidecarDef *appsv1.SidecarDefinition) error {
+func (r *SidecarDefinitionReconciler) validateNResolveSelectors(_ client.Client, _ intctrlutil.RequestCtx,
+	sidecarDef *appsv1.SidecarDefinition, compDefs []appsv1.ComponentDefinition) error {
 	selectors := sidecarDef.Spec.Selectors
 	for _, selector := range selectors {
 		if err := component.ValidateDefNameRegexp(selector); err != nil {
@@ -235,6 +290,9 @@ func (r *SidecarDefinitionReconciler) validateNResolveSelectors(compDefs []appsv
 		if slices.ContainsFunc(selectors, func(selector string) bool {
 			return component.DefNameMatched(compDef.Name, selector)
 		}) {
+			if err := r.validateMatchedCompDef(sidecarDef, &compDef); err != nil {
+				return err
+			}
 			matched = append(matched, compDef.Name)
 		}
 	}
@@ -246,8 +304,67 @@ func (r *SidecarDefinitionReconciler) validateNResolveSelectors(compDefs []appsv
 	return nil
 }
 
-func (r *SidecarDefinitionReconciler) validateOwnerNSelectors(_ []appsv1.ComponentDefinition,
-	sidecarDef *appsv1.SidecarDefinition) error {
+func (r *SidecarDefinitionReconciler) validateMatchedCompDef(sidecarDef *appsv1.SidecarDefinition,
+	compDef *appsv1.ComponentDefinition) error {
+	vars := func() error {
+		if len(sidecarDef.Spec.Vars) == 0 || len(compDef.Spec.Vars) == 0 {
+			return nil
+		}
+		names := sets.New[string]()
+		for _, v := range compDef.Spec.Vars {
+			names.Insert(v.Name)
+		}
+		for _, v := range sidecarDef.Spec.Vars {
+			if names.Has(v.Name) {
+				return fmt.Errorf("vars %s is conflicted with the component definition %s", v.Name, compDef.Name)
+			}
+		}
+		return nil
+	}
+
+	templates := func() error {
+		validate := func(key string, sidecar, comp []appsv1.ComponentTemplateSpec) error {
+			if len(sidecar) == 0 || len(comp) == 0 {
+				return nil
+			}
+			names := sets.New[string]()
+			for _, v := range comp {
+				names.Insert(v.Name)
+			}
+			for _, v := range sidecar {
+				if names.Has(v.Name) {
+					return fmt.Errorf("%s template %s is conflicted with the component definition %s", key, v.Name, compDef.Name)
+				}
+			}
+			return nil
+		}
+
+		templateOfConfig := func(configs []appsv1.ComponentConfigSpec) []appsv1.ComponentTemplateSpec {
+			if len(configs) == 0 {
+				return nil
+			}
+			l := make([]appsv1.ComponentTemplateSpec, 0)
+			for i := range configs {
+				l = append(l, configs[i].ComponentTemplateSpec)
+			}
+			return l
+		}
+
+		if err := validate("config", sidecarDef.Spec.Configs, templateOfConfig(compDef.Spec.Configs)); err != nil {
+			return err
+		}
+		return validate("script", sidecarDef.Spec.Scripts, compDef.Spec.Scripts)
+	}
+	for _, f := range []func() error{vars, templates} {
+		if err := f(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *SidecarDefinitionReconciler) validateOwnerNSelectors(_ client.Client, _ intctrlutil.RequestCtx,
+	sidecarDef *appsv1.SidecarDefinition, _ []appsv1.ComponentDefinition) error {
 	status := sidecarDef.Status
 	if len(status.Owners) == 0 || len(status.Selectors) == 0 {
 		return nil

@@ -2111,8 +2111,8 @@ the component definition of @selectors automatically.</p>
 <td>
 <code>configs</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.ComponentConfigSpec">
-[]ComponentConfigSpec
+<a href="#apps.kubeblocks.io/v1.ComponentTemplateSpec">
+[]ComponentTemplateSpec
 </a>
 </em>
 </td>
@@ -4609,7 +4609,7 @@ string
 <h3 id="apps.kubeblocks.io/v1.ComponentConfigSpec">ComponentConfigSpec
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>, <a href="#apps.kubeblocks.io/v1.SidecarDefinitionSpec">SidecarDefinitionSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
 </p>
 <div>
 </div>
@@ -10895,8 +10895,8 @@ the component definition of @selectors automatically.</p>
 <td>
 <code>configs</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.ComponentConfigSpec">
-[]ComponentConfigSpec
+<a href="#apps.kubeblocks.io/v1.ComponentTemplateSpec">
+[]ComponentTemplateSpec
 </a>
 </em>
 </td>

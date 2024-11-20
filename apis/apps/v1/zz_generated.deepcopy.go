@@ -3173,7 +3173,7 @@ func (in *SidecarDefinitionSpec) DeepCopyInto(out *SidecarDefinitionSpec) {
 	}
 	if in.Configs != nil {
 		in, out := &in.Configs, &out.Configs
-		*out = make([]ComponentConfigSpec, len(*in))
+		*out = make([]ComponentTemplateSpec, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}

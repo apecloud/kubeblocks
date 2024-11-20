@@ -33,7 +33,6 @@ import (
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -162,7 +161,6 @@ func kindsForDelete() ([]client.ObjectList, []client.ObjectList) {
 		&corev1.SecretList{},
 		&dpv1alpha1.BackupPolicyList{},
 		&dpv1alpha1.BackupScheduleList{},
-		&parametersv1alpha1.ComponentParameterList{},
 	}
 	return append(namespacedKinds, namespacedKindsPlus...), nonNamespacedKinds
 }

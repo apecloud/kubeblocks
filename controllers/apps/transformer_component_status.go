@@ -33,15 +33,12 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
-	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 const (
@@ -129,12 +126,6 @@ func (t *componentStatusTransformer) reconcileStatus(transCtx *componentTransfor
 	// check if the ITS is running
 	isITSUpdatedNRunning := t.isInstanceSetRunning()
 
-	// check if all configTemplates are synced
-	isAllConfigSynced, err := t.isAllConfigSynced(transCtx)
-	if err != nil {
-		return err
-	}
-
 	// check if the component has failed pod
 	hasFailedPod, messages := t.hasFailedPod()
 
@@ -162,8 +153,8 @@ func (t *componentStatusTransformer) reconcileStatus(transCtx *componentTransfor
 	}()
 
 	transCtx.Logger.Info(
-		fmt.Sprintf("status conditions, creating: %v, its running: %v, has failure: %v, updating: %v, config synced: %v",
-			isInCreatingPhase, isITSUpdatedNRunning, hasFailure, hasRunningScaleOut || hasRunningVolumeExpansion, isAllConfigSynced))
+		fmt.Sprintf("status conditions, creating: %v, its running: %v, has failure: %v, updating: %v",
+			isInCreatingPhase, isITSUpdatedNRunning, hasFailure, hasRunningScaleOut || hasRunningVolumeExpansion))
 
 	switch {
 	case isDeleting:
@@ -172,7 +163,7 @@ func (t *componentStatusTransformer) reconcileStatus(transCtx *componentTransfor
 		t.setComponentStatusPhase(transCtx, appsv1.StoppingComponentPhase, nil, "component is Stopping")
 	case stopped:
 		t.setComponentStatusPhase(transCtx, appsv1.StoppedComponentPhase, nil, "component is Stopped")
-	case isITSUpdatedNRunning && isAllConfigSynced && !hasRunningScaleOut && !hasRunningVolumeExpansion:
+	case isITSUpdatedNRunning && !hasRunningScaleOut && !hasRunningVolumeExpansion:
 		t.setComponentStatusPhase(transCtx, appsv1.RunningComponentPhase, nil, "component is Running")
 	case !hasFailure && isInCreatingPhase:
 		t.setComponentStatusPhase(transCtx, appsv1.CreatingComponentPhase, nil, "component is Creating")
@@ -202,46 +193,6 @@ func (t *componentStatusTransformer) isInstanceSetRunning() bool {
 		return false
 	}
 	return instanceset.IsInstanceSetReady(t.runningITS)
-}
-
-// isAllConfigSynced checks if all configTemplates are synced.
-func (t *componentStatusTransformer) isAllConfigSynced(transCtx *componentTransformContext) (bool, error) {
-	var (
-		cmKey client.ObjectKey
-		cmObj = &corev1.ConfigMap{}
-	)
-
-	if len(t.synthesizeComp.ConfigTemplates) == 0 {
-		return true, nil
-	}
-
-	configurationKey := client.ObjectKey{
-		Namespace: t.cluster.Namespace,
-		Name:      cfgcore.GenerateComponentParameterName(t.cluster.Name, t.synthesizeComp.Name),
-	}
-	componentParameter := &parametersv1alpha1.ComponentParameter{}
-	if err := t.Client.Get(transCtx.Context, configurationKey, componentParameter); err != nil {
-		return false, err
-	}
-	for _, configSpec := range t.synthesizeComp.ConfigTemplates {
-		item := intctrlutil.GetConfigTemplateItem(&componentParameter.Spec, configSpec.Name)
-		status := intctrlutil.GetItemStatus(&componentParameter.Status, configSpec.Name)
-		// for creating phase
-		if item == nil || status == nil {
-			return false, nil
-		}
-		cmKey = client.ObjectKey{
-			Namespace: t.cluster.Namespace,
-			Name:      cfgcore.GetComponentCfgName(t.cluster.Name, t.synthesizeComp.Name, configSpec.Name),
-		}
-		if err := t.Client.Get(transCtx.Context, cmKey, cmObj, inDataContext4C()); err != nil {
-			return false, err
-		}
-		if intctrlutil.GetConfigSpecReconcilePhase(cmObj, *item, status) != parametersv1alpha1.CFinishedPhase {
-			return false, nil
-		}
-	}
-	return true, nil
 }
 
 // hasScaleOutRunning checks if the scale out is running.

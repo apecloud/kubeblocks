@@ -158,19 +158,6 @@ func (r *ParameterReconciler) validate(parameter *parametersv1alpha1.Parameter, 
 	return nil
 }
 
-func validateCustomTemplate(ctx context.Context, cli client.Client, templates map[string]appsv1.ConfigTemplateExtension) error {
-	for configSpec, custom := range templates {
-		var cm = &corev1.ConfigMap{}
-		if err := cli.Get(ctx, types.NamespacedName{Name: custom.TemplateRef, Namespace: custom.Namespace}, cm); err != nil {
-			if apierrors.IsNotFound(err) {
-				return intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "not found configmap[%s] for custom template: %s", custom.TemplateRef, configSpec)
-			}
-			return err
-		}
-	}
-	return nil
-}
-
 func (r *ParameterReconciler) failWithTerminalReconcile(reqCtx intctrlutil.RequestCtx, parameter *parametersv1alpha1.Parameter, err error) (ctrl.Result, error) {
 	patch := parameter.DeepCopy()
 	parameter.Status.Phase = parametersv1alpha1.CMergeFailedPhase
@@ -183,6 +170,20 @@ func (r *ParameterReconciler) fail(reqCtx intctrlutil.RequestCtx, parameter *par
 		return r.failWithTerminalReconcile(reqCtx, parameter, err)
 	}
 	return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+}
+
+func validateCustomTemplate(ctx context.Context, cli client.Client, templates map[string]appsv1.ConfigTemplateExtension) error {
+	for configSpec, custom := range templates {
+		cm := &corev1.ConfigMap{}
+		err := cli.Get(ctx, types.NamespacedName{Name: custom.TemplateRef, Namespace: custom.Namespace}, cm)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return intctrlutil.NewErrorf(intctrlutil.ErrorTypeFatal, "not found configmap[%s] for custom template: %s", custom.TemplateRef, configSpec)
+			}
+			return err
+		}
+	}
+	return nil
 }
 
 func updateParameterStatus(reqCtx intctrlutil.RequestCtx, cli client.Client, parameter *parametersv1alpha1.Parameter, patch *parametersv1alpha1.Parameter, finished bool) (ctrl.Result, error) {
@@ -206,14 +207,16 @@ func syncParameterStatus(parameterStatus *parametersv1alpha1.ParameterStatus) bo
 	}()
 
 	for _, status := range parameterStatus.ReconfiguringStatus {
-		switch {
-		case status.Phase == parametersv1alpha1.CMergeFailedPhase:
+		switch status.Phase {
+		case parametersv1alpha1.CMergeFailedPhase:
 			parameterStatus.Phase = parametersv1alpha1.CMergeFailedPhase
 			return true
-		case status.Phase == parametersv1alpha1.CFailedAndPausePhase:
+		case parametersv1alpha1.CFailedAndPausePhase:
 			parameterStatus.Phase = parametersv1alpha1.CFailedAndPausePhase
 			return true
-		case status.Phase != parametersv1alpha1.CFinishedPhase:
+		case parametersv1alpha1.CFinishedPhase:
+			continue
+		default:
 			parameterStatus.Phase = parametersv1alpha1.CRunningPhase
 			finished = false
 		}

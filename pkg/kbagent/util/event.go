@@ -41,14 +41,22 @@ const (
 	sendEventRetryInterval = 10 * time.Second
 )
 
-func SendEventWithMessage(logger *logr.Logger, reason string, message string) {
-	go func() {
+func SendEventWithMessage(logger *logr.Logger, reason string, message string, sync bool) error {
+	send := func() error {
 		event := createEvent(reason, message)
 		err := sendEvent(event)
 		if logger != nil && err != nil {
 			logger.Error(err, fmt.Sprintf("send event failed, reason: %s, message: %s", reason, message))
 		}
+		return err
+	}
+	if sync {
+		return send()
+	}
+	go func() {
+		_ = send()
 	}()
+	return nil
 }
 
 func createEvent(reason string, message string) *corev1.Event {

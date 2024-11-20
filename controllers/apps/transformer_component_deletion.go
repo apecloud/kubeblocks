@@ -31,7 +31,6 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -170,8 +169,6 @@ func compOwnedKinds() []client.ObjectList {
 		&corev1.SecretList{},
 		&corev1.ConfigMapList{},
 		&corev1.PersistentVolumeClaimList{},
-		&dpv1alpha1.BackupList{},
-		&dpv1alpha1.RestoreList{},
 		&appsv1alpha1.ConfigurationList{},
 		&corev1.ServiceAccountList{},
 		&rbacv1.RoleBindingList{},

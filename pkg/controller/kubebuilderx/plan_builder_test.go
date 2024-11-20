@@ -182,13 +182,6 @@ var _ = Describe("plan builder test", func() {
 			Expect(err).ShouldNot(BeNil())
 			Expect(err.Error()).Should(ContainSubstring("vertex action can't be nil"))
 		})
-
-		It("should return nil and do nothing if action is Noop", func() {
-			v := &model.ObjectVertex{
-				Action: model.ActionNoopPtr(),
-			}
-			Expect(planBuilder.defaultWalkFunc(v)).Should(Succeed())
-		})
 	})
 
 	Context("buildOrderedVertices", func() {

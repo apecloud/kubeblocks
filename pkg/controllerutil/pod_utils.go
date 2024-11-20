@@ -321,18 +321,6 @@ func GetIntOrPercentValue(intOrStr *metautil.IntOrString) (int, bool, error) {
 	return v, true, nil
 }
 
-// GetPortByPortName gets the Port from pod by name
-func GetPortByPortName(containers []corev1.Container, portName string) (int32, error) {
-	for _, container := range containers {
-		for _, port := range container.Ports {
-			if port.Name == portName {
-				return port.ContainerPort, nil
-			}
-		}
-	}
-	return 0, fmt.Errorf("port %s not found", portName)
-}
-
 func GetPortByName(pod corev1.Pod, cname, pname string) (int32, error) {
 	for _, container := range pod.Spec.Containers {
 		if container.Name == cname {

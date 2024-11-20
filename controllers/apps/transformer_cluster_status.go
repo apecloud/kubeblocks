@@ -61,14 +61,9 @@ func (t *clusterStatusTransformer) Transform(ctx graph.TransformContext, dag *gr
 }
 
 func (t *clusterStatusTransformer) markClusterDagStatusAction(graphCli model.GraphClient, dag *graph.DAG, origCluster, cluster *appsv1.Cluster) {
-	if vertex := graphCli.FindMatchedVertex(dag, cluster); vertex != nil {
-		// check if the cluster needs to do other action.
-		ov, _ := vertex.(*model.ObjectVertex)
-		if ov.Action != model.ActionNoopPtr() {
-			return
-		}
+	if v := graphCli.FindMatchedVertex(dag, cluster); v == nil {
+		graphCli.Status(dag, origCluster, cluster)
 	}
-	graphCli.Status(dag, origCluster, cluster)
 }
 
 func (t *clusterStatusTransformer) reconcileClusterStatus(transCtx *clusterTransformContext, cluster *appsv1.Cluster) error {

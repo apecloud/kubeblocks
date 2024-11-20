@@ -41,7 +41,6 @@ import (
 )
 
 const (
-	defaultPort           = 3501
 	defaultMaxConcurrency = 8
 )
 
@@ -50,9 +49,11 @@ var serverConfig server.Config
 func init() {
 	viper.AutomaticEnv()
 
+	pflag.BoolVar(&serverConfig.Server, "server", true, "Run as a server.")
 	pflag.StringVar(&serverConfig.Address, "address", "0.0.0.0", "The HTTP Server listen address for kb-agent service.")
 	pflag.StringVar(&serverConfig.UnixDomainSocket, "unix-socket", "", "The path of the Unix Domain Socket for kb-agent service.")
-	pflag.IntVar(&serverConfig.Port, "port", defaultPort, "The HTTP Server listen port for kb-agent service.")
+	pflag.IntVar(&serverConfig.Port, "port", kbagent.DefaultHTTPPort, "The HTTP Server listen port for kb-agent service.")
+	pflag.IntVar(&serverConfig.StreamingPort, "streaming-port", kbagent.DefaultStreamingPort, "The listen port used by kb-agent to stream data.")
 	pflag.IntVar(&serverConfig.Concurrency, "max-concurrency", defaultMaxConcurrency,
 		fmt.Sprintf("The maximum number of concurrent connections the Server may serve, use the default value %d if <=0.", defaultMaxConcurrency))
 	pflag.BoolVar(&serverConfig.Logging, "api-logging", true, "Enable api logging for kb-agent request.")
@@ -83,20 +84,13 @@ func main() {
 	logger := kzap.New(kopts...)
 	ctrl.SetLogger(logger)
 
-	// initialize kb-agent
-	services, err := kbagent.Initialize(logger, os.Environ())
+	serving, err := kbagent.Launch(logger, serverConfig)
 	if err != nil {
-		panic(errors.Wrap(err, "init action handlers failed"))
+		panic(err)
 	}
-
-	// start HTTP Server
-	server := server.NewHTTPServer(logger, serverConfig, services)
-	err = server.StartNonBlocking()
-	if err != nil {
-		panic(errors.Wrap(err, "failed to start HTTP server"))
+	if serving {
+		stop := make(chan os.Signal, 1)
+		signal.Notify(stop, syscall.SIGTERM, os.Interrupt)
+		<-stop
 	}
-
-	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, syscall.SIGTERM, os.Interrupt)
-	<-stop
 }

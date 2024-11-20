@@ -104,7 +104,7 @@ spec:
       requests:
         cpu: "1"
         memory: 2Gi
-    serviceAccountName: null
+    serviceAccountName: kb-mycluster
     serviceVersion: 8.8.2
     services: null
     volumeClaimTemplates:

@@ -733,7 +733,7 @@ mycluster   milvus-2.3.2                                  Delete               R
 
 ## Stop/Start a cluster
 
-You can stop/start a cluster to save computing resources. When a cluster is stopped, the computing resources of this cluster are released, which means the pods of Kubernetes are released, but the storage resources are reserved. You can start this cluster again by snapshots if you want to restore the cluster resources.
+You can stop/start a cluster to save computing resources. When a cluster is stopped, the computing resources of this cluster are released, which means the pods of Kubernetes are released, but the storage resources are reserved. You can start this cluster again to restore it to the state it was in before it was stopped.
 
 ### Stop a cluster
 

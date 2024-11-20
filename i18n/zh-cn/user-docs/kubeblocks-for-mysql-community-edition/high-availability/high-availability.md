@@ -42,6 +42,34 @@ import TabItem from '@theme/TabItem';
 
 <Tabs>
 
+<TabItem value="kubectl" label="kubectl" default>
+
+1. 查看 MySQL 主备版 pod 角色。在本示例中，主节点为 `mycluster-mysql-0`。
+
+    ```bash
+    kubectl get pods --show-labels -n demo | grep role
+    ```
+
+    ![describe_pod](./../../../img/api-mysql-ha-grep-role.png)
+2. 删除主节点 `mycluster-mysql-0`，模拟节点故障。
+
+    ```bash
+    kubectl delete pod mycluster-mysql-0 -n demo
+    ```
+
+    ![delete_pod](./../../../img/api-mysql-ha-delete-primary-pod.png)
+3. 检查 pod 状态和集群连接。
+
+    此处示例显示 pod 角色发生变化。原主节点删除后，系统选出新的主节点为 `mycluster-mysql-1`。
+
+    ```bash
+    kubectl get pods --show-labels -n demo | grep role
+    ```
+
+    ![describe_cluster_after](./../../../img/api-mysql-ha-delete-primary-pod-after.png)
+
+</TabItem>
+
 <TabItem value="kbcli" label="kbcli">
 
 1. 查看集群信息。可在 `Topology` 中查看主节点的名称，在如下例子中，主节点为 `mycluster-mysql-0`。
@@ -74,34 +102,6 @@ import TabItem from '@theme/TabItem';
 
 </TabItem>
 
-<TabItem value="kubectl" label="kubectl" default>
-
-1. 查看 MySQL 主备版 pod 角色。在本示例中，主节点为 `mycluster-mysql-0`。
-
-    ```bash
-    kubectl get pods --show-labels -n demo | grep role
-    ```
-
-    ![describe_pod](./../../../img/api-mysql-ha-grep-role.png)
-2. 删除主节点 `mycluster-mysql-0`，模拟节点故障。
-
-    ```bash
-    kubectl delete pod mycluster-mysql-0 -n demo
-    ```
-
-    ![delete_pod](./../../../img/api-mysql-ha-delete-primary-pod.png)
-3. 检查 pod 状态和集群连接。
-
-    此处示例显示 pod 角色发生变化。原主节点删除后，系统选出新的主节点为 `mycluster-mysql-1`。
-
-    ```bash
-    kubectl get pods --show-labels -n demo | grep role
-    ```
-
-    ![describe_cluster_after](./../../../img/api-mysql-ha-delete-primary-pod-after.png)
-
-</TabItem>
-
 </Tabs>
 
 ***自动恢复机制***
@@ -113,32 +113,6 @@ import TabItem from '@theme/TabItem';
 ***步骤：***
 
 <Tabs>
-
-<TabItem value="kbcli" label="kbcli">
-
-1. 查看集群信息。可在 `Topology` 中查看备节点的名称，在如下例子中，备节点为 `mycluster-mysql-0`。
-
-    ```bash
-    kbcli cluster describe mycluster
-    ```
-
-    ![describe_cluster](./../../../img/ha-mysql-primary-pod-describe-after.png)
-2. 删除备节点 `mycluster-mysql-0`。
-
-    ```bash
-    kubectl delete pod mycluster-mysql-0
-    ```
-
-    ![delete_secondary_pod](./../../../img/ha-mysql-delete-secondary.png)
-3. 查看集群状态，可在 `Component.Instance` 看到备节点处于终止状态。
-
-    ```bash
-    kbcli cluster describe mycluster
-    ```
-
-    ![describe_cluster_secondary](./../../../img/ha-mysql-delete-secondary-after.png)
-
-</TabItem>
 
 <TabItem value="kubectl" label="kubectl" default>
 
@@ -170,6 +144,32 @@ import TabItem from '@theme/TabItem';
 
 </TabItem>
 
+<TabItem value="kbcli" label="kbcli">
+
+1. 查看集群信息。可在 `Topology` 中查看备节点的名称，在如下例子中，备节点为 `mycluster-mysql-0`。
+
+    ```bash
+    kbcli cluster describe mycluster
+    ```
+
+    ![describe_cluster](./../../../img/ha-mysql-primary-pod-describe-after.png)
+2. 删除备节点 `mycluster-mysql-0`。
+
+    ```bash
+    kubectl delete pod mycluster-mysql-0
+    ```
+
+    ![delete_secondary_pod](./../../../img/ha-mysql-delete-secondary.png)
+3. 查看集群状态，可在 `Component.Instance` 看到备节点处于终止状态。
+
+    ```bash
+    kbcli cluster describe mycluster
+    ```
+
+    ![describe_cluster_secondary](./../../../img/ha-mysql-delete-secondary-after.png)
+
+</TabItem>
+
 </Tabs>
 
 ***自动恢复机制***
@@ -181,32 +181,6 @@ import TabItem from '@theme/TabItem';
 ***步骤：***
 
 <Tabs>
-
-<TabItem value="kbcli" label="kbcli">
-
-1. 查看集群信息，在 `Topology` 中查看节点名称。
-
-    ```bash
-    kbcli cluster describe mycluster
-    ```
-
-    ![describe_cluster](./../../../img/ha-mysql-delete-secondary-after.png)
-2. 删除所有节点。
-
-    ```bash
-    kubectl delete pod mycluster-mysql-1 mycluster-mysql-0
-    ```
-
-    ![delete_three_pods](./../../../img/ha-mysql-delete-both-pods.png)
-3. 查看删除任务进展，发现所有节点都处于 pending 状态，几秒后恢复正常。
-
-    ```bash
-    kbcli cluster describe mycluster
-    ```
-
-    ![describe_three_clusters](./../../../img/ha-mysql-delete-both-pods-after.png)
-
-</TabItem>
 
 <TabItem value="kubectl" label="kubectl" default>
 
@@ -238,6 +212,32 @@ import TabItem from '@theme/TabItem';
     ```
 
     ![describe_cluster](./../../../img/api-mysql-ha-both-pods-grep-role-after.png)
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+1. 查看集群信息，在 `Topology` 中查看节点名称。
+
+    ```bash
+    kbcli cluster describe mycluster
+    ```
+
+    ![describe_cluster](./../../../img/ha-mysql-delete-secondary-after.png)
+2. 删除所有节点。
+
+    ```bash
+    kubectl delete pod mycluster-mysql-1 mycluster-mysql-0
+    ```
+
+    ![delete_three_pods](./../../../img/ha-mysql-delete-both-pods.png)
+3. 查看删除任务进展，发现所有节点都处于 pending 状态，几秒后恢复正常。
+
+    ```bash
+    kbcli cluster describe mycluster
+    ```
+
+    ![describe_three_clusters](./../../../img/ha-mysql-delete-both-pods-after.png)
 
 </TabItem>
 

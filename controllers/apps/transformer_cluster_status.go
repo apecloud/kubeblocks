@@ -61,14 +61,9 @@ func (t *clusterStatusTransformer) Transform(ctx graph.TransformContext, dag *gr
 }
 
 func (t *clusterStatusTransformer) markClusterDagStatusAction(graphCli model.GraphClient, dag *graph.DAG, origCluster, cluster *appsv1.Cluster) {
-	if vertex := graphCli.FindMatchedVertex(dag, cluster); vertex != nil {
-		// check if the cluster needs to do other action.
-		ov, _ := vertex.(*model.ObjectVertex)
-		if ov.Action != model.ActionNoopPtr() {
-			return
-		}
+	if v := graphCli.FindMatchedVertex(dag, cluster); v == nil {
+		graphCli.Status(dag, origCluster, cluster)
 	}
-	graphCli.Status(dag, origCluster, cluster)
 }
 
 func (t *clusterStatusTransformer) reconcileClusterStatus(transCtx *clusterTransformContext, cluster *appsv1.Cluster) error {
@@ -129,13 +124,13 @@ func (t *clusterStatusTransformer) syncClusterConditions(cluster *appsv1.Cluster
 
 func composeClusterPhase(statusList []appsv1.ClusterComponentStatus) appsv1.ClusterPhase {
 	var (
-		isAllComponentCreating = true
-		isAllComponentRunning  = true
-		isAllComponentWorking  = true
-		hasComponentStopping   = false
-		isAllComponentStopped  = true
-		isAllComponentFailed   = true
-		hasComponentFailed     = false
+		isAllComponentCreating         = true
+		isAllComponentWorking          = true
+		hasComponentStopping           = false
+		isAllComponentStopped          = true
+		isAllComponentFailed           = true
+		hasComponentFailed             = false
+		isAllComponentRunningOrStopped = true
 	)
 	isPhaseIn := func(phase appsv1.ComponentPhase, phases ...appsv1.ComponentPhase) bool {
 		for _, p := range phases {
@@ -150,8 +145,8 @@ func composeClusterPhase(statusList []appsv1.ClusterComponentStatus) appsv1.Clus
 		if !isPhaseIn(phase, appsv1.CreatingComponentPhase) {
 			isAllComponentCreating = false
 		}
-		if !isPhaseIn(phase, appsv1.RunningComponentPhase) {
-			isAllComponentRunning = false
+		if !isPhaseIn(phase, appsv1.RunningComponentPhase, appsv1.StoppedComponentPhase) {
+			isAllComponentRunningOrStopped = false
 		}
 		if !isPhaseIn(phase, appsv1.CreatingComponentPhase, appsv1.RunningComponentPhase, appsv1.UpdatingComponentPhase) {
 			isAllComponentWorking = false
@@ -168,17 +163,18 @@ func composeClusterPhase(statusList []appsv1.ClusterComponentStatus) appsv1.Clus
 		if isPhaseIn(phase, appsv1.FailedComponentPhase) {
 			hasComponentFailed = true
 		}
+
 	}
 
 	switch {
-	case isAllComponentRunning:
+	case isAllComponentStopped:
+		return appsv1.StoppedClusterPhase
+	case isAllComponentRunningOrStopped:
 		return appsv1.RunningClusterPhase
 	case isAllComponentCreating:
 		return appsv1.CreatingClusterPhase
 	case isAllComponentWorking:
 		return appsv1.UpdatingClusterPhase
-	case isAllComponentStopped:
-		return appsv1.StoppedClusterPhase
 	case hasComponentStopping:
 		return appsv1.StoppingClusterPhase
 	case isAllComponentFailed:

@@ -24,18 +24,14 @@ import (
 	"slices"
 	"time"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
+	intctrlcomp "github.com/apecloud/kubeblocks/pkg/controller/component"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-
-	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
-	intctrlcomp "github.com/apecloud/kubeblocks/pkg/controller/component"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 type horizontalScalingOpsHandler struct{}
@@ -215,43 +211,11 @@ func (hs horizontalScalingOpsHandler) getCreateAndDeletePodSet(opsRes *OpsResour
 // Cancel this function defines the cancel horizontalScaling action.
 func (hs horizontalScalingOpsHandler) Cancel(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
 	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.HorizontalScalingList)
-	if err := compOpsHelper.cancelComponentOps(reqCtx.Ctx, cli, opsRes, func(lastConfig *opsv1alpha1.LastComponentConfiguration, comp *appsv1.ClusterComponentSpec) {
+	return compOpsHelper.cancelComponentOps(reqCtx.Ctx, cli, opsRes, func(lastConfig *opsv1alpha1.LastComponentConfiguration, comp *appsv1.ClusterComponentSpec) {
 		comp.Replicas = *lastConfig.Replicas
 		comp.Instances = lastConfig.Instances
 		comp.OfflineInstances = lastConfig.OfflineInstances
-	}); err != nil {
-		return err
-	}
-	// delete the running restore resource to release PVC of the pod which will be deleted after cancelling the ops.
-	restoreList := &dpv1alpha1.RestoreList{}
-	if err := cli.List(reqCtx.Ctx, restoreList, client.InNamespace(opsRes.OpsRequest.Namespace),
-		client.MatchingLabels{constant.AppInstanceLabelKey: opsRes.Cluster.Name}); err != nil {
-		return err
-	}
-	for i := range restoreList.Items {
-		restore := &restoreList.Items[i]
-		if restore.Status.Phase != dpv1alpha1.RestorePhaseRunning {
-			continue
-		}
-		compName := restore.Labels[constant.KBAppComponentLabelKey]
-		if _, ok := compOpsHelper.componentOpsSet[compName]; !ok {
-			continue
-		}
-		workloadName := constant.GenerateWorkloadNamePattern(opsRes.Cluster.Name, compName)
-		if restore.Spec.Backup.Name != constant.GenerateResourceNameWithScalingSuffix(workloadName) {
-			continue
-		}
-		if err := intctrlutil.BackgroundDeleteObject(cli, reqCtx.Ctx, restore); err != nil {
-			return err
-		}
-		// remove component finalizer
-		patch := client.MergeFrom(restore.DeepCopy())
-		controllerutil.RemoveFinalizer(restore, constant.DBComponentFinalizerName)
-		if err := cli.Patch(reqCtx.Ctx, restore, patch); err != nil {
-			return err
-		}
-	}
-	return nil
+	})
 }
 
 // checkIntersectionWithEarlierOps checks if the pod deleted by the current ops is a pod created by another ops

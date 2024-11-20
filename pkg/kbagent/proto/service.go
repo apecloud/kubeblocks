@@ -36,4 +36,9 @@ var (
 		Version: "v1.0",
 		URI:     "/v1.0/probe",
 	}
+	ServiceStreaming = &Service{
+		Kind:    "Streaming",
+		Version: "v1.0",
+		URI:     "/v1.0/streaming",
+	}
 )

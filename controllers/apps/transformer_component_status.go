@@ -28,13 +28,11 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -95,14 +93,9 @@ func (t *componentStatusTransformer) Transform(ctx graph.TransformContext, dag *
 	}
 
 	graphCli, _ := transCtx.Client.(model.GraphClient)
-	if vertex := graphCli.FindMatchedVertex(dag, comp); vertex != nil {
-		// check if the component needs to do other action.
-		ov, _ := vertex.(*model.ObjectVertex)
-		if ov.Action != model.ActionNoopPtr() {
-			return nil
-		}
+	if v := graphCli.FindMatchedVertex(dag, comp); v == nil {
+		graphCli.Status(dag, transCtx.ComponentOrig, comp)
 	}
-	graphCli.Status(dag, transCtx.ComponentOrig, comp)
 	return nil
 }
 
@@ -145,7 +138,7 @@ func (t *componentStatusTransformer) reconcileStatus(transCtx *componentTransfor
 	hasFailedPod, messages := t.hasFailedPod()
 
 	// check if the component scale out failed
-	isScaleOutFailed, err := t.isScaleOutFailed(transCtx)
+	hasRunningScaleOut, hasFailedScaleOut, err := t.hasScaleOutRunning(transCtx)
 	if err != nil {
 		return err
 	}
@@ -158,7 +151,7 @@ func (t *componentStatusTransformer) reconcileStatus(transCtx *componentTransfor
 
 	// calculate if the component has failure
 	hasFailure := func() bool {
-		return hasFailedPod || isScaleOutFailed || hasFailedVolumeExpansion
+		return hasFailedPod || hasFailedScaleOut || hasFailedVolumeExpansion
 	}()
 
 	// check if the component is in creating phase
@@ -169,7 +162,7 @@ func (t *componentStatusTransformer) reconcileStatus(transCtx *componentTransfor
 
 	transCtx.Logger.Info(
 		fmt.Sprintf("status conditions, creating: %v, its running: %v, has failure: %v, updating: %v, config synced: %v",
-			isInCreatingPhase, isITSUpdatedNRunning, hasFailure, hasRunningVolumeExpansion, isAllConfigSynced))
+			isInCreatingPhase, isITSUpdatedNRunning, hasFailure, hasRunningScaleOut || hasRunningVolumeExpansion, isAllConfigSynced))
 
 	switch {
 	case isDeleting:
@@ -178,7 +171,7 @@ func (t *componentStatusTransformer) reconcileStatus(transCtx *componentTransfor
 		t.setComponentStatusPhase(transCtx, appsv1.StoppingComponentPhase, nil, "component is Stopping")
 	case stopped:
 		t.setComponentStatusPhase(transCtx, appsv1.StoppedComponentPhase, nil, "component is Stopped")
-	case isITSUpdatedNRunning && isAllConfigSynced && !hasRunningVolumeExpansion:
+	case isITSUpdatedNRunning && isAllConfigSynced && !hasRunningScaleOut && !hasRunningVolumeExpansion:
 		t.setComponentStatusPhase(transCtx, appsv1.RunningComponentPhase, nil, "component is Running")
 	case !hasFailure && isInCreatingPhase:
 		t.setComponentStatusPhase(transCtx, appsv1.CreatingComponentPhase, nil, "component is Creating")
@@ -250,69 +243,30 @@ func (t *componentStatusTransformer) isAllConfigSynced(transCtx *componentTransf
 	return true, nil
 }
 
-// isScaleOutFailed checks if the component scale out failed.
-func (t *componentStatusTransformer) isScaleOutFailed(transCtx *componentTransformContext) (bool, error) {
-	if t.runningITS == nil {
-		return false, nil
-	}
-	if t.runningITS.Spec.Replicas == nil {
-		return false, nil
-	}
-	if t.synthesizeComp.Replicas <= *t.runningITS.Spec.Replicas {
-		return false, nil
+// hasScaleOutRunning checks if the scale out is running.
+func (t *componentStatusTransformer) hasScaleOutRunning(transCtx *componentTransformContext) (running bool, failed bool, err error) {
+	if t.runningITS == nil || t.runningITS.Spec.Replicas == nil {
+		return false, false, nil
 	}
 
-	reqCtx := intctrlutil.RequestCtx{
-		Ctx:      transCtx.Context,
-		Log:      transCtx.Logger,
-		Recorder: transCtx.EventRecorder,
-	}
-	backupKey := types.NamespacedName{
-		Namespace: t.runningITS.Namespace,
-		Name:      constant.GenerateResourceNameWithScalingSuffix(t.runningITS.Name),
-	}
-	d, err := newDataClone(reqCtx, t.Client, t.cluster, t.synthesizeComp, t.runningITS, t.protoITS, backupKey)
+	replicas, err := component.GetReplicasStatusFunc(t.protoITS, func(status component.ReplicaStatus) bool {
+		return status.DataLoaded != nil && !*status.DataLoaded ||
+			status.MemberJoined != nil && !*status.MemberJoined
+	})
 	if err != nil {
-		return false, err
+		return false, false, err
 	}
-	if status, err := d.CheckBackupStatus(); err != nil {
-		return false, err
-	} else if status == backupStatusFailed {
-		return true, nil
+	if len(replicas) == 0 {
+		return false, false, nil
 	}
-	desiredPodNames, err := generatePodNames(t.synthesizeComp)
-	if err != nil {
-		return false, err
-	}
-	currentPodNames, err := generatePodNamesByITS(t.runningITS)
-	if err != nil {
-		return false, err
-	}
-	currentPodNameSet := sets.New(currentPodNames...)
-	for _, podName := range desiredPodNames {
-		if _, ok := currentPodNameSet[podName]; ok {
-			continue
-		}
-		// backup's ready, then start to check restore
-		templateName, index, err := component.GetTemplateNameAndOrdinal(t.runningITS.Name, podName)
-		if err != nil {
-			return false, err
-		}
-		if status, err := d.CheckRestoreStatus(templateName, index); err != nil {
-			return false, err
-		} else if status == dpv1alpha1.RestorePhaseFailed {
-			return true, nil
-		}
-	}
-	return false, nil
+
+	// TODO: scale-out failed
+
+	return true, false, nil
 }
 
 // hasVolumeExpansionRunning checks if the volume expansion is running.
-func (t *componentStatusTransformer) hasVolumeExpansionRunning(transCtx *componentTransformContext) (bool, bool, error) {
-	var (
-		running bool
-		failed  bool
-	)
+func (t *componentStatusTransformer) hasVolumeExpansionRunning(transCtx *componentTransformContext) (running bool, failed bool, err error) {
 	for _, vct := range t.runningITS.Spec.VolumeClaimTemplates {
 		volumes, err := getRunningVolumes(transCtx.Context, t.Client, t.synthesizeComp, t.runningITS, vct.Name)
 		if err != nil {

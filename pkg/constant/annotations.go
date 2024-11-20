@@ -19,10 +19,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package constant
 
-const (
-	HorizontalScaleBackupPolicyTemplateKey = "apps.kubeblocks.io/horizontal-scale-backup-policy-template"
-)
-
 // annotations defined by KubeBlocks
 const (
 	ClusterSnapshotAnnotationKey         = "kubeblocks.io/cluster-snapshot"          // ClusterSnapshotAnnotationKey saves the snapshot of cluster.
@@ -46,7 +42,6 @@ const (
 
 	// NodeSelectorOnceAnnotationKey adds nodeSelector in podSpec for one pod exactly once
 	NodeSelectorOnceAnnotationKey = "workloads.kubeblocks.io/node-selector-once"
-	MemberJoinStatusAnnotationKey = "workloads.kubeblocks.io/memberjoin-pod-list"
 )
 
 // annotations for multi-cluster

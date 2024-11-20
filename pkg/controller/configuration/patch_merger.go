@@ -20,31 +20,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package configuration
 
 import (
-	"fmt"
-
-	corev1 "k8s.io/api/core/v1"
-
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-func ApplyParameters(item parametersv1alpha1.ConfigTemplateItemDetail, orig *corev1.ConfigMap, configRender *parametersv1alpha1.ParameterDrivenConfigRender, paramsDefs []*parametersv1alpha1.ParametersDefinition) (*corev1.ConfigMap, error) {
-	if configRender == nil || len(configRender.Spec.Configs) == 0 {
-		return nil, fmt.Errorf("not support parameter reconfigure")
-	}
-
-	newData, err := DoMerge(orig.Data, item.ConfigFileParams, paramsDefs, configRender.Spec.Configs)
-	if err != nil {
-		return nil, err
-	}
-
-	expected := orig.DeepCopy()
-	expected.Data = newData
-	return expected, nil
-}
-
-func DoMerge(baseData map[string]string, patch map[string]parametersv1alpha1.ParametersInFile, paramsDefs []*parametersv1alpha1.ParametersDefinition, configDescs []parametersv1alpha1.ComponentConfigDescription) (map[string]string, error) {
+func DoMerge(baseData map[string]string,
+	patch map[string]parametersv1alpha1.ParametersInFile,
+	paramsDefs []*parametersv1alpha1.ParametersDefinition,
+	configDescs []parametersv1alpha1.ComponentConfigDescription) (map[string]string, error) {
 	var (
 		updatedFiles  = make(map[string]string, len(patch))
 		updatedParams = make([]core.ParamPairs, 0, len(patch))

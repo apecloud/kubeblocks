@@ -36,6 +36,8 @@ import (
 const (
 	compDefName              = "test-compdef"
 	clusterName              = "test-cluster"
+	paramsDefName            = "mysql-params-def"
+	pdcrName                 = "mysql-pdcr"
 	configTemplateName       = "test-config-template"
 	scriptTemplateName       = "test-script-template"
 	mysqlCompName            = "mysql"

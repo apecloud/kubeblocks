@@ -17,6 +17,8 @@ limitations under the License.
 package configuration
 
 import (
+	"fmt"
+
 	corev1 "k8s.io/api/core/v1"
 
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
@@ -41,12 +43,35 @@ func RerenderParametersTemplate(reconcileCtx *render.ReconcileCtx, item paramete
 	if err != nil {
 		return nil, err
 	}
+
 	if item.CustomTemplates != nil {
-		newData, err := mergerConfigTemplate(*item.CustomTemplates, templateRender, *item.ConfigSpec, cmObj.Data, defs, configRender, reconcileCtx.Context, reconcileCtx.Client)
+		mergedData, err := mergerConfigTemplate(*item.CustomTemplates,
+			templateRender,
+			*item.ConfigSpec,
+			cmObj.Data,
+			defs,
+			configRender,
+			reconcileCtx.Context,
+			reconcileCtx.Client)
 		if err != nil {
 			return nil, err
 		}
-		cmObj.Data = newData
+		cmObj.Data = mergedData
 	}
 	return cmObj, nil
+}
+
+func ApplyParameters(item parametersv1alpha1.ConfigTemplateItemDetail, orig *corev1.ConfigMap, configRender *parametersv1alpha1.ParameterDrivenConfigRender, paramsDefs []*parametersv1alpha1.ParametersDefinition) (*corev1.ConfigMap, error) {
+	if configRender == nil || len(configRender.Spec.Configs) == 0 {
+		return nil, fmt.Errorf("not support parameter reconfigure")
+	}
+
+	newData, err := DoMerge(orig.Data, item.ConfigFileParams, paramsDefs, configRender.Spec.Configs)
+	if err != nil {
+		return nil, err
+	}
+
+	expected := orig.DeepCopy()
+	expected.Data = newData
+	return expected, nil
 }

@@ -19,11 +19,10 @@ package render
 import (
 	"context"
 
-	v2 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	v1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	"github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 )
 
@@ -41,11 +40,11 @@ type ResourceCtx struct {
 type ReconcileCtx struct {
 	*ResourceCtx
 
-	Cluster              *v1.Cluster
-	Component            *v1.Component
+	Cluster              *appsv1.Cluster
+	Component            *appsv1.Component
 	SynthesizedComponent *component.SynthesizedComponent
-	PodSpec              *v2.PodSpec
-	ComponentParameter   *v1alpha1.ComponentParameter
+	PodSpec              *corev1.PodSpec
+	ComponentParameters  appsv1.ComponentParameters
 
 	Cache []client.Object
 }

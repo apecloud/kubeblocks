@@ -126,8 +126,8 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 
 	limitSharedMemoryVolumeSize(synthesizeComp, comp)
 
-	// build componentService
-	buildComponentServices(synthesizeComp, comp)
+	// override componentService
+	overrideComponentServices(synthesizeComp, comp)
 
 	if err = overrideConfigTemplates(synthesizeComp, comp); err != nil {
 		return nil, err
@@ -138,6 +138,10 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 
 	// build runtimeClassName
 	buildRuntimeClassName(synthesizeComp, comp)
+
+	if err = buildSidecars(ctx, cli, comp, synthesizeComp); err != nil {
+		return nil, err
+	}
 
 	if err = buildKBAgentContainer(synthesizeComp); err != nil {
 		return nil, errors.Wrap(err, "build kb-agent container failed")
@@ -290,19 +294,6 @@ func mergeUserDefinedVolumes(synthesizedComp *SynthesizedComponent, comp *appsv1
 		}
 	}
 
-	// for _, cc := range [][]corev1.Container{synthesizedComp.PodSpec.InitContainers, synthesizedComp.PodSpec.Containers} {
-	//	for _, c := range cc {
-	//		missed := make([]string, 0)
-	//		for _, mount := range c.VolumeMounts {
-	//			if !volumes[mount.Name] {
-	//				missed = append(missed, mount.Name)
-	//			}
-	//		}
-	//		if len(missed) > 0 {
-	//			return fmt.Errorf("volumes should be provided for mounts %s", strings.Join(missed, ","))
-	//		}
-	//	}
-	// }
 	synthesizedComp.PodSpec.Volumes = append(synthesizedComp.PodSpec.Volumes, comp.Spec.Volumes...)
 	return nil
 }
@@ -368,7 +359,7 @@ func buildAndUpdateResources(synthesizeComp *SynthesizedComponent, comp *appsv1.
 	}
 }
 
-func buildComponentServices(synthesizeComp *SynthesizedComponent, comp *appsv1.Component) {
+func overrideComponentServices(synthesizeComp *SynthesizedComponent, comp *appsv1.Component) {
 	if len(synthesizeComp.ComponentServices) == 0 || len(comp.Spec.Services) == 0 {
 		return
 	}

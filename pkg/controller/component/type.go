@@ -42,6 +42,7 @@ type SynthesizedComponent struct {
 	Replicas                         int32                                  `json:"replicas"`
 	Resources                        corev1.ResourceRequirements            `json:"resources,omitempty"`
 	PodSpec                          *corev1.PodSpec                        `json:"podSpec,omitempty"`
+	SidecarVars                      []kbappsv1.EnvVar                      // vars defined by sidecars
 	VolumeClaimTemplates             []corev1.PersistentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
 	LogConfigs                       []kbappsv1.LogConfig                   `json:"logConfigs,omitempty"`
 	ConfigTemplates                  []kbappsv1.ComponentConfigSpec         `json:"configTemplates,omitempty"`

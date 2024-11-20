@@ -296,7 +296,7 @@ func buildPodSpecVolumeMounts(synthesizeComp *component.SynthesizedComponent) {
 				if slices.Contains(kbScriptAndConfigVolumeNames, v.Name) {
 					continue
 				}
-				// if persistence is not found, add emptyDir pod.spec.volumes[]
+				// if persistence is not found, add an emptyDir to pod.spec.volumes
 				createFn := func(_ string) corev1.Volume {
 					return corev1.Volume{
 						Name: v.Name,

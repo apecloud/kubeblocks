@@ -25,6 +25,7 @@ const (
 	shardingDefinitionFinalizerName  = "shardingdefinition.kubeblocks.io/finalizer"
 	componentDefinitionFinalizerName = "componentdefinition.kubeblocks.io/finalizer"
 	componentVersionFinalizerName    = "componentversion.kubeblocks.io/finalizer"
+	sidecarDefinitionFinalizerName   = "sidecardefinition.kubeblocks.io/finalizer"
 )
 
 const (

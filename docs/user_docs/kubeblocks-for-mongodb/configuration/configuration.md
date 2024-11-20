@@ -62,7 +62,7 @@ The example below configures systemLog.verbosity to 1.
           kbcli cluster describe-ops mycluster-reconfiguring-q8ndn -n default
    ```
 
-2. Check the configuration history.
+2. Check the configuration history and view whether the configuration is successful.
 
    ```bash
 
@@ -133,7 +133,7 @@ View the parameter configuration history.
 kbcli cluster describe-config mycluster -n demo                 
 ```
 
-If you perform several parameter configurations, you can Ccmpare these modifications to view the configured parameters and their different values for different versions.
+If you perform several parameter configurations, you can compare these modifications to view the configured parameters and their different values for different versions.
 
 ```bash
 kbcli cluster diff-config mycluster-reconfiguring-q8ndn mycluster-reconfiguring-hxqfx -n demo

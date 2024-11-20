@@ -29,17 +29,6 @@ KubeBlocks 支持对 MySQL 集群进行垂直扩缩容和水平扩缩容。
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli">
-
-```bash
-kbcli cluster list mycluster -n demo
->
-NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    CREATED-TIME
-mycluster   demo        mysql                mysql-8.0.33   Delete               Running   Jul 05,2024 18:46 UTC+0800
-```
-
-</TabItem>
-
 <TabItem value="kubectl" label="kubectl" default>
 
 ```bash
@@ -47,6 +36,17 @@ kubectl get cluster mycluster -n demo
 >
 NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    AGE
 mycluster   mysql                mysql-8.0.33   Delete               Running   18m
+```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+```bash
+kbcli cluster list mycluster -n demo
+>
+NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    CREATED-TIME
+mycluster   demo        mysql                mysql-8.0.33   Delete               Running   Jul 05,2024 18:46 UTC+0800
 ```
 
 </TabItem>
@@ -164,9 +164,9 @@ mycluster   mysql                mysql-8.0.33   Delete               Running   1
 
 2. 通过以下任意一种方式验证垂直扩容是否完成。
 
-    - 查看 OpsRequest 进程。
+    - 查看 OpsRequest 进度。
 
-        执行磁盘扩容命令后，KubeBlocks 会自动输出查看 OpsRequest 进程的命令，可通过该命令查看 OpsRequest 进程的细节，包括 OpsRequest 的状态、Pod 状态等。当 OpsRequest 的状态为 `Succeed` 时，表明这一进程已完成。
+        执行命令后，KubeBlocks 会自动输出查看 OpsRequest 进度的命令，可通过该命令查看 OpsRequest 进度的细节，包括 OpsRequest 的状态、Pod 状态等。当 OpsRequest 的状态为 `Succeed` 时，表明这一任务已完成。
     - 查看集群状态。
 
         ```bash
@@ -203,17 +203,6 @@ mycluster   mysql                mysql-8.0.33   Delete               Running   1
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli">
-
-```bash
-kbcli cluster list mycluster -n demo
->
-NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    CREATED-TIME
-mycluster   demo        mysql                mysql-8.0.33   Delete               Running   Jul 05,2024 18:46 UTC+0800
-```
-
-</TabItem>
-
 <TabItem value="kubectl" label="kubectl" default>
 
 ```bash
@@ -221,6 +210,17 @@ kubectl get cluster mycluster -n demo
 >
 NAME        CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    AGE
 mycluster   mysql                mysql-8.0.33   Delete               Running   18m
+```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+```bash
+kbcli cluster list mycluster -n demo
+>
+NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS    CREATED-TIME
+mycluster   demo        mysql                mysql-8.0.33   Delete               Running   Jul 05,2024 18:46 UTC+0800
 ```
 
 </TabItem>
@@ -348,9 +348,9 @@ mycluster   mysql                mysql-8.0.33   Delete               Running   1
 
 2. 通过以下任意一种方式验证水平扩容是否成功。
 
-   - 查看 OpsRequest 进程。
+   - 查看 OpsRequest 进度。
 
-       执行磁盘扩容命令后，KubeBlocks 会自动输出查看 OpsRequest 进程的命令，可通过该命令查看 OpsRequest 进程的细节，包括 OpsRequest 的状态、Pod 状态等。当 OpsRequest 的状态为 `Succeed` 时，表明这一进程已完成。
+       执行命令后，KubeBlocks 会自动输出查看 OpsRequest 进度的命令，可通过该命令查看 OpsRequest 进度的细节，包括 OpsRequest 的状态、Pod 状态等。当 OpsRequest 的状态为 `Succeed` 时，表明这一任务已完成。
 
        ```bash
        kbcli cluster describe-ops mycluster-horizontalscaling-g67k9 -n demo

@@ -19,17 +19,6 @@ import TabItem from '@theme/TabItem';
 
    <Tabs>
 
-   <TabItem value="kbcli" label="kbcli">
-
-   ```bash
-   kbcli cluster list mycluster -n demo
-   >
-   NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    CREATED-TIME
-   mycluster   demo        apecloud-mysql       ac-mysql-8.0.30   Delete               Running   Sep 19,2024 16:01 UTC+0800
-   ```
-
-   </TabItem>
-
    <TabItem value="kubectl" label="kubectl" default>
 
    ```bash
@@ -37,6 +26,17 @@ import TabItem from '@theme/TabItem';
    >
    NAME        CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    AGE
    mycluster   apecloud-mysql       ac-mysql-8.0.30   Delete               Running   27m
+   ```
+
+   </TabItem>
+
+   <TabItem value="kbcli" label="kbcli">
+
+   ```bash
+   kbcli cluster list mycluster -n demo
+   >
+   NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    CREATED-TIME
+   mycluster   demo        apecloud-mysql       ac-mysql-8.0.30   Delete               Running   Sep 19,2024 16:01 UTC+0800
    ```
 
    </TabItem>
@@ -60,28 +60,6 @@ import TabItem from '@theme/TabItem';
 将 ApeCloud MySQL 集群版集群的一个 Follower 切换为 Leader，并将原 Leader 实例切换为 Follower。
 
 <Tabs>
-
-<TabItem value="kbcli" label="kbcli">
-
-* 不指定 Leader 实例进行切换。
-
-    ```bash
-    kbcli cluster promote mycluster -n demo
-    ```
-
-* 指定一个新的 Leader 实例进行切换。
-
-    ```bash
-    kbcli cluster promote mycluster --instance='mycluster-mysql-2' -n demo
-    ```
-
-* 如果有多个组件，可以使用 `--components` 参数指定一个组件。
-
-    ```bash
-    kbcli cluster promote mycluster --instance='mycluster-mysql-2' --components='apecloud-mysql' -n demo
-    ```
-
-</TabItem>
 
 <TabItem value="kubectl" label="kubectl" default>
 
@@ -123,6 +101,28 @@ import TabItem from '@theme/TabItem';
 
 </TabItem>
 
+<TabItem value="kbcli" label="kbcli">
+
+* 不指定 Leader 实例进行切换。
+
+    ```bash
+    kbcli cluster promote mycluster -n demo
+    ```
+
+* 指定一个新的 Leader 实例进行切换。
+
+    ```bash
+    kbcli cluster promote mycluster --instance='mycluster-mysql-2' -n demo
+    ```
+
+* 如果有多个组件，可以使用 `--components` 参数指定一个组件。
+
+    ```bash
+    kbcli cluster promote mycluster --instance='mycluster-mysql-2' --components='apecloud-mysql' -n demo
+    ```
+
+</TabItem>
+
 </Tabs>
 
 ## 验证集群切换
@@ -131,18 +131,18 @@ import TabItem from '@theme/TabItem';
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli">
-
-```bash
-kbcli cluster list-instances -n demo
-```
-
-</TabItem>
-
 <TabItem value="kubectl" label="kubectl" default>
 
 ```bash
 kubectl get pods -n demo
+```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+```bash
+kbcli cluster list-instances -n demo
 ```
 
 </TabItem>

@@ -96,7 +96,7 @@ func getPodsForOnlineUpdate(params reconfigureContext) ([]corev1.Pod, error) {
 
 // TODO commonOnlineUpdateWithPod migrate to sql command pipeline
 func commonOnlineUpdateWithPod(pod *corev1.Pod, ctx context.Context, createClient createReconfigureClient, configSpec string, configFile string, updatedParams map[string]string) error {
-	address, err := cfgManagerGrpcURL(pod)
+	address, err := resolveReloadServerGrpcURL(pod)
 	if err != nil {
 		return err
 	}
@@ -131,7 +131,7 @@ func commonStopContainerWithPod(pod *corev1.Pod, ctx context.Context, containerN
 		containerIDs = append(containerIDs, containerID)
 	}
 
-	address, err := cfgManagerGrpcURL(pod)
+	address, err := resolveReloadServerGrpcURL(pod)
 	if err != nil {
 		return err
 	}
@@ -155,19 +155,19 @@ func commonStopContainerWithPod(pod *corev1.Pod, ctx context.Context, containerN
 	return nil
 }
 
-func cfgManagerGrpcURL(pod *corev1.Pod) (string, error) {
+func resolveReloadServerGrpcURL(pod *corev1.Pod) (string, error) {
 	podPort := viper.GetInt(constant.ConfigManagerGPRCPortEnv)
 	if pod.Spec.HostNetwork {
-		containerPort, err := configuration.GetConfigManagerGRPCPort(pod.Spec.Containers)
+		containerPort, err := configuration.ResolveReloadServerGRPCPort(pod.Spec.Containers)
 		if err != nil {
 			return "", err
 		}
 		podPort = int(containerPort)
 	}
-	return getURLFromPod(pod, podPort)
+	return generateGrpcURL(pod, podPort)
 }
 
-func getURLFromPod(pod *corev1.Pod, portPort int) (string, error) {
+func generateGrpcURL(pod *corev1.Pod, portPort int) (string, error) {
 	ip, err := ipAddressFromPod(pod.Status)
 	if err != nil {
 		return "", err
@@ -286,22 +286,24 @@ func resolveReloadActionPolicy(jsonPatch string,
 	return policy, nil
 }
 
+// genReconfigureActionTasks generates a list of reconfiguration tasks based on the provided templateSpec,
+// reconfiguration context, configuration patch, and a restart flag.
 func genReconfigureActionTasks(templateSpec *appsv1.ComponentTemplateSpec, rctx *ReconcileContext, patch *core.ConfigPatchInfo, restart bool) ([]ReloadAction, error) {
 	var tasks []ReloadAction
 
+	// If the patch or ConfigRender is nil, return a single restart task.
 	if patch == nil || rctx.ConfigRender == nil {
 		return []ReloadAction{buildRestartTask(templateSpec, rctx)}, nil
 	}
 
-	checkNeedReloadAction := func(pd *parametersv1alpha1.ParametersDefinition, policy parametersv1alpha1.ReloadPolicy) bool {
-		if restart {
-			return policy == parametersv1alpha1.SyncDynamicReloadPolicy && intctrlutil.NeedDynamicReloadAction(&pd.Spec)
-		}
-		return true
+	// needReloadAction determines if a reload action is needed based on the ParametersDefinition and ReloadPolicy.
+	needReloadAction := func(pd *parametersv1alpha1.ParametersDefinition, policy parametersv1alpha1.ReloadPolicy) bool {
+		return !restart || (policy == parametersv1alpha1.SyncDynamicReloadPolicy && intctrlutil.NeedDynamicReloadAction(&pd.Spec))
 	}
 
 	for key, jsonPatch := range patch.UpdateConfig {
 		pd, ok := rctx.ParametersDefs[key]
+		// If the ParametersDefinition or its ReloadAction is nil, continue to the next iteration.
 		if !ok || pd.Spec.ReloadAction == nil {
 			continue
 		}
@@ -309,15 +311,18 @@ func genReconfigureActionTasks(templateSpec *appsv1.ComponentTemplateSpec, rctx 
 		if configFormat == nil || configFormat.FileFormatConfig == nil {
 			continue
 		}
+		// Determine the appropriate ReloadPolicy.
 		policy, err := resolveReloadActionPolicy(string(jsonPatch), configFormat.FileFormatConfig, &pd.Spec)
 		if err != nil {
 			return nil, err
 		}
-		if checkNeedReloadAction(pd, policy) {
+		// If a reload action is needed, append a new reload action task to the tasks slice.
+		if needReloadAction(pd, policy) {
 			tasks = append(tasks, buildReloadActionTask(policy, templateSpec, rctx, pd, configFormat, patch))
 		}
 	}
 
+	// If no tasks were added, return a single restart task.
 	if len(tasks) == 0 {
 		return []ReloadAction{buildRestartTask(templateSpec, rctx)}, nil
 	}
@@ -342,7 +347,7 @@ func buildReloadActionTask(reloadPolicy parametersv1alpha1.ReloadPolicy, templat
 	}
 
 	if reloadPolicy == parametersv1alpha1.SyncDynamicReloadPolicy {
-		reCtx.UpdatedParameters = getOnlineUpdateParams(patch, &pd.Spec, *configDescription)
+		reCtx.UpdatedParameters = generateOnlineUpdateParams(patch, &pd.Spec, *configDescription)
 	}
 
 	return reconfigureTask{ReloadPolicy: reloadPolicy, taskCtx: reCtx}

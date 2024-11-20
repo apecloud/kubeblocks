@@ -130,7 +130,12 @@ func GetClientFactory() createReconfigureClient {
 }
 
 func (param *reconfigureContext) getConfigKey() string {
-	return param.ConfigTemplate.Name
+	key := param.ConfigTemplate.Name
+	if param.ConfigDescription != nil && param.ConfigDescription.Name != "" {
+		hash, _ := util.ComputeHash(param.ConfigDescription.Name)
+		key = key + "/" + hash
+	}
+	return key
 }
 
 func (param *reconfigureContext) getTargetVersionHash() string {

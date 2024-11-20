@@ -243,12 +243,12 @@ func buildConfigManagerParams(cli client.Client, ctx context.Context, cluster *a
 	return cfgManagerParams, nil
 }
 
-func GetConfigManagerGRPCPort(containers []corev1.Container) (int32, error) {
+func ResolveReloadServerGRPCPort(containers []corev1.Container) (int32, error) {
 	for _, container := range containers {
 		if container.Name != constant.ConfigSidecarName {
 			continue
 		}
-		if port, ok := findPortByPortName(container); ok {
+		if port, ok := resolveReloadContainerPort(container); ok {
 			return port, nil
 		}
 	}
@@ -265,7 +265,7 @@ func allocConfigManagerHostPort(comp *component.SynthesizedComponent) (int32, er
 	return port, nil
 }
 
-func findPortByPortName(container corev1.Container) (int32, bool) {
+func resolveReloadContainerPort(container corev1.Container) (int32, bool) {
 	for _, port := range container.Ports {
 		if port.Name == constant.ConfigManagerPortName {
 			return port.ContainerPort, true

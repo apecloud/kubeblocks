@@ -128,7 +128,7 @@ func sync(rctx reconfigureContext, updatedParameters map[string]string, pods []c
 	return makeReturnedStatus(r, withExpected(requireUpdatedCount), withSucceed(progress)), nil
 }
 
-func getOnlineUpdateParams(configPatch *core.ConfigPatchInfo, paramDef *parametersv1alpha1.ParametersDefinitionSpec, description parametersv1alpha1.ComponentConfigDescription) map[string]string {
+func generateOnlineUpdateParams(configPatch *core.ConfigPatchInfo, paramDef *parametersv1alpha1.ParametersDefinitionSpec, description parametersv1alpha1.ComponentConfigDescription) map[string]string {
 	r := make(map[string]string)
 	dynamicAction := intctrlutil.NeedDynamicReloadAction(paramDef)
 	needReloadStaticParameters := intctrlutil.ReloadStaticParameters(paramDef)

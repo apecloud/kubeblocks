@@ -234,13 +234,35 @@ func (r *ReconfigureReconciler) performUpgrade(rctx *ReconcileContext, reloadTas
 	var reloadType string
 
 	for _, task := range reloadTasks {
-		returnedStatus, err = task.ExecReload()
 		reloadType = task.ReloadType()
+		returnedStatus, err = task.ExecReload()
 		if err != nil || returnedStatus.Status != ESNone {
 			return r.status(rctx, returnedStatus, reloadType, err)
 		}
 	}
+	return r.succeed(rctx, reloadType, returnedStatus)
+}
 
+func (r *ReconfigureReconciler) status(rctx *ReconcileContext, returnedStatus ReturnedStatus, policy string, err error) (ctrl.Result, error) {
+	updatePhase := func(phase parametersv1alpha1.ParameterPhase, options ...options) (ctrl.Result, error) {
+		return updateConfigPhaseWithResult(rctx.Client, rctx.RequestCtx, rctx.ConfigMap, reconciled(returnedStatus, policy, phase, options...))
+	}
+
+	switch returnedStatus.Status {
+	case ESFailedAndRetry:
+		return updatePhase(parametersv1alpha1.CFailedPhase, withFailed(err, true))
+	case ESRetry:
+		return updatePhase(parametersv1alpha1.CUpgradingPhase)
+	case ESFailed:
+		return updatePhase(parametersv1alpha1.CFailedAndPausePhase, withFailed(err, false))
+	case ESNone:
+		return r.succeed(rctx, policy, returnedStatus)
+	default:
+		return updatePhase(parametersv1alpha1.CFailedAndPausePhase, withFailed(core.MakeError("unknown status"), false))
+	}
+}
+
+func (r *ReconfigureReconciler) succeed(rctx *ReconcileContext, reloadType string, returnedStatus ReturnedStatus) (ctrl.Result, error) {
 	rctx.Recorder.Eventf(rctx.ConfigMap,
 		corev1.EventTypeNormal,
 		appsv1alpha1.ReasonReconfigureSucceed,
@@ -249,50 +271,4 @@ func (r *ReconfigureReconciler) performUpgrade(rctx *ReconcileContext, reloadTas
 
 	result := reconciled(returnedStatus, reloadType, parametersv1alpha1.CFinishedPhase)
 	return r.updateConfigCMStatus(rctx.RequestCtx, rctx.ConfigMap, reloadType, &result)
-}
-
-func (r *ReconfigureReconciler) status(rctx *ReconcileContext, returnedStatus ReturnedStatus, policy string, err error) (ctrl.Result, error) {
-	switch returnedStatus.Status {
-	default:
-		return updateConfigPhaseWithResult(
-			rctx.Client,
-			rctx.RequestCtx,
-			rctx.ConfigMap,
-			reconciled(returnedStatus, policy, parametersv1alpha1.CFailedAndPausePhase,
-				withFailed(core.MakeError("unknown status"), false)),
-		)
-	case ESFailedAndRetry:
-		return updateConfigPhaseWithResult(
-			rctx.Client,
-			rctx.RequestCtx,
-			rctx.ConfigMap,
-			reconciled(returnedStatus, policy, parametersv1alpha1.CFailedPhase,
-				withFailed(err, true)),
-		)
-	case ESRetry:
-		return updateConfigPhaseWithResult(
-			rctx.Client,
-			rctx.RequestCtx,
-			rctx.ConfigMap,
-			reconciled(returnedStatus, policy, parametersv1alpha1.CUpgradingPhase),
-		)
-	case ESFailed:
-		return updateConfigPhaseWithResult(
-			rctx.Client,
-			rctx.RequestCtx,
-			rctx.ConfigMap,
-			reconciled(returnedStatus, policy, parametersv1alpha1.CFailedAndPausePhase,
-				withFailed(err, false)),
-		)
-	case ESNone:
-		rctx.Recorder.Eventf(
-			rctx.ConfigMap,
-			corev1.EventTypeNormal,
-			appsv1alpha1.ReasonReconfigureSucceed,
-			"the reconfigure[%s] has been processed successfully",
-			policy,
-		)
-		result := reconciled(returnedStatus, policy, parametersv1alpha1.CFinishedPhase)
-		return r.updateConfigCMStatus(rctx.RequestCtx, rctx.ConfigMap, policy, &result)
-	}
 }

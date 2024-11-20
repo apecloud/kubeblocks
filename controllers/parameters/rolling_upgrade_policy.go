@@ -77,20 +77,20 @@ func performRollingUpgrade(rctx reconfigureContext, funcs RollingUpgradeFuncs) (
 		return makeReturnedStatus(ESRetry), nil
 	}
 
-	podStats := classifyPodByStats(pods, rctx.getTargetReplicas(), rctx.podMinReadySeconds())
-	podSwitchWindow := markDynamicSwitchWindow(pods, podStats, configKey, configVersion, rollingReplicas)
-	if !canSafeUpdatePods(podSwitchWindow) {
+	podStatus := classifyPodByStats(pods, rctx.getTargetReplicas(), rctx.podMinReadySeconds())
+	updateWindow := markDynamicSwitchWindow(pods, podStatus, configKey, configVersion, rollingReplicas)
+	if !canSafeUpdatePods(updateWindow) {
 		rctx.Log.Info("wait for pod stat ready.")
 		return makeReturnedStatus(ESRetry), nil
 	}
 
-	waitUpgradingPods := podSwitchWindow.getWaitUpgradePods()
-	if len(waitUpgradingPods) == 0 {
-		return makeReturnedStatus(ESNone, withSucceed(int32(podStats.targetReplica)), withExpected(int32(podStats.targetReplica))), nil
+	podsToUpgrade := updateWindow.getPendingUpgradePods()
+	if len(podsToUpgrade) == 0 {
+		return makeReturnedStatus(ESNone, withSucceed(int32(podStatus.targetReplica)), withExpected(int32(podStatus.targetReplica))), nil
 	}
 
-	for _, pod := range waitUpgradingPods {
-		if podStats.isUpdating(&pod) {
+	for _, pod := range podsToUpgrade {
+		if podStatus.isUpdating(&pod) {
 			rctx.Log.Info("pod is in rolling update.", "pod name", pod.Name)
 			continue
 		}
@@ -103,8 +103,8 @@ func performRollingUpgrade(rctx reconfigureContext, funcs RollingUpgradeFuncs) (
 	}
 
 	return makeReturnedStatus(ESRetry,
-		withExpected(int32(podStats.targetReplica)),
-		withSucceed(int32(len(podStats.updated)+len(podStats.updating)))), nil
+		withExpected(int32(podStatus.targetReplica)),
+		withSucceed(int32(len(podStatus.updated)+len(podStatus.updating)))), nil
 }
 
 func canSafeUpdatePods(wind switchWindow) bool {
@@ -201,7 +201,7 @@ type switchWindow struct {
 	*componentPodStats
 }
 
-func (w *switchWindow) getWaitUpgradePods() []corev1.Pod {
+func (w *switchWindow) getPendingUpgradePods() []corev1.Pod {
 	return w.pods[w.begin:w.end]
 }
 

@@ -181,6 +181,10 @@ func syncImpl(taskCtx *TaskContext,
 	return nil
 }
 
+// persistUpdatedParameters merges and updates parameter-related configmaps.
+// It first calls mergeAndApplyConfig to merge and update the configmap.
+// If the updatedConfig is nil, it returns nil. Otherwise, it calls updateInjectedEnvVars
+// to check and update the injected environment variables.
 func persistUpdatedParameters(rctx *configctrl.ResourceCtx,
 	comp *component.SynthesizedComponent,
 	configRender *parametersv1alpha1.ParameterDrivenConfigRender,
@@ -189,16 +193,16 @@ func persistUpdatedParameters(rctx *configctrl.ResourceCtx,
 	owner client.Object,
 	item parametersv1alpha1.ConfigTemplateItemDetail,
 	revision string) error {
-	if err := mergeAndUpdate(rctx, updatedConfig, original, owner, item, revision); err != nil {
+	if err := mergeAndApplyConfig(rctx, updatedConfig, original, owner, item, revision); err != nil {
 		return err
 	}
 	if updatedConfig == nil {
 		return nil
 	}
-	return checkAndUpdateInjectedEnv(rctx, comp, configRender, updatedConfig, owner, item, revision)
+	return updateInjectedEnvVars(rctx, comp, configRender, updatedConfig, owner, item, revision)
 }
 
-func checkAndUpdateInjectedEnv(rctx *configctrl.ResourceCtx,
+func updateInjectedEnvVars(rctx *configctrl.ResourceCtx,
 	comp *component.SynthesizedComponent,
 	configRender *parametersv1alpha1.ParameterDrivenConfigRender,
 	config *corev1.ConfigMap,
@@ -234,7 +238,7 @@ func checkAndUpdateInjectedEnv(rctx *configctrl.ResourceCtx,
 	return err
 }
 
-func mergeAndUpdate(resourceCtx *configctrl.ResourceCtx,
+func mergeAndApplyConfig(resourceCtx *configctrl.ResourceCtx,
 	expected *corev1.ConfigMap,
 	running *corev1.ConfigMap,
 	owner client.Object,

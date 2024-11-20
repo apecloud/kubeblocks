@@ -60,6 +60,7 @@ var _ = Describe("Reconfigure RollingPolicy", func() {
 			withConfigSpec("for_test", map[string]string{
 				"key": "value",
 			}),
+			withConfigDescription(&parametersv1alpha1.FileFormatConfig{Format: parametersv1alpha1.Properties}),
 			withGRPCClient(func(addr string) (cfgproto.ReconfigureClient, error) {
 				return reconfigureClient, nil
 			}),

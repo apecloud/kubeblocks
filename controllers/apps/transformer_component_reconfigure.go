@@ -79,7 +79,7 @@ func (t *componentReloadActionSidecarTransformer) Transform(ctx graph.TransformC
 	}
 
 	graphCli, _ := transCtx.Client.(model.GraphClient)
-	if err := checkAndCreateConfigRelatedObjs(transCtx, graphCli, dag, configmaps...); err != nil {
+	if err := ensureConfigMapsPresence(transCtx, graphCli, dag, configmaps...); err != nil {
 		return err
 	}
 	if err := updatePodVolumes(synthesizeComp.PodSpec, synthesizeComp); err != nil {
@@ -92,7 +92,7 @@ func (t *componentReloadActionSidecarTransformer) Transform(ctx graph.TransformC
 	return configctrl.BuildReloadActionContainer(reconcileCtx, cluster, synthesizeComp, transCtx.CompDef, configmaps)
 }
 
-func checkAndCreateConfigRelatedObjs(ctx context.Context, cli model.GraphClient, dag *graph.DAG, configmaps ...*corev1.ConfigMap) error {
+func ensureConfigMapsPresence(ctx context.Context, cli model.GraphClient, dag *graph.DAG, configmaps ...*corev1.ConfigMap) error {
 	for _, configmap := range configmaps {
 		var cm = &corev1.ConfigMap{}
 		if err := cli.Get(ctx, client.ObjectKeyFromObject(configmap), cm); err != nil {

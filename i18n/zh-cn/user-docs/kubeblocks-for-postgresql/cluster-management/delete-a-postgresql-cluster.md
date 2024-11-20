@@ -30,17 +30,6 @@ import TabItem from '@theme/TabItem';
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli">
-
-```bash
-kbcli cluster list mycluster -n demo
->
-NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION             TERMINATION-POLICY   STATUS    CREATED-TIME
-mycluster   demo        postgresql           postgresql-14.8.0   Delete               Running   Sep 28,2024 16:47 UTC+0800
-```
-
-</TabItem>
-
 <TabItem value="kubectl" label="kubectl" default>
 
 ```bash
@@ -52,6 +41,17 @@ mycluster   postgresql           postgresql-14.8.0   Delete               Runnin
 
 </TabItem>
 
+<TabItem value="kbcli" label="kbcli">
+
+```bash
+kbcli cluster list mycluster -n demo
+>
+NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION             TERMINATION-POLICY   STATUS    CREATED-TIME
+mycluster   demo        postgresql           postgresql-14.8.0   Delete               Running   Sep 28,2024 16:47 UTC+0800
+```
+
+</TabItem>
+
 </Tabs>
 
 ## 步骤
@@ -59,14 +59,6 @@ mycluster   postgresql           postgresql-14.8.0   Delete               Runnin
 执行以下命令，删除集群。
 
 <Tabs>
-
-<TabItem value="kbcli" label="kbcli">
-
-```bash
-kbcli cluster delete mycluster -n demo
-```
-
-</TabItem>
 
 <TabItem value="kubectl" label="kubectl" default>
 
@@ -80,6 +72,14 @@ kubectl delete cluster mycluster -n demo
 kubectl patch -n demo cluster mycluster -p '{"spec":{"terminationPolicy":"WipeOut"}}' --type="merge"
 
 kubectl delete -n demo cluster mycluster
+```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+```bash
+kbcli cluster delete mycluster -n demo
 ```
 
 </TabItem>

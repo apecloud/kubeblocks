@@ -23,34 +23,6 @@ KubeBlocks 支持重启集群中的所有 Pod。当数据库出现异常时，�
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli">
-
-1. 重启集群。
-
-   配置 `components` 和 `ttlSecondsAfterSucceed` 的值，执行以下命令来重启指定集群。
-
-   ```bash
-   kbcli cluster restart mycluster --components="mysql" \
-     --ttlSecondsAfterSucceed=30 -n demo
-   ```
-
-   - `components` 表示需要重启的组件名称。
-   - `ttlSecondsAfterSucceed` 表示重启成功后 OpsRequest 作业的生存时间。
-
-2. 检查集群状态，验证重启操作是否成功。
-
-   ```bash
-   kbcli cluster list mycluster -n demo
-   >
-   NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    CREATED-TIME
-   mycluster   demo        apecloud-mysql       ac-mysql-8.0.30   Delete               Running   Sep 19,2024 16:01 UTC+0800
-   ```
-
-   - STATUS=Updating 表示集群正在重启中。
-   - STATUS=Running 表示集群已重启。
-
-</TabItem>
-
 <TabItem value="kubectl" label="kubectl" default>
 
 1. 创建 OpsRequest 重启集群。
@@ -92,6 +64,34 @@ KubeBlocks 支持重启集群中的所有 Pod。当数据库出现异常时，�
    - STATUS=Running：表示集群已重启。
 
    如果操作过程中出现报错，可通过 `kubectl describe ops -n demo` 查看该操作的事件，协助排障。
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+1. 重启集群。
+
+   配置 `components` 和 `ttlSecondsAfterSucceed` 的值，执行以下命令来重启指定集群。
+
+   ```bash
+   kbcli cluster restart mycluster --components="mysql" \
+     --ttlSecondsAfterSucceed=30 -n demo
+   ```
+
+   - `components` 表示需要重启的组件名称。
+   - `ttlSecondsAfterSucceed` 表示重启成功后 OpsRequest 作业的生存时间。
+
+2. 检查集群状态，验证重启操作是否成功。
+
+   ```bash
+   kbcli cluster list mycluster -n demo
+   >
+   NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    CREATED-TIME
+   mycluster   demo        apecloud-mysql       ac-mysql-8.0.30   Delete               Running   Sep 19,2024 16:01 UTC+0800
+   ```
+
+   - STATUS=Updating 表示集群正在重启中。
+   - STATUS=Running 表示集群已重启。
 
 </TabItem>
 

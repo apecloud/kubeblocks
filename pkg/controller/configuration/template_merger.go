@@ -88,7 +88,7 @@ type configOnlyAddMerger struct {
 }
 
 func (c *configPatcher) Merge(baseData map[string]string, updatedData map[string]string) (map[string]string, error) {
-	if c.configRender == nil {
+	if c.configRender == nil || len(c.configRender.Spec.Configs) == 0 {
 		return nil, fmt.Errorf("not support patch merge policy")
 	}
 	configPatch, err := core.TransformConfigPatchFromData(updatedData, c.configRender.Spec)
@@ -126,7 +126,7 @@ func (c *configReplaceMerger) Merge(baseData map[string]string, updatedData map[
 	return core.MergeUpdatedConfig(baseData, updatedData), nil
 }
 
-func (c *configOnlyAddMerger) Merge(baseData map[string]string, updatedData map[string]string) (map[string]string, error) {
+func (c *configOnlyAddMerger) Merge(map[string]string, map[string]string) (map[string]string, error) {
 	return nil, core.MakeError("not implemented")
 }
 

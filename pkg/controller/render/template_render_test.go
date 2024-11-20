@@ -20,584 +20,96 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package render
 
 import (
-	"strconv"
-	"strings"
+	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/spf13/viper"
+	"k8s.io/apimachinery/pkg/types"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	ctrlcomp "github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
+	testparameters "github.com/apecloud/kubeblocks/pkg/testutil/parameters"
 )
 
-type insClassType struct {
-	memSize int64
-	cpu     int64
-	// recommended buffer size
-	bufferSize string
+const (
+	ns                 = "default"
+	compDefName        = "test-compdef"
+	clusterName        = "test-cluster"
+	configTemplateName = "test-config-template"
+	mysqlCompName      = "mysql"
+	mysqlConfigName    = "mysql-component-config"
+	configVolumeName   = "mysql-config"
+)
 
-	maxBufferSize int
-}
+var _ = Describe("TemplateWrapperTest", func() {
+	var mockK8sCli *testutil.K8sClientMockHelper
+	var clusterObj *appsv1.Cluster
+	var componentObj *appsv1.Component
+	var compDefObj *appsv1.ComponentDefinition
+	var clusterComponent *component.SynthesizedComponent
+	var configMapObj *corev1.ConfigMap
 
-var _ = Describe("tpl template", func() {
-
-	var (
-		podSpec   *corev1.PodSpec
-		component *ctrlcomp.SynthesizedComponent
-	)
-
-	const (
-		mysqlDataVolume    = "/data/mysql"
-		mysqlCfgName       = "my.cfg"
-		mysqlCfgTmpContext = `
-#test
-cluster_name = {{ $.cluster.metadata.name }}
-cluster_namespace = {{ $.cluster.metadata.namespace }}
-component_name = {{ $.component.name }}
-component_replica = {{ $.component.replicas }}
-containers = {{ (index $.podSpec.containers 0 ).name }}
-{{- $thread_stack := 262144 }}
-{{- $binlog_cache_size := 32768 }}
-{{- $single_thread_memory := add $thread_stack $binlog_cache_size }}
-single_thread_memory = {{ $single_thread_memory }}
-`
-		mysqlCfgRenderedContext = `
-#test
-cluster_name = my_test
-cluster_namespace = default
-component_name = replicasets
-component_replica = 5
-containers = mytest
-single_thread_memory = 294912
-`
-	)
+	renderTemplate := func(tpls []appsv1.ComponentTemplateSpec) error {
+		_, err := RenderTemplate(&ResourceCtx{
+			Context:       ctx,
+			Client:        mockK8sCli.Client(),
+			ClusterName:   clusterName,
+			ComponentName: mysqlCompName,
+		}, clusterObj, clusterComponent, componentObj, nil, tpls)
+		return err
+	}
 
 	BeforeEach(func() {
-		// Add any steup steps that needs to be executed before each test
-		podSpec = &corev1.PodSpec{
-			Containers: []corev1.Container{
-				{
-					Name: "mytest",
-					VolumeMounts: []corev1.VolumeMount{
-						{
-							Name:      "data",
-							MountPath: mysqlDataVolume,
-						},
-						{
-							Name:      "log",
-							MountPath: "/log/mysql",
-						},
-					},
-					Env: []corev1.EnvVar{
-						{
-							Name:  "t1",
-							Value: "value1",
-						},
-						{
-							Name:  "t2",
-							Value: "value2",
-						},
-						{
-							Name:  "a",
-							Value: "b",
-						},
-					},
-					Args: []string{
-						"logs",
-						"for_test",
-					},
-					Ports: []corev1.ContainerPort{
-						{
-							Name:          "mysql",
-							ContainerPort: 3356,
-							Protocol:      "TCP",
-						},
-						{
-							Name:          "paxos",
-							ContainerPort: 3356,
-							Protocol:      "TCP",
-						},
-					},
-					Resources: corev1.ResourceRequirements{
-						Limits: map[corev1.ResourceName]resource.Quantity{
-							corev1.ResourceMemory: resource.MustParse("8Gi"),
-							corev1.ResourceCPU:    resource.MustParse("4"),
-						},
-					},
-				},
-				{
-					Name: "invalid_container",
-				},
-			},
-			Volumes: []corev1.Volume{
-				{
-					Name: "config",
-					VolumeSource: corev1.VolumeSource{
-						ConfigMap: &corev1.ConfigMapVolumeSource{
-							LocalObjectReference: corev1.LocalObjectReference{
-								Name: "cluster_name_for_test",
-							},
-						},
-					},
-				},
-			},
-		}
-		component = &ctrlcomp.SynthesizedComponent{
-			ClusterDefName: "mysql-three-node-definition",
-			Name:           "replicasets",
-			Replicas:       5,
-			VolumeClaimTemplates: []corev1.PersistentVolumeClaimTemplate{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "data",
-					},
-					Spec: corev1.PersistentVolumeClaimSpec{
-						Resources: corev1.VolumeResourceRequirements{
-							Requests: corev1.ResourceList{
-								corev1.ResourceStorage: resource.MustParse("10Gi"),
-							},
-						},
-					},
-				},
-			},
-		}
+		// Add any setup steps that needs to be executed before each test
+		mockK8sCli = testutil.NewK8sMockClient()
+
+		configMapObj = testparameters.NewComponentTemplateFactory(configTemplateName, ns).
+			GetObject()
+
+		compDefObj = testapps.NewComponentDefinitionFactory(compDefName).
+			WithRandomName().
+			SetDefaultSpec().
+			AddConfigTemplate(mysqlConfigName, configMapObj.Name, ns, configVolumeName).
+			GetObject()
+
+		clusterObj = testapps.NewClusterFactory(ns, clusterName, "").
+			AddComponent(mysqlCompName, compDefObj.GetName()).
+			GetObject()
+
+		fullCompName := constant.GenerateClusterComponentName(clusterName, mysqlCompName)
+		componentObj = testapps.NewComponentFactory(ns, fullCompName, compDefObj.Name).
+			AddAnnotations(constant.KBAppClusterUIDKey, string(clusterObj.UID)).
+			AddLabels(constant.AppInstanceLabelKey, clusterName).
+			SetUID(types.UID(fmt.Sprintf("%s-%s", clusterObj.Name, "test-uid"))).
+			SetReplicas(1).
+			GetObject()
+
+		clusterComponent, _ = component.BuildSynthesizedComponent(ctx, mockK8sCli.Client(), compDefObj, componentObj, clusterObj)
 	})
 
-	// for test GetContainerWithVolumeMount
-	Context("ConfigTemplateBuilder sample test", func() {
-		It("test render", func() {
-			renderWrapper := NewTemplateBuilder(&ReconcileCtx{
-				ResourceCtx: &ResourceCtx{
-					Context:     ctx,
-					ClusterName: "my_test",
-					Namespace:   "default",
-				},
-				Cluster: &appsv1.Cluster{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "my_test",
-						Namespace: "default",
-					},
-				},
-				SynthesizedComponent: component,
-				PodSpec:              podSpec,
-			})
-			renderWrapper.setTemplateName("for_test")
-			rendered, err := renderWrapper.render(map[string]string{
-				mysqlCfgName: mysqlCfgTmpContext,
-			})
-
-			Expect(err).Should(BeNil())
-			Expect(rendered[mysqlCfgName]).Should(Equal(mysqlCfgRenderedContext))
-		})
-		It("test built-in function", func() {
-			viper.SetDefault(constant.KubernetesClusterDomainEnv, "test-domain")
-			renderWrapper := NewTemplateBuilder(&ReconcileCtx{
-				ResourceCtx: &ResourceCtx{
-					Context:     ctx,
-					ClusterName: "my_test",
-					Namespace:   "default",
-				},
-				Cluster: &appsv1.Cluster{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "my_test",
-						Namespace: "default",
-					},
-				},
-				SynthesizedComponent: component,
-				PodSpec:              podSpec,
-			})
-			rendered, err := renderWrapper.render(map[string]string{
-				"a":                 "{{ getVolumePathByName ( index $.podSpec.containers 0 ) \"log\" }}",
-				"b":                 "{{ getVolumePathByName ( index $.podSpec.containers 0 ) \"data\" }}",
-				"c":                 "{{ ( getPortByName ( index $.podSpec.containers 0 ) \"mysql\" ).containerPort }}",
-				"d":                 "{{ callBufferSizeByResource ( index $.podSpec.containers 0 ) }}",
-				"e":                 "{{ getArgByName ( index $.podSpec.containers 0 ) \"User\" }}",
-				"f":                 "{{ getVolumePathByName ( getContainerByName $.podSpec.containers \"mytest\") \"data\" }}",
-				"i":                 "{{ getEnvByName ( index $.podSpec.containers 0 ) \"a\" }}",
-				"j":                 "{{ ( getPVCByName $.podSpec.volumes \"config\" ).configMap.name }}",
-				"h":                 "{{ getContainerMemory ( index $.podSpec.containers 0 ) }}",
-				"invalid_volume":    "{{ getVolumePathByName ( index $.podSpec.containers 0 ) \"invalid\" }}",
-				"invalid_port":      "{{ getPortByName ( index $.podSpec.containers 0 ) \"invalid\" }}",
-				"invalid_container": "{{ getContainerByName $.podSpec.containers  \"invalid\" }}",
-				"invalid_resource":  "{{ callBufferSizeByResource ( index $.podSpec.containers 1 ) }}",
-				"invalid_env":       "{{ getEnvByName ( index $.podSpec.containers 0 ) \"invalid\" }}",
-				"invalid_pvc":       "{{ getPVCByName $.podSpec.volumes \"invalid\" }}",
-				"invalid_memory":    "{{ getContainerMemory ( index $.podSpec.containers 1 ) }}",
-				"cluster_domain":    "{{- $.clusterDomain }}",
-				"pvc_size":          "{{- getComponentPVCSizeByName $.component \"data\" }}",
-				"pvc_size2":         "{{- getPVCSize ( index $.component.volumeClaimTemplates 0 ) }}",
-			})
-
-			Expect(err).Should(BeNil())
-			// for test volumeMounts
-			Expect(rendered["a"]).Should(BeEquivalentTo("/log/mysql"))
-			// for test volumeMounts
-			Expect(rendered["b"]).Should(BeEquivalentTo(mysqlDataVolume))
-			// for test port
-			Expect(rendered["c"]).Should(BeEquivalentTo("3356"))
-			// for test resource
-			Expect(rendered["d"]).Should(BeEquivalentTo("4096M"))
-			// for test args
-			Expect(rendered["e"]).Should(BeEquivalentTo(""))
-			// for test volumeMounts
-			Expect(rendered["f"]).Should(BeEquivalentTo(mysqlDataVolume))
-			// for test env
-			Expect(rendered["i"]).Should(BeEquivalentTo("b"))
-			// for test volume
-			Expect(rendered["j"]).Should(BeEquivalentTo("cluster_name_for_test"))
-			Expect(rendered["h"]).Should(BeEquivalentTo(strconv.Itoa(8 * 1024 * 1024 * 1024)))
-			Expect(rendered["invalid_volume"]).Should(BeEquivalentTo(""))
-			Expect(rendered["invalid_port"]).Should(BeEquivalentTo("<no value>"))
-			Expect(rendered["invalid_container"]).Should(BeEquivalentTo("<no value>"))
-			Expect(rendered["invalid_env"]).Should(BeEquivalentTo(""))
-			Expect(rendered["invalid_pvc"]).Should(BeEquivalentTo("<no value>"))
-			Expect(rendered["invalid_resource"]).Should(BeEquivalentTo(""))
-			Expect(rendered["invalid_memory"]).Should(BeEquivalentTo("0"))
-			Expect(rendered["cluster_domain"]).Should(BeEquivalentTo("test-domain"))
-			Expect(rendered["pvc_size"]).Should(BeEquivalentTo("10737418240"))
-			Expect(rendered["pvc_size2"]).Should(BeEquivalentTo("10737418240"))
-		})
-
-		It("test array null check", func() {
-			renderWrapper := NewTemplateBuilder(&ReconcileCtx{
-				ResourceCtx: &ResourceCtx{
-					Context:     ctx,
-					ClusterName: "my_test",
-					Namespace:   "default",
-				},
-				Cluster: &appsv1.Cluster{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "my_test",
-						Namespace: "default",
-					},
-				},
-				SynthesizedComponent: component,
-				PodSpec:              podSpec,
-			})
-
-			tests := []struct {
-				name     string
-				tpl      string
-				expected string
-				wantErr  bool
-			}{{
-				name: "null failed",
-				tpl: ` {{- if mustHas "logs" (index $.podSpec.containers 1 ).args -}}
-true
-{{- end -}}
-`,
-				expected: "",
-				wantErr:  true,
-			}, {
-				name: "null check",
-				tpl: `
-{{- if hasKey (index $.podSpec.containers 1 ) "args" }}
-{{- if mustHas "logs" (index $.podSpec.containers 1 ).args -}}
-true
-{{- end -}}
-{{- end -}}
-`,
-				expected: "",
-				wantErr:  false,
-			}, {
-				name: "exist_test",
-				tpl: `
-{{- if hasKey (index $.podSpec.containers 0 ) "args" }}
-{{- if mustHas "logs" (index $.podSpec.containers 0 ).args -}}
-true
-{{- end }}
-{{- end -}}
-`,
-				expected: "true",
-				wantErr:  false,
-			}, {
-				name: "not exist key",
-				tpl: `
-{{- if hasKey (index $.podSpec.containers 0 ) "args" }}
-{{- if mustHas "abcd" (index $.podSpec.containers 0 ).args -}}
-true
-{{- end }}
-{{- end -}}
-`,
-				expected: "",
-				wantErr:  false,
-			}, {
-				name: "kb component test",
-				tpl: `
-{{- if mustHas "error" $.component.enabledLogs }}
-    log_error=log/mysqld.err
-{{- end }}
-`,
-				expected: "",
-				wantErr:  true,
-			}, {
-				name: "kb component test",
-				tpl: `
-{{- if hasKey $.component "enabledLogs" }}
-{{- if mustHas "error" $.component.enabledLogs }}
-    log_error=log/mysqld.err
-{{- end }}
-{{- end -}}
-`,
-				expected: "",
-				wantErr:  false,
-			}}
-
-			for _, tt := range tests {
-				rendered, err := renderWrapper.render(map[string]string{
-					tt.name: tt.tpl,
-				})
-				if tt.wantErr {
-					Expect(err).ShouldNot(Succeed())
-				} else {
-					Expect(rendered[tt.name]).Should(BeEquivalentTo(tt.expected))
-				}
-			}
-		})
-
+	AfterEach(func() {
+		DeferCleanup(mockK8sCli.Finish)
 	})
 
-	Context("calMysqlPoolSizeByResource test", func() {
-		It("mysql test", func() {
-			Expect(calMysqlPoolSizeByResource(nil, false)).Should(Equal("128M"))
+	Context("TestConfigSpec", func() {
+		It("TestConfigSpec without template", func() {
+			mockK8sCli.MockGetMethod(testutil.WithGetReturned(testutil.WithConstructSimpleGetResult([]client.Object{}), testutil.WithAnyTimes()))
 
-			Expect(calMysqlPoolSizeByResource(nil, true)).Should(Equal("128M"))
+			Expect(renderTemplate(clusterComponent.ConfigTemplates)).ShouldNot(Succeed())
+		})
 
-			// for small instance class
-			Expect(calMysqlPoolSizeByResource(&ResourceDefinition{
-				MemorySize: 1024 * 1024 * 0.5,
-				CoreNum:    1,
-			}, false)).Should(Equal("128M"))
+		It("TestConfigSpec with exist configmap", func() {
+			mockK8sCli.MockGetMethod(testutil.WithGetReturned(testutil.WithConstructSimpleGetResult([]client.Object{
+				configMapObj,
+			}), testutil.WithAnyTimes()))
 
-			Expect(calMysqlPoolSizeByResource(&ResourceDefinition{
-				MemorySize: 1024 * 1024 * 1024,
-				CoreNum:    1,
-			}, false)).Should(Equal("256M"))
-
-			Expect(calMysqlPoolSizeByResource(&ResourceDefinition{
-				MemorySize: 2 * 1024 * 1024 * 1024,
-				CoreNum:    2,
-			}, false)).Should(Equal("384M"))
-
-			// for share
-			Expect(calMysqlPoolSizeByResource(&ResourceDefinition{
-				MemorySize: 1024 * 1024 * 0.5,
-				CoreNum:    1,
-			}, true)).Should(Equal("128M"))
-
-			Expect(calMysqlPoolSizeByResource(&ResourceDefinition{
-				MemorySize: 1024 * 1024 * 1024,
-				CoreNum:    1,
-			}, true)).Should(Equal("512M"))
-
-			Expect(calMysqlPoolSizeByResource(&ResourceDefinition{
-				MemorySize: 2 * 1024 * 1024 * 1024,
-				CoreNum:    2,
-			}, true)).Should(Equal("1024M"))
-
-			insClassTest := []insClassType{
-				// for 2 core
-				{
-					memSize:       4,
-					cpu:           2,
-					bufferSize:    "1024M",
-					maxBufferSize: 1024,
-				},
-				{
-					memSize:       8,
-					cpu:           2,
-					bufferSize:    "4096M",
-					maxBufferSize: 4096,
-				},
-				{
-					memSize:       16,
-					cpu:           2,
-					bufferSize:    "9216M",
-					maxBufferSize: 10240,
-				},
-				// for 4 core
-				{
-					memSize:       8,
-					cpu:           4,
-					bufferSize:    "4096M",
-					maxBufferSize: 4096,
-				},
-				{
-					memSize:       16,
-					cpu:           4,
-					bufferSize:    "9216M",
-					maxBufferSize: 10240,
-				},
-				{
-					memSize:       32,
-					cpu:           4,
-					bufferSize:    "21504M",
-					maxBufferSize: 22528,
-				},
-				// for 8 core
-				{
-					memSize:       16,
-					cpu:           8,
-					bufferSize:    "9216M",
-					maxBufferSize: 10240,
-				},
-				{
-					memSize:       32,
-					cpu:           8,
-					bufferSize:    "21504M",
-					maxBufferSize: 22528,
-				},
-				{
-					memSize:       64,
-					cpu:           8,
-					bufferSize:    "45056M",
-					maxBufferSize: 48128,
-				},
-				// for 12 core
-				{
-					memSize:       24,
-					cpu:           12,
-					bufferSize:    "15360M",
-					maxBufferSize: 16384,
-				},
-				{
-					memSize:       48,
-					cpu:           12,
-					bufferSize:    "33792M",
-					maxBufferSize: 35840,
-				},
-				{
-					memSize:       96,
-					cpu:           12,
-					bufferSize:    "69632M",
-					maxBufferSize: 73728,
-				},
-				// for 16 core
-				{
-					memSize:       32,
-					cpu:           16,
-					bufferSize:    "21504M",
-					maxBufferSize: 22528,
-				},
-				{
-					memSize:       64,
-					cpu:           16,
-					bufferSize:    "45056M",
-					maxBufferSize: 48128,
-				},
-				{
-					memSize:       128,
-					cpu:           16,
-					bufferSize:    "93184M",
-					maxBufferSize: 99328,
-				},
-				// for 24 core
-				{
-					memSize:       48,
-					cpu:           24,
-					bufferSize:    "32768M",
-					maxBufferSize: 34816,
-				},
-				{
-					memSize:       96,
-					cpu:           24,
-					bufferSize:    "69632M",
-					maxBufferSize: 73728,
-				},
-				{
-					memSize:       192,
-					cpu:           24,
-					bufferSize:    "140288M",
-					maxBufferSize: 149504,
-				},
-				// for 32 core
-				{
-					memSize:       64,
-					cpu:           32,
-					bufferSize:    "45056M",
-					maxBufferSize: 47104,
-				},
-				{
-					memSize:       128,
-					cpu:           32,
-					bufferSize:    "93184M",
-					maxBufferSize: 99328,
-				},
-				{
-					memSize:       256,
-					cpu:           32,
-					bufferSize:    "188416M",
-					maxBufferSize: 200704,
-				},
-				// for 52 core
-				{
-					memSize:       96,
-					cpu:           52,
-					bufferSize:    "67584M",
-					maxBufferSize: 72704,
-				},
-				{
-					memSize:       192,
-					cpu:           52,
-					bufferSize:    "140288M",
-					maxBufferSize: 149504,
-				},
-				{
-					memSize:       384,
-					cpu:           52,
-					bufferSize:    "283648M",
-					maxBufferSize: 302080,
-				},
-				// for 64 core
-				{
-					memSize:       256,
-					cpu:           64,
-					bufferSize:    "188416M",
-					maxBufferSize: 200704,
-				},
-				{
-					memSize:       512,
-					cpu:           64,
-					bufferSize:    "378880M",
-					maxBufferSize: 403456,
-				},
-				// for 102
-				{
-					memSize:       768,
-					cpu:           102,
-					bufferSize:    "569344M",
-					maxBufferSize: 607232,
-				},
-				// for 104 core
-				{
-					memSize:       192,
-					cpu:           104,
-					bufferSize:    "138240M",
-					maxBufferSize: 147456,
-				},
-				{
-					memSize:       384,
-					cpu:           104,
-					bufferSize:    "282624M",
-					maxBufferSize: 302080,
-				},
-			}
-
-			for _, r := range insClassTest {
-				ret := calMysqlPoolSizeByResource(&ResourceDefinition{
-					MemorySize: r.memSize * 1024 * 1024 * 1024, // 4G
-					CoreNum:    r.cpu,                          // 2core
-				}, false)
-				Expect(ret).Should(Equal(r.bufferSize))
-				Expect(strconv.ParseInt(strings.Trim(ret, "M"), 10, 64)).Should(BeNumerically("<=", r.maxBufferSize))
-			}
+			Expect(renderTemplate(clusterComponent.ConfigTemplates)).Should(Succeed())
 		})
 	})
-
 })

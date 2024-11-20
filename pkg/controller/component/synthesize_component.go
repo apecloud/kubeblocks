@@ -108,8 +108,6 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 		PodUpdatePolicy:                  comp.Spec.PodUpdatePolicy,
 	}
 
-	buildCompatibleHorizontalScalePolicy(compDefObj, synthesizeComp)
-
 	if err = mergeUserDefinedEnv(synthesizeComp, comp); err != nil {
 		return nil, err
 	}
@@ -451,15 +449,6 @@ func buildRuntimeClassName(synthesizeComp *SynthesizedComponent, comp *appsv1.Co
 		return
 	}
 	synthesizeComp.PodSpec.RuntimeClassName = comp.Spec.RuntimeClassName
-}
-
-func buildCompatibleHorizontalScalePolicy(compDef *appsv1.ComponentDefinition, synthesizeComp *SynthesizedComponent) {
-	if compDef.Annotations != nil {
-		templateName, ok := compDef.Annotations[constant.HorizontalScaleBackupPolicyTemplateKey]
-		if ok {
-			synthesizeComp.HorizontalScaleBackupPolicyTemplate = &templateName
-		}
-	}
 }
 
 func GetConfigSpecByName(synthesizedComp *SynthesizedComponent, configSpec string) *appsv1.ComponentConfigSpec {

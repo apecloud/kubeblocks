@@ -23,6 +23,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"reflect"
 	"strings"
 	"time"
@@ -83,6 +84,10 @@ func (s *probeService) Start() error {
 		go runner.run(s.probes[name])
 		s.runners[name] = runner
 	}
+	return nil
+}
+
+func (s *probeService) HandleConn(ctx context.Context, conn net.Conn) error {
 	return nil
 }
 
@@ -235,7 +240,7 @@ func (r *probeRunner) buildNSendEvent(instance, probe string, code int32, output
 func (r *probeRunner) sendEvent(event *proto.ProbeEvent) {
 	msg, err := json.Marshal(&event)
 	if err == nil {
-		util.SendEventWithMessage(&r.logger, event.Probe, string(msg))
+		_ = util.SendEventWithMessage(&r.logger, event.Probe, string(msg), false)
 	} else {
 		r.logger.Error(err, fmt.Sprintf("failed to marshal probe event, probe: %s", event.Probe))
 	}

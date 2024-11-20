@@ -11,7 +11,7 @@ import TabItem from '@theme/TabItem';
 
 # 用 KubeBlocks 管理 RabbitMQ
 
-RabbitMQ 是一种可靠且成熟的消息和流处理中间件，支持在云环境、本地数据中心或个人计算机上部署。
+RabbitMQ 是一靠且成熟的消息和流处理中间件，支持在云环境、本地数据中心或个人计算机上部署。
 
 本文档展示了如何通过 kbcli、kubectl 或 YAML 文件等当时创建和管理 RabbitMQ 集群。您可以在 [GitHub 仓库](https://github.com/apecloud/kubeblocks-addons/tree/main/examples/rabbitmq)查看 YAML 示例。
 

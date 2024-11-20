@@ -1,31 +1,40 @@
 ---
-title: Manage RabbitMQ with KubeBlocks
-description: How to manage RabbitMQ on KubeBlocks
-keywords: [rabbitmq, message queue, streaming, broker]
+title: 用 KubeBlocks 管理 RabbitMQ
+description: 如何使用 KubeBlocks 管理 RabbitMQ
+keywords: [rabbitmq, 消息队列, streaming, broker]
 sidebar_position: 1
-sidebar_label: Manage RabbitMQ with KubeBlocks
+sidebar_label: 用 KubeBlocks 管理 RabbitMQ
 ---
 
-# Manage RabbitMQ with KubeBlocks
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
-RabbitMQ is a reliable and mature messaging and streaming broker, which is easy to deploy on cloud environments, on-premises, and on your local machine.
+# 用 KubeBlocks 管理 RabbitMQ
 
-KubeBlocks supports the management of RabbitMQ.
+RabbitMQ 是一种可靠且成熟的消息和流处理中间件，支持在云环境、本地数据中心或个人计算机上部署。
+
+本文档展示了如何通过 kbcli、kubectl 或 YAML 文件等当时创建和管理 RabbitMQ 集群。您可以在 [GitHub 仓库](https://github.com/apecloud/kubeblocks-addons/tree/main/examples/rabbitmq)查看 YAML 示例。
 
 :::note
 
-Currently, KubeBlocks only supports managing RabbitMQ by `kubectl`.
+当前，KubeBlocks 仅支持通过 `kubectl` 管理 RabbitMQ 集群.
 
 :::
 
-## Before you start
+## 开始之前
 
-- Install KubeBlocks [by kbcli](./../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) or [by Helm](./../installation/install-with-helm/install-kubeblocks.md).
-- Install and enable the rabbitmq addon [by kbcli](./../installation/install-with-kbcli/install-addons.md) or [by Helm](./../installation/install-with-helm/install-addons.md).
+- 安装 KubeBlocks，可通过 [kbcli](./../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) 或 [Helm](./../installation/install-with-helm/install-kubeblocks.md) 安装.
+- 安装并启用 rabbitmq 引擎，可通过 [kbcli](./../installation/install-with-kbcli/install-addons.md) 或 [Helm](./../installation/install-with-helm/install-addons.md)操作.
 
-## Create a cluster
+## 创建集群
 
-KubeBlocks implements a Cluster CRD to define a cluster. Here is an example of creating a RabbitMQ cluster with three replicas. Pods are distributed on different nodes by default. But if you only have one node for a cluster with three replicas, set `spec.affinity.topologyKeys` as `null`.
+KubeBlocks 通过 `Cluster` 定义集群。以下是创建 RabbitMQ 集群的示例。Pod 默认分布在不同节点。但如果您只有一个节点可用于部署集群，可将 `spec.affinity.topologyKeys` 设置为 `null`。
+
+:::note
+
+生产环境中，不建议将所有副本部署在同一个节点上，因为这可能会降低集群的可用性。
+
+:::
 
 ```bash
 cat <<EOF | kubectl apply -f -
@@ -69,40 +78,43 @@ spec:
 EOF
 ```
 
-| Field                                 | Definition  |
+| 字段                                   | 定义  |
 |---------------------------------------|--------------------------------------|
-| `spec.terminationPolicy`              | It is the policy of cluster termination. The default value is `Delete`. Valid values are `DoNotTerminate`, `Delete`, `WipeOut`. For the detailed definition, you can refer to [Termination Policy](#termination-policy). |
-| `spec.affinity`                       | It defines a set of node affinity scheduling rules for the cluster's Pods. This field helps control the placement of Pods on nodes within the cluster.  |
-| `spec.affinity.podAntiAffinity`       | It specifies the anti-affinity level of Pods within a component. It determines how pods should spread across nodes to improve availability and performance. |
-| `spec.affinity.topologyKeys`          | It represents the key of node labels used to define the topology domain for Pod anti-affinity and Pod spread constraints.   |
-| `spec.componentSpecs`                 | It is the list of components that define the cluster components. This field allows customized configuration of each component within a cluster.   |
-| `spec.componentSpecs.componentDefRef` | It is the name of the component definition that is defined in the cluster definition and you can get the component definition names with `kubectl get clusterdefinition qdrant -o json \| jq '.spec.componentDefs[].name'`.   |
-| `spec.componentSpecs.name`            | It specifies the name of the component.     |
-| `spec.componentSpecs.disableExporter` | It defines whether the monitoring function is enabled. |
-| `spec.componentSpecs.replicas`        | It specifies the number of replicas of the component.  |
-| `spec.componentSpecs.resources`       | It specifies the resource requirements of the component.  |
+| `spec.terminationPolicy`              | 集群的终止策略，默认值为 `Delete`，有效值为 `DoNotTerminate`、`Halt`、`Delete` 和 `WipeOut`。 具体定义可参考 [终止策略](#终止策略)。|
+| `spec.affinity`                       | 为集群的 Pods 定义了一组节点亲和性调度规则。该字段可控制 Pods 在集群中节点上的分布。 |
+| `spec.affinity.podAntiAffinity`       | 定义了不在同一 component 中的 Pods 的反亲和性水平。该字段决定了 Pods 以何种方式跨节点分布，以提升可用性和性能。 |
+| `spec.affinity.topologyKeys`          | 用于定义 Pod 反亲和性和 Pod 分布约束的拓扑域的节点标签值。 |
+| `spec.tolerations`                    | 该字段为数组，用于定义集群中 Pods 的容忍，确保 Pod 可被调度到具有匹配污点的节点上。 |
+| `spec.componentSpecs`                 | 集群 components 列表，定义了集群 components。该字段允许对集群中的每个 component 进行自定义配置。 |
+| `spec.componentSpecs.componentDefRef` | 表示 cluster definition 中定义的 component definition 的名称，可通过执行 `kubectl get clusterdefinition rabbitmq -o json \| jq '.spec.componentDefs[].name'` 命令获取 component definition 名称。 |
+| `spec.componentSpecs.name`            | 定义了 component 的名称。  |
+| `spec.componentSpecs.disableExporter` | 定义了是否开启监控功能。 |
+| `spec.componentSpecs.replicas`        | 定义了 component 中 replicas 的数量。 |
+| `spec.componentSpecs.resources`       | 定义了 component 的资源要求。  |
 
-KubeBlocks operator watches for the `Cluster` CRD and creates the cluster and all dependent resources. You can get all the resources created by the cluster with `kubectl get all,secret,rolebinding,serviceaccount -l app.kubernetes.io/instance=mycluster -n demo`.
+KubeBlocks operator 监控 `Cluster` CRD 并创建集群和全部依赖资源。您可执行以下命令获取集群创建的所有资源信息。
 
 ```bash
 kubectl get all,secret,rolebinding,serviceaccount -l app.kubernetes.io/instance=mycluster -n demo
 ```
 
-Run the following command to see the created RabbitMQ cluster object:
+执行以下命令，查看已创建的 RabbitMQ 集群。
 
 ```bash
 kubectl get cluster mycluster -n demo -o yaml
 ```
 
-## Connect to the cluster
+## 连接集群
 
-Use the [RabbitMQ tools](https://www.rabbitmq.com/docs/cli) to connect to and manage the RabbitMQ cluster.
+可使用 [RabbitMQ tools](https://www.rabbitmq.com/docs/cli) 连接并管理 RabbitMQ 集群。
 
-## Scale
+## 扩缩容
 
-### Scale vertically
+### 垂直扩缩容
 
-Before you start, check whether the cluster status is `Running`. Otherwise, the following operations may fail.
+#### 开始之前
+
+确认集群状态是否为 `Running`。否则，后续相关操作可能会失败。
 
 ```bash
 kubectl get cluster mycluster -n demo
@@ -111,9 +123,13 @@ NAME        CLUSTER-DEFINITION    VERSION        TERMINATION-POLICY     STATUS  
 mycluster                                        Delete                 Running   47m
 ```
 
-#### Option 1. Apply an OpsRequest
+#### 步骤
 
-1. Apply an OpsRequest to the specified cluster. Configure the parameters according to your needs.
+<Tabs>
+
+<TabItem value="OpsRequest" label="OpsRequest" default>
+
+1. 对指定的集群应用 OpsRequest，可根据您的需求配置参数。
 
    ```bash
    kubectl apply -f - <<EOF
@@ -136,7 +152,7 @@ mycluster                                        Delete                 Running 
    EOF
    ```
 
-2. Check the operation status to validate the vertical scaling.
+2. 查看运维任务状态，验证垂直扩缩容操作是否成功。
 
    ```bash
    kubectl get ops -n demo
@@ -145,17 +161,19 @@ mycluster                                        Delete                 Running 
    ops-vertical-scaling   VerticalScaling   mycluster   Succeed   3/3        6m
    ```
 
-   If an error occurs, you can troubleshoot it with `kubectl describe ops -n demo` command to view the events of this operation.
+   如果有报错，可执行 `kubectl describe ops -n demo` 命令查看该运维操作的相关事件，协助排障。
 
-3. Check whether the corresponding resources change.
+3. 当 OpsRequest 状态为 `Succeed` 或集群状态再次回到 `Running` 后，查看相应资源是否变更。
 
-    ```bash
-    kubectl describe cluster mycluster -n demo
-    ```
+   ```bash
+   kubectl describe cluster mycluster -n demo
+   ```
 
-#### Option 2. Edit the cluster YAML file
+</TabItem>
 
-1. Change the configuration of `spec.componentSpecs.resources` in the YAML file. `spec.componentSpecs.resources` controls the requirement and limit of resources and changing them triggers a vertical scaling.
+<TabItem value="修改集群 YAML 文件" label="修改集群 YAML 文件">
+
+1. 修改 YAML 文件中 `spec.componentSpecs.resources` 的配置。`spec.componentSpecs.resources` 控制资源的请求值和限制值，修改参数值将触发垂直扩缩容。
 
    ```yaml
    apiVersion: apps.kubeblocks.io/v1alpha1
@@ -168,7 +186,7 @@ mycluster                                        Delete                 Running 
      - name: rabbitmq
        componentDefRef: rabbitmq
        replicas: 3
-       resources: # Change the values of resources.
+       resources: # 修改 resources 中的参数值
          requests:
            memory: "2Gi"
            cpu: "1"
@@ -186,19 +204,25 @@ mycluster                                        Delete                 Running 
      terminationPolicy: Delete
    ```
 
-2. Check whether the corresponding resources change.
+2. 当集群状态再次回到 `Running` 后，查看相应资源是否变更。
 
-    ```bash
-    kubectl describe cluster mycluster -n demo
-    ```
+   ```bash
+   kubectl describe cluster mycluster -n demo
+   ```
 
-### Scale horizontally
+</TabItem>
 
-Horizontal scaling changes the amount of pods. For example, you can scale out replicas from three to five.
+</Tabs>
 
-From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out instances, refer to the [Horizontal Scale tutorial](./../maintenance/scale/horizontal-scale.md) for more details and examples.
+### 水平伸缩
 
-Before you start, check whether the cluster status is `Running`. Otherwise, the following operations may fail.
+水平扩展改变 Pod 的数量。例如，您可以将副本从三个扩展到五个。
+
+从 v0.9.0 开始，KubeBlocks 还支持了指定实例扩缩容。可通过 [水平扩缩容文档](./../maintenance/scale/horizontal-scale.md) 文档了解更多细节和示例。
+
+#### 开始之前
+
+确认集群状态是否为 `Running`。否则，后续相关操作可能会失败。
 
 ```bash
 kubectl get cluster mycluster -n demo
@@ -207,11 +231,15 @@ NAME        CLUSTER-DEFINITION    VERSION        TERMINATION-POLICY     STATUS  
 mycluster                                        Delete                 Running   47m
 ```
 
-#### Option 1. Apply an OpsRequest
+#### 步骤
 
-1. Apply an OpsRequest to a specified cluster. Configure the parameters according to your needs.
+<Tabs>
 
-   The example below means deleting two replicas.
+<TabItem value="OpsRequest" label="OpsRequest" default>
+
+1. 对指定的集群应用 OpsRequest，可根据您的需求配置参数。
+
+   以下示例演示了增加 2 个副本。
 
    ```bash
    kubectl apply -f - <<EOF
@@ -230,9 +258,9 @@ mycluster                                        Delete                 Running 
    EOF
    ```
 
-   If you want to scale in replicas, replace `scaleOut` with `scaleIn` and change the value in `replicaChanges`.
+   如果您想要缩容，可将 `scaleOut` 替换为 `scaleIn`，并修改 `replicaChanges` 的参数值。
 
-2. Check the operation status to validate the horizontal scaling status.
+2. 查看运维操作状态，验证水平扩缩容是否成功。
 
    ```bash
    kubectl get ops -n demo
@@ -241,17 +269,19 @@ mycluster                                        Delete                 Running 
    ops-horizontal-scaling   HorizontalScaling   mycluster   Succeed   2/2        6m
    ```
 
-   If an error occurs, you can troubleshoot it with `kubectl describe ops -n demo` command to view the events of this operation.
+   如果有报错，可执行 `kubectl describe ops -n demo` 命令查看该运维操作的相关事件，协助排障。
 
-3. Check whether the corresponding resources change.
+3. 当 OpsRequest 状态为 `Succeed` 或集群状态再次回到 `Running` 后，查看相应资源是否变更。
 
-    ```bash
-    kubectl describe cluster mycluster -n demo
-    ```
+   ```bash
+   kubectl describe cluster mycluster -n demo
+   ```
 
-#### Option 2. Edit the cluster YAML file
+</TabItem>
+  
+<TabItem value="编辑集群 YAML 文件" label="编辑集群 YAML 文件">
 
-1. Change the configuration of `spec.componentSpecs.replicas` in the YAML file. `spec.componentSpecs.replicas` stands for the pod amount and changing this value triggers a horizontal scaling of a cluster.
+1. 修改 YAML 文件中 `spec.componentSpecs.replicas` 的配置。`spec.componentSpecs.replicas` 定义了 pod 数量，修改该参数将触发集群水平扩缩容。
 
    ```bash
    kubectl edit cluster mycluster -n demo
@@ -264,7 +294,7 @@ mycluster                                        Delete                 Running 
      componentSpecs:
      - name: rabbitmq
        componentDefRef: rabbitmq
-       replicas: 1 # Change the amount
+       replicas: 1 # 修改参数值
        volumeClaimTemplates:
        - name: data
          spec:
@@ -276,15 +306,21 @@ mycluster                                        Delete                 Running 
     terminationPolicy: Delete
    ```
 
-2. Check whether the corresponding resources change.
+2. 当集群状态再次回到 `Running` 后，查看相关资源是否变更。
 
     ```bash
     kubectl describe cluster mycluster -n demo
     ```
 
-## Volume expansion
+</TabItem>
 
-Before you start, check whether the cluster status is `Running`. Otherwise, the following operations may fail.
+</Tabs>
+
+## 磁盘扩容
+
+### 开始之前
+
+确认集群状态是否为 `Running`。否则，后续相关操作可能会失败。
 
 ```bash
 kubectl get cluster mycluster -n demo
@@ -293,50 +329,56 @@ NAME        CLUSTER-DEFINITION    VERSION        TERMINATION-POLICY     STATUS  
 mycluster                                        Delete                 Running   47m
 ```
 
-### Option 1. Apply an OpsRequest
+### 步骤
 
-1. Change the value of storage according to your need and run the command below to expand the volume of a cluster.
+<Tabs>
 
-    ```bash
-    kubectl apply -f - <<EOF
-    apiVersion: apps.kubeblocks.io/v1alpha1
-    kind: OpsRequest
-    metadata:
-      name: ops-volume-expansion
-      namespace: demo
-    spec:
-      clusterName: mycluster
-      type: VolumeExpansion
-      volumeExpansion:
-      - componentName: rabbitmq
-        volumeClaimTemplates:
-        - name: data
-          storage: "40Gi"
-    EOF
-    ```
+<TabItem value="OpsRequest" label="OpsRequest" default>
 
-2. Validate the volume expansion operation.
+1. 应用 OpsRequest。根据需求更改 storage 的值，并执行以下命令来更改集群的存储容量。
 
-    ```bash
-    kubectl get ops -n demo
-    >
-    NAME                   TYPE              CLUSTER     STATUS    PROGRESS   AGE
-    ops-volume-expansion   VolumeExpansion   mycluster   Succeed   1/1        6m
-    ```
+   ```bash
+   kubectl apply -f - <<EOF
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: OpsRequest
+   metadata:
+     name: ops-volume-expansion
+     namespace: demo
+   spec:
+     clusterName: mycluster
+     type: VolumeExpansion
+     volumeExpansion:
+     - componentName: rabbitmq
+       volumeClaimTemplates:
+       - name: data
+         storage: "40Gi"
+   EOF
+   ```
 
-    If an error occurs, you can troubleshoot it with `kubectl describe ops -n demo` command to view the events of this operation.
+2. 查看磁盘扩容操作是否成功。
 
-3. Check whether the corresponding cluster resources change.
+   ```bash
+   kubectl get ops -n demo
+   >
+   NAME                   TYPE              CLUSTER     STATUS    PROGRESS   AGE
+   ops-volume-expansion   VolumeExpansion   mycluster   Succeed   1/1        6m
+   ```
 
-    ```bash
-    kubectl describe cluster mycluster -n demo
-    ```
+   如果有报错，可执行 `kubectl describe ops -n demo` 命令查看该运维操作的相关事件，协助排障。
 
-### Option 2. Edit the cluster YAML file
+3. 当 OpsRequest 状态为 `Succeed` 或集群状态再次回到 `Running` 后，查看相应资源是否变更。
 
-1. Change the value of `spec.componentSpecs.volumeClaimTemplates.spec.resources` in the cluster YAML file.
+   ```bash
+   kubectl describe cluster mycluster -n demo
+   ```
 
-   `spec.componentSpecs.volumeClaimTemplates.spec.resources` is the storage resource information of the pod and changing this value triggers the volume expansion of a cluster.
+</TabItem>
+
+<TabItem value="修改集群 YAML 文件" label="修改集群 YAML 文件">
+
+1. 修改集群 YAML 文件中 `spec.componentSpecs.volumeClaimTemplates.spec.resources` 的值。
+
+   `spec.componentSpecs.volumeClaimTemplates.spec.resources` 定义了 Pod 存储资源信息，修改该数值将触发集群磁盘扩容。
 
    ```bash
    kubectl edit cluster mycluster -n demo
@@ -357,19 +399,173 @@ mycluster                                        Delete                 Running 
              - ReadWriteOnce
            resources:
              requests:
-               storage: 40Gi # Change the volume storage size.
+               storage: 40Gi # 修改该参数值
      terminationPolicy: Delete
    ```
 
-2. Check whether the corresponding cluster resources change.
+2. 当集群状态再次回到 `Running` 后，查看相应资源是否变更。
 
-    ```bash
-    kubectl describe cluster mycluster -n demo
-    ```
+   ```bash
+   kubectl describe cluster mycluster -n demo
+   ```
 
-## Restart
+</TabItem>
 
-1. Restart a cluster.
+</Tabs>
+
+## 停止/启动集群
+
+您可以停止/启动集群以释放计算资源。当集群停止时，其计算资源将被释放，也就是说 Kubernetes 的 Pod 将被释放，但其存储资源仍将被保留。您也可以重新启动该集群，使其恢复到停止集群前的状态。
+
+### 停止集群
+
+1. 配置集群名称，并执行以下命令来停止该集群。
+
+   <Tabs>
+
+   <TabItem value="OpsRequest" label="OpsRequest" default>
+
+   ```bash
+   kubectl apply -f - <<EOF
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: OpsRequest
+   metadata:
+     name: mycluster-stop
+     namespace: demo
+   spec:
+     clusterName: mycluster
+     type: Stop
+   EOF
+   ```
+
+   </TabItem>
+
+   <TabItem value="修改集群 YAML 文件" label="修改集群 YAML 文件">
+
+   将 replicas 的值修改为 0，删除 pod。
+
+   ```yaml
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: Cluster
+   metadata:
+     name: mycluster
+     namespace: demo
+   spec:
+     terminationPolicy: Delete
+     affinity:
+       podAntiAffinity: Preferred
+       topologyKeys:
+         - kubernetes.io/hostname
+     componentSpecs:
+       - name: rabbitmq
+         componentDef: rabbitmq
+         serviceVersion: 3.13.2
+         replicas: 0
+         serviceAccountName: kb-mycluster
+         resources:
+           limits:
+             cpu: "0.5"
+             memory: "0.5Gi"
+           requests:
+             cpu: "0.5"
+             memory: "0.5Gi"
+         volumeClaimTemplates:
+           - name: data
+             spec:
+               accessModes:
+                 - ReadWriteOnce
+               resources:
+                 requests:
+                   storage: 20Gi
+         services:
+   ```
+
+   </TabItem>
+
+   </Tabs>
+
+2. 查看集群状态，确认集群是否已停止。
+
+   ```bash
+   kubectl get cluster mycluster -n demo
+   ```
+
+### 启动集群
+
+1. 配置集群名称，并执行以下命令来启动该集群。
+
+   <Tabs>
+
+   <TabItem value="OpsRequest" label="OpsRequest" default>
+
+   ```bash
+   kubectl apply -f - <<EOF
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: OpsRequest
+   metadata:
+     name: mycluster-start
+     namespace: demo
+   spec:
+     clusterName: mycluster
+     type: Start
+   EOF 
+   ```
+
+   </TabItem>
+
+   <TabItem value="修改集群 YAML 文件" label="修改集群 YAML 文件">
+
+   将 replicas 数值修改为初始值，启动集群。
+
+   ```yaml
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: Cluster
+   metadata:
+     name: mycluster
+     namespace: demo
+   spec:
+     terminationPolicy: Delete
+     affinity:
+       podAntiAffinity: Preferred
+       topologyKeys:
+         - kubernetes.io/hostname
+     componentSpecs:
+       - name: rabbitmq
+         componentDef: rabbitmq
+         serviceVersion: 3.13.2
+         replicas: 3
+         serviceAccountName: kb-mycluster
+         resources:
+           limits:
+             cpu: "0.5"
+             memory: "0.5Gi"
+           requests:
+             cpu: "0.5"
+             memory: "0.5Gi"
+         volumeClaimTemplates:
+           - name: data
+             spec:
+               accessModes:
+                 - ReadWriteOnce
+               resources:
+                 requests:
+                   storage: 20Gi
+         services:
+   ```
+
+   </TabItem>
+
+   </Tabs>
+
+2. 查看集群状态，确认集群是否已再次运行。
+
+   ```bash
+   kubectl get cluster mycluster -n demo
+   ```
+
+## 重启集群
+
+1. 执行以下命令，重启集群。
 
    ```bash
    kubectl apply -f - <<EOF
@@ -386,7 +582,7 @@ mycluster                                        Delete                 Running 
    EOF
    ```
 
-2. Check the pod and operation status to validate the restarting.
+2. 查看 pod 和运维操作状态，验证重启操作是否成功。
 
    ```bash
    kubectl get pod -n demo
@@ -394,217 +590,51 @@ mycluster                                        Delete                 Running 
    kubectl get ops -n demo
    ```
 
-   During the restarting process, there are two status types for pods.
+   重启过程中，Pod 有如下两种状态：
 
-   - STATUS=Terminating: it means the cluster restart is in progress.
-   - STATUS=Running: it means the cluster has been restarted.
+   - STATUS=Terminating：表示集群正在重启。
+   - STATUS=Running：表示集群已重启。
 
-## Stop/Start a cluster
+   如果操作过程中出现报错，可通过 `kubectl describe ops -n demo` 查看该操作的事件，协助排障。
 
-You can stop/start a cluster to save computing resources. When a cluster is stopped, the computing resources of this cluster are released, which means the pods of Kubernetes are released, but the storage resources are reserved. You can start this cluster again by snapshots if you want to restore the cluster resources.
+## 删除集群
 
-### Stop a cluster
-
-#### Option 1. Apply an OpsRequest
-
-Run the command below to stop a cluster.
-
-```bash
-kubectl apply -f - <<EOF
-apiVersion: apps.kubeblocks.io/v1alpha1
-kind: OpsRequest
-metadata:
-  name: mycluster-stop
-  namespace: demo
-spec:
-  clusterName: mycluster
-  type: Stop
-EOF
-```
-
-#### Option 2. Edit the cluster YAML file
-
-Configure `replicas` as 0 to delete pods.
-
-```yaml
-apiVersion: apps.kubeblocks.io/v1alpha1
-kind: Cluster
-metadata:
-  name: mycluster
-  namespace: demo
-  labels:
-    helm.sh/chart: rabbitmq-cluster-0.9.0
-    app.kubernetes.io/version: "3.13.2"
-    app.kubernetes.io/instance: mycluster
-spec:
-  terminationPolicy: Delete
-  affinity:
-    podAntiAffinity: Preferred
-    topologyKeys:
-      - kubernetes.io/hostname
-  componentSpecs:
-    - name: rabbitmq
-      componentDef: rabbitmq
-      serviceVersion: 3.13.2
-      replicas: 0
-      serviceAccountName: kb-mycluster
-      resources:
-        limits:
-          cpu: "0.5"
-          memory: "0.5Gi"
-        requests:
-          cpu: "0.5"
-          memory: "0.5Gi"
-      volumeClaimTemplates:
-        - name: data # ref clusterDefinition components.containers.volumeMounts.name
-          spec:
-            accessModes:
-              - ReadWriteOnce
-            resources:
-              requests:
-                storage: 20Gi
-      services:
-```
-
-### Start a cluster
-
-#### Option 1. Apply an OpsRequest
-
-Run the command below to start a cluster.
-
-```bash
-kubectl apply -f - <<EOF
-apiVersion: apps.kubeblocks.io/v1alpha1
-kind: OpsRequest
-metadata:
-  name: mycluster-start
-  namespace: demo
-spec:
-  clusterName: mycluster
-  type: Start
-EOF 
-```
-
-#### Option 2. Edit the cluster YAML file
-
-Change replicas back to the original amount to start this cluster again.
-
-```yaml
-apiVersion: apps.kubeblocks.io/v1alpha1
-kind: Cluster
-metadata:
-  name: mycluster
-  namespace: demo
-  labels:
-    helm.sh/chart: rabbitmq-cluster-0.9.0
-    app.kubernetes.io/version: "3.13.2"
-    app.kubernetes.io/instance: mycluster
-spec:
-  terminationPolicy: Delete
-  affinity:
-    podAntiAffinity: Preferred
-    topologyKeys:
-      - kubernetes.io/hostname
-  componentSpecs:
-    - name: rabbitmq
-      componentDef: rabbitmq
-      serviceVersion: 3.13.2
-      replicas: 3
-      serviceAccountName: kb-mycluster
-      resources:
-        limits:
-          cpu: "0.5"
-          memory: "0.5Gi"
-        requests:
-          cpu: "0.5"
-          memory: "0.5Gi"
-      volumeClaimTemplates:
-        - name: data # ref clusterDefinition components.containers.volumeMounts.name
-          spec:
-            accessModes:
-              - ReadWriteOnce
-            resources:
-              requests:
-                storage: 20Gi
-      services:
-```
-
-## Delete a cluster
-
-### Termination policy
+### 终止策略
 
 :::note
 
-The termination policy determines how a cluster is deleted.
+终止策略决定了删除集群的方式。
 
 :::
 
-| **terminationPolicy** | **Deleting Operation**                           |
-|:----------------------|:-------------------------------------------------|
-| `DoNotTerminate`      | `DoNotTerminate` blocks delete operation.        |
-| `Halt`                | `Halt` deletes Cluster resources like Pods and Services but retains Persistent Volume Claims (PVCs), allowing for data preservation while stopping other operations. Halt policy is deprecated in v0.9.1 and will have same meaning as DoNotTerminate. |
-| `Delete`              | `Delete` extends the Halt policy by also removing PVCs, leading to a thorough cleanup while removing all persistent data.   |
-| `WipeOut`             | `WipeOut` deletes all Cluster resources, including volume snapshots and backups in external storage. This results in complete data removal and should be used cautiously, especially in non-production environments, to avoid irreversible data loss.   |
+| **终止策略** | **删除操作**                                                                     |
+|:----------------------|:-------------------------------------------------------------------------------------------|
+| `DoNotTerminate`      | `DoNotTerminate` 禁止删除操作。                                                  |
+| `Halt`                | `Halt` 删除集群资源（如 Pods、Services 等），但保留 PVC。停止其他运维操作的同时，保留了数据。但 `Halt` 策略在 v0.9.1 中已删除，设置为 `Halt` 的效果与 `DoNotTerminate` 相同。  |
+| `Delete`              | `Delete` 在 `Halt` 的基础上，删除 PVC 及所有持久数据。                              |
+| `WipeOut`             | `WipeOut`  删除所有集群资源，包括外部存储中的卷快照和备份。使用该策略将会删除全部数据，特别是在非生产环境，该策略将会带来不可逆的数据丢失。请谨慎使用。   |
 
-To check the termination policy, execute the following command.
-
-<Tabs>
-
-<TabItem value="kbcli" label="kbcli" default>
-
-```bash
-kbcli cluster list mycluster -n demo
->
-NAME        NAMESPACE   CLUSTER-DEFINITION     VERSION         TERMINATION-POLICY   STATUS    CREATED-TIME
-mycluster   demo                                               Delete               Running   Sep 30,2024 13:03 UTC+0800 
-```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
+执行以下命令查看终止策略。
 
 ```bash
 kubectl get cluster mycluster -n demo
 >
 NAME        CLUSTER-DEFINITION    VERSION        TERMINATION-POLICY     STATUS    AGE
-mycluster                                        Delete                 Running   55m
+mycluster                                        Delete                 Running   47m
 ```
 
-</TabItem>
+### 步骤
 
-</Tabs>
-
-### Steps
-
-Run the command below to delete a specified cluster.
-
-<Tabs>
-
-<TabItem value="kbcli" label="kbcli" default>
+执行以下命令，删除集群。
 
 ```bash
-kbcli cluster delete mycluster -n demo
+kubectl delete cluster mycluster -n demo
 ```
 
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
-
-If you want to delete a cluster and its all related resources, you can modify the termination policy to `WipeOut`, then delete the cluster.
+如果想删除集群和所有相关资源，可以将终止策略修改为 `WipeOut`，然后再删除该集群。
 
 ```bash
 kubectl patch -n demo cluster mycluster -p '{"spec":{"terminationPolicy":"WipeOut"}}' --type="merge"
 
 kubectl delete -n demo cluster mycluster
 ```
-
-</TabItem>
-
-</Tabs>
-
-## Monitor
-
-The monitoring function of RabbitMQ is the same as other engines. For details, refer to related docs:
-
-- [Monitor databases by kbcli](./../observability/monitor-database.md)
-- [Monitor databases by kubectl](./../../api_docs/observability/monitor-database.md)

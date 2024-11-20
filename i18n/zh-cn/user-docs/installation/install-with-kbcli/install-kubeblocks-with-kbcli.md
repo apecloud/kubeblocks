@@ -10,7 +10,7 @@ sidebar_label: 用 kbcli 安装 KubeBlocks
 
 使用 Playground 创建一个新的 Kubernetes 集群并安装 KubeBlocks，是快速上手的一种方法。然而，在实际生产环境中，情况会复杂得多，应用程序在不同的命名空间中运行，还存在资源或权限限制。本文档将介绍如何在现有的 Kubernetes 集群上部署 KubeBlocks。
 
-如果您想要在本地环境试用 KubeBlocks，可通过 [Playground](./../../try-out-on-playground/try-kubeblocks-on-local-host.md) 试用，或者[先在本地创建 Kubernetes 测试集群](./../prerequisite/prepare-a-local-k8s-cluster.md)，然后按照本文操作步骤安装 KubeBlocks。
+如果您想要在本地环境试用 KubeBlocks，可通过 [Playground](./../../try-out-on-playground/try-kubeblocks-on-local-host.md) 试用，或者[先在本地创建 Kubernetes 测试集群](./../prepare-a-local-k8s-cluster/prepare-a-local-k8s-cluster.md)，然后按照本文操作步骤安装 KubeBlocks。
 
 ## 环境准备
 

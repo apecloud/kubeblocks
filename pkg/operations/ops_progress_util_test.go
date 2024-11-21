@@ -131,7 +131,7 @@ var _ = Describe("Ops ProgressDetails", func() {
 						ReplicaChanges: pointer.Int32(2),
 					},
 				},
-			})
+			}, false)
 			mockComponentIsOperating(opsRes.Cluster, appsv1.UpdatingComponentPhase, defaultCompName) // appsv1.HorizontalScalingPhase
 			initClusterForOps(opsRes)
 
@@ -188,7 +188,7 @@ var _ = Describe("Ops ProgressDetails", func() {
 						ReplicaChanges: pointer.Int32(1),
 					},
 				},
-			})
+			}, false)
 			mockComponentIsOperating(opsRes.Cluster, appsv1.UpdatingComponentPhase, defaultCompName) // appsv1.HorizontalScalingPhase
 			initClusterForOps(opsRes)
 

@@ -98,6 +98,5 @@ func (config *Config) GetConnectURLWithHost(host string) string {
 }
 
 func (config *Config) GetConsensusIPPort(cluster *dcs.Cluster, name string) string {
-	clusterDomain := viper.GetString(constant.KubernetesClusterDomainEnv)
-	return fmt.Sprintf("%s.%s-headless.%s.svc.%s:1%d", name, cluster.ClusterCompName, cluster.Namespace, clusterDomain, config.GetDBPort())
+	return fmt.Sprintf("%s.%s-headless.%s.svc:1%d", name, cluster.ClusterCompName, cluster.Namespace, config.GetDBPort())
 }

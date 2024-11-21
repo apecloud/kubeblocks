@@ -100,6 +100,6 @@ func TestConfigFunc(t *testing.T) {
 		}
 
 		consensusIPPort := metadata.GetConsensusIPPort(cluster, "test")
-		assert.Equal(t, consensusIPPort, "test.test-headless.default.svc.cluster.local:15432")
+		assert.Equal(t, consensusIPPort, "test.test-headless.default.svc:15432")
 	})
 }

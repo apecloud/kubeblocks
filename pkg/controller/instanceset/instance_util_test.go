@@ -1404,6 +1404,13 @@ var _ = Describe("instance util test", func() {
 			}}
 			Expect(isImageMatched(pod)).Should(BeTrue())
 
+			By("exactly match w/o registry and repository")
+			pod.Status.ContainerStatuses = []corev1.ContainerStatus{{
+				Name:  name,
+				Image: "nginx",
+			}}
+			Expect(isImageMatched(pod)).Should(BeTrue())
+
 			By("digest not matches")
 			pod.Spec.Containers = []corev1.Container{{
 				Name:  name,

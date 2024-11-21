@@ -4330,7 +4330,7 @@ spec:
                         varying configurations. It allows for pod-specific customization of the configuration.
 
 
-                        Note: This field will be deprecated in future versions, and the functionality will be moved to
+                        Deprecated: This field will be deprecated in future versions, and the functionality will be moved to
                         `cluster.spec.componentSpecs[*].instances[*]`.
                       properties:
                         namespace:

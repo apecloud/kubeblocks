@@ -157,6 +157,9 @@ spec:
                   If this field is not provided, each component must be explicitly defined in `componentSpecs[*].componentDef`.
 
 
+                  Note: `ClusterDefinition.spec.componentDef` is deprecated since v0.9.
+
+
                   Note: Once set, this field cannot be modified; it is immutable.
                 maxLength: 63
                 pattern: ^[a-z]([a-z0-9\.\-]*[a-z0-9])?$
@@ -16335,6 +16338,9 @@ spec:
 
 
                   If this field is not provided, each component must be explicitly defined in `componentSpecs[*].componentDef`.
+
+
+                  Note: `ClusterDefinition.spec.componentDef` is deprecated since v0.9.
 
 
                   Note: Once set, this field cannot be modified; it is immutable.

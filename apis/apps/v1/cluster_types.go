@@ -101,6 +101,8 @@ type ClusterSpec struct {
 	//
 	// If this field is not provided, each component must be explicitly defined in `componentSpecs[*].componentDef`.
 	//
+	// Note: `ClusterDefinition.spec.componentDef` is deprecated since v0.9.
+	//
 	// Note: Once set, this field cannot be modified; it is immutable.
 	//
 	// +kubebuilder:validation:MaxLength=63

@@ -1057,7 +1057,7 @@ type ComponentConfigSpec struct {
 	// This field is intended to handle scenarios where different pods within the same Component have
 	// varying configurations. It allows for pod-specific customization of the configuration.
 	//
-	// Note: This field will be deprecated in future versions, and the functionality will be moved to
+	// Deprecated: This field will be deprecated in future versions, and the functionality will be moved to
 	// `cluster.spec.componentSpecs[*].instances[*]`.
 	//
 	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0 and will be removed in 0.10.0"

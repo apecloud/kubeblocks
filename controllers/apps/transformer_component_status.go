@@ -82,13 +82,16 @@ func (t *componentStatusTransformer) Transform(ctx graph.TransformContext, dag *
 
 	t.init(transCtx, dag)
 
-	switch {
-	case model.IsObjectUpdating(transCtx.ComponentOrig):
-		transCtx.Logger.Info(fmt.Sprintf("update status after applying new spec, generation: %d", comp.Generation))
-		comp.Status.ObservedGeneration = comp.Generation
-	case model.IsObjectStatusUpdating(transCtx.ComponentOrig):
-		if err := t.reconcileStatus(transCtx); err != nil {
+	workloadGeneration, err := t.workloadGeneration()
+	if err != nil {
+		return err
+	}
+	if workloadGeneration == nil || *workloadGeneration >= comp.Status.ObservedGeneration {
+		if err = t.reconcileStatus(transCtx); err != nil {
 			return err
+		}
+		if workloadGeneration != nil {
+			comp.Status.ObservedGeneration = *workloadGeneration
 		}
 	}
 
@@ -182,6 +185,21 @@ func (t *componentStatusTransformer) reconcileStatus(transCtx *componentTransfor
 	}
 
 	return t.reconcileStatusCondition(transCtx)
+}
+
+func (t *componentStatusTransformer) workloadGeneration() (*int64, error) {
+	if t.runningITS == nil {
+		return nil, nil
+	}
+	generation, ok := t.runningITS.GetAnnotations()[constant.KubeBlocksGenerationKey]
+	if !ok {
+		return nil, nil
+	}
+	val, err := strconv.ParseInt(generation, 10, 64)
+	if err != nil {
+		return nil, err
+	}
+	return &val, nil
 }
 
 func (t *componentStatusTransformer) isWorkloadUpdated() bool {

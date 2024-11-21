@@ -424,17 +424,7 @@ func (s *Scheduler) reconfigure(schedulePolicy *dpv1alpha1.SchedulePolicy) error
 						ComponentOps: opsv1alpha1.ComponentOps{
 							ComponentName: targetPodSelector.MatchLabels[constant.KBAppComponentLabelKey],
 						},
-						Configurations: []opsv1alpha1.ConfigurationItem{
-							{
-								Name: configRef.Name,
-								Keys: []opsv1alpha1.ParameterConfig{
-									{
-										Key:        configRef.Key,
-										Parameters: parameters,
-									},
-								},
-							},
-						},
+						Parameters: ToV1ReconfigureParameters(parameters),
 					},
 				},
 			},
@@ -453,6 +443,14 @@ func (s *Scheduler) reconfigure(schedulePolicy *dpv1alpha1.SchedulePolicy) error
 		return err
 	}
 	return intctrlutil.NewErrorf(intctrlutil.ErrorTypeRequeue, "requeue to waiting for ops %s finished.", ops.Name)
+}
+
+func ToV1ReconfigureParameters(parameters []opsv1alpha1.ParameterPair) appsv1.ComponentParameters {
+	params := make(map[string]*string, len(parameters))
+	for _, parameter := range parameters {
+		params[parameter.Key] = parameter.Value
+	}
+	return params
 }
 
 func (s *Scheduler) reconcileReconfigure(backupSchedule *dpv1alpha1.BackupSchedule) error {

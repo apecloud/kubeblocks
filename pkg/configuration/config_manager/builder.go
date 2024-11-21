@@ -38,7 +38,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -68,8 +68,6 @@ const (
 	KBConfigManagerPathEnv = "TOOLS_PATH"
 )
 
-const KBConfigSpecLazyRenderedYamlFile = "lazy-rendered-config.yaml"
-
 func BuildConfigManagerContainerParams(cli client.Client, ctx context.Context, managerParams *CfgManagerBuildParams, volumeDirs []corev1.VolumeMount) error {
 	var volume *corev1.VolumeMount
 	var buildParam *ConfigSpecMeta
@@ -86,9 +84,6 @@ func BuildConfigManagerContainerParams(cli client.Client, ctx context.Context, m
 		if err := buildConfigSpecHandleMeta(cli, ctx, buildParam, managerParams); err != nil {
 			return err
 		}
-		if err := buildLazyRenderedConfig(cli, ctx, buildParam, managerParams); err != nil {
-			return err
-		}
 	}
 	downwardAPIVolumes := buildDownwardAPIVolumes(managerParams)
 	allVolumeMounts = append(allVolumeMounts, downwardAPIVolumes...)
@@ -103,9 +98,9 @@ func getWatchedVolume(volumeDirs []corev1.VolumeMount, buildParams []ConfigSpecM
 				continue
 			}
 			switch param.ReloadType {
-			case appsv1beta1.TPLScriptType:
+			case parametersv1alpha1.TPLScriptType:
 				return core.IsWatchModuleForTplTrigger(param.ReloadAction.TPLScriptTrigger)
-			case appsv1beta1.ShellType:
+			case parametersv1alpha1.ShellType:
 				return core.IsWatchModuleForShellTrigger(param.ReloadAction.ShellTrigger)
 			default:
 				return true
@@ -121,41 +116,6 @@ func getWatchedVolume(volumeDirs []corev1.VolumeMount, buildParams []ConfigSpecM
 		}
 	}
 	return allVolumeMounts
-}
-
-// buildLazyRenderedConfig prepare secondary render config and volume
-func buildLazyRenderedConfig(cli client.Client, ctx context.Context, param *ConfigSpecMeta, manager *CfgManagerBuildParams) error {
-	processYamlConfig := func(cm *corev1.ConfigMap) error {
-		renderMeta := ConfigLazyRenderedMeta{
-			ComponentConfigSpec: &param.ConfigSpec,
-			Templates:           cfgutil.ToSet(cm.Data).AsSlice(),
-			FormatterConfig:     param.FormatterConfig,
-		}
-		b, err := cfgutil.ToYamlConfig(renderMeta)
-		if err != nil {
-			return err
-		}
-		cm.Data[KBConfigSpecLazyRenderedYamlFile] = string(b)
-		return nil
-	}
-
-	secondaryTemplate := param.ConfigSpec.LegacyRenderedConfigSpec
-	if secondaryTemplate == nil {
-		return nil
-	}
-	referenceCMKey := client.ObjectKey{
-		Namespace: secondaryTemplate.Namespace,
-		Name:      secondaryTemplate.TemplateRef,
-	}
-	configCMKey := client.ObjectKey{
-		Namespace: manager.Cluster.GetNamespace(),
-		Name:      fmt.Sprintf("%s%s-%s", configManagerCMPrefix, secondaryTemplate.TemplateRef, manager.Cluster.GetName()),
-	}
-	if err := checkOrCreateConfigMap(referenceCMKey, configCMKey, cli, ctx, manager.Cluster, processYamlConfig); err != nil {
-		return err
-	}
-	buildLazyRenderedConfigVolume(configCMKey.Name, manager, GetConfigMountPoint(param.ConfigSpec), GetConfigVolumeName(param.ConfigSpec), param.ConfigSpec)
-	return nil
 }
 
 func buildDownwardAPIVolumes(params *CfgManagerBuildParams) []corev1.VolumeMount {
@@ -264,7 +224,7 @@ func buildConfigSpecHandleMeta(cli client.Client, ctx context.Context, buildPara
 			return err
 		}
 	}
-	if buildParam.ReloadType == appsv1beta1.TPLScriptType {
+	if buildParam.ReloadType == parametersv1alpha1.TPLScriptType {
 		return buildTPLScriptCM(buildParam, cmBuildParam, cli, ctx)
 	}
 	return nil
@@ -302,7 +262,7 @@ func buildTPLScriptCM(configSpecBuildMeta *ConfigSpecMeta, manager *CfgManagerBu
 	return nil
 }
 
-func buildDownwardAPIVolume(manager *CfgManagerBuildParams, fieldInfo appsv1beta1.DownwardAPIChangeTriggeredAction) {
+func buildDownwardAPIVolume(manager *CfgManagerBuildParams, fieldInfo parametersv1alpha1.DownwardAPIChangeTriggeredAction) {
 	manager.DownwardAPIVolumes = append(manager.DownwardAPIVolumes, corev1.VolumeMount{
 		Name:      fieldInfo.Name,
 		MountPath: fieldInfo.MountPoint,
@@ -331,23 +291,6 @@ func buildReloadScriptVolume(scriptCMName string, manager *CfgManagerBuildParams
 			},
 		},
 	})
-}
-
-func buildLazyRenderedConfigVolume(cmName string, manager *CfgManagerBuildParams, mountPoint, volumeName string, configSpec appsv1.ComponentConfigSpec) {
-	n := len(manager.Volumes)
-	manager.Volumes = append(manager.Volumes, corev1.VolumeMount{
-		Name:      volumeName,
-		MountPath: mountPoint,
-	})
-	manager.CMConfigVolumes = append(manager.CMConfigVolumes, corev1.Volume{
-		Name: volumeName,
-		VolumeSource: corev1.VolumeSource{
-			ConfigMap: &corev1.ConfigMapVolumeSource{
-				LocalObjectReference: corev1.LocalObjectReference{Name: cmName},
-			},
-		},
-	})
-	manager.ConfigLazyRenderedVolumes[configSpec.VolumeName] = manager.Volumes[n]
 }
 
 func checkOrCreateConfigMap(referenceCM client.ObjectKey, scriptCMKey client.ObjectKey, cli client.Client, ctx context.Context, cluster *appsv1.Cluster, fn func(cm *corev1.ConfigMap) error) error {
@@ -410,7 +353,7 @@ func mergeWithOverride(dst, src interface{}) {
 	_ = mergo.Merge(dst, src, mergo.WithOverride)
 }
 
-func checkAndUpdateReloadYaml(data map[string]string, reloadConfig string, formatterConfig appsv1beta1.FileFormatConfig) (map[string]string, error) {
+func checkAndUpdateReloadYaml(data map[string]string, reloadConfig string, formatterConfig parametersv1alpha1.FileFormatConfig) (map[string]string, error) {
 	configObject := make(map[string]interface{})
 	if content, ok := data[reloadConfig]; ok {
 		if err := yaml.Unmarshal([]byte(content), &configObject); err != nil {
@@ -436,7 +379,7 @@ func checkAndUpdateReloadYaml(data map[string]string, reloadConfig string, forma
 	return data, nil
 }
 
-func buildCfgManagerScripts(options appsv1beta1.ScriptConfig, manager *CfgManagerBuildParams, cli client.Client, ctx context.Context, configSpec appsv1.ComponentConfigSpec) error {
+func buildCfgManagerScripts(options parametersv1alpha1.ScriptConfig, manager *CfgManagerBuildParams, cli client.Client, ctx context.Context, configSpec appsv1.ComponentTemplateSpec) error {
 	mountPoint := filepath.Join(KBScriptVolumePath, configSpec.Name)
 	referenceCMKey := client.ObjectKey{
 		Namespace: options.Namespace,
@@ -453,19 +396,15 @@ func buildCfgManagerScripts(options appsv1beta1.ScriptConfig, manager *CfgManage
 	return nil
 }
 
-func GetConfigMountPoint(configSpec appsv1.ComponentConfigSpec) string {
-	return filepath.Join(KBConfigVolumePath, configSpec.Name)
-}
-
-func GetScriptsMountPoint(configSpec appsv1.ComponentConfigSpec) string {
+func GetScriptsMountPoint(configSpec appsv1.ComponentTemplateSpec) string {
 	return filepath.Join(KBScriptVolumePath, configSpec.Name)
 }
 
-func GetScriptsVolumeName(configSpec appsv1.ComponentConfigSpec) string {
+func GetScriptsVolumeName(configSpec appsv1.ComponentTemplateSpec) string {
 	return fmt.Sprintf("%s%s", scriptVolumePrefix, configSpec.Name)
 }
 
-func GetConfigVolumeName(configSpec appsv1.ComponentConfigSpec) string {
+func GetConfigVolumeName(configSpec appsv1.ComponentTemplateSpec) string {
 	return fmt.Sprintf("%s%s", configVolumePrefix, configSpec.Name)
 }
 

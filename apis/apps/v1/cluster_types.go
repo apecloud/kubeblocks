@@ -499,6 +499,11 @@ type ClusterComponentSpec struct {
 	//
 	// +optional
 	Stop *bool `json:"stop,omitempty"`
+
+	// Specifies the initialization parameters.
+	//
+	// +optional
+	InitParameters ComponentParameters `json:"initParameters,omitempty"`
 }
 
 type ClusterComponentService struct {

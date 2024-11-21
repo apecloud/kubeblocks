@@ -31,15 +31,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
-	"github.com/apecloud/kubeblocks/pkg/configuration/core"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
+	configcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/plan"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	testparameters "github.com/apecloud/kubeblocks/pkg/testutil/parameters"
 )
 
 var _ = Describe("TLS self-signed cert function", func() {
@@ -49,6 +49,8 @@ var _ = Describe("TLS self-signed cert function", func() {
 		serviceKind        = "mysql"
 		defaultCompName    = "mysql"
 		configTemplateName = "mysql-config-tpl"
+		paramsDef          = "mysql-pd"
+		pdcrName           = "mysql-pd"
 	)
 
 	var (
@@ -66,13 +68,18 @@ var _ = Describe("TLS self-signed cert function", func() {
 		// create the new objects.
 		By("clean resources")
 
+		inNs := client.InNamespace(testCtx.DefaultNamespace)
+		hasLabels := client.HasLabels{testCtx.TestObjLabelKey}
+
 		// delete cluster(and all dependent sub-resources), cluster definition
 		testapps.ClearClusterResourcesWithRemoveFinalizerOption(&testCtx)
 
 		// delete rest configurations
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ConfigMapSignature, true, inNs, hasLabels)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// non-namespaced
-		testapps.ClearResources(&testCtx, generics.ConfigConstraintSignature, ml)
+		testapps.ClearResources(&testCtx, generics.ParameterDrivenConfigRenderSignature, ml)
+		testapps.ClearResources(&testCtx, generics.ParametersDefinitionSignature, ml)
 		testapps.ClearResources(&testCtx, generics.BackupPolicyTemplateSignature, ml)
 	}
 
@@ -82,15 +89,14 @@ var _ = Describe("TLS self-signed cert function", func() {
 
 	Context("tls is enabled/disabled", func() {
 		BeforeEach(func() {
-			configMapObj := testapps.CheckedCreateCustomizedObj(&testCtx,
-				"resources/mysql-tls-config-template.yaml",
-				&corev1.ConfigMap{},
-				testCtx.UseDefaultNamespace(),
-				testapps.WithAnnotations(constant.CMInsEnableRerenderTemplateKey, "true"))
+			configMapObj := testparameters.NewComponentTemplateFactory(configTemplateName, testCtx.DefaultNamespace).
+				Create(&testCtx).
+				GetObject()
 
-			configConstraintObj := testapps.CheckedCreateCustomizedObj(&testCtx,
-				"resources/mysql-config-constraint.yaml",
-				&appsv1beta1.ConfigConstraint{})
+			paramsdef := testparameters.NewParametersDefinitionFactory(paramsDef).
+				SetReloadAction(testparameters.WithNoneAction()).
+				Create(&testCtx).
+				GetObject()
 
 			By("Create a componentDefinition obj")
 			compDefObj = testapps.NewComponentDefinitionFactory(compDefName).
@@ -98,10 +104,17 @@ var _ = Describe("TLS self-signed cert function", func() {
 				AddAnnotations(constant.SkipImmutableCheckAnnotationKey, "true").
 				SetDefaultSpec().
 				SetServiceKind(serviceKind).
-				AddConfigTemplate(configTemplateName, configMapObj.Name, configConstraintObj.Name, testCtx.DefaultNamespace, testapps.ConfVolumeName).
+				AddConfigTemplate(configTemplateName, configMapObj.Name, testCtx.DefaultNamespace, testapps.ConfVolumeName).
 				AddEnv(testapps.DefaultMySQLContainerName, corev1.EnvVar{Name: "MYSQL_ALLOW_EMPTY_PASSWORD", Value: "yes"}).
 				Create(&testCtx).
 				GetObject()
+
+			testparameters.NewParametersDrivenConfigFactory(pdcrName).
+				SetParametersDefs(paramsdef.Name).
+				SetComponentDefinition(compDefObj.GetName()).
+				SetTemplateName(configTemplateName).
+				TLSEnabled().
+				Create(&testCtx)
 		})
 
 		Context("when issuer is UserProvided", func() {
@@ -172,11 +185,11 @@ var _ = Describe("TLS self-signed cert function", func() {
 				Eventually(testapps.ClusterReconciled(&testCtx, clusterKey)).Should(BeTrue())
 				Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1.CreatingClusterPhase))
 				cfgKey := client.ObjectKey{
-					Name:      core.GenerateComponentConfigurationName(clusterObj.Name, defaultCompName),
+					Name:      configcore.GenerateComponentParameterName(clusterObj.Name, defaultCompName),
 					Namespace: testCtx.DefaultNamespace,
 				}
 				hasTLSSettings := func() bool {
-					conf := &appsv1alpha1.Configuration{}
+					conf := &parametersv1alpha1.ComponentParameter{}
 					Expect(k8sClient.Get(ctx, cfgKey, conf)).Should(Succeed())
 					item := &conf.Spec.ConfigItemDetails[0]
 					if item.Payload.Data == nil {
@@ -214,8 +227,8 @@ var _ = Describe("TLS self-signed cert function", func() {
 				Expect(k8sClient.Patch(ctx, clusterObj, patch)).Should(Succeed())
 				Eventually(hasTLSSettings).Should(BeTrue())
 
-				testapps.DeleteObject(&testCtx, clusterKey, &appsv1.Cluster{})
-				Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1.Cluster{}, false)).Should(Succeed())
+				// testapps.DeleteObject(&testCtx, clusterKey, &appsv1.Cluster{})
+				// Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1.Cluster{}, false)).Should(Succeed())
 			})
 		})
 

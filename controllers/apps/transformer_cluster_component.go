@@ -209,6 +209,7 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1.Component) *appsv1.Com
 	compObjCopy.Spec.DisableExporter = compProto.Spec.DisableExporter
 	compObjCopy.Spec.Stop = compProto.Spec.Stop
 	compObjCopy.Spec.Sidecars = compProto.Spec.Sidecars
+	compObjCopy.Spec.InitParameters = compProto.Spec.InitParameters
 
 	if reflect.DeepEqual(oldCompObj.Annotations, compObjCopy.Annotations) &&
 		reflect.DeepEqual(oldCompObj.Labels, compObjCopy.Labels) &&

@@ -40,7 +40,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsconfig "github.com/apecloud/kubeblocks/controllers/apps/configuration"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -134,9 +133,6 @@ func (r *ComponentDefinitionReconciler) deletionHandler(rctx intctrlutil.Request
 			recordEvent, &appsv1.ComponentList{}); res != nil || err != nil {
 			return res, err
 		}
-		if err := appsconfig.DeleteConfigMapFinalizer(r.Client, rctx, cmpd); err != nil {
-			return &ctrl.Result{}, err
-		}
 		return nil, nil
 	}
 }
@@ -191,7 +187,7 @@ func (r *ComponentDefinitionReconciler) validate(cli client.Client, rctx intctrl
 		r.validateVolumes,
 		r.validateHostNetwork,
 		r.validateServices,
-		r.validateConfigs,
+		validateComponentTemplate,
 		r.validateSystemAccounts,
 		r.validateReplicasLimit,
 		r.validateAvailable,
@@ -326,11 +322,6 @@ func (r *ComponentDefinitionReconciler) validateServices(cli client.Client, rctx
 		}
 	}
 	return nil
-}
-
-func (r *ComponentDefinitionReconciler) validateConfigs(cli client.Client, rctx intctrlutil.RequestCtx,
-	compDef *appsv1.ComponentDefinition) error {
-	return appsconfig.ReconcileConfigSpecsForReferencedCR(cli, rctx, compDef)
 }
 
 func (r *ComponentDefinitionReconciler) validateSystemAccounts(cli client.Client, rctx intctrlutil.RequestCtx,

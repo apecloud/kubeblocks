@@ -402,6 +402,11 @@ spec:
                         - name
                         type: object
                       type: array
+                    initParameters:
+                      additionalProperties:
+                        type: string
+                      description: Specifies the initialization parameters.
+                      type: object
                     instances:
                       description: |-
                         Allows for the customization of configuration values for each instance within a Component.
@@ -9043,6 +9048,11 @@ spec:
                             - name
                             type: object
                           type: array
+                        initParameters:
+                          additionalProperties:
+                            type: string
+                          description: Specifies the initialization parameters.
+                          type: object
                         instances:
                           description: |-
                             Allows for the customization of configuration values for each instance within a Component.

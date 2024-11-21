@@ -21,12 +21,14 @@ package configuration
 
 import (
 	"context"
+	"fmt"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
+	"github.com/apecloud/kubeblocks/pkg/controller/render"
 )
 
 type TemplateMerger interface {
@@ -39,13 +41,14 @@ type TemplateMerger interface {
 }
 
 type mergeContext struct {
-	template   appsv1.ConfigTemplateExtension
-	configSpec appsv1.ComponentConfigSpec
-	ccSpec     *appsv1beta1.ConfigConstraintSpec
+	template     appsv1.ConfigTemplateExtension
+	configSpec   appsv1.ComponentTemplateSpec
+	paramsDefs   []*parametersv1alpha1.ParametersDefinition
+	configRender *parametersv1alpha1.ParameterDrivenConfigRender
 
-	builder *configTemplateBuilder
-	ctx     context.Context
-	client  client.Client
+	templateRender render.TemplateRender
+	ctx            context.Context
+	client         client.Client
 }
 
 func (m *mergeContext) renderTemplate() (map[string]string, error) {
@@ -54,11 +57,11 @@ func (m *mergeContext) renderTemplate() (map[string]string, error) {
 		Namespace:   m.template.Namespace,
 		TemplateRef: m.template.TemplateRef,
 	}
-	configs, err := renderConfigMapTemplate(m.builder, templateSpec, m.ctx, m.client)
+	configs, err := m.templateRender.RenderConfigMapTemplate(templateSpec)
 	if err != nil {
 		return nil, err
 	}
-	if err := validateRawData(configs, m.configSpec, m.ccSpec); err != nil {
+	if err := validateRenderedData(configs, m.paramsDefs, m.configRender); err != nil {
 		return nil, err
 	}
 	return configs, nil
@@ -85,8 +88,10 @@ type configOnlyAddMerger struct {
 }
 
 func (c *configPatcher) Merge(baseData map[string]string, updatedData map[string]string) (map[string]string, error) {
-	formatter := c.ccSpec.FileFormatConfig
-	configPatch, err := core.TransformConfigPatchFromData(updatedData, formatter.Format, c.configSpec.Keys)
+	if c.configRender == nil || len(c.configRender.Spec.Configs) == 0 {
+		return nil, fmt.Errorf("not support patch merge policy")
+	}
+	configPatch, err := core.TransformConfigPatchFromData(updatedData, c.configRender.Spec)
 	if err != nil {
 		return nil, err
 	}
@@ -94,19 +99,25 @@ func (c *configPatcher) Merge(baseData map[string]string, updatedData map[string
 		return baseData, nil
 	}
 
+	params := core.GenerateVisualizedParamsList(configPatch, c.configRender.Spec.Configs)
 	mergedData := copyMap(baseData)
-	params := core.GenerateVisualizedParamsList(configPatch, formatter, nil)
 	for key, patch := range splitParameters(params) {
 		v, ok := baseData[key]
 		if !ok {
 			mergedData[key] = updatedData[key]
 			continue
 		}
-		newConfig, err := core.ApplyConfigPatch([]byte(v), patch, formatter)
+		newConfig, err := core.ApplyConfigPatch([]byte(v), patch, core.ResolveConfigFormat(c.configRender.Spec.Configs, key))
 		if err != nil {
 			return nil, err
 		}
 		mergedData[key] = newConfig
+	}
+
+	for key, content := range updatedData {
+		if _, ok := mergedData[key]; !ok {
+			mergedData[key] = content
+		}
 	}
 	return mergedData, err
 }
@@ -115,18 +126,26 @@ func (c *configReplaceMerger) Merge(baseData map[string]string, updatedData map[
 	return core.MergeUpdatedConfig(baseData, updatedData), nil
 }
 
-func (c *configOnlyAddMerger) Merge(baseData map[string]string, updatedData map[string]string) (map[string]string, error) {
+func (c *configOnlyAddMerger) Merge(map[string]string, map[string]string) (map[string]string, error) {
 	return nil, core.MakeError("not implemented")
 }
 
-func NewTemplateMerger(template appsv1.ConfigTemplateExtension, ctx context.Context, cli client.Client, builder *configTemplateBuilder, configSpec appsv1.ComponentConfigSpec, ccSpec *appsv1beta1.ConfigConstraintSpec) (TemplateMerger, error) {
+func NewTemplateMerger(template appsv1.ConfigTemplateExtension,
+	ctx context.Context,
+	cli client.Client,
+	templateRender render.TemplateRender,
+	configSpec appsv1.ComponentTemplateSpec,
+	paramsDefs []*parametersv1alpha1.ParametersDefinition,
+	configRender *parametersv1alpha1.ParameterDrivenConfigRender,
+) (TemplateMerger, error) {
 	templateData := &mergeContext{
-		configSpec: configSpec,
-		template:   template,
-		ctx:        ctx,
-		client:     cli,
-		builder:    builder,
-		ccSpec:     ccSpec,
+		configSpec:     configSpec,
+		template:       template,
+		ctx:            ctx,
+		client:         cli,
+		templateRender: templateRender,
+		paramsDefs:     paramsDefs,
+		configRender:   configRender,
 	}
 
 	var merger TemplateMerger
@@ -145,27 +164,14 @@ func NewTemplateMerger(template appsv1.ConfigTemplateExtension, ctx context.Cont
 	return merger, nil
 }
 
-func mergerConfigTemplate(template *appsv1.LegacyRenderedTemplateSpec,
-	builder *configTemplateBuilder,
-	configSpec appsv1.ComponentConfigSpec,
+func mergerConfigTemplate(template appsv1.ConfigTemplateExtension,
+	templateRender render.TemplateRender,
+	configSpec appsv1.ComponentTemplateSpec,
 	baseData map[string]string,
+	paramsDefs []*parametersv1alpha1.ParametersDefinition,
+	configRender *parametersv1alpha1.ParameterDrivenConfigRender,
 	ctx context.Context, cli client.Client) (map[string]string, error) {
-	if configSpec.ConfigConstraintRef == "" {
-		return nil, core.MakeError("ConfigConstraintRef require not empty, configSpec[%v]", configSpec.Name)
-	}
-	ccObj := &appsv1beta1.ConfigConstraint{}
-	ccKey := client.ObjectKey{
-		Namespace: "",
-		Name:      configSpec.ConfigConstraintRef,
-	}
-	if err := cli.Get(ctx, ccKey, ccObj); err != nil {
-		return nil, core.WrapError(err, "failed to get ConfigConstraint, key[%v]", configSpec)
-	}
-	if ccObj.Spec.FileFormatConfig == nil {
-		return nil, core.MakeError("importedConfigTemplate require ConfigConstraint.Spec.FileFormatConfig, configSpec[%v]", configSpec)
-	}
-
-	templateMerger, err := NewTemplateMerger(template.ConfigTemplateExtension, ctx, cli, builder, configSpec, &ccObj.Spec)
+	templateMerger, err := NewTemplateMerger(template, ctx, cli, templateRender, configSpec, paramsDefs, configRender)
 	if err != nil {
 		return nil, err
 	}

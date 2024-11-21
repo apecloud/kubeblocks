@@ -298,15 +298,14 @@ func NewReconfigureCondition(ops *OpsRequest) *metav1.Condition {
 }
 
 // NewReconfigureRunningCondition creates a condition that the OpsRequest reconfigure workflow
-func NewReconfigureRunningCondition(ops *OpsRequest, conditionType string, configSpecName string, info ...string) *metav1.Condition {
+func NewReconfigureRunningCondition(ops *OpsRequest, conditionType string, info ...string) *metav1.Condition {
 	status := metav1.ConditionTrue
 	if conditionType == appsv1alpha1.ReasonReconfigureFailed {
 		status = metav1.ConditionFalse
 	}
-	message := fmt.Sprintf("Reconfiguring in Cluster: %s, Component: %s, ConfigSpec: %s",
+	message := fmt.Sprintf("Reconfiguring in Cluster: %s, Component: %s",
 		ops.Spec.GetClusterName(),
-		getComponentName(ops.Spec),
-		configSpecName)
+		getComponentName(ops.Spec))
 	if len(info) > 0 {
 		message = message + ", info: " + info[0]
 	}

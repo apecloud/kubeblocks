@@ -111,13 +111,8 @@ func (r *ClusterDefinitionReconciler) deletionHandler(rctx intctrlutil.RequestCt
 			recordEvent, &appsv1.ClusterList{}); res != nil || err != nil {
 			return res, err
 		}
-		return nil, r.deleteExternalResources(rctx, clusterDef)
+		return nil, nil
 	}
-}
-
-func (r *ClusterDefinitionReconciler) deleteExternalResources(rctx intctrlutil.RequestCtx, clusterDef *appsv1.ClusterDefinition) error {
-	// delete any external resources associated with the cluster definition CR.
-	return nil
 }
 
 func (r *ClusterDefinitionReconciler) available(rctx intctrlutil.RequestCtx, clusterDef *appsv1.ClusterDefinition) error {

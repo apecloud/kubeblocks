@@ -186,8 +186,7 @@ single_thread_memory = 294912
 				},
 				SynthesizedComponent: component,
 				PodSpec:              podSpec,
-			})
-			renderWrapper.setTemplateName("for_test")
+			}).(*templateRenderWrapper)
 			rendered, err := renderWrapper.render(map[string]string{
 				mysqlCfgName: mysqlCfgTmpContext,
 			})
@@ -211,7 +210,7 @@ single_thread_memory = 294912
 				},
 				SynthesizedComponent: component,
 				PodSpec:              podSpec,
-			})
+			}).(*templateRenderWrapper)
 			rendered, err := renderWrapper.render(map[string]string{
 				"a":                 "{{ getVolumePathByName ( index $.podSpec.containers 0 ) \"log\" }}",
 				"b":                 "{{ getVolumePathByName ( index $.podSpec.containers 0 ) \"data\" }}",
@@ -279,7 +278,7 @@ single_thread_memory = 294912
 				},
 				SynthesizedComponent: component,
 				PodSpec:              podSpec,
-			})
+			}).(*templateRenderWrapper)
 
 			tests := []struct {
 				name     string

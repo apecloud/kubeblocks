@@ -17,65 +17,46 @@ limitations under the License.
 package render
 
 import (
-	"context"
-
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	"github.com/apecloud/kubeblocks/pkg/controller/factory"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-// RenderComponentTemplate renders config file by config template provided by provider.
-func RenderComponentTemplate(cluster *appsv1.Cluster,
-	component *component.SynthesizedComponent,
-	templateRender TemplateRender,
-	cmName string,
-	templateSpec appsv1.ComponentTemplateSpec,
-	ctx context.Context,
-	cli client.Client, dataValidator RenderedValidator) (*corev1.ConfigMap, error) {
-	// Render config template by TplEngine
-	// The template namespace must be the same as the ClusterDefinition namespace
-	configs, err := RenderConfigMapTemplate(templateRender, templateSpec, ctx, cli)
-	if err != nil {
-		return nil, err
+// RenderTemplate renders multiple component templates into Kubernetes ConfigMap objects.
+func RenderTemplate(resourceCtx *ResourceCtx,
+	cluster *appsv1.Cluster,
+	synthesizedComponent *component.SynthesizedComponent,
+	comp *appsv1.Component,
+	localObjs []client.Object,
+	tpls []appsv1.ComponentTemplateSpec) ([]*corev1.ConfigMap, error) {
+	var err error
+	var configMap *corev1.ConfigMap
+	var configMaps []*corev1.ConfigMap
+
+	reconcileCtx := &ReconcileCtx{
+		ResourceCtx:          resourceCtx,
+		Cluster:              cluster,
+		Component:            comp,
+		SynthesizedComponent: synthesizedComponent,
+		PodSpec:              synthesizedComponent.PodSpec,
+		Cache:                localObjs,
 	}
 
-	if dataValidator != nil {
-		if err = dataValidator(configs); err != nil {
+	tplBuilder := NewTemplateBuilder(reconcileCtx)
+	for _, template := range tpls {
+		cmName := core.GetComponentCfgName(cluster.Name, synthesizedComponent.Name, template.Name)
+		configMap, err = tplBuilder.RenderComponentTemplate(template, cmName, nil)
+		if err != nil {
 			return nil, err
 		}
+		if err = intctrlutil.SetOwnerReference(comp, configMap); err != nil {
+			return nil, err
+		}
+		configMaps = append(configMaps, configMap)
 	}
-
-	// Using ConfigMap cue template render to configmap of config
-	return factory.BuildConfigMapWithTemplate(cluster, component, configs, cmName, templateSpec), nil
-}
-
-// RenderConfigMapTemplate renders config file using template engine
-func RenderConfigMapTemplate(
-	templateRender TemplateRender,
-	templateSpec appsv1.ComponentTemplateSpec,
-	ctx context.Context,
-	cli client.Client) (map[string]string, error) {
-	cmObj := &corev1.ConfigMap{}
-	//  Require template configmap exist
-	if err := cli.Get(ctx, client.ObjectKey{
-		Namespace: templateSpec.Namespace,
-		Name:      templateSpec.TemplateRef,
-	}, cmObj); err != nil {
-		return nil, err
-	}
-
-	if len(cmObj.Data) == 0 {
-		return map[string]string{}, nil
-	}
-
-	templateRender.setTemplateName(templateSpec.TemplateRef)
-	renderedData, err := templateRender.render(cmObj.Data)
-	if err != nil {
-		return nil, core.WrapError(err, "failed to render configmap")
-	}
-	return renderedData, nil
+	return configMaps, nil
 }

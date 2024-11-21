@@ -44,14 +44,16 @@ type ReconcileCtx struct {
 	Component            *appsv1.Component
 	SynthesizedComponent *component.SynthesizedComponent
 	PodSpec              *corev1.PodSpec
-	ComponentParameters  appsv1.ComponentParameters
 
 	Cache []client.Object
 }
 
 type TemplateRender interface {
-	render(configs map[string]string) (map[string]string, error)
-	setTemplateName(name string)
+	RenderComponentTemplate(templateSpec appsv1.ComponentTemplateSpec,
+		cmName string,
+		dataValidator RenderedValidator) (*corev1.ConfigMap, error)
+
+	RenderConfigMapTemplate(templateSpec appsv1.ComponentTemplateSpec) (map[string]string, error)
 }
 
 type RenderedValidator = func(map[string]string) error

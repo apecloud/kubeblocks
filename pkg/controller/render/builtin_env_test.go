@@ -239,7 +239,7 @@ bootstrap:
 					},
 					PodSpec: podSpec,
 				},
-			)
+			).(*templateRenderWrapper)
 
 			rendered, err := cfgBuilder.render(map[string]string{
 				// KB_CLUSTER_NAME, KB_COMP_NAME from env

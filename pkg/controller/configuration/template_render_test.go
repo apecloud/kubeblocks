@@ -85,7 +85,6 @@ var _ = Describe("ToolsImageBuilderTest", func() {
 			Cluster:              clusterObj,
 			SynthesizedComponent: clusterComponent,
 			PodSpec:              &corev1.PodSpec{},
-			ComponentParameters:  parameters,
 		}
 		item := parametersv1alpha1.ConfigTemplateItemDetail{
 			Name: configTemplateName,

@@ -32,13 +32,10 @@ func RerenderParametersTemplate(reconcileCtx *render.ReconcileCtx, item paramete
 	}
 
 	templateRender := render.NewTemplateBuilder(reconcileCtx)
-	cmObj, err := render.RenderComponentTemplate(reconcileCtx.Cluster,
-		reconcileCtx.SynthesizedComponent,
-		templateRender,
-		core.GetComponentCfgName(reconcileCtx.SynthesizedComponent.ClusterName, reconcileCtx.SynthesizedComponent.Name, item.ConfigSpec.Name),
-		*item.ConfigSpec,
-		reconcileCtx.Context,
-		reconcileCtx.Client,
+	cmObj, err := templateRender.RenderComponentTemplate(*item.ConfigSpec,
+		core.GetComponentCfgName(reconcileCtx.SynthesizedComponent.ClusterName,
+			reconcileCtx.SynthesizedComponent.Name,
+			item.ConfigSpec.Name),
 		parametersValidate)
 	if err != nil {
 		return nil, err

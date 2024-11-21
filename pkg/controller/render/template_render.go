@@ -27,7 +27,7 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	"github.com/apecloud/kubeblocks/pkg/gotemplate"
 )
@@ -41,59 +41,111 @@ type templateRenderWrapper struct {
 	builtInFunctions *gotemplate.BuiltInObjectsFunc
 	builtInObjects   *builtInObjects
 
-	podSpec *corev1.PodSpec
-	ctx     context.Context
-	cli     client.Reader
+	cluster          *appsv1.Cluster
+	component        *appsv1.Component
+	builtinComponent *component.SynthesizedComponent
+	podSpec          *corev1.PodSpec
+
+	ctx context.Context
+	cli client.Client
 }
 
 const defaultTemplateName = "KbTemplate"
 
 func NewTemplateBuilder(reconcileCtx *ReconcileCtx) TemplateRender {
 	builder := &templateRenderWrapper{
-		namespace:    reconcileCtx.Namespace,
-		clusterName:  reconcileCtx.ClusterName,
-		templateName: defaultTemplateName,
-		ctx:          reconcileCtx.Context,
-		cli:          reconcileCtx.Client,
+		namespace:        reconcileCtx.Namespace,
+		clusterName:      reconcileCtx.ClusterName,
+		templateName:     defaultTemplateName,
+		cluster:          reconcileCtx.Cluster,
+		component:        reconcileCtx.Component,
+		builtinComponent: reconcileCtx.SynthesizedComponent,
+		ctx:              reconcileCtx.Context,
+		cli:              reconcileCtx.Client,
 	}
 	builder.injectBuiltInObjectsAndFunctions(reconcileCtx.PodSpec, reconcileCtx.SynthesizedComponent, reconcileCtx.Cache, reconcileCtx.Cluster)
 	return builder
 }
 
-func (c *templateRenderWrapper) setTemplateName(templateName string) {
-	c.templateName = templateName
+// RenderComponentTemplate renders config file by config template provided by provider.
+func (r *templateRenderWrapper) RenderComponentTemplate(
+	templateSpec appsv1.ComponentTemplateSpec,
+	cmName string,
+	dataValidator RenderedValidator) (*corev1.ConfigMap, error) {
+	// Render config template by TplEngine
+	// The template namespace must be the same as the ClusterDefinition namespace
+	configs, err := r.RenderConfigMapTemplate(templateSpec)
+	if err != nil {
+		return nil, err
+	}
+
+	if dataValidator != nil {
+		if err = dataValidator(configs); err != nil {
+			return nil, err
+		}
+	}
+
+	// Using ConfigMap cue template render to configmap of config
+	return factory.BuildConfigMapWithTemplate(r.cluster, r.builtinComponent, configs, cmName, templateSpec), nil
 }
 
-func (c *templateRenderWrapper) formatError(file string, err error) error {
-	return fmt.Errorf("failed to render configuration template[cm:%s][key:%s], error: [%v]", c.templateName, file, err)
+// RenderConfigMapTemplate renders config file using template engine
+func (r *templateRenderWrapper) RenderConfigMapTemplate(templateSpec appsv1.ComponentTemplateSpec, ) (map[string]string, error) {
+	cmObj := &corev1.ConfigMap{}
+	//  Require template configmap exist
+	if err := r.cli.Get(r.ctx, client.ObjectKey{
+		Namespace: templateSpec.Namespace,
+		Name:      templateSpec.TemplateRef,
+	}, cmObj); err != nil {
+		return nil, err
+	}
+
+	if len(cmObj.Data) == 0 {
+		return map[string]string{}, nil
+	}
+
+	r.setTemplateName(templateSpec.TemplateRef)
+	renderedData, err := r.render(cmObj.Data)
+	if err != nil {
+		return nil, core.WrapError(err, "failed to render configmap")
+	}
+	return renderedData, nil
 }
 
-func (c *templateRenderWrapper) render(configs map[string]string) (map[string]string, error) {
-	values, err := builtinObjectsAsValues(c.builtInObjects)
+func (r *templateRenderWrapper) setTemplateName(templateName string) {
+	r.templateName = templateName
+}
+
+func (r *templateRenderWrapper) formatError(file string, err error) error {
+	return fmt.Errorf("failed to render configuration template[cm:%s][key:%s], error: [%v]", r.templateName, file, err)
+}
+
+func (r *templateRenderWrapper) render(configs map[string]string) (map[string]string, error) {
+	values, err := builtinObjectsAsValues(r.builtInObjects)
 	if err != nil {
 		return nil, err
 	}
 
 	rendered := make(map[string]string, len(configs))
-	engine := gotemplate.NewTplEngine(values, c.builtInFunctions, c.templateName, c.cli, c.ctx)
+	engine := gotemplate.NewTplEngine(values, r.builtInFunctions, r.templateName, r.cli, r.ctx)
 	for file, configContext := range configs {
 		newContext, err := engine.Render(configContext)
 		if err != nil {
-			return nil, c.formatError(file, err)
+			return nil, r.formatError(file, err)
 		}
 		rendered[file] = newContext
 	}
 	return rendered, nil
 }
 
-func (c *templateRenderWrapper) injectBuiltInObjectsAndFunctions(
+func (r *templateRenderWrapper) injectBuiltInObjectsAndFunctions(
 	podSpec *corev1.PodSpec,
 	component *component.SynthesizedComponent,
 	localObjs []client.Object,
 	cluster *appsv1.Cluster) {
-	c.podSpec = podSpec
-	c.builtInFunctions = BuiltInCustomFunctions(c, component, localObjs)
-	c.builtInObjects = buildInComponentObjects(podSpec, component, cluster)
+	r.podSpec = podSpec
+	r.builtInFunctions = BuiltInCustomFunctions(r, component, localObjs)
+	r.builtInObjects = buildInComponentObjects(podSpec, component, cluster)
 }
 
 func findMatchedLocalObject(localObjs []client.Object, objKey client.ObjectKey, gvk schema.GroupVersionKind) client.Object {
@@ -105,39 +157,4 @@ func findMatchedLocalObject(localObjs []client.Object, objKey client.ObjectKey, 
 		}
 	}
 	return nil
-}
-
-// RenderTemplate renders multiple component templates into Kubernetes ConfigMap objects.
-func RenderTemplate(resourceCtx *ResourceCtx,
-	cluster *appsv1.Cluster,
-	synthesizedComponent *component.SynthesizedComponent,
-	comp *appsv1.Component,
-	localObjs []client.Object,
-	tpls []appsv1.ComponentTemplateSpec) ([]*corev1.ConfigMap, error) {
-	var err error
-	var configMap *corev1.ConfigMap
-	var configMaps []*corev1.ConfigMap
-
-	reconcileCtx := &ReconcileCtx{
-		ResourceCtx:          resourceCtx,
-		Cluster:              cluster,
-		Component:            comp,
-		SynthesizedComponent: synthesizedComponent,
-		PodSpec:              synthesizedComponent.PodSpec,
-		Cache:                localObjs,
-	}
-
-	tplBuilder := NewTemplateBuilder(reconcileCtx)
-	for _, tpl := range tpls {
-		cmName := core.GetComponentCfgName(cluster.Name, synthesizedComponent.Name, tpl.Name)
-		configMap, err = RenderComponentTemplate(cluster, synthesizedComponent, tplBuilder, cmName, tpl, resourceCtx.Context, reconcileCtx.Client, nil)
-		if err != nil {
-			return nil, err
-		}
-		if err = intctrlutil.SetOwnerReference(comp, configMap); err != nil {
-			return nil, err
-		}
-		configMaps = append(configMaps, configMap)
-	}
-	return configMaps, nil
 }

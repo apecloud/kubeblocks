@@ -57,7 +57,7 @@ func (m *mergeContext) renderTemplate() (map[string]string, error) {
 		Namespace:   m.template.Namespace,
 		TemplateRef: m.template.TemplateRef,
 	}
-	configs, err := render.RenderConfigMapTemplate(m.templateRender, templateSpec, m.ctx, m.client)
+	configs, err := m.templateRender.RenderConfigMapTemplate(templateSpec)
 	if err != nil {
 		return nil, err
 	}

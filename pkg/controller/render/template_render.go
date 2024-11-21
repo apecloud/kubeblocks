@@ -90,7 +90,7 @@ func (r *templateRenderWrapper) RenderComponentTemplate(
 }
 
 // RenderConfigMapTemplate renders config file using template engine
-func (r *templateRenderWrapper) RenderConfigMapTemplate(templateSpec appsv1.ComponentTemplateSpec, ) (map[string]string, error) {
+func (r *templateRenderWrapper) RenderConfigMapTemplate(templateSpec appsv1.ComponentTemplateSpec) (map[string]string, error) {
 	cmObj := &corev1.ConfigMap{}
 	//  Require template configmap exist
 	if err := r.cli.Get(r.ctx, client.ObjectKey{

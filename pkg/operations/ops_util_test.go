@@ -87,7 +87,7 @@ var _ = Describe("OpsUtil functions", func() {
 						ReplicaChanges: pointer.Int32(2),
 					},
 				},
-			})
+			}, false)
 			Expect(patchValidateErrorCondition(ctx, k8sClient, opsRes, "validate error")).Should(Succeed())
 			Expect(PatchOpsHandlerNotSupported(ctx, k8sClient, opsRes)).Should(Succeed())
 			Expect(isOpsRequestFailedPhase(opsv1alpha1.OpsFailedPhase)).Should(BeTrue())
@@ -209,7 +209,7 @@ var _ = Describe("OpsUtil functions", func() {
 							ReplicaChanges: pointer.Int32(1),
 						},
 					},
-				})
+				}, false)
 				opsRes.OpsRequest = ops
 				_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 				Expect(err).ShouldNot(HaveOccurred())
@@ -266,7 +266,7 @@ var _ = Describe("OpsUtil functions", func() {
 				ScaleIn: &opsv1alpha1.ScaleIn{
 					ReplicaChanger: opsv1alpha1.ReplicaChanger{ReplicaChanges: pointer.Int32(1)},
 				},
-			})
+			}, false)
 			opsRes.OpsRequest = ops1
 			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
@@ -278,7 +278,7 @@ var _ = Describe("OpsUtil functions", func() {
 				ScaleOut: &opsv1alpha1.ScaleOut{
 					ReplicaChanger: opsv1alpha1.ReplicaChanger{ReplicaChanges: pointer.Int32(1)},
 				},
-			})
+			}, false)
 			ops2.Annotations = map[string]string{constant.OpsDependentOnSuccessfulOpsAnnoKey: ops1.Name}
 			ops2.Spec.Force = true
 			opsRes.OpsRequest = ops2
@@ -329,7 +329,7 @@ var _ = Describe("OpsUtil functions", func() {
 						ReplicaChanges: pointer.Int32(1),
 					},
 				},
-			})
+			}, false)
 			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
 			_, _ = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsFailedPhase))
@@ -342,7 +342,7 @@ var _ = Describe("OpsUtil functions", func() {
 						ReplicaChanges: pointer.Int32(1),
 					},
 				},
-			})
+			}, false)
 			opsRes.OpsRequest.Spec.Force = true
 			opsRes.OpsRequest.Spec.EnqueueOnForce = true
 			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsPendingPhase

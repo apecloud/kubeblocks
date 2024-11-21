@@ -1,35 +1,57 @@
 ---
-title: 卸载 kbcli 和 KubeBlocks
-description: 卸载 kbcli 和 KubeBlocks
-keywords: [kbcli, kubeblocks, 卸载]
-sidebar_position: 4
-sidebar_label: 卸载 KubeBlocks 和 kbcli
+title: 卸载 KubeBlocks
+description: 卸载 KubeBlocks
+keywords: [kubeblocks, 卸载]
+sidebar_position: 5
+sidebar_label: 卸载 KubeBlocks 及 kbcli
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# 卸载 KubeBlocks 和 kbcli
+# 卸载 KubeBlocks 及 kbcli
 
 卸载顺序：
 
 1. 如果已经创建了集群，请先删除集群。
 
-    ```bash
-    kbcli cluster delete <name>
-    ```
+   ```bash
+   kubebctl delete cluster <clustername> -n namespace
+   ```
 
 2. 卸载 KubeBlocks。
 
-3. 卸载 kbcli。
-
 ## 卸载 KubeBlocks
 
-如果想在试用结束后删除 KubeBlocks，请执行以下操作：
+<Tabs>
+
+<TabItem value="Helm" label="Helm" default>
+
+在执行以下命令前，请删除之前创建的所有集群和资源，否则卸载可能无法成功。
 
 ```bash
-kbcli kubeblocks uninstall
+helm uninstall kubeblocks --namespace kb-system
 ```
+
+Helm 不会删除 CRD 对象。请使用以下命令删除 KubeBlocks 创建的对象。
+
+```bash
+kubectl get crd -o name | grep kubeblocks.io | xargs kubectl delete
+```
+
+</TabItem>
+
+<TabItem value="YAML" label="YAML">
+
+从 KubeBlocks chart 生成 YAML 文件，并使用 `kubectl` 进行卸载。使用 `--version x.y.z` 指定版本，确保卸载的版本与安装的版本相同。
+
+```bash
+helm template kubeblocks kubeblocks/kubeblocks --version x.y.z --namespace kb-system | kubectl delete -f -
+```
+
+</TabItem>
+
+</Tabs>
 
 ## 卸载 kbcli
 
@@ -90,3 +112,4 @@ kbcli 会在 HOME 目录下创建一个名为 `~/.kbcli` 的隐藏文件夹，�
 </TabItem>
 
 </Tabs>
+

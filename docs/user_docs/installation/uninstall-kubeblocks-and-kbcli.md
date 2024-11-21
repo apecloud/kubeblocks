@@ -1,8 +1,8 @@
 ---
-title: Uninstall kbcli and KubeBlocks
-description: Handle exception and uninstall kbcli and KubeBlocks
-keywords: [kbcli, kubeblocks, exception, uninstall]
-sidebar_position: 4
+title: Uninstall KubeBlocks
+description: Uninstall KubeBlocks by Helm, applying a YAML file, or kbcli.
+keywords: [kubeblocks, uninstall, helm, kbcli]
+sidebar_position: 5
 sidebar_label: Uninstall KubeBlocks and kbcli
 ---
 
@@ -16,26 +16,57 @@ Uninstallation order:
 1. Delete your cluster if you have created a cluster.
 
    ```bash
-   kbcli cluster delete <name>
+   kubebctl delete cluster <clustername> -n namespace
    ```
 
 2. Uninstall KubeBlocks.
 
-3. Uninstall kbcli.
-
 ## Uninstall KubeBlocks
 
-Uninstall KubeBlocks if you want to delete KubeBlocks after your trial.
+<Tabs>
+
+<TabItem value="Helm" label="Helm" default>
+
+Delete all the clusters and resources created before performing the following command, otherwise the uninstallation may not be successful.
+
+```bash
+helm uninstall kubeblocks --namespace kb-system
+```
+
+Helm does not delete CRD objects. You can delete the ones KubeBlocks created with the following commands:
+
+```bash
+kubectl get crd -o name | grep kubeblocks.io | xargs kubectl delete
+```
+
+</TabItem>
+
+<TabItem value="YAML" label="YAML">
+
+You can generate YAMLs from the KubeBlocks chart and uninstall using `kubectl`. Use `--version x.y.z` to specify a version and make sure the uninstalled version is the same as the installed one.
+
+```bash
+helm template kubeblocks kubeblocks/kubeblocks --namespace kb-system --version x.y.z | kubectl delete -f -
+```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
 
 ```bash
 kbcli kubeblocks uninstall
 ```
+
+</TabItem>
+
+</Tabs>
 
 ## Uninstall kbcli
 
 Uninstall kbcli if you want to delete kbcli after your trial. Use the same option as the way you install kbcli.
 
 <Tabs>
+
 <TabItem value="macOS" label="macOS" default>
 
 For `curl`, run

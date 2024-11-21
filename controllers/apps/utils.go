@@ -28,9 +28,11 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 // default reconcile requeue after duration
@@ -148,4 +150,25 @@ func shouldAllocateNodePorts(svc *corev1.ServiceSpec) bool {
 		return true
 	}
 	return false
+}
+
+func validateComponentTemplate(cli client.Client, rctx intctrlutil.RequestCtx, compd *appsv1.ComponentDefinition) error {
+	validateObject := func(objectKey client.ObjectKey) error {
+		configObj := &corev1.ConfigMap{}
+		return cli.Get(rctx.Ctx, objectKey, configObj)
+	}
+	validateTemplate := func(tpl appsv1.ComponentTemplateSpec) error {
+		if tpl.TemplateRef != "" {
+			return validateObject(client.ObjectKey{Namespace: tpl.Namespace, Name: tpl.TemplateRef})
+		}
+		return nil
+	}
+	for _, tpls := range [][]appsv1.ComponentTemplateSpec{compd.Spec.Configs, compd.Spec.Scripts} {
+		for _, tpl := range tpls {
+			if err := validateTemplate(tpl); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }

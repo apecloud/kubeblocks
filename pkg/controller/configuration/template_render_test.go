@@ -98,6 +98,7 @@ var _ = Describe("ToolsImageBuilderTest", func() {
 		}
 		pds := []*parametersv1alpha1.ParametersDefinition{paramsDef}
 		cmObj, err := RerenderParametersTemplate(rctx, item, pdcr, pds)
+		Expect(err).Should(Succeed())
 		configdesc := pdcr.Spec.Configs[0]
 		if len(parameters) == 0 {
 			configReaders, err := cfgcore.LoadRawConfigObject(cmObj.Data, configdesc.FileFormatConfig, []string{configdesc.Name})
@@ -112,6 +113,7 @@ var _ = Describe("ToolsImageBuilderTest", func() {
 		result, err := ApplyParameters(item, cmObj, pdcr, pds)
 		Expect(err).Should(Succeed())
 		configReaders, err := cfgcore.LoadRawConfigObject(result.Data, configdesc.FileFormatConfig, []string{configdesc.Name})
+		Expect(err).Should(Succeed())
 		return configReaders[configdesc.Name]
 	}
 

@@ -40,7 +40,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsconfig "github.com/apecloud/kubeblocks/controllers/apps/configuration"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -53,9 +52,9 @@ type SidecarDefinitionReconciler struct {
 	Recorder record.EventRecorder
 }
 
-//+kubebuilder:rbac:groups=apps.kubeblocks.io,resources=sidecardefinitions,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=apps.kubeblocks.io,resources=sidecardefinitions/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=apps.kubeblocks.io,resources=sidecardefinitions/finalizers,verbs=update
+// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=sidecardefinitions,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=sidecardefinitions/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=sidecardefinitions/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -228,25 +227,13 @@ func (r *SidecarDefinitionReconciler) validateConfigNScript(cli client.Client, r
 		return fmt.Errorf("duplicate names of configs/scripts are not allowed")
 	}
 
-	configs := func() []appsv1.ComponentConfigSpec {
-		if len(sidecarDef.Spec.Configs) == 0 {
-			return nil
-		}
-		configs := make([]appsv1.ComponentConfigSpec, 0)
-		for i := range sidecarDef.Spec.Configs {
-			configs = append(configs, appsv1.ComponentConfigSpec{
-				ComponentTemplateSpec: sidecarDef.Spec.Configs[i],
-			})
-		}
-		return configs
-	}
 	compDef := &appsv1.ComponentDefinition{
 		Spec: appsv1.ComponentDefinitionSpec{
-			Configs: configs(),
+			Configs: sidecarDef.Spec.Configs,
 			Scripts: sidecarDef.Spec.Scripts,
 		},
 	}
-	return appsconfig.ReconcileConfigSpecsForReferencedCR(cli, rctx, compDef)
+	return validateComponentTemplate(cli, rctx, compDef)
 }
 
 func (r *SidecarDefinitionReconciler) validateNResolveOwner(_ client.Client, _ intctrlutil.RequestCtx,
@@ -339,18 +326,7 @@ func (r *SidecarDefinitionReconciler) validateMatchedCompDef(sidecarDef *appsv1.
 			return nil
 		}
 
-		templateOfConfig := func(configs []appsv1.ComponentConfigSpec) []appsv1.ComponentTemplateSpec {
-			if len(configs) == 0 {
-				return nil
-			}
-			l := make([]appsv1.ComponentTemplateSpec, 0)
-			for i := range configs {
-				l = append(l, configs[i].ComponentTemplateSpec)
-			}
-			return l
-		}
-
-		if err := validate("config", sidecarDef.Spec.Configs, templateOfConfig(compDef.Spec.Configs)); err != nil {
+		if err := validate("config", sidecarDef.Spec.Configs, compDef.Spec.Configs); err != nil {
 			return err
 		}
 		return validate("script", sidecarDef.Spec.Scripts, compDef.Spec.Scripts)

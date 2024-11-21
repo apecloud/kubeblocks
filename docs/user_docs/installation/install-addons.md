@@ -156,7 +156,7 @@ You can enable them according to your needs.
    kbcli addon disable qdrant
    ```
 
-After enabling/disabling an Addon, check the Addon list to verify whether the Addon's staus changes as required.
+After enabling/disabling an Addon, check the Addon list to verify whether the Addon's status changes as required.
 
 ```bash
 kbcli addon list

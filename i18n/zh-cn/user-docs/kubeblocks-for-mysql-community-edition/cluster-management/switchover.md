@@ -32,25 +32,91 @@ import TabItem from '@theme/TabItem';
 
 将 MySQL 主备版集群的一个备节点切换为主节点，并将原主节点实例切换为备节点。
 
+<Tabs>
+
+<TabItem value="kubectl" label="kubectl" default>
+
+`instanceName` 字段的值定义了本次切换是否指定了新的主节点实例。
+
+* 不指定主节点实例进行切换。
+
+  ```yaml
+  kubectl apply -f -<<EOF
+  apiVersion: apps.kubeblocks.io/v1alpha1
+  kind: OpsRequest
+  metadata:
+    name: mycluster-switchover-demo
+    namespace: demo
+  spec:
+    clusterRef: mycluster
+    type: Switchover
+    switchover:
+    - componentName: mysql
+      instanceName: '*'
+  >>
+  ```
+
+* 指定一个新的主节点实例进行切换。
+
+  ```yaml
+  kubectl apply -f -<<EOF
+  apiVersion: apps.kubeblocks.io/v1alpha1
+  kind: OpsRequest
+  metadata:
+    name: mycluster-switchover-demo
+    namespace: demo
+  spec:
+    clusterRef: mycluster
+    type: Switchover
+    switchover:
+    - componentName: mysql
+      instanceName: 'mycluster-mysql-1'
+  >>
+  ```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
 * 不指定主节点实例进行切换。
 
     ```bash
-    kbcli cluster promote mycluster --instance='mycluster-mysql-1'
+    kbcli cluster promote mycluster --instance='mycluster-mysql-1' -n demo
     ```
 
 * 如果有多个组件，可以使用 `--components` 参数指定一个组件。
 
     ```bash
-    kbcli cluster promote mycluster --instance='mycluster-mysql-1' --components='apecloud-mysql'
+    kbcli cluster promote mycluster --instance='mycluster-mysql-1' --components='apecloud-mysql' -n demo
     ```
+
+</TabItem>
+
+</Tabs>
 
 ## 验证集群切换
 
 查看实例状态，验证切换是否成功。
 
+<Tabs>
+
+<TabItem value="kubectl" label="kubectl" default>
+
 ```bash
-kbcli cluster list-instances
+kubectl get pods -n demo
 ```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+```bash
+kbcli cluster list-instances -n demo
+```
+
+</TabItem>
+
+</Tabs>
 
 ## 处理异常情况
 

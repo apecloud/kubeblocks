@@ -33,7 +33,7 @@ type GraphOption interface {
 }
 
 // ReplaceIfExistingOption tells the GraphWriter methods to replace Obj and OriObj with the given ones if already existing.
-// used in Action methods: Create, Update, Patch, Status, Noop and Delete
+// used in Action methods: Create, Update, Patch, Status and Delete
 type ReplaceIfExistingOption struct{}
 
 var _ GraphOption = &ReplaceIfExistingOption{}

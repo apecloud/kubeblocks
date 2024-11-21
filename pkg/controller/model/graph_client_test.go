@@ -88,12 +88,6 @@ var _ = Describe("graph client test.", func() {
 				return obj == newObj1
 			})).Should(BeNumerically(">=", 0))
 
-			By("noop")
-			graphCli.Noop(dag, obj0)
-			Expect(dag.Equals(dagExpected, DefaultLess)).Should(BeFalse())
-			v0.Action = ActionNoopPtr()
-			Expect(dag.Equals(dagExpected, DefaultLess)).Should(BeTrue())
-
 			By("patch")
 			graphCli.Patch(dag, obj0.DeepCopy(), obj0)
 			Expect(dag.Equals(dagExpected, DefaultLess)).Should(BeFalse())

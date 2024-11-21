@@ -197,7 +197,7 @@ It is recommended to use kbcli to create an ApeCloud MySQL Proxy Cluster.
 
 :::note
 
-If you only have one node for deploying a RaftGroup Cluster, set the `extra.availability-policy` as `none` when creating a RaftGroup Cluster.
+If you only have one node for deploying a RaftGroup Cluster, set the `extra.availabilityPolicy` as `none` when creating a RaftGroup Cluster.
 
 ```bash
 helm install myproxy kubeblocks/apecloud-mysql-cluster --version=v0.9.0 --set mode=raftGroup,proxyEnabled=true,etcd.serviceReference.endpoint="etcd-cluster-etcd.default.svc.cluster.local:2379" --set extra.availabilityPolicy=none
@@ -422,11 +422,7 @@ VTGate, VTConsensus, and VTTablet support parameter configuration. You can confi
 
 </TabItem>
 
-<TabItem value="kubectl" label="kubectl">
-
-VTGate, VTConsensus, and VTTablet support parameter configuration. You can configure the proxy cluster by editing the configuration file or by performing an OpsRequest.
-
-### Option 1. Edit the config file
+<TabItem value="Edit Config File" label="Edit Config File">
 
 1. Get the configuration file of this cluster.
 
@@ -478,7 +474,9 @@ VTGate, VTConsensus, and VTTablet support parameter configuration. You can confi
       1 row in set (0.00 sec)
       ```
 
-### Option 2. Apply an OpsRequest
+</TabItem>
+
+<TabItem value="OpsRequest" label="OpsRequest">
 
 Apply an OpsRequest to the specified cluster. Configure the parameters according to your needs.
 
@@ -717,7 +715,7 @@ You can also set the ratio for read-write splitting and here is an example of di
 kbcli cluster configure myproxy --components vtgate --set=read_write_splitting_ratio=70
 ```
 
-Moreover, you can [use Grafana](#monitoring) or run `show workload` to view the flow distribution.
+Moreover, you can [use Grafana](#monitoring) or run `show workload` in the VTGate terminal to view the flow distribution.
 
 ```bash
 show workload;

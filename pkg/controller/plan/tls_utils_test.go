@@ -119,23 +119,5 @@ var _ = Describe("TLSUtilsTest", func() {
 				}).Times(1)
 			Expect(CheckTLSSecretRef(ctx, k8sMock, namespace, secretRef)).Should(Succeed())
 		})
-
-		Context("GetTLSKeyWord function", func() {
-			It("should work well", func() {
-				suite := []struct {
-					input    string
-					expected string
-				}{
-					{input: "mysql", expected: "ssl_cert"},
-					{input: "postgresql", expected: "ssl_cert_file"},
-					{input: "redis", expected: "tls-cert-file"},
-					{input: "others", expected: "unsupported-character-type"},
-				}
-
-				for _, s := range suite {
-					Expect(GetTLSKeyWord(s.input)).Should(Equal(s.expected))
-				}
-			})
-		})
 	})
 })

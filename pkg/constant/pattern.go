@@ -71,7 +71,11 @@ func GenerateDefaultComponentHeadlessServiceName(clusterName, compName string) s
 
 // GenerateClusterComponentEnvPattern generates cluster and component pattern
 func GenerateClusterComponentEnvPattern(clusterName, compName string) string {
-	return fmt.Sprintf("%s-%s-env", clusterName, compName)
+	return GetCompEnvCMName(fmt.Sprintf("%s-%s", clusterName, compName))
+}
+
+func GetCompEnvCMName(compObjName string) string {
+	return fmt.Sprintf("%s-env", compObjName)
 }
 
 // GenerateDefaultServiceAccountName generates default service account name for a cluster.
@@ -89,17 +93,7 @@ func GeneratePodName(clusterName, compName string, ordinal int) string {
 	return fmt.Sprintf("%s-%d", GenerateClusterComponentName(clusterName, compName), ordinal)
 }
 
-// GenerateResourceNameWithScalingSuffix generates name with '-scaling' suffix.
-func GenerateResourceNameWithScalingSuffix(name string) string {
-	return fmt.Sprintf("%s-%s", name, SlashScalingLowerSuffix)
-}
-
 // GenerateShardingNamePrefix generates sharding name prefix.
 func GenerateShardingNamePrefix(shardingName string) string {
 	return fmt.Sprintf("%s-", shardingName)
-}
-
-// GenerateShardingNameSvcPrefix generates sharding service name prefix.
-func GenerateShardingNameSvcPrefix(shardingSvcName string) string {
-	return fmt.Sprintf("%s-", shardingSvcName)
 }

@@ -19,18 +19,18 @@ The termination policy determines how a cluster is deleted. Set the policy when 
 
 :::
 
-| **terminationPolicy**  | **Deleting Operation**                    |
-|:--                     | :--                                       |
-| `DoNotTerminate`       | `DoNotTerminate` blocks delete operation. |
-| `Halt`                 | `Halt` deletes workload resources such as statefulset, deployment workloads but keep PVCs. |
-| `Delete`               | `Delete` deletes workload resources and PVCs but keep backups. |
-| `WipeOut`              | `WipeOut` deletes workload resources, PVCs and all relevant resources included backups. |
+| **terminationPolicy** | **Deleting Operation**                           |
+|:----------------------|:-------------------------------------------------|
+| `DoNotTerminate`      | `DoNotTerminate` blocks delete operation.        |
+| `Halt`                | `Halt` deletes Cluster resources like Pods and Services but retains Persistent Volume Claims (PVCs), allowing for data preservation while stopping other operations. Halt policy is deprecated in v0.9.1 and will have same meaning as DoNotTerminate. |
+| `Delete`              | `Delete` extends the Halt policy by also removing PVCs, leading to a thorough cleanup while removing all persistent data.   |
+| `WipeOut`             | `WipeOut` deletes all Cluster resources, including volume snapshots and backups in external storage. This results in complete data removal and should be used cautiously, especially in non-production environments, to avoid irreversible data loss.   |
+
+To check the termination policy, execute the following command.
 
 <Tabs>
 
 <TabItem value="kbcli" label="kbcli" default>
-
-To check the termination policy, execute the following command.
 
 ```bash
 kbcli cluster list mycluster -n demo
@@ -56,11 +56,11 @@ mycluster      kafka                kafka-3.3.2    Delete               Running 
 
 ## Steps
 
+Run the command below to delete a specified cluster.
+
 <Tabs>
 
 <TabItem value="kbcli" label="kbcli" default>
-
-Run the command below to delete a specified cluster.
 
 ```bash
 kbcli cluster delete mycluster
@@ -69,8 +69,6 @@ kbcli cluster delete mycluster
 </TabItem>
 
 <TabItem value="kubectl" label="kubectl">
-
-Run the command below to delete a specified cluster.
 
 ```bash
 kubectl delete -n demo cluster mycluster

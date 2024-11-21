@@ -158,6 +158,18 @@ func adaptLorryIfCustomHandlerDefined(synthesizeComp *SynthesizedComponent, lorr
 		}
 		lorryContainer.Env = append(lorryContainer.Env, env)
 	}
+
+	volumeMountSet := sets.New([]string{}...)
+	for _, volumeMount := range lorryContainer.VolumeMounts {
+		volumeMountSet.Insert(volumeMount.Name)
+	}
+
+	for _, volumeMount := range execContainer.VolumeMounts {
+		if volumeMountSet.Has(volumeMount.Name) {
+			continue
+		}
+		lorryContainer.VolumeMounts = append(lorryContainer.VolumeMounts, volumeMount)
+	}
 }
 
 func buildBasicContainer(lorryHTTPPort int) *corev1.Container {

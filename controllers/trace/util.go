@@ -799,6 +799,8 @@ func getFieldAsStruct(obj client.Object, fieldName string) (interface{}, error) 
 	return specField.Interface(), nil
 }
 
+// normalize normalizes the default value of fields to a uniform format, for example, a list with a length of 0 is normalized to nil.
+// The purpose is making the object easily to be compared by reflect.DeepEqual.
 func normalize(obj client.Object) (client.Object, error) {
 	if obj == nil {
 		return nil, nil

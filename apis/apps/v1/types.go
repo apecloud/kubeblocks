@@ -41,47 +41,11 @@ const (
 	UnavailablePhase Phase = "Unavailable"
 )
 
-// ClusterComponentPhase defines the phase of a cluster component as represented in cluster.status.components.phase field.
-//
-// +enum
-// +kubebuilder:validation:Enum={Creating,Running,Updating,Stopping,Stopped,Deleting,Failed,Abnormal}
-type ClusterComponentPhase string
-
-const (
-	// CreatingClusterCompPhase indicates the component is being created.
-	CreatingClusterCompPhase ClusterComponentPhase = "Creating"
-
-	// RunningClusterCompPhase indicates the component has more than zero replicas, and all pods are up-to-date and
-	// in a 'Running' state.
-	RunningClusterCompPhase ClusterComponentPhase = "Running"
-
-	// UpdatingClusterCompPhase indicates the component has more than zero replicas, and there are no failed pods,
-	// it is currently being updated.
-	UpdatingClusterCompPhase ClusterComponentPhase = "Updating"
-
-	// StoppingClusterCompPhase indicates the component has zero replicas, and there are pods that are terminating.
-	StoppingClusterCompPhase ClusterComponentPhase = "Stopping"
-
-	// StoppedClusterCompPhase indicates the component has zero replicas, and all pods have been deleted.
-	StoppedClusterCompPhase ClusterComponentPhase = "Stopped"
-
-	// DeletingClusterCompPhase indicates the component is currently being deleted.
-	DeletingClusterCompPhase ClusterComponentPhase = "Deleting"
-
-	// FailedClusterCompPhase indicates the component has more than zero replicas, but there are some failed pods.
-	// The component is not functioning.
-	FailedClusterCompPhase ClusterComponentPhase = "Failed"
-
-	// AbnormalClusterCompPhase indicates the component has more than zero replicas, but there are some failed pods.
-	// The component is functioning, but it is in a fragile state.
-	AbnormalClusterCompPhase ClusterComponentPhase = "Abnormal"
-)
-
 const (
 	ConditionTypeProvisioningStarted = "ProvisioningStarted" // ConditionTypeProvisioningStarted the operator starts resource provisioning to create or change the cluster
 	ConditionTypeApplyResources      = "ApplyResources"      // ConditionTypeApplyResources the operator start to apply resources to create or change the cluster
-	ConditionTypeReplicasReady       = "ReplicasReady"       // ConditionTypeReplicasReady all pods of components are ready
-	ConditionTypeReady               = "Ready"               // ConditionTypeReady all components are running
+	ConditionTypeReady               = "Ready"               // ConditionTypeReady all components and shardings are running
+	ConditionTypeAvailable           = "Available"           // ConditionTypeAvailable indicates whether the target object is available for serving.
 )
 
 type ServiceRef struct {

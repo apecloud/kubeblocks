@@ -136,33 +136,23 @@ KubeBlocks supports creating two types of MongoDB clusters: Standalone and Repli
      name: mycluster
      namespace: demo
    spec:
-     clusterDefinitionRef: mongodb
-     clusterVersionRef: mongodb-6.0
-     terminationPolicy: Delete
      affinity:
        podAntiAffinity: Preferred
+       tenancy: SharedNode
        topologyKeys:
        - kubernetes.io/hostname
-     tolerations:
-       - key: kb-data
-         operator: Equal
-         value: 'true'
-         effect: NoSchedule
      componentSpecs:
-     - name: mongodb
-       componentDefRef: mongodb
-       enabledLogs:
-       - running
-       disableExporter: true
-       serviceAccountName: kb-mongo-cluster
-       replicas: 1
+     - componentDef: mongodb
+       name: mongodb
+       replicas: 3
        resources:
          limits:
-           cpu: '0.5'
+           cpu: "0.5"
            memory: 0.5Gi
          requests:
-           cpu: '0.5'
+           cpu: "0.5"
            memory: 0.5Gi
+       serviceVersion: 6.0.16
        volumeClaimTemplates:
        - name: data
          spec:
@@ -171,14 +161,13 @@ KubeBlocks supports creating two types of MongoDB clusters: Standalone and Repli
            resources:
              requests:
                storage: 20Gi
+     terminationPolicy: Delete
    EOF
    ```
 
    | Field                                 | Definition  |
    |---------------------------------------|--------------------------------------|
-   | `spec.clusterDefinitionRef`           | It specifies the name of the ClusterDefinition for creating a specific type of cluster.  |
-   | `spec.clusterVersionRef`              | It is the name of the cluster version CRD that defines the cluster version.  |
-   | `spec.terminationPolicy`              | It is the policy of cluster termination. The default value is `Delete`. Valid values are `DoNotTerminate`, `Halt`, `Delete`, `WipeOut`.  <p> - `DoNotTerminate` blocks deletion operation. </p><p> - `Halt` deletes workload resources such as statefulset and deployment workloads but keep PVCs. </p><p> - `Delete` is based on Halt and deletes PVCs. </p> <p> - `WipeOut` is based on Delete and wipe out all volume snapshots and snapshot data from a backup storage location. </p> |
+   | `spec.terminationPolicy`              | It is the policy of cluster termination. The default value is `Delete`. Valid values are `DoNotTerminate`, `Delete`, `WipeOut`. For the detailed definition, you can refer to [Termination Policy](./delete-mongodb-cluster.md#termination-policy). |
    | `spec.affinity`                       | It defines a set of node affinity scheduling rules for the cluster's Pods. This field helps control the placement of Pods on nodes within the cluster.  |
    | `spec.affinity.podAntiAffinity`       | It specifies the anti-affinity level of Pods within a component. It determines how pods should spread across nodes to improve availability and performance. |
    | `spec.affinity.topologyKeys`          | It represents the key of node labels used to define the topology domain for Pod anti-affinity and Pod spread constraints.   |
@@ -186,7 +175,6 @@ KubeBlocks supports creating two types of MongoDB clusters: Standalone and Repli
    | `spec.componentSpecs`                 | It is the list of components that define the cluster components. This field allows customized configuration of each component within a cluster.   |
    | `spec.componentSpecs.componentDefRef` | It is the name of the component definition that is defined in the cluster definition and you can get the component definition names with `kubectl get clusterdefinition mongodb -o json \| jq '.spec.componentDefs[].name'`.   |
    | `spec.componentSpecs.name`            | It specifies the name of the component.     |
-   | `spec.componentSpecs.disableExporter` | It defines whether the monitoring function is enabled. |
    | `spec.componentSpecs.replicas`        | It specifies the number of replicas of the component.  |
    | `spec.componentSpecs.resources`       | It specifies the resource requirements of the component.  |
 
@@ -242,11 +230,11 @@ KubeBlocks operator has created a new Secret called `mycluster-conn-credential` 
 1. Get the `username` and `password` to connect to this MongoDB cluster for the `kubectl exec` command.
 
    ```bash
-   kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\username}' | base64 -d
+   kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.username}' | base64 -d
    >
    root
 
-   kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\password}' | base64 -d
+   kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.password}' | base64 -d
    >
    266zfqx5
    ```

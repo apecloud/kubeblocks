@@ -347,7 +347,7 @@ func skipImmutableCheckForComponentService(svc *corev1.Service) bool {
 
 func generatePodNames(synthesizeComp *component.SynthesizedComponent) ([]string, error) {
 	return component.GenerateAllPodNames(synthesizeComp.Replicas, synthesizeComp.Instances,
-		synthesizeComp.OfflineInstances, synthesizeComp.ClusterName, synthesizeComp.Name)
+		synthesizeComp.OfflineInstances, synthesizeComp.FullCompName)
 }
 
 func generatePodNamesByITS(its *workloads.InstanceSet) ([]string, error) {

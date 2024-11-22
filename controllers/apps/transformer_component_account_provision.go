@@ -62,7 +62,7 @@ func (t *componentAccountProvisionTransformer) Transform(ctx graph.TransformCont
 	if len(transCtx.SynthesizeComponent.SystemAccounts) == 0 {
 		return nil
 	}
-	if transCtx.Component.Status.Phase != appsv1.RunningClusterCompPhase {
+	if transCtx.Component.Status.Phase != appsv1.RunningComponentPhase {
 		return nil
 	}
 	// TODO: (good-first-issue) if the component's account is deleted by user, we should re-provision it

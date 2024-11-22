@@ -23,6 +23,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"strings"
 	"sync"
 
@@ -73,12 +74,22 @@ func (s *actionService) Start() error {
 	return nil
 }
 
+func (s *actionService) HandleConn(ctx context.Context, conn net.Conn) error {
+	return nil
+}
+
 func (s *actionService) HandleRequest(ctx context.Context, payload []byte) ([]byte, error) {
 	req, err := s.decode(payload)
 	if err != nil {
 		return s.encode(nil, err), nil
 	}
-	return s.encode(s.handleRequest(ctx, req)), nil
+	resp, err := s.handleRequest(ctx, req)
+	result := string(resp)
+	if err != nil {
+		result = err.Error()
+	}
+	s.logger.Info("Action Executed", "action", req.Action, "result", result)
+	return s.encode(resp, err), nil
 }
 
 func (s *actionService) decode(payload []byte) (*proto.ActionRequest, error) {

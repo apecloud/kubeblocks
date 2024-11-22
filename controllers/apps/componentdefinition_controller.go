@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -133,6 +134,9 @@ func (r *ComponentDefinitionReconciler) deletionHandler(rctx intctrlutil.Request
 			recordEvent, &appsv1.ComponentList{}); res != nil || err != nil {
 			return res, err
 		}
+		if err := appsconfig.DeleteConfigMapFinalizer(r.Client, rctx, cmpd); err != nil {
+			return &ctrl.Result{}, err
+		}
 		return nil, nil
 	}
 }
@@ -181,17 +185,18 @@ func (r *ComponentDefinitionReconciler) validate(cli client.Client, rctx intctrl
 	cmpd *appsv1.ComponentDefinition) error {
 	for _, validator := range []func(client.Client, intctrlutil.RequestCtx, *appsv1.ComponentDefinition) error{
 		r.validateServiceVersion,
+		r.validateLabels,
 		r.validateRuntime,
 		r.validateVars,
 		r.validateVolumes,
 		r.validateHostNetwork,
 		r.validateServices,
 		r.validateConfigs,
-		r.validatePolicyRules,
-		r.validateLabels,
-		r.validateReplicasLimit,
 		r.validateSystemAccounts,
+		r.validateReplicasLimit,
+		r.validateAvailable,
 		r.validateReplicaRoles,
+		r.validatePolicyRules,
 		r.validateLifecycleActions,
 	} {
 		if err := validator(cli, rctx, cmpd); err != nil {
@@ -204,6 +209,11 @@ func (r *ComponentDefinitionReconciler) validate(cli client.Client, rctx intctrl
 func (r *ComponentDefinitionReconciler) validateServiceVersion(cli client.Client, rctx intctrlutil.RequestCtx,
 	cmpd *appsv1.ComponentDefinition) error {
 	return validateServiceVersion(cmpd.Spec.ServiceVersion)
+}
+
+func (r *ComponentDefinitionReconciler) validateLabels(cli client.Client, rctx intctrlutil.RequestCtx,
+	cmpd *appsv1.ComponentDefinition) error {
+	return nil
 }
 
 func (r *ComponentDefinitionReconciler) validateRuntime(cli client.Client, rctx intctrlutil.RequestCtx,
@@ -241,7 +251,7 @@ func (r *ComponentDefinitionReconciler) validateVars(cli client.Client, rctx int
 		if len(compDef) == 0 {
 			continue
 		}
-		if err := component.ValidateCompDefRegexp(compDef); err != nil {
+		if err := component.ValidateDefNameRegexp(compDef); err != nil {
 			return errors.Wrapf(err, "invalid reference to component definition name pattern: %s", compDef)
 		}
 	}
@@ -323,22 +333,6 @@ func (r *ComponentDefinitionReconciler) validateConfigs(cli client.Client, rctx 
 	return appsconfig.ReconcileConfigSpecsForReferencedCR(cli, rctx, compDef)
 }
 
-func (r *ComponentDefinitionReconciler) validatePolicyRules(cli client.Client, rctx intctrlutil.RequestCtx,
-	cmpd *appsv1.ComponentDefinition) error {
-	// TODO: how to check the acquired rules can be granted?
-	return nil
-}
-
-func (r *ComponentDefinitionReconciler) validateLabels(cli client.Client, rctx intctrlutil.RequestCtx,
-	cmpd *appsv1.ComponentDefinition) error {
-	return nil
-}
-
-func (r *ComponentDefinitionReconciler) validateReplicasLimit(cli client.Client, rctx intctrlutil.RequestCtx,
-	cmpd *appsv1.ComponentDefinition) error {
-	return nil
-}
-
 func (r *ComponentDefinitionReconciler) validateSystemAccounts(cli client.Client, rctx intctrlutil.RequestCtx,
 	cmpd *appsv1.ComponentDefinition) error {
 	for _, v := range cmpd.Spec.SystemAccounts {
@@ -357,11 +351,62 @@ func (r *ComponentDefinitionReconciler) validateSystemAccounts(cli client.Client
 	return nil
 }
 
+func (r *ComponentDefinitionReconciler) validateReplicasLimit(cli client.Client, rctx intctrlutil.RequestCtx,
+	cmpd *appsv1.ComponentDefinition) error {
+	return nil
+}
+
+func (r *ComponentDefinitionReconciler) validateAvailable(cli client.Client, rctx intctrlutil.RequestCtx,
+	cmpd *appsv1.ComponentDefinition) error {
+	if cmpd.Spec.Available == nil {
+		return nil
+	}
+	if cmpd.Spec.Available.WithPhases != nil && cmpd.Spec.Available.WithProbe == nil {
+		return r.validateAvailableWithPhases(cmpd)
+	}
+	return r.validateAvailableWithProbe(cmpd)
+}
+
+func (r *ComponentDefinitionReconciler) validateAvailableWithPhases(cmpd *appsv1.ComponentDefinition) error {
+	phases := sets.New[string](strings.Split(strings.ToLower(*cmpd.Spec.Available.WithPhases), ",")...)
+	supported := sets.New[string](
+		strings.ToLower(string(appsv1.CreatingComponentPhase)),
+		strings.ToLower(string(appsv1.RunningComponentPhase)),
+		strings.ToLower(string(appsv1.UpdatingComponentPhase)),
+		strings.ToLower(string(appsv1.StoppingComponentPhase)),
+		strings.ToLower(string(appsv1.StoppedComponentPhase)),
+		strings.ToLower(string(appsv1.DeletingComponentPhase)),
+		strings.ToLower(string(appsv1.FailedComponentPhase)),
+	)
+	result := phases.Difference(supported)
+	if result.Len() > 0 {
+		return fmt.Errorf("unsupported phases are specified: %s", strings.Join(sets.List(result), ","))
+	}
+	return nil
+}
+
+func (r *ComponentDefinitionReconciler) validateAvailableWithProbe(cmpd *appsv1.ComponentDefinition) error {
+	withProbe := cmpd.Spec.Available.WithProbe
+	if withProbe == nil {
+		return nil
+	}
+	if cmpd.Spec.LifecycleActions == nil || cmpd.Spec.LifecycleActions.AvailableProbe == nil {
+		return fmt.Errorf("the available probe is required to be defined when withProbe of available is specified")
+	}
+	return nil
+}
+
 func (r *ComponentDefinitionReconciler) validateReplicaRoles(cli client.Client, reqCtx intctrlutil.RequestCtx,
 	cmpd *appsv1.ComponentDefinition) error {
 	if !checkUniqueItemWithValue(cmpd.Spec.Roles, "Name", nil) {
 		return fmt.Errorf("duplicate replica roles are not allowed")
 	}
+	return nil
+}
+
+func (r *ComponentDefinitionReconciler) validatePolicyRules(cli client.Client, rctx intctrlutil.RequestCtx,
+	cmpd *appsv1.ComponentDefinition) error {
+	// TODO: how to check the acquired rules can be granted?
 	return nil
 }
 
@@ -404,6 +449,7 @@ func (r *ComponentDefinitionReconciler) cmpdHash(cmpd *appsv1.ComponentDefinitio
 	objCopy.Spec.Description = ""
 	objCopy.Spec.Exporter = nil
 	objCopy.Spec.PodManagementPolicy = nil
+	objCopy.Spec.MinReadySeconds = 0
 
 	// TODO: bpt
 

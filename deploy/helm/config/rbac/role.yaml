@@ -18,6 +18,32 @@ rules:
   verbs:
   - get
   - list
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - statefulsets
+  verbs:
+  - create
+  - delete
+  - deletecollection
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - statefulsets/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - apps
+  resources:
+  - statefulsets/status
+  verbs:
+  - get
 - apiGroups:
   - apps.kubeblocks.io
   resources:
@@ -249,6 +275,32 @@ rules:
   - apps.kubeblocks.io
   resources:
   - shardingdefinitions/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - apps.kubeblocks.io
+  resources:
+  - sidecardefinitions
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps.kubeblocks.io
+  resources:
+  - sidecardefinitions/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - apps.kubeblocks.io
+  resources:
+  - sidecardefinitions/status
   verbs:
   - get
   - patch

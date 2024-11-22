@@ -42,6 +42,8 @@ Resource Types:
 <a href="#apps.kubeblocks.io/v1.ServiceDescriptor">ServiceDescriptor</a>
 </li><li>
 <a href="#apps.kubeblocks.io/v1.ShardingDefinition">ShardingDefinition</a>
+</li><li>
+<a href="#apps.kubeblocks.io/v1.SidecarDefinition">SidecarDefinition</a>
 </li></ul>
 <h3 id="apps.kubeblocks.io/v1.Cluster">Cluster
 </h3>
@@ -200,26 +202,26 @@ The <code>WipeOut</code> policy is particularly risky in production environments
 <em>(Optional)</em>
 <p>Specifies a list of ClusterComponentSpec objects used to define the individual Components that make up a Cluster.
 This field allows for detailed configuration of each Component within the Cluster.</p>
-<p>Note: <code>shardingSpecs</code> and <code>componentSpecs</code> cannot both be empty; at least one must be defined to configure a Cluster.</p>
+<p>Note: <code>shardings</code> and <code>componentSpecs</code> cannot both be empty; at least one must be defined to configure a Cluster.</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>shardingSpecs</code><br/>
+<code>shardings</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.ShardingSpec">
-[]ShardingSpec
+<a href="#apps.kubeblocks.io/v1.ClusterSharding">
+[]ClusterSharding
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies a list of ShardingSpec objects that manage the sharding topology for Cluster Components.
-Each ShardingSpec organizes components into shards, with each shard corresponding to a Component.
+<p>Specifies a list of ClusterSharding objects that manage the sharding topology for Cluster Components.
+Each ClusterSharding organizes components into shards, with each shard corresponding to a Component.
 Components within a shard are all based on a common ClusterComponentSpec template, ensuring uniform configurations.</p>
 <p>This field supports dynamic resharding by facilitating the addition or removal of shards
-through the <code>shards</code> field in ShardingSpec.</p>
-<p>Note: <code>shardingSpecs</code> and <code>componentSpecs</code> cannot both be empty; at least one must be defined to configure a Cluster.</p>
+through the <code>shards</code> field in ClusterSharding.</p>
+<p>Note: <code>shardings</code> and <code>componentSpecs</code> cannot both be empty; at least one must be defined to configure a Cluster.</p>
 </td>
 </tr>
 <tr>
@@ -260,7 +262,7 @@ SchedulingPolicy
 <td>
 <em>(Optional)</em>
 <p>Defines a list of additional Services that are exposed by a Cluster.
-This field allows Services of selected Components, either from <code>componentSpecs</code> or <code>shardingSpecs</code> to be exposed,
+This field allows Services of selected Components, either from <code>componentSpecs</code> or <code>shardings</code> to be exposed,
 alongside Services defined with ComponentService.</p>
 <p>Services defined here can be referenced by other clusters using the ServiceRefClusterSelector.</p>
 </td>
@@ -301,11 +303,12 @@ ClusterStatus
 <div>
 <p>ClusterDefinition defines the topology for databases or storage systems,
 offering a variety of topological configurations to meet diverse deployment needs and scenarios.</p>
-<p>It includes a list of Components, each linked to a ComponentDefinition, which enhances reusability and reduce redundancy.
+<p>It includes a list of Components and/or Shardings, each linked to a ComponentDefinition or a ShardingDefinition,
+which enhances reusability and reduce redundancy.
 For example, widely used components such as etcd and Zookeeper can be defined once and reused across multiple ClusterDefinitions,
 simplifying the setup of new systems.</p>
-<p>Additionally, ClusterDefinition also specifies the sequence of startup, upgrade, and shutdown for Components,
-ensuring a controlled and predictable management of component lifecycles.</p>
+<p>Additionally, ClusterDefinition also specifies the sequence of startup, upgrade, and shutdown between Components and/or Shardings,
+ensuring a controlled and predictable management of cluster lifecycles.</p>
 </div>
 <table>
 <thead>
@@ -836,6 +839,20 @@ bool
 If set, all the computing resources will be released.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>sidecars</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Sidecar">
+[]Sidecar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the sidecars to be injected into the Component.</p>
+</td>
+</tr>
 </table>
 </td>
 </tr>
@@ -1323,6 +1340,21 @@ ReplicasLimit
 <p>Defines the upper limit of the number of replicas supported by the Component.</p>
 <p>It defines the maximum number of replicas that can be created for the Component.
 This field allows you to set a limit on the scalability of the Component, preventing it from exceeding a certain number of replicas.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>available</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentAvailable">
+ComponentAvailable
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the strategies for determining the available status of the Component.</p>
 <p>This field is immutable.</p>
 </td>
 </tr>
@@ -1953,6 +1985,175 @@ ShardingDefinitionStatus
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1.SidecarDefinition">SidecarDefinition
+</h3>
+<div>
+<p>SidecarDefinition is the Schema for the sidecardefinitions API</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>apiVersion</code><br/>
+string</td>
+<td>
+<code>apps.kubeblocks.io/v1</code>
+</td>
+</tr>
+<tr>
+<td>
+<code>kind</code><br/>
+string
+</td>
+<td><code>SidecarDefinition</code></td>
+</tr>
+<tr>
+<td>
+<code>metadata</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#objectmeta-v1-meta">
+Kubernetes meta/v1.ObjectMeta
+</a>
+</em>
+</td>
+<td>
+Refer to the Kubernetes API documentation for the fields of the
+<code>metadata</code> field.
+</td>
+</tr>
+<tr>
+<td>
+<code>spec</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.SidecarDefinitionSpec">
+SidecarDefinitionSpec
+</a>
+</em>
+</td>
+<td>
+<br/>
+<br/>
+<table>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the name of the sidecar.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>owner</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the component definition that the sidecar belongs to.</p>
+<p>For a specific cluster object, if there is any components provided by the component definition of @owner,
+the sidecar will be created and injected into the components which are provided by
+the component definition of @selectors automatically.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>selectors</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<p>Specifies the component definition of components that the sidecar along with.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>containers</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#container-v1-core">
+[]Kubernetes core/v1.Container
+</a>
+</em>
+</td>
+<td>
+<p>List of containers for the sidecar.</p>
+<p>Cannot be updated.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>vars</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.EnvVar">
+[]EnvVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines variables which are needed by the sidecar.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>configs</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentTemplateSpec">
+[]ComponentTemplateSpec
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the configuration file templates used by the Sidecar.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>scripts</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentTemplateSpec">
+[]ComponentTemplateSpec
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the scripts used by the Sidecar.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+<tr>
+<td>
+<code>status</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.SidecarDefinitionStatus">
+SidecarDefinitionStatus
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1.Action">Action
 </h3>
 <p>
@@ -2084,6 +2285,111 @@ This process does not affect the readiness state of the Component or the Cluster
 This execution does not alter the Component or the Cluster&rsquo;s state of readiness.</li>
 </ul>
 <p>This field cannot be updated.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ActionAssertion">ActionAssertion
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentAvailableProbeAssertion">ComponentAvailableProbeAssertion</a>)
+</p>
+<div>
+<p>ActionAssertion defines the custom assertions for evaluating the success or failure of an action.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>succeed</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Whether the action should succeed or fail.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>stdout</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ActionOutputMatcher">
+ActionOutputMatcher
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the stdout matcher for the action.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>stderr</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ActionOutputMatcher">
+ActionOutputMatcher
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the stderr matcher for the action.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ActionOutputMatcher">ActionOutputMatcher
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ActionAssertion">ActionAssertion</a>)
+</p>
+<div>
+<p>ActionOutputMatcher defines the matcher for the output of an action.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>equalTo</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The output of the action should be equal to the specified value.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>contains</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The output of the action should contain the specified value.</p>
+<p>This field is immutable once set.</p>
 </td>
 </tr>
 </tbody>
@@ -2279,51 +2585,6 @@ Kubernetes core/v1.ConfigMapVolumeSource
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1.ClusterComponentPhase">ClusterComponentPhase
-(<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentStatus">ClusterComponentStatus</a>, <a href="#apps.kubeblocks.io/v1.ComponentStatus">ComponentStatus</a>)
-</p>
-<div>
-<p>ClusterComponentPhase defines the phase of a cluster component as represented in cluster.status.components.phase field.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>&#34;Abnormal&#34;</p></td>
-<td><p>AbnormalClusterCompPhase indicates the component has more than zero replicas, but there are some failed pods.
-The component is functioning, but it is in a fragile state.</p>
-</td>
-</tr><tr><td><p>&#34;Creating&#34;</p></td>
-<td><p>CreatingClusterCompPhase indicates the component is being created.</p>
-</td>
-</tr><tr><td><p>&#34;Deleting&#34;</p></td>
-<td><p>DeletingClusterCompPhase indicates the component is currently being deleted.</p>
-</td>
-</tr><tr><td><p>&#34;Failed&#34;</p></td>
-<td><p>FailedClusterCompPhase indicates the component has more than zero replicas, but there are some failed pods.
-The component is not functioning.</p>
-</td>
-</tr><tr><td><p>&#34;Running&#34;</p></td>
-<td><p>RunningClusterCompPhase indicates the component has more than zero replicas, and all pods are up-to-date and
-in a &lsquo;Running&rsquo; state.</p>
-</td>
-</tr><tr><td><p>&#34;Stopped&#34;</p></td>
-<td><p>StoppedClusterCompPhase indicates the component has zero replicas, and all pods have been deleted.</p>
-</td>
-</tr><tr><td><p>&#34;Stopping&#34;</p></td>
-<td><p>StoppingClusterCompPhase indicates the component has zero replicas, and there are pods that are terminating.</p>
-</td>
-</tr><tr><td><p>&#34;Updating&#34;</p></td>
-<td><p>UpdatingClusterCompPhase indicates the component has more than zero replicas, and there are no failed pods,
-it is currently being updated.</p>
-</td>
-</tr></tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1.ClusterComponentService">ClusterComponentService
 </h3>
 <p>
@@ -2406,7 +2667,7 @@ If set to true, a separate Service will be created for each Pod in the Cluster.<
 <h3 id="apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterSpec">ClusterSpec</a>, <a href="#apps.kubeblocks.io/v1.ShardingSpec">ShardingSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterSharding">ClusterSharding</a>, <a href="#apps.kubeblocks.io/v1.ClusterSpec">ClusterSpec</a>)
 </p>
 <div>
 <p>ClusterComponentSpec defines the specification of a Component within a Cluster.</p>
@@ -2430,7 +2691,7 @@ string
 <em>(Optional)</em>
 <p>Specifies the Component&rsquo;s name.
 It&rsquo;s part of the Service DNS name and must comply with the IANA service naming rule.
-The name is optional when ClusterComponentSpec is used as a template (e.g., in <code>shardingSpec</code>),
+The name is optional when ClusterComponentSpec is used as a template (e.g., in <code>clusterSharding</code>),
 but required otherwise.</p>
 </td>
 </tr>
@@ -2853,8 +3114,8 @@ If set, all the computing resources will be released.</p>
 <td>
 <code>phase</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.ClusterComponentPhase">
-ClusterComponentPhase
+<a href="#apps.kubeblocks.io/v1.ComponentPhase">
+ComponentPhase
 </a>
 </em>
 </td>
@@ -3177,8 +3438,8 @@ If not provided, an error will be raised when handling multiple matches.</p>
 </tr>
 </thead>
 <tbody><tr><td><p>&#34;Abnormal&#34;</p></td>
-<td><p>AbnormalClusterPhase represents some components are in <code>Failed</code> or <code>Abnormal</code> phase, indicates that the cluster
-is in a fragile state and troubleshooting is required.</p>
+<td><p>AbnormalClusterPhase represents some components are in <code>Failed</code> phase, indicates that the cluster is in
+a fragile state and troubleshooting is required.</p>
 </td>
 </tr><tr><td><p>&#34;Creating&#34;</p></td>
 <td><p>CreatingClusterPhase represents all components are in <code>Creating</code> phase.</p>
@@ -3254,6 +3515,101 @@ string
 <em>(Optional)</em>
 <p>Extends the ServiceSpec.Selector by allowing the specification of components, to be used as a selector for the service.</p>
 <p>If the <code>componentSelector</code> is set as the name of a sharding, the service will be exposed to all components in the sharding.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ClusterSharding">ClusterSharding
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterSpec">ClusterSpec</a>)
+</p>
+<div>
+<p>ClusterSharding defines how KubeBlocks manage dynamic provisioned shards.
+A typical design pattern for distributed databases is to distribute data across multiple shards,
+with each shard consisting of multiple replicas.
+Therefore, KubeBlocks supports representing a shard with a Component and dynamically instantiating Components
+using a template when shards are added.
+When shards are removed, the corresponding Components are also deleted.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Represents the common parent part of all shard names.</p>
+<p>This identifier is included as part of the Service DNS name and must comply with IANA service naming rules.
+It is used to generate the names of underlying Components following the pattern <code>$(clusterSharding.name)-$(ShardID)</code>.
+ShardID is a random string that is appended to the Name to generate unique identifiers for each shard.
+For example, if the sharding specification name is &ldquo;my-shard&rdquo; and the ShardID is &ldquo;abc&rdquo;, the resulting Component name
+would be &ldquo;my-shard-abc&rdquo;.</p>
+<p>Note that the name defined in Component template(<code>clusterSharding.template.name</code>) will be disregarded
+when generating the Component names of the shards. The <code>clusterSharding.name</code> field takes precedence.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>shardingDef</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the ShardingDefinition custom resource (CR) that defines the sharding&rsquo;s characteristics and behavior.</p>
+<p>The full name or regular expression is supported to match the ShardingDefinition.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>template</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">
+ClusterComponentSpec
+</a>
+</em>
+</td>
+<td>
+<p>The template for generating Components for shards, where each shard consists of one Component.</p>
+<p>This field is of type ClusterComponentSpec, which encapsulates all the required details and
+definitions for creating and managing the Components.
+KubeBlocks uses this template to generate a set of identical Components of shards.
+All the generated Components will have the same specifications and definitions as specified in the <code>template</code> field.</p>
+<p>This allows for the creation of multiple Components with consistent configurations,
+enabling sharding and distribution of workloads across Components.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>shards</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>Specifies the desired number of shards.</p>
+<p>Users can declare the desired number of shards through this field.
+KubeBlocks dynamically creates and deletes Components based on the difference
+between the desired and actual number of shards.
+KubeBlocks provides lifecycle management for sharding, including:</p>
+<ul>
+<li>Executing the shardProvision Action defined in the ShardingDefinition when the number of shards increases.
+This allows for custom actions to be performed after a new shard is provisioned.</li>
+<li>Executing the shardTerminate Action defined in the ShardingDefinition when the number of shards decreases.
+This enables custom cleanup or data migration tasks to be executed before a shard is terminated.
+Resources and data associated with the corresponding Component will also be deleted.</li>
+</ul>
 </td>
 </tr>
 </tbody>
@@ -3355,26 +3711,26 @@ The <code>WipeOut</code> policy is particularly risky in production environments
 <em>(Optional)</em>
 <p>Specifies a list of ClusterComponentSpec objects used to define the individual Components that make up a Cluster.
 This field allows for detailed configuration of each Component within the Cluster.</p>
-<p>Note: <code>shardingSpecs</code> and <code>componentSpecs</code> cannot both be empty; at least one must be defined to configure a Cluster.</p>
+<p>Note: <code>shardings</code> and <code>componentSpecs</code> cannot both be empty; at least one must be defined to configure a Cluster.</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>shardingSpecs</code><br/>
+<code>shardings</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.ShardingSpec">
-[]ShardingSpec
+<a href="#apps.kubeblocks.io/v1.ClusterSharding">
+[]ClusterSharding
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies a list of ShardingSpec objects that manage the sharding topology for Cluster Components.
-Each ShardingSpec organizes components into shards, with each shard corresponding to a Component.
+<p>Specifies a list of ClusterSharding objects that manage the sharding topology for Cluster Components.
+Each ClusterSharding organizes components into shards, with each shard corresponding to a Component.
 Components within a shard are all based on a common ClusterComponentSpec template, ensuring uniform configurations.</p>
 <p>This field supports dynamic resharding by facilitating the addition or removal of shards
-through the <code>shards</code> field in ShardingSpec.</p>
-<p>Note: <code>shardingSpecs</code> and <code>componentSpecs</code> cannot both be empty; at least one must be defined to configure a Cluster.</p>
+through the <code>shards</code> field in ClusterSharding.</p>
+<p>Note: <code>shardings</code> and <code>componentSpecs</code> cannot both be empty; at least one must be defined to configure a Cluster.</p>
 </td>
 </tr>
 <tr>
@@ -3415,7 +3771,7 @@ SchedulingPolicy
 <td>
 <em>(Optional)</em>
 <p>Defines a list of additional Services that are exposed by a Cluster.
-This field allows Services of selected Components, either from <code>componentSpecs</code> or <code>shardingSpecs</code> to be exposed,
+This field allows Services of selected Components, either from <code>componentSpecs</code> or <code>shardings</code> to be exposed,
 alongside Services defined with ComponentService.</p>
 <p>Services defined here can be referenced by other clusters using the ServiceRefClusterSelector.</p>
 </td>
@@ -3507,14 +3863,16 @@ map[string]github.com/apecloud/kubeblocks/apis/apps/v1.ClusterComponentStatus
 </tr>
 <tr>
 <td>
-<code>clusterDefGeneration</code><br/>
+<code>shardings</code><br/>
 <em>
-int64
+<a href="#apps.kubeblocks.io/v1.ClusterComponentStatus">
+map[string]github.com/apecloud/kubeblocks/apis/apps/v1.ClusterComponentStatus
+</a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Represents the generation number of the referenced ClusterDefinition.</p>
+<p>Records the current status information of all shardings within the Cluster.</p>
 </td>
 </tr>
 <tr>
@@ -3575,7 +3933,22 @@ Cannot be updated.</p>
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Components specifies the components in the topology.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>shardings</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ClusterTopologySharding">
+[]ClusterTopologySharding
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Shardings specifies the shardings in the topology.</p>
 </td>
 </tr>
 <tr>
@@ -3633,10 +4006,11 @@ string
 </em>
 </td>
 <td>
-<p>Defines the unique identifier of the component within the cluster topology.
-It follows IANA Service naming rules and is used as part of the Service&rsquo;s DNS name.
+<p>Defines the unique identifier of the component within the cluster topology.</p>
+<p>It follows IANA Service naming rules and is used as part of the Service&rsquo;s DNS name.
 The name must start with a lowercase letter, can contain lowercase letters, numbers,
 and hyphens, and must end with a lowercase letter or number.</p>
+<p>If the @template field is set to true, the name will be used as a prefix to match the specific components dynamically created.</p>
 <p>Cannot be updated once set.</p>
 </td>
 </tr>
@@ -3657,7 +4031,20 @@ This approach allows:</p>
 <li>Flexible and automatic selection of the most up-to-date ComponentDefinition CR
 by specifying a name prefix or regular expression pattern.</li>
 </ol>
-<p>Once set, this field cannot be updated.</p>
+<p>Cannot be updated once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>template</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies whether the topology component will be considered as a template for instantiating components upon user requests dynamically.</p>
+<p>Cannot be updated once set.</p>
 </td>
 </tr>
 </tbody>
@@ -3691,9 +4078,9 @@ These groups are processed sequentially, allowing precise control based on compo
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the order for creating and initializing components.
-This is designed for components that depend on one another. Components without dependencies can be grouped together.</p>
-<p>Components that can be provisioned independently or have no dependencies can be listed together in the same stage,
+<p>Specifies the order for creating and initializing entities.
+This is designed for entities that depend on one another. Entities without dependencies can be grouped together.</p>
+<p>Entities that can be provisioned independently or have no dependencies can be listed together in the same stage,
 separated by commas.</p>
 </td>
 </tr>
@@ -3706,9 +4093,9 @@ separated by commas.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Outlines the order for stopping and deleting components.
-This sequence is designed for components that require a graceful shutdown or have interdependencies.</p>
-<p>Components that can be terminated independently or have no dependencies can be listed together in the same stage,
+<p>Outlines the order for stopping and deleting entities.
+This sequence is designed for entities that require a graceful shutdown or have interdependencies.</p>
+<p>Entities that can be terminated independently or have no dependencies can be listed together in the same stage,
 separated by commas.</p>
 </td>
 </tr>
@@ -3721,10 +4108,62 @@ separated by commas.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Update determines the order for updating components&rsquo; specifications, such as image upgrades or resource scaling.
-This sequence is designed for components that have dependencies or require specific update procedures.</p>
-<p>Components that can be updated independently or have no dependencies can be listed together in the same stage,
+<p>Update determines the order for updating entities&rsquo; specifications, such as image upgrades or resource scaling.
+This sequence is designed for entities that have dependencies or require specific update procedures.</p>
+<p>Entities that can be updated independently or have no dependencies can be listed together in the same stage,
 separated by commas.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ClusterTopologySharding">ClusterTopologySharding
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterTopology">ClusterTopology</a>)
+</p>
+<div>
+<p>ClusterTopologySharding defines a sharding within a ClusterTopology.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Defines the unique identifier of the sharding within the cluster topology.
+It follows IANA Service naming rules and is used as part of the Service&rsquo;s DNS name.
+The name must start with a lowercase letter, can contain lowercase letters, numbers,
+and hyphens, and must end with a lowercase letter or number.</p>
+<p>Cannot be updated once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>shardingDef</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the sharding definition that defines the characteristics and behavior of the sharding.</p>
+<p>The system selects the ShardingDefinition CR with the latest version that matches the pattern.
+This approach allows:</p>
+<ol>
+<li>Precise selection by providing the exact name of a ShardingDefinition CR.</li>
+<li>Flexible and automatic selection of the most up-to-date ShardingDefinition CR
+by specifying a regular expression pattern.</li>
+</ol>
+<p>Once set, this field cannot be updated.</p>
 </td>
 </tr>
 </tbody>
@@ -3817,6 +4256,352 @@ VarOption
 <td>
 <em>(Optional)</em>
 <p>Reference to the UID of the Cluster object.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ComponentAvailable">ComponentAvailable
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
+</p>
+<div>
+<p>ComponentAvailable defines the strategies for determining whether the component is available.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>withPhases</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the phases that the component will go through to be considered available.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>withProbe</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentAvailableWithProbe">
+ComponentAvailableWithProbe
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the strategies for determining whether the component is available based on the available probe.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ComponentAvailableCondition">ComponentAvailableCondition
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentAvailableWithProbe">ComponentAvailableWithProbe</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>ComponentAvailableExpression</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentAvailableExpression">
+ComponentAvailableExpression
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>ComponentAvailableExpression</code> are embedded into this type.)
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>and</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentAvailableExpression">
+[]ComponentAvailableExpression
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Logical And to combine multiple expressions.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>or</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentAvailableExpression">
+[]ComponentAvailableExpression
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Logical Or to combine multiple expressions.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>not</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentAvailableExpression">
+ComponentAvailableExpression
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Logical Not to negate the expression.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ComponentAvailableExpression">ComponentAvailableExpression
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentAvailableCondition">ComponentAvailableCondition</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>all</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentAvailableProbeAssertion">
+ComponentAvailableProbeAssertion
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>All replicas must satisfy the assertion.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>any</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentAvailableProbeAssertion">
+ComponentAvailableProbeAssertion
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>At least one replica must satisfy the assertion.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>none</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentAvailableProbeAssertion">
+ComponentAvailableProbeAssertion
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>None of the replicas must satisfy the assertion.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>majority</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentAvailableProbeAssertion">
+ComponentAvailableProbeAssertion
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Majority replicas must satisfy the assertion.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ComponentAvailableProbeAssertion">ComponentAvailableProbeAssertion
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentAvailableExpression">ComponentAvailableExpression</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>ActionAssertion</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ActionAssertion">
+ActionAssertion
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>ActionAssertion</code> are embedded into this type.)
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>and</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ActionAssertion">
+[]ActionAssertion
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Logical And to combine multiple assertions.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>or</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ActionAssertion">
+[]ActionAssertion
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Logical Or to combine multiple assertions.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>not</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ActionAssertion">
+ActionAssertion
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Logical Not to negate the assertions.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>strict</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies whether apply the assertions strictly to all replicas.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ComponentAvailableWithProbe">ComponentAvailableWithProbe
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentAvailable">ComponentAvailable</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>timeWindowSeconds</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>condition</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentAvailableCondition">
+ComponentAvailableCondition
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the conditions that the component will go through to be considered available.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>description</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>A brief description for the condition when the component is available.</p>
 </td>
 </tr>
 </tbody>
@@ -4387,6 +5172,21 @@ This field allows you to set a limit on the scalability of the Component, preven
 </tr>
 <tr>
 <td>
+<code>available</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentAvailable">
+ComponentAvailable
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the strategies for determining the available status of the Component.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>roles</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.ReplicaRole">
@@ -4704,6 +5504,21 @@ Without this, services that rely on roleSelectors might improperly direct traffi
 </tr>
 <tr>
 <td>
+<code>availableProbe</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Probe">
+Probe
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the procedure which is invoked regularly to assess the availability of the component.</p>
+<p>Note: This field is immutable once it has been set.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>switchover</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.Action">
@@ -4864,6 +5679,10 @@ Some database engines or associated sidecar applications (e.g., Patroni) may alr
 In such cases, this action may not be required.</p>
 <p>The output should be a valid data dump streamed to stdout. It must exclude any irrelevant information to ensure
 that only the necessary data is exported for import into the new replica.</p>
+<p>The container executing this action has access to following environment variables:</p>
+<ul>
+<li>KB_TARGET_POD_NAME: The name of the replica pod into which the data will be loaded.</li>
+</ul>
 <p>Note: This field is immutable once it has been set.</p>
 </td>
 </tr>
@@ -4930,6 +5749,44 @@ and other administrative tasks.</p>
 </td>
 </tr>
 </tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ComponentPhase">ComponentPhase
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentStatus">ClusterComponentStatus</a>, <a href="#apps.kubeblocks.io/v1.ComponentStatus">ComponentStatus</a>)
+</p>
+<div>
+<p>ComponentPhase defines the phase of the Component within the .status.phase field.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Creating&#34;</p></td>
+<td><p>CreatingComponentPhase indicates the component is currently being created.</p>
+</td>
+</tr><tr><td><p>&#34;Deleting&#34;</p></td>
+<td><p>DeletingComponentPhase indicates the component is currently being deleted.</p>
+</td>
+</tr><tr><td><p>&#34;Failed&#34;</p></td>
+<td><p>FailedComponentPhase indicates that there are some pods of the component not in a &lsquo;Running&rsquo; state.</p>
+</td>
+</tr><tr><td><p>&#34;Running&#34;</p></td>
+<td><p>RunningComponentPhase indicates that all pods of the component are up-to-date and in a &lsquo;Running&rsquo; state.</p>
+</td>
+</tr><tr><td><p>&#34;Stopped&#34;</p></td>
+<td><p>StoppedComponentPhase indicates the component is stopped.</p>
+</td>
+</tr><tr><td><p>&#34;Stopping&#34;</p></td>
+<td><p>StoppingComponentPhase indicates the component is currently being stopped.</p>
+</td>
+</tr><tr><td><p>&#34;Updating&#34;</p></td>
+<td><p>UpdatingComponentPhase indicates the component is currently being updated.</p>
+</td>
+</tr></tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1.ComponentService">ComponentService
 </h3>
@@ -5417,6 +6274,20 @@ bool
 If set, all the computing resources will be released.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>sidecars</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Sidecar">
+[]Sidecar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the sidecars to be injected into the Component.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1.ComponentStatus">ComponentStatus
@@ -5469,8 +6340,8 @@ automated logic or direct inspection.</p>
 <td>
 <code>phase</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.ClusterComponentPhase">
-ClusterComponentPhase
+<a href="#apps.kubeblocks.io/v1.ComponentPhase">
+ComponentPhase
 </a>
 </em>
 </td>
@@ -5478,12 +6349,9 @@ ClusterComponentPhase
 <p>Indicates the current phase of the Component, with each phase indicating specific conditions:</p>
 <ul>
 <li>Creating: The initial phase for new Components, transitioning from &lsquo;empty&rsquo;(&ldquo;&rdquo;).</li>
-<li>Running: All Pods in a Running state.</li>
+<li>Running: All Pods are up-to-date and in a Running state.</li>
 <li>Updating: The Component is currently being updated, with no failed Pods present.</li>
-<li>Abnormal: Some Pods have failed, indicating a potentially unstable state.
-However, the cluster remains available as long as a quorum of members is functioning.</li>
-<li>Failed: A significant number of Pods or critical Pods have failed
-The cluster may be non-functional or may offer only limited services (e.g, read-only).</li>
+<li>Failed: A significant number of Pods have failed.</li>
 <li>Stopping: All Pods are being terminated, with current replica count at zero.</li>
 <li>Stopped: All associated Pods have been successfully deleted.</li>
 <li>Deleting: The Component is being deleted.</li>
@@ -5568,7 +6436,7 @@ ProvisionSecretRef
 <h3 id="apps.kubeblocks.io/v1.ComponentTemplateSpec">ComponentTemplateSpec
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentConfigSpec">ComponentConfigSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentConfigSpec">ComponentConfigSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>, <a href="#apps.kubeblocks.io/v1.SidecarDefinitionSpec">SidecarDefinitionSpec</a>)
 </p>
 <div>
 </div>
@@ -6411,7 +7279,7 @@ VarOption
 <h3 id="apps.kubeblocks.io/v1.EnvVar">EnvVar
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>, <a href="#apps.kubeblocks.io/v1.SidecarDefinitionSpec">SidecarDefinitionSpec</a>)
 </p>
 <div>
 <p>EnvVar represents a variable present in the env of Pod/Action or the template of config/script.</p>
@@ -7622,7 +8490,7 @@ Kubernetes core/v1.PersistentVolumeMode
 <h3 id="apps.kubeblocks.io/v1.Phase">Phase
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterDefinitionStatus">ClusterDefinitionStatus</a>, <a href="#apps.kubeblocks.io/v1.ComponentDefinitionStatus">ComponentDefinitionStatus</a>, <a href="#apps.kubeblocks.io/v1.ComponentVersionStatus">ComponentVersionStatus</a>, <a href="#apps.kubeblocks.io/v1.ServiceDescriptorStatus">ServiceDescriptorStatus</a>, <a href="#apps.kubeblocks.io/v1.ShardingDefinitionStatus">ShardingDefinitionStatus</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterDefinitionStatus">ClusterDefinitionStatus</a>, <a href="#apps.kubeblocks.io/v1.ComponentDefinitionStatus">ComponentDefinitionStatus</a>, <a href="#apps.kubeblocks.io/v1.ComponentVersionStatus">ComponentVersionStatus</a>, <a href="#apps.kubeblocks.io/v1.ServiceDescriptorStatus">ServiceDescriptorStatus</a>, <a href="#apps.kubeblocks.io/v1.ShardingDefinitionStatus">ShardingDefinitionStatus</a>, <a href="#apps.kubeblocks.io/v1.SidecarDefinitionStatus">SidecarDefinitionStatus</a>)
 </p>
 <div>
 <p>Phase represents the status of a CR.</p>
@@ -9773,88 +10641,6 @@ Action
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1.ShardingSpec">ShardingSpec
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterSpec">ClusterSpec</a>)
-</p>
-<div>
-<p>ShardingSpec defines how KubeBlocks manage dynamic provisioned shards.
-A typical design pattern for distributed databases is to distribute data across multiple shards,
-with each shard consisting of multiple replicas.
-Therefore, KubeBlocks supports representing a shard with a Component and dynamically instantiating Components
-using a template when shards are added.
-When shards are removed, the corresponding Components are also deleted.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>name</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Represents the common parent part of all shard names.
-This identifier is included as part of the Service DNS name and must comply with IANA service naming rules.
-It is used to generate the names of underlying Components following the pattern <code>$(shardingSpec.name)-$(ShardID)</code>.
-ShardID is a random string that is appended to the Name to generate unique identifiers for each shard.
-For example, if the sharding specification name is &ldquo;my-shard&rdquo; and the ShardID is &ldquo;abc&rdquo;, the resulting Component name
-would be &ldquo;my-shard-abc&rdquo;.</p>
-<p>Note that the name defined in Component template(<code>shardingSpec.template.name</code>) will be disregarded
-when generating the Component names of the shards. The <code>shardingSpec.name</code> field takes precedence.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>template</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">
-ClusterComponentSpec
-</a>
-</em>
-</td>
-<td>
-<p>The template for generating Components for shards, where each shard consists of one Component.
-This field is of type ClusterComponentSpec, which encapsulates all the required details and
-definitions for creating and managing the Components.
-KubeBlocks uses this template to generate a set of identical Components or shards.
-All the generated Components will have the same specifications and definitions as specified in the <code>template</code> field.</p>
-<p>This allows for the creation of multiple Components with consistent configurations,
-enabling sharding and distribution of workloads across Components.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>shards</code><br/>
-<em>
-int32
-</em>
-</td>
-<td>
-<p>Specifies the desired number of shards.
-Users can declare the desired number of shards through this field.
-KubeBlocks dynamically creates and deletes Components based on the difference
-between the desired and actual number of shards.
-KubeBlocks provides lifecycle management for sharding, including:</p>
-<ul>
-<li>Executing the postProvision Action defined in the ComponentDefinition when the number of shards increases.
-This allows for custom actions to be performed after a new shard is provisioned.</li>
-<li>Executing the preTerminate Action defined in the ComponentDefinition when the number of shards decreases.
-This enables custom cleanup or data migration tasks to be executed before a shard is terminated.
-Resources and data associated with the corresponding Component will also be deleted.</li>
-</ul>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1.ShardingSystemAccount">ShardingSystemAccount
 </h3>
 <p>
@@ -9966,6 +10752,254 @@ int32
 </td>
 <td>
 <p>The maximum limit of replicas.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.Sidecar">Sidecar
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Name specifies the unique name of the sidecar.</p>
+<p>The name will be used as the name of the sidecar container in the Pod.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>owner</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the exact component definition that the sidecar belongs to.</p>
+<p>A sidecar will be updated when the owner component definition is updated only.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>sidecarDef</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the sidecar definition CR to be used to create the sidecar.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.SidecarDefinitionSpec">SidecarDefinitionSpec
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.SidecarDefinition">SidecarDefinition</a>)
+</p>
+<div>
+<p>SidecarDefinitionSpec defines the desired state of SidecarDefinition</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the name of the sidecar.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>owner</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the component definition that the sidecar belongs to.</p>
+<p>For a specific cluster object, if there is any components provided by the component definition of @owner,
+the sidecar will be created and injected into the components which are provided by
+the component definition of @selectors automatically.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>selectors</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<p>Specifies the component definition of components that the sidecar along with.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>containers</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#container-v1-core">
+[]Kubernetes core/v1.Container
+</a>
+</em>
+</td>
+<td>
+<p>List of containers for the sidecar.</p>
+<p>Cannot be updated.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>vars</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.EnvVar">
+[]EnvVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines variables which are needed by the sidecar.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>configs</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentTemplateSpec">
+[]ComponentTemplateSpec
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the configuration file templates used by the Sidecar.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>scripts</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentTemplateSpec">
+[]ComponentTemplateSpec
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the scripts used by the Sidecar.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.SidecarDefinitionStatus">SidecarDefinitionStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.SidecarDefinition">SidecarDefinition</a>)
+</p>
+<div>
+<p>SidecarDefinitionStatus defines the observed state of SidecarDefinition</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>observedGeneration</code><br/>
+<em>
+int64
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Refers to the most recent generation that has been observed for the SidecarDefinition.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>phase</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Phase">
+Phase
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Represents the current status of the SidecarDefinition. Valid values include `<code>,</code>Available<code>, and</code>Unavailable<code>.
+When the status is</code>Available`, the SidecarDefinition is ready and can be utilized by related objects.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>message</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Provides additional information about the current phase.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>owners</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Resolved owners of the SidecarDefinition.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>selectors</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Resolved selectors of the SidecarDefinition.</p>
 </td>
 </tr>
 </tbody>
@@ -27521,23 +28555,6 @@ More info: <a href="https://kubernetes.io/docs/concepts/overview/working-with-ob
 </tr>
 <tr>
 <td>
-<code>service</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#service-v1-core">
-Kubernetes core/v1.Service
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the behavior of a service spec.
-Provides read-write service.
-<a href="https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status">https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status</a></p>
-<p>Note: This field will be removed in future version.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>template</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#podtemplatespec-v1-core">
@@ -28065,23 +29082,6 @@ Kubernetes meta/v1.LabelSelector
 <p>Represents a label query over pods that should match the desired replica count indicated by the <code>replica</code> field.
 It must match the labels defined in the pod template.
 More info: <a href="https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors">https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors</a></p>
-</td>
-</tr>
-<tr>
-<td>
-<code>service</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#service-v1-core">
-Kubernetes core/v1.Service
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the behavior of a service spec.
-Provides read-write service.
-<a href="https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status">https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status</a></p>
-<p>Note: This field will be removed in future version.</p>
 </td>
 </tr>
 <tr>

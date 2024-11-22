@@ -140,7 +140,7 @@ var _ = Describe("", func() {
 				clusterObj.Status.Phase = appsv1.RunningClusterPhase
 				clusterObj.Status.Components = map[string]appsv1.ClusterComponentStatus{
 					defaultCompName: {
-						Phase: appsv1.RunningClusterCompPhase,
+						Phase: appsv1.RunningComponentPhase,
 					},
 				}
 			})).Should(Succeed())

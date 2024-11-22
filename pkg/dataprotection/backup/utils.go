@@ -27,8 +27,10 @@ import (
 	"strings"
 
 	"github.com/rogpeppe/go-internal/semver"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -285,4 +287,18 @@ func BuildCronJobSchedule(cronExpression string) (*string, string) {
 		return nil, cronExpression
 	}
 	return nil, fmt.Sprintf("CRON_TZ=%s %s", timeZone, cronExpression)
+}
+
+// StopStatefulSetsWhenFailed stops the sts to un-bound the pvcs.
+func StopStatefulSetsWhenFailed(ctx context.Context, cli client.Client, backup *dpv1alpha1.Backup, targetName string) error {
+	if backup.Status.Phase != dpv1alpha1.BackupPhaseFailed {
+		return nil
+	}
+	sts := &appsv1.StatefulSet{}
+	stsName := GenerateBackupStatefulSetName(backup, targetName, BackupDataJobNamePrefix)
+	if err := cli.Get(ctx, client.ObjectKey{Name: stsName, Namespace: backup.Namespace}, sts); client.IgnoreNotFound(err) != nil {
+		return nil
+	}
+	sts.Spec.Replicas = pointer.Int32(0)
+	return cli.Update(ctx, sts)
 }

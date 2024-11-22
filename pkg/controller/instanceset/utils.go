@@ -131,7 +131,7 @@ func IsInstanceSetReady(its *workloads.InstanceSet) bool {
 	}
 
 	// check whether role probe has done
-	if its.Spec.Roles == nil || its.Spec.RoleProbe == nil {
+	if len(its.Spec.Roles) == 0 && its.Spec.RoleProbe == nil {
 		return true
 	}
 	membersStatus := its.Status.MembersStatus
@@ -217,17 +217,8 @@ func getMatchLabels(name string) map[string]string {
 	}
 }
 
-func getSvcSelector(its *workloads.InstanceSet, headless bool) map[string]string {
+func getHeadlessSvcSelector(its *workloads.InstanceSet) map[string]string {
 	selectors := make(map[string]string)
-
-	if !headless {
-		for _, role := range its.Spec.Roles {
-			if role.IsLeader && len(role.Name) > 0 {
-				selectors[constant.RoleLabelKey] = role.Name
-				break
-			}
-		}
-	}
 
 	for k, v := range its.Spec.Selector.MatchLabels {
 		selectors[k] = v

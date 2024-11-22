@@ -31,11 +31,12 @@ import (
 var _ = Describe("service", func() {
 	Context("new", func() {
 		It("empty", func() {
-			services, err := New(logr.New(nil), nil, nil)
+			services, err := New(logr.New(nil), nil, nil, nil)
 			Expect(err).Should(BeNil())
-			Expect(services).Should(HaveLen(2))
+			Expect(services).Should(HaveLen(3))
 			Expect(services[0]).ShouldNot(BeNil())
 			Expect(services[1]).ShouldNot(BeNil())
+			Expect(services[2]).ShouldNot(BeNil())
 		})
 
 		It("action", func() {
@@ -44,11 +45,12 @@ var _ = Describe("service", func() {
 					Name: "action",
 				},
 			}
-			services, err := New(logr.New(nil), actions, nil)
+			services, err := New(logr.New(nil), actions, nil, nil)
 			Expect(err).Should(BeNil())
-			Expect(services).Should(HaveLen(2))
+			Expect(services).Should(HaveLen(3))
 			Expect(services[0]).ShouldNot(BeNil())
 			Expect(services[1]).ShouldNot(BeNil())
+			Expect(services[2]).ShouldNot(BeNil())
 		})
 
 		It("probe", func() {
@@ -62,11 +64,29 @@ var _ = Describe("service", func() {
 					Action: "action",
 				},
 			}
-			services, err := New(logr.New(nil), actions, probes)
+			services, err := New(logr.New(nil), actions, probes, nil)
 			Expect(err).Should(BeNil())
-			Expect(services).Should(HaveLen(2))
+			Expect(services).Should(HaveLen(3))
 			Expect(services[0]).ShouldNot(BeNil())
 			Expect(services[1]).ShouldNot(BeNil())
+			Expect(services[2]).ShouldNot(BeNil())
+		})
+
+		It("streaming", func() {
+			actions := []proto.Action{
+				{
+					Name: "action",
+				},
+			}
+			streamingActions := []string{
+				"action",
+			}
+			services, err := New(logr.New(nil), actions, nil, streamingActions)
+			Expect(err).Should(BeNil())
+			Expect(services).Should(HaveLen(3))
+			Expect(services[0]).ShouldNot(BeNil())
+			Expect(services[1]).ShouldNot(BeNil())
+			Expect(services[2]).ShouldNot(BeNil())
 		})
 
 		It("probe which has no action", func() {
@@ -83,7 +103,21 @@ var _ = Describe("service", func() {
 					Action: "not-defined",
 				},
 			}
-			_, err := New(logr.New(nil), actions, probes)
+			_, err := New(logr.New(nil), actions, probes, nil)
+			Expect(err).ShouldNot(BeNil())
+		})
+
+		It("streaming which has no action", func() {
+			actions := []proto.Action{
+				{
+					Name: "action",
+				},
+			}
+			streamingActions := []string{
+				"action",
+				"not-defined",
+			}
+			_, err := New(logr.New(nil), actions, nil, streamingActions)
 			Expect(err).ShouldNot(BeNil())
 		})
 	})

@@ -136,6 +136,28 @@ type SpecificOpsRequest struct {
 	// +listMapKey=componentName
 	VolumeExpansionList []VolumeExpansion `json:"volumeExpansion,omitempty"  patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
 
+	// Lists Components to be started. If empty, all components will be started.
+	//
+	// +optional
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.start"
+	// +kubebuilder:validation:MaxItems=1024
+	// +patchMergeKey=componentName
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=componentName
+	StartList []ComponentOps `json:"start,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
+
+	// Lists Components to be stopped. If empty, all components will be stopped.
+	//
+	// +optional
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.stop"
+	// +kubebuilder:validation:MaxItems=1024
+	// +patchMergeKey=componentName
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=componentName
+	StopList []ComponentOps `json:"stop,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
+
 	// Lists Components to be restarted.
 	//
 	// +optional
@@ -282,14 +304,10 @@ type Switchover struct {
 	//
 	// 1. "*" (wildcard value):
 	// - Indicates no specific instance is designated as the primary or leader.
-	// - Executes the switchover action from `clusterDefinition.componentDefs[*].switchoverSpec.withoutCandidate`.
-	// - `clusterDefinition.componentDefs[x].switchoverSpec.withoutCandidate` must be defined when using "*".
 	//
 	// 2. A valid instance name (pod name):
 	// - Designates a specific instance (pod) as the primary or leader.
 	// - The name must match one of the pods in the component. Any non-valid pod name is considered invalid.
-	// - Executes the switchover action from `clusterDefinition.componentDefs[*].switchoverSpec.withCandidate`.
-	// - `clusterDefinition.componentDefs[*].switchoverSpec.withCandidate` must be defined when specifying a valid instance name.
 	//
 	// +kubebuilder:validation:Required
 	InstanceName string `json:"instanceName"`
@@ -1090,11 +1108,10 @@ type LastConfiguration struct {
 
 type OpsRequestComponentStatus struct {
 	// Records the current phase of the Component, mirroring `cluster.status.components[componentName].phase`.
-	// Possible values include "Creating", "Running", "Updating", "Stopping", "Stopped", "Deleting", "Failed", "Abnormal".
 	// +optional
-	Phase appsv1.ClusterComponentPhase `json:"phase,omitempty"`
+	Phase appsv1.ComponentPhase `json:"phase,omitempty"`
 
-	// Records the timestamp when the Component last transitioned to a "Failed" or "Abnormal" phase.
+	// Records the timestamp when the Component last transitioned to a "Failed" phase.
 	// +optional
 	LastFailedTime metav1.Time `json:"lastFailedTime,omitempty"`
 

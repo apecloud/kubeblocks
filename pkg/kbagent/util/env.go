@@ -100,6 +100,10 @@ func namespace() string {
 	return os.Getenv(kbEnvNamespace)
 }
 
+func PodName() string {
+	return podName()
+}
+
 func podName() string {
 	return os.Getenv(kbEnvPodName)
 }

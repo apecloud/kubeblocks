@@ -108,16 +108,6 @@ func (a *kbagent) MemberLeave(ctx context.Context, cli client.Reader, opts *Opti
 	return a.ignoreOutput(a.checkedCallAction(ctx, cli, a.synthesizedComp.LifecycleActions.MemberLeave, lfa, opts))
 }
 
-func (a *kbagent) DataDump(ctx context.Context, cli client.Reader, opts *Options) error {
-	lfa := &dataDump{}
-	return a.ignoreOutput(a.checkedCallAction(ctx, cli, a.synthesizedComp.LifecycleActions.DataDump, lfa, opts))
-}
-
-func (a *kbagent) DataLoad(ctx context.Context, cli client.Reader, opts *Options) error {
-	lfa := &dataLoad{}
-	return a.ignoreOutput(a.checkedCallAction(ctx, cli, a.synthesizedComp.LifecycleActions.DataLoad, lfa, opts))
-}
-
 func (a *kbagent) AccountProvision(ctx context.Context, cli client.Reader, opts *Options, statement, user, password string) error {
 	lfa := &accountProvision{
 		statement: statement,
@@ -178,7 +168,7 @@ func (a *kbagent) clusterReadyCheck(ctx context.Context, cli client.Reader) erro
 func (a *kbagent) compReadyCheck(ctx context.Context, cli client.Reader) error {
 	ready := func(object client.Object) bool {
 		comp := object.(*appsv1.Component)
-		return comp.Status.Phase == appsv1.RunningClusterCompPhase
+		return comp.Status.Phase == appsv1.RunningComponentPhase
 	}
 	compName := constant.GenerateClusterComponentName(a.synthesizedComp.ClusterName, a.synthesizedComp.Name)
 	return a.readyCheck(ctx, cli, compName, "component", &appsv1.Component{}, ready)
@@ -282,11 +272,14 @@ func (a *kbagent) callActionWithSelector(ctx context.Context, spec *appsv1.Actio
 	//  - timeout
 	var output []byte
 	for _, pod := range pods {
-		host, port, err := a.serverEndpoint(pod)
-		if err != nil {
-			return nil, errors.Wrapf(err, "pod %s is unavailable to execute action %s", pod.Name, lfa.name())
+		endpoint := func() (string, int32, error) {
+			host, port, err := a.serverEndpoint(pod)
+			if err != nil {
+				return "", 0, errors.Wrapf(err, "pod %s is unavailable to execute action %s", pod.Name, lfa.name())
+			}
+			return host, port, nil
 		}
-		cli, err := kbacli.NewClient(host, port)
+		cli, err := kbacli.NewClient(endpoint)
 		if err != nil {
 			return nil, err // mock client error
 		}
@@ -309,48 +302,11 @@ func (a *kbagent) callActionWithSelector(ctx context.Context, spec *appsv1.Actio
 }
 
 func (a *kbagent) selectTargetPods(spec *appsv1.Action) ([]*corev1.Pod, error) {
-	if spec.Exec == nil || len(spec.Exec.TargetPodSelector) == 0 {
-		return []*corev1.Pod{a.pod}, nil
-	}
-
-	anyPod := func() []*corev1.Pod {
-		i := rand.Int() % len(a.pods)
-		return []*corev1.Pod{a.pods[i]}
-	}
-
-	allPods := func() []*corev1.Pod {
-		return a.pods
-	}
-
-	podsWithRole := func() []*corev1.Pod {
-		roleName := spec.Exec.MatchingKey
-		var pods []*corev1.Pod
-		for i, pod := range a.pods {
-			if len(pod.Labels) != 0 {
-				if pod.Labels[constant.RoleLabelKey] == roleName {
-					pods = append(pods, a.pods[i])
-				}
-			}
-		}
-		return pods
-	}
-
-	switch spec.Exec.TargetPodSelector {
-	case appsv1.AnyReplica:
-		return anyPod(), nil
-	case appsv1.AllReplicas:
-		return allPods(), nil
-	case appsv1.RoleSelector:
-		return podsWithRole(), nil
-	case appsv1.OrdinalSelector:
-		return nil, fmt.Errorf("ordinal selector is not supported")
-	default:
-		return nil, fmt.Errorf("unknown pod selector: %s", spec.Exec.TargetPodSelector)
-	}
+	return SelectTargetPods(a.pods, a.pod, spec)
 }
 
 func (a *kbagent) serverEndpoint(pod *corev1.Pod) (string, int32, error) {
-	port, err := intctrlutil.GetPortByName(*pod, kbagt.ContainerName, kbagt.DefaultPortName)
+	port, err := intctrlutil.GetPortByName(*pod, kbagt.ContainerName, kbagt.DefaultHTTPPortName)
 	if err != nil {
 		// has no kb-agent defined
 		return "", 0, nil
@@ -388,5 +344,46 @@ func (a *kbagent) formatError(lfa lifecycleAction, rsp proto.ActionResponse) err
 		return wrapError(ErrActionInternalError)
 	default:
 		return wrapError(err)
+	}
+}
+
+func SelectTargetPods(pods []*corev1.Pod, pod *corev1.Pod, spec *appsv1.Action) ([]*corev1.Pod, error) {
+	if spec.Exec == nil || len(spec.Exec.TargetPodSelector) == 0 {
+		return []*corev1.Pod{pod}, nil
+	}
+
+	anyPod := func() []*corev1.Pod {
+		i := rand.Int() % len(pods)
+		return []*corev1.Pod{pods[i]}
+	}
+
+	allPods := func() []*corev1.Pod {
+		return pods
+	}
+
+	podsWithRole := func() []*corev1.Pod {
+		roleName := spec.Exec.MatchingKey
+		var rolePods []*corev1.Pod
+		for i, pod := range pods {
+			if len(pod.Labels) != 0 {
+				if pod.Labels[constant.RoleLabelKey] == roleName {
+					rolePods = append(rolePods, pods[i])
+				}
+			}
+		}
+		return rolePods
+	}
+
+	switch spec.Exec.TargetPodSelector {
+	case appsv1.AnyReplica:
+		return anyPod(), nil
+	case appsv1.AllReplicas:
+		return allPods(), nil
+	case appsv1.RoleSelector:
+		return podsWithRole(), nil
+	case appsv1.OrdinalSelector:
+		return nil, fmt.Errorf("ordinal selector is not supported")
+	default:
+		return nil, fmt.Errorf("unknown pod selector: %s", spec.Exec.TargetPodSelector)
 	}
 }

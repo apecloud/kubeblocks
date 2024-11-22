@@ -52,7 +52,6 @@ const (
 	PATCH  = Action("PATCH")
 	DELETE = Action("DELETE")
 	STATUS = Action("STATUS")
-	NOOP   = Action("NOOP")
 )
 
 type GVKNObjKey struct {

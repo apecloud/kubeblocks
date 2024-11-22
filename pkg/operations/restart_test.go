@@ -85,7 +85,7 @@ var _ = Describe("Restart OpsRequest", func() {
 			opsRes, _, cluster = initOperationsResources(compDefName, clusterName)
 			By("create Restart opsRequest")
 			opsRes.OpsRequest = createRestartOpsObj(clusterName, "restart-ops-"+randomStr)
-			mockComponentIsOperating(opsRes.Cluster, appsv1.UpdatingClusterCompPhase, defaultCompName)
+			mockComponentIsOperating(opsRes.Cluster, appsv1.UpdatingComponentPhase, defaultCompName)
 
 			By("mock restart OpsRequest to Creating")
 			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
@@ -118,7 +118,7 @@ var _ = Describe("Restart OpsRequest", func() {
 			By("create Restart opsRequest")
 			opsRes.OpsRequest = createRestartOpsObj(clusterName, "restart-ops-"+randomStr,
 				defaultCompName, secondaryCompName, thirdCompName)
-			mockComponentIsOperating(opsRes.Cluster, appsv1.UpdatingClusterCompPhase,
+			mockComponentIsOperating(opsRes.Cluster, appsv1.UpdatingComponentPhase,
 				defaultCompName, secondaryCompName, thirdCompName)
 
 			By("mock restart OpsRequest to Creating")

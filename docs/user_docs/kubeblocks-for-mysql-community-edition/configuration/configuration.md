@@ -176,7 +176,7 @@ The example below takes configuring `max_connections` and `innodb_buffer_pool_si
 
 4. Connect to the database to verify whether the parameters are configured as expected.
 
-   The whole searching process has a 30-second delay since it takes some time for kubelet to synchronize modifications to the volume of the pod.
+   It takes about 30 seconds for the configuration to take effect because the kubelet requires some time to sync changes in the ConfigMap to the Pod's volume.
 
    ```bash
    kbcli cluster connect mycluster -n demo
@@ -319,11 +319,11 @@ KubeBlocks supports configuring cluster parameters by editing its configuration 
    1. Get the username and password.
 
       ```bash
-      kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\username}' | base64 -d
+      kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.username}' | base64 -d
       >
       root
 
-      kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\password}' | base64 -d
+      kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.password}' | base64 -d
       >
       2gvztbvz
       ```
@@ -398,7 +398,7 @@ KubeBlocks supports configuring cluster parameters with OpsRequest.
 2. Apply the configuration opsRequest.
 
    ```bash
-   kubectl apply -f mycluster-configuring-demo.yaml
+   kubectl apply -f mycluster-configuring-demo.yaml -n demo
    ```
 
 3. Connect to this cluster to verify whether the configuration takes effect.
@@ -406,11 +406,11 @@ KubeBlocks supports configuring cluster parameters with OpsRequest.
    1. Get the username and password.
 
       ```bash
-      kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\username}' | base64 -d
+      kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.username}' | base64 -d
       >
       root
 
-      kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\password}' | base64 -d
+      kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.password}' | base64 -d
       >
       2gvztbvz
       ```

@@ -21,6 +21,7 @@ package service
 
 import (
 	"context"
+	"net"
 
 	"github.com/go-logr/logr"
 
@@ -33,10 +34,12 @@ type Service interface {
 
 	Start() error
 
+	HandleConn(ctx context.Context, conn net.Conn) error
+
 	HandleRequest(ctx context.Context, payload []byte) ([]byte, error)
 }
 
-func New(logger logr.Logger, actions []proto.Action, probes []proto.Probe) ([]Service, error) {
+func New(logger logr.Logger, actions []proto.Action, probes []proto.Probe, streaming []string) ([]Service, error) {
 	sa, err := newActionService(logger, actions)
 	if err != nil {
 		return nil, err
@@ -45,5 +48,18 @@ func New(logger logr.Logger, actions []proto.Action, probes []proto.Probe) ([]Se
 	if err != nil {
 		return nil, err
 	}
-	return []Service{sa, sp}, nil
+	ss, err := newStreamingService(logger, sa, streaming)
+	if err != nil {
+		return nil, err
+	}
+	return []Service{sa, sp, ss}, nil
+}
+
+func RunTasks(logger logr.Logger, service Service, tasks []proto.Task) error {
+	st := &taskService{
+		logger:        logger,
+		actionService: service.(*actionService),
+		tasks:         tasks,
+	}
+	return st.runTasks(context.Background())
 }

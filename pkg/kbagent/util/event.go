@@ -32,6 +32,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/kubernetes"
 	ctlruntime "sigs.k8s.io/controller-runtime"
+
+	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 )
 
 const (
@@ -39,14 +41,22 @@ const (
 	sendEventRetryInterval = 10 * time.Second
 )
 
-func SendEventWithMessage(logger *logr.Logger, reason string, message string) {
-	go func() {
+func SendEventWithMessage(logger *logr.Logger, reason string, message string, sync bool) error {
+	send := func() error {
 		event := createEvent(reason, message)
 		err := sendEvent(event)
 		if logger != nil && err != nil {
-			logger.Error(err, "send event failed")
+			logger.Error(err, fmt.Sprintf("send event failed, reason: %s, message: %s", reason, message))
 		}
+		return err
+	}
+	if sync {
+		return send()
+	}
+	go func() {
+		_ = send()
 	}()
+	return nil
 }
 
 func createEvent(reason string, message string) *corev1.Event {
@@ -60,18 +70,18 @@ func createEvent(reason string, message string) *corev1.Event {
 			Namespace: namespace(),
 			Name:      podName(),
 			UID:       types.UID(podUID()),
-			FieldPath: "spec.containers{kbagent}",
+			FieldPath: proto.ProbeEventFieldPath,
 		},
 		Reason:  reason,
 		Message: message,
 		Source: corev1.EventSource{
-			Component: "kbagent",
+			Component: proto.ProbeEventSourceComponent,
 			Host:      nodeName(),
 		},
 		FirstTimestamp:      metav1.Now(),
 		LastTimestamp:       metav1.Now(),
 		EventTime:           metav1.NowMicro(),
-		ReportingController: "kbagent",
+		ReportingController: proto.ProbeEventReportingController,
 		ReportingInstance:   podName(),
 		Action:              reason,
 		Type:                "Normal",

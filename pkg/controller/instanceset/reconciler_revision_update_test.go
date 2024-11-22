@@ -23,8 +23,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	corev1 "k8s.io/api/core/v1"
-
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
@@ -33,7 +31,6 @@ import (
 var _ = Describe("revision update reconciler test", func() {
 	BeforeEach(func() {
 		its = builder.NewInstanceSetBuilder(namespace, name).
-			SetService(&corev1.Service{}).
 			SetReplicas(3).
 			SetTemplate(template).
 			SetVolumeClaimTemplates(volumeClaimTemplates...).

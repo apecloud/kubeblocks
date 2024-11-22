@@ -7,17 +7,17 @@ sidebar_position: 2
 
 # 配置告警
 
-告警主要用于日常故障响应，以提高系统的可用性。KubeBlocks 内置了一组通用的告警规则，并集成了多个通知渠道，可满足生产级线上集群的运维需求。
+告警主要用于日常故障响应，以提高系统可用性。KubeBlocks 使用开源版本的 Prometheus 配置警报规则和多个通知渠道。KubeBlocks 的告警功能能够满足生产级在线集群的运维需求。
 
 :::note
 
-告警功能对所有数据库都是一样的。
+所有数据库的告警功能相同。
 
 :::
 
 ## 告警规则
 
-KubeBlocks 内置的告警系统可以满足各种数据产品的需求，并提供了开箱即用的体验，无需进一步配置。这些告警规则为集群运维提供了最佳实践，通过经验总结的平滑窗口、告警阈值、告警级别和告警指标，进一步提高了告警的准确性，降低了误报率和漏报率。
+KubeBlocks 使用开源版本的 Prometheus 来满足各种数据产品的需求。这些警报规则提供了集群运维的最佳实践，通过经验总结的平滑窗口、告警阈值、告警级别和告警指标，进一步提高了告警的准确性，降低了误报率和漏报率。
 
 以 PostgreSQL 为例，告警规则中内置了常见的异常事件，例如实例宕机、实例重启、慢查询、连接数、死锁和缓存命中率等。
 
@@ -37,15 +37,7 @@ alert: PostgreSQLTooManyConnections
     description: "PostgreSQL has too many connections and the value is {{ $value }}. (instance: {{ $labels.pod }})"
 ```
 
-你可以在  **Prometheus 仪表盘**的 **Alerts** 选项卡中查看所有的告警规则。执行以下命令打开 Prometheus 仪表盘：
-
-```bash
-# 查看仪表盘列表
-kbcli dashboard list
-
-# 打开 Prometheus 仪表盘
-kbcli dashboard open kubeblocks-prometheus-server # 这是一个示例，请根据上述仪表盘列表中的实际名称填写
-```
+您可按需配置告警规则，详情可参考 [Prometheus 告警规则文档](https://prometheus.io/docs/prometheus/latest/configuration/alerting_rules/#defining-alerting-rules)。
 
 ## 通知
 

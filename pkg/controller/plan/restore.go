@@ -98,7 +98,7 @@ func (r *RestoreManager) DoRestore(comp *component.SynthesizedComponent, compObj
 	if err = r.DoPrepareData(comp, compObj, backupObj); err != nil {
 		return err
 	}
-	if compObj.Status.Phase != appsv1.RunningClusterCompPhase {
+	if compObj.Status.Phase != appsv1.RunningComponentPhase {
 		return nil
 	}
 	// wait for the post-provision action to complete.

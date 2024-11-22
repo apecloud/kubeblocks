@@ -25,7 +25,6 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubectl/pkg/util/storage"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/pkg/testutil"
@@ -37,63 +36,12 @@ var (
 	defaultProvisioner             = "testing.kubeblocks.io"
 )
 
-func GetDefaultStorageClass(testCtx *testutil.TestContext) *storagev1.StorageClass {
-	scList := &storagev1.StorageClassList{}
-	gomega.Expect(testCtx.Cli.List(testCtx.Ctx, scList)).Should(gomega.Succeed())
-	if len(scList.Items) == 0 {
-		return nil
-	}
-
-	for _, sc := range scList.Items {
-		annot := sc.Annotations
-		if annot == nil {
-			continue
-		}
-		if isDefaultStorageClassAnnotation(&sc) {
-			return &sc
-		}
-	}
-	return nil
-}
-
-func isDefaultStorageClassAnnotation(storageClass *storagev1.StorageClass) bool {
-	return storageClass.Annotations != nil && storageClass.Annotations[storage.IsDefaultStorageClassAnnotation] == "true"
-}
-
 func CreateMockStorageClass(testCtx *testutil.TestContext, storageClassName string) *storagev1.StorageClass {
 	sc := getStorageClass(testCtx, storageClassName)
 	if sc == nil {
 		sc = createStorageClass(testCtx, storageClassName)
 	}
 	return sc
-}
-
-func MockEnableVolumeSnapshot(testCtx *testutil.TestContext, storageClassName string) {
-	sc := getStorageClass(testCtx, storageClassName)
-	if sc == nil {
-		sc = createStorageClass(testCtx, storageClassName)
-	}
-	vsc := getVolumeSnapshotClass(testCtx, sc)
-	if vsc == nil {
-		CreateVolumeSnapshotClass(testCtx, sc.Provisioner)
-	}
-	gomega.Expect(IsMockVolumeSnapshotEnabled(testCtx, storageClassName)).Should(gomega.BeTrue())
-}
-
-func MockDisableVolumeSnapshot(testCtx *testutil.TestContext, storageClassName string) {
-	sc := getStorageClass(testCtx, storageClassName)
-	if sc != nil {
-		deleteVolumeSnapshotClass(testCtx, sc)
-		deleteStorageClass(testCtx, storageClassName)
-	}
-}
-
-func IsMockVolumeSnapshotEnabled(testCtx *testutil.TestContext, storageClassName string) bool {
-	sc := getStorageClass(testCtx, storageClassName)
-	if sc == nil {
-		return false
-	}
-	return getVolumeSnapshotClass(testCtx, sc) != nil
 }
 
 func getStorageClass(testCtx *testutil.TestContext, storageClassName string) *storagev1.StorageClass {
@@ -120,24 +68,6 @@ func createStorageClass(testCtx *testutil.TestContext, storageClassName string) 
 	return sc
 }
 
-func deleteStorageClass(testCtx *testutil.TestContext, storageClassName string) {
-	sc := getStorageClass(testCtx, storageClassName)
-	if sc != nil {
-		gomega.Expect(testCtx.Cli.Delete(testCtx.Ctx, sc)).Should(gomega.Succeed())
-	}
-}
-
-func getVolumeSnapshotClass(testCtx *testutil.TestContext, storageClass *storagev1.StorageClass) *snapshotv1.VolumeSnapshotClass {
-	vscList := &snapshotv1.VolumeSnapshotClassList{}
-	gomega.Expect(testCtx.Cli.List(testCtx.Ctx, vscList)).Should(gomega.Succeed())
-	for i, vsc := range vscList.Items {
-		if vsc.Driver == storageClass.Provisioner {
-			return &vscList.Items[i]
-		}
-	}
-	return nil
-}
-
 func CreateVolumeSnapshotClass(testCtx *testutil.TestContext, storageProvisioner string) *snapshotv1.VolumeSnapshotClass {
 	vsc := &snapshotv1.VolumeSnapshotClass{
 		ObjectMeta: metav1.ObjectMeta{
@@ -148,11 +78,4 @@ func CreateVolumeSnapshotClass(testCtx *testutil.TestContext, storageProvisioner
 	}
 	gomega.Expect(testCtx.Create(testCtx.Ctx, vsc)).Should(gomega.Succeed())
 	return vsc
-}
-
-func deleteVolumeSnapshotClass(testCtx *testutil.TestContext, storageClass *storagev1.StorageClass) {
-	vsc := getVolumeSnapshotClass(testCtx, storageClass)
-	if vsc != nil {
-		gomega.Expect(testCtx.Cli.Delete(testCtx.Ctx, vsc)).Should(gomega.Succeed())
-	}
 }

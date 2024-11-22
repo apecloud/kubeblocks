@@ -26,14 +26,17 @@ import (
 	"reflect"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/spf13/viper"
 	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -58,6 +61,7 @@ type componentWorkloadOps struct {
 	cli            client.Client
 	reqCtx         intctrlutil.RequestCtx
 	cluster        *appsv1.Cluster
+	component      *appsv1.Component
 	synthesizeComp *component.SynthesizedComponent
 	dag            *graph.DAG
 
@@ -81,6 +85,7 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 
 	cluster := transCtx.Cluster
 	compDef := transCtx.CompDef
+	comp := transCtx.Component
 	synthesizeComp := transCtx.SynthesizeComponent
 	reqCtx := intctrlutil.RequestCtx{
 		Ctx:      transCtx.Context,
@@ -102,14 +107,14 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 	}
 	transCtx.ProtoWorkload = protoITS
 
-	if err = t.reconcileWorkload(synthesizeComp, transCtx.Component, runningITS, protoITS); err != nil {
+	if err = t.reconcileWorkload(transCtx.Context, t.Client, synthesizeComp, comp, runningITS, protoITS); err != nil {
 		return err
 	}
 
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	if runningITS == nil {
 		if protoITS != nil {
-			if err := setCompOwnershipNFinalizer(transCtx.Component, protoITS); err != nil {
+			if err := setCompOwnershipNFinalizer(comp, protoITS); err != nil {
 				return err
 			}
 			graphCli.Create(dag, protoITS)
@@ -119,7 +124,7 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 		if protoITS == nil {
 			graphCli.Delete(dag, runningITS)
 		} else {
-			err = t.handleUpdate(reqCtx, graphCli, dag, cluster, synthesizeComp, runningITS, protoITS)
+			err = t.handleUpdate(reqCtx, graphCli, dag, cluster, synthesizeComp, comp, runningITS, protoITS)
 		}
 	}
 	return err
@@ -138,14 +143,18 @@ func (t *componentWorkloadTransformer) runningInstanceSetObject(ctx graph.Transf
 	return objs[0], nil
 }
 
-func (t *componentWorkloadTransformer) reconcileWorkload(synthesizedComp *component.SynthesizedComponent,
-	comp *appsv1.Component, runningITS, protoITS *workloads.InstanceSet) error {
+func (t *componentWorkloadTransformer) reconcileWorkload(ctx context.Context, cli client.Reader,
+	synthesizedComp *component.SynthesizedComponent, comp *appsv1.Component, runningITS, protoITS *workloads.InstanceSet) error {
 	if runningITS != nil {
 		*protoITS.Spec.Selector = *runningITS.Spec.Selector
 		protoITS.Spec.Template.Labels = intctrlutil.MergeMetadataMaps(runningITS.Spec.Template.Labels, synthesizedComp.DynamicLabels)
 	}
 
 	buildInstanceSetPlacementAnnotation(comp, protoITS)
+
+	if err := t.reconcileReplicasStatus(ctx, cli, synthesizedComp, runningITS, protoITS); err != nil {
+		return err
+	}
 
 	// build configuration template annotations to workload
 	configuration.BuildConfigTemplateAnnotations(protoITS, synthesizedComp)
@@ -156,6 +165,59 @@ func (t *componentWorkloadTransformer) reconcileWorkload(synthesizedComp *compon
 	}
 
 	return nil
+}
+
+func (t *componentWorkloadTransformer) reconcileReplicasStatus(ctx context.Context, cli client.Reader,
+	synthesizedComp *component.SynthesizedComponent, runningITS, protoITS *workloads.InstanceSet) error {
+	var (
+		namespace   = synthesizedComp.Namespace
+		clusterName = synthesizedComp.ClusterName
+		compName    = synthesizedComp.Name
+	)
+
+	// HACK: sync replicas status from runningITS to protoITS
+	component.BuildReplicasStatus(runningITS, protoITS)
+
+	replicas, err := func() ([]string, error) {
+		pods, err := component.ListOwnedPods(ctx, cli, namespace, clusterName, compName)
+		if err != nil {
+			return nil, err
+		}
+		podNameSet := sets.New[string]()
+		for _, pod := range pods {
+			podNameSet.Insert(pod.Name)
+		}
+
+		desiredPodNames, err := generatePodNames(synthesizedComp)
+		if err != nil {
+			return nil, err
+		}
+		desiredPodNameSet := sets.New(desiredPodNames...)
+
+		return desiredPodNameSet.Intersection(podNameSet).UnsortedList(), nil
+	}()
+	if err != nil {
+		return err
+	}
+
+	hasMemberJoinDefined, hasDataActionDefined := hasMemberJoinNDataActionDefined(synthesizedComp.LifecycleActions)
+	return component.StatusReplicasStatus(protoITS, replicas, hasMemberJoinDefined, hasDataActionDefined)
+}
+
+func hasMemberJoinNDataActionDefined(lifecycleActions *appsv1.ComponentLifecycleActions) (bool, bool) {
+	if lifecycleActions == nil {
+		return false, false
+	}
+	hasActionDefined := func(actions []*appsv1.Action) bool {
+		for _, action := range actions {
+			if action == nil || action.Exec == nil {
+				return false
+			}
+		}
+		return true
+	}
+	return hasActionDefined([]*appsv1.Action{lifecycleActions.MemberJoin}),
+		hasActionDefined([]*appsv1.Action{lifecycleActions.DataDump, lifecycleActions.DataLoad})
 }
 
 func isCompStopped(synthesizedComp *component.SynthesizedComponent) bool {
@@ -172,25 +234,32 @@ func (t *componentWorkloadTransformer) stopWorkload(protoITS *workloads.Instance
 }
 
 func (t *componentWorkloadTransformer) handleUpdate(reqCtx intctrlutil.RequestCtx, cli model.GraphClient, dag *graph.DAG,
-	cluster *appsv1.Cluster, synthesizeComp *component.SynthesizedComponent, runningITS, protoITS *workloads.InstanceSet) error {
+	cluster *appsv1.Cluster, synthesizeComp *component.SynthesizedComponent, comp *appsv1.Component, runningITS, protoITS *workloads.InstanceSet) error {
 	if !isCompStopped(synthesizeComp) {
 		// postpone the update of the workload until the component is back to running.
-		if err := t.handleWorkloadUpdate(reqCtx, dag, cluster, synthesizeComp, runningITS, protoITS); err != nil {
+		if err := t.handleWorkloadUpdate(reqCtx, dag, cluster, synthesizeComp, comp, runningITS, protoITS); err != nil {
 			return err
 		}
 	}
 
-	objCopy := copyAndMergeITS(runningITS, protoITS, synthesizeComp)
-	if objCopy != nil && !cli.IsAction(dag, objCopy, model.ActionNoopPtr()) {
+	objCopy := copyAndMergeITS(runningITS, protoITS)
+	if objCopy != nil {
 		cli.Update(dag, nil, objCopy, &model.ReplaceIfExistingOption{})
+		// make sure the workload is updated after the env CM
+		cli.DependOn(dag, &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: synthesizeComp.Namespace,
+				Name:      constant.GenerateClusterComponentEnvPattern(synthesizeComp.ClusterName, synthesizeComp.Name),
+			},
+		})
 	}
 
 	return nil
 }
 
 func (t *componentWorkloadTransformer) handleWorkloadUpdate(reqCtx intctrlutil.RequestCtx, dag *graph.DAG,
-	cluster *appsv1.Cluster, synthesizeComp *component.SynthesizedComponent, obj, its *workloads.InstanceSet) error {
-	cwo, err := newComponentWorkloadOps(reqCtx, t.Client, cluster, synthesizeComp, obj, its, dag)
+	cluster *appsv1.Cluster, synthesizeComp *component.SynthesizedComponent, comp *appsv1.Component, obj, its *workloads.InstanceSet) error {
+	cwo, err := newComponentWorkloadOps(reqCtx, t.Client, cluster, synthesizeComp, comp, obj, its, dag)
 	if err != nil {
 		return err
 	}
@@ -227,7 +296,7 @@ func buildPodSpecVolumeMounts(synthesizeComp *component.SynthesizedComponent) {
 				if slices.Contains(kbScriptAndConfigVolumeNames, v.Name) {
 					continue
 				}
-				// if persistence is not found, add emptyDir pod.spec.volumes[]
+				// if persistence is not found, add an emptyDir to pod.spec.volumes
 				createFn := func(_ string) corev1.Volume {
 					return corev1.Volume{
 						Name: v.Name,
@@ -247,7 +316,7 @@ func buildPodSpecVolumeMounts(synthesizeComp *component.SynthesizedComponent) {
 // copyAndMergeITS merges two ITS objects for updating:
 //  1. new an object targetObj by copying from oldObj
 //  2. merge all fields can be updated from newObj into targetObj
-func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet, synthesizeComp *component.SynthesizedComponent) *workloads.InstanceSet {
+func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet) *workloads.InstanceSet {
 	// mergeAnnotations keeps the original annotations.
 	mergeMetadataMap := func(originalMap map[string]string, targetMap *map[string]string) {
 		if targetMap == nil || originalMap == nil {
@@ -280,27 +349,6 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet, synthesizeComp *comp
 		}
 	}
 
-	// be compatible with existed cluster
-	updateService := func(itsObj, itsProto *workloads.InstanceSet) *corev1.Service {
-		if itsProto.Spec.Service != nil {
-			return itsProto.Spec.Service
-		}
-		if itsObj.Spec.Service == nil {
-			return nil
-		}
-		defaultServiceName := itsObj.Name
-		for _, svc := range synthesizeComp.ComponentServices {
-			if svc.PodService != nil && *svc.PodService || svc.DisableAutoProvision != nil && *svc.DisableAutoProvision {
-				continue
-			}
-			serviceName := constant.GenerateComponentServiceName(synthesizeComp.ClusterName, synthesizeComp.Name, svc.ServiceName)
-			if defaultServiceName == serviceName {
-				return itsObj.Spec.Service
-			}
-		}
-		return nil
-	}
-
 	itsObjCopy := oldITS.DeepCopy()
 	itsProto := newITS
 
@@ -321,7 +369,6 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet, synthesizeComp *comp
 	mergeMetadataMap(itsObjCopy.Spec.Template.Annotations, &itsProto.Spec.Template.Annotations)
 	itsObjCopy.Spec.Template = *itsProto.Spec.Template.DeepCopy()
 	itsObjCopy.Spec.Replicas = itsProto.Spec.Replicas
-	itsObjCopy.Spec.Service = updateService(itsObjCopy, itsProto)
 	itsObjCopy.Spec.Roles = itsProto.Spec.Roles
 	itsObjCopy.Spec.RoleProbe = itsProto.Spec.RoleProbe
 	itsObjCopy.Spec.MembershipReconfiguration = itsProto.Spec.MembershipReconfiguration
@@ -470,26 +517,23 @@ func (r *componentWorkloadOps) expandVolume() error {
 	return nil
 }
 
-// horizontalScale handles workload horizontal scale
 func (r *componentWorkloadOps) horizontalScale() error {
-	its := r.runningITS
-	doScaleOut, doScaleIn := r.horizontalScaling()
-	if !doScaleOut && !doScaleIn {
-		if err := r.postScaleIn(); err != nil {
-			return err
-		}
-		if err := r.postScaleOut(its); err != nil {
-			return err
-		}
-		return nil
+	var (
+		in  = r.runningItsPodNameSet.Difference(r.desiredCompPodNameSet)
+		out = r.desiredCompPodNameSet.Difference(r.runningItsPodNameSet)
+	)
+	if in.Len() == 0 && out.Len() == 0 {
+		return r.postHorizontalScale() // TODO: how about consecutive horizontal scales?
 	}
-	if doScaleIn {
-		if err := r.scaleIn(its); err != nil {
+
+	if in.Len() > 0 {
+		if err := r.scaleIn(); err != nil {
 			return err
 		}
 	}
-	if doScaleOut {
-		if err := r.scaleOut(its); err != nil {
+
+	if out.Len() > 0 {
+		if err := r.scaleOut(); err != nil {
 			return err
 		}
 	}
@@ -498,132 +542,75 @@ func (r *componentWorkloadOps) horizontalScale() error {
 		corev1.EventTypeNormal,
 		"HorizontalScale",
 		"start horizontal scale component %s of cluster %s from %d to %d",
-		r.synthesizeComp.Name, r.cluster.Name, int(*its.Spec.Replicas), r.synthesizeComp.Replicas)
+		r.synthesizeComp.Name, r.cluster.Name, int(*r.runningITS.Spec.Replicas), r.synthesizeComp.Replicas)
 
 	return nil
 }
 
-// < 0 for scale in, > 0 for scale out, and == 0 for nothing
-func (r *componentWorkloadOps) horizontalScaling() (bool, bool) {
-	var (
-		doScaleOut bool
-		doScaleIn  bool
-	)
-	for _, podName := range r.desiredCompPodNames {
-		if _, ok := r.runningItsPodNameSet[podName]; !ok {
-			doScaleOut = true
-			break
+func (r *componentWorkloadOps) scaleIn() error {
+	deleteReplicas := r.runningItsPodNameSet.Difference(r.desiredCompPodNameSet).UnsortedList()
+	joinedReplicas := make([]string, 0)
+	err := component.DeleteReplicasStatus(r.protoITS, deleteReplicas, func(s component.ReplicaStatus) {
+		// has no member join defined or has joined successfully
+		if s.Provisioned && (s.MemberJoined == nil || *s.MemberJoined) {
+			joinedReplicas = append(joinedReplicas, s.Name)
 		}
-	}
-	for _, podName := range r.runningItsPodNames {
-		if _, ok := r.desiredCompPodNameSet[podName]; !ok {
-			doScaleIn = true
-			break
-		}
-	}
-	return doScaleOut, doScaleIn
-}
-
-func (r *componentWorkloadOps) postScaleIn() error {
-	return nil
-}
-
-func (r *componentWorkloadOps) postScaleOut(itsObj *workloads.InstanceSet) error {
-	var (
-		snapshotKey = types.NamespacedName{
-			Namespace: itsObj.Namespace,
-			Name:      constant.GenerateResourceNameWithScalingSuffix(itsObj.Name),
-		}
-	)
-
-	d, err := newDataClone(r.reqCtx, r.cli, r.cluster, r.synthesizeComp, itsObj, itsObj, snapshotKey)
+	})
 	if err != nil {
 		return err
 	}
-	if d != nil {
-		// clean backup resources.
-		// there will not be any backup resources other than scale out.
-		tmpObjs, err := d.GetTmpResources()
-		if err != nil {
-			return err
-		}
-		graphCli := model.NewGraphClient(r.cli)
-		for _, obj := range tmpObjs {
-			graphCli.Do(r.dag, nil, obj, model.ActionDeletePtr(), nil)
-		}
+
+	// TODO: check the component definition to determine whether we need to call leave member before deleting replicas.
+	if err := r.leaveMember4ScaleIn(deleteReplicas, joinedReplicas); err != nil {
+		r.reqCtx.Log.Error(err, "leave member at scaling-in error")
+		return err
 	}
 
-	return nil
-}
-
-func (r *componentWorkloadOps) scaleIn(itsObj *workloads.InstanceSet) error {
-	// if scale in to 0, do not delete pvcs
+	// TODO: if scale in to 0, do not delete pvcs, remove this later
 	if r.synthesizeComp.Replicas == 0 {
 		r.reqCtx.Log.Info("scale in to 0, keep all PVCs")
 		return nil
 	}
-	// TODO: check the component definition to determine whether we need to call leave member before deleting replicas.
-	err := r.leaveMember4ScaleIn()
-	if err != nil {
-		r.reqCtx.Log.Info(fmt.Sprintf("leave member at scaling-in error, retry later: %s", err.Error()))
-		return err
-	}
-	return r.deletePVCs4ScaleIn(itsObj)
+
+	return r.deletePVCs4ScaleIn(r.runningITS)
 }
 
-func (r *componentWorkloadOps) scaleOut(itsObj *workloads.InstanceSet) error {
-	var (
-		backupKey = types.NamespacedName{
-			Namespace: itsObj.Namespace,
-			Name:      constant.GenerateResourceNameWithScalingSuffix(itsObj.Name),
-		}
-	)
-
-	// its's replicas=0 means it's starting not scaling, skip all the scaling work.
-	if *itsObj.Spec.Replicas == 0 {
-		return nil
-	}
-	graphCli := model.NewGraphClient(r.cli)
-	graphCli.Noop(r.dag, r.protoITS)
-	d, err := newDataClone(r.reqCtx, r.cli, r.cluster, r.synthesizeComp, itsObj, r.protoITS, backupKey)
-	if err != nil {
-		return err
-	}
-	var succeed bool
-	if d == nil {
-		succeed = true
-	} else {
-		succeed, err = d.Succeed()
-		if err != nil {
-			return err
-		}
-	}
-	if succeed {
-		// pvcs are ready, ITS.replicas should be updated
-		graphCli.Update(r.dag, nil, r.protoITS)
-		return r.postScaleOut(itsObj)
-	} else {
-		graphCli.Noop(r.dag, r.protoITS)
-		// update objs will trigger reconcile, no need to requeue error
-		objs1, objs2, err := d.CloneData(d)
-		if err != nil {
-			return err
-		}
-		for _, obj := range objs1 {
-			graphCli.Do(r.dag, nil, obj, model.ActionCreatePtr(), nil)
-		}
-		for _, obj := range objs2 {
-			graphCli.Do(r.dag, nil, obj, model.ActionCreatePtr(), nil, inDataContext4G())
-		}
-		return nil
-	}
-}
-
-func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
+func (r *componentWorkloadOps) leaveMember4ScaleIn(deleteReplicas, joinedReplicas []string) error {
 	pods, err := component.ListOwnedPods(r.reqCtx.Ctx, r.cli, r.cluster.Namespace, r.cluster.Name, r.synthesizeComp.Name)
 	if err != nil {
 		return err
 	}
+
+	deleteReplicasSet := sets.New(deleteReplicas...)
+	joinedReplicasSet := sets.New(joinedReplicas...)
+	hasMemberLeaveDefined := r.synthesizeComp.LifecycleActions != nil && r.synthesizeComp.LifecycleActions.MemberLeave != nil
+	r.reqCtx.Log.Info("leave member at scaling-in", "delete replicas", deleteReplicas,
+		"joined replicas", joinedReplicas, "has member-leave action defined", hasMemberLeaveDefined)
+
+	leaveErrors := make([]error, 0)
+	for _, pod := range pods {
+		if deleteReplicasSet.Has(pod.Name) {
+			if joinedReplicasSet.Has(pod.Name) { // else: hasn't joined yet, no need to leave
+				if err = r.leaveMemberForPod(pod, pods); err != nil {
+					leaveErrors = append(leaveErrors, err)
+				}
+				joinedReplicasSet.Delete(pod.Name)
+			}
+			deleteReplicasSet.Delete(pod.Name)
+		}
+	}
+
+	if hasMemberLeaveDefined && len(joinedReplicasSet) > 0 {
+		leaveErrors = append(leaveErrors,
+			fmt.Errorf("some replicas have joined but not leaved since the Pod object is not exist: %v", sets.List(joinedReplicasSet)))
+	}
+	if len(leaveErrors) > 0 {
+		return newRequeueError(time.Second, fmt.Sprintf("%v", leaveErrors))
+	}
+	return nil
+}
+
+func (r *componentWorkloadOps) leaveMemberForPod(pod *corev1.Pod, pods []*corev1.Pod) error {
 	isLeader := func(pod *corev1.Pod) bool {
 		if pod == nil || len(pod.Labels) == 0 {
 			return false
@@ -657,41 +644,28 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn() error {
 		return err
 	}
 
-	// TODO: Move memberLeave to the ITS controller. Instead of performing a switchover, we can directly scale down the non-leader nodes. This is because the pod ordinal is not guaranteed to be continuous.
-	podsToMemberLeave := make([]*corev1.Pod, 0)
-	for _, pod := range pods {
-		// if the pod not exists in the generated pod names, it should be a member that needs to leave
-		if _, ok := r.desiredCompPodNameSet[pod.Name]; ok {
-			continue
-		}
-		podsToMemberLeave = append(podsToMemberLeave, pod)
+	if !(isLeader(pod) || // if the pod is leader, it needs to call switchover
+		(r.synthesizeComp.LifecycleActions != nil && r.synthesizeComp.LifecycleActions.MemberLeave != nil)) { // if the memberLeave action is defined, it needs to call it
+		return nil
 	}
-	for _, pod := range podsToMemberLeave {
-		if !(isLeader(pod) || // if the pod is leader, it needs to call switchover
-			(r.synthesizeComp.LifecycleActions != nil && r.synthesizeComp.LifecycleActions.MemberLeave != nil)) { // if the memberLeave action is defined, it needs to call it
-			continue
-		}
 
-		lfa, err1 := lifecycle.New(r.synthesizeComp, pod, pods...)
-		if err1 != nil {
-			if err == nil {
-				err = err1
-			}
-			continue
-		}
+	lfa, err := lifecycle.New(r.synthesizeComp, pod, pods...)
+	if err != nil {
+		return err
+	}
 
-		// switchover if the leaving pod is leader
-		if switchoverErr := tryToSwitchover(lfa, pod); switchoverErr != nil {
-			return switchoverErr
-		}
+	// switchover if the leaving pod is leader
+	if switchoverErr := tryToSwitchover(lfa, pod); switchoverErr != nil {
+		return switchoverErr
+	}
 
-		if err2 := lfa.MemberLeave(r.reqCtx.Ctx, r.cli, nil); err2 != nil {
-			if !errors.Is(err2, lifecycle.ErrActionNotDefined) && err == nil {
-				err = err2
-			}
+	if err = lfa.MemberLeave(r.reqCtx.Ctx, r.cli, nil); err != nil {
+		if !errors.Is(err, lifecycle.ErrActionNotDefined) && err == nil {
+			return err
 		}
 	}
-	return err // TODO: use requeue-after
+	r.reqCtx.Log.Info("succeed to leave member for pod", "pod", pod.Name)
+	return nil
 }
 
 func (r *componentWorkloadOps) deletePVCs4ScaleIn(itsObj *workloads.InstanceSet) error {
@@ -707,6 +681,9 @@ func (r *componentWorkloadOps) deletePVCs4ScaleIn(itsObj *workloads.InstanceSet)
 			}
 			pvc := corev1.PersistentVolumeClaim{}
 			if err := r.cli.Get(r.reqCtx.Ctx, pvcKey, &pvc, inDataContext4C()); err != nil {
+				if apierrors.IsNotFound(err) {
+					continue // the pvc is already deleted or not created
+				}
 				return err
 			}
 			// Since there are no order guarantee between updating ITS and deleting PVCs, if there is any error occurred
@@ -716,6 +693,145 @@ func (r *componentWorkloadOps) deletePVCs4ScaleIn(itsObj *workloads.InstanceSet)
 			graphCli.Delete(r.dag, &pvc, inDataContext4G())
 		}
 	}
+	return nil
+}
+
+func (r *componentWorkloadOps) scaleOut() error {
+	// replicas in provisioning that the data has not been loaded
+	provisioningReplicas, err := component.GetReplicasStatusFunc(r.protoITS, func(s component.ReplicaStatus) bool {
+		return s.DataLoaded != nil && !*s.DataLoaded
+	})
+	if err != nil {
+		return err
+	}
+
+	// replicas to be created
+	newReplicas := r.desiredCompPodNameSet.Difference(r.runningItsPodNameSet).UnsortedList()
+
+	hasMemberJoinDefined, hasDataActionDefined := hasMemberJoinNDataActionDefined(r.synthesizeComp.LifecycleActions)
+
+	// build and assign data replication tasks
+	if err := func() error {
+		if !hasDataActionDefined {
+			return nil
+		}
+
+		source, err := r.sourceReplica(r.synthesizeComp.LifecycleActions.DataDump)
+		if err != nil {
+			return err
+		}
+
+		replicas := append(slices.Clone(newReplicas), provisioningReplicas...)
+		parameters, err := component.NewReplicaTask(r.synthesizeComp.FullCompName, r.synthesizeComp.Generation, source, replicas)
+		if err != nil {
+			return err
+		}
+		// apply the updated env to the env CM
+		transCtx := &componentTransformContext{
+			Context:             r.reqCtx.Ctx,
+			Client:              model.NewGraphClient(r.cli),
+			SynthesizeComponent: r.synthesizeComp,
+			Component:           r.component,
+		}
+		if err = createOrUpdateEnvConfigMap(transCtx, r.dag, nil, parameters); err != nil {
+			return err
+		}
+		return nil
+	}(); err != nil {
+		return err
+	}
+
+	return component.NewReplicasStatus(r.protoITS, newReplicas, hasMemberJoinDefined, hasDataActionDefined)
+}
+
+func (r *componentWorkloadOps) sourceReplica(dataDump *appsv1.Action) (*corev1.Pod, error) {
+	pods, err := component.ListOwnedPods(r.reqCtx.Ctx, r.cli, r.cluster.Namespace, r.cluster.Name, r.synthesizeComp.Name)
+	if err != nil {
+		return nil, err
+	}
+	if len(pods) > 0 {
+		if len(dataDump.Exec.TargetPodSelector) == 0 {
+			dataDump.Exec.TargetPodSelector = appsv1.AnyReplica
+		}
+		pods, err = lifecycle.SelectTargetPods(pods, nil, dataDump)
+		if err != nil {
+			return nil, err
+		}
+		if len(pods) > 0 {
+			return pods[0], nil
+		}
+	}
+	return nil, fmt.Errorf("no available pod to dump data")
+}
+
+func (r *componentWorkloadOps) postHorizontalScale() error {
+	if err := r.joinMember4ScaleOut(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *componentWorkloadOps) joinMember4ScaleOut() error {
+	pods, err := component.ListOwnedPods(r.reqCtx.Ctx, r.cli, r.cluster.Namespace, r.cluster.Name, r.synthesizeComp.Name)
+	if err != nil {
+		return err
+	}
+
+	joinErrors := make([]error, 0)
+	if err = component.UpdateReplicasStatusFunc(r.protoITS, func(replicas *component.ReplicasStatus) error {
+		for _, pod := range pods {
+			i := slices.IndexFunc(replicas.Status, func(r component.ReplicaStatus) bool {
+				return r.Name == pod.Name
+			})
+			if i < 0 {
+				continue // the pod is not in the replicas status?
+			}
+
+			status := replicas.Status[i]
+			if status.MemberJoined == nil || *status.MemberJoined {
+				continue // no need to join or already joined
+			}
+
+			// TODO: should wait for the data to be loaded before joining the member?
+
+			if err := r.joinMemberForPod(pod, pods); err != nil {
+				joinErrors = append(joinErrors, fmt.Errorf("pod %s: %w", pod.Name, err))
+			} else {
+				replicas.Status[i].MemberJoined = ptr.To(true)
+			}
+		}
+
+		notJoinedReplicas := make([]string, 0)
+		for _, r := range replicas.Status {
+			if r.MemberJoined != nil && !*r.MemberJoined {
+				notJoinedReplicas = append(notJoinedReplicas, r.Name)
+			}
+		}
+		if len(notJoinedReplicas) > 0 {
+			joinErrors = append(joinErrors, fmt.Errorf("some replicas have not joined: %v", notJoinedReplicas))
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	if len(joinErrors) > 0 {
+		return newRequeueError(time.Second, fmt.Sprintf("%v", joinErrors))
+	}
+	return nil
+}
+
+func (r *componentWorkloadOps) joinMemberForPod(pod *corev1.Pod, pods []*corev1.Pod) error {
+	lfa, err := lifecycle.New(r.synthesizeComp, pod, pods...)
+	if err != nil {
+		return err
+	}
+	if err = lfa.MemberJoin(r.reqCtx.Ctx, r.cli, nil); err != nil {
+		if !errors.Is(err, lifecycle.ErrActionNotDefined) {
+			return err
+		}
+	}
+	r.reqCtx.Log.Info("succeed to join member for pod", "pod", pod.Name)
 	return nil
 }
 
@@ -961,6 +1077,7 @@ func newComponentWorkloadOps(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	cluster *appsv1.Cluster,
 	synthesizeComp *component.SynthesizedComponent,
+	comp *appsv1.Component,
 	runningITS *workloads.InstanceSet,
 	protoITS *workloads.InstanceSet,
 	dag *graph.DAG) (*componentWorkloadOps, error) {
@@ -976,6 +1093,7 @@ func newComponentWorkloadOps(reqCtx intctrlutil.RequestCtx,
 		cli:                   cli,
 		reqCtx:                reqCtx,
 		cluster:               cluster,
+		component:             comp,
 		synthesizeComp:        synthesizeComp,
 		runningITS:            runningITS,
 		protoITS:              protoITS,

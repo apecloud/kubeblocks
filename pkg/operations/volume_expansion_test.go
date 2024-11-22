@@ -237,7 +237,7 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 				clusterObject.Status.Phase = appsv1.RunningClusterPhase
 				clusterObject.Status.Components = map[string]appsv1.ClusterComponentStatus{
 					consensusCompName: {
-						Phase: appsv1.RunningClusterCompPhase,
+						Phase: appsv1.RunningComponentPhase,
 					},
 				}
 			})).ShouldNot(HaveOccurred())

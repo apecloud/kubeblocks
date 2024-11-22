@@ -21,6 +21,7 @@ package instanceset
 
 import (
 	"fmt"
+	"time"
 
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -126,6 +127,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	updatedPods := 0
 	priorities := ComposeRolePriorityMap(its.Spec.Roles)
 	isBlocked := false
+	needRetry := false
 	sortObjects(oldPodList, priorities, false)
 	for _, pod := range oldPodList {
 		if updatingPods >= updateCount || updatingPods >= unavailable {
@@ -135,8 +137,26 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			break
 		}
 
+		if !isImageMatched(pod) {
+			tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on update as the image(s) of pod %s is not matched", its.Namespace, its.Name, pod.Name))
+			break
+		}
+		if !isContainersRunning(pod) {
+			tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on update as some the container(s) of pod %s are not started at least for %d seconds", its.Namespace, its.Name, pod.Name, its.Spec.MinReadySeconds))
+			// as no further event triggers the next reconciliation, we need a retry
+			needRetry = true
+			break
+		}
 		if !isHealthy(pod) {
-			tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on scale-in as the pod %s is not healthy", its.Namespace, its.Name, pod.Name))
+			tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on update as the pod %s is not healthy", its.Namespace, its.Name, pod.Name))
+			break
+		}
+		if !isRunningAndAvailable(pod, its.Spec.MinReadySeconds) {
+			tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on update as the pod %s is not available", its.Namespace, its.Name, pod.Name))
+			break
+		}
+		if !isRoleReady(pod, its.Spec.Roles) {
+			tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on update as the role of pod %s is not ready", its.Namespace, its.Name, pod.Name))
 			break
 		}
 
@@ -145,7 +165,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			return kubebuilderx.Continue, err
 		}
 		if its.Spec.PodUpdatePolicy == workloads.StrictInPlacePodUpdatePolicyType && updatePolicy == RecreatePolicy {
-			message := fmt.Sprintf("InstanceSet %s/%s blocks on scale-in as the PodUpdatePolicy is %s and the pod %s can not inplace update",
+			message := fmt.Sprintf("InstanceSet %s/%s blocks on update as the PodUpdatePolicy is %s and the pod %s can not inplace update",
 				its.Namespace, its.Name, workloads.StrictInPlacePodUpdatePolicyType, pod.Name)
 			if tree != nil && tree.EventRecorder != nil {
 				tree.EventRecorder.Eventf(its, corev1.EventTypeWarning, EventReasonStrictInPlace, message)
@@ -176,6 +196,9 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 	if !isBlocked {
 		meta.RemoveStatusCondition(&its.Status.Conditions, string(workloads.InstanceUpdateRestricted))
+	}
+	if needRetry {
+		return kubebuilderx.RetryAfter(2 * time.Second), nil
 	}
 	return kubebuilderx.Continue, nil
 }

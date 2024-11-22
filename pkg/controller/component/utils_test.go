@@ -38,7 +38,7 @@ var _ = Describe("component utils", func() {
 			}
 
 			for _, expr := range validExpressions {
-				err := ValidateCompDefRegexp(expr)
+				err := ValidateDefNameRegexp(expr)
 				Expect(err).Should(BeNil())
 			}
 		})
@@ -53,7 +53,7 @@ var _ = Describe("component utils", func() {
 			}
 
 			for _, expr := range invalidExpressions {
-				err := ValidateCompDefRegexp(expr)
+				err := ValidateDefNameRegexp(expr)
 				Expect(err).ShouldNot(BeNil())
 			}
 		})

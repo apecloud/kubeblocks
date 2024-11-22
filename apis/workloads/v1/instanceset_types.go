@@ -98,16 +98,6 @@ type InstanceSetSpec struct {
 	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
 	Selector *metav1.LabelSelector `json:"selector"`
 
-	// Defines the behavior of a service spec.
-	// Provides read-write service.
-	// https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-	//
-	// Note: This field will be removed in future version.
-	//
-	// +kubebuilder:pruning:PreserveUnknownFields
-	// +optional
-	Service *corev1.Service `json:"service,omitempty"`
-
 	Template corev1.PodTemplateSpec `json:"template"`
 
 	// Overrides values in default Template.

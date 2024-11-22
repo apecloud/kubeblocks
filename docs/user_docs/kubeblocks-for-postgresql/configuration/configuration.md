@@ -161,7 +161,7 @@ error: failed to validate updated config: [failed to cue template render configu
 
 4. Connect to the database to verify whether the parameter is configured as expected.
 
-   The whole searching process has a 30-second delay since it takes some time for kubelet to synchronize modifications to the volume of the pod.
+   It takes about 30 seconds for the configuration to take effect because the kubelet requires some time to sync changes in the ConfigMap to the Pod's volume.
 
    ```bash
    kbcli cluster connect mycluster -n demo
@@ -302,11 +302,11 @@ KubeBlocks supports configuring cluster parameters by editing its configuration 
    1. Get the username and password.
 
       ```bash
-      kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\username}' | base64 -d
+      kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.username}' | base64 -d
       >
       root
 
-      kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\password}' | base64 -d
+      kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.password}' | base64 -d
       >
       2gvztbvz
       ```
@@ -385,11 +385,11 @@ Just in case you cannot find the configuration file of your cluster, you can swi
    1. Get the username and password.
 
       ```bash
-      kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\username}' | base64 -d
+      kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.username}' | base64 -d
       >
       postgres
 
-      kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\password}' | base64 -d
+      kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.password}' | base64 -d
       >
       tf8fhsv2
       ```

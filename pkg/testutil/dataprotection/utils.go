@@ -22,12 +22,12 @@ package dataprotection
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 
 	vsv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -130,7 +130,7 @@ func CheckRestoreAndSetCompleted(testCtx *testutil.TestContext, clusterKey types
 	ml := client.MatchingLabels{
 		constant.AppInstanceLabelKey:    clusterKey.Name,
 		constant.KBAppComponentLabelKey: compName,
-		constant.KBManagedByKey:         "cluster",
+		constant.AppManagedByLabelKey:   constant.AppName,
 	}
 	Eventually(testapps.List(testCtx, generics.RestoreSignature,
 		ml, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(scaleOutReplicas))

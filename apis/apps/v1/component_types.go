@@ -284,6 +284,11 @@ type ComponentSpec struct {
 	//
 	// +optional
 	Stop *bool `json:"stop,omitempty"`
+
+	// Specifies the sidecars to be injected into the Component.
+	//
+	// +optional
+	Sidecars []Sidecar `json:"sidecars,omitempty"`
 }
 
 // ComponentStatus represents the observed state of a Component within the Cluster.
@@ -306,16 +311,13 @@ type ComponentStatus struct {
 	// Indicates the current phase of the Component, with each phase indicating specific conditions:
 	//
 	// - Creating: The initial phase for new Components, transitioning from 'empty'("").
-	// - Running: All Pods in a Running state.
+	// - Running: All Pods are up-to-date and in a Running state.
 	// - Updating: The Component is currently being updated, with no failed Pods present.
-	// - Abnormal: Some Pods have failed, indicating a potentially unstable state.
-	//   However, the cluster remains available as long as a quorum of members is functioning.
-	// - Failed: A significant number of Pods or critical Pods have failed
-	//   The cluster may be non-functional or may offer only limited services (e.g, read-only).
+	// - Failed: A significant number of Pods have failed.
 	// - Stopping: All Pods are being terminated, with current replica count at zero.
 	// - Stopped: All associated Pods have been successfully deleted.
 	// - Deleting: The Component is being deleted.
-	Phase ClusterComponentPhase `json:"phase,omitempty"`
+	Phase ComponentPhase `json:"phase,omitempty"`
 
 	// A map that stores detailed message about the Component.
 	// Each entry in the map provides insights into specific elements of the Component, such as Pods or workloads.
@@ -326,3 +328,53 @@ type ComponentStatus struct {
 	// +optional
 	Message map[string]string `json:"message,omitempty"`
 }
+
+type Sidecar struct {
+	// Name specifies the unique name of the sidecar.
+	//
+	// The name will be used as the name of the sidecar container in the Pod.
+	//
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// Specifies the exact component definition that the sidecar belongs to.
+	//
+	// A sidecar will be updated when the owner component definition is updated only.
+	//
+	// +kubebuilder:validation:Required
+	Owner string `json:"owner"`
+
+	// Specifies the sidecar definition CR to be used to create the sidecar.
+	//
+	// +kubebuilder:validation:Required
+	SidecarDef string `json:"sidecarDef"`
+}
+
+// ComponentPhase defines the phase of the Component within the .status.phase field.
+//
+// +enum
+// +kubebuilder:validation:Enum={Creating,Deleting,Updating,Stopping,Running,Stopped,Failed}
+type ComponentPhase string
+
+const (
+	// CreatingComponentPhase indicates the component is currently being created.
+	CreatingComponentPhase ComponentPhase = "Creating"
+
+	// DeletingComponentPhase indicates the component is currently being deleted.
+	DeletingComponentPhase ComponentPhase = "Deleting"
+
+	// UpdatingComponentPhase indicates the component is currently being updated.
+	UpdatingComponentPhase ComponentPhase = "Updating"
+
+	// StoppingComponentPhase indicates the component is currently being stopped.
+	StoppingComponentPhase ComponentPhase = "Stopping"
+
+	// RunningComponentPhase indicates that all pods of the component are up-to-date and in a 'Running' state.
+	RunningComponentPhase ComponentPhase = "Running"
+
+	// StoppedComponentPhase indicates the component is stopped.
+	StoppedComponentPhase ComponentPhase = "Stopped"
+
+	// FailedComponentPhase indicates that there are some pods of the component not in a 'Running' state.
+	FailedComponentPhase ComponentPhase = "Failed"
+)

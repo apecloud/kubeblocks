@@ -112,11 +112,11 @@ After the leader pod is deleted, the ApeCloud MySQL RaftGroup Cluster elects a n
     Connect to this cluster to check the pod roles and status. This cluster can be connected within seconds.
 
     ```bash
-    kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\username}' | base64 -d
+    kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.username}' | base64 -d
     >
     root
 
-    kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\password}' | base64 -d
+    kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.password}' | base64 -d
     >
     pt2mmdlp4
 

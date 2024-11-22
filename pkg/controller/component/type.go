@@ -42,6 +42,7 @@ type SynthesizedComponent struct {
 	Replicas                         int32                                  `json:"replicas"`
 	Resources                        corev1.ResourceRequirements            `json:"resources,omitempty"`
 	PodSpec                          *corev1.PodSpec                        `json:"podSpec,omitempty"`
+	SidecarVars                      []kbappsv1.EnvVar                      // vars defined by sidecars
 	VolumeClaimTemplates             []corev1.PersistentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
 	LogConfigs                       []kbappsv1.LogConfig                   `json:"logConfigs,omitempty"`
 	ConfigTemplates                  []kbappsv1.ComponentConfigSpec         `json:"configTemplates,omitempty"`
@@ -74,8 +75,4 @@ type SynthesizedComponent struct {
 	MinReadySeconds                  int32                                  `json:"minReadySeconds,omitempty"`
 	DisableExporter                  *bool                                  `json:"disableExporter,omitempty"`
 	Stop                             *bool
-
-	// TODO(xingran): The following fields will be deprecated after KubeBlocks version 0.8.0
-	ClusterDefName                      string `json:"clusterDefName,omitempty"` // the name of the clusterDefinition
-	HorizontalScaleBackupPolicyTemplate *string
 }

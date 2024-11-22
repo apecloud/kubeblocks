@@ -379,7 +379,7 @@ func (r *ComponentVersionReconciler) imageDefinedInActions(_ appsv1.ComponentDef
 func validateCompatibilityRulesCompDef(compVersion *appsv1.ComponentVersion) error {
 	for _, rule := range compVersion.Spec.CompatibilityRules {
 		for _, compDefName := range rule.CompDefs {
-			if err := component.ValidateCompDefRegexp(compDefName); err != nil {
+			if err := component.ValidateDefNameRegexp(compDefName); err != nil {
 				return errors.Wrapf(err, "invalid reference to component definition name pattern: %s in compatibility rules", compDefName)
 			}
 		}
@@ -471,12 +471,12 @@ func serviceVersionToCompDefinitions(ctx context.Context, cli client.Reader,
 
 // compatibleServiceVersions4Definition returns all service versions that are compatible with specified component definition.
 func compatibleServiceVersions4Definition(compDef *appsv1.ComponentDefinition, compVersion *appsv1.ComponentVersion) sets.Set[string] {
-	prefixMatch := func(prefix string) bool {
-		return strings.HasPrefix(compDef.Name, prefix)
+	match := func(pattern string) bool {
+		return component.PrefixOrRegexMatched(compDef.Name, pattern)
 	}
 	releases := make(map[string]bool, 0)
 	for _, rule := range compVersion.Spec.CompatibilityRules {
-		if slices.IndexFunc(rule.CompDefs, prefixMatch) >= 0 {
+		if slices.IndexFunc(rule.CompDefs, match) >= 0 {
 			for _, release := range rule.Releases {
 				releases[release] = true
 			}

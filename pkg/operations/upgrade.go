@@ -21,6 +21,7 @@ package operations
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -52,7 +53,7 @@ func init() {
 
 // ActionStartedCondition the started condition when handle the upgrade request.
 func (u upgradeOpsHandler) ActionStartedCondition(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (*metav1.Condition, error) {
-	return opsv1alpha1.NewHorizontalScalingCondition(opsRes.OpsRequest), nil
+	return opsv1alpha1.NewUpgradingCondition(opsRes.OpsRequest), nil
 }
 
 func (u upgradeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
@@ -100,30 +101,12 @@ func (u upgradeOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 	if componentDefMap, err = u.getComponentDefMapWithUpdatedImages(reqCtx, cli, opsRes); err != nil {
 		return opsRes.OpsRequest.Status.Phase, 0, err
 	}
-	componentUpgraded := func(cluster *appsv1.Cluster,
-		lastCompConfiguration opsv1alpha1.LastComponentConfiguration,
-		upgradeComp opsv1alpha1.UpgradeComponent) bool {
-		if u.needUpdateCompDef(upgradeComp, opsRes.Cluster) &&
-			lastCompConfiguration.ComponentDefinitionName != *upgradeComp.ComponentDefinitionName {
-			return true
-		}
-		if upgradeComp.ServiceVersion != nil && lastCompConfiguration.ServiceVersion != *upgradeComp.ServiceVersion {
-			return true
-		}
-		return false
-	}
 	podApplyCompOps := func(
 		ops *opsv1alpha1.OpsRequest,
 		pod *corev1.Pod,
-		compOps ComponentOpsInterface,
-		insTemplateName string) bool {
-		upgradeComponent := compOps.(opsv1alpha1.UpgradeComponent)
-		lastCompConfiguration := opsRes.OpsRequest.Status.LastConfiguration.Components[compOps.GetComponentName()]
-		if !componentUpgraded(opsRes.Cluster, lastCompConfiguration, upgradeComponent) {
-			// if componentDefinition and serviceVersion no changes, return true
-			return true
-		}
-		compDef, ok := componentDefMap[compOps.GetComponentName()]
+		pgRes *progressResource) bool {
+		upgradeComponent := pgRes.compOps.(opsv1alpha1.UpgradeComponent)
+		compDef, ok := componentDefMap[upgradeComponent.GetComponentName()]
 		if !ok {
 			return true
 		}
@@ -180,14 +163,18 @@ func (u upgradeOpsHandler) podImageApplied(pod *corev1.Pod, expectContainers []c
 	if len(expectContainers) == 0 {
 		return true
 	}
+	imageName := func(image string) string {
+		images := strings.Split(image, "/")
+		return images[len(images)-1]
+	}
 	for _, v := range expectContainers {
 		for _, cs := range pod.Status.ContainerStatuses {
-			if cs.Name == v.Name && cs.Image != v.Image {
+			if cs.Name == v.Name && imageName(cs.Image) != imageName(v.Image) {
 				return false
 			}
 		}
 		for _, c := range pod.Spec.Containers {
-			if c.Name == v.Name && c.Image != v.Image {
+			if c.Name == v.Name && imageName(c.Image) != imageName(v.Image) {
 				return false
 			}
 		}
@@ -199,7 +186,7 @@ func (u upgradeOpsHandler) needUpdateCompDef(upgradeComp opsv1alpha1.UpgradeComp
 	if upgradeComp.ComponentDefinitionName == nil {
 		return false
 	}
-	// we will ignore the empty ComponentDefinitionName if cluster.Spec.ClusterDef is empty.
+	// we will ignore the empty ComponentDefinitionName if cluster.Spec.clusterDef is empty.
 	return *upgradeComp.ComponentDefinitionName != "" ||
 		(*upgradeComp.ComponentDefinitionName == "" && cluster.Spec.ClusterDef != "")
 }

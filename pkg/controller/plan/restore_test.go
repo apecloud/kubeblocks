@@ -231,12 +231,12 @@ var _ = Describe("Restore", func() {
 				cluster.Status.Phase = appsv1.RunningClusterPhase
 				cluster.Status.Components = map[string]appsv1.ClusterComponentStatus{
 					defaultCompName: {
-						Phase: appsv1.RunningClusterCompPhase,
+						Phase: appsv1.RunningComponentPhase,
 					},
 				}
 			})).Should(Succeed())
 			Expect(testapps.ChangeObjStatus(&testCtx, compObj, func() {
-				compObj.Status.Phase = appsv1.RunningClusterCompPhase
+				compObj.Status.Phase = appsv1.RunningComponentPhase
 			})).Should(Succeed())
 
 			By("wait for postReady restore created and mock it to Completed")

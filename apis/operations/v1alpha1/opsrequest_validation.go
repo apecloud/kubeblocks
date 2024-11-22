@@ -344,9 +344,9 @@ func (r *OpsRequest) validateHorizontalScaling(_ context.Context, _ client.Clien
 			}
 		}
 	}
-	for _, shardingSpec := range cluster.Spec.ShardingSpecs {
-		if hScale, ok := hScaleMap[shardingSpec.Name]; ok {
-			if err := r.validateHorizontalScalingSpec(hScale, shardingSpec.Template, cluster.Name, true); err != nil {
+	for _, spec := range cluster.Spec.Shardings {
+		if hScale, ok := hScaleMap[spec.Name]; ok {
+			if err := r.validateHorizontalScalingSpec(hScale, spec.Template, cluster.Name, true); err != nil {
 				return err
 			}
 		}
@@ -443,12 +443,16 @@ func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, com
 		if err := validateHScaleOperation(scaleOut.ReplicaChanger, scaleOut.NewInstances, scaleOut.OfflineInstancesToOnline, false); err != nil {
 			return err
 		}
-		if len(scaleOut.OfflineInstancesToOnline) > 0 {
-			offlineInstanceSet := sets.New(compSpec.OfflineInstances...)
-			for _, offlineInsName := range scaleOut.OfflineInstancesToOnline {
-				if _, ok := offlineInstanceSet[offlineInsName]; !ok {
-					return fmt.Errorf(`cannot find the offline instance "%s" in component "%s" for scaleOut operation`, offlineInsName, hScale.ComponentName)
-				}
+	}
+	// instance cannot be both in OfflineInstancesToOnline and OnlineInstancesToOffline
+	if scaleIn != nil && scaleOut != nil {
+		offlineToOnlineSet := make(map[string]struct{})
+		for _, instance := range scaleIn.OnlineInstancesToOffline {
+			offlineToOnlineSet[instance] = struct{}{}
+		}
+		for _, instance := range scaleOut.OfflineInstancesToOnline {
+			if _, exists := offlineToOnlineSet[instance]; exists {
+				return fmt.Errorf(`instance "%s" cannot be both in "OfflineInstancesToOnline" and "OnlineInstancesToOffline"`, instance)
 			}
 		}
 	}
@@ -503,11 +507,11 @@ func (r *OpsRequest) checkInstanceTemplate(cluster *appsv1.Cluster, componentOps
 			instanceNameMap[instances[i].Name] = sets.Empty{}
 		}
 	}
-	for _, shardingSpec := range cluster.Spec.ShardingSpecs {
-		if shardingSpec.Name != componentOps.ComponentName {
+	for _, spec := range cluster.Spec.Shardings {
+		if spec.Name != componentOps.ComponentName {
 			continue
 		}
-		setInstanceMap(shardingSpec.Template.Instances)
+		setInstanceMap(spec.Template.Instances)
 	}
 	for _, compSpec := range cluster.Spec.ComponentSpecs {
 		if compSpec.Name != componentOps.ComponentName {
@@ -533,8 +537,8 @@ func (r *OpsRequest) checkComponentExistence(cluster *appsv1.Cluster, compOpsLis
 	for _, compSpec := range cluster.Spec.ComponentSpecs {
 		compNameMap[compSpec.Name] = sets.Empty{}
 	}
-	for _, shardingSpec := range cluster.Spec.ShardingSpecs {
-		compNameMap[shardingSpec.Name] = sets.Empty{}
+	for _, spec := range cluster.Spec.Shardings {
+		compNameMap[spec.Name] = sets.Empty{}
 	}
 	var (
 		notFoundCompNames []string
@@ -615,7 +619,7 @@ func (r *OpsRequest) checkVolumesAllowExpansion(ctx context.Context, cli client.
 	for _, comp := range cluster.Spec.ComponentSpecs {
 		fillCompVols(comp, comp.Name, false)
 	}
-	for _, sharding := range cluster.Spec.ShardingSpecs {
+	for _, sharding := range cluster.Spec.Shardings {
 		fillCompVols(sharding.Template, sharding.Name, true)
 	}
 

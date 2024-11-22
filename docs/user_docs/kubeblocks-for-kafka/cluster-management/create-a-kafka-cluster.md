@@ -19,14 +19,33 @@ This document shows how to create a Kafka cluster.
 * Install KubeBlocks [by kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) or [by Helm](./../../installation/install-with-helm/install-kubeblocks.md).
 * Make sure Kafka Addon is enabled with `kbcli addon list`. If this Addon is not enabled, enable it first. Both [kbccli](./../../installation/install-with-kbcli/install-addons.md) and [Helm](./../../installation/install-with-helm/install-addons.md) options are available.
 
+  <Tabs>
+
+  <TabItem value="kbcli" label="kbcli" default>
+
   ```bash
   kbcli addon list
   >
-  NAME                           VERSION         PROVIDER    STATUS     AUTO-INSTALL
+  NAME                           TYPE   STATUS     EXTRAS         AUTO-INSTALL  
   ...
-  kafka                          0.9.0           community   Enabled    true
+  kafka                          Helm   Enabled                   true
   ...
   ```
+
+  </TabItem>
+
+  <TabItem value="kubectl" label="kubectl">
+
+  ```bash
+  kubectl get addons.extensions.kubeblocks.io kafka
+  >
+  NAME    TYPE   VERSION   PROVIDER   STATUS    AGE
+  kafka   Helm                        Enabled   13m
+  ```
+
+  </TabItem>
+
+  </Tabs>
 
 * To keep things isolated, create a separate namespace called `demo` throughout this tutorial.
 
@@ -264,7 +283,7 @@ This document shows how to create a Kafka cluster.
    | `metadata.annotations.kubeblocks.io/enabled-pod-ordinal-svc` | It defines kafka cluster annotation keys for nodeport feature gate. You can also set`kubeblocks.io/enabled-node-port-svc: broker` and `kubeblocks.io/disabled-cluster-ip-svc: broker`. |
    | `spec.clusterDefinitionRef`           | It specifies the name of the ClusterDefinition for creating a specific type of cluster.  |
    | `spec.clusterVersionRef`              | It is the name of the cluster version CRD that defines the cluster version.  |
-   | `spec.terminationPolicy`              | It is the policy of cluster termination. The default value is `Delete`. Valid values are `DoNotTerminate`, `Halt`, `Delete`, `WipeOut`.  <p> - `DoNotTerminate` blocks deletion operation. </p><p> - `Halt` deletes workload resources such as statefulset and deployment workloads but keep PVCs. </p><p> - `Delete` is based on Halt and deletes PVCs. </p><p> - `WipeOut` is based on Delete and wipe out all volume snapshots and snapshot data from a backup storage location. </p> |
+   | `spec.terminationPolicy`              | It is the policy of cluster termination. The default value is `Delete`. Valid values are `DoNotTerminate`, `Delete`, `WipeOut`. For the detailed definition, you can refer to [Termination Policy](./delete-kafka-cluster.md#termination-policy). |
    | `spec.affinity`                       | It defines a set of node affinity scheduling rules for the cluster's Pods. This field helps control the placement of Pods on nodes within the cluster.  |
    | `spec.affinity.podAntiAffinity`       | It specifies the anti-affinity level of Pods within a component. It determines how pods should spread across nodes to improve availability and performance. |
    | `spec.affinity.topologyKeys`          | It represents the key of node labels used to define the topology domain for Pod anti-affinity and Pod spread constraints.   |

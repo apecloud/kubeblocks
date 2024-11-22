@@ -138,6 +138,9 @@ func (c *mockClient) Delete(ctx context.Context, obj client.Object, opts ...clie
 		object.SetDeletionTimestamp(&ts)
 		return c.store.Update(object)
 	}
+	if len(object.GetFinalizers()) != 0 {
+		return nil
+	}
 	return c.store.Delete(obj)
 }
 

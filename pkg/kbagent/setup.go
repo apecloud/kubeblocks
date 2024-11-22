@@ -52,25 +52,31 @@ const (
 	taskEnvName      = "KB_AGENT_TASK"
 )
 
-func BuildEnv4Server(actions []proto.Action, probes []proto.Probe, streamings []string) ([]corev1.EnvVar, error) {
+func BuildEnv4Server(actions []proto.Action, probes []proto.Probe, streaming []string) ([]corev1.EnvVar, error) {
 	da, dp, err := serializeActionNProbe(actions, probes)
 	if err != nil {
 		return nil, err
 	}
-	return append(util.DefaultEnvVars(), []corev1.EnvVar{
-		{
+	envVars := make([]corev1.EnvVar, 0)
+	if len(da) > 0 {
+		envVars = append(envVars, corev1.EnvVar{
 			Name:  actionEnvName,
 			Value: da,
-		},
-		{
+		})
+	}
+	if len(dp) > 0 {
+		envVars = append(envVars, corev1.EnvVar{
 			Name:  probeEnvName,
 			Value: dp,
-		},
-		{
+		})
+	}
+	if len(streaming) > 0 {
+		envVars = append(envVars, corev1.EnvVar{
 			Name:  streamingEnvName,
-			Value: strings.Join(streamings, ","),
-		},
-	}...), nil
+			Value: strings.Join(streaming, ","),
+		})
+	}
+	return append(util.DefaultEnvVars(), envVars...), nil
 }
 
 func BuildEnv4Worker(tasks []proto.Task) (*corev1.EnvVar, error) {
@@ -145,7 +151,11 @@ func initialize(logger logr.Logger, envVars map[string]string) ([]service.Servic
 		return nil, err
 	}
 
-	return service.New(logger, actions, probes, strings.Split(ds, ","))
+	var streaming []string
+	if len(ds) > 0 {
+		streaming = strings.Split(ds, ",")
+	}
+	return service.New(logger, actions, probes, streaming)
 }
 
 func getActionProbeNStreamingEnvValues(envVars map[string]string) (string, string, string) {

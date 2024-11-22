@@ -157,13 +157,12 @@ var _ = BeforeSuite(func() {
 	Expect(k8sClient).NotTo(BeNil())
 
 	// run reconcile
-	unCachedObjs := intctrlutil.GetUncachedObjects()
 	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
 		Scheme:  scheme.Scheme,
 		Metrics: server.Options{BindAddress: "0"},
 		Client: client.Options{
 			Cache: &client.CacheOptions{
-				DisableFor: append(unCachedObjs, &dpv1alpha1.Restore{}),
+				DisableFor: intctrlutil.GetUncachedObjects(),
 			},
 		},
 	})
@@ -205,6 +204,13 @@ var _ = BeforeSuite(func() {
 		Client:   k8sManager.GetClient(),
 		Scheme:   k8sManager.GetScheme(),
 		Recorder: k8sManager.GetEventRecorderFor("component-version-controller"),
+	}).SetupWithManager(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
+	err = (&SidecarDefinitionReconciler{
+		Client:   k8sManager.GetClient(),
+		Scheme:   k8sManager.GetScheme(),
+		Recorder: k8sManager.GetEventRecorderFor("sidecar-definition-controller"),
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 

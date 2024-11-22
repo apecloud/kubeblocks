@@ -97,6 +97,8 @@ var ComponentDefinitionSignature = func(appsv1.ComponentDefinition, *appsv1.Comp
 }
 var ComponentVersionSignature = func(appsv1.ComponentVersion, *appsv1.ComponentVersion, appsv1.ComponentVersionList, *appsv1.ComponentVersionList) {
 }
+var SidecarDefinitionSignature = func(appsv1.SidecarDefinition, *appsv1.SidecarDefinition, appsv1.SidecarDefinitionList, *appsv1.SidecarDefinitionList) {
+}
 var ClusterSignature = func(_ appsv1.Cluster, _ *appsv1.Cluster, _ appsv1.ClusterList, _ *appsv1.ClusterList) {
 }
 var ComponentSignature = func(appsv1.Component, *appsv1.Component, appsv1.ComponentList, *appsv1.ComponentList) {

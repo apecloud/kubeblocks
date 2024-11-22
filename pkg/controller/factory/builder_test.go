@@ -27,7 +27,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -77,25 +76,6 @@ var _ = Describe("builder", func() {
 		return clusterObj, compDefObj, key
 	}
 
-	newItsObj := func() *workloads.InstanceSet {
-		container := corev1.Container{
-			Name: "mysql",
-			VolumeMounts: []corev1.VolumeMount{{
-				Name:      "mysql-config",
-				MountPath: "/mnt/config",
-			}},
-		}
-		return testapps.NewInstanceSetFactory(testCtx.DefaultNamespace, "mock-its", clusterName, mysqlCompName).
-			AddAppNameLabel("mock-app").
-			AddAppInstanceLabel(clusterName).
-			AddAppComponentLabel(mysqlCompName).
-			SetReplicas(1).AddContainer(container).
-			AddVolumeClaimTemplate(corev1.PersistentVolumeClaim{
-				ObjectMeta: metav1.ObjectMeta{Name: testapps.DataVolumeName},
-				Spec:       testapps.NewPVC("1Gi"),
-			}).GetObject()
-	}
-
 	newAllFieldsSynthesizedComponent := func(compDef *appsv1.ComponentDefinition, cluster *appsv1.Cluster) *component.SynthesizedComponent {
 		By("assign every available fields")
 		comp, err := component.BuildComponent(cluster, &cluster.Spec.ComponentSpecs[0], nil, nil)
@@ -118,21 +98,6 @@ var _ = Describe("builder", func() {
 	}
 
 	Context("has helper function which builds specific object from cue template", func() {
-		It("builds PVC correctly", func() {
-			snapshotName := "test-snapshot-name"
-			its := newItsObj()
-			_, cluster, synthesizedComponent := newClusterObjs(nil)
-			pvcKey := types.NamespacedName{
-				Namespace: "default",
-				Name:      "data-mysql-01-replicasets-0",
-			}
-			pvc := BuildPVC(cluster, synthesizedComponent, &synthesizedComponent.VolumeClaimTemplates[0], pvcKey, "", snapshotName)
-			Expect(pvc).ShouldNot(BeNil())
-			Expect(pvc.Spec.AccessModes).Should(Equal(its.Spec.VolumeClaimTemplates[0].Spec.AccessModes))
-			Expect(pvc.Spec.Resources).Should(Equal(synthesizedComponent.VolumeClaimTemplates[0].Spec.Resources))
-			Expect(pvc.Spec.StorageClassName).Should(Equal(synthesizedComponent.VolumeClaimTemplates[0].Spec.StorageClassName))
-		})
-
 		It("builds InstanceSet correctly", func() {
 			compDef, cluster, synthesizedComponent := newClusterObjs(nil)
 
@@ -165,17 +130,6 @@ var _ = Describe("builder", func() {
 			// test member update strategy
 			Expect(its.Spec.MemberUpdateStrategy).ShouldNot(BeNil())
 			Expect(*its.Spec.MemberUpdateStrategy).Should(BeEquivalentTo(workloads.BestEffortParallelUpdateStrategy))
-		})
-
-		It("builds BackupJob correctly", func() {
-			_, cluster, synthesizedComponent := newClusterObjs(nil)
-			backupJobKey := types.NamespacedName{
-				Namespace: "default",
-				Name:      "test-backup-job",
-			}
-			backupPolicyName := "test-backup-policy"
-			backupJob := BuildBackup(cluster, synthesizedComponent, backupPolicyName, backupJobKey, "snapshot")
-			Expect(backupJob).ShouldNot(BeNil())
 		})
 
 		It("builds ConfigMap with template correctly", func() {

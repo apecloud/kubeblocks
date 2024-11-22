@@ -133,7 +133,7 @@ func (t *clusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 		delKindMap[o.GetObjectKind().GroupVersionKind().Kind] = sets.Empty{}
 	}
 
-	// set cluster action to noop until all the sub-resources deleted
+	// set cluster action to status until all the sub-resources deleted
 	if len(delObjs) == 0 {
 		graphCli.Delete(dag, cluster)
 	} else {

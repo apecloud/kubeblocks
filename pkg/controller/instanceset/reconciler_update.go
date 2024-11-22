@@ -137,12 +137,8 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 			break
 		}
 
-		if !isImageMatched(pod) {
-			tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on update as the image(s) of pod %s is not matched", its.Namespace, its.Name, pod.Name))
-			break
-		}
-		if !isContainersRunning(pod) {
-			tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on update as some the container(s) of pod %s are not started at least for %d seconds", its.Namespace, its.Name, pod.Name, its.Spec.MinReadySeconds))
+		if !isContainersReady(pod) {
+			tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on update as some the container(s) of pod %s are not ready", its.Namespace, its.Name, pod.Name))
 			// as no further event triggers the next reconciliation, we need a retry
 			needRetry = true
 			break

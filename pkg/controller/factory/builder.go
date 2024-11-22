@@ -26,12 +26,10 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
-	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	cfgcm "github.com/apecloud/kubeblocks/pkg/configuration/config_manager"
@@ -40,7 +38,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -229,55 +226,6 @@ func GetRestoreSystemAccountPassword(annotations map[string]string, componentNam
 	}
 	password, _ := e.Decrypt([]byte(encryptedPwd))
 	return password
-}
-
-func BuildPVC(cluster *appsv1.Cluster,
-	synthesizedComp *component.SynthesizedComponent,
-	vct *corev1.PersistentVolumeClaimTemplate,
-	pvcKey types.NamespacedName,
-	templateName,
-	snapshotName string) *corev1.PersistentVolumeClaim {
-	pvcBuilder := builder.NewPVCBuilder(pvcKey.Namespace, pvcKey.Name).
-		AddLabelsInMap(constant.GetCompLabels(cluster.Name, synthesizedComp.Name)).
-		AddLabelsInMap(synthesizedComp.DynamicLabels).
-		AddLabels(constant.VolumeClaimTemplateNameLabelKey, vct.Name).
-		AddLabelsInMap(synthesizedComp.StaticLabels).
-		AddAnnotationsInMap(synthesizedComp.DynamicAnnotations).
-		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
-		SetAccessModes(vct.Spec.AccessModes).
-		SetResources(vct.Spec.Resources)
-	if vct.Spec.StorageClassName != nil {
-		pvcBuilder.SetStorageClass(*vct.Spec.StorageClassName)
-	}
-	if len(snapshotName) > 0 {
-		apiGroup := "snapshot.storage.k8s.io"
-		pvcBuilder.SetDataSource(corev1.TypedLocalObjectReference{
-			APIGroup: &apiGroup,
-			Kind:     "VolumeSnapshot",
-			Name:     snapshotName,
-		})
-	}
-	pvc := pvcBuilder.GetObject()
-	BuildPersistentVolumeClaimLabels(synthesizedComp, pvc, vct.Name, templateName)
-	return pvc
-}
-
-func BuildBackup(cluster *appsv1.Cluster,
-	synthesizedComp *component.SynthesizedComponent,
-	backupPolicyName string,
-	backupKey types.NamespacedName,
-	backupMethod string) *dpv1alpha1.Backup {
-	return builder.NewBackupBuilder(backupKey.Namespace, backupKey.Name).
-		AddLabels(dptypes.BackupMethodLabelKey, backupMethod).
-		AddLabels(dptypes.BackupPolicyLabelKey, backupPolicyName).
-		AddLabels(constant.AppManagedByLabelKey, constant.AppName).
-		AddLabels(constant.AppNameLabelKey, synthesizedComp.ClusterDefName).
-		AddLabels(constant.AppInstanceLabelKey, cluster.Name).
-		AddLabels(constant.AppManagedByLabelKey, constant.AppName).
-		AddLabels(constant.KBAppComponentLabelKey, synthesizedComp.Name).
-		SetBackupPolicyName(backupPolicyName).
-		SetBackupMethod(backupMethod).
-		GetObject()
 }
 
 func BuildConfigMapWithTemplate(cluster *appsv1.Cluster,

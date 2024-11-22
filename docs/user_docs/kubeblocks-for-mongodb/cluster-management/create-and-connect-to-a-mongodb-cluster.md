@@ -136,33 +136,23 @@ KubeBlocks supports creating two types of MongoDB clusters: Standalone and Repli
      name: mycluster
      namespace: demo
    spec:
-     clusterDefinitionRef: mongodb
-     clusterVersionRef: mongodb-6.0
-     terminationPolicy: Delete
      affinity:
        podAntiAffinity: Preferred
+       tenancy: SharedNode
        topologyKeys:
        - kubernetes.io/hostname
-     tolerations:
-       - key: kb-data
-         operator: Equal
-         value: 'true'
-         effect: NoSchedule
      componentSpecs:
-     - name: mongodb
-       componentDefRef: mongodb
-       enabledLogs:
-       - running
-       disableExporter: true
-       serviceAccountName: kb-mongo-cluster
-       replicas: 1
+     - componentDef: mongodb
+       name: mongodb
+       replicas: 3
        resources:
          limits:
-           cpu: '0.5'
+           cpu: "0.5"
            memory: 0.5Gi
          requests:
-           cpu: '0.5'
+           cpu: "0.5"
            memory: 0.5Gi
+       serviceVersion: 6.0.16
        volumeClaimTemplates:
        - name: data
          spec:
@@ -171,13 +161,12 @@ KubeBlocks supports creating two types of MongoDB clusters: Standalone and Repli
            resources:
              requests:
                storage: 20Gi
+     terminationPolicy: Delete
    EOF
    ```
 
    | Field                                 | Definition  |
    |---------------------------------------|--------------------------------------|
-   | `spec.clusterDefinitionRef`           | It specifies the name of the ClusterDefinition for creating a specific type of cluster.  |
-   | `spec.clusterVersionRef`              | It is the name of the cluster version CRD that defines the cluster version.  |
    | `spec.terminationPolicy`              | It is the policy of cluster termination. The default value is `Delete`. Valid values are `DoNotTerminate`, `Delete`, `WipeOut`. For the detailed definition, you can refer to [Termination Policy](./delete-mongodb-cluster.md#termination-policy). |
    | `spec.affinity`                       | It defines a set of node affinity scheduling rules for the cluster's Pods. This field helps control the placement of Pods on nodes within the cluster.  |
    | `spec.affinity.podAntiAffinity`       | It specifies the anti-affinity level of Pods within a component. It determines how pods should spread across nodes to improve availability and performance. |
@@ -186,7 +175,6 @@ KubeBlocks supports creating two types of MongoDB clusters: Standalone and Repli
    | `spec.componentSpecs`                 | It is the list of components that define the cluster components. This field allows customized configuration of each component within a cluster.   |
    | `spec.componentSpecs.componentDefRef` | It is the name of the component definition that is defined in the cluster definition and you can get the component definition names with `kubectl get clusterdefinition mongodb -o json \| jq '.spec.componentDefs[].name'`.   |
    | `spec.componentSpecs.name`            | It specifies the name of the component.     |
-   | `spec.componentSpecs.disableExporter` | It defines whether the monitoring function is enabled. |
    | `spec.componentSpecs.replicas`        | It specifies the number of replicas of the component.  |
    | `spec.componentSpecs.resources`       | It specifies the resource requirements of the component.  |
 

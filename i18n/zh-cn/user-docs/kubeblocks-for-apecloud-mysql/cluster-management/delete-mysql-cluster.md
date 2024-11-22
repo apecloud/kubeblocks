@@ -30,17 +30,6 @@ import TabItem from '@theme/TabItem';
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli">
-
-```bash
-kbcli cluster list -n demo
->
-NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    CREATED-TIME
-mycluster   demo        apecloud-mysql       ac-mysql-8.0.30   Delete               Running   Sep 19,2024 16:01 UTC+0800
-```
-
-</TabItem>
-
 <TabItem value="kubectl" label="kubectl" default>
 
 ```bash
@@ -48,6 +37,17 @@ kubectl get cluster mycluster -n demo
 >
 NAME        CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    AGE
 mycluster   apecloud-mysql       ac-mysql-8.0.30   Delete               Running   27m
+```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+```bash
+kbcli cluster list -n demo
+>
+NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    CREATED-TIME
+mycluster   demo        apecloud-mysql       ac-mysql-8.0.30   Delete               Running   Sep 19,2024 16:01 UTC+0800
 ```
 
 </TabItem>
@@ -60,14 +60,6 @@ mycluster   apecloud-mysql       ac-mysql-8.0.30   Delete               Running 
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli">
-
-```bash
-kbcli cluster delete mycluster -n demo
-```
-
-</TabItem>
-
 <TabItem value="kubectl" label="kubectl" default>
 
 如果想删除集群和所有相关资源，可以将终止策略修改为 `WipeOut`，然后再删除该集群。
@@ -76,6 +68,14 @@ kbcli cluster delete mycluster -n demo
 kubectl patch -n demo cluster mycluster -p '{"spec":{"terminationPolicy":"WipeOut"}}' --type="merge"
 
 kubectl delete -n demo cluster mycluster
+```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+```bash
+kbcli cluster delete mycluster -n demo
 ```
 
 </TabItem>

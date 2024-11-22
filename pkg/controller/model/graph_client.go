@@ -47,9 +47,6 @@ type GraphWriter interface {
 	// Status updates the given obj's status in the underlying DAG.
 	Status(dag *graph.DAG, objOld, objNew client.Object, opts ...GraphOption)
 
-	// Noop means not to commit any change made to this obj in the execute phase.
-	Noop(dag *graph.DAG, obj client.Object, opts ...GraphOption)
-
 	// Do does 'action' to 'objOld' and 'objNew' and return the vertex created.
 	// this method creates a vertex directly even if the given object already exists in the underlying DAG.
 	// WARN: this is a rather low-level API, will be refactored out in near future, avoid to use it.
@@ -121,10 +118,6 @@ func (r *realGraphClient) Delete(dag *graph.DAG, obj client.Object, opts ...Grap
 
 func (r *realGraphClient) Status(dag *graph.DAG, objOld, objNew client.Object, opts ...GraphOption) {
 	r.doWrite(dag, objOld, objNew, ActionStatusPtr(), opts...)
-}
-
-func (r *realGraphClient) Noop(dag *graph.DAG, obj client.Object, opts ...GraphOption) {
-	r.doWrite(dag, nil, obj, ActionNoopPtr(), opts...)
 }
 
 func (r *realGraphClient) Do(dag *graph.DAG, objOld, objNew client.Object, action *Action, parent *ObjectVertex, opts ...GraphOption) *ObjectVertex {

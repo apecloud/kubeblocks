@@ -1,0 +1,26 @@
+# permissions for end users to edit shardingdefinitions.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "kubeblocks.fullname" . }}-shardingdefinition-editor-role
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+rules:
+- apiGroups:
+  - apps.kubeblocks.io
+  resources:
+  - shardingdefinitions
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps.kubeblocks.io
+  resources:
+  - shardingdefinitions/status
+  verbs:
+  - get

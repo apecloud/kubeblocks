@@ -23,6 +23,17 @@ import TabItem from '@theme/TabItem';
   
   <Tabs>
 
+  <TabItem value="kubectl" label="kubectl" default>
+
+  ```bash
+  kubectl get addons.extensions.kubeblocks.io postgresql
+  >
+  NAME         TOPOLOGIES   SERVICEREFS   STATUS      AGE
+  postgresql                              Available   30m
+  ```
+
+  </TabItem>
+
   <TabItem value="kbcli" label="kbcli">
 
   ```bash
@@ -36,31 +47,11 @@ import TabItem from '@theme/TabItem';
 
   </TabItem>
 
-  <TabItem value="kubectl" label="kubectl" default>
-
-  ```bash
-  kubectl get addons.extensions.kubeblocks.io postgresql
-  >
-  NAME         TOPOLOGIES   SERVICEREFS   STATUS      AGE
-  postgresql                              Available   30m
-  ```
-
-  </TabItem>
-
   </Tabs>
 
 * 查看可用于创建集群的数据库类型和版本。
 
   <Tabs>
-
-  <TabItem value="kbcli" label="kbcli">
-
-  ```bash
-  kbcli clusterdefinition list
-  kbcli clusterversion list
-  ```
-
-  </TabItem>
 
   <TabItem value="kubectl" label="kubectl" default>
 
@@ -90,6 +81,15 @@ import TabItem from '@theme/TabItem';
 
   </TabItem>
 
+  <TabItem value="kbcli" label="kbcli">
+
+  ```bash
+  kbcli clusterdefinition list
+  kbcli clusterversion list
+  ```
+
+  </TabItem>
+
   </Tabs>
 
 * 为了保持隔离，本文档中创建一个名为 `demo` 的独立命名空间。
@@ -103,47 +103,6 @@ import TabItem from '@theme/TabItem';
 KubeBlocks 支持创建两种 PostgreSQL 集群：单机版（Standalone）和主备版（Replication）。单机版仅支持一个副本，适用于对可用性要求较低的场景。 对于高可用性要求较高的场景，建议创建集群版，以支持自动故障切换。为了确保高可用性，所有的副本都默认分布在不同的节点上。
 
 <Tabs>
-
-<TabItem value="kbcli" label="kbcli">
-
-1. 创建 PostgreSQL 集群。
-
-   以下为创建单机版的示例。
-
-   ```bash
-   kbcli cluster create postgresql mycluster -n demo
-   ```
-
-   如果您需要自定义集群规格，kbcli 也提供了诸多参数，如支持设置引擎版本、终止策略、CPU、内存规格。您可通过在命令结尾添加 `--help` 或 `-h` 来查看具体说明。比如，
-
-   ```bash
-   kbcli cluster create postgresql --help
-
-   kbcli cluster create postgresql -h
-   ```
-
-   例如，您可以使用 `--replicas` 指定副本数，创建主备版集群。
-
-   ```bash
-   kbcli cluster create postgresql mycluster --replicas=2 -n demo
-   ```
-
-   如果您只有一个节点用于部署三节点集群，可在创建集群时将 `topology-keys` 设为 `null`。但需要注意的是，生产环境中，不建议将所有副本部署在同一个节点上，因为这可能会降低集群的可用性。
-
-   ```bash
-   kbcli cluster create postgresql mycluster --replicas=2 --availability-policy='none' -n demo
-   ```
-
-2. 验证集群是否创建成功。
-
-   ```bash
-   kbcli cluster list -n demo
-   >
-   NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION             TERMINATION-POLICY   STATUS    CREATED-TIME
-   mycluster   demo        postgresql           postgresql-14.8.0   Delete               Running   Sep 28,2024 16:47 UTC+0800
-   ```
-
-</TabItem>
 
 <TabItem value="kubectl" label="kubectl" default>
 
@@ -231,6 +190,47 @@ KubeBlocks 支持创建两种 PostgreSQL 集群：单机版（Standalone）和�
    >
    NAME        CLUSTER-DEFINITION   VERSION             TERMINATION-POLICY   STATUS    AGE
    mycluster   postgresql           postgresql-14.8.0   Delete               Running   9m21s
+   ```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+1. 创建 PostgreSQL 集群。
+
+   以下为创建单机版的示例。
+
+   ```bash
+   kbcli cluster create postgresql mycluster -n demo
+   ```
+
+   如果您需要自定义集群规格，kbcli 也提供了诸多参数，如支持设置引擎版本、终止策略、CPU、内存规格。您可通过在命令结尾添加 `--help` 或 `-h` 来查看具体说明。比如，
+
+   ```bash
+   kbcli cluster create postgresql --help
+
+   kbcli cluster create postgresql -h
+   ```
+
+   例如，您可以使用 `--replicas` 指定副本数，创建主备版集群。
+
+   ```bash
+   kbcli cluster create postgresql mycluster --replicas=2 -n demo
+   ```
+
+   如果您只有一个节点用于部署三节点集群，可在创建集群时将 `topology-keys` 设为 `null`。但需要注意的是，生产环境中，不建议将所有副本部署在同一个节点上，因为这可能会降低集群的可用性。
+
+   ```bash
+   kbcli cluster create postgresql mycluster --replicas=2 --availability-policy='none' -n demo
+   ```
+
+2. 验证集群是否创建成功。
+
+   ```bash
+   kbcli cluster list -n demo
+   >
+   NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION             TERMINATION-POLICY   STATUS    CREATED-TIME
+   mycluster   demo        postgresql           postgresql-14.8.0   Delete               Running   Sep 28,2024 16:47 UTC+0800
    ```
 
 </TabItem>

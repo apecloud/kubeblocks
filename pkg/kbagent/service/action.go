@@ -23,6 +23,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"strings"
 	"sync"
 
@@ -70,6 +71,10 @@ func (s *actionService) URI() string {
 }
 
 func (s *actionService) Start() error {
+	return nil
+}
+
+func (s *actionService) HandleConn(ctx context.Context, conn net.Conn) error {
 	return nil
 }
 

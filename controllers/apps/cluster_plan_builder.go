@@ -309,8 +309,6 @@ func (c *clusterPlanBuilder) reconcileObject(node *model.ObjectVertex) error {
 		return c.reconcileDeleteObject(ctx, node)
 	case model.STATUS:
 		return c.reconcileStatusObject(ctx, node)
-	case model.NOOP:
-		return c.reconcileNoopObject(ctx, node)
 	}
 	return nil
 }
@@ -378,10 +376,6 @@ func (c *clusterPlanBuilder) reconcileStatusObject(ctx context.Context, node *mo
 		c.emitConditionUpdatingEvent(oldCluster.Status.Conditions, newCluster.Status.Conditions)
 		c.emitStatusUpdatingEvent(oldCluster.Status, newCluster.Status)
 	}
-	return nil
-}
-
-func (c *clusterPlanBuilder) reconcileNoopObject(ctx context.Context, node *model.ObjectVertex) error {
 	return nil
 }
 

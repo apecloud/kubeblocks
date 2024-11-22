@@ -22,7 +22,6 @@ package trace
 import (
 	"sort"
 	"strconv"
-	"sync/atomic"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -47,7 +46,7 @@ type changeCaptureStore struct {
 	scheme    *runtime.Scheme
 	formatter descriptionFormatter
 	store     map[model.GVKNObjKey]client.Object
-	clock     atomic.Int64
+	clock     int64
 	changes   []tracev1.ObjectChange
 }
 
@@ -55,8 +54,8 @@ func (s *changeCaptureStore) Load(objects ...client.Object) error {
 	for _, object := range objects {
 		// sync the clock
 		revision := parseRevision(object.GetResourceVersion())
-		if revision > s.clock.Load() {
-			s.clock.Store(revision)
+		if revision > s.clock {
+			s.clock = revision
 		}
 		objectRef, err := getObjectRef(object, s.scheme)
 		if err != nil {
@@ -161,7 +160,8 @@ func newChangeCaptureStore(scheme *runtime.Scheme, formatter descriptionFormatte
 }
 
 func (s *changeCaptureStore) applyRevision() string {
-	return strconv.FormatInt(s.clock.Add(1), 10)
+	s.clock++
+	return strconv.FormatInt(s.clock, 10)
 }
 
 func (s *changeCaptureStore) captureCreation(objectRef *model.GVKNObjKey, object client.Object) {

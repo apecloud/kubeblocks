@@ -75,7 +75,7 @@ var (
 
 	itsCriteria = OwnershipCriteria{
 		LabelCriteria: map[string]string{
-			instanceset.WorkloadsManagedByLabelKey: workloads.Kind,
+			instanceset.WorkloadsManagedByLabelKey: workloads.InstanceSetKind,
 			instanceset.WorkloadsInstanceLabelKey:  "$(primary.name)",
 		},
 	}
@@ -119,7 +119,7 @@ var (
 			Primary: objectType(kbappsv1.SchemeGroupVersion.String(), kbappsv1.ComponentKind),
 			OwnedResources: []OwnedResource{
 				{
-					Secondary: objectType(workloads.SchemeGroupVersion.String(), workloads.Kind),
+					Secondary: objectType(workloads.SchemeGroupVersion.String(), workloads.InstanceSetKind),
 					Criteria:  componentCriteria,
 				},
 				{
@@ -169,7 +169,7 @@ var (
 			},
 		},
 		{
-			Primary: objectType(workloads.SchemeGroupVersion.String(), workloads.Kind),
+			Primary: objectType(workloads.SchemeGroupVersion.String(), workloads.InstanceSetKind),
 			OwnedResources: []OwnedResource{
 				{
 					Secondary: objectType(corev1.SchemeGroupVersion.String(), constant.PodKind),
@@ -260,7 +260,7 @@ func initKBOwnershipRules(cfg *rest.Config) func() {
 
 func filterUnsupportedRules(ownershipRules []OwnershipRule, cfg *rest.Config) []OwnershipRule {
 	if cfg == nil {
-		cfg = intctrlutil.GeKubeRestConfig("kubeblocks-api-tester")
+		cfg = intctrlutil.GetKubeRestConfig("kubeblocks-api-tester")
 	}
 	var rules []OwnershipRule
 	for _, rule := range ownershipRules {

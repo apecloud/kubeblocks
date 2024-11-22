@@ -33,6 +33,10 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
+// ObjectRevisionStore defines an object store which can get the history revision.
+// WARN: This store is designed only for Reconciliation Trace Controller,
+// it's not thread-safe, it doesn't do a deep copy before returning the object.
+// Don't use it in other place.
 type ObjectRevisionStore interface {
 	Insert(object, reference client.Object) error
 	Get(objectRef *model.GVKNObjKey, revision int64) (client.Object, error)
@@ -67,15 +71,15 @@ func (s *objectRevisionStore) Insert(object, reference client.Object) error {
 	objectMap, ok := s.store[objectRef.GroupVersionKind]
 	if !ok {
 		objectMap = make(map[types.NamespacedName]map[int64]client.Object)
+		s.store[objectRef.GroupVersionKind] = objectMap
 	}
 	revisionMap, ok := objectMap[objectRef.ObjectKey]
 	if !ok {
 		revisionMap = make(map[int64]client.Object)
+		objectMap[objectRef.ObjectKey] = revisionMap
 	}
 	revision := parseRevision(object.GetResourceVersion())
 	revisionMap[revision] = object
-	objectMap[objectRef.ObjectKey] = revisionMap
-	s.store[objectRef.GroupVersionKind] = objectMap
 
 	// update reference counter
 	s.counterLock.Lock()

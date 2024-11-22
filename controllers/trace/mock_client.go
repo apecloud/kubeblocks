@@ -257,7 +257,7 @@ func checkStatus(oldObj client.Object, newObj client.Object) bool {
 }
 
 func (c *mockClient) DeleteAllOf(ctx context.Context, obj client.Object, opts ...client.DeleteAllOfOption) error {
-	panic("not implemented")
+	return fmt.Errorf("DeleteAllOf not implemented")
 }
 
 func (c *mockClient) Status() client.SubResourceWriter {

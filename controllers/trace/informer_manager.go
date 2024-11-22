@@ -128,6 +128,7 @@ func (m *informerManager) processNextWorkItem() bool {
 	if evt, ok := object.(*corev1.Event); ok {
 		ro, err := m.scheme.New(evt.InvolvedObject.GroupVersionKind())
 		if err != nil {
+			m.logger.Error(err, "new an event involved object failed")
 			return false
 		}
 		object, _ = ro.(client.Object)

@@ -865,13 +865,14 @@ spec:
                   specDiff:
                     description: "SpecDiff describes the diff between the current
                       spec and the final spec.\nThe whole spec struct will be compared
-                      and an example SpecDiff looks like:\n{\n\t\tAffinity: {\n   \t\tPodAntiAffinity:
-                      \"Preferred\",\n   \t\tTenancy: \"SharedNode\",\n\t\t},\n \tComponentSpecs:
-                      {\n\t\t\t{\n \t\t\tComponentDef: \"postgresql\",\n   \t\t\tName:
-                      \"postgresql\",\n-    \t\tReplicas: 2,\n   \t\t\tResources:\n\t\t\t\t{\n
-                      \    \t\t\tLimits:\n\t\t\t\t\t{\n-        \t\t\tCPU: 500m,\n-
-                      \      \t\t\t\tMemory: 512Mi,\n\t\t\t\t\t},\n     \t\t\tRequests:\n\t\t\t\t\t{\n-
-                      \     \t\t\t\tCPU: 500m,\n-      \t\t\t\tMemory: 512Mi,\n\t\t\t\t\t},\n\t\t\t\t},\n\t\t\t},\n\t\t},\n}"
+                      and an example SpecDiff looks like:\n{\n \tAffinity: {\n \t\tPodAntiAffinity:
+                      \"Preferred\",\n \t\tTenancy: \"SharedNode\",\n \t},\n \tComponentSpecs:
+                      {\n \t\t{\n \t\t\tComponentDef: \"postgresql\",\n \t\t\tName:
+                      \"postgresql\",\n-\t\t\tReplicas: 2,\n \t\t\tResources:\n \t\t\t{\n
+                      \t\t\t\tLimits:\n \t\t\t\t{\n-\t\t\t\t\tCPU: 500m,\n-\t\t\t\t\tMemory:
+                      512Mi,\n \t\t\t\t},\n \t\t\t\tRequests:\n \t\t\t\t{\n-\t\t\t\t\tCPU:
+                      500m,\n-\t\t\t\t\tMemory: 512Mi,\n \t\t\t\t},\n \t\t\t},\n \t\t},\n
+                      \t},\n}"
                     type: string
                 required:
                 - desiredSpecRevision

@@ -68,7 +68,7 @@ var reconcilerFuncMap = map[tracev1.ObjectType]reconcilerFunc{
 	objectType(kbappsv1.SchemeGroupVersion.String(), kbappsv1.ComponentKind):           newComponentReconciler,
 	objectType(corev1.SchemeGroupVersion.String(), constant.SecretKind):                newSecretReconciler,
 	objectType(corev1.SchemeGroupVersion.String(), constant.ServiceKind):               newServiceReconciler,
-	objectType(workloadsAPI.SchemeGroupVersion.String(), workloadsAPI.Kind):            newInstanceSetReconciler,
+	objectType(workloadsAPI.SchemeGroupVersion.String(), workloadsAPI.InstanceSetKind): newInstanceSetReconciler,
 	objectType(corev1.SchemeGroupVersion.String(), constant.ConfigMapKind):             newConfigMapReconciler,
 	objectType(corev1.SchemeGroupVersion.String(), constant.PersistentVolumeClaimKind): newPVCReconciler,
 	objectType(rbacv1.SchemeGroupVersion.String(), constant.ClusterRoleBindingKind):    newClusterRoleBindingReconciler,
@@ -289,9 +289,6 @@ func (r *pvcReconciler) Reconcile(ctx context.Context, req reconcile.Request) (r
 		if err = r.Status().Update(ctx, pvc); err != nil {
 			return reconcile.Result{}, err
 		}
-		if err := r.Status().Update(ctx, pvc); err != nil {
-			return reconcile.Result{}, err
-		}
 	}
 
 	return reconcile.Result{}, nil
@@ -456,7 +453,11 @@ func (r *stsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 	if model.IsObjectDeleting(sts) {
 		// delete all pods
 		podList := &corev1.PodList{}
-		if err = r.List(ctx, podList, client.MatchingLabels(sts.Spec.Template.Labels)); err != nil {
+		labels, err := metav1.LabelSelectorAsMap(sts.Spec.Selector)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		if err = r.List(ctx, podList, client.MatchingLabels(labels)); err != nil {
 			return ctrl.Result{}, err
 		}
 		for _, pod := range podList.Items {
@@ -528,7 +529,11 @@ func (r *stsReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.R
 
 	// Update the status of the StatefulSet
 	podList := &corev1.PodList{}
-	if err = r.List(ctx, podList, client.MatchingLabels(sts.Spec.Template.Labels)); err != nil {
+	labels, err := metav1.LabelSelectorAsMap(sts.Spec.Selector)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	if err = r.List(ctx, podList, client.MatchingLabels(labels)); err != nil {
 		return ctrl.Result{}, err
 	}
 	isCreated := func(pod *corev1.Pod) bool {

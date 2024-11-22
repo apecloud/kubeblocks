@@ -228,6 +228,11 @@ var _ = Describe("dry_run_handler test", func() {
 					return nil
 				}).AnyTimes()
 			k8sMock.EXPECT().
+				List(gomock.Any(), &kbappsv1.SidecarDefinitionList{}, gomock.Any()).
+				DoAndReturn(func(_ context.Context, list *kbappsv1.SidecarDefinitionList, _ ...client.ListOption) error {
+					return nil
+				}).AnyTimes()
+			k8sMock.EXPECT().
 				List(gomock.Any(), &dpv1alpha1.BackupPolicyTemplateList{}, gomock.Any()).
 				DoAndReturn(func(_ context.Context, list *dpv1alpha1.BackupPolicyTemplateList, _ ...client.ListOption) error {
 					return nil

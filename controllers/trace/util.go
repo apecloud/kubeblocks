@@ -147,7 +147,7 @@ func getObjectReferenceString(n *tracev1.ObjectTreeNode) string {
 		n.Primary.Namespace,
 		n.Primary.Name,
 		n.Primary.APIVersion,
-	}, "")
+	}, "-")
 }
 
 func matchOwnerOf(owner *matchOwner, o client.Object) bool {

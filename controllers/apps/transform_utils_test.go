@@ -100,7 +100,7 @@ func TestIsOwnedByInstanceSet(t *testing.T) {
 
 	its.OwnerReferences = []metav1.OwnerReference{
 		{
-			Kind:       workloads.Kind,
+			Kind:       workloads.InstanceSetKind,
 			Controller: pointer.Bool(true),
 		},
 	}

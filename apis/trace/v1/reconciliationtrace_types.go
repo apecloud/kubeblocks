@@ -149,35 +149,35 @@ type DryRunResult struct {
 	// SpecDiff describes the diff between the current spec and the final spec.
 	// The whole spec struct will be compared and an example SpecDiff looks like:
 	// {
-	//		Affinity: {
-	//    		PodAntiAffinity: "Preferred",
-	//    		Tenancy: "SharedNode",
-	//		},
+	//  	Affinity: {
+	//  		PodAntiAffinity: "Preferred",
+	//  		Tenancy: "SharedNode",
+	//  	},
 	//  	ComponentSpecs: {
-	//			{
+	//  		{
 	//  			ComponentDef: "postgresql",
-	//    			Name: "postgresql",
-	// -    		Replicas: 2,
-	// +    		Replicas: 3,
-	//    			Resources:
-	//				{
-	//      			Limits:
-	//					{
-	// -        			CPU: 500m,
-	// +        			CPU: 800m,
-	// -       				Memory: 512Mi,
-	// +       				Memory: 768Mi,
-	//					},
-	//      			Requests:
-	//					{
-	// -      				CPU: 500m,
-	// +       				CPU: 800m,
-	// -      				Memory: 512Mi,
-	// +       				Memory: 768Mi,
-	//					},
-	//				},
-	//			},
-	//		},
+	//  			Name: "postgresql",
+	// -			Replicas: 2,
+	// +			Replicas: 3,
+	//  			Resources:
+	//  			{
+	//  				Limits:
+	//  				{
+	// -					CPU: 500m,
+	// +					CPU: 800m,
+	// -					Memory: 512Mi,
+	// +					Memory: 768Mi,
+	//  				},
+	//  				Requests:
+	//  				{
+	// -					CPU: 500m,
+	// +					CPU: 800m,
+	// -					Memory: 512Mi,
+	// +					Memory: 768Mi,
+	//  				},
+	//  			},
+	//  		},
+	//  	},
 	// }
 	//
 	SpecDiff string `json:"specDiff"`

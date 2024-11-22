@@ -34,7 +34,7 @@ func setCompOwnershipNFinalizer(comp *appsv1.Component, object client.Object) er
 		return nil
 	}
 	// add finalizer to the object
-	addFinalizer(object, comp)
+	controllerutil.AddFinalizer(object, constant.DBComponentFinalizerName)
 	if err := intctrlutil.SetOwnership(comp, object, rscheme, ""); err != nil {
 		if _, ok := err.(*controllerutil.AlreadyOwnedError); ok {
 			return nil
@@ -52,8 +52,4 @@ func skipSetCompOwnershipNFinalizer(obj client.Object) bool {
 	default:
 		return false
 	}
-}
-
-func addFinalizer(obj client.Object, comp *appsv1.Component) {
-	controllerutil.AddFinalizer(obj, constant.DBComponentFinalizerName)
 }

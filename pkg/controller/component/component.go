@@ -22,14 +22,11 @@ package component
 import (
 	"context"
 	"fmt"
-	"strconv"
-	"strings"
-	"time"
-
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"strconv"
+	"strings"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/common"
@@ -258,28 +255,6 @@ func GetCompNCompDefByName(ctx context.Context, cli client.Reader, namespace, fu
 	return comp, compDef, nil
 }
 
-// CheckAndGetClusterComponents checks if all components have created and gets the created components.
-func CheckAndGetClusterComponents(ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster) ([]client.Object, error) {
-	compList := &appsv1alpha1.ComponentList{}
-	if err := cli.List(ctx, compList, client.InNamespace(cluster.Namespace), client.MatchingLabels{constant.AppInstanceLabelKey: cluster.Name}); err != nil {
-		return nil, err
-	}
-	compMap := map[string]client.Object{}
-	for i := range compList.Items {
-		compMap[compList.Items[i].Name] = &compList.Items[i]
-	}
-	var components []client.Object
-	for _, compSpec := range cluster.Spec.ComponentSpecs {
-		compName := constant.GenerateClusterComponentName(cluster.Name, compSpec.Name)
-		v, ok := compMap[compName]
-		if !ok {
-			return nil, intctrlutil.NewRequeueError(time.Second, "waiting for all component creations to be completed")
-		}
-		components = append(components, v)
-	}
-	return components, nil
-}
-
 // ListClusterComponents lists the components of the cluster.
 func ListClusterComponents(ctx context.Context, cli client.Reader, cluster *appsv1alpha1.Cluster) ([]appsv1alpha1.Component, error) {
 	compList := &appsv1alpha1.ComponentList{}
@@ -304,14 +279,6 @@ func GetClusterComponentShortNameSet(ctx context.Context, cli client.Reader, clu
 		compSet.Insert(compShortName)
 	}
 	return compSet, nil
-}
-
-// GetHostNetworkRelatedComponents checks if it is necessary to wait for the completion of relevant conditions.
-func GetHostNetworkRelatedComponents(podSpec *corev1.PodSpec, ctx context.Context, cli client.Client, cluster *appsv1alpha1.Cluster) ([]client.Object, error) {
-	if !podSpec.HostNetwork {
-		return nil, nil
-	}
-	return CheckAndGetClusterComponents(ctx, cli, cluster)
 }
 
 func GetExporter(componentDef appsv1alpha1.ComponentDefinitionSpec) *common.Exporter {

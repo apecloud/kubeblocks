@@ -365,8 +365,14 @@ func (r *OpsRequest) CountOfflineOrOnlineInstances(clusterName, componentName st
 }
 
 func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, compSpec appsv1.ClusterComponentSpec, clusterName string, isSharding bool) error {
+	if hScale.Shards != nil && !isSharding {
+		return fmt.Errorf(`shards field cannot be used for the component "%s"`, hScale.ComponentName)
+	}
 	scaleIn := hScale.ScaleIn
 	scaleOut := hScale.ScaleOut
+	if hScale.Shards != nil && (scaleOut != nil || scaleIn != nil) {
+		return fmt.Errorf(`shards field cannot be used together with scaleOut or scaleIn for the component "%s"`, hScale.ComponentName)
+	}
 	if lastCompConfiguration, ok := r.Status.LastConfiguration.Components[hScale.ComponentName]; ok {
 		// use last component configuration snapshot
 		compSpec.Instances = lastCompConfiguration.Instances

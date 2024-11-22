@@ -265,6 +265,11 @@ func (in *Expose) DeepCopy() *Expose {
 func (in *HorizontalScaling) DeepCopyInto(out *HorizontalScaling) {
 	*out = *in
 	out.ComponentOps = in.ComponentOps
+	if in.Shards != nil {
+		in, out := &in.Shards, &out.Shards
+		*out = new(int32)
+		**out = **in
+	}
 	if in.ScaleOut != nil {
 		in, out := &in.ScaleOut, &out.ScaleOut
 		*out = new(ScaleOut)

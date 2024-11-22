@@ -77,6 +77,31 @@ var _ = Describe("status reconciler test", func() {
 			Expect(res).Should(Equal(kubebuilderx.Continue))
 		}
 
+		makePodAvailableWithRevision := func(pod *corev1.Pod, revision string, updatePodAvailable bool) {
+			pod.Labels[appsv1.ControllerRevisionHashLabelKey] = revision
+			pod.Status.Phase = corev1.PodRunning
+			condition := corev1.PodCondition{
+				Type:               corev1.PodReady,
+				Status:             corev1.ConditionTrue,
+				LastTransitionTime: metav1.NewTime(time.Now()),
+			}
+			if updatePodAvailable {
+				condition.LastTransitionTime = metav1.NewTime(time.Now().Add(-1 * minReadySeconds * time.Second))
+			}
+			pod.Status.Conditions = []corev1.PodCondition{condition}
+			for _, c := range pod.Spec.Containers {
+				pod.Status.ContainerStatuses = append(pod.Status.ContainerStatuses, corev1.ContainerStatus{
+					Name:  c.Name,
+					Image: c.Image,
+					State: corev1.ContainerState{
+						Running: &corev1.ContainerStateRunning{
+							StartedAt: metav1.NewTime(time.Now()),
+						},
+					},
+				})
+			}
+		}
+
 		It("should work well", func() {
 			By("PreCondition")
 			its.Generation = 1
@@ -123,19 +148,6 @@ var _ = Describe("status reconciler test", func() {
 			}
 
 			By("make all pods ready with old revision")
-			condition := corev1.PodCondition{
-				Type:               corev1.PodReady,
-				Status:             corev1.ConditionTrue,
-				LastTransitionTime: metav1.NewTime(time.Now()),
-			}
-			makePodAvailableWithRevision := func(pod *corev1.Pod, revision string, updatePodAvailable bool) {
-				pod.Labels[appsv1.ControllerRevisionHashLabelKey] = revision
-				pod.Status.Phase = corev1.PodRunning
-				if updatePodAvailable {
-					condition.LastTransitionTime = metav1.NewTime(time.Now().Add(-1 * minReadySeconds * time.Second))
-				}
-				pod.Status.Conditions = []corev1.PodCondition{condition}
-			}
 			pods := tree.List(&corev1.Pod{})
 			currentRevisionMap := map[string]string{}
 			oldRevision := "old-revision"
@@ -249,6 +261,46 @@ var _ = Describe("status reconciler test", func() {
 			Expect(its.Status.Conditions[2].Type).Should(BeEquivalentTo(workloads.InstanceFailure))
 			Expect(its.Status.Conditions[2].Reason).Should(BeEquivalentTo(workloads.ReasonInstanceFailure))
 			Expect(its.Status.Conditions[2].Message).Should(BeEquivalentTo(message))
+		})
+
+		It("updates image in-place", func() {
+			tree := kubebuilderx.NewObjectTree()
+			tree.SetRoot(its)
+			reconcilePods(tree)
+
+			By("make all pods available")
+			condition := corev1.PodCondition{
+				Type:               corev1.PodReady,
+				Status:             corev1.ConditionTrue,
+				LastTransitionTime: metav1.NewTime(time.Now()),
+			}
+			makePodAvailableWithRevision := func(pod *corev1.Pod, revision string, updatePodAvailable bool) {
+				pod.Labels[appsv1.ControllerRevisionHashLabelKey] = revision
+				pod.Status.Phase = corev1.PodRunning
+				if updatePodAvailable {
+					condition.LastTransitionTime = metav1.NewTime(time.Now().Add(-1 * minReadySeconds * time.Second))
+				}
+				pod.Status.Conditions = []corev1.PodCondition{condition}
+			}
+			pods := tree.List(&corev1.Pod{})
+			currentRevisionMap := map[string]string{}
+			oldRevision := "old-revision"
+			for _, object := range pods {
+				pod, ok := object.(*corev1.Pod)
+				Expect(ok).Should(BeTrue())
+				makePodAvailableWithRevision(pod, oldRevision, false)
+				currentRevisionMap[pod.Name] = oldRevision
+			}
+
+			By("update image")
+			// update image in its
+			// call update reconciler to update spec image of pod
+			// call status reconciler
+			// test its status(pod should not be ready)
+
+			By("make all containers of pod ready")
+			// call status reconciler
+			// test its status
 		})
 
 		It("updates nodeSelectorOnce Annotation", func() {

@@ -29413,20 +29413,6 @@ Used only when spec.roles set.</p>
 </tr>
 <tr>
 <td>
-<code>readyWithoutPrimary</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Indicates whether it is required for the InstanceSet to have at least one primary instance ready.</p>
-<p>Deprecated: since instanceset no longer checks a &ldquo;primary&rdquo; role when doing ready check, this
-field is no longer needed and will be removed in the future.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>currentRevisions</code><br/>
 <em>
 map[string]string

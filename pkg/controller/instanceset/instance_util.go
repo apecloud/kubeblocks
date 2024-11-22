@@ -27,7 +27,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/klauspost/compress/zstd"
 	appsv1 "k8s.io/api/apps/v1"
@@ -160,24 +159,9 @@ func isRunningAndAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
 	return podutils.IsPodAvailable(pod, minReadySeconds, metav1.Now())
 }
 
-func isContainersReady(pod *corev1.Pod) bool {
-	index := slices.IndexFunc(pod.Status.Conditions, func(condition corev1.PodCondition) bool {
-		return condition.Type == corev1.ContainersReady
-	})
-	if index < 0 {
-		return false
-	}
-	if pod.Status.Conditions[index].Status != corev1.ConditionTrue {
-		return false
-	}
-	containersReadyTime := pod.Status.Conditions[index].LastTransitionTime.Time
-	twoSecondsAgo := metav1.Now().Add(-2 * time.Second)
+func isContainersRunning(pod *corev1.Pod) bool {
 	for _, status := range pod.Status.ContainerStatuses {
 		if status.State.Running == nil {
-			continue
-		}
-		startedAt := status.State.Running.StartedAt
-		if startedAt.After(containersReadyTime) && startedAt.After(twoSecondsAgo) {
 			return false
 		}
 	}

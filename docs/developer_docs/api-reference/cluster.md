@@ -42,6 +42,8 @@ Resource Types:
 <a href="#apps.kubeblocks.io/v1.ServiceDescriptor">ServiceDescriptor</a>
 </li><li>
 <a href="#apps.kubeblocks.io/v1.ShardingDefinition">ShardingDefinition</a>
+</li><li>
+<a href="#apps.kubeblocks.io/v1.SidecarDefinition">SidecarDefinition</a>
 </li></ul>
 <h3 id="apps.kubeblocks.io/v1.Cluster">Cluster
 </h3>
@@ -835,6 +837,20 @@ bool
 <em>(Optional)</em>
 <p>Stop the Component.
 If set, all the computing resources will be released.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>sidecars</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Sidecar">
+[]Sidecar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the sidecars to be injected into the Component.</p>
 </td>
 </tr>
 </table>
@@ -1959,6 +1975,175 @@ ShardingLifecycleActions
 <em>
 <a href="#apps.kubeblocks.io/v1.ShardingDefinitionStatus">
 ShardingDefinitionStatus
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.SidecarDefinition">SidecarDefinition
+</h3>
+<div>
+<p>SidecarDefinition is the Schema for the sidecardefinitions API</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>apiVersion</code><br/>
+string</td>
+<td>
+<code>apps.kubeblocks.io/v1</code>
+</td>
+</tr>
+<tr>
+<td>
+<code>kind</code><br/>
+string
+</td>
+<td><code>SidecarDefinition</code></td>
+</tr>
+<tr>
+<td>
+<code>metadata</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#objectmeta-v1-meta">
+Kubernetes meta/v1.ObjectMeta
+</a>
+</em>
+</td>
+<td>
+Refer to the Kubernetes API documentation for the fields of the
+<code>metadata</code> field.
+</td>
+</tr>
+<tr>
+<td>
+<code>spec</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.SidecarDefinitionSpec">
+SidecarDefinitionSpec
+</a>
+</em>
+</td>
+<td>
+<br/>
+<br/>
+<table>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the name of the sidecar.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>owner</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the component definition that the sidecar belongs to.</p>
+<p>For a specific cluster object, if there is any components provided by the component definition of @owner,
+the sidecar will be created and injected into the components which are provided by
+the component definition of @selectors automatically.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>selectors</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<p>Specifies the component definition of components that the sidecar along with.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>containers</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#container-v1-core">
+[]Kubernetes core/v1.Container
+</a>
+</em>
+</td>
+<td>
+<p>List of containers for the sidecar.</p>
+<p>Cannot be updated.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>vars</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.EnvVar">
+[]EnvVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines variables which are needed by the sidecar.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>configs</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentTemplateSpec">
+[]ComponentTemplateSpec
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the configuration file templates used by the Sidecar.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>scripts</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentTemplateSpec">
+[]ComponentTemplateSpec
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the scripts used by the Sidecar.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+<tr>
+<td>
+<code>status</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.SidecarDefinitionStatus">
+SidecarDefinitionStatus
 </a>
 </em>
 </td>
@@ -5490,6 +5675,10 @@ Some database engines or associated sidecar applications (e.g., Patroni) may alr
 In such cases, this action may not be required.</p>
 <p>The output should be a valid data dump streamed to stdout. It must exclude any irrelevant information to ensure
 that only the necessary data is exported for import into the new replica.</p>
+<p>The container executing this action has access to following environment variables:</p>
+<ul>
+<li>KB_TARGET_POD_NAME: The name of the replica pod into which the data will be loaded.</li>
+</ul>
 <p>Note: This field is immutable once it has been set.</p>
 </td>
 </tr>
@@ -6081,6 +6270,20 @@ bool
 If set, all the computing resources will be released.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>sidecars</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Sidecar">
+[]Sidecar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the sidecars to be injected into the Component.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1.ComponentStatus">ComponentStatus
@@ -6229,7 +6432,7 @@ ProvisionSecretRef
 <h3 id="apps.kubeblocks.io/v1.ComponentTemplateSpec">ComponentTemplateSpec
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentConfigSpec">ComponentConfigSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentConfigSpec">ComponentConfigSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>, <a href="#apps.kubeblocks.io/v1.SidecarDefinitionSpec">SidecarDefinitionSpec</a>)
 </p>
 <div>
 </div>
@@ -7072,7 +7275,7 @@ VarOption
 <h3 id="apps.kubeblocks.io/v1.EnvVar">EnvVar
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>, <a href="#apps.kubeblocks.io/v1.SidecarDefinitionSpec">SidecarDefinitionSpec</a>)
 </p>
 <div>
 <p>EnvVar represents a variable present in the env of Pod/Action or the template of config/script.</p>
@@ -8283,7 +8486,7 @@ Kubernetes core/v1.PersistentVolumeMode
 <h3 id="apps.kubeblocks.io/v1.Phase">Phase
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterDefinitionStatus">ClusterDefinitionStatus</a>, <a href="#apps.kubeblocks.io/v1.ComponentDefinitionStatus">ComponentDefinitionStatus</a>, <a href="#apps.kubeblocks.io/v1.ComponentVersionStatus">ComponentVersionStatus</a>, <a href="#apps.kubeblocks.io/v1.ServiceDescriptorStatus">ServiceDescriptorStatus</a>, <a href="#apps.kubeblocks.io/v1.ShardingDefinitionStatus">ShardingDefinitionStatus</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterDefinitionStatus">ClusterDefinitionStatus</a>, <a href="#apps.kubeblocks.io/v1.ComponentDefinitionStatus">ComponentDefinitionStatus</a>, <a href="#apps.kubeblocks.io/v1.ComponentVersionStatus">ComponentVersionStatus</a>, <a href="#apps.kubeblocks.io/v1.ServiceDescriptorStatus">ServiceDescriptorStatus</a>, <a href="#apps.kubeblocks.io/v1.ShardingDefinitionStatus">ShardingDefinitionStatus</a>, <a href="#apps.kubeblocks.io/v1.SidecarDefinitionStatus">SidecarDefinitionStatus</a>)
 </p>
 <div>
 <p>Phase represents the status of a CR.</p>
@@ -10472,6 +10675,254 @@ int32
 </td>
 <td>
 <p>The maximum limit of replicas.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.Sidecar">Sidecar
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Name specifies the unique name of the sidecar.</p>
+<p>The name will be used as the name of the sidecar container in the Pod.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>owner</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the exact component definition that the sidecar belongs to.</p>
+<p>A sidecar will be updated when the owner component definition is updated only.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>sidecarDef</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the sidecar definition CR to be used to create the sidecar.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.SidecarDefinitionSpec">SidecarDefinitionSpec
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.SidecarDefinition">SidecarDefinition</a>)
+</p>
+<div>
+<p>SidecarDefinitionSpec defines the desired state of SidecarDefinition</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the name of the sidecar.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>owner</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the component definition that the sidecar belongs to.</p>
+<p>For a specific cluster object, if there is any components provided by the component definition of @owner,
+the sidecar will be created and injected into the components which are provided by
+the component definition of @selectors automatically.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>selectors</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<p>Specifies the component definition of components that the sidecar along with.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>containers</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#container-v1-core">
+[]Kubernetes core/v1.Container
+</a>
+</em>
+</td>
+<td>
+<p>List of containers for the sidecar.</p>
+<p>Cannot be updated.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>vars</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.EnvVar">
+[]EnvVar
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines variables which are needed by the sidecar.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>configs</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentTemplateSpec">
+[]ComponentTemplateSpec
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the configuration file templates used by the Sidecar.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>scripts</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentTemplateSpec">
+[]ComponentTemplateSpec
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the scripts used by the Sidecar.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.SidecarDefinitionStatus">SidecarDefinitionStatus
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.SidecarDefinition">SidecarDefinition</a>)
+</p>
+<div>
+<p>SidecarDefinitionStatus defines the observed state of SidecarDefinition</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>observedGeneration</code><br/>
+<em>
+int64
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Refers to the most recent generation that has been observed for the SidecarDefinition.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>phase</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Phase">
+Phase
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Represents the current status of the SidecarDefinition. Valid values include `<code>,</code>Available<code>, and</code>Unavailable<code>.
+When the status is</code>Available`, the SidecarDefinition is ready and can be utilized by related objects.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>message</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Provides additional information about the current phase.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>owners</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Resolved owners of the SidecarDefinition.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>selectors</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Resolved selectors of the SidecarDefinition.</p>
 </td>
 </tr>
 </tbody>

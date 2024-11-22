@@ -31,21 +31,22 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	kbagent "github.com/apecloud/kubeblocks/pkg/kbagent/client"
+	"github.com/apecloud/kubeblocks/pkg/kbagent"
+	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
 	kbagentproto "github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 	"github.com/apecloud/kubeblocks/pkg/testutil"
 )
 
-func MockKBAgentClient(mock func(*kbagent.MockClientMockRecorder)) {
-	cli := kbagent.NewMockClient(gomock.NewController(GinkgoT()))
+func MockKBAgentClient(mock func(*kbacli.MockClientMockRecorder)) {
+	cli := kbacli.NewMockClient(gomock.NewController(GinkgoT()))
 	if mock != nil {
 		mock(cli.EXPECT())
 	}
-	kbagent.SetMockClient(cli, nil)
+	kbacli.SetMockClient(cli, nil)
 }
 
 func MockKBAgentClientDefault() {
-	MockKBAgentClient(func(recorder *kbagent.MockClientMockRecorder) {
+	MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
 		recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
 			return kbagentproto.ActionResponse{}, nil
 		}).AnyTimes()
@@ -53,7 +54,7 @@ func MockKBAgentClientDefault() {
 }
 
 func MockKBAgentClient4HScale(testCtx *testutil.TestContext, clusterKey types.NamespacedName, compName, podAnnotationKey4Test string, replicas int) {
-	MockKBAgentClient(func(recorder *kbagent.MockClientMockRecorder) {
+	MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
 		recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
 			rsp := kbagentproto.ActionResponse{}
 			if req.Action != "memberLeave" {
@@ -86,8 +87,8 @@ func MockKBAgentClient4HScale(testCtx *testutil.TestContext, clusterKey types.Na
 
 func MockKBAgentClient4Workload(testCtx *testutil.TestContext, pods []*corev1.Pod) {
 	const (
-		memberJoinCompoletedLabel  = "test.kubeblock.io/memberjoin-completed"
-		memberLeaveCompoletedLabel = "test.kubeblock.io/memberleave-completed"
+		memberJoinCompletedLabel  = "test.kubeblock.io/memberjoin-completed"
+		memberLeaveCompletedLabel = "test.kubeblock.io/memberleave-completed"
 	)
 
 	rsp := kbagentproto.ActionResponse{Message: "mock success"}
@@ -96,7 +97,7 @@ func MockKBAgentClient4Workload(testCtx *testutil.TestContext, pods []*corev1.Po
 			if pod.Name != podName {
 				continue
 			}
-			pod.Labels[memberLeaveCompoletedLabel] = "true"
+			pod.Labels[memberLeaveCompletedLabel] = "true"
 			err := testCtx.Cli.Update(testCtx.Ctx, pod)
 			if err != nil {
 				return kbagentproto.ActionResponse{}, err
@@ -110,7 +111,7 @@ func MockKBAgentClient4Workload(testCtx *testutil.TestContext, pods []*corev1.Po
 			if pod.Name != podName {
 				continue
 			}
-			pod.Labels[memberJoinCompoletedLabel] = "true"
+			pod.Labels[memberJoinCompletedLabel] = "true"
 			err := testCtx.Cli.Update(testCtx.Ctx, pod)
 			if err != nil {
 				return kbagentproto.ActionResponse{}, err
@@ -147,7 +148,7 @@ func MockKBAgentClient4Workload(testCtx *testutil.TestContext, pods []*corev1.Po
 		return rsp, nil
 	}
 
-	MockKBAgentClient(func(recorder *kbagent.MockClientMockRecorder) {
+	MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
 		recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
 			switch req.Action {
 			case "memberLeave":
@@ -164,4 +165,21 @@ func MockKBAgentClient4Workload(testCtx *testutil.TestContext, pods []*corev1.Po
 			}
 		}).AnyTimes()
 	})
+}
+
+func MockKBAgentContainer() corev1.Container {
+	return corev1.Container{
+		Name:  kbagent.ContainerName,
+		Image: "mock-image",
+		Ports: []corev1.ContainerPort{
+			{
+				Name:          kbagent.DefaultHTTPPortName,
+				ContainerPort: kbagent.DefaultHTTPPort,
+			},
+			{
+				Name:          kbagent.DefaultStreamingPortName,
+				ContainerPort: kbagent.DefaultStreamingPort,
+			},
+		},
+	}
 }

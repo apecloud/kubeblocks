@@ -35,79 +35,6 @@ import TabItem from '@theme/TabItem';
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli">
-
-1. 启用 etcd 引擎，创建 etcd 集群。
-
-   1. 安装并启用 etcd 引擎。etcd 引擎默认未安装，需安装后在进行后续操作。可参考[使用引擎](./../../installation/install-with-kbcli/install-addons.md)文档。
-
-       ```bash
-       # 1. 查看是否已添加 KubeBlocks 引擎索引
-       kbcli addon index list
-
-       # 如果列表为空，请先添加索引
-       kbcli addon index add kubeblocks https://github.com/apecloud/block-index.git
-
-       # 2. 搜索 etcd 引擎
-       kbcli addon search etcd
-
-       # 3. 安装 etcd 引擎
-       kbcli addon install etcd --index kubeblocks --version 0.9.0
-
-       # 4. 启用 etcd 引擎
-       kbcli addon enable etcd
-
-       # 5. 确认 etcd 引擎是否已启用
-       kbcli addon list
-       ```
-
-   2. 创建 etcd 集群。
-
-       ```bash
-       kbcli cluster create myetcd --cluster-definition etcd
-       ```
-
-   3. 查看 etcd 服务状态。
-
-       ```bash
-       kbcli cluster list myetcd
-       ```
-
-2. 查看 etcd 服务地址或 etcd pod 地址。
-
-    ```bash
-    kubectl get service
-    >
-    NAME                             TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)                                                  AGE
-    kubernetes                       ClusterIP   10.96.0.1        <none>        443/TCP                                                  85d
-    myetcd-etcd                      ClusterIP   10.101.227.143   <none>        2379/TCP                                                 111s
-    myetcd-etcd-headless             ClusterIP   None             <none>        2379/TCP,2380/TCP,3501/TCP,50001/TCP                     111s
-    ```
-
-3. 创建 ApeCloud MySQL Proxy 集群。
-
-    ```bash
-    helm repo add kubeblocks https://apecloud.github.io/helm-charts
-
-    helm install myproxy kubeblocks/apecloud-mysql-cluster --set mode=raftGroup,proxyEnabled=true,etcd.serviceReference.endpoint="etcd-cluster-etcd.default.svc.cluster.local:2379"
-    ```
-
-4. 查看集群状态。
-
-    ```bash
-    kbcli get cluster
-
-    kbcli get pods
-    ```
-
-    您也可进入 etcd 或者 wesql-scale 容器中查看wesql-scale 配置，或检查 etcd 服务可用性。
-
-    ```bash
-    etcdctl --endpoints=http://etcd-cluster-etcd.default.svc.cluster.local:2379 get /vitess --prefix --keys-only
-    ```
-
-</TabItem>
-
 <TabItem value="kubectl" label="kubectl" default>
 
 1. 添加 KubeBlocks 仓库。
@@ -221,6 +148,79 @@ helm install myproxy kubeblocks/apecloud-mysql-cluster --version=v0.9.0 --set mo
 
 </TabItem>
 
+<TabItem value="kbcli" label="kbcli">
+
+1. 启用 etcd 引擎，创建 etcd 集群。
+
+   1. 安装并启用 etcd 引擎。etcd 引擎默认未安装，需安装后在进行后续操作。可参考[使用引擎](./../../installation/install-with-kbcli/install-addons.md)文档。
+
+       ```bash
+       # 1. 查看是否已添加 KubeBlocks 引擎索引
+       kbcli addon index list
+
+       # 如果列表为空，请先添加索引
+       kbcli addon index add kubeblocks https://github.com/apecloud/block-index.git
+
+       # 2. 搜索 etcd 引擎
+       kbcli addon search etcd
+
+       # 3. 安装 etcd 引擎
+       kbcli addon install etcd --index kubeblocks --version 0.9.0
+
+       # 4. 启用 etcd 引擎
+       kbcli addon enable etcd
+
+       # 5. 确认 etcd 引擎是否已启用
+       kbcli addon list
+       ```
+
+   2. 创建 etcd 集群。
+
+       ```bash
+       kbcli cluster create myetcd --cluster-definition etcd
+       ```
+
+   3. 查看 etcd 服务状态。
+
+       ```bash
+       kbcli cluster list myetcd
+       ```
+
+2. 查看 etcd 服务地址或 etcd pod 地址。
+
+    ```bash
+    kubectl get service
+    >
+    NAME                             TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)                                                  AGE
+    kubernetes                       ClusterIP   10.96.0.1        <none>        443/TCP                                                  85d
+    myetcd-etcd                      ClusterIP   10.101.227.143   <none>        2379/TCP                                                 111s
+    myetcd-etcd-headless             ClusterIP   None             <none>        2379/TCP,2380/TCP,3501/TCP,50001/TCP                     111s
+    ```
+
+3. 创建 ApeCloud MySQL Proxy 集群。
+
+    ```bash
+    helm repo add kubeblocks https://apecloud.github.io/helm-charts
+
+    helm install myproxy kubeblocks/apecloud-mysql-cluster --set mode=raftGroup,proxyEnabled=true,etcd.serviceReference.endpoint="etcd-cluster-etcd.default.svc.cluster.local:2379"
+    ```
+
+4. 查看集群状态。
+
+    ```bash
+    kbcli get cluster
+
+    kbcli get pods
+    ```
+
+    您也可进入 etcd 或者 wesql-scale 容器中查看wesql-scale 配置，或检查 etcd 服务可用性。
+
+    ```bash
+    etcdctl --endpoints=http://etcd-cluster-etcd.default.svc.cluster.local:2379 get /vitess --prefix --keys-only
+    ```
+
+</TabItem>
+
 </Tabs>
 
 ## 动态启用代理
@@ -245,24 +245,6 @@ ApeCloud MySQL 代理通过 `vtgate` 组件进行路由，MySQL 服务器访问 
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli">
-
-执行以下命令连接到代理集群。
-
-```bash
-kbcli cluster connect myproxy --components vtgate
-```
-
-### 通过 MySQL 服务器连接代理集群
-
-执行以下命令连接到代理集群。
-
-```bash
-kbcli cluster connect myproxy --components vtgate
-```
-
-</TabItem>
-
 <TabItem value="kubectl" label="kubectl" default>
 
 1. 将 VTGate 的端口映射到本地主机，使本地主机可以访问代理。
@@ -279,21 +261,29 @@ kbcli cluster connect myproxy --components vtgate
 
 </TabItem>
 
+<TabItem value="kbcli" label="kbcli">
+
+执行以下命令连接到代理集群。
+
+```bash
+kbcli cluster connect myproxy --components vtgate
+```
+
+### 通过 MySQL 服务器连接代理集群
+
+执行以下命令连接到代理集群。
+
+```bash
+kbcli cluster connect myproxy --components vtgate
+```
+
+</TabItem>
+
 </Tabs>
 
 ### 通过 MySQL 服务器连接代理集群
 
 <Tabs>
-
-<TabItem value="kbcli" label="kbcli">
-
-执行以下命令，连接至 MySQL 服务器。
-
-```bash
-kbcli cluster connect myproxy
-```
-
-</TabItem>
 
 <TabItem value="kubectl" label="kubectl" default>
 
@@ -308,6 +298,16 @@ kbcli cluster connect myproxy
    ```bash
    mysql -h 127.0.0.1 -P 3306
    ```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+执行以下命令，连接至 MySQL 服务器。
+
+```bash
+kbcli cluster connect myproxy
+```
 
 </TabItem>
 
@@ -546,31 +546,6 @@ VTGate、VTConsensus 和 VTTablet 都支持参数配置。你可以使用 `--com
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli">
-
-查看不同组件的日志。
-
-```bash
-kbcli cluster list-logs myproxy
-kbcli cluster list-logs myproxy --components vtgate
-kbcli cluster list-logs myproxy --components vtcontroller
-kbcli cluster list-logs myproxy --components mysql
-```
-
-查看 Pod 日志。
-
-```bash
-kbcli cluster logs myproxy --instance myproxy-vtgate-85bdcf99df-wbmnl
-```
-
-查看 Pod 中容器的日志。
-
-```bash
-kbcli cluster logs myproxy --instance myproxy-mysql-0 -c vttablet
-```
-
-</TabItem>
-
 <TabItem value="kubectl" label="kubectl" default>
 
 查看 VTGate 日志。
@@ -601,6 +576,31 @@ ls /vtdataroot
 
 </TabItem>
 
+<TabItem value="kbcli" label="kbcli">
+
+查看不同组件的日志。
+
+```bash
+kbcli cluster list-logs myproxy
+kbcli cluster list-logs myproxy --components vtgate
+kbcli cluster list-logs myproxy --components vtcontroller
+kbcli cluster list-logs myproxy --components mysql
+```
+
+查看 Pod 日志。
+
+```bash
+kbcli cluster logs myproxy --instance myproxy-vtgate-85bdcf99df-wbmnl
+```
+
+查看 Pod 中容器的日志。
+
+```bash
+kbcli cluster logs myproxy --instance myproxy-mysql-0 -c vttablet
+```
+
+</TabItem>
+
 </Tabs>
 
 ## 监控
@@ -612,36 +612,6 @@ ls /vtdataroot
 :::
 
 <Tabs>
-
-<TabItem value="kbcli" label="kbcli">
-
-1. 启用监控功能。
-
-   ```bash
-   kbcli cluster update myproxy --monitor=true
-   ```
-
-2. 查看插件列表并启用 Grafana 插件。
-
-   ```bash
-   kbcli addon list 
-   
-   kbcli addon enable grafana
-   ```
-
-3. 查看仪表盘列表。
-
-   ```bash
-   kbcli dashboard list
-   ```
-
-4. 打开 Grafana 仪表盘。
-
-   ```bash
-   kbcli dashboard open kubeblocks-grafana
-   ```
-
-</TabItem>
 
 <TabItem value="kubectl" label="kubectl" default>
 
@@ -702,6 +672,36 @@ ls /vtdataroot
 
 </TabItem>
 
+<TabItem value="kbcli" label="kbcli">
+
+1. 启用监控功能。
+
+   ```bash
+   kbcli cluster update myproxy --monitor=true
+   ```
+
+2. 查看插件列表并启用 Grafana 插件。
+
+   ```bash
+   kbcli addon list 
+   
+   kbcli addon enable grafana
+   ```
+
+3. 查看仪表盘列表。
+
+   ```bash
+   kbcli dashboard list
+   ```
+
+4. 打开 Grafana 仪表盘。
+
+   ```bash
+   kbcli dashboard open kubeblocks-grafana
+   ```
+
+</TabItem>
+
 </Tabs>
 
 ## 读写分离
@@ -709,26 +709,6 @@ ls /vtdataroot
 你可以启用读写分离功能。
 
 <Tabs>
-
-<TabItem value="kbcli" label="kbcli">
-
-```bash
-kbcli cluster configure myproxy --components vtgate --set=read_write_splitting_policy=random
-```
-
-还可以设置读写分离的比例。如下是设置 70% 的流量导向只读节点的例子。
-
-```bash
-kbcli cluster configure myproxy --components vtgate --set=read_write_splitting_ratio=70
-```
-
-此外，你还可以[使用 Grafana](#监控) 或执行 `show workload` 来查看流量分布。
-
-```bash
-show workload;
-```
-
-</TabItem>
 
 <TabItem value="kubectl" label="kubectl" default>
 
@@ -782,6 +762,26 @@ spec:
 
 </TabItem>
 
+<TabItem value="kbcli" label="kbcli">
+
+```bash
+kbcli cluster configure myproxy --components vtgate --set=read_write_splitting_policy=random
+```
+
+还可以设置读写分离的比例。如下是设置 70% 的流量导向只读节点的例子。
+
+```bash
+kbcli cluster configure myproxy --components vtgate --set=read_write_splitting_ratio=70
+```
+
+此外，你还可以[使用 Grafana](#监控) 或在 VTGate 终端中执行 `show workload` 来查看流量分布。
+
+```bash
+show workload;
+```
+
+</TabItem>
+
 </Tabs>
 
 ## 透明故障切换
@@ -789,14 +789,6 @@ spec:
 执行以下命令，实现透明故障切换。
 
 <Tabs>
-
-<TabItem value="kbcli" label="kbcli">
-
-```bash
-kbcli cluster configure myproxy --components vtgate --set=enable_buffer=true
-```
-
-</TabItem>
 
 <TabItem value="kubectl" label="kubectl" default>
 
@@ -826,6 +818,14 @@ kbcli cluster configure myproxy --components vtgate --set=enable_buffer=true
        name: vtgate-config
        payload: {}
    ```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+```bash
+kbcli cluster configure myproxy --components vtgate --set=enable_buffer=true
+```
 
 </TabItem>
 

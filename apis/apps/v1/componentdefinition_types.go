@@ -1609,6 +1609,10 @@ type ComponentLifecycleActions struct {
 	// The output should be a valid data dump streamed to stdout. It must exclude any irrelevant information to ensure
 	// that only the necessary data is exported for import into the new replica.
 	//
+	// The container executing this action has access to following environment variables:
+	//
+	// - KB_TARGET_POD_NAME: The name of the replica pod into which the data will be loaded.
+	//
 	// Note: This field is immutable once it has been set.
 	//
 	// +optional

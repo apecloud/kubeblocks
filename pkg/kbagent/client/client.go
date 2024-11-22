@@ -54,11 +54,15 @@ func GetMockClient() Client {
 	return mockClient
 }
 
-func NewClient(host string, port int32) (Client, error) {
+func NewClient(endpoint func() (string, int32, error)) (Client, error) {
 	if mockClient != nil || mockClientError != nil {
 		return mockClient, mockClientError
 	}
 
+	host, port, err := endpoint()
+	if err != nil {
+		return nil, err
+	}
 	if host == "" && port == 0 {
 		return nil, nil
 	}

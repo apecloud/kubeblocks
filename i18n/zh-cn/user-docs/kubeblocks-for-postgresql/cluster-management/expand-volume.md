@@ -25,17 +25,6 @@ KubeBlocks 支持 Pod 存储磁盘扩容。
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli">
-
-```bash
-kbcli cluster list mycluster -n demo
->
-NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION             TERMINATION-POLICY   STATUS    CREATED-TIME
-mycluster   demo        postgresql           postgresql-14.8.0   Delete               Running   Sep 28,2024 16:47 UTC+0800
-```
-
-</TabItem>
-
 <TabItem value="kubectl" label="kubectl" default>
 
 ```bash
@@ -43,6 +32,17 @@ kubectl -n demo get cluster mycluster
 >
 NAME        CLUSTER-DEFINITION   VERSION             TERMINATION-POLICY   STATUS    AGE
 mycluster   postgresql           postgresql-14.8.0   Delete               Running   29m
+```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+```bash
+kbcli cluster list mycluster -n demo
+>
+NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION             TERMINATION-POLICY   STATUS    CREATED-TIME
+mycluster   demo        postgresql           postgresql-14.8.0   Delete               Running   Sep 28,2024 16:47 UTC+0800
 ```
 
 </TabItem>
@@ -167,9 +167,9 @@ mycluster   postgresql           postgresql-14.8.0   Delete               Runnin
 
 2. 验证扩容操作是否成功。
 
-    - 查看 OpsRequest 进程。
+    - 查看 OpsRequest 进度。
 
-       执行磁盘扩容命令后，KubeBlocks 会自动输出查看 OpsRequest 进程的命令，可通过该命令查看 OpsRequest 进程的细节，包括 OpsRequest 的状态、PVC 状态等。当 OpsRequest 的状态为 `Succeed` 时，表明这一进程已完成。
+       执行磁盘扩容命令后，KubeBlocks 会自动输出查看 OpsRequest 进度的命令，可通过该命令查看 OpsRequest 进度的细节，包括 OpsRequest 的状态、PVC 状态等。当 OpsRequest 的状态为 `Succeed` 时，表明这一任务已完成。
 
        ```bash
        kbcli cluster describe-ops mycluster-volumeexpansion-8257f -n demo

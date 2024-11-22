@@ -24,8 +24,9 @@ import (
 	"fmt"
 	"reflect"
 
+	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -59,8 +60,15 @@ func (t *componentVarsTransformer) Transform(ctx graph.TransformContext, dag *gr
 	reader := &varsReader{transCtx.Client, graphCli, dag}
 	synthesizedComp := transCtx.SynthesizeComponent
 
-	templateVars, envVars, err := component.ResolveTemplateNEnvVars(transCtx.Context, reader,
-		synthesizedComp, transCtx.CompDef.Spec.Vars)
+	vars := transCtx.CompDef.Spec.Vars
+	if len(synthesizedComp.SidecarVars) > 0 {
+		if vars == nil {
+			vars = synthesizedComp.SidecarVars
+		} else {
+			vars = append(vars, synthesizedComp.SidecarVars...)
+		}
+	}
+	templateVars, envVars, err := component.ResolveTemplateNEnvVars(transCtx.Context, reader, synthesizedComp, vars)
 	if err != nil {
 		return err
 	}
@@ -69,7 +77,7 @@ func (t *componentVarsTransformer) Transform(ctx graph.TransformContext, dag *gr
 	envVars2, envData := buildEnvVarsNData(envVars)
 	setTemplateNEnvVars(synthesizedComp, templateVars, envVars2)
 
-	if err := createOrUpdateEnvConfigMap(ctx, dag, envData); err != nil {
+	if err := createOrUpdateEnvConfigMap(ctx, dag, nil, envData); err != nil {
 		return err
 	}
 	return nil
@@ -112,7 +120,9 @@ func envConfigMapSource(clusterName, compName string) corev1.EnvFromSource {
 	}
 }
 
-func createOrUpdateEnvConfigMap(ctx graph.TransformContext, dag *graph.DAG, data map[string]string) error {
+// TODO: remove the deleted env vars from the ConfigMap
+func createOrUpdateEnvConfigMap(ctx graph.TransformContext, dag *graph.DAG,
+	data map[string]string, patches ...map[string]string) error {
 	var (
 		transCtx, _     = ctx.(*componentTransformContext)
 		synthesizedComp = transCtx.SynthesizeComponent
@@ -120,29 +130,73 @@ func createOrUpdateEnvConfigMap(ctx graph.TransformContext, dag *graph.DAG, data
 			Namespace: synthesizedComp.Namespace,
 			Name:      constant.GenerateClusterComponentEnvPattern(synthesizedComp.ClusterName, synthesizedComp.Name),
 		}
+		graphCli, _ = transCtx.Client.(model.GraphClient)
 	)
-	envObj := &corev1.ConfigMap{}
-	err := transCtx.Client.Get(transCtx.Context, envKey, envObj, inDataContext4C())
-	if err != nil && !apierrors.IsNotFound(err) {
+
+	envObj, envObjVertex, err := func() (*corev1.ConfigMap, graph.Vertex, error) {
+		// look up in graph first
+		if v := graphCli.FindMatchedVertex(dag, &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: envKey.Namespace,
+				Name:      envKey.Name,
+			},
+		}); v != nil {
+			return v.(*model.ObjectVertex).Obj.(*corev1.ConfigMap), v, nil
+		}
+
+		obj := &corev1.ConfigMap{}
+		err := transCtx.Client.Get(transCtx.Context, envKey, obj, inDataContext4C())
+		if err != nil {
+			return nil, nil, client.IgnoreNotFound(err)
+		}
+		return obj, nil, nil
+	}()
+	if err != nil {
 		return err
 	}
 
-	graphCli, _ := transCtx.Client.(model.GraphClient)
-	if err != nil { // not-found
+	newData := func() map[string]string {
+		mergeWith := func(m map[string]string) map[string]string {
+			if m == nil {
+				m = make(map[string]string)
+			}
+			for _, patch := range patches {
+				maps.Copy(m, patch)
+			}
+			return m
+		}
+		if data != nil {
+			return mergeWith(data)
+		}
+		if envObj != nil {
+			return mergeWith(maps.Clone(envObj.Data))
+		}
+		return mergeWith(nil)
+	}()
+
+	if envObj == nil {
 		obj := builder.NewConfigMapBuilder(envKey.Namespace, envKey.Name).
 			AddLabelsInMap(constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name)).
 			AddLabelsInMap(synthesizedComp.StaticLabels).
 			AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
-			SetData(data).
+			SetData(newData).
 			GetObject()
 		if err := setCompOwnershipNFinalizer(transCtx.Component, obj); err != nil {
 			return err
 		}
 		graphCli.Create(dag, obj, inDataContext4G())
-	} else if !reflect.DeepEqual(envObj.Data, data) {
-		envObjCopy := envObj.DeepCopy()
-		envObjCopy.Data = data
-		graphCli.Update(dag, envObj, envObjCopy, inDataContext4G())
+		return nil
+	}
+
+	if !reflect.DeepEqual(envObj.Data, newData) {
+		if envObjVertex != nil {
+			envObj.Data = newData // in-place update
+		} else {
+			envObjCopy := envObj.DeepCopy()
+			envObjCopy.Data = newData
+			graphCli.Update(dag, envObj, envObjCopy, inDataContext4G())
+		}
+		return nil
 	}
 	return nil
 }

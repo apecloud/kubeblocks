@@ -23,6 +23,17 @@ import TabItem from '@theme/TabItem';
   
   <Tabs>
 
+  <TabItem value="kubectl" label="kubectl" default>
+
+  ```bash
+  kubectl get addons.extensions.kubeblocks.io mysql
+  >
+  NAME    TYPE   VERSION   PROVIDER   STATUS    AGE
+  mysql   Helm                        Enabled   27h
+  ```
+
+  </TabItem>
+
   <TabItem value="kbcli" label="kbcli">
 
   ```bash
@@ -36,31 +47,11 @@ import TabItem from '@theme/TabItem';
 
   </TabItem>
 
-  <TabItem value="kubectl" label="kubectl" default>
-
-  ```bash
-  kubectl get addons.extensions.kubeblocks.io mysql
-  >
-  NAME    TYPE   VERSION   PROVIDER   STATUS    AGE
-  mysql   Helm                        Enabled   27h
-  ```
-
-  </TabItem>
-
   </Tabs>
 
 * 查看可用于创建集群的数据库类型和版本。
 
   <Tabs>
-
-  <TabItem value="kbcli" label="kbcli">
-
-  ```bash
-  kbcli clusterdefinition list
-  kbcli clusterversion list
-  ```
-
-  </TabItem>
 
   <TabItem value="kubectl" label="kubectl" default>
 
@@ -86,6 +77,15 @@ import TabItem from '@theme/TabItem';
 
   </TabItem>
 
+  <TabItem value="kbcli" label="kbcli">
+
+  ```bash
+  kbcli clusterdefinition list
+  kbcli clusterversion list
+  ```
+
+  </TabItem>
+
   </Tabs>
 
 * 为保持隔离，本教程中创建一个名为 `demo` 的独立命名空间。
@@ -99,46 +99,6 @@ import TabItem from '@theme/TabItem';
 KubeBlocks 支持创建两种类型的 MySQL 集群：单机版（Standalone）和主备版（Replication）。单机版仅支持一个副本，适用于对可用性要求较低的场景。主备版包含两个副本，适用于对高可用性要求较高的场景。为了确保高可用性，所有的副本都默认分布在不同的节点上。
 
 <Tabs>
-
-<TabItem value="kbcli" label="kbcli">
-
-1. 创建 MySQL 集群。
-
-   创建单机版。
-
-   ```bash
-   kbcli cluster create mycluster --cluster-definition mysql -n demo
-   ```
-
-   如果您需要自定义集群规格，kbcli 也提供了诸多参数，如支持设置引擎版本、终止策略、CPU、内存规格。您可通过在命令结尾添加 `--help` 或 `-h` 来查看具体说明。比如，
-
-   ```bash
-   kbcli cluster create mysql --help
-   kbcli cluster create mysql -h
-   ```
-
-   例如，您可以使用 `--replicas` 指定副本数，创建主备版集群。
-
-   ```bash
-   kbcli cluster create mycluster --cluster-definition mysql --replicas=2 -n demo
-   ```
-
-   如果您只有一个节点可用于部署主备版，可将 `topology-keys` 设置为 `null`。
-
-   ```bash
-   kbcli cluster create mycluster --cluster-definition mysql --set replicas=2 --topology-keys null -n demo
-   ```
-
-2. 验证集群是否创建成功。
-
-   ```bash
-   kbcli cluster list -n demo
-   >
-   NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    CREATED-TIME
-   mycluster   demo        mysql                mysql-8.0.30      Delete               Running   Jul 05,2024 18:46 UTC+0800
-   ```
-
-</TabItem>
 
 <TabItem value="kubectl" label="kubectl" default>
 
@@ -230,6 +190,46 @@ KubeBlocks 支持创建两种类型的 MySQL 集群：单机版（Standalone）�
    >
    NAME        CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    AGE
    mycluster   mysql                mysql-8.0.30      Delete               Running   6m53s
+   ```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+1. 创建 MySQL 集群。
+
+   创建单机版。
+
+   ```bash
+   kbcli cluster create mycluster --cluster-definition mysql -n demo
+   ```
+
+   如果您需要自定义集群规格，kbcli 也提供了诸多参数，如支持设置引擎版本、终止策略、CPU、内存规格。您可通过在命令结尾添加 `--help` 或 `-h` 来查看具体说明。比如，
+
+   ```bash
+   kbcli cluster create mysql --help
+   kbcli cluster create mysql -h
+   ```
+
+   例如，您可以使用 `--replicas` 指定副本数，创建主备版集群。
+
+   ```bash
+   kbcli cluster create mycluster --cluster-definition mysql --replicas=2 -n demo
+   ```
+
+   如果您只有一个节点可用于部署主备版，可将 `topology-keys` 设置为 `null`。
+
+   ```bash
+   kbcli cluster create mycluster --cluster-definition mysql --set replicas=2 --topology-keys null -n demo
+   ```
+
+2. 验证集群是否创建成功。
+
+   ```bash
+   kbcli cluster list -n demo
+   >
+   NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    CREATED-TIME
+   mycluster   demo        mysql                mysql-8.0.30      Delete               Running   Jul 05,2024 18:46 UTC+0800
    ```
 
 </TabItem>

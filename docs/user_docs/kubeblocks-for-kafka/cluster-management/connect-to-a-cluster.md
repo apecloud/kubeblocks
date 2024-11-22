@@ -6,6 +6,9 @@ sidebar_position: 2
 sidebar_label: Connect
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # Connect to a Kafka cluster
 
 Before you connect to the Kafka cluster, you must check your network environment, and from which network you would like to connect to the cluster.
@@ -85,9 +88,59 @@ If you use AWS EKS, you may want to access to the Kafka cluster from EC2 instanc
 
 1. Set the value of `host-network-accessible` as true.
 
-    ```bash
-    kbcli cluster create kafka mycluster --host-network-accessible=true -n demo
-    ```
+   <Tabs>
+
+   <TabItem value="kbcli" label="kbcli" default>
+
+   ```bash
+   kbcli cluster create kafka mycluster --host-network-accessible=true -n demo
+   ```
+
+   </TabItem>
+
+   <TabItem value="kubectl" label="kubectl">
+
+   ```bash
+   kubectl apply -f - <<EOF
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: Cluster
+   metadata:
+     name: mycluster
+     namespace: demo
+   spec:
+     affinity:
+       podAntiAffinity: Preferred
+       topologyKeys:
+       - kubernetes.io/hostname
+     clusterDefinitionRef: kafka
+     clusterVersionRef: kafka-3.3.2
+     componentSpecs:
+     - componentDefRef: kafka-server
+       disableExporter: true
+       name: broker
+       replicas: 1
+       resources:
+         limits:
+           cpu: "1"
+           memory: 1Gi
+         requests:
+           cpu: "1"
+           memory: 1Gi
+       serviceAccountName: kb-sa-kafka
+       services:
+       - annotations: 
+           service.beta.kubernetes.io/aws-load-balancer-type: nlb
+           service.beta.kubernetes.io/aws-load-balancer-internal: "true"
+         name: vpc
+         serviceType: LoadBalancer
+       tls: false
+     terminationPolicy: Delete
+   EOF
+   ```
+
+   </TabItem>
+
+   </Tabs>
 
 2. Get the corresponding ELB address.
 
@@ -121,9 +174,59 @@ The current version only supports Kafka broker with a single replica (combined: 
 
 1. Set the `--publicly-accessible` value as true when creating cluster.
 
-    ```bash
-    kbcli cluster create kafka mycluster --publicly-accessible=true -n demo
-    ```
+   <Tabs>
+
+   <TabItem value="kbcli" label="kbcli" default>
+
+   ```bash
+   kbcli cluster create kafka mycluster --publicly-accessible=true -n demo
+   ```
+
+   </TabItem>
+
+   <TabItem value="kubectl" label="kubectl">
+
+   ```bash
+   kubectl apply -f - <<EOF
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: Cluster
+   metadata:
+     name: mycluster
+     namespace: demo
+   spec:
+     affinity:
+       podAntiAffinity: Preferred
+       topologyKeys:
+       - kubernetes.io/hostname
+     clusterDefinitionRef: kafka
+     clusterVersionRef: kafka-3.3.2
+     componentSpecs:
+     - componentDefRef: kafka-server
+       disableExporter: true
+       name: broker
+       replicas: 1
+       resources:
+         limits:
+           cpu: "1"
+           memory: 1Gi
+         requests:
+           cpu: "1"
+           memory: 1Gi
+       serviceAccountName: kb-sa-kafka
+       services:
+       - annotations: 
+           service.beta.kubernetes.io/aws-load-balancer-type: nlb
+           service.beta.kubernetes.io/aws-load-balancer-internal: "false"
+         name: vpc
+         serviceType: LoadBalancer
+       tls: false
+     terminationPolicy: Delete
+   EOF
+   ```
+
+   </TabItem>
+
+   </Tabs>
 
 2. Get the corresponding ELB address.
 

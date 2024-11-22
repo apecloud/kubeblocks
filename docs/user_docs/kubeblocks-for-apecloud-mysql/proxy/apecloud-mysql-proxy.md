@@ -715,7 +715,7 @@ You can also set the ratio for read-write splitting and here is an example of di
 kbcli cluster configure myproxy --components vtgate --set=read_write_splitting_ratio=70
 ```
 
-Moreover, you can [use Grafana](#monitoring) or run `show workload` to view the flow distribution.
+Moreover, you can [use Grafana](#monitoring) or run `show workload` in the VTGate terminal to view the flow distribution.
 
 ```bash
 show workload;

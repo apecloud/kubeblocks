@@ -34,18 +34,29 @@ type Server interface {
 }
 
 type Config struct {
+	Server           bool
 	Address          string
 	UnixDomainSocket string
 	Port             int
+	StreamingPort    int
 	Concurrency      int
 	Logging          bool
 }
 
 // NewHTTPServer returns a new HTTP server.
 func NewHTTPServer(logger logr.Logger, config Config, services []service.Service) Server {
-	return &server{
+	return &httpServer{
 		logger:   logger,
 		config:   config,
 		services: services,
+	}
+}
+
+// NewStreamingServer returns a new Streaming server.
+func NewStreamingServer(logger logr.Logger, config Config, service service.Service) Server {
+	return &streamingServer{
+		logger:  logger,
+		config:  config,
+		service: service,
 	}
 }

@@ -149,9 +149,8 @@ single_thread_memory = 294912
 			},
 		}
 		component = &ctrlcomp.SynthesizedComponent{
-			ClusterDefName: "mysql-three-node-definition",
-			Name:           "replicasets",
-			Replicas:       5,
+			Name:     "replicasets",
+			Replicas: 5,
 			VolumeClaimTemplates: []corev1.PersistentVolumeClaimTemplate{
 				{
 					ObjectMeta: metav1.ObjectMeta{

@@ -291,14 +291,6 @@ type InstanceSetStatus struct {
 	// +optional
 	MembersStatus []MemberStatus `json:"membersStatus,omitempty"`
 
-	// Indicates whether it is required for the InstanceSet to have at least one primary instance ready.
-	//
-	// Deprecated: since instanceset no longer checks a "primary" role when doing ready check, this
-	// field is no longer needed and will be removed in the future.
-	//
-	// +optional
-	ReadyWithoutPrimary bool `json:"readyWithoutPrimary,omitempty"`
-
 	// currentRevisions, if not empty, indicates the old version of the InstanceSet used to generate the underlying workload.
 	// key is the pod name, value is the revision.
 	//

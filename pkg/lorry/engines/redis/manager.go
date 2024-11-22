@@ -66,7 +66,7 @@ func NewManager(properties engines.Properties) (engines.DBManager, error) {
 	}
 
 	if viper.IsSet(constant.KBEnvServicePort) {
-		properties["redisHost"] = fmt.Sprintf("127.0.0,1:%s", viper.GetString(constant.KBEnvServicePort))
+		properties["redisHost"] = fmt.Sprintf("127.0.0.1:%s", viper.GetString(constant.KBEnvServicePort))
 	}
 
 	managerBase, err := engines.NewDBManagerBase(logger)

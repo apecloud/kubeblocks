@@ -530,6 +530,8 @@ func buildChanges(oldObjectMap, newObjectMap map[model.GVKNObjKey]client.Object,
 		tracev1.ObjectUpdateType:   updateSet,
 		tracev1.ObjectDeletionType: deleteSet,
 	}
+	// Why not use for-range on allObjectMap:
+	// Order is important here. A for-range on a map can't guarantee the built changes' order.
 	for _, changeType := range []tracev1.ObjectChangeType{tracev1.ObjectCreationType, tracev1.ObjectUpdateType, tracev1.ObjectDeletionType} {
 		changeSet := allObjectMap[changeType]
 		for key := range changeSet {

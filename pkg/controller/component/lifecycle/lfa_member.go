@@ -21,8 +21,6 @@ package lifecycle
 
 import (
 	"context"
-	"fmt"
-	"math"
 
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -72,10 +70,7 @@ func (a *switchover) parameters(ctx context.Context, cli client.Reader) (map[str
 	//
 	// - KB_SWITCHOVER_CANDIDATE_NAME: The name of the pod for the new leader candidate, which may not be specified (empty).
 	// - KB_SWITCHOVER_CANDIDATE_FQDN: The FQDN of the new leader candidate's pod, which may not be specified (empty).
-	m, err := hackParameters4Switchover(ctx, cli, a.namespace, a.clusterName, a.compName, a.roles)
-	if err != nil {
-		return nil, err
-	}
+	m := make(map[string]string)
 	if len(a.candidate) > 0 {
 		compName := constant.GenerateClusterComponentName(a.clusterName, a.compName)
 		m[switchoverCandidateName] = a.candidate
@@ -132,55 +127,4 @@ func (a *memberLeave) parameters(ctx context.Context, cli client.Reader) (map[st
 		leaveMemberPodFQDNVar: component.PodFQDN(a.namespace, compName, a.pod.Name),
 		leaveMemberPodNameVar: a.pod.Name,
 	}, nil
-}
-
-////////// hack for legacy Addons //////////
-// The container executing this action has access to following variables:
-//
-// - KB_LEADER_POD_IP: The IP address of the current leader's pod prior to the switchover.
-// - KB_LEADER_POD_NAME: The name of the current leader's pod prior to the switchover.
-// - KB_LEADER_POD_FQDN: The FQDN of the current leader's pod prior to the switchover.
-
-func hackParameters4Switchover(ctx context.Context, cli client.Reader, namespace, clusterName, compName string, roles []appsv1.ReplicaRole) (map[string]string, error) {
-	const (
-		leaderPodName = "KB_LEADER_POD_NAME"
-		leaderPodFQDN = "KB_LEADER_POD_FQDN"
-		leaderPodIP   = "KB_LEADER_POD_IP"
-	)
-
-	role, err := leaderRole(roles)
-	if err != nil {
-		return nil, err
-	}
-
-	pods, err := component.ListOwnedPodsWithRole(ctx, cli, namespace, clusterName, compName, role)
-	if err != nil {
-		return nil, err
-	}
-	if len(pods) == 0 {
-		return nil, fmt.Errorf("has no pod with the leader role %s", role)
-	}
-	if len(pods) > 1 {
-		return nil, fmt.Errorf("more than one pod found as leader: %d, role: %s", len(pods), role)
-	}
-
-	pod := pods[0]
-	return map[string]string{
-		leaderPodName: pod.Name,
-		leaderPodFQDN: component.PodFQDN(namespace, constant.GenerateClusterComponentName(clusterName, compName), pod.Name),
-		leaderPodIP:   pod.Status.PodIP,
-	}, nil
-}
-
-func leaderRole(roles []appsv1.ReplicaRole) (string, error) {
-	// HACK: assume the role with highest priority to be leader
-	highestPriority := math.MinInt
-	var role string
-	for _, r := range roles {
-		if r.UpdatePriority > highestPriority {
-			highestPriority = r.UpdatePriority
-			role = r.Name
-		}
-	}
-	return role, nil
 }

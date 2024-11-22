@@ -27,7 +27,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/klauspost/compress/zstd"
 	appsv1 "k8s.io/api/apps/v1"
@@ -160,28 +159,17 @@ func isRunningAndAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
 	return podutils.IsPodAvailable(pod, minReadySeconds, metav1.Now())
 }
 
-func isContainersReady(pod *corev1.Pod) bool {
-	index := slices.IndexFunc(pod.Status.Conditions, func(condition corev1.PodCondition) bool {
-		return condition.Type == corev1.ContainersReady
-	})
-	if index < 0 {
-		return false
-	}
-	if pod.Status.Conditions[index].Status != corev1.ConditionTrue {
-		return false
-	}
-	containersReadyTime := pod.Status.Conditions[index].LastTransitionTime.Time
-	twoSecondsAgo := metav1.Now().Add(-2 * time.Second)
+func isContainersRunning(pod *corev1.Pod) bool {
 	for _, status := range pod.Status.ContainerStatuses {
 		if status.State.Running == nil {
-			continue
-		}
-		startedAt := status.State.Running.StartedAt
-		if startedAt.After(containersReadyTime) && startedAt.After(twoSecondsAgo) {
 			return false
 		}
 	}
 	return true
+}
+
+func isContainersReady(pod *corev1.Pod) bool {
+	return isImageMatched(pod) && isContainersRunning(pod)
 }
 
 // isCreated returns true if pod has been created and is maintained by the API server
@@ -232,10 +220,12 @@ func isImageMatched(pod *corev1.Pod) bool {
 			return false
 		}
 		// otherwise, statusName should be same as or has suffix of specName
-		// remove registry and repository in specName (if presents)
-		names := strings.Split(specName, "/")
-		if !strings.HasSuffix(statusName, "/"+names[len(names)-1]) {
-			return false
+		if specName != statusName {
+			specNames := strings.Split(specName, "/")
+			statusNames := strings.Split(statusName, "/")
+			if specNames[len(specNames)-1] != statusNames[len(statusNames)-1] {
+				return false
+			}
 		}
 	}
 	return true

@@ -115,6 +115,7 @@ func (s *objectRevisionStore) Get(objectRef *model.GVKNObjKey, revision int64) (
 	if !ok {
 		return nil, apierrors.NewNotFound(objectRef.GroupVersion().WithResource(strings.ToLower(objectRef.Kind)).GroupResource(), objectRef.Name)
 	}
+	object = object.DeepCopyObject().(client.Object)
 	return object, nil
 }
 
@@ -126,7 +127,16 @@ func (s *objectRevisionStore) List(gvk *schema.GroupVersionKind) map[types.Names
 	if !ok {
 		return nil
 	}
-	return objectMap
+	objectMapCopy := make(map[types.NamespacedName]map[int64]client.Object, len(objectMap))
+	for name, revisionMap := range objectMap {
+		revisionMapCopy := make(map[int64]client.Object, len(revisionMap))
+		objectMapCopy[name] = revisionMapCopy
+		for revision, object := range revisionMap {
+			objectCopy := object.DeepCopyObject().(client.Object)
+			revisionMapCopy[revision] = objectCopy
+		}
+	}
+	return objectMapCopy
 }
 
 func (s *objectRevisionStore) Delete(objectRef *model.GVKNObjKey, reference client.Object, revision int64) {

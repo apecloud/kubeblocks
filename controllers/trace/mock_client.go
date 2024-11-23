@@ -178,8 +178,8 @@ func doPatch(obj client.Object, patch client.Patch, store ChangeCaptureStore, sc
 	if err != nil {
 		return err
 	}
-	newObj := oldObj.DeepCopyObject().(client.Object)
-	if err = applyPatch(newObj, patch.Type(), patchData); err != nil {
+	newObj, err := applyPatch(oldObj, patch.Type(), patchData)
+	if err != nil {
 		return err
 	}
 	metaChanged := checkMetadata(oldObj, newObj)
@@ -196,11 +196,11 @@ func doPatch(obj client.Object, patch client.Patch, store ChangeCaptureStore, sc
 	return nil
 }
 
-func applyPatch(obj client.Object, patchType types.PatchType, patchData []byte) error {
+func applyPatch(obj client.Object, patchType types.PatchType, patchData []byte) (client.Object, error) {
 	// Convert the object to JSON
 	originalJSON, err := json.Marshal(obj)
 	if err != nil {
-		return fmt.Errorf("failed to marshal original object: %w", err)
+		return nil, fmt.Errorf("failed to marshal original object: %w", err)
 	}
 
 	// Apply the patch
@@ -211,14 +211,32 @@ func applyPatch(obj client.Object, patchType types.PatchType, patchData []byte) 
 	case types.MergePatchType:
 		patchedJSON, err = jsonpatch.MergePatch(originalJSON, patchData)
 	default:
-		return fmt.Errorf("unsupported patch type: %s", patchType)
+		return nil, fmt.Errorf("unsupported patch type: %s", patchType)
 	}
 	if err != nil {
-		return fmt.Errorf("failed to apply patch: %w", err)
+		return nil, fmt.Errorf("failed to apply patch: %w", err)
 	}
 
-	// Unmarshal the patched JSON back into the object
-	return json.Unmarshal(patchedJSON, obj)
+	// Unmarshal the patched JSON into a new clean object
+	newObj := obj.DeepCopyObject().(client.Object)
+	zeroOutStruct(newObj)
+	err = json.Unmarshal(patchedJSON, newObj)
+	return newObj, err
+}
+
+// zeroOutStruct zero out a struct
+func zeroOutStruct(i interface{}) {
+	v := reflect.ValueOf(i)
+	if v.Kind() != reflect.Ptr {
+		return // Must be a pointer
+	}
+	elem := v.Elem()
+	if elem.Kind() != reflect.Struct {
+		return // Must be pointing to a struct
+	}
+	// Create zero value of the same type and set it
+	zero := reflect.Zero(elem.Type())
+	elem.Set(zero)
 }
 
 func checkMetadata(oldObj client.Object, newObj client.Object) bool {

@@ -383,6 +383,11 @@ func (in *LastComponentConfiguration) DeepCopyInto(out *LastComponentConfigurati
 		*out = new(int32)
 		**out = **in
 	}
+	if in.Shards != nil {
+		in, out := &in.Shards, &out.Shards
+		*out = new(int32)
+		**out = **in
+	}
 	in.ResourceRequirements.DeepCopyInto(&out.ResourceRequirements)
 	if in.VolumeClaimTemplates != nil {
 		in, out := &in.VolumeClaimTemplates, &out.VolumeClaimTemplates

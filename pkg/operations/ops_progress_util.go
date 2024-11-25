@@ -547,6 +547,10 @@ func handleComponentProgressForScalingShards(reqCtx intctrlutil.RequestCtx,
 			completedCount = updateShards
 		}
 	}
+	if completedCount > updateShards {
+		// completedCount may exceed updated shards if components have been rebuilt by other operations.
+		completedCount = updateShards
+	}
 	return updateShards, completedCount, err
 }
 

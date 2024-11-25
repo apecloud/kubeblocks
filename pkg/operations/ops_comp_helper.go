@@ -31,7 +31,6 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -273,18 +272,11 @@ func (c componentOpsHelper) reconcileActionWithComponentOps(reqCtx intctrlutil.R
 		if c.existFailure(opsRes.OpsRequest, pgResource.compOps.GetComponentName()) {
 			existFailure = true
 		}
-		componentPhase := opsRes.Cluster.Status.Components[pgResource.compOps.GetComponentName()].Phase
+		var componentPhase appsv1.ComponentPhase
 		if pgResource.shards == nil {
-			if opsCompStatus.Phase != componentPhase {
-				opsCompStatus.Phase = componentPhase
-			}
+			componentPhase = opsRes.Cluster.Status.Components[pgResource.compOps.GetComponentName()].Phase
 		} else {
-			compObj, err := component.GetComponentByName(reqCtx.Ctx, cli, opsRes.Cluster.Namespace,
-				constant.GenerateClusterComponentName(opsRes.Cluster.Name, pgResource.fullComponentName))
-			if err != nil {
-				return opsRequestPhase, 0, err
-			}
-			componentPhase = compObj.Status.Phase
+			componentPhase = opsRes.Cluster.Status.Shardings[pgResource.compOps.GetComponentName()].Phase
 		}
 		// conditions whether ops is running:
 		//  1. completedProgressCount is not equal to expectProgressCount.
@@ -296,6 +288,7 @@ func (c componentOpsHelper) reconcileActionWithComponentOps(reqCtx intctrlutil.R
 			(!slices.Contains(componentTerminalPhases(), componentPhase) || completedCount == 0) {
 			opsIsCompleted = false
 		}
+		opsCompStatus.Phase = componentPhase
 		opsRequest.Status.Components[pgResource.compOps.GetComponentName()] = opsCompStatus
 	}
 	// TODO: wait for sharding cluster to completed for next opsRequest.

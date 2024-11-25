@@ -421,8 +421,12 @@ func updateProgressDetailForHScale(
 	pgRes *progressResource,
 	compStatus *opsv1alpha1.OpsRequestComponentStatus,
 	objectKey string, status opsv1alpha1.ProgressStatus) {
+	var group string
+	if pgRes.fullComponentName != "" {
+		group = fmt.Sprintf("%s/%s", pgRes.fullComponentName, pgRes.opsMessageKey)
+	}
 	progressDetail := opsv1alpha1.ProgressStatusDetail{
-		Group:     fmt.Sprintf("%s/%s", pgRes.fullComponentName, pgRes.opsMessageKey),
+		Group:     group,
 		ObjectKey: objectKey,
 		Status:    status,
 	}
@@ -542,10 +546,7 @@ func handleComponentProgressForScalingShards(reqCtx intctrlutil.RequestCtx,
 		completedCount, err = handleScaleOutForShards(reqCtx, cli, opsRes, pgRes, compStatus)
 	} else if updateShards < 0 {
 		updateShards *= -1
-		completedCount, err = handleScaleInForShards(reqCtx, cli, opsRes, pgRes, compStatus)
-		if *pgRes.shards == *pgRes.compOps.(opsv1alpha1.HorizontalScaling).Shards {
-			completedCount = updateShards
-		}
+		completedCount, err = handleScaleInForShards(reqCtx, cli, opsRes, pgRes, compStatus, updateShards)
 	}
 	if completedCount > updateShards {
 		// completedCount may exceed updated shards if components have been rebuilt by other operations.
@@ -588,7 +589,8 @@ func handleScaleInForShards(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	opsRes *OpsResource,
 	pgRes *progressResource,
-	compStatus *opsv1alpha1.OpsRequestComponentStatus) (int32, error) {
+	compStatus *opsv1alpha1.OpsRequestComponentStatus,
+	updateShards int32) (int32, error) {
 	compList, err := intctrlutil.ListShardingComponents(reqCtx.Ctx, cli, opsRes.Cluster, pgRes.compOps.GetComponentName())
 	if err != nil {
 		return 0, err
@@ -598,7 +600,7 @@ func handleScaleInForShards(reqCtx intctrlutil.RequestCtx,
 	for _, comp := range compList {
 		objKey := getProgressObjectKey(appsv1.ComponentKind, comp.Name)
 		compMap[objKey] = struct{}{}
-		if comp.DeletionTimestamp.Before(&opsRes.OpsRequest.Status.StartTimestamp) {
+		if comp.DeletionTimestamp.IsZero() || comp.DeletionTimestamp.Before(&opsRes.OpsRequest.Status.StartTimestamp) {
 			continue
 		}
 		pgRes.opsMessageKey = "delete"
@@ -610,6 +612,9 @@ func handleScaleInForShards(reqCtx intctrlutil.RequestCtx,
 			completedCount += 1
 			updateProgressDetailForHScale(opsRes, pgRes, compStatus, progressDetail.ObjectKey, opsv1alpha1.SucceedProgressStatus)
 		}
+	}
+	if int32(len(compList)) == *pgRes.compOps.(opsv1alpha1.HorizontalScaling).Shards {
+		completedCount = updateShards
 	}
 	return completedCount, nil
 }

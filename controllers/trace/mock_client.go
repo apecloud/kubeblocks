@@ -218,25 +218,42 @@ func applyPatch(obj client.Object, patchType types.PatchType, patchData []byte) 
 	}
 
 	// Unmarshal the patched JSON into a new clean object
-	newObj := obj.DeepCopyObject().(client.Object)
-	zeroOutStruct(newObj)
+	newObj, err := newZeroObject(obj)
+	if err != nil {
+		return nil, err
+	}
 	err = json.Unmarshal(patchedJSON, newObj)
 	return newObj, err
 }
 
-// zeroOutStruct zero out a struct
-func zeroOutStruct(i interface{}) {
-	v := reflect.ValueOf(i)
-	if v.Kind() != reflect.Ptr {
-		return // Must be a pointer
+// newZeroObject creates a new zeroed instance of the same type as the given object
+func newZeroObject(obj client.Object) (client.Object, error) {
+	if obj == nil {
+		return nil, fmt.Errorf("input object cannot be nil")
 	}
-	elem := v.Elem()
-	if elem.Kind() != reflect.Struct {
-		return // Must be pointing to a struct
+
+	// Get the reflect.Type of the original object
+	t := reflect.TypeOf(obj)
+	if t.Kind() != reflect.Ptr {
+		return nil, fmt.Errorf("object must be a pointer")
 	}
-	// Create zero value of the same type and set it
-	zero := reflect.Zero(elem.Type())
-	elem.Set(zero)
+
+	// Get the underlying type (struct type)
+	elemType := t.Elem()
+	if elemType.Kind() != reflect.Struct {
+		return nil, fmt.Errorf("object must be a pointer to struct")
+	}
+
+	// Create new instance
+	newObj := reflect.New(elemType).Interface()
+
+	// Type assert to client.Object
+	clientObj, ok := newObj.(client.Object)
+	if !ok {
+		return nil, fmt.Errorf("failed to convert new instance to client.Object")
+	}
+
+	return clientObj, nil
 }
 
 func checkMetadata(oldObj client.Object, newObj client.Object) bool {

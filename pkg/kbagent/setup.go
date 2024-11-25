@@ -169,7 +169,7 @@ func getActionProbeNStreamingEnvValues(envVars map[string]string) (string, strin
 	}
 	ds, ok := envVars[streamingEnvName]
 	if !ok {
-		return da, "", ""
+		return da, dp, ""
 	}
 	return da, dp, ds
 }
@@ -192,8 +192,10 @@ func deserializeActionNProbe(da, dp string) ([]proto.Action, []proto.Probe, erro
 		return nil, nil, err
 	}
 	probes := make([]proto.Probe, 0)
-	if err := json.Unmarshal([]byte(dp), &probes); err != nil {
-		return nil, nil, err
+	if len(dp) > 0 {
+		if err := json.Unmarshal([]byte(dp), &probes); err != nil {
+			return nil, nil, err
+		}
 	}
 	return actions, probes, nil
 }

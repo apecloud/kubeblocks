@@ -196,7 +196,7 @@ func (r *ComponentReconciler) SetupWithManager(mgr ctrl.Manager, multiClusterMgr
 }
 
 func (r *ComponentReconciler) setupWithManager(mgr ctrl.Manager) error {
-	b := intctrlutil.NewNamespacedControllerManagedBy(mgr).
+	b := intctrlutil.NewControllerManagedBy(mgr, &appsv1.Component{}, &workloads.InstanceSet{}).
 		For(&appsv1.Component{}).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: viper.GetInt(constant.CfgKBReconcileWorkers),
@@ -220,7 +220,7 @@ func (r *ComponentReconciler) setupWithManager(mgr ctrl.Manager) error {
 }
 
 func (r *ComponentReconciler) setupWithMultiClusterManager(mgr ctrl.Manager, multiClusterMgr multicluster.Manager) error {
-	b := intctrlutil.NewNamespacedControllerManagedBy(mgr).
+	b := intctrlutil.NewControllerManagedBy(mgr, &appsv1.Component{}, &workloads.InstanceSet{}).
 		For(&appsv1.Component{}).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: viper.GetInt(constant.CfgKBReconcileWorkers),

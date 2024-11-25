@@ -21,6 +21,9 @@ package constant
 
 // annotations defined by KubeBlocks
 const (
+	// CRDAPIVersionAnnotationKey indicates the CRD API version of the object.
+	CRDAPIVersionAnnotationKey = "kubeblocks.io/crd-api-version"
+
 	ClusterSnapshotAnnotationKey         = "kubeblocks.io/cluster-snapshot"          // ClusterSnapshotAnnotationKey saves the snapshot of cluster.
 	EncryptedSystemAccountsAnnotationKey = "kubeblocks.io/encrypted-system-accounts" // EncryptedSystemAccountsAnnotationKey saves the encrypted system accounts.
 	OpsRequestAnnotationKey              = "kubeblocks.io/ops-request"               // OpsRequestAnnotationKey OpsRequest annotation key in Cluster

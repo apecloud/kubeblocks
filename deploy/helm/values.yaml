@@ -1866,7 +1866,7 @@ controllers:
   experimental:
     enabled: false
   trace:
-    enabled: true
+    enabled: false
 
 featureGates:
   ignoreConfigTemplateDefaultMode:

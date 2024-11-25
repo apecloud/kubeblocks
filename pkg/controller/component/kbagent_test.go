@@ -127,14 +127,15 @@ var _ = Describe("kb-agent", func() {
 
 			c := kbAgentContainer()
 			Expect(c).ShouldNot(BeNil())
-			Expect(c.Ports).Should(HaveLen(1))
-			Expect(c.Ports[0].ContainerPort).Should(Equal(int32(kbAgentDefaultPort)))
+			Expect(c.Ports).Should(HaveLen(2))
+			Expect(c.Ports[0].ContainerPort).Should(Equal(int32(kbagent.DefaultHTTPPort)))
+			Expect(c.Ports[1].ContainerPort).Should(Equal(int32(kbagent.DefaultStreamingPort)))
 		})
 
 		It("port - in use", func() {
 			synthesizedComp.PodSpec.Containers[0].Ports = []corev1.ContainerPort{
 				{
-					ContainerPort: kbAgentDefaultPort,
+					ContainerPort: kbagent.DefaultHTTPPort,
 				},
 			}
 			err := buildKBAgentContainer(synthesizedComp)
@@ -142,8 +143,9 @@ var _ = Describe("kb-agent", func() {
 
 			c := kbAgentContainer()
 			Expect(c).ShouldNot(BeNil())
-			Expect(c.Ports).Should(HaveLen(1))
-			Expect(c.Ports[0].ContainerPort).Should(Equal(int32(kbAgentDefaultPort + 1)))
+			Expect(c.Ports).Should(HaveLen(2))
+			Expect(c.Ports[0].ContainerPort).Should(Equal(int32(kbagent.DefaultHTTPPort + 1)))
+			Expect(c.Ports[1].ContainerPort).Should(Equal(int32(kbagent.DefaultStreamingPort + 1)))
 		})
 
 		It("startup env", func() {
@@ -152,7 +154,7 @@ var _ = Describe("kb-agent", func() {
 
 			c := kbAgentContainer()
 			Expect(c).ShouldNot(BeNil())
-			Expect(c.Env).Should(HaveLen(6))
+			Expect(c.Env).Should(HaveLen(6)) // 4 + 2
 		})
 
 		It("action env", func() {
@@ -177,7 +179,7 @@ var _ = Describe("kb-agent", func() {
 
 			c := kbAgentContainer()
 			Expect(c).ShouldNot(BeNil())
-			Expect(c.Env).Should(HaveLen(8))
+			Expect(c.Env).Should(HaveLen(8)) // 2 + 4 + 2
 			Expect(reflect.DeepEqual(c.Env[0], env[0])).Should(BeTrue())
 			Expect(reflect.DeepEqual(c.Env[1], env[1])).Should(BeTrue())
 		})

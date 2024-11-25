@@ -137,6 +137,28 @@ type SpecificOpsRequest struct {
 	// +listMapKey=componentName
 	VolumeExpansionList []VolumeExpansion `json:"volumeExpansion,omitempty"  patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
 
+	// Lists Components to be started. If empty, all components will be started.
+	//
+	// +optional
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.start"
+	// +kubebuilder:validation:MaxItems=1024
+	// +patchMergeKey=componentName
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=componentName
+	StartList []ComponentOps `json:"start,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
+
+	// Lists Components to be stopped. If empty, all components will be stopped.
+	//
+	// +optional
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.stop"
+	// +kubebuilder:validation:MaxItems=1024
+	// +patchMergeKey=componentName
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=componentName
+	StopList []ComponentOps `json:"stop,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
+
 	// Lists Components to be restarted.
 	//
 	// +optional

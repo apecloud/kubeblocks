@@ -1451,6 +1451,16 @@ func (in *SpecificOpsRequest) DeepCopyInto(out *SpecificOpsRequest) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.StartList != nil {
+		in, out := &in.StartList, &out.StartList
+		*out = make([]ComponentOps, len(*in))
+		copy(*out, *in)
+	}
+	if in.StopList != nil {
+		in, out := &in.StopList, &out.StopList
+		*out = make([]ComponentOps, len(*in))
+		copy(*out, *in)
+	}
 	if in.RestartList != nil {
 		in, out := &in.RestartList, &out.RestartList
 		*out = make([]ComponentOps, len(*in))

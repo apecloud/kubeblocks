@@ -4987,8 +4987,7 @@ spec:
                 maxLength: 32
                 type: string
               services:
-                description: Overrides Services defined in referenced ComponentDefinition
-                  and exposes endpoints that can be accessed by clients.
+                description: Overrides Services defined in referenced ComponentDefinition.
                 items:
                   description: |-
                     ComponentService defines a service that would be exposed as an inter-component service within a Cluster.
@@ -5433,6 +5432,34 @@ spec:
                       type: object
                   required:
                   - name
+                  type: object
+                type: array
+              sidecars:
+                description: Specifies the sidecars to be injected into the Component.
+                items:
+                  properties:
+                    name:
+                      description: |-
+                        Name specifies the unique name of the sidecar.
+
+
+                        The name will be used as the name of the sidecar container in the Pod.
+                      type: string
+                    owner:
+                      description: |-
+                        Specifies the exact component definition that the sidecar belongs to.
+
+
+                        A sidecar will be updated when the owner component definition is updated only.
+                      type: string
+                    sidecarDef:
+                      description: Specifies the sidecar definition CR to be used
+                        to create the sidecar.
+                      type: string
+                  required:
+                  - name
+                  - owner
+                  - sidecarDef
                   type: object
                 type: array
               stop:

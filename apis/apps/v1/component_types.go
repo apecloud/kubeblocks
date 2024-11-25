@@ -149,7 +149,7 @@ type ComponentSpec struct {
 	// +optional
 	Volumes []corev1.Volume `json:"volumes,omitempty"`
 
-	// Overrides Services defined in referenced ComponentDefinition and exposes endpoints that can be accessed by clients.
+	// Overrides Services defined in referenced ComponentDefinition.
 	//
 	// +optional
 	Services []ComponentService `json:"services,omitempty"`
@@ -284,6 +284,11 @@ type ComponentSpec struct {
 	//
 	// +optional
 	Stop *bool `json:"stop,omitempty"`
+
+	// Specifies the sidecars to be injected into the Component.
+	//
+	// +optional
+	Sidecars []Sidecar `json:"sidecars,omitempty"`
 }
 
 // ComponentStatus represents the observed state of a Component within the Cluster.
@@ -322,6 +327,27 @@ type ComponentStatus struct {
 	//
 	// +optional
 	Message map[string]string `json:"message,omitempty"`
+}
+
+type Sidecar struct {
+	// Name specifies the unique name of the sidecar.
+	//
+	// The name will be used as the name of the sidecar container in the Pod.
+	//
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// Specifies the exact component definition that the sidecar belongs to.
+	//
+	// A sidecar will be updated when the owner component definition is updated only.
+	//
+	// +kubebuilder:validation:Required
+	Owner string `json:"owner"`
+
+	// Specifies the sidecar definition CR to be used to create the sidecar.
+	//
+	// +kubebuilder:validation:Required
+	SidecarDef string `json:"sidecarDef"`
 }
 
 // ComponentPhase defines the phase of the Component within the .status.phase field.

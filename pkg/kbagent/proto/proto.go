@@ -19,7 +19,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package proto
 
-import "time"
+import (
+	"time"
+)
 
 type Action struct {
 	Name           string       `json:"name"`
@@ -54,6 +56,12 @@ type ActionResponse struct {
 
 // TODO: define the event spec for probe or async action
 
+const (
+	ProbeEventFieldPath           = "spec.containers{kbagent}"
+	ProbeEventReportingController = "kbagent"
+	ProbeEventSourceComponent     = "kbagent"
+)
+
 type Probe struct {
 	Instance            string `json:"instance"`
 	Action              string `json:"action"`
@@ -72,8 +80,32 @@ type ProbeEvent struct {
 	Message  string `json:"message,omitempty"` // message of the probe on failure
 }
 
-const (
-	ProbeEventFieldPath           = "spec.containers{kbagent}"
-	ProbeEventReportingController = "kbagent"
-	ProbeEventSourceComponent     = "kbagent"
-)
+type Task struct {
+	Instance            string          `json:"instance"`
+	Task                string          `json:"task"`
+	UID                 string          `json:"UID"`                           // the unique identifier of the task
+	Replicas            string          `json:"replicas"`                      // target replicas to run the task
+	NotifyAtFinish      bool            `json:"notifyAtFinish,omitempty"`      // whether to notify the controller when the task is finished
+	ReportPeriodSeconds int32           `json:"reportPeriodSeconds,omitempty"` // the period to report the progress of the task
+	NewReplica          *NewReplicaTask `json:"newReplica,omitempty"`
+}
+
+type TaskEvent struct {
+	Instance  string    `json:"instance"`
+	Task      string    `json:"task"`
+	UID       string    `json:"UID"`
+	Replica   string    `json:"replica"`
+	StartTime time.Time `json:"startTime"`
+	EndTime   time.Time `json:"endTime"`
+	Code      int32     `json:"code"`
+	Output    []byte    `json:"output,omitempty"`  // output of the task on success
+	Message   string    `json:"message,omitempty"` // message of the task on failure
+}
+
+type NewReplicaTask struct {
+	Remote         string            `json:"remote"` // the remote address of the data source
+	Port           int32             `json:"port"`
+	Replicas       string            `json:"replicas"`             // replicas to load the data
+	Parameters     map[string]string `json:"parameters,omitempty"` // parameters for data dump and load
+	TimeoutSeconds *int32            `json:"timeoutSeconds,omitempty"`
+}

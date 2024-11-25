@@ -107,7 +107,7 @@ var _ = Describe("Cluster Controller", func() {
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupSignature, true, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupPolicySignature, true, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.VolumeSnapshotSignature, true, inNS)
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ServiceSignature, true, inNS)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ServiceSignature, true, inNS, ml)
 		// non-namespaced
 		testapps.ClearResources(&testCtx, generics.BackupPolicyTemplateSignature, ml)
 		testapps.ClearResources(&testCtx, generics.ActionSetSignature, ml)
@@ -306,7 +306,7 @@ var _ = Describe("Cluster Controller", func() {
 			ml, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(defaultShardCount))
 
 		By("checking backup policy")
-		backupPolicyName := generateBackupPolicyName(clusterKey.Name, compTplName, false)
+		backupPolicyName := generateBackupPolicyName(clusterKey.Name, compTplName)
 		backupPolicyKey := client.ObjectKey{Name: backupPolicyName, Namespace: clusterKey.Namespace}
 		Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, bp *dpv1alpha1.BackupPolicy) {
 			g.Expect(bp.Spec.Targets).Should(HaveLen(defaultShardCount))
@@ -1071,7 +1071,7 @@ var _ = Describe("Cluster Controller", func() {
 				}
 
 				By("checking backup policy")
-				backupPolicyName := generateBackupPolicyName(clusterKey.Name, defaultCompName, false)
+				backupPolicyName := generateBackupPolicyName(clusterKey.Name, defaultCompName)
 				backupPolicyKey := client.ObjectKey{Name: backupPolicyName, Namespace: clusterKey.Namespace}
 				backupPolicy := &dpv1alpha1.BackupPolicy{}
 				Eventually(testapps.CheckObjExists(&testCtx, backupPolicyKey, backupPolicy, true)).Should(Succeed())

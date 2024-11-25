@@ -28,7 +28,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -38,21 +37,17 @@ import (
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	opsutil "github.com/apecloud/kubeblocks/pkg/operations/util"
-	testops "github.com/apecloud/kubeblocks/pkg/testutil/operations"
-
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/controllers/apps"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/generics"
+	opsutil "github.com/apecloud/kubeblocks/pkg/operations/util"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
-	testdp "github.com/apecloud/kubeblocks/pkg/testutil/dataprotection"
 	testk8s "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
+	testops "github.com/apecloud/kubeblocks/pkg/testutil/operations"
 )
 
 var _ = Describe("OpsRequest Controller", func() {
@@ -85,7 +80,6 @@ var _ = Describe("OpsRequest Controller", func() {
 
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.PodSignature, true, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.OpsRequestSignature, true, inNS, ml)
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.VolumeSnapshotSignature, true, inNS)
 
 		// delete cluster(and all dependent sub-resources), cluster definition
 		testapps.ClearClusterResourcesWithRemoveFinalizerOption(&testCtx)
@@ -248,21 +242,8 @@ var _ = Describe("OpsRequest Controller", func() {
 
 	Context("with Cluster which has MySQL ConsensusSet", func() {
 		BeforeEach(func() {
-			testk8s.MockEnableVolumeSnapshot(&testCtx, testk8s.DefaultStorageClassName)
-
 			By("Create a componentDefinition obj")
 			compDefObj = testapps.NewComponentDefinitionFactory(compDefName).
-				AddAnnotations(constant.HorizontalScaleBackupPolicyTemplateKey, testdp.BackupPolicyTPLName).
-				SetDefaultSpec().
-				Create(&testCtx).
-				GetObject()
-
-			testdp.CreateBackupPolicyTpl(&testCtx, compDefObj.Name)
-
-			By("Create a componentDefinition obj")
-			compDefObj = testapps.NewComponentDefinitionFactory(compDefName).
-				WithRandomName().
-				AddAnnotations(constant.SkipImmutableCheckAnnotationKey, "true").
 				SetDefaultSpec().
 				Create(&testCtx).
 				GetObject()
@@ -313,18 +294,6 @@ var _ = Describe("OpsRequest Controller", func() {
 		}
 
 		createMysqlCluster := func(replicas int32) {
-
-			By("set component to horizontal with snapshot policy")
-			testk8s.MockEnableVolumeSnapshot(&testCtx, testk8s.DefaultStorageClassName)
-
-			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(compDefObj),
-				func(compDef *appsv1.ComponentDefinition) {
-					if compDef.Annotations == nil {
-						compDef.Annotations = map[string]string{}
-					}
-					compDef.Annotations[constant.HorizontalScaleBackupPolicyTemplateKey] = testdp.BackupPolicyTPLName
-				})()).ShouldNot(HaveOccurred())
-
 			pvcSpec := testapps.NewPVCSpec("1Gi")
 			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix, "").
 				WithRandomName().
@@ -404,8 +373,6 @@ var _ = Describe("OpsRequest Controller", func() {
 
 		It("HorizontalScaling when not support snapshot", func() {
 			By("init backup policy template, mysql cluster and hscale ops")
-			testk8s.MockDisableVolumeSnapshot(&testCtx, testk8s.DefaultStorageClassName)
-
 			createMysqlCluster(3)
 			cluster := &appsv1.Cluster{}
 			Expect(testCtx.Cli.Get(testCtx.Ctx, clusterKey, cluster)).Should(Succeed())
@@ -443,128 +410,6 @@ var _ = Describe("OpsRequest Controller", func() {
 				g.Expect(cluster.Status.Phase).Should(Equal(appsv1.RunningClusterPhase))
 			})).Should(Succeed())
 		})
-
-		args := func() {
-			By("init backup policy template, mysql cluster and hscale ops")
-			testk8s.MockEnableVolumeSnapshot(&testCtx, testk8s.DefaultStorageClassName)
-			oldReplicas := int32(3)
-			createMysqlCluster(oldReplicas)
-
-			ops := createClusterHScaleOps(2, true)
-			opsKey := client.ObjectKeyFromObject(ops)
-
-			By("expect cluster and component is reconciling the new spec")
-			Eventually(testops.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(opsv1alpha1.OpsRunningPhase))
-			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1.Cluster) {
-				g.Expect(cluster.Generation == 2).Should(BeTrue())
-				g.Expect(cluster.Status.ObservedGeneration == 2).Should(BeTrue())
-				g.Expect(cluster.Status.Components[mysqlCompName].Phase).Should(Equal(appsv1.UpdatingComponentPhase))
-				// the expected cluster phase is Updating during Hscale.
-				g.Expect(cluster.Status.Phase).Should(Equal(appsv1.UpdatingClusterPhase))
-			})).Should(Succeed())
-
-			By("mock backup status is ready, component phase should change to Updating when component is horizontally scaling.")
-			backupKey := client.ObjectKey{Name: fmt.Sprintf("%s-%s-scaling",
-				clusterKey.Name, mysqlCompName), Namespace: testCtx.DefaultNamespace}
-			backup := &dpv1alpha1.Backup{}
-			Expect(k8sClient.Get(testCtx.Ctx, backupKey, backup)).Should(Succeed())
-			backup.Status.Phase = dpv1alpha1.BackupPhaseCompleted
-			testdp.MockBackupStatusMethod(backup, testdp.BackupMethodName, testapps.DataVolumeName, testdp.ActionSetName)
-			Expect(k8sClient.Status().Update(testCtx.Ctx, backup)).Should(Succeed())
-			Consistently(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1.Cluster) {
-				g.Expect(cluster.Status.Components[mysqlCompName].Phase).Should(Equal(appsv1.UpdatingComponentPhase))
-				g.Expect(cluster.Status.Phase).Should(Equal(appsv1.UpdatingClusterPhase))
-			})).Should(Succeed())
-
-			By("mock create volumesnapshot, which should done by backup controller")
-			vs := &snapshotv1.VolumeSnapshot{}
-			vs.Name = backupKey.Name
-			vs.Namespace = backupKey.Namespace
-			vs.Labels = map[string]string{
-				dptypes.BackupNameLabelKey: backupKey.Name,
-			}
-			pvcName := ""
-			vs.Spec = snapshotv1.VolumeSnapshotSpec{
-				Source: snapshotv1.VolumeSnapshotSource{
-					PersistentVolumeClaimName: &pvcName,
-				},
-			}
-			Expect(k8sClient.Create(testCtx.Ctx, vs)).Should(Succeed())
-			Eventually(testapps.CheckObjExists(&testCtx, backupKey, vs, true)).Should(Succeed())
-			expectReplicas := int32(5)
-			mockComponentPVCsAndBound := func(comp *appsv1.ClusterComponentSpec) {
-				for i := 0; i < int(expectReplicas); i++ {
-					for _, vct := range comp.VolumeClaimTemplates {
-						pvcKey := types.NamespacedName{
-							Namespace: clusterKey.Namespace,
-							Name:      fmt.Sprintf("%s-%s-%s-%d", vct.Name, clusterKey.Name, comp.Name, i),
-						}
-						testapps.NewPersistentVolumeClaimFactory(testCtx.DefaultNamespace, pvcKey.Name, clusterKey.Name,
-							comp.Name, testapps.DataVolumeName).SetStorage(vct.Spec.Resources.Requests.Storage().String()).AddLabelsInMap(map[string]string{
-							constant.AppInstanceLabelKey:    clusterKey.Name,
-							constant.KBAppComponentLabelKey: comp.Name,
-							constant.AppManagedByLabelKey:   constant.AppName,
-						}).CheckedCreate(&testCtx)
-						Eventually(testapps.GetAndChangeObjStatus(&testCtx, pvcKey, func(pvc *corev1.PersistentVolumeClaim) {
-							pvc.Status.Phase = corev1.ClaimBound
-							if pvc.Status.Capacity == nil {
-								pvc.Status.Capacity = corev1.ResourceList{}
-							}
-							pvc.Status.Capacity[corev1.ResourceStorage] = pvc.Spec.Resources.Requests[corev1.ResourceStorage]
-						})).Should(Succeed())
-					}
-				}
-			}
-
-			// mock pvcs have restored
-			mockComponentPVCsAndBound(clusterObj.GetComponentByName(mysqlCompName))
-			// check restore CR and mock it to Completed
-			testdp.CheckRestoreAndSetCompleted(&testCtx, clusterKey, mysqlCompName, int(expectReplicas-oldReplicas))
-
-			By("check the underlying workload been updated")
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentWorkload()),
-				func(g Gomega, its *workloads.InstanceSet) {
-					g.Expect(*its.Spec.Replicas).Should(Equal(expectReplicas))
-				})).Should(Succeed())
-			its := componentWorkload()
-			Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(its), func(its *workloads.InstanceSet) {
-				its.Spec.Replicas = &expectReplicas
-			})).Should(Succeed())
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(componentWorkload()),
-				func(g Gomega, its *workloads.InstanceSet) {
-					g.Expect(*its.Spec.Replicas).Should(Equal(expectReplicas))
-				})).Should(Succeed())
-
-			By("Checking pvc created")
-			Eventually(testapps.List(&testCtx, intctrlutil.PersistentVolumeClaimSignature,
-				client.MatchingLabels{
-					constant.AppInstanceLabelKey:    clusterKey.Name,
-					constant.KBAppComponentLabelKey: mysqlCompName,
-				}, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(int(expectReplicas)))
-
-			By("mock all new PVCs scaled bounded")
-			for i := 0; i < int(expectReplicas); i++ {
-				pvcKey := types.NamespacedName{
-					Namespace: testCtx.DefaultNamespace,
-					Name:      fmt.Sprintf("%s-%s-%s-%d", testapps.DataVolumeName, clusterKey.Name, mysqlCompName, i),
-				}
-				Expect(testapps.GetAndChangeObjStatus(&testCtx, pvcKey, func(pvc *corev1.PersistentVolumeClaim) {
-					pvc.Status.Phase = corev1.ClaimBound
-				})()).Should(Succeed())
-			}
-
-			By("check the backup created for scaling has been deleted")
-			Eventually(testapps.CheckObjExists(&testCtx, backupKey, backup, false)).Should(Succeed())
-
-			By("mock component workload is running and expect cluster and component are running")
-			mockCompRunning(expectReplicas, false)
-			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1.Cluster) {
-				g.Expect(cluster.Status.Components[mysqlCompName].Phase).Should(Equal(appsv1.RunningComponentPhase))
-				g.Expect(cluster.Status.Phase).Should(Equal(appsv1.RunningClusterPhase))
-			})).Should(Succeed())
-			Eventually(testops.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(opsv1alpha1.OpsSucceedPhase))
-		}
-		It("HorizontalScaling via volume snapshot backup", args)
 
 		It("HorizontalScaling when the number of pods is inconsistent with the number of replicas", func() {
 			testapps.MockKBAgentClient4HScale(&testCtx, clusterKey, mysqlCompName, podAnnotationKey4Test, 2)
@@ -630,7 +475,6 @@ var _ = Describe("OpsRequest Controller", func() {
 
 		It("delete Running opsRequest", func() {
 			By("Create a horizontalScaling ops")
-			testk8s.MockEnableVolumeSnapshot(&testCtx, testk8s.DefaultStorageClassName)
 			createMysqlCluster(3)
 			ops := createClusterHScaleOps(2, true)
 			opsKey := client.ObjectKeyFromObject(ops)
@@ -658,40 +502,24 @@ var _ = Describe("OpsRequest Controller", func() {
 
 		It("cancel HorizontalScaling opsRequest which is Running", func() {
 			By("create cluster and mock it to running")
-			testk8s.MockDisableVolumeSnapshot(&testCtx, testk8s.DefaultStorageClassName)
 			oldReplicas := int32(3)
 			createMysqlCluster(oldReplicas)
 			mockCompRunning(oldReplicas, false)
 
 			By("create a horizontalScaling ops")
 			ops := createClusterHScaleOps(2, true)
+
+			By("check the horizontalScaling is running")
 			opsKey := client.ObjectKeyFromObject(ops)
 			Eventually(testops.GetOpsRequestPhase(&testCtx, opsKey)).Should(Equal(opsv1alpha1.OpsRunningPhase))
 			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1.UpdatingClusterPhase))
-
-			By("create one pod")
-			podName := fmt.Sprintf("%s-%s-%d", clusterObj.Name, mysqlCompName, 3)
-			pod := testapps.MockInstanceSetPod(&testCtx, nil, clusterObj.Name, mysqlCompName, podName, "follower", "Readonly")
-
-			By("mock a running restore")
-			workloadName := constant.GenerateWorkloadNamePattern(clusterKey.Name, mysqlCompName)
-			restore := testdp.NewRestoreFactory(testCtx.DefaultNamespace, testdp.RestoreName).
-				AddFinalizers([]string{constant.DBComponentFinalizerName}).
-				SetLabels(map[string]string{
-					constant.AppInstanceLabelKey:    clusterKey.Name,
-					constant.KBAppComponentLabelKey: mysqlCompName,
-				}).
-				SetBackup(constant.GenerateResourceNameWithScalingSuffix(workloadName), testCtx.DefaultNamespace).Create(&testCtx).GetObject()
-			Expect(testapps.ChangeObjStatus(&testCtx, restore, func() {
-				restore.Status.Phase = dpv1alpha1.RestorePhaseRunning
-			})).Should(Succeed())
 
 			By("cancel the opsRequest")
 			Eventually(testapps.ChangeObj(&testCtx, ops, func(opsRequest *opsv1alpha1.OpsRequest) {
 				opsRequest.Spec.Cancel = true
 			})).Should(Succeed())
 
-			By("check opsRequest is Cancelling and Running restore should be deleted")
+			By("check opsRequest is Cancelling")
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(ops), func(g Gomega, opsRequest *opsv1alpha1.OpsRequest) {
 				g.Expect(opsRequest.Status.Phase).Should(Equal(opsv1alpha1.OpsCancellingPhase))
 				g.Expect(opsRequest.Status.CancelTimestamp.IsZero()).Should(BeFalse())
@@ -699,12 +527,18 @@ var _ = Describe("OpsRequest Controller", func() {
 				g.Expect(cancelCondition).ShouldNot(BeNil())
 				g.Expect(cancelCondition.Reason).Should(Equal(opsv1alpha1.ReasonOpsCanceling))
 			})).Should(Succeed())
-			Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(restore), &dpv1alpha1.Restore{}, false)).Should(Succeed())
 
-			By("delete the created pod")
-			pod.Kind = constant.PodKind
-			testk8s.MockPodIsTerminating(ctx, testCtx, pod)
-			testk8s.RemovePodFinalizer(ctx, testCtx, pod)
+			By("mock ITS as ready with original replicas")
+			itsKey := types.NamespacedName{
+				Namespace: clusterKey.Namespace,
+				Name:      constant.GenerateWorkloadNamePattern(clusterKey.Name, mysqlCompName),
+			}
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(*its.Spec.Replicas).Should(Equal(oldReplicas))
+			})).Should(Succeed())
+			Expect(testapps.GetAndChangeObjStatus(&testCtx, itsKey, func(its *workloads.InstanceSet) {
+				testk8s.MockInstanceSetReady(its, testapps.MockInstanceSetPods(&testCtx, its, clusterObj, mysqlCompName)...)
+			})()).ShouldNot(HaveOccurred())
 
 			By("opsRequest phase should be Cancelled")
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(ops), func(g Gomega, opsRequest *opsv1alpha1.OpsRequest) {

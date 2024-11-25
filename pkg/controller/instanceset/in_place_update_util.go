@@ -257,10 +257,10 @@ func equalBasicInPlaceFields(old, new *corev1.Pod) bool {
 	return true
 }
 
+// equalResourcesInPlaceFields checks if the desired values of pod resources are equal to their current actual values.
+// If they are equal, it returns true. Containers in 'old' that are not recognized (they may have been injected by external mutating admission webhooks)
+// will not participate in the comparison.
 func equalResourcesInPlaceFields(old, new *corev1.Pod) bool {
-	if len(old.Spec.Containers) != len(new.Spec.Containers) {
-		return false
-	}
 	for _, nc := range new.Spec.Containers {
 		index := slices.IndexFunc(old.Spec.Containers, func(oc corev1.Container) bool {
 			return oc.Name == nc.Name

@@ -31,3 +31,5 @@ type ComponentVersionExpansion interface{}
 type ServiceDescriptorExpansion interface{}
 
 type ShardingDefinitionExpansion interface{}
+
+type SidecarDefinitionExpansion interface{}

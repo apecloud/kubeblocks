@@ -29,11 +29,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 )
 
@@ -51,18 +52,18 @@ func (t *clusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 
-	transCtx.Cluster.Status.Phase = kbappsv1.DeletingClusterPhase
+	transCtx.Cluster.Status.Phase = appsv1.DeletingClusterPhase
 
 	// list all kinds to be deleted based on v1alpha1.TerminationPolicyType
 	var toDeleteNamespacedKinds, toDeleteNonNamespacedKinds []client.ObjectList
 	switch cluster.Spec.TerminationPolicy {
-	case kbappsv1.DoNotTerminate:
+	case appsv1.DoNotTerminate:
 		transCtx.EventRecorder.Eventf(cluster, corev1.EventTypeWarning, "DoNotTerminate",
 			"spec.terminationPolicy %s is preventing deletion.", cluster.Spec.TerminationPolicy)
 		return graph.ErrPrematureStop
-	case kbappsv1.Delete:
+	case appsv1.Delete:
 		toDeleteNamespacedKinds, toDeleteNonNamespacedKinds = kindsForDelete()
-	case kbappsv1.WipeOut:
+	case appsv1.WipeOut:
 		toDeleteNamespacedKinds, toDeleteNonNamespacedKinds = kindsForWipeOut()
 	}
 
@@ -106,7 +107,7 @@ func (t *clusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 			return err
 		}
 	}
-	if cluster.Spec.TerminationPolicy != kbappsv1.WipeOut {
+	if cluster.Spec.TerminationPolicy != appsv1.WipeOut {
 		if err = getFailedBackups(transCtx.Context, transCtx.Client, cluster.Namespace, ml, namespacedObjs); err != nil {
 			return err
 		}
@@ -154,7 +155,7 @@ func kindsForDoNotTerminate() ([]client.ObjectList, []client.ObjectList) {
 func kindsForDelete() ([]client.ObjectList, []client.ObjectList) {
 	namespacedKinds, nonNamespacedKinds := kindsForDoNotTerminate()
 	namespacedKindsPlus := []client.ObjectList{
-		&kbappsv1.ComponentList{},
+		&appsv1.ComponentList{},
 		&corev1.ServiceList{},
 		&corev1.SecretList{},
 		&dpv1alpha1.BackupPolicyList{},
@@ -182,8 +183,11 @@ func deleteCompNShardingInOrder4Terminate(transCtx *clusterTransformContext, dag
 	if err = loadNCheckClusterDefinition(transCtx, transCtx.Cluster); err != nil {
 		return nil, err
 	}
-	err = deleteCompNShardingInOrder(transCtx, dag, nameSet, nil)
-	if err != nil {
+	if err = deleteCompNShardingInOrder(transCtx, dag, nameSet, nil); err != nil {
+		if intctrlutil.IsDelayedRequeueError(err) {
+			delayedErr := err.(intctrlutil.DelayedRequeueError)
+			err = intctrlutil.NewRequeueError(delayedErr.RequeueAfter(), delayedErr.Reason())
+		}
 		return nil, err
 	}
 	return nameSet, nil

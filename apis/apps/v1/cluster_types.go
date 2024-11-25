@@ -366,7 +366,7 @@ type ClusterComponentSpec struct {
 	// +optional
 	Volumes []corev1.Volume `json:"volumes,omitempty"`
 
-	// Overrides services defined in referenced ComponentDefinition and expose endpoints that can be accessed by clients.
+	// Overrides services defined in referenced ComponentDefinition.
 	//
 	// +optional
 	Services []ClusterComponentService `json:"services,omitempty"`

@@ -674,8 +674,8 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 				})).Should(Succeed())
 				return comp
 			}
-			comp1 := createComponent(secondaryCompName + "-comp1")
-			comp2 := createComponent(secondaryCompName + "-comp2")
+			comp4 := createComponent(secondaryCompName + "-comp4")
+			comp5 := createComponent(secondaryCompName + "-comp5")
 			_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest), func(g Gomega, pobj *opsv1alpha1.OpsRequest) {
@@ -685,11 +685,11 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 
 			By("expect ops phase to succeed when new components are running")
 			// mock components and cluster is running
-			Expect(testapps.ChangeObjStatus(&testCtx, comp1, func() {
-				comp1.Status.Phase = appsv1.RunningComponentPhase
+			Expect(testapps.ChangeObjStatus(&testCtx, comp4, func() {
+				comp4.Status.Phase = appsv1.RunningComponentPhase
 			})).Should(Succeed())
-			Expect(testapps.ChangeObjStatus(&testCtx, comp2, func() {
-				comp2.Status.Phase = appsv1.RunningComponentPhase
+			Expect(testapps.ChangeObjStatus(&testCtx, comp5, func() {
+				comp5.Status.Phase = appsv1.RunningComponentPhase
 			})).Should(Succeed())
 			Expect(testapps.ChangeObjStatus(&testCtx, opsRes.Cluster, func() {
 				opsRes.Cluster.Status.Shardings = map[string]appsv1.ClusterComponentStatus{
@@ -721,7 +721,11 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			})).Should(Succeed())
 
 			By("expect ops phase to succeed when the component is deleted")
-			testapps.DeleteObject(&testCtx, client.ObjectKeyFromObject(comp1), &appsv1.Component{})
+			// Create 3 components to mock already existing components.
+			createComponent(secondaryCompName + "-comp1")
+			createComponent(secondaryCompName + "-comp2")
+			createComponent(secondaryCompName + "-comp3")
+			testapps.DeleteObject(&testCtx, client.ObjectKeyFromObject(comp5), &appsv1.Component{})
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest), func(g Gomega, pobj *opsv1alpha1.OpsRequest) {

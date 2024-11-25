@@ -82,10 +82,6 @@ const (
 	multiClusterContextsDisabledFlagKey flagName = "multi-cluster-contexts-disabled"
 
 	userAgentFlagKey flagName = "user-agent"
-
-	// dual-operators-mode indicates whether the operator runs in dual-operators mode.
-	// If it's true, the operator will degrade to a secondary operator and only manage the resources dedicated to releases prior to v1.0.
-	dualOperatorsModeFlag flagName = "dual-operators-mode"
 )
 
 var (
@@ -122,6 +118,7 @@ func init() {
 	viper.SetDefault(dptypes.CfgKeyWorkerServiceAccountAnnotations, "{}")
 	viper.SetDefault(dptypes.CfgKeyWorkerClusterRoleName, "kubeblocks-dataprotection-worker-role")
 	viper.SetDefault(dptypes.CfgDataProtectionReconcileWorkers, runtime.NumCPU())
+	viper.SetDefault(constant.DualOperatorsMode, false)
 }
 
 func main() {
@@ -151,8 +148,6 @@ func main() {
 	flag.String(multiClusterContextsDisabledFlagKey.String(), "", "Kube contexts that mark as disabled.")
 
 	flag.String(userAgentFlagKey.String(), "", "User agent of the operator.")
-
-	flag.Bool(dualOperatorsModeFlag.String(), false, "Whether the operator runs in dual-operators mode.")
 
 	flag.String(constant.ManagedNamespacesFlag, "",
 		"The namespaces that the operator will manage, multiple namespaces are separated by commas.")
@@ -279,8 +274,7 @@ func main() {
 		client = multiClusterMgr.GetClient()
 	}
 
-	dualOperatorsMode := viper.GetBool(dualOperatorsModeFlag.viperName())
-	if !dualOperatorsMode {
+	if !viper.GetBool(constant.DualOperatorsMode) {
 		if err = (&dpcontrollers.ActionSetReconciler{
 			Client:   mgr.GetClient(),
 			Scheme:   mgr.GetScheme(),

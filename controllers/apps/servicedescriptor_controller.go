@@ -107,7 +107,7 @@ func (r *ServiceDescriptorReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ServiceDescriptorReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return intctrlutil.NewControllerManagedBy(mgr, &appsv1alpha1.ServiceDescriptor{}).
+	return intctrlutil.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.ServiceDescriptor{}).
 		Complete(r)
 }

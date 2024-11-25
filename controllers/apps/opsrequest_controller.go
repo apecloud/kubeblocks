@@ -88,7 +88,7 @@ func (r *OpsRequestReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *OpsRequestReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return intctrlutil.NewControllerManagedBy(mgr, &appsv1alpha1.Cluster{}, &workloadsv1alpha1.InstanceSet{}).
+	return intctrlutil.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.OpsRequest{}).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: int(math.Ceil(viper.GetFloat64(constant.CfgKBReconcileWorkers) / 2)),

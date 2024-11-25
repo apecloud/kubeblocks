@@ -73,9 +73,9 @@ spec:
                         or not.
                       type: boolean
                     name:
-                      description: Specifies the name of the schedule. Names cannot
-                        be duplicated
-                      pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                      description: |-
+                        Specifies the name of the schedule. Names cannot be duplicated.
+                        If the name is empty, it will be considered the same as the value of the backupMethod below.
                       type: string
                     parameters:
                       description: |-

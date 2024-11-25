@@ -84,7 +84,7 @@ func (s *stateEvaluation) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx
 		APIVersion: kbappsv1.APIVersion,
 		Kind:       kbappsv1.ClusterKind,
 	}
-	latestReconciliationCycleStart := 0
+	latestReconciliationCycleStart := -1
 	var initialRoot *kbappsv1.Cluster
 	for i := len(trace.Status.CurrentState.Changes) - 1; i >= 0; i-- {
 		change := trace.Status.CurrentState.Changes[i]

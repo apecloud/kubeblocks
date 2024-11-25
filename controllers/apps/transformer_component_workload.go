@@ -611,7 +611,7 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn(deleteReplicas, joinedReplica
 }
 
 func (r *componentWorkloadOps) leaveMemberForPod(pod *corev1.Pod, pods []*corev1.Pod) error {
-	isLeader := func(pod *corev1.Pod) bool {
+	needSwtichover := func(pod *corev1.Pod) bool {
 		if pod == nil || len(pod.Labels) == 0 {
 			return false
 		}
@@ -621,19 +621,17 @@ func (r *componentWorkloadOps) leaveMemberForPod(pod *corev1.Pod, pods []*corev1
 		}
 
 		for _, replicaRole := range r.runningITS.Spec.Roles {
-			if roleName == replicaRole.Name && replicaRole.IsLeader {
+			if roleName == replicaRole.Name && replicaRole.SwitchoverBeforeUpdate {
 				return true
 			}
 		}
 		return false
 	}
 
-	tryToSwitchover := func(lfa lifecycle.Lifecycle, pod *corev1.Pod) error {
-		// if pod is not leader/primary, no need to switchover
-		if !isLeader(pod) {
+	trySwitchover := func(lfa lifecycle.Lifecycle, pod *corev1.Pod) error {
+		if !needSwtichover(pod) {
 			return nil
 		}
-		// if HA functionality is not enabled, no need to switchover
 		err := lfa.Switchover(r.reqCtx.Ctx, r.cli, nil, "")
 		if err != nil && errors.Is(err, lifecycle.ErrActionNotDefined) {
 			return nil
@@ -644,8 +642,17 @@ func (r *componentWorkloadOps) leaveMemberForPod(pod *corev1.Pod, pods []*corev1
 		return err
 	}
 
-	if !(isLeader(pod) || // if the pod is leader, it needs to call switchover
-		(r.synthesizeComp.LifecycleActions != nil && r.synthesizeComp.LifecycleActions.MemberLeave != nil)) { // if the memberLeave action is defined, it needs to call it
+	tryMemberLeave := func(lfa lifecycle.Lifecycle) error {
+		if r.synthesizeComp.LifecycleActions == nil || r.synthesizeComp.LifecycleActions.MemberLeave == nil {
+			return nil
+		}
+
+		if err := lfa.MemberLeave(r.reqCtx.Ctx, r.cli, nil); err != nil {
+			if !errors.Is(err, lifecycle.ErrActionNotDefined) {
+				return err
+			}
+		}
+
 		return nil
 	}
 
@@ -654,17 +661,15 @@ func (r *componentWorkloadOps) leaveMemberForPod(pod *corev1.Pod, pods []*corev1
 		return err
 	}
 
-	// switchover if the leaving pod is leader
-	if switchoverErr := tryToSwitchover(lfa, pod); switchoverErr != nil {
-		return switchoverErr
+	if err := trySwitchover(lfa, pod); err != nil {
+		return err
 	}
 
-	if err = lfa.MemberLeave(r.reqCtx.Ctx, r.cli, nil); err != nil {
-		if !errors.Is(err, lifecycle.ErrActionNotDefined) && err == nil {
-			return err
-		}
+	if err := tryMemberLeave(lfa); err != nil {
+		return err
 	}
 	r.reqCtx.Log.Info("succeed to leave member for pod", "pod", pod.Name)
+
 	return nil
 }
 

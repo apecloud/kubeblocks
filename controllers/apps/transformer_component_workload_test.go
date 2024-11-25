@@ -24,7 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
@@ -46,6 +45,11 @@ var _ = Describe("Component Workload Operations Test", func() {
 		comp           *appsv1.Component
 		synthesizeComp *component.SynthesizedComponent
 	)
+
+	roles := []appsv1.ReplicaRole{
+		{Name: "leader", SwitchoverBeforeUpdate: true, UpdatePriority: 3},
+		{Name: "follower", SwitchoverBeforeUpdate: false, UpdatePriority: 2},
+	}
 
 	newDAG := func(graphCli model.GraphClient, comp *appsv1.Component) *graph.DAG {
 		d := graph.NewDAG()
@@ -72,10 +76,7 @@ var _ = Describe("Component Workload Operations Test", func() {
 			Namespace:   testCtx.DefaultNamespace,
 			ClusterName: clusterName,
 			Name:        compName,
-			Roles: []appsv1.ReplicaRole{
-				{Name: "leader", Serviceable: true, Writable: true, Votable: true},
-				{Name: "follower", Serviceable: false, Writable: false, Votable: false},
-			},
+			Roles:       roles,
 			LifecycleActions: &appsv1.ComponentLifecycleActions{
 				MemberJoin: &appsv1.Action{
 					Exec: &appsv1.ExecAction{
@@ -150,10 +151,7 @@ var _ = Describe("Component Workload Operations Test", func() {
 				AddAppComponentLabel(compName).
 				AddAppManagedByLabel().
 				SetReplicas(2).
-				SetRoles([]workloads.ReplicaRole{
-					{Name: "leader", AccessMode: workloads.ReadWriteMode, CanVote: true, IsLeader: true},
-					{Name: "follower", AccessMode: workloads.ReadonlyMode, CanVote: true, IsLeader: false},
-				}).
+				SetRoles(roles).
 				GetObject()
 
 			mockCluster := testapps.NewClusterFactory(testCtx.DefaultNamespace, "test-cluster", "test-def").

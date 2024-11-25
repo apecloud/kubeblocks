@@ -23,8 +23,7 @@ const (
 	WorkloadsManagedByLabelKey = "workloads.kubeblocks.io/managed-by"
 	WorkloadsInstanceLabelKey  = "workloads.kubeblocks.io/instance"
 
-	RoleLabelKey       = "kubeblocks.io/role"
-	AccessModeLabelKey = "workloads.kubeblocks.io/access-mode"
+	RoleLabelKey = "kubeblocks.io/role"
 
 	LegacyRSMFinalizerName = "rsm.workloads.kubeblocks.io/finalizer"
 

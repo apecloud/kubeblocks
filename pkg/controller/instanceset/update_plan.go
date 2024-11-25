@@ -21,6 +21,7 @@ package instanceset
 
 import (
 	"errors"
+	"math"
 
 	corev1 "k8s.io/api/core/v1"
 
@@ -144,12 +145,23 @@ func (p *realUpdatePlan) buildBestEffortParallelUpdatePlan(rolePriorityMap map[s
 	currentVertex, _ := model.FindRootVertex(p.dag)
 	preVertex := currentVertex
 
+	quorumPriority := math.MaxInt32
+	leaderPriority := 0
+	for _, role := range p.its.Spec.Roles {
+		if rolePriorityMap[role.Name] > leaderPriority {
+			leaderPriority = rolePriorityMap[role.Name]
+		}
+		if role.ParticipatesInQuorum && quorumPriority > rolePriorityMap[role.Name] {
+			quorumPriority = rolePriorityMap[role.Name]
+		}
+	}
+
 	// append unknown, empty and learner
 	index := 0
 	podList := p.pods
 	for i, pod := range podList {
 		roleName := getRoleName(&pod)
-		if rolePriorityMap[roleName] <= learnerPriority {
+		if rolePriorityMap[roleName] < quorumPriority {
 			vertex := &model.ObjectVertex{Obj: &podList[i]}
 			p.dag.AddConnect(preVertex, vertex)
 			currentVertex = vertex

@@ -289,11 +289,9 @@ func (f *MockComponentDefinitionFactory) SetAvailable(available *kbappsv1.Compon
 	return f
 }
 
-func (f *MockComponentDefinitionFactory) AddRole(name string, serviceable, writable bool) *MockComponentDefinitionFactory {
+func (f *MockComponentDefinitionFactory) AddRole(name string) *MockComponentDefinitionFactory {
 	role := kbappsv1.ReplicaRole{
-		Name:        name,
-		Serviceable: serviceable,
-		Writable:    writable,
+		Name: name,
 	}
 	if f.Get().Spec.Roles == nil {
 		f.Get().Spec.Roles = make([]kbappsv1.ReplicaRole, 0)

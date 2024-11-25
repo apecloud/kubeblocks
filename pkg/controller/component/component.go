@@ -58,6 +58,13 @@ func GetClusterUID(comp *appsv1alpha1.Component) (string, error) {
 	return getCompLabelValue(comp, constant.KBAppClusterUIDLabelKey)
 }
 
+func GetShardingName(comp *appsv1alpha1.Component) string {
+	if comp.Labels == nil {
+		return ""
+	}
+	return comp.Labels[constant.KBAppShardingNameLabelKey]
+}
+
 // IsGenerated checks if the component is generated from legacy cluster definitions.
 func IsGenerated(comp *appsv1alpha1.Component) bool {
 	return len(comp.Spec.CompDef) == 0

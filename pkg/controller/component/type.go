@@ -38,6 +38,7 @@ type SynthesizedComponent struct {
 	Name                 string                                 `json:"name,omitempty"`          // the name of the component w/o clusterName prefix
 	FullCompName         string                                 `json:"fullCompName,omitempty"`  // the full name of the component w/ clusterName prefix
 	CompDefName          string                                 `json:"compDefName,omitempty"`   // the name of the componentDefinition
+	ShardingName         string                                 `json:"shardingName,omitempty"`  // the name of sharding
 	ServiceVersion       string                                 `json:"serviceVersion,omitempty"`
 	Replicas             int32                                  `json:"replicas"`
 	Resources            corev1.ResourceRequirements            `json:"resources,omitempty"`

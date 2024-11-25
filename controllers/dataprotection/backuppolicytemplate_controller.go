@@ -132,12 +132,8 @@ func (r *BackupPolicyTemplateReconciler) validateAvailable(reqCtx intctrlutil.Re
 			continue
 		}
 		// validate schedule parameters
-		if actionSet != nil && len(v.Parameters) > 0 {
-			withParameters := []string{}
-			if actionSet.Spec.Backup != nil {
-				withParameters = actionSet.Spec.Backup.WithParameters
-			}
-			if err := dputils.ValidateParameters(actionSet.Spec.ParametersSchema, withParameters, v.Parameters); err != nil {
+		if actionSet != nil {
+			if err := dputils.ValidateParameters(actionSet, v.Parameters, true); err != nil {
 				message += fmt.Sprintf(`fails to validate parameters of backupMethod "%s": %v;`, v.BackupMethod, err)
 			}
 		}

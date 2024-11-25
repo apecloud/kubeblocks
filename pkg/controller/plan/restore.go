@@ -57,7 +57,7 @@ type RestoreManager struct {
 	namespace                         string
 	restoreTime                       string
 	env                               []corev1.EnvVar
-	parameters                        map[string]string
+	parameters                        []dpv1alpha1.ParameterPair
 	volumeRestorePolicy               dpv1alpha1.VolumeClaimRestorePolicy
 	doReadyRestoreAfterClusterRunning bool
 	startingIndex                     int32

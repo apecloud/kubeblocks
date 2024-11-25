@@ -277,3 +277,13 @@ type SelectiveParametersSchema struct {
 	// +optional
 	OpenAPIV3Schema *apiextensionsv1.JSONSchemaProps `json:"openAPIV3Schema,omitempty"`
 }
+
+type ParameterPair struct {
+	// Represents the name of the parameter.
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// Represents the parameter values.
+	// +kubebuilder:validation:Required
+	Value string `json:"value"`
+}

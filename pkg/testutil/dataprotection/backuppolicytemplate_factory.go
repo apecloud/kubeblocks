@@ -56,7 +56,7 @@ func (f *MockBackupPolicyTemplateFactory) AddSchedule(
 	method, schedule, retentionPeriod string,
 	enable bool,
 	name string,
-	parameters map[string]string,
+	parameters []dpv1alpha1.ParameterPair,
 ) *MockBackupPolicyTemplateFactory {
 	schedulePolicy := dpv1alpha1.SchedulePolicy{
 		Enabled:         &enable,

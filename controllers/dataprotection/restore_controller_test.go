@@ -243,15 +243,16 @@ var _ = Describe("Restore Controller test", func() {
 				client.InNamespace(testCtx.DefaultNamespace))).Should(Succeed())
 			for _, job := range jobList.Items {
 				Expect(len(job.Spec.Template.Spec.Containers)).ShouldNot(BeZero())
-				expectedEnv := []string{testdp.ParameterString, testdp.ParameterArray}
 				for _, c := range job.Spec.Template.Spec.Containers {
 					count := 0
 					for _, env := range c.Env {
-						if v, ok := testdp.TestParameters[env.Name]; ok && v == env.Value {
-							count++
+						for _, param := range testdp.TestParameters {
+							if param.Name == env.Name && param.Value == env.Value {
+								count++
+							}
 						}
 					}
-					Expect(count).To(Equal(len(expectedEnv)))
+					Expect(count).To(Equal(len(testdp.TestParameters)))
 				}
 			}
 		}

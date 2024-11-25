@@ -338,12 +338,14 @@ string
 <td>
 <code>parameters</code><br/>
 <em>
-map[string]string
+<a href="#dataprotection.kubeblocks.io/v1alpha1.ParameterPair">
+[]ParameterPair
+</a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies parameters and their corresponding values.
+<p>Specifies a list of name-value pairs representing parameters and their corresponding values.
 Parameters match the schema specified in the <code>actionset.spec.parametersSchema</code></p>
 </td>
 </tr>
@@ -1007,12 +1009,14 @@ int32
 <td>
 <code>parameters</code><br/>
 <em>
-map[string]string
+<a href="#dataprotection.kubeblocks.io/v1alpha1.ParameterPair">
+[]ParameterPair
+</a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies parameters and their corresponding values.
+<p>Specifies a list of name-value pairs representing parameters and their corresponding values.
 Parameters match the schema specified in the <code>actionset.spec.parametersSchema</code></p>
 </td>
 </tr>
@@ -3207,12 +3211,14 @@ string
 <td>
 <code>parameters</code><br/>
 <em>
-map[string]string
+<a href="#dataprotection.kubeblocks.io/v1alpha1.ParameterPair">
+[]ParameterPair
+</a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies parameters and their corresponding values.
+<p>Specifies a list of name-value pairs representing parameters and their corresponding values.
 Parameters match the schema specified in the <code>actionset.spec.parametersSchema</code></p>
 </td>
 </tr>
@@ -4399,6 +4405,45 @@ The default value is empty.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="dataprotection.kubeblocks.io/v1alpha1.ParameterPair">ParameterPair
+</h3>
+<p>
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.BackupSpec">BackupSpec</a>, <a href="#dataprotection.kubeblocks.io/v1alpha1.RestoreSpec">RestoreSpec</a>, <a href="#dataprotection.kubeblocks.io/v1alpha1.SchedulePolicy">SchedulePolicy</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Represents the name of the parameter.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>value</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Represents the parameter values.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="dataprotection.kubeblocks.io/v1alpha1.ParametersSchema">ParametersSchema
 </h3>
 <p>
@@ -5191,12 +5236,14 @@ int32
 <td>
 <code>parameters</code><br/>
 <em>
-map[string]string
+<a href="#dataprotection.kubeblocks.io/v1alpha1.ParameterPair">
+[]ParameterPair
+</a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies parameters and their corresponding values.
+<p>Specifies a list of name-value pairs representing parameters and their corresponding values.
 Parameters match the schema specified in the <code>actionset.spec.parametersSchema</code></p>
 </td>
 </tr>
@@ -5685,7 +5732,8 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the name of the schedule. Names cannot be duplicated</p>
+<p>Specifies the name of the schedule. Names cannot be duplicated.
+If the name is empty, it will be considered the same as the value of the backupMethod below.</p>
 </td>
 </tr>
 <tr>
@@ -5740,12 +5788,14 @@ Sample duration format:</p>
 <td>
 <code>parameters</code><br/>
 <em>
-map[string]string
+<a href="#dataprotection.kubeblocks.io/v1alpha1.ParameterPair">
+[]ParameterPair
+</a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies parameters and their corresponding values.
+<p>Specifies a list of name-value pairs representing parameters and their corresponding values.
 Parameters match the schema specified in the <code>actionset.spec.parametersSchema</code></p>
 </td>
 </tr>

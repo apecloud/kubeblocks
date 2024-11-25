@@ -96,11 +96,7 @@ func (s *Scheduler) validate() error {
 			if err != nil {
 				return err
 			}
-			withParameters := []string{}
-			if actionSet.Spec.Backup != nil {
-				withParameters = actionSet.Spec.Backup.WithParameters
-			}
-			if err := dputils.ValidateParameters(actionSet.Spec.ParametersSchema, withParameters, sp.Parameters); err != nil {
+			if err := dputils.ValidateParameters(actionSet, sp.Parameters, true); err != nil {
 				return fmt.Errorf("fails to validate parameters of backupMethod %s: %v", sp.BackupMethod, err)
 			}
 		}
@@ -145,7 +141,7 @@ func (s *Scheduler) buildCronJob(schedulePolicy *dpv1alpha1.SchedulePolicy, cron
 	)
 
 	if cronJobName == "" {
-		cronJobName = GenerateCRNameByBackupScheduleAndScheduleName(s.BackupSchedule, schedulePolicy.BackupMethod, schedulePolicy.Name)
+		cronJobName = GenerateCRNameByScheduleNameAndMethod(s.BackupSchedule, schedulePolicy.BackupMethod, schedulePolicy.Name)
 	}
 
 	podSpec, err := s.buildPodSpec(schedulePolicy)
@@ -250,7 +246,7 @@ func (s *Scheduler) reconcileCronJob(schedulePolicy *dpv1alpha1.SchedulePolicy) 
 		return err
 	} else if len(cronJobList.Items) > 0 {
 		// the schedulePolicy name can be empty
-		targetCronJobName := GenerateCRNameByBackupScheduleAndScheduleName(s.BackupSchedule, schedulePolicy.BackupMethod, schedulePolicy.Name)
+		targetCronJobName := GenerateCRNameByScheduleNameAndMethod(s.BackupSchedule, schedulePolicy.BackupMethod, schedulePolicy.Name)
 		for i, item := range cronJobList.Items {
 			if item.Name == targetCronJobName {
 				cronJob = &cronJobList.Items[i]

@@ -187,13 +187,13 @@ func GenerateCRNameByBackupSchedule(backupSchedule *dpv1alpha1.BackupSchedule, m
 	return generateBaseCRNameByBackupSchedule(uniqueNameWithBackupSchedule, backupSchedule.Namespace, method)
 }
 
-// GenerateCRNameByBackupScheduleAndScheduleName generate a CR name which is created by BackupSchedule, such as CronJob Backup.
-func GenerateCRNameByBackupScheduleAndScheduleName(backupSchedule *dpv1alpha1.BackupSchedule, method string, name string) string {
-	genName := GenerateCRNameByBackupSchedule(backupSchedule, method)
-	if len(name) > 0 {
-		return fmt.Sprintf("%s-%s", genName, name)
+// GenerateCRNameByScheduleNameAndMethod generate a CR name which is created by BackupSchedule, such as CronJob Backup.
+func GenerateCRNameByScheduleNameAndMethod(backupSchedule *dpv1alpha1.BackupSchedule, method string, name string) string {
+	suffix := name
+	if len(suffix) == 0 {
+		suffix = method
 	}
-	return genName
+	return GenerateCRNameByBackupSchedule(backupSchedule, suffix)
 }
 
 // GenerateLegacyCRNameByBackupSchedule generate a legacy CR name which is created by BackupSchedule, such as CronJob Backup.
@@ -312,13 +312,14 @@ func StopStatefulSetsWhenFailed(ctx context.Context, cli client.Client, backup *
 	return cli.Update(ctx, sts)
 }
 
-func BuildParametersManifest(parameters map[string]string) string {
+func BuildParametersManifest(parameters []dpv1alpha1.ParameterPair) string {
 	var res string
 	if len(parameters) == 0 {
 		return res
 	}
-	for k, v := range parameters {
-		res += fmt.Sprintf("    %s: %s\n", k, v)
+	for _, v := range parameters {
+		res += fmt.Sprintf("  - name: %s\n", v.Name)
+		res += fmt.Sprintf("    value: %s\n", v.Value)
 	}
 	str := fmt.Sprintf("  parameters:\n%s", res)
 	return strings.Trim(str, "\n")

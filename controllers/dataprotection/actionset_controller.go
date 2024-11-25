@@ -69,7 +69,7 @@ func (r *ActionSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return *res, err
 	}
 
-	if actionSet.Status.ObservedGeneration == actionSet.Generation {
+	if actionSet.Status.ObservedGeneration == actionSet.Generation && actionSet.Status.Phase.IsAvailable() {
 		return ctrl.Result{}, nil
 	}
 

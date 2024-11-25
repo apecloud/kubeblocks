@@ -114,9 +114,7 @@ var _ = Describe("", func() {
 			bpt := testdp.NewBackupPolicyTemplateFactory(BackupPolicyTemplateName).
 				AddBackupMethod(BackupMethod, false, testdp.ActionSetName).
 				SetBackupMethodVolumeMounts("data", "/data").
-				AddSchedule(BackupMethod, "0 0 * * *", ttl, true, scheduleName1, map[string]string{
-					testdp.InvalidParameter: testdp.InvalidParameter,
-				}).
+				AddSchedule(BackupMethod, "0 0 * * *", ttl, true, scheduleName1, testdp.InvalidParameters).
 				AddSchedule(BackupMethod, "0 0 * * *", ttl, true, scheduleName2, testdp.TestParameters).
 				AddSchedule(BackupMethod, "0 0 * * *", ttl, true, "", nil).
 				Create(&testCtx).GetObject()

@@ -112,7 +112,7 @@ func (f *MockRestoreFactory) buildRestoreVolumeClaim(name, volumeSource, mountPa
 	}
 }
 
-func (f *MockRestoreFactory) SetParameters(parameters map[string]string) *MockRestoreFactory {
+func (f *MockRestoreFactory) SetParameters(parameters []dpv1alpha1.ParameterPair) *MockRestoreFactory {
 	f.Get().Spec.Parameters = parameters
 	return f
 }

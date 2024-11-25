@@ -78,13 +78,26 @@ spec:
                       pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
                     parameters:
-                      additionalProperties:
-                        type: string
                       description: |-
-                        Specifies parameters and their corresponding values.
+                        Specifies a list of name-value pairs representing parameters and their corresponding values.
                         Parameters match the schema specified in the `actionset.spec.parametersSchema`
-                      maxProperties: 30
-                      type: object
+                      items:
+                        properties:
+                          name:
+                            description: Represents the name of the parameter.
+                            type: string
+                          value:
+                            description: Represents the parameter values.
+                            type: string
+                        required:
+                        - name
+                        - value
+                        type: object
+                      maxItems: 128
+                      type: array
+                      x-kubernetes-list-map-keys:
+                      - name
+                      x-kubernetes-list-type: map
                     retentionPeriod:
                       default: 7d
                       description: "Determines the duration for which the backup should

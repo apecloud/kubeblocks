@@ -49,9 +49,9 @@ type SchedulePolicy struct {
 	// +optional
 	Enabled *bool `json:"enabled,omitempty"`
 
-	// Specifies the name of the schedule. Names cannot be duplicated
+	// Specifies the name of the schedule. Names cannot be duplicated.
+	// If the name is empty, it will be considered the same as the value of the backupMethod below.
 	//
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	// +optional
 	Name string `json:"name,omitempty"`
 
@@ -83,12 +83,16 @@ type SchedulePolicy struct {
 	// +kubebuilder:default="7d"
 	RetentionPeriod RetentionPeriod `json:"retentionPeriod,omitempty"`
 
-	// Specifies parameters and their corresponding values.
+	// Specifies a list of name-value pairs representing parameters and their corresponding values.
 	// Parameters match the schema specified in the `actionset.spec.parametersSchema`
 	//
-	// +kubebuilder:validation:MaxProperties=30
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
+	// +kubebuilder:validation:MaxItems=128
 	// +optional
-	Parameters map[string]string `json:"parameters,omitempty"`
+	Parameters []ParameterPair `json:"parameters,omitempty"`
 }
 
 // BackupScheduleStatus defines the observed state of BackupSchedule.

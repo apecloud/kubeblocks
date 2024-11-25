@@ -491,9 +491,7 @@ var _ = Describe("Backup Controller test", func() {
 			It("should succeed if parameters are invalid", func() {
 				By("create a backup with invalid parameters")
 				backup := testdp.NewFakeBackup(&testCtx, func(bp *dpv1alpha1.Backup) {
-					bp.Spec.Parameters = map[string]string{
-						testdp.InvalidParameter: testdp.InvalidParameter,
-					}
+					bp.Spec.Parameters = testdp.InvalidParameters
 				})
 				By("check the backup")
 				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(backup), func(g Gomega, fetched *dpv1alpha1.Backup) {
@@ -520,15 +518,16 @@ var _ = Describe("Backup Controller test", func() {
 				}
 				Eventually(testapps.CheckObj(&testCtx, getJobKey(0), func(g Gomega, job *batchv1.Job) {
 					g.Expect(len(job.Spec.Template.Spec.Containers)).ShouldNot(BeZero())
-					expectedEnv := []string{testdp.ParameterString, testdp.ParameterArray}
 					for _, c := range job.Spec.Template.Spec.Containers {
 						count := 0
 						for _, env := range c.Env {
-							if v, ok := testdp.TestParameters[env.Name]; ok && v == env.Value {
-								count++
+							for _, param := range testdp.TestParameters {
+								if param.Name == env.Name && param.Value == env.Value {
+									count++
+								}
 							}
 						}
-						g.Expect(count).To(Equal(len(expectedEnv)))
+						g.Expect(count).To(Equal(len(testdp.TestParameters)))
 					}
 				})).Should(Succeed())
 			})

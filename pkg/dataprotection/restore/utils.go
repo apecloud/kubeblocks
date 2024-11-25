@@ -259,11 +259,7 @@ func ValidateAndInitRestoreMGR(reqCtx intctrlutil.RequestCtx,
 
 	// validate rstore parameters
 	if backupSet.ActionSet != nil {
-		withParameters := []string{}
-		if backupSet.ActionSet.Spec.Restore != nil {
-			withParameters = backupSet.ActionSet.Spec.Restore.WithParameters
-		}
-		if err := utils.ValidateParameters(backupSet.ActionSet.Spec.ParametersSchema, withParameters, restoreMgr.Restore.Spec.Parameters); err != nil {
+		if err := utils.ValidateParameters(backupSet.ActionSet, restoreMgr.Restore.Spec.Parameters, false); err != nil {
 			return fmt.Errorf("fails to validate parameters with actionset %s: %v", backupSet.ActionSet.Name, err)
 		}
 	}
@@ -339,7 +335,7 @@ func GetRestoreFromBackupAnnotation(
 	restoreTime string,
 	env []corev1.EnvVar,
 	doReadyRestoreAfterClusterRunning bool,
-	parameters map[string]string,
+	parameters []dpv1alpha1.ParameterPair,
 ) (string, error) {
 	componentName := component.GetComponentNameFromObj(backup)
 	if len(componentName) == 0 {

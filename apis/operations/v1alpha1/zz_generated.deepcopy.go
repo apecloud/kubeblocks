@@ -26,6 +26,7 @@ package v1alpha1
 import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	dataprotectionv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -51,10 +52,8 @@ func (in *Backup) DeepCopyInto(out *Backup) {
 	*out = *in
 	if in.Parameters != nil {
 		in, out := &in.Parameters, &out.Parameters
-		*out = make(map[string]string, len(*in))
-		for key, val := range *in {
-			(*out)[key] = val
-		}
+		*out = make([]dataprotectionv1alpha1.ParameterPair, len(*in))
+		copy(*out, *in)
 	}
 }
 
@@ -1351,10 +1350,8 @@ func (in *Restore) DeepCopyInto(out *Restore) {
 	}
 	if in.Parameters != nil {
 		in, out := &in.Parameters, &out.Parameters
-		*out = make(map[string]string, len(*in))
-		for key, val := range *in {
-			(*out)[key] = val
-		}
+		*out = make([]dataprotectionv1alpha1.ParameterPair, len(*in))
+		copy(*out, *in)
 	}
 }
 

@@ -90,7 +90,7 @@ var _ = Describe("Backup Schedule Controller", func() {
 		getCronjobKey := func(backupSchedule *dpv1alpha1.BackupSchedule,
 			method string, name string) client.ObjectKey {
 			return client.ObjectKey{
-				Name:      dpbackup.GenerateCRNameByBackupScheduleAndScheduleName(backupSchedule, method, name),
+				Name:      dpbackup.GenerateCRNameByScheduleNameAndMethod(backupSchedule, method, name),
 				Namespace: backupPolicy.Namespace,
 			}
 		}
@@ -206,9 +206,7 @@ var _ = Describe("Backup Schedule Controller", func() {
 				backupSchedule := testdp.NewFakeBackupSchedule(&testCtx, func(schedule *dpv1alpha1.BackupSchedule) {
 					schedule.Spec.Schedules[1].BackupMethod = testdp.BackupMethodName
 					schedule.Spec.Schedules[1].Name = scheduleName
-					schedule.Spec.Schedules[1].Parameters = map[string]string{
-						testdp.InvalidParameter: testdp.InvalidParameter,
-					}
+					schedule.Spec.Schedules[1].Parameters = testdp.InvalidParameters
 				})
 				backupScheduleKey := client.ObjectKeyFromObject(backupSchedule)
 				By("the backupSchedule should fail ")

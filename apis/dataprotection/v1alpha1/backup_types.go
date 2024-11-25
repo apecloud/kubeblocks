@@ -76,13 +76,15 @@ type BackupSpec struct {
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.parentBackupName"
 	ParentBackupName string `json:"parentBackupName,omitempty"`
 
-	// Specifies parameters and their corresponding values.
+	// Specifies a list of name-value pairs representing parameters and their corresponding values.
 	// Parameters match the schema specified in the `actionset.spec.parametersSchema`
 	//
-	// +kubebuilder:validation:MaxProperties=30
+	// +listType=map
+	// +listMapKey=name
+	// +kubebuilder:validation:MaxItems=128
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.parameters"
 	// +optional
-	Parameters map[string]string `json:"parameters,omitempty"`
+	Parameters []ParameterPair `json:"parameters,omitempty"`
 }
 
 // BackupStatus defines the observed state of Backup.

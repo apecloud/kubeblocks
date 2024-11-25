@@ -28,6 +28,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -168,21 +169,38 @@ var _ = Describe("BackupRepo controller", func() {
 			obj.GenerateName = "storageprovider-"
 			obj.Spec.CSIDriverName = defaultCSIDriverName
 			obj.Spec.CSIDriverSecretTemplate = `
-value-of-key1: {{ index .Parameters "key1" }}
-value-of-key2: {{ index .Parameters "key2" }}
-value-of-cred-key1: {{ index .Parameters "cred-key1" }}
-value-of-cred-key2: {{ index .Parameters "cred-key2" }}
+value-of-key1: "{{ index .Parameters "key1" }}"
+value-of-key2: "{{ index .Parameters "key2" }}"
+value-of-cred-key1: "{{ index .Parameters "cred-key1" }}"
+value-of-cred-key2: "{{ index .Parameters "cred-key2" }}"
+value-of-with-default: "{{ index .Parameters "with-default" }}"
+value-of-with-default-int: "{{ index .Parameters "with-default-int" }}"
 `
 			obj.Spec.StorageClassTemplate = `
 provisioner: default.csi.driver
 parameters:
-    value-of-key1: {{ index .Parameters "key1" }}
-    value-of-key2: {{ index .Parameters "key2" }}
-    value-of-cred-key1: {{ index .Parameters "cred-key1" }}
-    value-of-cred-key2: {{ index .Parameters "cred-key2" }}
-    secret-name: {{ .CSIDriverSecretRef.Name }}
-    secret-namespace: {{ .CSIDriverSecretRef.Namespace }}
+    value-of-key1: "{{ index .Parameters "key1" }}"
+    value-of-key2: "{{ index .Parameters "key2" }}"
+    value-of-cred-key1: "{{ index .Parameters "cred-key1" }}"
+    value-of-cred-key2: "{{ index .Parameters "cred-key2" }}"
+    value-of-with-default: "{{ index .Parameters "with-default" }}"
+    value-of-with-default-int: "{{ index .Parameters "with-default-int" }}"
+    secret-name: "{{ .CSIDriverSecretRef.Name }}"
+    secret-namespace: "{{ .CSIDriverSecretRef.Namespace }}"
 `
+			obj.Spec.ParametersSchema = &dpv1alpha1.ParametersSchema{
+				OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+					Properties: map[string]apiextensionsv1.JSONSchemaProps{
+						"with-default": {
+							Default: &apiextensionsv1.JSON{Raw: []byte(`"default value"`)},
+						},
+						"with-default-int": {
+							Default: &apiextensionsv1.JSON{Raw: []byte(`123`)},
+						},
+					},
+				},
+			}
+
 			obj.Status.Phase = dpv1alpha1.StorageProviderReady
 			meta.SetStatusCondition(&obj.Status.Conditions, metav1.Condition{
 				Type:   dpv1alpha1.ConditionTypeCSIDriverInstalled,
@@ -423,10 +441,12 @@ parameters:
 			secretKey := types.NamespacedName{Name: secretRef.Name, Namespace: secretRef.Namespace}
 			Eventually(testapps.CheckObj(&testCtx, secretKey, func(g Gomega, secret *corev1.Secret) {
 				g.Expect(secret.Data).To(Equal(map[string][]byte{
-					"value-of-key1":      []byte("val1"),
-					"value-of-key2":      []byte("val2"),
-					"value-of-cred-key1": []byte("cred-val1"),
-					"value-of-cred-key2": []byte("cred-val2"),
+					"value-of-key1":             []byte("val1"),
+					"value-of-key2":             []byte("val2"),
+					"value-of-cred-key1":        []byte("cred-val1"),
+					"value-of-cred-key2":        []byte("cred-val2"),
+					"value-of-with-default":     []byte("default value"),
+					"value-of-with-default-int": []byte("123"),
 				}))
 				g.Expect(isOwned(repo, secret)).To(BeTrue())
 				g.Expect(secret.Labels[dataProtectionBackupRepoKey]).To(Equal(repoKey.Name))
@@ -436,12 +456,14 @@ parameters:
 			storageClassNameKey := types.NamespacedName{Name: storageClassName}
 			Eventually(testapps.CheckObj(&testCtx, storageClassNameKey, func(g Gomega, storageClass *storagev1.StorageClass) {
 				g.Expect(storageClass.Parameters).To(Equal(map[string]string{
-					"value-of-key1":      "val1",
-					"value-of-key2":      "val2",
-					"value-of-cred-key1": "cred-val1",
-					"value-of-cred-key2": "cred-val2",
-					"secret-name":        secretKey.Name,
-					"secret-namespace":   secretKey.Namespace,
+					"value-of-key1":             "val1",
+					"value-of-key2":             "val2",
+					"value-of-cred-key1":        "cred-val1",
+					"value-of-cred-key2":        "cred-val2",
+					"value-of-with-default":     "default value",
+					"value-of-with-default-int": "123",
+					"secret-name":               secretKey.Name,
+					"secret-namespace":          secretKey.Namespace,
 				}))
 				g.Expect(isOwned(repo, storageClass)).To(BeTrue())
 				g.Expect(storageClass.Labels[dataProtectionBackupRepoKey]).To(Equal(repoKey.Name))
@@ -473,11 +495,13 @@ parameters:
 			By("checking the Secret again, should have new generation and new content")
 			Eventually(testapps.CheckObj(&testCtx, secretKey, func(g Gomega, secret *corev1.Secret) {
 				g.Expect(secret.Data).To(Equal(map[string][]byte{
-					"value-of-key1":      []byte("val1"),
-					"value-of-key2":      []byte("val2"),
-					"value-of-cred-key1": []byte("cred-val1"),
-					"value-of-cred-key2": []byte("cred-val2"),
-					"new-item":           []byte("new-value"),
+					"value-of-key1":             []byte("val1"),
+					"value-of-key2":             []byte("val2"),
+					"value-of-cred-key1":        []byte("cred-val1"),
+					"value-of-cred-key2":        []byte("cred-val2"),
+					"value-of-with-default":     []byte("default value"),
+					"value-of-with-default-int": []byte("123"),
+					"new-item":                  []byte("new-value"),
 				}))
 				g.Expect(secret.ResourceVersion).ToNot(Equal(reversion))
 				reversion = secret.ResourceVersion
@@ -486,15 +510,18 @@ parameters:
 			By("updating the config")
 			Eventually(testapps.GetAndChangeObj(&testCtx, repoKey, func(repo *dpv1alpha1.BackupRepo) {
 				repo.Spec.Config["key1"] = "changed-val1"
+				repo.Spec.Config["with-default"] = "overwritten value"
 			})).Should(Succeed())
 			By("checking the Secret again, should have new generation and new content")
 			Eventually(testapps.CheckObj(&testCtx, secretKey, func(g Gomega, secret *corev1.Secret) {
 				g.Expect(secret.Data).To(Equal(map[string][]byte{
-					"value-of-key1":      []byte("changed-val1"),
-					"value-of-key2":      []byte("val2"),
-					"value-of-cred-key1": []byte("cred-val1"),
-					"value-of-cred-key2": []byte("cred-val2"),
-					"new-item":           []byte("new-value"),
+					"value-of-key1":             []byte("changed-val1"),
+					"value-of-key2":             []byte("val2"),
+					"value-of-cred-key1":        []byte("cred-val1"),
+					"value-of-cred-key2":        []byte("cred-val2"),
+					"value-of-with-default":     []byte("overwritten value"),
+					"value-of-with-default-int": []byte("123"),
+					"new-item":                  []byte("new-value"),
 				}))
 				g.Expect(secret.ResourceVersion).ToNot(Equal(reversion))
 				reversion = secret.ResourceVersion
@@ -507,11 +534,13 @@ parameters:
 			By("checking the Secret again, should have new generation and new content")
 			Eventually(testapps.CheckObj(&testCtx, secretKey, func(g Gomega, secret *corev1.Secret) {
 				g.Expect(secret.Data).To(Equal(map[string][]byte{
-					"value-of-key1":      []byte("changed-val1"),
-					"value-of-key2":      []byte("val2"),
-					"value-of-cred-key1": []byte("changed-cred-val1"),
-					"value-of-cred-key2": []byte("cred-val2"),
-					"new-item":           []byte("new-value"),
+					"value-of-key1":             []byte("changed-val1"),
+					"value-of-key2":             []byte("val2"),
+					"value-of-cred-key1":        []byte("changed-cred-val1"),
+					"value-of-cred-key2":        []byte("cred-val2"),
+					"value-of-with-default":     []byte("overwritten value"),
+					"value-of-with-default-int": []byte("123"),
+					"new-item":                  []byte("new-value"),
 				}))
 				g.Expect(secret.ResourceVersion).ToNot(Equal(reversion))
 				reversion = secret.ResourceVersion
@@ -873,6 +902,8 @@ key1={{ index .Parameters "key1" }}
 key2={{ index .Parameters "key2" }}
 cred-key1={{ index .Parameters "cred-key1" }}
 cred-key2={{ index .Parameters "cred-key2" }}
+with-default={{ index .Parameters "with-default" }}
+with-default-int={{ index .Parameters "with-default-int" }}
 `
 					if mutateFunc != nil {
 						mutateFunc(provider)
@@ -968,6 +999,8 @@ key1=val1
 key2=val2
 cred-key1=cred-val1
 cred-key2=cred-val2
+with-default=default value
+with-default-int=123
 `)))
 				})).Should(Succeed())
 
@@ -999,6 +1032,8 @@ key1=val1
 key2=val2
 cred-key1=cred-val1
 cred-key2=cred-val2
+with-default=default value
+with-default-int=123
 new-item=new-value
 `)))
 				})).Should(Succeed())
@@ -1006,6 +1041,7 @@ new-item=new-value
 				By("changing the value")
 				Eventually(testapps.GetAndChangeObj(&testCtx, repoKey, func(repo *dpv1alpha1.BackupRepo) {
 					repo.Spec.Config["key1"] = "changed-val1"
+					repo.Spec.Config["with-default"] = "overwritten value"
 				})).Should(Succeed())
 				completePreCheckJob(repo)
 				Eventually(testapps.CheckObj(&testCtx, toolConfigSecretKey, func(g Gomega, secret *corev1.Secret) {
@@ -1016,6 +1052,8 @@ key1=changed-val1
 key2=val2
 cred-key1=cred-val1
 cred-key2=cred-val2
+with-default=overwritten value
+with-default-int=123
 new-item=new-value
 `)))
 				})).Should(Succeed())

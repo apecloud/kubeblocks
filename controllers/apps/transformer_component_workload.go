@@ -21,6 +21,7 @@ package apps
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"reflect"
@@ -159,11 +160,6 @@ func (t *componentWorkloadTransformer) reconcileWorkload(ctx context.Context, cl
 	// build configuration template annotations to workload
 	configuration.BuildConfigTemplateAnnotations(protoITS, synthesizedComp)
 
-	// mark proto its as stopped if the component is stopped
-	if isCompStopped(synthesizedComp) {
-		t.stopWorkload(protoITS)
-	}
-
 	return nil
 }
 
@@ -220,24 +216,16 @@ func hasMemberJoinNDataActionDefined(lifecycleActions *appsv1.ComponentLifecycle
 		hasActionDefined([]*appsv1.Action{lifecycleActions.DataDump, lifecycleActions.DataLoad})
 }
 
-func isCompStopped(synthesizedComp *component.SynthesizedComponent) bool {
-	return synthesizedComp.Stop != nil && *synthesizedComp.Stop
-}
-
-func (t *componentWorkloadTransformer) stopWorkload(protoITS *workloads.InstanceSet) {
-	zero := func() *int32 { r := int32(0); return &r }()
-	// since its doesn't support stop, we achieve it by setting replicas to 0.
-	protoITS.Spec.Replicas = zero
-	for i := range protoITS.Spec.Instances {
-		protoITS.Spec.Instances[i].Replicas = zero
-	}
-}
-
 func (t *componentWorkloadTransformer) handleUpdate(reqCtx intctrlutil.RequestCtx, cli model.GraphClient, dag *graph.DAG,
-	cluster *appsv1.Cluster, synthesizeComp *component.SynthesizedComponent, comp *appsv1.Component, runningITS, protoITS *workloads.InstanceSet) error {
-	if !isCompStopped(synthesizeComp) {
+	cluster *appsv1.Cluster, synthesizedComp *component.SynthesizedComponent, comp *appsv1.Component, runningITS, protoITS *workloads.InstanceSet) error {
+	start, stop, err := t.handleWorkloadStartNStop(synthesizedComp, runningITS, &protoITS)
+	if err != nil {
+		return err
+	}
+
+	if !(start || stop) {
 		// postpone the update of the workload until the component is back to running.
-		if err := t.handleWorkloadUpdate(reqCtx, dag, cluster, synthesizeComp, comp, runningITS, protoITS); err != nil {
+		if err := t.handleWorkloadUpdate(reqCtx, dag, cluster, synthesizedComp, comp, runningITS, protoITS); err != nil {
 			return err
 		}
 	}
@@ -248,11 +236,109 @@ func (t *componentWorkloadTransformer) handleUpdate(reqCtx intctrlutil.RequestCt
 		// make sure the workload is updated after the env CM
 		cli.DependOn(dag, &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
-				Namespace: synthesizeComp.Namespace,
-				Name:      constant.GenerateClusterComponentEnvPattern(synthesizeComp.ClusterName, synthesizeComp.Name),
+				Namespace: synthesizedComp.Namespace,
+				Name:      constant.GenerateClusterComponentEnvPattern(synthesizedComp.ClusterName, synthesizedComp.Name),
 			},
 		})
 	}
+
+	// if start {
+	//	return intctrlutil.NewDelayedRequeueError(time.Second, "workload is starting")
+	// }
+	return nil
+}
+
+func (t *componentWorkloadTransformer) handleWorkloadStartNStop(
+	synthesizedComp *component.SynthesizedComponent, runningITS *workloads.InstanceSet, protoITS **workloads.InstanceSet) (bool, bool, error) {
+	var (
+		stop  = isCompStopped(synthesizedComp)
+		start = !stop && isWorkloadStopped(runningITS)
+	)
+	if start || stop {
+		*protoITS = runningITS.DeepCopy() // don't modify the runningITS except for the replicas
+	}
+	if stop {
+		return start, stop, t.stopWorkload(synthesizedComp, runningITS, *protoITS)
+	}
+	if start {
+		return start, stop, t.startWorkload(synthesizedComp, runningITS, *protoITS)
+	}
+	return start, stop, nil
+}
+
+func isCompStopped(synthesizedComp *component.SynthesizedComponent) bool {
+	return synthesizedComp.Stop != nil && *synthesizedComp.Stop
+}
+
+func isWorkloadStopped(runningITS *workloads.InstanceSet) bool {
+	_, ok := runningITS.Annotations[constant.StopReplicasSnapshotKey]
+	return ok
+}
+
+func (t *componentWorkloadTransformer) stopWorkload(
+	synthesizedComp *component.SynthesizedComponent, runningITS, protoITS *workloads.InstanceSet) error {
+	// since its doesn't support stop, we achieve it by setting replicas to 0.
+	protoITS.Spec.Replicas = ptr.To(int32(0))
+	for i := range protoITS.Spec.Instances {
+		protoITS.Spec.Instances[i].Replicas = ptr.To(int32(0))
+	}
+
+	// backup the replicas of runningITS
+	snapshot, ok := runningITS.Annotations[constant.StopReplicasSnapshotKey]
+	if !ok {
+		replicas := map[string]int32{}
+		if runningITS.Spec.Replicas != nil {
+			replicas[""] = *runningITS.Spec.Replicas
+		}
+		for i := range runningITS.Spec.Instances {
+			if runningITS.Spec.Instances[i].Replicas != nil {
+				replicas[protoITS.Spec.Instances[i].Name] = *runningITS.Spec.Instances[i].Replicas
+			}
+		}
+		out, err := json.Marshal(replicas)
+		if err != nil {
+			return err
+		}
+		snapshot = string(out)
+
+		protoITS.Annotations[constant.KubeBlocksGenerationKey] = synthesizedComp.Generation
+	}
+	protoITS.Annotations[constant.StopReplicasSnapshotKey] = snapshot
+	return nil
+}
+
+func (t *componentWorkloadTransformer) startWorkload(
+	synthesizedComp *component.SynthesizedComponent, runningITS, protoITS *workloads.InstanceSet) error {
+	snapshot := runningITS.Annotations[constant.StopReplicasSnapshotKey]
+	replicas := map[string]int32{}
+	if err := json.Unmarshal([]byte(snapshot), &replicas); err != nil {
+		return err
+	}
+
+	restore := func(p **int32, key string) {
+		val, ok := replicas[key]
+		if ok {
+			*p = ptr.To(val)
+		} else {
+			*p = nil
+		}
+	}
+
+	// restore the replicas of runningITS
+	restore(&protoITS.Spec.Replicas, "")
+	for i := range runningITS.Spec.Instances {
+		for j := range protoITS.Spec.Instances {
+			if runningITS.Spec.Instances[i].Name == protoITS.Spec.Instances[j].Name {
+				restore(&protoITS.Spec.Instances[j].Replicas, runningITS.Spec.Instances[i].Name)
+				break
+			}
+		}
+	}
+
+	delete(protoITS.Annotations, constant.StopReplicasSnapshotKey)
+	delete(runningITS.Annotations, constant.StopReplicasSnapshotKey)
+
+	protoITS.Annotations[constant.KubeBlocksGenerationKey] = synthesizedComp.Generation
 
 	return nil
 }
@@ -455,27 +541,6 @@ func checkNRollbackProtoImages(itsObj, itsProto *workloads.InstanceSet) {
 	}
 }
 
-func (r *componentWorkloadOps) expandVolumeClaimTemplates(runningVCTs []corev1.PersistentVolumeClaim, protoVCTs []corev1.PersistentVolumeClaimTemplate, insTPLName string) error {
-	for _, vct := range runningVCTs {
-		var proto *corev1.PersistentVolumeClaimTemplate
-		for i, v := range protoVCTs {
-			if v.Name == vct.Name {
-				proto = &protoVCTs[i]
-				break
-			}
-		}
-		// REVIEW: seems we can remove a volume claim from templates at runtime, without any changes and warning messages?
-		if proto == nil {
-			continue
-		}
-
-		if err := r.expandVolumes(insTPLName, vct.Name, proto); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 // expandVolume handles workload expand volume
 func (r *componentWorkloadOps) expandVolume() error {
 	// 1. expand the volumes without instance template name.
@@ -511,6 +576,27 @@ func (r *componentWorkloadOps) expandVolume() error {
 			}
 		}
 		if err := r.expandVolumeClaimTemplates(runningInsSpec.VolumeClaimTemplates, protoVCTs, runningInsTPL.Name); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *componentWorkloadOps) expandVolumeClaimTemplates(runningVCTs []corev1.PersistentVolumeClaim, protoVCTs []corev1.PersistentVolumeClaimTemplate, insTPLName string) error {
+	for _, vct := range runningVCTs {
+		var proto *corev1.PersistentVolumeClaimTemplate
+		for i, v := range protoVCTs {
+			if v.Name == vct.Name {
+				proto = &protoVCTs[i]
+				break
+			}
+		}
+		// REVIEW: seems we can remove a volume claim from templates at runtime, without any changes and warning messages?
+		if proto == nil {
+			continue
+		}
+
+		if err := r.expandVolumes(insTPLName, vct.Name, proto); err != nil {
 			return err
 		}
 	}

@@ -1887,7 +1887,7 @@ var _ = Describe("Component Controller", func() {
 		}
 
 		checkCompRunning := func() {
-			checkCompRunningAs(kbappsv1.UpdatingComponentPhase)
+			checkCompRunningAs(kbappsv1.StartingComponentPhase)
 		}
 
 		checkCompStopped := func() {
@@ -1966,7 +1966,50 @@ var _ = Describe("Component Controller", func() {
 				g.Expect(comp.Spec.Replicas).Should(Equal(3))
 				g.Expect(comp.Status.ObservedGeneration).Should(Equal(comp.Generation))
 				g.Expect(comp.Status.Phase).Should(Equal(kbappsv1.UpdatingComponentPhase))
+			}))
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(*its.Spec.Replicas).To(BeEquivalentTo(3))
+			}))
+		})
 
+		It("h-scale a stopped component - w/ data actions", func() {
+			By("update the cmpd object to set data actions")
+			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(compDefObj),
+				func(cmpd *kbappsv1.ComponentDefinition) {
+					if cmpd.Spec.LifecycleActions == nil {
+						cmpd.Spec.LifecycleActions = &kbappsv1.ComponentLifecycleActions{}
+					}
+					cmpd.Spec.LifecycleActions.DataLoad = testapps.NewLifecycleAction("data-load")
+					cmpd.Spec.LifecycleActions.DataDump = testapps.NewLifecycleAction("data-dump")
+				})()).Should(Succeed())
+
+			createClusterObjWithPhase(defaultCompName, compDefName, func(f *testapps.MockClusterFactory) {
+				f.SetStop(func() *bool { b := true; return &b }())
+			}, kbappsv1.StoppedClusterPhase)
+			checkCompStopped()
+
+			By("scale-out")
+			changeCompReplicas(clusterKey, 3, &clusterObj.Spec.ComponentSpecs[0])
+
+			By("check comp & its")
+			Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *kbappsv1.Component) {
+				g.Expect(comp.Spec.Replicas).Should(Equal(3))
+				g.Expect(comp.Status.ObservedGeneration < comp.Generation).Should(BeTrue())
+				g.Expect(comp.Status.Phase).Should(Equal(kbappsv1.StoppedComponentPhase))
+			}))
+			itsKey := compKey
+			Consistently(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(*its.Spec.Replicas).To(BeEquivalentTo(0))
+			}))
+
+			By("start it")
+			startComp()
+
+			By("check comp & its")
+			Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *kbappsv1.Component) {
+				g.Expect(comp.Spec.Replicas).Should(Equal(3))
+				g.Expect(comp.Status.ObservedGeneration).Should(Equal(comp.Generation))
+				g.Expect(comp.Status.Phase).Should(Equal(kbappsv1.UpdatingComponentPhase))
 			}))
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 				g.Expect(*its.Spec.Replicas).To(BeEquivalentTo(3))

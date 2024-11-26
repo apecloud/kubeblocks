@@ -5777,6 +5777,9 @@ and other administrative tasks.</p>
 </tr><tr><td><p>&#34;Running&#34;</p></td>
 <td><p>RunningComponentPhase indicates that all pods of the component are up-to-date and in a &lsquo;Running&rsquo; state.</p>
 </td>
+</tr><tr><td><p>&#34;Starting&#34;</p></td>
+<td><p>StartingComponentPhase indicates the component is currently being started.</p>
+</td>
 </tr><tr><td><p>&#34;Stopped&#34;</p></td>
 <td><p>StoppedComponentPhase indicates the component is stopped.</p>
 </td>
@@ -6354,6 +6357,7 @@ ComponentPhase
 <li>Failed: A significant number of Pods have failed.</li>
 <li>Stopping: All Pods are being terminated, with current replica count at zero.</li>
 <li>Stopped: All associated Pods have been successfully deleted.</li>
+<li>Starting: Pods are being started.</li>
 <li>Deleting: The Component is being deleted.</li>
 </ul>
 </td>

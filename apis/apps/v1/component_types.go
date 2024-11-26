@@ -316,6 +316,7 @@ type ComponentStatus struct {
 	// - Failed: A significant number of Pods have failed.
 	// - Stopping: All Pods are being terminated, with current replica count at zero.
 	// - Stopped: All associated Pods have been successfully deleted.
+	// - Starting: Pods are being started.
 	// - Deleting: The Component is being deleted.
 	Phase ComponentPhase `json:"phase,omitempty"`
 
@@ -353,7 +354,7 @@ type Sidecar struct {
 // ComponentPhase defines the phase of the Component within the .status.phase field.
 //
 // +enum
-// +kubebuilder:validation:Enum={Creating,Deleting,Updating,Stopping,Running,Stopped,Failed}
+// +kubebuilder:validation:Enum={Creating,Deleting,Updating,Stopping,Starting,Running,Stopped,Failed}
 type ComponentPhase string
 
 const (
@@ -368,6 +369,9 @@ const (
 
 	// StoppingComponentPhase indicates the component is currently being stopped.
 	StoppingComponentPhase ComponentPhase = "Stopping"
+
+	// StartingComponentPhase indicates the component is currently being started.
+	StartingComponentPhase ComponentPhase = "Starting"
 
 	// RunningComponentPhase indicates that all pods of the component are up-to-date and in a 'Running' state.
 	RunningComponentPhase ComponentPhase = "Running"

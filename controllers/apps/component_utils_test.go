@@ -69,7 +69,7 @@ var _ = Describe("Component Utils", func() {
 			)
 			pod := testapps.MockInstanceSetPod(&testCtx, nil, clusterName, compName, podName, role, mode)
 			ppod := testapps.NewPodFactory(testCtx.DefaultNamespace, "pod").
-				SetOwnerReferences(workloads.GroupVersion.String(), workloads.Kind, nil).
+				SetOwnerReferences(workloads.GroupVersion.String(), workloads.InstanceSetKind, nil).
 				AddAppInstanceLabel(clusterName).
 				AddAppComponentLabel(compName).
 				AddAppManagedByLabel().

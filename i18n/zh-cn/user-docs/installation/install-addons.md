@@ -34,7 +34,7 @@ KubeBlocks v0.8.0 发布后，数据库引擎插件（Addon）与 KubeBlocks 解
 3. 以 etcd 为例，安装引擎。使用 `--version` 指定版本。
 
    ```bash
-   helm install etcd kubeblocks/etcd --namespace kb-system --create-namespace --version x.y.z
+   helm install kb-etcd-addon kubeblocks/etcd --namespace kb-system --create-namespace --version x.y.z
    ```
 
 4. 验证该引擎是否安装成功。
@@ -46,13 +46,13 @@ KubeBlocks v0.8.0 发布后，数据库引擎插件（Addon）与 KubeBlocks 解
    >
    NAME                 NAMESPACE	REVISION	UPDATED                                	STATUS  	CHART              APP VERSION
    ......
-   etcd               	kb-system	1       	2024-10-25 07:18:35.294326176 +0000 UTC	deployed	etcd-0.9.0         v3.5.6
+   kb-etcd-addon        kb-system	1       	2024-10-25 07:18:35.294326176 +0000 UTC	deployed	etcd-0.9.0         v3.5.6
    ```
 
 5. （可选）您可以执行以下命令卸载引擎。如果您已使用该引擎创建集群，请先删除集群。
 
    ```bash
-   helm uninstall etcd --namespace kb-system
+   helm uninstall kb-etcd-addon --namespace kb-system
    ```
 
 </TabItem>

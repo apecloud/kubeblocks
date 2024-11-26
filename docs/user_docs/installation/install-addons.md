@@ -34,7 +34,7 @@ The official index repo is [KubeBlocks index](https://github.com/apecloud/block-
 3. Install the Addon (take etcd as example). Specify a version with `--version`.
 
    ```bash
-   helm install etcd kubeblocks/etcd --namespace kb-system --create-namespace --version x.y.z
+   helm install kb-etcd-addon kubeblocks/etcd --namespace kb-system --create-namespace --version x.y.z
    ```
 
 4. Verify whether this Addon is installed.
@@ -46,7 +46,7 @@ The official index repo is [KubeBlocks index](https://github.com/apecloud/block-
    >
    NAME                 NAMESPACE	REVISION	UPDATED                                	STATUS  	CHART              APP VERSION
    ......
-   etcd               	kb-system	1       	2024-10-25 07:18:35.294326176 +0000 UTC	deployed	etcd-0.9.0         v3.5.6
+   kb-etcd-addon        kb-system	1       	2024-10-25 07:18:35.294326176 +0000 UTC	deployed	etcd-0.9.0         v3.5.6
    ```
 
 5. (Optional) You can run the command below to disable the Addon.
@@ -54,7 +54,7 @@ The official index repo is [KubeBlocks index](https://github.com/apecloud/block-
    If you have created a related cluster, delete the cluster first.
 
    ```bash
-   helm uninstall etcd --namespace kb-system
+   helm uninstall kb-etcd-addon --namespace kb-system
    ```
 
 </TabItem>

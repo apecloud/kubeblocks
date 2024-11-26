@@ -16,7 +16,7 @@ Uninstallation order:
 1. Delete your cluster if you have created a cluster.
 
    ```bash
-   kubebctl delete cluster <clustername> -n namespace
+   kubectl delete cluster <clustername> -n namespace
    ```
 
 2. Uninstall KubeBlocks.

@@ -16,7 +16,7 @@ import TabItem from '@theme/TabItem';
 1. 如果已经创建了集群，请先删除集群。
 
    ```bash
-   kubebctl delete cluster <clustername> -n namespace
+   kubectl delete cluster <clustername> -n namespace
    ```
 
 2. 卸载 KubeBlocks。

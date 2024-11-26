@@ -24,6 +24,7 @@ import (
 	"context"
 	"crypto/md5"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -217,7 +218,7 @@ func (r *BackupRepoReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	// check parameters for rendering templates
-	parameters, err := r.checkParameters(reqCtx, repo)
+	parameters, err := r.checkParameters(reqCtx, repo, provider)
 	if err != nil {
 		_ = r.updateStatus(reqCtx, repo)
 		return checkedRequeueWithError(err, reqCtx.Log, "check parameters failed")
@@ -452,14 +453,14 @@ func (r *BackupRepoReconciler) checkStorageProvider(
 }
 
 func (r *BackupRepoReconciler) checkParameters(reqCtx intctrlutil.RequestCtx,
-	repo *dpv1alpha1.BackupRepo) (parameters map[string]string, err error) {
+	repo *dpv1alpha1.BackupRepo, provider *dpv1alpha1.StorageProvider) (parameters map[string]string, err error) {
 	reason := ReasonUnknownError
 	defer func() {
 		r.updateConditionInDefer(reqCtx.Ctx, repo, ConditionTypeParametersChecked, reason, nil, nil, &err)
 	}()
 
 	// collect parameters for rendering templates
-	parameters, err = r.collectParameters(reqCtx, repo)
+	parameters, err = r.collectParameters(reqCtx, repo, provider)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			reason = ReasonCredentialSecretNotFound
@@ -1276,13 +1277,48 @@ func (r *BackupRepoReconciler) createToolConfigSecret(reconCtx *reconcileContext
 	return secret, err
 }
 
-func (r *BackupRepoReconciler) collectParameters(
-	reqCtx intctrlutil.RequestCtx, repo *dpv1alpha1.BackupRepo) (map[string]string, error) {
-	values := make(map[string]string)
-	for k, v := range repo.Spec.Config {
-		values[k] = v
+func extractDefaultValues(provider *dpv1alpha1.StorageProvider) map[string]string {
+	result := make(map[string]string)
+	if provider.Spec.ParametersSchema == nil || provider.Spec.ParametersSchema.OpenAPIV3Schema == nil {
+		return result
 	}
-	// merge with secret values
+	schema := provider.Spec.ParametersSchema.OpenAPIV3Schema
+	for name, prop := range schema.Properties {
+		if prop.Default == nil {
+			continue
+		}
+		var strVal string
+		err := json.Unmarshal(prop.Default.Raw, &strVal)
+		if err == nil {
+			result[name] = strVal
+		} else {
+			// boolean or number types
+			result[name] = string(prop.Default.Raw)
+		}
+	}
+	return result
+}
+
+func mergeParameters(maps ...map[string]string) map[string]string {
+	merged := make(map[string]string)
+	mergeFn := func(m map[string]string) {
+		for k, v := range m {
+			merged[k] = v
+		}
+	}
+	for _, m := range maps {
+		mergeFn(m)
+	}
+	return merged
+}
+
+func (r *BackupRepoReconciler) collectParameters(
+	reqCtx intctrlutil.RequestCtx, repo *dpv1alpha1.BackupRepo,
+	provider *dpv1alpha1.StorageProvider) (map[string]string, error) {
+
+	defaultValues := extractDefaultValues(provider)
+
+	var valuesFromSecret map[string]string
 	if repo.Spec.Credential != nil {
 		// Note: this secret is created by the user and placed in the control cluster
 		secretObj := &corev1.Secret{}
@@ -1293,11 +1329,12 @@ func (r *BackupRepoReconciler) collectParameters(
 		if err != nil {
 			return nil, fmt.Errorf("failed to get secret: %w", err)
 		}
+		valuesFromSecret = make(map[string]string)
 		for k, v := range secretObj.Data {
-			values[k] = string(v)
+			valuesFromSecret[k] = string(v)
 		}
 	}
-	return values, nil
+	return mergeParameters(defaultValues, repo.Spec.Config, valuesFromSecret), nil
 }
 
 func (r *BackupRepoReconciler) deleteExternalResources(

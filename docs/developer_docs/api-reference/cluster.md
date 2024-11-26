@@ -13232,6 +13232,18 @@ ComponentOps
 </tr>
 <tr>
 <td>
+<code>shards</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<p>Specifies the desired number of shards for the component.
+This parameter is mutually exclusive with other parameters.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>replicas</code><br/>
 <em>
 int32
@@ -13989,6 +14001,18 @@ int32
 <td>
 <em>(Optional)</em>
 <p>Records the <code>replicas</code> of the Component prior to any changes.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>shards</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Records the <code>shards</code> of the Component prior to any changes.</p>
 </td>
 </tr>
 <tr>

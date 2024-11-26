@@ -83,9 +83,12 @@ func (hs horizontalScalingOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli 
 				if currHorizontalScaling.Replicas != nil || v.Replicas != nil {
 					return true, nil
 				}
-				// if the earlier opsRequest is pending and not `Overwrite` operator, return false.
+				// if the earlier opsRequest is pending, return false.
 				if earlierOps.Status.Phase == appsv1alpha1.OpsPendingPhase {
 					return false, nil
+				}
+				if v.Shards != nil && currHorizontalScaling.Shards != nil {
+					return true, nil
 				}
 				// check if the instance to be taken offline was created by another opsRequest.
 				if err := hs.checkIntersectionWithEarlierOps(opsRes, earlierOps, currHorizontalScaling, v); err != nil {
@@ -97,8 +100,22 @@ func (hs horizontalScalingOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli 
 		return err
 	}
 
+	// update shard count
+	for i := range opsRes.Cluster.Spec.ShardingSpecs {
+		sharding := &opsRes.Cluster.Spec.ShardingSpecs[i]
+		if compOps, ok := compOpsSet.componentOpsSet[sharding.Name]; ok {
+			horizontalScaling := compOps.(appsv1alpha1.HorizontalScaling)
+			if horizontalScaling.Shards != nil {
+				sharding.Shards = *horizontalScaling.Shards
+			}
+		}
+	}
+
 	if err := compOpsSet.updateClusterComponentsAndShardings(opsRes.Cluster, func(compSpec *appsv1alpha1.ClusterComponentSpec, obj ComponentOpsInterface) error {
 		horizontalScaling := obj.(appsv1alpha1.HorizontalScaling)
+		if horizontalScaling.Shards != nil {
+			return nil
+		}
 		lastCompConfiguration := opsRes.OpsRequest.Status.LastConfiguration.Components[obj.GetComponentName()]
 		if horizontalScaling.ScaleIn != nil && len(horizontalScaling.ScaleIn.OnlineInstancesToOffline) > 0 {
 			// check if the instances are online.
@@ -146,14 +163,18 @@ func (hs horizontalScalingOpsHandler) ReconcileAction(reqCtx intctrlutil.Request
 		opsRes *OpsResource,
 		pgRes *progressResource,
 		compStatus *appsv1alpha1.OpsRequestComponentStatus) (int32, int32, error) {
-		lastCompConfiguration := opsRes.OpsRequest.Status.LastConfiguration.Components[pgRes.compOps.GetComponentName()]
 		horizontalScaling := pgRes.compOps.(appsv1alpha1.HorizontalScaling)
+		pgRes.noWaitComponentCompleted = true
+		if horizontalScaling.Shards != nil {
+			// horizontal scaling for shard count.
+			return handleComponentProgressForScalingShards(reqCtx, cli, opsRes, pgRes, compStatus)
+		}
 		var err error
+		lastCompConfiguration := opsRes.OpsRequest.Status.LastConfiguration.Components[pgRes.compOps.GetComponentName()]
 		pgRes.createdPodSet, pgRes.deletedPodSet, err = hs.getCreateAndDeletePodSet(opsRes, lastCompConfiguration, *pgRes.clusterComponent, horizontalScaling, pgRes.fullComponentName)
 		if err != nil {
 			return 0, 0, err
 		}
-		pgRes.noWaitComponentCompleted = true
 		return handleComponentProgressForScalingReplicas(reqCtx, cli, opsRes, pgRes, compStatus)
 	}
 	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.HorizontalScalingList)
@@ -162,15 +183,26 @@ func (hs horizontalScalingOpsHandler) ReconcileAction(reqCtx intctrlutil.Request
 
 // SaveLastConfiguration records last configuration to the OpsRequest.status.lastConfiguration
 func (hs horizontalScalingOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
-	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.HorizontalScalingList)
+	shardsMap := make(map[string]int32, len(opsRes.Cluster.Spec.ShardingSpecs))
+	for _, v := range opsRes.Cluster.Spec.ShardingSpecs {
+		shardsMap[v.Name] = v.Shards
+	}
 	getLastComponentInfo := func(compSpec appsv1alpha1.ClusterComponentSpec, comOps ComponentOpsInterface) appsv1alpha1.LastComponentConfiguration {
-		lastCompConfiguration := appsv1alpha1.LastComponentConfiguration{
+		horizontalScaling := comOps.(appsv1alpha1.HorizontalScaling)
+		if horizontalScaling.Shards != nil {
+			var lastCompConfiguration appsv1alpha1.LastComponentConfiguration
+			if shards, ok := shardsMap[comOps.GetComponentName()]; ok {
+				lastCompConfiguration.Shards = pointer.Int32(shards)
+			}
+			return lastCompConfiguration
+		}
+		return appsv1alpha1.LastComponentConfiguration{
 			Replicas:         pointer.Int32(compSpec.Replicas),
 			Instances:        compSpec.Instances,
 			OfflineInstances: compSpec.OfflineInstances,
 		}
-		return lastCompConfiguration
 	}
+	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.HorizontalScalingList)
 	compOpsHelper.saveLastConfigurations(opsRes, getLastComponentInfo)
 	return nil
 }
@@ -217,6 +249,12 @@ func (hs horizontalScalingOpsHandler) getCreateAndDeletePodSet(opsRes *OpsResour
 
 // Cancel this function defines the cancel horizontalScaling action.
 func (hs horizontalScalingOpsHandler) Cancel(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
+	for _, v := range opsRes.OpsRequest.Spec.HorizontalScalingList {
+		if v.Shards != nil {
+			// This operation requires intervention by operations personnel.
+			return intctrlutil.NewErrorf(intctrlutil.ErrorIgnoreCancel, "does not support cancellation of shard count changes during horizontal scaling.")
+		}
+	}
 	compOpsHelper := newComponentOpsHelper(opsRes.OpsRequest.Spec.HorizontalScalingList)
 	if err := compOpsHelper.cancelComponentOps(reqCtx.Ctx, cli, opsRes, func(lastConfig *appsv1alpha1.LastComponentConfiguration, comp *appsv1alpha1.ClusterComponentSpec) {
 		comp.Replicas = *lastConfig.Replicas

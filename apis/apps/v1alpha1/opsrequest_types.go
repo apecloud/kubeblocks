@@ -477,10 +477,16 @@ type OpsRequestVolumeClaimTemplate struct {
 	Name string `json:"name"`
 }
 
+// +kubebuilder:validation:XValidation:rule="has(self.shards) ? (!has(self.scaleOut) && !has(self.scaleIn)) : true",message="shards field cannot be used together with scaleOut or scaleIn"
+
 // HorizontalScaling defines the parameters of a horizontal scaling operation.
 type HorizontalScaling struct {
 	// Specifies the name of the Component.
 	ComponentOps `json:",inline"`
+
+	// Specifies the desired number of shards for the component.
+	// This parameter is mutually exclusive with other parameters.
+	Shards *int32 `json:"shards,omitempty"`
 
 	// Deprecated: since v0.9, use scaleOut and scaleIn instead.
 	// Specifies the number of replicas for the component. Cannot be used with "scaleIn" and "scaleOut".
@@ -1210,6 +1216,10 @@ type LastComponentConfiguration struct {
 	// Records the `replicas` of the Component prior to any changes.
 	// +optional
 	Replicas *int32 `json:"replicas,omitempty"`
+
+	// Records the `shards` of the Component prior to any changes.
+	// +optional
+	Shards *int32 `json:"shards,omitempty"`
 
 	// Records the resources of the Component prior to any changes.
 	// +kubebuilder:pruning:PreserveUnknownFields

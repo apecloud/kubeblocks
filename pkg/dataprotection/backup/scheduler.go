@@ -309,8 +309,10 @@ func (s *Scheduler) generateBackupName(schedulePolicy *dpv1alpha1.SchedulePolicy
 	if backupNamePrefix == "" {
 		backupNamePrefix = s.BackupSchedule.Name
 	}
-	if len(schedulePolicy.Name) > 0 {
-		backupNamePrefix = fmt.Sprintf("%s-%s", backupNamePrefix, schedulePolicy.Name)
+	// use schedule name to distinguish different schedule policies
+	name := schedulePolicy.GetScheduleName()
+	if len(name) > 0 {
+		backupNamePrefix = fmt.Sprintf("%s-%s", backupNamePrefix, name)
 	}
 	return backupNamePrefix + "-$(date -u +'%Y%m%d%H%M%S')"
 }

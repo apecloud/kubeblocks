@@ -761,7 +761,7 @@ func (r *componentWorkloadOps) precondition(name string, action *appsv1alpha1.Ac
 			return fmt.Errorf("component is nil when checking RuntimeReady preCondition in %s action", name)
 		}
 	case appsv1alpha1.RuntimeReadyPreConditionType:
-		if r.runningITS == nil || instanceset.IsInstancesReady(r.runningITS) {
+		if r.runningITS == nil || !instanceset.IsInstancesReady(r.runningITS) {
 			return fmt.Errorf("runtime is nil when checking RuntimeReady preCondition in %s action", name)
 		}
 	case appsv1alpha1.ClusterReadyPreConditionType:

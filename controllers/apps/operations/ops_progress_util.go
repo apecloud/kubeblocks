@@ -425,8 +425,12 @@ func updateProgressDetailForHScale(
 	pgRes *progressResource,
 	compStatus *appsv1alpha1.OpsRequestComponentStatus,
 	objectKey string, status appsv1alpha1.ProgressStatus) {
+	var group string
+	if pgRes.fullComponentName != "" {
+		group = fmt.Sprintf("%s/%s", pgRes.fullComponentName, pgRes.opsMessageKey)
+	}
 	progressDetail := appsv1alpha1.ProgressStatusDetail{
-		Group:     fmt.Sprintf("%s/%s", pgRes.fullComponentName, pgRes.opsMessageKey),
+		Group:     group,
 		ObjectKey: objectKey,
 		Status:    status,
 	}

@@ -38,7 +38,6 @@ import (
 	"k8s.io/kubectl/pkg/util/podutils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/kustomize/api/image"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -205,8 +204,8 @@ func isImageMatched(pod *corev1.Pod) bool {
 		statusImage := pod.Status.ContainerStatuses[index].Image
 		// Image in status may not match the image used in the PodSpec.
 		// More info: https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/pod-v1/#PodStatus
-		specName, specTag, specDigest := image.Split(specImage)
-		statusName, statusTag, statusDigest := image.Split(statusImage)
+		specName, specTag, specDigest := imageSplit(specImage)
+		statusName, statusTag, statusDigest := imageSplit(statusImage)
 		// if digest presents in spec, it must be same in status
 		if len(specDigest) != 0 && specDigest != statusDigest {
 			return false
@@ -225,6 +224,53 @@ func isImageMatched(pod *corev1.Pod) bool {
 		}
 	}
 	return true
+}
+
+// imageSplit separates and returns the name and tag parts
+// from the image string using either colon `:` or at `@` separators.
+// image reference pattern: [[host[:port]/]component/]component[:tag][@digest]
+func imageSplit(imageName string) (name string, tag string, digest string) {
+	// check if image name contains a domain
+	// if domain is present, ignore domain and check for `:`
+	searchName := imageName
+	slashIndex := strings.Index(imageName, "/")
+	if slashIndex > 0 {
+		searchName = imageName[slashIndex:]
+	} else {
+		slashIndex = 0
+	}
+
+	id := strings.Index(searchName, "@")
+	ic := strings.Index(searchName, ":")
+
+	// no tag or digest
+	if ic < 0 && id < 0 {
+		return imageName, "", ""
+	}
+
+	// digest only
+	if id >= 0 && (id < ic || ic < 0) {
+		id += slashIndex
+		name = imageName[:id]
+		digest = strings.TrimPrefix(imageName[id:], "@")
+		return name, "", digest
+	}
+
+	// tag and digest
+	if id >= 0 && ic >= 0 {
+		id += slashIndex
+		ic += slashIndex
+		name = imageName[:ic]
+		tag = strings.TrimPrefix(imageName[ic:id], ":")
+		digest = strings.TrimPrefix(imageName[id:], "@")
+		return name, tag, digest
+	}
+
+	// tag only
+	ic += slashIndex
+	name = imageName[:ic]
+	tag = strings.TrimPrefix(imageName[ic:], ":")
+	return name, tag, ""
 }
 
 // getPodRevision gets the revision of Pod by inspecting the StatefulSetRevisionLabel. If pod has no revision the empty

@@ -660,7 +660,7 @@ func (r *componentWorkloadOps) leaveMemberForPod(pod *corev1.Pod, pods []*corev1
 	}
 
 	if err = lfa.MemberLeave(r.reqCtx.Ctx, r.cli, nil); err != nil {
-		if !errors.Is(err, lifecycle.ErrActionNotDefined) && err == nil {
+		if !errors.Is(err, lifecycle.ErrActionNotDefined) {
 			return err
 		}
 	}

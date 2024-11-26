@@ -52,4 +52,6 @@ const (
 	CfgKBReconcileWorkers = "KUBEBLOCKS_RECONCILE_WORKERS"
 	CfgClientQPS          = "CLIENT_QPS"
 	CfgClientBurst        = "CLIENT_BURST"
+
+	I18nResourcesName = "I18N_RESOURCES_NAME"
 )

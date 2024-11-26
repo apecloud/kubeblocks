@@ -37,3 +37,8 @@ func (builder *ClusterBuilder) SetComponentSpecs(specs []appsv1.ClusterComponent
 	builder.get().Spec.ComponentSpecs = specs
 	return builder
 }
+
+func (builder *ClusterBuilder) SetResourceVersion(resourceVersion string) *ClusterBuilder {
+	builder.get().ResourceVersion = resourceVersion
+	return builder
+}

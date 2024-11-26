@@ -55,6 +55,7 @@ import (
 	experimentalv1alpha1 "github.com/apecloud/kubeblocks/apis/experimental/v1alpha1"
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
+	tracev1 "github.com/apecloud/kubeblocks/apis/trace/v1"
 	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	workloadsv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	appscontrollers "github.com/apecloud/kubeblocks/controllers/apps"
@@ -63,6 +64,7 @@ import (
 	extensionscontrollers "github.com/apecloud/kubeblocks/controllers/extensions"
 	k8scorecontrollers "github.com/apecloud/kubeblocks/controllers/k8score"
 	opscontrollers "github.com/apecloud/kubeblocks/controllers/operations"
+	tracecontrollers "github.com/apecloud/kubeblocks/controllers/trace"
 	workloadscontrollers "github.com/apecloud/kubeblocks/controllers/workloads"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
@@ -89,6 +91,7 @@ const (
 	operationsFlagKey   flagName = "operations"
 	extensionsFlagKey   flagName = "extensions"
 	experimentalFlagKey flagName = "experimental"
+	traceFlagKey        flagName = "trace"
 
 	multiClusterKubeConfigFlagKey       flagName = "multi-cluster-kubeconfig"
 	multiClusterContextsFlagKey         flagName = "multi-cluster-contexts"
@@ -115,6 +118,7 @@ func init() {
 	utilruntime.Must(workloadsv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(workloadsv1.AddToScheme(scheme))
 	utilruntime.Must(experimentalv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(tracev1.AddToScheme(scheme))
 
 	// +kubebuilder:scaffold:scheme
 
@@ -144,6 +148,7 @@ func init() {
 	viper.SetDefault(constant.CfgKBReconcileWorkers, 8)
 	viper.SetDefault(constant.FeatureGateIgnoreConfigTemplateDefaultMode, false)
 	viper.SetDefault(constant.FeatureGateInPlacePodVerticalScaling, false)
+	viper.SetDefault(constant.I18nResourcesName, "kubeblocks-i18n-resources")
 }
 
 type flagName string
@@ -177,6 +182,8 @@ func setupFlags() {
 		"Enable the extensions controller manager.")
 	flag.Bool(experimentalFlagKey.String(), false,
 		"Enable the experimental controller manager.")
+	flag.Bool(traceFlagKey.String(), true,
+		"Enable the trace controller manager.")
 
 	flag.String(multiClusterKubeConfigFlagKey.String(), "", "Paths to the kubeconfig for multi-cluster accessing.")
 	flag.String(multiClusterContextsFlagKey.String(), "", "Kube contexts the manager will talk to.")
@@ -312,7 +319,7 @@ func main() {
 	userAgent = viper.GetString(userAgentFlagKey.viperName())
 
 	setupLog.Info("golang runtime metrics.", "featureGate", intctrlutil.EnabledRuntimeMetrics())
-	mgr, err := ctrl.NewManager(intctrlutil.GeKubeRestConfig(userAgent), ctrl.Options{
+	mgr, err := ctrl.NewManager(intctrlutil.GetKubeRestConfig(userAgent), ctrl.Options{
 		Scheme: scheme,
 		Metrics: server.Options{
 			BindAddress:   metricsAddr,
@@ -533,6 +540,22 @@ func main() {
 			Recorder: mgr.GetEventRecorderFor("node-count-scaler-controller"),
 		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "NodeCountScaler")
+			os.Exit(1)
+		}
+	}
+
+	if viper.GetBool(traceFlagKey.viperName()) {
+		traceReconciler := &tracecontrollers.ReconciliationTraceReconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("reconciliation-trace-controller"),
+		}
+		if err := traceReconciler.SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "ReconciliationTrace")
+			os.Exit(1)
+		}
+		if err := mgr.Add(traceReconciler.InformerManager); err != nil {
+			setupLog.Error(err, "unable to add trace informer manager", "controller", "InformerManager")
 			os.Exit(1)
 		}
 	}

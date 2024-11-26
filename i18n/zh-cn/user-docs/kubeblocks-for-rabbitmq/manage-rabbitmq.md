@@ -11,9 +11,9 @@ import TabItem from '@theme/TabItem';
 
 # 用 KubeBlocks 管理 RabbitMQ
 
-RabbitMQ 是一靠且成熟的消息和流处理中间件，支持在云环境、本地数据中心或个人计算机上部署。
+RabbitMQ 是可靠且成熟的消息和流处理中间件，支持在云环境、本地数据中心或个人计算机上部署。
 
-本文档展示了如何通过 kbcli、kubectl 或 YAML 文件等当时创建和管理 RabbitMQ 集群。您可以在 [GitHub 仓库](https://github.com/apecloud/kubeblocks-addons/tree/main/examples/rabbitmq)查看 YAML 示例。
+本文档展示了如何通过 kbcli、kubectl 等方式创建和管理 RabbitMQ 集群。您可以在 [GitHub 仓库](https://github.com/apecloud/kubeblocks-addons/tree/main/examples/rabbitmq)查看 YAML 示例。
 
 :::note
 
@@ -175,12 +175,14 @@ mycluster                                        Delete                 Running 
 
 1. 修改 YAML 文件中 `spec.componentSpecs.resources` 的配置。`spec.componentSpecs.resources` 控制资源的请求值和限制值，修改参数值将触发垂直扩缩容。
 
+   ```bash
+   kubectl edit cluster mycluster -n demo
+   ```
+
+   在编辑器中修改 `spec.componentSpecs.resources` 的值。
+
    ```yaml
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: Cluster
-   metadata:
-     name: mycluster
-     namespace: demo
+   ...
    spec:
      componentSpecs:
      - name: rabbitmq
@@ -193,15 +195,7 @@ mycluster                                        Delete                 Running 
          limits:
            memory: "4Gi"
            cpu: "2"
-       volumeClaimTemplates:
-       - name: data
-         spec:
-           accessModes:
-             - ReadWriteOnce
-           resources:
-             requests:
-               storage: 1Gi
-     terminationPolicy: Delete
+   ...
    ```
 
 2. 当集群状态再次回到 `Running` 后，查看相应资源是否变更。
@@ -285,25 +279,18 @@ mycluster                                        Delete                 Running 
 
    ```bash
    kubectl edit cluster mycluster -n demo
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: Cluster
-   metadata:
-     name: mycluster
-     namespace: demo
+   ```
+
+   在编辑器中修改 `spec.componentSpecs.replicas` 的值。
+
+   ```yaml
+   ...
    spec:
      componentSpecs:
      - name: rabbitmq
        componentDefRef: rabbitmq
        replicas: 1 # 修改参数值
-       volumeClaimTemplates:
-       - name: data
-         spec:
-           accessModes:
-             - ReadWriteOnce
-           resources:
-             requests:
-               storage: 20Gi
-    terminationPolicy: Delete
+   ...
    ```
 
 2. 当集群状态再次回到 `Running` 后，查看相关资源是否变更。
@@ -382,11 +369,12 @@ mycluster                                        Delete                 Running 
 
    ```bash
    kubectl edit cluster mycluster -n demo
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: Cluster
-   metadata:
-     name: mycluster
-     namespace: demo
+   ```
+
+   在编辑器中修改 `spec.componentSpecs.volumeClaimTemplates.spec.resources` 的值。
+
+   ```yaml
+   ...
    spec:
      componentSpecs:
      - name: rabbitmq
@@ -401,6 +389,7 @@ mycluster                                        Delete                 Running 
              requests:
                storage: 40Gi # 修改该参数值
      terminationPolicy: Delete
+   ...
    ```
 
 2. 当集群状态再次回到 `Running` 后，查看相应资源是否变更。

@@ -22,7 +22,6 @@ package apps
 import (
 	"context"
 	"fmt"
-	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"reflect"
 	"strings"
 	"time"
@@ -43,6 +42,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"

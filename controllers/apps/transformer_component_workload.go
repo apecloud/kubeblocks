@@ -22,6 +22,7 @@ package apps
 import (
 	"context"
 	"fmt"
+	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"reflect"
 	"strings"
 	"time"
@@ -60,6 +61,7 @@ type componentWorkloadOps struct {
 	cluster        *appsv1alpha1.Cluster
 	synthesizeComp *component.SynthesizedComponent
 	dag            *graph.DAG
+	component      *appsv1alpha1.Component
 
 	// runningITS is a snapshot of the InstanceSet that is already running
 	runningITS *workloads.InstanceSet
@@ -82,6 +84,7 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 	cluster := transCtx.Cluster
 	compDef := transCtx.CompDef
 	synthesizeComp := transCtx.SynthesizeComponent
+	component := transCtx.Component
 	reqCtx := intctrlutil.RequestCtx{
 		Ctx:      transCtx.Context,
 		Log:      transCtx.Logger,
@@ -116,7 +119,7 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 		if protoITS == nil {
 			graphCli.Delete(dag, runningITS)
 		} else {
-			err = t.handleUpdate(reqCtx, graphCli, dag, cluster, synthesizeComp, runningITS, protoITS)
+			err = t.handleUpdate(reqCtx, graphCli, dag, cluster, synthesizeComp, runningITS, protoITS, component)
 		}
 	}
 	return err
@@ -168,11 +171,10 @@ func (t *componentWorkloadTransformer) stopWorkload(protoITS *workloads.Instance
 	}
 }
 
-func (t *componentWorkloadTransformer) handleUpdate(reqCtx intctrlutil.RequestCtx, cli model.GraphClient, dag *graph.DAG,
-	cluster *appsv1alpha1.Cluster, synthesizeComp *component.SynthesizedComponent, runningITS, protoITS *workloads.InstanceSet) error {
+func (t *componentWorkloadTransformer) handleUpdate(reqCtx intctrlutil.RequestCtx, cli model.GraphClient, dag *graph.DAG, cluster *appsv1alpha1.Cluster, synthesizeComp *component.SynthesizedComponent, runningITS, protoITS *workloads.InstanceSet, component *appsv1alpha1.Component) error {
 	if !isCompStopped(synthesizeComp) {
 		// postpone the update of the workload until the component is back to running.
-		if err := t.handleWorkloadUpdate(reqCtx, dag, cluster, synthesizeComp, runningITS, protoITS); err != nil {
+		if err := t.handleWorkloadUpdate(reqCtx, dag, cluster, synthesizeComp, runningITS, protoITS, component); err != nil {
 			return err
 		}
 	}
@@ -189,9 +191,8 @@ func (t *componentWorkloadTransformer) handleUpdate(reqCtx intctrlutil.RequestCt
 	return nil
 }
 
-func (t *componentWorkloadTransformer) handleWorkloadUpdate(reqCtx intctrlutil.RequestCtx, dag *graph.DAG,
-	cluster *appsv1alpha1.Cluster, synthesizeComp *component.SynthesizedComponent, obj, its *workloads.InstanceSet) error {
-	cwo, err := newComponentWorkloadOps(reqCtx, t.Client, cluster, synthesizeComp, obj, its, dag)
+func (t *componentWorkloadTransformer) handleWorkloadUpdate(reqCtx intctrlutil.RequestCtx, dag *graph.DAG, cluster *appsv1alpha1.Cluster, synthesizeComp *component.SynthesizedComponent, obj, its *workloads.InstanceSet, component *appsv1alpha1.Component) error {
+	cwo, err := newComponentWorkloadOps(reqCtx, t.Client, cluster, synthesizeComp, obj, its, dag, component)
 	if err != nil {
 		return err
 	}
@@ -747,9 +748,44 @@ func (r *componentWorkloadOps) checkAndDoMemberJoin() error {
 	return nil
 }
 
+func (r *componentWorkloadOps) precondition(name string, action *appsv1alpha1.Action) error {
+	if action == nil || action.PreCondition == nil {
+		return nil
+	}
+
+	switch *action.PreCondition {
+	case appsv1alpha1.ImmediatelyPreConditionType:
+		return nil
+	case appsv1alpha1.ComponentReadyPreConditionType:
+		if r.component == nil || r.component.Status.Phase != appsv1alpha1.RunningClusterCompPhase {
+			return fmt.Errorf("component is nil when checking RuntimeReady preCondition in %s action", name)
+		}
+	case appsv1alpha1.RuntimeReadyPreConditionType:
+		if r.runningITS == nil || instanceset.IsInstancesReady(r.runningITS) {
+			return fmt.Errorf("runtime is nil when checking RuntimeReady preCondition in %s action", name)
+		}
+	case appsv1alpha1.ClusterReadyPreConditionType:
+		if r.cluster == nil || r.cluster.Status.Phase != appsv1alpha1.RunningClusterPhase {
+			return fmt.Errorf("cluster is nil when checking RuntimeReady preCondition in %s action", name)
+		}
+	default:
+		return fmt.Errorf("unknown precondition type %s", *action.PreCondition)
+	}
+
+	return nil
+}
+
 func (r *componentWorkloadOps) doMemberJoin(podSet sets.Set[string]) error {
 	if len(podSet) == 0 {
 		return nil
+	}
+
+	if r.synthesizeComp.LifecycleActions == nil || r.synthesizeComp.LifecycleActions.MemberJoin == nil {
+		return nil
+	}
+
+	if err := r.precondition(constant.MemberJoinAction, r.synthesizeComp.LifecycleActions.MemberJoin.CustomHandler); err != nil {
+		return err
 	}
 
 	labels := constant.GetComponentWellKnownLabels(r.synthesizeComp.ClusterName, r.synthesizeComp.Name)
@@ -1082,13 +1118,7 @@ func buildInstanceSetPlacementAnnotation(comp *appsv1alpha1.Component, its *work
 	}
 }
 
-func newComponentWorkloadOps(reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
-	cluster *appsv1alpha1.Cluster,
-	synthesizeComp *component.SynthesizedComponent,
-	runningITS *workloads.InstanceSet,
-	protoITS *workloads.InstanceSet,
-	dag *graph.DAG) (*componentWorkloadOps, error) {
+func newComponentWorkloadOps(reqCtx intctrlutil.RequestCtx, cli client.Client, cluster *appsv1alpha1.Cluster, synthesizeComp *component.SynthesizedComponent, runningITS *workloads.InstanceSet, protoITS *workloads.InstanceSet, dag *graph.DAG, component *appsv1alpha1.Component) (*componentWorkloadOps, error) {
 	compPodNames, err := generatePodNames(synthesizeComp)
 	if err != nil {
 		return nil, err
@@ -1109,5 +1139,6 @@ func newComponentWorkloadOps(reqCtx intctrlutil.RequestCtx,
 		runningItsPodNames:    itsPodNames,
 		desiredCompPodNameSet: sets.New(compPodNames...),
 		runningItsPodNameSet:  sets.New(itsPodNames...),
+		component:             component,
 	}, nil
 }

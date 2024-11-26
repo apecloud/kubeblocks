@@ -713,6 +713,7 @@ func (h *clusterShardingHandler) create(transCtx *clusterTransformContext, dag *
 	return nil
 }
 
+// delete handles the sharding component deletion when cluster is Deleting
 func (h *clusterShardingHandler) delete(transCtx *clusterTransformContext, dag *graph.DAG, name string) error {
 	runningComps, err := ictrlutil.ListShardingComponents(transCtx.Context, transCtx.Client, transCtx.Cluster, name)
 	if err != nil {
@@ -738,9 +739,9 @@ func (h *clusterShardingHandler) deleteComp(transCtx *clusterTransformContext,
 		if scaleIn != nil && *scaleIn {
 			compCopy := comp.DeepCopy()
 			if comp.Annotations == nil {
-				compCopy.Annotations = make(map[string]string)
+				comp.Annotations = make(map[string]string)
 			}
-			compCopy.Annotations[constant.ComponentScaleInAnnotationKey] = trueVal
+			comp.Annotations[constant.ComponentScaleInAnnotationKey] = trueVal
 			graphCli.Do(dag, compCopy, comp, model.ActionUpdatePtr(), vertex)
 		}
 	}
@@ -773,7 +774,6 @@ func (h *clusterShardingHandler) update(transCtx *clusterTransformContext, dag *
 	toCreate, toDelete, toUpdate := mapDiff(runningCompsMap, protoCompsMap)
 
 	// TODO: update strategy
-
 	h.deleteComps(transCtx, dag, runningCompsMap, toDelete)
 	h.updateComps(transCtx, dag, runningCompsMap, protoCompsMap, toUpdate)
 	h.createComps(transCtx, dag, protoCompsMap, toCreate)
@@ -790,12 +790,12 @@ func (h *clusterShardingHandler) createComps(transCtx *clusterTransformContext, 
 	}
 }
 
+// deleteComps deletes the subcomponents of the sharding when the shards count is updated.
 func (h *clusterShardingHandler) deleteComps(transCtx *clusterTransformContext, dag *graph.DAG,
 	runningComps map[string]*appsv1.Component, deleteSet sets.Set[string]) {
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	for name := range deleteSet {
-		// TODO: shard pre-terminate
-		h.deleteComp(transCtx, graphCli, dag, runningComps[name], h.scaleIn)
+		h.deleteComp(transCtx, graphCli, dag, runningComps[name], pointer.Bool(true))
 	}
 }
 

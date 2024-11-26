@@ -110,7 +110,7 @@ func (r *InstanceSetReconciler) SetupWithManager(mgr ctrl.Manager, multiClusterM
 }
 
 func (r *InstanceSetReconciler) setupWithManager(mgr ctrl.Manager, ctx *handler.FinderContext) error {
-	itsFinder := handler.NewLabelFinder(&workloads.InstanceSet{}, instanceset.WorkloadsManagedByLabelKey, workloads.Kind, instanceset.WorkloadsInstanceLabelKey)
+	itsFinder := handler.NewLabelFinder(&workloads.InstanceSet{}, instanceset.WorkloadsManagedByLabelKey, workloads.InstanceSetKind, instanceset.WorkloadsInstanceLabelKey)
 	podHandler := handler.NewBuilder(ctx).AddFinder(itsFinder).Build()
 	return intctrlutil.NewNamespacedControllerManagedBy(mgr).
 		For(&workloads.InstanceSet{}).

@@ -203,7 +203,7 @@ func isOwnedByComp(obj client.Object) bool {
 // isOwnedByInstanceSet is used to judge if the obj is owned by the InstanceSet controller
 func isOwnedByInstanceSet(obj client.Object) bool {
 	for _, ref := range obj.GetOwnerReferences() {
-		if ref.Kind == workloads.Kind && ref.Controller != nil && *ref.Controller {
+		if ref.Kind == workloads.InstanceSetKind && ref.Controller != nil && *ref.Controller {
 			return true
 		}
 	}

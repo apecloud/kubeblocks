@@ -62,11 +62,7 @@ func ValidateScheduleNames(schedules []dpv1alpha1.SchedulePolicy) error {
 	}
 	nameMap := map[string]struct{}{}
 	for _, sp := range schedules {
-		name := sp.Name
-		if len(name) == 0 {
-			// use backupMethod if name is empty
-			name = sp.BackupMethod
-		}
+		name := sp.GetScheduleName()
 		// names cannot be duplicated
 		if _, ok := nameMap[name]; ok {
 			return fmt.Errorf("schedule name %s is duplicated", name)

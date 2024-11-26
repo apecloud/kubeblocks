@@ -191,3 +191,12 @@ type BackupScheduleList struct {
 func init() {
 	SchemeBuilder.Register(&BackupSchedule{}, &BackupScheduleList{})
 }
+
+// GetScheduleName gets the name of schedulePolicy.
+// If name is empty, return backupMethod.
+func (s *SchedulePolicy) GetScheduleName() string {
+	if len(s.Name) > 0 {
+		return s.Name
+	}
+	return s.BackupMethod
+}

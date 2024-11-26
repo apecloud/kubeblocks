@@ -13,7 +13,7 @@ import TabItem from '@theme/TabItem';
 
 ## Before you start
 
-1. [Install kbcli](./../../installation/install-with-kbcli/install-kbcli.md).
+1. [Install kbcli](./../../installation/install-kbcli.md).
 2. [Install Helm](https://helm.sh/docs/intro/install/).
 3. Install KubeBlocks.
 
@@ -26,7 +26,7 @@ import TabItem from '@theme/TabItem';
    kbcli playground init --version='x.y.z'
    ```
 
-   Or if you already have a Kubernetes cluster, you can install KubeBlocks [by kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) or [by Helm](./../../installation/install-with-helm/install-kubeblocks.md) directly.
+   Or if you already have a Kubernetes cluster, you can [install KubeBlocks](./../../installation/install-kubeblocks.md)directly.
 4. Prepare an ApeCloud MySQL RaftGroup named `mycluster` for demonstrating how to enable the proxy function for an existing cluster. Refer to [Create a MySQL cluster](./../cluster-management/create-and-connect-an-apecloud-mysql-cluster.md) for details.
 
 ## Create a Proxy Cluster

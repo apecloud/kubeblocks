@@ -27,7 +27,7 @@ import TabItem from '@theme/TabItem';
 
 - [安装 AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)。
 - [安装 kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl)。
-- [安装 kbcli](./../installation/install-with-kbcli/install-kbcli.md)。
+- [安装 kbcli](./../installation/install-kbcli.md)。
 
 ### 配置访问密钥
 
@@ -85,7 +85,7 @@ kbcli cluster list
 请确保已经：
 - 拥有 Google Cloud 账户。
 - [安装 kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl)。
-- [安装 kbcli](./../installation/install-with-kbcli/install-kbcli.md)。
+- [安装 kbcli](./../installation/install-kbcli.md)。
 
 ### 配置 GCP 环境
 
@@ -156,7 +156,7 @@ kbcli cluster list
 请确保已经：
 - 拥有腾讯云账户。
 - [安装 kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl)。
-- [安装 kbcli](./../installation/install-with-kbcli/install-kbcli.md)。
+- [安装 kbcli](./../installation/install-kbcli.md)。
 
 ### 配置 TKE 环境
 
@@ -208,7 +208,7 @@ kbcli cluster list
 请确保已经：
 - 拥有阿里云账户。
 - [安装 kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl)。
-- [安装 kbcli](./../installation/install-with-kbcli/install-kbcli.md)。
+- [安装 kbcli](./../installation/install-kbcli.md)。
 
 ### 配置 ACK 环境
 

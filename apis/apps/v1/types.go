@@ -126,6 +126,8 @@ type ServiceRefClusterSelector struct {
 	//
 	// +optional
 	Credential *ServiceRefCredentialSelector `json:"credential,omitempty"`
+
+	// TODO: support to reference the CA file
 }
 
 type ServiceRefServiceSelector struct {

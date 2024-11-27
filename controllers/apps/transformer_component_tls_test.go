@@ -31,9 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
-	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
@@ -154,68 +152,6 @@ var _ = Describe("TLS self-signed cert function", func() {
 					client.ObjectKeyFromObject(clusterObj),
 					clusterObj)).
 					Should(Succeed())
-			})
-		})
-
-		Context("when switch between disabled and enabled", func() {
-			It("should handle tls settings properly", func() {
-				By("create cluster with tls disabled")
-				clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix, "").
-					WithRandomName().
-					AddComponent(defaultCompName, compDefObj.Name).
-					SetReplicas(3).
-					SetTLS(false).
-					Create(&testCtx).
-					GetObject()
-				clusterKey := client.ObjectKeyFromObject(clusterObj)
-				Eventually(k8sClient.Get(ctx, clusterKey, clusterObj)).Should(Succeed())
-				Eventually(testapps.ClusterReconciled(&testCtx, clusterKey)).Should(BeTrue())
-				Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1.CreatingClusterPhase))
-				cfgKey := client.ObjectKey{
-					Name:      core.GenerateComponentConfigurationName(clusterObj.Name, defaultCompName),
-					Namespace: testCtx.DefaultNamespace,
-				}
-				hasTLSSettings := func() bool {
-					conf := &appsv1alpha1.Configuration{}
-					Expect(k8sClient.Get(ctx, cfgKey, conf)).Should(Succeed())
-					item := &conf.Spec.ConfigItemDetails[0]
-					if item.Payload.Data == nil {
-						return false
-					}
-					payload, ok := item.Payload.Data[constant.TLSPayload]
-					if !ok || payload == nil {
-						return false
-					}
-					return true
-				}
-
-				Eventually(hasTLSSettings).Should(BeFalse())
-
-				By("update tls to enabled")
-				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(clusterObj), clusterObj)).Should(Succeed())
-				patch := client.MergeFrom(clusterObj.DeepCopy())
-				clusterObj.Spec.ComponentSpecs[0].TLS = true
-				clusterObj.Spec.ComponentSpecs[0].Issuer = &appsv1.Issuer{Name: appsv1.IssuerKubeBlocks}
-				Expect(k8sClient.Patch(ctx, clusterObj, patch)).Should(Succeed())
-				Eventually(hasTLSSettings).Should(BeTrue())
-
-				By("update tls to disabled")
-				patch = client.MergeFrom(clusterObj.DeepCopy())
-				clusterObj.Spec.ComponentSpecs[0].TLS = false
-				clusterObj.Spec.ComponentSpecs[0].Issuer = nil
-				Expect(k8sClient.Patch(ctx, clusterObj, patch)).Should(Succeed())
-				Eventually(hasTLSSettings).Should(BeFalse())
-
-				By("delete a cluster cleanly when tls enabled")
-				Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(clusterObj), clusterObj)).Should(Succeed())
-				patch = client.MergeFrom(clusterObj.DeepCopy())
-				clusterObj.Spec.ComponentSpecs[0].TLS = true
-				clusterObj.Spec.ComponentSpecs[0].Issuer = &appsv1.Issuer{Name: appsv1.IssuerKubeBlocks}
-				Expect(k8sClient.Patch(ctx, clusterObj, patch)).Should(Succeed())
-				Eventually(hasTLSSettings).Should(BeTrue())
-
-				testapps.DeleteObject(&testCtx, clusterKey, &appsv1.Cluster{})
-				Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1.Cluster{}, false)).Should(Succeed())
 			})
 		})
 

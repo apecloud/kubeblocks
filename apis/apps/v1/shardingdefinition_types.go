@@ -98,6 +98,13 @@ type ShardingDefinitionSpec struct {
 	//
 	// +optional
 	SystemAccounts []ShardingSystemAccount `json:"systemAccounts,omitempty"`
+
+	// Defines the TLS for the sharding.
+	//
+	// This field is immutable.
+	//
+	// +optional
+	TLS *ShardingTLS `json:"tls,omitempty"`
 }
 
 // ShardingDefinitionStatus defines the observed state of ShardingDefinition
@@ -203,6 +210,13 @@ type ShardingSystemAccount struct {
 	Name string `json:"name"`
 
 	// Specifies whether the account is shared across all shards in the sharding.
+	//
+	// +optional
+	Shared *bool `json:"shared,omitempty"`
+}
+
+type ShardingTLS struct {
+	// Specifies whether the TLS configuration is shared across all shards in the sharding.
 	//
 	// +optional
 	Shared *bool `json:"shared,omitempty"`

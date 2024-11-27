@@ -27,7 +27,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/gotemplate"
@@ -296,21 +295,6 @@ func getPVCSize(args interface{}) (int64, error) {
 	return intctrlutil.GetStorageSizeFromPersistentVolume(*pvcTemp), nil
 }
 
-// getCAFile gets CA file
-func getCAFile() string {
-	return constant.MountPath + "/" + constant.CAName
-}
-
-// getCertFile gets cert file
-func getCertFile() string {
-	return constant.MountPath + "/" + constant.CertName
-}
-
-// getKeyFile gets key file
-func getKeyFile() string {
-	return constant.MountPath + "/" + constant.KeyName
-}
-
 // BuiltInCustomFunctions builds a map of customized functions for KubeBlocks
 func BuiltInCustomFunctions(c *configTemplateBuilder, component *component.SynthesizedComponent, localObjs []client.Object) *gotemplate.BuiltInObjectsFunc {
 	return &gotemplate.BuiltInObjectsFunc{
@@ -326,9 +310,5 @@ func BuiltInCustomFunctions(c *configTemplateBuilder, component *component.Synth
 		builtInGetPVCSizeFunctionName:                getPVCSize,
 		builtInGetContainerMemoryFunctionName:        getContainerMemory,
 		builtInGetContainerRequestMemoryFunctionName: getContainerRequestMemory,
-		builtInGetCAFile:                             getCAFile,
-		builtInGetCertFile:                           getCertFile,
-		builtInGetKeyFile:                            getKeyFile,
 	}
-
 }

@@ -21,7 +21,6 @@ package plan
 
 import (
 	"context"
-	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -30,6 +29,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -43,23 +43,32 @@ var _ = Describe("TLSUtilsTest", func() {
 
 	Context("ComposeTLSSecret function", func() {
 		It("should work well", func() {
+			compDef := &appsv1.ComponentDefinition{
+				Spec: appsv1.ComponentDefinitionSpec{
+					TLS: &appsv1.TLS{
+						CAFile:   ptr.To("ca.pem"),
+						CertFile: ptr.To("cert.pem"),
+						KeyFile:  ptr.To("key.pem"),
+					},
+				},
+			}
 			synthesizedComp := component.SynthesizedComponent{
 				Namespace:   testCtx.DefaultNamespace,
 				ClusterName: "bar",
 				Name:        "test",
 			}
-			secret, err := ComposeTLSSecret(synthesizedComp)
+			secret, err := ComposeTLSSecret(compDef, synthesizedComp)
 			Expect(err).Should(BeNil())
 			Expect(secret).ShouldNot(BeNil())
-			Expect(secret.Name).Should(Equal(fmt.Sprintf("%s-%s-tls-certs", synthesizedComp.ClusterName, synthesizedComp.Name)))
+			Expect(secret.Name).Should(Equal(GenerateTLSSecretName(synthesizedComp.ClusterName, synthesizedComp.Name)))
 			Expect(secret.Labels).ShouldNot(BeNil())
 			Expect(secret.Labels[constant.AppInstanceLabelKey]).Should(Equal(synthesizedComp.ClusterName))
 			Expect(secret.Labels[constant.AppManagedByLabelKey]).Should(Equal(constant.AppName))
 			Expect(secret.Labels[constant.KBAppComponentLabelKey]).Should(Equal(synthesizedComp.Name))
 			Expect(secret.StringData).ShouldNot(BeNil())
-			Expect(secret.StringData[constant.CAName]).ShouldNot(BeZero())
-			Expect(secret.StringData[constant.CertName]).ShouldNot(BeZero())
-			Expect(secret.StringData[constant.KeyName]).ShouldNot(BeZero())
+			Expect(secret.StringData[*compDef.Spec.TLS.CAFile]).ShouldNot(BeZero())
+			Expect(secret.StringData[*compDef.Spec.TLS.CertFile]).ShouldNot(BeZero())
+			Expect(secret.StringData[*compDef.Spec.TLS.KeyFile]).ShouldNot(BeZero())
 		})
 	})
 

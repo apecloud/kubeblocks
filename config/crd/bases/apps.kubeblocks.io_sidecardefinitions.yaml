@@ -2193,6 +2193,91 @@ spec:
                               - Optional
                               type: string
                           type: object
+                        tlsVarRef:
+                          description: Selects a defined var of the TLS.
+                          properties:
+                            caFile:
+                              description: |-
+                                CAFile references the CA file of the TLS.
+
+
+                                To mount the referenced CA file into the container properly, the TLS must be explicitly defined in the ComponentDefinition.
+                              enum:
+                              - Required
+                              - Optional
+                              type: string
+                            compDef:
+                              description: |-
+                                Specifies the exact name, name prefix, or regular expression pattern for matching the name of the ComponentDefinition
+                                custom resource (CR) used by the component that the referent object resident in.
+
+
+                                If not specified, the component itself will be used.
+                              type: string
+                            enabled:
+                              description: VarOption defines whether a variable is
+                                required or optional.
+                              enum:
+                              - Required
+                              - Optional
+                              type: string
+                            multipleClusterObjectOption:
+                              description: |-
+                                This option defines the behavior when multiple component objects match the specified @CompDef.
+                                If not provided, an error will be raised when handling multiple matches.
+                              properties:
+                                combinedOption:
+                                  description: |-
+                                    Define the options for handling combined variables.
+                                    Valid only when the strategy is set to "combined".
+                                  properties:
+                                    flattenFormat:
+                                      description: 'The flatten format, default is:
+                                        $(comp-name-1):value,$(comp-name-2):value.'
+                                      properties:
+                                        delimiter:
+                                          default: ','
+                                          description: Pair delimiter.
+                                          type: string
+                                        keyValueDelimiter:
+                                          default: ':'
+                                          description: Key-value delimiter.
+                                          type: string
+                                      required:
+                                      - delimiter
+                                      - keyValueDelimiter
+                                      type: object
+                                    newVarSuffix:
+                                      description: |-
+                                        If set, the existing variable will be kept, and a new variable will be defined with the specified suffix
+                                        in pattern: $(var.name)_$(suffix).
+                                        The new variable will be auto-created and placed behind the existing one.
+                                        If not set, the existing variable will be reused with the value format defined below.
+                                      type: string
+                                    valueFormat:
+                                      default: Flatten
+                                      description: The format of the value that the
+                                        operator will use to compose values from multiple
+                                        components.
+                                      type: string
+                                  type: object
+                                strategy:
+                                  description: Define the strategy for handling multiple
+                                    cluster objects.
+                                  enum:
+                                  - individual
+                                  - combined
+                                  type: string
+                              required:
+                              - strategy
+                              type: object
+                            name:
+                              description: Name of the referent object.
+                              type: string
+                            optional:
+                              description: Specify whether the object must be defined.
+                              type: boolean
+                          type: object
                       type: object
                   required:
                   - name

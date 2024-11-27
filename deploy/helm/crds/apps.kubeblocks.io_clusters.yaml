@@ -15944,6 +15944,7 @@ spec:
                       - Deleting
                       - Updating
                       - Stopping
+                      - Starting
                       - Running
                       - Stopped
                       - Failed
@@ -16069,6 +16070,7 @@ spec:
                       - Deleting
                       - Updating
                       - Stopping
+                      - Starting
                       - Running
                       - Stopped
                       - Failed

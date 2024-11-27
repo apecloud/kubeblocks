@@ -126,7 +126,7 @@ func (m *informerManager) processNextWorkItem() bool {
 	}
 	// get involved object if 'object' is an Event
 	if evt, ok := object.(*corev1.Event); ok {
-		ro, err := m.scheme.New(evt.InvolvedObject.GroupVersionKind())
+		ro, err := m.scheme.New(getGVK(&evt.InvolvedObject))
 		if err != nil {
 			m.logger.Error(err, "new an event involved object failed")
 			return true
@@ -143,6 +143,37 @@ func (m *informerManager) processNextWorkItem() bool {
 	}
 
 	return true
+}
+
+func getGVK(ref *corev1.ObjectReference) schema.GroupVersionKind {
+	if ref == nil {
+		return schema.GroupVersionKind{}
+	}
+
+	// handle core group
+	if ref.APIVersion == "" || ref.APIVersion == "v1" {
+		return schema.GroupVersionKind{
+			Group:   "",
+			Version: "v1",
+			Kind:    ref.Kind,
+		}
+	}
+
+	// handle other group
+	gv, err := schema.ParseGroupVersion(ref.APIVersion)
+	if err != nil {
+		return schema.GroupVersionKind{
+			Group:   "",
+			Version: ref.APIVersion,
+			Kind:    ref.Kind,
+		}
+	}
+
+	return schema.GroupVersionKind{
+		Group:   gv.Group,
+		Version: gv.Version,
+		Kind:    ref.Kind,
+	}
 }
 
 func (m *informerManager) createInformer(gvk schema.GroupVersionKind) error {

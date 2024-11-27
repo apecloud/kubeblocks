@@ -71,7 +71,6 @@ var reconcilerFuncMap = map[tracev1.ObjectType]reconcilerFunc{
 	objectType(workloadsAPI.SchemeGroupVersion.String(), workloadsAPI.InstanceSetKind): newInstanceSetReconciler,
 	objectType(corev1.SchemeGroupVersion.String(), constant.ConfigMapKind):             newConfigMapReconciler,
 	objectType(corev1.SchemeGroupVersion.String(), constant.PersistentVolumeClaimKind): newPVCReconciler,
-	objectType(rbacv1.SchemeGroupVersion.String(), constant.ClusterRoleBindingKind):    newClusterRoleBindingReconciler,
 	objectType(rbacv1.SchemeGroupVersion.String(), constant.RoleBindingKind):           newRoleBindingReconciler,
 	objectType(corev1.SchemeGroupVersion.String(), constant.ServiceAccountKind):        newSAReconciler,
 	objectType(batchv1.SchemeGroupVersion.String(), constant.JobKind):                  newJobReconciler,
@@ -697,10 +696,6 @@ func newSAReconciler(c client.Client, recorder record.EventRecorder) reconcile.R
 }
 
 func newRoleBindingReconciler(c client.Client, recorder record.EventRecorder) reconcile.Reconciler {
-	return newDoNothingReconciler()
-}
-
-func newClusterRoleBindingReconciler(c client.Client, recorder record.EventRecorder) reconcile.Reconciler {
 	return newDoNothingReconciler()
 }
 

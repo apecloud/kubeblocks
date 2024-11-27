@@ -121,8 +121,8 @@ func (r *OpsRequest) Force() bool {
 	return r.Spec.Force && r.Spec.Type != StartType
 }
 
-// validateClusterPhase validates whether the current cluster state supports the OpsRequest
-func (r *OpsRequest) validateClusterPhase(cluster *Cluster) error {
+// ValidateClusterPhase validates whether the current cluster state supports the OpsRequest
+func (r *OpsRequest) ValidateClusterPhase(cluster *Cluster) error {
 	opsBehaviour := OpsRequestBehaviourMapper[r.Spec.Type]
 	// if the OpsType has no cluster phases, ignore it
 	if len(opsBehaviour.FromClusterPhases) == 0 {
@@ -134,12 +134,12 @@ func (r *OpsRequest) validateClusterPhase(cluster *Cluster) error {
 	// validate whether existing the same type OpsRequest
 	var (
 		opsRequestValue string
-		opsRecorder     []OpsRecorder
+		opsRecorders    []OpsRecorder
 		ok              bool
 	)
 	if opsRequestValue, ok = cluster.Annotations[opsRequestAnnotationKey]; ok {
 		// opsRequest annotation value in cluster to map
-		if err := json.Unmarshal([]byte(opsRequestValue), &opsRecorder); err != nil {
+		if err := json.Unmarshal([]byte(opsRequestValue), &opsRecorders); err != nil {
 			return err
 		}
 	}
@@ -147,12 +147,19 @@ func (r *OpsRequest) validateClusterPhase(cluster *Cluster) error {
 	if slices.Contains(opsBehaviour.FromClusterPhases, cluster.Status.Phase) {
 		return nil
 	}
-	// check if this opsRequest needs to verify cluster phase before opsRequest starts running.
-	needCheck := len(opsRecorder) == 0 || (opsRecorder[0].Name == r.Name && opsRecorder[0].InQueue)
-	if !needCheck {
-		return nil
+	var opsRecord *OpsRecorder
+	for _, v := range opsRecorders {
+		if v.Name == r.Name {
+			opsRecord = &v
+			break
+		}
 	}
-	return fmt.Errorf("OpsRequest.spec.type=%s is forbidden when Cluster.status.phase=%s", r.Spec.Type, cluster.Status.Phase)
+	// check if this opsRequest needs to verify cluster phase before opsRequest starts running.
+	needCheck := len(opsRecorders) == 0 || (opsRecord != nil && !opsRecord.InQueue)
+	if needCheck {
+		return fmt.Errorf("OpsRequest.spec.type=%s is forbidden when Cluster.status.phase=%s", r.Spec.Type, cluster.Status.Phase)
+	}
+	return nil
 }
 
 // getCluster gets cluster with webhook client
@@ -189,11 +196,11 @@ func (r *OpsRequest) Validate(ctx context.Context,
 	cluster *Cluster,
 	needCheckClusterPhase bool) error {
 	if needCheckClusterPhase {
-		if err := r.validateClusterPhase(cluster); err != nil {
+		if err := r.ValidateClusterPhase(cluster); err != nil {
 			return err
 		}
 	}
-	return r.validateOps(ctx, k8sClient, cluster)
+	return r.ValidateOps(ctx, k8sClient, cluster)
 }
 
 // ValidateEntry OpsRequest webhook validate entry
@@ -215,8 +222,8 @@ func (r *OpsRequest) validateEntry(isCreate bool) error {
 	return r.Validate(ctx, k8sClient, cluster, isCreate)
 }
 
-// validateOps validates ops attributes
-func (r *OpsRequest) validateOps(ctx context.Context,
+// ValidateOps validates ops attributes
+func (r *OpsRequest) ValidateOps(ctx context.Context,
 	k8sClient client.Client,
 	cluster *Cluster) error {
 	// Check whether the corresponding attribute is legal according to the operation type

@@ -65,4 +65,5 @@ const (
 
 	OpsDependentOnSuccessfulOpsAnnoKey = "ops.kubeblocks.io/dependent-on-successful-ops" // OpsDependentOnSuccessfulOpsAnnoKey wait for the dependent ops to succeed before executing the current ops. If it fails, this ops will also fail.
 	RelatedOpsAnnotationKey            = "ops.kubeblocks.io/related-ops"
+	QueueEndTimeAnnotationKey          = "operations.kubeblocks.io/queue-end-time"
 )

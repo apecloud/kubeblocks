@@ -144,14 +144,21 @@ func builtinTemplateVars(synthesizedComp *SynthesizedComponent, definedVars []ap
 		}
 
 		vars := make([]corev1.EnvVar, 0)
-		for _, e := range [][]string{
+		builtinVars := [][]string{
 			{constant.KBEnvNamespace, synthesizedComp.Namespace},
 			{constant.KBEnvClusterName, synthesizedComp.ClusterName},
 			{constant.KBEnvClusterUID, synthesizedComp.ClusterUID},
 			{constant.KBEnvClusterCompName, constant.GenerateClusterComponentName(synthesizedComp.ClusterName, synthesizedComp.Name)},
 			{constant.KBEnvCompName, synthesizedComp.Name},
 			{constant.KBEnvCompReplicas, strconv.Itoa(int(synthesizedComp.Replicas))},
-		} {
+		}
+		if synthesizedComp.TLSConfig != nil && synthesizedComp.TLSConfig.Enable {
+			builtinVars = append(builtinVars, constant.EnabledTLSEnv()...)
+		} else {
+			builtinVars = append(builtinVars, constant.DisabledTLSEnv()...)
+		}
+
+		for _, e := range builtinVars {
 			if !defined.Has(e[0]) {
 				vars = append(vars, corev1.EnvVar{Name: e[0], Value: e[1]})
 			}

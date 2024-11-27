@@ -29,5 +29,6 @@ const (
 )
 
 const (
-	trueVal = "true"
+	trueVal  = "true"
+	falseVal = "false"
 )

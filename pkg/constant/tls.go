@@ -20,9 +20,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package constant
 
 const (
-	VolumeName = "tls"
-	CAName     = "ca.crt"
-	CertName   = "tls.crt"
-	KeyName    = "tls.key"
-	MountPath  = "/etc/pki/tls"
+	VolumeName        = "tls"
+	CAName            = "ca.crt"
+	CertName          = "tls.crt"
+	KeyName           = "tls.key"
+	MountPath         = "/etc/pki/tls"
+	TLSEnabledEnvName = "TLS_ENABLED"
+	CAEnvName         = "TLS_CA"
+	CertEnvName       = "TLS_CERT"
+	KeyEnvName        = "TLS_KEY"
 )
+
+func EnabledTLSEnv() [][]string {
+	return [][]string{
+		{TLSEnabledEnvName, "true"},
+		{CAEnvName, MountPath + "/" + CAName},
+		{CertEnvName, MountPath + "/" + CertName},
+		{KeyEnvName, MountPath + "/" + KeyName},
+	}
+}
+
+func DisabledTLSEnv() [][]string {
+	return [][]string{
+		{TLSEnabledEnvName, "false"},
+	}
+}

@@ -38,6 +38,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/plan"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
 // componentTLSTransformer handles component configuration render
@@ -65,6 +66,43 @@ func (t *componentTLSTransformer) Transform(ctx graph.TransformContext, dag *gra
 		return err
 	}
 
+	if err := updateTLSEnv(transCtx.Context, synthesizedComp, t.Client); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func updateTLSEnv(ctx context.Context, synthesizedComp *component.SynthesizedComponent, cli client.Client) error {
+	envKey := types.NamespacedName{
+		Namespace: synthesizedComp.Namespace,
+		Name:      constant.GetCompEnvCMName(cfgcore.GenerateComponentConfigurationName(synthesizedComp.ClusterName, synthesizedComp.Name)),
+	}
+	obj := &corev1.ConfigMap{}
+	err := cli.Get(ctx, envKey, obj)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+	tls := synthesizedComp.TLSConfig
+
+	if tls == nil || !tls.Enable {
+		if obj.Data[constant.TLSEnabledEnvName] == trueVal {
+			obj.Data[constant.TLSEnabledEnvName] = falseVal
+			delete(obj.Data, constant.CAEnvName)
+			delete(obj.Data, constant.CertEnvName)
+			delete(obj.Data, constant.KeyEnvName)
+		}
+	} else if obj.Data[constant.TLSEnabledEnvName] == falseVal {
+		for _, e := range constant.EnabledTLSEnv() {
+			obj.Data[e[0]] = e[1]
+		}
+	}
+	if err = cli.Update(ctx, obj); err != nil {
+		return err
+	}
 	return nil
 }
 

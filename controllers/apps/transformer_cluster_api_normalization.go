@@ -22,7 +22,9 @@ package apps
 import (
 	"fmt"
 	"maps"
+	"strings"
 
+	"golang.org/x/exp/slices"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -216,6 +218,21 @@ func (t *ClusterAPINormalizationTransformer) buildCompAnnotationsInheritedFromCl
 	annotations := make(map[string]map[string]string)
 	for _, compSpec := range transCtx.ComponentSpecs {
 		annotations[compSpec.Name] = maps.Clone(clusterAnnotations)
+	}
+
+	// covert the sharding hostNetwork annotation to the component annotation
+	hnShardingOrComps, ok := cluster.Annotations[constant.HostNetworkAnnotationKey]
+	if !ok {
+		return annotations
+	}
+
+	hnShardingOrCompList := strings.Split(hnShardingOrComps, ",")
+	for _, sharding := range cluster.Spec.ShardingSpecs {
+		if slices.Index(hnShardingOrCompList, sharding.Name) >= 0 {
+			for _, compSpec := range transCtx.ShardingComponentSpecs[sharding.Name] {
+				annotations[compSpec.Name][constant.HostNetworkAnnotationKey] = compSpec.Name
+			}
+		}
 	}
 	return annotations
 }

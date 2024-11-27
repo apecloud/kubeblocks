@@ -121,9 +121,6 @@ func hasHostNetworkCapability(synthesizedComp *SynthesizedComponent, compDef *ap
 }
 
 func hasHostNetworkEnabled(annotations map[string]string, compName string) bool {
-	if annotations == nil {
-		return false
-	}
 	comps, ok := annotations[constant.HostNetworkAnnotationKey]
 	if !ok {
 		return false

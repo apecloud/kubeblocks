@@ -1290,7 +1290,6 @@ type TLS struct {
 	//
 	// This field is immutable once set.
 	//
-	// +kubebuilder:default=ca.pem
 	// +optional
 	CAFile *string `json:"caFile,omitempty"`
 
@@ -1298,7 +1297,6 @@ type TLS struct {
 	//
 	// This field is immutable once set.
 	//
-	// +kubebuilder:default=cert.pem
 	// +optional
 	CertFile *string `json:"certFile,omitempty"`
 
@@ -1306,7 +1304,6 @@ type TLS struct {
 	//
 	// This field is immutable once set.
 	//
-	// +kubebuilder:default=key.pem
 	// +optional
 	KeyFile *string `json:"keyFile,omitempty"`
 }

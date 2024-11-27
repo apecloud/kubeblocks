@@ -57,7 +57,7 @@ var _ = Describe("TLSUtilsTest", func() {
 				ClusterName: "bar",
 				Name:        "test",
 			}
-			secret, err := ComposeTLSSecret(compDef, synthesizedComp)
+			secret, err := ComposeTLSSecret(compDef, synthesizedComp, nil)
 			Expect(err).Should(BeNil())
 			Expect(secret).ShouldNot(BeNil())
 			Expect(secret.Name).Should(Equal(GenerateTLSSecretName(synthesizedComp.ClusterName, synthesizedComp.Name)))

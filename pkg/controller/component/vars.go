@@ -1072,23 +1072,6 @@ func resolveCredentialVarRefLow(ctx context.Context, cli client.Reader, synthesi
 	return resolveClusterObjectVars("Credential", selector.ClusterObjectReference, option, resolveObjs, resolveVar)
 }
 
-func resolveTLSVarRefLow(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
-	selector appsv1.TLSVarSelector, option *appsv1.VarOption, resolveVar func(any) (*corev1.EnvVar, *corev1.EnvVar, error)) ([]*corev1.EnvVar, []*corev1.EnvVar, error) {
-	resolveObjs := func() (map[string]any, error) {
-		getter := func(compName string) (any, error) {
-			key := types.NamespacedName{
-				Namespace: synthesizedComp.Namespace,
-				Name:      constant.GenerateAccountSecretName(synthesizedComp.ClusterName, compName, selector.Name),
-			}
-			obj := &corev1.Secret{}
-			err := cli.Get(ctx, key, obj, inDataContext())
-			return obj, err
-		}
-		return resolveReferentObjects(synthesizedComp, selector.ClusterObjectReference, getter)
-	}
-	return resolveClusterObjectVars("Credential", selector.ClusterObjectReference, option, resolveObjs, resolveVar)
-}
-
 func resolveServiceRefVarRefLow(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
 	selector appsv1.ServiceRefVarSelector, option *appsv1.VarOption, resolveVar func(any) (*corev1.EnvVar, *corev1.EnvVar, error)) ([]*corev1.EnvVar, []*corev1.EnvVar, error) {
 	resolveObjs := func() (map[string]any, error) {

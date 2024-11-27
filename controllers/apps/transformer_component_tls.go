@@ -62,15 +62,13 @@ func (t *componentTLSTransformer) Transform(ctx graph.TransformContext, dag *gra
 		return fmt.Errorf("issuer shouldn't be nil when tls enabled")
 	}
 
-	// build tls cert
-	if err := buildTLSCert(transCtx.Context, transCtx.Client, compDef, *synthesizedComp, dag); err != nil {
+	if err = buildTLSCert(transCtx.Context, transCtx.Client, compDef, *synthesizedComp, dag); err != nil {
 		return err
 	}
 
-	if err := t.updateVolumeNVolumeMount(compDef, synthesizedComp); err != nil {
+	if err = t.updateVolumeNVolumeMount(compDef, synthesizedComp); err != nil {
 		return err
 	}
-
 	return nil
 }
 
@@ -86,47 +84,48 @@ func (t *componentTLSTransformer) enabled(compDef *appsv1.ComponentDefinition, s
 
 func buildTLSCert(ctx context.Context, cli client.Reader,
 	compDef *appsv1.ComponentDefinition, synthesizedComp component.SynthesizedComponent, dag *graph.DAG) error {
+	tls := synthesizedComp.TLSConfig
+	switch tls.Issuer.Name {
+	case appsv1.IssuerUserProvided:
+		return plan.CheckTLSSecretRef(ctx, cli, synthesizedComp.Namespace, tls.Issuer.SecretRef)
+	case appsv1.IssuerKubeBlocks:
+		return buildTLSCertByKubeBlocks(ctx, cli, compDef, synthesizedComp, dag)
+	default:
+		return fmt.Errorf("unknown TLS issuer %s", tls.Issuer.Name)
+	}
+}
+
+func buildTLSCertByKubeBlocks(ctx context.Context, cli client.Reader,
+	compDef *appsv1.ComponentDefinition, synthesizedComp component.SynthesizedComponent, dag *graph.DAG) error {
 	var (
 		namespace   = synthesizedComp.Namespace
 		clusterName = synthesizedComp.ClusterName
 		compName    = synthesizedComp.Name
-		tls         = synthesizedComp.TLSConfig
 	)
-	switch tls.Issuer.Name {
-	case appsv1.IssuerUserProvided:
-		if err := plan.CheckTLSSecretRef(ctx, cli, namespace, tls.Issuer.SecretRef); err != nil {
-			return err
-		}
-	case appsv1.IssuerKubeBlocks:
-		secretName := plan.GenerateTLSSecretName(clusterName, compName)
-		existSecret := &corev1.Secret{}
-		err := cli.Get(ctx, types.NamespacedName{Namespace: namespace, Name: secretName}, existSecret)
-		if err != nil && !errors.IsNotFound(err) {
-			return err
-		}
+	secretName := plan.GenerateTLSSecretName(clusterName, compName)
+	secret := &corev1.Secret{}
+	err := cli.Get(ctx, types.NamespacedName{Namespace: namespace, Name: secretName}, secret)
+	if err != nil && !errors.IsNotFound(err) {
+		return err
+	}
 
-		graphCli, _ := cli.(model.GraphClient)
+	graphCli, _ := cli.(model.GraphClient)
+	if err != nil {
+		secret, err = plan.ComposeTLSSecret(compDef, synthesizedComp, nil)
 		if err != nil {
-			secret, err := plan.ComposeTLSSecret(compDef, synthesizedComp)
-			if err != nil {
-				return err
-			}
-			graphCli.Create(dag, secret)
-		} else {
-			updateTLSSecretMeta(graphCli, dag, synthesizedComp, existSecret)
+			return err
+		}
+		graphCli.Create(dag, secret)
+	} else {
+		proto := plan.BuildTLSSecret(synthesizedComp)
+		secretCopy := secret.DeepCopy()
+		secretCopy.Labels = proto.Labels
+		secretCopy.Annotations = proto.Annotations
+		if !reflect.DeepEqual(secret, secretCopy) {
+			graphCli.Update(dag, secret, secretCopy)
 		}
 	}
 	return nil
-}
-
-func updateTLSSecretMeta(graphCli model.GraphClient, dag *graph.DAG, synthesizedComp component.SynthesizedComponent, secret *corev1.Secret) {
-	proto := plan.BuildTLSSecret(synthesizedComp)
-	secretCopy := secret.DeepCopy()
-	secretCopy.Labels = proto.Labels
-	secretCopy.Annotations = proto.Annotations
-	if !reflect.DeepEqual(secret, secretCopy) {
-		graphCli.Update(dag, secret, secretCopy)
-	}
 }
 
 func (t *componentTLSTransformer) updateVolumeNVolumeMount(
@@ -148,7 +147,8 @@ func (t *componentTLSTransformer) updateVolumeNVolumeMount(
 	}
 	for i := range synthesizedComp.PodSpec.Containers {
 		mounts := synthesizedComp.PodSpec.Containers[i].VolumeMounts
-		synthesizedComp.PodSpec.Containers[i].VolumeMounts = append(mounts, mount)
+		mounts = append(mounts, mount)
+		synthesizedComp.PodSpec.Containers[i].VolumeMounts = mounts
 	}
 
 	return nil
@@ -156,35 +156,66 @@ func (t *componentTLSTransformer) updateVolumeNVolumeMount(
 
 func (t *componentTLSTransformer) composeTLSVolume(
 	compDef *appsv1.ComponentDefinition, synthesizedComp *component.SynthesizedComponent) (*corev1.Volume, error) {
-	var secretName, ca, cert, key string
+	var secretName string
+	var ca, cert, key *string
 
 	tls := synthesizedComp.TLSConfig
 	switch tls.Issuer.Name {
 	case appsv1.IssuerKubeBlocks:
 		secretName = plan.GenerateTLSSecretName(synthesizedComp.ClusterName, synthesizedComp.Name)
-		ca = *compDef.Spec.TLS.CAFile
-		cert = *compDef.Spec.TLS.CertFile
-		key = *compDef.Spec.TLS.KeyFile
+		ca = compDef.Spec.TLS.CAFile
+		cert = compDef.Spec.TLS.CertFile
+		key = compDef.Spec.TLS.KeyFile
 	case appsv1.IssuerUserProvided:
 		secretName = tls.Issuer.SecretRef.Name
-		ca = tls.Issuer.SecretRef.CA
-		cert = tls.Issuer.SecretRef.Cert
-		key = tls.Issuer.SecretRef.Key
+		if len(tls.Issuer.SecretRef.CA) > 0 {
+			ca = &tls.Issuer.SecretRef.CA
+		}
+		if len(tls.Issuer.SecretRef.Cert) > 0 {
+			cert = &tls.Issuer.SecretRef.Cert
+		}
+		if len(tls.Issuer.SecretRef.Key) > 0 {
+			key = &tls.Issuer.SecretRef.Key
+		}
 	}
+
 	volume := corev1.Volume{
 		Name: compDef.Spec.TLS.VolumeName,
 		VolumeSource: corev1.VolumeSource{
 			Secret: &corev1.SecretVolumeSource{
-				SecretName: secretName,
-				Items: []corev1.KeyToPath{
-					{Key: ca, Path: *compDef.Spec.TLS.CAFile},
-					{Key: cert, Path: *compDef.Spec.TLS.CertFile},
-					{Key: key, Path: *compDef.Spec.TLS.KeyFile},
-				},
+				SecretName:  secretName,
+				Items:       []corev1.KeyToPath{},
 				Optional:    ptr.To(false),
 				DefaultMode: ptr.To(*compDef.Spec.TLS.DefaultMode),
 			},
 		},
 	}
+
+	addItem := func(source, target *string) error {
+		if target != nil && source == nil {
+			return fmt.Errorf("%s is required but not provided", *target)
+		}
+		if target != nil && source != nil {
+			volume.VolumeSource.Secret.Items =
+				append(volume.VolumeSource.Secret.Items, corev1.KeyToPath{Key: *source, Path: *target})
+		}
+		return nil
+	}
+	if err := addItem(ca, compDef.Spec.TLS.CAFile); err != nil {
+		return nil, err
+	}
+	if err := addItem(cert, compDef.Spec.TLS.CertFile); err != nil {
+		return nil, err
+	}
+	if err := addItem(key, compDef.Spec.TLS.KeyFile); err != nil {
+		return nil, err
+	}
+
+	if compDef.Spec.TLS.DefaultMode != nil {
+		volume.VolumeSource.Secret.DefaultMode = ptr.To(*compDef.Spec.TLS.DefaultMode)
+	} else {
+		volume.VolumeSource.Secret.DefaultMode = ptr.To(int32(0600))
+	}
+
 	return &volume, nil
 }

@@ -16798,7 +16798,6 @@ spec:
                   This field is immutable.
                 properties:
                   caFile:
-                    default: ca.pem
                     description: |-
                       The CA file name of TLS.
 
@@ -16806,7 +16805,6 @@ spec:
                       This field is immutable once set.
                     type: string
                   certFile:
-                    default: cert.pem
                     description: |-
                       The certificate file name of TLS.
 
@@ -16819,7 +16817,6 @@ spec:
                     format: int32
                     type: integer
                   keyFile:
-                    default: key.pem
                     description: |-
                       The key file name of TLS.
 

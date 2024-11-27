@@ -59,13 +59,15 @@ func BuildTLSSecret(synthesizedComp component.SynthesizedComponent) *v1.Secret {
 //  1. missing public function doc
 //  2. should avoid using Go template to call a function, this is too hacky & costly,
 //     should just call underlying registered Go template function.
-func ComposeTLSSecret(compDef *appsv1.ComponentDefinition, synthesizedComp component.SynthesizedComponent) (*v1.Secret, error) {
+func ComposeTLSSecret(compDef *appsv1.ComponentDefinition, synthesizedComp component.SynthesizedComponent, secret *v1.Secret) (*v1.Secret, error) {
 	var (
 		namespace   = synthesizedComp.Namespace
 		clusterName = synthesizedComp.ClusterName
 		compName    = synthesizedComp.Name
 	)
-	secret := BuildTLSSecret(synthesizedComp)
+	if secret == nil {
+		secret = BuildTLSSecret(synthesizedComp)
+	}
 	// use ca gen cert
 	// IP: 127.0.0.1 and ::1
 	// DNS: localhost and *.<clusterName>-<compName>-headless.<namespace>.svc.cluster.local
@@ -88,9 +90,15 @@ func ComposeTLSSecret(compDef *appsv1.ComponentDefinition, synthesizedComp compo
 		return nil, errors.Errorf("generate TLS certificates failed with cluster name %s, component name %s in namespace %s",
 			clusterName, compName, namespace)
 	}
-	secret.StringData[*compDef.Spec.TLS.CAFile] = parts[0]
-	secret.StringData[*compDef.Spec.TLS.CertFile] = parts[1]
-	secret.StringData[*compDef.Spec.TLS.KeyFile] = parts[2]
+	if compDef.Spec.TLS.CAFile != nil {
+		secret.StringData[*compDef.Spec.TLS.CAFile] = parts[0]
+	}
+	if compDef.Spec.TLS.CertFile != nil {
+		secret.StringData[*compDef.Spec.TLS.CertFile] = parts[1]
+	}
+	if compDef.Spec.TLS.KeyFile != nil {
+		secret.StringData[*compDef.Spec.TLS.KeyFile] = parts[2]
+	}
 	return secret, nil
 }
 

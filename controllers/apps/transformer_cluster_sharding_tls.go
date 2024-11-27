@@ -20,11 +20,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"fmt"
+
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/common"
+	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/plan"
 )
 
 // clusterShardingTLSTransformer handles shared TLS for sharding.
@@ -43,7 +53,120 @@ func (t *clusterShardingTLSTransformer) Transform(ctx graph.TransformContext, da
 		return nil
 	}
 
-	// TODO: impl
+	graphCli, _ := transCtx.Client.(model.GraphClient)
+	return t.reconcileShardingTLSs(transCtx, graphCli, dag)
+}
+
+func (t *clusterShardingTLSTransformer) reconcileShardingTLSs(
+	transCtx *clusterTransformContext, graphCli model.GraphClient, dag *graph.DAG) error {
+	for _, sharding := range transCtx.shardings {
+		shardDef, ok := transCtx.shardingDefs[sharding.ShardingDef]
+		if ok {
+			tls := shardDef.Spec.TLS
+			if tls != nil && tls.Shared != nil && *tls.Shared {
+				if err := t.reconcileShardingTLS(transCtx, graphCli, dag, sharding); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func (t *clusterShardingTLSTransformer) reconcileShardingTLS(transCtx *clusterTransformContext,
+	graphCli model.GraphClient, dag *graph.DAG, sharding *appsv1.ClusterSharding) error {
+	if !sharding.Template.TLS {
+		return nil
+	}
+	if sharding.Template.Issuer == nil {
+		return fmt.Errorf("issuer shouldn't be nil when tls enabled")
+	}
+	if sharding.Template.Issuer.Name == appsv1.IssuerUserProvided {
+		return nil // all components will share the same secret
+	}
+
+	exist, err := t.checkTLSSecret(transCtx, sharding)
+	if err != nil {
+		return err
+	}
+	if !exist {
+		obj, err := t.newTLSSecret(transCtx, sharding)
+		if err != nil {
+			return err
+		}
+		graphCli.Create(dag, obj)
+	}
+
+	// TODO: update
+
+	t.rewriteTLSConfig(transCtx, sharding)
 
 	return nil
+}
+
+func (t *clusterShardingTLSTransformer) checkTLSSecret(transCtx *clusterTransformContext, sharding *appsv1.ClusterSharding) (bool, error) {
+	var (
+		cluster = transCtx.Cluster
+	)
+	secretKey := types.NamespacedName{
+		Namespace: cluster.Namespace,
+		Name:      shardingTLSSecretName(cluster.Name, sharding.Name),
+	}
+	secret := &corev1.Secret{}
+	err := transCtx.GetClient().Get(transCtx.GetContext(), secretKey, secret)
+	if err != nil && !apierrors.IsNotFound(err) {
+		return false, err
+	}
+	return !apierrors.IsNotFound(err), nil
+}
+
+func (t *clusterShardingTLSTransformer) newTLSSecret(transCtx *clusterTransformContext, sharding *appsv1.ClusterSharding) (*corev1.Secret, error) {
+	var (
+		cluster      = transCtx.Cluster
+		namespace    = cluster.Namespace
+		clusterName  = cluster.Name
+		shardingName = sharding.Name
+	)
+	compDef := transCtx.componentDefs[sharding.Template.ComponentDef]
+	synthesizedComp := component.SynthesizedComponent{
+		Namespace:   namespace,
+		ClusterName: clusterName,
+		Name:        shardingName,
+	}
+	shardingLabels := map[string]string{
+		constant.KBAppShardingNameLabelKey: shardingName,
+	}
+	secret := builder.NewSecretBuilder(namespace, shardingTLSSecretName(clusterName, shardingName)).
+		AddLabelsInMap(constant.GetClusterLabels(clusterName, shardingLabels)).
+		AddLabelsInMap(sharding.Template.Labels).
+		AddLabelsInMap(compDef.Spec.Labels).
+		AddAnnotationsInMap(sharding.Template.Annotations).
+		AddAnnotationsInMap(compDef.Spec.Annotations).
+		SetStringData(map[string]string{}).
+		GetObject()
+	return plan.ComposeTLSSecret(compDef, synthesizedComp, secret)
+}
+
+func (t *clusterShardingTLSTransformer) rewriteTLSConfig(transCtx *clusterTransformContext, sharding *appsv1.ClusterSharding) {
+	sharding.Template.Issuer = &appsv1.Issuer{
+		Name: appsv1.IssuerUserProvided,
+		SecretRef: &appsv1.TLSSecretRef{
+			Name: shardingTLSSecretName(transCtx.Cluster.Name, sharding.Name),
+		},
+	}
+	compDef := transCtx.componentDefs[sharding.Template.ComponentDef]
+	tls := compDef.Spec.TLS
+	if tls.CAFile != nil {
+		sharding.Template.Issuer.SecretRef.CA = *tls.CAFile
+	}
+	if tls.CertFile != nil {
+		sharding.Template.Issuer.SecretRef.Cert = *tls.CertFile
+	}
+	if tls.KeyFile != nil {
+		sharding.Template.Issuer.SecretRef.Key = *tls.KeyFile
+	}
+}
+
+func shardingTLSSecretName(cluster, sharding string) string {
+	return fmt.Sprintf("%s-%s-tls", cluster, sharding)
 }

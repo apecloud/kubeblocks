@@ -28,6 +28,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -47,6 +48,9 @@ var _ = Describe("TLS self-signed cert function", func() {
 		serviceKind        = "mysql"
 		defaultCompName    = "mysql"
 		configTemplateName = "mysql-config-tpl"
+		caFile             = "ca.pem"
+		certFile           = "cert.pem"
+		keyFile            = "key.pem"
 	)
 
 	var (
@@ -103,28 +107,39 @@ var _ = Describe("TLS self-signed cert function", func() {
 		})
 
 		Context("when issuer is UserProvided", func() {
-			var userProvidedTLSSecretObj *corev1.Secret
+			var (
+				secretObj *corev1.Secret
+			)
 
 			BeforeEach(func() {
 				// prepare self provided tls certs secret
 				var err error
+				compDef := &appsv1.ComponentDefinition{
+					Spec: appsv1.ComponentDefinitionSpec{
+						TLS: &appsv1.TLS{
+							CAFile:   ptr.To(caFile),
+							CertFile: ptr.To(certFile),
+							KeyFile:  ptr.To(keyFile),
+						},
+					},
+				}
 				synthesizedComp := component.SynthesizedComponent{
 					Namespace:   testCtx.DefaultNamespace,
 					ClusterName: "test",
 					Name:        "self-provided",
 				}
-				userProvidedTLSSecretObj, err = plan.ComposeTLSSecret(synthesizedComp)
+				secretObj, err = plan.ComposeTLSSecret(compDef, synthesizedComp, nil)
 				Expect(err).Should(BeNil())
-				Expect(k8sClient.Create(ctx, userProvidedTLSSecretObj)).Should(Succeed())
+				Expect(k8sClient.Create(ctx, secretObj)).Should(Succeed())
 			})
 
 			AfterEach(func() {
 				// delete self provided tls certs secret
-				Expect(k8sClient.Delete(ctx, userProvidedTLSSecretObj)).Should(Succeed())
+				Expect(k8sClient.Delete(ctx, secretObj)).Should(Succeed())
 				Eventually(func() bool {
 					err := k8sClient.Get(ctx,
-						client.ObjectKeyFromObject(userProvidedTLSSecretObj),
-						userProvidedTLSSecretObj)
+						client.ObjectKeyFromObject(secretObj),
+						secretObj)
 					return apierrors.IsNotFound(err)
 				}).Should(BeTrue())
 			})
@@ -133,10 +148,10 @@ var _ = Describe("TLS self-signed cert function", func() {
 				tlsIssuer := &appsv1.Issuer{
 					Name: appsv1.IssuerUserProvided,
 					SecretRef: &appsv1.TLSSecretRef{
-						Name: userProvidedTLSSecretObj.Name,
-						CA:   "ca.crt",
-						Cert: "tls.crt",
-						Key:  "tls.key",
+						Name: secretObj.Name,
+						CA:   caFile,
+						Cert: certFile,
+						Key:  keyFile,
 					},
 				}
 				By("create cluster obj")
@@ -157,13 +172,23 @@ var _ = Describe("TLS self-signed cert function", func() {
 
 		Context("when issuer is KubeBlocks check secret exists or not", func() {
 			var (
-				kbTLSSecretObj  *corev1.Secret
+				compDef         *appsv1.ComponentDefinition
 				synthesizedComp component.SynthesizedComponent
 				dag             *graph.DAG
+				secretObj       *corev1.Secret
 				err             error
 			)
 
 			BeforeEach(func() {
+				compDef = &appsv1.ComponentDefinition{
+					Spec: appsv1.ComponentDefinitionSpec{
+						TLS: &appsv1.TLS{
+							CAFile:   ptr.To(caFile),
+							CertFile: ptr.To(certFile),
+							KeyFile:  ptr.To(keyFile),
+						},
+					},
+				}
 				synthesizedComp = component.SynthesizedComponent{
 					Namespace:   testCtx.DefaultNamespace,
 					ClusterName: "test-kb",
@@ -176,29 +201,29 @@ var _ = Describe("TLS self-signed cert function", func() {
 					},
 				}
 				dag = &graph.DAG{}
-				kbTLSSecretObj, err = plan.ComposeTLSSecret(synthesizedComp)
+				secretObj, err = plan.ComposeTLSSecret(compDef, synthesizedComp, nil)
 				Expect(err).Should(BeNil())
-				Expect(k8sClient.Create(ctx, kbTLSSecretObj)).Should(Succeed())
+				Expect(k8sClient.Create(ctx, secretObj)).Should(Succeed())
 			})
 
 			AfterEach(func() {
 				// delete self provided tls certs secret
-				Expect(k8sClient.Delete(ctx, kbTLSSecretObj)).Should(Succeed())
+				Expect(k8sClient.Delete(ctx, secretObj)).Should(Succeed())
 				Eventually(func() bool {
 					err := k8sClient.Get(ctx,
-						client.ObjectKeyFromObject(kbTLSSecretObj),
-						kbTLSSecretObj)
+						client.ObjectKeyFromObject(secretObj),
+						secretObj)
 					return apierrors.IsNotFound(err)
 				}).Should(BeTrue())
 			})
 
 			It("should skip if the existence of the secret is confirmed", func() {
-				err := buildTLSCert(ctx, k8sClient, synthesizedComp, dag)
+				err := buildTLSCert(ctx, k8sClient, compDef, synthesizedComp, dag)
 				Expect(err).Should(BeNil())
-				createdSecret := &corev1.Secret{}
-				err = k8sClient.Get(ctx, types.NamespacedName{Namespace: testCtx.DefaultNamespace, Name: kbTLSSecretObj.Name}, createdSecret)
+				secret := &corev1.Secret{}
+				err = k8sClient.Get(ctx, types.NamespacedName{Namespace: testCtx.DefaultNamespace, Name: secretObj.Name}, secret)
 				Expect(err).Should(BeNil())
-				Expect(createdSecret.Data).To(Equal(kbTLSSecretObj.Data))
+				Expect(secret.Data).To(Equal(secretObj.Data))
 			})
 		})
 	})

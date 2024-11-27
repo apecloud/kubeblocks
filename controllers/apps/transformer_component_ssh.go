@@ -29,14 +29,14 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 )
 
-// componentSshTransformer handles the ssh configuration for the component.
-type componentSshTransformer struct {
+// componentSSHTransformer handles the SSH configuration for the component.
+type componentSSHTransformer struct {
 	client.Client
 }
 
-var _ graph.Transformer = &componentSshTransformer{}
+var _ graph.Transformer = &componentSSHTransformer{}
 
-func (t *componentSshTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+func (t *componentSSHTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	var (
 		transCtx        = ctx.(*componentTransformContext)
 		compDef         = transCtx.CompDef
@@ -57,7 +57,7 @@ func (t *componentSshTransformer) Transform(ctx graph.TransformContext, dag *gra
 	return nil
 }
 
-func (t *componentSshTransformer) enabled(compDef *appsv1.ComponentDefinition, synthesizedComp *component.SynthesizedComponent) (bool, error) {
+func (t *componentSSHTransformer) enabled(compDef *appsv1.ComponentDefinition, synthesizedComp *component.SynthesizedComponent) (bool, error) {
 	if synthesizedComp.TLSConfig == nil || !synthesizedComp.TLSConfig.Enable {
 		return false, nil
 	}

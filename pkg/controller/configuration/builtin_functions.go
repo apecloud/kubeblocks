@@ -49,11 +49,6 @@ const (
 	// BuiltinMysqlCalBufferFunctionName Mysql Built-in
 	// TODO: This function migrate to configuration template
 	builtInMysqlCalBufferFunctionName = "callBufferSizeByResource"
-
-	// TLS Built-in
-	builtInGetCAFile   = "getCAFile"
-	builtInGetCertFile = "getCertFile"
-	builtInGetKeyFile  = "getKeyFile"
 )
 
 func toJSONObject[T corev1.VolumeSource | corev1.Container | corev1.ContainerPort](obj T) (interface{}, error) {

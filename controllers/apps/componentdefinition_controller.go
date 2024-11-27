@@ -373,6 +373,7 @@ func (r *ComponentDefinitionReconciler) validateAvailableWithPhases(cmpd *appsv1
 		strings.ToLower(string(appsv1.CreatingComponentPhase)),
 		strings.ToLower(string(appsv1.RunningComponentPhase)),
 		strings.ToLower(string(appsv1.UpdatingComponentPhase)),
+		strings.ToLower(string(appsv1.StartingComponentPhase)),
 		strings.ToLower(string(appsv1.StoppingComponentPhase)),
 		strings.ToLower(string(appsv1.StoppedComponentPhase)),
 		strings.ToLower(string(appsv1.DeletingComponentPhase)),

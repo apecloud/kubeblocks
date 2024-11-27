@@ -75,7 +75,7 @@ func IsHostNetworkEnabled(synthesizedComp *SynthesizedComponent) bool {
 	if synthesizedComp.PodSpec.HostNetwork {
 		return true
 	}
-	return hasHostNetworkEnabled(synthesizedComp.Annotations, synthesizedComp)
+	return hasHostNetworkEnabled(synthesizedComp.Annotations, synthesizedComp.Name)
 }
 
 func isHostNetworkEnabled(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent, compName string) (bool, error) {
@@ -93,7 +93,7 @@ func isHostNetworkEnabled(ctx context.Context, cli client.Reader, synthesizedCom
 	if err := cli.Get(ctx, compKey, comp, inDataContext()); err != nil {
 		return false, err
 	}
-	if !hasHostNetworkEnabled(comp.Annotations, synthesizedComp) {
+	if !hasHostNetworkEnabled(comp.Annotations, compName) {
 		return false, nil
 	}
 
@@ -120,14 +120,12 @@ func hasHostNetworkCapability(synthesizedComp *SynthesizedComponent, compDef *ap
 	return false
 }
 
-func hasHostNetworkEnabled(annotations map[string]string, synthesizedComp *SynthesizedComponent) bool {
+func hasHostNetworkEnabled(annotations map[string]string, compName string) bool {
 	comps, ok := annotations[constant.HostNetworkAnnotationKey]
 	if !ok {
 		return false
 	}
-
-	compsList := strings.Split(comps, ",")
-	return slices.Contains(compsList, synthesizedComp.Name) || slices.Contains(compsList, synthesizedComp.ShardingName)
+	return slices.Index(strings.Split(comps, ","), compName) >= 0
 }
 
 func getHostNetworkPort(ctx context.Context, _ client.Reader, clusterName, compName, cName, pName string) (int32, error) {

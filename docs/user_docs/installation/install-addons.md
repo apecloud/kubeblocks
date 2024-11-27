@@ -124,7 +124,7 @@ The official index repo is [KubeBlocks index](https://github.com/apecloud/block-
 
 :::note
 
-kbcli supports enable/disable an Addon. When installing KubeBlocks by kbcli, some Addons are installed but remain disabled by default, with their status shown as `Disabled`. For example,
+kbcli supports enable/disable an Addon. You can enable/disable Addons according to your need. Moreover, when installing KubeBlocks by kbcli, some Addons are installed but remain disabled by default, with their status shown as `Disabled`. You can enable them by kbcli. For example,
 
 ```bash
 kbcli addon list
@@ -141,8 +141,6 @@ prometheus                     15.16.1        community   Disabled   false
 qdrant                         0.9.1          community   Disabled   false
 victoria-metrics-agent         0.8.41         community   Disabled   false
 ```
-
-You can enable them according to your needs.
 
 * Enable an Addon.
 

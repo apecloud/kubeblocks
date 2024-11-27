@@ -10,7 +10,7 @@ sidebar_label: 安装引擎
 
 KubeBlocks v0.8.0 发布后，数据库引擎插件（Addon）与 KubeBlocks 解耦，KubeBlocks 默认安装了部分引擎，如需体验其它引擎，需通过索引安装。如果您卸载了部分引擎，也可通过本文步骤，重新安装。
 
-本文以 etcd 为例，可根据实际情况替换引擎名称。
+本文以 elasticsearch 为例，可根据实际情况替换引擎名称。
 
 官网引擎索引仓库为 [KubeBlocks 索引](https://github.com/apecloud/block-index)。引擎代码维护在 [KubeBlocks 引擎插件仓库](https://github.com/apecloud/kubeblocks-addons)。
 
@@ -28,13 +28,13 @@ KubeBlocks v0.8.0 发布后，数据库引擎插件（Addon）与 KubeBlocks 解
 2. 查看引擎版本。
 
    ```bash
-   helm search repo kubeblocks/etcd --devel --versions
+   helm search repo kubeblocks/elasticsearch --devel --versions
    ```
 
-3. 以 etcd 为例，安装引擎。使用 `--version` 指定版本。
+3. 以 elasticsearch 为例，安装引擎。使用 `--version` 指定版本。
 
    ```bash
-   helm install kb-etcd-addon kubeblocks/etcd --namespace kb-system --create-namespace --version x.y.z
+   helm install kb-addon-es kubeblocks/elasticsearch --namespace kb-system --create-namespace --version x.y.z
    ```
 
 4. 验证该引擎是否安装成功。
@@ -44,15 +44,15 @@ KubeBlocks v0.8.0 发布后，数据库引擎插件（Addon）与 KubeBlocks 解
    ```bash
    helm list -A
    >
-   NAME                 NAMESPACE	REVISION	UPDATED                                	STATUS  	CHART              APP VERSION
+   NAME                 NAMESPACE	REVISION	UPDATED                                	STATUS  	 CHART                             APP VERSION
    ......
-   kb-etcd-addon        kb-system	1       	2024-10-25 07:18:35.294326176 +0000 UTC	deployed	etcd-0.9.0         v3.5.6
+   kb-addon-es          kb-system	1       	2024-11-27 10:04:59.730127 +0800 CST   	deployed	 elasticsearch-0.9.0               	8.8.2   
    ```
 
 5. （可选）您可以执行以下命令卸载引擎。如果您已使用该引擎创建集群，请先删除集群。
 
    ```bash
-   helm uninstall kb-etcd-addon --namespace kb-system
+   helm uninstall kb-addon-es --namespace kb-system
    ```
 
 </TabItem>
@@ -85,20 +85,22 @@ KubeBlocks v0.8.0 发布后，数据库引擎插件（Addon）与 KubeBlocks 解
 2. （可选）索引建立后，可以通过 `addon search` 命令检查想要安装的引擎是否在索引信息中存在。
 
    ```bash
-   kbcli addon search etcd
+   kbcli addon search elasticsearch
    >
-   ADDON   VERSION         INDEX
-   etcd    0.7.0           kubeblocks
-   etcd    0.8.0           kubeblocks
-   etcd    0.9.0           kubeblocks
+   ADDON           VERSION         INDEX
+   elasticsearch   0.7.0           kubeblocks
+   elasticsearch   0.7.1           kubeblocks
+   elasticsearch   0.7.2           kubeblocks
+   elasticsearch   0.8.0           kubeblocks
+   elasticsearch   0.9.0           kubeblocks
    ```
 
 3. 安装引擎。
 
-   当引擎有多个版本和索引源时，可使用 `--index` 指定索引源，`--version` 指定安装版本。系统默认以 `kubeblocks` 索引仓库 为索引源，安装最新版本。
+   当引擎有多个版本和索引源时，可使用 `--index` 指定索引源，`--version` 指定安装版本。系统默认以 `kubeblocks` 索引仓库为索引源，安装最新版本。
 
    ```bash
-   kbcli addon install etcd --index kubeblocks --version x.y.z
+   kbcli addon install elasticsearch --index kubeblocks --version x.y.z
    ```
 
 4. 验证该引擎是否安装成功。
@@ -109,18 +111,18 @@ KubeBlocks v0.8.0 发布后，数据库引擎插件（Addon）与 KubeBlocks 解
    kbcli addon list
    >
    NAME                           VERSION        PROVIDER    STATUS     AUTO-INSTALL
-   etcd                           0.9.0          apecloud    Enabled    true
+   elasticsearch                  0.9.0          apecloud    Enabled    true
    ```
 
 5. （可选）您可以执行以下命令卸载引擎。如果您已使用该引擎创建集群，请先删除集群。
 
    ```bash
-   kbcli addon uninstall etcd
+   kbcli addon uninstall elasticsearch
    ```
 
 :::note
 
-kbcli 支持启用/禁用引擎。使用 kbcli 安装 KubeBlocks 时，系统默认安装但禁用了部分引擎，这类引擎的状态为 `Disabled`。例如，
+kbcli 支持启用/禁用引擎。您可以按需调整引擎启用状态。此外，使用 kbcli 安装 KubeBlocks 时，系统默认安装但禁用了部分引擎，这类引擎的状态为 `Disabled`，您可以通过 kbcli 启用这类引擎。例如，
 
 ```bash
 kbcli addon list
@@ -137,8 +139,6 @@ prometheus                     15.16.1        community   Disabled   false
 qdrant                         0.9.1          community   Disabled   false
 victoria-metrics-agent         0.8.41         community   Disabled   false
 ```
-
-您可通过执行以下命令启用引擎。
 
 * 启用引擎。
 

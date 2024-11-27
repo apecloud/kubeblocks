@@ -26,7 +26,7 @@ import TabItem from '@theme/TabItem';
    kbcli playground init --version='x.y.z'
    ```
 
-   Or if you already have a Kubernetes cluster, you can [install KubeBlocks](./../../installation/install-kubeblocks.md)directly.
+   Or if you already have a Kubernetes cluster, you can [install KubeBlocks](./../../installation/install-kubeblocks.md) directly.
 4. Prepare an ApeCloud MySQL RaftGroup named `mycluster` for demonstrating how to enable the proxy function for an existing cluster. Refer to [Create a MySQL cluster](./../cluster-management/create-and-connect-an-apecloud-mysql-cluster.md) for details.
 
 ## Create a Proxy Cluster

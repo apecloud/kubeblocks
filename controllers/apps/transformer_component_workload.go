@@ -52,6 +52,11 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
+const (
+	// TODO: use replicas status
+	stopReplicasSnapshotKey = "apps.kubeblocks.io/stop-replicas-snapshot"
+)
+
 // componentWorkloadTransformer handles component workload generation
 type componentWorkloadTransformer struct {
 	client.Client
@@ -271,7 +276,7 @@ func isCompStopped(synthesizedComp *component.SynthesizedComponent) bool {
 }
 
 func isWorkloadStopped(runningITS *workloads.InstanceSet) bool {
-	_, ok := runningITS.Annotations[constant.StopReplicasSnapshotKey]
+	_, ok := runningITS.Annotations[stopReplicasSnapshotKey]
 	return ok
 }
 
@@ -284,7 +289,7 @@ func (t *componentWorkloadTransformer) stopWorkload(
 	}
 
 	// backup the replicas of runningITS
-	snapshot, ok := runningITS.Annotations[constant.StopReplicasSnapshotKey]
+	snapshot, ok := runningITS.Annotations[stopReplicasSnapshotKey]
 	if !ok {
 		replicas := map[string]int32{}
 		if runningITS.Spec.Replicas != nil {
@@ -303,13 +308,13 @@ func (t *componentWorkloadTransformer) stopWorkload(
 
 		protoITS.Annotations[constant.KubeBlocksGenerationKey] = synthesizedComp.Generation
 	}
-	protoITS.Annotations[constant.StopReplicasSnapshotKey] = snapshot
+	protoITS.Annotations[stopReplicasSnapshotKey] = snapshot
 	return nil
 }
 
 func (t *componentWorkloadTransformer) startWorkload(
 	synthesizedComp *component.SynthesizedComponent, runningITS, protoITS *workloads.InstanceSet) error {
-	snapshot := runningITS.Annotations[constant.StopReplicasSnapshotKey]
+	snapshot := runningITS.Annotations[stopReplicasSnapshotKey]
 	replicas := map[string]int32{}
 	if err := json.Unmarshal([]byte(snapshot), &replicas); err != nil {
 		return err
@@ -335,10 +340,8 @@ func (t *componentWorkloadTransformer) startWorkload(
 		}
 	}
 
-	delete(protoITS.Annotations, constant.StopReplicasSnapshotKey)
-	delete(runningITS.Annotations, constant.StopReplicasSnapshotKey)
-
-	protoITS.Annotations[constant.KubeBlocksGenerationKey] = synthesizedComp.Generation
+	delete(protoITS.Annotations, stopReplicasSnapshotKey)
+	delete(runningITS.Annotations, stopReplicasSnapshotKey)
 
 	return nil
 }

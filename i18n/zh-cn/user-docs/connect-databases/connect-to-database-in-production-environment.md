@@ -108,7 +108,7 @@ spec:
   expose:
   - componentName: mysql
     services:
-    - name: intranet
+    - name: vpc
       roleSelector: leader
       serviceType: LoadBalancer
     switch: Enable
@@ -146,7 +146,7 @@ spec:
   expose:
   - componentName: mysql
     services:
-    - name: intranet
+    - name: vpc
       roleSelector: leader
       serviceType: LoadBalancer
     switch: Disable

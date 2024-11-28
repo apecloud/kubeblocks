@@ -10,7 +10,7 @@ sidebar_label: Install KubeBlocks
 
 The quickest way to try out KubeBlocks is to create a new Kubernetes cluster and install KubeBlocks using the playground. However, production environments are more complex, with applications running in different namespaces and with resource or permission limitations. This document explains how to deploy KubeBlocks on an existing Kubernetes cluster.
 
-To try out KubeBlocks on your local host, you can use the [Playground](./../../try-out-on-playground/try-kubeblocks-on-your-laptop.md) or [create a local Kubernetes test cluster first](./../prerequisite/prepare-a-local-k8s-cluster.md) and then follow the steps in this tutorial to install KubeBlocks.
+To try out KubeBlocks on your local host, you can use the [Playground](./../../try-out-on-playground/try-kubeblocks-on-your-laptop.md) or [create a local Kubernetes test cluster first](./../prepare-a-local-k8s-cluster/prepare-a-local-k8s-cluster.md) and then follow the steps in this tutorial to install KubeBlocks.
 
 ## Environment preparation
 

@@ -149,31 +149,16 @@ func getGVK(ref *corev1.ObjectReference) schema.GroupVersionKind {
 	if ref == nil {
 		return schema.GroupVersionKind{}
 	}
-
 	// handle core group
-	if ref.APIVersion == "" || ref.APIVersion == "v1" {
+	if ref.APIVersion == "" {
 		return schema.GroupVersionKind{
 			Group:   "",
 			Version: "v1",
 			Kind:    ref.Kind,
 		}
 	}
-
 	// handle other group
-	gv, err := schema.ParseGroupVersion(ref.APIVersion)
-	if err != nil {
-		return schema.GroupVersionKind{
-			Group:   "",
-			Version: ref.APIVersion,
-			Kind:    ref.Kind,
-		}
-	}
-
-	return schema.GroupVersionKind{
-		Group:   gv.Group,
-		Version: gv.Version,
-		Kind:    ref.Kind,
-	}
+	return schema.FromAPIVersionAndKind(ref.APIVersion, ref.Kind)
 }
 
 func (m *informerManager) createInformer(gvk schema.GroupVersionKind) error {

@@ -22,7 +22,7 @@ sidebar_label: 在本地使用 KubeBlocks
 * 在电脑上已安装：
   * [Docker](https://docs.docker.com/get-docker/)：v20.10.5（runc ≥ v1.0.0-rc93）或更高版本；
   * [kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl)：用于与 Kubernetes 集群进行交互；
-  * [kbcli](./../installation/install-with-kbcli/install-kbcli.md)：用于 Playground 和 KubeBlocks 之间的交互。
+  * [kbcli](./../installation/install-kbcli.md)：用于 Playground 和 KubeBlocks 之间的交互。
 
 ## 初始化 Playground
 

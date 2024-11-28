@@ -17,9 +17,9 @@ KubeBlocks supports the management of Qdrant. This tutorial illustrates how to c
 
 ## Before you start
 
-- [Install kbcli](./../installation/install-with-kbcli/install-kbcli.md) if you want to manage the Qdrant cluster with `kbcli`.
-- Install KubeBlocks [by kbcli](./../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) or [by Helm](./../installation/install-with-helm/install-kubeblocks.md).
-- Install and enable the Qdrant Addon [by kbcli](./../installation/install-with-kbcli/install-addons.md) or [by Helm](./../installation/install-with-helm/install-addons.md).
+- [Install kbcli](./../installation/install-kbcli.md) if you want to manage the Qdrant cluster with `kbcli`.
+- [Install KubeBlocks](./../installation/install-kubeblocks.md).
+- [Install and enable the Qdrant Addon](./../installation/install-addons.md).
 - To keep things isolated, create a separate namespace called `demo` throughout this tutorial.
 
    ```bash

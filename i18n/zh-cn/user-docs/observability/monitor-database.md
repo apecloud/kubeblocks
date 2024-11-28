@@ -31,7 +31,7 @@ KubeBlocks 以插件（Addon）形式集成了许多开源监控组件，如 Pro
 
 <TabItem value="kbcli" label="kbcli" default>
 
-1. 查看所有支持的引擎，确保监控引擎已启用。可参考[此文档](./../installation/install-with-kbcli/install-kbcli.md)，查看安装或启用引擎的详细说明。
+1. 查看所有支持的引擎，确保监控引擎已启用。可参考[此文档](./../installation/install-addons.md)，查看安装或启用引擎的详细说明。
 
     ```bash
     # 查看内置支持的所有引擎

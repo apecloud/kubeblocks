@@ -29,9 +29,9 @@ KubeBlocks 可以通过良好的抽象快速集成新引擎，并支持 Pulsar �
 
 ### 开始之前
 
-* 如果您想通过 `kbcli` 创建和管理集群，请先[安装 kbcli](./../../installation/install-with-kbcli/install-kbcli.md)。
-* 安装 KubeBlocks，可通过 [kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) 或 [Helm](./../../installation/install-with-helm/install-kubeblocks.md) 安装。
-* 确保 Pulsar 引擎已启用。如果引擎未启用，可参考相关文档，启用该引擎，可通过 [kbcli](./../../installation/install-with-kbcli/install-addons.md) 或 [Helm](./../../installation/install-with-helm/install-addons.md) 操作。
+* 如果您想通过 `kbcli` 创建和管理集群，请先[安装 kbcli](./../../installation/install-kbcli.md)。
+* [安装 KubeBlocks](./../../installation/install-kubeblocks.md)。
+* 确保 Pulsar 引擎已启用。如果引擎未启用，可参考相关文档，[启用该引擎](./../../installation/install-addons.md)。
 
 * 查看可用于创建集群的数据库类型和版本。
 

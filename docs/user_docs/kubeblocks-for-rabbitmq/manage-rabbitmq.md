@@ -20,8 +20,8 @@ Currently, KubeBlocks only supports managing RabbitMQ by `kubectl`.
 
 ## Before you start
 
-- Install KubeBlocks [by kbcli](./../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) or [by Helm](./../installation/install-with-helm/install-kubeblocks.md).
-- Install and enable the rabbitmq addon [by kbcli](./../installation/install-with-kbcli/install-addons.md) or [by Helm](./../installation/install-with-helm/install-addons.md).
+- [Install KubeBlocks](./../installation/install-kubeblocks.md).
+- [Install and enable the rabbitmq addon](./../installation/install-addons.md).
 
 ## Create a cluster
 

@@ -19,9 +19,9 @@ Milvus 是高度灵活、可靠且速度极快的云原生开源矢量数据库�
 
 ## 开始之前
 
-- 如果您想通过 `kbcli` 创建并连接 Milvus 集群，请先[安装 kbcli](./../installation/install-with-kbcli/install-kbcli.md)。
-- 安装 KubeBlocks，可通过 [kbcli](./../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) 或 [Helm](./../installation/install-with-helm/install-kubeblocks.md) 安装。
-- 安装并启用 milvus 引擎，可通过 [kbcli](./../installation/install-with-kbcli/install-addons.md) 或 [Helm](./../installation/install-with-helm/install-addons.md) 操作。
+- 如果您想通过 `kbcli` 创建并连接 Milvus 集群，请先[安装 kbcli](./../installation/install-kbcli.md)。
+- [安装 KubeBlocks](./../installation/install-kubeblocks.md)。
+- [安装并启用 milvus 引擎](./../installation/install-addons.md)。
 - 为了保持隔离，本文档中创建一个名为 `demo` 的独立命名空间。
 
   ```bash

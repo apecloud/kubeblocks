@@ -31,7 +31,7 @@ Redis Cluster 还提供集群的节点间通信和数据迁移机制。当集群
 
 ### 开始之前
 
-* [安装 KubeBlocks](./../installation/install-kubeblocks.md)。
+* 安装 KubeBlocks，可通过 [kbcli](./../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) 或 [Helm](./../installation/install-with-helm/install-kubeblocks.md) 安装。
    - KubeBlocks 及 Addon 的版本都需要 0.9 版本以上。
 * 确保 Redis 引擎已启用。
 * 查看可用于创建集群的数据库类型和版本。

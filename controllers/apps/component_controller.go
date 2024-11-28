@@ -38,6 +38,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
@@ -207,6 +208,7 @@ func (r *ComponentReconciler) setupWithManager(mgr ctrl.Manager) error {
 		Owns(&corev1.Service{}).
 		Owns(&corev1.Secret{}).
 		Owns(&corev1.ConfigMap{}).
+		Watches(&dpv1alpha1.Restore{}, handler.EnqueueRequestsFromMapFunc(r.filterComponentResources)).
 		Watches(&corev1.PersistentVolumeClaim{}, handler.EnqueueRequestsFromMapFunc(r.filterComponentResources)).
 		Watches(&appsv1alpha1.Configuration{}, handler.EnqueueRequestsFromMapFunc(r.configurationEventHandler))
 
@@ -228,6 +230,7 @@ func (r *ComponentReconciler) setupWithMultiClusterManager(mgr ctrl.Manager, mul
 			MaxConcurrentReconciles: viper.GetInt(constant.CfgKBReconcileWorkers),
 		}).
 		Owns(&workloads.InstanceSet{}).
+		Watches(&dpv1alpha1.Restore{}, handler.EnqueueRequestsFromMapFunc(r.filterComponentResources)).
 		Watches(&appsv1alpha1.Configuration{}, handler.EnqueueRequestsFromMapFunc(r.configurationEventHandler))
 
 	eventHandler := handler.EnqueueRequestsFromMapFunc(r.filterComponentResources)

@@ -13,7 +13,7 @@ import TabItem from '@theme/TabItem';
 
 ## 开始之前
 
-1. [安装 kbcli](./../../installation/install-with-kbcli/install-kbcli.md)。
+1. [安装 kbcli](./../../installation/install-kbcli.md)。
 2. [安装 Helm](https://helm.sh/docs/intro/install/)。
 3. 安装 KubeBlocks。
 
@@ -26,7 +26,7 @@ import TabItem from '@theme/TabItem';
    kbcli playground init --version='x.y.z'
    ```
 
-   如果已经有 Kubernetes 集群，可以通过 [kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md)  或 [Helm](./../../installation/install-with-helm/install-kubeblocks.md) 安装 KubeBlocks。
+   如果已经有 Kubernetes 集群，可以直接[安装 KubeBlocks](./../../installation/install-kubeblocks.md)。
 4. 准备一个名为 mycluster 的 ApeCloud MySQL 集群版集群，用于演示如何为现有集群启用代理功能。详情请参考[创建并连接到 MySQL 集群](./../cluster-management/create-and-connect-a-mysql-cluster.md)。
 
 ## 创建代理集群

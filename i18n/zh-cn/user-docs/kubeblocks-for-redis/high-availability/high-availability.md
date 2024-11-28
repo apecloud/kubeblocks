@@ -18,7 +18,7 @@ Redis Sentinel 是 Redis 官方推荐的主备集群高可用性解决方案，�
 
 ## 开始之前
 
-* 安装 KubeBlocks，可通过 [kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) 或 [Helm](./../../installation/install-with-helm/install-kubeblocks.md) 安装。
+* [安装 KubeBlocks](./../../installation/install-kubeblocks.md)。
 * [创建 Redis 主备版集群](./../../kubeblocks-for-redis/cluster-management/create-and-connect-to-a-redis-cluster.md#创建集群)。
 * 检查切换策略和角色探测参数。
   * 检查切换策略是否为 `Noop`。

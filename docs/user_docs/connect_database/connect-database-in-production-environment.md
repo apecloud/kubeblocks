@@ -136,7 +136,7 @@ kubectl apply -f - <<EOF
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
-  name: ops-expose-enable
+  name: ops-expose-disable
   namespace: demo
 spec:
   clusterName: mycluster

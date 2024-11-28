@@ -96,26 +96,24 @@ kbcli cluster expose ${cluster-name} --type vpc --enable=true
 
 此处以 MySQL 集群为例，在阿里云上为集群暴露 VPC 访问地址的方式如下：
 
-```bash
+```yaml
 kubectl apply -f - <<EOF
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
   name: ops-expose-enable
+  namespace: demo
 spec:
-  clusterRef: mycluster
+  clusterName: mycluster
   expose:
   - componentName: mysql
     services:
-    - annotations:
-        service.beta.kubernetes.io/alibaba-cloud-loadbalancer-address-type: intranet
-      ipFamilyPolicy: PreferDualStack
-      name: vpc
+    - name: intranet
+      roleSelector: leader
       serviceType: LoadBalancer
     switch: Enable
-  ttlSecondsBeforeAbort: 0
+  preConditionDeadlineSeconds: 0
   type: Expose
-EOF
 ```
 
 </TabItem>
@@ -136,26 +134,24 @@ kbcli cluster expose ${cluster-name} --type vpc --enable=false
 
 <TabItem value="kubectl" label="kubeclt">
 
-```bash
+```yaml
 kubectl apply -f - <<EOF
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
   name: ops-expose-disable
+  namespace: demo
 spec:
-  clusterRef: mycluster
+  clusterName: mycluster
   expose:
   - componentName: mysql
     services:
-    - annotations:
-        service.beta.kubernetes.io/alibaba-cloud-loadbalancer-address-type: intranet
-      ipFamilyPolicy: PreferDualStack
-      name: vpc
+    - name: intranet
+      roleSelector: leader
       serviceType: LoadBalancer
     switch: Disable
-  ttlSecondsBeforeAbort: 0
+  preConditionDeadlineSeconds: 0
   type: Expose
-EOF
 ```
 
 </TabItem>
@@ -192,26 +188,25 @@ kbcli cluster expose ${cluster-name} --type internet --enable=true
 
 以 MySQL 集群为例，在阿里云上为集群暴露公网访问地址的方式如下：
 
-```bash
+```yaml
 kubectl apply -f - <<EOF
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
   name: ops-expose-enable
+  namespace: demo
 spec:
-  clusterRef: mycluster
+  clusterName: mycluster
   expose:
   - componentName: mysql
     services:
-    - annotations:
-        service.beta.kubernetes.io/alibaba-cloud-loadbalancer-address-type: internet
-      ipFamilyPolicy: PreferDualStack
-      name: internet
+    - name: internet
+      roleSelector: leader
       serviceType: LoadBalancer
     switch: Enable
-  ttlSecondsBeforeAbort: 0
+  preConditionDeadlineSeconds: 0
   type: Expose
-EOF
+```
 ```
 
 </TabItem>
@@ -238,26 +233,24 @@ kbcli cluster expose ${cluster-name} --type internet --enable=false
 
 <TabItem value="kubectl" label="kubeclt">
 
-```bash
+```yaml
 kubectl apply -f - <<EOF
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
   name: ops-expose-disable
+  namespace: demo
 spec:
-  clusterRef: mycluster
+  clusterName: mycluster
   expose:
   - componentName: mysql
     services:
-    - annotations:
-        service.beta.kubernetes.io/alibaba-cloud-loadbalancer-address-type: internet
-      ipFamilyPolicy: PreferDualStack
-      name: internet
+    - name: internet
+      roleSelector: leader
       serviceType: LoadBalancer
     switch: Disable
-  ttlSecondsBeforeAbort: 0
+  preConditionDeadlineSeconds: 0
   type: Expose
-EOF
 ```
 
 </TabItem>

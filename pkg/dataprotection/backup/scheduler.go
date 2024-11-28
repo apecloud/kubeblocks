@@ -191,6 +191,10 @@ func (s *Scheduler) buildCronJob(schedulePolicy *dpv1alpha1.SchedulePolicy, cron
 
 func (s *Scheduler) buildPodSpec(schedulePolicy *dpv1alpha1.SchedulePolicy) (*corev1.PodSpec, error) {
 	// TODO(ldm): add backup deletionPolicy
+	parameters, err := BuildParametersManifest(schedulePolicy.Parameters)
+	if err != nil {
+		return nil, err
+	}
 	createBackupCmd := fmt.Sprintf(`
 kubectl create -f - <<EOF
 apiVersion: dataprotection.kubeblocks.io/v1alpha1
@@ -204,12 +208,11 @@ metadata:
 spec:
   backupPolicyName: %s
   backupMethod: %s
-  retentionPeriod: %s
-%s
+  retentionPeriod: %s%s
 EOF
 `, s.BackupSchedule.Name, s.generateBackupName(schedulePolicy), s.BackupSchedule.Namespace,
 		s.BackupPolicy.Name, schedulePolicy.BackupMethod,
-		schedulePolicy.RetentionPeriod, BuildParametersManifest(schedulePolicy.Parameters))
+		schedulePolicy.RetentionPeriod, parameters)
 
 	container := corev1.Container{
 		Name:            "backup-schedule",

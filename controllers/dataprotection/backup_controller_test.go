@@ -488,7 +488,7 @@ var _ = Describe("Backup Controller test", func() {
 				By("set backup parameters and schema in acitionSet")
 				testdp.MockActionSetWithSchema(&testCtx, actionSet)
 			})
-			It("should succeed if parameters are invalid", func() {
+			It("should fail if parameters are invalid", func() {
 				By("create a backup with invalid parameters")
 				backup := testdp.NewFakeBackup(&testCtx, func(bp *dpv1alpha1.Backup) {
 					bp.Spec.Parameters = testdp.InvalidParameters

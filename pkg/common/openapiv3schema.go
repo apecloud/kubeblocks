@@ -54,7 +54,7 @@ func ValidateDataWithSchema(openAPIV3Schema *apiextensionsv1.JSONSchemaProps, da
 	return nil
 }
 
-func CoverStringToInterfaceBySchemaType(openAPIV3Schema *apiextensionsv1.JSONSchemaProps, input map[string]string) (map[string]interface{}, error) {
+func ConvertStringToInterfaceBySchemaType(openAPIV3Schema *apiextensionsv1.JSONSchemaProps, input map[string]string) (map[string]interface{}, error) {
 	out := map[string]interface{}{}
 	properties := openAPIV3Schema.Properties
 	covertError := func(key string, err error) error {

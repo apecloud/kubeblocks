@@ -263,7 +263,7 @@ type EncryptionConfig struct {
 	PassPhraseSecretKeyRef *corev1.SecretKeySelector `json:"passPhraseSecretKeyRef"`
 }
 
-type SelectiveParametersSchema struct {
+type ActionSetParametersSchema struct {
 	// Defines the schema for parameters using the OpenAPI v3.
 	// The supported property types include:
 	// - string

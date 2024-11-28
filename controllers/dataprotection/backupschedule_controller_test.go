@@ -239,7 +239,7 @@ var _ = Describe("Backup Schedule Controller", func() {
 					g.Expect(fetched.Spec.JobTemplate.Spec.Template.Spec.Containers).Should(HaveLen(1))
 					args := fetched.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Args
 					g.Expect(args).Should(HaveLen(1))
-					g.Expect(args[0]).Should(ContainSubstring(dpbackup.BuildParametersManifest(testdp.TestParameters)))
+					g.Expect(args[0]).Should(ContainSubstring(`  parameters: [{"name":"testString","value":"stringValue"},{"name":"testArray","value":"v1,v2"}]`))
 				})).Should(Succeed())
 			})
 		})

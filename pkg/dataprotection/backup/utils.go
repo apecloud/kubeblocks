@@ -21,6 +21,7 @@ package backup
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"slices"
@@ -187,7 +188,7 @@ func GenerateCRNameByBackupSchedule(backupSchedule *dpv1alpha1.BackupSchedule, m
 	return generateBaseCRNameByBackupSchedule(uniqueNameWithBackupSchedule, backupSchedule.Namespace, method)
 }
 
-// GenerateCRNameByScheduleNameAndMethod generate a CR name which is created by BackupSchedule, such as CronJob Backup.
+// GenerateCRNameByScheduleNameAndMethod generate a CR name which is created by BackupSchedule, such as CronJob.
 func GenerateCRNameByScheduleNameAndMethod(backupSchedule *dpv1alpha1.BackupSchedule, method string, name string) string {
 	suffix := name
 	if len(suffix) == 0 {
@@ -196,7 +197,7 @@ func GenerateCRNameByScheduleNameAndMethod(backupSchedule *dpv1alpha1.BackupSche
 	return GenerateCRNameByBackupSchedule(backupSchedule, suffix)
 }
 
-// GenerateLegacyCRNameByBackupSchedule generate a legacy CR name which is created by BackupSchedule, such as CronJob Backup.
+// GenerateLegacyCRNameByBackupSchedule generate a legacy CR name which is created by BackupSchedule, such as CronJob.
 func GenerateLegacyCRNameByBackupSchedule(backupSchedule *dpv1alpha1.BackupSchedule, method string) string {
 	uniqueNameWithBackupSchedule := fmt.Sprintf("%s-%s", backupSchedule.UID[:8], backupSchedule.Name)
 	return generateBaseCRNameByBackupSchedule(uniqueNameWithBackupSchedule, backupSchedule.Namespace, method)
@@ -312,15 +313,14 @@ func StopStatefulSetsWhenFailed(ctx context.Context, cli client.Client, backup *
 	return cli.Update(ctx, sts)
 }
 
-func BuildParametersManifest(parameters []dpv1alpha1.ParameterPair) string {
-	var res string
+func BuildParametersManifest(parameters []dpv1alpha1.ParameterPair) (string, error) {
 	if len(parameters) == 0 {
-		return res
+		return "", nil
 	}
-	for _, v := range parameters {
-		res += fmt.Sprintf("  - name: %s\n", v.Name)
-		res += fmt.Sprintf("    value: %s\n", v.Value)
+	bytes, err := json.Marshal(parameters)
+	if err != nil {
+		return "", err
 	}
-	str := fmt.Sprintf("  parameters:\n%s", res)
-	return strings.Trim(str, "\n")
+	res := fmt.Sprintf("\n  parameters: %s", string(bytes))
+	return res, nil
 }

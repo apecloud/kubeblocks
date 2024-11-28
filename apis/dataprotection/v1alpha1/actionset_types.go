@@ -40,7 +40,7 @@ type ActionSetSpec struct {
 	// Specifies the schema of parameters in backups and restores before their usage.
 	//
 	// +optional
-	ParametersSchema *SelectiveParametersSchema `json:"parametersSchema,omitempty"`
+	ParametersSchema *ActionSetParametersSchema `json:"parametersSchema,omitempty"`
 
 	// Specifies a list of environment variables to be set in the container.
 	//

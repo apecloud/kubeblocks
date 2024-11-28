@@ -22,10 +22,10 @@ package dataprotection
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testdp "github.com/apecloud/kubeblocks/pkg/testutil/dataprotection"
@@ -65,17 +65,17 @@ var _ = Describe("ActionSet Controller test", func() {
 			as := testdp.NewFakeActionSet(&testCtx)
 			Expect(as).ShouldNot(BeNil())
 			By("set invalid withParameters and schema")
-			Expect(testapps.ChangeObj(&testCtx, as, func(action *v1alpha1.ActionSet) {
-				as.Spec.ParametersSchema = &v1alpha1.SelectiveParametersSchema{
-					OpenAPIV3Schema: &v1.JSONSchemaProps{
-						Properties: map[string]v1.JSONSchemaProps{
+			Expect(testapps.ChangeObj(&testCtx, as, func(action *dpv1alpha1.ActionSet) {
+				as.Spec.ParametersSchema = &dpv1alpha1.ActionSetParametersSchema{
+					OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+						Properties: map[string]apiextensionsv1.JSONSchemaProps{
 							testdp.ParameterString: {
 								Type: testdp.ParameterStringType,
 							},
 							testdp.ParameterArray: {
 								Type: testdp.ParameterArrayType,
-								Items: &v1.JSONSchemaPropsOrArray{
-									Schema: &v1.JSONSchemaProps{
+								Items: &apiextensionsv1.JSONSchemaPropsOrArray{
+									Schema: &apiextensionsv1.JSONSchemaProps{
 										Type: testdp.ParameterStringType,
 									},
 								},
@@ -87,20 +87,20 @@ var _ = Describe("ActionSet Controller test", func() {
 			})).Should(Succeed())
 			By("should be unavailable with invalid withParameters")
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(as),
-				func(g Gomega, as *v1alpha1.ActionSet) {
+				func(g Gomega, as *dpv1alpha1.ActionSet) {
 					g.Expect(as.Status.ObservedGeneration).Should(Equal(as.Generation))
-					g.Expect(as.Status.Phase).Should(BeEquivalentTo(v1alpha1.UnavailablePhase))
+					g.Expect(as.Status.Phase).Should(BeEquivalentTo(dpv1alpha1.UnavailablePhase))
 					g.Expect(as.Status.Message).ShouldNot(BeEmpty())
 				})).Should(Succeed())
 			By("set valid parameters")
-			Expect(testapps.ChangeObj(&testCtx, as, func(action *v1alpha1.ActionSet) {
+			Expect(testapps.ChangeObj(&testCtx, as, func(action *dpv1alpha1.ActionSet) {
 				as.Spec.Backup.WithParameters = []string{testdp.ParameterString, testdp.ParameterArray}
 			})).Should(Succeed())
 			By("should be available")
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(as),
-				func(g Gomega, as *v1alpha1.ActionSet) {
+				func(g Gomega, as *dpv1alpha1.ActionSet) {
 					g.Expect(as.Status.ObservedGeneration).Should(Equal(as.Generation))
-					g.Expect(as.Status.Phase).Should(BeEquivalentTo(v1alpha1.AvailablePhase))
+					g.Expect(as.Status.Phase).Should(BeEquivalentTo(dpv1alpha1.AvailablePhase))
 					g.Expect(as.Status.Message).Should(BeEmpty())
 				})).Should(Succeed())
 		})

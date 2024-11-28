@@ -430,7 +430,7 @@ func ValidateParameters(actionSet *dpv1alpha1.ActionSet, parameters []dpv1alpha1
 		return fmt.Errorf("the parametersSchema is invalid in actionSet %s", actionSet.Name)
 	}
 	// convert to type map[string]interface{} and validate the schema
-	params, err := common.CoverStringToInterfaceBySchemaType(schema.OpenAPIV3Schema, parametersMap)
+	params, err := common.ConvertStringToInterfaceBySchemaType(schema.OpenAPIV3Schema, parametersMap)
 	if err != nil {
 		return intctrlutil.NewFatalError(err.Error())
 	}

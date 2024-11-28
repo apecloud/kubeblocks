@@ -110,8 +110,8 @@ BackupType
 <td>
 <code>parametersSchema</code><br/>
 <em>
-<a href="#dataprotection.kubeblocks.io/v1alpha1.SelectiveParametersSchema">
-SelectiveParametersSchema
+<a href="#dataprotection.kubeblocks.io/v1alpha1.ActionSetParametersSchema">
+ActionSetParametersSchema
 </a>
 </em>
 </td>
@@ -1280,6 +1280,42 @@ the BackupController.</p>
 </td>
 </tr></tbody>
 </table>
+<h3 id="dataprotection.kubeblocks.io/v1alpha1.ActionSetParametersSchema">ActionSetParametersSchema
+</h3>
+<p>
+(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.ActionSetSpec">ActionSetSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>openAPIV3Schema</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#jsonschemaprops-v1-apiextensions-k8s-io">
+Kubernetes api extensions v1.JSONSchemaProps
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the schema for parameters using the OpenAPI v3.
+The supported property types include:
+- string
+- number
+- integer
+- array: Note that only items of string type are supported.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="dataprotection.kubeblocks.io/v1alpha1.ActionSetSpec">ActionSetSpec
 </h3>
 <p>
@@ -1320,8 +1356,8 @@ BackupType
 <td>
 <code>parametersSchema</code><br/>
 <em>
-<a href="#dataprotection.kubeblocks.io/v1alpha1.SelectiveParametersSchema">
-SelectiveParametersSchema
+<a href="#dataprotection.kubeblocks.io/v1alpha1.ActionSetParametersSchema">
+ActionSetParametersSchema
 </a>
 </em>
 </td>
@@ -5972,42 +6008,6 @@ string
 <em>(Optional)</em>
 <p>Specifies the scheduler to dispatch the pod.
 If not specified, the pod will be dispatched by the default scheduler.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="dataprotection.kubeblocks.io/v1alpha1.SelectiveParametersSchema">SelectiveParametersSchema
-</h3>
-<p>
-(<em>Appears on:</em><a href="#dataprotection.kubeblocks.io/v1alpha1.ActionSetSpec">ActionSetSpec</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>openAPIV3Schema</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#jsonschemaprops-v1-apiextensions-k8s-io">
-Kubernetes api extensions v1.JSONSchemaProps
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the schema for parameters using the OpenAPI v3.
-The supported property types include:
-- string
-- number
-- integer
-- array: Note that only items of string type are supported.</p>
 </td>
 </tr>
 </tbody>

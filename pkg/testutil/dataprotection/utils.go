@@ -25,7 +25,7 @@ import (
 	. "github.com/onsi/gomega"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -152,16 +152,16 @@ func MockRestoreCompleted(testCtx *testutil.TestContext, ml client.MatchingLabel
 
 func MockActionSetWithSchema(testCtx *testutil.TestContext, actionSet *dpv1alpha1.ActionSet) {
 	Expect(testapps.ChangeObj(testCtx, actionSet, func(as *dpv1alpha1.ActionSet) {
-		as.Spec.ParametersSchema = &dpv1alpha1.SelectiveParametersSchema{
-			OpenAPIV3Schema: &v1.JSONSchemaProps{
-				Properties: map[string]v1.JSONSchemaProps{
+		as.Spec.ParametersSchema = &dpv1alpha1.ActionSetParametersSchema{
+			OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+				Properties: map[string]apiextensionsv1.JSONSchemaProps{
 					ParameterString: {
 						Type: ParameterStringType,
 					},
 					ParameterArray: {
 						Type: ParameterArrayType,
-						Items: &v1.JSONSchemaPropsOrArray{
-							Schema: &v1.JSONSchemaProps{
+						Items: &apiextensionsv1.JSONSchemaPropsOrArray{
+							Schema: &apiextensionsv1.JSONSchemaProps{
 								Type: ParameterStringType,
 							},
 						},

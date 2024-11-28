@@ -257,7 +257,7 @@ func ValidateAndInitRestoreMGR(reqCtx intctrlutil.RequestCtx,
 		return err
 	}
 
-	// validate rstore parameters
+	// validate restore parameters
 	if backupSet.ActionSet != nil {
 		if err := utils.ValidateParameters(backupSet.ActionSet, restoreMgr.Restore.Spec.Parameters, false); err != nil {
 			return fmt.Errorf("fails to validate parameters with actionset %s: %v", backupSet.ActionSet.Name, err)

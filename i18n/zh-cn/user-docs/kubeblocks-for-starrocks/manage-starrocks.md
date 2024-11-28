@@ -17,9 +17,9 @@ StarRocks 是一款高性能分析型数据仓库，使用向量化、MPP 架构
 
 ## 开始之前
 
-- 如果您想通过 `kbcli` 创建并连接 StarRocks 集群，请先[安装 kbcli](./../installation/install-with-kbcli/install-kbcli.md)。
-- 安装 KubeBlocks，可通过 [kbcli](./../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) 或 [Helm](./../installation/install-with-helm/install-kubeblocks.md) 安装。
-- 安装并启用 starrocks 引擎，可通过 [kbcli](./../installation/install-with-kbcli/install-addons.md) 或 [Helm](./../installation/install-with-helm/install-addons.md) 操作。
+- 如果您想通过 `kbcli` 创建并连接 StarRocks 集群，请先[安装 kbcli](./../installation/install-kbcli.md)。
+- [安装 KubeBlocks](./../installation/install-kubeblocks.md)。
+- [安装并启用 starrocks 引擎](./../installation/install-addons.md)。
 
 ## 创建集群
 

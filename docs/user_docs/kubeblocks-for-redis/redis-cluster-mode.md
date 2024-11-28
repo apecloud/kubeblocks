@@ -30,7 +30,7 @@ Below is a brief introduction to the basic operations of Redis Cluster Mode.
 
 ### Before you start
 
-* Install KubeBlocks [by kbcli](./../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) or [by Helm](../../user_docs/installation/install-with-helm/install-kubeblocks.md).
+* [Install KubeBlocks](./../installation/install-kubeblocks.md).
     Make sure your KubeBlocks and addon are version 0.9 or above.
 * Make sure the Redis Addon is enabled.
 * View all the database types and versions available for creating a cluster.

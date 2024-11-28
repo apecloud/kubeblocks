@@ -17,9 +17,9 @@ This tutorial shows how to create and connect to a MySQL cluster.
 
 ### Before you start
 
-* [Install kbcli](./../../installation/install-with-kbcli/install-kbcli.md).
-* Install KubeBlocks  [by kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) or [by Helm](./../../installation/install-with-helm/install-kubeblocks.md).
-* Make sure the MySQL Addon is enabled. The MySQL Addon is installed and enabled by KubeBlocks by default. If you disable it when installing KubeBlocks, [enable it](./../../installation/install-with-kbcli/install-addons.md) first.
+* [Install kbcli](./../../installation/install-kbcli.md).
+* [Install KubeBlocks](./../../installation/install-kubeblocks.md).
+* Make sure the MySQL Addon is enabled. The MySQL Addon is installed and enabled by KubeBlocks by default. If you disable it when installing KubeBlocks, [enable it](./../../installation/install-addons.md) first.
 
   <Tabs>
 

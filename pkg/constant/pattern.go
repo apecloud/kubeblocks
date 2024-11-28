@@ -79,8 +79,8 @@ func GetCompEnvCMName(compObjName string) string {
 }
 
 // GenerateDefaultServiceAccountName generates default service account name for a cluster.
-func GenerateDefaultServiceAccountName(clusterName, compName string) string {
-	return fmt.Sprintf("%s-%s-%s", KBLowerPrefix, clusterName, compName)
+func GenerateDefaultServiceAccountName(cmpdName string) string {
+	return fmt.Sprintf("%s-%s", KBLowerPrefix, cmpdName)
 }
 
 // GenerateWorkloadNamePattern generates the workload name pattern

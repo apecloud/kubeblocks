@@ -60,19 +60,19 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 		return nil
 	}
 
+	var serviceAccountName string
+	var sa *corev1.ServiceAccount
 	// If the user has disabled rbac manager or specified comp.Spec.ServiceAccountName, it is now the user's responsibility to
-	// provide appropriate serviceaccount, roles and rolebindings.
-	if userSaName := transCtx.Component.Spec.ServiceAccountName; userSaName != "" {
+	// provide appropriate serviceaccount.
+	if serviceAccountName = transCtx.Component.Spec.ServiceAccountName; serviceAccountName != "" {
 		// if user provided serviceaccount does not exist, raise error
 		sa := &corev1.ServiceAccount{}
-		if err := transCtx.Client.Get(transCtx.Context, types.NamespacedName{Namespace: synthesizedComp.Namespace, Name: userSaName}, sa); err != nil {
+		if err := transCtx.Client.Get(transCtx.Context, types.NamespacedName{Namespace: synthesizedComp.Namespace, Name: serviceAccountName}, sa); err != nil {
 			if errors.IsNotFound(err) {
-				transCtx.EventRecorder.Event(transCtx.Cluster, corev1.EventTypeWarning, EventReasonRBACManager, fmt.Sprintf("serviceaccount %v not found", userSaName))
+				transCtx.EventRecorder.Event(transCtx.Cluster, corev1.EventTypeWarning, EventReasonRBACManager, fmt.Sprintf("serviceaccount %v not found", serviceAccountName))
 			}
 			return err
 		}
-
-		return nil
 	}
 	if !viper.GetBool(constant.EnableRBACManager) {
 		transCtx.EventRecorder.Event(transCtx.Cluster, corev1.EventTypeWarning, EventReasonRBACManager, "RBAC manager is disabled")
@@ -85,7 +85,15 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 		return err
 	}
 
-	serviceAccountName := constant.GenerateDefaultServiceAccountName(synthesizedComp.ClusterName, synthesizedComp.Name)
+	var err error
+	if serviceAccountName == "" {
+		serviceAccountName = constant.GenerateDefaultServiceAccountName(synthesizedComp.CompDefName)
+		// if no rolebinding is needed, sa will be created anyway, because other modules may reference it.
+		sa, err = createOrUpdateServiceAccount(transCtx, serviceAccountName, graphCli, dag)
+		if err != nil {
+			return err
+		}
+	}
 	role, err := createOrUpdateRole(transCtx, serviceAccountName, graphCli, dag)
 	if err != nil {
 		return err
@@ -96,20 +104,16 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 		return err
 	}
 
-	// if no rolebinding is needed, sa will be created anyway, because other modules may reference it.
-	sa, err := createOrUpdateServiceAccount(transCtx, serviceAccountName, graphCli, dag)
-	if err != nil {
-		return err
-	}
-
-	// serviceAccount should be created before roleBinding and role
-	for _, rb := range rbs {
-		graphCli.DependOn(dag, rb, sa, role)
-	}
-	// serviceAccount should be created before workload
-	itsList := graphCli.FindAll(dag, &workloads.InstanceSet{})
-	for _, its := range itsList {
-		graphCli.DependOn(dag, its, sa)
+	if sa != nil {
+		// serviceAccount should be created before roleBinding and role
+		for _, rb := range rbs {
+			graphCli.DependOn(dag, rb, sa, role)
+		}
+		// serviceAccount should be created before workload
+		itsList := graphCli.FindAll(dag, &workloads.InstanceSet{})
+		for _, its := range itsList {
+			graphCli.DependOn(dag, its, sa)
+		}
 	}
 
 	return nil
@@ -208,6 +212,9 @@ func createOrUpdateRoleBinding(
 			Kind:     "Role",
 			Name:     cmpdRole.Name,
 		}, serviceAccountName)
+		if err := setCompOwnershipNFinalizer(transCtx.Component, cmpdRoleBinding); err != nil {
+			return nil, err
+		}
 		rb, err := createOrUpdate(transCtx, cmpdRoleBinding, graphCli, dag, cmpRoleBinding)
 		if err != nil {
 			return nil, err
@@ -226,6 +233,9 @@ func createOrUpdateRoleBinding(
 			},
 			serviceAccountName,
 		)
+		if err := setCompOwnershipNFinalizer(transCtx.Component, clusterPodRoleBinding); err != nil {
+			return nil, err
+		}
 		rb, err := createOrUpdate(transCtx, clusterPodRoleBinding, graphCli, dag, cmpRoleBinding)
 		if err != nil {
 			return nil, err

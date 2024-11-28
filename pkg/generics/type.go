@@ -75,6 +75,8 @@ var ServiceAccountSignature = func(_ corev1.ServiceAccount, _ *corev1.ServiceAcc
 }
 var RoleBindingSignature = func(_ rbacv1.RoleBinding, _ *rbacv1.RoleBinding, _ rbacv1.RoleBindingList, _ *rbacv1.RoleBindingList) {
 }
+var RoleSignature = func(_ rbacv1.Role, _ *rbacv1.Role, _ rbacv1.RoleList, _ *rbacv1.RoleList) {
+}
 
 var JobSignature = func(_ batchv1.Job, _ *batchv1.Job, _ batchv1.JobList, _ *batchv1.JobList) {}
 var CronJobSignature = func(_ batchv1.CronJob, _ *batchv1.CronJob, _ batchv1.CronJobList, _ *batchv1.CronJobList) {}

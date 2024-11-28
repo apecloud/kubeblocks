@@ -210,6 +210,7 @@ func (r *ComponentReconciler) setupWithManager(mgr ctrl.Manager) error {
 
 	if viper.GetBool(constant.EnableRBACManager) {
 		b.Owns(&rbacv1.RoleBinding{}).
+			Owns(&rbacv1.Role{}).
 			Owns(&corev1.ServiceAccount{})
 	}
 

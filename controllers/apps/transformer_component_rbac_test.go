@@ -43,7 +43,6 @@ import (
 )
 
 var _ = Describe("object rbac transformer test.", func() {
-	const compDefName = "test-compdef"
 	const clusterName = "test-cluster"
 	const compName = "default"
 	var serviceAccountName = ""
@@ -65,6 +64,7 @@ var _ = Describe("object rbac transformer test.", func() {
 
 	init := func(enableLifecycleAction bool, enablePolicyRules bool) {
 		By("Create a component definition")
+		compDefName := "test-compdef"
 		compDefFactory := testapps.NewComponentDefinitionFactory(compDefName).
 			WithRandomName().
 			SetDefaultSpec().
@@ -104,7 +104,7 @@ var _ = Describe("object rbac transformer test.", func() {
 		graphCli = model.NewGraphClient(k8sClient)
 
 		var err error
-		serviceAccountName = constant.GenerateDefaultServiceAccountName(cluster.Name, compName)
+		serviceAccountName = constant.GenerateDefaultServiceAccountName(compDefFactory.Get().Name)
 		synthesizedComp, err = component.BuildSynthesizedComponent(ctx, k8sClient, compDefObj, compObj, cluster)
 		Expect(err).Should(Succeed())
 

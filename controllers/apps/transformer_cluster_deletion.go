@@ -27,6 +27,7 @@ import (
 	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -78,7 +79,7 @@ func (t *clusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 	if len(deleteSet) > 0 {
 		// wait for the components to be deleted to trigger the next reconcile
 		transCtx.Logger.Info(fmt.Sprintf("wait for the components and shardings to be deleted: %v", deleteSet))
-		return nil
+		return graph.ErrPrematureStop
 	}
 
 	// then list all the others objects owned by this cluster in cache, and delete them all
@@ -136,6 +137,7 @@ func (t *clusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 
 	// set cluster action to status until all the sub-resources deleted
 	if len(delObjs) == 0 {
+		transCtx.Logger.Info(fmt.Sprintf("deleting cluster %v", klog.KObj(cluster)))
 		graphCli.Delete(dag, cluster)
 	} else {
 		transCtx.Logger.Info(fmt.Sprintf("deleting the sub-resource kinds: %v", maps.Keys(delKindMap)))

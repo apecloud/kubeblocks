@@ -138,8 +138,9 @@ var _ = Describe("Component Controller", func() {
 	// test function helpers
 	createAllDefinitionObjects := func() {
 		By("Create a componentDefinition obj")
+		// FIXME: WithRandomName needed?
 		compDefObj = testapps.NewComponentDefinitionFactory(compDefName).
-			WithRandomName().
+			// WithRandomName().
 			AddAnnotations(constant.SkipImmutableCheckAnnotationKey, "true").
 			SetDefaultSpec().
 			Create(&testCtx).
@@ -1348,7 +1349,7 @@ var _ = Describe("Component Controller", func() {
 		By("creating a component with target service account name")
 		if len(saName) == 0 {
 			createClusterObj(compName, compDefName, nil)
-			saName = constant.GenerateDefaultServiceAccountName(clusterObj.Name, compName)
+			saName = constant.GenerateDefaultServiceAccountName(compDefName)
 		} else {
 			createClusterObj(compName, compDefName, func(f *testapps.MockClusterFactory) {
 				f.SetServiceAccountName(saName)
@@ -1376,7 +1377,7 @@ var _ = Describe("Component Controller", func() {
 		Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &kbappsv1.Cluster{}, false)).Should(Succeed())
 
 		By("check the RBAC resources deleted")
-		saName := constant.GenerateDefaultServiceAccountName(clusterObj.Name, compName)
+		saName := constant.GenerateDefaultServiceAccountName(compDefName)
 		checkRBACResourcesExistence(saName, fmt.Sprintf("%v-pod", saName), false)
 
 		By("re-create cluster(component) with same name")
@@ -1399,19 +1400,19 @@ var _ = Describe("Component Controller", func() {
 		By("user manually creates ServiceAccount and RoleBinding")
 		sa := builder.NewServiceAccountBuilder(testCtx.DefaultNamespace, saName).GetObject()
 		testapps.CheckedCreateK8sResource(&testCtx, sa)
-		rb := builder.NewRoleBindingBuilder(testCtx.DefaultNamespace, saName+"-pod").
-			SetRoleRef(rbacv1.RoleRef{
-				APIGroup: rbacv1.GroupName,
-				Kind:     "Role",
-				Name:     constant.RBACRoleName,
-			}).
-			AddSubjects(rbacv1.Subject{
-				Kind:      rbacv1.ServiceAccountKind,
-				Namespace: testCtx.DefaultNamespace,
-				Name:      saName,
-			}).
-			GetObject()
-		testapps.CheckedCreateK8sResource(&testCtx, rb)
+		// rb := builder.NewRoleBindingBuilder(testCtx.DefaultNamespace, saName+"-pod").
+		// 	SetRoleRef(rbacv1.RoleRef{
+		// 		APIGroup: rbacv1.GroupName,
+		// 		Kind:     "Role",
+		// 		Name:     constant.RBACRoleName,
+		// 	}).
+		// 	AddSubjects(rbacv1.Subject{
+		// 		Kind:      rbacv1.ServiceAccountKind,
+		// 		Namespace: testCtx.DefaultNamespace,
+		// 		Name:      saName,
+		// 	}).
+		// 	GetObject()
+		// testapps.CheckedCreateK8sResource(&testCtx, rb)
 
 		testCompRBAC(compName, compDefName, saName)
 
@@ -1419,8 +1420,8 @@ var _ = Describe("Component Controller", func() {
 		testapps.DeleteObject(&testCtx, clusterKey, &kbappsv1.Cluster{})
 		Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &kbappsv1.Cluster{}, true)).Should(Succeed())
 
-		By("check the RBAC resources not deleted")
-		checkRBACResourcesExistence(saName, rb.Name, true)
+		By("check the serviceaccount not deleted")
+		Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(sa), &corev1.ServiceAccount{}, true)).Should(Succeed())
 	}
 
 	testThreeReplicas := func(compName, compDefName string) {

@@ -27,7 +27,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -37,6 +39,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 // componentDeletionTransformer handles component deletion
@@ -125,6 +128,13 @@ func (t *componentDeletionTransformer) deleteCompResources(transCtx *componentTr
 			if isOwnedByInstanceSet(object) {
 				continue
 			}
+			skipDeletion, err := handleRBACResourceDeletion(object, transCtx, comp, graphCli, dag)
+			if err != nil {
+				return fmt.Errorf("handle rbac deletion failed: %w", err)
+			}
+			if skipDeletion {
+				continue
+			}
 			graphCli.Delete(dag, object)
 		}
 		graphCli.Status(dag, comp, transCtx.Component)
@@ -141,6 +151,43 @@ func (t *componentDeletionTransformer) deleteCompResources(transCtx *componentTr
 
 	// fast return, that is stopping the plan.Build() stage and jump to plan.Execute() directly
 	return graph.ErrPrematureStop
+}
+
+func handleRBACResourceDeletion(obj client.Object, transCtx *componentTransformContext, comp *appsv1.Component,
+	graphCli model.GraphClient, dag *graph.DAG) (skipDeletion bool, err error) {
+	switch v := obj.(type) {
+	case *corev1.ServiceAccount, *rbacv1.Role, *rbacv1.RoleBinding:
+		// list other components that reference the same componentdefinition
+		compDefName := comp.Spec.CompDef
+		compList := &appsv1.ComponentList{}
+		if err := transCtx.Client.List(transCtx.Context, compList, client.InNamespace(comp.Namespace),
+			client.MatchingLabels{constant.ComponentDefinitionLabelKey: compDefName}); err != nil {
+			return false, err
+		}
+		// if any, transfer ownership to any other component
+		for _, otherComp := range compList.Items {
+			if otherComp.Name == comp.Name {
+				// skip current component
+				continue
+			}
+			if err := controllerutil.RemoveControllerReference(comp, v, rscheme); err != nil {
+				return false, err
+			}
+			if err := controllerutil.SetControllerReference(&otherComp, v, rscheme); err != nil {
+				return false, err
+			}
+			graphCli.Update(dag, nil, v)
+			gvk, err := apiutil.GVKForObject(v, rscheme)
+			if err != nil {
+				return false, err
+			}
+			transCtx.Logger.V(1).Info("rbac resources owner transfered, skip deletion", "name", klog.KObj(v), "gvk", gvk)
+			return true, nil
+		}
+		return false, nil
+	default:
+		return false, nil
+	}
 }
 
 func (t *componentDeletionTransformer) getCluster(transCtx *componentTransformContext, comp *appsv1.Component) (*appsv1.Cluster, error) {
@@ -171,6 +218,7 @@ func compOwnedKinds() []client.ObjectList {
 		&corev1.PersistentVolumeClaimList{},
 		&appsv1alpha1.ConfigurationList{},
 		&corev1.ServiceAccountList{},
+		&rbacv1.RoleList{},
 		&rbacv1.RoleBindingList{},
 	}
 }

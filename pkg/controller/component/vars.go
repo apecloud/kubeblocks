@@ -791,8 +791,6 @@ func resolveTLSVarRef(ctx context.Context, cli client.Reader, synthesizedComp *S
 	switch {
 	case selector.Enabled != nil:
 		resolveFunc = resolveTLSEnabledRef
-	case selector.CAFile != nil:
-		resolveFunc = resolveTLSCAFileRef
 	default:
 		return nil, nil, nil
 	}
@@ -813,20 +811,6 @@ func resolveTLSEnabledRef(ctx context.Context, cli client.Reader, synthesizedCom
 		return &corev1.EnvVar{Name: defineKey, Value: enabled}, nil, nil
 	}
 	return resolveComponentVarRefLow(ctx, cli, synthesizedComp, selector.ClusterObjectReference, selector.Enabled, resolveEnabled)
-}
-
-func resolveTLSCAFileRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
-	defineKey string, selector appsv1.TLSVarSelector) ([]*corev1.EnvVar, []*corev1.EnvVar, error) {
-	resolveCAFile := func(obj any) (*corev1.EnvVar, *corev1.EnvVar, error) {
-		comp := obj.(*appsv1.Component)
-		if comp.Spec.TLSConfig == nil || !comp.Spec.TLSConfig.Enable {
-			return nil, nil, nil
-		}
-		caFile := "" // TODO: get the cmpd and resolve the CAFile from it.
-		// TODO: mount the secret of target CAFile to the component
-		return &corev1.EnvVar{Name: defineKey, Value: caFile}, nil, nil
-	}
-	return resolveComponentVarRefLow(ctx, cli, synthesizedComp, selector.ClusterObjectReference, selector.Enabled, resolveCAFile)
 }
 
 func resolveServiceRefVarRef(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,

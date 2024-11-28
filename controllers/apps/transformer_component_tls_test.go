@@ -218,7 +218,7 @@ var _ = Describe("TLS self-signed cert function", func() {
 			})
 
 			It("should skip if the existence of the secret is confirmed", func() {
-				err := buildTLSCert(ctx, k8sClient, compDef, synthesizedComp, dag)
+				err := buildNCheckTLSCert(ctx, k8sClient, compDef, synthesizedComp, dag)
 				Expect(err).Should(BeNil())
 				secret := &corev1.Secret{}
 				err = k8sClient.Get(ctx, types.NamespacedName{Namespace: testCtx.DefaultNamespace, Name: secretObj.Name}, secret)

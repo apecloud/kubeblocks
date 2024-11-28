@@ -2196,16 +2196,6 @@ spec:
                         tlsVarRef:
                           description: Selects a defined var of the TLS.
                           properties:
-                            caFile:
-                              description: |-
-                                CAFile references the CA file of the TLS.
-
-
-                                To mount the referenced CA file into the container properly, the TLS must be explicitly defined in the ComponentDefinition.
-                              enum:
-                              - Required
-                              - Optional
-                              type: string
                             compDef:
                               description: |-
                                 Specifies the exact name, name prefix, or regular expression pattern for matching the name of the ComponentDefinition

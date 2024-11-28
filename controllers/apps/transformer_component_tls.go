@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"slices"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -62,7 +63,7 @@ func (t *componentTLSTransformer) Transform(ctx graph.TransformContext, dag *gra
 		return fmt.Errorf("issuer shouldn't be nil when tls enabled")
 	}
 
-	if err = buildTLSCert(transCtx.Context, transCtx.Client, compDef, *synthesizedComp, dag); err != nil {
+	if err = buildNCheckTLSCert(transCtx.Context, transCtx.Client, compDef, *synthesizedComp, dag); err != nil {
 		return err
 	}
 
@@ -77,12 +78,12 @@ func (t *componentTLSTransformer) enabled(compDef *appsv1.ComponentDefinition, s
 		return false, nil
 	}
 	if compDef.Spec.TLS == nil {
-		return false, fmt.Errorf("the TLS is not supported by the component definition %s", compDef.Name)
+		return false, fmt.Errorf("the tls is enabled but the component definition %s doesn't support it", compDef.Name)
 	}
 	return true, nil
 }
 
-func buildTLSCert(ctx context.Context, cli client.Reader,
+func buildNCheckTLSCert(ctx context.Context, cli client.Reader,
 	compDef *appsv1.ComponentDefinition, synthesizedComp component.SynthesizedComponent, dag *graph.DAG) error {
 	tls := synthesizedComp.TLSConfig
 	switch tls.Issuer.Name {
@@ -136,6 +137,11 @@ func (t *componentTLSTransformer) updateVolumeNVolumeMount(
 	if err != nil {
 		return err
 	}
+	if slices.ContainsFunc(volumes, func(v corev1.Volume) bool {
+		return v.Name == volume.Name
+	}) {
+		return fmt.Errorf("the TLS volume %s already exists", volume.Name)
+	}
 	volumes = append(volumes, *volume)
 	synthesizedComp.PodSpec.Volumes = volumes
 
@@ -147,8 +153,12 @@ func (t *componentTLSTransformer) updateVolumeNVolumeMount(
 	}
 	for i := range synthesizedComp.PodSpec.Containers {
 		mounts := synthesizedComp.PodSpec.Containers[i].VolumeMounts
-		mounts = append(mounts, mount)
-		synthesizedComp.PodSpec.Containers[i].VolumeMounts = mounts
+		if !slices.ContainsFunc(mounts, func(m corev1.VolumeMount) bool {
+			return m.Name == mount.Name
+		}) {
+			mounts = append(mounts, mount)
+			synthesizedComp.PodSpec.Containers[i].VolumeMounts = mounts
+		}
 	}
 
 	return nil
@@ -183,10 +193,9 @@ func (t *componentTLSTransformer) composeTLSVolume(
 		Name: compDef.Spec.TLS.VolumeName,
 		VolumeSource: corev1.VolumeSource{
 			Secret: &corev1.SecretVolumeSource{
-				SecretName:  secretName,
-				Items:       []corev1.KeyToPath{},
-				Optional:    ptr.To(false),
-				DefaultMode: ptr.To(*compDef.Spec.TLS.DefaultMode),
+				SecretName: secretName,
+				Items:      []corev1.KeyToPath{},
+				Optional:   ptr.To(false),
 			},
 		},
 	}

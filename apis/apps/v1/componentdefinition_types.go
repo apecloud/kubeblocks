@@ -717,13 +717,6 @@ type CredentialVars struct {
 type TLSVars struct {
 	// +optional
 	Enabled *VarOption `json:"enabled,omitempty"`
-
-	// CAFile references the CA file of the TLS.
-	//
-	// To mount the referenced CA file into the container properly, the TLS must be explicitly defined in the ComponentDefinition.
-	//
-	// +optional
-	CAFile *VarOption `json:"caFile,omitempty"`
 }
 
 // ServiceRefVars defines the vars that can be referenced from a ServiceRef.
@@ -1265,42 +1258,44 @@ type SystemAccount struct {
 
 type TLS struct {
 	// Specifies the volume name for the TLS secret.
+	// The controller will create a volume object with the specified name and add it to the pod when the TLS is enabled.
 	//
 	// This field is immutable once set.
 	//
-	// +kubebuilder:default=tls
-	// +optional
+	// +kubebuilder:validation:Required
 	VolumeName string `json:"volumeName"`
 
 	// Specifies the mount path for the TLS secret to be mounted.
+	// Similar to the volume, the controller will mount the created volume to the specified path within containers when the TLS is enabled.
 	//
 	// This field is immutable once set.
 	//
-	// +kubebuilder:default=/etc/pki/tls
-	// +optional
+	// +kubebuilder:validation:Required
 	MountPath string `json:"mountPath"`
 
+	// The default permissions for the mounted path.
+	//
 	// This field is immutable once set.
 	//
 	// +kubebuilder:default=0600
 	// +optional
 	DefaultMode *int32 `json:"defaultMode,omitempty"`
 
-	// The CA file name of TLS.
+	// The CA file of the TLS.
 	//
 	// This field is immutable once set.
 	//
 	// +optional
 	CAFile *string `json:"caFile,omitempty"`
 
-	// The certificate file name of TLS.
+	// The certificate file of the TLS.
 	//
 	// This field is immutable once set.
 	//
 	// +optional
 	CertFile *string `json:"certFile,omitempty"`
 
-	// The key file name of TLS.
+	// The key file of the TLS.
 	//
 	// This field is immutable once set.
 	//

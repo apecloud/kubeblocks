@@ -11205,8 +11205,8 @@ string
 </em>
 </td>
 <td>
-<em>(Optional)</em>
-<p>Specifies the volume name for the TLS secret.</p>
+<p>Specifies the volume name for the TLS secret.
+The controller will create a volume object with the specified name and add it to the pod when the TLS is enabled.</p>
 <p>This field is immutable once set.</p>
 </td>
 </tr>
@@ -11218,8 +11218,8 @@ string
 </em>
 </td>
 <td>
-<em>(Optional)</em>
-<p>Specifies the mount path for the TLS secret to be mounted.</p>
+<p>Specifies the mount path for the TLS secret to be mounted.
+Similar to the volume, the controller will mount the created volume to the specified path within containers when the TLS is enabled.</p>
 <p>This field is immutable once set.</p>
 </td>
 </tr>
@@ -11232,6 +11232,7 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
+<p>The default permissions for the mounted path.</p>
 <p>This field is immutable once set.</p>
 </td>
 </tr>
@@ -11244,7 +11245,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>The CA file name of TLS.</p>
+<p>The CA file of the TLS.</p>
 <p>This field is immutable once set.</p>
 </td>
 </tr>
@@ -11257,7 +11258,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>The certificate file name of TLS.</p>
+<p>The certificate file of the TLS.</p>
 <p>This field is immutable once set.</p>
 </td>
 </tr>
@@ -11270,7 +11271,7 @@ string
 </td>
 <td>
 <em>(Optional)</em>
-<p>The key file name of TLS.</p>
+<p>The key file of the TLS.</p>
 <p>This field is immutable once set.</p>
 </td>
 </tr>
@@ -11466,21 +11467,6 @@ VarOption
 </td>
 <td>
 <em>(Optional)</em>
-</td>
-</tr>
-<tr>
-<td>
-<code>caFile</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.VarOption">
-VarOption
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>CAFile references the CA file of the TLS.</p>
-<p>To mount the referenced CA file into the container properly, the TLS must be explicitly defined in the ComponentDefinition.</p>
 </td>
 </tr>
 </tbody>

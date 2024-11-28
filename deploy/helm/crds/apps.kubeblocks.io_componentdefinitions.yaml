@@ -16799,46 +16799,53 @@ spec:
                 properties:
                   caFile:
                     description: |-
-                      The CA file name of TLS.
+                      The CA file of the TLS.
 
 
                       This field is immutable once set.
                     type: string
                   certFile:
                     description: |-
-                      The certificate file name of TLS.
+                      The certificate file of the TLS.
 
 
                       This field is immutable once set.
                     type: string
                   defaultMode:
                     default: 600
-                    description: This field is immutable once set.
+                    description: |-
+                      The default permissions for the mounted path.
+
+
+                      This field is immutable once set.
                     format: int32
                     type: integer
                   keyFile:
                     description: |-
-                      The key file name of TLS.
+                      The key file of the TLS.
 
 
                       This field is immutable once set.
                     type: string
                   mountPath:
-                    default: /etc/pki/tls
                     description: |-
                       Specifies the mount path for the TLS secret to be mounted.
+                      Similar to the volume, the controller will mount the created volume to the specified path within containers when the TLS is enabled.
 
 
                       This field is immutable once set.
                     type: string
                   volumeName:
-                    default: tls
                     description: |-
                       Specifies the volume name for the TLS secret.
+                      The controller will create a volume object with the specified name and add it to the pod when the TLS is enabled.
 
 
                       This field is immutable once set.
                     type: string
+                required:
+                - mountPath
+                - volumeName
                 type: object
               updateStrategy:
                 default: Serial
@@ -17528,16 +17535,6 @@ spec:
                         tlsVarRef:
                           description: Selects a defined var of the TLS.
                           properties:
-                            caFile:
-                              description: |-
-                                CAFile references the CA file of the TLS.
-
-
-                                To mount the referenced CA file into the container properly, the TLS must be explicitly defined in the ComponentDefinition.
-                              enum:
-                              - Required
-                              - Optional
-                              type: string
                             compDef:
                               description: |-
                                 Specifies the exact name, name prefix, or regular expression pattern for matching the name of the ComponentDefinition

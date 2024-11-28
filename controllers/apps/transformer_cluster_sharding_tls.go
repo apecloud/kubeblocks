@@ -21,9 +21,9 @@ package apps
 
 import (
 	"fmt"
+	"reflect"
 
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -85,26 +85,35 @@ func (t *clusterShardingTLSTransformer) reconcileShardingTLS(transCtx *clusterTr
 		return nil // all components will share the same secret
 	}
 
-	exist, err := t.checkTLSSecret(transCtx, sharding)
+	secret, err := t.checkTLSSecret(transCtx, sharding)
 	if err != nil {
 		return err
 	}
-	if !exist {
-		obj, err := t.newTLSSecret(transCtx, sharding)
-		if err != nil {
-			return err
+
+	compDef := transCtx.componentDefs[sharding.Template.ComponentDef]
+	if secret == nil {
+		obj, err1 := t.buildTLSSecret(transCtx, sharding, compDef)
+		if err1 != nil {
+			return err1
 		}
 		graphCli.Create(dag, obj)
+	} else {
+		proto := t.newTLSSecret(transCtx, sharding, compDef)
+		secretCopy := secret.DeepCopy()
+		secretCopy.Labels = proto.Labels
+		secretCopy.Annotations = proto.Annotations
+		if !reflect.DeepEqual(secret, secretCopy) {
+			graphCli.Update(dag, secret, secretCopy)
+		}
 	}
 
-	// TODO: update
-
-	t.rewriteTLSConfig(transCtx, sharding)
+	t.rewriteTLSConfig(transCtx, sharding, compDef)
 
 	return nil
 }
 
-func (t *clusterShardingTLSTransformer) checkTLSSecret(transCtx *clusterTransformContext, sharding *appsv1.ClusterSharding) (bool, error) {
+func (t *clusterShardingTLSTransformer) checkTLSSecret(
+	transCtx *clusterTransformContext, sharding *appsv1.ClusterSharding) (*corev1.Secret, error) {
 	var (
 		cluster = transCtx.Cluster
 	)
@@ -114,29 +123,35 @@ func (t *clusterShardingTLSTransformer) checkTLSSecret(transCtx *clusterTransfor
 	}
 	secret := &corev1.Secret{}
 	err := transCtx.GetClient().Get(transCtx.GetContext(), secretKey, secret)
-	if err != nil && !apierrors.IsNotFound(err) {
-		return false, err
+	if err != nil {
+		return nil, client.IgnoreNotFound(err)
 	}
-	return !apierrors.IsNotFound(err), nil
+	return secret, nil
 }
 
-func (t *clusterShardingTLSTransformer) newTLSSecret(transCtx *clusterTransformContext, sharding *appsv1.ClusterSharding) (*corev1.Secret, error) {
+func (t *clusterShardingTLSTransformer) buildTLSSecret(transCtx *clusterTransformContext,
+	sharding *appsv1.ClusterSharding, compDef *appsv1.ComponentDefinition) (*corev1.Secret, error) {
+	synthesizedComp := component.SynthesizedComponent{
+		Namespace:   transCtx.Cluster.Namespace,
+		ClusterName: transCtx.Cluster.Name,
+		Name:        sharding.Name,
+	}
+	secret := t.newTLSSecret(transCtx, sharding, compDef)
+	return plan.ComposeTLSSecret(compDef, synthesizedComp, secret)
+}
+
+func (t *clusterShardingTLSTransformer) newTLSSecret(transCtx *clusterTransformContext,
+	sharding *appsv1.ClusterSharding, compDef *appsv1.ComponentDefinition) *corev1.Secret {
 	var (
 		cluster      = transCtx.Cluster
 		namespace    = cluster.Namespace
 		clusterName  = cluster.Name
 		shardingName = sharding.Name
 	)
-	compDef := transCtx.componentDefs[sharding.Template.ComponentDef]
-	synthesizedComp := component.SynthesizedComponent{
-		Namespace:   namespace,
-		ClusterName: clusterName,
-		Name:        shardingName,
-	}
 	shardingLabels := map[string]string{
 		constant.KBAppShardingNameLabelKey: shardingName,
 	}
-	secret := builder.NewSecretBuilder(namespace, shardingTLSSecretName(clusterName, shardingName)).
+	return builder.NewSecretBuilder(namespace, shardingTLSSecretName(clusterName, shardingName)).
 		AddLabelsInMap(constant.GetClusterLabels(clusterName, shardingLabels)).
 		AddLabelsInMap(sharding.Template.Labels).
 		AddLabelsInMap(compDef.Spec.Labels).
@@ -144,17 +159,16 @@ func (t *clusterShardingTLSTransformer) newTLSSecret(transCtx *clusterTransformC
 		AddAnnotationsInMap(compDef.Spec.Annotations).
 		SetStringData(map[string]string{}).
 		GetObject()
-	return plan.ComposeTLSSecret(compDef, synthesizedComp, secret)
 }
 
-func (t *clusterShardingTLSTransformer) rewriteTLSConfig(transCtx *clusterTransformContext, sharding *appsv1.ClusterSharding) {
+func (t *clusterShardingTLSTransformer) rewriteTLSConfig(
+	transCtx *clusterTransformContext, sharding *appsv1.ClusterSharding, compDef *appsv1.ComponentDefinition) {
 	sharding.Template.Issuer = &appsv1.Issuer{
 		Name: appsv1.IssuerUserProvided,
 		SecretRef: &appsv1.TLSSecretRef{
 			Name: shardingTLSSecretName(transCtx.Cluster.Name, sharding.Name),
 		},
 	}
-	compDef := transCtx.componentDefs[sharding.Template.ComponentDef]
 	tls := compDef.Spec.TLS
 	if tls.CAFile != nil {
 		sharding.Template.Issuer.SecretRef.CA = *tls.CAFile

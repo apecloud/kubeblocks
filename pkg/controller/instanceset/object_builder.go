@@ -254,7 +254,7 @@ func injectCustomRoleProbeContainer(its *workloads.InstanceSet, template *corev1
 	agentPath := strings.Join([]string{roleAgentVolumeMountPath, roleAgentName}, "/")
 	initContainer := corev1.Container{
 		Name:            roleAgentInstallerName,
-		Image:           shell2httpImage,
+		Image:           strings.Join([]string{viper.GetString(constant.KBImageRegistry), shell2httpImage}, "/"),
 		ImagePullPolicy: corev1.PullIfNotPresent,
 		VolumeMounts:    []corev1.VolumeMount{agentVolumeMount},
 		Command: []string{

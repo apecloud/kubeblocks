@@ -31,6 +31,7 @@ const (
 	KBToolsImage         = "KUBEBLOCKS_TOOLS_IMAGE"
 	KBImagePullPolicy    = "KUBEBLOCKS_IMAGE_PULL_POLICY"
 	KBImagePullSecrets   = "KUBEBLOCKS_IMAGE_PULL_SECRETS"
+	KBImageRegistry      = "KUBEBLOCKS_IMAGE_REGISTRY"
 )
 
 const (

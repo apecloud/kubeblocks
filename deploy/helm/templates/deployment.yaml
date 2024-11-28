@@ -121,6 +121,8 @@ spec:
               value: {{ .Values.image.imagePullSecrets | toJson | quote }}
             - name: KUBEBLOCKS_TOOLS_IMAGE
               value: "{{ .Values.image.registry | default "docker.io" }}/{{ .Values.image.tools.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+            - name: KUBEBLOCKS_IMAGE_REGISTRY
+              value: "{{ .Values.image.registry | default "docker.io" }}"
             - name: KUBEBLOCKS_SERVICEACCOUNT_NAME
               value: {{ include "kubeblocks.serviceAccountName" . }}
             {{- if .Capabilities.APIVersions.Has "snapshot.storage.k8s.io/v1" }}

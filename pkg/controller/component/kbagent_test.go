@@ -154,7 +154,7 @@ var _ = Describe("kb-agent", func() {
 
 			c := kbAgentContainer()
 			Expect(c).ShouldNot(BeNil())
-			Expect(c.Env).Should(HaveLen(7)) // 4 + 3
+			Expect(c.Env).Should(HaveLen(6)) // 4 + 2
 		})
 
 		It("action env", func() {
@@ -179,7 +179,7 @@ var _ = Describe("kb-agent", func() {
 
 			c := kbAgentContainer()
 			Expect(c).ShouldNot(BeNil())
-			Expect(c.Env).Should(HaveLen(9)) // 2 + 4 + 3
+			Expect(c.Env).Should(HaveLen(8)) // 2 + 4 + 2
 			Expect(reflect.DeepEqual(c.Env[0], env[0])).Should(BeTrue())
 			Expect(reflect.DeepEqual(c.Env[1], env[1])).Should(BeTrue())
 		})

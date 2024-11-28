@@ -1,0 +1,946 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.14.0
+  labels:
+    app.kubernetes.io/name: kubeblocks
+  name: reconciliationtraces.trace.kubeblocks.io
+spec:
+  group: trace.kubeblocks.io
+  names:
+    categories:
+    - kubeblocks
+    - all
+    kind: ReconciliationTrace
+    listKind: ReconciliationTraceList
+    plural: reconciliationtraces
+    shortNames:
+    - trace
+    singular: reconciliationtrace
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .metadata.creationTimestamp
+      name: AGE
+      type: date
+    - description: Target Object Namespace
+      jsonPath: .spec.targetObject.namespace
+      name: TARGET_NS
+      type: string
+    - description: Target Object Name
+      jsonPath: .spec.targetObject.name
+      name: TARGET_NAME
+      type: string
+    - description: Latest Changed Object API Version
+      jsonPath: .status.currentState.changes[-1].objectReference.apiVersion
+      name: API_VERSION
+      type: string
+    - description: Latest Changed Object Kind
+      jsonPath: .status.currentState.changes[-1].objectReference.kind
+      name: KIND
+      type: string
+    - description: Latest Changed Object Namespace
+      jsonPath: .status.currentState.changes[-1].objectReference.namespace
+      name: NAMESPACE
+      type: string
+    - description: Latest Changed Object Name
+      jsonPath: .status.currentState.changes[-1].objectReference.name
+      name: NAME
+      type: string
+    - description: Latest Change Description
+      jsonPath: .status.currentState.changes[-1].description
+      name: CHANGE
+      type: string
+    name: v1
+    schema:
+      openAPIV3Schema:
+        description: ReconciliationTrace is the Schema for the reconciliationtraces
+          API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ReconciliationTraceSpec defines the desired state of ReconciliationTrace
+            properties:
+              dryRun:
+                description: |-
+                  DryRun tells the Controller to simulate the reconciliation process with a new desired spec of the TargetObject.
+                  And a reconciliation plan will be generated and described in the ReconciliationTraceStatus.
+                  The plan generation process will not impact the state of the TargetObject.
+                properties:
+                  desiredSpec:
+                    description: |-
+                      DesiredSpec specifies the desired spec of the TargetObject.
+                      The desired spec will be merged into the current spec by a strategic merge patch way to build the final spec,
+                      and the reconciliation plan will be calculated by comparing the current spec to the final spec.
+                      DesiredSpec should be a valid YAML string.
+                    type: string
+                required:
+                - desiredSpec
+                type: object
+              locale:
+                description: Locale specifies the locale to use when localizing the
+                  reconciliation trace.
+                type: string
+              stateEvaluationExpression:
+                description: |-
+                  StateEvaluationExpression specifies the state evaluation expression used during reconciliation progress observation.
+                  The whole reconciliation process from the creation of the TargetObject to the deletion of it
+                  is separated into several reconciliation cycles.
+                  The StateEvaluationExpression is applied to the TargetObject,
+                  and an evaluation result of true indicates the end of a reconciliation cycle.
+                  StateEvaluationExpression overrides the builtin default value.
+                properties:
+                  celExpression:
+                    description: |-
+                      CELExpression specifies to use CEL to evaluation the object state.
+                      The root object used in the expression is the primary object.
+                    properties:
+                      expression:
+                        description: Expression specifies the CEL expression.
+                        type: string
+                    required:
+                    - expression
+                    type: object
+                type: object
+              targetObject:
+                description: |-
+                  TargetObject specifies the target Cluster object.
+                  Default is the Cluster object with same namespace and name as this ReconciliationTrace object.
+                properties:
+                  name:
+                    description: |-
+                      Name of the referent.
+                      Default is same as the ReconciliationTrace object.
+                    type: string
+                  namespace:
+                    description: |-
+                      Namespace of the referent.
+                      Default is same as the ReconciliationTrace object.
+                    type: string
+                type: object
+            type: object
+          status:
+            description: ReconciliationTraceStatus defines the observed state of ReconciliationTrace
+            properties:
+              currentState:
+                description: |-
+                  CurrentState is the current state of the latest reconciliation cycle,
+                  that is the reconciliation process from the end of last reconciliation cycle until now.
+                properties:
+                  changes:
+                    description: Changes describes the detail reconciliation process.
+                    items:
+                      description: ObjectChange defines a detailed change of an object.
+                      properties:
+                        changeType:
+                          description: |-
+                            ChangeType specifies the change type.
+                            Event - specifies that this is a Kubernetes Event.
+                            Creation - specifies that this is an object creation.
+                            Update - specifies that this is an object update.
+                            Deletion - specifies that this is an object deletion.
+                          enum:
+                          - Event
+                          - Creation
+                          - Update
+                          - Deletion
+                          type: string
+                        description:
+                          description: Description describes the change in a user-friendly
+                            way.
+                          type: string
+                        eventAttributes:
+                          description: EventAttributes specifies the attributes of
+                            the event when ChangeType is Event.
+                          properties:
+                            name:
+                              description: Name of the Event.
+                              type: string
+                            reason:
+                              description: Reason of the Event.
+                              type: string
+                            type:
+                              description: Type of the Event.
+                              type: string
+                          required:
+                          - name
+                          - reason
+                          - type
+                          type: object
+                        localDescription:
+                          description: |-
+                            LocalDescription is the localized version of Description by using the Locale specified in `spec.locale`.
+                            Empty if the `spec.locale` is not specified.
+                          type: string
+                        objectReference:
+                          description: ObjectReference specifies the Object this change
+                            described.
+                          properties:
+                            apiVersion:
+                              description: API version of the referent.
+                              type: string
+                            fieldPath:
+                              description: |-
+                                If referring to a piece of an object instead of an entire object, this string
+                                should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                                For example, if the object reference is to a container within a pod, this would take on a value like:
+                                "spec.containers{name}" (where "name" refers to the name of the container that triggered
+                                the event) or if no container name is specified "spec.containers[2]" (container with
+                                index 2 in this pod). This syntax is chosen only to have some well-defined way of
+                                referencing a part of an object.
+                                TODO: this design is not final and this field is subject to change in the future.
+                              type: string
+                            kind:
+                              description: |-
+                                Kind of the referent.
+                                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                              type: string
+                            name:
+                              description: |-
+                                Name of the referent.
+                                More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                              type: string
+                            namespace:
+                              description: |-
+                                Namespace of the referent.
+                                More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+                              type: string
+                            resourceVersion:
+                              description: |-
+                                Specific resourceVersion to which this reference is made, if any.
+                                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                              type: string
+                            uid:
+                              description: |-
+                                UID of the referent.
+                                More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+                              type: string
+                          type: object
+                          x-kubernetes-map-type: atomic
+                        revision:
+                          description: |-
+                            Revision specifies the revision of the object after this change.
+                            Revision can be compared globally between all ObjectChanges of all Objects, to build a total order object change sequence.
+                          format: int64
+                          type: integer
+                        timestamp:
+                          description: |-
+                            Timestamp is a timestamp representing the ReconciliationTrace Controller time when this change occurred.
+                            It is not guaranteed to be set in happens-before order across separate changes.
+                            It is represented in RFC3339 form and is in UTC.
+                          format: date-time
+                          type: string
+                      required:
+                      - changeType
+                      - description
+                      - objectReference
+                      - revision
+                      type: object
+                    type: array
+                  objectTree:
+                    description: |-
+                      ObjectTree specifies the current object tree of the reconciliation cycle.
+                      Ideally, ObjectTree should be same as applying Changes to InitialObjectTree.
+                    properties:
+                      primary:
+                        description: Primary specifies reference of the primary object.
+                        properties:
+                          apiVersion:
+                            description: API version of the referent.
+                            type: string
+                          fieldPath:
+                            description: |-
+                              If referring to a piece of an object instead of an entire object, this string
+                              should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                              For example, if the object reference is to a container within a pod, this would take on a value like:
+                              "spec.containers{name}" (where "name" refers to the name of the container that triggered
+                              the event) or if no container name is specified "spec.containers[2]" (container with
+                              index 2 in this pod). This syntax is chosen only to have some well-defined way of
+                              referencing a part of an object.
+                              TODO: this design is not final and this field is subject to change in the future.
+                            type: string
+                          kind:
+                            description: |-
+                              Kind of the referent.
+                              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                            type: string
+                          name:
+                            description: |-
+                              Name of the referent.
+                              More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            type: string
+                          namespace:
+                            description: |-
+                              Namespace of the referent.
+                              More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+                            type: string
+                          resourceVersion:
+                            description: |-
+                              Specific resourceVersion to which this reference is made, if any.
+                              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                            type: string
+                          uid:
+                            description: |-
+                              UID of the referent.
+                              More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+                            type: string
+                        type: object
+                        x-kubernetes-map-type: atomic
+                      secondaries:
+                        description: Secondaries describes all the secondary objects
+                          of this object, if any.
+                        x-kubernetes-preserve-unknown-fields: true
+                    required:
+                    - primary
+                    type: object
+                  summary:
+                    description: Summary summarizes the ObjectTree and Changes.
+                    properties:
+                      objectSummaries:
+                        description: ObjectSummaries summarizes each object type.
+                        items:
+                          description: ObjectSummary defines the total and change
+                            of an object.
+                          properties:
+                            changeSummary:
+                              description: |-
+                                ChangeSummary summarizes the change by comparing the final state to the current state of this type.
+                                Nil means no change.
+                              properties:
+                                added:
+                                  description: Added specifies the number of object
+                                    will be added.
+                                  format: int32
+                                  type: integer
+                                deleted:
+                                  description: Deleted specifies the number of object
+                                    will be deleted.
+                                  format: int32
+                                  type: integer
+                                updated:
+                                  description: Updated specifies the number of object
+                                    will be updated.
+                                  format: int32
+                                  type: integer
+                              type: object
+                            objectType:
+                              description: ObjectType of the object.
+                              properties:
+                                apiVersion:
+                                  description: APIVersion of the type.
+                                  type: string
+                                kind:
+                                  description: Kind of the type.
+                                  type: string
+                              required:
+                              - apiVersion
+                              - kind
+                              type: object
+                            total:
+                              description: Total number of the object of type defined
+                                by ObjectType.
+                              format: int32
+                              type: integer
+                          required:
+                          - objectType
+                          - total
+                          type: object
+                        type: array
+                    required:
+                    - objectSummaries
+                    type: object
+                required:
+                - changes
+                - objectTree
+                - summary
+                type: object
+              desiredState:
+                description: DesiredState is the desired state of the latest reconciliation
+                  cycle.
+                properties:
+                  changes:
+                    description: Changes describes the detail reconciliation process.
+                    items:
+                      description: ObjectChange defines a detailed change of an object.
+                      properties:
+                        changeType:
+                          description: |-
+                            ChangeType specifies the change type.
+                            Event - specifies that this is a Kubernetes Event.
+                            Creation - specifies that this is an object creation.
+                            Update - specifies that this is an object update.
+                            Deletion - specifies that this is an object deletion.
+                          enum:
+                          - Event
+                          - Creation
+                          - Update
+                          - Deletion
+                          type: string
+                        description:
+                          description: Description describes the change in a user-friendly
+                            way.
+                          type: string
+                        eventAttributes:
+                          description: EventAttributes specifies the attributes of
+                            the event when ChangeType is Event.
+                          properties:
+                            name:
+                              description: Name of the Event.
+                              type: string
+                            reason:
+                              description: Reason of the Event.
+                              type: string
+                            type:
+                              description: Type of the Event.
+                              type: string
+                          required:
+                          - name
+                          - reason
+                          - type
+                          type: object
+                        localDescription:
+                          description: |-
+                            LocalDescription is the localized version of Description by using the Locale specified in `spec.locale`.
+                            Empty if the `spec.locale` is not specified.
+                          type: string
+                        objectReference:
+                          description: ObjectReference specifies the Object this change
+                            described.
+                          properties:
+                            apiVersion:
+                              description: API version of the referent.
+                              type: string
+                            fieldPath:
+                              description: |-
+                                If referring to a piece of an object instead of an entire object, this string
+                                should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                                For example, if the object reference is to a container within a pod, this would take on a value like:
+                                "spec.containers{name}" (where "name" refers to the name of the container that triggered
+                                the event) or if no container name is specified "spec.containers[2]" (container with
+                                index 2 in this pod). This syntax is chosen only to have some well-defined way of
+                                referencing a part of an object.
+                                TODO: this design is not final and this field is subject to change in the future.
+                              type: string
+                            kind:
+                              description: |-
+                                Kind of the referent.
+                                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                              type: string
+                            name:
+                              description: |-
+                                Name of the referent.
+                                More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                              type: string
+                            namespace:
+                              description: |-
+                                Namespace of the referent.
+                                More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+                              type: string
+                            resourceVersion:
+                              description: |-
+                                Specific resourceVersion to which this reference is made, if any.
+                                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                              type: string
+                            uid:
+                              description: |-
+                                UID of the referent.
+                                More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+                              type: string
+                          type: object
+                          x-kubernetes-map-type: atomic
+                        revision:
+                          description: |-
+                            Revision specifies the revision of the object after this change.
+                            Revision can be compared globally between all ObjectChanges of all Objects, to build a total order object change sequence.
+                          format: int64
+                          type: integer
+                        timestamp:
+                          description: |-
+                            Timestamp is a timestamp representing the ReconciliationTrace Controller time when this change occurred.
+                            It is not guaranteed to be set in happens-before order across separate changes.
+                            It is represented in RFC3339 form and is in UTC.
+                          format: date-time
+                          type: string
+                      required:
+                      - changeType
+                      - description
+                      - objectReference
+                      - revision
+                      type: object
+                    type: array
+                  objectTree:
+                    description: |-
+                      ObjectTree specifies the current object tree of the reconciliation cycle.
+                      Ideally, ObjectTree should be same as applying Changes to InitialObjectTree.
+                    properties:
+                      primary:
+                        description: Primary specifies reference of the primary object.
+                        properties:
+                          apiVersion:
+                            description: API version of the referent.
+                            type: string
+                          fieldPath:
+                            description: |-
+                              If referring to a piece of an object instead of an entire object, this string
+                              should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                              For example, if the object reference is to a container within a pod, this would take on a value like:
+                              "spec.containers{name}" (where "name" refers to the name of the container that triggered
+                              the event) or if no container name is specified "spec.containers[2]" (container with
+                              index 2 in this pod). This syntax is chosen only to have some well-defined way of
+                              referencing a part of an object.
+                              TODO: this design is not final and this field is subject to change in the future.
+                            type: string
+                          kind:
+                            description: |-
+                              Kind of the referent.
+                              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                            type: string
+                          name:
+                            description: |-
+                              Name of the referent.
+                              More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            type: string
+                          namespace:
+                            description: |-
+                              Namespace of the referent.
+                              More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+                            type: string
+                          resourceVersion:
+                            description: |-
+                              Specific resourceVersion to which this reference is made, if any.
+                              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                            type: string
+                          uid:
+                            description: |-
+                              UID of the referent.
+                              More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+                            type: string
+                        type: object
+                        x-kubernetes-map-type: atomic
+                      secondaries:
+                        description: Secondaries describes all the secondary objects
+                          of this object, if any.
+                        x-kubernetes-preserve-unknown-fields: true
+                    required:
+                    - primary
+                    type: object
+                  summary:
+                    description: Summary summarizes the ObjectTree and Changes.
+                    properties:
+                      objectSummaries:
+                        description: ObjectSummaries summarizes each object type.
+                        items:
+                          description: ObjectSummary defines the total and change
+                            of an object.
+                          properties:
+                            changeSummary:
+                              description: |-
+                                ChangeSummary summarizes the change by comparing the final state to the current state of this type.
+                                Nil means no change.
+                              properties:
+                                added:
+                                  description: Added specifies the number of object
+                                    will be added.
+                                  format: int32
+                                  type: integer
+                                deleted:
+                                  description: Deleted specifies the number of object
+                                    will be deleted.
+                                  format: int32
+                                  type: integer
+                                updated:
+                                  description: Updated specifies the number of object
+                                    will be updated.
+                                  format: int32
+                                  type: integer
+                              type: object
+                            objectType:
+                              description: ObjectType of the object.
+                              properties:
+                                apiVersion:
+                                  description: APIVersion of the type.
+                                  type: string
+                                kind:
+                                  description: Kind of the type.
+                                  type: string
+                              required:
+                              - apiVersion
+                              - kind
+                              type: object
+                            total:
+                              description: Total number of the object of type defined
+                                by ObjectType.
+                              format: int32
+                              type: integer
+                          required:
+                          - objectType
+                          - total
+                          type: object
+                        type: array
+                    required:
+                    - objectSummaries
+                    type: object
+                required:
+                - changes
+                - objectTree
+                - summary
+                type: object
+              dryRunResult:
+                description: DryRunResult specifies the dry-run result.
+                properties:
+                  desiredSpecRevision:
+                    description: DesiredSpecRevision specifies the revision of the
+                      DesiredSpec.
+                    type: string
+                  message:
+                    description: Message specifies a description of the failure reason.
+                    type: string
+                  observedTargetGeneration:
+                    description: ObservedTargetGeneration specifies the observed generation
+                      of the TargetObject.
+                    format: int64
+                    type: integer
+                  phase:
+                    description: |-
+                      Phase specifies the current phase of the plan generation process.
+                      Succeed - the plan is calculated successfully.
+                      Failed - the plan can't be generated for some reason described in Reason.
+                    enum:
+                    - Succeed
+                    - Failed
+                    type: string
+                  plan:
+                    description: Plan describes the detail reconciliation process
+                      if the DesiredSpec is applied.
+                    properties:
+                      changes:
+                        description: Changes describes the detail reconciliation process.
+                        items:
+                          description: ObjectChange defines a detailed change of an
+                            object.
+                          properties:
+                            changeType:
+                              description: |-
+                                ChangeType specifies the change type.
+                                Event - specifies that this is a Kubernetes Event.
+                                Creation - specifies that this is an object creation.
+                                Update - specifies that this is an object update.
+                                Deletion - specifies that this is an object deletion.
+                              enum:
+                              - Event
+                              - Creation
+                              - Update
+                              - Deletion
+                              type: string
+                            description:
+                              description: Description describes the change in a user-friendly
+                                way.
+                              type: string
+                            eventAttributes:
+                              description: EventAttributes specifies the attributes
+                                of the event when ChangeType is Event.
+                              properties:
+                                name:
+                                  description: Name of the Event.
+                                  type: string
+                                reason:
+                                  description: Reason of the Event.
+                                  type: string
+                                type:
+                                  description: Type of the Event.
+                                  type: string
+                              required:
+                              - name
+                              - reason
+                              - type
+                              type: object
+                            localDescription:
+                              description: |-
+                                LocalDescription is the localized version of Description by using the Locale specified in `spec.locale`.
+                                Empty if the `spec.locale` is not specified.
+                              type: string
+                            objectReference:
+                              description: ObjectReference specifies the Object this
+                                change described.
+                              properties:
+                                apiVersion:
+                                  description: API version of the referent.
+                                  type: string
+                                fieldPath:
+                                  description: |-
+                                    If referring to a piece of an object instead of an entire object, this string
+                                    should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                                    For example, if the object reference is to a container within a pod, this would take on a value like:
+                                    "spec.containers{name}" (where "name" refers to the name of the container that triggered
+                                    the event) or if no container name is specified "spec.containers[2]" (container with
+                                    index 2 in this pod). This syntax is chosen only to have some well-defined way of
+                                    referencing a part of an object.
+                                    TODO: this design is not final and this field is subject to change in the future.
+                                  type: string
+                                kind:
+                                  description: |-
+                                    Kind of the referent.
+                                    More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                                  type: string
+                                name:
+                                  description: |-
+                                    Name of the referent.
+                                    More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                  type: string
+                                namespace:
+                                  description: |-
+                                    Namespace of the referent.
+                                    More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+                                  type: string
+                                resourceVersion:
+                                  description: |-
+                                    Specific resourceVersion to which this reference is made, if any.
+                                    More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                                  type: string
+                                uid:
+                                  description: |-
+                                    UID of the referent.
+                                    More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+                                  type: string
+                              type: object
+                              x-kubernetes-map-type: atomic
+                            revision:
+                              description: |-
+                                Revision specifies the revision of the object after this change.
+                                Revision can be compared globally between all ObjectChanges of all Objects, to build a total order object change sequence.
+                              format: int64
+                              type: integer
+                            timestamp:
+                              description: |-
+                                Timestamp is a timestamp representing the ReconciliationTrace Controller time when this change occurred.
+                                It is not guaranteed to be set in happens-before order across separate changes.
+                                It is represented in RFC3339 form and is in UTC.
+                              format: date-time
+                              type: string
+                          required:
+                          - changeType
+                          - description
+                          - objectReference
+                          - revision
+                          type: object
+                        type: array
+                      objectTree:
+                        description: |-
+                          ObjectTree specifies the current object tree of the reconciliation cycle.
+                          Ideally, ObjectTree should be same as applying Changes to InitialObjectTree.
+                        properties:
+                          primary:
+                            description: Primary specifies reference of the primary
+                              object.
+                            properties:
+                              apiVersion:
+                                description: API version of the referent.
+                                type: string
+                              fieldPath:
+                                description: |-
+                                  If referring to a piece of an object instead of an entire object, this string
+                                  should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                                  For example, if the object reference is to a container within a pod, this would take on a value like:
+                                  "spec.containers{name}" (where "name" refers to the name of the container that triggered
+                                  the event) or if no container name is specified "spec.containers[2]" (container with
+                                  index 2 in this pod). This syntax is chosen only to have some well-defined way of
+                                  referencing a part of an object.
+                                  TODO: this design is not final and this field is subject to change in the future.
+                                type: string
+                              kind:
+                                description: |-
+                                  Kind of the referent.
+                                  More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                                type: string
+                              name:
+                                description: |-
+                                  Name of the referent.
+                                  More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                type: string
+                              namespace:
+                                description: |-
+                                  Namespace of the referent.
+                                  More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+                                type: string
+                              resourceVersion:
+                                description: |-
+                                  Specific resourceVersion to which this reference is made, if any.
+                                  More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                                type: string
+                              uid:
+                                description: |-
+                                  UID of the referent.
+                                  More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+                                type: string
+                            type: object
+                            x-kubernetes-map-type: atomic
+                          secondaries:
+                            description: Secondaries describes all the secondary objects
+                              of this object, if any.
+                            x-kubernetes-preserve-unknown-fields: true
+                        required:
+                        - primary
+                        type: object
+                      summary:
+                        description: Summary summarizes the ObjectTree and Changes.
+                        properties:
+                          objectSummaries:
+                            description: ObjectSummaries summarizes each object type.
+                            items:
+                              description: ObjectSummary defines the total and change
+                                of an object.
+                              properties:
+                                changeSummary:
+                                  description: |-
+                                    ChangeSummary summarizes the change by comparing the final state to the current state of this type.
+                                    Nil means no change.
+                                  properties:
+                                    added:
+                                      description: Added specifies the number of object
+                                        will be added.
+                                      format: int32
+                                      type: integer
+                                    deleted:
+                                      description: Deleted specifies the number of
+                                        object will be deleted.
+                                      format: int32
+                                      type: integer
+                                    updated:
+                                      description: Updated specifies the number of
+                                        object will be updated.
+                                      format: int32
+                                      type: integer
+                                  type: object
+                                objectType:
+                                  description: ObjectType of the object.
+                                  properties:
+                                    apiVersion:
+                                      description: APIVersion of the type.
+                                      type: string
+                                    kind:
+                                      description: Kind of the type.
+                                      type: string
+                                  required:
+                                  - apiVersion
+                                  - kind
+                                  type: object
+                                total:
+                                  description: Total number of the object of type
+                                    defined by ObjectType.
+                                  format: int32
+                                  type: integer
+                              required:
+                              - objectType
+                              - total
+                              type: object
+                            type: array
+                        required:
+                        - objectSummaries
+                        type: object
+                    required:
+                    - changes
+                    - objectTree
+                    - summary
+                    type: object
+                  reason:
+                    description: Reason specifies the reason when the Phase is Failed.
+                    type: string
+                  specDiff:
+                    description: "SpecDiff describes the diff between the current
+                      spec and the final spec.\nThe whole spec struct will be compared
+                      and an example SpecDiff looks like:\n{\n \tAffinity: {\n \t\tPodAntiAffinity:
+                      \"Preferred\",\n \t\tTenancy: \"SharedNode\",\n \t},\n \tComponentSpecs:
+                      {\n \t\t{\n \t\t\tComponentDef: \"postgresql\",\n \t\t\tName:
+                      \"postgresql\",\n-\t\t\tReplicas: 2,\n \t\t\tResources:\n \t\t\t{\n
+                      \t\t\t\tLimits:\n \t\t\t\t{\n-\t\t\t\t\tCPU: 500m,\n-\t\t\t\t\tMemory:
+                      512Mi,\n \t\t\t\t},\n \t\t\t\tRequests:\n \t\t\t\t{\n-\t\t\t\t\tCPU:
+                      500m,\n-\t\t\t\t\tMemory: 512Mi,\n \t\t\t\t},\n \t\t\t},\n \t\t},\n
+                      \t},\n}"
+                    type: string
+                required:
+                - desiredSpecRevision
+                - observedTargetGeneration
+                - plan
+                - specDiff
+                type: object
+              initialObjectTree:
+                description: InitialObjectTree specifies the initial object tree when
+                  the latest reconciliation cycle started.
+                properties:
+                  primary:
+                    description: Primary specifies reference of the primary object.
+                    properties:
+                      apiVersion:
+                        description: API version of the referent.
+                        type: string
+                      fieldPath:
+                        description: |-
+                          If referring to a piece of an object instead of an entire object, this string
+                          should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2].
+                          For example, if the object reference is to a container within a pod, this would take on a value like:
+                          "spec.containers{name}" (where "name" refers to the name of the container that triggered
+                          the event) or if no container name is specified "spec.containers[2]" (container with
+                          index 2 in this pod). This syntax is chosen only to have some well-defined way of
+                          referencing a part of an object.
+                          TODO: this design is not final and this field is subject to change in the future.
+                        type: string
+                      kind:
+                        description: |-
+                          Kind of the referent.
+                          More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                        type: string
+                      name:
+                        description: |-
+                          Name of the referent.
+                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                        type: string
+                      namespace:
+                        description: |-
+                          Namespace of the referent.
+                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/
+                        type: string
+                      resourceVersion:
+                        description: |-
+                          Specific resourceVersion to which this reference is made, if any.
+                          More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
+                        type: string
+                      uid:
+                        description: |-
+                          UID of the referent.
+                          More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids
+                        type: string
+                    type: object
+                    x-kubernetes-map-type: atomic
+                  secondaries:
+                    description: Secondaries describes all the secondary objects of
+                      this object, if any.
+                    x-kubernetes-preserve-unknown-fields: true
+                required:
+                - primary
+                type: object
+            required:
+            - currentState
+            - initialObjectTree
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

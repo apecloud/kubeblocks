@@ -609,7 +609,7 @@ These templates are used to dynamically provision persistent volumes for the Com
 </td>
 <td>
 <em>(Optional)</em>
-<p>Overrides Services defined in referenced ComponentDefinition and exposes endpoints that can be accessed by clients.</p>
+<p>Overrides Services defined in referenced ComponentDefinition.</p>
 </td>
 </tr>
 <tr>
@@ -2883,7 +2883,7 @@ These templates are used to dynamically provision persistent volumes for the Com
 </td>
 <td>
 <em>(Optional)</em>
-<p>Overrides services defined in referenced ComponentDefinition and expose endpoints that can be accessed by clients.</p>
+<p>Overrides services defined in referenced ComponentDefinition.</p>
 </td>
 </tr>
 <tr>
@@ -5777,6 +5777,9 @@ and other administrative tasks.</p>
 </tr><tr><td><p>&#34;Running&#34;</p></td>
 <td><p>RunningComponentPhase indicates that all pods of the component are up-to-date and in a &lsquo;Running&rsquo; state.</p>
 </td>
+</tr><tr><td><p>&#34;Starting&#34;</p></td>
+<td><p>StartingComponentPhase indicates the component is currently being started.</p>
+</td>
 </tr><tr><td><p>&#34;Stopped&#34;</p></td>
 <td><p>StoppedComponentPhase indicates the component is stopped.</p>
 </td>
@@ -6044,7 +6047,7 @@ These templates are used to dynamically provision persistent volumes for the Com
 </td>
 <td>
 <em>(Optional)</em>
-<p>Overrides Services defined in referenced ComponentDefinition and exposes endpoints that can be accessed by clients.</p>
+<p>Overrides Services defined in referenced ComponentDefinition.</p>
 </td>
 </tr>
 <tr>
@@ -6354,6 +6357,7 @@ ComponentPhase
 <li>Failed: A significant number of Pods have failed.</li>
 <li>Stopping: All Pods are being terminated, with current replica count at zero.</li>
 <li>Stopped: All associated Pods have been successfully deleted.</li>
+<li>Starting: Pods are being started.</li>
 <li>Deleting: The Component is being deleted.</li>
 </ul>
 </td>
@@ -14412,7 +14416,7 @@ the risk of simultaneous downtime.</p>
 <li><code>mongodb</code></li>
 <li><code>etcd</code></li>
 <li><code>postgresql</code></li>
-<li><code>official-postgresql</code></li>
+<li><code>vanilla-postgresql</code></li>
 <li><code>apecloud-postgresql</code></li>
 <li><code>polardbx</code></li>
 <li><code>custom</code></li>
@@ -14438,8 +14442,6 @@ the risk of simultaneous downtime.</p>
 <td></td>
 </tr><tr><td><p>&#34;oceanbase&#34;</p></td>
 <td></td>
-</tr><tr><td><p>&#34;official-postgresql&#34;</p></td>
-<td></td>
 </tr><tr><td><p>&#34;polardbx&#34;</p></td>
 <td></td>
 </tr><tr><td><p>&#34;postgresql&#34;</p></td>
@@ -14447,6 +14449,8 @@ the risk of simultaneous downtime.</p>
 </tr><tr><td><p>&#34;redis&#34;</p></td>
 <td></td>
 </tr><tr><td><p>&#34;unknown&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;vanilla-postgresql&#34;</p></td>
 <td></td>
 </tr><tr><td><p>&#34;wesql&#34;</p></td>
 <td></td>
@@ -22559,7 +22563,7 @@ BuiltinActionHandlerType
 <p>Lorry, as a sidecar agent co-located with the database container in the same Pod,
 includes a suite of built-in action implementations that are tailored to different database engines.
 These are known as &ldquo;builtin&rdquo; handlers, includes: <code>mysql</code>, <code>redis</code>, <code>mongodb</code>, <code>etcd</code>,
-<code>postgresql</code>, <code>official-postgresql</code>, <code>apecloud-postgresql</code>, <code>wesql</code>, <code>oceanbase</code>, <code>polardbx</code>.</p>
+<code>postgresql</code>, <code>vanilla-postgresql</code>, <code>apecloud-postgresql</code>, <code>wesql</code>, <code>oceanbase</code>, <code>polardbx</code>.</p>
 <p>If the <code>builtinHandler</code> field is specified, it instructs Lorry to utilize its internal built-in action handler
 to execute the specified lifecycle actions.</p>
 <p>The <code>builtinHandler</code> field is of type <code>BuiltinActionHandlerType</code>,

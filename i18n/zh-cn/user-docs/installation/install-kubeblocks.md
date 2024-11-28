@@ -15,7 +15,7 @@ import TabItem from '@theme/TabItem';
 
 KubeBlocks 是 Kubernetes 原生 operator，可通过 Helm、 kubectl 应用 YAML 文件或者 kbcli 安装 KubeBlocks。
 
-如果您想要在本地环境试用 KubeBlocks，可通过 [Playground](./../../try-out-on-playground/try-kubeblocks-on-local-host.md) 试用，或者[先在本地创建 Kubernetes 测试集群](./../prerequisite/prepare-a-local-k8s-cluster.md)，然后按照本文操作步骤安装 KubeBlocks。
+如果您想要在本地环境试用 KubeBlocks，可通过 [Playground](./../../try-out-on-playground/try-kubeblocks-on-local-host.md) 试用，或者[先在本地创建 Kubernetes 测试集群](./../prepare-a-local-k8s-cluster/prepare-a-local-k8s-cluster.md)，然后按照本文操作步骤安装 KubeBlocks。
 
 :::note
 

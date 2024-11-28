@@ -139,10 +139,6 @@ var (
 					Criteria:  componentCriteria,
 				},
 				{
-					Secondary: objectType(rbacv1.SchemeGroupVersion.String(), constant.ClusterRoleBindingKind),
-					Criteria:  componentCriteria,
-				},
-				{
 					Secondary: objectType(rbacv1.SchemeGroupVersion.String(), constant.RoleBindingKind),
 					Criteria:  componentCriteria,
 				},

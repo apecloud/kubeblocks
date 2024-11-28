@@ -44,7 +44,6 @@ const (
 	PersistentVolumeClaimKind = "PersistentVolumeClaim"
 	PersistentVolumeKind      = "PersistentVolume"
 	ConfigurationKind         = "Configuration"
-	ClusterRoleBindingKind    = "ClusterRoleBinding"
 	RoleBindingKind           = "RoleBinding"
 	ServiceAccountKind        = "ServiceAccount"
 	EventKind                 = "Event"

@@ -173,7 +173,6 @@ func mockObjects(k8sMock *mocks.MockClient) (*kbappsv1.Cluster, []kbappsv1.Compo
 		&corev1.SecretList{},
 		&corev1.ConfigMapList{},
 		&corev1.PersistentVolumeClaimList{},
-		&rbacv1.ClusterRoleBindingList{},
 		&rbacv1.RoleBindingList{},
 		&corev1.ServiceAccountList{},
 		&batchv1.JobList{},

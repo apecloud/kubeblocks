@@ -27,6 +27,7 @@ import (
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	tracev1 "github.com/apecloud/kubeblocks/apis/trace/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
 type resourcesValidator struct {
@@ -46,6 +47,9 @@ func (r *resourcesValidator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuild
 	if tree.GetRoot() == nil {
 		return kubebuilderx.Commit, nil
 	}
+	if model.IsObjectDeleting(tree.GetRoot()) {
+		return kubebuilderx.Continue, nil
+	}
 
 	// target object should exist
 	v, _ := tree.GetRoot().(*tracev1.ReconciliationTrace)
@@ -55,7 +59,7 @@ func (r *resourcesValidator) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuild
 		objectKey.Name = v.Spec.TargetObject.Name
 	}
 	if err := r.reader.Get(r.ctx, objectKey, &kbappsv1.Cluster{}); err != nil {
-		return kubebuilderx.Commit, err
+		return kubebuilderx.Commit, client.IgnoreNotFound(err)
 	}
 
 	return kubebuilderx.Continue, nil

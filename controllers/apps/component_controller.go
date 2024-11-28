@@ -152,8 +152,6 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			&componentAccountTransformer{},
 			// handle the TLS configuration
 			&componentTLSTransformer{Client: r.Client},
-			// handle the ssh service
-			&componentSSHTransformer{Client: r.Client},
 			// rerender parameters after v-scale and h-scale
 			&componentRelatedParametersTransformer{Client: r.Client},
 			// resolve and build vars for template and Env

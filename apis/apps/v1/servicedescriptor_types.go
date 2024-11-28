@@ -112,8 +112,6 @@ type ServiceDescriptorSpec struct {
 	//
 	// +optional
 	Auth *ConnectionCredentialAuth `json:"auth,omitempty"`
-
-	// TODO: the CA file
 }
 
 // ServiceDescriptorStatus defines the observed state of ServiceDescriptor

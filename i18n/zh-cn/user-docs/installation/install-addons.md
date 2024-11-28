@@ -14,6 +14,14 @@ KubeBlocks v0.8.0 发布后，数据库引擎插件（Addon）与 KubeBlocks 解
 
 官网引擎索引仓库为 [KubeBlocks 索引](https://github.com/apecloud/block-index)。引擎代码维护在 [KubeBlocks 引擎插件仓库](https://github.com/apecloud/kubeblocks-addons)。
 
+:::note
+
+请确保 Addon 和 KubeBlocks 的大版本匹配。
+
+例如，如果您当前使用的 KubeBlocks 版本是 v0.9.2，Addon 应安装对应的 v0.9.0，而不是其他版本（如 v0.8.0），否则系统将因版本不匹配产生报错。
+
+:::
+
 <Tabs>
 
 <TabItem value="Helm" label="Helm" default>
@@ -114,7 +122,13 @@ KubeBlocks v0.8.0 发布后，数据库引擎插件（Addon）与 KubeBlocks 解
    elasticsearch                  0.9.0          apecloud    Enabled    true
    ```
 
-5. （可选）您可以执行以下命令卸载引擎。如果您已使用该引擎创建集群，请先删除集群。
+5. （可选）您可以执行以下命令停用引擎。如果您已使用该引擎创建集群，请先删除集群。
+
+   ```bash
+   kbcli addon disable elasticsearch
+   ```
+
+   您也可以卸载该引擎。
 
    ```bash
    kbcli addon uninstall elasticsearch
@@ -122,7 +136,7 @@ KubeBlocks v0.8.0 发布后，数据库引擎插件（Addon）与 KubeBlocks 解
 
 :::note
 
-kbcli 支持启用/禁用引擎。您可以按需调整引擎启用状态。此外，使用 kbcli 安装 KubeBlocks 时，系统默认安装但禁用了部分引擎，这类引擎的状态为 `Disabled`，您可以通过 kbcli 启用这类引擎。例如，
+kbcli 支持启用/停用引擎。您可以按需调整引擎启用状态。此外，使用 kbcli 安装 KubeBlocks 时，系统默认安装但禁用了部分引擎，这类引擎的状态为 `Disabled`，您可以通过 kbcli 启用这类引擎。例如，
 
 ```bash
 kbcli addon list

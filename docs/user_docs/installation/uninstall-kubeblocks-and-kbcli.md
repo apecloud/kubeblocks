@@ -13,10 +13,14 @@ import TabItem from '@theme/TabItem';
 
 Uninstallation order:
 
-1. Delete your cluster if you have created a cluster.
+1. Delete all clusters and backups before uninstalling KubeBlocks and kbcli.
 
    ```bash
    kubectl delete cluster <clustername> -n namespace
+   ```
+
+   ```bash
+   kubectl delete backup <backname> -n namespace
    ```
 
 2. Uninstall KubeBlocks.

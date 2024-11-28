@@ -13,10 +13,14 @@ import TabItem from '@theme/TabItem';
 
 卸载顺序：
 
-1. 如果已经创建了集群，请先删除集群。
+1. 卸载前，请确保所有集群和备份已删除
 
    ```bash
    kubectl delete cluster <clustername> -n namespace
+   ```
+
+   ```bash
+   kubectl delete backup <backname> -n namespace
    ```
 
 2. 卸载 KubeBlocks。

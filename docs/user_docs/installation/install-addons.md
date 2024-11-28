@@ -10,9 +10,17 @@ sidebar_label: Install Addons
 
 With the release of KubeBlocks v0.8.0, Addons are decoupled from KubeBlocks and some Addons are not installed by default. If you want to use these Addons, install Addons first by index. Or if you uninstalled some Addons, you can follow the steps in this tutorial to install them again.
 
-This tutorial takes etcd as an example. You can replace etcd with the Addon you need.
+This tutorial takes elasticsearch as an example. You can replace elasticsearch with the Addon you need.
 
 The official index repo is [KubeBlocks index](https://github.com/apecloud/block-index). Addons are maintained in the [KubeBlocks Addon repo](https://github.com/apecloud/kubeblocks-addons).
+
+:::note
+
+Make sure the major version of Addons and KubeBlocks are the same.
+
+For example, you can install an Addon v0.9.0 with KubeBlocks v0.9.2, but using mismatched major versions, such as an Addon v0.8.0 with KubeBlocks v0.9.2, may lead to errors.
+
+:::
 
 <Tabs>
 
@@ -28,13 +36,13 @@ The official index repo is [KubeBlocks index](https://github.com/apecloud/block-
 2. View the Addon versions.
 
    ```bash
-   helm search repo kubeblocks/etcd --devel --versions
+   helm search repo kubeblocks/elasticsearch --devel --versions
    ```
 
-3. Install the Addon (take etcd as example). Specify a version with `--version`.
+3. Install the Addon (take elasticsearch as example). Specify a version with `--version`.
 
    ```bash
-   helm install kb-etcd-addon kubeblocks/etcd --namespace kb-system --create-namespace --version x.y.z
+   helm install kb-addon-es kubeblocks/elasticsearch --namespace kb-system --create-namespace --version x.y.z
    ```
 
 4. Verify whether this Addon is installed.
@@ -44,17 +52,17 @@ The official index repo is [KubeBlocks index](https://github.com/apecloud/block-
    ```bash
    helm list -A
    >
-   NAME                 NAMESPACE	REVISION	UPDATED                                	STATUS  	CHART              APP VERSION
+   NAME             NAMESPACE	REVISION	UPDATED                                STATUS  	 CHART                   APP VERSION
    ......
-   kb-etcd-addon        kb-system	1       	2024-10-25 07:18:35.294326176 +0000 UTC	deployed	etcd-0.9.0         v3.5.6
+   kb-addon-es      kb-system	1       	2024-11-27 10:04:59.730127 +0800 CST   deployed	 elasticsearch-0.9.0     8.8.2 
    ```
 
-5. (Optional) You can run the command below to disable the Addon.
+5. (Optional) You can run the command below to uninstall the Addon.
 
    If you have created a related cluster, delete the cluster first.
 
    ```bash
-   helm uninstall kb-etcd-addon --namespace kb-system
+   helm uninstall kb-addon-es --namespace kb-system
    ```
 
 </TabItem>
@@ -87,12 +95,14 @@ The official index repo is [KubeBlocks index](https://github.com/apecloud/block-
 2. (Optional) Search whether the Addon exists in the index.
 
    ```bash
-   kbcli addon search etcd
+   kbcli addon search elasticsearch
    >
-   ADDON   VERSION         INDEX
-   etcd    0.7.0           kubeblocks
-   etcd    0.8.0           kubeblocks
-   etcd    0.9.0           kubeblocks
+   ADDON           VERSION         INDEX
+   elasticsearch   0.7.0           kubeblocks
+   elasticsearch   0.7.1           kubeblocks
+   elasticsearch   0.7.2           kubeblocks
+   elasticsearch   0.8.0           kubeblocks
+   elasticsearch   0.9.0           kubeblocks
    ```
 
 3. Install the Addon.
@@ -100,7 +110,7 @@ The official index repo is [KubeBlocks index](https://github.com/apecloud/block-
    If there are multiple index sources and versions for an Addon, you can specify an index by `--index` and a version by `--version`. The system installs the latest version in the `kubeblocks` index by default.
 
    ```bash
-   kbcli addon install etcd --index kubeblocks --version x.y.z
+   kbcli addon install elasticsearch --index kubeblocks --version x.y.z
    ```
 
 4. Verify whether this Addon is installed.
@@ -111,7 +121,7 @@ The official index repo is [KubeBlocks index](https://github.com/apecloud/block-
    kbcli addon list
    >
    NAME                           VERSION        PROVIDER    STATUS     AUTO-INSTALL
-   etcd                           0.9.0          apecloud    Enabled    true
+   elasticsearch                  0.9.0          apecloud    Enabled    true
    ```
 
 5. (Optional) You can run the command below to disable the Addon.
@@ -119,7 +129,13 @@ The official index repo is [KubeBlocks index](https://github.com/apecloud/block-
    If you have created a related cluster, delete the cluster first.
 
    ```bash
-   kbcli addon uninstall etcd
+   kbcli addon disable elasticsearch
+   ```
+
+   Or you can run the command below to uninstall the Addon.
+
+   ```bash
+   kbcli addon uninstall elasticsearch
    ```
 
 :::note

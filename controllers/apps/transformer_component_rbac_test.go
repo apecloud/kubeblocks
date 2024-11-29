@@ -187,7 +187,8 @@ var _ = Describe("object rbac transformer test.", func() {
 			actualRoleBinding := graphCli.FindAll(dag, &rbacv1.RoleBinding{})
 			Expect(actualRoleBinding).To(HaveLen(1))
 			rb := actualRoleBinding[0].(*rbacv1.RoleBinding)
-			Expect(reflect.DeepEqual(rb, cmpdRoleBinding)).To(BeTrue())
+			Expect(reflect.DeepEqual(rb.Subjects, cmpdRoleBinding.Subjects)).To(BeTrue())
+			Expect(reflect.DeepEqual(rb.RoleRef, cmpdRoleBinding.RoleRef)).To(BeTrue())
 		})
 
 		It("cleans old resources", func() {

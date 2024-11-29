@@ -342,6 +342,9 @@ func BuildComponentRole(synthesizedComp *component.SynthesizedComponent, cmpd *a
 		return nil
 	}
 	return builder.NewRoleBuilder(synthesizedComp.Namespace, saName).
+		AddLabelsInMap(constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name)).
+		AddLabelsInMap(synthesizedComp.StaticLabels).
+		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
 		AddPolicyRules(rules).
 		GetObject()
 }

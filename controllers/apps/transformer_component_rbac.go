@@ -21,12 +21,13 @@ package apps
 
 import (
 	"fmt"
-	"reflect"
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -163,6 +164,7 @@ func createOrUpdate[T any, PT generics.PObject[T]](
 		return nil, err
 	}
 	if !cmpFn(oldObj, obj) {
+		transCtx.Logger.V(1).Info("updating rbac resources", "name", klog.KObj(obj).String(), "obj", fmt.Sprintf("%#v", obj))
 		graphCli.Update(dag, oldObj, obj, inDataContext4G())
 	}
 	return obj, nil
@@ -177,9 +179,9 @@ func createOrUpdateServiceAccount(transCtx *componentTransformContext, serviceAc
 	}
 
 	return createOrUpdate(transCtx, sa, graphCli, dag, func(old, new *corev1.ServiceAccount) bool {
-		return reflect.DeepEqual(old.ImagePullSecrets, new.ImagePullSecrets) &&
-			reflect.DeepEqual(old.Secrets, new.Secrets) &&
-			*old.AutomountServiceAccountToken == *new.AutomountServiceAccountToken
+		return equality.Semantic.DeepEqual(old.ImagePullSecrets, new.ImagePullSecrets) &&
+			equality.Semantic.DeepEqual(old.Secrets, new.Secrets) &&
+			equality.Semantic.DeepEqual(old.AutomountServiceAccountToken, new.AutomountServiceAccountToken)
 	})
 }
 
@@ -194,7 +196,7 @@ func createOrUpdateRole(
 		return nil, err
 	}
 	return createOrUpdate(transCtx, role, graphCli, dag, func(old, new *rbacv1.Role) bool {
-		return reflect.DeepEqual(old.Rules, new.Rules)
+		return equality.Semantic.DeepEqual(old.Rules, new.Rules)
 	})
 }
 
@@ -202,7 +204,7 @@ func createOrUpdateRoleBinding(
 	transCtx *componentTransformContext, cmpdRole *rbacv1.Role, serviceAccountName string, graphCli model.GraphClient, dag *graph.DAG,
 ) ([]*rbacv1.RoleBinding, error) {
 	cmpRoleBinding := func(old, new *rbacv1.RoleBinding) bool {
-		return reflect.DeepEqual(old.Subjects, new.Subjects) && reflect.DeepEqual(old.RoleRef, new.RoleRef)
+		return equality.Semantic.DeepEqual(old.Subjects, new.Subjects) && equality.Semantic.DeepEqual(old.RoleRef, new.RoleRef)
 	}
 	res := make([]*rbacv1.RoleBinding, 0)
 

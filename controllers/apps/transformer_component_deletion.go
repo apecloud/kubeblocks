@@ -158,6 +158,8 @@ func handleRBACResourceDeletion(obj client.Object, transCtx *componentTransformC
 	switch v := obj.(type) {
 	case *corev1.ServiceAccount, *rbacv1.Role, *rbacv1.RoleBinding:
 		// list other components that reference the same componentdefinition
+		transCtx.Logger.V(1).Info("handling rbac resources deletion",
+			"comp", comp.Name, "name", klog.KObj(v).String())
 		compDefName := comp.Spec.CompDef
 		compList := &appsv1.ComponentList{}
 		if err := transCtx.Client.List(transCtx.Context, compList, client.InNamespace(comp.Namespace),
@@ -176,12 +178,26 @@ func handleRBACResourceDeletion(obj client.Object, transCtx *componentTransformC
 			if err := controllerutil.SetControllerReference(&otherComp, v, rscheme); err != nil {
 				return false, err
 			}
+			// component controller selects a comp's subresource by labels, so change them too
+			clusterName, err := component.GetClusterName(&otherComp)
+			if err != nil {
+				return false, err
+			}
+			compShortName, err := component.ShortName(clusterName, otherComp.Name)
+			if err != nil {
+				return false, err
+			}
+			newLabels := constant.GetCompLabels(clusterName, compShortName)
+			for k, val := range newLabels {
+				v.GetLabels()[k] = val
+			}
 			graphCli.Update(dag, nil, v)
 			gvk, err := apiutil.GVKForObject(v, rscheme)
 			if err != nil {
 				return false, err
 			}
-			transCtx.Logger.V(1).Info("rbac resources owner transfered, skip deletion", "name", klog.KObj(v), "gvk", gvk)
+			transCtx.Logger.V(1).Info("rbac resources owner transfered, skip deletion",
+				"fromComp", comp.Name, "toComp", otherComp.Name, "name", klog.KObj(v).String(), "gvk", gvk)
 			return true, nil
 		}
 		return false, nil

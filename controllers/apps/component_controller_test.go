@@ -109,7 +109,11 @@ var _ = Describe("Component Controller", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ComponentSignature, true, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ComponentSignature, true, inNS)
+		// FIXME: remove rbac cleanup?
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ServiceAccountSignature, true, inNS)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.RoleSignature, true, inNS)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.RoleBindingSignature, true, inNS)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PodSignature, true, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupSignature, true, inNS, ml)
@@ -1369,6 +1373,18 @@ var _ = Describe("Component Controller", func() {
 		checkRBACResourcesExistence(saName, fmt.Sprintf("%v-pod", saName), true)
 	}
 
+	testCompWithRBAC := func(compName, compDefName string) {
+		testCompRBAC(compName, compDefName, "")
+		By("delete the cluster(component)")
+		testapps.DeleteObject(&testCtx, clusterKey, &kbappsv1.Cluster{})
+		Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &kbappsv1.Cluster{}, false)).Should(Succeed())
+		Eventually(testapps.CheckObjExists(&testCtx, compKey, &kbappsv1.Component{}, false)).Should(Succeed())
+
+		By("check the RBAC resources deleted")
+		saName := constant.GenerateDefaultServiceAccountName(compDefName)
+		checkRBACResourcesExistence(saName, fmt.Sprintf("%v-pod", saName), false)
+	}
+
 	testRecreateCompWithRBACCreateByKubeBlocks := func(compName, compDefName string) {
 		testCompRBAC(compName, compDefName, "")
 
@@ -1382,6 +1398,51 @@ var _ = Describe("Component Controller", func() {
 
 		By("re-create cluster(component) with same name")
 		testCompRBAC(compName, compDefName, "")
+	}
+
+	testSharedRBACResoucreDeletion := func() {
+		By("create first cluster")
+		createClusterObj(defaultCompName+"-comp1", compDefName, nil)
+		comp1Key := compKey
+		cluster1Key := clusterKey
+
+		By("check rbac resources owner")
+		saName := constant.GenerateDefaultServiceAccountName(compDefName)
+		saKey := types.NamespacedName{
+			Namespace: compObj.Namespace,
+			Name:      saName,
+		}
+		Eventually(testapps.CheckObj(&testCtx, saKey, func(g Gomega, sa *corev1.ServiceAccount) {
+			refs := sa.GetOwnerReferences()
+			g.Expect(refs).Should(HaveLen(1))
+			owner := refs[0]
+			g.Expect(owner.Name).Should(Equal(comp1Key.Name))
+		})).Should(Succeed())
+
+		checkRBACResourcesExistence(saName, fmt.Sprintf("%v-pod", saName), true)
+
+		By("create second cluster")
+		createClusterObj(defaultCompName+"-comp2", compDefName, nil)
+		comp2Key := compKey
+		By("check rbac resources owner not modified")
+		Eventually(testapps.CheckObj(&testCtx, saKey, func(g Gomega, sa *corev1.ServiceAccount) {
+			refs := sa.GetOwnerReferences()
+			g.Expect(refs).Should(HaveLen(1))
+			owner := refs[0]
+			g.Expect(owner.Name).Should(Equal(comp1Key.Name))
+		})).Should(Succeed())
+
+		By("delete first cluster")
+		testapps.DeleteObject(&testCtx, cluster1Key, &kbappsv1.Cluster{})
+		Eventually(testapps.CheckObjExists(&testCtx, cluster1Key, &kbappsv1.Cluster{}, false)).Should(Succeed())
+
+		By("check rbac resources owner transfered")
+		Eventually(testapps.CheckObj(&testCtx, saKey, func(g Gomega, sa *corev1.ServiceAccount) {
+			refs := sa.GetOwnerReferences()
+			g.Expect(refs).Should(HaveLen(1))
+			owner := refs[0]
+			g.Expect(owner.Name).Should(Equal(comp2Key.Name))
+		})).Should(Succeed())
 	}
 
 	testCreateCompWithNonExistRBAC := func(compName, compDefName string) {
@@ -1400,19 +1461,6 @@ var _ = Describe("Component Controller", func() {
 		By("user manually creates ServiceAccount and RoleBinding")
 		sa := builder.NewServiceAccountBuilder(testCtx.DefaultNamespace, saName).GetObject()
 		testapps.CheckedCreateK8sResource(&testCtx, sa)
-		// rb := builder.NewRoleBindingBuilder(testCtx.DefaultNamespace, saName+"-pod").
-		// 	SetRoleRef(rbacv1.RoleRef{
-		// 		APIGroup: rbacv1.GroupName,
-		// 		Kind:     "Role",
-		// 		Name:     constant.RBACRoleName,
-		// 	}).
-		// 	AddSubjects(rbacv1.Subject{
-		// 		Kind:      rbacv1.ServiceAccountKind,
-		// 		Namespace: testCtx.DefaultNamespace,
-		// 		Name:      saName,
-		// 	}).
-		// 	GetObject()
-		// testapps.CheckedCreateK8sResource(&testCtx, rb)
 
 		testCompRBAC(compName, compDefName, saName)
 
@@ -1716,12 +1764,16 @@ var _ = Describe("Component Controller", func() {
 			testCompConfiguration(defaultCompName, compDefName)
 		})
 
-		It("with component RBAC set", func() {
-			testCompRBAC(defaultCompName, compDefName, "")
+		It("creates component RBAC resources", func() {
+			testCompWithRBAC(defaultCompName, compDefName)
 		})
 
-		It("re-create component with custom RBAC which is not exist and auto created by KubeBlocks", func() {
+		It("re-creates component with custom RBAC which is not exist and auto created by KubeBlocks", func() {
 			testRecreateCompWithRBACCreateByKubeBlocks(defaultCompName, compDefName)
+		})
+
+		It("transfers rbac resources' ownership when multiple components share them", func() {
+			testSharedRBACResoucreDeletion()
 		})
 
 		It("creates component with non-exist serviceaccount", func() {

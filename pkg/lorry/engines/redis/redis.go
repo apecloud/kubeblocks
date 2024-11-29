@@ -145,10 +145,11 @@ func newClient(s *Settings) redis.UniversalClient {
 }
 
 func newSentinelClient(s *Settings, clusterCompName string) *redis.SentinelClient {
-	// TODO: use headless service directly
-	sentinelEnv := fmt.Sprintf("%s_SENTINEL_SERVICE", strings.ToUpper(strings.Join(strings.Split(clusterCompName, "-"), "_")))
-	sentinelHost := viper.GetString(fmt.Sprintf("%s_HOST", sentinelEnv))
-	sentinelPort := viper.GetString(fmt.Sprintf("%s_PORT", sentinelEnv))
+	sentinelHost := fmt.Sprintf("%s-sentinel-headless", clusterCompName)
+	sentinelPort := "26379"
+	if viper.IsSet("REDIS_SENTINEL_HOST_NETWORK_PORT") {
+		sentinelPort = viper.GetString("REDIS_SENTINEL_HOST_NETWORK_PORT")
+	}
 
 	opt := &redis.Options{
 		DB:              s.DB,

@@ -22,6 +22,7 @@ package controllerutil
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -65,7 +66,9 @@ func GenShardingCompSpecList(ctx context.Context, cli client.Reader,
 			compNameMap[genCompName] = genCompName
 		}
 	case len(undeletedShardingCompSpecs) > int(shardingSpec.Shards):
-		// TODO: order by?
+		slices.SortFunc(compSpecList, func(a, b *appsv1alpha1.ClusterComponentSpec) int {
+			return strings.Compare(a.Name, b.Name)
+		})
 		compSpecList = compSpecList[:int(shardingSpec.Shards)]
 	}
 	return compSpecList, nil

@@ -8,57 +8,27 @@ sidebar_label: Supported addons
 
 # Supported Addons
 
-KubeBlocks, as a cloud-native data infrastructure based on Kubernetes, provides management and control for relational databases, NoSQL databases, vector databases, and stream computing systems; and these databases can be all added as addons. Besides databases, the KubeBlocks addon now also supports plugins for cloud environments and applications.
+KubeBlocks uses Addons to extend support for various database engines,
+And there are currently over 30 Addons available in the KubeBlocks repository.
+Which can be further categorized as follows sections.
 
 For installing and enabling Addons, refer to install Addons [by kbcli](./../installation/install-with-kbcli/install-addons.md) or [by Helm](./../installation/install-with-helm/install-addons.md).
 
-| Addons          | Description                                                                                                                                                                                                       |
-|:----------------|:------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| apecloud-mysql  | ApeCloud MySQL is a database that is compatible with MySQL syntax and achieves high availability through the utilization of the RAFT consensus protocol.                                                          |
-| apecloud-postgresql | ApeCloud PostgreSQL is a database that is compatible with PostgreSQL syntax and achieves high availability through the utilization of the RAFT consensus protocol. |
-| camellia-redis-proxy | Camellia Redis Proxy is a high-performance redis proxy developed using Netty4. |
-| clickhouse      | ClickHouse is a column-oriented database that enables its users to generate powerful analytics, using SQL queries, in real-time. |
-| elasticsearch   | Elasticsearch is a distributed, RESTful search engine optimized for speed and relevance on production-scale workloads. |
-| etcd            | etcd is a strongly consistent, distributed key-value store that provides a reliable way to store data that needs to be accessed by a distributed system or cluster of machines. |
-| flink           | Apache Flink is a framework and distributed processing engine for stateful computations over unbounded and bounded data streams. |
-| greatsql        | GreatSQL is a high performance open source relational database management system that can be used on common hardware for financial-grade application scenarios.  |
-| greptimedb      | GreptimeDB is an open-source time-series database with a special focus on scalability, analytical capabilities and efficiency. |
-| influxdb        | InfluxDB enables real-time analytics by serving as a purpose-built database that optimizes processing and scaling for large time series data workloads. |
-| kafka           | Apache Kafka is an open-source distributed event streaming platform used by thousands of companies for high-performance data pipelines, streaming analytics, data integration, and mission-critical applications. |
-| mariadb         | MariaDB is a high performance open source relational database management system that is widely used for web and application servers. |
-| milvus          | Milvus is a flexible, reliable, & blazing-fast cloud-native, open-source vector database.                                                                                                                         |
-| minio           | MinIO is an object storage solution that provides an Amazon Web Services S3-compatible API and supports all core S3 features. |
-| mogdb           | MogDB is a stable and easy-to-use enterprise-ready relational database based on the openGauss open source database. |
-| mongodb         | MongoDB is a document-oriented NoSQL database used for high volume data storage.                                                                                                                                  |
-| mysql  (Primary-Secondary replication) |
-| nebula          | NebulaGraph is an open source graph database that can store and process graphs with trillions of edges and vertices.                                                                                              |
-| neon            | Neon is Serverless Postgres built for the cloud. |
-| oceanbase-ce    | Unlimited scalable distributed database for data-intensive transactional and real-time operational analytics workloads, with ultra-fast performance that has once achieved world records in the TPC-C benchmark test. OceanBase has served over 400 customers across the globe and has been supporting all mission critical systems in Alipay. |
-| official-postgresql | An official PostgreSQL cluster definition Helm chart for Kubernetes. |
-| opengauss       | openGauss is an open source relational database management system that is released with the Mulan PSL v2.  |
-| openldap        | The OpenLDAP Project is a collaborative effort to develop a robust, commercial-grade, fully featured, and open source LDAP suite of applications and development tools. This chart provides KubeBlocks. |
-| opensearch      | Open source distributed and RESTful search engine. |
-| opentenbase     | OpenTenBase is an enterprise-level distributed HTAP open source database. |
-| orchestrator	   | Orchestrator is a MySQL high availability and replication management tool, runs as a service and provides command line access, HTTP API and Web interface. |
-| oriolebd        | OrioleDB is a new storage engine for PostgreSQL, bringing a modern approach to database capacity, capabilities and performance to the world's most-loved database platform. |
-| polardb-x       | PolarDB-X is a cloud native distributed SQL Database designed for high concurrency, massive storage, complex querying scenarios. |
-| postgresql      | PostgreSQL is an advanced, enterprise class open source relational database that supports both SQL (relational) and JSON (non-relational) querying.                                                            |
-| pulsar          | Apache® Pulsar™ is an open-source, distributed messaging and streaming platform built for the cloud. |
-| qdrant          | Qdrant is a vector database & vector similarity search engine.                                                                                                                                                    |
-| rabbitmq        | RabbitMQ is a reliable and mature messaging and streaming broker.  |
-| redis           | Redis is a fast, open source, in-memory, key-value data store.                                                                                                                                                    |
-| risingwave      | RisingWave is a distributed SQL database for stream processing. It is designed to reduce the complexity and cost of building real-time applications. |
-| solr            | Solr is the popular, blazing-fast, open source enterprise search platform built on Apache Lucene. |
-| starrocks-ce    | StarRocks is a next-gen, high-performance analytical data warehouse that enables real-time, multi-dimensional, and highly concurrent data analysis. |
-| tdengine        | TDengine™ is an industrial data platform purpose-built for the Industrial IoT, combining a time series database with essential features like stream processing, data subscription, and caching.                  |
-| tidb            | TiDB is an open-source, cloud-native, distributed, MySQL-Compatible database for elastic scale and real-time analytics. |
-| victoria-metrics  | VictoriaMetrics is a fast, cost-effective and scalable monitoring solution and time series database. |
-| weaviate        | Weaviate is an open-source vector database.                                                                                                                                                                       |
-| xinference      | Xorbits Inference(Xinference) is a powerful and versatile library designed to serve language, speech recognition, and multimodal models. |
-| yanshan         | YashanDB is a database management system developed by Shenzhen Institute of Computing Science. |
-| zookeeper       | Apache ZooKeeper is a centralized service for maintaining configuration information, naming, providing distributed synchronization, and providing group services. |
+## Relational Databases
 
-## Supported functions of addons
+MySQL and PostgreSQL are the two most popular open-source relational databases in the world, and they have branches/variants.
+
+### MySQL and its variants
+
+**Addon List**
+
+| Addons          | Description                                                                                                                                                                                                                                                                                                                                                             |
+|:----------------|:------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| mysql           | This addon uses the community edition MySQL image officially released by Oracle.                                                                                                                                                                                                                                                                                        |
+| apecloud-mysql  | ApeCloud MySQL is a free, fully compatible drop-in replacement for MySQL Community Edition, offering enhanced high availability through a RAFT protocol replication plugin. The image is provided by ApeCloud. Additionally, ApeCloud MySQL includes an open-source proxy called WeScale, which provides features such as read-write splitting and connection pooling.  |
+| mariadb         | MariaDB is a high performance open source relational database management system that is widely used for web and application servers.                                                                                                                                                                                                                                    |
+
+**Supported Features**
 
 :::note
 

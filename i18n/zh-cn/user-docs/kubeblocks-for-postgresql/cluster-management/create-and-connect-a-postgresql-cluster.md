@@ -17,9 +17,9 @@ import TabItem from '@theme/TabItem';
 
 ### 开始之前
 
-* 如果您想通过 `kbcli` 创建并连接 PostgreSQL 集群，请先[安装 kbcli](./../../installation/install-with-kbcli/install-kbcli.md)。
-* 安装 KubeBlocks，可通过 [kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) 或 [Helm](./../../installation/install-with-helm/install-kubeblocks.md) 安装。
-* 确保 PostgreSQL 引擎已启用。KubeBlocks 默认已安装 PostreSQL，如果您在安装 KubeBlocks 时关闭/卸载了该引擎，可参考相关文档，再次启用/安装该引擎，可通过 [kbcli](./../../installation/install-with-kbcli/install-addons.md) 或者 [Helm](./../../installation/install-with-helm/install-addons.md) 操作。
+* 如果您想通过 `kbcli` 创建并连接 PostgreSQL 集群，请先[安装 kbcli](./../../installation/install-kbcli.md)。
+* [安装 KubeBlocks](./../../installation/install-kubeblocks.md)。
+* 确保 PostgreSQL 引擎已启用。KubeBlocks 默认已安装 PostreSQL，如果您在安装 KubeBlocks 时关闭/卸载了该引擎，可参考相关文档，再次[启用/安装该引擎](./../../installation/install-addons.md)。
   
   <Tabs>
 

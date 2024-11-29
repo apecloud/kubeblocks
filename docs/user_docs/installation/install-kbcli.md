@@ -2,7 +2,7 @@
 title: Install kbcli 
 description: Install kbcli 
 keywords: [install, kbcli,]
-sidebar_position: 1
+sidebar_position: 2
 sidebar_label: Install kbcli
 ---
 

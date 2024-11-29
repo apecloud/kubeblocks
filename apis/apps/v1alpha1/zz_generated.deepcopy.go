@@ -3726,6 +3726,11 @@ func (in *HorizontalScalePolicy) DeepCopy() *HorizontalScalePolicy {
 func (in *HorizontalScaling) DeepCopyInto(out *HorizontalScaling) {
 	*out = *in
 	out.ComponentOps = in.ComponentOps
+	if in.Shards != nil {
+		in, out := &in.Shards, &out.Shards
+		*out = new(int32)
+		**out = **in
+	}
 	if in.Replicas != nil {
 		in, out := &in.Replicas, &out.Replicas
 		*out = new(int32)
@@ -4042,6 +4047,11 @@ func (in *LastComponentConfiguration) DeepCopyInto(out *LastComponentConfigurati
 	*out = *in
 	if in.Replicas != nil {
 		in, out := &in.Replicas, &out.Replicas
+		*out = new(int32)
+		**out = **in
+	}
+	if in.Shards != nil {
+		in, out := &in.Shards, &out.Shards
 		*out = new(int32)
 		**out = **in
 	}

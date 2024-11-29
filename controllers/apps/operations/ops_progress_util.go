@@ -425,8 +425,12 @@ func updateProgressDetailForHScale(
 	pgRes *progressResource,
 	compStatus *appsv1alpha1.OpsRequestComponentStatus,
 	objectKey string, status appsv1alpha1.ProgressStatus) {
+	var group string
+	if pgRes.fullComponentName != "" {
+		group = fmt.Sprintf("%s/%s", pgRes.fullComponentName, pgRes.opsMessageKey)
+	}
 	progressDetail := appsv1alpha1.ProgressStatusDetail{
-		Group:     fmt.Sprintf("%s/%s", pgRes.fullComponentName, pgRes.opsMessageKey),
+		Group:     group,
 		ObjectKey: objectKey,
 		Status:    status,
 	}
@@ -524,4 +528,97 @@ func syncProgressToOpsRequest(
 		return cli.Status().Patch(reqCtx.Ctx, opsRes.OpsRequest, client.MergeFrom(oldOpsRequest))
 	}
 	return nil
+}
+
+// handleComponentProgressForScalingShards handles the component progressDetails when scaling the shards.
+// @return expectProgressCount,
+// @return completedCount
+// @return error
+func handleComponentProgressForScalingShards(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	opsRes *OpsResource,
+	pgRes *progressResource,
+	compStatus *appsv1alpha1.OpsRequestComponentStatus) (int32, int32, error) {
+	var (
+		lastCompConfiguration = opsRes.OpsRequest.Status.LastConfiguration.Components[pgRes.compOps.GetComponentName()]
+		err                   error
+		completedCount        int32
+		updateShards          int32
+	)
+	updateShards = *pgRes.shards - *lastCompConfiguration.Shards
+	if updateShards > 0 {
+		completedCount, err = handleScaleOutForShards(reqCtx, cli, opsRes, pgRes, compStatus)
+	} else if updateShards < 0 {
+		updateShards *= -1
+		completedCount, err = handleScaleInForShards(reqCtx, cli, opsRes, pgRes, compStatus, updateShards)
+	}
+	if completedCount > updateShards {
+		// completedCount may exceed updated shards if components have been rebuilt by other operations.
+		completedCount = updateShards
+	}
+	return updateShards, completedCount, err
+}
+
+func handleScaleOutForShards(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	opsRes *OpsResource,
+	pgRes *progressResource,
+	compStatus *appsv1alpha1.OpsRequestComponentStatus) (int32, error) {
+	compList, err := intctrlutil.ListShardingComponents(reqCtx.Ctx, cli, opsRes.Cluster, pgRes.compOps.GetComponentName())
+	if err != nil {
+		return 0, err
+	}
+	var completedCount int32
+	for _, comp := range compList {
+		if comp.CreationTimestamp.Before(&opsRes.OpsRequest.Status.StartTimestamp) {
+			continue
+		}
+		objectKey := getProgressObjectKey(appsv1alpha1.ComponentKind, comp.Name)
+		pgRes.opsMessageKey = "create"
+		switch comp.Status.Phase {
+		case appsv1alpha1.RunningClusterCompPhase:
+			completedCount += 1
+			updateProgressDetailForHScale(opsRes, pgRes, compStatus, objectKey, appsv1alpha1.SucceedProgressStatus)
+		case appsv1alpha1.FailedClusterCompPhase:
+			completedCount += 1
+			updateProgressDetailForHScale(opsRes, pgRes, compStatus, objectKey, appsv1alpha1.FailedProgressStatus)
+		default:
+			updateProgressDetailForHScale(opsRes, pgRes, compStatus, objectKey, appsv1alpha1.ProcessingProgressStatus)
+		}
+	}
+	return completedCount, nil
+}
+
+func handleScaleInForShards(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	opsRes *OpsResource,
+	pgRes *progressResource,
+	compStatus *appsv1alpha1.OpsRequestComponentStatus,
+	updateShards int32) (int32, error) {
+	compList, err := intctrlutil.ListShardingComponents(reqCtx.Ctx, cli, opsRes.Cluster, pgRes.compOps.GetComponentName())
+	if err != nil {
+		return 0, err
+	}
+	var completedCount int32
+	compMap := make(map[string]struct{}, len(compList))
+	for _, comp := range compList {
+		objKey := getProgressObjectKey(appsv1alpha1.ComponentKind, comp.Name)
+		compMap[objKey] = struct{}{}
+		if comp.DeletionTimestamp.IsZero() || comp.DeletionTimestamp.Before(&opsRes.OpsRequest.Status.StartTimestamp) {
+			continue
+		}
+		pgRes.opsMessageKey = "delete"
+		updateProgressDetailForHScale(opsRes, pgRes, compStatus, objKey, appsv1alpha1.ProcessingProgressStatus)
+	}
+	for i := range compStatus.ProgressDetails {
+		progressDetail := &compStatus.ProgressDetails[i]
+		if _, ok := compMap[progressDetail.ObjectKey]; !ok {
+			completedCount += 1
+			updateProgressDetailForHScale(opsRes, pgRes, compStatus, progressDetail.ObjectKey, appsv1alpha1.SucceedProgressStatus)
+		}
+	}
+	if int32(len(compList)) == *pgRes.compOps.(appsv1alpha1.HorizontalScaling).Shards {
+		completedCount = updateShards
+	}
+	return completedCount, nil
 }

@@ -14,7 +14,7 @@ KubeBlocks 集成[开源的 Patroni 方案](https://patroni.readthedocs.io/en/la
 
 ## 开始之前
 
-* 安装 KubeBlocks，可通过 [kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) 或 [Helm](./../../installation/install-with-helm/install-kubeblocks.md) 安装。
+* [安装 KubeBlocks](./../../installation/install-kubeblocks.md)。
 * [创建 PostgreSQL 主备版](./../cluster-management/create-and-connect-a-postgresql-cluster.md)。
 * 检查切换策略和角色探测参数。
   * 检查切换策略是否为 `Noop`。

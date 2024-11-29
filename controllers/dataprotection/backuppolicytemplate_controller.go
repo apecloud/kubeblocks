@@ -24,7 +24,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -36,6 +35,7 @@ import (
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	dputils "github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
 	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils/boolptr"
 )
 
@@ -95,11 +95,12 @@ func (r *BackupPolicyTemplateReconciler) setComponentDefLabels(reqCtx intctrluti
 
 func (r *BackupPolicyTemplateReconciler) validateAvailable(reqCtx intctrlutil.RequestCtx, oldBPT, bpt *dpv1alpha1.BackupPolicyTemplate) error {
 	message := ""
-	backupMethodMap := map[string]sets.Empty{}
+	backupMethodMap := map[string]*dpv1alpha1.ActionSet{}
 	actionSetNotFound := false
 	// validate the referred actionSetName of the backupMethod
 	for _, v := range bpt.Spec.BackupMethods {
-		backupMethodMap[v.Name] = sets.Empty{}
+		// confirm the method exists
+		backupMethodMap[v.Name] = nil
 		if boolptr.IsSetToFalse(v.SnapshotVolumes) && v.ActionSetName == "" {
 			message += fmt.Sprintf(`backupMethod "%s" is missing an ActionSet name;`, v.Name)
 			continue
@@ -116,13 +117,28 @@ func (r *BackupPolicyTemplateReconciler) validateAvailable(reqCtx intctrlutil.Re
 			}
 			return err
 		}
+		// record found actionSets
+		backupMethodMap[v.Name] = actionSet
+	}
+	// validate the schedule names
+	if err := dputils.ValidateScheduleNames(bpt.Spec.Schedules); err != nil {
+		message += fmt.Sprintf(`fails to validate schedule name: %v;`, err)
 	}
 	// validate the schedules
 	for _, v := range bpt.Spec.Schedules {
-		if _, ok := backupMethodMap[v.BackupMethod]; !ok {
+		actionSet, ok := backupMethodMap[v.BackupMethod]
+		if !ok {
 			message += fmt.Sprintf(`backupMethod "%s" not found in the spec.backupMethods;`, v.BackupMethod)
+			continue
+		}
+		// validate schedule parameters
+		if actionSet != nil {
+			if err := dputils.ValidateParameters(actionSet, v.Parameters, true); err != nil {
+				message += fmt.Sprintf(`fails to validate parameters of backupMethod "%s": %v;`, v.BackupMethod, err)
+			}
 		}
 	}
+
 	bpt.Status.ObservedGeneration = bpt.Generation
 	bpt.Status.Message = message
 	if len(message) > 0 {

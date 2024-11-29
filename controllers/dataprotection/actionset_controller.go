@@ -21,6 +21,7 @@ package dataprotection
 
 import (
 	"context"
+	"fmt"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
@@ -68,8 +69,7 @@ func (r *ActionSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return *res, err
 	}
 
-	if actionSet.Status.ObservedGeneration == actionSet.Generation &&
-		actionSet.Status.Phase.IsAvailable() {
+	if actionSet.Status.ObservedGeneration == actionSet.Generation && actionSet.Status.Phase.IsAvailable() {
 		return ctrl.Result{}, nil
 	}
 
@@ -81,9 +81,14 @@ func (r *ActionSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 		return r.Client.Status().Patch(reqCtx.Ctx, actionSet, patch)
 	}
 
-	// TODO(ldm): validate actionSet
+	phase := dpv1alpha1.AvailablePhase
+	var message string
+	if err = r.validate(actionSet); err != nil {
+		phase = dpv1alpha1.UnavailablePhase
+		message = err.Error()
+	}
 
-	if err = patchStatus(dpv1alpha1.AvailablePhase, ""); err != nil {
+	if err = patchStatus(phase, message); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 	intctrlutil.RecordCreatedEvent(r.Recorder, actionSet)
@@ -100,5 +105,37 @@ func (r *ActionSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
 func (r *ActionSetReconciler) deleteExternalResources(
 	_ intctrlutil.RequestCtx,
 	_ *dpv1alpha1.ActionSet) error {
+	return nil
+}
+
+func (r *ActionSetReconciler) validate(actionset *dpv1alpha1.ActionSet) error {
+	validateWithParameters := func(withParameters []string) error {
+		if len(withParameters) == 0 {
+			return nil
+		}
+		schema := actionset.Spec.ParametersSchema
+		if schema == nil || schema.OpenAPIV3Schema == nil || len(schema.OpenAPIV3Schema.Properties) == 0 {
+			return fmt.Errorf("the parametersSchema is invalid")
+		}
+		properties := schema.OpenAPIV3Schema.Properties
+		for _, parameter := range withParameters {
+			if _, ok := properties[parameter]; !ok {
+				return fmt.Errorf("parameter %s is not defined in the parametersSchema", parameter)
+			}
+		}
+		return nil
+	}
+
+	// validate withParameters
+	if actionset.Spec.Backup != nil {
+		if err := validateWithParameters(actionset.Spec.Backup.WithParameters); err != nil {
+			return fmt.Errorf("fails to validate backup withParameters: %v", err)
+		}
+	}
+	if actionset.Spec.Restore != nil {
+		if err := validateWithParameters(actionset.Spec.Restore.WithParameters); err != nil {
+			return fmt.Errorf("fails to validate restore withParameters: %v", err)
+		}
+	}
 	return nil
 }

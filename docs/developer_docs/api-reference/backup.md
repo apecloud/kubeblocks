@@ -102,6 +102,7 @@ BackupType
 <li><code>Incremental</code> back up data that have changed since the last backup (either full or incremental).</li>
 <li><code>Differential</code> back up data that has changed since the last full backup.</li>
 <li><code>Continuous</code> back up transaction logs continuously, such as MySQL binlog, PostgreSQL WAL, etc.</li>
+<li><code>Selective</code> back up data more precisely, use custom parameters, such as specific databases or tables.</li>
 </ul>
 <p>Continuous backup is essential for implementing Point-in-Time Recovery (PITR).</p>
 </td>
@@ -1348,6 +1349,7 @@ BackupType
 <li><code>Incremental</code> back up data that have changed since the last backup (either full or incremental).</li>
 <li><code>Differential</code> back up data that has changed since the last full backup.</li>
 <li><code>Continuous</code> back up transaction logs continuously, such as MySQL binlog, PostgreSQL WAL, etc.</li>
+<li><code>Selective</code> back up data more precisely, use custom parameters, such as specific databases or tables.</li>
 </ul>
 <p>Continuous backup is essential for implementing Point-in-Time Recovery (PITR).</p>
 </td>
@@ -3772,6 +3774,8 @@ Kubernetes meta/v1.Time
 </tr><tr><td><p>&#34;Full&#34;</p></td>
 <td></td>
 </tr><tr><td><p>&#34;Incremental&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Selective&#34;</p></td>
 <td></td>
 </tr></tbody>
 </table>

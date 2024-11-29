@@ -1425,7 +1425,7 @@ var _ = Describe("Component Controller", func() {
 		createClusterObj(defaultCompName+"-comp2", compDefName, nil)
 		comp2Key := compKey
 		By("check rbac resources owner not modified")
-		Eventually(testapps.CheckObj(&testCtx, saKey, func(g Gomega, sa *corev1.ServiceAccount) {
+		Consistently(testapps.CheckObj(&testCtx, saKey, func(g Gomega, sa *corev1.ServiceAccount) {
 			refs := sa.GetOwnerReferences()
 			g.Expect(refs).Should(HaveLen(1))
 			owner := refs[0]

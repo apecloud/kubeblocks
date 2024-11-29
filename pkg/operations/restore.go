@@ -91,7 +91,7 @@ func (r RestoreOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 	}
 	opsRequest.Labels[constant.AppInstanceLabelKey] = opsRequest.Spec.GetClusterName()
 	opsRequest.Labels[constant.OpsRequestTypeLabelKey] = string(opsRequest.Spec.Type)
-	scheme, _ := opsv1alpha1.SchemeBuilder.Build()
+	scheme, _ := appsv1.SchemeBuilder.Build()
 	if err = controllerutil.SetOwnerReference(cluster, opsRequest, scheme); err != nil {
 		return err
 	}

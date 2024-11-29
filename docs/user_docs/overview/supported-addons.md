@@ -8,9 +8,7 @@ sidebar_label: Supported addons
 
 # Supported Addons
 
-KubeBlocks uses Addons to extend support for various database engines,
-And there are currently over 30 Addons available in the KubeBlocks repository.
-Which can be further categorized as follows sections.
+KubeBlocks uses Addons to extend support for various database engines. And there are currently over 30 Addons available in the KubeBlocks repository, which can be further categorized as follows sections.
 
 For installing and enabling Addons, refer to install Addons [by kbcli](./../installation/install-with-kbcli/install-addons.md) or [by Helm](./../installation/install-with-helm/install-addons.md).
 

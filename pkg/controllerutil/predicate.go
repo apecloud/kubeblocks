@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package controllerutil
 
 import (
-	"fmt"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -92,19 +91,13 @@ var (
 	// unchanged：NodeCountScaler, Addon - the new operator will be responsible for these
 	// deleted：ClusterVersion, ComponentClassDefinition - nothing to do
 	// group changed：OpsRequest, OpsDefinition, ConfigConstraint, Configuration - nothing to do
-	// TODO:
-	//    EventReconciler.Event
-	//    configs & parameters
-	//    data protections
 
 	managedNamespaces       *sets.Set[string]
 	supportedCRDAPIVersions = sets.New[string](
-		// ClusterDefinition, ComponentDefinition, ComponentVersion, BackupPolicyTemplate
-		// ServiceDescriptor, Cluster, Component
+		// ClusterDefinition, ComponentDefinition, ComponentVersion, Cluster, Component
 		appsv1alpha1.GroupVersion.String(),
 		// InstanceSet
 		workloadsv1alpha1.GroupVersion.String(),
-		// TODO: corev1.Event
 	)
 )
 
@@ -134,29 +127,18 @@ func namespacePredicateFilter(object client.Object) bool {
 
 func newAPIVersionPredicateFilter(objs []client.Object) func(client.Object) bool {
 	return func(obj client.Object) bool {
+		if !viper.GetBool(constant.DualOperatorsMode) {
+			return true
+		}
+		_, clusterObj := obj.(*appsv1alpha1.Cluster)
 		annotations := obj.GetAnnotations()
 		if annotations == nil {
-			return true
+			return !clusterObj // for newly created clusters, let the new operator handle them first
 		}
 		apiVersion, ok := annotations[constant.CRDAPIVersionAnnotationKey]
 		if !ok {
-			return true
+			return !clusterObj // for newly created clusters, let the new operator handle them first
 		}
-		// as a fast path
-		if !supportedCRDAPIVersions.Has(apiVersion) {
-			return false
-		}
-		if len(objs) > 0 {
-			for _, o := range objs {
-				if o.GetObjectKind().GroupVersionKind().GroupKind() == obj.GetObjectKind().GroupVersionKind().GroupKind() {
-					return true
-				}
-			}
-			// has the api version set, but not in the object list?
-			// we cannot ignore the event silently, so panic here
-			panic(fmt.Sprintf("seen an event of an object with API version %s, "+
-				"but the object is not in the object list that controller expects, object: %v", apiVersion, obj))
-		}
-		return true
+		return supportedCRDAPIVersions.Has(apiVersion)
 	}
 }

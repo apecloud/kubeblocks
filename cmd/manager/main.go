@@ -92,10 +92,6 @@ const (
 	multiClusterContextsDisabledFlagKey flagName = "multi-cluster-contexts-disabled"
 
 	userAgentFlagKey flagName = "user-agent"
-
-	// dual-operators-mode indicates whether the operator runs in dual-operators mode.
-	// If it's true, the operator will degrade to a secondary operator and only manage the resources dedicated to releases prior to v1.0.
-	dualOperatorsModeFlag flagName = "dual-operators-mode"
 )
 
 var (
@@ -150,6 +146,7 @@ func init() {
 	viper.SetDefault(constant.FeatureGateComponentReplicasAnnotation, true)
 	viper.SetDefault(constant.FeatureGateInPlacePodVerticalScaling, false)
 	viper.SetDefault(constant.FeatureGateNoRSMEnv, false)
+	viper.SetDefault(constant.DualOperatorsMode, false)
 }
 
 type flagName string
@@ -190,8 +187,6 @@ func setupFlags() {
 		"The namespaces that the operator will manage, multiple namespaces are separated by commas.")
 
 	flag.String(userAgentFlagKey.String(), "", "User agent of the operator.")
-
-	flag.Bool(dualOperatorsModeFlag.String(), false, "Whether the operator runs in dual-operators mode.")
 
 	opts := zap.Options{
 		Development: false,
@@ -434,49 +429,53 @@ func main() {
 			os.Exit(1)
 		}
 
-		if err = (&appscontrollers.OpsDefinitionReconciler{
-			Client:   mgr.GetClient(),
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("ops-definition-controller"),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "OpsDefinition")
-			os.Exit(1)
+		if !viper.GetBool(constant.DualOperatorsMode) {
+			if err = (&appscontrollers.OpsDefinitionReconciler{
+				Client:   mgr.GetClient(),
+				Scheme:   mgr.GetScheme(),
+				Recorder: mgr.GetEventRecorderFor("ops-definition-controller"),
+			}).SetupWithManager(mgr); err != nil {
+				setupLog.Error(err, "unable to create controller", "controller", "OpsDefinition")
+				os.Exit(1)
+			}
+
+			if err = (&appscontrollers.OpsRequestReconciler{
+				Client:   mgr.GetClient(),
+				Scheme:   mgr.GetScheme(),
+				Recorder: mgr.GetEventRecorderFor("ops-request-controller"),
+			}).SetupWithManager(mgr); err != nil {
+				setupLog.Error(err, "unable to create controller", "controller", "OpsRequest")
+				os.Exit(1)
+			}
 		}
 
-		if err = (&appscontrollers.OpsRequestReconciler{
-			Client:   mgr.GetClient(),
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("ops-request-controller"),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "OpsRequest")
-			os.Exit(1)
-		}
+		if !viper.GetBool(constant.DualOperatorsMode) {
+			if err = (&configuration.ConfigConstraintReconciler{
+				Client:   mgr.GetClient(),
+				Scheme:   mgr.GetScheme(),
+				Recorder: mgr.GetEventRecorderFor("config-constraint-controller"),
+			}).SetupWithManager(mgr); err != nil {
+				setupLog.Error(err, "unable to create controller", "controller", "ConfigConstraint")
+				os.Exit(1)
+			}
 
-		if err = (&configuration.ConfigConstraintReconciler{
-			Client:   mgr.GetClient(),
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("config-constraint-controller"),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "ConfigConstraint")
-			os.Exit(1)
-		}
+			if err = (&configuration.ReconfigureReconciler{
+				Client:   client,
+				Scheme:   mgr.GetScheme(),
+				Recorder: mgr.GetEventRecorderFor("reconfigure-controller"),
+			}).SetupWithManager(mgr, multiClusterMgr); err != nil {
+				setupLog.Error(err, "unable to create controller", "controller", "ReconfigureRequest")
+				os.Exit(1)
+			}
 
-		if err = (&configuration.ReconfigureReconciler{
-			Client:   client,
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("reconfigure-controller"),
-		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "ReconfigureRequest")
-			os.Exit(1)
-		}
-
-		if err = (&configuration.ConfigurationReconciler{
-			Client:   client,
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("configuration-controller"),
-		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "Configuration")
-			os.Exit(1)
+			if err = (&configuration.ConfigurationReconciler{
+				Client:   client,
+				Scheme:   mgr.GetScheme(),
+				Recorder: mgr.GetEventRecorderFor("configuration-controller"),
+			}).SetupWithManager(mgr, multiClusterMgr); err != nil {
+				setupLog.Error(err, "unable to create controller", "controller", "Configuration")
+				os.Exit(1)
+			}
 		}
 
 		if err = (&appscontrollers.SystemAccountReconciler{
@@ -488,13 +487,15 @@ func main() {
 			os.Exit(1)
 		}
 
-		if err = (&k8scorecontrollers.EventReconciler{
-			Client:   client,
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("event-controller"),
-		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "Event")
-			os.Exit(1)
+		if !viper.GetBool(constant.DualOperatorsMode) {
+			if err = (&k8scorecontrollers.EventReconciler{
+				Client:   client,
+				Scheme:   mgr.GetScheme(),
+				Recorder: mgr.GetEventRecorderFor("event-controller"),
+			}).SetupWithManager(mgr, multiClusterMgr); err != nil {
+				setupLog.Error(err, "unable to create controller", "controller", "Event")
+				os.Exit(1)
+			}
 		}
 
 		if err = (&appscontrollers.ComponentClassReconciler{
@@ -506,22 +507,26 @@ func main() {
 			os.Exit(1)
 		}
 
-		if err = (&appscontrollers.ServiceDescriptorReconciler{
-			Client:   mgr.GetClient(),
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("service-descriptor-controller"),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "ServiceDescriptor")
-			os.Exit(1)
+		if !viper.GetBool(constant.DualOperatorsMode) {
+			if err = (&appscontrollers.ServiceDescriptorReconciler{
+				Client:   mgr.GetClient(),
+				Scheme:   mgr.GetScheme(),
+				Recorder: mgr.GetEventRecorderFor("service-descriptor-controller"),
+			}).SetupWithManager(mgr); err != nil {
+				setupLog.Error(err, "unable to create controller", "controller", "ServiceDescriptor")
+				os.Exit(1)
+			}
 		}
 
-		if err = (&appscontrollers.BackupPolicyTemplateReconciler{
-			Client:   mgr.GetClient(),
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("backup-policy-template-controller"),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "BackupPolicyTemplate")
-			os.Exit(1)
+		if !viper.GetBool(constant.DualOperatorsMode) {
+			if err = (&appscontrollers.BackupPolicyTemplateReconciler{
+				Client:   mgr.GetClient(),
+				Scheme:   mgr.GetScheme(),
+				Recorder: mgr.GetEventRecorderFor("backup-policy-template-controller"),
+			}).SetupWithManager(mgr); err != nil {
+				setupLog.Error(err, "unable to create controller", "controller", "BackupPolicyTemplate")
+				os.Exit(1)
+			}
 		}
 	}
 
@@ -536,9 +541,7 @@ func main() {
 		}
 	}
 
-	dualOperatorsMode := viper.GetBool(dualOperatorsModeFlag.viperName())
-
-	if !dualOperatorsMode && viper.GetBool(extensionsFlagKey.viperName()) {
+	if !viper.GetBool(constant.DualOperatorsMode) && viper.GetBool(extensionsFlagKey.viperName()) {
 		if err = (&extensionscontrollers.AddonReconciler{
 			Client:     mgr.GetClient(),
 			Scheme:     mgr.GetScheme(),
@@ -550,7 +553,7 @@ func main() {
 		}
 	}
 
-	if !dualOperatorsMode && viper.GetBool(experimentalFlagKey.viperName()) {
+	if !viper.GetBool(constant.DualOperatorsMode) && viper.GetBool(experimentalFlagKey.viperName()) {
 		if err = (&experimentalcontrollers.NodeCountScalerReconciler{
 			Client:   mgr.GetClient(),
 			Scheme:   mgr.GetScheme(),

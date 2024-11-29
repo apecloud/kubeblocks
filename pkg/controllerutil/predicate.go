@@ -141,17 +141,14 @@ func newAPIVersionPredicateFilter(objs []client.Object) func(client.Object) bool
 				return IsSupportedCRDAPIVersion(apiVersion)
 			}
 		}
-		switch reflect.TypeOf(obj) {
-		case reflect.TypeOf(&appsv1.Cluster{}):
-			return true
-		case reflect.TypeOf(&appsv1.ClusterDefinition{}),
-			reflect.TypeOf(&appsv1.ComponentDefinition{}),
-			reflect.TypeOf(&appsv1.ComponentVersion{}),
-			reflect.TypeOf(&appsv1.Component{}),
-			reflect.TypeOf(&workloadsv1.InstanceSet{}):
-			return false
-		default:
-			return true
+		if reflect.TypeOf(obj) == reflect.TypeOf(&appsv1.Cluster{}) {
+			return true // to resolve the CRD API version of the cluster
 		}
+		for _, wobj := range objs {
+			if reflect.TypeOf(obj) == reflect.TypeOf(wobj) {
+				return false // watched objects, but has no CRD API version, it may be the old version
+			}
+		}
+		return true
 	}
 }

@@ -68,6 +68,7 @@ var _ = Describe("InstanceSet Controller", func() {
 			}
 			its := builder.NewInstanceSetBuilder(testCtx.DefaultNamespace, name).
 				AddMatchLabelsInMap(commonLabels).
+				AddAnnotations(constant.CRDAPIVersionAnnotationKey, workloads.GroupVersion.String()).
 				SetTemplate(template).
 				AddCustomHandler(action).
 				GetObject()

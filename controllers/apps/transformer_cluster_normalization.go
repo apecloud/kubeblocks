@@ -414,19 +414,9 @@ func (t *clusterNormalizationTransformer) writeBackCompNShardingSpecs(transCtx *
 func (t *clusterNormalizationTransformer) patchCRDAPIVersionKey(transCtx *clusterTransformContext) error {
 	apiVersions := map[string][]string{}
 
-	add := func(k, v string) {
-		if _, ok := apiVersions[k]; !ok {
-			apiVersions[k] = []string{}
-		}
-		apiVersions[k] = append(apiVersions[k], v)
-	}
-
 	from := func(name string, annotations map[string]string) {
-		if annotations == nil {
-			add("", name)
-		} else {
-			add(annotations[constant.CRDAPIVersionAnnotationKey], name)
-		}
+		key := annotations[constant.CRDAPIVersionAnnotationKey]
+		apiVersions[key] = append(apiVersions[key], name)
 	}
 
 	if transCtx.clusterDef != nil {

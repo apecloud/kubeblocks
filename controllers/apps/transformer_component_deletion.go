@@ -196,7 +196,7 @@ func handleRBACResourceDeletion(obj client.Object, transCtx *componentTransformC
 			if err != nil {
 				return false, err
 			}
-			transCtx.Logger.V(1).Info("rbac resources owner transfered, skip deletion",
+			transCtx.Logger.V(1).Info("rbac resources owner transferred, skip deletion",
 				"fromComp", comp.Name, "toComp", otherComp.Name, "name", klog.KObj(v).String(), "gvk", gvk)
 			return true, nil
 		}

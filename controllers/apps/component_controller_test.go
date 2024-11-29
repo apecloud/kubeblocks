@@ -1436,7 +1436,7 @@ var _ = Describe("Component Controller", func() {
 		testapps.DeleteObject(&testCtx, cluster1Key, &kbappsv1.Cluster{})
 		Eventually(testapps.CheckObjExists(&testCtx, cluster1Key, &kbappsv1.Cluster{}, false)).Should(Succeed())
 
-		By("check rbac resources owner transfered")
+		By("check rbac resources owner transferred")
 		Eventually(testapps.CheckObj(&testCtx, saKey, func(g Gomega, sa *corev1.ServiceAccount) {
 			refs := sa.GetOwnerReferences()
 			g.Expect(refs).Should(HaveLen(1))

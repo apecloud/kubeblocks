@@ -131,7 +131,7 @@ Like any other resource in Kubernetes, KubeBlocks can be installed through a YAM
    curl -s "https://api.github.com/repos/apecloud/kubeblocks/releases?per_page=100&page=1" | jq -r '.[] | select(.prerelease == false) | .tag_name' | sort -V -r
    ```
 
-2. Copy the URL of the `kubeblocks.yaml file` for the version you need from the Assets on the [KubeBlocks Release page](https://github.com/apecloud/kubeblocks/releases).
+2. Copy the URL of the `kubeblocks.yaml` file for the version you need from the Assets on the [KubeBlocks Release page](https://github.com/apecloud/kubeblocks/releases).
 3. Replace the YAML file URL in the command below and run this command to install KubeBlocks.
 
      ```bash

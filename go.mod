@@ -11,7 +11,6 @@ require (
 	github.com/authzed/controller-idioms v0.7.0
 	github.com/aws/aws-sdk-go v1.50.8
 	github.com/bhmj/jsonslice v1.1.2
-	github.com/charmbracelet/keygen v0.5.1
 	github.com/clbanning/mxj/v2 v2.5.7
 	github.com/docker/docker v25.0.6+incompatible
 	github.com/evanphx/json-patch v5.6.0+incompatible

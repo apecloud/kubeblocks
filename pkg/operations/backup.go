@@ -149,6 +149,7 @@ func buildBackup(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRequest *o
 		Spec: dpv1alpha1.BackupSpec{
 			BackupPolicyName: backupSpec.BackupPolicyName,
 			BackupMethod:     backupSpec.BackupMethod,
+			Parameters:       backupSpec.Parameters,
 		},
 	}
 

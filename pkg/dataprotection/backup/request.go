@@ -352,6 +352,7 @@ func (r *Request) BuildJobActionPodSpec(targetPod *corev1.Pod,
 		envVars = append(envVars, envFromTarget...)
 		if r.ActionSet != nil {
 			envVars = append(envVars, r.ActionSet.Spec.Env...)
+			envVars = append(envVars, utils.BuildEnvByParameters(r.Backup.Spec.Parameters)...)
 		}
 		// build envs for kb cluster
 		setKBClusterEnv := func(labelKey, envName string) {

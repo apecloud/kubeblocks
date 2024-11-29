@@ -37,6 +37,11 @@ type ActionSetSpec struct {
 	// +kubebuilder:validation:Required
 	BackupType BackupType `json:"backupType"`
 
+	// Specifies the schema of parameters in backups and restores before their usage.
+	//
+	// +optional
+	ParametersSchema *ActionSetParametersSchema `json:"parametersSchema,omitempty"`
+
 	// Specifies a list of environment variables to be set in the container.
 	//
 	// +kubebuilder:pruning:PreserveUnknownFields
@@ -117,6 +122,11 @@ type BackupActionSpec struct {
 	//
 	// +optional
 	PreDeleteBackup *BaseJobActionSpec `json:"preDelete,omitempty"`
+
+	// Specifies the parameters used by the backup action
+	//
+	// +optional
+	WithParameters []string `json:"withParameters,omitempty"`
 }
 
 // BackupDataActionSpec defines how to back up data.
@@ -162,6 +172,11 @@ type RestoreActionSpec struct {
 	// +optional
 	// +kubebuilder:default=true
 	BaseBackupRequired *bool `json:"baseBackupRequired,omitempty"`
+
+	// Specifies the parameters used by the restore action
+	//
+	// +optional
+	WithParameters []string `json:"withParameters,omitempty"`
 }
 
 // ActionSpec defines an action that should be executed. Only one of the fields may be set.

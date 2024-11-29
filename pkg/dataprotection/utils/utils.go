@@ -39,6 +39,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
@@ -390,6 +391,51 @@ func GetBackupStatusTarget(backupObj *dpv1alpha1.Backup, sourceTargetName string
 		if sourceTargetName == v.Name {
 			return &v
 		}
+	}
+	return nil
+}
+
+func ValidateParameters(actionSet *dpv1alpha1.ActionSet, parameters []dpv1alpha1.ParameterPair, isBackup bool) error {
+	if len(parameters) == 0 {
+		return nil
+	}
+	if actionSet == nil {
+		return fmt.Errorf("actionSet is empty")
+	}
+	var withParameters []string
+	if isBackup && actionSet.Spec.Backup != nil {
+		withParameters = actionSet.Spec.Backup.WithParameters
+	} else if !isBackup && actionSet.Spec.Restore != nil {
+		withParameters = actionSet.Spec.Restore.WithParameters
+	}
+	if len(withParameters) < len(parameters) {
+		return fmt.Errorf("some parameters are undeclared in withParameters of actionSet %s", actionSet.Name)
+	}
+	// check whether the parameter is declared in withParameters
+	parametersMap := map[string]string{}
+	for _, pair := range parameters {
+		parametersMap[pair.Name] = pair.Value
+	}
+	withParametersMap := map[string]struct{}{}
+	for _, v := range withParameters {
+		withParametersMap[v] = struct{}{}
+	}
+	for k := range parametersMap {
+		if _, ok := withParametersMap[k]; !ok {
+			return fmt.Errorf("parameter %s is undeclared in withParameters of actionSet %s", k, actionSet.Name)
+		}
+	}
+	schema := actionSet.Spec.ParametersSchema
+	if schema == nil || schema.OpenAPIV3Schema == nil || len(schema.OpenAPIV3Schema.Properties) == 0 {
+		return fmt.Errorf("the parametersSchema is invalid in actionSet %s", actionSet.Name)
+	}
+	// convert to type map[string]interface{} and validate the schema
+	params, err := common.ConvertStringToInterfaceBySchemaType(schema.OpenAPIV3Schema, parametersMap)
+	if err != nil {
+		return intctrlutil.NewFatalError(err.Error())
+	}
+	if err = common.ValidateDataWithSchema(schema.OpenAPIV3Schema, params); err != nil {
+		return intctrlutil.NewFatalError(err.Error())
 	}
 	return nil
 }

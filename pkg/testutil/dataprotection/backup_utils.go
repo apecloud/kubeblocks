@@ -22,13 +22,11 @@ package dataprotection
 import (
 	"fmt"
 
-	"k8s.io/apimachinery/pkg/api/meta"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -256,7 +254,6 @@ func EnableBackupSchedule(testCtx *testutil.TestContext,
 		for i := range schedule.Spec.Schedules {
 			if schedule.Spec.Schedules[i].BackupMethod == method {
 				schedule.Spec.Schedules[i].Enabled = boolptr.True()
-				break
 			}
 		}
 	})).Should(Succeed())

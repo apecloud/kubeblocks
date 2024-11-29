@@ -22,6 +22,7 @@ package controllerutil
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -64,7 +65,9 @@ func GenShardingCompSpecList(ctx context.Context, cli client.Reader,
 			compNameMap[genCompName] = genCompName
 		}
 	case len(undeletedShardingCompSpecs) > int(sharding.Shards):
-		// TODO: order by?
+		slices.SortFunc(compSpecList, func(a, b *appsv1.ClusterComponentSpec) int {
+			return strings.Compare(a.Name, b.Name)
+		})
 		compSpecList = compSpecList[:int(sharding.Shards)]
 	}
 	return compSpecList, nil

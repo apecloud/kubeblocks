@@ -221,7 +221,9 @@ var _ = Describe("plan builder test", func() {
 				env := builder.NewConfigMapBuilder(namespace, name+"-env").GetObject()
 
 				var verticesExpected []*model.ObjectVertex
-				verticesExpected = append(verticesExpected, newVertex(its.DeepCopy(), its, model.ActionStatusPtr()))
+				itsCopy := its.DeepCopy()
+				itsCopy.Status.Replicas = *itsCopy.Spec.Replicas
+				verticesExpected = append(verticesExpected, newVertex(its, itsCopy, model.ActionStatusPtr()))
 				verticesExpected = append(verticesExpected, newVertex(nil, pod, model.ActionCreatePtr()))
 				verticesExpected = append(verticesExpected, newVertex(nil, headlessSvc, model.ActionCreatePtr()))
 				verticesExpected = append(verticesExpected, newVertex(nil, svc, model.ActionCreatePtr()))
@@ -229,7 +231,7 @@ var _ = Describe("plan builder test", func() {
 
 				// build ordered vertices
 				currentTree.SetRoot(its)
-				desiredTree.SetRoot(its)
+				desiredTree.SetRoot(itsCopy)
 				Expect(desiredTree.Add(pod, headlessSvc, svc, env)).Should(Succeed())
 				vertices := buildOrderedVertices(ctx, currentTree, desiredTree)
 

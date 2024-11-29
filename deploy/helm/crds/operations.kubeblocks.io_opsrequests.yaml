@@ -3937,9 +3937,20 @@ spec:
                           minimum: 0
                           type: integer
                       type: object
+                    shards:
+                      description: |-
+                        Specifies the desired number of shards for the component.
+                        This parameter is mutually exclusive with other parameters.
+                      format: int32
+                      type: integer
                   required:
                   - componentName
                   type: object
+                  x-kubernetes-validations:
+                  - message: shards field cannot be used together with scaleOut or
+                      scaleIn
+                    rule: 'has(self.shards) ? (!has(self.scaleOut) && !has(self.scaleIn))
+                      : true'
                 type: array
                 x-kubernetes-list-map-keys:
                 - componentName
@@ -4867,6 +4878,7 @@ spec:
                       - Deleting
                       - Updating
                       - Stopping
+                      - Starting
                       - Running
                       - Stopped
                       - Failed
@@ -8502,6 +8514,11 @@ spec:
                             - name
                             type: object
                           type: array
+                        shards:
+                          description: Records the `shards` of the Component prior
+                            to any changes.
+                          format: int32
+                          type: integer
                         volumeClaimTemplates:
                           description: Records volumes' storage size of the Component
                             prior to any changes.

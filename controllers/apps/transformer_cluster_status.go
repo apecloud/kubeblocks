@@ -126,6 +126,7 @@ func composeClusterPhase(statusList []appsv1.ClusterComponentStatus) appsv1.Clus
 	var (
 		isAllComponentCreating         = true
 		isAllComponentWorking          = true
+		hasComponentStarting           = false
 		hasComponentStopping           = false
 		isAllComponentStopped          = true
 		isAllComponentFailed           = true
@@ -151,6 +152,9 @@ func composeClusterPhase(statusList []appsv1.ClusterComponentStatus) appsv1.Clus
 		if !isPhaseIn(phase, appsv1.CreatingComponentPhase, appsv1.RunningComponentPhase, appsv1.UpdatingComponentPhase) {
 			isAllComponentWorking = false
 		}
+		if isPhaseIn(phase, appsv1.StartingComponentPhase) {
+			hasComponentStarting = true
+		}
 		if isPhaseIn(phase, appsv1.StoppingComponentPhase) {
 			hasComponentStopping = true
 		}
@@ -173,7 +177,7 @@ func composeClusterPhase(statusList []appsv1.ClusterComponentStatus) appsv1.Clus
 		return appsv1.RunningClusterPhase
 	case isAllComponentCreating:
 		return appsv1.CreatingClusterPhase
-	case isAllComponentWorking:
+	case isAllComponentWorking || hasComponentStarting:
 		return appsv1.UpdatingClusterPhase
 	case hasComponentStopping:
 		return appsv1.StoppingClusterPhase

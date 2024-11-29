@@ -337,3 +337,7 @@ Define the replica count for kubeblocks.
 {{- .Values.replicaCount }}
 {{- end }}
 {{- end }}
+
+{{- define "kubeblocks.i18nResourcesName" -}}
+{{ include "kubeblocks.fullname" . }}-i18n-resources
+{{- end }}

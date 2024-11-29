@@ -17,9 +17,9 @@ This tutorial shows how to create and connect to an ApeCloud MySQL cluster.
 
 ### Before you start
 
-* [Install kbcli](./../../installation/install-with-kbcli/install-kbcli.md) if you want to create and connect a MySQL cluster by `kbcli`.
-* Install KubeBlocks [by kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) or [by Helm](./../../installation/install-with-helm/install-kubeblocks.md).
-* Check whether the ApeCloud MySQL Addon is enabled. The ApeCloud MySQL Addon is enabled by KubeBlocks by default. If you disable it when installing KubeBlocks,[enable it](./../../installation/install-with-kbcli/install-addons.md#enabledisable-addons) first.
+* [Install kbcli](./../../installation/install-kbcli.md) if you want to create and connect a MySQL cluster by `kbcli`.
+* [Install KubeBlocks](./../../installation/install-kubeblocks.md).
+* Check whether the ApeCloud MySQL Addon is enabled. The ApeCloud MySQL Addon is enabled by KubeBlocks by default. If you disable it when installing KubeBlocks,[enable it](./../../installation/install-addons.md) first.
   
   <Tabs>
 

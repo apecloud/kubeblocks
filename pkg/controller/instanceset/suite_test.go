@@ -71,7 +71,7 @@ var (
 
 	selectors = map[string]string{
 		constant.AppInstanceLabelKey: name,
-		WorkloadsManagedByLabelKey:   workloads.Kind,
+		WorkloadsManagedByLabelKey:   workloads.InstanceSetKind,
 	}
 	roles = []workloads.ReplicaRole{
 		{

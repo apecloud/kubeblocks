@@ -207,7 +207,7 @@ func main() {
 	if len(managedNamespaces) > 0 {
 		setupLog.Info(fmt.Sprintf("managed namespaces: %s", managedNamespaces))
 	}
-	mgr, err := ctrl.NewManager(intctrlutil.GeKubeRestConfig(userAgent), ctrl.Options{
+	mgr, err := ctrl.NewManager(intctrlutil.GetKubeRestConfig(userAgent), ctrl.Options{
 		Scheme: scheme,
 		Metrics: server.Options{
 			BindAddress:   metricsAddr,

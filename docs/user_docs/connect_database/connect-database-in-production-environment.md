@@ -96,20 +96,18 @@ apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
   name: ops-expose-enable
+  namespace: demo
 spec:
-  clusterRef: mycluster
+  clusterName: mycluster
   expose:
   - componentName: mysql
     services:
-    - annotations:
-        service.beta.kubernetes.io/alibaba-cloud-loadbalancer-address-type: intranet
-      ipFamilyPolicy: PreferDualStack
-      name: vpc
+    - name: vpc
+      roleSelector: leader
       serviceType: LoadBalancer
     switch: Enable
-  ttlSecondsBeforeAbort: 0
+  preConditionDeadlineSeconds: 0
   type: Expose
-EOF
 ```
 
 </TabItem>
@@ -139,20 +137,18 @@ apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
   name: ops-expose-disable
+  namespace: demo
 spec:
-  clusterRef: mycluster
+  clusterName: mycluster
   expose:
   - componentName: mysql
     services:
-    - annotations:
-        service.beta.kubernetes.io/alibaba-cloud-loadbalancer-address-type: intranet
-      ipFamilyPolicy: PreferDualStack
-      name: vpc
+    - name: vpc
+      roleSelector: leader
       serviceType: LoadBalancer
     switch: Disable
-  ttlSecondsBeforeAbort: 0
+  preConditionDeadlineSeconds: 0
   type: Expose
-EOF
 ```
 
 </TabItem>
@@ -186,20 +182,18 @@ apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
   name: ops-expose-enable
+  namespace: demo
 spec:
-  clusterRef: mycluster
+  clusterName: mycluster
   expose:
   - componentName: mysql
     services:
-    - annotations:
-        service.beta.kubernetes.io/alibaba-cloud-loadbalancer-address-type: internet
-      ipFamilyPolicy: PreferDualStack
-      name: internet
+    - name: internet
+      roleSelector: leader
       serviceType: LoadBalancer
     switch: Enable
-  ttlSecondsBeforeAbort: 0
+  preConditionDeadlineSeconds: 0
   type: Expose
-EOF
 ```
 
 </TabItem>
@@ -223,20 +217,18 @@ apiVersion: apps.kubeblocks.io/v1alpha1
 kind: OpsRequest
 metadata:
   name: ops-expose-disable
+  namespace: demo
 spec:
-  clusterRef: mycluster
+  clusterName: mycluster
   expose:
   - componentName: mysql
     services:
-    - annotations:
-        service.beta.kubernetes.io/alibaba-cloud-loadbalancer-address-type: internet
-      ipFamilyPolicy: PreferDualStack
-      name: internet
+    - name: internet
+      roleSelector: leader
       serviceType: LoadBalancer
     switch: Disable
-  ttlSecondsBeforeAbort: 0
+  preConditionDeadlineSeconds: 0
   type: Expose
-EOF
 ```
 
 </TabItem>

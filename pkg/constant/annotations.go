@@ -24,6 +24,7 @@ const (
 	// CRDAPIVersionAnnotationKey indicates the CRD API version of the object.
 	CRDAPIVersionAnnotationKey = "kubeblocks.io/crd-api-version"
 
+	KubeBlocksGenerationKey              = "kubeblocks.io/generation"
 	ClusterSnapshotAnnotationKey         = "kubeblocks.io/cluster-snapshot"          // ClusterSnapshotAnnotationKey saves the snapshot of cluster.
 	EncryptedSystemAccountsAnnotationKey = "kubeblocks.io/encrypted-system-accounts" // EncryptedSystemAccountsAnnotationKey saves the encrypted system accounts.
 	OpsRequestAnnotationKey              = "kubeblocks.io/ops-request"               // OpsRequestAnnotationKey OpsRequest annotation key in Cluster
@@ -32,10 +33,10 @@ const (
 	RestoreFromBackupAnnotationKey       = "kubeblocks.io/restore-from-backup"
 	RestoreDoneAnnotationKey             = "kubeblocks.io/restore-done"
 	BackupSourceTargetAnnotationKey      = "kubeblocks.io/backup-source-target" // RestoreFromBackupAnnotationKey specifies the component to recover from the backup.
+
+	KBAppClusterUIDKey                   = "apps.kubeblocks.io/cluster-uid"
 	BackupPolicyTemplateAnnotationKey    = "apps.kubeblocks.io/backup-policy-template"
 	PVLastClaimPolicyAnnotationKey       = "apps.kubeblocks.io/pv-last-claim-policy"
-	KubeBlocksGenerationKey              = "kubeblocks.io/generation"
-	KBAppClusterUIDKey                   = "apps.kubeblocks.io/cluster-uid"
 	LastRoleSnapshotVersionAnnotationKey = "apps.kubeblocks.io/last-role-snapshot-version"
 	ComponentScaleInAnnotationKey        = "apps.kubeblocks.io/component-scale-in" // ComponentScaleInAnnotationKey specifies whether the component is scaled in
 

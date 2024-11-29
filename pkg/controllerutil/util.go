@@ -163,7 +163,7 @@ func SetControllerReference(owner, object metav1.Object) error {
 	return controllerutil.SetControllerReference(owner, object, innerScheme)
 }
 
-func GeKubeRestConfig(userAgent string) *rest.Config {
+func GetKubeRestConfig(userAgent string) *rest.Config {
 	cfg := ctrl.GetConfigOrDie()
 	clientQPS := viper.GetInt(constant.CfgClientQPS)
 	if clientQPS != 0 {

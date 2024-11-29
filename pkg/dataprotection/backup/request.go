@@ -170,7 +170,7 @@ func (r *Request) buildBackupDataAction(targetPod *corev1.Pod, name string) (act
 
 	backupDataAct := r.ActionSet.Spec.Backup.BackupData
 	switch r.ActionSet.Spec.BackupType {
-	case dpv1alpha1.BackupTypeFull:
+	case dpv1alpha1.BackupTypeFull, dpv1alpha1.BackupTypeSelective:
 		podSpec, err := r.BuildJobActionPodSpec(targetPod, BackupDataContainerName, &backupDataAct.JobActionSpec)
 		if err != nil {
 			return nil, fmt.Errorf("failed to build job action pod spec: %w", err)

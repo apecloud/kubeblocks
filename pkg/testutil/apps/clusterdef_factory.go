@@ -21,6 +21,7 @@ package apps
 
 import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 type MockClusterDefFactory struct {
@@ -33,6 +34,7 @@ func NewClusterDefFactory(name string) *MockClusterDefFactory {
 		&appsv1.ClusterDefinition{
 			Spec: appsv1.ClusterDefinitionSpec{},
 		}, f)
+	f.AddAnnotations(constant.CRDAPIVersionAnnotationKey, appsv1.GroupVersion.String())
 	return f
 }
 

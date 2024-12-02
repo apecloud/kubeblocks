@@ -86,7 +86,7 @@ func (r *ComponentDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ComponentDefinitionReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return intctrlutil.NewNamespacedControllerManagedBy(mgr).
+	return intctrlutil.NewControllerManagedBy(mgr, &appsv1.ComponentDefinition{}).
 		For(&appsv1.ComponentDefinition{}).
 		Complete(r)
 }

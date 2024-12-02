@@ -28,6 +28,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 type MockComponentDefinitionFactory struct {
@@ -49,6 +50,7 @@ func NewComponentDefinitionFactoryExt(name, provider, description, serviceKind, 
 				ServiceVersion: serviceVersion,
 			},
 		}, f)
+	f.AddAnnotations(constant.CRDAPIVersionAnnotationKey, kbappsv1.GroupVersion.String())
 	return f
 }
 

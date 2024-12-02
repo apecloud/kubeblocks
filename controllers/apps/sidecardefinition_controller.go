@@ -108,7 +108,7 @@ func (r *SidecarDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *SidecarDefinitionReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return intctrlutil.NewNamespacedControllerManagedBy(mgr).
+	return intctrlutil.NewControllerManagedBy(mgr).
 		For(&appsv1.SidecarDefinition{}).
 		Watches(&appsv1.ComponentDefinition{}, handler.EnqueueRequestsFromMapFunc(r.matchedCompDefinition)).
 		Complete(r)

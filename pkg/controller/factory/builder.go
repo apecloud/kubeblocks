@@ -77,10 +77,6 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, component
 		SetReplicas(synthesizedComp.Replicas).
 		SetMinReadySeconds(synthesizedComp.MinReadySeconds)
 
-	if shardingName, ok := synthesizedComp.Labels[constant.KBAppShardingNameLabelKey]; ok {
-		itsBuilder.AddLabels(constant.KBAppShardingNameLabelKey, shardingName)
-	}
-
 	var vcts []corev1.PersistentVolumeClaim
 	for _, vct := range synthesizedComp.VolumeClaimTemplates {
 		intctrlutil.MergeMetadataMapInplace(synthesizedComp.DynamicLabels, &vct.ObjectMeta.Labels)

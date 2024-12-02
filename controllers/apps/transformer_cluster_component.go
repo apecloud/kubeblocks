@@ -811,6 +811,12 @@ func (h *clusterShardingHandler) updateComps(transCtx *clusterTransformContext, 
 }
 
 func (h *clusterShardingHandler) protoComps(transCtx *clusterTransformContext, name string, running *appsv1.Component) ([]*appsv1.Component, error) {
+	setShardingNameLabel := func(comp *appsv1.Component, shardingName string) {
+		if comp.Spec.Labels == nil {
+			comp.Spec.Labels = make(map[string]string)
+		}
+		comp.Spec.Labels[constant.KBAppShardingNameLabelKey] = shardingName
+	}
 	build := func(sharding *appsv1.ClusterSharding) ([]*appsv1.Component, error) {
 		labels := map[string]string{
 			constant.KBAppShardingNameLabelKey: sharding.Name,
@@ -829,6 +835,7 @@ func (h *clusterShardingHandler) protoComps(transCtx *clusterTransformContext, n
 				annotations = transCtx.annotations[spec.Name]
 			}
 			obj, err := buildComponentWrapper(transCtx, spec, labels, annotations, running)
+			setShardingNameLabel(obj, sharding.Name)
 			if err != nil {
 				return nil, err
 			}

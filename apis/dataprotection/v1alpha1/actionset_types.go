@@ -29,10 +29,11 @@ type ActionSetSpec struct {
 	// - `Incremental` back up data that have changed since the last backup (either full or incremental).
 	// - `Differential` back up data that has changed since the last full backup.
 	// - `Continuous` back up transaction logs continuously, such as MySQL binlog, PostgreSQL WAL, etc.
+	// - `Selective` back up data more precisely, use custom parameters, such as specific databases or tables.
 	//
 	// Continuous backup is essential for implementing Point-in-Time Recovery (PITR).
 	//
-	// +kubebuilder:validation:Enum={Full,Incremental,Differential,Continuous}
+	// +kubebuilder:validation:Enum={Full,Incremental,Differential,Continuous,Selective}
 	// +kubebuilder:default=Full
 	// +kubebuilder:validation:Required
 	BackupType BackupType `json:"backupType"`
@@ -91,7 +92,7 @@ type ActionSetStatus struct {
 
 // BackupType the backup type.
 // +enum
-// +kubebuilder:validation:Enum={Full,Incremental,Differential,Continuous}
+// +kubebuilder:validation:Enum={Full,Incremental,Differential,Continuous,Selective}
 type BackupType string
 
 const (
@@ -99,6 +100,7 @@ const (
 	BackupTypeIncremental  BackupType = "Incremental"
 	BackupTypeDifferential BackupType = "Differential"
 	BackupTypeContinuous   BackupType = "Continuous"
+	BackupTypeSelective    BackupType = "Selective"
 )
 
 type BackupActionSpec struct {

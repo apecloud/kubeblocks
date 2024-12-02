@@ -282,11 +282,13 @@ spec:
                   - Incremental
                   - Differential
                   - Continuous
+                  - Selective
                 - enum:
                   - Full
                   - Incremental
                   - Differential
                   - Continuous
+                  - Selective
                 default: Full
                 description: |-
                   Specifies the backup type. Supported values include:
@@ -296,6 +298,7 @@ spec:
                   - `Incremental` back up data that have changed since the last backup (either full or incremental).
                   - `Differential` back up data that has changed since the last full backup.
                   - `Continuous` back up transaction logs continuously, such as MySQL binlog, PostgreSQL WAL, etc.
+                  - `Selective` back up data more precisely, use custom parameters, such as specific databases or tables.
 
 
                   Continuous backup is essential for implementing Point-in-Time Recovery (PITR).

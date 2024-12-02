@@ -43,6 +43,7 @@ var _ = Describe("builder", func() {
 	const compDefName = "test-compdef"
 	const clusterName = "test-cluster"
 	const mysqlCompName = "mysql"
+	const dynamicLabel = "dynamic"
 
 	allFieldsCompDefObj := func(needCreate bool) *appsv1.ComponentDefinition {
 		By("By assure an componentDefinition obj")
@@ -78,6 +79,9 @@ var _ = Describe("builder", func() {
 	newAllFieldsSynthesizedComponent := func(compDef *appsv1.ComponentDefinition, cluster *appsv1.Cluster) *component.SynthesizedComponent {
 		By("assign every available fields")
 		comp, err := component.BuildComponent(cluster, &cluster.Spec.ComponentSpecs[0], nil, nil)
+		comp.Spec.Labels = map[string]string{
+			dynamicLabel: dynamicLabel,
+		}
 		Expect(err).Should(Succeed())
 		synthesizeComp, err := component.BuildSynthesizedComponent(testCtx.Ctx, testCtx.Cli, compDef, comp, cluster)
 		Expect(err).Should(Succeed())
@@ -101,6 +105,7 @@ var _ = Describe("builder", func() {
 			compDef, cluster, synthesizedComponent := newClusterObjs(nil)
 
 			its, err := BuildInstanceSet(synthesizedComponent, nil)
+			Expect(its.Labels).Should(HaveKey(dynamicLabel))
 			Expect(err).Should(BeNil())
 			Expect(its).ShouldNot(BeNil())
 

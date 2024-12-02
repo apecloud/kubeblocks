@@ -405,6 +405,11 @@ var _ = Describe("Cluster Controller", func() {
 			constant.KBAppShardingNameLabelKey: compName,
 		}
 		Eventually(testapps.List(&testCtx, generics.ComponentSignature, ml, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(shards))
+
+		By("checking the sharding name label")
+		compList := &appsv1.ComponentList{}
+		Expect(k8sClient.List(ctx, compList, ml)).Should(Succeed())
+		Expect(compList.Items[0].Spec.Labels[constant.KBAppShardingNameLabelKey]).Should(Equal(compName))
 	}
 
 	testClusterComponentScaleIn := func(compName, compDefName string) {

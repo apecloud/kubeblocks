@@ -525,6 +525,12 @@ var _ = Describe("cluster component transformer test", func() {
 		setters = append(setters, func(comp *appsv1.Component) {
 			comp.Labels[constant.KBAppShardingNameLabelKey] = shardingName
 		})
+		setters = append(setters, func(comp *appsv1.Component) {
+			if comp.Spec.Labels == nil {
+				comp.Spec.Labels = map[string]string{}
+			}
+			comp.Spec.Labels[constant.KBAppShardingNameLabelKey] = shardingName
+		})
 		return newCompObj(transCtx, specs[0], setters...)
 	}
 
@@ -1262,7 +1268,6 @@ var _ = Describe("cluster component transformer test", func() {
 			}
 			transCtx.Client = model.NewGraphClient(reader)
 			transCtx.OrigCluster.Generation += 1 // mock cluster spec update
-
 			err := transformer.Transform(transCtx, dag)
 			Expect(err).Should(BeNil())
 

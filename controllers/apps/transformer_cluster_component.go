@@ -835,10 +835,10 @@ func (h *clusterShardingHandler) protoComps(transCtx *clusterTransformContext, n
 				annotations = transCtx.annotations[spec.Name]
 			}
 			obj, err := buildComponentWrapper(transCtx, spec, labels, annotations, running)
-			setShardingNameLabel(obj, sharding.Name)
 			if err != nil {
 				return nil, err
 			}
+			setShardingNameLabel(obj, sharding.Name)
 			objs = append(objs, obj)
 		}
 		return objs, nil

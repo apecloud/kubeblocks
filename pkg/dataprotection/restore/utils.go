@@ -275,7 +275,7 @@ func ValidateAndInitRestoreMGR(reqCtx intctrlutil.RequestCtx,
 
 	// build backupActionSets of prepareData and postReady stage based on the specified backup's type.
 	switch backupType {
-	case dpv1alpha1.BackupTypeFull:
+	case dpv1alpha1.BackupTypeFull, dpv1alpha1.BackupTypeSelective:
 		restoreMgr.SetBackupSets(*backupSet)
 	case dpv1alpha1.BackupTypeIncremental:
 		err = restoreMgr.BuildIncrementalBackupActionSets(reqCtx, cli, *backupSet)

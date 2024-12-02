@@ -171,6 +171,7 @@ func MockActionSetWithSchema(testCtx *testutil.TestContext, actionSet *dpv1alpha
 		}
 		as.Spec.Backup.WithParameters = []string{ParameterString, ParameterArray}
 		as.Spec.Restore.WithParameters = []string{ParameterString, ParameterArray}
+		as.Spec.BackupType = dpv1alpha1.BackupTypeSelective
 	})).Should(Succeed())
 	By("the actionSet should be available")
 	Eventually(testapps.CheckObj(testCtx, client.ObjectKeyFromObject(actionSet),

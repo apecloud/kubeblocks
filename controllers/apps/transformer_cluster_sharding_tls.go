@@ -49,7 +49,7 @@ func (t *clusterShardingTLSTransformer) Transform(ctx graph.TransformContext, da
 	}
 
 	if common.IsCompactMode(transCtx.Cluster.Annotations) {
-		transCtx.V(1).Info("Cluster is in compact mode, no need to create account related objects", "cluster", client.ObjectKeyFromObject(transCtx.Cluster))
+		transCtx.V(1).Info("Cluster is in compact mode, no need to create tls related objects", "cluster", client.ObjectKeyFromObject(transCtx.Cluster))
 		return nil
 	}
 

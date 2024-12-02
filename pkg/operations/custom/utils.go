@@ -53,6 +53,18 @@ const (
 	kbEnvAccountPassword     = "KB_ACCOUNT_PASSWORD"
 )
 
+func getComponentInfo(opsDef *opsv1alpha1.OpsDefinition, compDefName string) *opsv1alpha1.ComponentInfo {
+	if opsDef == nil {
+		return nil
+	}
+	for _, v := range opsDef.Spec.ComponentInfos {
+		if component.PrefixOrRegexMatched(compDefName, v.ComponentDefinitionName) {
+			return &v
+		}
+	}
+	return nil
+}
+
 // buildComponentDefEnvs builds the env vars by the opsDefinition.spec.componentDefinitionRef
 func buildComponentEnvs(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
@@ -78,7 +90,7 @@ func buildComponentEnvs(reqCtx intctrlutil.RequestCtx,
 	if err != nil {
 		return err
 	}
-	componentInfo := opsDef.GetComponentInfo(compDef.Name)
+	componentInfo := getComponentInfo(opsDef, compDef.Name)
 	if componentInfo == nil {
 		return intctrlutil.NewFatalError(fmt.Sprintf(`componentDefinition "%s" is not support for this operations`, compDef.Name))
 	}

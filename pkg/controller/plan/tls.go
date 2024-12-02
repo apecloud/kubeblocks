@@ -38,38 +38,8 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 )
 
-// ComposeTLSSecret composes a TSL secret object.
-// REVIEW/TODO:
-//  1. missing public function doc
-//  2. should avoid using Go template to call a function, this is too hacky & costly,
-//     should just call underlying registered Go template function.
-func ComposeTLSSecret(synthesizedComp component.SynthesizedComponent) (*v1.Secret, error) {
-	secret := BuildTLSSecret(synthesizedComp)
-	// use ca gen cert
-	// IP: 127.0.0.1 and ::1
-	// DNS: localhost and *.<clusterName>-<componentName>-headless.<namespace>.svc.cluster.local
-	const spliter = "___spliter___"
-	SignedCertTpl := fmt.Sprintf(`
-	{{- $ca := genCA "KubeBlocks" 36500 -}}
-	{{- $cert := genSignedCert "%s peer" (list "127.0.0.1" "::1") (list "localhost" "*.%s-%s-headless.%s.svc.cluster.local") 36500 $ca -}}
-	{{- $ca.Cert -}}
-	{{- print "%s" -}}
-	{{- $cert.Cert -}}
-	{{- print "%s" -}}
-	{{- $cert.Key -}}
-`, synthesizedComp.Name, synthesizedComp.ClusterName, synthesizedComp.Name, synthesizedComp.Namespace, spliter, spliter)
-	out, err := buildFromTemplate(SignedCertTpl, nil)
-	if err != nil {
-		return nil, err
-	}
-	parts := strings.Split(out, spliter)
-	if len(parts) != 3 {
-		return nil, errors.Errorf("generate TLS certificates failed with cluster name %s, component name %s in namespace %s", synthesizedComp.ClusterName, synthesizedComp.Name, synthesizedComp.Namespace)
-	}
-	secret.StringData[constant.CAName] = parts[0]
-	secret.StringData[constant.CertName] = parts[1]
-	secret.StringData[constant.KeyName] = parts[2]
-	return secret, nil
+func GenerateTLSSecretName(clusterName, componentName string) string {
+	return clusterName + "-" + componentName + "-tls-certs"
 }
 
 func BuildTLSSecret(synthesizedComp component.SynthesizedComponent) *v1.Secret {
@@ -84,8 +54,52 @@ func BuildTLSSecret(synthesizedComp component.SynthesizedComponent) *v1.Secret {
 		GetObject()
 }
 
-func GenerateTLSSecretName(clusterName, componentName string) string {
-	return clusterName + "-" + componentName + "-tls-certs"
+// ComposeTLSSecret composes a TSL secret object.
+// REVIEW/TODO:
+//  1. missing public function doc
+//  2. should avoid using Go template to call a function, this is too hacky & costly,
+//     should just call underlying registered Go template function.
+func ComposeTLSSecret(compDef *appsv1.ComponentDefinition, synthesizedComp component.SynthesizedComponent, secret *v1.Secret) (*v1.Secret, error) {
+	var (
+		namespace   = synthesizedComp.Namespace
+		clusterName = synthesizedComp.ClusterName
+		compName    = synthesizedComp.Name
+	)
+	if secret == nil {
+		secret = BuildTLSSecret(synthesizedComp)
+	}
+	// use ca gen cert
+	// IP: 127.0.0.1 and ::1
+	// DNS: localhost and *.<clusterName>-<compName>-headless.<namespace>.svc.cluster.local
+	const spliter = "___spliter___"
+	SignedCertTpl := fmt.Sprintf(`
+	{{- $ca := genCA "KubeBlocks" 36500 -}}
+	{{- $cert := genSignedCert "%s peer" (list "127.0.0.1" "::1") (list "localhost" "*.%s-%s-headless.%s.svc.cluster.local") 36500 $ca -}}
+	{{- $ca.Cert -}}
+	{{- print "%s" -}}
+	{{- $cert.Cert -}}
+	{{- print "%s" -}}
+	{{- $cert.Key -}}
+`, compName, clusterName, compName, namespace, spliter, spliter)
+	out, err := buildFromTemplate(SignedCertTpl, nil)
+	if err != nil {
+		return nil, err
+	}
+	parts := strings.Split(out, spliter)
+	if len(parts) != 3 {
+		return nil, errors.Errorf("generate TLS certificates failed with cluster name %s, component name %s in namespace %s",
+			clusterName, compName, namespace)
+	}
+	if compDef.Spec.TLS.CAFile != nil {
+		secret.StringData[*compDef.Spec.TLS.CAFile] = parts[0]
+	}
+	if compDef.Spec.TLS.CertFile != nil {
+		secret.StringData[*compDef.Spec.TLS.CertFile] = parts[1]
+	}
+	if compDef.Spec.TLS.KeyFile != nil {
+		secret.StringData[*compDef.Spec.TLS.KeyFile] = parts[2]
+	}
+	return secret, nil
 }
 
 func buildFromTemplate(tpl string, vars interface{}) (string, error) {
@@ -99,8 +113,7 @@ func buildFromTemplate(tpl string, vars interface{}) (string, error) {
 	return b.String(), nil
 }
 
-func CheckTLSSecretRef(ctx context.Context, cli client.Reader, namespace string,
-	secretRef *appsv1.TLSSecretRef) error {
+func CheckTLSSecretRef(ctx context.Context, cli client.Reader, namespace string, secretRef *appsv1.TLSSecretRef) error {
 	if secretRef == nil {
 		return errors.New("issuer.secretRef shouldn't be nil when issuer is UserProvided")
 	}

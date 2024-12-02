@@ -1253,6 +1253,18 @@ spec:
                 required:
                 - compDef
                 type: object
+              tls:
+                description: |-
+                  Defines the TLS for the sharding.
+
+
+                  This field is immutable.
+                properties:
+                  shared:
+                    description: Specifies whether the TLS configuration is shared
+                      across all shards in the sharding.
+                    type: boolean
+                type: object
               updateStrategy:
                 default: Serial
                 description: |-

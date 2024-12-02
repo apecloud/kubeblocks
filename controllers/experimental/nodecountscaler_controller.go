@@ -32,6 +32,7 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	experimental "github.com/apecloud/kubeblocks/apis/experimental/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 // NodeCountScalerReconciler reconciles a NodeCountScaler object
@@ -69,7 +70,7 @@ func (r *NodeCountScalerReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *NodeCountScalerReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
+	return intctrlutil.NewControllerManagedBy(mgr).
 		For(&experimental.NodeCountScaler{}).
 		Watches(&corev1.Node{}, &nodeScalingHandler{r.Client}).
 		Watches(&appsv1.Cluster{}, &clusterHandler{r.Client}).

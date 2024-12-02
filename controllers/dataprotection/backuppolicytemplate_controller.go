@@ -190,7 +190,7 @@ func (r *BackupPolicyTemplateReconciler) compatibleBackupPolicyTemplate(ctx cont
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *BackupPolicyTemplateReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return intctrlutil.NewNamespacedControllerManagedBy(mgr).
+	return intctrlutil.NewControllerManagedBy(mgr).
 		For(&dpv1alpha1.BackupPolicyTemplate{}).
 		Watches(&appsv1.ComponentDefinition{}, handler.EnqueueRequestsFromMapFunc(r.compatibleBackupPolicyTemplate)).
 		Complete(r)

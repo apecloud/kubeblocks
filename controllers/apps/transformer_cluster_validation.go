@@ -146,7 +146,6 @@ func loadNCheckClusterDefinition(transCtx *clusterTransformContext, cluster *app
 			return err
 		}
 	}
-
 	if cd != nil {
 		if cd.Generation != cd.Status.ObservedGeneration {
 			return fmt.Errorf("the referenced ClusterDefinition is not up to date: %s", cd.Name)
@@ -154,10 +153,6 @@ func loadNCheckClusterDefinition(transCtx *clusterTransformContext, cluster *app
 		if cd.Status.Phase != appsv1.AvailablePhase {
 			return fmt.Errorf("the referenced ClusterDefinition is unavailable: %s", cd.Name)
 		}
-	}
-
-	if cd == nil {
-		cd = &appsv1.ClusterDefinition{}
 	}
 	transCtx.clusterDef = cd
 	return nil

@@ -51,8 +51,7 @@ type informerManager struct {
 
 	eventChan chan event.GenericEvent
 
-	informerSet     sets.Set[schema.GroupVersionKind]
-	informerSetLock sync.Mutex
+	informerSet sets.Set[schema.GroupVersionKind]
 
 	cache cache.Cache
 	cli   client.Client
@@ -87,9 +86,6 @@ func (m *informerManager) Start(ctx context.Context) error {
 }
 
 func (m *informerManager) watch(resource schema.GroupVersionKind) error {
-	m.informerSetLock.Lock()
-	defer m.informerSetLock.Unlock()
-
 	if _, ok := m.informerSet[resource]; ok {
 		return nil
 	}
@@ -126,7 +122,11 @@ func (m *informerManager) processNextWorkItem() bool {
 	}
 	// get involved object if 'object' is an Event
 	if evt, ok := object.(*corev1.Event); ok {
-		ro, err := m.scheme.New(getGVK(&evt.InvolvedObject))
+		gvk := getGVK(&evt.InvolvedObject)
+		if !m.informerSet.Has(gvk) {
+			return true
+		}
+		ro, err := m.scheme.New(gvk)
 		if err != nil {
 			m.logger.Error(err, "new an event involved object failed")
 			return true

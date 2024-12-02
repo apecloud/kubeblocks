@@ -182,7 +182,7 @@ func setupFlags() {
 		"Enable the extensions controller manager.")
 	flag.Bool(experimentalFlagKey.String(), false,
 		"Enable the experimental controller manager.")
-	flag.Bool(traceFlagKey.String(), true,
+	flag.Bool(traceFlagKey.String(), false,
 		"Enable the trace controller manager.")
 
 	flag.String(multiClusterKubeConfigFlagKey.String(), "", "Paths to the kubeconfig for multi-cluster accessing.")

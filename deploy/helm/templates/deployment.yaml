@@ -72,7 +72,7 @@ spec:
             - "--operations={{ ne .Values.controllers.operations.enabled false }}"
             - "--extensions={{- default "true" ( include "kubeblocks.addonControllerEnabled" . ) }}"
             - "--experimental={{- default "false" .Values.controllers.experimental.enabled }}"
-            - "--trace={{- default "true" .Values.controllers.trace.enabled }}"
+            - "--trace={{- default "false" .Values.controllers.trace.enabled }}"
             {{- with .Values.managedNamespaces }}
             - "--managed-namespaces={{ . }}"
             {{- end }}

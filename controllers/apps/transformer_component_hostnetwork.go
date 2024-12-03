@@ -20,8 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
-	"fmt"
-	
 	corev1 "k8s.io/api/core/v1"
 
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -53,67 +51,48 @@ func (t *componentHostNetworkTransformer) Transform(ctx graph.TransformContext, 
 }
 
 func allocateHostPorts(synthesizedComp *component.SynthesizedComponent) (map[string]map[string]int32, error) {
-	// container -> portName -> allocateRequired
 	ports := map[string]map[string]bool{}
-
-	for _, c := range synthesizedComp.PodSpec.Containers {
-		ports[c.Name] = make(map[string]bool)
-		for _, p := range c.Ports {
-			ports[c.Name][p.Name] = false
-		}
-	}
-
 	for _, c := range synthesizedComp.HostNetwork.ContainerPorts {
-		if containerPorts, exists := ports[c.Container]; exists {
-			for _, p := range c.Ports {
-				containerPorts[p] = true
+		for _, p := range c.Ports {
+			if _, ok := ports[c.Container]; !ok {
+				ports[c.Container] = map[string]bool{}
 			}
+			ports[c.Container][p] = true
 		}
 	}
 
 	pm := intctrlutil.GetPortManager()
-	needAllocate := func(containerName string, portName string) bool {
-		if containerPorts, ok := ports[containerName]; ok {
-			return containerPorts[portName]
+	needAllocate := func(c string, p string) bool {
+		containerPorts, ok := ports[c]
+		if !ok {
+			return false
 		}
-		return false
+		return containerPorts[p]
 	}
-
 	return allocateHostPortsWithFunc(pm, synthesizedComp, needAllocate)
 }
 
 func allocateHostPortsWithFunc(pm *intctrlutil.PortManager, synthesizedComp *component.SynthesizedComponent,
 	needAllocate func(string, string) bool) (map[string]map[string]int32, error) {
-	// container -> portName -> port
 	ports := map[string]map[string]int32{}
-
-	insert := func(containerName, portName string, portValue int32) {
-		if _, ok := ports[containerName]; !ok {
-			ports[containerName] = map[string]int32{}
+	insert := func(c, pk string, pv int32) {
+		if _, ok := ports[c]; !ok {
+			ports[c] = map[string]int32{}
 		}
-		ports[containerName][portName] = portValue
+		ports[c][pk] = pv
 	}
-
-	for _, container := range synthesizedComp.PodSpec.Containers {
-		for _, port := range container.Ports {
-			portKey := intctrlutil.BuildHostPortName(
-				synthesizedComp.ClusterName,
-				synthesizedComp.Name,
-				container.Name,
-				port.Name,
-			)
-
-			if needAllocate(container.Name, port.Name) {
-				allocatedPort, err := pm.AllocatePort(portKey)
+	for _, c := range synthesizedComp.PodSpec.Containers {
+		for _, p := range c.Ports {
+			portKey := intctrlutil.BuildHostPortName(synthesizedComp.ClusterName, synthesizedComp.Name, c.Name, p.Name)
+			if needAllocate(c.Name, p.Name) {
+				port, err := pm.AllocatePort(portKey)
 				if err != nil {
-					return nil, fmt.Errorf("failed to allocate port for container %s, port %s: %v",
-						container.Name, port.Name, err)
+					return nil, err
 				}
-				insert(container.Name, port.Name, allocatedPort)
+				insert(c.Name, p.Name, port)
 			} else {
-				if err := pm.UsePort(portKey, port.ContainerPort); err != nil {
-					return nil, fmt.Errorf("failed to use port for container %s, port %s: %v",
-						container.Name, port.Name, err)
+				if err := pm.UsePort(portKey, p.ContainerPort); err != nil {
+					return nil, err
 				}
 			}
 		}

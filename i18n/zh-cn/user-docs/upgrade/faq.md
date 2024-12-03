@@ -2,7 +2,7 @@
 title: FAQ
 description: 升级, faq
 keywords: [升级, FAQ]
-sidebar_position: 3
+sidebar_position: 4
 sidebar_label: FAQ
 ---
 
@@ -58,11 +58,11 @@ Error: UPGRADE FAILED: cannot patch "kubeblocks-dataprotection" with kind Deploy
 如果出现这种错误，可以先手动删除 `kubeblocks` 和 `kubeblocks-dataprotection` 这两个 deployment，然后再执行 `helm upgrade` 升级到 KubeBlocks v0.9.1。
 
 ```bash
-# Scale to 0 replica
+# 水平缩容至 0 replica
 kubectl -n kb-system scale deployment kubeblocks --replicas 0
 kubectl -n kb-system scale deployment kubeblocks-dataprotection --replicas 0
 
-# Delete deployments
+# 删除 deployments
 kubectl delete -n kb-system deployments.apps kubeblocks kubeblocks-dataprotection
 ```
 

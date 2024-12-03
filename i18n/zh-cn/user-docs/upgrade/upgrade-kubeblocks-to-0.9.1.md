@@ -6,13 +6,17 @@ sidebar_position: 1
 sidebar_label: 升级到 KubeBlocks v0.9.1
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # 升级到 KubeBlocks v0.9.1
 
 本文档将介绍如何升级至 KubeBlocks v0.9.1。
 
 :::note
 
-在升级前，请先执行 `helm -n kb-system list | grep kubeblocks` 查看正在使用的 KubeBlocks 版本，并根据不同版本，执行升级操作。
+- 在升级前，请先执行 `helm -n kb-system list | grep kubeblocks` 查看正在使用的 KubeBlocks 版本，并根据不同版本，执行升级操作。
+- v0.9.2 的升级操作与 v0.9.1 相同，可按需替换版本，按照本文档操作。
 
 :::
 
@@ -23,6 +27,10 @@ KubeBlocks v0.9.1 可以兼容 KubeBlocks v0.8 的 API，但不保证兼容 v0.8
 如果您是从 v0.8 升级到 v0.9，需要打开 webhook，以确保可用性。
 
 ## 从 v0.9.0 升级
+
+<Tabs>
+
+<TabItem value="Helm" label="Helm" default>
 
 1. 查看引擎，确认引擎是否已添加 `"helm.sh/resource-policy": "keep"` 注解。
 
@@ -68,7 +76,43 @@ KubeBlocks v0.9.1 可以兼容 KubeBlocks v0.8 的 API，但不保证兼容 v0.8
 
     :::
 
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+1. 下载 kbcli v0.9.1。
+
+    ```bash
+    curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash -s 0.9.1
+    ```
+
+2. 升级 KubeBlocks。
+
+    ```bash
+    kbcli kb upgrade --version 0.9.1
+    ```
+
+    :::warning
+
+    为避免影响已有的数据库集群，升级 KubeBlocks 至 v0.9.1 时，默认不会升级已经安装的引擎版本，如果要升级引擎版本至 KubeBlocks v0.9.1 内置引擎的版本，可以执行如下命令，这可能导致已有集群发生重启，影响可用性，请务必谨慎操作。
+
+    ```bash
+    kbcli kb upgrade --version 0.9.1 --set upgradeAddons=true
+    ```
+
+    :::
+
+   kbcli 会默认为已有引擎添加 `"helm.sh/resource-policy": "keep"` 注解，确保升级过程中已有引擎不会被删除。
+
+</TabItem>
+
+</Tabs>
+
 ## 从 v0.8.x 升级
+
+<Tabs>
+
+<TabItem value="Helm" label="Helm" default>
 
 1. 查看引擎，确认引擎是否已添加 `"helm.sh/resource-policy": "keep"` 注解。
 
@@ -104,7 +148,7 @@ KubeBlocks v0.9.1 可以兼容 KubeBlocks v0.8 的 API，但不保证兼容 v0.8
 
 4. 升级 KubeBlocks。
 
-    如果您当前运行的 KubeBlocks 使用的镜像仓库为 `infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com`，升级时请显式设置镜像仓库。
+    如果您当前运行的 KubeBlocks 使用的镜像仓库为 `infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com`，升级时请显式设置镜像仓库。具体可参考 [FAQ](./faq.md#升级时如何指定镜像仓库)
 
     设置 `admissionWebhooks.enabled=true` 将启动 webhook，用于 ConfigConstraint API 多版本转换。
 
@@ -133,6 +177,51 @@ KubeBlocks v0.9.1 可以兼容 KubeBlocks v0.8 的 API，但不保证兼容 v0.8
 
     :::
 
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+1. 下载 kbcli v0.9.1。
+
+    ```bash
+    curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash -s 0.9.1
+    ```
+
+2. 升级 KubeBlocks。
+
+    查看 kbcli 版本，确保您使用的 kbcli 版本为 v0.9.1。
+
+    ```bash
+    kbcli version
+    ```
+
+    如果您当前运行的 KubeBlocks 使用的镜像仓库为 `infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com`，升级时请显式设置镜像仓库。具体操作可参考 [FAQ](./faq.md#升级时如何指定镜像仓库)。
+
+    ```bash
+    kbcli kb upgrade --version 0.9.1 \
+      --set admissionWebhooks.enabled=true \
+      --set admissionWebhooks.ignoreReplicasCheck=true
+    ```
+
+    :::warning
+
+    为避免影响已有的数据库集群，升级 KubeBlocks 至 v0.9.1 时，默认不会升级已经安装的引擎版本，如果要升级引擎版本至 KubeBlocks v0.9.1 内置引擎的版本，可以执行如下命令，这可能导致已有集群发生重启，影响可用性，请务必谨慎操作。
+
+    ```bash
+    kbcli kb upgrade --version 0.9.1 \
+      --set upgradeAddons=true \
+      --set admissionWebhooks.enabled=true \
+      --set admissionWebhooks.ignoreReplicasCheck=true
+    ```
+
+    :::
+
+    kbcli 会默认为已有引擎添加 `"helm.sh/resource-policy": "keep"` 注解，确保升级过程中已有引擎不会被删除。
+
+</TabItem>
+
+</Tabs>
+
 ## 升级引擎
 
 如果您在上述步骤中，没有将 `upgradeAddons` 指定为 `true`，或者您想要使用的引擎不在默认列表中，但您想要使用 v0.9.1 API，可使用如下方式升级引擎。
@@ -144,6 +233,10 @@ KubeBlocks v0.9.1 可以兼容 KubeBlocks v0.8 的 API，但不保证兼容 v0.8
 - 如果您想要升级 `clickhouse/milvus/elasticsearch/llm`，您需要先升级 KubeBlocks，再升级引擎，否在将无法在 v0.9.1 中正常使用。
 
 :::
+
+<Tabs>
+
+<TabItem value="Helm" label="Helm" default>
 
 ```bash
 # 添加 Helm 仓库
@@ -161,6 +254,37 @@ helm search repo kubeblocks-addons/{addon-name} --versions --devel
 # 更新引擎版本
 helm upgrade -i {addon-release-name} kubeblocks-addons/{addon-name} --version x.y.z -n kb-system   
 ```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+```bash
+# 查看引擎索引列表
+kbcli addon index list
+
+# 更新某一个索引， 默认的是 kubeblocks
+kbcli addon index update kubeblocks
+
+# 检索可用的引擎版本
+kbcli addon search {addon-name}
+
+# 安装引擎
+kbcli addon install {addon-name} --version x.y.z
+
+# 更新引擎到指定版本
+kbcli addon upgrade {addon-name} --version x.y.z
+
+# 强制更新引擎到指定版本
+kbcli addon upgrade {addon-name} --version x.y.z --force
+
+# 查看指定引擎版本
+kbcli addon list | grep {addon-name}
+```
+
+</TabItem>
+
+</Tabs>
 
 ## FAQ
 

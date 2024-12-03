@@ -15,11 +15,15 @@ import TabItem from '@theme/TabItem';
 
 :::note
 
-在升级前，请先执行 `helm -n kb-system list | grep kubeblocks` 查看正在使用的 KubeBlocks 版本，并根据不同版本，执行升级操作。
+在升级前，请先执行 `helm -n kb-system list | grep kubeblocks` 或者 `kbcli version` 查看正在使用的 KubeBlocks 版本，并根据不同版本，执行升级操作。
 
 :::
 
 ## 从 v0.7 升级
+
+<Tabs>
+
+<TabItem value="Helm" label="Helm" default>
 
 1. 设置 keepAddons。
 
@@ -68,6 +72,46 @@ helm -n kb-system upgrade kubeblocks kubeblocks/kubeblocks --version 0.8.1 --set
 ```
 
 :::
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+1. 下载 kbcli v0.8 版本。
+
+    ```shell
+    curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash -s 0.8.1
+    ```
+
+2. 升级 KubeBlocks。
+
+    ```shell
+
+    kbcli kb upgrade --version 0.8.1 --set dataProtection.image.datasafed.tag=0.1.0
+
+    ```
+
+    kbcli 会默认为已有 addon 添加 annotation `"helm.sh/resource-policy": "keep"`，确保升级过程中已有的 addon 不会被删除。
+
+</TabItem>
+
+</Tabs>
+
+## 从 v0.6 版本升级
+
+如果当前使用的是 KubeBlocks v0.6 版本，请先将 KubeBlocks 升级至 v0.7.2 版本，操作如下：
+
+1. 下载 kbcli v0.7.2 版本。
+
+    ```shell
+    curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash -s 0.7.2
+    ```
+
+2. 升级至 KubeBlocks v0.7.2。
+
+    ```shell
+    kbcli kb upgrade --version 0.7.2
+    ```
 
 ## FAQ
 

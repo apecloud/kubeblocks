@@ -68,9 +68,9 @@ kubectl delete -n kb-system deployments.apps kubeblocks kubeblocks-dataprotectio
 
 ## Specify an image registry during KubeBlocks upgrade
 
-KubeBlocks v0.8.x uses `infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com` and `docker.io` as image registries and KubeBlocks v0.9.x uses `apecloud-registry.cn-zhangjiakou.cr.aliyuncs.com` and `docker.io`.
+The image registries for KubeBlocks v0.8.x include `docker.io` and a registry starting with `infracreate-registry`. However, v0.9.x adopts new image registries, `docker.io` and `apecloud-registry.cn-zhangjiakou.cr.aliyuncs.com`. If your current configuration uses the image registry starting with `infracreate-registry`, ensure you specify the new image address during the upgrade.
 
-When upgrading KubeBlocks, you can override the default image registry by specifying the following parameters.
+You can override the default image registry by specifying the following parameters.
 
 <Tabs>
 

@@ -6,11 +6,15 @@ sidebar_position: 1
 sidebar_label: Upgrade to KubeBlocks v0.9.1
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # Upgrade to KubeBlocks v0.9.1
 
 :::note
 
-Execute `helm -n kb-system list | grep kubeblocks` to check the current KubeBlocks version you are running before upgrading KubeBlocks.
+- Execute `helm -n kb-system list | grep kubeblocks` or `kbcli version` to check the current KubeBlocks version you are running before upgrading KubeBlocks.
+- The upgrade process for v0.9.2 is identical to that of v0.9.1. Simply follow the v0.9.1 tutorial, updating the version number as needed to complete the upgrade to v0.9.2.
 
 :::
 
@@ -21,6 +25,10 @@ KubeBlocks v0.9.1 is compatible with KubeBlocks v0.8 APIs, but compatibility wit
 If you are upgrading from v0.8 to v0.9, it's recommended to enable webhook to ensure the availability.
 
 ## Upgrade from KubeBlocks v0.9.0
+
+<Tabs>
+
+<TabItem value="Helm" label="Helm" default>
 
 1. View Addon and check whether the `"helm.sh/resource-policy": "keep"` annotation exists.
 
@@ -66,7 +74,43 @@ If you are upgrading from v0.8 to v0.9, it's recommended to enable webhook to en
 
     :::
 
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+1. Download kbcli v0.9.1.
+
+    ```bash
+    curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash -s 0.9.1
+    ```
+
+2. Upgrade KubeBlocks.
+
+    ```bash
+    kbcli kb upgrade --version 0.9.1
+    ```
+
+    :::warning
+
+    To avoid affecting existing database clusters, when upgrading to KubeBlocks v0.9.1, the versions of already-installed Addons will not be upgraded by default. If you want to upgrade the Addons to the versions built into KubeBlocks v0.9.1, execute the following command. Note that this may restart existing clusters and affect availability. Please proceed with caution.
+
+    ```bash
+    kbcli kb upgrade --version 0.9.1 --set upgradeAddons=true
+    ```
+
+    :::
+
+   `kbcli` will automatically add the annotation `"helm.sh/resource-policy": "keep"` to ensure that existing Addons are not deleted during the upgrade.
+
+</TabItem>
+
+</Tabs>
+
 ## Upgrade from KubeBlocks v0.8.x
+
+<Tabs>
+
+<TabItem value="Helm" label="Helm" default>
 
 1. View Addon and check whether the `"helm.sh/resource-policy": "keep"` annotation exists.
 
@@ -102,7 +146,7 @@ If you are upgrading from v0.8 to v0.9, it's recommended to enable webhook to en
 
 4. Upgrade KubeBlocks.
 
-    If the KubeBlocks you are running uses the image registry `infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com`, it is recommended to explicitly configure the image registry during the upgrade.
+    If the KubeBlocks you are running uses the image registry `infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com`, it is recommended to explicitly configure the image registry during the upgrade. Refer to [FAQ](./faq.md#specify-an-image-registry-during-kubeblocks-upgrade) for how to specify an image registry during the upgrade.
 
     Setting `admissionWebhooks.enabled=true` enables the webhook, supporting the multi-version conversion of the ConfigConstraint API.
 
@@ -131,6 +175,51 @@ If you are upgrading from v0.8 to v0.9, it's recommended to enable webhook to en
 
     :::
 
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+1. Download kbcli v0.9.1.
+
+    ```bash
+    curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash -s 0.9.1
+    ```
+
+2. Upgrade KubeBlocks.
+
+    Check the kbcli version and make sure you're using kbcli v0.9.1.
+
+    ```bash
+    kbcli version
+    ```
+
+    If the KubeBlocks you are running uses the image registry `infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com`, it is recommended to explicitly configure the image registry during the upgrade. Refer to [FAQ](./faq.md#specify-an-image-registry-during-kubeblocks-upgrade) for how to specify an image registry during the upgrade.
+
+    ```bash
+    kbcli kb upgrade --version 0.9.1 \
+      --set admissionWebhooks.enabled=true \
+      --set admissionWebhooks.ignoreReplicasCheck=true
+    ```
+
+    :::warning
+
+    To avoid affecting existing database clusters, when upgrading to KubeBlocks v0.9.1, the versions of already-installed Addons will not be upgraded by default. If you want to upgrade the Addons to the versions built into KubeBlocks v0.9.1, execute the following command. Note that this may restart existing clusters and affect availability. Please proceed with caution.
+
+    ```bash
+    kbcli kb upgrade --version 0.9.1 \
+      --set upgradeAddons=true \
+      --set admissionWebhooks.enabled=true \
+      --set admissionWebhooks.ignoreReplicasCheck=true
+    ```
+
+    :::
+
+    `kbcli` will automatically add the annotation `"helm.sh/resource-policy": "keep"` to ensure that existing Addons are not deleted during the upgrade.
+
+</TabItem>
+
+</Tabs>
+
 ## Upgrade Addons
 
 If you didn't specify `upgradeAddons` as `true` or your Addon is not included in the default installed addons, you can upgrade Addons by running the commands provided below to use the v0.9.x API.
@@ -142,6 +231,10 @@ If you didn't specify `upgradeAddons` as `true` or your Addon is not included in
 - If the Addon you want to use is `clickhouse/milvus/elasticsearch/llm`, you need to upgrade KubeBlocks first and then upgrade this Addon. Otherwise, these Addons cannot be used in KubeBlocks v0.9.x normally.
 
 :::
+
+<Tabs>
+
+<TabItem value="Helm" label="Helm" default>
 
 ```bash
 # Add Helm repo 
@@ -159,6 +252,37 @@ helm search repo kubeblocks-addons/{addon-name} --versions --devel
 # Update addon version
 helm upgrade -i {addon-release-name} kubeblocks-addons/{addon-name} --version x.y.z -n kb-system   
 ```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+```bash
+# View the Addon index list
+kbcli addon index list
+
+# Update one index and the default index is kubeblocks
+kbcli addon index update kubeblocks
+
+# Search available Addon versions
+kbcli addon search {addon-name}
+
+# Install an Addon
+kbcli addon install {addon-name} --version x.y.z
+
+# Upgrade this Addon to a specified version
+kbcli addon upgrade {addon-name} --version x.y.z
+
+# Force to upgrade to a specified version
+kbcli addon upgrade {addon-name} --version x.y.z --force
+
+# View the available Addon versions
+kbcli addon list | grep {addon-name}
+```
+
+</TabItem>
+
+</Tabs>
 
 ## FAQ
 

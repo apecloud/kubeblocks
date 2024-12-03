@@ -6,6 +6,9 @@ sidebar_position: 2
 sidebar_label: 升级到 KubeBlocks v0.9
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # 升级到 KubeBlocks v0.9
 
 本文档将介绍如何升级至 KubeBlocks v0.9。
@@ -21,6 +24,10 @@ sidebar_label: 升级到 KubeBlocks v0.9
 KubeBlocks 0.9 可以兼容 KubeBlocks 0.8 的 API，但不保证兼容 0.8 之前版本的 API，如果您正在使用 KubeBlocks 0.7 或者更老版本的引擎（版本号为 `0.7.x`, `0.6.x`），请务必参考 [0.8 升级文档](./upgrade-kubeblocks-to-0.8.md)将 KubeBlocks 升级至 0.8 并将所有引擎升级至 0.8，以确保升级至 0.9 版本后服务的可用性。
 
 ## 从 v0.8 版本升级
+
+<Tabs>
+
+<TabItem value="Helm" label="Helm" default>
 
 1. 为引擎添加 `"helm.sh/resource-policy": "keep"` 注解。
 
@@ -69,6 +76,38 @@ KubeBlocks 0.9 可以兼容 KubeBlocks 0.8 的 API，但不保证兼容 0.8 之�
 
     :::
 
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+1. 下载 kbcli v0.9.0。
+
+    ```shell
+    curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash -s 0.9.0
+    ```
+
+2. 升级 KubeBlocks。
+
+    ```bash
+    kbcli kb upgrade --version 0.9.0 
+    ```
+
+    :::note
+
+    为避免影响已有的数据库集群，升级 KubeBlocks 至 v0.9 时，默认不会升级已经安装的引擎版本，如果要升级引擎版本至 KubeBlocks v0.9 内置引擎的版本，可以执行如下命令，这可能导致已有集群发生重启，影响可用性，请务必谨慎操作。
+
+    ```bash
+    kbcli kb upgrade --version 0.9.0 --set upgradeAddons=true
+    ```
+
+    :::
+
+    kbcli 会默认为已有引擎添加 `"helm.sh/resource-policy": "keep"` 注解，确保升级过程中已有引擎不会被删除。
+
+</TabItem>
+
+</Tabs>
+
 ## 升级引擎
 
 为了使用 v0.9.0 的 API，如果在上述步骤中，没有指定 `upgradeAddons`，或者您的引擎不在默认引擎列表里，可使用如下方式升级引擎。
@@ -80,6 +119,10 @@ KubeBlocks 0.9 可以兼容 KubeBlocks 0.8 的 API，但不保证兼容 0.8 之�
 - 如果您要使用 `clickhouse/milvus/elasticsearch/llm` 等引擎，需要升级 KubeBlocks 之后，再升级引擎，否则无法在 v0.9 正常使用。
 
 :::
+
+<Tabs>
+
+<TabItem value="Helm" label="Helm" default>
 
 ```bash
 # 添加 Helm 仓库
@@ -94,6 +137,37 @@ helm repo update
 # 升级引擎
 helm upgrade -i xxx kubeblocks-addons/xxx --version x.y.z -n kb-system  
 ```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+```bash
+# 查看引擎索引列表
+kbcli addon index list
+
+# 更新某一个索引， 默认的是 kubeblocks
+kbcli addon index update kubeblocks
+
+# 检索可用的引擎版本
+kbcli addon search {addon-name}
+
+# 安装引擎
+kbcli addon install {addon-name} --version x.y.z
+
+# 更新引擎到指定版本
+kbcli addon upgrade {addon-name} --version x.y.z
+
+# 强制更新引擎到指定版本
+kbcli addon upgrade {addon-name} --version x.y.z --force
+
+# 查看指定引擎版本
+kbcli addon list | grep {addon-name}
+```
+
+</TabItem>
+
+</Tabs>
 
 ## FAQ
 

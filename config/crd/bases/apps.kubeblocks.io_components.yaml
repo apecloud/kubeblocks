@@ -7506,12 +7506,14 @@ spec:
                   - Failed: A significant number of Pods have failed.
                   - Stopping: All Pods are being terminated, with current replica count at zero.
                   - Stopped: All associated Pods have been successfully deleted.
+                  - Starting: Pods are being started.
                   - Deleting: The Component is being deleted.
                 enum:
                 - Creating
                 - Deleting
                 - Updating
                 - Stopping
+                - Starting
                 - Running
                 - Stopped
                 - Failed

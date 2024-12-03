@@ -1328,6 +1328,21 @@ granting only the necessary access rights to complete their required tasks.</li>
 </tr>
 <tr>
 <td>
+<code>tls</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.TLS">
+TLS
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the TLS configuration for the Component.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>replicasLimit</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.ReplicasLimit">
@@ -1964,6 +1979,21 @@ ShardingLifecycleActions
 <td>
 <em>(Optional)</em>
 <p>Defines the system accounts for the sharding.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>tls</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardingTLS">
+ShardingTLS
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the TLS for the sharding.</p>
 <p>This field is immutable.</p>
 </td>
 </tr>
@@ -3352,7 +3382,7 @@ string
 <h3 id="apps.kubeblocks.io/v1.ClusterObjectReference">ClusterObjectReference
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentVarSelector">ComponentVarSelector</a>, <a href="#apps.kubeblocks.io/v1.CredentialVarSelector">CredentialVarSelector</a>, <a href="#apps.kubeblocks.io/v1.HostNetworkVarSelector">HostNetworkVarSelector</a>, <a href="#apps.kubeblocks.io/v1.ServiceRefVarSelector">ServiceRefVarSelector</a>, <a href="#apps.kubeblocks.io/v1.ServiceVarSelector">ServiceVarSelector</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentVarSelector">ComponentVarSelector</a>, <a href="#apps.kubeblocks.io/v1.CredentialVarSelector">CredentialVarSelector</a>, <a href="#apps.kubeblocks.io/v1.HostNetworkVarSelector">HostNetworkVarSelector</a>, <a href="#apps.kubeblocks.io/v1.ServiceRefVarSelector">ServiceRefVarSelector</a>, <a href="#apps.kubeblocks.io/v1.ServiceVarSelector">ServiceVarSelector</a>, <a href="#apps.kubeblocks.io/v1.TLSVarSelector">TLSVarSelector</a>)
 </p>
 <div>
 <p>ClusterObjectReference defines information to let you locate the referenced object inside the same Cluster.</p>
@@ -5153,6 +5183,21 @@ granting only the necessary access rights to complete their required tasks.</li>
 </tr>
 <tr>
 <td>
+<code>tls</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.TLS">
+TLS
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the TLS configuration for the Component.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>replicasLimit</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.ReplicasLimit">
@@ -5774,6 +5819,9 @@ and other administrative tasks.</p>
 </tr><tr><td><p>&#34;Running&#34;</p></td>
 <td><p>RunningComponentPhase indicates that all pods of the component are up-to-date and in a &lsquo;Running&rsquo; state.</p>
 </td>
+</tr><tr><td><p>&#34;Starting&#34;</p></td>
+<td><p>StartingComponentPhase indicates the component is currently being started.</p>
+</td>
 </tr><tr><td><p>&#34;Stopped&#34;</p></td>
 <td><p>StoppedComponentPhase indicates the component is stopped.</p>
 </td>
@@ -6351,6 +6399,7 @@ ComponentPhase
 <li>Failed: A significant number of Pods have failed.</li>
 <li>Stopping: All Pods are being terminated, with current replica count at zero.</li>
 <li>Stopped: All associated Pods have been successfully deleted.</li>
+<li>Starting: Pods are being started.</li>
 <li>Deleting: The Component is being deleted.</li>
 </ul>
 </td>
@@ -10492,6 +10541,21 @@ ShardingLifecycleActions
 <p>This field is immutable.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>tls</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ShardingTLS">
+ShardingTLS
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Defines the TLS for the sharding.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1.ShardingDefinitionStatus">ShardingDefinitionStatus
@@ -10675,6 +10739,35 @@ bool
 <td>
 <em>(Optional)</em>
 <p>Specifies whether the account is shared across all shards in the sharding.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ShardingTLS">ShardingTLS
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ShardingDefinitionSpec">ShardingDefinitionSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>shared</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies whether the TLS configuration is shared across all shards in the sharding.</p>
 </td>
 </tr>
 </tbody>
@@ -11086,6 +11179,101 @@ ProvisionSecretRef
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1.TLS">TLS
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>volumeName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the volume name for the TLS secret.
+The controller will create a volume object with the specified name and add it to the pod when the TLS is enabled.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>mountPath</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the mount path for the TLS secret to be mounted.
+Similar to the volume, the controller will mount the created volume to the specified path within containers when the TLS is enabled.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>defaultMode</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The default permissions for the mounted path.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>caFile</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The CA file of the TLS.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>certFile</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The certificate file of the TLS.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>keyFile</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The key file of the TLS.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1.TLSConfig">TLSConfig
 </h3>
 <p>
@@ -11200,6 +11388,86 @@ string
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1.TLSVarSelector">TLSVarSelector
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.VarSource">VarSource</a>)
+</p>
+<div>
+<p>TLSVarSelector selects a var from the TLS.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>ClusterObjectReference</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ClusterObjectReference">
+ClusterObjectReference
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>ClusterObjectReference</code> are embedded into this type.)
+</p>
+<p>The Component to select from.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>TLSVars</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.TLSVars">
+TLSVars
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>TLSVars</code> are embedded into this type.)
+</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.TLSVars">TLSVars
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.TLSVarSelector">TLSVarSelector</a>)
+</p>
+<div>
+<p>TLSVars defines the vars that can be referenced from the TLS.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>enabled</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.VarOption">
+VarOption
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1.TargetPodSelector">TargetPodSelector
 (<code>string</code> alias)</h3>
 <p>
@@ -11295,7 +11563,7 @@ This ensures that only one replica is unavailable at a time during the update pr
 <h3 id="apps.kubeblocks.io/v1.VarOption">VarOption
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterVars">ClusterVars</a>, <a href="#apps.kubeblocks.io/v1.ComponentVars">ComponentVars</a>, <a href="#apps.kubeblocks.io/v1.CredentialVars">CredentialVars</a>, <a href="#apps.kubeblocks.io/v1.NamedVar">NamedVar</a>, <a href="#apps.kubeblocks.io/v1.RoledVar">RoledVar</a>, <a href="#apps.kubeblocks.io/v1.ServiceRefVars">ServiceRefVars</a>, <a href="#apps.kubeblocks.io/v1.ServiceVars">ServiceVars</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterVars">ClusterVars</a>, <a href="#apps.kubeblocks.io/v1.ComponentVars">ComponentVars</a>, <a href="#apps.kubeblocks.io/v1.CredentialVars">CredentialVars</a>, <a href="#apps.kubeblocks.io/v1.NamedVar">NamedVar</a>, <a href="#apps.kubeblocks.io/v1.RoledVar">RoledVar</a>, <a href="#apps.kubeblocks.io/v1.ServiceRefVars">ServiceRefVars</a>, <a href="#apps.kubeblocks.io/v1.ServiceVars">ServiceVars</a>, <a href="#apps.kubeblocks.io/v1.TLSVars">TLSVars</a>)
 </p>
 <div>
 <p>VarOption defines whether a variable is required or optional.</p>
@@ -11384,6 +11652,20 @@ CredentialVarSelector
 <td>
 <em>(Optional)</em>
 <p>Selects a defined var of a Credential (SystemAccount).</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>tlsVarRef</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.TLSVarSelector">
+TLSVarSelector
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Selects a defined var of the TLS.</p>
 </td>
 </tr>
 <tr>

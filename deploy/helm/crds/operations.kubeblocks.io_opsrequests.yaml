@@ -91,6 +91,30 @@ spec:
                     - Delete
                     - Retain
                     type: string
+                  parameters:
+                    description: |-
+                      Specifies a list of name-value pairs representing parameters and their corresponding values.
+                      Parameters match the schema specified in the `actionset.spec.parametersSchema`
+                    items:
+                      properties:
+                        name:
+                          description: Represents the name of the parameter.
+                          type: string
+                        value:
+                          description: Represents the parameter values.
+                          type: string
+                      required:
+                      - name
+                      - value
+                      type: object
+                    maxItems: 128
+                    type: array
+                    x-kubernetes-list-map-keys:
+                    - name
+                    x-kubernetes-list-type: map
+                    x-kubernetes-validations:
+                    - message: forbidden to update parameters
+                      rule: self == oldSelf
                   parentBackupName:
                     description: If the specified BackupMethod is incremental, `parentBackupName`
                       is required.
@@ -121,6 +145,9 @@ spec:
                       Otherwise, only the Backup custom resource will be deleted.
                     type: string
                 type: object
+                x-kubernetes-validations:
+                - message: forbidden to update backup.parameters
+                  rule: has(oldSelf.parameters) == has(self.parameters)
               cancel:
                 description: |-
                   Indicates whether the current operation should be canceled and terminated gracefully if it's in the
@@ -4407,6 +4434,30 @@ spec:
                       type: object
                     type: array
                     x-kubernetes-preserve-unknown-fields: true
+                  parameters:
+                    description: |-
+                      Specifies a list of name-value pairs representing parameters and their corresponding values.
+                      Parameters match the schema specified in the `actionset.spec.parametersSchema`
+                    items:
+                      properties:
+                        name:
+                          description: Represents the name of the parameter.
+                          type: string
+                        value:
+                          description: Represents the parameter values.
+                          type: string
+                      required:
+                      - name
+                      - value
+                      type: object
+                    maxItems: 128
+                    type: array
+                    x-kubernetes-list-map-keys:
+                    - name
+                    x-kubernetes-list-type: map
+                    x-kubernetes-validations:
+                    - message: forbidden to update parameters
+                      rule: self == oldSelf
                   restorePointInTime:
                     description: |-
                       Specifies the point in time to which the restore should be performed.
@@ -4433,6 +4484,9 @@ spec:
                 required:
                 - backupName
                 type: object
+                x-kubernetes-validations:
+                - message: forbidden to update restore.parameters
+                  rule: has(oldSelf.parameters) == has(self.parameters)
               start:
                 description: Lists Components to be started. If empty, all components
                   will be started.
@@ -4878,6 +4932,7 @@ spec:
                       - Deleting
                       - Updating
                       - Stopping
+                      - Starting
                       - Running
                       - Stopped
                       - Failed

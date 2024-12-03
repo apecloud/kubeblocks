@@ -102,7 +102,7 @@ func (r *OpsDefinitionReconciler) updateStatusUnavailable(reqCtx intctrlutil.Req
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *OpsDefinitionReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return intctrlutil.NewNamespacedControllerManagedBy(mgr).
+	return intctrlutil.NewControllerManagedBy(mgr).
 		For(&opsv1alpha1.OpsDefinition{}).
 		Complete(r)
 }

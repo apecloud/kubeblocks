@@ -22,6 +22,7 @@ package apps
 import (
 	"fmt"
 
+	"golang.org/x/exp/maps"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -81,7 +82,7 @@ func (t *clusterNormalizationTransformer) Transform(ctx graph.TransformContext, 
 	// write-back the resolved definitions and service versions to cluster spec.
 	t.writeBackCompNShardingSpecs(transCtx)
 
-	return nil
+	return t.patchCRDAPIVersionKey(transCtx)
 }
 
 func (t *clusterNormalizationTransformer) resolveCompsNShardings(transCtx *clusterTransformContext) ([]*appsv1.ClusterComponentSpec, []*appsv1.ClusterSharding, error) {
@@ -408,4 +409,42 @@ func (t *clusterNormalizationTransformer) writeBackCompNShardingSpecs(transCtx *
 		}
 		transCtx.Cluster.Spec.Shardings = shardings
 	}
+}
+
+func (t *clusterNormalizationTransformer) patchCRDAPIVersionKey(transCtx *clusterTransformContext) error {
+	apiVersions := map[string][]string{}
+
+	from := func(name string, annotations map[string]string) {
+		key := annotations[constant.CRDAPIVersionAnnotationKey]
+		apiVersions[key] = append(apiVersions[key], name)
+	}
+
+	if transCtx.clusterDef != nil {
+		from(transCtx.clusterDef.Name, transCtx.clusterDef.Annotations)
+	} else {
+		for _, compDef := range transCtx.componentDefs {
+			from(compDef.Name, compDef.Annotations)
+		}
+		for _, shardingDef := range transCtx.shardingDefs {
+			from(shardingDef.Name, shardingDef.Annotations)
+		}
+	}
+
+	if len(apiVersions) > 1 {
+		return fmt.Errorf("multiple CRD API versions found: %v", apiVersions)
+	}
+
+	apiVersion := ""
+	if len(apiVersions) == 1 {
+		apiVersion = maps.Keys(apiVersions)[0]
+		if transCtx.Cluster.Annotations == nil {
+			transCtx.Cluster.Annotations = make(map[string]string)
+		}
+		transCtx.Cluster.Annotations[constant.CRDAPIVersionAnnotationKey] = apiVersion
+	}
+
+	if controllerutil.IsSupportedCRDAPIVersion(apiVersion) {
+		return nil
+	}
+	return graph.ErrPrematureStop // un-supported CRD API version, stop the transformation
 }

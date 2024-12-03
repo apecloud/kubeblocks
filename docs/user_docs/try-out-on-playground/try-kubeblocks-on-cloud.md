@@ -26,7 +26,7 @@ Make sure you have all the followings prepared.
 
 * [Install AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)
 * [Install kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl)
-* [Install kbcli](./../installation/install-with-kbcli/install-kbcli.md)
+* [Install kbcli](./../installation/install-kbcli.md)
 
 ### Configure access key
 
@@ -85,7 +85,7 @@ Make sure you have all the followings prepared.
 
 * Google Cloud account
 * [Install kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl)
-* [Install kbcli](./../installation/install-with-kbcli/install-kbcli.md)
+* [Install kbcli](./../installation/install-kbcli.md)
   
 ### Configure GCP environment
 
@@ -156,7 +156,7 @@ Make sure you have all the followings prepared.
 
 * Tencent Cloud account
 * [Install kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl)
-* [Install kbcli](./../installation/install-with-kbcli/install-kbcli.md)
+* [Install kbcli](./../installation/install-kbcli.md)
   
 ### Configure TKE environment
 
@@ -209,7 +209,7 @@ Make sure you have all the followings prepared.
 
 * Alibaba Cloud account.
 * [Install kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl).
-* [Install kbcli](./../installation/install-with-kbcli/install-kbcli.md).
+* [Install kbcli](./../installation/install-kbcli.md).
   
 ### Configure ACK environment
 

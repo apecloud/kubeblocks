@@ -105,7 +105,7 @@ func (r *ShardingDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.R
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ShardingDefinitionReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return intctrlutil.NewNamespacedControllerManagedBy(mgr).
+	return intctrlutil.NewControllerManagedBy(mgr).
 		For(&appsv1.ShardingDefinition{}).
 		Complete(r)
 }

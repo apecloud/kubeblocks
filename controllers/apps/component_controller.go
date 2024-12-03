@@ -38,6 +38,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
@@ -149,7 +150,7 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			&componentServiceTransformer{},
 			// handle component system accounts
 			&componentAccountTransformer{},
-			// handle tls volume and cert
+			// handle the TLS configuration
 			&componentTLSTransformer{Client: r.Client},
 			// rerender parameters after v-scale and h-scale
 			&componentRelatedParametersTransformer{Client: r.Client},
@@ -196,7 +197,7 @@ func (r *ComponentReconciler) SetupWithManager(mgr ctrl.Manager, multiClusterMgr
 }
 
 func (r *ComponentReconciler) setupWithManager(mgr ctrl.Manager) error {
-	b := intctrlutil.NewNamespacedControllerManagedBy(mgr).
+	b := intctrlutil.NewControllerManagedBy(mgr, &appsv1.Component{}, &workloads.InstanceSet{}).
 		For(&appsv1.Component{}).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: viper.GetInt(constant.CfgKBReconcileWorkers),
@@ -205,6 +206,7 @@ func (r *ComponentReconciler) setupWithManager(mgr ctrl.Manager) error {
 		Owns(&corev1.Service{}).
 		Owns(&corev1.Secret{}).
 		Owns(&corev1.ConfigMap{}).
+		Watches(&dpv1alpha1.Restore{}, handler.EnqueueRequestsFromMapFunc(r.filterComponentResources)).
 		Watches(&corev1.PersistentVolumeClaim{}, handler.EnqueueRequestsFromMapFunc(r.filterComponentResources)).
 		Watches(&appsv1alpha1.Configuration{}, handler.EnqueueRequestsFromMapFunc(r.configurationEventHandler))
 
@@ -218,12 +220,13 @@ func (r *ComponentReconciler) setupWithManager(mgr ctrl.Manager) error {
 }
 
 func (r *ComponentReconciler) setupWithMultiClusterManager(mgr ctrl.Manager, multiClusterMgr multicluster.Manager) error {
-	b := intctrlutil.NewNamespacedControllerManagedBy(mgr).
+	b := intctrlutil.NewControllerManagedBy(mgr, &appsv1.Component{}, &workloads.InstanceSet{}).
 		For(&appsv1.Component{}).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: viper.GetInt(constant.CfgKBReconcileWorkers),
 		}).
 		Owns(&workloads.InstanceSet{}).
+		Watches(&dpv1alpha1.Restore{}, handler.EnqueueRequestsFromMapFunc(r.filterComponentResources)).
 		Watches(&appsv1alpha1.Configuration{}, handler.EnqueueRequestsFromMapFunc(r.configurationEventHandler))
 
 	eventHandler := handler.EnqueueRequestsFromMapFunc(r.filterComponentResources)

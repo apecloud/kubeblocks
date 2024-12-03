@@ -19,6 +19,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package dataprotection
 
+import dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+
 const (
 	ClusterName   = "test-cluster"
 	ComponentName = "test-comp"
@@ -58,4 +60,31 @@ const (
 const (
 	RestoreName       = "test-restore"
 	MysqlTemplateName = "data-mysql-mysql"
+)
+
+const (
+	InvalidParameter    = "invalid"
+	ParameterString     = "testString"
+	ParameterStringType = "string"
+	ParameterArray      = "testArray"
+	ParameterArrayType  = "array"
+)
+
+var (
+	TestParameters = []dpv1alpha1.ParameterPair{
+		{
+			Name:  ParameterString,
+			Value: "stringValue",
+		},
+		{
+			Name:  ParameterArray,
+			Value: "v1,v2",
+		},
+	}
+	InvalidParameters = []dpv1alpha1.ParameterPair{
+		{
+			Name:  "invalid",
+			Value: "invalid",
+		},
+	}
 )

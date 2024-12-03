@@ -17,9 +17,9 @@ StarRocks 是一款高性能分析型数据仓库，使用向量化、MPP 架构
 
 ## 开始之前
 
-- 如果您想通过 `kbcli` 创建并连接 StarRocks 集群，请先[安装 kbcli](./../installation/install-with-kbcli/install-kbcli.md)。
-- 安装 KubeBlocks，可通过 [kbcli](./../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) 或 [Helm](./../installation/install-with-helm/install-kubeblocks.md) 安装。
-- 安装并启用 starrocks 引擎，可通过 [kbcli](./../installation/install-with-kbcli/install-addons.md) 或 [Helm](./../installation/install-with-helm/install-addons.md) 操作。
+- 如果您想通过 `kbcli` 创建并连接 StarRocks 集群，请先[安装 kbcli](./../installation/install-kbcli.md)。
+- [安装 KubeBlocks](./../installation/install-kubeblocks.md)。
+- [安装并启用 starrocks 引擎](./../installation/install-addons.md)。
 
 ## 创建集群
 
@@ -94,7 +94,7 @@ EOF
 |---------------------------------------|--------------------------------------|
 | `spec.clusterDefinitionRef`           | 集群定义 CRD 的名称，用来定义集群组件。  |
 | `spec.clusterVersionRef`              | 集群版本 CRD 的名称，用来定义集群版本。 |
-| `spec.terminationPolicy`              | 集群的终止策略，默认值为 `Delete`，有效值为 `DoNotTerminate`、`Halt`、`Delete` 和 `WipeOut`。 <p> - `DoNotTerminate` 会阻止删除操作。 </p><p> - `Halt` 会删除工作负载资源，如 statefulset 和 deployment 等，但是保留了 PVC 。  </p><p> - `Delete` 在 `Halt` 的基础上进一步删除了 PVC。 </p><p> - `WipeOut` 在 `Delete` 的基础上从备份存储的位置完全删除所有卷快照和快照数据。 </p>|
+| `spec.terminationPolicy`              | 集群的终止策略，默认值为 `Delete`，有效值为 `DoNotTerminate`、`Halt`、`Delete` 和 `WipeOut`。具体定义可参考 [终止策略](#终止策略)。 |
 | `spec.affinity`                       | 为集群的 Pods 定义了一组节点亲和性调度规则。该字段可控制 Pods 在集群中节点上的分布。 |
 | `spec.affinity.podAntiAffinity`       | 定义了不在同一 component 中的 Pods 的反亲和性水平。该字段决定了 Pods 以何种方式跨节点分布，以提升可用性和性能。 |
 | `spec.affinity.topologyKeys`          | 用于定义 Pod 反亲和性和 Pod 分布约束的拓扑域的节点标签值。 |
@@ -578,7 +578,7 @@ mycluster   demo        starrocks            starrocks-3.1.1   Delete           
 
     如果有报错，可执行 `kubectl describe ops -n demo` 命令查看该运维操作的相关事件，协助排障。
 
-3. 查看相应资源是否变更。
+3. 当 OpsRequest 状态为 `Succeed` 或集群状态再次回到 `Running` 后，查看相应资源是否变更。
 
     ```bash
     kubectl describe cluster mycluster -n demo
@@ -616,7 +616,7 @@ mycluster   demo        starrocks            starrocks-3.1.1   Delete           
      terminationPolicy: Delete
    ```
 
-2. 查看相应资源是否变更。
+2. 当集群状态再次回到 `Running` 后，查看相应资源是否变更。
 
     ```bash
     kubectl describe cluster mycluster -n demo
@@ -738,26 +738,26 @@ mycluster   demo        starrocks            starrocks-3.1.1   Delete           
     kbcli cluster stop mycluster -n demo
     ```
 
-    </Tabs>
-
     </TabItem>
+
+    </Tabs>
 
 2. 查看集群状态，确认集群是否已停止。
 
     <Tabs>
 
-    <TabItem value="kbcli" label="kbcli">
-
-    ```bash
-    kbcli cluster list mycluster -n demo
-    ```
-
-    </TabItem>
-
     <TabItem value="kubectl" label="kubectl" default>
 
     ```bash
     kubectl get cluster mycluster -n demo
+    ```
+
+    </TabItem>
+
+    <TabItem value="kbcli" label="kbcli">
+
+    ```bash
+    kbcli cluster list mycluster -n demo
     ```
 
     </TabItem>
@@ -831,18 +831,18 @@ mycluster   demo        starrocks            starrocks-3.1.1   Delete           
 
     <Tabs>
 
-    <TabItem value="kbcli" label="kbcli">
-
-    ```bash
-    kbcli cluster list mycluster -n demo
-    ```
-
-    </TabItem>
-
     <TabItem value="kubectl" label="kubectl" default>
 
     ```bash
     kubectl get cluster mycluster -n demo
+    ```
+
+    </TabItem>
+
+    <TabItem value="kbcli" label="kbcli">
+
+    ```bash
+    kbcli cluster list mycluster -n demo
     ```
 
     </TabItem>
@@ -924,6 +924,83 @@ KubeBlocks 支持重启集群中的所有 Pod。当数据库出现异常时，�
 
    - STATUS=Updating 表示集群正在重启中。
    - STATUS=Running 表示集群已重启。
+
+</TabItem>
+
+</Tabs>
+
+## 删除集群
+
+### 终止策略
+
+:::note
+
+终止策略决定了删除集群的方式。
+
+:::
+
+| **终止策略** | **删除操作**                                                                     |
+|:----------------------|:-------------------------------------------------------------------------------------------|
+| `DoNotTerminate`      | `DoNotTerminate` 禁止删除操作。                                                  |
+| `Halt`                | `Halt` 删除集群资源（如 Pods、Services 等），但保留 PVC。停止其他运维操作的同时，保留了数据。但 `Halt` 策略在 v0.9.1 中已删除，设置为 `Halt` 的效果与 `DoNotTerminate` 相同。  |
+| `Delete`              | `Delete` 在 `Halt` 的基础上，删除 PVC 及所有持久数据。                              |
+| `WipeOut`             | `WipeOut`  删除所有集群资源，包括外部存储中的卷快照和备份。使用该策略将会删除全部数据，特别是在非生产环境，该策略将会带来不可逆的数据丢失。请谨慎使用。   |
+
+执行以下命令查看终止策略。
+
+<Tabs>
+
+<TabItem value="kubectl" label="kubectl" default>
+
+```bash
+kubectl get cluster mycluster -n demo
+>
+NAME        CLUSTER-DEFINITION    VERSION              TERMINATION-POLICY     STATUS    AGE
+mycluster   starrocks             starrocks-ce-3.1.1   Delete                 Running   47m
+```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+```bash
+kbcli cluster list -n demo
+>
+NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS     CREATED-TIME
+mycluster   demo        starrocks            starrocks-3.1.1   Delete               Running    Jul 17,2024 19:06 UTC+0800  
+```
+
+</TabItem>
+
+</Tabs>
+
+### 步骤
+
+执行以下命令，删除集群。
+
+<Tabs>
+
+<TabItem value="kubectl" label="kubectl" default>
+
+```bash
+kubectl delete cluster mycluster -n demo
+```
+
+如果想删除集群和所有相关资源，可以将终止策略修改为 `WipeOut`，然后再删除该集群。
+
+```bash
+kubectl patch -n demo cluster mycluster -p '{"spec":{"terminationPolicy":"WipeOut"}}' --type="merge"
+
+kubectl delete -n demo cluster mycluster
+```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+```bash
+kbcli cluster delete mycluster -n demo
+```
 
 </TabItem>
 

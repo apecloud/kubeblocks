@@ -20,9 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package builder
 
 import (
-	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
 type ComponentBuilder struct {

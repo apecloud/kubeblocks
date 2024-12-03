@@ -21,6 +21,7 @@ package backup
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"slices"
@@ -177,7 +178,7 @@ func generateBaseCRNameByBackupSchedule(uniqueNameWithBackupSchedule, backupSche
 	return fmt.Sprintf("%s-%s", name, method)
 }
 
-// GenerateCRNameByBackupSchedule generate a CR name which is created by BackupSchedule, such as CronJob Backup.
+// GenerateCRNameByBackupSchedule generate a CR name which is created by BackupSchedule, such as Continuous Backup.
 func GenerateCRNameByBackupSchedule(backupSchedule *dpv1alpha1.BackupSchedule, method string) string {
 	uid := backupSchedule.UID[:8]
 	if len(backupSchedule.OwnerReferences) > 0 {
@@ -187,7 +188,16 @@ func GenerateCRNameByBackupSchedule(backupSchedule *dpv1alpha1.BackupSchedule, m
 	return generateBaseCRNameByBackupSchedule(uniqueNameWithBackupSchedule, backupSchedule.Namespace, method)
 }
 
-// GenerateLegacyCRNameByBackupSchedule generate a legacy CR name which is created by BackupSchedule, such as CronJob Backup.
+// GenerateCRNameByScheduleNameAndMethod generate a CR name which is created by BackupSchedule, such as CronJob.
+func GenerateCRNameByScheduleNameAndMethod(backupSchedule *dpv1alpha1.BackupSchedule, method string, name string) string {
+	suffix := name
+	if len(suffix) == 0 {
+		suffix = method
+	}
+	return GenerateCRNameByBackupSchedule(backupSchedule, suffix)
+}
+
+// GenerateLegacyCRNameByBackupSchedule generate a legacy CR name which is created by BackupSchedule, such as CronJob.
 func GenerateLegacyCRNameByBackupSchedule(backupSchedule *dpv1alpha1.BackupSchedule, method string) string {
 	uniqueNameWithBackupSchedule := fmt.Sprintf("%s-%s", backupSchedule.UID[:8], backupSchedule.Name)
 	return generateBaseCRNameByBackupSchedule(uniqueNameWithBackupSchedule, backupSchedule.Namespace, method)
@@ -301,4 +311,16 @@ func StopStatefulSetsWhenFailed(ctx context.Context, cli client.Client, backup *
 	}
 	sts.Spec.Replicas = pointer.Int32(0)
 	return cli.Update(ctx, sts)
+}
+
+func BuildParametersManifest(parameters []dpv1alpha1.ParameterPair) (string, error) {
+	if len(parameters) == 0 {
+		return "", nil
+	}
+	bytes, err := json.Marshal(parameters)
+	if err != nil {
+		return "", err
+	}
+	res := fmt.Sprintf("\n  parameters: %s", string(bytes))
+	return res, nil
 }

@@ -257,6 +257,13 @@ func ValidateAndInitRestoreMGR(reqCtx intctrlutil.RequestCtx,
 		return err
 	}
 
+	// validate restore parameters
+	if backupSet.ActionSet != nil {
+		if err := utils.ValidateParameters(backupSet.ActionSet, restoreMgr.Restore.Spec.Parameters, false); err != nil {
+			return fmt.Errorf("fails to validate parameters with actionset %s: %v", backupSet.ActionSet.Name, err)
+		}
+	}
+
 	// TODO: check if there is permission for cross namespace recovery.
 
 	// check if the backup is completed exclude continuous backup.
@@ -268,7 +275,7 @@ func ValidateAndInitRestoreMGR(reqCtx intctrlutil.RequestCtx,
 
 	// build backupActionSets of prepareData and postReady stage based on the specified backup's type.
 	switch backupType {
-	case dpv1alpha1.BackupTypeFull:
+	case dpv1alpha1.BackupTypeFull, dpv1alpha1.BackupTypeSelective:
 		restoreMgr.SetBackupSets(*backupSet)
 	case dpv1alpha1.BackupTypeIncremental:
 		err = restoreMgr.BuildIncrementalBackupActionSets(reqCtx, cli, *backupSet)
@@ -322,7 +329,14 @@ func isTimeInRange(t time.Time, start time.Time, end time.Time) bool {
 	return !t.Before(start) && !t.After(end)
 }
 
-func GetRestoreFromBackupAnnotation(backup *dpv1alpha1.Backup, volumeRestorePolicy, restoreTime string, env []corev1.EnvVar, doReadyRestoreAfterClusterRunning bool) (string, error) {
+func GetRestoreFromBackupAnnotation(
+	backup *dpv1alpha1.Backup,
+	volumeRestorePolicy string,
+	restoreTime string,
+	env []corev1.EnvVar,
+	doReadyRestoreAfterClusterRunning bool,
+	parameters []dpv1alpha1.ParameterPair,
+) (string, error) {
 	componentName := component.GetComponentNameFromObj(backup)
 	if len(componentName) == 0 {
 		return "", intctrlutil.NewFatalError("unable to obtain the name of the component to be recovered, please ensure that Backup.status.componentName exists")
@@ -342,7 +356,13 @@ func GetRestoreFromBackupAnnotation(backup *dpv1alpha1.Backup, volumeRestorePoli
 		}
 		restoreInfoMap[constant.EnvForRestore] = string(bytes)
 	}
-
+	if len(parameters) > 0 {
+		bytes, err := json.Marshal(parameters)
+		if err != nil {
+			return "", err
+		}
+		restoreInfoMap[constant.ParametersForRestore] = string(bytes)
+	}
 	connectionPassword := backup.Annotations[dptypes.ConnectionPasswordAnnotationKey]
 	if connectionPassword != "" {
 		restoreInfoMap[constant.ConnectionPassword] = connectionPassword

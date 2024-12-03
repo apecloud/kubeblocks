@@ -96,7 +96,7 @@ func (r *ClusterDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ClusterDefinitionReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return intctrlutil.NewNamespacedControllerManagedBy(mgr).
+	return intctrlutil.NewControllerManagedBy(mgr, &appsv1.ClusterDefinition{}).
 		For(&appsv1.ClusterDefinition{}).
 		Complete(r)
 }
@@ -367,12 +367,14 @@ func defaultClusterTopology(clusterDef *appsv1.ClusterDefinition) *appsv1.Cluste
 
 // referredClusterTopology returns the cluster topology which has name @name.
 func referredClusterTopology(clusterDef *appsv1.ClusterDefinition, name string) *appsv1.ClusterTopology {
-	if len(name) == 0 {
-		return defaultClusterTopology(clusterDef)
-	}
-	for i, topology := range clusterDef.Spec.Topologies {
-		if topology.Name == name {
-			return &clusterDef.Spec.Topologies[i]
+	if clusterDef != nil {
+		if len(name) == 0 {
+			return defaultClusterTopology(clusterDef)
+		}
+		for i, topology := range clusterDef.Spec.Topologies {
+			if topology.Name == name {
+				return &clusterDef.Spec.Topologies[i]
+			}
 		}
 	}
 	return nil

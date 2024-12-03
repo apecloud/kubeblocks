@@ -141,7 +141,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *BackupReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	b := intctrlutil.NewNamespacedControllerManagedBy(mgr).
+	b := intctrlutil.NewControllerManagedBy(mgr).
 		For(&dpv1alpha1.Backup{}).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: viper.GetInt(dptypes.CfgDataProtectionReconcileWorkers),
@@ -358,7 +358,6 @@ func (r *BackupReconciler) prepareBackupRequest(
 		RequestCtx: reqCtx,
 		Client:     r.Client,
 	}
-
 	if request.Annotations == nil {
 		request.Annotations = make(map[string]string)
 	}
@@ -412,6 +411,11 @@ func (r *BackupReconciler) prepareBackupRequest(
 				return nil, fmt.Errorf("create continuous backup by failed backupschedule %s/%s",
 					backupSchedule.Namespace, backupSchedule.Name)
 			}
+		}
+
+		// validate parameters
+		if err := dputils.ValidateParameters(actionSet, backup.Spec.Parameters, true); err != nil {
+			return nil, fmt.Errorf("fails to validate parameters with actionset %s: %v", actionSet.Name, err)
 		}
 	}
 

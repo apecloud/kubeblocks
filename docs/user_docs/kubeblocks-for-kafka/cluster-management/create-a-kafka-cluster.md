@@ -15,9 +15,9 @@ This document shows how to create a Kafka cluster.
 
 ## Before you start
 
-* [Install kbcli](./../../installation/install-with-kbcli/install-kbcli.md) if you want to create a Kafka cluster by `kbcli`.
-* Install KubeBlocks [by kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) or [by Helm](./../../installation/install-with-helm/install-kubeblocks.md).
-* Make sure Kafka Addon is enabled with `kbcli addon list`. If this Addon is not enabled, enable it first. Both [kbccli](./../../installation/install-with-kbcli/install-addons.md) and [Helm](./../../installation/install-with-helm/install-addons.md) options are available.
+* [Install kbcli](./../../installation/install-kbcli.md) if you want to create a Kafka cluster by `kbcli`.
+* [Install KubeBlocks](./../../installation/install-kubeblocks.md).
+* Make sure Kafka Addon is enabled with `kbcli addon list`. If this Addon is not enabled, [enable it](./../../installation/install-addons.md) first.
 
   <Tabs>
 

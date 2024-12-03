@@ -41,6 +41,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -1281,6 +1282,20 @@ var _ = Describe("Component Controller", func() {
 	}
 
 	testCompTLSConfig := func(compName, compDefName string) {
+		tls := kbappsv1.TLS{
+			VolumeName:  "tls",
+			MountPath:   "/etc/pki/tls",
+			DefaultMode: ptr.To(int32(0600)),
+			CAFile:      ptr.To("ca.pem"),
+			CertFile:    ptr.To("cert.pem"),
+			KeyFile:     ptr.To("key.pem"),
+		}
+
+		By("update comp definition to set the TLS")
+		Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(compDefObj), func(compDef *kbappsv1.ComponentDefinition) {
+			compDef.Spec.TLS = &tls
+		})()).Should(Succeed())
+
 		createClusterObj(compName, compDefName, func(f *testapps.MockClusterFactory) {
 			issuer := &kbappsv1.Issuer{
 				Name: kbappsv1.IssuerKubeBlocks,
@@ -1294,30 +1309,30 @@ var _ = Describe("Component Controller", func() {
 			Name:      plan.GenerateTLSSecretName(clusterObj.Name, compName),
 		}
 		Eventually(testapps.CheckObj(&testCtx, secretKey, func(g Gomega, secret *corev1.Secret) {
-			g.Expect(secret.Data).Should(HaveKey(constant.CAName))
-			g.Expect(secret.Data).Should(HaveKey(constant.CertName))
-			g.Expect(secret.Data).Should(HaveKey(constant.KeyName))
+			g.Expect(secret.Data).Should(HaveKey(*tls.CAFile))
+			g.Expect(secret.Data).Should(HaveKey(*tls.CertFile))
+			g.Expect(secret.Data).Should(HaveKey(*tls.KeyFile))
 		})).Should(Succeed())
 
 		By("check pod's volumes and mounts")
 		targetVolume := corev1.Volume{
-			Name: constant.VolumeName,
+			Name: tls.VolumeName,
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
 					SecretName: secretKey.Name,
 					Items: []corev1.KeyToPath{
-						{Key: constant.CAName, Path: constant.CAName},
-						{Key: constant.CertName, Path: constant.CertName},
-						{Key: constant.KeyName, Path: constant.KeyName},
+						{Key: *tls.CAFile, Path: *tls.CAFile},
+						{Key: *tls.CertFile, Path: *tls.CertFile},
+						{Key: *tls.KeyFile, Path: *tls.KeyFile},
 					},
-					Optional:    func() *bool { o := false; return &o }(),
-					DefaultMode: func() *int32 { m := int32(0600); return &m }(),
+					Optional:    ptr.To(false),
+					DefaultMode: tls.DefaultMode,
 				},
 			},
 		}
 		targetVolumeMount := corev1.VolumeMount{
-			Name:      constant.VolumeName,
-			MountPath: constant.MountPath,
+			Name:      tls.VolumeName,
+			MountPath: tls.MountPath,
 			ReadOnly:  true,
 		}
 		itsKey := types.NamespacedName{
@@ -1331,9 +1346,6 @@ var _ = Describe("Component Controller", func() {
 				g.Expect(c.VolumeMounts).Should(ContainElements(targetVolumeMount))
 			}
 		})).Should(Succeed())
-	}
-
-	testCompConfiguration := func(compName, compDefName string) {
 	}
 
 	checkRBACResourcesExistence := func(saName, rbName string, expectExisted bool) {
@@ -1760,10 +1772,6 @@ var _ = Describe("Component Controller", func() {
 			testCompTLSConfig(defaultCompName, compDefName)
 		})
 
-		It("with component configurations", func() {
-			testCompConfiguration(defaultCompName, compDefName)
-		})
-
 		It("creates component RBAC resources", func() {
 			testCompWithRBAC(defaultCompName, compDefName)
 		})
@@ -1952,7 +1960,7 @@ var _ = Describe("Component Controller", func() {
 		}
 
 		checkCompRunning := func() {
-			checkCompRunningAs(kbappsv1.UpdatingComponentPhase)
+			checkCompRunningAs(kbappsv1.StartingComponentPhase)
 		}
 
 		checkCompStopped := func() {
@@ -2031,7 +2039,50 @@ var _ = Describe("Component Controller", func() {
 				g.Expect(comp.Spec.Replicas).Should(Equal(3))
 				g.Expect(comp.Status.ObservedGeneration).Should(Equal(comp.Generation))
 				g.Expect(comp.Status.Phase).Should(Equal(kbappsv1.UpdatingComponentPhase))
+			}))
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(*its.Spec.Replicas).To(BeEquivalentTo(3))
+			}))
+		})
 
+		It("h-scale a stopped component - w/ data actions", func() {
+			By("update the cmpd object to set data actions")
+			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(compDefObj),
+				func(cmpd *kbappsv1.ComponentDefinition) {
+					if cmpd.Spec.LifecycleActions == nil {
+						cmpd.Spec.LifecycleActions = &kbappsv1.ComponentLifecycleActions{}
+					}
+					cmpd.Spec.LifecycleActions.DataLoad = testapps.NewLifecycleAction("data-load")
+					cmpd.Spec.LifecycleActions.DataDump = testapps.NewLifecycleAction("data-dump")
+				})()).Should(Succeed())
+
+			createClusterObjWithPhase(defaultCompName, compDefName, func(f *testapps.MockClusterFactory) {
+				f.SetStop(func() *bool { b := true; return &b }())
+			}, kbappsv1.StoppedClusterPhase)
+			checkCompStopped()
+
+			By("scale-out")
+			changeCompReplicas(clusterKey, 3, &clusterObj.Spec.ComponentSpecs[0])
+
+			By("check comp & its")
+			Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *kbappsv1.Component) {
+				g.Expect(comp.Spec.Replicas).Should(Equal(3))
+				g.Expect(comp.Status.ObservedGeneration < comp.Generation).Should(BeTrue())
+				g.Expect(comp.Status.Phase).Should(Equal(kbappsv1.StoppedComponentPhase))
+			}))
+			itsKey := compKey
+			Consistently(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(*its.Spec.Replicas).To(BeEquivalentTo(0))
+			}))
+
+			By("start it")
+			startComp()
+
+			By("check comp & its")
+			Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *kbappsv1.Component) {
+				g.Expect(comp.Spec.Replicas).Should(Equal(3))
+				g.Expect(comp.Status.ObservedGeneration).Should(Equal(comp.Generation))
+				g.Expect(comp.Status.Phase).Should(Equal(kbappsv1.UpdatingComponentPhase))
 			}))
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 				g.Expect(*its.Spec.Replicas).To(BeEquivalentTo(3))

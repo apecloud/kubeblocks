@@ -330,7 +330,7 @@ func initOpsDefAndValidate(reqCtx intctrlutil.RequestCtx,
 				return err
 			}
 			// covert to type map[string]interface{}
-			params, err := common.CoverStringToInterfaceBySchemaType(parametersSchema.OpenAPIV3Schema, paramsMap)
+			params, err := common.ConvertStringToInterfaceBySchemaType(parametersSchema.OpenAPIV3Schema, paramsMap)
 			if err != nil {
 				return intctrlutil.NewFatalError(err.Error())
 			}

@@ -22,6 +22,7 @@ package service
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -66,12 +67,11 @@ func runCommand(ctx context.Context, action *proto.ExecAction, parameters map[st
 	if err != nil {
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) {
-			stderrMsg := result.stderr.String()
-			if len(stderrMsg) > 0 {
-				err = errors.Wrapf(proto.ErrFailed, "exec exit %d and stderr: %s", exitErr.ExitCode(), stderrMsg)
-			} else {
-				err = errors.Wrapf(proto.ErrFailed, "exec exit %d but stderr is blank", exitErr.ExitCode())
+			errMsg := fmt.Sprintf("exit code: %d", exitErr.ExitCode())
+			if stderrMsg := result.stderr.String(); len(stderrMsg) > 0 {
+				errMsg += fmt.Sprintf(", stderr: %s", stderrMsg)
 			}
+			return nil, errors.Wrapf(proto.ErrFailed, errMsg)
 		}
 		return nil, err
 	}

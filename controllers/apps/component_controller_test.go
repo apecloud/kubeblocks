@@ -142,9 +142,7 @@ var _ = Describe("Component Controller", func() {
 	// test function helpers
 	createAllDefinitionObjects := func() {
 		By("Create a componentDefinition obj")
-		// FIXME: WithRandomName needed?
 		compDefObj = testapps.NewComponentDefinitionFactory(compDefName).
-			// WithRandomName().
 			AddAnnotations(constant.SkipImmutableCheckAnnotationKey, "true").
 			SetDefaultSpec().
 			Create(&testCtx).

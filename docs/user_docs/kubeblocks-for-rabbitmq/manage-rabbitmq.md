@@ -255,25 +255,18 @@ mycluster                                        Delete                 Running 
 
    ```bash
    kubectl edit cluster mycluster -n demo
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: Cluster
-   metadata:
-     name: mycluster
-     namespace: demo
+   ```
+
+   Edit the value of `spec.componentSpecs.replicas`.
+
+   ```yaml
+   ...
    spec:
      componentSpecs:
      - name: rabbitmq
        componentDefRef: rabbitmq
-       replicas: 1 # Change the amount
-       volumeClaimTemplates:
-       - name: data
-         spec:
-           accessModes:
-             - ReadWriteOnce
-           resources:
-             requests:
-               storage: 20Gi
-    terminationPolicy: Delete
+       replicas: 1 # Change this value
+   ...
    ```
 
 2. Check whether the corresponding resources change.
@@ -340,11 +333,12 @@ mycluster                                        Delete                 Running 
 
    ```bash
    kubectl edit cluster mycluster -n demo
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: Cluster
-   metadata:
-     name: mycluster
-     namespace: demo
+   ```
+
+   Edit the value of `spec.componentSpecs.volumeClaimTemplates.spec.resources`.
+
+   ```yaml
+   ...
    spec:
      componentSpecs:
      - name: rabbitmq
@@ -358,7 +352,7 @@ mycluster                                        Delete                 Running 
            resources:
              requests:
                storage: 40Gi # Change the volume storage size.
-     terminationPolicy: Delete
+   ...
    ```
 
 2. Check whether the corresponding cluster resources change.
@@ -426,16 +420,14 @@ EOF
 
 Configure `replicas` as 0 to delete pods.
 
+```bash
+kubectl edit cluster mycluster -n demo
+```
+
+Edit the value of `replicas`.
+
 ```yaml
-apiVersion: apps.kubeblocks.io/v1alpha1
-kind: Cluster
-metadata:
-  name: mycluster
-  namespace: demo
-  labels:
-    helm.sh/chart: rabbitmq-cluster-0.9.0
-    app.kubernetes.io/version: "3.13.2"
-    app.kubernetes.io/instance: mycluster
+...
 spec:
   terminationPolicy: Delete
   affinity:
@@ -446,7 +438,7 @@ spec:
     - name: rabbitmq
       componentDef: rabbitmq
       serviceVersion: 3.13.2
-      replicas: 0
+      replicas: 0 # Change this value
       serviceAccountName: kb-mycluster
       resources:
         limits:
@@ -489,6 +481,12 @@ EOF
 
 Change replicas back to the original amount to start this cluster again.
 
+```bash
+kubectl edit cluster mycluster -n demo
+```
+
+Edit the value of `replicas`.
+
 ```yaml
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
@@ -509,7 +507,7 @@ spec:
     - name: rabbitmq
       componentDef: rabbitmq
       serviceVersion: 3.13.2
-      replicas: 3
+      replicas: 3 # Change this value
       serviceAccountName: kb-mycluster
       resources:
         limits:

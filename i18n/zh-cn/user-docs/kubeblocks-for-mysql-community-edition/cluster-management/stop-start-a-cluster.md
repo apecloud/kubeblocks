@@ -38,14 +38,14 @@ import TabItem from '@theme/TabItem';
 
     <TabItem value="编辑集群 YAML 文件" label="编辑集群 YAML 文件">
 
+    ```bash
+    kubectl edit cluster mycluster -n demo
+    ```
+
     将 replicas 设为 0，删除 Pods。
 
     ```yaml
-    apiVersion: apps.kubeblocks.io/v1alpha1
-    kind: Cluster
-    metadata:
-      name: mycluster
-      namespace: demo
+    ...
     spec:
       clusterDefinitionRef: mysql
       clusterVersionRef: mysql-8.0.33
@@ -55,7 +55,7 @@ import TabItem from '@theme/TabItem';
         componentDefRef: mysql
         disableExporter: true  
         replicas: 0
-    ......  
+    ...
     ```
 
     </TabItem>
@@ -117,14 +117,14 @@ import TabItem from '@theme/TabItem';
 
     <TabItem value="编辑集群 YAML 文件" label="编辑集群 YAML 文件">
 
+    ```bash
+    kubectl edit cluster mycluster -n demo
+    ```
+
     将 replicas 数值调整为停止集群前的数量，再次启动集群。
 
     ```yaml
-    apiVersion: apps.kubeblocks.io/v1alpha1
-    kind: Cluster
-    metadata:
-      name: mycluster
-      namespace: demo
+    ...
     spec:
       clusterDefinitionRef: mysql
       clusterVersionRef: mysql-8.0.33
@@ -134,7 +134,7 @@ import TabItem from '@theme/TabItem';
         componentDefRef: mysql
         disableExporter: true  
         replicas: 2
-    ......
+    ...
     ```
 
     </TabItem>

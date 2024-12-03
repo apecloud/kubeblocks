@@ -19,18 +19,7 @@ Check whether the cluster STATUS is `Running`. Otherwise, the following operatio
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-```bash
-kbcli cluster list mycluster -n demo
->
-NAME             NAMESPACE        CLUSTER-DEFINITION    VERSION            TERMINATION-POLICY        STATUS         CREATED-TIME
-mycluster        demo             mongodb               mongodb-5.0        Delete                    Running        Apr 10,2023 16:20 UTC+0800
-```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 ```bash
 kubectl get cluster mycluster -n demo
@@ -41,55 +30,24 @@ mycluster   mongodb              mongodb-5.0   Delete               Running   27
 
 </TabItem>
 
+<TabItem value="kbcli" label="kbcli">
+
+```bash
+kbcli cluster list mycluster -n demo
+>
+NAME             NAMESPACE        CLUSTER-DEFINITION    VERSION            TERMINATION-POLICY        STATUS         CREATED-TIME
+mycluster        demo             mongodb               mongodb-5.0        Delete                    Running        Apr 10,2023 16:20 UTC+0800
+```
+
+</TabItem>
+
 </Tabs>
 
 ## Steps
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-1. Configure the values of `--components`, `--volume-claim-templates`, and `--storage`, and run the command below to expand the volume.
-
-    ```bash
-    kbcli cluster volume-expand mycluster -n demo --components="mongodb" --volume-claim-templates="data" --storage="30Gi"
-    ```
-
-    - `--components` describes the component name for volume expansion.
-    - `--volume-claim-templates` describes the VolumeClaimTemplate names in components.
-    - `--storage` describes the volume storage size.
-
-2. Validate the volume expansion operation.
-
-    - View the OpsRequest progress.
-
-       KubeBlocks outputs a command automatically for you to view the details of the OpsRequest progress. The output includes the status of this OpsRequest and PVC. When the status is `Succeed`, this OpsRequest is completed.
-
-       ```bash
-       kbcli cluster describe-ops mycluster-volumeexpansion-8257f -n demo
-       ```
-
-    - View the cluster status.
-
-       ```bash
-       kbcli cluster list mycluster
-       >
-       NAME              NAMESPACE        CLUSTER-DEFINITION        VERSION            TERMINATION-POLICY        STATUS          CREATED-TIME
-       mycluster         demo             mongodb                   mongodb-5.0        Delete                    Updating        Apr 10,2023 16:27 UTC+0800
-       ```
-
-       * STATUS=Updating: it means the volume expansion is in progress.
-       * STATUS=Running: it means the volume expansion operation has been applied.
-
-3. After the OpsRequest status is `Succeed` or the cluster status is `Running` again, check whether the corresponding resources change.
-
-    ```bash
-    kbcli cluster describe mycluster -n demo
-    ```
-
-</TabItem>
-
-<TabItem value="OpsRequest" label="OpsRequest">
+<TabItem value="OpsRequest" label="OpsRequest" default>
 
 1. Apply an OpsRequest. Change the value of storage according to your need and run the command below to expand the volume of a cluster.
 
@@ -125,7 +83,7 @@ mycluster   mongodb              mongodb-5.0   Delete               Running   27
    ```bash
    kubectl describe cluster mycluster -n demo
    >
-   ......
+   ...
    Volume Claim Templates:
       Name:  data
       Spec:
@@ -171,7 +129,7 @@ mycluster   mongodb              mongodb-5.0   Delete               Running   27
    ```bash
    kubectl describe cluster mycluster -n demo
    >
-   ......
+   ...
    Volume Claim Templates:
       Name:  data
       Spec:
@@ -181,6 +139,48 @@ mycluster   mongodb              mongodb-5.0   Delete               Running   27
           Requests:
             Storage:   40Gi
    ```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+1. Configure the values of `--components`, `--volume-claim-templates`, and `--storage`, and run the command below to expand the volume.
+
+    ```bash
+    kbcli cluster volume-expand mycluster -n demo --components="mongodb" --volume-claim-templates="data" --storage="30Gi"
+    ```
+
+    - `--components` describes the component name for volume expansion.
+    - `--volume-claim-templates` describes the VolumeClaimTemplate names in components.
+    - `--storage` describes the volume storage size.
+
+2. Validate the volume expansion operation.
+
+    - View the OpsRequest progress.
+
+       KubeBlocks outputs a command automatically for you to view the details of the OpsRequest progress. The output includes the status of this OpsRequest and PVC. When the status is `Succeed`, this OpsRequest is completed.
+
+       ```bash
+       kbcli cluster describe-ops mycluster-volumeexpansion-8257f -n demo
+       ```
+
+    - View the cluster status.
+
+       ```bash
+       kbcli cluster list mycluster
+       >
+       NAME              NAMESPACE        CLUSTER-DEFINITION        VERSION            TERMINATION-POLICY        STATUS          CREATED-TIME
+       mycluster         demo             mongodb                   mongodb-5.0        Delete                    Updating        Apr 10,2023 16:27 UTC+0800
+       ```
+
+       * STATUS=Updating: it means the volume expansion is in progress.
+       * STATUS=Running: it means the volume expansion operation has been applied.
+
+3. After the OpsRequest status is `Succeed` or the cluster status is `Running` again, check whether the corresponding resources change.
+
+    ```bash
+    kbcli cluster describe mycluster -n demo
+    ```
 
 </TabItem>
 

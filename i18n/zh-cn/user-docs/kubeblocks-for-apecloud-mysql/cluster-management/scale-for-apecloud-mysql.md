@@ -107,12 +107,12 @@ mycluster   demo        apecloud-mysql       ac-mysql-8.0.30   Delete           
 
    ```bash
    kubectl edit cluster mycluster -n demo
-   >
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: Cluster
-   metadata:
-     name: mycluster
-     namespace: demo
+   ```
+
+   在编辑器中修改 `spec.componentSpecs.resources` 的参数值。
+
+   ```yaml
+   ...
    spec:
      clusterDefinitionRef: apecloud-mysql
      clusterVersionRef: ac-mysql-8.0.30
@@ -304,19 +304,19 @@ mycluster   demo        apecloud-mysql       ac-mysql-8.0.30   Delete           
 
    ```yaml
    kubectl edit cluster mycluster -n demo
-   >
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: Cluster
-   metadata:
-     name: mycluster
-     namespace: demo
+   ```
+
+   在编辑器中修改 `spec.componentSpecs.replicas` 的参数值。
+
+   ```yaml
+   ...
    spec:
      clusterDefinitionRef: apecloud-mysql
      clusterVersionRef: ac-mysql-8.0.30
      componentSpecs:
      - name: mysql
        componentDefRef: mysql
-       replicas: 1 # 修改该数值
+       replicas: 1 # 修改该参数值
        volumeClaimTemplates:
        - name: data
          spec:

@@ -17,9 +17,9 @@ KubeBlocks supports the management of Elasticsearch. This tutorial illustrates h
 
 ## Before you start
 
-- [Install kbcli](./../installation/install-with-kbcli/install-kbcli.md) if you want to manage your Elasticsearch cluster with `kbcli`.
-- Install KubeBlocks [by kbcli](./../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) or [by Helm](./../installation/install-with-helm/install-kubeblocks.md).
-- Install and enable the elasticsearch Addon [by kbcli](./../installation/install-with-kbcli/install-addons.md) or [by Helm](./../installation/install-with-helm/install-addons.md).
+- [Install kbcli](./../installation/install-kbcli.md) if you want to manage your Elasticsearch cluster with `kbcli`.
+- [Install KubeBlocks](./../installation/install-kubeblocks.md).
+- [Install and enable the elasticsearch Addon](./../installation/install-addons.md).
 - To keep things isolated, create a separate namespace called `demo` throughout this tutorial.
 
   ```bash
@@ -104,7 +104,7 @@ spec:
       requests:
         cpu: "1"
         memory: 2Gi
-    serviceAccountName: null
+    serviceAccountName: kb-mycluster
     serviceVersion: 8.8.2
     services: null
     volumeClaimTemplates:
@@ -121,7 +121,7 @@ EOF
 
 | Field                                 | Definition  |
 |---------------------------------------|--------------------------------------|
-| `spec.terminationPolicy`              | It is the policy of cluster termination. The default value is `Delete`. Valid values are `DoNotTerminate`, `Halt`, `Delete`, `WipeOut`.  <p> - `DoNotTerminate` blocks deletion operation. </p><p> - `Halt` deletes workload resources such as statefulset and deployment workloads but keep PVCs. </p><p> - `Delete` is based on Halt and deletes PVCs. </p> - `WipeOut` is based on Delete and wipe out all volume snapshots and snapshot data from a backup storage location. |
+| `spec.terminationPolicy`              | It is the policy of cluster termination. The default value is `Delete`. Valid values are `DoNotTerminate`, `Delete`, `WipeOut`. For the detailed definition, you can refer to [Termination Policy](#termination-policy). |
 | `spec.affinity`                       | It defines a set of node affinity scheduling rules for the cluster's Pods. This field helps control the placement of Pods on nodes within the cluster.  |
 | `spec.affinity.podAntiAffinity`       | It specifies the anti-affinity level of Pods within a component. It determines how pods should spread across nodes to improve availability and performance. |
 | `spec.affinity.topologyKeys`          | It represents the key of node labels used to define the topology domain for Pod anti-affinity and Pod spread constraints.   |
@@ -199,7 +199,7 @@ mycluster                                                 Delete               R
 
 Horizontal scaling changes the amount of pods. For example, you can scale out replicas from three to five.
 
-From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out instances, refer to [Horizontal Scale](./../../api_docs/maintenance/scale/horizontal-scale.md) in API docs for more details and examples.
+From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out instances, refer to the [Horizontal Scale tutorial](./../maintenance/scale/horizontal-scale.md) for more details and examples.
 
 <Tabs>
 
@@ -889,6 +889,79 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
 
    - STATUS=Terminating: it means the cluster restart is in progress.
    - STATUS=Running: it means the cluster has been restarted.
+
+</TabItem>
+
+</Tabs>
+
+## Delete a cluster
+
+### Termination policy
+
+:::note
+
+The termination policy determines how a cluster is deleted.
+
+:::
+
+| **terminationPolicy** | **Deleting Operation**                           |
+|:----------------------|:-------------------------------------------------|
+| `DoNotTerminate`      | `DoNotTerminate` blocks delete operation.        |
+| `Halt`                | `Halt` deletes Cluster resources like Pods and Services but retains Persistent Volume Claims (PVCs), allowing for data preservation while stopping other operations. Halt policy is deprecated in v0.9.1 and will have same meaning as DoNotTerminate. |
+| `Delete`              | `Delete` extends the Halt policy by also removing PVCs, leading to a thorough cleanup while removing all persistent data.   |
+| `WipeOut`             | `WipeOut` deletes all Cluster resources, including volume snapshots and backups in external storage. This results in complete data removal and should be used cautiously, especially in non-production environments, to avoid irreversible data loss.   |
+
+To check the termination policy, execute the following command.
+
+<Tabs>
+
+<TabItem value="kbcli" label="kbcli" default>
+
+```bash
+kbcli cluster list mycluster -n demo
+>
+NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    CREATED-TIME
+mycluster   demo                                               Delete               Running   Sep 27,2024 11:42 UTC+0800
+```
+
+</TabItem>
+
+<TabItem value="kubectl" label="kubectl">
+
+```bash
+kubectl get cluster mycluster -n demo
+>
+NAME     CLUSTER-DEFINITION   VERSION   TERMINATION-POLICY   STATUS     AGE
+mydemo                                  Delete               Creating   27m
+```
+
+</TabItem>
+
+</Tabs>
+
+### Steps
+
+Run the command below to delete a specified cluster.
+
+<Tabs>
+
+<TabItem value="kbcli" label="kbcli" default>
+
+```bash
+kbcli cluster delete mycluster -n demo
+```
+
+</TabItem>
+
+<TabItem value="kubectl" label="kubectl">
+
+If you want to delete a cluster and its all related resources, you can modify the termination policy to `WipeOut`, then delete the cluster.
+
+```bash
+kubectl patch -n demo cluster mycluster -p '{"spec":{"terminationPolicy":"WipeOut"}}' --type="merge"
+
+kubectl delete -n demo cluster mycluster
+```
 
 </TabItem>
 

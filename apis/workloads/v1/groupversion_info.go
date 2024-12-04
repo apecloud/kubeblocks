@@ -38,4 +38,4 @@ var (
 	AddToScheme = SchemeBuilder.AddToScheme
 )
 
-const Kind = "InstanceSet"
+const InstanceSetKind = "InstanceSet"

@@ -59,7 +59,7 @@ Before connecting to the MySQL database running inside your Kubernetes cluster, 
    Use the kubectl get secrets command to extract the username from the secret named `mycluster-conn-credential` in the demo namespace.
 
    ```bash
-   kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\username}' | base64 -d
+   kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.username}' | base64 -d
    >
    root
     ```
@@ -70,7 +70,7 @@ Before connecting to the MySQL database running inside your Kubernetes cluster, 
 2. Retrieve the `password`:
 
    ```bash
-   kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.\password}' | base64 -d
+   kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.password}' | base64 -d
    >
    2gvztbvz
    ```
@@ -109,7 +109,7 @@ In some cases, you may need to connect directly to a MySQL database running insi
    kubectl exec -ti -n demo mycluster-mysql-0 -- bash
    ```
 
-   - `-ti`: Opens an interactive terminal session (-t allocates a pseudo-TTY, and -i keeps the session open).
+   - `-ti`: Opens an interactive terminal session (-t allocates a TTY, and -i passes stdin to the container).
    - `-n demo`: Specifies the demo namespace where your Pod is running.
    - `mycluster-mysql-0`: The name of the MySQL Pod. Make sure to replace this with the actual Pod name if it's different.
    - `-- bash`: Opens a Bash shell inside the Pod. You can also use sh if Bash is not available in the container.

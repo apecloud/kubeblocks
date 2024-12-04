@@ -156,11 +156,11 @@ func MockInstanceSetPod(
 		name = its.Name
 	}
 	ml := map[string]string{
-		"workloads.kubeblocks.io/managed-by": workloads.Kind,
+		"workloads.kubeblocks.io/managed-by": workloads.InstanceSetKind,
 		"workloads.kubeblocks.io/instance":   name,
 	}
 	podFactory := NewPodFactory(testCtx.DefaultNamespace, podName).
-		SetOwnerReferences(workloads.GroupVersion.String(), workloads.Kind, its).
+		SetOwnerReferences(workloads.GroupVersion.String(), workloads.InstanceSetKind, its).
 		AddAppInstanceLabel(clusterName).
 		AddAppComponentLabel(consensusCompName).
 		AddAppManagedByLabel().
@@ -303,7 +303,9 @@ func MockInstanceSetStatus(testCtx testutil.TestContext, cluster *appsv1.Cluster
 				CanVote:    true,
 			},
 		}
-		if memberStatus.ReplicaRole.AccessMode == workloads.ReadWriteMode {
+		if memberStatus.ReplicaRole.AccessMode == "" {
+			memberStatus.ReplicaRole.AccessMode = workloads.NoneMode
+		} else if memberStatus.ReplicaRole.AccessMode == workloads.ReadWriteMode {
 			memberStatus.ReplicaRole.IsLeader = true
 		}
 		newMembersStatus = append(newMembersStatus, memberStatus)

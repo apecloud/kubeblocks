@@ -29,8 +29,9 @@ Refer to the [Pulsar official document](https://pulsar.apache.org/docs/3.1.x/) f
 
 ## Before you start
 
-* Install KubeBlocks [by kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) or [by Helm](../../../user_docs/installation/install-with-helm/install-kubeblocks.md).
-* Check whether the Pulsar Addon is enabled. If this Addon is disabled, [enable it](./../../installation/install-with-kbcli/install-addons.md#enabledisable-addons) first.
+* [Install kbcli](./../../installation/install-kbcli.md) if you want to manage the StarRocks cluster with `kbcli`.
+* [Install KubeBlocks](./../../installation/install-kubeblocks.md).
+* Check whether the Pulsar Addon is enabled. If this Addon is disabled, [enable it](./../../installation/install-addons.md) first.
 * View all the database types and versions available for creating a cluster.
 
   <Tabs>
@@ -136,7 +137,7 @@ Refer to the [Pulsar official document](https://pulsar.apache.org/docs/3.1.x/) f
       - zookeeper: 3 replicas
 
      ```bash
-     helm install mycluster kubeblocks/pulsar-cluster --version "x.x.x" -f values-production.yaml --set monitor.enabled=true --namespace=demo
+     helm install mycluster kubeblocks/pulsar-cluster --version "x.y.z" -f values-production.yaml --set monitor.enabled=true --namespace=demo
      ```
 
    - **Option 2**: Create pulsar cluster with proxy.
@@ -148,7 +149,7 @@ Refer to the [Pulsar official document](https://pulsar.apache.org/docs/3.1.x/) f
       - zookeeper: 3 replicas
 
      ```bash
-     helm install mycluster kubeblocks/pulsar-cluster --version "x.x.x" -f values-production.yaml --set proxy.enable=true  --set monitor.enabled=true --namespace=demo
+     helm install mycluster kubeblocks/pulsar-cluster --version "x.y.z" -f values-production.yaml --set proxy.enable=true  --set monitor.enabled=true --namespace=demo
      ```
 
    - **Option 3**:  Create pulsar cluster with proxy and deploy `bookies-recovery` component.  
@@ -161,7 +162,7 @@ Refer to the [Pulsar official document](https://pulsar.apache.org/docs/3.1.x/) f
       - bookies-recovery: 3 replicas
 
      ```bash
-     helm install mycluster kubeblocks/pulsar-cluster --version "x.x.x" -f values-production.yaml --set proxy.enable=true --set bookiesRecovery.enable=true --set monitor.enabled=true --namespace=demo 
+     helm install mycluster kubeblocks/pulsar-cluster --version "x.y.z" -f values-production.yaml --set proxy.enable=true --set bookiesRecovery.enable=true --set monitor.enabled=true --namespace=demo 
      ```
 
    - **Option 4**: Create pulsar cluster and specify bookies and zookeeper storage parameters.
@@ -172,7 +173,7 @@ Refer to the [Pulsar official document](https://pulsar.apache.org/docs/3.1.x/) f
       - zookeeper: 3 replicas
 
      ```bash
-     helm install mycluster kubeblocks/pulsar-cluster --version "x.x.x" -f values-production.yaml --set bookies.persistence.data.storageClassName=<sc name>,bookies.persistence.log.storageClassName=<sc name>,zookeeper.persistence.data.storageClassName=<sc name>,zookeeper.persistence.log.storageClassName=<sc name> --set monitor.enabled=true --namespace=demo
+     helm install mycluster kubeblocks/pulsar-cluster --version "x.y.z" -f values-production.yaml --set bookies.persistence.data.storageClassName=<sc name>,bookies.persistence.log.storageClassName=<sc name>,zookeeper.persistence.data.storageClassName=<sc name>,zookeeper.persistence.log.storageClassName=<sc name> --set monitor.enabled=true --namespace=demo
      ```
 
    You can specify the storage name `<sc name>`.

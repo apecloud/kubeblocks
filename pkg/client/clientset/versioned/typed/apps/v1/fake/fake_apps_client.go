@@ -52,6 +52,14 @@ func (c *FakeAppsV1) ServiceDescriptors(namespace string) v1.ServiceDescriptorIn
 	return &FakeServiceDescriptors{c, namespace}
 }
 
+func (c *FakeAppsV1) ShardingDefinitions() v1.ShardingDefinitionInterface {
+	return &FakeShardingDefinitions{c}
+}
+
+func (c *FakeAppsV1) SidecarDefinitions() v1.SidecarDefinitionInterface {
+	return &FakeSidecarDefinitions{c}
+}
+
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
 func (c *FakeAppsV1) RESTClient() rest.Interface {

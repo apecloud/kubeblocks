@@ -20,9 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package builder
 
 import (
-	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
 type ComponentBuilder struct {
@@ -110,14 +111,6 @@ func (builder *ComponentBuilder) SetTLSConfig(enable bool, issuer *appsv1.Issuer
 	return builder
 }
 
-func (builder *ComponentBuilder) AddVolumeClaimTemplate(volumeName string, pvcSpec appsv1.PersistentVolumeClaimSpec) *ComponentBuilder {
-	builder.get().Spec.VolumeClaimTemplates = append(builder.get().Spec.VolumeClaimTemplates, appsv1.ClusterComponentVolumeClaimTemplate{
-		Name: volumeName,
-		Spec: pvcSpec,
-	})
-	return builder
-}
-
 func (builder *ComponentBuilder) SetVolumeClaimTemplates(volumeClaimTemplates []appsv1.ClusterComponentVolumeClaimTemplate) *ComponentBuilder {
 	builder.get().Spec.VolumeClaimTemplates = volumeClaimTemplates
 	return builder
@@ -177,5 +170,10 @@ func (builder *ComponentBuilder) SetRuntimeClassName(runtimeClassName *string) *
 
 func (builder *ComponentBuilder) SetStop(stop *bool) *ComponentBuilder {
 	builder.get().Spec.Stop = stop
+	return builder
+}
+
+func (builder *ComponentBuilder) SetSidecars(sidecars []appsv1.Sidecar) *ComponentBuilder {
+	builder.get().Spec.Sidecars = sidecars
 	return builder
 }

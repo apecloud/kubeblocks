@@ -91,6 +91,30 @@ spec:
                     - Delete
                     - Retain
                     type: string
+                  parameters:
+                    description: |-
+                      Specifies a list of name-value pairs representing parameters and their corresponding values.
+                      Parameters match the schema specified in the `actionset.spec.parametersSchema`
+                    items:
+                      properties:
+                        name:
+                          description: Represents the name of the parameter.
+                          type: string
+                        value:
+                          description: Represents the parameter values.
+                          type: string
+                      required:
+                      - name
+                      - value
+                      type: object
+                    maxItems: 128
+                    type: array
+                    x-kubernetes-list-map-keys:
+                    - name
+                    x-kubernetes-list-type: map
+                    x-kubernetes-validations:
+                    - message: forbidden to update parameters
+                      rule: self == oldSelf
                   parentBackupName:
                     description: If the specified BackupMethod is incremental, `parentBackupName`
                       is required.
@@ -121,6 +145,9 @@ spec:
                       Otherwise, only the Backup custom resource will be deleted.
                     type: string
                 type: object
+                x-kubernetes-validations:
+                - message: forbidden to update backup.parameters
+                  rule: has(oldSelf.parameters) == has(self.parameters)
               cancel:
                 description: |-
                   Indicates whether the current operation should be canceled and terminated gracefully if it's in the
@@ -3937,9 +3964,20 @@ spec:
                           minimum: 0
                           type: integer
                       type: object
+                    shards:
+                      description: |-
+                        Specifies the desired number of shards for the component.
+                        This parameter is mutually exclusive with other parameters.
+                      format: int32
+                      type: integer
                   required:
                   - componentName
                   type: object
+                  x-kubernetes-validations:
+                  - message: shards field cannot be used together with scaleOut or
+                      scaleIn
+                    rule: 'has(self.shards) ? (!has(self.scaleOut) && !has(self.scaleIn))
+                      : true'
                 type: array
                 x-kubernetes-list-map-keys:
                 - componentName
@@ -4396,6 +4434,30 @@ spec:
                       type: object
                     type: array
                     x-kubernetes-preserve-unknown-fields: true
+                  parameters:
+                    description: |-
+                      Specifies a list of name-value pairs representing parameters and their corresponding values.
+                      Parameters match the schema specified in the `actionset.spec.parametersSchema`
+                    items:
+                      properties:
+                        name:
+                          description: Represents the name of the parameter.
+                          type: string
+                        value:
+                          description: Represents the parameter values.
+                          type: string
+                      required:
+                      - name
+                      - value
+                      type: object
+                    maxItems: 128
+                    type: array
+                    x-kubernetes-list-map-keys:
+                    - name
+                    x-kubernetes-list-type: map
+                    x-kubernetes-validations:
+                    - message: forbidden to update parameters
+                      rule: self == oldSelf
                   restorePointInTime:
                     description: |-
                       Specifies the point in time to which the restore should be performed.
@@ -4422,6 +4484,51 @@ spec:
                 required:
                 - backupName
                 type: object
+                x-kubernetes-validations:
+                - message: forbidden to update restore.parameters
+                  rule: has(oldSelf.parameters) == has(self.parameters)
+              start:
+                description: Lists Components to be started. If empty, all components
+                  will be started.
+                items:
+                  description: ComponentOps specifies the Component to be operated
+                    on.
+                  properties:
+                    componentName:
+                      description: Specifies the name of the Component.
+                      type: string
+                  required:
+                  - componentName
+                  type: object
+                maxItems: 1024
+                type: array
+                x-kubernetes-list-map-keys:
+                - componentName
+                x-kubernetes-list-type: map
+                x-kubernetes-validations:
+                - message: forbidden to update spec.start
+                  rule: self == oldSelf
+              stop:
+                description: Lists Components to be stopped. If empty, all components
+                  will be stopped.
+                items:
+                  description: ComponentOps specifies the Component to be operated
+                    on.
+                  properties:
+                    componentName:
+                      description: Specifies the name of the Component.
+                      type: string
+                  required:
+                  - componentName
+                  type: object
+                maxItems: 1024
+                type: array
+                x-kubernetes-list-map-keys:
+                - componentName
+                x-kubernetes-list-type: map
+                x-kubernetes-validations:
+                - message: forbidden to update spec.stop
+                  rule: self == oldSelf
               switchover:
                 description: Lists Switchover objects, each specifying a Component
                   to perform the switchover operation.
@@ -4440,15 +4547,11 @@ spec:
 
                         1. "*" (wildcard value):
                         - Indicates no specific instance is designated as the primary or leader.
-                        - Executes the switchover action from `clusterDefinition.componentDefs[*].switchoverSpec.withoutCandidate`.
-                        - `clusterDefinition.componentDefs[x].switchoverSpec.withoutCandidate` must be defined when using "*".
 
 
                         2. A valid instance name (pod name):
                         - Designates a specific instance (pod) as the primary or leader.
                         - The name must match one of the pods in the component. Any non-valid pod name is considered invalid.
-                        - Executes the switchover action from `clusterDefinition.componentDefs[*].switchoverSpec.withCandidate`.
-                        - `clusterDefinition.componentDefs[*].switchoverSpec.withCandidate` must be defined when specifying a valid instance name.
                       type: string
                   required:
                   - componentName
@@ -4813,7 +4916,7 @@ spec:
                   properties:
                     lastFailedTime:
                       description: Records the timestamp when the Component last transitioned
-                        to a "Failed" or "Abnormal" phase.
+                        to a "Failed" phase.
                       format: date-time
                       type: string
                     message:
@@ -4822,18 +4925,17 @@ spec:
                       maxLength: 32768
                       type: string
                     phase:
-                      description: |-
-                        Records the current phase of the Component, mirroring `cluster.status.components[componentName].phase`.
-                        Possible values include "Creating", "Running", "Updating", "Stopping", "Stopped", "Deleting", "Failed", "Abnormal".
+                      description: Records the current phase of the Component, mirroring
+                        `cluster.status.components[componentName].phase`.
                       enum:
                       - Creating
-                      - Running
+                      - Deleting
                       - Updating
                       - Stopping
+                      - Starting
+                      - Running
                       - Stopped
-                      - Deleting
                       - Failed
-                      - Abnormal
                       type: string
                     preCheck:
                       description: Records the result of the preConditions check of
@@ -8466,6 +8568,11 @@ spec:
                             - name
                             type: object
                           type: array
+                        shards:
+                          description: Records the `shards` of the Component prior
+                            to any changes.
+                          format: int32
+                          type: integer
                         volumeClaimTemplates:
                           description: Records volumes' storage size of the Component
                             prior to any changes.

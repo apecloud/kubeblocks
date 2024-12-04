@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -108,8 +109,6 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 		PodUpdatePolicy:                  comp.Spec.PodUpdatePolicy,
 	}
 
-	buildCompatibleHorizontalScalePolicy(compDefObj, synthesizeComp)
-
 	if err = mergeUserDefinedEnv(synthesizeComp, comp); err != nil {
 		return nil, err
 	}
@@ -128,8 +127,8 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 
 	limitSharedMemoryVolumeSize(synthesizeComp, comp)
 
-	// build componentService
-	buildComponentServices(synthesizeComp, comp)
+	// override componentService
+	overrideComponentServices(synthesizeComp, comp)
 
 	if err = overrideConfigTemplates(synthesizeComp, comp); err != nil {
 		return nil, err
@@ -140,6 +139,10 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 
 	// build runtimeClassName
 	buildRuntimeClassName(synthesizeComp, comp)
+
+	if err = buildSidecars(ctx, cli, comp, synthesizeComp); err != nil {
+		return nil, err
+	}
 
 	if err = buildKBAgentContainer(synthesizeComp); err != nil {
 		return nil, errors.Wrap(err, "build kb-agent container failed")
@@ -165,9 +168,9 @@ func buildComp2CompDefs(ctx context.Context, cli client.Reader, cluster *appsv1.
 		}
 	}
 
-	// build from shardingSpecs
-	for _, shardingSpec := range cluster.Spec.ShardingSpecs {
-		shardingComps, err := intctrlutil.ListShardingComponents(ctx, cli, cluster, shardingSpec.Name)
+	// build from shardings
+	for _, spec := range cluster.Spec.Shardings {
+		shardingComps, err := intctrlutil.ListShardingComponents(ctx, cli, cluster, spec.Name)
 		if err != nil {
 			return nil, err
 		}
@@ -250,7 +253,7 @@ func buildSchedulingPolicy(synthesizedComp *SynthesizedComponent, comp *appsv1.C
 
 func buildVolumeClaimTemplates(synthesizeComp *SynthesizedComponent, comp *appsv1.Component) {
 	if comp.Spec.VolumeClaimTemplates != nil {
-		synthesizeComp.VolumeClaimTemplates = toVolumeClaimTemplates(&comp.Spec)
+		synthesizeComp.VolumeClaimTemplates = ToVolumeClaimTemplates(comp.Spec.VolumeClaimTemplates)
 	}
 }
 
@@ -292,19 +295,6 @@ func mergeUserDefinedVolumes(synthesizedComp *SynthesizedComponent, comp *appsv1
 		}
 	}
 
-	// for _, cc := range [][]corev1.Container{synthesizedComp.PodSpec.InitContainers, synthesizedComp.PodSpec.Containers} {
-	//	for _, c := range cc {
-	//		missed := make([]string, 0)
-	//		for _, mount := range c.VolumeMounts {
-	//			if !volumes[mount.Name] {
-	//				missed = append(missed, mount.Name)
-	//			}
-	//		}
-	//		if len(missed) > 0 {
-	//			return fmt.Errorf("volumes should be provided for mounts %s", strings.Join(missed, ","))
-	//		}
-	//	}
-	// }
 	synthesizedComp.PodSpec.Volumes = append(synthesizedComp.PodSpec.Volumes, comp.Spec.Volumes...)
 	return nil
 }
@@ -336,7 +326,7 @@ func limitSharedMemoryVolumeSize(synthesizeComp *SynthesizedComponent, comp *app
 	}
 }
 
-func toVolumeClaimTemplates(compSpec *appsv1.ComponentSpec) []corev1.PersistentVolumeClaimTemplate {
+func ToVolumeClaimTemplates(vcts []appsv1.ClusterComponentVolumeClaimTemplate) []corev1.PersistentVolumeClaimTemplate {
 	storageClassName := func(spec appsv1.PersistentVolumeClaimSpec, defaultStorageClass string) *string {
 		if spec.StorageClassName != nil && *spec.StorageClassName != "" {
 			return spec.StorageClassName
@@ -347,7 +337,7 @@ func toVolumeClaimTemplates(compSpec *appsv1.ComponentSpec) []corev1.PersistentV
 		return nil
 	}
 	var ts []corev1.PersistentVolumeClaimTemplate
-	for _, t := range compSpec.VolumeClaimTemplates {
+	for _, t := range vcts {
 		ts = append(ts, corev1.PersistentVolumeClaimTemplate{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: t.Name,
@@ -370,7 +360,7 @@ func buildAndUpdateResources(synthesizeComp *SynthesizedComponent, comp *appsv1.
 	}
 }
 
-func buildComponentServices(synthesizeComp *SynthesizedComponent, comp *appsv1.Component) {
+func overrideComponentServices(synthesizeComp *SynthesizedComponent, comp *appsv1.Component) {
 	if len(synthesizeComp.ComponentServices) == 0 || len(comp.Spec.Services) == 0 {
 		return
 	}
@@ -387,7 +377,7 @@ func buildComponentServices(synthesizeComp *SynthesizedComponent, comp *appsv1.C
 			svc.Annotations = svc1.Annotations
 			svc.PodService = svc1.PodService
 			if svc.DisableAutoProvision != nil {
-				svc.DisableAutoProvision = func() *bool { b := false; return &b }()
+				svc.DisableAutoProvision = ptr.To(false)
 			}
 		}
 	}
@@ -451,15 +441,6 @@ func buildRuntimeClassName(synthesizeComp *SynthesizedComponent, comp *appsv1.Co
 		return
 	}
 	synthesizeComp.PodSpec.RuntimeClassName = comp.Spec.RuntimeClassName
-}
-
-func buildCompatibleHorizontalScalePolicy(compDef *appsv1.ComponentDefinition, synthesizeComp *SynthesizedComponent) {
-	if compDef.Annotations != nil {
-		templateName, ok := compDef.Annotations[constant.HorizontalScaleBackupPolicyTemplateKey]
-		if ok {
-			synthesizeComp.HorizontalScaleBackupPolicyTemplate = &templateName
-		}
-	}
 }
 
 func GetConfigSpecByName(synthesizedComp *SynthesizedComponent, configSpec string) *appsv1.ComponentConfigSpec {

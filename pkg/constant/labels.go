@@ -34,8 +34,10 @@ const (
 // labels defined by KubeBlocks
 const (
 	ClusterDefLabelKey            = "clusterdefinition.kubeblocks.io/name"
+	ShardingDefLabelKey           = "shardingdefinition.kubeblocks.io/name"
 	ComponentDefinitionLabelKey   = "componentdefinition.kubeblocks.io/name"
 	ComponentVersionLabelKey      = "componentversion.kubeblocks.io/name"
+	SidecarDefLabelKey            = "sidecardefinition.kubeblocks.io/name"
 	ServiceDescriptorNameLabelKey = "servicedescriptor.kubeblocks.io/name"
 	AddonNameLabelKey             = "extensions.kubeblocks.io/addon-name"
 
@@ -47,13 +49,10 @@ const (
 	VolumeClaimTemplateNameLabelKey        = "apps.kubeblocks.io/vct-name"
 	KBAppPodNameLabelKey                   = "apps.kubeblocks.io/pod-name"
 
-	RoleLabelKey             = "kubeblocks.io/role" // RoleLabelKey consensusSet and replicationSet role label key
-	KBAppServiceVersionKey   = "apps.kubeblocks.io/service-version"
-	BackupProtectionLabelKey = "kubeblocks.io/backup-protection" // BackupProtectionLabelKey Backup delete protection policy label
-	AccessModeLabelKey       = "workloads.kubeblocks.io/access-mode"
-	ReadyWithoutPrimaryKey   = "kubeblocks.io/ready-without-primary"
-
-	KBManagedByKey = "apps.kubeblocks.io/managed-by" // KBManagedByKey marks resources that auto created
+	RoleLabelKey           = "kubeblocks.io/role" // RoleLabelKey consensusSet and replicationSet role label key
+	KBAppServiceVersionKey = "apps.kubeblocks.io/service-version"
+	AccessModeLabelKey     = "workloads.kubeblocks.io/access-mode"
+	ReadyWithoutPrimaryKey = "kubeblocks.io/ready-without-primary"
 )
 
 func GetClusterLabels(clusterName string, labels ...map[string]string) map[string]string {

@@ -27,13 +27,13 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsconfig "github.com/apecloud/kubeblocks/controllers/apps/configuration"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -96,7 +96,7 @@ func (r *ClusterDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ClusterDefinitionReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return intctrlutil.NewNamespacedControllerManagedBy(mgr).
+	return intctrlutil.NewControllerManagedBy(mgr, &appsv1.ClusterDefinition{}).
 		For(&appsv1.ClusterDefinition{}).
 		Complete(r)
 }
@@ -116,11 +116,8 @@ func (r *ClusterDefinitionReconciler) deletionHandler(rctx intctrlutil.RequestCt
 }
 
 func (r *ClusterDefinitionReconciler) deleteExternalResources(rctx intctrlutil.RequestCtx, clusterDef *appsv1.ClusterDefinition) error {
-	// delete any external resources associated with the cronJob
-	//
-	// Ensure that delete implementation is idempotent and safe to invoke
-	// multiple times for same object.
-	return appsconfig.DeleteConfigMapFinalizer(r.Client, rctx, clusterDef)
+	// delete any external resources associated with the cluster definition CR.
+	return nil
 }
 
 func (r *ClusterDefinitionReconciler) available(rctx intctrlutil.RequestCtx, clusterDef *appsv1.ClusterDefinition) error {
@@ -178,19 +175,32 @@ func (r *ClusterDefinitionReconciler) reconcileTopologies(rctx intctrlutil.Reque
 }
 
 func (r *ClusterDefinitionReconciler) validateTopology(rctx intctrlutil.RequestCtx, topology appsv1.ClusterTopology) error {
-	if !checkUniqueItemWithValue(topology.Components, "Name", nil) {
-		return fmt.Errorf("duplicate topology component names")
+	if err := r.validateTopologyComponents(rctx, topology); err != nil {
+		return err
+	}
+	if err := r.validateTopologyShardings(rctx, topology); err != nil {
+		return err
+	}
+	if err := r.globalUniqueNameCheck(topology); err != nil {
+		return err
 	}
 	if topology.Orders != nil {
 		if err := r.validateTopologyOrders(topology); err != nil {
 			return err
 		}
 	}
+	return nil
+}
+
+func (r *ClusterDefinitionReconciler) validateTopologyComponents(rctx intctrlutil.RequestCtx, topology appsv1.ClusterTopology) error {
+	if !checkUniqueItemWithValue(topology.Components, "Name", nil) {
+		return fmt.Errorf("duplicate topology component names")
+	}
 
 	// validate topology reference component definitions name pattern
 	for _, comp := range topology.Components {
-		if err := component.ValidateCompDefRegexp(comp.CompDef); err != nil {
-			return fmt.Errorf("invalid component definition reference pattern: %s", comp.CompDef)
+		if err := component.ValidateDefNameRegexp(comp.CompDef); err != nil {
+			return fmt.Errorf("invalid component definition reference: %s", comp.CompDef)
 		}
 	}
 
@@ -202,34 +212,6 @@ func (r *ClusterDefinitionReconciler) validateTopology(rctx intctrlutil.RequestC
 		if err := r.validateTopologyComponent(compDefs, comp); err != nil {
 			return err
 		}
-	}
-	return nil
-}
-
-func (r *ClusterDefinitionReconciler) validateTopologyOrders(topology appsv1.ClusterTopology) error {
-	comps := make([]string, 0)
-	for _, comp := range topology.Components {
-		comps = append(comps, comp.Name)
-	}
-	slices.Sort(comps)
-
-	validate := func(order []string) bool {
-		if len(order) == 0 {
-			return true
-		}
-		items := strings.Split(strings.Join(order, ","), ",")
-		slices.Sort(items)
-		return slices.Equal(items, comps)
-	}
-
-	if !validate(topology.Orders.Provision) {
-		return fmt.Errorf("the components in provision orders are different from those in definition")
-	}
-	if !validate(topology.Orders.Terminate) {
-		return fmt.Errorf("the components in terminate orders are different from those in definition")
-	}
-	if !validate(topology.Orders.Update) {
-		return fmt.Errorf("the components in update orders are different from those in definition")
 	}
 	return nil
 }
@@ -263,7 +245,112 @@ func (r *ClusterDefinitionReconciler) validateTopologyComponent(compDefs map[str
 	comp appsv1.ClusterTopologyComponent) error {
 	defs, ok := compDefs[comp.Name]
 	if !ok || len(defs) == 0 {
-		return fmt.Errorf("there is no matched definitions found for the topology component %s", comp.Name)
+		return fmt.Errorf("there is no matched definitions found for the component %s", comp.Name)
+	}
+	return nil
+}
+
+func (r *ClusterDefinitionReconciler) validateTopologyShardings(rctx intctrlutil.RequestCtx, topology appsv1.ClusterTopology) error {
+	if !checkUniqueItemWithValue(topology.Shardings, "Name", nil) {
+		return fmt.Errorf("duplicate topology sharding names")
+	}
+
+	for _, sharding := range topology.Shardings {
+		if err := component.ValidateDefNameRegexp(sharding.ShardingDef); err != nil {
+			return fmt.Errorf("invalid sharding definition reference: %s", sharding.ShardingDef)
+		}
+	}
+
+	shardingDefs, err := r.loadTopologyShardingDefs(rctx.Ctx, topology)
+	if err != nil {
+		return err
+	}
+	for _, sharding := range topology.Shardings {
+		if err := r.validateTopologySharding(shardingDefs, sharding); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *ClusterDefinitionReconciler) loadTopologyShardingDefs(ctx context.Context,
+	topology appsv1.ClusterTopology) (map[string][]*appsv1.ShardingDefinition, error) {
+	shardingDefList := &appsv1.ShardingDefinitionList{}
+	if err := r.Client.List(ctx, shardingDefList); err != nil {
+		return nil, err
+	}
+
+	shardingDefs := map[string]*appsv1.ShardingDefinition{}
+	for i, item := range shardingDefList.Items {
+		shardingDefs[item.Name] = &shardingDefList.Items[i]
+	}
+
+	result := make(map[string][]*appsv1.ShardingDefinition)
+	for _, sharding := range topology.Shardings {
+		defs := make([]*appsv1.ShardingDefinition, 0)
+		for shardingDefName := range shardingDefs {
+			if component.PrefixOrRegexMatched(shardingDefName, sharding.ShardingDef) {
+				defs = append(defs, shardingDefs[shardingDefName])
+			}
+		}
+		result[sharding.Name] = defs
+	}
+	return result, nil
+}
+
+func (r *ClusterDefinitionReconciler) validateTopologySharding(shardingDefs map[string][]*appsv1.ShardingDefinition,
+	sharding appsv1.ClusterTopologySharding) error {
+	defs, ok := shardingDefs[sharding.Name]
+	if !ok || len(defs) == 0 {
+		return fmt.Errorf("there is no matched definitions found for the sharding %s", sharding.Name)
+	}
+	return nil
+}
+
+func (r *ClusterDefinitionReconciler) globalUniqueNameCheck(topology appsv1.ClusterTopology) error {
+	if len(topology.Components) == 0 || len(topology.Shardings) == 0 {
+		return nil
+	}
+	names := sets.New[string]()
+	for _, comp := range topology.Components {
+		names.Insert(comp.Name)
+	}
+	for _, sharding := range topology.Shardings {
+		if names.Has(sharding.Name) {
+			return fmt.Errorf("duplicate topology component and sharding names: %s", sharding.Name)
+		}
+		names.Insert(sharding.Name)
+	}
+	return nil
+}
+
+func (r *ClusterDefinitionReconciler) validateTopologyOrders(topology appsv1.ClusterTopology) error {
+	entities := make([]string, 0)
+	for _, comp := range topology.Components {
+		entities = append(entities, comp.Name)
+	}
+	for _, sharding := range topology.Shardings {
+		entities = append(entities, sharding.Name)
+	}
+	slices.Sort(entities)
+
+	validate := func(order []string) bool {
+		if len(order) == 0 {
+			return true
+		}
+		items := strings.Split(strings.Join(order, ","), ",")
+		slices.Sort(items)
+		return slices.Equal(items, entities)
+	}
+
+	if !validate(topology.Orders.Provision) {
+		return fmt.Errorf("the components and shardings in provision orders are different from those in definition")
+	}
+	if !validate(topology.Orders.Terminate) {
+		return fmt.Errorf("the components and shardings in terminate orders are different from those in definition")
+	}
+	if !validate(topology.Orders.Update) {
+		return fmt.Errorf("the components and shardings in update orders are different from those in definition")
 	}
 	return nil
 }
@@ -280,13 +367,25 @@ func defaultClusterTopology(clusterDef *appsv1.ClusterDefinition) *appsv1.Cluste
 
 // referredClusterTopology returns the cluster topology which has name @name.
 func referredClusterTopology(clusterDef *appsv1.ClusterDefinition, name string) *appsv1.ClusterTopology {
-	if len(name) == 0 {
-		return defaultClusterTopology(clusterDef)
-	}
-	for i, topology := range clusterDef.Spec.Topologies {
-		if topology.Name == name {
-			return &clusterDef.Spec.Topologies[i]
+	if clusterDef != nil {
+		if len(name) == 0 {
+			return defaultClusterTopology(clusterDef)
+		}
+		for i, topology := range clusterDef.Spec.Topologies {
+			if topology.Name == name {
+				return &clusterDef.Spec.Topologies[i]
+			}
 		}
 	}
 	return nil
+}
+
+func clusterTopologyCompMatched(comp appsv1.ClusterTopologyComponent, compName string) bool {
+	if comp.Name == compName {
+		return true
+	}
+	if comp.Template != nil && *comp.Template {
+		return strings.HasPrefix(compName, comp.Name)
+	}
+	return false
 }

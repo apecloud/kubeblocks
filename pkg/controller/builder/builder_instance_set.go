@@ -155,11 +155,6 @@ func (builder *InstanceSetBuilder) SetRoleProbe(roleProbe *workloads.RoleProbe) 
 	return builder
 }
 
-func (builder *InstanceSetBuilder) SetService(service *corev1.Service) *InstanceSetBuilder {
-	builder.get().Spec.Service = service
-	return builder
-}
-
 func (builder *InstanceSetBuilder) SetMembershipReconfiguration(reconfiguration *workloads.MembershipReconfiguration) *InstanceSetBuilder {
 	builder.get().Spec.MembershipReconfiguration = reconfiguration
 	return builder

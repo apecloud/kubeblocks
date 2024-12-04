@@ -157,13 +157,12 @@ var _ = BeforeSuite(func() {
 	Expect(k8sClient).NotTo(BeNil())
 
 	// run reconcile
-	unCachedObjs := intctrlutil.GetUncachedObjects()
 	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
 		Scheme:  scheme.Scheme,
 		Metrics: server.Options{BindAddress: "0"},
 		Client: client.Options{
 			Cache: &client.CacheOptions{
-				DisableFor: append(unCachedObjs, &dpv1alpha1.Restore{}),
+				DisableFor: intctrlutil.GetUncachedObjects(),
 			},
 		},
 	})
@@ -180,14 +179,6 @@ var _ = BeforeSuite(func() {
 	err = intctrlutil.InitHostPortManager(k8sClient)
 	Expect(err).ToNot(HaveOccurred())
 
-	clusterRecorder = k8sManager.GetEventRecorderFor("cluster-controller")
-	err = (&ClusterReconciler{
-		Client:   k8sManager.GetClient(),
-		Scheme:   k8sManager.GetScheme(),
-		Recorder: clusterRecorder,
-	}).SetupWithManager(k8sManager)
-	Expect(err).ToNot(HaveOccurred())
-
 	err = (&ClusterDefinitionReconciler{
 		Client:   k8sManager.GetClient(),
 		Scheme:   k8sManager.GetScheme(),
@@ -195,11 +186,11 @@ var _ = BeforeSuite(func() {
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
-	err = (&ComponentReconciler{
+	err = (&ShardingDefinitionReconciler{
 		Client:   k8sManager.GetClient(),
 		Scheme:   k8sManager.GetScheme(),
-		Recorder: k8sManager.GetEventRecorderFor("component-controller"),
-	}).SetupWithManager(k8sManager, nil)
+		Recorder: k8sManager.GetEventRecorderFor("sharding-definition-controller"),
+	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
 	err = (&ComponentDefinitionReconciler{
@@ -213,6 +204,35 @@ var _ = BeforeSuite(func() {
 		Client:   k8sManager.GetClient(),
 		Scheme:   k8sManager.GetScheme(),
 		Recorder: k8sManager.GetEventRecorderFor("component-version-controller"),
+	}).SetupWithManager(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
+	err = (&SidecarDefinitionReconciler{
+		Client:   k8sManager.GetClient(),
+		Scheme:   k8sManager.GetScheme(),
+		Recorder: k8sManager.GetEventRecorderFor("sidecar-definition-controller"),
+	}).SetupWithManager(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
+	clusterRecorder = k8sManager.GetEventRecorderFor("cluster-controller")
+	err = (&ClusterReconciler{
+		Client:   k8sManager.GetClient(),
+		Scheme:   k8sManager.GetScheme(),
+		Recorder: clusterRecorder,
+	}).SetupWithManager(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
+	err = (&ComponentReconciler{
+		Client:   k8sManager.GetClient(),
+		Scheme:   k8sManager.GetScheme(),
+		Recorder: k8sManager.GetEventRecorderFor("component-controller"),
+	}).SetupWithManager(k8sManager, nil)
+	Expect(err).ToNot(HaveOccurred())
+
+	err = (&ServiceDescriptorReconciler{
+		Client:   k8sManager.GetClient(),
+		Scheme:   k8sManager.GetScheme(),
+		Recorder: k8sManager.GetEventRecorderFor("service-descriptor-controller"),
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
@@ -235,13 +255,6 @@ var _ = BeforeSuite(func() {
 		Scheme:   k8sManager.GetScheme(),
 		Recorder: k8sManager.GetEventRecorderFor("configuration-controller"),
 	}).SetupWithManager(k8sManager, nil)
-	Expect(err).ToNot(HaveOccurred())
-
-	err = (&ServiceDescriptorReconciler{
-		Client:   k8sManager.GetClient(),
-		Scheme:   k8sManager.GetScheme(),
-		Recorder: k8sManager.GetEventRecorderFor("service-descriptor-controller"),
-	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
 	err = (&dataprotection.BackupPolicyTemplateReconciler{

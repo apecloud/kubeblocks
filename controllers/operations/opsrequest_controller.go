@@ -90,7 +90,7 @@ func (r *OpsRequestReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *OpsRequestReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return intctrlutil.NewNamespacedControllerManagedBy(mgr).
+	return intctrlutil.NewControllerManagedBy(mgr).
 		For(&opsv1alpha1.OpsRequest{}).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: int(math.Ceil(viper.GetFloat64(constant.CfgKBReconcileWorkers) / 2)),
@@ -163,6 +163,11 @@ func (r *OpsRequestReconciler) fetchCluster(reqCtx intctrlutil.RequestCtx, opsRe
 	}, cluster); err != nil {
 		if apierrors.IsNotFound(err) {
 			_ = operations.PatchClusterNotFound(reqCtx.Ctx, r.Client, opsRes)
+			if !opsRes.OpsRequest.DeletionTimestamp.IsZero() {
+				return intctrlutil.HandleCRDeletion(reqCtx, r, opsRes.OpsRequest, constant.OpsRequestFinalizerName, func() (*ctrl.Result, error) {
+					return nil, r.deleteCreatedPodsInKBNamespace(reqCtx, opsRes.OpsRequest)
+				})
+			}
 		}
 		return intctrlutil.ResultToP(intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, ""))
 	}

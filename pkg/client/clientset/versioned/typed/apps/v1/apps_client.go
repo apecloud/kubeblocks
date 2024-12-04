@@ -34,6 +34,8 @@ type AppsV1Interface interface {
 	ComponentDefinitionsGetter
 	ComponentVersionsGetter
 	ServiceDescriptorsGetter
+	ShardingDefinitionsGetter
+	SidecarDefinitionsGetter
 }
 
 // AppsV1Client is used to interact with features provided by the apps.kubeblocks.io group.
@@ -63,6 +65,14 @@ func (c *AppsV1Client) ComponentVersions() ComponentVersionInterface {
 
 func (c *AppsV1Client) ServiceDescriptors(namespace string) ServiceDescriptorInterface {
 	return newServiceDescriptors(c, namespace)
+}
+
+func (c *AppsV1Client) ShardingDefinitions() ShardingDefinitionInterface {
+	return newShardingDefinitions(c)
+}
+
+func (c *AppsV1Client) SidecarDefinitions() SidecarDefinitionInterface {
+	return newSidecarDefinitions(c)
 }
 
 // NewForConfig creates a new AppsV1Client for the given config.

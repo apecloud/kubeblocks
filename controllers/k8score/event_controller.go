@@ -21,6 +21,7 @@ package k8score
 
 import (
 	"context"
+	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -31,10 +32,19 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
+
+const (
+	eventHandledAnnotationKey = "kubeblocks.io/event-handled"
+)
+
+type eventHandler interface {
+	Handle(cli client.Client, reqCtx intctrlutil.RequestCtx, recorder record.EventRecorder, event *corev1.Event) error
+}
 
 // EventReconciler reconciles an Event object
 type EventReconciler struct {
@@ -65,16 +75,30 @@ func (r *EventReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "getEventError")
 	}
 
-	handler := &instanceset.PodRoleEventHandler{}
-	if err := handler.Handle(r.Client, reqCtx, r.Recorder, event); err != nil && !apierrors.IsNotFound(err) {
-		return intctrlutil.RequeueWithError(err, reqCtx.Log, "handleEventError")
+	if r.isEventHandled(event) {
+		return intctrlutil.Reconciled()
+	}
+
+	handlers := []eventHandler{
+		&instanceset.PodRoleEventHandler{},
+		&component.AvailableEventHandler{},
+		&component.KBAgentTaskEventHandler{},
+	}
+	for _, handler := range handlers {
+		if err := handler.Handle(r.Client, reqCtx, r.Recorder, event); err != nil && !apierrors.IsNotFound(err) {
+			return intctrlutil.RequeueWithError(err, reqCtx.Log, "handleEventError")
+		}
+	}
+
+	if err := r.eventHandled(ctx, event); err != nil {
+		return intctrlutil.RequeueWithError(err, reqCtx.Log, "eventHandledError")
 	}
 	return intctrlutil.Reconciled()
 }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *EventReconciler) SetupWithManager(mgr ctrl.Manager, multiClusterMgr multicluster.Manager) error {
-	b := intctrlutil.NewNamespacedControllerManagedBy(mgr).
+	b := intctrlutil.NewControllerManagedBy(mgr).
 		For(&corev1.Event{})
 
 	if multiClusterMgr != nil {
@@ -82,4 +106,22 @@ func (r *EventReconciler) SetupWithManager(mgr ctrl.Manager, multiClusterMgr mul
 	}
 
 	return b.Complete(r)
+}
+
+func (r *EventReconciler) isEventHandled(event *corev1.Event) bool {
+	count := fmt.Sprintf("%d", event.Count)
+	annotations := event.GetAnnotations()
+	if annotations != nil && annotations[eventHandledAnnotationKey] == count {
+		return true
+	}
+	return false
+}
+
+func (r *EventReconciler) eventHandled(ctx context.Context, event *corev1.Event) error {
+	patch := client.MergeFrom(event.DeepCopy())
+	if event.Annotations == nil {
+		event.Annotations = make(map[string]string, 0)
+	}
+	event.Annotations[eventHandledAnnotationKey] = fmt.Sprintf("%d", event.Count)
+	return r.Client.Patch(ctx, event, patch, multicluster.InDataContextUnspecified())
 }

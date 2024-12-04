@@ -158,6 +158,19 @@ func isRunningAndAvailable(pod *corev1.Pod, minReadySeconds int32) bool {
 	return podutils.IsPodAvailable(pod, minReadySeconds, metav1.Now())
 }
 
+func isContainersRunning(pod *corev1.Pod) bool {
+	for _, status := range pod.Status.ContainerStatuses {
+		if status.State.Running == nil {
+			return false
+		}
+	}
+	return true
+}
+
+func isContainersReady(pod *corev1.Pod) bool {
+	return isImageMatched(pod) && isContainersRunning(pod)
+}
+
 // isCreated returns true if pod has been created and is maintained by the API server
 func isCreated(pod *corev1.Pod) bool {
 	return pod.Status.Phase != ""
@@ -171,6 +184,97 @@ func isTerminating(pod *corev1.Pod) bool {
 // isHealthy returns true if pod is running and ready and has not been terminated
 func isHealthy(pod *corev1.Pod) bool {
 	return isRunningAndReady(pod) && !isTerminating(pod)
+}
+
+// isRoleReady returns true if pod has role label
+func isRoleReady(pod *corev1.Pod, roles []workloads.ReplicaRole) bool {
+	if len(roles) == 0 {
+		return true
+	}
+	_, ok := pod.Labels[constant.RoleLabelKey]
+	return ok
+}
+
+// isImageMatched returns true if all container statuses have same image as defined in pod spec
+func isImageMatched(pod *corev1.Pod) bool {
+	for _, container := range pod.Spec.Containers {
+		index := slices.IndexFunc(pod.Status.ContainerStatuses, func(status corev1.ContainerStatus) bool {
+			return status.Name == container.Name
+		})
+		if index == -1 {
+			continue
+		}
+		specImage := container.Image
+		statusImage := pod.Status.ContainerStatuses[index].Image
+		// Image in status may not match the image used in the PodSpec.
+		// More info: https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/pod-v1/#PodStatus
+		specName, specTag, specDigest := imageSplit(specImage)
+		statusName, statusTag, statusDigest := imageSplit(statusImage)
+		// if digest presents in spec, it must be same in status
+		if len(specDigest) != 0 && specDigest != statusDigest {
+			return false
+		}
+		// if tag presents in spec, it must be same in status
+		if len(specTag) != 0 && specTag != statusTag {
+			return false
+		}
+		// otherwise, statusName should be same as or has suffix of specName
+		if specName != statusName {
+			specNames := strings.Split(specName, "/")
+			statusNames := strings.Split(statusName, "/")
+			if specNames[len(specNames)-1] != statusNames[len(statusNames)-1] {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// imageSplit separates and returns the name and tag parts
+// from the image string using either colon `:` or at `@` separators.
+// image reference pattern: [[host[:port]/]component/]component[:tag][@digest]
+func imageSplit(imageName string) (name string, tag string, digest string) {
+	// check if image name contains a domain
+	// if domain is present, ignore domain and check for `:`
+	searchName := imageName
+	slashIndex := strings.Index(imageName, "/")
+	if slashIndex > 0 {
+		searchName = imageName[slashIndex:]
+	} else {
+		slashIndex = 0
+	}
+
+	id := strings.Index(searchName, "@")
+	ic := strings.Index(searchName, ":")
+
+	// no tag or digest
+	if ic < 0 && id < 0 {
+		return imageName, "", ""
+	}
+
+	// digest only
+	if id >= 0 && (id < ic || ic < 0) {
+		id += slashIndex
+		name = imageName[:id]
+		digest = strings.TrimPrefix(imageName[id:], "@")
+		return name, "", digest
+	}
+
+	// tag and digest
+	if id >= 0 && ic >= 0 {
+		id += slashIndex
+		ic += slashIndex
+		name = imageName[:ic]
+		tag = strings.TrimPrefix(imageName[ic:id], ":")
+		digest = strings.TrimPrefix(imageName[id:], "@")
+		return name, tag, digest
+	}
+
+	// tag only
+	ic += slashIndex
+	name = imageName[:ic]
+	tag = strings.TrimPrefix(imageName[ic:], ":")
+	return name, tag, ""
 }
 
 // getPodRevision gets the revision of Pod by inspecting the StatefulSetRevisionLabel. If pod has no revision the empty

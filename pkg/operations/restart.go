@@ -31,6 +31,7 @@ import (
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -63,14 +64,14 @@ func (r restartOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 	if opsRes.OpsRequest.Status.StartTimestamp.IsZero() {
 		return fmt.Errorf("status.startTimestamp can not be null")
 	}
-	// abort earlier running vertical scaling opsRequest.
+	r.compOpsHelper = newComponentOpsHelper(opsRes.OpsRequest.Spec.RestartList)
+	// abort earlier running 'Restart' opsRequest.
 	if err := abortEarlierOpsRequestWithSameKind(reqCtx, cli, opsRes, []opsv1alpha1.OpsType{opsv1alpha1.RestartType},
 		func(earlierOps *opsv1alpha1.OpsRequest) (bool, error) {
-			return true, nil
+			return hasIntersectionCompOpsList(r.compOpsHelper.componentOpsSet, earlierOps.Spec.RestartList), nil
 		}); err != nil {
 		return err
 	}
-	r.compOpsHelper = newComponentOpsHelper(opsRes.OpsRequest.Spec.RestartList)
 	orderedComps, err := r.getComponentOrders(reqCtx, cli, opsRes)
 	if err != nil {
 		return err
@@ -115,8 +116,7 @@ func (r restartOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCtx, 
 func (r restartOpsHandler) podApplyCompOps(
 	ops *opsv1alpha1.OpsRequest,
 	pod *corev1.Pod,
-	compOps ComponentOpsInterface,
-	insTemplateName string) bool {
+	pgRes *progressResource) bool {
 	return !pod.CreationTimestamp.Before(&ops.Status.StartTimestamp)
 }
 
@@ -153,12 +153,8 @@ func (r restartOpsHandler) restartComponents(reqCtx intctrlutil.RequestCtx, cli 
 		if !r.matchToRestart(opsRes, comOpsList, index, inOrder) {
 			continue
 		}
-		matchingLabels := client.MatchingLabels{constant.AppInstanceLabelKey: opsRes.Cluster.Name}
-		if opsRes.Cluster.Spec.GetShardingByName(compOps.ComponentName) != nil {
-			matchingLabels[constant.KBAppShardingNameLabelKey] = compOps.ComponentName
-		} else {
-			matchingLabels[constant.KBAppComponentLabelKey] = compOps.ComponentName
-		}
+		compNameLabelKey := component.GetComponentNameLabelKey(opsRes.Cluster, compOps.ComponentName)
+		matchingLabels := client.MatchingLabels{constant.AppInstanceLabelKey: opsRes.Cluster.Name, compNameLabelKey: compOps.ComponentName}
 		instanceSetList := &workloads.InstanceSetList{}
 		if err := cli.List(reqCtx.Ctx, instanceSetList,
 			client.InNamespace(opsRes.Cluster.Namespace), matchingLabels); err != nil {
@@ -216,25 +212,18 @@ func (r restartOpsHandler) getCompReplicas(cluster *appsv1.Cluster, compName str
 	if compSpec != nil {
 		return compSpec.Replicas
 	}
-	shardingSpec := cluster.Spec.GetShardingByName(compName)
-	if shardingSpec != nil {
-		return shardingSpec.Template.Replicas
+	sharding := cluster.Spec.GetShardingByName(compName)
+	if sharding != nil {
+		return sharding.Template.Replicas
 	}
 	return 0
 }
 
 // isRestarted checks whether the component has been restarted
 func (r restartOpsHandler) isRestarted(opsRes *OpsResource, object client.Object, podTemplate *corev1.PodTemplateSpec) bool {
-	cName := object.GetLabels()[constant.KBAppComponentLabelKey]
-	shardingName := object.GetLabels()[constant.KBAppShardingNameLabelKey]
-	if shardingName != "" {
-		if _, ok := r.compOpsHelper.componentOpsSet[shardingName]; !ok {
-			return true
-		}
-	} else {
-		if _, ok := r.compOpsHelper.componentOpsSet[cName]; !ok {
-			return true
-		}
+	compName := component.GetComponentNameFromObj(object)
+	if _, ok := r.compOpsHelper.componentOpsSet[compName]; !ok {
+		return true
 	}
 	if podTemplate.Annotations == nil {
 		podTemplate.Annotations = map[string]string{}

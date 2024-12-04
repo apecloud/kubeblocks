@@ -14,7 +14,7 @@ aggregationRule:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: kubeblocks-lorry-pod-role
+  name: {{ include "kubeblocks.fullname" . }}-agent-pod-role
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
     app.kubernetes.io/required-by: pod
@@ -25,6 +25,8 @@ rules:
   - events
   verbs:
   - create
+  - get
+  - update
 - apiGroups:
   - ""
   resources:
@@ -67,7 +69,7 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: kubeblocks-patroni-pod-role
+  name: {{ include "kubeblocks.fullname" . }}-patroni-pod-role
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
     app.kubernetes.io/required-by: pod
@@ -110,27 +112,3 @@ rules:
   - patch
   - update
   - watch
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: kubeblocks-backup-pod-role
-  labels:
-    {{- include "kubeblocks.labels" . | nindent 4 }}
-    app.kubernetes.io/required-by: pod
-rules:
-- apiGroups:
-  - "dataprotection.kubeblocks.io"
-  resources:
-  - backups/status
-  verbs:
-  - get
-  - update
-  - patch
-- apiGroups:
-  - "dataprotection.kubeblocks.io"
-  resources:
-  - backups
-  verbs:
-  - create
-  - get

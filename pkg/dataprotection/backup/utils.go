@@ -21,14 +21,17 @@ package backup
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"slices"
 	"strings"
 
 	"github.com/rogpeppe/go-internal/semver"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
@@ -175,7 +178,7 @@ func generateBaseCRNameByBackupSchedule(uniqueNameWithBackupSchedule, backupSche
 	return fmt.Sprintf("%s-%s", name, method)
 }
 
-// GenerateCRNameByBackupSchedule generate a CR name which is created by BackupSchedule, such as CronJob Backup.
+// GenerateCRNameByBackupSchedule generate a CR name which is created by BackupSchedule, such as Continuous Backup.
 func GenerateCRNameByBackupSchedule(backupSchedule *dpv1alpha1.BackupSchedule, method string) string {
 	uid := backupSchedule.UID[:8]
 	if len(backupSchedule.OwnerReferences) > 0 {
@@ -185,7 +188,16 @@ func GenerateCRNameByBackupSchedule(backupSchedule *dpv1alpha1.BackupSchedule, m
 	return generateBaseCRNameByBackupSchedule(uniqueNameWithBackupSchedule, backupSchedule.Namespace, method)
 }
 
-// GenerateLegacyCRNameByBackupSchedule generate a legacy CR name which is created by BackupSchedule, such as CronJob Backup.
+// GenerateCRNameByScheduleNameAndMethod generate a CR name which is created by BackupSchedule, such as CronJob.
+func GenerateCRNameByScheduleNameAndMethod(backupSchedule *dpv1alpha1.BackupSchedule, method string, name string) string {
+	suffix := name
+	if len(suffix) == 0 {
+		suffix = method
+	}
+	return GenerateCRNameByBackupSchedule(backupSchedule, suffix)
+}
+
+// GenerateLegacyCRNameByBackupSchedule generate a legacy CR name which is created by BackupSchedule, such as CronJob.
 func GenerateLegacyCRNameByBackupSchedule(backupSchedule *dpv1alpha1.BackupSchedule, method string) string {
 	uniqueNameWithBackupSchedule := fmt.Sprintf("%s-%s", backupSchedule.UID[:8], backupSchedule.Name)
 	return generateBaseCRNameByBackupSchedule(uniqueNameWithBackupSchedule, backupSchedule.Namespace, method)
@@ -285,4 +297,30 @@ func BuildCronJobSchedule(cronExpression string) (*string, string) {
 		return nil, cronExpression
 	}
 	return nil, fmt.Sprintf("CRON_TZ=%s %s", timeZone, cronExpression)
+}
+
+// StopStatefulSetsWhenFailed stops the sts to un-bound the pvcs.
+func StopStatefulSetsWhenFailed(ctx context.Context, cli client.Client, backup *dpv1alpha1.Backup, targetName string) error {
+	if backup.Status.Phase != dpv1alpha1.BackupPhaseFailed {
+		return nil
+	}
+	sts := &appsv1.StatefulSet{}
+	stsName := GenerateBackupStatefulSetName(backup, targetName, BackupDataJobNamePrefix)
+	if err := cli.Get(ctx, client.ObjectKey{Name: stsName, Namespace: backup.Namespace}, sts); client.IgnoreNotFound(err) != nil {
+		return nil
+	}
+	sts.Spec.Replicas = pointer.Int32(0)
+	return cli.Update(ctx, sts)
+}
+
+func BuildParametersManifest(parameters []dpv1alpha1.ParameterPair) (string, error) {
+	if len(parameters) == 0 {
+		return "", nil
+	}
+	bytes, err := json.Marshal(parameters)
+	if err != nil {
+		return "", err
+	}
+	res := fmt.Sprintf("\n  parameters: %s", string(bytes))
+	return res, nil
 }

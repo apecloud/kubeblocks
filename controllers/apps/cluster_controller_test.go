@@ -107,7 +107,7 @@ var _ = Describe("Cluster Controller", func() {
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupSignature, true, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupPolicySignature, true, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.VolumeSnapshotSignature, true, inNS)
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ServiceSignature, true, inNS)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ServiceSignature, true, inNS, ml)
 		// non-namespaced
 		testapps.ClearResources(&testCtx, generics.BackupPolicyTemplateSignature, ml)
 		testapps.ClearResources(&testCtx, generics.ActionSetSignature, ml)
@@ -196,14 +196,14 @@ var _ = Describe("Cluster Controller", func() {
 	}
 
 	waitForCreatingResourceCompletely := func(clusterKey client.ObjectKey, compNames ...string) {
-		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+		Eventually(testapps.ClusterReconciled(&testCtx, clusterKey)).Should(BeTrue())
 		cluster := &appsv1.Cluster{}
 		Eventually(testapps.CheckObjExists(&testCtx, clusterKey, cluster, true)).Should(Succeed())
 		for _, compName := range compNames {
-			compPhase := appsv1.CreatingClusterCompPhase
+			compPhase := appsv1.CreatingComponentPhase
 			for _, spec := range cluster.Spec.ComponentSpecs {
 				if spec.Name == compName && spec.Replicas == 0 {
-					compPhase = appsv1.StoppedClusterCompPhase
+					compPhase = appsv1.StoppedComponentPhase
 				}
 			}
 			Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, compName)).Should(Equal(compPhase))
@@ -235,7 +235,8 @@ var _ = Describe("Cluster Controller", func() {
 
 	shardingComponentProcessorWrapper := func(compName, compDefName string, processor ...func(*testapps.MockClusterFactory)) func(f *testapps.MockClusterFactory) {
 		return func(f *testapps.MockClusterFactory) {
-			f.AddShardingSpec(compName, compDefName).SetShards(defaultShardCount)
+			f.AddSharding(compName, "", compDefName).
+				SetShards(defaultShardCount)
 			for _, p := range processor {
 				if p != nil {
 					p(f)
@@ -260,7 +261,7 @@ var _ = Describe("Cluster Controller", func() {
 		createClusterObjNoWait("", componentProcessorWrapper(compName, compDefName, processor))
 
 		By("Waiting for the cluster enter Creating phase")
-		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+		Eventually(testapps.ClusterReconciled(&testCtx, clusterKey)).Should(BeTrue())
 		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1.CreatingClusterPhase))
 
 		By("Wait component created")
@@ -277,7 +278,7 @@ var _ = Describe("Cluster Controller", func() {
 		createClusterObjNoWait(clusterDefObj.Name, componentProcessorWrapper(compName, "", setTopology, processor))
 
 		By("Waiting for the cluster enter Creating phase")
-		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+		Eventually(testapps.ClusterReconciled(&testCtx, clusterKey)).Should(BeTrue())
 		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1.CreatingClusterPhase))
 
 		By("Wait components created")
@@ -293,7 +294,7 @@ var _ = Describe("Cluster Controller", func() {
 		createClusterObjNoWait("", shardingComponentProcessorWrapper(compTplName, compDefName, processor))
 
 		By("Waiting for the cluster enter Creating phase")
-		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+		Eventually(testapps.ClusterReconciled(&testCtx, clusterKey)).Should(BeTrue())
 		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1.CreatingClusterPhase))
 
 		By("Wait component created")
@@ -305,10 +306,11 @@ var _ = Describe("Cluster Controller", func() {
 			ml, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(defaultShardCount))
 
 		By("checking backup policy")
-		backupPolicyName := generateBackupPolicyName(clusterKey.Name, compTplName, false)
+		backupPolicyName := generateBackupPolicyName(clusterKey.Name, compTplName)
 		backupPolicyKey := client.ObjectKey{Name: backupPolicyName, Namespace: clusterKey.Namespace}
 		Eventually(testapps.CheckObj(&testCtx, backupPolicyKey, func(g Gomega, bp *dpv1alpha1.BackupPolicy) {
 			g.Expect(bp.Spec.Targets).Should(HaveLen(defaultShardCount))
+			g.Expect(bp.Spec.Targets[0].Name).ShouldNot(BeEmpty())
 		})).Should(Succeed())
 
 		By("checking backup schedule")
@@ -323,7 +325,7 @@ var _ = Describe("Cluster Controller", func() {
 		createClusterObjNoWait("", multipleTemplateComponentProcessorWrapper(compName, compDefName, processor))
 
 		By("Waiting for the cluster enter Creating phase")
-		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(1))
+		Eventually(testapps.ClusterReconciled(&testCtx, clusterKey)).Should(BeTrue())
 		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(appsv1.CreatingClusterPhase))
 
 		By("Wait component created")
@@ -450,9 +452,9 @@ var _ = Describe("Cluster Controller", func() {
 
 		By("scale in the sharding component")
 		Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1.Cluster) {
-			for i := range cluster.Spec.ShardingSpecs {
-				if cluster.Spec.ShardingSpecs[i].Name == compName {
-					cluster.Spec.ShardingSpecs[i].Shards = int32(shards - 1)
+			for i := range cluster.Spec.Shardings {
+				if cluster.Spec.Shardings[i].Name == compName {
+					cluster.Spec.Shardings[i].Shards = int32(shards - 1)
 				}
 			}
 		})()).ShouldNot(HaveOccurred())
@@ -768,7 +770,7 @@ var _ = Describe("Cluster Controller", func() {
 		}
 	}
 
-	deleteClusterWithBackup := func(terminationPolicy appsv1.TerminationPolicyType, backupRetainPolicy string) {
+	deleteClusterWithBackup := func(terminationPolicy appsv1.TerminationPolicyType) {
 		By("mocking a retained backup")
 		backupPolicyName := "test-backup-policy"
 		backupName := "test-backup"
@@ -777,9 +779,8 @@ var _ = Describe("Cluster Controller", func() {
 			SetBackupPolicyName(backupPolicyName).
 			SetBackupMethod(backupMethod).
 			SetLabels(map[string]string{
-				constant.AppManagedByLabelKey:     constant.AppName,
-				constant.AppInstanceLabelKey:      clusterObj.Name,
-				constant.BackupProtectionLabelKey: backupRetainPolicy,
+				constant.AppManagedByLabelKey: constant.AppName,
+				constant.AppInstanceLabelKey:  clusterObj.Name,
 			}).
 			WithRandomName().
 			Create(&testCtx).GetObject()
@@ -793,7 +794,7 @@ var _ = Describe("Cluster Controller", func() {
 		Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &appsv1.Cluster{}, false)).Should(Succeed())
 
 		By(fmt.Sprintf("checking the backup with TerminationPolicyType=%s", terminationPolicy))
-		if terminationPolicy == appsv1.WipeOut && backupRetainPolicy == constant.BackupDelete {
+		if terminationPolicy == appsv1.WipeOut {
 			Eventually(testapps.CheckObjExists(&testCtx, backupKey, &dpv1alpha1.Backup{}, false)).Should(Succeed())
 		} else {
 			Consistently(testapps.CheckObjExists(&testCtx, backupKey, &dpv1alpha1.Backup{}, true)).Should(Succeed())
@@ -805,7 +806,7 @@ var _ = Describe("Cluster Controller", func() {
 			Client:  testCtx.Cli,
 		}
 		var namespacedKinds, clusteredKinds []client.ObjectList
-		if terminationPolicy == appsv1.WipeOut && backupRetainPolicy == constant.BackupDelete {
+		if terminationPolicy == appsv1.WipeOut {
 			namespacedKinds, clusteredKinds = kindsForWipeOut()
 		} else {
 			namespacedKinds, clusteredKinds = kindsForDelete()
@@ -818,12 +819,12 @@ var _ = Describe("Cluster Controller", func() {
 
 	testDeleteClusterWithDelete := func(createObj func(appsv1.TerminationPolicyType)) {
 		createObj(appsv1.Delete)
-		deleteClusterWithBackup(appsv1.Delete, constant.BackupRetain)
+		deleteClusterWithBackup(appsv1.Delete)
 	}
 
-	testDeleteClusterWithWipeOut := func(createObj func(appsv1.TerminationPolicyType), backupRetainPolicy string) {
+	testDeleteClusterWithWipeOut := func(createObj func(appsv1.TerminationPolicyType)) {
 		createObj(appsv1.WipeOut)
-		deleteClusterWithBackup(appsv1.WipeOut, backupRetainPolicy)
+		deleteClusterWithBackup(appsv1.WipeOut)
 	}
 
 	Context("cluster provisioning", func() {
@@ -910,13 +911,10 @@ var _ = Describe("Cluster Controller", func() {
 			testDeleteClusterWithDelete(createObj)
 		})
 
-		It("delete cluster with terminationPolicy=WipeOut and backupRetainPolicy=Delete", func() {
-			testDeleteClusterWithWipeOut(createObj, constant.BackupDelete)
+		It("delete cluster with terminationPolicy=WipeOut", func() {
+			testDeleteClusterWithWipeOut(createObj)
 		})
 
-		It("delete cluster with terminationPolicy=WipeOut and backupRetainPolicy=Retain", func() {
-			testDeleteClusterWithWipeOut(createObj, constant.BackupRetain)
-		})
 	})
 
 	Context("cluster status", func() {
@@ -1067,10 +1065,13 @@ var _ = Describe("Cluster Controller", func() {
 						g.Expect(*policy.Spec.BackupRepoName).Should(BeEquivalentTo(backup.RepoName))
 					}
 					g.Expect(policy.Spec.BackupMethods).ShouldNot(BeEmpty())
+					g.Expect(policy.Spec.Targets).Should(HaveLen(0))
+					g.Expect(policy.Spec.Target).ShouldNot(BeNil())
+					g.Expect(policy.Spec.Target.Name).Should(BeEmpty())
 				}
 
 				By("checking backup policy")
-				backupPolicyName := generateBackupPolicyName(clusterKey.Name, defaultCompName, false)
+				backupPolicyName := generateBackupPolicyName(clusterKey.Name, defaultCompName)
 				backupPolicyKey := client.ObjectKey{Name: backupPolicyName, Namespace: clusterKey.Namespace}
 				backupPolicy := &dpv1alpha1.BackupPolicy{}
 				Eventually(testapps.CheckObjExists(&testCtx, backupPolicyKey, backupPolicy, true)).Should(Succeed())

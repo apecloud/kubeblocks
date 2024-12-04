@@ -17,9 +17,9 @@ This tutorial shows how to create and connect to a Redis cluster.
 
 ### Before you start
 
-* [Install kbcli](./../../installation/install-with-kbcli/install-kbcli.md) if you want to create a Redis cluster by `kbcli`.
-* Install KubeBlocks [by kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) or [by Helm](./../../installation/install-with-helm/install-kubeblocks.md).
-* Make sure the Redis Addon is enabled. The Redis Addon is enabled by KubeBlocks by default. If you disable it when installing KubeBlocks, [enable it](./../../installation/install-with-kbcli/install-addons.md) first.
+* [Install kbcli](./../../installation/install-kbcli.md) if you want to create a Redis cluster by `kbcli`.
+* [Install KubeBlocks](./../../installation/install-kubeblocks.md).
+* Make sure the Redis Addon is enabled. The Redis Addon is enabled by KubeBlocks by default. If you disable it when installing KubeBlocks, [enable it](./../../installation/install-addons.md) first.
 
   <Tabs>
 
@@ -186,7 +186,7 @@ EOF
 |---------------------------------------|--------------------------------------|
 | `spec.clusterDefinitionRef`           | It specifies the name of the ClusterDefinition for creating a specific type of cluster.  |
 | `spec.clusterVersionRef`              | It is the name of the cluster version CRD that defines the cluster version.  |
-| `spec.terminationPolicy`              | It is the policy of cluster termination. The default value is `Delete`. Valid values are `DoNotTerminate`, `Halt`, `Delete`, `WipeOut`.  <p> - `DoNotTerminate` blocks deletion operation. </p><p> - `Halt` deletes workload resources such as statefulset and deployment workloads but keep PVCs. </p><p> - `Delete` is based on Halt and deletes PVCs. </p> - `WipeOut` is based on Delete and wipe out all volume snapshots and snapshot data from a backup storage location. |
+| `spec.terminationPolicy`              | It is the policy of cluster termination. The default value is `Delete`. Valid values are `DoNotTerminate`, `Delete`, `WipeOut`. For the detailed definition, you can refer to [Termination Policy](./delete-a-redis-cluster.md#termination-policy). |
 | `spec.affinity`                       | It defines a set of node affinity scheduling rules for the cluster's Pods. This field helps control the placement of Pods on nodes within the cluster.  |
 | `spec.affinity.podAntiAffinity`       | It specifies the anti-affinity level of Pods within a component. It determines how pods should spread across nodes to improve availability and performance. |
 | `spec.affinity.topologyKeys`          | It represents the key of node labels used to define the topology domain for Pod anti-affinity and Pod spread constraints.   |
@@ -235,11 +235,11 @@ KubeBlocks operator has created a new Secret called `mycluster-conn-credential` 
 1. Get the `username` and `password` for the `kubectl exec` command.
 
    ```bash
-   kubectl get secrets -n demo mycluster-redis-account-default -o jsonpath='{.data.\username}' | base64 -d
+   kubectl get secrets -n demo mycluster-redis-account-default -o jsonpath='{.data.username}' | base64 -d
    >
    default
 
-   kubectl get secrets -n demo mycluster-redis-account-default -o jsonpath='{.data.\password}' | base64 -d
+   kubectl get secrets -n demo mycluster-redis-account-default -o jsonpath='{.data.password}' | base64 -d
    >
    5bv7czc4
    ```

@@ -53,3 +53,11 @@ type ServiceDescriptorListerExpansion interface{}
 // ServiceDescriptorNamespaceListerExpansion allows custom methods to be added to
 // ServiceDescriptorNamespaceLister.
 type ServiceDescriptorNamespaceListerExpansion interface{}
+
+// ShardingDefinitionListerExpansion allows custom methods to be added to
+// ShardingDefinitionLister.
+type ShardingDefinitionListerExpansion interface{}
+
+// SidecarDefinitionListerExpansion allows custom methods to be added to
+// SidecarDefinitionLister.
+type SidecarDefinitionListerExpansion interface{}

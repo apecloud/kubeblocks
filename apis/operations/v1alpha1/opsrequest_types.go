@@ -24,6 +24,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 )
 
 // OpsRequestSpec defines the desired state of OpsRequest
@@ -136,6 +137,28 @@ type SpecificOpsRequest struct {
 	// +listMapKey=componentName
 	VolumeExpansionList []VolumeExpansion `json:"volumeExpansion,omitempty"  patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
 
+	// Lists Components to be started. If empty, all components will be started.
+	//
+	// +optional
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.start"
+	// +kubebuilder:validation:MaxItems=1024
+	// +patchMergeKey=componentName
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=componentName
+	StartList []ComponentOps `json:"start,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
+
+	// Lists Components to be stopped. If empty, all components will be stopped.
+	//
+	// +optional
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.stop"
+	// +kubebuilder:validation:MaxItems=1024
+	// +patchMergeKey=componentName
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=componentName
+	StopList []ComponentOps `json:"stop,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
+
 	// Lists Components to be restarted.
 	//
 	// +optional
@@ -183,12 +206,15 @@ type SpecificOpsRequest struct {
 	ExposeList []Expose `json:"expose,omitempty"`
 
 	// Specifies the parameters to back up a Cluster.
+	//
+	// +kubebuilder:validation:XValidation:rule="has(oldSelf.parameters) == has(self.parameters)",message="forbidden to update backup.parameters"
 	// +optional
 	Backup *Backup `json:"backup,omitempty"`
 
 	// Specifies the parameters to restore a Cluster.
 	// Note that this restore operation will roll back cluster services.
 	//
+	// +kubebuilder:validation:XValidation:rule="has(oldSelf.parameters) == has(self.parameters)",message="forbidden to update restore.parameters"
 	// +optional
 	Restore *Restore `json:"restore,omitempty"`
 
@@ -282,14 +308,10 @@ type Switchover struct {
 	//
 	// 1. "*" (wildcard value):
 	// - Indicates no specific instance is designated as the primary or leader.
-	// - Executes the switchover action from `clusterDefinition.componentDefs[*].switchoverSpec.withoutCandidate`.
-	// - `clusterDefinition.componentDefs[x].switchoverSpec.withoutCandidate` must be defined when using "*".
 	//
 	// 2. A valid instance name (pod name):
 	// - Designates a specific instance (pod) as the primary or leader.
 	// - The name must match one of the pods in the component. Any non-valid pod name is considered invalid.
-	// - Executes the switchover action from `clusterDefinition.componentDefs[*].switchoverSpec.withCandidate`.
-	// - `clusterDefinition.componentDefs[*].switchoverSpec.withCandidate` must be defined when specifying a valid instance name.
 	//
 	// +kubebuilder:validation:Required
 	InstanceName string `json:"instanceName"`
@@ -414,10 +436,16 @@ type OpsRequestVolumeClaimTemplate struct {
 	Name string `json:"name"`
 }
 
+// +kubebuilder:validation:XValidation:rule="has(self.shards) ? (!has(self.scaleOut) && !has(self.scaleIn)) : true",message="shards field cannot be used together with scaleOut or scaleIn"
+
 // HorizontalScaling defines the parameters of a horizontal scaling operation.
 type HorizontalScaling struct {
 	// Specifies the name of the Component.
 	ComponentOps `json:",inline"`
+
+	// Specifies the desired number of shards for the component.
+	// This parameter is mutually exclusive with other parameters.
+	Shards *int32 `json:"shards,omitempty"`
 
 	// Specifies the replica changes for scaling out components and instance templates,
 	// and brings offline instances back online. Can be used in conjunction with the "scaleIn" operation.
@@ -888,6 +916,16 @@ type Backup struct {
 	//
 	// +optional
 	ParentBackupName string `json:"parentBackupName,omitempty"`
+
+	// Specifies a list of name-value pairs representing parameters and their corresponding values.
+	// Parameters match the schema specified in the `actionset.spec.parametersSchema`
+	//
+	// +listType=map
+	// +listMapKey=name
+	// +kubebuilder:validation:MaxItems=128
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update parameters"
+	// +optional
+	Parameters []dpv1alpha1.ParameterPair `json:"parameters,omitempty"`
 }
 
 type Restore struct {
@@ -929,6 +967,16 @@ type Restore struct {
 	//
 	// This setting is useful for coordinating PostReady operations across the Cluster for optimal cluster conditions.
 	DeferPostReadyUntilClusterRunning bool `json:"deferPostReadyUntilClusterRunning,omitempty"`
+
+	// Specifies a list of name-value pairs representing parameters and their corresponding values.
+	// Parameters match the schema specified in the `actionset.spec.parametersSchema`
+	//
+	// +listType=map
+	// +listMapKey=name
+	// +kubebuilder:validation:MaxItems=128
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update parameters"
+	// +optional
+	Parameters []dpv1alpha1.ParameterPair `json:"parameters,omitempty"`
 }
 
 // OpsRequestStatus represents the observed state of an OpsRequest.
@@ -1051,6 +1099,10 @@ type LastComponentConfiguration struct {
 	// +optional
 	Replicas *int32 `json:"replicas,omitempty"`
 
+	// Records the `shards` of the Component prior to any changes.
+	// +optional
+	Shards *int32 `json:"shards,omitempty"`
+
 	// Records the resources of the Component prior to any changes.
 	// +kubebuilder:pruning:PreserveUnknownFields
 	// +optional
@@ -1090,11 +1142,10 @@ type LastConfiguration struct {
 
 type OpsRequestComponentStatus struct {
 	// Records the current phase of the Component, mirroring `cluster.status.components[componentName].phase`.
-	// Possible values include "Creating", "Running", "Updating", "Stopping", "Stopped", "Deleting", "Failed", "Abnormal".
 	// +optional
-	Phase appsv1.ClusterComponentPhase `json:"phase,omitempty"`
+	Phase appsv1.ComponentPhase `json:"phase,omitempty"`
 
-	// Records the timestamp when the Component last transitioned to a "Failed" or "Abnormal" phase.
+	// Records the timestamp when the Component last transitioned to a "Failed" phase.
 	// +optional
 	LastFailedTime metav1.Time `json:"lastFailedTime,omitempty"`
 

@@ -157,6 +157,7 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCt
 						expectCount:          int(ins.GetReplicas()),
 						vctName:              vct.Name,
 						offlineInstanceNames: compSpec.OfflineInstances,
+						templateName:         ins.Name,
 					})
 				}
 			}
@@ -169,17 +170,17 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCt
 		}
 		setVeHelpers(compSpec, compOps, compSpec.Name)
 	}
-	for _, shardingSpec := range opsRes.Cluster.Spec.ShardingSpecs {
-		compOps, ok := compOpsHelper.componentOpsSet[shardingSpec.Name]
+	for _, sharding := range opsRes.Cluster.Spec.Shardings {
+		compOps, ok := compOpsHelper.componentOpsSet[sharding.Name]
 		if !ok {
 			continue
 		}
-		shardingComps, err := intctrlutil.ListShardingComponents(reqCtx.Ctx, cli, opsRes.Cluster, shardingSpec.Name)
+		shardingComps, err := intctrlutil.ListShardingComponents(reqCtx.Ctx, cli, opsRes.Cluster, sharding.Name)
 		if err != nil {
 			return opsRequestPhase, 0, err
 		}
 		for _, v := range shardingComps {
-			setVeHelpers(shardingSpec.Template, compOps, v.Labels[constant.KBAppComponentLabelKey])
+			setVeHelpers(sharding.Template, compOps, v.Labels[constant.KBAppComponentLabelKey])
 		}
 	}
 	// reconcile the status.components. when the volume expansion is successful,
@@ -239,7 +240,7 @@ func (ve volumeExpansionOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.Req
 		getLastVCTs := func(vcts []appsv1.ClusterComponentVolumeClaimTemplate, templateName string) []appsv1.ClusterComponentVolumeClaimTemplate {
 			lastVCTs := make([]appsv1.ClusterComponentVolumeClaimTemplate, 0)
 			for _, vct := range vcts {
-				key := getComponentVCTKey(comOps.GetComponentName(), comOps.GetComponentName(), templateName)
+				key := getComponentVCTKey(comOps.GetComponentName(), templateName, vct.Name)
 				if _, ok := storageMap[key]; !ok {
 					continue
 				}
@@ -256,6 +257,7 @@ func (ve volumeExpansionOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.Req
 					continue
 				}
 				instanceTemplates = append(instanceTemplates, appsv1.InstanceTemplate{
+					Name:                 v.Name,
 					VolumeClaimTemplates: getLastVCTs(ins.VolumeClaimTemplates, ins.Name),
 				})
 			}

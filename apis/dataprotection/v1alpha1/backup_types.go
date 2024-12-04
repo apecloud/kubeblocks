@@ -22,6 +22,7 @@ import (
 )
 
 // BackupSpec defines the desired state of Backup.
+// +kubebuilder:validation:XValidation:rule="has(oldSelf.parameters) == has(self.parameters)",message="forbidden to update spec.parameters"
 type BackupSpec struct {
 	// Specifies the backup policy to be applied for this backup.
 	//
@@ -74,6 +75,16 @@ type BackupSpec struct {
 	// +optional
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.parentBackupName"
 	ParentBackupName string `json:"parentBackupName,omitempty"`
+
+	// Specifies a list of name-value pairs representing parameters and their corresponding values.
+	// Parameters match the schema specified in the `actionset.spec.parametersSchema`
+	//
+	// +listType=map
+	// +listMapKey=name
+	// +kubebuilder:validation:MaxItems=128
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.parameters"
+	// +optional
+	Parameters []ParameterPair `json:"parameters,omitempty"`
 }
 
 // BackupStatus defines the observed state of Backup.
@@ -374,6 +385,7 @@ const (
 // +kubebuilder:printcolumn:name="STATUS",type=string,JSONPath=`.status.phase`
 // +kubebuilder:printcolumn:name="TOTAL-SIZE",type=string,JSONPath=`.status.totalSize`
 // +kubebuilder:printcolumn:name="DURATION",type=string,JSONPath=`.status.duration`
+// +kubebuilder:printcolumn:name="DELETION-POLICY",type=string,JSONPath=`.spec.deletionPolicy`
 // +kubebuilder:printcolumn:name="CREATION-TIME",type=string,JSONPath=".metadata.creationTimestamp"
 // +kubebuilder:printcolumn:name="COMPLETION-TIME",type=string,JSONPath=`.status.completionTimestamp`
 // +kubebuilder:printcolumn:name="EXPIRATION-TIME",type=string,JSONPath=`.status.expiration`

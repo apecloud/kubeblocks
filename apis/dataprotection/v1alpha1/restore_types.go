@@ -22,6 +22,7 @@ import (
 )
 
 // RestoreSpec defines the desired state of Restore
+// +kubebuilder:validation:XValidation:rule="has(oldSelf.parameters) == has(self.parameters)",message="forbidden to update spec.parameters"
 type RestoreSpec struct {
 	// Specifies the backup to be restored. The restore behavior is based on the backup type:
 	//
@@ -84,6 +85,16 @@ type RestoreSpec struct {
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=10
 	BackoffLimit *int32 `json:"backoffLimit,omitempty"`
+
+	// Specifies a list of name-value pairs representing parameters and their corresponding values.
+	// Parameters match the schema specified in the `actionset.spec.parametersSchema`
+	//
+	// +listType=map
+	// +listMapKey=name
+	// +kubebuilder:validation:MaxItems=128
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.parameters"
+	// +optional
+	Parameters []ParameterPair `json:"parameters,omitempty"`
 }
 
 // BackupRef describes the backup info.

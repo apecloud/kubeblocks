@@ -21,7 +21,7 @@ Meet the following requirements for a smooth user experience:
 * Make sure the following tools are installed on your laptop:
   * [Docker](https://docs.docker.com/get-docker/): v20.10.5 (runc ≥ v1.0.0-rc93) or above;
   * [kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl): it is used to interact with Kubernetes clusters;
-  * [kbcli](./../installation/install-with-kbcli/install-kbcli.md): it is used for the interaction between Playground and KubeBlocks.
+  * [kbcli](./../installation/install-kbcli.md): it is used for the interaction between Playground and KubeBlocks.
 
 ## Initialize Playground
 

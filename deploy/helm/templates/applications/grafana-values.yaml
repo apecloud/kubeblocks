@@ -1,3 +1,4 @@
+{{- if has "grafana" .Values.autoInstalledAddons  }}
 {{- $imageRegistry := include "kubeblocks.imageRegistry" . }}
 apiVersion: v1
 kind: ConfigMap
@@ -25,3 +26,4 @@ data:
     {{- $sidecar = set $sidecar "image" $sidecarImage }}
     {{- $grafana = set $grafana "sidecar" $sidecar }}
     {{- toYaml $grafana | nindent 4 }}
+{{- end }}

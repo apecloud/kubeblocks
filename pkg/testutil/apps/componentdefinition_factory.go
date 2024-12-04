@@ -28,6 +28,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 type MockComponentDefinitionFactory struct {
@@ -49,6 +50,7 @@ func NewComponentDefinitionFactoryExt(name, provider, description, serviceKind, 
 				ServiceVersion: serviceVersion,
 			},
 		}, f)
+	f.AddAnnotations(constant.CRDAPIVersionAnnotationKey, kbappsv1.GroupVersion.String())
 	return f
 }
 
@@ -281,6 +283,11 @@ func (f *MockComponentDefinitionFactory) SetUpdateStrategy(strategy *kbappsv1.Up
 
 func (f *MockComponentDefinitionFactory) SetPodManagementPolicy(policy *appsv1.PodManagementPolicyType) *MockComponentDefinitionFactory {
 	f.Get().Spec.PodManagementPolicy = policy
+	return f
+}
+
+func (f *MockComponentDefinitionFactory) SetAvailable(available *kbappsv1.ComponentAvailable) *MockComponentDefinitionFactory {
+	f.Get().Spec.Available = available
 	return f
 }
 

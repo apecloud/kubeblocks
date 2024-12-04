@@ -26,10 +26,10 @@ import (
 	"strconv"
 	"time"
 
+	vsv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
-	vsv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,7 +37,7 @@ import (
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -99,16 +99,17 @@ var _ = Describe("Backup Controller test", func() {
 
 	When("with default settings", func() {
 		var (
+			actionSet    *dpv1alpha1.ActionSet
 			backupPolicy *dpv1alpha1.BackupPolicy
 			repoPVCName  string
-			cluster      *appsv1.Cluster
+			cluster      *kbappsv1.Cluster
 			pvcName      string
 			targetPod    *corev1.Pod
 		)
 
 		BeforeEach(func() {
 			By("creating an actionSet")
-			actionSet := testdp.NewFakeActionSet(&testCtx)
+			actionSet = testdp.NewFakeActionSet(&testCtx)
 
 			By("creating storage provider")
 			_ = testdp.NewFakeStorageProvider(&testCtx, nil)
@@ -481,6 +482,55 @@ var _ = Describe("Backup Controller test", func() {
 				// image should be expanded by env
 				g.Expect(getDPDBPortEnv(&fetched.Spec.Template.Spec.Containers[0]).Value).Should(Equal(strconv.Itoa(testdp.PortNum)))
 			})).Should(Succeed())
+		})
+		Context("creates backups with parameters", func() {
+			BeforeEach(func() {
+				By("set backup parameters and schema in acitionSet")
+				testdp.MockActionSetWithSchema(&testCtx, actionSet)
+			})
+			It("should fail if parameters are invalid", func() {
+				By("create a backup with invalid parameters")
+				backup := testdp.NewFakeBackup(&testCtx, func(bp *dpv1alpha1.Backup) {
+					bp.Spec.Parameters = testdp.InvalidParameters
+				})
+				By("check the backup")
+				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(backup), func(g Gomega, fetched *dpv1alpha1.Backup) {
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseFailed))
+				})).Should(Succeed())
+
+			})
+			It("should succeed if parameters are valid", func() {
+				By("create a backup with parameters")
+				backup := testdp.NewFakeBackup(&testCtx, func(bp *dpv1alpha1.Backup) {
+					bp.Spec.Parameters = testdp.TestParameters
+				})
+				By("check the backup")
+				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(backup), func(g Gomega, fetched *dpv1alpha1.Backup) {
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseRunning))
+				})).Should(Succeed())
+
+				By("check the backup job and env")
+				getJobKey := func(index int) client.ObjectKey {
+					return client.ObjectKey{
+						Name:      dpbackup.GenerateBackupJobName(backup, fmt.Sprintf("%s-%d", dpbackup.BackupDataJobNamePrefix, index)),
+						Namespace: backup.Namespace,
+					}
+				}
+				Eventually(testapps.CheckObj(&testCtx, getJobKey(0), func(g Gomega, job *batchv1.Job) {
+					g.Expect(len(job.Spec.Template.Spec.Containers)).ShouldNot(BeZero())
+					for _, c := range job.Spec.Template.Spec.Containers {
+						count := 0
+						for _, env := range c.Env {
+							for _, param := range testdp.TestParameters {
+								if param.Name == env.Name && param.Value == env.Value {
+									count++
+								}
+							}
+						}
+						g.Expect(count).To(Equal(len(testdp.TestParameters)))
+					}
+				})).Should(Succeed())
+			})
 		})
 		Context("creates a backup with encryption", func() {
 			const (
@@ -878,6 +928,38 @@ var _ = Describe("Backup Controller test", func() {
 					g.Expect(fetched.Status.Phase).Should(Equal(dpv1alpha1.BackupPhaseRunning))
 					g.Expect(fetched.Status.PersistentVolumeClaimName).Should(Equal(repoPVCName))
 				})).Should(Succeed())
+
+				backup := &dpv1alpha1.Backup{}
+				Expect(k8sClient.Get(ctx, backupKey, backup)).Should(Succeed())
+				stsKey := client.ObjectKey{
+					Name:      dpbackup.GenerateBackupStatefulSetName(backup, "", dpbackup.BackupDataJobNamePrefix),
+					Namespace: testCtx.DefaultNamespace,
+				}
+				Eventually(testapps.CheckObjExists(&testCtx, backupKey, &appsv1.StatefulSet{}, true)).Should(Succeed())
+
+				By("mock no target pod found and expect backup is Failed")
+				Expect(testapps.ChangeObj(&testCtx, clusterInfo.TargetPod, func(pod *corev1.Pod) {
+					delete(clusterInfo.TargetPod.Labels, constant.RoleLabelKey)
+				}))
+				Eventually(testapps.CheckObj(&testCtx, backupKey, func(g Gomega, fetched *dpv1alpha1.Backup) {
+					g.Expect(fetched.Status.Phase).Should(Equal(dpv1alpha1.BackupPhaseFailed))
+					g.Expect(fetched.Status.FailureReason).Should(ContainSubstring("failed to get target pods by backup policy"))
+				})).Should(Succeed())
+
+				By("expect the replicas of statefulSet is 0")
+				Eventually(testapps.CheckObj(&testCtx, stsKey, func(g Gomega, sts *appsv1.StatefulSet) {
+					g.Expect(*sts.Spec.Replicas).Should(BeEquivalentTo(0))
+				})).Should(Succeed())
+
+				By("mock target pod exists")
+				Expect(testapps.ChangeObj(&testCtx, clusterInfo.TargetPod, func(pod *corev1.Pod) {
+					clusterInfo.TargetPod.Labels[constant.RoleLabelKey] = constant.Leader
+				})).Should(Succeed())
+
+				By("expect the replicas of statefulSet is 1")
+				Eventually(testapps.CheckObj(&testCtx, stsKey, func(g Gomega, sts *appsv1.StatefulSet) {
+					g.Expect(*sts.Spec.Replicas).Should(BeEquivalentTo(1))
+				})).Should(Succeed())
 			})
 		})
 	})
@@ -1041,7 +1123,7 @@ var _ = Describe("Backup Controller test", func() {
 		var (
 			backupPolicy *dpv1alpha1.BackupPolicy
 			repoPVCName  string
-			cluster      *appsv1.Cluster
+			cluster      *kbappsv1.Cluster
 		)
 
 		BeforeEach(func() {

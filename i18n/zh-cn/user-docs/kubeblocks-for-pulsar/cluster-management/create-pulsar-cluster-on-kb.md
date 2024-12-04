@@ -6,6 +6,9 @@ sidebar_position: 1
 sidebar_label: 创建
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 ## 概述
 
 KubeBlocks 可以通过良好的抽象快速集成新引擎，并支持 Pulsar 集群的创建和删除、集群组件的垂直扩缩容和水平扩缩容、存储扩容、重启和配置更改等。
@@ -26,26 +29,45 @@ KubeBlocks 可以通过良好的抽象快速集成新引擎，并支持 Pulsar �
 
 ### 开始之前
 
-* [安装 kbcli](./../../installation/install-with-kbcli/install-kbcli.md)。
-* [安装 KubeBlocks](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md)。
-* 确保 Pulsar 引擎已启用。如果未启用，可参考[该文档](./../../overview/database-engines-supported.md#使用引擎)启用引擎。
-  
-  ```bash
-  kbcli addon list
-  >
-  NAME                      TYPE   STATUS     EXTRAS         AUTO-INSTALL
-  ...
-  pulsar                    Helm   Enabled                   true
-  ...
-  ```
+* 如果您想通过 `kbcli` 创建和管理集群，请先[安装 kbcli](./../../installation/install-kbcli.md)。
+* [安装 KubeBlocks](./../../installation/install-kubeblocks.md)。
+* 确保 Pulsar 引擎已启用。如果引擎未启用，可参考相关文档，[启用该引擎](./../../installation/install-addons.md)。
 
 * 查看可用于创建集群的数据库类型和版本。
 
+  <Tabs>
+
+  <TabItem value="kubectl" label="kubectl" default>
+
+  ```bash
+  kubectl get clusterdefinition pulsar
+  >
+  NAME    TOPOLOGIES                                        SERVICEREFS    STATUS      AGE
+  pulsar  pulsar-basic-cluster,pulsar-enhanced-cluster                     Available   16m
+  ```
+
+  查看可用版本。
+
+  ```bash
+  kubectl get clusterversions -l clusterdefinition.kubeblocks.io/name=pulsar
+  >
+  NAME            CLUSTER-DEFINITION   STATUS      AGE
+  pulsar-2.11.2   pulsar               Available   16m
+  pulsar-3.0.2    pulsar               Available   16m
+  ```
+
+  </TabItem>
+
+  <TabItem value="kbcli" label="kbcli">
+
   ```bash
   kbcli clusterdefinition list
-
   kbcli clusterversion list
   ```
+
+  </TabItem>
+
+  </Tabs>
 
 * 为了保持隔离，本文档中创建一个名为 `demo` 的独立命名空间。
 
@@ -108,14 +130,14 @@ KubeBlocks 可以通过良好的抽象快速集成新引擎，并支持 Pulsar �
 
 2. 创建集群。
 
-   - **选项 1.**（**推荐**）使用 `values-production.yaml` 创建 Pulsar 集群并启用监控。
+   - **选项 1.**（**推荐**）使用 `values-production.yaml` 创建 Pulsar 集群。
    配置:
      - 3 节点 broker
      - 4 节点 bookies
      - 3 节点 zookeeper
 
      ```bash
-     helm install pulsar kubeblocks/pulsar-cluster --version "x.x.x" -f values-production.yaml --set monitor.enabled=true
+     helm install mycluster kubeblocks/pulsar-cluster --version "x.y.z" -f values-production.yaml --namespace demo
      ```
 
    - **选项 2.** 创建带 proxy 的 Pulsar 集群。
@@ -126,7 +148,7 @@ KubeBlocks 可以通过良好的抽象快速集成新引擎，并支持 Pulsar �
      - 3 节点 zookeeper
 
      ```bash
-     helm install pulsar kubeblocks/pulsar-cluster --version "x.x.x" -f values-production.yaml --set proxy.enable=true  --set monitor.enabled=true  
+     helm install mycluster kubeblocks/pulsar-cluster --version "x.y.z" -f values-production.yaml --set proxy.enable=true --namespace demo
      ```
 
    - **选项 3.** 创建带 proxy 的 Pulsar 集群，并部署独立的 `bookies-recovery` 组件。
@@ -138,7 +160,7 @@ KubeBlocks 可以通过良好的抽象快速集成新引擎，并支持 Pulsar �
      - 3 节点 bookies-recovery
 
      ```bash
-     helm install pulsar kubeblocks/pulsar-cluster --version "x.x.x" -f values-production.yaml --set proxy.enable=true --set bookiesRecovery.enable=true --set monitor.enabled=true 
+     helm install mycluster kubeblocks/pulsar-cluster --version "x.y.z" -f values-production.yaml --set proxy.enable=true --set bookiesRecovery.enable=true --namespace demo
      ```
 
    - **选项 4.** 创建 Pulsar 集群并指定 bookies 和 zookeeper 的存储参数。
@@ -148,15 +170,15 @@ KubeBlocks 可以通过良好的抽象快速集成新引擎，并支持 Pulsar �
      - 3 节点 zookeeper
 
      ```bash
-     helm install pulsar kubeblocks/pulsar-cluster --version "x.x.x" -f values-production.yaml --set bookies.persistence.data.storageClassName=<sc name>,bookies.persistence.log.storageClassName=<sc name>,zookeeper.persistence.data.storageClassName=<sc name>,zookeeper.persistence.log.storageClassName=<sc name> --set monitor.enabled=true
+     helm install mycluster kubeblocks/pulsar-cluster --version "x.y.z" -f values-production.yaml --set bookies.persistence.data.storageClassName=<sc name>,bookies.persistence.log.storageClassName=<sc name>,zookeeper.persistence.data.storageClassName=<sc name>,zookeeper.persistence.log.storageClassName=<sc name> --namespace demo
      ```
 
-   你可以指定存储名称 `<sc name>`。
+   您可以指定存储名称 `<sc name>`。
 
 3. 验证已创建的集群。
 
     ```bash
-    kubectl get cluster pulsar
+    kubectl get cluster mycluster -n demo
     ```
 
     当状态显示为 `Running` 时，表示集群已成功创建。

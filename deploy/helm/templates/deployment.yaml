@@ -2,12 +2,16 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ include "kubeblocks.fullname" . }}
+  {{- with .Values.deployAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
     app.kubernetes.io/component: "apps"
 spec:
   {{- if not .Values.autoscaling.enabled }}
-  replicas: {{ .Values.replicaCount }}
+  replicas: {{ include "kubeblocks.replicaCount" . }}
   {{- end }}
   selector:
     matchLabels:
@@ -63,10 +67,12 @@ spec:
             {{- with .Values.loggerSettings.encoder }}
             - "--zap-encoder={{ . }}"
             {{- end }}
-            - "--extensions={{- default "true" ( include "kubeblocks.addonControllerEnabled" . ) }}"
             - "--apps={{ ne .Values.controllers.apps.enabled false }}"
             - "--workloads={{ ne .Values.controllers.workloads.enabled false }}"
+            - "--operations={{ ne .Values.controllers.operations.enabled false }}"
+            - "--extensions={{- default "true" ( include "kubeblocks.addonControllerEnabled" . ) }}"
             - "--experimental={{- default "false" .Values.controllers.experimental.enabled }}"
+            - "--trace={{- default "false" .Values.controllers.trace.enabled }}"
             {{- with .Values.managedNamespaces }}
             - "--managed-namespaces={{ . }}"
             {{- end }}
@@ -124,7 +130,7 @@ spec:
             - name: VOLUMESNAPSHOT_API_BETA
               value: "true"
             {{- end }}
-            {{- if .Values.admissionWebhooks.enabled }}
+            {{- if .Values.webhooks.conversionEnabled }}
             - name: ENABLE_WEBHOOKS
               value: "true"
             {{- end }}
@@ -178,6 +184,13 @@ spec:
               value: {{ .Values.featureGates.componentReplicasAnnotation.enabled | quote }}
             - name: IN_PLACE_POD_VERTICAL_SCALING
               value: {{ .Values.featureGates.inPlacePodVerticalScaling.enabled | quote }}
+            {{- if .Values.controllers.trace.enabled }}
+            - name: I18N_RESOURCES_NAME
+              value: {{ include "kubeblocks.i18nResourcesName" . }}
+            {{- end }}
+            {{- if .Values.extraEnvs }}
+            {{- toYaml .Values.extraEnvs | nindent 12 }}
+            {{- end }}
           {{- with .Values.securityContext }}
           securityContext:
             {{- toYaml . | nindent 12 }}
@@ -211,7 +224,7 @@ spec:
           volumeMounts:
             - mountPath: /etc/kubeblocks
               name: manager-config
-            {{- if .Values.admissionWebhooks.enabled }}
+            {{- if .Values.webhooks.conversionEnabled }}
             - mountPath: /tmp/k8s-webhook-server/serving-certs
               name: cert
               readOnly: true
@@ -248,7 +261,7 @@ spec:
         - name: manager-config
           configMap:
             name: {{ include "kubeblocks.fullname" . }}-manager-config
-        {{- if .Values.admissionWebhooks.enabled }}
+        {{- if .Values.webhooks.conversionEnabled }}
         - name: cert
           secret:
             defaultMode: 420

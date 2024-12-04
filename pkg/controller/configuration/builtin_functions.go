@@ -27,7 +27,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/gotemplate"
@@ -50,11 +49,6 @@ const (
 	// BuiltinMysqlCalBufferFunctionName Mysql Built-in
 	// TODO: This function migrate to configuration template
 	builtInMysqlCalBufferFunctionName = "callBufferSizeByResource"
-
-	// TLS Built-in
-	builtInGetCAFile   = "getCAFile"
-	builtInGetCertFile = "getCertFile"
-	builtInGetKeyFile  = "getKeyFile"
 )
 
 func toJSONObject[T corev1.VolumeSource | corev1.Container | corev1.ContainerPort](obj T) (interface{}, error) {
@@ -128,36 +122,28 @@ func calMysqlPoolSizeByResource(resource *ResourceDefinition, isShared bool) str
 		return defaultPoolSize
 	}
 
-	// small instance class
-	// mem_size <= 1G or
-	// core <= 2
-	if resource.MemorySize <= smallClassMemorySize {
-		return defaultPoolSize
-	}
-
 	memSizeMB := resource.MemorySize / 1024 / 1024
-	maxBufferSize := int32(memSizeMB * 80 / 100)
 	totalMemorySize := memSizeMB
-
 	if !isShared {
 		reverseBuffer := calReverseRebaseBuffer(memSizeMB, resource.CoreNum)
 		totalMemorySize = memSizeMB - reverseBuffer
-
-		// for small instance class
-		if resource.CoreNum <= 2 {
-			totalMemorySize -= 128
-		}
 	}
 
-	if totalMemorySize <= minBufferSizeMB {
+	// small instance class
+	// mem_size < 1G
+	if resource.MemorySize < smallClassMemorySize || resource.CoreNum < 1 {
 		return defaultPoolSize
+	}
+
+	if resource.MemorySize == smallClassMemorySize || resource.CoreNum == 1 {
+		if isShared {
+			return fmt.Sprintf("%dM", minBufferSizeMB*4)
+		}
+		return fmt.Sprintf("%dM", minBufferSizeMB*2)
 	}
 
 	// (total_memory - reverseBuffer) * 75
 	bufferSize := int32(totalMemorySize * 75 / 100)
-	if bufferSize > maxBufferSize {
-		bufferSize = maxBufferSize
-	}
 
 	// https://dev.mysql.com/doc/refman/8.0/en/innodb-parameters.html#sysvar_innodb_buffer_pool_size
 	// Buffer size require aligned 128MB or 1G
@@ -165,14 +151,13 @@ func calMysqlPoolSizeByResource(resource *ResourceDefinition, isShared bool) str
 	if bufferSize > 1024 {
 		alignedSize = 1024
 	}
-
 	bufferSize /= alignedSize
 	bufferSize *= alignedSize
 	return fmt.Sprintf("%dM", bufferSize)
 }
 
 // calDBPoolSize for specific engine: mysql
-func calDBPoolSize(args interface{}) (string, error) {
+func calDBPoolSize(args interface{}, isShares ...bool) (string, error) {
 	container, err := fromJSONObject[corev1.Container](args)
 	if err != nil {
 		return "", err
@@ -184,7 +169,11 @@ func calDBPoolSize(args interface{}) (string, error) {
 		MemorySize: intctrlutil.GetMemorySize(*container),
 		CoreNum:    intctrlutil.GetCoreNum(*container),
 	}
-	return calMysqlPoolSizeByResource(&resource, false), nil
+	var isShared bool
+	if len(isShares) > 0 {
+		isShared = isShares[0]
+	}
+	return calMysqlPoolSizeByResource(&resource, isShared), nil
 
 }
 
@@ -301,21 +290,6 @@ func getPVCSize(args interface{}) (int64, error) {
 	return intctrlutil.GetStorageSizeFromPersistentVolume(*pvcTemp), nil
 }
 
-// getCAFile gets CA file
-func getCAFile() string {
-	return constant.MountPath + "/" + constant.CAName
-}
-
-// getCertFile gets cert file
-func getCertFile() string {
-	return constant.MountPath + "/" + constant.CertName
-}
-
-// getKeyFile gets key file
-func getKeyFile() string {
-	return constant.MountPath + "/" + constant.KeyName
-}
-
 // BuiltInCustomFunctions builds a map of customized functions for KubeBlocks
 func BuiltInCustomFunctions(c *configTemplateBuilder, component *component.SynthesizedComponent, localObjs []client.Object) *gotemplate.BuiltInObjectsFunc {
 	return &gotemplate.BuiltInObjectsFunc{
@@ -331,9 +305,5 @@ func BuiltInCustomFunctions(c *configTemplateBuilder, component *component.Synth
 		builtInGetPVCSizeFunctionName:                getPVCSize,
 		builtInGetContainerMemoryFunctionName:        getContainerMemory,
 		builtInGetContainerRequestMemoryFunctionName: getContainerRequestMemory,
-		builtInGetCAFile:                             getCAFile,
-		builtInGetCertFile:                           getCertFile,
-		builtInGetKeyFile:                            getKeyFile,
 	}
-
 }

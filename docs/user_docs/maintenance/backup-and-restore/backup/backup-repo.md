@@ -19,10 +19,10 @@ You can create multiple BackupRepos to suit different scenarios. For example, ba
 
 Make sure you have all the following prepared.
 
-* [Install kbcli](./../../../installation/install-with-kbcli/install-kbcli.md).
+* [Install kbcli](./../../../installation/install-kbcli.md).
 * [Install kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl).
 * [Install Helm](https://helm.sh/docs/intro/install/).
-* Install KubeBlocks by [kbcli](./../../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md).
+* [Install KubeBlocks](./../../../installation/install-kubeblocks.md).
 
 ## Install MinIO
 
@@ -499,7 +499,7 @@ If you do not configure the BackupRepo information when installing KubeBlocks, y
      annotations:
        dataprotection.kubeblocks.io/is-default-repo: "true"
    spec:
-     storageProviderRef: gcs
+     storageProviderRef: gcs-s3comp
      accessMethod: Tool
      pvReclaimPolicy: Retain
      volumeCapacity: 100Gi

@@ -31,12 +31,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 )
 
 // clusterDeletionTransformer handles cluster deletion
@@ -53,32 +54,32 @@ func (t *clusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 
-	transCtx.Cluster.Status.Phase = kbappsv1.DeletingClusterPhase
+	transCtx.Cluster.Status.Phase = appsv1.DeletingClusterPhase
 
 	// list all kinds to be deleted based on v1alpha1.TerminationPolicyType
 	var toDeleteNamespacedKinds, toDeleteNonNamespacedKinds []client.ObjectList
 	switch cluster.Spec.TerminationPolicy {
-	case kbappsv1.DoNotTerminate:
+	case appsv1.DoNotTerminate:
 		transCtx.EventRecorder.Eventf(cluster, corev1.EventTypeWarning, "DoNotTerminate",
 			"spec.terminationPolicy %s is preventing deletion.", cluster.Spec.TerminationPolicy)
 		return graph.ErrPrematureStop
-	case kbappsv1.Delete:
+	case appsv1.Delete:
 		toDeleteNamespacedKinds, toDeleteNonNamespacedKinds = kindsForDelete()
-	case kbappsv1.WipeOut:
+	case appsv1.WipeOut:
 		toDeleteNamespacedKinds, toDeleteNonNamespacedKinds = kindsForWipeOut()
 	}
 
 	transCtx.EventRecorder.Eventf(cluster, corev1.EventTypeNormal, constant.ReasonDeletingCR, "Deleting %s: %s",
 		strings.ToLower(cluster.GetObjectKind().GroupVersionKind().Kind), cluster.GetName())
 
-	// firstly, delete components in the order that topology defined.
-	deleteCompSet, err := deleteCompsInOrder4Terminate(transCtx, dag)
+	// firstly, delete components and shardings in the order that topology defined.
+	deleteSet, err := deleteCompNShardingInOrder4Terminate(transCtx, dag)
 	if err != nil {
 		return err
 	}
-	if len(deleteCompSet) > 0 {
+	if len(deleteSet) > 0 {
 		// wait for the components to be deleted to trigger the next reconcile
-		transCtx.Logger.Info(fmt.Sprintf("wait for the components to be deleted: %v", deleteCompSet))
+		transCtx.Logger.Info(fmt.Sprintf("wait for the components and shardings to be deleted: %v", deleteSet))
 		return nil
 	}
 
@@ -88,9 +89,12 @@ func (t *clusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 	toDeleteObjs := func(objs owningObjects) []client.Object {
 		var delObjs []client.Object
 		for _, obj := range objs {
-			// retain backup for data protection even if the cluster is wiped out.
-			if strings.EqualFold(obj.GetLabels()[constant.BackupProtectionLabelKey], constant.BackupRetain) {
-				continue
+			if obj.GetObjectKind().GroupVersionKind().Kind == dptypes.BackupKind {
+				backupObj := obj.(*dpv1alpha1.Backup)
+				// retain backup for data protection even if the cluster is wiped out.
+				if backupObj.Spec.DeletionPolicy == dpv1alpha1.BackupDeletionPolicyRetain {
+					continue
+				}
 			}
 			delObjs = append(delObjs, obj)
 		}
@@ -102,6 +106,11 @@ func (t *clusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 	if err != nil {
 		// PDB or CRDs that not present in data-plane clusters
 		if !strings.Contains(err.Error(), "the server could not find the requested resource") {
+			return err
+		}
+	}
+	if cluster.Spec.TerminationPolicy != appsv1.WipeOut {
+		if err = getFailedBackups(transCtx.Context, transCtx.Client, cluster.Namespace, ml, namespacedObjs); err != nil {
 			return err
 		}
 	}
@@ -127,7 +136,7 @@ func (t *clusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 		delKindMap[o.GetObjectKind().GroupVersionKind().Kind] = sets.Empty{}
 	}
 
-	// set cluster action to noop until all the sub-resources deleted
+	// set cluster action to status until all the sub-resources deleted
 	if len(delObjs) == 0 {
 		graphCli.Delete(dag, cluster)
 	} else {
@@ -148,7 +157,7 @@ func kindsForDoNotTerminate() ([]client.ObjectList, []client.ObjectList) {
 func kindsForDelete() ([]client.ObjectList, []client.ObjectList) {
 	namespacedKinds, nonNamespacedKinds := kindsForDoNotTerminate()
 	namespacedKindsPlus := []client.ObjectList{
-		&kbappsv1.ComponentList{},
+		&appsv1.ComponentList{},
 		&corev1.ServiceList{},
 		&corev1.SecretList{},
 		&dpv1alpha1.BackupPolicyList{},
@@ -166,7 +175,7 @@ func kindsForWipeOut() ([]client.ObjectList, []client.ObjectList) {
 }
 
 // shouldSkipObjOwnedByComp is used to judge whether the object owned by component should be skipped when deleting the cluster
-func shouldSkipObjOwnedByComp(obj client.Object, cluster kbappsv1.Cluster) bool {
+func shouldSkipObjOwnedByComp(obj client.Object, cluster appsv1.Cluster) bool {
 	ownByComp := isOwnedByComp(obj)
 	if !ownByComp {
 		// if the object is not owned by component, it should not be skipped
@@ -196,20 +205,23 @@ func shouldSkipObjOwnedByComp(obj client.Object, cluster kbappsv1.Cluster) bool 
 	return true
 }
 
-func deleteCompsInOrder4Terminate(transCtx *clusterTransformContext, dag *graph.DAG) (sets.Set[string], error) {
-	compNameSet, err := component.GetClusterComponentShortNameSet(transCtx.Context, transCtx.Client, transCtx.Cluster)
+func deleteCompNShardingInOrder4Terminate(transCtx *clusterTransformContext, dag *graph.DAG) (sets.Set[string], error) {
+	nameSet, err := clusterRunningCompNShardingSet(transCtx.Context, transCtx.Client, transCtx.Cluster)
 	if err != nil {
 		return nil, err
 	}
-	if len(compNameSet) == 0 {
+	if len(nameSet) == 0 {
 		return nil, nil
 	}
 	if err = loadNCheckClusterDefinition(transCtx, transCtx.Cluster); err != nil {
 		return nil, err
 	}
-	err = deleteCompsInOrder(transCtx, dag, compNameSet, true)
-	if err != nil {
+	if err = deleteCompNShardingInOrder(transCtx, dag, nameSet, nil); err != nil {
+		if intctrlutil.IsDelayedRequeueError(err) {
+			delayedErr := err.(intctrlutil.DelayedRequeueError)
+			err = intctrlutil.NewRequeueError(delayedErr.RequeueAfter(), delayedErr.Reason())
+		}
 		return nil, err
 	}
-	return compNameSet, nil
+	return nameSet, nil
 }

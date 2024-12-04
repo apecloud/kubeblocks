@@ -20,23 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package constant
 
 const (
-	// BackupRetain always retained, unless manually deleted by the user
-	BackupRetain = "Retain"
-
-	// BackupRetainUntilExpired retains backup till it expires
-	BackupRetainUntilExpired = "RetainUntilExpired"
-
-	// BackupDelete (default) deletes backup immediately when cluster's terminationPolicy is WipeOut
-	BackupDelete = "Delete"
-)
-
-const (
 	BackupNameKeyForRestore           = "name"
 	BackupNamespaceKeyForRestore      = "namespace"
 	VolumeRestorePolicyKeyForRestore  = "volumeRestorePolicy"
 	DoReadyRestoreAfterClusterRunning = "doReadyRestoreAfterClusterRunning"
 	RestoreTimeKeyForRestore          = "restoreTime"
 	EnvForRestore                     = "restoreEnv"
+	ParametersForRestore              = "restoreParameters"
 	ConnectionPassword                = "connectionPassword"
 	EncryptedSystemAccounts           = "encryptedSystemAccounts"
 )

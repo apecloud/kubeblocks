@@ -391,6 +391,13 @@ type ComponentDefinitionSpec struct {
 	// +optional
 	SystemAccounts []SystemAccount `json:"systemAccounts,omitempty"`
 
+	// Specifies the TLS configuration for the Component.
+	//
+	// This field is immutable.
+	//
+	// +optional
+	TLS *TLS `json:"tls,omitempty"`
+
 	// Defines the upper limit of the number of replicas supported by the Component.
 	//
 	// It defines the maximum number of replicas that can be created for the Component.
@@ -400,6 +407,13 @@ type ComponentDefinitionSpec struct {
 	//
 	// +optional
 	ReplicasLimit *ReplicasLimit `json:"replicasLimit,omitempty"`
+
+	// Specifies the strategies for determining the available status of the Component.
+	//
+	// This field is immutable.
+	//
+	// +optional
+	Available *ComponentAvailable `json:"available,omitempty"`
 
 	// Enumerate all possible roles assigned to each replica of the Component, influencing its behavior.
 	//
@@ -601,6 +615,10 @@ type VarSource struct {
 	// +optional
 	CredentialVarRef *CredentialVarSelector `json:"credentialVarRef,omitempty"`
 
+	// Selects a defined var of the TLS.
+	// +optional
+	TLSVarRef *TLSVarSelector `json:"tlsVarRef,omitempty"`
+
 	// Selects a defined var of a ServiceRef.
 	// +optional
 	ServiceRefVarRef *ServiceRefVarSelector `json:"serviceRefVarRef,omitempty"`
@@ -695,6 +713,12 @@ type CredentialVars struct {
 	Password *VarOption `json:"password,omitempty"`
 }
 
+// TLSVars defines the vars that can be referenced from the TLS.
+type TLSVars struct {
+	// +optional
+	Enabled *VarOption `json:"enabled,omitempty"`
+}
+
 // ServiceRefVars defines the vars that can be referenced from a ServiceRef.
 type ServiceRefVars struct {
 	// +optional
@@ -735,6 +759,14 @@ type CredentialVarSelector struct {
 	ClusterObjectReference `json:",inline"`
 
 	CredentialVars `json:",inline"`
+}
+
+// TLSVarSelector selects a var from the TLS.
+type TLSVarSelector struct {
+	// The Component to select from.
+	ClusterObjectReference `json:",inline"`
+
+	TLSVars `json:",inline"`
 }
 
 // ServiceRefVarSelector selects a var from a ServiceRefDeclaration.
@@ -1224,6 +1256,53 @@ type SystemAccount struct {
 	SecretRef *ProvisionSecretRef `json:"secretRef,omitempty"`
 }
 
+type TLS struct {
+	// Specifies the volume name for the TLS secret.
+	// The controller will create a volume object with the specified name and add it to the pod when the TLS is enabled.
+	//
+	// This field is immutable once set.
+	//
+	// +kubebuilder:validation:Required
+	VolumeName string `json:"volumeName"`
+
+	// Specifies the mount path for the TLS secret to be mounted.
+	// Similar to the volume, the controller will mount the created volume to the specified path within containers when the TLS is enabled.
+	//
+	// This field is immutable once set.
+	//
+	// +kubebuilder:validation:Required
+	MountPath string `json:"mountPath"`
+
+	// The default permissions for the mounted path.
+	//
+	// This field is immutable once set.
+	//
+	// +kubebuilder:default=0600
+	// +optional
+	DefaultMode *int32 `json:"defaultMode,omitempty"`
+
+	// The CA file of the TLS.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	CAFile *string `json:"caFile,omitempty"`
+
+	// The certificate file of the TLS.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	CertFile *string `json:"certFile,omitempty"`
+
+	// The key file of the TLS.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	KeyFile *string `json:"keyFile,omitempty"`
+}
+
 // ReplicasLimit defines the valid range of number of replicas supported.
 //
 // +kubebuilder:validation:XValidation:rule="self.minReplicas >= 0 && self.maxReplicas <= 16384",message="the minimum and maximum limit of replicas should be in the range of [0, 16384]"
@@ -1238,6 +1317,129 @@ type ReplicasLimit struct {
 	//
 	// +kubebuilder:validation:Required
 	MaxReplicas int32 `json:"maxReplicas"`
+}
+
+// ComponentAvailable defines the strategies for determining whether the component is available.
+type ComponentAvailable struct {
+	// Specifies the phases that the component will go through to be considered available.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	WithPhases *string `json:"withPhases,omitempty"`
+
+	// Specifies the strategies for determining whether the component is available based on the available probe.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	WithProbe *ComponentAvailableWithProbe `json:"withProbe,omitempty"`
+}
+
+type ComponentAvailableWithProbe struct {
+	// This field is immutable once set.
+	//
+	// +optional
+	TimeWindowSeconds *int32 `json:"timeWindowSeconds,omitempty"`
+
+	// Specifies the conditions that the component will go through to be considered available.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	Condition *ComponentAvailableCondition `json:"condition,omitempty"`
+
+	// A brief description for the condition when the component is available.
+	//
+	// +optional
+	Description string `json:"description,omitempty"`
+}
+
+type ComponentAvailableCondition struct {
+	ComponentAvailableExpression `json:",inline"`
+
+	// Logical And to combine multiple expressions.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	And []ComponentAvailableExpression `json:"and,omitempty"`
+
+	// Logical Or to combine multiple expressions.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	Or []ComponentAvailableExpression `json:"or,omitempty"`
+
+	// Logical Not to negate the expression.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	Not *ComponentAvailableExpression `json:"not,omitempty"`
+}
+
+type ComponentAvailableExpression struct {
+	// All replicas must satisfy the assertion.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	All *ComponentAvailableProbeAssertion `json:"all,omitempty"`
+
+	// At least one replica must satisfy the assertion.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	Any *ComponentAvailableProbeAssertion `json:"any,omitempty"`
+
+	// None of the replicas must satisfy the assertion.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	None *ComponentAvailableProbeAssertion `json:"none,omitempty"`
+
+	// Majority replicas must satisfy the assertion.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	Majority *ComponentAvailableProbeAssertion `json:"majority,omitempty"`
+}
+
+type ComponentAvailableProbeAssertion struct {
+	ActionAssertion `json:",inline"`
+
+	// Logical And to combine multiple assertions.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	And []ActionAssertion `json:"and,omitempty"`
+
+	// Logical Or to combine multiple assertions.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	Or []ActionAssertion `json:"or,omitempty"`
+
+	// Logical Not to negate the assertions.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	Not *ActionAssertion `json:"not,omitempty"`
+
+	// Specifies whether apply the assertions strictly to all replicas.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	Strict *bool `json:"strict,omitempty"`
 }
 
 // ReplicaRole represents a role that can be assumed by a component instance.
@@ -1369,6 +1571,13 @@ type ComponentLifecycleActions struct {
 	// +optional
 	RoleProbe *Probe `json:"roleProbe,omitempty"`
 
+	// Defines the procedure which is invoked regularly to assess the availability of the component.
+	//
+	// Note: This field is immutable once it has been set.
+	//
+	// +optional
+	AvailableProbe *Probe `json:"availableProbe,omitempty"`
+
 	// Defines the procedure for a controlled transition of leadership from the current leader to a new replica.
 	// This approach aims to minimize downtime and maintain availability in systems with a leader-follower topology,
 	// during events such as planned maintenance or when performing stop, shutdown, restart, or upgrade operations
@@ -1499,6 +1708,10 @@ type ComponentLifecycleActions struct {
 	//
 	// The output should be a valid data dump streamed to stdout. It must exclude any irrelevant information to ensure
 	// that only the necessary data is exported for import into the new replica.
+	//
+	// The container executing this action has access to following environment variables:
+	//
+	// - KB_TARGET_POD_NAME: The name of the replica pod into which the data will be loaded.
 	//
 	// Note: This field is immutable once it has been set.
 	//
@@ -1784,6 +1997,47 @@ type Probe struct {
 	//
 	// +optional
 	FailureThreshold int32 `json:"failureThreshold,omitempty"`
+}
+
+// ActionAssertion defines the custom assertions for evaluating the success or failure of an action.
+type ActionAssertion struct {
+	// Whether the action should succeed or fail.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	Succeed *bool `json:"succeed,omitempty"`
+
+	// Specifies the stdout matcher for the action.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	Stdout *ActionOutputMatcher `json:"stdout,omitempty"`
+
+	// Specifies the stderr matcher for the action.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	Stderr *ActionOutputMatcher `json:"stderr,omitempty"`
+}
+
+// ActionOutputMatcher defines the matcher for the output of an action.
+type ActionOutputMatcher struct {
+	// The output of the action should be equal to the specified value.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	EqualTo *string `json:"equalTo,omitempty"`
+
+	// The output of the action should contain the specified value.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	Contains *string `json:"contains,omitempty"`
 }
 
 // ServiceRefDeclaration represents a reference to a service that can be either provided by a KubeBlocks Cluster

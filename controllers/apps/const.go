@@ -22,9 +22,10 @@ package apps
 const (
 	// name of our custom finalizer
 	clusterDefinitionFinalizerName   = "clusterdefinition.kubeblocks.io/finalizer"
-	opsDefinitionFinalizerName       = "opsdefinition.kubeblocks.io/finalizer"
+	shardingDefinitionFinalizerName  = "shardingdefinition.kubeblocks.io/finalizer"
 	componentDefinitionFinalizerName = "componentdefinition.kubeblocks.io/finalizer"
 	componentVersionFinalizerName    = "componentversion.kubeblocks.io/finalizer"
+	sidecarDefinitionFinalizerName   = "sidecardefinition.kubeblocks.io/finalizer"
 )
 
 const (

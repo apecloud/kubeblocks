@@ -292,6 +292,21 @@ func resolveParameterValue(ctx context.Context,
 	return "", nil
 }
 
+func validateAndGetCompSpec(cluster *appsv1.Cluster, opsDef *opsv1alpha1.OpsDefinition, componentName string) (*appsv1.ClusterComponentSpec, error) {
+	compSpec := cluster.Spec.GetComponentByName(componentName)
+	if compSpec != nil {
+		return compSpec, nil
+	}
+	shardingSpec := cluster.Spec.GetShardingByName(componentName)
+	if shardingSpec == nil {
+		return nil, intctrlutil.NewFatalError(fmt.Sprintf(`cannot found the component "%s" in cluster "%s"`, componentName, cluster.Name))
+	}
+	if len(opsDef.Spec.PodInfoExtractors) == 0 {
+		return nil, intctrlutil.NewFatalError(fmt.Sprintf(`podInfoExtractors cannot be empty in opsDef "%s" when the component "%s" is a shard component`, opsDef.Name, componentName))
+	}
+	return &shardingSpec.Template, nil
+}
+
 // initOpsDefAndValidate inits the opsDefinition to OpsResource and validates if the opsRequest is valid.
 func initOpsDefAndValidate(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
@@ -305,31 +320,33 @@ func initOpsDefAndValidate(reqCtx intctrlutil.RequestCtx,
 		return err
 	}
 	opsRes.OpsDef = opsDef
-	// 1. validate OpenApV3Schema
+
 	parametersSchema := opsDef.Spec.ParametersSchema
-	if parametersSchema == nil {
-		return nil
-	}
 	for _, v := range customSpec.CustomOpsComponents {
-		paramsMap, err := covertParametersToMap(reqCtx.Ctx, cli, v.Parameters, opsRes.OpsRequest.Namespace)
+		// 1. validate OpenApV3Schema
+		if parametersSchema != nil {
+			paramsMap, err := covertParametersToMap(reqCtx.Ctx, cli, v.Parameters, opsRes.OpsRequest.Namespace)
+			if err != nil {
+				return err
+			}
+			// covert to type map[string]interface{}
+			params, err := common.ConvertStringToInterfaceBySchemaType(parametersSchema.OpenAPIV3Schema, paramsMap)
+			if err != nil {
+				return intctrlutil.NewFatalError(err.Error())
+			}
+			if parametersSchema != nil && parametersSchema.OpenAPIV3Schema != nil {
+				if err = common.ValidateDataWithSchema(parametersSchema.OpenAPIV3Schema, params); err != nil {
+					return intctrlutil.NewFatalError(err.Error())
+				}
+			}
+		}
+		// 2. validate component and componentDef
+		compSpec, err := validateAndGetCompSpec(opsRes.Cluster, opsDef, v.ComponentName)
 		if err != nil {
 			return err
 		}
-		// covert to type map[string]interface{}
-		params, err := common.CoverStringToInterfaceBySchemaType(parametersSchema.OpenAPIV3Schema, paramsMap)
-		if err != nil {
-			return intctrlutil.NewFatalError(err.Error())
-		}
-		if parametersSchema != nil && parametersSchema.OpenAPIV3Schema != nil {
-			if err = common.ValidateDataWithSchema(parametersSchema.OpenAPIV3Schema, params); err != nil {
-				return intctrlutil.NewFatalError(err.Error())
-			}
-		}
-
-		// 2. validate component and componentDef
 		if len(opsRes.OpsDef.Spec.ComponentInfos) > 0 {
 			// get component definition
-			compSpec := getComponentSpecOrShardingTemplate(opsRes.Cluster, v.ComponentName)
 			compDef, err := component.GetCompDefByName(reqCtx.Ctx, cli, compSpec.ComponentDef)
 			if err != nil {
 				return err

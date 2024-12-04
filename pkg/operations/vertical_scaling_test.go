@@ -24,6 +24,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"k8s.io/utils/pointer"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -73,12 +74,27 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 
 	Context("Test OpsRequest", func() {
 
-		testVerticalScaling := func(verticalScaling []opsv1alpha1.VerticalScaling) *OpsResource {
+		newResources := corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("400m"),
+				corev1.ResourceMemory: resource.MustParse("300Mi"),
+			},
+			Limits: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("400m"),
+				corev1.ResourceMemory: resource.MustParse("300Mi"),
+			},
+		}
+
+		testVerticalScaling := func(verticalScaling []opsv1alpha1.VerticalScaling, instances []appsv1.InstanceTemplate) *OpsResource {
 			By("init operations resources ")
 			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
-
+			if len(instances) > 0 {
+				Expect(testapps.ChangeObj(&testCtx, opsRes.Cluster, func(cluster *appsv1.Cluster) {
+					cluster.Spec.ComponentSpecs[0].Instances = instances
+				})).Should(Succeed())
+			}
 			By("create VerticalScaling ops")
-			ops := testops.NewOpsRequestObj("vertical-scaling-ops-"+randomStr, testCtx.DefaultNamespace,
+			ops := testops.NewOpsRequestObj("vertical-scaling-ops-"+testCtx.GetRandomStr(), testCtx.DefaultNamespace,
 				clusterName, opsv1alpha1.VerticalScalingType)
 
 			ops.Spec.VerticalScalingList = verticalScaling
@@ -102,20 +118,62 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 		It("vertical scaling by resource", func() {
 			verticalScaling := []opsv1alpha1.VerticalScaling{
 				{
+					ComponentOps:         opsv1alpha1.ComponentOps{ComponentName: defaultCompName},
+					ResourceRequirements: newResources,
+				},
+			}
+			testVerticalScaling(verticalScaling, nil)
+		})
+
+		It("vertical scaling the component which existing instance template", func() {
+			templateName := "foo"
+			verticalScaling := []opsv1alpha1.VerticalScaling{
+				{
 					ComponentOps: opsv1alpha1.ComponentOps{ComponentName: defaultCompName},
-					ResourceRequirements: corev1.ResourceRequirements{
-						Requests: corev1.ResourceList{
-							corev1.ResourceCPU:    resource.MustParse("400m"),
-							corev1.ResourceMemory: resource.MustParse("300Mi"),
-						},
-						Limits: corev1.ResourceList{
-							corev1.ResourceCPU:    resource.MustParse("400m"),
-							corev1.ResourceMemory: resource.MustParse("300Mi"),
-						},
+					Instances: []opsv1alpha1.InstanceResourceTemplate{
+						{Name: templateName, ResourceRequirements: corev1.ResourceRequirements{
+							Limits: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("500m"),
+								corev1.ResourceMemory: resource.MustParse("300Mi"),
+							},
+						}},
+					},
+					ResourceRequirements: newResources,
+				},
+			}
+			opsRes := testVerticalScaling(verticalScaling, []appsv1.InstanceTemplate{{Name: templateName, Replicas: pointer.Int32(1)}})
+			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("0/3"))
+		})
+
+		It("vertical scaling the replicas which instance template is empty", func() {
+			templateName := "foo"
+			verticalScaling := []opsv1alpha1.VerticalScaling{
+				{
+					ComponentOps:         opsv1alpha1.ComponentOps{ComponentName: defaultCompName},
+					ResourceRequirements: newResources,
+				},
+			}
+			opsRes := testVerticalScaling(verticalScaling, []appsv1.InstanceTemplate{{Name: templateName, Replicas: pointer.Int32(1), Resources: &newResources}})
+			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("0/2"))
+		})
+
+		It("vertical scaling the instance template", func() {
+			templateName := "foo"
+			verticalScaling := []opsv1alpha1.VerticalScaling{
+				{
+					ComponentOps: opsv1alpha1.ComponentOps{ComponentName: defaultCompName},
+					Instances: []opsv1alpha1.InstanceResourceTemplate{
+						{Name: templateName, ResourceRequirements: corev1.ResourceRequirements{
+							Limits: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("500m"),
+								corev1.ResourceMemory: resource.MustParse("300Mi"),
+							},
+						}},
 					},
 				},
 			}
-			testVerticalScaling(verticalScaling)
+			opsRes := testVerticalScaling(verticalScaling, []appsv1.InstanceTemplate{{Name: templateName, Replicas: pointer.Int32(1)}})
+			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("0/1"))
 		})
 
 		It("cancel vertical scaling opsRequest", func() {
@@ -131,17 +189,14 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 				{
 					ComponentOps: opsv1alpha1.ComponentOps{ComponentName: defaultCompName},
 					ResourceRequirements: corev1.ResourceRequirements{
-						Limits: corev1.ResourceList{
-							corev1.ResourceCPU:    resource.MustParse("400m"),
-							corev1.ResourceMemory: resource.MustParse("300Mi"),
-						},
+						Limits: newResources.Limits,
 					},
 				},
 			}
 			opsRes.OpsRequest = testops.CreateOpsRequest(ctx, testCtx, ops)
 
 			By("mock opsRequest is Running")
-			mockComponentIsOperating(opsRes.Cluster, appsv1.UpdatingClusterCompPhase, defaultCompName)
+			mockComponentIsOperating(opsRes.Cluster, appsv1.UpdatingComponentPhase, defaultCompName)
 			Expect(testapps.ChangeObjStatus(&testCtx, opsRes.OpsRequest, func() {
 				opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsRunningPhase
 				opsRes.OpsRequest.Status.StartTimestamp = metav1.Time{Time: time.Now()}
@@ -194,20 +249,11 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 			By("create the first vertical scaling")
 			verticalScaling1 := []opsv1alpha1.VerticalScaling{
 				{
-					ComponentOps: opsv1alpha1.ComponentOps{ComponentName: defaultCompName},
-					ResourceRequirements: corev1.ResourceRequirements{
-						Requests: corev1.ResourceList{
-							corev1.ResourceCPU:    resource.MustParse("400m"),
-							corev1.ResourceMemory: resource.MustParse("300Mi"),
-						},
-						Limits: corev1.ResourceList{
-							corev1.ResourceCPU:    resource.MustParse("400m"),
-							corev1.ResourceMemory: resource.MustParse("300Mi"),
-						},
-					},
+					ComponentOps:         opsv1alpha1.ComponentOps{ComponentName: defaultCompName},
+					ResourceRequirements: newResources,
 				},
 			}
-			opsRes := testVerticalScaling(verticalScaling1)
+			opsRes := testVerticalScaling(verticalScaling1, nil)
 			firstOpsRequest := opsRes.OpsRequest.DeepCopy()
 			Expect(testapps.ChangeObjStatus(&testCtx, firstOpsRequest, func() {
 				firstOpsRequest.Status.Phase = opsv1alpha1.OpsRunningPhase
@@ -221,13 +267,10 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 				{
 					ComponentOps: opsv1alpha1.ComponentOps{ComponentName: defaultCompName},
 					ResourceRequirements: corev1.ResourceRequirements{
-						Requests: corev1.ResourceList{
+						Requests: newResources.Requests,
+						Limits: corev1.ResourceList{
 							corev1.ResourceCPU:    resource.MustParse("400m"),
 							corev1.ResourceMemory: resource.MustParse("300Mi"),
-						},
-						Limits: corev1.ResourceList{
-							corev1.ResourceCPU:    resource.MustParse("500m"),
-							corev1.ResourceMemory: resource.MustParse("600Mi"),
 						},
 					},
 				},

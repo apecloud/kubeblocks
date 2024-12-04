@@ -31,9 +31,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 )
 
 func newRequeueError(after time.Duration, reason string) error {
@@ -58,6 +60,32 @@ func getAppInstanceML(cluster appsv1.Cluster) client.MatchingLabels {
 	return client.MatchingLabels{
 		constant.AppInstanceLabelKey: cluster.Name,
 	}
+}
+
+func getFailedBackups(ctx context.Context,
+	cli client.Reader,
+	namespace string,
+	labels client.MatchingLabels,
+	owningNamespacedObjects owningObjects) error {
+	backupList := &dpv1alpha1.BackupList{}
+	if err := cli.List(ctx, backupList, client.InNamespace(namespace), labels); err != nil {
+		return err
+	}
+
+	for i := range backupList.Items {
+		backup := &backupList.Items[i]
+		if backup.Status.Phase != dpv1alpha1.BackupPhaseFailed {
+			continue
+		}
+		if backup.Labels[dptypes.BackupTypeLabelKey] != string(dpv1alpha1.BackupTypeContinuous) {
+			gvr, err := getGVKName(backup, rscheme)
+			if err != nil {
+				return err
+			}
+			owningNamespacedObjects[*gvr] = backup
+		}
+	}
+	return nil
 }
 
 func getOwningNamespacedObjects(ctx context.Context,
@@ -175,7 +203,7 @@ func isOwnedByComp(obj client.Object) bool {
 // isOwnedByInstanceSet is used to judge if the obj is owned by the InstanceSet controller
 func isOwnedByInstanceSet(obj client.Object) bool {
 	for _, ref := range obj.GetOwnerReferences() {
-		if ref.Kind == workloads.Kind && ref.Controller != nil && *ref.Controller {
+		if ref.Kind == workloads.InstanceSetKind && ref.Controller != nil && *ref.Controller {
 			return true
 		}
 	}

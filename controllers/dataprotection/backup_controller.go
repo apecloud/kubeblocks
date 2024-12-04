@@ -82,6 +82,10 @@ type BackupReconciler struct {
 // +kubebuilder:rbac:groups=core,resources=serviceaccounts,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings,verbs=get;list;watch;create;update;patch;delete
 
+// +kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=get;list;watch;create;update;patch;delete;deletecollection
+// +kubebuilder:rbac:groups=apps,resources=statefulsets/status,verbs=get
+// +kubebuilder:rbac:groups=apps,resources=statefulsets/finalizers,verbs=update
+
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the backup closer to the desired state.
 func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -137,7 +141,7 @@ func (r *BackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *BackupReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	b := intctrlutil.NewNamespacedControllerManagedBy(mgr).
+	b := intctrlutil.NewControllerManagedBy(mgr).
 		For(&dpv1alpha1.Backup{}).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: viper.GetInt(dptypes.CfgDataProtectionReconcileWorkers),
@@ -354,7 +358,6 @@ func (r *BackupReconciler) prepareBackupRequest(
 		RequestCtx: reqCtx,
 		Client:     r.Client,
 	}
-
 	if request.Annotations == nil {
 		request.Annotations = make(map[string]string)
 	}
@@ -409,6 +412,11 @@ func (r *BackupReconciler) prepareBackupRequest(
 					backupSchedule.Namespace, backupSchedule.Name)
 			}
 		}
+
+		// validate parameters
+		if err := dputils.ValidateParameters(actionSet, backup.Spec.Parameters, true); err != nil {
+			return nil, fmt.Errorf("fails to validate parameters with actionset %s: %v", actionSet.Name, err)
+		}
 	}
 
 	// check encryption config
@@ -450,10 +458,20 @@ func (r *BackupReconciler) prepareRequestTargetInfo(reqCtx intctrlutil.RequestCt
 	}
 	targetPods, err := GetTargetPods(reqCtx, r.Client,
 		selectedPods, request.BackupPolicy, target, backupType)
-	if err != nil || len(targetPods) == 0 {
+	if err != nil {
+		return err
+	}
+	if len(targetPods) == 0 {
+		if backupType == dpv1alpha1.BackupTypeContinuous {
+			// stop the sts to un-bound the pvcs when the continuous backup is failed.
+			if err = dpbackup.StopStatefulSetsWhenFailed(reqCtx.Ctx, r.Client, request.Backup, target.Name); err != nil {
+				return err
+			}
+		}
 		return fmt.Errorf("failed to get target pods by backup policy %s/%s",
 			request.BackupPolicy.Namespace, request.BackupPolicy.Name)
 	}
+
 	request.TargetPods = targetPods
 	saName := target.ServiceAccountName
 	if saName == "" {
@@ -753,7 +771,9 @@ func PatchBackupObjectMeta(
 	}
 
 	for _, v := range getClusterLabelKeys() {
-		request.Labels[v] = targetPod.Labels[v]
+		if labelValue, ok := targetPod.Labels[v]; ok {
+			request.Labels[v] = labelValue
+		}
 	}
 
 	if _, ok := request.Labels[constant.AppManagedByLabelKey]; !ok {
@@ -837,6 +857,9 @@ func setEncryptedSystemAccountsAnnotation(request *dpbackup.Request, cluster *kb
 			continue
 		}
 		componentName := secretList.Items[i].Labels[constant.KBAppComponentLabelKey]
+		if componentName == "" {
+			componentName = secretList.Items[i].Labels[constant.KBAppShardingNameLabelKey]
+		}
 		userName := string(secretList.Items[i].Data[usernameKey])
 		e := intctrlutil.NewEncryptor(viper.GetString(constant.CfgKeyDPEncryptionKey))
 		encryptedPwd, err := e.Encrypt(secretList.Items[i].Data[passwordKey])

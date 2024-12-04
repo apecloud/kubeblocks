@@ -3,6 +3,9 @@ on:
   issue_comment:
     types: [created]
 
+env:
+  GH_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+
 
 jobs:
   cherry-pick:
@@ -12,10 +15,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ env.GH_TOKEN }}
           fetch-depth: 0
 
       - name: Automatic Cherry Pick
         uses: apecloud-inc/gha-cherry-pick@v1
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ env.GH_TOKEN }}

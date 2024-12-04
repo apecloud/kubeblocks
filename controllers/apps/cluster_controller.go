@@ -129,14 +129,14 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		AddTransformer(
 			// handle cluster deletion
 			&clusterDeletionTransformer{},
-			// update finalizer and cd&cv labels
-			&clusterAssureMetaTransformer{},
-			// validate cd & cv's existence and availability
-			&clusterLoadRefResourcesTransformer{},
+			// update finalizer and definition labels
+			&clusterMetaTransformer{},
+			// validate the cluster spec
+			&clusterValidationTransformer{},
 			// handle cluster shared account
-			&clusterSharedAccountTransformer{},
-			// normalize the cluster and component API
-			&ClusterAPINormalizationTransformer{},
+			&clusterShardingAccountTransformer{},
+			// normalize the cluster spec
+			&clusterNormalizationTransformer{},
 			// placement replicas across data-plane k8s clusters
 			&clusterPlacementTransformer{multiClusterMgr: r.MultiClusterMgr},
 			// handle cluster services
@@ -171,7 +171,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return intctrlutil.NewNamespacedControllerManagedBy(mgr).
+	return intctrlutil.NewControllerManagedBy(mgr, &appsv1.Cluster{}, &appsv1.Component{}).
 		For(&appsv1.Cluster{}).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: int(math.Ceil(viper.GetFloat64(constant.CfgKBReconcileWorkers) / 4)),

@@ -211,6 +211,11 @@ func (t *componentServiceTransformer) buildService(comp *appsv1.Component,
 		AddSelectorsInMap(t.builtinSelector(comp)).
 		Optimize4ExternalTraffic()
 
+	// explicitly set the service type to ClusterIP if not specified
+	if service.Spec.Type == "" {
+		builder.SetType(corev1.ServiceTypeClusterIP)
+	}
+
 	if len(service.RoleSelector) > 0 && (service.PodService == nil || !*service.PodService) {
 		if err := t.checkRoleSelector(synthesizeComp, service.Name, service.RoleSelector); err != nil {
 			return nil, err
@@ -296,7 +301,7 @@ func (t *componentServiceTransformer) createOrUpdateService(ctx graph.TransformC
 			return err
 		}
 
-		// don't update service not owned by the owner, to keep compatible with existed cluster
+		// don't update service not owned by the component, to keep compatible with existed cluster
 		if !model.IsOwnerOf(owner, originSvc) {
 			return nil
 		}
@@ -347,7 +352,7 @@ func skipImmutableCheckForComponentService(svc *corev1.Service) bool {
 
 func generatePodNames(synthesizeComp *component.SynthesizedComponent) ([]string, error) {
 	return component.GenerateAllPodNames(synthesizeComp.Replicas, synthesizeComp.Instances,
-		synthesizeComp.OfflineInstances, synthesizeComp.ClusterName, synthesizeComp.Name)
+		synthesizeComp.OfflineInstances, synthesizeComp.FullCompName)
 }
 
 func generatePodNamesByITS(its *workloads.InstanceSet) ([]string, error) {

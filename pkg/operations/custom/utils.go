@@ -36,6 +36,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/scheduling"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -52,21 +53,34 @@ const (
 	kbEnvAccountPassword     = "KB_ACCOUNT_PASSWORD"
 )
 
+func getComponentInfo(opsDef *opsv1alpha1.OpsDefinition, compDefName string) *opsv1alpha1.ComponentInfo {
+	if opsDef == nil {
+		return nil
+	}
+	for _, v := range opsDef.Spec.ComponentInfos {
+		if component.PrefixOrRegexMatched(compDefName, v.ComponentDefinitionName) {
+			return &v
+		}
+	}
+	return nil
+}
+
 // buildComponentDefEnvs builds the env vars by the opsDefinition.spec.componentDefinitionRef
 func buildComponentEnvs(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	cluster *appsv1.Cluster,
 	opsDef *opsv1alpha1.OpsDefinition,
 	env *[]corev1.EnvVar,
-	comp *appsv1.ClusterComponentSpec) error {
+	comp *appsv1.ClusterComponentSpec,
+	componentName string) error {
 	// inject built-in component env
-	fullCompName := constant.GenerateClusterComponentName(cluster.Name, comp.Name)
+	fullCompName := constant.GenerateClusterComponentName(cluster.Name, componentName)
 	*env = append(*env, []corev1.EnvVar{
 		{Name: constant.KBEnvClusterName, Value: cluster.Name},
-		{Name: constant.KBEnvCompName, Value: comp.Name},
+		{Name: constant.KBEnvCompName, Value: componentName},
 		{Name: constant.KBEnvClusterCompName, Value: fullCompName},
 		{Name: constant.KBEnvCompReplicas, Value: strconv.Itoa(int(comp.Replicas))},
-		{Name: kbEnvCompHeadlessSVCName, Value: constant.GenerateDefaultComponentHeadlessServiceName(cluster.Name, comp.Name)},
+		{Name: kbEnvCompHeadlessSVCName, Value: constant.GenerateDefaultComponentHeadlessServiceName(cluster.Name, componentName)},
 	}...)
 	if len(opsDef.Spec.ComponentInfos) == 0 {
 		return nil
@@ -76,7 +90,7 @@ func buildComponentEnvs(reqCtx intctrlutil.RequestCtx,
 	if err != nil {
 		return err
 	}
-	componentInfo := opsDef.GetComponentInfo(compDef.Name)
+	componentInfo := getComponentInfo(opsDef, compDef.Name)
 	if componentInfo == nil {
 		return intctrlutil.NewFatalError(fmt.Sprintf(`componentDefinition "%s" is not support for this operations`, compDef.Name))
 	}
@@ -95,7 +109,7 @@ func buildComponentEnvs(reqCtx intctrlutil.RequestCtx,
 	}
 	// inject connect envs
 	if componentInfo.AccountName != "" {
-		accountSecretName := constant.GenerateAccountSecretName(cluster.Name, comp.Name, componentInfo.AccountName)
+		accountSecretName := constant.GenerateAccountSecretName(cluster.Name, componentName, componentInfo.AccountName)
 		*env = append(*env, corev1.EnvVar{Name: kbEnvAccountUserName, Value: componentInfo.AccountName})
 		*env = append(*env, corev1.EnvVar{Name: kbEnvAccountPassword, ValueFrom: buildSecretKeyRef(accountSecretName, constant.AccountPasswdForSecret)})
 	}
@@ -106,7 +120,7 @@ func buildComponentEnvs(reqCtx intctrlutil.RequestCtx,
 			if v.Name != componentInfo.ServiceName {
 				continue
 			}
-			*env = append(*env, corev1.EnvVar{Name: kbEnvCompSVCName, Value: constant.GenerateComponentServiceName(cluster.Name, comp.Name, v.ServiceName)})
+			*env = append(*env, corev1.EnvVar{Name: kbEnvCompSVCName, Value: constant.GenerateComponentServiceName(cluster.Name, componentName, v.ServiceName)})
 			for _, port := range v.Spec.Ports {
 				portName := strings.ReplaceAll(port.Name, "-", "_")
 				*env = append(*env, corev1.EnvVar{Name: kbEnvCompSVCPortPrefix + strings.ToUpper(portName), Value: strconv.Itoa(int(port.Port))})
@@ -252,8 +266,16 @@ func buildActionPodEnv(reqCtx intctrlutil.RequestCtx,
 			Value: ops.Namespace,
 		},
 	}
+
+	componentName := compCustomItem.ComponentName
+	if targetPod != nil {
+		// "component" might be a shard component and the name is logical.
+		// we should get the real component name from the pod labels.
+		componentName = targetPod.Labels[constant.KBAppComponentLabelKey]
+	}
+
 	// inject component and componentDef envs
-	if err := buildComponentEnvs(reqCtx, cli, cluster, opsDef, &env, comp); err != nil {
+	if err := buildComponentEnvs(reqCtx, cli, cluster, opsDef, &env, comp, componentName); err != nil {
 		return nil, err
 	}
 
@@ -338,7 +360,7 @@ func getTargetPods(
 	if cluster.Spec.GetShardingByName(compName) != nil {
 		// get pods of the sharding components
 		podList := &corev1.PodList{}
-		labels := constant.GetClusterLabels(cluster.Namespace)
+		labels := constant.GetClusterLabels(cluster.Name)
 		labels[constant.KBAppShardingNameLabelKey] = compName
 		if podSelector.Role != "" {
 			labels[constant.RoleLabelKey] = podSelector.Role
@@ -398,4 +420,15 @@ func getNameFromObjectKey(objectKey string) string {
 		return strs[1]
 	}
 	return objectKey
+}
+
+func getTolerations(cluster *appsv1.Cluster, compSpec *appsv1.ClusterComponentSpec) ([]corev1.Toleration, error) {
+	schedulePolicy, err := scheduling.BuildSchedulingPolicy(cluster, compSpec)
+	if err != nil {
+		return nil, err
+	}
+	if schedulePolicy == nil {
+		return nil, nil
+	}
+	return schedulePolicy.Tolerations, nil
 }

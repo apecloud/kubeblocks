@@ -18,6 +18,32 @@ rules:
   verbs:
   - get
   - list
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - statefulsets
+  verbs:
+  - create
+  - delete
+  - deletecollection
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - statefulsets/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - apps
+  resources:
+  - statefulsets/status
+  verbs:
+  - get
 - apiGroups:
   - apps.kubeblocks.io
   resources:
@@ -223,6 +249,58 @@ rules:
   - apps.kubeblocks.io
   resources:
   - servicedescriptors/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - apps.kubeblocks.io
+  resources:
+  - shardingdefinitions
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps.kubeblocks.io
+  resources:
+  - shardingdefinitions/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - apps.kubeblocks.io
+  resources:
+  - shardingdefinitions/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - apps.kubeblocks.io
+  resources:
+  - sidecardefinitions
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps.kubeblocks.io
+  resources:
+  - sidecardefinitions/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - apps.kubeblocks.io
+  resources:
+  - sidecardefinitions/status
   verbs:
   - get
   - patch
@@ -859,6 +937,32 @@ rules:
   - get
   - list
   - watch
+- apiGroups:
+  - trace.kubeblocks.io
+  resources:
+  - reconciliationtraces
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - trace.kubeblocks.io
+  resources:
+  - reconciliationtraces/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - trace.kubeblocks.io
+  resources:
+  - reconciliationtraces/status
+  verbs:
+  - get
+  - patch
+  - update
 - apiGroups:
   - workloads.kubeblocks.io
   resources:

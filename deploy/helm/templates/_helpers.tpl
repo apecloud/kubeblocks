@@ -271,13 +271,6 @@ Define addon loki name
 {{- end }}
 
 {{/*
-Define addon apecloud-otel-collector name
-*/}}
-{{- define "addon.apecloud-otel-collector.name" -}}
-{{- print "apecloud-otel-collector" }}
-{{- end }}
-
-{{/*
 Get cloud provider, now support aws, gcp, aliyun and tencentCloud.
 TODO: For azure, we should get provider from node.Spec.ProviderID
 */}}
@@ -331,5 +324,20 @@ Define default storage class name, if cloud provider is known, specify a default
 {{- "apecloud-registry.cn-zhangjiakou.cr.aliyuncs.com" }}
 {{- else }}
 {{- .Values.image.registry }}
-{{- end}}
-{{- end}}
+{{- end }}
+{{- end }}
+
+{{/*
+Define the replica count for kubeblocks.
+*/}}
+{{- define "kubeblocks.replicaCount" }}
+{{- if and .Values.webhooks.conversionEnabled .Release.IsInstall }}
+{{- print 0 }}
+{{- else }}
+{{- .Values.replicaCount }}
+{{- end }}
+{{- end }}
+
+{{- define "kubeblocks.i18nResourcesName" -}}
+{{ include "kubeblocks.fullname" . }}-i18n-resources
+{{- end }}

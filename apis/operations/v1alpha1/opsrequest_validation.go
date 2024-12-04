@@ -344,9 +344,9 @@ func (r *OpsRequest) validateHorizontalScaling(_ context.Context, _ client.Clien
 			}
 		}
 	}
-	for _, shardingSpec := range cluster.Spec.ShardingSpecs {
-		if hScale, ok := hScaleMap[shardingSpec.Name]; ok {
-			if err := r.validateHorizontalScalingSpec(hScale, shardingSpec.Template, cluster.Name, true); err != nil {
+	for _, spec := range cluster.Spec.Shardings {
+		if hScale, ok := hScaleMap[spec.Name]; ok {
+			if err := r.validateHorizontalScalingSpec(hScale, spec.Template, cluster.Name, true); err != nil {
 				return err
 			}
 		}
@@ -367,6 +367,15 @@ func (r *OpsRequest) CountOfflineOrOnlineInstances(clusterName, componentName st
 func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, compSpec appsv1.ClusterComponentSpec, clusterName string, isSharding bool) error {
 	scaleIn := hScale.ScaleIn
 	scaleOut := hScale.ScaleOut
+	if hScale.Shards != nil {
+		if !isSharding {
+			return fmt.Errorf(`shards field cannot be used for the component "%s"`, hScale.ComponentName)
+		}
+		if scaleOut != nil || scaleIn != nil {
+			return fmt.Errorf(`shards field cannot be used together with scaleOut or scaleIn for the component "%s"`, hScale.ComponentName)
+		}
+		return nil
+	}
 	if lastCompConfiguration, ok := r.Status.LastConfiguration.Components[hScale.ComponentName]; ok {
 		// use last component configuration snapshot
 		compSpec.Instances = lastCompConfiguration.Instances
@@ -443,12 +452,16 @@ func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, com
 		if err := validateHScaleOperation(scaleOut.ReplicaChanger, scaleOut.NewInstances, scaleOut.OfflineInstancesToOnline, false); err != nil {
 			return err
 		}
-		if len(scaleOut.OfflineInstancesToOnline) > 0 {
-			offlineInstanceSet := sets.New(compSpec.OfflineInstances...)
-			for _, offlineInsName := range scaleOut.OfflineInstancesToOnline {
-				if _, ok := offlineInstanceSet[offlineInsName]; !ok {
-					return fmt.Errorf(`cannot find the offline instance "%s" in component "%s" for scaleOut operation`, offlineInsName, hScale.ComponentName)
-				}
+	}
+	// instance cannot be both in OfflineInstancesToOnline and OnlineInstancesToOffline
+	if scaleIn != nil && scaleOut != nil {
+		offlineToOnlineSet := make(map[string]struct{})
+		for _, instance := range scaleIn.OnlineInstancesToOffline {
+			offlineToOnlineSet[instance] = struct{}{}
+		}
+		for _, instance := range scaleOut.OfflineInstancesToOnline {
+			if _, exists := offlineToOnlineSet[instance]; exists {
+				return fmt.Errorf(`instance "%s" cannot be both in "OfflineInstancesToOnline" and "OnlineInstancesToOffline"`, instance)
 			}
 		}
 	}
@@ -503,11 +516,11 @@ func (r *OpsRequest) checkInstanceTemplate(cluster *appsv1.Cluster, componentOps
 			instanceNameMap[instances[i].Name] = sets.Empty{}
 		}
 	}
-	for _, shardingSpec := range cluster.Spec.ShardingSpecs {
-		if shardingSpec.Name != componentOps.ComponentName {
+	for _, spec := range cluster.Spec.Shardings {
+		if spec.Name != componentOps.ComponentName {
 			continue
 		}
-		setInstanceMap(shardingSpec.Template.Instances)
+		setInstanceMap(spec.Template.Instances)
 	}
 	for _, compSpec := range cluster.Spec.ComponentSpecs {
 		if compSpec.Name != componentOps.ComponentName {
@@ -533,8 +546,8 @@ func (r *OpsRequest) checkComponentExistence(cluster *appsv1.Cluster, compOpsLis
 	for _, compSpec := range cluster.Spec.ComponentSpecs {
 		compNameMap[compSpec.Name] = sets.Empty{}
 	}
-	for _, shardingSpec := range cluster.Spec.ShardingSpecs {
-		compNameMap[shardingSpec.Name] = sets.Empty{}
+	for _, spec := range cluster.Spec.Shardings {
+		compNameMap[spec.Name] = sets.Empty{}
 	}
 	var (
 		notFoundCompNames []string
@@ -615,7 +628,7 @@ func (r *OpsRequest) checkVolumesAllowExpansion(ctx context.Context, cli client.
 	for _, comp := range cluster.Spec.ComponentSpecs {
 		fillCompVols(comp, comp.Name, false)
 	}
-	for _, sharding := range cluster.Spec.ShardingSpecs {
+	for _, sharding := range cluster.Spec.Shardings {
 		fillCompVols(sharding.Template, sharding.Name, true)
 	}
 
@@ -694,10 +707,17 @@ func (r *OpsRequest) checkStorageClassAllowExpansion(ctx context.Context,
 // getSCNameByPvcAndCheckStorageSize gets the storageClassName by pvc and checks if the storage size is valid.
 func (r *OpsRequest) getSCNameByPvcAndCheckStorageSize(ctx context.Context,
 	cli client.Client,
-	componentName,
+	key,
 	vctName string,
 	isShardingComponent bool,
 	requestStorage resource.Quantity) (*string, error) {
+	componentName := key
+	targetInsTPLName := ""
+	if strings.Contains(key, ".") {
+		keyStrs := strings.Split(key, ".")
+		componentName = keyStrs[0]
+		targetInsTPLName = keyStrs[1]
+	}
 	matchingLabels := client.MatchingLabels{
 		constant.AppInstanceLabelKey:             r.Spec.GetClusterName(),
 		constant.VolumeClaimTemplateNameLabelKey: vctName,
@@ -711,10 +731,16 @@ func (r *OpsRequest) getSCNameByPvcAndCheckStorageSize(ctx context.Context,
 	if err := cli.List(ctx, pvcList, client.InNamespace(r.Namespace), matchingLabels); err != nil {
 		return nil, err
 	}
-	if len(pvcList.Items) == 0 {
+	var pvc *corev1.PersistentVolumeClaim
+	for _, pvcItem := range pvcList.Items {
+		if targetInsTPLName == pvcItem.Labels[constant.KBAppComponentInstanceTemplateLabelKey] {
+			pvc = &pvcItem
+			break
+		}
+	}
+	if pvc == nil {
 		return nil, nil
 	}
-	pvc := pvcList.Items[0]
 	previousValue := *pvc.Status.Capacity.Storage()
 	if requestStorage.Cmp(previousValue) < 0 {
 		return nil, fmt.Errorf(`requested storage size of volumeClaimTemplate "%s" can not less than status.capacity.storage "%s" `,

@@ -55,6 +55,7 @@ import (
 	experimentalv1alpha1 "github.com/apecloud/kubeblocks/apis/experimental/v1alpha1"
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
+	tracev1 "github.com/apecloud/kubeblocks/apis/trace/v1"
 	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	workloadsv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	appscontrollers "github.com/apecloud/kubeblocks/controllers/apps"
@@ -63,6 +64,7 @@ import (
 	extensionscontrollers "github.com/apecloud/kubeblocks/controllers/extensions"
 	k8scorecontrollers "github.com/apecloud/kubeblocks/controllers/k8score"
 	opscontrollers "github.com/apecloud/kubeblocks/controllers/operations"
+	tracecontrollers "github.com/apecloud/kubeblocks/controllers/trace"
 	workloadscontrollers "github.com/apecloud/kubeblocks/controllers/workloads"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
@@ -85,9 +87,11 @@ const (
 
 	// switch flags key for API groups
 	appsFlagKey         flagName = "apps"
-	extensionsFlagKey   flagName = "extensions"
 	workloadsFlagKey    flagName = "workloads"
+	operationsFlagKey   flagName = "operations"
+	extensionsFlagKey   flagName = "extensions"
 	experimentalFlagKey flagName = "experimental"
+	traceFlagKey        flagName = "trace"
 
 	multiClusterKubeConfigFlagKey       flagName = "multi-cluster-kubeconfig"
 	multiClusterContextsFlagKey         flagName = "multi-cluster-contexts"
@@ -114,6 +118,7 @@ func init() {
 	utilruntime.Must(workloadsv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(workloadsv1.AddToScheme(scheme))
 	utilruntime.Must(experimentalv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(tracev1.AddToScheme(scheme))
 
 	// +kubebuilder:scaffold:scheme
 
@@ -143,6 +148,7 @@ func init() {
 	viper.SetDefault(constant.CfgKBReconcileWorkers, 8)
 	viper.SetDefault(constant.FeatureGateIgnoreConfigTemplateDefaultMode, false)
 	viper.SetDefault(constant.FeatureGateInPlacePodVerticalScaling, false)
+	viper.SetDefault(constant.I18nResourcesName, "kubeblocks-i18n-resources")
 }
 
 type flagName string
@@ -168,12 +174,16 @@ func setupFlags() {
 
 	flag.Bool(appsFlagKey.String(), true,
 		"Enable the apps controller manager.")
-	flag.Bool(extensionsFlagKey.String(), true,
-		"Enable the extensions controller manager.")
 	flag.Bool(workloadsFlagKey.String(), true,
 		"Enable the workloads controller manager.")
+	flag.Bool(operationsFlagKey.String(), true,
+		"Enable the operations controller manager.")
+	flag.Bool(extensionsFlagKey.String(), true,
+		"Enable the extensions controller manager.")
 	flag.Bool(experimentalFlagKey.String(), false,
 		"Enable the experimental controller manager.")
+	flag.Bool(traceFlagKey.String(), false,
+		"Enable the trace controller manager.")
 
 	flag.String(multiClusterKubeConfigFlagKey.String(), "", "Paths to the kubeconfig for multi-cluster accessing.")
 	flag.String(multiClusterContextsFlagKey.String(), "", "Kube contexts the manager will talk to.")
@@ -316,7 +326,7 @@ func main() {
 	userAgent = viper.GetString(userAgentFlagKey.viperName())
 
 	setupLog.Info("golang runtime metrics.", "featureGate", intctrlutil.EnabledRuntimeMetrics())
-	mgr, err := ctrl.NewManager(intctrlutil.GeKubeRestConfig(userAgent), ctrl.Options{
+	mgr, err := ctrl.NewManager(intctrlutil.GetKubeRestConfig(userAgent), ctrl.Options{
 		Scheme: scheme,
 		Metrics: server.Options{
 			BindAddress:   metricsAddr,
@@ -377,16 +387,6 @@ func main() {
 	}
 
 	if viper.GetBool(appsFlagKey.viperName()) {
-		if err = (&appscontrollers.ClusterReconciler{
-			Client:          client,
-			Scheme:          mgr.GetScheme(),
-			Recorder:        mgr.GetEventRecorderFor("cluster-controller"),
-			MultiClusterMgr: multiClusterMgr,
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "Cluster")
-			os.Exit(1)
-		}
-
 		if err = (&appscontrollers.ClusterDefinitionReconciler{
 			Client:   mgr.GetClient(),
 			Scheme:   mgr.GetScheme(),
@@ -396,12 +396,12 @@ func main() {
 			os.Exit(1)
 		}
 
-		if err = (&appscontrollers.ComponentReconciler{
-			Client:   client,
+		if err = (&appscontrollers.ShardingDefinitionReconciler{
+			Client:   mgr.GetClient(),
 			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("component-controller"),
-		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "Component")
+			Recorder: mgr.GetEventRecorderFor("sharding-definition-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "ShardingDefinition")
 			os.Exit(1)
 		}
 
@@ -423,6 +423,92 @@ func main() {
 			os.Exit(1)
 		}
 
+		if err = (&appscontrollers.SidecarDefinitionReconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("sidecar-definition-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "SidecarDefinition")
+			os.Exit(1)
+		}
+
+		if err = (&appscontrollers.ClusterReconciler{
+			Client:          client,
+			Scheme:          mgr.GetScheme(),
+			Recorder:        mgr.GetEventRecorderFor("cluster-controller"),
+			MultiClusterMgr: multiClusterMgr,
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "Cluster")
+			os.Exit(1)
+		}
+
+		if err = (&appscontrollers.ComponentReconciler{
+			Client:   client,
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("component-controller"),
+		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "Component")
+			os.Exit(1)
+		}
+
+		if err = (&appscontrollers.ServiceDescriptorReconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("service-descriptor-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "ServiceDescriptor")
+			os.Exit(1)
+		}
+
+		if err = (&k8scorecontrollers.EventReconciler{
+			Client:   client,
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("event-controller"),
+		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "Event")
+			os.Exit(1)
+		}
+
+		if err = (&configuration.ConfigConstraintReconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("config-constraint-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "ConfigConstraint")
+			os.Exit(1)
+		}
+
+		if err = (&configuration.ConfigurationReconciler{
+			Client:   client,
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("configuration-controller"),
+		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "Configuration")
+			os.Exit(1)
+		}
+
+		if err = (&configuration.ReconfigureReconciler{
+			Client:   client,
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("reconfigure-controller"),
+		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "ReconfigureRequest")
+			os.Exit(1)
+		}
+	}
+
+	if viper.GetBool(workloadsFlagKey.viperName()) {
+		if err = (&workloadscontrollers.InstanceSetReconciler{
+			Client:   client,
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("instance-set-controller"),
+		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "InstanceSet")
+			os.Exit(1)
+		}
+	}
+
+	if viper.GetBool(operationsFlagKey.viperName()) {
 		if err = (&opscontrollers.OpsDefinitionReconciler{
 			Client:   mgr.GetClient(),
 			Scheme:   mgr.GetScheme(),
@@ -440,51 +526,6 @@ func main() {
 			setupLog.Error(err, "unable to create controller", "controller", "OpsRequest")
 			os.Exit(1)
 		}
-
-		if err = (&configuration.ConfigConstraintReconciler{
-			Client:   mgr.GetClient(),
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("config-constraint-controller"),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "ConfigConstraint")
-			os.Exit(1)
-		}
-
-		if err = (&configuration.ReconfigureReconciler{
-			Client:   client,
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("reconfigure-controller"),
-		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "ReconfigureRequest")
-			os.Exit(1)
-		}
-
-		if err = (&configuration.ConfigurationReconciler{
-			Client:   client,
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("configuration-controller"),
-		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "Configuration")
-			os.Exit(1)
-		}
-
-		if err = (&k8scorecontrollers.EventReconciler{
-			Client:   client,
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("event-controller"),
-		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "Event")
-			os.Exit(1)
-		}
-
-		if err = (&appscontrollers.ServiceDescriptorReconciler{
-			Client:   mgr.GetClient(),
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("service-descriptor-controller"),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "ServiceDescriptor")
-			os.Exit(1)
-		}
 	}
 
 	if viper.GetBool(extensionsFlagKey.viperName()) {
@@ -499,17 +540,6 @@ func main() {
 		}
 	}
 
-	if viper.GetBool(workloadsFlagKey.viperName()) {
-		if err = (&workloadscontrollers.InstanceSetReconciler{
-			Client:   client,
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("instance-set-controller"),
-		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "InstanceSet")
-			os.Exit(1)
-		}
-	}
-
 	if viper.GetBool(experimentalFlagKey.viperName()) {
 		if err = (&experimentalcontrollers.NodeCountScalerReconciler{
 			Client:   mgr.GetClient(),
@@ -517,6 +547,22 @@ func main() {
 			Recorder: mgr.GetEventRecorderFor("node-count-scaler-controller"),
 		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "NodeCountScaler")
+			os.Exit(1)
+		}
+	}
+
+	if viper.GetBool(traceFlagKey.viperName()) {
+		traceReconciler := &tracecontrollers.ReconciliationTraceReconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("reconciliation-trace-controller"),
+		}
+		if err := traceReconciler.SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "ReconciliationTrace")
+			os.Exit(1)
+		}
+		if err := mgr.Add(traceReconciler.InformerManager); err != nil {
+			setupLog.Error(err, "unable to add trace informer manager", "controller", "InformerManager")
 			os.Exit(1)
 		}
 	}

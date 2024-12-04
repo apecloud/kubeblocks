@@ -57,6 +57,7 @@ type RestoreManager struct {
 	namespace                         string
 	restoreTime                       string
 	env                               []corev1.EnvVar
+	parameters                        []dpv1alpha1.ParameterPair
 	volumeRestorePolicy               dpv1alpha1.VolumeClaimRestorePolicy
 	doReadyRestoreAfterClusterRunning bool
 	startingIndex                     int32
@@ -98,7 +99,7 @@ func (r *RestoreManager) DoRestore(comp *component.SynthesizedComponent, compObj
 	if err = r.DoPrepareData(comp, compObj, backupObj); err != nil {
 		return err
 	}
-	if compObj.Status.Phase != appsv1.RunningClusterCompPhase {
+	if compObj.Status.Phase != appsv1.RunningComponentPhase {
 		return nil
 	}
 	// wait for the post-provision action to complete.
@@ -212,6 +213,7 @@ func (r *RestoreManager) BuildPrepareDataRestore(comp *component.SynthesizedComp
 			},
 			RestoreTime: r.restoreTime,
 			Env:         r.env,
+			Parameters:  r.parameters,
 			PrepareDataConfig: &dpv1alpha1.PrepareDataConfig{
 				RequiredPolicyForAllPodSelection: r.buildRequiredPolicy(sourceTarget),
 				SchedulingSpec:                   schedulingSpec,
@@ -245,6 +247,7 @@ func (r *RestoreManager) DoPostReady(comp *component.SynthesizedComponent,
 			},
 			RestoreTime: r.restoreTime,
 			Env:         r.env,
+			Parameters:  r.parameters,
 			ReadyConfig: &dpv1alpha1.ReadyConfig{
 				ExecAction: &dpv1alpha1.ExecAction{
 					Target: dpv1alpha1.ExecActionTarget{
@@ -357,6 +360,11 @@ func (r *RestoreManager) initFromAnnotation(synthesizedComponent *component.Synt
 	}
 	if env := backupSource[constant.EnvForRestore]; env != "" {
 		if err = json.Unmarshal([]byte(env), &r.env); err != nil {
+			return nil, err
+		}
+	}
+	if parameters := backupSource[constant.ParametersForRestore]; len(parameters) > 0 {
+		if err = json.Unmarshal([]byte(parameters), &r.parameters); err != nil {
 			return nil, err
 		}
 	}

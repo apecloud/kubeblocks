@@ -226,6 +226,10 @@ func (r *restoreJobBuilder) addCommonEnv(sourceTargetPodName string) *restoreJob
 		restoreTime, _ := time.Parse(time.RFC3339, r.restore.Spec.RestoreTime)
 		appendTimeEnv(DPRestoreTime, DPRestoreTimestamp, backup.GetTimeZone(), &metav1.Time{Time: restoreTime})
 	}
+	// append restore parameters env
+	if r.restore != nil {
+		r.env = append(r.env, utils.BuildEnvByParameters(r.restore.Spec.Parameters)...)
+	}
 	// append actionSet env
 	r.env = append(r.env, actionSetEnv...)
 	backupMethod := r.backupSet.Backup.Status.BackupMethod

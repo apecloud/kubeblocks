@@ -39,7 +39,6 @@ import (
 var _ = Describe("replicas alignment reconciler test", func() {
 	BeforeEach(func() {
 		its = builder.NewInstanceSetBuilder(namespace, name).
-			SetService(&corev1.Service{}).
 			SetReplicas(3).
 			SetTemplate(template).
 			SetVolumeClaimTemplates(volumeClaimTemplates...).

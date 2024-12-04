@@ -42,14 +42,14 @@ import (
 
 var (
 	defaultNamespace = "default"
-	itsSchemaKind    = workloads.GroupVersion.WithKind(workloads.Kind)
+	itsSchemaKind    = workloads.GroupVersion.WithKind(workloads.InstanceSetKind)
 )
 
 func newMockInstanceSet(replicas int, name string, labels map[string]string) workloads.InstanceSet {
 	uid, _ := password.Generate(12, 12, 0, true, false)
 	return workloads.InstanceSet{
 		TypeMeta: metav1.TypeMeta{
-			Kind:       workloads.Kind,
+			Kind:       workloads.InstanceSetKind,
 			APIVersion: workloads.GroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{

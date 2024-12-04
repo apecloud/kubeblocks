@@ -89,10 +89,6 @@ func (r *clusterBackupPolicyTransformer) Transform(ctx graph.TransformContext, d
 		if backupPolicy == nil {
 			return
 		}
-		if bpBuilder.isHScaleTPL {
-			r.V(1).Info("Skip creating backup schedule for the h-scale backup policy template", "template", bpBuilder.backupPolicyTPL.Name)
-			return
-		}
 		// build the data protection backup schedule from the template.
 		oldBackupSchedule, newBackupSchedule := bpBuilder.transformBackupSchedule(backupPolicy)
 		// merge cluster backup configuration into the backup schedule.
@@ -120,8 +116,8 @@ func (r *clusterBackupPolicyTransformer) Transform(ctx graph.TransformContext, d
 		graphCli.DependOn(dag, backupPolicy, comps...)
 	}
 
-	transformBackupPolicyAndSchedule := func(bpt *dpv1alpha1.BackupPolicyTemplate, compSpec *appsv1.ClusterComponentSpec, componentName string, isSharding, isHScaleTPL bool) error {
-		bpBuilder := newBackupPolicyBuilder(r, compSpec, bpt, componentName, isSharding, isHScaleTPL)
+	transformBackupPolicyAndSchedule := func(bpt *dpv1alpha1.BackupPolicyTemplate, compSpec *appsv1.ClusterComponentSpec, componentName string, isSharding bool) error {
+		bpBuilder := newBackupPolicyBuilder(r, compSpec, bpt, componentName, isSharding)
 		policy := transformBackupPolicy(bpBuilder)
 		// only merge the first backupSchedule for the cluster backup.
 		transformBackupSchedule(bpBuilder, policy)
@@ -129,28 +125,14 @@ func (r *clusterBackupPolicyTransformer) Transform(ctx graph.TransformContext, d
 	}
 
 	transformComponentBackupPolicy := func(compSpec *appsv1.ClusterComponentSpec, componentName string, isSharding bool) error {
-		compDef := r.ComponentDefs[compSpec.ComponentDef]
-		if compDef == nil {
-			return nil
-		}
-		hScaleBPTName := compDef.Annotations[constant.HorizontalScaleBackupPolicyTemplateKey]
-		if hScaleBPTName != "" {
-			bpt := &dpv1alpha1.BackupPolicyTemplate{}
-			if err := r.Client.Get(ctx.GetContext(), client.ObjectKey{Name: hScaleBPTName}, bpt); err != nil {
-				return err
-			}
-			if err := transformBackupPolicyAndSchedule(bpt, compSpec, componentName, isSharding, true); err != nil {
-				return err
-			}
-		}
-		bpt, err := r.getBackupPolicyTemplate(compSpec.ComponentDef, hScaleBPTName)
+		bpt, err := r.getBackupPolicyTemplate(compSpec.ComponentDef)
 		if err != nil {
 			return err
 		}
 		if bpt == nil {
 			return nil
 		}
-		return transformBackupPolicyAndSchedule(bpt, compSpec, componentName, isSharding, false)
+		return transformBackupPolicyAndSchedule(bpt, compSpec, componentName, isSharding)
 	}
 
 	for i := range r.Cluster.Spec.ComponentSpecs {
@@ -159,27 +141,24 @@ func (r *clusterBackupPolicyTransformer) Transform(ctx graph.TransformContext, d
 			return err
 		}
 	}
-	for i := range r.Cluster.Spec.ShardingSpecs {
-		shardingSpec := r.Cluster.Spec.ShardingSpecs[i]
-		if err := transformComponentBackupPolicy(&shardingSpec.Template, shardingSpec.Name, true); err != nil {
+	for i := range r.Cluster.Spec.Shardings {
+		spec := r.Cluster.Spec.Shardings[i]
+		if err := transformComponentBackupPolicy(&spec.Template, spec.Name, true); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (r *clusterBackupPolicyTransformer) getBackupPolicyTemplate(componentDef string, hScaleBPTName string) (*dpv1alpha1.BackupPolicyTemplate, error) {
+func (r *clusterBackupPolicyTransformer) getBackupPolicyTemplate(componentDef string) (*dpv1alpha1.BackupPolicyTemplate, error) {
 	bptList := &dpv1alpha1.BackupPolicyTemplateList{}
 	if err := r.Client.List(r.Context, bptList, client.MatchingLabels{
 		componentDef: componentDef,
 	}); err != nil {
 		return nil, err
 	}
-	for _, v := range bptList.Items {
-		if v.Name == hScaleBPTName {
-			continue
-		}
-		return &v, nil
+	if len(bptList.Items) > 0 {
+		return &bptList.Items[0], nil
 	}
 	return nil, nil
 }
@@ -190,7 +169,6 @@ type backupPolicyBuilder struct {
 	record.EventRecorder
 	logr.Logger
 	Cluster         *appsv1.Cluster
-	isHScaleTPL     bool
 	backupPolicyTPL *dpv1alpha1.BackupPolicyTemplate
 	compSpec        *appsv1.ClusterComponentSpec
 	componentName   string
@@ -201,8 +179,7 @@ func newBackupPolicyBuilder(r *clusterBackupPolicyTransformer,
 	compSpec *appsv1.ClusterComponentSpec,
 	backupPolicyTPL *dpv1alpha1.BackupPolicyTemplate,
 	componentName string,
-	isSharding,
-	isHScaleTPL bool) *backupPolicyBuilder {
+	isSharding bool) *backupPolicyBuilder {
 	return &backupPolicyBuilder{
 		Context:         r.Context,
 		Client:          r.Client,
@@ -212,14 +189,13 @@ func newBackupPolicyBuilder(r *clusterBackupPolicyTransformer,
 		compSpec:        compSpec,
 		backupPolicyTPL: backupPolicyTPL,
 		componentName:   componentName,
-		isHScaleTPL:     isHScaleTPL,
 		isSharding:      isSharding,
 	}
 }
 
 // transformBackupPolicy transforms backup policy template to backup policy.
 func (r *backupPolicyBuilder) transformBackupPolicy() (*dpv1alpha1.BackupPolicy, *dpv1alpha1.BackupPolicy) {
-	backupPolicyName := generateBackupPolicyName(r.Cluster.Name, r.componentName, r.isHScaleTPL)
+	backupPolicyName := generateBackupPolicyName(r.Cluster.Name, r.componentName)
 	backupPolicy := &dpv1alpha1.BackupPolicy{}
 	if err := r.Client.Get(r.Context, client.ObjectKey{
 		Namespace: r.Cluster.Namespace,
@@ -307,11 +283,14 @@ func (r *backupPolicyBuilder) buildBackupSchedule(
 
 	var schedules []dpv1alpha1.SchedulePolicy
 	for _, s := range r.backupPolicyTPL.Spec.Schedules {
+		name := s.GetScheduleName()
 		schedules = append(schedules, dpv1alpha1.SchedulePolicy{
 			BackupMethod:    s.BackupMethod,
 			CronExpression:  s.CronExpression,
 			Enabled:         s.Enabled,
 			RetentionPeriod: s.RetentionPeriod,
+			Name:            name,
+			Parameters:      s.Parameters,
 		})
 	}
 	backupSchedule.Spec.Schedules = schedules
@@ -319,16 +298,22 @@ func (r *backupPolicyBuilder) buildBackupSchedule(
 }
 
 func (r *backupPolicyBuilder) syncBackupSchedule(backupSchedule *dpv1alpha1.BackupSchedule) {
-	scheduleMethodMap := map[string]struct{}{}
-	for _, s := range backupSchedule.Spec.Schedules {
-		scheduleMethodMap[s.BackupMethod] = struct{}{}
+	scheduleNameMap := map[string]struct{}{}
+	for i := range backupSchedule.Spec.Schedules {
+		s := &backupSchedule.Spec.Schedules[i]
+		if len(s.Name) == 0 {
+			// assign to backupMethod if name is empty.
+			s.Name = s.BackupMethod
+		}
+		scheduleNameMap[s.Name] = struct{}{}
 	}
 	mergeMap(backupSchedule.Annotations, r.buildAnnotations())
 	// update backupSchedule annotation to reconcile it.
 	backupSchedule.Annotations[constant.ReconcileAnnotationKey] = r.Cluster.ResourceVersion
 	// sync the newly added schedule policies.
 	for _, s := range r.backupPolicyTPL.Spec.Schedules {
-		if _, ok := scheduleMethodMap[s.BackupMethod]; ok {
+		name := s.GetScheduleName()
+		if _, ok := scheduleNameMap[name]; ok {
 			continue
 		}
 		backupSchedule.Spec.Schedules = append(backupSchedule.Spec.Schedules, dpv1alpha1.SchedulePolicy{
@@ -336,6 +321,8 @@ func (r *backupPolicyBuilder) syncBackupSchedule(backupSchedule *dpv1alpha1.Back
 			CronExpression:  s.CronExpression,
 			Enabled:         s.Enabled,
 			RetentionPeriod: s.RetentionPeriod,
+			Name:            name,
+			Parameters:      s.Parameters,
 		})
 	}
 }
@@ -535,7 +522,9 @@ func (r *backupPolicyBuilder) buildBackupTarget(
 			MatchLabels: r.buildTargetPodLabels(targetTpl.FallbackRole, fullCompName),
 		}
 	}
-	target.Name = fullCompName
+	if r.isSharding {
+		target.Name = fullCompName
+	}
 	// build the target connection credential
 	if targetTpl.Account != "" {
 		target.ConnectionCredential = &dpv1alpha1.ConnectionCredential{
@@ -635,6 +624,9 @@ func (r *backupPolicyBuilder) mergeClusterBackup(
 		if as.Spec.BackupType == dpv1alpha1.BackupTypeContinuous && backup.PITREnabled != nil && !hasSyncPITRMethod {
 			// auto-sync the first continuous backup for the 'pirtEnable' option.
 			backupSchedule.Spec.Schedules[i].Enabled = backup.PITREnabled
+			if backup.RetentionPeriod.String() != "" {
+				backupSchedule.Spec.Schedules[i].RetentionPeriod = backup.RetentionPeriod
+			}
 			hasSyncPITRMethod = true
 		}
 		if as.Spec.BackupType == dpv1alpha1.BackupTypeFull && enableAutoBackup {
@@ -651,16 +643,9 @@ func (r *backupPolicyBuilder) mergeClusterBackup(
 	return backupSchedule
 }
 
-func (r *backupPolicyBuilder) defaultPolicyAnnotationValue() string {
-	if r.isHScaleTPL {
-		return "false"
-	}
-	return trueVal
-}
-
 func (r *backupPolicyBuilder) buildAnnotations() map[string]string {
 	annotations := map[string]string{
-		dptypes.DefaultBackupPolicyAnnotationKey:   r.defaultPolicyAnnotationValue(),
+		dptypes.DefaultBackupPolicyAnnotationKey:   trueVal,
 		constant.BackupPolicyTemplateAnnotationKey: r.backupPolicyTPL.Name,
 	}
 	if r.backupPolicyTPL.Annotations[dptypes.ReconfigureRefAnnotationKey] != "" {
@@ -703,10 +688,7 @@ func (r *backupPolicyBuilder) buildTargetPodLabels(role string, fullCompName str
 }
 
 // generateBackupPolicyName generates the backup policy name which is created from backup policy template.
-func generateBackupPolicyName(clusterName, componentName string, isHScaleTPL bool) string {
-	if isHScaleTPL {
-		return fmt.Sprintf("%s-%s-backup-policy-hscale", clusterName, componentName)
-	}
+func generateBackupPolicyName(clusterName, componentName string) string {
 	return fmt.Sprintf("%s-%s-backup-policy", clusterName, componentName)
 }
 

@@ -19,9 +19,9 @@ This tutorial illustrates how to create and manage a Milvus cluster by `kbcli`, 
 
 ## Before you start
 
-- [Install kbcli](./../installation/install-with-kbcli/install-kbcli.md) if you want to manage the Milvus cluster with `kbcli`.
-- Install KubeBlocks [by kbcli](./../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) or [by Helm](./../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md).
-- Install and enable the milvus Addon [by kbcli](./../installation/install-with-kbcli/install-addons.md) or [by Helm](./../installation/install-with-helm/install-addons.md).
+- [Install kbcli](./../installation/install-kbcli.md) if you want to manage the Milvus cluster with `kbcli`.
+- [Install KubeBlocks](./../installation/install-kubeblocks.md).
+- [Install and enable the milvus Addon](./../installation/install-addons.md).
 - To keep things isolated, create a separate namespace called `demo` throughout this tutorial.
 
   ```bash
@@ -309,7 +309,7 @@ EOF
 |---------------------------------------|--------------------------------------|
 | `spec.clusterDefinitionRef`           | It specifies the name of the ClusterDefinition for creating a specific type of cluster.  |
 | `spec.clusterVersionRef`              | It is the name of the cluster version CRD that defines the cluster version.  |
-| `spec.terminationPolicy`              | It is the policy of cluster termination. The default value is `Delete`. Valid values are `DoNotTerminate`, `Halt`, `Delete`, `WipeOut`.  <p> - `DoNotTerminate` blocks deletion operation. </p><p> - `Halt` deletes workload resources such as statefulset and deployment workloads but keep PVCs. </p><p> - `Delete` is based on Halt and deletes PVCs. </p> - `WipeOut` is based on Delete and wipe out all volume snapshots and snapshot data from a backup storage location. |
+| `spec.terminationPolicy`              | It is the policy of cluster termination. The default value is `Delete`. Valid values are `DoNotTerminate`, `Delete`, `WipeOut`. For the detailed definition, you can refer to [Termination Policy](#termination-policy). |
 | `spec.affinity`                       | It defines a set of node affinity scheduling rules for the cluster's Pods. This field helps control the placement of Pods on nodes within the cluster.  |
 | `spec.affinity.podAntiAffinity`       | It specifies the anti-affinity level of Pods within a component. It determines how pods should spread across nodes to improve availability and performance. |
 | `spec.affinity.topologyKeys`          | It represents the key of node labels used to define the topology domain for Pod anti-affinity and Pod spread constraints.   |
@@ -733,7 +733,7 @@ mycluster   milvus-2.3.2                                  Delete               R
 
 ## Stop/Start a cluster
 
-You can stop/start a cluster to save computing resources. When a cluster is stopped, the computing resources of this cluster are released, which means the pods of Kubernetes are released, but the storage resources are reserved. You can start this cluster again by snapshots if you want to restore the cluster resources.
+You can stop/start a cluster to save computing resources. When a cluster is stopped, the computing resources of this cluster are released, which means the pods of Kubernetes are released, but the storage resources are reserved. You can start this cluster again to restore it to the state it was in before it was stopped.
 
 ### Stop a cluster
 
@@ -895,3 +895,76 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
     </TabItem>
 
     </Tabs>
+
+## Delete a cluster
+
+### Termination policy
+
+:::note
+
+The termination policy determines how a cluster is deleted.
+
+:::
+
+| **terminationPolicy** | **Deleting Operation**                           |
+|:----------------------|:-------------------------------------------------|
+| `DoNotTerminate`      | `DoNotTerminate` blocks delete operation.        |
+| `Halt`                | `Halt` deletes Cluster resources like Pods and Services but retains Persistent Volume Claims (PVCs), allowing for data preservation while stopping other operations. Halt policy is deprecated in v0.9.1 and will have same meaning as DoNotTerminate. |
+| `Delete`              | `Delete` extends the Halt policy by also removing PVCs, leading to a thorough cleanup while removing all persistent data.   |
+| `WipeOut`             | `WipeOut` deletes all Cluster resources, including volume snapshots and backups in external storage. This results in complete data removal and should be used cautiously, especially in non-production environments, to avoid irreversible data loss.   |
+
+To check the termination policy, execute the following command.
+
+<Tabs>
+
+<TabItem value="kbcli" label="kbcli" default>
+
+```bash
+kbcli cluster list mycluster -n demo
+>
+NAME        NAMESPACE   CLUSTER-DEFINITION        VERSION               TERMINATION-POLICY   STATUS           CREATED-TIME
+mycluster   demo        milvus-2.3.2                                    Delete               Running          Jul 05,2024 17:35 UTC+0800  
+```
+
+</TabItem>
+
+<TabItem value="kubectl" label="kubectl">
+
+```bash
+kubectl get cluster mycluster -n demo
+>
+NAME        CLUSTER-DEFINITION   VERSION                  TERMINATION-POLICY   STATUS    AGE
+mycluster   milvus-2.3.2                                  Delete               Running   14m
+```
+
+</TabItem>
+
+</Tabs>
+
+### Steps
+
+Run the command below to delete a specified cluster.
+
+<Tabs>
+
+<TabItem value="kbcli" label="kbcli" default>
+
+```bash
+kbcli cluster delete mycluster -n demo
+```
+
+</TabItem>
+
+<TabItem value="kubectl" label="kubectl">
+
+If you want to delete a cluster and its all related resources, you can modify the termination policy to `WipeOut`, then delete the cluster.
+
+```bash
+kubectl patch -n demo cluster mycluster -p '{"spec":{"terminationPolicy":"WipeOut"}}' --type="merge"
+
+kubectl delete -n demo cluster mycluster
+```
+
+</TabItem>
+
+</Tabs>

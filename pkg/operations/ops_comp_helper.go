@@ -31,7 +31,6 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -72,9 +71,9 @@ func (c componentOpsHelper) updateClusterComponentsAndShardings(cluster *appsv1.
 		}
 	}
 	// 1. update the sharding components
-	for index := range cluster.Spec.ShardingSpecs {
-		shardingSpec := &cluster.Spec.ShardingSpecs[index]
-		if err := updateComponentSpecs(&shardingSpec.Template, shardingSpec.Name); err != nil {
+	for index := range cluster.Spec.Shardings {
+		sharding := &cluster.Spec.Shardings[index]
+		if err := updateComponentSpecs(&sharding.Template, sharding.Name); err != nil {
 			return err
 		}
 	}
@@ -100,7 +99,7 @@ func (c componentOpsHelper) saveLastConfigurations(opsRes *OpsResource,
 		setLastCompConfiguration(v, lastConfiguration, v.Name)
 	}
 	// 2. record the volumeTemplate of sharding components
-	for _, v := range opsRes.Cluster.Spec.ShardingSpecs {
+	for _, v := range opsRes.Cluster.Spec.Shardings {
 		setLastCompConfiguration(v.Template, lastConfiguration, v.Name)
 	}
 }
@@ -127,10 +126,10 @@ func (c componentOpsHelper) cancelComponentOps(ctx context.Context,
 		compSpec := &opsRes.Cluster.Spec.ComponentSpecs[index]
 		rollBackCompSpec(compSpec, lastCompInfos, compSpec.Name)
 	}
-	// 2. rollback the shardingSpecs
-	for index := range opsRes.Cluster.Spec.ShardingSpecs {
-		shardingSpec := &opsRes.Cluster.Spec.ShardingSpecs[index]
-		rollBackCompSpec(&shardingSpec.Template, lastCompInfos, shardingSpec.Name)
+	// 2. rollback the shardings
+	for index := range opsRes.Cluster.Spec.Shardings {
+		sharding := &opsRes.Cluster.Spec.Shardings[index]
+		rollBackCompSpec(&sharding.Template, lastCompInfos, sharding.Name)
 	}
 	return cli.Update(ctx, opsRes.Cluster)
 }
@@ -142,6 +141,87 @@ func (c componentOpsHelper) existFailure(ops *opsv1alpha1.OpsRequest, componentN
 		}
 	}
 	return false
+}
+
+func (c componentOpsHelper) getComponentOps(componentName string) (ComponentOpsInterface, bool) {
+	if len(c.componentOpsSet) == 0 {
+		return opsv1alpha1.ComponentOps{ComponentName: componentName}, true
+	}
+	compOps, ok := c.componentOpsSet[componentName]
+	return compOps, ok
+}
+
+func (c componentOpsHelper) isHScaleShards(opsRequest *opsv1alpha1.OpsRequest, compOps ComponentOpsInterface) bool {
+	if opsRequest.Spec.Type != opsv1alpha1.HorizontalScalingType {
+		return false
+	}
+	return compOps.(opsv1alpha1.HorizontalScaling).Shards != nil
+}
+
+func (c componentOpsHelper) buildProgressResources(reqCtx intctrlutil.RequestCtx,
+	cli client.Client,
+	opsRes *OpsResource,
+	clusterDef *appsv1.ClusterDefinition,
+	opsMessageKey string) ([]progressResource, error) {
+	var progressResources []progressResource
+	setProgressResource := func(compSpec *appsv1.ClusterComponentSpec, compOps ComponentOpsInterface,
+		fullComponentName string, shards *int32) error {
+		var componentDefinition *appsv1.ComponentDefinition
+		if compSpec.ComponentDef != "" {
+			componentDefinition = &appsv1.ComponentDefinition{}
+			if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: compSpec.ComponentDef}, componentDefinition); err != nil {
+				return err
+			}
+		}
+		progressResources = append(progressResources, progressResource{
+			opsMessageKey:     opsMessageKey,
+			clusterComponent:  compSpec,
+			clusterDef:        clusterDef,
+			componentDef:      componentDefinition,
+			compOps:           compOps,
+			fullComponentName: fullComponentName,
+			shards:            shards,
+		})
+		return nil
+	}
+	// 1. handle the component status
+	for i := range opsRes.Cluster.Spec.ComponentSpecs {
+		compSpec := &opsRes.Cluster.Spec.ComponentSpecs[i]
+		compOps, ok := c.getComponentOps(compSpec.Name)
+		if !ok {
+			continue
+		}
+		if err := setProgressResource(compSpec, compOps, compSpec.Name, nil); err != nil {
+			return nil, err
+		}
+	}
+
+	// 2. handle the sharding status.
+	for i := range opsRes.Cluster.Spec.Shardings {
+		sharding := opsRes.Cluster.Spec.Shardings[i]
+		compOps, ok := c.getComponentOps(sharding.Name)
+		if !ok {
+			continue
+		}
+		if c.isHScaleShards(opsRes.OpsRequest, compOps) {
+			if err := setProgressResource(&sharding.Template, compOps, "", &sharding.Shards); err != nil {
+				return nil, err
+			}
+			continue
+		}
+		// handle the progress of the components of the sharding.
+		shardingComps, err := intctrlutil.ListShardingComponents(reqCtx.Ctx, cli, opsRes.Cluster, sharding.Name)
+		if err != nil {
+			return nil, err
+		}
+		for j := range shardingComps {
+			if err = setProgressResource(&sharding.Template, compOps,
+				shardingComps[j].Labels[constant.KBAppComponentLabelKey], &sharding.Shards); err != nil {
+				return nil, err
+			}
+		}
+	}
+	return progressResources, nil
 }
 
 // reconcileActionWithComponentOps will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
@@ -160,7 +240,6 @@ func (c componentOpsHelper) reconcileActionWithComponentOps(reqCtx intctrlutil.R
 		opsRequest             = opsRes.OpsRequest
 		expectProgressCount    int32
 		completedProgressCount int32
-		requeueTimeAfterFailed time.Duration
 		err                    error
 		clusterDef             *appsv1.ClusterDefinition
 	)
@@ -175,64 +254,9 @@ func (c componentOpsHelper) reconcileActionWithComponentOps(reqCtx intctrlutil.R
 	if opsRequest.Status.Components == nil {
 		opsRequest.Status.Components = map[string]opsv1alpha1.OpsRequestComponentStatus{}
 	}
-	var progressResources []progressResource
-	setProgressResource := func(compSpec *appsv1.ClusterComponentSpec, compOps ComponentOpsInterface,
-		fullComponentName string, isShardingComponent bool) error {
-		var componentDefinition *appsv1.ComponentDefinition
-		if compSpec.ComponentDef != "" {
-			componentDefinition = &appsv1.ComponentDefinition{}
-			if err = cli.Get(reqCtx.Ctx, client.ObjectKey{Name: compSpec.ComponentDef}, componentDefinition); err != nil {
-				return err
-			}
-		}
-		progressResources = append(progressResources, progressResource{
-			opsMessageKey:       opsMessageKey,
-			clusterComponent:    compSpec,
-			clusterDef:          clusterDef,
-			componentDef:        componentDefinition,
-			compOps:             compOps,
-			fullComponentName:   fullComponentName,
-			isShardingComponent: isShardingComponent,
-		})
-		return nil
-	}
-	getCompOps := func(componentName string) (ComponentOpsInterface, bool) {
-		if len(c.componentOpsSet) == 0 {
-			return opsv1alpha1.ComponentOps{ComponentName: componentName}, true
-		}
-		compOps, ok := c.componentOpsSet[componentName]
-		return compOps, ok
-	}
-	// 1. handle the component status
-	for i := range opsRes.Cluster.Spec.ComponentSpecs {
-		compSpec := &opsRes.Cluster.Spec.ComponentSpecs[i]
-		compOps, ok := getCompOps(compSpec.Name)
-		if !ok {
-			continue
-		}
-		if err = setProgressResource(compSpec, compOps, compSpec.Name, false); err != nil {
-			return opsRequestPhase, 0, err
-		}
-	}
-
-	// 2. handle the sharding status.
-	for i := range opsRes.Cluster.Spec.ShardingSpecs {
-		shardingSpec := opsRes.Cluster.Spec.ShardingSpecs[i]
-		compOps, ok := getCompOps(shardingSpec.Name)
-		if !ok {
-			continue
-		}
-		// handle the progress of the components of the sharding.
-		shardingComps, err := intctrlutil.ListShardingComponents(reqCtx.Ctx, cli, opsRes.Cluster, shardingSpec.Name)
-		if err != nil {
-			return opsRequestPhase, 0, err
-		}
-		for j := range shardingComps {
-			if err = setProgressResource(&shardingSpec.Template, compOps,
-				shardingComps[j].Labels[constant.KBAppComponentLabelKey], true); err != nil {
-				return opsRequestPhase, 0, err
-			}
-		}
+	progressResources, err := c.buildProgressResources(reqCtx, cli, opsRes, clusterDef, opsMessageKey)
+	if err != nil {
+		return opsRequestPhase, 0, err
 	}
 	opsIsCompleted := true
 	existFailure := false
@@ -248,18 +272,11 @@ func (c componentOpsHelper) reconcileActionWithComponentOps(reqCtx intctrlutil.R
 		if c.existFailure(opsRes.OpsRequest, pgResource.compOps.GetComponentName()) {
 			existFailure = true
 		}
-		componentPhase := opsRes.Cluster.Status.Components[pgResource.compOps.GetComponentName()].Phase
-		if !pgResource.isShardingComponent {
-			if opsCompStatus.Phase != componentPhase {
-				opsCompStatus.Phase = componentPhase
-			}
+		var componentPhase appsv1.ComponentPhase
+		if pgResource.shards == nil {
+			componentPhase = opsRes.Cluster.Status.Components[pgResource.compOps.GetComponentName()].Phase
 		} else {
-			compObj, err := component.GetComponentByName(reqCtx.Ctx, cli, opsRes.Cluster.Namespace,
-				constant.GenerateClusterComponentName(opsRes.Cluster.Name, pgResource.fullComponentName))
-			if err != nil {
-				return opsRequestPhase, 0, err
-			}
-			componentPhase = compObj.Status.Phase
+			componentPhase = opsRes.Cluster.Status.Shardings[pgResource.compOps.GetComponentName()].Phase
 		}
 		// conditions whether ops is running:
 		//  1. completedProgressCount is not equal to expectProgressCount.
@@ -268,9 +285,10 @@ func (c componentOpsHelper) reconcileActionWithComponentOps(reqCtx intctrlutil.R
 		if expectCount != completedCount {
 			opsIsCompleted = false
 		} else if !pgResource.noWaitComponentCompleted &&
-			(!slices.Contains(appsv1.GetComponentTerminalPhases(), componentPhase) || completedCount == 0) {
+			(!slices.Contains(componentTerminalPhases(), componentPhase) || completedCount == 0) {
 			opsIsCompleted = false
 		}
+		opsCompStatus.Phase = componentPhase
 		opsRequest.Status.Components[pgResource.compOps.GetComponentName()] = opsCompStatus
 	}
 	// TODO: wait for sharding cluster to completed for next opsRequest.
@@ -284,11 +302,24 @@ func (c componentOpsHelper) reconcileActionWithComponentOps(reqCtx intctrlutil.R
 		return opsRequestPhase, 0, nil
 	}
 	if existFailure {
-		if requeueTimeAfterFailed != 0 {
-			// component failure may be temporary, waiting for component failure timeout.
-			return opsRequestPhase, requeueTimeAfterFailed, nil
-		}
 		return opsv1alpha1.OpsFailedPhase, 0, nil
 	}
 	return opsv1alpha1.OpsSucceedPhase, 0, nil
+}
+
+func hasIntersectionCompOpsList[T ComponentOpsInterface, S ComponentOpsInterface](currCompOpsMap map[string]T, list []S) bool {
+	for _, comp := range list {
+		if _, ok := currCompOpsMap[comp.GetComponentName()]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+func componentTerminalPhases() []appsv1.ComponentPhase {
+	return []appsv1.ComponentPhase{
+		appsv1.RunningComponentPhase,
+		appsv1.StoppedComponentPhase,
+		appsv1.FailedComponentPhase,
+	}
 }

@@ -6,6 +6,9 @@ sidebar_position: 4
 sidebar_label: 安装引擎
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # 安装引擎
 
 KubeBlocks v0.8.0 发布后，数据库引擎插件（Addon）与 KubeBlocks 解耦，KubeBlocks 默认安装了部分引擎，如需体验其它引擎，需通过索引安装。如果您卸载了部分引擎，也可通过本文步骤，重新安装。

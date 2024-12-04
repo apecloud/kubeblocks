@@ -138,6 +138,6 @@ func getK8sClientSet() (*kubernetes.Clientset, error) {
 
 func generateEventName(reason, message string) string {
 	hash := fnv.New32a()
-	hash.Write([]byte(fmt.Sprintf("%s.%s.%s", podName(), reason, message)))
+	hash.Write([]byte(fmt.Sprintf("%s.%s.%s", podUID(), reason, message)))
 	return fmt.Sprintf("%s.%x", podName(), hash.Sum32())
 }

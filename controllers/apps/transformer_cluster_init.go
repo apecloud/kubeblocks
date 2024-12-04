@@ -20,9 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"github.com/pkg/errors"
+
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 type clusterInitTransformer struct {
@@ -35,6 +38,14 @@ func (t *clusterInitTransformer) Transform(ctx graph.TransformContext, dag *grap
 	transCtx, _ := ctx.(*clusterTransformContext)
 	transCtx.Cluster, transCtx.OrigCluster = t.cluster, t.cluster.DeepCopy()
 	graphCli, _ := transCtx.Client.(model.GraphClient)
+
+	supported, err := intctrlutil.APIVersionPredicate(t.cluster)
+	if err != nil {
+		return errors.Wrap(err, "API version predicate failed")
+	}
+	if !supported {
+		return graph.ErrPrematureStop
+	}
 
 	// init dag
 	graphCli.Root(dag, transCtx.OrigCluster, transCtx.Cluster, model.ActionStatusPtr())

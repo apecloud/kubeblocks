@@ -17,37 +17,35 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package apps
+package instanceset
 
 import (
-	"github.com/pkg/errors"
-
-	"github.com/apecloud/kubeblocks/pkg/controller/graph"
-	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-type componentInitTransformer struct{}
+type apiVersionReconciler struct{}
 
-var _ graph.Transformer = &componentInitTransformer{}
+func (r *apiVersionReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
+	if tree.GetRoot() == nil {
+		return kubebuilderx.ConditionUnsatisfied
+	}
+	return kubebuilderx.ConditionSatisfied
+}
 
-func (t *componentInitTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	transCtx, _ := ctx.(*componentTransformContext)
-
-	supported, err := intctrlutil.APIVersionPredicate(transCtx.Component)
+func (r *apiVersionReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
+	supported, err := intctrlutil.APIVersionPredicate(tree.GetRoot())
 	if err != nil {
-		return errors.Wrap(err, "API version predicate failed")
+		return kubebuilderx.Continue, err
 	}
 	if !supported {
-		return graph.ErrPrematureStop
+		return kubebuilderx.Commit, nil
 	}
-
-	// init dag
-	rootVertex := &model.ObjectVertex{Obj: transCtx.Component, OriObj: transCtx.ComponentOrig, Action: model.ActionStatusPtr()}
-	dag.AddVertex(rootVertex)
-
-	// init placement
-	transCtx.Context = intoContext(transCtx.Context, placement(transCtx.Component))
-
-	return nil
+	return kubebuilderx.Continue, nil
 }
+
+func NewAPIVersionReconciler() kubebuilderx.Reconciler {
+	return &apiVersionReconciler{}
+}
+
+var _ kubebuilderx.Reconciler = &apiVersionReconciler{}

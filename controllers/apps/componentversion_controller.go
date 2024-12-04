@@ -86,12 +86,20 @@ func (r *ComponentVersionReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return intctrlutil.CheckedRequeueWithError(err, rctx.Log, "")
 	}
 
+	supported, err := intctrlutil.APIVersionPredicate(compVersion)
+	if err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, rctx.Log, "API version predicate failed")
+	}
+	if !supported {
+		return intctrlutil.Reconciled()
+	}
+
 	return r.reconcile(rctx, compVersion)
 }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ComponentVersionReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return intctrlutil.NewControllerManagedBy(mgr, &appsv1.ComponentVersion{}, &appsv1.ComponentDefinition{}).
+	return intctrlutil.NewControllerManagedBy(mgr).
 		For(&appsv1.ComponentVersion{}).
 		Watches(&appsv1.ComponentDefinition{}, handler.EnqueueRequestsFromMapFunc(r.compatibleCompVersion)).
 		Complete(r)

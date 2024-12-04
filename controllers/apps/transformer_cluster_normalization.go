@@ -69,6 +69,10 @@ func (t *clusterNormalizationTransformer) Transform(ctx graph.TransformContext, 
 		return err
 	}
 
+	if err = t.checkNPatchCRDAPIVersionKey(transCtx); err != nil {
+		return err
+	}
+
 	// build component specs for shardings after resolving definitions
 	transCtx.shardingComps, err = t.buildShardingComps(transCtx)
 	if err != nil {
@@ -82,7 +86,7 @@ func (t *clusterNormalizationTransformer) Transform(ctx graph.TransformContext, 
 	// write-back the resolved definitions and service versions to cluster spec.
 	t.writeBackCompNShardingSpecs(transCtx)
 
-	return t.patchCRDAPIVersionKey(transCtx)
+	return nil
 }
 
 func (t *clusterNormalizationTransformer) resolveCompsNShardings(transCtx *clusterTransformContext) ([]*appsv1.ClusterComponentSpec, []*appsv1.ClusterSharding, error) {
@@ -411,7 +415,7 @@ func (t *clusterNormalizationTransformer) writeBackCompNShardingSpecs(transCtx *
 	}
 }
 
-func (t *clusterNormalizationTransformer) patchCRDAPIVersionKey(transCtx *clusterTransformContext) error {
+func (t *clusterNormalizationTransformer) checkNPatchCRDAPIVersionKey(transCtx *clusterTransformContext) error {
 	apiVersions := map[string][]string{}
 
 	from := func(name string, annotations map[string]string) {
@@ -443,7 +447,11 @@ func (t *clusterNormalizationTransformer) patchCRDAPIVersionKey(transCtx *cluste
 		transCtx.Cluster.Annotations[constant.CRDAPIVersionAnnotationKey] = apiVersion
 	}
 
-	if controllerutil.IsSupportedCRDAPIVersion(apiVersion) {
+	supported, err := controllerutil.IsSupportedAPIVersion(apiVersion)
+	if err != nil {
+		return err
+	}
+	if supported {
 		return nil
 	}
 	return graph.ErrPrematureStop // un-supported CRD API version, stop the transformation

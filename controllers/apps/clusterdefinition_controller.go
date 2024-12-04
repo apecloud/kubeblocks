@@ -68,6 +68,14 @@ func (r *ClusterDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
+	supported, err := intctrlutil.APIVersionPredicate(clusterDef)
+	if err != nil {
+		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "API version predicate failed")
+	}
+	if !supported {
+		return intctrlutil.Reconciled()
+	}
+
 	if res, err := intctrlutil.HandleCRDeletion(reqCtx, r, clusterDef,
 		clusterDefinitionFinalizerName, r.deletionHandler(reqCtx, clusterDef)); res != nil {
 		return *res, err
@@ -96,7 +104,7 @@ func (r *ClusterDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ClusterDefinitionReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return intctrlutil.NewControllerManagedBy(mgr, &appsv1.ClusterDefinition{}).
+	return intctrlutil.NewControllerManagedBy(mgr).
 		For(&appsv1.ClusterDefinition{}).
 		Complete(r)
 }

@@ -21,6 +21,7 @@ package controllerutil
 
 import (
 	"reflect"
+	"regexp"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -95,8 +96,8 @@ var (
 	// TODO:
 	//    EventReconciler.Event
 
-	managedNamespaces       *sets.Set[string]
-	supportedCRDAPIVersions = sets.New[string](
+	managedNamespaces    *sets.Set[string]
+	supportedAPIVersions = sets.New[string](
 		// ClusterDefinition, ComponentDefinition, ComponentVersion, Cluster, Component
 		appsv1.GroupVersion.String(),
 		// InstanceSet
@@ -104,16 +105,35 @@ var (
 	)
 )
 
-func IsSupportedCRDAPIVersion(apiVersion string) bool {
-	return supportedCRDAPIVersions.Has(apiVersion)
+func IsSupportedAPIVersion(apiVersion string) (bool, error) {
+	supported := viper.GetString(constant.APIVersionSupported)
+	if len(supported) > 0 {
+		exp, err := regexp.Compile(supported)
+		if err != nil {
+			return false, err
+		}
+		return exp.MatchString(apiVersion), nil
+	}
+	return supportedAPIVersions.Has(apiVersion), nil
 }
 
-func NewControllerManagedBy(mgr manager.Manager, objs ...client.Object) *builder.Builder {
+func APIVersionPredicate(obj client.Object) (bool, error) {
+	supported, err := IsSupportedAPIVersion(obj.GetAnnotations()[constant.CRDAPIVersionAnnotationKey])
+	if err != nil {
+		return false, err
+	}
+	if supported {
+		return true, nil
+	}
+	if reflect.TypeOf(obj) == reflect.TypeOf(&appsv1.Cluster{}) {
+		return true, nil // to resolve the CRD API version of the cluster
+	}
+	return false, nil
+}
+
+func NewControllerManagedBy(mgr manager.Manager) *builder.Builder {
 	b := ctrl.NewControllerManagedBy(mgr).
 		WithEventFilter(predicate.NewPredicateFuncs(namespacePredicateFilter))
-	if len(objs) > 0 {
-		b.WithEventFilter(predicate.NewPredicateFuncs(newAPIVersionPredicateFilter(objs)))
-	}
 	return b
 }
 
@@ -130,25 +150,4 @@ func namespacePredicateFilter(object client.Object) bool {
 		return true
 	}
 	return managedNamespaces.Has(object.GetNamespace())
-}
-
-func newAPIVersionPredicateFilter(objs []client.Object) func(client.Object) bool {
-	return func(obj client.Object) bool {
-		annotations := obj.GetAnnotations()
-		if annotations != nil {
-			apiVersion, ok := annotations[constant.CRDAPIVersionAnnotationKey]
-			if ok {
-				return IsSupportedCRDAPIVersion(apiVersion)
-			}
-		}
-		if reflect.TypeOf(obj) == reflect.TypeOf(&appsv1.Cluster{}) {
-			return true // to resolve the CRD API version of the cluster
-		}
-		for _, wobj := range objs {
-			if reflect.TypeOf(obj) == reflect.TypeOf(wobj) {
-				return false // watched objects, but has no CRD API version, it may be the old version
-			}
-		}
-		return true
-	}
 }

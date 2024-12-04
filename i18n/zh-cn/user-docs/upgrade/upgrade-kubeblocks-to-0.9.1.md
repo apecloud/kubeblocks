@@ -148,11 +148,11 @@ KubeBlocks v0.9.1 可以兼容 KubeBlocks v0.8 的 API，但不保证兼容 v0.8
 
 4. 升级 KubeBlocks。
 
-    如果您当前运行的 KubeBlocks 使用的镜像仓库为 `infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com`，升级时请显式设置镜像仓库。具体可参考 [FAQ](./faq.md#升级时如何指定镜像仓库)
+    请关注以下选项：
 
-    设置 `admissionWebhooks.enabled=true` 将启动 webhook，用于 ConfigConstraint API 多版本转换。
-
-    设置 `admissionWebhooks.ignoreReplicasCheck=true` 默认只有在 3 副本部署 KubeBlocks 时才可开启 webhook。若只部署单副本 KubeBlocks，可配置该变量跳过检查。
+    - 设置 `admissionWebhooks.enabled=true` 将启动 webhook，用于 ConfigConstraint API 多版本转换。
+    - 设置 `admissionWebhooks.ignoreReplicasCheck=true` 默认只有在 3 副本部署 KubeBlocks 时才可开启 webhook。若只部署单副本 KubeBlocks，可配置该变量跳过检查。
+    - 如果您当前运行的 KubeBlocks 使用的镜像仓库为 `infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com`，升级时请显式设置镜像仓库。具体可参考 [FAQ](./faq.md#升级时如何指定镜像仓库)
 
     ```bash
     helm repo add kubeblocks https://apecloud.github.io/helm-charts
@@ -195,7 +195,11 @@ KubeBlocks v0.9.1 可以兼容 KubeBlocks v0.8 的 API，但不保证兼容 v0.8
     kbcli version
     ```
 
-    如果您当前运行的 KubeBlocks 使用的镜像仓库为 `infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com`，升级时请显式设置镜像仓库。具体操作可参考 [FAQ](./faq.md#升级时如何指定镜像仓库)。
+    请关注以下选项：
+
+    - 设置 `admissionWebhooks.enabled=true` 将启动 webhook，用于 ConfigConstraint API 多版本转换。
+    - 设置 `admissionWebhooks.ignoreReplicasCheck=true` 默认只有在 3 副本部署 KubeBlocks 时才可开启 webhook。若只部署单副本 KubeBlocks，可配置该变量跳过检查。
+    - 如果您当前运行的 KubeBlocks 使用的镜像仓库为 `infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com`，升级时请显式设置镜像仓库。具体可参考 [FAQ](./faq.md#升级时如何指定镜像仓库)。
 
     ```bash
     kbcli kb upgrade --version 0.9.1 \

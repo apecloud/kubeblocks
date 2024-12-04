@@ -68,7 +68,7 @@ kubectl delete -n kb-system deployments.apps kubeblocks kubeblocks-dataprotectio
 
 ## 升级时如何指定镜像仓库
 
-从 v0.9.0 开始，KubeBlocks 使用的镜像仓库中，有一个仓库发生了变化。该镜像仓库前缀从 `infracreate-registry` 更新为 `apecloud-registry`。其他镜像仓库不受影响。建议安装 KubeBlocks v0.8.0 及之前版本的用户检查当前的镜像仓库配置，并在升级时根据需要指定新的镜像仓库地址。
+从 v0.9.0 开始，KubeBlocks 使用的镜像仓库中，有一个仓库地址发生了变化，该仓库的前缀从 `infracreate-registry` 更新为 `apecloud-registry`。其他镜像仓库不受影响。建议安装了 KubeBlocks v0.8.0 及之前版本的用户在升级到 v0.9.x 之前，先检查当前的镜像仓库配置，并在升级时指定新的镜像仓库地址。
 
 1. 检查 KubeBlocks 使用的镜像仓库。
 

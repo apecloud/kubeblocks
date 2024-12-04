@@ -112,47 +112,18 @@ func (r *RequestCtx) WithValue(key, val any) context.Context {
 	return context.WithValue(r.Ctx, key, val)
 }
 
-func IsNil(i interface{}) bool {
-	if i == nil {
-		return true
-	}
-	switch reflect.TypeOf(i).Kind() {
-	case reflect.Ptr, reflect.Map, reflect.Array, reflect.Chan, reflect.Slice:
-		return reflect.ValueOf(i).IsNil()
-	}
-	return false
-}
-
 // MergeMetadataMapInplace merges two map[string]string, the targetMap will be updated.
 func MergeMetadataMapInplace(originalMap map[string]string, targetMap *map[string]string) {
-	if targetMap == nil || originalMap == nil {
+	if originalMap == nil {
 		return
 	}
 	if *targetMap == nil {
 		*targetMap = map[string]string{}
 	}
 	for k, v := range originalMap {
-		// if the annotation not exist in targetAnnotations, copy it from original.
-		if _, ok := (*targetMap)[k]; !ok {
-			(*targetMap)[k] = v
-		}
+		// add or override the target map with values from the original map
+		(*targetMap)[k] = v
 	}
-}
-
-// MergeMetadataMaps merges targetMaps into originalMap if item not exist in originalMap and return the merged map.
-func MergeMetadataMaps(originalMap map[string]string, targetMaps ...map[string]string) map[string]string {
-	mergeMap := map[string]string{}
-	for k, v := range originalMap {
-		mergeMap[k] = v
-	}
-	for _, targetMap := range targetMaps {
-		for k, v := range targetMap {
-			if _, ok := mergeMap[k]; !ok {
-				mergeMap[k] = v
-			}
-		}
-	}
-	return mergeMap
 }
 
 func SetOwnerReference(owner, object metav1.Object) error {

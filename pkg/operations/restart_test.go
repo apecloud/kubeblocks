@@ -30,7 +30,6 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
@@ -100,13 +99,12 @@ var _ = Describe("Restart OpsRequest", func() {
 			Expect(err).ShouldNot(HaveOccurred())
 		})
 
-		ExpectCompRestarted := func(opsRequest *opsv1alpha1.OpsRequest, compName string, expectRestarted bool) {
-			instanceSetName := constant.GenerateWorkloadNamePattern(clusterName, compName)
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKey{Name: instanceSetName, Namespace: testCtx.DefaultNamespace},
-				func(g Gomega, pobj *workloads.InstanceSet) {
+		ExpectCompRestarted := func(opsRes *OpsResource, compName string, expectRestarted bool) {
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKey{Name: opsRes.Cluster.Name, Namespace: testCtx.DefaultNamespace},
+				func(g Gomega, pobj *appsv1.Cluster) {
 					startTimestamp := opsRes.OpsRequest.Status.StartTimestamp
-					workloadRestartTimeStamp := pobj.Spec.Template.Annotations[constant.RestartAnnotationKey]
-					res, _ := time.Parse(time.RFC3339, workloadRestartTimeStamp)
+					compRestartTimeStamp := pobj.Spec.GetComponentByName(compName).Annotations[constant.RestartAnnotationKey]
+					res, _ := time.Parse(time.RFC3339, compRestartTimeStamp)
 					g.Expect(!startTimestamp.After(res)).Should(Equal(expectRestarted))
 				})).Should(Succeed())
 		}
@@ -129,16 +127,16 @@ var _ = Describe("Restart OpsRequest", func() {
 			By("test restart Action")
 			rHandler := restartOpsHandler{}
 			_ = rHandler.Action(reqCtx, k8sClient, opsRes)
-			ExpectCompRestarted(opsRes.OpsRequest, defaultCompName, false)
-			ExpectCompRestarted(opsRes.OpsRequest, secondaryCompName, false)
-			ExpectCompRestarted(opsRes.OpsRequest, thirdCompName, false)
+			ExpectCompRestarted(opsRes, defaultCompName, false)
+			ExpectCompRestarted(opsRes, secondaryCompName, false)
+			ExpectCompRestarted(opsRes, thirdCompName, false)
 
 			By("test reconcile Action")
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
-			ExpectCompRestarted(opsRes.OpsRequest, defaultCompName, true)
-			ExpectCompRestarted(opsRes.OpsRequest, secondaryCompName, false)
-			ExpectCompRestarted(opsRes.OpsRequest, thirdCompName, false)
+			ExpectCompRestarted(opsRes, defaultCompName, true)
+			ExpectCompRestarted(opsRes, secondaryCompName, false)
+			ExpectCompRestarted(opsRes, thirdCompName, false)
 
 			By("mock restart secondary component completed")
 			setCompProgress := func(compName string, status opsv1alpha1.ProgressStatus) {
@@ -157,9 +155,9 @@ var _ = Describe("Restart OpsRequest", func() {
 			By("test reconcile Action and expect to restart third component")
 			_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err == nil).Should(BeTrue())
-			ExpectCompRestarted(opsRes.OpsRequest, defaultCompName, true)
-			ExpectCompRestarted(opsRes.OpsRequest, secondaryCompName, true)
-			ExpectCompRestarted(opsRes.OpsRequest, thirdCompName, false)
+			ExpectCompRestarted(opsRes, defaultCompName, true)
+			ExpectCompRestarted(opsRes, secondaryCompName, true)
+			ExpectCompRestarted(opsRes, thirdCompName, false)
 		})
 
 		It("expect failed when cluster is stopped", func() {

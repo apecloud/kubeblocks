@@ -216,14 +216,14 @@ var _ = BeforeSuite(func() {
 
 	clusterRecorder = k8sManager.GetEventRecorderFor("cluster-controller")
 	err = (&ClusterReconciler{
-		Client:   k8sManager.GetClient(),
+		Client:   k8sClient,
 		Scheme:   k8sManager.GetScheme(),
 		Recorder: clusterRecorder,
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
 	err = (&ComponentReconciler{
-		Client:   k8sManager.GetClient(),
+		Client:   k8sClient,
 		Scheme:   k8sManager.GetScheme(),
 		Recorder: k8sManager.GetEventRecorderFor("component-controller"),
 	}).SetupWithManager(k8sManager, nil)

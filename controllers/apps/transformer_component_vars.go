@@ -38,6 +38,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 // componentVarsTransformer resolves and builds vars for template and Env.
@@ -174,25 +175,34 @@ func createOrUpdateEnvConfigMap(ctx graph.TransformContext, dag *graph.DAG,
 		return mergeWith(nil)
 	}()
 
+	newObj := builder.NewConfigMapBuilder(envKey.Namespace, envKey.Name).
+		// Priority: dynamic < static < built-in
+		AddLabelsInMap(synthesizedComp.DynamicLabels).
+		AddLabelsInMap(synthesizedComp.StaticLabels).
+		AddLabelsInMap(constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name)).
+		AddAnnotationsInMap(synthesizedComp.DynamicAnnotations).
+		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
+		SetData(newData).
+		GetObject()
 	if envObj == nil {
-		obj := builder.NewConfigMapBuilder(envKey.Namespace, envKey.Name).
-			AddLabelsInMap(constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name)).
-			AddLabelsInMap(synthesizedComp.StaticLabels).
-			AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
-			SetData(newData).
-			GetObject()
-		if err := setCompOwnershipNFinalizer(transCtx.Component, obj); err != nil {
+		if err := setCompOwnershipNFinalizer(transCtx.Component, newObj); err != nil {
 			return err
 		}
-		graphCli.Create(dag, obj, inDataContext4G())
+		graphCli.Create(dag, newObj, inDataContext4G())
 		return nil
 	}
 
-	if !reflect.DeepEqual(envObj.Data, newData) {
+	envObjCopy := envObj.DeepCopy()
+	intctrlutil.MergeMetadataMapInplace(newObj.Labels, &envObjCopy.Labels)
+	intctrlutil.MergeMetadataMapInplace(newObj.Annotations, &envObjCopy.Annotations)
+	if !reflect.DeepEqual(envObjCopy.Data, newData) ||
+		!reflect.DeepEqual(envObjCopy.Labels, envObj.Labels) ||
+		!reflect.DeepEqual(envObjCopy.Annotations, envObj.Annotations) {
 		if envObjVertex != nil {
 			envObj.Data = newData // in-place update
+			envObj.Labels = envObjCopy.Labels
+			envObj.Annotations = envObjCopy.Annotations
 		} else {
-			envObjCopy := envObj.DeepCopy()
 			envObjCopy.Data = newData
 			graphCli.Update(dag, envObj, envObjCopy, inDataContext4G())
 		}

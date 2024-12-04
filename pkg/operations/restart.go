@@ -29,9 +29,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -149,28 +147,41 @@ func (r restartOpsHandler) getComponentOrders(reqCtx intctrlutil.RequestCtx, cli
 }
 
 func (r restartOpsHandler) restartComponents(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource, comOpsList []opsv1alpha1.ComponentOps, inOrder bool) error {
+	doRestart := func(compSpec *appsv1.ClusterComponentSpec, currCompName, targetCompName string) (bool, error) {
+		if compSpec.Name != currCompName {
+			return false, nil
+		}
+		if r.isRestarted(opsRes, compSpec) {
+			return false, nil
+		}
+		if err := cli.Update(reqCtx.Ctx, opsRes.Cluster); err != nil {
+			return false, err
+		}
+		return true, nil
+	}
+
+	restartComponent := func(targetCompName string) error {
+		for i := range opsRes.Cluster.Spec.ComponentSpecs {
+			componentSpec := &opsRes.Cluster.Spec.ComponentSpecs[i]
+			if ok, err := doRestart(componentSpec, componentSpec.Name, targetCompName); ok || err != nil {
+				return err
+			}
+		}
+		for i := range opsRes.Cluster.Spec.Shardings {
+			shardingSpec := &opsRes.Cluster.Spec.Shardings[i]
+			if ok, err := doRestart(&shardingSpec.Template, shardingSpec.Name, targetCompName); ok || err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
 	for index, compOps := range comOpsList {
 		if !r.matchToRestart(opsRes, comOpsList, index, inOrder) {
 			continue
 		}
-		compNameLabelKey := component.GetComponentNameLabelKey(opsRes.Cluster, compOps.ComponentName)
-		matchingLabels := client.MatchingLabels{constant.AppInstanceLabelKey: opsRes.Cluster.Name, compNameLabelKey: compOps.ComponentName}
-		instanceSetList := &workloads.InstanceSetList{}
-		if err := cli.List(reqCtx.Ctx, instanceSetList,
-			client.InNamespace(opsRes.Cluster.Namespace), matchingLabels); err != nil {
+		if err := restartComponent(compOps.GetComponentName()); err != nil {
 			return err
-		}
-		if len(instanceSetList.Items) == 0 {
-			return fmt.Errorf(`the instanceSet workloads are not exists for the component "%s"`, compOps.ComponentName)
-		}
-		for i := range instanceSetList.Items {
-			instanceSet := &instanceSetList.Items[i]
-			if r.isRestarted(opsRes, instanceSet, &instanceSet.Spec.Template) {
-				continue
-			}
-			if err := cli.Update(reqCtx.Ctx, instanceSet); err != nil {
-				return err
-			}
 		}
 		if inOrder {
 			// if a component has been restarted in order, break
@@ -220,19 +231,15 @@ func (r restartOpsHandler) getCompReplicas(cluster *appsv1.Cluster, compName str
 }
 
 // isRestarted checks whether the component has been restarted
-func (r restartOpsHandler) isRestarted(opsRes *OpsResource, object client.Object, podTemplate *corev1.PodTemplateSpec) bool {
-	compName := component.GetComponentNameFromObj(object)
-	if _, ok := r.compOpsHelper.componentOpsSet[compName]; !ok {
-		return true
-	}
-	if podTemplate.Annotations == nil {
-		podTemplate.Annotations = map[string]string{}
+func (r restartOpsHandler) isRestarted(opsRes *OpsResource, compSpec *appsv1.ClusterComponentSpec) bool {
+	if compSpec.Annotations == nil {
+		compSpec.Annotations = map[string]string{}
 	}
 	hasRestarted := true
 	startTimestamp := opsRes.OpsRequest.Status.StartTimestamp
-	workloadRestartTimeStamp := podTemplate.Annotations[constant.RestartAnnotationKey]
+	workloadRestartTimeStamp := compSpec.Annotations[constant.RestartAnnotationKey]
 	if res, _ := time.Parse(time.RFC3339, workloadRestartTimeStamp); startTimestamp.After(res) {
-		podTemplate.Annotations[constant.RestartAnnotationKey] = startTimestamp.Format(time.RFC3339)
+		compSpec.Annotations[constant.RestartAnnotationKey] = startTimestamp.Format(time.RFC3339)
 		hasRestarted = false
 	}
 	return hasRestarted

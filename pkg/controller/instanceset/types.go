@@ -29,18 +29,6 @@ const (
 	LegacyRSMFinalizerName = "rsm.workloads.kubeblocks.io/finalizer"
 
 	roleProbeContainerName       = "kb-role-probe"
-	roleProbeBinaryName          = "lorry"
-	roleAgentVolumeName          = "role-agent"
-	roleAgentInstallerName       = "role-agent-installer"
-	roleAgentVolumeMountPath     = "/role-probe"
-	roleAgentName                = "agent"
-	defaultRoleProbeDaemonPort   = 7373
-	defaultRoleProbeGRPCPort     = 50101
-	roleProbeDaemonPortName      = "probe-port"
-	roleProbeGRPCPortName        = "probe-grpc-port"
-	grpcHealthProbeBinaryPath    = "/bin/grpc_health_probe"
-	grpcHealthProbeArgsFormat    = "-addr=:%d"
-	defaultActionImage           = "busybox:1.35"
 	usernameCredentialVarName    = "KB_RSM_USERNAME"
 	passwordCredentialVarName    = "KB_RSM_PASSWORD"
 	servicePortVarName           = "KB_RSM_SERVICE_PORT"
@@ -48,10 +36,6 @@ const (
 	RoleUpdateMechanismVarName   = "KB_RSM_ROLE_UPDATE_MECHANISM"
 	roleProbeTimeoutVarName      = "KB_RSM_ROLE_PROBE_TIMEOUT"
 	readinessProbeEventFieldPath = "spec.containers{" + roleProbeContainerName + "}"
-
-	actionSvcPortBase = int32(
-		36500,
-	)
 )
 
 const (

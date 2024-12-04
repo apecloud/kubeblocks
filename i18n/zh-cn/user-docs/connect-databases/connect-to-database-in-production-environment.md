@@ -207,7 +207,6 @@ spec:
   preConditionDeadlineSeconds: 0
   type: Expose
 ```
-```
 
 </TabItem>
 

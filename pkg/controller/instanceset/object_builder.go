@@ -64,7 +64,6 @@ func getHeadlessSvcName(itsName string) string {
 
 func BuildPodTemplate(its *workloads.InstanceSet) *corev1.PodTemplateSpec {
 	template := its.Spec.Template.DeepCopy()
-	// injectRoleProbeContainer(its, template)
 
 	return template
 }

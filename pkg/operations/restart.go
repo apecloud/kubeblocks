@@ -148,7 +148,7 @@ func (r restartOpsHandler) getComponentOrders(reqCtx intctrlutil.RequestCtx, cli
 
 func (r restartOpsHandler) restartComponents(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource, comOpsList []opsv1alpha1.ComponentOps, inOrder bool) error {
 	doRestart := func(compSpec *appsv1.ClusterComponentSpec, currCompName, targetCompName string) (bool, error) {
-		if compSpec.Name != currCompName {
+		if targetCompName != currCompName {
 			return false, nil
 		}
 		if r.isRestarted(opsRes, compSpec) {

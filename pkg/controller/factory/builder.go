@@ -74,7 +74,7 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, component
 			constant.AppComponentLabelKey:   compDefName,
 			constant.KBAppServiceVersionKey: synthesizedComp.ServiceVersion,
 		}).
-		AddLabelsInMap(synthesizedComp.DynamicAnnotations).
+		AddAnnotationsInMap(synthesizedComp.DynamicAnnotations).
 		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
 		AddAnnotationsInMap(getMonitorAnnotations(synthesizedComp, componentDef)).
 		SetTemplate(template).

@@ -2104,7 +2104,7 @@ var _ = Describe("Component Controller", func() {
 			viper.Set(constant.CfgRegistries, intctrlutil.RegistriesConfig{
 				DefaultRegistry: registry,
 			})
-			intctrlutil.ReloadRegistryConfig()
+			Expect(intctrlutil.ReloadRegistryConfig()).Should(Succeed())
 		}
 
 		BeforeEach(func() {
@@ -2113,7 +2113,7 @@ var _ = Describe("Component Controller", func() {
 
 		AfterEach(func() {
 			viper.Set(constant.CfgRegistries, nil)
-			intctrlutil.ReloadRegistryConfig()
+			Expect(intctrlutil.ReloadRegistryConfig()).Should(Succeed())
 		})
 
 		It("replaces image registry", func() {

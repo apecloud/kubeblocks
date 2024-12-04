@@ -23,6 +23,7 @@ import (
 	//  Import these crypto algorithm so that the image parser can work with digest
 	_ "crypto/sha256"
 	_ "crypto/sha512"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -75,21 +76,21 @@ func GetRegistriesConfig() *RegistriesConfig {
 	return registriesConfig
 }
 
-func ReloadRegistryConfig() {
+func ReloadRegistryConfig() error {
 	registriesConfigMutex.Lock()
 	registriesConfig = &RegistriesConfig{}
 	if err := viper.UnmarshalKey(constant.CfgRegistries, &registriesConfig); err != nil {
-		panic(err)
+		return err
 	}
 	registriesConfigMutex.Unlock()
 
 	for _, registry := range registriesConfig.RegistryConfig {
 		if len(registry.From) == 0 {
-			panic("from can't be empty")
+			return errors.New("registries config invalid: from can't be empty")
 		}
 
 		if len(registry.To) == 0 {
-			panic("to can't be empty")
+			return errors.New("registries config invalid: to can't be empty")
 		}
 	}
 
@@ -98,6 +99,7 @@ func ReloadRegistryConfig() {
 	viper.Set(constant.KBToolsImage, ReplaceImageRegistry(viper.GetString(constant.KBToolsImage)))
 
 	imageLogger.Info("registriesConfig reloaded", "registriesConfig", registriesConfig)
+	return nil
 }
 
 // For a detailed explanation of an image's format, see:

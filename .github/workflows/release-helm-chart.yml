@@ -52,7 +52,7 @@ jobs:
     uses: apecloud/apecloud-cd/.github/workflows/release-charts.yml@v0.1.68
     with:
       GITHUB_REPO: "apecloud/kubeblocks-addons"
-      GITHUB_REF: ${{ github.ref }}
+      GITHUB_REF: "${{ github.ref_name }}"
       CHART_DIR: "addons"
       APECD_REF: "v0.1.68"
       ENABLE_JIHU: false
@@ -139,7 +139,7 @@ jobs:
         with:
           repository: apecloud/kubeblocks-addons
           path: kubeblocks-addons
-          ref: ${{ github.ref }}
+          ref: "${{ github.ref_name }}"
       - name: get addons chart dir
         id: get_addons_chart_dir
         run: |
@@ -163,7 +163,7 @@ jobs:
     uses: apecloud/apecloud-cd/.github/workflows/release-charts-jihu.yml@v0.1.52
     with:
       GITHUB_REPO: "apecloud/kubeblocks-addons"
-      GITHUB_REF: ${{ github.ref }}
+      GITHUB_REF: "${{ github.ref_name }}"
       CHART_DIR: "addons"
       SPECIFY_CHART: "${{ matrix.addon-name }}"
       APECD_REF: "v0.1.52"
@@ -174,7 +174,7 @@ jobs:
     uses: apecloud/apecloud-cd/.github/workflows/release-charts-enterprise.yml@v0.1.53
     with:
       GITHUB_REPO: "apecloud/apecloud-addons"
-      GITHUB_REF: ${{ github.ref }}
+      GITHUB_REF: "${{ github.ref_name }}"
       CHART_DIR: "addons"
       APECD_REF: "v0.1.53"
       ENABLE_JIHU: false
@@ -190,7 +190,7 @@ jobs:
         with:
           repository: apecloud/apecloud-addons
           path: apecloud-addons
-          ref: ${{ github.ref }}
+          ref: "${{ github.ref_name }}"
           token: ${{ env.GITHUB_TOKEN }}
 
       - name: get addons chart dir
@@ -216,7 +216,7 @@ jobs:
     uses: apecloud/apecloud-cd/.github/workflows/release-charts-jihu-enterprise.yml@v0.1.53
     with:
       GITHUB_REPO: "apecloud/apecloud-addons"
-      GITHUB_REF: ${{ github.ref }}
+      GITHUB_REF: "${{ github.ref_name }}"
       CHART_DIR: "addons"
       SPECIFY_CHART: "${{ matrix.addon-name }}"
       APECD_REF: "v0.1.53"

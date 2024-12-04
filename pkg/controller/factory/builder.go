@@ -51,12 +51,12 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, component
 	)
 
 	podBuilder := builder.NewPodBuilder("", "").
-		// Priority: dynamic < static < built-in
-		AddLabelsInMap(synthesizedComp.DynamicLabels).
+		// Priority: static < dynamic < built-in
 		AddLabelsInMap(synthesizedComp.StaticLabels).
+		AddLabelsInMap(synthesizedComp.DynamicLabels).
 		AddLabelsInMap(constant.GetCompLabels(clusterName, compName, synthesizedComp.Labels)).
-		AddAnnotationsInMap(synthesizedComp.DynamicAnnotations).
-		AddAnnotationsInMap(synthesizedComp.StaticAnnotations)
+		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
+		AddAnnotationsInMap(synthesizedComp.DynamicAnnotations)
 	template := corev1.PodTemplateSpec{
 		ObjectMeta: podBuilder.GetObject().ObjectMeta,
 		Spec:       *synthesizedComp.PodSpec.DeepCopy(),
@@ -64,9 +64,9 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, component
 
 	itsName := constant.GenerateWorkloadNamePattern(clusterName, compName)
 	itsBuilder := builder.NewInstanceSetBuilder(namespace, itsName).
-		// Priority: dynamic < static < built-in
-		AddLabelsInMap(synthesizedComp.DynamicLabels).
+		// Priority: static < dynamic < built-in
 		AddLabelsInMap(synthesizedComp.StaticLabels).
+		AddLabelsInMap(synthesizedComp.DynamicLabels).
 		AddLabelsInMap(constant.GetCompLabels(clusterName, compName)).
 		AddAnnotations(constant.KubeBlocksGenerationKey, synthesizedComp.Generation).
 		AddAnnotations(constant.CRDAPIVersionAnnotationKey, workloads.GroupVersion.String()).
@@ -74,8 +74,8 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, component
 			constant.AppComponentLabelKey:   compDefName,
 			constant.KBAppServiceVersionKey: synthesizedComp.ServiceVersion,
 		}).
-		AddAnnotationsInMap(synthesizedComp.DynamicAnnotations).
 		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
+		AddAnnotationsInMap(synthesizedComp.DynamicAnnotations).
 		AddAnnotationsInMap(getMonitorAnnotations(synthesizedComp, componentDef)).
 		SetTemplate(template).
 		AddMatchLabelsInMap(constant.GetCompLabels(clusterName, compName)).
@@ -84,11 +84,11 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, component
 
 	var vcts []corev1.PersistentVolumeClaim
 	for _, vct := range synthesizedComp.VolumeClaimTemplates {
-		// Priority: dynamic < static < built-in
-		intctrlutil.MergeMetadataMapInplace(synthesizedComp.DynamicLabels, &vct.ObjectMeta.Labels)
-		intctrlutil.MergeMetadataMapInplace(synthesizedComp.DynamicAnnotations, &vct.ObjectMeta.Annotations)
+		// Priority: static < dynamic < built-in
 		intctrlutil.MergeMetadataMapInplace(synthesizedComp.StaticLabels, &vct.ObjectMeta.Labels)
 		intctrlutil.MergeMetadataMapInplace(synthesizedComp.StaticAnnotations, &vct.ObjectMeta.Annotations)
+		intctrlutil.MergeMetadataMapInplace(synthesizedComp.DynamicLabels, &vct.ObjectMeta.Labels)
+		intctrlutil.MergeMetadataMapInplace(synthesizedComp.DynamicAnnotations, &vct.ObjectMeta.Annotations)
 		vcts = append(vcts, vctToPVC(vct))
 	}
 	itsBuilder.SetVolumeClaimTemplates(vcts...)
@@ -325,24 +325,24 @@ func setToolsScriptsPath(container *corev1.Container, meta cfgcm.ConfigSpecMeta)
 
 func BuildServiceAccount(synthesizedComp *component.SynthesizedComponent, saName string) *corev1.ServiceAccount {
 	return builder.NewServiceAccountBuilder(synthesizedComp.Namespace, saName).
-		// Priority: dynamic < static < built-in
-		AddLabelsInMap(synthesizedComp.DynamicLabels).
+		// Priority: static < dynamic < built-in
 		AddLabelsInMap(synthesizedComp.StaticLabels).
+		AddLabelsInMap(synthesizedComp.DynamicLabels).
 		AddLabelsInMap(constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name)).
-		AddAnnotationsInMap(synthesizedComp.DynamicAnnotations).
 		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
+		AddAnnotationsInMap(synthesizedComp.DynamicAnnotations).
 		SetImagePullSecrets(intctrlutil.BuildImagePullSecrets()).
 		GetObject()
 }
 
 func BuildRoleBinding(synthesizedComp *component.SynthesizedComponent, saName string) *rbacv1.RoleBinding {
 	return builder.NewRoleBindingBuilder(synthesizedComp.Namespace, saName).
-		// Priority: dynamic < static < built-in
-		AddLabelsInMap(synthesizedComp.DynamicLabels).
+		// Priority: static < dynamic < built-in
 		AddLabelsInMap(synthesizedComp.StaticLabels).
+		AddLabelsInMap(synthesizedComp.DynamicLabels).
 		AddLabelsInMap(constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name)).
-		AddAnnotationsInMap(synthesizedComp.DynamicAnnotations).
 		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
+		AddAnnotationsInMap(synthesizedComp.DynamicAnnotations).
 		SetRoleRef(rbacv1.RoleRef{
 			APIGroup: rbacv1.GroupName,
 			Kind:     "ClusterRole",

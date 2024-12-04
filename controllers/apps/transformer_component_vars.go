@@ -176,12 +176,12 @@ func createOrUpdateEnvConfigMap(ctx graph.TransformContext, dag *graph.DAG,
 	}()
 
 	newObj := builder.NewConfigMapBuilder(envKey.Namespace, envKey.Name).
-		// Priority: dynamic < static < built-in
-		AddLabelsInMap(synthesizedComp.DynamicLabels).
+		// Priority: static < dynamic < built-in
 		AddLabelsInMap(synthesizedComp.StaticLabels).
+		AddLabelsInMap(synthesizedComp.DynamicLabels).
 		AddLabelsInMap(constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name)).
-		AddAnnotationsInMap(synthesizedComp.DynamicAnnotations).
 		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
+		AddAnnotationsInMap(synthesizedComp.DynamicAnnotations).
 		SetData(newData).
 		GetObject()
 	if envObj == nil {

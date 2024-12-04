@@ -163,12 +163,12 @@ func (t *componentAccountTransformer) buildAccountSecretWithPassword(ctx *compon
 	synthesizeComp *component.SynthesizedComponent, account appsv1.SystemAccount, password []byte) (*corev1.Secret, error) {
 	secretName := constant.GenerateAccountSecretName(synthesizeComp.ClusterName, synthesizeComp.Name, account.Name)
 	secret := builder.NewSecretBuilder(synthesizeComp.Namespace, secretName).
-		// Priority: dynamic < static < built-in
-		AddLabelsInMap(synthesizeComp.DynamicLabels).
+		// Priority: static < dynamic < built-in
 		AddLabelsInMap(synthesizeComp.StaticLabels).
+		AddLabelsInMap(synthesizeComp.DynamicLabels).
 		AddLabelsInMap(constant.GetCompLabels(synthesizeComp.ClusterName, synthesizeComp.Name)).
-		AddAnnotationsInMap(synthesizeComp.DynamicAnnotations).
 		AddAnnotationsInMap(synthesizeComp.StaticAnnotations).
+		AddAnnotationsInMap(synthesizeComp.DynamicAnnotations).
 		PutData(constant.AccountNameForSecret, []byte(account.Name)).
 		PutData(constant.AccountPasswdForSecret, password).
 		SetImmutable(true).

@@ -202,12 +202,12 @@ func (t *componentServiceTransformer) buildService(comp *appsv1.Component,
 
 	serviceFullName := constant.GenerateComponentServiceName(synthesizeComp.ClusterName, synthesizeComp.Name, service.ServiceName)
 	builder := builder.NewServiceBuilder(namespace, serviceFullName).
-		// Priority: dynamic < static < built-in
-		AddLabelsInMap(synthesizeComp.DynamicLabels).
+		// Priority: static < dynamic < built-in
 		AddLabelsInMap(synthesizeComp.StaticLabels).
+		AddLabelsInMap(synthesizeComp.DynamicLabels).
 		AddLabelsInMap(constant.GetCompLabels(clusterName, compName)).
-		AddAnnotationsInMap(synthesizeComp.DynamicAnnotations).
 		AddAnnotationsInMap(synthesizeComp.StaticAnnotations).
+		AddAnnotationsInMap(synthesizeComp.DynamicAnnotations).
 		AddAnnotationsInMap(service.Annotations).
 		SetSpec(&service.Spec).
 		AddSelectorsInMap(t.builtinSelector(comp)).

@@ -35,6 +35,7 @@ import (
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 )
 
@@ -127,6 +128,15 @@ var StorageProviderSignature = func(_ dpv1alpha1.StorageProvider, _ *dpv1alpha1.
 }
 
 var AddonSignature = func(_ extensionsv1alpha1.Addon, _ *extensionsv1alpha1.Addon, _ extensionsv1alpha1.AddonList, _ *extensionsv1alpha1.AddonList) {
+}
+
+var ParametersDefinitionSignature = func(_ parametersv1alpha1.ParametersDefinition, _ *parametersv1alpha1.ParametersDefinition, _ parametersv1alpha1.ParametersDefinitionList, _ *parametersv1alpha1.ParametersDefinitionList) {
+}
+var ParameterSignature = func(_ parametersv1alpha1.Parameter, _ *parametersv1alpha1.Parameter, _ parametersv1alpha1.ParameterList, _ *parametersv1alpha1.ParameterList) {
+}
+var ParameterDrivenConfigRenderSignature = func(_ parametersv1alpha1.ParameterDrivenConfigRender, _ *parametersv1alpha1.ParameterDrivenConfigRender, _ parametersv1alpha1.ParameterDrivenConfigRenderList, _ *parametersv1alpha1.ParameterDrivenConfigRenderList) {
+}
+var ComponentParameterSignature = func(_ parametersv1alpha1.ComponentParameter, _ *parametersv1alpha1.ComponentParameter, _ parametersv1alpha1.ComponentParameterList, _ *parametersv1alpha1.ComponentParameterList) {
 }
 
 func ToGVK(object client.Object) schema.GroupVersionKind {

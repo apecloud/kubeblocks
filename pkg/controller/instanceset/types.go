@@ -34,9 +34,6 @@ const (
 	roleAgentInstallerName       = "role-agent-installer"
 	roleAgentVolumeMountPath     = "/role-probe"
 	roleAgentName                = "agent"
-	shell2httpImage              = "msoap/shell2http:1.16.0"
-	shell2httpBinaryPath         = "/app/shell2http"
-	shell2httpServePath          = "/role"
 	defaultRoleProbeDaemonPort   = 7373
 	defaultRoleProbeGRPCPort     = 50101
 	roleProbeDaemonPortName      = "probe-port"

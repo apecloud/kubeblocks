@@ -31,11 +31,6 @@ import (
 
 func delayUpdateInstanceSetSystemFields(obj workloads.InstanceSetSpec, pobj *workloads.InstanceSetSpec) {
 	delayUpdatePodSpecSystemFields(obj.Template.Spec, &pobj.Template.Spec)
-
-	if pobj.RoleProbe != nil && obj.RoleProbe != nil {
-		pobj.RoleProbe.FailureThreshold = obj.RoleProbe.FailureThreshold
-		pobj.RoleProbe.SuccessThreshold = obj.RoleProbe.SuccessThreshold
-	}
 }
 
 // delayUpdatePodSpecSystemFields to delay the updating to system fields in pod spec.
@@ -50,10 +45,6 @@ func delayUpdatePodSpecSystemFields(obj corev1.PodSpec, pobj *corev1.PodSpec) {
 
 func updateInstanceSetSystemFields(obj workloads.InstanceSetSpec, pobj *workloads.InstanceSetSpec) {
 	updatePodSpecSystemFields(obj.Template.Spec, &pobj.Template.Spec)
-	if pobj.RoleProbe != nil && obj.RoleProbe != nil {
-		pobj.RoleProbe.FailureThreshold = obj.RoleProbe.FailureThreshold
-		pobj.RoleProbe.SuccessThreshold = obj.RoleProbe.SuccessThreshold
-	}
 }
 
 // updatePodSpecSystemFields to update system fields in pod spec.

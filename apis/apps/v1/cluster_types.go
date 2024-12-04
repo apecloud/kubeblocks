@@ -499,6 +499,15 @@ type ClusterComponentSpec struct {
 	//
 	// +optional
 	Stop *bool `json:"stop,omitempty"`
+
+	// Specifies the initialization parameters.
+	//
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
+	// +optional
+	InitParameters []ComponentParameter `json:"initParameters,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 }
 
 type ClusterComponentService struct {

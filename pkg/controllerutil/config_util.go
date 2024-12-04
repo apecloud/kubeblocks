@@ -22,16 +22,19 @@ package controllerutil
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"slices"
 
 	"github.com/StudioSol/set"
 	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/configuration/util"
 	"github.com/apecloud/kubeblocks/pkg/configuration/validate"
@@ -238,4 +241,51 @@ func TransformConfigTemplate(configs []appsv1.ComponentConfigSpec) []appsv1.Comp
 		arr = append(arr, config.ComponentTemplateSpec)
 	}
 	return arr
+}
+
+func ResolveCmpdParametersDefs(ctx context.Context, reader client.Reader, cmpd *appsv1.ComponentDefinition) (*parametersv1alpha1.ParameterDrivenConfigRender, []*parametersv1alpha1.ParametersDefinition, error) {
+	var paramsDefs []*parametersv1alpha1.ParametersDefinition
+
+	configRender, err := ResolveComponentConfigRender(ctx, reader, cmpd)
+	if err != nil {
+		return nil, nil, err
+	}
+	if configRender == nil || len(configRender.Spec.ParametersDefs) == 0 {
+		return configRender, nil, nil
+	}
+	for _, defName := range configRender.Spec.ParametersDefs {
+		paramsDef := &parametersv1alpha1.ParametersDefinition{}
+		if err = reader.Get(ctx, client.ObjectKey{Name: defName}, paramsDef); err != nil {
+			return nil, nil, err
+		}
+		if paramsDef.Status.Phase != parametersv1alpha1.PDAvailablePhase {
+			return nil, nil, fmt.Errorf("the referenced ParametersDefinition is unavailable: %s", paramsDef.Name)
+		}
+		paramsDefs = append(paramsDefs, paramsDef)
+	}
+	return configRender, paramsDefs, nil
+}
+
+func ResolveComponentConfigRender(ctx context.Context, reader client.Reader, cmpd *appsv1.ComponentDefinition) (*parametersv1alpha1.ParameterDrivenConfigRender, error) {
+	configDefList := &parametersv1alpha1.ParameterDrivenConfigRenderList{}
+	if err := reader.List(ctx, configDefList); err != nil {
+		return nil, err
+	}
+
+	checkAvailable := func(configDef parametersv1alpha1.ParameterDrivenConfigRender) error {
+		if configDef.Status.Phase != parametersv1alpha1.PDAvailablePhase {
+			return fmt.Errorf("the referenced ParameterDrivenConfigRender is unavailable: %s", configDef.Name)
+		}
+		return nil
+	}
+
+	for i, item := range configDefList.Items {
+		if item.Spec.ComponentDef != cmpd.Name {
+			continue
+		}
+		if item.Spec.ServiceVersion == "" || item.Spec.ServiceVersion == cmpd.Spec.ServiceVersion {
+			return &configDefList.Items[i], checkAvailable(item)
+		}
+	}
+	return nil, nil
 }

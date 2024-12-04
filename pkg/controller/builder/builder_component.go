@@ -177,3 +177,8 @@ func (builder *ComponentBuilder) SetSidecars(sidecars []appsv1.Sidecar) *Compone
 	builder.get().Spec.Sidecars = sidecars
 	return builder
 }
+
+func (builder *ComponentBuilder) SetInitParameters(params []appsv1.ComponentParameter) *ComponentBuilder {
+	builder.get().Spec.InitParameters = params
+	return builder
+}

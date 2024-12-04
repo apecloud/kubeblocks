@@ -853,6 +853,20 @@ If set, all the computing resources will be released.</p>
 <p>Specifies the sidecars to be injected into the Component.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>initParameters</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentParameter">
+[]ComponentParameter
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the initialization parameters.</p>
+</td>
+</tr>
 </table>
 </td>
 </tr>
@@ -3118,6 +3132,20 @@ bool
 <em>(Optional)</em>
 <p>Stop the Component.
 If set, all the computing resources will be released.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>initParameters</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentParameter">
+[]ComponentParameter
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the initialization parameters.</p>
 </td>
 </tr>
 </tbody>
@@ -5778,6 +5806,47 @@ and other administrative tasks.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1.ComponentParameter">ComponentParameter
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the name of the parameter that is to be updated.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>value</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the parameter values that are to be updated.
+If set to nil, the parameter defined by the Key field will be removed from the configuration file.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1.ComponentPhase">ComponentPhase
 (<code>string</code> alias)</h3>
 <p>
@@ -6317,6 +6386,20 @@ If set, all the computing resources will be released.</p>
 <td>
 <em>(Optional)</em>
 <p>Specifies the sidecars to be injected into the Component.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>initParameters</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentParameter">
+[]ComponentParameter
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the initialization parameters.</p>
 </td>
 </tr>
 </tbody>

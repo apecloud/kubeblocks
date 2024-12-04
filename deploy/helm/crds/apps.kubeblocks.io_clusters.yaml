@@ -402,6 +402,26 @@ spec:
                         - name
                         type: object
                       type: array
+                    initParameters:
+                      description: Specifies the initialization parameters.
+                      items:
+                        properties:
+                          name:
+                            description: Specifies the name of the parameter that
+                              is to be updated.
+                            type: string
+                          value:
+                            description: |-
+                              Specifies the parameter values that are to be updated.
+                              If set to nil, the parameter defined by the Key field will be removed from the configuration file.
+                            type: string
+                        required:
+                        - name
+                        type: object
+                      type: array
+                      x-kubernetes-list-map-keys:
+                      - name
+                      x-kubernetes-list-type: map
                     instances:
                       description: |-
                         Allows for the customization of configuration values for each instance within a Component.
@@ -9042,6 +9062,26 @@ spec:
                             - name
                             type: object
                           type: array
+                        initParameters:
+                          description: Specifies the initialization parameters.
+                          items:
+                            properties:
+                              name:
+                                description: Specifies the name of the parameter that
+                                  is to be updated.
+                                type: string
+                              value:
+                                description: |-
+                                  Specifies the parameter values that are to be updated.
+                                  If set to nil, the parameter defined by the Key field will be removed from the configuration file.
+                                type: string
+                            required:
+                            - name
+                            type: object
+                          type: array
+                          x-kubernetes-list-map-keys:
+                          - name
+                          x-kubernetes-list-type: map
                         instances:
                           description: |-
                             Allows for the customization of configuration values for each instance within a Component.

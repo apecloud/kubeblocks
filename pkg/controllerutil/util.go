@@ -112,6 +112,21 @@ func (r *RequestCtx) WithValue(key, val any) context.Context {
 	return context.WithValue(r.Ctx, key, val)
 }
 
+func MergeMetadataMaps(originalMap map[string]string, targetMaps ...map[string]string) map[string]string {
+	mergeMap := map[string]string{}
+	for k, v := range originalMap {
+		mergeMap[k] = v
+	}
+	for _, targetMap := range targetMaps {
+		for k, v := range targetMap {
+			if _, ok := mergeMap[k]; !ok {
+				mergeMap[k] = v
+			}
+		}
+	}
+	return mergeMap
+}
+
 // MergeMetadataMapInplace merges two map[string]string, the targetMap will be updated.
 func MergeMetadataMapInplace(originalMap map[string]string, targetMap *map[string]string) {
 	if originalMap == nil {

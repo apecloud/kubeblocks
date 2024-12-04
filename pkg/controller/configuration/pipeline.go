@@ -382,8 +382,8 @@ func (p *updatePipeline) Sync() *updatePipeline {
 		case p.ConfigMapObj != nil:
 			patch := client.MergeFrom(p.ConfigMapObj)
 			if p.ConfigMapObj != nil {
-				intctrlutil.MergeMetadataMapInplace(p.ConfigMapObj.Labels, &p.newCM.Labels)
-				intctrlutil.MergeMetadataMapInplace(p.ConfigMapObj.Annotations, &p.newCM.Annotations)
+				p.newCM.Labels = intctrlutil.MergeMetadataMaps(p.newCM.Labels, p.ConfigMapObj.Labels)
+				p.newCM.Annotations = intctrlutil.MergeMetadataMaps(p.newCM.Annotations, p.ConfigMapObj.Annotations)
 			}
 			return p.Client.Patch(p.Context, p.newCM, patch)
 		}

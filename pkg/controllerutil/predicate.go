@@ -146,7 +146,7 @@ func newAPIVersionPredicateFilter(objs []client.Object) func(client.Object) bool
 		}
 		for _, wobj := range objs {
 			if reflect.TypeOf(obj) == reflect.TypeOf(wobj) {
-				return true // watched objects, but has no CRD API version, it may be the old version
+				return false // watched objects, but has no CRD API version, it may be the old version
 			}
 		}
 		return true

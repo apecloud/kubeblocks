@@ -189,6 +189,12 @@ type ComponentSpec struct {
 	// +optional
 	ServiceAccountName string `json:"serviceAccountName,omitempty"`
 
+	// Indicates the InstanceUpdateStrategy that will be
+	// employed to update instances in the InstanceSet when a new ServiceVersion is specified.
+	//
+	// +optional
+	InstanceUpdateStrategy *InstanceUpdateStrategy `json:"instanceUpdateStrategy,omitempty"`
+
 	// Controls the concurrency of pods during initial scale up, when replacing pods on nodes,
 	// or when scaling down. It only used when `PodManagementPolicy` is set to `Parallel`.
 	// The default Concurrency is 100%.

@@ -18,6 +18,7 @@ package v1
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 const (
@@ -660,4 +661,25 @@ type InstanceTemplate struct {
 	// Add new or override existing volume claim templates.
 	// +optional
 	VolumeClaimTemplates []ClusterComponentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
+}
+
+// InstanceUpdateStrategy defines how instances of a component should be updated when a new ServiceVersion specified.
+type InstanceUpdateStrategy struct {
+	// Indicates the number of instances that should be updated during a rolling update.
+	// The remaining instances will remain untouched. This is helpful in defining how many instances
+	// should participate in the update process.
+	// Value can be an absolute number (ex: 5) or a percentage of desired instances (ex: 10%).
+	// Absolute number is calculated from percentage by rounding up.
+	// The default value is ComponentSpec.Replicas (i.e., update all instances).
+	//
+	// +optional
+	Replicas *intstr.IntOrString `json:"replicas,omitempty"`
+
+	// The maximum number of instances that can be unavailable during the update.
+	// Value can be an absolute number (ex: 5) or a percentage of desired instances (ex: 10%).
+	// Absolute number is calculated from percentage by rounding up. This can not be 0.
+	// Defaults to 1. The field applies to all instances. That means if there is any unavailable pod,
+	// it will be counted towards MaxUnavailable.
+	// +optional
+	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty"`
 }

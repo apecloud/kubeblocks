@@ -36,7 +36,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
+	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/generics"
@@ -1259,12 +1259,12 @@ var _ = Describe("Cluster Controller", func() {
 				By("InstanceSet.spec.template.annotations/labels need to be consistent with component")
 				// The labels and annotations of the Pod will be kept consistent with those of the InstanceSet
 				Eventually(testapps.CheckObj(&testCtx, client.ObjectKey{Name: workloadName, Namespace: testCtx.DefaultNamespace},
-					func(g Gomega, instanceSet *workloads.InstanceSet) {
+					func(g Gomega, instanceSet *workloadsv1.InstanceSet) {
 						checkWorkloadFunc(g, instanceSet.Spec.Template.GetLabels(), instanceSet.Spec.Template.GetAnnotations())
 					})).Should(Succeed())
 			}
 
-			FIt("test add/override annotations and labels", func() {
+			It("test add/override annotations and labels", func() {
 				By("creating a cluster")
 				clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
 					WithRandomName().

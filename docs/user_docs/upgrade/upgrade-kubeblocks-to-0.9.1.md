@@ -146,11 +146,11 @@ If you are upgrading from v0.8 to v0.9, it's recommended to enable webhook to en
 
 4. Upgrade KubeBlocks.
 
-    If the KubeBlocks you are running uses the image registry `infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com`, it is recommended to explicitly configure the image registry during the upgrade. Refer to [FAQ](./faq.md#specify-an-image-registry-during-kubeblocks-upgrade) for how to specify an image registry during the upgrade.
+    Here are some options that need your attention before the upgrade.
 
-    Setting `admissionWebhooks.enabled=true` enables the webhook, supporting the multi-version conversion of the ConfigConstraint API.
-
-    Setting `admissionWebhooks.ignoreReplicasCheck=true` enables the webhook by default only when KubeBlocks is deployed with 3 replicas. If only a single replica is deployed, you can configure this variable to bypass the check.
+    - Setting `admissionWebhooks.enabled=true` enables the webhook, supporting the multi-version conversion of the ConfigConstraint API.
+    - Setting `admissionWebhooks.ignoreReplicasCheck=true` enables the webhook by default only when KubeBlocks is deployed with 3 replicas. If only a single replica is deployed, you can configure this variable to bypass the check.
+    - If the KubeBlocks you are running uses the image registry starting with `infracreate-registry`, it is recommended to explicitly configure the image registry during the upgrade. Refer to [FAQ](./faq.md#specify-an-image-registry-during-upgrading-kubeblocks) for details.
 
     ```bash
     helm repo add kubeblocks https://apecloud.github.io/helm-charts
@@ -193,7 +193,11 @@ If you are upgrading from v0.8 to v0.9, it's recommended to enable webhook to en
     kbcli version
     ```
 
-    If the KubeBlocks you are running uses the image registry `infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com`, it is recommended to explicitly configure the image registry during the upgrade. Refer to [FAQ](./faq.md#specify-an-image-registry-during-kubeblocks-upgrade) for how to specify an image registry during the upgrade.
+    Here are some options that need your attention before the upgrade.
+
+    - Setting `admissionWebhooks.enabled=true` enables the webhook, supporting the multi-version conversion of the ConfigConstraint API.
+    - Setting `admissionWebhooks.ignoreReplicasCheck=true` enables the webhook by default only when KubeBlocks is deployed with 3 replicas. If only a single replica is deployed, you can configure this variable to bypass the check.
+    - If the KubeBlocks you are running uses the image registry starting with `infracreate-registry`, it is recommended to explicitly configure the image registry during the upgrade. Refer to [FAQ](./faq.md#specify-an-image-registry-during-upgrading-kubeblocks) for details.
 
     ```bash
     kbcli kb upgrade --version 0.9.1 \

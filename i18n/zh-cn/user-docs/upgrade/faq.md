@@ -68,42 +68,60 @@ kubectl delete -n kb-system deployments.apps kubeblocks kubeblocks-dataprotectio
 
 ## 升级时如何指定镜像仓库
 
-KubeBlocks v0.8.x 使用的镜像仓库为 `infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com` 和 `docker.io`，KubeBlocks 从 v0.9.0 之后使用的镜像仓库为 `apecloud-registry.cn-zhangjiakou.cr.aliyuncs.com` 和 `docker.io`。
+从 v0.9.0 开始，KubeBlocks 使用的镜像仓库中，有一个仓库发生了变化。该镜像仓库前缀从 `infracreate-registry` 更新为 `apecloud-registry`。其他镜像仓库不受影响。建议安装 KubeBlocks v0.8.0 及之前版本的用户检查当前的镜像仓库配置，并在升级时根据需要指定新的镜像仓库地址。
 
-升级 KubeBlocks 时，可以通过以下参数指定修改默认镜像。
+1. 检查 KubeBlocks 使用的镜像仓库。
 
-<Tabs>
+   ```bash
+   helm -n kb-system get values kubeblocks -a | yq .image.registry
+   ```
 
-<TabItem value="kbcli" label="kbcli" default>
+   如果输出的镜像仓库是以 `infracreate-registry` 开头（如下所示），您需要在升级 KubeBlocks 时指定新的镜像仓库，将前缀改为 `apecloud-registry`。
 
-```bash
-kbcli kb upgrade --version 0.9.1 \ 
-  --set admissionWebhooks.enabled=true \
-  --set admissionWebhooks.ignoreReplicasCheck=true \
-  --set image.registry=docker.io \
-  --set dataProtection.image.registry=docker.io \
-  --set addonChartsImage.registry=docker.io
-```
+   <details>
 
-</TabItem>
+   <summary>Output</summary>
 
-<TabItem value="Helm" label="Helm">
+   ```text
+   infracreate-registry.cn-xxx.xxx.com
+   ```
 
-```bash
-helm -n kb-system upgrade kubeblocks kubeblocks/kubeblocks --version 0.9.1 \
-  --set admissionWebhooks.enabled=true \
-  --set admissionWebhooks.ignoreReplicasCheck=true \
-  --set image.registry=docker.io \
-  --set dataProtection.image.registry=docker.io \
-  --set addonChartsImage.registry=docker.io
-```
+   </details>
 
-</TabItem>
+2. 升级 KubeBlocks 时，可以通过以下参数指定修改默认镜像。
 
-</Tabs>
+   <Tabs>
 
-以下为上述命令的参数说明：
+   <TabItem value="Helm" label="Helm" default>
 
-- `--set image.registry=docker.io` 设置KubeBlocks 镜像仓库。
-- `--set dataProtection.image.registry=docker.io` 设置 KubeBlocks-Dataprotection 镜像仓库。
-- `--set addonChartsImage.registry=docker.io` 设置 addon Charts 镜像仓库。
+   ```bash
+   helm -n kb-system upgrade kubeblocks kubeblocks/kubeblocks --version 0.9.1 \
+     --set admissionWebhooks.enabled=true \
+     --set admissionWebhooks.ignoreReplicasCheck=true \
+     --set image.registry=docker.io \
+     --set dataProtection.image.registry=docker.io \
+     --set addonChartsImage.registry=docker.io
+   ```
+
+   </TabItem>
+
+   <TabItem value="kbcli" label="kbcli">
+
+   ```bash
+   kbcli kb upgrade --version 0.9.1 \ 
+     --set admissionWebhooks.enabled=true \
+     --set admissionWebhooks.ignoreReplicasCheck=true \
+     --set image.registry=apecloud-registry.cn-xxx.xxx.com \
+     --set dataProtection.image.registry=apecloud-registry.cn-xxx.xxx.com \
+     --set addonChartsImage.registry=apecloud-registry.cn-xxx.xxx.com
+   ```
+
+   </TabItem>
+
+   </Tabs>
+
+   以下为上述命令的参数说明：
+
+   - `--set image.registry=docker.io` 设置KubeBlocks 镜像仓库。
+   - `--set dataProtection.image.registry=docker.io` 设置 KubeBlocks-Dataprotection 镜像仓库。
+   - `--set addonChartsImage.registry=docker.io` 设置 addon Charts 镜像仓库。

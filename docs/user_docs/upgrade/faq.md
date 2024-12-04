@@ -66,44 +66,62 @@ kubectl -n kb-system scale deployment kubeblocks-dataprotection --replicas 0
 kubectl delete -n kb-system deployments.apps kubeblocks kubeblocks-dataprotection
 ```
 
-## Specify an image registry during KubeBlocks upgrade
+## Specify an image registry during upgrading KubeBlocks
 
-KubeBlocks v0.8.x uses `infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com` and `docker.io` as image registries but KubeBlocks v0.9.x uses `apecloud-registry.cn-zhangjiakou.cr.aliyuncs.com` and `docker.io`.
+Starting from v0.9.0, one of KubeBlocks' image registries has changed. Specifically, the registry prefix for one of the repositories has been updated from `infracreate-registry` to `apecloud-registry`. It’s important to note that other image registries remain unaffected. Users who installed KubeBlocks prior to v0.9.0 are recommended to check their current registry configuration and update it during the upgrade if necessary.
 
-You can override the default image registry by specifying the following parameters.
+1. Check the image registry of KubeBlocks.
 
-<Tabs>
+   ```bash
+   helm -n kb-system get values kubeblocks -a | yq .image.registry
+   ```
 
-<TabItem value="kbcli" label="kbcli" default>
+   If the image registry starts with `infracreate-registry` as shown below, you must specify the new image registry during the upgrade by changing the image registry prefix to `apecloud-registry`.
 
-```bash
-kbcli kb upgrade --version 0.9.1 \ 
-  --set admissionWebhooks.enabled=true \
-  --set admissionWebhooks.ignoreReplicasCheck=true \
-  --set image.registry=docker.io \
-  --set dataProtection.image.registry=docker.io \
-  --set addonChartsImage.registry=docker.io
-```
+   <details>
 
-</TabItem>
+   <summary>Output</summary>
 
-<TabItem value="Helm" label="Helm">
+   ```text
+   infracreate-registry.cn-xxx.xxx.com
+   ```
 
-```bash
-helm -n kb-system upgrade kubeblocks kubeblocks/kubeblocks --version 0.9.1 \
-  --set admissionWebhooks.enabled=true \
-  --set admissionWebhooks.ignoreReplicasCheck=true \
-  --set image.registry=docker.io \
-  --set dataProtection.image.registry=docker.io \
-  --set addonChartsImage.registry=docker.io
-```
+   </details>
 
-</TabItem>
+2. Override the default image registry by specifying the following parameters.
 
-</Tabs>
+   <Tabs>
 
-Here is an introdution to the flags in the above command.
+   <TabItem value="Helm" label="Helm" default>
 
-- `--set image.registry=docker.io` specifies the KubeBlocks image registry.
-- `--set dataProtection.image.registry=docker.io` specifies the KubeBlocks-Dataprotection image registry.
-- `--set addonChartsImage.registry=docker.io` specifies Addon Charts image registry.
+   ```bash
+   helm -n kb-system upgrade kubeblocks kubeblocks/kubeblocks --version 0.9.1 \
+     --set admissionWebhooks.enabled=true \
+     --set admissionWebhooks.ignoreReplicasCheck=true \
+     --set image.registry=apecloud-registry.cn-xxx.xxx.com \
+     --set dataProtection.image.registry=apecloud-registry.cn-xxx.xxx.com \
+     --set addonChartsImage.registry=apecloud-registry.cn-xxx.xxx.com
+   ```
+
+   </TabItem>
+
+   <TabItem value="kbcli" label="kbcli">
+
+   ```bash
+   kbcli kb upgrade --version 0.9.1 \ 
+     --set admissionWebhooks.enabled=true \
+     --set admissionWebhooks.ignoreReplicasCheck=true \
+     --set image.registry=docker.io \
+     --set dataProtection.image.registry=docker.io \
+     --set addonChartsImage.registry=docker.io
+   ```
+
+   </TabItem>
+
+   </Tabs>
+
+   Here is an introdution to the flags in the above command.
+
+   - `--set image.registry=docker.io` specifies the KubeBlocks image registry.
+   - `--set dataProtection.image.registry=docker.io` specifies the KubeBlocks-Dataprotection image registry.
+   - `--set addonChartsImage.registry=docker.io` specifies Addon Charts image registry.

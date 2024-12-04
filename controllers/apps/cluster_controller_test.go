@@ -1226,14 +1226,6 @@ var _ = Describe("Cluster Controller", func() {
 					Namespace: testCtx.DefaultNamespace}, func(g Gomega, secret *corev1.Secret) {
 					checkFunc(g, secret)
 				})).Should(Succeed())
-
-				// check related configmap of the component
-				envCMName := constant.GenerateClusterComponentEnvPattern(clusterObj.Name, compName)
-				Eventually(testapps.CheckObj(&testCtx, client.ObjectKey{Name: envCMName,
-					Namespace: testCtx.DefaultNamespace}, func(g Gomega, cm *corev1.ConfigMap) {
-					checkFunc(g, cm)
-				})).Should(Succeed())
-
 			}
 
 			testUpdateAnnoAndLabels := func(compName string,

@@ -86,11 +86,7 @@ func (r *ComponentVersionReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return intctrlutil.CheckedRequeueWithError(err, rctx.Log, "")
 	}
 
-	supported, err := intctrlutil.APIVersionPredicate(compVersion)
-	if err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, rctx.Log, "API version predicate failed")
-	}
-	if !supported {
+	if !intctrlutil.ObjectAPIVersionSupported(compVersion) {
 		return intctrlutil.Reconciled()
 	}
 

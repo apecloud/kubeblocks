@@ -24,6 +24,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -32,6 +33,7 @@ import (
 	"github.com/fsnotify/fsnotify"
 	snapshotv1beta1 "github.com/kubernetes-csi/external-snapshotter/client/v3/apis/volumesnapshot/v1beta1"
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
+	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
 	corev1 "k8s.io/api/core/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
@@ -267,6 +269,14 @@ func validateRequiredToParseConfigs() error {
 		secrets := make([]corev1.LocalObjectReference, 0)
 		if err := json.Unmarshal([]byte(imagePullSecrets), &secrets); err != nil {
 			return err
+		}
+	}
+
+	supportedAPIVersion := viper.GetString(constant.APIVersionSupported)
+	if len(supportedAPIVersion) > 0 {
+		_, err := regexp.Compile(supportedAPIVersion)
+		if err != nil {
+			return errors.Wrap(err, "invalid supported API version")
 		}
 	}
 

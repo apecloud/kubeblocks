@@ -20,8 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
-	"github.com/pkg/errors"
-
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -34,11 +32,7 @@ var _ graph.Transformer = &componentInitTransformer{}
 func (t *componentInitTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*componentTransformContext)
 
-	supported, err := intctrlutil.APIVersionPredicate(transCtx.Component)
-	if err != nil {
-		return errors.Wrap(err, "API version predicate failed")
-	}
-	if !supported {
+	if !intctrlutil.ObjectAPIVersionSupported(transCtx.Component) {
 		return graph.ErrPrematureStop
 	}
 

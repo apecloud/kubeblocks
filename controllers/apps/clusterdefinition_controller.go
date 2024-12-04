@@ -68,11 +68,7 @@ func (r *ClusterDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
-	supported, err := intctrlutil.APIVersionPredicate(clusterDef)
-	if err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "API version predicate failed")
-	}
-	if !supported {
+	if !intctrlutil.ObjectAPIVersionSupported(clusterDef) {
 		return intctrlutil.Reconciled()
 	}
 

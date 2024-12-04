@@ -447,11 +447,7 @@ func (t *clusterNormalizationTransformer) checkNPatchCRDAPIVersionKey(transCtx *
 		transCtx.Cluster.Annotations[constant.CRDAPIVersionAnnotationKey] = apiVersion
 	}
 
-	supported, err := controllerutil.IsSupportedAPIVersion(apiVersion)
-	if err != nil {
-		return err
-	}
-	if supported {
+	if controllerutil.IsAPIVersionSupported(apiVersion) {
 		return nil
 	}
 	return graph.ErrPrematureStop // un-supported CRD API version, stop the transformation

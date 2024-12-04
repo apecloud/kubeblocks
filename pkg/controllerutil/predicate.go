@@ -105,30 +105,24 @@ var (
 	)
 )
 
-func IsSupportedAPIVersion(apiVersion string) (bool, error) {
+func IsAPIVersionSupported(apiVersion string) bool {
 	supported := viper.GetString(constant.APIVersionSupported)
 	if len(supported) > 0 {
-		exp, err := regexp.Compile(supported)
-		if err != nil {
-			return false, err
-		}
-		return exp.MatchString(apiVersion), nil
+		// has been validated at startup
+		exp, _ := regexp.Compile(supported)
+		return exp.MatchString(apiVersion)
 	}
-	return supportedAPIVersions.Has(apiVersion), nil
+	return supportedAPIVersions.Has(apiVersion)
 }
 
-func APIVersionPredicate(obj client.Object) (bool, error) {
-	supported, err := IsSupportedAPIVersion(obj.GetAnnotations()[constant.CRDAPIVersionAnnotationKey])
-	if err != nil {
-		return false, err
-	}
-	if supported {
-		return true, nil
+func ObjectAPIVersionSupported(obj client.Object) bool {
+	if IsAPIVersionSupported(obj.GetAnnotations()[constant.CRDAPIVersionAnnotationKey]) {
+		return true
 	}
 	if reflect.TypeOf(obj) == reflect.TypeOf(&appsv1.Cluster{}) {
-		return true, nil // to resolve the CRD API version of the cluster
+		return true // to resolve the CRD API version of the cluster
 	}
-	return false, nil
+	return false
 }
 
 func NewControllerManagedBy(mgr manager.Manager) *builder.Builder {

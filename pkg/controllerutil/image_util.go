@@ -38,9 +38,9 @@ import (
 var imageLogger = log.Log.WithName("ImageUtil")
 
 type RegistryConfig struct {
-	From                     string `mapstructure:"from"`
-	To                       string `mapstructure:"to"`
-	RegistryDefaultNamespace string `mapstructure:"registryDefaultNamespace"`
+	From             string `mapstructure:"from"`
+	To               string `mapstructure:"to"`
+	DefaultNamespace string `mapstructure:"defaultNamespace"`
 
 	// Quote from https://docs.docker.com/reference/cli/docker/image/tag/
 	// > While the OCI Distribution Specification supports more than two slash-separated components,
@@ -68,7 +68,7 @@ type RegistriesConfig struct {
 var registriesConfigMutex sync.RWMutex
 var registriesConfig = &RegistriesConfig{}
 
-func GetRegistriesConfig() *RegistriesConfig {
+func getRegistriesConfig() *RegistriesConfig {
 	registriesConfigMutex.RLock()
 	defer registriesConfigMutex.RUnlock()
 
@@ -77,12 +77,10 @@ func GetRegistriesConfig() *RegistriesConfig {
 }
 
 func ReloadRegistryConfig() error {
-	registriesConfigMutex.Lock()
-	registriesConfig = &RegistriesConfig{}
-	if err := viper.UnmarshalKey(constant.CfgRegistries, &registriesConfig); err != nil {
+	newRegistriesConfig := &RegistriesConfig{}
+	if err := viper.UnmarshalKey(constant.CfgRegistries, &newRegistriesConfig); err != nil {
 		return err
 	}
-	registriesConfigMutex.Unlock()
 
 	for _, registry := range registriesConfig.RegistryConfig {
 		if len(registry.From) == 0 {
@@ -93,6 +91,10 @@ func ReloadRegistryConfig() error {
 			return errors.New("registries config invalid: to can't be empty")
 		}
 	}
+
+	registriesConfigMutex.Lock()
+	registriesConfig = newRegistriesConfig
+	registriesConfigMutex.Unlock()
 
 	// since the use of kb tools image is widespread, set viper value here so that we don't need
 	// to replace it every time
@@ -144,7 +146,7 @@ func ReplaceImageRegistry(image string) string {
 	if err != nil {
 		return image
 	}
-	registriesConfigCopy := GetRegistriesConfig()
+	registriesConfigCopy := getRegistriesConfig()
 
 	chooseRegistry := func() string {
 		if registriesConfigCopy.DefaultRegistry != "" {
@@ -176,8 +178,8 @@ func ReplaceImageRegistry(image string) string {
 			}
 
 			if dstNamespace == nil {
-				if registryMapping.RegistryDefaultNamespace != "" {
-					dstNamespace = &registryMapping.RegistryDefaultNamespace
+				if registryMapping.DefaultNamespace != "" {
+					dstNamespace = &registryMapping.DefaultNamespace
 				} else {
 					dstNamespace = &namespace
 				}

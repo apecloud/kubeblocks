@@ -138,9 +138,9 @@ var _ = Describe("image util test", func() {
 			DefaultNamespace: "default",
 			RegistryConfig: []RegistryConfig{
 				{
-					From:                     "docker.io",
-					To:                       "bar.io",
-					RegistryDefaultNamespace: "docker",
+					From:             "docker.io",
+					To:               "bar.io",
+					DefaultNamespace: "docker",
 				},
 				{
 					From: "foo.io",

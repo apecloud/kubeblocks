@@ -341,7 +341,7 @@ func BuildRoleBinding(synthesizedComp *component.SynthesizedComponent, saName st
 		AddLabelsInMap(synthesizedComp.DynamicLabels).
 		AddLabelsInMap(synthesizedComp.StaticLabels).
 		AddLabelsInMap(constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name)).
-		AddLabelsInMap(synthesizedComp.DynamicAnnotations).
+		AddAnnotationsInMap(synthesizedComp.DynamicAnnotations).
 		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
 		SetRoleRef(rbacv1.RoleRef{
 			APIGroup: rbacv1.GroupName,

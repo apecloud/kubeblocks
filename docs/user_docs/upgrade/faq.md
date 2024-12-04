@@ -15,7 +15,7 @@ This guide addresses common questions and issues that may arise when upgrading K
 
 ## Manually mark Addons
 
-In earlier versions, KubeBlocks pre-installed some Addons in the Helm chart, but some of these Addons have been removed in the new version. Consequently, if you upgrade ddirectly from an older version to the latest, Helm will remove the CRs of these removed Addons, affecting the clusters created by these Addons. To prevent this, it is recommended to add the `"helm.sh/resource-policy": "keep"` annotation for Addons to ensure they remain during upgraing.
+In earlier versions, KubeBlocks pre-installed some Addons in the Helm chart, but some of these Addons have been removed in the new version. Consequently, if you upgrade directly from an older version to the latest, Helm will remove the CRs of these removed Addons, affecting the clusters created by these Addons. To prevent this, it is recommended to add the `"helm.sh/resource-policy": "keep"` annotation for Addons to ensure they remain during upgrading.
 
 ### View the Addon annotation
 
@@ -53,7 +53,7 @@ When upgrading KubeBlocks to v0.8.x/v0.9.0, you might encounter the following er
 Error: UPGRADE FAILED: cannot patch "kubeblocks-dataprotection" with kind Deployment: Deployment.apps "kubeblocks-dataprotection" is invalid: spec.selector: Invalid value: v1.LabelSelector{MatchLabels:map[string]string{"app.kubernetes.io/component":"dataprotection", "app.kubernetes.io/instance":"kubeblocks", "app.kubernetes.io/name":"kubeblocks"}, MatchExpressions:[]v1.LabelSelectorRequirement(nil)}: field is immutable && cannot patch "kubeblocks" with kind Deployment: Deployment.apps "kubeblocks" is invalid: spec.selector: Invalid value: v1.LabelSelector{MatchLabels:map[string]string{"app.kubernetes.io/component":"apps", "app.kubernetes.io/instance":"kubeblocks", "app.kubernetes.io/name":"kubeblocks"}, MatchExpressions:[]v1.LabelSelectorRequirement(nil)}: field is immutable
 ```
 
-This is due to label modifications of KubeBlocks and KubeBlocks-Dataprotection in KubeBlocks v0.9.1.
+This error occurs due to label modifications introduced for KubeBlocks and KubeBlocks-Dataprotection in KubeBlocks v0.9.1.
 
 To resolve the issue, manually delete the `kubeblocks` and `kubeblocks-dataprotection` deployments, then run helm upgrade to complete the upgrade to v0.9.1.
 
@@ -68,7 +68,7 @@ kubectl delete -n kb-system deployments.apps kubeblocks kubeblocks-dataprotectio
 
 ## Specify an image registry during upgrading KubeBlocks
 
-Starting from v0.9.0, one of KubeBlocks' image registries has changed. Specifically, the registry prefix for one of the repositories has been updated from `infracreate-registry` to `apecloud-registry`. It’s important to note that other image registries remain unaffected. Users who installed KubeBlocks prior to v0.9.0 are recommended to check their current registry configuration and update it during the upgrade if necessary.
+Starting from v0.9.0, one of KubeBlocks' image registries has changed. Specifically, the registry prefix for one of the repositories has been updated from `infracreate-registry` to `apecloud-registry`. Other image registries remain unaffected. If you installed KubeBlocks before v0.9.0, check and update your image registry configuration during the upgrade.
 
 1. Check the image registry of KubeBlocks.
 
@@ -120,7 +120,7 @@ Starting from v0.9.0, one of KubeBlocks' image registries has changed. Specifica
 
    </Tabs>
 
-   Here is an introdution to the flags in the above command.
+   Here is an introduction to the flags in the above command.
 
    - `--set image.registry=docker.io` specifies the KubeBlocks image registry.
    - `--set dataProtection.image.registry=docker.io` specifies the KubeBlocks-Dataprotection image registry.

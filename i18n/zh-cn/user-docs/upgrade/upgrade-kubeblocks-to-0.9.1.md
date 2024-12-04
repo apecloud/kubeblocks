@@ -11,12 +11,12 @@ import TabItem from '@theme/TabItem';
 
 # 升级到 KubeBlocks v0.9.1
 
-本文档将介绍如何升级至 KubeBlocks v0.9.1。
+本文档将介绍如何从不同版本升级至 KubeBlocks v0.9.1。
 
 :::note
 
 - 在升级前，请先执行 `helm -n kb-system list | grep kubeblocks` 查看正在使用的 KubeBlocks 版本，并根据不同版本，执行升级操作。
-- v0.9.2 的升级操作与 v0.9.1 相同，可按需替换版本，按照本文档操作。
+- v0.9.2 的升级操作与 v0.9.1 相同，您可以参照本文档并根据需要替换版本。
 
 :::
 
@@ -34,7 +34,7 @@ KubeBlocks v0.9.1 可以兼容 KubeBlocks v0.8 的 API，但不保证兼容 v0.8
 
 1. 查看引擎，确认引擎是否已添加 `"helm.sh/resource-policy": "keep"` 注解。
 
-    KubeBlocks 对默认安装的引擎做了精简。添加 `"helm.sh/resource-policy": "keep"` 注解可以避免升级时删除已经在使用的引擎资源。
+    KubeBlocks 对默认安装的引擎做了精简。添加 `"helm.sh/resource-policy": "keep"` 注解，以避免升级时删除已经在使用的引擎资源。
 
     查看引擎中是否添加了 `"helm.sh/resource-policy": "keep"`。
 
@@ -62,7 +62,7 @@ KubeBlocks v0.9.1 可以兼容 KubeBlocks v0.8 的 API，但不保证兼容 v0.8
     helm -n kb-system upgrade kubeblocks kubeblocks/kubeblocks --version 0.9.1 --set crd.enabled=false
     ```
 
-    KubeBocks v0.9 到 v0.9.1 的升级不涉及 API 变更，可通过设置 `--set crd.enabled=false` 跳过 API 升级任务。
+    KubeBlocks v0.9 到 v0.9.1 的升级不涉及 API 变更，可通过设置 `--set crd.enabled=false` 跳过 API 升级任务。
 
     :::warning
 
@@ -152,7 +152,7 @@ KubeBlocks v0.9.1 可以兼容 KubeBlocks v0.8 的 API，但不保证兼容 v0.8
 
     - 设置 `admissionWebhooks.enabled=true` 将启动 webhook，用于 ConfigConstraint API 多版本转换。
     - 设置 `admissionWebhooks.ignoreReplicasCheck=true` 默认只有在 3 副本部署 KubeBlocks 时才可开启 webhook。若只部署单副本 KubeBlocks，可配置该变量跳过检查。
-    - 如果您当前运行的 KubeBlocks 使用的镜像仓库为 `infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com`，升级时请显式设置镜像仓库。具体可参考 [FAQ](./faq.md#升级时如何指定镜像仓库)
+    - 如果您当前运行的 KubeBlocks 使用的镜像仓库为 `infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com`，升级时请显式设置镜像仓库。具体可参考 [FAQ 中镜像仓库章节](./faq.md#升级时如何指定镜像仓库)
 
     ```bash
     helm repo add kubeblocks https://apecloud.github.io/helm-charts
@@ -232,7 +232,7 @@ KubeBlocks v0.9.1 可以兼容 KubeBlocks v0.8 的 API，但不保证兼容 v0.8
 
 :::note
 
-- 如果您想要升级的引擎是 `mysql`，您需要升级引擎并重启集群。否则使用 KubeBlocks v0.8.x 创建的集群将无法在 v0.9.1 中使用。
+- 如果要升级的引擎是 `mysql`，需要先升级引擎并重启集群。否则使用 KubeBlocks v0.8.x 创建的集群将无法在 v0.9.1 中正常运行。
 
 - 如果您想要升级 `clickhouse/milvus/elasticsearch/llm`，您需要先升级 KubeBlocks，再升级引擎，否在将无法在 v0.9.1 中正常使用。
 

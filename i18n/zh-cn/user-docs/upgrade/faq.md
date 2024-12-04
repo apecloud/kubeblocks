@@ -1,7 +1,7 @@
 ---
 title: FAQ
 description: 升级, faq
-keywords: [升级, FAQ]
+keywords: [升级, FAQ, KubeBlocks, 升级指南]
 sidebar_position: 4
 sidebar_label: FAQ
 ---
@@ -122,6 +122,6 @@ kubectl delete -n kb-system deployments.apps kubeblocks kubeblocks-dataprotectio
 
    以下为上述命令的参数说明：
 
-   - `--set image.registry=docker.io` 设置KubeBlocks 镜像仓库。
+   - `--set image.registry=docker.io` 设置 KubeBlocks 镜像仓库。
    - `--set dataProtection.image.registry=docker.io` 设置 KubeBlocks-Dataprotection 镜像仓库。
    - `--set addonChartsImage.registry=docker.io` 设置 addon Charts 镜像仓库。

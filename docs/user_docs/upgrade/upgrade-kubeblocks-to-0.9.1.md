@@ -40,7 +40,7 @@ If you are upgrading from v0.8 to v0.9, it's recommended to enable webhook to en
     kubectl get addon -o json | jq '.items[] | {name: .metadata.name, resource_policy: .metadata.annotations["helm.sh/resource-policy"]}'
     ```
 
-    If the annotation doesn't exists, run the command below to add it. You can replace `-l app.kubernetes.io/name=kubeblocks` with your actual filter name.
+    If the annotation doesn't exist, run the command below to add it. You can replace `-l app.kubernetes.io/name=kubeblocks` with your actual filter name.
 
     ```bash
     kubectl annotate addons.extensions.kubeblocks.io -l app.kubernetes.io/name=kubeblocks helm.sh/resource-policy=keep
@@ -64,7 +64,7 @@ If you are upgrading from v0.8 to v0.9, it's recommended to enable webhook to en
 
     :::warning
 
-    To avoid affecting existing database clusters, when upgrading to KubeBlocks v0.9.1, the versions of already-installed addons will not be upgraded by default. If you want to upgrade the addons to the versions built into KubeBlocks v0.9.1, execute the following command. Note that this may restart existing clusters and affect availability. Please proceed with caution.
+    To avoid affecting existing database clusters, when upgrading to KubeBlocks v0.9.1, the versions of already-installed Addons will not be upgraded by default. If you want to upgrade the Addons to the versions built into KubeBlocks v0.9.1, execute the following command. Note that this may restart existing clusters and affect availability. Please proceed with caution.
 
     ```bash
     helm -n kb-system upgrade kubeblocks kubeblocks/kubeblocks --version 0.9.1 \
@@ -164,7 +164,7 @@ If you are upgrading from v0.8 to v0.9, it's recommended to enable webhook to en
 
     :::warning
 
-    To avoid affecting existing database clusters, when upgrading to KubeBlocks v0.9.1, the versions of already-installed addons will not be upgraded by default. If you want to upgrade the Addons to the versions built into KubeBlocks v0.9.1, execute the following command. Note that this may restart existing clusters and affect availability. Please proceed with caution.
+    To avoid affecting existing database clusters, when upgrading to KubeBlocks v0.9.1, the versions of already-installed Addons will not be upgraded by default. If you want to upgrade the Addons to the versions built into KubeBlocks v0.9.1, execute the following command. Note that this may restart existing clusters and affect availability. Please proceed with caution.
 
     ```bash
     helm -n kb-system upgrade kubeblocks kubeblocks/kubeblocks --version 0.9.1 \
@@ -226,7 +226,7 @@ If you are upgrading from v0.8 to v0.9, it's recommended to enable webhook to en
 
 ## Upgrade Addons
 
-If you didn't specify `upgradeAddons` as `true` or your Addon is not included in the default installed addons, you can upgrade Addons by running the commands provided below to use the v0.9.x API.
+If you didn't specify `upgradeAddons` as `true` or your Addon is not included in the default installed Addons, you can upgrade Addons by running the commands provided below to use the v0.9.x API.
 
 :::note
 
@@ -290,4 +290,4 @@ kbcli addon list | grep {addon-name}
 
 ## FAQ
 
-Refer to the [FAQ](./../faq.md) to address common questions and issues that may arise when upgrading KubeBlocks. If your question isn't covered, you can [submit an issue](https://github.com/apecloud/kubeblocks/issues/new/choose) or [start a discussion](https://github.com/apecloud/kubeblocks/discussions) on upgrading in GitHub.
+Refer to the [FAQ](./../faq.md) to address common questions and issues that may arise when upgrading KubeBlocks. If your question isn't covered, you can [submit an issue](https://github.com/apecloud/kubeblocks/issues/new/choose) or [start a discussion](https://github.com/apecloud/kubeblocks/discussions) on upgrading on GitHub.

@@ -189,11 +189,10 @@ type ComponentSpec struct {
 	// +optional
 	ServiceAccountName string `json:"serviceAccountName,omitempty"`
 
-	// Indicates the InstanceUpdateStrategy that will be
-	// employed to update instances in the InstanceSet when a new ServiceVersion is specified.
+	// Provides fine-grained control over the RollingUpdate process when a new ServiceVersion specified.
 	//
 	// +optional
-	InstanceUpdateStrategy *InstanceUpdateStrategy `json:"instanceUpdateStrategy,omitempty"`
+	RollingUpdate *RollingUpdate `json:"rollingUpdate,omitempty"`
 
 	// Controls the concurrency of pods during initial scale up, when replacing pods on nodes,
 	// or when scaling down. It only used when `PodManagementPolicy` is set to `Parallel`.

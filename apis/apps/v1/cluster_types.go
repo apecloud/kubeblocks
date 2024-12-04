@@ -426,10 +426,10 @@ type ClusterComponentSpec struct {
 	// +optional
 	ParallelPodManagementConcurrency *intstr.IntOrString `json:"parallelPodManagementConcurrency,omitempty"`
 
-	// Controls how the instances should be updated when a new ServiceVersion specified.
+	// Provides fine-grained control over the RollingUpdate process when a new ServiceVersion specified.
 	//
 	// +optional
-	InstanceUpdateStrategy *InstanceUpdateStrategy `json:"instanceUpdateStrategy,omitempty"`
+	RollingUpdate *RollingUpdate `json:"rollingUpdate,omitempty"`
 
 	// PodUpdatePolicy indicates how pods should be updated
 	//

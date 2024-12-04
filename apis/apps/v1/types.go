@@ -663,8 +663,8 @@ type InstanceTemplate struct {
 	VolumeClaimTemplates []ClusterComponentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
 }
 
-// InstanceUpdateStrategy defines how instances of a component should be updated when a new ServiceVersion specified.
-type InstanceUpdateStrategy struct {
+// RollingUpdate defines fine-grained control over the RollingUpdate process when a new ServiceVersion specified.
+type RollingUpdate struct {
 	// Indicates the number of instances that should be updated during a rolling update.
 	// The remaining instances will remain untouched. This is helpful in defining how many instances
 	// should participate in the update process.

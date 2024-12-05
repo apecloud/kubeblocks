@@ -31,6 +31,7 @@ import (
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/configuration"
+	"github.com/apecloud/kubeblocks/pkg/controller/render"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
@@ -112,7 +113,7 @@ var _ = Describe("Prepare Test", func() {
 			synthesizeComp, err := component.BuildSynthesizedComponent(ctx, testCtx.Cli, compDefObj, comp, cluster)
 			Expect(err).Should(Succeed())
 			Expect(synthesizeComp.PodSpec).ShouldNot(BeNil())
-			resCtx := &configuration.ResourceCtx{
+			resCtx := &render.ResourceCtx{
 				Context:       testCtx.Ctx,
 				Client:        testCtx.Cli,
 				Namespace:     synthesizeComp.Namespace,

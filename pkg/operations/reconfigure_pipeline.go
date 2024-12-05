@@ -35,6 +35,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/configuration/validate"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
+	"github.com/apecloud/kubeblocks/pkg/controller/render"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -68,7 +69,7 @@ type pipeline struct {
 
 func newPipeline(ctx reconfigureContext) *pipeline {
 	pipeline := &pipeline{reconfigureContext: ctx}
-	pipeline.Init(&configctrl.ResourceCtx{
+	pipeline.Init(&render.ResourceCtx{
 		Client:        ctx.cli,
 		Context:       ctx.reqCtx.Ctx,
 		Namespace:     ctx.resource.OpsRequest.Namespace,

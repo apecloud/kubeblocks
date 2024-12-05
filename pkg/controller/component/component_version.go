@@ -176,13 +176,36 @@ func findMatchedImagesFromCompVersions(compVersions []*appsv1alpha1.ComponentVer
 			}
 		}
 	}
-	apps := make(map[string]appNameVersionImage)
-	for name, releases := range appsWithReleases {
-		names := maps.Keys(releases)
-		slices.Sort(names)
-		// use the latest release
-		apps[name] = releases[names[len(names)-1]]
+
+	exactMatchedServiceVersion := func(releases map[string]appNameVersionImage) []string {
+		names := make([]string, 0)
+		for name, r := range releases {
+			if r.version == serviceVersion {
+				names = append(names, name)
+			}
+		}
+		return names
 	}
+
+	apps := make(map[string]appNameVersionImage)
+	for appName, releases := range appsWithReleases {
+		releaseNames := maps.Keys(releases)
+		if names := exactMatchedServiceVersion(releases); len(names) > 0 {
+			releaseNames = names
+		}
+		slices.Sort(releaseNames)
+		// use the latest release
+		apps[appName] = releases[releaseNames[len(releaseNames)-1]]
+	}
+
+	matched := appNameVersionImage{}
+	for name, app := range apps {
+		if len(matched.version) > 0 && app.version != matched.version {
+			return nil, fmt.Errorf("multiple service versions matched: %v, %v", matched, app)
+		}
+		matched = apps[name]
+	}
+
 	return apps, nil
 }
 

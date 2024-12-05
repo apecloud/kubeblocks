@@ -35,7 +35,6 @@ import (
 
 const (
 	toolsVolumeName                      = "kb-tools"
-	initSecRenderedToolContainerName     = "init-secondary-rendered-tool"
 	installConfigMangerToolContainerName = "install-config-manager-tool"
 	kbToolsImagePlaceHolder              = "$(KUBEBLOCKS_TOOLS_IMAGE)"
 )
@@ -94,10 +93,6 @@ func checkAndInstallToolsImageVolume(toolContainers []appsv1beta1.ToolConfig, bu
 		if buildParam.ToolsImageSpec == nil {
 			continue
 		}
-		if buildParam.ConfigSpec.LegacyRenderedConfigSpec != nil {
-			// auto install config_render tool
-			toolContainers = checkAndCreateRenderedInitContainer(toolContainers, buildParam.ToolsImageSpec.MountPoint)
-		}
 		if !useBuiltinSidecarImage {
 			toolContainers = checkAndCreateConfigManagerToolsContainer(toolContainers, buildParam.ToolsImageSpec.MountPoint)
 			configManagerBinaryPath = filepath.Join(buildParam.ToolsImageSpec.MountPoint, filepath.Base(constant.ConfigManagerToolPath))
@@ -110,20 +105,6 @@ func containerExists(containers []appsv1beta1.ToolConfig, containerName string) 
 	return generics.CountFunc(containers, func(container appsv1beta1.ToolConfig) bool {
 		return container.Name == containerName
 	}) != 0
-}
-
-func checkAndCreateRenderedInitContainer(toolContainers []appsv1beta1.ToolConfig, mountPoint string) []appsv1beta1.ToolConfig {
-	if containerExists(toolContainers, initSecRenderedToolContainerName) {
-		return toolContainers
-	}
-
-	kbToolsImage := viper.GetString(constant.KBToolsImage)
-	toolContainers = append(toolContainers, appsv1beta1.ToolConfig{
-		Name:    initSecRenderedToolContainerName,
-		Image:   kbToolsImage,
-		Command: []string{"cp", constant.TPLRenderToolPath, mountPoint},
-	})
-	return toolContainers
 }
 
 func checkAndCreateConfigManagerToolsContainer(toolContainers []appsv1beta1.ToolConfig, mountPoint string) []appsv1beta1.ToolConfig {

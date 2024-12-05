@@ -2105,4 +2105,92 @@ var _ = Describe("Component Controller", func() {
 			testImageUnchangedAfterNewReleasePublished(release)
 		})
 	})
+
+	Context("with registry replace enabled", func() {
+		registry := "foo.bar"
+		setRegistryConfig := func() {
+			viper.Set(constant.CfgRegistries, map[string]any{
+				"defaultRegistry": registry,
+			})
+			Expect(intctrlutil.LoadRegistryConfig()).Should(Succeed())
+		}
+
+		BeforeEach(func() {
+			createAllDefinitionObjects()
+		})
+
+		AfterEach(func() {
+			viper.Set(constant.CfgRegistries, nil)
+			Expect(intctrlutil.LoadRegistryConfig()).Should(Succeed())
+		})
+
+		It("replaces image registry", func() {
+			setRegistryConfig()
+
+			createClusterObj(defaultCompName, compDefName, nil)
+
+			itsKey := compKey
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				// check the image
+				c := its.Spec.Template.Spec.Containers[0]
+				g.Expect(c.Image).To(HavePrefix(registry))
+			})).Should(Succeed())
+		})
+
+		It("handles running its and upgrade", func() {
+			createClusterObj(defaultCompName, compDefName, nil)
+			itsKey := compKey
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				// check the image
+				c := its.Spec.Template.Spec.Containers[0]
+				g.Expect(c.Image).To(Equal(compVerObj.Spec.Releases[0].Images[c.Name]))
+			})).Should(Succeed())
+
+			setRegistryConfig()
+			By("trigger component reconcile")
+			now := time.Now().Format(time.RFC3339)
+			Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
+				comp.Annotations["now"] = now
+			})()).Should(Succeed())
+
+			Consistently(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				// check the image
+				c := its.Spec.Template.Spec.Containers[0]
+				g.Expect(c.Image).NotTo(HavePrefix(registry))
+			})).Should(Succeed())
+
+			By("replaces registry when upgrading")
+			release := kbappsv1.ComponentVersionRelease{
+				Name:           "8.0.31",
+				ServiceVersion: "8.0.31",
+				Images: map[string]string{
+					testapps.DefaultMySQLContainerName: "docker.io/apecloud/mysql:8.0.31",
+				},
+			}
+
+			By("publish a new release")
+			compVerKey := client.ObjectKeyFromObject(compVerObj)
+			Expect(testapps.GetAndChangeObj(&testCtx, compVerKey, func(compVer *kbappsv1.ComponentVersion) {
+				compVer.Spec.Releases = append(compVer.Spec.Releases, release)
+				compVer.Spec.CompatibilityRules[0].Releases = append(compVer.Spec.CompatibilityRules[0].Releases, release.Name)
+			})()).Should(Succeed())
+
+			By("update serviceversion in cluster")
+			Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *kbappsv1.Cluster) {
+				cluster.Spec.ComponentSpecs[0].ServiceVersion = "8.0.31"
+			})()).Should(Succeed())
+
+			By("trigger component reconcile")
+			now = time.Now().Format(time.RFC3339)
+			Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
+				comp.Annotations["now"] = now
+			})()).Should(Succeed())
+
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				// check the image
+				c := its.Spec.Template.Spec.Containers[0]
+				g.Expect(c.Image).To(HavePrefix(registry))
+			})).Should(Succeed())
+		})
+	})
 })

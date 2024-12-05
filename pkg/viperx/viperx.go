@@ -67,6 +67,18 @@ func GetDuration(key string) time.Duration {
 	return rCall(key, viper.GetDuration)
 }
 
+func Unmarshal(rawVal interface{}, opts ...viper.DecoderConfigOption) error {
+	lock.RLock()
+	defer lock.RUnlock()
+	return viper.Unmarshal(rawVal, opts...)
+}
+
+func UnmarshalKey(key string, rawVal interface{}, opts ...viper.DecoderConfigOption) error {
+	lock.RLock()
+	defer lock.RUnlock()
+	return viper.UnmarshalKey(key, rawVal, opts...)
+}
+
 func AllSettings() map[string]interface{} {
 	lock.RLock()
 	defer lock.RUnlock()

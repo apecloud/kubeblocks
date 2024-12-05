@@ -302,9 +302,16 @@ func main() {
 	if err := viper.ReadInConfig(); err != nil { // Handle errors reading the config file
 		setupLog.Info("unable to read in config, errors ignored")
 	}
+	if err := intctrlutil.LoadRegistryConfig(); err != nil {
+		setupLog.Error(err, "unable to reload registry config")
+		os.Exit(1)
+	}
 	setupLog.Info(fmt.Sprintf("config file: %s", viper.GetViper().ConfigFileUsed()))
 	viper.OnConfigChange(func(e fsnotify.Event) {
 		setupLog.Info(fmt.Sprintf("config file changed: %s", e.Name))
+		if err := intctrlutil.LoadRegistryConfig(); err != nil {
+			setupLog.Error(err, "unable to reload registry config")
+		}
 	})
 	viper.WatchConfig()
 

@@ -74,7 +74,7 @@ func (h *PodRoleEventHandler) Handle(cli client.Client, reqCtx intctrlutil.Reque
 	// HACK: to support kb-agent probe event
 	event = h.transformKBAgentProbeEvent(reqCtx.Log, event)
 
-	filePaths := []string{readinessProbeEventFieldPath, legacyEventFieldPath, lorryEventFieldPath}
+	filePaths := []string{legacyEventFieldPath, lorryEventFieldPath}
 	if !slices.Contains(filePaths, event.InvolvedObject.FieldPath) || event.Reason != checkRoleOperation {
 		return nil
 	}

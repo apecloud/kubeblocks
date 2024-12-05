@@ -25,17 +25,6 @@ const (
 
 	RoleLabelKey       = "kubeblocks.io/role"
 	AccessModeLabelKey = "workloads.kubeblocks.io/access-mode"
-
-	LegacyRSMFinalizerName = "rsm.workloads.kubeblocks.io/finalizer"
-
-	roleProbeContainerName       = "kb-role-probe"
-	usernameCredentialVarName    = "KB_RSM_USERNAME"
-	passwordCredentialVarName    = "KB_RSM_PASSWORD"
-	servicePortVarName           = "KB_RSM_SERVICE_PORT"
-	actionSvcListVarName         = "KB_RSM_ACTION_SVC_LIST"
-	RoleUpdateMechanismVarName   = "KB_RSM_ROLE_UPDATE_MECHANISM"
-	roleProbeTimeoutVarName      = "KB_RSM_ROLE_PROBE_TIMEOUT"
-	readinessProbeEventFieldPath = "spec.containers{" + roleProbeContainerName + "}"
 )
 
 const (

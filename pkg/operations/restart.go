@@ -140,45 +140,6 @@ func (r restartOpsHandler) restartComponents(reqCtx intctrlutil.RequestCtx, cli 
 	return nil
 }
 
-func (r restartOpsHandler) matchToRestart(opsRes *OpsResource, comOpsList []opsv1alpha1.ComponentOps, index int, inOrder bool) bool {
-	if !inOrder {
-		return true
-	}
-	compHasRestartCompleted := func(compName string) bool {
-		if r.getCompReplicas(opsRes.Cluster, compName) == 0 {
-			return true
-		}
-		progressDetails := opsRes.OpsRequest.Status.Components[compName].ProgressDetails
-		if len(progressDetails) == 0 {
-			return false
-		}
-		for _, v := range progressDetails {
-			if !isCompletedProgressStatus(v.Status) {
-				return false
-			}
-		}
-		return true
-	}
-	if index > 0 {
-		if !compHasRestartCompleted(comOpsList[index-1].ComponentName) {
-			return false
-		}
-	}
-	return !compHasRestartCompleted(comOpsList[index].ComponentName)
-}
-
-func (r restartOpsHandler) getCompReplicas(cluster *appsv1.Cluster, compName string) int32 {
-	compSpec := cluster.Spec.GetComponentByName(compName)
-	if compSpec != nil {
-		return compSpec.Replicas
-	}
-	sharding := cluster.Spec.GetShardingByName(compName)
-	if sharding != nil {
-		return sharding.Template.Replicas
-	}
-	return 0
-}
-
 // isRestarted checks whether the component has been restarted
 func (r restartOpsHandler) isRestarted(opsRes *OpsResource, compSpec *appsv1.ClusterComponentSpec) bool {
 	if compSpec.Annotations == nil {

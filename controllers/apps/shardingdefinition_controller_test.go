@@ -115,8 +115,8 @@ var _ = Describe("ShardingDefinition Controller", func() {
 		It("ok", func() {
 			By("create a ShardingDefinition obj")
 			shardingDefObj := testapps.NewShardingDefinitionFactory(shardingDefName, compDefObj.GetName()).
-				SetProvisionStrategy(appsv1.SerialStrategy).
-				SetUpdateStrategy(appsv1.ParallelStrategy).
+				SetProvisionStrategy(appsv1.SerialConcurrency).
+				SetUpdateStrategy(appsv1.ParallelConcurrency).
 				Create(&testCtx).GetObject()
 
 			checkObjectStatus(shardingDefObj, appsv1.AvailablePhase)
@@ -125,8 +125,8 @@ var _ = Describe("ShardingDefinition Controller", func() {
 		It("unsupported strategy", func() {
 			By("create a ShardingDefinition obj")
 			shardingDefObj := testapps.NewShardingDefinitionFactory(shardingDefName, compDefObj.GetName()).
-				SetProvisionStrategy(appsv1.BestEffortParallelStrategy).
-				SetUpdateStrategy(appsv1.BestEffortParallelStrategy).
+				SetProvisionStrategy(appsv1.BestEffortParallelConcurrency).
+				SetUpdateStrategy(appsv1.BestEffortParallelConcurrency).
 				Create(&testCtx).GetObject()
 
 			checkObjectStatus(shardingDefObj, appsv1.UnavailablePhase)

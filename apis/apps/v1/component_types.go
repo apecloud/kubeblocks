@@ -189,10 +189,10 @@ type ComponentSpec struct {
 	// +optional
 	ServiceAccountName string `json:"serviceAccountName,omitempty"`
 
-	// Provides fine-grained control over the RollingUpdate process when a new ServiceVersion specified.
+	// Provides fine-grained control over the spec update process of all instances.
 	//
 	// +optional
-	RollingUpdate *RollingUpdate `json:"rollingUpdate,omitempty"`
+	UpdateStrategy *UpdateStrategy `json:"updateStrategy,omitempty"`
 
 	// Controls the concurrency of pods during initial scale up, when replacing pods on nodes,
 	// or when scaling down. It only used when `PodManagementPolicy` is set to `Parallel`.
@@ -200,17 +200,6 @@ type ComponentSpec struct {
 	//
 	// +optional
 	ParallelPodManagementConcurrency *intstr.IntOrString `json:"parallelPodManagementConcurrency,omitempty"`
-
-	// PodUpdatePolicy indicates how pods should be updated
-	//
-	// - `StrictInPlace` indicates that only allows in-place upgrades.
-	// Any attempt to modify other fields will be rejected.
-	// - `PreferInPlace` indicates that we will first attempt an in-place upgrade of the Pod.
-	// If that fails, it will fall back to the ReCreate, where pod will be recreated.
-	// Default value is "PreferInPlace"
-	//
-	// +optional
-	PodUpdatePolicy *PodUpdatePolicyType `json:"podUpdatePolicy,omitempty"`
 
 	// Specifies the scheduling policy for the Component.
 	//

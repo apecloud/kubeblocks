@@ -259,11 +259,11 @@ func getMemberUpdateStrategy(synthesizedComp *SynthesizedComponent) *workloads.M
 		bestEffortParallelUpdate = workloads.BestEffortParallelUpdateStrategy
 	)
 	switch *synthesizedComp.UpdateStrategy {
-	case kbappsv1.SerialStrategy:
+	case kbappsv1.SerialConcurrency:
 		return &serial
-	case kbappsv1.ParallelStrategy:
+	case kbappsv1.ParallelConcurrency:
 		return &parallelUpdate
-	case kbappsv1.BestEffortParallelStrategy:
+	case kbappsv1.BestEffortParallelConcurrency:
 		return &bestEffortParallelUpdate
 	default:
 		return nil

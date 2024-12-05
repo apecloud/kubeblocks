@@ -104,13 +104,13 @@ func (r *Cluster) changesToCluster(cluster *appsv1.Cluster) {
 	//       - volumeClaimTemplates
 	//           spec:
 	//             resources: corev1.ResourceRequirements -> corev1.VolumeResourceRequirements
-	//         podUpdatePolicy: *workloads.PodUpdatePolicyType -> *PodUpdatePolicyType
+	//         podUpdatePolicy: *workloads.InstanceUpdatePolicyType -> *InstanceUpdatePolicyType
 	//     sharings
 	//       - template
 	//           volumeClaimTemplates
 	//             spec:
 	//               resources: corev1.ResourceRequirements -> corev1.VolumeResourceRequirements
-	//           podUpdatePolicy: *workloads.PodUpdatePolicyType -> *PodUpdatePolicyType
+	//           podUpdatePolicy: *workloads.InstanceUpdatePolicyType -> *InstanceUpdatePolicyType
 	//   status
 	//     components
 	//       - message: ComponentMessageMap -> map[string]string
@@ -132,13 +132,13 @@ func (r *Cluster) changesFromCluster(cluster *appsv1.Cluster) {
 	//       - volumeClaimTemplates
 	//           spec:
 	//             resources: corev1.ResourceRequirements -> corev1.VolumeResourceRequirements
-	//         podUpdatePolicy: *workloads.PodUpdatePolicyType -> *PodUpdatePolicyType
+	//         podUpdatePolicy: *workloads.InstanceUpdatePolicyType -> *InstanceUpdatePolicyType
 	//     sharings
 	//       - template
 	//           volumeClaimTemplates
 	//             spec:
 	//               resources: corev1.ResourceRequirements -> corev1.VolumeResourceRequirements
-	//           podUpdatePolicy: *workloads.PodUpdatePolicyType -> *PodUpdatePolicyType
+	//           podUpdatePolicy: *workloads.InstanceUpdatePolicyType -> *InstanceUpdatePolicyType
 	//   status
 	//     components
 	//       - message: ComponentMessageMap -> map[string]string

@@ -522,7 +522,7 @@ var _ = Describe("ComponentDefinition Controller", func() {
 			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(componentDefObj), func(cmpd *kbappsv1.ComponentDefinition) {
 				cmpd.Spec.Description = "v0.0.2"
 				cmpd.Spec.Runtime.Containers[0].Image = "image:v0.0.2"
-				parallel := kbappsv1.ParallelStrategy
+				parallel := kbappsv1.ParallelConcurrency
 				cmpd.Spec.UpdateStrategy = &parallel
 			})()).Should(Succeed())
 
@@ -539,7 +539,7 @@ var _ = Describe("ComponentDefinition Controller", func() {
 					}
 					g.Expect(cmpd.Spec.Runtime.Containers[0]).Should(BeEquivalentTo(c))
 					g.Expect(cmpd.Spec.UpdateStrategy).ShouldNot(BeNil())
-					g.Expect(*cmpd.Spec.UpdateStrategy).Should(Equal(kbappsv1.ParallelStrategy))
+					g.Expect(*cmpd.Spec.UpdateStrategy).Should(Equal(kbappsv1.ParallelConcurrency))
 				})).Should(Succeed())
 		})
 
@@ -550,7 +550,7 @@ var _ = Describe("ComponentDefinition Controller", func() {
 			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(componentDefObj), func(cmpd *kbappsv1.ComponentDefinition) {
 				cmpd.Spec.Description = "v0.0.2"
 				cmpd.Spec.Runtime.Containers[0].Image = "image:v0.0.2"
-				parallel := kbappsv1.ParallelStrategy
+				parallel := kbappsv1.ParallelConcurrency
 				cmpd.Spec.UpdateStrategy = &parallel
 			})()).Should(Succeed())
 
@@ -567,7 +567,7 @@ var _ = Describe("ComponentDefinition Controller", func() {
 					}
 					g.Expect(cmpd.Spec.Runtime.Containers[0]).Should(BeEquivalentTo(c))
 					g.Expect(cmpd.Spec.UpdateStrategy).ShouldNot(BeNil())
-					g.Expect(*cmpd.Spec.UpdateStrategy).Should(Equal(kbappsv1.ParallelStrategy))
+					g.Expect(*cmpd.Spec.UpdateStrategy).Should(Equal(kbappsv1.ParallelConcurrency))
 				})).Should(Succeed())
 
 			By("revert the change to immutable fields back")
@@ -589,7 +589,7 @@ var _ = Describe("ComponentDefinition Controller", func() {
 					}
 					g.Expect(cmpd.Spec.Runtime.Containers[0]).Should(BeEquivalentTo(c))
 					g.Expect(cmpd.Spec.UpdateStrategy).ShouldNot(BeNil())
-					g.Expect(*cmpd.Spec.UpdateStrategy).Should(Equal(kbappsv1.SerialStrategy))
+					g.Expect(*cmpd.Spec.UpdateStrategy).Should(Equal(kbappsv1.SerialConcurrency))
 				})).Should(Succeed())
 		})
 	})

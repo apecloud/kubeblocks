@@ -457,16 +457,16 @@ type ClusterComponentConfigSource struct {
 	// - Local file
 }
 
-type PodUpdatePolicyType string
+type InstanceUpdatePolicyType string
 
 const (
-	// StrictInPlacePodUpdatePolicyType indicates that only allows in-place upgrades.
-	// Any attempt to modify other fields will be rejected.
-	StrictInPlacePodUpdatePolicyType PodUpdatePolicyType = "StrictInPlace"
+	// StrictInPlaceInstanceUpdatePolicyType indicates that only allows in-place update.
+	// Any attempt to modify other fields that not support in-place update will be rejected.
+	StrictInPlaceInstanceUpdatePolicyType InstanceUpdatePolicyType = "StrictInPlace"
 
-	// PreferInPlacePodUpdatePolicyType indicates that we will first attempt an in-place upgrade of the Pod.
-	// If that fails, it will fall back to the ReCreate, where pod will be recreated.
-	PreferInPlacePodUpdatePolicyType PodUpdatePolicyType = "PreferInPlace"
+	// PreferInPlaceInstanceUpdatePolicyType indicates that we will first attempt an in-place update of the instance.
+	// If that fails, it will fall back to the ReCreate, where instance will be recreated.
+	PreferInPlaceInstanceUpdatePolicyType InstanceUpdatePolicyType = "PreferInPlace"
 )
 
 type SchedulingPolicy struct {
@@ -663,7 +663,27 @@ type InstanceTemplate struct {
 	VolumeClaimTemplates []ClusterComponentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
 }
 
-// RollingUpdate defines fine-grained control over the RollingUpdate process when a new ServiceVersion specified.
+// UpdateStrategy defines fine-grained control over the spec update process of all instances.
+type UpdateStrategy struct {
+	// Indicates how instances should be updated.
+	//
+	// - `StrictInPlace` indicates that only allows in-place update.
+	// Any attempt to modify other fields that not support in-place update will be rejected.
+	// - `PreferInPlace` indicates that we will first attempt an in-place update of the instance.
+	// If that fails, it will fall back to the ReCreate, where instance will be recreated.
+	// Default value is "PreferInPlace".
+	//
+	// +kubebuilder:validation:Enum={StrictInPlace,PreferInPlace}
+	// +optional
+	InstanceUpdatePolicy *InstanceUpdatePolicyType `json:"instanceUpdatePolicy,omitempty"`
+
+	// Specifies how the rolling update should be applied.
+	//
+	// +optional
+	RollingUpdate *RollingUpdate `json:"rollingUpdate,omitempty"`
+}
+
+// RollingUpdate specifies how the rolling update should be applied.
 type RollingUpdate struct {
 	// Indicates the number of instances that should be updated during a rolling update.
 	// The remaining instances will remain untouched. This is helpful in defining how many instances
@@ -675,11 +695,65 @@ type RollingUpdate struct {
 	// +optional
 	Replicas *intstr.IntOrString `json:"replicas,omitempty"`
 
+	// Specifies the concurrency level for updating instances during a rolling update.
+	// Available levels:
+	//
+	// - `Serial`: Updates instances one at a time, ensuring minimal downtime by waiting for each instance to become ready
+	//   before updating the next.
+	// - `Parallel`: Updates all instances simultaneously, optimizing for speed but potentially reducing availability
+	//   during the update.
+	// - `BestEffortParallel`: Updates instances concurrently with a limit on simultaneous updates to ensure a minimum
+	//   number of operational replicas for maintaining quorum.
+	//	 For example, in a 5-instances setup, updating a maximum of 2 instances simultaneously keeps
+	//	 at least 3 operational for quorum.
+	//
+	// Defaults to 'Serial'.
+	//
+	// +kubebuilder:validation:Enum={Serial,Parallel,BestEffortParallel}
+	// +kubebuilder:default=Serial
+	// +optional
+	UpdateConcurrency *UpdateConcurrency `json:"updateConcurrency,omitempty"`
+
 	// The maximum number of instances that can be unavailable during the update.
 	// Value can be an absolute number (ex: 5) or a percentage of desired instances (ex: 10%).
 	// Absolute number is calculated from percentage by rounding up. This can not be 0.
 	// Defaults to 1. The field applies to all instances. That means if there is any unavailable pod,
 	// it will be counted towards MaxUnavailable.
+	//
 	// +optional
 	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty"`
 }
+
+// UpdateConcurrency defines the update concurrency level for cluster components. This concurrency level determines how updates are applied
+// across the cluster.
+// The available concurrency levels are `Serial`, `BestEffortParallel`, and `Parallel`.
+//
+// +enum
+// +kubebuilder:validation:Enum={Serial,BestEffortParallel,Parallel}
+type UpdateConcurrency string
+
+const (
+	// SerialConcurrency indicates that updates are applied one at a time in a sequential manner.
+	// The operator waits for each replica to be updated and ready before proceeding to the next one.
+	// This ensures that only one replica is unavailable at a time during the update process.
+	SerialConcurrency UpdateConcurrency = "Serial"
+
+	// ParallelConcurrency indicates that updates are applied simultaneously to all Pods of a Component.
+	// The replicas are updated in parallel, with the operator updating all replicas concurrently.
+	// This strategy provides the fastest update time but may lead to a period of reduced availability or
+	// capacity during the update process.
+	ParallelConcurrency UpdateConcurrency = "Parallel"
+
+	// BestEffortParallelConcurrency indicates that the replicas are updated in parallel, with the operator making
+	// a best-effort attempt to update as many replicas as possible concurrently
+	// while maintaining the component's availability.
+	// Unlike the `Parallel` strategy, the `BestEffortParallel` strategy aims to ensure that a minimum number
+	// of replicas remain available during the update process to maintain the component's quorum and functionality.
+	//
+	// For example, consider a component with 5 replicas. To maintain the component's availability and quorum,
+	// the operator may allow a maximum of 2 replicas to be simultaneously updated. This ensures that at least
+	// 3 replicas (a quorum) remain available and functional during the update process.
+	//
+	// The `BestEffortParallel` strategy strikes a balance between update speed and component availability.
+	BestEffortParallelConcurrency UpdateConcurrency = "BestEffortParallel"
+)

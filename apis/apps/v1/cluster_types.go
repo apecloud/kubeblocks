@@ -426,22 +426,10 @@ type ClusterComponentSpec struct {
 	// +optional
 	ParallelPodManagementConcurrency *intstr.IntOrString `json:"parallelPodManagementConcurrency,omitempty"`
 
-	// Provides fine-grained control over the RollingUpdate process when a new ServiceVersion specified.
+	// Provides fine-grained control over the spec update process of all instances.
 	//
 	// +optional
-	RollingUpdate *RollingUpdate `json:"rollingUpdate,omitempty"`
-
-	// PodUpdatePolicy indicates how pods should be updated
-	//
-	// - `StrictInPlace` indicates that only allows in-place upgrades.
-	// Any attempt to modify other fields will be rejected.
-	// - `PreferInPlace` indicates that we will first attempt an in-place upgrade of the Pod.
-	// If that fails, it will fall back to the ReCreate, where pod will be recreated.
-	// Default value is "PreferInPlace"
-	//
-	// +kubebuilder:validation:Enum={StrictInPlace,PreferInPlace}
-	// +optional
-	PodUpdatePolicy *PodUpdatePolicyType `json:"podUpdatePolicy,omitempty"`
+	UpdateStrategy *UpdateStrategy `json:"updateStrategy,omitempty"`
 
 	// Allows for the customization of configuration values for each instance within a Component.
 	// An instance represent a single replica (Pod and associated K8s resources like PVCs, Services, and ConfigMaps).

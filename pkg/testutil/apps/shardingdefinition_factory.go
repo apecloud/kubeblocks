@@ -40,12 +40,12 @@ func NewShardingDefinitionFactory(name, compDef string) *MockShardingDefinitionF
 	return f
 }
 
-func (f *MockShardingDefinitionFactory) SetProvisionStrategy(strategy appsv1.UpdateStrategy) *MockShardingDefinitionFactory {
+func (f *MockShardingDefinitionFactory) SetProvisionStrategy(strategy appsv1.UpdateConcurrency) *MockShardingDefinitionFactory {
 	f.Get().Spec.ProvisionStrategy = &strategy
 	return f
 }
 
-func (f *MockShardingDefinitionFactory) SetUpdateStrategy(strategy appsv1.UpdateStrategy) *MockShardingDefinitionFactory {
+func (f *MockShardingDefinitionFactory) SetUpdateStrategy(strategy appsv1.UpdateConcurrency) *MockShardingDefinitionFactory {
 	f.Get().Spec.UpdateStrategy = &strategy
 	return f
 }

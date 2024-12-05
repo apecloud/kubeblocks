@@ -64,9 +64,7 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, component
 
 	itsName := constant.GenerateWorkloadNamePattern(clusterName, compName)
 	itsBuilder := builder.NewInstanceSetBuilder(namespace, itsName).
-		// Priority: static < dynamic < built-in
 		AddLabelsInMap(synthesizedComp.StaticLabels).
-		AddLabelsInMap(synthesizedComp.DynamicLabels).
 		AddLabelsInMap(constant.GetCompLabels(clusterName, compName)).
 		AddAnnotations(constant.KubeBlocksGenerationKey, synthesizedComp.Generation).
 		AddAnnotations(constant.CRDAPIVersionAnnotationKey, workloads.GroupVersion.String()).
@@ -75,7 +73,6 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, component
 			constant.KBAppServiceVersionKey: synthesizedComp.ServiceVersion,
 		}).
 		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
-		AddAnnotationsInMap(synthesizedComp.DynamicAnnotations).
 		AddAnnotationsInMap(getMonitorAnnotations(synthesizedComp, componentDef)).
 		SetTemplate(template).
 		AddMatchLabelsInMap(constant.GetCompLabels(clusterName, compName)).
@@ -325,24 +322,18 @@ func setToolsScriptsPath(container *corev1.Container, meta cfgcm.ConfigSpecMeta)
 
 func BuildServiceAccount(synthesizedComp *component.SynthesizedComponent, saName string) *corev1.ServiceAccount {
 	return builder.NewServiceAccountBuilder(synthesizedComp.Namespace, saName).
-		// Priority: static < dynamic < built-in
 		AddLabelsInMap(synthesizedComp.StaticLabels).
-		AddLabelsInMap(synthesizedComp.DynamicLabels).
 		AddLabelsInMap(constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name)).
 		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
-		AddAnnotationsInMap(synthesizedComp.DynamicAnnotations).
 		SetImagePullSecrets(intctrlutil.BuildImagePullSecrets()).
 		GetObject()
 }
 
 func BuildRoleBinding(synthesizedComp *component.SynthesizedComponent, saName string) *rbacv1.RoleBinding {
 	return builder.NewRoleBindingBuilder(synthesizedComp.Namespace, saName).
-		// Priority: static < dynamic < built-in
 		AddLabelsInMap(synthesizedComp.StaticLabels).
-		AddLabelsInMap(synthesizedComp.DynamicLabels).
 		AddLabelsInMap(constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name)).
 		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
-		AddAnnotationsInMap(synthesizedComp.DynamicAnnotations).
 		SetRoleRef(rbacv1.RoleRef{
 			APIGroup: rbacv1.GroupName,
 			Kind:     "ClusterRole",

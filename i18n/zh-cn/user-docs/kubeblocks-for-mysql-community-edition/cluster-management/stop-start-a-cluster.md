@@ -54,7 +54,7 @@ import TabItem from '@theme/TabItem';
       - name: mysql
         componentDefRef: mysql
         disableExporter: true  
-        replicas: 0
+        replicas: 0 #修改该参数值
     ...
     ```
 
@@ -133,7 +133,7 @@ import TabItem from '@theme/TabItem';
       - name: mysql
         componentDefRef: mysql
         disableExporter: true  
-        replicas: 2
+        replicas: 2 #修改该参数值
     ...
     ```
 

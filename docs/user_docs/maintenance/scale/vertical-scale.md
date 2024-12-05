@@ -102,7 +102,7 @@ There are two ways to apply vertical scaling.
      - name: mysql
        componentDefRef: mysql
        replicas: 3
-       resources: # Change the values of resources.
+       resources: # Change the values of resources
          requests:
            memory: "2Gi"
            cpu: "1"

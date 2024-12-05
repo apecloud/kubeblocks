@@ -115,7 +115,7 @@ mycluster   demo        redis                          Delete               Runn
      - name: redis
        componentDef: redis
        replicas: 1
-       resources: # Change values of resources.
+       resources: # Change values of resources
          requests:
            memory: "2Gi"
            cpu: "1"

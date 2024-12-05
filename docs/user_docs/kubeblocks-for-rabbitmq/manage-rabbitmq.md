@@ -351,7 +351,7 @@ mycluster                                        Delete                 Running 
              - ReadWriteOnce
            resources:
              requests:
-               storage: 40Gi # Change the volume storage size.
+               storage: 40Gi # Change the volume storage size
    ...
    ```
 

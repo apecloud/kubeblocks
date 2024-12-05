@@ -54,7 +54,7 @@ import TabItem from '@theme/TabItem';
       - name: pulsar
         componentDefRef: pulsar
         disableExporter: true 
-        replicas: 0
+        replicas: 0 # 修改该参数值
     ...
     ```
 
@@ -133,7 +133,7 @@ import TabItem from '@theme/TabItem';
       - name: pulsar
         componentDefRef: pulsar
         disableExporter: true  
-        replicas: 1
+        replicas: 1 # 修改该参数值
     ...
     ```
 

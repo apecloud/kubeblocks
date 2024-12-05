@@ -121,7 +121,7 @@ mycluster   demo        kafka                kafka-3.3.2   Delete               
              - ReadWriteOnce
            resources:
              requests:
-               storage: 40Gi # Change the volume storage size.
+               storage: 40Gi # Change the volume storage size
      terminationPolicy: Delete
    ```
 

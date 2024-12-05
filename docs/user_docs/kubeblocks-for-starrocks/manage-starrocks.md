@@ -288,7 +288,7 @@ mycluster   demo        starrocks            starrocks-3.1.1   Delete           
      - name: fe
        componentDefRef: fe
        replicas: 2
-       resources: # Change the values of resources.
+       resources: # Change the values of resources
          requests:
            memory: "2Gi"
            cpu: "1"
@@ -629,7 +629,7 @@ mycluster   demo        starrocks            starrocks-3.1.1   Delete           
              - ReadWriteOnce
            resources:
              requests:
-               storage: 40Gi # Change the volume storage size.
+               storage: 40Gi # Change the volume storage size
    ...
    ```
 

@@ -120,7 +120,7 @@ mycluster        demo             mongodb               mongodb-5.0        Delet
              - ReadWriteOnce
            resources:
              requests:
-               storage: 40Gi # Change the volume storage size.
+               storage: 40Gi # Change the volume storage size
      terminationPolicy: Delete
    ```
 

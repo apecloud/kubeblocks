@@ -144,7 +144,7 @@ mycluster   demo        redis                          Delete               Runn
             - ReadWriteOnce
             resources:
               requests:
-                storage: 40Gi # Change the volume storage size.
+                storage: 40Gi # Change the volume storage size
     ...
     ```
 

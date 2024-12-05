@@ -54,7 +54,7 @@ import TabItem from '@theme/TabItem';
      - name: postgresql
        componentDefRef: postgresql
        disableExporter: true  
-       replicas: 0 #修改该参数值
+       replicas: 0 # 修改该参数值
    ...
    ```
 

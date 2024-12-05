@@ -152,7 +152,7 @@ helm install myproxy kubeblocks/apecloud-mysql-cluster --version=v0.9.0 --set mo
 
 1. Enable the etcd Addon and create an etcd cluster.
 
-   1. Install and enable the etcd Addon. You need to install the etcd Addon first since the etcd Addon is not installed by default. Refer to [Addons installation tutorial](./../../installation/install-with-kbcli/install-addons.md) for details.
+   1. Install and enable the etcd Addon. You need to install the etcd Addon first since the etcd Addon is not installed by default. Refer to [Addons installation tutorial](./../../installation/install-addons.md) for details.
 
        ```bash
        # 1. Check whether the KubeBlocks Addon index is added

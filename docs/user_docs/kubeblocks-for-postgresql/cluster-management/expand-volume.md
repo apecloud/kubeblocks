@@ -122,7 +122,7 @@ mycluster   demo        postgresql           postgresql-14.8.0   Delete         
              - ReadWriteOnce
            resources:
              requests:
-               storage: 40Gi # Change the volume storage size.
+               storage: 40Gi # Change the volume storage size
      terminationPolicy: Delete
    ```
 

@@ -107,7 +107,7 @@ kbcli cluster list mycluster -n demo
              - ReadWriteOnce
            resources:
              requests:
-               storage: 40Gi # Change the volume storage size.
+               storage: 40Gi # Change the volume storage size
      terminationPolicy: Delete
    ```
 

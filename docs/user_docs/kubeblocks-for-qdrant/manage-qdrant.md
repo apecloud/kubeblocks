@@ -676,7 +676,7 @@ mycluster   demo        qdrant                         Delete               Runn
              - ReadWriteOnce
            resources:
              requests:
-               storage: 1Gi # Change the volume storage size.
+               storage: 1Gi # Change the volume storage size
    ...
    ```
 

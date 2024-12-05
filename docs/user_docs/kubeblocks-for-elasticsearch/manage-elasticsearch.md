@@ -284,7 +284,7 @@ From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out insta
      componentSpecs:
      - name: mdit
        componentDefRef: elasticsearch
-       replicas: 1 # Change the value
+       replicas: 1 # Change this value
    ...
    ```
 

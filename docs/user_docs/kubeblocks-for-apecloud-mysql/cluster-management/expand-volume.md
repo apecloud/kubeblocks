@@ -119,7 +119,7 @@ mycluster   demo        apecloud-mysql       ac-mysql-8.0.30   Delete           
              - ReadWriteOnce
            resources:
              requests:
-               storage: 40Gi # Change the volume storage size.
+               storage: 40Gi # Change the volume storage size
      terminationPolicy: Delete
    ```
 

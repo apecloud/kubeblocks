@@ -1,17 +1,17 @@
 ---
-title: 升级到 KubeBlocks v0.9
-description: 升级到 KubeBlocks v0.9, 升级操作
-keywords: [升级, 0.9]
+title: 升级到 KubeBlocks v0.9.0
+description: 升级到 KubeBlocks v0.9.0, 升级操作
+keywords: [升级, 0.9.0]
 sidebar_position: 2
-sidebar_label: 升级到 KubeBlocks v0.9
+sidebar_label: 升级到 KubeBlocks v0.9.0
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# 升级到 KubeBlocks v0.9
+# 升级到 KubeBlocks v0.9.0
 
-本文档将介绍如何升级至 KubeBlocks v0.9。
+本文档将介绍如何升级至 KubeBlocks v0.9.0。
 
 :::note
 
@@ -21,7 +21,7 @@ import TabItem from '@theme/TabItem';
 
 ## 兼容性说明
 
-KubeBlocks 0.9 可以兼容 KubeBlocks 0.8 的 API，但不保证兼容 0.8 之前版本的 API，如果您正在使用 KubeBlocks 0.7 或者更老版本的引擎（版本号为 `0.7.x`, `0.6.x`），请务必参考 [0.8 升级文档](./upgrade-kubeblocks-to-0.8.md)将 KubeBlocks 升级至 0.8 并将所有引擎升级至 0.8，以确保升级至 0.9 版本后服务的可用性。
+KubeBlocks 0.9.0 可以兼容 KubeBlocks 0.8 的 API，但不保证兼容 0.8 之前版本的 API，如果您正在使用 KubeBlocks 0.7 或者更老版本的引擎（版本号为 `0.7.x`, `0.6.x`），请务必参考 [0.8 升级文档](./upgrade-kubeblocks-to-0.8.md)将 KubeBlocks 升级至 0.8 并将所有引擎升级至 0.8，以确保升级至 0.9.0 版本后服务的可用性。
 
 ## 从 v0.8 版本升级
 
@@ -67,7 +67,7 @@ KubeBlocks 0.9 可以兼容 KubeBlocks 0.8 的 API，但不保证兼容 0.8 之�
 
     :::note
 
-    避免影响已有的数据库集群，升级 KubeBlocks 至 v0.9 时，默认不会升级已经安装的引擎版本，如果要将引擎版本至 KubeBlocks v0.9 内置引擎的版本，可以执行如下命令，这可能导致已有集群发生重启，影响可用性，请务必谨慎操作。
+    避免影响已有的数据库集群，升级 KubeBlocks 至 v0.9.0 时，默认不会升级已经安装的引擎版本，如果要将引擎版本至 KubeBlocks v0.9 内置引擎的版本，可以执行如下命令，这可能导致已有集群发生重启，影响可用性，请务必谨慎操作。
 
     ```bash
     helm -n kb-system upgrade kubeblocks kubeblocks/kubeblocks --version 0.9.0 \
@@ -94,7 +94,7 @@ KubeBlocks 0.9 可以兼容 KubeBlocks 0.8 的 API，但不保证兼容 0.8 之�
 
     :::note
 
-    为避免影响已有的数据库集群，升级 KubeBlocks 至 v0.9 时，默认不会升级已经安装的引擎版本，如果要升级引擎版本至 KubeBlocks v0.9 内置引擎的版本，可以执行如下命令，这可能导致已有集群发生重启，影响可用性，请务必谨慎操作。
+    为避免影响已有的数据库集群，升级 KubeBlocks 至 v0.9.0 时，默认不会升级已经安装的引擎版本，如果要升级引擎版本至 KubeBlocks v0.9.0 内置引擎的版本，可以执行如下命令，这可能导致已有集群发生重启，影响可用性，请务必谨慎操作。
 
     ```bash
     kbcli kb upgrade --version 0.9.0 --set upgradeAddons=true
@@ -114,9 +114,9 @@ KubeBlocks 0.9 可以兼容 KubeBlocks 0.8 的 API，但不保证兼容 0.8 之�
 
 :::note
 
-- 如果您使用的引擎是 MySQL, 需要升级引擎并重启集群，否则 KubeBlocks v0.8 创建的集群将无法在 v0.9 中使用。
+- 如果您使用的引擎是 MySQL, 需要升级引擎并重启集群，否则 KubeBlocks v0.8 创建的集群将无法在 v0.9.0 中使用。
 
-- 如果您要使用 `clickhouse/milvus/elasticsearch/llm` 等引擎，需要升级 KubeBlocks 之后，再升级引擎，否则无法在 v0.9 正常使用。
+- 如果您要使用 `clickhouse/milvus/elasticsearch/llm` 等引擎，需要升级 KubeBlocks 之后，再升级引擎，否则无法在 v0.9.0 正常使用。
 
 :::
 

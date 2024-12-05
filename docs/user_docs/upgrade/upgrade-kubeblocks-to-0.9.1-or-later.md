@@ -1,15 +1,15 @@
 ---
-title: Upgrade to KubeBlocks v0.9.1
-description: Upgrade to KubeBlocks v0.9.1, operation, tips and notes
-keywords: [upgrade, 0.9.1]
+title: Upgrade to KubeBlocks v0.9.1 or Later
+description: Upgrade to KubeBlocks v0.9.1 or later, operation, tips and notes
+keywords: [upgrade, 0.9.1, 0.9.2]
 sidebar_position: 1
-sidebar_label: Upgrade to KubeBlocks v0.9.1
+sidebar_label: Upgrade to KubeBlocks v0.9.1 or Later
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Upgrade to KubeBlocks v0.9.1
+# Upgrade to KubeBlocks v0.9.1 or Later
 
 :::note
 

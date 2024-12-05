@@ -1,17 +1,17 @@
 ---
-title: 升级到 KubeBlocks v0.9.1
-description: KubeBlocks v0.9.1 升级文档
+title: 升级到 KubeBlocks v0.9.1 及以上版本
+description: KubeBlocks v0.9.1 及以上版本升级文档
 keywords: [升级, 0.9.1, Helm]
 sidebar_position: 1
-sidebar_label: 升级到 KubeBlocks v0.9.1
+sidebar_label: 升级到 KubeBlocks v0.9.1 及以上版本
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# 升级到 KubeBlocks v0.9.1
+# 升级到 KubeBlocks v0.9.1 及以上版本
 
-本文档将介绍如何从不同版本升级至 KubeBlocks v0.9.1。
+本文档将介绍如何从不同版本升级至 KubeBlocks v0.9.1 及以上版本。
 
 :::note
 

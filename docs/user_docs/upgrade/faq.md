@@ -111,9 +111,9 @@ Starting from v0.9.0, one of KubeBlocks' image registries has changed. Specifica
    kbcli kb upgrade --version 0.9.1 \ 
      --set admissionWebhooks.enabled=true \
      --set admissionWebhooks.ignoreReplicasCheck=true \
-     --set image.registry=docker.io \
-     --set dataProtection.image.registry=docker.io \
-     --set addonChartsImage.registry=docker.io
+     --set image.registry=apecloud-registry.cn-xxx.xxx.com \
+     --set dataProtection.image.registry=apecloud-registry.cn-xxx.xxx.com \
+     --set addonChartsImage.registry=apecloud-registry.cn-xxx.xxx.com
    ```
 
    </TabItem>
@@ -122,6 +122,6 @@ Starting from v0.9.0, one of KubeBlocks' image registries has changed. Specifica
 
    Here is an introduction to the flags in the above command.
 
-   - `--set image.registry=docker.io` specifies the KubeBlocks image registry.
-   - `--set dataProtection.image.registry=docker.io` specifies the KubeBlocks-Dataprotection image registry.
-   - `--set addonChartsImage.registry=docker.io` specifies Addon Charts image registry.
+   - `--set image.registry=apecloud-registry.cn-xxx.xxx.com` specifies the KubeBlocks image registry.
+   - `--set dataProtection.image.registry=apecloud-registry.cn-xxx.xxx.com` specifies the KubeBlocks-Dataprotection image registry.
+   - `--set addonChartsImage.registry=apecloud-registry.cn-xxx.xxx.com` specifies Addon Charts image registry.

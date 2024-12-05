@@ -70,15 +70,7 @@ func (r restartOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		}); err != nil {
 		return err
 	}
-	orderedComps, err := r.getComponentOrders(reqCtx, cli, opsRes)
-	if err != nil {
-		return err
-	}
-	if len(orderedComps) > 0 {
-		// will restart components in "ReconcileAction"
-		return nil
-	}
-	return r.restartComponents(reqCtx, cli, opsRes, opsRes.OpsRequest.Spec.RestartList, false)
+	return r.restartComponents(reqCtx, cli, opsRes, opsRes.OpsRequest.Spec.RestartList)
 }
 
 // ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
@@ -91,15 +83,6 @@ func (r restartOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli cl
 		pgRes *progressResource,
 		compStatus *opsv1alpha1.OpsRequestComponentStatus) (expectProgressCount int32, completedCount int32, err error) {
 		return handleComponentStatusProgress(reqCtx, cli, opsRes, pgRes, compStatus, r.podApplyCompOps)
-	}
-	orderedComps, err := r.getComponentOrders(reqCtx, cli, opsRes)
-	if err != nil {
-		return "", 0, err
-	}
-	if len(orderedComps) > 0 {
-		if err = r.restartComponents(reqCtx, cli, opsRes, orderedComps, true); err != nil {
-			return "", 0, err
-		}
 	}
 	return r.compOpsHelper.reconcileActionWithComponentOps(reqCtx, cli, opsRes,
 		"restart", handleRestartProgress)
@@ -118,35 +101,7 @@ func (r restartOpsHandler) podApplyCompOps(
 	return !pod.CreationTimestamp.Before(&ops.Status.StartTimestamp)
 }
 
-func (r restartOpsHandler) getComponentOrders(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) ([]opsv1alpha1.ComponentOps, error) {
-	cd := &appsv1.ClusterDefinition{}
-	if opsRes.Cluster.Spec.ClusterDef == "" || opsRes.Cluster.Spec.Topology == "" {
-		return nil, nil
-	}
-	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: opsRes.Cluster.Spec.ClusterDef}, cd); err != nil {
-		return nil, err
-	}
-	// components that require sequential restart
-	var orderedComps []opsv1alpha1.ComponentOps
-	for _, topology := range cd.Spec.Topologies {
-		if topology.Name != opsRes.Cluster.Spec.Topology {
-			continue
-		}
-		if topology.Orders != nil && len(topology.Orders.Update) > 0 {
-			// when using clusterDef and topology, "update orders" includes all components
-			for _, compName := range topology.Orders.Update {
-				// get the ordered components to restart
-				if compOps, ok := r.compOpsHelper.componentOpsSet[compName]; ok {
-					orderedComps = append(orderedComps, compOps.(opsv1alpha1.ComponentOps))
-				}
-			}
-		}
-		break
-	}
-	return orderedComps, nil
-}
-
-func (r restartOpsHandler) restartComponents(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource, comOpsList []opsv1alpha1.ComponentOps, inOrder bool) error {
+func (r restartOpsHandler) restartComponents(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource, comOpsList []opsv1alpha1.ComponentOps) error {
 	doRestart := func(compSpec *appsv1.ClusterComponentSpec, currCompName, targetCompName string) (bool, error) {
 		if targetCompName != currCompName {
 			return false, nil
@@ -176,17 +131,11 @@ func (r restartOpsHandler) restartComponents(reqCtx intctrlutil.RequestCtx, cli 
 		return nil
 	}
 
-	for index, compOps := range comOpsList {
-		if !r.matchToRestart(opsRes, comOpsList, index, inOrder) {
-			continue
-		}
+	for _, compOps := range comOpsList {
 		if err := restartComponent(compOps.GetComponentName()); err != nil {
 			return err
 		}
-		if inOrder {
-			// if a component has been restarted in order, break
-			break
-		}
+
 	}
 	return nil
 }

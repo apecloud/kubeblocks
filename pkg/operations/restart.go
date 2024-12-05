@@ -70,7 +70,15 @@ func (r restartOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 		}); err != nil {
 		return err
 	}
-	return r.restartComponents(reqCtx, cli, opsRes, opsRes.OpsRequest.Spec.RestartList)
+	for i := range opsRes.Cluster.Spec.ComponentSpecs {
+		componentSpec := &opsRes.Cluster.Spec.ComponentSpecs[i]
+		r.doRestart(opsRes, componentSpec, componentSpec.Name)
+	}
+	for i := range opsRes.Cluster.Spec.Shardings {
+		shardingSpec := &opsRes.Cluster.Spec.Shardings[i]
+		r.doRestart(opsRes, &shardingSpec.Template, shardingSpec.Name)
+	}
+	return cli.Update(reqCtx.Ctx, opsRes.Cluster)
 }
 
 // ReconcileAction will be performed when action is done and loops till OpsRequest.status.phase is Succeed/Failed.
@@ -101,56 +109,16 @@ func (r restartOpsHandler) podApplyCompOps(
 	return !pod.CreationTimestamp.Before(&ops.Status.StartTimestamp)
 }
 
-func (r restartOpsHandler) restartComponents(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource, comOpsList []opsv1alpha1.ComponentOps) error {
-	doRestart := func(compSpec *appsv1.ClusterComponentSpec, currCompName, targetCompName string) (bool, error) {
-		if targetCompName != currCompName {
-			return false, nil
-		}
-		if r.isRestarted(opsRes, compSpec) {
-			return false, nil
-		}
-		if err := cli.Update(reqCtx.Ctx, opsRes.Cluster); err != nil {
-			return false, err
-		}
-		return true, nil
+func (r restartOpsHandler) doRestart(opsRes *OpsResource, compSpec *appsv1.ClusterComponentSpec, componentName string) {
+	if _, ok := r.compOpsHelper.componentOpsSet[componentName]; !ok {
+		return
 	}
-
-	restartComponent := func(targetCompName string) error {
-		for i := range opsRes.Cluster.Spec.ComponentSpecs {
-			componentSpec := &opsRes.Cluster.Spec.ComponentSpecs[i]
-			if ok, err := doRestart(componentSpec, componentSpec.Name, targetCompName); ok || err != nil {
-				return err
-			}
-		}
-		for i := range opsRes.Cluster.Spec.Shardings {
-			shardingSpec := &opsRes.Cluster.Spec.Shardings[i]
-			if ok, err := doRestart(&shardingSpec.Template, shardingSpec.Name, targetCompName); ok || err != nil {
-				return err
-			}
-		}
-		return nil
-	}
-
-	for _, compOps := range comOpsList {
-		if err := restartComponent(compOps.GetComponentName()); err != nil {
-			return err
-		}
-
-	}
-	return nil
-}
-
-// isRestarted checks whether the component has been restarted
-func (r restartOpsHandler) isRestarted(opsRes *OpsResource, compSpec *appsv1.ClusterComponentSpec) bool {
 	if compSpec.Annotations == nil {
 		compSpec.Annotations = map[string]string{}
 	}
-	hasRestarted := true
 	startTimestamp := opsRes.OpsRequest.Status.StartTimestamp
 	workloadRestartTimeStamp := compSpec.Annotations[constant.RestartAnnotationKey]
 	if res, _ := time.Parse(time.RFC3339, workloadRestartTimeStamp); startTimestamp.After(res) {
 		compSpec.Annotations[constant.RestartAnnotationKey] = startTimestamp.Format(time.RFC3339)
-		hasRestarted = false
 	}
-	return hasRestarted
 }

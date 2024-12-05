@@ -599,10 +599,3 @@ kubectl delete -n demo cluster mycluster
 </TabItem>
 
 </Tabs>
-
-## Monitor
-
-The monitoring function of RabbitMQ is the same as other engines. For details, refer to related docs:
-
-- [Monitor databases by kbcli](./../observability/monitor-database.md)
-- [Monitor databases by kubectl](./../../api_docs/observability/monitor-database.md)

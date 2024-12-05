@@ -143,7 +143,7 @@ If there is no data in the dashboard, you can check whether the job is `kubebloc
 
 <TabItem value="kbcli" label="kbcli">
 
-1. View all built-in Addons and make sure the monitoring Addons are enabled. If the monitoring Addons are not enabled, [enable these addons](./../installation/install-with-kbcli/install-addons.md) first.
+1. View all built-in Addons and make sure the monitoring Addons are enabled. If the monitoring Addons are not enabled, [enable these addons](./../installation/install-addons.md) first.
 
    ```bash
    # View all addons supported

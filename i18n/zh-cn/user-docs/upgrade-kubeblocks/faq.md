@@ -47,15 +47,15 @@ kubectl get addon {addonName} -o json | jq '{name: .metadata.name, resource_poli
 
 ## 解决 "cannot patch 'kubeblocks-dataprotection' with kind Deployment" 问题
 
-升级到 KubeBlocks v0.8.x/v0.9.0时，可能会出现以下报错：
+升级到 KubeBlocks v0.8.x/v0.9.x时，可能会出现以下报错：
 
 ```bash
 Error: UPGRADE FAILED: cannot patch "kubeblocks-dataprotection" with kind Deployment: Deployment.apps "kubeblocks-dataprotection" is invalid: spec.selector: Invalid value: v1.LabelSelector{MatchLabels:map[string]string{"app.kubernetes.io/component":"dataprotection", "app.kubernetes.io/instance":"kubeblocks", "app.kubernetes.io/name":"kubeblocks"}, MatchExpressions:[]v1.LabelSelectorRequirement(nil)}: field is immutable && cannot patch "kubeblocks" with kind Deployment: Deployment.apps "kubeblocks" is invalid: spec.selector: Invalid value: v1.LabelSelector{MatchLabels:map[string]string{"app.kubernetes.io/component":"apps", "app.kubernetes.io/instance":"kubeblocks", "app.kubernetes.io/name":"kubeblocks"}, MatchExpressions:[]v1.LabelSelectorRequirement(nil)}: field is immutable
 ```
 
-这是因为 KubeBlocks v0.9.1 修改了 KubeBlocks 和 KubeBlocks-Dataprotection 的标签。
+这是因为 KubeBlocks v0.9 修改了 KubeBlocks 和 KubeBlocks-Dataprotection 的标签。
 
-如果出现这种错误，可以先手动删除 `kubeblocks` 和 `kubeblocks-dataprotection` 这两个 deployment，然后再执行 `helm upgrade` 升级到 KubeBlocks v0.9.1。
+如果出现这种错误，可以先手动删除 `kubeblocks` 和 `kubeblocks-dataprotection` 这两个 deployment，然后再执行 `helm upgrade` 升级到 KubeBlocks v0.9.x。
 
 ```bash
 # 水平缩容至 0 replica
@@ -95,7 +95,7 @@ kubectl delete -n kb-system deployments.apps kubeblocks kubeblocks-dataprotectio
    <TabItem value="Helm" label="Helm" default>
 
    ```bash
-   helm -n kb-system upgrade kubeblocks kubeblocks/kubeblocks --version 0.9.1 \
+   helm -n kb-system upgrade kubeblocks kubeblocks/kubeblocks --version 0.9.2 \
      --set admissionWebhooks.enabled=true \
      --set admissionWebhooks.ignoreReplicasCheck=true \
      --set image.registry=apecloud-registry.cn-xxx.xxx.com \
@@ -108,7 +108,7 @@ kubectl delete -n kb-system deployments.apps kubeblocks kubeblocks-dataprotectio
    <TabItem value="kbcli" label="kbcli">
 
    ```bash
-   kbcli kb upgrade --version 0.9.1 \ 
+   kbcli kb upgrade --version 0.9.2 \ 
      --set admissionWebhooks.enabled=true \
      --set admissionWebhooks.ignoreReplicasCheck=true \
      --set image.registry=apecloud-registry.cn-xxx.xxx.com \

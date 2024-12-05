@@ -1,9 +1,8 @@
 ---
-title: 升级到 KubeBlocks v0.9.0
-description: 升级到 KubeBlocks v0.9.0, 升级操作
+title: 升级至 v0.9.0
+description: 升级至 KubeBlocks v0.9.0, 升级操作
 keywords: [升级, 0.9.0]
-sidebar_position: 2
-sidebar_label: 升级到 KubeBlocks v0.9.0
+draft: true
 ---
 
 import Tabs from '@theme/Tabs';

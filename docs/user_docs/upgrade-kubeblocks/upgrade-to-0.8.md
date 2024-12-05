@@ -1,9 +1,8 @@
 ---
-title: Upgrade to KubeBlocks v0.8
+title: Upgrade to v0.8
 description: Upgrade to KubeBlocks v0.8, operation, tips and notes
 keywords: [upgrade, 0.8]
-sidebar_position: 3
-sidebar_label: Upgrade to KubeBlocks v0.8
+draft: true
 ---
 
 import Tabs from '@theme/Tabs';

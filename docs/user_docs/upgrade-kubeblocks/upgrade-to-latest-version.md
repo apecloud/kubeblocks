@@ -1,26 +1,34 @@
 ---
-title: Upgrade to KubeBlocks v0.9.1 or Later
-description: Upgrade to KubeBlocks v0.9.1 or later, operation, tips and notes
-keywords: [upgrade, 0.9.1, 0.9.2]
+title: Upgrade to v0.9.2
+description: Upgrade to KubeBlocks v0.9.2, operation, tips and notes
+keywords: [upgrade, 0.9.2]
 sidebar_position: 1
-sidebar_label: Upgrade to KubeBlocks v0.9.1 or Later
+sidebar_label: Upgrade to v0.9.2
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# Upgrade to KubeBlocks v0.9.1 or Later
+# Upgrade to KubeBlocks v0.9.2
 
 :::note
 
-- Execute `helm -n kb-system list | grep kubeblocks` or `kbcli version` to check the current KubeBlocks version you are running before upgrading KubeBlocks.
-- The upgrade process for v0.9.2 is identical to that of v0.9.1. Simply follow the v0.9.1 tutorial, updating the version number as needed to complete the upgrade to v0.9.2.
+- Before upgrading, check your current KubeBlocks version:
+
+   Run `helm -n kb-system list | grep kubeblocks` or `kbcli version`.
+- For upgrading to different versions:
+
+   - For v0.9.1, follow this upgrade tutorial, replacing the version number with v0.9.1.
+   - [v0.9.0 upgrade guide](https://github.com/apecloud/kubeblocks/blob/main/docs/user_docs/upgrade-kubeblocks/upgrade-to-0.9.0.md).
+   - [v0.8.x upgrade guide](https://github.com/apecloud/kubeblocks/blob/main/docs/user_docs/upgrade-kubeblocks/upgrade-to-0.8.md).
+
+   Installing the latest version is recommended for better performance and features.
 
 :::
 
 ## Compatibility
 
-KubeBlocks v0.9.1 is compatible with KubeBlocks v0.8 APIs, but compatibility with APIs from versions prior to v0.8 is not guaranteed. If you are using Addons from KubeBlocks v0.7 or earlier (v0.6, etc), DO [upgrade KubeBlocks and all Addons to v0.8 first](./upgrade-kubeblocks-to-0.8.md) to ensure service availability before upgrading to v0.9.
+KubeBlocks v0.9.2 is compatible with KubeBlocks v0.8 APIs, but compatibility with APIs from versions prior to v0.8 is not guaranteed. If you are using Addons from KubeBlocks v0.7 or earlier (v0.6, etc), DO [upgrade KubeBlocks and all Addons to v0.8 first](./upgrade-kubeblocks-to-0.8.md) to ensure service availability before upgrading to v0.9.
 
 If you are upgrading from v0.8 to v0.9, it's recommended to enable webhook to ensure the availability.
 
@@ -51,23 +59,23 @@ If you are upgrading from v0.8 to v0.9, it's recommended to enable webhook to en
     To reduce the size of Helm chart, KubeBlocks v0.8 removes CRD from the Helm chart. Before upgrading, you need to install CRD.
 
     ```bash
-    kubectl replace -f https://github.com/apecloud/kubeblocks/releases/download/v0.9.1/kubeblocks_crds.yaml
+    kubectl replace -f https://github.com/apecloud/kubeblocks/releases/download/v0.9.2/kubeblocks_crds.yaml
     ```
 
 3. Upgrade KubeBlocks.
 
     ```bash
-    helm -n kb-system upgrade kubeblocks kubeblocks/kubeblocks --version 0.9.1 --set crd.enabled=false
+    helm -n kb-system upgrade kubeblocks kubeblocks/kubeblocks --version 0.9.2 --set crd.enabled=false
     ```
 
-    Upgrading from v0.9.0 to v0.9.1 doesn't include API change, so you can set `--set crd.enabled=false` to skip the API upgrade task.
+    Upgrading from v0.9.0 to v0.9.2 doesn't include API change, so you can set `--set crd.enabled=false` to skip the API upgrade task.
 
     :::warning
 
-    To avoid affecting existing database clusters, when upgrading to KubeBlocks v0.9.1, the versions of already-installed Addons will not be upgraded by default. If you want to upgrade the Addons to the versions built into KubeBlocks v0.9.1, execute the following command. Note that this may restart existing clusters and affect availability. Please proceed with caution.
+    To avoid affecting existing database clusters, when upgrading to KubeBlocks v0.9.2, the versions of already-installed Addons will not be upgraded by default. If you want to upgrade the Addons to the versions built into KubeBlocks v0.9.2, execute the following command. Note that this may restart existing clusters and affect availability. Please proceed with caution.
 
     ```bash
-    helm -n kb-system upgrade kubeblocks kubeblocks/kubeblocks --version 0.9.1 \
+    helm -n kb-system upgrade kubeblocks kubeblocks/kubeblocks --version 0.9.2 \
       --set upgradeAddons=true \
       --set crd.enabled=false
     ```
@@ -78,24 +86,24 @@ If you are upgrading from v0.8 to v0.9, it's recommended to enable webhook to en
 
 <TabItem value="kbcli" label="kbcli">
 
-1. Download kbcli v0.9.1.
+1. Download kbcli v0.9.2.
 
     ```bash
-    curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash -s 0.9.1
+    curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash -s 0.9.2
     ```
 
 2. Upgrade KubeBlocks.
 
     ```bash
-    kbcli kb upgrade --version 0.9.1
+    kbcli kb upgrade --version 0.9.2
     ```
 
     :::warning
 
-    To avoid affecting existing database clusters, when upgrading to KubeBlocks v0.9.1, the versions of already-installed Addons will not be upgraded by default. If you want to upgrade the Addons to the versions built into KubeBlocks v0.9.1, execute the following command. Note that this may restart existing clusters and affect availability. Please proceed with caution.
+    To avoid affecting existing database clusters, when upgrading to KubeBlocks v0.9.2, the versions of already-installed Addons will not be upgraded by default. If you want to upgrade the Addons to the versions built into KubeBlocks v0.9.2, execute the following command. Note that this may restart existing clusters and affect availability. Please proceed with caution.
 
     ```bash
-    kbcli kb upgrade --version 0.9.1 --set upgradeAddons=true
+    kbcli kb upgrade --version 0.9.2 --set upgradeAddons=true
     ```
 
     :::
@@ -141,7 +149,7 @@ If you are upgrading from v0.8 to v0.9, it's recommended to enable webhook to en
     If the network is slow, it's recommended to download the CRD YAML file on your localhost before further operations.
 
     ```bash
-    kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/v0.9.1/dataprotection.kubeblocks.io_storageproviders.yaml
+    kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/v0.9.2/dataprotection.kubeblocks.io_storageproviders.yaml
     ```
 
 4. Upgrade KubeBlocks.
@@ -157,17 +165,17 @@ If you are upgrading from v0.8 to v0.9, it's recommended to enable webhook to en
 
     helm repo update kubeblocks
 
-    helm -n kb-system upgrade kubeblocks kubeblocks/kubeblocks --version 0.9.1 \
+    helm -n kb-system upgrade kubeblocks kubeblocks/kubeblocks --version 0.9.2 \
       --set admissionWebhooks.enabled=true \
       --set admissionWebhooks.ignoreReplicasCheck=true
     ```
 
     :::warning
 
-    To avoid affecting existing database clusters, when upgrading to KubeBlocks v0.9.1, the versions of already-installed Addons will not be upgraded by default. If you want to upgrade the Addons to the versions built into KubeBlocks v0.9.1, execute the following command. Note that this may restart existing clusters and affect availability. Please proceed with caution.
+    To avoid affecting existing database clusters, when upgrading to KubeBlocks v0.9.2, the versions of already-installed Addons will not be upgraded by default. If you want to upgrade the Addons to the versions built into KubeBlocks v0.9.2, execute the following command. Note that this may restart existing clusters and affect availability. Please proceed with caution.
 
     ```bash
-    helm -n kb-system upgrade kubeblocks kubeblocks/kubeblocks --version 0.9.1 \
+    helm -n kb-system upgrade kubeblocks kubeblocks/kubeblocks --version 0.9.2 \
       --set upgradeAddons=true \
       --set admissionWebhooks.enabled=true \
       --set admissionWebhooks.ignoreReplicasCheck=true 
@@ -179,15 +187,15 @@ If you are upgrading from v0.8 to v0.9, it's recommended to enable webhook to en
 
 <TabItem value="kbcli" label="kbcli">
 
-1. Download kbcli v0.9.1.
+1. Download kbcli v0.9.2.
 
     ```bash
-    curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash -s 0.9.1
+    curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash -s 0.9.2
     ```
 
 2. Upgrade KubeBlocks.
 
-    Check the kbcli version and make sure you're using kbcli v0.9.1.
+    Check the kbcli version and make sure you're using kbcli v0.9.2.
 
     ```bash
     kbcli version
@@ -200,17 +208,17 @@ If you are upgrading from v0.8 to v0.9, it's recommended to enable webhook to en
     - If the KubeBlocks you are running uses the image registry starting with `infracreate-registry`, it is recommended to explicitly configure the image registry during the upgrade. Refer to [FAQ](./faq.md#specify-an-image-registry-during-upgrading-kubeblocks) for details.
 
     ```bash
-    kbcli kb upgrade --version 0.9.1 \
+    kbcli kb upgrade --version 0.9.2 \
       --set admissionWebhooks.enabled=true \
       --set admissionWebhooks.ignoreReplicasCheck=true
     ```
 
     :::warning
 
-    To avoid affecting existing database clusters, when upgrading to KubeBlocks v0.9.1, the versions of already-installed Addons will not be upgraded by default. If you want to upgrade the Addons to the versions built into KubeBlocks v0.9.1, execute the following command. Note that this may restart existing clusters and affect availability. Please proceed with caution.
+    To avoid affecting existing database clusters, when upgrading to KubeBlocks v0.9.2, the versions of already-installed Addons will not be upgraded by default. If you want to upgrade the Addons to the versions built into KubeBlocks v0.9.2, execute the following command. Note that this may restart existing clusters and affect availability. Please proceed with caution.
 
     ```bash
-    kbcli kb upgrade --version 0.9.1 \
+    kbcli kb upgrade --version 0.9.2 \
       --set upgradeAddons=true \
       --set admissionWebhooks.enabled=true \
       --set admissionWebhooks.ignoreReplicasCheck=true

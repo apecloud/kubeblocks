@@ -1,28 +1,34 @@
 ---
-title: 升级到 KubeBlocks v0.9.1 及以上版本
-description: KubeBlocks v0.9.1 及以上版本升级文档
-keywords: [升级, 0.9.1, Helm]
+title: 升级至 v0.9.2
+description: KubeBlocks v0.9.2
+keywords: [升级, 0.9.2, Helm]
 sidebar_position: 1
-sidebar_label: 升级到 KubeBlocks v0.9.1 及以上版本
+sidebar_label: 升级至 v0.9.2
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# 升级到 KubeBlocks v0.9.1 及以上版本
+# 升级到 KubeBlocks v0.9.2
 
-本文档将介绍如何从不同版本升级至 KubeBlocks v0.9.1 及以上版本。
+本文档将介绍如何从不同版本升级至 KubeBlocks v0.9.2。
 
 :::note
 
-- 在升级前，请先执行 `helm -n kb-system list | grep kubeblocks` 查看正在使用的 KubeBlocks 版本，并根据不同版本，执行升级操作。
-- v0.9.2 的升级操作与 v0.9.1 相同，您可以参照本文档并根据需要替换版本。
+- 升级前，请查看当前 KubeBlocks 的版本，并根据不同版本，执行升级操作。
+   执行 `helm -n kb-system list | grep kubeblocks` 或 `kbcli version`。
+- 如需升级到其他版本，可参考以下操作指南：
+   - 如需升级至 v0.9.1，可按照本文档中的步骤操作，将版本号替换为 v0.9.1。
+   - [v0.9.0 升级指南](https://github.com/apecloud/kubeblocks/blob/main/i18n/zh-cn/user-docs/upgrade-kubeblocks/upgrade-to-0.9.0.md).
+   - [v0.8.x 升级指南](https://github.com/apecloud/kubeblocks/blob/main/i18n/zh-cn/user-docs/upgrade-kubeblocks/upgrade-to-0.8.md).
+
+   建议安装最新版本，以体验全新功能及更优性能。
 
 :::
 
 ## 兼容性说明
 
-KubeBlocks v0.9.1 可以兼容 KubeBlocks v0.8 的 API，但不保证兼容 v0.8 之前版本的 API，如果您正在使用 KubeBlocks v0.7 或者更老版本的引擎（版本号为 `0.7.x`, `0.6.x`），请务必参考 [v0.8 升级文档](./upgrade-kubeblocks-to-0.8.md)将 KubeBlocks 升级至 v0.8 并将所有引擎升级至 0.8，以确保升级至 v0.9 版本后服务的可用性。
+KubeBlocks v0.9.2 可以兼容 KubeBlocks v0.8 的 API，但不保证兼容 v0.8 之前版本的 API，如果您正在使用 KubeBlocks v0.7 或者更老版本的引擎（版本号为 `0.7.x`, `0.6.x`），请务必参考 [v0.8 升级文档](./upgrade-kubeblocks-to-0.8.md)将 KubeBlocks 升级至 v0.8 并将所有引擎升级至 0.8，以确保升级至 v0.9 版本后服务的可用性。
 
 如果您是从 v0.8 升级到 v0.9，需要打开 webhook，以确保可用性。
 
@@ -53,23 +59,23 @@ KubeBlocks v0.9.1 可以兼容 KubeBlocks v0.8 的 API，但不保证兼容 v0.8
     为避免 KubeBlocks Helm Chart 过大，0.8 版本将 CRD 从 Helm Chart 中移除了，升级前需要先安装 CRD。
 
     ```bash
-    kubectl replace -f https://github.com/apecloud/kubeblocks/releases/download/v0.9.1/kubeblocks_crds.yaml
+    kubectl replace -f https://github.com/apecloud/kubeblocks/releases/download/v0.9.2/kubeblocks_crds.yaml
     ```
 
 3. 升级 KubeBlocks。
 
     ```bash
-    helm -n kb-system upgrade kubeblocks kubeblocks/kubeblocks --version 0.9.1 --set crd.enabled=false
+    helm -n kb-system upgrade kubeblocks kubeblocks/kubeblocks --version 0.9.2 --set crd.enabled=false
     ```
 
-    KubeBlocks v0.9 到 v0.9.1 的升级不涉及 API 变更，可通过设置 `--set crd.enabled=false` 跳过 API 升级任务。
+    KubeBlocks v0.9 到 v0.9.2 的升级不涉及 API 变更，可通过设置 `--set crd.enabled=false` 跳过 API 升级任务。
 
     :::warning
 
-    为避免影响已有的数据库集群，升级 KubeBlocks 至 v0.9.1 时，默认不会升级已经安装的引擎版本，如果要升级引擎版本至 KubeBlocks v0.9.1 内置引擎的版本，可以执行如下命令，这可能导致已有集群发生重启，影响可用性，请务必谨慎操作。
+    为避免影响已有的数据库集群，升级 KubeBlocks 至 v0.9.2 时，默认不会升级已经安装的引擎版本，如果要升级引擎版本至 KubeBlocks v0.9.2 内置引擎的版本，可以执行如下命令，这可能导致已有集群发生重启，影响可用性，请务必谨慎操作。
 
     ```bash
-    helm -n kb-system upgrade kubeblocks kubeblocks/kubeblocks --version 0.9.1 \
+    helm -n kb-system upgrade kubeblocks kubeblocks/kubeblocks --version 0.9.2 \
       --set upgradeAddons=true \
       --set crd.enabled=false
     ```
@@ -80,24 +86,24 @@ KubeBlocks v0.9.1 可以兼容 KubeBlocks v0.8 的 API，但不保证兼容 v0.8
 
 <TabItem value="kbcli" label="kbcli">
 
-1. 下载 kbcli v0.9.1。
+1. 下载 kbcli v0.9.2。
 
     ```bash
-    curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash -s 0.9.1
+    curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash -s 0.9.2
     ```
 
 2. 升级 KubeBlocks。
 
     ```bash
-    kbcli kb upgrade --version 0.9.1
+    kbcli kb upgrade --version 0.9.2
     ```
 
     :::warning
 
-    为避免影响已有的数据库集群，升级 KubeBlocks 至 v0.9.1 时，默认不会升级已经安装的引擎版本，如果要升级引擎版本至 KubeBlocks v0.9.1 内置引擎的版本，可以执行如下命令，这可能导致已有集群发生重启，影响可用性，请务必谨慎操作。
+    为避免影响已有的数据库集群，升级 KubeBlocks 至 v0.9.2 时，默认不会升级已经安装的引擎版本，如果要升级引擎版本至 KubeBlocks v0.9.2 内置引擎的版本，可以执行如下命令，这可能导致已有集群发生重启，影响可用性，请务必谨慎操作。
 
     ```bash
-    kbcli kb upgrade --version 0.9.1 --set upgradeAddons=true
+    kbcli kb upgrade --version 0.9.2 --set upgradeAddons=true
     ```
 
     :::
@@ -143,7 +149,7 @@ KubeBlocks v0.9.1 可以兼容 KubeBlocks v0.8 的 API，但不保证兼容 v0.8
     如果网络较慢，建议先下载 CRD YAML 文件到本地，再执行操作。
 
     ```bash
-    kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/v0.9.1/dataprotection.kubeblocks.io_storageproviders.yaml
+    kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/v0.9.2/dataprotection.kubeblocks.io_storageproviders.yaml
     ```
 
 4. 升级 KubeBlocks。
@@ -152,24 +158,24 @@ KubeBlocks v0.9.1 可以兼容 KubeBlocks v0.8 的 API，但不保证兼容 v0.8
 
     - 设置 `admissionWebhooks.enabled=true` 将启动 webhook，用于 ConfigConstraint API 多版本转换。
     - 设置 `admissionWebhooks.ignoreReplicasCheck=true` 默认只有在 3 副本部署 KubeBlocks 时才可开启 webhook。若只部署单副本 KubeBlocks，可配置该变量跳过检查。
-    - 如果您当前运行的 KubeBlocks 使用的镜像仓库为 `infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com`，升级时请显式设置镜像仓库。具体可参考 [FAQ 中镜像仓库章节](./faq.md#升级时如何指定镜像仓库)
+    - 如果您当前运行的 KubeBlocks 使用的镜像仓库是以 `infracreate-registry`开头，升级时请显式设置镜像仓库。具体可参考 [FAQ 中镜像仓库章节](./faq.md#升级时如何指定镜像仓库)
 
     ```bash
     helm repo add kubeblocks https://apecloud.github.io/helm-charts
 
     helm repo update kubeblocks
 
-    helm -n kb-system upgrade kubeblocks kubeblocks/kubeblocks --version 0.9.1 \
+    helm -n kb-system upgrade kubeblocks kubeblocks/kubeblocks --version 0.9.2 \
       --set admissionWebhooks.enabled=true \
       --set admissionWebhooks.ignoreReplicasCheck=true
     ```
 
     :::warning
 
-    为避免影响已有的数据库集群，升级 KubeBlocks 至 v0.9.1 时，默认不会升级已经安装的引擎版本，如果要升级引擎版本至 KubeBlocks v0.9.1 内置引擎的版本，可以执行如下命令，这可能导致已有集群发生重启，影响可用性，请务必谨慎操作。
+    为避免影响已有的数据库集群，升级 KubeBlocks 至 v0.9.2 时，默认不会升级已经安装的引擎版本，如果要升级引擎版本至 KubeBlocks v0.9.2 内置引擎的版本，可以执行如下命令，这可能导致已有集群发生重启，影响可用性，请务必谨慎操作。
 
     ```bash
-    helm -n kb-system upgrade kubeblocks kubeblocks/kubeblocks --version 0.9.1 \
+    helm -n kb-system upgrade kubeblocks kubeblocks/kubeblocks --version 0.9.2 \
       --set upgradeAddons=true \
       --set admissionWebhooks.enabled=true \
       --set admissionWebhooks.ignoreReplicasCheck=true 
@@ -181,15 +187,15 @@ KubeBlocks v0.9.1 可以兼容 KubeBlocks v0.8 的 API，但不保证兼容 v0.8
 
 <TabItem value="kbcli" label="kbcli">
 
-1. 下载 kbcli v0.9.1。
+1. 下载 kbcli v0.9.2。
 
     ```bash
-    curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash -s 0.9.1
+    curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash -s 0.9.2
     ```
 
 2. 升级 KubeBlocks。
 
-    查看 kbcli 版本，确保您使用的 kbcli 版本为 v0.9.1。
+    查看 kbcli 版本，确保您使用的 kbcli 版本为 v0.9.2。
 
     ```bash
     kbcli version
@@ -199,20 +205,20 @@ KubeBlocks v0.9.1 可以兼容 KubeBlocks v0.8 的 API，但不保证兼容 v0.8
 
     - 设置 `admissionWebhooks.enabled=true` 将启动 webhook，用于 ConfigConstraint API 多版本转换。
     - 设置 `admissionWebhooks.ignoreReplicasCheck=true` 默认只有在 3 副本部署 KubeBlocks 时才可开启 webhook。若只部署单副本 KubeBlocks，可配置该变量跳过检查。
-    - 如果您当前运行的 KubeBlocks 使用的镜像仓库为 `infracreate-registry.cn-zhangjiakou.cr.aliyuncs.com`，升级时请显式设置镜像仓库。具体可参考 [FAQ](./faq.md#升级时如何指定镜像仓库)。
+    - 如果您当前运行的 KubeBlocks 使用的镜像仓库是以 `infracreate-registry` 开头，升级时请显式设置镜像仓库。具体可参考 [FAQ 中镜像仓库章节](./faq.md#升级时如何指定镜像仓库)。
 
     ```bash
-    kbcli kb upgrade --version 0.9.1 \
+    kbcli kb upgrade --version 0.9.2 \
       --set admissionWebhooks.enabled=true \
       --set admissionWebhooks.ignoreReplicasCheck=true
     ```
 
     :::warning
 
-    为避免影响已有的数据库集群，升级 KubeBlocks 至 v0.9.1 时，默认不会升级已经安装的引擎版本，如果要升级引擎版本至 KubeBlocks v0.9.1 内置引擎的版本，可以执行如下命令，这可能导致已有集群发生重启，影响可用性，请务必谨慎操作。
+    为避免影响已有的数据库集群，升级 KubeBlocks 至 v0.9.2 时，默认不会升级已经安装的引擎版本，如果要升级引擎版本至 KubeBlocks v0.9.2 内置引擎的版本，可以执行如下命令，这可能导致已有集群发生重启，影响可用性，请务必谨慎操作。
 
     ```bash
-    kbcli kb upgrade --version 0.9.1 \
+    kbcli kb upgrade --version 0.9.2 \
       --set upgradeAddons=true \
       --set admissionWebhooks.enabled=true \
       --set admissionWebhooks.ignoreReplicasCheck=true
@@ -228,13 +234,13 @@ KubeBlocks v0.9.1 可以兼容 KubeBlocks v0.8 的 API，但不保证兼容 v0.8
 
 ## 升级引擎
 
-如果您在上述步骤中，没有将 `upgradeAddons` 指定为 `true`，或者您想要使用的引擎不在默认列表中，但您想要使用 v0.9.1 API，可使用如下方式升级引擎。
+如果您在上述步骤中，没有将 `upgradeAddons` 指定为 `true`，或者您想要使用的引擎不在默认列表中，但您想要使用 v0.9.2 API，可使用如下方式升级引擎。
 
 :::note
 
-- 如果要升级的引擎是 `mysql`，需要先升级引擎并重启集群。否则使用 KubeBlocks v0.8.x 创建的集群将无法在 v0.9.1 中正常运行。
+- 如果要升级的引擎是 `mysql`，需要先升级引擎并重启集群。否则使用 KubeBlocks v0.8.x 创建的集群将无法在 v0.9.2 中正常运行。
 
-- 如果您想要升级 `clickhouse/milvus/elasticsearch/llm`，您需要先升级 KubeBlocks，再升级引擎，否在将无法在 v0.9.1 中正常使用。
+- 如果您想要升级 `clickhouse/milvus/elasticsearch/llm`，您需要先升级 KubeBlocks，再升级引擎，否在将无法在 v0.9.2 中正常使用。
 
 :::
 

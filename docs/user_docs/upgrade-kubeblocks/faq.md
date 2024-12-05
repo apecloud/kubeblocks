@@ -47,15 +47,15 @@ kubectl get addon {addonName} -o json | jq '{name: .metadata.name, resource_poli
 
 ## Fix "cannot patch 'kubeblocks-dataprotection' with kind Deployment" error
 
-When upgrading KubeBlocks to v0.8.x/v0.9.0, you might encounter the following error:
+When upgrading KubeBlocks to v0.8.x/v0.9.x, you might encounter the following error:
 
 ```bash
 Error: UPGRADE FAILED: cannot patch "kubeblocks-dataprotection" with kind Deployment: Deployment.apps "kubeblocks-dataprotection" is invalid: spec.selector: Invalid value: v1.LabelSelector{MatchLabels:map[string]string{"app.kubernetes.io/component":"dataprotection", "app.kubernetes.io/instance":"kubeblocks", "app.kubernetes.io/name":"kubeblocks"}, MatchExpressions:[]v1.LabelSelectorRequirement(nil)}: field is immutable && cannot patch "kubeblocks" with kind Deployment: Deployment.apps "kubeblocks" is invalid: spec.selector: Invalid value: v1.LabelSelector{MatchLabels:map[string]string{"app.kubernetes.io/component":"apps", "app.kubernetes.io/instance":"kubeblocks", "app.kubernetes.io/name":"kubeblocks"}, MatchExpressions:[]v1.LabelSelectorRequirement(nil)}: field is immutable
 ```
 
-This error occurs due to label modifications introduced for KubeBlocks and KubeBlocks-Dataprotection in KubeBlocks v0.9.1.
+This error occurs due to label modifications introduced for KubeBlocks and KubeBlocks-Dataprotection in KubeBlocks v0.9.x.
 
-To resolve the issue, manually delete the `kubeblocks` and `kubeblocks-dataprotection` deployments, then run helm upgrade to complete the upgrade to v0.9.1.
+To resolve the issue, manually delete the `kubeblocks` and `kubeblocks-dataprotection` deployments, then run helm upgrade to complete the upgrade to v0.9.x.
 
 ```bash
 # Scale to 0 replica
@@ -95,7 +95,7 @@ Starting from v0.9.0, one of KubeBlocks' image registries has changed. Specifica
    <TabItem value="Helm" label="Helm" default>
 
    ```bash
-   helm -n kb-system upgrade kubeblocks kubeblocks/kubeblocks --version 0.9.1 \
+   helm -n kb-system upgrade kubeblocks kubeblocks/kubeblocks --version 0.9.2 \
      --set admissionWebhooks.enabled=true \
      --set admissionWebhooks.ignoreReplicasCheck=true \
      --set image.registry=apecloud-registry.cn-xxx.xxx.com \
@@ -108,7 +108,7 @@ Starting from v0.9.0, one of KubeBlocks' image registries has changed. Specifica
    <TabItem value="kbcli" label="kbcli">
 
    ```bash
-   kbcli kb upgrade --version 0.9.1 \ 
+   kbcli kb upgrade --version 0.9.2 \ 
      --set admissionWebhooks.enabled=true \
      --set admissionWebhooks.ignoreReplicasCheck=true \
      --set image.registry=apecloud-registry.cn-xxx.xxx.com \

@@ -28,7 +28,7 @@ import TabItem from '@theme/TabItem';
 
 ## 兼容性说明
 
-KubeBlocks v0.9.2 可以兼容 KubeBlocks v0.8 的 API，但不保证兼容 v0.8 之前版本的 API，如果您正在使用 KubeBlocks v0.7 或者更老版本的引擎（版本号为 `0.7.x`, `0.6.x`），请务必参考 [v0.8 升级文档](./upgrade-kubeblocks-to-0.8.md)将 KubeBlocks 升级至 v0.8 并将所有引擎升级至 0.8，以确保升级至 v0.9 版本后服务的可用性。
+KubeBlocks v0.9.2 可以兼容 KubeBlocks v0.8 的 API，但不保证兼容 v0.8 之前版本的 API，如果您正在使用 KubeBlocks v0.7 或者更老版本的引擎（版本号为 `0.7.x`, `0.6.x`），请务必参考 [v0.8 升级文档](https://github.com/apecloud/kubeblocks/blob/main/docs/user_docs/upgrade-kubeblocks/upgrade-to-0.8.md)将 KubeBlocks 升级至 v0.8 并将所有引擎升级至 0.8，以确保升级至 v0.9 版本后服务的可用性。
 
 如果您是从 v0.8 升级到 v0.9，需要打开 webhook，以确保可用性。
 
@@ -298,4 +298,4 @@ kbcli addon list | grep {addon-name}
 
 ## FAQ
 
-可查看 [FAQ](./../faq.md)，了解并解决升级 KubeBlocks 过程中的常见问题。如果您还遇到了其他问题，可以[提交 issue](https://github.com/apecloud/kubeblocks/issues/new/choose) 或者在 [GitHub 讨论区](https://github.com/apecloud/kubeblocks/discussions)提交您的问题。
+可查看 [FAQ](./faq.md)，了解并解决升级 KubeBlocks 过程中的常见问题。如果您还遇到了其他问题，可以[提交 issue](https://github.com/apecloud/kubeblocks/issues/new/choose) 或者在 [GitHub 讨论区](https://github.com/apecloud/kubeblocks/discussions)提交您的问题。

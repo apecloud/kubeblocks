@@ -28,7 +28,7 @@ import TabItem from '@theme/TabItem';
 
 ## Compatibility
 
-KubeBlocks v0.9.2 is compatible with KubeBlocks v0.8 APIs, but compatibility with APIs from versions prior to v0.8 is not guaranteed. If you are using Addons from KubeBlocks v0.7 or earlier (v0.6, etc), DO [upgrade KubeBlocks and all Addons to v0.8 first](./upgrade-kubeblocks-to-0.8.md) to ensure service availability before upgrading to v0.9.
+KubeBlocks v0.9.2 is compatible with KubeBlocks v0.8 APIs, but compatibility with APIs from versions prior to v0.8 is not guaranteed. If you are using Addons from KubeBlocks v0.7 or earlier (v0.6, etc), DO [upgrade KubeBlocks and all Addons to v0.8 first](https://github.com/apecloud/kubeblocks/blob/main/docs/user_docs/upgrade-kubeblocks/upgrade-to-0.8.md) to ensure service availability before upgrading to v0.9.
 
 If you are upgrading from v0.8 to v0.9, it's recommended to enable webhook to ensure the availability.
 
@@ -298,4 +298,4 @@ kbcli addon list | grep {addon-name}
 
 ## FAQ
 
-Refer to the [FAQ](./../faq.md) to address common questions and issues that may arise when upgrading KubeBlocks. If your question isn't covered, you can [submit an issue](https://github.com/apecloud/kubeblocks/issues/new/choose) or [start a discussion](https://github.com/apecloud/kubeblocks/discussions) on upgrading on GitHub.
+Refer to the [FAQ](./faq.md) to address common questions and issues that may arise when upgrading KubeBlocks. If your question isn't covered, you can [submit an issue](https://github.com/apecloud/kubeblocks/issues/new/choose) or [start a discussion](https://github.com/apecloud/kubeblocks/discussions) on upgrading on GitHub.

@@ -288,7 +288,6 @@ resources:
     namespaced: true
   controller: true
   domain: kubeblocks.io
-  domain: kubeblocks.io
   group: trace
   kind: ReconciliationTrace
   path: github.com/apecloud/kubeblocks/apis/trace/v1

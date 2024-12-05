@@ -29,7 +29,62 @@ If you are using KubeBlocks Playground, these addons are enabled by default.
 
 <Tabs>
 
-<TabItem value="kubectl" label="kubectl" default>
+<TabItem value="kbcli" label="kbcli" default>
+
+1. View all built-in Addons and make sure the monitoring Addons are enabled. If the monitoring Addons are not enabled, [enable these addons](./../installation/install-addons.md) first.
+
+   ```bash
+   # View all addons supported
+   kbcli addon list
+   ...
+   grafana                        Helm   Enabled                   true                                                                                    
+   alertmanager-webhook-adaptor   Helm   Enabled                   true                                                                                    
+   prometheus                     Helm   Enabled    alertmanager   true 
+   ...
+   ```
+
+2. Check whether the monitoring function of the cluster is enabled. If the monitoring function is enabled, the output shows `disableExporter: false`.
+
+   ```bash
+   kubectl get cluster mycluster -o yaml
+   >
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: Cluster
+   metadata:
+   ......
+   spec:
+     ......
+     componentSpecs:
+     ......
+       disableExporter: false
+   ```
+
+   If `disableExporter: false` is not shown in the output, it means the monitoring function of this cluster is not enabled and you need to enable it first.
+
+   ```bash
+   kbcli cluster update mycluster --disable-exporter=false
+   ```
+
+3. View the dashboard list.
+
+   ```bash
+   kbcli dashboard list
+   >
+   NAME                                 NAMESPACE   PORT    CREATED-TIME
+   kubeblocks-grafana                   kb-system   13000   Jul 24,2023 11:38 UTC+0800
+   kubeblocks-prometheus-alertmanager   kb-system   19093   Jul 24,2023 11:38 UTC+0800
+   kubeblocks-prometheus-server         kb-system   19090   Jul 24,2023 11:38 UTC+0800
+   ```
+
+4. Open and view the web console of a monitoring dashboard. For example,
+
+   ```bash
+   kbcli dashboard open kubeblocks-grafana
+   ```
+
+</TabItem>
+
+<TabItem value="kubectl" label="kubectl">
 
 #### Enable monitoring addons
 

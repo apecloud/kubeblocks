@@ -136,13 +136,11 @@ max_connections=666
 
 	Context("with patch Merge", func() {
 		It("mergerConfigTemplate patch policy", func() {
-			importedTemplate := &appsv1.LegacyRenderedTemplateSpec{
-				ConfigTemplateExtension: appsv1.ConfigTemplateExtension{
-					Namespace: "default",
-					// Name:        configSpec.Name,
-					TemplateRef: updatedCMObject.GetName(),
-					Policy:      appsv1.PatchPolicy,
-				},
+			importedTemplate := appsv1.ConfigTemplateExtension{
+				Namespace: "default",
+				// Name:        configSpec.Name,
+				TemplateRef: updatedCMObject.GetName(),
+				Policy:      appsv1.PatchPolicy,
 			}
 
 			tmpCM := baseCMObject.DeepCopy()
@@ -166,12 +164,10 @@ max_connections=666
 
 	Context("with replace Merge", func() {
 		It("test mergerConfigTemplate replace policy", func() {
-			importedTemplate := &appsv1.LegacyRenderedTemplateSpec{
-				ConfigTemplateExtension: appsv1.ConfigTemplateExtension{
-					Namespace:   "default",
-					TemplateRef: updatedCMObject.GetName(),
-					Policy:      appsv1.ReplacePolicy,
-				},
+			importedTemplate := appsv1.ConfigTemplateExtension{
+				Namespace:   "default",
+				TemplateRef: updatedCMObject.GetName(),
+				Policy:      appsv1.ReplacePolicy,
 			}
 
 			tmpCM := baseCMObject.DeepCopy()
@@ -193,12 +189,10 @@ max_connections=666
 
 	Context("with only add Merge", func() {
 		It("test mergerConfigTemplate add policy", func() {
-			importedTemplate := &appsv1.LegacyRenderedTemplateSpec{
-				ConfigTemplateExtension: appsv1.ConfigTemplateExtension{
-					Namespace:   "default",
-					TemplateRef: updatedCMObject.GetName(),
-					Policy:      appsv1.OnlyAddPolicy,
-				},
+			importedTemplate := appsv1.ConfigTemplateExtension{
+				Namespace:   "default",
+				TemplateRef: updatedCMObject.GetName(),
+				Policy:      appsv1.OnlyAddPolicy,
 			}
 
 			tmpCM := baseCMObject.DeepCopy()
@@ -209,12 +203,10 @@ max_connections=666
 
 	Context("with none Merge", func() {
 		It("test mergerConfigTemplate none policy", func() {
-			importedTemplate := &appsv1.LegacyRenderedTemplateSpec{
-				ConfigTemplateExtension: appsv1.ConfigTemplateExtension{
-					Namespace:   "default",
-					TemplateRef: updatedCMObject.GetName(),
-					Policy:      appsv1.NoneMergePolicy,
-				},
+			importedTemplate := appsv1.ConfigTemplateExtension{
+				Namespace:   "default",
+				TemplateRef: updatedCMObject.GetName(),
+				Policy:      appsv1.NoneMergePolicy,
 			}
 
 			tmpCM := baseCMObject.DeepCopy()
@@ -226,12 +218,10 @@ max_connections=666
 
 	Context("failed test", func() {
 		It("test mergerConfigTemplate function", func() {
-			importedTemplate := &appsv1.LegacyRenderedTemplateSpec{
-				ConfigTemplateExtension: appsv1.ConfigTemplateExtension{
-					Namespace:   "default",
-					TemplateRef: updatedCMObject.GetName(),
-					Policy:      "",
-				},
+			importedTemplate := appsv1.ConfigTemplateExtension{
+				Namespace:   "default",
+				TemplateRef: updatedCMObject.GetName(),
+				Policy:      "",
 			}
 
 			tmpCM := baseCMObject.DeepCopy()
@@ -240,12 +230,10 @@ max_connections=666
 		})
 
 		It("not configconstraint", func() {
-			importedTemplate := &appsv1.LegacyRenderedTemplateSpec{
-				ConfigTemplateExtension: appsv1.ConfigTemplateExtension{
-					Namespace:   "default",
-					TemplateRef: updatedCMObject.GetName(),
-					Policy:      "none",
-				},
+			importedTemplate := appsv1.ConfigTemplateExtension{
+				Namespace:   "default",
+				TemplateRef: updatedCMObject.GetName(),
+				Policy:      "none",
 			}
 
 			tmpCM := baseCMObject.DeepCopy()
@@ -256,12 +244,10 @@ max_connections=666
 		})
 
 		It("not formatter", func() {
-			importedTemplate := &appsv1.LegacyRenderedTemplateSpec{
-				ConfigTemplateExtension: appsv1.ConfigTemplateExtension{
-					Namespace:   "default",
-					TemplateRef: updatedCMObject.GetName(),
-					Policy:      "none",
-				},
+			importedTemplate := appsv1.ConfigTemplateExtension{
+				Namespace:   "default",
+				TemplateRef: updatedCMObject.GetName(),
+				Policy:      "none",
 			}
 
 			tmpCM := baseCMObject.DeepCopy()

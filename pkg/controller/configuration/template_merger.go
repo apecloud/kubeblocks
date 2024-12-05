@@ -145,7 +145,7 @@ func NewTemplateMerger(template appsv1.ConfigTemplateExtension, ctx context.Cont
 	return merger, nil
 }
 
-func mergerConfigTemplate(template *appsv1.LegacyRenderedTemplateSpec,
+func mergerConfigTemplate(template appsv1.ConfigTemplateExtension,
 	builder *configTemplateBuilder,
 	configSpec appsv1.ComponentConfigSpec,
 	baseData map[string]string,
@@ -165,7 +165,7 @@ func mergerConfigTemplate(template *appsv1.LegacyRenderedTemplateSpec,
 		return nil, core.MakeError("importedConfigTemplate require ConfigConstraint.Spec.FileFormatConfig, configSpec[%v]", configSpec)
 	}
 
-	templateMerger, err := NewTemplateMerger(template.ConfigTemplateExtension, ctx, cli, builder, configSpec, &ccObj.Spec)
+	templateMerger, err := NewTemplateMerger(template, ctx, cli, builder, configSpec, &ccObj.Spec)
 	if err != nil {
 		return nil, err
 	}

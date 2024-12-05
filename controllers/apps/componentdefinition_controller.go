@@ -81,12 +81,16 @@ func (r *ComponentDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.
 		return intctrlutil.CheckedRequeueWithError(err, rctx.Log, "")
 	}
 
+	if !intctrlutil.ObjectAPIVersionSupported(cmpd) {
+		return intctrlutil.Reconciled()
+	}
+
 	return r.reconcile(rctx, cmpd)
 }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ComponentDefinitionReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return intctrlutil.NewControllerManagedBy(mgr, &appsv1.ComponentDefinition{}).
+	return intctrlutil.NewControllerManagedBy(mgr).
 		For(&appsv1.ComponentDefinition{}).
 		Complete(r)
 }

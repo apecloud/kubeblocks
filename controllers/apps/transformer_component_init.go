@@ -22,6 +22,7 @@ package apps
 import (
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 type componentInitTransformer struct{}
@@ -30,6 +31,10 @@ var _ graph.Transformer = &componentInitTransformer{}
 
 func (t *componentInitTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*componentTransformContext)
+
+	if !intctrlutil.ObjectAPIVersionSupported(transCtx.Component) {
+		return graph.ErrPrematureStop
+	}
 
 	// init dag
 	rootVertex := &model.ObjectVertex{Obj: transCtx.Component, OriObj: transCtx.ComponentOrig, Action: model.ActionStatusPtr()}

@@ -17,31 +17,31 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package apps
+package instanceset
 
 import (
-	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	"github.com/apecloud/kubeblocks/pkg/controller/graph"
-	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-type clusterInitTransformer struct {
-	cluster *appsv1.Cluster
-}
+type apiVersionReconciler struct{}
 
-var _ graph.Transformer = &clusterInitTransformer{}
-
-func (t *clusterInitTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
-	transCtx, _ := ctx.(*clusterTransformContext)
-	transCtx.Cluster, transCtx.OrigCluster = t.cluster, t.cluster.DeepCopy()
-	graphCli, _ := transCtx.Client.(model.GraphClient)
-
-	if !intctrlutil.ObjectAPIVersionSupported(t.cluster) {
-		return graph.ErrPrematureStop
+func (r *apiVersionReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebuilderx.CheckResult {
+	if tree.GetRoot() == nil {
+		return kubebuilderx.ConditionUnsatisfied
 	}
-
-	// init dag
-	graphCli.Root(dag, transCtx.OrigCluster, transCtx.Cluster, model.ActionStatusPtr())
-	return nil
+	return kubebuilderx.ConditionSatisfied
 }
+
+func (r *apiVersionReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
+	if intctrlutil.ObjectAPIVersionSupported(tree.GetRoot()) {
+		return kubebuilderx.Continue, nil
+	}
+	return kubebuilderx.Commit, nil
+}
+
+func NewAPIVersionReconciler() kubebuilderx.Reconciler {
+	return &apiVersionReconciler{}
+}
+
+var _ kubebuilderx.Reconciler = &apiVersionReconciler{}

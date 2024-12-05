@@ -31,7 +31,7 @@ If you are using KubeBlocks Playground, these addons are enabled by default.
 
 <TabItem value="kbcli" label="kbcli" default>
 
-1. View all built-in Addons and make sure the monitoring Addons are enabled. If the monitoring Addons are not enabled, [enable these addons](./../installation/install-with-kbcli/install-addons.md) first.
+1. View all built-in Addons and make sure the monitoring Addons are enabled. If the monitoring Addons are not enabled, [enable these addons](./../installation/install-addons.md) first.
 
    ```bash
    # View all addons supported

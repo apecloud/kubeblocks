@@ -444,12 +444,12 @@ type ComponentDefinitionSpec struct {
 	// +optional
 	MinReadySeconds int32 `json:"minReadySeconds,omitempty"`
 
-	// Specifies fine-grained control over the spec update process of all instances.
+	// Specifies constraint on Component's UpdateStrategy.
 	//
 	// This field is immutable.
 	//
 	// +optional
-	UpdateStrategy *UpdateStrategy `json:"updateStrategy,omitempty"`
+	UpdateStrategyConstraint *UpdateStrategyConstraint `json:"updateStrategyConstraint,omitempty"`
 
 	// InstanceSet controls the creation of pods during initial scale up, replacement of pods on nodes, and scaling down.
 	//
@@ -2087,3 +2087,68 @@ const (
 	HTTPProtocol  PrometheusScheme = "http"
 	HTTPSProtocol PrometheusScheme = "https"
 )
+
+// UpdateStrategyConstraint defines constraint on Component's UpdateStrategy.
+type UpdateStrategyConstraint struct {
+	// Specifies how an instance should be updated.
+	//
+	// - `StrictInPlace` indicates that only allows in-place update.
+	// Any attempt to modify other fields that not support in-place update will be rejected.
+	// - `PreferInPlace` indicates that we will first attempt an in-place update of the instance.
+	// If that fails, it will fall back to the ReCreate, where instance will be recreated.
+	// Default value is "PreferInPlace".
+	//
+	// +kubebuilder:validation:Enum={StrictInPlace,PreferInPlace}
+	// +optional
+	InstanceUpdatePolicy *InstanceUpdatePolicyType `json:"instanceUpdatePolicy,omitempty"`
+
+	// Defines what InstanceUpdatePolicyTypes are allowed to be specified in Component.
+	//
+	// +optional
+	InstanceUpdatePoliciesAllowed []InstanceUpdatePolicyType `json:"instanceUpdatePoliciesAllowed,omitempty"`
+
+	// Specifies constraint on Component's RollingUpdate.
+	//
+	// +optional
+	RollingUpdateConstraint *RollingUpdateConstraint `json:"rollingUpdateConstraint,omitempty"`
+}
+
+type RollingUpdateConstraint struct {
+	// Specifies the concurrency level for updating instances during a rolling update.
+	// Available levels:
+	//
+	// - `Serial`: Updates instances one at a time, ensuring minimal downtime by waiting for each instance to become ready
+	//   before updating the next.
+	// - `Parallel`: Updates all instances simultaneously, optimizing for speed but potentially reducing availability
+	//   during the update.
+	// - `BestEffortParallel`: Updates instances concurrently with a limit on simultaneous updates to ensure a minimum
+	//   number of operational replicas for maintaining quorum.
+	//	 For example, in a 5-instances setup, updating a maximum of 2 instances simultaneously keeps
+	//	 at least 3 operational for quorum.
+	//
+	// Defaults to 'Serial'.
+	//
+	// +kubebuilder:validation:Enum={Serial,Parallel,BestEffortParallel}
+	// +kubebuilder:default=Serial
+	// +optional
+	UpdateConcurrency *UpdateConcurrency `json:"updateConcurrency,omitempty"`
+
+	// Defines what UpdateConcurrences are allowed to be specified in Component.
+	//
+	// +optional
+	UpdateConcurrencesAllowed []UpdateConcurrency `json:"updateConcurrencesAllowed,omitempty"`
+
+	// The maximum number of instances that can be unavailable during the update.
+	// Value can be an absolute number (ex: 5) or a percentage of desired instances (ex: 10%).
+	// Absolute number is calculated from percentage by rounding up. This can not be 0.
+	// Defaults to 1. The field applies to all instances. That means if there is any unavailable pod,
+	// it will be counted towards MaxUnavailable.
+	//
+	// +optional
+	MaxUnavailable *string `json:"maxUnavailable,omitempty"`
+
+	// Defines the upper bound of the MaxUnavailable in Component.
+	//
+	// +optional
+	MaxUnavailableLimit *string `json:"maxUnavailableLimit,omitempty"`
+}

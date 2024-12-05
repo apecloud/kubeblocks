@@ -277,7 +277,7 @@ func (f *MockComponentDefinitionFactory) AddSystemAccount(accountName string, in
 }
 
 func (f *MockComponentDefinitionFactory) SetUpdateStrategy(strategy *kbappsv1.UpdateConcurrency) *MockComponentDefinitionFactory {
-	f.Get().Spec.UpdateStrategy = strategy
+	f.Get().Spec.UpdateStrategyConstraint = strategy
 	return f
 }
 

@@ -1196,8 +1196,8 @@ func (in *ComponentDefinitionSpec) DeepCopyInto(out *ComponentDefinitionSpec) {
 		*out = make([]ReplicaRole, len(*in))
 		copy(*out, *in)
 	}
-	if in.UpdateStrategy != nil {
-		in, out := &in.UpdateStrategy, &out.UpdateStrategy
+	if in.UpdateStrategyConstraint != nil {
+		in, out := &in.UpdateStrategyConstraint, &out.UpdateStrategyConstraint
 		*out = new(UpdateConcurrency)
 		**out = **in
 	}

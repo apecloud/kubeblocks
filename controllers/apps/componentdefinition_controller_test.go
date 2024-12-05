@@ -523,7 +523,7 @@ var _ = Describe("ComponentDefinition Controller", func() {
 				cmpd.Spec.Description = "v0.0.2"
 				cmpd.Spec.Runtime.Containers[0].Image = "image:v0.0.2"
 				parallel := kbappsv1.ParallelConcurrency
-				cmpd.Spec.UpdateStrategy = &parallel
+				cmpd.Spec.UpdateStrategyConstraint = &parallel
 			})()).Should(Succeed())
 
 			By(fmt.Sprintf("checking the updated object as %s", strings.ToLower(string(kbappsv1.AvailablePhase))))
@@ -538,8 +538,8 @@ var _ = Describe("ComponentDefinition Controller", func() {
 						Command: []string{"command"},
 					}
 					g.Expect(cmpd.Spec.Runtime.Containers[0]).Should(BeEquivalentTo(c))
-					g.Expect(cmpd.Spec.UpdateStrategy).ShouldNot(BeNil())
-					g.Expect(*cmpd.Spec.UpdateStrategy).Should(Equal(kbappsv1.ParallelConcurrency))
+					g.Expect(cmpd.Spec.UpdateStrategyConstraint).ShouldNot(BeNil())
+					g.Expect(*cmpd.Spec.UpdateStrategyConstraint).Should(Equal(kbappsv1.ParallelConcurrency))
 				})).Should(Succeed())
 		})
 
@@ -551,7 +551,7 @@ var _ = Describe("ComponentDefinition Controller", func() {
 				cmpd.Spec.Description = "v0.0.2"
 				cmpd.Spec.Runtime.Containers[0].Image = "image:v0.0.2"
 				parallel := kbappsv1.ParallelConcurrency
-				cmpd.Spec.UpdateStrategy = &parallel
+				cmpd.Spec.UpdateStrategyConstraint = &parallel
 			})()).Should(Succeed())
 
 			By(fmt.Sprintf("checking the updated object as %s", strings.ToLower(string(kbappsv1.UnavailablePhase))))
@@ -566,14 +566,14 @@ var _ = Describe("ComponentDefinition Controller", func() {
 						Command: []string{"command"},
 					}
 					g.Expect(cmpd.Spec.Runtime.Containers[0]).Should(BeEquivalentTo(c))
-					g.Expect(cmpd.Spec.UpdateStrategy).ShouldNot(BeNil())
-					g.Expect(*cmpd.Spec.UpdateStrategy).Should(Equal(kbappsv1.ParallelConcurrency))
+					g.Expect(cmpd.Spec.UpdateStrategyConstraint).ShouldNot(BeNil())
+					g.Expect(*cmpd.Spec.UpdateStrategyConstraint).Should(Equal(kbappsv1.ParallelConcurrency))
 				})).Should(Succeed())
 
 			By("revert the change to immutable fields back")
 			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(componentDefObj), func(cmpd *kbappsv1.ComponentDefinition) {
 				cmpd.Spec.Runtime.Containers[0].Image = "image:v0.0.1"
-				cmpd.Spec.UpdateStrategy = nil
+				cmpd.Spec.UpdateStrategyConstraint = nil
 			})()).Should(Succeed())
 
 			By(fmt.Sprintf("checking the updated object as %s", strings.ToLower(string(kbappsv1.AvailablePhase))))
@@ -588,8 +588,8 @@ var _ = Describe("ComponentDefinition Controller", func() {
 						Command: []string{"command"},
 					}
 					g.Expect(cmpd.Spec.Runtime.Containers[0]).Should(BeEquivalentTo(c))
-					g.Expect(cmpd.Spec.UpdateStrategy).ShouldNot(BeNil())
-					g.Expect(*cmpd.Spec.UpdateStrategy).Should(Equal(kbappsv1.SerialConcurrency))
+					g.Expect(cmpd.Spec.UpdateStrategyConstraint).ShouldNot(BeNil())
+					g.Expect(*cmpd.Spec.UpdateStrategyConstraint).Should(Equal(kbappsv1.SerialConcurrency))
 				})).Should(Succeed())
 		})
 	})

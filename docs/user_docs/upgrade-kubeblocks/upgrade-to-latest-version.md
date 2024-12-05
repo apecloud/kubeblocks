@@ -32,7 +32,7 @@ KubeBlocks v0.9.2 is compatible with KubeBlocks v0.8 APIs, but compatibility wit
 
 If you are upgrading from v0.8 to v0.9, it's recommended to enable webhook to ensure the availability.
 
-## Upgrade from KubeBlocks v0.9.0
+## Upgrade from KubeBlocks v0.9.x
 
 <Tabs>
 
@@ -68,7 +68,7 @@ If you are upgrading from v0.8 to v0.9, it's recommended to enable webhook to en
     helm -n kb-system upgrade kubeblocks kubeblocks/kubeblocks --version 0.9.2 --set crd.enabled=false
     ```
 
-    Upgrading from v0.9.0 to v0.9.2 doesn't include API change, so you can set `--set crd.enabled=false` to skip the API upgrade task.
+    Upgrading from v0.9.0/v0.9.1 to v0.9.2 doesn't include API change, so you can set `--set crd.enabled=false` to skip the API upgrade task.
 
     :::warning
 

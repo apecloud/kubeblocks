@@ -32,7 +32,7 @@ KubeBlocks v0.9.2 可以兼容 KubeBlocks v0.8 的 API，但不保证兼容 v0.8
 
 如果您是从 v0.8 升级到 v0.9，需要打开 webhook，以确保可用性。
 
-## 从 v0.9.0 升级
+## 从 v0.9.x 升级
 
 <Tabs>
 
@@ -68,7 +68,7 @@ KubeBlocks v0.9.2 可以兼容 KubeBlocks v0.8 的 API，但不保证兼容 v0.8
     helm -n kb-system upgrade kubeblocks kubeblocks/kubeblocks --version 0.9.2 --set crd.enabled=false
     ```
 
-    KubeBlocks v0.9 到 v0.9.2 的升级不涉及 API 变更，可通过设置 `--set crd.enabled=false` 跳过 API 升级任务。
+    KubeBlocks v0.9.0/v0.9.1 到 v0.9.2 的升级不涉及 API 变更，可通过设置 `--set crd.enabled=false` 跳过 API 升级任务。
 
     :::warning
 

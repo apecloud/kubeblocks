@@ -119,8 +119,11 @@ func (mgr *Manager) IsDBStartupReady() bool {
 	// test if db is ready to connect or not
 	err := mgr.DB.PingContext(ctx)
 	if err != nil {
-		mgr.Logger.Info("DB is not ready", "error", err)
-		return false
+		var driverErr *mysql.MySQLError
+		if !errors.As(err, &driverErr) {
+			mgr.Logger.Info("DB is not ready", "error", err)
+			return false
+		}
 	}
 
 	mgr.DBStartupReady = true

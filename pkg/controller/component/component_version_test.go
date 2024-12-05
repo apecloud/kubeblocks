@@ -126,5 +126,90 @@ var _ = Describe("Component Version", func() {
 			Expect(err).Should(Succeed())
 			Expect(compDefObj.Spec.Runtime.Containers[0].Image).Should(Equal(releases[2].Images[testapps.AppName]))
 		})
+
+		It("exact matched service version", func() {
+			compDefObj := testapps.NewComponentDefinitionFactory(testapps.CompDefName("v1")).
+				SetRuntime(&corev1.Container{Name: testapps.AppName}).
+				GetObject()
+
+			releases := []appsv1.ComponentVersionRelease{
+				{
+					Name:           testapps.ReleaseID("r0"),    // v0.0.1-r0
+					ServiceVersion: testapps.ServiceVersion(""), // 8.0.30
+					Images: map[string]string{
+						testapps.AppName: testapps.AppImage(testapps.AppName, testapps.ReleaseID("r0")),
+					},
+				},
+				{
+					Name:           testapps.ReleaseID("r0-opt"),   // // v0.0.1-r0-opt, has a newer release name
+					ServiceVersion: testapps.ServiceVersion("opt"), // 8.0.30-opt
+					Images: map[string]string{
+						testapps.AppName: testapps.AppImage(testapps.AppName, testapps.ReleaseID("r0-opt")),
+					},
+				},
+			}
+
+			compVersionObj := testapps.NewComponentVersionFactory(testapps.CompVersionName).
+				SetSpec(appsv1.ComponentVersionSpec{
+					CompatibilityRules: []appsv1.ComponentVersionCompatibilityRule{
+						{
+							CompDefs: []string{compDefObj.Name},
+							Releases: []string{releases[0].Name, releases[1].Name},
+						},
+					},
+					Releases: []appsv1.ComponentVersionRelease{releases[0], releases[1]},
+				}).
+				GetObject()
+
+			By("resolve images with service version 8.0.30")
+			err := resolveImagesWithCompVersions(compDefObj, []*appsv1.ComponentVersion{compVersionObj}, testapps.ServiceVersion(""))
+			Expect(err).Should(Succeed())
+			Expect(compDefObj.Spec.Runtime.Containers[0].Image).Should(Equal(releases[0].Images[testapps.AppName]))
+		})
+
+		It("matched from different service versions", func() {
+			var (
+				app1, app2 = "app1", "app2"
+			)
+
+			compDefObj := testapps.NewComponentDefinitionFactory(testapps.CompDefName("v1")).
+				SetRuntime(&corev1.Container{Name: app1}).
+				SetRuntime(&corev1.Container{Name: app2}).
+				GetObject()
+
+			releases := []appsv1.ComponentVersionRelease{
+				{
+					Name:           testapps.ReleaseID("r0"),    // v0.0.1-r0
+					ServiceVersion: testapps.ServiceVersion(""), // 8.0.30
+					Images: map[string]string{
+						app1: testapps.AppImage(app1, testapps.ReleaseID("r0")),
+					},
+				},
+				{
+					Name:           testapps.ReleaseID("r0-opt"),   // // v0.0.1-r0-opt, has a newer release name
+					ServiceVersion: testapps.ServiceVersion("opt"), // 8.0.30-opt
+					Images: map[string]string{
+						app1: testapps.AppImage(app1, testapps.ReleaseID("r0-opt")),
+						app2: testapps.AppImage(app2, testapps.ReleaseID("r0-opt")),
+					},
+				},
+			}
+
+			compVersionObj := testapps.NewComponentVersionFactory(testapps.CompVersionName).
+				SetSpec(appsv1.ComponentVersionSpec{
+					CompatibilityRules: []appsv1.ComponentVersionCompatibilityRule{
+						{
+							CompDefs: []string{compDefObj.Name},
+							Releases: []string{releases[0].Name, releases[1].Name},
+						},
+					},
+					Releases: []appsv1.ComponentVersionRelease{releases[0], releases[1]},
+				}).
+				GetObject()
+
+			By("resolve images with service version 8.0.30")
+			err := resolveImagesWithCompVersions(compDefObj, []*appsv1.ComponentVersion{compVersionObj}, testapps.ServiceVersion(""))
+			Expect(err).ShouldNot(BeNil())
+		})
 	})
 })

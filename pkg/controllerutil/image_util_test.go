@@ -39,7 +39,7 @@ var _ = Describe("image util test", func() {
 
 	AfterEach(func() {
 		// reset config
-		registriesConfig = &RegistriesConfig{}
+		registriesConfigInstance = &registriesConfig{}
 	})
 
 	It("parses image", func() {
@@ -69,7 +69,7 @@ var _ = Describe("image util test", func() {
 	})
 
 	It("replaces image when default config exists", func() {
-		registriesConfig = &RegistriesConfig{
+		registriesConfigInstance = &registriesConfig{
 			DefaultRegistry: "foo.bar",
 		}
 		for _, image := range imageList {
@@ -81,7 +81,7 @@ var _ = Describe("image util test", func() {
 			}
 		}
 
-		registriesConfig = &RegistriesConfig{
+		registriesConfigInstance = &registriesConfig{
 			DefaultRegistry:  "foo.bar",
 			DefaultNamespace: "test",
 		}
@@ -92,10 +92,10 @@ var _ = Describe("image util test", func() {
 	})
 
 	It("replaces image when registry/namespace config exists", func() {
-		registriesConfig = &RegistriesConfig{
+		registriesConfigInstance = &registriesConfig{
 			DefaultRegistry:  "foo.bar",
 			DefaultNamespace: "default",
-			RegistryConfig: []RegistryConfig{
+			RegistryConfig: []registryConfig{
 				{
 					From: "docker.io",
 					To:   "bar.io",
@@ -133,10 +133,10 @@ var _ = Describe("image util test", func() {
 	})
 
 	It("replaces image w/ or w/o RegistryDefaultNamespace", func() {
-		registriesConfig = &RegistriesConfig{
+		registriesConfigInstance = &registriesConfig{
 			DefaultRegistry:  "foo.bar",
 			DefaultNamespace: "default",
-			RegistryConfig: []RegistryConfig{
+			RegistryConfig: []registryConfig{
 				{
 					From:             "docker.io",
 					To:               "bar.io",

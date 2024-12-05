@@ -37,7 +37,7 @@ import (
 
 var imageLogger = log.Log.WithName("ImageUtil")
 
-type RegistryConfig struct {
+type registryConfig struct {
 	From             string `mapstructure:"from"`
 	To               string `mapstructure:"to"`
 	DefaultNamespace string `mapstructure:"defaultNamespace"`
@@ -57,32 +57,32 @@ type RegistryConfig struct {
 	NamespaceMapping map[string]string `mapstructure:"namespaceMapping"`
 }
 
-type RegistriesConfig struct {
+type registriesConfig struct {
 	DefaultRegistry  string           `mapstructure:"defaultRegistry"`
 	DefaultNamespace string           `mapstructure:"defaultNamespace"`
-	RegistryConfig   []RegistryConfig `mapstructure:"registryConfig"`
+	RegistryConfig   []registryConfig `mapstructure:"registryConfig"`
 }
 
 // this lock protects r/w to this variable itself,
 // not the data it points to
 var registriesConfigMutex sync.RWMutex
-var registriesConfig = &RegistriesConfig{}
+var registriesConfigInstance = &registriesConfig{}
 
-func getRegistriesConfig() *RegistriesConfig {
+func getRegistriesConfig() *registriesConfig {
 	registriesConfigMutex.RLock()
 	defer registriesConfigMutex.RUnlock()
 
 	// this will return a copy of the pointer
-	return registriesConfig
+	return registriesConfigInstance
 }
 
-func ReloadRegistryConfig() error {
-	newRegistriesConfig := &RegistriesConfig{}
+func LoadRegistryConfig() error {
+	newRegistriesConfig := &registriesConfig{}
 	if err := viper.UnmarshalKey(constant.CfgRegistries, &newRegistriesConfig); err != nil {
 		return err
 	}
 
-	for _, registry := range registriesConfig.RegistryConfig {
+	for _, registry := range registriesConfigInstance.RegistryConfig {
 		if len(registry.From) == 0 {
 			return errors.New("registries config invalid: from can't be empty")
 		}
@@ -93,14 +93,14 @@ func ReloadRegistryConfig() error {
 	}
 
 	registriesConfigMutex.Lock()
-	registriesConfig = newRegistriesConfig
+	registriesConfigInstance = newRegistriesConfig
 	registriesConfigMutex.Unlock()
 
 	// since the use of kb tools image is widespread, set viper value here so that we don't need
 	// to replace it every time
 	viper.Set(constant.KBToolsImage, ReplaceImageRegistry(viper.GetString(constant.KBToolsImage)))
 
-	imageLogger.Info("registriesConfig reloaded", "registriesConfig", registriesConfig)
+	imageLogger.Info("registriesConfig reloaded", "registriesConfig", registriesConfigInstance)
 	return nil
 }
 

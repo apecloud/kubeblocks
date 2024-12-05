@@ -2109,10 +2109,10 @@ var _ = Describe("Component Controller", func() {
 	Context("with registry replace enabled", func() {
 		registry := "foo.bar"
 		setRegistryConfig := func() {
-			viper.Set(constant.CfgRegistries, intctrlutil.RegistriesConfig{
-				DefaultRegistry: registry,
+			viper.Set(constant.CfgRegistries, map[string]any{
+				"defaultRegistry": registry,
 			})
-			Expect(intctrlutil.ReloadRegistryConfig()).Should(Succeed())
+			Expect(intctrlutil.LoadRegistryConfig()).Should(Succeed())
 		}
 
 		BeforeEach(func() {
@@ -2121,7 +2121,7 @@ var _ = Describe("Component Controller", func() {
 
 		AfterEach(func() {
 			viper.Set(constant.CfgRegistries, nil)
-			Expect(intctrlutil.ReloadRegistryConfig()).Should(Succeed())
+			Expect(intctrlutil.LoadRegistryConfig()).Should(Succeed())
 		})
 
 		It("replaces image registry", func() {

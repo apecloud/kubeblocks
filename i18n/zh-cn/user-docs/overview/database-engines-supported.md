@@ -12,7 +12,7 @@ KubeBlocks 是基于 Kubernetes 的云原生数据基础设施，可以帮助用
 
 KubeBlocks 使用插件机制扩展对各种数据库引擎的支持，目前 KubeBlocks 存储库中提供了超过 30 个数据引擎插件，分类如下。
 
-KubeBlocks 默认安装并启用了部分引擎插件，对于其他未安装或未启用的引擎，您可通过 [kbcli](./../installation/install-with-kbcli/install-addons.md) 或者 [Helm](./../installation/install-with-helm/install-addons.md) 安装和启用。
+KubeBlocks 默认安装并启用了部分引擎插件，对于其他未安装或未启用的引擎，您可参考[引擎安装文档](./../installation/install-addons.md)，安装或启用引擎。
 
 :::note
 

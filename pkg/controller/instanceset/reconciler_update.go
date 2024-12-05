@@ -130,7 +130,8 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		if updatedPods >= partition {
 			break
 		}
-		if !isContainersReady(pod) {
+		// when PodUpdatePolicy is Recreate, no need to check whether containers are ready.
+		if its.Spec.PodUpdatePolicy != workloads.RecreatePodUpdatePolicyType && !isContainersReady(pod) {
 			tree.Logger.Info(fmt.Sprintf("InstanceSet %s/%s blocks on update as some the container(s) of pod %s are not ready", its.Namespace, its.Name, pod.Name))
 			// as no further event triggers the next reconciliation, we need a retry
 			needRetry = true

@@ -28,6 +28,7 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
+	"github.com/apecloud/kubeblocks/pkg/controller/render"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 )
 
@@ -45,7 +46,7 @@ type configReconcileContext struct {
 }
 
 func newConfigReconcileContext(ctx context.Context,
-	resourceCtx *configctrl.ResourceCtx,
+	resourceCtx *render.ResourceCtx,
 	cm *corev1.ConfigMap,
 	configSpecName string,
 	matchingLabels client.MatchingLabels) *configReconcileContext {

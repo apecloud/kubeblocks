@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package configuration
+package render
 
 import (
 	"fmt"
@@ -34,6 +34,7 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	ctrlcomp "github.com/apecloud/kubeblocks/pkg/controller/component"
+	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 )
 
@@ -217,29 +218,28 @@ bootstrap:
 	// for test GetContainerWithVolumeMount
 	Context("ConfigTemplateBuilder built-in env test", func() {
 		It("test built-in function", func() {
-			cfgBuilder := newTemplateBuilder(
-				"my_test",
-				"default",
-				ctx, mockClient.Client(),
-			)
-
-			localObjs := []coreclient.Object{
-				&corev1.ConfigMap{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      cmTemplateName,
+			cfgBuilder := NewTemplateBuilder(
+				&ReconcileCtx{
+					ResourceCtx: &ResourceCtx{
+						Context:   ctx,
+						Client:    mockClient.Client(),
 						Namespace: "default",
 					},
-					Data: map[string]string{
-						cmConfigFileName: patroniTemplate,
-					}},
-			}
-			cfgBuilder.injectBuiltInObjectsAndFunctions(podSpec, component, localObjs,
-				&appsv1.Cluster{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "my_test",
-						Namespace: "default",
+					Cluster:              testapps.NewClusterFactory("my_test", "default", "cmpd").GetObject(),
+					SynthesizedComponent: component,
+					Cache: []coreclient.Object{
+						&corev1.ConfigMap{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      cmTemplateName,
+								Namespace: "default",
+							},
+							Data: map[string]string{
+								cmConfigFileName: patroniTemplate,
+							}},
 					},
-				})
+					PodSpec: podSpec,
+				},
+			).(*templateRenderWrapper)
 
 			rendered, err := cfgBuilder.render(map[string]string{
 				// KB_CLUSTER_NAME, KB_COMP_NAME from env

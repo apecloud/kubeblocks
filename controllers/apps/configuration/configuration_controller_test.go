@@ -30,7 +30,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
-	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
+	"github.com/apecloud/kubeblocks/pkg/controller/render"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
 
@@ -59,7 +59,7 @@ var _ = Describe("Configuration Controller", func() {
 
 			By("wait for configuration status to be init phase.")
 			Eventually(checkCfgStatus(appsv1alpha1.CInitPhase)).Should(BeFalse())
-			Expect(initConfiguration(&configctrl.ResourceCtx{
+			Expect(initConfiguration(&render.ResourceCtx{
 				Client:        k8sClient,
 				Context:       ctx,
 				Namespace:     testCtx.DefaultNamespace,
@@ -99,7 +99,7 @@ var _ = Describe("Configuration Controller", func() {
 				Namespace: testCtx.DefaultNamespace,
 			}
 
-			Expect(initConfiguration(&configctrl.ResourceCtx{
+			Expect(initConfiguration(&render.ResourceCtx{
 				Client:        k8sClient,
 				Context:       ctx,
 				Namespace:     testCtx.DefaultNamespace,
@@ -140,7 +140,7 @@ var _ = Describe("Configuration Controller", func() {
 
 			By("wait for configuration status to be init phase.")
 			Eventually(checkCfgStatus(appsv1alpha1.CInitPhase)).Should(BeFalse())
-			Expect(initConfiguration(&configctrl.ResourceCtx{
+			Expect(initConfiguration(&render.ResourceCtx{
 				Client:        k8sClient,
 				Context:       ctx,
 				Namespace:     testCtx.DefaultNamespace,

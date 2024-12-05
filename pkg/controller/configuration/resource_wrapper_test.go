@@ -31,6 +31,7 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	"github.com/apecloud/kubeblocks/pkg/controller/render"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 )
@@ -96,7 +97,7 @@ type test struct {
 
 func NewTest(cli client.Client, ctx context.Context) *test {
 	tt := &test{}
-	return tt.Init(&ResourceCtx{
+	return tt.Init(&render.ResourceCtx{
 		Client:  cli,
 		Context: ctx,
 

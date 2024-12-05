@@ -33,6 +33,7 @@ import (
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/render"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 )
@@ -71,7 +72,7 @@ max_connections=666
 
 	var (
 		mockClient          *testutil.K8sClientMockHelper
-		templateBuilder     *configTemplateBuilder
+		templateBuilder     render.TemplateRender
 		configSpec          appsv1.ComponentConfigSpec
 		configConstraintObj *appsv1beta1.ConfigConstraint
 
@@ -111,17 +112,22 @@ max_connections=666
 			ConfigConstraintRef: configConstraintObj.GetName(),
 		}
 
-		templateBuilder = newTemplateBuilder(
-			testClusterName,
-			"default", nil, nil)
-		templateBuilder.injectBuiltInObjectsAndFunctions(
-			&corev1.PodSpec{}, &component.SynthesizedComponent{}, nil,
-			&appsv1.Cluster{
+		templateBuilder = render.NewTemplateBuilder(&render.ReconcileCtx{
+			ResourceCtx: &render.ResourceCtx{
+				Context:     ctx,
+				Client:      mockClient.Client(),
+				ClusterName: testClusterName,
+				Namespace:   "default",
+			},
+			Cluster: &appsv1.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      testClusterName,
 					Namespace: "default",
 				},
-			})
+			},
+			SynthesizedComponent: &component.SynthesizedComponent{},
+			PodSpec:              nil,
+		})
 
 		mockClient.MockGetMethod(testutil.WithGetReturned(testutil.WithConstructSimpleGetResult([]client.Object{
 			baseCMObject,

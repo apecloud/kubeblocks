@@ -188,11 +188,11 @@ func (r *ShardingDefinitionReconciler) validateShardsLimit(ctx context.Context, 
 
 func (r *ShardingDefinitionReconciler) validateProvisionNUpdateStrategy(ctx context.Context, cli client.Client,
 	shardingDef *appsv1.ShardingDefinition) error {
-	supported := func(strategy *appsv1.UpdateStrategy) bool {
+	supported := func(strategy *appsv1.UpdateConcurrency) bool {
 		if strategy == nil {
 			return true
 		}
-		return *strategy == appsv1.SerialStrategy || *strategy == appsv1.ParallelStrategy
+		return *strategy == appsv1.SerialConcurrency || *strategy == appsv1.ParallelConcurrency
 	}
 	if !supported(shardingDef.Spec.ProvisionStrategy) {
 		return fmt.Errorf("unsupported provision strategy: %s", *shardingDef.Spec.ProvisionStrategy)

@@ -818,7 +818,7 @@ func (h *clusterShardingHandler) protoComps(transCtx *clusterTransformContext, n
 			annotations = maps.Clone(compAnnotations)
 		}
 
-		// covert the sharding hostNetwork annotation to the component annotation
+		// convert the sharding hostNetwork annotation to the component annotation
 		if hnKey, ok := transCtx.Cluster.Annotations[constant.HostNetworkAnnotationKey]; ok {
 			hns := strings.Split(hnKey, ",")
 			if slices.Index(hns, shardingName) >= 0 {

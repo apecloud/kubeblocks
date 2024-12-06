@@ -128,33 +128,6 @@ func (builder *InstanceSetBuilder) SetUpdateStrategyType(strategyType apps.State
 	return builder
 }
 
-func (builder *InstanceSetBuilder) SetCustomHandler(handler []workloads.Action) *InstanceSetBuilder {
-	roleProbe := builder.get().Spec.RoleProbe
-	if roleProbe == nil {
-		roleProbe = &workloads.RoleProbe{}
-	}
-	roleProbe.CustomHandler = handler
-	builder.get().Spec.RoleProbe = roleProbe
-	return builder
-}
-
-func (builder *InstanceSetBuilder) AddCustomHandler(handler workloads.Action) *InstanceSetBuilder {
-	roleProbe := builder.get().Spec.RoleProbe
-	if roleProbe == nil {
-		roleProbe = &workloads.RoleProbe{}
-	}
-	handlers := roleProbe.CustomHandler
-	handlers = append(handlers, handler)
-	roleProbe.CustomHandler = handlers
-	builder.get().Spec.RoleProbe = roleProbe
-	return builder
-}
-
-func (builder *InstanceSetBuilder) SetRoleProbe(roleProbe *workloads.RoleProbe) *InstanceSetBuilder {
-	builder.get().Spec.RoleProbe = roleProbe
-	return builder
-}
-
 func (builder *InstanceSetBuilder) SetMembershipReconfiguration(reconfiguration *workloads.MembershipReconfiguration) *InstanceSetBuilder {
 	builder.get().Spec.MembershipReconfiguration = reconfiguration
 	return builder

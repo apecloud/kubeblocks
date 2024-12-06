@@ -24,7 +24,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 )
 
 func TestIniFormat(t *testing.T) {
@@ -41,7 +41,7 @@ plugin-load = "rpl_semi_sync_master=semisync_master.so;rpl_semi_sync_slave=semis
 port=3306
 `
 
-	iniConfigObj, err := LoadConfig("ini_test", iniContext, appsv1beta1.Ini)
+	iniConfigObj, err := LoadConfig("ini_test", iniContext, parametersv1alpha1.Ini)
 	assert.Nil(t, err)
 
 	assert.EqualValues(t, iniConfigObj.Get("mysqld.gtid_mode"), "OFF")
@@ -77,7 +77,7 @@ autovacuum_freeze_max_age = '100000000'
 autovacuum_max_workers = '1'
 autovacuum_naptime = '1min'
 `
-	propConfigObj, err := LoadConfig("prop_test", propertiesContext, appsv1beta1.Properties)
+	propConfigObj, err := LoadConfig("prop_test", propertiesContext, parametersv1alpha1.Properties)
 	assert.Nil(t, err)
 
 	assert.EqualValues(t, propConfigObj.Get("auto_explain.log_nested_statements"), "'True'")
@@ -107,7 +107,7 @@ func TestJSONFormat(t *testing.T) {
   "type": "student"
 }`
 
-	jsonConfigObj, err := LoadConfig("json_test", jsonContext, appsv1beta1.JSON)
+	jsonConfigObj, err := LoadConfig("json_test", jsonContext, parametersv1alpha1.JSON)
 	assert.Nil(t, err)
 
 	assert.EqualValues(t, jsonConfigObj.Get("id"), "0001")

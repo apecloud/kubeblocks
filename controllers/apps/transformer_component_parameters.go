@@ -22,10 +22,11 @@ package apps
 import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 type componentRelatedParametersTransformer struct {
@@ -38,20 +39,21 @@ func (c *componentRelatedParametersTransformer) Transform(ctx graph.TransformCon
 	transCtx, _ := ctx.(*componentTransformContext)
 	synthesizedComp := transCtx.SynthesizeComponent
 
-	config := appsv1alpha1.Configuration{}
+	componentParameter := &parametersv1alpha1.ComponentParameter{}
 	configKey := client.ObjectKey{Namespace: synthesizedComp.Namespace,
 		Name: cfgcore.GenerateComponentConfigurationName(synthesizedComp.ClusterName, synthesizedComp.Name)}
-	if err := c.Get(ctx.GetContext(), configKey, &config); err != nil {
+	if err := c.Get(ctx.GetContext(), configKey, componentParameter); err != nil {
 		return client.IgnoreNotFound(err)
 	}
 
-	configNew := config.DeepCopy()
-	updated, err := configuration.UpdateConfigPayload(&configNew.Spec, synthesizedComp)
+	configRender, err := intctrlutil.ResolveComponentConfigRender(ctx.GetContext(), c, transCtx.CompDef)
 	if err != nil {
+		return client.IgnoreNotFound(err)
+	}
+
+	configNew := componentParameter.DeepCopy()
+	if err = configuration.UpdateConfigPayload(&configNew.Spec, &transCtx.Component.Spec, &configRender.Spec); err != nil {
 		return err
 	}
-	if !updated {
-		return nil
-	}
-	return c.Patch(ctx.GetContext(), configNew, client.MergeFrom(config.DeepCopy()))
+	return c.Patch(ctx.GetContext(), configNew, client.MergeFrom(componentParameter.DeepCopy()))
 }

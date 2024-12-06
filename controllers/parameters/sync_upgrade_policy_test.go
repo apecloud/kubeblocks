@@ -28,9 +28,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	cfgproto "github.com/apecloud/kubeblocks/pkg/configuration/proto"
-	mock_proto "github.com/apecloud/kubeblocks/pkg/configuration/proto/mocks"
+	mockproto "github.com/apecloud/kubeblocks/pkg/configuration/proto/mocks"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 )
 
@@ -40,12 +40,12 @@ var _ = Describe("Reconfigure OperatorSyncPolicy", func() {
 
 	var (
 		k8sMockClient     *testutil.K8sClientMockHelper
-		reconfigureClient *mock_proto.MockReconfigureClient
+		reconfigureClient *mockproto.MockReconfigureClient
 	)
 
 	BeforeEach(func() {
 		k8sMockClient = testutil.NewK8sMockClient()
-		reconfigureClient = mock_proto.NewMockReconfigureClient(k8sMockClient.Controller())
+		reconfigureClient = mockproto.NewMockReconfigureClient(k8sMockClient.Controller())
 	})
 
 	AfterEach(func() {
@@ -64,8 +64,8 @@ var _ = Describe("Reconfigure OperatorSyncPolicy", func() {
 				}),
 				withMockInstanceSet(3, nil),
 				withConfigSpec("for_test", map[string]string{"a": "c b e f"}),
-				withConfigConstraintSpec(&appsv1beta1.FileFormatConfig{Format: appsv1beta1.RedisCfg}),
-				withConfigPatch(map[string]string{
+				withConfigDescription(&parametersv1alpha1.FileFormatConfig{Format: parametersv1alpha1.RedisCfg}),
+				withUpdatedParameters(map[string]string{
 					"a": "c b e f",
 				}),
 				withClusterComponent(3))
@@ -115,17 +115,19 @@ var _ = Describe("Reconfigure OperatorSyncPolicy", func() {
 				}),
 				withMockInstanceSet(3, nil),
 				withConfigSpec("for_test", map[string]string{"a": "c b e f"}),
-				withConfigConstraintSpec(&appsv1beta1.FileFormatConfig{Format: appsv1beta1.RedisCfg}),
-				withConfigPatch(map[string]string{
+				withConfigDescription(&parametersv1alpha1.FileFormatConfig{Format: parametersv1alpha1.RedisCfg}),
+				withUpdatedParameters(map[string]string{
 					"a": "c b e f",
 				}),
 				withClusterComponent(3))
 
 			// add selector
-			mockParam.ConfigConstraint.ReloadAction = &appsv1beta1.ReloadAction{
-				TargetPodSelector: &metav1.LabelSelector{
-					MatchLabels: map[string]string{
-						"primary": "true",
+			mockParam.ParametersDef = &parametersv1alpha1.ParametersDefinitionSpec{
+				ReloadAction: &parametersv1alpha1.ReloadAction{
+					TargetPodSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"primary": "true",
+						},
 					},
 				},
 			}

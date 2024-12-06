@@ -233,7 +233,7 @@ func filterImmutableParameters(parameters map[string]any, immutableParams []stri
 }
 
 func TransformConfigTemplate(configs []appsv1.ComponentConfigSpec) []appsv1.ComponentTemplateSpec {
-	var arr []appsv1.ComponentTemplateSpec
+	arr := make([]appsv1.ComponentTemplateSpec, 0, len(configs))
 	for _, config := range configs {
 		arr = append(arr, config.ComponentTemplateSpec)
 	}

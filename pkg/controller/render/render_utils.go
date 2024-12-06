@@ -27,6 +27,18 @@ import (
 )
 
 // RenderTemplate renders multiple component templates into Kubernetes ConfigMap objects.
+//
+// Parameters:
+// - resourceCtx: The context for resource operations.
+// - cluster: The cluster being reconciled.
+// - synthesizedComponent: Details of the synthesized component.
+// - comp: The component being reconciled.
+// - localObjs: A cache of client objects.
+// - tpls: A list of component template specifications.
+//
+// Returns:
+// - A slice of pointers to the rendered ConfigMap objects.
+// - An error if the rendering or validation fails.
 func RenderTemplate(resourceCtx *ResourceCtx,
 	cluster *appsv1.Cluster,
 	synthesizedComponent *component.SynthesizedComponent,
@@ -35,7 +47,6 @@ func RenderTemplate(resourceCtx *ResourceCtx,
 	tpls []appsv1.ComponentTemplateSpec) ([]*corev1.ConfigMap, error) {
 	var err error
 	var configMap *corev1.ConfigMap
-	var configMaps []*corev1.ConfigMap
 
 	reconcileCtx := &ReconcileCtx{
 		ResourceCtx:          resourceCtx,
@@ -47,10 +58,10 @@ func RenderTemplate(resourceCtx *ResourceCtx,
 	}
 
 	tplBuilder := NewTemplateBuilder(reconcileCtx)
+	configMaps := make([]*corev1.ConfigMap, 0, len(tpls))
 	for _, template := range tpls {
 		cmName := core.GetComponentCfgName(cluster.Name, synthesizedComponent.Name, template.Name)
-		configMap, err = tplBuilder.RenderComponentTemplate(template, cmName, nil)
-		if err != nil {
+		if configMap, err = tplBuilder.RenderComponentTemplate(template, cmName, nil); err != nil {
 			return nil, err
 		}
 		if err = intctrlutil.SetOwnerReference(comp, configMap); err != nil {

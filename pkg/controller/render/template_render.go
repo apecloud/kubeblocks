@@ -146,10 +146,8 @@ func (r *templateRenderWrapper) injectBuiltInObjectsAndFunctions(localObjs []cli
 
 func findMatchedLocalObject(localObjs []client.Object, objKey client.ObjectKey, gvk schema.GroupVersionKind) client.Object {
 	for _, obj := range localObjs {
-		if obj.GetName() == objKey.Name && obj.GetNamespace() == objKey.Namespace {
-			if generics.ToGVK(obj) == gvk {
-				return obj
-			}
+		if client.ObjectKeyFromObject(obj) == objKey && generics.ToGVK(obj) == gvk {
+			return obj
 		}
 	}
 	return nil

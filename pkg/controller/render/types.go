@@ -49,8 +49,26 @@ type ReconcileCtx struct {
 }
 
 type TemplateRender interface {
+	// RenderConfigMapTemplate renders a ConfigMap template based on the provided specification.
+	//
+	// Parameters:
+	// - templateSpec: The specification for the component template.
+	//
+	// Returns:
+	// - A map containing the rendered template data.
+	// - An error if the rendering fails.
 	RenderConfigMapTemplate(templateSpec appsv1.ComponentTemplateSpec) (map[string]string, error)
 
+	// RenderComponentTemplate renders a component template and validates the rendered data.
+	//
+	// Parameters:
+	// - templateSpec: The specification for the component template.
+	// - cmName: The name of the ConfigMap.
+	// - dataValidator: A function to validate the rendered data.
+	//
+	// Returns:
+	// - A pointer to the rendered ConfigMap.
+	// - An error if the rendering or validation fails.
 	RenderComponentTemplate(templateSpec appsv1.ComponentTemplateSpec,
 		cmName string,
 		dataValidator RenderedValidator) (*corev1.ConfigMap, error)

@@ -60,10 +60,10 @@ If you are currently running KubeBlocks v0.6, please upgrade to v0.7.2 first.
     ```shell
     helm repo add kubeblocks https://apecloud.github.io/helm-charts
     helm repo update kubeblocks
-    helm -n kb-system upgrade kubeblocks kubeblocks/kubeblocks --version {VERSION} --set keepAddons=true
+    helm -n kb-system upgrade kubeblocks kubeblocks/kubeblocks --version <versionNumber> --set keepAddons=true
     ```
 
-    Replace {VERSION} with your current KubeBlocks version, such as 0.7.2.
+    Replace `{VERSION}` with your current KubeBlocks version, such as 0.7.2.
 
 - Check addons.
 

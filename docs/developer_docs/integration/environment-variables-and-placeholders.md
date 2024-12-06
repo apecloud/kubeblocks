@@ -30,7 +30,7 @@ The following variables are injected by KubeBlocks into each pod.
 | KB_REPLICA_COUNT | Running pod's component's replica |
 | KB_CLUSTER_UID | Running pods' KubeBlocks Cluster API object's `metadata.uid` |
 | KB_CLUSTER_UID_POSTFIX_8 | Last eight digits of KB_CLUSTER_UID |
-| KB_{ordinal}_HOSTNAME | Running pod's hostname, where `{ordinal}` is the ordinal of pod. <br /> N/A if workloadType=Stateless. |
+| `KB_{ordinal}_HOSTNAME` | Running pod's hostname, where `{ordinal}` is the ordinal of pod. <br /> N/A if workloadType=Stateless. |
 | KB_POD_FQDN | Running pod's fully qualified domain name (FQDN). <br /> N/A if workloadType=Stateless. |
 
 ## Built-in Place-holders
@@ -53,5 +53,5 @@ The following variables are injected by KubeBlocks into each pod.
 | UUID_HEX | Generate a random UUID v4 HEX representation. |
 | HEADLESS_SVC_FQDN | Headless service FQDN placeholder, value pattern - `$(CLUSTER_NAME)-$(1ST_COMP_NAME)-headless.$(NAMESPACE).svc`, where 1ST_COMP_NAME is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service` attribute. |
 | SVC_FQDN | Service FQDN  placeholder, value pattern - `$(CLUSTER_NAME)-$(1ST_COMP_NAME).$(NAMESPACE).svc`, where 1ST_COMP_NAME is the 1st component that provide `ClusterDefinition.spec.componentDefs[].service` attribute. |
-| SVC_PORT_{PORT_NAME} | A ServicePort's port value with specified port name, i.e, a servicePort JSON struct: <br /> `{"name": "mysql", "targetPort": "mysqlContainerPort", "port": 3306}`, and "$(SVC_PORT_mysql)" in the connection credential value is 3306. |
+| `SVC_PORT_{PORT_NAME}` | A ServicePort's port value with specified port name, i.e, a servicePort JSON struct: <br /> `{"name": "mysql", "targetPort": "mysqlContainerPort", "port": 3306}`, and "$(SVC_PORT_mysql)" in the connection credential value is 3306. |
 | RANDOM_PASSWD | Random 8 characters |

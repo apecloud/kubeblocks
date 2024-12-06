@@ -181,9 +181,9 @@ Case 2: Nebula-Graphd needs to configure the DNS of all PODs of Nebula-Metad.
 :::note
 
 KubeBlocks provides three built-in variables as placeholders and they will be replaced with specific values when the cluster is created:
-- ${POD_ORDINAL}, which is the ordinal number of the Pod.
-- ${POD_NAME}, which is the name of the Pod, formatted as `{clusterName}-{componentName}-{podOrdinal}`.
-- ${POD_FQDN}, which is the Fully Qualified Domain Name (FQDN) of the Pod.
+- `${POD_ORDINAL}`, which is the ordinal number of the Pod.
+- `${POD_NAME}`, which is the name of the Pod, formatted as `{clusterName}-{componentName}-{podOrdinal}`.
+- `${POD_FQDN}`, which is the Fully Qualified Domain Name (FQDN) of the Pod.
 
 In KubeBlocks, each stateful component has a Headless Service named `headlessServiceName = {clusterName}-{componentName}-headless` by default.
 

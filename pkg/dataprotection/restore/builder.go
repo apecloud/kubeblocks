@@ -342,16 +342,17 @@ func (r *restoreJobBuilder) build() *batchv1.Job {
 
 	// 2. set restore container
 	r.specificVolumeMounts = append(r.specificVolumeMounts, r.commonVolumeMounts...)
+	// expand the image value with the env variables.
+	image := common.Expand(r.image, common.MappingFuncFor(utils.CovertEnvToMap(r.env)))
 	container := corev1.Container{
-		Name:         Restore,
-		Resources:    r.restore.Spec.ContainerResources,
-		Env:          r.env,
-		EnvFrom:      r.envFrom,
-		VolumeMounts: r.specificVolumeMounts,
-		Command:      r.command,
-		Args:         r.args,
-		// expand the image value with the env variables.
-		Image:           common.Expand(r.image, common.MappingFuncFor(utils.CovertEnvToMap(r.env))),
+		Name:            Restore,
+		Resources:       r.restore.Spec.ContainerResources,
+		Env:             r.env,
+		EnvFrom:         r.envFrom,
+		VolumeMounts:    r.specificVolumeMounts,
+		Command:         r.command,
+		Args:            r.args,
+		Image:           intctrlutil.ReplaceImageRegistry(image),
 		ImagePullPolicy: corev1.PullIfNotPresent,
 	}
 

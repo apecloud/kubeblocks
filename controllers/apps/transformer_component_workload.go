@@ -151,6 +151,16 @@ func (t *componentWorkloadTransformer) runningInstanceSetObject(ctx graph.Transf
 
 func (t *componentWorkloadTransformer) reconcileWorkload(ctx context.Context, cli client.Reader,
 	synthesizedComp *component.SynthesizedComponent, comp *appsv1.Component, runningITS, protoITS *workloads.InstanceSet) error {
+	// if runningITS already exists, the image changes in protoITS will be
+	// rollback to the original image in `checkNRollbackProtoImages`.
+	// So changing registry configs won't affect existing clusters.
+	for i, container := range protoITS.Spec.Template.Spec.Containers {
+		protoITS.Spec.Template.Spec.Containers[i].Image = intctrlutil.ReplaceImageRegistry(container.Image)
+	}
+	for i, container := range protoITS.Spec.Template.Spec.InitContainers {
+		protoITS.Spec.Template.Spec.InitContainers[i].Image = intctrlutil.ReplaceImageRegistry(container.Image)
+	}
+
 	buildInstanceSetPlacementAnnotation(comp, protoITS)
 
 	if err := t.reconcileReplicasStatus(ctx, cli, synthesizedComp, runningITS, protoITS); err != nil {

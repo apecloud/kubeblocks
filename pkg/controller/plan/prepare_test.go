@@ -27,13 +27,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	"github.com/apecloud/kubeblocks/pkg/controller/render"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	testparameters "github.com/apecloud/kubeblocks/pkg/testutil/parameters"
 )
 
 var _ = Describe("Prepare Test", func() {
@@ -48,10 +50,13 @@ var _ = Describe("Prepare Test", func() {
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 
 		// non-namespaced
-		testapps.ClearResources(&testCtx, generics.ConfigConstraintSignature, ml)
+		testapps.ClearResources(&testCtx, generics.ParameterDrivenConfigRenderSignature, ml)
+		testapps.ClearResources(&testCtx, generics.ParametersDefinitionSignature, ml)
+		testapps.ClearResources(&testCtx, generics.ComponentDefinitionSignature, ml)
 
 		// namespaced
 		testapps.ClearResources(&testCtx, generics.ConfigMapSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.ComponentSignature, inNS, ml)
 	}
 
 	BeforeEach(func() {
@@ -66,13 +71,15 @@ var _ = Describe("Prepare Test", func() {
 		compDefName   = "test-compdef"
 		clusterName   = "test-cluster"
 		mysqlCompName = "mysql"
+		paramsDefName = "mysql-params-def"
+		pdcrName      = "mysql-pdcr"
+		envFileName   = "test"
 	)
 
 	var (
-		compDefObj     *appsv1.ComponentDefinition
-		cluster        *appsv1.Cluster
-		comp           *appsv1.Component
-		configSpecName string
+		compDefObj *appsv1.ComponentDefinition
+		cluster    *appsv1.Cluster
+		comp       *appsv1.Component
 	)
 
 	Context("create cluster with component and component definition API, testing render configuration", func() {
@@ -86,14 +93,50 @@ var _ = Describe("Prepare Test", func() {
 				AddVolumeMounts("mysql", []corev1.VolumeMount{{Name: testapps.DefaultConfigSpecVolumeName, MountPath: "/mnt/config"}}).
 				Create(&testCtx).
 				GetObject()
+			Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(compDefObj), func(obj *appsv1.ComponentDefinition) {
+				obj.Status.Phase = appsv1.AvailablePhase
+			})()).Should(Succeed())
 		}
 
 		BeforeEach(func() {
 			createAllTypesClusterDef()
 
-			testapps.CreateCustomizedObj(&testCtx, "config/envfrom-config.yaml", &corev1.ConfigMap{}, testCtx.UseDefaultNamespace())
-			tpl := testapps.CreateCustomizedObj(&testCtx, "config/envfrom-constraint.yaml", &appsv1beta1.ConfigConstraint{})
-			configSpecName = tpl.Name
+			parametersDef := testparameters.NewParametersDefinitionFactory(paramsDefName).
+				SetConfigFile(envFileName).
+				Schema("").
+				Create(&testCtx).
+				GetObject()
+			Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(parametersDef), func(obj *parametersv1alpha1.ParametersDefinition) {
+				obj.Status.Phase = parametersv1alpha1.PDAvailablePhase
+			})()).Should(Succeed())
+
+			configRender := testparameters.NewParametersDrivenConfigFactory(pdcrName).
+				SetConfigDescription(envFileName, testapps.DefaultConfigSpecName, parametersv1alpha1.FileFormatConfig{Format: parametersv1alpha1.Properties}).
+				SetComponentDefinition(compDefObj.Name).
+				SetParametersDefs(paramsDefName).
+				Create(&testCtx).
+				GetObject()
+
+			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(configRender), func(obj *parametersv1alpha1.ParameterDrivenConfigRender) {
+				config := intctrlutil.GetComponentConfigDescription(&obj.Spec, envFileName)
+				config.InjectEnvTo = []string{compDefObj.Spec.Runtime.Containers[0].Name}
+			})()).Should(Succeed())
+
+			Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(configRender), func(obj *parametersv1alpha1.ParameterDrivenConfigRender) {
+				obj.Status.Phase = parametersv1alpha1.PDAvailablePhase
+			})()).Should(Succeed())
+
+			testparameters.NewComponentTemplateFactory(testapps.DefaultConfigSpecTplRef, testCtx.DefaultNamespace).
+				AddConfigFile(envFileName, `
+dbStorage_rocksDB_writeBufferSizeMB=8
+dbStorage_rocksDB_sstSizeInMB=64
+dbStorage_rocksDB_blockSize=65536
+dbStorage_rocksDB_bloomFilterBitsPerKey=10
+dbStorage_rocksDB_numLevels=-1
+dbStorage_rocksDB_numFilesInLevel0=4
+dbStorage_rocksDB_maxSizeInLevel1MB=256
+`).
+				Create(&testCtx)
 
 			pvcSpec := testapps.NewPVCSpec("1Gi")
 			cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
@@ -107,6 +150,7 @@ var _ = Describe("Prepare Test", func() {
 			comp, err = component.BuildComponent(cluster, &cluster.Spec.ComponentSpecs[0], nil, nil)
 			Expect(err).Should(Succeed())
 			comp.SetUID("test-uid")
+			Expect(testCtx.CreateObj(ctx, comp)).Should(Succeed())
 		})
 
 		It("render configuration should success", func() {
@@ -122,7 +166,7 @@ var _ = Describe("Prepare Test", func() {
 			}
 			err = RenderConfigNScriptFiles(resCtx, cluster, comp, synthesizeComp, synthesizeComp.PodSpec, nil)
 			Expect(err).Should(Succeed())
-			Expect(configuration.CheckEnvFrom(&synthesizeComp.PodSpec.Containers[0], cfgcore.GenerateEnvFromName(cfgcore.GetComponentCfgName(cluster.Name, synthesizeComp.Name, configSpecName)))).Should(BeFalse())
+			Expect(configuration.CheckEnvFrom(&synthesizeComp.PodSpec.Containers[0], cfgcore.GenerateEnvFromName(cfgcore.GetComponentCfgName(cluster.Name, synthesizeComp.Name, testapps.DefaultConfigSpecName)))).Should(BeTrue())
 		})
 	})
 })

@@ -22,31 +22,32 @@ package configuration
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"slices"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	cfgcm "github.com/apecloud/kubeblocks/pkg/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
+	"github.com/apecloud/kubeblocks/pkg/controller/render"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
-func createConfigObjects(cli client.Client, ctx context.Context, objs []client.Object, excludeObjs []client.Object) error {
+func createConfigObjects(cli client.Client, ctx context.Context, objs []*corev1.ConfigMap) error {
 	for _, obj := range objs {
-		if slices.Contains(excludeObjs, obj) {
-			continue
-		}
 		if err := cli.Create(ctx, obj, inDataContext()); err != nil {
 
 			if !apierrors.IsAlreadyExists(err) {
@@ -66,16 +67,28 @@ func createConfigObjects(cli client.Client, ctx context.Context, objs []client.O
 
 // buildConfigManagerWithComponent build the configmgr sidecar container and update it
 // into PodSpec if configuration reload option is on
-func buildConfigManagerWithComponent(podSpec *corev1.PodSpec, configSpecs []appsv1.ComponentConfigSpec,
-	ctx context.Context, cli client.Client, cluster *appsv1.Cluster, synthesizedComp *component.SynthesizedComponent) error {
-	var err error
-	var buildParams *cfgcm.CfgManagerBuildParams
+func buildConfigManagerWithComponent(rctx *render.ResourceCtx, cluster *appsv1.Cluster, synthesizedComp *component.SynthesizedComponent, cmpd *appsv1.ComponentDefinition) error {
+	var (
+		err         error
+		buildParams *cfgcm.CfgManagerBuildParams
+
+		podSpec      = synthesizedComp.PodSpec
+		configSpecs  = synthesizedComp.ConfigTemplates
+		configRender *parametersv1alpha1.ParameterDrivenConfigRender
+		paramsDefs   []*parametersv1alpha1.ParametersDefinition
+	)
 
 	volumeDirs, usingConfigSpecs := getUsingVolumesByConfigSpecs(podSpec, configSpecs)
 	if len(volumeDirs) == 0 {
 		return nil
 	}
-	configSpecMetas, err := cfgcm.GetSupportReloadConfigSpecs(usingConfigSpecs, cli, ctx)
+	if configRender, paramsDefs, err = intctrlutil.ResolveCmpdParametersDefs(rctx.Context, rctx.Client, cmpd); err != nil {
+		return err
+	}
+	if configRender == nil || len(configRender.Spec.Configs) == 0 {
+		return nil
+	}
+	configSpecMetas, err := cfgcm.GetSupportReloadConfigSpecs(usingConfigSpecs, configRender.Spec.Configs, paramsDefs)
 	if err != nil {
 		return err
 	}
@@ -85,7 +98,7 @@ func buildConfigManagerWithComponent(podSpec *corev1.PodSpec, configSpecs []apps
 	if len(configSpecMetas) == 0 {
 		return nil
 	}
-	if buildParams, err = buildConfigManagerParams(cli, ctx, cluster, synthesizedComp, configSpecMetas, volumeDirs, podSpec); err != nil {
+	if buildParams, err = buildConfigManagerParams(rctx.Client, rctx.Context, cluster, synthesizedComp, configSpecMetas, volumeDirs, podSpec); err != nil {
 		return err
 	}
 	if buildParams == nil {
@@ -161,18 +174,11 @@ func updateCfgManagerVolumes(podSpec *corev1.PodSpec, configManager *cfgcm.CfgMa
 		}
 	}
 	podSpec.Volumes = podVolumes
-
-	for volumeName, volume := range configManager.ConfigLazyRenderedVolumes {
-		usingContainers := intctrlutil.GetPodContainerWithVolumeMount(podSpec, volumeName)
-		for _, container := range usingContainers {
-			container.VolumeMounts = append(container.VolumeMounts, volume)
-		}
-	}
 }
 
-func getUsingVolumesByConfigSpecs(podSpec *corev1.PodSpec, configSpecs []appsv1.ComponentConfigSpec) ([]corev1.VolumeMount, []appsv1.ComponentConfigSpec) {
+func getUsingVolumesByConfigSpecs(podSpec *corev1.PodSpec, configSpecs []appsv1.ComponentTemplateSpec) ([]corev1.VolumeMount, []appsv1.ComponentTemplateSpec) {
 	// Ignore useless configTemplate
-	usingConfigSpecs := make([]appsv1.ComponentConfigSpec, 0, len(configSpecs))
+	usingConfigSpecs := make([]appsv1.ComponentTemplateSpec, 0, len(configSpecs))
 	config2Containers := make(map[string][]*corev1.Container)
 	for _, configSpec := range configSpecs {
 		usingContainers := intctrlutil.GetPodContainerWithVolumeMount(podSpec, configSpec.VolumeName)
@@ -192,10 +198,6 @@ func getUsingVolumesByConfigSpecs(podSpec *corev1.PodSpec, configSpecs []appsv1.
 	// Find out which configurations are used by the container
 	volumeDirs := make([]corev1.VolumeMount, 0, len(configSpecs)+1)
 	for _, configSpec := range usingConfigSpecs {
-		// Ignore config template, e.g scripts configmap
-		if !core.NeedReloadVolume(configSpec) {
-			continue
-		}
 		sets := cfgutil.NewSet()
 		for _, container := range config2Containers[configSpec.Name] {
 			volume := intctrlutil.GetVolumeMountByVolume(container, configSpec.VolumeName)
@@ -210,14 +212,13 @@ func getUsingVolumesByConfigSpecs(podSpec *corev1.PodSpec, configSpecs []appsv1.
 
 func buildConfigManagerParams(cli client.Client, ctx context.Context, cluster *appsv1.Cluster, comp *component.SynthesizedComponent, configSpecBuildParams []cfgcm.ConfigSpecMeta, volumeDirs []corev1.VolumeMount, podSpec *corev1.PodSpec) (*cfgcm.CfgManagerBuildParams, error) {
 	cfgManagerParams := &cfgcm.CfgManagerBuildParams{
-		ManagerName:               constant.ConfigSidecarName,
-		ComponentName:             comp.Name,
-		Image:                     viper.GetString(constant.KBToolsImage),
-		Volumes:                   volumeDirs,
-		Cluster:                   cluster,
-		ConfigSpecsBuildParams:    configSpecBuildParams,
-		ConfigLazyRenderedVolumes: make(map[string]corev1.VolumeMount),
-		ContainerPort:             viper.GetInt32(constant.ConfigManagerGPRCPortEnv),
+		ManagerName:            constant.ConfigSidecarName,
+		ComponentName:          comp.Name,
+		Image:                  viper.GetString(constant.KBToolsImage),
+		Volumes:                volumeDirs,
+		Cluster:                cluster,
+		ConfigSpecsBuildParams: configSpecBuildParams,
+		ContainerPort:          viper.GetInt32(constant.ConfigManagerGPRCPortEnv),
 	}
 
 	if podSpec.HostNetwork {
@@ -237,7 +238,7 @@ func buildConfigManagerParams(cli client.Client, ctx context.Context, cluster *a
 	return cfgManagerParams, nil
 }
 
-func GetConfigManagerGRPCPort(containers []corev1.Container) (int32, error) {
+func ResolveReloadServerGRPCPort(containers []corev1.Container) (int32, error) {
 	for _, container := range containers {
 		if container.Name != constant.ConfigSidecarName {
 			continue
@@ -269,47 +270,121 @@ func findPortByPortName(container corev1.Container) (int32, bool) {
 }
 
 // UpdateConfigPayload updates the configuration payload
-func UpdateConfigPayload(config *appsv1alpha1.ConfigurationSpec, component *component.SynthesizedComponent) (bool, error) {
-	updated := false
-	for i := range config.ConfigItemDetails {
+func UpdateConfigPayload(config *parametersv1alpha1.ComponentParameterSpec, component *appsv1.ComponentSpec, configRender *parametersv1alpha1.ParameterDrivenConfigRenderSpec) error {
+	if len(configRender.Configs) == 0 {
+		return nil
+	}
+
+	for i, item := range config.ConfigItemDetails {
+		configDescs := intctrlutil.GetComponentConfigDescriptions(configRender, item.Name)
 		configSpec := &config.ConfigItemDetails[i]
 		// check v-scale operation
-		if enableVScaleTrigger(configSpec.ConfigSpec) {
+		if enableVScaleTrigger(configDescs) {
 			resourcePayload := intctrlutil.ResourcesPayloadForComponent(component.Resources)
-			ret, err := intctrlutil.CheckAndPatchPayload(configSpec, constant.ComponentResourcePayload, resourcePayload)
-			if err != nil {
-				return false, err
+			if _, err := intctrlutil.CheckAndPatchPayload(configSpec, constant.ComponentResourcePayload, resourcePayload); err != nil {
+				return err
 			}
-			updated = updated || ret
 		}
 		// check h-scale operation
-		if enableHScaleTrigger(configSpec.ConfigSpec) {
-			ret, err := intctrlutil.CheckAndPatchPayload(configSpec, constant.ReplicasPayload, component.Replicas)
-			if err != nil {
-				return false, err
+		if enableHScaleTrigger(configDescs) {
+			if _, err := intctrlutil.CheckAndPatchPayload(configSpec, constant.ReplicasPayload, component.Replicas); err != nil {
+				return err
 			}
-			updated = updated || ret
+		}
+		// check tls
+		if enableTLSTrigger(configDescs) {
+			if component.TLSConfig == nil {
+				continue
+			}
+			if _, err := intctrlutil.CheckAndPatchPayload(configSpec, constant.TLSPayload, component.TLSConfig); err != nil {
+				return err
+			}
 		}
 	}
-	return updated, nil
+	return nil
 }
 
-func validRerenderResources(configSpec *appsv1alpha1.ComponentConfigSpec) bool {
-	return configSpec != nil && len(configSpec.ReRenderResourceTypes) != 0
-}
-
-func enableHScaleTrigger(configSpec *appsv1alpha1.ComponentConfigSpec) bool {
-	return validRerenderResources(configSpec) && slices.Contains(configSpec.ReRenderResourceTypes, appsv1alpha1.ComponentHScaleType)
-}
-
-func enableVScaleTrigger(configSpec *appsv1alpha1.ComponentConfigSpec) bool {
-	return validRerenderResources(configSpec) && slices.Contains(configSpec.ReRenderResourceTypes, appsv1alpha1.ComponentVScaleType)
-}
-
-func configSetFromComponent(templates []appsv1.ComponentConfigSpec) []string {
-	configSet := make([]string, 0)
-	for _, template := range templates {
-		configSet = append(configSet, template.Name)
+func rerenderConfigEnabled(configDescs []parametersv1alpha1.ComponentConfigDescription, rerenderType parametersv1alpha1.RerenderResourceType) bool {
+	for _, desc := range configDescs {
+		if slices.Contains(desc.ReRenderResourceTypes, rerenderType) {
+			return true
+		}
 	}
-	return configSet
+	return false
+}
+
+func enableHScaleTrigger(configDescs []parametersv1alpha1.ComponentConfigDescription) bool {
+	return rerenderConfigEnabled(configDescs, parametersv1alpha1.ComponentHScaleType)
+}
+
+func enableVScaleTrigger(configDescs []parametersv1alpha1.ComponentConfigDescription) bool {
+	return rerenderConfigEnabled(configDescs, parametersv1alpha1.ComponentVScaleType)
+}
+
+func enableTLSTrigger(configDescs []parametersv1alpha1.ComponentConfigDescription) bool {
+	return rerenderConfigEnabled(configDescs, parametersv1alpha1.ComponentTLSType)
+}
+
+func runningComponentParameter(ctx context.Context, reader client.Reader, comp *component.SynthesizedComponent) (*parametersv1alpha1.ComponentParameter, error) {
+	var componentParameter = &parametersv1alpha1.ComponentParameter{}
+
+	parameterKey := types.NamespacedName{
+		Name:      core.GenerateComponentConfigurationName(comp.ClusterName, comp.Name),
+		Namespace: comp.Namespace,
+	}
+	if err := reader.Get(ctx, parameterKey, componentParameter); err != nil {
+		return nil, client.IgnoreNotFound(err)
+	}
+	return componentParameter, nil
+}
+
+func buildComponentParameter(ctx context.Context, reader client.Reader, comp *component.SynthesizedComponent, owner *appsv1.Component, cmpd *appsv1.ComponentDefinition, configRender *parametersv1alpha1.ParameterDrivenConfigRender, paramsDefs []*parametersv1alpha1.ParametersDefinition) (*parametersv1alpha1.ComponentParameter, error) {
+	tpls, err := resolveComponentTemplate(ctx, reader, cmpd)
+	if err != nil {
+		return nil, err
+	}
+
+	parameterObj := builder.NewComponentParameterBuilder(comp.Namespace,
+		core.GenerateComponentConfigurationName(comp.ClusterName, comp.Name)).
+		AddLabelsInMap(constant.GetCompLabelsWithDef(comp.ClusterName, comp.Name, cmpd.Name)).
+		ClusterRef(comp.ClusterName).
+		Component(comp.Name).
+		SetConfigurationItem(ClassifyParamsFromConfigTemplate(intctrlutil.TransformComponentParameters(owner.Spec.InitParameters), cmpd, paramsDefs, tpls)).
+		GetObject()
+	if err = intctrlutil.SetOwnerReference(owner, parameterObj); err != nil {
+		return nil, err
+	}
+	if configRender != nil {
+		err = UpdateConfigPayload(&parameterObj.Spec, &owner.Spec, &configRender.Spec)
+	}
+	return parameterObj, err
+}
+
+func mergeComponentParameter(expected *parametersv1alpha1.ComponentParameter, existing *parametersv1alpha1.ComponentParameter) *parametersv1alpha1.ComponentParameter {
+	return MergeComponentParameter(expected, existing, func(dest, expected *parametersv1alpha1.ConfigTemplateItemDetail) {
+		if len(dest.ConfigFileParams) == 0 && len(expected.ConfigFileParams) != 0 {
+			dest.ConfigFileParams = expected.ConfigFileParams
+		}
+		dest.Payload = expected.Payload
+	})
+}
+
+func resolveComponentTemplate(ctx context.Context, reader client.Reader, cmpd *appsv1.ComponentDefinition) (map[string]*corev1.ConfigMap, error) {
+	tpls := make(map[string]*corev1.ConfigMap, len(cmpd.Spec.Configs))
+	for _, config := range cmpd.Spec.Configs {
+		cm := &corev1.ConfigMap{}
+		if err := reader.Get(ctx, client.ObjectKey{Name: config.TemplateRef, Namespace: config.Namespace}, cm); err != nil {
+			return nil, err
+		}
+		tpls[config.Name] = cm
+	}
+	return tpls, nil
+}
+
+func updateComponentParameters(ctx context.Context, cli client.Client, expected, existing *parametersv1alpha1.ComponentParameter) error {
+	mergedObject := mergeComponentParameter(expected, existing)
+	if reflect.DeepEqual(mergedObject, existing) {
+		return nil
+	}
+	return cli.Patch(ctx, mergedObject, client.MergeFrom(existing))
 }

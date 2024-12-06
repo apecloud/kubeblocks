@@ -34,25 +34,27 @@ import (
 )
 
 const (
-	compDefName               = "test-compdef"
-	clusterName               = "test-cluster"
-	configTemplateName        = "test-config-template"
-	scriptTemplateName        = "test-script-template"
-	mysqlCompName             = "mysql"
-	mysqlConfigName           = "mysql-component-config"
-	mysqlConfigConstraintName = "mysql8.0-config-constraints"
-	mysqlScriptsTemplateName  = "apecloud-mysql-scripts"
+	compDefName              = "test-compdef"
+	clusterName              = "test-cluster"
+	paramsDefName            = "mysql-params-def"
+	pdcrName                 = "mysql-pdcr"
+	configTemplateName       = "test-config-template"
+	scriptTemplateName       = "test-script-template"
+	mysqlCompName            = "mysql"
+	mysqlConfigName          = "mysql-component-config"
+	mysqlScriptsTemplateName = "apecloud-mysql-scripts"
 )
 
 func allFieldsCompDefObj(create bool) *appsv1.ComponentDefinition {
 	compDef := testapps.NewComponentDefinitionFactory(compDefName).
 		SetDefaultSpec().
-		AddConfigTemplate(configTemplateName, mysqlConfigName, mysqlConfigConstraintName, testCtx.DefaultNamespace, testapps.ConfVolumeName).
+		AddConfigTemplate(configTemplateName, mysqlConfigName, testCtx.DefaultNamespace, testapps.ConfVolumeName).
 		AddScriptTemplate(scriptTemplateName, mysqlScriptsTemplateName, testCtx.DefaultNamespace, testapps.ScriptsVolumeName, nil).
 		GetObject()
 	if create {
 		Expect(testCtx.CreateObj(testCtx.Ctx, compDef)).Should(Succeed())
 	}
+	compDef.Status.Phase = appsv1.AvailablePhase
 	return compDef
 }
 
@@ -85,10 +87,6 @@ func newAllFieldsSynthesizedComponent(compDef *appsv1.ComponentDefinition, clust
 	Expect(err).Should(Succeed())
 	Expect(synthesizeComp).ShouldNot(BeNil())
 	addTestVolumeMount(synthesizeComp.PodSpec, mysqlCompName)
-	if len(synthesizeComp.ConfigTemplates) > 0 {
-		configSpec := &synthesizeComp.ConfigTemplates[0]
-		configSpec.ReRenderResourceTypes = []appsv1.RerenderResourceType{appsv1.ComponentVScaleType, appsv1.ComponentHScaleType}
-	}
 	return synthesizeComp
 }
 

@@ -34,7 +34,7 @@ import (
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/render"
-	"github.com/apecloud/kubeblocks/pkg/controllerutil"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 type ResourceFetcher[T any] struct {
@@ -86,7 +86,7 @@ func (r *ResourceFetcher[T]) ComponentAndComponentDef() *T {
 	}
 	return r.Wrap(func() error {
 		r.ComponentObj = &appsv1.Component{}
-		err := r.Client.Get(r.Context, componentKey, r.ComponentObj)
+		err := r.Client.Get(r.Context, componentKey, r.ComponentObj, inDataContext())
 		if apierrors.IsNotFound(err) {
 			return nil
 		} else if err != nil {
@@ -101,7 +101,7 @@ func (r *ResourceFetcher[T]) ComponentAndComponentDef() *T {
 			Name: r.ComponentObj.Spec.CompDef,
 		}
 		r.ComponentDefObj = &appsv1.ComponentDefinition{}
-		if err := r.Client.Get(r.Context, compDefKey, r.ComponentDefObj); err != nil {
+		if err := r.Client.Get(r.Context, compDefKey, r.ComponentDefObj, inDataContext()); err != nil {
 			return err
 		}
 		if r.ComponentDefObj.Status.Phase != appsv1.AvailablePhase {
@@ -113,7 +113,7 @@ func (r *ResourceFetcher[T]) ComponentAndComponentDef() *T {
 
 func (r *ResourceFetcher[T]) ComponentSpec() *T {
 	return r.Wrap(func() (err error) {
-		r.ClusterComObj, err = controllerutil.GetComponentSpecByName(r.Context, r.Client, r.ClusterObj, r.ComponentName)
+		r.ClusterComObj, err = intctrlutil.GetComponentSpecByName(r.Context, r.Client, r.ClusterObj, r.ComponentName)
 		if err != nil {
 			return err
 		}

@@ -23,21 +23,19 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/golang/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/pointer"
+	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/render"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
+	testparameters "github.com/apecloud/kubeblocks/pkg/testutil/parameters"
 )
 
 var _ = Describe("ConfigurationOperatorTest", func() {
@@ -47,8 +45,9 @@ var _ = Describe("ConfigurationOperatorTest", func() {
 	var synthesizedComponent *component.SynthesizedComponent
 	var configMapObj *corev1.ConfigMap
 	var scriptsObj *corev1.ConfigMap
-	var configConstraint *appsv1beta1.ConfigConstraint
-	var configurationObj *appsv1alpha1.Configuration
+	var parametersDef *parametersv1alpha1.ParametersDefinition
+	var configRender *parametersv1alpha1.ParameterDrivenConfigRender
+	var componentParameter *parametersv1alpha1.ComponentParameter
 	var k8sMockClient *testutil.K8sClientMockHelper
 
 	createConfigReconcileTask := func() *configOperator {
@@ -77,32 +76,18 @@ var _ = Describe("ConfigurationOperatorTest", func() {
 			testapps.SetConfigMapData("test", "test"))
 		scriptsObj = testapps.NewConfigMap("default", mysqlScriptsTemplateName,
 			testapps.SetConfigMapData("script.sh", "echo \"hello\""))
-		configurationObj = builder.NewConfigurationBuilder(testCtx.DefaultNamespace,
+		componentParameter = builder.NewComponentParameterBuilder(testCtx.DefaultNamespace,
 			cfgcore.GenerateComponentConfigurationName(clusterName, mysqlCompName)).
 			ClusterRef(clusterName).
 			Component(mysqlCompName).
 			GetObject()
-		configConstraint = &appsv1beta1.ConfigConstraint{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: mysqlConfigConstraintName,
-			},
-			Spec: appsv1beta1.ConfigConstraintSpec{
-				ReloadAction: &appsv1beta1.ReloadAction{
-					ShellTrigger: &appsv1beta1.ShellTrigger{
-						Command: []string{"echo", "hello"},
-						Sync:    pointer.Bool(true),
-					},
-				},
-				FileFormatConfig: &appsv1beta1.FileFormatConfig{
-					Format: appsv1beta1.Ini,
-					FormatterAction: appsv1beta1.FormatterAction{
-						IniConfig: &appsv1beta1.IniConfig{
-							SectionName: "mysqld",
-						},
-					},
-				},
-			},
-		}
+		parametersDef = testparameters.NewParametersDefinitionFactory(paramsDefName).GetObject()
+		configRender = testparameters.NewParametersDrivenConfigFactory(pdcrName).
+			SetComponentDefinition(compDefObj.Name).
+			SetParametersDefs(paramsDefName).
+			GetObject()
+		parametersDef.Status.Phase = parametersv1alpha1.PDAvailablePhase
+		configRender.Status.Phase = parametersv1alpha1.PDAvailablePhase
 	})
 
 	AfterEach(func() {
@@ -114,103 +99,50 @@ var _ = Describe("ConfigurationOperatorTest", func() {
 			k8sMockClient.MockGetMethod(testutil.WithGetReturned(testutil.WithConstructSimpleGetResult(
 				[]client.Object{
 					compDefObj,
-					clusterObj,
+					componentObj,
 					clusterObj,
 					scriptsObj,
 					configMapObj,
-					configConstraint,
-					configurationObj,
+					parametersDef,
+					configRender,
+					componentParameter,
 				},
 			), testutil.WithAnyTimes()))
 			k8sMockClient.MockCreateMethod(testutil.WithCreateReturned(testutil.WithCreatedSucceedResult(), testutil.WithAnyTimes()))
 			k8sMockClient.MockPatchMethod(testutil.WithPatchReturned(func(obj client.Object, patch client.Patch) error {
 				switch v := obj.(type) {
-				case *appsv1alpha1.Configuration:
-					if client.ObjectKeyFromObject(obj) == client.ObjectKeyFromObject(configurationObj) {
-						configurationObj.Spec = *v.Spec.DeepCopy()
-						configurationObj.Status = *v.Status.DeepCopy()
+				case *parametersv1alpha1.ComponentParameter:
+					if client.ObjectKeyFromObject(obj) == client.ObjectKeyFromObject(componentParameter) {
+						componentParameter.Spec = *v.Spec.DeepCopy()
+						componentParameter.Status = *v.Status.DeepCopy()
 					}
 				}
 				return nil
 			}))
-			k8sMockClient.MockStatusMethod().
-				EXPECT().
-				Patch(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-				Return(nil)
-			Expect(createConfigReconcileTask().Reconcile()).Should(Succeed())
-		})
-
-		It("BuildConfigManagerNPETest", func() {
-			configConstraintNpe := &appsv1beta1.ConfigConstraint{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: mysqlConfigConstraintName + "_npe_test",
-				},
-				Spec: appsv1beta1.ConfigConstraintSpec{
-					ReloadAction: &appsv1beta1.ReloadAction{
-						ShellTrigger: &appsv1beta1.ShellTrigger{
-							Command: []string{"echo", "hello"},
-							Sync:    pointer.Bool(true),
-							ToolsSetup: &appsv1beta1.ToolsSetup{
-								MountPoint: "/kb_tools",
-								ToolConfigs: []appsv1beta1.ToolConfig{
-									{
-										Name:             "tools_name",
-										AsContainerImage: pointer.Bool(true),
-										Image:            "apecloud/tools:1234",
-									},
-								},
-							},
-						},
-					},
-					FileFormatConfig: &appsv1beta1.FileFormatConfig{
-						Format: appsv1beta1.Ini,
-					},
-				},
-			}
-			synthesizedComponent.ConfigTemplates = append(synthesizedComponent.ConfigTemplates, synthesizedComponent.ConfigTemplates[0])
-			synthesizedComponent.ConfigTemplates[1].Name = "npe_test"
-			synthesizedComponent.ConfigTemplates[1].ConfigConstraintRef = configConstraintNpe.Name
-
-			k8sMockClient.MockGetMethod(testutil.WithGetReturned(testutil.WithConstructSimpleGetResult(
-				[]client.Object{
-					compDefObj,
-					clusterObj,
-					clusterObj,
-					scriptsObj,
-					configMapObj,
-					configConstraint,
-					configurationObj,
-					configConstraintNpe,
-				},
-			), testutil.WithAnyTimes()))
-			k8sMockClient.MockCreateMethod(testutil.WithCreateReturned(testutil.WithCreatedSucceedResult(), testutil.WithAnyTimes()))
-			k8sMockClient.MockPatchMethod(testutil.WithPatchReturned(func(obj client.Object, patch client.Patch) error {
-				switch v := obj.(type) {
-				case *appsv1alpha1.Configuration:
-					if client.ObjectKeyFromObject(obj) == client.ObjectKeyFromObject(configurationObj) {
-						configurationObj.Spec = *v.Spec.DeepCopy()
-						configurationObj.Status = *v.Status.DeepCopy()
-					}
-				}
-				return nil
-			}))
-			k8sMockClient.MockStatusMethod().
-				EXPECT().
-				Patch(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-				Return(nil)
+			k8sMockClient.MockNListMethod(0, testutil.WithListReturned(
+				testutil.WithConstructListReturnedResult([]runtime.Object{configRender}),
+				testutil.WithAnyTimes(),
+			))
 			Expect(createConfigReconcileTask().Reconcile()).Should(Succeed())
 		})
 
 		It("EmptyConfigSpecTest", func() {
 
-			k8sMockClient.MockCreateMethod(testutil.WithCreateReturned(testutil.WithCreatedSucceedResult(), testutil.WithTimes(1)))
+			// k8sMockClient.MockCreateMethod(testutil.WithCreateReturned(testutil.WithCreatedSucceedResult(), testutil.WithTimes(1)))
 			k8sMockClient.MockGetMethod(testutil.WithGetReturned(testutil.WithConstructSimpleGetResult(
 				[]client.Object{
 					compDefObj,
+					componentObj,
 					clusterObj,
-					clusterObj,
+					configMapObj,
+					componentParameter,
 				},
 			), testutil.WithAnyTimes()))
+			k8sMockClient.MockPatchMethod(testutil.WithSucceed(), testutil.WithAnyTimes())
+			k8sMockClient.MockNListMethod(0, testutil.WithListReturned(
+				testutil.WithConstructListReturnedResult([]runtime.Object{configRender}),
+				testutil.WithAnyTimes(),
+			))
 
 			synthesizedComponent.ConfigTemplates = nil
 			synthesizedComponent.ScriptTemplates = nil

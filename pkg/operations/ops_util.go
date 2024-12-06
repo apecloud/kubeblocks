@@ -31,9 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
-	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	opsutil "github.com/apecloud/kubeblocks/pkg/operations/util"
@@ -56,8 +54,6 @@ type handleStatusProgressWithComponent func(reqCtx intctrlutil.RequestCtx,
 	opsRes *OpsResource,
 	pgRes *progressResource,
 	compStatus *opsv1alpha1.OpsRequestComponentStatus) (expectProgressCount int32, succeedCount int32, err error)
-
-type handleReconfigureOpsStatus func(cmStatus *opsv1alpha1.ConfigurationItemStatus) error
 
 // getClusterDefByName gets the ClusterDefinition object by the name.
 func getClusterDefByName(ctx context.Context, cli client.Client, clusterDefName string) (*appsv1.ClusterDefinition, error) {
@@ -173,32 +169,6 @@ func patchOpsRequestToCreating(reqCtx intctrlutil.RequestCtx,
 // isOpsRequestFailedPhase checks the OpsRequest phase is Failed
 func isOpsRequestFailedPhase(opsRequestPhase opsv1alpha1.OpsPhase) bool {
 	return opsRequestPhase == opsv1alpha1.OpsFailedPhase
-}
-
-// patchReconfigureOpsStatus when Reconfigure is running, we should update status to OpsRequest.Status.ConfigurationStatus.
-//
-// NOTES:
-// opsStatus describes status of OpsRequest.
-// reconfiguringStatus describes status of reconfiguring operation, which contains multiple configuration templates.
-// cmStatus describes status of configmap, it is uniquely associated with a configuration template, which contains multiple keys, each key is name of a configuration file.
-// execStatus describes the result of the execution of the state machine, which is designed to solve how to conduct the reconfiguring operation, such as whether to restart, how to send a signal to the process.
-func updateReconfigureStatusByCM(reconfiguringStatus *opsv1alpha1.ReconfiguringStatus, tplName string,
-	handleReconfigureStatus handleReconfigureOpsStatus) error {
-	for i, cmStatus := range reconfiguringStatus.ConfigurationStatus {
-		if cmStatus.Name == tplName {
-			// update cmStatus
-			return handleReconfigureStatus(&reconfiguringStatus.ConfigurationStatus[i])
-		}
-	}
-	cmCount := len(reconfiguringStatus.ConfigurationStatus)
-	reconfiguringStatus.ConfigurationStatus = append(reconfiguringStatus.ConfigurationStatus, opsv1alpha1.ConfigurationItemStatus{
-		Name:          tplName,
-		Status:        appsv1alpha1.ReasonReconfigurePersisting,
-		SucceedCount:  core.NotStarted,
-		ExpectedCount: core.Unconfirmed,
-	})
-	cmStatus := &reconfiguringStatus.ConfigurationStatus[cmCount]
-	return handleReconfigureStatus(cmStatus)
 }
 
 // validateOpsWaitingPhase validates whether the current cluster phase is expected, and whether the waiting time exceeds the limit.

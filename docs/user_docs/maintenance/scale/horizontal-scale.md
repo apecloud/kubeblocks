@@ -160,7 +160,11 @@ You can also edit the cluster YAML file to scale in a specified instance.
 
 ```yaml
 kubectl edit cluster redis
->
+```
+
+Edit the value of `replicas`.
+
+```yaml
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
@@ -168,9 +172,9 @@ metadata:
 spec:
   componentSpecs:
   - name: proxy
-    replicas: 9
+    replicas: 9 # Change this value
     offlineInstances: ["redis-proxy-proxy-2c4g-2"]
-# ...
+...
 ```
 
 </TabItem>

@@ -29,62 +29,7 @@ If you are using KubeBlocks Playground, these addons are enabled by default.
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-1. View all built-in Addons and make sure the monitoring Addons are enabled. If the monitoring Addons are not enabled, [enable these addons](./../installation/install-addons.md) first.
-
-   ```bash
-   # View all addons supported
-   kbcli addon list
-   ...
-   grafana                        Helm   Enabled                   true                                                                                    
-   alertmanager-webhook-adaptor   Helm   Enabled                   true                                                                                    
-   prometheus                     Helm   Enabled    alertmanager   true 
-   ...
-   ```
-
-2. Check whether the monitoring function of the cluster is enabled. If the monitoring function is enabled, the output shows `disableExporter: false`.
-
-   ```bash
-   kubectl get cluster mycluster -o yaml
-   >
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: Cluster
-   metadata:
-   ......
-   spec:
-     ......
-     componentSpecs:
-     ......
-       disableExporter: false
-   ```
-
-   If `disableExporter: false` is not shown in the output, it means the monitoring function of this cluster is not enabled and you need to enable it first.
-
-   ```bash
-   kbcli cluster update mycluster --disable-exporter=false
-   ```
-
-3. View the dashboard list.
-
-   ```bash
-   kbcli dashboard list
-   >
-   NAME                                 NAMESPACE   PORT    CREATED-TIME
-   kubeblocks-grafana                   kb-system   13000   Jul 24,2023 11:38 UTC+0800
-   kubeblocks-prometheus-alertmanager   kb-system   19093   Jul 24,2023 11:38 UTC+0800
-   kubeblocks-prometheus-server         kb-system   19090   Jul 24,2023 11:38 UTC+0800
-   ```
-
-4. Open and view the web console of a monitoring dashboard. For example,
-
-   ```bash
-   kbcli dashboard open kubeblocks-grafana
-   ```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 #### Enable monitoring addons
 
@@ -121,7 +66,7 @@ Here is an example of enabling the `prometheus` Addon. You can enable other moni
    helm list -A
    >
    NAME         NAMESPACE   REVISION    UPDATED                                 STATUS      CHART                APP VERSION
-   ......
+   ...
    prometheus   kb-system   1           2024-05-31 12:01:52.872584 +0800 CST    deployed    prometheus-15.16.1   2.39.1 
    ```
 
@@ -145,7 +90,12 @@ You can also edit the `cluster.yaml` to enable/disable the monitoring function.
 
 ```bash
 kubectl edit cluster mycluster -n demo
-......
+```
+
+Edit the value of `spec.componentSpecs.disableExporter`.
+
+```yaml
+...
 componentSpecs:
   - name: mysql
     componentDefRef: mysql
@@ -191,6 +141,61 @@ If there is no data in the dashboard, you can check whether the job is `kubebloc
 
 </TabItem>
 
+<TabItem value="kbcli" label="kbcli">
+
+1. View all built-in Addons and make sure the monitoring Addons are enabled. If the monitoring Addons are not enabled, [enable these addons](./../installation/install-addons.md) first.
+
+   ```bash
+   # View all addons supported
+   kbcli addon list
+   ...
+   grafana                        Helm   Enabled                   true                                                                                    
+   alertmanager-webhook-adaptor   Helm   Enabled                   true                                                                                    
+   prometheus                     Helm   Enabled    alertmanager   true 
+   ...
+   ```
+
+2. Check whether the monitoring function of the cluster is enabled. If the monitoring function is enabled, the output shows `disableExporter: false`.
+
+   ```bash
+   kubectl get cluster mycluster -o yaml
+   >
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: Cluster
+   metadata:
+   ...
+   spec:
+     ...
+     componentSpecs:
+     ...
+       disableExporter: false
+   ```
+
+   If `disableExporter: false` is not shown in the output, it means the monitoring function of this cluster is not enabled and you need to enable it first.
+
+   ```bash
+   kbcli cluster update mycluster --disable-exporter=false
+   ```
+
+3. View the dashboard list.
+
+   ```bash
+   kbcli dashboard list
+   >
+   NAME                                 NAMESPACE   PORT    CREATED-TIME
+   kubeblocks-grafana                   kb-system   13000   Jul 24,2023 11:38 UTC+0800
+   kubeblocks-prometheus-alertmanager   kb-system   19093   Jul 24,2023 11:38 UTC+0800
+   kubeblocks-prometheus-server         kb-system   19090   Jul 24,2023 11:38 UTC+0800
+   ```
+
+4. Open and view the web console of a monitoring dashboard. For example,
+
+   ```bash
+   kbcli dashboard open kubeblocks-grafana
+   ```
+
+</TabItem>
+
 </Tabs>
 
 ## For production environment
@@ -209,31 +214,7 @@ Check whether the monitoring function of the cluster is enabled. If the monitori
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-```bash
-kubectl get cluster mycluster -o yaml
->
-apiVersion: apps.kubeblocks.io/v1alpha1
-kind: Cluster
-metadata:
-......
-spec:
-   ......
-   componentSpecs:
-   ......
-      disableExporter: false
-```
-
-If `disableExporter: false` is not shown in the output, it means the monitoring function of this cluster is not enabled and you need to enable it first.
-
-```bash
-kbcli cluster update mycluster --disable-exporter=false
-```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 If you disable the monitoring function when creating a cluster, run the command below to enable it.
 
@@ -251,7 +232,12 @@ You can also edit the `cluster.yaml` to enable/disable the monitoring function.
 
 ```bash
 kubectl edit cluster mycluster -n demo
-......
+```
+
+Edit the value of `spec.componentSpecs.disableExporter`.
+
+```yaml
+...
 componentSpecs:
   - name: mysql
     componentDefRef: mysql
@@ -260,6 +246,30 @@ componentSpecs:
     - general
     - slow
     disableExporter: true # Change this value
+```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+```bash
+kubectl get cluster mycluster -o yaml
+>
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+...
+spec:
+   ...
+   componentSpecs:
+   ...
+      disableExporter: false
+```
+
+If `disableExporter: false` is not shown in the output, it means the monitoring function of this cluster is not enabled and you need to enable it first.
+
+```bash
+kbcli cluster update mycluster --disable-exporter=false
 ```
 
 </TabItem>
@@ -276,7 +286,17 @@ Remote write is an optional step and you can enable it based on your actual need
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
+<TabItem value="kubectl" label="kubectl" default>
+
+Install the `victoria-metrics-agent` Addon.
+
+```bash
+helm install vm kubeblocks/victoria-metrics-agent --set remoteWriteUrls={http://<remoteWriteUrl>:<port>/<remote write path>}
+```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
 
 1. Enable data push.
 
@@ -318,16 +338,6 @@ Remote write is an optional step and you can enable it based on your actual need
    ```bash
    kbcli addon disable victoria-metrics-agent
    ```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
-
-Install the `victoria-metrics-agent` Addon.
-
-```bash
-helm install vm kubeblocks/victoria-metrics-agent --set remoteWriteUrls={http://<remoteWriteUrl>:<port>/<remote write path>}
-```
 
 </TabItem>
 

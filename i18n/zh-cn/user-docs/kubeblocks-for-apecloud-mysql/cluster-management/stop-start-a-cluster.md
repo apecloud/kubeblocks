@@ -38,15 +38,14 @@ import TabItem from '@theme/TabItem';
   
     <TabItem value="编辑集群 YAML 文件" label="编辑集群 YAML 文件">
 
+    ```bash
+    kubectl edit cluster mycluster -n demo
+    ```
+
     将 replicas 设为 0，删除 Pods。
 
     ```yaml
-    kubectl edit cluster mycluster -n demo
-    >
-    apiVersion: apps.kubeblocks.io/v1alpha1
-    kind: Cluster
-    metadata:
-        name: mycluster
+    ...
     spec:
       clusterDefinitionRef: apecloud-mysql
       clusterVersionRef: ac-mysql-8.0.30
@@ -55,16 +54,8 @@ import TabItem from '@theme/TabItem';
       - name: mysql
         componentDefRef: mysql
         disableExporter: true  
-        replicas: 0
-        volumeClaimTemplates:
-        - name: data
-          spec:
-            storageClassName: standard
-            accessModes:
-              - ReadWriteOnce
-            resources:
-              requests:
-                storage: 20Gi
+        replicas: 0 # 修改该参数值
+    ...
     ```
 
     </TabItem>
@@ -126,15 +117,14 @@ import TabItem from '@theme/TabItem';
   
     <TabItem value="编辑集群 YAML 文件" label="编辑集群 YAML 文件">
 
+    ```bash
+    kubectl edit cluster mycluster -n demo
+    ```
+
     将 replicas 数值调整为停止集群前的数量，再次启动集群。
 
     ```yaml
-    kubectl edit cluster mycluster -n demo
-    >
-    apiVersion: apps.kubeblocks.io/v1alpha1
-    kind: Cluster
-    metadata:
-        name: mycluster
+    ...
     spec:
       clusterDefinitionRef: apecloud-mysql
       clusterVersionRef: ac-mysql-8.0.30
@@ -143,16 +133,8 @@ import TabItem from '@theme/TabItem';
       - name: mysql
         componentDefRef: mysql
         disableExporter: true
-        replicas: 3
-        volumeClaimTemplates:
-        - name: data
-          spec:
-            storageClassName: standard
-            accessModes:
-              - ReadWriteOnce
-            resources:
-              requests:
-                storage: 20Gi
+        replicas: 3 # 修改该参数值
+    ...
     ```
 
     </TabItem>

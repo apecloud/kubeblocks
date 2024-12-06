@@ -26,7 +26,7 @@ kbcli cluster create -h
 Create a cluster
 
 Examples:
-  ......
+  ...
   
   # 创建一个强制分散在节点上的集群
   kbcli cluster create --cluster-definition apecloud-mysql --topology-keys kubernetes.io/hostname --pod-anti-affinity
@@ -44,7 +44,7 @@ Required
   kbcli cluster create --tenancy=DedicatedNode
 
 Options:
-    ......
+    ...
     --node-labels=[]:
         Node label selector
 
@@ -59,8 +59,7 @@ Options:
 
     --topology-keys=[]:
         Topology keys for affinity
-    ......
-.......
+...
 ```
 
 </TabItem>
@@ -91,7 +90,7 @@ spec:
       podAntiAffinity: Required
       topologyKeys:
         - kubernetes.io/hostname
-    ......
+...
 ```
 
 **YAML 文件中的参数**

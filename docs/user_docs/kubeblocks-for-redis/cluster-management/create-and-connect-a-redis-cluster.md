@@ -23,7 +23,18 @@ This tutorial shows how to create and connect to a Redis cluster.
 
   <Tabs>
 
-  <TabItem value="kbcli" label="kbcli" default>
+  <TabItem value="kubectl" label="kubectl" default>
+
+  ```bash
+  kubectl get addons.extensions.kubeblocks.io redis
+  >
+  NAME      TYPE   VERSION   PROVIDER   STATUS    AGE
+  redis     Helm                        Enabled   61m
+  ```
+
+  </TabItem>
+
+  <TabItem value="kbcli" label="kbcli">
 
   ```bash
   kbcli addon list
@@ -36,41 +47,13 @@ This tutorial shows how to create and connect to a Redis cluster.
 
   </TabItem>
 
-  <TabItem value="kubectl" label="kubectl">
-
-  ```bash
-  kubectl get addons.extensions.kubeblocks.io redis
-  >
-  NAME      TYPE   VERSION   PROVIDER   STATUS    AGE
-  redis     Helm                        Enabled   61m
-  ```
-
-  </TabItem>
-
   </Tabs>
 
 * View all the database types and versions available for creating a cluster.
 
   <Tabs>
 
-  <TabItem value="kbcli" label="kbcli" default>
-
-  ```bash
-  kbcli clusterdefinition list
-  >
-  NAME               TOPOLOGIES                                              SERVICEREFS   STATUS      AGE
-  redis              replication,replication-twemproxy,standalone                          Available   16m
-
-  kbcli clusterversion list
-  >
-  NAME                 CLUSTER-DEFINITION   STATUS      IS-DEFAULT   CREATED-TIME
-  redis-7.0.6          redis                Available   false        Sep 27,2024 11:36 UTC+0800
-  redis-7.2.4          redis                Available   false        Sep 27,2024 11:36 UTC+0800
-  ```
-
-  </TabItem>
-
-  <TabItem value="kubectl" label="kubectl">
+  <TabItem value="kubectl" label="kubectl" default>
 
   ```bash
   kubectl get clusterdefinition redis
@@ -85,6 +68,23 @@ This tutorial shows how to create and connect to a Redis cluster.
   NAME          CLUSTER-DEFINITION   STATUS      AGE
   redis-7.0.6   redis                Available   16m
   redis-7.2.4   redis                Available   16m
+  ```
+
+  </TabItem>
+
+  <TabItem value="kbcli" label="kbcli">
+
+  ```bash
+  kbcli clusterdefinition list
+  >
+  NAME               TOPOLOGIES                                              SERVICEREFS   STATUS      AGE
+  redis              replication,replication-twemproxy,standalone                          Available   16m
+
+  kbcli clusterversion list
+  >
+  NAME                 CLUSTER-DEFINITION   STATUS      IS-DEFAULT   CREATED-TIME
+  redis-7.0.6          redis                Available   false        Sep 27,2024 11:36 UTC+0800
+  redis-7.2.4          redis                Available   false        Sep 27,2024 11:36 UTC+0800
   ```
 
   </TabItem>
@@ -105,34 +105,7 @@ KubeBlocks supports creating two types of Redis clusters: Standalone and Replica
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-1. Create an Redis cluster.
-
-   ```bash
-   kbcli cluster create redis mycluster -n demo
-   ```
-
-   If you want to customize your cluster specifications, kbcli provides various options, such as setting cluster version, termination policy, CPU, and memory. You can view these options by adding `--help` or `-h` flag.
-
-   ```bash
-   kbcli cluster create redis --help
-
-   kbcli cluster create redis -h
-   ```
-
-2. Verify whether this cluster is created successfully.
-
-   ```bash
-   kbcli cluster list -n demo
-   >
-   NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION   TERMINATION-POLICY   STATUS     CREATED-TIME
-   mycluster   demo        redis                          Delete               Running    Sep 29,2024 09:46 UTC+0800
-   ```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 KubeBlocks implements a `Cluster` CRD to define a cluster. Here is an example of creating a Standalone.
 
@@ -206,21 +179,40 @@ kubectl get cluster mycluster -n demo -o yaml
 
 </TabItem>
 
+<TabItem value="kbcli" label="kbcli">
+
+1. Create an Redis cluster.
+
+   ```bash
+   kbcli cluster create redis mycluster -n demo
+   ```
+
+   If you want to customize your cluster specifications, kbcli provides various options, such as setting cluster version, termination policy, CPU, and memory. You can view these options by adding `--help` or `-h` flag.
+
+   ```bash
+   kbcli cluster create redis --help
+
+   kbcli cluster create redis -h
+   ```
+
+2. Verify whether this cluster is created successfully.
+
+   ```bash
+   kbcli cluster list -n demo
+   >
+   NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION   TERMINATION-POLICY   STATUS     CREATED-TIME
+   mycluster   demo        redis                          Delete               Running    Sep 29,2024 09:46 UTC+0800
+   ```
+
+</TabItem>
+
 </Tabs>
 
 ## Connect to a Redis Cluster
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-```bash
-kbcli cluster connect mycluster -n demo
-```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 You can use `kubectl exec` to exec into a Pod and connect to a database.
 
@@ -269,6 +261,14 @@ You can also port forward the service to connect to the database from your local
    ```bash
    root@mycluster-redis-0:/# redis-cli -a 5bv7czc4  --user default
    ```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+```bash
+kbcli cluster connect mycluster -n demo
+```
 
 </TabItem>
 

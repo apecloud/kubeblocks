@@ -105,14 +105,14 @@ mycluster   demo        mysql                mysql-8.0.33   Delete              
 
 1. 修改 YAML 文件中 `spec.componentSpecs.resources` 的配置。`spec.componentSpecs.resources` 控制资源的请求值和限制值，修改参数值将触发垂直扩缩容。
 
-   ```yaml
+   ```bash
    kubectl edit cluster mycluster -n demo
-   >
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: Cluster
-   metadata:
-     name: mycluster
-     namespace: demo
+   ```
+
+   在编辑器中修改 `spec.componentSpecs.resources` 的参数值。
+
+   ```yaml
+   ...
    spec:
      clusterDefinitionRef: mysql
      clusterVersionRef: mysql-8.0.30
@@ -127,15 +127,7 @@ mycluster   demo        mysql                mysql-8.0.33   Delete              
          limits:
            memory: "4Gi"
            cpu: "2"
-       volumeClaimTemplates:
-       - name: data
-         spec:
-           accessModes:
-             - ReadWriteOnce
-           resources:
-             requests:
-               storage: 40Gi
-     terminationPolicy: Delete
+   ...
    ```
 
 2. 当集群状态再次回到 `Running` 后。查看相应资源是否变更。
@@ -298,14 +290,14 @@ mycluster   demo        mysql                mysql-8.0.33   Delete              
 
 1. 修改 YAML 文件中 `spec.componentSpecs.replicas` 的配置。`spec.componentSpecs.replicas` 定义了 pod 数量，修改该参数将触发集群水平扩缩容。
 
-   ```yaml
+   ```bash
    kubectl edit cluster mycluster -n demo
-   >
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: Cluster
-   metadata:
-     name: mycluster
-     namespace: demo
+   ```
+
+   在编辑器中修改 `spec.componentSpecs.replicas` 的参数值。
+
+   ```yaml
+   ...
    spec:
      clusterDefinitionRef: mysql
      clusterVersionRef: mysql-8.0.30
@@ -313,15 +305,7 @@ mycluster   demo        mysql                mysql-8.0.33   Delete              
      - name: mysql
        componentDefRef: mysql
        replicas: 1 # 修改该参数值
-       volumeClaimTemplates:
-       - name: data
-         spec:
-           accessModes:
-             - ReadWriteOnce
-           resources:
-             requests:
-               storage: 1Gi
-    terminationPolicy: Delete
+   ...
    ```
 
 2. 当集群状态再次回到 `Running` 后，查看相关资源是否变更。

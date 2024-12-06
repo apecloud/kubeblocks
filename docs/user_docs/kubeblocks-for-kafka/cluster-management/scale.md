@@ -23,18 +23,7 @@ Check whether the cluster status is `Running`. Otherwise, the following operatio
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-```bash
-kbcli cluster list mycluster -n demo
->
-NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION       TERMINATION-POLICY   STATUS    CREATED-TIME
-mycluster   demo        kafka                kafka-3.3.2   Delete               Running   Sep 27,2024 15:15 UTC+0800
-```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 ```bash
 kubectl -n demo get cluster mycluster
@@ -45,65 +34,24 @@ mycluster      kafka                kafka-3.3.2    Delete               Running 
 
 </TabItem>
 
+<TabItem value="kbcli" label="kbcli">
+
+```bash
+kbcli cluster list mycluster -n demo
+>
+NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION       TERMINATION-POLICY   STATUS    CREATED-TIME
+mycluster   demo        kafka                kafka-3.3.2   Delete               Running   Sep 27,2024 15:15 UTC+0800
+```
+
+</TabItem>
+
 </Tabs>
 
 ### Steps
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-1. Configure the parameters `--components`, `--memory`, and `--cpu` and run the command.
-
-   ```bash
-    kbcli cluster vscale mycluster -n demo --components="broker" --memory="4Gi" --cpu="2" 
-   ```
-
-   - `--components` value can be `broker` or `controller`.
-     - broker: all nodes in the combined mode, or all the broker node in the separated node.
-     - controller: all the corresponding nodes in the separated mode.
-   - `--memory` describes the requested and limited size of the component memory.
-   - `--cpu` describes the requested and limited size of the component CPU.
-
-2. Validate the vertical scaling operation.
-
-   - View the OpsRequest progress.
-
-     KubeBlocks outputs a command automatically for you to view the OpsRequest progress. The output includes the status of this OpsRequest and Pods. When the status is `Succeed`, this OpsRequest is completed.
-
-     ```bash
-     kbcli cluster describe-ops mycluster-verticalscaling-g67k9 -n demo
-     ```
-
-   - Check the cluster status.
-
-     ```bash
-     kbcli cluster list mycluster -n demo
-     >
-     NAME             NAMESPACE        CLUSTER-DEFINITION       VERSION                TERMINATION-POLICY        STATUS          CREATED-TIME
-     mycluster        demo         kafka                    kafka-3.3.2            Delete                    Updating        Sep 27,2024 15:15 UTC+0800
-     ```
-
-    - STATUS=Updating: it means the vertical scaling is in progress.
-    - STATUS=Running: it means the vertical scaling operation has been applied.
-    - STATUS=Abnormal: it means the vertical scaling is abnormal. The reason may be that the number of the normal instances is less than that of the total instance or the leader instance is running properly while others are abnormal.
-      > To solve the problem, you can manually check whether this error is caused by insufficient resources. Then if AutoScaling is supported by the Kubernetes cluster, the system recovers when there are enough resources. Otherwise, you can create enough resources and troubleshoot with `kubectl describe` command.
-
-:::note
-
-Vertical scaling does not synchronize parameters related to CPU and memory and it is required to manually call the OpsRequest of configuration to change parameters accordingly. Refer to [Configuration](./../configuration/configuration.md) for instructions.
-
-:::
-
-3. After the OpsRequest status is `Succeed` or the cluster status is `Running` again, check whether the corresponding resources change.
-
-    ```bash
-    kbcli cluster describe mycluster -n demo
-    ```
-
-</TabItem>
-
-<TabItem value="OpsRequest" label="OpsRequest">
+<TabItem value="OpsRequest" label="OpsRequest" default>
 
 1. Apply an OpsRequest to the specified cluster. Configure the parameters according to your needs.
 
@@ -144,7 +92,7 @@ Vertical scaling does not synchronize parameters related to CPU and memory and i
    ```bash
    kubectl describe cluster mycluster -n demo
    >
-   ......
+   ...
    Component Specs:
     Component Def Ref:  kafka
     Enabled Logs:
@@ -203,7 +151,7 @@ Vertical scaling does not synchronize parameters related to CPU and memory and i
    ```bash
    kubectl describe cluster mycluster -n demo
    >
-   ......
+   ...
    Component Specs:
     Component Def Ref:  kafka
     Enabled Logs:
@@ -222,6 +170,58 @@ Vertical scaling does not synchronize parameters related to CPU and memory and i
 
 </TabItem>
 
+<TabItem value="kbcli" label="kbcli">
+
+1. Configure the parameters `--components`, `--memory`, and `--cpu` and run the command.
+
+   ```bash
+    kbcli cluster vscale mycluster -n demo --components="broker" --memory="4Gi" --cpu="2" 
+   ```
+
+   - `--components` value can be `broker` or `controller`.
+     - broker: all nodes in the combined mode, or all the broker node in the separated node.
+     - controller: all the corresponding nodes in the separated mode.
+   - `--memory` describes the requested and limited size of the component memory.
+   - `--cpu` describes the requested and limited size of the component CPU.
+
+2. Validate the vertical scaling operation.
+
+   - View the OpsRequest progress.
+
+     KubeBlocks outputs a command automatically for you to view the OpsRequest progress. The output includes the status of this OpsRequest and Pods. When the status is `Succeed`, this OpsRequest is completed.
+
+     ```bash
+     kbcli cluster describe-ops mycluster-verticalscaling-g67k9 -n demo
+     ```
+
+   - Check the cluster status.
+
+     ```bash
+     kbcli cluster list mycluster -n demo
+     >
+     NAME             NAMESPACE        CLUSTER-DEFINITION       VERSION                TERMINATION-POLICY        STATUS          CREATED-TIME
+     mycluster        demo         kafka                    kafka-3.3.2            Delete                    Updating        Sep 27,2024 15:15 UTC+0800
+     ```
+
+    - STATUS=Updating: it means the vertical scaling is in progress.
+    - STATUS=Running: it means the vertical scaling operation has been applied.
+    - STATUS=Abnormal: it means the vertical scaling is abnormal. The reason may be that the number of the normal instances is less than that of the total instance or the leader instance is running properly while others are abnormal.
+      > To solve the problem, you can manually check whether this error is caused by insufficient resources. Then if AutoScaling is supported by the Kubernetes cluster, the system recovers when there are enough resources. Otherwise, you can create enough resources and troubleshoot with `kubectl describe` command.
+
+:::note
+
+Vertical scaling does not synchronize parameters related to CPU and memory and it is required to manually call the OpsRequest of configuration to change parameters accordingly. Refer to [Configuration](./../configuration/configuration.md) for instructions.
+
+:::
+
+3. After the OpsRequest status is `Succeed` or the cluster status is `Running` again, check whether the corresponding resources change.
+
+    ```bash
+    kbcli cluster describe mycluster -n demo
+    ```
+
+</TabItem>
+
 </Tabs>
 
 ## Horizontal scaling
@@ -235,24 +235,24 @@ From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out insta
 - Check whether the cluster STATUS is `Running`. Otherwise, the following operations may fail.
    <Tabs>
 
-   <TabItem value="kbcli" label="kbcli" default>
-
-   ```bash
-   kbcli cluster list mycluster -n demo
-   >
-   NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION       TERMINATION-POLICY   STATUS    CREATED-TIME
-   mycluster   demo        kafka                kafka-3.3.2   Delete               Running   Sep 27,2024 15:15 UTC+0800
-   ```
-
-   </TabItem>
-
-   <TabItem value="kubectl" label="kubectl">
+   <TabItem value="kubectl" label="kubectl" default>
 
    ```bash
    kubectl -n demo get cluster mycluster
    >
    NAME           CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS     AGE
    mycluster      kafka                kafka-3.3.2    Delete               Running    19m
+   ```
+
+   </TabItem>
+
+   <TabItem value="kbcli" label="kbcli">
+
+   ```bash
+   kbcli cluster list mycluster -n demo
+   >
+   NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION       TERMINATION-POLICY   STATUS    CREATED-TIME
+   mycluster   demo        kafka                kafka-3.3.2   Delete               Running   Sep 27,2024 15:15 UTC+0800
    ```
 
    </TabItem>
@@ -265,45 +265,7 @@ From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out insta
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-1. Configure the parameters `--components` and `--replicas`, and run the command.
-
-   ```bash
-   kbcli cluster hscale mycluster -n demo --components="broker" --replicas=3
-   ```
-
-   - `--components` describes the component name ready for horizontal scaling.
-   - `--replicas` describes the replica amount of the specified components. Edit the amount based on your demands to scale in or out replicas.
-
-2. Validate the horizontal scaling operation.
-
-   - View the OpsRequest progress.
-
-     KubeBlocks outputs a command automatically for you to view the OpsRequest progress. The output includes the status of this OpsRequest and Pods. When the status is `Succeed`, this OpsRequest is completed.
-
-     ```bash
-     kbcli cluster describe-ops mycluster-horizontalscaling-ffp9p -n demo
-     ```
-
-   - View the cluster satus.
-
-     ```bash
-     kbcli cluster list mycluster -n demo
-     ```
-
-     - STATUS=Updating: it means horizontal scaling is in progress.
-     - STATUS=Running: it means horizontal scaling has been applied.
-
-3. Check whether the corresponding resources change.
-
-    ```bash
-    kbcli cluster describe mycluster -n demo
-    ```
-
-</TabItem>
-
-<TabItem value="OpsRequest" label="OpsRequest">
+<TabItem value="OpsRequest" label="OpsRequest" default>
 
 1. Apply an OpsRequest to a specified cluster. Configure the parameters according to your needs.
 
@@ -363,7 +325,7 @@ From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out insta
    ```bash
    kubectl describe cluster mycluster -n demo
    >
-   ......
+   ...
    Component Specs:
     Component Def Ref:  kafka
     Enabled Logs:
@@ -386,30 +348,22 @@ From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out insta
 
 1. Change the configuration of `spec.componentSpecs.replicas` in the YAML file. `spec.componentSpecs.replicas` stands for the pod amount and changing this value triggers a horizontal scaling of a cluster.
 
-   ```yaml
+   ```bash
    kubectl edit cluster mycluster -n demo
-   >
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: Cluster
-   metadata:
-     name: mycluster
-     namespace: demo
+   ```
+
+   Edit the value of `spec.componentSpecs.replicas`.
+
+   ```yaml
+   ...
    spec:
      clusterDefinitionRef: kafka
      clusterVersionRef: kafka-3.3.2 
      componentSpecs:
      - name: broker
        componentDefRef: broker
-       replicas: 2 # Change the amount
-       volumeClaimTemplates:
-       - name: data
-         spec:
-           accessModes:
-             - ReadWriteOnce
-           resources:
-             requests:
-               storage: 20Gi
-    terminationPolicy: Delete
+       replicas: 2 # Change this value
+   ...
    ```
 
 2. Check whether the corresponding resources change.
@@ -417,7 +371,7 @@ From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out insta
    ```bash
    kubectl describe cluster mycluster -n demo
    >
-   ......
+   ...
    Component Specs:
     Component Def Ref:  kafka
     Enabled Logs:
@@ -433,6 +387,44 @@ From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out insta
         Cpu:     1
         Memory:  2Gi
    ```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+1. Configure the parameters `--components` and `--replicas`, and run the command.
+
+   ```bash
+   kbcli cluster hscale mycluster -n demo --components="broker" --replicas=3
+   ```
+
+   - `--components` describes the component name ready for horizontal scaling.
+   - `--replicas` describes the replica amount of the specified components. Edit the amount based on your demands to scale in or out replicas.
+
+2. Validate the horizontal scaling operation.
+
+   - View the OpsRequest progress.
+
+     KubeBlocks outputs a command automatically for you to view the OpsRequest progress. The output includes the status of this OpsRequest and Pods. When the status is `Succeed`, this OpsRequest is completed.
+
+     ```bash
+     kbcli cluster describe-ops mycluster-horizontalscaling-ffp9p -n demo
+     ```
+
+   - View the cluster satus.
+
+     ```bash
+     kbcli cluster list mycluster -n demo
+     ```
+
+     - STATUS=Updating: it means horizontal scaling is in progress.
+     - STATUS=Running: it means horizontal scaling has been applied.
+
+3. Check whether the corresponding resources change.
+
+    ```bash
+    kbcli cluster describe mycluster -n demo
+    ```
 
 </TabItem>
 

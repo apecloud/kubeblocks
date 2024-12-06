@@ -36,16 +36,7 @@ Refer to the [Pulsar official document](https://pulsar.apache.org/docs/3.1.x/) f
 
   <Tabs>
 
-  <TabItem value="kbcli" label="kbcli" default>
-
-  ```bash
-  kbcli clusterdefinition list
-  kbcli clusterversion list
-  ```
-
-  </TabItem>
-
-  <TabItem value="kubectl" label="kubectl">
+  <TabItem value="kubectl" label="kubectl" default>
 
   ```bash
   kubectl get clusterdefinition pulsar
@@ -62,6 +53,15 @@ Refer to the [Pulsar official document](https://pulsar.apache.org/docs/3.1.x/) f
   NAME            CLUSTER-DEFINITION   STATUS      AGE
   pulsar-2.11.2   pulsar               Available   16m
   pulsar-3.0.2    pulsar               Available   16m
+  ```
+
+  </TabItem>
+
+  <TabItem value="kbcli" label="kbcli">
+
+  ```bash
+  kbcli clusterdefinition list
+  kbcli clusterversion list
   ```
 
   </TabItem>

@@ -19,24 +19,24 @@ You can initiate a switchover for an ApeCloud MySQL RaftGroup by executing the k
   
    <Tabs>
 
-   <TabItem value="kbcli" label="kbcli" default>
-
-   ```bash
-   kbcli cluster list mycluster -n demo
-   >
-   NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    CREATED-TIME
-   mycluster   demo        apecloud-mysql       ac-mysql-8.0.30   Delete               Running   Sep 19,2024 16:01 UTC+0800
-   ```
-
-   </TabItem>
-
-   <TabItem value="kubectl" label="kubectl">
+   <TabItem value="kubectl" label="kubectl" default>
 
    ```bash
    kubectl get cluster mycluster -n demo
    >
    NAME        CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    AGE
    mycluster   apecloud-mysql       ac-mysql-8.0.30   Delete               Running   27m
+   ```
+
+   </TabItem>
+
+   <TabItem value="kbcli" label="kbcli">
+
+   ```bash
+   kbcli cluster list mycluster -n demo
+   >
+   NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    CREATED-TIME
+   mycluster   demo        apecloud-mysql       ac-mysql-8.0.30   Delete               Running   Sep 19,2024 16:01 UTC+0800
    ```
 
    </TabItem>
@@ -60,29 +60,7 @@ You can switch over a follower of an ApeCloud MySQL RaftGroup to the leader role
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-* Initiate a switchover with no leader instance specified.
-
-    ```bash
-    kbcli cluster promote mycluster -n demo
-    ```
-
-* Initiate a switchover with a specified new leader instance.
-
-    ```bash
-    kbcli cluster promote mycluster --instance='mycluster-mysql-2' -n demo
-    ```
-
-* If there are multiple components, you can use `--components` to specify a component.
-
-    ```bash
-    kbcli cluster promote mycluster --instance='mycluster-mysql-2' --components='apecloud-mysql' -n demo
-    ```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 The value of `instanceName` decides whether a new leader instance is specified for the switchover.
 
@@ -124,6 +102,28 @@ The value of `instanceName` decides whether a new leader instance is specified f
 
 </TabItem>
 
+<TabItem value="kbcli" label="kbcli">
+
+* Initiate a switchover with no leader instance specified.
+
+    ```bash
+    kbcli cluster promote mycluster -n demo
+    ```
+
+* Initiate a switchover with a specified new leader instance.
+
+    ```bash
+    kbcli cluster promote mycluster --instance='mycluster-mysql-2' -n demo
+    ```
+
+* If there are multiple components, you can use `--components` to specify a component.
+
+    ```bash
+    kbcli cluster promote mycluster --instance='mycluster-mysql-2' --components='apecloud-mysql' -n demo
+    ```
+
+</TabItem>
+
 </Tabs>
 
 ## Verify the switchover
@@ -132,18 +132,18 @@ Check the instance status to verify whether the switchover is performed successf
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
+<TabItem value="kubectl" label="kubectl" default>
 
 ```bash
-kbcli cluster list-instances -n demo
+kubectl get pods -n demo
 ```
 
 </TabItem>
 
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kbcli" label="kbcli">
 
 ```bash
-kubectl get pods -n demo
+kbcli cluster list-instances -n demo
 ```
 
 </TabItem>

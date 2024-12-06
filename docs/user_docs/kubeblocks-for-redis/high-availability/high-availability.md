@@ -50,72 +50,7 @@ In the Redis Replication Cluster provided by KubeBlocks, Sentinel is deployed as
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-This section takes the cluster `redis-cluster` in the namespace `default` as an example.
-
-1. View the initial status of the Redis cluster.
-
-   ```bash
-   kbcli cluster describe redis-cluster
-   ```
-
-   ![Redis cluster original status](../../../img/redis-ha-before.png)
-
-   Currently, `redis-cluster-redis-0` is the primary pod and `redis-cluster-redis-1` is the secondary pod.
-
-2. Simulate a primary pod exception.
-
-   ```bash
-   # Enter the primary pod
-   kubectl exec -it redis-cluster-redis-0  -- bash
-
-   # Execute the debug sleep command to simulate a primary pod exception
-   root@redis-redis-0:/# redis-cli debug sleep 30
-   ```
-
-3. Open the Redis Sentinel log to view the failover.
-
-   ```bash
-   kubectl logs redis-cluster-redis-sentinel-0
-   ```
-
-   In the logs, we can view when a high-availability switch occurs.
-
-   ```bash
-   1:X 18 Apr 2023 06:13:17.072 # +switch-master redis-cluster-redis-sentinel redis-cluster-redis-0.redis-cluster-redis-headless.default.svc 6379 redis-cluster-redis-1.redis-cluster-redis-headless.default.svc 6379
-   1:X 18 Apr 2023 06:13:17.074 * +slave slave redis-cluster-redis-0.redis-cluster-redis-headless.default.svc:6379 redis-cluster-redis-0.redis-cluster-redis-headless.default.svc 6379 @ redis-cluster-redis-sentinel redis-cluster-redis-1.redis-cluster-redis-headless.default.svc 6379
-   1:X 18 Apr 2023 06:13:17.077 * Sentinel new configuration saved on disk
-   ```
-
-4. Connect to the Redis cluster to view the primary pod information after the exception simulation.
-
-   ```bash
-   kbcli cluster connect redis-cluster
-   ```
-
-   ```bash
-   # View the current primary pod
-   127.0.0.1:6379> info replication
-   ```
-
-   ![Redis info replication](../../../img/redis-ha-info-replication.png)
-
-   From the output, `redis-cluster-redis-1` has been assigned as the primary's pod.
-
-5. Describe the cluster and check the instance role.
-
-   ```bash
-   kbcli cluster describe redis-cluster
-   ```
-
-   ![Redis cluster status after HA](./../../../img/redis-ha-after.png)
-
-   After the failover, `redis-cluster-redis-0` becomes the secondary pod and `redis-cluster-redis-1` becomes the primary pod.
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 This section takes the cluster `mycluster` in the namespace `demo` as an example.
 
@@ -185,6 +120,71 @@ This section takes the cluster `mycluster` in the namespace `demo` as an example
    ```
 
    After the failover, `mycluster-redis-0` becomes the secondary pod and `mycluster-redis-1` becomes the primary pod.
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+This section takes the cluster `redis-cluster` in the namespace `default` as an example.
+
+1. View the initial status of the Redis cluster.
+
+   ```bash
+   kbcli cluster describe redis-cluster
+   ```
+
+   ![Redis cluster original status](../../../img/redis-ha-before.png)
+
+   Currently, `redis-cluster-redis-0` is the primary pod and `redis-cluster-redis-1` is the secondary pod.
+
+2. Simulate a primary pod exception.
+
+   ```bash
+   # Enter the primary pod
+   kubectl exec -it redis-cluster-redis-0  -- bash
+
+   # Execute the debug sleep command to simulate a primary pod exception
+   root@redis-redis-0:/# redis-cli debug sleep 30
+   ```
+
+3. Open the Redis Sentinel log to view the failover.
+
+   ```bash
+   kubectl logs redis-cluster-redis-sentinel-0
+   ```
+
+   In the logs, we can view when a high-availability switch occurs.
+
+   ```bash
+   1:X 18 Apr 2023 06:13:17.072 # +switch-master redis-cluster-redis-sentinel redis-cluster-redis-0.redis-cluster-redis-headless.default.svc 6379 redis-cluster-redis-1.redis-cluster-redis-headless.default.svc 6379
+   1:X 18 Apr 2023 06:13:17.074 * +slave slave redis-cluster-redis-0.redis-cluster-redis-headless.default.svc:6379 redis-cluster-redis-0.redis-cluster-redis-headless.default.svc 6379 @ redis-cluster-redis-sentinel redis-cluster-redis-1.redis-cluster-redis-headless.default.svc 6379
+   1:X 18 Apr 2023 06:13:17.077 * Sentinel new configuration saved on disk
+   ```
+
+4. Connect to the Redis cluster to view the primary pod information after the exception simulation.
+
+   ```bash
+   kbcli cluster connect redis-cluster
+   ```
+
+   ```bash
+   # View the current primary pod
+   127.0.0.1:6379> info replication
+   ```
+
+   ![Redis info replication](../../../img/redis-ha-info-replication.png)
+
+   From the output, `redis-cluster-redis-1` has been assigned as the primary's pod.
+
+5. Describe the cluster and check the instance role.
+
+   ```bash
+   kbcli cluster describe redis-cluster
+   ```
+
+   ![Redis cluster status after HA](./../../../img/redis-ha-after.png)
+
+   After the failover, `redis-cluster-redis-0` becomes the secondary pod and `redis-cluster-redis-1` becomes the primary pod.
 
 </TabItem>
 

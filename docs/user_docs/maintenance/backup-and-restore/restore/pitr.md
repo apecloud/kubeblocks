@@ -23,24 +23,7 @@ KubeBlocks supports PITR for databases such as MySQL and PostgreSQL. This docume
 
      <Tabs>
 
-     <TabItem value="kbcli" label="kbcli" default>
-
-     ```bash
-     kbcli cluster describe pg-cluster
-     >
-     ...
-     Data Protection:
-     BACKUP-REPO   AUTO-BACKUP   BACKUP-SCHEDULE   BACKUP-METHOD   BACKUP-RETENTION   RECOVERABLE-TIME                                                
-     minio         Enabled       */5 * * * *       archive-wal     8d                 May 07,2024 15:29:46 UTC+0800 ~ May 07,2024 15:48:47 UTC+0800
-     ```
-
-     `RECOVERABLE-TIME` represents the time range within which the cluster can be restored.
-
-     It can be seen that the current backup time range is `May 07,2024 15:29:46 UTC+0800 ~ May 07,2024 15:48:47 UTC+0800`. Still, a full backup is required for data restoration, and this full backup must be completed within the time range of the log backups.
-
-     </TabItem>
-
-     <TabItem value="kubectl" label="kubectl">
+     <TabItem value="kubectl" label="kubectl" default>
 
      ```bash
      # 1. Get all backup objects for the current cluster
@@ -59,21 +42,30 @@ KubeBlocks supports PITR for databases such as MySQL and PostgreSQL. This docume
 
      </TabItem>
 
+     <TabItem value="kbcli" label="kbcli">
+
+     ```bash
+     kbcli cluster describe pg-cluster
+     >
+     ...
+     Data Protection:
+     BACKUP-REPO   AUTO-BACKUP   BACKUP-SCHEDULE   BACKUP-METHOD   BACKUP-RETENTION   RECOVERABLE-TIME                                                
+     minio         Enabled       */5 * * * *       archive-wal     8d                 May 07,2024 15:29:46 UTC+0800 ~ May 07,2024 15:48:47 UTC+0800
+     ```
+
+     `RECOVERABLE-TIME` represents the time range within which the cluster can be restored.
+
+     It can be seen that the current backup time range is `May 07,2024 15:29:46 UTC+0800 ~ May 07,2024 15:48:47 UTC+0800`. Still, a full backup is required for data restoration, and this full backup must be completed within the time range of the log backups.
+
+     </TabItem>
+
      </Tabs>
 
 2. Restore the cluster to a specific point in time.
 
      <Tabs>
 
-     <TabItem value="kbcli" label="kbcli" default>
-
-     ```bash
-     kbcli cluster restore pg-cluster-pitr --restore-to-time 'May 07,2024 15:48:47 UTC+0800' --backup <continuousBackupName>
-     ```
-
-     </TabItem>
-
-     <TabItem value="kubectl" label="kubectl">
+     <TabItem value="kubectl" label="kubectl" default>
 
      ```bash
      apiVersion: apps.kubeblocks.io/v1alpha1
@@ -91,24 +83,32 @@ KubeBlocks supports PITR for databases such as MySQL and PostgreSQL. This docume
 
      </TabItem>
 
+     <TabItem value="kbcli" label="kbcli">
+
+     ```bash
+     kbcli cluster restore pg-cluster-pitr --restore-to-time 'May 07,2024 15:48:47 UTC+0800' --backup <continuousBackupName>
+     ```
+
+     </TabItem>
+
      </Tabs>
 
 3. Check the status of the new cluster.
 
      <Tabs>
 
-     <TabItem value="kbcli" label="kbcli" default>
+     <TabItem value="kubectl" label="kubectl" default>
 
      ```bash
-     kbcli cluster list pg-cluster-pitr
+     kubectl get cluster pg-cluster-pitr
      ```
 
      </TabItem>
 
-     <TabItem value="kubectl" label="kubectl">
+     <TabItem value="kbcli" label="kbcli">
 
      ```bash
-     kubectl get cluster pg-cluster-pitr
+     kbcli cluster list pg-cluster-pitr
      ```
 
      </TabItem>

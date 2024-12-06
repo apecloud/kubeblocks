@@ -19,19 +19,19 @@ When an exception occurs during your operation, you can perform the following st
 
    <Tabs>
 
-   <TabItem value="kbcli" label="kbcli" default>
-
-   ```bash
-   kbcli cluster list mycluster
-   ```
-
-   </TabItem>
-
-   <TabItem value="kubectl" label="kubectl">
+   <TabItem value="kubectl" label="kubectl" default>
 
     ```bash
     kubectl describe cluster mycluster
     ```
+
+   </TabItem>
+
+   <TabItem value="kbcli" label="kbcli">
+
+   ```bash
+   kbcli cluster list mycluster
+   ```
 
    </TabItem>
 

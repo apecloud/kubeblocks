@@ -23,36 +23,7 @@ The pod role may change after the cluster restarts.
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-1. Restart a cluster.
-  
-   Configure the values of `components` and `ttlSecondsAfterSucceed` and run the command below to restart a specified cluster.
-
-   ```bash
-   kbcli cluster restart mycluster --components="redis" --ttlSecondsAfterSucceed=30
-   ```
-
-   - `components` describes the component name that needs to be restarted.
-   - `ttlSecondsAfterSucceed` describes the time to live of an OpsRequest job after the restarting succeeds.
-
-2. Validate the restart operation.
-
-   Check the cluster status to identify the restart status.
-
-   ```bash
-   kbcli cluster list mycluster -n demo
-   >
-   NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION   TERMINATION-POLICY   STATUS    CREATED-TIME
-   mycluster   demo        redis                          Delete               Running   Sep 29,2024 09:46 UTC+0800
-   ```
-
-   - STATUS=Updating: it means the cluster restart is in progress.
-   - STATUS=Running: it means the cluster has been restarted.
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 1. Create an OpsRequest to restart a cluster.
 
@@ -88,6 +59,35 @@ The pod role may change after the cluster restarts.
    During the restarting process, there are two status types for pods.
 
    - STATUS=Terminating: it means the cluster restart is in progress.
+   - STATUS=Running: it means the cluster has been restarted.
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+1. Restart a cluster.
+  
+   Configure the values of `components` and `ttlSecondsAfterSucceed` and run the command below to restart a specified cluster.
+
+   ```bash
+   kbcli cluster restart mycluster --components="redis" --ttlSecondsAfterSucceed=30
+   ```
+
+   - `components` describes the component name that needs to be restarted.
+   - `ttlSecondsAfterSucceed` describes the time to live of an OpsRequest job after the restarting succeeds.
+
+2. Validate the restart operation.
+
+   Check the cluster status to identify the restart status.
+
+   ```bash
+   kbcli cluster list mycluster -n demo
+   >
+   NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION   TERMINATION-POLICY   STATUS    CREATED-TIME
+   mycluster   demo        redis                          Delete               Running   Sep 29,2024 09:46 UTC+0800
+   ```
+
+   - STATUS=Updating: it means the cluster restart is in progress.
    - STATUS=Running: it means the cluster has been restarted.
 
 </TabItem>

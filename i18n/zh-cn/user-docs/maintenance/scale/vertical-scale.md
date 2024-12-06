@@ -86,14 +86,14 @@ mycluster   mysql                mysql-8.0.33   Delete               Running   4
 
 1. 修改 YAML 文件中 `spec.componentSpecs.resources` 的配置。`spec.componentSpecs.resources` 控制资源的请求值和限制值，修改参数值将触发垂直扩缩容。
 
-   ```yaml
+   ```bash
    kubectl edit cluster mycluster -n demo
-   >
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: Cluster
-   metadata:
-     name: mycluster
-     namespace: demo
+   ```
+
+   在编辑器中修改 `spec.componentSpecs.resources` 的参数值。
+
+   ```yaml
+   ...
    spec:
      clusterDefinitionRef: apecloud-mysql
      clusterVersionRef: ac-mysql-8.0.30
@@ -108,15 +108,7 @@ mycluster   mysql                mysql-8.0.33   Delete               Running   4
          limits:
            memory: "4Gi"
            cpu: "2"
-       volumeClaimTemplates:
-       - name: data
-         spec:
-           accessModes:
-             - ReadWriteOnce
-           resources:
-             requests:
-               storage: 20Gi
-     terminationPolicy: Delete
+   ...
    ```
 
 2. 查看相应资源是否变更。

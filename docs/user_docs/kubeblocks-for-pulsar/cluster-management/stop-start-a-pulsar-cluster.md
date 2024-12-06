@@ -19,15 +19,7 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
 
     <Tabs>
 
-    <TabItem value="kbcli" label="kbcli" default>
-
-    ```bash
-    kbcli cluster stop mycluster -n demo
-    ```
-
-    </TabItem>
-
-    <TabItem value="OpsRequest" label="OpsRequest">
+    <TabItem value="OpsRequest" label="OpsRequest" default>
 
     Apply an OpsRequest to stop a cluster.
 
@@ -48,14 +40,14 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
 
     <TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
 
+    ```bash
+    kubectl edit cluster mycluster -n demo
+    ```
+
     Configure replicas as 0 to delete pods.
 
     ```yaml
-    apiVersion: apps.kubeblocks.io/v1alpha1
-    kind: Cluster
-    metadata:
-      name: mycluster
-      namespace: demo
+    ...
     spec:
       clusterDefinitionRef: pulsar
       clusterVersionRef: pulsar-3.0.2
@@ -65,7 +57,15 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
         componentDefRef: pulsar
         disableExporter: true 
         replicas: 0
-    ......
+    ...
+    ```
+
+    </TabItem>
+
+    <TabItem value="kbcli" label="kbcli">
+
+    ```bash
+    kbcli cluster stop mycluster -n demo
     ```
 
     </TabItem>
@@ -76,18 +76,18 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
 
     <Tabs>
 
-    <TabItem value="kbcli" label="kbcli" default>
+    <TabItem value="kubectl" label="kubectl" default>
 
     ```bash
-    kbcli cluster list mycluster -n demo
+    kubectl get cluster mycluster -n demo
     ```
 
     </TabItem>
 
-    <TabItem value="kubectl" label="kubectl">
+    <TabItem value="kbcli" label="kbcli">
 
     ```bash
-    kubectl get cluster mycluster -n demo
+    kbcli cluster list mycluster -n demo
     ```
 
     </TabItem>
@@ -100,15 +100,7 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
 
     <Tabs>
 
-    <TabItem value="kbcli" label="kbcli" default>
-
-    ```bash
-    kbcli cluster start mycluster -n demo
-    ```
-
-    </TabItem>
-
-    <TabItem value="OpsRequest" label="OpsRequest">
+    <TabItem value="OpsRequest" label="OpsRequest" default>
 
     Apply an OpsRequest to start a cluster.
 
@@ -129,14 +121,14 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
 
     <TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
 
+    ```bash
+    kubectl edit cluster mycluster 
+    ```
+
     Change replicas back to the original amount to start this cluster again.
 
     ```yaml
-    apiVersion: apps.kubeblocks.io/v1alpha1
-    kind: Cluster
-    metadata:
-      name: mycluster
-      namespace: demo
+    ...
     spec:
       clusterDefinitionRef: pulsar
       clusterVersionRef: pulsar-3.0.2
@@ -146,7 +138,15 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
         componentDefRef: pulsar
         disableExporter: true  
         replicas: 1
-    ......
+    ...
+    ```
+
+    </TabItem>
+
+    <TabItem value="kbcli" label="kbcli">
+
+    ```bash
+    kbcli cluster start mycluster -n demo
     ```
 
     </TabItem>
@@ -157,18 +157,18 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
 
     <Tabs>
 
-    <TabItem value="kbcli" label="kbcli" default>
+    <TabItem value="kubectl" label="kubectl" default>
 
     ```bash
-    kbcli cluster list mycluster -n demo
+    kubectl get cluster mycluster -n demo
     ```
 
     </TabItem>
 
-    <TabItem value="kubectl" label="kubectl">
+    <TabItem value="kbcli" label="kbcli">
 
     ```bash
-    kubectl get cluster mycluster -n demo
+    kbcli cluster list mycluster -n demo
     ```
 
     </TabItem>

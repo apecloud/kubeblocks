@@ -21,7 +21,163 @@ But it's also important to note that the dynamic parameter configuration doesn't
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
+<TabItem value="Edit config file" label="Edit config file" default>
+
+KubeBlocks supports configuring cluster parameters by editing the configuration file.
+
+1. Get the configuration file of this cluster.
+
+   ```bash
+   kubectl edit configurations.apps.kubeblocks.io mycluster-mysql -n demo
+   ```
+
+2. Configure parameters according to your needs. The example below adds the `spec.configFileParams` part to configure `max_connections`.
+
+   ```yaml
+   spec:
+     clusterRef: mycluster
+     componentName: mysql
+     configItemDetails:
+     - configFileParams:
+         my.cnf:
+           parameters:
+             max_connections: "600"
+       configSpec:
+         constraintRef: mysql8.0-config-constraints
+         name: mysql-consensusset-config
+         namespace: kb-system
+         templateRef: mysql8.0-config-template
+         volumeName: mysql-config
+       name: mysql-consensusset-config
+     - configSpec:
+         defaultMode: 292
+   ```
+
+3. Connect to this cluster to verify whether the configuration takes effect.
+
+   1. Get the username and password.
+
+      ```bash
+      kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.username}' | base64 -d
+      >
+      root
+
+      kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.password}' | base64 -d
+      >
+      2gvztbvz
+      ```
+
+   2. Connect to this cluster and verify whether the parameters are configured as expected.
+
+      ```bash
+      kubectl exec -ti -n demo mycluster-mysql-0 -- bash
+
+      mysql -uroot -p2gvztbvz
+      >
+      mysql> show variables like 'max_connections';
+      +-----------------+-------+
+      | Variable_name   | Value |
+      +-----------------+-------+
+      | max_connections | 600   |
+      +-----------------+-------+
+      1 row in set (0.00 sec)
+      ```
+
+:::note
+
+Just in case you cannot find the configuration file of your cluster, you can switch to the `kbcli` tab and use relevant commands to view the current configuration file of a cluster.
+
+:::
+
+</TabItem>
+
+<TabItem value="OpsRequest" label="OpsRequest">
+
+KubeBlocks supports configuring cluster parameters with an OpsRequest.
+
+1. Define an OpsRequest file and configure the parameters in the OpsRequest in a YAML file named `mycluster-configuring-demo.yaml`. In this example, `max_connections` is configured as `600`.
+
+   ```bash
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: OpsRequest
+   metadata:
+     name: mycluster-configuring-demo
+     namespace: demo
+   spec:
+     clusterName: mycluster
+     reconfigure:
+       componentName: mysql
+       configurations:
+       - keys:
+         - key: my.cnf
+           parameters:
+           - key: max_connections
+             value: "600"
+         name: mysql-consensusset-configuration
+     preConditionDeadlineSeconds: 0
+     type: Reconfiguring
+   ```
+
+   | Field                                                  | Definition     |
+   |--------------------------------------------------------|--------------------------------|
+   | `metadata.name`                                        | It specifies the name of this OpsRequest. |
+   | `metadata.namespace`                                   | It specifies the namespace where this cluster is created. |
+   | `spec.clusterName`                                     | It specifies the cluster name that this operation is targeted at. |
+   | `spec.reconfigure`                                     | It specifies a component and its configuration updates. |
+   | `spec.reconfigure.componentName`                       | It specifies the component name of this cluster.  |
+   | `spec.configurations`                                  | It contains a list of ConfigurationItem objects, specifying the component's configuration template name, upgrade policy, and parameter key-value pairs to be updated. |
+   | `spec.reconfigure.configurations.keys.key`             | It specifies the configuration map. |
+   | `spec.reconfigure.configurations.keys.parameters`      | It defines a list of key-value pairs for a single configuration file. |
+   | `spec.reconfigure.configurations.keys.parameter.key`   | It represents the name of the parameter you want to edit. |
+   | `spec.reconfigure.configurations.keys.parameter.value` | It represents the parameter values that are to be updated. If set to nil, the parameter defined by the Key field will be removed from the configuration file.  |
+   | `spec.reconfigure.configurations.name`                 | It specifies the configuration template name.  |
+   | `preConditionDeadlineSeconds`                          | It specifies the maximum number of seconds this OpsRequest will wait for its start conditions to be met before aborting. If set to 0 (default), the start conditions must be met immediately for the OpsRequest to proceed. |
+
+2. Apply the configuration opsRequest.
+
+   ```bash
+   kubectl apply -f mycluster-configuring-demo.yaml
+   ```
+
+3. Connect to this cluster to verify whether the configuration takes effect.
+
+   1. Get the username and password.
+
+      ```bash
+      kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.username}' | base64 -d
+      >
+      root
+
+      kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.password}' | base64 -d
+      >
+      2gvztbvz
+      ```
+
+   2. Connect to this cluster and verify whether the parameters are configured as expected.
+
+      ```bash
+      kubectl exec -ti -n demo mycluster-mysql-0 -- bash
+
+      mysql -uroot -p2gvztbvz
+      >
+      mysql> show variables like 'max_connections';
+      +-----------------+-------+
+      | Variable_name   | Value |
+      +-----------------+-------+
+      | max_connections | 600   |
+      +-----------------+-------+
+      1 row in set (0.00 sec)
+      ```
+
+:::note
+
+Just in case you cannot find the configuration file of your cluster, you can switch to the `kbcli` tab and use relevant commands to view the current configuration file of a cluster.
+
+:::
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
 
 ## View parameter information
 
@@ -279,162 +435,6 @@ PARAMETERNAME             MYCLUSTER-RECONFIGURING-ZK4B4   MYCLUSTER-RECONFIGURIN
 max_connections           600                             610                                        
 innodb_buffer_pool_size   512M                            512M
 ```
-
-</TabItem>
-
-<TabItem value="Edit config file" label="Edit config file">
-
-KubeBlocks supports configuring cluster parameters by editing the configuration file.
-
-1. Get the configuration file of this cluster.
-
-   ```bash
-   kubectl edit configurations.apps.kubeblocks.io mycluster-mysql -n demo
-   ```
-
-2. Configure parameters according to your needs. The example below adds the `spec.configFileParams` part to configure `max_connections`.
-
-   ```yaml
-   spec:
-     clusterRef: mycluster
-     componentName: mysql
-     configItemDetails:
-     - configFileParams:
-         my.cnf:
-           parameters:
-             max_connections: "600"
-       configSpec:
-         constraintRef: mysql8.0-config-constraints
-         name: mysql-consensusset-config
-         namespace: kb-system
-         templateRef: mysql8.0-config-template
-         volumeName: mysql-config
-       name: mysql-consensusset-config
-     - configSpec:
-         defaultMode: 292
-   ```
-
-3. Connect to this cluster to verify whether the configuration takes effect.
-
-   1. Get the username and password.
-
-      ```bash
-      kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.username}' | base64 -d
-      >
-      root
-
-      kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.password}' | base64 -d
-      >
-      2gvztbvz
-      ```
-
-   2. Connect to this cluster and verify whether the parameters are configured as expected.
-
-      ```bash
-      kubectl exec -ti -n demo mycluster-mysql-0 -- bash
-
-      mysql -uroot -p2gvztbvz
-      >
-      mysql> show variables like 'max_connections';
-      +-----------------+-------+
-      | Variable_name   | Value |
-      +-----------------+-------+
-      | max_connections | 600   |
-      +-----------------+-------+
-      1 row in set (0.00 sec)
-      ```
-
-:::note
-
-Just in case you cannot find the configuration file of your cluster, you can switch to the `kbcli` tab and use relevant commands to view the current configuration file of a cluster.
-
-:::
-
-</TabItem>
-
-<TabItem value="OpsRequest" label="OpsRequest">
-
-KubeBlocks supports configuring cluster parameters with an OpsRequest.
-
-1. Define an OpsRequest file and configure the parameters in the OpsRequest in a YAML file named `mycluster-configuring-demo.yaml`. In this example, `max_connections` is configured as `600`.
-
-   ```bash
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: OpsRequest
-   metadata:
-     name: mycluster-configuring-demo
-     namespace: demo
-   spec:
-     clusterName: mycluster
-     reconfigure:
-       componentName: mysql
-       configurations:
-       - keys:
-         - key: my.cnf
-           parameters:
-           - key: max_connections
-             value: "600"
-         name: mysql-consensusset-configuration
-     preConditionDeadlineSeconds: 0
-     type: Reconfiguring
-   ```
-
-   | Field                                                  | Definition     |
-   |--------------------------------------------------------|--------------------------------|
-   | `metadata.name`                                        | It specifies the name of this OpsRequest. |
-   | `metadata.namespace`                                   | It specifies the namespace where this cluster is created. |
-   | `spec.clusterName`                                     | It specifies the cluster name that this operation is targeted at. |
-   | `spec.reconfigure`                                     | It specifies a component and its configuration updates. |
-   | `spec.reconfigure.componentName`                       | It specifies the component name of this cluster.  |
-   | `spec.configurations`                                  | It contains a list of ConfigurationItem objects, specifying the component's configuration template name, upgrade policy, and parameter key-value pairs to be updated. |
-   | `spec.reconfigure.configurations.keys.key`             | It specifies the configuration map. |
-   | `spec.reconfigure.configurations.keys.parameters`      | It defines a list of key-value pairs for a single configuration file. |
-   | `spec.reconfigure.configurations.keys.parameter.key`   | It represents the name of the parameter you want to edit. |
-   | `spec.reconfigure.configurations.keys.parameter.value` | It represents the parameter values that are to be updated. If set to nil, the parameter defined by the Key field will be removed from the configuration file.  |
-   | `spec.reconfigure.configurations.name`                 | It specifies the configuration template name.  |
-   | `preConditionDeadlineSeconds`                          | It specifies the maximum number of seconds this OpsRequest will wait for its start conditions to be met before aborting. If set to 0 (default), the start conditions must be met immediately for the OpsRequest to proceed. |
-
-2. Apply the configuration opsRequest.
-
-   ```bash
-   kubectl apply -f mycluster-configuring-demo.yaml
-   ```
-
-3. Connect to this cluster to verify whether the configuration takes effect.
-
-   1. Get the username and password.
-
-      ```bash
-      kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.username}' | base64 -d
-      >
-      root
-
-      kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.password}' | base64 -d
-      >
-      2gvztbvz
-      ```
-
-   2. Connect to this cluster and verify whether the parameters are configured as expected.
-
-      ```bash
-      kubectl exec -ti -n demo mycluster-mysql-0 -- bash
-
-      mysql -uroot -p2gvztbvz
-      >
-      mysql> show variables like 'max_connections';
-      +-----------------+-------+
-      | Variable_name   | Value |
-      +-----------------+-------+
-      | max_connections | 600   |
-      +-----------------+-------+
-      1 row in set (0.00 sec)
-      ```
-
-:::note
-
-Just in case you cannot find the configuration file of your cluster, you can switch to the `kbcli` tab and use relevant commands to view the current configuration file of a cluster.
-
-:::
 
 </TabItem>
 

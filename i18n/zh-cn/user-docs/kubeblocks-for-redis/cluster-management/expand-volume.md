@@ -91,7 +91,7 @@ mycluster   demo        redis                          Delete               Runn
    ```bash
    kubectl describe cluster mycluster -n demo
    >
-   ......
+   ...
    Volume Claim Templates:
       Name:  data
       Spec:
@@ -148,7 +148,7 @@ mycluster   demo        redis                          Delete               Runn
    ```bash
    kubectl describe cluster mycluster -n demo
    >
-   ......
+   ...
    Volume Claim Templates:
       Name:  data
       Spec:

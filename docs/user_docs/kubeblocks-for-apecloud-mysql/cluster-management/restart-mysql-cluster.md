@@ -17,34 +17,7 @@ You can restart all pods of the cluster. When an exception occurs in a database,
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-1. Restart a cluster.  
-
-   Configure the values of `components` and `ttlSecondsAfterSucceed` and run the command below to restart a specified cluster.
-
-   ```bash
-   kbcli cluster restart mycluster --components="mysql" --ttlSecondsAfterSucceed=30 -n demo
-   ```
-
-   - `components` describes the component name that needs to be restarted.
-   - `ttlSecondsAfterSucceed` describes the time to live of an OpsRequest job after the restarting succeeds.
-
-2. Check the cluster status to validate the restarting.
-
-   ```bash
-   kbcli cluster list mycluster -n demo
-   >
-   NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    CREATED-TIME
-   mycluster   demo        apecloud-mysql       ac-mysql-8.0.30   Delete               Running   Sep 19,2024 16:01 UTC+0800
-   ```
-
-   - STATUS=Updating: it means the cluster restart is in progress.
-   - STATUS=Running: it means the cluster has been restarted.
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 1. Create an OpsRequest to restart a cluster.
 
@@ -85,6 +58,33 @@ You can restart all pods of the cluster. When an exception occurs in a database,
    - STATUS=Running: it means the cluster has been restarted.
 
    If an error occurs, you can troubleshoot with `kubectl describe` command to view the events of this operation.
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+1. Restart a cluster.  
+
+   Configure the values of `components` and `ttlSecondsAfterSucceed` and run the command below to restart a specified cluster.
+
+   ```bash
+   kbcli cluster restart mycluster --components="mysql" --ttlSecondsAfterSucceed=30 -n demo
+   ```
+
+   - `components` describes the component name that needs to be restarted.
+   - `ttlSecondsAfterSucceed` describes the time to live of an OpsRequest job after the restarting succeeds.
+
+2. Check the cluster status to validate the restarting.
+
+   ```bash
+   kbcli cluster list mycluster -n demo
+   >
+   NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    CREATED-TIME
+   mycluster   demo        apecloud-mysql       ac-mysql-8.0.30   Delete               Running   Sep 19,2024 16:01 UTC+0800
+   ```
+
+   - STATUS=Updating: it means the cluster restart is in progress.
+   - STATUS=Running: it means the cluster has been restarted.
 
 </TabItem>
 

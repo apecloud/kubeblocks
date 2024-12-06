@@ -34,29 +34,7 @@ You can switch over a secondary of a PostgreSQL Replication Cluster to the prima
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-* Switchover with no primary instance specified
-
-    ```bash
-    kbcli cluster promote mycluster -n demo
-    ```
-
-* Switchover with a specified new primary instance
-
-    ```bash
-    kbcli cluster promote mycluster -n demo --instance='mycluster-postgresql-2'
-    ```
-
-* If there are multiple components, you can use `--components` to specify a component.
-
-    ```bash
-    kbcli cluster promote mycluster -n demo --instance='mycluster-postgresql-2' --components='postgresql'
-    ```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 The value of `instanceName` decides whether a new primary instance is specified for the switchover.
 
@@ -98,6 +76,28 @@ The value of `instanceName` decides whether a new primary instance is specified 
 
 </TabItem>
 
+<TabItem value="kbcli" label="kbcli">
+
+* Switchover with no primary instance specified
+
+    ```bash
+    kbcli cluster promote mycluster -n demo
+    ```
+
+* Switchover with a specified new primary instance
+
+    ```bash
+    kbcli cluster promote mycluster -n demo --instance='mycluster-postgresql-2'
+    ```
+
+* If there are multiple components, you can use `--components` to specify a component.
+
+    ```bash
+    kbcli cluster promote mycluster -n demo --instance='mycluster-postgresql-2' --components='postgresql'
+    ```
+
+</TabItem>
+
 </Tabs>
 
 ## Verify the switchover
@@ -106,20 +106,20 @@ Check the instance status to verify whether the switchover is performed successf
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-```bash
-kbcli cluster list-instances -n demo
-```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 ```bash
 kubectl get cluster mycluster -n demo
 
 kubectl -n demo get po -L kubeblocks.io/role 
+```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+```bash
+kbcli cluster list-instances -n demo
 ```
 
 </TabItem>

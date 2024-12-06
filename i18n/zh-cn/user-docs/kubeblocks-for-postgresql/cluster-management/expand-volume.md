@@ -89,7 +89,7 @@ mycluster   demo        postgresql           postgresql-14.8.0   Delete         
    ```bash
    kubectl describe cluster mycluster -n demo
    >
-   ......
+   ...
    Volume Claim Templates:
       Name:  data
       Spec:
@@ -137,7 +137,7 @@ mycluster   demo        postgresql           postgresql-14.8.0   Delete         
    ```bash
    kubectl describe cluster mycluster -n demo
    >
-   ......
+   ...
    Volume Claim Templates:
       Name:  data
       Spec:

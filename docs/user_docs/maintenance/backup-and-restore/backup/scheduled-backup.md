@@ -15,29 +15,17 @@ KubeBlocks supports configuring scheduled backups for clusters.
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-```bash
-kbcli cluster update mysql-cluster --backup-enabled=true \
---backup-method=xtrabackup --backup-repo-name=my-repo \
---backup-retention-period=7d --backup-cron-expression="0 18 * * *"
-```
-
-- `--backup-enabled` indicates whether to enable scheduled backups.
-- `--backup-method` specifies the backup method. You can use the `kbcli cluster describe-backup-policy mysql-cluster` command to view the supported backup methods.
-- `--backup-repo-name` specifies the name of the backupRepo.
-- `--backup-retention-period` specifies the retention period for backups, which is 7 days in the example.
-- `--backup-cron-expression` specifies the backup schedule using a cron expression in UTC timezone. Refer to [cron](https://en.wikipedia.org/wiki/Cron) for the expression format.
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 Modify the backup field with kubectl as follows.
 
 ```bash
 kubectl edit cluster -n default mysql-cluster
->
+```
+
+Edit the cluster YAML.
+
+```yaml
 spec:
   ...
   backup:
@@ -56,6 +44,22 @@ spec:
 ```
 
 In the above YAML file, you can set whether to enable automatic backups and PITR as needed, and also specify backup methods, repo names, retention periods, etc.
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+```bash
+kbcli cluster update mysql-cluster --backup-enabled=true \
+--backup-method=xtrabackup --backup-repo-name=my-repo \
+--backup-retention-period=7d --backup-cron-expression="0 18 * * *"
+```
+
+- `--backup-enabled` indicates whether to enable scheduled backups.
+- `--backup-method` specifies the backup method. You can use the `kbcli cluster describe-backup-policy mysql-cluster` command to view the supported backup methods.
+- `--backup-repo-name` specifies the name of the backupRepo.
+- `--backup-retention-period` specifies the retention period for backups, which is 7 days in the example.
+- `--backup-cron-expression` specifies the backup schedule using a cron expression in UTC timezone. Refer to [cron](https://en.wikipedia.org/wiki/Cron) for the expression format.
 
 </TabItem>
 

@@ -23,7 +23,18 @@ This tutorial shows how to create and connect to an ApeCloud MySQL cluster.
   
   <Tabs>
 
-  <TabItem value="kbcli" label="kbcli" default>
+  <TabItem value="kubectl" label="kubectl" default>
+
+  ```bash
+  kubectl get addons.extensions.kubeblocks.io apecloud-mysql
+  >
+  NAME             TYPE   VERSION   PROVIDER   STATUS    AGE
+  apecloud-mysql   Helm                        Enabled   61m
+  ```
+
+  </TabItem>
+
+  <TabItem value="kbcli" label="kbcli">
   
   ```bash
   kbcli addon list
@@ -36,34 +47,13 @@ This tutorial shows how to create and connect to an ApeCloud MySQL cluster.
 
   </TabItem>
 
-  <TabItem value="kubectl" label="kubectl">
-
-  ```bash
-  kubectl get addons.extensions.kubeblocks.io apecloud-mysql
-  >
-  NAME             TYPE   VERSION   PROVIDER   STATUS    AGE
-  apecloud-mysql   Helm                        Enabled   61m
-  ```
-
-  </TabItem>
-
   </Tabs>
 
 * View all the database types and versions available for creating a cluster.
 
   <Tabs>
 
-  <TabItem value="kbcli" label="kbcli" default>
-
-  ```bash
-  kbcli clusterdefinition list
-
-  kbcli clusterversion list
-  ```
-
-  </TabItem>
-
-  <TabItem value="kubectl" label="kubectl">
+  <TabItem value="kubectl" label="kubectl" default>
   
   Make sure the `apecloud-mysql` cluster definition is installed.
 
@@ -85,6 +75,16 @@ This tutorial shows how to create and connect to an ApeCloud MySQL cluster.
 
   </TabItem>
 
+  <TabItem value="kbcli" label="kbcli">
+
+  ```bash
+  kbcli clusterdefinition list
+
+  kbcli clusterversion list
+  ```
+
+  </TabItem>
+
   </Tabs>
 
 * To keep things isolated, create a separate namespace called `demo` throughout this tutorial.
@@ -99,48 +99,7 @@ KubeBlocks supports creating two types of ApeCloud MySQL clusters: Standalone an
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-1. Create an ApeCloud MySQL cluster.
-
-   Below are some common examples to create a cluster with default settings. If you want to customize your cluster specifications, kbcli provides various options, such as setting cluster version, termination policy, CPU, and memory. You can view these options by adding `--help` or `-h` flag.
-  
-   ```bash
-   kbcli cluster create apecloud-mysql --help
-
-   kbcli cluster create apecloud-mysql -h
-   ```
-
-   Create a Standalone.
-
-   ```bash
-   kbcli cluster create mycluster --cluster-definition apecloud-mysql --namespace demo
-   ```
-
-   Create a RaftGroup Cluster.
-
-   ```bash
-   kbcli cluster create mycluster --cluster-definition apecloud-mysql --set replicas=3 --namespace demo
-   ```
-
-   If you only have one node for deploying a RaftGroup Cluster, set the `topology-keys` as `null` when creating a RaftGroup Cluster. But you should note that for a production environment, it is not recommended to deploy all replicas on one node, which may decrease the cluster availability.
-
-   ```bash
-   kbcli cluster create mycluster --cluster-definition apecloud-mysql --set replicas=3 --topology-keys null --namespace demo
-   ```
-
-2. Verify whether this cluster is created successfully.
-
-   ```bash
-   kbcli cluster list -n demo
-   >
-   NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    CREATED-TIME
-   mycluster   demo        apecloud-mysql       ac-mysql-8.0.30   Delete               Running   Sep 19,2024 16:01 UTC+0800
-   ```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 1. Create an ApeCloud MySQL cluster.
 
@@ -235,21 +194,54 @@ KubeBlocks supports creating two types of ApeCloud MySQL clusters: Standalone an
 
 </TabItem>
 
+<TabItem value="kbcli" label="kbcli">
+
+1. Create an ApeCloud MySQL cluster.
+
+   Below are some common examples to create a cluster with default settings. If you want to customize your cluster specifications, kbcli provides various options, such as setting cluster version, termination policy, CPU, and memory. You can view these options by adding `--help` or `-h` flag.
+  
+   ```bash
+   kbcli cluster create apecloud-mysql --help
+
+   kbcli cluster create apecloud-mysql -h
+   ```
+
+   Create a Standalone.
+
+   ```bash
+   kbcli cluster create mycluster --cluster-definition apecloud-mysql --namespace demo
+   ```
+
+   Create a RaftGroup Cluster.
+
+   ```bash
+   kbcli cluster create mycluster --cluster-definition apecloud-mysql --set replicas=3 --namespace demo
+   ```
+
+   If you only have one node for deploying a RaftGroup Cluster, set the `topology-keys` as `null` when creating a RaftGroup Cluster. But you should note that for a production environment, it is not recommended to deploy all replicas on one node, which may decrease the cluster availability.
+
+   ```bash
+   kbcli cluster create mycluster --cluster-definition apecloud-mysql --set replicas=3 --topology-keys null --namespace demo
+   ```
+
+2. Verify whether this cluster is created successfully.
+
+   ```bash
+   kbcli cluster list -n demo
+   >
+   NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    CREATED-TIME
+   mycluster   demo        apecloud-mysql       ac-mysql-8.0.30   Delete               Running   Sep 19,2024 16:01 UTC+0800
+   ```
+
+</TabItem>
+
 </Tabs>
 
 ## Connect to an ApeCloud MySQL Cluster
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-```bash
-kbcli cluster connect mycluster  -n demo
-```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 You can use `kubectl exec` to exec into a Pod and connect to a database.
 
@@ -298,6 +290,14 @@ You can also port forward the service to connect to a database from your local m
    ```bash
    mysql -uroot -p2gvztbvz
    ```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+```bash
+kbcli cluster connect mycluster  -n demo
+```
 
 </TabItem>
 

@@ -38,11 +38,14 @@ import TabItem from '@theme/TabItem';
 
     <TabItem value="编辑集群 YAML 文件" label="编辑集群 YAML 文件">
 
+    ```bash
+    kubectl edit cluster mycluster -n demo
+    ```
+
     将 replicas 设为 0，删除 Pods。
 
     ```yaml
-    kubectl edit cluster mycluster -n demo
-    >
+    ...
     spec:
       affinity:
         podAntiAffinity: Preferred
@@ -55,12 +58,12 @@ import TabItem from '@theme/TabItem';
         - running
         disableExporter: true
         name: redis
-        replicas: 0
-        ......
+        replicas: 0 # 修改该参数值
+        ...
       - componentDef: redis-sentinel-7
         name: redis-sentinel
-        replicas: 0
-        ......
+        replicas: 0 # 修改该参数值
+        ...
     ```
 
     </TabItem>
@@ -122,11 +125,14 @@ import TabItem from '@theme/TabItem';
 
     <TabItem value="编辑集群 YAML 文件" label="编辑集群 YAML 文件">
 
+    ```bash
+    kubectl edit cluster mycluster -n demo
+    ```
+
     将 replicas 数值调整为停止集群前的数量，再次启动集群。
 
     ```yaml
-    kubectl edit cluster mycluster -n demo
-    >
+    ...
     spec:
       affinity:
         podAntiAffinity: Preferred
@@ -139,12 +145,12 @@ import TabItem from '@theme/TabItem';
         - running
         disableExporter: true
         name: redis
-        replicas: 3
-        ......
+        replicas: 3 # 修改该参数值
+        ...
       - componentDef: redis-sentinel-7
         name: redis-sentinel
-        replicas: 3
-        ......
+        replicas: 3 # 修改该参数值
+        ...
     ```
 
     </TabItem>

@@ -40,16 +40,15 @@ import TabItem from '@theme/TabItem';
 
    <TabItem value="编辑集群 YAML 文件" label="编辑集群 YAML 文件">
 
+   ```bash
+   kubectl edit cluster mycluster -n demo
+   ```
+
    将 replicas 设为 0，删除 Pods。
 
    ```yaml
-   kubectl edit cluster mycluster -n demo
    >
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: Cluster
-   metadata:
-     name: mycluster
-     namespace: demo
+   ...
    spec:
      clusterDefinitionRef: kafka
      clusterVersionRef: kafka-3.3.2
@@ -58,17 +57,9 @@ import TabItem from '@theme/TabItem';
      - name: kafka
        componentDefRef: kafka
        disableExporter: true  
-       replicas: 0
-       volumeClaimTemplates:
-       - name: data
-         spec:
-           storageClassName: standard
-           accessModes:
-             - ReadWriteOnce
-           resources:
-             requests:
-               storage: 20Gi
-     ```
+       replicas: 0 # 修改该参数值
+   ...
+   ```
 
    </TabItem>
 

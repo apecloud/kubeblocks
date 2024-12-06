@@ -21,7 +21,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	"github.com/apecloud/kubeblocks/pkg/configuration/core"
+	configcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 )
 
 var _ = Describe("configuration builder", func() {
@@ -31,7 +31,7 @@ var _ = Describe("configuration builder", func() {
 			componentName = "mysql"
 			ns            = "default"
 		)
-		name := core.GenerateComponentConfigurationName(clusterName, componentName)
+		name := configcore.GenerateComponentConfigurationName(clusterName, componentName)
 		config := NewComponentParameterBuilder(ns, name).
 			ClusterRef(clusterName).
 			Component(componentName).

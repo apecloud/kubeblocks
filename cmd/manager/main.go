@@ -590,20 +590,28 @@ func main() {
 	}
 
 	if viper.GetBool(parametersFlagKey.viperName()) {
-		if err = (&parameterscontrollers.ConfigConstraintReconciler{
+		if err = (&parameterscontrollers.ParametersDefinitionReconciler{
 			Client:   mgr.GetClient(),
 			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("config-constraint-controller"),
+			Recorder: mgr.GetEventRecorderFor("parameters-definition-controller"),
 		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "ConfigConstraint")
+			setupLog.Error(err, "unable to create controller", "controller", "ParametersDefinition")
 			os.Exit(1)
 		}
-		if err = (&parameterscontrollers.ConfigurationReconciler{
+		if err = (&parameterscontrollers.ParameterReconciler{
 			Client:   client,
 			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("configuration-controller"),
+			Recorder: mgr.GetEventRecorderFor("parameter-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "Parameter")
+			os.Exit(1)
+		}
+		if err = (&parameterscontrollers.ComponentParameterReconciler{
+			Client:   client,
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("component-parameter-controller"),
 		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "Configuration")
+			setupLog.Error(err, "unable to create controller", "controller", "ComponentParameter")
 			os.Exit(1)
 		}
 		if err = (&parameterscontrollers.ReconfigureReconciler{

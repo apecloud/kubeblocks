@@ -33,7 +33,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 )
@@ -78,7 +77,7 @@ var _ = Describe("TemplateWrapperTest", func() {
 		compDefObj = testapps.NewComponentDefinitionFactory(compDefName).
 			WithRandomName().
 			SetDefaultSpec().
-			AddConfigTemplate(mysqlConfigName, configMapObj.Name, "", ns, configVolumeName).
+			AddConfigTemplate(mysqlConfigName, configMapObj.Name, ns, configVolumeName).
 			GetObject()
 
 		clusterObj = testapps.NewClusterFactory(ns, clusterName, "").
@@ -104,7 +103,7 @@ var _ = Describe("TemplateWrapperTest", func() {
 		It("TestConfigSpec without template", func() {
 			mockK8sCli.MockGetMethod(testutil.WithGetReturned(testutil.WithConstructSimpleGetResult([]client.Object{}), testutil.WithAnyTimes()))
 
-			Expect(renderTemplate(intctrlutil.TransformConfigTemplate(clusterComponent.ConfigTemplates))).ShouldNot(Succeed())
+			Expect(renderTemplate(clusterComponent.ConfigTemplates)).ShouldNot(Succeed())
 		})
 
 		It("TestConfigSpec with exist configmap", func() {
@@ -112,7 +111,7 @@ var _ = Describe("TemplateWrapperTest", func() {
 				configMapObj,
 			}), testutil.WithAnyTimes()))
 
-			Expect(renderTemplate(intctrlutil.TransformConfigTemplate(clusterComponent.ConfigTemplates))).Should(Succeed())
+			Expect(renderTemplate(clusterComponent.ConfigTemplates)).Should(Succeed())
 		})
 	})
 })

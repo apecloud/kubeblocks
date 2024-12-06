@@ -27,9 +27,13 @@ import (
 	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	cfgcm "github.com/apecloud/kubeblocks/pkg/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgproto "github.com/apecloud/kubeblocks/pkg/configuration/proto"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -42,10 +46,10 @@ import (
 )
 
 // GetComponentPods gets all pods of the component.
-func GetComponentPods(params reconfigureParams) ([]corev1.Pod, error) {
+func GetComponentPods(params reconfigureContext) ([]corev1.Pod, error) {
 	componentPods := make([]corev1.Pod, 0)
 	for i := range params.InstanceSetUnits {
-		pods, err := intctrlutil.GetPodListByInstanceSet(params.Ctx.Ctx, params.Client, &params.InstanceSetUnits[i])
+		pods, err := intctrlutil.GetPodListByInstanceSet(params.Ctx, params.Client, &params.InstanceSetUnits[i])
 		if err != nil {
 			return nil, err
 		}
@@ -70,7 +74,7 @@ func CheckReconfigureUpdateProgress(pods []corev1.Pod, configKey, version string
 	return readyPods
 }
 
-func getPodsForOnlineUpdate(params reconfigureParams) ([]corev1.Pod, error) {
+func getPodsForOnlineUpdate(params reconfigureContext) ([]corev1.Pod, error) {
 	if len(params.InstanceSetUnits) > 1 {
 		return nil, core.MakeError("component require only one InstanceSet, actual %d components", len(params.InstanceSetUnits))
 	}
@@ -91,8 +95,8 @@ func getPodsForOnlineUpdate(params reconfigureParams) ([]corev1.Pod, error) {
 }
 
 // TODO commonOnlineUpdateWithPod migrate to sql command pipeline
-func commonOnlineUpdateWithPod(pod *corev1.Pod, ctx context.Context, createClient createReconfigureClient, configSpec string, updatedParams map[string]string) error {
-	address, err := cfgManagerGrpcURL(pod)
+func commonOnlineUpdateWithPod(pod *corev1.Pod, ctx context.Context, createClient createReconfigureClient, configSpec string, configFile string, updatedParams map[string]string) error {
+	address, err := resolveReloadServerGrpcURL(pod)
 	if err != nil {
 		return err
 	}
@@ -104,6 +108,7 @@ func commonOnlineUpdateWithPod(pod *corev1.Pod, ctx context.Context, createClien
 	response, err := client.OnlineUpgradeParams(ctx, &cfgproto.OnlineUpgradeParamsRequest{
 		ConfigSpec: configSpec,
 		Params:     updatedParams,
+		ConfigFile: pointer.String(configFile),
 	})
 	if err != nil {
 		return err
@@ -126,7 +131,7 @@ func commonStopContainerWithPod(pod *corev1.Pod, ctx context.Context, containerN
 		containerIDs = append(containerIDs, containerID)
 	}
 
-	address, err := cfgManagerGrpcURL(pod)
+	address, err := resolveReloadServerGrpcURL(pod)
 	if err != nil {
 		return err
 	}
@@ -150,19 +155,19 @@ func commonStopContainerWithPod(pod *corev1.Pod, ctx context.Context, containerN
 	return nil
 }
 
-func cfgManagerGrpcURL(pod *corev1.Pod) (string, error) {
+func resolveReloadServerGrpcURL(pod *corev1.Pod) (string, error) {
 	podPort := viper.GetInt(constant.ConfigManagerGPRCPortEnv)
 	if pod.Spec.HostNetwork {
-		containerPort, err := configuration.GetConfigManagerGRPCPort(pod.Spec.Containers)
+		containerPort, err := configuration.ResolveReloadServerGRPCPort(pod.Spec.Containers)
 		if err != nil {
 			return "", err
 		}
 		podPort = int(containerPort)
 	}
-	return getURLFromPod(pod, podPort)
+	return generateGrpcURL(pod, podPort)
 }
 
-func getURLFromPod(pod *corev1.Pod, portPort int) (string, error) {
+func generateGrpcURL(pod *corev1.Pod, portPort int) (string, error) {
 	ip, err := ipAddressFromPod(pod.Status)
 	if err != nil {
 		return "", err
@@ -235,4 +240,153 @@ func restartComponent(cli client.Client, ctx intctrlutil.RequestCtx, configKey s
 
 func updatedVersion(podTemplate *corev1.PodTemplateSpec, keyPath, expectedVersion string) bool {
 	return podTemplate.Annotations != nil && podTemplate.Annotations[keyPath] == expectedVersion
+}
+
+type ReloadAction interface {
+	ExecReload() (ReturnedStatus, error)
+	ReloadType() string
+}
+
+type reconfigureTask struct {
+	parametersv1alpha1.ReloadPolicy
+	taskCtx reconfigureContext
+}
+
+func (r reconfigureTask) ReloadType() string {
+	return string(r.ReloadPolicy)
+}
+
+func (r reconfigureTask) ExecReload() (ReturnedStatus, error) {
+	if executor, ok := upgradePolicyMap[r.ReloadPolicy]; ok {
+		return executor.Upgrade(r.taskCtx)
+	}
+
+	return ReturnedStatus{}, fmt.Errorf("not support reload action[%s]", r.ReloadPolicy)
+}
+
+func resolveReloadActionPolicy(jsonPatch string,
+	format *parametersv1alpha1.FileFormatConfig,
+	pd *parametersv1alpha1.ParametersDefinitionSpec) (parametersv1alpha1.ReloadPolicy, error) {
+	var policy = parametersv1alpha1.NonePolicy
+	dynamicUpdate, err := core.CheckUpdateDynamicParameters(format, pd, jsonPatch)
+	if err != nil {
+		return policy, err
+	}
+
+	// make decision
+	switch {
+	case !dynamicUpdate && intctrlutil.NeedDynamicReloadAction(pd): // static parameters update
+		policy = parametersv1alpha1.DynamicReloadAndRestartPolicy
+	case cfgcm.IsAutoReload(pd.ReloadAction): // if core support hot update, don't need to do anything
+		policy = parametersv1alpha1.AsyncDynamicReloadPolicy
+	case enableSyncTrigger(pd.ReloadAction): // sync config-manager exec hot update
+		policy = parametersv1alpha1.SyncDynamicReloadPolicy
+	default: // config-manager auto trigger to hot update
+		policy = parametersv1alpha1.AsyncDynamicReloadPolicy
+	}
+	return policy, nil
+}
+
+// genReconfigureActionTasks generates a list of reconfiguration tasks based on the provided templateSpec,
+// reconfiguration context, configuration patch, and a restart flag.
+func genReconfigureActionTasks(templateSpec *appsv1.ComponentTemplateSpec, rctx *ReconcileContext, patch *core.ConfigPatchInfo, restart bool) ([]ReloadAction, error) {
+	var tasks []ReloadAction
+
+	// If the patch or ConfigRender is nil, return a single restart task.
+	if patch == nil || rctx.ConfigRender == nil {
+		return []ReloadAction{buildRestartTask(templateSpec, rctx)}, nil
+	}
+
+	// needReloadAction determines if a reload action is needed based on the ParametersDefinition and ReloadPolicy.
+	needReloadAction := func(pd *parametersv1alpha1.ParametersDefinition, policy parametersv1alpha1.ReloadPolicy) bool {
+		return !restart || (policy == parametersv1alpha1.SyncDynamicReloadPolicy && intctrlutil.NeedDynamicReloadAction(&pd.Spec))
+	}
+
+	for key, jsonPatch := range patch.UpdateConfig {
+		pd, ok := rctx.ParametersDefs[key]
+		// If the ParametersDefinition or its ReloadAction is nil, continue to the next iteration.
+		if !ok || pd.Spec.ReloadAction == nil {
+			continue
+		}
+		configFormat := intctrlutil.GetComponentConfigDescription(&rctx.ConfigRender.Spec, key)
+		if configFormat == nil || configFormat.FileFormatConfig == nil {
+			continue
+		}
+		// Determine the appropriate ReloadPolicy.
+		policy, err := resolveReloadActionPolicy(string(jsonPatch), configFormat.FileFormatConfig, &pd.Spec)
+		if err != nil {
+			return nil, err
+		}
+		// If a reload action is needed, append a new reload action task to the tasks slice.
+		if needReloadAction(pd, policy) {
+			tasks = append(tasks, buildReloadActionTask(policy, templateSpec, rctx, pd, configFormat, patch))
+		}
+	}
+
+	// If no tasks were added, return a single restart task.
+	if len(tasks) == 0 {
+		return []ReloadAction{buildRestartTask(templateSpec, rctx)}, nil
+	}
+
+	return tasks, nil
+}
+
+func buildReloadActionTask(reloadPolicy parametersv1alpha1.ReloadPolicy, templateSpec *appsv1.ComponentTemplateSpec, rctx *ReconcileContext, pd *parametersv1alpha1.ParametersDefinition, configDescription *parametersv1alpha1.ComponentConfigDescription, patch *core.ConfigPatchInfo) reconfigureTask {
+	reCtx := reconfigureContext{
+		RequestCtx:               rctx.RequestCtx,
+		Client:                   rctx.Client,
+		ConfigTemplate:           *templateSpec,
+		ConfigMap:                rctx.ConfigMap,
+		ParametersDef:            &pd.Spec,
+		ConfigDescription:        configDescription,
+		Cluster:                  rctx.ClusterObj,
+		ContainerNames:           rctx.Containers,
+		InstanceSetUnits:         rctx.InstanceSetList,
+		ClusterComponent:         rctx.ClusterComObj,
+		SynthesizedComponent:     rctx.BuiltinComponent,
+		ReconfigureClientFactory: GetClientFactory(),
+	}
+
+	if reloadPolicy == parametersv1alpha1.SyncDynamicReloadPolicy {
+		reCtx.UpdatedParameters = generateOnlineUpdateParams(patch, &pd.Spec, *configDescription)
+	}
+
+	return reconfigureTask{ReloadPolicy: reloadPolicy, taskCtx: reCtx}
+}
+
+func buildRestartTask(configTemplate *appsv1.ComponentTemplateSpec, rctx *ReconcileContext) reconfigureTask {
+	return reconfigureTask{
+		ReloadPolicy: parametersv1alpha1.RestartPolicy,
+		taskCtx: reconfigureContext{
+			RequestCtx:           rctx.RequestCtx,
+			Client:               rctx.Client,
+			ConfigTemplate:       *configTemplate,
+			ClusterComponent:     rctx.ClusterComObj,
+			SynthesizedComponent: rctx.BuiltinComponent,
+			InstanceSetUnits:     rctx.InstanceSetList,
+			ConfigMap:            rctx.ConfigMap,
+		},
+	}
+}
+
+func generateOnlineUpdateParams(configPatch *core.ConfigPatchInfo, paramDef *parametersv1alpha1.ParametersDefinitionSpec, description parametersv1alpha1.ComponentConfigDescription) map[string]string {
+	params := make(map[string]string)
+	dynamicAction := intctrlutil.NeedDynamicReloadAction(paramDef)
+	needReloadStaticParams := intctrlutil.ReloadStaticParameters(paramDef)
+	visualizedParams := core.GenerateVisualizedParamsList(configPatch, []parametersv1alpha1.ComponentConfigDescription{description})
+
+	for _, key := range visualizedParams {
+		if key.UpdateType != core.UpdatedType {
+			continue
+		}
+		for _, p := range key.Parameters {
+			if dynamicAction && !needReloadStaticParams && !core.IsDynamicParameter(p.Key, paramDef) {
+				continue
+			}
+			if p.Value != nil {
+				params[p.Key] = *p.Value
+			}
+		}
+	}
+	return params
 }

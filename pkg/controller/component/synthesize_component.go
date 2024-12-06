@@ -285,7 +285,7 @@ func mergeUserDefinedVolumes(synthesizedComp *SynthesizedComponent, comp *appsv1
 		return nil
 	}
 	for _, tpl := range synthesizedComp.ConfigTemplates {
-		if err := checkConfigNScriptTemplate(tpl.ComponentTemplateSpec); err != nil {
+		if err := checkConfigNScriptTemplate(tpl); err != nil {
 			return err
 		}
 	}
@@ -391,7 +391,7 @@ func overrideConfigTemplates(synthesizedComp *SynthesizedComponent, comp *appsv1
 		return nil
 	}
 
-	templates := make(map[string]*appsv1.ComponentConfigSpec)
+	templates := make(map[string]*appsv1.ComponentTemplateSpec)
 	for i, template := range synthesizedComp.ConfigTemplates {
 		templates[template.Name] = &synthesizedComp.ConfigTemplates[i]
 	}
@@ -441,14 +441,4 @@ func buildRuntimeClassName(synthesizeComp *SynthesizedComponent, comp *appsv1.Co
 		return
 	}
 	synthesizeComp.PodSpec.RuntimeClassName = comp.Spec.RuntimeClassName
-}
-
-func GetConfigSpecByName(synthesizedComp *SynthesizedComponent, configSpec string) *appsv1.ComponentConfigSpec {
-	for i := range synthesizedComp.ConfigTemplates {
-		template := &synthesizedComp.ConfigTemplates[i]
-		if template.Name == configSpec {
-			return template
-		}
-	}
-	return nil
 }

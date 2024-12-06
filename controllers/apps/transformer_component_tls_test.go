@@ -32,13 +32,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/plan"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	testparameters "github.com/apecloud/kubeblocks/pkg/testutil/parameters"
 )
 
 var _ = Describe("TLS self-signed cert function", func() {
@@ -51,6 +51,8 @@ var _ = Describe("TLS self-signed cert function", func() {
 		caFile             = "ca.pem"
 		certFile           = "cert.pem"
 		keyFile            = "key.pem"
+		paramsDef          = "mysql-pd"
+		pdcrName           = "mysql-pd"
 	)
 
 	var (
@@ -73,8 +75,10 @@ var _ = Describe("TLS self-signed cert function", func() {
 
 		// delete rest configurations
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ConfigMapSignature, true, client.InNamespace(testCtx.DefaultNamespace))
 		// non-namespaced
-		testapps.ClearResources(&testCtx, generics.ConfigConstraintSignature, ml)
+		testapps.ClearResources(&testCtx, generics.ParametersDefinitionSignature, ml)
+		testapps.ClearResources(&testCtx, generics.ParameterDrivenConfigRenderSignature, ml)
 		testapps.ClearResources(&testCtx, generics.BackupPolicyTemplateSignature, ml)
 	}
 
@@ -84,15 +88,14 @@ var _ = Describe("TLS self-signed cert function", func() {
 
 	Context("tls is enabled/disabled", func() {
 		BeforeEach(func() {
-			configMapObj := testapps.CheckedCreateCustomizedObj(&testCtx,
-				"resources/mysql-tls-config-template.yaml",
-				&corev1.ConfigMap{},
-				testCtx.UseDefaultNamespace(),
-				testapps.WithAnnotations(constant.CMInsEnableRerenderTemplateKey, "true"))
+			configMapObj := testparameters.NewComponentTemplateFactory(configTemplateName, testCtx.DefaultNamespace).
+				Create(&testCtx).
+				GetObject()
 
-			configConstraintObj := testapps.CheckedCreateCustomizedObj(&testCtx,
-				"resources/mysql-config-constraint.yaml",
-				&appsv1beta1.ConfigConstraint{})
+			paramsdef := testparameters.NewParametersDefinitionFactory(paramsDef).
+				SetReloadAction(testparameters.WithNoneAction()).
+				Create(&testCtx).
+				GetObject()
 
 			By("Create a componentDefinition obj")
 			compDefObj = testapps.NewComponentDefinitionFactory(compDefName).
@@ -100,10 +103,17 @@ var _ = Describe("TLS self-signed cert function", func() {
 				AddAnnotations(constant.SkipImmutableCheckAnnotationKey, "true").
 				SetDefaultSpec().
 				SetServiceKind(serviceKind).
-				AddConfigTemplate(configTemplateName, configMapObj.Name, configConstraintObj.Name, testCtx.DefaultNamespace, testapps.ConfVolumeName).
+				AddConfigTemplate(configTemplateName, configMapObj.Name, testCtx.DefaultNamespace, testapps.ConfVolumeName).
 				AddEnv(testapps.DefaultMySQLContainerName, corev1.EnvVar{Name: "MYSQL_ALLOW_EMPTY_PASSWORD", Value: "yes"}).
 				Create(&testCtx).
 				GetObject()
+
+			testparameters.NewParametersDrivenConfigFactory(pdcrName).
+				SetParametersDefs(paramsdef.Name).
+				SetComponentDefinition(compDefObj.GetName()).
+				SetTemplateName(configTemplateName).
+				TLSEnabled().
+				Create(&testCtx)
 		})
 
 		Context("when issuer is UserProvided", func() {

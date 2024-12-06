@@ -30,7 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	cfgcm "github.com/apecloud/kubeblocks/pkg/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -131,15 +131,12 @@ var _ = Describe("builder", func() {
 		It("builds ConfigMap with template correctly", func() {
 			config := map[string]string{}
 			_, cluster, synthesizedComponent := newClusterObjs(nil)
-			tplCfg := appsv1.ComponentConfigSpec{
-				ComponentTemplateSpec: appsv1.ComponentTemplateSpec{
-					Name:        "test-config-tpl",
-					TemplateRef: "test-config-tpl",
-				},
-				ConfigConstraintRef: "test-config-constraint",
+			tplCfg := appsv1.ComponentTemplateSpec{
+				Name:        "test-config-tpl",
+				TemplateRef: "test-config-tpl",
 			}
 			configmap := BuildConfigMapWithTemplate(cluster, synthesizedComponent, config,
-				"test-cm", tplCfg.ComponentTemplateSpec)
+				"test-cm", tplCfg)
 			Expect(configmap).ShouldNot(BeNil())
 		})
 
@@ -182,12 +179,11 @@ var _ = Describe("builder", func() {
 		It("builds cfg manager tools  correctly", func() {
 			_, cluster, _ := newClusterObjs(nil)
 			cfgManagerParams := &cfgcm.CfgManagerBuildParams{
-				ManagerName:               constant.ConfigSidecarName,
-				Image:                     viper.GetString(constant.KBToolsImage),
-				Cluster:                   cluster,
-				ConfigLazyRenderedVolumes: make(map[string]corev1.VolumeMount),
+				ManagerName: constant.ConfigSidecarName,
+				Image:       viper.GetString(constant.KBToolsImage),
+				Cluster:     cluster,
 			}
-			toolContainers := []appsv1beta1.ToolConfig{
+			toolContainers := []parametersv1alpha1.ToolConfig{
 				{Name: "test-tool", Image: "test-image", Command: []string{"sh"}},
 			}
 

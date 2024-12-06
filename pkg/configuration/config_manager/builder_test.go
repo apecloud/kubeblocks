@@ -34,7 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 )
 
@@ -78,39 +78,39 @@ var _ = Describe("Config Builder Test", func() {
 				Name:      "pg_config",
 			}}
 	}
-	newReloadOptions := func(t appsv1beta1.DynamicReloadType, sync *bool) *appsv1beta1.ReloadAction {
-		signalHandle := &appsv1beta1.UnixSignalTrigger{
+	newReloadOptions := func(t parametersv1alpha1.DynamicReloadType, sync *bool) *parametersv1alpha1.ReloadAction {
+		signalHandle := &parametersv1alpha1.UnixSignalTrigger{
 			ProcessName: "postgres",
-			Signal:      appsv1beta1.SIGHUP,
+			Signal:      parametersv1alpha1.SIGHUP,
 		}
-		shellHandle := &appsv1beta1.ShellTrigger{
+		shellHandle := &parametersv1alpha1.ShellTrigger{
 			Command: []string{"pwd"},
 		}
-		scriptHandle := &appsv1beta1.TPLScriptTrigger{
+		scriptHandle := &parametersv1alpha1.TPLScriptTrigger{
 			Sync: sync,
-			ScriptConfig: appsv1beta1.ScriptConfig{
+			ScriptConfig: parametersv1alpha1.ScriptConfig{
 				ScriptConfigMapRef: "reload-script",
 				Namespace:          scriptsNS,
 			},
 		}
-		autoHandle := &appsv1beta1.AutoTrigger{
+		autoHandle := &parametersv1alpha1.AutoTrigger{
 			ProcessName: "postgres",
 		}
 
 		switch t {
 		default:
 			return nil
-		case appsv1beta1.UnixSignalType:
-			return &appsv1beta1.ReloadAction{
+		case parametersv1alpha1.UnixSignalType:
+			return &parametersv1alpha1.ReloadAction{
 				UnixSignalTrigger: signalHandle}
-		case appsv1beta1.ShellType:
-			return &appsv1beta1.ReloadAction{
+		case parametersv1alpha1.ShellType:
+			return &parametersv1alpha1.ReloadAction{
 				ShellTrigger: shellHandle}
-		case appsv1beta1.TPLScriptType:
-			return &appsv1beta1.ReloadAction{
+		case parametersv1alpha1.TPLScriptType:
+			return &parametersv1alpha1.ReloadAction{
 				TPLScriptTrigger: scriptHandle}
-		case appsv1beta1.AutoType:
-			return &appsv1beta1.ReloadAction{
+		case parametersv1alpha1.AutoType:
+			return &parametersv1alpha1.ReloadAction{
 				AutoTrigger: autoHandle}
 		}
 	}
@@ -118,11 +118,9 @@ var _ = Describe("Config Builder Test", func() {
 		return []ConfigSpecMeta{
 			{
 				ConfigSpecInfo: ConfigSpecInfo{
-					ConfigSpec: appsv1.ComponentConfigSpec{
-						ComponentTemplateSpec: appsv1.ComponentTemplateSpec{
-							Name:       "pg_config",
-							VolumeName: "pg_config",
-						},
+					ConfigSpec: appsv1.ComponentTemplateSpec{
+						Name:       "pg_config",
+						VolumeName: "pg_config",
 					},
 				},
 			},
@@ -137,14 +135,13 @@ var _ = Describe("Config Builder Test", func() {
 					Namespace: "default",
 				},
 			},
-			ComponentName:             "test",
-			Volumes:                   newVolumeMounts(),
-			ConfigSpecsBuildParams:    newConfigSpecMeta(),
-			ConfigLazyRenderedVolumes: make(map[string]corev1.VolumeMount),
-			DownwardAPIVolumes:        make([]corev1.VolumeMount, 0),
+			ComponentName:          "test",
+			Volumes:                newVolumeMounts(),
+			ConfigSpecsBuildParams: newConfigSpecMeta(),
+			DownwardAPIVolumes:     make([]corev1.VolumeMount, 0),
 		}
 		if hasScripts {
-			param.ConfigSpecsBuildParams[0].ScriptConfig = []appsv1beta1.ScriptConfig{
+			param.ConfigSpecsBuildParams[0].ScriptConfig = []parametersv1alpha1.ScriptConfig{
 				{
 					Namespace:          scriptsNS,
 					ScriptConfigMapRef: scriptsName,
@@ -181,8 +178,8 @@ formatterConfig:
 		mockK8sCli.MockCreateMethod(testutil.WithCreateReturned(testutil.WithCreatedSucceedResult(), testutil.WithAnyTimes()))
 	}
 
-	newDownwardAPIVolumes := func() []appsv1beta1.DownwardAPIChangeTriggeredAction {
-		return []appsv1beta1.DownwardAPIChangeTriggeredAction{
+	newDownwardAPIVolumes := func() []parametersv1alpha1.DownwardAPIChangeTriggeredAction {
+		return []parametersv1alpha1.DownwardAPIChangeTriggeredAction{
 			{
 				Name:       "downward-api",
 				MountPoint: "/etc/podinfo",
@@ -203,11 +200,11 @@ formatterConfig:
 		It("builds unixSignal reloader correctly", func() {
 			param := newCMBuildParams(false)
 			mockTplScriptCM()
-			reloadOptions := newReloadOptions(appsv1beta1.UnixSignalType, nil)
+			reloadOptions := newReloadOptions(parametersv1alpha1.UnixSignalType, nil)
 			for i := range param.ConfigSpecsBuildParams {
 				buildParam := &param.ConfigSpecsBuildParams[i]
 				buildParam.ReloadAction = reloadOptions
-				buildParam.ReloadType = appsv1beta1.UnixSignalType
+				buildParam.ReloadType = parametersv1alpha1.UnixSignalType
 			}
 			Expect(BuildConfigManagerContainerParams(mockK8sCli.Client(), ctx, param, newVolumeMounts2())).Should(Succeed())
 			for _, arg := range []string{`--volume-dir`, `/postgresql/conf`, `--volume-dir`, `/postgresql/conf2`} {
@@ -227,11 +224,11 @@ formatterConfig:
 			mockK8sCli.MockCreateMethod(testutil.WithCreateReturned(testutil.WithCreatedSucceedResult(), testutil.WithTimes(2)))
 
 			param := newCMBuildParams(true)
-			reloadOptions := newReloadOptions(appsv1beta1.ShellType, nil)
+			reloadOptions := newReloadOptions(parametersv1alpha1.ShellType, nil)
 			for i := range param.ConfigSpecsBuildParams {
 				buildParam := &param.ConfigSpecsBuildParams[i]
 				buildParam.ReloadAction = reloadOptions
-				buildParam.ReloadType = appsv1beta1.ShellType
+				buildParam.ReloadType = parametersv1alpha1.ShellType
 			}
 			Expect(BuildConfigManagerContainerParams(mockK8sCli.Client(), context.TODO(), param, newVolumeMounts())).Should(Succeed())
 			for _, arg := range []string{`--volume-dir`, `/postgresql/conf`} {
@@ -242,11 +239,11 @@ formatterConfig:
 		It("builds tplScriptsTrigger reloader correctly", func() {
 			mockTplScriptCM()
 			param := newCMBuildParams(false)
-			reloadOptions := newReloadOptions(appsv1beta1.TPLScriptType, syncFn(true))
+			reloadOptions := newReloadOptions(parametersv1alpha1.TPLScriptType, syncFn(true))
 			for i := range param.ConfigSpecsBuildParams {
 				buildParam := &param.ConfigSpecsBuildParams[i]
 				buildParam.ReloadAction = reloadOptions
-				buildParam.ReloadType = appsv1beta1.TPLScriptType
+				buildParam.ReloadType = parametersv1alpha1.TPLScriptType
 			}
 			Expect(BuildConfigManagerContainerParams(mockK8sCli.Client(), context.TODO(), param, newVolumeMounts())).Should(Succeed())
 			for _, arg := range []string{`--operator-update-enable`} {
@@ -257,11 +254,11 @@ formatterConfig:
 		It("builds tplScriptsTrigger reloader correctly with sync", func() {
 			mockTplScriptCM()
 			param := newCMBuildParams(false)
-			reloadOptions := newReloadOptions(appsv1beta1.TPLScriptType, syncFn(false))
+			reloadOptions := newReloadOptions(parametersv1alpha1.TPLScriptType, syncFn(false))
 			for i := range param.ConfigSpecsBuildParams {
 				buildParam := &param.ConfigSpecsBuildParams[i]
 				buildParam.ReloadAction = reloadOptions
-				buildParam.ReloadType = appsv1beta1.TPLScriptType
+				buildParam.ReloadType = parametersv1alpha1.TPLScriptType
 			}
 			Expect(BuildConfigManagerContainerParams(mockK8sCli.Client(), context.TODO(), param, newVolumeMounts())).Should(Succeed())
 			for _, arg := range []string{`--volume-dir`, `/postgresql/conf`} {
@@ -274,7 +271,7 @@ formatterConfig:
 			param := newCMBuildParams(false)
 			buildParam := &param.ConfigSpecsBuildParams[0]
 			buildParam.DownwardAPIOptions = newDownwardAPIVolumes()
-			buildParam.ReloadAction = newReloadOptions(appsv1beta1.TPLScriptType, syncFn(true))
+			buildParam.ReloadAction = newReloadOptions(parametersv1alpha1.TPLScriptType, syncFn(true))
 			Expect(BuildConfigManagerContainerParams(mockK8sCli.Client(), context.TODO(), param, newVolumeMounts())).Should(Succeed())
 			Expect(FindVolumeMount(param.DownwardAPIVolumes, buildParam.DownwardAPIOptions[0].Name)).ShouldNot(BeNil())
 		})
@@ -305,7 +302,7 @@ func TestCheckAndUpdateReloadYaml(t *testing.T) {
 	type args struct {
 		data            map[string]string
 		reloadConfig    string
-		formatterConfig *appsv1beta1.FileFormatConfig
+		formatterConfig *parametersv1alpha1.FileFormatConfig
 	}
 	tests := []struct {
 		name    string
@@ -320,8 +317,8 @@ fileRegex: my.cnf
 scripts: reload.tpl
 `},
 			reloadConfig: "reload.yaml",
-			formatterConfig: &appsv1beta1.FileFormatConfig{
-				Format: appsv1beta1.Ini,
+			formatterConfig: &parametersv1alpha1.FileFormatConfig{
+				Format: parametersv1alpha1.Ini,
 			},
 		},
 		wantErr: false,
@@ -337,7 +334,7 @@ formatterConfig:
 		args: args{
 			data:            map[string]string{},
 			reloadConfig:    "reload.yaml",
-			formatterConfig: &appsv1beta1.FileFormatConfig{Format: appsv1beta1.Ini},
+			formatterConfig: &parametersv1alpha1.FileFormatConfig{Format: parametersv1alpha1.Ini},
 		},
 		wantErr: true,
 		want:    map[string]string{},

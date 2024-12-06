@@ -26,12 +26,12 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
 func TestRedisConfig(t *testing.T) {
-	c, err := LoadConfig("test", "", appsv1beta1.RedisCfg)
+	c, err := LoadConfig("test", "", parametersv1alpha1.RedisCfg)
 	require.Nil(t, err)
 
 	tests := []struct {
@@ -96,7 +96,7 @@ func TestRedisConfigGetAllParameters(t *testing.T) {
 	}{{
 		name: "multi field update test",
 		fn: func() ConfigObject {
-			c, _ := LoadConfig("test", "", appsv1beta1.RedisCfg)
+			c, _ := LoadConfig("test", "", parametersv1alpha1.RedisCfg)
 			_ = c.Update("port", "123")
 			_ = c.Update("a b", "123 234")
 			_ = c.Update("a c", "345")
@@ -114,7 +114,7 @@ func TestRedisConfigGetAllParameters(t *testing.T) {
 	}, {
 		name: "multi field update and delete test",
 		fn: func() ConfigObject {
-			c, _ := LoadConfig("test", "", appsv1beta1.RedisCfg)
+			c, _ := LoadConfig("test", "", parametersv1alpha1.RedisCfg)
 			_ = c.Update("port", "123")
 			_ = c.Update("a b", "123 234")
 			_ = c.Update("a c", "345")
@@ -195,7 +195,7 @@ zset-max-listpack-value 64`
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			config, err := LoadConfig(tt.name, tt.input, appsv1beta1.RedisCfg)
+			config, err := LoadConfig(tt.name, tt.input, parametersv1alpha1.RedisCfg)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Marshal() error = %v, wantErr %v", err, tt.wantErr)
 				return

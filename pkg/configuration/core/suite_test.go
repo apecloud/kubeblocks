@@ -36,7 +36,7 @@ import (
 var ctx context.Context
 var cancel context.CancelFunc
 
-func TestNetwork(t *testing.T) {
+func TestConfigCore(t *testing.T) {
 	RegisterFailHandler(Fail)
 
 	RunSpecs(t, "TPL Test Suite")

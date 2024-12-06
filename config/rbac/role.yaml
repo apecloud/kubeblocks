@@ -178,58 +178,6 @@ rules:
 - apiGroups:
   - apps.kubeblocks.io
   resources:
-  - configconstraints
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - apps.kubeblocks.io
-  resources:
-  - configconstraints/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - apps.kubeblocks.io
-  resources:
-  - configconstraints/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - apps.kubeblocks.io
-  resources:
-  - configurations
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - apps.kubeblocks.io
-  resources:
-  - configurations/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - apps.kubeblocks.io
-  resources:
-  - configurations/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - apps.kubeblocks.io
-  resources:
   - servicedescriptors
   verbs:
   - create
@@ -866,6 +814,32 @@ rules:
 - apiGroups:
   - parameters.kubeblocks.io
   resources:
+  - componentparameters
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - parameters.kubeblocks.io
+  resources:
+  - componentparameters/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - parameters.kubeblocks.io
+  resources:
+  - componentparameters/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - parameters.kubeblocks.io
+  resources:
   - paramconfigrenderers
   verbs:
   - create
@@ -885,6 +859,32 @@ rules:
   - parameters.kubeblocks.io
   resources:
   - paramconfigrenderers/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - parameters.kubeblocks.io
+  resources:
+  - parameters
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - parameters.kubeblocks.io
+  resources:
+  - parameters/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - parameters.kubeblocks.io
+  resources:
+  - parameters/status
   verbs:
   - get
   - patch

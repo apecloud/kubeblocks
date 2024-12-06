@@ -25,7 +25,7 @@ import (
 	"github.com/fsnotify/fsnotify"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 )
 
 type ConfigHandler interface {
@@ -35,13 +35,14 @@ type ConfigHandler interface {
 }
 
 type ConfigSpecInfo struct {
-	*appsv1beta1.ReloadAction `json:",inline"`
+	*parametersv1alpha1.ReloadAction `json:",inline"`
 
-	ReloadType      appsv1beta1.DynamicReloadType `json:"reloadType"`
-	ConfigSpec      appsv1.ComponentConfigSpec    `json:"configSpec"`
-	FormatterConfig appsv1beta1.FileFormatConfig  `json:"formatterConfig"`
+	ReloadType      parametersv1alpha1.DynamicReloadType `json:"reloadType"`
+	ConfigSpec      appsv1.ComponentTemplateSpec         `json:"configSpec"`
+	FormatterConfig parametersv1alpha1.FileFormatConfig  `json:"formatterConfig"`
+	ConfigFile      string                               `json:"configFile"`
 
-	DownwardAPIOptions []appsv1beta1.DownwardAPIChangeTriggeredAction `json:"downwardAPIOptions"`
+	DownwardAPIOptions []parametersv1alpha1.DownwardAPIChangeTriggeredAction `json:"downwardAPIOptions"`
 
 	// config volume mount path
 	MountPoint string `json:"mountPoint"`
@@ -51,8 +52,8 @@ type ConfigSpecInfo struct {
 type ConfigSpecMeta struct {
 	ConfigSpecInfo `json:",inline"`
 
-	ScriptConfig   []appsv1beta1.ScriptConfig
-	ToolsImageSpec *appsv1beta1.ToolsSetup
+	ScriptConfig   []parametersv1alpha1.ScriptConfig
+	ToolsImageSpec *parametersv1alpha1.ToolsSetup
 }
 
 type TPLScriptConfig struct {
@@ -61,13 +62,5 @@ type TPLScriptConfig struct {
 	DataType  string `json:"dataType"`
 	DSN       string `json:"dsn"`
 
-	FormatterConfig appsv1beta1.FileFormatConfig `json:"formatterConfig"`
-}
-
-type ConfigLazyRenderedMeta struct {
-	*appsv1.ComponentConfigSpec `json:",inline"`
-
-	// secondary template path
-	Templates       []string                     `json:"templates"`
-	FormatterConfig appsv1beta1.FileFormatConfig `json:"formatterConfig"`
+	FormatterConfig parametersv1alpha1.FileFormatConfig `json:"formatterConfig"`
 }

@@ -20,9 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
-	"reflect"
-	"testing"
-
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
@@ -191,56 +188,3 @@ var _ = Describe("Component", func() {
 		})
 	})
 })
-
-func TestGetConfigSpecByName(t *testing.T) {
-	type args struct {
-		component  *SynthesizedComponent
-		configSpec string
-	}
-	tests := []struct {
-		name string
-		args args
-		want *appsv1.ComponentConfigSpec
-	}{{
-		name: "test",
-		args: args{
-			component:  &SynthesizedComponent{},
-			configSpec: "for_test",
-		},
-		want: nil,
-	}, {
-		name: "test",
-		args: args{
-			component: &SynthesizedComponent{
-				ConfigTemplates: []appsv1.ComponentConfigSpec{{
-					ComponentTemplateSpec: appsv1.ComponentTemplateSpec{
-						Name: "test",
-					}}},
-			},
-			configSpec: "for-test",
-		},
-		want: nil,
-	}, {
-		name: "test",
-		args: args{
-			component: &SynthesizedComponent{
-				ConfigTemplates: []appsv1.ComponentConfigSpec{{
-					ComponentTemplateSpec: appsv1.ComponentTemplateSpec{
-						Name: "for-test",
-					}}},
-			},
-			configSpec: "for-test",
-		},
-		want: &appsv1.ComponentConfigSpec{
-			ComponentTemplateSpec: appsv1.ComponentTemplateSpec{
-				Name: "for-test",
-			}},
-	}}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := GetConfigSpecByName(tt.args.component, tt.args.configSpec); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("GetConfigSpecByName() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}

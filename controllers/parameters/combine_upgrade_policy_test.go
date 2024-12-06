@@ -25,7 +25,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 )
 
@@ -50,16 +50,16 @@ var _ = Describe("Reconfigure CombineSyncPolicy", func() {
 				policyExecutors: []reconfigurePolicy{&testPolicy{}},
 			}
 
-			Expect(upgradePolicyMap[appsv1alpha1.DynamicReloadAndRestartPolicy]).ShouldNot(BeNil())
+			Expect(upgradePolicyMap[parametersv1alpha1.DynamicReloadAndRestartPolicy]).ShouldNot(BeNil())
 
-			mockParam := newMockReconfigureParams("simplePolicy", k8sMockClient.Client(),
+			mockParam := newMockReconfigureParams("restartPolicy", k8sMockClient.Client(),
 				withMockInstanceSet(2, nil),
 				withConfigSpec("for_test", map[string]string{
 					"key": "value",
 				}),
 				withClusterComponent(2))
 
-			Expect(testPolicyExecs.GetPolicyName()).Should(BeEquivalentTo(appsv1alpha1.DynamicReloadAndRestartPolicy))
+			Expect(testPolicyExecs.GetPolicyName()).Should(BeEquivalentTo(parametersv1alpha1.DynamicReloadAndRestartPolicy))
 			status, err := testPolicyExecs.Upgrade(mockParam)
 			Expect(err).Should(Succeed())
 			Expect(status.Status).Should(BeEquivalentTo(ESNone))
@@ -71,14 +71,14 @@ var _ = Describe("Reconfigure CombineSyncPolicy", func() {
 				policyExecutors: []reconfigurePolicy{&testErrorPolicy{}},
 			}
 
-			mockParam := newMockReconfigureParams("simplePolicy", k8sMockClient.Client(),
+			mockParam := newMockReconfigureParams("restartPolicy", k8sMockClient.Client(),
 				withMockInstanceSet(2, nil),
 				withConfigSpec("for_test", map[string]string{
 					"key": "value",
 				}),
 				withClusterComponent(2))
 
-			Expect(testPolicyExecs.GetPolicyName()).Should(BeEquivalentTo(appsv1alpha1.DynamicReloadAndRestartPolicy))
+			Expect(testPolicyExecs.GetPolicyName()).Should(BeEquivalentTo(parametersv1alpha1.DynamicReloadAndRestartPolicy))
 			status, err := testPolicyExecs.Upgrade(mockParam)
 			Expect(err).ShouldNot(Succeed())
 			Expect(status.Status).Should(BeEquivalentTo(ESFailedAndRetry))
@@ -92,7 +92,7 @@ type testPolicy struct {
 type testErrorPolicy struct {
 }
 
-func (t testErrorPolicy) Upgrade(params reconfigureParams) (ReturnedStatus, error) {
+func (t testErrorPolicy) Upgrade(params reconfigureContext) (ReturnedStatus, error) {
 	return makeReturnedStatus(ESFailedAndRetry), fmt.Errorf("testErrorPolicy failed")
 }
 
@@ -100,7 +100,7 @@ func (t testErrorPolicy) GetPolicyName() string {
 	return "testErrorPolicy"
 }
 
-func (t testPolicy) Upgrade(params reconfigureParams) (ReturnedStatus, error) {
+func (t testPolicy) Upgrade(params reconfigureContext) (ReturnedStatus, error) {
 	return makeReturnedStatus(ESNone), nil
 }
 

@@ -25,7 +25,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/test/testdata"
 )
 
@@ -37,14 +37,9 @@ var fromTestData = func(fileName string) string {
 	return string(content)
 }
 
-var newFakeConfConstraint = func(cueFile string, cfgFormatter appsv1beta1.CfgFileFormat) *appsv1beta1.ConfigConstraintSpec {
-	return &appsv1beta1.ConfigConstraintSpec{
-		ParametersSchema: &appsv1beta1.ParametersSchema{
-			CUE: fromTestData(cueFile),
-		},
-		FileFormatConfig: &appsv1beta1.FileFormatConfig{
-			Format: cfgFormatter,
-		},
+var newFakeConfigSchema = func(cueFile string) *parametersv1alpha1.ParametersSchema {
+	return &parametersv1alpha1.ParametersSchema{
+		CUE: fromTestData(cueFile),
 	}
 }
 
@@ -52,8 +47,7 @@ func TestSchemaValidatorWithCue(t *testing.T) {
 	type args struct {
 		cueFile    string
 		configFile string
-		format     appsv1beta1.CfgFileFormat
-		options    []ValidatorOptions
+		format     parametersv1alpha1.CfgFileFormat
 	}
 	tests := []struct {
 		name string
@@ -64,7 +58,7 @@ func TestSchemaValidatorWithCue(t *testing.T) {
 		args: args{
 			cueFile:    "cue_testdata/mongod.cue",
 			configFile: "cue_testdata/mongod.conf",
-			format:     appsv1beta1.YAML,
+			format:     parametersv1alpha1.YAML,
 		},
 		err: nil,
 	}, {
@@ -72,7 +66,7 @@ func TestSchemaValidatorWithCue(t *testing.T) {
 		args: args{
 			cueFile:    "cue_testdata/wesql.cue",
 			configFile: "cue_testdata/wesql.cnf",
-			format:     appsv1beta1.Ini,
+			format:     parametersv1alpha1.Ini,
 		},
 		err: nil,
 	}, {
@@ -80,7 +74,7 @@ func TestSchemaValidatorWithCue(t *testing.T) {
 		args: args{
 			cueFile:    "cue_testdata/pg14.cue",
 			configFile: "cue_testdata/pg14.conf",
-			format:     appsv1beta1.Properties,
+			format:     parametersv1alpha1.Properties,
 		},
 		err: nil,
 	}, {
@@ -88,7 +82,7 @@ func TestSchemaValidatorWithCue(t *testing.T) {
 		args: args{
 			cueFile:    "cue_testdata/clickhouse.cue",
 			configFile: "cue_testdata/clickhouse.xml",
-			format:     appsv1beta1.XML,
+			format:     parametersv1alpha1.XML,
 		},
 		err: nil,
 	}, {
@@ -96,7 +90,7 @@ func TestSchemaValidatorWithCue(t *testing.T) {
 		args: args{
 			cueFile:    "cue_testdata/mysql.cue",
 			configFile: "cue_testdata/mysql.cnf",
-			format:     appsv1beta1.Ini,
+			format:     parametersv1alpha1.Ini,
 		},
 		err: nil,
 	}, {
@@ -104,7 +98,7 @@ func TestSchemaValidatorWithCue(t *testing.T) {
 		args: args{
 			cueFile:    "cue_testdata/mysql.cue",
 			configFile: "cue_testdata/mysql_err.cnf",
-			format:     appsv1beta1.Ini,
+			format:     parametersv1alpha1.Ini,
 		},
 		err: errors.New(`failed to render cue template configure: [mysqld.innodb_autoinc_lock_mode: 3 errors in empty disjunction:
 mysqld.innodb_autoinc_lock_mode: conflicting values 0 and 100:
@@ -117,55 +111,33 @@ mysqld.innodb_autoinc_lock_mode: conflicting values 2 and 100:
 		name: "configmap_key_filter",
 		args: args{
 			cueFile:    "cue_testdata/mysql.cue",
-			configFile: "cue_testdata/mysql_err.cnf",
-			format:     appsv1beta1.Ini,
-			options:    []ValidatorOptions{WithKeySelector([]string{"key2", "key3"})},
+			configFile: "cue_testdata/mysql.cnf",
+			format:     parametersv1alpha1.Ini,
 		},
 	}}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			validator := NewConfigValidator(newFakeConfConstraint(tt.args.cueFile, tt.args.format), tt.args.options...)
+			validator := NewConfigValidator(newFakeConfigSchema(tt.args.cueFile), &parametersv1alpha1.FileFormatConfig{Format: tt.args.format})
 			require.NotNil(t, validator)
-			require.Equal(t, tt.err, validator.Validate(
-				map[string]string{
-					"key": fromTestData(tt.args.configFile),
-				}))
+			require.Equal(t, tt.err, validator.Validate(fromTestData(tt.args.configFile)))
 		})
 	}
 }
 
 func TestSchemaValidatorWithSelector(t *testing.T) {
-	validator := NewConfigValidator(newFakeConfConstraint("cue_testdata/mysql.cue", appsv1beta1.Ini))
+	validator := NewConfigValidator(newFakeConfigSchema("cue_testdata/mysql.cue"), &parametersv1alpha1.FileFormatConfig{Format: parametersv1alpha1.Ini})
 	require.NotNil(t, validator)
 	require.ErrorContains(t, validator.Validate(
-		map[string]string{
-			"normal_key":   fromTestData("cue_testdata/mysql.cnf"),
-			"abnormal_key": fromTestData("cue_testdata/mysql_err.cnf"),
-		}), "[mysqld.innodb_autoinc_lock_mode: 3 errors in empty disjunction")
-
-	validator = NewConfigValidator(newFakeConfConstraint("cue_testdata/mysql.cue", appsv1beta1.Ini), WithKeySelector([]string{}))
-	require.NotNil(t, validator)
-	require.ErrorContains(t, validator.Validate(
-		map[string]string{
-			"normal_key":   fromTestData("cue_testdata/mysql.cnf"),
-			"abnormal_key": fromTestData("cue_testdata/mysql_err.cnf"),
-		}), "[mysqld.innodb_autoinc_lock_mode: 3 errors in empty disjunction")
-
-	validator = NewConfigValidator(newFakeConfConstraint("cue_testdata/mysql.cue", appsv1beta1.Ini), WithKeySelector([]string{"normal_key"}))
-	require.NotNil(t, validator)
-	require.Nil(t, validator.Validate(
-		map[string]string{
-			"normal_key":   fromTestData("cue_testdata/mysql.cnf"),
-			"abnormal_key": fromTestData("cue_testdata/mysql_err.cnf"),
-		}))
+		fromTestData("cue_testdata/mysql_err.cnf"),
+	), "[mysqld.innodb_autoinc_lock_mode: 3 errors in empty disjunction")
 }
 
 func TestSchemaValidatorWithOpenSchema(t *testing.T) {
 	type args struct {
 		cueFile        string
 		configFile     string
-		format         appsv1beta1.CfgFileFormat
+		format         parametersv1alpha1.CfgFileFormat
 		SchemaTypeName string
 	}
 	tests := []struct {
@@ -177,23 +149,20 @@ func TestSchemaValidatorWithOpenSchema(t *testing.T) {
 		args: args{
 			cueFile:    "cue_testdata/mysql.cue",
 			configFile: "cue_testdata/mysql.cnf",
-			format:     appsv1beta1.Ini,
+			format:     parametersv1alpha1.Ini,
 		},
 		err: nil,
 	}}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tplConstraint := newFakeConfConstraint(tt.args.cueFile, tt.args.format)
+			configSchema := newFakeConfigSchema(tt.args.cueFile)
 			validator := &schemaValidator{
 				typeName: tt.args.SchemaTypeName,
-				cfgType:  tplConstraint.FileFormatConfig.Format,
-				schema:   tplConstraint.ParametersSchema.SchemaInJSON,
+				cfgType:  tt.args.format,
+				schema:   configSchema.SchemaInJSON,
 			}
-			require.Equal(t, tt.err, validator.Validate(
-				map[string]string{
-					"key": fromTestData(tt.args.configFile),
-				}))
+			require.Equal(t, tt.err, validator.Validate(fromTestData(tt.args.configFile)))
 		})
 	}
 }

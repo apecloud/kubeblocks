@@ -31,13 +31,12 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 
-	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
-	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 	"github.com/apecloud/kubeblocks/test/testdata"
 )
@@ -89,7 +88,7 @@ func TestFromUpdatedConfig(t *testing.T) {
 func TestIsRerender(t *testing.T) {
 	type args struct {
 		cm   *corev1.ConfigMap
-		item v1alpha1.ConfigurationItemDetail
+		item parametersv1alpha1.ConfigTemplateItemDetail
 	}
 	tests := []struct {
 		name string
@@ -100,7 +99,7 @@ func TestIsRerender(t *testing.T) {
 		name: "test",
 		args: args{
 			cm: nil,
-			item: v1alpha1.ConfigurationItemDetail{
+			item: parametersv1alpha1.ConfigTemplateItemDetail{
 				Name: "test",
 			},
 		},
@@ -109,43 +108,8 @@ func TestIsRerender(t *testing.T) {
 		name: "test",
 		args: args{
 			cm: builder.NewConfigMapBuilder("default", "test").GetObject(),
-			item: v1alpha1.ConfigurationItemDetail{
+			item: parametersv1alpha1.ConfigTemplateItemDetail{
 				Name: "test",
-			},
-		},
-		want: false,
-	}, {
-		name: "test",
-		args: args{
-			cm: builder.NewConfigMapBuilder("default", "test").
-				GetObject(),
-			item: v1alpha1.ConfigurationItemDetail{
-				Name:    "test",
-				Version: "v1",
-			},
-		},
-		want: true,
-	}, {
-		name: "test",
-		args: args{
-			cm: builder.NewConfigMapBuilder("default", "test").
-				AddAnnotations(constant.CMConfigurationTemplateVersion, "v1").
-				GetObject(),
-			item: v1alpha1.ConfigurationItemDetail{
-				Name:    "test",
-				Version: "v2",
-			},
-		},
-		want: true,
-	}, {
-		name: "test",
-		args: args{
-			cm: builder.NewConfigMapBuilder("default", "test").
-				AddAnnotations(constant.CMConfigurationTemplateVersion, "v1").
-				GetObject(),
-			item: v1alpha1.ConfigurationItemDetail{
-				Name:    "test",
-				Version: "v1",
 			},
 		},
 		want: false,
@@ -155,12 +119,12 @@ func TestIsRerender(t *testing.T) {
 			cm: builder.NewConfigMapBuilder("default", "test").
 				AddAnnotations(constant.ConfigAppliedVersionAnnotationKey, "").
 				GetObject(),
-			item: v1alpha1.ConfigurationItemDetail{
+			item: parametersv1alpha1.ConfigTemplateItemDetail{
 				Name: "test",
-				ImportTemplateRef: &v1alpha1.ConfigTemplateExtension{
+				CustomTemplates: &appsv1.ConfigTemplateExtension{
 					TemplateRef: "contig-test-template",
 					Namespace:   "default",
-					Policy:      v1alpha1.PatchPolicy,
+					Policy:      appsv1.PatchPolicy,
 				},
 			},
 		},
@@ -171,7 +135,7 @@ func TestIsRerender(t *testing.T) {
 			cm: builder.NewConfigMapBuilder("default", "test").
 				AddAnnotations(constant.ConfigAppliedVersionAnnotationKey, `
 {
-  "importTemplateRef": {
+  "userConfigTemplates": {
     "templateRef": "contig-test-template",
     "namespace": "default",
     "policy": "patch"
@@ -179,12 +143,12 @@ func TestIsRerender(t *testing.T) {
 }
 `).
 				GetObject(),
-			item: v1alpha1.ConfigurationItemDetail{
+			item: parametersv1alpha1.ConfigTemplateItemDetail{
 				Name: "test",
-				ImportTemplateRef: &v1alpha1.ConfigTemplateExtension{
+				CustomTemplates: &appsv1.ConfigTemplateExtension{
 					TemplateRef: "contig-test-template",
 					Namespace:   "default",
-					Policy:      v1alpha1.PatchPolicy,
+					Policy:      appsv1.PatchPolicy,
 				},
 			},
 		},
@@ -195,28 +159,22 @@ func TestIsRerender(t *testing.T) {
 			cm: builder.NewConfigMapBuilder("default", "test").
 				AddAnnotations(constant.ConfigAppliedVersionAnnotationKey, "").
 				GetObject(),
-			item: v1alpha1.ConfigurationItemDetail{
-				Name: "test",
-				Payload: v1alpha1.Payload{
-					Data: map[string]any{
-						"key": "value",
-					},
-				},
+			item: parametersv1alpha1.ConfigTemplateItemDetail{
+				Name:    "test",
+				Payload: parametersv1alpha1.Payload{},
 			},
 		},
-		want: true,
+		want: false,
 	}, {
 		name: "payload-test",
 		args: args{
 			cm: builder.NewConfigMapBuilder("default", "test").
 				AddAnnotations(constant.ConfigAppliedVersionAnnotationKey, ` {"payload":{"key":"value"}} `).
 				GetObject(),
-			item: v1alpha1.ConfigurationItemDetail{
+			item: parametersv1alpha1.ConfigTemplateItemDetail{
 				Name: "test",
-				Payload: v1alpha1.Payload{
-					Data: map[string]any{
-						"key": "value",
-					},
+				Payload: parametersv1alpha1.Payload{
+					"key": transformPayload("value"),
 				},
 			},
 		},
@@ -234,48 +192,48 @@ func TestIsRerender(t *testing.T) {
 func TestGetConfigSpecReconcilePhase(t *testing.T) {
 	type args struct {
 		cm     *corev1.ConfigMap
-		item   v1alpha1.ConfigurationItemDetail
-		status *v1alpha1.ConfigurationItemDetailStatus
+		item   parametersv1alpha1.ConfigTemplateItemDetail
+		status *parametersv1alpha1.ConfigTemplateItemDetailStatus
 	}
 	tests := []struct {
 		name string
 		args args
-		want v1alpha1.ConfigurationPhase
+		want parametersv1alpha1.ParameterPhase
 	}{{
 		name: "test",
 		args: args{
 			cm: nil,
-			item: v1alpha1.ConfigurationItemDetail{
+			item: parametersv1alpha1.ConfigTemplateItemDetail{
 				Name: "test",
 			},
 		},
-		want: v1alpha1.CCreatingPhase,
+		want: parametersv1alpha1.CCreatingPhase,
 	}, {
 		name: "test",
 		args: args{
 			cm: builder.NewConfigMapBuilder("default", "test").GetObject(),
-			item: v1alpha1.ConfigurationItemDetail{
+			item: parametersv1alpha1.ConfigTemplateItemDetail{
 				Name: "test",
 			},
-			status: &v1alpha1.ConfigurationItemDetailStatus{
-				Phase: v1alpha1.CInitPhase,
+			status: &parametersv1alpha1.ConfigTemplateItemDetailStatus{
+				Phase: parametersv1alpha1.CInitPhase,
 			},
 		},
-		want: v1alpha1.CPendingPhase,
+		want: parametersv1alpha1.CPendingPhase,
 	}, {
 		name: "test",
 		args: args{
 			cm: builder.NewConfigMapBuilder("default", "test").
 				AddAnnotations(constant.ConfigAppliedVersionAnnotationKey, `{"name":"test"}`).
 				GetObject(),
-			item: v1alpha1.ConfigurationItemDetail{
+			item: parametersv1alpha1.ConfigTemplateItemDetail{
 				Name: "test",
 			},
-			status: &v1alpha1.ConfigurationItemDetailStatus{
-				Phase: v1alpha1.CUpgradingPhase,
+			status: &parametersv1alpha1.ConfigTemplateItemDetailStatus{
+				Phase: parametersv1alpha1.CUpgradingPhase,
 			},
 		},
-		want: v1alpha1.CUpgradingPhase,
+		want: parametersv1alpha1.CUpgradingPhase,
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -303,26 +261,22 @@ var _ = Describe("config_util", func() {
 	Context("MergeAndValidateConfigs", func() {
 		It("Should succeed with no error", func() {
 			type args struct {
-				configConstraint appsv1beta1.ConfigConstraintSpec
-				baseCfg          map[string]string
-				updatedParams    []core.ParamPairs
-				cmKeys           []string
+				parametersDef parametersv1alpha1.ParametersDefinition
+				baseCfg       map[string]string
+				updatedParams []core.ParamPairs
+				configs       []parametersv1alpha1.ComponentConfigDescription
 			}
 
-			configConstraintObj := testapps.NewCustomizedObj("resources/mysql-config-constraint.yaml",
-				&appsv1beta1.ConfigConstraint{}, func(cc *appsv1beta1.ConfigConstraint) {
-					if ccContext, err := testdata.GetTestDataFileContent("cue_testdata/pg14.cue"); err == nil {
-						cc.Spec.ParametersSchema = &appsv1beta1.ParametersSchema{
-							CUE: string(ccContext),
-						}
-					}
-					cc.Spec.FileFormatConfig = &appsv1beta1.FileFormatConfig{
-						Format: appsv1beta1.Properties,
-					}
-				})
-
-			cfgContext, err := testdata.GetTestDataFileContent("cue_testdata/pg14.conf")
-			Expect(err).Should(Succeed())
+			cfgContext, _ := testdata.GetTestDataFileContent("cue_testdata/pg14.conf")
+			ccContext, _ := testdata.GetTestDataFileContent("cue_testdata/pg14.cue")
+			paramsDef := parametersv1alpha1.ParametersDefinition{
+				Spec: parametersv1alpha1.ParametersDefinitionSpec{
+					FileName: "key",
+					ParametersSchema: &parametersv1alpha1.ParametersSchema{
+						CUE: string(ccContext),
+					},
+				},
+			}
 
 			tests := []struct {
 				name    string
@@ -332,7 +286,7 @@ var _ = Describe("config_util", func() {
 			}{{
 				name: "pg1_merge",
 				args: args{
-					configConstraint: configConstraintObj.Spec,
+					parametersDef: paramsDef,
 					baseCfg: map[string]string{
 						"key":  string(cfgContext),
 						"key2": "not support context",
@@ -346,7 +300,7 @@ var _ = Describe("config_util", func() {
 							},
 						},
 					},
-					cmKeys: []string{"key", "key3"},
+					configs: []parametersv1alpha1.ComponentConfigDescription{{Name: "key", FileFormatConfig: &parametersv1alpha1.FileFormatConfig{Format: parametersv1alpha1.Properties}}},
 				},
 				want: map[string]string{
 					"max_connections": "200",
@@ -355,7 +309,7 @@ var _ = Describe("config_util", func() {
 			}, {
 				name: "not_support_key_updated",
 				args: args{
-					configConstraint: configConstraintObj.Spec,
+					parametersDef: paramsDef,
 					baseCfg: map[string]string{
 						"key":  string(cfgContext),
 						"key2": "not_support_context",
@@ -369,20 +323,20 @@ var _ = Describe("config_util", func() {
 							},
 						},
 					},
-					cmKeys: []string{"key1", "key2"},
+					configs: []parametersv1alpha1.ComponentConfigDescription{{Name: "key2", FileFormatConfig: &parametersv1alpha1.FileFormatConfig{Format: parametersv1alpha1.Properties}}},
 				},
 				wantErr: true,
 			}}
 			for _, tt := range tests {
-				got, err := MergeAndValidateConfigs(tt.args.configConstraint, tt.args.baseCfg, tt.args.cmKeys, tt.args.updatedParams)
+				got, err := MergeAndValidateConfigs(tt.args.baseCfg, tt.args.updatedParams, []*parametersv1alpha1.ParametersDefinition{&tt.args.parametersDef}, tt.args.configs)
 				Expect(err != nil).Should(BeEquivalentTo(tt.wantErr))
 				if tt.wantErr {
 					continue
 				}
 
 				option := core.CfgOption{
-					Type:    core.CfgTplType,
-					CfgType: tt.args.configConstraint.FileFormatConfig.Format,
+					Type:         core.CfgTplType,
+					FileFormatFn: core.WithConfigFileFormat(tt.args.configs),
 				}
 
 				patch, err := core.CreateMergePatch(&core.ConfigResource{
@@ -403,7 +357,7 @@ var _ = Describe("config_util", func() {
 
 func TestCheckAndPatchPayload(t *testing.T) {
 	type args struct {
-		item      *v1alpha1.ConfigurationItemDetail
+		item      *parametersv1alpha1.ConfigTemplateItemDetail
 		payloadID string
 		payload   interface{}
 	}
@@ -415,7 +369,7 @@ func TestCheckAndPatchPayload(t *testing.T) {
 	}{{
 		name: "test",
 		args: args{
-			item:      &v1alpha1.ConfigurationItemDetail{},
+			item:      &parametersv1alpha1.ConfigTemplateItemDetail{},
 			payloadID: constant.BinaryVersionPayload,
 			payload:   "md5-12912uy1232o9y2",
 		},
@@ -430,11 +384,9 @@ func TestCheckAndPatchPayload(t *testing.T) {
 	}, {
 		name: "test-delete-payload",
 		args: args{
-			item: &v1alpha1.ConfigurationItemDetail{
-				Payload: v1alpha1.Payload{
-					Data: map[string]any{
-						constant.BinaryVersionPayload: "md5-12912uy1232o9y2",
-					},
+			item: &parametersv1alpha1.ConfigTemplateItemDetail{
+				Payload: parametersv1alpha1.Payload{
+					constant.BinaryVersionPayload: json.RawMessage("md5-12912uy1232o9y2"),
 				},
 			},
 			payloadID: constant.BinaryVersionPayload,
@@ -444,17 +396,15 @@ func TestCheckAndPatchPayload(t *testing.T) {
 	}, {
 		name: "test-update-payload",
 		args: args{
-			item: &v1alpha1.ConfigurationItemDetail{
-				Payload: v1alpha1.Payload{
-					Data: map[string]any{
-						constant.BinaryVersionPayload: "md5-12912uy1232o9y2",
-						constant.ComponentResourcePayload: map[string]any{
-							"limit": map[string]string{
-								"cpu":    "100m",
-								"memory": "100Mi",
-							},
+			item: &parametersv1alpha1.ConfigTemplateItemDetail{
+				Payload: parametersv1alpha1.Payload{
+					constant.BinaryVersionPayload: json.RawMessage("md5-12912uy1232o9y2"),
+					constant.ComponentResourcePayload: transformPayload(map[string]any{
+						"limit": map[string]string{
+							"cpu":    "100m",
+							"memory": "100Mi",
 						},
-					},
+					}),
 				},
 			},
 			payloadID: constant.ComponentResourcePayload,
@@ -526,9 +476,20 @@ func Test_filterImmutableParameters(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := filterImmutableParameters(tt.args.parameters, tt.args.immutableParams); !reflect.DeepEqual(got, tt.want) {
+			paramsDefs := []*parametersv1alpha1.ParametersDefinition{{
+				Spec: parametersv1alpha1.ParametersDefinitionSpec{
+					FileName:            "test",
+					ImmutableParameters: tt.args.immutableParams,
+				},
+			}}
+			if got := filterImmutableParameters(tt.args.parameters, "test", paramsDefs); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("filterImmutableParameters() = %v, want %v", got, tt.want)
 			}
 		})
 	}
+}
+
+func transformPayload(data interface{}) json.RawMessage {
+	raw, _ := buildPayloadAsUnstructuredObject(data)
+	return raw
 }

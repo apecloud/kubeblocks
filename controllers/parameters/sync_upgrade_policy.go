@@ -26,40 +26,35 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
-	podutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-type syncPolicy struct {
-}
+var syncPolicyInstance = &syncPolicy{}
+
+type syncPolicy struct{}
 
 func init() {
-	RegisterPolicy(appsv1alpha1.SyncDynamicReloadPolicy, &syncPolicy{})
+	registerPolicy(parametersv1alpha1.SyncDynamicReloadPolicy, syncPolicyInstance)
 }
 
 func (o *syncPolicy) GetPolicyName() string {
-	return string(appsv1alpha1.SyncDynamicReloadPolicy)
+	return string(parametersv1alpha1.SyncDynamicReloadPolicy)
 }
 
-func (o *syncPolicy) Upgrade(params reconfigureParams) (ReturnedStatus, error) {
-	configPatch := params.ConfigPatch
-	if !configPatch.IsModify {
-		return makeReturnedStatus(ESNone), nil
-	}
-
-	updatedParameters := getOnlineUpdateParams(configPatch, params.ConfigConstraint)
+func (o *syncPolicy) Upgrade(rctx reconfigureContext) (ReturnedStatus, error) {
+	updatedParameters := rctx.UpdatedParameters
 	if len(updatedParameters) == 0 {
 		return makeReturnedStatus(ESNone), nil
 	}
 
 	funcs := GetInstanceSetRollingUpgradeFuncs()
-	pods, err := funcs.GetPodsFunc(params)
+	pods, err := funcs.GetPodsFunc(rctx)
 	if err != nil {
 		return makeReturnedStatus(ESFailedAndRetry), err
 	}
-	return sync(params, updatedParameters, pods, funcs)
+	return sync(rctx, updatedParameters, pods, funcs)
 }
 
 func matchLabel(pods []corev1.Pod, selector *metav1.LabelSelector) ([]corev1.Pod, error) {
@@ -77,18 +72,19 @@ func matchLabel(pods []corev1.Pod, selector *metav1.LabelSelector) ([]corev1.Pod
 	return result, nil
 }
 
-func sync(params reconfigureParams, updatedParameters map[string]string, pods []corev1.Pod, funcs RollingUpgradeFuncs) (ReturnedStatus, error) {
+func sync(rctx reconfigureContext, updatedParameters map[string]string, pods []corev1.Pod, funcs RollingUpgradeFuncs) (ReturnedStatus, error) {
 	var (
 		r        = ESNone
 		total    = int32(len(pods))
-		replicas = int32(params.getTargetReplicas())
+		replicas = int32(rctx.getTargetReplicas())
 		progress = core.NotStarted
 
 		err         error
-		ctx         = params.Ctx.Ctx
-		configKey   = params.getConfigKey()
-		versionHash = params.getTargetVersionHash()
-		selector    = params.ConfigConstraint.GetPodSelector()
+		ctx         = rctx.Ctx
+		configKey   = rctx.getConfigKey()
+		versionHash = rctx.getTargetVersionHash()
+		selector    = intctrlutil.GetPodSelector(rctx.ParametersDef)
+		fileName    string
 	)
 
 	if selector != nil {
@@ -98,26 +94,27 @@ func sync(params reconfigureParams, updatedParameters map[string]string, pods []
 		return makeReturnedStatus(ESFailedAndRetry), err
 	}
 	if len(pods) == 0 {
-		params.Ctx.Log.Info(fmt.Sprintf("no pods to update, and retry, selector: %v", selector))
+		rctx.Log.Info(fmt.Sprintf("no pods to update, and retry, selector: %v", selector))
 		return makeReturnedStatus(ESRetry), nil
+	}
+	if rctx.ConfigDescription != nil {
+		fileName = rctx.ConfigDescription.Name
 	}
 
 	requireUpdatedCount := int32(len(pods))
 	for _, pod := range pods {
-		params.Ctx.Log.V(1).Info(fmt.Sprintf("sync pod: %s", pod.Name))
-		if podutil.IsMatchConfigVersion(&pod, configKey, versionHash) {
+		rctx.Log.V(1).Info(fmt.Sprintf("sync pod: %s", pod.Name))
+		if intctrlutil.IsMatchConfigVersion(&pod, configKey, versionHash) {
 			progress++
 			continue
 		}
-		if !podutil.PodIsReady(&pod) {
+		if !intctrlutil.PodIsReady(&pod) {
 			continue
 		}
-		err = funcs.OnlineUpdatePodFunc(&pod, ctx, params.ReconfigureClientFactory, params.ConfigSpecName, updatedParameters)
-		if err != nil {
+		if err = funcs.OnlineUpdatePodFunc(&pod, ctx, rctx.ReconfigureClientFactory, rctx.ConfigTemplate.Name, fileName, updatedParameters); err != nil {
 			return makeReturnedStatus(ESFailedAndRetry), err
 		}
-		err = updatePodLabelsWithConfigVersion(&pod, configKey, versionHash, params.Client, ctx)
-		if err != nil {
+		if err = updatePodLabelsWithConfigVersion(&pod, configKey, versionHash, rctx.Client, ctx); err != nil {
 			return makeReturnedStatus(ESFailedAndRetry), err
 		}
 		progress++
@@ -127,24 +124,4 @@ func sync(params reconfigureParams, updatedParameters map[string]string, pods []
 		r = ESRetry
 	}
 	return makeReturnedStatus(r, withExpected(requireUpdatedCount), withSucceed(progress)), nil
-}
-
-func getOnlineUpdateParams(configPatch *core.ConfigPatchInfo, cc *appsv1beta1.ConfigConstraintSpec) map[string]string {
-	r := make(map[string]string)
-	dynamicAction := cc.NeedDynamicReloadAction()
-	needReloadStaticParameters := cc.ReloadStaticParameters()
-	parameters := core.GenerateVisualizedParamsList(configPatch, cc.FileFormatConfig, nil)
-	for _, key := range parameters {
-		if key.UpdateType == core.UpdatedType {
-			for _, p := range key.Parameters {
-				if dynamicAction && !needReloadStaticParameters && !core.IsDynamicParameter(p.Key, cc) {
-					continue
-				}
-				if p.Value != nil {
-					r[p.Key] = *p.Value
-				}
-			}
-		}
-	}
-	return r
 }

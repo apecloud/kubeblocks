@@ -456,17 +456,7 @@ func (s *Scheduler) reconfigure(schedulePolicy *dpv1alpha1.SchedulePolicy) error
 						ComponentOps: opsv1alpha1.ComponentOps{
 							ComponentName: targetPodSelector.MatchLabels[constant.KBAppComponentLabelKey],
 						},
-						Configurations: []opsv1alpha1.ConfigurationItem{
-							{
-								Name: configRef.Name,
-								Keys: []opsv1alpha1.ParameterConfig{
-									{
-										Key:        configRef.Key,
-										Parameters: parameters,
-									},
-								},
-							},
-						},
+						Parameters: ToV1ReconfigureParameters(parameters),
 					},
 				},
 			},
@@ -506,4 +496,15 @@ func (s *Scheduler) reconcileReconfigure(backupSchedule *dpv1alpha1.BackupSchedu
 		}
 	}
 	return nil
+}
+
+func ToV1ReconfigureParameters(parameters []opsv1alpha1.ParameterPair) []appsv1.ComponentParameter {
+	params := make([]appsv1.ComponentParameter, len(parameters))
+	for _, parameter := range parameters {
+		params = append(params, appsv1.ComponentParameter{
+			Name:  parameter.Key,
+			Value: parameter.Value,
+		})
+	}
+	return params
 }

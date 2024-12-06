@@ -28,12 +28,11 @@ import (
 
 	"github.com/golang/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
@@ -41,6 +40,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/render"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
+	testparameters "github.com/apecloud/kubeblocks/pkg/testutil/parameters"
 )
 
 var _ = Describe("ConfigurationPipelineTest", func() {
@@ -51,8 +51,9 @@ var _ = Describe("ConfigurationPipelineTest", func() {
 	var compDefObj *appsv1.ComponentDefinition
 	var synthesizedComponent *component.SynthesizedComponent
 	var configMapObj *corev1.ConfigMap
-	var configConstraint *appsv1beta1.ConfigConstraint
-	var configurationObj *appsv1alpha1.Configuration
+	var parametersDef *parametersv1alpha1.ParametersDefinition
+	var componentParameter *parametersv1alpha1.ComponentParameter
+	var configRender *parametersv1alpha1.ParameterDrivenConfigRender
 	var k8sMockClient *testutil.K8sClientMockHelper
 
 	mockAPIResource := func(lazyFetcher testutil.Getter) {
@@ -62,28 +63,34 @@ var _ = Describe("ConfigurationPipelineTest", func() {
 				clusterObj,
 				clusterObj,
 				configMapObj,
-				configConstraint,
-				configurationObj,
+				parametersDef,
+				componentObj,
+				componentParameter,
+				configRender,
 			}, lazyFetcher), testutil.WithAnyTimes()))
 		k8sMockClient.MockCreateMethod(testutil.WithCreateReturned(testutil.WithCreatedSucceedResult(), testutil.WithAnyTimes()))
 		k8sMockClient.MockPatchMethod(testutil.WithPatchReturned(func(obj client.Object, patch client.Patch) error {
 			switch v := obj.(type) {
-			case *appsv1alpha1.Configuration:
-				if client.ObjectKeyFromObject(obj) == client.ObjectKeyFromObject(configurationObj) {
-					configurationObj.Spec = *v.Spec.DeepCopy()
-					configurationObj.Status = *v.Status.DeepCopy()
+			case *parametersv1alpha1.ComponentParameter:
+				if client.ObjectKeyFromObject(obj) == client.ObjectKeyFromObject(componentParameter) {
+					componentParameter.Spec = *v.Spec.DeepCopy()
+					componentParameter.Status = *v.Status.DeepCopy()
 				}
 			}
 			return nil
 		}, testutil.WithAnyTimes()))
+		k8sMockClient.MockNListMethod(0, testutil.WithListReturned(
+			testutil.WithConstructListReturnedResult([]runtime.Object{configRender}),
+			testutil.WithAnyTimes(),
+		))
 		k8sMockClient.MockStatusMethod().
 			EXPECT().
 			Patch(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 			DoAndReturn(func(ctx context.Context, obj client.Object, patch client.Patch, opts ...client.SubResourcePatchOption) error {
 				switch v := obj.(type) {
-				case *appsv1alpha1.Configuration:
-					if client.ObjectKeyFromObject(obj) == client.ObjectKeyFromObject(configurationObj) {
-						configurationObj.Status = *v.Status.DeepCopy()
+				case *parametersv1alpha1.ComponentParameter:
+					if client.ObjectKeyFromObject(obj) == client.ObjectKeyFromObject(componentParameter) {
+						componentParameter.Status = *v.Status.DeepCopy()
 					}
 				}
 				return nil
@@ -109,20 +116,20 @@ checkpoint_flush_after = '32'
 checkpoint_timeout = '15min'
 max_connections = '1000'
 `))
-		configurationObj = builder.NewConfigurationBuilder(testCtx.DefaultNamespace,
+		componentParameter = builder.NewComponentParameterBuilder(testCtx.DefaultNamespace,
 			cfgcore.GenerateComponentConfigurationName(clusterName, mysqlCompName)).
 			ClusterRef(clusterName).
 			Component(mysqlCompName).
 			GetObject()
-		configConstraint = &appsv1beta1.ConfigConstraint{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: mysqlConfigConstraintName,
-			},
-			Spec: appsv1beta1.ConfigConstraintSpec{
-				FileFormatConfig: &appsv1beta1.FileFormatConfig{
-					Format: appsv1beta1.Properties,
-				},
-			}}
+
+		parametersDef = testparameters.NewParametersDefinitionFactory(paramsDefName).GetObject()
+		configRender = testparameters.NewParametersDrivenConfigFactory(pdcrName).
+			SetConfigDescription(testConfigFile, configTemplateName, parametersv1alpha1.FileFormatConfig{Format: parametersv1alpha1.Properties}).
+			SetComponentDefinition(compDefObj.Name).
+			SetParametersDefs(paramsDefName).
+			GetObject()
+		parametersDef.Status.Phase = parametersv1alpha1.PDAvailablePhase
+		configRender.Status.Phase = parametersv1alpha1.PDAvailablePhase
 	})
 
 	AfterEach(func() {
@@ -131,9 +138,6 @@ max_connections = '1000'
 
 	Context("ConfigPipelineTest", func() {
 		It("NormalTest", func() {
-			By("mock configSpec keys")
-			synthesizedComponent.ConfigTemplates[0].Keys = []string{testConfigFile}
-
 			By("create configuration resource")
 			createPipeline := NewCreatePipeline(render.ReconcileCtx{
 				ResourceCtx: &render.ResourceCtx{
@@ -163,20 +167,25 @@ max_connections = '1000'
 				return false, nil
 			})
 
-			err := createPipeline.Prepare().
-				UpdateConfiguration(). // reconcile Configuration
-				Configuration().       // sync Configuration
+			err := createPipeline.
+				ComponentAndComponentDef().
+				Prepare().
+				SyncComponentParameter().
+				ComponentParameter().
 				CreateConfigTemplate().
 				UpdatePodVolumes().
 				BuildConfigManagerSidecar().
 				UpdateConfigRelatedObject().
-				UpdateConfigurationStatus().
 				Complete()
 			Expect(err).Should(Succeed())
 
 			By("update configuration resource for mocking reconfiguring")
-			item := configurationObj.Spec.ConfigItemDetails[0]
-			item.ConfigFileParams = map[string]appsv1alpha1.ConfigParams{
+			item := componentParameter.Spec.ConfigItemDetails[0]
+			status := &parametersv1alpha1.ConfigTemplateItemDetailStatus{
+				Name:  item.Name,
+				Phase: parametersv1alpha1.CInitPhase,
+			}
+			item.ConfigFileParams = map[string]parametersv1alpha1.ParametersInFile{
 				testConfigFile: {
 					Parameters: map[string]*string{
 						"max_connections": cfgutil.ToPointer("2000"),
@@ -192,34 +201,16 @@ max_connections = '1000'
 				Component:            componentObj,
 				SynthesizedComponent: synthesizedComponent,
 				PodSpec:              synthesizedComponent.PodSpec,
-			}, item, &configurationObj.Status.ConfigurationItemStatus[0], nil)
+			}, item, status, configMapObj, componentParameter)
 
 			By("update configuration resource")
-			err = reconcileTask.InitConfigSpec().
-				Configuration().
-				ConfigMap(configTemplateName).
-				ConfigConstraints(reconcileTask.ConfigSpec().ConfigConstraintRef).
+			err = reconcileTask.
+				ComponentAndComponentDef().
 				PrepareForTemplate().
 				RerenderTemplate().
 				ApplyParameters().
-				UpdateConfigVersion(strconv.FormatInt(reconcileTask.ConfigurationObj.GetGeneration(), 10)).
+				UpdateConfigVersion(strconv.FormatInt(reconcileTask.ComponentParameterObj.GetGeneration(), 10)).
 				Sync().
-				SyncStatus().
-				Complete()
-			Expect(err).Should(Succeed())
-
-			By("rerender configuration template")
-			reconcileTask.item.Version = "v2"
-			err = reconcileTask.InitConfigSpec().
-				Configuration().
-				ConfigMap(configTemplateName).
-				ConfigConstraints(reconcileTask.ConfigSpec().ConfigConstraintRef).
-				PrepareForTemplate().
-				RerenderTemplate().
-				ApplyParameters().
-				UpdateConfigVersion(strconv.FormatInt(reconcileTask.ConfigurationObj.GetGeneration(), 10)).
-				Sync().
-				SyncStatus().
 				Complete()
 			Expect(err).Should(Succeed())
 		})

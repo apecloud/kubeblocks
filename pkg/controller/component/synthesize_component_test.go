@@ -70,19 +70,15 @@ var _ = Describe("synthesized component", func() {
 					Name: "test-compdef",
 				},
 				Spec: appsv1.ComponentDefinitionSpec{
-					Configs: []appsv1.ComponentConfigSpec{
+					Configs: []appsv1.ComponentTemplateSpec{
 						{
-							ComponentTemplateSpec: appsv1.ComponentTemplateSpec{
-								Name:        "app",
-								TemplateRef: "app",
-								VolumeName:  "app",
-							},
+							Name:        "app",
+							TemplateRef: "app",
+							VolumeName:  "app",
 						},
 						{
-							ComponentTemplateSpec: appsv1.ComponentTemplateSpec{
-								Name:       "external",
-								VolumeName: "external",
-							},
+							Name:       "external",
+							VolumeName: "external",
 						},
 					},
 				},

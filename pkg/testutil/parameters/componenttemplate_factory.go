@@ -60,14 +60,4 @@ slow_query_log=0
 [client]
 socket=/var/run/mysqld/mysqld.sock
 host=localhost
-{{- if $.component.tlsConfig }}
-{{- $ca_file := getCAFile }}
-{{- $cert_file := getCertFile }}
-{{- $key_file := getKeyFile }}
-# tls
-require_secure_transport=ON
-ssl_ca={{ $ca_file }}
-ssl_cert={{ $cert_file }}
-ssl_key={{ $key_file }}
-{{- end }}
 `

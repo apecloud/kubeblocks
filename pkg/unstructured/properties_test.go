@@ -24,7 +24,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 )
 
 func TestPropertiesFormat(t *testing.T) {
@@ -53,7 +53,7 @@ brokerMaxConnections=0
 # The maximum number of connections per IP. If it exceeds, new connections are rejected.
 brokerMaxConnectionsPerIp=0
 `
-	propsConfigObj, err := LoadConfig("props_test", propsContext, appsv1beta1.PropertiesPlus)
+	propsConfigObj, err := LoadConfig("props_test", propsContext, parametersv1alpha1.PropertiesPlus)
 	assert.Nil(t, err)
 
 	assert.EqualValues(t, propsConfigObj.Get("brokerDeduplicationProducerInactivityTimeoutMinutes"), "360")
@@ -70,7 +70,7 @@ brokerMaxConnectionsPerIp=0
 
 	dumpContext, err := propsConfigObj.Marshal()
 	assert.Nil(t, err)
-	newObj, err := LoadConfig("props_test", dumpContext, appsv1beta1.PropertiesPlus)
+	newObj, err := LoadConfig("props_test", dumpContext, parametersv1alpha1.PropertiesPlus)
 	assert.Nil(t, err)
 	assert.EqualValues(t, newObj.GetAllParameters(), propsConfigObj.GetAllParameters())
 
@@ -84,7 +84,7 @@ brokerMaxConnectionsPerIp=0
 }
 
 func TestPropertiesEmpty(t *testing.T) {
-	propsConfigObj, err := LoadConfig("props_test", "", appsv1beta1.PropertiesPlus)
+	propsConfigObj, err := LoadConfig("props_test", "", parametersv1alpha1.PropertiesPlus)
 	assert.Nil(t, err)
 
 	v, err := propsConfigObj.Marshal()

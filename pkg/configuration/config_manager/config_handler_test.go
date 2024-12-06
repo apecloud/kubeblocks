@@ -37,7 +37,7 @@ import (
 	"github.com/fsnotify/fsnotify"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/util"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 )
@@ -67,44 +67,41 @@ var _ = Describe("Config Handler Test", func() {
 		DeferCleanup(mockK8sCli.Finish)
 	})
 
-	newConfigSpec := func() appsv1.ComponentConfigSpec {
-		return appsv1.ComponentConfigSpec{
-			ComponentTemplateSpec: appsv1.ComponentTemplateSpec{
-				Name:        "config",
-				TemplateRef: "config-template",
-				VolumeName:  "/opt/config",
-				Namespace:   "default",
-			},
-			ConfigConstraintRef: "config-constraint",
+	newConfigSpec := func() appsv1.ComponentTemplateSpec {
+		return appsv1.ComponentTemplateSpec{
+			Name:        "config",
+			TemplateRef: "config-template",
+			VolumeName:  "/opt/config",
+			Namespace:   "default",
 		}
 	}
 
-	newFormatter := func() appsv1beta1.FileFormatConfig {
-		return appsv1beta1.FileFormatConfig{
-			FormatterAction: appsv1beta1.FormatterAction{
-				IniConfig: &appsv1beta1.IniConfig{
+	newFormatter := func() parametersv1alpha1.FileFormatConfig {
+		return parametersv1alpha1.FileFormatConfig{
+			FormatterAction: parametersv1alpha1.FormatterAction{
+				IniConfig: &parametersv1alpha1.IniConfig{
 					SectionName: "test",
 				},
 			},
-			Format: appsv1beta1.Ini,
+			Format: parametersv1alpha1.Ini,
 		}
 	}
 
 	newUnixSignalConfig := func() ConfigSpecInfo {
 		return ConfigSpecInfo{
-			ReloadAction: &appsv1beta1.ReloadAction{
-				UnixSignalTrigger: &appsv1beta1.UnixSignalTrigger{
+			ReloadAction: &parametersv1alpha1.ReloadAction{
+				UnixSignalTrigger: &parametersv1alpha1.UnixSignalTrigger{
 					ProcessName: findCurrProcName(),
-					Signal:      appsv1beta1.SIGHUP,
+					Signal:      parametersv1alpha1.SIGHUP,
 				}},
-			ReloadType: appsv1beta1.UnixSignalType,
+			ReloadType: parametersv1alpha1.UnixSignalType,
 			MountPoint: "/tmp/test",
 			ConfigSpec: newConfigSpec(),
 		}
 	}
 
-	newDownwardAPIOptions := func() []appsv1beta1.DownwardAPIChangeTriggeredAction {
-		return []appsv1beta1.DownwardAPIChangeTriggeredAction{
+	newDownwardAPIOptions := func() []parametersv1alpha1.DownwardAPIChangeTriggeredAction {
+		return []parametersv1alpha1.DownwardAPIChangeTriggeredAction{
 			{
 				Name:       "labels",
 				MountPoint: filepath.Join(tmpWorkDir, "labels"),
@@ -120,12 +117,12 @@ var _ = Describe("Config Handler Test", func() {
 
 	newDownwardAPIConfig := func() ConfigSpecInfo {
 		return ConfigSpecInfo{
-			ReloadAction: &appsv1beta1.ReloadAction{
-				ShellTrigger: &appsv1beta1.ShellTrigger{
+			ReloadAction: &parametersv1alpha1.ReloadAction{
+				ShellTrigger: &parametersv1alpha1.ShellTrigger{
 					Command: []string{"sh", "-c", `echo "hello world" "$@"`},
 				},
 			},
-			ReloadType:         appsv1beta1.ShellType,
+			ReloadType:         parametersv1alpha1.ShellType,
 			MountPoint:         tmpWorkDir,
 			ConfigSpec:         newConfigSpec(),
 			FormatterConfig:    newFormatter(),
@@ -135,10 +132,10 @@ var _ = Describe("Config Handler Test", func() {
 
 	newTPLScriptsConfig := func(configPath string) ConfigSpecInfo {
 		return ConfigSpecInfo{
-			ReloadAction: &appsv1beta1.ReloadAction{
-				TPLScriptTrigger: &appsv1beta1.TPLScriptTrigger{},
+			ReloadAction: &parametersv1alpha1.ReloadAction{
+				TPLScriptTrigger: &parametersv1alpha1.TPLScriptTrigger{},
 			},
-			ReloadType:      appsv1beta1.TPLScriptType,
+			ReloadType:      parametersv1alpha1.TPLScriptType,
 			MountPoint:      "/tmp/test",
 			ConfigSpec:      newConfigSpec(),
 			FormatterConfig: newFormatter(),
@@ -167,7 +164,7 @@ var _ = Describe("Config Handler Test", func() {
 
 	Context("TestSimpleHandler", func() {
 		It("CreateSignalHandler", func() {
-			_, err := CreateSignalHandler(appsv1beta1.SIGALRM, "test", "")
+			_, err := CreateSignalHandler(parametersv1alpha1.SIGALRM, "test", "")
 			Expect(err).Should(Succeed())
 			_, err = CreateSignalHandler("NOSIGNAL", "test", "")
 			Expect(err.Error()).To(ContainSubstring("not supported unix signal: NOSIGNAL"))
@@ -179,10 +176,9 @@ var _ = Describe("Config Handler Test", func() {
 			_, err = CreateExecHandler([]string{}, "", nil, "")
 			Expect(err.Error()).To(ContainSubstring("invalid command"))
 			c, err := CreateExecHandler([]string{"go", "version"}, "", &ConfigSpecInfo{
-				ConfigSpec: appsv1.ComponentConfigSpec{
-					ComponentTemplateSpec: appsv1.ComponentTemplateSpec{
-						Name: "for_test",
-					}}},
+				ConfigSpec: appsv1.ComponentTemplateSpec{
+					Name: "for_test",
+				}},
 				"")
 			Expect(err).Should(Succeed())
 			Expect(c.VolumeHandle(context.Background(), fsnotify.Event{})).Should(Succeed())
@@ -273,11 +269,11 @@ var _ = Describe("Config Handler Test", func() {
 			})
 			It("should succeed on reload individually", func() {
 				configSpec := ConfigSpecInfo{
-					ReloadAction: &appsv1beta1.ReloadAction{
-						ShellTrigger: &appsv1beta1.ShellTrigger{
+					ReloadAction: &parametersv1alpha1.ReloadAction{
+						ShellTrigger: &parametersv1alpha1.ShellTrigger{
 							Command: []string{"sh", "-c", `echo "hello world" "$@"`, "sh"},
 						}},
-					ReloadType:      appsv1beta1.ShellType,
+					ReloadType:      parametersv1alpha1.ShellType,
 					MountPoint:      configPath,
 					ConfigSpec:      newConfigSpec(),
 					FormatterConfig: newFormatter(),
@@ -287,15 +283,15 @@ var _ = Describe("Config Handler Test", func() {
 			Describe("Test reload in a batch", func() {
 				It("should succeed on the default batch input format", func() {
 					configSpec := ConfigSpecInfo{
-						ReloadAction: &appsv1beta1.ReloadAction{
-							ShellTrigger: &appsv1beta1.ShellTrigger{
+						ReloadAction: &parametersv1alpha1.ReloadAction{
+							ShellTrigger: &parametersv1alpha1.ShellTrigger{
 								Command: []string{"sh", "-c",
 									`while IFS="=" read -r the_key the_val; do echo "key='$the_key'; val='$the_val'"; done`,
 								},
 								BatchReload:                  util.ToPointer(true),
 								BatchParamsFormatterTemplate: defaultBatchInputTemplate,
 							}},
-						ReloadType:      appsv1beta1.ShellType,
+						ReloadType:      parametersv1alpha1.ShellType,
 						MountPoint:      configPath,
 						ConfigSpec:      newConfigSpec(),
 						FormatterConfig: newFormatter(),
@@ -307,15 +303,15 @@ var _ = Describe("Config Handler Test", func() {
 {{ printf "%s:%s" $pKey $pValue }}
 {{- end }}`
 					configSpec := ConfigSpecInfo{
-						ReloadAction: &appsv1beta1.ReloadAction{
-							ShellTrigger: &appsv1beta1.ShellTrigger{
+						ReloadAction: &parametersv1alpha1.ReloadAction{
+							ShellTrigger: &parametersv1alpha1.ShellTrigger{
 								Command: []string{"sh", "-c",
 									`while IFS=":" read -r the_key the_val; do echo "key='$the_key'; val='$the_val'"; done`,
 								},
 								BatchReload:                  util.ToPointer(true),
 								BatchParamsFormatterTemplate: customBatchInputTemplate,
 							}},
-						ReloadType:      appsv1beta1.ShellType,
+						ReloadType:      parametersv1alpha1.ShellType,
 						MountPoint:      configPath,
 						ConfigSpec:      newConfigSpec(),
 						FormatterConfig: newFormatter(),

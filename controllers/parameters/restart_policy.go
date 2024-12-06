@@ -24,48 +24,50 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 )
 
-type simplePolicy struct {
-}
+var restartPolicyInstance = &restartPolicy{}
+
+type restartPolicy struct{}
 
 func init() {
-	RegisterPolicy(appsv1alpha1.NormalPolicy, &simplePolicy{})
+	registerPolicy(parametersv1alpha1.RestartPolicy, restartPolicyInstance)
 }
 
-func (s *simplePolicy) Upgrade(params reconfigureParams) (ReturnedStatus, error) {
-	params.Ctx.Log.V(1).Info("simple policy begin....")
+func (s *restartPolicy) Upgrade(rctx reconfigureContext) (ReturnedStatus, error) {
+	rctx.Log.V(1).Info("simple policy begin....")
 
-	return restartAndCheckComponent(params, GetInstanceSetRollingUpgradeFuncs(), fromWorkloadObjects(params))
+	return restartAndVerifyComponent(rctx, GetInstanceSetRollingUpgradeFuncs(), fromWorkloadObjects(rctx))
 }
 
-func (s *simplePolicy) GetPolicyName() string {
-	return string(appsv1alpha1.NormalPolicy)
+func (s *restartPolicy) GetPolicyName() string {
+	return string(parametersv1alpha1.RestartPolicy)
 }
 
-func restartAndCheckComponent(param reconfigureParams, funcs RollingUpgradeFuncs, objs []client.Object) (ReturnedStatus, error) {
+func restartAndVerifyComponent(rctx reconfigureContext, funcs RollingUpgradeFuncs, objs []client.Object) (ReturnedStatus, error) {
 	var (
-		newVersion = param.getTargetVersionHash()
-		configKey  = param.getConfigKey()
+		newVersion = rctx.getTargetVersionHash()
+		configKey  = rctx.getConfigKey()
 
 		retStatus = ESRetry
 		progress  = core.NotStarted
 	)
 
 	recordEvent := func(obj client.Object) {
-		param.Ctx.Recorder.Eventf(obj,
+		rctx.Recorder.Eventf(obj,
 			corev1.EventTypeNormal, appsv1alpha1.ReasonReconfigureRestart,
-			"restarting component[%s] in cluster[%s], version: %s", param.ClusterComponent.Name, param.Cluster.Name, newVersion)
+			"restarting component[%s] in cluster[%s], version: %s", rctx.ClusterComponent.Name, rctx.Cluster.Name, newVersion)
 	}
-	if obj, err := funcs.RestartComponent(param.Client, param.Ctx, configKey, newVersion, objs, recordEvent); err != nil {
-		param.Ctx.Recorder.Eventf(obj,
+	if obj, err := funcs.RestartComponent(rctx.Client, rctx.RequestCtx, configKey, newVersion, objs, recordEvent); err != nil {
+		rctx.Recorder.Eventf(obj,
 			corev1.EventTypeWarning, appsv1alpha1.ReasonReconfigureRestartFailed,
-			"failed to  restart component[%s] in cluster[%s], version: %s", client.ObjectKeyFromObject(obj), param.Cluster.Name, newVersion)
+			"failed to  restart component[%s] in cluster[%s], version: %s", client.ObjectKeyFromObject(obj), rctx.Cluster.Name, newVersion)
 		return makeReturnedStatus(ESFailedAndRetry), err
 	}
 
-	pods, err := funcs.GetPodsFunc(param)
+	pods, err := funcs.GetPodsFunc(rctx)
 	if err != nil {
 		return makeReturnedStatus(ESFailedAndRetry), err
 	}

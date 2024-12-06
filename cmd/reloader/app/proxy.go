@@ -95,7 +95,11 @@ func (r *reconfigureProxy) OnlineUpgradeParams(ctx context.Context, request *cfg
 	if len(params) == 0 {
 		return nil, cfgcore.MakeError("update params is empty.")
 	}
-	if err := r.updater(ctx, request.ConfigSpec, params); err != nil {
+	key := request.ConfigSpec
+	if request.ConfigFile != nil && *request.ConfigFile != "" {
+		key = key + "/" + *request.ConfigFile
+	}
+	if err := r.updater(ctx, key, params); err != nil {
 		return nil, err
 	}
 	return &cfgproto.OnlineUpgradeParamsResponse{}, nil

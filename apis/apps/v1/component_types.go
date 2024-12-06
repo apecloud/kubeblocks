@@ -289,6 +289,26 @@ type ComponentSpec struct {
 	//
 	// +optional
 	Sidecars []Sidecar `json:"sidecars,omitempty"`
+
+	// Specifies the initialization parameters.
+	//
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	// +listType=map
+	// +listMapKey=name
+	// +optional
+	InitParameters []ComponentParameter `json:"initParameters,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
+}
+
+type ComponentParameter struct {
+	// Specifies the name of the parameter that is to be updated.
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// Specifies the parameter values that are to be updated.
+	// If set to nil, the parameter defined by the Key field will be removed from the configuration file.
+	// +optional
+	Value *string `json:"value,omitempty"`
 }
 
 // ComponentStatus represents the observed state of a Component within the Cluster.

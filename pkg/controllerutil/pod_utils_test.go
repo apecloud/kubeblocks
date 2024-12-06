@@ -21,6 +21,8 @@ package controllerutil
 
 import (
 	"encoding/json"
+	"fmt"
+	"reflect"
 	"sort"
 	"strings"
 	"testing"
@@ -33,10 +35,11 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	metautil "k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -98,7 +101,6 @@ func TestGetPodRevision(t *testing.T) {
 }
 
 var _ = Describe("pod utils", func() {
-
 	var (
 		statefulSet     *appsv1.StatefulSet
 		pod             *corev1.Pod
@@ -556,28 +558,28 @@ var _ = Describe("pod utils", func() {
 		})
 
 		It("GetIntOrPercentValue Should succeed with no error", func() {
-			fn := func(v metautil.IntOrString) *metautil.IntOrString { return &v }
+			fn := func(v intstr.IntOrString) *intstr.IntOrString { return &v }
 			tests := []struct {
 				name      string
-				args      *metautil.IntOrString
+				args      *intstr.IntOrString
 				want      int
 				isPercent bool
 				wantErr   bool
 			}{{
 				name:      "test",
-				args:      fn(metautil.FromString("10")),
+				args:      fn(intstr.FromString("10")),
 				want:      0,
 				isPercent: false,
 				wantErr:   true,
 			}, {
 				name:      "test",
-				args:      fn(metautil.FromString("10%")),
+				args:      fn(intstr.FromString("10%")),
 				want:      10,
 				isPercent: true,
 				wantErr:   false,
 			}, {
 				name:      "test",
-				args:      fn(metautil.FromInt(60)),
+				args:      fn(intstr.FromInt(60)),
 				want:      60,
 				isPercent: false,
 				wantErr:   false,
@@ -591,6 +593,7 @@ var _ = Describe("pod utils", func() {
 			}
 		})
 	})
+
 	Context("test sort by pod name", func() {
 		It("Should succeed with no error", func() {
 			pods := []corev1.Pod{{
@@ -605,6 +608,62 @@ var _ = Describe("pod utils", func() {
 			sort.Sort(ByPodName(pods))
 			Expect(pods[0].Name).Should(Equal("pod-0"))
 			Expect(pods[3].Name).Should(Equal("pod-3"))
+		})
+	})
+
+	Context("ResolvePodSpecDefaultFields", func() {
+		It("test sync pod spec default values set by k8s", func() {
+			var (
+				clusterName = "cluster"
+				compName    = "component"
+				podName     = "pod"
+				role        = "leader"
+				mode        = "ReadWrite"
+			)
+			pod := testapps.MockInstanceSetPod(&testCtx, nil, clusterName, compName, podName, role, mode)
+			ppod := testapps.NewPodFactory(testCtx.DefaultNamespace, "pod").
+				AddAppInstanceLabel(clusterName).
+				AddAppComponentLabel(compName).
+				AddAppManagedByLabel().
+				AddRoleLabel(role).
+				AddAccessModeLabel(mode).
+				AddControllerRevisionHashLabel("").
+				AddVolume(corev1.Volume{
+					Name: testapps.DataVolumeName,
+					VolumeSource: corev1.VolumeSource{
+						PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+							ClaimName: fmt.Sprintf("%s-%s", testapps.DataVolumeName, podName),
+						},
+					},
+				}).
+				AddContainer(corev1.Container{
+					Name:  testapps.DefaultMySQLContainerName,
+					Image: testapps.ApeCloudMySQLImage,
+					LivenessProbe: &corev1.Probe{
+						ProbeHandler: corev1.ProbeHandler{
+							HTTPGet: &corev1.HTTPGetAction{
+								Path: "/hello",
+								Port: intstr.FromInt(1024),
+							},
+						},
+						TimeoutSeconds:   1,
+						PeriodSeconds:    1,
+						FailureThreshold: 1,
+					},
+					StartupProbe: &corev1.Probe{
+						ProbeHandler: corev1.ProbeHandler{
+							TCPSocket: &corev1.TCPSocketAction{
+								Port: intstr.FromInt(1024),
+							},
+						},
+					},
+					VolumeMounts: []corev1.VolumeMount{
+						{Name: testapps.DataVolumeName, MountPath: "/test"},
+					},
+				}).
+				GetObject()
+			ResolvePodSpecDefaultFields(pod.Spec, &ppod.Spec)
+			Expect(reflect.DeepEqual(pod.Spec, ppod.Spec)).Should(BeTrue())
 		})
 	})
 })

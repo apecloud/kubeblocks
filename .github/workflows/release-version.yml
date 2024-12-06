@@ -85,7 +85,7 @@ jobs:
     with:
       GITHUB_REPO: "apecloud/apecloud-addons"
       VERSION: "${{ inputs.release_version }}"
-      BRANCH_NAME: "main"
+      BRANCH_NAME: "${{ needs.release-branch.outputs.release-branch }}"
       WORKFLOW_ID: "release-version.yml"
       APECD_REF: "v0.1.38"
     secrets: inherit

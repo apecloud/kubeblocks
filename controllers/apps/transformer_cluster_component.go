@@ -27,6 +27,7 @@ import (
 	"strconv"
 	"strings"
 
+	"golang.org/x/exp/maps"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -813,8 +814,8 @@ func (h *clusterShardingHandler) updateComps(transCtx *clusterTransformContext, 
 func (h *clusterShardingHandler) protoComps(transCtx *clusterTransformContext, name string, running *appsv1.Component) ([]*appsv1.Component, error) {
 	buildAnnotations := func(shardingName, compName string) map[string]string {
 		var annotations map[string]string
-		if transCtx.annotations != nil {
-			annotations = transCtx.annotations[compName]
+		if compAnnotations := transCtx.annotations[compName]; len(compAnnotations) > 0 {
+			annotations = maps.Clone(compAnnotations)
 		}
 
 		// covert the sharding hostNetwork annotation to the component annotation

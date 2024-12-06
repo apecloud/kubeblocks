@@ -801,11 +801,8 @@ func resolveTLSEnabledRef(ctx context.Context, cli client.Reader, synthesizedCom
 	defineKey string, selector appsv1.TLSVarSelector) ([]*corev1.EnvVar, []*corev1.EnvVar, error) {
 	resolveEnabled := func(obj any) (*corev1.EnvVar, *corev1.EnvVar, error) {
 		comp := obj.(*appsv1.Component)
-		if comp.Spec.TLSConfig == nil {
-			return nil, nil, nil
-		}
 		enabled := "false"
-		if comp.Spec.TLSConfig.Enable {
+		if comp.Spec.TLSConfig != nil && comp.Spec.TLSConfig.Enable {
 			enabled = "true"
 		}
 		return &corev1.EnvVar{Name: defineKey, Value: enabled}, nil, nil

@@ -49,8 +49,8 @@ func ReconcileCompPreTerminate(reqCtx intctrlutil.RequestCtx,
 	comp *appsv1alpha1.Component,
 	dag *graph.DAG) error {
 	ctx := reqCtx.Ctx
-	if comp == nil || len(comp.Spec.CompDef) == 0 {
-		reqCtx.Log.Info("comp is nil or compDef is empty, skip reconciling component preTerminate")
+	if comp == nil || len(comp.Spec.CompDef) == 0 || comp.Status.Phase == appsv1alpha1.StoppedClusterCompPhase {
+		reqCtx.Log.Info("comp is nil or compDef is empty or comp phase is stopped, skip reconciling component preTerminate")
 		return nil
 	}
 	compKey := types.NamespacedName{

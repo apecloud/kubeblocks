@@ -548,21 +548,6 @@ The termination policy determines how a cluster is deleted.
 
 To check the termination policy, execute the following command.
 
-<Tabs>
-
-<TabItem value="kbcli" label="kbcli" default>
-
-```bash
-kbcli cluster list mycluster -n demo
->
-NAME        NAMESPACE   CLUSTER-DEFINITION     VERSION         TERMINATION-POLICY   STATUS    CREATED-TIME
-mycluster   demo                                               Delete               Running   Sep 30,2024 13:03 UTC+0800 
-```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
-
 ```bash
 kubectl get cluster mycluster -n demo
 >
@@ -570,25 +555,9 @@ NAME        CLUSTER-DEFINITION    VERSION        TERMINATION-POLICY     STATUS  
 mycluster                                        Delete                 Running   55m
 ```
 
-</TabItem>
-
-</Tabs>
-
 ### Steps
 
 Run the command below to delete a specified cluster.
-
-<Tabs>
-
-<TabItem value="kbcli" label="kbcli" default>
-
-```bash
-kbcli cluster delete mycluster -n demo
-```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
 
 If you want to delete a cluster and its all related resources, you can modify the termination policy to `WipeOut`, then delete the cluster.
 
@@ -597,14 +566,3 @@ kubectl patch -n demo cluster mycluster -p '{"spec":{"terminationPolicy":"WipeOu
 
 kubectl delete -n demo cluster mycluster
 ```
-
-</TabItem>
-
-</Tabs>
-
-## Monitor
-
-The monitoring function of RabbitMQ is the same as other engines. For details, refer to related docs:
-
-- [Monitor databases by kbcli](./../observability/monitor-database.md)
-- [Monitor databases by kubectl](./../../api_docs/observability/monitor-database.md)

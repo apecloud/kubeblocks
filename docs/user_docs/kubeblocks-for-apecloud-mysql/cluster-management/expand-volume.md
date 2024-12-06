@@ -99,6 +99,12 @@ mycluster   demo        apecloud-mysql       ac-mysql-8.0.30   Delete           
 
    `spec.componentSpecs.volumeClaimTemplates.spec.resources` is the storage resource information of the pod and changing this value triggers the volume expansion of a cluster.
 
+   ```bash
+   kubectl edit cluster mycluster -n demo
+   ```
+
+   Edit the value of `spec.componentSpecs.volumeClaimTemplates.spec.resources`.
+
    ```yaml
    apiVersion: apps.kubeblocks.io/v1alpha1
    kind: Cluster

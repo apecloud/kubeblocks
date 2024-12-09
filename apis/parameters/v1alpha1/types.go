@@ -165,7 +165,7 @@ type ParametersInFile struct {
 
 // ReloadPolicy defines the policy of reconfiguring.
 // +enum
-// +kubebuilder:validation:Enum={none,restart,rolling,asyncReload,syncUpdate,dynamicReloadBeginRestart}
+// +kubebuilder:validation:Enum={none,restart,rolling,asyncReload,syncReload,dynamicReloadBeginRestart}
 type ReloadPolicy string
 
 const (
@@ -173,7 +173,7 @@ const (
 	RestartPolicy                 ReloadPolicy = "restart"
 	RollingPolicy                 ReloadPolicy = "rolling"
 	AsyncDynamicReloadPolicy      ReloadPolicy = "asyncReload"
-	SyncDynamicReloadPolicy       ReloadPolicy = "syncUpdate"
+	SyncDynamicReloadPolicy       ReloadPolicy = "syncReload"
 	DynamicReloadAndRestartPolicy ReloadPolicy = "dynamicReloadBeginRestart"
 )
 

@@ -121,7 +121,7 @@ func validateParametersConfigs(configs []parametersv1alpha1.ComponentConfigDescr
 			return config.TemplateName == spec.Name
 		}
 		if len(generics.FindFunc(templates, match)) == 0 {
-			return fmt.Errorf("")
+			return fmt.Errorf("config template[%s] not found in component definition", config.TemplateName)
 		}
 	}
 	return nil

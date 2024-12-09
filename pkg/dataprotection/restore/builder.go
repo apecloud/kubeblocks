@@ -253,11 +253,22 @@ func (r *restoreJobBuilder) addTargetPodAndCredentialEnv(pod *corev1.Pod,
 		env = pod.Spec.Containers[0].Env
 		r.envFrom = pod.Spec.Containers[0].EnvFrom
 	}
-	env = append(env, corev1.EnvVar{Name: dptypes.DPDBHost, Value: intctrlutil.BuildPodHostDNS(pod)})
-	if connectionCredential == nil {
-		if portEnv, err := utils.GetDPDBPortEnv(pod, target.ContainerPort); err == nil {
+	addDBHostEnv := func() {
+		env = append(env, corev1.EnvVar{Name: dptypes.DPDBHost, Value: intctrlutil.BuildPodHostDNS(pod)})
+	}
+	addDBPortEnv := func() {
+		portEnv, err := utils.GetDPDBPortEnv(pod, target.ContainerPort)
+		if err != nil {
+			// fallback to use the first port of the pod
+			portEnv, _ = utils.GetDPDBPortEnv(pod, nil)
+		}
+		if portEnv != nil {
 			env = append(env, *portEnv)
 		}
+	}
+	if connectionCredential == nil {
+		addDBHostEnv()
+		addDBPortEnv()
 	} else {
 		appendEnvFromSecret := func(envName, keyName string) {
 			if keyName == "" {
@@ -277,11 +288,12 @@ func (r *restoreJobBuilder) addTargetPodAndCredentialEnv(pod *corev1.Pod,
 		if connectionCredential.PortKey != "" {
 			appendEnvFromSecret(dptypes.DPDBPort, connectionCredential.PortKey)
 		} else {
-			portEnv, _ := utils.GetDPDBPortEnv(pod, nil)
-			env = append(env, *portEnv)
+			addDBPortEnv()
 		}
 		if connectionCredential.HostKey != "" {
 			appendEnvFromSecret(dptypes.DPDBHost, connectionCredential.HostKey)
+		} else {
+			addDBHostEnv()
 		}
 	}
 	r.env = utils.MergeEnv(r.env, env)

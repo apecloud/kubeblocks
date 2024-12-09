@@ -329,5 +329,5 @@ const EmptyInsTemplateName = ""
 // DualOperatorsMode indicates whether the operator runs in dual-operators mode.
 // If it's true, the operator will degrade to a secondary operator and only manage the resources dedicated to releases prior to v1.0.
 const (
-	DualOperatorsMode = "dual-operators-mode"
+	DualOperatorsMode = "DUAL_OPERATORS_MODE"
 )

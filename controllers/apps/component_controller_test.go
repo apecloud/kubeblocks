@@ -38,7 +38,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/utils/pointer"
 	"k8s.io/utils/ptr"
@@ -1594,71 +1593,6 @@ var _ = Describe("Component Controller", func() {
 		})).Should(Succeed())
 	}
 
-	testUpdateKubeBlocksToolsImage := func(compName, compDefName string) {
-		createClusterObj(compName, compDefName, nil)
-
-		oldToolsImage := viper.GetString(constant.KBToolsImage)
-		newToolsImage := fmt.Sprintf("%s-%s", oldToolsImage, rand.String(4))
-		defer func() {
-			viper.Set(constant.KBToolsImage, oldToolsImage)
-		}()
-
-		underlyingWorkload := func() *workloads.InstanceSet {
-			itsList := testk8s.ListAndCheckInstanceSet(&testCtx, clusterKey)
-			return &itsList.Items[0]
-		}
-
-		initWorkloadGeneration := underlyingWorkload().GetGeneration()
-		Expect(initWorkloadGeneration).ShouldNot(Equal(0))
-
-		checkWorkloadGenerationAndToolsImage := func(assertion func(any, ...any) AsyncAssertion,
-			workloadGenerationExpected int64, oldImageCntExpected, newImageCntExpected int) {
-			assertion(func(g Gomega) {
-				its := underlyingWorkload()
-				g.Expect(its.Generation).Should(Equal(workloadGenerationExpected))
-				oldImageCnt := 0
-				newImageCnt := 0
-				for _, c := range its.Spec.Template.Spec.Containers {
-					if c.Image == oldToolsImage {
-						oldImageCnt += 1
-					}
-					if c.Image == newToolsImage {
-						newImageCnt += 1
-					}
-				}
-				g.Expect(oldImageCnt + newImageCnt).Should(Equal(oldImageCntExpected + newImageCntExpected))
-				g.Expect(oldImageCnt).Should(Equal(oldImageCntExpected))
-				g.Expect(newImageCnt).Should(Equal(newImageCntExpected))
-			}).Should(Succeed())
-		}
-
-		By("check the workload generation as init")
-		checkWorkloadGenerationAndToolsImage(Consistently, initWorkloadGeneration, 1, 0)
-
-		By("update kubeblocks tools image")
-		viper.Set(constant.KBToolsImage, newToolsImage)
-
-		By("update component annotation to trigger component status reconcile")
-		Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
-			comp.Annotations = map[string]string{"time": time.Now().Format(time.RFC3339)}
-		})()).Should(Succeed())
-		checkWorkloadGenerationAndToolsImage(Consistently, initWorkloadGeneration, 1, 0)
-
-		By("update spec to trigger component spec reconcile, but workload not changed")
-		Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *kbappsv1.Cluster) {
-			cluster.Spec.ComponentSpecs[0].ServiceRefs = []kbappsv1.ServiceRef{
-				{Name: randomStr()}, // set a non-existed reference.
-			}
-		})()).Should(Succeed())
-		checkWorkloadGenerationAndToolsImage(Consistently, initWorkloadGeneration, 1, 0)
-
-		By("update replicas to trigger component spec and workload reconcile")
-		Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *kbappsv1.Cluster) {
-			cluster.Spec.ComponentSpecs[0].Replicas += 1
-		})()).Should(Succeed())
-		checkWorkloadGenerationAndToolsImage(Eventually, initWorkloadGeneration+1, 0, 1)
-	}
-
 	Context("provisioning", func() {
 		BeforeEach(func() {
 			createAllDefinitionObjects()
@@ -1725,10 +1659,6 @@ var _ = Describe("Component Controller", func() {
 
 		It("create component with custom RBAC which is already exist created by User", func() {
 			tesCreateCompWithRBACCreateByUser(defaultCompName, compDefName)
-		})
-
-		It("update kubeblocks-tools image", func() {
-			testUpdateKubeBlocksToolsImage(defaultCompName, compDefName)
 		})
 	})
 

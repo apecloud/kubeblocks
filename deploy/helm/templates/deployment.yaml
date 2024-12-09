@@ -102,7 +102,7 @@ spec:
             {{- end }}
             {{- if .Values.dualOperatorsMode }}
             - name: DUAL_OPERATORS_MODE
-              value: {{ .Values.dualOperatorsMode }}
+              value: {{ .Values.dualOperatorsMode  | quote  }}
             {{- end }}
             {{- if .Values.reconcileWorkers }}
             - name: KUBEBLOCKS_RECONCILE_WORKERS

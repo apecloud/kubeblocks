@@ -85,15 +85,16 @@ spec:
             {{- if .Values.userAgent }}
             - "--user-agent={{ .Values.userAgent }}"
             {{- end }}
-            {{- if .Values.dualOperatorsMode }}
-            - "--dual-operators-mode={{ .Values.dualOperatorsMode }}"
-            {{- end }}
           env:
             - name: CM_NAMESPACE
               value: {{ .Release.Namespace }}
             {{- with .Values.dataProtection.affinity }}
             - name: CM_AFFINITY
               value: {{ toJson . | quote }}
+            {{- end }}
+            {{- if .Values.dualOperatorsMode }}
+            - name: DUAL_OPERATORS_MODE
+              value: {{ .Values.dualOperatorsMode  | quote  }}
             {{- end }}
             {{- with .Values.nodeSelector }}
             - name: CM_NODE_SELECTOR

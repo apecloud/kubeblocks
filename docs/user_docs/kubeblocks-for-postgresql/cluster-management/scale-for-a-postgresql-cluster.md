@@ -381,7 +381,7 @@ mycluster   demo        postgresql           postgresql-14.8.0   Delete         
          kbcli cluster describe-ops mycluster-horizontalscaling-ffp9p -n demo
          ```
 
-    - View the cluster satus.
+    - View the cluster status.
 
          ```bash
          kbcli cluster list mycluster -n demo

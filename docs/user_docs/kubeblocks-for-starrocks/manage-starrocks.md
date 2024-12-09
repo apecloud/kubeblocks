@@ -506,7 +506,7 @@ mycluster   demo        starrocks            starrocks-3.1.1   Delete           
        kbcli cluster describe-ops mycluster-horizontalscaling-ffp9p -n demo
        ```
 
-    - View the cluster satus.
+    - View the cluster status.
 
        ```bash
        kbcli cluster list mycluster -n demo

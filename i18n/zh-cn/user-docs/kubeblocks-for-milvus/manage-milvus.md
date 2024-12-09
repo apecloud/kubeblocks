@@ -589,7 +589,7 @@ mycluster   demo        milvus-2.3.2                           Delete           
 
 1. 修改 YAML 文件中 `spec.componentSpecs.volumeClaimTemplates.spec.resources` 的配置。`spec.componentSpecs.volumeClaimTemplates.spec.resources` 控制资源的请求值和限制值，修改参数值将触发垂直扩缩容。
 
-   ```bahs
+   ```bash
    kubectl edit cluster mycluster -n demo
    ```
 

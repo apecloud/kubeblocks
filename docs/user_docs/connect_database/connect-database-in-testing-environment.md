@@ -140,7 +140,7 @@ Information printed includes database addresses, port No., username, password. T
 - Address: -h specifies the server address. In the example below it is 127.0.0.1
 - Port: -P specifies port No. , In the example below it is 3306.
 - User: -u is the user name.
-- Password: -p shows the password. In the example below, it is hQBCKZLI.
+- Password: -p shows the password. In the example below, it is `hQBCKZLI`.
 
 :::note
 

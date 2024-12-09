@@ -319,7 +319,7 @@ From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out insta
      kbcli cluster describe-ops mycluster-horizontalscaling-xpdwz -n demo
      ```
 
-   - View the cluster satus.
+   - View the cluster status.
 
      ```bash
      kbcli cluster list mycluster -n demo

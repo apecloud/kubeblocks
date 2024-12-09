@@ -342,7 +342,7 @@ mycluster   demo        apecloud-mysql       ac-mysql-8.0.30   Delete           
      kbcli cluster describe-ops mycluster-horizontalscaling-ffp9p -n demo
      ```
 
-   - View the cluster satus.
+   - View the cluster status.
 
      ```bash
      kbcli cluster list mycluster -n demo

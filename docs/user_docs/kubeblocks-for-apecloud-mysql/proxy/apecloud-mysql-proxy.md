@@ -165,7 +165,7 @@ helm install myproxy kubeblocks/apecloud-mysql-cluster --version=v0.9.0 --set mo
        kbcli addon search etcd
 
        # 3. Install the etcd Addon
-       kbcli addon install etcd --index kubeblocks --version 0.9.0
+       kbcli addon install etcd --index kubeblocks --version 0.9.2
 
        # 4. Enable the etcd Addon
        kbcli addon enable etcd

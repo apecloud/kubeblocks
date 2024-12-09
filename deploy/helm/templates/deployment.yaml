@@ -101,7 +101,7 @@ spec:
               value: {{ toJson . | quote }}
             {{- end }}
             {{- if .Values.dualOperatorsMode }}
-            - name: dual-operators-mode
+            - name: DUAL_OPERATORS_MODE
               value: {{ .Values.dualOperatorsMode }}
             {{- end }}
             {{- if .Values.reconcileWorkers }}

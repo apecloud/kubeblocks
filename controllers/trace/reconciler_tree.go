@@ -46,8 +46,8 @@ import (
 	tracev1 "github.com/apecloud/kubeblocks/apis/trace/v1"
 	workloadsAPI "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/controllers/apps"
-	"github.com/apecloud/kubeblocks/controllers/apps/configuration"
 	"github.com/apecloud/kubeblocks/controllers/dataprotection"
+	"github.com/apecloud/kubeblocks/controllers/parameters"
 	"github.com/apecloud/kubeblocks/controllers/workloads"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
@@ -178,7 +178,7 @@ func newComponentReconciler(cli client.Client, recorder record.EventRecorder) re
 }
 
 func newConfigurationReconciler(cli client.Client, recorder record.EventRecorder) reconcile.Reconciler {
-	return &configuration.ConfigurationReconciler{
+	return &parameters.ConfigurationReconciler{
 		Client:   cli,
 		Scheme:   cli.Scheme(),
 		Recorder: recorder,

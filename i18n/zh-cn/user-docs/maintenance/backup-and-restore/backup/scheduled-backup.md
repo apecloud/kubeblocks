@@ -37,7 +37,11 @@ kbcli cluster update mysql-cluster --backup-enabled=true \
 
 ```bash
 kubectl edit cluster -n default mycluster
->
+```
+
+修改 backup 相关字段的参数值。
+
+```yaml
 spec:
   ...
   backup:

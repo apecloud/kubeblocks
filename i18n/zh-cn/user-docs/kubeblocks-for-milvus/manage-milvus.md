@@ -589,13 +589,14 @@ mycluster   demo        milvus-2.3.2                           Delete           
 
 1. 修改 YAML 文件中 `spec.componentSpecs.volumeClaimTemplates.spec.resources` 的配置。`spec.componentSpecs.volumeClaimTemplates.spec.resources` 控制资源的请求值和限制值，修改参数值将触发垂直扩缩容。
 
-   ```yaml
+   ```bash
    kubectl edit cluster mycluster -n demo
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: Cluster
-   metadata:
-     name: mycluster
-     namespace: demo
+   ```
+
+   在编辑器中修改 `spec.componentSpecs.volumeClaimTemplates.spec.resources` 的参数值。
+
+   ```yaml
+   ...
    spec:
      clusterDefinitionRef: milvus
      clusterVersionRef: milvus-2.3.2
@@ -611,7 +612,7 @@ mycluster   demo        milvus-2.3.2                           Delete           
            resources:
              requests:
                storage: 40Gi # 修改磁盘容量
-     terminationPolicy: Delete
+   ...
    ```
 
 2. 当集群状态再次回到 `Running` 后，查看相应资源是否变更。
@@ -764,14 +765,14 @@ mycluster   demo        milvus-2.3.2                           Delete           
 
     <TabItem value="编辑集群 YAML 文件" label="编辑集群 YAML 文件">
 
+    ```bash
+    kubectl edit cluster mycluster -n demo
+    ```
+
     将 replicas 设为 0，删除 Pods。
 
     ```yaml
-    apiVersion: apps.kubeblocks.io/v1alpha1
-    kind: Cluster
-    metadata:
-      name: mycluster
-      namespace: demo
+    ...
     spec:
       clusterDefinitionRef: milvus
       clusterVersionRef: milvus-2.3.2
@@ -781,7 +782,7 @@ mycluster   demo        milvus-2.3.2                           Delete           
         componentDefRef: milvus
         disableExporter: true  
         replicas: 0 # 修改该参数值
-    ......
+    ...
     ```
 
     </TabItem>
@@ -843,14 +844,14 @@ mycluster   demo        milvus-2.3.2                           Delete           
 
     <TabItem value="编辑集群 YAML 文件" label="编辑集群 YAML 文件">
 
+    ```bash
+    kubectl edit cluster mycluster -n demo
+    ```
+
     将 replicas 数值改为停止集群前的数值，再次启动集群。
 
     ```yaml
-    apiVersion: apps.kubeblocks.io/v1alpha1
-    kind: Cluster
-    metadata:
-      name: mycluster
-      namespace: demo
+    ...
     spec:
       clusterDefinitionRef: milvus
       clusterVersionRef: milvus-2.3.2
@@ -860,7 +861,7 @@ mycluster   demo        milvus-2.3.2                           Delete           
         componentDefRef: milvus
         disableExporter: true  
         replicas: 1 # 修改该参数值
-    ......
+    ...
     ```
 
     </TabItem>

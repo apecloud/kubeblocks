@@ -85,7 +85,7 @@ mycluster   demo        kafka                kafka-3.3.2   Delete               
    ```bash
    kubectl describe cluster mycluster -n demo
    >
-   ......
+   ...
    Volume Claim Templates:
      Name:  data
      Spec:
@@ -132,7 +132,7 @@ mycluster   demo        kafka                kafka-3.3.2   Delete               
    ```bash
    kubectl describe cluster mycluster -n demo
    >
-   ......
+   ...
    Volume Claim Templates:
      Name:  data
      Spec:

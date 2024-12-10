@@ -34,29 +34,7 @@ You can switch over a secondary of a MongoDB ReplicaSet to the primary role, and
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-* Switchover with no primary instance specified
-
-    ```bash
-    kbcli cluster promote mycluster -n demo
-    ```
-
-* Switchover with a specified new primary instance
-
-    ```bash
-    kbcli cluster promote mycluster --instance='mycluster-mongodb-2' -n demo
-    ```
-
-* If there are multiple components, you can use `--components` to specify a component.
-
-    ```bash
-    kbcli cluster promote mycluster --instance='mycluster-mongodb-2' --components='mongodb' -n demo
-    ```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 The value of `instanceName` decides whether a new primary instance is specified for the switchover.
 
@@ -98,6 +76,28 @@ The value of `instanceName` decides whether a new primary instance is specified 
 
 </TabItem>
 
+<TabItem value="kbcli" label="kbcli">
+
+* Switchover with no primary instance specified
+
+    ```bash
+    kbcli cluster promote mycluster -n demo
+    ```
+
+* Switchover with a specified new primary instance
+
+    ```bash
+    kbcli cluster promote mycluster --instance='mycluster-mongodb-2' -n demo
+    ```
+
+* If there are multiple components, you can use `--components` to specify a component.
+
+    ```bash
+    kbcli cluster promote mycluster --instance='mycluster-mongodb-2' --components='mongodb' -n demo
+    ```
+
+</TabItem>
+
 </Tabs>
 
 ## Verify the switchover
@@ -106,18 +106,18 @@ Check the instance status to verify whether the switchover is performed successf
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
+<TabItem value="kubectl" label="kubectl" default>
 
 ```bash
-kbcli cluster list-instances -n demo
+kubectl get pods -n demo
 ```
 
 </TabItem>
 
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kbcli" label="kbcli">
 
 ```bash
-kubectl get pods -n demo
+kbcli cluster list-instances -n demo
 ```
 
 </TabItem>

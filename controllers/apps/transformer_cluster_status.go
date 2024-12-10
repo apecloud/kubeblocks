@@ -143,7 +143,7 @@ func composeClusterPhase(statusList []appsv1.ClusterComponentStatus) appsv1.Clus
 	}
 	for _, status := range statusList {
 		phase := status.Phase
-		if !isPhaseIn(phase, appsv1.CreatingComponentPhase) {
+		if !isPhaseIn(phase, appsv1.CreatingComponentPhase, "") {
 			isAllComponentCreating = false
 		}
 		if !isPhaseIn(phase, appsv1.RunningComponentPhase, appsv1.StoppedComponentPhase) {

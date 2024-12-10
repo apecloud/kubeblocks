@@ -15,7 +15,7 @@ The quickest way to try out KubeBlocks is to create a new Kubernetes cluster and
 
 KubeBlocks is Kubernetes-native, you can use Helm or kubectl with a YAML file to install it. You can also use kbcli, an intuitive CLI tool, to install KubeBlocks.
 
-To try out KubeBlocks on your local host, you can use the [Playground](./../../try-out-on-playground/try-kubeblocks-on-your-laptop.md) or [create a local Kubernetes test cluster first](./../prepare-a-local-k8s-cluster/prepare-a-local-k8s-cluster.md) and then follow the steps in this tutorial to install KubeBlocks.
+To try out KubeBlocks on your local host, you can use the [Playground](./../try-out-on-playground/try-kubeblocks-on-your-laptop.md) or [create a local Kubernetes test cluster first](./prepare-a-local-k8s-cluster/prepare-a-local-k8s-cluster.md) and then follow the steps in this tutorial to install KubeBlocks.
 
 :::note
 

@@ -21,18 +21,18 @@ Check whether the cluster status is `Running`. Otherwise, the following operatio
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
+<TabItem value="kubectl" label="kubectl" default>
 
 ```bash
-kbcli cluster list mycluster -n demo
+kubectl get cluster mycluster -n demo
 ```
 
 </TabItem>
 
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kbcli" label="kbcli">
 
 ```bash
-kubectl get cluster mycluster -n demo
+kbcli cluster list mycluster -n demo
 ```
 
 </TabItem>
@@ -43,54 +43,7 @@ kubectl get cluster mycluster -n demo
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-1. Configure the parameters `--components`, `--memory`, and `--cpu` and run the command.
-
-   ```bash
-   kbcli cluster vscale mycluster --cpu=3 --memory=10Gi --components=broker,bookies -n demo
-   ```
-
-   - `--components` describes the component name ready for vertical scaling.
-   - `--memory` describes the requested and limited size of the component memory.
-   - `--cpu` describes the requested and limited size of the component CPU.
-
-2. Validate the vertical scaling operation.
-
-   - View the OpsRequest progress.
-
-       KubeBlocks outputs a command automatically for you to view the OpsRequest progress. The output includes the status of this OpsRequest and Pods. When the status is `Succeed`, this OpsRequest is completed.
-
-       ```bash
-       kbcli cluster describe-ops mycluster-verticalscaling-njl6s -n demo
-       ```
-
-   - Check the cluster status.
-
-       ```bash
-       kbcli cluster list mycluster -n demo
-       ```
-
-       - STATUS=updating: it means the vertical scaling is in progress.
-       - STATUS=Running: it means the vertical scaling operation has been applied.
-       - STATUS=Abnormal: it means the vertical scaling is abnormal. The reason may be that the number of the normal instances is less than that of the total instance or the leader instance is running properly while others are abnormal.
-          > To solve the problem, you can manually check whether this error is caused by insufficient resources. Then if AutoScaling is supported by the Kubernetes cluster, the system recovers when there are enough resources. Otherwise, you can create enough resources and troubleshoot with `kubectl describe` command.
-
-    :::note
-
-    Vertical scaling does not synchronize parameters related to CPU and memory and it is required to manually call the OpsRequest of configuration to change parameters accordingly. Refer to [Configuration](./../configuration/configuration.md) for instructions.
-
-    :::
-
-3. After the OpsRequest status is `Succeed` or the cluster status is `Running` again, check whether the corresponding resources change.
-
-    ```bash
-    kbcli cluster describe mycluster -n demo
-    ```
-
-</TabItem>
-
-<TabItem value="OpsRequest" label="OpsRequest">
+<TabItem value="OpsRequest" label="OpsRequest" default>
 
 1. Apply an OpsRequest to the specified cluster. Configure the parameters according to your needs.
 
@@ -143,14 +96,18 @@ kubectl get cluster mycluster -n demo
 
 <TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
 
-1. Change the configuration of `spec.components.resources` in the YAML file. 
+1. Change the configuration of `spec.componentSpecs.resources` in the YAML file. 
 
-   `spec.components.resources` controls the requirement and limit of resources and changing them triggers a vertical scaling.
+   `spec.componentSpecs.resources` controls the requirement and limit of resources and changing them triggers a vertical scaling.
+
+   ```bash
+   kubectl edit cluster mycluster -n demo
+   ```
+
+   Edit the value of `spec.componentSpecs.resources`.
 
    ```yaml
-   kubectl edit cluster mycluster -n demo
-   >
-   ......
+   ...
    spec:
      affinity:
        podAntiAffinity: Preferred
@@ -165,7 +122,7 @@ kubectl get cluster mycluster -n demo
        disableExporter: true
        name: pulsar
        replicas: 1
-       resources:
+       resources: # Change values of resources
          limits:
            cpu: "2"
            memory: 4Gi
@@ -179,7 +136,7 @@ kubectl get cluster mycluster -n demo
    ```bash
    kubectl describe cluster mycluster -n demo
    >
-   ......
+   ...
    Component Specs:
     Component Def Ref:  pulsar
     Enabled Logs:
@@ -195,6 +152,53 @@ kubectl get cluster mycluster -n demo
         Cpu:     1
         Memory:  2Gi
    ```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+1. Configure the parameters `--components`, `--memory`, and `--cpu` and run the command.
+
+   ```bash
+   kbcli cluster vscale mycluster --cpu=3 --memory=10Gi --components=broker,bookies -n demo
+   ```
+
+   - `--components` describes the component name ready for vertical scaling.
+   - `--memory` describes the requested and limited size of the component memory.
+   - `--cpu` describes the requested and limited size of the component CPU.
+
+2. Validate the vertical scaling operation.
+
+   - View the OpsRequest progress.
+
+       KubeBlocks outputs a command automatically for you to view the OpsRequest progress. The output includes the status of this OpsRequest and Pods. When the status is `Succeed`, this OpsRequest is completed.
+
+       ```bash
+       kbcli cluster describe-ops mycluster-verticalscaling-njl6s -n demo
+       ```
+
+   - Check the cluster status.
+
+       ```bash
+       kbcli cluster list mycluster -n demo
+       ```
+
+       - STATUS=updating: it means the vertical scaling is in progress.
+       - STATUS=Running: it means the vertical scaling operation has been applied.
+       - STATUS=Abnormal: it means the vertical scaling is abnormal. The reason may be that the number of the normal instances is less than that of the total instance or the leader instance is running properly while others are abnormal.
+          > To solve the problem, you can manually check whether this error is caused by insufficient resources. Then if AutoScaling is supported by the Kubernetes cluster, the system recovers when there are enough resources. Otherwise, you can create enough resources and troubleshoot with `kubectl describe` command.
+
+    :::note
+
+    Vertical scaling does not synchronize parameters related to CPU and memory and it is required to manually call the OpsRequest of configuration to change parameters accordingly. Refer to [Configuration](./../configuration/configuration.md) for instructions.
+
+    :::
+
+3. After the OpsRequest status is `Succeed` or the cluster status is `Running` again, check whether the corresponding resources change.
+
+    ```bash
+    kbcli cluster describe mycluster -n demo
+    ```
 
 </TabItem>
 
@@ -214,18 +218,18 @@ From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out insta
 
     <Tabs>
 
-    <TabItem value="kbcli" label="kbcli" default>
+    <TabItem value="kubectl" label="kubectl" default>
 
     ```bash
-    kbcli cluster list mycluster -n demo
+    kubectl get cluster mycluster -n demo
     ```
 
     </TabItem>
 
-    <TabItem value="kubectl" label="kubectl">
+    <TabItem value="kbcli" label="kbcli">
 
     ```bash
-    kubectl get cluster mycluster -n demo
+    kbcli cluster list mycluster -n demo
     ```
 
     </TabItem>
@@ -236,46 +240,7 @@ From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out insta
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-1. Change configuration.
-
-   Configure the parameters `--components` and `--replicas`, and run the command.
-
-   ```bash
-   kbcli cluster hscale pulsar-cluster --replicas=5 --components=broker,bookies    
-   ```
-
-   - `--components` describes the component name ready for horizontal scaling.
-   - `--replicas` describes the replica amount of the specified components. Edit the amount based on your demands to scale in or out replicas.
-
-2. Validate the horizontal scaling operation.
-
-   - View the OpsRequest progress.
-
-       KubeBlocks outputs a command automatically for you to view the OpsRequest progress. The output includes the status of this OpsRequest and Pods. When the status is `Succeed`, this OpsRequest is completed.
-
-       ```bash
-       kbcli cluster describe-ops mycluster-horizontalscaling-9lfvc -n demo
-       ```
-
-   - View the cluster satus.
-
-       Check the cluster STATUS to identify the horizontal scaling status.
-
-       ```bash
-       kbcli cluster list mycluster -n demo
-       ```
-
-3. After the OpsRequest status is `Succeed` or the cluster status is `Running` again, check whether the corresponding resources change.
-
-   ```bash
-   kbcli cluster describe mycluster -n demo
-   ```
-
-</TabItem>
-
-<TabItem value="OpsRequest" label="OpsRequest">
+<TabItem value="OpsRequest" label="OpsRequest" default>
 
 1. Apply an OpsRequest to a specified cluster. Configure the parameters according to your needs.
 
@@ -344,21 +309,22 @@ From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out insta
 
    `spec.componentSpecs.replicas` stands for the pod amount and changing this value triggers a horizontal scaling of a cluster.
 
-   ```yaml
+   ```bash
    kubectl edit cluster mycluster -n demo
-   >
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: Cluster
-   metadata:
-     name: mycluster
-     namespace: demo
+   ```
+
+   Edit the value of `spec.componentSpecs.replicas`.
+
+   ```yaml
+   ...
    spec:
      clusterDefinitionRef: pulsar
      clusterVersionRef: pulsar-3.0.2
      componentSpecs:
      - name: pulsar
        componentDefRef: pulsar-proxy
-       replicas: 2 # Change the amount
+       replicas: 2 # Change this value
+   ...
    ```
 
 2. Check whether the corresponding resources change.
@@ -366,6 +332,45 @@ From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out insta
     ```bash
     kubectl describe cluster mycluster -n demo
     ```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+1. Change configuration.
+
+   Configure the parameters `--components` and `--replicas`, and run the command.
+
+   ```bash
+   kbcli cluster hscale pulsar-cluster --replicas=5 --components=broker,bookies    
+   ```
+
+   - `--components` describes the component name ready for horizontal scaling.
+   - `--replicas` describes the replica amount of the specified components. Edit the amount based on your demands to scale in or out replicas.
+
+2. Validate the horizontal scaling operation.
+
+   - View the OpsRequest progress.
+
+       KubeBlocks outputs a command automatically for you to view the OpsRequest progress. The output includes the status of this OpsRequest and Pods. When the status is `Succeed`, this OpsRequest is completed.
+
+       ```bash
+       kbcli cluster describe-ops mycluster-horizontalscaling-9lfvc -n demo
+       ```
+
+   - View the cluster status.
+
+       Check the cluster STATUS to identify the horizontal scaling status.
+
+       ```bash
+       kbcli cluster list mycluster -n demo
+       ```
+
+3. After the OpsRequest status is `Succeed` or the cluster status is `Running` again, check whether the corresponding resources change.
+
+   ```bash
+   kbcli cluster describe mycluster -n demo
+   ```
 
 </TabItem>
 

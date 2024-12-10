@@ -60,11 +60,11 @@ KubeBlocks 以插件（Addon）形式集成了许多开源监控组件，如 Pro
    apiVersion: apps.kubeblocks.io/v1alpha1
    kind: Cluster
    metadata:
-   ......
+   ...
    spec:
-     ......
+     ...
      componentSpecs:
-     ......
+     ...
        disableExporter: false
    ```
 
@@ -130,7 +130,7 @@ KubeBlocks 以插件（Addon）形式集成了许多开源监控组件，如 Pro
    helm list -A
    >
    NAME         NAMESPACE   REVISION    UPDATED                                 STATUS      CHART                APP VERSION
-   ......
+   ...
    prometheus   kb-system   1           2024-05-31 12:01:52.872584 +0800 CST    deployed    prometheus-15.16.1   2.39.1 
    ```
 
@@ -148,7 +148,12 @@ kubectl patch cluster mycluster -n demo --type "json" -p '[{"op":"add","path":"/
 
 ```bash
 kubectl edit cluster mycluster -n demo
-......
+```
+
+在编辑器中修改 `disableExporter` 的参数值。
+
+```yaml
+...
 componentSpecs:
   - name: mysql
     componentDefRef: mysql
@@ -157,6 +162,7 @@ componentSpecs:
     - general
     - slow
     disableExporter: false # 修改该参数值
+...
 ```
 
 （可选）如果您想要在使用后关闭监控功能，可执行以下命令停用该功能。
@@ -222,11 +228,11 @@ kubectl get cluster mycluster -o yaml
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-......
+...
 spec:
-   ......
+   ...
    componentSpecs:
-   ......
+   ...
       disableExporter: false
 ```
 
@@ -252,7 +258,12 @@ kubectl patch cluster mycluster -n demo --type "json" -p '[{"op":"add","path":"/
 
 ```bash
 kubectl edit cluster mycluster -n demo
-......
+```
+
+在编辑器中修改 `disableExporter` 的参数值。
+
+```yaml
+...
 componentSpecs:
   - name: mysql
     componentDefRef: mysql
@@ -261,6 +272,7 @@ componentSpecs:
     - general
     - slow
     disableExporter: false # 修改该参数值
+...
 ```
 
 （可选）如果您想要在使用后关闭监控功能，可执行以下命令停用该功能。

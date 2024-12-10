@@ -30,46 +30,7 @@ KubeBlocks supports the management of Elasticsearch. This tutorial illustrates h
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-***Steps***
-
-1. Execute the following command to create an Elasticsearch cluster.
-
-   ```bash
-   kbcli cluster create elasticsearch mycluster -n demo
-   ```
-
-:::note
-
-If you want to customize your cluster specifications, kbcli provides various options, such as setting cluster version, termination policy, CPU, and memory. You can view these options by adding `--help` or `-h` flag.
-  
-```bash
-kbcli cluster create elasticsearch --help
-
-kbcli cluster create elasticsearch -h
-```
-
-:::
-
-2. Check whether the cluster is created.
-
-   ```bash
-   kbcli cluster list
-   >
-   NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION   TERMINATION-POLICY   STATUS     CREATED-TIME
-   mycluster   demo                                       Delete               Creating   Sep 27,2024 11:42 UTC+0800  
-   ```
-
-3. Check the cluster details.
-
-   ```bash
-   kbcli cluster describe elasticsearch -n demo
-   ```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 KubeBlocks implements a `Cluster` CRD to define a cluster. Here is an example of creating an Elasticsearch cluster.
 
@@ -147,6 +108,45 @@ kubectl get cluster mycluster -n demo -o yaml
 
 </TabItem>
 
+<TabItem value="kbcli" label="kbcli">
+
+***Steps***
+
+1. Execute the following command to create an Elasticsearch cluster.
+
+   ```bash
+   kbcli cluster create elasticsearch mycluster -n demo
+   ```
+
+:::note
+
+If you want to customize your cluster specifications, kbcli provides various options, such as setting cluster version, termination policy, CPU, and memory. You can view these options by adding `--help` or `-h` flag.
+  
+```bash
+kbcli cluster create elasticsearch --help
+
+kbcli cluster create elasticsearch -h
+```
+
+:::
+
+2. Check whether the cluster is created.
+
+   ```bash
+   kbcli cluster list
+   >
+   NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION   TERMINATION-POLICY   STATUS     CREATED-TIME
+   mycluster   demo                                       Delete               Creating   Sep 27,2024 11:42 UTC+0800  
+   ```
+
+3. Check the cluster details.
+
+   ```bash
+   kbcli cluster describe elasticsearch -n demo
+   ```
+
+</TabItem>
+
 </Tabs>
 
 ## Connect to the Elasticsearch cluster
@@ -171,24 +171,24 @@ Check whether the cluster status is `Running`. Otherwise, the following operatio
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-```bash
-kbcli cluster list mycluster -n demo
->
-NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    CREATED-TIME
-mycluster   demo                                               Delete               Running   Sep 27,2024 11:42 UTC+0800
-```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 ```bash
 kubectl get cluster mycluster -n demo
 >
 NAME        CLUSTER-DEFINITION   VERSION                  TERMINATION-POLICY   STATUS    AGE
 mycluster                                                 Delete               Running   4m29s
+```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+```bash
+kbcli cluster list mycluster -n demo
+>
+NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    CREATED-TIME
+mycluster   demo                                               Delete               Running   Sep 27,2024 11:42 UTC+0800
 ```
 
 </TabItem>
@@ -202,51 +202,8 @@ Horizontal scaling changes the amount of pods. For example, you can scale out re
 From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out instances, refer to the [Horizontal Scale tutorial](./../maintenance/scale/horizontal-scale.md) for more details and examples.
 
 <Tabs>
-
-<TabItem value="kbcli" label="kbcli" default>
-
-1. Set the `--replicas` value according to your needs and perform the horizontal scaling.
-
-    ```bash
-    kbcli cluster hscale mycluster --replicas=2 --components=elasticsearch -n demo
-    ```
-
-    - `--components` describes the component name ready for horizontal scaling.
-    - `--replicas` describes the replica amount of the specified components. Edit the amount based on your demands to scale in or out replicas.
-
-    Please wait a few seconds until the scaling process is over.
-
-2. Validate the horizontal scaling operation.
-
-   - View the OpsRequest progress.
-
-     KubeBlocks outputs a command automatically for you to view the OpsRequest progress. The output includes the status of this OpsRequest and Pods. When the status is `Succeed`, this OpsRequest is completed.
-
-     ```bash
-     kbcli cluster describe-ops mycluster-horizontalscaling-xpdwz -n demo
-     ```
-
-   - View the cluster satus.
-
-     ```bash
-     kbcli cluster list mycluster -n demo
-     >
-     NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS     CREATED-TIME
-     mycluster   demo                                               Delete               Updating   Sep 27,2024 10:01 UTC+0800
-     ```
-
-     - STATUS=Updating: it means horizontal scaling is in progress.
-     - STATUS=Running: it means horizontal scaling has been applied.
-
-3. After the OpsRequest status is `Succeed` or the cluster status is `Running` again, check whether the corresponding resources change.
-
-    ```bash
-    kbcli cluster describe mycluster -n demo
-    ```
-
-</TabItem>
   
-<TabItem value="OpsRequest" label="OpsRequest">
+<TabItem value="OpsRequest" label="OpsRequest" default>
 
 1. Apply an OpsRequest to a specified cluster. Configure the parameters according to your needs.
 
@@ -315,28 +272,20 @@ From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out insta
 
 1. Change the configuration of `spec.componentSpecs.replicas` in the YAML file. `spec.componentSpecs.replicas` stands for the pod amount and changing this value triggers a horizontal scaling of a cluster.
 
-   ```yaml
+   ```bash
    kubectl edit cluster mycluster -n demo
-   >
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: Cluster
-   metadata:
-     name: mycluster
-     namespace: demo
+   ```
+
+   Edit the value of `spec.componentSpecs.replicas`.
+
+   ```yaml
+   ...
    spec:
      componentSpecs:
      - name: mdit
        componentDefRef: elasticsearch
-       replicas: 1 # Change the amount
-       volumeClaimTemplates:
-       - name: data
-         spec:
-           accessModes:
-             - ReadWriteOnce
-           resources:
-             requests:
-               storage: 1Gi
-    terminationPolicy: Delete
+       replicas: 1 # Change this value
+   ...
    ```
 
 2. Check whether the corresponding resources change.
@@ -347,33 +296,30 @@ From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out insta
 
 </TabItem>
 
-</Tabs>
+<TabItem value="kbcli" label="kbcli">
 
-### Scale vertically
-
-<Tabs>
-
-<TabItem value="kbcli" label="kbcli" default>
-
-1. Set the `--cpu` and `--memory` values according to your needs and run the following command to perform vertical scaling.
+1. Set the `--replicas` value according to your needs and perform the horizontal scaling.
 
     ```bash
-    kbcli cluster vscale mycluster --cpu=2 --memory=3Gi --components=elasticsearch -n demo
+    kbcli cluster hscale mycluster --replicas=2 --components=elasticsearch -n demo
     ```
+
+    - `--components` describes the component name ready for horizontal scaling.
+    - `--replicas` describes the replica amount of the specified components. Edit the amount based on your demands to scale in or out replicas.
 
     Please wait a few seconds until the scaling process is over.
 
-2. Validate the vertical scaling operation.
+2. Validate the horizontal scaling operation.
 
    - View the OpsRequest progress.
 
      KubeBlocks outputs a command automatically for you to view the OpsRequest progress. The output includes the status of this OpsRequest and Pods. When the status is `Succeed`, this OpsRequest is completed.
 
      ```bash
-     kbcli cluster describe-ops mycluster-verticalscaling-rpw2l -n demo
+     kbcli cluster describe-ops mycluster-horizontalscaling-xpdwz -n demo
      ```
 
-   - Check the cluster status.
+   - View the cluster status.
 
      ```bash
      kbcli cluster list mycluster -n demo
@@ -382,11 +328,8 @@ From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out insta
      mycluster   demo                                               Delete               Updating   Sep 27,2024 10:01 UTC+0800
      ```
 
-     - STATUS=Updating: it means the vertical scaling is in progress.
-     - STATUS=Running: it means the vertical scaling operation has been applied.
-     - STATUS=Abnormal: it means the vertical scaling is abnormal. The reason may be that the number of the normal instances is less than that of the total instance or the leader instance is running properly while others are abnormal.
-
-         To solve the problem, you can manually check whether this error is caused by insufficient resources. Then if AutoScaling is supported by the Kubernetes cluster, the system recovers when there are enough resources. Otherwise, you can create enough resources and troubleshoot with `kubectl describe` command.
+     - STATUS=Updating: it means horizontal scaling is in progress.
+     - STATUS=Running: it means horizontal scaling has been applied.
 
 3. After the OpsRequest status is `Succeed` or the cluster status is `Running` again, check whether the corresponding resources change.
 
@@ -395,8 +338,14 @@ From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out insta
     ```
 
 </TabItem>
+
+</Tabs>
+
+### Scale vertically
+
+<Tabs>
   
-<TabItem value="OpsRequest" label="OpsRequest">
+<TabItem value="OpsRequest" label="OpsRequest" default>
 
 1. Apply an OpsRequest to a specified cluster. Configure the parameters according to your needs.
 
@@ -444,12 +393,12 @@ From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out insta
 
     ```yaml
     kubectl edit cluster mycluster -n demo
-    >
-    apiVersion: apps.kubeblocks.io/v1alpha1
-    kind: Cluster
-    metadata:
-      name: mycluster
-      namespace: demo
+    ```
+
+    Edit the value of `spec.componentSpecs.resources`.
+
+    ```yaml
+    ...
     spec:
       terminationPolicy: Delete
       affinity:
@@ -468,19 +417,63 @@ From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out insta
         serviceAccountName: null
         disableExporter: true
         replicas: 1
-        resources:
+        resources: # Change the values of resources
           limits:
             cpu: '1'
             memory: 4Gi
           requests:
             cpu: '1'
             memory: 4Gi
+    ...
     ```
 
 2. Check whether the corresponding resources change.
 
     ```bash
     kubectl describe cluster mycluster -n demo
+    ```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+1. Set the `--cpu` and `--memory` values according to your needs and run the following command to perform vertical scaling.
+
+    ```bash
+    kbcli cluster vscale mycluster --cpu=2 --memory=3Gi --components=elasticsearch -n demo
+    ```
+
+    Please wait a few seconds until the scaling process is over.
+
+2. Validate the vertical scaling operation.
+
+   - View the OpsRequest progress.
+
+     KubeBlocks outputs a command automatically for you to view the OpsRequest progress. The output includes the status of this OpsRequest and Pods. When the status is `Succeed`, this OpsRequest is completed.
+
+     ```bash
+     kbcli cluster describe-ops mycluster-verticalscaling-rpw2l -n demo
+     ```
+
+   - Check the cluster status.
+
+     ```bash
+     kbcli cluster list mycluster -n demo
+     >
+     NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS     CREATED-TIME
+     mycluster   demo                                               Delete               Updating   Sep 27,2024 10:01 UTC+0800
+     ```
+
+     - STATUS=Updating: it means the vertical scaling is in progress.
+     - STATUS=Running: it means the vertical scaling operation has been applied.
+     - STATUS=Abnormal: it means the vertical scaling is abnormal. The reason may be that the number of the normal instances is less than that of the total instance or the leader instance is running properly while others are abnormal.
+
+         To solve the problem, you can manually check whether this error is caused by insufficient resources. Then if AutoScaling is supported by the Kubernetes cluster, the system recovers when there are enough resources. Otherwise, you can create enough resources and troubleshoot with `kubectl describe` command.
+
+3. After the OpsRequest status is `Succeed` or the cluster status is `Running` again, check whether the corresponding resources change.
+
+    ```bash
+    kbcli cluster describe mycluster -n demo
     ```
 
 </TabItem>
@@ -495,18 +488,7 @@ Check whether the cluster status is `Running`. Otherwise, the following operatio
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-```bash
-kbcli cluster list mycluster -n demo
->
-NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    CREATED-TIME
-mycluster   demo                                               Delete               Running   Sep 27,2024 11:42 UTC+0800
-```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 ```bash
 kubectl get cluster mycluster -n demo
@@ -517,53 +499,24 @@ mycluster                                                 Delete               R
 
 </TabItem>
 
+<TabItem value="kbcli" label="kbcli">
+
+```bash
+kbcli cluster list mycluster -n demo
+>
+NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    CREATED-TIME
+mycluster   demo                                               Delete               Running   Sep 27,2024 11:42 UTC+0800
+```
+
+</TabItem>
+
 </Tabs>
 
 ### Steps
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-1. Set the `--storage` value according to your need and run the command to expand the volume.
-
-    ```bash
-    kbcli cluster volume-expand mycluster --storage=40Gi --components=elasticsearch -t data -n demo
-    ```
-
-    The volume expansion may take a few minutes.
-
-2. Validate the volume expansion operation.
-
-    - View the OpsRequest progress.
-
-      KubeBlocks outputs a command automatically for you to view the details of the OpsRequest progress. The output includes the status of this OpsRequest and PVC. When the status is `Succeed`, this OpsRequest is completed.
-
-      ```bash
-      kbcli cluster describe-ops mycluster-volumeexpansion-5pbd2 -n demo
-      ```
-
-    - View the cluster status.
-
-      ```bash
-      kbcli cluster list mycluster
-      >
-      NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS     CREATED-TIME
-      mycluster   demo                                               Delete               Updating   Sep 27,2024 10:01 UTC+0800
-      ```
-
-      * STATUS=Updating: it means the volume expansion is in progress.
-      * STATUS=Running: it means the volume expansion operation has been applied.
-
-3. After the OpsRequest status is `Succeed` or the cluster status is `Running` again, check whether the corresponding resources change.
-
-    ```bash
-    kbcli cluster describe mycluster -n demo
-    ```
-
-</TabItem>
-
-<TabItem value="OpsRequest" label="OpsRequest">
+<TabItem value="OpsRequest" label="OpsRequest" default>
 
 1. Change the value of storage according to your need and run the command below to expand the volume of a cluster.
 
@@ -610,13 +563,14 @@ mycluster                                                 Delete               R
 
    `spec.componentSpecs.volumeClaimTemplates.spec.resources` is the storage resource information of the pod and changing this value triggers the volume expansion of a cluster.
 
-   ```yaml
+   ```bash
    kubectl edit cluster mycluster -n demo
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: Cluster
-   metadata:
-     name: mycluster
-     namespace: demo
+   ```
+
+   Edit the values of `spec.componentSpecs.volumeClaimTemplates.spec.resources`.
+
+   ```yaml
+   ...
    spec:
      componentSpecs:
      - name: mdit
@@ -629,14 +583,54 @@ mycluster                                                 Delete               R
              - ReadWriteOnce
            resources:
              requests:
-               storage: 40Gi # Change the volume storage size.
-     terminationPolicy: Delete
+               storage: 40Gi # Change the volume storage size
+   ...
    ```
 
 2. Check whether the corresponding cluster resources change.
 
     ```bash
     kubectl describe cluster mycluster -n demo
+    ```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+1. Set the `--storage` value according to your need and run the command to expand the volume.
+
+    ```bash
+    kbcli cluster volume-expand mycluster --storage=40Gi --components=elasticsearch -t data -n demo
+    ```
+
+    The volume expansion may take a few minutes.
+
+2. Validate the volume expansion operation.
+
+    - View the OpsRequest progress.
+
+      KubeBlocks outputs a command automatically for you to view the details of the OpsRequest progress. The output includes the status of this OpsRequest and PVC. When the status is `Succeed`, this OpsRequest is completed.
+
+      ```bash
+      kbcli cluster describe-ops mycluster-volumeexpansion-5pbd2 -n demo
+      ```
+
+    - View the cluster status.
+
+      ```bash
+      kbcli cluster list mycluster
+      >
+      NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS     CREATED-TIME
+      mycluster   demo                                               Delete               Updating   Sep 27,2024 10:01 UTC+0800
+      ```
+
+      * STATUS=Updating: it means the volume expansion is in progress.
+      * STATUS=Running: it means the volume expansion operation has been applied.
+
+3. After the OpsRequest status is `Succeed` or the cluster status is `Running` again, check whether the corresponding resources change.
+
+    ```bash
+    kbcli cluster describe mycluster -n demo
     ```
 
 </TabItem>
@@ -653,15 +647,7 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
 
     <Tabs>
 
-    <TabItem value="kbcli" label="kbcli" default>
-
-    ```bash
-    kbcli cluster stop mycluster -n demo
-    ```
-
-    </TabItem>
-
-    <TabItem value="OpsRequest" label="OpsRequest">
+    <TabItem value="OpsRequest" label="OpsRequest" default>
 
     Configure replicas as 0 to delete pods.
 
@@ -682,32 +668,30 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
 
     <TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
 
-    Edit the cluster YAML file and configure replicas as 0 to delete pods.
+    ```bash
+    kubectl edit cluster mycluster -n demo
+    ```
+
+    Configure the value of `spec.componentSpecs.replicas` as 0 to delete pods.
 
     ```yaml
-    kubectl edit cluster mycluster -n demo
-    >
-    apiVersion: apps.kubeblocks.io/v1alpha1
-    kind: Cluster
-    metadata:
-        name: mycluster
-        namespace: demo
+    ...
     spec:
       terminationPolicy: Delete
       componentSpecs:
       - name: mdit
         componentDefRef: elasticsearch
         disableExporter: true  
-        replicas: 0
-        volumeClaimTemplates:
-        - name: data
-          spec:
-            storageClassName: standard
-            accessModes:
-              - ReadWriteOnce
-            resources:
-              requests:
-                storage: 20Gi
+        replicas: 0 # Change this value
+    ...
+    ```
+
+    </TabItem>
+
+    <TabItem value="kbcli" label="kbcli">
+
+    ```bash
+    kbcli cluster stop mycluster -n demo
     ```
 
     </TabItem>
@@ -718,18 +702,18 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
 
     <Tabs>
 
-    <TabItem value="kbcli" label="kbcli" default>
+    <TabItem value="kubectl" label="kubectl" default>
 
     ```bash
-    kbcli cluster list mycluster -n demo
+    kubectl get cluster mycluster -n demo
     ```
 
     </TabItem>
 
-    <TabItem value="kubectl" label="kubectl">
+    <TabItem value="kbcli" label="kbcli">
 
     ```bash
-    kubectl get cluster mycluster -n demo
+    kbcli cluster list mycluster -n demo
     ```
 
     </TabItem>
@@ -742,15 +726,7 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
   
     <Tabs>
 
-    <TabItem value="kbcli" label="kbcli" default>
-
-    ```bash
-    kbcli cluster start mycluster -n demo
-    ```
-
-    </TabItem>
-
-    <TabItem value="OpsRequest" label="OpsRequest">
+    <TabItem value="OpsRequest" label="OpsRequest" default>
 
     Run the command below to start a cluster.
 
@@ -771,32 +747,30 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
 
     <TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
 
-    Change replicas back to the original amount to start this cluster again.
+    ```bash
+    kubectl edit cluster mycluster -n demo
+    ```
+
+    Change the value of `spec.componentSpecs.replicas` back to the original amount to start this cluster again.
 
     ```yaml
-    kubectl edit cluster mycluster -n demo
-    >
-    apiVersion: apps.kubeblocks.io/v1alpha1
-    kind: Cluster
-    metadata:
-        name: mycluster
-        namespace: demo
+    ...
     spec:
       terminationPolicy: Delete
       componentSpecs:
       - name: mdit
         componentDefRef: elasticsearch
         disableExporter: true  
-        replicas: 1
-        volumeClaimTemplates:
-        - name: data
-          spec:
-            storageClassName: standard
-            accessModes:
-              - ReadWriteOnce
-            resources:
-              requests:
-                storage: 20Gi
+        replicas: 1 # Change this value
+    ...
+    ```
+
+    </TabItem>
+
+    <TabItem value="kbcli" label="kbcli">
+
+    ```bash
+    kbcli cluster start mycluster -n demo
     ```
 
     </TabItem>
@@ -807,18 +781,18 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
 
     <Tabs>
 
-    <TabItem value="kbcli" label="kbcli" default>
+    <TabItem value="kubectl" label="kubectl" default>
 
     ```bash
-    kbcli cluster list mycluster -n demo
+    kubectl get cluster mycluster -n demo
     ```
 
     </TabItem>
 
-    <TabItem value="kubectl" label="kubectl">
+    <TabItem value="kbcli" label="kbcli">
 
     ```bash
-    kubectl get cluster mycluster -n demo
+    kbcli cluster list mycluster -n demo
     ```
 
     </TabItem>
@@ -829,36 +803,7 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-1. Restart a cluster.
-
-   Configure the values of `components` and `ttlSecondsAfterSucceed` and run the command below to restart a specified cluster.
-
-   ```bash
-   kbcli cluster restart mycluster -n demo --components="elasticsearch" --ttlSecondsAfterSucceed=30
-   ```
-
-   - `components` describes the component name that needs to be restarted.
-   - `ttlSecondsAfterSucceed` describes the time to live of an OpsRequest job after the restarting succeeds.
-
-2. Validate the restarting.
-
-   Run the command below to check the cluster status to check the restarting status.
-
-   ```bash
-   kbcli cluster list mycluster -n demo
-   >
-   NAME            CLUSTER-DEFINITION          VERSION               TERMINATION-POLICY   STATUS    CREATED-TIME
-   mycluster                                                         Delete               Running   Jul 05,2024 17:51 UTC+0800
-   ```
-
-   * STATUS=Updating: it means the cluster restart is in progress.
-   * STATUS=Running: it means the cluster has been restarted.
-
-</TabItem>
-
-<TabItem value="OpsRequest" label="OpsRequest">
+<TabItem value="OpsRequest" label="OpsRequest" default>
 
 1. Restart a cluster.
 
@@ -892,6 +837,35 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
 
 </TabItem>
 
+<TabItem value="kbcli" label="kbcli">
+
+1. Restart a cluster.
+
+   Configure the values of `components` and `ttlSecondsAfterSucceed` and run the command below to restart a specified cluster.
+
+   ```bash
+   kbcli cluster restart mycluster -n demo --components="elasticsearch" --ttlSecondsAfterSucceed=30
+   ```
+
+   - `components` describes the component name that needs to be restarted.
+   - `ttlSecondsAfterSucceed` describes the time to live of an OpsRequest job after the restarting succeeds.
+
+2. Validate the restarting.
+
+   Run the command below to check the cluster status to check the restarting status.
+
+   ```bash
+   kbcli cluster list mycluster -n demo
+   >
+   NAME            CLUSTER-DEFINITION          VERSION               TERMINATION-POLICY   STATUS    CREATED-TIME
+   mycluster                                                         Delete               Running   Jul 05,2024 17:51 UTC+0800
+   ```
+
+   * STATUS=Updating: it means the cluster restart is in progress.
+   * STATUS=Running: it means the cluster has been restarted.
+
+</TabItem>
+
 </Tabs>
 
 ## Delete a cluster
@@ -915,24 +889,24 @@ To check the termination policy, execute the following command.
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-```bash
-kbcli cluster list mycluster -n demo
->
-NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    CREATED-TIME
-mycluster   demo                                               Delete               Running   Sep 27,2024 11:42 UTC+0800
-```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 ```bash
 kubectl get cluster mycluster -n demo
 >
 NAME     CLUSTER-DEFINITION   VERSION   TERMINATION-POLICY   STATUS     AGE
 mydemo                                  Delete               Creating   27m
+```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+```bash
+kbcli cluster list mycluster -n demo
+>
+NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    CREATED-TIME
+mycluster   demo                                               Delete               Running   Sep 27,2024 11:42 UTC+0800
 ```
 
 </TabItem>
@@ -945,15 +919,7 @@ Run the command below to delete a specified cluster.
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-```bash
-kbcli cluster delete mycluster -n demo
-```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 If you want to delete a cluster and its all related resources, you can modify the termination policy to `WipeOut`, then delete the cluster.
 
@@ -961,6 +927,14 @@ If you want to delete a cluster and its all related resources, you can modify th
 kubectl patch -n demo cluster mycluster -p '{"spec":{"terminationPolicy":"WipeOut"}}' --type="merge"
 
 kubectl delete -n demo cluster mycluster
+```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+```bash
+kbcli cluster delete mycluster -n demo
 ```
 
 </TabItem>

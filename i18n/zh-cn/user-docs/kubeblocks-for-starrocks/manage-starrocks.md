@@ -443,13 +443,14 @@ mycluster   demo        starrocks            starrocks-3.1.1   Delete           
 
 1. 修改 YAML 文件中 `spec.componentSpecs.replicas` 的配置。`spec.componentSpecs.replicas` 定义了 pod 数量，修改该参数将触发集群水平扩缩容。
 
-   ```yaml
+   ```bash
    kubectl edit cluster mycluster -n demo
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: Cluster
-   metadata:
-     name: mycluster
-     namespace: demo
+   ```
+
+   在编辑器中修改 `spec.componentSpecs.replicas` 的参数值。
+
+   ```yaml
+   ...
    spec:
      clusterDefinitionRef: starrocks-ce
      clusterVersionRef: starrocks-ce-3.1.1
@@ -457,6 +458,7 @@ mycluster   demo        starrocks            starrocks-3.1.1   Delete           
      - name: fe
        componentDefRef: fe
        replicas: 2 # 修改参数值
+   ...
    ```
 
 2. 当集群状态再次回到 `Running` 后，查看相关资源是否变更。
@@ -592,13 +594,14 @@ mycluster   demo        starrocks            starrocks-3.1.1   Delete           
 
    `spec.componentSpecs.volumeClaimTemplates.spec.resources` 定义了 Pod 存储资源信息，修改该数值将触发集群磁盘扩容。
 
-   ```yaml
+   ```bash
    kubectl edit cluster mycluster -n demo
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: Cluster
-   metadata:
-     name: mycluster
-     namespace: demo
+   ```
+
+   在编辑器中修改 `spec.componentSpecs.volumeClaimTemplates.spec.resources` 的参数值。
+
+   ```yaml
+   ...
    spec:
      clusterDefinitionRef: starrocks-ce
      clusterVersionRef: starrocks-ce-3.1.1
@@ -613,7 +616,7 @@ mycluster   demo        starrocks            starrocks-3.1.1   Delete           
            resources:
              requests:
                storage: 40Gi # 修改该参数值
-     terminationPolicy: Delete
+   ...
    ```
 
 2. 当集群状态再次回到 `Running` 后，查看相应资源是否变更。

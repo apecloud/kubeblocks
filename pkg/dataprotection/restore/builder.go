@@ -253,11 +253,22 @@ func (r *restoreJobBuilder) addTargetPodAndCredentialEnv(pod *corev1.Pod,
 		env = pod.Spec.Containers[0].Env
 		r.envFrom = pod.Spec.Containers[0].EnvFrom
 	}
-	if connectionCredential == nil {
+	addDBHostEnv := func() {
 		env = append(env, corev1.EnvVar{Name: dptypes.DPDBHost, Value: intctrlutil.BuildPodHostDNS(pod)})
-		if portEnv, err := utils.GetDPDBPortEnv(pod, target.ContainerPort); err == nil {
+	}
+	addDBPortEnv := func() {
+		portEnv, err := utils.GetDPDBPortEnv(pod, target.ContainerPort)
+		if err != nil {
+			// fallback to use the first port of the pod
+			portEnv, _ = utils.GetDPDBPortEnv(pod, nil)
+		}
+		if portEnv != nil {
 			env = append(env, *portEnv)
 		}
+	}
+	if connectionCredential == nil {
+		addDBHostEnv()
+		addDBPortEnv()
 	} else {
 		appendEnvFromSecret := func(envName, keyName string) {
 			if keyName == "" {
@@ -277,11 +288,12 @@ func (r *restoreJobBuilder) addTargetPodAndCredentialEnv(pod *corev1.Pod,
 		if connectionCredential.PortKey != "" {
 			appendEnvFromSecret(dptypes.DPDBPort, connectionCredential.PortKey)
 		} else {
-			portEnv, _ := utils.GetDPDBPortEnv(pod, nil)
-			env = append(env, *portEnv)
+			addDBPortEnv()
 		}
 		if connectionCredential.HostKey != "" {
 			appendEnvFromSecret(dptypes.DPDBHost, connectionCredential.HostKey)
+		} else {
+			addDBHostEnv()
 		}
 	}
 	r.env = utils.MergeEnv(r.env, env)
@@ -342,16 +354,17 @@ func (r *restoreJobBuilder) build() *batchv1.Job {
 
 	// 2. set restore container
 	r.specificVolumeMounts = append(r.specificVolumeMounts, r.commonVolumeMounts...)
+	// expand the image value with the env variables.
+	image := common.Expand(r.image, common.MappingFuncFor(utils.CovertEnvToMap(r.env)))
 	container := corev1.Container{
-		Name:         Restore,
-		Resources:    r.restore.Spec.ContainerResources,
-		Env:          r.env,
-		EnvFrom:      r.envFrom,
-		VolumeMounts: r.specificVolumeMounts,
-		Command:      r.command,
-		Args:         r.args,
-		// expand the image value with the env variables.
-		Image:           common.Expand(r.image, common.MappingFuncFor(utils.CovertEnvToMap(r.env))),
+		Name:            Restore,
+		Resources:       r.restore.Spec.ContainerResources,
+		Env:             r.env,
+		EnvFrom:         r.envFrom,
+		VolumeMounts:    r.specificVolumeMounts,
+		Command:         r.command,
+		Args:            r.args,
+		Image:           intctrlutil.ReplaceImageRegistry(image),
 		ImagePullPolicy: corev1.PullIfNotPresent,
 	}
 

@@ -38,14 +38,14 @@ import TabItem from '@theme/TabItem';
 
     <TabItem value="编辑集群 YAML 文件" label="编辑集群 YAML 文件">
 
+    ```bash
+    kubectl edit cluster mycluster -n demo
+    ```
+
     将 replicas 设为 0，删除 pods。
 
     ```yaml
-    apiVersion: apps.kubeblocks.io/v1alpha1
-    kind: Cluster
-    metadata:
-      name: mycluster
-      namespace: demo
+    ...
     spec:
       clusterDefinitionRef: pulsar
       clusterVersionRef: pulsar-3.0.2
@@ -54,8 +54,8 @@ import TabItem from '@theme/TabItem';
       - name: pulsar
         componentDefRef: pulsar
         disableExporter: true 
-        replicas: 0
-    ......
+        replicas: 0 # 修改该参数值
+    ...
     ```
 
     </TabItem>
@@ -117,14 +117,14 @@ import TabItem from '@theme/TabItem';
 
     <TabItem value="编辑集群 YAML 文件" label="编辑集群 YAML 文件">
 
+    ```bash
+    kubectl edit cluster mycluster -n demo
+    ```
+
     将 replicas 数值改为停止集群前的数值，再次启动集群。
 
     ```yaml
-    apiVersion: apps.kubeblocks.io/v1alpha1
-    kind: Cluster
-    metadata:
-      name: mycluster
-      namespace: demo
+    ...
     spec:
       clusterDefinitionRef: pulsar
       clusterVersionRef: pulsar-3.0.2
@@ -133,8 +133,8 @@ import TabItem from '@theme/TabItem';
       - name: pulsar
         componentDefRef: pulsar
         disableExporter: true  
-        replicas: 1
-    ......
+        replicas: 1 # 修改该参数值
+    ...
     ```
 
     </TabItem>

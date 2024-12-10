@@ -151,9 +151,14 @@ func (t *componentWorkloadTransformer) runningInstanceSetObject(ctx graph.Transf
 
 func (t *componentWorkloadTransformer) reconcileWorkload(ctx context.Context, cli client.Reader,
 	synthesizedComp *component.SynthesizedComponent, comp *appsv1.Component, runningITS, protoITS *workloads.InstanceSet) error {
-	if runningITS != nil {
-		*protoITS.Spec.Selector = *runningITS.Spec.Selector
-		protoITS.Spec.Template.Labels = intctrlutil.MergeMetadataMaps(runningITS.Spec.Template.Labels, synthesizedComp.DynamicLabels)
+	// if runningITS already exists, the image changes in protoITS will be
+	// rollback to the original image in `checkNRollbackProtoImages`.
+	// So changing registry configs won't affect existing clusters.
+	for i, container := range protoITS.Spec.Template.Spec.Containers {
+		protoITS.Spec.Template.Spec.Containers[i].Image = intctrlutil.ReplaceImageRegistry(container.Image)
+	}
+	for i, container := range protoITS.Spec.Template.Spec.InitContainers {
+		protoITS.Spec.Template.Spec.InitContainers[i].Image = intctrlutil.ReplaceImageRegistry(container.Image)
 	}
 
 	buildInstanceSetPlacementAnnotation(comp, protoITS)
@@ -406,21 +411,6 @@ func buildPodSpecVolumeMounts(synthesizeComp *component.SynthesizedComponent) {
 //  1. new an object targetObj by copying from oldObj
 //  2. merge all fields can be updated from newObj into targetObj
 func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet) *workloads.InstanceSet {
-	// mergeAnnotations keeps the original annotations.
-	mergeMetadataMap := func(originalMap map[string]string, targetMap *map[string]string) {
-		if targetMap == nil || originalMap == nil {
-			return
-		}
-		if *targetMap == nil {
-			*targetMap = map[string]string{}
-		}
-		for k, v := range originalMap {
-			// if the annotation not exist in targetAnnotations, copy it from original.
-			if _, ok := (*targetMap)[k]; !ok {
-				(*targetMap)[k] = v
-			}
-		}
-	}
 
 	updateUpdateStrategy := func(itsObj, itsProto *workloads.InstanceSet) {
 		var objMaxUnavailable *intstr.IntOrString
@@ -450,12 +440,8 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet) *workloads.InstanceS
 			return strings.HasPrefix(k, "monitor.kubeblocks.io")
 		})
 	}
-	mergeMetadataMap(itsObjCopy.Annotations, &itsProto.Annotations)
-	itsObjCopy.Annotations = itsProto.Annotations
-
-	// keep the original template annotations.
-	// if annotations exist and are replaced, the its will be updated.
-	mergeMetadataMap(itsObjCopy.Spec.Template.Annotations, &itsProto.Spec.Template.Annotations)
+	intctrlutil.MergeMetadataMapInplace(itsProto.Annotations, &itsObjCopy.Annotations)
+	intctrlutil.MergeMetadataMapInplace(itsProto.Labels, &itsObjCopy.Labels)
 	itsObjCopy.Spec.Template = *itsProto.Spec.Template.DeepCopy()
 	itsObjCopy.Spec.Replicas = itsProto.Spec.Replicas
 	itsObjCopy.Spec.Roles = itsProto.Spec.Roles
@@ -474,13 +460,8 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet) *workloads.InstanceS
 	}
 
 	intctrlutil.ResolvePodSpecDefaultFields(oldITS.Spec.Template.Spec, &itsObjCopy.Spec.Template.Spec)
-	delayUpdateInstanceSetSystemFields(oldITS.Spec, &itsObjCopy.Spec)
 
 	isSpecUpdated := !reflect.DeepEqual(&oldITS.Spec, &itsObjCopy.Spec)
-	if isSpecUpdated {
-		updateInstanceSetSystemFields(itsProto.Spec, &itsObjCopy.Spec)
-	}
-
 	isLabelsUpdated := !reflect.DeepEqual(oldITS.Labels, itsObjCopy.Labels)
 	isAnnotationsUpdated := !reflect.DeepEqual(oldITS.Annotations, itsObjCopy.Annotations)
 	if !isSpecUpdated && !isLabelsUpdated && !isAnnotationsUpdated {

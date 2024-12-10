@@ -15,13 +15,24 @@ This document shows how to create a Kafka cluster.
 
 ## Before you start
 
-* [Install kbcli](./../../installation/install-with-kbcli/install-kbcli.md) if you want to create a Kafka cluster by `kbcli`.
-* Install KubeBlocks [by kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) or [by Helm](./../../installation/install-with-helm/install-kubeblocks.md).
-* Make sure Kafka Addon is enabled with `kbcli addon list`. If this Addon is not enabled, enable it first. Both [kbccli](./../../installation/install-with-kbcli/install-addons.md) and [Helm](./../../installation/install-with-helm/install-addons.md) options are available.
+* [Install kbcli](./../../installation/install-kbcli.md) if you want to create a Kafka cluster by `kbcli`.
+* [Install KubeBlocks](./../../installation/install-kubeblocks.md).
+* Make sure Kafka Addon is enabled with `kbcli addon list`. If this Addon is not enabled, [enable it](./../../installation/install-addons.md) first.
 
   <Tabs>
 
-  <TabItem value="kbcli" label="kbcli" default>
+  <TabItem value="kubectl" label="kubectl" default>
+
+  ```bash
+  kubectl get addons.extensions.kubeblocks.io kafka
+  >
+  NAME    TYPE   VERSION   PROVIDER   STATUS    AGE
+  kafka   Helm                        Enabled   13m
+  ```
+
+  </TabItem>
+
+  <TabItem value="kbcli" label="kbcli">
 
   ```bash
   kbcli addon list
@@ -30,17 +41,6 @@ This document shows how to create a Kafka cluster.
   ...
   kafka                          Helm   Enabled                   true
   ...
-  ```
-
-  </TabItem>
-
-  <TabItem value="kubectl" label="kubectl">
-
-  ```bash
-  kubectl get addons.extensions.kubeblocks.io kafka
-  >
-  NAME    TYPE   VERSION   PROVIDER   STATUS    AGE
-  kafka   Helm                        Enabled   13m
   ```
 
   </TabItem>
@@ -65,36 +65,7 @@ This document shows how to create a Kafka cluster.
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-1. Create a Kafka cluster.
-
-   The cluster creation command is simply `kbcli cluster create`. Further, you can customize your cluster resources as demanded by using the `--set` flag.
-
-   ```bash
-   kbcli cluster create kafka mycluster -n demo
-   ```
-
-   kbcli provides more options for creating a Kafka cluster, such as setting cluster version, termination policy, CPU, and memory. You can view these options by adding `--help` or `-h` flag.
-
-   ```bash
-   kbcli cluster create kafka --help
-
-   kbcli cluster create kafka -h
-   ```
-
-2. Verify whether this cluster is created successfully.
-
-   ```bash
-   kbcli cluster list -n demo
-   >
-   NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION       TERMINATION-POLICY   STATUS    CREATED-TIME
-   mycluster   demo        kafka                kafka-3.3.2   Delete               Running   Sep 27,2024 15:15 UTC+0800
-   ```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 1. Create a Kafka cluster. If you only have one node for deploying a cluster with multiple replicas, set `spec.affinity.topologyKeys` as `null`. But for a production environment, it is not recommended to deploy all replicas on one node, which may decrease the cluster availability.
 
@@ -302,6 +273,35 @@ This document shows how to create a Kafka cluster.
    >
    NAME        CLUSTER-DEFINITION   VERSION       TERMINATION-POLICY   STATUS    AGE
    mycluster   kafka                kafka-3.3.2   Delete               Running   2m2s
+   ```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+1. Create a Kafka cluster.
+
+   The cluster creation command is simply `kbcli cluster create`. Further, you can customize your cluster resources as demanded by using the `--set` flag.
+
+   ```bash
+   kbcli cluster create kafka mycluster -n demo
+   ```
+
+   kbcli provides more options for creating a Kafka cluster, such as setting cluster version, termination policy, CPU, and memory. You can view these options by adding `--help` or `-h` flag.
+
+   ```bash
+   kbcli cluster create kafka --help
+
+   kbcli cluster create kafka -h
+   ```
+
+2. Verify whether this cluster is created successfully.
+
+   ```bash
+   kbcli cluster list -n demo
+   >
+   NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION       TERMINATION-POLICY   STATUS    CREATED-TIME
+   mycluster   demo        kafka                kafka-3.3.2   Delete               Running   Sep 27,2024 15:15 UTC+0800
    ```
 
 </TabItem>

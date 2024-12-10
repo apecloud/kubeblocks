@@ -283,11 +283,14 @@ func (r *backupPolicyBuilder) buildBackupSchedule(
 
 	var schedules []dpv1alpha1.SchedulePolicy
 	for _, s := range r.backupPolicyTPL.Spec.Schedules {
+		name := s.GetScheduleName()
 		schedules = append(schedules, dpv1alpha1.SchedulePolicy{
 			BackupMethod:    s.BackupMethod,
 			CronExpression:  s.CronExpression,
 			Enabled:         s.Enabled,
 			RetentionPeriod: s.RetentionPeriod,
+			Name:            name,
+			Parameters:      s.Parameters,
 		})
 	}
 	backupSchedule.Spec.Schedules = schedules
@@ -295,16 +298,22 @@ func (r *backupPolicyBuilder) buildBackupSchedule(
 }
 
 func (r *backupPolicyBuilder) syncBackupSchedule(backupSchedule *dpv1alpha1.BackupSchedule) {
-	scheduleMethodMap := map[string]struct{}{}
-	for _, s := range backupSchedule.Spec.Schedules {
-		scheduleMethodMap[s.BackupMethod] = struct{}{}
+	scheduleNameMap := map[string]struct{}{}
+	for i := range backupSchedule.Spec.Schedules {
+		s := &backupSchedule.Spec.Schedules[i]
+		if len(s.Name) == 0 {
+			// assign to backupMethod if name is empty.
+			s.Name = s.BackupMethod
+		}
+		scheduleNameMap[s.Name] = struct{}{}
 	}
 	mergeMap(backupSchedule.Annotations, r.buildAnnotations())
 	// update backupSchedule annotation to reconcile it.
 	backupSchedule.Annotations[constant.ReconcileAnnotationKey] = r.Cluster.ResourceVersion
 	// sync the newly added schedule policies.
 	for _, s := range r.backupPolicyTPL.Spec.Schedules {
-		if _, ok := scheduleMethodMap[s.BackupMethod]; ok {
+		name := s.GetScheduleName()
+		if _, ok := scheduleNameMap[name]; ok {
 			continue
 		}
 		backupSchedule.Spec.Schedules = append(backupSchedule.Spec.Schedules, dpv1alpha1.SchedulePolicy{
@@ -312,6 +321,8 @@ func (r *backupPolicyBuilder) syncBackupSchedule(backupSchedule *dpv1alpha1.Back
 			CronExpression:  s.CronExpression,
 			Enabled:         s.Enabled,
 			RetentionPeriod: s.RetentionPeriod,
+			Name:            name,
+			Parameters:      s.Parameters,
 		})
 	}
 }

@@ -112,34 +112,6 @@ func (r *RequestCtx) WithValue(key, val any) context.Context {
 	return context.WithValue(r.Ctx, key, val)
 }
 
-func IsNil(i interface{}) bool {
-	if i == nil {
-		return true
-	}
-	switch reflect.TypeOf(i).Kind() {
-	case reflect.Ptr, reflect.Map, reflect.Array, reflect.Chan, reflect.Slice:
-		return reflect.ValueOf(i).IsNil()
-	}
-	return false
-}
-
-// MergeMetadataMapInplace merges two map[string]string, the targetMap will be updated.
-func MergeMetadataMapInplace(originalMap map[string]string, targetMap *map[string]string) {
-	if targetMap == nil || originalMap == nil {
-		return
-	}
-	if *targetMap == nil {
-		*targetMap = map[string]string{}
-	}
-	for k, v := range originalMap {
-		// if the annotation not exist in targetAnnotations, copy it from original.
-		if _, ok := (*targetMap)[k]; !ok {
-			(*targetMap)[k] = v
-		}
-	}
-}
-
-// MergeMetadataMaps merges targetMaps into originalMap if item not exist in originalMap and return the merged map.
 func MergeMetadataMaps(originalMap map[string]string, targetMaps ...map[string]string) map[string]string {
 	mergeMap := map[string]string{}
 	for k, v := range originalMap {
@@ -155,6 +127,20 @@ func MergeMetadataMaps(originalMap map[string]string, targetMaps ...map[string]s
 	return mergeMap
 }
 
+// MergeMetadataMapInplace merges two map[string]string, the targetMap will be updated.
+func MergeMetadataMapInplace(originalMap map[string]string, targetMap *map[string]string) {
+	if originalMap == nil {
+		return
+	}
+	if *targetMap == nil {
+		*targetMap = map[string]string{}
+	}
+	for k, v := range originalMap {
+		// add or override the target map with values from the original map
+		(*targetMap)[k] = v
+	}
+}
+
 func SetOwnerReference(owner, object metav1.Object) error {
 	return controllerutil.SetOwnerReference(owner, object, innerScheme)
 }
@@ -163,7 +149,7 @@ func SetControllerReference(owner, object metav1.Object) error {
 	return controllerutil.SetControllerReference(owner, object, innerScheme)
 }
 
-func GeKubeRestConfig(userAgent string) *rest.Config {
+func GetKubeRestConfig(userAgent string) *rest.Config {
 	cfg := ctrl.GetConfigOrDie()
 	clientQPS := viper.GetInt(constant.CfgClientQPS)
 	if clientQPS != 0 {

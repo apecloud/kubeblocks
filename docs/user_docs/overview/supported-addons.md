@@ -8,11 +8,9 @@ sidebar_label: Supported addons
 
 # Supported Addons
 
-KubeBlocks uses Addons to extend support for various database engines,
-And there are currently over 30 Addons available in the KubeBlocks repository.
-Which can be further categorized as follows sections.
+KubeBlocks uses Addons to extend support for various database engines. And there are currently over 30 Addons available in the KubeBlocks repository, which can be further categorized as follows sections.
 
-For installing and enabling Addons, refer to install Addons [by kbcli](./../installation/install-with-kbcli/install-addons.md) or [by Helm](./../installation/install-with-helm/install-addons.md).
+For installing and enabling Addons, refer to [Addon installation tutorial](./../installation/install-addons.md).
 
 ## Relational Databases
 
@@ -50,7 +48,7 @@ The versions listed below may not be up-to-date, and some supported versions mig
 |:----------------|:-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | postgresql      | This addon provides PostgreSQL services using the Spilo image with Patroni for high availability (HA).                                                                       |
 | apecloud-postgresql | ApeCloud PostgreSQL is a free, fully compatible drop-in replacement for PostgreSQL,  offering enhanced high availability through a RAFT protocol replication plugin.         |
-| official-postgresql | This addon includes vanilla PostgreSQL, the official release from the PostgreSQL community, without any modifications, optimizations, or packaging from third-party vendors. |
+| vanilla-postgresql | This Addon is based on the vanilla PostgreSQL, providing high availability capabilities for native PostgreSQL and its variants. |
 | oriolebd        | OrioleDB is a new storage engine for PostgreSQL, bringing a modern approach to database capacity, capabilities and performance to the world's most-loved database platform.  |
 | neon            | Neon is Serverless Postgres.                                                                                                                                                 |
 
@@ -60,7 +58,7 @@ The versions listed below may not be up-to-date, and some supported versions mig
 |:-------------------:|:---------------------------------------------------------------------------------------------------------:|:----------------:|:----------------:|:------------:|:----------------:|:----------------:|:------:|:--------------:|:----:|:------:|:---------------------------:|:-------:|:--------:|:----------:|
 | postgresql |             <p>12.14.0</p><p>12.14.1</p><p>12.15.0</p><p>14.7.2</p><p>14.8.0</p><p>15.7.0</p>             | ✔️ | ✔️                | ✔️            | ✔️                | ✔️                | ✔️      | ✔️              | ✔️    | ✔️      | ✔️                           | ✔️       | ✔️        | ✔️          |
  apecloud-postgresql |                                                  14.11.0                                                  | ✔️                | ✔️                | ✔️            | ✔️                | ✔️                | ✔️      | N/A            | N/A  | N/A    | N/A                         | N/A     | N/A      | N/A        |
-| official-postgresql |                                                   14.7                                                    | ✔️                | ✔️                | ✔️            | ✔️                | ✔️                | N/A    | N/A            | N/A  | N/A    | N/A                         | N/A     | N/A      | N/A        |
+| vanilla-postgresql |     <p>12.15.0</p><p>14.7.0</p><p>15.6.1138</p><p>15.7.0</p>                    | ✔️                | ✔️                | ✔️            | ✔️                | ✔️                | ✔️    | ✔️            | ✔️  | ✔️    | N/A                         | ✔️     |✔️      | ✔️        |
 | orioledb            |                                               14.7.2-beta1                                                | ✔️                | ✔️                | ✔️            | ✔️                | ✔️                | N/A    | N/A            | N/A  | N/A    | N/A                         | N/A     | N/A      | N/A        |
 | neon | <p>neon-broker-1.0.0</p><p>neon-compute-1.0.0</p><p>neon-pageserver-1.0.0</p><p>neon-safekeeper-1.0.0</p> | ✔️ | N/A | N/A    | N/A              | N/A              | N/A    | N/A            | N/A  | N/A    | N/A                         | N/A     | N/A      | N/A        |
 

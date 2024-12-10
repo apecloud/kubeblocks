@@ -19,9 +19,9 @@ This tutorial illustrates how to create and manage a Milvus cluster by `kbcli`, 
 
 ## Before you start
 
-- [Install kbcli](./../installation/install-with-kbcli/install-kbcli.md) if you want to manage the Milvus cluster with `kbcli`.
-- Install KubeBlocks [by kbcli](./../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) or [by Helm](./../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md).
-- Install and enable the milvus Addon [by kbcli](./../installation/install-with-kbcli/install-addons.md) or [by Helm](./../installation/install-with-helm/install-addons.md).
+- [Install kbcli](./../installation/install-kbcli.md) if you want to manage the Milvus cluster with `kbcli`.
+- [Install KubeBlocks](./../installation/install-kubeblocks.md).
+- [Install and enable the milvus Addon](./../installation/install-addons.md).
 - To keep things isolated, create a separate namespace called `demo` throughout this tutorial.
 
   ```bash
@@ -32,92 +32,7 @@ This tutorial illustrates how to create and manage a Milvus cluster by `kbcli`, 
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-***Steps***
-
-1. Execute the following command to create a Milvus cluster.
-
-   ```bash
-   kbcli cluster create mycluster --cluster-definition=milvus-2.3.2 -n demo
-   ```
-
-:::note
-
-If you want to customize your cluster specifications, `kbcli` provides various options, such as setting cluster version, termination policy, CPU, and memory. You can view these options by adding `--help` or `-h` flag.
-
-```bash
-kbcli cluster create milvus --help
-
-kbcli cluster create milvus -h
-```
-
-:::
-
-2. Check whether the cluster is created successfully.
-
-   ```bash
-   kbcli cluster list -n demo
-   >
-   NAME        NAMESPACE   CLUSTER-DEFINITION        VERSION               TERMINATION-POLICY   STATUS           CREATED-TIME
-   mycluster   demo        milvus-2.3.2                                    Delete               Running          Jul 05,2024 17:35 UTC+0800   
-   ```
-
-2. Check the cluster information.
-
-   ```bash
-   kbcli cluster describe mycluster -n demo
-   >
-   Name: milvus	 Created Time: Jul 05,2024 17:35 UTC+0800
-   NAMESPACE   CLUSTER-DEFINITION   VERSION   STATUS    TERMINATION-POLICY   
-   demo        milvus-2.3.2                   Running   Delete               
-
-   Endpoints:
-   COMPONENT   MODE        INTERNAL                                        EXTERNAL   
-   milvus      ReadWrite   milvus-milvus.default.svc.cluster.local:19530   <none>     
-   minio       ReadWrite   milvus-minio.default.svc.cluster.local:9000     <none>     
-   proxy       ReadWrite   milvus-proxy.default.svc.cluster.local:19530    <none>     
-                           milvus-proxy.default.svc.cluster.local:9091                
-
-   Topology:
-   COMPONENT   INSTANCE             ROLE     STATUS    AZ       NODE     CREATED-TIME                 
-   etcd        milvus-etcd-0        <none>   Running   <none>   <none>   Jul 05,2024 17:35 UTC+0800   
-   minio       milvus-minio-0       <none>   Running   <none>   <none>   Jul 05,2024 17:35 UTC+0800   
-   milvus      milvus-milvus-0      <none>   Running   <none>   <none>   Jul 05,2024 17:35 UTC+0800   
-   indexnode   milvus-indexnode-0   <none>   Running   <none>   <none>   Jul 05,2024 17:35 UTC+0800   
-   mixcoord    milvus-mixcoord-0    <none>   Running   <none>   <none>   Jul 05,2024 17:35 UTC+0800   
-   querynode   milvus-querynode-0   <none>   Running   <none>   <none>   Jul 05,2024 17:35 UTC+0800   
-   datanode    milvus-datanode-0    <none>   Running   <none>   <none>   Jul 05,2024 17:35 UTC+0800   
-   proxy       milvus-proxy-0       <none>   Running   <none>   <none>   Jul 05,2024 17:35 UTC+0800   
-
-   Resources Allocation:
-   COMPONENT   DEDICATED   CPU(REQUEST/LIMIT)   MEMORY(REQUEST/LIMIT)   STORAGE-SIZE   STORAGE-CLASS     
-   milvus      false       1 / 1                1Gi / 1Gi               data:20Gi      csi-hostpath-sc   
-   etcd        false       1 / 1                1Gi / 1Gi               data:20Gi      csi-hostpath-sc   
-   minio       false       1 / 1                1Gi / 1Gi               data:20Gi      csi-hostpath-sc   
-   proxy       false       1 / 1                1Gi / 1Gi               data:20Gi      csi-hostpath-sc   
-   mixcoord    false       1 / 1                1Gi / 1Gi               data:20Gi      csi-hostpath-sc   
-   datanode    false       1 / 1                1Gi / 1Gi               data:20Gi      csi-hostpath-sc   
-   indexnode   false       1 / 1                1Gi / 1Gi               data:20Gi      csi-hostpath-sc   
-   querynode   false       1 / 1                1Gi / 1Gi               data:20Gi      csi-hostpath-sc   
-
-   Images:
-   COMPONENT   TYPE        IMAGE                                                
-   milvus      milvus      milvusdb/milvus:v2.3.2                               
-   etcd        etcd        docker.io/milvusdb/etcd:3.5.5-r2                     
-   minio       minio       docker.io/minio/minio:RELEASE.2022-03-17T06-34-49Z   
-   proxy       proxy       milvusdb/milvus:v2.3.2                               
-   mixcoord    mixcoord    milvusdb/milvus:v2.3.2                               
-   datanode    datanode    milvusdb/milvus:v2.3.2                               
-   indexnode   indexnode   milvusdb/milvus:v2.3.2                               
-   querynode   querynode   milvusdb/milvus:v2.3.2                               
-
-   Show cluster events: kbcli cluster list-events -n demo milvus
-   ```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 KubeBlocks implements a `Cluster` CRD to define a cluster. Here is an example of creating a Milvus cluster.
 
@@ -335,6 +250,91 @@ kubectl get cluster mycluster -n demo -o yaml
 
 </TabItem>
 
+<TabItem value="kbcli" label="kbcli">
+
+***Steps***
+
+1. Execute the following command to create a Milvus cluster.
+
+   ```bash
+   kbcli cluster create mycluster --cluster-definition=milvus-2.3.2 -n demo
+   ```
+
+:::note
+
+If you want to customize your cluster specifications, `kbcli` provides various options, such as setting cluster version, termination policy, CPU, and memory. You can view these options by adding `--help` or `-h` flag.
+
+```bash
+kbcli cluster create milvus --help
+
+kbcli cluster create milvus -h
+```
+
+:::
+
+2. Check whether the cluster is created successfully.
+
+   ```bash
+   kbcli cluster list -n demo
+   >
+   NAME        NAMESPACE   CLUSTER-DEFINITION        VERSION               TERMINATION-POLICY   STATUS           CREATED-TIME
+   mycluster   demo        milvus-2.3.2                                    Delete               Running          Jul 05,2024 17:35 UTC+0800   
+   ```
+
+3. Check the cluster information.
+
+   ```bash
+   kbcli cluster describe mycluster -n demo
+   >
+   Name: milvus	 Created Time: Jul 05,2024 17:35 UTC+0800
+   NAMESPACE   CLUSTER-DEFINITION   VERSION   STATUS    TERMINATION-POLICY   
+   demo        milvus-2.3.2                   Running   Delete               
+
+   Endpoints:
+   COMPONENT   MODE        INTERNAL                                        EXTERNAL   
+   milvus      ReadWrite   milvus-milvus.default.svc.cluster.local:19530   <none>     
+   minio       ReadWrite   milvus-minio.default.svc.cluster.local:9000     <none>     
+   proxy       ReadWrite   milvus-proxy.default.svc.cluster.local:19530    <none>     
+                           milvus-proxy.default.svc.cluster.local:9091                
+
+   Topology:
+   COMPONENT   INSTANCE             ROLE     STATUS    AZ       NODE     CREATED-TIME                 
+   etcd        milvus-etcd-0        <none>   Running   <none>   <none>   Jul 05,2024 17:35 UTC+0800   
+   minio       milvus-minio-0       <none>   Running   <none>   <none>   Jul 05,2024 17:35 UTC+0800   
+   milvus      milvus-milvus-0      <none>   Running   <none>   <none>   Jul 05,2024 17:35 UTC+0800   
+   indexnode   milvus-indexnode-0   <none>   Running   <none>   <none>   Jul 05,2024 17:35 UTC+0800   
+   mixcoord    milvus-mixcoord-0    <none>   Running   <none>   <none>   Jul 05,2024 17:35 UTC+0800   
+   querynode   milvus-querynode-0   <none>   Running   <none>   <none>   Jul 05,2024 17:35 UTC+0800   
+   datanode    milvus-datanode-0    <none>   Running   <none>   <none>   Jul 05,2024 17:35 UTC+0800   
+   proxy       milvus-proxy-0       <none>   Running   <none>   <none>   Jul 05,2024 17:35 UTC+0800   
+
+   Resources Allocation:
+   COMPONENT   DEDICATED   CPU(REQUEST/LIMIT)   MEMORY(REQUEST/LIMIT)   STORAGE-SIZE   STORAGE-CLASS     
+   milvus      false       1 / 1                1Gi / 1Gi               data:20Gi      csi-hostpath-sc   
+   etcd        false       1 / 1                1Gi / 1Gi               data:20Gi      csi-hostpath-sc   
+   minio       false       1 / 1                1Gi / 1Gi               data:20Gi      csi-hostpath-sc   
+   proxy       false       1 / 1                1Gi / 1Gi               data:20Gi      csi-hostpath-sc   
+   mixcoord    false       1 / 1                1Gi / 1Gi               data:20Gi      csi-hostpath-sc   
+   datanode    false       1 / 1                1Gi / 1Gi               data:20Gi      csi-hostpath-sc   
+   indexnode   false       1 / 1                1Gi / 1Gi               data:20Gi      csi-hostpath-sc   
+   querynode   false       1 / 1                1Gi / 1Gi               data:20Gi      csi-hostpath-sc   
+
+   Images:
+   COMPONENT   TYPE        IMAGE                                                
+   milvus      milvus      milvusdb/milvus:v2.3.2                               
+   etcd        etcd        docker.io/milvusdb/etcd:3.5.5-r2                     
+   minio       minio       docker.io/minio/minio:RELEASE.2022-03-17T06-34-49Z   
+   proxy       proxy       milvusdb/milvus:v2.3.2                               
+   mixcoord    mixcoord    milvusdb/milvus:v2.3.2                               
+   datanode    datanode    milvusdb/milvus:v2.3.2                               
+   indexnode   indexnode   milvusdb/milvus:v2.3.2                               
+   querynode   querynode   milvusdb/milvus:v2.3.2                               
+
+   Show cluster events: kbcli cluster list-events -n demo milvus
+   ```
+
+</TabItem>
+
 </Tabs>
 
 ## Scale
@@ -347,18 +347,7 @@ Check whether the cluster status is `Running`. Otherwise, the following operatio
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-```bash
-kbcli cluster list mycluster -n demo
->
-NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    CREATED-TIME
-mycluster   demo        milvus-2.3.2                           Delete               Running   Jul 05,2024 17:35 UTC+0800
-```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 ```bash
 kubectl get cluster mycluster -n demo
@@ -369,55 +358,24 @@ mycluster   milvus-2.3.2                                  Delete               R
 
 </TabItem>
 
+<TabItem value="kbcli" label="kbcli">
+
+```bash
+kbcli cluster list mycluster -n demo
+>
+NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    CREATED-TIME
+mycluster   demo        milvus-2.3.2                           Delete               Running   Jul 05,2024 17:35 UTC+0800
+```
+
+</TabItem>
+
 </Tabs>
 
 ### Steps
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-1. Set the `--cpu` and `--memory` values according to your needs and run the following command to perform vertical scaling.
-
-    ```bash
-    kbcli cluster vscale mycluster -n demo --cpu=1 --memory=1Gi --components=milvus 
-    ```
-
-    Please wait a few seconds until the scaling process is over.
-
-2. Validate the vertical scaling operation.
-
-    - View the OpsRequest progress.
-
-       KubeBlocks outputs a command automatically for you to view the OpsRequest progress. The output includes the status of this OpsRequest and Pods. When the status is `Succeed`, this OpsRequest is completed.
-
-       ```bash
-       kbcli cluster describe-ops mycluster-verticalscaling-rpw2l -n demo
-       ```
-
-    - Check the cluster status.
-
-       ```bash
-       kbcli cluster list mycluster -n demo
-       >
-       NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS     CREATED-TIME
-       mycluster   demo                                               Delete               Updating   Jul 05,2024 17:35 UTC+0800
-       ```
-
-       - STATUS=Updating: it means the vertical scaling is in progress.
-       - STATUS=Running: it means the vertical scaling operation has been applied.
-       - STATUS=Abnormal: it means the vertical scaling is abnormal. The reason may be that the number of the normal instances is less than that of the total instance or the leader instance is running properly while others are abnormal.
-          > To solve the problem, you can manually check whether this error is caused by insufficient resources. Then if AutoScaling is supported by the Kubernetes cluster, the system recovers when there are enough resources. Otherwise, you can create enough resources and troubleshoot with `kubectl describe` command.
-
-3. After the OpsRequest status is `Succeed` or the cluster status is `Running` again, check whether the corresponding resources change.
-
-    ```bash
-    kbcli cluster describe mycluster -n demo
-    ```
-
-</TabItem>
-
-<TabItem value="OpsRequest" label="OpsRequest">
+<TabItem value="OpsRequest" label="OpsRequest" default>
 
 1. Apply an OpsRequest to the specified cluster. Configure the parameters according to your needs.
 
@@ -504,6 +462,48 @@ mycluster   milvus-2.3.2                                  Delete               R
 
 </TabItem>
 
+<TabItem value="kbcli" label="kbcli">
+
+1. Set the `--cpu` and `--memory` values according to your needs and run the following command to perform vertical scaling.
+
+    ```bash
+    kbcli cluster vscale mycluster -n demo --cpu=1 --memory=1Gi --components=milvus 
+    ```
+
+    Please wait a few seconds until the scaling process is over.
+
+2. Validate the vertical scaling operation.
+
+    - View the OpsRequest progress.
+
+       KubeBlocks outputs a command automatically for you to view the OpsRequest progress. The output includes the status of this OpsRequest and Pods. When the status is `Succeed`, this OpsRequest is completed.
+
+       ```bash
+       kbcli cluster describe-ops mycluster-verticalscaling-rpw2l -n demo
+       ```
+
+    - Check the cluster status.
+
+       ```bash
+       kbcli cluster list mycluster -n demo
+       >
+       NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS     CREATED-TIME
+       mycluster   demo                                               Delete               Updating   Jul 05,2024 17:35 UTC+0800
+       ```
+
+       - STATUS=Updating: it means the vertical scaling is in progress.
+       - STATUS=Running: it means the vertical scaling operation has been applied.
+       - STATUS=Abnormal: it means the vertical scaling is abnormal. The reason may be that the number of the normal instances is less than that of the total instance or the leader instance is running properly while others are abnormal.
+          > To solve the problem, you can manually check whether this error is caused by insufficient resources. Then if AutoScaling is supported by the Kubernetes cluster, the system recovers when there are enough resources. Otherwise, you can create enough resources and troubleshoot with `kubectl describe` command.
+
+3. After the OpsRequest status is `Succeed` or the cluster status is `Running` again, check whether the corresponding resources change.
+
+    ```bash
+    kbcli cluster describe mycluster -n demo
+    ```
+
+</TabItem>
+
 </Tabs>
 
 ## Volume Expansion
@@ -514,18 +514,7 @@ Check whether the cluster status is `Running`. Otherwise, the following operatio
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-```bash
-kbcli cluster list mycluster -n demo
->
-NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    CREATED-TIME
-mycluster   demo        milvus-2.3.2                           Delete               Running   Jul 05,2024 17:35 UTC+0800
-```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 ```bash
 kubectl get cluster mycluster -n demo
@@ -536,53 +525,24 @@ mycluster   milvus-2.3.2                                  Delete               R
 
 </TabItem>
 
+<TabItem value="kbcli" label="kbcli">
+
+```bash
+kbcli cluster list mycluster -n demo
+>
+NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    CREATED-TIME
+mycluster   demo        milvus-2.3.2                           Delete               Running   Jul 05,2024 17:35 UTC+0800
+```
+
+</TabItem>
+
 </Tabs>
 
 ### Steps
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-1. Set the `--storage` value according to your need and run the command to expand the volume.
-
-    ```bash
-    kbcli cluster volume-expand mycluster -n demo --storage=40Gi --components=milvus -t data
-    ```
-
-    The volume expansion may take a few minutes.
-
-2. Validate the volume expansion operation.
-
-    - View the OpsRequest progress.
-
-      KubeBlocks outputs a command automatically for you to view the details of the OpsRequest progress. The output includes the status of this OpsRequest and PVC. When the status is `Succeed`, this OpsRequest is completed.
-
-      ```bash
-      kbcli cluster describe-ops mycluster-volumeexpansion-5pbd2 -n demo
-      ```
-
-    - View the cluster status.
-
-      ```bash
-      kbcli cluster list mycluster
-      >
-      NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS     CREATED-TIME
-      mycluster   demo        milvus-2.3.2                           Delete               Running    Jul 05,2024 17:35 UTC+0800
-      ```
-
-      * STATUS=Updating: it means the volume expansion is in progress.
-      * STATUS=Running: it means the volume expansion operation has been applied.
-
-3. After the OpsRequest status is `Succeed` or the cluster status is `Running` again, check whether the corresponding resources change.
-
-    ```bash
-    kbcli cluster describe mycluster -n demo
-    ```
-
-</TabItem>
-
-<TabItem value="OpsRequest" label="OpsRequest">
+<TabItem value="OpsRequest" label="OpsRequest" default>
 
 1. Change the value of storage according to your need and run the command below to expand the volume of a cluster.
 
@@ -623,19 +583,20 @@ mycluster   milvus-2.3.2                                  Delete               R
 
 </TabItem>
 
-<TabItem value="Edit cluster YAML file" label="Edit cluster YAML fil">
+<TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
 
 1. Change the value of `spec.componentSpecs.volumeClaimTemplates.spec.resources` in the cluster YAML file.
 
    `spec.componentSpecs.volumeClaimTemplates.spec.resources` is the storage resource information of the pod and changing this value triggers the volume expansion of a cluster.
 
-   ```yaml
+   ```bash
    kubectl edit cluster mycluster -n demo
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: Cluster
-   metadata:
-     name: mycluster
-     namespace: demo
+   ```
+
+   Edit the value of `spec.componentSpecs.volumeClaimTemplates.spec.resources`.
+
+   ```yaml
+   ...
    spec:
      clusterDefinitionRef: milvus
      clusterVersionRef: milvus-2.3.2
@@ -650,8 +611,8 @@ mycluster   milvus-2.3.2                                  Delete               R
              - ReadWriteOnce
            resources:
              requests:
-               storage: 40Gi # Change the volume storage size.
-     terminationPolicy: Delete
+               storage: 40Gi # Change the volume storage size
+   ...
    ```
 
 2. Check whether the corresponding cluster resources change.
@@ -662,40 +623,53 @@ mycluster   milvus-2.3.2                                  Delete               R
 
 </TabItem>
 
+<TabItem value="kbcli" label="kbcli">
+
+1. Set the `--storage` value according to your need and run the command to expand the volume.
+
+    ```bash
+    kbcli cluster volume-expand mycluster -n demo --storage=40Gi --components=milvus -t data
+    ```
+
+    The volume expansion may take a few minutes.
+
+2. Validate the volume expansion operation.
+
+    - View the OpsRequest progress.
+
+      KubeBlocks outputs a command automatically for you to view the details of the OpsRequest progress. The output includes the status of this OpsRequest and PVC. When the status is `Succeed`, this OpsRequest is completed.
+
+      ```bash
+      kbcli cluster describe-ops mycluster-volumeexpansion-5pbd2 -n demo
+      ```
+
+    - View the cluster status.
+
+      ```bash
+      kbcli cluster list mycluster
+      >
+      NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS     CREATED-TIME
+      mycluster   demo        milvus-2.3.2                           Delete               Running    Jul 05,2024 17:35 UTC+0800
+      ```
+
+      * STATUS=Updating: it means the volume expansion is in progress.
+      * STATUS=Running: it means the volume expansion operation has been applied.
+
+3. After the OpsRequest status is `Succeed` or the cluster status is `Running` again, check whether the corresponding resources change.
+
+    ```bash
+    kbcli cluster describe mycluster -n demo
+    ```
+
+</TabItem>
+
 </Tabs>
 
 ## Restart
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-1. Configure the values of `components` and `ttlSecondsAfterSucceed` and run the command below to restart a specified cluster.
-
-   ```bash
-   kbcli cluster restart mycluster -n demo --components="milvus" --ttlSecondsAfterSucceed=30
-   ```
-
-   - `components` describes the component name that needs to be restarted.
-   - `ttlSecondsAfterSucceed` describes the time to live of an OpsRequest job after the restarting succeeds.
-
-2. Validate the restarting.
-
-   Run the command below to check the cluster status to check the restarting status.
-
-   ```bash
-   kbcli cluster list mycluster -n demo
-   >
-   NAME     NAMESPACE   CLUSTER-DEFINITION     VERSION         TERMINATION-POLICY   STATUS    CREATED-TIME
-   milvus   demo     milvus-2.3.2                              Delete               Running   Jul 05,2024 18:35 UTC+0800
-   ```
-
-   * STATUS=Updating: it means the cluster restart is in progress.
-   * STATUS=Running: it means the cluster has been restarted.
-
-</TabItem>
-
-<TabItem value="OpsRequest" label="OpsRequest">
+<TabItem value="OpsRequest" label="OpsRequest" default>
 
 1. Restart a cluster.
 
@@ -729,6 +703,33 @@ mycluster   milvus-2.3.2                                  Delete               R
 
 </TabItem>
 
+<TabItem value="kbcli" label="kbcli">
+
+1. Configure the values of `components` and `ttlSecondsAfterSucceed` and run the command below to restart a specified cluster.
+
+   ```bash
+   kbcli cluster restart mycluster -n demo --components="milvus" --ttlSecondsAfterSucceed=30
+   ```
+
+   - `components` describes the component name that needs to be restarted.
+   - `ttlSecondsAfterSucceed` describes the time to live of an OpsRequest job after the restarting succeeds.
+
+2. Validate the restarting.
+
+   Run the command below to check the cluster status to check the restarting status.
+
+   ```bash
+   kbcli cluster list mycluster -n demo
+   >
+   NAME     NAMESPACE   CLUSTER-DEFINITION     VERSION         TERMINATION-POLICY   STATUS    CREATED-TIME
+   milvus   demo     milvus-2.3.2                              Delete               Running   Jul 05,2024 18:35 UTC+0800
+   ```
+
+   * STATUS=Updating: it means the cluster restart is in progress.
+   * STATUS=Running: it means the cluster has been restarted.
+
+</TabItem>
+
 </Tabs>
 
 ## Stop/Start a cluster
@@ -741,15 +742,7 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
 
     <Tabs>
 
-    <TabItem value="kbcli" label="kbcli" default>
-
-    ```bash
-    kbcli cluster stop mycluster -n demo
-    ```
-
-    </TabItem>
-
-    <TabItem value="OpsRequest" label="OpsRequest">
+    <TabItem value="OpsRequest" label="OpsRequest" default>
 
     Apply an OpsRequest to stop a cluster.
 
@@ -770,14 +763,14 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
 
     <TabItem value="Edit Cluster YAML File" label="Edit Cluster YAML File">
 
+    ```bash
+    kubectl edit cluster mycluster -n demo
+    ```
+
     Configure replicas as 0 to delete pods.
 
     ```yaml
-    apiVersion: apps.kubeblocks.io/v1alpha1
-    kind: Cluster
-    metadata:
-      name: mycluster
-      namespace: demo
+    ...
     spec:
       clusterDefinitionRef: milvus
       clusterVersionRef: milvus-2.3.2
@@ -787,7 +780,15 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
         componentDefRef: milvus
         disableExporter: true  
         replicas: 0 # Change this value
-    ......
+    ...
+    ```
+
+    </TabItem>
+
+    <TabItem value="kbcli" label="kbcli">
+
+    ```bash
+    kbcli cluster stop mycluster -n demo
     ```
 
     </TabItem>
@@ -798,18 +799,18 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
 
     <Tabs>
 
-    <TabItem value="kbcli" label="kbcli" default>
+    <TabItem value="kubectl" label="kubectl" default>
 
     ```bash
-    kbcli cluster list mycluster -n demo
+    kubectl get cluster mycluster -n demo
     ```
 
     </TabItem>
 
-    <TabItem value="kubectl" label="kubectl">
+    <TabItem value="kbcli" label="kbcli">
 
     ```bash
-    kubectl get cluster mycluster -n demo
+    kbcli cluster list mycluster -n demo
     ```
 
     </TabItem>
@@ -822,15 +823,7 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
 
     <Tabs>
 
-    <TabItem value="kbcli" label="kbcli" default>
-
-     ```bash
-     kbcli cluster start mycluster -n demo
-     ```
-
-    </TabItem>
-
-    <TabItem value="OpsRequest" label="OpsRequest">
+    <TabItem value="OpsRequest" label="OpsRequest" default>
 
     Apply an OpsRequest to start a cluster.
 
@@ -851,14 +844,14 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
 
     <TabItem value="Edit Cluster YAML File" label="Edit Cluster YAML File">
 
+    ```bash
+    kubectl edit cluster mycluster -n demo
+    ```
+
     Change replicas back to the original amount to start this cluster again.
 
     ```yaml
-    apiVersion: apps.kubeblocks.io/v1alpha1
-    kind: Cluster
-    metadata:
-      name: mycluster
-      namespace: demo
+    ...
     spec:
       clusterDefinitionRef: milvus
       clusterVersionRef: milvus-2.3.2
@@ -868,7 +861,15 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
         componentDefRef: milvus
         disableExporter: true  
         replicas: 1 # Change this value
-    ......
+    ...
+    ```
+
+    </TabItem>
+
+    <TabItem value="kbcli" label="kbcli">
+
+    ```bash
+    kbcli cluster start mycluster -n demo
     ```
 
     </TabItem>
@@ -878,18 +879,18 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
 
     <Tabs>
 
-    <TabItem value="kbcli" label="kbcli" default>
+    <TabItem value="kubectl" label="kubectl" default>
 
     ```bash
-    kbcli cluster list mycluster -n demo
+    kubectl get cluster mycluster -n demo
     ```
 
     </TabItem>
 
-    <TabItem value="kubectl" label="kubectl">
+    <TabItem value="kbcli" label="kbcli">
 
     ```bash
-    kubectl get cluster mycluster -n demo
+    kbcli cluster list mycluster -n demo
     ```
 
     </TabItem>
@@ -917,24 +918,24 @@ To check the termination policy, execute the following command.
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-```bash
-kbcli cluster list mycluster -n demo
->
-NAME        NAMESPACE   CLUSTER-DEFINITION        VERSION               TERMINATION-POLICY   STATUS           CREATED-TIME
-mycluster   demo        milvus-2.3.2                                    Delete               Running          Jul 05,2024 17:35 UTC+0800  
-```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 ```bash
 kubectl get cluster mycluster -n demo
 >
 NAME        CLUSTER-DEFINITION   VERSION                  TERMINATION-POLICY   STATUS    AGE
 mycluster   milvus-2.3.2                                  Delete               Running   14m
+```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+```bash
+kbcli cluster list mycluster -n demo
+>
+NAME        NAMESPACE   CLUSTER-DEFINITION        VERSION               TERMINATION-POLICY   STATUS           CREATED-TIME
+mycluster   demo        milvus-2.3.2                                    Delete               Running          Jul 05,2024 17:35 UTC+0800  
 ```
 
 </TabItem>
@@ -947,15 +948,7 @@ Run the command below to delete a specified cluster.
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-```bash
-kbcli cluster delete mycluster -n demo
-```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 If you want to delete a cluster and its all related resources, you can modify the termination policy to `WipeOut`, then delete the cluster.
 
@@ -963,6 +956,14 @@ If you want to delete a cluster and its all related resources, you can modify th
 kubectl patch -n demo cluster mycluster -p '{"spec":{"terminationPolicy":"WipeOut"}}' --type="merge"
 
 kubectl delete -n demo cluster mycluster
+```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+```bash
+kbcli cluster delete mycluster -n demo
 ```
 
 </TabItem>

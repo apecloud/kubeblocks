@@ -17,13 +17,24 @@ This tutorial shows how to create and connect to a MySQL cluster.
 
 ### Before you start
 
-* [Install kbcli](./../../installation/install-with-kbcli/install-kbcli.md).
-* Install KubeBlocks  [by kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) or [by Helm](./../../installation/install-with-helm/install-kubeblocks.md).
-* Make sure the MySQL Addon is enabled. The MySQL Addon is installed and enabled by KubeBlocks by default. If you disable it when installing KubeBlocks, [enable it](./../../installation/install-with-kbcli/install-addons.md) first.
+* [Install kbcli](./../../installation/install-kbcli.md).
+* [Install KubeBlocks](./../../installation/install-kubeblocks.md).
+* Make sure the MySQL Addon is enabled. The MySQL Addon is installed and enabled by KubeBlocks by default. If you disable it when installing KubeBlocks, [enable it](./../../installation/install-addons.md) first.
 
   <Tabs>
 
-  <TabItem value="kbcli" label="kbcli" default>
+  <TabItem value="kubectl" label="kubectl" default>
+
+  ```bash
+  kubectl get addons.extensions.kubeblocks.io mysql
+  >
+  NAME    TYPE   VERSION   PROVIDER   STATUS    AGE
+  mysql   Helm                        Enabled   27h
+  ```
+
+  </TabItem>
+
+  <TabItem value="kbcli" label="kbcli">
 
   ```bash
   kbcli addon list
@@ -36,33 +47,13 @@ This tutorial shows how to create and connect to a MySQL cluster.
 
   </TabItem>
 
-  <TabItem value="kubectl" label="kubectl">
-
-  ```bash
-  kubectl get addons.extensions.kubeblocks.io mysql
-  >
-  NAME    TYPE   VERSION   PROVIDER   STATUS    AGE
-  mysql   Helm                        Enabled   27h
-  ```
-
-  </TabItem>
-
   </Tabs>
 
 * View all the database types and versions available for creating a cluster.
 
   <Tabs>
 
-  <TabItem value="kbcli" label="kbcli" default>
-
-  ```bash
-  kbcli clusterdefinition list
-  kbcli clusterversion list
-  ```
-
-  </TabItem>
-
-  <TabItem value="kubectl" label="kubectl">
+  <TabItem value="kubectl" label="kubectl" default>
 
   Make sure the `mysql` cluster definition is installed.
 
@@ -86,6 +77,15 @@ This tutorial shows how to create and connect to a MySQL cluster.
 
   </TabItem>
 
+  <TabItem value="kbcli" label="kbcli">
+
+  ```bash
+  kbcli clusterdefinition list
+  kbcli clusterversion list
+  ```
+
+  </TabItem>
+
   </Tabs>
 
 * To keep things isolated, create a separate namespace called `demo` throughout this tutorial.
@@ -100,39 +100,7 @@ KubeBlocks supports creating two types of MySQL clusters: Standalone and Replica
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-1. Create a MySQL cluster.
-
-   ```bash
-   kbcli cluster create mycluster --cluster-definition mysql -n demo
-   ```
-
-   If you want to customize your cluster specifications, kbcli provides various options, such as setting cluster version, termination policy, CPU, and memory. You can view these options by adding `--help` or `-h` flag.
-
-   ```bash
-   kbcli cluster create mysql --help
-   kbcli cluster create mysql -h
-   ```
-
-   If you only have one node for deploying a Replication Cluster, set the `--topology-keys` as `null` when creating a Cluster. But you should note that for a production environment, it is not recommended to deploy all replicas on one node, which may decrease the cluster availability.
-
-   ```bash
-   kbcli cluster create mycluster --cluster-definition mysql --topology-keys null -n demo
-   ```
-
-2. Verify whether this cluster is created successfully.
-
-   ```bash
-   kbcli cluster list -n demo
-   >
-   NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    CREATED-TIME
-   mycluster   demo        mysql                mysql-8.0.30      Delete               Running   Jul 05,2024 18:46 UTC+0800
-   ```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 1. Create a MySQL cluster.
 
@@ -222,21 +190,45 @@ KubeBlocks supports creating two types of MySQL clusters: Standalone and Replica
 
 </TabItem>
 
+<TabItem value="kbcli" label="kbcli">
+
+1. Create a MySQL cluster.
+
+   ```bash
+   kbcli cluster create mycluster --cluster-definition mysql -n demo
+   ```
+
+   If you want to customize your cluster specifications, kbcli provides various options, such as setting cluster version, termination policy, CPU, and memory. You can view these options by adding `--help` or `-h` flag.
+
+   ```bash
+   kbcli cluster create mysql --help
+   kbcli cluster create mysql -h
+   ```
+
+   If you only have one node for deploying a Replication Cluster, set the `--topology-keys` as `null` when creating a Cluster. But you should note that for a production environment, it is not recommended to deploy all replicas on one node, which may decrease the cluster availability.
+
+   ```bash
+   kbcli cluster create mycluster --cluster-definition mysql --topology-keys null -n demo
+   ```
+
+2. Verify whether this cluster is created successfully.
+
+   ```bash
+   kbcli cluster list -n demo
+   >
+   NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    CREATED-TIME
+   mycluster   demo        mysql                mysql-8.0.30      Delete               Running   Jul 05,2024 18:46 UTC+0800
+   ```
+
+</TabItem>
+
 </Tabs>
 
 ## Connect to a MySQL Cluster
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-```bash
-kbcli cluster connect mycluster  --namespace demo
-```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 You can use `kubectl exec` to exec into a Pod and connect to a database.
 
@@ -287,6 +279,14 @@ You can also port forward the service to connect to a database from your local m
    ```bash
    mysql -uroot -pb8wvrwlm
    ```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+```bash
+kbcli cluster connect mycluster  --namespace demo
+```
 
 </TabItem>
 

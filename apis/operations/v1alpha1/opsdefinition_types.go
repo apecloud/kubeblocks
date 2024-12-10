@@ -486,15 +486,3 @@ type OpsDefinitionList struct {
 func init() {
 	SchemeBuilder.Register(&OpsDefinition{}, &OpsDefinitionList{})
 }
-
-func (o *OpsDefinition) GetComponentInfo(compDefName string) *ComponentInfo {
-	if o == nil {
-		return nil
-	}
-	for _, v := range o.Spec.ComponentInfos {
-		if compDefName == v.ComponentDefinitionName {
-			return &v
-		}
-	}
-	return nil
-}

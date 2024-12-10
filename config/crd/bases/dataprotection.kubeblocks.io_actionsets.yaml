@@ -269,6 +269,11 @@ spec:
                     - command
                     - image
                     type: object
+                  withParameters:
+                    description: Specifies the parameters used by the backup action
+                    items:
+                      type: string
+                    type: array
                 type: object
               backupType:
                 allOf:
@@ -277,11 +282,13 @@ spec:
                   - Incremental
                   - Differential
                   - Continuous
+                  - Selective
                 - enum:
                   - Full
                   - Incremental
                   - Differential
                   - Continuous
+                  - Selective
                 default: Full
                 description: |-
                   Specifies the backup type. Supported values include:
@@ -291,6 +298,7 @@ spec:
                   - `Incremental` back up data that have changed since the last backup (either full or incremental).
                   - `Differential` back up data that has changed since the last full backup.
                   - `Continuous` back up transaction logs continuously, such as MySQL binlog, PostgreSQL WAL, etc.
+                  - `Selective` back up data more precisely, use custom parameters, such as specific databases or tables.
 
 
                   Continuous backup is essential for implementing Point-in-Time Recovery (PITR).
@@ -457,6 +465,21 @@ spec:
                   type: object
                 type: array
                 x-kubernetes-preserve-unknown-fields: true
+              parametersSchema:
+                description: Specifies the schema of parameters in backups and restores
+                  before their usage.
+                properties:
+                  openAPIV3Schema:
+                    description: |-
+                      Defines the schema for parameters using the OpenAPI v3.
+                      The supported property types include:
+                      - string
+                      - number
+                      - integer
+                      - array: Note that only items of string type are supported.
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
+                type: object
               restore:
                 description: Specifies the restore action.
                 properties:
@@ -568,6 +591,11 @@ spec:
                     - command
                     - image
                     type: object
+                  withParameters:
+                    description: Specifies the parameters used by the restore action
+                    items:
+                      type: string
+                    type: array
                 type: object
             required:
             - backupType

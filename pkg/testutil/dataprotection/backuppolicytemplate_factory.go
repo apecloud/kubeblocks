@@ -52,12 +52,19 @@ func (f *MockBackupPolicyTemplateFactory) getLastBackupMethod() *dpv1alpha1.Back
 	return &backupMethods[l-1]
 }
 
-func (f *MockBackupPolicyTemplateFactory) AddSchedule(method, schedule, retentionPeriod string, enable bool) *MockBackupPolicyTemplateFactory {
+func (f *MockBackupPolicyTemplateFactory) AddSchedule(
+	method, schedule, retentionPeriod string,
+	enable bool,
+	name string,
+	parameters []dpv1alpha1.ParameterPair,
+) *MockBackupPolicyTemplateFactory {
 	schedulePolicy := dpv1alpha1.SchedulePolicy{
 		Enabled:         &enable,
 		CronExpression:  schedule,
 		BackupMethod:    method,
 		RetentionPeriod: dpv1alpha1.RetentionPeriod(retentionPeriod),
+		Parameters:      parameters,
+		Name:            name,
 	}
 	f.Get().Spec.Schedules = append(f.Get().Spec.Schedules, schedulePolicy)
 	return f

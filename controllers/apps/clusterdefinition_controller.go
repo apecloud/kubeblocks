@@ -68,6 +68,10 @@ func (r *ClusterDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
 
+	if !intctrlutil.ObjectAPIVersionSupported(clusterDef) {
+		return intctrlutil.Reconciled()
+	}
+
 	if res, err := intctrlutil.HandleCRDeletion(reqCtx, r, clusterDef,
 		clusterDefinitionFinalizerName, r.deletionHandler(reqCtx, clusterDef)); res != nil {
 		return *res, err
@@ -96,7 +100,7 @@ func (r *ClusterDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ClusterDefinitionReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return intctrlutil.NewNamespacedControllerManagedBy(mgr).
+	return intctrlutil.NewControllerManagedBy(mgr).
 		For(&appsv1.ClusterDefinition{}).
 		Complete(r)
 }
@@ -367,12 +371,14 @@ func defaultClusterTopology(clusterDef *appsv1.ClusterDefinition) *appsv1.Cluste
 
 // referredClusterTopology returns the cluster topology which has name @name.
 func referredClusterTopology(clusterDef *appsv1.ClusterDefinition, name string) *appsv1.ClusterTopology {
-	if len(name) == 0 {
-		return defaultClusterTopology(clusterDef)
-	}
-	for i, topology := range clusterDef.Spec.Topologies {
-		if topology.Name == name {
-			return &clusterDef.Spec.Topologies[i]
+	if clusterDef != nil {
+		if len(name) == 0 {
+			return defaultClusterTopology(clusterDef)
+		}
+		for i, topology := range clusterDef.Spec.Topologies {
+			if topology.Name == name {
+				return &clusterDef.Spec.Topologies[i]
+			}
 		}
 	}
 	return nil

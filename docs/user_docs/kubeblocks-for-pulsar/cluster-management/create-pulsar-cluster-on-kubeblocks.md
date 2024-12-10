@@ -29,22 +29,14 @@ Refer to the [Pulsar official document](https://pulsar.apache.org/docs/3.1.x/) f
 
 ## Before you start
 
-* Install KubeBlocks [by kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) or [by Helm](../../../user_docs/installation/install-with-helm/install-kubeblocks.md).
-* Check whether the Pulsar Addon is enabled. If this Addon is disabled, [enable it](./../../installation/install-with-kbcli/install-addons.md#enabledisable-addons) first.
+* [Install kbcli](./../../installation/install-kbcli.md) if you want to manage the StarRocks cluster with `kbcli`.
+* [Install KubeBlocks](./../../installation/install-kubeblocks.md).
+* Check whether the Pulsar Addon is enabled. If this Addon is disabled, [enable it](./../../installation/install-addons.md) first.
 * View all the database types and versions available for creating a cluster.
 
   <Tabs>
 
-  <TabItem value="kbcli" label="kbcli" default>
-
-  ```bash
-  kbcli clusterdefinition list
-  kbcli clusterversion list
-  ```
-
-  </TabItem>
-
-  <TabItem value="kubectl" label="kubectl">
+  <TabItem value="kubectl" label="kubectl" default>
 
   ```bash
   kubectl get clusterdefinition pulsar
@@ -61,6 +53,15 @@ Refer to the [Pulsar official document](https://pulsar.apache.org/docs/3.1.x/) f
   NAME            CLUSTER-DEFINITION   STATUS      AGE
   pulsar-2.11.2   pulsar               Available   16m
   pulsar-3.0.2    pulsar               Available   16m
+  ```
+
+  </TabItem>
+
+  <TabItem value="kbcli" label="kbcli">
+
+  ```bash
+  kbcli clusterdefinition list
+  kbcli clusterversion list
   ```
 
   </TabItem>

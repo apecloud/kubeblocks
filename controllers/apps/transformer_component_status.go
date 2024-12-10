@@ -21,6 +21,7 @@ package apps
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -163,6 +164,15 @@ func (t *componentStatusTransformer) reconcileStatus(transCtx *componentTransfor
 		return phase == "" || phase == appsv1.CreatingComponentPhase
 	}()
 
+	// check if the component is in starting phase
+	// TODO: differentiate between starting and updating based on replicas status
+	isInStartingPhase := func() bool {
+		phase := t.comp.Status.Phase
+		return slices.Contains([]appsv1.ComponentPhase{
+			appsv1.StoppedComponentPhase, appsv1.StoppingComponentPhase, appsv1.StartingComponentPhase,
+		}, phase)
+	}()
+
 	transCtx.Logger.Info(
 		fmt.Sprintf("status conditions, creating: %v, its running: %v, has failure: %v, updating: %v, config synced: %v",
 			isInCreatingPhase, isITSUpdatedNRunning, hasFailure, hasRunningScaleOut || hasRunningVolumeExpansion, isAllConfigSynced))
@@ -178,6 +188,8 @@ func (t *componentStatusTransformer) reconcileStatus(transCtx *componentTransfor
 		t.setComponentStatusPhase(transCtx, appsv1.RunningComponentPhase, nil, "component is Running")
 	case !hasFailure && isInCreatingPhase:
 		t.setComponentStatusPhase(transCtx, appsv1.CreatingComponentPhase, nil, "component is Creating")
+	case !hasFailure && isInStartingPhase:
+		t.setComponentStatusPhase(transCtx, appsv1.StartingComponentPhase, nil, "component is Starting")
 	case !hasFailure:
 		t.setComponentStatusPhase(transCtx, appsv1.UpdatingComponentPhase, nil, "component is Updating")
 	default:
@@ -308,7 +320,7 @@ func (t *componentStatusTransformer) hasFailedPod() (bool, appsv1alpha1.Componen
 	hasFailedPod := meta.IsStatusConditionTrue(t.runningITS.Status.Conditions, string(workloads.InstanceFailure))
 	if hasFailedPod {
 		failureCondition := meta.FindStatusCondition(t.runningITS.Status.Conditions, string(workloads.InstanceFailure))
-		messages.SetObjectMessage(workloads.Kind, t.runningITS.Name, failureCondition.Message)
+		messages.SetObjectMessage(workloads.InstanceSetKind, t.runningITS.Name, failureCondition.Message)
 		return true, messages
 	}
 
@@ -327,7 +339,7 @@ func (t *componentStatusTransformer) hasFailedPod() (bool, appsv1alpha1.Componen
 	probeTimeoutDuration := time.Duration(defaultRoleProbeTimeoutAfterPodsReady) * time.Second
 	condition := meta.FindStatusCondition(t.runningITS.Status.Conditions, string(workloads.InstanceReady))
 	if time.Now().After(condition.LastTransitionTime.Add(probeTimeoutDuration)) {
-		messages.SetObjectMessage(workloads.Kind, t.runningITS.Name, "Role probe timeout, check whether the application is available")
+		messages.SetObjectMessage(workloads.InstanceSetKind, t.runningITS.Name, "Role probe timeout, check whether the application is available")
 		return true, messages
 	}
 

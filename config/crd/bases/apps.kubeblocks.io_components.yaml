@@ -4987,8 +4987,7 @@ spec:
                 maxLength: 32
                 type: string
               services:
-                description: Overrides Services defined in referenced ComponentDefinition
-                  and exposes endpoints that can be accessed by clients.
+                description: Overrides Services defined in referenced ComponentDefinition.
                 items:
                   description: |-
                     ComponentService defines a service that would be exposed as an inter-component service within a Cluster.
@@ -7509,12 +7508,14 @@ spec:
                   - Failed: A significant number of Pods have failed.
                   - Stopping: All Pods are being terminated, with current replica count at zero.
                   - Stopped: All associated Pods have been successfully deleted.
+                  - Starting: Pods are being started.
                   - Deleting: The Component is being deleted.
                 enum:
                 - Creating
                 - Deleting
                 - Updating
                 - Stopping
+                - Starting
                 - Running
                 - Stopped
                 - Failed

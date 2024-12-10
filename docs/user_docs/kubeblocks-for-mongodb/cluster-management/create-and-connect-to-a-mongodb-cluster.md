@@ -17,13 +17,24 @@ This tutorial shows how to create and connect to a MongoDB cluster.
 
 ### Before you start
 
-* [Install kbcli](./../../installation/install-with-kbcli/install-kbcli.md) if you want to create and connect a MySQL cluster by `kbcli`.
-* Install KubeBlocks [by kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) or [by Helm](./../../installation/install-with-helm/install-kubeblocks.md).
-* Make sure the MongoDB Addon is enabled. If this addon is not enabled, enable it first. Both [kbcli](./../../installation/install-with-kbcli/install-addons.md) and [Helm](./../../installation/install-with-helm/install-addons.md) options are available.
+* [Install kbcli](./../../installation/install-kbcli.md) if you want to create and connect a MySQL cluster by `kbcli`.
+* [Install KubeBlocks](./../../installation/install-kubeblocks.md).
+* Make sure the MongoDB Addon is enabled. If this addon is not enabled, [enable it](./../../installation/install-addons.md) first.
 
   <Tabs>
 
-  <TabItem value="kbcli" label="kbcli" default>
+  <TabItem value="kubectl" label="kubectl" default>
+
+  ```bash
+  kubectl get addons.extensions.kubeblocks.io mongodb
+  >
+  NAME      TYPE   VERSION   PROVIDER   STATUS    AGE
+  mongodb   Helm                        Enabled   23m
+  ```
+
+  </TabItem>
+
+  <TabItem value="kbcli" label="kbcli">
 
   ```bash
   kbcli addon list
@@ -36,34 +47,13 @@ This tutorial shows how to create and connect to a MongoDB cluster.
 
   </TabItem>
 
-  <TabItem value="kubectl" label="kubectl">
-
-  ```bash
-  kubectl get addons.extensions.kubeblocks.io mongodb
-  >
-  NAME      TYPE   VERSION   PROVIDER   STATUS    AGE
-  mongodb   Helm                        Enabled   23m
-  ```
-
-  </TabItem>
-
   </Tabs>
 
 * View all the database types and versions available for creating a cluster.
 
   <Tabs>
 
-  <TabItem value="kbcli" label="kbcli" default>
-
-  ```bash
-  kbcli clusterdefinition list
-
-  kbcli clusterversion list
-  ```
-
-  </TabItem>
-
-  <TabItem value="kubectl" label="kubectl">
+  <TabItem value="kubectl" label="kubectl" default>
 
   ```bash
   kubectl get clusterdefinition mongodb
@@ -74,6 +64,16 @@ This tutorial shows how to create and connect to a MongoDB cluster.
 
   ```bash
   kubectl get clusterversions -l clusterdefinition.kubeblocks.io/name=mongodb
+  ```
+
+  </TabItem>
+
+  <TabItem value="kbcli" label="kbcli">
+
+  ```bash
+  kbcli clusterdefinition list
+
+  kbcli clusterversion list
   ```
 
   </TabItem>
@@ -94,33 +94,7 @@ KubeBlocks supports creating two types of MongoDB clusters: Standalone and Repli
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-1. Create a MongoDB cluster.
-
-   ```bash
-   kbcli cluster create mycluster --cluster-definition mongodb -n demo
-   ```
-
-   The commands above are some common examples to create a cluster with default settings. If you want to customize your cluster specifications, kbcli provides various options, such as setting cluster version, termination policy, CPU, and memory. You can view these options by adding `--help` or `-h` flag.
-
-   ```bash
-   kbcli cluster create mongodb --help
-   kbcli cluster create mongodb -h
-   ```
-
-2. Verify whether this cluster is created successfully.
-
-   ```bash
-   kbcli cluster list -n demo
-   >
-   NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    CREATED-TIME
-   mycluster   demo        mongodb              mongodb-5.0       Delete               Running   Sep 20,2024 10:01 UTC+0800
-   ```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 1. Create a MongoDB Standalone.
 
@@ -201,21 +175,39 @@ KubeBlocks supports creating two types of MongoDB clusters: Standalone and Repli
 
 </TabItem>
 
+<TabItem value="kbcli" label="kbcli">
+
+1. Create a MongoDB cluster.
+
+   ```bash
+   kbcli cluster create mycluster --cluster-definition mongodb -n demo
+   ```
+
+   The commands above are some common examples to create a cluster with default settings. If you want to customize your cluster specifications, kbcli provides various options, such as setting cluster version, termination policy, CPU, and memory. You can view these options by adding `--help` or `-h` flag.
+
+   ```bash
+   kbcli cluster create mongodb --help
+   kbcli cluster create mongodb -h
+   ```
+
+2. Verify whether this cluster is created successfully.
+
+   ```bash
+   kbcli cluster list -n demo
+   >
+   NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    CREATED-TIME
+   mycluster   demo        mongodb              mongodb-5.0       Delete               Running   Sep 20,2024 10:01 UTC+0800
+   ```
+
+</TabItem>
+
 </Tabs>
 
 ## Connect to a MongoDB Cluster
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-```bash
-kbcli cluster connect mycluster -n demo
-```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 You can use `kubectl exec` to exec into a Pod and connect to a database.
 
@@ -264,6 +256,14 @@ You can also port forward the service to connect to the database from your local
    ```bash
    root@mycluster-mongodb-0:/# mongo --username root --password 266zfqx5 --authenticationDatabase admin
    ```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+```bash
+kbcli cluster connect mycluster -n demo
+```
 
 </TabItem>
 

@@ -12,7 +12,7 @@ KubeBlocks 是基于 Kubernetes 的云原生数据基础设施，可以帮助用
 
 KubeBlocks 使用插件机制扩展对各种数据库引擎的支持，目前 KubeBlocks 存储库中提供了超过 30 个数据引擎插件，分类如下。
 
-KubeBlocks 默认安装并启用了部分引擎插件，对于其他未安装或未启用的引擎，您可通过 [kbcli](./../installation/install-with-kbcli/install-addons.md) 或者 [Helm](./../installation/install-with-helm/install-addons.md) 安装和启用。
+KubeBlocks 默认安装并启用了部分引擎插件，对于其他未安装或未启用的引擎，您可参考[引擎安装文档](./../installation/install-addons.md)，安装或启用引擎。
 
 :::note
 
@@ -51,7 +51,7 @@ MySQL 和 PostgreSQL 是两大最受欢迎的开源关系型数据库，有诸�
 |:----------------|:-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | postgresql      | PostgreSQL Addon 使用 Spilo 镜像和 Patroni 提供 PostgreSQL 服务，以实现高可用性（HA）。                                                                    |
 | apecloud-postgresql | ApeCloud PostgreSQL 是免费的、完全兼容的 PostgreSQL 替代，通过 RAFT 协议复制插件提供增强的高可用性。       |
-| official-postgresql | 该 Addon 包含原版 PostgreSQL，采用 PostgreSQL 社区的官方版本，未经任何第三方供应商的修改、优化或打包。|
+| vanilla-postgresql | 该 Addon 基于原版 PostgreSQL，为原生的PostgreSQL及variants提供高可用能力。|
 | oriolebd        | OrioleDB 是 PostgreSQL 的全新存储引擎，为该数据库平台带来了现代化的数据库容量、功能和性能。 |
 | neon            | Neon 是 Serverless 版的 Postgres。        |
 
@@ -61,7 +61,7 @@ MySQL 和 PostgreSQL 是两大最受欢迎的开源关系型数据库，有诸�
 |:-------------------:|:----------------------------:|:-------------:|:-----------------:|:-------:|:-----------:|:----------------:|:------:|:-------:|:----:|:----:|:----------------:|:-------:|:------:|:----------:|
 | postgresql | <p>12.14.0</p><p>12.14.1</p><p>12.15.0</p><p>14.7.2</p><p>14.8.0</p><p>15.7.0</p>  | ✔️ | ✔️ | ✔️  | ✔️ | ✔️             | ✔️       | ✔️       | ✔️   | ✔️   | ✔️                   | ✔️      | ✔️       | ✔️         |
  apecloud-postgresql |     14.11.0                  | ✔️              | ✔️                | ✔️       | ✔️            | ✔️               | ✔️       | N/A     | N/A | N/A | N/A                | N/A     | N/A    | N/A        |
-| official-postgresql |    14.7                      | ✔️             | ✔️                | ✔️       | ✔️            | ✔️               | N/A     | N/A     | N/A | N/A | N/A                | N/A     | N/A      | N/A      |
+| vanilla-postgresql |    <p>12.15.0</p><p>14.7.0</p><p>15.6.1138</p><p>15.7.0</p> | ✔️             | ✔️                | ✔️       | ✔️            | ✔️               | ✔️     | ✔️     | ✔️ | ✔️ | N/A                | ✔️     | ✔️      | ✔️      |
 | orioledb            |       14.7.2-beta1           | ✔️             | ✔️                | ✔️       | ✔️            | ✔️               | N/A     | N/A     | N/A | N/A | N/A                | N/A     | N/A      | N/A      |
 | neon | <p>neon-broker-1.0.0</p><p>neon-compute-1.0.0</p><p>neon-pageserver-1.0.0</p><p>neon-safekeeper-1.0.0</p> | ✔️ | N/A | N/A  | N/A  | N/A   | N/A    | N/A  | N/A  | N/A    | N/A     | N/A    | N/A  | N/A      |
 

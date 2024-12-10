@@ -69,23 +69,39 @@ func (s *Scheduler) Schedule() error {
 
 // validate validates the backup schedule.
 func (s *Scheduler) validate() error {
-	methodInBackupPolicy := func(name string) bool {
-		for _, method := range s.BackupPolicy.Spec.BackupMethods {
+	methodInBackupPolicy := func(name string) *dpv1alpha1.BackupMethod {
+		for i, method := range s.BackupPolicy.Spec.BackupMethods {
 			if method.Name == name {
-				return true
+				return &s.BackupPolicy.Spec.BackupMethods[i]
 			}
 		}
-		return false
+		return nil
+	}
+
+	// validate schedule names
+	if err := dputils.ValidateScheduleNames(s.BackupSchedule.Spec.Schedules); err != nil {
+		return err
 	}
 
 	for _, sp := range s.BackupSchedule.Spec.Schedules {
-		if methodInBackupPolicy(sp.BackupMethod) {
-			continue
+		method := methodInBackupPolicy(sp.BackupMethod)
+		if method == nil {
+			// backup method name is not in backup policy
+			return fmt.Errorf("backup method %s is not in backup policy %s/%s",
+				sp.BackupMethod, s.BackupPolicy.Namespace, s.BackupPolicy.Name)
 		}
-		// backup method name is not in backup policy
-		return fmt.Errorf("backup method %s is not in backup policy %s/%s",
-			sp.BackupMethod, s.BackupPolicy.Namespace, s.BackupPolicy.Name)
+		// validate schedule parameters
+		if len(method.ActionSetName) > 0 && len(sp.Parameters) > 0 {
+			actionSet, err := dputils.GetActionSetByName(s.RequestCtx, s.Client, method.ActionSetName)
+			if err != nil {
+				return err
+			}
+			if err := dputils.ValidateParameters(actionSet, sp.Parameters, true); err != nil {
+				return fmt.Errorf("fails to validate parameters of backupMethod %s: %v", sp.BackupMethod, err)
+			}
+		}
 	}
+
 	return nil
 }
 
@@ -125,7 +141,7 @@ func (s *Scheduler) buildCronJob(schedulePolicy *dpv1alpha1.SchedulePolicy, cron
 	)
 
 	if cronJobName == "" {
-		cronJobName = GenerateCRNameByBackupSchedule(s.BackupSchedule, schedulePolicy.BackupMethod)
+		cronJobName = GenerateCRNameByScheduleNameAndMethod(s.BackupSchedule, schedulePolicy.BackupMethod, schedulePolicy.Name)
 	}
 
 	podSpec, err := s.buildPodSpec(schedulePolicy)
@@ -175,6 +191,10 @@ func (s *Scheduler) buildCronJob(schedulePolicy *dpv1alpha1.SchedulePolicy, cron
 
 func (s *Scheduler) buildPodSpec(schedulePolicy *dpv1alpha1.SchedulePolicy) (*corev1.PodSpec, error) {
 	// TODO(ldm): add backup deletionPolicy
+	parameters, err := BuildParametersManifest(schedulePolicy.Parameters)
+	if err != nil {
+		return nil, err
+	}
 	createBackupCmd := fmt.Sprintf(`
 kubectl create -f - <<EOF
 apiVersion: dataprotection.kubeblocks.io/v1alpha1
@@ -188,11 +208,11 @@ metadata:
 spec:
   backupPolicyName: %s
   backupMethod: %s
-  retentionPeriod: %s
+  retentionPeriod: %s%s
 EOF
 `, s.BackupSchedule.Name, s.generateBackupName(schedulePolicy), s.BackupSchedule.Namespace,
 		s.BackupPolicy.Name, schedulePolicy.BackupMethod,
-		schedulePolicy.RetentionPeriod)
+		schedulePolicy.RetentionPeriod, parameters)
 
 	container := corev1.Container{
 		Name:            "backup-schedule",
@@ -228,7 +248,14 @@ func (s *Scheduler) reconcileCronJob(schedulePolicy *dpv1alpha1.SchedulePolicy) 
 	); err != nil {
 		return err
 	} else if len(cronJobList.Items) > 0 {
-		cronJob = &cronJobList.Items[0]
+		// the schedulePolicy name can be empty
+		targetCronJobName := GenerateCRNameByScheduleNameAndMethod(s.BackupSchedule, schedulePolicy.BackupMethod, schedulePolicy.Name)
+		for i, item := range cronJobList.Items {
+			if item.Name == targetCronJobName {
+				cronJob = &cronJobList.Items[i]
+				break
+			}
+		}
 	}
 
 	// schedule is disabled, delete cronjob if exists
@@ -284,6 +311,11 @@ func (s *Scheduler) generateBackupName(schedulePolicy *dpv1alpha1.SchedulePolicy
 	// if cluster name can not be found, use backup schedule name as backup name prefix
 	if backupNamePrefix == "" {
 		backupNamePrefix = s.BackupSchedule.Name
+	}
+	// use schedule name to distinguish different schedule policies
+	name := schedulePolicy.GetScheduleName()
+	if len(name) > 0 {
+		backupNamePrefix = fmt.Sprintf("%s-%s", backupNamePrefix, name)
 	}
 	return backupNamePrefix + "-$(date -u +'%Y%m%d%H%M%S')"
 }

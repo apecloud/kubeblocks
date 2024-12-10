@@ -17,13 +17,24 @@ This tutorial shows how to create and connect to a PostgreSQL cluster.
 
 ### Before you start
 
-* [Install kbcli](./../../installation/install-with-kbcli/install-kbcli.md) if you want to manage the PostgreSQL cluster by `kbcli`.
-* Install KubeBlocks [by kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) or [by Helm](./../../installation/install-with-helm/install-kubeblocks.md).
-* Make sure the PostgreSQL Addon is enabled. The PostgreSQL Addon is installed and enabled  by KubeBlocks by default. But if you disable it when installing KubeBlocks, [enable it](./../../installation/install-with-kbcli/install-addons.md) first.
+* [Install kbcli](./../../installation/install-kbcli.md) if you want to manage the PostgreSQL cluster by `kbcli`.
+* [Install KubeBlocks](./../../installation/install-kubeblocks.md).
+* Make sure the PostgreSQL Addon is enabled. The PostgreSQL Addon is installed and enabled  by KubeBlocks by default. But if you disable it when installing KubeBlocks, [enable it](./../../installation/install-addons.md) first.
   
   <Tabs>
 
-  <TabItem value="kbcli" label="kbcli" default>
+  <TabItem value="kubectl" label="kubectl" default>
+
+  ```bash
+  kubectl get addons.extensions.kubeblocks.io postgresql
+  >
+  NAME         TOPOLOGIES   SERVICEREFS   STATUS      AGE
+  postgresql                              Available   30m
+  ```
+
+  </TabItem>
+
+  <TabItem value="kbcli" label="kbcli">
 
   ```bash
   kbcli addon list
@@ -36,33 +47,13 @@ This tutorial shows how to create and connect to a PostgreSQL cluster.
 
   </TabItem>
 
-  <TabItem value="kubectl" label="kubectl">
-
-  ```bash
-  kubectl get addons.extensions.kubeblocks.io postgresql
-  >
-  NAME         TOPOLOGIES   SERVICEREFS   STATUS      AGE
-  postgresql                              Available   30m
-  ```
-
-  </TabItem>
-
   </Tabs>
 
 * View all the database types and versions available for creating a cluster.
 
   <Tabs>
 
-  <TabItem value="kbcli" label="kbcli" default>
-
-  ```bash
-  kbcli clusterdefinition list
-  kbcli clusterversion list
-  ```
-
-  </TabItem>
-
-  <TabItem value="kubectl" label="kubectl">
+  <TabItem value="kubectl" label="kubectl" default>
   
   ```bash
   kubectl get clusterdefinition postgresql
@@ -88,6 +79,15 @@ This tutorial shows how to create and connect to a PostgreSQL cluster.
 
   </TabItem>
 
+  <TabItem value="kbcli" label="kbcli">
+
+  ```bash
+  kbcli clusterdefinition list
+  kbcli clusterversion list
+  ```
+
+  </TabItem>
+
   </Tabs>
 
 * To keep things isolated, create a separate namespace called `demo` throughout this tutorial.
@@ -102,47 +102,7 @@ KubeBlocks supports creating two types of PostgreSQL clusters: Standalone and Re
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-1. Create a PostgreSQL cluster.
-
-   Here is an example of creating a Standalone.
-
-   ```bash
-   kbcli cluster create postgresql mycluster -n demo
-   ```
-
-   `kbcli` provides various options for you to customize your cluster specifications, such as setting cluster version, termination policy, CPU, and memory. You can view these options by adding `--help` or `-h` flag.
-
-   ```bash
-   kbcli cluster create postgresql --help
-   kbcli cluster create postgresql -h
-   ```
-
-   For example, you can create a Replication Cluster with the `--replicas` flag.
-
-   ```bash
-   kbcli cluster create postgresql mycluster --replicas=2 -n demo
-   ```
-
-   If you only have one node for deploying a Replication Cluster, set the `--topology-keys` as `null` when creating a Replication Cluster. But you should note that for a production environment, it is not recommended to deploy all replicas on one node, which may decrease the cluster availability.
-
-   ```bash
-   kbcli cluster create postgresql mycluster --replicas=2 --availability-policy='none' -n demo
-   ```
-
-2. Verify whether this cluster is created successfully.
-
-   ```bash
-   kbcli cluster list -n demo
-   >
-   NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION             TERMINATION-POLICY   STATUS    CREATED-TIME
-   mycluster   demo        postgresql           postgresql-14.8.0   Delete               Running   Sep 28,2024 16:47 UTC+0800
-   ```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 1. Create a PostgreSQL cluster.
 
@@ -232,19 +192,51 @@ KubeBlocks supports creating two types of PostgreSQL clusters: Standalone and Re
 
 </TabItem>
 
+<TabItem value="kbcli" label="kbcli">
+
+1. Create a PostgreSQL cluster.
+
+   Here is an example of creating a Standalone.
+
+   ```bash
+   kbcli cluster create postgresql mycluster -n demo
+   ```
+
+   `kbcli` provides various options for you to customize your cluster specifications, such as setting cluster version, termination policy, CPU, and memory. You can view these options by adding `--help` or `-h` flag.
+
+   ```bash
+   kbcli cluster create postgresql --help
+   kbcli cluster create postgresql -h
+   ```
+
+   For example, you can create a Replication Cluster with the `--replicas` flag.
+
+   ```bash
+   kbcli cluster create postgresql mycluster --replicas=2 -n demo
+   ```
+
+   If you only have one node for deploying a Replication Cluster, set the `--topology-keys` as `null` when creating a Replication Cluster. But you should note that for a production environment, it is not recommended to deploy all replicas on one node, which may decrease the cluster availability.
+
+   ```bash
+   kbcli cluster create postgresql mycluster --replicas=2 --availability-policy='none' -n demo
+   ```
+
+2. Verify whether this cluster is created successfully.
+
+   ```bash
+   kbcli cluster list -n demo
+   >
+   NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION             TERMINATION-POLICY   STATUS    CREATED-TIME
+   mycluster   demo        postgresql           postgresql-14.8.0   Delete               Running   Sep 28,2024 16:47 UTC+0800
+   ```
+
+</TabItem>
+
 </Tabs>
 
 ## Connect to a PostgreSQL Cluster
 
 <Tabs>
-
-<TabItem value="kbcli" label="kbcli" default>
-
-```bash
-kbcli cluster connect mycluster  --namespace demo
-```
-
-</TabItem>
 
 <TabItem value="kubectl" label="kubectl" default>
 
@@ -297,6 +289,14 @@ You can also port forward the service to connect to the database from your local
    root@mycluster-postgresql-0:/home/postgres# psql -U postgres -W
    Password: h62rg2kl
    ```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+```bash
+kbcli cluster connect mycluster  --namespace demo
+```
 
 </TabItem>
 

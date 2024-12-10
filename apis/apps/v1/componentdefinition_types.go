@@ -393,6 +393,13 @@ type ComponentDefinitionSpec struct {
 	// +optional
 	SystemAccounts []SystemAccount `json:"systemAccounts,omitempty"`
 
+	// Specifies the TLS configuration for the Component.
+	//
+	// This field is immutable.
+	//
+	// +optional
+	TLS *TLS `json:"tls,omitempty"`
+
 	// Defines the upper limit of the number of replicas supported by the Component.
 	//
 	// It defines the maximum number of replicas that can be created for the Component.
@@ -616,6 +623,10 @@ type VarSource struct {
 	// +optional
 	CredentialVarRef *CredentialVarSelector `json:"credentialVarRef,omitempty"`
 
+	// Selects a defined var of the TLS.
+	// +optional
+	TLSVarRef *TLSVarSelector `json:"tlsVarRef,omitempty"`
+
 	// Selects a defined var of a ServiceRef.
 	// +optional
 	ServiceRefVarRef *ServiceRefVarSelector `json:"serviceRefVarRef,omitempty"`
@@ -710,6 +721,12 @@ type CredentialVars struct {
 	Password *VarOption `json:"password,omitempty"`
 }
 
+// TLSVars defines the vars that can be referenced from the TLS.
+type TLSVars struct {
+	// +optional
+	Enabled *VarOption `json:"enabled,omitempty"`
+}
+
 // ServiceRefVars defines the vars that can be referenced from a ServiceRef.
 type ServiceRefVars struct {
 	// +optional
@@ -750,6 +767,14 @@ type CredentialVarSelector struct {
 	ClusterObjectReference `json:",inline"`
 
 	CredentialVars `json:",inline"`
+}
+
+// TLSVarSelector selects a var from the TLS.
+type TLSVarSelector struct {
+	// The Component to select from.
+	ClusterObjectReference `json:",inline"`
+
+	TLSVars `json:",inline"`
 }
 
 // ServiceRefVarSelector selects a var from a ServiceRefDeclaration.
@@ -1237,6 +1262,53 @@ type SystemAccount struct {
 	//
 	// +optional
 	SecretRef *ProvisionSecretRef `json:"secretRef,omitempty"`
+}
+
+type TLS struct {
+	// Specifies the volume name for the TLS secret.
+	// The controller will create a volume object with the specified name and add it to the pod when the TLS is enabled.
+	//
+	// This field is immutable once set.
+	//
+	// +kubebuilder:validation:Required
+	VolumeName string `json:"volumeName"`
+
+	// Specifies the mount path for the TLS secret to be mounted.
+	// Similar to the volume, the controller will mount the created volume to the specified path within containers when the TLS is enabled.
+	//
+	// This field is immutable once set.
+	//
+	// +kubebuilder:validation:Required
+	MountPath string `json:"mountPath"`
+
+	// The default permissions for the mounted path.
+	//
+	// This field is immutable once set.
+	//
+	// +kubebuilder:default=0600
+	// +optional
+	DefaultMode *int32 `json:"defaultMode,omitempty"`
+
+	// The CA file of the TLS.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	CAFile *string `json:"caFile,omitempty"`
+
+	// The certificate file of the TLS.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	CertFile *string `json:"certFile,omitempty"`
+
+	// The key file of the TLS.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	KeyFile *string `json:"keyFile,omitempty"`
 }
 
 // ReplicasLimit defines the valid range of number of replicas supported.

@@ -81,12 +81,16 @@ func (r *ComponentDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.
 		return intctrlutil.CheckedRequeueWithError(err, rctx.Log, "")
 	}
 
+	if !intctrlutil.ObjectAPIVersionSupported(cmpd) {
+		return intctrlutil.Reconciled()
+	}
+
 	return r.reconcile(rctx, cmpd)
 }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ComponentDefinitionReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return intctrlutil.NewNamespacedControllerManagedBy(mgr).
+	return intctrlutil.NewControllerManagedBy(mgr).
 		For(&appsv1.ComponentDefinition{}).
 		Complete(r)
 }
@@ -373,6 +377,7 @@ func (r *ComponentDefinitionReconciler) validateAvailableWithPhases(cmpd *appsv1
 		strings.ToLower(string(appsv1.CreatingComponentPhase)),
 		strings.ToLower(string(appsv1.RunningComponentPhase)),
 		strings.ToLower(string(appsv1.UpdatingComponentPhase)),
+		strings.ToLower(string(appsv1.StartingComponentPhase)),
 		strings.ToLower(string(appsv1.StoppingComponentPhase)),
 		strings.ToLower(string(appsv1.StoppedComponentPhase)),
 		strings.ToLower(string(appsv1.DeletingComponentPhase)),

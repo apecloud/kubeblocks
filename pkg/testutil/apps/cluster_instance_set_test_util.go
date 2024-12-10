@@ -173,11 +173,11 @@ func MockInstanceSetPod(
 		name = its.Name
 	}
 	ml := map[string]string{
-		"workloads.kubeblocks.io/managed-by": workloads.Kind,
+		"workloads.kubeblocks.io/managed-by": workloads.InstanceSetKind,
 		"workloads.kubeblocks.io/instance":   name,
 	}
 	podFactory := NewPodFactory(testCtx.DefaultNamespace, podName).
-		SetOwnerReferences(workloads.GroupVersion.String(), workloads.Kind, its).
+		SetOwnerReferences(workloads.GroupVersion.String(), workloads.InstanceSetKind, its).
 		AddAppInstanceLabel(clusterName).
 		AddAppComponentLabel(consensusCompName).
 		AddAppManagedByLabel().

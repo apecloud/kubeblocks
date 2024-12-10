@@ -177,7 +177,7 @@ func mergeMap[K comparable, V any](src, dst *map[K]V) {
 func getMatchLabels(name string) map[string]string {
 	return map[string]string{
 		constant.AppManagedByLabelKey: constant.AppName,
-		WorkloadsManagedByLabelKey:    workloads.Kind,
+		WorkloadsManagedByLabelKey:    workloads.InstanceSetKind,
 		WorkloadsInstanceLabelKey:     name,
 	}
 }

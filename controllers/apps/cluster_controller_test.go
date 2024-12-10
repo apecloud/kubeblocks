@@ -36,6 +36,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/generics"
@@ -107,7 +108,7 @@ var _ = Describe("Cluster Controller", func() {
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupSignature, true, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupPolicySignature, true, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.VolumeSnapshotSignature, true, inNS)
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ServiceSignature, true, inNS)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ServiceSignature, true, inNS, ml)
 		// non-namespaced
 		testapps.ClearResources(&testCtx, generics.BackupPolicyTemplateSignature, ml)
 		testapps.ClearResources(&testCtx, generics.ActionSetSignature, ml)
@@ -1180,7 +1181,7 @@ var _ = Describe("Cluster Controller", func() {
 
 			By("update cluster to upgrade component definition")
 			Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *appsv1.Cluster) {
-				cluster.Spec.ComponentSpecs[0].ComponentDef = ""
+				cluster.Spec.ComponentSpecs[0].ComponentDef = newCompDefObj.Name
 			})()).ShouldNot(HaveOccurred())
 
 			By("check cluster and component objects been upgraded")
@@ -1192,6 +1193,137 @@ var _ = Describe("Cluster Controller", func() {
 				g.Expect(comp.Spec.CompDef).Should(Equal(newCompDefObj.Name))
 				g.Expect(comp.Spec.ServiceVersion).Should(Equal(defaultServiceVersion))
 			})).Should(Succeed())
+		})
+
+		Context("cluster component annotations and labels", func() {
+			BeforeEach(func() {
+				cleanEnv()
+				createAllDefinitionObjects()
+			})
+
+			AfterEach(func() {
+				cleanEnv()
+			})
+
+			addMetaMap := func(metaMap *map[string]string, key string, value string) {
+				if *metaMap == nil {
+					*metaMap = make(map[string]string)
+				}
+				(*metaMap)[key] = value
+			}
+
+			checkRelatedObject := func(compName string, checkFunc func(g Gomega, obj client.Object)) {
+				// check related services of the component
+				defaultSvcName := constant.GenerateComponentServiceName(clusterObj.Name, compName, "")
+				Eventually(testapps.CheckObj(&testCtx, client.ObjectKey{Name: defaultSvcName,
+					Namespace: testCtx.DefaultNamespace}, func(g Gomega, svc *corev1.Service) {
+					checkFunc(g, svc)
+				})).Should(Succeed())
+
+				// check related account secret of the component
+				rootAccountSecretName := constant.GenerateAccountSecretName(clusterObj.Name, compName, "root")
+				Eventually(testapps.CheckObj(&testCtx, client.ObjectKey{Name: rootAccountSecretName,
+					Namespace: testCtx.DefaultNamespace}, func(g Gomega, secret *corev1.Secret) {
+					checkFunc(g, secret)
+				})).Should(Succeed())
+			}
+
+			testUpdateAnnoAndLabels := func(compName string,
+				changeCluster func(cluster *appsv1.Cluster),
+				checkWorkloadFunc func(g Gomega, labels, annotations map[string]string),
+				checkRelatedObjFunc func(g Gomega, obj client.Object)) {
+				Expect(testapps.ChangeObj(&testCtx, clusterObj, func(obj *appsv1.Cluster) {
+					changeCluster(obj)
+				})).Should(Succeed())
+
+				By("check component has updated")
+				workloadName := constant.GenerateWorkloadNamePattern(clusterObj.Name, defaultCompName)
+				Eventually(testapps.CheckObj(&testCtx, client.ObjectKey{Name: workloadName,
+					Namespace: testCtx.DefaultNamespace}, func(g Gomega, compObj *appsv1.Component) {
+					checkWorkloadFunc(g, compObj.Spec.Labels, compObj.Spec.Annotations)
+				})).Should(Succeed())
+
+				By("check related objects annotations and labels")
+				checkRelatedObject(defaultCompName, func(g Gomega, obj client.Object) {
+					checkRelatedObjFunc(g, obj)
+				})
+
+				By("InstanceSet.spec.template.annotations/labels need to be consistent with component")
+				// The labels and annotations of the Pod will be kept consistent with those of the InstanceSet
+				Eventually(testapps.CheckObj(&testCtx, client.ObjectKey{Name: workloadName, Namespace: testCtx.DefaultNamespace},
+					func(g Gomega, instanceSet *workloadsv1.InstanceSet) {
+						checkWorkloadFunc(g, instanceSet.Spec.Template.GetLabels(), instanceSet.Spec.Template.GetAnnotations())
+					})).Should(Succeed())
+			}
+
+			It("test add/override annotations and labels", func() {
+				By("creating a cluster")
+				clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
+					WithRandomName().
+					AddComponent(defaultCompName, compDefObj.Name).
+					SetServiceVersion(defaultServiceVersion).
+					SetReplicas(3).
+					Create(&testCtx).
+					GetObject()
+
+				By("add annotations and labels")
+				key1 := "key1"
+				value1 := "value1"
+				testUpdateAnnoAndLabels(defaultCompName,
+					func(cluster *appsv1.Cluster) {
+						addMetaMap(&cluster.Spec.ComponentSpecs[0].Annotations, key1, value1)
+						addMetaMap(&cluster.Spec.ComponentSpecs[0].Labels, key1, value1)
+					},
+					func(g Gomega, labels, annotations map[string]string) {
+						g.Expect(labels[key1]).Should(Equal(value1))
+						g.Expect(annotations[key1]).Should(Equal(value1))
+					},
+					func(g Gomega, obj client.Object) {
+						g.Expect(obj.GetLabels()[key1]).Should(Equal(value1))
+						g.Expect(obj.GetAnnotations()[key1]).Should(Equal(value1))
+					})
+
+				By("override annotations and labels")
+				value2 := "value2"
+				testUpdateAnnoAndLabels(defaultCompName,
+					func(cluster *appsv1.Cluster) {
+						addMetaMap(&cluster.Spec.ComponentSpecs[0].Annotations, key1, value2)
+						addMetaMap(&cluster.Spec.ComponentSpecs[0].Labels, key1, value2)
+					},
+					func(g Gomega, labels, annotations map[string]string) {
+						g.Expect(labels[key1]).Should(Equal(value2))
+						g.Expect(annotations[key1]).Should(Equal(value2))
+					},
+					func(g Gomega, obj client.Object) {
+						g.Expect(obj.GetLabels()[key1]).Should(Equal(value2))
+						g.Expect(obj.GetAnnotations()[key1]).Should(Equal(value2))
+					})
+
+				By("delete the annotations and labels, but retain the deleted annotations and labels for related objects")
+				key2 := "key2"
+				testUpdateAnnoAndLabels(defaultCompName,
+					func(cluster *appsv1.Cluster) {
+						cluster.Spec.ComponentSpecs[0].Annotations = map[string]string{
+							key2: value2,
+						}
+						cluster.Spec.ComponentSpecs[0].Labels = map[string]string{
+							key2: value2,
+						}
+					},
+					func(g Gomega, labels, annotations map[string]string) {
+						g.Expect(labels).ShouldNot(HaveKey(key1))
+						g.Expect(annotations).ShouldNot(HaveKey(key1))
+						g.Expect(labels[key2]).Should(Equal(value2))
+						g.Expect(annotations[key2]).Should(Equal(value2))
+					},
+					func(g Gomega, obj client.Object) {
+						g.Expect(obj.GetLabels()[key1]).Should(Equal(value2))
+						g.Expect(obj.GetAnnotations()[key1]).Should(Equal(value2))
+						g.Expect(obj.GetLabels()[key2]).Should(Equal(value2))
+						g.Expect(obj.GetAnnotations()[key2]).Should(Equal(value2))
+					})
+
+			})
 		})
 	})
 })

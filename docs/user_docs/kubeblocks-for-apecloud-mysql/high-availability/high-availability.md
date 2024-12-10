@@ -24,7 +24,7 @@ The faults here are all simulated by deleting a pod. When there are sufficient r
 
 ### Before you start
 
-* Install KubeBlocks [by kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) or [by Helm](./../../installation/install-with-helm/install-kubeblocks.md).
+* [Install KubeBlocks](./../../installation/install-kubeblocks.md).
 * Create an ApeCloud MySQL RaftGroup, refer to [Create a MySQL cluster](./../cluster-management/create-and-connect-an-apecloud-mysql-cluster.md).
 * Run `kubectl get cd apecloud-mysql -o yaml` to check whether _rolechangedprobe_ is enabled in the ApeCloud MySQL RaftGroup (it is enabled by default). If the following configuration exists, it indicates that it is enabled:
 
@@ -42,48 +42,7 @@ The faults here are all simulated by deleting a pod. When there are sufficient r
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-1. View the ApeCloud MySQL RaftGroup information. View the leader pod name in `Topology`. In this example, the leader pod's name is `mycluster-mysql-2`.
-
-    ```bash
-    kbcli cluster describe mycluster -n demo
-    ```
-
-    ![describe_cluster](./../../../img/failure_simulation_describe_cluster.png)
-2. Delete the leader pod `mycluster-mysql-2` to simulate a pod fault.
-
-    ```bash
-    kubectl delete pod mycluster-mysql-2 -n demo
-    ```
-
-    ![delete_pod](./../../../img/failure_simulation_delete_pod.png)
-3. Run `kbcli cluster describe` and `kbcli cluster connect` to check the status of the pods and RaftGroup connection.
-
-    ***Results***
-
-    The following example shows that the roles of pods have changed after the old leader pod was deleted and `mycluster-mysql-1` is elected as the new leader pod.
-
-    ```bash
-    kbcli cluster describe mycluster -n demo
-    ```
-
-    ![describe_cluster_after](./../../../img/failure_simulation_describe_cluster_after.png)
-    It shows that this ApeCloud MySQL RaftGroup can be connected within seconds.
-
-    ```bash
-    kbcli cluster connect mycluster -n demo
-    ```
-
-    ![connect_cluster_after](./../../../img/failure_simulation_connect_cluster_after.png)
-
-***How the automatic recovery works***
-
-After the leader pod is deleted, the ApeCloud MySQL RaftGroup Cluster elects a new leader. In this example, `mycluster-mysql-1` is elected as the new leader. KubeBlocks detects that the leader has changed, and sends a notification to update the access link. The original exception node automatically rebuilds and recovers to the normal RaftGroup Cluster state. It normally takes 30 seconds from exception to recovery.
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 1. View the pod role of the ApeCloud MySQL RaftGroup Cluster. In this example, the leader pod's name is `mycluster-mysql-1`.
 
@@ -133,6 +92,47 @@ After the leader pod is deleted, the ApeCloud MySQL RaftGroup Cluster elects a n
 
 </TabItem>
 
+<TabItem value="kbcli" label="kbcli">
+
+1. View the ApeCloud MySQL RaftGroup information. View the leader pod name in `Topology`. In this example, the leader pod's name is `mycluster-mysql-2`.
+
+    ```bash
+    kbcli cluster describe mycluster -n demo
+    ```
+
+    ![describe_cluster](./../../../img/failure_simulation_describe_cluster.png)
+2. Delete the leader pod `mycluster-mysql-2` to simulate a pod fault.
+
+    ```bash
+    kubectl delete pod mycluster-mysql-2 -n demo
+    ```
+
+    ![delete_pod](./../../../img/failure_simulation_delete_pod.png)
+3. Run `kbcli cluster describe` and `kbcli cluster connect` to check the status of the pods and RaftGroup connection.
+
+    ***Results***
+
+    The following example shows that the roles of pods have changed after the old leader pod was deleted and `mycluster-mysql-1` is elected as the new leader pod.
+
+    ```bash
+    kbcli cluster describe mycluster -n demo
+    ```
+
+    ![describe_cluster_after](./../../../img/failure_simulation_describe_cluster_after.png)
+    It shows that this ApeCloud MySQL RaftGroup can be connected within seconds.
+
+    ```bash
+    kbcli cluster connect mycluster -n demo
+    ```
+
+    ![connect_cluster_after](./../../../img/failure_simulation_connect_cluster_after.png)
+
+***How the automatic recovery works***
+
+After the leader pod is deleted, the ApeCloud MySQL RaftGroup Cluster elects a new leader. In this example, `mycluster-mysql-1` is elected as the new leader. KubeBlocks detects that the leader has changed, and sends a notification to update the access link. The original exception node automatically rebuilds and recovers to the normal RaftGroup Cluster state. It normally takes 30 seconds from exception to recovery.
+
+</TabItem>
+
 </Tabs>
 
 ### Single follower pod exception
@@ -141,40 +141,7 @@ After the leader pod is deleted, the ApeCloud MySQL RaftGroup Cluster elects a n
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-1. View the ApeCloud MySQL RaftGroup information and view the follower pod name in `Topology`. In this example, the follower pods are `mycluster-mysql-0` and m`mycluster-mysql-2`.
-
-    ```bash
-    kbcli cluster describe mycluster -n demo
-    ```
-
-    ![describe_cluster](./../../../img/failure_simulation_describe_cluster_after.png)
-2. Delete the follower pod `mycluster-mysql-0`.
-
-    ```bash
-    kubectl delete pod mycluster-mysql-0 -n demo
-    ```
-
-    ![delete_follower_pod](./../../../img/failure_simulation_delete_follower_pod.png)
-3. View the RaftGroup status and you can find the follower pod is being terminated.
-
-    ```bash
-    kbcli cluster describe mycluster -n demo
-    ```
-
-    ![describe_cluster_follower](./../../../img/failure_simulation_describe_cluster_follower.png)
-4. Connect to the RaftGroup and you can find this single follower exception doesn't affect the R/W of the cluster.
-
-    ```bash
-    kbcli cluster connect mycluster -n demo
-    ```
-
-    ![connect_cluster_follower](./../../../img/failure_simulation_connect_cluster_follower.png)
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 1. View the pod role again and in this example, the follower pods are `mycluster-mysql-1` and `mycluster-mysql-2`.
 
@@ -214,6 +181,39 @@ After the leader pod is deleted, the ApeCloud MySQL RaftGroup Cluster elects a n
 
 </TabItem>
 
+<TabItem value="kbcli" label="kbcli">
+
+1. View the ApeCloud MySQL RaftGroup information and view the follower pod name in `Topology`. In this example, the follower pods are `mycluster-mysql-0` and m`mycluster-mysql-2`.
+
+    ```bash
+    kbcli cluster describe mycluster -n demo
+    ```
+
+    ![describe_cluster](./../../../img/failure_simulation_describe_cluster_after.png)
+2. Delete the follower pod `mycluster-mysql-0`.
+
+    ```bash
+    kubectl delete pod mycluster-mysql-0 -n demo
+    ```
+
+    ![delete_follower_pod](./../../../img/failure_simulation_delete_follower_pod.png)
+3. View the RaftGroup status and you can find the follower pod is being terminated.
+
+    ```bash
+    kbcli cluster describe mycluster -n demo
+    ```
+
+    ![describe_cluster_follower](./../../../img/failure_simulation_describe_cluster_follower.png)
+4. Connect to the RaftGroup and you can find this single follower exception doesn't affect the R/W of the cluster.
+
+    ```bash
+    kbcli cluster connect mycluster -n demo
+    ```
+
+    ![connect_cluster_follower](./../../../img/failure_simulation_connect_cluster_follower.png)
+
+</TabItem>
+
 </Tabs>
 
 ***How the automatic recovery works***
@@ -230,40 +230,7 @@ In this way, whether exceptions occur to one leader and one follower or two foll
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-1. View the ApeCloud MySQL RaftGroup information and view the follower pod name in `Topology`. In this example, the follower pods are `mycluster-mysql-0` and `mycluster-mysql-2`.
-
-    ```bash
-    kbcli cluster describe mycluster -n demo
-    ```
-
-    ![describe_cluster](./../../../img/failure_simulation_describe_cluster_2.png)
-2. Delete these two follower pods.
-
-    ```bash
-    kubectl delete pod mycluster-mysql-0 mycluster-mysql-2 -n demo
-    ```
-
-    ![delete_two_pods](./../../../img/failure_simulation_delete_two_pods.png)
-3. View the RaftGroup status and you can find the follower pods are pending and a new leader pod is selected.
-
-    ```bash
-    kbcli cluster describe mycluster -n demo
-    ```
-
-    ![describe_two_pods](./../../../img/failure_simulation_describe_two_pods.png)
-4. Run `kbcli cluster connect mycluster` again after a few seconds and you can find the pods in the RaftGroup work normally again.
-
-    ```bash
-    kbcli cluster connect mycluster -n demo
-    ```
-
-    ![connect_two_pods](./../../../img/failure_simulation_connect_two_pods.png)
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 1. View the pod role again. In this example, the follower pods are `mycluster-mysql-1` and `mycluster-mysql-2`.
 
@@ -307,6 +274,39 @@ In this way, whether exceptions occur to one leader and one follower or two foll
 
 </TabItem>
 
+<TabItem value="kbcli" label="kbcli">
+
+1. View the ApeCloud MySQL RaftGroup information and view the follower pod name in `Topology`. In this example, the follower pods are `mycluster-mysql-0` and `mycluster-mysql-2`.
+
+    ```bash
+    kbcli cluster describe mycluster -n demo
+    ```
+
+    ![describe_cluster](./../../../img/failure_simulation_describe_cluster_2.png)
+2. Delete these two follower pods.
+
+    ```bash
+    kubectl delete pod mycluster-mysql-0 mycluster-mysql-2 -n demo
+    ```
+
+    ![delete_two_pods](./../../../img/failure_simulation_delete_two_pods.png)
+3. View the RaftGroup status and you can find the follower pods are pending and a new leader pod is selected.
+
+    ```bash
+    kbcli cluster describe mycluster -n demo
+    ```
+
+    ![describe_two_pods](./../../../img/failure_simulation_describe_two_pods.png)
+4. Run `kbcli cluster connect mycluster` again after a few seconds and you can find the pods in the RaftGroup work normally again.
+
+    ```bash
+    kbcli cluster connect mycluster -n demo
+    ```
+
+    ![connect_two_pods](./../../../img/failure_simulation_connect_two_pods.png)
+
+</TabItem>
+
 </Tabs>
 
 ***How the automatic recovery works***
@@ -319,40 +319,7 @@ When two pods of the ApeCloud MySQL RaftGroup are exceptional, pods are unavaila
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-1. Run the command below to view the ApeCloud MySQL RaftGroup information and view the pods' names in `Topology`.
-
-    ```bash
-    kbcli cluster describe mycluster -n demo
-    ```
-
-    ![describe_cluster](./../../../img/failure_simulation_describe_two_pods.png)
-2. Delete all pods.
-
-    ```bash
-    kubectl delete pod mycluster-mysql-1 mycluster-mysql-0 mycluster-mysql-2 -n demo
-    ```
-
-    ![delete_three_pods](./../../../img/failure_simulation_delete_three_pods.png)
-3. Run the command below to view the cluster and pod status. After a few seconds, you can find all pods are running again and a new leader is selected.
-
-    ```bash
-    kbcli cluster describe mycluster -n demo
-    ```
-
-    ![describe_three_clusters](./../../../img/failure_simulation_describe_three_pods.png)
-4. Connect to the cluster and the connection works normally again.
-
-    ```bash
-    kbcli cluster connect mycluster -n demo
-    ```
-
-    ![connect_three_clusters](./../../../img/failure_simulation_connect_three_pods.png)
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 1. View the role of pods.
 
@@ -391,6 +358,39 @@ When two pods of the ApeCloud MySQL RaftGroup are exceptional, pods are unavaila
     ```
 
     ![connect_three_clusters](./../../../img/api-ha-all-pods-connect-after.png)
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+1. Run the command below to view the ApeCloud MySQL RaftGroup information and view the pods' names in `Topology`.
+
+    ```bash
+    kbcli cluster describe mycluster -n demo
+    ```
+
+    ![describe_cluster](./../../../img/failure_simulation_describe_two_pods.png)
+2. Delete all pods.
+
+    ```bash
+    kubectl delete pod mycluster-mysql-1 mycluster-mysql-0 mycluster-mysql-2 -n demo
+    ```
+
+    ![delete_three_pods](./../../../img/failure_simulation_delete_three_pods.png)
+3. Run the command below to view the cluster and pod status. After a few seconds, you can find all pods are running again and a new leader is selected.
+
+    ```bash
+    kbcli cluster describe mycluster -n demo
+    ```
+
+    ![describe_three_clusters](./../../../img/failure_simulation_describe_three_pods.png)
+4. Connect to the cluster and the connection works normally again.
+
+    ```bash
+    kbcli cluster connect mycluster -n demo
+    ```
+
+    ![connect_three_clusters](./../../../img/failure_simulation_connect_three_pods.png)
 
 </TabItem>
 

@@ -38,9 +38,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
@@ -1275,6 +1275,20 @@ var _ = Describe("Component Controller", func() {
 	}
 
 	testCompTLSConfig := func(compName, compDefName string) {
+		tls := kbappsv1.TLS{
+			VolumeName:  "tls",
+			MountPath:   "/etc/pki/tls",
+			DefaultMode: ptr.To(int32(0600)),
+			CAFile:      ptr.To("ca.pem"),
+			CertFile:    ptr.To("cert.pem"),
+			KeyFile:     ptr.To("key.pem"),
+		}
+
+		By("update comp definition to set the TLS")
+		Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(compDefObj), func(compDef *kbappsv1.ComponentDefinition) {
+			compDef.Spec.TLS = &tls
+		})()).Should(Succeed())
+
 		createClusterObj(compName, compDefName, func(f *testapps.MockClusterFactory) {
 			issuer := &kbappsv1.Issuer{
 				Name: kbappsv1.IssuerKubeBlocks,
@@ -1288,30 +1302,30 @@ var _ = Describe("Component Controller", func() {
 			Name:      plan.GenerateTLSSecretName(clusterObj.Name, compName),
 		}
 		Eventually(testapps.CheckObj(&testCtx, secretKey, func(g Gomega, secret *corev1.Secret) {
-			g.Expect(secret.Data).Should(HaveKey(constant.CAName))
-			g.Expect(secret.Data).Should(HaveKey(constant.CertName))
-			g.Expect(secret.Data).Should(HaveKey(constant.KeyName))
+			g.Expect(secret.Data).Should(HaveKey(*tls.CAFile))
+			g.Expect(secret.Data).Should(HaveKey(*tls.CertFile))
+			g.Expect(secret.Data).Should(HaveKey(*tls.KeyFile))
 		})).Should(Succeed())
 
 		By("check pod's volumes and mounts")
 		targetVolume := corev1.Volume{
-			Name: constant.VolumeName,
+			Name: tls.VolumeName,
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
 					SecretName: secretKey.Name,
 					Items: []corev1.KeyToPath{
-						{Key: constant.CAName, Path: constant.CAName},
-						{Key: constant.CertName, Path: constant.CertName},
-						{Key: constant.KeyName, Path: constant.KeyName},
+						{Key: *tls.CAFile, Path: *tls.CAFile},
+						{Key: *tls.CertFile, Path: *tls.CertFile},
+						{Key: *tls.KeyFile, Path: *tls.KeyFile},
 					},
-					Optional:    func() *bool { o := false; return &o }(),
-					DefaultMode: func() *int32 { m := int32(0600); return &m }(),
+					Optional:    ptr.To(false),
+					DefaultMode: tls.DefaultMode,
 				},
 			},
 		}
 		targetVolumeMount := corev1.VolumeMount{
-			Name:      constant.VolumeName,
-			MountPath: constant.MountPath,
+			Name:      tls.VolumeName,
+			MountPath: tls.MountPath,
 			ReadOnly:  true,
 		}
 		itsKey := types.NamespacedName{
@@ -1325,9 +1339,6 @@ var _ = Describe("Component Controller", func() {
 				g.Expect(c.VolumeMounts).Should(ContainElements(targetVolumeMount))
 			}
 		})).Should(Succeed())
-	}
-
-	testCompConfiguration := func(compName, compDefName string) {
 	}
 
 	checkRBACResourcesExistence := func(saName string, expectExisted bool) {
@@ -1582,71 +1593,6 @@ var _ = Describe("Component Controller", func() {
 		})).Should(Succeed())
 	}
 
-	testUpdateKubeBlocksToolsImage := func(compName, compDefName string) {
-		createClusterObj(compName, compDefName, nil)
-
-		oldToolsImage := viper.GetString(constant.KBToolsImage)
-		newToolsImage := fmt.Sprintf("%s-%s", oldToolsImage, rand.String(4))
-		defer func() {
-			viper.Set(constant.KBToolsImage, oldToolsImage)
-		}()
-
-		underlyingWorkload := func() *workloads.InstanceSet {
-			itsList := testk8s.ListAndCheckInstanceSet(&testCtx, clusterKey)
-			return &itsList.Items[0]
-		}
-
-		initWorkloadGeneration := underlyingWorkload().GetGeneration()
-		Expect(initWorkloadGeneration).ShouldNot(Equal(0))
-
-		checkWorkloadGenerationAndToolsImage := func(assertion func(any, ...any) AsyncAssertion,
-			workloadGenerationExpected int64, oldImageCntExpected, newImageCntExpected int) {
-			assertion(func(g Gomega) {
-				its := underlyingWorkload()
-				g.Expect(its.Generation).Should(Equal(workloadGenerationExpected))
-				oldImageCnt := 0
-				newImageCnt := 0
-				for _, c := range its.Spec.Template.Spec.Containers {
-					if c.Image == oldToolsImage {
-						oldImageCnt += 1
-					}
-					if c.Image == newToolsImage {
-						newImageCnt += 1
-					}
-				}
-				g.Expect(oldImageCnt + newImageCnt).Should(Equal(oldImageCntExpected + newImageCntExpected))
-				g.Expect(oldImageCnt).Should(Equal(oldImageCntExpected))
-				g.Expect(newImageCnt).Should(Equal(newImageCntExpected))
-			}).Should(Succeed())
-		}
-
-		By("check the workload generation as init")
-		checkWorkloadGenerationAndToolsImage(Consistently, initWorkloadGeneration, 1, 0)
-
-		By("update kubeblocks tools image")
-		viper.Set(constant.KBToolsImage, newToolsImage)
-
-		By("update component annotation to trigger component status reconcile")
-		Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
-			comp.Annotations = map[string]string{"time": time.Now().Format(time.RFC3339)}
-		})()).Should(Succeed())
-		checkWorkloadGenerationAndToolsImage(Consistently, initWorkloadGeneration, 1, 0)
-
-		By("update spec to trigger component spec reconcile, but workload not changed")
-		Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *kbappsv1.Cluster) {
-			cluster.Spec.ComponentSpecs[0].ServiceRefs = []kbappsv1.ServiceRef{
-				{Name: randomStr()}, // set a non-existed reference.
-			}
-		})()).Should(Succeed())
-		checkWorkloadGenerationAndToolsImage(Consistently, initWorkloadGeneration, 1, 0)
-
-		By("update replicas to trigger component spec and workload reconcile")
-		Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *kbappsv1.Cluster) {
-			cluster.Spec.ComponentSpecs[0].Replicas += 1
-		})()).Should(Succeed())
-		checkWorkloadGenerationAndToolsImage(Eventually, initWorkloadGeneration+1, 0, 1)
-	}
-
 	Context("provisioning", func() {
 		BeforeEach(func() {
 			createAllDefinitionObjects()
@@ -1703,10 +1649,6 @@ var _ = Describe("Component Controller", func() {
 			testCompTLSConfig(defaultCompName, compDefName)
 		})
 
-		It("with component configurations", func() {
-			testCompConfiguration(defaultCompName, compDefName)
-		})
-
 		It("with component RBAC set", func() {
 			testCompRBAC(defaultCompName, compDefName, "")
 		})
@@ -1717,10 +1659,6 @@ var _ = Describe("Component Controller", func() {
 
 		It("create component with custom RBAC which is already exist created by User", func() {
 			tesCreateCompWithRBACCreateByUser(defaultCompName, compDefName)
-		})
-
-		It("update kubeblocks-tools image", func() {
-			testUpdateKubeBlocksToolsImage(defaultCompName, compDefName)
 		})
 	})
 
@@ -1887,7 +1825,7 @@ var _ = Describe("Component Controller", func() {
 		}
 
 		checkCompRunning := func() {
-			checkCompRunningAs(kbappsv1.UpdatingComponentPhase)
+			checkCompRunningAs(kbappsv1.StartingComponentPhase)
 		}
 
 		checkCompStopped := func() {
@@ -1966,7 +1904,50 @@ var _ = Describe("Component Controller", func() {
 				g.Expect(comp.Spec.Replicas).Should(Equal(3))
 				g.Expect(comp.Status.ObservedGeneration).Should(Equal(comp.Generation))
 				g.Expect(comp.Status.Phase).Should(Equal(kbappsv1.UpdatingComponentPhase))
+			}))
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(*its.Spec.Replicas).To(BeEquivalentTo(3))
+			}))
+		})
 
+		It("h-scale a stopped component - w/ data actions", func() {
+			By("update the cmpd object to set data actions")
+			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(compDefObj),
+				func(cmpd *kbappsv1.ComponentDefinition) {
+					if cmpd.Spec.LifecycleActions == nil {
+						cmpd.Spec.LifecycleActions = &kbappsv1.ComponentLifecycleActions{}
+					}
+					cmpd.Spec.LifecycleActions.DataLoad = testapps.NewLifecycleAction("data-load")
+					cmpd.Spec.LifecycleActions.DataDump = testapps.NewLifecycleAction("data-dump")
+				})()).Should(Succeed())
+
+			createClusterObjWithPhase(defaultCompName, compDefName, func(f *testapps.MockClusterFactory) {
+				f.SetStop(func() *bool { b := true; return &b }())
+			}, kbappsv1.StoppedClusterPhase)
+			checkCompStopped()
+
+			By("scale-out")
+			changeCompReplicas(clusterKey, 3, &clusterObj.Spec.ComponentSpecs[0])
+
+			By("check comp & its")
+			Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *kbappsv1.Component) {
+				g.Expect(comp.Spec.Replicas).Should(Equal(3))
+				g.Expect(comp.Status.ObservedGeneration < comp.Generation).Should(BeTrue())
+				g.Expect(comp.Status.Phase).Should(Equal(kbappsv1.StoppedComponentPhase))
+			}))
+			itsKey := compKey
+			Consistently(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				g.Expect(*its.Spec.Replicas).To(BeEquivalentTo(0))
+			}))
+
+			By("start it")
+			startComp()
+
+			By("check comp & its")
+			Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *kbappsv1.Component) {
+				g.Expect(comp.Spec.Replicas).Should(Equal(3))
+				g.Expect(comp.Status.ObservedGeneration).Should(Equal(comp.Generation))
+				g.Expect(comp.Status.Phase).Should(Equal(kbappsv1.UpdatingComponentPhase))
 			}))
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 				g.Expect(*its.Spec.Replicas).To(BeEquivalentTo(3))
@@ -2052,6 +2033,94 @@ var _ = Describe("Component Controller", func() {
 				},
 			}
 			testImageUnchangedAfterNewReleasePublished(release)
+		})
+	})
+
+	Context("with registry replace enabled", func() {
+		registry := "foo.bar"
+		setRegistryConfig := func() {
+			viper.Set(constant.CfgRegistries, map[string]any{
+				"defaultRegistry": registry,
+			})
+			Expect(intctrlutil.LoadRegistryConfig()).Should(Succeed())
+		}
+
+		BeforeEach(func() {
+			createAllDefinitionObjects()
+		})
+
+		AfterEach(func() {
+			viper.Set(constant.CfgRegistries, nil)
+			Expect(intctrlutil.LoadRegistryConfig()).Should(Succeed())
+		})
+
+		It("replaces image registry", func() {
+			setRegistryConfig()
+
+			createClusterObj(defaultCompName, compDefName, nil)
+
+			itsKey := compKey
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				// check the image
+				c := its.Spec.Template.Spec.Containers[0]
+				g.Expect(c.Image).To(HavePrefix(registry))
+			})).Should(Succeed())
+		})
+
+		It("handles running its and upgrade", func() {
+			createClusterObj(defaultCompName, compDefName, nil)
+			itsKey := compKey
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				// check the image
+				c := its.Spec.Template.Spec.Containers[0]
+				g.Expect(c.Image).To(Equal(compVerObj.Spec.Releases[0].Images[c.Name]))
+			})).Should(Succeed())
+
+			setRegistryConfig()
+			By("trigger component reconcile")
+			now := time.Now().Format(time.RFC3339)
+			Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
+				comp.Annotations["now"] = now
+			})()).Should(Succeed())
+
+			Consistently(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				// check the image
+				c := its.Spec.Template.Spec.Containers[0]
+				g.Expect(c.Image).NotTo(HavePrefix(registry))
+			})).Should(Succeed())
+
+			By("replaces registry when upgrading")
+			release := kbappsv1.ComponentVersionRelease{
+				Name:           "8.0.31",
+				ServiceVersion: "8.0.31",
+				Images: map[string]string{
+					testapps.DefaultMySQLContainerName: "docker.io/apecloud/mysql:8.0.31",
+				},
+			}
+
+			By("publish a new release")
+			compVerKey := client.ObjectKeyFromObject(compVerObj)
+			Expect(testapps.GetAndChangeObj(&testCtx, compVerKey, func(compVer *kbappsv1.ComponentVersion) {
+				compVer.Spec.Releases = append(compVer.Spec.Releases, release)
+				compVer.Spec.CompatibilityRules[0].Releases = append(compVer.Spec.CompatibilityRules[0].Releases, release.Name)
+			})()).Should(Succeed())
+
+			By("update serviceversion in cluster")
+			Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *kbappsv1.Cluster) {
+				cluster.Spec.ComponentSpecs[0].ServiceVersion = "8.0.31"
+			})()).Should(Succeed())
+
+			By("trigger component reconcile")
+			now = time.Now().Format(time.RFC3339)
+			Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
+				comp.Annotations["now"] = now
+			})()).Should(Succeed())
+
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				// check the image
+				c := its.Spec.Template.Spec.Containers[0]
+				g.Expect(c.Image).To(HavePrefix(registry))
+			})).Should(Succeed())
 		})
 	})
 })

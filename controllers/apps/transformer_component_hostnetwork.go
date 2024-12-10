@@ -53,11 +53,12 @@ func (t *componentHostNetworkTransformer) Transform(ctx graph.TransformContext, 
 func allocateHostPorts(synthesizedComp *component.SynthesizedComponent) (map[string]map[string]int32, error) {
 	ports := map[string]map[string]bool{}
 	for _, c := range synthesizedComp.HostNetwork.ContainerPorts {
-		containerPorts := map[string]bool{}
 		for _, p := range c.Ports {
-			containerPorts[p] = true
+			if _, ok := ports[c.Container]; !ok {
+				ports[c.Container] = map[string]bool{}
+			}
+			ports[c.Container][p] = true
 		}
-		ports[c.Container] = containerPorts
 	}
 
 	pm := intctrlutil.GetPortManager()

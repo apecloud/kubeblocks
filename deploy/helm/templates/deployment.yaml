@@ -72,6 +72,7 @@ spec:
             - "--operations={{ ne .Values.controllers.operations.enabled false }}"
             - "--extensions={{- default "true" ( include "kubeblocks.addonControllerEnabled" . ) }}"
             - "--experimental={{- default "false" .Values.controllers.experimental.enabled }}"
+            - "--trace={{- default "false" .Values.controllers.trace.enabled }}"
             {{- with .Values.managedNamespaces }}
             - "--managed-namespaces={{ . }}"
             {{- end }}
@@ -183,6 +184,10 @@ spec:
               value: {{ .Values.featureGates.componentReplicasAnnotation.enabled | quote }}
             - name: IN_PLACE_POD_VERTICAL_SCALING
               value: {{ .Values.featureGates.inPlacePodVerticalScaling.enabled | quote }}
+            {{- if .Values.controllers.trace.enabled }}
+            - name: I18N_RESOURCES_NAME
+              value: {{ include "kubeblocks.i18nResourcesName" . }}
+            {{- end }}
             {{- if .Values.extraEnvs }}
             {{- toYaml .Values.extraEnvs | nindent 12 }}
             {{- end }}

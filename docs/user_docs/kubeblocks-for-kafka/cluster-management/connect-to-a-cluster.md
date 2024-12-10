@@ -90,15 +90,7 @@ If you use AWS EKS, you may want to access to the Kafka cluster from EC2 instanc
 
    <Tabs>
 
-   <TabItem value="kbcli" label="kbcli" default>
-
-   ```bash
-   kbcli cluster create kafka mycluster --host-network-accessible=true -n demo
-   ```
-
-   </TabItem>
-
-   <TabItem value="kubectl" label="kubectl">
+   <TabItem value="kubectl" label="kubectl" default>
 
    ```bash
    kubectl apply -f - <<EOF
@@ -140,6 +132,14 @@ If you use AWS EKS, you may want to access to the Kafka cluster from EC2 instanc
 
    </TabItem>
 
+   <TabItem value="kbcli" label="kbcli">
+
+   ```bash
+   kbcli cluster create kafka mycluster --host-network-accessible=true -n demo
+   ```
+
+   </TabItem>
+
    </Tabs>
 
 2. Get the corresponding ELB address.
@@ -176,15 +176,7 @@ The current version only supports Kafka broker with a single replica (combined: 
 
    <Tabs>
 
-   <TabItem value="kbcli" label="kbcli" default>
-
-   ```bash
-   kbcli cluster create kafka mycluster --publicly-accessible=true -n demo
-   ```
-
-   </TabItem>
-
-   <TabItem value="kubectl" label="kubectl">
+   <TabItem value="kubectl" label="kubectl" default>
 
    ```bash
    kubectl apply -f - <<EOF
@@ -222,6 +214,14 @@ The current version only supports Kafka broker with a single replica (combined: 
        tls: false
      terminationPolicy: Delete
    EOF
+   ```
+
+   </TabItem>
+
+   <TabItem value="kbcli" label="kbcli">
+
+   ```bash
+   kbcli cluster create kafka mycluster --publicly-accessible=true -n demo
    ```
 
    </TabItem>

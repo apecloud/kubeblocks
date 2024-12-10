@@ -24,6 +24,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 )
 
 // OpsRequestSpec defines the desired state of OpsRequest
@@ -205,12 +206,15 @@ type SpecificOpsRequest struct {
 	ExposeList []Expose `json:"expose,omitempty"`
 
 	// Specifies the parameters to back up a Cluster.
+	//
+	// +kubebuilder:validation:XValidation:rule="has(oldSelf.parameters) == has(self.parameters)",message="forbidden to update backup.parameters"
 	// +optional
 	Backup *Backup `json:"backup,omitempty"`
 
 	// Specifies the parameters to restore a Cluster.
 	// Note that this restore operation will roll back cluster services.
 	//
+	// +kubebuilder:validation:XValidation:rule="has(oldSelf.parameters) == has(self.parameters)",message="forbidden to update restore.parameters"
 	// +optional
 	Restore *Restore `json:"restore,omitempty"`
 
@@ -432,10 +436,16 @@ type OpsRequestVolumeClaimTemplate struct {
 	Name string `json:"name"`
 }
 
+// +kubebuilder:validation:XValidation:rule="has(self.shards) ? (!has(self.scaleOut) && !has(self.scaleIn)) : true",message="shards field cannot be used together with scaleOut or scaleIn"
+
 // HorizontalScaling defines the parameters of a horizontal scaling operation.
 type HorizontalScaling struct {
 	// Specifies the name of the Component.
 	ComponentOps `json:",inline"`
+
+	// Specifies the desired number of shards for the component.
+	// This parameter is mutually exclusive with other parameters.
+	Shards *int32 `json:"shards,omitempty"`
 
 	// Specifies the replica changes for scaling out components and instance templates,
 	// and brings offline instances back online. Can be used in conjunction with the "scaleIn" operation.
@@ -906,6 +916,16 @@ type Backup struct {
 	//
 	// +optional
 	ParentBackupName string `json:"parentBackupName,omitempty"`
+
+	// Specifies a list of name-value pairs representing parameters and their corresponding values.
+	// Parameters match the schema specified in the `actionset.spec.parametersSchema`
+	//
+	// +listType=map
+	// +listMapKey=name
+	// +kubebuilder:validation:MaxItems=128
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update parameters"
+	// +optional
+	Parameters []dpv1alpha1.ParameterPair `json:"parameters,omitempty"`
 }
 
 type Restore struct {
@@ -947,6 +967,16 @@ type Restore struct {
 	//
 	// This setting is useful for coordinating PostReady operations across the Cluster for optimal cluster conditions.
 	DeferPostReadyUntilClusterRunning bool `json:"deferPostReadyUntilClusterRunning,omitempty"`
+
+	// Specifies a list of name-value pairs representing parameters and their corresponding values.
+	// Parameters match the schema specified in the `actionset.spec.parametersSchema`
+	//
+	// +listType=map
+	// +listMapKey=name
+	// +kubebuilder:validation:MaxItems=128
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update parameters"
+	// +optional
+	Parameters []dpv1alpha1.ParameterPair `json:"parameters,omitempty"`
 }
 
 // OpsRequestStatus represents the observed state of an OpsRequest.
@@ -1068,6 +1098,10 @@ type LastComponentConfiguration struct {
 	// Records the `replicas` of the Component prior to any changes.
 	// +optional
 	Replicas *int32 `json:"replicas,omitempty"`
+
+	// Records the `shards` of the Component prior to any changes.
+	// +optional
+	Shards *int32 `json:"shards,omitempty"`
 
 	// Records the resources of the Component prior to any changes.
 	// +kubebuilder:pruning:PreserveUnknownFields

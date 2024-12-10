@@ -27,6 +27,7 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 )
 
@@ -44,6 +45,11 @@ var _ Client = &httpClient{}
 
 func (c *httpClient) Action(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
 	rsp := proto.ActionResponse{}
+
+	dryRun, ok := ctx.Value(constant.DryRunContextKey).(bool)
+	if ok && dryRun {
+		return rsp, nil
+	}
 
 	data, err := json.Marshal(req)
 	if err != nil {

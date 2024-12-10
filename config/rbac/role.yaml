@@ -938,6 +938,32 @@ rules:
   - list
   - watch
 - apiGroups:
+  - trace.kubeblocks.io
+  resources:
+  - reconciliationtraces
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - trace.kubeblocks.io
+  resources:
+  - reconciliationtraces/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - trace.kubeblocks.io
+  resources:
+  - reconciliationtraces/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
   - workloads.kubeblocks.io
   resources:
   - instancesets

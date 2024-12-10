@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -376,7 +377,7 @@ func overrideComponentServices(synthesizeComp *SynthesizedComponent, comp *appsv
 			svc.Annotations = svc1.Annotations
 			svc.PodService = svc1.PodService
 			if svc.DisableAutoProvision != nil {
-				svc.DisableAutoProvision = func() *bool { b := false; return &b }()
+				svc.DisableAutoProvision = ptr.To(false)
 			}
 		}
 	}

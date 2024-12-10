@@ -24,7 +24,7 @@ The faults here are all simulated by deleting a pod. When there are sufficient r
 
 ### Before you start
 
-* Install KubeBlocks [by kbcli](./../../installation/install-with-kbcli/install-kubeblocks-with-kbcli.md) or [by Helm](./../../installation/install-with-helm/install-kubeblocks.md).
+* [Install KubeBlocks](./../../installation/install-kubeblocks.md).
 * Create a MySQL Replication Cluster, refer to [Create a MySQL cluster](./../cluster-management/create-and-connect-a-mysql-cluster.md).
 * Run `kubectl get cd mysql -o yaml` to check whether _rolechangedprobe_ is enabled in the MySQL Replication (it is enabled by default). If the following configuration exists, it indicates that it is enabled:
 
@@ -42,7 +42,35 @@ The faults here are all simulated by deleting a pod. When there are sufficient r
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
+<TabItem value="kubectl" label="kubectl" default>
+
+1. View the pod role of the MySQL Replication Cluster. In this example, the primary pod's name is `mycluster-mysql-0`.
+
+    ```bash
+    kubectl get pods --show-labels -n demo | grep role
+    ```
+
+    ![describe_pod](./../../../img/api-mysql-ha-grep-role.png)
+2. Delete the primary pod `mycluster-mysql-0` to simulate a pod fault.
+
+    ```bash
+    kubectl delete pod mycluster-mysql-0 -n demo
+    ```
+
+    ![delete_pod](./../../../img/api-mysql-ha-delete-primary-pod.png)
+3. Check the status of the pods and Replication Cluster connection.
+
+    The following example shows that the roles of pods have changed after the old primary pod was deleted and `mycluster-mysql-1` is elected as the new primary pod.
+
+    ```bash
+    kubectl get pods --show-labels -n demo | grep role
+    ```
+
+    ![describe_cluster_after](./../../../img/api-mysql-ha-delete-primary-pod-after.png)
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
 
 1. View the MySQL Replication Cluster information. View the primary pod name in `Topology`. In this example, the primary pod's name is `mycluster-mysql-0`.
 
@@ -74,34 +102,6 @@ The faults here are all simulated by deleting a pod. When there are sufficient r
 
 </TabItem>
 
-<TabItem value="kubectl" label="kubectl">
-
-1. View the pod role of the MySQL Replication Cluster. In this example, the primary pod's name is `mycluster-mysql-0`.
-
-    ```bash
-    kubectl get pods --show-labels -n demo | grep role
-    ```
-
-    ![describe_pod](./../../../img/api-mysql-ha-grep-role.png)
-2. Delete the primary pod `mycluster-mysql-0` to simulate a pod fault.
-
-    ```bash
-    kubectl delete pod mycluster-mysql-0 -n demo
-    ```
-
-    ![delete_pod](./../../../img/api-mysql-ha-delete-primary-pod.png)
-3. Check the status of the pods and Replication Cluster connection.
-
-    The following example shows that the roles of pods have changed after the old primary pod was deleted and `mycluster-mysql-1` is elected as the new primary pod.
-
-    ```bash
-    kubectl get pods --show-labels -n demo | grep role
-    ```
-
-    ![describe_cluster_after](./../../../img/api-mysql-ha-delete-primary-pod-after.png)
-
-</TabItem>
-
 </Tabs>
 
 ***How the automatic recovery works***
@@ -114,33 +114,7 @@ After the primary pod is deleted, the MySQL Replication Cluster elects a new pri
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-1. View the MySQL Replication Cluster information and view the secondary pod name in `Topology`. In this example, the secondary pod is `mycluster-mysql-0`.
-
-    ```bash
-    kbcli cluster describe mycluster
-    ```
-
-    ![describe_cluster](./../../../img/ha-mysql-primary-pod-describe-after.png)
-2. Delete the secondary pod mycluster-mysql-0.
-
-    ```bash
-    kubectl delete pod mycluster-mysql-0
-    ```
-
-    ![delete_secondary_pod](./../../../img/ha-mysql-delete-secondary.png)
-3. View the Replication Cluster status and you can find the secondary pod is being terminated in `Component.Instance`.
-
-    ```bash
-    kbcli cluster describe mycluster
-    ```
-
-    ![describe_cluster_secondary](./../../../img/ha-mysql-delete-secondary-after.png)
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 1. View the pod role again and in this example, the secondary pod is `mycluster-mysql-0`.
 
@@ -170,6 +144,32 @@ After the primary pod is deleted, the MySQL Replication Cluster elects a new pri
 
 </TabItem>
 
+<TabItem value="kbcli" label="kbcli">
+
+1. View the MySQL Replication Cluster information and view the secondary pod name in `Topology`. In this example, the secondary pod is `mycluster-mysql-0`.
+
+    ```bash
+    kbcli cluster describe mycluster
+    ```
+
+    ![describe_cluster](./../../../img/ha-mysql-primary-pod-describe-after.png)
+2. Delete the secondary pod mycluster-mysql-0.
+
+    ```bash
+    kubectl delete pod mycluster-mysql-0
+    ```
+
+    ![delete_secondary_pod](./../../../img/ha-mysql-delete-secondary.png)
+3. View the Replication Cluster status and you can find the secondary pod is being terminated in `Component.Instance`.
+
+    ```bash
+    kbcli cluster describe mycluster
+    ```
+
+    ![describe_cluster_secondary](./../../../img/ha-mysql-delete-secondary-after.png)
+
+</TabItem>
+
 </Tabs>
 
 ***How the automatic recovery works***
@@ -182,33 +182,7 @@ One secondary pod exception doesn't trigger re-electing of the primary pod or ac
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-1. Run the command below to view the MySQL Replication Cluster information and view the pods' names in `Topology`.
-
-    ```bash
-    kbcli cluster describe mycluster
-    ```
-
-    ![describe_cluster](./../../../img/ha-mysql-delete-secondary-after.png)
-2. Delete all pods.
-
-    ```bash
-    kubectl delete pod mycluster-mysql-1 mycluster-mysql-0
-    ```
-
-    ![delete_three_pods](./../../../img/ha-mysql-delete-both-pods.png)
-3. Run the command below to view the deleting process. You can find the pods are pending.
-
-    ```bash
-    kbcli cluster describe mycluster
-    ```
-
-    ![describe_three_clusters](./../../../img/ha-mysql-delete-both-pods-after.png)
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 1. View the role of pods.
 
@@ -238,6 +212,32 @@ One secondary pod exception doesn't trigger re-electing of the primary pod or ac
     ```
 
     ![describe_cluster](./../../../img/api-mysql-ha-both-pods-grep-role-after.png)
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+1. Run the command below to view the MySQL Replication Cluster information and view the pods' names in `Topology`.
+
+    ```bash
+    kbcli cluster describe mycluster
+    ```
+
+    ![describe_cluster](./../../../img/ha-mysql-delete-secondary-after.png)
+2. Delete all pods.
+
+    ```bash
+    kubectl delete pod mycluster-mysql-1 mycluster-mysql-0
+    ```
+
+    ![delete_three_pods](./../../../img/ha-mysql-delete-both-pods.png)
+3. Run the command below to view the deleting process. You can find the pods are pending.
+
+    ```bash
+    kbcli cluster describe mycluster
+    ```
+
+    ![describe_three_clusters](./../../../img/ha-mysql-delete-both-pods-after.png)
 
 </TabItem>
 

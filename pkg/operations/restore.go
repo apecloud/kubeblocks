@@ -91,7 +91,7 @@ func (r RestoreOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clie
 	}
 	opsRequest.Labels[constant.AppInstanceLabelKey] = opsRequest.Spec.GetClusterName()
 	opsRequest.Labels[constant.OpsRequestTypeLabelKey] = string(opsRequest.Spec.Type)
-	scheme, _ := opsv1alpha1.SchemeBuilder.Build()
+	scheme, _ := appsv1.SchemeBuilder.Build()
 	if err = controllerutil.SetOwnerReference(cluster, opsRequest, scheme); err != nil {
 		return err
 	}
@@ -193,7 +193,8 @@ func (r RestoreOpsHandler) getClusterObjFromBackup(backup *dpv1alpha1.Backup, op
 	}
 	restoreSpec := opsRequest.Spec.GetRestore()
 	// set the restore annotation to cluster
-	restoreAnnotation, err := restore.GetRestoreFromBackupAnnotation(backup, restoreSpec.VolumeRestorePolicy, restoreSpec.RestorePointInTime, restoreSpec.Env, restoreSpec.DeferPostReadyUntilClusterRunning)
+	restoreAnnotation, err := restore.GetRestoreFromBackupAnnotation(backup, restoreSpec.VolumeRestorePolicy, restoreSpec.RestorePointInTime,
+		restoreSpec.Env, restoreSpec.DeferPostReadyUntilClusterRunning, restoreSpec.Parameters)
 	if err != nil {
 		return nil, err
 	}

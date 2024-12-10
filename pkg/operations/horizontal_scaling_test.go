@@ -464,7 +464,9 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			checkOpsRequestPhaseIsSucceed(reqCtx, opsRes)
 		})
 		createOpsAndToCreatingPhase := func(reqCtx intctrlutil.RequestCtx, opsRes *OpsResource, horizontalScaling opsv1alpha1.HorizontalScaling, ignoreHscalingStrictValidate bool) *opsv1alpha1.OpsRequest {
-			horizontalScaling.ComponentName = defaultCompName
+			if horizontalScaling.ComponentName == "" {
+				horizontalScaling.ComponentName = defaultCompName
+			}
 			opsRes.OpsRequest = createHorizontalScaling(clusterName, horizontalScaling, ignoreHscalingStrictValidate)
 			opsRes.OpsRequest.Spec.Force = true
 			// set ops phase to Pending
@@ -626,6 +628,110 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsFailedPhase))
 			conditions = opsRes.OpsRequest.Status.Conditions
 			Expect(conditions[len(conditions)-1].Message).Should(ContainSubstring(`cannot be taken offline as it has been created by another running opsRequest`))
+		})
+
+		It("horizontal scaling for shards component", func() {
+			By("init operations resources")
+			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
+			// add a sharding component
+			Expect(testapps.ChangeObj(&testCtx, opsRes.Cluster, func(cluster *appsv1.Cluster) {
+				cluster.Spec.Shardings = []appsv1.ClusterSharding{
+					{
+						Name:     secondaryCompName,
+						Shards:   int32(3),
+						Template: cluster.Spec.ComponentSpecs[0],
+					},
+				}
+			})).Should(Succeed())
+
+			By("add two shards by set shards to 5")
+			reqCtx := intctrlutil.RequestCtx{Ctx: ctx}
+			_ = createOpsAndToCreatingPhase(reqCtx, opsRes, opsv1alpha1.HorizontalScaling{
+				ComponentOps: opsv1alpha1.ComponentOps{ComponentName: secondaryCompName},
+				Shards:       pointer.Int32(5),
+			}, false)
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest), func(g Gomega, ops *opsv1alpha1.OpsRequest) {
+				g.Expect(*ops.Status.LastConfiguration.Components[secondaryCompName].Shards).Should(BeEquivalentTo(3))
+			})).Should(Succeed())
+
+			By("expect component shards to 5")
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.Cluster), func(g Gomega, cluster *appsv1.Cluster) {
+				g.Expect(cluster.Spec.Shardings[0].Shards).Should(BeEquivalentTo(5))
+			})).Should(Succeed())
+
+			By("mock the new components")
+			createComponent := func(compName string) *appsv1.Component {
+				comp := testapps.NewComponentFactory(testCtx.DefaultNamespace, opsRes.Cluster.Name+"-"+compName, compDefName).
+					AddLabels(constant.AppInstanceLabelKey, opsRes.Cluster.Name).
+					AddLabels(constant.KBAppClusterUIDKey, string(opsRes.Cluster.UID)).
+					AddLabels(constant.KBAppShardingNameLabelKey, secondaryCompName).
+					AddLabels(constant.KBAppComponentLabelKey, compName).
+					SetReplicas(3).
+					Create(&testCtx).
+					GetObject()
+				Expect(testapps.ChangeObjStatus(&testCtx, comp, func() {
+					comp.Status.Phase = appsv1.CreatingComponentPhase
+				})).Should(Succeed())
+				return comp
+			}
+			comp4 := createComponent(secondaryCompName + "-comp4")
+			comp5 := createComponent(secondaryCompName + "-comp5")
+			_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest), func(g Gomega, pobj *opsv1alpha1.OpsRequest) {
+				g.Expect(pobj.Status.Progress).Should(Equal("0/2"))
+				g.Expect(pobj.Status.Components[secondaryCompName].ProgressDetails).Should(HaveLen(2))
+			})).Should(Succeed())
+
+			By("expect ops phase to succeed when new components are running")
+			// mock components and cluster is running
+			Expect(testapps.ChangeObjStatus(&testCtx, comp4, func() {
+				comp4.Status.Phase = appsv1.RunningComponentPhase
+			})).Should(Succeed())
+			Expect(testapps.ChangeObjStatus(&testCtx, comp5, func() {
+				comp5.Status.Phase = appsv1.RunningComponentPhase
+			})).Should(Succeed())
+			Expect(testapps.ChangeObjStatus(&testCtx, opsRes.Cluster, func() {
+				opsRes.Cluster.Status.Shardings = map[string]appsv1.ClusterComponentStatus{
+					secondaryCompName: {
+						Phase: appsv1.RunningComponentPhase,
+					},
+				}
+			})).Should(Succeed())
+			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest), func(g Gomega, pobj *opsv1alpha1.OpsRequest) {
+				g.Expect(pobj.Status.Progress).Should(Equal("2/2"))
+				g.Expect(pobj.Status.Phase).Should(Equal(opsv1alpha1.OpsSucceedPhase))
+			})).Should(Succeed())
+
+			By("delete one shard by set shards to 4")
+			reqCtx = intctrlutil.RequestCtx{Ctx: ctx}
+			_ = createOpsAndToCreatingPhase(reqCtx, opsRes, opsv1alpha1.HorizontalScaling{
+				ComponentOps: opsv1alpha1.ComponentOps{ComponentName: secondaryCompName},
+				Shards:       pointer.Int32(4),
+			}, false)
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest), func(g Gomega, ops *opsv1alpha1.OpsRequest) {
+				g.Expect(*ops.Status.LastConfiguration.Components[secondaryCompName].Shards).Should(BeEquivalentTo(5))
+			})).Should(Succeed())
+
+			By("expect component shards to 5")
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.Cluster), func(g Gomega, cluster *appsv1.Cluster) {
+				g.Expect(cluster.Spec.Shardings[0].Shards).Should(BeEquivalentTo(4))
+			})).Should(Succeed())
+
+			By("expect ops phase to succeed when the component is deleted")
+			// Create 3 components to mock already existing components.
+			createComponent(secondaryCompName + "-comp1")
+			createComponent(secondaryCompName + "-comp2")
+			createComponent(secondaryCompName + "-comp3")
+			testapps.DeleteObject(&testCtx, client.ObjectKeyFromObject(comp5), &appsv1.Component{})
+			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest), func(g Gomega, pobj *opsv1alpha1.OpsRequest) {
+				g.Expect(pobj.Status.Progress).Should(Equal("1/1"))
+				g.Expect(pobj.Status.Phase).Should(Equal(opsv1alpha1.OpsSucceedPhase))
+			})).Should(Succeed())
 		})
 	})
 })

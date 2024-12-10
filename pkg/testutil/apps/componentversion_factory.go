@@ -21,6 +21,7 @@ package apps
 
 import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 type MockComponentVersionFactory struct {
@@ -35,6 +36,7 @@ func NewComponentVersionFactory(name string) *MockComponentVersionFactory {
 			Releases:           []appsv1.ComponentVersionRelease{},
 		},
 	}, f)
+	f.AddAnnotations(constant.CRDAPIVersionAnnotationKey, appsv1.GroupVersion.String())
 	return f
 }
 

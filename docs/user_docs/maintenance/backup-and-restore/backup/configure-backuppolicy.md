@@ -111,7 +111,18 @@ After creating a database cluster, a BackupPolicy is created automatically for d
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
+<TabItem value="kubectl" label="kubectl" default>
+
+```bash
+kubectl get backuppolicy | grep mycluster
+>
+mycluster-mysql-backup-policy                            Available   35m
+mycluster-mysql-backup-policy-hscale                     Available   35m
+```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
 
 ```bash
 kbcli cluster list-backup-policy mysql-cluster
@@ -123,24 +134,21 @@ mysql-cluster-mysql-backup-policy-hscale   default     false     mysql-cluster  
 
 </TabItem>
 
-<TabItem value="kubectl" label="kubectl">
-
-```bash
-kubectl get backuppolicy | grep mycluster
->
-mycluster-mysql-backup-policy                            Available   35m
-mycluster-mysql-backup-policy-hscale                     Available   35m
-```
-
-</TabItem>
-
 </Tabs>
 
 The backup policy includes the backup methods supported by the cluster. Execute the following command to view the backup methods.
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
+<TabItem value="kubectl" label="kubectl" default>
+
+```bash
+kubectl get backuppolicy mycluster-mysql-backup-policy -o yaml
+```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
 
 ```bash
 kbcli cluster describe-backup-policy mysql-cluster
@@ -156,14 +164,6 @@ Backup Methods:
 NAME              ACTIONSET                           SNAPSHOT-VOLUMES
 xtrabackup        xtrabackup-for-apecloud-mysql       false
 volume-snapshot   volumesnapshot-for-apecloud-mysql   true
-```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
-
-```bash
-kubectl get backuppolicy mycluster-mysql-backup-policy -o yaml
 ```
 
 </TabItem>

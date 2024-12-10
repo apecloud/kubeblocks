@@ -270,6 +270,30 @@ spec:
                   type: object
                 type: array
                 x-kubernetes-preserve-unknown-fields: true
+              parameters:
+                description: |-
+                  Specifies a list of name-value pairs representing parameters and their corresponding values.
+                  Parameters match the schema specified in the `actionset.spec.parametersSchema`
+                items:
+                  properties:
+                    name:
+                      description: Represents the name of the parameter.
+                      type: string
+                    value:
+                      description: Represents the parameter values.
+                      type: string
+                  required:
+                  - name
+                  - value
+                  type: object
+                maxItems: 128
+                type: array
+                x-kubernetes-list-map-keys:
+                - name
+                x-kubernetes-list-type: map
+                x-kubernetes-validations:
+                - message: forbidden to update spec.parameters
+                  rule: self == oldSelf
               prepareDataConfig:
                 description: |-
                   Configuration for the action of "prepareData" phase, including the persistent volume claims
@@ -2414,6 +2438,9 @@ spec:
             required:
             - backup
             type: object
+            x-kubernetes-validations:
+            - message: forbidden to update spec.parameters
+              rule: has(oldSelf.parameters) == has(self.parameters)
           status:
             description: RestoreStatus defines the observed state of Restore
             properties:

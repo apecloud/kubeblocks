@@ -186,9 +186,9 @@ spec:
 
 KuBeBlocks 提供了三个内置变量作为 place-holder，在集群创建时会被替换为具体的值：
 
-- ${POD_ORDINAL}，即 Pod 的序数；
-- ${POD_NAME}，即 Pod 的名称，格式为 `{clusterName}-{componentName}-{podOrdinal}`；
-- ${POD_FQDN}，即 Pod 的 Full Qualified Domain Name（FQDN）。
+- `${POD_ORDINAL}`，即 Pod 的序数；
+- `${POD_NAME}`，即 Pod 的名称，格式为 `{clusterName}-{componentName}-{podOrdinal}`；
+- `${POD_FQDN}`，即 Pod 的 Full Qualified Domain Name（FQDN）。
 
 在 KubeBlocks 中，每一个有状态的组件默认都会有一个 Headless Service，名为:
 `headlessServiceName = {clusterName}-{componentName}-headless`。
@@ -226,7 +226,7 @@ KuBeBlocks 提供了三个内置变量作为 place-holder，在集群创建时�
 KubeBlocks 在解析这里的 JSONPath 时，会默认注册两个 root objects：
 
 - **componentDef**：即被引用的componentDef 对象。
-- **components**- ：即创建的 Cluster 中，被引用的 componentDef 对应的所有组件。
+- **components**：即创建的 Cluster 中，被引用的 componentDef 对应的所有组件。
 
 因此，在 `fieldPath` 中可以用 `$.componentDef.service.ports[?(@.name == "thrift")].port` 表示获取该组件定义的 service 中名为 `thrift` 的端口号。
 

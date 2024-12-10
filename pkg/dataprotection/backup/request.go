@@ -170,7 +170,7 @@ func (r *Request) buildBackupDataAction(targetPod *corev1.Pod, name string) (act
 
 	backupDataAct := r.ActionSet.Spec.Backup.BackupData
 	switch r.ActionSet.Spec.BackupType {
-	case dpv1alpha1.BackupTypeFull:
+	case dpv1alpha1.BackupTypeFull, dpv1alpha1.BackupTypeSelective:
 		podSpec, err := r.BuildJobActionPodSpec(targetPod, BackupDataContainerName, &backupDataAct.JobActionSpec)
 		if err != nil {
 			return nil, fmt.Errorf("failed to build job action pod spec: %w", err)
@@ -352,6 +352,7 @@ func (r *Request) BuildJobActionPodSpec(targetPod *corev1.Pod,
 		envVars = append(envVars, envFromTarget...)
 		if r.ActionSet != nil {
 			envVars = append(envVars, r.ActionSet.Spec.Env...)
+			envVars = append(envVars, utils.BuildEnvByParameters(r.Backup.Spec.Parameters)...)
 		}
 		// build envs for kb cluster
 		setKBClusterEnv := func(labelKey, envName string) {
@@ -405,10 +406,11 @@ func (r *Request) BuildJobActionPodSpec(targetPod *corev1.Pod,
 	if err != nil {
 		return nil, err
 	}
+	// expand the image value with the env variables.
+	image := common.Expand(job.Image, common.MappingFuncFor(utils.CovertEnvToMap(env)))
 	container := corev1.Container{
-		Name: name,
-		// expand the image value with the env variables.
-		Image:           common.Expand(job.Image, common.MappingFuncFor(utils.CovertEnvToMap(env))),
+		Name:            name,
+		Image:           intctrlutil.ReplaceImageRegistry(image),
 		Command:         job.Command,
 		Env:             env,
 		EnvFrom:         targetPod.Spec.Containers[0].EnvFrom,

@@ -160,7 +160,11 @@ EOF
 
 ```yaml
 kubectl edit cluster redis
->
+```
+
+在编辑器中修改 `spec.componentSpecs.replicas` 及 `spec.componentSpecs.offlineInstances` 的参数值。
+
+```yaml
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
@@ -170,7 +174,7 @@ spec:
   - name: proxy
     replicas: 9
     offlineInstances: ["redis-proxy-proxy-2c4g-2"]
-# ...
+...
 ```
 
 </TabItem>

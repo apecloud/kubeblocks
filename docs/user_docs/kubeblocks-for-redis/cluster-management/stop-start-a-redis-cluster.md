@@ -19,15 +19,7 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
 
     <Tabs>
 
-    <TabItem value="kbcli" label="kbcli" default>
-
-    ```bash
-    kbcli cluster stop mycluster -n demo
-    ```
-
-    </TabItem>
-
-    <TabItem value="OpsRequest" label="OpsRequest">
+    <TabItem value="OpsRequest" label="OpsRequest" default>
 
     Run the command below to stop a cluster.
 
@@ -48,11 +40,14 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
 
     <TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
 
-    Configure replicas as 0 to delete pods.
+    ```bash
+    kubectl edit cluster mycluster -n demo
+    ```
+
+    Configure the values of `replicas` as 0 to delete pods.
 
     ```yaml
-    kubectl edit cluster mycluster -n demo
-    >
+    ...
     spec:
       affinity:
         podAntiAffinity: Preferred
@@ -65,12 +60,20 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
         - running
         disableExporter: true
         name: redis
-        replicas: 0
-        ......
+        replicas: 0 # Change this value
+        ...
       - componentDef: redis-sentinel-7
         name: redis-sentinel
-        replicas: 0
-        ......
+        replicas: 0 # Change this value
+        ...
+    ```
+
+    </TabItem>
+
+    <TabItem value="kbcli" label="kbcli">
+
+    ```bash
+    kbcli cluster stop mycluster -n demo
     ```
 
     </TabItem>
@@ -81,18 +84,18 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
 
     <Tabs>
 
-    <TabItem value="kbcli" label="kbcli" default>
+    <TabItem value="kubectl" label="kubectl" default>
 
     ```bash
-    kbcli cluster list -n demo
+    kubectl get cluster mycluster -n demo
     ```
 
     </TabItem>
 
-    <TabItem value="kubectl" label="kubectl">
+    <TabItem value="kbcli" label="kbcli">
 
     ```bash
-    kubectl get cluster mycluster -n demo
+    kbcli cluster list -n demo
     ```
 
     </TabItem>
@@ -105,15 +108,7 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
 
     <Tabs>
 
-    <TabItem value="kbcli" label="kbcli" default>
-
-    ```bash
-    kbcli cluster start mycluster -n demo
-    ```
-
-    </TabItem>
-
-    <TabItem value="OpsRequest" label="OpsRequest">
+    <TabItem value="OpsRequest" label="OpsRequest" default>
 
     Apply an OpsRequest to start the cluster.
 
@@ -134,11 +129,14 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
 
     <TabItem value="Edit cluster YAML file" label="Edit cluster YAML File">
 
-    Change replicas back to the original amount to start this cluster again.
+    ```bash
+    kubectl edit cluster mycluster -n demo
+    ```
+
+    Change the values of `replicas` back to the original amount to start this cluster again.
 
     ```yaml
-    kubectl edit cluster mycluster -n demo
-    >
+    ...
     spec:
       affinity:
         podAntiAffinity: Preferred
@@ -151,12 +149,20 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
         - running
         disableExporter: true
         name: redis
-        replicas: 3
-        ......
+        replicas: 3 # Change this value
+        ...
       - componentDef: redis-sentinel-7
         name: redis-sentinel
-        replicas: 3
-        ......
+        replicas: 3 # Change this value
+        ...
+    ```
+
+    </TabItem>
+
+    <TabItem value="kbcli" label="kbcli">
+
+    ```bash
+    kbcli cluster start mycluster -n demo
     ```
 
     </TabItem>
@@ -166,18 +172,18 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
 
     <Tabs>
 
-    <TabItem value="kbcli" label="kbcli" default>
+    <TabItem value="kubectl" label="kubectl" default>
 
     ```bash
-    kbcli cluster list -n demo
+    kubectl get cluster mycluster -n demo
     ```
 
     </TabItem>
 
-    <TabItem value="kubectl" label="kubectl">
+    <TabItem value="kbcli" label="kbcli">
 
     ```bash
-    kubectl get cluster mycluster -n demo
+    kbcli cluster list -n demo
     ```
 
     </TabItem>

@@ -88,12 +88,13 @@ There are two ways to apply vertical scaling.
 
    ```yaml
    kubectl edit cluster mycluster -n demo
+   ```
+
+   Edit the values of `spec.componentSpecs.resources`.
+
+   ```yaml
    >
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: Cluster
-   metadata:
-     name: mycluster
-     namespace: demo
+   ...
    spec:
      clusterDefinitionRef: apecloud-mysql
      clusterVersionRef: ac-mysql-8.0.30
@@ -101,22 +102,14 @@ There are two ways to apply vertical scaling.
      - name: mysql
        componentDefRef: mysql
        replicas: 3
-       resources: # Change the values of resources.
+       resources: # Change the values of resources
          requests:
            memory: "2Gi"
            cpu: "1"
          limits:
            memory: "4Gi"
            cpu: "2"
-       volumeClaimTemplates:
-       - name: data
-         spec:
-           accessModes:
-             - ReadWriteOnce
-           resources:
-             requests:
-               storage: 20Gi
-     terminationPolicy: Delete
+   ...
    ```
 
 2. Check whether the corresponding resources change.

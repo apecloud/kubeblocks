@@ -33,6 +33,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
+	"github.com/apecloud/kubeblocks/pkg/controller/render"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -98,7 +99,7 @@ func syncImpl(fetcher *Task,
 	synthesizedComponent *component.SynthesizedComponent,
 	revision string,
 	configSpec *appsv1.ComponentConfigSpec) (err error) {
-	err = configctrl.NewReconcilePipeline(configctrl.ReconcileCtx{
+	err = configctrl.NewReconcilePipeline(render.ReconcileCtx{
 		ResourceCtx:          fetcher.ResourceCtx,
 		Cluster:              fetcher.ClusterObj,
 		Component:            fetcher.ComponentObj,

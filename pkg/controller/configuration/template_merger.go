@@ -27,6 +27,7 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
+	"github.com/apecloud/kubeblocks/pkg/controller/render"
 )
 
 type TemplateMerger interface {
@@ -43,9 +44,7 @@ type mergeContext struct {
 	configSpec appsv1.ComponentConfigSpec
 	ccSpec     *appsv1beta1.ConfigConstraintSpec
 
-	builder *configTemplateBuilder
-	ctx     context.Context
-	client  client.Client
+	render.TemplateRender
 }
 
 func (m *mergeContext) renderTemplate() (map[string]string, error) {
@@ -54,7 +53,7 @@ func (m *mergeContext) renderTemplate() (map[string]string, error) {
 		Namespace:   m.template.Namespace,
 		TemplateRef: m.template.TemplateRef,
 	}
-	configs, err := renderConfigMapTemplate(m.builder, templateSpec, m.ctx, m.client)
+	configs, err := m.RenderConfigMapTemplate(templateSpec)
 	if err != nil {
 		return nil, err
 	}
@@ -119,14 +118,16 @@ func (c *configOnlyAddMerger) Merge(baseData map[string]string, updatedData map[
 	return nil, core.MakeError("not implemented")
 }
 
-func NewTemplateMerger(template appsv1.ConfigTemplateExtension, ctx context.Context, cli client.Client, builder *configTemplateBuilder, configSpec appsv1.ComponentConfigSpec, ccSpec *appsv1beta1.ConfigConstraintSpec) (TemplateMerger, error) {
+func NewTemplateMerger(template appsv1.ConfigTemplateExtension,
+	templateRender render.TemplateRender,
+	configSpec appsv1.ComponentConfigSpec,
+	ccSpec *appsv1beta1.ConfigConstraintSpec) (TemplateMerger, error) {
 	templateData := &mergeContext{
 		configSpec: configSpec,
 		template:   template,
-		ctx:        ctx,
-		client:     cli,
-		builder:    builder,
 		ccSpec:     ccSpec,
+
+		TemplateRender: templateRender,
 	}
 
 	var merger TemplateMerger
@@ -145,8 +146,8 @@ func NewTemplateMerger(template appsv1.ConfigTemplateExtension, ctx context.Cont
 	return merger, nil
 }
 
-func mergerConfigTemplate(template *appsv1.LegacyRenderedTemplateSpec,
-	builder *configTemplateBuilder,
+func mergerConfigTemplate(template appsv1.ConfigTemplateExtension,
+	templateRender render.TemplateRender,
 	configSpec appsv1.ComponentConfigSpec,
 	baseData map[string]string,
 	ctx context.Context, cli client.Client) (map[string]string, error) {
@@ -165,7 +166,7 @@ func mergerConfigTemplate(template *appsv1.LegacyRenderedTemplateSpec,
 		return nil, core.MakeError("importedConfigTemplate require ConfigConstraint.Spec.FileFormatConfig, configSpec[%v]", configSpec)
 	}
 
-	templateMerger, err := NewTemplateMerger(template.ConfigTemplateExtension, ctx, cli, builder, configSpec, &ccObj.Spec)
+	templateMerger, err := NewTemplateMerger(template, templateRender, configSpec, &ccObj.Spec)
 	if err != nil {
 		return nil, err
 	}

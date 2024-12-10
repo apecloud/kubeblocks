@@ -42,8 +42,8 @@ import (
 	cfgcm "github.com/apecloud/kubeblocks/pkg/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
+	"github.com/apecloud/kubeblocks/pkg/controller/render"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -185,7 +185,7 @@ func (r *ReconfigureReconciler) sync(reqCtx intctrlutil.RequestCtx, configMap *c
 
 	reconcileContext := newConfigReconcileContext(
 		reqCtx.Ctx,
-		&configctrl.ResourceCtx{
+		&render.ResourceCtx{
 			Context:       reqCtx.Ctx,
 			Client:        r.Client,
 			Namespace:     configMap.Namespace,

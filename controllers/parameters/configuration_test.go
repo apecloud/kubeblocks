@@ -179,7 +179,6 @@ func cleanEnv() {
 	inNS := client.InNamespace(testCtx.DefaultNamespace)
 	ml := client.HasLabels{testCtx.TestObjLabelKey}
 	// non-namespaced
-	testapps.ClearResources(&testCtx, generics.ConfigConstraintSignature, ml)
 	testapps.ClearResources(&testCtx, generics.ParametersDefinitionSignature, ml)
 	testapps.ClearResources(&testCtx, generics.ParamConfigRendererSignature, ml)
 	// namespaced
@@ -187,7 +186,6 @@ func cleanEnv() {
 	testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ConfigMapSignature, true, inNS)
 	testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.SecretSignature, true, inNS)
 	testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.InstanceSetSignature, true, inNS, ml)
-	testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ConfigurationSignature, false, inNS, ml)
 	testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ComponentParameterSignature, true, inNS)
 	testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ParameterSignature, true, inNS, ml)
 }

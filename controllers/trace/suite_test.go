@@ -42,10 +42,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	tracev1 "github.com/apecloud/kubeblocks/apis/trace/v1"
 	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
@@ -93,17 +92,13 @@ var _ = BeforeSuite(func() {
 
 	initKBOwnershipRulesForTest(cfg)
 
-	err = appsv1alpha1.AddToScheme(scheme.Scheme)
-	Expect(err).NotTo(HaveOccurred())
-	model.AddScheme(appsv1alpha1.AddToScheme)
-
 	err = opsv1alpha1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 	model.AddScheme(opsv1alpha1.AddToScheme)
 
-	err = appsv1beta1.AddToScheme(scheme.Scheme)
+	err = parametersv1alpha1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
-	model.AddScheme(appsv1beta1.AddToScheme)
+	model.AddScheme(parametersv1alpha1.AddToScheme)
 
 	err = kbappsv1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
@@ -178,7 +173,7 @@ func mockObjects(k8sMock *mocks.MockClient) (*kbappsv1.Cluster, []kbappsv1.Compo
 		&batchv1.JobList{},
 		&dpv1alpha1.BackupList{},
 		&dpv1alpha1.RestoreList{},
-		&appsv1alpha1.ConfigurationList{},
+		&parametersv1alpha1.ComponentParameterList{},
 	}
 	for _, secondary := range componentSecondaries {
 		k8sMock.EXPECT().

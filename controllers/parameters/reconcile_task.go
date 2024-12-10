@@ -21,16 +21,25 @@ package parameters
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
+	"reflect"
 	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/render"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -132,30 +141,188 @@ func syncImpl(taskCtx *TaskContext,
 	status *parametersv1alpha1.ConfigTemplateItemDetailStatus,
 	revision string,
 	configMap *corev1.ConfigMap) (err error) {
-	err = configctrl.NewReconcilePipeline(render.ReconcileCtx{
-		ResourceCtx:          fromResourceCtx(fetcher.ResourceCtx),
+	if intctrlutil.IsApplyConfigChanged(configMap, item) {
+		return nil
+	}
+
+	failStatus := func(err error) error {
+		status.Message = pointer.String(err.Error())
+		status.Phase = parametersv1alpha1.CMergeFailedPhase
+		return err
+	}
+
+	reconcileCtx := &render.ReconcileCtx{
+		ResourceCtx:          fetcher.ResourceCtx,
 		Cluster:              fetcher.ClusterObj,
 		Component:            fetcher.ComponentObj,
 		SynthesizedComponent: taskCtx.component,
 		PodSpec:              taskCtx.component.PodSpec,
-	}, item, status, configMap, taskCtx.componentParameter).
-		ComponentAndComponentDef().
-		PrepareForTemplate().
-		RerenderTemplate().
-		ApplyParameters().
-		UpdateConfigVersion(revision).
-		Sync().
-		Complete()
-
-	if err != nil {
-		status.Message = cfgutil.ToPointer(err.Error())
-		status.Phase = parametersv1alpha1.CMergeFailedPhase
-	} else {
-		status.Message = nil
-		status.Phase = parametersv1alpha1.CMergedPhase
 	}
+
+	var baseConfig = configMap
+	var updatedConfig *corev1.ConfigMap
+	if intctrlutil.IsRerender(configMap, item) {
+		if baseConfig, err = configctrl.RerenderParametersTemplate(reconcileCtx, item, taskCtx.configRender, taskCtx.paramsDefs); err != nil {
+			return failStatus(err)
+		}
+		updatedConfig = baseConfig
+	}
+	if len(item.ConfigFileParams) != 0 {
+		if updatedConfig, err = configctrl.ApplyParameters(item, baseConfig, taskCtx.configRender, taskCtx.paramsDefs); err != nil {
+			return failStatus(err)
+		}
+	}
+	if err = persistUpdatedParameters(fetcher.ResourceCtx, taskCtx.component, taskCtx.configRender, updatedConfig, configMap, fetcher.ComponentParameterObj, item, revision); err != nil {
+		return failStatus(err)
+	}
+
+	status.Message = nil
+	status.Phase = parametersv1alpha1.CMergedPhase
 	status.UpdateRevision = revision
+	return nil
+}
+
+// persistUpdatedParameters merges and updates parameter-related configmaps.
+// It first calls mergeAndApplyConfig to merge and update the configmap.
+// If the updatedConfig is nil, it returns nil. Otherwise, it calls updateInjectedEnvVars
+// to check and update the injected environment variables.
+func persistUpdatedParameters(rctx *render.ResourceCtx,
+	comp *component.SynthesizedComponent,
+	configRender *parametersv1alpha1.ParameterDrivenConfigRender,
+	updatedConfig *corev1.ConfigMap,
+	original *corev1.ConfigMap,
+	owner client.Object,
+	item parametersv1alpha1.ConfigTemplateItemDetail,
+	revision string) error {
+	if err := mergeAndApplyConfig(rctx, updatedConfig, original, owner, item, revision); err != nil {
+		return err
+	}
+	if updatedConfig == nil {
+		return nil
+	}
+	return updateInjectedEnvVars(rctx, comp, configRender, updatedConfig, owner, item, revision)
+}
+
+func updateInjectedEnvVars(rctx *render.ResourceCtx,
+	comp *component.SynthesizedComponent,
+	configRender *parametersv1alpha1.ParameterDrivenConfigRender,
+	config *corev1.ConfigMap,
+	owner client.Object,
+	item parametersv1alpha1.ConfigTemplateItemDetail,
+	revision string) error {
+	getOriginal := func(key types.NamespacedName) (*corev1.ConfigMap, error) {
+		var err error
+		var cmObj = &corev1.ConfigMap{}
+		err = rctx.Client.Get(rctx.Context, key, cmObj)
+		if err != nil && apierrors.IsNotFound(err) {
+			return nil, nil
+		}
+		return cmObj, err
+	}
+
+	envObjs, err := configctrl.InjectTemplateEnvFrom(comp, nil, configRender, []*corev1.ConfigMap{config})
+	if err != nil {
+		return err
+	}
+
+	var original *corev1.ConfigMap
+	for _, obj := range envObjs {
+		if original, err = getOriginal(client.ObjectKeyFromObject(obj)); err != nil {
+			return err
+		}
+		if original == nil {
+			err = errors.Join(err, create(rctx.Context, rctx.Client, obj, updateReconcileObject(item, owner, revision)))
+		} else {
+			err = errors.Join(err, update(rctx.Context, rctx.Client, original, original, mergedConfigmap(obj, updateReconcileObject(item, owner, revision))))
+		}
+	}
 	return err
+}
+
+func mergeAndApplyConfig(resourceCtx *render.ResourceCtx,
+	expected *corev1.ConfigMap,
+	running *corev1.ConfigMap,
+	owner client.Object,
+	item parametersv1alpha1.ConfigTemplateItemDetail,
+	revision string) error {
+	switch {
+	case expected == nil: // not update
+		return update(resourceCtx.Context, resourceCtx.Client, running, running, updateReconcileObject(item, owner, revision))
+	case running == nil: // cm been deleted
+		return create(resourceCtx.Context, resourceCtx.Client, expected, updateReconcileObject(item, owner, revision))
+	default:
+		return update(resourceCtx.Context, resourceCtx.Client, running, running, mergedConfigmap(expected, updateReconcileObject(item, owner, revision)))
+	}
+}
+
+func mergedConfigmap(expected *corev1.ConfigMap, setter func(*corev1.ConfigMap) error) func(*corev1.ConfigMap) error {
+	return func(cmObj *corev1.ConfigMap) error {
+		cmObj.Data = expected.Data
+		cmObj.Labels = intctrlutil.MergeMetadataMaps(expected.Labels, cmObj.Labels)
+		cmObj.Annotations = intctrlutil.MergeMetadataMaps(expected.Annotations, cmObj.Annotations)
+		return setter(cmObj)
+	}
+}
+
+func update(ctx context.Context, cli client.Client, expected, origin *corev1.ConfigMap, setter func(*corev1.ConfigMap) error) error {
+	objectDeep := expected.DeepCopy()
+	if err := setter(objectDeep); err != nil {
+		return err
+	}
+	if reflect.DeepEqual(objectDeep.Data, origin.Data) &&
+		reflect.DeepEqual(objectDeep.Annotations, origin.Annotations) &&
+		reflect.DeepEqual(objectDeep.Labels, origin.Labels) &&
+		reflect.DeepEqual(objectDeep.Finalizers, origin.Finalizers) &&
+		reflect.DeepEqual(objectDeep.OwnerReferences, origin.OwnerReferences) {
+		return nil
+	}
+	return cli.Patch(ctx, objectDeep, client.MergeFrom(origin))
+}
+
+func create(ctx context.Context, cli client.Client, expected *corev1.ConfigMap, setter func(*corev1.ConfigMap) error) error {
+	if err := setter(expected); err != nil {
+		return err
+	}
+	return cli.Create(ctx, expected)
+}
+
+func updateReconcileObject(item parametersv1alpha1.ConfigTemplateItemDetail,
+	owner client.Object,
+	revision string) func(*corev1.ConfigMap) error {
+	return func(cmObj *corev1.ConfigMap) error {
+		if !controllerutil.ContainsFinalizer(cmObj, constant.ConfigFinalizerName) {
+			controllerutil.AddFinalizer(cmObj, constant.ConfigFinalizerName)
+		}
+		if !model.IsOwnerOf(owner, cmObj) {
+			if err := intctrlutil.SetControllerReference(owner, cmObj); err != nil {
+				return err
+			}
+		}
+		return updateConfigLabels(cmObj, item, revision)
+	}
+}
+
+func updateConfigLabels(obj *corev1.ConfigMap,
+	item parametersv1alpha1.ConfigTemplateItemDetail,
+	revision string) error {
+	if obj.Annotations == nil {
+		obj.Annotations = make(map[string]string)
+	}
+	b, err := json.Marshal(&item)
+	if err != nil {
+		return err
+	}
+	obj.Annotations[constant.ConfigAppliedVersionAnnotationKey] = string(b)
+	obj.Annotations[constant.ConfigurationRevision] = revision
+
+	if obj.Labels == nil {
+		obj.Labels = make(map[string]string)
+	}
+	hash, _ := cfgutil.ComputeHash(obj.Data)
+	obj.Labels[constant.CMInsConfigurationHashLabelKey] = hash
+	obj.Labels[constant.CMConfigurationSpecProviderLabelKey] = item.Name
+	obj.Labels[constant.CMConfigurationTemplateNameLabelKey] = item.ConfigSpec.TemplateRef
+	return nil
 }
 
 func syncStatus(configMap *corev1.ConfigMap, status *parametersv1alpha1.ConfigTemplateItemDetailStatus) (err error) {
@@ -208,14 +375,4 @@ func prepareReconcileTask(reqCtx intctrlutil.RequestCtx, cli client.Client, comp
 		Complete()
 	fetcherTask.ComponentParameterObj = componentParameter
 	return fetcherTask, err
-}
-
-func fromResourceCtx(ctx *render.ResourceCtx) *render.ResourceCtx {
-	return &render.ResourceCtx{
-		Context:       ctx.Context,
-		Client:        ctx.Client,
-		Namespace:     ctx.Namespace,
-		ClusterName:   ctx.ClusterName,
-		ComponentName: ctx.ComponentName,
-	}
 }

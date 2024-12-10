@@ -75,7 +75,7 @@ type ShardingDefinitionSpec struct {
 	//
 	// +kubebuilder:default=Serial
 	// +optional
-	ProvisionStrategy *UpdateStrategy `json:"provisionStrategy,omitempty"`
+	ProvisionStrategy *UpdateConcurrency `json:"provisionStrategy,omitempty"`
 
 	// Specifies the strategy for updating shards of the sharding. Only `Serial` and `Parallel` are supported.
 	//
@@ -83,7 +83,7 @@ type ShardingDefinitionSpec struct {
 	//
 	// +kubebuilder:default=Serial
 	// +optional
-	UpdateStrategy *UpdateStrategy `json:"updateStrategy,omitempty"`
+	UpdateStrategy *UpdateConcurrency `json:"updateStrategy,omitempty"`
 
 	// Defines a set of hooks and procedures that customize the behavior of a sharding throughout its lifecycle.
 	//

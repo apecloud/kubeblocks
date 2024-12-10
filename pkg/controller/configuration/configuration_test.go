@@ -90,11 +90,6 @@ func newAllFieldsSynthesizedComponent(compDef *appsv1.ComponentDefinition, clust
 	return synthesizeComp
 }
 
-func newAllFieldsComponent(cluster *appsv1.Cluster) *appsv1.Component {
-	comp, _ := component.BuildComponent(cluster, &cluster.Spec.ComponentSpecs[0], nil, nil)
-	return comp
-}
-
 func addTestVolumeMount(spec *corev1.PodSpec, containerName string) {
 	for i := range spec.Containers {
 		container := &spec.Containers[i]

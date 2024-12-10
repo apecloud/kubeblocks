@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"golang.org/x/exp/maps"
@@ -29,6 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
@@ -416,37 +418,55 @@ func (t *clusterNormalizationTransformer) writeBackCompNShardingSpecs(transCtx *
 }
 
 func (t *clusterNormalizationTransformer) checkNPatchCRDAPIVersionKey(transCtx *clusterTransformContext) error {
-	apiVersions := map[string][]string{}
+	apiVersion := transCtx.Cluster.Annotations[constant.CRDAPIVersionAnnotationKey]
+	setCRDAPIVersion := func() error {
+		apiVersions := map[string][]string{}
 
-	from := func(name string, annotations map[string]string) {
-		key := annotations[constant.CRDAPIVersionAnnotationKey]
-		apiVersions[key] = append(apiVersions[key], name)
-	}
-
-	if transCtx.clusterDef != nil {
-		from(transCtx.clusterDef.Name, transCtx.clusterDef.Annotations)
-	} else {
-		for _, compDef := range transCtx.componentDefs {
-			from(compDef.Name, compDef.Annotations)
+		from := func(name string, annotations map[string]string) {
+			key := annotations[constant.CRDAPIVersionAnnotationKey]
+			apiVersions[key] = append(apiVersions[key], name)
 		}
-		for _, shardingDef := range transCtx.shardingDefs {
-			from(shardingDef.Name, shardingDef.Annotations)
+
+		switch {
+		case transCtx.clusterDef != nil:
+			from(transCtx.clusterDef.Name, transCtx.clusterDef.Annotations)
+		case transCtx.Cluster.Annotations[appsv1alpha1.KBIncrementConverterAK] != "":
+			var alpha1Cluster appsv1alpha1.Cluster
+			if err := json.Unmarshal([]byte(transCtx.Cluster.Annotations[appsv1alpha1.KBIncrementConverterAK]), &alpha1Cluster); err != nil {
+				return err
+			}
+			if alpha1Cluster.Spec.ClusterDefRef != "" {
+				apiVersion = appsv1alpha1.GroupVersion.String()
+			}
+		default:
+			for _, compDef := range transCtx.componentDefs {
+				from(compDef.Name, compDef.Annotations)
+			}
+			for _, shardingDef := range transCtx.shardingDefs {
+				from(shardingDef.Name, shardingDef.Annotations)
+			}
 		}
-	}
 
-	if len(apiVersions) > 1 {
-		return fmt.Errorf("multiple CRD API versions found: %v", apiVersions)
-	}
+		if len(apiVersions) > 1 {
+			return fmt.Errorf("multiple CRD API versions found: %v", apiVersions)
+		}
 
-	apiVersion := ""
-	if len(apiVersions) == 1 {
-		apiVersion = maps.Keys(apiVersions)[0]
-		if transCtx.Cluster.Annotations == nil {
-			transCtx.Cluster.Annotations = make(map[string]string)
+		if len(apiVersions) == 1 {
+			apiVersion = maps.Keys(apiVersions)[0]
+			if transCtx.Cluster.Annotations == nil {
+				transCtx.Cluster.Annotations = make(map[string]string)
+			}
 		}
 		transCtx.Cluster.Annotations[constant.CRDAPIVersionAnnotationKey] = apiVersion
+		return nil
 	}
 
+	if apiVersion == "" {
+		// If the cluster does not specify a CRD version, default to setting it.
+		if err := setCRDAPIVersion(); err != nil {
+			return err
+		}
+	}
 	if controllerutil.IsAPIVersionSupported(apiVersion) {
 		return nil
 	}

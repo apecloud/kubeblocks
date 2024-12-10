@@ -26,7 +26,7 @@ import (
 )
 
 const (
-	kbIncrementConverterAK = "kb-increment-converter"
+	KBIncrementConverterAK = "kb-increment-converter"
 )
 
 type incrementChange any
@@ -62,7 +62,7 @@ func incrementConvertTo(converter incrementConverter, target metav1.Object) erro
 	if annotations == nil {
 		annotations = make(map[string]string)
 	}
-	annotations[kbIncrementConverterAK] = string(bytes)
+	annotations[KBIncrementConverterAK] = string(bytes)
 	target.SetAnnotations(annotations)
 
 	return nil
@@ -75,15 +75,16 @@ func incrementConvertFrom(converter incrementConverter, source metav1.Object, ic
 
 	annotations := source.GetAnnotations()
 	if annotations != nil {
-		data, ok := annotations[kbIncrementConverterAK]
+		data, ok := annotations[KBIncrementConverterAK]
 		if ok {
+			// Convert from the incremental converter only if the annotation exists.
 			if err := json.Unmarshal([]byte(data), ic); err != nil {
 				return err
 			}
-			delete(annotations, kbIncrementConverterAK)
+			delete(annotations, KBIncrementConverterAK)
 			source.SetAnnotations(annotations)
+			return converter.incrementConvertFrom(source, ic)
 		}
 	}
-
-	return converter.incrementConvertFrom(source, ic)
+	return nil
 }

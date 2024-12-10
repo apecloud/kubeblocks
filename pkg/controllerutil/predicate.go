@@ -127,21 +127,3 @@ func ObjectAPIVersionSupported(obj client.Object) bool {
 	}
 	return supportedCRDAPIVersions.Has(obj.GetAnnotations()[constant.CRDAPIVersionAnnotationKey])
 }
-
-/*func newAPIVersionPredicateFilter(objs []client.Object) func(client.Object) bool {
-	return func(obj client.Object) bool {
-		if !viper.GetBool(constant.DualOperatorsMode) {
-			return true
-		}
-		_, clusterObj := obj.(*appsv1alpha1.Cluster)
-		annotations := obj.GetAnnotations()
-		if annotations == nil {
-			return !clusterObj // for newly created clusters, let the new operator handle them first
-		}
-		apiVersion, ok := annotations[constant.CRDAPIVersionAnnotationKey]
-		if !ok {
-			return !clusterObj // for newly created clusters, let the new operator handle them first
-		}
-		return supportedCRDAPIVersions.Has(apiVersion)
-	}
-}*/

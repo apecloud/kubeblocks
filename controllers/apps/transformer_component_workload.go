@@ -445,7 +445,6 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet) *workloads.InstanceS
 	itsObjCopy.Spec.Template = *itsProto.Spec.Template.DeepCopy()
 	itsObjCopy.Spec.Replicas = itsProto.Spec.Replicas
 	itsObjCopy.Spec.Roles = itsProto.Spec.Roles
-	itsObjCopy.Spec.RoleProbe = itsProto.Spec.RoleProbe
 	itsObjCopy.Spec.MembershipReconfiguration = itsProto.Spec.MembershipReconfiguration
 	itsObjCopy.Spec.MemberUpdateStrategy = itsProto.Spec.MemberUpdateStrategy
 	itsObjCopy.Spec.Credential = itsProto.Spec.Credential

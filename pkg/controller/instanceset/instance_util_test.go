@@ -130,7 +130,7 @@ var _ = Describe("instance util test", func() {
 			Expect(nameTemplate).Should(HaveKey(its.Name + "-1"))
 			Expect(nameTemplate).Should(HaveKey(its.Name + "-2"))
 			nameTemplate[name0].PodTemplateSpec.Spec.Volumes = nil
-			defaultTemplate := BuildPodTemplate(its)
+			defaultTemplate := its.Spec.Template.DeepCopy()
 			Expect(nameTemplate[name0].PodTemplateSpec.Spec).Should(Equal(defaultTemplate.Spec))
 		})
 
@@ -167,7 +167,7 @@ var _ = Describe("instance util test", func() {
 			Expect(nameTemplate).Should(HaveKey(name0))
 			Expect(nameTemplate).Should(HaveKey(name1))
 			Expect(nameTemplate).Should(HaveKey(nameOverride0))
-			expectedTemplate := BuildPodTemplate(its)
+			expectedTemplate := its.Spec.Template.DeepCopy()
 			Expect(nameTemplate[name0].PodTemplateSpec.Spec).Should(Equal(expectedTemplate.Spec))
 			Expect(nameTemplate[name1].PodTemplateSpec.Spec).Should(Equal(expectedTemplate.Spec))
 			Expect(nameTemplate[nameOverride0].PodTemplateSpec.Spec).ShouldNot(Equal(expectedTemplate.Spec))
@@ -198,7 +198,7 @@ var _ = Describe("instance util test", func() {
 			Expect(instance.pod.Namespace).Should(Equal(its.Namespace))
 			Expect(instance.pod.Spec.Volumes).Should(HaveLen(1))
 			Expect(instance.pod.Spec.Volumes[0].Name).Should(Equal(volumeClaimTemplates[0].Name))
-			expectedTemplate := BuildPodTemplate(its)
+			expectedTemplate := its.Spec.Template.DeepCopy()
 			Expect(instance.pod.Spec).ShouldNot(Equal(expectedTemplate.Spec))
 			// reset pod.volumes, pod.hostname and pod.subdomain
 			instance.pod.Spec.Volumes = nil

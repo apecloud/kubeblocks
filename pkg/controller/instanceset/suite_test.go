@@ -145,8 +145,6 @@ var (
 		Username: workloads.CredentialVar{Value: "foo"},
 		Password: workloads.CredentialVar{Value: "bar"},
 	}
-
-	observeActions = []workloads.Action{{Command: []string{"cmd"}}}
 )
 
 func makePodUpdateReady(newRevision string, roleful bool, pods ...*corev1.Pod) {

@@ -62,15 +62,10 @@ var _ = Describe("InstanceSet Controller", func() {
 				ObjectMeta: pod.ObjectMeta,
 				Spec:       pod.Spec,
 			}
-			action := workloads.Action{
-				Image:   "foo",
-				Command: []string{"bar"},
-			}
 			its := builder.NewInstanceSetBuilder(testCtx.DefaultNamespace, name).
 				AddMatchLabelsInMap(commonLabels).
 				AddAnnotations(constant.CRDAPIVersionAnnotationKey, workloads.GroupVersion.String()).
 				SetTemplate(template).
-				AddCustomHandler(action).
 				GetObject()
 			viper.Set(constant.KBToolsImage, "kb-tool-image")
 			Expect(k8sClient.Create(ctx, its)).Should(Succeed())

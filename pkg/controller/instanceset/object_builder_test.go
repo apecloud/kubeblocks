@@ -25,7 +25,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 )
@@ -40,105 +39,7 @@ var _ = Describe("object generation transformer test.", func() {
 			SetRoles(roles).
 			SetCredential(credential).
 			SetTemplate(template).
-			SetCustomHandler(observeActions).
 			GetObject()
-	})
-
-	Context("injectRoleProbeBaseContainer function", func() {
-		It("should reuse container 'kb-role-probe' if exists", func() {
-			templateCopy := template.DeepCopy()
-			templateCopy.Spec.Containers = append(templateCopy.Spec.Containers, corev1.Container{
-				Name:  roleProbeContainerName,
-				Image: "bar",
-				Ports: []corev1.ContainerPort{
-					{
-						Name:          roleProbeGRPCPortName,
-						ContainerPort: defaultRoleProbeGRPCPort,
-					},
-					{
-						Name:          roleProbeDaemonPortName,
-						ContainerPort: defaultRoleProbeDaemonPort,
-					},
-				},
-			})
-			injectRoleProbeBaseContainer(its, templateCopy, "", nil)
-			Expect(len(templateCopy.Spec.Containers)).Should(Equal(2))
-			probeContainer := templateCopy.Spec.Containers[1]
-			Expect(len(probeContainer.Ports)).Should(Equal(2))
-			Expect(probeContainer.Ports[0].ContainerPort).Should(BeElementOf([]int32{int32(defaultRoleProbeGRPCPort), int32(defaultRoleProbeDaemonPort)}))
-		})
-
-		It("should not use default grpcPort in case of 'probe-grpc-port' existence", func() {
-			its.Spec.RoleProbe.RoleUpdateMechanism = workloads.ReadinessProbeEventUpdate
-			templateCopy := template.DeepCopy()
-			templateCopy.Spec.Containers = append(templateCopy.Spec.Containers, corev1.Container{
-				Name:  roleProbeContainerName,
-				Image: "bar",
-				Ports: []corev1.ContainerPort{
-					{
-						Name:          roleProbeGRPCPortName,
-						ContainerPort: 9555,
-					},
-					{
-						Name:          roleProbeDaemonPortName,
-						ContainerPort: defaultRoleProbeDaemonPort,
-					},
-				},
-			})
-			injectRoleProbeBaseContainer(its, templateCopy, "", nil)
-			Expect(len(templateCopy.Spec.Containers)).Should(Equal(2))
-			probeContainer := templateCopy.Spec.Containers[1]
-			Expect(len(probeContainer.Ports)).Should(Equal(2))
-			Expect(probeContainer.Ports[0].ContainerPort).Should(Equal(int32(9555)))
-		})
-
-		It("container.ports nil", func() {
-			its.Spec.RoleProbe.RoleUpdateMechanism = workloads.ReadinessProbeEventUpdate
-			templateCopy := template.DeepCopy()
-			templateCopy.Spec.Containers = append(templateCopy.Spec.Containers, corev1.Container{
-				Name:  roleProbeContainerName,
-				Image: "bar",
-				Ports: []corev1.ContainerPort{
-					{
-						Name:          roleProbeGRPCPortName,
-						ContainerPort: defaultRoleProbeGRPCPort,
-					},
-					{
-						Name:          roleProbeDaemonPortName,
-						ContainerPort: defaultRoleProbeDaemonPort,
-					},
-				},
-			})
-			injectRoleProbeBaseContainer(its, templateCopy, "", nil)
-			Expect(len(templateCopy.Spec.Containers)).Should(Equal(2))
-			probeContainer := templateCopy.Spec.Containers[1]
-			Expect(len(probeContainer.Ports)).Should(Equal(2))
-			Expect(probeContainer.Ports[0].ContainerPort).Should(Equal(int32(defaultRoleProbeGRPCPort)))
-		})
-
-		It("container.ports.containerPort negative", func() {
-			its.Spec.RoleProbe.RoleUpdateMechanism = workloads.ReadinessProbeEventUpdate
-			templateCopy := template.DeepCopy()
-			templateCopy.Spec.Containers = append(templateCopy.Spec.Containers, corev1.Container{
-				Name:  roleProbeContainerName,
-				Image: "bar",
-				Ports: []corev1.ContainerPort{
-					{
-						Name:          roleProbeGRPCPortName,
-						ContainerPort: defaultRoleProbeGRPCPort,
-					},
-					{
-						Name:          roleProbeDaemonPortName,
-						ContainerPort: defaultRoleProbeDaemonPort,
-					},
-				},
-			})
-			injectRoleProbeBaseContainer(its, templateCopy, "", nil)
-			Expect(len(templateCopy.Spec.Containers)).Should(Equal(2))
-			probeContainer := templateCopy.Spec.Containers[1]
-			Expect(len(probeContainer.Ports)).Should(Equal(2))
-			Expect(probeContainer.Ports[0].ContainerPort).Should(Equal(int32(defaultRoleProbeGRPCPort)))
-		})
 	})
 
 	Context("headless service", func() {

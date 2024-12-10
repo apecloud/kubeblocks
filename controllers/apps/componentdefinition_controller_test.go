@@ -61,7 +61,6 @@ var _ = Describe("ComponentDefinition Controller", func() {
 
 		// non-namespaced
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.ComponentDefinitionSignature, true, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.ConfigConstraintSignature, ml)
 
 		// namespaced
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.ConfigMapSignature, true, inNS, ml)

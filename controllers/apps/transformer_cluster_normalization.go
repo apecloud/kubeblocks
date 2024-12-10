@@ -430,7 +430,7 @@ func (t *clusterNormalizationTransformer) checkNPatchCRDAPIVersionKey(transCtx *
 		switch {
 		case transCtx.clusterDef != nil:
 			from(transCtx.clusterDef.Name, transCtx.clusterDef.Annotations)
-		case transCtx.Cluster.Annotations[appsv1alpha1.KBIncrementConverterAK] != "":
+		case len(transCtx.Cluster.Annotations[appsv1alpha1.KBIncrementConverterAK]) != 0:
 			var alpha1Cluster appsv1alpha1.Cluster
 			if err := json.Unmarshal([]byte(transCtx.Cluster.Annotations[appsv1alpha1.KBIncrementConverterAK]), &alpha1Cluster); err != nil {
 				return err
@@ -461,7 +461,7 @@ func (t *clusterNormalizationTransformer) checkNPatchCRDAPIVersionKey(transCtx *
 		return nil
 	}
 
-	if apiVersion == "" {
+	if len(apiVersion) == 0 {
 		// If the cluster does not specify a CRD version, default to setting it.
 		if err := setCRDAPIVersion(); err != nil {
 			return err

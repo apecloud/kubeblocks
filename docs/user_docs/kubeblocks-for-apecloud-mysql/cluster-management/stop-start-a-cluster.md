@@ -19,15 +19,7 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
 
     <Tabs>
 
-    <TabItem value="kbcli" label="kbcli" default>
-
-    ```bash
-    kbcli cluster stop mycluster -n demo
-    ```
-
-    </TabItem>
-
-    <TabItem value="OpsRequest" label="OpsRequest">
+    <TabItem value="OpsRequest" label="OpsRequest" default>
 
     ```bash
     kubectl apply -f - <<EOF
@@ -46,15 +38,14 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
   
     <TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
 
-    Configure replicas as 0 to delete pods.
+    ```bash
+    kubectl edit cluster mycluster -n demo
+    ```
+
+    Configure the value of `spec.componentSpecs.replicas` as 0 to delete pods.
 
     ```yaml
-    kubectl edit cluster mycluster -n demo
-    >
-    apiVersion: apps.kubeblocks.io/v1alpha1
-    kind: Cluster
-    metadata:
-        name: mycluster
+    ...
     spec:
       clusterDefinitionRef: apecloud-mysql
       clusterVersionRef: ac-mysql-8.0.30
@@ -63,16 +54,16 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
       - name: mysql
         componentDefRef: mysql
         disableExporter: true  
-        replicas: 0
-        volumeClaimTemplates:
-        - name: data
-          spec:
-            storageClassName: standard
-            accessModes:
-              - ReadWriteOnce
-            resources:
-              requests:
-                storage: 20Gi
+        replicas: 0 # Change this value
+    ...
+    ```
+
+    </TabItem>
+
+    <TabItem value="kbcli" label="kbcli">
+
+    ```bash
+    kbcli cluster stop mycluster -n demo
     ```
 
     </TabItem>
@@ -82,18 +73,18 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
 
     <Tabs>
 
-    <TabItem value="kbcli" label="kbcli" default>
+    <TabItem value="kubectl" label="kubectl" default>
 
     ```bash
-    kbcli cluster list mycluster -n demo
+    kubectl get cluster mycluster -n demo
     ```
 
     </TabItem>
 
-    <TabItem value="kubectl" label="kubectl">
+    <TabItem value="kbcli" label="kbcli">
 
     ```bash
-    kubectl get cluster mycluster -n demo
+    kbcli cluster list mycluster -n demo
     ```
 
     </TabItem>
@@ -106,15 +97,7 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
 
     <Tabs>
 
-    <TabItem value="kbcli" label="kbcli" default>
-
-    ```bash
-    kbcli cluster start mycluster -n demo
-    ```
-
-    </TabItem>
-
-    <TabItem value="OpsRequest" label="OpsRequest">
+    <TabItem value="OpsRequest" label="OpsRequest" default>
 
     ```bash
     kubectl apply -f - <<EOF
@@ -133,15 +116,14 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
   
     <TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
 
-    Change replicas back to the original amount to start this cluster again.
+    ```bash
+    kubectl edit cluster mycluster -n demo
+    ```
+
+    Change the value of `spec.componentSpecs.replicas` back to the original amount to start this cluster again.
 
     ```yaml
-    kubectl edit cluster mycluster -n demo
-    >
-    apiVersion: apps.kubeblocks.io/v1alpha1
-    kind: Cluster
-    metadata:
-        name: mycluster
+    ...
     spec:
       clusterDefinitionRef: apecloud-mysql
       clusterVersionRef: ac-mysql-8.0.30
@@ -150,16 +132,16 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
       - name: mysql
         componentDefRef: mysql
         disableExporter: true
-        replicas: 3
-        volumeClaimTemplates:
-        - name: data
-          spec:
-            storageClassName: standard
-            accessModes:
-              - ReadWriteOnce
-            resources:
-              requests:
-                storage: 20Gi
+        replicas: 3 # Change this value
+    ...
+    ```
+
+    </TabItem>
+
+    <TabItem value="kbcli" label="kbcli">
+
+    ```bash
+    kbcli cluster start mycluster -n demo
     ```
 
     </TabItem>
@@ -170,18 +152,18 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
 
     <Tabs>
 
-    <TabItem value="kbcli" label="kbcli" default>
+    <TabItem value="kubectl" label="kubectl" default>
 
     ```bash
-    kbcli cluster list mycluster -n demo
+    kubectl get cluster mycluster -n demo
     ```
 
     </TabItem>
 
-    <TabItem value="kubectl" label="kubectl">
+    <TabItem value="kbcli" label="kbcli">
 
     ```bash
-    kubectl get cluster mycluster -n demo
+    kbcli cluster list mycluster -n demo
     ```
 
     </TabItem>

@@ -56,7 +56,7 @@ KubeBlocks v0.8.0 发布后，数据库引擎插件（Addon）与 KubeBlocks 解
    helm list -A
    >
    NAME                 NAMESPACE	REVISION	UPDATED                                	STATUS  	 CHART                             APP VERSION
-   ......
+   ...
    kb-addon-es          kb-system	1       	2024-11-27 10:04:59.730127 +0800 CST   	deployed	 elasticsearch-0.9.0               	8.8.2   
    ```
 

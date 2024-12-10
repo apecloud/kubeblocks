@@ -17,7 +17,15 @@ KubeBlocks supports restoring clusters from backups with the following instructi
 
      <Tabs>
 
-     <TabItem value="kbcli" label="kbcli" default>
+     <TabItem value="kubectl" label="kubectl" default>
+
+     ```bash
+     kubectl get backups
+     ```
+
+     </TabItem>
+
+     <TabItem value="kbcli" label="kbcli">
 
      For existing clusters, execute:
 
@@ -33,38 +41,13 @@ KubeBlocks supports restoring clusters from backups with the following instructi
 
      </TabItem>
 
-     <TabItem value="kubectl" label="kubectl">
-
-     ```bash
-     kubectl get backups
-     ```
-
-     </TabItem>
-
      </Tabs>
 
 2. Restore clusters from a specific backup.
 
      <Tabs>
 
-     <TabItem value="kbcli" label="kbcli" default>
-
-     ```bash
-     # Restore new cluster
-     kbcli cluster restore myrestore --backup mybackup
-     >
-     Cluster myrestore created
-
-     # View the status of the restored cluster
-     kbcli cluster list myrestore
-     >
-     NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    CREATED-TIME
-     myrestore   default     apecloud-mysql       ac-mysql-8.0.30   Delete               Running   Oct 30,2023 16:26 UTC+0800
-     ```
-
-     </TabItem>
-
-     <TabItem value="kubectl" label="kubectl">
+     <TabItem value="kubectl" label="kubectl" default>
 
      You can set the `connectionPassword.annotations` of the restored cluster as that of the original cluster. The password of the original cluster can be accessed by viewing the annotation of `dataprotection.kubeblocks.io/connection-password` in the backup YAML file.
 
@@ -94,6 +77,23 @@ KubeBlocks supports restoring clusters from backups with the following instructi
                    requests:
                      storage: 20Gi
      EOF
+     ```
+
+     </TabItem>
+
+     <TabItem value="kbcli" label="kbcli">
+
+     ```bash
+     # Restore new cluster
+     kbcli cluster restore myrestore --backup mybackup
+     >
+     Cluster myrestore created
+
+     # View the status of the restored cluster
+     kbcli cluster list myrestore
+     >
+     NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    CREATED-TIME
+     myrestore   default     apecloud-mysql       ac-mysql-8.0.30   Delete               Running   Oct 30,2023 16:26 UTC+0800
      ```
 
      </TabItem>

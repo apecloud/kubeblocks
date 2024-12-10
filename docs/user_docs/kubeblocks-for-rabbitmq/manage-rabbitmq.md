@@ -274,25 +274,18 @@ mycluster                                        Delete                 Running 
 
    ```bash
    kubectl edit cluster mycluster -n demo
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: Cluster
-   metadata:
-     name: mycluster
-     namespace: demo
+   ```
+
+   Edit the value of `spec.componentSpecs.replicas`.
+
+   ```yaml
+   ...
    spec:
      componentSpecs:
      - name: rabbitmq
        componentDefRef: rabbitmq
-       replicas: 1 # Change the amount
-       volumeClaimTemplates:
-       - name: data
-         spec:
-           accessModes:
-             - ReadWriteOnce
-           resources:
-             requests:
-               storage: 20Gi
-    terminationPolicy: Delete
+       replicas: 1 # Change this value
+   ...
    ```
 
 2. Check whether the corresponding resources change.
@@ -367,11 +360,12 @@ mycluster                                        Delete                 Running 
 
    ```bash
    kubectl edit cluster mycluster -n demo
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: Cluster
-   metadata:
-     name: mycluster
-     namespace: demo
+   ```
+
+   Edit the value of `spec.componentSpecs.volumeClaimTemplates.spec.resources`.
+
+   ```yaml
+   ...
    spec:
      componentSpecs:
      - name: rabbitmq
@@ -384,8 +378,8 @@ mycluster                                        Delete                 Running 
              - ReadWriteOnce
            resources:
              requests:
-               storage: 40Gi # Change the volume storage size.
-     terminationPolicy: Delete
+               storage: 40Gi # Change the volume storage size
+   ...
    ```
 
 2. Check whether the corresponding cluster resources change.
@@ -465,6 +459,12 @@ kubect edit cluster mycluster -n demo
 
 Configure `replicas` as 0 to delete pods.
 
+```bash
+kubectl edit cluster mycluster -n demo
+```
+
+Edit the value of `replicas`.
+
 ```yaml
 ...
 spec:
@@ -515,6 +515,12 @@ kubectl edit cluster mycluster -n demo
 ```
 
 Change replicas back to the original amount to start this cluster again.
+
+```bash
+kubectl edit cluster mycluster -n demo
+```
+
+Edit the value of `replicas`.
 
 ```yaml
 ...

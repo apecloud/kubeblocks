@@ -268,11 +268,12 @@ mycluster   demo                                               Delete           
 
    ```yaml
    kubectl edit cluster mycluster -n demo
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: Cluster
-   metadata:
-     name: mycluster
-     namespace: demo
+   ```
+
+   在编辑器中修改 `spec.componentSpecs.replicas` 的参数值。
+
+   ```yaml
+   ...
    spec:
      clusterDefinitionRef: elasticsearch
      clusterVersionRef: elasticsearch-8.8.2
@@ -280,15 +281,7 @@ mycluster   demo                                               Delete           
      - name: elasticsearch
        componentDefRef: elasticsearch
        replicas: 1 # 修改该参数值
-       volumeClaimTemplates:
-       - name: data
-         spec:
-           accessModes:
-             - ReadWriteOnce
-           resources:
-             requests:
-               storage: 1Gi
-    terminationPolicy: Delete
+   ...
    ```
 
 2. 当集群状态再次回到 `Running` 后，查看相关资源是否变更。
@@ -608,29 +601,22 @@ mycluster   demo                                               Delete           
 
 1. 修改 YAML 文件中 `spec.componentSpecs.replicas` 的配置。`spec.componentSpecs.replicas` 定义了 pod 数量，修改该参数将触发集群水平扩缩容。
 
-   ```yaml
+   ```bash
    kubectl edit cluster mycluster -n demo
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: Cluster
-   metadata:
-     name: mycluster
-     namespace: demo
+   ```
+
+   在编辑器中修改 `spec.componentSpecs.replicas` 的参数值。
+
+   ```yaml
+   ...
    spec:
      clusterDefinitionRef: elasticsearch
      clusterVersionRef: elasticsearch-8.8.2
      componentSpecs:
      - name: elasticsearch
        componentDefRef: elasticsearch
-       replicas: 1 # Change the amount
-       volumeClaimTemplates:
-       - name: data
-         spec:
-           accessModes:
-             - ReadWriteOnce
-           resources:
-             requests:
-               storage: 1Gi
-    terminationPolicy: Delete
+       replicas: 1 # 修改该参数值
+   ...
    ```
 
 2. 当集群状态再次回到 `Running` 后，查看相关资源是否变更。

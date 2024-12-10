@@ -84,7 +84,7 @@ mycluster   demo        mysql                mysql-8.0.33   Delete              
    ```bash
    kubectl describe cluster mycluster -n demo
    >
-   ......
+   ...
    Volume Claim Templates:
       Name:  data
       Spec:
@@ -132,7 +132,7 @@ mycluster   demo        mysql                mysql-8.0.33   Delete              
    ```bash
    kubectl describe cluster mycluster -n demo
    >
-   ......
+   ...
    Volume Claim Templates:
       Name:  data
       Spec:

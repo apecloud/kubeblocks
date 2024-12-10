@@ -213,12 +213,10 @@ func (wrapper *renderWrapper) rerenderConfigTemplate(cluster *appsv1.Cluster,
 	// render user specified template
 	if item != nil && item.ImportTemplateRef != nil {
 		newData, err := mergerConfigTemplate(
-			&appsv1.LegacyRenderedTemplateSpec{
-				ConfigTemplateExtension: appsv1.ConfigTemplateExtension{
-					TemplateRef: item.ImportTemplateRef.TemplateRef,
-					Namespace:   item.ImportTemplateRef.Namespace,
-					Policy:      appsv1.MergedPolicy(item.ImportTemplateRef.Policy),
-				},
+			appsv1.ConfigTemplateExtension{
+				TemplateRef: item.ImportTemplateRef.TemplateRef,
+				Namespace:   item.ImportTemplateRef.Namespace,
+				Policy:      appsv1.MergedPolicy(item.ImportTemplateRef.Policy),
 			},
 			wrapper.templateBuilder,
 			configSpec,

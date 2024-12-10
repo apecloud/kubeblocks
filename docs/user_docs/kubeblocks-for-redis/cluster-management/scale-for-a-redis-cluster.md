@@ -23,18 +23,7 @@ Run the command below to check whether the cluster STATUS is `Running`. Otherwis
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-```bash
-kbcli cluster list mycluster -n demo
->
-NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION   TERMINATION-POLICY   STATUS    CREATED-TIME
-mycluster   demo        redis                          Delete               Running   Sep 29,2024 09:46 UTC+0800
-```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 ```bash
 kubectl -n demo get cluster mycluster
@@ -45,63 +34,24 @@ mycluster      redis                               Delete               Running 
 
 </TabItem>
 
+<TabItem value="kbcli" label="kbcli">
+
+```bash
+kbcli cluster list mycluster -n demo
+>
+NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION   TERMINATION-POLICY   STATUS    CREATED-TIME
+mycluster   demo        redis                          Delete               Running   Sep 29,2024 09:46 UTC+0800
+```
+
+</TabItem>
+
 </Tabs>
 
 ### Steps
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-1. Configure the parameters `--components`, `--memory`, and `--cpu` and run the command.
-
-   ```bash
-   kbcli cluster vscale mycluster --components="redis" --memory="4Gi" --cpu="2"
-   ```
-
-   - `--components` describes the component name ready for vertical scaling.
-   - `--memory` describes the requested and limited size of the component memory.
-   - `--cpu` describes the requested and limited size of the component CPU.
-
-2. Validate the vertical scaling operation.
-
-   - View the OpsRequest progress.
-
-       KubeBlocks outputs a command automatically for you to view the OpsRequest progress. The output includes the status of this OpsRequest and Pods. When the status is `Succeed`, this OpsRequest is completed.
-
-       ```bash
-       kbcli cluster describe-ops mycluster-verticalscaling-enbr9 -n demo
-       ```
-
-   - Check the cluster status.
-
-       ```bash
-       kbcli cluster list mycluster
-       >
-       NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION   TERMINATION-POLICY   STATUS    CREATED-TIME
-       mycluster   demo        redis                          Delete               Running   Sep 29,2024 09:46 UTC+0800
-       ```
-
-       - STATUS=Updating: it means the vertical scaling is in progress.
-       - STATUS=Running: it means the vertical scaling operation has been applied.
-       - STATUS=Abnormal: it means the vertical scaling is abnormal. The reason may be the normal instances number is less than the total instance number or the leader instance is running properly while others are abnormal.
-          > To solve the problem, you can check manually to see whether resources are sufficient. If AutoScaling is supported, the system recovers when there are enough resources, otherwise, you can create enough resources and check the result with kubectl describe command.
-
-    :::note
-
-    Vertical scaling does not synchronize parameters related to CPU and memory and it is required to manually call the opsRequest of configuration to change parameters accordingly. Refer to [Configuration](./../configuration/configuration.md) for instructions.
-
-    :::
-
-3. Check whether the corresponding resources change.
-
-    ```bash
-    kbcli cluster describe mycluster -n demo
-    ```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 1. Apply an OpsRequest to the specified cluster. Configure the parameters according to your needs.
 
@@ -151,42 +101,84 @@ mycluster      redis                               Delete               Running 
 
    `spec.componentSpecs.resources` controls the requests and limits of resources and changing them triggers a vertical scaling.
 
-   ```yaml
+   ```bash
    kubectl edit cluster mycluster -n demo
-   >
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: Cluster
-   metadata:
-     name: mycluster
-     namespace: demo
+   ```
+
+   Edit the values of `spec.componentSpecs.resources`.
+
+   ```yaml
+   ...
    spec:
      clusterDefinitionRef: redis
      componentSpecs:
      - name: redis
        componentDef: redis
        replicas: 1
-       resources: # Change values of resources.
+       resources: # Change values of resources
          requests:
            memory: "2Gi"
            cpu: "1"
          limits:
            memory: "4Gi"
            cpu: "2"
-       volumeClaimTemplates:
-       - name: data
-         spec:
-           accessModes:
-             - ReadWriteOnce
-           resources:
-             requests:
-               storage: 1Gi
-     terminationPolicy: Delete
+   ...
    ```
 
 2. Check whether the corresponding resources change.
 
     ```bash
     kubectl describe cluster mycluster -n demo
+    ```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+1. Configure the parameters `--components`, `--memory`, and `--cpu` and run the command.
+
+   ```bash
+   kbcli cluster vscale mycluster --components="redis" --memory="4Gi" --cpu="2"
+   ```
+
+   - `--components` describes the component name ready for vertical scaling.
+   - `--memory` describes the requested and limited size of the component memory.
+   - `--cpu` describes the requested and limited size of the component CPU.
+
+2. Validate the vertical scaling operation.
+
+   - View the OpsRequest progress.
+
+       KubeBlocks outputs a command automatically for you to view the OpsRequest progress. The output includes the status of this OpsRequest and Pods. When the status is `Succeed`, this OpsRequest is completed.
+
+       ```bash
+       kbcli cluster describe-ops mycluster-verticalscaling-enbr9 -n demo
+       ```
+
+   - Check the cluster status.
+
+       ```bash
+       kbcli cluster list mycluster
+       >
+       NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION   TERMINATION-POLICY   STATUS    CREATED-TIME
+       mycluster   demo        redis                          Delete               Running   Sep 29,2024 09:46 UTC+0800
+       ```
+
+       - STATUS=Updating: it means the vertical scaling is in progress.
+       - STATUS=Running: it means the vertical scaling operation has been applied.
+       - STATUS=Abnormal: it means the vertical scaling is abnormal. The reason may be the normal instances number is less than the total instance number or the leader instance is running properly while others are abnormal.
+          > To solve the problem, you can check manually to see whether resources are sufficient. If AutoScaling is supported, the system recovers when there are enough resources, otherwise, you can create enough resources and check the result with kubectl describe command.
+
+    :::note
+
+    Vertical scaling does not synchronize parameters related to CPU and memory and it is required to manually call the opsRequest of configuration to change parameters accordingly. Refer to [Configuration](./../configuration/configuration.md) for instructions.
+
+    :::
+
+3. Check whether the corresponding resources change.
+
+    ```bash
+    kbcli cluster describe mycluster -n demo
     ```
 
 </TabItem>
@@ -205,18 +197,7 @@ Check whether the cluster status is `Running`. Otherwise, the following operatio
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-```bash
-kbcli cluster list mycluster -n demo
->
-NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION   TERMINATION-POLICY   STATUS    CREATED-TIME
-mycluster   demo        redis                          Delete               Running   Sep 29,2024 09:46 UTC+0800
-```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 ```bash
 kubectl -n demo get cluster mycluster
@@ -227,54 +208,24 @@ mycluster      redis                               Delete               Running 
 
 </TabItem>
 
+<TabItem value="kbcli" label="kbcli">
+
+```bash
+kbcli cluster list mycluster -n demo
+>
+NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION   TERMINATION-POLICY   STATUS    CREATED-TIME
+mycluster   demo        redis                          Delete               Running   Sep 29,2024 09:46 UTC+0800
+```
+
+</TabItem>
+
 </Tabs>
 
 ### Steps
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-1. Configure the parameters `--components` and `--replicas`, and run the command.
-
-   ```bash
-   kbcli cluster hscale mycluster --components="redis" --replicas=2
-   ```
-
-   - `--components` describes the component name ready for horizontal scaling.
-   - `--replicas` describes the replica amount of the specified components. Edit the amount based on your demands to scale in or out replicas.
-
-2. Validate the horizontal scaling operation.
-
-   - View the OpsRequest progress.
-
-       KubeBlocks outputs a command automatically for you to view the OpsRequest progress. The output includes the status of this OpsRequest and Pods. When the status is `Succeed`, this OpsRequest is completed.
-
-       ```bash
-       kbcli cluster describe-ops mycluster-horizontalscaling-we2r3 -n demo
-       ```
-
-   - View the cluster satus.
-
-       ```bash
-       kbcli cluster list mycluster -n demo
-       >
-       NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION   TERMINATION-POLICY   STATUS    CREATED-TIME
-       mycluster   demo        redis                          Delete               Running   Sep 29,2024 09:46 UTC+0800
-       ```
-
-       - STATUS=Updating: it means horizontal scaling is in progress.
-       - STATUS=Running: it means horizontal scaling has been applied.
-
-3. Check whether the corresponding resources change.
-
-    ```bash
-    kbcli cluster describe mycluster -n demo
-    ```
-
-</TabItem>
-
-<TabItem value="OpsRequest" label="OpsRequest">
+<TabItem value="OpsRequest" label="OpsRequest" default>
 
 1. Apply an OpsRequest to the specified cluster. Configure the parameters according to your needs.
 
@@ -341,29 +292,21 @@ mycluster      redis                               Delete               Running 
 
 1. Change the value of `spec.componentSpecs.replicas` in the YAML file. `spec.componentSpecs.replicas` stands for the pod amount and changing this value triggers a horizontal scaling of a cluster.
 
-   ```yaml
+   ```bash
    kubectl edit cluster mycluster -n demo
-   >
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: Cluster
-   metadata:
-     name: mycluster
-     namespace: demo
+   ```
+
+   Edit the value of `spec.componentSpecs.replicas`.
+
+   ```yaml
+   ...
    spec:
      clusterDefinitionRef: redis
      componentSpecs:
      - name: redis
        componentDef: redis
-       replicas: 2 # Change the pod amount.
-       volumeClaimTemplates:
-       - name: data
-         spec:
-           accessModes:
-           - ReadWriteOnce
-           resources:
-             requests:
-               storage: 1Gi
-    terminationPolicy: Delete
+       replicas: 2 # Change this value
+   ...
    ```
 
 2. Check whether the corresponding resources change.
@@ -371,6 +314,47 @@ mycluster      redis                               Delete               Running 
    ```bash
    kubectl describe cluster mycluster -n demo
    ```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+1. Configure the parameters `--components` and `--replicas`, and run the command.
+
+   ```bash
+   kbcli cluster hscale mycluster --components="redis" --replicas=2
+   ```
+
+   - `--components` describes the component name ready for horizontal scaling.
+   - `--replicas` describes the replica amount of the specified components. Edit the amount based on your demands to scale in or out replicas.
+
+2. Validate the horizontal scaling operation.
+
+   - View the OpsRequest progress.
+
+       KubeBlocks outputs a command automatically for you to view the OpsRequest progress. The output includes the status of this OpsRequest and Pods. When the status is `Succeed`, this OpsRequest is completed.
+
+       ```bash
+       kbcli cluster describe-ops mycluster-horizontalscaling-we2r3 -n demo
+       ```
+
+   - View the cluster status.
+
+       ```bash
+       kbcli cluster list mycluster -n demo
+       >
+       NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION   TERMINATION-POLICY   STATUS    CREATED-TIME
+       mycluster   demo        redis                          Delete               Running   Sep 29,2024 09:46 UTC+0800
+       ```
+
+       - STATUS=Updating: it means horizontal scaling is in progress.
+       - STATUS=Running: it means horizontal scaling has been applied.
+
+3. Check whether the corresponding resources change.
+
+    ```bash
+    kbcli cluster describe mycluster -n demo
+    ```
 
 </TabItem>
 

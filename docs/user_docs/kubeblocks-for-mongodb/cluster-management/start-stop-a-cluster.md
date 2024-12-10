@@ -21,15 +21,7 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
 
     <Tabs>
 
-    <TabItem value="kbcli" label="kbcli" default>
-
-    ```bash
-    kbcli cluster stop mycluster -n demo
-    ```
-
-    </TabItem>
-
-    <TabItem value="OpsRequest" label="OpsRequest">
+    <TabItem value="OpsRequest" label="OpsRequest" default>
 
     Apply an OpsRequest to stop a cluster.
 
@@ -80,24 +72,32 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
 
     </TabItem>
 
+    <TabItem value="kbcli" label="kbcli">
+
+    ```bash
+    kbcli cluster stop mycluster -n demo
+    ```
+
+    </TabItem>
+
     </Tabs>
 
 2. Check the status of the cluster to see whether it is stopped.
 
     <Tabs>
 
-    <TabItem value="kbcli" label="kbcli" default>
+    <TabItem value="kubectl" label="kubectl" default>
 
     ```bash
-    kbcli cluster list mycluster -n demo
+    kubectl get cluster mycluster -n demo
     ```
 
     </TabItem>
 
-    <TabItem value="kubectl" label="kubectl">
+    <TabItem value="kbcli" label="kbcli">
 
     ```bash
-    kubectl get cluster mycluster -n demo
+    kbcli cluster list mycluster -n demo
     ```
 
     </TabItem>
@@ -110,15 +110,7 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
 
     <Tabs>
 
-    <TabItem value="kbcli" label="kbcli" default>
-
-   ```bash
-   kbcli cluster start mycluster -n demo
-   ```
-
-    </TabItem>
-
-    <TabItem value="OpsRequest" label="OpsRequest">
+    <TabItem value="OpsRequest" label="OpsRequest" default>
 
     Apply an OpsRequest to start a cluster.
 
@@ -169,24 +161,32 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
 
     </TabItem>
 
+    <TabItem value="kbcli" label="kbcli">
+
+   ```bash
+   kbcli cluster start mycluster -n demo
+   ```
+
+    </TabItem>
+
     </Tabs>
 
 2. Check the status of the cluster to see whether it is running again.
 
     <Tabs>
 
-    <TabItem value="kbcli" label="kbcli" default>
+    <TabItem value="kubectl" label="kubectl" default>
 
     ```bash
-    kbcli cluster list mycluster -n demo
+    kubectl get cluster mycluster -n demo
     ```
 
     </TabItem>
 
-    <TabItem value="kubectl" label="kubectl">
+    <TabItem value="kbcli" label="kbcli">
 
     ```bash
-    kubectl get cluster mycluster -n demo
+    kbcli cluster list mycluster -n demo
     ```
 
     </TabItem>

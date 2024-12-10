@@ -57,7 +57,7 @@ kbcli cluster connect --show-example --show-password ${cluster-name}
 
 1. 获取 `username`。
 
-   使用 `kubectl get secrects` 命令，从 demo 命名空间中名为 `mycluster-conn-credential` 的 secret 中提取用户名。
+   使用 `kubectl get secrets` 命令，从 demo 命名空间中名为 `mycluster-conn-credential` 的 secret 中提取用户名。
 
    ```bash
    kubectl get secrets -n demo mycluster-conn-credential -o jsonpath='{.data.username}' | base64 -d

@@ -16,7 +16,123 @@ From v0.6.0, KubeBlocks supports `kbcli cluster configure` and `kbcli cluster ed
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
+<TabItem value="Edit config file" label="Edit config file" default>
+
+KubeBlocks supports configuring cluster parameters by editing its configuration file.
+
+1. Get the configuration file of this cluster.
+
+   ```bash
+   kubectl edit configurations.apps.kubeblocks.io mycluster-mongodb -n demo
+   ```
+
+2. Configure parameters according to your needs. The example below adds the `spec.configFileParams` part to configure `systemLog.verbosity`.
+
+   ```yaml
+   spec:
+     clusterRef: mycluster
+     componentName: mongodb
+     configItemDetails:
+     - configFileParams:
+         mongodb.cnf:
+           parameters:
+             systemLog.verbosity: "1"
+       configSpec:
+         constraintRef: mongodb-config-constraints
+         name: mongodb-configuration
+         namespace: kb-system
+         templateRef: mongodb5.0-config-template
+         volumeName: mongodb-config
+       name: mongodb-config
+     - configSpec:
+         defaultMode: 292
+   ```
+
+3. Connect to this cluster to verify whether the configuration takes effect as expected.
+
+      ```bash
+      kubectl exec -ti -n demo mycluster-mongodb-0 -- bash
+
+      root@mycluster-mongodb-0:/# cat etc/mongodb/mongodb.conf |grep verbosity
+      >
+        verbosity: 1
+      ```
+
+:::note
+
+Just in case you cannot find the configuration file of your cluster, you can switch to the `kbcli` tab to view the current configuration file of a cluster.
+
+:::
+
+</TabItem>
+
+<TabItem value="OpsRequest" label="OpsRequest">
+
+KubeBlocks supports configuring cluster parameters with OpsRequest.
+
+1. Define an OpsRequest file and configure the parameters in the OpsRequest in a yaml file named `mycluster-configuring-demo.yaml`. In this example, `systemLog.verbosity` is configured as `1`.
+
+   ```bash
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: OpsRequest
+   metadata:
+     name: mycluster-configuring-demo
+     namespace: demo
+   spec:
+     clusterName: mycluster
+     reconfigure:
+       componentName: mongodb
+       configurations:
+       - keys:
+         - key: mongodb.conf
+           parameters:
+           - key: systemLog.verbosity
+             value: "1"
+         name: mongodb-config
+     preConditionDeadlineSeconds: 0
+     type: Reconfiguring
+   ```
+
+   | Field                                                  | Definition     |
+   |--------------------------------------------------------|--------------------------------|
+   | `metadata.name`                                        | It specifies the name of this OpsRequest. |
+   | `metadata.namespace`                                   | It specifies the namespace where this cluster is created. |
+   | `spec.clusterName`                                     | It specifies the cluster name that this operation is targeted at. |
+   | `spec.reconfigure`                                     | It specifies a component and its configuration updates. |
+   | `spec.reconfigure.componentName`                       | It specifies the component name of this cluster.  |
+   | `spec.configurations`                                  | It contains a list of ConfigurationItem objects, specifying the component's configuration template name, upgrade policy, and parameter key-value pairs to be updated. |
+   | `spec.reconfigure.configurations.keys.key`             | It specifies the configuration map. |
+   | `spec.reconfigure.configurations.keys.parameters`      | It defines a list of key-value pairs for a single configuration file. |
+   | `spec.reconfigure.configurations.keys.parameter.key`   | It represents the name of the parameter you want to edit. |
+   | `spec.reconfigure.configurations.keys.parameter.value` | It represents the parameter values that are to be updated. If set to nil, the parameter defined by the Key field will be removed from the configuration file.  |
+   | `spec.reconfigure.configurations.name`                 | It specifies the configuration template name.  |
+   | `preConditionDeadlineSeconds`                          | It specifies the maximum number of seconds this OpsRequest will wait for its start conditions to be met before aborting. If set to 0 (default), the start conditions must be met immediately for the OpsRequest to proceed. |
+
+2. Apply the configuration opsRequest.
+
+   ```bash
+   kubectl apply -f mycluster-configuring-demo.yaml
+   ```
+
+3. Connect to this cluster to verify whether the configuration takes effect as expected.
+
+   ```bash
+   kubectl exec -ti -n demo mycluster-mongodb-0 -- bash
+
+   root@mycluster-mongodb-0:/# cat etc/mongodb/mongodb.conf |grep verbosity
+   >
+     verbosity: 1
+   ```
+
+:::note
+
+Just in case you cannot find the configuration file of your cluster, you can switch to the `kbcli` tab to view the current configuration file of a cluster.
+
+:::
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
 
 ## View parameter information
 
@@ -138,122 +254,6 @@ If you perform several parameter configurations, you can compare these modificat
 ```bash
 kbcli cluster diff-config mycluster-reconfiguring-q8ndn mycluster-reconfiguring-hxqfx -n demo
 ```
-
-</TabItem>
-
-<TabItem value="Edit config file" label="Edit config file">
-
-KubeBlocks supports configuring cluster parameters by editing its configuration file.
-
-1. Get the configuration file of this cluster.
-
-   ```bash
-   kubectl edit configurations.apps.kubeblocks.io mycluster-mongodb -n demo
-   ```
-
-2. Configure parameters according to your needs. The example below adds the `spec.configFileParams` part to configure `systemLog.verbosity`.
-
-   ```yaml
-   spec:
-     clusterRef: mycluster
-     componentName: mongodb
-     configItemDetails:
-     - configFileParams:
-         mongodb.cnf:
-           parameters:
-             systemLog.verbosity: "1"
-       configSpec:
-         constraintRef: mongodb-config-constraints
-         name: mongodb-configuration
-         namespace: kb-system
-         templateRef: mongodb5.0-config-template
-         volumeName: mongodb-config
-       name: mongodb-config
-     - configSpec:
-         defaultMode: 292
-   ```
-
-3. Connect to this cluster to verify whether the configuration takes effect as expected.
-
-      ```bash
-      kubectl exec -ti -n demo mycluster-mongodb-0 -- bash
-
-      root@mycluster-mongodb-0:/# cat etc/mongodb/mongodb.conf |grep verbosity
-      >
-        verbosity: 1
-      ```
-
-:::note
-
-Just in case you cannot find the configuration file of your cluster, you can switch to the `kbcli` tab to view the current configuration file of a cluster.
-
-:::
-
-</TabItem>
-
-<TabItem value="OpsRequest" label="OpsRequest">
-
-KubeBlocks supports configuring cluster parameters with OpsRequest.
-
-1. Define an OpsRequest file and configure the parameters in the OpsRequest in a yaml file named `mycluster-configuring-demo.yaml`. In this example, `systemLog.verbosity` is configured as `1`.
-
-   ```bash
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: OpsRequest
-   metadata:
-     name: mycluster-configuring-demo
-     namespace: demo
-   spec:
-     clusterName: mycluster
-     reconfigure:
-       componentName: mongodb
-       configurations:
-       - keys:
-         - key: mongodb.conf
-           parameters:
-           - key: systemLog.verbosity
-             value: "1"
-         name: mongodb-config
-     preConditionDeadlineSeconds: 0
-     type: Reconfiguring
-   ```
-
-   | Field                                                  | Definition     |
-   |--------------------------------------------------------|--------------------------------|
-   | `metadata.name`                                        | It specifies the name of this OpsRequest. |
-   | `metadata.namespace`                                   | It specifies the namespace where this cluster is created. |
-   | `spec.clusterName`                                     | It specifies the cluster name that this operation is targeted at. |
-   | `spec.reconfigure`                                     | It specifies a component and its configuration updates. |
-   | `spec.reconfigure.componentName`                       | It specifies the component name of this cluster.  |
-   | `spec.configurations`                                  | It contains a list of ConfigurationItem objects, specifying the component's configuration template name, upgrade policy, and parameter key-value pairs to be updated. |
-   | `spec.reconfigure.configurations.keys.key`             | It specifies the configuration map. |
-   | `spec.reconfigure.configurations.keys.parameters`      | It defines a list of key-value pairs for a single configuration file. |
-   | `spec.reconfigure.configurations.keys.parameter.key`   | It represents the name of the parameter you want to edit. |
-   | `spec.reconfigure.configurations.keys.parameter.value` | It represents the parameter values that are to be updated. If set to nil, the parameter defined by the Key field will be removed from the configuration file.  |
-   | `spec.reconfigure.configurations.name`                 | It specifies the configuration template name.  |
-   | `preConditionDeadlineSeconds`                          | It specifies the maximum number of seconds this OpsRequest will wait for its start conditions to be met before aborting. If set to 0 (default), the start conditions must be met immediately for the OpsRequest to proceed. |
-
-2. Apply the configuration opsRequest.
-
-   ```bash
-   kubectl apply -f mycluster-configuring-demo.yaml
-   ```
-
-3. Connect to this cluster to verify whether the configuration takes effect as expected.
-
-   ```bash
-   kubectl exec -ti -n demo mycluster-mongodb-0 -- bash
-
-   root@mycluster-mongodb-0:/# cat etc/mongodb/mongodb.conf |grep verbosity
-   >
-     verbosity: 1
-   ```
-
-:::note
-
-Just in case you cannot find the configuration file of your cluster, you can switch to the `kbcli` tab to view the current configuration file of a cluster.
-
-:::
 
 </TabItem>
 

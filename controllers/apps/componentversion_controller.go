@@ -85,13 +85,16 @@ func (r *ComponentVersionReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	if err := r.Client.Get(rctx.Ctx, rctx.Req.NamespacedName, compVersion); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, rctx.Log, "")
 	}
+	if !intctrlutil.ObjectAPIVersionSupported(compVersion) {
+		return intctrlutil.Reconciled()
+	}
 
 	return r.reconcile(rctx, compVersion)
 }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ComponentVersionReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return intctrlutil.NewControllerManagedBy(mgr, &appsv1alpha1.ComponentVersion{}, &appsv1alpha1.ComponentDefinition{}).
+	return intctrlutil.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.ComponentVersion{}).
 		Watches(&appsv1alpha1.ComponentDefinition{}, handler.EnqueueRequestsFromMapFunc(r.compatibleCompVersion)).
 		Complete(r)

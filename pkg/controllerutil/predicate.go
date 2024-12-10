@@ -101,13 +101,9 @@ var (
 	)
 )
 
-func NewControllerManagedBy(mgr manager.Manager, objs ...client.Object) *builder.Builder {
-	b := ctrl.NewControllerManagedBy(mgr).
+func NewControllerManagedBy(mgr manager.Manager) *builder.Builder {
+	return ctrl.NewControllerManagedBy(mgr).
 		WithEventFilter(predicate.NewPredicateFuncs(namespacePredicateFilter))
-	if len(objs) > 0 {
-		b.WithEventFilter(predicate.NewPredicateFuncs(newAPIVersionPredicateFilter(objs)))
-	}
-	return b
 }
 
 func namespacePredicateFilter(object client.Object) bool {
@@ -125,7 +121,14 @@ func namespacePredicateFilter(object client.Object) bool {
 	return managedNamespaces.Has(object.GetNamespace())
 }
 
-func newAPIVersionPredicateFilter(objs []client.Object) func(client.Object) bool {
+func ObjectAPIVersionSupported(obj client.Object) bool {
+	if !viper.GetBool(constant.DualOperatorsMode) {
+		return true
+	}
+	return supportedCRDAPIVersions.Has(obj.GetAnnotations()[constant.CRDAPIVersionAnnotationKey])
+}
+
+/*func newAPIVersionPredicateFilter(objs []client.Object) func(client.Object) bool {
 	return func(obj client.Object) bool {
 		if !viper.GetBool(constant.DualOperatorsMode) {
 			return true
@@ -141,4 +144,4 @@ func newAPIVersionPredicateFilter(objs []client.Object) func(client.Object) bool
 		}
 		return supportedCRDAPIVersions.Has(apiVersion)
 	}
-}
+}*/

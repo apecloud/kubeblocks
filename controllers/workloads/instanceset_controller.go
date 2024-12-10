@@ -81,6 +81,7 @@ func (r *InstanceSetReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	res, err := kubebuilderx.NewController(ctx, r.Client, req, r.Recorder, logger).
 		Prepare(instanceset.NewTreeLoader()).
+		Do(instanceset.NewAPIVersionReconciler()).
 		Do(instanceset.NewFixMetaReconciler()).
 		Do(instanceset.NewDeletionReconciler()).
 		Do(instanceset.NewStatusReconciler()).
@@ -112,7 +113,7 @@ func (r *InstanceSetReconciler) SetupWithManager(mgr ctrl.Manager, multiClusterM
 func (r *InstanceSetReconciler) setupWithManager(mgr ctrl.Manager, ctx *handler.FinderContext) error {
 	itsFinder := handler.NewLabelFinder(&workloads.InstanceSet{}, instanceset.WorkloadsManagedByLabelKey, workloads.Kind, instanceset.WorkloadsInstanceLabelKey)
 	podHandler := handler.NewBuilder(ctx).AddFinder(itsFinder).Build()
-	return intctrlutil.NewControllerManagedBy(mgr, &workloads.InstanceSet{}).
+	return intctrlutil.NewControllerManagedBy(mgr).
 		For(&workloads.InstanceSet{}).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: viper.GetInt(constant.CfgKBReconcileWorkers),
@@ -132,7 +133,7 @@ func (r *InstanceSetReconciler) setupWithMultiClusterManager(mgr ctrl.Manager,
 	// TODO: modify handler.getObjectFromKey to support running Job in data clusters
 	jobHandler := handler.NewBuilder(ctx).AddFinder(delegatorFinder).Build()
 
-	b := intctrlutil.NewControllerManagedBy(mgr, &workloads.InstanceSet{}).
+	b := intctrlutil.NewControllerManagedBy(mgr).
 		For(&workloads.InstanceSet{}).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: viper.GetInt(constant.CfgKBReconcileWorkers),

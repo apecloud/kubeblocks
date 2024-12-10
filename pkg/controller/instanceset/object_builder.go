@@ -61,9 +61,3 @@ func buildHeadlessSvc(its workloads.InstanceSet, labels, selectors map[string]st
 func getHeadlessSvcName(itsName string) string {
 	return strings.Join([]string{itsName, "headless"}, "-")
 }
-
-func BuildPodTemplate(its *workloads.InstanceSet) *corev1.PodTemplateSpec {
-	template := its.Spec.Template.DeepCopy()
-
-	return template
-}

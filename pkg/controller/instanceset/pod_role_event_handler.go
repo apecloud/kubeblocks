@@ -63,9 +63,10 @@ const (
 	roleChangedAnnotKey = "role.kubeblocks.io/event-handled"
 
 	// TODO(v1.0): remove this later.
-	checkRoleOperation   = "checkRole"
-	legacyEventFieldPath = "spec.containers{kb-checkrole}"
-	lorryEventFieldPath  = "spec.containers{lorry}"
+	checkRoleOperation                 = "checkRole"
+	lagacyReadinessProbeEventFieldPath = "spec.containers{kb-role-probe}"
+	legacyEventFieldPath               = "spec.containers{kb-checkrole}"
+	lorryEventFieldPath                = "spec.containers{lorry}"
 )
 
 var roleMessageRegex = regexp.MustCompile(`Readiness probe failed: .*({.*})`)
@@ -74,7 +75,7 @@ func (h *PodRoleEventHandler) Handle(cli client.Client, reqCtx intctrlutil.Reque
 	// HACK: to support kb-agent probe event
 	event = h.transformKBAgentProbeEvent(reqCtx.Log, event)
 
-	filePaths := []string{legacyEventFieldPath, lorryEventFieldPath}
+	filePaths := []string{lagacyReadinessProbeEventFieldPath, legacyEventFieldPath, lorryEventFieldPath}
 	if !slices.Contains(filePaths, event.InvolvedObject.FieldPath) || event.Reason != checkRoleOperation {
 		return nil
 	}

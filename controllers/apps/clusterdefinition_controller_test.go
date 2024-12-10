@@ -58,7 +58,6 @@ var _ = Describe("ClusterDefinition Controller", func() {
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.ClusterDefinitionSignature, true, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.ShardingDefinitionSignature, true, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.ComponentDefinitionSignature, true, ml)
-		testapps.ClearResources(&testCtx, intctrlutil.ConfigConstraintSignature, ml)
 
 		// namespaced
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, intctrlutil.ConfigMapSignature, true, inNS, ml)

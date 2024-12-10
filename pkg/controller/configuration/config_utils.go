@@ -22,13 +22,10 @@ package configuration
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"slices"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -38,7 +35,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/controller/render"
@@ -46,28 +42,9 @@ import (
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
-func createConfigObjects(cli client.Client, ctx context.Context, objs []*corev1.ConfigMap) error {
-	for _, obj := range objs {
-		if err := cli.Create(ctx, obj, inDataContext()); err != nil {
-
-			if !apierrors.IsAlreadyExists(err) {
-				return err
-			}
-			// for update script cm
-			if core.IsSchedulableConfigResource(obj) {
-				continue
-			}
-			if err := cli.Update(ctx, obj, inDataContext()); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-// buildConfigManagerWithComponent build the configmgr sidecar container and update it
+// BuildReloadActionContainer build the configmgr sidecar container and update it
 // into PodSpec if configuration reload option is on
-func buildConfigManagerWithComponent(rctx *render.ResourceCtx, cluster *appsv1.Cluster, synthesizedComp *component.SynthesizedComponent, cmpd *appsv1.ComponentDefinition) error {
+func BuildReloadActionContainer(resourceCtx *render.ResourceCtx, cluster *appsv1.Cluster, synthesizedComp *component.SynthesizedComponent, cmpd *appsv1.ComponentDefinition, configmaps []*corev1.ConfigMap) error {
 	var (
 		err         error
 		buildParams *cfgcm.CfgManagerBuildParams
@@ -82,12 +59,13 @@ func buildConfigManagerWithComponent(rctx *render.ResourceCtx, cluster *appsv1.C
 	if len(volumeDirs) == 0 {
 		return nil
 	}
-	if configRender, paramsDefs, err = intctrlutil.ResolveCmpdParametersDefs(rctx.Context, rctx.Client, cmpd); err != nil {
+	if configRender, paramsDefs, err = resolveComponentParameterDefs(resourceCtx.Context, resourceCtx.Client, cmpd, configmaps, synthesizedComp); err != nil {
 		return err
 	}
 	if configRender == nil || len(configRender.Spec.Configs) == 0 {
 		return nil
 	}
+
 	configSpecMetas, err := cfgcm.GetSupportReloadConfigSpecs(usingConfigSpecs, configRender.Spec.Configs, paramsDefs)
 	if err != nil {
 		return err
@@ -98,7 +76,7 @@ func buildConfigManagerWithComponent(rctx *render.ResourceCtx, cluster *appsv1.C
 	if len(configSpecMetas) == 0 {
 		return nil
 	}
-	if buildParams, err = buildConfigManagerParams(rctx.Client, rctx.Context, cluster, synthesizedComp, configSpecMetas, volumeDirs, podSpec); err != nil {
+	if buildParams, err = buildConfigManagerParams(resourceCtx.Client, resourceCtx.Context, cluster, synthesizedComp, configSpecMetas, volumeDirs, podSpec); err != nil {
 		return err
 	}
 	if buildParams == nil {
@@ -127,6 +105,34 @@ func buildConfigManagerWithComponent(rctx *render.ResourceCtx, cluster *appsv1.C
 		return slices.Contains(names, c.Name)
 	}
 	component.InjectEnvVars4Containers(synthesizedComp, synthesizedComp.EnvVars, synthesizedComp.EnvFromSources, filter)
+	return nil
+}
+
+func resolveComponentParameterDefs(ctx context.Context, cli client.Client, cmpd *appsv1.ComponentDefinition, configmaps []*corev1.ConfigMap, comp *component.SynthesizedComponent) (*parametersv1alpha1.ParamConfigRenderer, []*parametersv1alpha1.ParametersDefinition, error) {
+	configRender, paramsDefs, err := intctrlutil.ResolveCmpdParametersDefs(ctx, cli, cmpd)
+	if err != nil {
+		return nil, nil, err
+	}
+	if err = handleInjectEnv(ctx, cli, comp, configRender, configmaps); err != nil {
+		return nil, nil, err
+	}
+	return configRender, paramsDefs, nil
+}
+
+func handleInjectEnv(ctx context.Context,
+	cli client.Client,
+	comp *component.SynthesizedComponent,
+	configRender *parametersv1alpha1.ParamConfigRenderer,
+	configmaps []*corev1.ConfigMap) error {
+	envObjs, err := InjectTemplateEnvFrom(comp, comp.PodSpec, configRender, configmaps)
+	if err != nil {
+		return err
+	}
+	for _, obj := range envObjs {
+		if err = intctrlutil.IgnoreIsAlreadyExists(cli.Create(ctx, obj, inDataContext())); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -325,50 +331,6 @@ func enableTLSTrigger(configDescs []parametersv1alpha1.ComponentConfigDescriptio
 	return rerenderConfigEnabled(configDescs, parametersv1alpha1.ComponentTLSType)
 }
 
-func runningComponentParameter(ctx context.Context, reader client.Reader, comp *component.SynthesizedComponent) (*parametersv1alpha1.ComponentParameter, error) {
-	var componentParameter = &parametersv1alpha1.ComponentParameter{}
-
-	parameterKey := types.NamespacedName{
-		Name:      core.GenerateComponentConfigurationName(comp.ClusterName, comp.Name),
-		Namespace: comp.Namespace,
-	}
-	if err := reader.Get(ctx, parameterKey, componentParameter); err != nil {
-		return nil, client.IgnoreNotFound(err)
-	}
-	return componentParameter, nil
-}
-
-func buildComponentParameter(ctx context.Context, reader client.Reader, comp *component.SynthesizedComponent, owner *appsv1.Component, cmpd *appsv1.ComponentDefinition, configRender *parametersv1alpha1.ParamConfigRenderer, paramsDefs []*parametersv1alpha1.ParametersDefinition) (*parametersv1alpha1.ComponentParameter, error) {
-	tpls, err := ResolveComponentTemplate(ctx, reader, cmpd)
-	if err != nil {
-		return nil, err
-	}
-
-	parameterObj := builder.NewComponentParameterBuilder(comp.Namespace,
-		core.GenerateComponentConfigurationName(comp.ClusterName, comp.Name)).
-		AddLabelsInMap(constant.GetCompLabelsWithDef(comp.ClusterName, comp.Name, cmpd.Name)).
-		ClusterRef(comp.ClusterName).
-		Component(comp.Name).
-		SetConfigurationItem(ClassifyParamsFromConfigTemplate(intctrlutil.TransformComponentParameters(owner.Spec.InitParameters), cmpd, paramsDefs, tpls)).
-		GetObject()
-	if err = intctrlutil.SetOwnerReference(owner, parameterObj); err != nil {
-		return nil, err
-	}
-	if configRender != nil {
-		err = UpdateConfigPayload(&parameterObj.Spec, &owner.Spec, &configRender.Spec)
-	}
-	return parameterObj, err
-}
-
-func mergeComponentParameter(expected *parametersv1alpha1.ComponentParameter, existing *parametersv1alpha1.ComponentParameter) *parametersv1alpha1.ComponentParameter {
-	return MergeComponentParameter(expected, existing, func(dest, expected *parametersv1alpha1.ConfigTemplateItemDetail) {
-		if len(dest.ConfigFileParams) == 0 && len(expected.ConfigFileParams) != 0 {
-			dest.ConfigFileParams = expected.ConfigFileParams
-		}
-		dest.Payload = expected.Payload
-	})
-}
-
 func ResolveComponentTemplate(ctx context.Context, reader client.Reader, cmpd *appsv1.ComponentDefinition) (map[string]*corev1.ConfigMap, error) {
 	tpls := make(map[string]*corev1.ConfigMap, len(cmpd.Spec.Configs))
 	for _, config := range cmpd.Spec.Configs {
@@ -379,12 +341,4 @@ func ResolveComponentTemplate(ctx context.Context, reader client.Reader, cmpd *a
 		tpls[config.Name] = cm
 	}
 	return tpls, nil
-}
-
-func updateComponentParameters(ctx context.Context, cli client.Client, expected, existing *parametersv1alpha1.ComponentParameter) error {
-	mergedObject := mergeComponentParameter(expected, existing)
-	if reflect.DeepEqual(mergedObject, existing) {
-		return nil
-	}
-	return cli.Patch(ctx, mergedObject, client.MergeFrom(existing))
 }

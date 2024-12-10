@@ -37,7 +37,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -152,14 +151,12 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			&componentAccountTransformer{},
 			// handle the TLS configuration
 			&componentTLSTransformer{Client: r.Client},
-			// rerender parameters after v-scale and h-scale
-			&componentRelatedParametersTransformer{Client: r.Client},
 			// resolve and build vars for template and Env
 			&componentVarsTransformer{},
 			// provision component system accounts, depend on vars
 			&componentAccountProvisionTransformer{},
 			// render component configurations
-			&componentConfigurationTransformer{Client: r.Client},
+			&componentReloadActionSidecarTransformer{Client: r.Client},
 			// handle restore before workloads transform
 			&componentRestoreTransformer{Client: r.Client},
 			// handle the component workload
@@ -207,8 +204,7 @@ func (r *ComponentReconciler) setupWithManager(mgr ctrl.Manager) error {
 		Owns(&corev1.Secret{}).
 		Owns(&corev1.ConfigMap{}).
 		Watches(&dpv1alpha1.Restore{}, handler.EnqueueRequestsFromMapFunc(r.filterComponentResources)).
-		Watches(&corev1.PersistentVolumeClaim{}, handler.EnqueueRequestsFromMapFunc(r.filterComponentResources)).
-		Watches(&appsv1alpha1.Configuration{}, handler.EnqueueRequestsFromMapFunc(r.configurationEventHandler))
+		Watches(&corev1.PersistentVolumeClaim{}, handler.EnqueueRequestsFromMapFunc(r.filterComponentResources))
 
 	if viper.GetBool(constant.EnableRBACManager) {
 		b.Owns(&rbacv1.RoleBinding{}).
@@ -228,8 +224,7 @@ func (r *ComponentReconciler) setupWithMultiClusterManager(mgr ctrl.Manager, mul
 			MaxConcurrentReconciles: viper.GetInt(constant.CfgKBReconcileWorkers),
 		}).
 		Owns(&workloads.InstanceSet{}).
-		Watches(&dpv1alpha1.Restore{}, handler.EnqueueRequestsFromMapFunc(r.filterComponentResources)).
-		Watches(&appsv1alpha1.Configuration{}, handler.EnqueueRequestsFromMapFunc(r.configurationEventHandler))
+		Watches(&dpv1alpha1.Restore{}, handler.EnqueueRequestsFromMapFunc(r.filterComponentResources))
 
 	eventHandler := handler.EnqueueRequestsFromMapFunc(r.filterComponentResources)
 	multiClusterMgr.Watch(b, &corev1.Service{}, eventHandler).
@@ -259,21 +254,6 @@ func (r *ComponentReconciler) filterComponentResources(ctx context.Context, obj 
 			NamespacedName: types.NamespacedName{
 				Namespace: obj.GetNamespace(),
 				Name:      fullCompName,
-			},
-		},
-	}
-}
-
-func (r *ComponentReconciler) configurationEventHandler(_ context.Context, obj client.Object) []reconcile.Request {
-	cr, ok := obj.(*appsv1alpha1.Configuration)
-	if !ok {
-		return []reconcile.Request{}
-	}
-	return []reconcile.Request{
-		{
-			NamespacedName: types.NamespacedName{
-				Namespace: obj.GetNamespace(),
-				Name:      constant.GenerateClusterComponentName(cr.Spec.ClusterRef, cr.Spec.ComponentName),
 			},
 		},
 	}

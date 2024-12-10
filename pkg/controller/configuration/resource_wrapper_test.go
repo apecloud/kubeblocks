@@ -25,12 +25,11 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
+	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/render"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
@@ -71,19 +70,14 @@ var _ = Describe("resource Fetcher", func() {
 				[]client.Object{
 					cluster,
 					testapps.NewConfigMap("default", cfgcore.GetComponentCfgName(clusterName, mysqlCompName, mysqlConfigName)),
-					&appsv1beta1.ConfigConstraint{
-						ObjectMeta: metav1.ObjectMeta{
-							Name: mysqlConfigName,
-						},
-					},
+					builder.NewComponentParameterBuilder(testCtx.DefaultNamespace, cfgcore.GenerateComponentConfigurationName(clusterName, mysqlCompName)).GetObject(),
 				},
 			), testutil.WithAnyTimes()))
 			err := NewTest(k8sMockClient.Client(), ctx).
 				Cluster().
 				ComponentSpec().
 				ConfigMap(mysqlConfigName).
-				ConfigConstraints(mysqlConfigName).
-				Configuration().
+				ComponentParameter().
 				Complete()
 			Expect(err).Should(Succeed())
 		})

@@ -1,7 +1,0 @@
-apiVersion: apps.kubeblocks.io/v1beta1
-kind: ConfigConstraint
-metadata:
-  name: env-from-config-test
-spec:
-  fileFormatConfig:
-    format: properties

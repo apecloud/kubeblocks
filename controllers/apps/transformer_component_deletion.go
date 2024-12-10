@@ -30,7 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -169,7 +169,7 @@ func compOwnedKinds() []client.ObjectList {
 		&corev1.SecretList{},
 		&corev1.ConfigMapList{},
 		&corev1.PersistentVolumeClaimList{},
-		&appsv1alpha1.ConfigurationList{},
+		&parametersv1alpha1.ComponentParameterList{},
 		&corev1.ServiceAccountList{},
 		&rbacv1.RoleBindingList{},
 	}

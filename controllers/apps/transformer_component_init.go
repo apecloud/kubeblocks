@@ -32,10 +32,6 @@ var _ graph.Transformer = &componentInitTransformer{}
 func (t *componentInitTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*componentTransformContext)
 
-	if !intctrlutil.ObjectAPIVersionSupported(transCtx.Component) {
-		return graph.ErrPrematureStop
-	}
-
 	// init dag
 	rootVertex := &model.ObjectVertex{Obj: transCtx.Component, OriObj: transCtx.ComponentOrig, Action: model.ActionStatusPtr()}
 	dag.AddVertex(rootVertex)
@@ -43,5 +39,8 @@ func (t *componentInitTransformer) Transform(ctx graph.TransformContext, dag *gr
 	// init placement
 	transCtx.Context = intoContext(transCtx.Context, placement(transCtx.Component))
 
+	if !intctrlutil.ObjectAPIVersionSupported(transCtx.Component) {
+		return graph.ErrPrematureStop
+	}
 	return nil
 }

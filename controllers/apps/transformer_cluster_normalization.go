@@ -420,11 +420,12 @@ func (t *clusterNormalizationTransformer) writeBackCompNShardingSpecs(transCtx *
 func (t *clusterNormalizationTransformer) checkNPatchCRDAPIVersionKey(transCtx *clusterTransformContext) error {
 	apiVersion := transCtx.Cluster.Annotations[constant.CRDAPIVersionAnnotationKey]
 	getClusterDefFromIncrementConverter := func() (string, error) {
-		if len(transCtx.Cluster.Annotations[appsv1alpha1.KBIncrementConverterAK]) == 0 {
+		incrementConverterStr := transCtx.Cluster.Annotations[appsv1alpha1.KBIncrementConverterAK]
+		if len(incrementConverterStr) == 0 {
 			return "", nil
 		}
 		var alpha1Cluster appsv1alpha1.Cluster
-		if err := json.Unmarshal([]byte(transCtx.Cluster.Annotations[appsv1alpha1.KBIncrementConverterAK]), &alpha1Cluster); err != nil {
+		if err := json.Unmarshal([]byte(incrementConverterStr), &alpha1Cluster); err != nil {
 			return "", err
 		}
 		return alpha1Cluster.Spec.ClusterDefRef, nil

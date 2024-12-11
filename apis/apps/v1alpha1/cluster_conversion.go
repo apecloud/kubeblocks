@@ -154,6 +154,7 @@ type clusterConverter struct {
 }
 
 type clusterSpecConverter struct {
+	ClusterDefRef      string                          `json:"clusterDefRef,omitempty"`
 	ClusterVersionRef  string                          `json:"clusterVersionRef,omitempty"`
 	TerminationPolicy  TerminationPolicyType           `json:"terminationPolicy"`
 	Affinity           *Affinity                       `json:"affinity,omitempty"`
@@ -193,6 +194,7 @@ type clusterCompStatusConverter struct {
 
 func (c *clusterConverter) fromCluster(cluster *Cluster) {
 	c.Spec.ClusterVersionRef = cluster.Spec.ClusterVersionRef
+	c.Spec.ClusterDefRef = cluster.Spec.ClusterDefRef
 	c.Spec.TerminationPolicy = cluster.Spec.TerminationPolicy
 	c.Spec.Affinity = cluster.Spec.Affinity
 	c.Spec.Tolerations = cluster.Spec.Tolerations
@@ -244,6 +246,7 @@ func (c *clusterConverter) fromCluster(cluster *Cluster) {
 
 func (c *clusterConverter) toCluster(cluster *Cluster) {
 	cluster.Spec.ClusterVersionRef = c.Spec.ClusterVersionRef
+	cluster.Spec.ClusterDefRef = c.Spec.ClusterDefRef
 	cluster.Spec.TerminationPolicy = c.Spec.TerminationPolicy
 	cluster.Spec.Affinity = c.Spec.Affinity
 	cluster.Spec.Tolerations = c.Spec.Tolerations

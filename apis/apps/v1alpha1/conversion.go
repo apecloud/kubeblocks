@@ -23,10 +23,11 @@ import (
 	"encoding/json"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
-	KBIncrementConverterAK = "kb-increment-converter"
+	kbIncrementConverterAK = "kb-increment-converter"
 )
 
 type incrementChange any
@@ -62,7 +63,7 @@ func incrementConvertTo(converter incrementConverter, target metav1.Object) erro
 	if annotations == nil {
 		annotations = make(map[string]string)
 	}
-	annotations[KBIncrementConverterAK] = string(bytes)
+	annotations[kbIncrementConverterAK] = string(bytes)
 	target.SetAnnotations(annotations)
 
 	return nil
@@ -75,16 +76,28 @@ func incrementConvertFrom(converter incrementConverter, source metav1.Object, ic
 
 	annotations := source.GetAnnotations()
 	if annotations != nil {
-		data, ok := annotations[KBIncrementConverterAK]
+		data, ok := annotations[kbIncrementConverterAK]
 		if ok {
 			// Convert from the incremental converter only if the annotation exists.
 			if err := json.Unmarshal([]byte(data), ic); err != nil {
 				return err
 			}
-			delete(annotations, KBIncrementConverterAK)
+			delete(annotations, kbIncrementConverterAK)
 			source.SetAnnotations(annotations)
 			return converter.incrementConvertFrom(source, ic)
 		}
 	}
 	return nil
+}
+
+func GetClusterDefFromIncrementConverter(obj client.Object) (string, error) {
+	incrementConverterStr := obj.GetAnnotations()[kbIncrementConverterAK]
+	if len(incrementConverterStr) == 0 {
+		return "", nil
+	}
+	var alpha1Cluster Cluster
+	if err := json.Unmarshal([]byte(incrementConverterStr), &alpha1Cluster); err != nil {
+		return "", err
+	}
+	return alpha1Cluster.Spec.ClusterDefRef, nil
 }

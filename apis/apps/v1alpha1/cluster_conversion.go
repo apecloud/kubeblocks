@@ -127,6 +127,7 @@ func (r *Cluster) changesToCluster(cluster *appsv1.Cluster) {
 func (r *Cluster) changesFromCluster(cluster *appsv1.Cluster) {
 	// changed:
 	//   spec
+	//     clusterDefRef -> clusterDef
 	//     components
 	//       - volumeClaimTemplates
 	//           spec:
@@ -141,6 +142,9 @@ func (r *Cluster) changesFromCluster(cluster *appsv1.Cluster) {
 	//   status
 	//     components
 	//       - message: ComponentMessageMap -> map[string]string
+	if len(cluster.Spec.ClusterDef) > 0 {
+		r.Spec.ClusterDefRef = cluster.Spec.ClusterDef
+	}
 	// appsv1.TerminationPolicyType is a subset of appsv1alpha1.TerminationPolicyType, it can be converted directly.
 }
 

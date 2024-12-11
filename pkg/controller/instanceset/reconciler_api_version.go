@@ -34,10 +34,10 @@ func (r *apiVersionReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kube
 }
 
 func (r *apiVersionReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
-	if intctrlutil.ObjectAPIVersionSupported(tree.GetRoot()) {
-		return kubebuilderx.Continue, nil
+	if !intctrlutil.ObjectAPIVersionSupported(tree.GetRoot()) {
+		return kubebuilderx.Commit, nil
 	}
-	return kubebuilderx.Commit, nil
+	return kubebuilderx.Continue, nil
 }
 
 func NewAPIVersionReconciler() kubebuilderx.Reconciler {

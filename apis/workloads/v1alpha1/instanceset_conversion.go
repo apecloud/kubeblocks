@@ -21,9 +21,15 @@ package v1alpha1
 
 import (
 	"github.com/jinzhu/copier"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/json"
 	"sigs.k8s.io/controller-runtime/pkg/conversion"
 
 	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
+)
+
+const (
+	kbIncrementConverterAK = "kb-increment-converter"
 )
 
 // ConvertTo converts this InstanceSet to the Hub version (v1).
@@ -35,6 +41,10 @@ func (r *InstanceSet) ConvertTo(dstRaw conversion.Hub) error {
 
 	// spec
 	if err := copier.Copy(&dst.Spec, &r.Spec); err != nil {
+		return err
+	}
+
+	if err := r.incrementConvertTo(dst); err != nil {
 		return err
 	}
 
@@ -63,5 +73,58 @@ func (r *InstanceSet) ConvertFrom(srcRaw conversion.Hub) error {
 		return err
 	}
 
+	if err := r.incrementConvertFrom(src); err != nil {
+		return err
+	}
 	return nil
+}
+
+func (r *InstanceSet) incrementConvertTo(dstRaw metav1.Object) error {
+	if r.Spec.RoleProbe == nil && r.Spec.UpdateStrategy == nil {
+		return nil
+	}
+	// changed
+	instanceConvert := instanceSetConverter{
+		RoleProbe:      r.Spec.RoleProbe,
+		UpdateStrategy: r.Spec.UpdateStrategy,
+	}
+
+	if r.Spec.UpdateStrategy == nil || r.Spec.UpdateStrategy.MemberUpdateStrategy == nil {
+		// 1. set default update strategy
+		updateStrategy := SerialUpdateStrategy
+		instanceConvert.UpdateStrategy = &InstanceUpdateStrategy{
+			MemberUpdateStrategy: &updateStrategy,
+		}
+	}
+	bytes, err := json.Marshal(instanceConvert)
+	if err != nil {
+		return err
+	}
+	annotations := dstRaw.GetAnnotations()
+	if annotations == nil {
+		annotations = make(map[string]string)
+	}
+	annotations[kbIncrementConverterAK] = string(bytes)
+	dstRaw.SetAnnotations(annotations)
+	return nil
+}
+
+func (r *InstanceSet) incrementConvertFrom(srcRaw metav1.Object) error {
+	data, ok := srcRaw.GetAnnotations()[kbIncrementConverterAK]
+	if !ok {
+		return nil
+	}
+	instanceConvert := instanceSetConverter{}
+	if err := json.Unmarshal([]byte(data), &instanceConvert); err != nil {
+		return err
+	}
+	delete(srcRaw.GetAnnotations(), kbIncrementConverterAK)
+	r.Spec.RoleProbe = instanceConvert.RoleProbe
+	r.Spec.UpdateStrategy = instanceConvert.UpdateStrategy
+	return nil
+}
+
+type instanceSetConverter struct {
+	RoleProbe      *RoleProbe              `json:"roleProbe,omitempty"`
+	UpdateStrategy *InstanceUpdateStrategy `json:"updateStrategy,omitempty"`
 }

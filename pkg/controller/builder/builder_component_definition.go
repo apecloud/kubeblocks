@@ -205,8 +205,8 @@ func (builder *ComponentDefinitionBuilder) AddSystemAccount(accountName string, 
 	return builder
 }
 
-func (builder *ComponentDefinitionBuilder) SetUpdateStrategy(strategy *appsv1.UpdateStrategy) *ComponentDefinitionBuilder {
-	builder.get().Spec.UpdateStrategy = strategy
+func (builder *ComponentDefinitionBuilder) SetUpdateStrategy(strategy *appsv1.UpdateConcurrency) *ComponentDefinitionBuilder {
+	builder.get().Spec.UpdateStrategyConstraint = strategy
 	return builder
 }
 

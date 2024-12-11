@@ -4489,6 +4489,20 @@ spec:
                       type: object
                     type: array
                 type: object
+              instanceUpdatePolicy:
+                description: |-
+                  Specifies how an instance should be updated.
+
+
+                  - `StrictInPlace` indicates that only allows in-place update.
+                  Any attempt to modify other fields that not support in-place update will be rejected.
+                  - `PreferInPlace` indicates that we will first attempt an in-place update of the instance.
+                  If that fails, it will fall back to the ReCreate, where instance will be recreated.
+                  Default value is "PreferInPlace".
+                enum:
+                - StrictInPlace
+                - PreferInPlace
+                type: string
               labels:
                 additionalProperties:
                   type: string
@@ -16847,24 +16861,28 @@ spec:
                 - mountPath
                 - volumeName
                 type: object
-              updateStrategy:
+              updateConcurrency:
+                allOf:
+                - enum:
+                  - Serial
+                  - BestEffortParallel
+                  - Parallel
+                - enum:
+                  - Serial
+                  - Parallel
+                  - BestEffortParallel
                 default: Serial
-                description: "Specifies the concurrency strategy for updating multiple
-                  instances of the Component.\nAvailable strategies:\n\n\n- `Serial`:
-                  Updates replicas one at a time, ensuring minimal downtime by waiting
-                  for each replica to become ready\n  before updating the next.\n-
-                  `Parallel`: Updates all replicas simultaneously, optimizing for
-                  speed but potentially reducing availability\n  during the update.\n-
-                  `BestEffortParallel`: Updates replicas concurrently with a limit
-                  on simultaneous updates to ensure a minimum\n  number of operational
-                  replicas for maintaining quorum.\n\t For example, in a 5-replica
-                  component, updating a maximum of 2 replicas simultaneously keeps\n\t
-                  at least 3 operational for quorum.\n\n\nThis field is immutable
-                  and defaults to 'Serial'."
-                enum:
-                - Serial
-                - BestEffortParallel
-                - Parallel
+                description: "Specifies the concurrency level for updating instances
+                  during a rolling update.\nAvailable levels:\n\n\n- `Serial`: Updates
+                  instances one at a time, ensuring minimal downtime by waiting for
+                  each instance to become ready\n  before updating the next.\n- `Parallel`:
+                  Updates all instances simultaneously, optimizing for speed but potentially
+                  reducing availability\n  during the update.\n- `BestEffortParallel`:
+                  Updates instances concurrently with a limit on simultaneous updates
+                  to ensure a minimum\n  number of operational replicas for maintaining
+                  quorum.\n\t For example, in a 5-instances setup, updating a maximum
+                  of 2 instances simultaneously keeps\n\t at least 3 operational for
+                  quorum.\n\n\nDefaults to 'Serial'."
                 type: string
               vars:
                 description: |-

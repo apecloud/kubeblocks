@@ -48,10 +48,8 @@ func BuildWorkloadFrom(synthesizeComp *SynthesizedComponent, protoITS *workloads
 		"roleprobe":                        &itsRoleProbeConvertor{},
 		"credential":                       &itsCredentialConvertor{},
 		"membershipreconfiguration":        &itsMembershipReconfigurationConvertor{},
-		"memberupdatestrategy":             &itsMemberUpdateStrategyConvertor{},
 		"podmanagementpolicy":              &itsPodManagementPolicyConvertor{},
 		"parallelpodmanagementconcurrency": &itsParallelPodManagementConcurrencyConvertor{},
-		"podupdatepolicy":                  &itsPodUpdatePolicyConvertor{},
 		"updatestrategy":                   &itsUpdateStrategyConvertor{},
 		"instances":                        &itsInstancesConvertor{},
 		"offlineinstances":                 &itsOfflineInstancesConvertor{},
@@ -80,17 +78,6 @@ type itsCredentialConvertor struct{}
 // itsMembershipReconfigurationConvertor is an implementation of the convertor interface, used to convert the given object into InstanceSet.Spec.MembershipReconfiguration.
 type itsMembershipReconfigurationConvertor struct{}
 
-// itsMemberUpdateStrategyConvertor is an implementation of the convertor interface, used to convert the given object into InstanceSet.Spec.MemberUpdateStrategy.
-type itsMemberUpdateStrategyConvertor struct{}
-
-func (c *itsMemberUpdateStrategyConvertor) convert(args ...any) (any, error) {
-	synthesizeComp, err := parseITSConvertorArgs(args...)
-	if err != nil {
-		return nil, err
-	}
-	return getMemberUpdateStrategy(synthesizeComp), nil
-}
-
 // itsPodManagementPolicyConvertor is an implementation of the convertor interface, used to convert the given object into InstanceSet.Spec.PodManagementPolicy.
 type itsPodManagementPolicyConvertor struct{}
 
@@ -102,11 +89,7 @@ func (c *itsPodManagementPolicyConvertor) convert(args ...any) (any, error) {
 	if synthesizedComp.PodManagementPolicy != nil {
 		return *synthesizedComp.PodManagementPolicy, nil
 	}
-	memberUpdateStrategy := getMemberUpdateStrategy(synthesizedComp)
-	if memberUpdateStrategy == nil || *memberUpdateStrategy == workloads.SerialUpdateStrategy {
-		return appsv1.OrderedReadyPodManagement, nil
-	}
-	return appsv1.ParallelPodManagement, nil
+	return appsv1.OrderedReadyPodManagement, nil
 }
 
 // itsParallelPodManagementConcurrencyConvertor is an implementation of the convertor interface, used to convert the given object into InstanceSet.Spec.ParallelPodManagementConcurrency.
@@ -123,20 +106,6 @@ func (c *itsParallelPodManagementConcurrencyConvertor) convert(args ...any) (any
 	return &intstr.IntOrString{Type: intstr.String, StrVal: "100%"}, nil
 }
 
-// itsPodUpdatePolicyConvertor is an implementation of the convertor interface, used to convert the given object into InstanceSet.Spec.PodUpdatePolicy.
-type itsPodUpdatePolicyConvertor struct{}
-
-func (c *itsPodUpdatePolicyConvertor) convert(args ...any) (any, error) {
-	synthesizedComp, err := parseITSConvertorArgs(args...)
-	if err != nil {
-		return nil, err
-	}
-	if synthesizedComp.PodUpdatePolicy != nil {
-		return *synthesizedComp.PodUpdatePolicy, nil
-	}
-	return workloads.PreferInPlacePodUpdatePolicyType, nil
-}
-
 // itsUpdateStrategyConvertor is an implementation of the convertor interface, used to convert the given object into InstanceSet.Spec.Instances.
 type itsUpdateStrategyConvertor struct{}
 
@@ -145,11 +114,20 @@ func (c *itsUpdateStrategyConvertor) convert(args ...any) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	if getMemberUpdateStrategy(synthesizedComp) != nil {
-		// appsv1.OnDeleteStatefulSetStrategyType is the default value if member update strategy is set.
-		return appsv1.StatefulSetUpdateStrategy{}, nil
+	var updateStrategy *workloads.UpdateStrategy
+	if synthesizedComp.UpdateStrategy != nil {
+		updateStrategy = &workloads.UpdateStrategy{
+			InstanceUpdatePolicy: (*workloads.InstanceUpdatePolicyType)(synthesizedComp.UpdateStrategy.InstanceUpdatePolicy),
+		}
+		if synthesizedComp.UpdateStrategy.RollingUpdate != nil {
+			updateStrategy.RollingUpdate = &workloads.RollingUpdate{
+				Replicas:          synthesizedComp.UpdateStrategy.RollingUpdate.Replicas,
+				MaxUnavailable:    synthesizedComp.UpdateStrategy.RollingUpdate.MaxUnavailable,
+				UpdateConcurrency: (*workloads.UpdateConcurrency)(synthesizedComp.UpdateStrategy.RollingUpdate.UpdateConcurrency),
+			}
+		}
 	}
-	return nil, nil
+	return updateStrategy, nil
 }
 
 // itsInstancesConvertor converts component instanceTemplate to ITS instanceTemplate
@@ -247,27 +225,6 @@ func parseITSConvertorArgs(args ...any) (*SynthesizedComponent, error) {
 		return nil, errors.New("args[0] not a SynthesizedComponent object")
 	}
 	return synthesizeComp, nil
-}
-
-func getMemberUpdateStrategy(synthesizedComp *SynthesizedComponent) *workloads.MemberUpdateStrategy {
-	if synthesizedComp.UpdateStrategy == nil {
-		return nil
-	}
-	var (
-		serial                   = workloads.SerialUpdateStrategy
-		parallelUpdate           = workloads.ParallelUpdateStrategy
-		bestEffortParallelUpdate = workloads.BestEffortParallelUpdateStrategy
-	)
-	switch *synthesizedComp.UpdateStrategy {
-	case kbappsv1.SerialConcurrency:
-		return &serial
-	case kbappsv1.ParallelConcurrency:
-		return &parallelUpdate
-	case kbappsv1.BestEffortParallelConcurrency:
-		return &bestEffortParallelUpdate
-	default:
-		return nil
-	}
 }
 
 // itsServiceConvertor converts the given object into InstanceSet.Spec.Service.

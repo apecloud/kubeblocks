@@ -126,9 +126,13 @@ var _ = Describe("builder", func() {
 			// test role probe
 			Expect(its.Spec.RoleProbe).Should(BeNil())
 
-			// test member update strategy
-			Expect(its.Spec.MemberUpdateStrategy).ShouldNot(BeNil())
-			Expect(*its.Spec.MemberUpdateStrategy).Should(BeEquivalentTo(workloads.BestEffortParallelUpdateStrategy))
+			// test update strategy
+			Expect(its.Spec.UpdateStrategy).ShouldNot(BeNil())
+			Expect(its.Spec.UpdateStrategy.InstanceUpdatePolicy).ShouldNot(BeNil())
+			Expect(*its.Spec.UpdateStrategy.InstanceUpdatePolicy).Should(BeEquivalentTo(workloads.PreferInPlaceInstanceUpdatePolicyType))
+			Expect(its.Spec.UpdateStrategy.RollingUpdate).ShouldNot(BeNil())
+			Expect(its.Spec.UpdateStrategy.RollingUpdate.UpdateConcurrency).ShouldNot(BeNil())
+			Expect(*its.Spec.UpdateStrategy.RollingUpdate.UpdateConcurrency).Should(BeEquivalentTo(workloads.BestEffortParallelConcurrency))
 		})
 
 		It("builds ConfigMap with template correctly", func() {

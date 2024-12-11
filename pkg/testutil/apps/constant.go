@@ -206,7 +206,8 @@ var (
 				},
 			},
 		},
-		UpdateStrategyConstraint: &[]appsv1.UpdateConcurrency{appsv1.BestEffortParallelConcurrency}[0],
+		UpdateConcurrency:    &[]appsv1.UpdateConcurrency{appsv1.BestEffortParallelConcurrency}[0],
+		InstanceUpdatePolicy: &[]appsv1.InstanceUpdatePolicyType{appsv1.PreferInPlaceInstanceUpdatePolicyType}[0],
 		Roles: []appsv1.ReplicaRole{
 			{
 				Name:        "leader",

@@ -113,18 +113,8 @@ func (builder *InstanceSetBuilder) SetParallelPodManagementConcurrency(parallelP
 	return builder
 }
 
-func (builder *InstanceSetBuilder) SetPodUpdatePolicy(policy workloads.PodUpdatePolicyType) *InstanceSetBuilder {
-	builder.get().Spec.PodUpdatePolicy = policy
-	return builder
-}
-
-func (builder *InstanceSetBuilder) SetUpdateStrategy(strategy apps.StatefulSetUpdateStrategy) *InstanceSetBuilder {
+func (builder *InstanceSetBuilder) SetUpdateStrategy(strategy *workloads.UpdateStrategy) *InstanceSetBuilder {
 	builder.get().Spec.UpdateStrategy = strategy
-	return builder
-}
-
-func (builder *InstanceSetBuilder) SetUpdateStrategyType(strategyType apps.StatefulSetUpdateStrategyType) *InstanceSetBuilder {
-	builder.get().Spec.UpdateStrategy.Type = strategyType
 	return builder
 }
 
@@ -157,14 +147,6 @@ func (builder *InstanceSetBuilder) SetRoleProbe(roleProbe *workloads.RoleProbe) 
 
 func (builder *InstanceSetBuilder) SetMembershipReconfiguration(reconfiguration *workloads.MembershipReconfiguration) *InstanceSetBuilder {
 	builder.get().Spec.MembershipReconfiguration = reconfiguration
-	return builder
-}
-
-func (builder *InstanceSetBuilder) SetMemberUpdateStrategy(strategy *workloads.MemberUpdateStrategy) *InstanceSetBuilder {
-	builder.get().Spec.MemberUpdateStrategy = strategy
-	if strategy != nil {
-		builder.SetUpdateStrategyType(apps.OnDeleteStatefulSetStrategyType)
-	}
 	return builder
 }
 

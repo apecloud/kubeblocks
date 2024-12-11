@@ -77,7 +77,7 @@ func BuildComponent(cluster *appsv1.Cluster, compSpec *appsv1.ClusterComponentSp
 		SetResources(compSpec.Resources).
 		SetServiceAccountName(compSpec.ServiceAccountName).
 		SetParallelPodManagementConcurrency(compSpec.ParallelPodManagementConcurrency).
-		SetPodUpdatePolicy(compSpec.PodUpdatePolicy).
+		SetUpdateStrategy(compSpec.UpdateStrategy).
 		SetVolumeClaimTemplates(compSpec.VolumeClaimTemplates).
 		SetVolumes(compSpec.Volumes).
 		SetServices(compSpec.Services).

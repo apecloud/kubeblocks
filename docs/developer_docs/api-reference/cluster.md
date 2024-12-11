@@ -675,6 +675,20 @@ an existed ServiceAccount in this field.</p>
 </tr>
 <tr>
 <td>
+<code>updateStrategy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.UpdateStrategy">
+UpdateStrategy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Provides fine-grained control over the spec update process of all instances.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>parallelPodManagementConcurrency</code><br/>
 <em>
 <a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/util/intstr#IntOrString">
@@ -687,27 +701,6 @@ Kubernetes api utils intstr.IntOrString
 <p>Controls the concurrency of pods during initial scale up, when replacing pods on nodes,
 or when scaling down. It only used when <code>PodManagementPolicy</code> is set to <code>Parallel</code>.
 The default Concurrency is 100%.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>podUpdatePolicy</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.PodUpdatePolicyType">
-PodUpdatePolicyType
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>PodUpdatePolicy indicates how pods should be updated</p>
-<ul>
-<li><code>StrictInPlace</code> indicates that only allows in-place upgrades.
-Any attempt to modify other fields will be rejected.</li>
-<li><code>PreferInPlace</code> indicates that we will first attempt an in-place upgrade of the Pod.
-If that fails, it will fall back to the ReCreate, where pod will be recreated.
-Default value is &ldquo;PreferInPlace&rdquo;</li>
-</ul>
 </td>
 </tr>
 <tr>
@@ -1415,28 +1408,49 @@ This ensures the Pod&rsquo;s stability and readiness to serve requests.</p>
 </tr>
 <tr>
 <td>
-<code>updateStrategy</code><br/>
+<code>instanceUpdatePolicy</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.UpdateStrategy">
-UpdateStrategy
+<a href="#apps.kubeblocks.io/v1.InstanceUpdatePolicyType">
+InstanceUpdatePolicyType
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the concurrency strategy for updating multiple instances of the Component.
-Available strategies:</p>
+<p>Specifies how an instance should be updated.</p>
 <ul>
-<li><code>Serial</code>: Updates replicas one at a time, ensuring minimal downtime by waiting for each replica to become ready
+<li><code>StrictInPlace</code> indicates that only allows in-place update.
+Any attempt to modify other fields that not support in-place update will be rejected.</li>
+<li><code>PreferInPlace</code> indicates that we will first attempt an in-place update of the instance.
+If that fails, it will fall back to the ReCreate, where instance will be recreated.
+Default value is &ldquo;PreferInPlace&rdquo;.</li>
+</ul>
+</td>
+</tr>
+<tr>
+<td>
+<code>updateConcurrency</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.UpdateConcurrency">
+UpdateConcurrency
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the concurrency level for updating instances during a rolling update.
+Available levels:</p>
+<ul>
+<li><code>Serial</code>: Updates instances one at a time, ensuring minimal downtime by waiting for each instance to become ready
 before updating the next.</li>
-<li><code>Parallel</code>: Updates all replicas simultaneously, optimizing for speed but potentially reducing availability
+<li><code>Parallel</code>: Updates all instances simultaneously, optimizing for speed but potentially reducing availability
 during the update.</li>
-<li><code>BestEffortParallel</code>: Updates replicas concurrently with a limit on simultaneous updates to ensure a minimum
+<li><code>BestEffortParallel</code>: Updates instances concurrently with a limit on simultaneous updates to ensure a minimum
 number of operational replicas for maintaining quorum.
- For example, in a 5-replica component, updating a maximum of 2 replicas simultaneously keeps
+ For example, in a 5-instances setup, updating a maximum of 2 instances simultaneously keeps
 at least 3 operational for quorum.</li>
 </ul>
-<p>This field is immutable and defaults to &lsquo;Serial&rsquo;.</p>
+<p>Defaults to &lsquo;Serial&rsquo;.</p>
 </td>
 </tr>
 <tr>
@@ -1927,8 +1941,8 @@ ShardsLimit
 <td>
 <code>provisionStrategy</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.UpdateStrategy">
-UpdateStrategy
+<a href="#apps.kubeblocks.io/v1.UpdateConcurrency">
+UpdateConcurrency
 </a>
 </em>
 </td>
@@ -1942,8 +1956,8 @@ UpdateStrategy
 <td>
 <code>updateStrategy</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.UpdateStrategy">
-UpdateStrategy
+<a href="#apps.kubeblocks.io/v1.UpdateConcurrency">
+UpdateConcurrency
 </a>
 </em>
 </td>
@@ -3020,23 +3034,16 @@ The default Concurrency is 100%.</p>
 </tr>
 <tr>
 <td>
-<code>podUpdatePolicy</code><br/>
+<code>updateStrategy</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.PodUpdatePolicyType">
-PodUpdatePolicyType
+<a href="#apps.kubeblocks.io/v1.UpdateStrategy">
+UpdateStrategy
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>PodUpdatePolicy indicates how pods should be updated</p>
-<ul>
-<li><code>StrictInPlace</code> indicates that only allows in-place upgrades.
-Any attempt to modify other fields will be rejected.</li>
-<li><code>PreferInPlace</code> indicates that we will first attempt an in-place upgrade of the Pod.
-If that fails, it will fall back to the ReCreate, where pod will be recreated.
-Default value is &ldquo;PreferInPlace&rdquo;</li>
-</ul>
+<p>Provides fine-grained control over the spec update process of all instances.</p>
 </td>
 </tr>
 <tr>
@@ -5272,28 +5279,49 @@ This ensures the Pod&rsquo;s stability and readiness to serve requests.</p>
 </tr>
 <tr>
 <td>
-<code>updateStrategy</code><br/>
+<code>instanceUpdatePolicy</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.UpdateStrategy">
-UpdateStrategy
+<a href="#apps.kubeblocks.io/v1.InstanceUpdatePolicyType">
+InstanceUpdatePolicyType
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the concurrency strategy for updating multiple instances of the Component.
-Available strategies:</p>
+<p>Specifies how an instance should be updated.</p>
 <ul>
-<li><code>Serial</code>: Updates replicas one at a time, ensuring minimal downtime by waiting for each replica to become ready
+<li><code>StrictInPlace</code> indicates that only allows in-place update.
+Any attempt to modify other fields that not support in-place update will be rejected.</li>
+<li><code>PreferInPlace</code> indicates that we will first attempt an in-place update of the instance.
+If that fails, it will fall back to the ReCreate, where instance will be recreated.
+Default value is &ldquo;PreferInPlace&rdquo;.</li>
+</ul>
+</td>
+</tr>
+<tr>
+<td>
+<code>updateConcurrency</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.UpdateConcurrency">
+UpdateConcurrency
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the concurrency level for updating instances during a rolling update.
+Available levels:</p>
+<ul>
+<li><code>Serial</code>: Updates instances one at a time, ensuring minimal downtime by waiting for each instance to become ready
 before updating the next.</li>
-<li><code>Parallel</code>: Updates all replicas simultaneously, optimizing for speed but potentially reducing availability
+<li><code>Parallel</code>: Updates all instances simultaneously, optimizing for speed but potentially reducing availability
 during the update.</li>
-<li><code>BestEffortParallel</code>: Updates replicas concurrently with a limit on simultaneous updates to ensure a minimum
+<li><code>BestEffortParallel</code>: Updates instances concurrently with a limit on simultaneous updates to ensure a minimum
 number of operational replicas for maintaining quorum.
- For example, in a 5-replica component, updating a maximum of 2 replicas simultaneously keeps
+ For example, in a 5-instances setup, updating a maximum of 2 instances simultaneously keeps
 at least 3 operational for quorum.</li>
 </ul>
-<p>This field is immutable and defaults to &lsquo;Serial&rsquo;.</p>
+<p>Defaults to &lsquo;Serial&rsquo;.</p>
 </td>
 </tr>
 <tr>
@@ -6158,6 +6186,20 @@ an existed ServiceAccount in this field.</p>
 </tr>
 <tr>
 <td>
+<code>updateStrategy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.UpdateStrategy">
+UpdateStrategy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Provides fine-grained control over the spec update process of all instances.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>parallelPodManagementConcurrency</code><br/>
 <em>
 <a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/util/intstr#IntOrString">
@@ -6170,27 +6212,6 @@ Kubernetes api utils intstr.IntOrString
 <p>Controls the concurrency of pods during initial scale up, when replacing pods on nodes,
 or when scaling down. It only used when <code>PodManagementPolicy</code> is set to <code>Parallel</code>.
 The default Concurrency is 100%.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>podUpdatePolicy</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.PodUpdatePolicyType">
-PodUpdatePolicyType
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>PodUpdatePolicy indicates how pods should be updated</p>
-<ul>
-<li><code>StrictInPlace</code> indicates that only allows in-place upgrades.
-Any attempt to modify other fields will be rejected.</li>
-<li><code>PreferInPlace</code> indicates that we will first attempt an in-place upgrade of the Pod.
-If that fails, it will fall back to the ReCreate, where pod will be recreated.
-Default value is &ldquo;PreferInPlace&rdquo;</li>
-</ul>
 </td>
 </tr>
 <tr>
@@ -7938,6 +7959,30 @@ Add new or override existing volume claim templates.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1.InstanceUpdatePolicyType">InstanceUpdatePolicyType
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>, <a href="#apps.kubeblocks.io/v1.UpdateStrategy">UpdateStrategy</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;PreferInPlace&#34;</p></td>
+<td><p>PreferInPlaceInstanceUpdatePolicyType indicates that we will first attempt an in-place update of the instance.
+If that fails, it will fall back to the ReCreate, where instance will be recreated.</p>
+</td>
+</tr><tr><td><p>&#34;StrictInPlace&#34;</p></td>
+<td><p>StrictInPlaceInstanceUpdatePolicyType indicates that only allows in-place update.
+Any attempt to modify other fields that not support in-place update will be rejected.</p>
+</td>
+</tr></tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1.Issuer">Issuer
 </h3>
 <p>
@@ -8559,30 +8604,6 @@ Kubernetes core/v1.PersistentVolumeMode
 </td>
 </tr></tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1.PodUpdatePolicyType">PodUpdatePolicyType
-(<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>&#34;PreferInPlace&#34;</p></td>
-<td><p>PreferInPlacePodUpdatePolicyType indicates that we will first attempt an in-place upgrade of the Pod.
-If that fails, it will fall back to the ReCreate, where pod will be recreated.</p>
-</td>
-</tr><tr><td><p>&#34;StrictInPlace&#34;</p></td>
-<td><p>StrictInPlacePodUpdatePolicyType indicates that only allows in-place upgrades.
-Any attempt to modify other fields will be rejected.</p>
-</td>
-</tr></tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1.PreConditionType">PreConditionType
 (<code>string</code> alias)</h3>
 <p>
@@ -8967,6 +8988,87 @@ VarOption
 </td>
 <td>
 <em>(Optional)</em>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.RollingUpdate">RollingUpdate
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.UpdateStrategy">UpdateStrategy</a>)
+</p>
+<div>
+<p>RollingUpdate specifies how the rolling update should be applied.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>replicas</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/util/intstr#IntOrString">
+Kubernetes api utils intstr.IntOrString
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates the number of instances that should be updated during a rolling update.
+The remaining instances will remain untouched. This is helpful in defining how many instances
+should participate in the update process.
+Value can be an absolute number (ex: 5) or a percentage of desired instances (ex: 10%).
+Absolute number is calculated from percentage by rounding up.
+The default value is ComponentSpec.Replicas (i.e., update all instances).</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>updateConcurrency</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.UpdateConcurrency">
+UpdateConcurrency
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the concurrency level for updating instances during a rolling update.
+Available levels:</p>
+<ul>
+<li><code>Serial</code>: Updates instances one at a time, ensuring minimal downtime by waiting for each instance to become ready
+before updating the next.</li>
+<li><code>Parallel</code>: Updates all instances simultaneously, optimizing for speed but potentially reducing availability
+during the update.</li>
+<li><code>BestEffortParallel</code>: Updates instances concurrently with a limit on simultaneous updates to ensure a minimum
+number of operational replicas for maintaining quorum.
+ For example, in a 5-instances setup, updating a maximum of 2 instances simultaneously keeps
+at least 3 operational for quorum.</li>
+</ul>
+<p>Defaults to &lsquo;Serial&rsquo;.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>maxUnavailable</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/util/intstr#IntOrString">
+Kubernetes api utils intstr.IntOrString
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The maximum number of instances that can be unavailable during the update.
+Value can be an absolute number (ex: 5) or a percentage of desired instances (ex: 10%).
+Absolute number is calculated from percentage by rounding up. This can not be 0.
+Defaults to 1. The field applies to all instances. That means if there is any unavailable pod,
+it will be counted towards MaxUnavailable.</p>
 </td>
 </tr>
 </tbody>
@@ -10488,8 +10590,8 @@ ShardsLimit
 <td>
 <code>provisionStrategy</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.UpdateStrategy">
-UpdateStrategy
+<a href="#apps.kubeblocks.io/v1.UpdateConcurrency">
+UpdateConcurrency
 </a>
 </em>
 </td>
@@ -10503,8 +10605,8 @@ UpdateStrategy
 <td>
 <code>updateStrategy</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.UpdateStrategy">
-UpdateStrategy
+<a href="#apps.kubeblocks.io/v1.UpdateConcurrency">
+UpdateConcurrency
 </a>
 </em>
 </td>
@@ -11522,15 +11624,15 @@ VarOption
 </td>
 </tr></tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1.UpdateStrategy">UpdateStrategy
+<h3 id="apps.kubeblocks.io/v1.UpdateConcurrency">UpdateConcurrency
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>, <a href="#apps.kubeblocks.io/v1.ShardingDefinitionSpec">ShardingDefinitionSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>, <a href="#apps.kubeblocks.io/v1.RollingUpdate">RollingUpdate</a>, <a href="#apps.kubeblocks.io/v1.ShardingDefinitionSpec">ShardingDefinitionSpec</a>)
 </p>
 <div>
-<p>UpdateStrategy defines the update strategy for cluster components. This strategy determines how updates are applied
+<p>UpdateConcurrency defines the update concurrency level for cluster components. This concurrency level determines how updates are applied
 across the cluster.
-The available strategies are <code>Serial</code>, <code>BestEffortParallel</code>, and <code>Parallel</code>.</p>
+The available concurrency levels are <code>Serial</code>, <code>BestEffortParallel</code>, and <code>Parallel</code>.</p>
 </div>
 <table>
 <thead>
@@ -11540,7 +11642,7 @@ The available strategies are <code>Serial</code>, <code>BestEffortParallel</code
 </tr>
 </thead>
 <tbody><tr><td><p>&#34;BestEffortParallel&#34;</p></td>
-<td><p>BestEffortParallelStrategy indicates that the replicas are updated in parallel, with the operator making
+<td><p>BestEffortParallelConcurrency indicates that the replicas are updated in parallel, with the operator making
 a best-effort attempt to update as many replicas as possible concurrently
 while maintaining the component&rsquo;s availability.
 Unlike the <code>Parallel</code> strategy, the <code>BestEffortParallel</code> strategy aims to ensure that a minimum number
@@ -11551,17 +11653,70 @@ the operator may allow a maximum of 2 replicas to be simultaneously updated. Thi
 <p>The <code>BestEffortParallel</code> strategy strikes a balance between update speed and component availability.</p>
 </td>
 </tr><tr><td><p>&#34;Parallel&#34;</p></td>
-<td><p>ParallelStrategy indicates that updates are applied simultaneously to all Pods of a Component.
+<td><p>ParallelConcurrency indicates that updates are applied simultaneously to all Pods of a Component.
 The replicas are updated in parallel, with the operator updating all replicas concurrently.
 This strategy provides the fastest update time but may lead to a period of reduced availability or
 capacity during the update process.</p>
 </td>
 </tr><tr><td><p>&#34;Serial&#34;</p></td>
-<td><p>SerialStrategy indicates that updates are applied one at a time in a sequential manner.
+<td><p>SerialConcurrency indicates that updates are applied one at a time in a sequential manner.
 The operator waits for each replica to be updated and ready before proceeding to the next one.
 This ensures that only one replica is unavailable at a time during the update process.</p>
 </td>
 </tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.UpdateStrategy">UpdateStrategy
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>)
+</p>
+<div>
+<p>UpdateStrategy defines fine-grained control over the spec update process of all instances.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>instanceUpdatePolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.InstanceUpdatePolicyType">
+InstanceUpdatePolicyType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates how instances should be updated.</p>
+<ul>
+<li><code>StrictInPlace</code> indicates that only allows in-place update.
+Any attempt to modify other fields that not support in-place update will be rejected.</li>
+<li><code>PreferInPlace</code> indicates that we will first attempt an in-place update of the instance.
+If that fails, it will fall back to the ReCreate, where instance will be recreated.
+Default value is &ldquo;PreferInPlace&rdquo;.</li>
+</ul>
+</td>
+</tr>
+<tr>
+<td>
+<code>rollingUpdate</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.RollingUpdate">
+RollingUpdate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies how the rolling update should be applied.</p>
+</td>
+</tr>
+</tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1.VarOption">VarOption
 (<code>string</code> alias)</h3>
@@ -28953,40 +29108,16 @@ The default Concurrency is 100%.</p>
 </tr>
 <tr>
 <td>
-<code>podUpdatePolicy</code><br/>
+<code>updateStrategy</code><br/>
 <em>
-<a href="#workloads.kubeblocks.io/v1.PodUpdatePolicyType">
-PodUpdatePolicyType
+<a href="#workloads.kubeblocks.io/v1.UpdateStrategy">
+UpdateStrategy
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>PodUpdatePolicy indicates how pods should be updated</p>
-<ul>
-<li><code>StrictInPlace</code> indicates that only allows in-place upgrades.
-Any attempt to modify other fields will be rejected.</li>
-<li><code>PreferInPlace</code> indicates that we will first attempt an in-place upgrade of the Pod.
-If that fails, it will fall back to the ReCreate, where pod will be recreated.
-Default value is &ldquo;PreferInPlace&rdquo;</li>
-</ul>
-</td>
-</tr>
-<tr>
-<td>
-<code>updateStrategy</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#statefulsetupdatestrategy-v1-apps">
-Kubernetes apps/v1.StatefulSetUpdateStrategy
-</a>
-</em>
-</td>
-<td>
-<p>Indicates the StatefulSetUpdateStrategy that will be
-employed to update Pods in the InstanceSet when a revision is made to
-Template.
-UpdateStrategy.Type will be set to appsv1.OnDeleteStatefulSetStrategyType if MemberUpdateStrategy is not nil</p>
-<p>Note: This field will be removed in future version.</p>
+<p>Provides fine-grained control over the spec update process of all instances.</p>
 </td>
 </tr>
 <tr>
@@ -29029,25 +29160,6 @@ MembershipReconfiguration
 <td>
 <em>(Optional)</em>
 <p>Provides actions to do membership dynamic reconfiguration.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>memberUpdateStrategy</code><br/>
-<em>
-<a href="#workloads.kubeblocks.io/v1.MemberUpdateStrategy">
-MemberUpdateStrategy
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Members(Pods) update strategy.</p>
-<ul>
-<li>serial: update Members one by one that guarantee minimum component unavailable time.</li>
-<li>bestEffortParallel: update Members in parallel that guarantee minimum component un-writable time.</li>
-<li>parallel: force parallel</li>
-</ul>
 </td>
 </tr>
 <tr>
@@ -29484,40 +29596,16 @@ The default Concurrency is 100%.</p>
 </tr>
 <tr>
 <td>
-<code>podUpdatePolicy</code><br/>
+<code>updateStrategy</code><br/>
 <em>
-<a href="#workloads.kubeblocks.io/v1.PodUpdatePolicyType">
-PodUpdatePolicyType
+<a href="#workloads.kubeblocks.io/v1.UpdateStrategy">
+UpdateStrategy
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>PodUpdatePolicy indicates how pods should be updated</p>
-<ul>
-<li><code>StrictInPlace</code> indicates that only allows in-place upgrades.
-Any attempt to modify other fields will be rejected.</li>
-<li><code>PreferInPlace</code> indicates that we will first attempt an in-place upgrade of the Pod.
-If that fails, it will fall back to the ReCreate, where pod will be recreated.
-Default value is &ldquo;PreferInPlace&rdquo;</li>
-</ul>
-</td>
-</tr>
-<tr>
-<td>
-<code>updateStrategy</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#statefulsetupdatestrategy-v1-apps">
-Kubernetes apps/v1.StatefulSetUpdateStrategy
-</a>
-</em>
-</td>
-<td>
-<p>Indicates the StatefulSetUpdateStrategy that will be
-employed to update Pods in the InstanceSet when a revision is made to
-Template.
-UpdateStrategy.Type will be set to appsv1.OnDeleteStatefulSetStrategyType if MemberUpdateStrategy is not nil</p>
-<p>Note: This field will be removed in future version.</p>
+<p>Provides fine-grained control over the spec update process of all instances.</p>
 </td>
 </tr>
 <tr>
@@ -29560,25 +29648,6 @@ MembershipReconfiguration
 <td>
 <em>(Optional)</em>
 <p>Provides actions to do membership dynamic reconfiguration.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>memberUpdateStrategy</code><br/>
-<em>
-<a href="#workloads.kubeblocks.io/v1.MemberUpdateStrategy">
-MemberUpdateStrategy
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Members(Pods) update strategy.</p>
-<ul>
-<li>serial: update Members one by one that guarantee minimum component unavailable time.</li>
-<li>bestEffortParallel: update Members in parallel that guarantee minimum component un-writable time.</li>
-<li>parallel: force parallel</li>
-</ul>
 </td>
 </tr>
 <tr>
@@ -30116,6 +30185,30 @@ indicated by UpdateRevisions.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="workloads.kubeblocks.io/v1.InstanceUpdatePolicyType">InstanceUpdatePolicyType
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.UpdateStrategy">UpdateStrategy</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;PreferInPlace&#34;</p></td>
+<td><p>PreferInPlaceInstanceUpdatePolicyType indicates that we will first attempt an in-place update of the instance.
+If that fails, it will fall back to the ReCreate, where instance will be recreated.</p>
+</td>
+</tr><tr><td><p>&#34;StrictInPlace&#34;</p></td>
+<td><p>StrictInPlaceInstanceUpdatePolicyType indicates that only allows in-place update.
+Any attempt to modify other fields that not support in-place update will be rejected.</p>
+</td>
+</tr></tbody>
+</table>
 <h3 id="workloads.kubeblocks.io/v1.MemberStatus">MemberStatus
 </h3>
 <p>
@@ -30157,29 +30250,6 @@ ReplicaRole
 </td>
 </tr>
 </tbody>
-</table>
-<h3 id="workloads.kubeblocks.io/v1.MemberUpdateStrategy">MemberUpdateStrategy
-(<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>)
-</p>
-<div>
-<p>MemberUpdateStrategy defines Cluster Component update strategy.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>&#34;BestEffortParallel&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;Parallel&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;Serial&#34;</p></td>
-<td></td>
-</tr></tbody>
 </table>
 <h3 id="workloads.kubeblocks.io/v1.MembershipReconfiguration">MembershipReconfiguration
 </h3>
@@ -30318,30 +30388,6 @@ If the Image is not configured, the Image from the previous non-nil action will 
 </td>
 </tr>
 </tbody>
-</table>
-<h3 id="workloads.kubeblocks.io/v1.PodUpdatePolicyType">PodUpdatePolicyType
-(<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>&#34;PreferInPlace&#34;</p></td>
-<td><p>PreferInPlacePodUpdatePolicyType indicates that we will first attempt an in-place upgrade of the Pod.
-If that fails, it will fall back to the ReCreate, where pod will be recreated.</p>
-</td>
-</tr><tr><td><p>&#34;StrictInPlace&#34;</p></td>
-<td><p>StrictInPlacePodUpdatePolicyType indicates that only allows in-place upgrades.
-Any attempt to modify other fields will be rejected.</p>
-</td>
-</tr></tbody>
 </table>
 <h3 id="workloads.kubeblocks.io/v1.Range">Range
 </h3>
@@ -30581,6 +30627,87 @@ RoleUpdateMechanism
 <td></td>
 </tr></tbody>
 </table>
+<h3 id="workloads.kubeblocks.io/v1.RollingUpdate">RollingUpdate
+</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.UpdateStrategy">UpdateStrategy</a>)
+</p>
+<div>
+<p>RollingUpdate specifies how the rolling update should be applied.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>replicas</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/util/intstr#IntOrString">
+Kubernetes api utils intstr.IntOrString
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates the number of instances that should be updated during a rolling update.
+The remaining instances will remain untouched. This is helpful in defining how many instances
+should participate in the update process.
+Value can be an absolute number (ex: 5) or a percentage of desired instances (ex: 10%).
+Absolute number is calculated from percentage by rounding up.
+The default value is ComponentSpec.Replicas (i.e., update all instances).</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>updateConcurrency</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.UpdateConcurrency">
+UpdateConcurrency
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the concurrency level for updating instances during a rolling update.
+Available levels:</p>
+<ul>
+<li><code>Serial</code>: Updates instances one at a time, ensuring minimal downtime by waiting for each instance to become ready
+before updating the next.</li>
+<li><code>Parallel</code>: Updates all instances simultaneously, optimizing for speed but potentially reducing availability
+during the update.</li>
+<li><code>BestEffortParallel</code>: Updates instances concurrently with a limit on simultaneous updates to ensure a minimum
+number of operational replicas for maintaining quorum.
+ For example, in a 5-instances setup, updating a maximum of 2 instances simultaneously keeps
+at least 3 operational for quorum.</li>
+</ul>
+<p>Defaults to &lsquo;Serial&rsquo;.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>maxUnavailable</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/util/intstr#IntOrString">
+Kubernetes api utils intstr.IntOrString
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The maximum number of instances that can be unavailable during the update.
+Value can be an absolute number (ex: 5) or a percentage of desired instances (ex: 10%).
+Absolute number is calculated from percentage by rounding up. This can not be 0.
+Defaults to 1. The field applies to all instances. That means if there is any unavailable pod,
+it will be counted towards MaxUnavailable.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="workloads.kubeblocks.io/v1.SchedulingPolicy">SchedulingPolicy
 </h3>
 <p>
@@ -30688,6 +30815,100 @@ specified <code>key</code>, <code>value</code>, <code>effect</code>, and <code>o
 <p>TopologySpreadConstraints describes how a group of Pods ought to spread across topology
 domains. Scheduler will schedule Pods in a way which abides by the constraints.
 All topologySpreadConstraints are ANDed.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="workloads.kubeblocks.io/v1.UpdateConcurrency">UpdateConcurrency
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.RollingUpdate">RollingUpdate</a>)
+</p>
+<div>
+<p>UpdateConcurrency defines the update concurrency level for cluster components. This concurrency level determines how updates are applied
+across the cluster.
+The available concurrency levels are <code>Serial</code>, <code>BestEffortParallel</code>, and <code>Parallel</code>.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;BestEffortParallel&#34;</p></td>
+<td><p>BestEffortParallelConcurrency indicates that the replicas are updated in parallel, with the operator making
+a best-effort attempt to update as many replicas as possible concurrently
+while maintaining the component&rsquo;s availability.
+Unlike the <code>Parallel</code> strategy, the <code>BestEffortParallel</code> strategy aims to ensure that a minimum number
+of replicas remain available during the update process to maintain the component&rsquo;s quorum and functionality.</p>
+<p>For example, consider a component with 5 replicas. To maintain the component&rsquo;s availability and quorum,
+the operator may allow a maximum of 2 replicas to be simultaneously updated. This ensures that at least
+3 replicas (a quorum) remain available and functional during the update process.</p>
+<p>The <code>BestEffortParallel</code> strategy strikes a balance between update speed and component availability.</p>
+</td>
+</tr><tr><td><p>&#34;Parallel&#34;</p></td>
+<td><p>ParallelConcurrency indicates that updates are applied simultaneously to all Pods of a Component.
+The replicas are updated in parallel, with the operator updating all replicas concurrently.
+This strategy provides the fastest update time but may lead to a period of reduced availability or
+capacity during the update process.</p>
+</td>
+</tr><tr><td><p>&#34;Serial&#34;</p></td>
+<td><p>SerialConcurrency indicates that updates are applied one at a time in a sequential manner.
+The operator waits for each replica to be updated and ready before proceeding to the next one.
+This ensures that only one replica is unavailable at a time during the update process.</p>
+</td>
+</tr></tbody>
+</table>
+<h3 id="workloads.kubeblocks.io/v1.UpdateStrategy">UpdateStrategy
+</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>)
+</p>
+<div>
+<p>UpdateStrategy defines fine-grained control over the spec update process of all instances.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>instanceUpdatePolicy</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.InstanceUpdatePolicyType">
+InstanceUpdatePolicyType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates how instances should be updated.</p>
+<ul>
+<li><code>StrictInPlace</code> indicates that only allows in-place update.
+Any attempt to modify other fields that not support in-place update will be rejected.</li>
+<li><code>PreferInPlace</code> indicates that we will first attempt an in-place update of the instance.
+If that fails, it will fall back to the ReCreate, where instance will be recreated.
+Default value is &ldquo;PreferInPlace&rdquo;.</li>
+</ul>
+</td>
+</tr>
+<tr>
+<td>
+<code>rollingUpdate</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.RollingUpdate">
+RollingUpdate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies how the rolling update should be applied.</p>
 </td>
 </tr>
 </tbody>

@@ -45,7 +45,7 @@ var _ = Describe("instance_set builder", func() {
 			minReadySeconds              = int32(11)
 			port                         = int32(12345)
 			policy                       = apps.OrderedReadyPodManagement
-			podUpdatePolicy              = workloads.PreferInPlacePodUpdatePolicyType
+			instanceUpdatePolicy         = workloads.PreferInPlaceInstanceUpdatePolicyType
 		)
 		parallelPodManagementConcurrency := &intstr.IntOrString{Type: intstr.String, StrVal: "100%"}
 		selectors := map[string]string{selectorKey4: selectorValue4}
@@ -107,15 +107,17 @@ var _ = Describe("instance_set builder", func() {
 				},
 			},
 		}
-		partition, maxUnavailable := int32(3), intstr.FromInt(2)
-		strategy := apps.StatefulSetUpdateStrategy{
-			Type: apps.RollingUpdateStatefulSetStrategyType,
-			RollingUpdate: &apps.RollingUpdateStatefulSetStrategy{
-				Partition:      &partition,
-				MaxUnavailable: &maxUnavailable,
+		itUpdatePolicy := workloads.PreferInPlaceInstanceUpdatePolicyType
+		updateReplicas, maxUnavailable := intstr.FromInt32(3), intstr.FromInt32(2)
+		updateConcurrency := workloads.BestEffortParallelConcurrency
+		strategy := workloads.UpdateStrategy{
+			InstanceUpdatePolicy: &itUpdatePolicy,
+			RollingUpdate: &workloads.RollingUpdate{
+				Replicas:          &updateReplicas,
+				MaxUnavailable:    &maxUnavailable,
+				UpdateConcurrency: &updateConcurrency,
 			},
 		}
-		strategyType := apps.OnDeleteStatefulSetStrategyType
 		delay := int32(10)
 		roleProbe := workloads.RoleProbe{InitialDelaySeconds: delay}
 		actions := []workloads.Action{
@@ -128,7 +130,6 @@ var _ = Describe("instance_set builder", func() {
 			Image:   "foo-2",
 			Command: []string{"bar-2"},
 		}
-		memberUpdateStrategy := workloads.BestEffortParallelUpdateStrategy
 		paused := true
 		credential := workloads.Credential{
 			Username: workloads.CredentialVar{Value: "foo"},
@@ -157,13 +158,10 @@ var _ = Describe("instance_set builder", func() {
 			AddVolumeClaimTemplates(vc).
 			SetPodManagementPolicy(policy).
 			SetParallelPodManagementConcurrency(parallelPodManagementConcurrency).
-			SetPodUpdatePolicy(podUpdatePolicy).
-			SetUpdateStrategy(strategy).
-			SetUpdateStrategyType(strategyType).
+			SetUpdateStrategy(&strategy).
 			SetRoleProbe(&roleProbe).
 			SetCustomHandler(actions).
 			AddCustomHandler(action).
-			SetMemberUpdateStrategy(&memberUpdateStrategy).
 			SetPaused(paused).
 			SetCredential(credential).
 			SetInstances(instances).
@@ -189,20 +187,21 @@ var _ = Describe("instance_set builder", func() {
 		Expect(its.Spec.VolumeClaimTemplates[1]).Should(Equal(vc))
 		Expect(its.Spec.PodManagementPolicy).Should(Equal(policy))
 		Expect(its.Spec.ParallelPodManagementConcurrency).Should(Equal(parallelPodManagementConcurrency))
-		Expect(its.Spec.PodUpdatePolicy).Should(Equal(podUpdatePolicy))
-		Expect(its.Spec.UpdateStrategy.Type).Should(Equal(strategyType))
+		Expect(its.Spec.UpdateStrategy).ShouldNot(BeNil())
+		Expect(its.Spec.UpdateStrategy.InstanceUpdatePolicy).ShouldNot(BeNil())
+		Expect(*its.Spec.UpdateStrategy.InstanceUpdatePolicy).Should(Equal(instanceUpdatePolicy))
 		Expect(its.Spec.UpdateStrategy.RollingUpdate).ShouldNot(BeNil())
-		Expect(its.Spec.UpdateStrategy.RollingUpdate.Partition).ShouldNot(BeNil())
-		Expect(*its.Spec.UpdateStrategy.RollingUpdate.Partition).Should(Equal(partition))
+		Expect(its.Spec.UpdateStrategy.RollingUpdate.Replicas).ShouldNot(BeNil())
+		Expect(*its.Spec.UpdateStrategy.RollingUpdate.Replicas).Should(Equal(updateReplicas))
 		Expect(its.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable).ShouldNot(BeNil())
-		Expect(its.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable).ShouldNot(Equal(maxUnavailable))
+		Expect(*its.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable).Should(Equal(maxUnavailable))
+		Expect(its.Spec.UpdateStrategy.RollingUpdate.UpdateConcurrency).ShouldNot(BeNil())
+		Expect(*its.Spec.UpdateStrategy.RollingUpdate.UpdateConcurrency).Should(Equal(updateConcurrency))
 		Expect(its.Spec.RoleProbe).ShouldNot(BeNil())
 		Expect(its.Spec.RoleProbe.InitialDelaySeconds).Should(Equal(delay))
 		Expect(its.Spec.RoleProbe.CustomHandler).Should(HaveLen(2))
 		Expect(its.Spec.RoleProbe.CustomHandler[0]).Should(Equal(actions[0]))
 		Expect(its.Spec.RoleProbe.CustomHandler[1]).Should(Equal(action))
-		Expect(its.Spec.MemberUpdateStrategy).ShouldNot(BeNil())
-		Expect(*its.Spec.MemberUpdateStrategy).Should(Equal(memberUpdateStrategy))
 		Expect(its.Spec.Paused).Should(Equal(paused))
 		Expect(its.Spec.Credential).ShouldNot(BeNil())
 		Expect(*its.Spec.Credential).Should(Equal(credential))

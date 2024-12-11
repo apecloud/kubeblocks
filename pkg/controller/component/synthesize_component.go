@@ -91,7 +91,6 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 		ConfigTemplates:                  compDefObj.Spec.Configs,
 		ScriptTemplates:                  compDefObj.Spec.Scripts,
 		Roles:                            compDefObj.Spec.Roles,
-		UpdateStrategy:                   compDefObj.Spec.UpdateStrategyConstraint,
 		MinReadySeconds:                  compDefObj.Spec.MinReadySeconds,
 		PolicyRules:                      compDefObj.Spec.PolicyRules,
 		LifecycleActions:                 compDefObj.Spec.LifecycleActions,
@@ -106,12 +105,14 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 		Stop:                             comp.Spec.Stop,
 		PodManagementPolicy:              compDef.Spec.PodManagementPolicy,
 		ParallelPodManagementConcurrency: comp.Spec.ParallelPodManagementConcurrency,
-		PodUpdatePolicy:                  comp.Spec.PodUpdatePolicy,
 	}
 
 	if err = mergeUserDefinedEnv(synthesizeComp, comp); err != nil {
 		return nil, err
 	}
+
+	// build update strategy for workload
+	buildUpdateStrategy(synthesizeComp, comp, compDefObj)
 
 	// build scheduling policy for workload
 	buildSchedulingPolicy(synthesizeComp, comp)
@@ -153,6 +154,42 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 	}
 
 	return synthesizeComp, nil
+}
+
+func buildUpdateStrategy(synthesizeComp *SynthesizedComponent, comp *appsv1.Component, compDef *appsv1.ComponentDefinition) {
+	var updateStrategy *appsv1.UpdateStrategy
+	if comp.Spec.UpdateStrategy != nil {
+		updateStrategy = &appsv1.UpdateStrategy{
+			InstanceUpdatePolicy: comp.Spec.UpdateStrategy.InstanceUpdatePolicy,
+		}
+		if comp.Spec.UpdateStrategy.RollingUpdate != nil {
+			updateStrategy.RollingUpdate = &appsv1.RollingUpdate{
+				Replicas:          comp.Spec.UpdateStrategy.RollingUpdate.Replicas,
+				MaxUnavailable:    comp.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable,
+				UpdateConcurrency: comp.Spec.UpdateStrategy.RollingUpdate.UpdateConcurrency,
+			}
+		}
+	}
+	if compDef.Spec.InstanceUpdatePolicy != nil {
+		if updateStrategy == nil {
+			updateStrategy = &appsv1.UpdateStrategy{}
+		}
+		if updateStrategy.InstanceUpdatePolicy == nil {
+			updateStrategy.InstanceUpdatePolicy = compDef.Spec.InstanceUpdatePolicy
+		}
+	}
+	if compDef.Spec.UpdateConcurrency != nil {
+		if updateStrategy == nil {
+			updateStrategy = &appsv1.UpdateStrategy{}
+		}
+		if updateStrategy.RollingUpdate == nil {
+			updateStrategy.RollingUpdate = &appsv1.RollingUpdate{}
+		}
+		if updateStrategy.RollingUpdate.UpdateConcurrency == nil {
+			updateStrategy.RollingUpdate.UpdateConcurrency = compDef.Spec.UpdateConcurrency
+		}
+	}
+	synthesizeComp.UpdateStrategy = updateStrategy
 }
 
 func buildComp2CompDefs(ctx context.Context, cli client.Reader, cluster *appsv1.Cluster) (map[string]string, error) {

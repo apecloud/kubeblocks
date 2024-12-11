@@ -159,11 +159,11 @@ var _ = Describe("update reconciler test", func() {
 			Expect(err).Should(BeNil())
 			root, ok := partitionTree.GetRoot().(*workloads.InstanceSet)
 			Expect(ok).Should(BeTrue())
-			partition := int32(3)
+			updateReplicas := intstr.FromInt32(3)
 			maxUnavailable := intstr.FromInt32(2)
-			root.Spec.UpdateStrategy = appsv1.StatefulSetUpdateStrategy{
-				RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
-					Partition:      &partition,
+			root.Spec.UpdateStrategy = &workloads.UpdateStrategy{
+				RollingUpdate: &workloads.RollingUpdate{
+					Replicas:       &updateReplicas,
 					MaxUnavailable: &maxUnavailable,
 				},
 			}
@@ -179,9 +179,9 @@ var _ = Describe("update reconciler test", func() {
 			Expect(err).Should(BeNil())
 			root, ok = partitionTree.GetRoot().(*workloads.InstanceSet)
 			Expect(ok).Should(BeTrue())
-			root.Spec.UpdateStrategy = appsv1.StatefulSetUpdateStrategy{
-				RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
-					Partition:      &partition,
+			root.Spec.UpdateStrategy = &workloads.UpdateStrategy{
+				RollingUpdate: &workloads.RollingUpdate{
+					Replicas:       &updateReplicas,
 					MaxUnavailable: &maxUnavailable,
 				},
 			}
@@ -198,17 +198,6 @@ var _ = Describe("update reconciler test", func() {
 			Expect(res).Should(Equal(kubebuilderx.Continue))
 			expectUpdatedPods(partitionTree, []string{"bar-foo-0"})
 
-			By("reconcile with UpdateStrategy='OnDelete'")
-			onDeleteTree, err := tree.DeepCopy()
-			Expect(err).Should(BeNil())
-			root, ok = onDeleteTree.GetRoot().(*workloads.InstanceSet)
-			Expect(ok).Should(BeTrue())
-			root.Spec.UpdateStrategy.Type = appsv1.OnDeleteStatefulSetStrategyType
-			res, err = reconciler.Reconcile(onDeleteTree)
-			Expect(err).Should(BeNil())
-			Expect(res).Should(Equal(kubebuilderx.Continue))
-			expectUpdatedPods(onDeleteTree, []string{})
-
 			// order: bar-hello-0, bar-foo-1, bar-foo-0, bar-3, bar-2, bar-1, bar-0
 			// expected: bar-hello-0 being deleted
 			By("reconcile with PodUpdatePolicy='PreferInPlace'")
@@ -216,7 +205,10 @@ var _ = Describe("update reconciler test", func() {
 			Expect(err).Should(BeNil())
 			root, ok = preferInPlaceTree.GetRoot().(*workloads.InstanceSet)
 			Expect(ok).Should(BeTrue())
-			root.Spec.PodUpdatePolicy = workloads.PreferInPlacePodUpdatePolicyType
+			instanceUpdatePolicy := workloads.PreferInPlaceInstanceUpdatePolicyType
+			root.Spec.UpdateStrategy = &workloads.UpdateStrategy{
+				InstanceUpdatePolicy: &instanceUpdatePolicy,
+			}
 			// try to add env to instanceHello to trigger the recreation
 			root.Spec.Instances[0].Env = []corev1.EnvVar{
 				{
@@ -234,7 +226,10 @@ var _ = Describe("update reconciler test", func() {
 			Expect(err).Should(BeNil())
 			root, ok = strictInPlaceTree.GetRoot().(*workloads.InstanceSet)
 			Expect(ok).Should(BeTrue())
-			root.Spec.PodUpdatePolicy = workloads.StrictInPlacePodUpdatePolicyType
+			instanceUpdatePolicy = workloads.StrictInPlaceInstanceUpdatePolicyType
+			root.Spec.UpdateStrategy = &workloads.UpdateStrategy{
+				InstanceUpdatePolicy: &instanceUpdatePolicy,
+			}
 			// try to add env to instanceHello to trigger the recreation
 			root.Spec.Instances[0].Env = []corev1.EnvVar{
 				{

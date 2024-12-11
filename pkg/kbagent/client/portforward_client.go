@@ -142,15 +142,20 @@ func (pf *portForwardClient) newPortForwarder(readyCh, stopCh chan struct{}, out
 	return fw, nil
 }
 
-func NewPortForwardClient(pod *corev1.Pod, port string) (Client, error) {
+func NewPortForwardClient(pod *corev1.Pod, endpoint func() (string, int32, error)) (Client, error) {
 	if mockClient != nil || mockClientError != nil {
 		return mockClient, mockClientError
+	}
+
+	_, port, err := endpoint()
+	if err != nil {
+		return nil, err
 	}
 
 	config := ctrl.GetConfigOrDie()
 	return &portForwardClient{
 		pod:    pod,
-		port:   port,
+		port:   fmt.Sprint(port),
 		config: config,
 		logger: ctrl.Log.WithName("portforward"),
 	}, nil

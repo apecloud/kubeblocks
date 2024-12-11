@@ -285,11 +285,7 @@ func (a *kbagent) callActionWithSelector(ctx context.Context, spec *appsv1.Actio
 		if err != nil {
 			// If kb is not run in a k8s cluster, using pod ip to call kb-agent would fail.
 			// So we use a client that utilizes k8s' portforward ability.
-			_, port, err2 := endpoint()
-			if err2 != nil {
-				return nil, err2
-			}
-			cli, err = kbacli.NewPortForwardClient(pod, fmt.Sprint(port))
+			cli, err = kbacli.NewPortForwardClient(pod, endpoint)
 		} else {
 			cli, err = kbacli.NewClient(endpoint)
 		}

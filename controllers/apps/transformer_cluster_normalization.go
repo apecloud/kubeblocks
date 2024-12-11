@@ -419,6 +419,17 @@ func (t *clusterNormalizationTransformer) writeBackCompNShardingSpecs(transCtx *
 
 func (t *clusterNormalizationTransformer) checkNPatchCRDAPIVersionKey(transCtx *clusterTransformContext) error {
 	apiVersion := transCtx.Cluster.Annotations[constant.CRDAPIVersionAnnotationKey]
+	getClusterDefFromIncrementConverter := func() (string, error) {
+		if len(transCtx.Cluster.Annotations[appsv1alpha1.KBIncrementConverterAK]) == 0 {
+			return "", nil
+		}
+		var alpha1Cluster appsv1alpha1.Cluster
+		if err := json.Unmarshal([]byte(transCtx.Cluster.Annotations[appsv1alpha1.KBIncrementConverterAK]), &alpha1Cluster); err != nil {
+			return "", err
+		}
+		return alpha1Cluster.Spec.ClusterDefRef, nil
+	}
+
 	setCRDAPIVersion := func() error {
 		apiVersions := map[string][]string{}
 
@@ -427,17 +438,15 @@ func (t *clusterNormalizationTransformer) checkNPatchCRDAPIVersionKey(transCtx *
 			apiVersions[key] = append(apiVersions[key], name)
 		}
 
+		clusterDefRef, err := getClusterDefFromIncrementConverter()
+		if err != nil {
+			return err
+		}
 		switch {
+		case len(clusterDefRef) != 0:
+			apiVersion = appsv1alpha1.GroupVersion.String()
 		case transCtx.clusterDef != nil:
 			from(transCtx.clusterDef.Name, transCtx.clusterDef.Annotations)
-		case len(transCtx.Cluster.Annotations[appsv1alpha1.KBIncrementConverterAK]) != 0:
-			var alpha1Cluster appsv1alpha1.Cluster
-			if err := json.Unmarshal([]byte(transCtx.Cluster.Annotations[appsv1alpha1.KBIncrementConverterAK]), &alpha1Cluster); err != nil {
-				return err
-			}
-			if alpha1Cluster.Spec.ClusterDefRef != "" {
-				apiVersion = appsv1alpha1.GroupVersion.String()
-			}
 		default:
 			for _, compDef := range transCtx.componentDefs {
 				from(compDef.Name, compDef.Annotations)

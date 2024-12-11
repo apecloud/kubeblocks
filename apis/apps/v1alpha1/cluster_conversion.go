@@ -99,6 +99,7 @@ func (r *Cluster) incrementConvertFrom(srcRaw metav1.Object, ic incrementChange)
 func (r *Cluster) changesToCluster(cluster *appsv1.Cluster) {
 	// changed:
 	//   spec
+	//     clusterDefRef -> clusterDef
 	//     components
 	//       - volumeClaimTemplates
 	//           spec:
@@ -113,6 +114,9 @@ func (r *Cluster) changesToCluster(cluster *appsv1.Cluster) {
 	//   status
 	//     components
 	//       - message: ComponentMessageMap -> map[string]string
+	if len(r.Spec.ClusterDefRef) > 0 {
+		cluster.Spec.ClusterDef = r.Spec.ClusterDefRef
+	}
 	if r.Spec.TerminationPolicy == Halt {
 		cluster.Spec.TerminationPolicy = appsv1.DoNotTerminate
 	} else {

@@ -42,7 +42,6 @@ const (
 	mysqlConfigName           = "mysql-component-config"
 	mysqlConfigConstraintName = "mysql8.0-config-constraints"
 	mysqlScriptsTemplateName  = "apecloud-mysql-scripts"
-	testConfigContent         = "test-config-content"
 )
 
 func allFieldsCompDefObj(create bool) *appsv1.ComponentDefinition {

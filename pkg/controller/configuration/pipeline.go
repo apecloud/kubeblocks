@@ -33,32 +33,22 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/render"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
-
-type ReconcileCtx struct {
-	*ResourceCtx
-
-	Cluster              *appsv1.Cluster
-	Component            *appsv1.Component
-	SynthesizedComponent *component.SynthesizedComponent
-	PodSpec              *corev1.PodSpec
-
-	Cache []client.Object
-}
 
 type pipeline struct {
 	// configuration *appsv1alpha1.Configuration
 	renderWrapper renderWrapper
 
-	ctx ReconcileCtx
+	ctx render.ReconcileCtx
 	ResourceFetcher[pipeline]
 }
 
 type updatePipeline struct {
-	reconcile     bool
 	renderWrapper renderWrapper
 
+	reconcile  bool
 	item       appsv1alpha1.ConfigurationItemDetail
 	itemStatus *appsv1alpha1.ConfigurationItemDetailStatus
 	configSpec *appsv1.ComponentConfigSpec
@@ -67,16 +57,16 @@ type updatePipeline struct {
 	newCM       *corev1.ConfigMap
 	configPatch *core.ConfigPatchInfo
 
-	ctx ReconcileCtx
+	ctx render.ReconcileCtx
 	ResourceFetcher[updatePipeline]
 }
 
-func NewCreatePipeline(ctx ReconcileCtx) *pipeline {
+func NewCreatePipeline(ctx render.ReconcileCtx) *pipeline {
 	p := &pipeline{ctx: ctx}
 	return p.Init(ctx.ResourceCtx, p)
 }
 
-func NewReconcilePipeline(ctx ReconcileCtx, item appsv1alpha1.ConfigurationItemDetail, itemStatus *appsv1alpha1.ConfigurationItemDetailStatus, configSpec *appsv1.ComponentConfigSpec) *updatePipeline {
+func NewReconcilePipeline(ctx render.ReconcileCtx, item appsv1alpha1.ConfigurationItemDetail, itemStatus *appsv1alpha1.ConfigurationItemDetailStatus, configSpec *appsv1.ComponentConfigSpec) *updatePipeline {
 	p := &updatePipeline{
 		reconcile:  true,
 		item:       item,
@@ -90,10 +80,7 @@ func NewReconcilePipeline(ctx ReconcileCtx, item appsv1alpha1.ConfigurationItemD
 func (p *pipeline) Prepare() *pipeline {
 	buildTemplate := func() (err error) {
 		ctx := p.ctx
-		templateBuilder := newTemplateBuilder(p.ClusterName, p.Namespace, p.Context, p.Client)
-		// Prepare built-in objects and built-in functions
-		templateBuilder.injectBuiltInObjectsAndFunctions(ctx.PodSpec, ctx.SynthesizedComponent, ctx.Cache, ctx.Cluster)
-		p.renderWrapper = newTemplateRenderWrapper(p.Context, ctx.Client, templateBuilder, ctx.Cluster, ctx.Component)
+		p.renderWrapper = newTemplateRenderWrapper(p.Context, ctx.Client, render.NewTemplateBuilder(&ctx), ctx.Cluster, ctx.Component)
 		return
 	}
 
@@ -266,10 +253,7 @@ func (p *updatePipeline) PrepareForTemplate() *updatePipeline {
 		if p.isDone() {
 			return
 		}
-		templateBuilder := newTemplateBuilder(p.ClusterName, p.Namespace, p.Context, p.Client)
-		// Prepare built-in objects and built-in functions
-		templateBuilder.injectBuiltInObjectsAndFunctions(p.ctx.PodSpec, p.ctx.SynthesizedComponent, p.ctx.Cache, p.ctx.Cluster)
-		p.renderWrapper = newTemplateRenderWrapper(p.Context, p.Client, templateBuilder, p.ctx.Cluster, p.ctx.Component)
+		p.renderWrapper = newTemplateRenderWrapper(p.Context, p.Client, render.NewTemplateBuilder(&p.ctx), p.ctx.Cluster, p.ctx.Component)
 		return
 	}
 	return p.Wrap(buildTemplate)

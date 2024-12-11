@@ -39,15 +39,13 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/configuration/validate"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	"github.com/apecloud/kubeblocks/pkg/controller/factory"
+	"github.com/apecloud/kubeblocks/pkg/controller/render"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 )
 
-type templateRenderValidator = func(map[string]string) error
-
 type renderWrapper struct {
-	templateBuilder *configTemplateBuilder
+	render.TemplateRender
 
 	volumes             map[string]appsv1.ComponentTemplateSpec
 	templateAnnotations map[string]string
@@ -61,15 +59,16 @@ type renderWrapper struct {
 	component *appsv1.Component
 }
 
-func newTemplateRenderWrapper(ctx context.Context, cli client.Client, templateBuilder *configTemplateBuilder,
+func newTemplateRenderWrapper(ctx context.Context, cli client.Client, templateBuilder render.TemplateRender,
 	cluster *appsv1.Cluster, component *appsv1.Component) renderWrapper {
+
 	return renderWrapper{
 		ctx:       ctx,
 		cli:       cli,
 		cluster:   cluster,
 		component: component,
 
-		templateBuilder:     templateBuilder,
+		TemplateRender:      templateBuilder,
 		templateAnnotations: make(map[string]string),
 		volumes:             make(map[string]appsv1.ComponentTemplateSpec),
 	}
@@ -196,31 +195,21 @@ func (wrapper *renderWrapper) rerenderConfigTemplate(cluster *appsv1.Cluster,
 	item *appsv1alpha1.ConfigurationItemDetail,
 ) (*corev1.ConfigMap, error) {
 	cmName := core.GetComponentCfgName(cluster.Name, component.Name, configSpec.Name)
-	newCMObj, err := generateConfigMapFromTpl(cluster,
-		component,
-		wrapper.templateBuilder,
-		cmName,
-		configSpec.ConfigConstraintRef,
-		configSpec.ComponentTemplateSpec,
-		wrapper.ctx,
-		wrapper.cli,
-		func(m map[string]string) error {
-			return validateRenderedData(m, configSpec, wrapper.ctx, wrapper.cli)
-		})
+	newCMObj, err := wrapper.RenderComponentTemplate(configSpec.ComponentTemplateSpec, cmName, func(m map[string]string) error {
+		return validateRenderedData(m, configSpec, wrapper.ctx, wrapper.cli)
+	})
 	if err != nil {
 		return nil, err
 	}
 	// render user specified template
 	if item != nil && item.ImportTemplateRef != nil {
 		newData, err := mergerConfigTemplate(
-			&appsv1.LegacyRenderedTemplateSpec{
-				ConfigTemplateExtension: appsv1.ConfigTemplateExtension{
-					TemplateRef: item.ImportTemplateRef.TemplateRef,
-					Namespace:   item.ImportTemplateRef.Namespace,
-					Policy:      appsv1.MergedPolicy(item.ImportTemplateRef.Policy),
-				},
+			appsv1.ConfigTemplateExtension{
+				TemplateRef: item.ImportTemplateRef.TemplateRef,
+				Namespace:   item.ImportTemplateRef.Namespace,
+				Policy:      appsv1.MergedPolicy(item.ImportTemplateRef.Policy),
 			},
-			wrapper.templateBuilder,
+			wrapper.TemplateRender,
 			configSpec,
 			newCMObj.Data,
 			wrapper.ctx,
@@ -250,7 +239,7 @@ func (wrapper *renderWrapper) renderScriptTemplate(cluster *appsv1.Cluster, comp
 		}
 
 		// Generate ConfigMap objects for config files
-		cm, err := generateConfigMapFromTpl(cluster, component, wrapper.templateBuilder, cmName, "", templateSpec, wrapper.ctx, wrapper.cli, nil)
+		cm, err := wrapper.RenderComponentTemplate(templateSpec, cmName, nil)
 		if err != nil {
 			return err
 		}
@@ -336,59 +325,6 @@ func UpdateCMConfigSpecLabels(cm *corev1.ConfigMap, configSpec appsv1.ComponentC
 	if len(configSpec.Keys) != 0 {
 		cm.Labels[constant.CMConfigurationCMKeysLabelKey] = strings.Join(configSpec.Keys, ",")
 	}
-}
-
-// generateConfigMapFromTpl renders config file by config template provided by provider.
-func generateConfigMapFromTpl(cluster *appsv1.Cluster,
-	component *component.SynthesizedComponent,
-	tplBuilder *configTemplateBuilder,
-	cmName string,
-	configConstraintName string,
-	templateSpec appsv1.ComponentTemplateSpec,
-	ctx context.Context,
-	cli client.Client, dataValidator templateRenderValidator) (*corev1.ConfigMap, error) {
-	// Render config template by TplEngine
-	// The template namespace must be the same as the ClusterDefinition namespace
-	configs, err := renderConfigMapTemplate(tplBuilder, templateSpec, ctx, cli)
-	if err != nil {
-		return nil, err
-	}
-
-	if dataValidator != nil {
-		if err = dataValidator(configs); err != nil {
-			return nil, err
-		}
-	}
-
-	// Using ConfigMap cue template render to configmap of config
-	return factory.BuildConfigMapWithTemplate(cluster, component, configs, cmName, templateSpec), nil
-}
-
-// renderConfigMapTemplate renders config file using template engine
-func renderConfigMapTemplate(
-	templateBuilder *configTemplateBuilder,
-	templateSpec appsv1.ComponentTemplateSpec,
-	ctx context.Context,
-	cli client.Client) (map[string]string, error) {
-	cmObj := &corev1.ConfigMap{}
-	//  Require template configmap exist
-	if err := cli.Get(ctx, client.ObjectKey{
-		Namespace: templateSpec.Namespace,
-		Name:      templateSpec.TemplateRef,
-	}, cmObj); err != nil {
-		return nil, err
-	}
-
-	if len(cmObj.Data) == 0 {
-		return map[string]string{}, nil
-	}
-
-	templateBuilder.setTemplateName(templateSpec.TemplateRef)
-	renderedData, err := templateBuilder.render(cmObj.Data)
-	if err != nil {
-		return nil, core.WrapError(err, "failed to render configmap")
-	}
-	return renderedData, nil
 }
 
 func fetchConfigConstraint(ccName string, ctx context.Context, cli client.Client) (*appsv1beta1.ConfigConstraint, error) {

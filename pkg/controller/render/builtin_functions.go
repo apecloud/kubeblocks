@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package configuration
+package render
 
 import (
 	"encoding/json"
@@ -291,7 +291,7 @@ func getPVCSize(args interface{}) (int64, error) {
 }
 
 // BuiltInCustomFunctions builds a map of customized functions for KubeBlocks
-func BuiltInCustomFunctions(c *configTemplateBuilder, component *component.SynthesizedComponent, localObjs []client.Object) *gotemplate.BuiltInObjectsFunc {
+func BuiltInCustomFunctions(c *templateRenderWrapper, component *component.SynthesizedComponent, localObjs []client.Object) *gotemplate.BuiltInObjectsFunc {
 	return &gotemplate.BuiltInObjectsFunc{
 		builtInMysqlCalBufferFunctionName:            calDBPoolSize,
 		builtInGetVolumeFunctionName:                 getVolumeMountPathByName,

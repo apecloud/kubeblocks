@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package configuration
+package render
 
 import (
 	"fmt"
@@ -28,9 +28,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/kubectl/pkg/util/resource"
-	coreclient "sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/generics"
@@ -39,7 +38,6 @@ import (
 const (
 	kbEnvClusterUIDPostfix8Deprecated = "KB_CLUSTER_UID_POSTFIX_8"
 	kbComponentEnvCMPlaceHolder       = "$(COMP_ENV_CM_NAME)"
-	kbToolsImagePlaceHolder           = "$(KUBEBLOCKS_TOOLS_IMAGE)"
 )
 
 type envBuildInFunc func(container interface{}, envName string) (string, error)
@@ -47,24 +45,24 @@ type envBuildInFunc func(container interface{}, envName string) (string, error)
 type envWrapper struct {
 	// prevent circular references.
 	referenceCount int
-	*configTemplateBuilder
+	*templateRenderWrapper
 
 	// configmap or secret not yet submitted.
-	localObjects  []coreclient.Object
+	localObjects  []client.Object
 	clusterName   string
 	clusterUID    string
 	componentName string
 	// cache remoted configmap and secret.
-	cache map[schema.GroupVersionKind]map[coreclient.ObjectKey]coreclient.Object
+	cache map[schema.GroupVersionKind]map[client.ObjectKey]client.Object
 }
 
 const maxReferenceCount = 10
 
-func wrapGetEnvByName(templateBuilder *configTemplateBuilder, component *component.SynthesizedComponent, localObjs []coreclient.Object) envBuildInFunc {
+func wrapGetEnvByName(templateBuilder *templateRenderWrapper, component *component.SynthesizedComponent, localObjs []client.Object) envBuildInFunc {
 	wrapper := &envWrapper{
-		configTemplateBuilder: templateBuilder,
+		templateRenderWrapper: templateBuilder,
 		localObjects:          localObjs,
-		cache:                 make(map[schema.GroupVersionKind]map[coreclient.ObjectKey]coreclient.Object),
+		cache:                 make(map[schema.GroupVersionKind]map[client.ObjectKey]client.Object),
 	}
 	// hack for test cases of cli update cmd...
 	if component != nil {
@@ -152,14 +150,14 @@ func (w *envWrapper) secretValue(secretRef *corev1.SecretKeySelector, container 
 	}
 
 	if w.cli == nil {
-		return "", cfgcore.MakeError("not support secret[%s] value in local mode, cli is nil", secretRef.Name)
+		return "", fmt.Errorf("not support secret[%s] value in local mode, cli is nil", secretRef.Name)
 	}
 
 	secretName, err := w.checkAndReplaceEnv(secretRef.Name, container)
 	if err != nil {
 		return "", err
 	}
-	secretKey := coreclient.ObjectKey{
+	secretKey := client.ObjectKey{
 		Name:      secretName,
 		Namespace: w.namespace,
 	}
@@ -178,14 +176,14 @@ func (w *envWrapper) secretValue(secretRef *corev1.SecretKeySelector, container 
 
 func (w *envWrapper) configMapValue(configmapRef *corev1.ConfigMapKeySelector, container *corev1.Container) (string, error) {
 	if w.cli == nil {
-		return "", cfgcore.MakeError("not supported configmap[%s] value in local mode, cli is nil", configmapRef.Name)
+		return "", fmt.Errorf("not supported configmap[%s] value in local mode, cli is nil", configmapRef.Name)
 	}
 
 	cmName, err := w.checkAndReplaceEnv(configmapRef.Name, container)
 	if err != nil {
 		return "", err
 	}
-	cmKey := coreclient.ObjectKey{
+	cmKey := client.ObjectKey{
 		Name:      cmName,
 		Namespace: w.namespace,
 	}
@@ -196,9 +194,9 @@ func (w *envWrapper) configMapValue(configmapRef *corev1.ConfigMapKeySelector, c
 	return cm.Data[configmapRef.Key], nil
 }
 
-func (w *envWrapper) getResourceFromLocal(key coreclient.ObjectKey, gvk schema.GroupVersionKind) coreclient.Object {
+func (w *envWrapper) getResourceFromLocal(key client.ObjectKey, gvk schema.GroupVersionKind) client.Object {
 	if _, ok := w.cache[gvk]; !ok {
-		w.cache[gvk] = make(map[coreclient.ObjectKey]coreclient.Object)
+		w.cache[gvk] = make(map[client.ObjectKey]client.Object)
 	}
 	if v, ok := w.cache[gvk][key]; ok {
 		return v
@@ -244,7 +242,7 @@ func (w *envWrapper) doEnvReplace(replacedVars *set.LinkedHashSetString, oldValu
 	}
 
 	if !w.incAndCheckReferenceCount() {
-		return "", cfgcore.MakeError("too many reference count, maybe there is a cycled reference: [%s] more than %d times ", oldValue, w.referenceCount)
+		return "", fmt.Errorf("too many reference count, maybe there is a cycled reference: [%s] more than %d times ", oldValue, w.referenceCount)
 	}
 
 	replacedValue := oldValue
@@ -281,7 +279,7 @@ func (w *envWrapper) incAndCheckReferenceCount() bool {
 	return w.referenceCount <= maxReferenceCount
 }
 
-func getResourceObject[T generics.Object, PT generics.PObject[T]](w *envWrapper, obj PT, key coreclient.ObjectKey) (PT, error) {
+func getResourceObject[T generics.Object, PT generics.PObject[T]](w *envWrapper, obj PT, key client.ObjectKey) (PT, error) {
 	gvk := generics.ToGVK(obj)
 	object := w.getResourceFromLocal(key, gvk)
 	if object != nil {
@@ -305,7 +303,7 @@ func resourceRefValue(resourceRef *corev1.ResourceFieldSelector, containers []co
 			return containerResourceRefValue(resourceRef, &v)
 		}
 	}
-	return "", cfgcore.MakeError("not found named[%s] container", resourceRef.ContainerName)
+	return "", fmt.Errorf("not found named[%s] container", resourceRef.ContainerName)
 }
 
 func containerResourceRefValue(fieldSelector *corev1.ResourceFieldSelector, c *corev1.Container) (string, error) {
@@ -313,7 +311,7 @@ func containerResourceRefValue(fieldSelector *corev1.ResourceFieldSelector, c *c
 }
 
 func fieldRefValue(podReference *corev1.ObjectFieldSelector, podSpec *corev1.PodSpec) (string, error) {
-	return "", cfgcore.MakeError("not support pod field ref")
+	return "", fmt.Errorf("not support pod field ref")
 }
 
 func getReplacementMapForBuiltInEnv(clusterName, clusterUID, componentName string) map[string]string {

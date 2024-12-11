@@ -171,6 +171,7 @@ type ReloadPolicy string
 const (
 	NonePolicy                    ReloadPolicy = "none"
 	RestartPolicy                 ReloadPolicy = "restart"
+	RestartContainerPolicy        ReloadPolicy = "restartContainer"
 	RollingPolicy                 ReloadPolicy = "rolling"
 	AsyncDynamicReloadPolicy      ReloadPolicy = "asyncReload"
 	SyncDynamicReloadPolicy       ReloadPolicy = "syncReload"

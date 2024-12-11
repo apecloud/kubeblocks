@@ -29,24 +29,29 @@ import (
 
 	"github.com/go-logr/logr"
 	"go.uber.org/zap/zapcore"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
+
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/testutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
+
+// These tests use Ginkgo (BDD-style Go testing framework). Refer to
+// http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
 var cfg *rest.Config
 var k8sClient client.Client
@@ -55,10 +60,10 @@ var ctx context.Context
 var cancel context.CancelFunc
 var testCtx testutil.TestContext
 
-func TestReconfigure(t *testing.T) {
+func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
 
-	RunSpecs(t, "Configuration Suite")
+	RunSpecs(t, "Controller Suite")
 }
 
 var _ = BeforeSuite(func() {
@@ -84,6 +89,8 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(cfg).NotTo(BeNil())
 
+	err = parametersv1alpha1.AddToScheme(scheme.Scheme)
+	Expect(err).NotTo(HaveOccurred())
 	err = appsv1alpha1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 	err = appsv1beta1.AddToScheme(scheme.Scheme)
@@ -92,8 +99,7 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	err = workloadsv1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
-	err = parametersv1alpha1.AddToScheme(scheme.Scheme)
-	Expect(err).NotTo(HaveOccurred())
+	model.AddScheme(parametersv1alpha1.AddToScheme)
 
 	// +kubebuilder:scaffold:scheme
 
@@ -107,30 +113,23 @@ var _ = BeforeSuite(func() {
 		Metrics: server.Options{BindAddress: "0"},
 		Client: client.Options{
 			Cache: &client.CacheOptions{
-				DisableFor: intctrlutil.GetUncachedObjects(),
+				DisableFor: append(intctrlutil.GetUncachedObjects(), &parametersv1alpha1.ComponentParameter{}),
 			},
 		},
 	})
 	Expect(err).ToNot(HaveOccurred())
 
-	err = (&ReconfigureReconciler{
+	err = (&ParameterReconciler{
 		Client:   k8sManager.GetClient(),
 		Scheme:   k8sManager.GetScheme(),
-		Recorder: k8sManager.GetEventRecorderFor("reconfigure-controller"),
-	}).SetupWithManager(k8sManager, nil)
-	Expect(err).ToNot(HaveOccurred())
-
-	err = (&ConfigConstraintReconciler{
-		Client:   k8sManager.GetClient(),
-		Scheme:   k8sManager.GetScheme(),
-		Recorder: k8sManager.GetEventRecorderFor("configuration-cc-controller"),
+		Recorder: k8sManager.GetEventRecorderFor("parameter-controller"),
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
-	err = (&ConfigurationReconciler{
+	err = (&ComponentParameterReconciler{
 		Client:   k8sManager.GetClient(),
 		Scheme:   k8sManager.GetScheme(),
-		Recorder: k8sManager.GetEventRecorderFor("configuration-controller"),
+		Recorder: k8sManager.GetEventRecorderFor("component-parameter-controller"),
 	}).SetupWithManager(k8sManager, nil)
 	Expect(err).ToNot(HaveOccurred())
 
@@ -148,6 +147,13 @@ var _ = BeforeSuite(func() {
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
+	err = (&ReconfigureReconciler{
+		Client:   k8sManager.GetClient(),
+		Scheme:   k8sManager.GetScheme(),
+		Recorder: k8sManager.GetEventRecorderFor("reconfigure-controller"),
+	}).SetupWithManager(k8sManager, nil)
+	Expect(err).ToNot(HaveOccurred())
+
 	testCtx = testutil.NewDefaultTestContext(ctx, k8sClient, testEnv)
 
 	go func() {
@@ -155,12 +161,12 @@ var _ = BeforeSuite(func() {
 		err = k8sManager.Start(ctx)
 		Expect(err).ToNot(HaveOccurred(), "failed to run manager")
 	}()
+
 })
 
 var _ = AfterSuite(func() {
 	cancel()
 	By("tearing down the test environment")
-
 	err := testEnv.Stop()
 	Expect(err).NotTo(HaveOccurred())
 })

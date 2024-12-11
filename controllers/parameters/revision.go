@@ -27,7 +27,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -36,7 +36,7 @@ import (
 type ConfigurationRevision struct {
 	Revision    int64
 	StrRevision string
-	Phase       appsv1alpha1.ConfigurationPhase
+	Phase       parametersv1alpha1.ParameterPhase
 	Result      intctrlutil.Result
 }
 
@@ -115,7 +115,7 @@ func parseResult(data string, revision string) intctrlutil.Result {
 	}
 	err := json.Unmarshal([]byte(data), &result)
 	if err != nil {
-		result.Phase = appsv1alpha1.ConfigurationPhase(data)
+		result.Phase = parametersv1alpha1.ParameterPhase(data)
 	}
 	return result
 }

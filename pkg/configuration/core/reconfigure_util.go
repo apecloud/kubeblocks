@@ -28,12 +28,24 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 func getUpdateParameterList(cfg *ConfigPatchInfo, trimField string) ([]string, error) {
+	var params []string
+	for _, diff := range cfg.UpdateConfig {
+		r, err := resolveUpdateParameter(diff, trimField)
+		if err != nil {
+			return nil, err
+		}
+		params = append(params, r...)
+	}
+	return params, nil
+}
+
+func resolveUpdateParameter(diff []byte, trimField string) ([]string, error) {
 	params := make([]string, 0)
 	walkFn := func(parent, cur string, v reflect.Value, fn util.UpdateFn) error {
 		if cur != "" {
@@ -45,18 +57,16 @@ func getUpdateParameterList(cfg *ConfigPatchInfo, trimField string) ([]string, e
 		return nil
 	}
 
-	for _, diff := range cfg.UpdateConfig {
-		var err error
-		var updatedParams any
-		if err = json.Unmarshal(diff, &updatedParams); err != nil {
-			return nil, err
-		}
-		if updatedParams, err = trimNestedField(updatedParams, trimField); err != nil {
-			return nil, err
-		}
-		if err := util.UnstructuredObjectWalk(updatedParams, walkFn, true); err != nil {
-			return nil, WrapError(err, "failed to walk params: [%s]", diff)
-		}
+	var err error
+	var updatedParams any
+	if err = json.Unmarshal(diff, &updatedParams); err != nil {
+		return nil, err
+	}
+	if updatedParams, err = trimNestedField(updatedParams, trimField); err != nil {
+		return nil, err
+	}
+	if err := util.UnstructuredObjectWalk(updatedParams, walkFn, true); err != nil {
+		return nil, WrapError(err, "failed to walk params: [%s]", diff)
 	}
 	return params, nil
 }
@@ -78,12 +88,12 @@ func trimNestedField(updatedParams any, trimField string) (any, error) {
 }
 
 // ValidateConfigPatch Verifies if the changed parameters have been removed
-func ValidateConfigPatch(patch *ConfigPatchInfo, formatCfg *appsv1beta1.FileFormatConfig) error {
+func ValidateConfigPatch(patch *ConfigPatchInfo, configRender parametersv1alpha1.ParameterDrivenConfigRenderSpec) error {
 	if !patch.IsModify || len(patch.UpdateConfig) == 0 {
 		return nil
 	}
 
-	vParams := GenerateVisualizedParamsList(patch, formatCfg, nil)
+	vParams := GenerateVisualizedParamsList(patch, configRender.Configs)
 	for _, param := range vParams {
 		for _, p := range param.Parameters {
 			if p.Value == nil {
@@ -95,12 +105,12 @@ func ValidateConfigPatch(patch *ConfigPatchInfo, formatCfg *appsv1beta1.FileForm
 }
 
 // IsUpdateDynamicParameters checks if the changed parameters require a restart
-func IsUpdateDynamicParameters(cc *appsv1beta1.ConfigConstraintSpec, cfg *ConfigPatchInfo) (bool, error) {
+func IsUpdateDynamicParameters(config *parametersv1alpha1.FileFormatConfig, paramsDef *parametersv1alpha1.ParametersDefinitionSpec, cfg *ConfigPatchInfo) (bool, error) {
 	if len(cfg.DeleteConfig) > 0 || len(cfg.AddConfig) > 0 {
 		return false, nil
 	}
 
-	updatedParams, err := getUpdateParameterList(cfg, NestedPrefixField(cc.FileFormatConfig))
+	updatedParams, err := getUpdateParameterList(cfg, NestedPrefixField(config))
 	if err != nil {
 		return false, err
 	}
@@ -110,21 +120,60 @@ func IsUpdateDynamicParameters(cc *appsv1beta1.ConfigConstraintSpec, cfg *Config
 	updatedParamsSet := util.NewSet(updatedParams...)
 
 	// if ConfigConstraint has StaticParameters, check updated parameter
-	if len(cc.StaticParameters) > 0 {
-		staticParams := util.NewSet(cc.StaticParameters...)
+	if len(paramsDef.StaticParameters) > 0 {
+		staticParams := util.NewSet(paramsDef.StaticParameters...)
 		union := util.Union(staticParams, updatedParamsSet)
 		if union.Length() > 0 {
 			return false, nil
 		}
 		// if no dynamicParameters is configured, reload is the default behavior
-		if len(cc.DynamicParameters) == 0 {
+		if len(paramsDef.DynamicParameters) == 0 {
 			return true, nil
 		}
 	}
 
 	// if ConfigConstraint has DynamicParameter, and all updated params are dynamic
-	if len(cc.DynamicParameters) > 0 {
-		dynamicParams := util.NewSet(cc.DynamicParameters...)
+	if len(paramsDef.DynamicParameters) > 0 {
+		dynamicParams := util.NewSet(paramsDef.DynamicParameters...)
+		diff := util.Difference(updatedParamsSet, dynamicParams)
+		return diff.Length() == 0, nil
+	}
+
+	// if the updated parameter is not in list of DynamicParameter,
+	// it is StaticParameter by default, and restart is the default behavior.
+	return false, nil
+}
+
+func CheckUpdateDynamicParameters(config *parametersv1alpha1.FileFormatConfig, paramsDef *parametersv1alpha1.ParametersDefinitionSpec, patch string) (bool, error) {
+	if patch == "" {
+		return true, nil
+	}
+
+	updatedParams, err := resolveUpdateParameter([]byte(patch), NestedPrefixField(config))
+	if err != nil {
+		return false, err
+	}
+	if len(updatedParams) == 0 {
+		return true, nil
+	}
+	updatedParamsSet := util.NewSet(updatedParams...)
+
+	// if ConfigConstraint has StaticParameters, check updated parameter
+	if len(paramsDef.StaticParameters) > 0 {
+		staticParams := util.NewSet(paramsDef.StaticParameters...)
+		union := util.Union(staticParams, updatedParamsSet)
+		if union.Length() > 0 {
+			return false, nil
+		}
+		// if no dynamicParameters is configured, reload is the default behavior
+		if len(paramsDef.DynamicParameters) == 0 {
+			return true, nil
+		}
+	}
+
+	// if ConfigConstraint has DynamicParameter, and all updated params are dynamic
+	if len(paramsDef.DynamicParameters) > 0 {
+		dynamicParams := util.NewSet(paramsDef.DynamicParameters...)
 		diff := util.Difference(updatedParamsSet, dynamicParams)
 		return diff.Length() == 0, nil
 	}
@@ -135,12 +184,12 @@ func IsUpdateDynamicParameters(cc *appsv1beta1.ConfigConstraintSpec, cfg *Config
 }
 
 // IsDynamicParameter checks if the parameter supports hot update
-func IsDynamicParameter(paramName string, cc *appsv1beta1.ConfigConstraintSpec) bool {
-	if len(cc.DynamicParameters) != 0 {
-		return slices.Contains(cc.DynamicParameters, paramName)
+func IsDynamicParameter(paramName string, paramsDef *parametersv1alpha1.ParametersDefinitionSpec) bool {
+	if len(paramsDef.DynamicParameters) != 0 {
+		return slices.Contains(paramsDef.DynamicParameters, paramName)
 	}
-	if len(cc.StaticParameters) != 0 {
-		return !slices.Contains(cc.StaticParameters, paramName)
+	if len(paramsDef.StaticParameters) != 0 {
+		return !slices.Contains(paramsDef.StaticParameters, paramName)
 	}
 	return false
 }

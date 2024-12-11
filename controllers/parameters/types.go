@@ -31,11 +31,11 @@ import (
 
 type createReconfigureClient func(addr string) (cfgproto.ReconfigureClient, error)
 
-type GetPodsFunc func(params reconfigureParams) ([]corev1.Pod, error)
+type GetPodsFunc func(params reconfigureContext) ([]corev1.Pod, error)
 type RestartComponent func(client client.Client, ctx intctrlutil.RequestCtx, key string, version string, objs []client.Object, recordEvent func(obj client.Object)) (client.Object, error)
 
 type RestartContainerFunc func(pod *corev1.Pod, ctx context.Context, containerName []string, createConnFn createReconfigureClient) error
-type OnlineUpdatePodFunc func(pod *corev1.Pod, ctx context.Context, createClient createReconfigureClient, configSpec string, updatedParams map[string]string) error
+type OnlineUpdatePodFunc func(pod *corev1.Pod, ctx context.Context, createClient createReconfigureClient, configSpec string, configFile string, updatedParams map[string]string) error
 
 // Node: Distinguish between implementation and interface.
 

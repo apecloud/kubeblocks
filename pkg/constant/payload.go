@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package constant
 
 const (
+	TLSPayload               = "tls"
 	ComponentResourcePayload = "component-resource"
 	ReplicasPayload          = "replicas"
 	BinaryVersionPayload     = "binary-version"

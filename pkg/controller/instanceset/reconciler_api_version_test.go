@@ -59,7 +59,7 @@ var _ = Describe("api version reconciler test", func() {
 			tree.SetRoot(its)
 			res, err = reconciler.Reconcile(tree)
 			Expect(err).Should(BeNil())
-			Expect(res).Should(Equal(kubebuilderx.Commit))
+			Expect(res).Should(Equal(kubebuilderx.Continue))
 		})
 	})
 })

@@ -40,6 +40,7 @@ func (t *componentInitTransformer) Transform(ctx graph.TransformContext, dag *gr
 	transCtx.Context = intoContext(transCtx.Context, placement(transCtx.Component))
 
 	if !intctrlutil.ObjectAPIVersionSupported(transCtx.Component) {
+		rootVertex.Action = model.ActionNoopPtr()
 		return graph.ErrPrematureStop
 	}
 	return nil

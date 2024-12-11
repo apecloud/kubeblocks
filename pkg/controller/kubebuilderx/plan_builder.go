@@ -106,6 +106,18 @@ func (b *PlanBuilder) Build() (graph.Plan, error) {
 }
 
 func buildOrderedVertices(ctx context.Context, currentTree *ObjectTree, desiredTree *ObjectTree) []*model.ObjectVertex {
+	getStatusField := func(obj client.Object) interface{} {
+		objValue := reflect.ValueOf(obj)
+		if objValue.Kind() != reflect.Ptr || objValue.Elem().Kind() != reflect.Struct {
+			return nil
+		}
+		field := objValue.Elem().FieldByName("Status")
+		if !field.IsValid() {
+			return nil
+		}
+		return field.Interface()
+	}
+
 	var vertices []*model.ObjectVertex
 
 	// handle root object
@@ -113,8 +125,12 @@ func buildOrderedVertices(ctx context.Context, currentTree *ObjectTree, desiredT
 		root := model.NewObjectVertex(currentTree.GetRoot(), currentTree.GetRoot(), model.ActionDeletePtr())
 		vertices = append(vertices, root)
 	} else {
-		root := model.NewObjectVertex(currentTree.GetRoot(), desiredTree.GetRoot(), model.ActionStatusPtr())
-		vertices = append(vertices, root)
+		currentStatus := getStatusField(currentTree.GetRoot())
+		desiredStatus := getStatusField(desiredTree.GetRoot())
+		if !reflect.DeepEqual(currentStatus, desiredStatus) {
+			root := model.NewObjectVertex(currentTree.GetRoot(), desiredTree.GetRoot(), model.ActionStatusPtr())
+			vertices = append(vertices, root)
+		}
 		// if annotations, labels or finalizers updated, do both meta patch and status update.
 		if !reflect.DeepEqual(currentTree.GetRoot().GetAnnotations(), desiredTree.GetRoot().GetAnnotations()) ||
 			!reflect.DeepEqual(currentTree.GetRoot().GetLabels(), desiredTree.GetRoot().GetLabels()) ||

@@ -186,19 +186,19 @@ type ShardingLifecycleActions struct {
 	// +optional
 	PreTerminate *Action `json:"preTerminate,omitempty"`
 
-	// Specifies the hook to be executed after a shard's creation.
+	// Specifies the hook to be executed after a shard added.
 	//
 	// Note: This field is immutable once it has been set.
 	//
 	// +optional
-	ShardProvision *Action `json:"shardProvision,omitempty"`
+	ShardAdd *Action `json:"shardAdd,omitempty"`
 
-	// Specifies the hook to be executed prior to terminating a shard.
+	// Specifies the hook to be executed prior to remove a shard.
 	//
 	// Note: This field is immutable once it has been set.
 	//
 	// +optional
-	ShardTerminate *Action `json:"shardTerminate,omitempty"`
+	ShardRemove *Action `json:"shardRemove,omitempty"`
 }
 
 type ShardingSystemAccount struct {

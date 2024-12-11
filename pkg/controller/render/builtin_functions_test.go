@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package configuration
+package render
 
 import (
 	"strconv"
@@ -26,6 +26,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/spf13/viper"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,7 +34,6 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	ctrlcomp "github.com/apecloud/kubeblocks/pkg/controller/component"
-	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 type insClassType struct {
@@ -171,20 +171,22 @@ single_thread_memory = 294912
 	// for test GetContainerWithVolumeMount
 	Context("ConfigTemplateBuilder sample test", func() {
 		It("test render", func() {
-			cfgBuilder := newTemplateBuilder(
-				"my_test",
-				"default",
-				nil, nil)
-
-			cfgBuilder.injectBuiltInObjectsAndFunctions(podSpec, component, nil, &appsv1.Cluster{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "my_test",
-					Namespace: "default",
+			renderWrapper := NewTemplateBuilder(&ReconcileCtx{
+				ResourceCtx: &ResourceCtx{
+					Context:     ctx,
+					ClusterName: "my_test",
+					Namespace:   "default",
 				},
-			})
-
-			cfgBuilder.setTemplateName("for_test")
-			rendered, err := cfgBuilder.render(map[string]string{
+				Cluster: &appsv1.Cluster{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "my_test",
+						Namespace: "default",
+					},
+				},
+				SynthesizedComponent: component,
+				PodSpec:              podSpec,
+			}).(*templateRenderWrapper)
+			rendered, err := renderWrapper.render(map[string]string{
 				mysqlCfgName: mysqlCfgTmpContext,
 			})
 
@@ -192,23 +194,23 @@ single_thread_memory = 294912
 			Expect(rendered[mysqlCfgName]).Should(Equal(mysqlCfgRenderedContext))
 		})
 		It("test built-in function", func() {
-			cfgBuilder := newTemplateBuilder(
-				"my_test",
-				"default",
-				nil, nil,
-			)
-
-			viper.Set(constant.KubernetesClusterDomainEnv, "test-domain")
-
-			cfgBuilder.injectBuiltInObjectsAndFunctions(podSpec, component, nil,
-				&appsv1.Cluster{
+			viper.SetDefault(constant.KubernetesClusterDomainEnv, "test-domain")
+			renderWrapper := NewTemplateBuilder(&ReconcileCtx{
+				ResourceCtx: &ResourceCtx{
+					Context:     ctx,
+					ClusterName: "my_test",
+					Namespace:   "default",
+				},
+				Cluster: &appsv1.Cluster{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "my_test",
 						Namespace: "default",
 					},
-				})
-
-			rendered, err := cfgBuilder.render(map[string]string{
+				},
+				SynthesizedComponent: component,
+				PodSpec:              podSpec,
+			}).(*templateRenderWrapper)
+			rendered, err := renderWrapper.render(map[string]string{
 				"a":                 "{{ getVolumePathByName ( index $.podSpec.containers 0 ) \"log\" }}",
 				"b":                 "{{ getVolumePathByName ( index $.podSpec.containers 0 ) \"data\" }}",
 				"c":                 "{{ ( getPortByName ( index $.podSpec.containers 0 ) \"mysql\" ).containerPort }}",
@@ -261,19 +263,21 @@ single_thread_memory = 294912
 		})
 
 		It("test array null check", func() {
-			cfgBuilder := newTemplateBuilder(
-				"my_test",
-				"default",
-				nil, nil,
-			)
-
-			cfgBuilder.injectBuiltInObjectsAndFunctions(podSpec, component, nil,
-				&appsv1.Cluster{
+			renderWrapper := NewTemplateBuilder(&ReconcileCtx{
+				ResourceCtx: &ResourceCtx{
+					Context:     ctx,
+					ClusterName: "my_test",
+					Namespace:   "default",
+				},
+				Cluster: &appsv1.Cluster{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "my_test",
 						Namespace: "default",
 					},
-				})
+				},
+				SynthesizedComponent: component,
+				PodSpec:              podSpec,
+			}).(*templateRenderWrapper)
 
 			tests := []struct {
 				name     string
@@ -344,7 +348,7 @@ true
 			}}
 
 			for _, tt := range tests {
-				rendered, err := cfgBuilder.render(map[string]string{
+				rendered, err := renderWrapper.render(map[string]string{
 					tt.name: tt.tpl,
 				})
 				if tt.wantErr {

@@ -25,13 +25,14 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/render"
 )
 
 type configOperator struct {
-	ReconcileCtx
+	render.ReconcileCtx
 }
 
-func NewConfigReconcileTask(resourceCtx *ResourceCtx,
+func NewConfigReconcileTask(resourceCtx *render.ResourceCtx,
 	cluster *appsv1.Cluster,
 	component *appsv1.Component,
 	synthesizedComponent *component.SynthesizedComponent,
@@ -39,7 +40,7 @@ func NewConfigReconcileTask(resourceCtx *ResourceCtx,
 	localObjs []client.Object,
 ) *configOperator {
 	return &configOperator{
-		ReconcileCtx{
+		render.ReconcileCtx{
 			ResourceCtx:          resourceCtx,
 			Cluster:              cluster,
 			Component:            component,

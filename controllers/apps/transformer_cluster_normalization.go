@@ -419,7 +419,7 @@ func (t *clusterNormalizationTransformer) writeBackCompNShardingSpecs(transCtx *
 func (t *clusterNormalizationTransformer) checkNPatchCRDAPIVersionKey(transCtx *clusterTransformContext) error {
 	getCRDAPIVersion := func() (string, error) {
 		apiVersion := transCtx.Cluster.Annotations[constant.CRDAPIVersionAnnotationKey]
-		if apiVersion != "" {
+		if len(apiVersion) > 0 {
 			return apiVersion, nil
 		}
 		// check if the cluster is the alpha1 version
@@ -427,7 +427,7 @@ func (t *clusterNormalizationTransformer) checkNPatchCRDAPIVersionKey(transCtx *
 		if err != nil {
 			return "", err
 		}
-		if len(clusterDefRef) != 0 {
+		if len(clusterDefRef) > 0 {
 			return appsv1alpha1.GroupVersion.String(), nil
 		}
 

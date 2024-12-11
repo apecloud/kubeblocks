@@ -24,10 +24,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/pkg/common"
-	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/plan"
+	"github.com/apecloud/kubeblocks/pkg/controller/render"
 )
 
 // componentConfigurationTransformer handles component configuration render
@@ -70,7 +70,7 @@ func (t *componentConfigurationTransformer) Transform(ctx graph.TransformContext
 
 	// configuration render
 	if err := plan.RenderConfigNScriptFiles(
-		&configctrl.ResourceCtx{
+		&render.ResourceCtx{
 			Context:       transCtx.Context,
 			Client:        t.Client,
 			Namespace:     comp.GetNamespace(),

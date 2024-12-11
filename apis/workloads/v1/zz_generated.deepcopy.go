@@ -197,11 +197,6 @@ func (in *InstanceSetSpec) DeepCopyInto(out *InstanceSetSpec) {
 		*out = make([]basev1.ReplicaRole, len(*in))
 		copy(*out, *in)
 	}
-	if in.RoleProbe != nil {
-		in, out := &in.RoleProbe, &out.RoleProbe
-		*out = new(RoleProbe)
-		(*in).DeepCopyInto(*out)
-	}
 	if in.MembershipReconfiguration != nil {
 		in, out := &in.MembershipReconfiguration, &out.MembershipReconfiguration
 		*out = new(MembershipReconfiguration)

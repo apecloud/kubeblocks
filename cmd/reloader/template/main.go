@@ -124,7 +124,7 @@ func main() {
 	}
 
 	mergePolicy, err := configuration.NewTemplateMerger(configRenderMeta.LegacyRenderedConfigSpec.ConfigTemplateExtension,
-		context.TODO(), nil, nil, *configRenderMeta.ComponentConfigSpec, &appsv1beta1.ConfigConstraintSpec{
+		nil, *configRenderMeta.ComponentConfigSpec, &appsv1beta1.ConfigConstraintSpec{
 			FileFormatConfig: &configRenderMeta.FormatterConfig,
 		})
 	if err != nil {

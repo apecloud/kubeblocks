@@ -28926,20 +28926,6 @@ UpdateStrategy.Type will be set to appsv1.OnDeleteStatefulSetStrategyType if Mem
 </tr>
 <tr>
 <td>
-<code>roleProbe</code><br/>
-<em>
-<a href="#workloads.kubeblocks.io/v1.RoleProbe">
-RoleProbe
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Provides method to probe role.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>membershipReconfiguration</code><br/>
 <em>
 <a href="#workloads.kubeblocks.io/v1.MembershipReconfiguration">
@@ -29038,7 +29024,7 @@ InstanceSetStatus
 <h3 id="workloads.kubeblocks.io/v1.Action">Action
 </h3>
 <p>
-(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.MembershipReconfiguration">MembershipReconfiguration</a>, <a href="#workloads.kubeblocks.io/v1.RoleProbe">RoleProbe</a>)
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.MembershipReconfiguration">MembershipReconfiguration</a>)
 </p>
 <div>
 </div>
@@ -29448,20 +29434,6 @@ UpdateStrategy.Type will be set to appsv1.OnDeleteStatefulSetStrategyType if Mem
 <td>
 <em>(Optional)</em>
 <p>A list of roles defined in the system.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>roleProbe</code><br/>
-<em>
-<a href="#workloads.kubeblocks.io/v1.RoleProbe">
-RoleProbe
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Provides method to probe role.</p>
 </td>
 </tr>
 <tr>
@@ -30399,9 +30371,6 @@ RoleUpdateMechanism
 </table>
 <h3 id="workloads.kubeblocks.io/v1.RoleUpdateMechanism">RoleUpdateMechanism
 (<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.RoleProbe">RoleProbe</a>)
-</p>
 <div>
 <p>RoleUpdateMechanism defines the way how pod role label being updated.</p>
 </div>

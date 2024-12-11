@@ -109,7 +109,7 @@ func IsInstanceSetReady(its *workloads.InstanceSet) bool {
 	}
 
 	// check whether role probe has done
-	if len(its.Spec.Roles) == 0 && its.Spec.RoleProbe == nil {
+	if len(its.Spec.Roles) == 0 {
 		return true
 	}
 	membersStatus := its.Status.MembersStatus

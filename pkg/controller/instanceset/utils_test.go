@@ -199,12 +199,10 @@ var _ = Describe("utils test", func() {
 			By("set its to role-less")
 			its.Status.AvailableReplicas = replicas
 			its.Spec.Roles = nil
-			its.Spec.RoleProbe = nil
 			Expect(IsInstanceSetReady(its)).Should(BeTrue())
 
 			By("set its to role-ful")
 			its.Spec.Roles = roles
-			its.Spec.RoleProbe = &workloads.RoleProbe{}
 			Expect(IsInstanceSetReady(its)).Should(BeFalse())
 
 			By("set membersStatus to ready")

@@ -38,6 +38,7 @@ import (
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/apecloud/kubeblocks/pkg/controller/render"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 )
@@ -134,8 +135,8 @@ max_connections = '1000'
 			synthesizedComponent.ConfigTemplates[0].Keys = []string{testConfigFile}
 
 			By("create configuration resource")
-			createPipeline := NewCreatePipeline(ReconcileCtx{
-				ResourceCtx: &ResourceCtx{
+			createPipeline := NewCreatePipeline(render.ReconcileCtx{
+				ResourceCtx: &render.ResourceCtx{
 					Client:        k8sMockClient.Client(),
 					Context:       ctx,
 					Namespace:     testCtx.DefaultNamespace,
@@ -185,7 +186,7 @@ max_connections = '1000'
 					Content: cfgutil.ToPointer(`for test`),
 				},
 			}
-			reconcileTask := NewReconcilePipeline(ReconcileCtx{
+			reconcileTask := NewReconcilePipeline(render.ReconcileCtx{
 				ResourceCtx:          createPipeline.ResourceCtx,
 				Cluster:              clusterObj,
 				Component:            componentObj,

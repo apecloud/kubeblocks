@@ -197,11 +197,6 @@ type InstanceSetSpec struct {
 	// +optional
 	Roles []ReplicaRole `json:"roles,omitempty"`
 
-	// Provides method to probe role.
-	//
-	// +optional
-	RoleProbe *RoleProbe `json:"roleProbe,omitempty"`
-
 	// Provides actions to do membership dynamic reconfiguration.
 	//
 	// +optional
@@ -478,63 +473,6 @@ const (
 	ReadonlyMode  AccessMode = "Readonly"
 	NoneMode      AccessMode = "None"
 )
-
-// RoleProbe defines how to observe role
-type RoleProbe struct {
-	// Defines a custom method for role probing.
-	// Actions defined here are executed in series.
-	// Upon completion of all actions, the final output should be a single string representing the role name defined in spec.Roles.
-	// The latest [BusyBox](https://busybox.net/) image will be used if Image is not configured.
-	// Environment variables can be used in Command:
-	// - v_KB_ITS_LAST_STDOUT: stdout from the last action, watch for 'v_' prefix
-	// - KB_ITS_USERNAME: username part of the credential
-	// - KB_ITS_PASSWORD: password part of the credential
-	//
-	// +optional
-	CustomHandler []Action `json:"customHandler,omitempty"`
-
-	// Specifies the number of seconds to wait after the container has started before initiating role probing.
-	//
-	// +kubebuilder:default=0
-	// +kubebuilder:validation:Minimum=0
-	// +optional
-	InitialDelaySeconds int32 `json:"initialDelaySeconds,omitempty"`
-
-	// Specifies the number of seconds after which the probe times out.
-	//
-	// +kubebuilder:default=1
-	// +kubebuilder:validation:Minimum=1
-	// +optional
-	TimeoutSeconds int32 `json:"timeoutSeconds,omitempty"`
-
-	// Specifies the frequency (in seconds) of probe execution.
-	//
-	// +kubebuilder:default=2
-	// +kubebuilder:validation:Minimum=1
-	// +optional
-	PeriodSeconds int32 `json:"periodSeconds,omitempty"`
-
-	// Specifies the minimum number of consecutive successes for the probe to be considered successful after having failed.
-	//
-	// +kubebuilder:default=1
-	// +kubebuilder:validation:Minimum=1
-	// +optional
-	SuccessThreshold int32 `json:"successThreshold,omitempty"`
-
-	// Specifies the minimum number of consecutive failures for the probe to be considered failed after having succeeded.
-	//
-	// +kubebuilder:default=3
-	// +kubebuilder:validation:Minimum=1
-	// +optional
-	FailureThreshold int32 `json:"failureThreshold,omitempty"`
-
-	// Specifies the method for updating the pod role label.
-	//
-	// +kubebuilder:default=ReadinessProbeEventUpdate
-	// +kubebuilder:validation:Enum={ReadinessProbeEventUpdate, DirectAPIServerEventUpdate}
-	// +optional
-	RoleUpdateMechanism RoleUpdateMechanism `json:"roleUpdateMechanism,omitempty"`
-}
 
 type Action struct {
 	// Refers to the utility image that contains the command which can be utilized to retrieve or process role information.

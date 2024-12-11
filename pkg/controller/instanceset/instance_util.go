@@ -786,7 +786,7 @@ func BuildInstanceTemplateRevision(template *corev1.PodTemplateSpec, parent *wor
 }
 
 func buildInstanceTemplateExts(itsExt *instanceSetExt) []*instanceTemplateExt {
-	defaultTemplate := BuildPodTemplate(itsExt.its)
+	defaultTemplate := itsExt.its.Spec.Template.DeepCopy()
 	makeInstanceTemplateExt := func(templateName string) *instanceTemplateExt {
 		var claims []corev1.PersistentVolumeClaim
 		for _, template := range itsExt.its.Spec.VolumeClaimTemplates {

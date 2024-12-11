@@ -59,8 +59,6 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 		// namespaced
 		testapps.ClearResources(&testCtx, generics.OpsRequestSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, generics.ConfigMapSignature, inNS, ml)
-		// non-namespaced
-		testapps.ClearResources(&testCtx, generics.ConfigConstraintSignature, ml)
 	}
 
 	BeforeEach(cleanEnv)

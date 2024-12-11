@@ -22,7 +22,7 @@ package apps
 import (
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	intctrlutil `github.com/apecloud/kubeblocks/pkg/controllerutil`
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 type componentInitTransformer struct{}

@@ -68,8 +68,6 @@ const (
 	KBConfigManagerPathEnv = "TOOLS_PATH"
 )
 
-const KBConfigSpecLazyRenderedYamlFile = "lazy-rendered-config.yaml"
-
 func BuildConfigManagerContainerParams(cli client.Client, ctx context.Context, managerParams *CfgManagerBuildParams, volumeDirs []corev1.VolumeMount) error {
 	var volume *corev1.VolumeMount
 	var buildParam *ConfigSpecMeta
@@ -84,9 +82,6 @@ func BuildConfigManagerContainerParams(cli client.Client, ctx context.Context, m
 		}
 		buildParam.MountPoint = volume.MountPath
 		if err := buildConfigSpecHandleMeta(cli, ctx, buildParam, managerParams); err != nil {
-			return err
-		}
-		if err := buildLazyRenderedConfig(cli, ctx, buildParam, managerParams); err != nil {
 			return err
 		}
 	}
@@ -121,41 +116,6 @@ func getWatchedVolume(volumeDirs []corev1.VolumeMount, buildParams []ConfigSpecM
 		}
 	}
 	return allVolumeMounts
-}
-
-// buildLazyRenderedConfig prepare secondary render config and volume
-func buildLazyRenderedConfig(cli client.Client, ctx context.Context, param *ConfigSpecMeta, manager *CfgManagerBuildParams) error {
-	processYamlConfig := func(cm *corev1.ConfigMap) error {
-		renderMeta := ConfigLazyRenderedMeta{
-			ComponentConfigSpec: &param.ConfigSpec,
-			Templates:           cfgutil.ToSet(cm.Data).AsSlice(),
-			FormatterConfig:     param.FormatterConfig,
-		}
-		b, err := cfgutil.ToYamlConfig(renderMeta)
-		if err != nil {
-			return err
-		}
-		cm.Data[KBConfigSpecLazyRenderedYamlFile] = string(b)
-		return nil
-	}
-
-	secondaryTemplate := param.ConfigSpec.LegacyRenderedConfigSpec
-	if secondaryTemplate == nil {
-		return nil
-	}
-	referenceCMKey := client.ObjectKey{
-		Namespace: secondaryTemplate.Namespace,
-		Name:      secondaryTemplate.TemplateRef,
-	}
-	configCMKey := client.ObjectKey{
-		Namespace: manager.Cluster.GetNamespace(),
-		Name:      fmt.Sprintf("%s%s-%s", configManagerCMPrefix, secondaryTemplate.TemplateRef, manager.Cluster.GetName()),
-	}
-	if err := checkOrCreateConfigMap(referenceCMKey, configCMKey, cli, ctx, manager.Cluster, processYamlConfig); err != nil {
-		return err
-	}
-	buildLazyRenderedConfigVolume(configCMKey.Name, manager, GetConfigMountPoint(param.ConfigSpec), GetConfigVolumeName(param.ConfigSpec), param.ConfigSpec)
-	return nil
 }
 
 func buildDownwardAPIVolumes(params *CfgManagerBuildParams) []corev1.VolumeMount {
@@ -331,23 +291,6 @@ func buildReloadScriptVolume(scriptCMName string, manager *CfgManagerBuildParams
 			},
 		},
 	})
-}
-
-func buildLazyRenderedConfigVolume(cmName string, manager *CfgManagerBuildParams, mountPoint, volumeName string, configSpec appsv1.ComponentConfigSpec) {
-	n := len(manager.Volumes)
-	manager.Volumes = append(manager.Volumes, corev1.VolumeMount{
-		Name:      volumeName,
-		MountPath: mountPoint,
-	})
-	manager.CMConfigVolumes = append(manager.CMConfigVolumes, corev1.Volume{
-		Name: volumeName,
-		VolumeSource: corev1.VolumeSource{
-			ConfigMap: &corev1.ConfigMapVolumeSource{
-				LocalObjectReference: corev1.LocalObjectReference{Name: cmName},
-			},
-		},
-	})
-	manager.ConfigLazyRenderedVolumes[configSpec.VolumeName] = manager.Volumes[n]
 }
 
 func checkOrCreateConfigMap(referenceCM client.ObjectKey, scriptCMKey client.ObjectKey, cli client.Client, ctx context.Context, cluster *appsv1.Cluster, fn func(cm *corev1.ConfigMap) error) error {

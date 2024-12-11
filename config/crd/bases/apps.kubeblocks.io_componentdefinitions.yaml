@@ -4317,46 +4317,6 @@ spec:
                         type: string
                       type: array
                       x-kubernetes-list-type: set
-                    legacyRenderedConfigSpec:
-                      description: |-
-                        Specifies the secondary rendered config spec for pod-specific customization.
-
-
-                        The template is rendered inside the pod (by the "config-manager" sidecar container) and merged with the main
-                        template's render result to generate the final configuration file.
-
-
-                        This field is intended to handle scenarios where different pods within the same Component have
-                        varying configurations. It allows for pod-specific customization of the configuration.
-
-
-                        Note: This field will be deprecated in future versions, and the functionality will be moved to
-                        `cluster.spec.componentSpecs[*].instances[*]`.
-                      properties:
-                        namespace:
-                          default: default
-                          description: |-
-                            Specifies the namespace of the referenced configuration template ConfigMap object.
-                            An empty namespace is equivalent to the "default" namespace.
-                          pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
-                          type: string
-                        policy:
-                          default: none
-                          description: Defines the strategy for merging externally
-                            imported templates into component templates.
-                          enum:
-                          - patch
-                          - replace
-                          - none
-                          type: string
-                        templateRef:
-                          description: Specifies the name of the referenced configuration
-                            template ConfigMap object.
-                          pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
-                          type: string
-                      required:
-                      - templateRef
-                      type: object
                     name:
                       description: Specifies the name of the configuration template.
                       maxLength: 63

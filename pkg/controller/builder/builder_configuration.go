@@ -68,15 +68,6 @@ func ToV1ConfigSpec(spec *appsv1alpha1.ComponentConfigSpec) *appsv1.ComponentCon
 		InjectEnvTo:         spec.InjectEnvTo,
 		AsSecret:            spec.AsSecret,
 	}
-	if spec.LegacyRenderedConfigSpec != nil {
-		v1.LegacyRenderedConfigSpec = &appsv1.LegacyRenderedTemplateSpec{
-			ConfigTemplateExtension: appsv1.ConfigTemplateExtension{
-				TemplateRef: spec.LegacyRenderedConfigSpec.TemplateRef,
-				Namespace:   spec.LegacyRenderedConfigSpec.Namespace,
-				Policy:      appsv1.MergedPolicy(spec.LegacyRenderedConfigSpec.Policy),
-			},
-		}
-	}
 	if spec.ReRenderResourceTypes != nil {
 		v1.ReRenderResourceTypes = make([]appsv1.RerenderResourceType, 0)
 		for _, r := range spec.ReRenderResourceTypes {
@@ -100,15 +91,6 @@ func ToV1alpha1ConfigSpec(spec *appsv1.ComponentConfigSpec) *appsv1alpha1.Compon
 		AsEnvFrom:           spec.AsEnvFrom,
 		InjectEnvTo:         spec.InjectEnvTo,
 		AsSecret:            spec.AsSecret,
-	}
-	if spec.LegacyRenderedConfigSpec != nil {
-		v1.LegacyRenderedConfigSpec = &appsv1alpha1.LegacyRenderedTemplateSpec{
-			ConfigTemplateExtension: appsv1alpha1.ConfigTemplateExtension{
-				TemplateRef: spec.LegacyRenderedConfigSpec.TemplateRef,
-				Namespace:   spec.LegacyRenderedConfigSpec.Namespace,
-				Policy:      appsv1alpha1.MergedPolicy(spec.LegacyRenderedConfigSpec.Policy),
-			},
-		}
 	}
 	if spec.ReRenderResourceTypes != nil {
 		v1.ReRenderResourceTypes = make([]appsv1alpha1.RerenderResourceType, 0)

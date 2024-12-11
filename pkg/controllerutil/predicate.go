@@ -101,13 +101,9 @@ var (
 	)
 )
 
-func NewControllerManagedBy(mgr manager.Manager, objs ...client.Object) *builder.Builder {
-	b := ctrl.NewControllerManagedBy(mgr).
+func NewControllerManagedBy(mgr manager.Manager) *builder.Builder {
+	return ctrl.NewControllerManagedBy(mgr).
 		WithEventFilter(predicate.NewPredicateFuncs(namespacePredicateFilter))
-	if len(objs) > 0 {
-		b.WithEventFilter(predicate.NewPredicateFuncs(newAPIVersionPredicateFilter(objs)))
-	}
-	return b
 }
 
 func namespacePredicateFilter(object client.Object) bool {
@@ -125,20 +121,18 @@ func namespacePredicateFilter(object client.Object) bool {
 	return managedNamespaces.Has(object.GetNamespace())
 }
 
-func newAPIVersionPredicateFilter(objs []client.Object) func(client.Object) bool {
-	return func(obj client.Object) bool {
-		if !viper.GetBool(constant.DualOperatorsMode) {
-			return true
-		}
-		_, clusterObj := obj.(*appsv1alpha1.Cluster)
-		annotations := obj.GetAnnotations()
-		if annotations == nil {
-			return !clusterObj // for newly created clusters, let the new operator handle them first
-		}
-		apiVersion, ok := annotations[constant.CRDAPIVersionAnnotationKey]
-		if !ok {
-			return !clusterObj // for newly created clusters, let the new operator handle them first
-		}
-		return supportedCRDAPIVersions.Has(apiVersion)
+func ObjectAPIVersionSupported(obj client.Object) bool {
+	if !viper.GetBool(constant.DualOperatorsMode) {
+		return true
 	}
+	_, clusterObj := obj.(*appsv1alpha1.Cluster)
+	annotations := obj.GetAnnotations()
+	if annotations == nil {
+		return !clusterObj // for newly created clusters, let the new operator handle them first
+	}
+	apiVersion, ok := annotations[constant.CRDAPIVersionAnnotationKey]
+	if !ok {
+		return !clusterObj // for newly created clusters, let the new operator handle them first
+	}
+	return supportedCRDAPIVersions.Has(apiVersion)
 }

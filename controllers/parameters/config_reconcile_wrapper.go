@@ -20,8 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package parameters
 
 import (
-	"context"
-
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -38,7 +36,6 @@ type ReconcileContext struct {
 	intctrlutil.RequestCtx
 	configctrl.ResourceFetcher[ReconcileContext]
 
-	ctx              context.Context
 	Name             string
 	MatchingLabels   client.MatchingLabels
 	ConfigMap        *corev1.ConfigMap
@@ -51,13 +48,13 @@ type ReconcileContext struct {
 	ParametersDefs map[string]*parametersv1alpha1.ParametersDefinition
 }
 
-func newConfigReconcileContext(ctx context.Context,
+func newParameterReconcileContext(reqCtx intctrlutil.RequestCtx,
 	resourceCtx *render.ResourceCtx,
 	cm *corev1.ConfigMap,
 	configSpecName string,
 	matchingLabels client.MatchingLabels) *ReconcileContext {
 	configContext := ReconcileContext{
-		ctx:            ctx,
+		RequestCtx:     reqCtx,
 		ConfigMap:      cm,
 		Name:           configSpecName,
 		MatchingLabels: matchingLabels,
@@ -71,11 +68,12 @@ func (c *ReconcileContext) GetRelatedObjects() error {
 		ComponentSpec().
 		Workload().
 		SynthesizedComponent().
+		ParametersDefinitions().
 		Complete()
 }
 
 func (c *ReconcileContext) Workload() *ReconcileContext {
-	stsFn := func() (err error) {
+	instanceSetFn := func() (err error) {
 		c.InstanceSetList, c.Containers, err = retrieveRelatedComponentsByConfigmap(
 			c.Client,
 			c.Context,
@@ -86,13 +84,13 @@ func (c *ReconcileContext) Workload() *ReconcileContext {
 			c.MatchingLabels)
 		return
 	}
-	return c.Wrap(stsFn)
+	return c.Wrap(instanceSetFn)
 }
 
 func (c *ReconcileContext) SynthesizedComponent() *ReconcileContext {
 	return c.Wrap(func() (err error) {
 		// build synthesized component for the component
-		c.BuiltinComponent, err = component.BuildSynthesizedComponent(c.ctx, c.Client, c.ComponentDefObj, c.ComponentObj, c.ClusterObj)
+		c.BuiltinComponent, err = component.BuildSynthesizedComponent(c.Ctx, c.Client, c.ComponentDefObj, c.ComponentObj, c.ClusterObj)
 		return err
 	})
 }

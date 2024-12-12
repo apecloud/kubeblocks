@@ -26,6 +26,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
@@ -95,9 +96,9 @@ func TestParseRevision(t *testing.T) {
 		want: ConfigurationRevision{
 			StrRevision: "120000",
 			Revision:    120000,
-			Phase:       appsv1alpha1.CPendingPhase,
+			Phase:       parametersv1alpha1.CPendingPhase,
 			Result: intctrlutil.Result{
-				Phase:    appsv1alpha1.CPendingPhase,
+				Phase:    parametersv1alpha1.CPendingPhase,
 				Revision: "120000",
 			},
 		},
@@ -179,9 +180,9 @@ func TestGetLastRevision(t *testing.T) {
 		want: ConfigurationRevision{
 			Revision:    2,
 			StrRevision: "2",
-			Phase:       appsv1alpha1.CRunningPhase,
+			Phase:       parametersv1alpha1.CRunningPhase,
 			Result: intctrlutil.Result{
-				Phase:    appsv1alpha1.CRunningPhase,
+				Phase:    parametersv1alpha1.CRunningPhase,
 				Revision: "2",
 			},
 		},

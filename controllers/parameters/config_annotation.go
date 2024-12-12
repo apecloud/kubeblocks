@@ -28,7 +28,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/configuration/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -37,7 +37,7 @@ import (
 
 type options = func(*intctrlutil.Result)
 
-func reconciled(status ReturnedStatus, policy string, phase appsv1alpha1.ConfigurationPhase, options ...options) intctrlutil.Result {
+func reconciled(status ReturnedStatus, policy string, phase parametersv1alpha1.ParameterPhase, options ...options) intctrlutil.Result {
 	result := intctrlutil.Result{
 		Policy:        policy,
 		Phase:         phase,
@@ -52,7 +52,7 @@ func reconciled(status ReturnedStatus, policy string, phase appsv1alpha1.Configu
 	return result
 }
 
-func unReconciled(phase appsv1alpha1.ConfigurationPhase, revision string, message string) intctrlutil.Result {
+func unReconciled(phase parametersv1alpha1.ParameterPhase, revision string, message string) intctrlutil.Result {
 	return intctrlutil.Result{
 		Phase:         phase,
 		Revision:      revision,
@@ -95,7 +95,7 @@ func checkEnableCfgUpgrade(object client.Object) bool {
 	return true
 }
 
-func updateConfigPhase(cli client.Client, ctx intctrlutil.RequestCtx, config *corev1.ConfigMap, phase appsv1alpha1.ConfigurationPhase, message string) (ctrl.Result, error) {
+func updateConfigPhase(cli client.Client, ctx intctrlutil.RequestCtx, config *corev1.ConfigMap, phase parametersv1alpha1.ParameterPhase, message string) (ctrl.Result, error) {
 	return updateConfigPhaseWithResult(cli, ctx, config, unReconciled(phase, "", message))
 }
 
@@ -159,7 +159,7 @@ func updateAppliedConfigs(cli client.Client, ctx intctrlutil.RequestCtx, config 
 	GcConfigRevision(config)
 	if revision, ok := config.ObjectMeta.Annotations[constant.ConfigurationRevision]; ok && revision != "" {
 		if result == nil {
-			result = util.ToPointer(unReconciled(appsv1alpha1.CFinishedPhase, "", fmt.Sprintf("phase: %s", reconfigurePhase)))
+			result = util.ToPointer(unReconciled(parametersv1alpha1.CFinishedPhase, "", fmt.Sprintf("phase: %s", reconfigurePhase)))
 		}
 		result.Revision = revision
 		b, _ := json.Marshal(result)
@@ -202,18 +202,4 @@ func getLastVersionConfig(cm *corev1.ConfigMap) (map[string]string, error) {
 	}
 
 	return data, nil
-}
-
-func getUpgradePolicy(cm *corev1.ConfigMap) appsv1alpha1.UpgradePolicy {
-	const (
-		DefaultUpgradePolicy = appsv1alpha1.NonePolicy
-	)
-
-	annotations := cm.GetAnnotations()
-	value, ok := annotations[constant.UpgradePolicyAnnotationKey]
-	if !ok {
-		return DefaultUpgradePolicy
-	}
-
-	return appsv1alpha1.UpgradePolicy(value)
 }

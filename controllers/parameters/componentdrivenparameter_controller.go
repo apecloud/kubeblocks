@@ -99,7 +99,7 @@ func (r *ComponentDrivenParameterReconciler) reconcile(reqCtx intctrlutil.Reques
 		return r.delete(reqCtx, existingObject)
 	}
 	if expectedObject, err = buildComponentParameter(reqCtx, r.Client, component); err != nil {
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
 	}
 
 	switch {

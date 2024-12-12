@@ -627,9 +627,9 @@ spec:
                         format: int32
                         type: integer
                     type: object
-                  shardProvision:
+                  shardAdd:
                     description: |-
-                      Specifies the hook to be executed after a shard's creation.
+                      Specifies the hook to be executed after a shard added.
 
 
                       Note: This field is immutable once it has been set.
@@ -899,9 +899,9 @@ spec:
                         format: int32
                         type: integer
                     type: object
-                  shardTerminate:
+                  shardRemove:
                     description: |-
-                      Specifies the hook to be executed prior to terminating a shard.
+                      Specifies the hook to be executed prior to remove a shard.
 
 
                       Note: This field is immutable once it has been set.

@@ -61,6 +61,7 @@ func (r *InstanceSet) ConvertFrom(srcRaw conversion.Hub) error {
 	if err := copier.Copy(&r.Spec, &src.Spec); err != nil {
 		return err
 	}
+	r.changesFromInstanceSet(src)
 
 	// status
 	if err := copier.Copy(&r.Status, &src.Status); err != nil {

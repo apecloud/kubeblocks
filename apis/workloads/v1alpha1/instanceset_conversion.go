@@ -21,6 +21,9 @@ package v1alpha1
 
 import (
 	"github.com/jinzhu/copier"
+	appsv1 "k8s.io/api/apps/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/conversion"
 
 	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
@@ -37,6 +40,7 @@ func (r *InstanceSet) ConvertTo(dstRaw conversion.Hub) error {
 	if err := copier.Copy(&dst.Spec, &r.Spec); err != nil {
 		return err
 	}
+	r.changesToInstanceSet(dst)
 
 	// status
 	if err := copier.Copy(&dst.Status, &r.Status); err != nil {
@@ -64,4 +68,58 @@ func (r *InstanceSet) ConvertFrom(srcRaw conversion.Hub) error {
 	}
 
 	return nil
+}
+
+func (r *InstanceSet) changesToInstanceSet(its *workloadsv1.InstanceSet) {
+	// changed:
+	// spec
+	//   podUpdatePolicy -> updateStrategy.instanceUpdatePolicy
+	//   memberUpdateStrategy -> updateStrategy.rollingUpdate.updateConcurrency
+	//   updateStrategy.rollingUpdate.partition -> updateStrategy.rollingUpdate.replicas
+	if its.Spec.UpdateStrategy == nil {
+		its.Spec.UpdateStrategy = &workloadsv1.UpdateStrategy{}
+	}
+	its.Spec.UpdateStrategy.InstanceUpdatePolicy = (*workloadsv1.InstanceUpdatePolicyType)(&r.Spec.PodUpdatePolicy)
+	if r.Spec.MemberUpdateStrategy != nil {
+		if its.Spec.UpdateStrategy.RollingUpdate == nil {
+			its.Spec.UpdateStrategy.RollingUpdate = &workloadsv1.RollingUpdate{}
+		}
+		its.Spec.UpdateStrategy.RollingUpdate.UpdateConcurrency = (*workloadsv1.UpdateConcurrency)(r.Spec.MemberUpdateStrategy)
+	}
+	if r.Spec.UpdateStrategy.RollingUpdate != nil {
+		if r.Spec.UpdateStrategy.RollingUpdate.Partition != nil {
+			if its.Spec.UpdateStrategy.RollingUpdate == nil {
+				its.Spec.UpdateStrategy.RollingUpdate = &workloadsv1.RollingUpdate{}
+			}
+			replicas := intstr.FromInt32(*r.Spec.UpdateStrategy.RollingUpdate.Partition)
+			its.Spec.UpdateStrategy.RollingUpdate.Replicas = &replicas
+		}
+	}
+}
+
+func (r *InstanceSet) changesFromInstanceSet(its *workloadsv1.InstanceSet) {
+	// changed:
+	// spec
+	//   podUpdatePolicy -> updateStrategy.instanceUpdatePolicy
+	//   memberUpdateStrategy -> updateStrategy.rollingUpdate.updateConcurrency
+	//   updateStrategy.rollingUpdate.partition -> updateStrategy.rollingUpdate.replicas
+	if its.Spec.UpdateStrategy == nil {
+		return
+	}
+	if its.Spec.UpdateStrategy.InstanceUpdatePolicy != nil {
+		r.Spec.PodUpdatePolicy = PodUpdatePolicyType(*its.Spec.UpdateStrategy.InstanceUpdatePolicy)
+	}
+	if its.Spec.UpdateStrategy.RollingUpdate == nil {
+		return
+	}
+	if its.Spec.UpdateStrategy.RollingUpdate.UpdateConcurrency != nil {
+		r.Spec.MemberUpdateStrategy = (*MemberUpdateStrategy)(its.Spec.UpdateStrategy.RollingUpdate.UpdateConcurrency)
+	}
+	if its.Spec.UpdateStrategy.RollingUpdate.Replicas != nil {
+		if r.Spec.UpdateStrategy.RollingUpdate == nil {
+			r.Spec.UpdateStrategy.RollingUpdate = &appsv1.RollingUpdateStatefulSetStrategy{}
+		}
+		partition, _ := intstr.GetScaledValueFromIntOrPercent(its.Spec.UpdateStrategy.RollingUpdate.Replicas, int(*its.Spec.Replicas), false)
+		r.Spec.UpdateStrategy.RollingUpdate.Partition = pointer.Int32(int32(partition))
+	}
 }

@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package v1alpha1
 
 import (
+	"slices"
+
 	"github.com/jinzhu/copier"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -104,13 +106,13 @@ func (r *Cluster) changesToCluster(cluster *appsv1.Cluster) {
 	//       - volumeClaimTemplates
 	//           spec:
 	//             resources: corev1.ResourceRequirements -> corev1.VolumeResourceRequirements
-	//         podUpdatePolicy: *workloads.InstanceUpdatePolicyType -> *InstanceUpdatePolicyType
+	//         podUpdatePolicy: *workloads.InstanceUpdatePolicyType -> *UpdateStrategy.InstanceUpdatePolicyType
 	//     sharings
 	//       - template
 	//           volumeClaimTemplates
 	//             spec:
 	//               resources: corev1.ResourceRequirements -> corev1.VolumeResourceRequirements
-	//           podUpdatePolicy: *workloads.InstanceUpdatePolicyType -> *InstanceUpdatePolicyType
+	//           podUpdatePolicy: *workloads.InstanceUpdatePolicyType -> *UpdateStrategy.InstanceUpdatePolicyType
 	//   status
 	//     components
 	//       - message: ComponentMessageMap -> map[string]string
@@ -122,6 +124,38 @@ func (r *Cluster) changesToCluster(cluster *appsv1.Cluster) {
 	} else {
 		cluster.Spec.TerminationPolicy = appsv1.TerminationPolicyType(r.Spec.TerminationPolicy)
 	}
+	for i := range r.Spec.ComponentSpecs {
+		spec := &r.Spec.ComponentSpecs[i]
+		if spec.PodUpdatePolicy == nil {
+			continue
+		}
+		index := slices.IndexFunc(cluster.Spec.ComponentSpecs, func(componentSpec appsv1.ClusterComponentSpec) bool {
+			return spec.Name == componentSpec.Name
+		})
+		if index < 0 {
+			continue
+		}
+		if cluster.Spec.ComponentSpecs[index].UpdateStrategy == nil {
+			cluster.Spec.ComponentSpecs[index].UpdateStrategy = &appsv1.UpdateStrategy{}
+		}
+		cluster.Spec.ComponentSpecs[index].UpdateStrategy.InstanceUpdatePolicy = (*appsv1.InstanceUpdatePolicyType)(spec.PodUpdatePolicy)
+	}
+	for i := range r.Spec.ShardingSpecs {
+		spec := &r.Spec.ShardingSpecs[i]
+		if spec.Template.PodUpdatePolicy == nil {
+			continue
+		}
+		index := slices.IndexFunc(cluster.Spec.Shardings, func(sharding appsv1.ClusterSharding) bool {
+			return spec.Name == sharding.Name
+		})
+		if index < 0 {
+			continue
+		}
+		if cluster.Spec.Shardings[index].Template.UpdateStrategy == nil {
+			cluster.Spec.Shardings[index].Template.UpdateStrategy = &appsv1.UpdateStrategy{}
+		}
+		cluster.Spec.Shardings[index].Template.UpdateStrategy.InstanceUpdatePolicy = (*appsv1.InstanceUpdatePolicyType)(spec.Template.PodUpdatePolicy)
+	}
 }
 
 func (r *Cluster) changesFromCluster(cluster *appsv1.Cluster) {
@@ -132,13 +166,13 @@ func (r *Cluster) changesFromCluster(cluster *appsv1.Cluster) {
 	//       - volumeClaimTemplates
 	//           spec:
 	//             resources: corev1.ResourceRequirements -> corev1.VolumeResourceRequirements
-	//         podUpdatePolicy: *workloads.InstanceUpdatePolicyType -> *InstanceUpdatePolicyType
+	//         podUpdatePolicy: *workloads.InstanceUpdatePolicyType -> *UpdateStrategy.InstanceUpdatePolicyType
 	//     sharings
 	//       - template
 	//           volumeClaimTemplates
 	//             spec:
 	//               resources: corev1.ResourceRequirements -> corev1.VolumeResourceRequirements
-	//           podUpdatePolicy: *workloads.InstanceUpdatePolicyType -> *InstanceUpdatePolicyType
+	//           podUpdatePolicy: *workloads.InstanceUpdatePolicyType -> *UpdateStrategy.InstanceUpdatePolicyType
 	//   status
 	//     components
 	//       - message: ComponentMessageMap -> map[string]string
@@ -146,6 +180,30 @@ func (r *Cluster) changesFromCluster(cluster *appsv1.Cluster) {
 		r.Spec.ClusterDefRef = cluster.Spec.ClusterDef
 	}
 	// appsv1.TerminationPolicyType is a subset of appsv1alpha1.TerminationPolicyType, it can be converted directly.
+	for _, spec := range cluster.Spec.ComponentSpecs {
+		if spec.UpdateStrategy == nil || spec.UpdateStrategy.InstanceUpdatePolicy == nil {
+			continue
+		}
+		index := slices.IndexFunc(r.Spec.ComponentSpecs, func(componentSpec ClusterComponentSpec) bool {
+			return spec.Name == componentSpec.Name
+		})
+		if index < 0 {
+			continue
+		}
+		r.Spec.ComponentSpecs[index].PodUpdatePolicy = (*workloads.PodUpdatePolicyType)(spec.UpdateStrategy.InstanceUpdatePolicy)
+	}
+	for _, sharding := range cluster.Spec.Shardings {
+		if sharding.Template.UpdateStrategy == nil || sharding.Template.UpdateStrategy.InstanceUpdatePolicy == nil {
+			continue
+		}
+		index := slices.IndexFunc(r.Spec.ShardingSpecs, func(spec ShardingSpec) bool {
+			return spec.Name == sharding.Name
+		})
+		if index < 0 {
+			continue
+		}
+		r.Spec.ShardingSpecs[index].Template.PodUpdatePolicy = (*workloads.PodUpdatePolicyType)(sharding.Template.UpdateStrategy.InstanceUpdatePolicy)
+	}
 }
 
 type clusterConverter struct {

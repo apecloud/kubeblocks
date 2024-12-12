@@ -10617,7 +10617,7 @@ until the PreTerminate action has completed successfully.</p>
 </tr>
 <tr>
 <td>
-<code>shardProvision</code><br/>
+<code>shardAdd</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.Action">
 Action
@@ -10626,13 +10626,13 @@ Action
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the hook to be executed after a shard&rsquo;s creation.</p>
+<p>Specifies the hook to be executed after a shard added.</p>
 <p>Note: This field is immutable once it has been set.</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>shardTerminate</code><br/>
+<code>shardRemove</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.Action">
 Action
@@ -10641,7 +10641,7 @@ Action
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the hook to be executed prior to terminating a shard.</p>
+<p>Specifies the hook to be executed prior to remove a shard.</p>
 <p>Note: This field is immutable once it has been set.</p>
 </td>
 </tr>

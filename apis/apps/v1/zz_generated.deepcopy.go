@@ -2992,13 +2992,13 @@ func (in *ShardingLifecycleActions) DeepCopyInto(out *ShardingLifecycleActions) 
 		*out = new(Action)
 		(*in).DeepCopyInto(*out)
 	}
-	if in.ShardProvision != nil {
-		in, out := &in.ShardProvision, &out.ShardProvision
+	if in.ShardAdd != nil {
+		in, out := &in.ShardAdd, &out.ShardAdd
 		*out = new(Action)
 		(*in).DeepCopyInto(*out)
 	}
-	if in.ShardTerminate != nil {
-		in, out := &in.ShardTerminate, &out.ShardTerminate
+	if in.ShardRemove != nil {
+		in, out := &in.ShardRemove, &out.ShardRemove
 		*out = new(Action)
 		(*in).DeepCopyInto(*out)
 	}

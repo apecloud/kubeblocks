@@ -26,10 +26,10 @@ import (
 type Interface interface {
 	// ComponentParameters returns a ComponentParameterInformer.
 	ComponentParameters() ComponentParameterInformer
+	// ParamConfigRenderers returns a ParamConfigRendererInformer.
+	ParamConfigRenderers() ParamConfigRendererInformer
 	// Parameters returns a ParameterInformer.
 	Parameters() ParameterInformer
-	// ParameterDrivenConfigRenders returns a ParameterDrivenConfigRenderInformer.
-	ParameterDrivenConfigRenders() ParameterDrivenConfigRenderInformer
 	// ParametersDefinitions returns a ParametersDefinitionInformer.
 	ParametersDefinitions() ParametersDefinitionInformer
 }
@@ -50,14 +50,14 @@ func (v *version) ComponentParameters() ComponentParameterInformer {
 	return &componentParameterInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }
 
+// ParamConfigRenderers returns a ParamConfigRendererInformer.
+func (v *version) ParamConfigRenderers() ParamConfigRendererInformer {
+	return &paramConfigRendererInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
+}
+
 // Parameters returns a ParameterInformer.
 func (v *version) Parameters() ParameterInformer {
 	return &parameterInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
-}
-
-// ParameterDrivenConfigRenders returns a ParameterDrivenConfigRenderInformer.
-func (v *version) ParameterDrivenConfigRenders() ParameterDrivenConfigRenderInformer {
-	return &parameterDrivenConfigRenderInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
 // ParametersDefinitions returns a ParametersDefinitionInformer.

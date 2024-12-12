@@ -26,6 +26,10 @@ type ComponentParameterListerExpansion interface{}
 // ComponentParameterNamespaceLister.
 type ComponentParameterNamespaceListerExpansion interface{}
 
+// ParamConfigRendererListerExpansion allows custom methods to be added to
+// ParamConfigRendererLister.
+type ParamConfigRendererListerExpansion interface{}
+
 // ParameterListerExpansion allows custom methods to be added to
 // ParameterLister.
 type ParameterListerExpansion interface{}
@@ -33,10 +37,6 @@ type ParameterListerExpansion interface{}
 // ParameterNamespaceListerExpansion allows custom methods to be added to
 // ParameterNamespaceLister.
 type ParameterNamespaceListerExpansion interface{}
-
-// ParameterDrivenConfigRenderListerExpansion allows custom methods to be added to
-// ParameterDrivenConfigRenderLister.
-type ParameterDrivenConfigRenderListerExpansion interface{}
 
 // ParametersDefinitionListerExpansion allows custom methods to be added to
 // ParametersDefinitionLister.

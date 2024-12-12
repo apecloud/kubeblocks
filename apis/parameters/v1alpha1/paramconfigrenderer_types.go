@@ -34,30 +34,30 @@ import (
 // +kubebuilder:printcolumn:name="PHASE",type="string",JSONPath=".status.phase",description="status phase"
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
 
-// ParameterDrivenConfigRender is the Schema for the parameterdrivenconfigrenders API
-type ParameterDrivenConfigRender struct {
+// ParamConfigRenderer is the Schema for the paramconfigrenderers API
+type ParamConfigRenderer struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   ParameterDrivenConfigRenderSpec   `json:"spec,omitempty"`
-	Status ParameterDrivenConfigRenderStatus `json:"status,omitempty"`
+	Spec   ParamConfigRendererSpec   `json:"spec,omitempty"`
+	Status ParamConfigRendererStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 
-// ParameterDrivenConfigRenderList contains a list of ParameterDrivenConfigRender
-type ParameterDrivenConfigRenderList struct {
+// ParamConfigRendererList contains a list of ParamConfigRenderer
+type ParamConfigRendererList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []ParameterDrivenConfigRender `json:"items"`
+	Items           []ParamConfigRenderer `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&ParameterDrivenConfigRender{}, &ParameterDrivenConfigRenderList{})
+	SchemeBuilder.Register(&ParamConfigRenderer{}, &ParamConfigRendererList{})
 }
 
-// ParameterDrivenConfigRenderSpec defines the desired state of ParameterDrivenConfigRender
-type ParameterDrivenConfigRenderSpec struct {
+// ParamConfigRendererSpec defines the desired state of ParamConfigRenderer
+type ParamConfigRendererSpec struct {
 	// Specifies the ComponentDefinition custom resource (CR) that defines the Component's characteristics and behavior.
 	//
 	// +kubebuilder:validation:Required
@@ -93,7 +93,7 @@ type ComponentConfigDescription struct {
 
 	// Specifies the name of the referenced componentTemplateSpec.
 	//
-	// +kubebuilder:validation:Required
+	// +optional
 	TemplateName string `json:"templateName"`
 
 	// Specifies the format of the configuration file and any associated parameters that are specific to the chosen format.
@@ -113,20 +113,6 @@ type ComponentConfigDescription struct {
 	// +kubebuilder:validation:Required
 	FileFormatConfig *FileFormatConfig `json:"fileFormatConfig"`
 
-	// Specifies the containers to inject the ConfigMap parameters as environment variables.
-	//
-	// This is useful when application images accept parameters through environment variables and
-	// generate the final configuration file in the startup script based on these variables.
-	//
-	// This field allows users to specify a list of container names, and KubeBlocks will inject the environment
-	// variables converted from the ConfigMap into these designated containers. This provides a flexible way to
-	// pass the configuration items from the ConfigMap to the container without modifying the image.
-	//
-	//
-	// +listType=set
-	// +optional
-	InjectEnvTo []string `json:"injectEnvTo,omitempty"`
-
 	// Specifies whether the configuration needs to be re-rendered after v-scale or h-scale operations to reflect changes.
 	//
 	// In some scenarios, the configuration may need to be updated to reflect the changes in resource allocation
@@ -141,8 +127,8 @@ type ComponentConfigDescription struct {
 	ReRenderResourceTypes []RerenderResourceType `json:"reRenderResourceTypes,omitempty"`
 }
 
-// ParameterDrivenConfigRenderStatus defines the observed state of ParameterDrivenConfigRender
-type ParameterDrivenConfigRenderStatus struct {
+// ParamConfigRendererStatus defines the observed state of ParamConfigRenderer
+type ParamConfigRendererStatus struct {
 	// The most recent generation number of the ParamsDesc object that has been observed by the controller.
 	//
 	// +optional

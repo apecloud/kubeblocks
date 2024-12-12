@@ -190,7 +190,7 @@ func cleanEnv() {
 	// non-namespaced
 	testapps.ClearResources(&testCtx, generics.ConfigConstraintSignature, ml)
 	testapps.ClearResources(&testCtx, generics.ParametersDefinitionSignature, ml)
-	testapps.ClearResources(&testCtx, generics.ParameterDrivenConfigRenderSignature, ml)
+	testapps.ClearResources(&testCtx, generics.ParamConfigRendererSignature, ml)
 	// namespaced
 	testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ComponentSignature, true, inNS, ml)
 	testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ConfigMapSignature, true, inNS)

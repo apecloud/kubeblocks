@@ -122,7 +122,7 @@ func (r *ParametersDefinitionReconciler) deletionHandler(parametersDef *paramete
 		}
 		if res, err := intctrlutil.ValidateReferenceCR(reqCtx, r.Client, parametersDef,
 			cfgcore.GenerateConstraintsUniqLabelKeyWithConfig(parametersDef.GetName()),
-			recordEvent, &parametersv1alpha1.ParameterDrivenConfigRenderList{}); res != nil || err != nil {
+			recordEvent, &parametersv1alpha1.ParamConfigRendererList{}); res != nil || err != nil {
 			return res, err
 		}
 		return nil, nil

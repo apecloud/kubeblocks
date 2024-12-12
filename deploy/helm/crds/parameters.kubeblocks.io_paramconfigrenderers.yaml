@@ -5,18 +5,18 @@ metadata:
     controller-gen.kubebuilder.io/version: v0.14.0
   labels:
     app.kubernetes.io/name: kubeblocks
-  name: parameterdrivenconfigrenders.parameters.kubeblocks.io
+  name: paramconfigrenderers.parameters.kubeblocks.io
 spec:
   group: parameters.kubeblocks.io
   names:
     categories:
     - kubeblocks
-    kind: ParameterDrivenConfigRender
-    listKind: ParameterDrivenConfigRenderList
-    plural: parameterdrivenconfigrenders
+    kind: ParamConfigRenderer
+    listKind: ParamConfigRendererList
+    plural: paramconfigrenderers
     shortNames:
     - paramstemplate
-    singular: parameterdrivenconfigrender
+    singular: paramconfigrenderer
   scope: Cluster
   versions:
   - additionalPrinterColumns:
@@ -34,7 +34,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: ParameterDrivenConfigRender is the Schema for the parameterdrivenconfigrenders
+        description: ParamConfigRenderer is the Schema for the paramconfigrenderers
           API
         properties:
           apiVersion:
@@ -55,8 +55,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: ParameterDrivenConfigRenderSpec defines the desired state
-              of ParameterDrivenConfigRender
+            description: ParamConfigRendererSpec defines the desired state of ParamConfigRenderer
             properties:
               componentDef:
                 description: Specifies the ComponentDefinition custom resource (CR)
@@ -122,22 +121,6 @@ spec:
                       required:
                       - format
                       type: object
-                    injectEnvTo:
-                      description: |-
-                        Specifies the containers to inject the ConfigMap parameters as environment variables.
-
-
-                        This is useful when application images accept parameters through environment variables and
-                        generate the final configuration file in the startup script based on these variables.
-
-
-                        This field allows users to specify a list of container names, and KubeBlocks will inject the environment
-                        variables converted from the ConfigMap into these designated containers. This provides a flexible way to
-                        pass the configuration items from the ConfigMap to the container without modifying the image.
-                      items:
-                        type: string
-                      type: array
-                      x-kubernetes-list-type: set
                     name:
                       description: Specifies the config file name in the config template.
                       type: string
@@ -169,7 +152,6 @@ spec:
                   required:
                   - fileFormatConfig
                   - name
-                  - templateName
                   type: object
                 type: array
                 x-kubernetes-list-map-keys:
@@ -191,8 +173,7 @@ spec:
             - componentDef
             type: object
           status:
-            description: ParameterDrivenConfigRenderStatus defines the observed state
-              of ParameterDrivenConfigRender
+            description: ParamConfigRendererStatus defines the observed state of ParamConfigRenderer
             properties:
               message:
                 description: Provides additional information about the current phase.

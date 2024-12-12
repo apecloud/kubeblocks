@@ -32,58 +32,58 @@ import (
 	cache "k8s.io/client-go/tools/cache"
 )
 
-// ParameterDrivenConfigRenderInformer provides access to a shared informer and lister for
-// ParameterDrivenConfigRenders.
-type ParameterDrivenConfigRenderInformer interface {
+// ParamConfigRendererInformer provides access to a shared informer and lister for
+// ParamConfigRenderers.
+type ParamConfigRendererInformer interface {
 	Informer() cache.SharedIndexInformer
-	Lister() v1alpha1.ParameterDrivenConfigRenderLister
+	Lister() v1alpha1.ParamConfigRendererLister
 }
 
-type parameterDrivenConfigRenderInformer struct {
+type paramConfigRendererInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
 	tweakListOptions internalinterfaces.TweakListOptionsFunc
 }
 
-// NewParameterDrivenConfigRenderInformer constructs a new informer for ParameterDrivenConfigRender type.
+// NewParamConfigRendererInformer constructs a new informer for ParamConfigRenderer type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewParameterDrivenConfigRenderInformer(client versioned.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredParameterDrivenConfigRenderInformer(client, resyncPeriod, indexers, nil)
+func NewParamConfigRendererInformer(client versioned.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredParamConfigRendererInformer(client, resyncPeriod, indexers, nil)
 }
 
-// NewFilteredParameterDrivenConfigRenderInformer constructs a new informer for ParameterDrivenConfigRender type.
+// NewFilteredParamConfigRendererInformer constructs a new informer for ParamConfigRenderer type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredParameterDrivenConfigRenderInformer(client versioned.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredParamConfigRendererInformer(client versioned.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.ParametersV1alpha1().ParameterDrivenConfigRenders().List(context.TODO(), options)
+				return client.ParametersV1alpha1().ParamConfigRenderers().List(context.TODO(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.ParametersV1alpha1().ParameterDrivenConfigRenders().Watch(context.TODO(), options)
+				return client.ParametersV1alpha1().ParamConfigRenderers().Watch(context.TODO(), options)
 			},
 		},
-		&parametersv1alpha1.ParameterDrivenConfigRender{},
+		&parametersv1alpha1.ParamConfigRenderer{},
 		resyncPeriod,
 		indexers,
 	)
 }
 
-func (f *parameterDrivenConfigRenderInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredParameterDrivenConfigRenderInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+func (f *paramConfigRendererInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+	return NewFilteredParamConfigRendererInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
-func (f *parameterDrivenConfigRenderInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&parametersv1alpha1.ParameterDrivenConfigRender{}, f.defaultInformer)
+func (f *paramConfigRendererInformer) Informer() cache.SharedIndexInformer {
+	return f.factory.InformerFor(&parametersv1alpha1.ParamConfigRenderer{}, f.defaultInformer)
 }
 
-func (f *parameterDrivenConfigRenderInformer) Lister() v1alpha1.ParameterDrivenConfigRenderLister {
-	return v1alpha1.NewParameterDrivenConfigRenderLister(f.Informer().GetIndexer())
+func (f *paramConfigRendererInformer) Lister() v1alpha1.ParamConfigRendererLister {
+	return v1alpha1.NewParamConfigRendererLister(f.Informer().GetIndexer())
 }

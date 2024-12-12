@@ -32,12 +32,12 @@ func (c *FakeParametersV1alpha1) ComponentParameters(namespace string) v1alpha1.
 	return &FakeComponentParameters{c, namespace}
 }
 
-func (c *FakeParametersV1alpha1) Parameters(namespace string) v1alpha1.ParameterInterface {
-	return &FakeParameters{c, namespace}
+func (c *FakeParametersV1alpha1) ParamConfigRenderers() v1alpha1.ParamConfigRendererInterface {
+	return &FakeParamConfigRenderers{c}
 }
 
-func (c *FakeParametersV1alpha1) ParameterDrivenConfigRenders() v1alpha1.ParameterDrivenConfigRenderInterface {
-	return &FakeParameterDrivenConfigRenders{c}
+func (c *FakeParametersV1alpha1) Parameters(namespace string) v1alpha1.ParameterInterface {
+	return &FakeParameters{c, namespace}
 }
 
 func (c *FakeParametersV1alpha1) ParametersDefinitions() v1alpha1.ParametersDefinitionInterface {

@@ -59,7 +59,7 @@ func ParametersDefinitionTerminalPhases(status parametersv1alpha1.ParametersDefi
 	return status.ObservedGeneration == generation && status.Phase == parametersv1alpha1.PDAvailablePhase
 }
 
-func ParametersDrivenConfigRenderTerminalPhases(status parametersv1alpha1.ParameterDrivenConfigRenderStatus, generation int64) bool {
+func ParametersDrivenConfigRenderTerminalPhases(status parametersv1alpha1.ParamConfigRendererStatus, generation int64) bool {
 	return status.ObservedGeneration == generation && status.Phase == parametersv1alpha1.PDAvailablePhase
 }
 
@@ -139,7 +139,7 @@ func GetConfigTemplateItem(parameterSpec *parametersv1alpha1.ComponentParameterS
 	return nil
 }
 
-func GetComponentConfigDescription(pdcr *parametersv1alpha1.ParameterDrivenConfigRenderSpec, name string) *parametersv1alpha1.ComponentConfigDescription {
+func GetComponentConfigDescription(pdcr *parametersv1alpha1.ParamConfigRendererSpec, name string) *parametersv1alpha1.ComponentConfigDescription {
 	match := func(desc parametersv1alpha1.ComponentConfigDescription) bool {
 		return desc.Name == name
 	}
@@ -150,7 +150,7 @@ func GetComponentConfigDescription(pdcr *parametersv1alpha1.ParameterDrivenConfi
 	return nil
 }
 
-func GetComponentConfigDescriptions(pdcr *parametersv1alpha1.ParameterDrivenConfigRenderSpec, tpl string) []parametersv1alpha1.ComponentConfigDescription {
+func GetComponentConfigDescriptions(pdcr *parametersv1alpha1.ParamConfigRendererSpec, tpl string) []parametersv1alpha1.ComponentConfigDescription {
 	match := func(desc parametersv1alpha1.ComponentConfigDescription) bool {
 		return desc.TemplateName == tpl
 	}

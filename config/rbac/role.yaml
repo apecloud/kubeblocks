@@ -866,7 +866,7 @@ rules:
 - apiGroups:
   - parameters.kubeblocks.io
   resources:
-  - parameterdrivenconfigrenders
+  - paramconfigrenderers
   verbs:
   - create
   - delete
@@ -878,13 +878,13 @@ rules:
 - apiGroups:
   - parameters.kubeblocks.io
   resources:
-  - parameterdrivenconfigrenders/finalizers
+  - paramconfigrenderers/finalizers
   verbs:
   - update
 - apiGroups:
   - parameters.kubeblocks.io
   resources:
-  - parameterdrivenconfigrenders/status
+  - paramconfigrenderers/status
   verbs:
   - get
   - patch

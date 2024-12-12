@@ -134,7 +134,7 @@ var ParametersDefinitionSignature = func(_ parametersv1alpha1.ParametersDefiniti
 }
 var ParameterSignature = func(_ parametersv1alpha1.Parameter, _ *parametersv1alpha1.Parameter, _ parametersv1alpha1.ParameterList, _ *parametersv1alpha1.ParameterList) {
 }
-var ParameterDrivenConfigRenderSignature = func(_ parametersv1alpha1.ParameterDrivenConfigRender, _ *parametersv1alpha1.ParameterDrivenConfigRender, _ parametersv1alpha1.ParameterDrivenConfigRenderList, _ *parametersv1alpha1.ParameterDrivenConfigRenderList) {
+var ParamConfigRendererSignature = func(_ parametersv1alpha1.ParamConfigRenderer, _ *parametersv1alpha1.ParamConfigRenderer, _ parametersv1alpha1.ParamConfigRendererList, _ *parametersv1alpha1.ParamConfigRendererList) {
 }
 var ComponentParameterSignature = func(_ parametersv1alpha1.ComponentParameter, _ *parametersv1alpha1.ComponentParameter, _ parametersv1alpha1.ComponentParameterList, _ *parametersv1alpha1.ComponentParameterList) {
 }

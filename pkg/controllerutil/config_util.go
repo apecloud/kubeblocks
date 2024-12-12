@@ -243,7 +243,7 @@ func TransformConfigTemplate(configs []appsv1.ComponentConfigSpec) []appsv1.Comp
 	return arr
 }
 
-func ResolveCmpdParametersDefs(ctx context.Context, reader client.Reader, cmpd *appsv1.ComponentDefinition) (*parametersv1alpha1.ParameterDrivenConfigRender, []*parametersv1alpha1.ParametersDefinition, error) {
+func ResolveCmpdParametersDefs(ctx context.Context, reader client.Reader, cmpd *appsv1.ComponentDefinition) (*parametersv1alpha1.ParamConfigRenderer, []*parametersv1alpha1.ParametersDefinition, error) {
 	var paramsDefs []*parametersv1alpha1.ParametersDefinition
 
 	configRender, err := ResolveComponentConfigRender(ctx, reader, cmpd)
@@ -266,15 +266,15 @@ func ResolveCmpdParametersDefs(ctx context.Context, reader client.Reader, cmpd *
 	return configRender, paramsDefs, nil
 }
 
-func ResolveComponentConfigRender(ctx context.Context, reader client.Reader, cmpd *appsv1.ComponentDefinition) (*parametersv1alpha1.ParameterDrivenConfigRender, error) {
-	configDefList := &parametersv1alpha1.ParameterDrivenConfigRenderList{}
+func ResolveComponentConfigRender(ctx context.Context, reader client.Reader, cmpd *appsv1.ComponentDefinition) (*parametersv1alpha1.ParamConfigRenderer, error) {
+	configDefList := &parametersv1alpha1.ParamConfigRendererList{}
 	if err := reader.List(ctx, configDefList); err != nil {
 		return nil, err
 	}
 
-	checkAvailable := func(configDef parametersv1alpha1.ParameterDrivenConfigRender) error {
+	checkAvailable := func(configDef parametersv1alpha1.ParamConfigRenderer) error {
 		if configDef.Status.Phase != parametersv1alpha1.PDAvailablePhase {
-			return fmt.Errorf("the referenced ParameterDrivenConfigRender is unavailable: %s", configDef.Name)
+			return fmt.Errorf("the referenced ParamConfigRenderer is unavailable: %s", configDef.Name)
 		}
 		return nil
 	}

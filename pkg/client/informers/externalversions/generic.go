@@ -129,10 +129,10 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		// Group=parameters.kubeblocks.io, Version=v1alpha1
 	case parametersv1alpha1.SchemeGroupVersion.WithResource("componentparameters"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Parameters().V1alpha1().ComponentParameters().Informer()}, nil
+	case parametersv1alpha1.SchemeGroupVersion.WithResource("paramconfigrenderers"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Parameters().V1alpha1().ParamConfigRenderers().Informer()}, nil
 	case parametersv1alpha1.SchemeGroupVersion.WithResource("parameters"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Parameters().V1alpha1().Parameters().Informer()}, nil
-	case parametersv1alpha1.SchemeGroupVersion.WithResource("parameterdrivenconfigrenders"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Parameters().V1alpha1().ParameterDrivenConfigRenders().Informer()}, nil
 	case parametersv1alpha1.SchemeGroupVersion.WithResource("parametersdefinitions"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Parameters().V1alpha1().ParametersDefinitions().Informer()}, nil
 

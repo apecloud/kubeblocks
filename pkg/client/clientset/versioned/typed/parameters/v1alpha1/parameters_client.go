@@ -29,8 +29,8 @@ import (
 type ParametersV1alpha1Interface interface {
 	RESTClient() rest.Interface
 	ComponentParametersGetter
+	ParamConfigRenderersGetter
 	ParametersGetter
-	ParameterDrivenConfigRendersGetter
 	ParametersDefinitionsGetter
 }
 
@@ -43,12 +43,12 @@ func (c *ParametersV1alpha1Client) ComponentParameters(namespace string) Compone
 	return newComponentParameters(c, namespace)
 }
 
-func (c *ParametersV1alpha1Client) Parameters(namespace string) ParameterInterface {
-	return newParameters(c, namespace)
+func (c *ParametersV1alpha1Client) ParamConfigRenderers() ParamConfigRendererInterface {
+	return newParamConfigRenderers(c)
 }
 
-func (c *ParametersV1alpha1Client) ParameterDrivenConfigRenders() ParameterDrivenConfigRenderInterface {
-	return newParameterDrivenConfigRenders(c)
+func (c *ParametersV1alpha1Client) Parameters(namespace string) ParameterInterface {
+	return newParameters(c, namespace)
 }
 
 func (c *ParametersV1alpha1Client) ParametersDefinitions() ParametersDefinitionInterface {

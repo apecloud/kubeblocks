@@ -28,7 +28,7 @@ import (
 	testparameters "github.com/apecloud/kubeblocks/pkg/testutil/parameters"
 )
 
-var _ = Describe("ParameterDrivenConfigRender Controller", func() {
+var _ = Describe("ParamConfigRenderer Controller", func() {
 
 	BeforeEach(cleanEnv)
 
@@ -65,14 +65,14 @@ var _ = Describe("ParameterDrivenConfigRender Controller", func() {
 		It("normal test", func() {
 			initPDCRTest()
 
-			pdcr := testparameters.NewParametersDrivenConfigFactory(pdcrName).
+			pdcr := testparameters.NewParamConfigRendererFactory(pdcrName).
 				SetParametersDefs(paramsDefName).
 				SetComponentDefinition(compDefName).
 				SetTemplateName(configSpecName).
 				Create(&testCtx).
 				GetObject()
 
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(pdcr), func(g Gomega, pdcr *parametersv1alpha1.ParameterDrivenConfigRender) {
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(pdcr), func(g Gomega, pdcr *parametersv1alpha1.ParamConfigRenderer) {
 				g.Expect(pdcr.Status.Phase).Should(BeEquivalentTo(parametersv1alpha1.PDAvailablePhase))
 			})).Should(Succeed())
 
@@ -81,7 +81,7 @@ var _ = Describe("ParameterDrivenConfigRender Controller", func() {
 		It("invalid config template", func() {
 			initPDCRTest()
 
-			pdcr := testparameters.NewParametersDrivenConfigFactory(pdcrName).
+			pdcr := testparameters.NewParamConfigRendererFactory(pdcrName).
 				SetParametersDefs(paramsDefName).
 				SetComponentDefinition(compDefName).
 				SetTemplateName(configSpecName).
@@ -89,7 +89,7 @@ var _ = Describe("ParameterDrivenConfigRender Controller", func() {
 				Create(&testCtx).
 				GetObject()
 
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(pdcr), func(g Gomega, pdcr *parametersv1alpha1.ParameterDrivenConfigRender) {
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(pdcr), func(g Gomega, pdcr *parametersv1alpha1.ParamConfigRenderer) {
 				g.Expect(pdcr.Status.Phase).Should(BeEquivalentTo(parametersv1alpha1.PDAvailablePhase))
 			})).ShouldNot(Succeed())
 		})
@@ -97,13 +97,13 @@ var _ = Describe("ParameterDrivenConfigRender Controller", func() {
 		It("invalid parametersdefinitions", func() {
 			initPDCRTest()
 
-			pdcr := testparameters.NewParametersDrivenConfigFactory(pdcrName).
+			pdcr := testparameters.NewParamConfigRendererFactory(pdcrName).
 				SetParametersDefs("not_exist_pd").
 				SetComponentDefinition(compDefName).
 				Create(&testCtx).
 				GetObject()
 
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(pdcr), func(g Gomega, pdcr *parametersv1alpha1.ParameterDrivenConfigRender) {
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(pdcr), func(g Gomega, pdcr *parametersv1alpha1.ParamConfigRenderer) {
 				g.Expect(pdcr.Status.Phase).Should(BeEquivalentTo(parametersv1alpha1.PDAvailablePhase))
 			})).ShouldNot(Succeed())
 		})
@@ -111,13 +111,13 @@ var _ = Describe("ParameterDrivenConfigRender Controller", func() {
 		It("invalid cmpd", func() {
 			initPDCRTest()
 
-			pdcr := testparameters.NewParametersDrivenConfigFactory(pdcrName).
+			pdcr := testparameters.NewParamConfigRendererFactory(pdcrName).
 				SetParametersDefs(paramsDefName).
 				SetComponentDefinition("not_exist_cmpd").
 				Create(&testCtx).
 				GetObject()
 
-			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(pdcr), func(g Gomega, pdcr *parametersv1alpha1.ParameterDrivenConfigRender) {
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(pdcr), func(g Gomega, pdcr *parametersv1alpha1.ParamConfigRenderer) {
 				g.Expect(pdcr.Status.Phase).Should(BeEquivalentTo(parametersv1alpha1.PDAvailablePhase))
 			})).ShouldNot(Succeed())
 		})

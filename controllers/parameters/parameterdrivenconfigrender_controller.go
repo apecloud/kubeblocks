@@ -88,9 +88,9 @@ func (r *ParameterDrivenConfigRenderReconciler) reconcile(reqCtx intctrlutil.Req
 
 	if err := r.validate(reqCtx, r.Client, &parameterTemplate.Spec); err != nil {
 		if uErr := r.unavailable(reqCtx.Ctx, r.Client, parameterTemplate, err); uErr != nil {
-			return intctrlutil.CheckedRequeueWithError(uErr, reqCtx.Log, "")
+			return intctrlutil.RequeueWithError(uErr, reqCtx.Log, "")
 		}
-		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
+		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
 	}
 
 	if err := r.available(reqCtx.Ctx, r.Client, parameterTemplate); err != nil {

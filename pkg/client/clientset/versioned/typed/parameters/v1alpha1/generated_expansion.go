@@ -20,8 +20,8 @@ package v1alpha1
 
 type ComponentParameterExpansion interface{}
 
-type ParameterExpansion interface{}
+type ParamConfigRendererExpansion interface{}
 
-type ParameterDrivenConfigRenderExpansion interface{}
+type ParameterExpansion interface{}
 
 type ParametersDefinitionExpansion interface{}

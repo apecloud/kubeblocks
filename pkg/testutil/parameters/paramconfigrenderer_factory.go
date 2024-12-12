@@ -22,14 +22,14 @@ import (
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
 
-type MockParametersDrivenConfigFactory struct {
-	testapps.BaseFactory[parametersv1alpha1.ParameterDrivenConfigRender, *parametersv1alpha1.ParameterDrivenConfigRender, MockParametersDrivenConfigFactory]
+type MockParamConfigRendererFactory struct {
+	testapps.BaseFactory[parametersv1alpha1.ParamConfigRenderer, *parametersv1alpha1.ParamConfigRenderer, MockParamConfigRendererFactory]
 }
 
-func NewParametersDrivenConfigFactory(name string) *MockParametersDrivenConfigFactory {
-	f := &MockParametersDrivenConfigFactory{}
-	f.Init("", name, &parametersv1alpha1.ParameterDrivenConfigRender{
-		Spec: parametersv1alpha1.ParameterDrivenConfigRenderSpec{
+func NewParamConfigRendererFactory(name string) *MockParamConfigRendererFactory {
+	f := &MockParamConfigRendererFactory{}
+	f.Init("", name, &parametersv1alpha1.ParamConfigRenderer{
+		Spec: parametersv1alpha1.ParamConfigRendererSpec{
 			Configs: []parametersv1alpha1.ComponentConfigDescription{
 				{
 					Name: MysqlConfigFile,
@@ -48,17 +48,17 @@ func NewParametersDrivenConfigFactory(name string) *MockParametersDrivenConfigFa
 	return f
 }
 
-func (f *MockParametersDrivenConfigFactory) SetParametersDefs(paramsDefs ...string) *MockParametersDrivenConfigFactory {
+func (f *MockParamConfigRendererFactory) SetParametersDefs(paramsDefs ...string) *MockParamConfigRendererFactory {
 	f.Get().Spec.ParametersDefs = paramsDefs
 	return f
 }
 
-func (f *MockParametersDrivenConfigFactory) SetComponentDefinition(cmpd string) *MockParametersDrivenConfigFactory {
+func (f *MockParamConfigRendererFactory) SetComponentDefinition(cmpd string) *MockParamConfigRendererFactory {
 	f.Get().Spec.ComponentDef = cmpd
 	return f
 }
 
-func (f *MockParametersDrivenConfigFactory) safeGetConfigDescription(key string) *parametersv1alpha1.ComponentConfigDescription {
+func (f *MockParamConfigRendererFactory) safeGetConfigDescription(key string) *parametersv1alpha1.ComponentConfigDescription {
 	desc := intctrlutil.GetComponentConfigDescription(&f.Get().Spec, key)
 	if desc != nil {
 		return desc
@@ -69,39 +69,33 @@ func (f *MockParametersDrivenConfigFactory) safeGetConfigDescription(key string)
 	return intctrlutil.GetComponentConfigDescription(&f.Get().Spec, key)
 }
 
-func (f *MockParametersDrivenConfigFactory) SetConfigDescription(key, tpl string, formatter parametersv1alpha1.FileFormatConfig) *MockParametersDrivenConfigFactory {
+func (f *MockParamConfigRendererFactory) SetConfigDescription(key, tpl string, formatter parametersv1alpha1.FileFormatConfig) *MockParamConfigRendererFactory {
 	desc := f.safeGetConfigDescription(key)
 	desc.TemplateName = tpl
 	desc.FileFormatConfig = formatter.DeepCopy()
 	return f
 }
 
-func (f *MockParametersDrivenConfigFactory) SetTemplateName(tpl string) *MockParametersDrivenConfigFactory {
+func (f *MockParamConfigRendererFactory) SetTemplateName(tpl string) *MockParamConfigRendererFactory {
 	desc := f.safeGetConfigDescription(MysqlConfigFile)
 	desc.TemplateName = tpl
 	return f
 }
 
-func (f *MockParametersDrivenConfigFactory) HScaleEnabled() *MockParametersDrivenConfigFactory {
+func (f *MockParamConfigRendererFactory) HScaleEnabled() *MockParamConfigRendererFactory {
 	desc := f.safeGetConfigDescription(MysqlConfigFile)
 	desc.ReRenderResourceTypes = append(desc.ReRenderResourceTypes, parametersv1alpha1.ComponentHScaleType)
 	return f
 }
 
-func (f *MockParametersDrivenConfigFactory) TLSEnabled() *MockParametersDrivenConfigFactory {
+func (f *MockParamConfigRendererFactory) TLSEnabled() *MockParamConfigRendererFactory {
 	desc := f.safeGetConfigDescription(MysqlConfigFile)
 	desc.ReRenderResourceTypes = append(desc.ReRenderResourceTypes, parametersv1alpha1.ComponentTLSType)
 	return f
 }
 
-func (f *MockParametersDrivenConfigFactory) VScaleEnabled() *MockParametersDrivenConfigFactory {
+func (f *MockParamConfigRendererFactory) VScaleEnabled() *MockParamConfigRendererFactory {
 	desc := f.safeGetConfigDescription(MysqlConfigFile)
 	desc.ReRenderResourceTypes = append(desc.ReRenderResourceTypes, parametersv1alpha1.ComponentVScaleType)
-	return f
-}
-
-func (f *MockParametersDrivenConfigFactory) SetInjectEnv(containers ...string) *MockParametersDrivenConfigFactory {
-	desc := f.safeGetConfigDescription(MysqlConfigFile)
-	desc.InjectEnvTo = containers
 	return f
 }

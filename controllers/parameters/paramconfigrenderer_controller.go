@@ -36,16 +36,16 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/generics"
 )
 
-// ParameterDrivenConfigRenderReconciler reconciles a ParameterDrivenConfigRender object
+// ParameterDrivenConfigRenderReconciler reconciles a ParamConfigRenderer object
 type ParameterDrivenConfigRenderReconciler struct {
 	client.Client
 	Scheme   *runtime.Scheme
 	Recorder record.EventRecorder
 }
 
-// +kubebuilder:rbac:groups=parameters.kubeblocks.io,resources=parameterdrivenconfigrenders,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=parameters.kubeblocks.io,resources=parameterdrivenconfigrenders/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=parameters.kubeblocks.io,resources=parameterdrivenconfigrenders/finalizers,verbs=update
+// +kubebuilder:rbac:groups=parameters.kubeblocks.io,resources=paramconfigrenderers,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=parameters.kubeblocks.io,resources=paramconfigrenderers/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=parameters.kubeblocks.io,resources=paramconfigrenderers/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -59,10 +59,10 @@ func (r *ParameterDrivenConfigRenderReconciler) Reconcile(ctx context.Context, r
 		Recorder: r.Recorder,
 		Log: log.FromContext(ctx).
 			WithName("ParameterDrivenConfigRenderReconciler").
-			WithValues("ParameterDrivenConfigRender", req.Name),
+			WithValues("ParamConfigRenderer", req.Name),
 	}
 
-	parameterTemplate := &parametersv1alpha1.ParameterDrivenConfigRender{}
+	parameterTemplate := &parametersv1alpha1.ParamConfigRenderer{}
 	if err := r.Client.Get(reqCtx.Ctx, reqCtx.Req.NamespacedName, parameterTemplate); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
@@ -77,11 +77,11 @@ func (r *ParameterDrivenConfigRenderReconciler) Reconcile(ctx context.Context, r
 // SetupWithManager sets up the controller with the Manager.
 func (r *ParameterDrivenConfigRenderReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&parametersv1alpha1.ParameterDrivenConfigRender{}).
+		For(&parametersv1alpha1.ParamConfigRenderer{}).
 		Complete(r)
 }
 
-func (r *ParameterDrivenConfigRenderReconciler) reconcile(reqCtx intctrlutil.RequestCtx, parameterTemplate *parametersv1alpha1.ParameterDrivenConfigRender) (ctrl.Result, error) {
+func (r *ParameterDrivenConfigRenderReconciler) reconcile(reqCtx intctrlutil.RequestCtx, parameterTemplate *parametersv1alpha1.ParamConfigRenderer) (ctrl.Result, error) {
 	if intctrlutil.ParametersDrivenConfigRenderTerminalPhases(parameterTemplate.Status, parameterTemplate.Generation) {
 		return intctrlutil.Reconciled()
 	}
@@ -101,7 +101,7 @@ func (r *ParameterDrivenConfigRenderReconciler) reconcile(reqCtx intctrlutil.Req
 	return intctrlutil.Reconciled()
 }
 
-func (r *ParameterDrivenConfigRenderReconciler) validate(ctx intctrlutil.RequestCtx, cli client.Client, parameterTemplate *parametersv1alpha1.ParameterDrivenConfigRenderSpec) error {
+func (r *ParameterDrivenConfigRenderReconciler) validate(ctx intctrlutil.RequestCtx, cli client.Client, parameterTemplate *parametersv1alpha1.ParamConfigRendererSpec) error {
 	cmpd := &appsv1.ComponentDefinition{}
 	if err := cli.Get(ctx.Ctx, client.ObjectKey{Name: parameterTemplate.ComponentDef}, cmpd); err != nil {
 		return err
@@ -141,15 +141,15 @@ func validateParametersDefs(reqCtx intctrlutil.RequestCtx, cli client.Client, pa
 	return nil
 }
 
-func (r *ParameterDrivenConfigRenderReconciler) available(ctx context.Context, cli client.Client, parameterTemplate *parametersv1alpha1.ParameterDrivenConfigRender) error {
+func (r *ParameterDrivenConfigRenderReconciler) available(ctx context.Context, cli client.Client, parameterTemplate *parametersv1alpha1.ParamConfigRenderer) error {
 	return r.status(ctx, cli, parameterTemplate, parametersv1alpha1.PDAvailablePhase, nil)
 }
 
-func (r *ParameterDrivenConfigRenderReconciler) unavailable(ctx context.Context, cli client.Client, parameterTemplate *parametersv1alpha1.ParameterDrivenConfigRender, err error) error {
+func (r *ParameterDrivenConfigRenderReconciler) unavailable(ctx context.Context, cli client.Client, parameterTemplate *parametersv1alpha1.ParamConfigRenderer, err error) error {
 	return r.status(ctx, cli, parameterTemplate, parametersv1alpha1.PDUnavailablePhase, err)
 }
 
-func (r *ParameterDrivenConfigRenderReconciler) status(ctx context.Context, cli client.Client, parameterRender *parametersv1alpha1.ParameterDrivenConfigRender, phase parametersv1alpha1.ParametersDescPhase, err error) error {
+func (r *ParameterDrivenConfigRenderReconciler) status(ctx context.Context, cli client.Client, parameterRender *parametersv1alpha1.ParamConfigRenderer, phase parametersv1alpha1.ParametersDescPhase, err error) error {
 	patch := client.MergeFrom(parameterRender.DeepCopy())
 	parameterRender.Status.ObservedGeneration = parameterRender.Generation
 	parameterRender.Status.Phase = phase

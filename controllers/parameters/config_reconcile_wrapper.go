@@ -47,7 +47,7 @@ type ReconcileContext struct {
 	Containers      []string
 	InstanceSetList []workloads.InstanceSet
 
-	ConfigRender   *parametersv1alpha1.ParameterDrivenConfigRender
+	ConfigRender   *parametersv1alpha1.ParamConfigRenderer
 	ParametersDefs map[string]*parametersv1alpha1.ParametersDefinition
 }
 

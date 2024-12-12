@@ -306,13 +306,14 @@ mycluster   demo        qdrant                         Delete               Runn
 
 1. 修改 YAML 文件中 `spec.componentSpecs.replicas` 的配置。`spec.componentSpecs.replicas` 定义了 pod 数量，修改该参数将触发集群水平扩缩容。
 
-   ```yaml
+   ```bash
    kubectl edit cluster mycluster -n demo
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: Cluster
-   metadata:
-     name: mycluster
-     namespace: demo
+   ```
+
+   在编辑器中修改 `spec.componentSpecs.replicas` 的参数值。
+
+   ```yaml
+   ...
    spec:
      clusterDefinitionRef: qdrant
      clusterVersionRef: qdrant-1.8.1
@@ -320,15 +321,7 @@ mycluster   demo        qdrant                         Delete               Runn
      - name: qdrant
        componentDefRef: qdrant
        replicas: 2 # 修改该参数值
-       volumeClaimTemplates:
-       - name: data
-         spec:
-           accessModes:
-             - ReadWriteOnce
-           resources:
-             requests:
-               storage: 1Gi
-    terminationPolicy: Delete
+   ...
    ```
 
 2. 当集群状态再次回到 `Running` 后，查看相关资源是否变更。
@@ -632,13 +625,14 @@ mycluster   demo        qdrant                         Delete               Runn
 
    `spec.componentSpecs.volumeClaimTemplates.spec.resources` 定义了 Pod 的存储资源信息，更改此值会触发磁盘扩容。
 
-   ```yaml
+   ```bash
    kubectl edit cluster mycluster -n demo
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: Cluster
-   metadata:
-     name: mycluster
-     namespace: demo
+   ```
+
+   在编辑器中修改 `spec.componentSpecs.volumeClaimTemplates.spec.resources` 的参数值。
+
+   ```yaml
+   ...
    spec:
      clusterDefinitionRef: qdrant
      clusterVersionRef: qdrant-1.8.1
@@ -655,6 +649,7 @@ mycluster   demo        qdrant                         Delete               Runn
              requests:
                storage: 40Gi # 修改该参数值
      terminationPolicy: Delete
+   ...
    ```
 
 2. 查看对应的集群资源是否变更。
@@ -807,16 +802,14 @@ mycluster   demo        qdrant                         Delete               Runn
 
    <TabItem value="编辑集群 YAML 文件" label="编辑集群 YAML 文件">
 
+   ```bash
+   kubectl edit cluster mycluster -n demo
+   ```
+
    将 replicas 设为 0，删除 pods。
 
    ```yaml
-   kubectl edit cluster mycluster -n demo
-   >
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: Cluster
-   metadata:
-     name: mycluster
-     namespace: demo
+   ...
    spec:
      clusterDefinitionRef: qdrant
      clusterVersionRef: qdrant-1.8.1
@@ -825,8 +818,8 @@ mycluster   demo        qdrant                         Delete               Runn
      - name: qdrant
        componentDefRef: qdrant
        disableExporter: true  
-       replicas: 0
-   ......
+       replicas: 0 # 修改该参数值
+   ...
    ```
 
    </TabItem>
@@ -888,16 +881,14 @@ mycluster   demo        qdrant                         Delete               Runn
 
    <TabItem value="编辑集群 YAML 文件" label="编辑集群 YAML 文件">
 
+   ```bash
+   kubectl edit cluster mycluster -n demo
+   ```
+
    将 replicas 修改为停止集群前的数量，再次启动集群。
 
    ```yaml
-   kubectl edit cluster mycluster -n demo
-   >
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: Cluster
-   metadata:
-     name: mycluster
-     namespace: demo
+   ...
    spec:
      clusterDefinitionRef: qdrant
      clusterVersionRef: qdrant-1.8.1
@@ -907,7 +898,7 @@ mycluster   demo        qdrant                         Delete               Runn
        componentDefRef: qdrant
        disableExporter: true  
        replicas: 1
-   ......
+   ...
    ```
 
    </TabItem>

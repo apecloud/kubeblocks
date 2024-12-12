@@ -229,6 +229,9 @@ var _ = Describe("OpsRequest Controller", func() {
 				SetDefaultSpec().
 				Create(&testCtx).
 				GetObject()
+
+			By("Mock kb-agent client for the default transformer of system accounts provision")
+			testapps.MockKBAgentClientDefault()
 		})
 
 		It("create cluster by resource, vertical scaling by resource", func() {

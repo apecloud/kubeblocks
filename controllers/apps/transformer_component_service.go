@@ -43,6 +43,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 var (
@@ -201,12 +202,13 @@ func (t *componentServiceTransformer) buildService(comp *appsv1.Component,
 
 	serviceFullName := constant.GenerateComponentServiceName(synthesizeComp.ClusterName, synthesizeComp.Name, service.ServiceName)
 	builder := builder.NewServiceBuilder(namespace, serviceFullName).
-		AddLabelsInMap(constant.GetCompLabels(clusterName, compName)).
-		AddLabelsInMap(synthesizeComp.DynamicLabels).
+		// Priority: static < dynamic < built-in
 		AddLabelsInMap(synthesizeComp.StaticLabels).
-		AddAnnotationsInMap(service.Annotations).
-		AddAnnotationsInMap(synthesizeComp.DynamicAnnotations).
+		AddLabelsInMap(synthesizeComp.DynamicLabels).
+		AddLabelsInMap(constant.GetCompLabels(clusterName, compName)).
 		AddAnnotationsInMap(synthesizeComp.StaticAnnotations).
+		AddAnnotationsInMap(synthesizeComp.DynamicAnnotations).
+		AddAnnotationsInMap(service.Annotations).
 		SetSpec(&service.Spec).
 		AddSelectorsInMap(t.builtinSelector(comp)).
 		Optimize4ExternalTraffic()
@@ -307,10 +309,12 @@ func (t *componentServiceTransformer) createOrUpdateService(ctx graph.TransformC
 		}
 
 		newSvc := originSvc.DeepCopy()
-		newSvc.Spec = service.Spec
+		intctrlutil.MergeMetadataMapInplace(service.Labels, &newSvc.Labels)
+		intctrlutil.MergeMetadataMapInplace(service.Annotations, &newSvc.Annotations)
 
 		// if skip immutable check, update the service directly
 		if skipImmutableCheckForComponentService(originSvc) {
+			newSvc.Spec = service.Spec
 			resolveServiceDefaultFields(&originSvc.Spec, &newSvc.Spec)
 			if !reflect.DeepEqual(originSvc, newSvc) {
 				graphCli.Update(dag, originSvc, newSvc, inDataContext4G())
@@ -318,22 +322,12 @@ func (t *componentServiceTransformer) createOrUpdateService(ctx graph.TransformC
 			return nil
 		}
 		// otherwise only support to update the override params defined in cluster.spec.componentSpec[].services
-
-		overrideMutableParams := func(originSvc, newSvc *corev1.Service) {
-			newSvc.Spec.Type = originSvc.Spec.Type
-			newSvc.Name = originSvc.Name
-			newSvc.Spec.Selector = originSvc.Spec.Selector
-			newSvc.Annotations = originSvc.Annotations
-		}
-
-		// modify mutable field of newSvc to check if it is overridable
-		overrideMutableParams(originSvc, newSvc)
-		if !reflect.DeepEqual(originSvc, newSvc) {
+		overrideMutableParams := func() {
 			// other fields are immutable, we can't update the service
-			return nil
+			newSvc.Spec.Type = service.Spec.Type
+			newSvc.Spec.Selector = service.Spec.Selector
 		}
-
-		overrideMutableParams(service, newSvc)
+		overrideMutableParams()
 		if !reflect.DeepEqual(originSvc, newSvc) {
 			graphCli.Update(dag, originSvc, newSvc, inDataContext4G())
 		}

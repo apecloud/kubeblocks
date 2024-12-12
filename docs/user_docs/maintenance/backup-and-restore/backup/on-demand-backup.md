@@ -19,25 +19,7 @@ The following command uses the `xtrabackup` backup method to create a backup nam
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-```bash
-# Create a backup
-kbcli cluster backup mysql-cluster --name mybackup --method xtrabackup
->
-Backup mybackup created successfully, you can view the progress:
-        kbcli cluster list-backups --name=mybackup -n default
-        
-# View the backup
-kbcli cluster list-backups --name=mybackup -n default
->
-NAME       NAMESPACE   SOURCE-CLUSTER   METHOD       STATUS      TOTAL-SIZE   DURATION   CREATE-TIME                  COMPLETION-TIME              EXPIRATION
-mybackup   default     mysql-cluster    xtrabackup   Completed   4426858      2m8s       Oct 30,2023 15:19 UTC+0800   Oct 30,2023 15:21 UTC+0800
-```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 ```bash
 # Create a backup
@@ -69,6 +51,24 @@ The `dataprotection.kubeblocks.io/connection-password` in annotations uses the p
 
 </TabItem>
 
+<TabItem value="kbcli" label="kbcli">
+
+```bash
+# Create a backup
+kbcli cluster backup mysql-cluster --name mybackup --method xtrabackup
+>
+Backup mybackup created successfully, you can view the progress:
+        kbcli cluster list-backups --name=mybackup -n default
+        
+# View the backup
+kbcli cluster list-backups --name=mybackup -n default
+>
+NAME       NAMESPACE   SOURCE-CLUSTER   METHOD       STATUS      TOTAL-SIZE   DURATION   CREATE-TIME                  COMPLETION-TIME              EXPIRATION
+mybackup   default     mysql-cluster    xtrabackup   Completed   4426858      2m8s       Oct 30,2023 15:19 UTC+0800   Oct 30,2023 15:21 UTC+0800
+```
+
+</TabItem>
+
 </Tabs>
 
 ## Volume snapshot backup
@@ -77,25 +77,7 @@ To create a backup using the snapshot, the `backupMethod` in the YAML configurat
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-```bash
-# Create a backup
-kbcli cluster backup mysql-cluster --name mybackup --method volume-snapshot
->
-Backup mybackup created successfully, you can view the progress:
-        kbcli cluster list-backups --name=mybackup -n default
-        
-# View the backup
-kbcli cluster list-backups --name=mybackup -n default
->
-NAME       NAMESPACE   SOURCE-CLUSTER   METHOD            STATUS      TOTAL-SIZE   DURATION   CREATE-TIME                  COMPLETION-TIME              EXPIRATION
-mybackup   default     mysql-cluster    volume-snapshot   Completed   4426858      2m8s       Oct 30,2023 15:19 UTC+0800   Oct 30,2023 15:21 UTC+0800
-```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 ```bash
 # Create a backup
@@ -115,6 +97,24 @@ kubectl get backup mybackup
 >
 NAME       POLICY                              METHOD            REPO      STATUS      TOTAL-SIZE   DURATION   CREATION-TIME          COMPLETION-TIME        EXPIRATION-TIME
 mybackup   mycluster-mysql-backup-policy       volume-snapshot   my-repo   Completed   4426858      2m8s       2023-10-30T07:19:21Z   2023-10-30T07:21:28Z
+```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+```bash
+# Create a backup
+kbcli cluster backup mysql-cluster --name mybackup --method volume-snapshot
+>
+Backup mybackup created successfully, you can view the progress:
+        kbcli cluster list-backups --name=mybackup -n default
+        
+# View the backup
+kbcli cluster list-backups --name=mybackup -n default
+>
+NAME       NAMESPACE   SOURCE-CLUSTER   METHOD            STATUS      TOTAL-SIZE   DURATION   CREATE-TIME                  COMPLETION-TIME              EXPIRATION
+mybackup   default     mysql-cluster    volume-snapshot   Completed   4426858      2m8s       Oct 30,2023 15:19 UTC+0800   Oct 30,2023 15:21 UTC+0800
 ```
 
 </TabItem>

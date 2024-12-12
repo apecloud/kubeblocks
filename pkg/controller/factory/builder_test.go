@@ -123,9 +123,6 @@ var _ = Describe("builder", func() {
 			// test roles
 			Expect(its.Spec.Roles).Should(HaveLen(len(compDef.Spec.Roles)))
 
-			// test role probe
-			Expect(its.Spec.RoleProbe).Should(BeNil())
-
 			// test update strategy
 			Expect(its.Spec.UpdateStrategy).ShouldNot(BeNil())
 			Expect(its.Spec.UpdateStrategy.InstanceUpdatePolicy).ShouldNot(BeNil())

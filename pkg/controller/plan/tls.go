@@ -45,11 +45,12 @@ func GenerateTLSSecretName(clusterName, componentName string) string {
 func BuildTLSSecret(synthesizedComp component.SynthesizedComponent) *v1.Secret {
 	name := GenerateTLSSecretName(synthesizedComp.ClusterName, synthesizedComp.Name)
 	return builder.NewSecretBuilder(synthesizedComp.Namespace, name).
-		AddLabelsInMap(constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name)).
-		AddLabelsInMap(synthesizedComp.DynamicLabels).
+		// Priority: static < dynamic < built-in
 		AddLabelsInMap(synthesizedComp.StaticLabels).
-		AddAnnotationsInMap(synthesizedComp.DynamicAnnotations).
+		AddLabelsInMap(synthesizedComp.DynamicLabels).
+		AddLabelsInMap(constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name)).
 		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
+		AddAnnotationsInMap(synthesizedComp.DynamicAnnotations).
 		SetStringData(map[string]string{}).
 		GetObject()
 }

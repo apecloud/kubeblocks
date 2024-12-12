@@ -6,6 +6,9 @@ sidebar_position: 4
 sidebar_label: Install Addons
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # Install Addons
 
 With the release of KubeBlocks v0.8.0, Addons are decoupled from KubeBlocks and some Addons are not installed by default. If you want to use these Addons, install Addons first by index. Or if you uninstalled some Addons, you can follow the steps in this tutorial to install them again.
@@ -53,7 +56,7 @@ For example, you can install an Addon v0.9.0 with KubeBlocks v0.9.2, but using m
    helm list -A
    >
    NAME             NAMESPACE	REVISION	UPDATED                                STATUS  	 CHART                   APP VERSION
-   ......
+   ...
    kb-addon-es      kb-system	1       	2024-11-27 10:04:59.730127 +0800 CST   deployed	 elasticsearch-0.9.0     8.8.2 
    ```
 

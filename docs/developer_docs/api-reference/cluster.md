@@ -4694,26 +4694,6 @@ and ConfigConstraint applies to all keys.</p>
 </tr>
 <tr>
 <td>
-<code>legacyRenderedConfigSpec</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.LegacyRenderedTemplateSpec">
-LegacyRenderedTemplateSpec
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the secondary rendered config spec for pod-specific customization.</p>
-<p>The template is rendered inside the pod (by the &ldquo;config-manager&rdquo; sidecar container) and merged with the main
-template&rsquo;s render result to generate the final configuration file.</p>
-<p>This field is intended to handle scenarios where different pods within the same Component have
-varying configurations. It allows for pod-specific customization of the configuration.</p>
-<p>Note: This field will be deprecated in future versions, and the functionality will be moved to
-<code>cluster.spec.componentSpecs[*].instances[*]</code>.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>constraintRef</code><br/>
 <em>
 string
@@ -7054,9 +7034,6 @@ as defined in <code>componentDefinition.spec.lifecycleActions.readWrite</code>, 
 </table>
 <h3 id="apps.kubeblocks.io/v1.ConfigTemplateExtension">ConfigTemplateExtension
 </h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.LegacyRenderedTemplateSpec">LegacyRenderedTemplateSpec</a>)
-</p>
 <div>
 </div>
 <table>
@@ -8058,41 +8035,6 @@ It is required when the issuer is set to <code>UserProvided</code>.</p>
 <td><p>IssuerUserProvided indicates that the user has provided their own CA-signed certificates.</p>
 </td>
 </tr></tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1.LegacyRenderedTemplateSpec">LegacyRenderedTemplateSpec
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentConfigSpec">ComponentConfigSpec</a>)
-</p>
-<div>
-<p>LegacyRenderedTemplateSpec describes the configuration extension for the lazy rendered template.
-Deprecated: LegacyRenderedTemplateSpec has been deprecated since 0.9.0 and will be removed in 0.10.0</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>ConfigTemplateExtension</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.ConfigTemplateExtension">
-ConfigTemplateExtension
-</a>
-</em>
-</td>
-<td>
-<p>
-(Members of <code>ConfigTemplateExtension</code> are embedded into this type.)
-</p>
-<p>Extends the configuration template.</p>
-</td>
-</tr>
-</tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1.LetterCase">LetterCase
 (<code>string</code> alias)</h3>
@@ -10777,7 +10719,7 @@ until the PreTerminate action has completed successfully.</p>
 </tr>
 <tr>
 <td>
-<code>shardProvision</code><br/>
+<code>shardAdd</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.Action">
 Action
@@ -10786,13 +10728,13 @@ Action
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the hook to be executed after a shard&rsquo;s creation.</p>
+<p>Specifies the hook to be executed after a shard added.</p>
 <p>Note: This field is immutable once it has been set.</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>shardTerminate</code><br/>
+<code>shardRemove</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.Action">
 Action
@@ -10801,7 +10743,7 @@ Action
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the hook to be executed prior to terminating a shard.</p>
+<p>Specifies the hook to be executed prior to remove a shard.</p>
 <p>Note: This field is immutable once it has been set.</p>
 </td>
 </tr>
@@ -29136,20 +29078,6 @@ UpdateStrategy
 </tr>
 <tr>
 <td>
-<code>roleProbe</code><br/>
-<em>
-<a href="#workloads.kubeblocks.io/v1.RoleProbe">
-RoleProbe
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Provides method to probe role.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>membershipReconfiguration</code><br/>
 <em>
 <a href="#workloads.kubeblocks.io/v1.MembershipReconfiguration">
@@ -29232,7 +29160,7 @@ InstanceSetStatus
 <h3 id="workloads.kubeblocks.io/v1.Action">Action
 </h3>
 <p>
-(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.MembershipReconfiguration">MembershipReconfiguration</a>, <a href="#workloads.kubeblocks.io/v1.RoleProbe">RoleProbe</a>)
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.MembershipReconfiguration">MembershipReconfiguration</a>)
 </p>
 <div>
 </div>
@@ -29620,20 +29548,6 @@ UpdateStrategy
 <td>
 <em>(Optional)</em>
 <p>A list of roles defined in the system.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>roleProbe</code><br/>
-<em>
-<a href="#workloads.kubeblocks.io/v1.RoleProbe">
-RoleProbe
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Provides method to probe role.</p>
 </td>
 </tr>
 <tr>
@@ -30493,124 +30407,8 @@ bool
 </tr>
 </tbody>
 </table>
-<h3 id="workloads.kubeblocks.io/v1.RoleProbe">RoleProbe
-</h3>
-<p>
-(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>)
-</p>
-<div>
-<p>RoleProbe defines how to observe role</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>customHandler</code><br/>
-<em>
-<a href="#workloads.kubeblocks.io/v1.Action">
-[]Action
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines a custom method for role probing.
-Actions defined here are executed in series.
-Upon completion of all actions, the final output should be a single string representing the role name defined in spec.Roles.
-The latest <a href="https://busybox.net/">BusyBox</a> image will be used if Image is not configured.
-Environment variables can be used in Command:
-- v_KB_ITS_LAST<em>STDOUT: stdout from the last action, watch for &lsquo;v</em>&rsquo; prefix
-- KB_ITS_USERNAME: username part of the credential
-- KB_ITS_PASSWORD: password part of the credential</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>initialDelaySeconds</code><br/>
-<em>
-int32
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the number of seconds to wait after the container has started before initiating role probing.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>timeoutSeconds</code><br/>
-<em>
-int32
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the number of seconds after which the probe times out.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>periodSeconds</code><br/>
-<em>
-int32
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the frequency (in seconds) of probe execution.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>successThreshold</code><br/>
-<em>
-int32
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the minimum number of consecutive successes for the probe to be considered successful after having failed.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>failureThreshold</code><br/>
-<em>
-int32
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the minimum number of consecutive failures for the probe to be considered failed after having succeeded.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>roleUpdateMechanism</code><br/>
-<em>
-<a href="#workloads.kubeblocks.io/v1.RoleUpdateMechanism">
-RoleUpdateMechanism
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the method for updating the pod role label.</p>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="workloads.kubeblocks.io/v1.RoleUpdateMechanism">RoleUpdateMechanism
 (<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.RoleProbe">RoleProbe</a>)
-</p>
 <div>
 <p>RoleUpdateMechanism defines the way how pod role label being updated.</p>
 </div>

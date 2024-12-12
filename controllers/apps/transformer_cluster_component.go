@@ -27,6 +27,7 @@ import (
 	"strconv"
 	"strings"
 
+	"golang.org/x/exp/maps"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -811,6 +812,25 @@ func (h *clusterShardingHandler) updateComps(transCtx *clusterTransformContext, 
 }
 
 func (h *clusterShardingHandler) protoComps(transCtx *clusterTransformContext, name string, running *appsv1.Component) ([]*appsv1.Component, error) {
+	buildAnnotations := func(shardingName, compName string) map[string]string {
+		var annotations map[string]string
+		if compAnnotations := transCtx.annotations[compName]; len(compAnnotations) > 0 {
+			annotations = maps.Clone(compAnnotations)
+		}
+
+		// convert the sharding hostNetwork annotation to the component annotation
+		if hnKey, ok := transCtx.Cluster.Annotations[constant.HostNetworkAnnotationKey]; ok {
+			hns := strings.Split(hnKey, ",")
+			if slices.Index(hns, shardingName) >= 0 {
+				if annotations == nil {
+					annotations = make(map[string]string)
+				}
+				annotations[constant.HostNetworkAnnotationKey] = compName
+			}
+		}
+		return annotations
+	}
+
 	build := func(sharding *appsv1.ClusterSharding) ([]*appsv1.Component, error) {
 		labels := map[string]string{
 			constant.KBAppShardingNameLabelKey: sharding.Name,
@@ -824,10 +844,7 @@ func (h *clusterShardingHandler) protoComps(transCtx *clusterTransformContext, n
 		shardingComps := transCtx.shardingComps[sharding.Name]
 		for i := range shardingComps {
 			spec := shardingComps[i]
-			var annotations map[string]string
-			if transCtx.annotations != nil {
-				annotations = transCtx.annotations[spec.Name]
-			}
+			annotations := buildAnnotations(sharding.Name, spec.Name)
 			obj, err := buildComponentWrapper(transCtx, spec, labels, annotations, running)
 			if err != nil {
 				return nil, err

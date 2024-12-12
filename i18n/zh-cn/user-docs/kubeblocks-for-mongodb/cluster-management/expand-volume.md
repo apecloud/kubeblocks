@@ -85,7 +85,7 @@ mycluster        demo             mongodb               mongodb-5.0        Delet
    ```bash
    kubectl describe cluster mycluster -n demo
    >
-   ......
+   ...
    Volume Claim Templates:
       Name:  data
       Spec:
@@ -131,7 +131,7 @@ mycluster        demo             mongodb               mongodb-5.0        Delet
    ```bash
    kubectl describe cluster mycluster -n demo
    >
-   ......
+   ...
    Volume Claim Templates:
       Name:  data
       Spec:

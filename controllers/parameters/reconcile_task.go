@@ -142,7 +142,7 @@ func syncImpl(taskCtx *TaskContext,
 	revision string,
 	configMap *corev1.ConfigMap) (err error) {
 	if intctrlutil.IsApplyConfigChanged(configMap, item) {
-		return nil
+		return syncStatus(configMap, status)
 	}
 
 	failStatus := func(err error) error {

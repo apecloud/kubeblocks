@@ -323,9 +323,18 @@ func (c *itsRoleProbeConvertor) convert(args ...any) (any, error) {
 		return nil, nil
 	}
 
+	// set the default values for dual operator mode
+	timeoutSeconds := synthesizeComp.LifecycleActions.RoleProbe.TimeoutSeconds
+	periodSeconds := synthesizeComp.LifecycleActions.RoleProbe.PeriodSeconds
+	if timeoutSeconds == 0 {
+		timeoutSeconds = 1
+	}
+	if periodSeconds == 0 {
+		periodSeconds = 2
+	}
 	itsRoleProbe := &workloads.RoleProbe{
-		TimeoutSeconds:      synthesizeComp.LifecycleActions.RoleProbe.TimeoutSeconds,
-		PeriodSeconds:       synthesizeComp.LifecycleActions.RoleProbe.PeriodSeconds,
+		TimeoutSeconds:      timeoutSeconds,
+		PeriodSeconds:       periodSeconds,
 		SuccessThreshold:    1,
 		FailureThreshold:    2,
 		RoleUpdateMechanism: workloads.DirectAPIServerEventUpdate,

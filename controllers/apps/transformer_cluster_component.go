@@ -181,10 +181,8 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1.Component) *appsv1.Com
 	compProto := newCompObj
 
 	// merge labels and annotations
-	ictrlutil.MergeMetadataMapInplace(compObjCopy.Annotations, &compProto.Annotations)
-	ictrlutil.MergeMetadataMapInplace(compObjCopy.Labels, &compProto.Labels)
-	compObjCopy.Annotations = compProto.Annotations
-	compObjCopy.Labels = compProto.Labels
+	ictrlutil.MergeMetadataMapInplace(compProto.Annotations, &compObjCopy.Annotations)
+	ictrlutil.MergeMetadataMapInplace(compProto.Labels, &compObjCopy.Labels)
 
 	// merge spec
 	compObjCopy.Spec.CompDef = compProto.Spec.CompDef

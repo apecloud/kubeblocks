@@ -116,10 +116,12 @@ func IsAPIVersionSupported(apiVersion string) bool {
 }
 
 func ObjectAPIVersionSupported(obj client.Object) bool {
-	if IsAPIVersionSupported(obj.GetAnnotations()[constant.CRDAPIVersionAnnotationKey]) {
+	crdAPIVersion := obj.GetAnnotations()[constant.CRDAPIVersionAnnotationKey]
+	if IsAPIVersionSupported(crdAPIVersion) {
 		return true
 	}
-	if reflect.TypeOf(obj) == reflect.TypeOf(&appsv1.Cluster{}) {
+	if reflect.TypeOf(obj) == reflect.TypeOf(&appsv1.Cluster{}) &&
+		len(crdAPIVersion) == 0 {
 		return true // to resolve the CRD API version of the cluster
 	}
 	return false

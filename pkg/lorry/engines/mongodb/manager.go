@@ -284,8 +284,7 @@ func (mgr *Manager) IsDBStartupReady() bool {
 func (mgr *Manager) GetMemberState(ctx context.Context) (string, error) {
 	status, err := mgr.GetReplSetStatus(ctx)
 	if err != nil {
-		mgr.Logger.Info("rs.status() error", "error", err.Error())
-		return "", err
+		return "", errors.Wrap(err, "rs.status() failed")
 	}
 
 	self := status.GetSelf()

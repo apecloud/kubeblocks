@@ -169,9 +169,6 @@ func (s *CheckRole) Do(ctx context.Context, _ *operations.OpsRequest) (*operatio
 	// When network partition occurs, the new primary needs to send global role change information to the controller.
 	isLeader, err := manager.IsLeader(ctx, cluster)
 	if err != nil {
-		if err != models.ErrNotImplemented {
-			return nil, err
-		}
 		isLeader = models.IsLikelyPrimaryRole(role)
 	}
 

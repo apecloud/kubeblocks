@@ -38,7 +38,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
-	"github.com/apecloud/kubeblocks/pkg/controller/scheduling"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dputils "github.com/apecloud/kubeblocks/pkg/dataprotection/utils"
 )
@@ -203,10 +202,6 @@ func (r *RestoreManager) BuildPrepareDataRestore(comp *component.SynthesizedComp
 	if len(templates) == 0 {
 		return nil, nil
 	}
-	schedulingSpec, err := r.buildSchedulingSpec(comp)
-	if err != nil {
-		return nil, err
-	}
 	sourceTargetName := comp.Annotations[constant.BackupSourceTargetAnnotationKey]
 	sourceTarget := dputils.GetBackupStatusTarget(backupObj, sourceTargetName)
 	restore := &dpv1alpha1.Restore{
@@ -221,7 +216,7 @@ func (r *RestoreManager) BuildPrepareDataRestore(comp *component.SynthesizedComp
 			Env:         r.env,
 			PrepareDataConfig: &dpv1alpha1.PrepareDataConfig{
 				RequiredPolicyForAllPodSelection: r.buildRequiredPolicy(sourceTarget),
-				SchedulingSpec:                   schedulingSpec,
+				SchedulingSpec:                   r.buildSchedulingSpec(comp),
 				VolumeClaimRestorePolicy:         r.volumeRestorePolicy,
 				RestoreVolumeClaimsTemplate: &dpv1alpha1.RestoreVolumeClaimsTemplate{
 					Replicas:      r.replicas,
@@ -296,24 +291,15 @@ func (r *RestoreManager) buildRequiredPolicy(sourceTarget *dpv1alpha1.BackupStat
 	return requiredPolicy
 }
 
-func (r *RestoreManager) buildSchedulingSpec(comp *component.SynthesizedComponent) (dpv1alpha1.SchedulingSpec, error) {
-	var err error
-	shardingName := comp.Labels[constant.KBAppShardingNameLabelKey]
-	var compSpec *appsv1alpha1.ClusterComponentSpec
-	if shardingName != "" {
-		compSpec = &r.Cluster.Spec.GetShardingByName(shardingName).Template
-	} else {
-		compSpec = r.Cluster.Spec.GetComponentByName(comp.Name)
-	}
-	schedulingPolicy, err := scheduling.BuildSchedulingPolicy(r.Cluster, compSpec)
-	if err != nil {
-		return dpv1alpha1.SchedulingSpec{}, err
+func (r *RestoreManager) buildSchedulingSpec(comp *component.SynthesizedComponent) dpv1alpha1.SchedulingSpec {
+	if comp.PodSpec == nil {
+		return dpv1alpha1.SchedulingSpec{}
 	}
 	return dpv1alpha1.SchedulingSpec{
-		Affinity:                  schedulingPolicy.Affinity,
-		Tolerations:               schedulingPolicy.Tolerations,
-		TopologySpreadConstraints: schedulingPolicy.TopologySpreadConstraints,
-	}, nil
+		Affinity:                  comp.PodSpec.Affinity,
+		Tolerations:               comp.PodSpec.Tolerations,
+		TopologySpreadConstraints: comp.PodSpec.TopologySpreadConstraints,
+	}
 }
 
 func (r *RestoreManager) GetRestoreObjectMeta(comp *component.SynthesizedComponent, stage dpv1alpha1.RestoreStage, templateName string) metav1.ObjectMeta {

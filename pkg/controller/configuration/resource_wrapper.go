@@ -23,7 +23,6 @@ import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -81,15 +80,11 @@ func (r *ResourceFetcher[T]) ComponentAndComponentDef() *T {
 	}
 	return r.Wrap(func() error {
 		r.ComponentObj = &appsv1.Component{}
-		err := r.Client.Get(r.Context, componentKey, r.ComponentObj, inDataContext())
-		if apierrors.IsNotFound(err) {
-			return nil
-		} else if err != nil {
+		if err := r.Client.Get(r.Context, componentKey, r.ComponentObj, inDataContext()); err != nil {
 			return err
 		}
-
 		if len(r.ComponentObj.Spec.CompDef) == 0 {
-			return nil
+			return fmt.Errorf("componentDefinition not found in component: %s", r.ComponentObj.Name)
 		}
 
 		compDefKey := types.NamespacedName{

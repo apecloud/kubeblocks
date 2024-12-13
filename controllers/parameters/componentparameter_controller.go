@@ -186,7 +186,7 @@ func (r *ComponentParameterReconciler) deletionHandler(reqCtx intctrlutil.Reques
 	return func() (*ctrl.Result, error) {
 		var cms = &corev1.ConfigMapList{}
 		matchLabels := client.MatchingLabels(constant.GetCompLabels(componentParameter.Spec.ClusterName, componentParameter.Spec.ComponentName))
-		if err := r.Client.List(reqCtx.Ctx, cms, client.InNamespace(componentParameter.Name), matchLabels); err != nil {
+		if err := r.Client.List(reqCtx.Ctx, cms, client.InNamespace(componentParameter.Namespace), matchLabels); err != nil {
 			return &reconcile.Result{}, err
 		}
 		if err := removeConfigRelatedFinalizer(reqCtx.Ctx, r.Client, cms.Items); err != nil {

@@ -798,12 +798,3 @@ func GetRunningOpsByOpsType(ctx context.Context, cli client.Client,
 	}
 	return runningOpsList, nil
 }
-
-// getComponentDefByName gets ComponentDefinition with compDefName
-func getComponentDefByName(ctx context.Context, cli client.Client, compDefName string) (*appsv1.ComponentDefinition, error) {
-	compDef := &appsv1.ComponentDefinition{}
-	if err := cli.Get(ctx, types.NamespacedName{Name: compDefName}, compDef); err != nil {
-		return nil, err
-	}
-	return compDef, nil
-}

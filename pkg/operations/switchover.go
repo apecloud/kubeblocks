@@ -39,7 +39,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/component/lifecycle"
-	"github.com/apecloud/kubeblocks/pkg/controllerutil"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -118,18 +117,18 @@ func switchoverPreCheck(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes
 		}
 
 		if synthesizedComp.LifecycleActions == nil || synthesizedComp.LifecycleActions.Switchover == nil {
-			return controllerutil.NewFatalError(fmt.Sprintf(`the component "%s" does not define switchover lifecycle action`, switchover.ComponentName))
+			return intctrlutil.NewFatalError(fmt.Sprintf(`the component "%s" does not define switchover lifecycle action`, switchover.ComponentName))
 		}
 
 		if len(synthesizedComp.Roles) == 0 {
-			return controllerutil.NewFatalError(fmt.Sprintf(`the component "%s" does not have any role`, switchover.ComponentName))
+			return intctrlutil.NewFatalError(fmt.Sprintf(`the component "%s" does not have any role`, switchover.ComponentName))
 		}
 
 		getPod := func(name string) (*corev1.Pod, error) {
 			pod := &corev1.Pod{}
 			if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Namespace: synthesizedComp.Namespace, Name: name}, pod); err != nil {
 				if apierrors.IsNotFound(err) {
-					return nil, controllerutil.NewFatalError(err.Error())
+					return nil, intctrlutil.NewFatalError(err.Error())
 				}
 				return nil, fmt.Errorf("get pod %s/%s failed, err: %s", synthesizedComp.Namespace, name, err.Error())
 			}
@@ -138,7 +137,7 @@ func switchoverPreCheck(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes
 
 		checkOwnership := func(pod *corev1.Pod) error {
 			if pod.Labels[constant.AppInstanceLabelKey] != synthesizedComp.ClusterName || component.GetComponentNameFromObj(pod) != switchover.ComponentName {
-				return controllerutil.NewFatalError(fmt.Sprintf(`the pod "%s" not belongs to the component "%s"`, switchover.InstanceName, switchover.ComponentName))
+				return intctrlutil.NewFatalError(fmt.Sprintf(`the pod "%s" not belongs to the component "%s"`, switchover.InstanceName, switchover.ComponentName))
 			}
 			return nil
 		}
@@ -152,7 +151,7 @@ func switchoverPreCheck(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes
 		}
 		roleName, ok := pod.Labels[constant.RoleLabelKey]
 		if !ok || roleName == "" {
-			return controllerutil.NewFatalError(fmt.Sprintf("pod %s cannot perform switchover because it does not have a role label", switchover.InstanceName))
+			return intctrlutil.NewFatalError(fmt.Sprintf("pod %s cannot perform switchover because it does not have a role label", switchover.InstanceName))
 		}
 
 		if switchover.CandidateName != "" {

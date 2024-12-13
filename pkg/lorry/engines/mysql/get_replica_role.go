@@ -33,7 +33,7 @@ func (mgr *Manager) GetReplicaRole(ctx context.Context, cluster *dcs.Cluster) (s
 		return "", errors.New("cluster not found")
 	}
 	if cluster.HaConfig != nil && !cluster.HaConfig.IsEnable() {
-		return "", errors.New("cluster's ha is disabled")
+		return mgr.GetReplicaRoleFromDB(ctx)
 	}
 
 	leader, err := dcs.GetStore().GetLeader()

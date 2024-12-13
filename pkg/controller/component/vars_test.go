@@ -294,8 +294,7 @@ var _ = Describe("vars", func() {
 		It("host-network vars", func() {
 			vars := []appsv1.EnvVar{
 				{
-					Name:  "host-network-port",
-					Value: "3306", // default value
+					Name: "host-network-port",
 					ValueFrom: &appsv1.VarSource{
 						HostNetworkVarRef: &appsv1.HostNetworkVarSelector{
 							ClusterObjectReference: appsv1.ClusterObjectReference{
@@ -345,8 +344,7 @@ var _ = Describe("vars", func() {
 			By("w/ default value - has host-network port")
 			vars = []appsv1.EnvVar{
 				{
-					Name:  "host-network-port",
-					Value: "3306", // default value
+					Name: "host-network-port",
 					ValueFrom: &appsv1.VarSource{
 						HostNetworkVarRef: &appsv1.HostNetworkVarSelector{
 							ClusterObjectReference: appsv1.ClusterObjectReference{
@@ -370,12 +368,11 @@ var _ = Describe("vars", func() {
 			Expect(templateVars).Should(HaveKeyWithValue("host-network-port", "30001"))
 			checkEnvVarWithValue(envVars, "host-network-port", "30001")
 
-			By("w/ default value - back-off to default value")
-			synthesizedComp.Annotations = nil // disable the host-network
-			templateVars, envVars, err = ResolveTemplateNEnvVars(testCtx.Ctx, testCtx.Cli, synthesizedComp, vars)
-			Expect(err).Should(Succeed())
-			Expect(templateVars).Should(HaveKeyWithValue("host-network-port", "3306"))
-			checkEnvVarWithValue(envVars, "host-network-port", "3306")
+			By("both value and valueFrom are specified for var host-network-port")
+			vars[0].Value = "3306"
+			_, _, err = ResolveTemplateNEnvVars(ctx, testCtx.Cli, synthesizedComp, vars)
+			Expect(err).ShouldNot(Succeed())
+			Expect(err.Error()).Should(ContainSubstring("both value and valueFrom are specified for var host-network-port"))
 		})
 
 		Context("service vars", func() {

@@ -1251,11 +1251,10 @@ type TLS struct {
 	// +kubebuilder:validation:Required
 	MountPath string `json:"mountPath"`
 
-	// The default permissions for the mounted path.
+	// The permissions for the mounted path. Defaults to 0600.
 	//
 	// This field is immutable once set.
 	//
-	// +kubebuilder:default=0600
 	// +optional
 	DefaultMode *int32 `json:"defaultMode,omitempty"`
 

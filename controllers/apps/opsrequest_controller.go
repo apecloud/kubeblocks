@@ -352,6 +352,9 @@ func (r *OpsRequestReconciler) handleOpsReqDeletedDuringRunning(reqCtx intctrlut
 		return err
 	}
 	for _, cluster := range clusterList.Items {
+		if !intctrlutil.ObjectAPIVersionSupported(&cluster) {
+			continue
+		}
 		if err := r.cleanupOpsAnnotationForCluster(reqCtx, &cluster); err != nil {
 			return err
 		}

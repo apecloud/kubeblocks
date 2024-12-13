@@ -362,6 +362,7 @@ func buildRestartTask(configTemplate *appsv1.ComponentTemplateSpec, rctx *Reconc
 			Client:               rctx.Client,
 			ConfigTemplate:       *configTemplate,
 			ClusterComponent:     rctx.ClusterComObj,
+			Cluster:              rctx.ClusterObj,
 			SynthesizedComponent: rctx.BuiltinComponent,
 			InstanceSetUnits:     rctx.InstanceSetList,
 			ConfigMap:            rctx.ConfigMap,

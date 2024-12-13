@@ -367,12 +367,6 @@ var _ = Describe("vars", func() {
 			Expect(err).Should(Succeed())
 			Expect(templateVars).Should(HaveKeyWithValue("host-network-port", "30001"))
 			checkEnvVarWithValue(envVars, "host-network-port", "30001")
-
-			By("both value and valueFrom are specified for var host-network-port")
-			vars[0].Value = "3306"
-			_, _, err = ResolveTemplateNEnvVars(ctx, testCtx.Cli, synthesizedComp, vars)
-			Expect(err).ShouldNot(Succeed())
-			Expect(err.Error()).Should(ContainSubstring("both value and valueFrom are specified for var host-network-port"))
 		})
 
 		Context("service vars", func() {

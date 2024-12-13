@@ -26,5 +26,12 @@ import (
 )
 
 func (mgr *Manager) GetReplicaRole(ctx context.Context, cluster *dcs.Cluster) (string, error) {
-	return mgr.GetMemberState(ctx)
+	role, err := mgr.GetMemberState(ctx)
+	if err != nil {
+		mgr.Logger.Info("get replica state failed", "error", err.Error())
+		// if get replica state failed, return "" to reset the pod role
+		return "", nil
+	}
+
+	return role, nil
 }

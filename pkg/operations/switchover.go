@@ -250,7 +250,15 @@ func doSwitchover(ctx context.Context, cli client.Reader, synthesizedComp *compo
 		return err
 	}
 
-	lfa, err := lifecycle.New(synthesizedComp, nil, pods...)
+	pod := &corev1.Pod{}
+	for _, p := range pods {
+		if p.Name == switchover.InstanceName {
+			pod = p
+			break
+		}
+	}
+
+	lfa, err := lifecycle.New(synthesizedComp, pod, pods...)
 	if err != nil {
 		return err
 	}

@@ -20,12 +20,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"context"
 	"fmt"
 
+	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -33,15 +35,16 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
+	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
+	kbagentproto "github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testops "github.com/apecloud/kubeblocks/pkg/testutil/operations"
 )
 
 var _ = Describe("", func() {
 	var (
-		randomStr   = testCtx.GetRandomStr()
-		compDefName = "test-compdef-" + randomStr
-		clusterName = "test-cluster-" + randomStr
+		compDefName = "test-compdef-"
+		clusterName = "test-cluster-"
 		compDefObj  *appsv1.ComponentDefinition
 		clusterObj  *appsv1.Cluster
 	)
@@ -69,6 +72,7 @@ var _ = Describe("", func() {
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
 		testapps.ClearResources(&testCtx, generics.OpsRequestSignature, inNS, ml)
+		testapps.ClearResources(&testCtx, generics.ComponentSignature, inNS, ml)
 	}
 
 	BeforeEach(cleanEnv)
@@ -79,25 +83,34 @@ var _ = Describe("", func() {
 		BeforeEach(func() {
 			By("Create a componentDefinition obj.")
 			compDefObj = testapps.NewComponentDefinitionFactory(compDefName).
+				WithRandomName().
 				SetDefaultSpec().
+				SetLifecycleAction("Switchover", testapps.NewLifecycleAction("switchover")).
 				Create(&testCtx).
 				GetObject()
 		})
 
-		// TODO(v1.0): workload and switchover have been removed from CD/CV.
-		PIt("Test switchover OpsRequest", func() {
+		It("Test switchover OpsRequest", func() {
 			reqCtx := intctrlutil.RequestCtx{
 				Ctx:      testCtx.Ctx,
 				Recorder: k8sManager.GetEventRecorderFor("opsrequest-controller"),
 			}
-			By("Creating a cluster.")
+			By("Creating a cluster")
 			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
 				WithRandomName().
 				AddComponent(defaultCompName, compDefObj.GetName()).
 				SetReplicas(2).
 				Create(&testCtx).GetObject()
 
-			By("Creating a instanceset.")
+			By("creating a component")
+			_ = testapps.NewComponentFactory(testCtx.DefaultNamespace, clusterObj.Name+"-"+defaultCompName, compDefObj.Name).
+				AddAppManagedByLabel().
+				AddAppInstanceLabel(clusterObj.Name).
+				AddAnnotations(constant.KBAppClusterUIDKey, string(clusterObj.UID)).
+				Create(&testCtx).
+				GetObject()
+
+			By("Creating a instanceset")
 			container := corev1.Container{
 				Name:            "mock-container-name",
 				Image:           testapps.ApeCloudMySQLImage,
@@ -114,21 +127,12 @@ var _ = Describe("", func() {
 				Create(&testCtx).GetObject()
 
 			By("Creating Pods of replication.")
-			var (
-				leaderPod   *corev1.Pod
-				followerPod *corev1.Pod
-			)
 			for i := int32(0); i < *its.Spec.Replicas; i++ {
-				pod := testapps.NewPodFactory(testCtx.DefaultNamespace, fmt.Sprintf("%s-%d", its.Name, i)).
+				_ = testapps.NewPodFactory(testCtx.DefaultNamespace, fmt.Sprintf("%s-%d", its.Name, i)).
 					AddContainer(container).
 					AddLabelsInMap(its.Labels).
 					AddRoleLabel(defaultRole(i)).
 					Create(&testCtx).GetObject()
-				if pod.Labels[constant.RoleLabelKey] == constant.Leader {
-					leaderPod = pod
-				} else {
-					followerPod = pod
-				}
 			}
 
 			opsRes := &OpsResource{
@@ -147,12 +151,13 @@ var _ = Describe("", func() {
 			opsRes.Cluster = clusterObj
 
 			By("create switchover opsRequest")
-			ops := testops.NewOpsRequestObj("ops-switchover-"+randomStr, testCtx.DefaultNamespace,
+			ops := testops.NewOpsRequestObj("ops-switchover-"+testCtx.GetRandomStr(), testCtx.DefaultNamespace,
 				clusterObj.Name, opsv1alpha1.SwitchoverType)
+			instanceName := fmt.Sprintf("%s-%s-%d", clusterObj.Name, defaultCompName, 1)
 			ops.Spec.SwitchoverList = []opsv1alpha1.Switchover{
 				{
 					ComponentOps: opsv1alpha1.ComponentOps{ComponentName: defaultCompName},
-					InstanceName: fmt.Sprintf("%s-%s-%d", clusterObj.Name, defaultCompName, 1),
+					InstanceName: instanceName,
 				},
 			}
 			opsRes.OpsRequest = testops.CreateOpsRequest(ctx, testCtx, ops)
@@ -168,24 +173,18 @@ var _ = Describe("", func() {
 			By("do switchover action")
 			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
+			Expect(meta.FindStatusCondition(opsRes.OpsRequest.Status.Conditions, opsv1alpha1.ConditionTypeFailed)).Should(BeNil())
 
-			By("do reconcile switchoverAction failed because switchover job status failed")
-			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
-			Expect(err).Should(HaveOccurred())
-			Expect(err.Error()).Should(ContainSubstring("requeue to waiting for job"))
+			testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).Times(1).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+					GinkgoWriter.Printf("ActionRequest: %#v\n", req)
+					Expect(req.Parameters["KB_SWITCHOVER_CURRENT_NAME"]).Should(Equal(instanceName))
+					rsp := kbagentproto.ActionResponse{Message: "mock success"}
+					return rsp, nil
+				})
+			})
 
-			By("do reconcile switchoverAction failed because pod role label is not consistency")
-			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
-			Expect(err).Should(HaveOccurred())
-			Expect(err.Error()).Should(ContainSubstring("requeue to waiting for pod role label consistency"))
-
-			By("mock pod role label changed.")
-			Expect(testapps.ChangeObj(&testCtx, leaderPod, func(pod *corev1.Pod) {
-				pod.Labels[constant.RoleLabelKey] = constant.Follower
-			})).Should(Succeed())
-			Expect(testapps.ChangeObj(&testCtx, followerPod, func(pod *corev1.Pod) {
-				pod.Labels[constant.RoleLabelKey] = constant.Leader
-			})).Should(Succeed())
+			By("do reconcile switchover action")
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
 		})

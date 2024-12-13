@@ -71,7 +71,7 @@ func (a *switchover) name() string {
 }
 
 func (a *switchover) parameters(ctx context.Context, cli client.Reader) (map[string]string, error) {
-	// refer to ComponentLifecycleActions.Switchover's documentation for explaination of each variable.
+	// refer to ComponentLifecycleActions.Switchover's documentation for explanation of each variable.
 	m := make(map[string]string)
 	if len(a.candidatePod) > 0 {
 		compName := constant.GenerateClusterComponentName(a.clusterName, a.compName)

@@ -793,31 +793,12 @@ func GetRunningOpsByOpsType(ctx context.Context, cli client.Client,
 
 // validateSwitchoverResourceList checks if switchover resourceList is legal.
 func validateSwitchoverResourceList(ctx context.Context, cli client.Client, cluster *appsv1.Cluster, switchoverList []Switchover) error {
-	var (
-		targetRole string
-	)
 	for _, switchover := range switchoverList {
 		if switchover.InstanceName == "" {
 			return notEmptyError("switchover.instanceName")
 		}
 
 		validateBaseOnCompDef := func(compDef string) error {
-			getTargetRole := func(roles []appsv1.ReplicaRole) (string, error) {
-				targetRole = ""
-				if len(roles) == 0 {
-					return targetRole, errors.New("component has no roles definition, does not support switchover")
-				}
-				for _, role := range roles {
-					// FIXME: the assumption that only one role supports switchover may change in the future
-					if role.SwitchoverBeforeUpdate {
-						if targetRole != "" {
-							return targetRole, errors.New("componentDefinition has more than role that needs switchover before, does not support switchover")
-						}
-						targetRole = role.Name
-					}
-				}
-				return targetRole, nil
-			}
 			compDefObj, err := getComponentDefByName(ctx, cli, compDef)
 			if err != nil {
 				return err
@@ -832,27 +813,47 @@ func validateSwitchoverResourceList(ctx context.Context, cli client.Client, clus
 			if switchover.InstanceName == KBSwitchoverCandidateInstanceForAnyPod {
 				return nil
 			}
-			targetRole, err = getTargetRole(compDefObj.Spec.Roles)
+			if len(compDefObj.Spec.Roles) == 0 {
+				return errors.New("component has no roles definition, does not support switchover")
+			}
+
+			getPod := func(name string) (*corev1.Pod, error) {
+				pod := &corev1.Pod{}
+				if err := cli.Get(ctx, types.NamespacedName{Namespace: cluster.Namespace, Name: name}, pod); err != nil {
+					return nil, fmt.Errorf("get instanceName %s failed, err: %s, and check the validity of the instanceName using \"kbcli cluster list-instances\"", name, err.Error())
+				}
+				return pod, nil
+			}
+
+			checkOwnership := func(pod *corev1.Pod) error {
+				if !strings.HasPrefix(pod.Name, fmt.Sprintf("%s-%s", cluster.Name, switchover.ComponentName)) {
+					return fmt.Errorf("instanceName %s does not belong to the current component, please check the validity of the instance using \"kbcli cluster list-instances\"", switchover.InstanceName)
+				}
+				return nil
+			}
+
+			pod, err := getPod(switchover.InstanceName)
 			if err != nil {
 				return err
 			}
-			if targetRole == "" {
-				return errors.New("componentDefinition has no role is serviceable and writable, does not support switchover")
+			if err := checkOwnership(pod); err != nil {
+				return err
 			}
-			pod := &corev1.Pod{}
-			if err := cli.Get(ctx, types.NamespacedName{Namespace: cluster.Namespace, Name: switchover.InstanceName}, pod); err != nil {
-				return fmt.Errorf("get instanceName %s failed, err: %s, and check the validity of the instanceName using \"kbcli cluster list-instances\"", switchover.InstanceName, err.Error())
-			}
-			v, ok := pod.Labels[constant.RoleLabelKey]
-			if !ok || v == "" {
+			roleName, ok := pod.Labels[constant.RoleLabelKey]
+			if !ok || roleName == "" {
 				return fmt.Errorf("instanceName %s cannot be promoted because it had a invalid role label", switchover.InstanceName)
 			}
-			if v == targetRole {
-				return fmt.Errorf("instanceName %s cannot be promoted because it is already the primary or leader instance", switchover.InstanceName)
+
+			if switchover.CandidateName != "" {
+				candidatePod, err := getPod(switchover.InstanceName)
+				if err != nil {
+					return err
+				}
+				if err := checkOwnership(candidatePod); err != nil {
+					return err
+				}
 			}
-			if !strings.HasPrefix(pod.Name, fmt.Sprintf("%s-%s", cluster.Name, switchover.ComponentName)) {
-				return fmt.Errorf("instanceName %s does not belong to the current component, please check the validity of the instance using \"kbcli cluster list-instances\"", switchover.InstanceName)
-			}
+
 			return nil
 		}
 

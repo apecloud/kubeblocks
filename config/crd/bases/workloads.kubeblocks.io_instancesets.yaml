@@ -4215,17 +4215,6 @@ spec:
 
                         This field is immutable once set.
                       type: boolean
-                    switchoverBeforeUpdate:
-                      default: false
-                      description: |-
-                        SwitchoverBeforeUpdate indicates if a role switchover operation should be performed before
-                        updating or scaling in pods with this role. This is typically used for leader roles to
-                        ensure minimal disruption during updates.
-                        The default value is false.
-
-
-                        This field is immutable once set.
-                      type: boolean
                     updatePriority:
                       default: 0
                       description: |-
@@ -12426,17 +12415,6 @@ spec:
                             - 1 leader pod (participatesInQuorum=true)
                             The quorum size would be 3 (based on the 3 participating pods), allowing parallel updates
                             of 2 learners and 1 follower while maintaining quorum.
-
-
-                            This field is immutable once set.
-                          type: boolean
-                        switchoverBeforeUpdate:
-                          default: false
-                          description: |-
-                            SwitchoverBeforeUpdate indicates if a role switchover operation should be performed before
-                            updating or scaling in pods with this role. This is typically used for leader roles to
-                            ensure minimal disruption during updates.
-                            The default value is false.
 
 
                             This field is immutable once set.

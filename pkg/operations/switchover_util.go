@@ -28,9 +28,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -49,13 +49,13 @@ func needDoSwitchover(ctx context.Context,
 	cli client.Client,
 	synthesizedComp *component.SynthesizedComponent,
 	switchover *opsv1alpha1.Switchover) (bool, error) {
-	pod, err := getPodToPerformSwitchover(ctx, cli, synthesizedComp)
-	if err != nil {
-		return false, err
-	}
-	if pod == nil {
-		return false, nil
-	}
+	// pod, err := getPodToPerformSwitchover(ctx, cli, synthesizedComp)
+	// if err != nil {
+	// 	return false, err
+	// }
+	// if pod == nil {
+	// 	return false, nil
+	// }
 	switch switchover.InstanceName {
 	case KBSwitchoverCandidateInstanceForAnyPod:
 		return true, nil
@@ -71,31 +71,29 @@ func needDoSwitchover(ctx context.Context,
 			return false, controllerutil.NewFatalError(fmt.Sprintf(`the pod "%s" not belongs to the component "%s"`, switchover.InstanceName, switchover.ComponentName))
 		}
 		// If the current instance is already the primary, then no switchover will be performed.
-		if pod.Name == switchover.InstanceName {
-			return false, nil
-		}
+		// if pod.Name == switchover.InstanceName {
+		// 	return false, nil
+		// }
 	}
 	return true, nil
 }
 
-// checkPodRoleLabelConsistency checks whether the pod role label is consistent with the specified role label after switchover.
-func checkPodRoleLabelConsistency(ctx context.Context,
+func roleLabelChanged(ctx context.Context,
 	cli client.Reader,
 	synthesizedComp component.SynthesizedComponent,
 	switchover *opsv1alpha1.Switchover,
 	switchoverCondition *metav1.Condition) (bool, error) {
-	if switchover == nil || switchoverCondition == nil {
-		return false, nil
-	}
-	pod, err := getPodToPerformSwitchover(ctx, cli, &synthesizedComp)
-	if err != nil {
-		return false, err
-	}
-	if pod == nil {
-		return false, nil
+	pod := &corev1.Pod{}
+	if err := cli.Get(ctx, types.NamespacedName{Namespace: synthesizedComp.Namespace, Name: switchover.InstanceName}, pod); err != nil {
+		return false, fmt.Errorf("get pod %v/%v failed, err: %v", synthesizedComp.Namespace, switchover.InstanceName, err.Error())
 	}
 	var switchoverMessageMap map[string]SwitchoverMessage
 	if err := json.Unmarshal([]byte(switchoverCondition.Message), &switchoverMessageMap); err != nil {
+		return false, err
+	}
+
+	role, err := getRoleName(pod)
+	if err != nil {
 		return false, err
 	}
 
@@ -103,55 +101,19 @@ func checkPodRoleLabelConsistency(ctx context.Context,
 		if switchoverMessage.ComponentName != synthesizedComp.Name {
 			continue
 		}
-		switch switchoverMessage.Switchover.InstanceName {
-		case KBSwitchoverCandidateInstanceForAnyPod:
-			if pod.Name != switchoverMessage.OldPod {
-				return true, nil
-			}
-		default:
-			if pod.Name == switchoverMessage.Switchover.InstanceName {
-				return true, nil
-			}
+		if switchoverMessage.Role != role {
+			return true, nil
+		} else {
+			return false, nil
 		}
 	}
-	return false, nil
+	return false, errors.New("invalid switchover message")
 }
 
-// get the Pod object whose current role needs to be transferred to another pod
-func getPodToPerformSwitchover(ctx context.Context, cli client.Reader, synthesizedComp *component.SynthesizedComponent) (*corev1.Pod, error) {
-	role, err := getTargetRoleName(synthesizedComp.Roles)
-	if err != nil {
-		return nil, err
+func getRoleName(pod *corev1.Pod) (string, error) {
+	roleName, ok := pod.Labels[constant.RoleLabelKey]
+	if !ok || roleName == "" {
+		return "", fmt.Errorf("pod %s/%s does not have a invalid role label", pod.Namespace, pod.Name)
 	}
-	pod, err := getPodByRole(ctx, cli, synthesizedComp, role)
-	return pod, err
-}
-
-func getPodByRole(ctx context.Context, cli client.Reader, synthesizeComp *component.SynthesizedComponent, targetRole string) (*corev1.Pod, error) {
-	pods, err := component.ListOwnedPodsWithRole(ctx, cli, synthesizeComp.Namespace, synthesizeComp.ClusterName, synthesizeComp.Name, targetRole)
-	if err != nil {
-		return nil, err
-	}
-	if len(pods) != 1 {
-		return nil, errors.New("target pod list is empty or has more than one pod")
-	}
-	return pods[0], nil
-}
-
-// getTargetRole returns the role on which the switchover is performed
-// FIXME: the assumption that only one role supports switchover may change in the future
-func getTargetRoleName(roles []appsv1.ReplicaRole) (string, error) {
-	targetRole := ""
-	if len(roles) == 0 {
-		return targetRole, errors.New("component has no roles definition, does not support switchover")
-	}
-	for _, role := range roles {
-		if role.SwitchoverBeforeUpdate {
-			if targetRole != "" {
-				return targetRole, errors.New("componentDefinition has more than role that needs switchover before, does not support switchover")
-			}
-			targetRole = role.Name
-		}
-	}
-	return targetRole, nil
+	return roleName, nil
 }

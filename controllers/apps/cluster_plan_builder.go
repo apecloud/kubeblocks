@@ -111,9 +111,12 @@ func (c *clusterTransformContext) GetLogger() logr.Logger {
 }
 
 func (c *clusterTransformContext) sharding(name string) bool {
-	// hack: use shardingComps to determine if the entity is sharding or component
-	_, ok := c.shardingComps[name]
-	return ok
+	for _, sharding := range c.Cluster.Spec.Shardings {
+		if sharding.Name == name {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *clusterTransformContext) total() int {

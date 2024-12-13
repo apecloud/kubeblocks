@@ -340,6 +340,9 @@ func resolveClusterObjectRefVars(ctx context.Context, cli client.Reader, synthes
 	}
 	vars1, vars2 := make([]corev1.EnvVar, 0), make([]corev1.EnvVar, 0)
 	for _, v := range definedVars {
+		if len(v.Value) > 0 && v.ValueFrom != nil {
+			return nil, nil, fmt.Errorf("both value and valueFrom are specified for var %s", v.Name)
+		}
 		switch {
 		case v.ValueFrom != nil:
 			var1, var2, err := resolveClusterObjectVarRef(ctx, cli, synthesizedComp, v.Name, *v.ValueFrom, v)

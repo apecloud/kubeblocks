@@ -11232,7 +11232,7 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
-<p>The default permissions for the mounted path.</p>
+<p>The permissions for the mounted path. Defaults to 0600.</p>
 <p>This field is immutable once set.</p>
 </td>
 </tr>

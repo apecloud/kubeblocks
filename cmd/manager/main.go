@@ -429,24 +429,22 @@ func main() {
 			os.Exit(1)
 		}
 
-		if !viper.GetBool(constant.DualOperatorsMode) {
-			if err = (&appscontrollers.OpsDefinitionReconciler{
-				Client:   mgr.GetClient(),
-				Scheme:   mgr.GetScheme(),
-				Recorder: mgr.GetEventRecorderFor("ops-definition-controller"),
-			}).SetupWithManager(mgr); err != nil {
-				setupLog.Error(err, "unable to create controller", "controller", "OpsDefinition")
-				os.Exit(1)
-			}
+		if err = (&appscontrollers.OpsDefinitionReconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("ops-definition-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "OpsDefinition")
+			os.Exit(1)
+		}
 
-			if err = (&appscontrollers.OpsRequestReconciler{
-				Client:   mgr.GetClient(),
-				Scheme:   mgr.GetScheme(),
-				Recorder: mgr.GetEventRecorderFor("ops-request-controller"),
-			}).SetupWithManager(mgr); err != nil {
-				setupLog.Error(err, "unable to create controller", "controller", "OpsRequest")
-				os.Exit(1)
-			}
+		if err = (&appscontrollers.OpsRequestReconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("ops-request-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "OpsRequest")
+			os.Exit(1)
 		}
 
 		if !viper.GetBool(constant.DualOperatorsMode) {

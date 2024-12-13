@@ -47,8 +47,8 @@ var _ = Describe("Component Workload Operations Test", func() {
 	)
 
 	roles := []appsv1.ReplicaRole{
-		{Name: "leader", SwitchoverBeforeUpdate: true, UpdatePriority: 3},
-		{Name: "follower", SwitchoverBeforeUpdate: false, UpdatePriority: 2},
+		{Name: "leader", UpdatePriority: 3},
+		{Name: "follower", UpdatePriority: 2},
 	}
 
 	newDAG := func(graphCli model.GraphClient, comp *appsv1.Component) *graph.DAG {

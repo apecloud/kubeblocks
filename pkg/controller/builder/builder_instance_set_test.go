@@ -50,10 +50,9 @@ var _ = Describe("instance_set builder", func() {
 		parallelPodManagementConcurrency := &intstr.IntOrString{Type: intstr.String, StrVal: "100%"}
 		selectors := map[string]string{selectorKey4: selectorValue4}
 		role := workloads.ReplicaRole{
-			Name:                   "foo",
-			SwitchoverBeforeUpdate: true,
-			ParticipatesInQuorum:   true,
-			UpdatePriority:         1,
+			Name:                 "foo",
+			ParticipatesInQuorum: true,
+			UpdatePriority:       1,
 		}
 		reconfiguration := workloads.MembershipReconfiguration{
 			SwitchoverAction: &workloads.Action{

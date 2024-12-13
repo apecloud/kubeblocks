@@ -77,16 +77,14 @@ func MockInstanceSetComponent(
 		AddContainer(corev1.Container{Name: DefaultMySQLContainerName, Image: ApeCloudMySQLImage}).
 		SetRoles([]workloads.ReplicaRole{
 			{
-				Name:                   "leader",
-				SwitchoverBeforeUpdate: true,
-				ParticipatesInQuorum:   true,
-				UpdatePriority:         5,
+				Name:                 "leader",
+				ParticipatesInQuorum: true,
+				UpdatePriority:       5,
 			},
 			{
-				Name:                   "follower",
-				SwitchoverBeforeUpdate: false,
-				ParticipatesInQuorum:   true,
-				UpdatePriority:         4,
+				Name:                 "follower",
+				ParticipatesInQuorum: true,
+				UpdatePriority:       4,
 			},
 		}).Create(testCtx).GetObject()
 }

@@ -209,22 +209,19 @@ var (
 		UpdateStrategy: &[]appsv1.UpdateStrategy{appsv1.BestEffortParallelStrategy}[0],
 		Roles: []appsv1.ReplicaRole{
 			{
-				Name:                   "leader",
-				SwitchoverBeforeUpdate: true,
-				ParticipatesInQuorum:   true,
-				UpdatePriority:         5,
+				Name:                 "leader",
+				ParticipatesInQuorum: true,
+				UpdatePriority:       5,
 			},
 			{
-				Name:                   "follower",
-				SwitchoverBeforeUpdate: false,
-				ParticipatesInQuorum:   true,
-				UpdatePriority:         4,
+				Name:                 "follower",
+				ParticipatesInQuorum: true,
+				UpdatePriority:       4,
 			},
 			{
-				Name:                   "learner",
-				SwitchoverBeforeUpdate: false,
-				ParticipatesInQuorum:   false,
-				UpdatePriority:         2,
+				Name:                 "learner",
+				ParticipatesInQuorum: false,
+				UpdatePriority:       2,
 			},
 		},
 		Exporter: &appsv1.Exporter{

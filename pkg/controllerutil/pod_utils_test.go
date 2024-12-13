@@ -626,7 +626,6 @@ var _ = Describe("pod utils", func() {
 				AddAppComponentLabel(compName).
 				AddAppManagedByLabel().
 				AddRoleLabel(role).
-				AddAccessModeLabel(mode).
 				AddControllerRevisionHashLabel("").
 				AddVolume(corev1.Volume{
 					Name: testapps.DataVolumeName,

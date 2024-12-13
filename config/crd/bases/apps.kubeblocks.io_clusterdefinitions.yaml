@@ -9001,6 +9001,12 @@ spec:
                         roleProbe:
                           description: Defines the method used to probe a role.
                           properties:
+                            builtinHandlerName:
+                              description: |-
+                                Specifies the builtin handler name to use to probe the role of the main container.
+                                Available handlers include: mysql, postgres, mongodb, redis, etcd, kafka.
+                                Use CustomHandler to define a custom role probe function if none of the built-in handlers meet the requirement.
+                              type: string
                             customHandler:
                               description: |-
                                 Defines a custom method for role probing.

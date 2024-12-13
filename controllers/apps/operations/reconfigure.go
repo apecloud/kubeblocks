@@ -30,6 +30,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -142,10 +143,37 @@ func (r *reconfigureAction) ReconcileAction(reqCtx intctrlutil.RequestCtx, cli c
 func fromReconfigureOperations(request appsv1alpha1.OpsRequestSpec, reqCtx intctrlutil.RequestCtx, cli client.Client, resource *OpsResource) (reconfigures []reconfigureParams) {
 	var operations []appsv1alpha1.Reconfigure
 
-	if request.Reconfigure != nil {
-		operations = append(operations, *request.Reconfigure)
+	shardingNameMap := map[string][]appsv1alpha1.Component{}
+	for _, shardingSpec := range resource.Cluster.Spec.ShardingSpecs {
+		components, err := intctrlutil.ListShardingComponents(reqCtx.Ctx, cli, resource.Cluster, shardingSpec.Name)
+		if err != nil {
+			continue
+		}
+		shardingNameMap[shardingSpec.Name] = components
 	}
-	operations = append(operations, request.Reconfigures...)
+
+	appendReconfigure := func(reconfigures ...appsv1alpha1.Reconfigure) {
+		for _, reconfigure := range reconfigures {
+			// Perform the same reconfigure operation on all shards
+			if _, ok := shardingNameMap[reconfigure.ComponentName]; ok {
+				for _, shardingComponents := range shardingNameMap[reconfigure.ComponentName] {
+					operations = append(operations, appsv1alpha1.Reconfigure{
+						ComponentOps: appsv1alpha1.ComponentOps{
+							ComponentName: shardingComponents.Labels[constant.KBAppComponentLabelKey],
+						},
+						Configurations: reconfigure.Configurations,
+					})
+				}
+			} else {
+				operations = append(operations, *request.Reconfigure)
+			}
+		}
+	}
+
+	if request.Reconfigure != nil {
+		appendReconfigure(*request.Reconfigure)
+	}
+	appendReconfigure(request.Reconfigures...)
 
 	for _, reconfigure := range operations {
 		if len(reconfigure.Configurations) == 0 {

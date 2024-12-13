@@ -190,6 +190,20 @@ func (r *OpsRequest) getConfigMap(ctx context.Context,
 	return cmObj, nil
 }
 
+func (r *OpsRequest) getShardingComponents(ctx context.Context,
+	k8sClient client.Client,
+	cluster *Cluster, shardingName string) ([]Component, error) {
+	compList := &ComponentList{}
+	ml := client.MatchingLabels{
+		constant.AppInstanceLabelKey:       cluster.Name,
+		constant.KBAppShardingNameLabelKey: shardingName,
+	}
+	if err := k8sClient.List(ctx, compList, client.InNamespace(cluster.Namespace), ml); err != nil {
+		return nil, err
+	}
+	return compList.Items, nil
+}
+
 // Validate validates OpsRequest
 func (r *OpsRequest) Validate(ctx context.Context,
 	k8sClient client.Client,
@@ -375,24 +389,54 @@ func (r *OpsRequest) validateReconfigureParams(ctx context.Context,
 	k8sClient client.Client,
 	cluster *Cluster,
 	reconfigure *Reconfigure) error {
-	if cluster.Spec.GetComponentByName(reconfigure.ComponentName) == nil {
+	if cluster.Spec.GetComponentByName(reconfigure.ComponentName) == nil &&
+		cluster.Spec.GetShardingByName(reconfigure.ComponentName) == nil {
 		return fmt.Errorf("component %s not found", reconfigure.ComponentName)
 	}
-	for _, configuration := range reconfigure.Configurations {
-		cmObj, err := r.getConfigMap(ctx, k8sClient, fmt.Sprintf("%s-%s-%s", r.Spec.GetClusterName(), reconfigure.ComponentName, configuration.Name))
+
+	shardingNameMap := map[string][]Component{}
+	for _, shardingSpec := range cluster.Spec.ShardingSpecs {
+		shardingComponents, err := r.getShardingComponents(ctx, k8sClient, cluster, shardingSpec.Name)
 		if err != nil {
 			return err
 		}
-		for _, key := range configuration.Keys {
-			// check add file
-			if _, ok := cmObj.Data[key.Key]; !ok && key.FileContent == "" {
-				return errors.Errorf("key %s not found in configmap %s", key.Key, configuration.Name)
+		shardingNameMap[shardingSpec.Name] = shardingComponents
+	}
+
+	validateConfiguration := func(reconfigure *Reconfigure) error {
+		for _, configuration := range reconfigure.Configurations {
+			cmObj, err := r.getConfigMap(ctx, k8sClient, fmt.Sprintf("%s-%s-%s", r.Spec.GetClusterName(), reconfigure.ComponentName, configuration.Name))
+			if err != nil {
+				return err
 			}
-			if key.FileContent == "" && len(key.Parameters) == 0 {
-				return errors.New("key.fileContent and key.parameters cannot be empty at the same time")
+			for _, key := range configuration.Keys {
+				// check add file
+				if _, ok := cmObj.Data[key.Key]; !ok && key.FileContent == "" {
+					return errors.Errorf("key %s not found in configmap %s", key.Key, configuration.Name)
+				}
+				if key.FileContent == "" && len(key.Parameters) == 0 {
+					return errors.New("key.fileContent and key.parameters cannot be empty at the same time")
+				}
 			}
 		}
+		return nil
 	}
+
+	if _, ok := shardingNameMap[reconfigure.ComponentName]; ok {
+		for _, shardingComponents := range shardingNameMap[reconfigure.ComponentName] {
+			if err := validateConfiguration(&Reconfigure{
+				ComponentOps: ComponentOps{
+					ComponentName: shardingComponents.Labels[constant.KBAppComponentLabelKey],
+				},
+				Configurations: reconfigure.Configurations,
+			}); err != nil {
+				return err
+			}
+		}
+	} else {
+		return validateConfiguration(reconfigure)
+	}
+
 	return nil
 }
 

@@ -27,8 +27,10 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -47,8 +49,9 @@ var _ OpsHandler = switchoverOpsHandler{}
 // SwitchoverMessage is the OpsRequest.Status.Condition.Message for switchover.
 type SwitchoverMessage struct {
 	opsv1alpha1.Switchover
-	OldPrimary string
-	Cluster    string
+	OldPod  string
+	Role    string
+	Cluster string
 }
 
 func init() {
@@ -72,13 +75,18 @@ func (r switchoverOpsHandler) ActionStartedCondition(reqCtx intctrlutil.RequestC
 		if err != nil {
 			return nil, err
 		}
-		pod, err := getServiceableNWritablePod(reqCtx.Ctx, cli, *synthesizedComp)
-		if err != nil {
-			return nil, err
+		pod := &corev1.Pod{}
+		if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Namespace: synthesizedComp.Namespace, Name: switchover.InstanceName}, pod); err != nil {
+			return nil, fmt.Errorf("get pod %v/%v failed, err: %v", synthesizedComp.Namespace, switchover.InstanceName, err.Error())
+		}
+		roleName, ok := pod.Labels[constant.RoleLabelKey]
+		if !ok || roleName == "" {
+			return nil, fmt.Errorf("pod %s does not have a invalid role label", switchover.InstanceName)
 		}
 		switchoverMessageMap[switchover.ComponentName] = SwitchoverMessage{
 			Switchover: switchover,
-			OldPrimary: pod.Name,
+			OldPod:     pod.Name,
+			Role:       roleName,
 			Cluster:    opsRes.Cluster.Name,
 		}
 	}
@@ -239,13 +247,14 @@ func handleSwitchover(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *
 	return nil
 }
 
+// We consider a switchover action succeeds if the role label of the pod to perform switchover has changed.
 func doSwitchover(ctx context.Context, cli client.Reader, synthesizedComp *component.SynthesizedComponent,
 	switchover *opsv1alpha1.Switchover, switchoverCondition *metav1.Condition) error {
-	consistency, err := checkPodRoleLabelConsistency(ctx, cli, *synthesizedComp, switchover, switchoverCondition)
+	changed, err := roleLabelChanged(ctx, cli, *synthesizedComp, switchover, switchoverCondition)
 	if err != nil {
 		return err
 	}
-	if consistency {
+	if changed {
 		return nil
 	}
 
@@ -259,13 +268,8 @@ func doSwitchover(ctx context.Context, cli client.Reader, synthesizedComp *compo
 		return err
 	}
 
-	var candidate string
-	if switchover.InstanceName == KBSwitchoverCandidateInstanceForAnyPod {
-		candidate = ""
-	} else {
-		candidate = switchover.InstanceName
-	}
-	err = lfa.Switchover(ctx, cli, nil, candidate)
+	// NOTE: switchover is a blocking action currently. May change to non-blocking for better performance.
+	err = lfa.Switchover(ctx, cli, nil, switchover.CandidateName)
 	if err != nil {
 		return err
 	} else {

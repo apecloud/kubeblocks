@@ -498,7 +498,7 @@ type ComponentDefinitionSpec struct {
 	//     `Immediately`, `RuntimeReady`, `ComponentReady`, and `ClusterReady`.
 	//   - `preTerminate`: Defines the hook to be executed before terminating a Component.
 	//   - `roleProbe`: Defines the procedure which is invoked regularly to assess the role of replicas.
-	//   - `switchover`: Defines the procedure for a controlled transition of leadership from the current leader to a new replica.
+	//   - `switchover`: Defines the procedure for a controlled transition of a role to a new replica.
 	//     This approach aims to minimize downtime and maintain availability in systems with a leader-follower topology,
 	//     such as before planned maintenance or upgrades on the current leader node.
 	//   - `memberJoin`: Defines the procedure to add a new replica to the replication group.
@@ -1555,15 +1555,18 @@ type ComponentLifecycleActions struct {
 	// +optional
 	AvailableProbe *Probe `json:"availableProbe,omitempty"`
 
-	// Defines the procedure for a controlled transition of leadership from the current leader to a new replica.
-	// This approach aims to minimize downtime and maintain availability in systems with a leader-follower topology,
+	// Defines the procedure for a controlled transition of a role to a new replica.
+	// This approach aims to minimize downtime and maintain availability
 	// during events such as planned maintenance or when performing stop, shutdown, restart, or upgrade operations
 	// involving the current leader node.
 	//
 	// The container executing this action has access to following variables:
 	//
-	// - KB_SWITCHOVER_CANDIDATE_NAME: The name of the pod for the new leader candidate, which may not be specified (empty).
-	// - KB_SWITCHOVER_CANDIDATE_FQDN: The FQDN of the new leader candidate's pod, which may not be specified (empty).
+	// - KB_SWITCHOVER_CANDIDATE_NAME: The name of the pod of the new role's candidate, which may not be specified (empty).
+	// - KB_SWITCHOVER_CANDIDATE_FQDN: The FQDN of the pod of the new role's candidate, which may not be specified (empty).
+	// - KB_SWITCHOVER_CURRENT_NAME: The name of the pod of the current role.
+	// - KB_SWITCHOVER_CURRENT_FQDN: The FQDN of the pod of the current role.
+	// - KB_SWITCHOVER_ROLE: The role that will be transferred to another replica.
 	//
 	// Note: This field is immutable once it has been set.
 	//
@@ -1751,7 +1754,7 @@ type ComponentLifecycleActions struct {
 //     `Immediately`, `RuntimeReady`, `ComponentReady`, and `ClusterReady`.
 //   - `preTerminate`: Defines the hook to be executed before terminating a Component.
 //   - `roleProbe`: Defines the procedure which is invoked regularly to assess the role of replicas.
-//   - `switchover`: Defines the procedure for a controlled transition of leadership from the current leader to a new replica.
+//   - `switchover`: Defines the procedure for a controlled transition of a role to a new replica.
 //     This approach aims to minimize downtime and maintain availability in systems with a leader-follower topology,
 //     such as during planned maintenance or upgrades on the current leader node.
 //   - `memberJoin`: Defines the procedure to add a new replica to the replication group.

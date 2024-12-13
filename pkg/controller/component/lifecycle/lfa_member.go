@@ -34,6 +34,9 @@ import (
 const (
 	switchoverCandidateName = "KB_SWITCHOVER_CANDIDATE_NAME"
 	switchoverCandidateFQDN = "KB_SWITCHOVER_CANDIDATE_FQDN"
+	switchoverCurrentName   = "KB_SWITCHOVER_CURRENT_NAME"
+	switchoverCurrentFQDN   = "KB_SWITCHOVER_CURRENT_FQDN"
+	switchoverRole          = "KB_SWITCHOVER_ROLE"
 	joinMemberPodFQDNVar    = "KB_JOIN_MEMBER_POD_FQDN"
 	joinMemberPodNameVar    = "KB_JOIN_MEMBER_POD_NAME"
 	leaveMemberPodFQDNVar   = "KB_LEAVE_MEMBER_POD_FQDN"
@@ -53,11 +56,13 @@ func (a *roleProbe) parameters(ctx context.Context, cli client.Reader) (map[stri
 }
 
 type switchover struct {
-	namespace   string
-	clusterName string
-	compName    string
-	roles       []appsv1.ReplicaRole
-	candidate   string
+	namespace    string
+	clusterName  string
+	compName     string
+	roles        []appsv1.ReplicaRole
+	role         string // the role that will be transferred to another replica.
+	currentPod   string
+	candidatePod string
 }
 
 var _ lifecycleAction = &switchover{}
@@ -71,15 +76,15 @@ func (a *switchover) parameters(ctx context.Context, cli client.Reader) (map[str
 	//
 	// - KB_SWITCHOVER_CANDIDATE_NAME: The name of the pod for the new leader candidate, which may not be specified (empty).
 	// - KB_SWITCHOVER_CANDIDATE_FQDN: The FQDN of the new leader candidate's pod, which may not be specified (empty).
-	m, err := hackParameters4Switchover(ctx, cli, a.namespace, a.clusterName, a.compName, a.roles)
-	if err != nil {
-		return nil, err
-	}
-	if len(a.candidate) > 0 {
+	m := make(map[string]string)
+	if len(a.candidatePod) > 0 {
 		compName := constant.GenerateClusterComponentName(a.clusterName, a.compName)
-		m[switchoverCandidateName] = a.candidate
-		m[switchoverCandidateFQDN] = component.PodFQDN(a.namespace, compName, a.candidate)
+		m[switchoverCandidateName] = a.candidatePod
+		m[switchoverCandidateFQDN] = component.PodFQDN(a.namespace, compName, a.candidatePod)
 	}
+	m[switchoverCurrentName] = a.currentPod
+	m[switchoverCurrentFQDN] = component.PodFQDN(a.namespace, a.compName, a.currentPod)
+	m[switchoverRole] = a.role
 	return m, nil
 }
 

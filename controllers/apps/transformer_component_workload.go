@@ -684,17 +684,9 @@ func (r *componentWorkloadOps) leaveMemberForPod(pod *corev1.Pod, pods []*corev1
 		if pod == nil || len(pod.Labels) == 0 {
 			return false
 		}
-		roleName, ok := pod.Labels[constant.RoleLabelKey]
-		if !ok {
-			return false
-		}
+		_, ok := pod.Labels[constant.RoleLabelKey]
 
-		for _, replicaRole := range r.runningITS.Spec.Roles {
-			if roleName == replicaRole.Name && replicaRole.IsLeader {
-				return true
-			}
-		}
-		return false
+		return ok
 	}
 
 	tryToSwitchover := func(lfa lifecycle.Lifecycle, pod *corev1.Pod) error {
@@ -708,6 +700,7 @@ func (r *componentWorkloadOps) leaveMemberForPod(pod *corev1.Pod, pods []*corev1
 			return nil
 		}
 		if err == nil {
+			// FIXME: compare role labels after switchover succeeds
 			return fmt.Errorf("switchover succeed, wait role label to be updated")
 		}
 		return err

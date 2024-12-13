@@ -21,13 +21,13 @@ package operations
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"reflect"
 	"time"
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -39,20 +39,18 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/component/lifecycle"
+	"github.com/apecloud/kubeblocks/pkg/controllerutil"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+)
+
+// switchover constants
+const (
+	KBSwitchoverKey = "Switchover"
 )
 
 type switchoverOpsHandler struct{}
 
 var _ OpsHandler = switchoverOpsHandler{}
-
-// SwitchoverMessage is the OpsRequest.Status.Condition.Message for switchover.
-type SwitchoverMessage struct {
-	opsv1alpha1.Switchover
-	OldPod  string
-	Role    string
-	Cluster string
-}
 
 func init() {
 	switchoverBehaviour := OpsBehaviour{
@@ -68,33 +66,7 @@ func init() {
 
 // ActionStartedCondition the started condition when handle the switchover request.
 func (r switchoverOpsHandler) ActionStartedCondition(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) (*metav1.Condition, error) {
-	switchoverMessageMap := make(map[string]SwitchoverMessage)
-	for _, switchover := range opsRes.OpsRequest.Spec.SwitchoverList {
-		compSpec := opsRes.Cluster.Spec.GetComponentByName(switchover.ComponentName)
-		synthesizedComp, err := buildSynthesizedComp(reqCtx.Ctx, cli, opsRes, compSpec)
-		if err != nil {
-			return nil, err
-		}
-		pod := &corev1.Pod{}
-		if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Namespace: synthesizedComp.Namespace, Name: switchover.InstanceName}, pod); err != nil {
-			return nil, fmt.Errorf("get pod %v/%v failed, err: %v", synthesizedComp.Namespace, switchover.InstanceName, err.Error())
-		}
-		roleName, ok := pod.Labels[constant.RoleLabelKey]
-		if !ok || roleName == "" {
-			return nil, fmt.Errorf("pod %s does not have a invalid role label", switchover.InstanceName)
-		}
-		switchoverMessageMap[switchover.ComponentName] = SwitchoverMessage{
-			Switchover: switchover,
-			OldPod:     pod.Name,
-			Role:       roleName,
-			Cluster:    opsRes.Cluster.Name,
-		}
-	}
-	msg, err := json.Marshal(switchoverMessageMap)
-	if err != nil {
-		return nil, err
-	}
-	return opsv1alpha1.NewSwitchoveringCondition(opsRes.Cluster.Generation, string(msg)), nil
+	return opsv1alpha1.NewSwitchoveringCondition(opsRes.Cluster.Generation, ""), nil
 }
 
 func (r switchoverOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource) error {
@@ -132,43 +104,73 @@ func (r switchoverOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.RequestCt
 // switchoverPreCheck checks whether the component need switchover.
 func switchoverPreCheck(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *OpsResource, switchoverList []opsv1alpha1.Switchover) error {
 	var (
-		opsRequest          = opsRes.OpsRequest
-		oldOpsRequestStatus = opsRequest.Status.DeepCopy()
+		opsRequest = opsRes.OpsRequest
 	)
-	patch := client.MergeFrom(opsRequest.DeepCopy())
 	if opsRequest.Status.Components == nil {
 		opsRequest.Status.Components = make(map[string]opsv1alpha1.OpsRequestComponentStatus)
 	}
+
 	for _, switchover := range switchoverList {
 		compSpec := opsRes.Cluster.Spec.GetComponentByName(switchover.ComponentName)
 		synthesizedComp, err := buildSynthesizedComp(reqCtx.Ctx, cli, opsRes, compSpec)
 		if err != nil {
 			return err
 		}
-		needSwitchover, err := needDoSwitchover(reqCtx.Ctx, cli, synthesizedComp, &switchover)
+
+		if synthesizedComp.LifecycleActions == nil || synthesizedComp.LifecycleActions.Switchover == nil {
+			return controllerutil.NewFatalError(fmt.Sprintf(`the component "%s" does not define switchover lifecycle action`, switchover.ComponentName))
+		}
+
+		if len(synthesizedComp.Roles) == 0 {
+			return controllerutil.NewFatalError(fmt.Sprintf(`the component "%s" does not have any role`, switchover.ComponentName))
+		}
+
+		getPod := func(name string) (*corev1.Pod, error) {
+			pod := &corev1.Pod{}
+			if err := cli.Get(reqCtx.Ctx, types.NamespacedName{Namespace: synthesizedComp.Namespace, Name: name}, pod); err != nil {
+				if apierrors.IsNotFound(err) {
+					return nil, controllerutil.NewFatalError(err.Error())
+				}
+				return nil, fmt.Errorf("get pod %s/%s failed, err: %s", synthesizedComp.Namespace, name, err.Error())
+			}
+			return pod, nil
+		}
+
+		checkOwnership := func(pod *corev1.Pod) error {
+			if pod.Labels[constant.AppInstanceLabelKey] != synthesizedComp.ClusterName || component.GetComponentNameFromObj(pod) != switchover.ComponentName {
+				return controllerutil.NewFatalError(fmt.Sprintf(`the pod "%s" not belongs to the component "%s"`, switchover.InstanceName, switchover.ComponentName))
+			}
+			return nil
+		}
+
+		pod, err := getPod(switchover.InstanceName)
 		if err != nil {
 			return err
 		}
-		if !needSwitchover {
-			opsRequest.Status.Components[switchover.ComponentName] = opsv1alpha1.OpsRequestComponentStatus{
-				Phase:           appsv1.RunningComponentPhase,
-				Reason:          OpsReasonForSkipSwitchover,
-				Message:         fmt.Sprintf("This component %s is already in the expected state, skip the switchover operation", switchover.ComponentName),
-				ProgressDetails: []opsv1alpha1.ProgressStatusDetail{},
-			}
-			continue
-		} else {
-			opsRequest.Status.Components[switchover.ComponentName] = opsv1alpha1.OpsRequestComponentStatus{
-				Phase:           appsv1.UpdatingComponentPhase,
-				ProgressDetails: []opsv1alpha1.ProgressStatusDetail{},
-			}
-		}
-	}
-	if !reflect.DeepEqual(*oldOpsRequestStatus, opsRequest.Status) {
-		if err := cli.Status().Patch(reqCtx.Ctx, opsRequest, patch); err != nil {
+		if err := checkOwnership(pod); err != nil {
 			return err
 		}
+		roleName, ok := pod.Labels[constant.RoleLabelKey]
+		if !ok || roleName == "" {
+			return controllerutil.NewFatalError(fmt.Sprintf("pod %s cannot perform switchover because it does not have a role label", switchover.InstanceName))
+		}
+
+		if switchover.CandidateName != "" {
+			candidatePod, err := getPod(switchover.InstanceName)
+			if err != nil {
+				return err
+			}
+			if err := checkOwnership(candidatePod); err != nil {
+				return err
+			}
+		}
+
+		opsRequest.Status.Components[switchover.ComponentName] = opsv1alpha1.OpsRequestComponentStatus{
+			Phase:           appsv1.UpdatingComponentPhase,
+			ProgressDetails: []opsv1alpha1.ProgressStatusDetail{},
+		}
 	}
+
 	return nil
 }
 
@@ -208,17 +210,10 @@ func handleSwitchover(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *
 		return errors.New("switchover condition is nil")
 	}
 
-	// Skip if the component does not need switchover
-	reason := opsRequest.Status.Components[switchover.ComponentName].Reason
-	if reason == OpsReasonForSkipSwitchover {
-		*completedCount++
-		return nil
-	}
-
 	detail := opsv1alpha1.ProgressStatusDetail{
-		ObjectKey: getProgressObjectKey(KBSwitchoverDoNCheckRoleChangeKey, switchover.ComponentName),
+		ObjectKey: getProgressObjectKey(KBSwitchoverKey, switchover.ComponentName),
 		Status:    opsv1alpha1.ProcessingProgressStatus,
-		Message:   fmt.Sprintf("do switchover for component %s and check role label", switchover.ComponentName),
+		Message:   fmt.Sprintf("do switchover for component %s", switchover.ComponentName),
 	}
 
 	synthesizedComp, err := buildSynthesizedComp(reqCtx.Ctx, cli, opsRes, opsRes.Cluster.Spec.GetComponentByName(switchover.ComponentName))
@@ -236,8 +231,8 @@ func handleSwitchover(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *
 		return handleError(reqCtx, opsRequest, &detail, switchover.ComponentName, fmt.Sprintf("build synthesizedComponent template vars failed: %s", err.Error()), failedCount)
 	}
 
-	if err = doSwitchover(reqCtx.Ctx, cli, synthesizedComp, switchover, switchoverCondition); err != nil {
-		return handleError(reqCtx, opsRequest, &detail, switchover.ComponentName, fmt.Sprintf("call switchover action and check role label failed: %s", err.Error()), failedCount)
+	if err = doSwitchover(reqCtx.Ctx, cli, synthesizedComp, switchover); err != nil {
+		return handleError(reqCtx, opsRequest, &detail, switchover.ComponentName, fmt.Sprintf("call switchover action failed: %s", err.Error()), failedCount)
 	}
 
 	*completedCount++
@@ -247,17 +242,9 @@ func handleSwitchover(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *
 	return nil
 }
 
-// We consider a switchover action succeeds if the role label of the pod to perform switchover has changed.
+// We consider a switchover action succeeds if the action returns without error. We don't need to know if a switchover is actually executed.
 func doSwitchover(ctx context.Context, cli client.Reader, synthesizedComp *component.SynthesizedComponent,
-	switchover *opsv1alpha1.Switchover, switchoverCondition *metav1.Condition) error {
-	changed, err := roleLabelChanged(ctx, cli, *synthesizedComp, switchover, switchoverCondition)
-	if err != nil {
-		return err
-	}
-	if changed {
-		return nil
-	}
-
+	switchover *opsv1alpha1.Switchover) error {
 	pods, err := component.ListOwnedPods(ctx, cli, synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name)
 	if err != nil {
 		return err
@@ -269,12 +256,7 @@ func doSwitchover(ctx context.Context, cli client.Reader, synthesizedComp *compo
 	}
 
 	// NOTE: switchover is a blocking action currently. May change to non-blocking for better performance.
-	err = lfa.Switchover(ctx, cli, nil, switchover.CandidateName)
-	if err != nil {
-		return err
-	} else {
-		return fmt.Errorf("switchover succeed, wait role label to be updated")
-	}
+	return lfa.Switchover(ctx, cli, nil, switchover.CandidateName)
 }
 
 // setComponentSwitchoverProgressDetails sets component switchover progress details.

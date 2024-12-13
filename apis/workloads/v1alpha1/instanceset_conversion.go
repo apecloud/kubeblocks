@@ -44,12 +44,12 @@ func (r *InstanceSet) ConvertTo(dstRaw conversion.Hub) error {
 		return err
 	}
 
-	if err := r.incrementConvertTo(dst); err != nil {
+	// status
+	if err := copier.Copy(&dst.Status, &r.Status); err != nil {
 		return err
 	}
 
-	// status
-	if err := copier.Copy(&dst.Status, &r.Status); err != nil {
+	if err := r.incrementConvertTo(dst); err != nil {
 		return err
 	}
 

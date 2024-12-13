@@ -90,14 +90,14 @@ var _ = Describe("", func() {
 				Ctx:      testCtx.Ctx,
 				Recorder: k8sManager.GetEventRecorderFor("opsrequest-controller"),
 			}
-			By("Creating a cluster with consensus .")
+			By("Creating a cluster.")
 			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
 				WithRandomName().
 				AddComponent(defaultCompName, compDefObj.GetName()).
 				SetReplicas(2).
 				Create(&testCtx).GetObject()
 
-			By("Creating a statefulSet.")
+			By("Creating a instanceset.")
 			container := corev1.Container{
 				Name:            "mock-container-name",
 				Image:           testapps.ApeCloudMySQLImage,

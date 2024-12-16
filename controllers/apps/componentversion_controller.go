@@ -251,15 +251,17 @@ func (r *ComponentVersionReconciler) status(cli client.Client, rctx intctrlutil.
 }
 
 func (r *ComponentVersionReconciler) supportedServiceVersions(compVersion *appsv1.ComponentVersion) string {
-	versions := map[string]bool{}
+	versionSet := sets.New[string]()
 	for _, release := range compVersion.Spec.Releases {
 		if len(release.ServiceVersion) > 0 {
-			versions[release.ServiceVersion] = true
+			versionSet.Insert(release.ServiceVersion)
 		}
 	}
-	keys := maps.Keys(versions)
-	slices.Sort(keys)
-	return strings.Join(keys, ",") // TODO(API): service versions length
+	versions := versionSet.UnsortedList()
+	slices.SortFunc(versions, func(a, b string) int {
+		return serviceVersionComparator(a, b) * -1
+	})
+	return strings.Join(versions, ",") // TODO(API): service versions length
 }
 
 func (r *ComponentVersionReconciler) updateSupportedCompDefLabels(cli client.Client, rctx intctrlutil.RequestCtx,

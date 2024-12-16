@@ -41,8 +41,9 @@ var _ = Describe("ComponentVersion Controller", func() {
 		// compDefinitionObjs []*appsv1.ComponentDefinition
 		compVersionObj *appsv1.ComponentVersion
 
-		compDefNames    = []string{testapps.CompDefName("v1.0"), testapps.CompDefName("v1.1"), testapps.CompDefName("v2.0"), testapps.CompDefName("v3.0")}
-		serviceVersions = []string{testapps.ServiceVersion("v1"), testapps.ServiceVersion("v2"), testapps.ServiceVersion("v3")}
+		compDefNames = []string{testapps.CompDefName("v1.0"), testapps.CompDefName("v1.1"), testapps.CompDefName("v2.0"), testapps.CompDefName("v3.0")}
+		// in reverse order
+		serviceVersions = []string{testapps.ServiceVersion("v3"), testapps.ServiceVersion("v2"), testapps.ServiceVersion("v1")}
 	)
 
 	cleanEnv := func() {
@@ -362,7 +363,7 @@ var _ = Describe("ComponentVersion Controller", func() {
 				func(g Gomega, cmpv *appsv1.ComponentVersion) {
 					g.Expect(cmpv.Status.ObservedGeneration).Should(Equal(cmpv.GetGeneration()))
 					g.Expect(cmpv.Status.Phase).Should(Equal(appsv1.AvailablePhase))
-					g.Expect(cmpv.Status.ServiceVersions).Should(Equal(strings.Join([]string{testapps.ServiceVersion("v1"), testapps.ServiceVersion("v3")}, ",")))
+					g.Expect(cmpv.Status.ServiceVersions).Should(Equal(strings.Join([]string{testapps.ServiceVersion("v3"), testapps.ServiceVersion("v1")}, ",")))
 					for i := 0; i < len(compDefNames); i++ {
 						g.Expect(cmpv.Labels).Should(HaveKeyWithValue(compDefNames[i], compDefNames[i]))
 					}

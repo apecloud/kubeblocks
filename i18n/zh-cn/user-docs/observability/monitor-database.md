@@ -173,11 +173,11 @@ kubectl get cluster mycluster -o yaml
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-......
+...
 spec:
-   ......
+   ...
    componentSpecs:
-   ......
+   ...
       disableExporter: false
 ```
 
@@ -257,11 +257,11 @@ componentSpecs:
 
     登录 Grafana 大盘，并导入大盘。
 
-    Grafana 大盘的 `APPS / PostgreSQL` 文件夹下有预设的大盘模板。您也可以在 Grafana 大盘商店获取更多大盘模板。
+    Grafana 大盘的 `APPS / PostgreSQL` 文件夹下有预设的大盘模板。您也可以在 [Grafana 大盘商店](https://grafana.com/grafana/dashboards/)获取更多大盘模板。
 
 ::::note
 
-请确保 `PodMonitor` 文件中的标签设置正确，与大盘匹配。
+请确保 `PodMonitor` 文件中的标签（如 endpoint 中的 path 和 port 值）设置正确，与您使用的大盘匹配。
 
 :::
 

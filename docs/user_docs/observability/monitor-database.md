@@ -171,11 +171,11 @@ View the output.
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-......
+...
 spec:
-   ......
+   ...
    componentSpecs:
-   ......
+   ...
       disableExporter: false
 ```
 
@@ -254,11 +254,11 @@ When the cluster is running, each Pod should have a sidecar container, named `ex
 
    Log in to the Grafana dashboard and import the dashboard.
 
-   There is a pre-configured dashboard for PostgreSQL under the `APPS / PostgreSQL` folder in the Grafana dashboard. And more dashboards can be found in the Grafana dashboard store.
+   There is a pre-configured dashboard for PostgreSQL under the `APPS / PostgreSQL` folder in the Grafana dashboard. And more dashboards can be found in the [Grafana dashboard store](https://grafana.com/grafana/dashboards/).
 
 ::::note
 
-Make sure the labels are set correctly in the `PodMonitor` file to match the dashboard.
+Make sure the labels (such as the values of path and port in endpoint) are set correctly in the `PodMonitor` file to match your dashboard.
 
 :::
 

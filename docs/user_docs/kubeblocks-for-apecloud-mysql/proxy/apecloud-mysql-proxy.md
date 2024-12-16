@@ -595,108 +595,6 @@ kbcli cluster logs myproxy --instance myproxy-mysql-0 -c vttablet
 
 </Tabs>
 
-## Monitoring
-
-:::note
-
-In the production environment, all monitoring Addons are disabled by default when installing KubeBlocks. You can enable these Addons but it is highly recommended to build your monitoring system or purchase a third-party monitoring service. For details, refer to [Monitoring](./../../observability/monitor-database.md).
-
-:::
-
-<Tabs>
-
-<TabItem value="kubectl" label="kubectl" default>
-
-1. Enable the monitoring Addons.
-
-   For the testing/demo environment, run the commands below to enable the monitoring Addons provided by KubeBlocks.
-
-   ```bash
-   helm install prometheus kubeblocks/prometheus --namespace kb-system --create-namespace
-   helm install prometheus kubeblocks/prometheus --namespace kb-system --create-namespace
-   helm install prometheus kubeblocks/prometheus --namespace kb-system --create-namespace
-   ```
-
-   For the production environment, you can integrate the monitoring components. For details, you can refer to the relevant docs provided by the monitoring tools.
-
-2. Check whether the monitoring function of this proxy cluster is enabled.
-
-   ```bash
-   kubectl get cluster myproxy -o yaml
-   ```
-
-   If the output YAML file shows `disableExporter: false`, the monitoring function of this proxy cluster is enabled.
-
-   If the monitoring function is not enabled, run the command below to enable it first.
-
-   ```bash
-   kubectl patch cluster mycluster -n demo --type "json" -p '[{"op":"add","path":"/spec/componentSpecs/0/disableExporter","value":false}]'
-   ```
-
-3. View the dashboard.
-
-   For the testing/demo environment, run the commands below to view the Grafana dashboard.
-
-   ```bash
-   # 1. Get the username and password 
-   kubectl get secret grafana -n kb-system -o jsonpath='{.data.admin-user}' |base64 -d
-
-   kubectl get secret grafana -n kb-system -o jsonpath='{.data.admin-password}' |base64 -d
-
-   # 2. Connect to the Grafana dashboard
-   kubectl port-forward svc/grafana -n kb-system 3000:8
-
-   # 3. Open the web browser and enter the address 127.0.0.1:3000 to visit the dashboard.
-
-   # 4. Enter the username and password obtained from step 1.
-   ```
-
-   For the production environment, you can view the dashboard of the corresponding cluster via Grafana Web Console. For more detailed information, see [the Grafana dashboard documentation](https://grafana.com/docs/grafana/latest/dashboards/).
-
-:::note
-
-1. If there is no data in the dashboard, you can check whether the job is `kubeblocks-service`. Enter `kubeblocks-service` in the job field and press the enter button.
-
-   ![Monitoring dashboard](./../../../img/api-monitoring.png)
-
-2. For more details on the monitoring function, you can refer to [Monitoring](./../../observability/monitor-database.md).
-
-:::
-
-</TabItem>
-
-<TabItem value="kbcli" label="kbcli">
-
-1. Enable the monitoring function.
-
-   ```bash
-   kbcli cluster update myproxy --disable-exporter=false
-   ```
-
-2. View the Addon list and enable the Grafana Addon.
-
-   ```bash
-   kbcli addon list 
-   
-   kbcli addon enable grafana
-   ```
-
-3. View the dashboard list.
-
-   ```bash
-   kbcli dashboard list
-   ```
-
-4. Open the Grafana dashboard.
-
-   ```bash
-   kbcli dashboard open kubeblocks-grafana
-   ```
-
-</TabItem>
-
-</Tabs>
-
 ## Read-write splitting
 
 You can enable the read-write splitting function.
@@ -767,7 +665,7 @@ You can also set the ratio for read-write splitting and here is an example of di
 kbcli cluster configure myproxy --components vtgate --set=read_write_splitting_ratio=70
 ```
 
-Moreover, you can [use Grafana](#monitoring) or run `show workload` in the VTGate terminal to view the flow distribution.
+Moreover, you can run `show workload` in the VTGate terminal to view the flow distribution.
 
 ```bash
 show workload;

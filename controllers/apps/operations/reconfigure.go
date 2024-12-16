@@ -165,7 +165,7 @@ func fromReconfigureOperations(request appsv1alpha1.OpsRequestSpec, reqCtx intct
 					})
 				}
 			} else {
-				operations = append(operations, *request.Reconfigure)
+				operations = append(operations, reconfigure)
 			}
 		}
 	}

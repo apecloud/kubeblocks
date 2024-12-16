@@ -169,9 +169,9 @@ var _ = Describe("Component Controller", func() {
 		}
 	}
 
-	createClusterObjX := func(clusterDefName, compName, compDefName string,
+	createClusterObjX := func(compName, compDefName string,
 		processor func(*testapps.MockClusterFactory), phase *kbappsv1.ClusterPhase) {
-		factory := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName).
+		factory := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
 			WithRandomName().
 			AddComponent(compName, compDefName).
 			SetReplicas(1)
@@ -183,7 +183,7 @@ var _ = Describe("Component Controller", func() {
 
 		By("Waiting for the cluster enter expected phase")
 		Eventually(testapps.ClusterReconciled(&testCtx, clusterKey)).Should(BeTrue())
-		if phase == nil {
+		if phase == nil || *phase == "" {
 			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(kbappsv1.CreatingClusterPhase))
 		} else {
 			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(*phase))
@@ -204,12 +204,12 @@ var _ = Describe("Component Controller", func() {
 
 	createClusterObj := func(compName, compDefName string, processor func(*testapps.MockClusterFactory)) {
 		By("Creating a cluster with new component definition")
-		createClusterObjX("", compName, compDefName, processor, nil)
+		createClusterObjX(compName, compDefName, processor, nil)
 	}
 
 	createClusterObjWithPhase := func(compName, compDefName string, processor func(*testapps.MockClusterFactory), phase kbappsv1.ClusterPhase) {
 		By("Creating a cluster with new component definition")
-		createClusterObjX("", compName, compDefName, processor, &phase)
+		createClusterObjX(compName, compDefName, processor, &phase)
 	}
 
 	mockCompRunning := func(compName string) {
@@ -1607,9 +1607,9 @@ var _ = Describe("Component Controller", func() {
 		})
 
 		It("with component zero replicas", func() {
-			zeroReplicas := func(f *testapps.MockClusterFactory) { f.SetReplicas(0) }
-			phase := kbappsv1.ClusterPhase("")
-			createClusterObjX("", defaultCompName, compDefName, zeroReplicas, &phase)
+			createClusterObjWithPhase(defaultCompName, compDefName, func(f *testapps.MockClusterFactory) {
+				f.SetReplicas(0)
+			}, "")
 
 			By("checking the component status can't be reconciled well")
 			Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *kbappsv1.Component) {

@@ -578,7 +578,7 @@ func getHealthyLorryClient(pods []*corev1.Pod) (lorry.Client, error) {
 }
 
 func (r *componentWorkloadOps) annotateInstanceSetForMemberJoin() {
-	if r.synthesizeComp.LifecycleActions.MemberJoin == nil {
+	if r.synthesizeComp.LifecycleActions == nil || r.synthesizeComp.LifecycleActions.MemberJoin == nil {
 		return
 	}
 
@@ -738,13 +738,8 @@ func (r *componentWorkloadOps) checkAndDoMemberJoin() error {
 		return err
 	}
 
-	if podsToMemberjoin.Len() == 0 {
-		// Anno will be merged later, so it should be deleted from both protoITS and runningITS
-		delete(r.protoITS.Annotations, constant.MemberJoinStatusAnnotationKey)
-		delete(r.runningITS.Annotations, constant.MemberJoinStatusAnnotationKey)
-	} else {
-		r.protoITS.Annotations[constant.MemberJoinStatusAnnotationKey] = strings.Join(sets.List(podsToMemberjoin), ",")
-	}
+	r.protoITS.Annotations[constant.MemberJoinStatusAnnotationKey] = strings.Join(sets.List(podsToMemberjoin), ",")
+
 	return nil
 }
 

@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package v1
 
 import (
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -1054,6 +1055,22 @@ type ComponentTemplateSpec struct {
 	//
 	// +optional
 	DefaultMode *int32 `json:"defaultMode,omitempty" protobuf:"varint,3,opt,name=defaultMode"`
+
+	// Specifies the list of variables that can be used in the template.
+	//
+	// +optional
+	Variables []TemplateVariables `json:"variables,omitempty"`
+}
+
+type TemplateVariables struct {
+	FileName  string             `json:"fileName"`
+	Variables []TemplateVariable `json:"variables"`
+}
+
+type TemplateVariable struct {
+	Name     string              `json:"name"`
+	Optional *bool               `json:"optional,omitempty"`
+	Value    *intstr.IntOrString `json:"value,omitempty"`
 }
 
 type ComponentConfigSpec struct {

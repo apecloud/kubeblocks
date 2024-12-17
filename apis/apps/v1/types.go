@@ -440,6 +440,9 @@ type ClusterComponentConfig struct {
 
 	// The source of the config.
 	ClusterComponentConfigSource `json:",inline"`
+
+	// +optional
+	Variables []TemplateVariables `json:"variables,omitempty"`
 }
 
 // ClusterComponentConfigSource represents the source of a config.

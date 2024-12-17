@@ -80,6 +80,9 @@ var _ = Describe("", func() {
 	AfterEach(cleanEnv)
 
 	Context("Test OpsRequest", func() {
+		var reqCtx intctrlutil.RequestCtx
+		var opsRes *OpsResource
+
 		BeforeEach(func() {
 			By("Create a componentDefinition obj.")
 			compDefObj = testapps.NewComponentDefinitionFactory(compDefName).
@@ -88,13 +91,7 @@ var _ = Describe("", func() {
 				SetLifecycleAction("Switchover", testapps.NewLifecycleAction("switchover")).
 				Create(&testCtx).
 				GetObject()
-		})
 
-		It("Test switchover OpsRequest", func() {
-			reqCtx := intctrlutil.RequestCtx{
-				Ctx:      testCtx.Ctx,
-				Recorder: k8sManager.GetEventRecorderFor("opsrequest-controller"),
-			}
 			By("Creating a cluster")
 			clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
 				WithRandomName().
@@ -135,10 +132,6 @@ var _ = Describe("", func() {
 					Create(&testCtx).GetObject()
 			}
 
-			opsRes := &OpsResource{
-				Cluster:  clusterObj,
-				Recorder: k8sManager.GetEventRecorderFor("opsrequest-controller"),
-			}
 			By("mock cluster is Running and the status operations")
 			Expect(testapps.ChangeObjStatus(&testCtx, clusterObj, func() {
 				clusterObj.Status.Phase = appsv1.RunningClusterPhase
@@ -148,8 +141,19 @@ var _ = Describe("", func() {
 					},
 				}
 			})).Should(Succeed())
-			opsRes.Cluster = clusterObj
 
+			reqCtx = intctrlutil.RequestCtx{
+				Ctx:      testCtx.Ctx,
+				Recorder: k8sManager.GetEventRecorderFor("opsrequest-controller"),
+			}
+
+			opsRes = &OpsResource{
+				Cluster:  clusterObj,
+				Recorder: k8sManager.GetEventRecorderFor("opsrequest-controller"),
+			}
+		})
+
+		It("Test switchover OpsRequest", func() {
 			By("create switchover opsRequest")
 			ops := testops.NewOpsRequestObj("ops-switchover-"+testCtx.GetRandomStr(), testCtx.DefaultNamespace,
 				clusterObj.Name, opsv1alpha1.SwitchoverType)
@@ -161,7 +165,6 @@ var _ = Describe("", func() {
 				},
 			}
 			opsRes.OpsRequest = testops.CreateOpsRequest(ctx, testCtx, ops)
-			// set ops phase to Pending
 			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsPendingPhase
 
 			By("mock switchover OpsRequest phase is Creating")
@@ -169,7 +172,6 @@ var _ = Describe("", func() {
 			Expect(err).ShouldNot(HaveOccurred())
 			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
 
-			// do switchover action
 			By("do switchover action")
 			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
@@ -179,6 +181,47 @@ var _ = Describe("", func() {
 				recorder.Action(gomock.Any(), gomock.Any()).Times(1).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
 					GinkgoWriter.Printf("ActionRequest: %#v\n", req)
 					Expect(req.Parameters["KB_SWITCHOVER_CURRENT_NAME"]).Should(Equal(instanceName))
+					rsp := kbagentproto.ActionResponse{Message: "mock success"}
+					return rsp, nil
+				})
+			})
+
+			By("do reconcile switchover action")
+			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+		})
+
+		It("Test switchover OpsRequest with candidate", func() {
+			By("create switchover opsRequest")
+			ops := testops.NewOpsRequestObj("ops-switchover-"+testCtx.GetRandomStr(), testCtx.DefaultNamespace,
+				clusterObj.Name, opsv1alpha1.SwitchoverType)
+			instanceName := fmt.Sprintf("%s-%s-%d", clusterObj.Name, defaultCompName, 1)
+			candidateName := fmt.Sprintf("%s-%s-%d", clusterObj.Name, defaultCompName, 0)
+			ops.Spec.SwitchoverList = []opsv1alpha1.Switchover{
+				{
+					ComponentOps:  opsv1alpha1.ComponentOps{ComponentName: defaultCompName},
+					InstanceName:  instanceName,
+					CandidateName: candidateName,
+				},
+			}
+			opsRes.OpsRequest = testops.CreateOpsRequest(ctx, testCtx, ops)
+			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsPendingPhase
+
+			By("mock switchover OpsRequest phase is Creating")
+			_, err := GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Eventually(testops.GetOpsRequestPhase(&testCtx, client.ObjectKeyFromObject(opsRes.OpsRequest))).Should(Equal(opsv1alpha1.OpsCreatingPhase))
+
+			By("do switchover action")
+			_, err = GetOpsManager().Do(reqCtx, k8sClient, opsRes)
+			Expect(err).ShouldNot(HaveOccurred())
+			Expect(meta.FindStatusCondition(opsRes.OpsRequest.Status.Conditions, opsv1alpha1.ConditionTypeFailed)).Should(BeNil())
+
+			testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).Times(1).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+					GinkgoWriter.Printf("ActionRequest: %#v\n", req)
+					Expect(req.Parameters["KB_SWITCHOVER_CURRENT_NAME"]).Should(Equal(instanceName))
+					Expect(req.Parameters["KB_SWITCHOVER_CANDIDATE_NAME"]).Should(Equal(candidateName))
 					rsp := kbagentproto.ActionResponse{Message: "mock success"}
 					return rsp, nil
 				})

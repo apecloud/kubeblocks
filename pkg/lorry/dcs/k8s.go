@@ -362,6 +362,10 @@ func (store *KubernetesStore) GetLeader() (*Leader, error) {
 		ttl = viper.GetInt(constant.KBEnvTTL)
 	}
 	leader := annotations["leader"]
+	holder := annotations["holder"]
+	if holder == "" {
+		holder = leader
+	}
 	stateStr, ok := annotations["dbstate"]
 	var dbState *DBState
 	if ok {
@@ -380,6 +384,7 @@ func (store *KubernetesStore) GetLeader() (*Leader, error) {
 	return &Leader{
 		Index:       configmap.ResourceVersion,
 		Name:        leader,
+		Holder:      holder,
 		AcquireTime: acquireTime,
 		RenewTime:   renewTime,
 		TTL:         ttl,

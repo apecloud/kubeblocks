@@ -221,6 +221,7 @@ type Leader struct {
 	DBState     *DBState
 	Index       string
 	Name        string
+	Holder      string
 	AcquireTime int64
 	RenewTime   int64
 	TTL         int

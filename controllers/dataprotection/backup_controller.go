@@ -439,6 +439,38 @@ func (r *BackupReconciler) prepareBackupRequest(
 		}
 	}
 	request.BackupMethod = backupMethod
+	// get and validate parent backup
+	if request.GetBackupType() == string(dpv1alpha1.BackupTypeIncremental) {
+		request.ParentBackup, err = GetParentBackup(reqCtx.Ctx, r.Client, request.Backup, request.BackupPolicy)
+		if err != nil {
+			if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeNeedWaiting) {
+				return request, nil
+			}
+			return nil, err
+		}
+		parentBackupType, err := dputils.GetBackupTypeByMethodName(reqCtx, r.Client, request.ParentBackup.Spec.BackupMethod, request.BackupPolicy)
+		if err != nil {
+			return nil, err
+		}
+		if parentBackupType == dpv1alpha1.BackupTypeFull {
+			request.BaseBackup = request.ParentBackup
+			request.Status.BaseBackupName = request.ParentBackup.Name
+		} else if parentBackupType == dpv1alpha1.BackupTypeIncremental {
+			baseBackup := &dpv1alpha1.Backup{}
+			baseBackupName := request.ParentBackup.Status.BaseBackupName
+			if len(baseBackupName) == 0 {
+				return nil, fmt.Errorf("backup %s/%s base backup name is empty", request.ParentBackup.Namespace, request.ParentBackup.Name)
+			}
+			if err := request.Client.Get(reqCtx.Ctx, client.ObjectKey{Name: baseBackupName,
+				Namespace: request.ParentBackup.Namespace}, baseBackup); err != nil {
+				return nil, fmt.Errorf("failed to get base backup %s/%s: %w", request.ParentBackup.Namespace, baseBackupName, err)
+			}
+			request.BaseBackup = baseBackup
+			request.Status.BaseBackupName = baseBackup.Name
+		} else {
+			return nil, fmt.Errorf("parent backup type is %s, but only full and incremental backup are supported", parentBackupType)
+		}
+	}
 	return request, nil
 }
 

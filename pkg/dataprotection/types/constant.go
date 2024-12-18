@@ -104,6 +104,8 @@ const (
 	DPTargetPodRole = "DP_TARGET_POD_ROLE"
 	// DPBackupBasePath the base path for backup data in the storage
 	DPBackupBasePath = "DP_BACKUP_BASE_PATH"
+	// DPParentBackupBasePath the base path for parent backup data in the storage
+	DPParentBackupBasePath = "DP_PARENT_BACKUP_BASE_PATH"
 	// DPBackupName backup CR name
 	DPBackupName = "DP_BACKUP_NAME"
 	// DPParentBackupName backup CR name

@@ -194,6 +194,16 @@ type BackupStatus struct {
 	// +optional
 	VolumeSnapshots []VolumeSnapshotStatus `json:"volumeSnapshots,omitempty"`
 
+	// Records the parent backup name for incremental or differential backup.
+	//
+	// +optional
+	ParentBackupName string `json:"parentBackupName,omitempty"`
+
+	// Records the base full backup name for incremental backup or differential backup.
+	//
+	// +optional
+	BaseBackupName string `json:"baseBackupName,omitempty"`
+
 	// Records any additional information for the backup.
 	//
 	// +optional

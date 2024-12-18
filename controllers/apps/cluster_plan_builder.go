@@ -112,14 +112,18 @@ func (c *clusterTransformContext) GetLogger() logr.Logger {
 
 // sharding use to determine if the entity is sharding or component
 func (c *clusterTransformContext) sharding(name string) (bool, error) {
+	// fast return when the object has already been initialized
+	if len(c.components) > 0 || len(c.shardings) > 0 {
+		_, ok := c.shardingComps[name]
+		return ok, nil
+	}
+
 	// sharding defined in cd topology
 	if len(c.Cluster.Spec.ClusterDef) > 0 && len(c.Cluster.Spec.Topology) > 0 {
 		if c.clusterDef == nil {
-			cd, err := loadClusterDefinition(c, c.Cluster)
-			if err != nil {
+			if err := loadNCheckClusterDefinition(c, c.Cluster); err != nil {
 				return false, err
 			}
-			c.clusterDef = cd
 		}
 		for _, topo := range c.clusterDef.Spec.Topologies {
 			if c.Cluster.Spec.Topology != topo.Name {
@@ -130,7 +134,9 @@ func (c *clusterTransformContext) sharding(name string) (bool, error) {
 					return true, nil
 				}
 			}
+			return false, nil
 		}
+		return false, fmt.Errorf("topology %s not found in ClusterDefinition %s", c.Cluster.Spec.Topology, c.Cluster.Spec.ClusterDef)
 	}
 
 	// sharding defined in cluster.spec.shardings

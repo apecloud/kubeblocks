@@ -115,9 +115,11 @@ func (c *clusterTransformContext) sharding(name string) (bool, error) {
 	// sharding defined in cd topology
 	if len(c.Cluster.Spec.ClusterDef) > 0 && len(c.Cluster.Spec.Topology) > 0 {
 		if c.clusterDef == nil {
-			if err := loadNCheckClusterDefinition(c, c.Cluster); err != nil {
+			cd, err := loadClusterDefinition(c, c.Cluster)
+			if err != nil {
 				return false, err
 			}
+			c.clusterDef = cd
 		}
 		for _, topo := range c.clusterDef.Spec.Topologies {
 			if c.Cluster.Spec.Topology != topo.Name {

@@ -137,14 +137,22 @@ func (t *clusterValidationTransformer) checkNUpdateClusterTopology(transCtx *clu
 	return nil
 }
 
-func loadNCheckClusterDefinition(transCtx *clusterTransformContext, cluster *appsv1.Cluster) error {
+func loadClusterDefinition(transCtx *clusterTransformContext, cluster *appsv1.Cluster) (*appsv1.ClusterDefinition, error) {
 	var cd *appsv1.ClusterDefinition
 	if len(cluster.Spec.ClusterDef) > 0 {
 		cd = &appsv1.ClusterDefinition{}
 		key := types.NamespacedName{Name: cluster.Spec.ClusterDef}
 		if err := transCtx.Client.Get(transCtx.Context, key, cd); err != nil {
-			return err
+			return nil, err
 		}
+	}
+	return cd, nil
+}
+
+func loadNCheckClusterDefinition(transCtx *clusterTransformContext, cluster *appsv1.Cluster) error {
+	cd, err := loadClusterDefinition(transCtx, cluster)
+	if err != nil {
+		return err
 	}
 	if cd != nil {
 		if cd.Generation != cd.Status.ObservedGeneration {

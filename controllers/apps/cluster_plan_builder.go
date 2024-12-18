@@ -110,13 +110,34 @@ func (c *clusterTransformContext) GetLogger() logr.Logger {
 	return c.Logger
 }
 
-func (c *clusterTransformContext) sharding(name string) bool {
-	for _, sharding := range c.Cluster.Spec.Shardings {
-		if sharding.Name == name {
-			return true
+// sharding use to determine if the entity is sharding or component
+func (c *clusterTransformContext) sharding(name string) (bool, error) {
+	// sharding defined in cd topology
+	if len(c.Cluster.Spec.ClusterDef) > 0 && len(c.Cluster.Spec.Topology) > 0 {
+		if c.clusterDef == nil {
+			if err := loadNCheckClusterDefinition(c, c.Cluster); err != nil {
+				return false, err
+			}
+		}
+		for _, topo := range c.clusterDef.Spec.Topologies {
+			if c.Cluster.Spec.Topology != topo.Name {
+				continue
+			}
+			for _, sharding := range topo.Shardings {
+				if sharding.Name == name {
+					return true, nil
+				}
+			}
 		}
 	}
-	return false
+
+	// sharding defined in cluster.spec.shardings
+	for _, sharding := range c.Cluster.Spec.Shardings {
+		if sharding.Name == name {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func (c *clusterTransformContext) total() int {

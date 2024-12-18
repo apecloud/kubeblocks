@@ -25,7 +25,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 )
@@ -58,7 +57,6 @@ type switchover struct {
 	namespace    string
 	clusterName  string
 	compName     string
-	roles        []appsv1.ReplicaRole
 	role         string // the role that will be transferred to another replica.
 	currentPod   string
 	candidatePod string

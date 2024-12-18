@@ -79,15 +79,11 @@ func (a *kbagent) RoleProbe(ctx context.Context, cli client.Reader, opts *Option
 }
 
 func (a *kbagent) Switchover(ctx context.Context, cli client.Reader, opts *Options, candidate string) error {
-	roleName, ok := a.pod.Labels[constant.RoleLabelKey]
-	if !ok {
-		return errors.Errorf("pod %s/%s has no role label", a.pod.Namespace, a.pod.Name)
-	}
+	roleName := a.pod.Labels[constant.RoleLabelKey]
 	lfa := &switchover{
 		namespace:    a.synthesizedComp.Namespace,
 		clusterName:  a.synthesizedComp.ClusterName,
 		compName:     a.synthesizedComp.Name,
-		roles:        a.synthesizedComp.Roles,
 		role:         roleName,
 		currentPod:   a.pod.Name,
 		candidatePod: candidate,

@@ -2200,9 +2200,7 @@ with <code>preCondition</code> specifying when the action should be fired relati
 <code>Immediately</code>, <code>RuntimeReady</code>, <code>ComponentReady</code>, and <code>ClusterReady</code>.</li>
 <li><code>preTerminate</code>: Defines the hook to be executed before terminating a Component.</li>
 <li><code>roleProbe</code>: Defines the procedure which is invoked regularly to assess the role of replicas.</li>
-<li><code>switchover</code>: Defines the procedure for a controlled transition of a role to a new replica.
-This approach aims to minimize downtime and maintain availability in systems with a leader-follower topology,
-such as during planned maintenance or upgrades on the current leader node.</li>
+<li><code>switchover</code>: Defines the procedure for a controlled transition of a role to a new replica.</li>
 <li><code>memberJoin</code>: Defines the procedure to add a new replica to the replication group.</li>
 <li><code>memberLeave</code>: Defines the method to remove a replica from the replication group.</li>
 <li><code>readOnly</code>: Defines the procedure to switch a replica into the read-only state.</li>
@@ -5555,15 +5553,17 @@ Action
 <em>(Optional)</em>
 <p>Defines the procedure for a controlled transition of a role to a new replica.
 This approach aims to minimize downtime and maintain availability
-during events such as planned maintenance or when performing stop, shutdown, restart, or upgrade operations
-involving the current leader node.</p>
+during events such as planned maintenance or when performing stop, shutdown, restart, or upgrade operations.
+In a typical consensus system, this action is used to transfer leader role to another replica.</p>
 <p>The container executing this action has access to following variables:</p>
 <ul>
 <li>KB_SWITCHOVER_CANDIDATE_NAME: The name of the pod of the new role&rsquo;s candidate, which may not be specified (empty).</li>
 <li>KB_SWITCHOVER_CANDIDATE_FQDN: The FQDN of the pod of the new role&rsquo;s candidate, which may not be specified (empty).</li>
 <li>KB_SWITCHOVER_CURRENT_NAME: The name of the pod of the current role.</li>
 <li>KB_SWITCHOVER_CURRENT_FQDN: The FQDN of the pod of the current role.</li>
-<li>KB_SWITCHOVER_ROLE: The role that will be transferred to another replica.</li>
+<li>KB_SWITCHOVER_ROLE: The role that will be transferred to another replica.
+This variable can be empty if, for example, role probe does not succeed.
+It depends on the addon implementation what to do under such cases.</li>
 </ul>
 <p>Note: This field is immutable once it has been set.</p>
 </td>

@@ -681,15 +681,6 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn(deleteReplicas, joinedReplica
 
 func (r *componentWorkloadOps) leaveMemberForPod(pod *corev1.Pod, pods []*corev1.Pod) error {
 	trySwitchover := func(lfa lifecycle.Lifecycle, pod *corev1.Pod) error {
-		// if pod does not have role, no need to call switchover
-		if pod == nil || len(pod.Labels) == 0 {
-			return nil
-		}
-		_, ok := pod.Labels[constant.RoleLabelKey]
-		if !ok {
-			return nil
-		}
-
 		err := lfa.Switchover(r.reqCtx.Ctx, r.cli, nil, "")
 		if err != nil {
 			if errors.Is(err, lifecycle.ErrActionNotDefined) {
@@ -701,7 +692,7 @@ func (r *componentWorkloadOps) leaveMemberForPod(pod *corev1.Pod, pods []*corev1
 		return nil
 	}
 
-	tryMemberLeave := func(lfa lifecycle.Lifecycle) error {
+	tryMemberLeave := func(lfa lifecycle.Lifecycle, pod *corev1.Pod) error {
 		err := lfa.MemberLeave(r.reqCtx.Ctx, r.cli, nil)
 		if err != nil {
 			if errors.Is(err, lifecycle.ErrActionNotDefined) {
@@ -723,7 +714,7 @@ func (r *componentWorkloadOps) leaveMemberForPod(pod *corev1.Pod, pods []*corev1
 		return err
 	}
 
-	if err := tryMemberLeave(lfa); err != nil {
+	if err := tryMemberLeave(lfa, pod); err != nil {
 		return err
 	}
 

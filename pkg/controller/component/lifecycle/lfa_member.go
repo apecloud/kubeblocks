@@ -71,13 +71,13 @@ func (a *switchover) name() string {
 func (a *switchover) parameters(ctx context.Context, cli client.Reader) (map[string]string, error) {
 	// refer to ComponentLifecycleActions.Switchover's documentation for explanation of each variable.
 	m := make(map[string]string)
+	compName := constant.GenerateClusterComponentName(a.clusterName, a.compName)
 	if len(a.candidatePod) > 0 {
-		compName := constant.GenerateClusterComponentName(a.clusterName, a.compName)
 		m[switchoverCandidateName] = a.candidatePod
 		m[switchoverCandidateFQDN] = component.PodFQDN(a.namespace, compName, a.candidatePod)
 	}
 	m[switchoverCurrentName] = a.currentPod
-	m[switchoverCurrentFQDN] = component.PodFQDN(a.namespace, a.compName, a.currentPod)
+	m[switchoverCurrentFQDN] = component.PodFQDN(a.namespace, compName, a.currentPod)
 	m[switchoverRole] = a.role
 	return m, nil
 }

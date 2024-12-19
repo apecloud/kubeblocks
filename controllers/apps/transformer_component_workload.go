@@ -688,7 +688,7 @@ func (r *componentWorkloadOps) leaveMemberForPod(pod *corev1.Pod, pods []*corev1
 			}
 			return err
 		}
-		r.reqCtx.Recorder.Eventf(r.component, corev1.EventTypeNormal, "Switchover", "successfully call switchover action for pod %v", pod.Name)
+		r.reqCtx.Log.Info("successfully call switchover action for pod", "pod", pod.Name)
 		return nil
 	}
 
@@ -701,7 +701,7 @@ func (r *componentWorkloadOps) leaveMemberForPod(pod *corev1.Pod, pods []*corev1
 			return err
 		}
 
-		r.reqCtx.Recorder.Eventf(r.component, corev1.EventTypeNormal, "MemberLeave", "successfully leave member for pod %v", pod.Name)
+		r.reqCtx.Log.Info("successfully call leave member action for pod", "pod", pod.Name)
 		return nil
 	}
 

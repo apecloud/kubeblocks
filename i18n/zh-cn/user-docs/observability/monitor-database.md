@@ -183,7 +183,9 @@ spec:
 
 </details>
 
-如果输出结果中未显示 `disableExporter: false`，则说明集群监控功能未开启，可执行以下命令，开启监控功能。
+将 `disableExporter` 设置为 `false` 或使用隐式设置（使用默认值），即表示监控 exporter 已启用，这是监控功能正常运行的前提条件。如果输出结果显示 `disableExporter: true`，您需要将其修改为 `false`，开启监控 exporter。
+
+请注意更新 `disableExporter` 字段会导致集群中的所有 Pod 重启。
 
 <Tabs>
 
@@ -247,10 +249,39 @@ componentSpecs:
 
 2. 创建 `PodMonitor`。
 
-   应用 `PodMonitor` 文件，监控集群。您可在 [KubeBlocks Addons 仓库](https://github.com/apecloud/kubeblocks-addons/blob/main/examples/postgresql/pod-monitor.yml)中查看示例 YAML 文件。
+   应用 `PodMonitor` 文件，监控集群。您也可以在 [KubeBlocks Addons 仓库](https://github.com/apecloud/kubeblocks-addons/blob/main/examples/postgresql/pod-monitor.yml)中查看最新版本示例 YAML 文件。
 
-   ```bash
-   kubectl apply -f examples/postgresql/pod-monitor.yaml
+   ```yaml
+   kubectl apply -f - <<EOF
+   apiVersion: monitoring.coreos.com/v1
+   kind: PodMonitor
+   metadata:
+     name: pg-cluster-pod-monitor
+     namespace: monitoring # 说明：此处为 Prometheus operator 所在的 namespace
+     labels:               # 此处对应 `prometheus.spec.podMonitorSelector` 中设置的标签。
+       release: prometheus
+   spec:
+     jobLabel: kubeblocks-service
+     # 定义了从关联的 Kubernetes `Pod` 对象
+     # 传递到采集指标上的标签
+     # 请按需设置标签
+     podTargetLabels:
+     - app.kubernetes.io/instance
+     - app.kubernetes.io/managed-by
+     - apps.kubeblocks.io/component-name
+     - apps.kubeblocks.io/pod-name
+     podMetricsEndpoints:
+       - path: /metrics
+         port: http-metrics
+         scheme: http
+     namespaceSelector:
+       matchNames:
+         - default
+     selector:
+       matchLabels:
+         app.kubernetes.io/instance: pg-cluster
+         apps.kubeblocks.io/component-name: postgresql
+   EOF
    ```
 
 3. 连接 Grafana 大盘.
@@ -264,13 +295,3 @@ componentSpecs:
 请确保 `PodMonitor` 文件中的标签（如 endpoint 中的 path 和 port 值）设置正确，与您使用的大盘匹配。
 
 :::
-
-## 删除资源
-
-如果您想要删除集群和所有相关资源，可以将终止策略修改为 `WipeOut`，然后再删除该集群。
-
-```bash
-kubectl patch cluster mycluster -p '{"spec":{"terminationPolicy":"WipeOut"}}' --type="merge"
-
-kubectl delete cluster mycluster
-```

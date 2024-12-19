@@ -179,7 +179,9 @@ spec:
       disableExporter: false
 ```
 
-If `disableExporter: false` is not shown in the output, it means the monitoring function of this cluster is not enabled and you need to enable it first.
+Setting `disableExporter: false` or leaving this field unset enables the monitoring exporter, which is the prerequisite of the monitoring function. If the output shows `disableExporter: true`, you need to change it to `false` to enable the exporter.
+
+Note that updating `disableExporter` will restart all pods in the cluster.
 
 <Tabs>
 
@@ -244,10 +246,39 @@ When the cluster is running, each Pod should have a sidecar container, named `ex
 
 2. Create `PodMonitor`.
 
-   Apply the `PodMonitor` file to monitor the cluster. You can find the example YAML file in the [KubeBlocks Addons repo](https://github.com/apecloud/kubeblocks-addons/blob/main/examples/postgresql/pod-monitor.yml).
+   Apply the `PodMonitor` file to monitor the cluster. You can also find the latest example YAML file in the [KubeBlocks Addons repo](https://github.com/apecloud/kubeblocks-addons/blob/main/examples/postgresql/pod-monitor.yml).
 
-   ```bash
-   kubectl apply -f examples/postgresql/pod-monitor.yaml
+   ```yaml
+   kubectl apply -f - <<EOF
+   apiVersion: monitoring.coreos.com/v1
+   kind: PodMonitor
+   metadata:
+     name: pg-cluster-pod-monitor
+     namespace: monitoring # Note: this is namespace for prometheus operator
+     labels:               # This is labels set in `prometheus.spec.podMonitorSelector`
+       release: prometheus
+   spec:
+     jobLabel: kubeblocks-service
+     # Define the labels which are transferred from the
+     # associated Kubernetes `Pod` object onto the ingested metrics
+     # set the labels w.r.t your own needs
+     podTargetLabels:
+     - app.kubernetes.io/instance
+     - app.kubernetes.io/managed-by
+     - apps.kubeblocks.io/component-name
+     - apps.kubeblocks.io/pod-name
+     podMetricsEndpoints:
+       - path: /metrics
+         port: http-metrics
+         scheme: http
+     namespaceSelector:
+       matchNames:
+         - default
+     selector:
+       matchLabels:
+         app.kubernetes.io/instance: pg-cluster
+         apps.kubeblocks.io/component-name: postgresql
+   EOF
    ```
 
 3. Access the Grafana dashboard.
@@ -261,13 +292,3 @@ When the cluster is running, each Pod should have a sidecar container, named `ex
 Make sure the labels (such as the values of path and port in endpoint) are set correctly in the `PodMonitor` file to match your dashboard.
 
 :::
-
-## Delete resources
-
-If you want to delete the cluster and all its resources, you can modify the termination policy and then delete the cluster.
-
-```bash
-kubectl patch cluster mycluster -p '{"spec":{"terminationPolicy":"WipeOut"}}' --type="merge"
-
-kubectl delete cluster mycluster
-```

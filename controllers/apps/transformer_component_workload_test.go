@@ -16,12 +16,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
+	"context"
+
+	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
@@ -30,6 +31,8 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
+	kbagentproto "github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
 
@@ -132,9 +135,7 @@ var _ = Describe("Component Workload Operations Test", func() {
 				).
 				GetObject()
 
-			pods = []*corev1.Pod{}
-			pods = append(pods, pod0)
-			pods = append(pods, pod1)
+			pods = []*corev1.Pod{pod0, pod1}
 
 			container := corev1.Container{
 				Name:            "mock-container-name",
@@ -161,7 +162,7 @@ var _ = Describe("Component Workload Operations Test", func() {
 
 			ops = &componentWorkloadOps{
 				cli:            k8sClient,
-				reqCtx:         intctrlutil.RequestCtx{Ctx: ctx, Log: logger},
+				reqCtx:         intctrlutil.RequestCtx{Ctx: ctx, Log: logger, Recorder: clusterRecorder},
 				cluster:        mockCluster,
 				component:      comp,
 				synthesizeComp: synthesizeComp,
@@ -169,31 +170,29 @@ var _ = Describe("Component Workload Operations Test", func() {
 				protoITS:       mockITS.DeepCopy(),
 				dag:            dag,
 			}
-
-			testapps.MockKBAgentClient4Workload(&testCtx, pods)
 		})
 
-		It("should handle switchover for leader pod", func() {
+		It("should handle switchover for when scale in", func() {
+			testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+				recorder.Action(gomock.Any(), gomock.Any()).Times(2).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+					GinkgoWriter.Printf("ActionRequest: %#v\n", req)
+					switch req.Action {
+					case "switchover":
+						Expect(req.Parameters["KB_SWITCHOVER_CURRENT_NAME"]).Should(Equal(pod1.Name))
+					case "memberLeave":
+						Expect(req.Parameters["KB_LEAVE_MEMBER_POD_NAME"]).Should(Equal(pod1.Name))
+					}
+					rsp := kbagentproto.ActionResponse{Message: "mock success"}
+					return rsp, nil
+				})
+			})
+
 			By("setting up leader pod")
 			pod1.Labels[constant.RoleLabelKey] = "follower"
 			pod1.Labels[constant.RoleLabelKey] = "leader"
 
-			for _, pod := range pods {
-				Expect(ops.cli.Create(ctx, pod)).Should(BeNil())
-			}
-
-			ops.desiredCompPodNameSet = make(sets.Set[string])
-			ops.desiredCompPodNameSet.Insert(pod0.Name)
-
 			By("executing leave member for leader")
-			err := ops.leaveMemberForPod(pod1, []*corev1.Pod{pod1})
-			Expect(err).ShouldNot(BeNil())
-			Expect(pod0.Labels[constant.RoleLabelKey]).Should(Equal("leader"))
-			Expect(pod1.Labels[constant.RoleLabelKey]).ShouldNot(Equal("leader"))
-
-			for _, pod := range pods {
-				Expect(ops.cli.Delete(ctx, pod)).Should(BeNil())
-			}
+			Expect(ops.leaveMemberForPod(pod1, pods)).Should(Succeed())
 		})
 	})
 })

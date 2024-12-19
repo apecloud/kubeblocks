@@ -79,12 +79,14 @@ func (a *kbagent) RoleProbe(ctx context.Context, cli client.Reader, opts *Option
 }
 
 func (a *kbagent) Switchover(ctx context.Context, cli client.Reader, opts *Options, candidate string) error {
+	roleName := a.pod.Labels[constant.RoleLabelKey]
 	lfa := &switchover{
-		namespace:   a.synthesizedComp.Namespace,
-		clusterName: a.synthesizedComp.ClusterName,
-		compName:    a.synthesizedComp.Name,
-		roles:       a.synthesizedComp.Roles,
-		candidate:   candidate,
+		namespace:    a.synthesizedComp.Namespace,
+		clusterName:  a.synthesizedComp.ClusterName,
+		compName:     a.synthesizedComp.Name,
+		role:         roleName,
+		currentPod:   a.pod.Name,
+		candidatePod: candidate,
 	}
 	return a.ignoreOutput(a.checkedCallAction(ctx, cli, a.synthesizedComp.LifecycleActions.Switchover, lfa, opts))
 }

@@ -142,7 +142,7 @@ func (r *OpsRequest) ValidateOps(ctx context.Context,
 	case ReconfiguringType:
 		return r.validateReconfigure(ctx, k8sClient, cluster)
 	case SwitchoverType:
-		return r.validateSwitchover(ctx, k8sClient, cluster)
+		return r.validateSwitchover(cluster)
 	case ExposeType:
 		return r.validateExpose(ctx, cluster)
 	case RebuildInstanceType:
@@ -493,7 +493,8 @@ func (r *OpsRequest) validateVolumeExpansion(ctx context.Context, cli client.Cli
 }
 
 // validateSwitchover validates switchover api when spec.type is Switchover.
-func (r *OpsRequest) validateSwitchover(ctx context.Context, cli client.Client, cluster *appsv1.Cluster) error {
+// more time consuming checks will be done in handler's Action() function.
+func (r *OpsRequest) validateSwitchover(cluster *appsv1.Cluster) error {
 	switchoverList := r.Spec.SwitchoverList
 	if len(switchoverList) == 0 {
 		return notEmptyError("spec.switchover")
@@ -506,7 +507,14 @@ func (r *OpsRequest) validateSwitchover(ctx context.Context, cli client.Client, 
 	if err := r.checkComponentExistence(cluster, compOpsList); err != nil {
 		return err
 	}
-	return validateSwitchoverResourceList(ctx, cli, cluster, switchoverList)
+
+	for _, switchover := range switchoverList {
+		if switchover.InstanceName == "" {
+			return notEmptyError("switchover.instanceName")
+		}
+	}
+
+	return nil
 }
 
 func (r *OpsRequest) checkInstanceTemplate(cluster *appsv1.Cluster, componentOps ComponentOps, inputInstances []string) error {
@@ -789,90 +797,4 @@ func GetRunningOpsByOpsType(ctx context.Context, cli client.Client,
 		}
 	}
 	return runningOpsList, nil
-}
-
-// validateSwitchoverResourceList checks if switchover resourceList is legal.
-func validateSwitchoverResourceList(ctx context.Context, cli client.Client, cluster *appsv1.Cluster, switchoverList []Switchover) error {
-	var (
-		targetRole string
-	)
-	for _, switchover := range switchoverList {
-		if switchover.InstanceName == "" {
-			return notEmptyError("switchover.instanceName")
-		}
-
-		validateBaseOnCompDef := func(compDef string) error {
-			getTargetRole := func(roles []appsv1.ReplicaRole) (string, error) {
-				targetRole = ""
-				if len(roles) == 0 {
-					return targetRole, errors.New("component has no roles definition, does not support switchover")
-				}
-				for _, role := range roles {
-					if role.Serviceable && role.Writable {
-						if targetRole != "" {
-							return targetRole, errors.New("componentDefinition has more than role is serviceable and writable, does not support switchover")
-						}
-						targetRole = role.Name
-					}
-				}
-				return targetRole, nil
-			}
-			compDefObj, err := getComponentDefByName(ctx, cli, compDef)
-			if err != nil {
-				return err
-			}
-			if compDefObj == nil {
-				return fmt.Errorf("this component %s referenced componentDefinition is invalid", switchover.ComponentName)
-			}
-			if compDefObj.Spec.LifecycleActions == nil || compDefObj.Spec.LifecycleActions.Switchover == nil {
-				return fmt.Errorf("this cluster component %s does not support switchover", switchover.ComponentName)
-			}
-			// check switchover.InstanceName whether exist and role label is correct
-			if switchover.InstanceName == KBSwitchoverCandidateInstanceForAnyPod {
-				return nil
-			}
-			targetRole, err = getTargetRole(compDefObj.Spec.Roles)
-			if err != nil {
-				return err
-			}
-			if targetRole == "" {
-				return errors.New("componentDefinition has no role is serviceable and writable, does not support switchover")
-			}
-			pod := &corev1.Pod{}
-			if err := cli.Get(ctx, types.NamespacedName{Namespace: cluster.Namespace, Name: switchover.InstanceName}, pod); err != nil {
-				return fmt.Errorf("get instanceName %s failed, err: %s, and check the validity of the instanceName using \"kbcli cluster list-instances\"", switchover.InstanceName, err.Error())
-			}
-			v, ok := pod.Labels[constant.RoleLabelKey]
-			if !ok || v == "" {
-				return fmt.Errorf("instanceName %s cannot be promoted because it had a invalid role label", switchover.InstanceName)
-			}
-			if v == targetRole {
-				return fmt.Errorf("instanceName %s cannot be promoted because it is already the primary or leader instance", switchover.InstanceName)
-			}
-			if !strings.HasPrefix(pod.Name, fmt.Sprintf("%s-%s", cluster.Name, switchover.ComponentName)) {
-				return fmt.Errorf("instanceName %s does not belong to the current component, please check the validity of the instance using \"kbcli cluster list-instances\"", switchover.InstanceName)
-			}
-			return nil
-		}
-
-		compSpec := cluster.Spec.GetComponentByName(switchover.ComponentName)
-		if compSpec == nil {
-			return fmt.Errorf("component %s not found", switchover.ComponentName)
-		}
-		if compSpec.ComponentDef != "" {
-			return validateBaseOnCompDef(compSpec.ComponentDef)
-		} else {
-			return fmt.Errorf("not-supported")
-		}
-	}
-	return nil
-}
-
-// getComponentDefByName gets ComponentDefinition with compDefName
-func getComponentDefByName(ctx context.Context, cli client.Client, compDefName string) (*appsv1.ComponentDefinition, error) {
-	compDef := &appsv1.ComponentDefinition{}
-	if err := cli.Get(ctx, types.NamespacedName{Name: compDefName}, compDef); err != nil {
-		return nil, err
-	}
-	return compDef, nil
 }

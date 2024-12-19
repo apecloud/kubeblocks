@@ -4175,7 +4175,8 @@ spec:
                 minimum: 0
                 type: integer
               roles:
-                description: A list of roles defined in the system.
+                description: A list of roles defined in the system. Instanceset obtains
+                  role through pods' role label `kubeblocks.io/role`.
                 items:
                   properties:
                     accessMode:

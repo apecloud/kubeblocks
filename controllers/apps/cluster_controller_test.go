@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"slices"
+	"strconv"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -1185,13 +1186,16 @@ var _ = Describe("Cluster Controller", func() {
 			})()).ShouldNot(HaveOccurred())
 
 			By("check cluster and component objects been upgraded")
+			var clusterGenerate int64
 			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, cluster *appsv1.Cluster) {
 				g.Expect(cluster.Spec.ComponentSpecs[0].ComponentDef).Should(Equal(newCompDefObj.Name))
 				g.Expect(cluster.Spec.ComponentSpecs[0].ServiceVersion).Should(Equal(defaultServiceVersion))
+				clusterGenerate = cluster.Generation
 			})).Should(Succeed())
 			Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *appsv1.Component) {
 				g.Expect(comp.Spec.CompDef).Should(Equal(newCompDefObj.Name))
 				g.Expect(comp.Spec.ServiceVersion).Should(Equal(defaultServiceVersion))
+				g.Expect(strconv.Itoa(int(clusterGenerate))).Should(Equal(comp.Annotations[constant.KubeBlocksGenerationKey]))
 			})).Should(Succeed())
 		})
 

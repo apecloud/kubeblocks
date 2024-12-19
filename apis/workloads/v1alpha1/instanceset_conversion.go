@@ -21,12 +21,17 @@ package v1alpha1
 
 import (
 	"github.com/jinzhu/copier"
-	appsv1 "k8s.io/api/apps/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/conversion"
 
 	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
+)
+
+const (
+	kbIncrementConverterAK = "kb-increment-converter"
 )
 
 // ConvertTo converts this InstanceSet to the Hub version (v1).
@@ -44,6 +49,10 @@ func (r *InstanceSet) ConvertTo(dstRaw conversion.Hub) error {
 
 	// status
 	if err := copier.Copy(&dst.Status, &r.Status); err != nil {
+		return err
+	}
+
+	if err := r.incrementConvertTo(dst); err != nil {
 		return err
 	}
 
@@ -68,7 +77,49 @@ func (r *InstanceSet) ConvertFrom(srcRaw conversion.Hub) error {
 		return err
 	}
 
+	if err := r.incrementConvertFrom(src); err != nil {
+		return err
+	}
 	return nil
+}
+
+func (r *InstanceSet) incrementConvertTo(dstRaw metav1.Object) error {
+	if r.Spec.RoleProbe == nil {
+		return nil
+	}
+	// changed
+	instanceConvert := instanceSetConverter{
+		RoleProbe: r.Spec.RoleProbe,
+	}
+	bytes, err := json.Marshal(instanceConvert)
+	if err != nil {
+		return err
+	}
+	annotations := dstRaw.GetAnnotations()
+	if annotations == nil {
+		annotations = make(map[string]string)
+	}
+	annotations[kbIncrementConverterAK] = string(bytes)
+	dstRaw.SetAnnotations(annotations)
+	return nil
+}
+
+func (r *InstanceSet) incrementConvertFrom(srcRaw metav1.Object) error {
+	data, ok := srcRaw.GetAnnotations()[kbIncrementConverterAK]
+	if !ok {
+		return nil
+	}
+	instanceConvert := instanceSetConverter{}
+	if err := json.Unmarshal([]byte(data), &instanceConvert); err != nil {
+		return err
+	}
+	delete(srcRaw.GetAnnotations(), kbIncrementConverterAK)
+	r.Spec.RoleProbe = instanceConvert.RoleProbe
+	return nil
+}
+
+type instanceSetConverter struct {
+	RoleProbe *RoleProbe `json:"roleProbe,omitempty"`
 }
 
 func (r *InstanceSet) changesToInstanceSet(its *workloadsv1.InstanceSet) {
@@ -76,24 +127,36 @@ func (r *InstanceSet) changesToInstanceSet(its *workloadsv1.InstanceSet) {
 	// spec
 	//   podUpdatePolicy -> updateStrategy.instanceUpdatePolicy
 	//   memberUpdateStrategy -> updateStrategy.rollingUpdate.updateConcurrency
-	//   updateStrategy.rollingUpdate.partition -> updateStrategy.rollingUpdate.replicas
+	//   updateStrategy.partition -> updateStrategy.rollingUpdate.replicas
+	//   updateStrategy.maxUnavailable -> updateStrategy.rollingUpdate.maxUnavailable
+	//   updateStrategy.memberUpdateStrategy -> updateStrategy.rollingUpdate.updateConcurrency
 	if its.Spec.UpdateStrategy == nil {
 		its.Spec.UpdateStrategy = &workloadsv1.UpdateStrategy{}
 	}
 	its.Spec.UpdateStrategy.InstanceUpdatePolicy = (*workloadsv1.InstanceUpdatePolicyType)(&r.Spec.PodUpdatePolicy)
-	if r.Spec.MemberUpdateStrategy != nil {
+	initRollingUpdate := func() {
 		if its.Spec.UpdateStrategy.RollingUpdate == nil {
 			its.Spec.UpdateStrategy.RollingUpdate = &workloadsv1.RollingUpdate{}
 		}
-		its.Spec.UpdateStrategy.RollingUpdate.UpdateConcurrency = (*workloadsv1.UpdateConcurrency)(r.Spec.MemberUpdateStrategy)
 	}
-	if r.Spec.UpdateStrategy.RollingUpdate != nil {
-		if r.Spec.UpdateStrategy.RollingUpdate.Partition != nil {
-			if its.Spec.UpdateStrategy.RollingUpdate == nil {
-				its.Spec.UpdateStrategy.RollingUpdate = &workloadsv1.RollingUpdate{}
-			}
-			replicas := intstr.FromInt32(*r.Spec.UpdateStrategy.RollingUpdate.Partition)
+	setUpdateConcurrency := func(strategy *MemberUpdateStrategy) {
+		if strategy == nil {
+			return
+		}
+		initRollingUpdate()
+		its.Spec.UpdateStrategy.RollingUpdate.UpdateConcurrency = (*workloadsv1.UpdateConcurrency)(strategy)
+	}
+	setUpdateConcurrency(r.Spec.MemberUpdateStrategy)
+	if r.Spec.UpdateStrategy != nil {
+		setUpdateConcurrency(r.Spec.UpdateStrategy.MemberUpdateStrategy)
+		if r.Spec.UpdateStrategy.Partition != nil {
+			initRollingUpdate()
+			replicas := intstr.FromInt32(*r.Spec.UpdateStrategy.Partition)
 			its.Spec.UpdateStrategy.RollingUpdate.Replicas = &replicas
+		}
+		if r.Spec.UpdateStrategy.MaxUnavailable != nil {
+			initRollingUpdate()
+			its.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable = r.Spec.UpdateStrategy.MaxUnavailable
 		}
 	}
 }
@@ -103,7 +166,9 @@ func (r *InstanceSet) changesFromInstanceSet(its *workloadsv1.InstanceSet) {
 	// spec
 	//   podUpdatePolicy -> updateStrategy.instanceUpdatePolicy
 	//   memberUpdateStrategy -> updateStrategy.rollingUpdate.updateConcurrency
-	//   updateStrategy.rollingUpdate.partition -> updateStrategy.rollingUpdate.replicas
+	//   updateStrategy.partition -> updateStrategy.rollingUpdate.replicas
+	//   updateStrategy.maxUnavailable -> updateStrategy.rollingUpdate.maxUnavailable
+	//   updateStrategy.memberUpdateStrategy -> updateStrategy.rollingUpdate.updateConcurrency
 	if its.Spec.UpdateStrategy == nil {
 		return
 	}
@@ -113,14 +178,18 @@ func (r *InstanceSet) changesFromInstanceSet(its *workloadsv1.InstanceSet) {
 	if its.Spec.UpdateStrategy.RollingUpdate == nil {
 		return
 	}
+	if r.Spec.UpdateStrategy == nil {
+		r.Spec.UpdateStrategy = &InstanceUpdateStrategy{}
+	}
 	if its.Spec.UpdateStrategy.RollingUpdate.UpdateConcurrency != nil {
 		r.Spec.MemberUpdateStrategy = (*MemberUpdateStrategy)(its.Spec.UpdateStrategy.RollingUpdate.UpdateConcurrency)
+		r.Spec.UpdateStrategy.MemberUpdateStrategy = r.Spec.MemberUpdateStrategy
 	}
 	if its.Spec.UpdateStrategy.RollingUpdate.Replicas != nil {
-		if r.Spec.UpdateStrategy.RollingUpdate == nil {
-			r.Spec.UpdateStrategy.RollingUpdate = &appsv1.RollingUpdateStatefulSetStrategy{}
-		}
 		partition, _ := intstr.GetScaledValueFromIntOrPercent(its.Spec.UpdateStrategy.RollingUpdate.Replicas, int(*its.Spec.Replicas), false)
-		r.Spec.UpdateStrategy.RollingUpdate.Partition = pointer.Int32(int32(partition))
+		r.Spec.UpdateStrategy.Partition = pointer.Int32(int32(partition))
+	}
+	if its.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable != nil {
+		r.Spec.UpdateStrategy.MaxUnavailable = its.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable
 	}
 }

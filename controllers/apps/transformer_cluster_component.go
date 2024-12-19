@@ -181,10 +181,8 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1.Component) *appsv1.Com
 	compProto := newCompObj
 
 	// merge labels and annotations
-	ictrlutil.MergeMetadataMapInplace(compObjCopy.Annotations, &compProto.Annotations)
-	ictrlutil.MergeMetadataMapInplace(compObjCopy.Labels, &compProto.Labels)
-	compObjCopy.Annotations = compProto.Annotations
-	compObjCopy.Labels = compProto.Labels
+	ictrlutil.MergeMetadataMapInplace(compProto.Annotations, &compObjCopy.Annotations)
+	ictrlutil.MergeMetadataMapInplace(compProto.Labels, &compObjCopy.Labels)
 
 	// merge spec
 	compObjCopy.Spec.CompDef = compProto.Spec.CompDef
@@ -359,7 +357,11 @@ func (c *notExistPrecondition) match(transCtx *clusterTransformContext, dag *gra
 }
 
 func (c *notExistPrecondition) predecessorExist(transCtx *clusterTransformContext, dag *graph.DAG, name string) (bool, error) {
-	if transCtx.sharding(name) {
+	isSharding, err := transCtx.sharding(name)
+	if err != nil {
+		return false, err
+	}
+	if isSharding {
 		return c.shardingExist(transCtx, dag, name)
 	}
 	return c.compExist(transCtx, dag, name)
@@ -455,7 +457,11 @@ func (c *phasePrecondition) match(transCtx *clusterTransformContext, dag *graph.
 }
 
 func (c *phasePrecondition) predecessorMatch(transCtx *clusterTransformContext, dag *graph.DAG, name string) (bool, error) {
-	if transCtx.sharding(name) {
+	isSharding, err := transCtx.sharding(name)
+	if err != nil {
+		return false, err
+	}
+	if isSharding {
 		return c.shardingMatch(transCtx, dag, name)
 	}
 	return c.compMatch(transCtx, dag, name)
@@ -544,7 +550,11 @@ type clusterCompNShardingHandler struct {
 }
 
 func (h *clusterCompNShardingHandler) handle(transCtx *clusterTransformContext, dag *graph.DAG, name string) error {
-	if transCtx.sharding(name) {
+	isSharding, err := transCtx.sharding(name)
+	if err != nil {
+		return err
+	}
+	if isSharding {
 		handler := &clusterShardingHandler{scaleIn: h.scaleIn}
 		switch h.op {
 		case createOp:

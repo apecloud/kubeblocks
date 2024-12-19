@@ -1,7 +1,7 @@
 {{- if has "redis" .Values.autoInstalledAddons  }}
 {{- $selectorLabels := include "kubeblocks.selectorLabels" . }}
 {{- include "kubeblocks.buildAddonCR" (merge (dict
-  "kbVersion" ">=0.7.0"
+  "kbVersion" ">=1.0.0"
   "selectorLabels" $selectorLabels
   "name" "redis"
   "version" "1.0.0-alpha.0"

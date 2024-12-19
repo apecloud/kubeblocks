@@ -153,10 +153,6 @@ Elasticsearch 提供 HTTP 访问协议，使用端口 9200 进行通信。您可
 curl http://127.0.0.1:9200/_cat/nodes?v
 ```
 
-## 监控集群
-
-Elasticsearch 的监控功能与其他引擎相同，可参考[监控文档](./../observability/monitor-database.md)，了解功能细节。
-
 ## 扩缩容
 
 ### 水平扩缩容

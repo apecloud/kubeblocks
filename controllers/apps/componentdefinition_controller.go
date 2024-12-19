@@ -234,6 +234,9 @@ func (r *ComponentDefinitionReconciler) validateVars(cli client.Client, rctx int
 	// validate the reference to component definition name pattern
 	var compDef string
 	for _, cVar := range cmpd.Spec.Vars {
+		if len(cVar.Value) > 0 && cVar.ValueFrom != nil {
+			return fmt.Errorf("both value and valueFrom are specified for component var: %s", cVar.Name)
+		}
 		if cVar.ValueFrom == nil {
 			continue
 		}

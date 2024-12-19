@@ -266,3 +266,13 @@ func CalculateConcurrencyReplicas(concurrency *intstr.IntOrString, replicas int)
 	pValue = integer.IntMax(integer.IntMin(pValue, replicas), 1)
 	return pValue, nil
 }
+
+func getUpdateConcurrency(its *workloads.InstanceSet) workloads.UpdateConcurrency {
+	updateConcurrency := workloads.SerialConcurrency
+	if its.Spec.UpdateStrategy != nil &&
+		its.Spec.UpdateStrategy.RollingUpdate != nil &&
+		its.Spec.UpdateStrategy.RollingUpdate.UpdateConcurrency != nil {
+		updateConcurrency = *its.Spec.UpdateStrategy.RollingUpdate.UpdateConcurrency
+	}
+	return updateConcurrency
+}

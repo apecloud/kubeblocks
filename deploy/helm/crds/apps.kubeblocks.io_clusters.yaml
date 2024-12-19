@@ -3783,20 +3783,6 @@ spec:
                         or when scaling down. It only used when `PodManagementPolicy` is set to `Parallel`.
                         The default Concurrency is 100%.
                       x-kubernetes-int-or-string: true
-                    podUpdatePolicy:
-                      description: |-
-                        PodUpdatePolicy indicates how pods should be updated
-
-
-                        - `StrictInPlace` indicates that only allows in-place upgrades.
-                        Any attempt to modify other fields will be rejected.
-                        - `PreferInPlace` indicates that we will first attempt an in-place upgrade of the Pod.
-                        If that fails, it will fall back to the ReCreate, where pod will be recreated.
-                        Default value is "PreferInPlace"
-                      enum:
-                      - StrictInPlace
-                      - PreferInPlace
-                      type: string
                     replicas:
                       default: 1
                       description: Specifies the desired number of replicas in the
@@ -5352,6 +5338,79 @@ spec:
                         If TLS is enabled, the Component may require additional configuration, such as specifying TLS certificates and keys,
                         to properly set up the secure communication channel.
                       type: boolean
+                    updateStrategy:
+                      description: Provides fine-grained control over the spec update
+                        process of all instances.
+                      properties:
+                        instanceUpdatePolicy:
+                          description: |-
+                            Indicates how instances should be updated.
+
+
+                            - `StrictInPlace` indicates that only allows in-place update.
+                            Any attempt to modify other fields that not support in-place update will be rejected.
+                            - `PreferInPlace` indicates that we will first attempt an in-place update of the instance.
+                            If that fails, it will fall back to the ReCreate, where instance will be recreated.
+                            Default value is "PreferInPlace".
+                          enum:
+                          - StrictInPlace
+                          - PreferInPlace
+                          type: string
+                        rollingUpdate:
+                          description: Specifies how the rolling update should be
+                            applied.
+                          properties:
+                            maxUnavailable:
+                              anyOf:
+                              - type: integer
+                              - type: string
+                              description: |-
+                                The maximum number of instances that can be unavailable during the update.
+                                Value can be an absolute number (ex: 5) or a percentage of desired instances (ex: 10%).
+                                Absolute number is calculated from percentage by rounding up. This can not be 0.
+                                Defaults to 1. The field applies to all instances. That means if there is any unavailable pod,
+                                it will be counted towards MaxUnavailable.
+                              x-kubernetes-int-or-string: true
+                            replicas:
+                              anyOf:
+                              - type: integer
+                              - type: string
+                              description: |-
+                                Indicates the number of instances that should be updated during a rolling update.
+                                The remaining instances will remain untouched. This is helpful in defining how many instances
+                                should participate in the update process.
+                                Value can be an absolute number (ex: 5) or a percentage of desired instances (ex: 10%).
+                                Absolute number is calculated from percentage by rounding up.
+                                The default value is ComponentSpec.Replicas (i.e., update all instances).
+                              x-kubernetes-int-or-string: true
+                            updateConcurrency:
+                              allOf:
+                              - enum:
+                                - Serial
+                                - BestEffortParallel
+                                - Parallel
+                              - enum:
+                                - Serial
+                                - Parallel
+                                - BestEffortParallel
+                              default: Serial
+                              description: "Specifies the concurrency level for updating
+                                instances during a rolling update.\nAvailable levels:\n\n\n-
+                                `Serial`: Updates instances one at a time, ensuring
+                                minimal downtime by waiting for each instance to become
+                                ready\n  before updating the next.\n- `Parallel`:
+                                Updates all instances simultaneously, optimizing for
+                                speed but potentially reducing availability\n  during
+                                the update.\n- `BestEffortParallel`: Updates instances
+                                concurrently with a limit on simultaneous updates
+                                to ensure a minimum\n  number of operational replicas
+                                for maintaining quorum.\n\t For example, in a 5-instances
+                                setup, updating a maximum of 2 instances simultaneously
+                                keeps\n\t at least 3 operational for quorum.\n\n\nDefaults
+                                to 'Serial'."
+                              type: string
+                          type: object
+                      type: object
                     volumeClaimTemplates:
                       description: |-
                         Specifies a list of PersistentVolumeClaim templates that represent the storage requirements for the Component.
@@ -12473,20 +12532,6 @@ spec:
                             or when scaling down. It only used when `PodManagementPolicy` is set to `Parallel`.
                             The default Concurrency is 100%.
                           x-kubernetes-int-or-string: true
-                        podUpdatePolicy:
-                          description: |-
-                            PodUpdatePolicy indicates how pods should be updated
-
-
-                            - `StrictInPlace` indicates that only allows in-place upgrades.
-                            Any attempt to modify other fields will be rejected.
-                            - `PreferInPlace` indicates that we will first attempt an in-place upgrade of the Pod.
-                            If that fails, it will fall back to the ReCreate, where pod will be recreated.
-                            Default value is "PreferInPlace"
-                          enum:
-                          - StrictInPlace
-                          - PreferInPlace
-                          type: string
                         replicas:
                           default: 1
                           description: Specifies the desired number of replicas in
@@ -14054,6 +14099,80 @@ spec:
                             If TLS is enabled, the Component may require additional configuration, such as specifying TLS certificates and keys,
                             to properly set up the secure communication channel.
                           type: boolean
+                        updateStrategy:
+                          description: Provides fine-grained control over the spec
+                            update process of all instances.
+                          properties:
+                            instanceUpdatePolicy:
+                              description: |-
+                                Indicates how instances should be updated.
+
+
+                                - `StrictInPlace` indicates that only allows in-place update.
+                                Any attempt to modify other fields that not support in-place update will be rejected.
+                                - `PreferInPlace` indicates that we will first attempt an in-place update of the instance.
+                                If that fails, it will fall back to the ReCreate, where instance will be recreated.
+                                Default value is "PreferInPlace".
+                              enum:
+                              - StrictInPlace
+                              - PreferInPlace
+                              type: string
+                            rollingUpdate:
+                              description: Specifies how the rolling update should
+                                be applied.
+                              properties:
+                                maxUnavailable:
+                                  anyOf:
+                                  - type: integer
+                                  - type: string
+                                  description: |-
+                                    The maximum number of instances that can be unavailable during the update.
+                                    Value can be an absolute number (ex: 5) or a percentage of desired instances (ex: 10%).
+                                    Absolute number is calculated from percentage by rounding up. This can not be 0.
+                                    Defaults to 1. The field applies to all instances. That means if there is any unavailable pod,
+                                    it will be counted towards MaxUnavailable.
+                                  x-kubernetes-int-or-string: true
+                                replicas:
+                                  anyOf:
+                                  - type: integer
+                                  - type: string
+                                  description: |-
+                                    Indicates the number of instances that should be updated during a rolling update.
+                                    The remaining instances will remain untouched. This is helpful in defining how many instances
+                                    should participate in the update process.
+                                    Value can be an absolute number (ex: 5) or a percentage of desired instances (ex: 10%).
+                                    Absolute number is calculated from percentage by rounding up.
+                                    The default value is ComponentSpec.Replicas (i.e., update all instances).
+                                  x-kubernetes-int-or-string: true
+                                updateConcurrency:
+                                  allOf:
+                                  - enum:
+                                    - Serial
+                                    - BestEffortParallel
+                                    - Parallel
+                                  - enum:
+                                    - Serial
+                                    - Parallel
+                                    - BestEffortParallel
+                                  default: Serial
+                                  description: "Specifies the concurrency level for
+                                    updating instances during a rolling update.\nAvailable
+                                    levels:\n\n\n- `Serial`: Updates instances one
+                                    at a time, ensuring minimal downtime by waiting
+                                    for each instance to become ready\n  before updating
+                                    the next.\n- `Parallel`: Updates all instances
+                                    simultaneously, optimizing for speed but potentially
+                                    reducing availability\n  during the update.\n-
+                                    `BestEffortParallel`: Updates instances concurrently
+                                    with a limit on simultaneous updates to ensure
+                                    a minimum\n  number of operational replicas for
+                                    maintaining quorum.\n\t For example, in a 5-instances
+                                    setup, updating a maximum of 2 instances simultaneously
+                                    keeps\n\t at least 3 operational for quorum.\n\n\nDefaults
+                                    to 'Serial'."
+                                  type: string
+                              type: object
+                          type: object
                         volumeClaimTemplates:
                           description: |-
                             Specifies a list of PersistentVolumeClaim templates that represent the storage requirements for the Component.

@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"time"
 
-	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -93,13 +92,8 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 
 	// 3. do update
-	// do nothing if UpdateStrategyType is 'OnDelete'
-	if its.Spec.UpdateStrategy.Type == apps.OnDeleteStatefulSetStrategyType {
-		return kubebuilderx.Continue, nil
-	}
-
 	// handle 'RollingUpdate'
-	partition, maxUnavailable, err := parsePartitionNMaxUnavailable(its.Spec.UpdateStrategy.RollingUpdate, len(oldPodList))
+	partition, maxUnavailable, err := parseReplicasNMaxUnavailable(its.Spec.UpdateStrategy, len(oldPodList))
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}
@@ -114,8 +108,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	// if it's a roleful InstanceSet, we use updateCount to represent Pods can be updated according to the spec.memberUpdateStrategy.
 	updateCount := len(oldPodList)
 	if len(its.Spec.Roles) > 0 {
-		itsForPlan := getInstanceSetForUpdatePlan(its)
-		plan := NewUpdatePlan(*itsForPlan, oldPodList, IsPodUpdated)
+		plan := NewUpdatePlan(*its, oldPodList, IsPodUpdated)
 		podsToBeUpdated, err := plan.Execute()
 		if err != nil {
 			return kubebuilderx.Continue, err
@@ -160,9 +153,13 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		if err != nil {
 			return kubebuilderx.Continue, err
 		}
-		if its.Spec.PodUpdatePolicy == workloads.StrictInPlacePodUpdatePolicyType && updatePolicy == RecreatePolicy {
-			message := fmt.Sprintf("InstanceSet %s/%s blocks on update as the PodUpdatePolicy is %s and the pod %s can not inplace update",
-				its.Namespace, its.Name, workloads.StrictInPlacePodUpdatePolicyType, pod.Name)
+		instanceUpdatePolicy := workloads.PreferInPlaceInstanceUpdatePolicyType
+		if its.Spec.UpdateStrategy != nil && its.Spec.UpdateStrategy.InstanceUpdatePolicy != nil {
+			instanceUpdatePolicy = *its.Spec.UpdateStrategy.InstanceUpdatePolicy
+		}
+		if instanceUpdatePolicy == workloads.StrictInPlaceInstanceUpdatePolicyType && updatePolicy == RecreatePolicy {
+			message := fmt.Sprintf("InstanceSet %s/%s blocks on update as the InstanceUpdatePolicy is %s and the pod %s can not inplace update",
+				its.Namespace, its.Name, workloads.StrictInPlaceInstanceUpdatePolicyType, pod.Name)
 			if tree != nil && tree.EventRecorder != nil {
 				tree.EventRecorder.Eventf(its, corev1.EventTypeWarning, EventReasonStrictInPlace, message)
 			}
@@ -209,39 +206,33 @@ func buildBlockedCondition(its *workloads.InstanceSet, message string) *metav1.C
 	}
 }
 
-func getInstanceSetForUpdatePlan(its *workloads.InstanceSet) *workloads.InstanceSet {
-	if its.Spec.MemberUpdateStrategy != nil {
-		return its
-	}
-	itsForPlan := its.DeepCopy()
-	updateStrategy := workloads.SerialUpdateStrategy
-	if its.Spec.PodManagementPolicy == apps.ParallelPodManagement {
-		updateStrategy = workloads.ParallelUpdateStrategy
-	}
-	itsForPlan.Spec.MemberUpdateStrategy = &updateStrategy
-	return itsForPlan
-}
-
-func parsePartitionNMaxUnavailable(rollingUpdate *apps.RollingUpdateStatefulSetStrategy, replicas int) (int, int, error) {
-	partition := replicas
+func parseReplicasNMaxUnavailable(updateStrategy *workloads.UpdateStrategy, totalReplicas int) (int, int, error) {
+	replicas := totalReplicas
 	maxUnavailable := 1
-	if rollingUpdate == nil {
-		return partition, maxUnavailable, nil
+	if updateStrategy == nil {
+		return replicas, maxUnavailable, nil
 	}
-	if rollingUpdate.Partition != nil {
-		partition = int(*rollingUpdate.Partition)
+	rollingUpdate := updateStrategy.RollingUpdate
+	if rollingUpdate == nil {
+		return replicas, maxUnavailable, nil
+	}
+	var err error
+	if rollingUpdate.Replicas != nil {
+		replicas, err = intstr.GetScaledValueFromIntOrPercent(rollingUpdate.Replicas, totalReplicas, false)
+		if err != nil {
+			return replicas, maxUnavailable, err
+		}
 	}
 	if rollingUpdate.MaxUnavailable != nil {
-		maxUnavailableNum, err := intstr.GetScaledValueFromIntOrPercent(intstr.ValueOrDefault(rollingUpdate.MaxUnavailable, intstr.FromInt32(1)), replicas, false)
+		maxUnavailable, err = intstr.GetScaledValueFromIntOrPercent(intstr.ValueOrDefault(rollingUpdate.MaxUnavailable, intstr.FromInt32(1)), totalReplicas, false)
 		if err != nil {
 			return 0, 0, err
 		}
 		// maxUnavailable might be zero for small percentage with round down.
 		// So we have to enforce it not to be less than 1.
-		if maxUnavailableNum < 1 {
-			maxUnavailableNum = 1
+		if maxUnavailable < 1 {
+			maxUnavailable = 1
 		}
-		maxUnavailable = maxUnavailableNum
 	}
-	return partition, maxUnavailable, nil
+	return replicas, maxUnavailable, nil
 }

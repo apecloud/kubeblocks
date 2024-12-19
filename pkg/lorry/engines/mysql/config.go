@@ -86,15 +86,8 @@ func NewConfig(properties map[string]string) (*Config, error) {
 		config.URL = "root:@tcp(127.0.0.1:3306)/mysql?multiStatements=true"
 	}
 
-	if viper.IsSet(constant.KBEnvServiceUser) {
-		config.Username = viper.GetString(constant.KBEnvServiceUser)
-	} else if username, ok := properties["username"]; ok {
-		config.Username = username
-	}
-
-	if viper.IsSet(constant.KBEnvServicePassword) {
-		config.Password = viper.GetString(constant.KBEnvServicePassword)
-	}
+	config.Username = getUserName()
+	config.Password = getPassword()
 
 	if viper.IsSet(constant.KBEnvServicePort) {
 		config.port = viper.GetString(constant.KBEnvServicePort)
@@ -146,6 +139,28 @@ func NewConfig(properties map[string]string) (*Config, error) {
 		}
 	}
 	return config, nil
+}
+
+func getUserName() string {
+	if viper.IsSet("MYSQL_ADMIN_USER") {
+		return viper.GetString("MYSQL_ADMIN_USER")
+	} else if viper.IsSet(constant.KBEnvServiceUser) {
+		return viper.GetString(constant.KBEnvServiceUser)
+	} else if viper.IsSet("MYSQL_ROOT_USER") {
+		return viper.GetString("MYSQL_ROOT_USER")
+	}
+	return ""
+}
+
+func getPassword() string {
+	if viper.IsSet("MYSQL_ADMIN_PASSWORD") {
+		return viper.GetString("MYSQL_ADMIN_PASSWORD")
+	} else if viper.IsSet(constant.KBEnvServicePassword) {
+		return viper.GetString(constant.KBEnvServicePassword)
+	} else if viper.IsSet("MYSQL_ROOT_PASSWORD") {
+		return viper.GetString("MYSQL_ROOT_PASSWORD")
+	}
+	return ""
 }
 
 func (config *Config) GetLocalDBConn() (*sql.DB, error) {

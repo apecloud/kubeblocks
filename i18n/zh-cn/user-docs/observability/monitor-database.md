@@ -1,7 +1,7 @@
 ---
-title: 监控数据库
-description: 如何监控数据库
-keywords: [监控数据库, 监控集群, 监控]
+title: 监控
+description: 如何监控数据库集群
+keywords: [监控, 监控数据库集群]
 sidebar_position: 1
 ---
 
@@ -10,221 +10,166 @@ import TabItem from '@theme/TabItem';
 
 # 监控数据库
 
-KubeBlocks 提供了强大的可观测性能力。您可以实时观察数据库的健康状态，及时跟踪数据库，并优化数据库性能。本文档将展示 KubeBlocks 中的数据库监控工具以及它们该如何使用。
+您可按需通过不同的监控工具监控集群状态，本教程使用 Prometheus 和 Grafana 作为监控工作，以配置 PostgreSQL 集群的监控功能为例进行说明。
 
-## Playground/演示场景
+## 步骤 1. 安装 Prometheus Operator 和 Grafana
 
-KubeBlocks 以插件（Addon）形式集成了许多开源监控组件，如 Prometheus、AlertManager 和 Grafana，并采用定制的 `apecloud-otel-collector` 组件收集数据库和宿主机的监控指标。您可以在测试或演示环境中使用以下监控引擎。
+安装 Prometheus Operator 和 Grafana, 监控数据库性能指标。如果您的环境中已有 Prometheus Operator，可跳过本节。
 
-- `prometheus`：包括 Prometheus 和 AlertManager 两个监控组件。
-- `grafana`：包括 Grafana 的监控组件。
-- `victoria-metrics`：从多个源收集指标并将其存储到 VictoriaMetrics 中。
-- `victoria-metrics-agent`：从多个源收集指标，重新标记和过滤收集到的指标，并通过 Prometheus `remote_write` 协议或 VictoriaMetrics `remote_write` 协议将其存储到 VictoriaMetrics 或其他存储系统中。
-- `alertmanager-webhook-adaptor`：包括消息通知扩展组件，用于扩展 AlertManager 的通知能力。目前已经支持飞书、钉钉和企业微信的自定义机器人。
-- `apecloud-otel-collector`：用于采集数据库和宿主机的指标。
-
-如果您使用的是 KubeBlocks Playground，上述监控引擎默认启用。如需在测试环境中使用，可按照以下步骤操作。
-
-### 步骤
-
-<Tabs>
-
-<TabItem value="kbcli" label="kbcli" default>
-
-1. 查看所有支持的引擎，确保监控引擎已启用。可参考[此文档](./../installation/install-addons.md)，查看安装或启用引擎的详细说明。
-
-    ```bash
-    # 查看内置支持的所有引擎
-    kbcli addon list
-    ...
-    grafana                        Helm   Enabled                   true                                                                                    
-    alertmanager-webhook-adaptor   Helm   Enabled                   true                                                                                    
-    ...
-
-    # 如果监控引擎未列出，则表明该引擎未安装，可按照以下步骤安装引擎
-    # 1. 检索引擎
-    kbcli addon search prometheus
-
-    # 2. 安装引擎
-    kbcli addon install prometheus --index kubeblocks
-
-    # 如果列表中有该引擎但显示为 Disabled，说明引擎未启用，可按照以下步骤启用引擎
-    kbcli addon enable apecloud-otel-collector
-    ```
-
-2. 查看集群监控功能是否已开启。如果输出结果显示 `disableExporter: false`，则说明监控功能已开启。
+1. 为监控 Operator 创建新的命名空间。
 
    ```bash
-   kubectl get cluster mycluster -o yaml
-   >
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: Cluster
+   kubectl create namespace monitoring
+   ```
+
+2. 添加 Prometheus Operator Helm 仓库。
+
+   ```bash
+   helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+   ```
+
+3. 安装 Prometheus Operator。
+
+   ```bash
+   helm install prometheus-operator prometheus-community/kube-prometheus-stack --namespace monitoring
+   ```
+
+4. 验证 Prometheus Operator 是否安装成功。
+
+   ```bash
+   kubectl get pods -n monitoring
+   ```
+
+5. 连接 Prometheus 和 Grafana 大盘。
+
+   1. 查看 Prometheus 和 Grafana 的服务端口。
+
+     ```bash
+     kubectl get svc -n monitoring
+     ```
+
+   2. 使用 port forward 从本地连接 Prometheus 大盘。
+
+     ```bash
+     kubectl port-forward svc/prometheus-operator-kube-p-prometheus -n monitoring 9090:9090
+     ```
+
+     您也可通过在浏览器中打开 "http://localhost:9090" 地址，连接 Prometheus 大盘。
+
+   3. 从 secret 中获取 Grafana 的连接凭证。
+
+     ```bash
+     kubectl get secrets prometheus-operator-grafana -n monitoring -oyaml
+     ```  
+
+   4. 使用 port forward 从本地连接 Grafana 大盘。
+
+     ```bash
+     kubectl port-forward svc/prometheus-operator-grafana -n monitoring 3000:80
+     ```
+
+     您也可通过在浏览器中打开 "http://localhost:3000" 地址，连接 Grafana 大盘。
+
+6. （可选）配置 `PodMonitor` 及 `ServiceMonitor` 选择器。
+
+   Prometheus Operator 使用 Prometheus CRD 创建实例，自定义配置 replica、PVC 等其他参数。
+
+   如需更新 `PodMonitor` 及 `ServiceMonitor` 的配置，您可按需更新 Prometheus CR 文件。
+
+   ```yaml
+   apiVersion: monitoring.coreos.com/v1
+   kind: Prometheus
    metadata:
-   ...
    spec:
-     ...
-     componentSpecs:
-     ...
-       disableExporter: false
+     podMonitorNamespaceSelector: {} # 匹配 PodMonitor 的命名空间
+     # 选择用于目标发现的 PodMonitors。空的标签选择器
+     # 会匹配所有对象
+     podMonitorSelector:
+       matchLabels:
+         release: prometheus # 确保您的 PodMonitor CR 的标签与此选择器匹配
+     serviceMonitorNamespaceSelector: {} # 匹配 ServiceMonitor 的命名空间
+     # 选择用于目标发现的 ServiceMonitors。空的标签选择器
+     # 会匹配所有对象
+     serviceMonitorSelector:
+       matchLabels:
+         release: prometheus # 确保您的 ServiceMonitor CR 的标签与此选择器匹配
    ```
 
-   如果输出结果中未显示 `disableExporter: false`，则说明集群监控功能未开启，可执行以下命令，开启监控功能。
+## 步骤 2. 监控数据库集群
 
-   ```bash
-   kbcli cluster update mycluster --disable-exporter=false
-   ```
+监控集群的方式多种多样，本文档中我们使用 Promethus 和 Grafana 演示如何监控集群。
 
-3. 查看仪表盘列表。
+### 开启集群的监控 exporter
 
-    ```bash
-    kbcli dashboard list
-    >
-    NAME                                 NAMESPACE   PORT    CREATED-TIME
-    kubeblocks-grafana                   kb-system   13000   Jul 24,2023 11:38 UTC+0800
-    kubeblocks-prometheus-alertmanager   kb-system   19093   Jul 24,2023 11:38 UTC+0800
-    kubeblocks-prometheus-server         kb-system   19090   Jul 24,2023 11:38 UTC+0800
-    ```
+#### 创建新集群并开启监控 exporter
 
-4. 打开网页控制台并查看。例如：
+使用以下命令创建集群，并开启监控 exporter。
 
-    ```bash
-    kbcli dashboard open kubeblocks-grafana
-    ```
+:::Note
 
-</TabItem>
-
-<TabItem value="kubectl" label="kubeclt">
-
-:::note
-
-以下示例展示了启用 `prometheus` 引擎。您可以将 `prometheus` 替换为其他监控引擎的名称，以开启对应的引擎。
+创建集群时，请确保 `spec.componentSpecs.disableExporter` 设为 `false`。
 
 :::
-
-### 1. 启用监控引擎
-
-1. （可选）添加 KubeBlocks 仓库。如果您通过 Helm 安装 KubeBlocks，可直接执行 `helm repo update`。
-
-   ```bash
-   helm repo add kubeblocks https://apecloud.github.io/helm-charts
-   helm repo update
-   ```
-
-2. 查看引擎版本。
-
-   ```bash
-   helm search repo kubeblocks/prometheus --devel --versions
-   ```
-
-3. 安装引擎。
-
-   ```bash
-   helm install prometheus kubeblocks/prometheus --namespace kb-system --create-namespace
-   ```
-
-4. 验证该引擎是否安装成功。
-
-   状态显示为 deployed 表明该引擎安装成功。
-
-   ```bash
-   helm list -A
-   >
-   NAME         NAMESPACE   REVISION    UPDATED                                 STATUS      CHART                APP VERSION
-   ...
-   prometheus   kb-system   1           2024-05-31 12:01:52.872584 +0800 CST    deployed    prometheus-15.16.1   2.39.1 
-   ```
-
-### 2. 开启集群监控功能
-
-监控功能开启后，开源或自定义 Exporter 将会注入，Prometheus 服务器将自动发现该 Exporter，并定时抓取监控指标。
-
-如果您在创建集群是关闭了监控功能，可执行以下命令再次开启。
-
-```bash
-kubectl patch cluster mycluster -n demo --type "json" -p '[{"op":"add","path":"/spec/componentSpecs/0/disableExporter","value":false}]'
-```
-
-您也可通过编辑 `cluster.yaml` 文件开启/停用监控功能。
-
-```bash
-kubectl edit cluster mycluster -n demo
-```
-
-在编辑器中修改 `disableExporter` 的参数值。
 
 ```yaml
-...
-componentSpecs:
-  - name: mysql
-    componentDefRef: mysql
+cat <<EOF | kubectl apply -f -
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: mycluster
+  namespace: demo
+spec:
+  clusterDefinitionRef: postgresql
+  clusterVersionRef: postgresql-12.14.0
+  terminationPolicy: Delete
+  affinity:
+    podAntiAffinity: Preferred
+    topologyKeys:
+    - kubernetes.io/hostname
+    tenancy: SharedNode
+  tolerations:
+    - key: kb-data
+      operator: Equal
+      value: 'true'
+      effect: NoSchedule
+  componentSpecs:
+  - name: postgresql
+    componentDefRef: postgresql
     enabledLogs:
-    - error
-    - general
-    - slow
-    disableExporter: false # 修改该参数值
-...
+    - running
+    disableExporter: true # 将参数值设为 `false`，开启 exporter
+    replicas: 2
+    resources:
+      limits:
+        cpu: '0.5'
+        memory: 0.5Gi
+      requests:
+        cpu: '0.5'
+        memory: 0.5Gi
+    volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi
+EOF
 ```
 
-（可选）如果您想要在使用后关闭监控功能，可执行以下命令停用该功能。
+#### 开启已有集群的监控 exporter
 
-```bash
-kubectl patch cluster mycluster -n namespace --type "json" -p '[{"op":"add","path":"/spec/componentSpecs/0/disableExporter","value":true}]'
-```
-
-### 3. 查看监控大盘
-
-使用 KubeBlocks 提供的 Grafana 引擎查看监控大盘。
-
-1. 获取 Grafana 引擎的用户名和密码。
-
-   ```bash
-   kubectl get secret grafana -n kb-system -o jsonpath='{.data.admin-user}' |base64 -d
-
-   kubectl get secret grafana -n kb-system -o jsonpath='{.data.admin-password}' |base64 -d
-   ```
-
-2. 执行以下命令连接 Grafana 大盘。
-
-   ```bash
-   kubectl port-forward svc/grafana -n kb-system 3000:80
-   >
-   Forwarding from 127.0.0.1:3000 -> 3000
-   Forwarding from [::1]:3000 -> 3000
-   Handling connection for 3000
-   ```
-
-3. 打开浏览器，输入 `127.0.0.1:3000`，跳转至大盘界面。
-4. 输入第 1 步中获取的用户名和密码，即可访问。
-
-:::note
-
-如果大盘中无数据，您可以检查界面中的 job 是否为 `kubeblocks-service`。如果不是，可在 job 框中输入 `kubeblocks-service`，回车后再次查看。
-
-![monitoring](./../../img/api-monitoring.png)
-
-:::
-
-</TabItem>
-
-</Tabs>
-
-## 生产环境
-
-在生产环境中，强烈建议搭建独立的监控系统或购买第三方监控服务。
-
-### 1. 集成监控大盘和告警规则
-
-KubeBlocks 为主流数据库引擎提供了 Grafana 监控大盘和 Prometheus 告警规则，您可通过[该仓库](https://github.com/apecloud/kubeblocks-mixin)获取，或者按需转化或定制。
-
-具体导入方法，可参考您使用的第三方监控服务的相关文档。
-
-### 2. 开启数据库监控功能
-
-查看集群监控功能是否已开启。如果输出结果显示 `disableExporter: false`，则说明监控功能已开启。
+如果您的环境中已有集群，可执行以下命令查看监控 exporter 是否开启。
 
 ```bash
 kubectl get cluster mycluster -o yaml
->
+```
+
+<details>
+
+<summary>输出</summary>
+
+```yaml
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
@@ -236,31 +181,31 @@ spec:
       disableExporter: false
 ```
 
-如果输出结果中未显示 `disableExporter: false`，则说明集群监控功能未开启，可执行以下命令，开启监控功能。
+</details>
+
+将 `disableExporter` 设置为 `false` 或使用隐式设置（使用默认值），即表示监控 exporter 已启用，这是监控功能正常运行的前提条件。如果输出结果显示 `disableExporter: true`，您需要将其修改为 `false`，开启监控 exporter。
+
+请注意更新 `disableExporter` 字段会导致集群中的所有 Pod 重启。
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-```bash
-kbcli cluster update mycluster --disable-exporter=false
-```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubeclt">
+<TabItem value="kubectl patch" label="kubectl patch" default>
 
 ```bash
 kubectl patch cluster mycluster -n demo --type "json" -p '[{"op":"add","path":"/spec/componentSpecs/0/disableExporter","value":false}]'
 ```
 
-您也可通过编辑 `cluster.yaml` 文件开启/停用监控功能。
+</TabItem>
+
+<TabItem value="编辑集群 YAML 文件" label="编辑集群 YAML 文件">
+
+您也可通过编辑 `cluster.yaml` 文件开启监控功能。
 
 ```bash
 kubectl edit cluster mycluster -n demo
 ```
 
-在编辑器中修改 `disableExporter` 的参数值。
+修改 `disableExporter` 的参数值。
 
 ```yaml
 ...
@@ -271,89 +216,82 @@ componentSpecs:
     - error
     - general
     - slow
-    disableExporter: false # 修改该参数值
-...
-```
-
-（可选）如果您想要在使用后关闭监控功能，可执行以下命令停用该功能。
-
-```bash
-kubectl patch cluster mycluster -n namespace --type "json" -p '[{"op":"add","path":"/spec/componentSpecs/0/disableExporter","value":true}]'
+    disableExporter: true # 将参数值设为 `false`，开启 exporter
 ```
 
 </TabItem>
 
 </Tabs>
 
-### 3. 查看大盘
+集群运行时，每个 Pod 都拥有一个名为 `exporter` 的 sidecar 容器，用于运行 postgres-exporter。
 
-您可通过 Grafana 网页控制台查看对应集群的大盘。具体信息，可查看 [Grafana 大盘文档](https://grafana.com/docs/grafana/latest/dashboards/)。
+### 创建 PodMonitor
 
-### 4. （可选）开启远程写（Remote Write）
+1. 获取 `scrapePath` 及 `scrapePort`。
 
-远程写为可选操作，您可根据实际需要开启。
-
-KubeBlocks 支持 victoria-metrics-agent 引擎，支持用户将数据远程写入 VictoriaMetrics 中，相较于 Prometheus 原生应用，[vmagent](https://docs.victoriametrics.com/vmagent.html) 更轻量。
-
-<Tabs>
-
-<TabItem value="kbcli" label="kbcli" default>
-
-1. 开启数据推送。
-
-   你只需要提供支持 Prometheus Remote Write 协议的终端节点（可以支持多个终端节点）。关于获取方式，请参考第三方监控系统的文档。
-
-   下面展示如何通过不同的方法启用数据推送：
+   您可从 Pod 的 exporter 容器中获取 `scrapePath` 及 `scrapePort`。
 
    ```bash
-   # 默认选项：只需提供一个无需验证的终端节点。
-   # 示例：http://localhost:8428/api/v1/write
-   kbcli addon enable victoria-metrics-agent --set remoteWriteUrls={http://<remoteWriteUrl>:<port>/<remote write path>}
+   kubectl get po mycluster-postgresql-0 -oyaml | yq '.spec.containers[] | select(.name=="exporter") | .ports '
    ```
+
+   <details>
+
+   <summary>输出</summary>
 
    ```bash
-   # Basic Auth 方式
-   kbcli addon enable victoria-metrics-agent --set "extraArgs.remoteWrite\.basicAuth\.username=<your username>,extraArgs.remoteWrite\.basicAuth\.password=<your password>,remoteWriteUrls={http://<remoteWriteUrl>:<port>/<remote write path>}"
+   - containerPort: 9187
+     name: http-metrics
+     protocol: TCP
    ```
 
-   ```bash
-   # TLS 方式
-   kbcli addon enable victoria-metrics-agent --set "extraArgs.tls=true,extraArgs.tlsCertFile=<path to certifle>,extraArgs.tlsKeyFile=<path to keyfile>,remoteWriteUrls={http://<remoteWriteUrl>:<port>/<remote write path>}"
+   </details>
+
+2. 创建 `PodMonitor`。
+
+   应用 `PodMonitor` 文件，监控集群。您也可以在 [KubeBlocks Addons 仓库](https://github.com/apecloud/kubeblocks-addons/blob/main/examples/postgresql/pod-monitor.yml)中查看最新版本示例 YAML 文件。
+
+   ```yaml
+   kubectl apply -f - <<EOF
+   apiVersion: monitoring.coreos.com/v1
+   kind: PodMonitor
+   metadata:
+     name: pg-cluster-pod-monitor
+     namespace: monitoring # 说明：此处为 Prometheus operator 所在的 namespace
+     labels:               # 此处对应 `prometheus.spec.podMonitorSelector` 中设置的标签。
+       release: prometheus
+   spec:
+     jobLabel: kubeblocks-service
+     # 定义了从关联的 Kubernetes `Pod` 对象
+     # 传递到采集指标上的标签
+     # 请按需设置标签
+     podTargetLabels:
+     - app.kubernetes.io/instance
+     - app.kubernetes.io/managed-by
+     - apps.kubeblocks.io/component-name
+     - apps.kubeblocks.io/pod-name
+     podMetricsEndpoints:
+       - path: /metrics
+         port: http-metrics
+         scheme: http
+     namespaceSelector:
+       matchNames:
+         - default
+     selector:
+       matchLabels:
+         app.kubernetes.io/instance: pg-cluster
+         apps.kubeblocks.io/component-name: postgresql
+   EOF
    ```
 
-   ```bash
-   # AWS SigV4 方式
-   kbcli addon enable victoria-metrics-agent --set "extraArgs.remoteWrite\.aws\.region=<your AMP region>,extraArgs.remoteWrite\.aws\.accessKey=<your accessKey>,extraArgs.remoteWrite\.aws\.secretKey=<your secretKey>,remoteWriteUrls={http://<remoteWriteUrl>:<port>/<remote write path>}"
-   ```
+3. 连接 Grafana 大盘.
 
-2. （可选）水平扩容 `victoria-metrics-agent`。
+    登录 Grafana 大盘，并导入大盘。
 
-   当数据库实例不断增多时，单节点 vmagent 会成为瓶颈。此时可以选择通过扩容 vmagent 来解决这个问题。多节点 vmagent 内部会根据哈希策略自动划分数据采集的任务。
+    Grafana 大盘的 `APPS / PostgreSQL` 文件夹下有预设的大盘模板。您也可以在 [Grafana 大盘商店](https://grafana.com/grafana/dashboards/)获取更多大盘模板。
 
-   ```bash
-   kbcli addon enable victoria-metrics-agent --replicas <replica count> --set remoteWriteUrls={http://<remoteWriteUrl>:<port>/<remote write path>}
-   ```
+::::note
 
-3. （可选）关闭 `victoria-metrics-agent` 引擎。
+请确保 `PodMonitor` 文件中的标签（如 endpoint 中的 path 和 port 值）设置正确，与您使用的大盘匹配。
 
-   ```bash
-   kbcli addon disable victoria-metrics-agent
-   ```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubeclt">
-
-KubeBlocks 支持 `victoria-metrics-agent` 引擎，使您可以将数据远程写入您的 VM。与原生 Prometheus 相比，[vmgent](https://docs.victoriametrics.com/vmagent.html) 更轻量并且支持水平扩展。
-
-执行以下命令，安装 `victoria-metrics-agent` 引擎。
-
-```bash
-helm install vm kubeblocks/victoria-metrics-agent --set remoteWriteUrls={http://<remoteWriteUrl>:<port>/<remote write path>}
-```
-
-有关详细设置，您可以参考 [Victoria Metrics 文档](https://artifacthub.io/packages/helm/victoriametrics/victoria-metrics-agent)。
-
-</TabItem>
-
-</Tabs>
+:::

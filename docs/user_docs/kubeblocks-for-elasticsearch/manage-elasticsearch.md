@@ -157,10 +157,6 @@ Elasticsearch provides the HTTP protocol for client access on port 9200. You can
 curl http://127.0.0.1:9200/_cat/nodes?v
 ```
 
-## Monitor the Elasticsearch cluster
-
-The monitoring function of Elasticsearch is the same as other engines. For details, refer to [the monitoring tutorial](./../observability/monitor-database.md).
-
 ## Scale
 
 KubeBlocks supports horizontally and vertially scaling an Elasticsearch cluster.

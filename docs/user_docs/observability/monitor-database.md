@@ -12,7 +12,7 @@ import TabItem from '@theme/TabItem';
 
 This tutorial demonstrates how to configure the monitoring function for a PostgreSQL cluster, using Prometheus and Grafana.
 
-## Step 1. Install the Prometheus Operator and Grafana
+## Step 1. Install Prometheus Operator and Grafana
 
 Install the Promethus Operator and Grafana to monitor the performance of a database. Skip this step if a Prometheus Operator is already installed in your environment.
 
@@ -44,31 +44,31 @@ Install the Promethus Operator and Grafana to monitor the performance of a datab
 
    1. Check the service endpoints of Prometheus and Grafana.
 
-     ```bash
-     kubectl get svc -n monitoring
-     ```
+       ```bash
+       kubectl get svc -n monitoring
+       ```
 
    2. Use port forwarding to access the Prometheus dashboard locally.
 
-     ```bash
-     kubectl port-forward svc/prometheus-operator-kube-p-prometheus -n monitoring 9090:9090
-     ```
+       ```bash
+       kubectl port-forward svc/prometheus-operator-kube-p-prometheus -n monitoring 9090:9090
+       ```
 
-     You can also access the Prometheus dashboard by opening "http://localhost:9090" in your browser.
+       You can also access the Prometheus dashboard by opening "http://localhost:9090" in your browser.
 
    3. Retrieve the Grafana's login credential from the secret.
 
-     ```bash
-     kubectl get secrets prometheus-operator-grafana -n monitoring -o yaml
-     ```  
+       ```bash
+       kubectl get secrets prometheus-operator-grafana -n monitoring -o yaml
+       ```  
 
    4. Use port forwarding to access the Grafana dashboard locally.
 
-     ```bash
-     kubectl port-forward svc/prometheus-operator-grafana -n monitoring 3000:80
-     ```
+       ```bash
+       kubectl port-forward svc/prometheus-operator-grafana -n monitoring 3000:80
+       ```
 
-     You can also access the Grafana dashboard by opening "http://localhost:3000" in your browser.
+       You can also access the Grafana dashboard by opening "http://localhost:3000" in your browser.
 
 6. Configure the selectors for PodMonitor and ServiceMonitor to match your monitoring requirements.
 
@@ -287,7 +287,7 @@ When the cluster is running, each Pod should have a sidecar container, named `ex
 
    There is a pre-configured dashboard for PostgreSQL under the `APPS / PostgreSQL` folder in the Grafana dashboard. And more dashboards can be found in the [Grafana dashboard store](https://grafana.com/grafana/dashboards/).
 
-::::note
+:::note
 
 Make sure the labels (such as the values of path and port in endpoint) are set correctly in the `PodMonitor` file to match your dashboard.
 

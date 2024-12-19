@@ -44,31 +44,31 @@ import TabItem from '@theme/TabItem';
 
    1. 查看 Prometheus 和 Grafana 的服务端口。
 
-     ```bash
-     kubectl get svc -n monitoring
-     ```
+       ```bash
+       kubectl get svc -n monitoring
+       ```
 
    2. 使用 port forward 从本地连接 Prometheus 大盘。
 
-     ```bash
-     kubectl port-forward svc/prometheus-operator-kube-p-prometheus -n monitoring 9090:9090
-     ```
+       ```bash
+       kubectl port-forward svc/prometheus-operator-kube-p-prometheus -n monitoring 9090:9090
+       ```
 
-     您也可通过在浏览器中打开 "http://localhost:9090" 地址，连接 Prometheus 大盘。
+       您也可通过在浏览器中打开 "http://localhost:9090" 地址，连接 Prometheus 大盘。
 
    3. 从 secret 中获取 Grafana 的连接凭证。
 
-     ```bash
-     kubectl get secrets prometheus-operator-grafana -n monitoring -oyaml
-     ```  
+       ```bash
+       kubectl get secrets prometheus-operator-grafana -n monitoring -oyaml
+       ```  
 
    4. 使用 port forward 从本地连接 Grafana 大盘。
 
-     ```bash
-     kubectl port-forward svc/prometheus-operator-grafana -n monitoring 3000:80
-     ```
+       ```bash
+       kubectl port-forward svc/prometheus-operator-grafana -n monitoring 3000:80
+       ```
 
-     您也可通过在浏览器中打开 "http://localhost:3000" 地址，连接 Grafana 大盘。
+       您也可通过在浏览器中打开 "http://localhost:3000" 地址，连接 Grafana 大盘。
 
 6. （可选）配置 `PodMonitor` 及 `ServiceMonitor` 选择器。
 
@@ -290,7 +290,7 @@ componentSpecs:
 
     Grafana 大盘的 `APPS / PostgreSQL` 文件夹下有预设的大盘模板。您也可以在 [Grafana 大盘商店](https://grafana.com/grafana/dashboards/)获取更多大盘模板。
 
-::::note
+:::note
 
 请确保 `PodMonitor` 文件中的标签（如 endpoint 中的 path 和 port 值）设置正确，与您使用的大盘匹配。
 

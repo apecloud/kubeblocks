@@ -154,11 +154,12 @@ func getUserName() string {
 }
 
 func getPassword() string {
-	if viper.IsSet("MYSQL_ADMIN_PASSWORD") {
+	switch {
+	case viper.IsSet("MYSQL_ADMIN_PASSWORD"):
 		return viper.GetString("MYSQL_ADMIN_PASSWORD")
-	} else if viper.IsSet(constant.KBEnvServicePassword) {
+	case viper.IsSet(constant.KBEnvServicePassword):
 		return viper.GetString(constant.KBEnvServicePassword)
-	} else if viper.IsSet("MYSQL_ROOT_PASSWORD") {
+	case viper.IsSet("MYSQL_ROOT_PASSWORD"):
 		return viper.GetString("MYSQL_ROOT_PASSWORD")
 	}
 	return ""

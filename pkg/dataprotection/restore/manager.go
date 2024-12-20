@@ -127,7 +127,8 @@ func (r *RestoreManager) BuildIncrementalBackupActionSet(reqCtx intctrlutil.Requ
 				childBackupSet.Backup.Name, backupSet.Backup.Name))
 		}
 		if err := ValidateParentBackupSet(backupSet, childBackupSet); err != nil {
-			return err
+			return intctrlutil.NewFatalError(fmt.Sprintf(`fails to validate parent backup "%s" and child backup "%s": %v`,
+				backupSet.Backup.Name, childBackupSet.Backup.Name, err))
 		}
 		if backupSet.ActionSet != nil && backupSet.ActionSet.Spec.BackupType == dpv1alpha1.BackupTypeIncremental {
 			sourceBackupSet.AncestorIncrementalBackups = append([]*dpv1alpha1.Backup{backupSet.Backup}, sourceBackupSet.AncestorIncrementalBackups...)
@@ -166,31 +167,44 @@ func (r *RestoreManager) BuildContinuousRestoreManager(reqCtx intctrlutil.Reques
 		}
 	}
 
-	fullBackupSet, err := r.getFullBackupActionSetForContinuous(reqCtx, cli, continuousBackup, metav1.NewTime(restoreTime))
-	if err != nil || fullBackupSet == nil {
+	backupSet, err := r.getBackupActionSetForContinuous(reqCtx, cli, continuousBackup, metav1.NewTime(restoreTime))
+	if err != nil || backupSet == nil {
 		return err
 	}
 	// set base backup
-	continuousBackupSet.BaseBackup = fullBackupSet.Backup
-	r.SetBackupSets(*fullBackupSet, continuousBackupSet)
+	continuousBackupSet.BaseBackup = backupSet.Backup
+	if backupSet.ActionSet != nil && backupSet.ActionSet.Spec.BackupType == dpv1alpha1.BackupTypeIncremental {
+		if err = r.BuildIncrementalBackupActionSet(reqCtx, cli, *backupSet); err != nil {
+			return err
+		}
+		r.SetBackupSets(continuousBackupSet)
+	} else {
+		r.SetBackupSets(*backupSet, continuousBackupSet)
+	}
 	return nil
 }
 
-// getFullBackupActionSetForContinuous gets full backup and actionSet for continuous.
-func (r *RestoreManager) getFullBackupActionSetForContinuous(reqCtx intctrlutil.RequestCtx, cli client.Client, continuousBackup *dpv1alpha1.Backup, restoreTime metav1.Time) (*BackupActionSet, error) {
-	notFoundLatestFullBackup := func() (*BackupActionSet, error) {
-		return nil, intctrlutil.NewFatalError(fmt.Sprintf(`can not found latest full backup based on backupPolicy "%s" and specified restoreTime "%s"`,
+// getBackupActionSetForContinuous gets full or incremental backup and actionSet for continuous.
+func (r *RestoreManager) getBackupActionSetForContinuous(reqCtx intctrlutil.RequestCtx, cli client.Client, continuousBackup *dpv1alpha1.Backup, restoreTime metav1.Time) (*BackupActionSet, error) {
+	notFoundLatestBackup := func() (*BackupActionSet, error) {
+		return nil, intctrlutil.NewFatalError(fmt.Sprintf(`can not found latest full or incremental backup based on backupPolicy "%s" and specified restoreTime "%s"`,
 			continuousBackup.Spec.BackupPolicyName, restoreTime))
 	}
 	if continuousBackup.GetStartTime().IsZero() {
-		return notFoundLatestFullBackup()
+		return notFoundLatestBackup()
 	}
-	// 1. list completed full backups
-	backupItems, err := r.listCompletedFullBackups(reqCtx, cli, continuousBackup)
+	// 1. list completed backups
+	// full backups
+	fullBackupItems, err := r.listCompletedBackups(reqCtx, cli, continuousBackup, dpv1alpha1.BackupTypeFull)
 	if err != nil {
 		return nil, err
 	}
-
+	// incremental backups
+	incrementalBackupItems, err := r.listCompletedBackups(reqCtx, cli, continuousBackup, dpv1alpha1.BackupTypeIncremental)
+	if err != nil {
+		return nil, err
+	}
+	backupItems := append(fullBackupItems, incrementalBackupItems...)
 	// sort by completed time in descending order
 	sort.Slice(backupItems, func(i, j int) bool {
 		i, j = j, i
@@ -198,38 +212,38 @@ func (r *RestoreManager) getFullBackupActionSetForContinuous(reqCtx intctrlutil.
 	})
 
 	// 2. get the latest backup object
-	var latestFullBackup *dpv1alpha1.Backup
+	var latestBackup *dpv1alpha1.Backup
 	for _, item := range backupItems {
-		fullBackupStopTime := item.GetEndTime()
-		// latest full backup rules:
-		// 1. Full backup's stopTime must after Continuous backup's startTime.
+		backupStopTime := item.GetEndTime()
+		// latest backup rules:
+		// 1. Full or Incremental backup's stopTime must after Continuous backup's startTime.
 		//    Even if the seconds are the same, the data may not be continuous.
-		// 2. RestoreTime should after the Full backup's stopTime.
-		if fullBackupStopTime != nil &&
-			!restoreTime.Before(fullBackupStopTime) &&
-			!fullBackupStopTime.Before(continuousBackup.GetStartTime()) {
-			latestFullBackup = &item
+		// 2. RestoreTime should after the Full or Incremental backup's stopTime.
+		if backupStopTime != nil &&
+			!restoreTime.Before(backupStopTime) &&
+			!backupStopTime.Before(continuousBackup.GetStartTime()) {
+			latestBackup = &item
 			break
 		}
 	}
-	if latestFullBackup == nil {
-		return notFoundLatestFullBackup()
+	if latestBackup == nil {
+		return notFoundLatestBackup()
 	}
 	// 3. get the action set
 	var actionSetName string
-	if latestFullBackup.Status.BackupMethod != nil {
-		actionSetName = latestFullBackup.Status.BackupMethod.ActionSetName
+	if latestBackup.Status.BackupMethod != nil {
+		actionSetName = latestBackup.Status.BackupMethod.ActionSetName
 	}
 	actionSet, err := utils.GetActionSetByName(reqCtx, cli, actionSetName)
 	if err != nil {
 		return nil, err
 	}
-	return &BackupActionSet{Backup: latestFullBackup, ActionSet: actionSet}, nil
+	return &BackupActionSet{Backup: latestBackup, ActionSet: actionSet}, nil
 }
 
-func (r *RestoreManager) listCompletedFullBackups(reqCtx intctrlutil.RequestCtx, cli client.Client, continuousBackup *dpv1alpha1.Backup) ([]dpv1alpha1.Backup, error) {
+func (r *RestoreManager) listCompletedBackups(reqCtx intctrlutil.RequestCtx, cli client.Client, continuousBackup *dpv1alpha1.Backup, backupType dpv1alpha1.BackupType) ([]dpv1alpha1.Backup, error) {
 	matchingLabels := map[string]string{
-		dptypes.BackupTypeLabelKey: string(dpv1alpha1.BackupTypeFull),
+		dptypes.BackupTypeLabelKey: string(backupType),
 	}
 	if clusterUID := continuousBackup.Labels[dptypes.ClusterUIDLabelKey]; clusterUID != "" {
 		matchingLabels[dptypes.ClusterUIDLabelKey] = clusterUID

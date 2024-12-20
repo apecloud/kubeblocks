@@ -202,6 +202,17 @@ func (r *restoreJobBuilder) addCommonEnv(sourceTargetPodName string) *restoreJob
 		}
 		r.env = append(r.env, corev1.EnvVar{Name: dptypes.DPBackupBasePath, Value: filePath})
 	}
+	r.env = append(r.env, BackupFilePathEnv(filePath, r.restore.Spec.Backup.SourceTargetName, sourceTargetPodName)...)
+	if r.backupSet.BaseBackup != nil {
+		r.env = append(r.env, corev1.EnvVar{Name: dptypes.DPBaseBackupName, Value: r.backupSet.BaseBackup.Name})
+	}
+	if len(r.backupSet.AncestorIncrementalBackups) > 0 {
+		ancestorIncrementalBackupNames := []string{}
+		for _, backup := range r.backupSet.AncestorIncrementalBackups {
+			ancestorIncrementalBackupNames = append(ancestorIncrementalBackupNames, backup.Name)
+		}
+		r.env = append(r.env, corev1.EnvVar{Name: dptypes.DPAncestorIncrementalBackupNames, Value: strings.Join(ancestorIncrementalBackupNames, ",")})
+	}
 	// add time env
 	actionSetEnv := r.backupSet.ActionSet.Spec.Env
 	timeFormat := getTimeFormat(actionSetEnv)

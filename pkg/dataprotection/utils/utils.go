@@ -452,3 +452,18 @@ func ValidateParameters(actionSet *dpv1alpha1.ActionSet, parameters []dpv1alpha1
 	}
 	return nil
 }
+
+func CompareWithBackupStopTime(backupI, backupJ dpv1alpha1.Backup) bool {
+	endTimeI := backupI.GetEndTime()
+	endTimeJ := backupJ.GetEndTime()
+	if endTimeI.IsZero() {
+		return false
+	}
+	if endTimeJ.IsZero() {
+		return true
+	}
+	if endTimeI.Equal(endTimeJ) {
+		return backupI.Name < backupJ.Name
+	}
+	return endTimeI.Before(endTimeJ)
+}

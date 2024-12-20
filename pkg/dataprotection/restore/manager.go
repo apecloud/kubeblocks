@@ -46,6 +46,8 @@ import (
 
 type BackupActionSet struct {
 	Backup *dpv1alpha1.Backup
+	// set it when the backup relies on incremental backups, such as Incremental backup
+	AncestorIncrementalBackups []*dpv1alpha1.Backup
 	// set it when the backup relies on a base backup, such as Continuous backup
 	BaseBackup        *dpv1alpha1.Backup
 	ActionSet         *dpv1alpha1.ActionSet
@@ -107,37 +109,34 @@ func (r *RestoreManager) BuildDifferentialBackupActionSets(reqCtx intctrlutil.Re
 	return nil
 }
 
-// BuildIncrementalBackupActionSets builds the backupActionSets for specified incremental backup.
-func (r *RestoreManager) BuildIncrementalBackupActionSets(reqCtx intctrlutil.RequestCtx, cli client.Client, sourceBackupSet BackupActionSet) error {
-	r.SetBackupSets(sourceBackupSet)
-	if sourceBackupSet.ActionSet != nil && sourceBackupSet.ActionSet.Spec.BackupType == dpv1alpha1.BackupTypeIncremental {
+// BuildIncrementalBackupActionSet builds the backupActionSet for specified incremental backup.
+func (r *RestoreManager) BuildIncrementalBackupActionSet(reqCtx intctrlutil.RequestCtx, cli client.Client, sourceBackupSet BackupActionSet) error {
+	childBackupSet := &sourceBackupSet
+	backupMap := map[string]struct{}{}
+	for childBackupSet.ActionSet != nil && childBackupSet.ActionSet.Spec.BackupType == dpv1alpha1.BackupTypeIncremental {
+		// record the traversed backups
+		backupMap[childBackupSet.Backup.Name] = struct{}{}
 		// get the parent BackupActionSet for incremental.
-		backupSet, err := r.GetBackupActionSetByNamespaced(reqCtx, cli, sourceBackupSet.Backup.Spec.ParentBackupName, sourceBackupSet.Backup.Namespace)
+		backupSet, err := r.GetBackupActionSetByNamespaced(reqCtx, cli, childBackupSet.Backup.Status.ParentBackupName, childBackupSet.Backup.Namespace)
 		if err != nil || backupSet == nil {
+			return intctrlutil.NewFatalError(fmt.Sprintf(`fails to get parent backup "%s" of incremental backup "%s"`,
+				childBackupSet.Backup.Status.ParentBackupName, childBackupSet.Backup.Name))
+		}
+		if _, ok := backupMap[backupSet.Backup.Name]; ok {
+			return intctrlutil.NewFatalError(fmt.Sprintf(`backup "%s" relies on child backup "%s"`,
+				childBackupSet.Backup.Name, backupSet.Backup.Name))
+		}
+		if err := ValidateParentBackupSet(backupSet, childBackupSet); err != nil {
 			return err
 		}
-		return r.BuildIncrementalBackupActionSets(reqCtx, cli, *backupSet)
+		if backupSet.ActionSet != nil && backupSet.ActionSet.Spec.BackupType == dpv1alpha1.BackupTypeIncremental {
+			sourceBackupSet.AncestorIncrementalBackups = append([]*dpv1alpha1.Backup{backupSet.Backup}, sourceBackupSet.AncestorIncrementalBackups...)
+		} else {
+			sourceBackupSet.BaseBackup = backupSet.Backup
+		}
+		childBackupSet = backupSet
 	}
-	// if reaches full backup, sort the BackupActionSets and return
-	sortBackupSets := func(backupSets []BackupActionSet, reverse bool) []BackupActionSet {
-		sort.Slice(backupSets, func(i, j int) bool {
-			if reverse {
-				i, j = j, i
-			}
-			backupI := backupSets[i].Backup
-			backupJ := backupSets[j].Backup
-			if backupI == nil {
-				return false
-			}
-			if backupJ == nil {
-				return true
-			}
-			return CompareWithBackupStopTime(*backupI, *backupJ)
-		})
-		return backupSets
-	}
-	r.PrepareDataBackupSets = sortBackupSets(r.PrepareDataBackupSets, false)
-	r.PostReadyBackupSets = sortBackupSets(r.PostReadyBackupSets, false)
+	r.SetBackupSets(sourceBackupSet)
 	return nil
 }
 
@@ -195,7 +194,7 @@ func (r *RestoreManager) getFullBackupActionSetForContinuous(reqCtx intctrlutil.
 	// sort by completed time in descending order
 	sort.Slice(backupItems, func(i, j int) bool {
 		i, j = j, i
-		return CompareWithBackupStopTime(backupItems[i], backupItems[j])
+		return utils.CompareWithBackupStopTime(backupItems[i], backupItems[j])
 	})
 
 	// 2. get the latest backup object

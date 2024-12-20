@@ -22,6 +22,7 @@ package restore
 import (
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -188,21 +189,6 @@ func transformTimeWithZone(targetTime *metav1.Time, timeZone string) (*metav1.Ti
 	return &metav1.Time{Time: targetTime.In(zone)}, nil
 }
 
-func CompareWithBackupStopTime(backupI, backupJ dpv1alpha1.Backup) bool {
-	endTimeI := backupI.GetEndTime()
-	endTimeJ := backupJ.GetEndTime()
-	if endTimeI.IsZero() {
-		return false
-	}
-	if endTimeJ.IsZero() {
-		return true
-	}
-	if endTimeI.Equal(endTimeJ) {
-		return backupI.Name < backupJ.Name
-	}
-	return endTimeI.Before(endTimeJ)
-}
-
 func BuildJobKeyForActionStatus(jobName string) string {
 	return fmt.Sprintf("%s/%s", constant.JobKind, jobName)
 }
@@ -278,7 +264,7 @@ func ValidateAndInitRestoreMGR(reqCtx intctrlutil.RequestCtx,
 	case dpv1alpha1.BackupTypeFull, dpv1alpha1.BackupTypeSelective:
 		restoreMgr.SetBackupSets(*backupSet)
 	case dpv1alpha1.BackupTypeIncremental:
-		err = restoreMgr.BuildIncrementalBackupActionSets(reqCtx, cli, *backupSet)
+		err = restoreMgr.BuildIncrementalBackupActionSet(reqCtx, cli, *backupSet)
 	case dpv1alpha1.BackupTypeDifferential:
 		err = restoreMgr.BuildDifferentialBackupActionSets(reqCtx, cli, *backupSet)
 	case dpv1alpha1.BackupTypeContinuous:
@@ -429,4 +415,68 @@ func GetVolumeSnapshotsBySourcePod(backup *dpv1alpha1.Backup, target *dpv1alpha1
 		return snapshotGroup
 	}
 	return nil
+}
+
+// ValidateParentBackupSet validates the parent backup and child backup.
+func ValidateParentBackupSet(parentBackupSet *BackupActionSet, backupSet *BackupActionSet) error {
+	parentBackup := parentBackupSet.Backup
+	backup := backupSet.Backup
+	if parentBackup == nil || backup == nil {
+		return intctrlutil.NewFatalError("parent backup or child backup is nil")
+	}
+	// validate parent backup policy
+	if parentBackup.Spec.BackupPolicyName != backup.Spec.BackupPolicyName {
+		return intctrlutil.NewFatalError(
+			fmt.Sprintf(`parent backup policy: "%s" is defferent with child backup policy: "%s"`,
+				parentBackup.Spec.BackupPolicyName, backup.Spec.BackupPolicyName))
+	}
+	// validate parent backup method
+	if parentBackupSet.ActionSet != nil && parentBackupSet.ActionSet.Spec.BackupType == dpv1alpha1.BackupTypeIncremental {
+		if parentBackup.Spec.BackupMethod != backup.Spec.BackupMethod {
+			return intctrlutil.NewFatalError(
+				fmt.Sprintf(`the parent incremental backup method "%s" is not the same with the child backup method "%s"`,
+					parentBackup.Spec.BackupMethod, backup.Spec.BackupMethod))
+		}
+	} else if parentBackupSet.ActionSet != nil && parentBackupSet.ActionSet.Spec.BackupType == dpv1alpha1.BackupTypeFull {
+		if parentBackup.Spec.BackupMethod != backup.Status.BackupMethod.CompatibleMethod {
+			return intctrlutil.NewFatalError(
+				fmt.Sprintf(`the parent full backup method "%s" is not compatible with the child backup method "%s"`,
+					parentBackup.Spec.BackupMethod, backup.Spec.BackupMethod))
+		}
+	} else {
+		return intctrlutil.NewFatalError(fmt.Sprintf(`the parent backup "%s" is not incremental or full backup`,
+			parentBackup.Name))
+	}
+	// validate parent backup end time
+	if !utils.CompareWithBackupStopTime(*parentBackup, *backup) {
+		return intctrlutil.NewFatalError(fmt.Sprintf(`the parent backup "%s" is not before the child backup "%s"`,
+			parentBackup.Name, backup.Name))
+	}
+	return nil
+}
+
+// BackupFilePathEnv returns the envs for backup root path and target relative path.
+func BackupFilePathEnv(filePath, targetName, targetPodName string) []corev1.EnvVar {
+	envs := []corev1.EnvVar{}
+	if len(filePath) == 0 {
+		return envs
+	}
+	targetRelativePath := ""
+	if targetName != "" {
+		targetRelativePath = filepath.Join("/", targetRelativePath, targetName)
+	}
+	if targetPodName != "" {
+		targetRelativePath = filepath.Join("/", targetRelativePath, targetPodName)
+	}
+	envs = append(envs, []corev1.EnvVar{
+		{
+			Name:  dptypes.DPTargetRelativePath,
+			Value: targetRelativePath,
+		},
+		{
+			Name:  dptypes.DPBackupRootPath,
+			Value: filepath.Join("/", filePath, "../"),
+		},
+	}...)
+	return envs
 }

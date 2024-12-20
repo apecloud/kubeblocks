@@ -245,6 +245,11 @@ func (r *BackupReconciler) deleteBackupFiles(reqCtx intctrlutil.RequestCtx, back
 // handleDeletingPhase handles the deletion of backup. It will delete the backup CR
 // and the backup workload(job).
 func (r *BackupReconciler) handleDeletingPhase(reqCtx intctrlutil.RequestCtx, backup *dpv1alpha1.Backup) (ctrl.Result, error) {
+	// delete related backups
+	if err := r.deleteRelatedBackups(reqCtx, backup); err != nil {
+		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
+	}
+
 	// if backup phase is Deleting, delete the backup reference workloads,
 	// backup data stored in backup repository and volume snapshots.
 	// TODO(ldm): if backup is being used by restore, do not delete it.
@@ -443,9 +448,6 @@ func (r *BackupReconciler) prepareBackupRequest(
 	if request.GetBackupType() == string(dpv1alpha1.BackupTypeIncremental) {
 		request.ParentBackup, err = GetParentBackup(reqCtx.Ctx, r.Client, request.Backup, request.BackupPolicy)
 		if err != nil {
-			if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeNeedWaiting) {
-				return request, nil
-			}
 			return nil, err
 		}
 		parentBackupType, err := dputils.GetBackupTypeByMethodName(reqCtx, r.Client, request.ParentBackup.Spec.BackupMethod, request.BackupPolicy)
@@ -781,6 +783,30 @@ func (r *BackupReconciler) deleteExternalResources(
 
 	// delete the external statefulSets.
 	return deleteRelatedObjectList(reqCtx, r.Client, &appsv1.StatefulSetList{}, namespaces, labels)
+}
+
+func (r *BackupReconciler) deleteRelatedBackups(
+	reqCtx intctrlutil.RequestCtx,
+	backup *dpv1alpha1.Backup) error {
+	backupList := &dpv1alpha1.BackupList{}
+	labels := map[string]string{
+		dptypes.BackupPolicyLabelKey: backup.Spec.BackupPolicyName,
+	}
+	if err := r.Client.List(reqCtx.Ctx, backupList,
+		client.InNamespace(backup.Namespace), client.MatchingLabels(labels)); client.IgnoreNotFound(err) != nil {
+		return err
+	}
+	for i := range backupList.Items {
+		bp := &backupList.Items[i]
+		if bp.Status.ParentBackupName != backup.Name && bp.Status.BaseBackupName != backup.Name {
+			continue
+		}
+		if err := intctrlutil.BackgroundDeleteObject(r.Client, reqCtx.Ctx, bp); err != nil {
+			return err
+		}
+		reqCtx.Log.Info("delete the related backup", "backup", fmt.Sprintf("%s/%s", bp.Namespace, bp.Name))
+	}
+	return nil
 }
 
 // PatchBackupObjectMeta patches backup object metaObject include cluster snapshot.

@@ -211,6 +211,14 @@ func BuildBaseBackupPath(backup *dpv1alpha1.Backup, repoPathPrefix, pathPrefix s
 	return filepath.Join("/", repoPathPrefix, backup.Namespace, pathPrefix, backup.Name)
 }
 
+// BuildBackupRootPath builds the root path to storage backup data in backup repository.
+func BuildBackupRootPath(backup *dpv1alpha1.Backup, repoPathPrefix, pathPrefix string) string {
+	repoPathPrefix = strings.Trim(repoPathPrefix, "/")
+	pathPrefix = strings.Trim(pathPrefix, "/")
+	// pattern: ${repoPathPrefix}/${namespace}/${pathPrefix}
+	return filepath.Join("/", repoPathPrefix, backup.Namespace, pathPrefix)
+}
+
 // BuildBackupPathByTarget builds the backup by target.name and podSelectionStrategy.
 func BuildBackupPathByTarget(backup *dpv1alpha1.Backup,
 	target *dpv1alpha1.BackupTarget,
@@ -218,13 +226,21 @@ func BuildBackupPathByTarget(backup *dpv1alpha1.Backup,
 	pathPrefix,
 	targetPodName string) string {
 	baseBackupPath := BuildBaseBackupPath(backup, repoPathPrefix, pathPrefix)
+	targetRelativePath := BuildTargetRelativePath(target, targetPodName)
+	return filepath.Join("/", baseBackupPath, targetRelativePath)
+}
+
+// BuildTargetRelativePath builds the relative path by target.name and podSelectionStrategy.
+func BuildTargetRelativePath(target *dpv1alpha1.BackupTarget, targetPodName string) string {
+	path := ""
 	if target.Name != "" {
-		baseBackupPath = filepath.Join("/", baseBackupPath, target.Name)
+		path = filepath.Join("/", path, target.Name)
 	}
 	if target.PodSelector.Strategy == dpv1alpha1.PodSelectionStrategyAll {
-		baseBackupPath = filepath.Join("/", baseBackupPath, targetPodName)
+		path = filepath.Join("/", path, targetPodName)
 	}
-	return baseBackupPath
+	// return /${DP_TARGET_RELATIVE_PATH}
+	return path
 }
 
 // BuildKopiaRepoPath builds the path of kopia repository.

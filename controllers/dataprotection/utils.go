@@ -263,10 +263,6 @@ func getClusterLabelKeys() []string {
 	return []string{constant.AppInstanceLabelKey, constant.KBAppComponentLabelKey, constant.KBAppShardingNameLabelKey}
 }
 
-func getComonentLabelKeys() []string {
-	return []string{constant.AppInstanceLabelKey, dptypes.ClusterUIDLabelKey, constant.KBAppComponentLabelKey}
-}
-
 // sendWarningEventForError sends warning event for controller error
 func sendWarningEventForError(recorder record.EventRecorder, obj client.Object, err error) {
 	controllerErr := intctrlutil.UnwrapControllerError(err)
@@ -600,18 +596,12 @@ func GetParentBackup(ctx context.Context, cli client.Client, backup *dpv1alpha1.
 			return nil, err
 		}
 		if err := ValidateParentBackup(backup, parentBackup, backupPolicy); err != nil {
-			if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeNeedWaiting) {
-				return nil, err
-			}
 			return nil, fmt.Errorf("failed to validate specified parent backup %s: %w", backup.Spec.ParentBackupName, err)
 		}
 		return parentBackup, nil
 	}
 	parentBackup, err := FindParentBackup(ctx, cli, backup, backupPolicy)
 	if err != nil {
-		if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeNeedWaiting) {
-			return nil, err
-		}
 		return nil, fmt.Errorf("failed to find parent backup: %w", err)
 	}
 	if parentBackup == nil {
@@ -622,29 +612,18 @@ func GetParentBackup(ctx context.Context, cli client.Client, backup *dpv1alpha1.
 
 func FindParentBackup(ctx context.Context, cli client.Client, backup *dpv1alpha1.Backup,
 	backupPolicy *dpv1alpha1.BackupPolicy) (*dpv1alpha1.Backup, error) {
-	compareWithEndTime := func(backupI *dpv1alpha1.Backup, backupJ *dpv1alpha1.Backup) bool {
-		endTimeI := backupI.GetEndTime()
-		endTimeJ := backupJ.GetEndTime()
-		if endTimeI.Equal(endTimeJ) {
-			return backupI.Name > backupJ.Name
-		}
-		return endTimeJ.Before(endTimeI)
-	}
 	getLatestBackup := func(backupList []*dpv1alpha1.Backup) *dpv1alpha1.Backup {
 		if len(backupList) == 0 {
 			return nil
 		}
 		// sort by stop time in descending order
 		sort.Slice(backupList, func(i, j int) bool {
-			return compareWithEndTime(backupList[i], backupList[j])
+			i, j = j, i
+			return dputils.CompareWithBackupStopTime(*backupList[i], *backupList[j])
 		})
 		return backupList[0]
 	}
-	// build list labels
-	labelMap, err := GetBackupTargetLabels(backup)
-	if err != nil {
-		return nil, err
-	}
+	labelMap := map[string]string{}
 	// with backup policy label
 	labelMap[dptypes.BackupPolicyLabelKey] = backup.Spec.BackupPolicyName
 	getLatestParentBackup := func(labels map[string]string, incremental bool) (*dpv1alpha1.Backup, error) {
@@ -659,9 +638,11 @@ func FindParentBackup(ctx context.Context, cli client.Client, backup *dpv1alpha1
 		}
 		return getLatestBackup(filteredbackupList), nil
 	}
-	// add the schedule label if specified schedule
+	// with the schedule label if specified schedule
+	scheduled := false
 	if schedule, ok := backup.Labels[dptypes.BackupScheduleLabelKey]; ok && len(schedule) > 0 {
 		labelMap[dptypes.BackupScheduleLabelKey] = schedule
+		scheduled = true
 	}
 	// 1. get the latest incremental backups
 	labelMap[dptypes.BackupTypeLabelKey] = string(dpv1alpha1.BackupTypeIncremental)
@@ -675,9 +656,17 @@ func FindParentBackup(ctx context.Context, cli client.Client, backup *dpv1alpha1
 	if err != nil {
 		return nil, err
 	}
+	// get the latest unscheduled full backups if scheduled backups not found
+	if scheduled && latestIncrementalBackup == nil && latestFullBackup == nil {
+		delete(labelMap, dptypes.BackupScheduleLabelKey)
+		latestFullBackup, err = getLatestParentBackup(labelMap, false)
+		if err != nil {
+			return nil, err
+		}
+	}
 	// prefer the latest backup
 	if latestIncrementalBackup != nil && latestFullBackup != nil {
-		if compareWithEndTime(latestIncrementalBackup, latestFullBackup) {
+		if !dputils.CompareWithBackupStopTime(*latestIncrementalBackup, *latestFullBackup) {
 			return latestIncrementalBackup, nil
 		}
 		return latestFullBackup, nil
@@ -692,6 +681,9 @@ func FindParentBackup(ctx context.Context, cli client.Client, backup *dpv1alpha1
 func FilterParentBackups(backupList *dpv1alpha1.BackupList, targetBackup *dpv1alpha1.Backup,
 	backupPolicy *dpv1alpha1.BackupPolicy, incremental bool) ([]*dpv1alpha1.Backup, error) {
 	var res []*dpv1alpha1.Backup
+	if backupList == nil || len(backupList.Items) == 0 {
+		return res, nil
+	}
 	backupMethod := dputils.GetBackupMethodByName(targetBackup.Spec.BackupMethod, backupPolicy)
 	if backupMethod == nil {
 		return nil, fmt.Errorf("backupMethod %s not found", targetBackup.Spec.BackupMethod)
@@ -723,17 +715,6 @@ func ValidateParentBackup(backup *dpv1alpha1.Backup, parentBackup *dpv1alpha1.Ba
 	if parentBackup.Status.Phase != dpv1alpha1.BackupPhaseCompleted {
 		return fmt.Errorf("parent backup %s/%s is not completed", parentBackup.Namespace, parentBackup.Name)
 	}
-	// validate parent backup labels
-	labelMap, err := GetBackupTargetLabels(backup)
-	if err != nil {
-		return err
-	}
-	for k, v := range labelMap {
-		if value, ok := parentBackup.Labels[k]; !ok || value != v {
-			return fmt.Errorf("parent backup %s/%s label %s is not consistent with the backup",
-				parentBackup.Namespace, parentBackup.Name, k)
-		}
-	}
 	// validate if parent backup policy is consistent with the backup policy
 	if parentBackup.Spec.BackupPolicyName != backup.Spec.BackupPolicyName {
 		return fmt.Errorf("parent backup %s/%s policy %s is not consistent with the backup",
@@ -750,23 +731,6 @@ func ValidateParentBackup(backup *dpv1alpha1.Backup, parentBackup *dpv1alpha1.Ba
 			parentBackup.Namespace, parentBackup.Name, parentBackup.Spec.BackupMethod)
 	}
 	return nil
-}
-
-func GetBackupTargetLabels(backup *dpv1alpha1.Backup) (map[string]string, error) {
-	labelKeys := getComonentLabelKeys()
-	labelMap := map[string]string{}
-	for _, key := range labelKeys {
-		value, ok := backup.Labels[key]
-		if !ok {
-			if backup.Status.Phase == "" || backup.Status.Phase == dpv1alpha1.BackupPhaseNew {
-				// wait for the backup controller to set the labels
-				return nil, intctrlutil.NewErrorf(intctrlutil.ErrorTypeNeedWaiting, "label %s not found", key)
-			}
-			return nil, fmt.Errorf("fails to validate parent backup, label %s not found", key)
-		}
-		labelMap[key] = value
-	}
-	return labelMap, nil
 }
 
 // restore functions

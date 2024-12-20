@@ -66,7 +66,7 @@ type Request struct {
 	SnapshotVolumes      bool
 	Target               *dpv1alpha1.BackupTarget
 	ParentBackup         *dpv1alpha1.Backup
-	BaseBackup         *dpv1alpha1.Backup
+	BaseBackup           *dpv1alpha1.Backup
 }
 
 func (r *Request) GetBackupType() string {
@@ -322,10 +322,6 @@ func (r *Request) BuildJobActionPodSpec(targetPod *corev1.Pod,
 				Value: r.Backup.Name,
 			},
 			{
-				Name:  dptypes.DPParentBackupName,
-				Value: r.Backup.Spec.ParentBackupName,
-			},
-			{
 				Name:  dptypes.DPTargetPodName,
 				Value: targetPod.Name,
 			},
@@ -366,13 +362,26 @@ func (r *Request) BuildJobActionPodSpec(targetPod *corev1.Pod,
 		setKBClusterEnv(constant.AppInstanceLabelKey, constant.KBEnvClusterName)
 		setKBClusterEnv(constant.KBAppComponentLabelKey, constant.KBEnvCompName)
 		envVars = append(envVars, corev1.EnvVar{Name: constant.KBEnvNamespace, Value: r.Namespace})
-		// build envs for incremental backups
-		if r.ParentBackup != nil {
-			envVars = append(envVars, corev1.EnvVar{
-				Name: dptypes.DPParentBackupBasePath,
-				Value: BuildBackupPathByTarget(r.ParentBackup, &r.ParentBackup.Status.Target.BackupTarget,
-					r.BackupRepo.Spec.PathPrefix, r.BackupPolicy.Spec.PathPrefix, targetPod.Name),
-			})
+		if r.ParentBackup != nil && r.BaseBackup != nil {
+			// build envs for incremental backups
+			envVars = append(envVars, []corev1.EnvVar{
+				{
+					Name:  dptypes.DPParentBackupName,
+					Value: r.ParentBackup.Name,
+				},
+				{
+					Name:  dptypes.DPBaseBackupName,
+					Value: r.BaseBackup.Name,
+				},
+				{
+					Name:  dptypes.DPTargetRelativePath,
+					Value: BuildTargetRelativePath(r.Target, targetPod.Name),
+				},
+				{
+					Name:  dptypes.DPBackupRootPath,
+					Value: BuildBackupRootPath(r.Backup, r.BackupRepo.Spec.PathPrefix, r.BackupPolicy.Spec.PathPrefix),
+				},
+			}...)
 		}
 		return utils.MergeEnv(envVars, r.BackupMethod.Env), nil
 	}

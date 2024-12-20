@@ -336,8 +336,13 @@ func checkConfigTemplate(client client.Client, ctx intctrlutil.RequestCtx, obj c
 
 func updateLabelsByConfigSpec[T generics.Object, PT generics.PObject[T]](cli client.Client, ctx intctrlutil.RequestCtx, obj PT) (bool, error) {
 	handler := func(configSpecs []appsv1alpha1.ComponentConfigSpec) (bool, error) {
-		patch := client.MergeFrom(PT(obj.DeepCopy()))
+		objDeepyCopy := PT(obj.DeepCopy())
 		configuration.BuildConfigConstraintLabels(obj, configSpecs)
+		if reflect.DeepEqual(objDeepyCopy.GetLabels(), obj.GetLabels()) &&
+			reflect.DeepEqual(objDeepyCopy.GetAnnotations(), obj.GetAnnotations()) {
+			return true, nil
+		}
+		patch := client.MergeFrom(objDeepyCopy)
 		return true, cli.Patch(ctx.Ctx, obj, patch)
 	}
 	return handleConfigTemplate(obj, handler)

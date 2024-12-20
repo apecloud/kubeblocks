@@ -75,18 +75,19 @@ func (r *ComponentDefinition) ConvertFrom(srcRaw conversion.Hub) error {
 
 // convertTo converts this ComponentDefinition to the Hub version (v1).
 func (r *ComponentDefinition) incrementConvertTo(dstRaw metav1.Object) (incrementChange, error) {
-	// changed
-	if err := r.changesToComponentDefinition(dstRaw.(*appsv1.ComponentDefinition)); err != nil {
-		return nil, err
-	}
 
 	// deleted
 	c := &componentDefinitionConverter{
-		Monitor:        r.Spec.Monitor,
-		RoleArbitrator: r.Spec.RoleArbitrator,
+		Monitor:          r.Spec.Monitor,
+		RoleArbitrator:   r.Spec.RoleArbitrator,
+		LifecycleActions: r.Spec.LifecycleActions.DeepCopy(),
 	}
 	if r.Spec.LifecycleActions != nil && r.Spec.LifecycleActions.Switchover != nil {
 		c.LifecycleActionSwitchover = r.Spec.LifecycleActions.Switchover
+	}
+	// changed
+	if err := r.changesToComponentDefinition(dstRaw.(*appsv1.ComponentDefinition)); err != nil {
+		return nil, err
 	}
 	return c, nil
 }
@@ -97,6 +98,7 @@ func (r *ComponentDefinition) incrementConvertFrom(srcRaw metav1.Object, ic incr
 	c := ic.(*componentDefinitionConverter)
 	r.Spec.Monitor = c.Monitor
 	r.Spec.RoleArbitrator = c.RoleArbitrator
+	r.Spec.LifecycleActions = c.LifecycleActions
 	if c.LifecycleActionSwitchover != nil {
 		if r.Spec.LifecycleActions == nil {
 			r.Spec.LifecycleActions = &ComponentLifecycleActions{}
@@ -214,18 +216,18 @@ func (r *ComponentDefinition) fromV1LifecycleActions(cmpd *appsv1.ComponentDefin
 	if cmpd.Spec.LifecycleActions == nil {
 		return
 	}
-	r.Spec.LifecycleActions.PostProvision = r.fromV1LifecycleActionHandler(cmpd.Spec.LifecycleActions.PostProvision)
-	r.Spec.LifecycleActions.PreTerminate = r.fromV1LifecycleActionHandler(cmpd.Spec.LifecycleActions.PreTerminate)
-	r.Spec.LifecycleActions.MemberJoin = r.fromV1LifecycleActionHandler(cmpd.Spec.LifecycleActions.MemberJoin)
-	r.Spec.LifecycleActions.MemberLeave = r.fromV1LifecycleActionHandler(cmpd.Spec.LifecycleActions.MemberLeave)
-	r.Spec.LifecycleActions.Readonly = r.fromV1LifecycleActionHandler(cmpd.Spec.LifecycleActions.Readonly)
-	r.Spec.LifecycleActions.Readwrite = r.fromV1LifecycleActionHandler(cmpd.Spec.LifecycleActions.Readwrite)
-	r.Spec.LifecycleActions.DataDump = r.fromV1LifecycleActionHandler(cmpd.Spec.LifecycleActions.DataDump)
-	r.Spec.LifecycleActions.DataLoad = r.fromV1LifecycleActionHandler(cmpd.Spec.LifecycleActions.DataLoad)
-	r.Spec.LifecycleActions.Reconfigure = r.fromV1LifecycleActionHandler(cmpd.Spec.LifecycleActions.Reconfigure)
-	r.Spec.LifecycleActions.AccountProvision = r.fromV1LifecycleActionHandler(cmpd.Spec.LifecycleActions.AccountProvision)
+	r.Spec.LifecycleActions.PostProvision = r.fromV1LifecycleActionHandler(cmpd.Spec.LifecycleActions.PostProvision, r.Spec.LifecycleActions.PostProvision)
+	r.Spec.LifecycleActions.PreTerminate = r.fromV1LifecycleActionHandler(cmpd.Spec.LifecycleActions.PreTerminate, r.Spec.LifecycleActions.PreTerminate)
+	r.Spec.LifecycleActions.MemberJoin = r.fromV1LifecycleActionHandler(cmpd.Spec.LifecycleActions.MemberJoin, r.Spec.LifecycleActions.MemberJoin)
+	r.Spec.LifecycleActions.MemberLeave = r.fromV1LifecycleActionHandler(cmpd.Spec.LifecycleActions.MemberLeave, r.Spec.LifecycleActions.MemberLeave)
+	r.Spec.LifecycleActions.Readonly = r.fromV1LifecycleActionHandler(cmpd.Spec.LifecycleActions.Readonly, r.Spec.LifecycleActions.Readonly)
+	r.Spec.LifecycleActions.Readwrite = r.fromV1LifecycleActionHandler(cmpd.Spec.LifecycleActions.Readwrite, r.Spec.LifecycleActions.Readwrite)
+	r.Spec.LifecycleActions.DataDump = r.fromV1LifecycleActionHandler(cmpd.Spec.LifecycleActions.DataDump, r.Spec.LifecycleActions.DataDump)
+	r.Spec.LifecycleActions.DataLoad = r.fromV1LifecycleActionHandler(cmpd.Spec.LifecycleActions.DataLoad, r.Spec.LifecycleActions.DataLoad)
+	r.Spec.LifecycleActions.Reconfigure = r.fromV1LifecycleActionHandler(cmpd.Spec.LifecycleActions.Reconfigure, r.Spec.LifecycleActions.Reconfigure)
+	r.Spec.LifecycleActions.AccountProvision = r.fromV1LifecycleActionHandler(cmpd.Spec.LifecycleActions.AccountProvision, r.Spec.LifecycleActions.AccountProvision)
 
-	r.Spec.LifecycleActions.RoleProbe = r.fromV1LifecycleRoleProbe(cmpd.Spec.LifecycleActions.RoleProbe)
+	r.Spec.LifecycleActions.RoleProbe = r.fromV1LifecycleRoleProbe(cmpd.Spec.LifecycleActions.RoleProbe, r.Spec.LifecycleActions.RoleProbe)
 
 	// don't convert switchover
 }
@@ -237,9 +239,9 @@ func (r *ComponentDefinition) toV1LifecycleActionHandler(handler *LifecycleActio
 	return r.toV1LifecycleAction(handler.CustomHandler)
 }
 
-func (r *ComponentDefinition) fromV1LifecycleActionHandler(action *appsv1.Action) *LifecycleActionHandler {
+func (r *ComponentDefinition) fromV1LifecycleActionHandler(action *appsv1.Action, alphav1Action *LifecycleActionHandler) *LifecycleActionHandler {
 	if action == nil || action.Exec == nil {
-		return nil
+		return alphav1Action
 	}
 	return &LifecycleActionHandler{
 		CustomHandler: r.fromV1LifecycleAction(action),
@@ -264,9 +266,9 @@ func (r *ComponentDefinition) toV1LifecycleRoleProbe(probe *RoleProbe) *appsv1.P
 	}
 }
 
-func (r *ComponentDefinition) fromV1LifecycleRoleProbe(probe *appsv1.Probe) *RoleProbe {
+func (r *ComponentDefinition) fromV1LifecycleRoleProbe(probe *appsv1.Probe, alphav1RoleProbe *RoleProbe) *RoleProbe {
 	if probe == nil || probe.Exec == nil {
-		return nil
+		return alphav1RoleProbe
 	}
 	a := r.fromV1LifecycleAction(&probe.Action)
 	if a == nil {
@@ -341,7 +343,8 @@ func (r *ComponentDefinition) fromV1LifecycleAction(action *appsv1.Action) *Acti
 }
 
 type componentDefinitionConverter struct {
-	Monitor                   *MonitorConfig       `json:"monitor,omitempty"`
-	RoleArbitrator            *RoleArbitrator      `json:"roleArbitrator,omitempty"`
-	LifecycleActionSwitchover *ComponentSwitchover `json:"lifecycleActionSwitchover,omitempty"`
+	Monitor                   *MonitorConfig             `json:"monitor,omitempty"`
+	LifecycleActions          *ComponentLifecycleActions `json:"lifecycleActions,omitempty"`
+	RoleArbitrator            *RoleArbitrator            `json:"roleArbitrator,omitempty"`
+	LifecycleActionSwitchover *ComponentSwitchover       `json:"lifecycleActionSwitchover,omitempty"`
 }

@@ -20,7 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package v1alpha1
 
 import (
+	"sort"
+	"strings"
+
 	"github.com/jinzhu/copier"
+	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/conversion"
@@ -111,10 +115,65 @@ func (r *Cluster) changesToCluster(cluster *appsv1.Cluster) {
 	//   status
 	//     components
 	//       - message: ComponentMessageMap -> map[string]string
+	if len(r.Spec.ClusterDefRef) > 0 {
+		cluster.Spec.ClusterDef = r.Spec.ClusterDefRef
+	}
+
 	if r.Spec.TerminationPolicy == Halt {
 		cluster.Spec.TerminationPolicy = appsv1.DoNotTerminate
 	} else {
 		cluster.Spec.TerminationPolicy = appsv1.TerminationPolicyType(r.Spec.TerminationPolicy)
+	}
+
+	r.toClusterServices(cluster)
+
+	if cluster.Spec.SchedulingPolicy == nil {
+		var componentName string
+		if len(r.Spec.ComponentSpecs) > 0 {
+			componentName = r.Spec.ComponentSpecs[0].Name
+		}
+		// TODO: support convert the schedulingPolicy of the shardings
+		affinity := r.Spec.Affinity
+		if r.Spec.Affinity == nil {
+			affinity = buildAffinity(r)
+		}
+		cluster.Spec.SchedulingPolicy = r.toSchedulingPolicy(affinity, r.Spec.Tolerations, componentName)
+	}
+
+	for i := range r.Spec.ComponentSpecs {
+		compSpec := r.Spec.ComponentSpecs[i]
+		r.toComponentSpec(compSpec, &cluster.Spec.ComponentSpecs[i], compSpec.Name)
+	}
+	// TODO: support convert the shardings
+}
+
+func (r *Cluster) toClusterServices(cluster *appsv1.Cluster) {
+	for i := range r.Spec.Services {
+		clusterSVC := r.Spec.Services[i]
+		if len(clusterSVC.ShardingSelector) > 0 && len(clusterSVC.ComponentSelector) == 0 {
+			cluster.Spec.Services[i].ComponentSelector = clusterSVC.ShardingSelector
+		}
+	}
+}
+
+func (r *Cluster) toSchedulingPolicy(affinity *Affinity, tolerations []corev1.Toleration, compName string) *appsv1.SchedulingPolicy {
+	if len(compName) == 0 {
+		return nil
+	}
+	if affinity == nil && len(tolerations) == 0 {
+		return nil
+	}
+	schedulingPolicy := &appsv1.SchedulingPolicy{}
+	schedulingPolicy.Tolerations = tolerations
+
+	schedulingPolicy.Affinity = convertToAffinity(r.Name, compName, affinity)
+	schedulingPolicy.TopologySpreadConstraints = convertTopologySpreadConstraints4Legacy(r.Name, compName, affinity)
+	return schedulingPolicy
+}
+
+func (r *Cluster) toComponentSpec(fromCompSpec ClusterComponentSpec, toCompSpec *appsv1.ClusterComponentSpec, componentName string) {
+	if toCompSpec.SchedulingPolicy == nil {
+		toCompSpec.SchedulingPolicy = r.toSchedulingPolicy(fromCompSpec.Affinity, fromCompSpec.Tolerations, componentName)
 	}
 }
 
@@ -136,7 +195,10 @@ func (r *Cluster) changesFromCluster(cluster *appsv1.Cluster) {
 	//   status
 	//     components
 	//       - message: ComponentMessageMap -> map[string]string
-	// appsv1.TerminationPolicyType is a subset of appsv1alpha1.TerminationPolicyType, it can be converted directly.
+	// appsv1.TerminationPolicyType is a subset of TerminationPolicyType, it can be converted directly.
+	if len(cluster.Spec.ClusterDef) > 0 {
+		r.Spec.ClusterDefRef = cluster.Spec.ClusterDef
+	}
 }
 
 type clusterConverter struct {
@@ -282,4 +344,116 @@ func (c *clusterConverter) toCluster(cluster *Cluster) {
 			cluster.Status.Components[name] = comp
 		}
 	}
+}
+
+func convertToAffinity(clusterName, compName string, compAffinity *Affinity) *corev1.Affinity {
+	if compAffinity == nil {
+		return nil
+	}
+	affinity := new(corev1.Affinity)
+	// Build NodeAffinity
+	var matchExpressions []corev1.NodeSelectorRequirement
+	nodeLabelKeys := maps.Keys(compAffinity.NodeLabels)
+	// NodeLabels must be ordered
+	sort.Strings(nodeLabelKeys)
+	for _, key := range nodeLabelKeys {
+		values := strings.Split(compAffinity.NodeLabels[key], ",")
+		matchExpressions = append(matchExpressions, corev1.NodeSelectorRequirement{
+			Key:      key,
+			Operator: corev1.NodeSelectorOpIn,
+			Values:   values,
+		})
+	}
+	if len(matchExpressions) > 0 {
+		nodeSelectorTerm := corev1.NodeSelectorTerm{
+			MatchExpressions: matchExpressions,
+		}
+		affinity.NodeAffinity = &corev1.NodeAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+				NodeSelectorTerms: []corev1.NodeSelectorTerm{nodeSelectorTerm},
+			},
+		}
+	}
+	// Build PodAntiAffinity
+	var podAntiAffinity *corev1.PodAntiAffinity
+	var podAffinityTerms []corev1.PodAffinityTerm
+	for _, topologyKey := range compAffinity.TopologyKeys {
+		podAffinityTerms = append(podAffinityTerms, corev1.PodAffinityTerm{
+			TopologyKey: topologyKey,
+			LabelSelector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"app.kubernetes.io/instance":        clusterName,
+					"apps.kubeblocks.io/component-name": compName,
+				},
+			},
+		})
+	}
+	if compAffinity.PodAntiAffinity == Required {
+		podAntiAffinity = &corev1.PodAntiAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: podAffinityTerms,
+		}
+	} else {
+		var weightedPodAffinityTerms []corev1.WeightedPodAffinityTerm
+		for _, podAffinityTerm := range podAffinityTerms {
+			weightedPodAffinityTerms = append(weightedPodAffinityTerms, corev1.WeightedPodAffinityTerm{
+				Weight:          100,
+				PodAffinityTerm: podAffinityTerm,
+			})
+		}
+		podAntiAffinity = &corev1.PodAntiAffinity{
+			PreferredDuringSchedulingIgnoredDuringExecution: weightedPodAffinityTerms,
+		}
+	}
+	affinity.PodAntiAffinity = podAntiAffinity
+	return affinity
+}
+
+func convertTopologySpreadConstraints4Legacy(clusterName, compName string, compAffinity *Affinity) []corev1.TopologySpreadConstraint {
+	if compAffinity == nil {
+		return nil
+	}
+
+	var topologySpreadConstraints []corev1.TopologySpreadConstraint
+
+	var whenUnsatisfiable corev1.UnsatisfiableConstraintAction
+	if compAffinity.PodAntiAffinity == Required {
+		whenUnsatisfiable = corev1.DoNotSchedule
+	} else {
+		whenUnsatisfiable = corev1.ScheduleAnyway
+	}
+	for _, topologyKey := range compAffinity.TopologyKeys {
+		topologySpreadConstraints = append(topologySpreadConstraints, corev1.TopologySpreadConstraint{
+			MaxSkew:           1,
+			WhenUnsatisfiable: whenUnsatisfiable,
+			TopologyKey:       topologyKey,
+			LabelSelector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"app.kubernetes.io/instance":        clusterName,
+					"apps.kubeblocks.io/component-name": compName,
+				},
+			},
+		})
+	}
+	return topologySpreadConstraints
+}
+
+func buildAffinity(cluster *Cluster) *Affinity {
+	affinityTopoKey := func(policyType AvailabilityPolicyType) string {
+		switch policyType {
+		case AvailabilityPolicyZone:
+			return "topology.kubernetes.io/zone"
+		case AvailabilityPolicyNode:
+			return "kubernetes.io/hostname"
+		}
+		return ""
+	}
+	var affinity *Affinity
+	if len(cluster.Spec.Tenancy) > 0 || len(cluster.Spec.AvailabilityPolicy) > 0 {
+		affinity = &Affinity{
+			PodAntiAffinity: Preferred,
+			TopologyKeys:    []string{affinityTopoKey(cluster.Spec.AvailabilityPolicy)},
+			Tenancy:         cluster.Spec.Tenancy,
+		}
+	}
+	return affinity
 }

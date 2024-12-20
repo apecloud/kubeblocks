@@ -58,7 +58,7 @@ func TestManager_GetRole(t *testing.T) {
 		expectedRoles := []string{models.PRIMARY, models.SECONDARY}
 
 		for i, leaderName := range leaderNames {
-			cluster := &dcs.Cluster{Leader: &dcs.Leader{Name: leaderName}}
+			cluster := &dcs.Cluster{Leader: &dcs.Leader{Name: leaderName, Holder: leaderName}}
 			mockDCSStore.EXPECT().GetLeader().Return(cluster.Leader, nil)
 			role, err := manager.GetReplicaRole(ctx, cluster)
 			assert.Nil(t, err)

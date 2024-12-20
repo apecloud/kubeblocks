@@ -142,22 +142,24 @@ func NewConfig(properties map[string]string) (*Config, error) {
 }
 
 func getUserName() string {
-	if viper.IsSet("MYSQL_ADMIN_USER") {
+	switch {
+	case viper.IsSet("MYSQL_ADMIN_USER"):
 		return viper.GetString("MYSQL_ADMIN_USER")
-	} else if viper.IsSet(constant.KBEnvServiceUser) {
+	case viper.IsSet(constant.KBEnvServiceUser):
 		return viper.GetString(constant.KBEnvServiceUser)
-	} else if viper.IsSet("MYSQL_ROOT_USER") {
+	case viper.IsSet("MYSQL_ROOT_USER"):
 		return viper.GetString("MYSQL_ROOT_USER")
 	}
 	return ""
 }
 
 func getPassword() string {
-	if viper.IsSet("MYSQL_ADMIN_PASSWORD") {
+	switch {
+	case viper.IsSet("MYSQL_ADMIN_PASSWORD"):
 		return viper.GetString("MYSQL_ADMIN_PASSWORD")
-	} else if viper.IsSet(constant.KBEnvServicePassword) {
+	case viper.IsSet(constant.KBEnvServicePassword):
 		return viper.GetString(constant.KBEnvServicePassword)
-	} else if viper.IsSet("MYSQL_ROOT_PASSWORD") {
+	case viper.IsSet("MYSQL_ROOT_PASSWORD"):
 		return viper.GetString("MYSQL_ROOT_PASSWORD")
 	}
 	return ""

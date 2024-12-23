@@ -64,11 +64,11 @@ kbcli cluster update NAME [flags]
       --backup-repo-name string                the backup repository name
       --backup-retention-period string         a time string ending with the 'd'|'D'|'h'|'H' character to describe how long the Backup should be retained (default "1d")
       --backup-starting-deadline-minutes int   the deadline in minutes for starting the backup job if it misses its scheduled time for any reason
+      --disable-exporter                       Enable or disable monitoring (default true)
       --dry-run string[="unchanged"]           Must be "none", "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource. (default "none")
       --edit                                   Edit the API resource
       --enable-all-logs                        Enable advanced application all log extraction, set to true will ignore enabledLogs of component level, default is false
   -h, --help                                   help for update
-      --monitoring-interval uint8              The monitoring interval of cluster, 0 is disabled, the unit is second, any non-zero value means enabling monitoring.
       --node-labels stringToString             Node label selector (default [])
   -o, --output string                          Output format. One of: (json, yaml, name, go-template, go-template-file, template, templatefile, jsonpath, jsonpath-as-json, jsonpath-file).
       --pitr-enabled                           Specify whether enabled point in time recovery

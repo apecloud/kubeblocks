@@ -23,19 +23,20 @@ kbcli cluster create mysql NAME [flags]
 ```
       --availability-policy string   The availability policy of cluster. Legal values [none, node, zone]. (default "node")
       --cpu float                    CPU cores. Value range [0.5, 64]. (default 0.5)
+      --disable-exporter             Enable or disable monitor. (default true)
   -h, --help                         help for mysql
       --host-network-accessible      Specify whether the cluster can be accessed from within the VPC.
       --memory float                 Memory, the unit is Gi. Value range [0.5, 1000]. (default 0.5)
       --mode string                  Cluster topology mode. Legal values [standalone, raftGroup]. (default "standalone")
-      --monitoring-interval int      The monitoring interval of cluster, 0 is disabled, the unit is second. Value range [0, 60].
       --proxy-enabled                Enable proxy or not.
       --publicly-accessible          Specify whether the cluster can be accessed from the public internet.
       --rbac-enabled                 Specify whether rbac resources will be created by client, otherwise KubeBlocks server will try to create rbac resources.
       --replicas int                 The number of replicas, for standalone mode, the replicas is 1, for raftGroup mode, the default replicas is 3. Value range [1, 5]. (default 1)
       --storage float                Storage size, the unit is Gi. Value range [1, 10000]. (default 20)
+      --storage-class-name string    Storage class name of the data volume
       --tenancy string               The tenancy of cluster. Legal values [SharedNode, DedicatedNode]. (default "SharedNode")
       --termination-policy string    The termination policy of cluster. Legal values [DoNotTerminate, Halt, Delete, WipeOut]. (default "Delete")
-      --version string               Cluster version.
+      --version string               Cluster version. (default "ac-mysql-8.0.30")
 ```
 
 ### Options inherited from parent commands

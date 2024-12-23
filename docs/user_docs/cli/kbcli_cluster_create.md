@@ -98,6 +98,7 @@ kbcli cluster create [NAME] [flags]
 ### Options
 
 ```
+      --annotation stringArray                 Set annotations for cluster
       --backup string                          Set a source backup to restore data
       --backup-cron-expression string          the cron expression for schedule, the timezone is in UTC. see https://en.wikipedia.org/wiki/Cron.
       --backup-enabled                         Specify whether enabled automated backup
@@ -107,11 +108,15 @@ kbcli cluster create [NAME] [flags]
       --backup-starting-deadline-minutes int   the deadline in minutes for starting the backup job if it misses its scheduled time for any reason
       --cluster-definition string              Specify cluster definition, run "kbcli cd list" to show all available cluster definitions
       --cluster-version string                 Specify cluster version, run "kbcli cv list" to show all available cluster versions, use the latest version if not specified
+      --cpu-oversell-ratio float               Set oversell ratio of CPU, set to 10 means 10 times oversell (default 1)
+      --create-only-set                        Create components exclusively configured in 'set'
+      --disable-exporter                       Enable or disable monitoring (default true)
       --dry-run string[="unchanged"]           Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent. (default "none")
       --edit                                   Edit the API resource before creating
       --enable-all-logs                        Enable advanced application all log extraction, set to true will ignore enabledLogs of component level, default is false
   -h, --help                                   help for create
-      --monitoring-interval uint8              The monitoring interval of cluster, 0 is disabled, the unit is second, any non-zero value means enabling monitoring.
+      --label stringArray                      Set labels for cluster resources
+      --memory-oversell-ratio float            Set oversell ratio of memory, set to 10 means 10 times oversell (default 1)
       --node-labels stringToString             Node label selector (default [])
   -o, --output format                          Prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
       --pitr-enabled                           Specify whether enabled point in time recovery
@@ -120,7 +125,7 @@ kbcli cluster create [NAME] [flags]
       --rbac-enabled                           Specify whether rbac resources will be created by kbcli, otherwise KubeBlocks server will try to create rbac resources
       --restore-to-time string                 Set a time for point in time recovery
       --service-reference stringArray          Set the other KubeBlocks cluster dependencies, each '--service-reference' corresponds to a cluster service. (e.g --service-reference name=pulsarZookeeper,cluster=zookeeper,namespace=default)
-      --set stringArray                        Set the cluster resource including cpu, memory, replicas and storage, each set corresponds to a component.(e.g. --set cpu=1,memory=1Gi,replicas=3,storage=20Gi or --set class=general-1c1g)
+      --set stringArray                        Set the cluster resource including cpu, memory, replicas and storage, each set corresponds to a component.(e.g. --set cpu=1,memory=1Gi,replicas=3,storage=20Gi)
   -f, --set-file string                        Use yaml file, URL, or stdin to set the cluster resource
       --tenancy string                         Tenancy options, one of: (SharedNode, DedicatedNode) (default "SharedNode")
       --termination-policy string              Termination policy, one of: (DoNotTerminate, Halt, Delete, WipeOut) (default "Delete")
@@ -156,11 +161,13 @@ kbcli cluster create [NAME] [flags]
 ### SEE ALSO
 
 * [kbcli cluster](kbcli_cluster.md)	 - Cluster command.
+* [kbcli cluster create elasticsearch](kbcli_cluster_create_elasticsearch.md)	 - Create a elasticsearch cluster.
 * [kbcli cluster create kafka](kbcli_cluster_create_kafka.md)	 - Create a kafka cluster.
 * [kbcli cluster create llm](kbcli_cluster_create_llm.md)	 - Create a llm cluster.
 * [kbcli cluster create mongodb](kbcli_cluster_create_mongodb.md)	 - Create a mongodb cluster.
 * [kbcli cluster create mysql](kbcli_cluster_create_mysql.md)	 - Create a mysql cluster.
 * [kbcli cluster create postgresql](kbcli_cluster_create_postgresql.md)	 - Create a postgresql cluster.
+* [kbcli cluster create qdrant](kbcli_cluster_create_qdrant.md)	 - Create a qdrant cluster.
 * [kbcli cluster create redis](kbcli_cluster_create_redis.md)	 - Create a redis cluster.
 * [kbcli cluster create xinference](kbcli_cluster_create_xinference.md)	 - Create a xinference cluster.
 

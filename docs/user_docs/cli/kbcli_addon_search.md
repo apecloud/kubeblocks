@@ -1,24 +1,17 @@
 ---
-title: kbcli clusterdefinition list-service-reference
+title: kbcli addon search
 ---
 
-List cluster references declared in a cluster definition.
+Search the addon from index
 
 ```
-kbcli clusterdefinition list-service-reference [flags]
-```
-
-### Examples
-
-```
-  # List cluster references name declared in a cluster definition.
-  kbcli clusterdefinition list-service-reference orioledb
+kbcli addon search [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help   help for list-service-reference
+  -h, --help   help for search
 ```
 
 ### Options inherited from parent commands
@@ -47,7 +40,7 @@ kbcli clusterdefinition list-service-reference [flags]
 
 ### SEE ALSO
 
-* [kbcli clusterdefinition](kbcli_clusterdefinition.md)	 - ClusterDefinition command.
+* [kbcli addon](kbcli_addon.md)	 - Addon command.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

@@ -1,24 +1,27 @@
 ---
-title: kbcli clusterdefinition list-service-reference
+title: kbcli addon index add
 ---
 
-List cluster references declared in a cluster definition.
+Add a new addon index
+
+### Synopsis
+
+Configure a new index to install KubeBlocks addon from.
 
 ```
-kbcli clusterdefinition list-service-reference [flags]
+kbcli addon index add [flags]
 ```
 
 ### Examples
 
 ```
-  # List cluster references name declared in a cluster definition.
-  kbcli clusterdefinition list-service-reference orioledb
+kbcli addon index add kubeblocks https://github.com/apecloud/block-index.git
 ```
 
 ### Options
 
 ```
-  -h, --help   help for list-service-reference
+  -h, --help   help for add
 ```
 
 ### Options inherited from parent commands
@@ -47,7 +50,7 @@ kbcli clusterdefinition list-service-reference [flags]
 
 ### SEE ALSO
 
-* [kbcli clusterdefinition](kbcli_clusterdefinition.md)	 - ClusterDefinition command.
+* [kbcli addon index](kbcli_addon_index.md)	 - Manage custom addon indexes
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

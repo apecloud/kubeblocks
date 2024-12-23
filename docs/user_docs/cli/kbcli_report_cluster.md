@@ -72,7 +72,7 @@ kbcli report cluster NAME [-f file] [-with-logs] [-mask] [flags]
 
 ### SEE ALSO
 
-* [kbcli report](kbcli_report.md)	 - report kubeblocks or cluster info.
+* [kbcli report](kbcli_report.md)	 - Report kubeblocks or cluster info.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

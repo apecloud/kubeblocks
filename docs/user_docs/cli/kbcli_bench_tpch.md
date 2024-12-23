@@ -14,6 +14,9 @@ kbcli bench tpch [Step] [BenchmarkName] [flags]
   # tpch on a cluster, that will exec for all steps, cleanup, prepare and run
   kbcli bench tpch mytest --cluster mycluster --user xxx --password xxx --database mydb
   
+  # tpch on a cluster, but with cpu and memory limits set
+  kbcli bench tpch mytest --cluster mycluster --user xxx --password xxx --database mydb --limit-cpu 1 --limit-memory 1Gi
+  
   # tpch on a cluster with run, just run by running the test
   kbcli bench tpch run mytest --cluster mycluster --user xxx --password xxx --database mydb
 ```
@@ -21,16 +24,21 @@ kbcli bench tpch [Step] [BenchmarkName] [flags]
 ### Options
 
 ```
-      --cluster string        the cluster of database
-      --database string       database name
-      --driver string         the driver of database
-      --extra-args strings    extra arguments for benchmark
-  -h, --help                  help for tpch
-      --host string           the host of database
-      --password string       the password of database
-      --port int              the port of database
-      --tolerations strings   Tolerations for benchmark, such as '"dev=true:NoSchedule,large=true:NoSchedule"'
-      --user string           the user of database
+      --cluster string          the cluster of database
+      --database string         database name
+      --driver string           the driver of database
+      --extra-args strings      extra arguments for benchmark
+  -h, --help                    help for tpch
+      --host string             the host of database
+      --limit-cpu string        the limit cpu of benchmark
+      --limit-memory string     the limit memory of benchmark
+      --password string         the password of database
+      --port int                the port of database
+      --request-cpu string      the request cpu of benchmark
+      --request-memory string   the request memory of benchmark
+      --size int                specify the overall database size scaling parameter, 1 means 1GB (default 1)
+      --tolerations strings     Tolerations for benchmark, such as '"dev=true:NoSchedule,large=true:NoSchedule"'
+      --user string             the user of database
 ```
 
 ### Options inherited from parent commands

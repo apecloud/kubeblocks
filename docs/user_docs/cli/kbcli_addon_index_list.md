@@ -1,24 +1,24 @@
 ---
-title: kbcli clusterdefinition list-service-reference
+title: kbcli addon index list
 ---
 
-List cluster references declared in a cluster definition.
+List addon indexes
+
+### Synopsis
+
+Print a list of addon indexes.
+
+This command prints a list of addon indexes. It shows the name and the remote URL for
+each addon index in table format.
 
 ```
-kbcli clusterdefinition list-service-reference [flags]
-```
-
-### Examples
-
-```
-  # List cluster references name declared in a cluster definition.
-  kbcli clusterdefinition list-service-reference orioledb
+kbcli addon index list [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help   help for list-service-reference
+  -h, --help   help for list
 ```
 
 ### Options inherited from parent commands
@@ -47,7 +47,7 @@ kbcli clusterdefinition list-service-reference [flags]
 
 ### SEE ALSO
 
-* [kbcli clusterdefinition](kbcli_clusterdefinition.md)	 - ClusterDefinition command.
+* [kbcli addon index](kbcli_addon_index.md)	 - Manage custom addon indexes
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

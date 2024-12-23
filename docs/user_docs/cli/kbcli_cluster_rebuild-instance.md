@@ -1,24 +1,37 @@
 ---
-title: kbcli clusterdefinition list-service-reference
+title: kbcli cluster rebuild-instance
 ---
 
-List cluster references declared in a cluster definition.
+Rebuild the specified instances in the cluster.
 
 ```
-kbcli clusterdefinition list-service-reference [flags]
+kbcli cluster rebuild-instance NAME [flags]
 ```
 
 ### Examples
 
 ```
-  # List cluster references name declared in a cluster definition.
-  kbcli clusterdefinition list-service-reference orioledb
+  # rebuild instance without backup
+  kbcli cluster rebuild-instance mycluster --instances pod1,pod2
+  
+  # rebuild instance from backup
+  kbcli cluster rebuild-instance mycluster --instances pod1,pod2 --backupName <backup>
 ```
 
 ### Options
 
 ```
-  -h, --help   help for list-service-reference
+      --auto-approve                   Skip interactive approval before rebuilding the instances.gi
+      --backup string                  instances will be rebuild by the specified backup.
+      --dry-run string[="unchanged"]   Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent. (default "none")
+      --env stringArray                provide the necessary env for the 'Restore' operation from the backup. format: key1=value, key2=value
+      --force                           skip the pre-checks of the opsRequest to run the opsRequest forcibly
+  -h, --help                           help for rebuild-instance
+      --instances strings              instance which need to rebuild.
+      --name string                    OpsRequest name. if not specified, it will be randomly generated
+      --node strings                   specified the target node which rebuilds the instance on the node otherwise will rebuild on a randon node. format: insName1=nodeName,insName2=nodeName
+  -o, --output format                  Prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
+      --ttlSecondsAfterSucceed int     Time to live after the OpsRequest succeed
 ```
 
 ### Options inherited from parent commands
@@ -47,7 +60,7 @@ kbcli clusterdefinition list-service-reference [flags]
 
 ### SEE ALSO
 
-* [kbcli clusterdefinition](kbcli_clusterdefinition.md)	 - ClusterDefinition command.
+* [kbcli cluster](kbcli_cluster.md)	 - Cluster command.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

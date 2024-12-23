@@ -1,41 +1,40 @@
 ---
-title: kbcli cluster create mongodb
+title: kbcli cluster create elasticsearch
 ---
 
-Create a mongodb cluster.
+Create a elasticsearch cluster.
 
 ```
-kbcli cluster create mongodb NAME [flags]
+kbcli cluster create elasticsearch NAME [flags]
 ```
 
 ### Examples
 
 ```
   # Create a cluster with the default values
-  kbcli cluster create mongodb
+  kbcli cluster create elasticsearch
   
   # Create a cluster with the specified cpu, memory and storage
-  kbcli cluster create mongodb --cpu 1 --memory 2 --storage 10
+  kbcli cluster create elasticsearch --cpu 1 --memory 2 --storage 10
 ```
 
 ### Options
 
 ```
       --availability-policy string   The availability policy of cluster. Legal values [none, node, zone]. (default "node")
-      --cpu float                    CPU cores. Value range [0.5, 64]. (default 0.5)
+      --cpu float                    CPU cores. Value range [0.5, 64]. (default 1)
       --disable-exporter             Enable or disable monitor. (default true)
-  -h, --help                         help for mongodb
+  -h, --help                         help for elasticsearch
       --host-network-accessible      Specify whether the cluster can be accessed from within the VPC.
-      --memory float                 Memory, the unit is Gi. Value range [0.5, 1000]. (default 0.5)
-      --mode string                  Cluster topology mode. Legal values [standalone, replicaset]. (default "standalone")
+      --memory float                 Memory, the unit is Gi. Value range [1, 1000]. (default 2)
+      --mode string                  Mode for ElasticSearch Legal values [single-node, multi-node]. (default "multi-node")
       --publicly-accessible          Specify whether the cluster can be accessed from the public internet.
-      --rbac-enabled                 Specify whether rbac resources will be created by client, otherwise KubeBlocks server will try to create rbac resources.
-      --replicas int                 The number of replicas, for standalone mode, the replicas is 1, for replicaset mode, the default replicas is 3. Value range [1, 5]. (default 1)
+      --rbac-enabled                 Specify whether rbac resources will be created by client, otherwise KubeBlocks server will try to create rbac resources. (default true)
+      --replicas int                 The number of replicas, for single-node mode, the replicas is 1, for multi-node mode, the default replicas is 3. Value range [1, 5]. (default 1)
       --storage float                Storage size, the unit is Gi. Value range [1, 10000]. (default 20)
-      --storage-class-name string    Storage class name of the data volume
       --tenancy string               The tenancy of cluster. Legal values [SharedNode, DedicatedNode]. (default "SharedNode")
       --termination-policy string    The termination policy of cluster. Legal values [DoNotTerminate, Halt, Delete, WipeOut]. (default "Delete")
-      --version string               Cluster version. Legal values [7.0.12, 6.0.16, 5.0.28, 4.4.29, 4.2.24, 4.0.28]. (default "6.0.16")
+      --version string               The version of ElasticSearch. (default "8.8.2")
 ```
 
 ### Options inherited from parent commands

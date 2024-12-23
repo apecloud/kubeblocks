@@ -11,11 +11,8 @@ kbcli cluster connect (NAME | -i INSTANCE-NAME) [flags]
 ### Examples
 
 ```
-  # connect to a specified cluster, default connect to the leader/primary instance
+  # connect to a specified cluster
   kbcli cluster connect mycluster
-  
-  # connect to cluster as user
-  kbcli cluster connect mycluster --as-user myuser
   
   # connect to a specified instance
   kbcli cluster connect -i mycluster-instance-0
@@ -23,29 +20,17 @@ kbcli cluster connect (NAME | -i INSTANCE-NAME) [flags]
   # connect to a specified component
   kbcli cluster connect mycluster --component mycomponent
   
-  # show cli connection example with password mask
-  kbcli cluster connect mycluster --show-example --client=cli
-  
-  # show java connection example with password mask
-  kbcli cluster connect mycluster --show-example --client=java
-  
-  # show all connection examples with password mask
-  kbcli cluster connect mycluster --show-example
-  
-  # show cli connection examples with real password
-  kbcli cluster connect mycluster --show-example --client=cli --show-password
+  # show cli connection example, supported client: [cli, java, python, rust, php, node.js, go, .net, django] and more.
+  kbcli cluster connect mycluster --client=cli
 ```
 
 ### Options
 
 ```
-      --as-user string     Connect to cluster as user
-      --client string      Which client connection example should be output, only valid if --show-example is true.
-      --component string   The component to connect. If not specified, pick up the first one.
+      --client string      Which client connection example should be output.
+      --component string   The component to connect. If not specified and no any cluster scope services, pick up the first one.
   -h, --help               help for connect
   -i, --instance string    The instance name to connect.
-      --show-example       Show how to connect to cluster/instance from different clients.
-      --show-password      Show password in example.
 ```
 
 ### Options inherited from parent commands

@@ -17,7 +17,7 @@ kbcli dataprotection backup NAME [flags]
   # create a backup with a specified method, run "kbcli cluster desc-backup-policy mycluster" to show supported backup methods
   kbcli dp backup mybackup --cluster mycluster --method mymethod
   
-  # create a backup with specified backup policy, run "kbcli cluster list-backup-policy mycluster" to show the cluster supported backup policies
+  # create a backup with specified backup policy, run "kbcli cluster list-backup-policies mycluster" to show the cluster supported backup policies
   kbcli dp backup mybackup --cluster mycluster --policy mypolicy
   
   # create a backup from a parent backup

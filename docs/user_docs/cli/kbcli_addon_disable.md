@@ -8,10 +8,21 @@ Disable an addon.
 kbcli addon disable ADDON_NAME [flags]
 ```
 
+### Examples
+
+```
+  # Disable "prometheus" addon
+  kbcli addon disable prometheus
+  
+  # Disable addons in batch
+  kbcli addon disable prometheus csi-s3
+```
+
 ### Options
 
 ```
       --allow-missing-template-keys    If true, ignore any errors in templates when a field or map key is missing in the template. Only applies to golang and jsonpath output formats. (default true)
+      --auto-approve                   Skip interactive approval before disabling addon
       --dry-run string[="unchanged"]   Must be "none", "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource. (default "none")
       --edit                           Edit the API resource
   -h, --help                           help for disable

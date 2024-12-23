@@ -43,7 +43,6 @@ func (r *Cluster) ConvertTo(dstRaw conversion.Hub) error {
 	if err := incrementConvertTo(r, dst); err != nil {
 		return err
 	}
-
 	// status
 	if err := copier.Copy(&dst.Status, &r.Status); err != nil {
 		return err
@@ -63,15 +62,13 @@ func (r *Cluster) ConvertFrom(srcRaw conversion.Hub) error {
 	if err := copier.Copy(&r.Spec, &src.Spec); err != nil {
 		return err
 	}
-	if err := incrementConvertFrom(r, src, &clusterConverter{}); err != nil {
-		return err
-	}
-
 	// status
 	if err := copier.Copy(&r.Status, &src.Status); err != nil {
 		return err
 	}
-
+	if err := incrementConvertFrom(r, src, &clusterConverter{}); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -114,9 +111,6 @@ func (r *Cluster) changesToCluster(cluster *appsv1.Cluster) {
 	//   status
 	//     components
 	//       - message: ComponentMessageMap -> map[string]string
-	if len(r.Spec.ClusterDefRef) > 0 {
-		cluster.Spec.ClusterDef = r.Spec.ClusterDefRef
-	}
 	if r.Spec.TerminationPolicy == Halt {
 		cluster.Spec.TerminationPolicy = appsv1.DoNotTerminate
 	} else {
@@ -142,9 +136,6 @@ func (r *Cluster) changesFromCluster(cluster *appsv1.Cluster) {
 	//   status
 	//     components
 	//       - message: ComponentMessageMap -> map[string]string
-	if len(cluster.Spec.ClusterDef) > 0 {
-		r.Spec.ClusterDefRef = cluster.Spec.ClusterDef
-	}
 	// appsv1.TerminationPolicyType is a subset of appsv1alpha1.TerminationPolicyType, it can be converted directly.
 }
 
@@ -154,6 +145,7 @@ type clusterConverter struct {
 }
 
 type clusterSpecConverter struct {
+	ClusterDefRef      string                          `json:"clusterDefinitionRef,omitempty"`
 	ClusterVersionRef  string                          `json:"clusterVersionRef,omitempty"`
 	TerminationPolicy  TerminationPolicyType           `json:"terminationPolicy"`
 	Affinity           *Affinity                       `json:"affinity,omitempty"`
@@ -193,6 +185,7 @@ type clusterCompStatusConverter struct {
 
 func (c *clusterConverter) fromCluster(cluster *Cluster) {
 	c.Spec.ClusterVersionRef = cluster.Spec.ClusterVersionRef
+	c.Spec.ClusterDefRef = cluster.Spec.ClusterDefRef
 	c.Spec.TerminationPolicy = cluster.Spec.TerminationPolicy
 	c.Spec.Affinity = cluster.Spec.Affinity
 	c.Spec.Tolerations = cluster.Spec.Tolerations
@@ -244,6 +237,7 @@ func (c *clusterConverter) fromCluster(cluster *Cluster) {
 
 func (c *clusterConverter) toCluster(cluster *Cluster) {
 	cluster.Spec.ClusterVersionRef = c.Spec.ClusterVersionRef
+	cluster.Spec.ClusterDefRef = c.Spec.ClusterDefRef
 	cluster.Spec.TerminationPolicy = c.Spec.TerminationPolicy
 	cluster.Spec.Affinity = c.Spec.Affinity
 	cluster.Spec.Tolerations = c.Spec.Tolerations

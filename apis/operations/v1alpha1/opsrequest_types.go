@@ -311,6 +311,7 @@ type Switchover struct {
 	// If CandidateName is specified, the role will be transferred to this instance.
 	// The name must match one of the pods in the component.
 	// Refer to ComponentDefinition's Swtichover lifecycle action for more details.
+	//
 	// +optional
 	CandidateName string `json:"candidateName,omitempty"`
 }

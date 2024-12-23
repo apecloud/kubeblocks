@@ -142,7 +142,7 @@ func (r *OpsRequest) ValidateOps(ctx context.Context,
 	case ReconfiguringType:
 		return r.validateReconfigure(ctx, k8sClient, cluster)
 	case SwitchoverType:
-		return r.validateSwitchover(ctx, k8sClient, cluster)
+		return r.validateSwitchover(cluster)
 	case ExposeType:
 		return r.validateExpose(ctx, cluster)
 	case RebuildInstanceType:
@@ -493,7 +493,8 @@ func (r *OpsRequest) validateVolumeExpansion(ctx context.Context, cli client.Cli
 }
 
 // validateSwitchover validates switchover api when spec.type is Switchover.
-func (r *OpsRequest) validateSwitchover(ctx context.Context, cli client.Client, cluster *appsv1.Cluster) error {
+// more time consuming checks will be done in handler's Action() function.
+func (r *OpsRequest) validateSwitchover(cluster *appsv1.Cluster) error {
 	switchoverList := r.Spec.SwitchoverList
 	if len(switchoverList) == 0 {
 		return notEmptyError("spec.switchover")
@@ -506,7 +507,14 @@ func (r *OpsRequest) validateSwitchover(ctx context.Context, cli client.Client, 
 	if err := r.checkComponentExistence(cluster, compOpsList); err != nil {
 		return err
 	}
-	return validateSwitchoverResourceList(ctx, cli, cluster, switchoverList)
+
+	for _, switchover := range switchoverList {
+		if switchover.InstanceName == "" {
+			return notEmptyError("switchover.instanceName")
+		}
+	}
+
+	return nil
 }
 
 func (r *OpsRequest) checkInstanceTemplate(cluster *appsv1.Cluster, componentOps ComponentOps, inputInstances []string) error {
@@ -789,92 +797,4 @@ func GetRunningOpsByOpsType(ctx context.Context, cli client.Client,
 		}
 	}
 	return runningOpsList, nil
-}
-
-// validateSwitchoverResourceList checks if switchover resourceList is legal.
-func validateSwitchoverResourceList(ctx context.Context, cli client.Client, cluster *appsv1.Cluster, switchoverList []Switchover) error {
-	for _, switchover := range switchoverList {
-		if switchover.InstanceName == "" {
-			return notEmptyError("switchover.instanceName")
-		}
-
-		validateBaseOnCompDef := func(compDef string) error {
-			compDefObj, err := getComponentDefByName(ctx, cli, compDef)
-			if err != nil {
-				return err
-			}
-			if compDefObj == nil {
-				return fmt.Errorf("this component %s referenced componentDefinition is invalid", switchover.ComponentName)
-			}
-			if compDefObj.Spec.LifecycleActions == nil || compDefObj.Spec.LifecycleActions.Switchover == nil {
-				return fmt.Errorf("this cluster component %s does not support switchover", switchover.ComponentName)
-			}
-			// check switchover.InstanceName whether exist and role label is correct
-			if switchover.InstanceName == KBSwitchoverCandidateInstanceForAnyPod {
-				return nil
-			}
-			if len(compDefObj.Spec.Roles) == 0 {
-				return errors.New("component has no roles definition, does not support switchover")
-			}
-
-			getPod := func(name string) (*corev1.Pod, error) {
-				pod := &corev1.Pod{}
-				if err := cli.Get(ctx, types.NamespacedName{Namespace: cluster.Namespace, Name: name}, pod); err != nil {
-					return nil, fmt.Errorf("get instanceName %s failed, err: %s, and check the validity of the instanceName using \"kbcli cluster list-instances\"", name, err.Error())
-				}
-				return pod, nil
-			}
-
-			checkOwnership := func(pod *corev1.Pod) error {
-				if !strings.HasPrefix(pod.Name, fmt.Sprintf("%s-%s", cluster.Name, switchover.ComponentName)) {
-					return fmt.Errorf("instanceName %s does not belong to the current component, please check the validity of the instance using \"kbcli cluster list-instances\"", switchover.InstanceName)
-				}
-				return nil
-			}
-
-			pod, err := getPod(switchover.InstanceName)
-			if err != nil {
-				return err
-			}
-			if err := checkOwnership(pod); err != nil {
-				return err
-			}
-			roleName, ok := pod.Labels[constant.RoleLabelKey]
-			if !ok || roleName == "" {
-				return fmt.Errorf("instanceName %s cannot be promoted because it had a invalid role label", switchover.InstanceName)
-			}
-
-			if switchover.CandidateName != "" {
-				candidatePod, err := getPod(switchover.InstanceName)
-				if err != nil {
-					return err
-				}
-				if err := checkOwnership(candidatePod); err != nil {
-					return err
-				}
-			}
-
-			return nil
-		}
-
-		compSpec := cluster.Spec.GetComponentByName(switchover.ComponentName)
-		if compSpec == nil {
-			return fmt.Errorf("component %s not found", switchover.ComponentName)
-		}
-		if compSpec.ComponentDef != "" {
-			return validateBaseOnCompDef(compSpec.ComponentDef)
-		} else {
-			return fmt.Errorf("not-supported")
-		}
-	}
-	return nil
-}
-
-// getComponentDefByName gets ComponentDefinition with compDefName
-func getComponentDefByName(ctx context.Context, cli client.Client, compDefName string) (*appsv1.ComponentDefinition, error) {
-	compDef := &appsv1.ComponentDefinition{}
-	if err := cli.Get(ctx, types.NamespacedName{Name: compDefName}, compDef); err != nil {
-		return nil, err
-	}
-	return compDef, nil
 }

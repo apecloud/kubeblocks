@@ -195,7 +195,7 @@ func parseGlobalRoleSnapshot(role string, event *corev1.Event) *common.GlobalRol
 	if err := json.Unmarshal([]byte(role), snapshot); err == nil {
 		return snapshot
 	}
-	snapshot.Version = strconv.FormatInt(event.EventTime.UnixMicro(), 10)
+	snapshot.Version = strconv.FormatInt(event.LastTimestamp.UnixMicro(), 10)
 	pair := common.PodRoleNamePair{
 		PodName:  event.InvolvedObject.Name,
 		RoleName: role,

@@ -34,7 +34,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -113,7 +112,7 @@ func resolveTemplateNEnvVars(ctx context.Context, cli client.Reader, synthesized
 
 func resolveNewTemplateNEnvVars(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
 	definedVars []appsv1.EnvVar) ([]corev1.EnvVar, []corev1.EnvVar, error) {
-	vars, credentialVars, err := resolveBuiltinNObjectRefVars(ctx, cli, synthesizedComp, definedVars)
+	vars, credentialVars, err := resolveObjectRefVars(ctx, cli, synthesizedComp, definedVars)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -121,44 +120,16 @@ func resolveNewTemplateNEnvVars(ctx context.Context, cli client.Reader, synthesi
 	return templateVars, append(envVars, credentialVars...), nil
 }
 
-func resolveBuiltinNObjectRefVars(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
+func resolveObjectRefVars(ctx context.Context, cli client.Reader, synthesizedComp *SynthesizedComponent,
 	definedVars []appsv1.EnvVar) ([]corev1.EnvVar, []corev1.EnvVar, error) {
-	vars := builtinTemplateVars(synthesizedComp, definedVars)
-	vars1, vars2, err := resolveClusterObjectRefVars(ctx, cli, synthesizedComp, definedVars)
+	vars, vars2, err := resolveClusterObjectRefVars(ctx, cli, synthesizedComp, definedVars)
 	if err != nil {
 		return nil, nil, err
 	}
-	vars = append(vars, vars1...)
 	if err = evaluateObjectVarsExpression(definedVars, vars2, &vars); err != nil {
 		return nil, nil, err
 	}
 	return vars, vars2, nil
-}
-
-func builtinTemplateVars(synthesizedComp *SynthesizedComponent, definedVars []appsv1.EnvVar) []corev1.EnvVar {
-	if synthesizedComp != nil {
-		// keep those vars to be compatible with legacy.
-		defined := sets.New[string]()
-		for _, v := range definedVars {
-			defined.Insert(v.Name)
-		}
-
-		vars := make([]corev1.EnvVar, 0)
-		for _, e := range [][]string{
-			{constant.KBEnvNamespace, synthesizedComp.Namespace},
-			{constant.KBEnvClusterName, synthesizedComp.ClusterName},
-			{constant.KBEnvClusterUID, synthesizedComp.ClusterUID},
-			{constant.KBEnvClusterCompName, constant.GenerateClusterComponentName(synthesizedComp.ClusterName, synthesizedComp.Name)},
-			{constant.KBEnvCompName, synthesizedComp.Name},
-			{constant.KBEnvCompReplicas, strconv.Itoa(int(synthesizedComp.Replicas))},
-		} {
-			if !defined.Has(e[0]) {
-				vars = append(vars, corev1.EnvVar{Name: e[0], Value: e[1]})
-			}
-		}
-		return vars
-	}
-	return []corev1.EnvVar{}
 }
 
 func resolveVarsReferenceNEscaping(templateVars []corev1.EnvVar, credentialVars []corev1.EnvVar) ([]corev1.EnvVar, []corev1.EnvVar) {

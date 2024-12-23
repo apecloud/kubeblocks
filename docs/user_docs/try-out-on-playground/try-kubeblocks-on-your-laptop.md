@@ -133,27 +133,6 @@ kbcli cluster connect mycluster
    5 rows in set (0.02 sec)
    ```
 
-### Observe a MySQL cluster
-
-KubeBlocks supports complete observability capabilities. This section demonstrates the monitoring function of KubeBlocks.
-
-***Steps:***
-
-1. Open the grafana dashboard.
-
-   ```bash
-   kbcli dashboard open kubeblocks-grafana
-   ```
-
-   **Result:**
-
-   A monitoring page on Grafana website is loaded automatically after the command is executed.
-
-2. Click the Dashboard icon on the left bar and monitoring panels show on the page.
-   ![Dashboards](./../../img/quick_start_dashboards.png)
-3. Click **General** -> **MySQL** to monitor the status of the MySQL cluster.
-   ![MySQL_panel](./../../img/quick_start_mysql_panel.png)
-
 ### High availability of MySQL
 
 This guide shows a simple failure simulation to show you the failure recovery capability of MySQL.

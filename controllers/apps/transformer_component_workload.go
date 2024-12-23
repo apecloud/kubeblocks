@@ -680,41 +680,28 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn(deleteReplicas, joinedReplica
 }
 
 func (r *componentWorkloadOps) leaveMemberForPod(pod *corev1.Pod, pods []*corev1.Pod) error {
-	needSwtichover := func(pod *corev1.Pod) bool {
-		if pod == nil || len(pod.Labels) == 0 {
-			return false
-		}
-		_, ok := pod.Labels[constant.RoleLabelKey]
-
-		return ok
-	}
-
 	trySwitchover := func(lfa lifecycle.Lifecycle, pod *corev1.Pod) error {
-		if !needSwtichover(pod) {
-			return nil
-		}
 		err := lfa.Switchover(r.reqCtx.Ctx, r.cli, nil, "")
-		if err != nil && errors.Is(err, lifecycle.ErrActionNotDefined) {
-			return nil
+		if err != nil {
+			if errors.Is(err, lifecycle.ErrActionNotDefined) {
+				return nil
+			}
+			return err
 		}
-		if err == nil {
-			// FIXME: compare role labels after switchover succeeds
-			return fmt.Errorf("switchover succeed, wait role label to be updated")
-		}
-		return err
+		r.reqCtx.Log.Info("successfully call switchover action for pod", "pod", pod.Name)
+		return nil
 	}
 
-	tryMemberLeave := func(lfa lifecycle.Lifecycle) error {
-		if r.synthesizeComp.LifecycleActions == nil || r.synthesizeComp.LifecycleActions.MemberLeave == nil {
-			return nil
-		}
-
-		if err := lfa.MemberLeave(r.reqCtx.Ctx, r.cli, nil); err != nil {
-			if !errors.Is(err, lifecycle.ErrActionNotDefined) {
-				return err
+	tryMemberLeave := func(lfa lifecycle.Lifecycle, pod *corev1.Pod) error {
+		err := lfa.MemberLeave(r.reqCtx.Ctx, r.cli, nil)
+		if err != nil {
+			if errors.Is(err, lifecycle.ErrActionNotDefined) {
+				return nil
 			}
+			return err
 		}
 
+		r.reqCtx.Log.Info("successfully call leave member action for pod", "pod", pod.Name)
 		return nil
 	}
 
@@ -727,10 +714,9 @@ func (r *componentWorkloadOps) leaveMemberForPod(pod *corev1.Pod, pods []*corev1
 		return err
 	}
 
-	if err := tryMemberLeave(lfa); err != nil {
+	if err := tryMemberLeave(lfa, pod); err != nil {
 		return err
 	}
-	r.reqCtx.Log.Info("succeed to leave member for pod", "pod", pod.Name)
 
 	return nil
 }

@@ -4317,46 +4317,6 @@ spec:
                         type: string
                       type: array
                       x-kubernetes-list-type: set
-                    legacyRenderedConfigSpec:
-                      description: |-
-                        Specifies the secondary rendered config spec for pod-specific customization.
-
-
-                        The template is rendered inside the pod (by the "config-manager" sidecar container) and merged with the main
-                        template's render result to generate the final configuration file.
-
-
-                        This field is intended to handle scenarios where different pods within the same Component have
-                        varying configurations. It allows for pod-specific customization of the configuration.
-
-
-                        Note: This field will be deprecated in future versions, and the functionality will be moved to
-                        `cluster.spec.componentSpecs[*].instances[*]`.
-                      properties:
-                        namespace:
-                          default: default
-                          description: |-
-                            Specifies the namespace of the referenced configuration template ConfigMap object.
-                            An empty namespace is equivalent to the "default" namespace.
-                          pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
-                          type: string
-                        policy:
-                          default: none
-                          description: Defines the strategy for merging externally
-                            imported templates into component templates.
-                          enum:
-                          - patch
-                          - replace
-                          - none
-                          type: string
-                        templateRef:
-                          description: Specifies the name of the referenced configuration
-                            template ConfigMap object.
-                          pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
-                          type: string
-                      required:
-                      - templateRef
-                      type: object
                     name:
                       description: Specifies the name of the configuration template.
                       maxLength: 63
@@ -7994,8 +7954,8 @@ spec:
                     description: |-
                       Defines the procedure for a controlled transition of a role to a new replica.
                       This approach aims to minimize downtime and maintain availability
-                      during events such as planned maintenance or when performing stop, shutdown, restart, or upgrade operations
-                      involving the current leader node.
+                      during events such as planned maintenance or when performing stop, shutdown, restart, or upgrade operations.
+                      In a typical consensus system, this action is used to transfer leader role to another replica.
 
 
                       The container executing this action has access to following variables:
@@ -8006,6 +7966,8 @@ spec:
                       - KB_SWITCHOVER_CURRENT_NAME: The name of the pod of the current role.
                       - KB_SWITCHOVER_CURRENT_FQDN: The FQDN of the pod of the current role.
                       - KB_SWITCHOVER_ROLE: The role that will be transferred to another replica.
+                        This variable can be empty if, for example, role probe does not succeed.
+                        It depends on the addon implementation what to do under such cases.
 
 
                       Note: This field is immutable once it has been set.
@@ -16831,9 +16793,8 @@ spec:
                       This field is immutable once set.
                     type: string
                   defaultMode:
-                    default: 600
                     description: |-
-                      The default permissions for the mounted path.
+                      The permissions for the mounted path. Defaults to 0600.
 
 
                       This field is immutable once set.

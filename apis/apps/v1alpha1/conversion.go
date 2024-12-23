@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -77,13 +78,26 @@ func incrementConvertFrom(converter incrementConverter, source metav1.Object, ic
 	if annotations != nil {
 		data, ok := annotations[kbIncrementConverterAK]
 		if ok {
+			// Convert from the incremental converter only if the annotation exists.
 			if err := json.Unmarshal([]byte(data), ic); err != nil {
 				return err
 			}
 			delete(annotations, kbIncrementConverterAK)
 			source.SetAnnotations(annotations)
+			return converter.incrementConvertFrom(source, ic)
 		}
 	}
+	return nil
+}
 
-	return converter.incrementConvertFrom(source, ic)
+func GetClusterDefFromIncrementConverter(obj client.Object) (string, error) {
+	incrementConverterStr := obj.GetAnnotations()[kbIncrementConverterAK]
+	if len(incrementConverterStr) == 0 {
+		return "", nil
+	}
+	var alpha1Cluster Cluster
+	if err := json.Unmarshal([]byte(incrementConverterStr), &alpha1Cluster); err != nil {
+		return "", err
+	}
+	return alpha1Cluster.Spec.ClusterDefRef, nil
 }

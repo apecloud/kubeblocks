@@ -224,7 +224,7 @@ var _ = Describe("Event Controller", func() {
 			By("send role changed event with afterLastTS later than pod last role changes event timestamp annotation should be update successfully")
 			role = "follower"
 			sndValidEvent := createRoleChangedEvent(podName, role, uid)
-			sndValidEvent.EventTime = metav1.NewMicroTime(afterLastTS)
+			sndValidEvent.LastTimestamp = metav1.NewTime(afterLastTS)
 			Expect(testCtx.CreateObj(ctx, sndValidEvent)).Should(Succeed())
 			Eventually(func() string {
 				event := &corev1.Event{}
@@ -240,7 +240,7 @@ var _ = Describe("Event Controller", func() {
 				g.Expect(p).ShouldNot(BeNil())
 				g.Expect(p.Labels).ShouldNot(BeNil())
 				g.Expect(p.Labels[constant.RoleLabelKey]).Should(Equal(role))
-				g.Expect(p.Annotations[constant.LastRoleSnapshotVersionAnnotationKey]).Should(Equal(strconv.FormatInt(sndValidEvent.EventTime.UnixMicro(), 10)))
+				g.Expect(p.Annotations[constant.LastRoleSnapshotVersionAnnotationKey]).Should(Equal(strconv.FormatInt(sndValidEvent.LastTimestamp.UnixMicro(), 10)))
 			})).Should(Succeed())
 		})
 	})

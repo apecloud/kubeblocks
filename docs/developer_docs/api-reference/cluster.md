@@ -1499,7 +1499,7 @@ with <code>preCondition</code> specifying when the action should be fired relati
 <code>Immediately</code>, <code>RuntimeReady</code>, <code>ComponentReady</code>, and <code>ClusterReady</code>.</li>
 <li><code>preTerminate</code>: Defines the hook to be executed before terminating a Component.</li>
 <li><code>roleProbe</code>: Defines the procedure which is invoked regularly to assess the role of replicas.</li>
-<li><code>switchover</code>: Defines the procedure for a controlled transition of leadership from the current leader to a new replica.
+<li><code>switchover</code>: Defines the procedure for a controlled transition of a role to a new replica.
 This approach aims to minimize downtime and maintain availability in systems with a leader-follower topology,
 such as before planned maintenance or upgrades on the current leader node.</li>
 <li><code>memberJoin</code>: Defines the procedure to add a new replica to the replication group.</li>
@@ -2198,9 +2198,7 @@ with <code>preCondition</code> specifying when the action should be fired relati
 <code>Immediately</code>, <code>RuntimeReady</code>, <code>ComponentReady</code>, and <code>ClusterReady</code>.</li>
 <li><code>preTerminate</code>: Defines the hook to be executed before terminating a Component.</li>
 <li><code>roleProbe</code>: Defines the procedure which is invoked regularly to assess the role of replicas.</li>
-<li><code>switchover</code>: Defines the procedure for a controlled transition of leadership from the current leader to a new replica.
-This approach aims to minimize downtime and maintain availability in systems with a leader-follower topology,
-such as during planned maintenance or upgrades on the current leader node.</li>
+<li><code>switchover</code>: Defines the procedure for a controlled transition of a role to a new replica.</li>
 <li><code>memberJoin</code>: Defines the procedure to add a new replica to the replication group.</li>
 <li><code>memberLeave</code>: Defines the method to remove a replica from the replication group.</li>
 <li><code>readOnly</code>: Defines the procedure to switch a replica into the read-only state.</li>
@@ -4685,26 +4683,6 @@ and ConfigConstraint applies to all keys.</p>
 </tr>
 <tr>
 <td>
-<code>legacyRenderedConfigSpec</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.LegacyRenderedTemplateSpec">
-LegacyRenderedTemplateSpec
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the secondary rendered config spec for pod-specific customization.</p>
-<p>The template is rendered inside the pod (by the &ldquo;config-manager&rdquo; sidecar container) and merged with the main
-template&rsquo;s render result to generate the final configuration file.</p>
-<p>This field is intended to handle scenarios where different pods within the same Component have
-varying configurations. It allows for pod-specific customization of the configuration.</p>
-<p>Note: This field will be deprecated in future versions, and the functionality will be moved to
-<code>cluster.spec.componentSpecs[*].instances[*]</code>.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>constraintRef</code><br/>
 <em>
 string
@@ -5354,7 +5332,7 @@ with <code>preCondition</code> specifying when the action should be fired relati
 <code>Immediately</code>, <code>RuntimeReady</code>, <code>ComponentReady</code>, and <code>ClusterReady</code>.</li>
 <li><code>preTerminate</code>: Defines the hook to be executed before terminating a Component.</li>
 <li><code>roleProbe</code>: Defines the procedure which is invoked regularly to assess the role of replicas.</li>
-<li><code>switchover</code>: Defines the procedure for a controlled transition of leadership from the current leader to a new replica.
+<li><code>switchover</code>: Defines the procedure for a controlled transition of a role to a new replica.
 This approach aims to minimize downtime and maintain availability in systems with a leader-follower topology,
 such as before planned maintenance or upgrades on the current leader node.</li>
 <li><code>memberJoin</code>: Defines the procedure to add a new replica to the replication group.</li>
@@ -5569,14 +5547,19 @@ Action
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines the procedure for a controlled transition of leadership from the current leader to a new replica.
-This approach aims to minimize downtime and maintain availability in systems with a leader-follower topology,
-during events such as planned maintenance or when performing stop, shutdown, restart, or upgrade operations
-involving the current leader node.</p>
+<p>Defines the procedure for a controlled transition of a role to a new replica.
+This approach aims to minimize downtime and maintain availability
+during events such as planned maintenance or when performing stop, shutdown, restart, or upgrade operations.
+In a typical consensus system, this action is used to transfer leader role to another replica.</p>
 <p>The container executing this action has access to following variables:</p>
 <ul>
-<li>KB_SWITCHOVER_CANDIDATE_NAME: The name of the pod for the new leader candidate, which may not be specified (empty).</li>
-<li>KB_SWITCHOVER_CANDIDATE_FQDN: The FQDN of the new leader candidate&rsquo;s pod, which may not be specified (empty).</li>
+<li>KB_SWITCHOVER_CANDIDATE_NAME: The name of the pod of the new role&rsquo;s candidate, which may not be specified (empty).</li>
+<li>KB_SWITCHOVER_CANDIDATE_FQDN: The FQDN of the pod of the new role&rsquo;s candidate, which may not be specified (empty).</li>
+<li>KB_SWITCHOVER_CURRENT_NAME: The name of the pod of the current role.</li>
+<li>KB_SWITCHOVER_CURRENT_FQDN: The FQDN of the pod of the current role.</li>
+<li>KB_SWITCHOVER_ROLE: The role that will be transferred to another replica.
+This variable can be empty if, for example, role probe does not succeed.
+It depends on the addon implementation what to do under such cases.</li>
 </ul>
 <p>Note: This field is immutable once it has been set.</p>
 </td>
@@ -7029,9 +7012,6 @@ as defined in <code>componentDefinition.spec.lifecycleActions.readWrite</code>, 
 </table>
 <h3 id="apps.kubeblocks.io/v1.ConfigTemplateExtension">ConfigTemplateExtension
 </h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.LegacyRenderedTemplateSpec">LegacyRenderedTemplateSpec</a>)
-</p>
 <div>
 </div>
 <table>
@@ -8009,41 +7989,6 @@ It is required when the issuer is set to <code>UserProvided</code>.</p>
 <td><p>IssuerUserProvided indicates that the user has provided their own CA-signed certificates.</p>
 </td>
 </tr></tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1.LegacyRenderedTemplateSpec">LegacyRenderedTemplateSpec
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentConfigSpec">ComponentConfigSpec</a>)
-</p>
-<div>
-<p>LegacyRenderedTemplateSpec describes the configuration extension for the lazy rendered template.
-Deprecated: LegacyRenderedTemplateSpec has been deprecated since 0.9.0 and will be removed in 0.10.0</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>ConfigTemplateExtension</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.ConfigTemplateExtension">
-ConfigTemplateExtension
-</a>
-</em>
-</td>
-<td>
-<p>
-(Members of <code>ConfigTemplateExtension</code> are embedded into this type.)
-</p>
-<p>Extends the configuration template.</p>
-</td>
-</tr>
-</tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1.LetterCase">LetterCase
 (<code>string</code> alias)</h3>
@@ -10598,7 +10543,7 @@ until the PreTerminate action has completed successfully.</p>
 </tr>
 <tr>
 <td>
-<code>shardProvision</code><br/>
+<code>shardAdd</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.Action">
 Action
@@ -10607,13 +10552,13 @@ Action
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the hook to be executed after a shard&rsquo;s creation.</p>
+<p>Specifies the hook to be executed after a shard added.</p>
 <p>Note: This field is immutable once it has been set.</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>shardTerminate</code><br/>
+<code>shardRemove</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.Action">
 Action
@@ -10622,7 +10567,7 @@ Action
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies the hook to be executed prior to terminating a shard.</p>
+<p>Specifies the hook to be executed prior to remove a shard.</p>
 <p>Note: This field is immutable once it has been set.</p>
 </td>
 </tr>
@@ -11155,7 +11100,7 @@ int32
 </td>
 <td>
 <em>(Optional)</em>
-<p>The default permissions for the mounted path.</p>
+<p>The permissions for the mounted path. Defaults to 0600.</p>
 <p>This field is immutable once set.</p>
 </td>
 </tr>
@@ -28921,7 +28866,7 @@ UpdateStrategy.Type will be set to appsv1.OnDeleteStatefulSetStrategyType if Mem
 </td>
 <td>
 <em>(Optional)</em>
-<p>A list of roles defined in the system.</p>
+<p>A list of roles defined in the system. Instanceset obtains role through pods&rsquo; role label <code>kubeblocks.io/role</code>.</p>
 </td>
 </tr>
 <tr>
@@ -29433,7 +29378,7 @@ UpdateStrategy.Type will be set to appsv1.OnDeleteStatefulSetStrategyType if Mem
 </td>
 <td>
 <em>(Optional)</em>
-<p>A list of roles defined in the system.</p>
+<p>A list of roles defined in the system. Instanceset obtains role through pods&rsquo; role label <code>kubeblocks.io/role</code>.</p>
 </td>
 </tr>
 <tr>
@@ -30668,16 +30613,15 @@ Default value is &ldquo;PreferInPlace&rdquo;</li>
 <td>
 <code>updateStrategy</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#statefulsetupdatestrategy-v1-apps">
-Kubernetes apps/v1.StatefulSetUpdateStrategy
+<a href="#workloads.kubeblocks.io/v1alpha1.InstanceUpdateStrategy">
+InstanceUpdateStrategy
 </a>
 </em>
 </td>
 <td>
 <p>Indicates the StatefulSetUpdateStrategy that will be
 employed to update Pods in the InstanceSet when a revision is made to
-Template.
-UpdateStrategy.Type will be set to appsv1.OnDeleteStatefulSetStrategyType if MemberUpdateStrategy is not nil</p>
+Template.</p>
 <p>Note: This field will be removed in future version.</p>
 </td>
 </tr>
@@ -31216,16 +31160,15 @@ Default value is &ldquo;PreferInPlace&rdquo;</li>
 <td>
 <code>updateStrategy</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#statefulsetupdatestrategy-v1-apps">
-Kubernetes apps/v1.StatefulSetUpdateStrategy
+<a href="#workloads.kubeblocks.io/v1alpha1.InstanceUpdateStrategy">
+InstanceUpdateStrategy
 </a>
 </em>
 </td>
 <td>
 <p>Indicates the StatefulSetUpdateStrategy that will be
 employed to update Pods in the InstanceSet when a revision is made to
-Template.
-UpdateStrategy.Type will be set to appsv1.OnDeleteStatefulSetStrategyType if MemberUpdateStrategy is not nil</p>
+Template.</p>
 <p>Note: This field will be removed in future version.</p>
 </td>
 </tr>
@@ -31825,6 +31768,79 @@ indicated by UpdateRevisions.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="workloads.kubeblocks.io/v1alpha1.InstanceUpdateStrategy">InstanceUpdateStrategy
+</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1alpha1.InstanceSetSpec">InstanceSetSpec</a>)
+</p>
+<div>
+<p>InstanceUpdateStrategy indicates the strategy that the InstanceSet
+controller will use to perform updates. It includes any additional parameters
+necessary to perform the update for the indicated strategy.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>partition</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Partition indicates the number of pods that should be updated during a rolling update.
+The remaining pods will remain untouched. This is helpful in defining how many pods
+should participate in the update process. The update process will follow the order
+of pod names in descending lexicographical (dictionary) order. The default value is
+Replicas (i.e., update all pods).</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>maxUnavailable</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/util/intstr#IntOrString">
+Kubernetes api utils intstr.IntOrString
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The maximum number of pods that can be unavailable during the update.
+Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
+Absolute number is calculated from percentage by rounding up. This can not be 0.
+Defaults to 1. The field applies to all pods. That means if there is any unavailable pod,
+it will be counted towards MaxUnavailable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>memberUpdateStrategy</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1alpha1.MemberUpdateStrategy">
+MemberUpdateStrategy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Members(Pods) update strategy.</p>
+<ul>
+<li>serial: update Members one by one that guarantee minimum component unavailable time.</li>
+<li>bestEffortParallel: update Members in parallel that guarantee minimum component un-writable time.</li>
+<li>parallel: force parallel</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="workloads.kubeblocks.io/v1alpha1.MemberStatus">MemberStatus
 </h3>
 <p>
@@ -31870,7 +31886,7 @@ ReplicaRole
 <h3 id="workloads.kubeblocks.io/v1alpha1.MemberUpdateStrategy">MemberUpdateStrategy
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.RSMSpec">RSMSpec</a>, <a href="#workloads.kubeblocks.io/v1alpha1.InstanceSetSpec">InstanceSetSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.RSMSpec">RSMSpec</a>, <a href="#workloads.kubeblocks.io/v1alpha1.InstanceSetSpec">InstanceSetSpec</a>, <a href="#workloads.kubeblocks.io/v1alpha1.InstanceUpdateStrategy">InstanceUpdateStrategy</a>)
 </p>
 <div>
 <p>MemberUpdateStrategy defines Cluster Component update strategy.</p>
@@ -32172,6 +32188,20 @@ bool
 </tr>
 </thead>
 <tbody>
+<tr>
+<td>
+<code>builtinHandlerName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the builtin handler name to use to probe the role of the main container.
+Available handlers include: mysql, postgres, mongodb, redis, etcd, kafka.
+Use CustomHandler to define a custom role probe function if none of the built-in handlers meet the requirement.</p>
+</td>
+</tr>
 <tr>
 <td>
 <code>customHandler</code><br/>

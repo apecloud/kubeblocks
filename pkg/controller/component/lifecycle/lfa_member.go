@@ -25,7 +25,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 )
@@ -58,7 +57,6 @@ type switchover struct {
 	namespace    string
 	clusterName  string
 	compName     string
-	roles        []appsv1.ReplicaRole
 	role         string // the role that will be transferred to another replica.
 	currentPod   string
 	candidatePod string
@@ -71,18 +69,15 @@ func (a *switchover) name() string {
 }
 
 func (a *switchover) parameters(ctx context.Context, cli client.Reader) (map[string]string, error) {
-	// The container executing this action has access to following variables:
-	//
-	// - KB_SWITCHOVER_CANDIDATE_NAME: The name of the pod for the new leader candidate, which may not be specified (empty).
-	// - KB_SWITCHOVER_CANDIDATE_FQDN: The FQDN of the new leader candidate's pod, which may not be specified (empty).
+	// refer to ComponentLifecycleActions.Switchover's documentation for explanation of each variable.
 	m := make(map[string]string)
+	compName := constant.GenerateClusterComponentName(a.clusterName, a.compName)
 	if len(a.candidatePod) > 0 {
-		compName := constant.GenerateClusterComponentName(a.clusterName, a.compName)
 		m[switchoverCandidateName] = a.candidatePod
 		m[switchoverCandidateFQDN] = component.PodFQDN(a.namespace, compName, a.candidatePod)
 	}
 	m[switchoverCurrentName] = a.currentPod
-	m[switchoverCurrentFQDN] = component.PodFQDN(a.namespace, a.compName, a.currentPod)
+	m[switchoverCurrentFQDN] = component.PodFQDN(a.namespace, compName, a.currentPod)
 	m[switchoverRole] = a.role
 	return m, nil
 }

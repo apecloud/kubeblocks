@@ -140,7 +140,7 @@ func (p *realUpdatePlan) build() {
 	}
 }
 
-// unknown & empty & learner & 1/2 followers -> 1/2 followers -> leader
+// unknown & empty & roles that do not participate in quorum & 1/2 followers -> 1/2 followers -> leader
 func (p *realUpdatePlan) buildBestEffortParallelUpdatePlan(rolePriorityMap map[string]int) {
 	currentVertex, _ := model.FindRootVertex(p.dag)
 	preVertex := currentVertex
@@ -156,7 +156,7 @@ func (p *realUpdatePlan) buildBestEffortParallelUpdatePlan(rolePriorityMap map[s
 		}
 	}
 
-	// append unknown, empty and learner
+	// append unknown, empty and roles that do not participate in quorum
 	index := 0
 	podList := p.pods
 	for i, pod := range podList {
@@ -206,7 +206,7 @@ func (p *realUpdatePlan) buildBestEffortParallelUpdatePlan(rolePriorityMap map[s
 	}
 }
 
-// unknown & empty & leader & followers & learner
+// unknown & empty & all roles
 func (p *realUpdatePlan) buildParallelUpdatePlan() {
 	root, _ := model.FindRootVertex(p.dag)
 	for i := range p.pods {
@@ -215,7 +215,7 @@ func (p *realUpdatePlan) buildParallelUpdatePlan() {
 	}
 }
 
-// unknown -> empty -> learner -> followers(none->readonly->readwrite) -> leader
+// update according to role update priority
 func (p *realUpdatePlan) buildSerialUpdatePlan() {
 	preVertex, _ := model.FindRootVertex(p.dag)
 	for i := range p.pods {

@@ -110,16 +110,42 @@ jobs:
         with:
           go-version: "${{ env.GO_VERSION }}"
 
+      - name: checkout kbcli code
+        uses: actions/checkout@v4
+        with:
+          repository: apecloud/kbcli
+          path: kbcli
+          ref: ${{ github.ref_name }}
+          token: ${{ env.GITHUB_TOKEN }}
+
+      - name: Update kbcli doc
+        id: update_kbcli_doc
+        run: |
+          echo "copy kbcli user docs to kubeblocks docs"
+          cp -r ${{ github.workspace }}/kbcli/docs/user_docs/cli/* ${{ github.workspace }}/docs/user_docs/cli/
+          FILE_CHANGES=`git diff --name-only ${{ github.sha }}`
+          git add ${{ github.workspace }}/docs/user_docs/cli/*
+          if [[ -n "$FILE_CHANGES" ]]; then
+            echo $FILE_CHANGES
+            git config --local user.name "$GITHUB_ACTOR"
+            git config --local user.email "$GITHUB_ACTOR@users.noreply.github.com"
+            git commit -a -m "chore: auto update kbcli user docs"
+          fi
+          echo file_changes=$FILE_CHANGES >> $GITHUB_OUTPUT
+          
+          RELEASE_COMMIT="$(git rev-parse HEAD)"
+          echo 'RELEASE_COMMIT='${RELEASE_COMMIT} >> $GITHUB_ENV
+
       - name: Update apis doc
         id: update_apis_doc
         run: |
           make doc
           FILE_CHANGES=`git diff --name-only ${{ github.sha }}`
-          if [[ ! -z "$FILE_CHANGES" ]]; then
+          if [[ -n "$FILE_CHANGES" ]]; then
             echo $FILE_CHANGES
             git config --local user.name "$GITHUB_ACTOR"
             git config --local user.email "$GITHUB_ACTOR@users.noreply.github.com"
-            git commit -a -m "chore: auto update apis doc changes"
+            git commit -a -m "chore: auto update apis docs"
           fi
           echo file_changes=$FILE_CHANGES >> $GITHUB_OUTPUT
           
@@ -150,7 +176,7 @@ jobs:
               fi
           done
           FILE_CHANGES=`git diff --name-only ${{ env.RELEASE_COMMIT }}`
-          if [[ ! -z "$FILE_CHANGES" ]]; then
+          if [[ -n "$FILE_CHANGES" ]]; then
               echo $FILE_CHANGES
               git config --local user.name "$GITHUB_ACTOR"
               git config --local user.email "$GITHUB_ACTOR@users.noreply.github.com"
@@ -161,21 +187,21 @@ jobs:
           RELEASE_COMMIT="$(git rev-parse HEAD)"
           echo 'RELEASE_COMMIT='${RELEASE_COMMIT} >> $GITHUB_ENV
 
-      - name: push addons version changes to new branch
-        if: ${{ (steps.update_apis_doc.outputs.file_changes || steps.upgrade_addon_version.outputs.file_changes) && github.ref_name == 'main' }}
+      - name: push changes to new branch
+        if: ${{ (steps.update_kbcli_doc.outputs.file_changes || steps.update_apis_doc.outputs.file_changes || steps.upgrade_addon_version.outputs.file_changes) && github.ref_name == 'main' }}
         uses: ad-m/github-push-action@master
         with:
           github_token: ${{ env.GITHUB_TOKEN }}
           branch: support/auto-update-${{ env.RELEASE_COMMIT }}
 
       - name: auto create pr head new branch
-        if: ${{ (steps.update_apis_doc.outputs.file_changes || steps.upgrade_addon_version.outputs.file_changes) && github.ref_name == 'main' }}
+        if: ${{ (steps.update_kbcli_doc.outputs.file_changes || steps.update_apis_doc.outputs.file_changes || steps.upgrade_addon_version.outputs.file_changes) && github.ref_name == 'main' }}
         run: |
-          gh pr create --base "${{ github.ref }}" --head "support/auto-update-${{ env.RELEASE_COMMIT }}" --title "chore: auto upgrade addons version or update apis doc" --body ""
+          gh pr create --base "${{ github.ref }}" --head "support/auto-update-${{ env.RELEASE_COMMIT }}" --title "chore: auto upgrade addons version or update apis docs or update kbcli user docs" --body ""
 
-      - name: push addons version changes
+      - name: push changes to ${{ github.ref_name }}
         uses: ad-m/github-push-action@master
-        if: ${{ (steps.update_apis_doc.outputs.file_changes || steps.upgrade_addon_version.outputs.file_changes) && github.ref_name != 'main' }}
+        if: ${{ (steps.update_kbcli_doc.outputs.file_changes || steps.update_apis_doc.outputs.file_changes || steps.upgrade_addon_version.outputs.file_changes) && github.ref_name != 'main' }}
         with:
           github_token: ${{ env.GITHUB_TOKEN }}
           branch: ${{ github.ref }}

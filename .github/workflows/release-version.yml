@@ -125,6 +125,7 @@ jobs:
         id: update_kbcli_doc
         run: |
           echo "copy kbcli user docs to kubeblocks docs"
+          rm -rf ${{ github.workspace }}/docs/user_docs/cli/*
           cp -r ${{ github.workspace }}/kbcli/docs/user_docs/cli/* ${{ github.workspace }}/docs/user_docs/cli/
           FILE_CHANGES=`git diff --name-only ${{ github.sha }}`
           git add ${{ github.workspace }}/docs/user_docs/cli/*

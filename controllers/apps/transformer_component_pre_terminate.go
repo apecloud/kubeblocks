@@ -21,11 +21,13 @@ package apps
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"k8s.io/apimachinery/pkg/types"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/component/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
@@ -62,7 +64,9 @@ func (t *componentPreTerminateTransformer) Transform(ctx graph.TransformContext,
 		return nil
 	}
 
-	// TODO: force skip the pre-terminate action?
+	if t.skipPreTerminate(transCtx) {
+		return nil
+	}
 
 	if t.checkPreTerminateDone(transCtx, dag) {
 		return nil
@@ -72,6 +76,15 @@ func (t *componentPreTerminateTransformer) Transform(ctx graph.TransformContext,
 		return lifecycle.IgnoreNotDefined(err)
 	}
 	return t.markPreTerminateDone(transCtx, dag)
+}
+
+func (t *componentPreTerminateTransformer) skipPreTerminate(transCtx *componentTransformContext) bool {
+	comp := transCtx.Component
+	if comp.Annotations == nil {
+		return false
+	}
+	skip, ok := comp.Annotations[constant.SkipPreTerminateAnnotationKey]
+	return ok && strings.ToLower(skip) == "true"
 }
 
 func (t *componentPreTerminateTransformer) checkPreTerminateDone(transCtx *componentTransformContext, dag *graph.DAG) bool {

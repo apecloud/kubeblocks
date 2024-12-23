@@ -36,47 +36,47 @@ jobs:
 
   release-chart:
     needs: [ release-version ]
-    uses: apecloud/apecloud-cd/.github/workflows/release-charts.yml@v0.1.62
+    uses: apecloud/apecloud-cd/.github/workflows/release-charts.yml@v0.1.86
     with:
       MAKE_OPS: "bump-chart-ver"
       VERSION: "${{ needs.release-version.outputs.release-version }}"
       CHART_NAME: "kubeblocks"
       CHART_DIR: "deploy/helm"
-      APECD_REF: "v0.1.62"
+      APECD_REF: "v0.1.86"
       MAKE_OPS_POST: "install"
       GO_VERSION: "1.21"
     secrets: inherit
 
   release-addons-chart:
     needs: [ release-chart ]
-    uses: apecloud/apecloud-cd/.github/workflows/release-charts.yml@v0.1.68
+    uses: apecloud/apecloud-cd/.github/workflows/release-charts.yml@v0.1.86
     with:
       GITHUB_REPO: "apecloud/kubeblocks-addons"
       GITHUB_REF: "${{ github.ref_name }}"
       CHART_DIR: "addons"
-      APECD_REF: "v0.1.68"
+      APECD_REF: "v0.1.86"
       ENABLE_JIHU: false
     secrets: inherit
 
   release-addons-cluster-chart:
     needs: [ release-addons-chart ]
-    uses: apecloud/apecloud-cd/.github/workflows/trigger-workflow.yml@v0.1.62
+    uses: apecloud/apecloud-cd/.github/workflows/trigger-workflow.yml@v0.1.86
     with:
       GITHUB_REPO: "apecloud/kubeblocks-addons"
       BRANCH_NAME: "${{ github.ref_name }}"
       WORKFLOW_ID: "release-addons-cluster-chart.yml"
-      APECD_REF: "v0.1.62"
+      APECD_REF: "v0.1.86"
     secrets: inherit
 
   release-charts-image:
     needs: [ release-version, release-addons-chart ]
-    uses: apecloud/apecloud-cd/.github/workflows/release-image-cache.yml@v0.1.24
+    uses: apecloud/apecloud-cd/.github/workflows/release-image-cache.yml@v0.1.86
     with:
       MAKE_OPS_PRE: "helm-package VERSION=${{ needs.release-version.outputs.release-version-bump }}"
       IMG: "apecloud/kubeblocks-charts"
       VERSION: "${{ needs.release-version.outputs.release-version }}"
       GO_VERSION: "1.21"
-      APECD_REF: "v0.1.24"
+      APECD_REF: "v0.1.86"
       DOCKERFILE_PATH: "./docker/Dockerfile-charts"
     secrets: inherit
 
@@ -122,11 +122,11 @@ jobs:
   send-message:
     needs: [ release-message ]
     if: ${{ always() && github.event.action == 'published' }}
-    uses: apecloud/apecloud-cd/.github/workflows/feishui-message.yml@v0.1.38
+    uses: apecloud/apecloud-cd/.github/workflows/feishui-message.yml@v0.1.86
     with:
       TYPE: "2"
       CONTENT: "release chart ${{ needs.release-message.outputs.release-version }} ${{ needs.release-message.outputs.content-result }}"
-      APECD_REF: "v0.1.38"
+      APECD_REF: "v0.1.86"
     secrets: inherit
 
   get-addons-chart-dir:
@@ -160,23 +160,23 @@ jobs:
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.get-addons-chart-dir.outputs.matrix) }}
-    uses: apecloud/apecloud-cd/.github/workflows/release-charts-jihu.yml@v0.1.52
+    uses: apecloud/apecloud-cd/.github/workflows/release-charts-jihu.yml@v0.1.86
     with:
       GITHUB_REPO: "apecloud/kubeblocks-addons"
       GITHUB_REF: "${{ github.ref_name }}"
       CHART_DIR: "addons"
       SPECIFY_CHART: "${{ matrix.addon-name }}"
-      APECD_REF: "v0.1.52"
+      APECD_REF: "v0.1.86"
     secrets: inherit
 
   release-addons-chart-ent:
     needs: [ release-chart ]
-    uses: apecloud/apecloud-cd/.github/workflows/release-charts-enterprise.yml@v0.1.53
+    uses: apecloud/apecloud-cd/.github/workflows/release-charts-enterprise.yml@v0.1.86
     with:
       GITHUB_REPO: "apecloud/apecloud-addons"
       GITHUB_REF: "${{ github.ref_name }}"
       CHART_DIR: "addons"
-      APECD_REF: "v0.1.53"
+      APECD_REF: "v0.1.86"
       ENABLE_JIHU: false
     secrets: inherit
 
@@ -213,11 +213,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.get-addons-chart-dir-ent.outputs.matrix) }}
-    uses: apecloud/apecloud-cd/.github/workflows/release-charts-jihu-enterprise.yml@v0.1.53
+    uses: apecloud/apecloud-cd/.github/workflows/release-charts-jihu-enterprise.yml@v0.1.86
     with:
       GITHUB_REPO: "apecloud/apecloud-addons"
       GITHUB_REF: "${{ github.ref_name }}"
       CHART_DIR: "addons"
       SPECIFY_CHART: "${{ matrix.addon-name }}"
-      APECD_REF: "v0.1.53"
+      APECD_REF: "v0.1.86"
     secrets: inherit

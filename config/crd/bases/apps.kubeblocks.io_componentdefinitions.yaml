@@ -4449,20 +4449,6 @@ spec:
                       type: object
                     type: array
                 type: object
-              instanceUpdatePolicy:
-                description: |-
-                  Specifies how an instance should be updated.
-
-
-                  - `StrictInPlace` indicates that only allows in-place update.
-                  Any attempt to modify other fields that not support in-place update will be rejected.
-                  - `PreferInPlace` indicates that we will first attempt an in-place update of the instance.
-                  If that fails, it will fall back to the ReCreate, where instance will be recreated.
-                  Default value is "PreferInPlace".
-                enum:
-                - StrictInPlace
-                - PreferInPlace
-                type: string
               labels:
                 additionalProperties:
                   type: string

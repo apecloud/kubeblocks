@@ -1191,11 +1191,6 @@ func (in *ComponentDefinitionSpec) DeepCopyInto(out *ComponentDefinitionSpec) {
 		*out = make([]ReplicaRole, len(*in))
 		copy(*out, *in)
 	}
-	if in.InstanceUpdatePolicy != nil {
-		in, out := &in.InstanceUpdatePolicy, &out.InstanceUpdatePolicy
-		*out = new(InstanceUpdatePolicyType)
-		**out = **in
-	}
 	if in.UpdateConcurrency != nil {
 		in, out := &in.UpdateConcurrency, &out.UpdateConcurrency
 		*out = new(UpdateConcurrency)

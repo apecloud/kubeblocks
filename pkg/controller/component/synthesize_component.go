@@ -170,14 +170,6 @@ func buildUpdateStrategy(synthesizeComp *SynthesizedComponent, comp *appsv1.Comp
 			}
 		}
 	}
-	if compDef.Spec.InstanceUpdatePolicy != nil {
-		if updateStrategy == nil {
-			updateStrategy = &appsv1.UpdateStrategy{}
-		}
-		if updateStrategy.InstanceUpdatePolicy == nil {
-			updateStrategy.InstanceUpdatePolicy = compDef.Spec.InstanceUpdatePolicy
-		}
-	}
 	if compDef.Spec.UpdateConcurrency != nil {
 		if updateStrategy == nil {
 			updateStrategy = &appsv1.UpdateStrategy{}

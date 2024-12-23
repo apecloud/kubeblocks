@@ -513,6 +513,10 @@ func listCompDefinitionsWithPattern(ctx context.Context, cli client.Reader, name
 	compDefsFullyMatched := make([]*appsv1alpha1.ComponentDefinition, 0)
 	compDefsPatternMatched := make([]*appsv1alpha1.ComponentDefinition, 0)
 	for i, item := range compDefList.Items {
+		// skip the component definition that is not supported by the current operator
+		if !intctrlutil.ObjectAPIVersionSupported(&item) {
+			continue
+		}
 		if item.Name == namePattern {
 			compDefsFullyMatched = append(compDefsFullyMatched, &compDefList.Items[i])
 		}

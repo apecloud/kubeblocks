@@ -145,7 +145,15 @@ func newClient(s *Settings) redis.UniversalClient {
 }
 
 func newSentinelClient(s *Settings, clusterCompName string) *redis.SentinelClient {
+	if !viper.IsSet("SENTINEL_COMPONENT_NAME") {
+		// cluster has no sentinel
+		return nil
+	}
+
 	sentinelHost := fmt.Sprintf("%s-sentinel-headless", clusterCompName)
+	if viper.IsSet("SENTINEL_HEADLESS_SERVICE_NAME") {
+		sentinelHost = viper.GetString("SENTINEL_HEADLESS_SERVICE_NAME")
+	}
 	sentinelPort := "26379"
 	if viper.IsSet("REDIS_SENTINEL_HOST_NETWORK_PORT") {
 		sentinelPort = viper.GetString("REDIS_SENTINEL_HOST_NETWORK_PORT")

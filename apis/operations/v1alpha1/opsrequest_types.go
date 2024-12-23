@@ -302,19 +302,18 @@ type Switchover struct {
 	// Specifies the name of the Component.
 	ComponentOps `json:",inline"`
 
-	// Specifies the instance to become the primary or leader during a switchover operation.
-	//
-	// The value of `instanceName` can be either:
-	//
-	// 1. "*" (wildcard value):
-	// - Indicates no specific instance is designated as the primary or leader.
-	//
-	// 2. A valid instance name (pod name):
-	// - Designates a specific instance (pod) as the primary or leader.
-	// - The name must match one of the pods in the component. Any non-valid pod name is considered invalid.
+	// Specifies the instance whose role will be transferred. A typical usage is to transfer the leader role
+	// in a consensus system.
 	//
 	// +kubebuilder:validation:Required
 	InstanceName string `json:"instanceName"`
+
+	// If CandidateName is specified, the role will be transferred to this instance.
+	// The name must match one of the pods in the component.
+	// Refer to ComponentDefinition's Swtichover lifecycle action for more details.
+	//
+	// +optional
+	CandidateName string `json:"candidateName,omitempty"`
 }
 
 // Upgrade defines the parameters for an upgrade operation.

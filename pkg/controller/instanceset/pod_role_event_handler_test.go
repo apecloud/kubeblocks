@@ -55,9 +55,9 @@ var _ = Describe("pod role label event handler test", func() {
 				FieldPath:  lorryEventFieldPath,
 			}
 			role := workloads.ReplicaRole{
-				Name:                   "leader",
-				ParticipatesInQuorum:   true,
-				UpdatePriority:         5,
+				Name:                 "leader",
+				ParticipatesInQuorum: true,
+				UpdatePriority:       5,
 			}
 
 			By("build an expected message")

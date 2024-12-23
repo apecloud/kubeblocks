@@ -125,8 +125,8 @@ var _ = Describe("builder", func() {
 
 			// test update strategy
 			Expect(its.Spec.UpdateStrategy).ShouldNot(BeNil())
-			Expect(its.Spec.UpdateStrategy.InstanceUpdatePolicy).ShouldNot(BeNil())
-			Expect(*its.Spec.UpdateStrategy.InstanceUpdatePolicy).Should(BeEquivalentTo(workloads.PreferInPlaceInstanceUpdatePolicyType))
+			Expect(its.Spec.UpdateStrategy.Type).Should(BeEmpty())
+			Expect(its.Spec.UpdateStrategy.InstanceUpdatePolicy).Should(BeNil())
 			Expect(its.Spec.UpdateStrategy.RollingUpdate).ShouldNot(BeNil())
 			Expect(its.Spec.UpdateStrategy.RollingUpdate.UpdateConcurrency).ShouldNot(BeNil())
 			Expect(*its.Spec.UpdateStrategy.RollingUpdate.UpdateConcurrency).Should(BeEquivalentTo(workloads.BestEffortParallelConcurrency))

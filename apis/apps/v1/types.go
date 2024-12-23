@@ -665,6 +665,12 @@ type InstanceTemplate struct {
 
 // UpdateStrategy defines fine-grained control over the spec update process of all instances.
 type UpdateStrategy struct {
+	// Indicates the type of the UpdateStrategy.
+	// Default is RollingUpdate.
+	//
+	// +optional
+	Type UpdateStrategyType `json:"type,omitempty"`
+
 	// Indicates how instances should be updated.
 	//
 	// - `StrictInPlace` indicates that only allows in-place update.
@@ -682,6 +688,23 @@ type UpdateStrategy struct {
 	// +optional
 	RollingUpdate *RollingUpdate `json:"rollingUpdate,omitempty"`
 }
+
+// UpdateStrategyType is a string enumeration type that enumerates
+// all possible update strategies for the KubeBlocks controllers.
+//
+// +enum
+// +kubebuilder:validation:Enum={RollingUpdate,OnDelete}
+type UpdateStrategyType string
+
+const (
+	// RollingUpdateStrategyType indicates that update will be
+	// applied to all Instances with respect to the InstanceSet
+	// ordering constraints.
+	RollingUpdateStrategyType UpdateStrategyType = "RollingUpdate"
+	// OnDeleteStrategyType indicates that ordered rolling restarts are disabled. Instances are recreated
+	// when they are manually deleted.
+	OnDeleteStrategyType UpdateStrategyType = "OnDelete"
+)
 
 // RollingUpdate specifies how the rolling update should be applied.
 type RollingUpdate struct {

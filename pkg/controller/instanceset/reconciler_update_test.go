@@ -198,6 +198,19 @@ var _ = Describe("update reconciler test", func() {
 			Expect(res).Should(Equal(kubebuilderx.Continue))
 			expectUpdatedPods(partitionTree, []string{"bar-foo-0"})
 
+			By("reconcile with UpdateStrategy='OnDelete'")
+			onDeleteTree, err := tree.DeepCopy()
+			Expect(err).Should(BeNil())
+			root, ok = onDeleteTree.GetRoot().(*workloads.InstanceSet)
+			Expect(ok).Should(BeTrue())
+			root.Spec.UpdateStrategy = &workloads.UpdateStrategy{
+				Type: workloads.OnDeleteStrategyType,
+			}
+			res, err = reconciler.Reconcile(onDeleteTree)
+			Expect(err).Should(BeNil())
+			Expect(res).Should(Equal(kubebuilderx.Continue))
+			expectUpdatedPods(onDeleteTree, []string{})
+
 			// order: bar-hello-0, bar-foo-1, bar-foo-0, bar-3, bar-2, bar-1, bar-0
 			// expected: bar-hello-0 being deleted
 			By("reconcile with PodUpdatePolicy='PreferInPlace'")

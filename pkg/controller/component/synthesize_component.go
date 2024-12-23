@@ -160,6 +160,7 @@ func buildUpdateStrategy(synthesizeComp *SynthesizedComponent, comp *appsv1.Comp
 	var updateStrategy *appsv1.UpdateStrategy
 	if comp.Spec.UpdateStrategy != nil {
 		updateStrategy = &appsv1.UpdateStrategy{
+			Type:                 comp.Spec.UpdateStrategy.Type,
 			InstanceUpdatePolicy: comp.Spec.UpdateStrategy.InstanceUpdatePolicy,
 		}
 		if comp.Spec.UpdateStrategy.RollingUpdate != nil {

@@ -206,7 +206,7 @@ var (
 				},
 			},
 		},
-		UpdateConcurrency:    &[]appsv1.UpdateConcurrency{appsv1.BestEffortParallelConcurrency}[0],
+		UpdateConcurrency: &[]appsv1.UpdateConcurrency{appsv1.BestEffortParallelConcurrency}[0],
 		Roles: []appsv1.ReplicaRole{
 			{
 				Name:        "leader",

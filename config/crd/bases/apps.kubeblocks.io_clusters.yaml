@@ -5410,6 +5410,14 @@ spec:
                                 to 'Serial'."
                               type: string
                           type: object
+                        type:
+                          description: |-
+                            Indicates the type of the UpdateStrategy.
+                            Default is RollingUpdate.
+                          enum:
+                          - RollingUpdate
+                          - OnDelete
+                          type: string
                       type: object
                     volumeClaimTemplates:
                       description: |-
@@ -14172,6 +14180,14 @@ spec:
                                     to 'Serial'."
                                   type: string
                               type: object
+                            type:
+                              description: |-
+                                Indicates the type of the UpdateStrategy.
+                                Default is RollingUpdate.
+                              enum:
+                              - RollingUpdate
+                              - OnDelete
+                              type: string
                           type: object
                         volumeClaimTemplates:
                           description: |-

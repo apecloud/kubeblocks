@@ -92,6 +92,11 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 
 	// 3. do update
+	// do nothing if UpdateStrategyType is 'OnDelete'
+	if its.Spec.UpdateStrategy != nil && its.Spec.UpdateStrategy.Type == workloads.OnDeleteStrategyType {
+		return kubebuilderx.Continue, nil
+	}
+
 	// handle 'RollingUpdate'
 	partition, maxUnavailable, err := parseReplicasNMaxUnavailable(its.Spec.UpdateStrategy, len(oldPodList))
 	if err != nil {

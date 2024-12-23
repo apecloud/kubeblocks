@@ -59,6 +59,9 @@ func NewInstanceSetFactory(namespace, name string, clusterName string, component
 						},
 					},
 				},
+				UpdateStrategy: &workloads.UpdateStrategy{
+					Type: workloads.OnDeleteStrategyType,
+				},
 			},
 		}, f)
 	return f

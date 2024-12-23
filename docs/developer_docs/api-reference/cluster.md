@@ -1408,27 +1408,6 @@ This ensures the Pod&rsquo;s stability and readiness to serve requests.</p>
 </tr>
 <tr>
 <td>
-<code>instanceUpdatePolicy</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.InstanceUpdatePolicyType">
-InstanceUpdatePolicyType
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies how an instance should be updated.</p>
-<ul>
-<li><code>StrictInPlace</code> indicates that only allows in-place update.
-Any attempt to modify other fields that not support in-place update will be rejected.</li>
-<li><code>PreferInPlace</code> indicates that we will first attempt an in-place update of the instance.
-If that fails, it will fall back to the ReCreate, where instance will be recreated.
-Default value is &ldquo;PreferInPlace&rdquo;.</li>
-</ul>
-</td>
-</tr>
-<tr>
-<td>
 <code>updateConcurrency</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.UpdateConcurrency">
@@ -5259,27 +5238,6 @@ This ensures the Pod&rsquo;s stability and readiness to serve requests.</p>
 </tr>
 <tr>
 <td>
-<code>instanceUpdatePolicy</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.InstanceUpdatePolicyType">
-InstanceUpdatePolicyType
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies how an instance should be updated.</p>
-<ul>
-<li><code>StrictInPlace</code> indicates that only allows in-place update.
-Any attempt to modify other fields that not support in-place update will be rejected.</li>
-<li><code>PreferInPlace</code> indicates that we will first attempt an in-place update of the instance.
-If that fails, it will fall back to the ReCreate, where instance will be recreated.
-Default value is &ldquo;PreferInPlace&rdquo;.</li>
-</ul>
-</td>
-</tr>
-<tr>
-<td>
 <code>updateConcurrency</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.UpdateConcurrency">
@@ -7939,7 +7897,7 @@ Add new or override existing volume claim templates.</p>
 <h3 id="apps.kubeblocks.io/v1.InstanceUpdatePolicyType">InstanceUpdatePolicyType
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>, <a href="#apps.kubeblocks.io/v1.UpdateStrategy">UpdateStrategy</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.UpdateStrategy">UpdateStrategy</a>)
 </p>
 <div>
 </div>
@@ -11625,6 +11583,21 @@ This ensures that only one replica is unavailable at a time during the update pr
 <tbody>
 <tr>
 <td>
+<code>type</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.UpdateStrategyType">
+UpdateStrategyType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates the type of the UpdateStrategy.
+Default is RollingUpdate.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>instanceUpdatePolicy</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.InstanceUpdatePolicyType">
@@ -11659,6 +11632,33 @@ RollingUpdate
 </td>
 </tr>
 </tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.UpdateStrategyType">UpdateStrategyType
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.UpdateStrategy">UpdateStrategy</a>)
+</p>
+<div>
+<p>UpdateStrategyType is a string enumeration type that enumerates
+all possible update strategies for the KubeBlocks controllers.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;OnDelete&#34;</p></td>
+<td><p>OnDeleteStrategyType indicates that ordered rolling restarts are disabled. Instances are recreated
+when they are manually deleted.</p>
+</td>
+</tr><tr><td><p>&#34;RollingUpdate&#34;</p></td>
+<td><p>RollingUpdateStrategyType indicates that update will be
+applied to all Instances with respect to the InstanceSet
+ordering constraints.</p>
+</td>
+</tr></tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1.VarOption">VarOption
 (<code>string</code> alias)</h3>
@@ -30676,6 +30676,21 @@ This ensures that only one replica is unavailable at a time during the update pr
 <tbody>
 <tr>
 <td>
+<code>type</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.UpdateStrategyType">
+UpdateStrategyType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates the type of the UpdateStrategy.
+Default is RollingUpdate.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>instanceUpdatePolicy</code><br/>
 <em>
 <a href="#workloads.kubeblocks.io/v1.InstanceUpdatePolicyType">
@@ -30710,6 +30725,33 @@ RollingUpdate
 </td>
 </tr>
 </tbody>
+</table>
+<h3 id="workloads.kubeblocks.io/v1.UpdateStrategyType">UpdateStrategyType
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.UpdateStrategy">UpdateStrategy</a>)
+</p>
+<div>
+<p>UpdateStrategyType is a string enumeration type that enumerates
+all possible update strategies for the KubeBlocks controllers.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;OnDelete&#34;</p></td>
+<td><p>OnDeleteStrategyType indicates that ordered rolling restarts are disabled. Instances are recreated
+when they are manually deleted.</p>
+</td>
+</tr><tr><td><p>&#34;RollingUpdate&#34;</p></td>
+<td><p>RollingUpdateStrategyType indicates that update will be
+applied to all Instances with respect to the InstanceSet
+ordering constraints.</p>
+</td>
+</tr></tbody>
 </table>
 <hr/>
 <h2 id="workloads.kubeblocks.io/v1alpha1">workloads.kubeblocks.io/v1alpha1</h2>

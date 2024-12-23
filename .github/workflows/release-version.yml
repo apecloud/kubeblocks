@@ -1,4 +1,4 @@
-name: Releases
+name: Release Version
 
 on:
   workflow_dispatch:
@@ -96,6 +96,9 @@ jobs:
     steps:
       - name: checkout branch ${{ github.ref_name }}
         uses: actions/checkout@v4
+        with:
+          token: ${{ env.GITHUB_TOKEN }}
+          ref: ${{ github.ref_name }}
 
       - name: install lib
         run: |
@@ -204,7 +207,7 @@ jobs:
         if: ${{ (steps.update_kbcli_doc.outputs.file_changes || steps.update_apis_doc.outputs.file_changes || steps.upgrade_addon_version.outputs.file_changes) && github.ref_name != 'main' }}
         with:
           github_token: ${{ env.GITHUB_TOKEN }}
-          branch: ${{ github.ref }}
+          branch: ${{ github.ref_name }}
 
       - name: push tag ${{ inputs.release_version }}
         uses: mathieudutour/github-tag-action@v6.1

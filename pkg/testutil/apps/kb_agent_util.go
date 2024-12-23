@@ -120,34 +120,6 @@ func MockKBAgentClient4Workload(testCtx *testutil.TestContext, pods []*corev1.Po
 		return rsp, nil
 	}
 
-	handleSwitchOver := func(podName string) (kbagentproto.ActionResponse, error) {
-		for _, pod := range pods {
-			if pod.Name != podName {
-				continue
-			}
-			if pod.Labels[constant.RoleLabelKey] != "leader" {
-				return rsp, nil
-			}
-			pod.Labels[constant.RoleLabelKey] = "follower"
-			err := testCtx.Cli.Update(testCtx.Ctx, pod)
-			if err != nil {
-				return kbagentproto.ActionResponse{}, err
-			}
-		}
-
-		for _, pod := range pods {
-			if pod.Name == podName {
-				continue
-			}
-			pod.Labels[constant.RoleLabelKey] = "leader"
-			err := testCtx.Cli.Update(testCtx.Ctx, pod)
-			if err != nil {
-				return kbagentproto.ActionResponse{}, err
-			}
-		}
-		return rsp, nil
-	}
-
 	MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
 		recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
 			switch req.Action {
@@ -157,9 +129,6 @@ func MockKBAgentClient4Workload(testCtx *testutil.TestContext, pods []*corev1.Po
 			case "memberJoin":
 				podName := req.Parameters["KB_JOIN_MEMBER_POD_NAME"]
 				return handleMemberJoin(podName)
-			case "switchover":
-				podName := req.Parameters["KB_LEADER_POD_NAME"]
-				return handleSwitchOver(podName)
 			default:
 				return rsp, nil
 			}

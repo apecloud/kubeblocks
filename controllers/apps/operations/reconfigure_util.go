@@ -67,7 +67,7 @@ func updateOpsLabelWithReconfigure(obj *appsv1alpha1.OpsRequest, params []core.P
 		if obj.Annotations == nil {
 			obj.Annotations = make(map[string]string)
 		}
-		oldValue, err := fetchOriginalValue(keyFile, data, param, formatter)
+		oldValue, err := fetchOriginalValue(keyFile, data, param, formatter, obj.Annotations[keyFile])
 		if err != nil {
 			log.Log.Error(err, "failed to fetch original value")
 			return
@@ -84,15 +84,26 @@ func updateOpsLabelWithReconfigure(obj *appsv1alpha1.OpsRequest, params []core.P
 	}
 }
 
-func fetchOriginalValue(keyFile, data string, params map[string]interface{}, formatter *appsv1beta1.FileFormatConfig) (string, error) {
+func fetchOriginalValue(keyFile, data string, params map[string]interface{}, formatter *appsv1beta1.FileFormatConfig, oldValueStr string) (string, error) {
 	baseConfigObj, err := core.FromConfigObject(keyFile, data, formatter)
 	if err != nil {
 		return "", err
 	}
-	r := make(map[string]string, len(params))
-	for key := range params {
+	r := make(map[string]string)
+	if oldValueStr != "" {
+		err = json.Unmarshal([]byte(oldValueStr), &r)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	for key, val := range params {
 		oldVal := baseConfigObj.Get(key)
 		if oldVal != nil {
+			// configmap has been updated, skip setting the old value
+			if oldVal == cast.ToString(val) {
+				continue
+			}
 			r[key] = cast.ToString(oldVal)
 		}
 	}

@@ -1019,8 +1019,9 @@ spec:
                 description: The name of the backup repository.
                 type: string
               baseBackupName:
-                description: Records the base full backup name for incremental backup
-                  or differential backup.
+                description: |-
+                  Records the base full backup name for incremental backup or differential backup.
+                  When the base backup is deleted, the backup will also be deleted.
                 type: string
               completionTimestamp:
                 description: |-
@@ -1102,8 +1103,9 @@ spec:
                 description: Records the path of the Kopia repository.
                 type: string
               parentBackupName:
-                description: Records the parent backup name for incremental or differential
-                  backup.
+                description: |-
+                  Records the parent backup name for incremental or differential backup.
+                  When the parent backup is deleted, the backup will also be deleted.
                 type: string
               path:
                 description: |-

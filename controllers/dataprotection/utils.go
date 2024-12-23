@@ -695,11 +695,14 @@ func FilterParentBackups(backupList *dpv1alpha1.BackupList, targetBackup *dpv1al
 		if backup.Spec.BackupPolicyName != targetBackup.Spec.BackupPolicyName {
 			continue
 		}
-		if incremental && backup.Spec.BackupMethod != targetBackup.Spec.BackupMethod {
-			continue
-		}
-		if !incremental && backupMethod.CompatibleMethod != backup.Spec.BackupMethod {
-			continue
+		if incremental {
+			if backup.Spec.BackupMethod != targetBackup.Spec.BackupMethod {
+				continue
+			}
+		} else {
+			if backupMethod.CompatibleMethod != backup.Spec.BackupMethod {
+				continue
+			}
 		}
 		if backup.GetEndTime().IsZero() {
 			continue

@@ -76,6 +76,11 @@ spec:
                         For volume snapshot backup, the actionSet is not required, the controller
                         will use the CSI volume snapshotter to create the snapshot.
                       type: string
+                    compatibleMethod:
+                      description: The name of the compatible full backup method,
+                        used by incremental backups.
+                      pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                      type: string
                     env:
                       description: Specifies the environment variables for the backup
                         workload.

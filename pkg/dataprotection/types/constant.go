@@ -103,7 +103,7 @@ const (
 	// DPTargetPodRole the target pod role
 	DPTargetPodRole = "DP_TARGET_POD_ROLE"
 	// DPBackupBasePath the base path for backup data in the storage
-	// For a backup action pod, it equals ${DP_BACKUP_ROOT_PATH}/${DP_BACKUP_NAME}/${DP_TARGET_RELATIVE_PATH}
+	// In a backup action pod, it equals ${DP_BACKUP_ROOT_PATH}/${DP_BACKUP_NAME}/${DP_TARGET_RELATIVE_PATH}
 	DPBackupBasePath = "DP_BACKUP_BASE_PATH"
 	// DPBackupRootPath the root path for backup data
 	DPBackupRootPath = "DP_BACKUP_ROOT_PATH"

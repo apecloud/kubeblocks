@@ -456,7 +456,6 @@ func (r *BackupReconciler) prepareBackupRequest(
 		}
 		if parentBackupType == dpv1alpha1.BackupTypeFull {
 			request.BaseBackup = request.ParentBackup
-			request.Status.BaseBackupName = request.ParentBackup.Name
 		} else if parentBackupType == dpv1alpha1.BackupTypeIncremental {
 			baseBackup := &dpv1alpha1.Backup{}
 			baseBackupName := request.ParentBackup.Status.BaseBackupName
@@ -468,10 +467,12 @@ func (r *BackupReconciler) prepareBackupRequest(
 				return nil, fmt.Errorf("failed to get base backup %s/%s: %w", request.ParentBackup.Namespace, baseBackupName, err)
 			}
 			request.BaseBackup = baseBackup
-			request.Status.BaseBackupName = baseBackup.Name
 		} else {
 			return nil, fmt.Errorf("parent backup type is %s, but only full and incremental backup are supported", parentBackupType)
 		}
+		// set status parent backup name and base backup name
+		request.Status.ParentBackupName = request.ParentBackup.Name
+		request.Status.BaseBackupName = request.BaseBackup.Name
 	}
 	return request, nil
 }

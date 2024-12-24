@@ -58,7 +58,7 @@ kbcli playground init [flags]
       --cluster-version string      Specify the cluster version, run "kbcli cv list" to get the available cluster versions
   -h, --help                        help for init
       --region string               The region to create kubernetes cluster
-      --timeout duration            Time to wait for init playground, such as --timeout=10m (default 5m0s)
+      --timeout duration            Time to wait for init playground, such as --timeout=10m (default 10m0s)
       --version string              KubeBlocks version
 ```
 

@@ -1,24 +1,28 @@
 ---
-title: kbcli clusterdefinition list-service-reference
+title: kbcli addon uninstall
 ---
 
-List cluster references declared in a cluster definition.
+Uninstall an existed addon
 
 ```
-kbcli clusterdefinition list-service-reference [flags]
+kbcli addon uninstall [flags]
 ```
 
 ### Examples
 
 ```
-  # List cluster references name declared in a cluster definition.
-  kbcli clusterdefinition list-service-reference orioledb
+  # uninstall an addon
+  kbcli addon uninstall apecloud-mysql
+  
+  # uninstall more than one addons
+  kbcli addon uninstall apecloud-mysql postgresql
 ```
 
 ### Options
 
 ```
-  -h, --help   help for list-service-reference
+      --auto-approve   Skip interactive approval before uninstalling addon
+  -h, --help           help for uninstall
 ```
 
 ### Options inherited from parent commands
@@ -47,7 +51,7 @@ kbcli clusterdefinition list-service-reference [flags]
 
 ### SEE ALSO
 
-* [kbcli clusterdefinition](kbcli_clusterdefinition.md)	 - ClusterDefinition command.
+* [kbcli addon](kbcli_addon.md)	 - Addon command.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

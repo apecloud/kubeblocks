@@ -1,24 +1,24 @@
 ---
-title: kbcli clusterdefinition list-service-reference
+title: kbcli backuprepo delete
 ---
 
-List cluster references declared in a cluster definition.
+Delete a backup repository.
 
 ```
-kbcli clusterdefinition list-service-reference [flags]
+kbcli backuprepo delete [flags]
 ```
 
 ### Examples
 
 ```
-  # List cluster references name declared in a cluster definition.
-  kbcli clusterdefinition list-service-reference orioledb
+  # Delete a backuprepo
+  kbcli backuprepo delete my-backuprepo
 ```
 
 ### Options
 
 ```
-  -h, --help   help for list-service-reference
+  -h, --help   help for delete
 ```
 
 ### Options inherited from parent commands
@@ -47,7 +47,7 @@ kbcli clusterdefinition list-service-reference [flags]
 
 ### SEE ALSO
 
-* [kbcli clusterdefinition](kbcli_clusterdefinition.md)	 - ClusterDefinition command.
+* [kbcli backuprepo](kbcli_backuprepo.md)	 - BackupRepo command.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

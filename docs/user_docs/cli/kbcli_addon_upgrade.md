@@ -1,24 +1,44 @@
 ---
-title: kbcli clusterdefinition list-service-reference
+title: kbcli addon upgrade
 ---
 
-List cluster references declared in a cluster definition.
+Upgrade an existed addon to latest version or a specified version
 
 ```
-kbcli clusterdefinition list-service-reference [flags]
+kbcli addon upgrade [flags]
 ```
 
 ### Examples
 
 ```
-  # List cluster references name declared in a cluster definition.
-  kbcli clusterdefinition list-service-reference orioledb
+  # upgrade an addon from default index to latest version
+  kbcli addon upgrade apecloud-mysql
+  
+  # upgrade an addon from default index to latest version and skip KubeBlocks version compatibility check
+  kbcli addon upgrade apecloud-mysql --force
+  
+  # upgrade an addon to latest version from a specified index
+  kbcli addon upgrade apecloud-mysql --index my-index
+  
+  # upgrade an addon with a specified version default index
+  kbcli addon upgrade apecloud-mysql --version 0.7.0
+  
+  # non-inplace upgrade an addon with a specified version
+  kbcli addon upgrade apecloud-mysql  --inplace=false --version 0.7.0
+  
+  # non-inplace upgrade an addon with a specified addon name
+  kbcli addon upgrade apecloud-mysql --inplace=false --name apecloud-mysql-0.7.0
 ```
 
 ### Options
 
 ```
-  -h, --help   help for list-service-reference
+      --force            force upgrade the addon and ignore the version check
+  -h, --help             help for upgrade
+      --index string     specify the addon index index, use 'kubeblocks' by default (default "kubeblocks")
+      --inplace          when inplace is false, it will retain the existing addon and reinstall the new version of the addon, otherwise the upgrade will be in-place. The default is true. (default true)
+      --name string      name is the new version addon name need to set by user when inplace is false, it also will be used as resourceNamePrefix of an addon with multiple version.
+      --version string   specify the addon version
 ```
 
 ### Options inherited from parent commands
@@ -47,7 +67,7 @@ kbcli clusterdefinition list-service-reference [flags]
 
 ### SEE ALSO
 
-* [kbcli clusterdefinition](kbcli_clusterdefinition.md)	 - ClusterDefinition command.
+* [kbcli addon](kbcli_addon.md)	 - Addon command.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

@@ -14,11 +14,8 @@ kbcli dataprotection list-backup-policy [flags]
   # list all backup policies
   kbcli cluster list-backup-policy
   
-  # list backup policies with specified name
-  kbcli cluster list-backup-policy mypolicy
-  
-  # list backup policies of the specified cluster
-  kbcli cluster list-backup-policy --cluster mycluster
+  # using short cmd to list backup policy of the specified cluster
+  kbcli cluster list-bp mycluster
 ```
 
 ### Options

@@ -14,6 +14,9 @@ kbcli bench ycsb [Step] [BenchmarkName] [flags]
   # ycsb on a cluster,  that will exec for all steps, cleanup, prepare and run
   kbcli bench ycsb mytest --cluster mycluster --user xxx --password xxx --database mydb
   
+  # ycsb on a cluster, but with cpu and memory limits set
+  kbcli bench ycsb mytest --cluster mycluster --user xxx --password xxx --database mydb --limit-cpu 1 --limit-memory 1Gi
+  
   # ycsb on a cluster with cleanup, only cleanup by deleting the testdata
   kbcli bench ycsb cleanup mytest --cluster mycluster --user xxx --password xxx --database mydb
   
@@ -43,12 +46,16 @@ kbcli bench ycsb [Step] [BenchmarkName] [flags]
   -h, --help                               help for ycsb
       --host string                        the host of database
       --insert-proportion int              the percentage of insert operations in benchmark
+      --limit-cpu string                   the limit cpu of benchmark
+      --limit-memory string                the limit memory of benchmark
       --operation-count int                the number of operations to use during the run phase (default 1000)
       --password string                    the password of database
       --port int                           the port of database
       --read-modify-write-proportion int   the percentage of read-modify-write operations in benchmark, which read a record, modify it, and write it back
       --read-proportion int                the percentage of read operations in benchmark
       --record-count int                   the number of records to use (default 1000)
+      --request-cpu string                 the request cpu of benchmark
+      --request-memory string              the request memory of benchmark
       --scan-proportion int                the percentage of scan operations in benchmark
       --threads ints                       the number of threads to use (default [1])
       --tolerations strings                Tolerations for benchmark, such as '"dev=true:NoSchedule,large=true:NoSchedule"'

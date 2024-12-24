@@ -1,68 +1,59 @@
 ---
-title: kbcli bench sysbench
+title: kbcli bench redis-benchmark
 ---
 
-run a SysBench benchmark
+Run redis-benchmark on a cluster
 
 ```
-kbcli bench sysbench [Step] [BenchmarkName] [flags]
+kbcli bench redis-benchmark [flags]
 ```
 
 ### Examples
 
 ```
-  # sysbench on a cluster, that will exec for all steps, cleanup, prepare and run
-  kbcli bench sysbench mytest --cluster mycluster --user xxx --password xxx --database mydb
+  # redis-benchmark run on a cluster
+  kbcli bench redis-benchmark mytest --cluster rediscluster --clients 50 --requests 10000 --password xxx
   
-  # sysbench on a cluster, but with cpu and memory limits set
-  kbcli bench sysbench mytest --cluster mycluster --user xxx --password xxx --database mydb --limit-cpu 1 --limit-memory 1Gi
+  # redis-benchmark run on a cluster, but with cpu and memory limits set
+  kbcli bench redis-benchmark mytest --cluster rediscluster --clients 50 --requests 10000 --limit-cpu 1 --limit-memory 1Gi --password xxx
   
-  # sysbench run on a cluster with cleanup, only cleanup by deleting the testdata
-  kbcli bench sysbench cleanup mytest --cluster mycluster --user xxx --password xxx --database mydb
+  # redis-benchmark run on a cluster, just test set/get
+  kbcli bench redis-benchmark mytest --cluster rediscluster --clients 50 --requests 10000 --tests set,get --password xxx
   
-  # sysbench run on a cluster with prepare, just prepare by creating the testdata
-  kbcli bench sysbench prepare mytest --cluster mycluster --user xxx --password xxx --database mydb
+  # redis-benchmark run on a cluster, just test set/get with key space
+  kbcli bench redis-benchmark mytest --cluster rediscluster --clients 50 --requests 10000 --tests set,get --key-space 100000 --password xxx
   
-  # sysbench run on a cluster with run, just run by running the test
-  kbcli bench sysbench run mytest --cluster mycluster --user xxx --password xxx --database mydb
+  # redis-benchmark run on a cluster, with pipeline
+  kbcli bench redis-benchmark mytest --cluster rediscluster --clients 50 --requests 10000 --pipeline 10 --password xxx
   
-  # sysbench on a cluster with thread counts
-  kbcli bench sysbench mytest --cluster mycluster --user xxx --password xxx --database mydb --threads 4,8
-  
-  # sysbench on a cluster with type
-  kbcli bench sysbench mytest --cluster mycluster --user xxx --password xxx --database mydb --type oltp_read_only,oltp_read_write
-  
-  # sysbench on a cluster with specified read/write ratio
-  kbcli bench sysbench mytest --cluster mycluster --user xxx --password xxx  --database mydb --type oltp_read_write_pct --read-percent 80 --write-percent 20
-  
-  # sysbench on a cluster with specified tables and size
-  kbcli bench sysbench mytest --cluster mycluster --user xxx --password xxx --database mydb --tables 10 --size 25000
+  # redis-benchmark run on a cluster, with csv output
+  kbcli bench redis-benchmark mytest --cluster rediscluster --clients 50 --requests 10000 --quiet false --extra-args "--csv" --password xxx
 ```
 
 ### Options
 
 ```
+      --clients ints            number of parallel connections (default [50])
       --cluster string          the cluster of database
+      --data-size int           data size of set/get value in bytes (default 3)
       --database string         database name
       --driver string           the driver of database
-      --duration int            the seconds of running sysbench (default 60)
       --extra-args strings      extra arguments for benchmark
-  -h, --help                    help for sysbench
+  -h, --help                    help for redis-benchmark
       --host string             the host of database
+      --key-space int           use random keys for SET/GET/INCR, random values for SADD
       --limit-cpu string        the limit cpu of benchmark
       --limit-memory string     the limit memory of benchmark
       --password string         the password of database
+      --pipeline int            pipelining num requests. Default 1 (no pipeline). (default 1)
       --port int                the port of database
-      --read-percent int        the percent of read, only useful when type is oltp_read_write_pct
+      --quiet                   quiet mode. Just show query/sec values (default true)
       --request-cpu string      the request cpu of benchmark
       --request-memory string   the request memory of benchmark
-      --size int                the data size of per table (default 25000)
-      --tables int              the number of tables (default 10)
-      --threads ints            the number of threads, you can set multiple values, like 4,8 (default [4])
+      --requests int            total number of requests (default 10000)
+      --tests string            only run the comma separated list of tests. The test names are the same as the ones produced as output.
       --tolerations strings     Tolerations for benchmark, such as '"dev=true:NoSchedule,large=true:NoSchedule"'
-      --type strings            sysbench type, you can set multiple values (default [oltp_read_write])
       --user string             the user of database
-      --write-percent int       the percent of write, only useful when type is oltp_read_write_pct
 ```
 
 ### Options inherited from parent commands

@@ -22,19 +22,19 @@ kbcli cluster create xinference NAME [flags]
 
 ```
       --availability-policy string   The availability policy of cluster. Legal values [none, node, zone]. (default "node")
-      --cpu float                    CPU cores. Value range [0.5, 64]. (default 2)
+      --cpu float                    CPU cores. Value range [0, 64].
       --cpu-mode                     Set to true if no GPU is available
+      --disable-exporter             Enable or disable monitor. (default true)
       --gpu float                    GPU cores. Value range [0, 64]. (default 1)
   -h, --help                         help for xinference
       --host-network-accessible      Specify whether the cluster can be accessed from within the VPC.
-      --memory float                 Memory, the unit is Gi. Value range [0.5, 1000]. (default 6)
-      --monitoring-interval int      The monitoring interval of cluster, 0 is disabled, the unit is second. Value range [0, 60].
+      --memory float                 Memory, the unit is Gi. Value range [0, 1000].
       --publicly-accessible          Specify whether the cluster can be accessed from the public internet.
       --rbac-enabled                 Specify whether rbac resources will be created by client, otherwise KubeBlocks server will try to create rbac resources.
       --replicas int                 The number of replicas, for standalone mode, the replicas is 1, for replication mode, the default replicas is 2. Value range [1, 5]. (default 1)
+      --shm-size string              shm size (default "64Mi")
       --tenancy string               The tenancy of cluster. Legal values [SharedNode, DedicatedNode]. (default "SharedNode")
       --termination-policy string    The termination policy of cluster. Legal values [DoNotTerminate, Halt, Delete, WipeOut]. (default "Delete")
-      --version string               Cluster version.
 ```
 
 ### Options inherited from parent commands

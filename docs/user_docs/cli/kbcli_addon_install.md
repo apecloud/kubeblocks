@@ -1,24 +1,36 @@
 ---
-title: kbcli clusterdefinition list-service-reference
+title: kbcli addon install
 ---
 
-List cluster references declared in a cluster definition.
+Install KubeBlocks addon
 
 ```
-kbcli clusterdefinition list-service-reference [flags]
+kbcli addon install [flags]
 ```
 
 ### Examples
 
 ```
-  # List cluster references name declared in a cluster definition.
-  kbcli clusterdefinition list-service-reference orioledb
+  # install an addon from default index
+  kbcli addon install apecloud-mysql
+  
+  # install an addon from default index and skip KubeBlocks version compatibility check
+  kbcli addon install apecloud-mysql --force
+  
+  # install an addon from a specified index
+  kbcli addon install apecloud-mysql --index my-index
+  
+  # install an addon with a specified version default index
+  kbcli addon install apecloud-mysql --version 0.7.0
 ```
 
 ### Options
 
 ```
-  -h, --help   help for list-service-reference
+      --force            force install the addon and ignore the version check
+  -h, --help             help for install
+      --index string     specify the addon index index, use 'kubeblocks' by default (default "kubeblocks")
+      --version string   specify the addon version to install, run 'kbcli addon search <addon-name>' to get the available versions
 ```
 
 ### Options inherited from parent commands
@@ -47,7 +59,7 @@ kbcli clusterdefinition list-service-reference [flags]
 
 ### SEE ALSO
 
-* [kbcli clusterdefinition](kbcli_clusterdefinition.md)	 - ClusterDefinition command.
+* [kbcli addon](kbcli_addon.md)	 - Addon command.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

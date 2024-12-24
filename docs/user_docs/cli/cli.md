@@ -11,25 +11,20 @@ Addon command.
 * [kbcli addon describe](kbcli_addon_describe.md)	 - Describe an addon specification.
 * [kbcli addon disable](kbcli_addon_disable.md)	 - Disable an addon.
 * [kbcli addon enable](kbcli_addon_enable.md)	 - Enable an addon.
+* [kbcli addon index](kbcli_addon_index.md)	 - Manage custom addon indexes
+* [kbcli addon install](kbcli_addon_install.md)	 - Install KubeBlocks addon
 * [kbcli addon list](kbcli_addon_list.md)	 - List addons.
-
-
-## [alert](kbcli_alert.md)
-
-Manage alert receiver, include add, list and delete receiver.
-
-* [kbcli alert add-receiver](kbcli_alert_add-receiver.md)	 - Add alert receiver, such as email, slack, webhook and so on.
-* [kbcli alert config-smtpserver](kbcli_alert_config-smtpserver.md)	 - Set smtp server config
-* [kbcli alert delete-receiver](kbcli_alert_delete-receiver.md)	 - Delete alert receiver.
-* [kbcli alert list-receivers](kbcli_alert_list-receivers.md)	 - List all alert receivers.
-* [kbcli alert list-smtpserver](kbcli_alert_list-smtpserver.md)	 - List alert smtp servers config.
+* [kbcli addon search](kbcli_addon_search.md)	 - Search the addon from index
+* [kbcli addon uninstall](kbcli_addon_uninstall.md)	 - Uninstall an existed addon
+* [kbcli addon upgrade](kbcli_addon_upgrade.md)	 - Upgrade an existed addon to latest version or a specified version
 
 
 ## [backuprepo](kbcli_backuprepo.md)
 
 BackupRepo command.
 
-* [kbcli backuprepo create](kbcli_backuprepo_create.md)	 - Create a backup repo
+* [kbcli backuprepo create](kbcli_backuprepo_create.md)	 - Create a backup repository
+* [kbcli backuprepo delete](kbcli_backuprepo_delete.md)	 - Delete a backup repository.
 * [kbcli backuprepo describe](kbcli_backuprepo_describe.md)	 - Describe a backup repository.
 * [kbcli backuprepo list](kbcli_backuprepo_list.md)	 - List Backup Repositories.
 * [kbcli backuprepo update](kbcli_backuprepo_update.md)	 - Update a backup repository.
@@ -43,27 +38,12 @@ Run a benchmark.
 * [kbcli bench describe](kbcli_bench_describe.md)	 - Describe a benchmark.
 * [kbcli bench list](kbcli_bench_list.md)	 - List all benchmarks.
 * [kbcli bench pgbench](kbcli_bench_pgbench.md)	 - Run pgbench against a PostgreSQL cluster
+* [kbcli bench redis-benchmark](kbcli_bench_redis-benchmark.md)	 - Run redis-benchmark on a cluster
 * [kbcli bench sysbench](kbcli_bench_sysbench.md)	 - run a SysBench benchmark
 * [kbcli bench tpcc](kbcli_bench_tpcc.md)	 - Run tpcc benchmark
+* [kbcli bench tpcds](kbcli_bench_tpcds.md)	 - Run TPC-DS benchmark
 * [kbcli bench tpch](kbcli_bench_tpch.md)	 - Run tpch benchmark
 * [kbcli bench ycsb](kbcli_bench_ycsb.md)	 - Run YCSB benchmark on a cluster
-
-
-## [builder](kbcli_builder.md)
-
-builder command.
-
-* [kbcli builder migrate-scripts](kbcli_builder_migrate-scripts.md)	 - migrate - a developer tool.
-* [kbcli builder template](kbcli_builder_template.md)	 - tpl - a developer tool integrated with KubeBlocks that can help developers quickly generate rendered configurations or scripts based on Helm templates, and discover errors in the template before creating the database cluster.
-
-
-## [class](kbcli_class.md)
-
-Manage classes
-
-* [kbcli class create](kbcli_class_create.md)	 - Create a class
-* [kbcli class list](kbcli_class_list.md)	 - List classes
-* [kbcli class template](kbcli_class_template.md)	 - Generate class definition template
 
 
 ## [cluster](kbcli_cluster.md)
@@ -76,6 +56,7 @@ Cluster command.
 * [kbcli cluster connect](kbcli_cluster_connect.md)	 - Connect to a cluster or instance.
 * [kbcli cluster create](kbcli_cluster_create.md)	 - Create a cluster.
 * [kbcli cluster create-account](kbcli_cluster_create-account.md)	 - Create account for a cluster
+* [kbcli cluster custom-ops](kbcli_cluster_custom-ops.md)	 - 
 * [kbcli cluster delete](kbcli_cluster_delete.md)	 - Delete clusters.
 * [kbcli cluster delete-account](kbcli_cluster_delete-account.md)	 - Delete account for a cluster
 * [kbcli cluster delete-backup](kbcli_cluster_delete-backup.md)	 - Delete a backup.
@@ -105,6 +86,7 @@ Cluster command.
 * [kbcli cluster list-ops](kbcli_cluster_list-ops.md)	 - List all opsRequests.
 * [kbcli cluster logs](kbcli_cluster_logs.md)	 - Access cluster log file.
 * [kbcli cluster promote](kbcli_cluster_promote.md)	 - Promote a non-primary or non-leader instance as the new primary or leader of the cluster
+* [kbcli cluster rebuild-instance](kbcli_cluster_rebuild-instance.md)	 - Rebuild the specified instances in the cluster.
 * [kbcli cluster register](kbcli_cluster_register.md)	 - Pull the cluster chart to the local cache and register the type to 'create' sub-command
 * [kbcli cluster restart](kbcli_cluster_restart.md)	 - Restart the specified components in the cluster.
 * [kbcli cluster restore](kbcli_cluster_restore.md)	 - Restore a new cluster from backup.
@@ -136,16 +118,6 @@ ClusterVersion command.
 * [kbcli clusterversion unset-default](kbcli_clusterversion_unset-default.md)	 - Unset the clusterversion if it's default.
 
 
-## [context](kbcli_context.md)
-
-kbcli context allows you to manage cloud context. This command is currently only applicable to cloud, and currently does not support switching the context of the local k8s cluster.
-
-* [kbcli context current](kbcli_context_current.md)	 - Get the currently used context.
-* [kbcli context describe](kbcli_context_describe.md)	 - Get the description information of a context.
-* [kbcli context list](kbcli_context_list.md)	 - List all created contexts.
-* [kbcli context use](kbcli_context_use.md)	 - Use another context that you have already created.
-
-
 ## [dashboard](kbcli_dashboard.md)
 
 List and open the KubeBlocks dashboards.
@@ -167,28 +139,6 @@ Data protection command.
 * [kbcli dataprotection restore](kbcli_dataprotection_restore.md)	 - Restore a new cluster from backup
 
 
-## [fault](kbcli_fault.md)
-
-Inject faults to pod.
-
-* [kbcli fault delete](kbcli_fault_delete.md)	 - Delete chaos resources.
-* [kbcli fault io](kbcli_fault_io.md)	 - IO chaos.
-* [kbcli fault list](kbcli_fault_list.md)	 - List chaos resources.
-* [kbcli fault network](kbcli_fault_network.md)	 - Network chaos.
-* [kbcli fault node](kbcli_fault_node.md)	 - Node chaos.
-* [kbcli fault pod](kbcli_fault_pod.md)	 - Pod chaos.
-* [kbcli fault stress](kbcli_fault_stress.md)	 - Add memory pressure or CPU load to the system.
-* [kbcli fault time](kbcli_fault_time.md)	 - Clock skew failure.
-
-
-## [infra](kbcli_infra.md)
-
-infra command
-
-* [kbcli infra create](kbcli_infra_create.md)	 - create kubernetes cluster.
-* [kbcli infra delete](kbcli_infra_delete.md)	 - delete kubernetes cluster.
-
-
 ## [kubeblocks](kbcli_kubeblocks.md)
 
 KubeBlocks operation commands.
@@ -204,44 +154,10 @@ KubeBlocks operation commands.
 * [kbcli kubeblocks upgrade](kbcli_kubeblocks_upgrade.md)	 - Upgrade KubeBlocks.
 
 
-## [login](kbcli_login.md)
-
-Authenticate with the KubeBlocks Cloud
-
-
-
-## [logout](kbcli_logout.md)
-
-Log out of the KubeBlocks Cloud
-
-
-
-## [migration](kbcli_migration.md)
-
-Data migration between two data sources.
-
-* [kbcli migration create](kbcli_migration_create.md)	 - Create a migration task.
-* [kbcli migration describe](kbcli_migration_describe.md)	 - Show details of a specific migration task.
-* [kbcli migration list](kbcli_migration_list.md)	 - List migration tasks.
-* [kbcli migration logs](kbcli_migration_logs.md)	 - Access migration task log file.
-* [kbcli migration templates](kbcli_migration_templates.md)	 - List migration templates.
-* [kbcli migration terminate](kbcli_migration_terminate.md)	 - Delete migration task.
-
-
 ## [options](kbcli_options.md)
 
 Print the list of flags inherited by all commands.
 
-
-
-## [org](kbcli_org.md)
-
-kbcli org is used to manage cloud organizations and is only suitable for interacting with cloud.
-
-* [kbcli org current](kbcli_org_current.md)	 - Get current organization.
-* [kbcli org describe](kbcli_org_describe.md)	 - Get the description information of an organization.
-* [kbcli org list](kbcli_org_list.md)	 - List all organizations you have joined.
-* [kbcli org switch](kbcli_org_switch.md)	 - Switch to another organization you are already a member of.
 
 
 ## [playground](kbcli_playground.md)
@@ -269,7 +185,7 @@ Provides utilities for interacting with plugins.
 
 ## [report](kbcli_report.md)
 
-report kubeblocks or cluster info.
+Report kubeblocks or cluster info.
 
 * [kbcli report cluster](kbcli_report_cluster.md)	 - Report Cluster information
 * [kbcli report kubeblocks](kbcli_report_kubeblocks.md)	 - Report KubeBlocks information, including deployments, events, logs, etc.

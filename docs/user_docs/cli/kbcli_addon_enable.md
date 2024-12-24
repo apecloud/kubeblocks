@@ -31,6 +31,9 @@ kbcli addon enable ADDON_NAME [flags]
   
   # Force enabled "csi-s3" addon
   kbcli addon enable csi-s3 --force
+  
+  # Enable addons in batch
+  kbcli addon enable prometheus csi-s3
 ```
 
 ### Options

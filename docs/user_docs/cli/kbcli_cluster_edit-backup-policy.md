@@ -14,8 +14,14 @@ kbcli cluster edit-backup-policy
   # edit backup policy
   kbcli cluster edit-backup-policy <backup-policy-name>
   
-  # update backup Repo
+  # specify a backup repository
   kbcli cluster edit-backup-policy <backup-policy-name> --set backupRepoName=<backup-repo-name>
+  
+  # enable encryption
+  kbcli cluster edit-backup-policy <backup-policy-name> --set encryption.algorithm=AES-256-CFB --set encryption.passPhrase="SECRET!"
+  
+  # disable encryption
+  kbcli cluster edit-backup-policy <backup-policy-name> --set encryption.disabled=true
   
   # using short cmd to edit backup policy
   kbcli cluster edit-bp <backup-policy-name>

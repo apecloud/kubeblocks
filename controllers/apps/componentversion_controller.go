@@ -126,7 +126,7 @@ func (r *ComponentVersionReconciler) compatibleCompVersion(ctx context.Context, 
 func (r *ComponentVersionReconciler) isCompatibleWith(compDef appsv1.ComponentDefinition, compVer appsv1.ComponentVersion) bool {
 	for _, rule := range compVer.Spec.CompatibilityRules {
 		for _, name := range rule.CompDefs {
-			if component.PrefixOrRegexMatched(compDef.Name, name) {
+			if component.RegexMatched(compDef.Name, name) {
 				return true
 			}
 		}
@@ -421,7 +421,7 @@ func resolveCompDefinitionNServiceVersion(ctx context.Context, cli client.Reader
 	// component definitions that support the service version
 	compatibleCompDefs := serviceVersionToCompDefs[serviceVersion]
 	if len(compatibleCompDefs) == 0 {
-		return compDef, serviceVersion, fmt.Errorf("no matched component definition found: %s", compDefName)
+		return compDef, serviceVersion, fmt.Errorf(`no matched component definition found with componentDef "%s" and serviceVersion "%s"`, compDefName, serviceVersion)
 	}
 
 	// choose the latest one
@@ -478,7 +478,7 @@ func serviceVersionToCompDefinitions(ctx context.Context, cli client.Reader,
 // compatibleServiceVersions4Definition returns all service versions that are compatible with specified component definition.
 func compatibleServiceVersions4Definition(compDef *appsv1.ComponentDefinition, compVersion *appsv1.ComponentVersion) sets.Set[string] {
 	match := func(pattern string) bool {
-		return component.PrefixOrRegexMatched(compDef.Name, pattern)
+		return component.RegexMatched(compDef.Name, pattern)
 	}
 	releases := make(map[string]bool, 0)
 	for _, rule := range compVersion.Spec.CompatibilityRules {

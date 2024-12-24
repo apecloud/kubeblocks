@@ -460,7 +460,7 @@ func (r *backupPolicyBuilder) resolveBackupMethodEnv(compSpec *appsv1.ClusterCom
 
 func (r *backupPolicyBuilder) matchMappingName(names []string, target string) bool {
 	for _, name := range names {
-		if component.PrefixOrRegexMatched(target, name) {
+		if component.RegexMatched(target, name) {
 			return true
 		}
 	}

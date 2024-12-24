@@ -11,18 +11,17 @@ kbcli dataprotection describe-backup-policy [flags]
 ### Examples
 
 ```
-  # describe a backup policy
-  kbcli cluster describe-backup-policy mypolicy
+  # describe the default backup policy of the cluster
+  kbcli dp describe-backup-policy cluster-name
   
-  # describe the default backup policy of the specified cluster
-  kbcli cluster describe-backup-policy --cluster mycluster
+  # describe the backup policy of the cluster with specified name
+  kbcli dp describe-backup-policy cluster-name --name backup-policy-name
 ```
 
 ### Options
 
 ```
-      --cluster strings   The cluster name
-  -h, --help              help for describe-backup-policy
+  -h, --help   help for describe-backup-policy
 ```
 
 ### Options inherited from parent commands
@@ -35,6 +34,7 @@ kbcli dataprotection describe-backup-policy [flags]
       --certificate-authority string   Path to a cert file for the certificate authority
       --client-certificate string      Path to a client certificate file for TLS
       --client-key string              Path to a client key file for TLS
+      --cluster string                 The name of the kubeconfig cluster to use
       --context string                 The name of the kubeconfig context to use
       --disable-compression            If true, opt-out of response compression for all requests to the server
       --insecure-skip-tls-verify       If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure

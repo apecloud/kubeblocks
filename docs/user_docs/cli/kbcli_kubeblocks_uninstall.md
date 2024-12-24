@@ -20,10 +20,11 @@ kbcli kubeblocks uninstall [flags]
 ```
       --auto-approve       Skip interactive approval before uninstalling KubeBlocks
   -h, --help               help for uninstall
+  -n, --namespace string   KubeBlocks namespace
       --remove-namespace   Remove default created "kb-system" namespace or not
       --remove-pvcs        Remove PersistentVolumeClaim or not
       --remove-pvs         Remove PersistentVolume or not
-      --timeout duration   Time to wait for uninstalling KubeBlocks, such as --timeout=5m (default 5m0s)
+      --timeout duration   Time to wait for uninstalling KubeBlocks, such as --timeout=5m (default 10m0s)
       --wait               Wait for KubeBlocks to be uninstalled, including all the add-ons. It will wait for a --timeout period (default true)
 ```
 
@@ -43,7 +44,6 @@ kbcli kubeblocks uninstall [flags]
       --insecure-skip-tls-verify       If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure
       --kubeconfig string              Path to the kubeconfig file to use for CLI requests.
       --match-server-version           Require server version to match client version
-  -n, --namespace string               If present, the namespace scope for this CLI request
       --request-timeout string         The length of time to wait before giving up on a single server request. Non-zero values should contain a corresponding time unit (e.g. 1s, 2m, 3h). A value of zero means don't timeout requests. (default "0")
   -s, --server string                  The address and port of the Kubernetes API server
       --tls-server-name string         Server name to use for server certificate validation. If it is not provided, the hostname used to contact the server is used

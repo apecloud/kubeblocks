@@ -137,7 +137,7 @@ var _ = Describe("OpsUtil functions", func() {
 			testk8s.MockPodIsTerminating(ctx, testCtx, pods[2])
 			testk8s.RemovePodFinalizer(ctx, testCtx, pods[2])
 			// recreate it
-			pod := testapps.MockInstanceSetPod(&testCtx, nil, clusterName, defaultCompName, pods[2].Name, "follower", "Readonly")
+			pod := testapps.MockInstanceSetPod(&testCtx, nil, clusterName, defaultCompName, pods[2].Name, "follower")
 			// mock pod is failed
 			testk8s.MockPodIsFailed(ctx, testCtx, pod)
 			opsPhase, _, err = compOpsHelper.reconcileActionWithComponentOps(reqCtx, k8sClient, opsRes, "test", handleRestartProgress)

@@ -140,7 +140,7 @@ func MockInstanceSetPods(
 				podRole = noneLeaderRole.Name
 			}
 		}
-		pod := MockInstanceSetPod(testCtx, its, cluster.Name, compName, pName, podRole, "")
+		pod := MockInstanceSetPod(testCtx, its, cluster.Name, compName, pName, podRole)
 		annotations := pod.Annotations
 		if annotations == nil {
 			annotations = make(map[string]string)
@@ -152,14 +152,13 @@ func MockInstanceSetPods(
 }
 
 // MockInstanceSetPod mocks to create the pod of the InstanceSet, just using in envTest
-// TODO: remove accessMode
 func MockInstanceSetPod(
 	testCtx *testutil.TestContext,
 	its *workloads.InstanceSet,
 	clusterName,
 	consensusCompName,
 	podName,
-	podRole, accessMode string,
+	podRole string,
 	resources ...corev1.ResourceRequirements,
 ) *corev1.Pod {
 	var stsUpdateRevision string

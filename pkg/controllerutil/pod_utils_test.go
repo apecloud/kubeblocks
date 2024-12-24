@@ -618,9 +618,8 @@ var _ = Describe("pod utils", func() {
 				compName    = "component"
 				podName     = "pod"
 				role        = "leader"
-				mode        = "ReadWrite"
 			)
-			pod := testapps.MockInstanceSetPod(&testCtx, nil, clusterName, compName, podName, role, mode)
+			pod := testapps.MockInstanceSetPod(&testCtx, nil, clusterName, compName, podName, role)
 			ppod := testapps.NewPodFactory(testCtx.DefaultNamespace, "pod").
 				AddAppInstanceLabel(clusterName).
 				AddAppComponentLabel(compName).

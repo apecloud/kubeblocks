@@ -2,7 +2,7 @@
 title: kbcli cluster upgrade
 ---
 
-Upgrade the cluster version.
+Upgrade the service version(only support to upgrade minor version).
 
 ```
 kbcli cluster upgrade NAME [flags]
@@ -11,19 +11,29 @@ kbcli cluster upgrade NAME [flags]
 ### Examples
 
 ```
-  # upgrade the cluster to the target version
-  kbcli cluster upgrade mycluster --cluster-version=ac-mysql-8.0.30
+  # upgrade the component to the target version
+  kbcli cluster upgrade mycluster --service-version=8.0.30 --components my-comp
+  
+  # upgrade the component with new component definition
+  kbcli cluster upgrade mycluster --component-def=8.0.30 --components my-comp
+  
+  # upgrade the component with new component definition and specified service version
+  kbcli cluster upgrade mycluster --component-def=8.0.30 --service-version=8.0.30  --components my-comp
 ```
 
 ### Options
 
 ```
       --auto-approve                   Skip interactive approval before upgrading the cluster
-      --cluster-version string         Reference cluster version (required)
+      --component-def string           Referring to the ComponentDefinition (default "nil")
+      --components strings             Component names to this operations
       --dry-run string[="unchanged"]   Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent. (default "none")
+      --edit                           Edit the API resource before creating
+      --force                           skip the pre-checks of the opsRequest to run the opsRequest forcibly
   -h, --help                           help for upgrade
-      --name string                    OpsRequest name. if not specified, it will be randomly generated 
+      --name string                    OpsRequest name. if not specified, it will be randomly generated
   -o, --output format                  Prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
+      --service-version string         Referring to the serviceVersion that is provided by ComponentDefinition and ComponentVersion (default "nil")
       --ttlSecondsAfterSucceed int     Time to live after the OpsRequest succeed
 ```
 

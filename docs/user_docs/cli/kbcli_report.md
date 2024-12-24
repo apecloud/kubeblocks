@@ -2,7 +2,7 @@
 title: kbcli report
 ---
 
-report kubeblocks or cluster info.
+Report kubeblocks or cluster info.
 
 ### Options
 

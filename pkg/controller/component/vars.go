@@ -1253,13 +1253,13 @@ func resolveReferentObjects(synthesizedComp *SynthesizedComponent,
 
 func resolveReferentComponents(synthesizedComp *SynthesizedComponent, objRef appsv1.ClusterObjectReference) ([]string, error) {
 	// match the current component when the multiple cluster object option not set
-	if len(objRef.CompDef) == 0 || (PrefixOrRegexMatched(synthesizedComp.CompDefName, objRef.CompDef) && objRef.MultipleClusterObjectOption == nil) {
+	if len(objRef.CompDef) == 0 || (RegexMatched(synthesizedComp.CompDefName, objRef.CompDef) && objRef.MultipleClusterObjectOption == nil) {
 		return []string{synthesizedComp.Name}, nil
 	}
 
 	compNames := make([]string, 0)
 	for k, v := range synthesizedComp.Comp2CompDefs {
-		if PrefixOrRegexMatched(v, objRef.CompDef) {
+		if RegexMatched(v, objRef.CompDef) {
 			compNames = append(compNames, k)
 		}
 	}

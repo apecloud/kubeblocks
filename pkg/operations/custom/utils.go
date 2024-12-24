@@ -58,7 +58,7 @@ func getComponentInfo(opsDef *opsv1alpha1.OpsDefinition, compDefName string) *op
 		return nil
 	}
 	for _, v := range opsDef.Spec.ComponentInfos {
-		if component.PrefixOrRegexMatched(compDefName, v.ComponentDefinitionName) {
+		if component.RegexMatched(compDefName, v.ComponentDefinitionName) {
 			return &v
 		}
 	}

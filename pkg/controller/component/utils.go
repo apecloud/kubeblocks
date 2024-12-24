@@ -43,11 +43,7 @@ func ValidateDefNameRegexp(defNamePattern string) error {
 	return err
 }
 
-func PrefixOrRegexMatched(defName, defNamePattern string) bool {
-	if strings.HasPrefix(defName, defNamePattern) {
-		return true
-	}
-
+func RegexMatched(defName, defNamePattern string) bool {
 	isRegexpPattern := func(pattern string) bool {
 		escapedPattern := regexp.QuoteMeta(pattern)
 		return escapedPattern != pattern

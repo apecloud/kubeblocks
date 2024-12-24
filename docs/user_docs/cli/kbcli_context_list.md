@@ -1,24 +1,17 @@
 ---
-title: kbcli clusterdefinition list-service-reference
+title: kbcli context list
 ---
 
-List cluster references declared in a cluster definition.
+List all created contexts.
 
 ```
-kbcli clusterdefinition list-service-reference [flags]
-```
-
-### Examples
-
-```
-  # List cluster references name declared in a cluster definition.
-  kbcli clusterdefinition list-service-reference orioledb
+kbcli context list [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help   help for list-service-reference
+  -h, --help   help for list
 ```
 
 ### Options inherited from parent commands
@@ -47,7 +40,7 @@ kbcli clusterdefinition list-service-reference [flags]
 
 ### SEE ALSO
 
-* [kbcli clusterdefinition](kbcli_clusterdefinition.md)	 - ClusterDefinition command.
+* [kbcli context](kbcli_context.md)	 - kbcli context allows you to manage cloud context. This command is currently only applicable to cloud, and currently does not support switching the context of the local k8s cluster.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

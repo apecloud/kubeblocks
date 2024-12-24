@@ -98,35 +98,41 @@ kbcli cluster create [NAME] [flags]
 ### Options
 
 ```
-      --backup string                          Set a source backup to restore data
-      --backup-cron-expression string          the cron expression for schedule, the timezone is in UTC. see https://en.wikipedia.org/wiki/Cron.
-      --backup-enabled                         Specify whether enabled automated backup
-      --backup-method string                   the backup method, view it by "kbcli cd describe <cluster-definition>", if not specified, the default backup method will be to take snapshots of the volume
-      --backup-repo-name string                the backup repository name
-      --backup-retention-period string         a time string ending with the 'd'|'D'|'h'|'H' character to describe how long the Backup should be retained (default "1d")
-      --backup-starting-deadline-minutes int   the deadline in minutes for starting the backup job if it misses its scheduled time for any reason
-      --cluster-definition string              Specify cluster definition, run "kbcli cd list" to show all available cluster definitions
-      --cluster-version string                 Specify cluster version, run "kbcli cv list" to show all available cluster versions, use the latest version if not specified
-      --dry-run string[="unchanged"]           Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent. (default "none")
-      --edit                                   Edit the API resource before creating
-      --enable-all-logs                        Enable advanced application all log extraction, set to true will ignore enabledLogs of component level, default is false
-  -h, --help                                   help for create
-      --monitoring-interval uint8              The monitoring interval of cluster, 0 is disabled, the unit is second, any non-zero value means enabling monitoring.
-      --node-labels stringToString             Node label selector (default [])
-  -o, --output format                          Prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
-      --pitr-enabled                           Specify whether enabled point in time recovery
-      --pod-anti-affinity string               Pod anti-affinity type, one of: (Preferred, Required) (default "Preferred")
-      --pvc stringArray                        Set the cluster detail persistent volume claim, each '--pvc' corresponds to a component, and will override the simple configurations about storage by --set (e.g. --pvc type=mysql,name=data,mode=ReadWriteOnce,size=20Gi --pvc type=mysql,name=log,mode=ReadWriteOnce,size=1Gi)
-      --rbac-enabled                           Specify whether rbac resources will be created by kbcli, otherwise KubeBlocks server will try to create rbac resources
-      --restore-to-time string                 Set a time for point in time recovery
-      --service-reference stringArray          Set the other KubeBlocks cluster dependencies, each '--service-reference' corresponds to a cluster service. (e.g --service-reference name=pulsarZookeeper,cluster=zookeeper,namespace=default)
-      --set stringArray                        Set the cluster resource including cpu, memory, replicas and storage, each set corresponds to a component.(e.g. --set cpu=1,memory=1Gi,replicas=3,storage=20Gi or --set class=general-1c1g)
-  -f, --set-file string                        Use yaml file, URL, or stdin to set the cluster resource
-      --tenancy string                         Tenancy options, one of: (SharedNode, DedicatedNode) (default "SharedNode")
-      --termination-policy string              Termination policy, one of: (DoNotTerminate, Halt, Delete, WipeOut) (default "Delete")
-      --tolerations strings                    Tolerations for cluster, such as "key=value:effect, key:effect", for example '"engineType=mongo:NoSchedule", "diskType:NoSchedule"'
-      --topology-keys stringArray              Topology keys for affinity
-      --volume-restore-policy string           the volume claim restore policy, supported values: [Serial, Parallel] (default "Parallel")
+      --annotation stringArray                   Set annotations for cluster
+      --backup string                            Set a source backup to restore data
+      --backup-cron-expression string            the cron expression for schedule, the timezone is in UTC. see https://en.wikipedia.org/wiki/Cron.
+      --backup-enabled                           Specify whether enabled automated backup
+      --backup-method string                     the backup method, view it by "kbcli cd describe <cluster-definition>", if not specified, the default backup method will be to take snapshots of the volume
+      --backup-repo-name string                  the backup repository name
+      --backup-retention-period string           a time string ending with the 'd'|'D'|'h'|'H' character to describe how long the Backup should be retained (default "1d")
+      --backup-starting-deadline-minutes int     the deadline in minutes for starting the backup job if it misses its scheduled time for any reason
+      --cluster-definition string                Specify cluster definition, run "kbcli cd list" to show all available cluster definitions
+      --cluster-version string                   Specify cluster version, run "kbcli cv list" to show all available cluster versions, use the latest version if not specified
+      --cpu-oversell-ratio float                 Set oversell ratio of CPU, set to 10 means 10 times oversell (default 1)
+      --create-only-set                          Create components exclusively configured in 'set'
+      --do-ready-restore-after-cluster-running   do ready restore after cluster running
+      --dry-run string[="unchanged"]             Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent. (default "none")
+      --edit                                     Edit the API resource before creating
+      --enable-all-logs                          Enable advanced application all log extraction, set to true will ignore enabledLogs of component level, default is false
+  -h, --help                                     help for create
+      --label stringArray                        Set labels for cluster resources
+      --memory-oversell-ratio float              Set oversell ratio of memory, set to 10 means 10 times oversell (default 1)
+      --monitoring-interval uint8                The monitoring interval of cluster, 0 is disabled, the unit is second, any non-zero value means enabling monitoring.
+      --node-labels stringToString               Node label selector (default [])
+  -o, --output format                            Prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
+      --pitr-enabled                             Specify whether enabled point in time recovery
+      --pod-anti-affinity string                 Pod anti-affinity type, one of: (Preferred, Required) (default "Preferred")
+      --pvc stringArray                          Set the cluster detail persistent volume claim, each '--pvc' corresponds to a component, and will override the simple configurations about storage by --set (e.g. --pvc type=mysql,name=data,mode=ReadWriteOnce,size=20Gi --pvc type=mysql,name=log,mode=ReadWriteOnce,size=1Gi)
+      --rbac-enabled                             Specify whether rbac resources will be created by kbcli, otherwise KubeBlocks server will try to create rbac resources
+      --restore-to-time string                   Set a time for point in time recovery
+      --service-reference stringArray            Set the other KubeBlocks cluster dependencies, each '--service-reference' corresponds to a cluster service. (e.g --service-reference name=pulsarZookeeper,cluster=zookeeper,namespace=default)
+      --set stringArray                          Set the cluster resource including cpu, memory, replicas and storage, each set corresponds to a component.(e.g. --set cpu=1,memory=1Gi,replicas=3,storage=20Gi or --set class=general-1c1g)
+  -f, --set-file string                          Use yaml file, URL, or stdin to set the cluster resource
+      --tenancy string                           Tenancy options, one of: (SharedNode, DedicatedNode) (default "SharedNode")
+      --termination-policy string                Termination policy, one of: (DoNotTerminate, Halt, Delete, WipeOut) (default "Delete")
+      --tolerations strings                      Tolerations for cluster, such as "key=value:effect, key:effect", for example '"engineType=mongo:NoSchedule", "diskType:NoSchedule"'
+      --topology-keys stringArray                Topology keys for affinity
+      --volume-restore-policy string             the volume claim restore policy, supported values: [Serial, Parallel] (default "Parallel")
 ```
 
 ### Options inherited from parent commands

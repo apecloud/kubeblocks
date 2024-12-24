@@ -46,6 +46,7 @@ kbcli kubeblocks install [flags]
   -f, --values strings               Specify values in a YAML file or a URL (can specify multiple)
       --version string               KubeBlocks version
       --wait                         Wait for KubeBlocks to be ready, including all the auto installed add-ons. It will wait for a --timeout period (default true)
+      --wait-addons                  Wait for auto installed add-ons. It will wait for a --timeout period (default true)
 ```
 
 ### Options inherited from parent commands

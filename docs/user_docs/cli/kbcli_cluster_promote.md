@@ -27,6 +27,7 @@ kbcli cluster promote NAME [--component=<comp-name>] [--instance <instance-name>
       --auto-approve                   Skip interactive approval before promote the instance
       --component string               Specify the component name of the cluster, if the cluster has multiple components, you need to specify a component
       --dry-run string[="unchanged"]   Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent. (default "none")
+      --force                          force switchover if failed
   -h, --help                           help for promote
       --instance string                Specify the instance name as the new primary or leader of the cluster, you can get the instance name by running "kbcli cluster list-instances"
       --name string                    OpsRequest name. if not specified, it will be randomly generated 

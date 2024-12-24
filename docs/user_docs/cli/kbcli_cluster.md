@@ -43,6 +43,7 @@ Cluster command.
 * [kbcli cluster connect](kbcli_cluster_connect.md)	 - Connect to a cluster or instance.
 * [kbcli cluster create](kbcli_cluster_create.md)	 - Create a cluster.
 * [kbcli cluster create-account](kbcli_cluster_create-account.md)	 - Create account for a cluster
+* [kbcli cluster custom-ops](kbcli_cluster_custom-ops.md)	 - 
 * [kbcli cluster delete](kbcli_cluster_delete.md)	 - Delete clusters.
 * [kbcli cluster delete-account](kbcli_cluster_delete-account.md)	 - Delete account for a cluster
 * [kbcli cluster delete-backup](kbcli_cluster_delete-backup.md)	 - Delete a backup.

@@ -5,7 +5,7 @@ title: kbcli cluster edit-config
 Edit the config file of the component.
 
 ```
-kbcli cluster edit-config NAME [--component=component-name] [--config-spec=config-spec-name] [--config-file=config-file] [flags]
+kbcli cluster edit-config NAME [--components=component-name] [--config-spec=config-spec-name] [--config-file=config-file] [flags]
 ```
 
 ### Examples
@@ -18,7 +18,7 @@ kbcli cluster edit-config NAME [--component=component-name] [--config-spec=confi
 ### Options
 
 ```
-      --component string               Specify the name of Component to be updated. If the cluster has only one component, unset the parameter.
+      --components strings             Component names to this operations
       --config-file string             Specify the name of the configuration file to be updated (e.g. for mysql: --config-file=my.cnf). For available templates and configs, refer to: 'kbcli cluster describe-config'.
       --config-spec string             Specify the name of the configuration template to be updated (e.g. for apecloud-mysql: --config-spec=mysql-3node-tpl). For available templates and configs, refer to: 'kbcli cluster describe-config'.
       --dry-run string[="unchanged"]   Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent. (default "none")

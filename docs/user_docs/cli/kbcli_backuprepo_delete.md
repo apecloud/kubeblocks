@@ -1,24 +1,24 @@
 ---
-title: kbcli backup describe
+title: kbcli backuprepo delete
 ---
 
-Describe a backup
+Delete a backup repository.
 
 ```
-kbcli backup describe [flags]
+kbcli backuprepo delete [flags]
 ```
 
 ### Examples
 
 ```
-  # describe a backup
-  kbcli backup describe mybackup
+  # Delete a backuprepo
+  kbcli backuprepo delete my-backuprepo
 ```
 
 ### Options
 
 ```
-  -h, --help   help for describe
+  -h, --help   help for delete
 ```
 
 ### Options inherited from parent commands
@@ -47,7 +47,7 @@ kbcli backup describe [flags]
 
 ### SEE ALSO
 
-* [kbcli backup](kbcli_backup.md)	 - Backup command.
+* [kbcli backuprepo](kbcli_backuprepo.md)	 - BackupRepo command.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

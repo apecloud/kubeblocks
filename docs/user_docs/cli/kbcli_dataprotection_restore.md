@@ -18,10 +18,11 @@ kbcli dataprotection restore [flags]
 ### Options
 
 ```
-      --cluster string                 The cluster to restore
-  -h, --help                           help for restore
-      --restore-to-time string         point in time recovery(PITR)
-      --volume-restore-policy string   the volume claim restore policy, supported values: [Serial, Parallel] (default "Parallel")
+      --cluster string                   The cluster to restore
+      --effective-common-component-def   this backup will be restored for all components which refer to common ComponentDefinition.
+  -h, --help                             help for restore
+      --restore-to-time string           point in time recovery(PITR)
+      --volume-restore-policy string     the volume claim restore policy, supported values: [Serial, Parallel] (default "Parallel")
 ```
 
 ### Options inherited from parent commands

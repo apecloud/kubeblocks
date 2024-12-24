@@ -21,20 +21,32 @@ kbcli cluster create redis NAME [flags]
 ### Options
 
 ```
-      --availability-policy string   The availability policy of cluster. Legal values [none, node, zone]. (default "node")
-      --cpu float                    CPU cores. Value range [0.5, 64]. (default 0.5)
-  -h, --help                         help for redis
-      --host-network-accessible      Specify whether the cluster can be accessed from within the VPC.
-      --memory float                 Memory, the unit is Gi. Value range [0.5, 1000]. (default 0.5)
-      --mode string                  Cluster topology mode. Legal values [standalone, replication]. (default "standalone")
-      --monitoring-interval int      The monitoring interval of cluster, 0 is disabled, the unit is second. Value range [0, 60].
-      --publicly-accessible          Specify whether the cluster can be accessed from the public internet.
-      --rbac-enabled                 Specify whether rbac resources will be created by client, otherwise KubeBlocks server will try to create rbac resources.
-      --replicas int                 The number of replicas, for standalone mode, the replicas is 1, for replication mode, the default replicas is 2. Value range [1, 5]. (default 1)
-      --storage float                Storage size, the unit is Gi. Value range [1, 10000]. (default 20)
-      --tenancy string               The tenancy of cluster. Legal values [SharedNode, DedicatedNode]. (default "SharedNode")
-      --termination-policy string    The termination policy of cluster. Legal values [DoNotTerminate, Halt, Delete, WipeOut]. (default "Delete")
-      --version string               Cluster version.
+      --availability-policy string        The availability policy of cluster. Legal values [none, node, zone]. (default "node")
+      --cpu float                         CPU cores. Value range [0.5, 64]. (default 0.5)
+  -h, --help                              help for redis
+      --host-network-accessible           Specify whether the cluster can be accessed from within the VPC.
+      --memory float                      Memory, the unit is Gi. Value range [0.5, 1000]. (default 0.5)
+      --mode string                       Cluster topology mode. Legal values [standalone, replication, cluster, sentinel]. (default "replication")
+      --monitoring-interval int           The monitoring interval of cluster, 0 is disabled, the unit is second. Value range [0, 60].
+      --node-port-enabled                 Whether NodePort service is enabled, default is true
+      --publicly-accessible               Specify whether the cluster can be accessed from the public internet.
+      --rbac-enabled                      Specify whether rbac resources will be created by client, otherwise KubeBlocks server will try to create rbac resources.
+      --redis-cluster.shard-count float   The number of shards in the redis cluster Value range [3, 2048]. (default 3)
+      --replicas int                      The number of replicas, for standalone mode, the replicas is 1, for replication mode, the default replicas is 2. Value range [1, 5]. (default 1)
+      --sentinel.cpu float                Sentinel component cpu cores. Value range [0.1, 8]. (default 0.2)
+      --sentinel.enabled                  Whether have sentinel component, default is true (default true)
+      --sentinel.memory float             Sentinel component memory, the unit is Gi. Value range [0.1, 4]. (default 0.2)
+      --sentinel.replicas float           Sentinel component replicas Value range [1, 5]. (default 3)
+      --sentinel.storage float            Sentinel component storage size, the unit is Gi. Value range [1, 1024]. (default 20)
+      --storage float                     Storage size, the unit is Gi. Value range [1, 10000]. (default 20)
+      --tenancy string                    The tenancy of cluster. Legal values [SharedNode, DedicatedNode]. (default "SharedNode")
+      --termination-policy string         The termination policy of cluster. Legal values [DoNotTerminate, Halt, Delete, WipeOut]. (default "Delete")
+      --twemproxy.cpu float               twemproxy component cpu cores. Value range [0.1, 8]. (default 0.2)
+      --twemproxy.enabled                 Whether have twemproxy component, default is false
+      --twemproxy.memory float            twemproxy component memory, the unit is Gi. Value range [0.1, 4]. (default 0.2)
+      --twemproxy.replicas float          twemproxy component replicas Value range [1, 5]. (default 3)
+      --use-legacy-comp-def               if useLegacyCompDef is false ,cluster will be rendered by compDef rather than componentDefRef in cluster definition
+      --version string                    Cluster version.
 ```
 
 ### Options inherited from parent commands

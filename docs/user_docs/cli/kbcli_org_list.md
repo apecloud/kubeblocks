@@ -1,24 +1,17 @@
 ---
-title: kbcli clusterdefinition list-service-reference
+title: kbcli org list
 ---
 
-List cluster references declared in a cluster definition.
+List all organizations you have joined.
 
 ```
-kbcli clusterdefinition list-service-reference [flags]
-```
-
-### Examples
-
-```
-  # List cluster references name declared in a cluster definition.
-  kbcli clusterdefinition list-service-reference orioledb
+kbcli org list [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help   help for list-service-reference
+  -h, --help   help for list
 ```
 
 ### Options inherited from parent commands
@@ -47,7 +40,7 @@ kbcli clusterdefinition list-service-reference [flags]
 
 ### SEE ALSO
 
-* [kbcli clusterdefinition](kbcli_clusterdefinition.md)	 - ClusterDefinition command.
+* [kbcli org](kbcli_org.md)	 - kbcli org is used to manage cloud organizations and is only suitable for interacting with cloud.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

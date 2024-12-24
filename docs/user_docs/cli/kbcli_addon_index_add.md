@@ -1,31 +1,27 @@
 ---
-title: kbcli backup list
+title: kbcli addon index add
 ---
 
-List backups.
+Add a new addon index
+
+### Synopsis
+
+Configure a new index to install KubeBlocks addon from.
 
 ```
-kbcli backup list [flags]
+kbcli addon index add [flags]
 ```
 
 ### Examples
 
 ```
-  # list all backups
-  kbcli backup list
-  
-  # list all backups of specified cluster
-  kbcli backup list --cluster mycluster
+kbcli addon index add kubeblocks https://github.com/apecloud/block-index.git
 ```
 
 ### Options
 
 ```
-      --cluster string    List backups in the specified cluster
-  -h, --help              help for list
-  -o, --output format     prints the output in the specified format. Allowed values: table, json, yaml, wide (default table)
-  -l, --selector string   Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2). Matching objects must satisfy all of the specified label constraints.
-      --show-labels       When printing, show all labels as the last column (default hide labels column)
+  -h, --help   help for add
 ```
 
 ### Options inherited from parent commands
@@ -38,6 +34,7 @@ kbcli backup list [flags]
       --certificate-authority string   Path to a cert file for the certificate authority
       --client-certificate string      Path to a client certificate file for TLS
       --client-key string              Path to a client key file for TLS
+      --cluster string                 The name of the kubeconfig cluster to use
       --context string                 The name of the kubeconfig context to use
       --disable-compression            If true, opt-out of response compression for all requests to the server
       --insecure-skip-tls-verify       If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure
@@ -53,7 +50,7 @@ kbcli backup list [flags]
 
 ### SEE ALSO
 
-* [kbcli backup](kbcli_backup.md)	 - Backup command.
+* [kbcli addon index](kbcli_addon_index.md)	 - Manage custom addon indexes
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

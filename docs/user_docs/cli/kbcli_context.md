@@ -1,25 +1,26 @@
 ---
-title: kbcli bench pgbench prepare
+title: kbcli context
 ---
 
-Prepare pgbench test data for a PostgreSQL cluster
-
-```
-kbcli bench pgbench prepare [ClusterName] [flags]
-```
+kbcli context allows you to manage cloud context. This command is currently only applicable to cloud, and currently does not support switching the context of the local k8s cluster.
 
 ### Examples
 
 ```
-  # pgbench prepare data on a cluster
-  kbcli bench pgbench prepare pgcluster --database postgres --user xxx --password xxx --scale 100
+  // Get the context name currently used by the user.
+  kbcli context current
+  // List all contexts created by the current user.
+  kbcli context list
+  // Get the description information of context context1.
+  kbcli context describe context1
+  // Switch to context context2.
+  kbcli context use context2
 ```
 
 ### Options
 
 ```
-  -h, --help        help for prepare
-      --scale int   The scale factor to use for pgbench (default 1)
+  -h, --help   help for context
 ```
 
 ### Options inherited from parent commands
@@ -34,25 +35,25 @@ kbcli bench pgbench prepare [ClusterName] [flags]
       --client-key string              Path to a client key file for TLS
       --cluster string                 The name of the kubeconfig cluster to use
       --context string                 The name of the kubeconfig context to use
-      --database string                database name
       --disable-compression            If true, opt-out of response compression for all requests to the server
-      --host string                    the host of database
       --insecure-skip-tls-verify       If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure
       --kubeconfig string              Path to the kubeconfig file to use for CLI requests.
       --match-server-version           Require server version to match client version
   -n, --namespace string               If present, the namespace scope for this CLI request
-      --password string                the password of database
-      --port int                       the port of database
       --request-timeout string         The length of time to wait before giving up on a single server request. Non-zero values should contain a corresponding time unit (e.g. 1s, 2m, 3h). A value of zero means don't timeout requests. (default "0")
   -s, --server string                  The address and port of the Kubernetes API server
       --tls-server-name string         Server name to use for server certificate validation. If it is not provided, the hostname used to contact the server is used
       --token string                   Bearer token for authentication to the API server
-      --user string                    the user of database
+      --user string                    The name of the kubeconfig user to use
 ```
 
 ### SEE ALSO
 
-* [kbcli bench pgbench](kbcli_bench_pgbench.md)	 - Run pgbench against a PostgreSQL cluster
+
+* [kbcli context current](kbcli_context_current.md)	 - Get the currently used context.
+* [kbcli context describe](kbcli_context_describe.md)	 - Get the description information of a context.
+* [kbcli context list](kbcli_context_list.md)	 - List all created contexts.
+* [kbcli context use](kbcli_context_use.md)	 - Use another context that you have already created.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

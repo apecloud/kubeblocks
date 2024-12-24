@@ -1,33 +1,17 @@
 ---
-title: kbcli backup create
+title: kbcli addon search
 ---
 
-Create a backup for the cluster.
+Search the addon from index
 
 ```
-kbcli backup create NAME [flags]
-```
-
-### Examples
-
-```
-  # Create a backup for the cluster
-  kbcli backup create mybackup --cluster mycluster
-  
-  # create a snapshot backup
-  kbcli backup create mybackup --cluster mycluster --type snapshot
-  
-  # create a backup with specified policy
-  kbcli backup create mybackup --cluster mycluster --policy mypolicy
+kbcli addon search [flags]
 ```
 
 ### Options
 
 ```
-      --cluster string   Cluster name
-  -h, --help             help for create
-      --method string    Backup type (default "snapshot")
-      --policy string    Backup policy name, this flag will be ignored when backup-type is snapshot
+  -h, --help   help for search
 ```
 
 ### Options inherited from parent commands
@@ -40,6 +24,7 @@ kbcli backup create NAME [flags]
       --certificate-authority string   Path to a cert file for the certificate authority
       --client-certificate string      Path to a client certificate file for TLS
       --client-key string              Path to a client key file for TLS
+      --cluster string                 The name of the kubeconfig cluster to use
       --context string                 The name of the kubeconfig context to use
       --disable-compression            If true, opt-out of response compression for all requests to the server
       --insecure-skip-tls-verify       If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure
@@ -55,7 +40,7 @@ kbcli backup create NAME [flags]
 
 ### SEE ALSO
 
-* [kbcli backup](kbcli_backup.md)	 - Backup command.
+* [kbcli addon](kbcli_addon.md)	 - Addon command.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

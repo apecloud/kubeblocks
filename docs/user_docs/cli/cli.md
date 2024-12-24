@@ -11,7 +11,12 @@ Addon command.
 * [kbcli addon describe](kbcli_addon_describe.md)	 - Describe an addon specification.
 * [kbcli addon disable](kbcli_addon_disable.md)	 - Disable an addon.
 * [kbcli addon enable](kbcli_addon_enable.md)	 - Enable an addon.
+* [kbcli addon index](kbcli_addon_index.md)	 - Manage custom addon indexes
+* [kbcli addon install](kbcli_addon_install.md)	 - Install KubeBlocks addon
 * [kbcli addon list](kbcli_addon_list.md)	 - List addons.
+* [kbcli addon search](kbcli_addon_search.md)	 - Search the addon from index
+* [kbcli addon uninstall](kbcli_addon_uninstall.md)	 - Uninstall an existed addon
+* [kbcli addon upgrade](kbcli_addon_upgrade.md)	 - Upgrade an existed addon to latest version or a specified version
 
 
 ## [alert](kbcli_alert.md)
@@ -29,7 +34,8 @@ Manage alert receiver, include add, list and delete receiver.
 
 BackupRepo command.
 
-* [kbcli backuprepo create](kbcli_backuprepo_create.md)	 - Create a backup repo
+* [kbcli backuprepo create](kbcli_backuprepo_create.md)	 - Create a backup repository
+* [kbcli backuprepo delete](kbcli_backuprepo_delete.md)	 - Delete a backup repository.
 * [kbcli backuprepo describe](kbcli_backuprepo_describe.md)	 - Describe a backup repository.
 * [kbcli backuprepo list](kbcli_backuprepo_list.md)	 - List Backup Repositories.
 * [kbcli backuprepo update](kbcli_backuprepo_update.md)	 - Update a backup repository.
@@ -76,6 +82,7 @@ Cluster command.
 * [kbcli cluster connect](kbcli_cluster_connect.md)	 - Connect to a cluster or instance.
 * [kbcli cluster create](kbcli_cluster_create.md)	 - Create a cluster.
 * [kbcli cluster create-account](kbcli_cluster_create-account.md)	 - Create account for a cluster
+* [kbcli cluster custom-ops](kbcli_cluster_custom-ops.md)	 - 
 * [kbcli cluster delete](kbcli_cluster_delete.md)	 - Delete clusters.
 * [kbcli cluster delete-account](kbcli_cluster_delete-account.md)	 - Delete account for a cluster
 * [kbcli cluster delete-backup](kbcli_cluster_delete-backup.md)	 - Delete a backup.

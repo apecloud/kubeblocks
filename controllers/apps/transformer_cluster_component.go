@@ -28,6 +28,7 @@ import (
 	"strings"
 
 	"golang.org/x/exp/maps"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -822,69 +823,94 @@ func (h *clusterShardingHandler) updateComps(transCtx *clusterTransformContext, 
 }
 
 func (h *clusterShardingHandler) protoComps(transCtx *clusterTransformContext, name string, running *appsv1.Component) ([]*appsv1.Component, error) {
-	buildAnnotations := func(shardingName, compName string) map[string]string {
-		var annotations map[string]string
-		if compAnnotations := transCtx.annotations[compName]; len(compAnnotations) > 0 {
-			annotations = maps.Clone(compAnnotations)
-		}
-
-		// convert the sharding hostNetwork annotation to the component annotation
-		if hnKey, ok := transCtx.Cluster.Annotations[constant.HostNetworkAnnotationKey]; ok {
-			hns := strings.Split(hnKey, ",")
-			if slices.Index(hns, shardingName) >= 0 {
-				if annotations == nil {
-					annotations = make(map[string]string)
-				}
-				annotations[constant.HostNetworkAnnotationKey] = compName
-			}
-		}
-		return annotations
-	}
-
-	build := func(sharding *appsv1.ClusterSharding) ([]*appsv1.Component, error) {
-		labels := map[string]string{
-			constant.KBAppShardingNameLabelKey: sharding.Name,
-		}
-		if len(sharding.ShardingDef) > 0 {
-			labels[constant.ShardingDefLabelKey] = sharding.ShardingDef
-		}
-
-		objs := make([]*appsv1.Component, 0)
-
-		shardingComps := transCtx.shardingComps[sharding.Name]
-		for i := range shardingComps {
-			spec := shardingComps[i]
-			annotations := buildAnnotations(sharding.Name, spec.Name)
-			obj, err := buildComponentWrapper(transCtx, spec, labels, annotations, running)
-			if err != nil {
-				return nil, err
-			}
-			objs = append(objs, obj)
-		}
-		return objs, nil
-	}
-
 	for _, sharding := range transCtx.shardings {
 		if sharding.Name == name {
-			return build(sharding)
+			return h.buildComps(transCtx, sharding, running)
 		}
 	}
 	return nil, fmt.Errorf("cluster sharding %s not found", name)
 }
 
-// func initClusterCompNShardingStatus(transCtx *clusterTransformContext, name string) {
-//	var (
-//		cluster = transCtx.Cluster
-//	)
-//	m := &cluster.Status.Components
-//	if transCtx.sharding(name) {
-//		m = &cluster.Status.Shardings
-//	}
-//	if *m == nil {
-//		*m = make(map[string]appsv1.ClusterComponentStatus)
-//	}
-//	(*m)[name] = appsv1.ClusterComponentStatus{}
-// }
+func (h *clusterShardingHandler) buildComps(transCtx *clusterTransformContext,
+	sharding *appsv1.ClusterSharding, running *appsv1.Component) ([]*appsv1.Component, error) {
+	objs := make([]*appsv1.Component, 0)
+	shardingComps := transCtx.shardingComps[sharding.Name]
+	for i := range shardingComps {
+		spec := shardingComps[i]
+		labels := h.buildLabels(sharding)
+		annotations := h.buildAnnotations(transCtx, sharding.Name, spec.Name)
+		obj, err := buildComponentWrapper(transCtx, spec, labels, annotations, running)
+		if err != nil {
+			return nil, err
+		}
+		h.buildShardPodAntiAffinity(transCtx, sharding.Name, spec.Name, obj)
+		objs = append(objs, obj)
+	}
+	return objs, nil
+}
+
+func (h *clusterShardingHandler) buildLabels(sharding *appsv1.ClusterSharding) map[string]string {
+	labels := map[string]string{
+		constant.KBAppShardingNameLabelKey: sharding.Name,
+	}
+	if len(sharding.ShardingDef) > 0 {
+		labels[constant.ShardingDefLabelKey] = sharding.ShardingDef
+	}
+	return labels
+}
+
+func (h *clusterShardingHandler) buildAnnotations(transCtx *clusterTransformContext, shardingName, compName string) map[string]string {
+	var annotations map[string]string
+	if compAnnotations := transCtx.annotations[compName]; len(compAnnotations) > 0 {
+		annotations = maps.Clone(compAnnotations)
+	}
+
+	// convert the sharding hostNetwork annotation to the component annotation
+	if hnKey, ok := transCtx.Cluster.Annotations[constant.HostNetworkAnnotationKey]; ok {
+		hns := strings.Split(hnKey, ",")
+		if slices.Index(hns, shardingName) >= 0 {
+			if annotations == nil {
+				annotations = make(map[string]string)
+			}
+			annotations[constant.HostNetworkAnnotationKey] = compName
+		}
+	}
+	return annotations
+}
+
+func (h *clusterShardingHandler) buildShardPodAntiAffinity(transCtx *clusterTransformContext,
+	shardingName, compName string, comp *appsv1.Component) {
+	var (
+		cluster = transCtx.Cluster
+	)
+	key := cluster.Annotations[constant.ShardPodAntiAffinityAnnotationKey]
+	if !slices.Contains(strings.Split(key, ","), shardingName) {
+		return
+	}
+
+	shardPodAntiAffinity := corev1.PodAffinityTerm{
+		LabelSelector: &metav1.LabelSelector{
+			MatchLabels: constant.GetCompLabels(cluster.Name, compName,
+				map[string]string{constant.KBAppShardingNameLabelKey: shardingName}),
+		},
+		TopologyKey: corev1.LabelHostname,
+	}
+
+	if comp.Spec.SchedulingPolicy == nil {
+		comp.Spec.SchedulingPolicy = &appsv1.SchedulingPolicy{}
+	}
+	if comp.Spec.SchedulingPolicy.Affinity == nil {
+		comp.Spec.SchedulingPolicy.Affinity = &corev1.Affinity{}
+	}
+	if comp.Spec.SchedulingPolicy.Affinity.PodAntiAffinity == nil {
+		comp.Spec.SchedulingPolicy.Affinity.PodAntiAffinity = &corev1.PodAntiAffinity{}
+	}
+	if comp.Spec.SchedulingPolicy.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution == nil {
+		comp.Spec.SchedulingPolicy.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = []corev1.PodAffinityTerm{}
+	}
+	comp.Spec.SchedulingPolicy.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(
+		comp.Spec.SchedulingPolicy.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution, shardPodAntiAffinity)
+}
 
 func clusterRunningCompNShardingSet(ctx context.Context, cli client.Reader, cluster *appsv1.Cluster) (sets.Set[string], error) {
 	compList := &appsv1.ComponentList{}

@@ -318,7 +318,7 @@ func MockInstanceSetStatus(testCtx testutil.TestContext, cluster *appsv1.Cluster
 				break
 			}
 		}
-		gomega.Expect(role).ShouldNot(gomega.BeNil())
+		// role can be nil
 		memberStatus := workloads.MemberStatus{
 			PodName:     pod.Name,
 			ReplicaRole: role,

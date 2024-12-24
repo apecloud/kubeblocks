@@ -214,10 +214,6 @@ If your cluster is on AWS, install the AWS Load Balancer Controller first.
 
 </Tabs>
 
-## Monitor the database
-
-The monitoring function of Qdrant is the same as other engines. For details, refer to [the monitoring tutorial](./../observability/monitor-database.md).
-
 ## Scale
 
 The scaling function for Qdrant is also supported.

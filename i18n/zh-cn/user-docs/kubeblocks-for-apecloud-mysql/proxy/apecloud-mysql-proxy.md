@@ -603,107 +603,6 @@ kbcli cluster logs myproxy --instance myproxy-mysql-0 -c vttablet
 
 </Tabs>
 
-## 监控
-
-:::note
-
-在生产环境安装 KubeBlocks 时，所有监控插件默认处于禁用状态。你可以自行启用这些插件，但强烈建议你构建自己的监控系统或购买第三方监控服务。详情请参考[监控](./../../observability/monitor-database.md)。
-
-:::
-
-<Tabs>
-
-<TabItem value="kubectl" label="kubectl" default>
-
-1. 启用监控引擎。
-
-   对于测试或演示环境，可执行以下命令，启用 KubeBlocks 提供的监控引擎。您可将 `prometheus` 替换为其他需要开启的监控引擎名称。
-
-   ```bash
-   helm install prometheus kubeblocks/prometheus --namespace kb-system --create-namespace
-   helm install grafana kubeblocks/grafana --namespace kb-system --create-namespace
-   ```
-
-   对于生产环境，您可以集成监控组件。可参考监控工具提供的相关文档查看集成细节。
-
-2. 检查当前代理集群的监控功能是否启用。
-
-   ```bash
-   kubectl get cluster myproxy -o yaml
-   ```
-
-   如果输出的 YAML 文件中显示 `disableExporter: false`，则表示该集群的监控功能已开启。
-
-   如果监控功能未开启，可执行以下命令启用监控功能。
-
-   ```bash
-   kubectl patch cluster mycluster -n demo --type "json" -p '[{"op":"add","path":"/spec/componentSpecs/0/disableExporter","value":false}]'
-   ```
-
-3. 查看监控大盘。
-
-   对于测试或演示环境，可执行以下命令查看 Grafana 大盘。
-
-   ```bash
-   # 1. 获取用户名及密码 
-   kubectl get secret grafana -n kb-system -o jsonpath='{.data.admin-user}' |base64 -d
-
-   kubectl get secret grafana -n kb-system -o jsonpath='{.data.admin-password}' |base64 -d
-
-   # 2. 连接至 Grafana 大盘
-   kubectl port-forward svc/grafana -n kb-system 3000:8
-
-   # 3. 打开浏览器，输入地址 127.0.0.1:3000，查看大盘
-
-   # 4. 输入步骤 1 中获取的用户名及密码
-   ```
-
-   对于生产环境，您可以通过 Grafana Web 控制台查看对应集群的大盘。可查看 [Grafana 大盘文档](https://grafana.com/docs/grafana/latest/dashboards/) 查看配置细节。
-
-:::note
-
-1. 如果大盘中无数据，您可检查 job 是否为 `kubeblocks-service`。如果不是，可在 job 字段中输入 `kubeblocks-service` 并按回车键跳转。
-
-   ![Monitoring dashboard](./../../../img/api-monitoring.png)
-
-2. 更多关于监控功能的细节，可查看 [监控](./../../observability/monitor-database.md) 文档。
-
-:::
-
-</TabItem>
-
-<TabItem value="kbcli" label="kbcli">
-
-1. 启用监控功能。
-
-   ```bash
-   kbcli cluster update myproxy --monitor=true
-   ```
-
-2. 查看插件列表并启用 Grafana 插件。
-
-   ```bash
-   kbcli addon list 
-   
-   kbcli addon enable grafana
-   ```
-
-3. 查看仪表盘列表。
-
-   ```bash
-   kbcli dashboard list
-   ```
-
-4. 打开 Grafana 仪表盘。
-
-   ```bash
-   kbcli dashboard open kubeblocks-grafana
-   ```
-
-</TabItem>
-
-</Tabs>
-
 ## 读写分离
 
 你可以启用读写分离功能。
@@ -774,7 +673,7 @@ kbcli cluster configure myproxy --components vtgate --set=read_write_splitting_p
 kbcli cluster configure myproxy --components vtgate --set=read_write_splitting_ratio=70
 ```
 
-此外，你还可以[使用 Grafana](#监控) 或在 VTGate 终端中执行 `show workload` 来查看流量分布。
+此外，你还可以在 VTGate 终端中执行 `show workload` 来查看流量分布。
 
 ```bash
 show workload;

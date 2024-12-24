@@ -100,6 +100,7 @@ var _ = Describe("Backup Controller test", func() {
 	When("with default settings", func() {
 		var (
 			actionSet    *dpv1alpha1.ActionSet
+			incActionSet *dpv1alpha1.ActionSet
 			backupPolicy *dpv1alpha1.BackupPolicy
 			repoPVCName  string
 			cluster      *kbappsv1.Cluster
@@ -108,8 +109,9 @@ var _ = Describe("Backup Controller test", func() {
 		)
 
 		BeforeEach(func() {
-			By("creating an actionSet")
-			actionSet = testdp.NewFakeActionSet(&testCtx)
+			By("creating actionSets")
+			actionSet = testdp.NewFakeActionSet(&testCtx, nil)
+			incActionSet = testdp.NewFakeIncActionSet(&testCtx)
 
 			By("creating storage provider")
 			_ = testdp.NewFakeStorageProvider(&testCtx, nil)
@@ -117,7 +119,7 @@ var _ = Describe("Backup Controller test", func() {
 			By("creating backup repo")
 			_, repoPVCName = testdp.NewFakeBackupRepo(&testCtx, nil)
 
-			By("creating a backupPolicy from actionSet: " + actionSet.Name)
+			By("creating a backupPolicy from actionSets: " + actionSet.Name + ", " + incActionSet.Name)
 			backupPolicy = testdp.NewFakeBackupPolicy(&testCtx, nil)
 
 			cluster = clusterInfo.Cluster
@@ -365,7 +367,7 @@ var _ = Describe("Backup Controller test", func() {
 			})).Should(Succeed())
 		})
 
-		It("create an backup using fallbackLabelSelector", func() {
+		It("create a backup using fallbackLabelSelector", func() {
 			podFactory := func(name string) *testapps.MockPodFactory {
 				return testapps.NewPodFactory(testCtx.DefaultNamespace, name).
 					AddAppInstanceLabel(testdp.ClusterName).
@@ -779,6 +781,183 @@ var _ = Describe("Backup Controller test", func() {
 				})).Should(Succeed())
 			})
 		})
+
+		Context("create incremental backup", func() {
+			const (
+				incBackupName = "inc-backup-"
+				scheduleName  = "schedule"
+			)
+			var (
+				fullBackup    *dpv1alpha1.Backup
+				fullBackupKey types.NamespacedName
+				now           = metav1.Now()
+			)
+
+			getJobKey := func(bp *dpv1alpha1.Backup) client.ObjectKey {
+				return client.ObjectKey{
+					Name:      dpbackup.GenerateBackupJobName(bp, dpbackup.BackupDataJobNamePrefix+"-0"),
+					Namespace: bp.Namespace,
+				}
+			}
+
+			newFakeIncBackup := func(name, parentName string, scheduled bool) *dpv1alpha1.Backup {
+				return testdp.NewFakeBackup(&testCtx, func(backup *dpv1alpha1.Backup) {
+					backup.Name = name
+					backup.Spec.BackupMethod = testdp.IncBackupMethodName
+					backup.Spec.ParentBackupName = parentName
+					if scheduled {
+						backup.Labels[dptypes.BackupScheduleLabelKey] = scheduleName
+					}
+				})
+			}
+
+			tik := func() *metav1.Time {
+				bak := now
+				now = metav1.Time{Time: now.Add(time.Hour)}
+				return &bak
+			}
+
+			mockBackupStatus := func(backup *dpv1alpha1.Backup, parentBackup, baseBackup string) {
+				backupStatus := dpv1alpha1.BackupStatus{
+					Phase:            dpv1alpha1.BackupPhaseCompleted,
+					ParentBackupName: parentBackup,
+					BaseBackupName:   baseBackup,
+					TimeRange: &dpv1alpha1.BackupTimeRange{
+						Start: tik(),
+						End:   tik(),
+					},
+				}
+				testdp.PatchBackupStatus(&testCtx, client.ObjectKeyFromObject(backup), backupStatus)
+			}
+
+			checkBackupParentAndBase := func(backup *dpv1alpha1.Backup, parentBackup, baseBackup string) {
+				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(backup), func(g Gomega, fetched *dpv1alpha1.Backup) {
+					g.Expect(fetched.Status.ParentBackupName).NotTo(HaveLen(0))
+					g.Expect(fetched.Status.ParentBackupName).To(Equal(parentBackup))
+					g.Expect(fetched.Status.BaseBackupName).NotTo(HaveLen(0))
+					g.Expect(fetched.Status.BaseBackupName).To(Equal(baseBackup))
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseRunning))
+				})).Should(Succeed())
+			}
+
+			checkBackupCompleted := func(backup *dpv1alpha1.Backup) {
+				testdp.PatchK8sJobStatus(&testCtx, getJobKey(backup), batchv1.JobComplete)
+				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(backup), func(g Gomega, fetched *dpv1alpha1.Backup) {
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseCompleted))
+				})).Should(Succeed())
+			}
+
+			checkBackupDeleting := func(backup *dpv1alpha1.Backup) {
+				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(backup), func(g Gomega, fetched *dpv1alpha1.Backup) {
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseDeleting))
+				})).Should(Succeed())
+			}
+
+			BeforeEach(func() {
+				By("creating a full backup from backupPolicy " + testdp.BackupPolicyName) //nolint:goconst
+				fullBackup = testdp.NewFakeBackup(&testCtx, func(backup *dpv1alpha1.Backup) {
+					backup.Labels[dptypes.BackupScheduleLabelKey] = scheduleName
+				})
+				fullBackupKey = client.ObjectKeyFromObject(fullBackup)
+			})
+
+			It("creates an incremental backup based on a specific backup", func() {
+				By("waiting for the full backup to complete, the full backup: " + fullBackupKey.String())
+				checkBackupCompleted(fullBackup)
+				mockBackupStatus(fullBackup, "", "")
+				By("creating an incremental backup from the specific full backup " + fullBackupKey.String())
+				incBackup1 := newFakeIncBackup(incBackupName+"1", fullBackup.Name, false)
+				incBackupKey1 := client.ObjectKeyFromObject(incBackup1)
+				By("check backup parent and base")
+				checkBackupParentAndBase(incBackup1, fullBackup.Name, fullBackup.Name)
+				By("check backup completed")
+				checkBackupCompleted(incBackup1)
+				mockBackupStatus(incBackup1, fullBackup.Name, fullBackup.Name)
+				By("creating an incremental backup from the specific incremental backup " + incBackupKey1.String())
+				incBackup2 := newFakeIncBackup(incBackupName+"2", incBackup1.Name, false)
+				By("check backup parent and base")
+				checkBackupParentAndBase(incBackup2, incBackup1.Name, fullBackup.Name)
+				By("check backup completed")
+				checkBackupCompleted(incBackup2)
+			})
+
+			It("creates an incremental backup without specific backup", func() {
+				By("waiting for the full backup to complete, the full backup: " + fullBackupKey.String())
+				checkBackupCompleted(fullBackup)
+				mockBackupStatus(fullBackup, "", "")
+				By("creating an incremental backup without specific backup")
+				incBackup1 := newFakeIncBackup(incBackupName+"1", "", true)
+				By("check backup parent and base")
+				checkBackupParentAndBase(incBackup1, fullBackup.Name, fullBackup.Name)
+				By("check backup completed")
+				checkBackupCompleted(incBackup1)
+				mockBackupStatus(incBackup1, fullBackup.Name, fullBackup.Name)
+				By("creating an incremental backup without specific backup")
+				incBackup2 := newFakeIncBackup(incBackupName+"2", "", false)
+				By("check backup parent and base")
+				checkBackupParentAndBase(incBackup2, incBackup1.Name, fullBackup.Name)
+				By("check backup completed")
+				checkBackupCompleted(incBackup2)
+				mockBackupStatus(incBackup2, incBackup1.Name, fullBackup.Name)
+				By("creating an incremental backup with the schedule label")
+				incBackup3 := newFakeIncBackup(incBackupName+"3", "", true)
+				By("check backup parent and base, preferring the latest schedule backup as parent")
+				checkBackupParentAndBase(incBackup3, incBackup1.Name, fullBackup.Name)
+				By("check backup completed")
+				checkBackupCompleted(incBackup3)
+				mockBackupStatus(incBackup3, incBackup1.Name, fullBackup.Name)
+				By("creating an incremental backup without the schedule label")
+				incBackup4 := newFakeIncBackup(incBackupName+"4", "", false)
+				By("check backup parent and base, preferring the latest backup as parent")
+				checkBackupParentAndBase(incBackup4, incBackup3.Name, fullBackup.Name)
+				By("check backup completed")
+				checkBackupCompleted(incBackup4)
+			})
+
+			It("creates an incremental backup without valid parent backups", func() {
+				By("creating an incremental backup without specific backup")
+				incBackup1 := newFakeIncBackup(incBackupName+"1", "", false)
+				incBackupKey1 := client.ObjectKeyFromObject(incBackup1)
+				By("check backup failed")
+				Eventually(testapps.CheckObj(&testCtx, incBackupKey1, func(g Gomega, fetched *dpv1alpha1.Backup) {
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseFailed))
+				})).Should(Succeed())
+			})
+
+			It("deletes incremental backups", func() {
+				By("waiting for the full backup to complete, the full backup: " + fullBackupKey.String())
+				checkBackupCompleted(fullBackup)
+				mockBackupStatus(fullBackup, "", "")
+				By("creating an incremental backup without specific backup")
+				incBackup1 := newFakeIncBackup(incBackupName+"1", "", false)
+				By("check backup parent and base")
+				checkBackupParentAndBase(incBackup1, fullBackup.Name, fullBackup.Name)
+				By("check backup completed")
+				checkBackupCompleted(incBackup1)
+				mockBackupStatus(incBackup1, fullBackup.Name, fullBackup.Name)
+				By("creating an incremental backup without specific backup")
+				incBackup2 := newFakeIncBackup(incBackupName+"2", "", false)
+				By("check backup parent and base")
+				checkBackupParentAndBase(incBackup2, incBackup1.Name, fullBackup.Name)
+				By("check backup completed")
+				checkBackupCompleted(incBackup2)
+				mockBackupStatus(incBackup2, incBackup1.Name, fullBackup.Name)
+				By("creating an incremental backup with the schedule label")
+				incBackup3 := newFakeIncBackup(incBackupName+"3", "", false)
+				By("check backup parent and base, preferring the latest schedule backup as parent")
+				checkBackupParentAndBase(incBackup3, incBackup2.Name, fullBackup.Name)
+				By("check backup completed")
+				checkBackupCompleted(incBackup3)
+				By("deleting an incremental backup will delete its child backup")
+				testapps.DeleteObject(&testCtx, client.ObjectKeyFromObject(incBackup2), &dpv1alpha1.Backup{})
+				checkBackupDeleting(incBackup2)
+				checkBackupDeleting(incBackup3)
+				By("deleting a base backup will delete all related incremental backups")
+				testapps.DeleteObject(&testCtx, client.ObjectKeyFromObject(fullBackup), &dpv1alpha1.Backup{})
+				checkBackupDeleting(fullBackup)
+				checkBackupDeleting(incBackup1)
+			})
+		})
 	})
 
 	When("with exceptional settings", func() {
@@ -855,7 +1034,7 @@ var _ = Describe("Backup Controller test", func() {
 			})
 
 			It("should fail because actionSet's backup type isn't Full", func() {
-				actionSet := testdp.NewFakeActionSet(&testCtx)
+				actionSet := testdp.NewFakeActionSet(&testCtx, nil)
 				actionSetKey := client.ObjectKeyFromObject(actionSet)
 				Eventually(testapps.GetAndChangeObj(&testCtx, actionSetKey, func(fetched *dpv1alpha1.ActionSet) {
 					fetched.Spec.BackupType = dpv1alpha1.BackupTypeIncremental
@@ -874,7 +1053,7 @@ var _ = Describe("Backup Controller test", func() {
 		Context("create continuous backup", func() {
 			It("should fail when continuous backup don't have backupschedule label", func() {
 				By("create actionset with continuous backuptype")
-				actionSet := testdp.NewFakeActionSet(&testCtx)
+				actionSet := testdp.NewFakeActionSet(&testCtx, nil)
 				actionSetKey := client.ObjectKeyFromObject(actionSet)
 				Eventually(testapps.GetAndChangeObj(&testCtx, actionSetKey, func(fetched *dpv1alpha1.ActionSet) {
 					fetched.Spec.BackupType = dpv1alpha1.BackupTypeContinuous
@@ -894,7 +1073,7 @@ var _ = Describe("Backup Controller test", func() {
 
 			It("continue reconcile when continuous backup is Failed after fixing the issue", func() {
 				By("create actionset and backupRepo for continuous backup")
-				actionSet := testdp.NewFakeActionSet(&testCtx)
+				actionSet := testdp.NewFakeActionSet(&testCtx, nil)
 				Eventually(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(actionSet), func(fetched *dpv1alpha1.ActionSet) {
 					fetched.Spec.BackupType = dpv1alpha1.BackupTypeContinuous
 				})).Should(Succeed())
@@ -977,7 +1156,7 @@ var _ = Describe("Backup Controller test", func() {
 			repo, repoPVCName = testdp.NewFakeBackupRepo(&testCtx, nil)
 
 			By("creating actionSet")
-			_ = testdp.NewFakeActionSet(&testCtx)
+			_ = testdp.NewFakeActionSet(&testCtx, nil)
 		})
 
 		Context("explicitly specify backup repo", func() {
@@ -1128,7 +1307,7 @@ var _ = Describe("Backup Controller test", func() {
 
 		BeforeEach(func() {
 			By("creating an actionSet")
-			actionSet := testdp.NewFakeActionSet(&testCtx)
+			actionSet := testdp.NewFakeActionSet(&testCtx, nil)
 
 			By("creating storage provider")
 			_ = testdp.NewFakeStorageProvider(&testCtx, nil)

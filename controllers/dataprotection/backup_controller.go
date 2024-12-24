@@ -786,6 +786,7 @@ func (r *BackupReconciler) deleteExternalResources(
 	return deleteRelatedObjectList(reqCtx, r.Client, &appsv1.StatefulSetList{}, namespaces, labels)
 }
 
+// deleteRelatedBackups deletes the related backups.
 func (r *BackupReconciler) deleteRelatedBackups(
 	reqCtx intctrlutil.RequestCtx,
 	backup *dpv1alpha1.Backup) error {
@@ -799,6 +800,7 @@ func (r *BackupReconciler) deleteRelatedBackups(
 	}
 	for i := range backupList.Items {
 		bp := &backupList.Items[i]
+		// delete backups related to the current backup
 		if bp.Status.ParentBackupName != backup.Name && bp.Status.BaseBackupName != backup.Name {
 			continue
 		}

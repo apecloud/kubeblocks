@@ -81,7 +81,7 @@ type BackupMethodTPL struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	Name string `json:"name"`
-	
+
 	// The name of the compatible full backup method, used by incremental backups.
 	//
 	// +optional

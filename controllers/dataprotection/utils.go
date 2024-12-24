@@ -587,7 +587,7 @@ func GetParentBackup(ctx context.Context, cli client.Client, backup *dpv1alpha1.
 	if backup == nil {
 		return nil, nil
 	}
-	var parentBackup *dpv1alpha1.Backup
+	parentBackup := &dpv1alpha1.Backup{}
 	if len(backup.Spec.ParentBackupName) != 0 {
 		if err := cli.Get(ctx, client.ObjectKey{
 			Namespace: backup.Namespace,
@@ -730,8 +730,12 @@ func ValidateParentBackup(backup *dpv1alpha1.Backup, parentBackup *dpv1alpha1.Ba
 	}
 	if backup.Spec.BackupMethod != parentBackup.Spec.BackupMethod &&
 		backupMethod.CompatibleMethod != parentBackup.Spec.BackupMethod {
-		return fmt.Errorf("parent backup %s/%s method %s is useless for incremental backup",
+		return fmt.Errorf("parent backup %s/%s method %s is invalid for incremental backup",
 			parentBackup.Namespace, parentBackup.Name, parentBackup.Spec.BackupMethod)
+	}
+	// valiate parent end time
+	if parentBackup.GetEndTime().IsZero() {
+		return fmt.Errorf("parent backup %s/%s end time is zero", parentBackup.Namespace, parentBackup.Name)
 	}
 	return nil
 }

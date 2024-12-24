@@ -447,12 +447,12 @@ func serviceVersionToCompDefinitions(ctx context.Context, cli client.Reader,
 
 // compatibleServiceVersions4Definition returns all service versions that are compatible with specified component definition.
 func compatibleServiceVersions4Definition(compDef *appsv1alpha1.ComponentDefinition, compVersion *appsv1alpha1.ComponentVersion) sets.Set[string] {
-	prefixMatch := func(prefix string) bool {
-		return strings.HasPrefix(compDef.Name, prefix)
+	compDefMatched := func(compDefPattern string) bool {
+		return component.CompDefMatched(compDef.Name, compDefPattern)
 	}
 	releases := make(map[string]bool, 0)
 	for _, rule := range compVersion.Spec.CompatibilityRules {
-		if slices.IndexFunc(rule.CompDefs, prefixMatch) >= 0 {
+		if slices.IndexFunc(rule.CompDefs, compDefMatched) >= 0 {
 			for _, release := range rule.Releases {
 				releases[release] = true
 			}

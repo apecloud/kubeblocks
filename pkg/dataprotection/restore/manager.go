@@ -204,7 +204,9 @@ func (r *RestoreManager) getBackupActionSetForContinuous(reqCtx intctrlutil.Requ
 	if err != nil {
 		return nil, err
 	}
-	backupItems := append(fullBackupItems, incrementalBackupItems...)
+	backupItems := []dpv1alpha1.Backup{}
+	backupItems = append(backupItems, fullBackupItems...)
+	backupItems = append(backupItems, incrementalBackupItems...)
 	// sort by completed time in descending order
 	sort.Slice(backupItems, func(i, j int) bool {
 		i, j = j, i

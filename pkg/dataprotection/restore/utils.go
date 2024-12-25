@@ -434,24 +434,27 @@ func ValidateParentBackupSet(parentBackupSet *BackupActionSet, backupSet *Backup
 			parentBackup.Spec.BackupPolicyName, backup.Spec.BackupPolicyName)
 	}
 	// validate parent backup method
-	if parentBackupSet.ActionSet != nil && parentBackupSet.ActionSet.Spec.BackupType == dpv1alpha1.BackupTypeIncremental {
+	var parentBackupType dpv1alpha1.BackupType
+	if parentBackupSet.ActionSet != nil {
+		parentBackupType = parentBackupSet.ActionSet.Spec.BackupType
+	}
+	switch parentBackupType {
+	case dpv1alpha1.BackupTypeIncremental:
 		if parentBackup.Spec.BackupMethod != backup.Spec.BackupMethod {
 			return fmt.Errorf(`the parent incremental backup method "%s" is not the same with the child backup method "%s"`,
 				parentBackup.Spec.BackupMethod, backup.Spec.BackupMethod)
 		}
-	} else if parentBackupSet.ActionSet != nil && parentBackupSet.ActionSet.Spec.BackupType == dpv1alpha1.BackupTypeFull {
+	case dpv1alpha1.BackupTypeFull:
 		if parentBackup.Spec.BackupMethod != backup.Status.BackupMethod.CompatibleMethod {
 			return fmt.Errorf(`the parent full backup method "%s" is not compatible with the child backup method "%s"`,
 				parentBackup.Spec.BackupMethod, backup.Spec.BackupMethod)
 		}
-	} else {
-		return fmt.Errorf(`the parent backup "%s" is not incremental or full backup`,
-			parentBackup.Name)
+	default:
+		return fmt.Errorf(`the parent backup "%s" is not incremental or full backup`, parentBackup.Name)
 	}
 	// validate parent backup end time
 	if !utils.CompareWithBackupStopTime(*parentBackup, *backup) {
-		return fmt.Errorf(`the parent backup "%s" is not before the child backup "%s"`,
-			parentBackup.Name, backup.Name)
+		return fmt.Errorf(`the parent backup "%s" is not before the child backup "%s"`, parentBackup.Name, backup.Name)
 	}
 	return nil
 }

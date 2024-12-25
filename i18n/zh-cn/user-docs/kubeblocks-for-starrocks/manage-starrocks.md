@@ -729,7 +729,6 @@ mycluster   demo        starrocks            starrocks-3.1.1   Delete           
       componentSpecs:
       - name: fe
         componentDefRef: fe
-        serviceAccountName: kb-starrocks-cluster
         replicas: 0
       - name: be
         componentDefRef: be
@@ -814,7 +813,6 @@ mycluster   demo        starrocks            starrocks-3.1.1   Delete           
       componentSpecs:
       - name: fe
         componentDefRef: fe
-        serviceAccountName: kb-starrocks-cluster
         replicas: 1
       - name: be
         componentDefRef: be

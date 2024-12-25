@@ -134,7 +134,6 @@ KubeBlocks supports creating two types of ApeCloud MySQL clusters: Standalone an
        - general
        - slow
        disableExporter: true
-       serviceAccountName: kb-acmysql-cluster
        replicas: 2
        resources:
          limits:

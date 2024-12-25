@@ -59,7 +59,6 @@ spec:
   - name: master
     componentDef: elasticsearch
     disableExporter: true
-    serviceAccountName: kb-elasticsearch-cluster
     replicas: 1
     resources:
       limits:
@@ -78,7 +77,6 @@ spec:
             storage: 20Gi
   - name: data
     componentDef: elasticsearch
-    serviceAccountName: kb-elasticsearch-cluster
     disableExporter: true
     replicas: 1
     resources:
@@ -98,7 +96,6 @@ spec:
             storage: 20Gi
   - name: ingest
     componentDef: elasticsearch
-    serviceAccountName: kb-elasticsearch-cluster
     disableExporter: true
     replicas: 1
     resources:
@@ -119,7 +116,6 @@ spec:
     services: null
   - name: transform
     componentDef: elasticsearch
-    serviceAccountName: kb-elasticsearch-cluster
     disableExporter: true
     replicas: 1
     resources:
@@ -470,7 +466,6 @@ From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out insta
       componentSpecs:
       - name: mdit
         componentDef: elasticsearch
-        serviceAccountName: null
         disableExporter: true
         replicas: 1
         resources: # Change the values of resources

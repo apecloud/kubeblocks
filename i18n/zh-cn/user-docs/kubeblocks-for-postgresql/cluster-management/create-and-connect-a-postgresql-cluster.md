@@ -135,7 +135,6 @@ KubeBlocks 支持创建两种 PostgreSQL 集群：单机版（Standalone）和�
          operator: Equal
          value: 'true'
          effect: NoSchedule
-       serviceAccountName: kb-pg-cluster
        replicas: 2
        resources:
          limits:

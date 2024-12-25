@@ -806,7 +806,6 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
       componentSpecs:
       - name: fe
         componentDefRef: fe
-        serviceAccountName: kb-starrocks-cluster
         replicas: 0 # Change this value
       - name: be
         componentDefRef: be
@@ -897,7 +896,6 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
      componentSpecs:
      - name: fe
        componentDefRef: fe
-       serviceAccountName: kb-starrocks-cluster
        replicas: 1 # Change this value
      - name: be
        componentDefRef: be

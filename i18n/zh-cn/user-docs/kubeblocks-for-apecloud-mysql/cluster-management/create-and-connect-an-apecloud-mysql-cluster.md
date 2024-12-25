@@ -134,7 +134,6 @@ KubeBlocks 支持创建两种类型的 ApeCloud MySQL 集群：单机版（Stand
        - general
        - slow
        disableExporter: true
-       serviceAccountName: kb-acmysql-cluster
        replicas: 2
        resources:
          limits:

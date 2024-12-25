@@ -124,7 +124,6 @@ KubeBlocks 可以通过良好的抽象快速集成新引擎，并支持 Pulsar �
      - name: pulsar-broker
        componentDef: pulsar-broker
        disableExporter: true
-       serviceAccountName: kb-pulsar-cluster
        replicas: 1
        resources:
          limits:

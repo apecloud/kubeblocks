@@ -133,7 +133,6 @@ KubeBlocks supports creating two types of PostgreSQL clusters: Standalone and Re
          operator: Equal
          value: 'true'
          effect: NoSchedule
-       serviceAccountName: kb-pg-cluster
        replicas: 2
        resources:
          limits:

@@ -134,7 +134,6 @@ spec:
     disableExporter: true
     enabledLogs:
     - running
-    serviceAccountName: kb-redis-cluster
     replicas: 2
     resources:
       limits:
@@ -164,7 +163,6 @@ spec:
       operator: Equal
       value: 'true'
       effect: NoSchedule
-    serviceAccountName: kb-redis-cluster
     replicas: 3
     resources:
       limits:

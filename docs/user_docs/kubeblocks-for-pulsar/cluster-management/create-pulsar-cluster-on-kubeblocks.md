@@ -123,7 +123,6 @@ Refer to the [Pulsar official document](https://pulsar.apache.org/docs/3.1.x/) f
      - name: pulsar-broker
        componentDef: pulsar-broker
        disableExporter: true
-       serviceAccountName: kb-pulsar-cluster
        replicas: 1
        resources:
          limits:

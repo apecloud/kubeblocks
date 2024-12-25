@@ -100,7 +100,6 @@ This document shows how to create a Kafka cluster.
            operator: Equal
            value: 'true'
            effect: NoSchedule
-         serviceAccountName: kb-kafka-cluster
          resources:
            limits:
              cpu: '0.5'
@@ -166,7 +165,6 @@ This document shows how to create a Kafka cluster.
            operator: Equal
            value: 'true'
            effect: NoSchedule
-         serviceAccountName: kb-kafka-cluster
          resources:
            limits:
              cpu: '0.5'
@@ -195,7 +193,6 @@ This document shows how to create a Kafka cluster.
          componentDef: kafka-controller
          tls: false
          replicas: 1
-         serviceAccountName: kb-kafka-cluster
          resources:
            limits:
              cpu: '0.5'

@@ -58,7 +58,6 @@ spec:
   componentSpecs:
     - name: proxy
       componentDef: milvus-proxy-0.9.0
-      serviceAccountName: kb-milvus-cluster
       replicas: 1
       resources:
         limits:
@@ -85,7 +84,6 @@ spec:
               name: admin
     - name: mixcoord
       componentDef: milvus-mixcoord-0.9.0
-      serviceAccountName: kb-milvus-cluster
       replicas: 1
       resources:
         limits:
@@ -112,7 +110,6 @@ spec:
               name: admin
     - name: datanode
       componentDef: milvus-datanode-0.9.0
-      serviceAccountName: kb-milvus-cluster
       replicas: 1
       resources:
         limits:
@@ -139,7 +136,6 @@ spec:
               name: admin
     - name: indexnode
       componentDef: milvus-indexnode-0.9.0
-      serviceAccountName: kb-milvus-cluster
       replicas: 1
       resources:
         limits:
@@ -166,7 +162,6 @@ spec:
               name: admin
     - name: querynode
       componentDef: milvus-querynode-0.9.0
-      serviceAccountName: kb-milvus-cluster
       replicas: 1
       resources:
         limits:
@@ -222,7 +217,6 @@ spec:
         requests:
           cpu: '0.5'
           memory: 0.5Gi
-      serviceAccountName: kb-etcdm-cluster
       volumeClaimTemplates:
         - name: data
           spec:
@@ -258,7 +252,6 @@ spec:
     - name: pulsar-broker
       componentDefRef: pulsar-broker
       disableExporter: true
-      serviceAccountName: kb-pulsarm-cluster
       replicas: 1
       resources:
         limits:
@@ -331,7 +324,6 @@ spec:
   componentSpecs:
     - name: minio
       componentDef: milvus-minio-0.9.0
-      serviceAccountName: kb-miniom-cluster
       replicas: 1
       resources:
         limits:

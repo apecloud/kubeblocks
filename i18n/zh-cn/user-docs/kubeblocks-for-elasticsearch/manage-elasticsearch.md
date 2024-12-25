@@ -62,7 +62,6 @@ spec:
   - name: master
     componentDef: elasticsearch
     disableExporter: true
-    serviceAccountName: kb-elasticsearch-cluster
     replicas: 1
     resources:
       limits:
@@ -81,7 +80,6 @@ spec:
             storage: 20Gi
   - name: data
     componentDef: elasticsearch
-    serviceAccountName: kb-elasticsearch-cluster
     disableExporter: true
     replicas: 1
     resources:
@@ -101,7 +99,6 @@ spec:
             storage: 20Gi
   - name: ingest
     componentDef: elasticsearch
-    serviceAccountName: kb-elasticsearch-cluster
     disableExporter: true
     replicas: 1
     resources:
@@ -122,7 +119,6 @@ spec:
     services: null
   - name: transform
     componentDef: elasticsearch
-    serviceAccountName: kb-elasticsearch-cluster
     disableExporter: true
     replicas: 1
     resources:

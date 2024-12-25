@@ -136,7 +136,6 @@ KubeBlocks 支持创建两种 Redis 集群：单机版（Standalone）和主备�
        disableExporter: true
        enabledLogs:
        - running
-       serviceAccountName: kb-redis-cluster
        replicas: 2
        resources:
          limits:
@@ -166,7 +165,6 @@ KubeBlocks 支持创建两种 Redis 集群：单机版（Standalone）和主备�
          operator: Equal
          value: 'true'
          effect: NoSchedule
-       serviceAccountName: kb-redis-cluster
        replicas: 3
        resources:
          limits:

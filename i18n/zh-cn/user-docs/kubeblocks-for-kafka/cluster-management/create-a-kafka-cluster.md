@@ -104,7 +104,6 @@ import TabItem from '@theme/TabItem';
            operator: Equal
            value: 'true'
            effect: NoSchedule
-         serviceAccountName: kb-kafka-cluster
          resources:
            limits:
              cpu: '0.5'
@@ -170,7 +169,6 @@ import TabItem from '@theme/TabItem';
            operator: Equal
            value: 'true'
            effect: NoSchedule
-         serviceAccountName: kb-kafka-cluster
          resources:
            limits:
              cpu: '0.5'
@@ -199,7 +197,6 @@ import TabItem from '@theme/TabItem';
          componentDef: kafka-controller
          tls: false
          replicas: 1
-         serviceAccountName: kb-kafka-cluster
          resources:
            limits:
              cpu: '0.5'

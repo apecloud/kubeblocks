@@ -59,7 +59,6 @@ spec:
       value: 'true'
       effect: NoSchedule
     disableExporter: true 
-    serviceAccountName: kb-qdrant-cluster
     replicas: 2
     resources:
       limits:

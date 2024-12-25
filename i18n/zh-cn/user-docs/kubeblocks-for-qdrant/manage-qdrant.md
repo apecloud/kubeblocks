@@ -54,23 +54,22 @@ metadata:
   name: mycluster
   namespace: demo
 spec:
-  clusterDefinitionRef: qdrant
-  clusterVersionRef: qdrant-1.8.1
   terminationPolicy: Delete
-  affinity:
-    podAntiAffinity: Preferred
-    topologyKeys:
-    - kubernetes.io/hostname
-  tolerations:
+  componentSpecs:
+  - name: qdrant
+    componentDef: qdrant
+    affinity:
+      podAntiAffinity: Preferred
+      topologyKeys:
+      - kubernetes.io/hostname
+      tenancy: SharedNode
+    tolerations:
     - key: kb-data
       operator: Equal
       value: 'true'
       effect: NoSchedule
-  componentSpecs:
-  - name: qdrant
-    componentDefRef: qdrant
-    disableExporter: true
-    serviceAccountName: kb-mycluster
+    disableExporter: true 
+    serviceAccountName: kb-qdrant-cluster
     replicas: 2
     resources:
       limits:
@@ -92,8 +91,6 @@ EOF
 
 | 字段                                   | 定义  |
 |---------------------------------------|--------------------------------------|
-| `spec.clusterDefinitionRef`           | 集群定义 CRD 的名称，用来定义集群组件。  |
-| `spec.clusterVersionRef`              | 集群版本 CRD 的名称，用来定义集群版本。 |
 | `spec.terminationPolicy`              | 集群的终止策略，默认值为 `Delete`，有效值为 `DoNotTerminate`、`Halt`、`Delete` 和 `WipeOut`。具体定义可参考 [终止策略](#终止策略)。  |
 | `spec.affinity`                       | 为集群的 Pods 定义了一组节点亲和性调度规则。该字段可控制 Pods 在集群中节点上的分布。 |
 | `spec.affinity.podAntiAffinity`       | 定义了不在同一 component 中的 Pods 的反亲和性水平。该字段决定了 Pods 以何种方式跨节点分布，以提升可用性和性能。 |

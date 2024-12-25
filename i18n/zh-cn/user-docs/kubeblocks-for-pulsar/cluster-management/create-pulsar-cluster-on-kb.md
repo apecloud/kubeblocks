@@ -79,103 +79,150 @@ KubeBlocks 可以通过良好的抽象快速集成新引擎，并支持 Pulsar �
 
 ## 创建 Pulsar 集群
 
-1. 在本地创建 `helm` 使用的 Pulsar 集群模板文件 `values-production.yaml`。
-  
-   将以下信息复制到本地文件 `values-production.yaml` 中。
+1. 创建 Pulsar 集群。
 
-   ```bash
-   ## 配置 Bookies
-   bookies:
-     resources:
-       limits:
-         memory: 8Gi
-       requests:
-         cpu: 2
-         memory: 8Gi
-
-     persistence:
-       data:
-         storageClassName: kb-default-sc
-         size: 128Gi
-       log:
-         storageClassName: kb-default-sc
-         size: 64Gi
-
-   ## 配置 Zookeeper
-   zookeeper:
-     resources:
-       limits:
-         memory: 2Gi
-       requests:
-         cpu: 1
-         memory: 2Gi
-
-     persistence:
-       data:
-         storageClassName: kb-default-sc
-         size: 20Gi
-       log:
-         storageClassName: kb-default-sc 
-         size: 20Gi
-        
-   broker:
-     replicaCount: 3
-     resources:
-       limits:
-         memory: 8Gi
-       requests:
-         cpu: 2
-         memory: 8Gi
+   ```yaml
+   cat <<EOF | kubectl apply -f -
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: Cluster
+   metadata:
+     name: mycluster
+     namespace: demo
+     annotations:
+       "kubeblocks.io/extra-env": '{"KB_PULSAR_BROKER_NODEPORT": "false"}'
+   spec:
+     terminationPolicy: Delete
+     services:
+     - name: proxy
+       serviceName: proxy
+       componentSelector: pulsar-proxy
+       spec:
+         type: ClusterIP
+         ports:
+         - name: pulsar
+           port: 6650
+           targetPort: 6650
+         - name: http
+           port: 80
+           targetPort: 8080
+     - name: broker-bootstrap
+       serviceName: broker-bootstrap
+       componentSelector: pulsar-broker
+       spec:
+         type: ClusterIP
+         ports:
+         - name: pulsar
+           port: 6650
+           targetPort: 6650
+         - name: http
+           port: 80
+           targetPort: 8080
+         - name: kafka-client
+           port: 9092
+           targetPort: 9092
+     componentSpecs:
+     - name: pulsar-broker
+       componentDef: pulsar-broker
+       disableExporter: true
+       serviceAccountName: kb-pulsar-cluster
+       replicas: 1
+       resources:
+         limits:
+           cpu: '0.5'
+           memory: 0.5Gi
+         requests:
+           cpu: '0.5'
+           memory: 0.5Gi
+       volumeClaimTemplates:
+       - name: data
+         spec:
+           accessModes:
+           - ReadWriteOnce
+           resources:
+             requests:
+               storage: 20Gi
+     - name: pulsar-proxy
+       componentDef: pulsar-proxy
+       replicas: 1
+       resources:
+         limits:
+           cpu: '0.5'
+           memory: 0.5Gi
+         requests:
+           cpu: '0.5'
+           memory: 0.5Gi
+     - name: bookies
+       componentDef: pulsar-bookkeeper
+       replicas: 3
+       resources:
+         limits:
+           cpu: '0.5'
+           memory: 0.5Gi
+         requests:
+           cpu: '0.5'
+           memory: 0.5Gi
+       volumeClaimTemplates:
+       - name: journal
+         spec:
+           accessModes:
+           - ReadWriteOnce
+           resources:
+             requests:
+               storage: 20Gi
+       - name: ledgers
+         spec:
+           accessModes:
+           - ReadWriteOnce
+           resources:
+             requests:
+               storage: 20Gi
+     - name: bookies-recovery
+       componentDef: pulsar-bkrecovery
+       replicas: 1
+       resources:
+         limits:
+           cpu: '0.5'
+           memory: 0.5Gi
+         requests:
+           cpu: '0.5'
+           memory: 0.5Gi
+     - name: zookeeper
+       componentDef: pulsar-zookeeper
+       replicas: 3
+       resources:
+         limits:
+           cpu: '0.5'
+           memory: 0.5Gi
+         requests:
+           cpu: '0.5'
+           memory: 0.5Gi
+       volumeClaimTemplates:
+       - name: data
+         spec:
+           accessModes:
+           - ReadWriteOnce
+           resources:
+             requests:
+               storage: 20Gi
+   EOF
    ```
 
-2. 创建集群。
+   | 字段                                   | 定义  |
+   |---------------------------------------|--------------------------------------|
+   | `metadata.annotations."kubeblocks.io/extra-env"` | 定义了是否启用 NodePort 服务。 |
+   | `spec.terminationPolicy`              | 集群的终止策略，默认值为 `Delete`，有效值为 `DoNotTerminate`、`Halt`、`Delete` 和 `WipeOut`。 <p> - `DoNotTerminate` 会阻止删除操作。 </p><p> - `Halt` 会删除工作负载资源，如 statefulset 和 deployment 等，但是保留了 PVC 。  </p><p> - `Delete` 在 `Halt` 的基础上进一步删除了 PVC。 </p><p> - `WipeOut` 在 `Delete` 的基础上从备份存储的位置完全删除所有卷快照和快照数据。 </p>|
+   | `spec.affinity`                       | 为集群的 Pods 定义了一组节点亲和性调度规则。该字段可控制 Pods 在集群中节点上的分布。 |
+   | `spec.affinity.podAntiAffinity`       | 定义了不在同一 component 中的 Pods 的反亲和性水平。该字段决定了 Pods 以何种方式跨节点分布，以提升可用性和性能。 |
+   | `spec.affinity.topologyKeys`          | 用于定义 Pod 反亲和性和 Pod 分布约束的拓扑域的节点标签值。 |
+   | `spec.tolerations`                    | 该字段为数组，用于定义集群中 Pods 的容忍，确保 Pod 可被调度到具有匹配污点的节点上。 |
+   | `spec.componentSpecs`                 | 集群 components 列表，定义了集群 components。该字段允许对集群中的每个 component 进行自定义配置。 |
+   | `spec.componentSpecs.componentDefRef` | 表示 cluster definition 中定义的 component definition 的名称，可通过执行 `kubectl get clusterdefinition postgresql -o json \| jq '.spec.componentDefs[].name'` 命令获取 component definition 名称。 |
+   | `spec.componentSpecs.name`            | 定义了 component 的名称。  |
+   | `spec.componentSpecs.disableExporter` | 定义了是否开启监控功能。 |
+   | `spec.componentSpecs.replicas`        | 定义了 component 中 replicas 的数量。 |
+   | `spec.componentSpecs.resources`       | 定义了 component 的资源要求。  |
 
-   - **选项 1.**（**推荐**）使用 `values-production.yaml` 创建 Pulsar 集群。
-   配置:
-     - 3 节点 broker
-     - 4 节点 bookies
-     - 3 节点 zookeeper
-
-     ```bash
-     helm install mycluster kubeblocks/pulsar-cluster --version "x.y.z" -f values-production.yaml --namespace demo
-     ```
-
-   - **选项 2.** 创建带 proxy 的 Pulsar 集群。
-   配置:
-     - 3 节点 proxy
-     - 3 节点 broker
-     - 4 节点 bookies
-     - 3 节点 zookeeper
-
-     ```bash
-     helm install mycluster kubeblocks/pulsar-cluster --version "x.y.z" -f values-production.yaml --set proxy.enable=true --namespace demo
-     ```
-
-   - **选项 3.** 创建带 proxy 的 Pulsar 集群，并部署独立的 `bookies-recovery` 组件。
-   配置:
-     - 3 节点 proxy
-     - 3 节点 broker
-     - 4 节点 bookies
-     - 3 节点 zookeeper
-     - 3 节点 bookies-recovery
-
-     ```bash
-     helm install mycluster kubeblocks/pulsar-cluster --version "x.y.z" -f values-production.yaml --set proxy.enable=true --set bookiesRecovery.enable=true --namespace demo
-     ```
-
-   - **选项 4.** 创建 Pulsar 集群并指定 bookies 和 zookeeper 的存储参数。
-   配置:
-     - 3 节点 broker
-     - 4 节点 bookies
-     - 3 节点 zookeeper
-
-     ```bash
-     helm install mycluster kubeblocks/pulsar-cluster --version "x.y.z" -f values-production.yaml --set bookies.persistence.data.storageClassName=<sc name>,bookies.persistence.log.storageClassName=<sc name>,zookeeper.persistence.data.storageClassName=<sc name>,zookeeper.persistence.log.storageClassName=<sc name> --namespace demo
-     ```
-
-   您可以指定存储名称 `<sc name>`。
-
-3. 验证已创建的集群。
+2. 验证已创建的集群。
 
     ```bash
     kubectl get cluster mycluster -n demo

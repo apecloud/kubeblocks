@@ -116,24 +116,24 @@ KubeBlocks supports creating two types of PostgreSQL clusters: Standalone and Re
      name: mycluster
      namespace: demo
    spec:
-     clusterDefinitionRef: postgresql
-     clusterVersionRef: postgresql-14.8.0
      terminationPolicy: Delete
-     affinity:
-       podAntiAffinity: Preferred
-       topologyKeys:
-       - kubernetes.io/hostname
-     tolerations:
+     componentSpecs:
+     - name: postgresql
+       componentDef: postgresql-12
+       enabledLogs:
+       - running
+       disableExporter: true
+       affinity:
+         podAntiAffinity: Preferred
+         topologyKeys:
+         - kubernetes.io/hostname
+         tenancy: SharedNode
+       tolerations:
        - key: kb-data
          operator: Equal
          value: 'true'
          effect: NoSchedule
-     componentSpecs:
-     - name: postgresql
-       componentDefRef: postgresql
-       enabledLogs:
-       - running
-       disableExporter: true
+       serviceAccountName: kb-pg-cluster
        replicas: 2
        resources:
          limits:
@@ -155,8 +155,6 @@ KubeBlocks supports creating two types of PostgreSQL clusters: Standalone and Re
 
    | Field                                 | Definition  |
    |---------------------------------------|--------------------------------------|
-   | `spec.clusterDefinitionRef`           | It specifies the name of the ClusterDefinition for creating a specific type of cluster.  |
-   | `spec.clusterVersionRef`              | It is the name of the cluster version CRD that defines the cluster version.  |
    | `spec.terminationPolicy`              | It is the policy of cluster termination. The default value is `Delete`. Valid values are `DoNotTerminate`, `Delete`, `WipeOut`. For the detailed definition, you can refer to [Termination Policy](./delete-a-postgresql-cluster.md#termination-policy). |
    | `spec.affinity`                       | It defines a set of node affinity scheduling rules for the cluster's Pods. This field helps control the placement of Pods on nodes within the cluster.  |
    | `spec.affinity.podAntiAffinity`       | It specifies the anti-affinity level of Pods within a component. It determines how pods should spread across nodes to improve availability and performance. |

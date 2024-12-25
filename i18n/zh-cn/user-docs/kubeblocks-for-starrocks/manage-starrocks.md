@@ -46,54 +46,57 @@ metadata:
   namespace: demo
 spec:
   clusterDefinitionRef: starrocks-ce
-  clusterVersionRef: starrocks-ce-3.1.1
   terminationPolicy: Delete
-  affinity:
-    podAntiAffinity: Preferred
-    topologyKeys:
-    - kubernetes.io/hostname
+  topology: shared-nothing
   tolerations:
     - key: kb-data
       operator: Equal
       value: 'true'
       effect: NoSchedule
   componentSpecs:
-  - name: fe
-    componentDefRef: fe
-    serviceAccountName: kb-starrocks-cluster
-    replicas: 1
-    resources:
-      limits:
-        cpu: '0.5'
-        memory: 0.5Gi
-      requests:
-        cpu: '0.5'
-        memory: 0.5Gi
-  - name: be
-    componentDefRef: be
-    replicas: 2
-    resources:
-      limits:
-        cpu: '0.5'
-        memory: 0.5Gi
-      requests:
-        cpu: '0.5'
-        memory: 0.5Gi
-    volumeClaimTemplates:
-    - name: be-storage
-      spec:
-        accessModes:
-        - ReadWriteOnce
-        resources:
-          requests:
-            storage: 20Gi
+    - name: fe
+      componentDef: starrocks-ce-fe
+      serviceVersion: 3.3.0
+      replicas: 1
+      resources:
+        limits:
+          cpu: "1"
+          memory: "1Gi"
+        requests:
+          cpu: "1"
+          memory: "1Gi"
+      volumeClaimTemplates:
+        - name: data # ref clusterDefinition components.containers.volumeMounts.name
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 20Gi
+    - name: be
+      componentDef: starrocks-ce-be
+      serviceVersion: 3.3.0
+      replicas: 1
+      resources:
+        limits:
+          cpu: "1"
+          memory: "1Gi"
+        requests:
+          cpu: "1"
+          memory: "1Gi"
+      volumeClaimTemplates:
+      - name: data
+        spec:
+          accessModes:
+          - ReadWriteOnce
+          resources:
+            requests:
+              storage: "20Gi"
 EOF
 ```
 
 | 字段                                   | 定义  |
 |---------------------------------------|--------------------------------------|
-| `spec.clusterDefinitionRef`           | 集群定义 CRD 的名称，用来定义集群组件。  |
-| `spec.clusterVersionRef`              | 集群版本 CRD 的名称，用来定义集群版本。 |
 | `spec.terminationPolicy`              | 集群的终止策略，默认值为 `Delete`，有效值为 `DoNotTerminate`、`Halt`、`Delete` 和 `WipeOut`。具体定义可参考 [终止策略](#终止策略)。 |
 | `spec.affinity`                       | 为集群的 Pods 定义了一组节点亲和性调度规则。该字段可控制 Pods 在集群中节点上的分布。 |
 | `spec.affinity.podAntiAffinity`       | 定义了不在同一 component 中的 Pods 的反亲和性水平。该字段决定了 Pods 以何种方式跨节点分布，以提升可用性和性能。 |

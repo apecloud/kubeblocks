@@ -71,123 +71,101 @@ This document shows how to create a Kafka cluster.
 
    * Create a Kafka cluster in combined mode.
 
-       ```yaml
-       # create kafka in combined mode 
-       kubectl apply -f - <<EOF
-       apiVersion: apps.kubeblocks.io/v1alpha1
-       kind: Cluster
-       metadata:
-         name: mycluster
-         namespace: demo
-         annotations:
-           "kubeblocks.io/extra-env": '{"KB_KAFKA_ENABLE_SASL":"false","KB_KAFKA_BROKER_HEAP":"-XshowSettings:vm -XX:MaxRAMPercentage=100 -Ddepth=64","KB_KAFKA_CONTROLLER_HEAP":"-XshowSettings:vm -XX:MaxRAMPercentage=100 -Ddepth=64","KB_KAFKA_PUBLIC_ACCESS":"false", "KB_KAFKA_BROKER_NODEPORT": "false"}'
-           kubeblocks.io/enabled-pod-ordinal-svc: broker
-       spec:
-         clusterDefinitionRef: kafka
-         clusterVersionRef: kafka-3.3.2
-         terminationPolicy: Delete
+     ```yaml
+     # create kafka in combined mode 
+     kubectl apply -f - <<EOF
+     apiVersion: apps.kubeblocks.io/v1alpha1
+     kind: Cluster
+     metadata:
+       name: mycluster
+       namespace: demo
+       annotations:
+         "kubeblocks.io/extra-env": '{"KB_KAFKA_ENABLE_SASL":"false","KB_KAFKA_BROKER_HEAP":"-XshowSettings:vm -XX:MaxRAMPercentage=100 -Ddepth=64","KB_KAFKA_CONTROLLER_HEAP":"-XshowSettings:vm -XX:MaxRAMPercentage=100 -Ddepth=64","KB_KAFKA_PUBLIC_ACCESS":"false"}'
+     spec:
+       terminationPolicy: Delete
+       componentSpecs:
+       - name: broker
+         componentDef: kafka-combine
+         tls: false
+         replicas: 1
+         serviceVersion: 3.3.2
+         services:
          affinity:
            podAntiAffinity: Preferred
            topologyKeys:
            - kubernetes.io/hostname
+           tenancy: SharedNode
          tolerations:
-           - key: kb-data
-             operator: Equal
-             value: "true"
-             effect: NoSchedule
-         services:
-         - name: bootstrap
-           serviceName: bootstrap
-           componentSelector: broker
+         - key: kb-data
+           operator: Equal
+           value: 'true'
+           effect: NoSchedule
+         serviceAccountName: kb-kafka-cluster
+         resources:
+           limits:
+             cpu: '0.5'
+             memory: 0.5Gi
+           requests:
+             cpu: '0.5'
+             memory: 0.5Gi
+         volumeClaimTemplates:
+         - name: data
            spec:
-             type: ClusterIP
-             ports:
-             - name: kafka-client
-               targetPort: 9092
-               port: 9092
-         componentSpecs:
-         - name: broker
-           componentDef: kafka-combine
-           tls: false
-           replicas: 1
-           serviceAccountName: kb-kafka-cluster
-           resources:
-             limits:
-               cpu: '0.5'
-               memory: 0.5Gi
-             requests:
-               cpu: '0.5'
-               memory: 0.5Gi
-           volumeClaimTemplates:
-           - name: data
-             spec:
-               accessModes:
-               - ReadWriteOnce
-               resources:
-                 requests:
-                   storage: 20Gi
-           - name: metadata
-             spec:
-               accessModes:
-               - ReadWriteOnce
-               resources:
-                 requests:
-                   storage: 20Gi
-         - name: metrics-exp
-           componentDefRef: kafka-exporter
-           componentDef: kafka-exporter
-           replicas: 1
-           resources:
-             limits:
-               cpu: '0.5'
-               memory: 0.5Gi
-             requests:
-               cpu: '0.5'
-               memory: 0.5Gi
-       EOF
-       ```
+             accessModes:
+             - ReadWriteOnce
+             resources:
+               requests:
+                 storage: 20Gi
+         - name: metadata
+           spec:
+             storageClassName: null
+             accessModes:
+             - ReadWriteOnce
+             resources:
+               requests:
+                 storage: 20Gi
+       - name: metrics-exp
+         componentDef: kafka-exporter
+         replicas: 1
+         resources:
+           limits:
+             cpu: '0.5'
+             memory: 0.5Gi
+           requests:
+             cpu: '0.5'
+             memory: 0.5Gi
+     EOF
+     ```
 
    * Create a Kafka cluster in separated mode.
 
-       ```yaml
-       # Create kafka cluster in separated mode
-       kubectl apply -f - <<EOF
-       apiVersion: apps.kubeblocks.io/v1alpha1
-       kind: Cluster
-       metadata:
-         name: kafka-cluster
-         namespace: demo
-         annotations:
-           "kubeblocks.io/extra-env": '{"KB_KAFKA_ENABLE_SASL":"false","KB_KAFKA_BROKER_HEAP":"-XshowSettings:vm -XX:MaxRAMPercentage=100 -Ddepth=64","KB_KAFKA_CONTROLLER_HEAP":"-XshowSettings:vm -XX:MaxRAMPercentage=100 -Ddepth=64","KB_KAFKA_PUBLIC_ACCESS":"false", "KB_KAFKA_BROKER_NODEPORT": "false"}'
-           kubeblocks.io/enabled-pod-ordinal-svc: broker
-       spec:
-         clusterDefinitionRef: kafka
-         clusterVersionRef: kafka-3.3.2
-         terminationPolicy: Delete
-         affinity:
-           podAntiAffinity: Preferred
-           topologyKeys:
-           - kubernetes.io/hostname
-           tolerations:
-             - key: kb-data
-               operator: Equal
-               value: "true"
-               effect: NoSchedule
-           services:
-             - name: bootstrap
-               serviceName: bootstrap
-               componentSelector: broker
-           spec:
-               type: ClusterIP
-               ports:
-               - name: kafka-client
-                 targetPort: 9092
-                 port: 9092
+     ```yaml
+     # Create kafka cluster in separated mode
+     kubectl apply -f - <<EOF
+     apiVersion: apps.kubeblocks.io/v1alpha1
+     kind: Cluster
+     metadata:
+       name: mycluster
+       namespace: demo
+       annotations:
+         "kubeblocks.io/extra-env": '{"KB_KAFKA_ENABLE_SASL":"false","KB_KAFKA_BROKER_HEAP":"-XshowSettings:vm -XX:MaxRAMPercentage=100 -Ddepth=64","KB_KAFKA_CONTROLLER_HEAP":"-XshowSettings:vm -XX:MaxRAMPercentage=100 -Ddepth=64","KB_KAFKA_PUBLIC_ACCESS":"false"}'
+     spec:
+       terminationPolicy: Delete
        componentSpecs:
        - name: broker
          componentDef: kafka-broker
          tls: false
          replicas: 1
+         affinity:
+           podAntiAffinity: Preferred
+           topologyKeys:
+           - kubernetes.io/hostname
+           tenancy: SharedNode
+         tolerations:
+         - key: kb-data
+           operator: Equal
+           value: 'true'
+           effect: NoSchedule
          serviceAccountName: kb-kafka-cluster
          resources:
            limits:
@@ -235,7 +213,6 @@ This document shows how to create a Kafka cluster.
                requests:
                  storage: 20Gi
        - name: metrics-exp
-         componentDefRef: kafka-exporter
          componentDef: kafka-exporter
          replicas: 1
          resources:
@@ -245,15 +222,12 @@ This document shows how to create a Kafka cluster.
            requests:
              cpu: '0.5'
              memory: 0.5Gi
-       EOF
-       ```
+     EOF
+     ```
 
    | Field                                 | Definition  |
    |---------------------------------------|--------------------------------------|
    | `metadata.annotations."kubeblocks.io/extra-env"` | It defines Kafka broker's jvm heap setting. |
-   | `metadata.annotations.kubeblocks.io/enabled-pod-ordinal-svc` | It defines kafka cluster annotation keys for nodeport feature gate. You can also set`kubeblocks.io/enabled-node-port-svc: broker` and `kubeblocks.io/disabled-cluster-ip-svc: broker`. |
-   | `spec.clusterDefinitionRef`           | It specifies the name of the ClusterDefinition for creating a specific type of cluster.  |
-   | `spec.clusterVersionRef`              | It is the name of the cluster version CRD that defines the cluster version.  |
    | `spec.terminationPolicy`              | It is the policy of cluster termination. The default value is `Delete`. Valid values are `DoNotTerminate`, `Delete`, `WipeOut`. For the detailed definition, you can refer to [Termination Policy](./delete-kafka-cluster.md#termination-policy). |
    | `spec.affinity`                       | It defines a set of node affinity scheduling rules for the cluster's Pods. This field helps control the placement of Pods on nodes within the cluster.  |
    | `spec.affinity.podAntiAffinity`       | It specifies the anti-affinity level of Pods within a component. It determines how pods should spread across nodes to improve availability and performance. |

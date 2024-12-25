@@ -116,7 +116,8 @@ func (mgr *Manager) DescribeUser(ctx context.Context, userName string) (*models.
 
 func (mgr *Manager) CreateUser(ctx context.Context, userName, password, statement string) error {
 	if !strings.HasPrefix(statement, "CREATE ") {
-		return fmt.Errorf("the user %s is created with invalid sql %s, wait and try again", userName, statement)
+		mgr.Logger.Info("the user is created with invalid sql, just ignore", "user", userName, "sql", statement)
+		return nil
 	}
 
 	sql := fmt.Sprintf(createUserSQL, userName, password)

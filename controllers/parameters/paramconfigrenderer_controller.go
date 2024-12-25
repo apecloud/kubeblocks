@@ -87,6 +87,7 @@ func (r *ParameterDrivenConfigRenderReconciler) reconcile(reqCtx intctrlutil.Req
 	if intctrlutil.ParametersDrivenConfigRenderTerminalPhases(parameterTemplate.Status, parameterTemplate.Generation) {
 		return intctrlutil.Reconciled()
 	}
+
 	cmpd := &appsv1.ComponentDefinition{}
 	if err := r.Get(reqCtx.Ctx, client.ObjectKey{Name: parameterTemplate.Spec.ComponentDef}, cmpd); err != nil {
 		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")

@@ -302,7 +302,7 @@ max_connections=666
 					})
 				}
 			}
-			configRender := parametersv1alpha1.ParameterDrivenConfigRenderSpec{Configs: configs}
+			configRender := parametersv1alpha1.ParamConfigRendererSpec{Configs: configs}
 			got, excludeDiff, err := CreateConfigPatch(tt.args.oldVersion, tt.args.newVersion, configRender, tt.args.enableExcludeDiff)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("CreateConfigPatch() error = %v, wantErr %v", err, tt.wantErr)

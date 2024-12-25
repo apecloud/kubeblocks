@@ -101,7 +101,7 @@ func (wrapper *renderWrapper) renderConfigTemplate(cluster *appsv1.Cluster,
 	component *component.SynthesizedComponent,
 	localObjs []client.Object,
 	componentParameter *parametersv1alpha1.ComponentParameter,
-	configRender *parametersv1alpha1.ParameterDrivenConfigRender,
+	configRender *parametersv1alpha1.ParamConfigRenderer,
 	defs []*parametersv1alpha1.ParametersDefinition, revision string) error {
 	for _, configSpec := range component.ConfigTemplates {
 		var item *parametersv1alpha1.ConfigTemplateItemDetail
@@ -160,7 +160,7 @@ func updateConfigMetaForCM(newCMObj *corev1.ConfigMap, item *parametersv1alpha1.
 	return
 }
 
-func applyUpdatedParameters(item *parametersv1alpha1.ConfigTemplateItemDetail, orig *corev1.ConfigMap, configRender *parametersv1alpha1.ParameterDrivenConfigRender, paramsDefs []*parametersv1alpha1.ParametersDefinition) (*corev1.ConfigMap, error) {
+func applyUpdatedParameters(item *parametersv1alpha1.ConfigTemplateItemDetail, orig *corev1.ConfigMap, configRender *parametersv1alpha1.ParamConfigRenderer, paramsDefs []*parametersv1alpha1.ParametersDefinition) (*corev1.ConfigMap, error) {
 	if configRender == nil || len(configRender.Spec.Configs) == 0 {
 		return nil, fmt.Errorf("not support parameter reconfigure")
 	}
@@ -179,7 +179,7 @@ func (wrapper *renderWrapper) rerenderConfigTemplate(cluster *appsv1.Cluster,
 	component *component.SynthesizedComponent,
 	configSpec appsv1.ComponentTemplateSpec,
 	item *parametersv1alpha1.ConfigTemplateItemDetail,
-	configRender *parametersv1alpha1.ParameterDrivenConfigRender,
+	configRender *parametersv1alpha1.ParamConfigRenderer,
 	defs []*parametersv1alpha1.ParametersDefinition) (*corev1.ConfigMap, error) {
 	cmName := core.GetComponentCfgName(cluster.Name, component.Name, configSpec.Name)
 	newCMObj, err := wrapper.RenderComponentTemplate(configSpec, cmName, func(m map[string]string) error {
@@ -297,7 +297,7 @@ func UpdateCMConfigSpecLabels(cm *corev1.ConfigMap, configSpec appsv1.ComponentT
 }
 
 // validateRenderedData validates config file against constraint
-func validateRenderedData(renderedData map[string]string, paramsDefs []*parametersv1alpha1.ParametersDefinition, configRender *parametersv1alpha1.ParameterDrivenConfigRender) error {
+func validateRenderedData(renderedData map[string]string, paramsDefs []*parametersv1alpha1.ParametersDefinition, configRender *parametersv1alpha1.ParamConfigRenderer) error {
 	if len(paramsDefs) == 0 || configRender == nil || len(configRender.Spec.Configs) == 0 {
 		return nil
 	}

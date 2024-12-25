@@ -20,18 +20,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package configuration
 
 import (
-	"context"
 	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/render"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
@@ -44,7 +41,7 @@ type pipeline struct {
 	ctx render.ReconcileCtx
 	ResourceFetcher[pipeline]
 
-	configRender   *parametersv1alpha1.ParameterDrivenConfigRender
+	configRender   *parametersv1alpha1.ParamConfigRenderer
 	parametersDefs []*parametersv1alpha1.ParametersDefinition
 }
 
@@ -63,7 +60,7 @@ type updatePipeline struct {
 	ctx render.ReconcileCtx
 	ResourceFetcher[updatePipeline]
 
-	configRender   *parametersv1alpha1.ParameterDrivenConfigRender
+	configRender   *parametersv1alpha1.ParamConfigRenderer
 	parametersDefs []*parametersv1alpha1.ParametersDefinition
 }
 
@@ -155,12 +152,8 @@ func (p *pipeline) BuildConfigManagerSidecar() *pipeline {
 
 func (p *pipeline) UpdateConfigRelatedObject() *pipeline {
 	updateMeta := func() error {
-		if err := syncInjectEnvFromCM(p.Context, p.Client, p.ctx.SynthesizedComponent, p.configRender, p.renderWrapper.renderedObjs, true); err != nil {
-			return err
-		}
 		return createConfigObjects(p.Client, p.Context, p.renderWrapper.renderedObjs)
 	}
-
 	return p.Wrap(updateMeta)
 }
 
@@ -255,11 +248,6 @@ func (p *updatePipeline) UpdateConfigVersion(revision string) *updatePipeline {
 // TODO(leon)
 func (p *updatePipeline) Sync() *updatePipeline {
 	return p.Wrap(func() error {
-		if !p.isDone() {
-			if err := syncInjectEnvFromCM(p.Context, p.Client, p.ctx.SynthesizedComponent, p.configRender, []*corev1.ConfigMap{p.newCM}, false); err != nil {
-				return err
-			}
-		}
 		if err := intctrlutil.SetControllerReference(p.ComponentParameterObj, p.newCM); err != nil {
 			return err
 		}
@@ -279,31 +267,4 @@ func (p *updatePipeline) Sync() *updatePipeline {
 		}
 		return core.MakeError("unexpected condition")
 	})
-}
-
-func syncInjectEnvFromCM(ctx context.Context, cli client.Client, synthesizedComp *component.SynthesizedComponent, configRender *parametersv1alpha1.ParameterDrivenConfigRender, configMaps []*corev1.ConfigMap, onlyCreate bool) error {
-	var podSpec *corev1.PodSpec
-
-	if onlyCreate {
-		podSpec = synthesizedComp.PodSpec
-	}
-	envObjs, err := InjectTemplateEnvFrom(synthesizedComp, podSpec, configRender, configMaps)
-	if err != nil {
-		return err
-	}
-	for _, obj := range envObjs {
-		if err = cli.Create(ctx, obj, inDataContext()); err == nil {
-			continue
-		}
-		if !apierrors.IsAlreadyExists(err) {
-			return err
-		}
-		if onlyCreate {
-			continue
-		}
-		if err = cli.Update(ctx, obj, inDataContext()); err != nil {
-			return err
-		}
-	}
-	return nil
 }

@@ -28,11 +28,8 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
-	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	"github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	"github.com/apecloud/kubeblocks/pkg/controller/render"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testparameters "github.com/apecloud/kubeblocks/pkg/testutil/parameters"
@@ -50,7 +47,7 @@ var _ = Describe("Prepare Test", func() {
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 
 		// non-namespaced
-		testapps.ClearResources(&testCtx, generics.ParameterDrivenConfigRenderSignature, ml)
+		testapps.ClearResources(&testCtx, generics.ParamConfigRendererSignature, ml)
 		testapps.ClearResources(&testCtx, generics.ParametersDefinitionSignature, ml)
 		testapps.ClearResources(&testCtx, generics.ComponentDefinitionSignature, ml)
 
@@ -110,19 +107,14 @@ var _ = Describe("Prepare Test", func() {
 				obj.Status.Phase = parametersv1alpha1.PDAvailablePhase
 			})()).Should(Succeed())
 
-			configRender := testparameters.NewParametersDrivenConfigFactory(pdcrName).
+			configRender := testparameters.NewParamConfigRendererFactory(pdcrName).
 				SetConfigDescription(envFileName, testapps.DefaultConfigSpecName, parametersv1alpha1.FileFormatConfig{Format: parametersv1alpha1.Properties}).
 				SetComponentDefinition(compDefObj.Name).
 				SetParametersDefs(paramsDefName).
 				Create(&testCtx).
 				GetObject()
 
-			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(configRender), func(obj *parametersv1alpha1.ParameterDrivenConfigRender) {
-				config := intctrlutil.GetComponentConfigDescription(&obj.Spec, envFileName)
-				config.InjectEnvTo = []string{compDefObj.Spec.Runtime.Containers[0].Name}
-			})()).Should(Succeed())
-
-			Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(configRender), func(obj *parametersv1alpha1.ParameterDrivenConfigRender) {
+			Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(configRender), func(obj *parametersv1alpha1.ParamConfigRenderer) {
 				obj.Status.Phase = parametersv1alpha1.PDAvailablePhase
 			})()).Should(Succeed())
 
@@ -166,7 +158,6 @@ dbStorage_rocksDB_maxSizeInLevel1MB=256
 			}
 			err = RenderConfigNScriptFiles(resCtx, cluster, comp, synthesizeComp, synthesizeComp.PodSpec, nil)
 			Expect(err).Should(Succeed())
-			Expect(configuration.CheckEnvFrom(&synthesizeComp.PodSpec.Containers[0], cfgcore.GenerateEnvFromName(cfgcore.GetComponentCfgName(cluster.Name, synthesizeComp.Name, testapps.DefaultConfigSpecName)))).Should(BeTrue())
 		})
 	})
 })

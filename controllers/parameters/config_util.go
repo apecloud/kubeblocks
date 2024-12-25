@@ -59,7 +59,7 @@ func checkConfigLabels(object client.Object, requiredLabs []string) bool {
 	return checkEnableCfgUpgrade(object)
 }
 
-func createConfigPatch(cfg *corev1.ConfigMap, configRender *parametersv1alpha1.ParameterDrivenConfigRender, paramsDefs map[string]*parametersv1alpha1.ParametersDefinition) (*core.ConfigPatchInfo, bool, error) {
+func createConfigPatch(cfg *corev1.ConfigMap, configRender *parametersv1alpha1.ParamConfigRenderer, paramsDefs map[string]*parametersv1alpha1.ParametersDefinition) (*core.ConfigPatchInfo, bool, error) {
 	if configRender == nil || len(configRender.Spec.Configs) == 0 {
 		return nil, true, nil
 	}

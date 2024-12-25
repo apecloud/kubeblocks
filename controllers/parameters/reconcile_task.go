@@ -46,7 +46,7 @@ type Task struct {
 
 type TaskContext struct {
 	componentParameter *parametersv1alpha1.ComponentParameter
-	configRender       *parametersv1alpha1.ParameterDrivenConfigRender
+	configRender       *parametersv1alpha1.ParamConfigRenderer
 	ctx                context.Context
 	component          *component.SynthesizedComponent
 	paramsDefs         []*parametersv1alpha1.ParametersDefinition
@@ -63,13 +63,13 @@ func NewTaskContext(ctx context.Context, cli client.Client, componentParameter *
 		return nil, err
 	}
 
-	configDefList := &parametersv1alpha1.ParameterDrivenConfigRenderList{}
+	configDefList := &parametersv1alpha1.ParamConfigRendererList{}
 	if err := cli.List(ctx, configDefList); err != nil {
 		return nil, err
 	}
 
 	var paramsDefs []*parametersv1alpha1.ParametersDefinition
-	var configRender *parametersv1alpha1.ParameterDrivenConfigRender
+	var configRender *parametersv1alpha1.ParamConfigRenderer
 	for i, item := range configDefList.Items {
 		if item.Spec.ComponentDef != cmpd.Name {
 			continue

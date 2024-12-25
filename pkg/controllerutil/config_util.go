@@ -253,14 +253,6 @@ func filterImmutableParameters(parameters map[string]any, fileName string, param
 	return validParameters
 }
 
-func TransformConfigTemplate(configs []appsv1.ComponentConfigSpec) []appsv1.ComponentTemplateSpec {
-	arr := make([]appsv1.ComponentTemplateSpec, 0, len(configs))
-	for _, config := range configs {
-		arr = append(arr, config.ComponentTemplateSpec)
-	}
-	return arr
-}
-
 func ResolveCmpdParametersDefs(ctx context.Context, reader client.Reader, cmpd *appsv1.ComponentDefinition) (*parametersv1alpha1.ParamConfigRenderer, []*parametersv1alpha1.ParametersDefinition, error) {
 	var paramsDefs []*parametersv1alpha1.ParametersDefinition
 

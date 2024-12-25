@@ -53,7 +53,7 @@ var _ = Describe("ConfigurationPipelineTest", func() {
 	var configMapObj *corev1.ConfigMap
 	var parametersDef *parametersv1alpha1.ParametersDefinition
 	var componentParameter *parametersv1alpha1.ComponentParameter
-	var configRender *parametersv1alpha1.ParameterDrivenConfigRender
+	var configRender *parametersv1alpha1.ParamConfigRenderer
 	var k8sMockClient *testutil.K8sClientMockHelper
 
 	mockAPIResource := func(lazyFetcher testutil.Getter) {
@@ -123,7 +123,7 @@ max_connections = '1000'
 			GetObject()
 
 		parametersDef = testparameters.NewParametersDefinitionFactory(paramsDefName).GetObject()
-		configRender = testparameters.NewParametersDrivenConfigFactory(pdcrName).
+		configRender = testparameters.NewParamConfigRendererFactory(pdcrName).
 			SetConfigDescription(testConfigFile, configTemplateName, parametersv1alpha1.FileFormatConfig{Format: parametersv1alpha1.Properties}).
 			SetComponentDefinition(compDefObj.Name).
 			SetParametersDefs(paramsDefName).

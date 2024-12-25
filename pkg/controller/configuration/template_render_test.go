@@ -42,7 +42,7 @@ var _ = Describe("ToolsImageBuilderTest", func() {
 	var compDefObj *appsv1.ComponentDefinition
 	var clusterComponent *component.SynthesizedComponent
 	var paramsDef *parametersv1alpha1.ParametersDefinition
-	var pdcr *parametersv1alpha1.ParameterDrivenConfigRender
+	var pdcr *parametersv1alpha1.ParamConfigRenderer
 
 	BeforeEach(func() {
 		mockK8sCli = testutil.NewK8sMockClient()
@@ -54,7 +54,7 @@ var _ = Describe("ToolsImageBuilderTest", func() {
 			GetObject()
 		clusterComponent = newAllFieldsSynthesizedComponent(compDefObj, clusterObj)
 
-		pdcr = testparameters.NewParametersDrivenConfigFactory(pdcrName).
+		pdcr = testparameters.NewParamConfigRendererFactory(pdcrName).
 			SetParametersDefs(paramsDef.Name).
 			SetComponentDefinition(compDefObj.GetName()).
 			SetTemplateName(configTemplateName).

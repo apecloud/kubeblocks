@@ -292,7 +292,7 @@ componentSpecs:
 
    </TabItem>
 
-   <TabItem value="MySQL Community Edition" label="MySQL Community Edition">
+   <TabItem value="MySQL 社区版" label="MySQL 社区版">
 
    您也可以在 [KubeBlocks Addons 仓库](https://github.com/apecloud/kubeblocks-addons/blob/main/examples/mysql/pod-monitor.yaml)中查看最新版本示例 YAML 文件。
 

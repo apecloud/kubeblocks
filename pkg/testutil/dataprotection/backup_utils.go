@@ -284,6 +284,9 @@ func MockBackupStatusMethod(backup *dpv1alpha1.Backup, backupMethodName, targetV
 			},
 		},
 	}
+	if backupMethodName == IncBackupMethodName {
+		backup.Status.BackupMethod.CompatibleMethod = BackupMethodName
+	}
 }
 
 func MockBackupStatusTarget(backup *dpv1alpha1.Backup, podSelectionStrategy dpv1alpha1.PodSelectionStrategy) {

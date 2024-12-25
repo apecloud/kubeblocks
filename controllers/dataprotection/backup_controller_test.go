@@ -811,7 +811,7 @@ var _ = Describe("Backup Controller test", func() {
 				})
 			}
 
-			tik := func() *metav1.Time {
+			step := func() *metav1.Time {
 				bak := now
 				now = metav1.Time{Time: now.Add(time.Hour)}
 				return &bak
@@ -823,8 +823,8 @@ var _ = Describe("Backup Controller test", func() {
 					ParentBackupName: parentBackup,
 					BaseBackupName:   baseBackup,
 					TimeRange: &dpv1alpha1.BackupTimeRange{
-						Start: tik(),
-						End:   tik(),
+						Start: step(),
+						End:   step(),
 					},
 				}
 				testdp.PatchBackupStatus(&testCtx, client.ObjectKeyFromObject(backup), backupStatus)
@@ -847,10 +847,20 @@ var _ = Describe("Backup Controller test", func() {
 				})).Should(Succeed())
 			}
 
-			checkBackupDeleting := func(backup *dpv1alpha1.Backup) {
-				Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(backup), func(g Gomega, fetched *dpv1alpha1.Backup) {
+			checkBackupDeleting := func(backup types.NamespacedName) {
+				Eventually(testapps.CheckObj(&testCtx, backup, func(g Gomega, fetched *dpv1alpha1.Backup) {
 					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseDeleting))
 				})).Should(Succeed())
+			}
+
+			mockIncBackupAndComplete := func(scheduled bool, backupName, parentName, expectedParent, expectedBase string) types.NamespacedName {
+				incBackup := newFakeIncBackup(backupName, parentName, scheduled)
+				By("check backup parent and base")
+				checkBackupParentAndBase(incBackup, expectedParent, expectedBase)
+				By("check backup completed")
+				checkBackupCompleted(incBackup)
+				mockBackupStatus(incBackup, expectedParent, expectedBase)
+				return client.ObjectKeyFromObject(incBackup)
 			}
 
 			BeforeEach(func() {
@@ -866,19 +876,9 @@ var _ = Describe("Backup Controller test", func() {
 				checkBackupCompleted(fullBackup)
 				mockBackupStatus(fullBackup, "", "")
 				By("creating an incremental backup from the specific full backup " + fullBackupKey.String())
-				incBackup1 := newFakeIncBackup(incBackupName+"1", fullBackup.Name, false)
-				incBackupKey1 := client.ObjectKeyFromObject(incBackup1)
-				By("check backup parent and base")
-				checkBackupParentAndBase(incBackup1, fullBackup.Name, fullBackup.Name)
-				By("check backup completed")
-				checkBackupCompleted(incBackup1)
-				mockBackupStatus(incBackup1, fullBackup.Name, fullBackup.Name)
-				By("creating an incremental backup from the specific incremental backup " + incBackupKey1.String())
-				incBackup2 := newFakeIncBackup(incBackupName+"2", incBackup1.Name, false)
-				By("check backup parent and base")
-				checkBackupParentAndBase(incBackup2, incBackup1.Name, fullBackup.Name)
-				By("check backup completed")
-				checkBackupCompleted(incBackup2)
+				incBackup1 := mockIncBackupAndComplete(false, incBackupName+"1", fullBackup.Name, fullBackup.Name, fullBackup.Name)
+				By("creating an incremental backup from the specific incremental backup " + incBackup1.String())
+				_ = mockIncBackupAndComplete(false, incBackupName+"2", incBackup1.Name, incBackup1.Name, fullBackup.Name)
 			})
 
 			It("creates an incremental backup without specific backup", func() {
@@ -886,32 +886,13 @@ var _ = Describe("Backup Controller test", func() {
 				checkBackupCompleted(fullBackup)
 				mockBackupStatus(fullBackup, "", "")
 				By("creating an incremental backup without specific backup")
-				incBackup1 := newFakeIncBackup(incBackupName+"1", "", true)
-				By("check backup parent and base")
-				checkBackupParentAndBase(incBackup1, fullBackup.Name, fullBackup.Name)
-				By("check backup completed")
-				checkBackupCompleted(incBackup1)
-				mockBackupStatus(incBackup1, fullBackup.Name, fullBackup.Name)
+				incBackup1 := mockIncBackupAndComplete(true, incBackupName+"1", "", fullBackup.Name, fullBackup.Name)
 				By("creating an incremental backup without specific backup")
-				incBackup2 := newFakeIncBackup(incBackupName+"2", "", false)
-				By("check backup parent and base")
-				checkBackupParentAndBase(incBackup2, incBackup1.Name, fullBackup.Name)
-				By("check backup completed")
-				checkBackupCompleted(incBackup2)
-				mockBackupStatus(incBackup2, incBackup1.Name, fullBackup.Name)
-				By("creating an incremental backup with the schedule label")
-				incBackup3 := newFakeIncBackup(incBackupName+"3", "", true)
-				By("check backup parent and base, preferring the latest schedule backup as parent")
-				checkBackupParentAndBase(incBackup3, incBackup1.Name, fullBackup.Name)
-				By("check backup completed")
-				checkBackupCompleted(incBackup3)
-				mockBackupStatus(incBackup3, incBackup1.Name, fullBackup.Name)
-				By("creating an incremental backup without the schedule label")
-				incBackup4 := newFakeIncBackup(incBackupName+"4", "", false)
-				By("check backup parent and base, preferring the latest backup as parent")
-				checkBackupParentAndBase(incBackup4, incBackup3.Name, fullBackup.Name)
-				By("check backup completed")
-				checkBackupCompleted(incBackup4)
+				_ = mockIncBackupAndComplete(false, incBackupName+"2", "", incBackup1.Name, fullBackup.Name)
+				By("creating an incremental backup with the schedule label, it prefers the latest schedule backup as parent")
+				incBackup3 := mockIncBackupAndComplete(true, incBackupName+"3", "", incBackup1.Name, fullBackup.Name)
+				By("creating an incremental backup without the schedule label, it prefers the latest backup as parent")
+				_ = mockIncBackupAndComplete(false, incBackupName+"4", "", incBackup3.Name, fullBackup.Name)
 			})
 
 			It("creates an incremental backup without valid parent backups", func() {
@@ -928,33 +909,19 @@ var _ = Describe("Backup Controller test", func() {
 				By("waiting for the full backup to complete, the full backup: " + fullBackupKey.String())
 				checkBackupCompleted(fullBackup)
 				mockBackupStatus(fullBackup, "", "")
-				By("creating an incremental backup without specific backup")
-				incBackup1 := newFakeIncBackup(incBackupName+"1", "", false)
-				By("check backup parent and base")
-				checkBackupParentAndBase(incBackup1, fullBackup.Name, fullBackup.Name)
-				By("check backup completed")
-				checkBackupCompleted(incBackup1)
-				mockBackupStatus(incBackup1, fullBackup.Name, fullBackup.Name)
-				By("creating an incremental backup without specific backup")
-				incBackup2 := newFakeIncBackup(incBackupName+"2", "", false)
-				By("check backup parent and base")
-				checkBackupParentAndBase(incBackup2, incBackup1.Name, fullBackup.Name)
-				By("check backup completed")
-				checkBackupCompleted(incBackup2)
-				mockBackupStatus(incBackup2, incBackup1.Name, fullBackup.Name)
-				By("creating an incremental backup with the schedule label")
-				incBackup3 := newFakeIncBackup(incBackupName+"3", "", false)
-				By("check backup parent and base, preferring the latest schedule backup as parent")
-				checkBackupParentAndBase(incBackup3, incBackup2.Name, fullBackup.Name)
-				By("check backup completed")
-				checkBackupCompleted(incBackup3)
+				By("creating an incremental backup " + incBackupName + "1")
+				incBackup1 := mockIncBackupAndComplete(false, incBackupName+"1", fullBackup.Name, fullBackup.Name, fullBackup.Name)
+				By("creating an incremental backup " + incBackupName + "2")
+				incBackup2 := mockIncBackupAndComplete(false, incBackupName+"2", incBackup1.Name, incBackup1.Name, fullBackup.Name)
+				By("creating an incremental backup " + incBackupName + "3")
+				incBackup3 := mockIncBackupAndComplete(false, incBackupName+"3", "", incBackup2.Name, fullBackup.Name)
 				By("deleting an incremental backup will delete its child backup")
-				testapps.DeleteObject(&testCtx, client.ObjectKeyFromObject(incBackup2), &dpv1alpha1.Backup{})
+				testapps.DeleteObject(&testCtx, incBackup2, &dpv1alpha1.Backup{})
 				checkBackupDeleting(incBackup2)
 				checkBackupDeleting(incBackup3)
 				By("deleting a base backup will delete all related incremental backups")
-				testapps.DeleteObject(&testCtx, client.ObjectKeyFromObject(fullBackup), &dpv1alpha1.Backup{})
-				checkBackupDeleting(fullBackup)
+				testapps.DeleteObject(&testCtx, fullBackupKey, &dpv1alpha1.Backup{})
+				checkBackupDeleting(fullBackupKey)
 				checkBackupDeleting(incBackup1)
 			})
 		})

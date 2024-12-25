@@ -109,7 +109,7 @@ var _ = Describe("Volume Populator Controller test", func() {
 			createStorageClass(volumeBinding)
 
 			By("create backup")
-			backup := mockBackupForRestore(actionSet.Name, "", "", mockBackupCompleted, useVolumeSnapshotBackup)
+			backup := mockBackupForRestore(actionSet.Name, "", "", mockBackupCompleted, useVolumeSnapshotBackup, "")
 
 			By("create restore ")
 			restore := testdp.NewRestoreFactory(testCtx.DefaultNamespace, testdp.RestoreName).

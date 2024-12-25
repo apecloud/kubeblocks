@@ -66,7 +66,7 @@ var _ = Describe("ComponentParameterGenerator Controller", func() {
 			obj.Status.Phase = appsv1.AvailablePhase
 		})()).Should(Succeed())
 
-		pdcr := testparameters.NewParametersDrivenConfigFactory(pdcrName).
+		pdcr := testparameters.NewParamConfigRendererFactory(pdcrName).
 			SetParametersDefs(paramsDef.Name).
 			SetComponentDefinition(compDefObj.GetName()).
 			SetTemplateName(configSpecName).
@@ -75,7 +75,7 @@ var _ = Describe("ComponentParameterGenerator Controller", func() {
 			TLSEnabled().
 			Create(&testCtx).
 			GetObject()
-		Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(pdcr), func(obj *parametersv1alpha1.ParameterDrivenConfigRender) {
+		Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(pdcr), func(obj *parametersv1alpha1.ParamConfigRenderer) {
 			obj.Status.Phase = parametersv1alpha1.PDAvailablePhase
 		})()).Should(Succeed())
 

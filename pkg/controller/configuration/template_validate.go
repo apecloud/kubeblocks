@@ -26,7 +26,7 @@ import (
 )
 
 // validateRenderedData validates config file against constraint
-func validateRenderedData(renderedData map[string]string, paramsDefs []*parametersv1alpha1.ParametersDefinition, configRender *parametersv1alpha1.ParameterDrivenConfigRender) error {
+func validateRenderedData(renderedData map[string]string, paramsDefs []*parametersv1alpha1.ParametersDefinition, configRender *parametersv1alpha1.ParamConfigRenderer) error {
 	if len(paramsDefs) == 0 || configRender == nil || len(configRender.Spec.Configs) == 0 {
 		return nil
 	}

@@ -59,7 +59,7 @@ func BuildReloadActionContainer(resourceCtx *render.ResourceCtx, cluster *appsv1
 	if len(volumeDirs) == 0 {
 		return nil
 	}
-	if configRender, paramsDefs, err = resolveComponentParameterDefs(resourceCtx.Context, resourceCtx.Client, cmpd, configmaps, synthesizedComp); err != nil {
+	if configRender, paramsDefs, err = intctrlutil.ResolveCmpdParametersDefs(resourceCtx.Context, resourceCtx.Client, cmpd); err != nil {
 		return err
 	}
 	if configRender == nil || len(configRender.Spec.Configs) == 0 {
@@ -105,34 +105,6 @@ func BuildReloadActionContainer(resourceCtx *render.ResourceCtx, cluster *appsv1
 		return slices.Contains(names, c.Name)
 	}
 	component.InjectEnvVars4Containers(synthesizedComp, synthesizedComp.EnvVars, synthesizedComp.EnvFromSources, filter)
-	return nil
-}
-
-func resolveComponentParameterDefs(ctx context.Context, cli client.Client, cmpd *appsv1.ComponentDefinition, configmaps []*corev1.ConfigMap, comp *component.SynthesizedComponent) (*parametersv1alpha1.ParamConfigRenderer, []*parametersv1alpha1.ParametersDefinition, error) {
-	configRender, paramsDefs, err := intctrlutil.ResolveCmpdParametersDefs(ctx, cli, cmpd)
-	if err != nil {
-		return nil, nil, err
-	}
-	if err = handleInjectEnv(ctx, cli, comp, configRender, configmaps); err != nil {
-		return nil, nil, err
-	}
-	return configRender, paramsDefs, nil
-}
-
-func handleInjectEnv(ctx context.Context,
-	cli client.Client,
-	comp *component.SynthesizedComponent,
-	configRender *parametersv1alpha1.ParamConfigRenderer,
-	configmaps []*corev1.ConfigMap) error {
-	envObjs, err := InjectTemplateEnvFrom(comp, comp.PodSpec, configRender, configmaps)
-	if err != nil {
-		return err
-	}
-	for _, obj := range envObjs {
-		if err = intctrlutil.IgnoreIsAlreadyExists(cli.Create(ctx, obj, inDataContext())); err != nil {
-			return err
-		}
-	}
 	return nil
 }
 

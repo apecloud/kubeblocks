@@ -44,8 +44,6 @@ type Manager struct {
 	clientSettings *Settings
 	sentinelClient *redis.SentinelClient
 
-	ctx                     context.Context
-	cancel                  context.CancelFunc
 	startAt                 time.Time
 	role                    string
 	roleSubscribeUpdateTime int64
@@ -90,10 +88,10 @@ func NewManager(properties engines.Properties) (engines.DBManager, error) {
 	}
 
 	mgr.sentinelClient = newSentinelClient(mgr.clientSettings, mgr.ClusterCompName)
+	if mgr.sentinelClient != nil {
+		go mgr.SubscribeRoleChange(context.Background())
+	}
 
-	mgr.ctx, mgr.cancel = context.WithCancel(context.Background())
-
-	go mgr.SubscribeRoleChange(mgr.ctx)
 	return mgr, nil
 }
 

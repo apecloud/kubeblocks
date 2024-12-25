@@ -34,10 +34,8 @@ func (mgr *Manager) GetReplicaRole(ctx context.Context, _ *dcs.Cluster) (string,
 		return mgr.role, nil
 	}
 
-	// We use the role obtained from Sentinel as the sole source of truth.
-	masterAddr, err := mgr.sentinelClient.GetMasterAddrByName(ctx, mgr.ClusterCompName).Result()
-	if err != nil {
-		// when we can't get role from sentinel, we query redis instead
+	// when we can't get role from sentinel, we query redis instead
+	getRoleFromRedisClient := func() (string, error) {
 		var role string
 		result, err := mgr.client.Info(ctx, "Replication").Result()
 		if err != nil {
@@ -59,6 +57,16 @@ func (mgr *Manager) GetReplicaRole(ctx context.Context, _ *dcs.Cluster) (string,
 		} else {
 			return models.SECONDARY, nil
 		}
+	}
+
+	if mgr.sentinelClient == nil {
+		return getRoleFromRedisClient()
+	}
+
+	// We use the role obtained from Sentinel as the sole source of truth.
+	masterAddr, err := mgr.sentinelClient.GetMasterAddrByName(ctx, mgr.ClusterCompName).Result()
+	if err != nil {
+		return getRoleFromRedisClient()
 	}
 
 	masterName := strings.Split(masterAddr[0], ".")[0]

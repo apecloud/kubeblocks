@@ -52,7 +52,7 @@ var _ = Describe("ParamConfigRenderer Controller", func() {
 		By("Create a component definition obj and mock to available")
 		compDefObj := testapps.NewComponentDefinitionFactory(compDefName).
 			SetDefaultSpec().
-			AddConfigTemplate(configSpecName, configmap.Name, "", testCtx.DefaultNamespace, configVolumeName).
+			AddConfigTemplate(configSpecName, configmap.Name, testCtx.DefaultNamespace, configVolumeName).
 			Create(&testCtx).
 			GetObject()
 		Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(compDefObj), func(obj *appsv1.ComponentDefinition) {

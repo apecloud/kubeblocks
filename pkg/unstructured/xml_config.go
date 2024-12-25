@@ -26,7 +26,7 @@ import (
 	mxjv2 "github.com/clbanning/mxj/v2"
 	"github.com/spf13/cast"
 
-	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 )
 
 type xmlConfig struct {
@@ -42,7 +42,7 @@ func init() {
 	// enable cast to int
 	mxjv2.CastValuesToInt(true)
 
-	CfgObjectRegistry().RegisterConfigCreator(appsv1beta1.XML, func(name string) ConfigObject {
+	CfgObjectRegistry().RegisterConfigCreator(parametersv1alpha1.XML, func(name string) ConfigObject {
 		return &xmlConfig{name: name}
 	})
 }

@@ -178,7 +178,7 @@ func newComponentReconciler(cli client.Client, recorder record.EventRecorder) re
 }
 
 func newConfigurationReconciler(cli client.Client, recorder record.EventRecorder) reconcile.Reconciler {
-	return &parameters.ConfigurationReconciler{
+	return &parameters.ComponentParameterReconciler{
 		Client:   cli,
 		Scheme:   cli.Scheme(),
 		Recorder: recorder,

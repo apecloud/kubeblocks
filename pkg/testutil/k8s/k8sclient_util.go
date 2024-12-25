@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/apecloud/kubeblocks/pkg/generics"
 	mock_client "github.com/apecloud/kubeblocks/pkg/testutil/k8s/mocks"
 )
 
@@ -170,6 +171,29 @@ func (helper *K8sClientMockHelper) MockDeleteMethod(options ...any) {
 		return caller, doAndReturn
 	})
 	helper.mockMethod(&helper.updateCaller, options...)
+}
+
+func WithArgsNum(num int) []any {
+	matchers := make([]any, num)
+	for i := 0; i < num; i++ {
+		matchers[i] = gomock.Any()
+	}
+	return matchers
+}
+
+func (helper *K8sClientMockHelper) MockNListMethod(argsN int, options ...any) {
+	helper.listCaller.Caller(func() (CallerFunction, DoReturnedFunction) {
+		caller := func() *gomock.Call {
+			return helper.k8sClient.EXPECT().List(gomock.Any(), gomock.Any(), WithArgsNum(argsN)...)
+		}
+		doAndReturn := func(caller *gomock.Call, fnWrap HandleListReturnedObject) {
+			caller.DoAndReturn(func(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
+				return fnWrap(list)
+			})
+		}
+		return caller, doAndReturn
+	})
+	helper.mockMethod(&helper.listCaller, options...)
 }
 
 func (helper *K8sClientMockHelper) MockListMethod(options ...any) {
@@ -344,14 +368,21 @@ func WithCreatedFailedResult() HandleCreateReturnedObject {
 type Getter = func(key client.ObjectKey, obj client.Object) (bool, error)
 
 func WithConstructSimpleGetResult(mockObjs []client.Object, get ...Getter) HandleGetReturnedObject {
-	mockMap := make(map[client.ObjectKey]client.Object, len(mockObjs))
+	mockMap := make(map[schema.GroupVersionKind]map[client.ObjectKey]client.Object, len(mockObjs))
 	for _, obj := range mockObjs {
-		mockMap[client.ObjectKeyFromObject(obj)] = obj
+		kind := generics.ToGVK(obj)
+		if _, ok := mockMap[kind]; !ok {
+			mockMap[kind] = make(map[client.ObjectKey]client.Object)
+		}
+		mockMap[kind][client.ObjectKeyFromObject(obj)] = obj
 	}
 	return func(key client.ObjectKey, obj client.Object) error {
-		if mockObj, ok := mockMap[key]; ok {
-			SetGetReturnedObject(obj, mockObj)
-			return nil
+		kind := generics.ToGVK(obj)
+		if mockMap[kind] != nil {
+			if mockObj, ok := mockMap[kind][key]; ok {
+				SetGetReturnedObject(obj, mockObj)
+				return nil
+			}
 		}
 		if len(get) > 0 {
 			processed, err := get[0](key, obj)

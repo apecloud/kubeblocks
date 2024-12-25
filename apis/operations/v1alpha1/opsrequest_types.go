@@ -524,31 +524,12 @@ type Reconfigure struct {
 	// Specifies the name of the Component.
 	ComponentOps `json:",inline"`
 
-	// Contains a list of ConfigurationItem objects, specifying the Component's configuration template name,
-	// upgrade policy, and parameter key-value pairs to be updated.
+	// Specifies a list of key-value pairs representing parameters and their corresponding values
+	// within a single configuration file.
+	// This field is used to override or set the values of parameters without modifying the entire configuration file.
 	//
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MinItems=1
-	// +patchMergeKey=name
-	// +patchStrategy=merge,retainKeys
-	// +listType=map
-	// +listMapKey=name
-	Configurations []ConfigurationItem `json:"configurations" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
-
-	// Indicates the duration for which the parameter changes are valid.
 	// +optional
-	// TTL *int64 `json:"ttl,omitempty"`
-
-	// Specifies the time when the parameter changes should be applied.
-	// +kubebuilder:validation:MaxLength=19
-	// +kubebuilder:validation:MinLength=19
-	// +kubebuilder:validation:Pattern:=`^([0-9]{2})/([0-9]{2})/([0-9]{4}) ([0-9]{2}):([0-9]{2}):([0-9]{2})$`
-	// +optional
-	// TriggeringTime *string `json:"triggeringTime,omitempty"`
-
-	//  Identifies the component to be reconfigured.
-	// +optional
-	// Selector *metav1.LabelSelector `json:"selector,omitempty"`
+	Parameters []appsv1.ComponentParameter `json:"parameters,omitempty"`
 }
 
 type ConfigurationItem struct {
@@ -1016,10 +997,6 @@ type OpsRequestStatus struct {
 	// +optional
 	CancelTimestamp metav1.Time `json:"cancelTimestamp,omitempty"`
 
-	// Records the status of a reconfiguring operation if `opsRequest.spec.type` equals to "Reconfiguring".
-	// +optional
-	ReconfiguringStatusAsComponent map[string]*ReconfiguringStatus `json:"reconfiguringStatusAsComponent,omitempty"`
-
 	// Describes the detailed status of the OpsRequest.
 	// Possible condition types include "Cancelled", "WaitForProgressing", "Validated", "Succeed", "Failed", "Restarting",
 	// "VerticalScaling", "HorizontalScaling", "VolumeExpanding", "Reconfigure", "Switchover", "Stopping", "Starting",
@@ -1175,77 +1152,6 @@ type PreCheckResult struct {
 	// Provides explanations related to the preCheck result in a human-readable format.
 	// +optional
 	Message string `json:"message,omitempty"`
-}
-
-type ReconfiguringStatus struct {
-	// Describes the reconfiguring detail status.
-	// Possible condition types include "Creating", "Init", "Running", "Pending", "Merged", "MergeFailed", "FailedAndPause",
-	// "Upgrading", "Deleting", "FailedAndRetry", "Finished", "ReconfigurePersisting", "ReconfigurePersisted".
-	// +optional
-	// +patchMergeKey=type
-	// +patchStrategy=merge
-	// +listType=map
-	// +listMapKey=type
-	Conditions []metav1.Condition `json:"conditions,omitempty"`
-
-	// Describes the status of the component reconfiguring.
-	// +kubebuilder:validation:Required
-	// +patchMergeKey=name
-	// +patchStrategy=merge,retainKeys
-	// +listType=map
-	// +listMapKey=name
-	ConfigurationStatus []ConfigurationItemStatus `json:"configurationStatus"`
-}
-
-type ConfigurationItemStatus struct {
-	// Indicates the name of the configuration template (as ConfigMap).
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=63
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	Name string `json:"name"`
-
-	// Records the UpgradePolicy of the configuration change operation.
-	// +optional
-	UpdatePolicy appsv1alpha1.UpgradePolicy `json:"updatePolicy,omitempty"`
-
-	// Represents the current state of the reconfiguration state machine.
-	// Possible values include "Creating", "Init", "Running", "Pending", "Merged", "MergeFailed", "FailedAndPause",
-	// "Upgrading", "Deleting", "FailedAndRetry", "Finished", "ReconfigurePersisting", "ReconfigurePersisted".
-	// +optional
-	Status string `json:"status,omitempty"`
-
-	// Provides details about the operation.
-	// +optional
-	Message string `json:"message,omitempty"`
-
-	// Records the number of pods successfully updated following a configuration change.
-	// +kubebuilder:default=0
-	// +optional
-	SucceedCount int32 `json:"succeedCount"`
-
-	// Represents the total count of pods intended to be updated by a configuration change.
-	// +kubebuilder:default=-1
-	// +optional
-	ExpectedCount int32 `json:"expectedCount"`
-
-	// Records the last state of the reconfiguration finite state machine.
-	// Possible values include "None", "Retry", "Failed", "NotSupport", "FailedAndRetry".
-	//
-	// - "None" describes fsm has finished and quit.
-	// - "Retry" describes fsm is running.
-	// - "Failed" describes fsm is failed and exited.
-	// - "NotSupport" describes fsm does not support the feature.
-	// - "FailedAndRetry" describes fsm is failed in current state, but can be retried.
-	// +optional
-	LastAppliedStatus string `json:"lastStatus,omitempty"`
-
-	// Stores the last applied configuration.
-	// +optional
-	LastAppliedConfiguration map[string]string `json:"lastAppliedConfiguration,omitempty"`
-
-	// Contains the updated parameters.
-	// +optional
-	UpdatedParameters UpdatedParameters `json:"updatedParameters"`
 }
 
 // UpdatedParameters holds details about the modifications made to configuration parameters.

@@ -106,13 +106,13 @@ func mockReconcileResource() (*corev1.ConfigMap, *parametersv1alpha1.ParametersD
 		obj.Status.Phase = appsv1.AvailablePhase
 	})()).Should(Succeed())
 
-	pdcr := testparameters.NewParametersDrivenConfigFactory(pdcrName).
+	pdcr := testparameters.NewParamConfigRendererFactory(pdcrName).
 		SetParametersDefs(paramsDef.GetName()).
 		SetComponentDefinition(compDefObj.GetName()).
 		SetTemplateName(configSpecName).
 		Create(&testCtx).
 		GetObject()
-	Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(pdcr), func(obj *parametersv1alpha1.ParameterDrivenConfigRender) {
+	Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(pdcr), func(obj *parametersv1alpha1.ParamConfigRenderer) {
 		obj.Status.Phase = parametersv1alpha1.PDAvailablePhase
 	})()).Should(Succeed())
 

@@ -76,7 +76,7 @@ max_connections=666
 		templateBuilder render.TemplateRender
 		configSpec      appsv1.ComponentTemplateSpec
 		paramsDefs      *parametersv1alpha1.ParametersDefinition
-		pdcr            *parametersv1alpha1.ParameterDrivenConfigRender
+		pdcr            *parametersv1alpha1.ParamConfigRenderer
 
 		baseCMObject    *corev1.ConfigMap
 		updatedCMObject *corev1.ConfigMap
@@ -87,7 +87,7 @@ max_connections=666
 		paramsDefs = testparameters.NewParametersDefinitionFactory("test-pd").
 			SetConfigFile(testConfigName).
 			GetObject()
-		pdcr = testparameters.NewParametersDrivenConfigFactory("test-pdcr").
+		pdcr = testparameters.NewParamConfigRendererFactory("test-pdcr").
 			SetTemplateName(testConfigSpecName).
 			GetObject()
 
@@ -248,7 +248,7 @@ max_connections=666
 			}
 
 			tmpCM := baseCMObject.DeepCopy()
-			_, err := mergerConfigTemplate(importedTemplate, templateBuilder, configSpec, tmpCM.Data, []*parametersv1alpha1.ParametersDefinition{paramsDefs}, &parametersv1alpha1.ParameterDrivenConfigRender{})
+			_, err := mergerConfigTemplate(importedTemplate, templateBuilder, configSpec, tmpCM.Data, []*parametersv1alpha1.ParametersDefinition{paramsDefs}, &parametersv1alpha1.ParamConfigRenderer{})
 			Expect(err).Should(Succeed())
 		})
 	})

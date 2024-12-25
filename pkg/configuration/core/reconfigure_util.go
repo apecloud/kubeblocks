@@ -88,7 +88,7 @@ func trimNestedField(updatedParams any, trimField string) (any, error) {
 }
 
 // ValidateConfigPatch Verifies if the changed parameters have been removed
-func ValidateConfigPatch(patch *ConfigPatchInfo, configRender parametersv1alpha1.ParameterDrivenConfigRenderSpec) error {
+func ValidateConfigPatch(patch *ConfigPatchInfo, configRender parametersv1alpha1.ParamConfigRendererSpec) error {
 	if !patch.IsModify || len(patch.UpdateConfig) == 0 {
 		return nil
 	}

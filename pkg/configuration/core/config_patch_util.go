@@ -32,7 +32,7 @@ import (
 )
 
 // CreateConfigPatch creates a patch for configuration files with different version.
-func CreateConfigPatch(oldVersion, newVersion map[string]string, configRender parametersv1alpha1.ParameterDrivenConfigRenderSpec, comparableAllFiles bool) (*ConfigPatchInfo, bool, error) {
+func CreateConfigPatch(oldVersion, newVersion map[string]string, configRender parametersv1alpha1.ParamConfigRendererSpec, comparableAllFiles bool) (*ConfigPatchInfo, bool, error) {
 	var hasFilesUpdated = false
 	var keys = ResolveConfigFiles(configRender.Configs)
 
@@ -99,7 +99,7 @@ func FromConfigObject(name, config string, formatConfig *parametersv1alpha1.File
 // TransformConfigFileToKeyValueMap transforms a config file in appsv1alpha1.CfgFileFormat format to a map in which the key is config name and the value is config value
 // sectionName means the desired section of config file, such as [mysqld] section.
 // If config file has no section structure, sectionName should be default to get all values in this config file.
-func TransformConfigFileToKeyValueMap(fileName string, configRender parametersv1alpha1.ParameterDrivenConfigRenderSpec, configData []byte) (map[string]string, error) {
+func TransformConfigFileToKeyValueMap(fileName string, configRender parametersv1alpha1.ParamConfigRendererSpec, configData []byte) (map[string]string, error) {
 	formatterConfig := ResolveConfigFormat(configRender.Configs, fileName)
 	if formatterConfig == nil {
 		return nil, fmt.Errorf("not found file formatter config: [%s]", fileName)

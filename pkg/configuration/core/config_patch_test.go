@@ -130,7 +130,7 @@ func TestTransformConfigPatchFromData(t *testing.T) {
 	testData := "[mysqld]\nmax_connections = 2000\ngeneral_log = OFF"
 
 	t.Run("testConfigPatch", func(t *testing.T) {
-		got, err := TransformConfigPatchFromData(map[string]string{configFile: testData}, parametersv1alpha1.ParameterDrivenConfigRenderSpec{
+		got, err := TransformConfigPatchFromData(map[string]string{configFile: testData}, parametersv1alpha1.ParamConfigRendererSpec{
 			Configs: []parametersv1alpha1.ComponentConfigDescription{{
 				Name:             "my.cnf",
 				FileFormatConfig: &parametersv1alpha1.FileFormatConfig{Format: parametersv1alpha1.Ini},

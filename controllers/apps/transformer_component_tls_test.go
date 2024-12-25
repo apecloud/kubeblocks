@@ -78,7 +78,7 @@ var _ = Describe("TLS self-signed cert function", func() {
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ConfigMapSignature, true, client.InNamespace(testCtx.DefaultNamespace))
 		// non-namespaced
 		testapps.ClearResources(&testCtx, generics.ParametersDefinitionSignature, ml)
-		testapps.ClearResources(&testCtx, generics.ParameterDrivenConfigRenderSignature, ml)
+		testapps.ClearResources(&testCtx, generics.ParamConfigRendererSignature, ml)
 		testapps.ClearResources(&testCtx, generics.BackupPolicyTemplateSignature, ml)
 	}
 
@@ -108,7 +108,7 @@ var _ = Describe("TLS self-signed cert function", func() {
 				Create(&testCtx).
 				GetObject()
 
-			testparameters.NewParametersDrivenConfigFactory(pdcrName).
+			testparameters.NewParamConfigRendererFactory(pdcrName).
 				SetParametersDefs(paramsdef.Name).
 				SetComponentDefinition(compDefObj.GetName()).
 				SetTemplateName(configTemplateName).

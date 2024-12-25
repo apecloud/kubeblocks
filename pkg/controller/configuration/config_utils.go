@@ -74,7 +74,7 @@ func buildConfigManagerWithComponent(rctx *render.ResourceCtx, cluster *appsv1.C
 
 		podSpec      = synthesizedComp.PodSpec
 		configSpecs  = synthesizedComp.ConfigTemplates
-		configRender *parametersv1alpha1.ParameterDrivenConfigRender
+		configRender *parametersv1alpha1.ParamConfigRenderer
 		paramsDefs   []*parametersv1alpha1.ParametersDefinition
 	)
 
@@ -270,7 +270,7 @@ func findPortByPortName(container corev1.Container) (int32, bool) {
 }
 
 // UpdateConfigPayload updates the configuration payload
-func UpdateConfigPayload(config *parametersv1alpha1.ComponentParameterSpec, component *appsv1.ComponentSpec, configRender *parametersv1alpha1.ParameterDrivenConfigRenderSpec) error {
+func UpdateConfigPayload(config *parametersv1alpha1.ComponentParameterSpec, component *appsv1.ComponentSpec, configRender *parametersv1alpha1.ParamConfigRendererSpec) error {
 	if len(configRender.Configs) == 0 {
 		return nil
 	}
@@ -338,7 +338,7 @@ func runningComponentParameter(ctx context.Context, reader client.Reader, comp *
 	return componentParameter, nil
 }
 
-func buildComponentParameter(ctx context.Context, reader client.Reader, comp *component.SynthesizedComponent, owner *appsv1.Component, cmpd *appsv1.ComponentDefinition, configRender *parametersv1alpha1.ParameterDrivenConfigRender, paramsDefs []*parametersv1alpha1.ParametersDefinition) (*parametersv1alpha1.ComponentParameter, error) {
+func buildComponentParameter(ctx context.Context, reader client.Reader, comp *component.SynthesizedComponent, owner *appsv1.Component, cmpd *appsv1.ComponentDefinition, configRender *parametersv1alpha1.ParamConfigRenderer, paramsDefs []*parametersv1alpha1.ParametersDefinition) (*parametersv1alpha1.ComponentParameter, error) {
 	tpls, err := ResolveComponentTemplate(ctx, reader, cmpd)
 	if err != nil {
 		return nil, err

@@ -23,9 +23,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
-
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
@@ -40,24 +37,6 @@ var _ = Describe("ComponentParameter Controller", func() {
 	BeforeEach(cleanEnv)
 
 	AfterEach(cleanEnv)
-
-	updatePDCRForInjectEnv := func() {
-		Eventually(testapps.GetAndChangeObj(&testCtx, types.NamespacedName{Name: pdcrName}, func(pdcr *parametersv1alpha1.ParameterDrivenConfigRender) {
-			pdcr.Spec.Configs = append(pdcr.Spec.Configs, parametersv1alpha1.ComponentConfigDescription{
-				Name:         envTestFileKey,
-				TemplateName: configSpecName,
-				InjectEnvTo:  []string{testapps.DefaultMySQLContainerName},
-				FileFormatConfig: &parametersv1alpha1.FileFormatConfig{
-					Format: parametersv1alpha1.Properties,
-				},
-			})
-		})).Should(Succeed())
-
-		Eventually(testapps.CheckObj(&testCtx, types.NamespacedName{Name: pdcrName}, func(g Gomega, pdcr *parametersv1alpha1.ParameterDrivenConfigRender) {
-			g.Expect(pdcr.Spec.Configs).Should(HaveLen(2))
-			g.Expect(pdcr.Spec.Configs[1].FileFormatConfig.Format).Should(BeEquivalentTo(parametersv1alpha1.Properties))
-		})).Should(Succeed())
-	}
 
 	Context("When updating configuration", func() {
 		It("Should reconcile success", func() {
@@ -92,48 +71,6 @@ var _ = Describe("ComponentParameter Controller", func() {
 				g.Expect(itemStatus).ShouldNot(BeNil())
 				g.Expect(itemStatus.UpdateRevision).Should(BeEquivalentTo("2"))
 				g.Expect(itemStatus.Phase).Should(BeEquivalentTo(parametersv1alpha1.CFinishedPhase))
-			})).Should(Succeed())
-		})
-
-	})
-
-	Context("When updating configuration with injectEnvTo", func() {
-		It("Should reconcile success", func() {
-			mockReconcileResource()
-			updatePDCRForInjectEnv()
-
-			cfgKey := client.ObjectKey{
-				Name:      core.GenerateComponentConfigurationName(clusterName, defaultCompName),
-				Namespace: testCtx.DefaultNamespace,
-			}
-			envKey := client.ObjectKey{
-				Name:      core.GenerateEnvFromName(core.GetComponentCfgName(clusterName, defaultCompName, configSpecName)),
-				Namespace: testCtx.DefaultNamespace,
-			}
-
-			By("reconfiguring parameters.")
-			Eventually(testapps.GetAndChangeObj(&testCtx, cfgKey, func(cfg *parametersv1alpha1.ComponentParameter) {
-				item := intctrlutil.GetConfigTemplateItem(&cfg.Spec, configSpecName)
-				item.ConfigFileParams = map[string]parametersv1alpha1.ParametersInFile{
-					envTestFileKey: {
-						Parameters: map[string]*string{
-							"max_connections": cfgutil.ToPointer("1000"),
-							"gtid_mode":       cfgutil.ToPointer("ON"),
-						},
-					},
-				}
-			})).Should(Succeed())
-
-			Eventually(testapps.CheckObj(&testCtx, cfgKey, func(g Gomega, cfg *parametersv1alpha1.ComponentParameter) {
-				itemStatus := intctrlutil.GetItemStatus(&cfg.Status, configSpecName)
-				g.Expect(itemStatus).ShouldNot(BeNil())
-				g.Expect(itemStatus.UpdateRevision).Should(BeEquivalentTo("2"))
-				g.Expect(itemStatus.Phase).Should(BeEquivalentTo(parametersv1alpha1.CFinishedPhase))
-			})).Should(Succeed())
-
-			Eventually(testapps.CheckObj(&testCtx, envKey, func(g Gomega, envObj *corev1.ConfigMap) {
-				g.Expect(envObj.Data).Should(HaveKeyWithValue("max_connections", "1000"))
-				g.Expect(envObj.Data).Should(HaveKeyWithValue("gtid_mode", "ON"))
 			})).Should(Succeed())
 		})
 

@@ -46,7 +46,7 @@ var _ = Describe("ConfigurationOperatorTest", func() {
 	var configMapObj *corev1.ConfigMap
 	var scriptsObj *corev1.ConfigMap
 	var parametersDef *parametersv1alpha1.ParametersDefinition
-	var configRender *parametersv1alpha1.ParameterDrivenConfigRender
+	var configRender *parametersv1alpha1.ParamConfigRenderer
 	var componentParameter *parametersv1alpha1.ComponentParameter
 	var k8sMockClient *testutil.K8sClientMockHelper
 
@@ -82,7 +82,7 @@ var _ = Describe("ConfigurationOperatorTest", func() {
 			Component(mysqlCompName).
 			GetObject()
 		parametersDef = testparameters.NewParametersDefinitionFactory(paramsDefName).GetObject()
-		configRender = testparameters.NewParametersDrivenConfigFactory(pdcrName).
+		configRender = testparameters.NewParamConfigRendererFactory(pdcrName).
 			SetComponentDefinition(compDefObj.Name).
 			SetParametersDefs(paramsDefName).
 			GetObject()

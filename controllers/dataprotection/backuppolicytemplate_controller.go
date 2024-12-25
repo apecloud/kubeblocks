@@ -82,7 +82,7 @@ func (r *BackupPolicyTemplateReconciler) setComponentDefLabels(reqCtx intctrluti
 	for _, item := range compDefList.Items {
 		for _, compDef := range bpt.Spec.CompDefs {
 			// set componentDef labels
-			if component.PrefixOrRegexMatched(item.Name, compDef) {
+			if component.RegexMatched(item.Name, compDef) {
 				bpt.Labels[item.Name] = item.Name
 			}
 		}
@@ -159,7 +159,7 @@ func (r *BackupPolicyTemplateReconciler) validateAvailable(reqCtx intctrlutil.Re
 
 func (r *BackupPolicyTemplateReconciler) isCompatibleWith(compDef appsv1.ComponentDefinition, bpt *dpv1alpha1.BackupPolicyTemplate) bool {
 	for _, compDefRegex := range bpt.Spec.CompDefs {
-		if component.PrefixOrRegexMatched(compDef.Name, compDefRegex) {
+		if component.RegexMatched(compDef.Name, compDefRegex) {
 			return true
 		}
 	}

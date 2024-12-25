@@ -329,7 +329,7 @@ func listShardingDefinitionsWithPattern(ctx context.Context, cli client.Reader, 
 		if item.Name == name {
 			fullyMatched = append(fullyMatched, &shardingDefList.Items[i])
 		}
-		if component.PrefixOrRegexMatched(item.Name, name) {
+		if component.RegexMatched(item.Name, name) {
 			patternMatched = append(patternMatched, &shardingDefList.Items[i])
 		}
 	}

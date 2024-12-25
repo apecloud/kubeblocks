@@ -236,7 +236,7 @@ func (r *ClusterDefinitionReconciler) loadTopologyCompDefs(ctx context.Context,
 	for _, comp := range topology.Components {
 		defs := make([]*appsv1.ComponentDefinition, 0)
 		for compDefName := range compDefs {
-			if component.PrefixOrRegexMatched(compDefName, comp.CompDef) {
+			if component.RegexMatched(compDefName, comp.CompDef) {
 				defs = append(defs, compDefs[compDefName])
 			}
 		}
@@ -293,7 +293,7 @@ func (r *ClusterDefinitionReconciler) loadTopologyShardingDefs(ctx context.Conte
 	for _, sharding := range topology.Shardings {
 		defs := make([]*appsv1.ShardingDefinition, 0)
 		for shardingDefName := range shardingDefs {
-			if component.PrefixOrRegexMatched(shardingDefName, sharding.ShardingDef) {
+			if component.RegexMatched(shardingDefName, sharding.ShardingDef) {
 				defs = append(defs, shardingDefs[shardingDefName])
 			}
 		}

@@ -148,7 +148,7 @@ var _ = Describe("component utils", func() {
 				want: false,
 			}}
 			for _, tt := range tests {
-				match := PrefixOrRegexMatched(tt.fields.compDef, tt.fields.compDefPattern)
+				match := RegexMatched(tt.fields.compDef, tt.fields.compDefPattern)
 				Expect(match).Should(Equal(tt.want))
 			}
 		})

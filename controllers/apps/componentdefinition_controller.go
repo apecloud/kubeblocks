@@ -499,7 +499,7 @@ func listCompDefinitionsWithPattern(ctx context.Context, cli client.Reader, name
 		if item.Name == name {
 			compDefsFullyMatched = append(compDefsFullyMatched, &compDefList.Items[i])
 		}
-		if component.PrefixOrRegexMatched(item.Name, name) {
+		if component.RegexMatched(item.Name, name) {
 			compDefsPatternMatched = append(compDefsPatternMatched, &compDefList.Items[i])
 		}
 	}

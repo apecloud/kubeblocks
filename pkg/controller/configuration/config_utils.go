@@ -339,7 +339,7 @@ func runningComponentParameter(ctx context.Context, reader client.Reader, comp *
 }
 
 func buildComponentParameter(ctx context.Context, reader client.Reader, comp *component.SynthesizedComponent, owner *appsv1.Component, cmpd *appsv1.ComponentDefinition, configRender *parametersv1alpha1.ParameterDrivenConfigRender, paramsDefs []*parametersv1alpha1.ParametersDefinition) (*parametersv1alpha1.ComponentParameter, error) {
-	tpls, err := resolveComponentTemplate(ctx, reader, cmpd)
+	tpls, err := ResolveComponentTemplate(ctx, reader, cmpd)
 	if err != nil {
 		return nil, err
 	}
@@ -369,7 +369,7 @@ func mergeComponentParameter(expected *parametersv1alpha1.ComponentParameter, ex
 	})
 }
 
-func resolveComponentTemplate(ctx context.Context, reader client.Reader, cmpd *appsv1.ComponentDefinition) (map[string]*corev1.ConfigMap, error) {
+func ResolveComponentTemplate(ctx context.Context, reader client.Reader, cmpd *appsv1.ComponentDefinition) (map[string]*corev1.ConfigMap, error) {
 	tpls := make(map[string]*corev1.ConfigMap, len(cmpd.Spec.Configs))
 	for _, config := range cmpd.Spec.Configs {
 		cm := &corev1.ConfigMap{}

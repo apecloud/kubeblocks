@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -32,6 +33,7 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 )
@@ -85,14 +87,19 @@ func (r *ParameterDrivenConfigRenderReconciler) reconcile(reqCtx intctrlutil.Req
 	if intctrlutil.ParametersDrivenConfigRenderTerminalPhases(parameterTemplate.Status, parameterTemplate.Generation) {
 		return intctrlutil.Reconciled()
 	}
-
-	if err := r.validate(reqCtx, r.Client, &parameterTemplate.Spec); err != nil {
-		if uErr := r.unavailable(reqCtx.Ctx, r.Client, parameterTemplate, err); uErr != nil {
-			return intctrlutil.RequeueWithError(uErr, reqCtx.Log, "")
+	cmpd := &appsv1.ComponentDefinition{}
+	if err := r.Get(reqCtx.Ctx, client.ObjectKey{Name: parameterTemplate.Spec.ComponentDef}, cmpd); err != nil {
+		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
+	}
+	if err := fillParameterTemplate(reqCtx, r.Client, parameterTemplate, cmpd); err != nil {
+		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
+	}
+	if err := r.validate(reqCtx, r.Client, &parameterTemplate.Spec, cmpd); err != nil {
+		if err2 := r.unavailable(reqCtx.Ctx, r.Client, parameterTemplate, err); err2 != nil {
+			return intctrlutil.RequeueWithError(err2, reqCtx.Log, "")
 		}
 		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
 	}
-
 	if err := r.available(reqCtx.Ctx, r.Client, parameterTemplate); err != nil {
 		return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 	}
@@ -101,11 +108,7 @@ func (r *ParameterDrivenConfigRenderReconciler) reconcile(reqCtx intctrlutil.Req
 	return intctrlutil.Reconciled()
 }
 
-func (r *ParameterDrivenConfigRenderReconciler) validate(ctx intctrlutil.RequestCtx, cli client.Client, parameterTemplate *parametersv1alpha1.ParamConfigRendererSpec) error {
-	cmpd := &appsv1.ComponentDefinition{}
-	if err := cli.Get(ctx.Ctx, client.ObjectKey{Name: parameterTemplate.ComponentDef}, cmpd); err != nil {
-		return err
-	}
+func (r *ParameterDrivenConfigRenderReconciler) validate(ctx intctrlutil.RequestCtx, cli client.Client, parameterTemplate *parametersv1alpha1.ParamConfigRendererSpec, cmpd *appsv1.ComponentDefinition) error {
 	if err := validateParametersDefs(ctx, cli, parameterTemplate.ParametersDefs); err != nil {
 		return err
 	}
@@ -113,6 +116,55 @@ func (r *ParameterDrivenConfigRenderReconciler) validate(ctx intctrlutil.Request
 		return err
 	}
 	return nil
+}
+
+func (r *ParameterDrivenConfigRenderReconciler) available(ctx context.Context, cli client.Client, parameterTemplate *parametersv1alpha1.ParamConfigRenderer) error {
+	return r.status(ctx, cli, parameterTemplate, parametersv1alpha1.PDAvailablePhase, nil)
+}
+
+func (r *ParameterDrivenConfigRenderReconciler) unavailable(ctx context.Context, cli client.Client, parameterTemplate *parametersv1alpha1.ParamConfigRenderer, err error) error {
+	return r.status(ctx, cli, parameterTemplate, parametersv1alpha1.PDUnavailablePhase, err)
+}
+
+func (r *ParameterDrivenConfigRenderReconciler) status(ctx context.Context, cli client.Client, parameterRender *parametersv1alpha1.ParamConfigRenderer, phase parametersv1alpha1.ParametersDescPhase, err error) error {
+	patch := client.MergeFrom(parameterRender.DeepCopy())
+	parameterRender.Status.ObservedGeneration = parameterRender.Generation
+	parameterRender.Status.Phase = phase
+	parameterRender.Status.Message = ""
+	if err != nil {
+		parameterRender.Status.Message = err.Error()
+	}
+	return cli.Status().Patch(ctx, parameterRender, patch)
+}
+
+func fillParameterTemplate(reqCtx intctrlutil.RequestCtx, cli client.Client, template *parametersv1alpha1.ParamConfigRenderer, cmpd *appsv1.ComponentDefinition) (err error) {
+	var tpls map[string]*corev1.ConfigMap
+
+	match := func(spec parametersv1alpha1.ComponentConfigDescription) bool {
+		return spec.TemplateName == ""
+	}
+	resolveConfigTemplate := func(config string) string {
+		for name, configTemplate := range tpls {
+			if _, ok := configTemplate.Data[config]; ok {
+				return name
+			}
+		}
+		return ""
+	}
+
+	if generics.CountFunc(template.Spec.Configs, match) == 0 {
+		return nil
+	}
+	if tpls, err = configctrl.ResolveComponentTemplate(reqCtx.Ctx, cli, cmpd); err != nil {
+		return err
+	}
+	deepCopy := template.DeepCopy()
+	for i, config := range deepCopy.Spec.Configs {
+		if tplName := resolveConfigTemplate(config.Name); tplName != "" {
+			deepCopy.Spec.Configs[i].TemplateName = tplName
+		}
+	}
+	return cli.Patch(reqCtx.Ctx, deepCopy, client.MergeFrom(template))
 }
 
 func validateParametersConfigs(configs []parametersv1alpha1.ComponentConfigDescription, templates []appsv1.ComponentTemplateSpec) error {
@@ -139,23 +191,4 @@ func validateParametersDefs(reqCtx intctrlutil.RequestCtx, cli client.Client, pa
 		}
 	}
 	return nil
-}
-
-func (r *ParameterDrivenConfigRenderReconciler) available(ctx context.Context, cli client.Client, parameterTemplate *parametersv1alpha1.ParamConfigRenderer) error {
-	return r.status(ctx, cli, parameterTemplate, parametersv1alpha1.PDAvailablePhase, nil)
-}
-
-func (r *ParameterDrivenConfigRenderReconciler) unavailable(ctx context.Context, cli client.Client, parameterTemplate *parametersv1alpha1.ParamConfigRenderer, err error) error {
-	return r.status(ctx, cli, parameterTemplate, parametersv1alpha1.PDUnavailablePhase, err)
-}
-
-func (r *ParameterDrivenConfigRenderReconciler) status(ctx context.Context, cli client.Client, parameterRender *parametersv1alpha1.ParamConfigRenderer, phase parametersv1alpha1.ParametersDescPhase, err error) error {
-	patch := client.MergeFrom(parameterRender.DeepCopy())
-	parameterRender.Status.ObservedGeneration = parameterRender.Generation
-	parameterRender.Status.Phase = phase
-	parameterRender.Status.Message = ""
-	if err != nil {
-		parameterRender.Status.Message = err.Error()
-	}
-	return cli.Status().Patch(ctx, parameterRender, patch)
 }

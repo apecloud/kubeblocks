@@ -314,6 +314,9 @@ dataPlane:
             values:
             - "true"
 
+# dynamically replace instance's registry. ref: https://github.com/apecloud/kubeblocks/pull/8018
+registryConfig: {}
+
 # Add extra pod labels to KubeBlocks Deployment
 extraLabels: {}
 

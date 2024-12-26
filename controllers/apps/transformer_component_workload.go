@@ -442,7 +442,12 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet) *workloads.InstanceS
 	}
 	intctrlutil.MergeMetadataMapInplace(itsProto.Annotations, &itsObjCopy.Annotations)
 	intctrlutil.MergeMetadataMapInplace(itsProto.Labels, &itsObjCopy.Labels)
-	itsObjCopy.Spec.Template = *itsProto.Spec.Template.DeepCopy()
+	// merge pod spec template annotations
+	intctrlutil.MergeMetadataMapInplace(itsProto.Spec.Template.Annotations, &itsObjCopy.Spec.Template.Annotations)
+	podTemplateCopy := *itsProto.Spec.Template.DeepCopy()
+	podTemplateCopy.Annotations = itsObjCopy.Spec.Template.Annotations
+
+	itsObjCopy.Spec.Template = podTemplateCopy
 	itsObjCopy.Spec.Replicas = itsProto.Spec.Replicas
 	itsObjCopy.Spec.Roles = itsProto.Spec.Roles
 	itsObjCopy.Spec.MembershipReconfiguration = itsProto.Spec.MembershipReconfiguration

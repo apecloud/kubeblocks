@@ -1234,7 +1234,7 @@ var _ = Describe("Cluster Controller", func() {
 
 			testUpdateAnnoAndLabels := func(compName string,
 				changeCluster func(cluster *appsv1.Cluster),
-				checkWorkloadFunc func(g Gomega, labels, annotations map[string]string),
+				checkWorkloadFunc func(g Gomega, labels, annotations map[string]string, isInstanceSet bool),
 				checkRelatedObjFunc func(g Gomega, obj client.Object)) {
 				Expect(testapps.ChangeObj(&testCtx, clusterObj, func(obj *appsv1.Cluster) {
 					changeCluster(obj)
@@ -1244,7 +1244,7 @@ var _ = Describe("Cluster Controller", func() {
 				workloadName := constant.GenerateWorkloadNamePattern(clusterObj.Name, defaultCompName)
 				Eventually(testapps.CheckObj(&testCtx, client.ObjectKey{Name: workloadName,
 					Namespace: testCtx.DefaultNamespace}, func(g Gomega, compObj *appsv1.Component) {
-					checkWorkloadFunc(g, compObj.Spec.Labels, compObj.Spec.Annotations)
+					checkWorkloadFunc(g, compObj.Spec.Labels, compObj.Spec.Annotations, false)
 				})).Should(Succeed())
 
 				By("check related objects annotations and labels")
@@ -1256,7 +1256,7 @@ var _ = Describe("Cluster Controller", func() {
 				// The labels and annotations of the Pod will be kept consistent with those of the InstanceSet
 				Eventually(testapps.CheckObj(&testCtx, client.ObjectKey{Name: workloadName, Namespace: testCtx.DefaultNamespace},
 					func(g Gomega, instanceSet *workloadsv1.InstanceSet) {
-						checkWorkloadFunc(g, instanceSet.Spec.Template.GetLabels(), instanceSet.Spec.Template.GetAnnotations())
+						checkWorkloadFunc(g, instanceSet.Spec.Template.GetLabels(), instanceSet.Spec.Template.GetAnnotations(), true)
 					})).Should(Succeed())
 			}
 
@@ -1278,7 +1278,7 @@ var _ = Describe("Cluster Controller", func() {
 						addMetaMap(&cluster.Spec.ComponentSpecs[0].Annotations, key1, value1)
 						addMetaMap(&cluster.Spec.ComponentSpecs[0].Labels, key1, value1)
 					},
-					func(g Gomega, labels, annotations map[string]string) {
+					func(g Gomega, labels, annotations map[string]string, isInstanceSet bool) {
 						g.Expect(labels[key1]).Should(Equal(value1))
 						g.Expect(annotations[key1]).Should(Equal(value1))
 					},
@@ -1287,6 +1287,14 @@ var _ = Describe("Cluster Controller", func() {
 						g.Expect(obj.GetAnnotations()[key1]).Should(Equal(value1))
 					})
 
+				By("merge instanceSet template annotations")
+				workloadName := constant.GenerateWorkloadNamePattern(clusterObj.Name, defaultCompName)
+				podTemplateKey := "pod-template-key"
+				podTemplateValue := "pod-template-value"
+				Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKey{Name: workloadName, Namespace: testCtx.DefaultNamespace}, func(instanceSet *workloadsv1.InstanceSet) {
+					instanceSet.Spec.Template.Annotations[podTemplateKey] = podTemplateValue
+				})()).Should(Succeed())
+
 				By("override annotations and labels")
 				value2 := "value2"
 				testUpdateAnnoAndLabels(defaultCompName,
@@ -1294,7 +1302,7 @@ var _ = Describe("Cluster Controller", func() {
 						addMetaMap(&cluster.Spec.ComponentSpecs[0].Annotations, key1, value2)
 						addMetaMap(&cluster.Spec.ComponentSpecs[0].Labels, key1, value2)
 					},
-					func(g Gomega, labels, annotations map[string]string) {
+					func(g Gomega, labels, annotations map[string]string, isInstanceSet bool) {
 						g.Expect(labels[key1]).Should(Equal(value2))
 						g.Expect(annotations[key1]).Should(Equal(value2))
 					},
@@ -1302,6 +1310,12 @@ var _ = Describe("Cluster Controller", func() {
 						g.Expect(obj.GetLabels()[key1]).Should(Equal(value2))
 						g.Expect(obj.GetAnnotations()[key1]).Should(Equal(value2))
 					})
+
+				By("check InstanceSet template annotations should keep the custom annotations")
+				Eventually(testapps.CheckObj(&testCtx, client.ObjectKey{Name: workloadName, Namespace: testCtx.DefaultNamespace},
+					func(g Gomega, instanceSet *workloadsv1.InstanceSet) {
+						g.Expect(instanceSet.Spec.Template.Annotations[podTemplateKey]).Should(Equal(podTemplateValue))
+					})).Should(Succeed())
 
 				By("delete the annotations and labels, but retain the deleted annotations and labels for related objects")
 				key2 := "key2"
@@ -1314,9 +1328,11 @@ var _ = Describe("Cluster Controller", func() {
 							key2: value2,
 						}
 					},
-					func(g Gomega, labels, annotations map[string]string) {
+					func(g Gomega, labels, annotations map[string]string, isInstanceSet bool) {
 						g.Expect(labels).ShouldNot(HaveKey(key1))
-						g.Expect(annotations).ShouldNot(HaveKey(key1))
+						if !isInstanceSet {
+							g.Expect(annotations).ShouldNot(HaveKey(key1))
+						}
 						g.Expect(labels[key2]).Should(Equal(value2))
 						g.Expect(annotations[key2]).Should(Equal(value2))
 					},

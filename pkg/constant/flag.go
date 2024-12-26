@@ -29,6 +29,9 @@ const (
 	// HostNetworkAnnotationKey defines the feature gate to enable the host-network for specified components or shardings.
 	HostNetworkAnnotationKey = "kubeblocks.io/host-network"
 
+	// ShardPodAntiAffinityAnnotationKey defines the feature gate to set the pod anti-affinity of a shard for specified shardings.
+	ShardPodAntiAffinityAnnotationKey = "apps.kubeblocks.io/shard-pod-anti-affinity"
+
 	// FeatureReconciliationInCompactModeAnnotationKey indicates that the controller should run in compact mode,
 	// means to try the best to cutoff useless objects.
 	FeatureReconciliationInCompactModeAnnotationKey = "kubeblocks.io/compact-mode"

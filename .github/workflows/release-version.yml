@@ -113,6 +113,29 @@ jobs:
         with:
           go-version: "${{ env.GO_VERSION }}"
 
+      - name: Update apis doc
+        id: update_apis_doc
+        run: |
+          make doc
+          FILE_CHANGES=`git diff --name-only ${{ github.sha }}`
+          if [[ -n "$FILE_CHANGES" ]]; then
+            echo $FILE_CHANGES
+            git config --local user.name "$GITHUB_ACTOR"
+            git config --local user.email "$GITHUB_ACTOR@users.noreply.github.com"
+            git commit -a -m "chore: auto update apis docs"
+          fi
+          echo file_changes=$FILE_CHANGES >> $GITHUB_OUTPUT
+          
+          RELEASE_COMMIT="$(git rev-parse HEAD)"
+          echo 'RELEASE_COMMIT='${RELEASE_COMMIT} >> $GITHUB_ENV
+
+      - name: Checkout kubeblocks-addons ${{ github.ref_name }}
+        uses: actions/checkout@v4
+        with:
+          repository: apecloud/kubeblocks-addons
+          path: kubeblocks-addons
+          ref: ${{ github.ref_name }}
+
       - name: checkout kbcli code
         uses: actions/checkout@v4
         with:
@@ -139,29 +162,6 @@ jobs:
           
           RELEASE_COMMIT="$(git rev-parse HEAD)"
           echo 'RELEASE_COMMIT='${RELEASE_COMMIT} >> $GITHUB_ENV
-
-      - name: Update apis doc
-        id: update_apis_doc
-        run: |
-          make doc
-          FILE_CHANGES=`git diff --name-only ${{ github.sha }}`
-          if [[ -n "$FILE_CHANGES" ]]; then
-            echo $FILE_CHANGES
-            git config --local user.name "$GITHUB_ACTOR"
-            git config --local user.email "$GITHUB_ACTOR@users.noreply.github.com"
-            git commit -a -m "chore: auto update apis docs"
-          fi
-          echo file_changes=$FILE_CHANGES >> $GITHUB_OUTPUT
-          
-          RELEASE_COMMIT="$(git rev-parse HEAD)"
-          echo 'RELEASE_COMMIT='${RELEASE_COMMIT} >> $GITHUB_ENV
-
-      - name: Checkout kubeblocks-addons ${{ github.ref_name }}
-        uses: actions/checkout@v4
-        with:
-          repository: apecloud/kubeblocks-addons
-          path: kubeblocks-addons
-          ref: ${{ github.ref_name }}
 
       - name: upgrade addons version
         id: upgrade_addon_version

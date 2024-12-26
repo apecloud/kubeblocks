@@ -201,7 +201,7 @@ func (r *Cluster) changesFromCluster(cluster *appsv1.Cluster) {
 	//   status
 	//     components
 	//       - message: ComponentMessageMap -> map[string]string
-	// appsv1.TerminationPolicyType is a subset of TerminationPolicyType, it can be converted directly.
+	// appsv1.TerminationPolicyType is a subset of appsv1alpha1.TerminationPolicyType, it can be converted directly.
 	if len(cluster.Spec.ClusterDef) > 0 {
 		r.Spec.ClusterDefRef = cluster.Spec.ClusterDef
 	}

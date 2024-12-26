@@ -467,12 +467,8 @@ func ValidateParentBackupSet(parentBackupSet *BackupActionSet, backupSet *Backup
 	return nil
 }
 
-// BackupFilePathEnv returns the envs for backup root path and target relative path.
-func BackupFilePathEnv(filePath, targetName, targetPodName string) []corev1.EnvVar {
-	envs := []corev1.EnvVar{}
-	if len(filePath) == 0 {
-		return envs
-	}
+// GetTargetRelativePath returns the target relative path.
+func GetTargetRelativePath(targetName, targetPodName string) string {
 	targetRelativePath := ""
 	if targetName != "" {
 		targetRelativePath = filepath.Join("/", targetRelativePath, targetName)
@@ -480,6 +476,16 @@ func BackupFilePathEnv(filePath, targetName, targetPodName string) []corev1.EnvV
 	if targetPodName != "" {
 		targetRelativePath = filepath.Join("/", targetRelativePath, targetPodName)
 	}
+	return targetRelativePath
+}
+
+// BackupFilePathEnv returns the envs for backup root path and target relative path.
+func BackupFilePathEnv(filePath, targetName, targetPodName string) []corev1.EnvVar {
+	envs := []corev1.EnvVar{}
+	if len(filePath) == 0 {
+		return envs
+	}
+	targetRelativePath := GetTargetRelativePath(targetName, targetPodName)
 	envs = append(envs, []corev1.EnvVar{
 		{
 			Name:  dptypes.DPTargetRelativePath,
@@ -488,6 +494,11 @@ func BackupFilePathEnv(filePath, targetName, targetPodName string) []corev1.EnvV
 		{
 			Name:  dptypes.DPBackupRootPath,
 			Value: filepath.Join("/", filePath, "../"),
+		},
+		// append targetName and sourceTargetPodName in backup path
+		{
+			Name:  dptypes.DPBackupBasePath,
+			Value: filepath.Join("/", filePath, targetRelativePath),
 		},
 	}...)
 	return envs

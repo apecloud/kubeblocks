@@ -22,7 +22,6 @@ package restore
 import (
 	"encoding/json"
 	"fmt"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -192,17 +191,8 @@ func (r *restoreJobBuilder) addCommonEnv(sourceTargetPodName string) *restoreJob
 	// add common env
 	filePath := r.backupSet.Backup.Status.Path
 	if filePath != "" {
-		// append targetName in backup path
-		if r.restore.Spec.Backup.SourceTargetName != "" {
-			filePath = filepath.Join("/", filePath, r.restore.Spec.Backup.SourceTargetName)
-		}
-		// append sourceTargetPodName in backup path
-		if sourceTargetPodName != "" {
-			filePath = filepath.Join("/", filePath, sourceTargetPodName)
-		}
-		r.env = append(r.env, corev1.EnvVar{Name: dptypes.DPBackupBasePath, Value: filePath})
+		r.env = append(r.env, BackupFilePathEnv(filePath, r.restore.Spec.Backup.SourceTargetName, sourceTargetPodName)...)
 	}
-	r.env = append(r.env, BackupFilePathEnv(filePath, r.restore.Spec.Backup.SourceTargetName, sourceTargetPodName)...)
 	if r.backupSet.BaseBackup != nil {
 		r.env = append(r.env, corev1.EnvVar{Name: dptypes.DPBaseBackupName, Value: r.backupSet.BaseBackup.Name})
 	}

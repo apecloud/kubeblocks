@@ -169,55 +169,55 @@ jobs:
       APECD_REF: "v0.1.86"
     secrets: inherit
 
-  release-addons-chart-ent:
-    needs: [ release-chart ]
-    uses: apecloud/apecloud-cd/.github/workflows/release-charts-enterprise.yml@v0.1.86
-    with:
-      GITHUB_REPO: "apecloud/apecloud-addons"
-      GITHUB_REF: "${{ github.ref_name }}"
-      CHART_DIR: "addons"
-      APECD_REF: "v0.1.86"
-      ENABLE_JIHU: false
-    secrets: inherit
-
-  get-addons-chart-dir-ent:
-    runs-on: ubuntu-latest
-    outputs:
-      matrix: ${{ steps.get_addons_chart_dir.outputs.matrix }}
-    steps:
-      - name: Checkout apecloud-addons Code
-        uses: actions/checkout@v4
-        with:
-          repository: apecloud/apecloud-addons
-          path: apecloud-addons
-          ref: "${{ github.ref_name }}"
-          token: ${{ env.GITHUB_TOKEN }}
-
-      - name: get addons chart dir
-        id: get_addons_chart_dir
-        run: |
-          addons_list=$(ls apecloud-addons/addons)
-          ADDONS_DIR=""
-          for addons_name in $( echo "$addons_list" ); do
-              if [[ -z "$ADDONS_DIR" ]]; then
-                  ADDONS_DIR="{\"addon-name\":\"$addons_name\"}"
-              else
-                  ADDONS_DIR="$ADDONS_DIR,{\"addon-name\":\"$addons_name\"}"
-              fi
-          done
-          echo "$ADDONS_DIR"
-          echo "matrix={\"include\":[$ADDONS_DIR]}" >> $GITHUB_OUTPUT
-
-  release-addons-chart-jihu-ent:
-    needs: [ get-addons-chart-dir-ent ]
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJSON(needs.get-addons-chart-dir-ent.outputs.matrix) }}
-    uses: apecloud/apecloud-cd/.github/workflows/release-charts-jihu-enterprise.yml@v0.1.86
-    with:
-      GITHUB_REPO: "apecloud/apecloud-addons"
-      GITHUB_REF: "${{ github.ref_name }}"
-      CHART_DIR: "addons"
-      SPECIFY_CHART: "${{ matrix.addon-name }}"
-      APECD_REF: "v0.1.86"
-    secrets: inherit
+#  release-addons-chart-ent:
+#    needs: [ release-chart ]
+#    uses: apecloud/apecloud-cd/.github/workflows/release-charts-enterprise.yml@v0.1.86
+#    with:
+#      GITHUB_REPO: "apecloud/apecloud-addons"
+#      GITHUB_REF: "${{ github.ref_name }}"
+#      CHART_DIR: "addons"
+#      APECD_REF: "v0.1.86"
+#      ENABLE_JIHU: false
+#    secrets: inherit
+#
+#  get-addons-chart-dir-ent:
+#    runs-on: ubuntu-latest
+#    outputs:
+#      matrix: ${{ steps.get_addons_chart_dir.outputs.matrix }}
+#    steps:
+#      - name: Checkout apecloud-addons Code
+#        uses: actions/checkout@v4
+#        with:
+#          repository: apecloud/apecloud-addons
+#          path: apecloud-addons
+#          ref: "${{ github.ref_name }}"
+#          token: ${{ env.GITHUB_TOKEN }}
+#
+#      - name: get addons chart dir
+#        id: get_addons_chart_dir
+#        run: |
+#          addons_list=$(ls apecloud-addons/addons)
+#          ADDONS_DIR=""
+#          for addons_name in $( echo "$addons_list" ); do
+#              if [[ -z "$ADDONS_DIR" ]]; then
+#                  ADDONS_DIR="{\"addon-name\":\"$addons_name\"}"
+#              else
+#                  ADDONS_DIR="$ADDONS_DIR,{\"addon-name\":\"$addons_name\"}"
+#              fi
+#          done
+#          echo "$ADDONS_DIR"
+#          echo "matrix={\"include\":[$ADDONS_DIR]}" >> $GITHUB_OUTPUT
+#
+#  release-addons-chart-jihu-ent:
+#    needs: [ get-addons-chart-dir-ent ]
+#    strategy:
+#      fail-fast: false
+#      matrix: ${{ fromJSON(needs.get-addons-chart-dir-ent.outputs.matrix) }}
+#    uses: apecloud/apecloud-cd/.github/workflows/release-charts-jihu-enterprise.yml@v0.1.86
+#    with:
+#      GITHUB_REPO: "apecloud/apecloud-addons"
+#      GITHUB_REF: "${{ github.ref_name }}"
+#      CHART_DIR: "addons"
+#      SPECIFY_CHART: "${{ matrix.addon-name }}"
+#      APECD_REF: "v0.1.86"
+#    secrets: inherit

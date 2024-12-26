@@ -1,35 +1,46 @@
 ---
-title: kbcli cluster custom-ops mysql-orc-switchover
+title: kbcli cluster create minio
 ---
 
-Create a custom ops with opsDef mysql-orc-switchover
+Create a minio cluster.
 
 ```
-kbcli cluster custom-ops mysql-orc-switchover <ClusterName> [flags]
+kbcli cluster create minio NAME [flags]
 ```
 
 ### Examples
 
 ```
-  # Create a mysql-orc-switchover ops
-  kbcli cluster custom-ops mysql-orc-switchover <clusterName> --component <componentName>
+  # Create a cluster with the default values
+  kbcli cluster create minio
+  
+  # Create a cluster with the specified cpu, memory and storage
+  kbcli cluster create minio --cpu 1 --memory 2 --storage 10
 ```
 
 ### Options
 
 ```
-      --auto-approve                   Skip interactive approval before promote the instance
-      --candidate string               candidate instance name(pod Name). if candidate is not empty, will promote it to primary.
-                                       otherwise promote a randomly selected pod to primary.
-                                       
-      --component string               Specify the component name of the cluster. if not specified, using the first component which referenced the defined componentDefinition.
+      --availability-policy string     The availability policy of cluster. Legal values [none, node, zone]. (default "node")
+      --cpu float                      CPU cores. Value range [0.5, 64]. (default 0.5)
+      --disable-exporter               Enable or disable monitor. (default true)
       --dry-run string[="unchanged"]   Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent. (default "none")
       --edit                           Edit the API resource before creating
-      --force                           skip the pre-checks of the opsRequest to run the opsRequest forcibly
-  -h, --help                           help for mysql-orc-switchover
-      --name string                    OpsRequest name. if not specified, it will be randomly generated
+  -h, --help                           help for minio
+      --host-network-accessible        Specify whether the cluster can be accessed from within the VPC.
+      --memory float                   Memory, the unit is Gi. Value range [0.5, 1000]. (default 0.5)
+      --node-labels stringToString     Node label selector (default [])
   -o, --output format                  Prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
-      --ttlSecondsAfterSucceed int     Time to live after the OpsRequest succeed
+      --pod-anti-affinity string       Pod anti-affinity type, one of: (Preferred, Required) (default "Preferred")
+      --publicly-accessible            Specify whether the cluster can be accessed from the public internet.
+      --rbac-enabled                   Specify whether rbac resources will be created by client, otherwise KubeBlocks server will try to create rbac resources.
+      --replicas int                   The number of replicas Value range [1, 5]. (default 1)
+      --storage float                  Storage size, the unit is Gi. Value range [1, 10000]. (default 20)
+      --storage-class-name string      Storage class name of the data volume
+      --tenancy string                 The tenancy of cluster. Legal values [SharedNode, DedicatedNode]. (default "SharedNode")
+      --termination-policy string      The termination policy of cluster. Legal values [DoNotTerminate, Halt, Delete, WipeOut]. (default "Delete")
+      --tolerations strings            Tolerations for cluster, such as "key=value:effect,key:effect", for example '"engineType=mongo:NoSchedule", "diskType:NoSchedule"'
+      --topology-keys stringArray      Topology keys for affinity
 ```
 
 ### Options inherited from parent commands
@@ -58,7 +69,7 @@ kbcli cluster custom-ops mysql-orc-switchover <ClusterName> [flags]
 
 ### SEE ALSO
 
-* [kbcli cluster custom-ops](kbcli_cluster_custom-ops.md)	 - 
+* [kbcli cluster create](kbcli_cluster_create.md)	 - Create a cluster.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

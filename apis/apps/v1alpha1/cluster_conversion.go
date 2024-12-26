@@ -127,24 +127,24 @@ func (r *Cluster) changesToCluster(cluster *appsv1.Cluster) {
 
 	r.toClusterServices(cluster)
 
-	if cluster.Spec.SchedulingPolicy == nil {
-		var componentName string
-		if len(r.Spec.ComponentSpecs) > 0 {
-			componentName = r.Spec.ComponentSpecs[0].Name
-		}
-		// TODO: support convert the schedulingPolicy of the shardings
-		affinity := r.Spec.Affinity
-		if r.Spec.Affinity == nil {
-			affinity = buildAffinity(r)
-		}
-		cluster.Spec.SchedulingPolicy = r.toSchedulingPolicy(affinity, r.Spec.Tolerations, componentName)
-	}
-
 	for i := range r.Spec.ComponentSpecs {
 		compSpec := r.Spec.ComponentSpecs[i]
 		r.toComponentSpec(compSpec, &cluster.Spec.ComponentSpecs[i], compSpec.Name)
 	}
-	// TODO: support convert the shardings
+	var shardingRequiredPodAntiAffinity []string
+	for i := range r.Spec.ShardingSpecs {
+		shardingSpec := r.Spec.ShardingSpecs[i]
+		podAntiAffinityRequired := r.toComponentSpec(shardingSpec.Template, &cluster.Spec.Shardings[i].Template, shardingSpec.Name)
+		if podAntiAffinityRequired {
+			shardingRequiredPodAntiAffinity = append(shardingRequiredPodAntiAffinity, shardingSpec.Name)
+		}
+	}
+	if len(shardingRequiredPodAntiAffinity) > 0 {
+		if cluster.Annotations == nil {
+			cluster.Annotations = make(map[string]string)
+		}
+		cluster.Annotations["apps.kubeblocks.io/shard-pod-anti-affinity"] = strings.Join(shardingRequiredPodAntiAffinity, ",")
+	}
 }
 
 func (r *Cluster) toClusterServices(cluster *appsv1.Cluster) {
@@ -157,9 +157,6 @@ func (r *Cluster) toClusterServices(cluster *appsv1.Cluster) {
 }
 
 func (r *Cluster) toSchedulingPolicy(affinity *Affinity, tolerations []corev1.Toleration, compName string) *appsv1.SchedulingPolicy {
-	if len(compName) == 0 {
-		return nil
-	}
 	if affinity == nil && len(tolerations) == 0 {
 		return nil
 	}
@@ -171,10 +168,19 @@ func (r *Cluster) toSchedulingPolicy(affinity *Affinity, tolerations []corev1.To
 	return schedulingPolicy
 }
 
-func (r *Cluster) toComponentSpec(fromCompSpec ClusterComponentSpec, toCompSpec *appsv1.ClusterComponentSpec, componentName string) {
-	if toCompSpec.SchedulingPolicy == nil {
-		toCompSpec.SchedulingPolicy = r.toSchedulingPolicy(fromCompSpec.Affinity, fromCompSpec.Tolerations, componentName)
+func (r *Cluster) toComponentSpec(fromCompSpec ClusterComponentSpec, toCompSpec *appsv1.ClusterComponentSpec, componentName string) bool {
+	var requiredPodAntiAffinity bool
+	if r.Spec.SchedulingPolicy == nil && toCompSpec.SchedulingPolicy == nil {
+		affinity := fromCompSpec.Affinity
+		if affinity == nil {
+			affinity = buildAffinity(r)
+		}
+		if affinity != nil && affinity.PodAntiAffinity == Required {
+			requiredPodAntiAffinity = true
+		}
+		toCompSpec.SchedulingPolicy = r.toSchedulingPolicy(affinity, fromCompSpec.Tolerations, componentName)
 	}
+	return requiredPodAntiAffinity
 }
 
 func (r *Cluster) changesFromCluster(cluster *appsv1.Cluster) {
@@ -438,6 +444,9 @@ func convertTopologySpreadConstraints4Legacy(clusterName, compName string, compA
 }
 
 func buildAffinity(cluster *Cluster) *Affinity {
+	if cluster.Spec.Affinity != nil {
+		return cluster.Spec.Affinity
+	}
 	affinityTopoKey := func(policyType AvailabilityPolicyType) string {
 		switch policyType {
 		case AvailabilityPolicyZone:

@@ -624,9 +624,7 @@ func GetParentBackup(ctx context.Context, cli client.Client, backup *dpv1alpha1.
 
 // FindParentBackupIfNotSet finds the latest valid parent backup for the incremental backup.
 // a. return the latest full backup when it is newer than the base backup of the latest incremental backup,
-//
-//	or when the base backup of the latest incremental backup is not found.
-//
+//    or when the base backup of the latest incremental backup is not found.
 // b. return the latest incremental backup.
 // c. return the latest full backup if incremental backups are not found.
 // For scheduled backups, find the parent within scheduled backups, which have the schedule label.

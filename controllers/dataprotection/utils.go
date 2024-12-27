@@ -623,8 +623,11 @@ func GetParentBackup(ctx context.Context, cli client.Client, backup *dpv1alpha1.
 }
 
 // FindParentBackupIfNotSet finds the latest valid parent backup for the incremental backup.
-// a. return the latest full backup which is not base backup of the incremental backups.
-// b. return the latest incremental backups.
+// a. return the latest full backup when it is newer than the base backup of the latest incremental backup,
+//
+//	or when the base backup of the latest incremental backup is not found.
+//
+// b. return the latest incremental backup.
 // c. return the latest full backup if incremental backups are not found.
 // For scheduled backups, find the parent within scheduled backups, which have the schedule label.
 // If not found, find the full backup as the parent within all backups.
@@ -671,14 +674,14 @@ func FindParentBackupIfNotSet(ctx context.Context, cli client.Client, backup *dp
 	if err != nil {
 		return nil, err
 	}
-	// 3. prefer the latest backup, and the incremental backup should be based on the latest full backup.
-	// For scheduled backups, find the parent within scheduled backups, which have the schedule label.
-	// For on-demand backups, find the parent within all backups.
+	// 3. prefer the latest backup; if it is an incremental backup, it should be based on the latest full backup.
 	if latestIncrementalBackup != nil && latestFullBackup != nil {
 		if !dputils.CompareWithBackupStopTime(*latestIncrementalBackup, *latestFullBackup) &&
 			latestIncrementalBackup.Status.BaseBackupName == latestFullBackup.Name {
 			return latestIncrementalBackup, nil
 		}
+		// the base backup of the latest incremental backup is not found,
+		// or the latest full backup is newer than the base backup of the latest incremental backup
 		return latestFullBackup, nil
 	}
 	// 4. get the latest unscheduled full backup if scheduled backups not found
@@ -694,9 +697,9 @@ func FindParentBackupIfNotSet(ctx context.Context, cli client.Client, backup *dp
 		return latestFullBackup, nil
 	}
 	// illegal case: no full backup found but incremental backup found,
-	// this may happen when deleting parent backup in a very short time.
 	if latestIncrementalBackup != nil {
-		return nil, fmt.Errorf("ilegal incremental backup %s/%s", latestIncrementalBackup.Namespace, latestIncrementalBackup.Name)
+		return nil, fmt.Errorf("ilegal incremental backup %s/%s", latestIncrementalBackup.Namespace,
+			latestIncrementalBackup.Name)
 	}
 	// 6. no backup found
 	return nil, nil

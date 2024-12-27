@@ -956,7 +956,8 @@ func buildInstanceTemplateExt(template workloads.InstanceTemplate, templateExt *
 				return vm.Name == item.Name
 			}
 		})
-	intctrlutil.MergeList(&template.VolumeClaimTemplates, &templateExt.VolumeClaimTemplates,
+	vcts := intctrlutil.ConvertAppsV1PersistentVolumeClaimsToCoreV1(template.VolumeClaimTemplates)
+	intctrlutil.MergeList(&vcts, &templateExt.VolumeClaimTemplates,
 		func(item corev1.PersistentVolumeClaim) func(corev1.PersistentVolumeClaim) bool {
 			return func(claim corev1.PersistentVolumeClaim) bool {
 				return claim.Name == item.Name

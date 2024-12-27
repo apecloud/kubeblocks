@@ -542,7 +542,8 @@ func (r *componentWorkloadOps) expandVolume() error {
 	for i := range r.runningITS.Spec.Instances {
 		runningInsSpec := r.runningITS.Spec.DeepCopy()
 		runningInsTPL := runningInsSpec.Instances[i]
-		intctrlutil.MergeList(&runningInsTPL.VolumeClaimTemplates, &runningInsSpec.VolumeClaimTemplates,
+		vcts := intctrlutil.ConvertAppsV1PersistentVolumeClaimsToCoreV1(runningInsTPL.VolumeClaimTemplates)
+		intctrlutil.MergeList(&vcts, &runningInsSpec.VolumeClaimTemplates,
 			func(item corev1.PersistentVolumeClaim) func(corev1.PersistentVolumeClaim) bool {
 				return func(claim corev1.PersistentVolumeClaim) bool {
 					return claim.Name == item.Name

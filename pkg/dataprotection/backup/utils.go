@@ -205,10 +205,9 @@ func GenerateLegacyCRNameByBackupSchedule(backupSchedule *dpv1alpha1.BackupSched
 
 // BuildBaseBackupPath builds the path to storage backup data in backup repository.
 func BuildBaseBackupPath(backup *dpv1alpha1.Backup, repoPathPrefix, pathPrefix string) string {
-	repoPathPrefix = strings.Trim(repoPathPrefix, "/")
-	pathPrefix = strings.Trim(pathPrefix, "/")
+	backupRootPath := BuildBackupRootPath(backup, repoPathPrefix, pathPrefix)
 	// pattern: ${repoPathPrefix}/${namespace}/${pathPrefix}/${backupName}
-	return filepath.Join("/", repoPathPrefix, backup.Namespace, pathPrefix, backup.Name)
+	return filepath.Join("/", backupRootPath, backup.Name)
 }
 
 // BuildBackupRootPath builds the root path to storage backup data in backup repository.

@@ -400,28 +400,11 @@ func (r *BackupReconciler) prepareBackupRequest(
 		if err != nil {
 			return nil, err
 		}
-		request.ActionSet = actionSet
-
-		// check continuous backups should have backupschedule label
-		if request.ActionSet.Spec.BackupType == dpv1alpha1.BackupTypeContinuous {
-			if _, ok := request.Labels[dptypes.BackupScheduleLabelKey]; !ok {
-				return nil, fmt.Errorf("continuous backup is only allowed to be created by backupSchedule")
-			}
-			backupSchedule := &dpv1alpha1.BackupSchedule{}
-			if err := request.Client.Get(reqCtx.Ctx, client.ObjectKey{Name: backup.Labels[dptypes.BackupScheduleLabelKey],
-				Namespace: backup.Namespace}, backupSchedule); err != nil {
-				return nil, err
-			}
-			if backupSchedule.Status.Phase != dpv1alpha1.BackupSchedulePhaseAvailable {
-				return nil, fmt.Errorf("create continuous backup by failed backupschedule %s/%s",
-					backupSchedule.Namespace, backupSchedule.Name)
-			}
-		}
-
 		// validate parameters
 		if err := dputils.ValidateParameters(actionSet, backup.Spec.Parameters, true); err != nil {
 			return nil, fmt.Errorf("fails to validate parameters with actionset %s: %v", actionSet.Name, err)
 		}
+		request.ActionSet = actionSet
 	}
 
 	// check encryption config
@@ -437,44 +420,25 @@ func (r *BackupReconciler) prepareBackupRequest(
 	}
 
 	request.BackupPolicy = backupPolicy
+	request.BackupMethod = backupMethod
+
+	switch dpv1alpha1.BackupType(request.GetBackupType()) {
+	case dpv1alpha1.BackupTypeIncremental:
+		request, err = prepare4Incremental(request)
+	case dpv1alpha1.BackupTypeContinuous:
+		err = validateContinuousBackup(backup, reqCtx, request.Client)
+	}
+	if err != nil {
+		return nil, err
+	}
+
 	if !snapshotVolumes {
 		// if use volume snapshot, ignore backup repo
 		if err = HandleBackupRepo(request); err != nil {
 			return nil, err
 		}
 	}
-	request.BackupMethod = backupMethod
-	// get and validate parent backup
-	if request.GetBackupType() == string(dpv1alpha1.BackupTypeIncremental) {
-		request.ParentBackup, err = GetParentBackup(reqCtx.Ctx, r.Client, request.Backup, request.BackupPolicy)
-		if err != nil {
-			return nil, err
-		}
-		parentBackupType, err := dputils.GetBackupTypeByMethodName(reqCtx, r.Client, request.ParentBackup.Spec.BackupMethod, request.BackupPolicy)
-		if err != nil {
-			return nil, err
-		}
-		switch parentBackupType {
-		case dpv1alpha1.BackupTypeFull:
-			request.BaseBackup = request.ParentBackup
-		case dpv1alpha1.BackupTypeIncremental:
-			baseBackup := &dpv1alpha1.Backup{}
-			baseBackupName := request.ParentBackup.Status.BaseBackupName
-			if len(baseBackupName) == 0 {
-				return nil, fmt.Errorf("backup %s/%s base backup name is empty", request.ParentBackup.Namespace, request.ParentBackup.Name)
-			}
-			if err := request.Client.Get(reqCtx.Ctx, client.ObjectKey{Name: baseBackupName,
-				Namespace: request.ParentBackup.Namespace}, baseBackup); err != nil {
-				return nil, fmt.Errorf("failed to get base backup %s/%s: %w", request.ParentBackup.Namespace, baseBackupName, err)
-			}
-			request.BaseBackup = baseBackup
-		default:
-			return nil, fmt.Errorf("parent backup type is %s, but only full and incremental backup are supported", parentBackupType)
-		}
-		// set status parent backup name and base backup name
-		request.Status.ParentBackupName = request.ParentBackup.Name
-		request.Status.BaseBackupName = request.BaseBackup.Name
-	}
+
 	return request, nil
 }
 
@@ -562,6 +526,14 @@ func (r *BackupReconciler) patchBackupStatus(
 	// update phase to running
 	request.Status.Phase = dpv1alpha1.BackupPhaseRunning
 	request.Status.StartTimestamp = &metav1.Time{Time: r.clock.Now().UTC()}
+
+	// set status parent backup and base backup name
+	if request.ParentBackup != nil {
+		request.Status.ParentBackupName = request.ParentBackup.Name
+	}
+	if request.BaseBackup != nil {
+		request.Status.BaseBackupName = request.BaseBackup.Name
+	}
 
 	if err = dpbackup.SetExpirationByCreationTime(request.Backup); err != nil {
 		return err
@@ -983,4 +955,57 @@ func setClusterSnapshotAnnotation(request *dpbackup.Request, cluster *kbappsv1.C
 	}
 	request.Backup.Annotations[constant.ClusterSnapshotAnnotationKey] = *clusterString
 	return nil
+}
+
+// validateContinuousBackup validates the continuous backup.
+func validateContinuousBackup(backup *dpv1alpha1.Backup, reqCtx intctrlutil.RequestCtx, cli client.Client) error {
+	// validate if the continuous backup is created by a backupSchedule.
+	if _, ok := backup.Labels[dptypes.BackupScheduleLabelKey]; !ok {
+		return fmt.Errorf("continuous backup is only allowed to be created by backupSchedule")
+	}
+	backupSchedule := &dpv1alpha1.BackupSchedule{}
+	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: backup.Labels[dptypes.BackupScheduleLabelKey],
+		Namespace: backup.Namespace}, backupSchedule); err != nil {
+		return err
+	}
+	if backupSchedule.Status.Phase != dpv1alpha1.BackupSchedulePhaseAvailable {
+		return fmt.Errorf("create continuous backup by failed backupschedule %s/%s",
+			backupSchedule.Namespace, backupSchedule.Name)
+	}
+	return nil
+}
+
+// prepare4Incremental prepares for incremental backup
+func prepare4Incremental(request *dpbackup.Request) (*dpbackup.Request, error) {
+	// get and validate parent backup
+	parentBackup, err := GetParentBackup(request.Ctx, request.Client, request.Backup, request.BackupMethod)
+	if err != nil {
+		return nil, err
+	}
+	parentBackupType, err := dputils.GetBackupTypeByMethodName(request.RequestCtx,
+		request.Client, parentBackup.Spec.BackupMethod, request.BackupPolicy)
+	if err != nil {
+		return nil, err
+	}
+	request.ParentBackup = parentBackup
+	// get and validate base backup
+	switch parentBackupType {
+	case dpv1alpha1.BackupTypeFull:
+		request.BaseBackup = request.ParentBackup
+	case dpv1alpha1.BackupTypeIncremental:
+		baseBackup := &dpv1alpha1.Backup{}
+		baseBackupName := request.ParentBackup.Status.BaseBackupName
+		if len(baseBackupName) == 0 {
+			return nil, fmt.Errorf("backup %s/%s base backup name is empty",
+				request.ParentBackup.Namespace, request.ParentBackup.Name)
+		}
+		if err := request.Client.Get(request.Ctx, client.ObjectKey{Name: baseBackupName,
+			Namespace: request.ParentBackup.Namespace}, baseBackup); err != nil {
+			return nil, fmt.Errorf("failed to get base backup %s/%s: %w", request.ParentBackup.Namespace, baseBackupName, err)
+		}
+		request.BaseBackup = baseBackup
+	default:
+		return nil, fmt.Errorf("parent backup type is %s, but only full and incremental backup are supported", parentBackupType)
+	}
+	return request, nil
 }

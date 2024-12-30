@@ -872,7 +872,7 @@ var _ = Describe("Backup Controller test", func() {
 			})
 
 			It("creates an incremental backup based on a specific backup", func() {
-				By("waiting for the full backup to complete, the full backup: " + fullBackupKey.String())
+				By("waiting for the full backup " + fullBackupKey.String() + " to complete")
 				checkBackupCompleted(fullBackup)
 				mockBackupStatus(fullBackup, "", "")
 				By("creating an incremental backup from the specific full backup " + fullBackupKey.String())
@@ -882,21 +882,32 @@ var _ = Describe("Backup Controller test", func() {
 			})
 
 			It("creates an incremental backup without specific backup", func() {
-				By("waiting for the full backup to complete, the full backup: " + fullBackupKey.String())
+				By("waiting for the full backup " + fullBackupKey.String() + " to complete")
 				checkBackupCompleted(fullBackup)
 				mockBackupStatus(fullBackup, "", "")
-				By("creating an incremental backup without specific backup")
+				By("creating an incremental backup" + incBackupName + "1 without specific backup")
 				incBackup1 := mockIncBackupAndComplete(true, incBackupName+"1", "", fullBackup.Name, fullBackup.Name)
-				By("creating an incremental backup without specific backup")
+				By("creating an incremental backup" + incBackupName + "2 without specific backup")
 				_ = mockIncBackupAndComplete(false, incBackupName+"2", "", incBackup1.Name, fullBackup.Name)
-				By("creating an incremental backup with the schedule label, it prefers the latest schedule backup as parent")
+				By("creating an incremental backup" + incBackupName + "3 with the schedule label, it prefers the latest schedule backup as parent")
 				incBackup3 := mockIncBackupAndComplete(true, incBackupName+"3", "", incBackup1.Name, fullBackup.Name)
-				By("creating an incremental backup without the schedule label, it prefers the latest backup as parent")
+				By("creating an incremental backup" + incBackupName + "4 without the schedule label, it prefers the latest backup as parent")
 				_ = mockIncBackupAndComplete(false, incBackupName+"4", "", incBackup3.Name, fullBackup.Name)
+				By("creating a new full backup from backupPolicy " + testdp.BackupPolicyName)
+				fullBackup1 := testdp.NewFakeBackup(&testCtx, func(backup *dpv1alpha1.Backup) {
+					backup.Name = "full-bakcup-1"
+				})
+				fullBackupKey1 := client.ObjectKeyFromObject(fullBackup1)
+				By("waiting for the full backup " + fullBackupKey1.String() + " to complete")
+				checkBackupCompleted(fullBackup1)
+				mockBackupStatus(fullBackup1, "", "")
+				By("creating an incremental backup " + incBackupName + "5, it prefers the latest full backup as parent")
+				_ = mockIncBackupAndComplete(false, incBackupName+"5", "", fullBackup1.Name, fullBackup1.Name)
+
 			})
 
 			It("creates an incremental backup without valid parent backups", func() {
-				By("creating an incremental backup without specific backup")
+				By("creating an incremental backup without specific parent backup")
 				incBackup1 := newFakeIncBackup(incBackupName+"1", "", false)
 				incBackupKey1 := client.ObjectKeyFromObject(incBackup1)
 				By("check backup failed")
@@ -915,11 +926,11 @@ var _ = Describe("Backup Controller test", func() {
 				incBackup2 := mockIncBackupAndComplete(false, incBackupName+"2", incBackup1.Name, incBackup1.Name, fullBackup.Name)
 				By("creating an incremental backup " + incBackupName + "3")
 				incBackup3 := mockIncBackupAndComplete(false, incBackupName+"3", "", incBackup2.Name, fullBackup.Name)
-				By("deleting an incremental backup will delete its child backup")
+				By("deleting an incremental backup" + incBackupName + "2 will delete its child backup")
 				testapps.DeleteObject(&testCtx, incBackup2, &dpv1alpha1.Backup{})
 				checkBackupDeleting(incBackup2)
 				checkBackupDeleting(incBackup3)
-				By("deleting a base backup will delete all related incremental backups")
+				By("deleting a base backup" + fullBackupKey.String() + " will delete all related incremental backups")
 				testapps.DeleteObject(&testCtx, fullBackupKey, &dpv1alpha1.Backup{})
 				checkBackupDeleting(fullBackupKey)
 				checkBackupDeleting(incBackup1)

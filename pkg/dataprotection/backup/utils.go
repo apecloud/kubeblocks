@@ -233,12 +233,12 @@ func BuildBackupPathByTarget(backup *dpv1alpha1.Backup,
 func BuildTargetRelativePath(target *dpv1alpha1.BackupTarget, targetPodName string) string {
 	path := ""
 	if target.Name != "" {
-		path = filepath.Join("/", path, target.Name)
+		path = filepath.Join(path, target.Name)
 	}
 	if target.PodSelector.Strategy == dpv1alpha1.PodSelectionStrategyAll {
-		path = filepath.Join("/", path, targetPodName)
+		path = filepath.Join(path, targetPodName)
 	}
-	// return /${DP_TARGET_RELATIVE_PATH}
+	// return ${DP_TARGET_RELATIVE_PATH}
 	return path
 }
 

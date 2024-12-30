@@ -627,8 +627,8 @@ func GetParentBackup(ctx context.Context, cli client.Client, backup *dpv1alpha1.
 // or when the base backup of the latest incremental backup is not found.
 // b. return the latest incremental backup.
 // c. return the latest full backup if incremental backups are not found.
-// For scheduled backups, find the parent within scheduled backups, which have the schedule label.
-// If not found, find the full backup as the parent within all backups.
+// For scheduled backups, find the parent within scheduled backups, which have the schedule label,
+// if not found, find the full backup as the parent within all backups.
 // For on-demand backups, find the parent within all backups.
 func FindParentBackupIfNotSet(ctx context.Context, cli client.Client, backup *dpv1alpha1.Backup,
 	backupMethod *dpv1alpha1.BackupMethod, scheduleName string) (*dpv1alpha1.Backup, error) {
@@ -694,7 +694,7 @@ func FindParentBackupIfNotSet(ctx context.Context, cli client.Client, backup *dp
 	if latestFullBackup != nil {
 		return latestFullBackup, nil
 	}
-	// illegal case: no full backup found but incremental backup found,
+	// illegal case: no full backup found but incremental backup found
 	if latestIncrementalBackup != nil {
 		return nil, fmt.Errorf("ilegal incremental backup %s/%s", latestIncrementalBackup.Namespace,
 			latestIncrementalBackup.Name)

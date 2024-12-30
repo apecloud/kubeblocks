@@ -471,10 +471,10 @@ func ValidateParentBackupSet(parentBackupSet *BackupActionSet, backupSet *Backup
 func GetTargetRelativePath(targetName, targetPodName string) string {
 	targetRelativePath := ""
 	if targetName != "" {
-		targetRelativePath = filepath.Join("/", targetRelativePath, targetName)
+		targetRelativePath = filepath.Join(targetRelativePath, targetName)
 	}
 	if targetPodName != "" {
-		targetRelativePath = filepath.Join("/", targetRelativePath, targetPodName)
+		targetRelativePath = filepath.Join(targetRelativePath, targetPodName)
 	}
 	return targetRelativePath
 }

@@ -108,7 +108,7 @@ const (
 	// DPBackupRootPath the root path for backup data
 	DPBackupRootPath = "DP_BACKUP_ROOT_PATH"
 	// DPTargetRelativePath the relative path based on the backup data root path
-	// ${DP_TARGET_RELATIVE_PATH}=/${target.name}/${target.selectedTargetPod[*]}
+	// ${DP_TARGET_RELATIVE_PATH}=${target.name}/${target.selectedTargetPod[*]}
 	DPTargetRelativePath = "DP_TARGET_RELATIVE_PATH"
 	// DPBackupName backup CR name
 	DPBackupName = "DP_BACKUP_NAME"

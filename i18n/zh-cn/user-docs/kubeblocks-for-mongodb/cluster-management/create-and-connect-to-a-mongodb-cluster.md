@@ -108,23 +108,27 @@ KubeBlocks 支持创建两种 MongoDB 集群：单机版（Standalone）和主�
      name: mycluster
      namespace: demo
    spec:
+     terminationPolicy: Delete
      affinity:
        podAntiAffinity: Preferred
-       tenancy: SharedNode
        topologyKeys:
        - kubernetes.io/hostname
+     tolerations:
+       - key: kb-data
+         operator: Equal
+         value: 'true'
+         effect: NoSchedule
      componentSpecs:
-     - componentDef: mongodb
-       name: mongodb
+     - name: mongodb
+       componentDef: mongodb
        replicas: 3
        resources:
          limits:
-           cpu: "0.5"
+           cpu: '0.5'
            memory: 0.5Gi
          requests:
-           cpu: "0.5"
+           cpu: '0.5'
            memory: 0.5Gi
-       serviceVersion: 6.0.16
        volumeClaimTemplates:
        - name: data
          spec:
@@ -133,7 +137,6 @@ KubeBlocks 支持创建两种 MongoDB 集群：单机版（Standalone）和主�
            resources:
              requests:
                storage: 20Gi
-     terminationPolicy: Delete
    EOF
    ```
 

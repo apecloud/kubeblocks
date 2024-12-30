@@ -44,186 +44,307 @@ metadata:
   name: mycluster
   namespace: demo
 spec:
+  terminationPolicy: Delete
   affinity:
     podAntiAffinity: Preferred
-    topologyKeys: 
-    - kubernetes.io/hostname
-  clusterDefinitionRef: milvus-2.3.2
+    topologyKeys:
+      - kubernetes.io/hostname
+    tenancy: SharedNode
+  tolerations:
+    - key: kb-data
+      operator: Equal
+      value: 'true'
+      effect: NoSchedule
   componentSpecs:
-  - componentDefRef: milvus
-    disableExporter: true
-    name: milvus
-    replicas: 1
-    resources:
-      limits:
-        cpu: "1"
-        memory: 1Gi
-      requests:
-        cpu: "1"
-        memory: 1Gi
-    serviceAccountName: kb-mycluster
-    volumeClaimTemplates:
-    - name: data
-      spec:
-        accessModes:
-        - ReadWriteOnce
-        resources:
-          requests:
-            storage: 20Gi
-  - componentDefRef: etcd
-    disableExporter: true
-    name: etcd
-    replicas: 1
-    resources:
-      limits:
-        cpu: "1"
-        memory: 1Gi
-      requests:
-        cpu: "1"
-        memory: 1Gi
-    serviceAccountName: kb-mycluster
-    volumeClaimTemplates:
-    - name: data
-      spec:
-        accessModes:
-        - ReadWriteOnce
-        resources:
-          requests:
-            storage: 20Gi
-  - componentDefRef: minio
-    disableExporter: true
-    name: minio
-    replicas: 1
-    resources:
-      limits:
-        cpu: "1"
-        memory: 1Gi
-      requests:
-        cpu: "1"
-        memory: 1Gi
-    serviceAccountName: kb-mycluster
-    volumeClaimTemplates:
-    - name: data
-      spec:
-        accessModes:
-        - ReadWriteOnce
-        resources:
-          requests:
-            storage: 20Gi
-  - componentDefRef: proxy
-    disableExporter: true
-    name: proxy
-    replicas: 1
-    resources:
-      limits:
-        cpu: "1"
-        memory: 1Gi
-      requests:
-        cpu: "1"
-        memory: 1Gi
-    serviceAccountName: kb-mycluster
-    volumeClaimTemplates:
-    - name: data
-      spec:
-        accessModes:
-        - ReadWriteOnce
-        resources:
-          requests:
-            storage: 20Gi
-  - componentDefRef: mixcoord
-    disableExporter: true
-    name: mixcoord
-    replicas: 1
-    resources:
-      limits:
-        cpu: "1"
-        memory: 1Gi
-      requests:
-        cpu: "1"
-        memory: 1Gi
-    serviceAccountName: kb-mycluster
-    volumeClaimTemplates:
-    - name: data
-      spec:
-        accessModes:
-        - ReadWriteOnce
-        resources:
-          requests:
-            storage: 20Gi
-  - componentDefRef: datanode
-    disableExporter: true
-    name: datanode
-    replicas: 1
-    resources:
-      limits:
-        cpu: "1"
-        memory: 1Gi
-      requests:
-        cpu: "1"
-        memory: 1Gi
-    serviceAccountName: kb-mycluster
-    volumeClaimTemplates:
-    - name: data
-      spec:
-        accessModes:
-        - ReadWriteOnce
-        resources:
-          requests:
-            storage: 20Gi
-  - componentDefRef: indexnode
-    disableExporter: true
-    name: indexnode
-    replicas: 1
-    resources:
-      limits:
-        cpu: "1"
-        memory: 1Gi
-      requests:
-        cpu: "1"
-        memory: 1Gi
-    serviceAccountName: kb-mycluster
-    volumeClaimTemplates:
-    - name: data
-      spec:
-        accessModes:
-        - ReadWriteOnce
-        resources:
-          requests:
-            storage: 20Gi
-  - componentDefRef: querynode
-    disableExporter: true
-    name: querynode
-    replicas: 1
-    resources:
-      limits:
-        cpu: "1"
-        memory: 1Gi
-      requests:
-        cpu: "1"
-        memory: 1Gi
-    serviceAccountName: kb-mycluster
-    volumeClaimTemplates:
-    - name: data
-      spec:
-        accessModes:
-        - ReadWriteOnce
-        resources:
-          requests:
-            storage: 20Gi
-  resources:
-    cpu: "0"
-    memory: "0"
-  storage:
-    size: "0"
-  terminationPolicy: Delete
-status: {}
+    - name: proxy
+      componentDef: milvus-proxy-0.9.0
+      replicas: 1
+      resources:
+        limits:
+          cpu: '0.5'
+          memory: 0.5Gi
+        requests:
+          cpu: '0.5'
+          memory: 0.5Gi
+      serviceRefs:
+        - cluster: etcdm-cluster
+          name: milvus-meta-storage
+        - cluster: pulsarm-cluster
+          name: milvus-log-storage
+        - name: milvus-object-storage
+          namespace: default
+          clusterServiceSelector:
+            cluster: miniom-cluster
+            service:
+              component: minio
+              service: headless
+              port: http
+            credential:
+              component: minio
+              name: admin
+    - name: mixcoord
+      componentDef: milvus-mixcoord-0.9.0
+      replicas: 1
+      resources:
+        limits:
+          cpu: '0.5'
+          memory: 0.5Gi
+        requests:
+          cpu: '0.5'
+          memory: 0.5Gi
+      serviceRefs:
+        - cluster: etcdm-cluster
+          name: milvus-meta-storage
+        - cluster: pulsarm-cluster
+          name: milvus-log-storage
+        - name: milvus-object-storage
+          namespace: default
+          clusterServiceSelector:
+            cluster: miniom-cluster
+            service:
+              component: minio
+              service: headless
+              port: http
+            credential:
+              component: minio
+              name: admin
+    - name: datanode
+      componentDef: milvus-datanode-0.9.0
+      replicas: 1
+      resources:
+        limits:
+          cpu: '0.5'
+          memory: 0.5Gi
+        requests:
+          cpu: '0.5'
+          memory: 0.5Gi
+      serviceRefs:
+        - cluster: etcdm-cluster
+          name: milvus-meta-storage
+        - cluster: pulsarm-cluster
+          name: milvus-log-storage
+        - name: milvus-object-storage
+          namespace: default
+          clusterServiceSelector:
+            cluster: miniom-cluster
+            service:
+              component: minio
+              service: headless
+              port: http
+            credential:
+              component: minio
+              name: admin
+    - name: indexnode
+      componentDef: milvus-indexnode-0.9.0
+      replicas: 1
+      resources:
+        limits:
+          cpu: '0.5'
+          memory: 0.5Gi
+        requests:
+          cpu: '0.5'
+          memory: 0.5Gi
+      serviceRefs:
+        - cluster: etcdm-cluster
+          name: milvus-meta-storage
+        - cluster: pulsarm-cluster
+          name: milvus-log-storage
+        - name: milvus-object-storage
+          namespace: default
+          clusterServiceSelector:
+            cluster: miniom-cluster
+            service:
+              component: minio
+              service: headless
+              port: http
+            credential:
+              component: minio
+              name: admin
+    - name: querynode
+      componentDef: milvus-querynode-0.9.0
+      replicas: 1
+      resources:
+        limits:
+          cpu: '0.5'
+          memory: 0.5Gi
+        requests:
+          cpu: '0.5'
+          memory: 0.5Gi
+      serviceRefs:
+        - cluster: etcdm-cluster
+          name: milvus-meta-storage
+        - cluster: pulsarm-cluster
+          name: milvus-log-storage
+        - name: milvus-object-storage
+          namespace: default
+          clusterServiceSelector:
+            cluster: miniom-cluster
+            service:
+              component: minio
+              service: headless
+              port: http
+            credential:
+              component: minio
+              name: admin
+---
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: etcdm-cluster
+  namespace: demo
+spec:
+  clusterDefinitionRef: etcd
+  clusterVersionRef: etcd-v3.5.6
+  terminationPolicy: WipeOut
+  affinity:
+    podAntiAffinity: Preferred
+    topologyKeys:
+      - kubernetes.io/hostname
+    tenancy: SharedNode
+  tolerations:
+    - key: kb-data
+      operator: Equal
+      value: 'true'
+      effect: NoSchedule
+  componentSpecs:
+    - name: etcd
+      componentDefRef: etcd
+      replicas: 1
+      resources:
+        limits:
+          cpu: '0.5'
+          memory: 0.5Gi
+        requests:
+          cpu: '0.5'
+          memory: 0.5Gi
+      volumeClaimTemplates:
+        - name: data
+          spec:
+            storageClassName: null
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 20Gi
+---
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: pulsarm-cluster
+  namespace: demo
+  annotations:
+    "kubeblocks.io/extra-env": '{"KB_PULSAR_BROKER_NODEPORT": "false"}'
+spec:
+  clusterDefinitionRef: pulsar
+  clusterVersionRef: pulsar-3.0.2
+  terminationPolicy: WipeOut
+  affinity:
+    podAntiAffinity: Preferred
+    topologyKeys:
+      - kubernetes.io/hostname
+    tenancy: SharedNode
+  tolerations:
+    - key: kb-data
+      operator: Equal
+      value: 'true'
+      effect: NoSchedule
+  componentSpecs:
+    - name: pulsar-broker
+      componentDefRef: pulsar-broker
+      disableExporter: true
+      replicas: 1
+      resources:
+        limits:
+          cpu: '0.5'
+          memory: 0.5Gi
+        requests:
+          cpu: '0.5'
+          memory: 0.5Gi
+      volumeClaimTemplates:
+        - name: data
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 20Gi
+    - name: bookies
+      componentDefRef: bookies
+      disableExporter: true
+      replicas: 3
+      resources:
+        limits:
+          cpu: '0.5'
+          memory: 0.5Gi
+        requests:
+          cpu: '0.5'
+          memory: 0.5Gi
+      volumeClaimTemplates:
+        - name: journal
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 20Gi
+        - name: ledgers
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 20Gi
+    - name: zookeeper
+      componentDefRef: zookeeper
+      disableExporter: true
+      replicas: 3
+      resources:
+        limits:
+          cpu: '0.5'
+          memory: 0.5Gi
+        requests:
+          cpu: '0.5'
+          memory: 0.5Gi
+      volumeClaimTemplates:
+        - name: data
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 20Gi
+---
+apiVersion: apps.kubeblocks.io/v1alpha1
+kind: Cluster
+metadata:
+  name: miniom-cluster
+  namespace: demo
+spec:
+  terminationPolicy: WipeOut
+  componentSpecs:
+    - name: minio
+      componentDef: milvus-minio-0.9.0
+      replicas: 1
+      resources:
+        limits:
+          cpu: '0.5'
+          memory: 0.5Gi
+        requests:
+          cpu: '0.5'
+          memory: 0.5Gi
+      volumeClaimTemplates:
+        - name: data
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 20Gi
 EOF
 ```
 
 | Field                                 | Definition  |
 |---------------------------------------|--------------------------------------|
-| `spec.clusterDefinitionRef`           | It specifies the name of the ClusterDefinition for creating a specific type of cluster.  |
-| `spec.clusterVersionRef`              | It is the name of the cluster version CRD that defines the cluster version.  |
 | `spec.terminationPolicy`              | It is the policy of cluster termination. The default value is `Delete`. Valid values are `DoNotTerminate`, `Delete`, `WipeOut`. For the detailed definition, you can refer to [Termination Policy](#termination-policy). |
 | `spec.affinity`                       | It defines a set of node affinity scheduling rules for the cluster's Pods. This field helps control the placement of Pods on nodes within the cluster.  |
 | `spec.affinity.podAntiAffinity`       | It specifies the anti-affinity level of Pods within a component. It determines how pods should spread across nodes to improve availability and performance. |

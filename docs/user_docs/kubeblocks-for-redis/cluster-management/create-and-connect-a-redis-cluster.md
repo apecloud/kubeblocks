@@ -107,7 +107,7 @@ KubeBlocks supports creating two types of Redis clusters: Standalone and Replica
 
 <TabItem value="kubectl" label="kubectl" default>
 
-KubeBlocks implements a `Cluster` CRD to define a cluster. Here is an example of creating a Standalone.
+KubeBlocks implements a `Cluster` CRD to define a cluster. Here is an example of creating a Replication Cluster.
 
 ```yaml
 cat <<EOF | kubectl apply -f -
@@ -115,28 +115,55 @@ apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
   name: mycluster
-  namespace: default
+  namespace: demo
 spec:
-  clusterDefinitionRef: redis
-  clusterVersionRef: redis-7.0.6
   terminationPolicy: Delete
-  affinity:
-    podAntiAffinity: Preferred
-    topologyKeys:
-    - kubernetes.io/hostname
-  tolerations:
+  componentSpecs:
+  - name: redis
+    componentDef: redis-7
+    affinity:
+      podAntiAffinity: Preferred
+      topologyKeys:
+      - kubernetes.io/hostname
+      tenancy: SharedNode
+    tolerations:
     - key: kb-data
       operator: Equal
       value: 'true'
       effect: NoSchedule
-  componentSpecs:
-  - name: redis
-    componentDefRef: redis
-    replicas: 1
     disableExporter: true
     enabledLogs:
     - running
-    serviceAccountName: kb-redis-cluster
+    replicas: 2
+    resources:
+      limits:
+        cpu: '0.5'
+        memory: 0.5Gi
+      requests:
+        cpu: '0.5'
+        memory: 0.5Gi
+    volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi
+  - name: redis-sentinel
+    componentDef: redis-sentinel-7
+    disableExporter: false
+    affinity:
+      podAntiAffinity: Preferred
+      topologyKeys:
+      - kubernetes.io/hostname
+      tenancy: SharedNode
+    tolerations:
+    - key: kb-data
+      operator: Equal
+      value: 'true'
+      effect: NoSchedule
+    replicas: 3
     resources:
       limits:
         cpu: '0.5'
@@ -157,8 +184,6 @@ EOF
 
 | Field                                 | Definition  |
 |---------------------------------------|--------------------------------------|
-| `spec.clusterDefinitionRef`           | It specifies the name of the ClusterDefinition for creating a specific type of cluster.  |
-| `spec.clusterVersionRef`              | It is the name of the cluster version CRD that defines the cluster version.  |
 | `spec.terminationPolicy`              | It is the policy of cluster termination. The default value is `Delete`. Valid values are `DoNotTerminate`, `Delete`, `WipeOut`. For the detailed definition, you can refer to [Termination Policy](./delete-a-redis-cluster.md#termination-policy). |
 | `spec.affinity`                       | It defines a set of node affinity scheduling rules for the cluster's Pods. This field helps control the placement of Pods on nodes within the cluster.  |
 | `spec.affinity.podAntiAffinity`       | It specifies the anti-affinity level of Pods within a component. It determines how pods should spread across nodes to improve availability and performance. |

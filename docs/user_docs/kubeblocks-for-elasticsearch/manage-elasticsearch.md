@@ -39,35 +39,34 @@ cat <<EOF | kubectl apply -f -
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-  annotations:
-    kubeblocks.io/extra-env: '{"mdit-roles":"master,data,ingest,transform","mode":"multi-node"}'
-  labels:
-    app.kubernetes.io/instance: mycluster
-    app.kubernetes.io/version: 8.8.2
-    helm.sh/chart: elasticsearch-cluster-0.9.0
   name: mycluster
   namespace: demo
+  annotations:
+    kubeblocks.io/extra-env: '{"master-roles":"master", "data-roles": "data", "ingest-roles": "ingest", "transform-roles": "transform"}'
 spec:
+  terminationPolicy: Delete
   affinity:
-    podAntiAffinity: Required
-    tenancy: SharedNode
+    podAntiAffinity: Preferred
     topologyKeys:
     - kubernetes.io/hostname
+    tenancy: SharedNode
+  tolerations:
+  - key: kb-data
+    operator: Equal
+    value: 'true'
+    effect: NoSchedule
   componentSpecs:
-  - componentDef: elasticsearch-8
+  - name: master
+    componentDef: elasticsearch
     disableExporter: true
-    name: mdit
-    replicas: 3
+    replicas: 1
     resources:
       limits:
-        cpu: "1"
+        cpu: '0.5'
         memory: 2Gi
       requests:
-        cpu: "1"
+        cpu: '0.5'
         memory: 2Gi
-    serviceAccountName: kb-mycluster
-    serviceVersion: 8.8.2
-    services: null
     volumeClaimTemplates:
     - name: data
       spec:
@@ -76,7 +75,64 @@ spec:
         resources:
           requests:
             storage: 20Gi
-  terminationPolicy: Delete
+  - name: data
+    componentDef: elasticsearch
+    disableExporter: true
+    replicas: 1
+    resources:
+      limits:
+        cpu: '0.5'
+        memory: 2Gi
+      requests:
+        cpu: '0.5'
+        memory: 2Gi
+    volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi
+  - name: ingest
+    componentDef: elasticsearch
+    disableExporter: true
+    replicas: 1
+    resources:
+      limits:
+        cpu: '0.5'
+        memory: 2Gi
+      requests:
+        cpu: '0.5'
+        memory: 2Gi
+    volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi
+    services: null
+  - name: transform
+    componentDef: elasticsearch
+    disableExporter: true
+    replicas: 1
+    resources:
+      limits:
+        cpu: '0.5'
+        memory: 2Gi
+      requests:
+        cpu: '0.5'
+        memory: 2Gi
+    volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi
 EOF
 ```
 
@@ -142,7 +198,7 @@ kbcli cluster create elasticsearch -h
 3. Check the cluster details.
 
    ```bash
-   kbcli cluster describe elasticsearch -n demo
+   kbcli cluster describe mycluster -n demo
    ```
 
 </TabItem>
@@ -410,7 +466,6 @@ From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out insta
       componentSpecs:
       - name: mdit
         componentDef: elasticsearch
-        serviceAccountName: null
         disableExporter: true
         replicas: 1
         resources: # Change the values of resources

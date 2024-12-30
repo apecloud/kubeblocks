@@ -96,7 +96,7 @@ KubeBlocks supports creating two types of MongoDB clusters: Standalone and Repli
 
 <TabItem value="kubectl" label="kubectl" default>
 
-1. Create a MongoDB Standalone.
+1. Create a MongoDB cluster.
 
    KubeBlocks implements a `Cluster` CRD to define a cluster. Here is an example of creating a MongoDB Standalone.
 
@@ -110,23 +110,27 @@ KubeBlocks supports creating two types of MongoDB clusters: Standalone and Repli
      name: mycluster
      namespace: demo
    spec:
+     terminationPolicy: Delete
      affinity:
        podAntiAffinity: Preferred
-       tenancy: SharedNode
        topologyKeys:
        - kubernetes.io/hostname
+     tolerations:
+       - key: kb-data
+         operator: Equal
+         value: 'true'
+         effect: NoSchedule
      componentSpecs:
-     - componentDef: mongodb
-       name: mongodb
+     - name: mongodb
+       componentDef: mongodb
        replicas: 3
        resources:
          limits:
-           cpu: "0.5"
+           cpu: '0.5'
            memory: 0.5Gi
          requests:
-           cpu: "0.5"
+           cpu: '0.5'
            memory: 0.5Gi
-       serviceVersion: 6.0.16
        volumeClaimTemplates:
        - name: data
          spec:
@@ -135,7 +139,6 @@ KubeBlocks supports creating two types of MongoDB clusters: Standalone and Repli
            resources:
              requests:
                storage: 20Gi
-     terminationPolicy: Delete
    EOF
    ```
 
@@ -180,7 +183,7 @@ KubeBlocks supports creating two types of MongoDB clusters: Standalone and Repli
 1. Create a MongoDB cluster.
 
    ```bash
-   kbcli cluster create mycluster --cluster-definition mongodb -n demo
+   kbcli cluster create mongodb mycluster -n demo
    ```
 
    The commands above are some common examples to create a cluster with default settings. If you want to customize your cluster specifications, kbcli provides various options, such as setting cluster version, termination policy, CPU, and memory. You can view these options by adding `--help` or `-h` flag.

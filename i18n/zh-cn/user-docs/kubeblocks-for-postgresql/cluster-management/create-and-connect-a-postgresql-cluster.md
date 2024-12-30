@@ -215,10 +215,10 @@ KubeBlocks 支持创建两种 PostgreSQL 集群：单机版（Standalone）和�
    kbcli cluster create postgresql mycluster --replicas=2 -n demo
    ```
 
-   如果您只有一个节点用于部署三节点集群，可在创建集群时将 `topology-keys` 设为 `null`。但需要注意的是，生产环境中，不建议将所有副本部署在同一个节点上，因为这可能会降低集群的可用性。
+   如果您只有一个节点可用于部署主备版，可将 `topology-keys` 设置为 `null`。但需要注意的是，生产环境中，不建议将所有副本部署在同一个节点上，因为这可能会降低集群的可用性。
 
    ```bash
-   kbcli cluster create postgresql mycluster --replicas=2 --availability-policy='none' -n demo
+   kbcli cluster create postgresql mycluster --replicas=2 --topology-keys=null -n demo
    ```
 
 2. 验证集群是否创建成功。

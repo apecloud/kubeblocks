@@ -107,7 +107,7 @@ KubeBlocks supports creating two types of Redis clusters: Standalone and Replica
 
 <TabItem value="kubectl" label="kubectl" default>
 
-KubeBlocks implements a `Cluster` CRD to define a cluster. Here is an example of creating a Standalone.
+KubeBlocks implements a `Cluster` CRD to define a cluster. Here is an example of creating a Replication Cluster.
 
 ```yaml
 cat <<EOF | kubectl apply -f -

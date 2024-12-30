@@ -135,8 +135,6 @@ spec:
   componentSpecs:
   - name: postgresql
     componentDefRef: postgresql
-    enabledLogs:
-    - running
     disableExporter: true # 将参数值设为 `false`，开启 exporter
     replicas: 2
     resources:
@@ -212,10 +210,6 @@ kubectl edit cluster mycluster -n demo
 componentSpecs:
   - name: mysql
     componentDefRef: mysql
-    enabledLogs:
-    - error
-    - general
-    - slow
     disableExporter: true # 将参数值设为 `false`，开启 exporter
 ```
 

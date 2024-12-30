@@ -135,8 +135,6 @@ spec:
   componentSpecs:
   - name: postgresql
     componentDefRef: postgresql
-    enabledLogs:
-    - running
     disableExporter: true # Set to `false` to enable exporter
     replicas: 2
     resources:
@@ -208,10 +206,6 @@ Edit the value of `disableExporter`.
 componentSpecs:
   - name: mysql
     componentDefRef: mysql
-    enabledLogs:
-    - error
-    - general
-    - slow
     disableExporter: true # Set to `false` to enable exporter
 ...
 ```

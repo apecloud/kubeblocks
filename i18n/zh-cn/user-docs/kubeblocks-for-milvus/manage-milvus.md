@@ -270,7 +270,7 @@ EOF
 |---------------------------------------|--------------------------------------|
 | `spec.terminationPolicy`              | 集群终止策略，有效值为 `DoNotTerminate`、`Delete` 和 `WipeOut`。具体定义可参考 [终止策略](#终止策略)。 |
 | `spec.clusterDef` | 指定了创建集群时要使用的 ClusterDefinition 的名称。**注意**：**请勿更新此字段**。创建 Milvus 集群时，该值必须为 `milvus`。 |
-| `spec.topology` | 指定了在创建集群时要使用的 ClusterTopology 的名称。可选值为[stanalone, cluster]。 |
+| `spec.topology` | 指定了在创建集群时要使用的 ClusterTopology 的名称。可选值为[standalone, cluster]。 |
 | `spec.componentSpecs`                 | 集群 component 列表，定义了集群 components。该字段支持自定义配置集群中每个 component。  |
 | `spec.componentSpecs.serviceRefs` | 定义了 component 的 ServiceRef 列表。 |
 | `spec.componentSpecs.serviceRefs.name` | 指定了服务引用声明的标识符，该标识符在 `componentDefinition.spec.serviceRefDeclarations[*].name` 中定义。 |

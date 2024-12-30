@@ -92,7 +92,7 @@ import TabItem from '@theme/TabItem';
            env:
              - name: KB_KAFKA_BROKER_HEAP # use this ENV to set BROKER HEAP
                value: "-XshowSettings:vm -XX:MaxRAMPercentage=100 -Ddepth=64"
-             - name: KB_KAFKA_CONTROLLER_HEAP # use this ENV to set CONTOLLER_HEAP
+             - name: KB_KAFKA_CONTROLLER_HEAP # use this ENV to set CONTROLLER_HEAP
                value: "-XshowSettings:vm -XX:MaxRAMPercentage=100 -Ddepth=64"
              - name: KB_BROKER_DIRECT_POD_ACCESS # set to FALSE for node-port
                value: "true"

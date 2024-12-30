@@ -78,76 +78,58 @@ import TabItem from '@theme/TabItem';
      ```yaml
      # 组合模式
      kubectl apply -f - <<EOF
-     apiVersion: apps.kubeblocks.io/v1alpha1
+     apiVersion: apps.kubeblocks.io/v1
      kind: Cluster
      metadata:
        name: mycluster
        namespace: demo
-       annotations:
-         "kubeblocks.io/extra-env": '{"KB_KAFKA_ENABLE_SASL":"false","KB_KAFKA_BROKER_HEAP":"-XshowSettings:vm -XX:MaxRAMPercentage=100 -Ddepth=64","KB_KAFKA_CONTROLLER_HEAP":"-XshowSettings:vm -XX:MaxRAMPercentage=100 -Ddepth=64","KB_KAFKA_PUBLIC_ACCESS":"false", "KB_KAFKA_BROKER_NODEPORT": "false"}'
-         kubeblocks.io/enabled-pod-ordinal-svc: broker
      spec:
-       clusterDefinitionRef: kafka
-       clusterVersionRef: kafka-3.3.2
        terminationPolicy: Delete
-       affinity:
-         podAntiAffinity: Preferred
-         topologyKeys:
-         - kubernetes.io/hostname
-       tolerations:
-         - key: kb-data
-           operator: Equal
-           value: "true"
-           effect: NoSchedule
-       services:
-       - name: bootstrap
-         serviceName: bootstrap
-         componentSelector: broker
-         spec:
-           type: ClusterIP
-           ports:
-           - name: kafka-client
-             targetPort: 9092
-             port: 9092
+       clusterDef: kafka
+       topology: combined_monitor
        componentSpecs:
-       - name: broker
-         componentDef: kafka-combine
-         tls: false
-         replicas: 1
-         serviceAccountName: kb-kafka-cluster
-         resources:
-           limits:
-             cpu: '0.5'
-             memory: 0.5Gi
-           requests:
-             cpu: '0.5'
-             memory: 0.5Gi
-         volumeClaimTemplates:
-         - name: data
-           spec:
-             accessModes:
-             - ReadWriteOnce
-             resources:
-               requests:
-                 storage: 20Gi
-         - name: metadata
-           spec:
-             accessModes:
-             - ReadWriteOnce
-             resources:
-               requests:
-                 storage: 20Gi
-       - name: metrics-exp
-         componentDefRef: kafka-exporter
-         componentDef: kafka-exporter
-         replicas: 1
-         resources:
-           limits:
-             cpu: '0.5'
-             memory: 0.5Gi
-           requests:
-             cpu: '0.5'
-             memory: 0.5Gi
+         - name: kafka-combine
+           env:
+             - name: KB_KAFKA_BROKER_HEAP # use this ENV to set BROKER HEAP
+               value: "-XshowSettings:vm -XX:MaxRAMPercentage=100 -Ddepth=64"
+             - name: KB_KAFKA_CONTROLLER_HEAP # use this ENV to set CONTOLLER_HEAP
+               value: "-XshowSettings:vm -XX:MaxRAMPercentage=100 -Ddepth=64"
+             - name: KB_BROKER_DIRECT_POD_ACCESS # set to FALSE for node-port
+               value: "true"
+           replicas: 1
+           resources:
+             limits:
+               cpu: "1"
+               memory: "1Gi"
+             requests:
+               cpu: "0.5"
+               memory: "0.5Gi"
+           volumeClaimTemplates:
+             - name: data
+               spec:
+                 storageClassName: ""
+                 accessModes:
+                   - ReadWriteOnce
+                 resources:
+                   requests:
+                     storage: 20Gi
+             - name: metadata
+               spec:
+                 storageClassName: ""
+                 accessModes:
+                   - ReadWriteOnce
+                 resources:
+                   requests:
+                     storage: 1Gi
+         - name: kafka-exporter 
+           replicas: 1
+           resources:
+             limits:
+               cpu: "0.5"
+               memory: "1Gi"
+             requests:
+               cpu: "0.1"
+               memory: "0.2Gi"
      EOF
      ```
 
@@ -156,119 +138,93 @@ import TabItem from '@theme/TabItem';
      ```yaml
      # 分离模式
      kubectl apply -f - <<EOF
-     apiVersion: apps.kubeblocks.io/v1alpha1
+     apiVersion: apps.kubeblocks.io/v1
      kind: Cluster
      metadata:
-       name: kafka-cluster
+       name: mycluster
        namespace: demo
-       annotations:
-         "kubeblocks.io/extra-env": '{"KB_KAFKA_ENABLE_SASL":"false","KB_KAFKA_BROKER_HEAP":"-XshowSettings:vm -XX:MaxRAMPercentage=100 -Ddepth=64","KB_KAFKA_CONTROLLER_HEAP":"-XshowSettings:vm -XX:MaxRAMPercentage=100 -Ddepth=64","KB_KAFKA_PUBLIC_ACCESS":"false", "KB_KAFKA_BROKER_NODEPORT": "false"}'
-         kubeblocks.io/enabled-pod-ordinal-svc: broker
      spec:
-       clusterDefinitionRef: kafka
-       clusterVersionRef: kafka-3.3.2
        terminationPolicy: Delete
-       affinity:
-         podAntiAffinity: Preferred
-         topologyKeys:
-         - kubernetes.io/hostname
-         tolerations:
-           - key: kb-data
-             operator: Equal
-             value: "true"
-             effect: NoSchedule
-         services:
-           - name: bootstrap
-             serviceName: bootstrap
-             componentSelector: broker
-         spec:
-             type: ClusterIP
-             ports:
-             - name: kafka-client
-               targetPort: 9092
-               port: 9092
-     componentSpecs:
-     - name: broker
-       componentDef: kafka-broker
-       tls: false
-       replicas: 1
-       serviceAccountName: kb-kafka-cluster
-       resources:
-         limits:
-           cpu: '0.5'
-           memory: 0.5Gi
-         requests:
-           cpu: '0.5'
-           memory: 0.5Gi
-       volumeClaimTemplates:
-       - name: data
-         spec:
-           accessModes:
-           - ReadWriteOnce
+       clusterDef: kafka
+       topology: separated_monitor
+       componentSpecs:
+         - name: kafka-broker
+           replicas: 1
            resources:
+             limits:
+               cpu: "0.5"
+               memory: "0.5Gi"
              requests:
-               storage: 20Gi
-       - name: metadata
-         spec:
-           storageClassName: null
-           accessModes:
-           - ReadWriteOnce
+               cpu: "0.5"
+               memory: "0.5Gi"
+           env:
+             - name: KB_KAFKA_BROKER_HEAP
+               value: "-XshowSettings:vm -XX:MaxRAMPercentage=100 -Ddepth=64"
+             - name: KB_KAFKA_CONTROLLER_HEAP
+               value: "-XshowSettings:vm -XX:MaxRAMPercentage=100 -Ddepth=64"
+             - name: KB_BROKER_DIRECT_POD_ACCESS
+               value: "true"
+           volumeClaimTemplates:
+             - name: data
+               spec:
+                 storageClassName: ""
+                 accessModes:
+                   - ReadWriteOnce
+                 resources:
+                   requests:
+                     storage: 20Gi
+             - name: metadata
+               spec:
+                 storageClassName: ""
+                 accessModes:
+                   - ReadWriteOnce
+                 resources:
+                   requests:
+                     storage: 1Gi
+         - name: kafka-controller
+           replicas: 1
            resources:
+             limits:
+               cpu: "0.5"
+               memory: "0.5Gi"
              requests:
-               storage: 5Gi
-     - name: controller
-       componentDefRef: controller
-       componentDef: kafka-controller
-       tls: false
-       replicas: 1
-       serviceAccountName: kb-kafka-cluster
-       resources:
-         limits:
-           cpu: '0.5'
-           memory: 0.5Gi
-         requests:
-           cpu: '0.5'
-           memory: 0.5Gi
-       volumeClaimTemplates:
-       - name: metadata
-         spec:
-           storageClassName: null
-           accessModes:
-           - ReadWriteOnce
+               cpu: "0.5"
+               memory: "0.5Gi"
+           volumeClaimTemplates:
+             - name: metadata
+               spec:
+                 storageClassName: ""
+                 accessModes:
+                   - ReadWriteOnce
+                 resources:
+                   requests:
+                     storage: 1Gi
+         - name: kafka-exporter
+           replicas: 1
            resources:
+             limits:
+               cpu: "0.5"
+               memory: "1Gi"
              requests:
-               storage: 20Gi
-     - name: metrics-exp
-       componentDefRef: kafka-exporter
-       componentDef: kafka-exporter
-       replicas: 1
-       resources:
-         limits:
-           cpu: '0.5'
-           memory: 0.5Gi
-         requests:
-           cpu: '0.5'
-           memory: 0.5Gi
+               cpu: "0.1"
+               memory: "0.2Gi"
      EOF
      ```
 
    | 字段                                   | 定义  |
    |---------------------------------------|--------------------------------------|
-   | `metadata.annotations."kubeblocks.io/extra-env"` | 定义了 Kafka broker 的 jvm heap 配置。 |
-   | `metadata.annotations.kubeblocks.io/enabled-pod-ordinal-svc` | 为 nodeport 特性门控定义了 Kafka 集群注释键。您还可以设置 `kubeblocks.io/enabled-node-port-svc: broker` 和 `kubeblocks.io/disabled-cluster-ip-svc: broker`。 |
-   | `spec.clusterDefinitionRef`           | 集群定义 CRD 的名称，用来定义集群组件。  |
-   | `spec.clusterVersionRef`              | 集群版本 CRD 的名称，用来定义集群版本。 |
-   | `spec.terminationPolicy`              | 集群的终止策略，默认值为 `Delete`，有效值为 `DoNotTerminate`、`Halt`、`Delete` 和 `WipeOut`。具体定义可参考 [终止策略](./delete-kafka-cluster.md#终止策略)。 |
-   | `spec.affinity`                       | 为集群的 Pods 定义了一组节点亲和性调度规则。该字段可控制 Pods 在集群中节点上的分布。 |
-   | `spec.affinity.podAntiAffinity`       | 定义了不在同一 component 中的 Pods 的反亲和性水平。该字段决定了 Pods 以何种方式跨节点分布，以提升可用性和性能。 |
-   | `spec.affinity.topologyKeys`          | 用于定义 Pod 反亲和性和 Pod 分布约束的拓扑域的节点标签值。 |
-   | `spec.tolerations`                    | 该字段为数组，用于定义集群中 Pods 的容忍，确保 Pod 可被调度到具有匹配污点的节点上。 |
-   | `spec.services`                       | 定义了访问集群的服务。 |
-   | `spec.componentSpecs`                 | 集群 components 列表，定义了集群 components。该字段允许对集群中的每个 component 进行自定义配置。 |
-   | `spec.componentSpecs.componentDefRef` | 表示 cluster definition 中定义的 component definition 的名称，可通过执行 `kubectl get clusterdefinition kafka -o json \| jq '.spec.componentDefs[].name'` 命令获取 component definition 名称。 |
-   | `spec.componentSpecs.name`            | 定义了 component 的名称。  |
+   | `spec.terminationPolicy`              | 集群终止策略，有效值为 `DoNotTerminate`、`Delete` 和 `WipeOut`。具体定义可参考 [终止策略](./delete-mysql-cluster.md#终止策略)。 |
+   | `spec.clusterDef` | 指定了创建集群时要使用的 ClusterDefinition 的名称。**注意**：**请勿更新此字段**。创建 Kafka 集群时，该值必须为 `kafka`。 |
+   | `spec.topology` | 指定了在创建集群时要使用的 ClusterTopology 的名称。有效值为 [combined,combined_monitor,separated,separated_monitor]。 |
+   | `spec.componentSpecs`                 | 集群 component 列表，定义了集群 components。该字段支持自定义配置集群中每个 component。  |
    | `spec.componentSpecs.replicas`        | 定义了 component 中 replicas 的数量。 |
    | `spec.componentSpecs.resources`       | 定义了 component 的资源要求。  |
+   | `spec.componentSpecs.volumeClaimTemplates` | PersistentVolumeClaim 模板列表，定义 component 的存储需求。 |
+   | `spec.componentSpecs.volumeClaimTemplates.name` | 引用了在 `componentDefinition.spec.runtime.containers[*].volumeMounts` 中定义的 volumeMount 名称。  |
+   | `spec.componentSpecs.volumeClaimTemplates.spec.storageClassName` | 定义了 StorageClass 的名称。如果未指定，系统将默认使用带有 `storageclass.kubernetes.io/is-default-class=true` 注释的 StorageClass。  |
+   | `spec.componentSpecs.volumeClaimTemplates.spec.resources.storage` | 可按需配置存储容量。 |
+
+   您可参考 [API 文档](https://kubeblocks.io/docs/preview/developer_docs/api-reference/cluster)，查看更多 API 字段及说明。
 
 2. 查看集群是否创建成功。
 

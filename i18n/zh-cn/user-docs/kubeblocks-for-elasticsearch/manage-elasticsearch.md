@@ -13,7 +13,7 @@ import TabItem from '@theme/TabItem';
 
 Elasticsearch 是一个分布式、RESTful 风格的搜索和数据分析引擎，能够解决不断涌现出的各种用例。作为 Elastic Stack 的核心，Elasticsearch 会集中存储您的数据，让您飞快完成搜索，微调相关性，进行强大的分析，并轻松缩放规模。
 
-本文档展示了如何通过 kbcli、kubectl 或 YAML 文件等当时创建和管理 Elasticsearch 集群。您可以在 [GitHub 仓库](https://github.com/apecloud/kubeblocks-addons/tree/release-0.9/examples/elasticsearch)查看 YAML 示例。
+本文档展示了如何通过 kbcli、kubectl 或 YAML 文件等当时创建和管理 Elasticsearch 集群。您可以在 [GitHub 仓库](https://github.com/apecloud/kubeblocks-addons/tree/main/examples/elasticsearch)查看 YAML 示例。
 
 ## 开始之前
 
@@ -39,63 +39,52 @@ KubeBlocks 通过 `Cluster` 定义集群。以下是创建 Elasticsearch 集群�
 
 ```yaml
 cat <<EOF | kubectl apply -f -
-apiVersion: apps.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1
 kind: Cluster
 metadata:
-  annotations:
-    kubeblocks.io/extra-env: '{"mdit-roles":"master,data,ingest,transform","mode":"multi-node"}'
-  labels:
-    app.kubernetes.io/instance: mycluster
-    app.kubernetes.io/version: 8.8.2
-    helm.sh/chart: elasticsearch-cluster-0.9.0
   name: mycluster
   namespace: demo
+  annotations:
+    kubeblocks.io/extra-env: '{"mode":"single-node"}'
 spec:
-  affinity:
-    podAntiAffinity: Required
-    tenancy: SharedNode
-    topologyKeys:
-    - kubernetes.io/hostname
-  componentSpecs:
-  - componentDef: elasticsearch-8
-    disableExporter: true
-    name: mdit
-    replicas: 3
-    resources:
-      limits:
-        cpu: "1"
-        memory: 2Gi
-      requests:
-        cpu: "1"
-        memory: 2Gi
-    serviceAccountName: kb-mycluster
-    serviceVersion: 8.8.2
-    services: null
-    volumeClaimTemplates:
-    - name: data
-      spec:
-        accessModes:
-        - ReadWriteOnce
-        resources:
-          requests:
-            storage: 20Gi
   terminationPolicy: Delete
-EOF
+  componentSpecs:
+    - name: mdit
+      componentDef: elasticsearch-8
+      serviceVersion: 8.8.2
+      replicas: 1
+      resources:
+        limits:
+          cpu: "1"
+          memory: "2Gi"
+        requests:
+          cpu: "1"
+          memory: "2Gi"
+      volumeClaimTemplates:
+        - name: data
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 20Gi
 ```
 
 | 字段                                   | 定义  |
 |---------------------------------------|--------------------------------------|
-| `spec.terminationPolicy`              | 集群的终止策略，默认值为 `Delete`，有效值为 `DoNotTerminate`、`Halt`、`Delete` 和 `WipeOut`。 具体定义可参考 [终止策略](#终止策略)。|
-| `spec.affinity`                       | 为集群的 Pods 定义了一组节点亲和性调度规则。该字段可控制 Pods 在集群中节点上的分布。 |
-| `spec.affinity.podAntiAffinity`       | 定义了不在同一 component 中的 Pods 的反亲和性水平。该字段决定了 Pods 以何种方式跨节点分布，以提升可用性和性能。 |
-| `spec.affinity.topologyKeys`          | 用于定义 Pod 反亲和性和 Pod 分布约束的拓扑域的节点标签值。 |
-| `spec.tolerations`                    | 该字段为数组，用于定义集群中 Pods 的容忍，确保 Pod 可被调度到具有匹配污点的节点上。 |
-| `spec.componentSpecs`                 | 集群 components 列表，定义了集群 components。该字段允许对集群中的每个 component 进行自定义配置。 |
-| `spec.componentSpecs.componentDefRef` | 表示 cluster definition 中定义的 component definition 的名称，可通过执行 `kubectl get clusterdefinition elasticsearch -o json \| jq '.spec.componentDefs[].name'` 命令获取 component definition 名称。 |
-| `spec.componentSpecs.name`            | 定义了 component 的名称。  |
-| `spec.componentSpecs.disableExporter` | 定义了是否开启监控功能。 |
+| `metadata.annotations`                | 定义了 Elasticsearch 集群类型。 |
+| `spec.terminationPolicy`              | 集群终止策略，有效值为 `DoNotTerminate`、`Delete` 和 `WipeOut`。具体定义可参考 [终止策略](#终止策略)。 |
+| `spec.componentSpecs`                 | 集群 component 列表，定义了集群 components。该字段支持自定义配置集群中每个 component。  |
+| `spec.componentSpecs.componentDef`    | 指定了用于定义 component 特性和行为的 ComponentDefinition 自定义资源（CR）。 |
+| `spec.componentSpecs.serviceVersion`  | 定义了 component 部署的服务版本。 |
 | `spec.componentSpecs.replicas`        | 定义了 component 中 replicas 的数量。 |
 | `spec.componentSpecs.resources`       | 定义了 component 的资源要求。  |
+| `spec.componentSpecs.volumeClaimTemplates` | PersistentVolumeClaim 模板列表，定义 component 的存储需求。 |
+| `spec.componentSpecs.volumeClaimTemplates.name` | 引用了在 `componentDefinition.spec.runtime.containers[*].volumeMounts` 中定义的 volumeMount 名称。  |
+| `spec.componentSpecs.volumeClaimTemplates.spec.storageClassName` | 定义了 StorageClass 的名称。如果未指定，系统将默认使用带有 `storageclass.kubernetes.io/is-default-class=true` 注释的 StorageClass。  |
+| `spec.componentSpecs.volumeClaimTemplates.spec.resources.storage` | 可按需配置存储容量。 |
+
+您可参考 [API 文档](https://kubeblocks.io/docs/preview/developer_docs/api-reference/cluster)，查看更多 API 字段及说明。
 
 KubeBlocks operator 监控 `Cluster` CRD 并创建集群和全部依赖资源。您可执行以下命令获取集群创建的所有资源信息。
 
@@ -940,8 +929,7 @@ KubeBlocks 支持重启集群中的所有 Pod。当数据库出现异常时，�
 | **终止策略** | **删除操作**                                                                     |
 |:----------------------|:-------------------------------------------------------------------------------------------|
 | `DoNotTerminate`      | `DoNotTerminate` 禁止删除操作。                                                  |
-| `Halt`                | `Halt` 删除集群资源（如 Pods、Services 等），但保留 PVC。停止其他运维操作的同时，保留了数据。但 `Halt` 策略在 v0.9.1 中已删除，设置为 `Halt` 的效果与 `DoNotTerminate` 相同。  |
-| `Delete`              | `Delete` 在 `Halt` 的基础上，删除 PVC 及所有持久数据。                              |
+| `Delete`              | `Delete` 删除 Pod、服务、PVC 等集群资源，删除所有持久数据。                              |
 | `WipeOut`             | `WipeOut`  删除所有集群资源，包括外部存储中的卷快照和备份。使用该策略将会删除全部数据，特别是在非生产环境，该策略将会带来不可逆的数据丢失。请谨慎使用。   |
 
 执行以下命令查看终止策略。

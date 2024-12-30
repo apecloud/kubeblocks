@@ -110,68 +110,53 @@ KubeBlocks supports creating two types of MySQL clusters: Standalone and Replica
 
    ```yaml
    cat <<EOF | kubectl apply -f -
-   apiVersion: apps.kubeblocks.io/v1alpha1
+   apiVersion: apps.kubeblocks.io/v1
    kind: Cluster
    metadata:
      name: mycluster
      namespace: demo
    spec:
-     clusterDefinitionRef: mysql
-     clusterVersionRef: mysql-8.0.33
      terminationPolicy: Delete
-     affinity:
-       podAntiAffinity: Preferred
-       topologyKeys:
-       - kubernetes.io/hostname
-     tolerations:
-       - key: kb-data
-         operator: Equal
-         value: 'true'
-         effect: NoSchedule
      componentSpecs:
-     - name: mysql
-       componentDefRef: mysql
-       enabledLogs:
-       - error
-       - slow
-       disableExporter: true
-       replicas: 2
-       serviceAccountName: kb-mycluster
-       resources:
-         limits:
-           cpu: '0.5'
-           memory: 0.5Gi
-         requests:
-           cpu: '0.5'
-           memory: 0.5Gi
-       volumeClaimTemplates:
-       - name: data
-         spec:
-           accessModes:
-           - ReadWriteOnce
-           resources:
-             requests:
-               storage: 20Gi
+       - name: mysql
+         componentDef: "mysql-8.0" 
+         serviceVersion: 8.0.35
+         disableExporter: false
+         replicas: 2
+         resources:
+           limits:
+             cpu: '0.5'
+             memory: 0.5Gi
+           requests:
+             cpu: '0.5'
+             memory: 0.5Gi
+         volumeClaimTemplates:
+           - name: data
+             spec:
+               storageClassName: ""
+               accessModes:
+                 - ReadWriteOnce
+               resources:
+                 requests:
+                   storage: 20Gi
    EOF
    ```
 
    | Field                                 | Definition  |
    |---------------------------------------|--------------------------------------|
-   | `spec.clusterDefinitionRef`           | It specifies the name of the ClusterDefinition for creating a specific type of cluster.  |
-   | `spec.clusterVersionRef`              | It is the name of the cluster version CRD that defines the cluster version.  |
-   | `spec.terminationPolicy`              | It is the policy of cluster termination. The default value is `Delete`. Valid values are `DoNotTerminate`, `Delete`, `WipeOut`. For the detailed definition, you can refer to [Termination Policy](./delete-mysql-cluster.md#termination-policy). |
-   | `spec.affinity`                       | It defines a set of node affinity scheduling rules for the cluster's Pods. This field helps control the placement of Pods on nodes within the cluster.  |
-   | `spec.affinity.podAntiAffinity`       | It specifies the anti-affinity level of Pods within a component. It determines how pods should spread across nodes to improve availability and performance. |
-   | `spec.affinity.topologyKeys`          | It represents the key of node labels used to define the topology domain for Pod anti-affinity and Pod spread constraints.   |
-   | `spec.tolerations`                    | It is an array that specifies tolerations attached to the cluster's Pods, allowing them to be scheduled onto nodes with matching taints.  |
-   | `spec.componentSpecs`                 | It is the list of components that define the cluster components. This field allows customized configuration of each component within a cluster.   |
-   | `spec.componentSpecs.componentDefRef` | It is the name of the component definition that is defined in the cluster definition and you can get the component definition names with `kubectl get clusterdefinition mysql -o json \| jq '.spec.componentDefs[].name'`.   |
-   | `spec.componentSpecs.name`            | It specifies the name of the component.     |
-   | `spec.componentSpecs.disableExporter` | It defines whether the monitoring function is enabled. |
-   | `spec.componentSpecs.replicas`        | It specifies the number of replicas of the component.  |
-   | `spec.componentSpecs.resources`       | It specifies the resource requirements of the component.  |
+   | `spec.terminationPolicy`              | It is the policy of cluster termination. Valid values are `DoNotTerminate`, `Delete`, `WipeOut`. For the detailed definition, you can refer to [Termination Policy](./delete-mysql-cluster.md#termination-policy). |
+   | `spec.componentSpecs`                 | It is the list of ClusterComponentSpec objects that define the individual Components that make up a Cluster. This field allows customized configuration of each component within a cluster.   |
+   | `spec.componentSpecs.componentDef` | It specifies the ComponentDefinition custom resource (CR) that defines the Component's characteristics and behavior. It supports three different ways to specify the ComponentDefinition: the regular expression (recommended), the full name (recommended), and the name prefix. |
+   | `spec.componentSpecs.serviceVersion` | It specifies the version of the Service expected to be provisioned by this Component. Valid options are [8.0.30,8.0.31,8.0.32,8.0.33,8.0.34,8.0.35,8.0.36,8.0.37,8.0.38,8.0.39]. |
+   | `spec.componentSpecs.disableExporter` | It determines whether metrics exporter information is annotated on the Component's headless Service. Valid options are [true, false]. |
+   | `spec.componentSpecs.replicas`        | It specifies the number of replicas of the component. |
+   | `spec.componentSpecs.resources`       | It specifies the resources required by the Component.  |
+   | `spec.componentSpecs.volumeClaimTemplates` | It specifies a list of PersistentVolumeClaim templates that define the storage requirements for the Component. |
+   | `spec.componentSpecs.volumeClaimTemplates.name` | It refers to the name of a volumeMount defined in `componentDefinition.spec.runtime.containers[*].volumeMounts`. |
+   | `spec.componentSpecs.volumeClaimTemplates.spec.storageClassName` | It is the name of the StorageClass required by the claim. If not specified, the StorageClass annotated with `storageclass.kubernetes.io/is-default-class=true` will be used by default. |
+   | `spec.componentSpecs.volumeClaimTemplates.spec.resources.storage` | You can set the storage size as needed. |
 
-   For the details of different parameters, you can refer to API docs.
+   For more API fields and descriptions, refer to the [API Reference](https://kubeblocks.io/docs/preview/developer_docs/api-reference/cluster).
 
    Run the following commands to see the created MySQL cluster object:
 
@@ -195,7 +180,7 @@ KubeBlocks supports creating two types of MySQL clusters: Standalone and Replica
 1. Create a MySQL cluster.
 
    ```bash
-   kbcli cluster create mycluster --cluster-definition mysql -n demo
+   kbcli cluster create mysql mycluster -n demo
    ```
 
    If you want to customize your cluster specifications, kbcli provides various options, such as setting cluster version, termination policy, CPU, and memory. You can view these options by adding `--help` or `-h` flag.
@@ -208,7 +193,7 @@ KubeBlocks supports creating two types of MySQL clusters: Standalone and Replica
    If you only have one node for deploying a Replication Cluster, set the `--topology-keys` as `null` when creating a Cluster. But you should note that for a production environment, it is not recommended to deploy all replicas on one node, which may decrease the cluster availability.
 
    ```bash
-   kbcli cluster create mycluster --cluster-definition mysql --topology-keys null -n demo
+   kbcli cluster create mysql mycluster --topology-keys null -n demo
    ```
 
 2. Verify whether this cluster is created successfully.

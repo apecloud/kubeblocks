@@ -109,67 +109,55 @@ KubeBlocks 支持创建两种类型的 ApeCloud MySQL 集群：单机版（Stand
 
    ```yaml
    cat <<EOF | kubectl apply -f -
-   apiVersion: apps.kubeblocks.io/v1alpha1
+   apiVersion: apps.kubeblocks.io/v1
    kind: Cluster
    metadata:
      name: mycluster
-     namespace: default
+     namespace: demo
    spec:
-     clusterDefinitionRef: apecloud-mysql
-     clusterVersionRef: ac-mysql-8.0.30
      terminationPolicy: Delete
-     affinity:
-       podAntiAffinity: Preferred
-       topologyKeys:
-       - kubernetes.io/hostname
-     tolerations:
-       - key: kb-data
-         operator: Equal
-         value: 'true'
-         effect: NoSchedule
+     clusterDef: apecloud-mysql
+     topology: apecloud-mysql
      componentSpecs:
-     - name: mysql
-       componentDefRef: mysql
-       enabledLogs:
-       - error
-       - general
-       - slow
-       disableExporter: true
-       replicas: 3
-       serviceAccountName: kb-acmysql-cluster
-       resources:
-         limits:
-           cpu: '0.5'
-           memory: 0.5Gi
-         requests:
-           cpu: '0.5'
-           memory: 0.5Gi
-       volumeClaimTemplates:
-       - name: data
-         spec:
-           accessModes:
-           - ReadWriteOnce
-           resources:
-             requests:
-               storage: 20Gi
+       - name: mysql
+         serviceVersion: "8.0.30"
+         disableExporter: false
+         replicas: 3
+         resources:
+           limits:
+             cpu: '0.5'
+             memory: 0.5Gi
+           requests:
+             cpu: '0.5'
+             memory: 0.5Gi
+         volumeClaimTemplates:
+           - name: data
+             spec:
+               storageClassName: ""
+               accessModes:
+                 - ReadWriteOnce
+               resources:
+                 requests:
+                   storage: 20Gi
    EOF
    ```
 
    | 字段                                   | 定义  |
    |---------------------------------------|--------------------------------------|
-   | `spec.clusterDefinitionRef`           | 集群定义 CRD 的名称，用来定义集群组件。  |
-   | `spec.clusterVersionRef`              | 集群版本 CRD 的名称，用来定义集群版本。 |
-   | `spec.terminationPolicy`              | 集群的终止策略，默认值为 `Delete`，有效值为 `DoNotTerminate`、`Delete` 和 `WipeOut`。具体定义可参考 [终止策略](./delete-mysql-cluster.md#终止策略)。 |
-   | `spec.affinity`                       | 为集群的 Pods 定义了一组节点亲和性调度规则。该字段可控制 Pods 在集群中节点上的分布。 |
-   | `spec.affinity.podAntiAffinity`       | 定义了不在同一 component 中的 Pods 的反亲和性水平。该字段决定了 Pods 以何种方式跨节点分布，以提升可用性和性能。 |
-   | `spec.affinity.topologyKeys`          | 用于定义 Pod 反亲和性和 Pod 分布约束的拓扑域的节点标签值。 |
-   | `spec.tolerations`                    | 该字段为数组，用于定义集群中 Pods 的容忍，确保 Pod 可被调度到具有匹配污点的节点上。 |
-   | `spec.componentSpecs`                 | 集群 components 列表，定义了集群 components。该字段允许对集群中的每个 component 进行自定义配置。 |
-   | `spec.componentSpecs.componentDefRef` | 表示 cluster definition 中定义的 component definition 的名称，可通过执行 `kubectl get clusterdefinition apecloud-mysql -o json \| jq '.spec.componentDefs[].name'` 命令获取 component definition 名称。 |
-   | `spec.componentSpecs.name`            | 定义了 component 的名称。  |
-   | `spec.componentSpecs.disableExporter` | 定义了是否开启监控功能。 |
-   | `spec.componentSpecs.replicas`        | 定义了 component 中 replicas 的数量。 |
+   | `spec.terminationPolicy`              | 集群终止策略，有效值为 `DoNotTerminate`、`Delete` 和 `WipeOut`。具体定义可参考 [终止策略](./delete-mysql-cluster.md#终止策略)。 |
+   | `spec.clusterDef` | 指定了创建集群时要使用的 ClusterDefinition 的名称。**注意**：**请勿更新此字段**。创建 ApeCloud MySQL 集群时，该值必须为 `apecloud-mysql`。 |
+   | `spec.topology` | 指定了在创建集群时要使用的 ClusterTopology 的名称。 |
+   | `spec.componentSpecs`                 | 集群 component 列表，定义了集群 components。该字段支持自定义配置集群中每个 component。  |
+   | `spec.componentSpecs.serviceVersion`  | 定义了 component 部署的服务版本。ApeCloud MySQL 版本为 8.0.30。 |
+   | `spec.componentSpecs.disableExporter` | 定义了是否在 component 无头服务（headless service）上标注指标 exporter 信息，是否开启监控 exporter。有效值为 [true, false]。 |
+   | `spec.componentSpecs.replicas`        | 定义了 component 中 replicas 的数量。ApeCloud MySQL 建议配置奇数，如 [1,3,5,7]。 |
    | `spec.componentSpecs.resources`       | 定义了 component 的资源要求。  |
+   | `spec.componentSpecs.volumeClaimTemplates` | PersistentVolumeClaim 模板列表，定义 component 的存储需求。 |
+   | `spec.componentSpecs.volumeClaimTemplates.name` | 引用了在 `componentDefinition.spec.runtime.containers[*].volumeMounts` 中定义的 volumeMount 名称。  |
+   | `spec.componentSpecs.volumeClaimTemplates.spec.storageClassName` | 定义了 StorageClass 的名称。如果未指定，系统将默认使用带有 `storageclass.kubernetes.io/is-default-class=true` 注释的 StorageClass。  |
+   | `spec.componentSpecs.volumeClaimTemplates.spec.resources.storage` | 可按需配置存储容量。 |
+
+   您可参考 [API 文档](https://kubeblocks.io/docs/preview/developer_docs/api-reference/cluster)，查看更多 API 字段及说明。
 
    KubeBlocks operator 监控 `Cluster` CRD 并创建集群和全部依赖资源。您可执行以下命令获取集群创建的所有资源信息。
 
@@ -201,7 +189,7 @@ KubeBlocks 支持创建两种类型的 ApeCloud MySQL 集群：单机版（Stand
    创建单机版。
 
    ```bash
-   kbcli cluster create mycluster --cluster-definition apecloud-mysql --namespace demo
+   kbcli cluster create apecloud-mysql mycluster --namespace demo
    ```
 
    如果您需要自定义集群规格，kbcli 也提供了诸多参数，如支持设置引擎版本、终止策略、CPU、内存规格。您可通过在命令结尾添加 `--help` 或 `-h` 来查看具体说明。比如，
@@ -215,13 +203,13 @@ KubeBlocks 支持创建两种类型的 ApeCloud MySQL 集群：单机版（Stand
    例如，您可以使用 `--replicas` 指定副本数，创建集群版集群。
 
    ```bash
-   kbcli cluster create mycluster --cluster-definition apecloud-mysql --set replicas=3 --namespace demo
+   kbcli cluster create apecloud-mysql mycluster --replicas=3 --namespace demo
    ```
 
    如果您只有一个节点用于部署三节点集群，可在创建集群时将 `topology-keys` 设为 `null`。但需要注意的是，生产环境中，不建议将所有副本部署在同一个节点上，因为这可能会降低集群的可用性。
 
    ```bash
-   kbcli cluster create mycluster --cluster-definition apecloud-mysql --set replicas=3 --topology-keys null --namespace demo
+   kbcli cluster create apecloud-mysql mycluster --replicas=3 --topology-keys null --namespace demo
    ```
 
 2. 验证集群是否创建成功。

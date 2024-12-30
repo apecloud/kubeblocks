@@ -13,7 +13,7 @@ import TabItem from '@theme/TabItem';
 
 Elasticsearch is a distributed, RESTful search and analytics engine that is capable of solving an ever-growing number of use cases. As the heart of the Elastic Stack, Elasticsearch stores your data centrally, allowing you to search it quickly, tune relevancy, perform sophisticated analytics, and easily scale.
 
-KubeBlocks supports the management of Elasticsearch. This tutorial illustrates how to create and manage an Elasticsearch cluster by `kbcli`, `kubectl` or a YAML file. You can find the YAML examples and guides in [the GitHub repository](https://github.com/apecloud/kubeblocks-addons/tree/release-0.9/examples/elasticsearch).
+KubeBlocks supports the management of Elasticsearch. This tutorial illustrates how to create and manage an Elasticsearch cluster by `kbcli`, `kubectl` or a YAML file. You can find the YAML examples and guides in [the GitHub repository](https://github.com/apecloud/kubeblocks-addons/tree/main/examples/elasticsearch).
 
 ## Before you start
 
@@ -32,67 +32,56 @@ KubeBlocks supports the management of Elasticsearch. This tutorial illustrates h
 
 <TabItem value="kubectl" label="kubectl" default>
 
-KubeBlocks implements a `Cluster` CRD to define a cluster. Here is an example of creating an Elasticsearch cluster.
+KubeBlocks implements a `Cluster` CRD to define a cluster. Here is an example of creating an Elasticsearch cluster with single node. For more examples, refer to [the GitHub repository](https://github.com/apecloud/kubeblocks-addons/tree/main/examples/elasticsearch).
 
 ```yaml
 cat <<EOF | kubectl apply -f -
-apiVersion: apps.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1
 kind: Cluster
 metadata:
-  annotations:
-    kubeblocks.io/extra-env: '{"mdit-roles":"master,data,ingest,transform","mode":"multi-node"}'
-  labels:
-    app.kubernetes.io/instance: mycluster
-    app.kubernetes.io/version: 8.8.2
-    helm.sh/chart: elasticsearch-cluster-0.9.0
   name: mycluster
   namespace: demo
+  annotations:
+    kubeblocks.io/extra-env: '{"mode":"single-node"}'
 spec:
-  affinity:
-    podAntiAffinity: Required
-    tenancy: SharedNode
-    topologyKeys:
-    - kubernetes.io/hostname
-  componentSpecs:
-  - componentDef: elasticsearch-8
-    disableExporter: true
-    name: mdit
-    replicas: 3
-    resources:
-      limits:
-        cpu: "1"
-        memory: 2Gi
-      requests:
-        cpu: "1"
-        memory: 2Gi
-    serviceAccountName: kb-mycluster
-    serviceVersion: 8.8.2
-    services: null
-    volumeClaimTemplates:
-    - name: data
-      spec:
-        accessModes:
-        - ReadWriteOnce
-        resources:
-          requests:
-            storage: 20Gi
   terminationPolicy: Delete
-EOF
+  componentSpecs:
+    - name: mdit
+      componentDef: elasticsearch-8
+      serviceVersion: 8.8.2
+      replicas: 1
+      resources:
+        limits:
+          cpu: "1"
+          memory: "2Gi"
+        requests:
+          cpu: "1"
+          memory: "2Gi"
+      volumeClaimTemplates:
+        - name: data
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 20Gi
 ```
 
 | Field                                 | Definition  |
 |---------------------------------------|--------------------------------------|
-| `spec.terminationPolicy`              | It is the policy of cluster termination. The default value is `Delete`. Valid values are `DoNotTerminate`, `Delete`, `WipeOut`. For the detailed definition, you can refer to [Termination Policy](#termination-policy). |
-| `spec.affinity`                       | It defines a set of node affinity scheduling rules for the cluster's Pods. This field helps control the placement of Pods on nodes within the cluster.  |
-| `spec.affinity.podAntiAffinity`       | It specifies the anti-affinity level of Pods within a component. It determines how pods should spread across nodes to improve availability and performance. |
-| `spec.affinity.topologyKeys`          | It represents the key of node labels used to define the topology domain for Pod anti-affinity and Pod spread constraints.   |
-| `spec.tolerations`                    | It is an array that specifies tolerations attached to the cluster's Pods, allowing them to be scheduled onto nodes with matching taints.  |
-| `spec.componentSpecs`                 | It is the list of components that define the cluster components. This field allows customized configuration of each component within a cluster.   |
-| `spec.componentSpecs.componentDefRef` | It is the name of the component definition that is defined in the cluster definition and you can get the component definition names with `kubectl get clusterdefinition elasticsearch -o json \| jq '.spec.componentDefs[].name'`.   |
-| `spec.componentSpecs.name`            | It specifies the name of the component.     |
-| `spec.componentSpecs.disableExporter` | It defines whether the monitoring function is enabled. |
-| `spec.componentSpecs.replicas`        | It specifies the number of replicas of the component.  |
-| `spec.componentSpecs.resources`       | It specifies the resource requirements of the component.  |
+| `metadata.annotations` | It specifies the Elasticsearch cluster type. |
+| `spec.terminationPolicy`              | It is the policy of cluster termination. Valid values are `DoNotTerminate`, `Delete`, `WipeOut`. For the detailed definition, you can refer to [Termination Policy](#termination-policy). |
+| `spec.componentSpecs`                 | It is the list of ClusterComponentSpec objects that define the individual Components that make up a Cluster. This field allows customized configuration of each component within a cluster.   |
+| `spec.componentSpecs.componentDef`    | It specifies the ComponentDefinition custom resource (CR) that defines the Component's characteristics and behavior. |
+| `spec.componentSpecs.serviceVersion`  | It specifies the version of the Service expected to be provisioned by this Component. |
+| `spec.componentSpecs.replicas`        | It specifies the number of replicas of the component. |
+| `spec.componentSpecs.resources`       | It specifies the resources required by the Component.  |
+| `spec.componentSpecs.volumeClaimTemplates` | It specifies a list of PersistentVolumeClaim templates that define the storage requirements for the Component. |
+| `spec.componentSpecs.volumeClaimTemplates.name` | It refers to the name of a volumeMount defined in `componentDefinition.spec.runtime.containers[*].volumeMounts`. |
+| `spec.componentSpecs.volumeClaimTemplates.spec.storageClassName` | It is the name of the StorageClass required by the claim. If not specified, the StorageClass annotated with `storageclass.kubernetes.io/is-default-class=true` will be used by default. |
+| `spec.componentSpecs.volumeClaimTemplates.spec.resources.storage` | You can set the storage size as needed. |
+
+For more API fields and descriptions, refer to the [API Reference](https://kubeblocks.io/docs/preview/developer_docs/api-reference/cluster).
 
 KubeBlocks operator watches for the `Cluster` CRD and creates the cluster and all dependent resources. You can get all the resources created by the cluster with `kubectl get all,secret,rolebinding,serviceaccount -l app.kubernetes.io/instance=mycluster -n demo`.
 
@@ -876,10 +865,9 @@ The termination policy determines how a cluster is deleted.
 
 | **terminationPolicy** | **Deleting Operation**                           |
 |:----------------------|:-------------------------------------------------|
-| `DoNotTerminate`      | `DoNotTerminate` blocks delete operation.        |
-| `Halt`                | `Halt` deletes Cluster resources like Pods and Services but retains Persistent Volume Claims (PVCs), allowing for data preservation while stopping other operations. Halt policy is deprecated in v0.9.1 and will have same meaning as DoNotTerminate. |
-| `Delete`              | `Delete` extends the Halt policy by also removing PVCs, leading to a thorough cleanup while removing all persistent data.   |
-| `WipeOut`             | `WipeOut` deletes all Cluster resources, including volume snapshots and backups in external storage. This results in complete data removal and should be used cautiously, especially in non-production environments, to avoid irreversible data loss.   |
+| `DoNotTerminate`      | `DoNotTerminate` prevents deletion of the Cluster. This policy ensures that all resources remain intact.       |
+| `Delete`              | `Delete` deletes Cluster resources like Pods, Services, and Persistent Volume Claims (PVCs), leading to a thorough cleanup while removing all persistent data.   |
+| `WipeOut`             | `WipeOut` is an aggressive policy that deletes all Cluster resources, including volume snapshots and backups in external storage. This results in complete data removal and should be used cautiously, primarily in non-production environments to avoid irreversible data loss.  |
 
 To check the termination policy, execute the following command.
 

@@ -78,107 +78,123 @@ Refer to the [Pulsar official document](https://pulsar.apache.org/docs/3.1.x/) f
 
 ## Create Pulsar cluster
 
-1. Create the Pulsar cluster template file `values-production.yaml` for `helm` locally.
-  
-   Copy the following information to the local file `values-production.yaml`.
+1. Create a Pulsar cluster in basic mode. For other cluster modes, check out the examples provided in [the GitHub repository](https://github.com/apecloud/kubeblocks-addons/tree/main/examples/pulsar).
 
-   ```bash
-   ## Bookies configuration
-   bookies:
-     resources:
-       limits:
-         memory: 8Gi
-       requests:
-         cpu: 2
-         memory: 8Gi
-
-     persistence:
-       data:
-         storageClassName: kb-default-sc
-         size: 128Gi
-       log:
-         storageClassName: kb-default-sc
-         size: 64Gi
-
-   ## Zookeeper configuration
-   zookeeper:
-     resources:
-       limits:
-         memory: 2Gi
-       requests:
-         cpu: 1
-         memory: 2Gi
-
-     persistence:
-       data:
-         storageClassName: kb-default-sc
-         size: 20Gi
-       log:
-         storageClassName: kb-default-sc 
-         size: 20Gi
-        
-   broker:
-     replicaCount: 3
-     resources:
-       limits:
-         memory: 8Gi
-       requests:
-         cpu: 2
-         memory: 8Gi
+   ```yaml
+   cat <<EOF | kubectl apply -f -
+   apiVersion: apps.kubeblocks.io/v1
+   kind: Cluster
+   metadata:
+     name: mycluster
+     namespace: demo
+   spec:
+     terminationPolicy: Delete
+     clusterDef: pulsar
+     topology: pulsar-basic-cluster
+     services:
+       - name: broker-bootstrap
+         serviceName: broker-bootstrap
+         componentSelector: broker
+         spec:
+           type: ClusterIP
+           ports:
+             - name: pulsar
+               port: 6650
+               targetPort: 6650
+             - name: http
+               port: 80
+               targetPort: 8080
+             - name: kafka-client
+               port: 9092
+               targetPort: 9092
+       - name: zookeeper
+         serviceName: zookeeper
+         componentSelector: zookeeper
+         spec:
+           type: ClusterIP
+           ports:
+             - name: client
+               port: 2181
+               targetPort: 2181
+     componentSpecs:
+       - name: broker
+         serviceVersion: 3.0.2
+         replicas: 1
+         env:
+           - name: KB_PULSAR_BROKER_NODEPORT
+             value: "false"
+         resources:
+           limits:
+             cpu: "1"
+             memory: "512Mi"
+           requests:
+             cpu: "200m"
+             memory: "512Mi"
+       - name: bookies
+         serviceVersion: 3.0.2
+         replicas: 4
+         resources:
+           limits:
+             cpu: "1"
+             memory: "512Mi"
+           requests:
+             cpu: "200m"
+             memory: "512Mi"
+         volumeClaimTemplates:
+           - name: ledgers
+             spec:
+               accessModes:
+                 - ReadWriteOnce
+               resources:
+                 requests:
+                   storage: 8Gi
+           - name: journal
+             spec:
+               accessModes:
+                 - ReadWriteOnce
+               resources:
+                 requests:
+                   storage: 8Gi
+       - name: zookeeper
+         serviceVersion: 3.0.2
+         replicas: 1
+         resources:
+           limits:
+             cpu: "1"
+             memory: "512Mi"
+           requests:
+             cpu: "100m"
+             memory: "512Mi"
+         volumeClaimTemplates:
+           - name: data
+             spec:
+               accessModes:
+                 - ReadWriteOnce
+               resources:
+                 requests:
+                   storage: 8Gi
+   EOF
    ```
 
-2. Create a cluster.
+   | Field                                 | Definition  |
+   |---------------------------------------|--------------------------------------|
+   | `spec.terminationPolicy`              | It is the policy of cluster termination. Valid values are `DoNotTerminate`, `Delete`, `WipeOut`. For the detailed definition, you can refer to [Termination Policy](./delete-a-pulsar-cluster.md#termination-policy). |
+   | `spec.clusterDef` | It specifies the name of the ClusterDefinition to use when creating a Cluster. **Note: DO NOT UPDATE THIS FIELD**. The value must be `pulsar` to create a Pulsar Cluster. |
+   | `spec.topology` | It specifies the name of the ClusterTopology to be used when creating the Cluster. |
+   | `spec.services` | It defines a list of additional Services that are exposed by a Cluster. |
+   | `spec.componentSpecs`                 | It is the list of ClusterComponentSpec objects that define the individual Components that make up a Cluster. This field allows customized configuration of each component within a cluster.   |
+   | `spec.componentSpecs.serviceVersion` | It specifies the version of the Service expected to be provisioned by this Component. Valid options are [2.11.2,3.0.2]. |
+   | `spec.componentSpecs.disableExporter` | It determines whether metrics exporter information is annotated on the Component's headless Service. Valid options are [true, false]. |
+   | `spec.componentSpecs.replicas`        | It specifies the amount of replicas of the component. |
+   | `spec.componentSpecs.resources`       | It specifies the resources required by the Component.  |
+   | `spec.componentSpecs.volumeClaimTemplates` | It specifies a list of PersistentVolumeClaim templates that define the storage requirements for the Component. |
+   | `spec.componentSpecs.volumeClaimTemplates.name` | It refers to the name of a volumeMount defined in `componentDefinition.spec.runtime.containers[*].volumeMounts`. |
+   | `spec.componentSpecs.volumeClaimTemplates.spec.storageClassName` | It is the name of the StorageClass required by the claim. If not specified, the StorageClass annotated with `storageclass.kubernetes.io/is-default-class=true` will be used by default. |
+   | `spec.componentSpecs.volumeClaimTemplates.spec.resources.storage` | You can set the storage size as needed. |
 
-   - **Option 1**: (**Recommended**) Create pulsar cluster by `values-production.yaml`.
-  
-     Configuration:
-      - broker: 3 replicas
-      - bookies: 4 replicas
-      - zookeeper: 3 replicas
+   For more API fields and descriptions, refer to the [API Reference](https://kubeblocks.io/docs/preview/developer_docs/api-reference/cluster).
 
-     ```bash
-     helm install mycluster kubeblocks/pulsar-cluster --version "x.y.z" -f values-production.yaml --namespace=demo
-     ```
-
-   - **Option 2**: Create pulsar cluster with proxy.
-   
-     Configuration:
-      - proxy: 3 replicas
-      - broker: 3 replicas
-      - bookies: 4 replicas
-      - zookeeper: 3 replicas
-
-     ```bash
-     helm install mycluster kubeblocks/pulsar-cluster --version "x.y.z" -f values-production.yaml --set proxy.enable=true --namespace=demo
-     ```
-
-   - **Option 3**:  Create pulsar cluster with proxy and deploy `bookies-recovery` component.  
-     
-     Configuration:
-      - proxy: 3 replicas
-      - broker: 3 replicas
-      - bookies: 4 replicas
-      - zookeeper: 3 replicas
-      - bookies-recovery: 3 replicas
-
-     ```bash
-     helm install mycluster kubeblocks/pulsar-cluster --version "x.y.z" -f values-production.yaml --set proxy.enable=true --set bookiesRecovery.enable=true --namespace=demo 
-     ```
-
-   - **Option 4**: Create pulsar cluster and specify bookies and zookeeper storage parameters.
-
-     Configuration:
-      - broker: 3 replicas
-      - bookies: 4 replicas
-      - zookeeper: 3 replicas
-
-     ```bash
-     helm install mycluster kubeblocks/pulsar-cluster --version "x.y.z" -f values-production.yaml --set bookies.persistence.data.storageClassName=<sc name>,bookies.persistence.log.storageClassName=<sc name>,zookeeper.persistence.data.storageClassName=<sc name>,zookeeper.persistence.log.storageClassName=<sc name> --namespace=demo
-     ```
-
-   You can specify the storage name `<sc name>`.
-
-3. Verify the cluster created.
+2. Verify the cluster created.
 
     ```bash
     kubectl get cluster mycluster -n demo

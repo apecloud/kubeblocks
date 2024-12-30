@@ -38,203 +38,244 @@ KubeBlocks implements a `Cluster` CRD to define a cluster. Here is an example of
 
 ```yaml
 cat <<EOF | kubectl apply -f -
-apiVersion: apps.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1
 kind: Cluster
 metadata:
-  name: mycluster
   namespace: demo
+  name: mycluster
 spec:
-  affinity:
-    podAntiAffinity: Preferred
-    topologyKeys: 
-    - kubernetes.io/hostname
-  clusterDefinitionRef: milvus-2.3.2
-  componentSpecs:
-  - componentDefRef: milvus
-    disableExporter: true
-    name: milvus
-    replicas: 1
-    resources:
-      limits:
-        cpu: "1"
-        memory: 1Gi
-      requests:
-        cpu: "1"
-        memory: 1Gi
-    serviceAccountName: kb-mycluster
-    volumeClaimTemplates:
-    - name: data
-      spec:
-        accessModes:
-        - ReadWriteOnce
-        resources:
-          requests:
-            storage: 20Gi
-  - componentDefRef: etcd
-    disableExporter: true
-    name: etcd
-    replicas: 1
-    resources:
-      limits:
-        cpu: "1"
-        memory: 1Gi
-      requests:
-        cpu: "1"
-        memory: 1Gi
-    serviceAccountName: kb-mycluster
-    volumeClaimTemplates:
-    - name: data
-      spec:
-        accessModes:
-        - ReadWriteOnce
-        resources:
-          requests:
-            storage: 20Gi
-  - componentDefRef: minio
-    disableExporter: true
-    name: minio
-    replicas: 1
-    resources:
-      limits:
-        cpu: "1"
-        memory: 1Gi
-      requests:
-        cpu: "1"
-        memory: 1Gi
-    serviceAccountName: kb-mycluster
-    volumeClaimTemplates:
-    - name: data
-      spec:
-        accessModes:
-        - ReadWriteOnce
-        resources:
-          requests:
-            storage: 20Gi
-  - componentDefRef: proxy
-    disableExporter: true
-    name: proxy
-    replicas: 1
-    resources:
-      limits:
-        cpu: "1"
-        memory: 1Gi
-      requests:
-        cpu: "1"
-        memory: 1Gi
-    serviceAccountName: kb-mycluster
-    volumeClaimTemplates:
-    - name: data
-      spec:
-        accessModes:
-        - ReadWriteOnce
-        resources:
-          requests:
-            storage: 20Gi
-  - componentDefRef: mixcoord
-    disableExporter: true
-    name: mixcoord
-    replicas: 1
-    resources:
-      limits:
-        cpu: "1"
-        memory: 1Gi
-      requests:
-        cpu: "1"
-        memory: 1Gi
-    serviceAccountName: kb-mycluster
-    volumeClaimTemplates:
-    - name: data
-      spec:
-        accessModes:
-        - ReadWriteOnce
-        resources:
-          requests:
-            storage: 20Gi
-  - componentDefRef: datanode
-    disableExporter: true
-    name: datanode
-    replicas: 1
-    resources:
-      limits:
-        cpu: "1"
-        memory: 1Gi
-      requests:
-        cpu: "1"
-        memory: 1Gi
-    serviceAccountName: kb-mycluster
-    volumeClaimTemplates:
-    - name: data
-      spec:
-        accessModes:
-        - ReadWriteOnce
-        resources:
-          requests:
-            storage: 20Gi
-  - componentDefRef: indexnode
-    disableExporter: true
-    name: indexnode
-    replicas: 1
-    resources:
-      limits:
-        cpu: "1"
-        memory: 1Gi
-      requests:
-        cpu: "1"
-        memory: 1Gi
-    serviceAccountName: kb-mycluster
-    volumeClaimTemplates:
-    - name: data
-      spec:
-        accessModes:
-        - ReadWriteOnce
-        resources:
-          requests:
-            storage: 20Gi
-  - componentDefRef: querynode
-    disableExporter: true
-    name: querynode
-    replicas: 1
-    resources:
-      limits:
-        cpu: "1"
-        memory: 1Gi
-      requests:
-        cpu: "1"
-        memory: 1Gi
-    serviceAccountName: kb-mycluster
-    volumeClaimTemplates:
-    - name: data
-      spec:
-        accessModes:
-        - ReadWriteOnce
-        resources:
-          requests:
-            storage: 20Gi
-  resources:
-    cpu: "0"
-    memory: "0"
-  storage:
-    size: "0"
   terminationPolicy: Delete
-status: {}
+  clusterDef: milvus
+  topology: cluster
+  componentSpecs:
+    - name: proxy
+      replicas: 1
+      resources:
+        limits:
+          cpu: "0.5"
+          memory: "0.5Gi"
+        requests:
+          cpu: "0.5"
+          memory: "0.5Gi"
+      serviceRefs:
+        - name: milvus-meta-storage 
+          namespace: demo        
+          clusterServiceSelector:
+            cluster: etcdm-cluster  
+            service:
+              component: etcd       
+              service: headless     
+              port: client          
+        - name: milvus-log-storage
+          namespace: demo
+          clusterServiceSelector:
+            cluster: pulsarm-cluster
+            service:
+              component: broker
+              service: headless
+              port: pulsar
+        - name: milvus-object-storage
+          namespace: demo
+          clusterServiceSelector:
+            cluster: miniom-cluster
+            service:
+              component: minio
+              service: headless
+              port: http
+            credential:            
+              component: minio     
+              name: admin          
+      disableExporter: true
+    - name: mixcoord
+      replicas: 1
+      resources:
+        limits:
+          cpu: "0.5"
+          memory: "0.5Gi"
+        requests:
+          cpu: "0.5"
+          memory: "0.5Gi"
+      serviceRefs:
+        - name: milvus-meta-storage
+          namespace: demo
+          clusterServiceSelector:
+            cluster: etcdm-cluster
+            service:
+              component: etcd
+              service: headless
+              port: client
+
+        - name: milvus-log-storage
+          namespace: demo
+          clusterServiceSelector:
+            cluster: pulsarm-cluster
+            service:
+              component: broker
+              service: headless
+              port: pulsar
+
+        - name: milvus-object-storage
+          namespace: demo
+          clusterServiceSelector:
+            cluster: miniom-cluster
+            service:
+              component: minio
+              service: headless
+              port: http
+            credential:
+              component: minio
+              name: admin
+
+      disableExporter: true
+    - name: datanode
+      replicas: 1
+      disableExporter: true
+      resources:
+        limits:
+          cpu: "0.5"
+          memory: "0.5Gi"
+        requests:
+          cpu: "0.5"
+          memory: "0.5Gi"
+      serviceRefs:
+        - name: milvus-meta-storage
+          namespace: demo
+          clusterServiceSelector:
+            cluster: etcdm-cluster
+            service:
+              component: etcd
+              service: headless
+              port: client
+
+        - name: milvus-log-storage
+          namespace: demo
+          clusterServiceSelector:
+            cluster: pulsarm-cluster
+            service:
+              component: broker
+              service: headless
+              port: pulsar
+
+        - name: milvus-object-storage
+          namespace: demo
+          clusterServiceSelector:
+            cluster: miniom-cluster
+            service:
+              component: minio
+              service: headless
+              port: http
+            credential:
+              component: minio
+              name: admin
+
+      disableExporter: true
+    - name: indexnode
+      replicas: 1
+      disableExporter: true
+      resources:
+        limits:
+          cpu: "0.5"
+          memory: "0.5Gi"
+        requests:
+          cpu: "0.5"
+          memory: "0.5Gi"
+      serviceRefs:
+        - name: milvus-meta-storage
+          namespace: demo
+          clusterServiceSelector:
+            cluster: etcdm-cluster
+            service:
+              component: etcd
+              service: headless
+              port: client
+
+        - name: milvus-log-storage
+          namespace: demo
+          clusterServiceSelector:
+            cluster: pulsarm-cluster
+            service:
+              component: broker
+              service: headless
+              port: pulsar
+
+        - name: milvus-object-storage
+          namespace: demo
+          clusterServiceSelector:
+            cluster: miniom-cluster
+            service:
+              component: minio
+              service: headless
+              port: http
+            credential:
+              component: minio
+              name: admin
+
+      disableExporter: true
+    - name: querynode
+      replicas: 1
+      disableExporter: true
+      resources:
+        limits:
+          cpu: "0.5"
+          memory: "0.5Gi"
+        requests:
+          cpu: "0.5"
+          memory: "0.5Gi"
+      serviceRefs:
+        - name: milvus-meta-storage
+          namespace: demo
+          clusterServiceSelector:
+            cluster: etcdm-cluster
+            service:
+              component: etcd
+              service: headless
+              port: client
+
+        - name: milvus-log-storage
+          namespace: demo
+          clusterServiceSelector:
+            cluster: pulsarm-cluster
+            service:
+              component: broker
+              service: headless
+              port: pulsar
+
+        - name: milvus-object-storage
+          namespace: demo
+          clusterServiceSelector:
+            cluster: miniom-cluster
+            service:
+              component: minio
+              service: headless
+              port: http
+            credential:
+              component: minio
+              name: admin
+
+      disableExporter: true
 EOF
 ```
 
 | Field                                 | Definition  |
 |---------------------------------------|--------------------------------------|
-| `spec.clusterDefinitionRef`           | It specifies the name of the ClusterDefinition for creating a specific type of cluster.  |
-| `spec.clusterVersionRef`              | It is the name of the cluster version CRD that defines the cluster version.  |
-| `spec.terminationPolicy`              | It is the policy of cluster termination. The default value is `Delete`. Valid values are `DoNotTerminate`, `Delete`, `WipeOut`. For the detailed definition, you can refer to [Termination Policy](#termination-policy). |
-| `spec.affinity`                       | It defines a set of node affinity scheduling rules for the cluster's Pods. This field helps control the placement of Pods on nodes within the cluster.  |
-| `spec.affinity.podAntiAffinity`       | It specifies the anti-affinity level of Pods within a component. It determines how pods should spread across nodes to improve availability and performance. |
-| `spec.affinity.topologyKeys`          | It represents the key of node labels used to define the topology domain for Pod anti-affinity and Pod spread constraints.   |
-| `spec.tolerations`                    | It is an array that specifies tolerations attached to the cluster's Pods, allowing them to be scheduled onto nodes with matching taints.  |
-| `spec.componentSpecs`                 | It is the list of components that define the cluster components. This field allows customized configuration of each component within a cluster.   |
-| `spec.componentSpecs.componentDefRef` | It is the name of the component definition that is defined in the cluster definition and you can get the component definition names with `kubectl get clusterdefinition milvus -o json \| jq '.spec.componentDefs[].name'`.   |
-| `spec.componentSpecs.name`            | It specifies the name of the component.     |
-| `spec.componentSpecs.disableExporter` | It defines whether the monitoring function is enabled. |
-| `spec.componentSpecs.replicas`        | It specifies the number of replicas of the component.  |
-| `spec.componentSpecs.resources`       | It specifies the resource requirements of the component.  |
+| `spec.terminationPolicy`              | It is the policy of cluster termination. Valid values are `DoNotTerminate`, `Delete`, `WipeOut`. For the detailed definition, you can refer to [Termination Policy](#termination-policy). |
+| `spec.clusterDef` | It specifies the name of the ClusterDefinition to use when creating a Cluster. Note: DO NOT UPDATE THIS FIELD. The value must be `milvus` to create a Milvus Cluster. |
+| `spec.topology` | It specifies the name of the ClusterTopology to be used when creating the Cluster. Valid options are: [standalone,cluster]. |
+| `spec.componentSpecs`                 | It is the list of ClusterComponentSpec objects that define the individual Components that make up a Cluster. This field allows customized configuration of each component within a cluster.   |
+| `spec.componentSpecs.serviceRefs` | It defines a list of ServiceRef for a Component. |
+| `spec.componentSpecs.serviceRefs.name` | It specifies the identifier of the service reference declaration, defined in `componentDefinition.spec.serviceRefDeclarations[*].name`. |
+| `spec.componentSpecs.serviceRefs.clusterServiceSelector` | It references a service provided by another KubeBlocks Cluster. |
+| `spec.componentSpecs.serviceRefs.clusterServiceSelector.cluster` | It defines the cluster name. You can name it on demand. |
+| `spec.componentSpecs.serviceRefs.clusterServiceSelector.service.component` | It defines the component name.|
+| `spec.componentSpecs.serviceRefs.clusterServiceSelector.service.service` | It refers to the default headless Service. |
+| `spec.componentSpecs.serviceRefs.clusterServiceSelector.service.port` | It refers to port name. |
+| `spec.componentSpecs.serviceRefs.clusterServiceSelector.credential` | It specifies the SystemAccount to authenticate and establish a connection with the referenced Cluster. |
+| `spec.componentSpecs.serviceRefs.clusterServiceSelector.credential.name` | It specifies to the name of the credential (SystemAccount) to reference, using account 'admin' in this case. |
+| `spec.componentSpecs.disableExporter` | It determines whether metrics exporter information is annotated on the Component's headless Service. Valid options are [true, false]. |
+| `spec.componentSpecs.replicas`        | It specifies the number of replicas of the component. |
+| `spec.componentSpecs.resources`       | It specifies the resources required by the Component.  |
+
+For more API fields and descriptions, refer to the [API Reference](https://kubeblocks.io/docs/preview/developer_docs/api-reference/cluster).
 
 KubeBlocks operator watches for the `Cluster` CRD and creates the cluster and all dependent resources. You can get all the resources created by the cluster with `kubectl get all,secret,rolebinding,serviceaccount -l app.kubernetes.io/instance=mycluster -n demo`.
 
@@ -909,10 +950,9 @@ The termination policy determines how a cluster is deleted.
 
 | **terminationPolicy** | **Deleting Operation**                           |
 |:----------------------|:-------------------------------------------------|
-| `DoNotTerminate`      | `DoNotTerminate` blocks delete operation.        |
-| `Halt`                | `Halt` deletes Cluster resources like Pods and Services but retains Persistent Volume Claims (PVCs), allowing for data preservation while stopping other operations. Halt policy is deprecated in v0.9.1 and will have same meaning as DoNotTerminate. |
-| `Delete`              | `Delete` extends the Halt policy by also removing PVCs, leading to a thorough cleanup while removing all persistent data.   |
-| `WipeOut`             | `WipeOut` deletes all Cluster resources, including volume snapshots and backups in external storage. This results in complete data removal and should be used cautiously, especially in non-production environments, to avoid irreversible data loss.   |
+| `DoNotTerminate`      | `DoNotTerminate` prevents deletion of the Cluster. This policy ensures that all resources remain intact.       |
+| `Delete`              | `Delete` deletes Cluster resources like Pods, Services, and Persistent Volume Claims (PVCs), leading to a thorough cleanup while removing all persistent data.   |
+| `WipeOut`             | `WipeOut` is an aggressive policy that deletes all Cluster resources, including volume snapshots and backups in external storage. This results in complete data removal and should be used cautiously, primarily in non-production environments to avoid irreversible data loss.  |
 
 To check the termination policy, execute the following command.
 

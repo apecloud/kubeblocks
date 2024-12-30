@@ -249,14 +249,20 @@ componentSpecs:
 
 2. 创建 `PodMonitor`。
 
-   应用 `PodMonitor` 文件，监控集群。您也可以在 [KubeBlocks Addons 仓库](https://github.com/apecloud/kubeblocks-addons/blob/main/examples/postgresql/pod-monitor.yml)中查看最新版本示例 YAML 文件。
+   应用 `PodMonitor` 文件，监控集群。以下展示了不同引擎的创建示例，您可按需修改相关参数值。
+
+   <Tabs>
+
+   <TabItem value="ApeCloud MySQL" label="ApeCloud MySQL" default>
+
+   您也可以在 [KubeBlocks Addons 仓库](https://github.com/apecloud/kubeblocks-addons/blob/main/examples/apecloud-mysql/pod-monitor.yaml)中查看最新版本示例 YAML 文件。
 
    ```yaml
    kubectl apply -f - <<EOF
    apiVersion: monitoring.coreos.com/v1
    kind: PodMonitor
    metadata:
-     name: pg-cluster-pod-monitor
+     name: mycluster-pod-monitor
      namespace: monitoring # 说明：此处为 Prometheus operator 所在的 namespace
      labels:               # 此处对应 `prometheus.spec.podMonitorSelector` 中设置的标签。
        release: prometheus
@@ -279,10 +285,131 @@ componentSpecs:
          - default
      selector:
        matchLabels:
-         app.kubernetes.io/instance: pg-cluster
+         app.kubernetes.io/instance: mycluster
+         apps.kubeblocks.io/component-name: mysql
+   EOF
+   ```
+
+   </TabItem>
+
+   <TabItem value="MySQL 社区版" label="MySQL 社区版">
+
+   您也可以在 [KubeBlocks Addons 仓库](https://github.com/apecloud/kubeblocks-addons/blob/main/examples/mysql/pod-monitor.yaml)中查看最新版本示例 YAML 文件。
+
+   ```yaml
+   kubectl apply -f - <<EOF
+   apiVersion: monitoring.coreos.com/v1
+   kind: PodMonitor
+   metadata:
+     name: mycluster-pod-monitor
+     namespace: monitoring # 说明：此处为 Prometheus operator 所在的 namespace
+     labels:               # 此处对应 `prometheus.spec.podMonitorSelector` 中设置的标签。
+       release: prometheus
+   spec:
+     jobLabel: kubeblocks-service
+     # 定义了从关联的 Kubernetes `Pod` 对象
+     # 传递到采集指标上的标签
+     # 请按需设置标签
+     podTargetLabels:
+     - app.kubernetes.io/instance
+     - app.kubernetes.io/managed-by
+     - apps.kubeblocks.io/component-name
+     - apps.kubeblocks.io/pod-name
+     podMetricsEndpoints:
+       - path: /metrics
+         port: http-metrics
+         scheme: http
+     namespaceSelector:
+       matchNames:
+         - default
+     selector:
+       matchLabels:
+         app.kubernetes.io/instance: mycluster
+         apps.kubeblocks.io/component-name: mysql
+   EOF
+   ```
+
+   </TabItem>
+
+   <TabItem value="PostgreSQL" label="PostgreSQL">
+
+   您也可以在 [KubeBlocks Addons 仓库](https://github.com/apecloud/kubeblocks-addons/blob/main/examples/postgresql/pod-monitor.yml)中查看最新版本示例 YAML 文件。
+
+   ```yaml
+   kubectl apply -f - <<EOF
+   apiVersion: monitoring.coreos.com/v1
+   kind: PodMonitor
+   metadata:
+     name: mycluster-pod-monitor
+     namespace: monitoring # 说明：此处为 Prometheus operator 所在的 namespace
+     labels:               # 此处对应 `prometheus.spec.podMonitorSelector` 中设置的标签。
+       release: prometheus
+   spec:
+     jobLabel: kubeblocks-service
+     # 定义了从关联的 Kubernetes `Pod` 对象
+     # 传递到采集指标上的标签
+     # 请按需设置标签
+     podTargetLabels:
+     - app.kubernetes.io/instance
+     - app.kubernetes.io/managed-by
+     - apps.kubeblocks.io/component-name
+     - apps.kubeblocks.io/pod-name
+     podMetricsEndpoints:
+       - path: /metrics
+         port: http-metrics
+         scheme: http
+     namespaceSelector:
+       matchNames:
+         - default
+     selector:
+       matchLabels:
+         app.kubernetes.io/instance: mycluster
          apps.kubeblocks.io/component-name: postgresql
    EOF
    ```
+
+   </TabItem>
+
+   <TabItem value="Redis" label="Redis">
+
+   您也可以在 [KubeBlocks Addons 仓库](https://github.com/apecloud/kubeblocks-addons/blob/main/examples/redis/pod-monitor.yaml)中查看最新版本示例 YAML 文件。
+
+   ```yaml
+   kubectl apply -f - <<EOF
+   apiVersion: monitoring.coreos.com/v1
+   kind: PodMonitor
+   metadata:
+     name: mycluster-pod-monitor
+     namespace: monitoring # 说明：此处为 Prometheus operator 所在的 namespace
+     labels:               # 此处对应 `prometheus.spec.podMonitorSelector` 中设置的标签。
+       release: prometheus
+   spec:
+     jobLabel: kubeblocks-service
+     # 定义了从关联的 Kubernetes `Pod` 对象
+     # 传递到采集指标上的标签
+     # 请按需设置标签
+     podTargetLabels:
+     - app.kubernetes.io/instance
+     - app.kubernetes.io/managed-by
+     - apps.kubeblocks.io/component-name
+     - apps.kubeblocks.io/pod-name
+     podMetricsEndpoints:
+       - path: /metrics
+         port: http-metrics
+         scheme: http
+     namespaceSelector:
+       matchNames:
+         - default
+     selector:
+       matchLabels:
+         app.kubernetes.io/instance: mycluster
+         apps.kubeblocks.io/component-name: redis
+   EOF
+   ```
+
+   </TabItem>
+
+   </Tabs>
 
 3. 连接 Grafana 大盘.
 

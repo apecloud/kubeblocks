@@ -24,6 +24,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
 // +genclient
@@ -306,150 +308,17 @@ type InstanceSetStatus struct {
 	TemplatesStatus []InstanceTemplateStatus `json:"templatesStatus,omitempty"`
 }
 
-// Range represents a range with a start and an end value.
-// It is used to define a continuous segment.
-type Range struct {
-	Start int32 `json:"start"`
-	End   int32 `json:"end"`
-}
+// +kubebuilder:object:generate=false
+type Range = kbappsv1.Range
 
-// Ordinals represents a combination of continuous segments and individual values.
-type Ordinals struct {
-	Ranges   []Range `json:"ranges,omitempty"`
-	Discrete []int32 `json:"discrete,omitempty"`
-}
+// +kubebuilder:object:generate=false
+type Ordinals = kbappsv1.Ordinals
 
-// InstanceTemplate allows customization of individual replica configurations within a Component,
-// without altering the base component template defined in ClusterComponentSpec.
-// It enables the application of distinct settings to specific instances (replicas),
-// providing flexibility while maintaining a common configuration baseline.
-type InstanceTemplate struct {
-	// Name specifies the unique name of the instance Pod created using this InstanceTemplate.
-	// This name is constructed by concatenating the component's name, the template's name, and the instance's ordinal
-	// using the pattern: $(cluster.name)-$(component.name)-$(template.name)-$(ordinal). Ordinals start from 0.
-	// The specified name overrides any default naming conventions or patterns.
-	//
-	// +kubebuilder:validation:MaxLength=54
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	// +kubebuilder:validation:Required
-	Name string `json:"name"`
+// +kubebuilder:object:generate=false
+type InstanceTemplate = kbappsv1.InstanceTemplate
 
-	// Specifies the number of instances (Pods) to create from this InstanceTemplate.
-	// This field allows setting how many replicated instances of the component,
-	// with the specific overrides in the InstanceTemplate, are created.
-	// The default value is 1. A value of 0 disables instance creation.
-	//
-	// +kubebuilder:default=1
-	// +kubebuilder:validation:Minimum=0
-	// +optional
-	Replicas *int32 `json:"replicas,omitempty"`
-
-	// Specifies the desired Ordinals of this InstanceTemplate.
-	// The Ordinals used to specify the ordinal of the instance (pod) names to be generated under this InstanceTemplate.
-	//
-	// For example, if Ordinals is {ranges: [{start: 0, end: 1}], discrete: [7]},
-	// then the instance names generated under this InstanceTemplate would be
-	// $(cluster.name)-$(component.name)-$(template.name)-0、$(cluster.name)-$(component.name)-$(template.name)-1 and
-	// $(cluster.name)-$(component.name)-$(template.name)-7
-	Ordinals Ordinals `json:"ordinals,omitempty"`
-
-	// Specifies a map of key-value pairs to be merged into the Pod's existing annotations.
-	// Existing keys will have their values overwritten, while new keys will be added to the annotations.
-	//
-	// +optional
-	Annotations map[string]string `json:"annotations,omitempty"`
-
-	// Specifies a map of key-value pairs that will be merged into the Pod's existing labels.
-	// Values for existing keys will be overwritten, and new keys will be added.
-	//
-	// +optional
-	Labels map[string]string `json:"labels,omitempty"`
-
-	// Specifies an override for the first container's image in the pod.
-	//
-	// +optional
-	Image *string `json:"image,omitempty"`
-
-	// Specifies the scheduling policy for the Component.
-	//
-	// +optional
-	SchedulingPolicy *SchedulingPolicy `json:"schedulingPolicy,omitempty"`
-
-	// Specifies an override for the resource requirements of the first container in the Pod.
-	// This field allows for customizing resource allocation (CPU, memory, etc.) for the container.
-	//
-	// +optional
-	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
-
-	// Defines Env to override.
-	// Add new or override existing envs.
-	// +optional
-	Env []corev1.EnvVar `json:"env,omitempty"`
-
-	// Defines Volumes to override.
-	// Add new or override existing volumes.
-	// +optional
-	Volumes []corev1.Volume `json:"volumes,omitempty"`
-
-	// Defines VolumeMounts to override.
-	// Add new or override existing volume mounts of the first container in the pod.
-	// +optional
-	VolumeMounts []corev1.VolumeMount `json:"volumeMounts,omitempty"`
-
-	// Defines VolumeClaimTemplates to override.
-	// Add new or override existing volume claim templates.
-	// +optional
-	VolumeClaimTemplates []corev1.PersistentVolumeClaim `json:"volumeClaimTemplates,omitempty"`
-}
-
-// SchedulingPolicy the scheduling policy.
-// Deprecated: Unify with apps/v1alpha1.SchedulingPolicy
-type SchedulingPolicy struct {
-	// If specified, the Pod will be dispatched by specified scheduler.
-	// If not specified, the Pod will be dispatched by default scheduler.
-	//
-	// +optional
-	SchedulerName string `json:"schedulerName,omitempty"`
-
-	// NodeSelector is a selector which must be true for the Pod to fit on a node.
-	// Selector which must match a node's labels for the Pod to be scheduled on that node.
-	// More info: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
-	//
-	// +optional
-	// +mapType=atomic
-	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
-
-	// NodeName is a request to schedule this Pod onto a specific node. If it is non-empty,
-	// the scheduler simply schedules this Pod onto that node, assuming that it fits resource
-	// requirements.
-	//
-	// +optional
-	NodeName string `json:"nodeName,omitempty"`
-
-	// Specifies a group of affinity scheduling rules of the Cluster, including NodeAffinity, PodAffinity, and PodAntiAffinity.
-	//
-	// +optional
-	Affinity *corev1.Affinity `json:"affinity,omitempty"`
-
-	// Allows Pods to be scheduled onto nodes with matching taints.
-	// Each toleration in the array allows the Pod to tolerate node taints based on
-	// specified `key`, `value`, `effect`, and `operator`.
-	//
-	// - The `key`, `value`, and `effect` identify the taint that the toleration matches.
-	// - The `operator` determines how the toleration matches the taint.
-	//
-	// Pods with matching tolerations are allowed to be scheduled on tainted nodes, typically reserved for specific purposes.
-	//
-	// +optional
-	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
-
-	// TopologySpreadConstraints describes how a group of Pods ought to spread across topology
-	// domains. Scheduler will schedule Pods in a way which abides by the constraints.
-	// All topologySpreadConstraints are ANDed.
-	//
-	// +optional
-	TopologySpreadConstraints []corev1.TopologySpreadConstraint `json:"topologySpreadConstraints,omitempty"`
-}
+// +kubebuilder:object:generate=false
+type SchedulingPolicy = kbappsv1.SchedulingPolicy
 
 type PodUpdatePolicyType string
 
@@ -688,18 +557,3 @@ const (
 )
 
 const defaultInstanceTemplateReplicas = 1
-
-func (t *InstanceTemplate) GetName() string {
-	return t.Name
-}
-
-func (t *InstanceTemplate) GetReplicas() int32 {
-	if t.Replicas != nil {
-		return *t.Replicas
-	}
-	return defaultInstanceTemplateReplicas
-}
-
-func (t *InstanceTemplate) GetOrdinals() Ordinals {
-	return t.Ordinals
-}

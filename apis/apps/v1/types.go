@@ -591,7 +591,23 @@ type TLSSecretRef struct {
 	Key string `json:"key"`
 }
 
-// InstanceTemplate allows customization of individual replica configurations in a Component.
+// Range represents a range with a start and an end value.
+// It is used to define a continuous segment.
+type Range struct {
+	Start int32 `json:"start"`
+	End   int32 `json:"end"`
+}
+
+// Ordinals represents a combination of continuous segments and individual values.
+type Ordinals struct {
+	Ranges   []Range `json:"ranges,omitempty"`
+	Discrete []int32 `json:"discrete,omitempty"`
+}
+
+// InstanceTemplate allows customization of individual replica configurations within a Component,
+// without altering the base component template defined in ClusterComponentSpec.
+// It enables the application of distinct settings to specific instances (replicas),
+// providing flexibility while maintaining a common configuration baseline.
 type InstanceTemplate struct {
 	// Name specifies the unique name of the instance Pod created using this InstanceTemplate.
 	// This name is constructed by concatenating the Component's name, the template's name, and the instance's ordinal
@@ -612,6 +628,15 @@ type InstanceTemplate struct {
 	// +kubebuilder:validation:Minimum=0
 	// +optional
 	Replicas *int32 `json:"replicas,omitempty"`
+
+	// Specifies the desired Ordinals of this InstanceTemplate.
+	// The Ordinals used to specify the ordinal of the instance (pod) names to be generated under this InstanceTemplate.
+	//
+	// For example, if Ordinals is {ranges: [{start: 0, end: 1}], discrete: [7]},
+	// then the instance names generated under this InstanceTemplate would be
+	// $(cluster.name)-$(component.name)-$(template.name)-0、$(cluster.name)-$(component.name)-$(template.name)-1 and
+	// $(cluster.name)-$(component.name)-$(template.name)-7
+	Ordinals Ordinals `json:"ordinals,omitempty"`
 
 	// Specifies a map of key-value pairs to be merged into the Pod's existing annotations.
 	// Existing keys will have their values overwritten, while new keys will be added to the annotations.

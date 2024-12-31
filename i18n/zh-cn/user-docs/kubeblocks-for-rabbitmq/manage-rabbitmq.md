@@ -28,13 +28,7 @@ RabbitMQ 是可靠且成熟的消息和流处理中间件，支持在云环境�
 
 ## 创建集群
 
-KubeBlocks 通过 `Cluster` 定义集群。以下是创建 RabbitMQ 集群的示例。Pod 默认分布在不同节点。但如果您只有一个节点可用于部署集群，可将 `spec.affinity.topologyKeys` 设置为 `null`。
-
-:::note
-
-生产环境中，不建议将所有副本部署在同一个节点上，因为这可能会降低集群的可用性。
-
-:::
+KubeBlocks 通过 `Cluster` 定义集群。以下是创建 RabbitMQ 集群的示例。Pod 默认分布在不同节点。如果您只有一个节点可用于部署多副本集群，可设置 `spec.schedulingPolicy` 或 `spec.componentSpecs.schedulingPolicy`，具体可参考 [API 文档](https://kubeblocks.io/docs/preview/developer_docs/api-reference/cluster#apps.kubeblocks.io/v1.SchedulingPolicy)。但生产环境中，不建议将所有副本部署在同一个节点上，因为这可能会降低集群的可用性。
 
 ```yaml
 cat <<EOF | kubectl apply -f -

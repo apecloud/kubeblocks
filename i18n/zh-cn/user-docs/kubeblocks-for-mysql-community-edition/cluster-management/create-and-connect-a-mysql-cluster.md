@@ -103,10 +103,10 @@ KubeBlocks 支持创建两种类型的 MySQL 集群：单机版（Standalone）�
 <TabItem value="kubectl" label="kubectl" default>
 
 1. 创建 MySQL 集群。
-   
+
    KubeBlocks 通过 `Cluster` 定义集群。以下是创建 MySQL 主备版的示例。
 
-   如果您只有一个节点可用于部署集群版，可将 `spec.affinity.topologyKeys` 设置为 `null`。但生产环境中，不建议将所有副本部署在同一个节点上，因为这可能会降低集群的可用性。
+   如果您只有一个节点可用于部署主备版集群，可设置 `spec.schedulingPolicy` 或 `spec.componentSpecs.schedulingPolicy`，具体可参考 [API 文档](https://kubeblocks.io/docs/preview/developer_docs/api-reference/cluster#apps.kubeblocks.io/v1.SchedulingPolicy)。但生产环境中，不建议将所有副本部署在同一个节点上，因为这可能会降低集群的可用性。
 
    ```yaml
    cat <<EOF | kubectl apply -f -
@@ -196,11 +196,7 @@ KubeBlocks 支持创建两种类型的 MySQL 集群：单机版（Standalone）�
    kbcli cluster create mysql -h
    ```
 
-   例如，如果您只有一个节点可用于部署主备版，可将 `topology-keys` 设置为 `null`。
-
-   ```bash
-   kbcli cluster create mysql mycluster --topology-keys=null -n demo
-   ```
+   如果您只有一个节点用于部署主备版集群，可在创建集群时配置集群亲和性，配置 `--pod-anti-afffinity`, `--tolerations` 和 `--topology-keys`。但需要注意的是，生产环境中，不建议将所有副本部署在同一个节点上，因为这可能会降低集群的可用性。
 
 2. 验证集群是否创建成功。
 

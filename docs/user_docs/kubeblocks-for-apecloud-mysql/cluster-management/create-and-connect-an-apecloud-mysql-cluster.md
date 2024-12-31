@@ -105,7 +105,7 @@ KubeBlocks supports creating two types of ApeCloud MySQL clusters: Standalone an
 
    KubeBlocks implements a `Cluster` CRD to define a cluster. Here is an example of creating a RaftGroup Cluster.
 
-   If you only have one node for deploying a RaftGroup Cluster, set `spec.affinity.topologyKeys` as `null`. But for a production environment, it is not recommended to deploy all replicas on one node, which may decrease the cluster availability.
+   If you only have one node for deploying a RaftGroup Cluster, configure the cluster affinity by setting `spec.schedulingPolicy` or `spec.componentSpecs.schedulingPolicy`. For details, you can refer to the [API docs](https://kubeblocks.io/docs/preview/developer_docs/api-reference/cluster#apps.kubeblocks.io/v1.SchedulingPolicy). But for a production environment, it is not recommended to deploy all replicas on one node, which may decrease the cluster availability.
 
    ```yaml
    cat <<EOF | kubectl apply -f -
@@ -197,20 +197,16 @@ KubeBlocks supports creating two types of ApeCloud MySQL clusters: Standalone an
    Create a Standalone.
 
    ```bash
-   kbcli cluster create apecloud-mysql mycluster --namespace demo
+   kbcli cluster create apecloud-mysql mycluster --set mode='standalone' --namespace demo
    ```
 
    Create a RaftGroup Cluster.
 
    ```bash
-   kbcli cluster create apecloud-mysql mycluster --replicas=3 --namespace demo
+   kbcli cluster create apecloud-mysql mycluster --set mode='raftGroup' --namespace demo
    ```
 
-   If you only have one node for deploying a RaftGroup Cluster, set the `topology-keys` as `null` when creating a RaftGroup Cluster. But you should note that for a production environment, it is not recommended to deploy all replicas on one node, which may decrease the cluster availability.
-
-   ```bash
-   kbcli cluster create apecloud-mysql mycluster --replicas=3 --topology-keys null --namespace demo
-   ```
+   If you only have one node for deploying a RaftGroup Cluster, you can configure the cluster affinity by setting `--pod-anti-afffinity`, `--tolerations`, and `--topology-keys` when creating a RaftGroup Cluster. But you should note that for a production environment, it is not recommended to deploy all replicas on one node, which may decrease the cluster availability.
 
 2. Verify whether this cluster is created successfully.
 

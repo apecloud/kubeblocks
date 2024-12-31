@@ -67,7 +67,7 @@ This document shows how to create a Kafka cluster.
 
 <TabItem value="kubectl" label="kubectl" default>
 
-1. Create a Kafka cluster. If you only have one node for deploying a cluster with multiple replicas, set `spec.componentSpecs.affinity.topologyKeys` as `null`. But for a production environment, it is not recommended to deploy all replicas on one node, which may decrease the cluster availability.
+1. Create a Kafka cluster. If you only have one node for deploying a cluster with multiple replicas, configure the cluster affinity by setting `spec.schedulingPolicy` or `spec.componentSpecs.schedulingPolicy`. For details, you can refer to the [API docs](https://kubeblocks.io/docs/preview/developer_docs/api-reference/cluster#apps.kubeblocks.io/v1.SchedulingPolicy). But for a production environment, it is not recommended to deploy all replicas on one node, which may decrease the cluster availability.
 
    For more cluster examples, refer to [the GitHub repository](https://github.com/apecloud/kubeblocks-addons/tree/main/examples/kafka).
 
@@ -252,6 +252,8 @@ This document shows how to create a Kafka cluster.
 
    kbcli cluster create kafka -h
    ```
+
+   If you only have one node for deploying a cluster with multiple replicas, you can configure the cluster affinity by setting `--pod-anti-afffinity`, `--tolerations`, and `--topology-keys` when creating a cluster. But you should note that for a production environment, it is not recommended to deploy all replicas on one node, which may decrease the cluster availability.
 
 2. Verify whether this cluster is created successfully.
 

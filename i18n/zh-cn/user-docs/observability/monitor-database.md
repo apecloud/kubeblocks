@@ -113,45 +113,39 @@ import TabItem from '@theme/TabItem';
 
 ```yaml
 cat <<EOF | kubectl apply -f -
-apiVersion: apps.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1
 kind: Cluster
 metadata:
   name: mycluster
   namespace: demo
 spec:
-  clusterDefinitionRef: postgresql
-  clusterVersionRef: postgresql-12.14.0
   terminationPolicy: Delete
-  affinity:
-    podAntiAffinity: Preferred
-    topologyKeys:
-    - kubernetes.io/hostname
-    tenancy: SharedNode
-  tolerations:
-    - key: kb-data
-      operator: Equal
-      value: 'true'
-      effect: NoSchedule
+  clusterDef: postgresql
+  topology: replication
   componentSpecs:
-  - name: postgresql
-    componentDefRef: postgresql
-    disableExporter: true # 将参数值设为 `false`，开启 exporter
-    replicas: 2
-    resources:
-      limits:
-        cpu: '0.5'
-        memory: 0.5Gi
-      requests:
-        cpu: '0.5'
-        memory: 0.5Gi
-    volumeClaimTemplates:
-    - name: data
-      spec:
-        accessModes:
-        - ReadWriteOnce
-        resources:
-          requests:
-            storage: 20Gi
+    - name: postgresql
+      serviceVersion: "14.7.2"
+      disableExporter: false
+      labels:
+        apps.kubeblocks.postgres.patroni/scope: mycluster-postgresql
+      replicas: 2
+      resources:
+        limits:
+          cpu: "0.5"
+          memory: "0.5Gi"
+        requests:
+          cpu: "0.5"
+          memory: "0.5Gi"
+      volumeClaimTemplates:
+        - name: data
+          spec:
+            storageClassName: ""
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 20Gi
+
 EOF
 ```
 

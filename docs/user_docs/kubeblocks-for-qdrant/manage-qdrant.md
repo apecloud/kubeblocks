@@ -34,7 +34,7 @@ KubeBlocks supports the management of Qdrant. This tutorial illustrates how to c
 
 <TabItem value="kubectl" label="kubectl" default>
 
-KubeBlocks implements a `Cluster` CRD to define a cluster. Here is an example of creating a Qdrant Replication cluster. Primary and Secondary are distributed on different nodes by default. But if you only have one node for deploying a Replication Cluster, set `spec.affinity.topologyKeys` as `null`.
+KubeBlocks implements a `Cluster` CRD to define a cluster. Here is an example of creating a Qdrant Replication cluster. Primary and Secondary are distributed on different nodes by default. But if you only have one node for deploying a Replication Cluster, configure the cluster affinity by setting `spec.schedulingPolicy` or `spec.componentSpecs.schedulingPolicy`. For details, you can refer to the [API docs](https://kubeblocks.io/docs/preview/developer_docs/api-reference/cluster#apps.kubeblocks.io/v1.SchedulingPolicy). But for a production environment, it is not recommended to deploy all replicas on one node, which may decrease the cluster availability.
 
 ```yaml
 cat <<EOF | kubectl apply -f -
@@ -43,14 +43,12 @@ kind: Cluster
 metadata:
   name: mycluster
   namespace: demo
-  annotations: {}
 spec:
   terminationPolicy: Delete
   clusterDef: qdrant
   topology: cluster
   componentSpecs:
     - name: qdrant
-      annotations: {}
       serviceVersion: 1.10.0
       replicas: 3
       resources:
@@ -118,6 +116,8 @@ kubectl get cluster mycluster -n demo -o yaml
 
    kbcli cluster create qdrant -h
    ```
+
+   If you only have one node for deploying a cluster with multiple replicas, you can configure the cluster affinity by setting `--pod-anti-afffinity`, `--tolerations`, and `--topology-keys` when creating a cluster. But you should note that for a production environment, it is not recommended to deploy all replicas on one node, which may decrease the cluster availability.
 
 2. Check whether the cluster is created.
 

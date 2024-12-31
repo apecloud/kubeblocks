@@ -78,7 +78,7 @@ Refer to the [Pulsar official document](https://pulsar.apache.org/docs/3.1.x/) f
 
 ## Create Pulsar cluster
 
-1. Create a Pulsar cluster in basic mode. For other cluster modes, check out the examples provided in [the GitHub repository](https://github.com/apecloud/kubeblocks-addons/tree/main/examples/pulsar).
+1. Create a Pulsar cluster in basic mode. For other cluster modes, check out the examples provided in [the GitHub repository](https://github.com/apecloud/kubeblocks-addons/tree/main/examples/pulsar). If you only have one node for deploying a Pulsar Cluster, configure the cluster affinity by setting `spec.schedulingPolicy` or `spec.componentSpecs.schedulingPolicy`. For details, you can refer to the [API docs](https://kubeblocks.io/docs/preview/developer_docs/api-reference/cluster#apps.kubeblocks.io/v1.SchedulingPolicy). But for a production environment, it is not recommended to deploy all replicas on one node, which may decrease the cluster availability.
 
    ```yaml
    cat <<EOF | kubectl apply -f -

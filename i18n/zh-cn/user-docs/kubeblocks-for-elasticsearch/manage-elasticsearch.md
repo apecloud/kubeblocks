@@ -29,13 +29,7 @@ Elasticsearch 是一个分布式、RESTful 风格的搜索和数据分析引擎�
 
 <TabItem value="kubectl" label="kubectl" default>
 
-KubeBlocks 通过 `Cluster` 定义集群。以下是创建 Elasticsearch 集群的示例。Pod 默认分布在不同节点。但如果您只有一个节点可用于部署集群，可将 `spec.affinity.topologyKeys` 设置为 `null`。
-
-:::note
-
-生产环境中，不建议将所有副本部署在同一个节点上，因为这可能会降低集群的可用性。
-
-:::
+KubeBlocks 通过 `Cluster` 定义集群。以下是创建 Elasticsearch 集群的示例。KubeBlocks 还支持创建Pod 默认分布在不同节点。如果您只有一个节点可用于部署集群，可设置 `spec.schedulingPolicy` 或 `spec.componentSpecs.schedulingPolicy`，具体可参考 [API 文档](https://kubeblocks.io/docs/preview/developer_docs/api-reference/cluster#apps.kubeblocks.io/v1.SchedulingPolicy)。但生产环境中，不建议将所有副本部署在同一个节点上，因为这可能会降低集群的可用性。
 
 ```yaml
 cat <<EOF | kubectl apply -f -
@@ -45,29 +39,83 @@ metadata:
   name: mycluster
   namespace: demo
   annotations:
-    kubeblocks.io/extra-env: '{"mode":"single-node"}'
+    kubeblocks.io/extra-env: '{"master-roles":"master", "data-roles": "data", "ingest-roles": "ingest", "transform-roles": "transform"}'
 spec:
   terminationPolicy: Delete
   componentSpecs:
-    - name: mdit
-      componentDef: elasticsearch-8
-      serviceVersion: 8.8.2
-      replicas: 1
-      resources:
-        limits:
-          cpu: "1"
-          memory: "2Gi"
-        requests:
-          cpu: "1"
-          memory: "2Gi"
-      volumeClaimTemplates:
-        - name: data
-          spec:
-            accessModes:
-              - ReadWriteOnce
-            resources:
-              requests:
-                storage: 20Gi
+  - name: master
+    componentDef: elasticsearch-8-1.0.0
+    replicas: 3
+    resources:
+      limits:
+        cpu: '0.5'
+        memory: 2Gi
+      requests:
+        cpu: '0.5'
+        memory: 2Gi
+    volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi
+  - name: data
+    componentDef: elasticsearch-8-1.0.0
+    replicas: 3
+    resources:
+      limits:
+        cpu: '0.5'
+        memory: 2Gi
+      requests:
+        cpu: '0.5'
+        memory: 2Gi
+    volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi
+  - name: ingest
+    componentDef: elasticsearch-8-1.0.0
+    replicas: 1
+    resources:
+      limits:
+        cpu: '0.5'
+        memory: 2Gi
+      requests:
+        cpu: '0.5'
+        memory: 2Gi
+    volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi
+  - name: transform
+    componentDef: elasticsearch-8-1.0.0
+    replicas: 1
+    resources:
+      limits:
+        cpu: '0.5'
+        memory: 2Gi
+      requests:
+        cpu: '0.5'
+        memory: 2Gi
+    volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi
+EOF
 ```
 
 | 字段                                   | 定义  |
@@ -114,6 +162,8 @@ kubectl get cluster mycluster -n demo -o yaml
    kbcli cluster create elasticsearch --help
    kbcli cluster create elasticsearch -h
    ```
+
+   如果您只有一个节点用于部署多副本集群，可在创建集群时配置集群亲和性，配置 `--pod-anti-afffinity`, `--tolerations` 和 `--topology-keys`。但需要注意的是，生产环境中，不建议将所有副本部署在同一个节点上，因为这可能会降低集群的可用性。
 
 2. 查看集群是否已创建。
 

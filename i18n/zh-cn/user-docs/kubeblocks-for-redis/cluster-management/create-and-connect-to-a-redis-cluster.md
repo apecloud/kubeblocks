@@ -101,7 +101,7 @@ import TabItem from '@theme/TabItem';
 
 ### 创建集群
 
-KubeBlocks 支持创建两种 Redis 集群：单机版（Standalone）和主备版（Replication）。Redis 单机版仅支持一个副本，适用于对可用性要求较低的场景。 对于高可用性要求较高的场景，建议创建主备版集群，以支持自动故障切换。为了确保高可用性，所有的副本都默认分布在不同的节点上。
+KubeBlocks 支持创建两种 Redis 集群：单机版（Standalone）和主备版（Replication）。Redis 单机版仅支持一个副本，适用于对可用性要求较低的场景。 对于高可用性要求较高的场景，建议创建主备版集群，以支持自动故障切换。为了确保高可用性，所有的副本都默认分布在不同的节点上。如果您只有一个节点可用于部署多副本集群，可设置 `spec.schedulingPolicy` 或 `spec.componentSpecs.schedulingPolicy`，具体可参考 [API 文档](https://kubeblocks.io/docs/preview/developer_docs/api-reference/cluster#apps.kubeblocks.io/v1.SchedulingPolicy)。但生产环境中，不建议将所有副本部署在同一个节点上，因为这可能会降低集群的可用性。
 
 <Tabs>
 
@@ -216,6 +216,8 @@ KubeBlocks 支持创建两种 Redis 集群：单机版（Standalone）和主备�
 
    kbcli cluster create redis -h
    ```
+
+   如果您只有一个节点用于部署多副本集群，可在创建集群时配置集群亲和性，配置 `--pod-anti-afffinity`, `--tolerations` 和 `--topology-keys`。但需要注意的是，生产环境中，不建议将所有副本部署在同一个节点上，因为这可能会降低集群的可用性。
 
 2. 验证集群是否创建成功。
 

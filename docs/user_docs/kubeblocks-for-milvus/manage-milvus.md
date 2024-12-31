@@ -34,7 +34,8 @@ This tutorial illustrates how to create and manage a Milvus cluster by `kbcli`, 
 
 <TabItem value="kubectl" label="kubectl" default>
 
-KubeBlocks implements a `Cluster` CRD to define a cluster. Here is an example of creating a Milvus cluster.
+KubeBlocks implements a `Cluster` CRD to define a cluster. Here is an example of creating a Milvus cluster. If you only have one node for deploying a cluster with multiple replicas, configure the cluster affinity by setting `spec.schedulingPolicy` or `spec.componentSpecs.schedulingPolicy`. For details, you can refer to the [API docs](https://kubeblocks.io/docs/preview/developer_docs/api-reference/cluster#apps.kubeblocks.io/v1.SchedulingPolicy). But for a production environment, it is not recommended to deploy all replicas on one node, which may decrease the cluster availability.
+
 
 ```yaml
 cat <<EOF | kubectl apply -f -
@@ -301,17 +302,15 @@ kubectl get cluster mycluster -n demo -o yaml
    kbcli cluster create mycluster --cluster-definition=milvus-2.3.2 -n demo
    ```
 
-:::note
+   If you want to customize your cluster specifications, `kbcli` provides various options, such as setting cluster version, termination policy, CPU, and memory. You can view these options by adding `--help` or `-h` flag.
 
-If you want to customize your cluster specifications, `kbcli` provides various options, such as setting cluster version, termination policy, CPU, and memory. You can view these options by adding `--help` or `-h` flag.
+   ```bash
+   kbcli cluster create milvus --help
 
-```bash
-kbcli cluster create milvus --help
+   kbcli cluster create milvus -h
+   ```
 
-kbcli cluster create milvus -h
-```
-
-:::
+   If you only have one node for deploying a cluster with multiple replicas, you can configure the cluster affinity by setting `--pod-anti-afffinity`, `--tolerations`, and `--topology-keys` when creating a cluster. But you should note that for a production environment, it is not recommended to deploy all replicas on one node, which may decrease the cluster availability.
 
 2. Check whether the cluster is created successfully.
 

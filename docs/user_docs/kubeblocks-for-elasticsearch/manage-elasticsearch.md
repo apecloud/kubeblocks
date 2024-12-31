@@ -32,39 +32,95 @@ KubeBlocks supports the management of Elasticsearch. This tutorial illustrates h
 
 <TabItem value="kubectl" label="kubectl" default>
 
-KubeBlocks implements a `Cluster` CRD to define a cluster. Here is an example of creating an Elasticsearch cluster with single node. For more examples, refer to [the GitHub repository](https://github.com/apecloud/kubeblocks-addons/tree/main/examples/elasticsearch).
+KubeBlocks implements a `Cluster` CRD to define a cluster. Here is an example of creating an Elasticsearch cluster with multiple nodes. For more examples, refer to [the GitHub repository](https://github.com/apecloud/kubeblocks-addons/tree/main/examples/elasticsearch).
+
+If you only have one node for deploying a cluster with multiple nodes, configure the cluster affinity by setting `spec.schedulingPolicy` or `spec.componentSpecs.schedulingPolicy`. For details, you can refer to the [API docs](https://kubeblocks.io/docs/preview/developer_docs/api-reference/cluster#apps.kubeblocks.io/v1.SchedulingPolicy). But for a production environment, it is not recommended to deploy all replicas on one node, which may decrease the cluster availability.
 
 ```yaml
 cat <<EOF | kubectl apply -f -
 apiVersion: apps.kubeblocks.io/v1
 kind: Cluster
 metadata:
-  name: mycluster
-  namespace: demo
+  name: es-multinode
+  namespace: default
   annotations:
-    kubeblocks.io/extra-env: '{"mode":"single-node"}'
+    kubeblocks.io/extra-env: '{"master-roles":"master", "data-roles": "data", "ingest-roles": "ingest", "transform-roles": "transform"}'
 spec:
   terminationPolicy: Delete
   componentSpecs:
-    - name: mdit
-      componentDef: elasticsearch-8
-      serviceVersion: 8.8.2
-      replicas: 1
-      resources:
-        limits:
-          cpu: "1"
-          memory: "2Gi"
-        requests:
-          cpu: "1"
-          memory: "2Gi"
-      volumeClaimTemplates:
-        - name: data
-          spec:
-            accessModes:
-              - ReadWriteOnce
-            resources:
-              requests:
-                storage: 20Gi
+  - name: master
+    componentDef: elasticsearch-8-1.0.0
+    replicas: 3
+    resources:
+      limits:
+        cpu: '0.5'
+        memory: 2Gi
+      requests:
+        cpu: '0.5'
+        memory: 2Gi
+    volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi
+  - name: data
+    componentDef: elasticsearch-8-1.0.0
+    replicas: 3
+    resources:
+      limits:
+        cpu: '0.5'
+        memory: 2Gi
+      requests:
+        cpu: '0.5'
+        memory: 2Gi
+    volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi
+  - name: ingest
+    componentDef: elasticsearch-8-1.0.0
+    replicas: 1
+    resources:
+      limits:
+        cpu: '0.5'
+        memory: 2Gi
+      requests:
+        cpu: '0.5'
+        memory: 2Gi
+    volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi
+  - name: transform
+    componentDef: elasticsearch-8-1.0.0
+    replicas: 1
+    resources:
+      limits:
+        cpu: '0.5'
+        memory: 2Gi
+      requests:
+        cpu: '0.5'
+        memory: 2Gi
+    volumeClaimTemplates:
+    - name: data
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi
+EOF
 ```
 
 | Field                                 | Definition  |
@@ -101,23 +157,21 @@ kubectl get cluster mycluster -n demo -o yaml
 
 ***Steps***
 
-1. Execute the following command to create an Elasticsearch cluster.
+1. Execute the following command to create an Elasticsearch cluster with multiple nodes.
 
    ```bash
    kbcli cluster create elasticsearch mycluster -n demo
    ```
 
-:::note
-
-If you want to customize your cluster specifications, kbcli provides various options, such as setting cluster version, termination policy, CPU, and memory. You can view these options by adding `--help` or `-h` flag.
+   If you want to customize your cluster specifications, kbcli provides various options, such as setting cluster version, termination policy, CPU, and memory. You can view these options by adding `--help` or `-h` flag.
   
-```bash
-kbcli cluster create elasticsearch --help
+   ```bash
+   kbcli cluster create elasticsearch --help
 
-kbcli cluster create elasticsearch -h
-```
+   kbcli cluster create elasticsearch -h
+   ```
 
-:::
+   If you only have one node for deploying a cluster with multiple nodes, you can configure the cluster affinity by setting `--pod-anti-afffinity`, `--tolerations`, and `--topology-keys` when creating a cluster. But you should note that for a production environment, it is not recommended to deploy all replicas on one node, which may decrease the cluster availability.
 
 2. Check whether the cluster is created.
 

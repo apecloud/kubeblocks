@@ -32,7 +32,8 @@ This tutorial illustrates how to create and manage a StarRocks cluster by `kbcli
 
 <TabItem value="kubectl" label="kubectl" default>
 
-KubeBlocks implements a `Cluster` CRD to define a cluster. Here is an example of creating a StarRocks cluster.
+KubeBlocks implements a `Cluster` CRD to define a cluster. Here is an example of creating a StarRocks cluster. If you only have one node for deploying a cluster with multiple replicas, configure the cluster affinity by setting `spec.schedulingPolicy` or `spec.componentSpecs.schedulingPolicy`. For details, you can refer to the [API docs](https://kubeblocks.io/docs/preview/developer_docs/api-reference/cluster#apps.kubeblocks.io/v1.SchedulingPolicy). But for a production environment, it is not recommended to deploy all replicas on one node, which may decrease the cluster availability.
+
 
 ```yaml
 cat <<EOF | kubectl apply -f -

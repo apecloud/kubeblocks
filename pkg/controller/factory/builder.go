@@ -77,7 +77,9 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, component
 		SetTemplate(template).
 		AddMatchLabelsInMap(constant.GetCompLabels(clusterName, compName)).
 		SetReplicas(synthesizedComp.Replicas).
-		SetMinReadySeconds(synthesizedComp.MinReadySeconds)
+		SetMinReadySeconds(synthesizedComp.MinReadySeconds).
+		SetLifecycleActions(synthesizedComp.LifecycleActions).
+		SetTemplateVars(synthesizedComp.TemplateVars)
 
 	var vcts []corev1.PersistentVolumeClaim
 	for _, vct := range synthesizedComp.VolumeClaimTemplates {

@@ -31,9 +31,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
@@ -434,7 +434,7 @@ var _ = Describe("service references", func() {
 			err := buildServiceReferencesWithoutResolve(testCtx.Ctx, reader, synthesizedComp, compDef, comp)
 			Expect(err).Should(Succeed())
 
-			svcFQDN := serviceFQDN("external", reader.objs[0].GetName())
+			svcFQDN := intctrlutil.ServiceFQDN("external", reader.objs[0].GetName())
 
 			Expect(synthesizedComp.ServiceReferences).Should(HaveKey(serviceRefDeclaration.Name))
 			serviceDescriptor := synthesizedComp.ServiceReferences[serviceRefDeclaration.Name]
@@ -564,10 +564,10 @@ var _ = Describe("service references", func() {
 			}
 
 			etcdComp := reader.objs[0].(*appsv1.Component)
-			podNames, _ := instanceset.GenerateAllInstanceNames(etcdComp.Name, etcdComp.Spec.Replicas, nil, nil, workloads.Ordinals{})
+			podNames, _ := instanceset.GenerateAllInstanceNames(etcdComp.Name, etcdComp.Spec.Replicas, nil, nil, appsv1.Ordinals{})
 			expectedPodFQDNs := strings.Join([]string{
-				PodFQDN(namespace, etcdComp.Name, podNames[0]),
-				PodFQDN(namespace, etcdComp.Name, podNames[1]),
+				intctrlutil.PodFQDN(namespace, etcdComp.Name, podNames[0]),
+				intctrlutil.PodFQDN(namespace, etcdComp.Name, podNames[1]),
 			}, ",")
 
 			err := buildServiceReferencesWithoutResolve(testCtx.Ctx, reader, synthesizedComp, compDef, comp)
@@ -630,7 +630,7 @@ var _ = Describe("service references", func() {
 			}
 
 			compName := constant.GenerateClusterComponentName(etcdCluster, etcdComponent)
-			expectedPodFQDNs := PodFQDN(namespace, compName, reader.objs[1].GetName())
+			expectedPodFQDNs := intctrlutil.PodFQDN(namespace, compName, reader.objs[1].GetName())
 
 			err := buildServiceReferencesWithoutResolve(testCtx.Ctx, reader, synthesizedComp, compDef, comp)
 			Expect(err).Should(Succeed())

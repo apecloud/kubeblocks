@@ -37,7 +37,6 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 )
@@ -94,8 +93,11 @@ var mockKBAgentClient = func(mock func(*kbacli.MockClientMockRecorder)) {
 
 var _ = Describe("lifecycle", func() {
 	var (
-		synthesizedComp *component.SynthesizedComponent
-		pods            []*corev1.Pod
+		namespace        string
+		clusterName      string
+		compName         string
+		lifecycleActions *appsv1.ComponentLifecycleActions
+		pods             []*corev1.Pod
 	)
 
 	cleanEnv := func() {
@@ -109,46 +111,34 @@ var _ = Describe("lifecycle", func() {
 	BeforeEach(func() {
 		cleanEnv()
 
-		synthesizedComp = &component.SynthesizedComponent{
-			Namespace:   "default",
-			ClusterName: "test-cluster",
-			Name:        "kbagent",
-			PodSpec: &corev1.PodSpec{
-				Containers: []corev1.Container{
-					{
-						Name: "test-kbagent",
-					},
+		namespace = "default"
+		clusterName = "test-cluster"
+		compName = "kbagent"
+		lifecycleActions = &appsv1.ComponentLifecycleActions{
+			PostProvision: &appsv1.Action{
+				Exec: &appsv1.ExecAction{
+					Command: []string{"/bin/bash", "-c", "echo -n post-provision"},
+				},
+				TimeoutSeconds: 5,
+				RetryPolicy: &appsv1.RetryPolicy{
+					MaxRetries:    5,
+					RetryInterval: 10,
 				},
 			},
-			LifecycleActions: &appsv1.ComponentLifecycleActions{
-				PostProvision: &appsv1.Action{
+			RoleProbe: &appsv1.Probe{
+				Action: appsv1.Action{
 					Exec: &appsv1.ExecAction{
-						Command: []string{"/bin/bash", "-c", "echo -n post-provision"},
+						Command: []string{"/bin/bash", "-c", "echo -n role-probe"},
 					},
 					TimeoutSeconds: 5,
-					RetryPolicy: &appsv1.RetryPolicy{
-						MaxRetries:    5,
-						RetryInterval: 10,
-					},
 				},
-				RoleProbe: &appsv1.Probe{
-					Action: appsv1.Action{
-						Exec: &appsv1.ExecAction{
-							Command: []string{"/bin/bash", "-c", "echo -n role-probe"},
-						},
-						TimeoutSeconds: 5,
-					},
-					InitialDelaySeconds: 5,
-					PeriodSeconds:       1,
-					SuccessThreshold:    3,
-					FailureThreshold:    3,
-				},
+				InitialDelaySeconds: 5,
+				PeriodSeconds:       1,
+				SuccessThreshold:    3,
+				FailureThreshold:    3,
 			},
 		}
-
-		pods = []*corev1.Pod{
-			{},
-		}
+		pods = []*corev1.Pod{{}}
 	})
 
 	AfterEach(func() {
@@ -159,19 +149,22 @@ var _ = Describe("lifecycle", func() {
 
 	Context("new", func() {
 		It("nil pod", func() {
-			_, err := New(nil, nil)
+			_, err := New("", "", "", nil, nil, nil)
 			Expect(err).ShouldNot(BeNil())
 			Expect(err.Error()).Should(ContainSubstring("either pod or pods must be provided to call lifecycle actions"))
 		})
 
 		It("pod", func() {
 			pod := pods[0]
-			lifecycle, err := New(synthesizedComp, pod)
+			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, pod)
 			Expect(err).Should(BeNil())
 
 			Expect(lifecycle).ShouldNot(BeNil())
 			agent := lifecycle.(*kbagent)
-			Expect(agent.synthesizedComp).Should(Equal(synthesizedComp))
+			Expect(agent.namespace).Should(Equal(namespace))
+			Expect(agent.clusterName).Should(Equal(clusterName))
+			Expect(agent.compName).Should(Equal(compName))
+			Expect(agent.lifecycleActions).Should(Equal(lifecycleActions))
 			Expect(agent.pod).Should(Equal(pod))
 			Expect(agent.pods).Should(HaveLen(1))
 			Expect(agent.pods[0]).Should(Equal(pod))
@@ -179,12 +172,15 @@ var _ = Describe("lifecycle", func() {
 
 		It("pods", func() {
 			pod := pods[0]
-			lifecycle, err := New(synthesizedComp, nil, pods...)
+			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods...)
 			Expect(err).Should(BeNil())
 
 			Expect(lifecycle).ShouldNot(BeNil())
 			agent := lifecycle.(*kbagent)
-			Expect(agent.synthesizedComp).Should(Equal(synthesizedComp))
+			Expect(agent.namespace).Should(Equal(namespace))
+			Expect(agent.clusterName).Should(Equal(clusterName))
+			Expect(agent.compName).Should(Equal(compName))
+			Expect(agent.lifecycleActions).Should(Equal(lifecycleActions))
 			Expect(agent.pod).Should(Equal(pod))
 			Expect(agent.pods).Should(HaveLen(1))
 			Expect(agent.pods[0]).Should(Equal(pod))
@@ -193,7 +189,7 @@ var _ = Describe("lifecycle", func() {
 
 	Context("call action", func() {
 		It("not defined", func() {
-			lifecycle, err := New(synthesizedComp, nil, pods...)
+			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods...)
 			Expect(err).Should(BeNil())
 			Expect(lifecycle).ShouldNot(BeNil())
 
@@ -203,11 +199,11 @@ var _ = Describe("lifecycle", func() {
 		})
 
 		It("action request", func() {
-			lifecycle, err := New(synthesizedComp, nil, pods...)
+			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods...)
 			Expect(err).Should(BeNil())
 			Expect(lifecycle).ShouldNot(BeNil())
 
-			action := synthesizedComp.LifecycleActions.PostProvision
+			action := lifecycleActions.PostProvision
 			mockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
 				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
 					Expect(req.Action).Should(Equal("postProvision"))
@@ -233,7 +229,7 @@ var _ = Describe("lifecycle", func() {
 		})
 
 		It("succeed", func() {
-			lifecycle, err := New(synthesizedComp, nil, pods...)
+			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods...)
 			Expect(err).Should(BeNil())
 			Expect(lifecycle).ShouldNot(BeNil())
 
@@ -248,7 +244,7 @@ var _ = Describe("lifecycle", func() {
 		})
 
 		It("succeed and stdout", func() {
-			lifecycle, err := New(synthesizedComp, nil, pods...)
+			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods...)
 			Expect(err).Should(BeNil())
 			Expect(lifecycle).ShouldNot(BeNil())
 
@@ -266,7 +262,7 @@ var _ = Describe("lifecycle", func() {
 		})
 
 		It("fail - error code", func() {
-			lifecycle, err := New(synthesizedComp, nil, pods...)
+			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods...)
 			Expect(err).Should(BeNil())
 			Expect(lifecycle).ShouldNot(BeNil())
 
@@ -335,7 +331,7 @@ var _ = Describe("lifecycle", func() {
 		})
 
 		It("fail - error msg", func() {
-			lifecycle, err := New(synthesizedComp, nil, pods...)
+			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods...)
 			Expect(err).Should(BeNil())
 			Expect(lifecycle).ShouldNot(BeNil())
 
@@ -355,7 +351,7 @@ var _ = Describe("lifecycle", func() {
 		})
 
 		It("parameters", func() {
-			lifecycle, err := New(synthesizedComp, nil, pods...)
+			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods...)
 			Expect(err).Should(BeNil())
 			Expect(lifecycle).ShouldNot(BeNil())
 
@@ -364,19 +360,19 @@ var _ = Describe("lifecycle", func() {
 				objs: []client.Object{
 					&appsv1.Component{
 						ObjectMeta: metav1.ObjectMeta{
-							Namespace: synthesizedComp.Namespace,
-							Name:      constant.GenerateClusterComponentName(synthesizedComp.ClusterName, synthesizedComp.Name),
+							Namespace: namespace,
+							Name:      constant.GenerateClusterComponentName(clusterName, compName),
 							Labels: map[string]string{
-								constant.AppInstanceLabelKey: synthesizedComp.ClusterName,
+								constant.AppInstanceLabelKey: clusterName,
 							},
 						},
 					},
 					&appsv1.Component{
 						ObjectMeta: metav1.ObjectMeta{
-							Namespace: synthesizedComp.Namespace,
-							Name:      constant.GenerateClusterComponentName(synthesizedComp.ClusterName, "another"),
+							Namespace: namespace,
+							Name:      constant.GenerateClusterComponentName(clusterName, "another"),
 							Labels: map[string]string{
-								constant.AppInstanceLabelKey: synthesizedComp.ClusterName,
+								constant.AppInstanceLabelKey: clusterName,
 							},
 						},
 					},
@@ -387,7 +383,7 @@ var _ = Describe("lifecycle", func() {
 				recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req proto.ActionRequest) (proto.ActionResponse, error) {
 					Expect(req.Action).Should(Equal("postProvision"))
 					Expect(req.Parameters).ShouldNot(BeNil()) // legacy parameters for post-provision action
-					Expect(req.Parameters[hackedAllCompList]).Should(Equal(strings.Join([]string{synthesizedComp.Name, "another"}, ",")))
+					Expect(req.Parameters[hackedAllCompList]).Should(Equal(strings.Join([]string{compName, "another"}, ",")))
 					return proto.ActionResponse{}, nil
 				}).AnyTimes()
 			})
@@ -399,9 +395,8 @@ var _ = Describe("lifecycle", func() {
 		It("template vars", func() {
 			key := "TEMPLATE_VAR1"
 			val := "template-vars1"
-			synthesizedComp.TemplateVars = map[string]any{key: val}
 
-			lifecycle, err := New(synthesizedComp, nil, pods...)
+			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, map[string]any{key: val}, nil, pods...)
 			Expect(err).Should(BeNil())
 			Expect(lifecycle).ShouldNot(BeNil())
 
@@ -423,9 +418,9 @@ var _ = Describe("lifecycle", func() {
 
 		It("precondition", func() {
 			clusterReady := appsv1.ClusterReadyPreConditionType
-			synthesizedComp.LifecycleActions.PostProvision.PreCondition = &clusterReady
+			lifecycleActions.PostProvision.PreCondition = &clusterReady
 
-			lifecycle, err := New(synthesizedComp, nil, pods...)
+			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods...)
 			Expect(err).Should(BeNil())
 			Expect(lifecycle).ShouldNot(BeNil())
 
@@ -434,8 +429,8 @@ var _ = Describe("lifecycle", func() {
 				objs: []client.Object{
 					&appsv1.Cluster{
 						ObjectMeta: metav1.ObjectMeta{
-							Namespace: synthesizedComp.Namespace,
-							Name:      synthesizedComp.ClusterName,
+							Namespace: namespace,
+							Name:      clusterName,
 						},
 						Status: appsv1.ClusterStatus{
 							Phase: appsv1.RunningClusterPhase,
@@ -456,9 +451,9 @@ var _ = Describe("lifecycle", func() {
 
 		It("precondition - fail", func() {
 			clusterReady := appsv1.ClusterReadyPreConditionType
-			synthesizedComp.LifecycleActions.PostProvision.PreCondition = &clusterReady
+			lifecycleActions.PostProvision.PreCondition = &clusterReady
 
-			lifecycle, err := New(synthesizedComp, nil, pods...)
+			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods...)
 			Expect(err).Should(BeNil())
 			Expect(lifecycle).ShouldNot(BeNil())
 
@@ -467,8 +462,8 @@ var _ = Describe("lifecycle", func() {
 				objs: []client.Object{
 					&appsv1.Cluster{
 						ObjectMeta: metav1.ObjectMeta{
-							Namespace: synthesizedComp.Namespace,
-							Name:      synthesizedComp.ClusterName,
+							Namespace: namespace,
+							Name:      clusterName,
 						},
 						Status: appsv1.ClusterStatus{
 							Phase: appsv1.FailedClusterPhase,
@@ -483,11 +478,11 @@ var _ = Describe("lifecycle", func() {
 		})
 
 		It("pod selector - any", func() {
-			synthesizedComp.LifecycleActions.PostProvision.Exec.TargetPodSelector = appsv1.AnyReplica
+			lifecycleActions.PostProvision.Exec.TargetPodSelector = appsv1.AnyReplica
 			pods = []*corev1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Namespace: synthesizedComp.Namespace,
+						Namespace: namespace,
 						Name:      "pod-0",
 					},
 					Spec: corev1.PodSpec{
@@ -505,7 +500,7 @@ var _ = Describe("lifecycle", func() {
 				},
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Namespace: synthesizedComp.Namespace,
+						Namespace: namespace,
 						Name:      "pod-1",
 					},
 					Spec: corev1.PodSpec{
@@ -523,7 +518,7 @@ var _ = Describe("lifecycle", func() {
 				},
 			}
 
-			lifecycle, err := New(synthesizedComp, nil, pods...)
+			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods...)
 			Expect(err).Should(BeNil())
 			Expect(lifecycle).ShouldNot(BeNil())
 
@@ -537,12 +532,12 @@ var _ = Describe("lifecycle", func() {
 		})
 
 		It("pod selector - role", func() {
-			synthesizedComp.LifecycleActions.PostProvision.Exec.TargetPodSelector = appsv1.RoleSelector
-			synthesizedComp.LifecycleActions.PostProvision.Exec.MatchingKey = "leader"
+			lifecycleActions.PostProvision.Exec.TargetPodSelector = appsv1.RoleSelector
+			lifecycleActions.PostProvision.Exec.MatchingKey = "leader"
 			pods = []*corev1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Namespace: synthesizedComp.Namespace,
+						Namespace: namespace,
 						Name:      "pod-0",
 						Labels: map[string]string{
 							constant.RoleLabelKey: "follower",
@@ -563,7 +558,7 @@ var _ = Describe("lifecycle", func() {
 				},
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Namespace: synthesizedComp.Namespace,
+						Namespace: namespace,
 						Name:      "pod-1",
 						Labels: map[string]string{
 							constant.RoleLabelKey: "leader",
@@ -584,7 +579,7 @@ var _ = Describe("lifecycle", func() {
 				},
 			}
 
-			lifecycle, err := New(synthesizedComp, nil, pods...)
+			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods...)
 			Expect(err).Should(BeNil())
 			Expect(lifecycle).ShouldNot(BeNil())
 
@@ -594,12 +589,12 @@ var _ = Describe("lifecycle", func() {
 		})
 
 		It("pod selector - has no matched", func() {
-			synthesizedComp.LifecycleActions.PostProvision.Exec.TargetPodSelector = appsv1.RoleSelector
-			synthesizedComp.LifecycleActions.PostProvision.Exec.MatchingKey = "leader"
+			lifecycleActions.PostProvision.Exec.TargetPodSelector = appsv1.RoleSelector
+			lifecycleActions.PostProvision.Exec.MatchingKey = "leader"
 			pods = []*corev1.Pod{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Namespace: synthesizedComp.Namespace,
+						Namespace: namespace,
 						Name:      "pod-0",
 						Labels: map[string]string{
 							constant.RoleLabelKey: "follower",
@@ -608,7 +603,7 @@ var _ = Describe("lifecycle", func() {
 				},
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Namespace: synthesizedComp.Namespace,
+						Namespace: namespace,
 						Name:      "pod-1",
 						Labels: map[string]string{
 							constant.RoleLabelKey: "follower",
@@ -617,7 +612,7 @@ var _ = Describe("lifecycle", func() {
 				},
 			}
 
-			lifecycle, err := New(synthesizedComp, nil, pods...)
+			lifecycle, err := New(namespace, clusterName, compName, lifecycleActions, nil, nil, pods...)
 			Expect(err).Should(BeNil())
 			Expect(lifecycle).ShouldNot(BeNil())
 

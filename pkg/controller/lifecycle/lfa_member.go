@@ -26,7 +26,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 const (
@@ -74,10 +74,10 @@ func (a *switchover) parameters(ctx context.Context, cli client.Reader) (map[str
 	compName := constant.GenerateClusterComponentName(a.clusterName, a.compName)
 	if len(a.candidatePod) > 0 {
 		m[switchoverCandidateName] = a.candidatePod
-		m[switchoverCandidateFQDN] = component.PodFQDN(a.namespace, compName, a.candidatePod)
+		m[switchoverCandidateFQDN] = intctrlutil.PodFQDN(a.namespace, compName, a.candidatePod)
 	}
 	m[switchoverCurrentName] = a.currentPod
-	m[switchoverCurrentFQDN] = component.PodFQDN(a.namespace, compName, a.currentPod)
+	m[switchoverCurrentFQDN] = intctrlutil.PodFQDN(a.namespace, compName, a.currentPod)
 	m[switchoverRole] = a.role
 	return m, nil
 }
@@ -102,7 +102,7 @@ func (a *memberJoin) parameters(ctx context.Context, cli client.Reader) (map[str
 	// - KB_JOIN_MEMBER_POD_NAME: The pod name of the replica being added to the group.
 	compName := constant.GenerateClusterComponentName(a.clusterName, a.compName)
 	return map[string]string{
-		joinMemberPodFQDNVar: component.PodFQDN(a.namespace, compName, a.pod.Name),
+		joinMemberPodFQDNVar: intctrlutil.PodFQDN(a.namespace, compName, a.pod.Name),
 		joinMemberPodNameVar: a.pod.Name,
 	}, nil
 }
@@ -127,7 +127,7 @@ func (a *memberLeave) parameters(ctx context.Context, cli client.Reader) (map[st
 	// - KB_LEAVE_MEMBER_POD_NAME: The pod name of the replica being removed from the group.
 	compName := constant.GenerateClusterComponentName(a.clusterName, a.compName)
 	return map[string]string{
-		leaveMemberPodFQDNVar: component.PodFQDN(a.namespace, compName, a.pod.Name),
+		leaveMemberPodFQDNVar: intctrlutil.PodFQDN(a.namespace, compName, a.pod.Name),
 		leaveMemberPodNameVar: a.pod.Name,
 	}, nil
 }

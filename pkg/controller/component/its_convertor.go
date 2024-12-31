@@ -24,13 +24,11 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 // BuildWorkloadFrom builds a new Component object based on SynthesizedComponent.
@@ -186,58 +184,19 @@ func AppsInstanceToWorkloadInstance(instance *kbappsv1.InstanceTemplate) *worklo
 	if instance == nil {
 		return nil
 	}
-	var schedulingPolicy *workloads.SchedulingPolicy
-	if instance.SchedulingPolicy != nil {
-		schedulingPolicy = &workloads.SchedulingPolicy{
-			SchedulerName:             instance.SchedulingPolicy.SchedulerName,
-			NodeSelector:              instance.SchedulingPolicy.NodeSelector,
-			NodeName:                  instance.SchedulingPolicy.NodeName,
-			Affinity:                  instance.SchedulingPolicy.Affinity,
-			Tolerations:               instance.SchedulingPolicy.Tolerations,
-			TopologySpreadConstraints: instance.SchedulingPolicy.TopologySpreadConstraints,
-		}
-	}
-
 	return &workloads.InstanceTemplate{
 		Name:                 instance.Name,
 		Replicas:             instance.Replicas,
 		Annotations:          instance.Annotations,
 		Labels:               instance.Labels,
 		Image:                instance.Image,
-		SchedulingPolicy:     schedulingPolicy,
+		SchedulingPolicy:     instance.SchedulingPolicy,
 		Resources:            instance.Resources,
 		Env:                  instance.Env,
 		Volumes:              instance.Volumes,
 		VolumeMounts:         instance.VolumeMounts,
-		VolumeClaimTemplates: toPersistentVolumeClaims(instance.VolumeClaimTemplates),
+		VolumeClaimTemplates: instance.VolumeClaimTemplates,
 	}
-}
-
-func toPersistentVolumeClaims(vcts []kbappsv1.ClusterComponentVolumeClaimTemplate) []corev1.PersistentVolumeClaim {
-	storageClassName := func(spec kbappsv1.PersistentVolumeClaimSpec, defaultStorageClass string) *string {
-		if spec.StorageClassName != nil && *spec.StorageClassName != "" {
-			return spec.StorageClassName
-		}
-		if defaultStorageClass != "" {
-			return &defaultStorageClass
-		}
-		return nil
-	}
-	var pvcs []corev1.PersistentVolumeClaim
-	for _, v := range vcts {
-		pvcs = append(pvcs, corev1.PersistentVolumeClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: v.Name,
-			},
-			Spec: corev1.PersistentVolumeClaimSpec{
-				AccessModes:      v.Spec.AccessModes,
-				Resources:        v.Spec.Resources,
-				StorageClassName: storageClassName(v.Spec, viper.GetString(constant.CfgKeyDefaultStorageClass)),
-				VolumeMode:       v.Spec.VolumeMode,
-			},
-		})
-	}
-	return pvcs
 }
 
 // parseITSConvertorArgs parses the args of ITS convertor.

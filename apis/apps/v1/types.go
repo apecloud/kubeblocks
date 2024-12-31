@@ -613,6 +613,15 @@ type InstanceTemplate struct {
 	// +optional
 	Replicas *int32 `json:"replicas,omitempty"`
 
+	// Specifies the desired Ordinals of this InstanceTemplate.
+	// The Ordinals used to specify the ordinal of the instance (pod) names to be generated under this InstanceTemplate.
+	//
+	// For example, if Ordinals is {ranges: [{start: 0, end: 1}], discrete: [7]},
+	// then the instance names generated under this InstanceTemplate would be
+	// $(cluster.name)-$(component.name)-$(template.name)-0、$(cluster.name)-$(component.name)-$(template.name)-1 and
+	// $(cluster.name)-$(component.name)-$(template.name)-7
+	Ordinals Ordinals `json:"ordinals,omitempty"`
+
 	// Specifies a map of key-value pairs to be merged into the Pod's existing annotations.
 	// Existing keys will have their values overwritten, while new keys will be added to the annotations.
 	//
@@ -660,4 +669,17 @@ type InstanceTemplate struct {
 	// Add new or override existing volume claim templates.
 	// +optional
 	VolumeClaimTemplates []ClusterComponentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
+}
+
+// Range represents a range with a start and an end value.
+// It is used to define a continuous segment.
+type Range struct {
+	Start int32 `json:"start"`
+	End   int32 `json:"end"`
+}
+
+// Ordinals represents a combination of continuous segments and individual values.
+type Ordinals struct {
+	Ranges   []Range `json:"ranges,omitempty"`
+	Discrete []int32 `json:"discrete,omitempty"`
 }

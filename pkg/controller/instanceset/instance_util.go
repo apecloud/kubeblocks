@@ -39,6 +39,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
@@ -50,7 +51,7 @@ import (
 type InstanceTemplate interface {
 	GetName() string
 	GetReplicas() int32
-	GetOrdinals() workloads.Ordinals
+	GetOrdinals() kbappsv1.Ordinals
 }
 
 type instanceTemplateExt struct {
@@ -339,7 +340,7 @@ func buildInstanceName2TemplateMap(itsExt *instanceSetExt) (map[string]*instance
 	return allNameTemplateMap, nil
 }
 
-func GenerateAllInstanceNames(parentName string, replicas int32, templates []InstanceTemplate, offlineInstances []string, defaultTemplateOrdinals workloads.Ordinals) ([]string, error) {
+func GenerateAllInstanceNames(parentName string, replicas int32, templates []InstanceTemplate, offlineInstances []string, defaultTemplateOrdinals kbappsv1.Ordinals) ([]string, error) {
 	totalReplicas := int32(0)
 	instanceNameList := make([]string, 0)
 	for _, template := range templates {
@@ -439,7 +440,7 @@ func GetOrdinalListByTemplateName(its *workloads.InstanceSet, templateName strin
 	return ConvertOrdinalsToSortedList(ordinals)
 }
 
-func GetOrdinalsByTemplateName(its *workloads.InstanceSet, templateName string) (workloads.Ordinals, error) {
+func GetOrdinalsByTemplateName(its *workloads.InstanceSet, templateName string) (kbappsv1.Ordinals, error) {
 	if templateName == "" {
 		return its.Spec.DefaultTemplateOrdinals, nil
 	}
@@ -448,10 +449,10 @@ func GetOrdinalsByTemplateName(its *workloads.InstanceSet, templateName string) 
 			return template.Ordinals, nil
 		}
 	}
-	return workloads.Ordinals{}, fmt.Errorf("template %s not found", templateName)
+	return kbappsv1.Ordinals{}, fmt.Errorf("template %s not found", templateName)
 }
 
-func ConvertOrdinalsToSortedList(ordinals workloads.Ordinals) ([]int32, error) {
+func ConvertOrdinalsToSortedList(ordinals kbappsv1.Ordinals) ([]int32, error) {
 	ordinalList := sets.New(ordinals.Discrete...)
 	for _, item := range ordinals.Ranges {
 		start := item.Start
@@ -956,7 +957,8 @@ func buildInstanceTemplateExt(template workloads.InstanceTemplate, templateExt *
 				return vm.Name == item.Name
 			}
 		})
-	intctrlutil.MergeList(&template.VolumeClaimTemplates, &templateExt.VolumeClaimTemplates,
+	vcts := intctrlutil.ToCoreV1PVCs(template.VolumeClaimTemplates)
+	intctrlutil.MergeList(&vcts, &templateExt.VolumeClaimTemplates,
 		func(item corev1.PersistentVolumeClaim) func(corev1.PersistentVolumeClaim) bool {
 			return func(claim corev1.PersistentVolumeClaim) bool {
 				return claim.Name == item.Name

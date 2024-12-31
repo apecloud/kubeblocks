@@ -24,8 +24,8 @@ import (
 	"time"
 
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	"github.com/apecloud/kubeblocks/pkg/controller/component/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -96,7 +96,8 @@ func (t *componentPostProvisionTransformer) lifecycleAction4Component(transCtx *
 		// TODO: (good-first-issue) we should handle the case that the component has no pods
 		return nil, fmt.Errorf("has no pods to running the post-provision action")
 	}
-	return lifecycle.New(transCtx.SynthesizeComponent, nil, pods...)
+	return lifecycle.New(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name,
+		synthesizedComp.LifecycleActions, synthesizedComp.TemplateVars, nil, pods...)
 }
 
 func checkPostProvisionDone(transCtx *componentTransformContext) bool {

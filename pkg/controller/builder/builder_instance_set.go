@@ -176,3 +176,8 @@ func (builder *InstanceSetBuilder) SetInstances(instances []workloads.InstanceTe
 	builder.get().Spec.Instances = instances
 	return builder
 }
+
+func (builder *InstanceSetBuilder) SetOfflineInstances(offlineInstances []string) *InstanceSetBuilder {
+	builder.get().Spec.OfflineInstances = offlineInstances
+	return builder
+}

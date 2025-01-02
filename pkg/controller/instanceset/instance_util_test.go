@@ -35,6 +35,7 @@ import (
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
@@ -528,7 +529,7 @@ var _ = Describe("instance util test", func() {
 			var templates []InstanceTemplate
 			templates = append(templates, templatesFoo, templateBar)
 			offlineInstances := []string{"foo-bar-1", "foo-0"}
-			instanceNameList, err := GenerateAllInstanceNames(parentName, 5, templates, offlineInstances, workloads.Ordinals{})
+			instanceNameList, err := GenerateAllInstanceNames(parentName, 5, templates, offlineInstances, kbappsv1.Ordinals{})
 			Expect(err).Should(BeNil())
 
 			podNamesExpected := []string{"foo-1", "foo-2", "foo-bar-0", "foo-bar-2", "foo-foo-0"}
@@ -536,8 +537,8 @@ var _ = Describe("instance util test", func() {
 		})
 		It("with Ordinals, without offlineInstances", func() {
 			parentName := "foo"
-			defaultTemplateOrdinals := workloads.Ordinals{
-				Ranges: []workloads.Range{
+			defaultTemplateOrdinals := kbappsv1.Ordinals{
+				Ranges: []kbappsv1.Range{
 					{
 						Start: 1,
 						End:   2,
@@ -547,15 +548,15 @@ var _ = Describe("instance util test", func() {
 			templatesFoo := &workloads.InstanceTemplate{
 				Name:     "foo",
 				Replicas: pointer.Int32(1),
-				Ordinals: workloads.Ordinals{
+				Ordinals: kbappsv1.Ordinals{
 					Discrete: []int32{0},
 				},
 			}
 			templateBar := &workloads.InstanceTemplate{
 				Name:     "bar",
 				Replicas: pointer.Int32(3),
-				Ordinals: workloads.Ordinals{
-					Ranges: []workloads.Range{
+				Ordinals: kbappsv1.Ordinals{
+					Ranges: []kbappsv1.Range{
 						{
 							Start: 2,
 							End:   3,
@@ -574,8 +575,8 @@ var _ = Describe("instance util test", func() {
 		})
 		It("with templatesOrdinals, with offlineInstances", func() {
 			parentName := "foo"
-			defaultTemplateOrdinals := workloads.Ordinals{
-				Ranges: []workloads.Range{
+			defaultTemplateOrdinals := kbappsv1.Ordinals{
+				Ranges: []kbappsv1.Range{
 					{
 						Start: 1,
 						End:   2,
@@ -585,15 +586,15 @@ var _ = Describe("instance util test", func() {
 			templatesFoo := &workloads.InstanceTemplate{
 				Name:     "foo",
 				Replicas: pointer.Int32(1),
-				Ordinals: workloads.Ordinals{
+				Ordinals: kbappsv1.Ordinals{
 					Discrete: []int32{0},
 				},
 			}
 			templateBar := &workloads.InstanceTemplate{
 				Name:     "bar",
 				Replicas: pointer.Int32(2),
-				Ordinals: workloads.Ordinals{
-					Ranges: []workloads.Range{
+				Ordinals: kbappsv1.Ordinals{
+					Ranges: []kbappsv1.Range{
 						{
 							Start: 2,
 							End:   3,
@@ -613,8 +614,8 @@ var _ = Describe("instance util test", func() {
 		})
 		It("with templatesOrdinals, with offlineInstances, replicas error", func() {
 			parentName := "foo"
-			defaultTemplateOrdinals := workloads.Ordinals{
-				Ranges: []workloads.Range{
+			defaultTemplateOrdinals := kbappsv1.Ordinals{
+				Ranges: []kbappsv1.Range{
 					{
 						Start: 1,
 						End:   2,
@@ -624,15 +625,15 @@ var _ = Describe("instance util test", func() {
 			templatesFoo := &workloads.InstanceTemplate{
 				Name:     "foo",
 				Replicas: pointer.Int32(1),
-				Ordinals: workloads.Ordinals{
+				Ordinals: kbappsv1.Ordinals{
 					Discrete: []int32{0},
 				},
 			}
 			templateBar := &workloads.InstanceTemplate{
 				Name:     "bar",
 				Replicas: pointer.Int32(3),
-				Ordinals: workloads.Ordinals{
-					Ranges: []workloads.Range{
+				Ordinals: kbappsv1.Ordinals{
+					Ranges: []kbappsv1.Range{
 						{
 							Start: 2,
 							End:   3,
@@ -657,8 +658,8 @@ var _ = Describe("instance util test", func() {
 		It("should work well", func() {
 			its := &workloads.InstanceSet{
 				Spec: workloads.InstanceSetSpec{
-					DefaultTemplateOrdinals: workloads.Ordinals{
-						Ranges: []workloads.Range{
+					DefaultTemplateOrdinals: kbappsv1.Ordinals{
+						Ranges: []kbappsv1.Range{
 							{
 								Start: 1,
 								End:   2,
@@ -668,14 +669,14 @@ var _ = Describe("instance util test", func() {
 					Instances: []workloads.InstanceTemplate{
 						{
 							Name: "foo",
-							Ordinals: workloads.Ordinals{
+							Ordinals: kbappsv1.Ordinals{
 								Discrete: []int32{0},
 							},
 						},
 						{
 							Name: "bar",
-							Ordinals: workloads.Ordinals{
-								Ranges: []workloads.Range{
+							Ordinals: kbappsv1.Ordinals{
+								Ranges: []kbappsv1.Range{
 									{
 										Start: 2,
 										End:   3,
@@ -718,8 +719,8 @@ var _ = Describe("instance util test", func() {
 		It("should work well", func() {
 			its := &workloads.InstanceSet{
 				Spec: workloads.InstanceSetSpec{
-					DefaultTemplateOrdinals: workloads.Ordinals{
-						Ranges: []workloads.Range{
+					DefaultTemplateOrdinals: kbappsv1.Ordinals{
+						Ranges: []kbappsv1.Range{
 							{
 								Start: 1,
 								End:   2,
@@ -729,14 +730,14 @@ var _ = Describe("instance util test", func() {
 					Instances: []workloads.InstanceTemplate{
 						{
 							Name: "foo",
-							Ordinals: workloads.Ordinals{
+							Ordinals: kbappsv1.Ordinals{
 								Discrete: []int32{0},
 							},
 						},
 						{
 							Name: "bar",
-							Ordinals: workloads.Ordinals{
-								Ranges: []workloads.Range{
+							Ordinals: kbappsv1.Ordinals{
+								Ranges: []kbappsv1.Range{
 									{
 										Start: 2,
 										End:   3,
@@ -755,8 +756,8 @@ var _ = Describe("instance util test", func() {
 
 			ordinalsDefault, err := GetOrdinalsByTemplateName(its, templateNameDefault)
 			Expect(err).Should(BeNil())
-			ordinalsDefaultExpected := workloads.Ordinals{
-				Ranges: []workloads.Range{
+			ordinalsDefaultExpected := kbappsv1.Ordinals{
+				Ranges: []kbappsv1.Range{
 					{
 						Start: 1,
 						End:   2,
@@ -767,15 +768,15 @@ var _ = Describe("instance util test", func() {
 
 			ordinalsFoo, err := GetOrdinalsByTemplateName(its, templateNameFoo)
 			Expect(err).Should(BeNil())
-			ordinalsFooExpected := workloads.Ordinals{
+			ordinalsFooExpected := kbappsv1.Ordinals{
 				Discrete: []int32{0},
 			}
 			Expect(ordinalsFoo).Should(Equal(ordinalsFooExpected))
 
 			ordinalsBar, err := GetOrdinalsByTemplateName(its, templateNameBar)
 			Expect(err).Should(BeNil())
-			ordinalsBarExpected := workloads.Ordinals{
-				Ranges: []workloads.Range{
+			ordinalsBarExpected := kbappsv1.Ordinals{
+				Ranges: []kbappsv1.Range{
 					{
 						Start: 2,
 						End:   3,
@@ -786,7 +787,7 @@ var _ = Describe("instance util test", func() {
 			Expect(ordinalsBar).Should(Equal(ordinalsBarExpected))
 
 			ordinalsNotFound, err := GetOrdinalsByTemplateName(its, templateNameNotFound)
-			Expect(ordinalsNotFound).Should(Equal(workloads.Ordinals{}))
+			Expect(ordinalsNotFound).Should(Equal(kbappsv1.Ordinals{}))
 			errExpected := fmt.Errorf("template %s not found", templateNameNotFound)
 			Expect(err).Should(Equal(errExpected))
 		})
@@ -794,8 +795,8 @@ var _ = Describe("instance util test", func() {
 
 	Context("ConvertOrdinalsToSortedList", func() {
 		It("should work well", func() {
-			ordinals := workloads.Ordinals{
-				Ranges: []workloads.Range{
+			ordinals := kbappsv1.Ordinals{
+				Ranges: []kbappsv1.Range{
 					{
 						Start: 2,
 						End:   4,
@@ -808,8 +809,8 @@ var _ = Describe("instance util test", func() {
 			sets.New(ordinalList...).Equal(sets.New[int32](0, 2, 3, 4, 6))
 		})
 		It("rightNumber must >= leftNumber", func() {
-			ordinals := workloads.Ordinals{
-				Ranges: []workloads.Range{
+			ordinals := kbappsv1.Ordinals{
+				Ranges: []kbappsv1.Range{
 					{
 						Start: 4,
 						End:   2,

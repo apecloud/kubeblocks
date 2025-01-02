@@ -26,6 +26,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/klog/v2"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -77,7 +78,13 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, component
 		SetTemplate(template).
 		AddMatchLabelsInMap(constant.GetCompLabels(clusterName, compName)).
 		SetReplicas(synthesizedComp.Replicas).
-		SetMinReadySeconds(synthesizedComp.MinReadySeconds)
+		SetMinReadySeconds(synthesizedComp.MinReadySeconds).
+		SetInstances(synthesizedComp.Instances).
+		SetOfflineInstances(synthesizedComp.OfflineInstances).
+		SetParallelPodManagementConcurrency(getParallelPodManagementConcurrency(synthesizedComp)).
+		SetPodUpdatePolicy(getPodUpdatePolicy(synthesizedComp)).
+		SetLifecycleActions(synthesizedComp.LifecycleActions).
+		SetTemplateVars(synthesizedComp.TemplateVars)
 
 	var vcts []corev1.PersistentVolumeClaim
 	for _, vct := range synthesizedComp.VolumeClaimTemplates {
@@ -113,6 +120,20 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, component
 	setDefaultResourceLimits(itsObj)
 
 	return itsObj, nil
+}
+
+func getParallelPodManagementConcurrency(synthesizedComp *component.SynthesizedComponent) *intstr.IntOrString {
+	if synthesizedComp.ParallelPodManagementConcurrency != nil {
+		return synthesizedComp.ParallelPodManagementConcurrency
+	}
+	return &intstr.IntOrString{Type: intstr.String, StrVal: "100%"} // default value
+}
+
+func getPodUpdatePolicy(synthesizedComp *component.SynthesizedComponent) workloads.PodUpdatePolicyType {
+	if synthesizedComp.PodUpdatePolicy != nil {
+		return workloads.PodUpdatePolicyType(*synthesizedComp.PodUpdatePolicy)
+	}
+	return workloads.PreferInPlacePodUpdatePolicyType // default value
 }
 
 func vctToPVC(vct corev1.PersistentVolumeClaimTemplate) corev1.PersistentVolumeClaim {

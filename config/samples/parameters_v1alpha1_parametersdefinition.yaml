@@ -1,0 +1,12 @@
+apiVersion: parameters.kubeblocks.io/v1alpha1
+kind: ParametersDefinition
+metadata:
+  labels:
+    app.kubernetes.io/name: parametersdefinition
+    app.kubernetes.io/instance: parametersdefinition-sample
+    app.kubernetes.io/part-of: kubeblocks
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: kubeblocks
+  name: parametersdefinition-sample
+spec:
+  # TODO(user): Add fields here

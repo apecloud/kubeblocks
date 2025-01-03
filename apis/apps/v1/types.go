@@ -429,6 +429,12 @@ type ProvisionSecretRef struct {
 	//
 	// +kubebuilder:validation:Required
 	Namespace string `json:"namespace"`
+
+	// The key in the secret data that contains the password.
+	//
+	// +kubebuilder:default="password"
+	// +optional
+	Password string `json:"password,omitempty"`
 }
 
 // ClusterComponentConfig represents a config with its source bound.

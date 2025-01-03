@@ -203,7 +203,7 @@ func (t *componentAccountProvisionTransformer) provisionAccount(transCtx *compon
 		return nil
 	}
 
-	err = lfa.AccountProvision(transCtx.Context, transCtx.Client, nil, account.Statement, string(username), string(password))
+	err = lfa.AccountProvision(transCtx.Context, transCtx.Client, nil, account.Statement.Create, string(username), string(password))
 	return lifecycle.IgnoreNotDefined(err)
 }
 

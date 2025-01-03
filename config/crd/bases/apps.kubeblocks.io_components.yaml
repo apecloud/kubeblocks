@@ -5529,6 +5529,11 @@ spec:
                         namespace:
                           description: The namespace where the secret is located.
                           type: string
+                        password:
+                          default: password
+                          description: The key in the secret data that contains the
+                            password.
+                          type: string
                       required:
                       - name
                       - namespace

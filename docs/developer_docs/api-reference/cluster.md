@@ -5771,6 +5771,7 @@ and other administrative tasks.</p>
 <p>The container executing this action has access to following variables:</p>
 <ul>
 <li>KB_ACCOUNT_NAME: The name of the system account to be created.</li>
+<li>KB_ACCOUNT_PASSWORD: The password for the system account.</li>
 <li>KB_ACCOUNT_STATEMENT: The statement used to create the system account.</li>
 </ul>
 <p>Note: This field is immutable once it has been set.</p>
@@ -8696,6 +8697,18 @@ string
 <p>The namespace where the secret is located.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>password</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The key in the secret data that contains the password.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1.ReplicaRole">ReplicaRole
@@ -11086,12 +11099,14 @@ bool
 <td>
 <code>statement</code><br/>
 <em>
-string
+<a href="#apps.kubeblocks.io/v1.SystemAccountStatement">
+SystemAccountStatement
+</a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines the statement used to create the account with the necessary privileges.</p>
+<p>Defines the statements used to create, delete, and update the account.</p>
 <p>This field is immutable once set.</p>
 </td>
 </tr>
@@ -11122,6 +11137,62 @@ ProvisionSecretRef
 <td>
 <em>(Optional)</em>
 <p>Refers to the secret from which data will be copied to create the new account.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.SystemAccountStatement">SystemAccountStatement
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.SystemAccount">SystemAccount</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>create</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The statement to create a new account with the necessary privileges.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>delete</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The statement to delete a account.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>update</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The statement to update an existing account.</p>
 <p>This field is immutable once set.</p>
 </td>
 </tr>

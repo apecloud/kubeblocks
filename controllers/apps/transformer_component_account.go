@@ -24,9 +24,11 @@ import (
 	"reflect"
 	"strings"
 
+	"golang.org/x/crypto/bcrypt"
+	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -38,6 +40,11 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	ctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+)
+
+const (
+	systemAccountLabel          = "apps.kubeblocks.io/system-account"
+	systemAccountHashAnnotation = "apps.kubeblocks.io/system-account-hash"
 )
 
 // componentAccountTransformer handles component system accounts.
@@ -55,52 +62,100 @@ func (t *componentAccountTransformer) Transform(ctx graph.TransformContext, dag 
 		return nil
 	}
 
-	synthesizeComp := transCtx.SynthesizeComponent
+	synthesizedComp := transCtx.SynthesizeComponent
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 
-	for _, account := range synthesizeComp.SystemAccounts {
-		existSecret, err := t.checkAccountSecretExist(ctx, synthesizeComp, account)
-		if err != nil {
-			return err
-		}
-		secret, err := t.buildAccountSecret(transCtx, synthesizeComp, account)
-		if err != nil {
-			return err
-		}
+	// exist account secret objects
+	secrets, err := t.listAccountSecrets(ctx, synthesizedComp)
+	if err != nil {
+		return err
+	}
+	runningNameSet := sets.New(maps.Keys(secrets)...)
 
-		if existSecret == nil {
-			graphCli.Create(dag, secret, inUniversalContext4G())
-			continue
-		}
+	// proto account objects
+	accounts := map[string]appsv1.SystemAccount{}
+	for i, account := range synthesizedComp.SystemAccounts {
+		accounts[account.Name] = synthesizedComp.SystemAccounts[i]
+	}
+	protoNameSet := sets.New(maps.Keys(accounts)...)
 
-		// just update existed account secret metadata if needed
-		existSecretCopy := existSecret.DeepCopy()
-		ctrlutil.MergeMetadataMapInplace(secret.Labels, &existSecretCopy.Labels)
-		ctrlutil.MergeMetadataMapInplace(secret.Annotations, &existSecretCopy.Annotations)
-		if !reflect.DeepEqual(existSecret, existSecretCopy) {
-			graphCli.Update(dag, existSecret, existSecretCopy, inUniversalContext4G())
+	createSet, deleteSet, updateSet := setDiff(runningNameSet, protoNameSet)
+
+	for _, name := range sets.List(createSet) {
+		if err := t.createAccount(transCtx, dag, graphCli, accounts[name]); err != nil {
+			return err
 		}
 	}
-	// TODO: (good-first-issue) if an account is deleted from the Spec, the secret and account should be deleted
+
+	for _, name := range sets.List(deleteSet) {
+		t.deleteAccount(transCtx, dag, graphCli, secrets[name])
+	}
+
+	for _, name := range sets.List(updateSet) {
+		if err := t.updateAccount(transCtx, dag, graphCli, accounts[name], secrets[name]); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
-func (t *componentAccountTransformer) checkAccountSecretExist(ctx graph.TransformContext,
-	synthesizeComp *component.SynthesizedComponent, account appsv1.SystemAccount) (*corev1.Secret, error) {
-	secretKey := types.NamespacedName{
-		Namespace: synthesizeComp.Namespace,
-		Name:      constant.GenerateAccountSecretName(synthesizeComp.ClusterName, synthesizeComp.Name, account.Name),
+func (t *componentAccountTransformer) listAccountSecrets(ctx graph.TransformContext,
+	synthesizeComp *component.SynthesizedComponent) (map[string]*corev1.Secret, error) {
+	opts := []client.ListOption{
+		client.InNamespace(synthesizeComp.Namespace),
+		client.MatchingLabels(constant.GetCompLabels(synthesizeComp.ClusterName, synthesizeComp.Name)),
 	}
-	secret := &corev1.Secret{}
-	err := ctx.GetClient().Get(ctx.GetContext(), secretKey, secret)
-	switch {
-	case err == nil:
-		return secret, nil
-	case apierrors.IsNotFound(err):
-		return nil, nil
-	default:
+	secretList := &corev1.SecretList{}
+	if err := ctx.GetClient().List(ctx.GetContext(), secretList, opts...); err != nil {
 		return nil, err
 	}
+
+	m := make(map[string]*corev1.Secret)
+	for i, secret := range secretList.Items {
+		if accountName, ok := secret.Labels[systemAccountLabel]; ok {
+			m[accountName] = &secretList.Items[i]
+		}
+	}
+	return m, nil
+}
+
+func (t *componentAccountTransformer) createAccount(transCtx *componentTransformContext,
+	dag *graph.DAG, graphCli model.GraphClient, account appsv1.SystemAccount) error {
+	secret, err := t.buildAccountSecret(transCtx, transCtx.SynthesizeComponent, account)
+	if err != nil {
+		return err
+	}
+	if err = t.signaturePassword(secret); err != nil {
+		return err
+	}
+	graphCli.Create(dag, secret, inUniversalContext4G())
+	return nil
+}
+
+func (t *componentAccountTransformer) deleteAccount(transCtx *componentTransformContext,
+	dag *graph.DAG, graphCli model.GraphClient, secret *corev1.Secret) {
+	graphCli.Delete(dag, secret, inUniversalContext4G())
+}
+
+func (t *componentAccountTransformer) updateAccount(transCtx *componentTransformContext,
+	dag *graph.DAG, graphCli model.GraphClient, account appsv1.SystemAccount, running *corev1.Secret) error {
+	secret, err := t.buildAccountSecret(transCtx, transCtx.SynthesizeComponent, account)
+	if err != nil {
+		return err
+	}
+
+	runningCopy := running.DeepCopy()
+	if account.SecretRef != nil {
+		// sync password from the external secret
+		runningCopy.Data[constant.AccountPasswdForSecret] = secret.Data[constant.AccountPasswdForSecret]
+	}
+	ctrlutil.MergeMetadataMapInplace(secret.Labels, &runningCopy.Labels)
+	ctrlutil.MergeMetadataMapInplace(secret.Annotations, &runningCopy.Annotations)
+	if !reflect.DeepEqual(running, runningCopy) {
+		graphCli.Update(dag, running, runningCopy, inUniversalContext4G())
+	}
+	return nil
 }
 
 func (t *componentAccountTransformer) buildAccountSecret(ctx *componentTransformContext,
@@ -127,10 +182,15 @@ func (t *componentAccountTransformer) getPasswordFromSecret(ctx graph.TransformC
 	if err := ctx.GetClient().Get(ctx.GetContext(), secretKey, secret); err != nil {
 		return nil, err
 	}
-	if len(secret.Data) == 0 || len(secret.Data[constant.AccountPasswdForSecret]) == 0 {
-		return nil, fmt.Errorf("referenced account secret has no required credential field")
+
+	passwordKey := constant.AccountPasswdForSecret
+	if len(account.SecretRef.Password) > 0 {
+		passwordKey = account.SecretRef.Password
 	}
-	return secret.Data[constant.AccountPasswdForSecret], nil
+	if len(secret.Data) == 0 || len(secret.Data[passwordKey]) == 0 {
+		return nil, fmt.Errorf("referenced account secret has no required credential field: %s", passwordKey)
+	}
+	return secret.Data[passwordKey], nil
 }
 
 func (t *componentAccountTransformer) buildPassword(ctx *componentTransformContext, account appsv1.SystemAccount) []byte {
@@ -167,6 +227,7 @@ func (t *componentAccountTransformer) buildAccountSecretWithPassword(ctx *compon
 		AddLabelsInMap(synthesizeComp.StaticLabels).
 		AddLabelsInMap(synthesizeComp.DynamicLabels).
 		AddLabelsInMap(constant.GetCompLabels(synthesizeComp.ClusterName, synthesizeComp.Name)).
+		AddLabels(systemAccountLabel, account.Name).
 		AddAnnotationsInMap(synthesizeComp.StaticAnnotations).
 		AddAnnotationsInMap(synthesizeComp.DynamicAnnotations).
 		PutData(constant.AccountNameForSecret, []byte(account.Name)).
@@ -178,3 +239,22 @@ func (t *componentAccountTransformer) buildAccountSecretWithPassword(ctx *compon
 	}
 	return secret, nil
 }
+
+func (t *componentAccountTransformer) signaturePassword(secret *corev1.Secret) error {
+	password := secret.Data[constant.AccountPasswdForSecret]
+	hashedPassword, err := bcrypt.GenerateFromPassword(password, bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+	if secret.Annotations == nil {
+		secret.Annotations = map[string]string{}
+	}
+	secret.Annotations[systemAccountHashAnnotation] = string(hashedPassword)
+	return nil
+}
+
+// func (t *componentAccountTransformer) verifyPassword(secret *corev1.Secret, password []byte) bool {
+//	hashedPassword := secret.Annotations[systemAccountHashAnnotation]
+//	err := bcrypt.CompareHashAndPassword(hashedPassword, password)
+//	return err == nil
+// }

@@ -343,7 +343,7 @@ func (r *ComponentDefinitionReconciler) validateConfigs(cli client.Client, rctx 
 func (r *ComponentDefinitionReconciler) validateSystemAccounts(cli client.Client, rctx intctrlutil.RequestCtx,
 	cmpd *appsv1.ComponentDefinition) error {
 	for _, v := range cmpd.Spec.SystemAccounts {
-		if v.SecretRef == nil && !v.InitAccount && (cmpd.Spec.LifecycleActions == nil || cmpd.Spec.LifecycleActions.AccountProvision == nil) {
+		if !v.InitAccount && (cmpd.Spec.LifecycleActions == nil || cmpd.Spec.LifecycleActions.AccountProvision == nil) {
 			return fmt.Errorf(`the AccountProvision action is needed to provision system account %s`, v.Name)
 		}
 	}
@@ -351,8 +351,8 @@ func (r *ComponentDefinitionReconciler) validateSystemAccounts(cli client.Client
 		return fmt.Errorf("duplicate system accounts are not allowed")
 	}
 	for _, account := range cmpd.Spec.SystemAccounts {
-		if !account.InitAccount && len(account.Statement) == 0 && account.SecretRef == nil {
-			return fmt.Errorf("the Statement or SecretRef must be provided to create system account: %s", account.Name)
+		if !account.InitAccount && (account.Statement == nil || len(account.Statement.Create) == 0) {
+			return fmt.Errorf("the create statement must be provided to provision system account: %s", account.Name)
 		}
 	}
 	return nil

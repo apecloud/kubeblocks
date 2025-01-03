@@ -208,7 +208,7 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 				testk8s.MockPodIsTerminating(ctx, testCtx, pod)
 				testk8s.RemovePodFinalizer(ctx, testCtx, pod)
 				testapps.MockInstanceSetPod(&testCtx, nil, clusterName, defaultCompName,
-					pod.Name, "leader", "ReadWrite", ops.Spec.VerticalScalingList[0].ResourceRequirements)
+					pod.Name, "leader", ops.Spec.VerticalScalingList[0].ResourceRequirements)
 			}
 
 			By("mock podList[0] rolling update successfully by re-creating it")

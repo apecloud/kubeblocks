@@ -26,6 +26,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	basev1 "github.com/apecloud/kubeblocks/apis/base/v1"
 )
 
 // +genclient
@@ -415,11 +417,16 @@ type ComponentDefinitionSpec struct {
 	// +optional
 	Available *ComponentAvailable `json:"available,omitempty"`
 
+	// FIXME: there's a bug in CEL's cost estimation when chaining .filter() and .map().
+	// It was fixed in k8s 1.30, see: https://github.com/kubernetes/kubernetes/pull/123562.
+	// Maybe we can add this back later.
+	// TODO +kubebuilder:validation:XValidation:rule="self.filter(x, x.participatesInQuorum == true).map(x, x.updatePriority).min() > self.filter(x, x.participatesInQuorum == false).map(x, x.updatePriority).max()",message="Roles participate in quorum should have higher update priority than roles do not participate in quorum."
+
 	// Enumerate all possible roles assigned to each replica of the Component, influencing its behavior.
 	//
-	// A replica can have zero to multiple roles.
-	// KubeBlocks operator determines the roles of each replica by invoking the `lifecycleActions.roleProbe` method.
-	// This action returns a list of roles for each replica, and the returned roles must be predefined in the `roles` field.
+	// A replica can have zero or one role.
+	// KubeBlocks operator determines the role of each replica by invoking the `lifecycleActions.roleProbe` method.
+	// This action returns the role for each replica, and the returned role must be predefined here.
 	//
 	// The roles assigned to a replica can influence various aspects of the Component's behavior, such as:
 	//
@@ -430,6 +437,7 @@ type ComponentDefinitionSpec struct {
 	//
 	// This field is immutable.
 	//
+	// +kubebuilder:validation:MaxItems=128
 	// +optional
 	Roles []ReplicaRole `json:"roles,omitempty"`
 
@@ -1419,45 +1427,9 @@ type ComponentAvailableProbeAssertion struct {
 	Strict *bool `json:"strict,omitempty"`
 }
 
-// ReplicaRole represents a role that can be assumed by a component instance.
-type ReplicaRole struct {
-	// Defines the role's identifier. It is used to set the "apps.kubeblocks.io/role" label value
-	// on the corresponding object.
-	//
-	// This field is immutable once set.
-	//
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=32
-	// +kubebuilder:validation:Pattern=`^.*[^\s]+.*$`
-	Name string `json:"name"`
-
-	// Indicates whether a replica assigned this role is capable of providing services.
-	//
-	// This field is immutable once set.
-	//
-	// +kubebuilder:default=false
-	// +optional
-	Serviceable bool `json:"serviceable,omitempty"`
-
-	// Determines if a replica in this role has the authority to perform write operations.
-	// A writable replica can modify data, handle update operations.
-	//
-	// This field is immutable once set.
-	//
-	// +kubebuilder:default=false
-	// +optional
-	Writable bool `json:"writable,omitempty"`
-
-	// Specifies whether a replica with this role has voting rights.
-	// In distributed systems, this typically means the replica can participate in consensus decisions,
-	// configuration changes, or other processes that require a quorum.
-	//
-	// This field is immutable once set.
-	//
-	// +kubebuilder:default=false
-	// +optional
-	Votable bool `json:"votable,omitempty"`
-}
+// ReplicaRole represents a role that can be assigned to a component instance, defining its behavior and responsibilities.
+// +kubebuilder:object:generate=false
+type ReplicaRole = basev1.ReplicaRole
 
 // UpdateStrategy defines the update strategy for cluster components. This strategy determines how updates are applied
 // across the cluster.

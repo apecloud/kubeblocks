@@ -1377,17 +1377,15 @@ ComponentAvailable
 <td>
 <code>roles</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.ReplicaRole">
-[]ReplicaRole
-</a>
+[]github.com/apecloud/kubeblocks/apis/base/v1.ReplicaRole
 </em>
 </td>
 <td>
 <em>(Optional)</em>
 <p>Enumerate all possible roles assigned to each replica of the Component, influencing its behavior.</p>
-<p>A replica can have zero to multiple roles.
-KubeBlocks operator determines the roles of each replica by invoking the <code>lifecycleActions.roleProbe</code> method.
-This action returns a list of roles for each replica, and the returned roles must be predefined in the <code>roles</code> field.</p>
+<p>A replica can have zero or one role.
+KubeBlocks operator determines the role of each replica by invoking the <code>lifecycleActions.roleProbe</code> method.
+This action returns the role for each replica, and the returned role must be predefined here.</p>
 <p>The roles assigned to a replica can influence various aspects of the Component&rsquo;s behavior, such as:</p>
 <ul>
 <li>Service selection: The Component&rsquo;s exposed Services may target replicas based on their roles using <code>roleSelector</code>.</li>
@@ -5212,17 +5210,15 @@ ComponentAvailable
 <td>
 <code>roles</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.ReplicaRole">
-[]ReplicaRole
-</a>
+[]github.com/apecloud/kubeblocks/apis/base/v1.ReplicaRole
 </em>
 </td>
 <td>
 <em>(Optional)</em>
 <p>Enumerate all possible roles assigned to each replica of the Component, influencing its behavior.</p>
-<p>A replica can have zero to multiple roles.
-KubeBlocks operator determines the roles of each replica by invoking the <code>lifecycleActions.roleProbe</code> method.
-This action returns a list of roles for each replica, and the returned roles must be predefined in the <code>roles</code> field.</p>
+<p>A replica can have zero or one role.
+KubeBlocks operator determines the role of each replica by invoking the <code>lifecycleActions.roleProbe</code> method.
+This action returns the role for each replica, and the returned role must be predefined here.</p>
 <p>The roles assigned to a replica can influence various aspects of the Component&rsquo;s behavior, such as:</p>
 <ul>
 <li>Service selection: The Component&rsquo;s exposed Services may target replicas based on their roles using <code>roleSelector</code>.</li>
@@ -8694,79 +8690,6 @@ string
 </td>
 <td>
 <p>The namespace where the secret is located.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1.ReplicaRole">ReplicaRole
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
-</p>
-<div>
-<p>ReplicaRole represents a role that can be assumed by a component instance.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>name</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Defines the role&rsquo;s identifier. It is used to set the &ldquo;apps.kubeblocks.io/role&rdquo; label value
-on the corresponding object.</p>
-<p>This field is immutable once set.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>serviceable</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Indicates whether a replica assigned this role is capable of providing services.</p>
-<p>This field is immutable once set.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>writable</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Determines if a replica in this role has the authority to perform write operations.
-A writable replica can modify data, handle update operations.</p>
-<p>This field is immutable once set.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>votable</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies whether a replica with this role has voting rights.
-In distributed systems, this typically means the replica can participate in consensus decisions,
-configuration changes, or other processes that require a quorum.</p>
-<p>This field is immutable once set.</p>
 </td>
 </tr>
 </tbody>
@@ -28938,9 +28861,7 @@ UpdateStrategy.Type will be set to appsv1.OnDeleteStatefulSetStrategyType if Mem
 <td>
 <code>roles</code><br/>
 <em>
-<a href="#workloads.kubeblocks.io/v1.ReplicaRole">
-[]ReplicaRole
-</a>
+[]github.com/apecloud/kubeblocks/apis/base/v1.ReplicaRole
 </em>
 </td>
 <td>
@@ -29027,9 +28948,6 @@ InstanceSetStatus
 </table>
 <h3 id="workloads.kubeblocks.io/v1.AccessMode">AccessMode
 (<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.ReplicaRole">ReplicaRole</a>)
-</p>
 <div>
 <p>AccessMode defines SVC access mode enums.</p>
 </div>
@@ -29455,9 +29373,7 @@ UpdateStrategy.Type will be set to appsv1.OnDeleteStatefulSetStrategyType if Mem
 <td>
 <code>roles</code><br/>
 <em>
-<a href="#workloads.kubeblocks.io/v1.ReplicaRole">
-[]ReplicaRole
-</a>
+[]github.com/apecloud/kubeblocks/apis/base/v1.ReplicaRole
 </em>
 </td>
 <td>
@@ -29692,18 +29608,6 @@ Used only when spec.roles set.</p>
 <td>
 <em>(Optional)</em>
 <p>Provides the status of each member in the cluster.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>readyWithoutPrimary</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Indicates whether it is required for the InstanceSet to have at least one primary instance ready.</p>
 </td>
 </tr>
 <tr>
@@ -30063,9 +29967,7 @@ string
 <td>
 <code>role</code><br/>
 <em>
-<a href="#workloads.kubeblocks.io/v1.ReplicaRole">
-ReplicaRole
-</a>
+github.com/apecloud/kubeblocks/apis/base/v1.ReplicaRole
 </em>
 </td>
 <td>
@@ -30295,71 +30197,6 @@ int32
 </em>
 </td>
 <td>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="workloads.kubeblocks.io/v1.ReplicaRole">ReplicaRole
-</h3>
-<p>
-(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>, <a href="#workloads.kubeblocks.io/v1.MemberStatus">MemberStatus</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>name</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Defines the role name of the replica.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>accessMode</code><br/>
-<em>
-<a href="#workloads.kubeblocks.io/v1.AccessMode">
-AccessMode
-</a>
-</em>
-</td>
-<td>
-<p>Specifies the service capabilities of this member.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>canVote</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Indicates if this member has voting rights.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>isLeader</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Determines if this member is the leader.</p>
 </td>
 </tr>
 </tbody>

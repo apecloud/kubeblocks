@@ -483,8 +483,8 @@ var _ = Describe("OpsUtil functions", func() {
 			})).Should(Succeed())
 
 			By("mock the new pods to available")
-			testapps.MockInstanceSetPod(&testCtx, nil, clusterName, defaultCompName, podPrefix+"-3", "follower", "Readonly")
-			testapps.MockInstanceSetPod(&testCtx, nil, clusterName, defaultCompName, podPrefix+"-4", "follower", "Readonly")
+			testapps.MockInstanceSetPod(&testCtx, nil, clusterName, defaultCompName, podPrefix+"-3", "follower")
+			testapps.MockInstanceSetPod(&testCtx, nil, clusterName, defaultCompName, podPrefix+"-4", "follower")
 
 			By("expect specified instances to take offline")
 			_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)

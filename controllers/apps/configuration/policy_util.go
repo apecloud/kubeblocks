@@ -33,7 +33,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgproto "github.com/apecloud/kubeblocks/pkg/configuration/proto"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -85,7 +84,11 @@ func getPodsForOnlineUpdate(params reconfigureParams) ([]corev1.Pod, error) {
 	}
 
 	if params.SynthesizedComponent != nil {
-		instanceset.SortPods(pods, instanceset.ComposeRolePriorityMap(component.ConvertSynthesizeCompRoleToInstanceSetRole(params.SynthesizedComponent)), true)
+		instanceset.SortPods(
+			pods,
+			instanceset.ComposeRolePriorityMap(params.SynthesizedComponent.Roles),
+			true,
+		)
 	}
 	return pods, nil
 }

@@ -31,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -190,10 +189,6 @@ func (r *statusReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	// 4. set members status
 	setMembersStatus(its, podList)
 
-	// 5. set readyWithoutPrimary
-	// TODO(free6om): should put this field to the spec
-	setReadyWithPrimary(its, podList)
-
 	if its.Spec.MinReadySeconds > 0 && availableReplicas != readyReplicas {
 		return kubebuilderx.RetryAfter(time.Second), nil
 	}
@@ -290,17 +285,6 @@ func buildFailureCondition(its *workloads.InstanceSet, pods []*corev1.Pod) (*met
 		Reason:             workloads.ReasonInstanceFailure,
 		Message:            string(message),
 	}, nil
-}
-
-func setReadyWithPrimary(its *workloads.InstanceSet, pods []*corev1.Pod) {
-	readyWithoutPrimary := false
-	for _, pod := range pods {
-		if value, ok := pod.Labels[constant.ReadyWithoutPrimaryKey]; ok && value == "true" {
-			readyWithoutPrimary = true
-			break
-		}
-	}
-	its.Status.ReadyWithoutPrimary = readyWithoutPrimary
 }
 
 func setMembersStatus(its *workloads.InstanceSet, pods []*corev1.Pod) {

@@ -164,16 +164,14 @@ func newMockReconfigureParams(testName string, cli client.Client, paramOps ...Pa
 			MinReadySeconds: 5,
 			Roles: []appsv1.ReplicaRole{
 				{
-					Name:        "leader",
-					Serviceable: true,
-					Writable:    true,
-					Votable:     true,
+					Name:                 "leader",
+					ParticipatesInQuorum: true,
+					UpdatePriority:       5,
 				},
 				{
-					Name:        "follower",
-					Serviceable: true,
-					Writable:    false,
-					Votable:     true,
+					Name:                 "follower",
+					ParticipatesInQuorum: true,
+					UpdatePriority:       4,
 				},
 			},
 		},

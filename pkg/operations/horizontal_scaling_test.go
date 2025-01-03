@@ -180,7 +180,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			}
 			for i := range ordinals {
 				podName := fmt.Sprintf("%s-%s%s-%d", clusterName, defaultCompName, prefix, ordinals[i])
-				pod := testapps.MockInstanceSetPod(&testCtx, nil, clusterName, defaultCompName, podName, "follower", "Readonly")
+				pod := testapps.MockInstanceSetPod(&testCtx, nil, clusterName, defaultCompName, podName, "follower")
 				pods = append(pods, pod)
 			}
 			return pods
@@ -388,7 +388,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 				},
 			}, []string{}, func(podList []*corev1.Pod) {
 				By("create the specified pod " + offlineInstanceName)
-				testapps.MockInstanceSetPod(&testCtx, nil, clusterName, defaultCompName, offlineInstanceName, "follower", "Readonly")
+				testapps.MockInstanceSetPod(&testCtx, nil, clusterName, defaultCompName, offlineInstanceName, "follower")
 			}, false)
 			Expect(opsRes.OpsRequest.Status.Progress).Should(Equal("1/1"))
 			By("expect replicas to 4")

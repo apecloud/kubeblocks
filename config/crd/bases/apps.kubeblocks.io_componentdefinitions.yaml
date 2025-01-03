@@ -4502,7 +4502,7 @@ spec:
 
 
                       - KB_ACCOUNT_NAME: The name of the system account to be created.
-                      - KB_ACCOUNT_PASSWORD: The password for the system account.  // TODO: how to pass the password securely?
+                      - KB_ACCOUNT_PASSWORD: The password for the system account.
                       - KB_ACCOUNT_STATEMENT: The statement used to create the system account.
 
 
@@ -16727,30 +16727,35 @@ spec:
                             Cannot be updated.
                           type: string
                       type: object
-                    secretRef:
+                    statement:
                       description: |-
-                        Refers to the secret from which data will be copied to create the new account.
+                        Defines the statements used to create, delete, and update the account.
 
 
                         This field is immutable once set.
                       properties:
-                        name:
-                          description: The unique identifier of the secret.
+                        create:
+                          description: |-
+                            The statement to create a new account with the necessary privileges.
+
+
+                            This field is immutable once set.
                           type: string
-                        namespace:
-                          description: The namespace where the secret is located.
+                        delete:
+                          description: |-
+                            The statement to delete a account.
+
+
+                            This field is immutable once set.
                           type: string
-                      required:
-                      - name
-                      - namespace
+                        update:
+                          description: |-
+                            The statement to update an existing account.
+
+
+                            This field is immutable once set.
+                          type: string
                       type: object
-                    statement:
-                      description: |-
-                        Defines the statement used to create the account with the necessary privileges.
-
-
-                        This field is immutable once set.
-                      type: string
                   required:
                   - name
                   type: object

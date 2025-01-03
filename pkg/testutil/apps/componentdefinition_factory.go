@@ -267,7 +267,9 @@ func (f *MockComponentDefinitionFactory) AddSystemAccount(accountName string, in
 	account := kbappsv1.SystemAccount{
 		Name:        accountName,
 		InitAccount: initAccount,
-		Statement:   statement,
+		Statement: &kbappsv1.SystemAccountStatement{
+			Create: statement,
+		},
 	}
 	if f.Get().Spec.SystemAccounts == nil {
 		f.Get().Spec.SystemAccounts = make([]kbappsv1.SystemAccount, 0)

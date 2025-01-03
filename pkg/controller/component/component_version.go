@@ -216,6 +216,9 @@ func actionsToResolveImage(compDef *appsv1.ComponentDefinition) map[string]*apps
 	if compDef.Spec.LifecycleActions.RoleProbe != nil {
 		actions[normalize("roleProbe")] = &compDef.Spec.LifecycleActions.RoleProbe.Action
 	}
+	if compDef.Spec.LifecycleActions.AvailableProbe != nil {
+		actions[normalize("availableProbe")] = &compDef.Spec.LifecycleActions.AvailableProbe.Action
+	}
 	return actions
 }
 

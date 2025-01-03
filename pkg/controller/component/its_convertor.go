@@ -302,8 +302,8 @@ func (c *itsCredentialConvertor) convert(args ...any) (any, error) {
 		return nil, err
 	}
 
-	credential := func(sysAccount kbappsv1.SystemAccount) *workloads.Credential {
-		secretName := constant.GenerateAccountSecretName(synthesizeComp.ClusterName, synthesizeComp.Name, sysAccount.Name)
+	credential := func(sysAccount string) *workloads.Credential {
+		secretName := constant.GenerateAccountSecretName(synthesizeComp.ClusterName, synthesizeComp.Name, sysAccount)
 		return &workloads.Credential{
 			Username: workloads.CredentialVar{
 				ValueFrom: &corev1.EnvVarSource{
@@ -329,9 +329,9 @@ func (c *itsCredentialConvertor) convert(args ...any) (any, error) {
 	}
 
 	// use first init account as the default credential
-	for index, sysAccount := range synthesizeComp.SystemAccounts {
+	for _, sysAccount := range synthesizeComp.SystemAccounts {
 		if sysAccount.InitAccount {
-			return credential(synthesizeComp.SystemAccounts[index]), nil
+			return credential(sysAccount.Name), nil
 		}
 	}
 	return nil, nil

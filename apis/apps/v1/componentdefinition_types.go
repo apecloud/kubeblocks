@@ -1212,12 +1212,12 @@ type SystemAccount struct {
 	// +optional
 	InitAccount bool `json:"initAccount,omitempty"`
 
-	// Defines the statement used to create the account with the necessary privileges.
+	// Defines the statements used to create, delete, and update the account.
 	//
 	// This field is immutable once set.
 	//
 	// +optional
-	Statement string `json:"statement,omitempty"`
+	Statement *SystemAccountStatement `json:"statement,omitempty"`
 
 	// Specifies the policy for generating the account's password.
 	//
@@ -1225,13 +1225,29 @@ type SystemAccount struct {
 	//
 	// +optional
 	PasswordGenerationPolicy PasswordConfig `json:"passwordGenerationPolicy"`
+}
 
-	// Refers to the secret from which data will be copied to create the new account.
+type SystemAccountStatement struct {
+	// The statement to create a new account with the necessary privileges.
 	//
 	// This field is immutable once set.
 	//
 	// +optional
-	SecretRef *ProvisionSecretRef `json:"secretRef,omitempty"`
+	Create string `json:"create,omitempty"`
+
+	// The statement to delete a account.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	Delete string `json:"delete,omitempty"`
+
+	// The statement to update an existing account.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	Update string `json:"update,omitempty"`
 }
 
 type TLS struct {
@@ -1736,7 +1752,7 @@ type ComponentLifecycleActions struct {
 	// The container executing this action has access to following variables:
 	//
 	// - KB_ACCOUNT_NAME: The name of the system account to be created.
-	// - KB_ACCOUNT_PASSWORD: The password for the system account.  // TODO: how to pass the password securely?
+	// - KB_ACCOUNT_PASSWORD: The password for the system account.
 	// - KB_ACCOUNT_STATEMENT: The statement used to create the system account.
 	//
 	// Note: This field is immutable once it has been set.

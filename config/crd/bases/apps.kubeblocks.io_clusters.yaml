@@ -5276,6 +5276,10 @@ spec:
                         ComponentDefinition.
                       items:
                         properties:
+                          disabled:
+                            default: false
+                            description: Specifies whether the system account is disabled.
+                            type: boolean
                           name:
                             description: The name of the system account.
                             type: string
@@ -5333,6 +5337,11 @@ spec:
                                 type: string
                               namespace:
                                 description: The namespace where the secret is located.
+                                type: string
+                              password:
+                                default: password
+                                description: The key in the secret data that contains
+                                  the password.
                                 type: string
                             required:
                             - name
@@ -13977,6 +13986,11 @@ spec:
                             ComponentDefinition.
                           items:
                             properties:
+                              disabled:
+                                default: false
+                                description: Specifies whether the system account
+                                  is disabled.
+                                type: boolean
                               name:
                                 description: The name of the system account.
                                 type: string
@@ -14035,6 +14049,11 @@ spec:
                                   namespace:
                                     description: The namespace where the secret is
                                       located.
+                                    type: string
+                                  password:
+                                    default: password
+                                    description: The key in the secret data that contains
+                                      the password.
                                     type: string
                                 required:
                                 - name

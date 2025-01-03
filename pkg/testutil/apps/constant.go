@@ -196,8 +196,11 @@ var (
 				},
 			},
 			{
-				Name:      "admin",
-				Statement: "CREATE USER $(USERNAME) IDENTIFIED BY '$(PASSWORD)'; GRANT ALL PRIVILEGES ON *.* TO $(USERNAME);",
+				Name: "admin",
+				Statement: &appsv1.SystemAccountStatement{
+					Create: "CREATE USER $(USERNAME) IDENTIFIED BY '$(PASSWORD)'; GRANT ALL PRIVILEGES ON *.* TO $(USERNAME);",
+					Delete: "DROP USER '$(USERNAME)'@'%';",
+				},
 				PasswordGenerationPolicy: appsv1.PasswordConfig{
 					Length:     10,
 					NumDigits:  5,

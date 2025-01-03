@@ -95,7 +95,7 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 		MinReadySeconds:                  compDefObj.Spec.MinReadySeconds,
 		PolicyRules:                      compDefObj.Spec.PolicyRules,
 		LifecycleActions:                 compDefObj.Spec.LifecycleActions,
-		SystemAccounts:                   mergeSystemAccounts(compDefObj.Spec.SystemAccounts, comp.Spec.SystemAccounts),
+		SystemAccounts:                   compDefObj.Spec.SystemAccounts,
 		Replicas:                         comp.Spec.Replicas,
 		Resources:                        comp.Spec.Resources,
 		TLSConfig:                        comp.Spec.TLSConfig,
@@ -208,35 +208,6 @@ func mergeUserDefinedEnv(synthesizedComp *SynthesizedComponent, comp *appsv1.Com
 		synthesizedComp.PodSpec.Containers[i].Env = append(synthesizedComp.PodSpec.Containers[i].Env, comp.Spec.Env...)
 	}
 	return nil
-}
-
-func mergeSystemAccounts(compDefAccounts []appsv1.SystemAccount,
-	compAccounts []appsv1.ComponentSystemAccount) []appsv1.SystemAccount {
-	if len(compAccounts) == 0 {
-		return compDefAccounts
-	}
-
-	override := func(compAccount appsv1.ComponentSystemAccount, idx int) {
-		if compAccount.PasswordConfig != nil {
-			compDefAccounts[idx].PasswordGenerationPolicy = *compAccount.PasswordConfig
-		}
-		compDefAccounts[idx].SecretRef = compAccount.SecretRef
-	}
-
-	tbl := make(map[string]int)
-	for i, account := range compDefAccounts {
-		tbl[account.Name] = i
-	}
-
-	for _, account := range compAccounts {
-		idx, ok := tbl[account.Name]
-		if !ok {
-			continue // ignore it silently
-		}
-		override(account, idx)
-	}
-
-	return compDefAccounts
 }
 
 func buildSchedulingPolicy(synthesizedComp *SynthesizedComponent, comp *appsv1.Component) {

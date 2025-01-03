@@ -96,7 +96,7 @@ var _ = Describe("", func() {
 			})).Should(Succeed())
 
 			By("should be available")
-			testdp.NewFakeActionSet(&testCtx)
+			testdp.NewFakeActionSet(&testCtx, nil)
 			Eventually(testapps.CheckObj(&testCtx, key, func(g Gomega, pobj *dpv1alpha1.BackupPolicyTemplate) {
 				g.Expect(pobj.Status.ObservedGeneration).To(Equal(bpt.Generation))
 				g.Expect(pobj.Status.Phase).To(Equal(dpv1alpha1.AvailablePhase))
@@ -109,7 +109,7 @@ var _ = Describe("", func() {
 				scheduleName2 = "test2"
 			)
 			By("set backup parameters and schema in acitionSet")
-			actionSet := testdp.NewFakeActionSet(&testCtx)
+			actionSet := testdp.NewFakeActionSet(&testCtx, nil)
 			testdp.MockActionSetWithSchema(&testCtx, actionSet)
 			bpt := testdp.NewBackupPolicyTemplateFactory(BackupPolicyTemplateName).
 				AddBackupMethod(BackupMethod, false, testdp.ActionSetName).

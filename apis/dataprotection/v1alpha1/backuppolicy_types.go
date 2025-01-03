@@ -221,6 +221,12 @@ type BackupMethod struct {
 	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	Name string `json:"name"`
 
+	// The name of the compatible full backup method, used by incremental backups.
+	//
+	// +optional
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	CompatibleMethod string `json:"compatibleMethod,omitempty"`
+
 	// Specifies whether to take snapshots of persistent volumes. If true,
 	// the ActionSetName is not required, the controller will use the CSI volume
 	// snapshotter to create the snapshot.

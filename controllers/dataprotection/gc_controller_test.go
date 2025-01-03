@@ -93,7 +93,7 @@ var _ = Describe("Data Protection Garbage Collection Controller", func() {
 
 		BeforeEach(func() {
 			By("creating an actionSet")
-			actionSet := testdp.NewFakeActionSet(&testCtx)
+			actionSet := testdp.NewFakeActionSet(&testCtx, nil)
 
 			By("creating storage provider")
 			_ = testdp.NewFakeStorageProvider(&testCtx, nil)

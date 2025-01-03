@@ -75,7 +75,7 @@ var _ = Describe("BackupPolicy Controller test", func() {
 
 		It("backup policy should be available for target", func() {
 			By("creating actionSet used by backup policy")
-			as := testdp.NewFakeActionSet(&testCtx)
+			as := testdp.NewFakeActionSet(&testCtx, nil)
 			Expect(as).ShouldNot(BeNil())
 
 			By("creating backupPolicy and its status should be available")
@@ -85,7 +85,7 @@ var _ = Describe("BackupPolicy Controller test", func() {
 
 		It("test backup policy with targets", func() {
 			By("creating actionSet used by backup policy")
-			as := testdp.NewFakeActionSet(&testCtx)
+			as := testdp.NewFakeActionSet(&testCtx, nil)
 			Expect(as).ShouldNot(BeNil())
 
 			By("creating backupPolicy")

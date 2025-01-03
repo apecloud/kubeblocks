@@ -180,3 +180,10 @@ func MockActionSetWithSchema(testCtx *testutil.TestContext, actionSet *dpv1alpha
 			g.Expect(as.Status.Message).Should(BeEmpty())
 		})).Should(Succeed())
 }
+
+func NewFakeIncActionSet(testCtx *testutil.TestContext) *dpv1alpha1.ActionSet {
+	return NewFakeActionSet(testCtx, func(as *dpv1alpha1.ActionSet) {
+		as.Name = IncActionSetName
+		as.Spec.BackupType = dpv1alpha1.BackupTypeIncremental
+	})
+}

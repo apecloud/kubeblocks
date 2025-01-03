@@ -1915,6 +1915,18 @@ string
 </tr>
 <tr>
 <td>
+<code>compatibleMethod</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The name of the compatible full backup method, used by incremental backups.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>snapshotVolumes</code><br/>
 <em>
 bool
@@ -2038,6 +2050,18 @@ string
 </td>
 <td>
 <p>The name of backup method.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>compatibleMethod</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The name of the compatible full backup method, used by incremental backups.</p>
 </td>
 </tr>
 <tr>
@@ -3538,6 +3562,32 @@ EncryptionConfig
 <td>
 <em>(Optional)</em>
 <p>Records the volume snapshot status for the action.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>parentBackupName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Records the parent backup name for incremental or differential backup.
+When the parent backup is deleted, the backup will also be deleted.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>baseBackupName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Records the base full backup name for incremental backup or differential backup.
+When the base backup is deleted, the backup will also be deleted.</p>
 </td>
 </tr>
 <tr>

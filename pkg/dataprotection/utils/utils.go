@@ -253,6 +253,19 @@ func GetBackupType(actionSet *dpv1alpha1.ActionSet, useSnapshot *bool) dpv1alpha
 	return ""
 }
 
+func GetBackupTypeByMethodName(reqCtx intctrlutil.RequestCtx, cli client.Client, methodName string,
+	backupPolicy *dpv1alpha1.BackupPolicy) (dpv1alpha1.BackupType, error) {
+	backupMethod := GetBackupMethodByName(methodName, backupPolicy)
+	if backupMethod == nil {
+		return "", nil
+	}
+	actionSet, err := GetActionSetByName(reqCtx, cli, backupMethod.ActionSetName)
+	if err != nil {
+		return "", err
+	}
+	return GetBackupType(actionSet, backupMethod.SnapshotVolumes), nil
+}
+
 // PrependSpaces prepends spaces to each line of the content.
 func PrependSpaces(content string, spaces int) string {
 	prefix := ""
@@ -438,4 +451,19 @@ func ValidateParameters(actionSet *dpv1alpha1.ActionSet, parameters []dpv1alpha1
 		return intctrlutil.NewFatalError(err.Error())
 	}
 	return nil
+}
+
+func CompareWithBackupStopTime(backupI, backupJ dpv1alpha1.Backup) bool {
+	endTimeI := backupI.GetEndTime()
+	endTimeJ := backupJ.GetEndTime()
+	if endTimeI.IsZero() {
+		return false
+	}
+	if endTimeJ.IsZero() {
+		return true
+	}
+	if endTimeI.Equal(endTimeJ) {
+		return backupI.Name < backupJ.Name
+	}
+	return endTimeI.Before(endTimeJ)
 }

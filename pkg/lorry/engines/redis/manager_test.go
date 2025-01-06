@@ -42,6 +42,7 @@ var _ = Describe("Redis DBManager", func() {
 	// Set up relevant viper config variables
 	viper.Set(constant.KBEnvServiceUser, "testuser")
 	viper.Set(constant.KBEnvServicePassword, "testpassword")
+	viper.Set("REDIS_VERSION", "7.2.4")
 	Context("new db manager", func() {
 		It("with right configurations", func() {
 			properties := engines.Properties{

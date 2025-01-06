@@ -29,13 +29,15 @@ const (
 	ProtocolName  = "TCP"
 	PortNum       = 10000
 
-	BackupName         = "test-backup"
-	BackupRepoName     = "test-repo"
-	BackupPolicyName   = "test-backup-policy"
-	BackupMethodName   = "xtrabackup"
-	VSBackupMethodName = "volume-snapshot"
-	BackupPathPrefix   = "/backup"
-	ActionSetName      = "xtrabackup"
+	BackupName          = "test-backup"
+	BackupRepoName      = "test-repo"
+	BackupPolicyName    = "test-backup-policy"
+	BackupMethodName    = "xtrabackup"
+	IncBackupMethodName = "xtrabackup-inc"
+	VSBackupMethodName  = "volume-snapshot"
+	BackupPathPrefix    = "/backup"
+	ActionSetName       = "xtrabackup"
+	IncActionSetName    = "xtrabackup-inc"
 
 	DataVolumeName      = "data"
 	DataVolumeMountPath = "/data"

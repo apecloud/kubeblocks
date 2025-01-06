@@ -68,6 +68,11 @@ func (f *MockBackupPolicyFactory) AddBackupMethod(name string,
 	return f
 }
 
+func (f *MockBackupPolicyFactory) SetBackupMethodCompatibleMethod(name string) *MockBackupPolicyFactory {
+	f.Get().Spec.BackupMethods[len(f.Get().Spec.BackupMethods)-1].CompatibleMethod = name
+	return f
+}
+
 func (f *MockBackupPolicyFactory) SetBackupMethodVolumes(names []string) *MockBackupPolicyFactory {
 	f.Get().Spec.BackupMethods[len(f.Get().Spec.BackupMethods)-1].TargetVolumes.Volumes = names
 	return f

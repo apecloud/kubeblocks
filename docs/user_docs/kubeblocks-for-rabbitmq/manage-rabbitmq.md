@@ -30,7 +30,7 @@ Currently, KubeBlocks only supports managing RabbitMQ by `kubectl`.
 
 KubeBlocks implements a Cluster CRD to define a cluster. Here is an example of creating a RabbitMQ cluster with three replicas. Pods are distributed on different nodes by default. But if you only have one node for a cluster with three replicas, set `spec.affinity.topologyKeys` as `null`.
 
-```bash
+```yaml
 cat <<EOF | kubectl apply -f -
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster

@@ -78,107 +78,149 @@ Refer to the [Pulsar official document](https://pulsar.apache.org/docs/3.1.x/) f
 
 ## Create Pulsar cluster
 
-1. Create the Pulsar cluster template file `values-production.yaml` for `helm` locally.
-  
-   Copy the following information to the local file `values-production.yaml`.
+1. Create a Pulsar cluster.
 
-   ```bash
-   ## Bookies configuration
-   bookies:
-     resources:
-       limits:
-         memory: 8Gi
-       requests:
-         cpu: 2
-         memory: 8Gi
-
-     persistence:
-       data:
-         storageClassName: kb-default-sc
-         size: 128Gi
-       log:
-         storageClassName: kb-default-sc
-         size: 64Gi
-
-   ## Zookeeper configuration
-   zookeeper:
-     resources:
-       limits:
-         memory: 2Gi
-       requests:
-         cpu: 1
-         memory: 2Gi
-
-     persistence:
-       data:
-         storageClassName: kb-default-sc
-         size: 20Gi
-       log:
-         storageClassName: kb-default-sc 
-         size: 20Gi
-        
-   broker:
-     replicaCount: 3
-     resources:
-       limits:
-         memory: 8Gi
-       requests:
-         cpu: 2
-         memory: 8Gi
+   ```yaml
+   cat <<EOF | kubectl apply -f -
+   apiVersion: apps.kubeblocks.io/v1alpha1
+   kind: Cluster
+   metadata:
+     name: mycluster
+     namespace: demo
+     annotations:
+       "kubeblocks.io/extra-env": '{"KB_PULSAR_BROKER_NODEPORT": "false"}'
+   spec:
+     terminationPolicy: Delete
+     services:
+     - name: proxy
+       serviceName: proxy
+       componentSelector: pulsar-proxy
+       spec:
+         type: ClusterIP
+         ports:
+         - name: pulsar
+           port: 6650
+           targetPort: 6650
+         - name: http
+           port: 80
+           targetPort: 8080
+     - name: broker-bootstrap
+       serviceName: broker-bootstrap
+       componentSelector: pulsar-broker
+       spec:
+         type: ClusterIP
+         ports:
+         - name: pulsar
+           port: 6650
+           targetPort: 6650
+         - name: http
+           port: 80
+           targetPort: 8080
+         - name: kafka-client
+           port: 9092
+           targetPort: 9092
+     componentSpecs:
+     - name: pulsar-broker
+       componentDef: pulsar-broker
+       disableExporter: true
+       replicas: 1
+       resources:
+         limits:
+           cpu: '0.5'
+           memory: 0.5Gi
+         requests:
+           cpu: '0.5'
+           memory: 0.5Gi
+       volumeClaimTemplates:
+       - name: data
+         spec:
+           accessModes:
+           - ReadWriteOnce
+           resources:
+             requests:
+               storage: 20Gi
+     - name: pulsar-proxy
+       componentDef: pulsar-proxy
+       replicas: 1
+       resources:
+         limits:
+           cpu: '0.5'
+           memory: 0.5Gi
+         requests:
+           cpu: '0.5'
+           memory: 0.5Gi
+     - name: bookies
+       componentDef: pulsar-bookkeeper
+       replicas: 3
+       resources:
+         limits:
+           cpu: '0.5'
+           memory: 0.5Gi
+         requests:
+           cpu: '0.5'
+           memory: 0.5Gi
+       volumeClaimTemplates:
+       - name: journal
+         spec:
+           accessModes:
+           - ReadWriteOnce
+           resources:
+             requests:
+               storage: 20Gi
+       - name: ledgers
+         spec:
+           accessModes:
+           - ReadWriteOnce
+           resources:
+             requests:
+               storage: 20Gi
+     - name: bookies-recovery
+       componentDef: pulsar-bkrecovery
+       replicas: 1
+       resources:
+         limits:
+           cpu: '0.5'
+           memory: 0.5Gi
+         requests:
+           cpu: '0.5'
+           memory: 0.5Gi
+     - name: zookeeper
+       componentDef: pulsar-zookeeper
+       replicas: 3
+       resources:
+         limits:
+           cpu: '0.5'
+           memory: 0.5Gi
+         requests:
+           cpu: '0.5'
+           memory: 0.5Gi
+       volumeClaimTemplates:
+       - name: data
+         spec:
+           accessModes:
+           - ReadWriteOnce
+           resources:
+             requests:
+               storage: 20Gi
+   EOF
    ```
 
-2. Create a cluster.
+   | Field                                 | Definition  |
+   |---------------------------------------|--------------------------------------|
+   | `metadata.annotations."kubeblocks.io/extra-env"` | It specifies whether to enable NodePort services. |
+   | `spec.terminationPolicy`              | It is the policy of cluster termination. The default value is `Delete`. Valid values are `DoNotTerminate`, `Delete`, `WipeOut`. For the detailed definition, you can refer to [Termination Policy](./delete-a-postgresql-cluster.md#termination-policy). |
+   | `spec.affinity`                       | It defines a set of node affinity scheduling rules for the cluster's Pods. This field helps control the placement of Pods on nodes within the cluster.  |
+   | `spec.affinity.podAntiAffinity`       | It specifies the anti-affinity level of Pods within a component. It determines how pods should spread across nodes to improve availability and performance. |
+   | `spec.affinity.topologyKeys`          | It represents the key of node labels used to define the topology domain for Pod anti-affinity and Pod spread constraints.   |
+   | `spec.tolerations`                    | It is an array that specifies tolerations attached to the cluster's Pods, allowing them to be scheduled onto nodes with matching taints.  |
+   | `spec.componentSpecs`                 | It is the list of components that define the cluster components. This field allows customized configuration of each component within a cluster.   |
+   | `spec.componentSpecs.componentDefRef` | It is the name of the component definition that is defined in the cluster definition and you can get the component definition names with `kubectl get clusterdefinition postgresql -o json \| jq '.spec.componentDefs[].name'`.   |
+   | `spec.componentSpecs.name`            | It specifies the name of the component.     |
+   | `spec.componentSpecs.disableExporter` | It defines whether the monitoring function is enabled. |
+   | `spec.componentSpecs.replicas`        | It specifies the number of replicas of the component.  |
+   | `spec.componentSpecs.resources`       | It specifies the resource requirements of the component.  |
 
-   - **Option 1**: (**Recommended**) Create pulsar cluster by `values-production.yaml`.
-  
-     Configuration:
-      - broker: 3 replicas
-      - bookies: 4 replicas
-      - zookeeper: 3 replicas
-
-     ```bash
-     helm install mycluster kubeblocks/pulsar-cluster --version "x.y.z" -f values-production.yaml --namespace=demo
-     ```
-
-   - **Option 2**: Create pulsar cluster with proxy.
-   
-     Configuration:
-      - proxy: 3 replicas
-      - broker: 3 replicas
-      - bookies: 4 replicas
-      - zookeeper: 3 replicas
-
-     ```bash
-     helm install mycluster kubeblocks/pulsar-cluster --version "x.y.z" -f values-production.yaml --set proxy.enable=true --namespace=demo
-     ```
-
-   - **Option 3**:  Create pulsar cluster with proxy and deploy `bookies-recovery` component.  
-     
-     Configuration:
-      - proxy: 3 replicas
-      - broker: 3 replicas
-      - bookies: 4 replicas
-      - zookeeper: 3 replicas
-      - bookies-recovery: 3 replicas
-
-     ```bash
-     helm install mycluster kubeblocks/pulsar-cluster --version "x.y.z" -f values-production.yaml --set proxy.enable=true --set bookiesRecovery.enable=true --namespace=demo 
-     ```
-
-   - **Option 4**: Create pulsar cluster and specify bookies and zookeeper storage parameters.
-
-     Configuration:
-      - broker: 3 replicas
-      - bookies: 4 replicas
-      - zookeeper: 3 replicas
-
-     ```bash
-     helm install mycluster kubeblocks/pulsar-cluster --version "x.y.z" -f values-production.yaml --set bookies.persistence.data.storageClassName=<sc name>,bookies.persistence.log.storageClassName=<sc name>,zookeeper.persistence.data.storageClassName=<sc name>,zookeeper.persistence.log.storageClassName=<sc name> --namespace=demo
-     ```
-
-   You can specify the storage name `<sc name>`.
-
-3. Verify the cluster created.
+2. Verify the cluster created.
 
     ```bash
     kubectl get cluster mycluster -n demo

@@ -118,24 +118,23 @@ KubeBlocks 支持创建两种 PostgreSQL 集群：单机版（Standalone）和�
      name: mycluster
      namespace: demo
    spec:
-     clusterDefinitionRef: postgresql
-     clusterVersionRef: postgresql-14.8.0
      terminationPolicy: Delete
-     affinity:
-       podAntiAffinity: Preferred
-       topologyKeys:
-       - kubernetes.io/hostname
-     tolerations:
+     componentSpecs:
+     - name: postgresql
+       componentDef: postgresql-12
+       enabledLogs:
+       - running
+       disableExporter: true
+       affinity:
+         podAntiAffinity: Preferred
+         topologyKeys:
+         - kubernetes.io/hostname
+         tenancy: SharedNode
+       tolerations:
        - key: kb-data
          operator: Equal
          value: 'true'
          effect: NoSchedule
-     componentSpecs:
-     - name: postgresql
-       componentDefRef: postgresql
-       enabledLogs:
-       - running
-       disableExporter: true
        replicas: 2
        resources:
          limits:
@@ -157,8 +156,6 @@ KubeBlocks 支持创建两种 PostgreSQL 集群：单机版（Standalone）和�
 
    | 字段                                   | 定义  |
    |---------------------------------------|--------------------------------------|
-   | `spec.clusterDefinitionRef`           | 集群定义 CRD 的名称，用来定义集群组件。  |
-   | `spec.clusterVersionRef`              | 集群版本 CRD 的名称，用来定义集群版本。 |
    | `spec.terminationPolicy`              | 集群的终止策略，默认值为 `Delete`，有效值为 `DoNotTerminate`、`Halt`、`Delete` 和 `WipeOut`。 <p> - `DoNotTerminate` 会阻止删除操作。 </p><p> - `Halt` 会删除工作负载资源，如 statefulset 和 deployment 等，但是保留了 PVC 。  </p><p> - `Delete` 在 `Halt` 的基础上进一步删除了 PVC。 </p><p> - `WipeOut` 在 `Delete` 的基础上从备份存储的位置完全删除所有卷快照和快照数据。 </p>|
    | `spec.affinity`                       | 为集群的 Pods 定义了一组节点亲和性调度规则。该字段可控制 Pods 在集群中节点上的分布。 |
    | `spec.affinity.podAntiAffinity`       | 定义了不在同一 component 中的 Pods 的反亲和性水平。该字段决定了 Pods 以何种方式跨节点分布，以提升可用性和性能。 |
@@ -218,10 +215,10 @@ KubeBlocks 支持创建两种 PostgreSQL 集群：单机版（Standalone）和�
    kbcli cluster create postgresql mycluster --replicas=2 -n demo
    ```
 
-   如果您只有一个节点用于部署三节点集群，可在创建集群时将 `topology-keys` 设为 `null`。但需要注意的是，生产环境中，不建议将所有副本部署在同一个节点上，因为这可能会降低集群的可用性。
+   如果您只有一个节点可用于部署主备版，可将 `topology-keys` 设置为 `null`。但需要注意的是，生产环境中，不建议将所有副本部署在同一个节点上，因为这可能会降低集群的可用性。
 
    ```bash
-   kbcli cluster create postgresql mycluster --replicas=2 --availability-policy='none' -n demo
+   kbcli cluster create postgresql mycluster --replicas=2 --topology-keys=null -n demo
    ```
 
 2. 验证集群是否创建成功。

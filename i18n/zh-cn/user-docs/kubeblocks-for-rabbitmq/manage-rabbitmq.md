@@ -36,7 +36,7 @@ KubeBlocks 通过 `Cluster` 定义集群。以下是创建 RabbitMQ 集群的示
 
 :::
 
-```bash
+```yaml
 cat <<EOF | kubectl apply -f -
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster

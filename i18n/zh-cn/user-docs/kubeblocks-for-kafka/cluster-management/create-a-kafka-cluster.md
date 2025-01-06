@@ -84,37 +84,26 @@ import TabItem from '@theme/TabItem';
        name: mycluster
        namespace: demo
        annotations:
-         "kubeblocks.io/extra-env": '{"KB_KAFKA_ENABLE_SASL":"false","KB_KAFKA_BROKER_HEAP":"-XshowSettings:vm -XX:MaxRAMPercentage=100 -Ddepth=64","KB_KAFKA_CONTROLLER_HEAP":"-XshowSettings:vm -XX:MaxRAMPercentage=100 -Ddepth=64","KB_KAFKA_PUBLIC_ACCESS":"false", "KB_KAFKA_BROKER_NODEPORT": "false"}'
-         kubeblocks.io/enabled-pod-ordinal-svc: broker
+         "kubeblocks.io/extra-env": '{"KB_KAFKA_ENABLE_SASL":"false","KB_KAFKA_BROKER_HEAP":"-XshowSettings:vm -XX:MaxRAMPercentage=100 -Ddepth=64","KB_KAFKA_CONTROLLER_HEAP":"-XshowSettings:vm -XX:MaxRAMPercentage=100 -Ddepth=64","KB_KAFKA_PUBLIC_ACCESS":"false"}'
      spec:
-       clusterDefinitionRef: kafka
-       clusterVersionRef: kafka-3.3.2
        terminationPolicy: Delete
-       affinity:
-         podAntiAffinity: Preferred
-         topologyKeys:
-         - kubernetes.io/hostname
-       tolerations:
-         - key: kb-data
-           operator: Equal
-           value: "true"
-           effect: NoSchedule
-       services:
-       - name: bootstrap
-         serviceName: bootstrap
-         componentSelector: broker
-         spec:
-           type: ClusterIP
-           ports:
-           - name: kafka-client
-             targetPort: 9092
-             port: 9092
        componentSpecs:
        - name: broker
          componentDef: kafka-combine
          tls: false
          replicas: 1
-         serviceAccountName: kb-kafka-cluster
+         serviceVersion: 3.3.2
+         services:
+         affinity:
+           podAntiAffinity: Preferred
+           topologyKeys:
+           - kubernetes.io/hostname
+           tenancy: SharedNode
+         tolerations:
+         - key: kb-data
+           operator: Equal
+           value: 'true'
+           effect: NoSchedule
          resources:
            limits:
              cpu: '0.5'
@@ -132,13 +121,13 @@ import TabItem from '@theme/TabItem';
                  storage: 20Gi
          - name: metadata
            spec:
+             storageClassName: null
              accessModes:
              - ReadWriteOnce
              resources:
                requests:
                  storage: 20Gi
        - name: metrics-exp
-         componentDefRef: kafka-exporter
          componentDef: kafka-exporter
          replicas: 1
          resources:
@@ -159,105 +148,87 @@ import TabItem from '@theme/TabItem';
      apiVersion: apps.kubeblocks.io/v1alpha1
      kind: Cluster
      metadata:
-       name: kafka-cluster
+       name: mycluster
        namespace: demo
        annotations:
-         "kubeblocks.io/extra-env": '{"KB_KAFKA_ENABLE_SASL":"false","KB_KAFKA_BROKER_HEAP":"-XshowSettings:vm -XX:MaxRAMPercentage=100 -Ddepth=64","KB_KAFKA_CONTROLLER_HEAP":"-XshowSettings:vm -XX:MaxRAMPercentage=100 -Ddepth=64","KB_KAFKA_PUBLIC_ACCESS":"false", "KB_KAFKA_BROKER_NODEPORT": "false"}'
-         kubeblocks.io/enabled-pod-ordinal-svc: broker
+         "kubeblocks.io/extra-env": '{"KB_KAFKA_ENABLE_SASL":"false","KB_KAFKA_BROKER_HEAP":"-XshowSettings:vm -XX:MaxRAMPercentage=100 -Ddepth=64","KB_KAFKA_CONTROLLER_HEAP":"-XshowSettings:vm -XX:MaxRAMPercentage=100 -Ddepth=64","KB_KAFKA_PUBLIC_ACCESS":"false"}'
      spec:
-       clusterDefinitionRef: kafka
-       clusterVersionRef: kafka-3.3.2
        terminationPolicy: Delete
-       affinity:
-         podAntiAffinity: Preferred
-         topologyKeys:
-         - kubernetes.io/hostname
+       componentSpecs:
+       - name: broker
+         componentDef: kafka-broker
+         tls: false
+         replicas: 1
+         affinity:
+           podAntiAffinity: Preferred
+           topologyKeys:
+           - kubernetes.io/hostname
+           tenancy: SharedNode
          tolerations:
-           - key: kb-data
-             operator: Equal
-             value: "true"
-             effect: NoSchedule
-         services:
-           - name: bootstrap
-             serviceName: bootstrap
-             componentSelector: broker
-         spec:
-             type: ClusterIP
-             ports:
-             - name: kafka-client
-               targetPort: 9092
-               port: 9092
-     componentSpecs:
-     - name: broker
-       componentDef: kafka-broker
-       tls: false
-       replicas: 1
-       serviceAccountName: kb-kafka-cluster
-       resources:
-         limits:
-           cpu: '0.5'
-           memory: 0.5Gi
-         requests:
-           cpu: '0.5'
-           memory: 0.5Gi
-       volumeClaimTemplates:
-       - name: data
-         spec:
-           accessModes:
-           - ReadWriteOnce
-           resources:
-             requests:
-               storage: 20Gi
-       - name: metadata
-         spec:
-           storageClassName: null
-           accessModes:
-           - ReadWriteOnce
-           resources:
-             requests:
-               storage: 5Gi
-     - name: controller
-       componentDefRef: controller
-       componentDef: kafka-controller
-       tls: false
-       replicas: 1
-       serviceAccountName: kb-kafka-cluster
-       resources:
-         limits:
-           cpu: '0.5'
-           memory: 0.5Gi
-         requests:
-           cpu: '0.5'
-           memory: 0.5Gi
-       volumeClaimTemplates:
-       - name: metadata
-         spec:
-           storageClassName: null
-           accessModes:
-           - ReadWriteOnce
-           resources:
-             requests:
-               storage: 20Gi
-     - name: metrics-exp
-       componentDefRef: kafka-exporter
-       componentDef: kafka-exporter
-       replicas: 1
-       resources:
-         limits:
-           cpu: '0.5'
-           memory: 0.5Gi
-         requests:
-           cpu: '0.5'
-           memory: 0.5Gi
+         - key: kb-data
+           operator: Equal
+           value: 'true'
+           effect: NoSchedule
+         resources:
+           limits:
+             cpu: '0.5'
+             memory: 0.5Gi
+           requests:
+             cpu: '0.5'
+             memory: 0.5Gi
+         volumeClaimTemplates:
+         - name: data
+           spec:
+             accessModes:
+             - ReadWriteOnce
+             resources:
+               requests:
+                 storage: 20Gi
+         - name: metadata
+           spec:
+             storageClassName: null
+             accessModes:
+             - ReadWriteOnce
+             resources:
+               requests:
+                 storage: 5Gi
+       - name: controller
+         componentDefRef: controller
+         componentDef: kafka-controller
+         tls: false
+         replicas: 1
+         resources:
+           limits:
+             cpu: '0.5'
+             memory: 0.5Gi
+           requests:
+             cpu: '0.5'
+             memory: 0.5Gi
+         volumeClaimTemplates:
+         - name: metadata
+           spec:
+             storageClassName: null
+             accessModes:
+             - ReadWriteOnce
+             resources:
+               requests:
+                 storage: 20Gi
+       - name: metrics-exp
+         componentDef: kafka-exporter
+         replicas: 1
+         resources:
+           limits:
+             cpu: '0.5'
+             memory: 0.5Gi
+           requests:
+             cpu: '0.5'
+             memory: 0.5Gi
      EOF
      ```
 
    | 字段                                   | 定义  |
    |---------------------------------------|--------------------------------------|
    | `metadata.annotations."kubeblocks.io/extra-env"` | 定义了 Kafka broker 的 jvm heap 配置。 |
-   | `metadata.annotations.kubeblocks.io/enabled-pod-ordinal-svc` | 为 nodeport 特性门控定义了 Kafka 集群注释键。您还可以设置 `kubeblocks.io/enabled-node-port-svc: broker` 和 `kubeblocks.io/disabled-cluster-ip-svc: broker`。 |
-   | `spec.clusterDefinitionRef`           | 集群定义 CRD 的名称，用来定义集群组件。  |
-   | `spec.clusterVersionRef`              | 集群版本 CRD 的名称，用来定义集群版本。 |
    | `spec.terminationPolicy`              | 集群的终止策略，默认值为 `Delete`，有效值为 `DoNotTerminate`、`Halt`、`Delete` 和 `WipeOut`。具体定义可参考 [终止策略](./delete-kafka-cluster.md#终止策略)。 |
    | `spec.affinity`                       | 为集群的 Pods 定义了一组节点亲和性调度规则。该字段可控制 Pods 在集群中节点上的分布。 |
    | `spec.affinity.podAntiAffinity`       | 定义了不在同一 component 中的 Pods 的反亲和性水平。该字段决定了 Pods 以何种方式跨节点分布，以提升可用性和性能。 |

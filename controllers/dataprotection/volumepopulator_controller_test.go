@@ -101,7 +101,7 @@ var _ = Describe("Volume Populator Controller test", func() {
 
 		BeforeEach(func() {
 			By("create actionSet")
-			actionSet = testdp.NewFakeActionSet(&testCtx)
+			actionSet = testdp.NewFakeActionSet(&testCtx, nil)
 		})
 
 		initResources := func(volumeBinding storagev1.VolumeBindingMode, useVolumeSnapshotBackup, mockBackupCompleted bool) *corev1.PersistentVolumeClaim {
@@ -109,7 +109,7 @@ var _ = Describe("Volume Populator Controller test", func() {
 			createStorageClass(volumeBinding)
 
 			By("create backup")
-			backup := mockBackupForRestore(actionSet.Name, "", "", mockBackupCompleted, useVolumeSnapshotBackup)
+			backup := mockBackupForRestore(actionSet.Name, "", "", mockBackupCompleted, useVolumeSnapshotBackup, "")
 
 			By("create restore ")
 			restore := testdp.NewRestoreFactory(testCtx.DefaultNamespace, testdp.RestoreName).

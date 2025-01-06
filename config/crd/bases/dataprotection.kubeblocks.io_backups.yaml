@@ -268,6 +268,11 @@ spec:
                       For volume snapshot backup, the actionSet is not required, the controller
                       will use the CSI volume snapshotter to create the snapshot.
                     type: string
+                  compatibleMethod:
+                    description: The name of the compatible full backup method, used
+                      by incremental backups.
+                    pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                    type: string
                   env:
                     description: Specifies the environment variables for the backup
                       workload.
@@ -957,6 +962,11 @@ spec:
               backupRepoName:
                 description: The name of the backup repository.
                 type: string
+              baseBackupName:
+                description: |-
+                  Records the base full backup name for incremental backup or differential backup.
+                  When the base backup is deleted, the backup will also be deleted.
+                type: string
               completionTimestamp:
                 description: |-
                   Records the time when the backup operation was completed.
@@ -1035,6 +1045,11 @@ spec:
                 type: string
               kopiaRepoPath:
                 description: Records the path of the Kopia repository.
+                type: string
+              parentBackupName:
+                description: |-
+                  Records the parent backup name for incremental or differential backup.
+                  When the parent backup is deleted, the backup will also be deleted.
                 type: string
               path:
                 description: |-

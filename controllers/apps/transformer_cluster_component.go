@@ -490,10 +490,14 @@ func (c *phasePrecondition) compMatch(transCtx *clusterTransformContext, dag *gr
 		return false, client.IgnoreNotFound(err)
 	}
 	if !c.expected(comp) {
+		transCtx.Logger.Info("waiting for predecessor component in expected phase",
+			"component", comp.Name, "predecessor", name)
 		return false, nil
 	}
 	// create or update in DAG?
 	if dagGet() {
+		transCtx.Logger.Info("waiting for predecessor component in DAG",
+			"component", comp.Name, "predecessor", name)
 		return false, nil
 	}
 	return true, nil
@@ -524,11 +528,15 @@ func (c *phasePrecondition) shardingMatch(transCtx *clusterTransformContext, dag
 	}
 	for _, comp := range comps {
 		if !c.expected(&comp) {
+			transCtx.Logger.Info("waiting for predecessor sharding in expected phase",
+				"shard", comp.Name, "predecessor sharding", name)
 			return false, nil
 		}
 	}
 	// create or update in DAG?
 	if dagList() {
+		transCtx.Logger.Info("waiting for predecessor sharding in DAG",
+			"shards", comps, "predecessor sharding", name)
 		return false, nil
 	}
 	return true, nil

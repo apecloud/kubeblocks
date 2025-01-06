@@ -8535,6 +8535,7 @@ spec:
                                 maxLength: 25
                                 type: string
                               podService:
+                                default: false
                                 description: |-
                                   Indicates whether to generate individual Services for each Pod.
                                   If set to true, a separate Service will be created for each Pod in the Cluster.

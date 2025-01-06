@@ -22,6 +22,8 @@ package redis
 import (
 	"context"
 	"fmt"
+	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 
@@ -44,7 +46,6 @@ type Manager struct {
 	clientSettings *Settings
 	sentinelClient *redis.SentinelClient
 
-	startAt                 time.Time
 	role                    string
 	roleSubscribeUpdateTime int64
 	roleProbePeriod         int64
@@ -76,7 +77,14 @@ func NewManager(properties engines.Properties) (engines.DBManager, error) {
 		roleProbePeriod: int64(viper.GetInt(constant.KBEnvRoleProbePeriod)),
 	}
 
-	mgr.startAt = time.Now()
+	maJorVersion, err := getRedisMajorVersion()
+	if err != nil {
+		return nil, err
+	}
+	// The username is supported after 6.0
+	if maJorVersion < 6 {
+		redisUser = ""
+	}
 
 	defaultSettings := &Settings{
 		Password: redisPasswd,
@@ -119,4 +127,29 @@ func tokenizeCmd2Args(cmd string) []interface{} {
 		redisArgs = append(redisArgs, arg)
 	}
 	return redisArgs
+}
+
+// we get redis version from 'redis-cli --version'
+func getRedisMajorVersion() (int, error) {
+	redisCliCMD, err := exec.LookPath("redis-cli")
+	if err != nil {
+		return -1, err
+	}
+
+	out, err := exec.Command(redisCliCMD, "--version").Output()
+	if err != nil {
+		return -1, err
+	}
+
+	// output eg: redis-cli 7.2.4
+	versionInfo := strings.Split(strings.TrimSpace(string(out)), " ")
+	if len(versionInfo) < 2 {
+		return -1, fmt.Errorf("invalid redis version info: %s", string(out))
+	}
+
+	majorVersion, err := strconv.Atoi(strings.Split(strings.TrimSpace(versionInfo[1]), ".")[0])
+	if err != nil {
+		return -1, err
+	}
+	return majorVersion, nil
 }

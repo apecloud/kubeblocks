@@ -77,12 +77,12 @@ func NewManager(properties engines.Properties) (engines.DBManager, error) {
 		roleProbePeriod: int64(viper.GetInt(constant.KBEnvRoleProbePeriod)),
 	}
 
-	maJorVersion, err := getRedisMajorVersion()
+	majorVersion, err := getRedisMajorVersion()
 	if err != nil {
 		return nil, err
 	}
 	// The username is supported after 6.0
-	if maJorVersion < 6 {
+	if majorVersion < 6 {
 		redisUser = ""
 	}
 

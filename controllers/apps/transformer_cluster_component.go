@@ -479,10 +479,14 @@ func (c *compPhasePrecondition) match(transCtx *clusterTransformContext, dag *gr
 			return false, client.IgnoreNotFound(err)
 		}
 		if comp.Generation != comp.Status.ObservedGeneration || !c.phaseExpectation(comp) {
+			transCtx.Logger.Info("component waiting: predecessor has generation mismatch or not in upWorking state",
+				"component", comp.Name, "predecessor", predecessor)
 			return false, nil
 		}
 		// create or update if exists in DAG
 		if dagGet(compKey) {
+			transCtx.Logger.Info("waiting for predecessor component in DAG",
+				"component", comp.Name, "predecessor", predecessor)
 			return false, nil
 		}
 	}

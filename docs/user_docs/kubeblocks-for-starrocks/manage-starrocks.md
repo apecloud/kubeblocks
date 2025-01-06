@@ -28,12 +28,7 @@ This tutorial illustrates how to create and manage a StarRocks cluster by `kbcli
 
 ## Create a cluster
 
-<Tabs>
-
-<TabItem value="kubectl" label="kubectl" default>
-
 KubeBlocks implements a `Cluster` CRD to define a cluster. Here is an example of creating a StarRocks cluster. If you only have one node for deploying a cluster with multiple replicas, configure the cluster affinity by setting `spec.schedulingPolicy` or `spec.componentSpecs.schedulingPolicy`. For details, you can refer to the [API docs](https://kubeblocks.io/docs/preview/developer_docs/api-reference/cluster#apps.kubeblocks.io/v1.SchedulingPolicy). But for a production environment, it is not recommended to deploy all replicas on one node, which may decrease the cluster availability.
-
 
 ```yaml
 cat <<EOF | kubectl apply -f -
@@ -101,79 +96,6 @@ Run the following command to see the created StarRocks cluster object:
 ```bash
 kubectl get cluster mycluster -n demo -o yaml
 ```
-
-</TabItem>
-
-<TabItem value="kbcli" label="kbcli">
-
-***Steps***
-
-1. Execute the following command to create a StarRocks cluster.
-
-   ```bash
-   kbcli cluster create mycluster --cluster-definition=starrocks -n demo
-   ```
-
-   You can also create a cluster with specified CPU, memory and storage values.
-
-   ```bash
-   kbcli cluster create mycluster --cluster-definition=starrocks --set cpu=1,memory=2Gi,storage=10Gi -n demo
-   ```
-
-:::note
-
-If you want to customize your cluster specifications, `kbcli` provides various options, such as setting cluster version, termination policy, CPU, and memory. You can view these options by adding `--help` or `-h` flag.
-
-```bash
-kbcli cluster create --help
-kbcli cluster create -h
-```
-
-:::
-
-2. Check whether the cluster is created successfully.
-
-   ```bash
-   kbcli cluster list -n demo
-   >
-   NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS     CREATED-TIME
-   mycluster   demo        starrocks            starrocks-3.1.1   Delete               Running    Jul 17,2024 19:06 UTC+0800   
-   ```
-
-3. Check the cluster information.
-
-    ```bash
-    kbcli cluster describe mycluster -n demo
-    >
-    Name: mycluster	 Created Time: Jul 17,2024 19:06 UTC+0800
-    NAMESPACE   CLUSTER-DEFINITION   VERSION           STATUS    TERMINATION-POLICY
-    demo        starrocks            starrocks-3.1.1   Running   Delete
-
-    Endpoints:
-    COMPONENT   MODE        INTERNAL                                      EXTERNAL
-    fe          ReadWrite   mycluster-fe.default.svc.cluster.local:9030   <none>
-
-    Topology:
-    COMPONENT   INSTANCE         ROLE     STATUS    AZ       NODE                    CREATED-TIME
-    be          mycluster-be-0   <none>   Running   <none>   minikube/192.168.49.2   Jul 17,2024 19:06 UTC+0800
-    fe          mycluster-fe-0   <none>   Running   <none>   minikube/192.168.49.2   Jul 17,2024 19:06 UTC+0800
-
-    Resources Allocation:
-    COMPONENT   DEDICATED   CPU(REQUEST/LIMIT)   MEMORY(REQUEST/LIMIT)   STORAGE-SIZE   STORAGE-CLASS
-    fe          false       1 / 1                1Gi / 1Gi               data:20Gi      standard
-    be          false       1 / 1                1Gi / 1Gi               data:20Gi      standard
-
-    Images:
-    COMPONENT   TYPE   IMAGE
-    fe          fe     apecloud-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/fe-ubuntu:2.5.4
-    be          be     apecloud-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/fe-ubuntu:2.5.4
-
-    Show cluster events: kbcli cluster list-events -n demo mycluster
-    ```
-
-</TabItem>
-
-</Tabs>
 
 ## Scale
 

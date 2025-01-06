@@ -25,10 +25,6 @@ StarRocks 是一款高性能分析型数据仓库，使用向量化、MPP 架构
 
 ***步骤：***
 
-<Tabs>
-
-<TabItem value="kubectl" label="kubectl" default>
-
 KubeBlocks 通过 `Cluster` 定义集群。以下是创建 StarRocks 集群的示例。Pod 默认分布在不同节点。如果您只有一个节点可用于部署多副本集群，可设置 `spec.schedulingPolicy` 或 `spec.componentSpecs.schedulingPolicy`，具体可参考 [API 文档](https://kubeblocks.io/docs/preview/developer_docs/api-reference/cluster#apps.kubeblocks.io/v1.SchedulingPolicy)。但生产环境中，不建议将所有副本部署在同一个节点上，因为这可能会降低集群的可用性。
 
 ```yaml
@@ -97,69 +93,6 @@ kubectl get all,secret,rolebinding,serviceaccount -l app.kubernetes.io/instance=
 ```bash
 kubectl get cluster mycluster -n demo -o yaml
 ```
-
-</TabItem>
-
-<TabItem value="kbcli" label="kbcli">
-
-1. 执行以下命令，创建 StarRocks 集群。
-
-   ```bash
-   kbcli cluster create mycluster --cluster-definition=starrocks -n demo
-   ```
-
-   如果您需要自定义集群规格，kbcli 也提供了诸多参数，如支持设置引擎版本、终止策略、CPU、内存规格。您可通过在命令结尾添加 --help 或 -h 来查看具体说明。比如，
-
-   ```bash
-   kbcli cluster create --help
-   kbcli cluster create -h
-   ```
-
-   如果您只有一个节点用于部署多副本集群，可在创建集群时配置集群亲和性，配置 `--pod-anti-afffinity`, `--tolerations` 和 `--topology-keys`。但需要注意的是，生产环境中，不建议将所有副本部署在同一个节点上，因为这可能会降低集群的可用性。
-
-2. 验证集群是否创建成功。
-
-   ```bash
-   kbcli cluster list -n demo
-   >
-   NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS     CREATED-TIME
-   mycluster   demo        starrocks            starrocks-3.1.1   Delete               Running    Jul 17,2024 19:06 UTC+0800   
-   ```
-
-3. 查看集群信息。
-
-   ```bash
-    kbcli cluster describe mycluster -n demo
-    >
-    Name: mycluster	 Created Time: Jul 17,2024 19:06 UTC+0800
-    NAMESPACE   CLUSTER-DEFINITION   VERSION           STATUS    TERMINATION-POLICY
-    demo        starrocks            starrocks-3.1.1   Running   Delete
-
-    Endpoints:
-    COMPONENT   MODE        INTERNAL                                      EXTERNAL
-    fe          ReadWrite   mycluster-fe.default.svc.cluster.local:9030   <none>
-
-    Topology:
-    COMPONENT   INSTANCE         ROLE     STATUS    AZ       NODE                    CREATED-TIME
-    be          mycluster-be-0   <none>   Running   <none>   minikube/192.168.49.2   Jul 17,2024 19:06 UTC+0800
-    fe          mycluster-fe-0   <none>   Running   <none>   minikube/192.168.49.2   Jul 17,2024 19:06 UTC+0800
-
-    Resources Allocation:
-    COMPONENT   DEDICATED   CPU(REQUEST/LIMIT)   MEMORY(REQUEST/LIMIT)   STORAGE-SIZE   STORAGE-CLASS
-    fe          false       1 / 1                1Gi / 1Gi               data:20Gi      standard
-    be          false       1 / 1                1Gi / 1Gi               data:20Gi      standard
-
-    Images:
-    COMPONENT   TYPE   IMAGE
-    fe          fe     docker.io/starrocks/fe-ubuntu:2.5.4
-    be          be     docker.io/starrocks/be-ubuntu:2.5.4
-
-    Show cluster events: kbcli cluster list-events -n demo mycluster
-   ```
-
-</TabItem>
-
-</Tabs>
 
 ## 扩缩容
 

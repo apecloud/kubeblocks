@@ -196,7 +196,16 @@ KubeBlocks 支持创建两种类型的 MySQL 集群：单机版（Standalone）�
    kbcli cluster create mysql -h
    ```
 
-   如果您只有一个节点用于部署主备版集群，可在创建集群时配置集群亲和性，配置 `--pod-anti-afffinity`, `--tolerations` 和 `--topology-keys`。但需要注意的是，生产环境中，不建议将所有副本部署在同一个节点上，因为这可能会降低集群的可用性。
+   如果您只有一个节点用于部署主备版集群，可在创建集群时配置集群亲和性，配置 `--pod-anti-affinity`, `--tolerations` 和 `--topology-keys`。但需要注意的是，生产环境中，不建议将所有副本部署在同一个节点上，因为这可能会降低集群的可用性。例如，
+
+   ```bash
+   kbcli cluster create mysql mycluster \
+       --mode='replication' \
+       --pod-anti-affinity='Preferred' \
+       --tolerations='node-role.kubeblocks.io/data-plane:NoSchedule' \
+       --topology-keys='null' \
+       --namespace demo
+   ```
 
 2. 验证集群是否创建成功。
 

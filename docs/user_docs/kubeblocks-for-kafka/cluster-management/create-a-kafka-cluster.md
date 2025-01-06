@@ -212,7 +212,7 @@ This document shows how to create a Kafka cluster.
    | Field                                 | Definition  |
    |---------------------------------------|--------------------------------------|
    | `spec.terminationPolicy`              | It is the policy of cluster termination. Valid values are `DoNotTerminate`, `Delete`, `WipeOut`. For the detailed definition, you can refer to [Termination Policy](./delete-kafka-cluster.md#termination-policy). |
-   | `spec.clusterDef` | It specifies the name of the ClusterDefinition to use when creating a Cluster. **Note: DO NOT UPDATE THIS FIELD**. The value must be must be `kafaka` to create a Kafka Cluster. |
+   | `spec.clusterDef` | It specifies the name of the ClusterDefinition to use when creating a Cluster. **Note: DO NOT UPDATE THIS FIELD**. The value must be must be `kafka` to create a Kafka Cluster. |
    | `spec.topology` | It specifies the name of the ClusterTopology to be used when creating the Cluster. Valid options are: [combined,combined_monitor,separated,separated_monitor]. |
    | `spec.componentSpecs`                 | It is the list of ClusterComponentSpec objects that define the individual Components that make up a Cluster. This field allows customized configuration of each component within a cluster.   |
    | `spec.componentSpecs.replicas`        | It specifies the amount of replicas of the component. |
@@ -239,7 +239,7 @@ This document shows how to create a Kafka cluster.
 
 1. Create a Kafka cluster.
 
-   The cluster creation command is simply `kbcli cluster create`. Further, you can customize your cluster resources as demanded by using the `--set` flag.
+   The cluster creation command is simply `kbcli cluster create`.
 
    ```bash
    kbcli cluster create kafka mycluster -n demo
@@ -253,7 +253,17 @@ This document shows how to create a Kafka cluster.
    kbcli cluster create kafka -h
    ```
 
-   If you only have one node for deploying a cluster with multiple replicas, you can configure the cluster affinity by setting `--pod-anti-afffinity`, `--tolerations`, and `--topology-keys` when creating a cluster. But you should note that for a production environment, it is not recommended to deploy all replicas on one node, which may decrease the cluster availability.
+   If you only have one node for deploying a cluster with multiple replicas, you can configure the cluster affinity by setting `--pod-anti-affinity`, `--tolerations`, and `--topology-keys` when creating a cluster. But you should note that for a production environment, it is not recommended to deploy all replicas on one node, which may decrease the cluster availability. For example,
+
+   ```bash
+   kbcli cluster create kafka mycluster \
+       --mode='combined' \
+       --replicas=3 \
+       --pod-anti-affinity='Preferred' \
+       --tolerations='node-role.kubeblocks.io/data-plane:NoSchedule' \
+       --topology-keys='null' \
+       --namespace demo
+   ```
 
 2. Verify whether this cluster is created successfully.
 

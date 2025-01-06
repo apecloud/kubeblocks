@@ -190,7 +190,16 @@ KubeBlocks supports creating two types of MySQL clusters: Standalone and Replica
    kbcli cluster create mysql -h
    ```
 
-   If you only have one node for deploying a Replication Cluster, you can configure the cluster affinity by setting `--pod-anti-afffinity`, `--tolerations`, and `--topology-keys` when creating a Replication Cluster. But you should note that for a production environment, it is not recommended to deploy all replicas on one node, which may decrease the cluster availability.
+   If you only have one node for deploying a Replication Cluster, you can configure the cluster affinity by setting `--pod-anti-affinity`, `--tolerations`, and `--topology-keys` when creating a Replication Cluster. But you should note that for a production environment, it is not recommended to deploy all replicas on one node, which may decrease the cluster availability. For example,
+
+   ```bash
+   kbcli cluster create mysql mycluster \
+       --mode='replication' \
+       --pod-anti-affinity='Preferred' \
+       --tolerations='node-role.kubeblocks.io/data-plane:NoSchedule' \
+       --topology-keys='null' \
+       --namespace demo
+   ```
 
 2. Verify whether this cluster is created successfully.
 

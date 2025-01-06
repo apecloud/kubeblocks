@@ -30,12 +30,7 @@ This tutorial illustrates how to create and manage a Milvus cluster by `kbcli`, 
 
 ## Create a cluster
 
-<Tabs>
-
-<TabItem value="kubectl" label="kubectl" default>
-
 KubeBlocks implements a `Cluster` CRD to define a cluster. Here is an example of creating a Milvus cluster. If you only have one node for deploying a cluster with multiple replicas, configure the cluster affinity by setting `spec.schedulingPolicy` or `spec.componentSpecs.schedulingPolicy`. For details, you can refer to the [API docs](https://kubeblocks.io/docs/preview/developer_docs/api-reference/cluster#apps.kubeblocks.io/v1.SchedulingPolicy). But for a production environment, it is not recommended to deploy all replicas on one node, which may decrease the cluster availability.
-
 
 ```yaml
 cat <<EOF | kubectl apply -f -
@@ -289,93 +284,6 @@ Run the following command to see the created Milvus cluster object:
 ```bash
 kubectl get cluster mycluster -n demo -o yaml
 ```
-
-</TabItem>
-
-<TabItem value="kbcli" label="kbcli">
-
-***Steps***
-
-1. Execute the following command to create a Milvus cluster.
-
-   ```bash
-   kbcli cluster create mycluster --cluster-definition=milvus-2.3.2 -n demo
-   ```
-
-   If you want to customize your cluster specifications, `kbcli` provides various options, such as setting cluster version, termination policy, CPU, and memory. You can view these options by adding `--help` or `-h` flag.
-
-   ```bash
-   kbcli cluster create milvus --help
-
-   kbcli cluster create milvus -h
-   ```
-
-   If you only have one node for deploying a cluster with multiple replicas, you can configure the cluster affinity by setting `--pod-anti-afffinity`, `--tolerations`, and `--topology-keys` when creating a cluster. But you should note that for a production environment, it is not recommended to deploy all replicas on one node, which may decrease the cluster availability.
-
-2. Check whether the cluster is created successfully.
-
-   ```bash
-   kbcli cluster list -n demo
-   >
-   NAME        NAMESPACE   CLUSTER-DEFINITION        VERSION               TERMINATION-POLICY   STATUS           CREATED-TIME
-   mycluster   demo        milvus-2.3.2                                    Delete               Running          Jul 05,2024 17:35 UTC+0800   
-   ```
-
-3. Check the cluster information.
-
-   ```bash
-   kbcli cluster describe mycluster -n demo
-   >
-   Name: milvus	 Created Time: Jul 05,2024 17:35 UTC+0800
-   NAMESPACE   CLUSTER-DEFINITION   VERSION   STATUS    TERMINATION-POLICY   
-   demo        milvus-2.3.2                   Running   Delete               
-
-   Endpoints:
-   COMPONENT   MODE        INTERNAL                                        EXTERNAL   
-   milvus      ReadWrite   milvus-milvus.default.svc.cluster.local:19530   <none>     
-   minio       ReadWrite   milvus-minio.default.svc.cluster.local:9000     <none>     
-   proxy       ReadWrite   milvus-proxy.default.svc.cluster.local:19530    <none>     
-                           milvus-proxy.default.svc.cluster.local:9091                
-
-   Topology:
-   COMPONENT   INSTANCE             ROLE     STATUS    AZ       NODE     CREATED-TIME                 
-   etcd        milvus-etcd-0        <none>   Running   <none>   <none>   Jul 05,2024 17:35 UTC+0800   
-   minio       milvus-minio-0       <none>   Running   <none>   <none>   Jul 05,2024 17:35 UTC+0800   
-   milvus      milvus-milvus-0      <none>   Running   <none>   <none>   Jul 05,2024 17:35 UTC+0800   
-   indexnode   milvus-indexnode-0   <none>   Running   <none>   <none>   Jul 05,2024 17:35 UTC+0800   
-   mixcoord    milvus-mixcoord-0    <none>   Running   <none>   <none>   Jul 05,2024 17:35 UTC+0800   
-   querynode   milvus-querynode-0   <none>   Running   <none>   <none>   Jul 05,2024 17:35 UTC+0800   
-   datanode    milvus-datanode-0    <none>   Running   <none>   <none>   Jul 05,2024 17:35 UTC+0800   
-   proxy       milvus-proxy-0       <none>   Running   <none>   <none>   Jul 05,2024 17:35 UTC+0800   
-
-   Resources Allocation:
-   COMPONENT   DEDICATED   CPU(REQUEST/LIMIT)   MEMORY(REQUEST/LIMIT)   STORAGE-SIZE   STORAGE-CLASS     
-   milvus      false       1 / 1                1Gi / 1Gi               data:20Gi      csi-hostpath-sc   
-   etcd        false       1 / 1                1Gi / 1Gi               data:20Gi      csi-hostpath-sc   
-   minio       false       1 / 1                1Gi / 1Gi               data:20Gi      csi-hostpath-sc   
-   proxy       false       1 / 1                1Gi / 1Gi               data:20Gi      csi-hostpath-sc   
-   mixcoord    false       1 / 1                1Gi / 1Gi               data:20Gi      csi-hostpath-sc   
-   datanode    false       1 / 1                1Gi / 1Gi               data:20Gi      csi-hostpath-sc   
-   indexnode   false       1 / 1                1Gi / 1Gi               data:20Gi      csi-hostpath-sc   
-   querynode   false       1 / 1                1Gi / 1Gi               data:20Gi      csi-hostpath-sc   
-
-   Images:
-   COMPONENT   TYPE        IMAGE                                                
-   milvus      milvus      milvusdb/milvus:v2.3.2                               
-   etcd        etcd        docker.io/milvusdb/etcd:3.5.5-r2                     
-   minio       minio       docker.io/minio/minio:RELEASE.2022-03-17T06-34-49Z   
-   proxy       proxy       milvusdb/milvus:v2.3.2                               
-   mixcoord    mixcoord    milvusdb/milvus:v2.3.2                               
-   datanode    datanode    milvusdb/milvus:v2.3.2                               
-   indexnode   indexnode   milvusdb/milvus:v2.3.2                               
-   querynode   querynode   milvusdb/milvus:v2.3.2                               
-
-   Show cluster events: kbcli cluster list-events -n demo milvus
-   ```
-
-</TabItem>
-
-</Tabs>
 
 ## Scale
 

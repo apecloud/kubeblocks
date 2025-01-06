@@ -205,13 +205,16 @@ KubeBlocks supports creating two types of PostgreSQL clusters: Standalone and Re
    kbcli cluster create postgresql -h
    ```
 
-   For example, you can create a Replication Cluster with the `--replicas` flag.
+   If you only have one node for deploying a Replication Cluster, you can configure the cluster affinity by setting `--pod-anti-affinity`, `--tolerations`, and `--topology-keys` when creating a Replication Cluster. But you should note that for a production environment, it is not recommended to deploy all replicas on one node, which may decrease the cluster availability. For example,
 
    ```bash
-   kbcli cluster create postgresql mycluster --replicas=2 -n demo
+   kbcli cluster create postgresql mycluster \
+       --mode='replication' \
+       --pod-anti-affinity='Preferred' \
+       --tolerations='node-role.kubeblocks.io/data-plane:NoSchedule' \
+       --topology-keys='null' \
+       --namespace demo
    ```
-
-   If you only have one node for deploying a RaftGroup Cluster, you can configure the cluster affinity by setting `--pod-anti-afffinity`, `--tolerations`, and `--topology-keys` when creating a Replication Cluster. But you should note that for a production environment, it is not recommended to deploy all replicas on one node, which may decrease the cluster availability.
 
 2. Verify whether this cluster is created successfully.
 

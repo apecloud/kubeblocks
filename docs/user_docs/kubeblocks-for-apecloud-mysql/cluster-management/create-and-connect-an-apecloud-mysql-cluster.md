@@ -197,16 +197,25 @@ KubeBlocks supports creating two types of ApeCloud MySQL clusters: Standalone an
    Create a Standalone.
 
    ```bash
-   kbcli cluster create apecloud-mysql mycluster --set mode='standalone' --namespace demo
+   kbcli cluster create apecloud-mysql mycluster --mode='standalone' --namespace demo
    ```
 
    Create a RaftGroup Cluster.
 
    ```bash
-   kbcli cluster create apecloud-mysql mycluster --set mode='raftGroup' --namespace demo
+   kbcli cluster create apecloud-mysql mycluster --mode='raftGroup' --namespace demo
    ```
 
-   If you only have one node for deploying a RaftGroup Cluster, you can configure the cluster affinity by setting `--pod-anti-afffinity`, `--tolerations`, and `--topology-keys` when creating a RaftGroup Cluster. But you should note that for a production environment, it is not recommended to deploy all replicas on one node, which may decrease the cluster availability.
+   If you only have one node for deploying a RaftGroup Cluster, you can configure the cluster affinity by setting `--pod-anti-affinity`, `--tolerations`, and `--topology-keys` when creating a RaftGroup Cluster. But you should note that for a production environment, it is not recommended to deploy all replicas on one node, which may decrease the cluster availability. For example,
+
+   ```bash
+   kbcli cluster create apecloud-mysql mycluster \
+       --mode='raftGroup' \
+       --pod-anti-affinity='Preferred' \
+       --tolerations='node-role.kubeblocks.io/data-plane:NoSchedule' \
+       --topology-keys='null' \
+       --namespace demo
+   ```
 
 2. Verify whether this cluster is created successfully.
 

@@ -774,6 +774,7 @@ func (r *BackupReconciler) deleteRelatedBackups(
 	for i := range backupList.Items {
 		bp := &backupList.Items[i]
 		// delete backups related to the current backup
+		// files in the related backup's status.path will be deleted by its own associated deleter
 		if bp.Status.ParentBackupName != backup.Name && bp.Status.BaseBackupName != backup.Name {
 			continue
 		}

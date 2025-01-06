@@ -476,6 +476,7 @@ func GetTargetRelativePath(targetName, targetPodName string) string {
 	if targetPodName != "" {
 		targetRelativePath = filepath.Join(targetRelativePath, targetPodName)
 	}
+	// ${targetName}/${targetPodName}
 	return targetRelativePath
 }
 
@@ -495,7 +496,7 @@ func BackupFilePathEnv(filePath, targetName, targetPodName string) []corev1.EnvV
 			Name:  dptypes.DPBackupRootPath,
 			Value: filepath.Join("/", filePath, "../"),
 		},
-		// append targetName and sourceTargetPodName in backup path
+		// construct the backup base path with target relative path
 		{
 			Name:  dptypes.DPBackupBasePath,
 			Value: filepath.Join("/", filePath, targetRelativePath),

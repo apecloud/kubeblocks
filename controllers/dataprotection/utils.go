@@ -696,7 +696,7 @@ func FindParentBackupIfNotSet(ctx context.Context, cli client.Client, backup *dp
 	}
 	// illegal case: no full backup found but incremental backup found
 	if latestIncrementalBackup != nil {
-		return nil, fmt.Errorf("ilegal incremental backup %s/%s", latestIncrementalBackup.Namespace,
+		return nil, fmt.Errorf("illegal incremental backup %s/%s", latestIncrementalBackup.Namespace,
 			latestIncrementalBackup.Name)
 	}
 	// 6. no backup found
@@ -714,6 +714,8 @@ func FilterParentBackups(backupList *dpv1alpha1.BackupList, targetBackup *dpv1al
 		if err := ValidateParentBackup(targetBackup, &backup, backupMethod); err != nil {
 			continue
 		}
+		// backups are listed by backup type label, validate if the backup method matches
+		// the backup type specified by label value.
 		if incremental {
 			if backup.Spec.BackupMethod != targetBackup.Spec.BackupMethod {
 				continue

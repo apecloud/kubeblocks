@@ -55,14 +55,14 @@ var _ = Describe("ActionSet Controller test", func() {
 
 	Context("create a actionSet", func() {
 		It("should be available", func() {
-			as := testdp.NewFakeActionSet(&testCtx)
+			as := testdp.NewFakeActionSet(&testCtx, nil)
 			Expect(as).ShouldNot(BeNil())
 		})
 	})
 
 	Context("validate a actionSet", func() {
 		It("validate withParameters", func() {
-			as := testdp.NewFakeActionSet(&testCtx)
+			as := testdp.NewFakeActionSet(&testCtx, nil)
 			Expect(as).ShouldNot(BeNil())
 			By("set invalid withParameters and schema")
 			Expect(testapps.ChangeObj(&testCtx, as, func(action *dpv1alpha1.ActionSet) {

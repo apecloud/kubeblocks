@@ -133,6 +133,9 @@ func tokenizeCmd2Args(cmd string) []interface{} {
 func getRedisMajorVersion() (int, error) {
 	redisCliCMD, err := exec.LookPath("redis-cli")
 	if err != nil {
+		if viper.IsSet("REDIS_VERSION") {
+			return strconv.Atoi(strings.Split(strings.TrimSpace(viper.GetString("REDIS_VERSION")), ".")[0])
+		}
 		return -1, err
 	}
 

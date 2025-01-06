@@ -179,7 +179,7 @@ KubeBlocks supports creating two types of ApeCloud MySQL clusters: Standalone an
    kubectl get cluster mycluster -n demo -o yaml
    ```
 
-1. Verify whether this cluster is created successfully.
+2. Verify whether this cluster is created successfully.
 
    ```bash
    kubectl get cluster mycluster -n demo

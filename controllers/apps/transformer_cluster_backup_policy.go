@@ -414,11 +414,12 @@ func (r *backupPolicyBuilder) syncBackupMethods(backupPolicy *dpv1alpha1.BackupP
 	}
 	for _, backupMethodTPL := range r.backupPolicyTPL.Spec.BackupMethods {
 		backupMethod := dpv1alpha1.BackupMethod{
-			Name:            backupMethodTPL.Name,
-			ActionSetName:   backupMethodTPL.ActionSetName,
-			SnapshotVolumes: backupMethodTPL.SnapshotVolumes,
-			TargetVolumes:   backupMethodTPL.TargetVolumes,
-			RuntimeSettings: backupMethodTPL.RuntimeSettings,
+			Name:             backupMethodTPL.Name,
+			CompatibleMethod: backupMethodTPL.CompatibleMethod,
+			ActionSetName:    backupMethodTPL.ActionSetName,
+			SnapshotVolumes:  backupMethodTPL.SnapshotVolumes,
+			TargetVolumes:    backupMethodTPL.TargetVolumes,
+			RuntimeSettings:  backupMethodTPL.RuntimeSettings,
 		}
 		if m, ok := oldBackupMethodMap[backupMethodTPL.Name]; ok {
 			backupMethod = m

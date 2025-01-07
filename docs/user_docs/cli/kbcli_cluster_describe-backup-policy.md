@@ -21,8 +21,8 @@ kbcli cluster describe-backup-policy [flags]
 ### Options
 
 ```
-  -h, --help           help for describe-backup-policy
-      --name strings   Backup policy name
+  -h, --help            help for describe-backup-policy
+      --names strings   Backup policy names
 ```
 
 ### Options inherited from parent commands

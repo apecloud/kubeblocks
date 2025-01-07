@@ -6,17 +6,14 @@ sidebar_position: 1
 sidebar_label: Manage RabbitMQ with KubeBlocks
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # Manage RabbitMQ with KubeBlocks
 
 RabbitMQ is a reliable and mature messaging and streaming broker, which is easy to deploy on cloud environments, on-premises, and on your local machine.
 
-KubeBlocks supports the management of RabbitMQ.
-
-:::note
-
-Currently, KubeBlocks only supports managing RabbitMQ by `kubectl`.
-
-:::
+KubeBlocks supports the management of RabbitMQ. This tutorial illustrates how to create and manage a Qdrant cluster by `kubectl` and YAML files. You can find more YAML examples in [the GitHub repository](https://github.com/apecloud/kubeblocks-addons/tree/main/examples/rabbitmq).
 
 ## Before you start
 
@@ -25,31 +22,23 @@ Currently, KubeBlocks only supports managing RabbitMQ by `kubectl`.
 
 ## Create a cluster
 
-KubeBlocks implements a Cluster CRD to define a cluster. Here is an example of creating a RabbitMQ cluster with three replicas. Pods are distributed on different nodes by default. But if you only have one node for a cluster with three replicas, set `spec.affinity.topologyKeys` as `null`.
+KubeBlocks implements a Cluster CRD to define a cluster. Here is an example of creating a RabbitMQ cluster with three replicas. Pods are distributed on different nodes by default. But if you only have one node for a cluster with three replicas, configure the cluster affinity by setting `spec.schedulingPolicy` or `spec.componentSpecs.schedulingPolicy`. For details, you can refer to the [API docs](https://kubeblocks.io/docs/preview/developer_docs/api-reference/cluster#apps.kubeblocks.io/v1.SchedulingPolicy). But for a production environment, it is not recommended to deploy all replicas on one node, which may decrease the cluster availability.
 
-```bash
+```yaml
 cat <<EOF | kubectl apply -f -
-apiVersion: apps.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1
 kind: Cluster
 metadata:
   name: mycluster
   namespace: demo
-  labels:
-    helm.sh/chart: rabbitmq-cluster-0.9.0
-    app.kubernetes.io/version: "3.13.2"
-    app.kubernetes.io/instance: mycluster
 spec:
   terminationPolicy: Delete
-  affinity:
-    podAntiAffinity: Preferred
-    topologyKeys:
-      - kubernetes.io/hostname
   componentSpecs:
     - name: rabbitmq
       componentDef: rabbitmq
-      serviceVersion: 3.13.2
+      serviceVersion: 3.13.7
+      serviceAccountName: kb-rabbitmq-cluster
       replicas: 3
-      serviceAccountName: kb-mycluster
       resources:
         limits:
           cpu: "0.5"
@@ -58,29 +47,69 @@ spec:
           cpu: "0.5"
           memory: "0.5Gi"
       volumeClaimTemplates:
-        - name: data # ref clusterDefinition components.containers.volumeMounts.name
+        - name: data
           spec:
+            storageClassName: ""
             accessModes:
               - ReadWriteOnce
             resources:
               requests:
                 storage: 20Gi
-      services:
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: rabbitmq-cluster-peer-discovery
+  namespace: demo
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - endpoints
+  verbs:
+  - get
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kb-rabbitmq-cluster
+  namespace: demo
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: kb-rabbitmq-cluster
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: rabbitmq-cluster-peer-discovery
+subjects:
+  - kind: ServiceAccount
+    name: kb-rabbitmq-cluster
+    namespace: demo
 EOF
 ```
 
 | Field                                 | Definition  |
 |---------------------------------------|--------------------------------------|
-| `spec.terminationPolicy`              | It is the policy of cluster termination. The default value is `Delete`. Valid values are `DoNotTerminate`, `Delete`, `WipeOut`. For the detailed definition, you can refer to [Termination Policy](#termination-policy). |
-| `spec.affinity`                       | It defines a set of node affinity scheduling rules for the cluster's Pods. This field helps control the placement of Pods on nodes within the cluster.  |
-| `spec.affinity.podAntiAffinity`       | It specifies the anti-affinity level of Pods within a component. It determines how pods should spread across nodes to improve availability and performance. |
-| `spec.affinity.topologyKeys`          | It represents the key of node labels used to define the topology domain for Pod anti-affinity and Pod spread constraints.   |
-| `spec.componentSpecs`                 | It is the list of components that define the cluster components. This field allows customized configuration of each component within a cluster.   |
-| `spec.componentSpecs.componentDefRef` | It is the name of the component definition that is defined in the cluster definition and you can get the component definition names with `kubectl get clusterdefinition qdrant -o json \| jq '.spec.componentDefs[].name'`.   |
-| `spec.componentSpecs.name`            | It specifies the name of the component.     |
-| `spec.componentSpecs.disableExporter` | It defines whether the monitoring function is enabled. |
-| `spec.componentSpecs.replicas`        | It specifies the number of replicas of the component.  |
-| `spec.componentSpecs.resources`       | It specifies the resource requirements of the component.  |
+| `spec.terminationPolicy`              | It is the policy of cluster termination. Valid values are `DoNotTerminate`, `Delete`, `WipeOut`. For the detailed definition, you can refer to [Termination Policy](#termination-policy). |
+| `spec.componentSpecs`                 | It is the list of ClusterComponentSpec objects that define the individual Components that make up a Cluster. This field allows customized configuration of each component within a cluster.   |
+| `spec.componentSpecs.serviceVersion` | It specifies the version of the Service expected to be provisioned by this Component. Valid options are [3.10.25,3.11.28,3.12.14,3.13.2,3.13.7,3.8.14,3.9.29]. |
+| `spec.componentSpecs.serviceAccountName` | It specifies the name of the ServiceAccount required by the running Component. RabbitMQ needs the `peer-discovery` role to create events and get endpoiints. This is essential for discovering other RabbitMQ nodes and forming a cluster. |
+| `spec.componentSpecs.replicas`        | It specifies the number of replicas of the component. RabbitMQ prefers ODD numbers like [3, 5, 7]. All data/state is replicated across all replicas. |
+| `spec.componentSpecs.resources`       | It specifies the resources required by the Component.  |
+| `spec.componentSpecs.volumeClaimTemplates` | It specifies a list of PersistentVolumeClaim templates that define the storage requirements for the Component. |
+| `spec.componentSpecs.volumeClaimTemplates.name` | It refers to the name of a volumeMount defined in `componentDefinition.spec.runtime.containers[*].volumeMounts`. |
+| `spec.componentSpecs.volumeClaimTemplates.spec.storageClassName` | It is the name of the StorageClass required by the claim. If not specified, the StorageClass annotated with `storageclass.kubernetes.io/is-default-class=true` will be used by default. |
+| `spec.componentSpecs.volumeClaimTemplates.spec.resources.storage` | You can set the storage size as needed. |
+
+For more API fields and descriptions, refer to the [API Reference](https://kubeblocks.io/docs/preview/developer_docs/api-reference/cluster).
 
 KubeBlocks operator watches for the `Cluster` CRD and creates the cluster and all dependent resources. You can get all the resources created by the cluster with `kubectl get all,secret,rolebinding,serviceaccount -l app.kubernetes.io/instance=mycluster -n demo`.
 
@@ -111,7 +140,11 @@ NAME        CLUSTER-DEFINITION    VERSION        TERMINATION-POLICY     STATUS  
 mycluster                                        Delete                 Running   47m
 ```
 
-#### Option 1. Apply an OpsRequest
+#### Steps
+
+<Tabs>
+
+<TabItem value="OpsRequest" label="OpsRequest" default>
 
 1. Apply an OpsRequest to the specified cluster. Configure the parameters according to your needs.
 
@@ -153,7 +186,9 @@ mycluster                                        Delete                 Running 
     kubectl describe cluster mycluster -n demo
     ```
 
-#### Option 2. Edit the cluster YAML file
+</TabItem>
+
+<TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
 
 1. Change the configuration of `spec.componentSpecs.resources` in the YAML file. `spec.componentSpecs.resources` controls the requirement and limit of resources and changing them triggers a vertical scaling.
 
@@ -168,7 +203,7 @@ mycluster                                        Delete                 Running 
      - name: rabbitmq
        componentDefRef: rabbitmq
        replicas: 3
-       resources: # Change the values of resources.
+       resources: # Change the values of resources
          requests:
            memory: "2Gi"
            cpu: "1"
@@ -192,6 +227,10 @@ mycluster                                        Delete                 Running 
     kubectl describe cluster mycluster -n demo
     ```
 
+</TabItem>
+
+</Tabs>
+
 ### Scale horizontally
 
 Horizontal scaling changes the amount of pods. For example, you can scale out replicas from three to five.
@@ -207,7 +246,11 @@ NAME        CLUSTER-DEFINITION    VERSION        TERMINATION-POLICY     STATUS  
 mycluster                                        Delete                 Running   47m
 ```
 
-#### Option 1. Apply an OpsRequest
+#### Steps
+
+<Tabs>
+
+<TabItem value="OpsRequest" label="OpsRequest" default>
 
 1. Apply an OpsRequest to a specified cluster. Configure the parameters according to your needs.
 
@@ -249,31 +292,26 @@ mycluster                                        Delete                 Running 
     kubectl describe cluster mycluster -n demo
     ```
 
-#### Option 2. Edit the cluster YAML file
+</TabItem>
+
+<TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
 
 1. Change the configuration of `spec.componentSpecs.replicas` in the YAML file. `spec.componentSpecs.replicas` stands for the pod amount and changing this value triggers a horizontal scaling of a cluster.
 
    ```bash
    kubectl edit cluster mycluster -n demo
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: Cluster
-   metadata:
-     name: mycluster
-     namespace: demo
+   ```
+
+   Edit the value of `spec.componentSpecs.replicas`.
+
+   ```yaml
+   ...
    spec:
      componentSpecs:
      - name: rabbitmq
        componentDefRef: rabbitmq
-       replicas: 1 # Change the amount
-       volumeClaimTemplates:
-       - name: data
-         spec:
-           accessModes:
-             - ReadWriteOnce
-           resources:
-             requests:
-               storage: 20Gi
-    terminationPolicy: Delete
+       replicas: 1 # Change this value
+   ...
    ```
 
 2. Check whether the corresponding resources change.
@@ -281,6 +319,10 @@ mycluster                                        Delete                 Running 
     ```bash
     kubectl describe cluster mycluster -n demo
     ```
+
+</TabItem>
+
+</Tabs>
 
 ## Volume expansion
 
@@ -293,7 +335,9 @@ NAME        CLUSTER-DEFINITION    VERSION        TERMINATION-POLICY     STATUS  
 mycluster                                        Delete                 Running   47m
 ```
 
-### Option 1. Apply an OpsRequest
+<Tabs>
+
+<TabItem value="OpsRequest" label="OpsRequest" default>
 
 1. Change the value of storage according to your need and run the command below to expand the volume of a cluster.
 
@@ -332,7 +376,9 @@ mycluster                                        Delete                 Running 
     kubectl describe cluster mycluster -n demo
     ```
 
-### Option 2. Edit the cluster YAML file
+</TabItem>
+
+<TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
 
 1. Change the value of `spec.componentSpecs.volumeClaimTemplates.spec.resources` in the cluster YAML file.
 
@@ -340,11 +386,12 @@ mycluster                                        Delete                 Running 
 
    ```bash
    kubectl edit cluster mycluster -n demo
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: Cluster
-   metadata:
-     name: mycluster
-     namespace: demo
+   ```
+
+   Edit the value of `spec.componentSpecs.volumeClaimTemplates.spec.resources`.
+
+   ```yaml
+   ...
    spec:
      componentSpecs:
      - name: rabbitmq
@@ -357,8 +404,8 @@ mycluster                                        Delete                 Running 
              - ReadWriteOnce
            resources:
              requests:
-               storage: 40Gi # Change the volume storage size.
-     terminationPolicy: Delete
+               storage: 40Gi # Change the volume storage size
+   ...
    ```
 
 2. Check whether the corresponding cluster resources change.
@@ -366,6 +413,10 @@ mycluster                                        Delete                 Running 
     ```bash
     kubectl describe cluster mycluster -n demo
     ```
+
+</TabItem>
+
+</Tabs>
 
 ## Restart
 
@@ -405,7 +456,9 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
 
 ### Stop a cluster
 
-#### Option 1. Apply an OpsRequest
+<Tabs>
+
+<TabItem value="OpsRequest" label="OpsRequest" default>
 
 Run the command below to stop a cluster.
 
@@ -422,20 +475,24 @@ spec:
 EOF
 ```
 
-#### Option 2. Edit the cluster YAML file
+</TabItem>
+
+<TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
+
+```bash
+kubect edit cluster mycluster -n demo
+```
 
 Configure `replicas` as 0 to delete pods.
 
+```bash
+kubectl edit cluster mycluster -n demo
+```
+
+Edit the value of `replicas`.
+
 ```yaml
-apiVersion: apps.kubeblocks.io/v1alpha1
-kind: Cluster
-metadata:
-  name: mycluster
-  namespace: demo
-  labels:
-    helm.sh/chart: rabbitmq-cluster-0.9.0
-    app.kubernetes.io/version: "3.13.2"
-    app.kubernetes.io/instance: mycluster
+...
 spec:
   terminationPolicy: Delete
   affinity:
@@ -446,29 +503,19 @@ spec:
     - name: rabbitmq
       componentDef: rabbitmq
       serviceVersion: 3.13.2
-      replicas: 0
-      serviceAccountName: kb-mycluster
-      resources:
-        limits:
-          cpu: "0.5"
-          memory: "0.5Gi"
-        requests:
-          cpu: "0.5"
-          memory: "0.5Gi"
-      volumeClaimTemplates:
-        - name: data # ref clusterDefinition components.containers.volumeMounts.name
-          spec:
-            accessModes:
-              - ReadWriteOnce
-            resources:
-              requests:
-                storage: 20Gi
-      services:
+      replicas: 0 # Change this value
+...
 ```
+
+</TabItem>
+
+</Tabs>
 
 ### Start a cluster
 
-#### Option 1. Apply an OpsRequest
+<Tabs>
+
+<TabItem value="OpsRequest" label="OpsRequest" default>
 
 Run the command below to start a cluster.
 
@@ -485,20 +532,24 @@ spec:
 EOF 
 ```
 
-#### Option 2. Edit the cluster YAML file
+</TabItem>
+
+<TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
+
+```bash
+kubectl edit cluster mycluster -n demo
+```
 
 Change replicas back to the original amount to start this cluster again.
 
+```bash
+kubectl edit cluster mycluster -n demo
+```
+
+Edit the value of `replicas`.
+
 ```yaml
-apiVersion: apps.kubeblocks.io/v1alpha1
-kind: Cluster
-metadata:
-  name: mycluster
-  namespace: demo
-  labels:
-    helm.sh/chart: rabbitmq-cluster-0.9.0
-    app.kubernetes.io/version: "3.13.2"
-    app.kubernetes.io/instance: mycluster
+...
 spec:
   terminationPolicy: Delete
   affinity:
@@ -509,25 +560,13 @@ spec:
     - name: rabbitmq
       componentDef: rabbitmq
       serviceVersion: 3.13.2
-      replicas: 3
-      serviceAccountName: kb-mycluster
-      resources:
-        limits:
-          cpu: "0.5"
-          memory: "0.5Gi"
-        requests:
-          cpu: "0.5"
-          memory: "0.5Gi"
-      volumeClaimTemplates:
-        - name: data # ref clusterDefinition components.containers.volumeMounts.name
-          spec:
-            accessModes:
-              - ReadWriteOnce
-            resources:
-              requests:
-                storage: 20Gi
-      services:
+      replicas: 3 # Change this value
+...
 ```
+
+</TabItem>
+
+</Tabs>
 
 ## Delete a cluster
 
@@ -541,27 +580,11 @@ The termination policy determines how a cluster is deleted.
 
 | **terminationPolicy** | **Deleting Operation**                           |
 |:----------------------|:-------------------------------------------------|
-| `DoNotTerminate`      | `DoNotTerminate` blocks delete operation.        |
-| `Halt`                | `Halt` deletes Cluster resources like Pods and Services but retains Persistent Volume Claims (PVCs), allowing for data preservation while stopping other operations. Halt policy is deprecated in v0.9.1 and will have same meaning as DoNotTerminate. |
-| `Delete`              | `Delete` extends the Halt policy by also removing PVCs, leading to a thorough cleanup while removing all persistent data.   |
-| `WipeOut`             | `WipeOut` deletes all Cluster resources, including volume snapshots and backups in external storage. This results in complete data removal and should be used cautiously, especially in non-production environments, to avoid irreversible data loss.   |
+| `DoNotTerminate`      | `DoNotTerminate` prevents deletion of the Cluster. This policy ensures that all resources remain intact.       |
+| `Delete`              | `Delete` deletes Cluster resources like Pods, Services, and Persistent Volume Claims (PVCs), leading to a thorough cleanup while removing all persistent data.   |
+| `WipeOut`             | `WipeOut` is an aggressive policy that deletes all Cluster resources, including volume snapshots and backups in external storage. This results in complete data removal and should be used cautiously, primarily in non-production environments to avoid irreversible data loss.  |
 
 To check the termination policy, execute the following command.
-
-<Tabs>
-
-<TabItem value="kbcli" label="kbcli" default>
-
-```bash
-kbcli cluster list mycluster -n demo
->
-NAME        NAMESPACE   CLUSTER-DEFINITION     VERSION         TERMINATION-POLICY   STATUS    CREATED-TIME
-mycluster   demo                                               Delete               Running   Sep 30,2024 13:03 UTC+0800 
-```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
 
 ```bash
 kubectl get cluster mycluster -n demo
@@ -570,25 +593,13 @@ NAME        CLUSTER-DEFINITION    VERSION        TERMINATION-POLICY     STATUS  
 mycluster                                        Delete                 Running   55m
 ```
 
-</TabItem>
-
-</Tabs>
-
 ### Steps
 
 Run the command below to delete a specified cluster.
 
-<Tabs>
-
-<TabItem value="kbcli" label="kbcli" default>
-
 ```bash
-kbcli cluster delete mycluster -n demo
+kubectl delete -n demo cluster mycluster
 ```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
 
 If you want to delete a cluster and its all related resources, you can modify the termination policy to `WipeOut`, then delete the cluster.
 
@@ -597,14 +608,3 @@ kubectl patch -n demo cluster mycluster -p '{"spec":{"terminationPolicy":"WipeOu
 
 kubectl delete -n demo cluster mycluster
 ```
-
-</TabItem>
-
-</Tabs>
-
-## Monitor
-
-The monitoring function of RabbitMQ is the same as other engines. For details, refer to related docs:
-
-- [Monitor databases by kbcli](./../observability/monitor-database.md)
-- [Monitor databases by kubectl](./../../api_docs/observability/monitor-database.md)

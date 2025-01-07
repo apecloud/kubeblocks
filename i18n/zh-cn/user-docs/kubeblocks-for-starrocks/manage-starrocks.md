@@ -13,7 +13,7 @@ import TabItem from '@theme/TabItem';
 
 StarRocks 是一款高性能分析型数据仓库，使用向量化、MPP 架构、CBO、智能物化视图、可实时更新的列式存储引擎等技术实现多维、实时、高并发的数据分析。
 
-本文档展示了如何通过 kbcli、kubectl 或 YAML 文件等当时创建和管理 StarRocks 集群。您可以在 [GitHub 仓库](https://github.com/apecloud/kubeblocks-addons/tree/release-0.9/examples/starrocks)查看 YAML 示例。
+本文档展示了如何通过 kbcli、kubectl 或 YAML 文件等当时创建和管理 StarRocks 集群。您可以在 [GitHub 仓库](https://github.com/apecloud/kubeblocks-addons/tree/main/examples/starrocks)查看 YAML 示例。
 
 ## 开始之前
 
@@ -25,62 +25,41 @@ StarRocks 是一款高性能分析型数据仓库，使用向量化、MPP 架构
 
 ***步骤：***
 
-<Tabs>
-
-<TabItem value="kubectl" label="kubectl" default>
-
-KubeBlocks 通过 `Cluster` 定义集群。以下是创建 StarRocks 集群的示例。Pod 默认分布在不同节点。但如果您只有一个节点可用于部署集群，可将 `spec.affinity.topologyKeys` 设置为 `null`。
-
-:::note
-
-生产环境中，不建议将所有副本部署在同一个节点上，因为这可能会降低集群的可用性。
-
-:::
+KubeBlocks 通过 `Cluster` 定义集群。以下是创建 StarRocks 集群的示例。Pod 默认分布在不同节点。如果您只有一个节点可用于部署多副本集群，可设置 `spec.schedulingPolicy` 或 `spec.componentSpecs.schedulingPolicy`，具体可参考 [API 文档](https://kubeblocks.io/docs/preview/developer_docs/api-reference/cluster#apps.kubeblocks.io/v1.SchedulingPolicy)。但生产环境中，不建议将所有副本部署在同一个节点上，因为这可能会降低集群的可用性。
 
 ```yaml
 cat <<EOF | kubectl apply -f -
-apiVersion: apps.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1
 kind: Cluster
 metadata:
   name: mycluster
   namespace: demo
 spec:
-  clusterDefinitionRef: starrocks-ce
-  clusterVersionRef: starrocks-ce-3.1.1
   terminationPolicy: Delete
-  affinity:
-    podAntiAffinity: Preferred
-    topologyKeys:
-    - kubernetes.io/hostname
-  tolerations:
-    - key: kb-data
-      operator: Equal
-      value: 'true'
-      effect: NoSchedule
   componentSpecs:
   - name: fe
-    componentDefRef: fe
+    componentDef: starrocks-ce-fe
     serviceAccountName: kb-starrocks-cluster
     replicas: 1
     resources:
       limits:
-        cpu: '0.5'
-        memory: 0.5Gi
+        cpu: '1'
+        memory: 1Gi
       requests:
-        cpu: '0.5'
-        memory: 0.5Gi
+        cpu: '1'
+        memory: 1Gi
   - name: be
-    componentDefRef: be
+    componentDef: starrocks-ce-be
     replicas: 2
     resources:
       limits:
-        cpu: '0.5'
-        memory: 0.5Gi
+        cpu: '1'
+        memory: 1Gi
       requests:
-        cpu: '0.5'
-        memory: 0.5Gi
+        cpu: '1'
+        memory: 1Gi
     volumeClaimTemplates:
-    - name: be-storage
+    - name: data
       spec:
         accessModes:
         - ReadWriteOnce
@@ -92,19 +71,16 @@ EOF
 
 | 字段                                   | 定义  |
 |---------------------------------------|--------------------------------------|
-| `spec.clusterDefinitionRef`           | 集群定义 CRD 的名称，用来定义集群组件。  |
-| `spec.clusterVersionRef`              | 集群版本 CRD 的名称，用来定义集群版本。 |
-| `spec.terminationPolicy`              | 集群的终止策略，默认值为 `Delete`，有效值为 `DoNotTerminate`、`Halt`、`Delete` 和 `WipeOut`。具体定义可参考 [终止策略](#终止策略)。 |
-| `spec.affinity`                       | 为集群的 Pods 定义了一组节点亲和性调度规则。该字段可控制 Pods 在集群中节点上的分布。 |
-| `spec.affinity.podAntiAffinity`       | 定义了不在同一 component 中的 Pods 的反亲和性水平。该字段决定了 Pods 以何种方式跨节点分布，以提升可用性和性能。 |
-| `spec.affinity.topologyKeys`          | 用于定义 Pod 反亲和性和 Pod 分布约束的拓扑域的节点标签值。 |
-| `spec.tolerations`                    | 该字段为数组，用于定义集群中 Pods 的容忍，确保 Pod 可被调度到具有匹配污点的节点上。 |
-| `spec.componentSpecs`                 | 集群 components 列表，定义了集群 components。该字段允许对集群中的每个 component 进行自定义配置。 |
-| `spec.componentSpecs.componentDefRef` | 表示 cluster definition 中定义的 component definition 的名称，可通过执行 `kubectl get clusterdefinition starrocks -o json \| jq '.spec.componentDefs[].name'` 命令获取 component definition 名称。 |
-| `spec.componentSpecs.name`            | 定义了 component 的名称。  |
-| `spec.componentSpecs.disableExporter` | 定义了是否开启监控功能。 |
+| `spec.terminationPolicy`              | 集群终止策略，有效值为 `DoNotTerminate`、`Delete` 和 `WipeOut`。具体定义可参考 [终止策略](#终止策略)。 |
+| `spec.componentSpecs`                 | ClusterComponentSpec 对象的列表，定义组成集群 components。该字段支持自定义配置集群中每个 component。注意：`shardingSpecs` 和 `componentSpecs` 不能同时为空；必须至少定义一个才能配置集群。ClusterComponentSpec 定义集群中组件的规格。 |
 | `spec.componentSpecs.replicas`        | 定义了 component 中 replicas 的数量。 |
 | `spec.componentSpecs.resources`       | 定义了 component 的资源要求。  |
+| `spec.componentSpecs.volumeClaimTemplates` | PersistentVolumeClaim 模板列表，定义 component 的存储需求。 |
+| `spec.componentSpecs.volumeClaimTemplates.name` | 引用了在 `componentDefinition.spec.runtime.containers[*].volumeMounts` 中定义的 volumeMount 名称。  |
+| `spec.componentSpecs.volumeClaimTemplates.spec.storageClassName` | 定义了 StorageClass 的名称。如果未指定，系统将默认使用带有 `storageclass.kubernetes.io/is-default-class=true` 注释的 StorageClass。  |
+| `spec.componentSpecs.volumeClaimTemplates.spec.resources.storage` | 可按需配置存储容量。 |
+
+您可参考 [API 文档](https://kubeblocks.io/docs/preview/developer_docs/api-reference/cluster)，查看更多 API 字段及说明。
 
 KubeBlocks operator 监控 `Cluster` CRD 并创建集群和全部依赖资源。您可执行以下命令获取集群创建的所有资源信息。
 
@@ -117,67 +93,6 @@ kubectl get all,secret,rolebinding,serviceaccount -l app.kubernetes.io/instance=
 ```bash
 kubectl get cluster mycluster -n demo -o yaml
 ```
-
-</TabItem>
-
-<TabItem value="kbcli" label="kbcli">
-
-1. 执行以下命令，创建 StarRocks 集群。
-
-   ```bash
-   kbcli cluster create mycluster --cluster-definition=starrocks -n demo
-   ```
-
-   如果您需要自定义集群规格，kbcli 也提供了诸多参数，如支持设置引擎版本、终止策略、CPU、内存规格。您可通过在命令结尾添加 --help 或 -h 来查看具体说明。比如，
-
-   ```bash
-   kbcli cluster create --help
-   kbcli cluster create -h
-   ```
-
-2. 验证集群是否创建成功。
-
-   ```bash
-   kbcli cluster list -n demo
-   >
-   NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS     CREATED-TIME
-   mycluster   demo        starrocks            starrocks-3.1.1   Delete               Running    Jul 17,2024 19:06 UTC+0800   
-   ```
-
-3. 查看集群信息。
-
-   ```bash
-    kbcli cluster describe mycluster -n demo
-    >
-    Name: mycluster	 Created Time: Jul 17,2024 19:06 UTC+0800
-    NAMESPACE   CLUSTER-DEFINITION   VERSION           STATUS    TERMINATION-POLICY
-    demo        starrocks            starrocks-3.1.1   Running   Delete
-
-    Endpoints:
-    COMPONENT   MODE        INTERNAL                                      EXTERNAL
-    fe          ReadWrite   mycluster-fe.default.svc.cluster.local:9030   <none>
-
-    Topology:
-    COMPONENT   INSTANCE         ROLE     STATUS    AZ       NODE                    CREATED-TIME
-    be          mycluster-be-0   <none>   Running   <none>   minikube/192.168.49.2   Jul 17,2024 19:06 UTC+0800
-    fe          mycluster-fe-0   <none>   Running   <none>   minikube/192.168.49.2   Jul 17,2024 19:06 UTC+0800
-
-    Resources Allocation:
-    COMPONENT   DEDICATED   CPU(REQUEST/LIMIT)   MEMORY(REQUEST/LIMIT)   STORAGE-SIZE   STORAGE-CLASS
-    fe          false       1 / 1                1Gi / 1Gi               data:20Gi      standard
-    be          false       1 / 1                1Gi / 1Gi               data:20Gi      standard
-
-    Images:
-    COMPONENT   TYPE   IMAGE
-    fe          fe     docker.io/starrocks/fe-ubuntu:2.5.4
-    be          be     docker.io/starrocks/be-ubuntu:2.5.4
-
-    Show cluster events: kbcli cluster list-events -n demo mycluster
-   ```
-
-</TabItem>
-
-</Tabs>
 
 ## 扩缩容
 
@@ -443,13 +358,14 @@ mycluster   demo        starrocks            starrocks-3.1.1   Delete           
 
 1. 修改 YAML 文件中 `spec.componentSpecs.replicas` 的配置。`spec.componentSpecs.replicas` 定义了 pod 数量，修改该参数将触发集群水平扩缩容。
 
-   ```yaml
+   ```bash
    kubectl edit cluster mycluster -n demo
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: Cluster
-   metadata:
-     name: mycluster
-     namespace: demo
+   ```
+
+   在编辑器中修改 `spec.componentSpecs.replicas` 的参数值。
+
+   ```yaml
+   ...
    spec:
      clusterDefinitionRef: starrocks-ce
      clusterVersionRef: starrocks-ce-3.1.1
@@ -457,6 +373,7 @@ mycluster   demo        starrocks            starrocks-3.1.1   Delete           
      - name: fe
        componentDefRef: fe
        replicas: 2 # 修改参数值
+   ...
    ```
 
 2. 当集群状态再次回到 `Running` 后，查看相关资源是否变更。
@@ -592,13 +509,14 @@ mycluster   demo        starrocks            starrocks-3.1.1   Delete           
 
    `spec.componentSpecs.volumeClaimTemplates.spec.resources` 定义了 Pod 存储资源信息，修改该数值将触发集群磁盘扩容。
 
-   ```yaml
+   ```bash
    kubectl edit cluster mycluster -n demo
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: Cluster
-   metadata:
-     name: mycluster
-     namespace: demo
+   ```
+
+   在编辑器中修改 `spec.componentSpecs.volumeClaimTemplates.spec.resources` 的参数值。
+
+   ```yaml
+   ...
    spec:
      clusterDefinitionRef: starrocks-ce
      clusterVersionRef: starrocks-ce-3.1.1
@@ -613,7 +531,7 @@ mycluster   demo        starrocks            starrocks-3.1.1   Delete           
            resources:
              requests:
                storage: 40Gi # 修改该参数值
-     terminationPolicy: Delete
+   ...
    ```
 
 2. 当集群状态再次回到 `Running` 后，查看相应资源是否变更。
@@ -942,8 +860,7 @@ KubeBlocks 支持重启集群中的所有 Pod。当数据库出现异常时，�
 | **终止策略** | **删除操作**                                                                     |
 |:----------------------|:-------------------------------------------------------------------------------------------|
 | `DoNotTerminate`      | `DoNotTerminate` 禁止删除操作。                                                  |
-| `Halt`                | `Halt` 删除集群资源（如 Pods、Services 等），但保留 PVC。停止其他运维操作的同时，保留了数据。但 `Halt` 策略在 v0.9.1 中已删除，设置为 `Halt` 的效果与 `DoNotTerminate` 相同。  |
-| `Delete`              | `Delete` 在 `Halt` 的基础上，删除 PVC 及所有持久数据。                              |
+| `Delete`              | `Delete` 删除 Pod、服务、PVC 等集群资源，删除所有持久数据。                              |
 | `WipeOut`             | `WipeOut`  删除所有集群资源，包括外部存储中的卷快照和备份。使用该策略将会删除全部数据，特别是在非生产环境，该策略将会带来不可逆的数据丢失。请谨慎使用。   |
 
 执行以下命令查看终止策略。

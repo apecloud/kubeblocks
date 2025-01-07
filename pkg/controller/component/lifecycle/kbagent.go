@@ -27,6 +27,7 @@ import (
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -78,12 +79,14 @@ func (a *kbagent) RoleProbe(ctx context.Context, cli client.Reader, opts *Option
 }
 
 func (a *kbagent) Switchover(ctx context.Context, cli client.Reader, opts *Options, candidate string) error {
+	roleName := a.pod.Labels[constant.RoleLabelKey]
 	lfa := &switchover{
-		namespace:   a.synthesizedComp.Namespace,
-		clusterName: a.synthesizedComp.ClusterName,
-		compName:    a.synthesizedComp.Name,
-		roles:       a.synthesizedComp.Roles,
-		candidate:   candidate,
+		namespace:    a.synthesizedComp.Namespace,
+		clusterName:  a.synthesizedComp.ClusterName,
+		compName:     a.synthesizedComp.Name,
+		role:         roleName,
+		currentPod:   a.pod.Name,
+		candidatePod: candidate,
 	}
 	return a.ignoreOutput(a.checkedCallAction(ctx, cli, a.synthesizedComp.LifecycleActions.Switchover, lfa, opts))
 }
@@ -279,7 +282,15 @@ func (a *kbagent) callActionWithSelector(ctx context.Context, spec *appsv1.Actio
 			}
 			return host, port, nil
 		}
-		cli, err := kbacli.NewClient(endpoint)
+		var cli kbacli.Client
+		_, err := rest.InClusterConfig()
+		if err != nil {
+			// If kb is not run in a k8s cluster, using pod ip to call kb-agent would fail.
+			// So we use a client that utilizes k8s' portforward ability.
+			cli, err = kbacli.NewPortForwardClient(pod, endpoint)
+		} else {
+			cli, err = kbacli.NewClient(endpoint)
+		}
 		if err != nil {
 			return nil, err // mock client error
 		}

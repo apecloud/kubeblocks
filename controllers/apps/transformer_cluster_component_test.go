@@ -23,11 +23,13 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/onsi/gomega/types"
 
+	"github.com/onsi/gomega/types"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -1662,6 +1664,44 @@ var _ = Describe("cluster component transformer test", func() {
 				// try again
 				err = transformer.Transform(transCtx, newDAG(graphCli, transCtx.Cluster))
 				Expect(err).Should(BeNil())
+			}
+		})
+	})
+
+	Context("sharding components", func() {
+		It("shard pod anti-affinity", func() {
+			transformer, transCtx, dag := newTransformerNCtx(clusterTopologyNoOrders4Sharding, func(f *testapps.MockClusterFactory) {
+				f.AddAnnotations(constant.ShardPodAntiAffinityAnnotationKey, strings.Join([]string{sharding1bName, sharding2aName}, ",")).
+					AddSharding(sharding1aName, "", "").SetShards(2).
+					AddSharding(sharding1bName, "", "").SetShards(2).
+					AddSharding(sharding2aName, "", "").SetShards(2).
+					AddSharding(sharding2bName, "", "").SetShards(2)
+			})
+			err := transformer.Transform(transCtx, dag)
+			Expect(err).Should(BeNil())
+
+			// check the components
+			graphCli := transCtx.Client.(model.GraphClient)
+			objs := graphCli.FindAll(dag, &appsv1.Component{})
+			Expect(len(objs)).Should(Equal(8))
+			for _, obj := range objs {
+				comp := obj.(*appsv1.Component)
+				Expect(graphCli.IsAction(dag, comp, model.ActionCreatePtr())).Should(BeTrue())
+
+				shardingName := comp.Labels[constant.KBAppShardingNameLabelKey]
+				compName := comp.Labels[constant.KBAppComponentLabelKey]
+				if shardingName == sharding1aName || shardingName == sharding2bName {
+					Expect(comp.Spec.SchedulingPolicy).Should(BeNil())
+				} else {
+					Expect(comp.Spec.SchedulingPolicy).ShouldNot(BeNil())
+					Expect(comp.Spec.SchedulingPolicy.Affinity).ShouldNot(BeNil())
+					Expect(comp.Spec.SchedulingPolicy.Affinity.PodAntiAffinity).ShouldNot(BeNil())
+					Expect(comp.Spec.SchedulingPolicy.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution).Should(HaveLen(1))
+					term := comp.Spec.SchedulingPolicy.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0]
+					Expect(term.LabelSelector.MatchLabels).Should(HaveKeyWithValue(constant.KBAppShardingNameLabelKey, shardingName))
+					Expect(term.LabelSelector.MatchLabels).Should(HaveKeyWithValue(constant.KBAppComponentLabelKey, compName))
+					Expect(term.TopologyKey).Should(Equal(corev1.LabelHostname))
+				}
 			}
 		})
 	})

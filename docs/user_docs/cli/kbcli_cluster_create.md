@@ -11,122 +11,20 @@ kbcli cluster create [NAME] [flags]
 ### Examples
 
 ```
-  # Create a cluster with cluster definition apecloud-mysql and cluster version ac-mysql-8.0.30
-  kbcli cluster create mycluster --cluster-definition apecloud-mysql --cluster-version ac-mysql-8.0.30
+  # Create a postgresql
+  kbcli cluster create postgresql my-cluster
   
-  # --cluster-definition is required, if --cluster-version is not specified, pick the most recently created version
-  kbcli cluster create mycluster --cluster-definition apecloud-mysql
+  # Get the cluster yaml by dry-run
+  kbcli cluster create postgresql my-cluster --dry-run
   
-  # Output resource information in YAML format, without creation of resources.
-  kbcli cluster create mycluster --cluster-definition apecloud-mysql --dry-run -o yaml
-  
-  # Output resource information in YAML format, the information will be sent to the server
-  # but the resources will not be actually created.
-  kbcli cluster create mycluster --cluster-definition apecloud-mysql --dry-run=server -o yaml
-  
-  # Create a cluster and set termination policy DoNotTerminate that prevents the cluster from being deleted
-  kbcli cluster create mycluster --cluster-definition apecloud-mysql --termination-policy DoNotTerminate
-  
-  # Delete resources such as statefulsets, deployments, services, pdb, but keep PVCs
-  # when deleting the cluster, use termination policy Halt
-  kbcli cluster create mycluster --cluster-definition apecloud-mysql --termination-policy Halt
-  
-  # Delete resource such as statefulsets, deployments, services, pdb, and including
-  # PVCs when deleting the cluster, use termination policy Delete
-  kbcli cluster create mycluster --cluster-definition apecloud-mysql --termination-policy Delete
-  
-  # Delete all resources including all snapshots and snapshot data when deleting
-  # the cluster, use termination policy WipeOut
-  kbcli cluster create mycluster --cluster-definition apecloud-mysql --termination-policy WipeOut
-  
-  # Create a cluster and set cpu to 1 core, memory to 1Gi, storage size to 20Gi and replicas to 3
-  kbcli cluster create mycluster --cluster-definition apecloud-mysql --set cpu=1,memory=1Gi,storage=20Gi,replicas=3
-  
-  # Create a cluster and set storageClass to csi-hostpath-sc, if storageClass is not specified,
-  # the default storage class will be used
-  kbcli cluster create mycluster --cluster-definition apecloud-mysql --set storageClass=csi-hostpath-sc
-  
-  # Create a cluster with replicationSet workloadType and set switchPolicy to Noop
-  kbcli cluster create mycluster --cluster-definition postgresql --set switchPolicy=Noop
-  
-  # Create a cluster with more than one component, use "--set type=component-name" to specify the component,
-  # if not specified, the main component will be used, run "kbcli cd list-components CLUSTER-DEFINITION-NAME"
-  # to show the components in the cluster definition
-  kbcli cluster create mycluster --cluster-definition redis --set type=redis,cpu=1 --set type=redis-sentinel,cpu=200m
-  
-  # Create a cluster and use a URL to set cluster resource
-  kbcli cluster create mycluster --cluster-definition apecloud-mysql \
-  --set-file https://kubeblocks.io/yamls/apecloud-mysql.yaml
-  
-  # Create a cluster and load cluster resource set from stdin
-  cat << EOF | kbcli cluster create mycluster --cluster-definition apecloud-mysql --set-file -
-  - name: my-test ...
-  
-  # Create a cluster scattered by nodes
-  kbcli cluster create --cluster-definition apecloud-mysql --topology-keys kubernetes.io/hostname \
-  --pod-anti-affinity Required
-  
-  # Create a cluster in specific labels nodes
-  kbcli cluster create --cluster-definition apecloud-mysql \
-  --node-labels '"topology.kubernetes.io/zone=us-east-1a","disktype=ssd,essd"'
-  
-  # Create a Cluster with two tolerations
-  kbcli cluster create --cluster-definition apecloud-mysql --tolerations \ '"engineType=mongo:NoSchedule","diskType=ssd:NoSchedule"'
-  
-  # Create a cluster, with each pod runs on their own dedicated node
-  kbcli cluster create --cluster-definition apecloud-mysql --tenancy=DedicatedNode
-  
-  # Create a cluster with backup to restore data
-  kbcli cluster create --backup backup-default-mycluster-20230616190023
-  
-  # Create a cluster with time to restore from point in time
-  kbcli cluster create --restore-to-time "Jun 16,2023 18:58:53 UTC+0800" --source-cluster mycluster
-  
-  # Create a cluster with auto backup
-  kbcli cluster create --cluster-definition apecloud-mysql --backup-enabled
-  
-  # Create a cluster with default component having multiple storage volumes
-  kbcli cluster create --cluster-definition oceanbase --pvc name=data-file,size=50Gi --pvc name=data-log,size=50Gi --pvc name=log,size=20Gi
-  
-  # Create a cluster with specifying a component having multiple storage volumes
-  kbcli cluster create --cluster-definition pulsar --pvc type=bookies,name=ledgers,size=20Gi --pvc type=bookies,name=journal,size=20Gi
-  
-  # Create a cluster with using a service reference to another KubeBlocks cluster
-  kbcli cluster create --cluster-definition pulsar --service-reference name=pulsarZookeeper,cluster=zookeeper,namespace=default
+  # Edit cluster yaml before creation.
+  kbcli cluster create mycluster --edit
 ```
 
 ### Options
 
 ```
-      --backup string                          Set a source backup to restore data
-      --backup-cron-expression string          the cron expression for schedule, the timezone is in UTC. see https://en.wikipedia.org/wiki/Cron.
-      --backup-enabled                         Specify whether enabled automated backup
-      --backup-method string                   the backup method, view it by "kbcli cd describe <cluster-definition>", if not specified, the default backup method will be to take snapshots of the volume
-      --backup-repo-name string                the backup repository name
-      --backup-retention-period string         a time string ending with the 'd'|'D'|'h'|'H' character to describe how long the Backup should be retained (default "1d")
-      --backup-starting-deadline-minutes int   the deadline in minutes for starting the backup job if it misses its scheduled time for any reason
-      --cluster-definition string              Specify cluster definition, run "kbcli cd list" to show all available cluster definitions
-      --cluster-version string                 Specify cluster version, run "kbcli cv list" to show all available cluster versions, use the latest version if not specified
-      --dry-run string[="unchanged"]           Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent. (default "none")
-      --edit                                   Edit the API resource before creating
-      --enable-all-logs                        Enable advanced application all log extraction, set to true will ignore enabledLogs of component level, default is false
-  -h, --help                                   help for create
-      --monitoring-interval uint8              The monitoring interval of cluster, 0 is disabled, the unit is second, any non-zero value means enabling monitoring.
-      --node-labels stringToString             Node label selector (default [])
-  -o, --output format                          Prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
-      --pitr-enabled                           Specify whether enabled point in time recovery
-      --pod-anti-affinity string               Pod anti-affinity type, one of: (Preferred, Required) (default "Preferred")
-      --pvc stringArray                        Set the cluster detail persistent volume claim, each '--pvc' corresponds to a component, and will override the simple configurations about storage by --set (e.g. --pvc type=mysql,name=data,mode=ReadWriteOnce,size=20Gi --pvc type=mysql,name=log,mode=ReadWriteOnce,size=1Gi)
-      --rbac-enabled                           Specify whether rbac resources will be created by kbcli, otherwise KubeBlocks server will try to create rbac resources
-      --restore-to-time string                 Set a time for point in time recovery
-      --service-reference stringArray          Set the other KubeBlocks cluster dependencies, each '--service-reference' corresponds to a cluster service. (e.g --service-reference name=pulsarZookeeper,cluster=zookeeper,namespace=default)
-      --set stringArray                        Set the cluster resource including cpu, memory, replicas and storage, each set corresponds to a component.(e.g. --set cpu=1,memory=1Gi,replicas=3,storage=20Gi or --set class=general-1c1g)
-  -f, --set-file string                        Use yaml file, URL, or stdin to set the cluster resource
-      --tenancy string                         Tenancy options, one of: (SharedNode, DedicatedNode) (default "SharedNode")
-      --termination-policy string              Termination policy, one of: (DoNotTerminate, Halt, Delete, WipeOut) (default "Delete")
-      --tolerations strings                    Tolerations for cluster, such as "key=value:effect, key:effect", for example '"engineType=mongo:NoSchedule", "diskType:NoSchedule"'
-      --topology-keys stringArray              Topology keys for affinity
-      --volume-restore-policy string           the volume claim restore policy, supported values: [Serial, Parallel] (default "Parallel")
+  -h, --help   help for create
 ```
 
 ### Options inherited from parent commands
@@ -156,11 +54,15 @@ kbcli cluster create [NAME] [flags]
 ### SEE ALSO
 
 * [kbcli cluster](kbcli_cluster.md)	 - Cluster command.
+* [kbcli cluster create apecloud-mysql](kbcli_cluster_create_apecloud-mysql.md)	 - Create a apecloud-mysql cluster.
+* [kbcli cluster create elasticsearch](kbcli_cluster_create_elasticsearch.md)	 - Create a elasticsearch cluster.
+* [kbcli cluster create etcd](kbcli_cluster_create_etcd.md)	 - Create a etcd cluster.
 * [kbcli cluster create kafka](kbcli_cluster_create_kafka.md)	 - Create a kafka cluster.
 * [kbcli cluster create llm](kbcli_cluster_create_llm.md)	 - Create a llm cluster.
 * [kbcli cluster create mongodb](kbcli_cluster_create_mongodb.md)	 - Create a mongodb cluster.
 * [kbcli cluster create mysql](kbcli_cluster_create_mysql.md)	 - Create a mysql cluster.
 * [kbcli cluster create postgresql](kbcli_cluster_create_postgresql.md)	 - Create a postgresql cluster.
+* [kbcli cluster create qdrant](kbcli_cluster_create_qdrant.md)	 - Create a qdrant cluster.
 * [kbcli cluster create redis](kbcli_cluster_create_redis.md)	 - Create a redis cluster.
 * [kbcli cluster create xinference](kbcli_cluster_create_xinference.md)	 - Create a xinference cluster.
 

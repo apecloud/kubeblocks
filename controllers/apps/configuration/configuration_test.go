@@ -37,6 +37,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
+	"github.com/apecloud/kubeblocks/pkg/controller/render"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
@@ -151,11 +152,11 @@ func mockReconcileResource() (*corev1.ConfigMap, *appsv1beta1.ConfigConstraint, 
 	return configmap, constraint, clusterObj, compObj, synthesizedComp
 }
 
-func initConfiguration(resourceCtx *configctrl.ResourceCtx,
+func initConfiguration(resourceCtx *render.ResourceCtx,
 	synthesizedComponent *component.SynthesizedComponent,
 	clusterObj *appsv1.Cluster,
 	componentObj *appsv1.Component) error {
-	return configctrl.NewCreatePipeline(configctrl.ReconcileCtx{
+	return configctrl.NewCreatePipeline(render.ReconcileCtx{
 		ResourceCtx:          resourceCtx,
 		Component:            componentObj,
 		SynthesizedComponent: synthesizedComponent,

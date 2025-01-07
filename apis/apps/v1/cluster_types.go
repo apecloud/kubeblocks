@@ -535,6 +535,7 @@ type ClusterComponentService struct {
 	// Indicates whether to generate individual Services for each Pod.
 	// If set to true, a separate Service will be created for each Pod in the Cluster.
 	//
+	// +kubebuilder:default=false
 	// +optional
 	PodService *bool `json:"podService,omitempty"`
 }

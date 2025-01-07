@@ -221,7 +221,7 @@ func NewReplicaTask(compName, uid string, source *corev1.Pod, replicas []string)
 		NotifyAtFinish:      true,
 		ReportPeriodSeconds: defaultNewReplicaTaskReportPeriodSeconds,
 		NewReplica: &proto.NewReplicaTask{
-			Remote:   source.Status.PodIP,
+			Remote:   PodFQDN(source.Namespace, compName, source.Name),
 			Port:     port,
 			Replicas: strings.Join(replicas, ","),
 		},

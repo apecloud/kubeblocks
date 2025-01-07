@@ -314,6 +314,13 @@ dataPlane:
             values:
             - "true"
 
+# dynamically replace instance's registry. ref: https://github.com/apecloud/kubeblocks/pull/8018
+# e.g.
+# registryConfig: 
+#   defaultRegistry: apecloud-registry.cn-zhangjiakou.cr.aliyuncs.com
+#   defaultNamespace: apecloud
+registryConfig: {}
+
 # Add extra pod labels to KubeBlocks Deployment
 extraLabels: {}
 
@@ -480,13 +487,12 @@ autoInstalledAddons:
   - "apecloud-mysql"
   - "etcd"
   - "kafka"
-  - "llm"
   - "mongodb"
   - "mysql"
   - "postgresql"
-  - "pulsar"
   - "qdrant"
   - "redis"
+  - "rabbitmq"
   - "alertmanager-webhook-adaptor"
   - "aws-load-balancer-controller"
   - "csi-hostpath-driver"

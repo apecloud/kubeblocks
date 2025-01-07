@@ -151,9 +151,14 @@ func (t *componentWorkloadTransformer) runningInstanceSetObject(ctx graph.Transf
 
 func (t *componentWorkloadTransformer) reconcileWorkload(ctx context.Context, cli client.Reader,
 	synthesizedComp *component.SynthesizedComponent, comp *appsv1.Component, runningITS, protoITS *workloads.InstanceSet) error {
-	if runningITS != nil {
-		*protoITS.Spec.Selector = *runningITS.Spec.Selector
-		protoITS.Spec.Template.Labels = intctrlutil.MergeMetadataMaps(runningITS.Spec.Template.Labels, synthesizedComp.DynamicLabels)
+	// if runningITS already exists, the image changes in protoITS will be
+	// rollback to the original image in `checkNRollbackProtoImages`.
+	// So changing registry configs won't affect existing clusters.
+	for i, container := range protoITS.Spec.Template.Spec.Containers {
+		protoITS.Spec.Template.Spec.Containers[i].Image = intctrlutil.ReplaceImageRegistry(container.Image)
+	}
+	for i, container := range protoITS.Spec.Template.Spec.InitContainers {
+		protoITS.Spec.Template.Spec.InitContainers[i].Image = intctrlutil.ReplaceImageRegistry(container.Image)
 	}
 
 	buildInstanceSetPlacementAnnotation(comp, protoITS)
@@ -406,21 +411,6 @@ func buildPodSpecVolumeMounts(synthesizeComp *component.SynthesizedComponent) {
 //  1. new an object targetObj by copying from oldObj
 //  2. merge all fields can be updated from newObj into targetObj
 func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet) *workloads.InstanceSet {
-	// mergeAnnotations keeps the original annotations.
-	mergeMetadataMap := func(originalMap map[string]string, targetMap *map[string]string) {
-		if targetMap == nil || originalMap == nil {
-			return
-		}
-		if *targetMap == nil {
-			*targetMap = map[string]string{}
-		}
-		for k, v := range originalMap {
-			// if the annotation not exist in targetAnnotations, copy it from original.
-			if _, ok := (*targetMap)[k]; !ok {
-				(*targetMap)[k] = v
-			}
-		}
-	}
 
 	updateUpdateStrategy := func(itsObj, itsProto *workloads.InstanceSet) {
 		var objMaxUnavailable *intstr.IntOrString
@@ -450,16 +440,16 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet) *workloads.InstanceS
 			return strings.HasPrefix(k, "monitor.kubeblocks.io")
 		})
 	}
-	mergeMetadataMap(itsObjCopy.Annotations, &itsProto.Annotations)
-	itsObjCopy.Annotations = itsProto.Annotations
+	intctrlutil.MergeMetadataMapInplace(itsProto.Annotations, &itsObjCopy.Annotations)
+	intctrlutil.MergeMetadataMapInplace(itsProto.Labels, &itsObjCopy.Labels)
+	// merge pod spec template annotations
+	intctrlutil.MergeMetadataMapInplace(itsProto.Spec.Template.Annotations, &itsObjCopy.Spec.Template.Annotations)
+	podTemplateCopy := *itsProto.Spec.Template.DeepCopy()
+	podTemplateCopy.Annotations = itsObjCopy.Spec.Template.Annotations
 
-	// keep the original template annotations.
-	// if annotations exist and are replaced, the its will be updated.
-	mergeMetadataMap(itsObjCopy.Spec.Template.Annotations, &itsProto.Spec.Template.Annotations)
-	itsObjCopy.Spec.Template = *itsProto.Spec.Template.DeepCopy()
+	itsObjCopy.Spec.Template = podTemplateCopy
 	itsObjCopy.Spec.Replicas = itsProto.Spec.Replicas
 	itsObjCopy.Spec.Roles = itsProto.Spec.Roles
-	itsObjCopy.Spec.RoleProbe = itsProto.Spec.RoleProbe
 	itsObjCopy.Spec.MembershipReconfiguration = itsProto.Spec.MembershipReconfiguration
 	itsObjCopy.Spec.MemberUpdateStrategy = itsProto.Spec.MemberUpdateStrategy
 	itsObjCopy.Spec.Credential = itsProto.Spec.Credential
@@ -475,13 +465,8 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet) *workloads.InstanceS
 	}
 
 	intctrlutil.ResolvePodSpecDefaultFields(oldITS.Spec.Template.Spec, &itsObjCopy.Spec.Template.Spec)
-	delayUpdateInstanceSetSystemFields(oldITS.Spec, &itsObjCopy.Spec)
 
 	isSpecUpdated := !reflect.DeepEqual(&oldITS.Spec, &itsObjCopy.Spec)
-	if isSpecUpdated {
-		updateInstanceSetSystemFields(itsProto.Spec, &itsObjCopy.Spec)
-	}
-
 	isLabelsUpdated := !reflect.DeepEqual(oldITS.Labels, itsObjCopy.Labels)
 	isAnnotationsUpdated := !reflect.DeepEqual(oldITS.Annotations, itsObjCopy.Annotations)
 	if !isSpecUpdated && !isLabelsUpdated && !isAnnotationsUpdated {
@@ -700,41 +685,28 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn(deleteReplicas, joinedReplica
 }
 
 func (r *componentWorkloadOps) leaveMemberForPod(pod *corev1.Pod, pods []*corev1.Pod) error {
-	isLeader := func(pod *corev1.Pod) bool {
-		if pod == nil || len(pod.Labels) == 0 {
-			return false
-		}
-		roleName, ok := pod.Labels[constant.RoleLabelKey]
-		if !ok {
-			return false
-		}
-
-		for _, replicaRole := range r.runningITS.Spec.Roles {
-			if roleName == replicaRole.Name && replicaRole.IsLeader {
-				return true
-			}
-		}
-		return false
-	}
-
-	tryToSwitchover := func(lfa lifecycle.Lifecycle, pod *corev1.Pod) error {
-		// if pod is not leader/primary, no need to switchover
-		if !isLeader(pod) {
-			return nil
-		}
-		// if HA functionality is not enabled, no need to switchover
+	trySwitchover := func(lfa lifecycle.Lifecycle, pod *corev1.Pod) error {
 		err := lfa.Switchover(r.reqCtx.Ctx, r.cli, nil, "")
-		if err != nil && errors.Is(err, lifecycle.ErrActionNotDefined) {
-			return nil
+		if err != nil {
+			if errors.Is(err, lifecycle.ErrActionNotDefined) {
+				return nil
+			}
+			return err
 		}
-		if err == nil {
-			return fmt.Errorf("switchover succeed, wait role label to be updated")
-		}
-		return err
+		r.reqCtx.Log.Info("successfully call switchover action for pod", "pod", pod.Name)
+		return nil
 	}
 
-	if !(isLeader(pod) || // if the pod is leader, it needs to call switchover
-		(r.synthesizeComp.LifecycleActions != nil && r.synthesizeComp.LifecycleActions.MemberLeave != nil)) { // if the memberLeave action is defined, it needs to call it
+	tryMemberLeave := func(lfa lifecycle.Lifecycle, pod *corev1.Pod) error {
+		err := lfa.MemberLeave(r.reqCtx.Ctx, r.cli, nil)
+		if err != nil {
+			if errors.Is(err, lifecycle.ErrActionNotDefined) {
+				return nil
+			}
+			return err
+		}
+
+		r.reqCtx.Log.Info("successfully call leave member action for pod", "pod", pod.Name)
 		return nil
 	}
 
@@ -743,17 +715,14 @@ func (r *componentWorkloadOps) leaveMemberForPod(pod *corev1.Pod, pods []*corev1
 		return err
 	}
 
-	// switchover if the leaving pod is leader
-	if switchoverErr := tryToSwitchover(lfa, pod); switchoverErr != nil {
-		return switchoverErr
+	if err := trySwitchover(lfa, pod); err != nil {
+		return err
 	}
 
-	if err = lfa.MemberLeave(r.reqCtx.Ctx, r.cli, nil); err != nil {
-		if !errors.Is(err, lifecycle.ErrActionNotDefined) {
-			return err
-		}
+	if err := tryMemberLeave(lfa, pod); err != nil {
+		return err
 	}
-	r.reqCtx.Log.Info("succeed to leave member for pod", "pod", pod.Name)
+
 	return nil
 }
 

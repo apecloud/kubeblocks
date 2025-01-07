@@ -1,0 +1,12 @@
+{{- if has "rabbitmq" .Values.autoInstalledAddons  }}
+{{- $selectorLabels := include "kubeblocks.selectorLabels" . }}
+{{- include "kubeblocks.buildAddonCR" (merge (dict
+  "kbVersion" ">=1.0.0"
+  "selectorLabels" $selectorLabels
+  "name" "rabbitmq"
+  "version" "1.0.0-alpha.0"
+  "model" "message"
+  "provider" "community"
+  "description" "RabbitMQ is a reliable and mature messaging and streaming broker."
+  "autoInstall" false) . ) -}}
+  {{- end }}

@@ -38,7 +38,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/utils/pointer"
 	"k8s.io/utils/ptr"
@@ -173,9 +172,9 @@ var _ = Describe("Component Controller", func() {
 		}
 	}
 
-	createClusterObjX := func(clusterDefName, compName, compDefName string,
+	createClusterObjX := func(compName, compDefName string,
 		processor func(*testapps.MockClusterFactory), phase *kbappsv1.ClusterPhase) {
-		factory := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName).
+		factory := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
 			WithRandomName().
 			AddComponent(compName, compDefName).
 			SetReplicas(1)
@@ -187,7 +186,7 @@ var _ = Describe("Component Controller", func() {
 
 		By("Waiting for the cluster enter expected phase")
 		Eventually(testapps.ClusterReconciled(&testCtx, clusterKey)).Should(BeTrue())
-		if phase == nil {
+		if phase == nil || *phase == "" {
 			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(kbappsv1.CreatingClusterPhase))
 		} else {
 			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(*phase))
@@ -208,12 +207,12 @@ var _ = Describe("Component Controller", func() {
 
 	createClusterObj := func(compName, compDefName string, processor func(*testapps.MockClusterFactory)) {
 		By("Creating a cluster with new component definition")
-		createClusterObjX("", compName, compDefName, processor, nil)
+		createClusterObjX(compName, compDefName, processor, nil)
 	}
 
 	createClusterObjWithPhase := func(compName, compDefName string, processor func(*testapps.MockClusterFactory), phase kbappsv1.ClusterPhase) {
 		By("Creating a cluster with new component definition")
-		createClusterObjX("", compName, compDefName, processor, &phase)
+		createClusterObjX(compName, compDefName, processor, &phase)
 	}
 
 	mockCompRunning := func(compName string) {
@@ -1648,71 +1647,6 @@ var _ = Describe("Component Controller", func() {
 		})).Should(Succeed())
 	}
 
-	testUpdateKubeBlocksToolsImage := func(compName, compDefName string) {
-		createClusterObj(compName, compDefName, nil)
-
-		oldToolsImage := viper.GetString(constant.KBToolsImage)
-		newToolsImage := fmt.Sprintf("%s-%s", oldToolsImage, rand.String(4))
-		defer func() {
-			viper.Set(constant.KBToolsImage, oldToolsImage)
-		}()
-
-		underlyingWorkload := func() *workloads.InstanceSet {
-			itsList := testk8s.ListAndCheckInstanceSet(&testCtx, clusterKey)
-			return &itsList.Items[0]
-		}
-
-		initWorkloadGeneration := underlyingWorkload().GetGeneration()
-		Expect(initWorkloadGeneration).ShouldNot(Equal(0))
-
-		checkWorkloadGenerationAndToolsImage := func(assertion func(any, ...any) AsyncAssertion,
-			workloadGenerationExpected int64, oldImageCntExpected, newImageCntExpected int) {
-			assertion(func(g Gomega) {
-				its := underlyingWorkload()
-				g.Expect(its.Generation).Should(Equal(workloadGenerationExpected))
-				oldImageCnt := 0
-				newImageCnt := 0
-				for _, c := range its.Spec.Template.Spec.Containers {
-					if c.Image == oldToolsImage {
-						oldImageCnt += 1
-					}
-					if c.Image == newToolsImage {
-						newImageCnt += 1
-					}
-				}
-				g.Expect(oldImageCnt + newImageCnt).Should(Equal(oldImageCntExpected + newImageCntExpected))
-				g.Expect(oldImageCnt).Should(Equal(oldImageCntExpected))
-				g.Expect(newImageCnt).Should(Equal(newImageCntExpected))
-			}).Should(Succeed())
-		}
-
-		By("check the workload generation as init")
-		checkWorkloadGenerationAndToolsImage(Consistently, initWorkloadGeneration, 1, 0)
-
-		By("update kubeblocks tools image")
-		viper.Set(constant.KBToolsImage, newToolsImage)
-
-		By("update component annotation to trigger component status reconcile")
-		Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
-			comp.Annotations = map[string]string{"time": time.Now().Format(time.RFC3339)}
-		})()).Should(Succeed())
-		checkWorkloadGenerationAndToolsImage(Consistently, initWorkloadGeneration, 1, 0)
-
-		By("update spec to trigger component spec reconcile, but workload not changed")
-		Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *kbappsv1.Cluster) {
-			cluster.Spec.ComponentSpecs[0].ServiceRefs = []kbappsv1.ServiceRef{
-				{Name: randomStr()}, // set a non-existed reference.
-			}
-		})()).Should(Succeed())
-		checkWorkloadGenerationAndToolsImage(Consistently, initWorkloadGeneration, 1, 0)
-
-		By("update replicas to trigger component spec and workload reconcile")
-		Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *kbappsv1.Cluster) {
-			cluster.Spec.ComponentSpecs[0].Replicas += 1
-		})()).Should(Succeed())
-		checkWorkloadGenerationAndToolsImage(Eventually, initWorkloadGeneration+1, 0, 1)
-	}
-
 	Context("provisioning", func() {
 		BeforeEach(func() {
 			createAllDefinitionObjects()
@@ -1727,9 +1661,9 @@ var _ = Describe("Component Controller", func() {
 		})
 
 		It("with component zero replicas", func() {
-			zeroReplicas := func(f *testapps.MockClusterFactory) { f.SetReplicas(0) }
-			phase := kbappsv1.ClusterPhase("")
-			createClusterObjX("", defaultCompName, compDefName, zeroReplicas, &phase)
+			createClusterObjWithPhase(defaultCompName, compDefName, func(f *testapps.MockClusterFactory) {
+				f.SetReplicas(0)
+			}, "")
 
 			By("checking the component status can't be reconciled well")
 			Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *kbappsv1.Component) {
@@ -1787,10 +1721,6 @@ var _ = Describe("Component Controller", func() {
 
 		It("create component with custom RBAC which is already exist created by User", func() {
 			testCreateCompWithRBACCreateByUser(defaultCompName, compDefName)
-		})
-
-		It("update kubeblocks-tools image", func() {
-			testUpdateKubeBlocksToolsImage(defaultCompName, compDefName)
 		})
 	})
 
@@ -2165,6 +2095,94 @@ var _ = Describe("Component Controller", func() {
 				},
 			}
 			testImageUnchangedAfterNewReleasePublished(release)
+		})
+	})
+
+	Context("with registry replace enabled", func() {
+		registry := "foo.bar"
+		setRegistryConfig := func() {
+			viper.Set(constant.CfgRegistries, map[string]any{
+				"defaultRegistry": registry,
+			})
+			Expect(intctrlutil.LoadRegistryConfig()).Should(Succeed())
+		}
+
+		BeforeEach(func() {
+			createAllDefinitionObjects()
+		})
+
+		AfterEach(func() {
+			viper.Set(constant.CfgRegistries, nil)
+			Expect(intctrlutil.LoadRegistryConfig()).Should(Succeed())
+		})
+
+		It("replaces image registry", func() {
+			setRegistryConfig()
+
+			createClusterObj(defaultCompName, compDefName, nil)
+
+			itsKey := compKey
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				// check the image
+				c := its.Spec.Template.Spec.Containers[0]
+				g.Expect(c.Image).To(HavePrefix(registry))
+			})).Should(Succeed())
+		})
+
+		It("handles running its and upgrade", func() {
+			createClusterObj(defaultCompName, compDefName, nil)
+			itsKey := compKey
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				// check the image
+				c := its.Spec.Template.Spec.Containers[0]
+				g.Expect(c.Image).To(Equal(compVerObj.Spec.Releases[0].Images[c.Name]))
+			})).Should(Succeed())
+
+			setRegistryConfig()
+			By("trigger component reconcile")
+			now := time.Now().Format(time.RFC3339)
+			Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
+				comp.Annotations["now"] = now
+			})()).Should(Succeed())
+
+			Consistently(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				// check the image
+				c := its.Spec.Template.Spec.Containers[0]
+				g.Expect(c.Image).NotTo(HavePrefix(registry))
+			})).Should(Succeed())
+
+			By("replaces registry when upgrading")
+			release := kbappsv1.ComponentVersionRelease{
+				Name:           "8.0.31",
+				ServiceVersion: "8.0.31",
+				Images: map[string]string{
+					testapps.DefaultMySQLContainerName: "docker.io/apecloud/mysql:8.0.31",
+				},
+			}
+
+			By("publish a new release")
+			compVerKey := client.ObjectKeyFromObject(compVerObj)
+			Expect(testapps.GetAndChangeObj(&testCtx, compVerKey, func(compVer *kbappsv1.ComponentVersion) {
+				compVer.Spec.Releases = append(compVer.Spec.Releases, release)
+				compVer.Spec.CompatibilityRules[0].Releases = append(compVer.Spec.CompatibilityRules[0].Releases, release.Name)
+			})()).Should(Succeed())
+
+			By("update serviceversion in cluster")
+			Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *kbappsv1.Cluster) {
+				cluster.Spec.ComponentSpecs[0].ServiceVersion = "8.0.31"
+			})()).Should(Succeed())
+
+			By("trigger component reconcile")
+			now = time.Now().Format(time.RFC3339)
+			Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
+				comp.Annotations["now"] = now
+			})()).Should(Succeed())
+
+			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+				// check the image
+				c := its.Spec.Template.Spec.Containers[0]
+				g.Expect(c.Image).To(HavePrefix(registry))
+			})).Should(Succeed())
 		})
 	})
 })

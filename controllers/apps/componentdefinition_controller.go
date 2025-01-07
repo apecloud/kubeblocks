@@ -81,12 +81,16 @@ func (r *ComponentDefinitionReconciler) Reconcile(ctx context.Context, req ctrl.
 		return intctrlutil.CheckedRequeueWithError(err, rctx.Log, "")
 	}
 
+	if !intctrlutil.ObjectAPIVersionSupported(cmpd) {
+		return intctrlutil.Reconciled()
+	}
+
 	return r.reconcile(rctx, cmpd)
 }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ComponentDefinitionReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return intctrlutil.NewControllerManagedBy(mgr, &appsv1.ComponentDefinition{}).
+	return intctrlutil.NewControllerManagedBy(mgr).
 		For(&appsv1.ComponentDefinition{}).
 		Complete(r)
 }
@@ -230,6 +234,9 @@ func (r *ComponentDefinitionReconciler) validateVars(cli client.Client, rctx int
 	// validate the reference to component definition name pattern
 	var compDef string
 	for _, cVar := range cmpd.Spec.Vars {
+		if len(cVar.Value) > 0 && cVar.ValueFrom != nil {
+			return fmt.Errorf("both value and valueFrom are specified for component var: %s", cVar.Name)
+		}
 		if cVar.ValueFrom == nil {
 			continue
 		}

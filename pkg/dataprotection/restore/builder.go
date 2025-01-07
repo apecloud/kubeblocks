@@ -22,7 +22,6 @@ package restore
 import (
 	"encoding/json"
 	"fmt"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -192,15 +191,17 @@ func (r *restoreJobBuilder) addCommonEnv(sourceTargetPodName string) *restoreJob
 	// add common env
 	filePath := r.backupSet.Backup.Status.Path
 	if filePath != "" {
-		// append targetName in backup path
-		if r.restore.Spec.Backup.SourceTargetName != "" {
-			filePath = filepath.Join("/", filePath, r.restore.Spec.Backup.SourceTargetName)
+		r.env = append(r.env, BackupFilePathEnv(filePath, r.restore.Spec.Backup.SourceTargetName, sourceTargetPodName)...)
+	}
+	if r.backupSet.BaseBackup != nil {
+		r.env = append(r.env, corev1.EnvVar{Name: dptypes.DPBaseBackupName, Value: r.backupSet.BaseBackup.Name})
+	}
+	if len(r.backupSet.AncestorIncrementalBackups) > 0 {
+		ancestorIncrementalBackupNames := []string{}
+		for _, backup := range r.backupSet.AncestorIncrementalBackups {
+			ancestorIncrementalBackupNames = append(ancestorIncrementalBackupNames, backup.Name)
 		}
-		// append sourceTargetPodName in backup path
-		if sourceTargetPodName != "" {
-			filePath = filepath.Join("/", filePath, sourceTargetPodName)
-		}
-		r.env = append(r.env, corev1.EnvVar{Name: dptypes.DPBackupBasePath, Value: filePath})
+		r.env = append(r.env, corev1.EnvVar{Name: dptypes.DPAncestorIncrementalBackupNames, Value: strings.Join(ancestorIncrementalBackupNames, ",")})
 	}
 	// add time env
 	actionSetEnv := r.backupSet.ActionSet.Spec.Env
@@ -253,11 +254,22 @@ func (r *restoreJobBuilder) addTargetPodAndCredentialEnv(pod *corev1.Pod,
 		env = pod.Spec.Containers[0].Env
 		r.envFrom = pod.Spec.Containers[0].EnvFrom
 	}
-	if connectionCredential == nil {
+	addDBHostEnv := func() {
 		env = append(env, corev1.EnvVar{Name: dptypes.DPDBHost, Value: intctrlutil.BuildPodHostDNS(pod)})
-		if portEnv, err := utils.GetDPDBPortEnv(pod, target.ContainerPort); err == nil {
+	}
+	addDBPortEnv := func() {
+		portEnv, err := utils.GetDPDBPortEnv(pod, target.ContainerPort)
+		if err != nil {
+			// fallback to use the first port of the pod
+			portEnv, _ = utils.GetDPDBPortEnv(pod, nil)
+		}
+		if portEnv != nil {
 			env = append(env, *portEnv)
 		}
+	}
+	if connectionCredential == nil {
+		addDBHostEnv()
+		addDBPortEnv()
 	} else {
 		appendEnvFromSecret := func(envName, keyName string) {
 			if keyName == "" {
@@ -277,11 +289,12 @@ func (r *restoreJobBuilder) addTargetPodAndCredentialEnv(pod *corev1.Pod,
 		if connectionCredential.PortKey != "" {
 			appendEnvFromSecret(dptypes.DPDBPort, connectionCredential.PortKey)
 		} else {
-			portEnv, _ := utils.GetDPDBPortEnv(pod, nil)
-			env = append(env, *portEnv)
+			addDBPortEnv()
 		}
 		if connectionCredential.HostKey != "" {
 			appendEnvFromSecret(dptypes.DPDBHost, connectionCredential.HostKey)
+		} else {
+			addDBHostEnv()
 		}
 	}
 	r.env = utils.MergeEnv(r.env, env)
@@ -342,16 +355,17 @@ func (r *restoreJobBuilder) build() *batchv1.Job {
 
 	// 2. set restore container
 	r.specificVolumeMounts = append(r.specificVolumeMounts, r.commonVolumeMounts...)
+	// expand the image value with the env variables.
+	image := common.Expand(r.image, common.MappingFuncFor(utils.CovertEnvToMap(r.env)))
 	container := corev1.Container{
-		Name:         Restore,
-		Resources:    r.restore.Spec.ContainerResources,
-		Env:          r.env,
-		EnvFrom:      r.envFrom,
-		VolumeMounts: r.specificVolumeMounts,
-		Command:      r.command,
-		Args:         r.args,
-		// expand the image value with the env variables.
-		Image:           common.Expand(r.image, common.MappingFuncFor(utils.CovertEnvToMap(r.env))),
+		Name:            Restore,
+		Resources:       r.restore.Spec.ContainerResources,
+		Env:             r.env,
+		EnvFrom:         r.envFrom,
+		VolumeMounts:    r.specificVolumeMounts,
+		Command:         r.command,
+		Args:            r.args,
+		Image:           intctrlutil.ReplaceImageRegistry(image),
 		ImagePullPolicy: corev1.PullIfNotPresent,
 	}
 

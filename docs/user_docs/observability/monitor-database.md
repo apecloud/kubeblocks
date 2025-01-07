@@ -10,325 +10,400 @@ import TabItem from '@theme/TabItem';
 
 # Monitor a database
 
-With the built-in database observability, you can observe the database health status and track and measure your database in real-time to optimize database performance. This section shows you how database monitoring tools work with KubeBlocks and how to use the function.
+This tutorial demonstrates how to configure the monitoring function for a PostgreSQL cluster, using Prometheus and Grafana.
 
-## For Playground/demo environment
+## Step 1. Install Prometheus Operator and Grafana
 
-KubeBlocks integrates open-source monitoring components, such as Prometheus, AlertManager, and Grafana, by Addons and adopts the custom `apecloud-otel-collector` to collect the monitoring indicators of databases and host machines. You can use these Addons for the test or demo environment.
+Install the Promethus Operator and Grafana to monitor the performance of a database. Skip this step if a Prometheus Operator is already installed in your environment.
 
-* `prometheus`: it includes Prometheus and AlertManager addons.
-* `grafana`: it includes Grafana monitoring addons.
-* `victoria-metrics`: it collects metrics from various sources and stores them to VictoriaMetrics.
-* `victoria-metrics-agent`: it collects metrics from various sources, relabel and filter the collected metrics and store them in VictoriaMetrics or any other storage systems via Prometheus `remote_write` protocol or via VictoriaMetrics `remote_write` protocol.
-* `alertmanager-webhook-adaptor`: it includes the notification extension and is used to extend the notification capability of AlertManager. Currently, the custom bots of Feishu, DingTalk, and Wechat Enterprise are supported.
-* `apecloud-otel-collector`: it is used to collect the indicators of databases and the host machine.
-
-If you are using KubeBlocks Playground, these addons are enabled by default.
-
-### Steps
-
-<Tabs>
-
-<TabItem value="kbcli" label="kbcli" default>
-
-1. View all built-in Addons and make sure the monitoring Addons are enabled. If the monitoring Addons are not enabled, [enable these addons](./../installation/install-with-kbcli/install-addons.md) first.
+1. Create a new namespace for Prometheus Operator.
 
    ```bash
-   # View all addons supported
-   kbcli addon list
-   ...
-   grafana                        Helm   Enabled                   true                                                                                    
-   alertmanager-webhook-adaptor   Helm   Enabled                   true                                                                                    
-   prometheus                     Helm   Enabled    alertmanager   true 
-   ...
+   kubectl create namespace monitoring
    ```
 
-2. Check whether the monitoring function of the cluster is enabled. If the monitoring function is enabled, the output shows `disableExporter: false`.
+2. Add the Prometheus Operator Helm repository.
 
    ```bash
-   kubectl get cluster mycluster -o yaml
-   >
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: Cluster
+   helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+   ```
+
+3. Install the Prometheus Operator.
+
+   ```bash
+   helm install prometheus-operator prometheus-community/kube-prometheus-stack --namespace monitoring
+   ```
+
+4. Verify the deployment of the Prometheus Operator. Make sure all pods are in the Ready state.
+
+   ```bash
+   kubectl get pods -n monitoring
+   ```
+
+5. Access the Prometheus and Grafana dashboards.
+
+   1. Check the service endpoints of Prometheus and Grafana.
+
+       ```bash
+       kubectl get svc -n monitoring
+       ```
+
+   2. Use port forwarding to access the Prometheus dashboard locally.
+
+       ```bash
+       kubectl port-forward svc/prometheus-operator-kube-p-prometheus -n monitoring 9090:9090
+       ```
+
+       You can also access the Prometheus dashboard by opening "http://localhost:9090" in your browser.
+
+   3. Retrieve the Grafana's login credential from the secret.
+
+       ```bash
+       kubectl get secrets prometheus-operator-grafana -n monitoring -o yaml
+       ```  
+
+   4. Use port forwarding to access the Grafana dashboard locally.
+
+       ```bash
+       kubectl port-forward svc/prometheus-operator-grafana -n monitoring 3000:80
+       ```
+
+       You can also access the Grafana dashboard by opening "http://localhost:3000" in your browser.
+
+6. Configure the selectors for PodMonitor and ServiceMonitor to match your monitoring requirements.
+
+   Prometheus Operator uses Prometheus CRD to set up a Prometheus instance and to customize configurations of replicas, PVCs, etc.
+
+   To update the configuration on PodMonitor and ServiceMonitor, modify the Prometheus CR according to your needs:
+
+   ```yaml
+   apiVersion: monitoring.coreos.com/v1
+   kind: Prometheus
    metadata:
-   ......
    spec:
-     ......
-     componentSpecs:
-     ......
-       disableExporter: false
+     podMonitorNamespaceSelector: {} # Namespaces to match for PodMonitors discovery
+     #  PodMonitors to be selected for target discovery. An empty label selector
+     #  matches all objects.
+     podMonitorSelector:
+       matchLabels:
+         release: prometheus # Make sure your PodMonitor CR labels matches the selector
+     serviceMonitorNamespaceSelector: {} # Namespaces to match for ServiceMonitors discovery
+     # ServiceMonitors to be selected for target discovery. An empty label selector
+     # matches all objects.
+     serviceMonitorSelector:
+       matchLabels:
+         release: prometheus # Make sure your ServiceMonitor CR labels matches the selector
    ```
 
-   If `disableExporter: false` is not shown in the output, it means the monitoring function of this cluster is not enabled and you need to enable it first.
+## Step 2. Monitor a database cluster
 
-   ```bash
-   kbcli cluster update mycluster --disable-exporter=false
-   ```
+This section demonstrates how to use Prometheus and Grafana for monitoring a database cluster.
 
-3. View the dashboard list.
+### Enable the monitoring function for a database cluster
 
-   ```bash
-   kbcli dashboard list
-   >
-   NAME                                 NAMESPACE   PORT    CREATED-TIME
-   kubeblocks-grafana                   kb-system   13000   Jul 24,2023 11:38 UTC+0800
-   kubeblocks-prometheus-alertmanager   kb-system   19093   Jul 24,2023 11:38 UTC+0800
-   kubeblocks-prometheus-server         kb-system   19090   Jul 24,2023 11:38 UTC+0800
-   ```
+#### For a new cluster
 
-4. Open and view the web console of a monitoring dashboard. For example,
-
-   ```bash
-   kbcli dashboard open kubeblocks-grafana
-   ```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
-
-#### Enable monitoring addons
+Create a new cluster with the following command, ensuring the monitoring exporter is enabled.
 
 :::note
 
-Here is an example of enabling the `prometheus` Addon. You can enable other monitoring addons by replacing `prometheus` in the example with the name of other Addons.
+Make sure `spec.componentSpecs.disableExporter` is set to `false` when creating a cluster.
 
 :::
 
-1. (Optional) Add the KubeBlocks repo. If you install KubeBlocks with Helm, just run `helm repo update`.
+```yaml
+cat <<EOF | kubectl apply -f -
+apiVersion: apps.kubeblocks.io/v1
+kind: Cluster
+metadata:
+  name: mycluster
+  namespace: demo
+spec:
+  terminationPolicy: Delete
+  clusterDef: postgresql
+  topology: replication
+  componentSpecs:
+    - name: postgresql
+      componentDef: postgresql
+      serviceVersion: "14.7.2"
+      disableExporter: false
+      labels:
+        apps.kubeblocks.postgres.patroni/scope: mycluster-postgresql
+      replicas: 2
+      resources:
+        limits:
+          cpu: "0.5"
+          memory: "0.5Gi"
+        requests:
+          cpu: "0.5"
+          memory: "0.5Gi"
+      volumeClaimTemplates:
+        - name: data
+          spec:
+            storageClassName: ""
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 20Gi
 
-   ```bash
-   helm repo add kubeblocks https://apecloud.github.io/helm-charts
-   helm repo update
-   ```
-
-2. View the addon versions.
-
-   ```bash
-   helm search repo kubeblocks/prometheus --devel --versions
-   ```
-
-3. Install the addon.
-
-   ```bash
-   helm install prometheus kubeblocks/prometheus --namespace kb-system --create-namespace
-   ```
-
-4. Verify whether this addon is installed.
-
-   The STATUS is deployed and this addon is installed successfully.
-
-   ```bash
-   helm list -A
-   >
-   NAME         NAMESPACE   REVISION    UPDATED                                 STATUS      CHART                APP VERSION
-   ......
-   prometheus   kb-system   1           2024-05-31 12:01:52.872584 +0800 CST    deployed    prometheus-15.16.1   2.39.1 
-   ```
-
-#### Enable the monitoring function for a database
-
-The open-source or customized Exporter is injected after the monitoring function is enabled. This Exporter can be found by the Prometheus server automatically and scrape monitoring indicators at regular intervals.
-
-If you disable the monitoring function when creating a cluster, run the command below to enable it.
-
-```bash
-kubectl patch cluster mycluster -n demo --type "json" -p '[{"op":"add","path":"/spec/componentSpecs/0/disableExporter","value":false}]'
+EOF
 ```
 
-If you want to disable the monitoring function, run the command below to disable it.
+#### For an existing cluster
 
-```bash
-kubectl patch cluster mycluster -n namespace --type "json" -p '[{"op":"add","path":"/spec/componentSpecs/0/disableExporter","value":true}]'
-```
-
-You can also edit the `cluster.yaml` to enable/disable the monitoring function.
-
-```bash
-kubectl edit cluster mycluster -n demo
-......
-componentSpecs:
-  - name: mysql
-    componentDefRef: mysql
-    enabledLogs:
-    - error
-    - general
-    - slow
-    disableExporter: false # Change this value
-```
-
-#### View the dashboard
-
-Use the `grafana` addon provided by KubeBlocks to view the dashboard.
-
-1. Get the username and password of the `grafana` addon.
-
-   ```bash
-   kubectl get secret grafana -n kb-system -o jsonpath='{.data.admin-user}' |base64 -d
-
-   kubectl get secret grafana -n kb-system -o jsonpath='{.data.admin-password}' |base64 -d
-   ```
-
-2. Run the command below to connect to the Grafana dashboard.
-
-   ```bash
-   kubectl port-forward svc/grafana -n kb-system 3000:80
-   >
-   Forwarding from 127.0.0.1:3000 -> 3000
-   Forwarding from [::1]:3000 -> 3000
-   Handling connection for 3000
-   ```
-
-3. Open the web browser and enter the address `127.0.0.1:3000` to visit the dashboard.
-4. Enter the username and password obtained from step 1.
-
-:::note
-
-If there is no data in the dashboard, you can check whether the job is `kubeblocks-service`. Enter `kubeblocks-service` in the job field and press the enter button.
-
-![monitoring](./../../img/api-monitoring.png)
-
-:::
-
-</TabItem>
-
-</Tabs>
-
-## For production environment
-
-For the production environment, it is highly recommended to build your monitoring system or purchase a third-party monitoring service.
-
-### Integrate dashboard and alert rules
-
-Kubeblocks provides Grafana Dashboards and Prometheus AlertRules for mainstream engines, which you can obtain from [the repository](https://github.com/apecloud/kubeblocks-mixin), or convert and customize according to your needs.
-
-For the importing method, refer to the tutorials of your third-party monitoring service.
-
-### Enable the monitoring function for a database
-
-Check whether the monitoring function of the cluster is enabled. If the monitoring function is enabled, the output shows `disableExporter: false`.
-
-<Tabs>
-
-<TabItem value="kbcli" label="kbcli" default>
+If a cluster already exists, you can run the command below to verify whether the monitoring exporter is enabled.
 
 ```bash
 kubectl get cluster mycluster -o yaml
->
+```
+
+View the output.
+
+```yaml
 apiVersion: apps.kubeblocks.io/v1alpha1
 kind: Cluster
 metadata:
-......
+...
 spec:
-   ......
+   ...
    componentSpecs:
-   ......
+   ...
       disableExporter: false
 ```
 
-If `disableExporter: false` is not shown in the output, it means the monitoring function of this cluster is not enabled and you need to enable it first.
+Setting `disableExporter: false` or leaving this field unset enables the monitoring exporter, which is the prerequisite of the monitoring function. If the output shows `disableExporter: true`, you need to change it to `false` to enable the exporter.
 
-```bash
-kbcli cluster update mycluster --disable-exporter=false
-```
+Note that updating `disableExporter` will restart all pods in the cluster.
 
-</TabItem>
+<Tabs>
 
-<TabItem value="kubectl" label="kubectl">
-
-If you disable the monitoring function when creating a cluster, run the command below to enable it.
+<TabItem value="kubectl patch" label="kubectl patch" default>
 
 ```bash
 kubectl patch cluster mycluster -n demo --type "json" -p '[{"op":"add","path":"/spec/componentSpecs/0/disableExporter","value":false}]'
 ```
 
-If you want to disable the monitoring function, run the command below to disable it.
+</TabItem>
 
-```bash
-kubectl patch cluster mycluster -n namespace --type "json" -p '[{"op":"add","path":"/spec/componentSpecs/0/disableExporter","value":true}]'
-```
+<TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
 
 You can also edit the `cluster.yaml` to enable/disable the monitoring function.
 
 ```bash
 kubectl edit cluster mycluster -n demo
-......
+```
+
+Edit the value of `disableExporter`.
+
+```yaml
+...
 componentSpecs:
-  - name: mysql
-    componentDefRef: mysql
-    enabledLogs:
-    - error
-    - general
-    - slow
-    disableExporter: true # Change this value
+...
+    disableExporter: true # Set to `false` to enable exporter
+...
 ```
 
 </TabItem>
 
 </Tabs>
 
-### View the dashboard
+When the cluster is running, each Pod should have a sidecar container, named `exporter` running the postgres-exporter.
 
-You can view the dashboard of the corresponding cluster via Grafana Web Console. For more detailed information, see the [Grafana dashboard documentation](https://grafana.com/docs/grafana/latest/dashboards/).
+### Create PodMonitor
 
-### (Optional) Enable remote write
+1. Query `scrapePath` and `scrapePort`.
 
-Remote write is an optional step and you can enable it based on your actual needs. KubeBlocks provides an Addon, `victoria-metrics-agent`, to push the monitoring data to a third-party monitoring system compatible with the Prometheus Remote Write protocol. Compared with the native Prometheus, [vmgent](https://docs.victoriametrics.com/vmagent.html) is lighter and supports the horizontal extension. For detailed settings, you can refer to [Victoria Metrics docs](https://artifacthub.io/packages/helm/victoriametrics/victoria-metrics-agent).
-
-<Tabs>
-
-<TabItem value="kbcli" label="kbcli" default>
-
-1. Enable data push.
-
-   You just need to provide the endpoint which supports the Prometheus Remote Write protocol and multiple endpoints can be supported. Refer to the tutorials of your third-party monitoring system for how to get an endpoint.
-
-   The following examples show how to enable data push by different options.
+   Retrieve the `scrapePath` and `scrapePort` from the Pod's exporter container.
 
    ```bash
-   # The default option. You only need to provide an endpoint with no verification.
-   # Endpoint example: http://localhost:8428/api/v1/write
-   kbcli addon enable victoria-metrics-agent --set remoteWriteUrls={http://<remoteWriteUrl>:<port>/<remote write path>}
+   kubectl get po mycluster-postgresql-0 -oyaml | yq '.spec.containers[] | select(.name=="exporter") | .ports '
    ```
+
+   <details>
+
+   <summary>Expected Output</summary>
 
    ```bash
-   # Basic Auth
-   kbcli addon enable victoria-metrics-agent --set "extraArgs.remoteWrite\.basicAuth\.username=<your username>,extraArgs.remoteWrite\.basicAuth\.password=<your password>,remoteWriteUrls={http://<remoteWriteUrl>:<port>/<remote write path>}"
+   - containerPort: 9187
+     name: http-metrics
+     protocol: TCP
    ```
 
-   ```bash
-   # TLS
-   kbcli addon enable victoria-metrics-agent --set "extraArgs.tls=true,extraArgs.tlsCertFile=<path to certifle>,extraArgs.tlsKeyFile=<path to keyfile>,remoteWriteUrls={http://<remoteWriteUrl>:<port>/<remote write path>}"
+   </details>
+
+2. Create `PodMonitor`.
+
+   Apply the `PodMonitor` file to monitor the cluster. Below are examples for different engines and you can edit the values according to your needs.
+
+   <Tabs>
+
+   <TabItem value="ApeCloud MySQL" label="ApeCloud MySQL">
+
+   You can also find the latest example YAML file in the [KubeBlocks Addons repo](https://github.com/apecloud/kubeblocks-addons/blob/main/examples/apecloud-mysql/pod-monitor.yaml).
+
+   ```yaml
+   kubectl apply -f - <<EOF
+   apiVersion: monitoring.coreos.com/v1
+   kind: PodMonitor
+   metadata:
+     name: mycluster-pod-monitor
+     namespace: monitoring # Note: this is namespace for prometheus operator
+     labels:               # This is labels set in `prometheus.spec.podMonitorSelector`
+       release: prometheus
+   spec:
+     jobLabel: kubeblocks-service
+     # Define the labels which are transferred from the
+     # associated Kubernetes `Pod` object onto the ingested metrics
+     # set the labels w.r.t your own needs
+     podTargetLabels:
+     - app.kubernetes.io/instance
+     - app.kubernetes.io/managed-by
+     - apps.kubeblocks.io/component-name
+     - apps.kubeblocks.io/pod-name
+     podMetricsEndpoints:
+       - path: /metrics
+         port: http-metrics
+         scheme: http
+     namespaceSelector:
+       matchNames:
+         - default
+     selector:
+       matchLabels:
+         app.kubernetes.io/instance: mycluster
+         apps.kubeblocks.io/component-name: mysql
+   EOF
    ```
 
-   ```bash
-   # AWS SigV4
-   kbcli addon enable victoria-metrics-agent --set "extraArgs.remoteWrite\.aws\.region=<your AMP region>,extraArgs.remoteWrite\.aws\.accessKey=<your accessKey>,extraArgs.remoteWrite\.aws\.secretKey=<your secretKey>,remoteWriteUrls={http://<remoteWriteUrl>:<port>/<remote write path>}"
+   </TabItem>
+
+   <TabItem value="MySQL Community Edition" label="MySQL Community Edition">
+
+   You can also find the latest example YAML file in the [KubeBlocks Addons repo](https://github.com/apecloud/kubeblocks-addons/blob/main/examples/mysql/pod-monitor.yaml).
+
+   ```yaml
+   kubectl apply -f - <<EOF
+   apiVersion: monitoring.coreos.com/v1
+   kind: PodMonitor
+   metadata:
+     name: mycluster-pod-monitor
+     namespace: monitoring # Note: this is namespace for prometheus operator
+     labels:               # This is labels set in `prometheus.spec.podMonitorSelector`
+       release: prometheus
+   spec:
+     jobLabel: kubeblocks-service
+     # Define the labels which are transferred from the
+     # associated Kubernetes `Pod` object onto the ingested metrics
+     # set the labels w.r.t your own needs
+     podTargetLabels:
+     - app.kubernetes.io/instance
+     - app.kubernetes.io/managed-by
+     - apps.kubeblocks.io/component-name
+     - apps.kubeblocks.io/pod-name
+     podMetricsEndpoints:
+       - path: /metrics
+         port: http-metrics
+         scheme: http
+     namespaceSelector:
+       matchNames:
+         - default
+     selector:
+       matchLabels:
+         app.kubernetes.io/instance: mycluster
+         apps.kubeblocks.io/component-name: mysql
+   EOF
    ```
 
-2. (Optional) Horizontally scale the `victoria-metrics-agent` addon.
+   </TabItem>
 
-   When the amount of database instances continues to increase, a single-node vmagent becomes the bottleneck. This problem can be solved by scaling vmagent. The multiple-node vmagent automatically divides the task of data collection according to the Hash strategy.
+   <TabItem value="PostgreSQL" label="PostgreSQL">
 
-   ```bash
-   kbcli addon enable victoria-metrics-agent --replicas <replica count> --set remoteWriteUrls={http://<remoteWriteUrl>:<port>/<remote write path>}
+   You can also find the latest example YAML file in the [KubeBlocks Addons repo](https://github.com/apecloud/kubeblocks-addons/blob/main/examples/postgresql/pod-monitor.yaml).
+
+   ```yaml
+   kubectl apply -f - <<EOF
+   apiVersion: monitoring.coreos.com/v1
+   kind: PodMonitor
+   metadata:
+     name: mycluster-pod-monitor
+     namespace: monitoring # Note: this is namespace for prometheus operator
+     labels:               # This is labels set in `prometheus.spec.podMonitorSelector`
+       release: prometheus
+   spec:
+     jobLabel: kubeblocks-service
+     # Define the labels which are transferred from the
+     # associated Kubernetes `Pod` object onto the ingested metrics
+     # set the labels w.r.t your own needs
+     podTargetLabels:
+     - app.kubernetes.io/instance
+     - app.kubernetes.io/managed-by
+     - apps.kubeblocks.io/component-name
+     - apps.kubeblocks.io/pod-name
+     podMetricsEndpoints:
+       - path: /metrics
+         port: http-metrics
+         scheme: http
+     namespaceSelector:
+       matchNames:
+         - default
+     selector:
+       matchLabels:
+         app.kubernetes.io/instance: mycluster
+         apps.kubeblocks.io/component-name: mysql
+   EOF
    ```
 
-3. (Optional) Disable the `victoria-metrics-agent` addon.
+   </TabItem>
 
-   ```bash
-   kbcli addon disable victoria-metrics-agent
+   <TabItem value="Redis" label="Redis">
+
+   You can also find the latest example YAML file in the [KubeBlocks Addons repo](https://github.com/apecloud/kubeblocks-addons/blob/main/examples/redis/pod-monitor.yaml).
+
+   ```yaml
+   kubectl apply -f - <<EOF
+   apiVersion: monitoring.coreos.com/v1
+   kind: PodMonitor
+   metadata:
+     name: mycluster-pod-monitor
+     namespace: monitoring # Note: this is namespace for prometheus operator
+     labels:               # This is labels set in `prometheus.spec.podMonitorSelector`
+       release: prometheus
+   spec:
+     jobLabel: kubeblocks-service
+     # Define the labels which are transferred from the
+     # associated Kubernetes `Pod` object onto the ingested metrics
+     # set the labels w.r.t your own needs
+     podTargetLabels:
+     - app.kubernetes.io/instance
+     - app.kubernetes.io/managed-by
+     - apps.kubeblocks.io/component-name
+     - apps.kubeblocks.io/pod-name
+     podMetricsEndpoints:
+       - path: /metrics
+         port: http-metrics
+         scheme: http
+     namespaceSelector:
+       matchNames:
+         - default
+     selector:
+       matchLabels:
+         app.kubernetes.io/instance: mycluster
+         apps.kubeblocks.io/component-name: redis
+   EOF
    ```
 
-</TabItem>
+   </TabItem>
 
-<TabItem value="kubectl" label="kubectl">
+   </Tabs>
 
-Install the `victoria-metrics-agent` Addon.
+3. Access the Grafana dashboard.
 
-```bash
-helm install vm kubeblocks/victoria-metrics-agent --set remoteWriteUrls={http://<remoteWriteUrl>:<port>/<remote write path>}
-```
+   Log in to the Grafana dashboard and import the dashboard.
 
-</TabItem>
+   There is a pre-configured dashboard for PostgreSQL under the `APPS / PostgreSQL` folder in the Grafana dashboard. And more dashboards can be found in the [Grafana dashboard store](https://grafana.com/grafana/dashboards/).
 
-</Tabs>
+:::note
+
+Make sure the labels (such as the values of path and port in endpoint) are set correctly in the `PodMonitor` file to match your dashboard.
+
+:::

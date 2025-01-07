@@ -86,12 +86,16 @@ func (r *ComponentVersionReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return intctrlutil.CheckedRequeueWithError(err, rctx.Log, "")
 	}
 
+	if !intctrlutil.ObjectAPIVersionSupported(compVersion) {
+		return intctrlutil.Reconciled()
+	}
+
 	return r.reconcile(rctx, compVersion)
 }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ComponentVersionReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return intctrlutil.NewControllerManagedBy(mgr, &appsv1.ComponentVersion{}, &appsv1.ComponentDefinition{}).
+	return intctrlutil.NewControllerManagedBy(mgr).
 		For(&appsv1.ComponentVersion{}).
 		Watches(&appsv1.ComponentDefinition{}, handler.EnqueueRequestsFromMapFunc(r.compatibleCompVersion)).
 		Complete(r)
@@ -247,15 +251,17 @@ func (r *ComponentVersionReconciler) status(cli client.Client, rctx intctrlutil.
 }
 
 func (r *ComponentVersionReconciler) supportedServiceVersions(compVersion *appsv1.ComponentVersion) string {
-	versions := map[string]bool{}
+	versionSet := sets.New[string]()
 	for _, release := range compVersion.Spec.Releases {
 		if len(release.ServiceVersion) > 0 {
-			versions[release.ServiceVersion] = true
+			versionSet.Insert(release.ServiceVersion)
 		}
 	}
-	keys := maps.Keys(versions)
-	slices.Sort(keys)
-	return strings.Join(keys, ",") // TODO(API): service versions length
+	versions := versionSet.UnsortedList()
+	slices.SortFunc(versions, func(a, b string) int {
+		return serviceVersionComparator(a, b) * -1
+	})
+	return strings.Join(versions, ",") // TODO(API): service versions length
 }
 
 func (r *ComponentVersionReconciler) updateSupportedCompDefLabels(cli client.Client, rctx intctrlutil.RequestCtx,
@@ -415,7 +421,7 @@ func resolveCompDefinitionNServiceVersion(ctx context.Context, cli client.Reader
 	// component definitions that support the service version
 	compatibleCompDefs := serviceVersionToCompDefs[serviceVersion]
 	if len(compatibleCompDefs) == 0 {
-		return compDef, serviceVersion, fmt.Errorf("no matched component definition found: %s", compDefName)
+		return compDef, serviceVersion, fmt.Errorf(`no matched component definition found with componentDef "%s" and serviceVersion "%s"`, compDefName, serviceVersion)
 	}
 
 	// choose the latest one

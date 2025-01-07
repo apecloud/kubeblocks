@@ -35,80 +35,7 @@ It is recommended to use kbcli to create an ApeCloud MySQL Proxy Cluster.
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-1. Enable the etcd Addon and create an etcd cluster.
-
-   1. Install and enable the etcd Addon. You need to install the etcd Addon first since the etcd Addon is not installed by default. Refer to [Addons installation tutorial](./../../installation/install-with-kbcli/install-addons.md) for details.
-
-       ```bash
-       # 1. Check whether the KubeBlocks Addon index is added
-       kbcli addon index list
-
-       # If the list is empty, add the index
-       kbcli addon index add kubeblocks https://github.com/apecloud/block-index.git
-
-       # 2. Search the etcd Addon
-       kbcli addon search etcd
-
-       # 3. Install the etcd Addon
-       kbcli addon install etcd --index kubeblocks --version 0.9.0
-
-       # 4. Enable the etcd Addon
-       kbcli addon enable etcd
-
-       # 5. Check whether the etcd Addon is enabled.
-       kbcli addon list
-       ```
-
-   2. Create an etcd cluster.
-
-       ```bash
-       kbcli cluster create myetcd --cluster-definition etcd
-       ```
-
-   3. Check the status of the etcd service
-
-       ```bash
-       kbcli cluster list myetcd
-       ```
-
-2. View the etcd service address or the etcd pod address.
-
-   ```bash
-   kubectl get service
-   >
-   NAME                             TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)                                                  AGE
-   kubernetes                       ClusterIP   10.96.0.1        <none>        443/TCP                                                  85d
-   myetcd-etcd                      ClusterIP   10.101.227.143   <none>        2379/TCP                                                 111s
-   myetcd-etcd-headless             ClusterIP   None             <none>        2379/TCP,2380/TCP,3501/TCP,50001/TCP                     111s
-   ```
-
-3. Create an ApeCloud MySQL Proxy cluster.
-
-    ```bash
-    helm repo add kubeblocks https://apecloud.github.io/helm-charts
-
-    helm install myproxy kubeblocks/apecloud-mysql-cluster --set mode=raftGroup,proxyEnabled=true,etcd.serviceReference.endpoint="etcd-cluster-etcd.default.svc.cluster.local:2379"
-    ```
-
-4. Check the status of the clusters.
-
-   ```bash
-   kbcli get cluster
-
-   kbcli get pods
-   ```
-
-   You can also enter the etcd container or wesql-scale container to view the configuration of wesql-scale or to check the availability of the etcd service.
-
-   ```bash
-   etcdctl --endpoints=http://etcd-cluster-etcd.default.svc.cluster.local:2379 get /vitess --prefix --keys-only
-   ```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 1. Add the KubeBlocks repository.
 
@@ -221,6 +148,79 @@ helm install myproxy kubeblocks/apecloud-mysql-cluster --version=v0.9.0 --set mo
 
 </TabItem>
 
+<TabItem value="kbcli" label="kbcli">
+
+1. Enable the etcd Addon and create an etcd cluster.
+
+   1. Install and enable the etcd Addon. You need to install the etcd Addon first since the etcd Addon is not installed by default. Refer to [Addons installation tutorial](./../../installation/install-addons.md) for details.
+
+       ```bash
+       # 1. Check whether the KubeBlocks Addon index is added
+       kbcli addon index list
+
+       # If the list is empty, add the index
+       kbcli addon index add kubeblocks https://github.com/apecloud/block-index.git
+
+       # 2. Search the etcd Addon
+       kbcli addon search etcd
+
+       # 3. Install the etcd Addon
+       kbcli addon install etcd --index kubeblocks --version 0.9.2
+
+       # 4. Enable the etcd Addon
+       kbcli addon enable etcd
+
+       # 5. Check whether the etcd Addon is enabled.
+       kbcli addon list
+       ```
+
+   2. Create an etcd cluster.
+
+       ```bash
+       kbcli cluster create myetcd --cluster-definition etcd
+       ```
+
+   3. Check the status of the etcd service
+
+       ```bash
+       kbcli cluster list myetcd
+       ```
+
+2. View the etcd service address or the etcd pod address.
+
+   ```bash
+   kubectl get service
+   >
+   NAME                             TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)                                                  AGE
+   kubernetes                       ClusterIP   10.96.0.1        <none>        443/TCP                                                  85d
+   myetcd-etcd                      ClusterIP   10.101.227.143   <none>        2379/TCP                                                 111s
+   myetcd-etcd-headless             ClusterIP   None             <none>        2379/TCP,2380/TCP,3501/TCP,50001/TCP                     111s
+   ```
+
+3. Create an ApeCloud MySQL Proxy cluster.
+
+    ```bash
+    helm repo add kubeblocks https://apecloud.github.io/helm-charts
+
+    helm install myproxy kubeblocks/apecloud-mysql-cluster --set mode=raftGroup,proxyEnabled=true,etcd.serviceReference.endpoint="etcd-cluster-etcd.default.svc.cluster.local:2379"
+    ```
+
+4. Check the status of the clusters.
+
+   ```bash
+   kbcli get cluster
+
+   kbcli get pods
+   ```
+
+   You can also enter the etcd container or wesql-scale container to view the configuration of wesql-scale or to check the availability of the etcd service.
+
+   ```bash
+   etcdctl --endpoints=http://etcd-cluster-etcd.default.svc.cluster.local:2379 get /vitess --prefix --keys-only
+   ```
+
+</TabItem>
+
 </Tabs>
 
 ## Enable/Disable Proxy dynamically
@@ -245,17 +245,7 @@ ApeCloud MySQL Proxy is routed through the `vtgate` component, and the way the M
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-Run the command below to connect to the Proxy Cluster.
-
-```bash
-kbcli cluster connect myproxy --components vtgate
-```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 1. Expose the port of VTGate to the localhost so that the localhost can access the Proxy.
 
@@ -271,23 +261,23 @@ kbcli cluster connect myproxy --components vtgate
 
 </TabItem>
 
+<TabItem value="kbcli" label="kbcli">
+
+Run the command below to connect to the Proxy Cluster.
+
+```bash
+kbcli cluster connect myproxy --components vtgate
+```
+
+</TabItem>
+
 </Tabs>
 
 ### Connect Proxy Cluster by MySQL Server
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-Run the command below to connect to the MySQL Server.
-
-```bash
-kbcli cluster connect myproxy
-```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 1. Expose the port of the MySQL Server to the localhost so that the localhost can access the MySQL Server.
 
@@ -300,6 +290,16 @@ kbcli cluster connect myproxy
    ```bash
    mysql -h 127.0.0.1 -P 3306
    ```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+Run the command below to connect to the MySQL Server.
+
+```bash
+kbcli cluster connect myproxy
+```
 
 </TabItem>
 
@@ -327,102 +327,7 @@ while true; do date; kubectl port-forward svc/vt-mysql 3306:3306; sleep 0.5; don
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-VTGate, VTConsensus, and VTTablet support parameter configuration. You can configure VTGate and VTConsensus by using `--components` to specify a component and configure VTTablet by using `--components=mysql --config-specs=vttablet-config` to specify both a component and a configuration file template since VTTablet is the sidecar of the MySQL component.
-
-### View parameter details
-
-* View the details of the current configuration file.
-
-   ```bash
-   # vtgate
-   kbcli cluster describe-config myproxy --components vtgate --show-detail
-   
-   # vtcontroller
-   kbcli cluster describe-config myproxy --components vtcontroller --show-detail
-   
-   # vttablet
-   kbcli cluster describe-config myproxy --components mysql --show-detail --config-specs vttablet-config
-   ```
-
-* View the parameter descriptions.
-
-   ```bash
-   # vtgate
-   kbcli cluster explain-config myproxy --components vtgate
-
-   # vttablet
-   kbcli cluster explain-config myproxy --components mysql --config-specs=vttablet-config
-   ```
-
-* View the definition of a specified parameter.
-
-   ```bash
-   kbcli cluster explain-config myproxy --components vtgate --param=healthcheck_timeout
-   ```
-
-### Reconfigure parameters
-
-1. View the current values in the MySQL Server.
-
-   ```bash
-   kbcli cluster connect myproxy --components=vtgate
-   ```
-
-   ```bash
-   mysql> show variables like '%healthcheck_timeout%';
-   ```
-
-   ```bash
-   mysql> show variables like '%health_check_interval%';
-   ```
-
-2. Configure the `healthcheck_timeout` for VTGate and the `health_check_interval` for VTTablet.
-
-   You can use `--set` flag or edit the parameter configuration file to edit values.
-
-   * By using `--set` flag
-
-      ```bash
-      # vtgate
-      kbcli cluster configure myproxy --components vtgate --set=healthcheck_timeout=2s
-
-      # vttablet
-      kbcli cluster configure myproxy --set=health_check_interval=4s --components=mysql --config-spec=vttablet-config
-      ```
-
-   * By editing the parameter configuration file
-
-      ```bash
-      kbcli cluster edit-config myproxy --components vtgate
-      ```
-
-    :::note
-
-    After the `vtgate` parameter values configuration command is executed, a new vtgate Pod is started and the old vtgate Pod is terminated. You can run the command below to monitor whether the old Pod is terminated.
-
-    ```bash
-    kubectl get pod <vtgate-pod-name> -w
-    ```
-
-    :::
-
-3. Use the output command to view the configuration status. For example,
-
-   ```bash
-   kbcli cluster describe-ops myproxy -reconfiguring-lth8d -n default
-   ```
-
-   :::note
-
-   For more information about parameter configuration, refer to [Configuration](./../configuration/configuration.md).
-
-   :::
-
-</TabItem>
-
-<TabItem value="Edit Config File" label="Edit Config File">
+<TabItem value="Edit Config File" label="Edit Config File" default>
 
 1. Get the configuration file of this cluster.
 
@@ -530,6 +435,101 @@ Apply an OpsRequest to the specified cluster. Configure the parameters according
 
 </TabItem>
 
+<TabItem value="kbcli" label="kbcli">
+
+VTGate, VTConsensus, and VTTablet support parameter configuration. You can configure VTGate and VTConsensus by using `--components` to specify a component and configure VTTablet by using `--components=mysql --config-specs=vttablet-config` to specify both a component and a configuration file template since VTTablet is the sidecar of the MySQL component.
+
+### View parameter details
+
+* View the details of the current configuration file.
+
+   ```bash
+   # vtgate
+   kbcli cluster describe-config myproxy --components vtgate --show-detail
+   
+   # vtcontroller
+   kbcli cluster describe-config myproxy --components vtcontroller --show-detail
+   
+   # vttablet
+   kbcli cluster describe-config myproxy --components mysql --show-detail --config-specs vttablet-config
+   ```
+
+* View the parameter descriptions.
+
+   ```bash
+   # vtgate
+   kbcli cluster explain-config myproxy --components vtgate
+
+   # vttablet
+   kbcli cluster explain-config myproxy --components mysql --config-specs=vttablet-config
+   ```
+
+* View the definition of a specified parameter.
+
+   ```bash
+   kbcli cluster explain-config myproxy --components vtgate --param=healthcheck_timeout
+   ```
+
+### Reconfigure parameters
+
+1. View the current values in the MySQL Server.
+
+   ```bash
+   kbcli cluster connect myproxy --components=vtgate
+   ```
+
+   ```bash
+   mysql> show variables like '%healthcheck_timeout%';
+   ```
+
+   ```bash
+   mysql> show variables like '%health_check_interval%';
+   ```
+
+2. Configure the `healthcheck_timeout` for VTGate and the `health_check_interval` for VTTablet.
+
+   You can use `--set` flag or edit the parameter configuration file to edit values.
+
+   * By using `--set` flag
+
+      ```bash
+      # vtgate
+      kbcli cluster configure myproxy --components vtgate --set=healthcheck_timeout=2s
+
+      # vttablet
+      kbcli cluster configure myproxy --set=health_check_interval=4s --components=mysql --config-spec=vttablet-config
+      ```
+
+   * By editing the parameter configuration file
+
+      ```bash
+      kbcli cluster edit-config myproxy --components vtgate
+      ```
+
+    :::note
+
+    After the `vtgate` parameter values configuration command is executed, a new vtgate Pod is started and the old vtgate Pod is terminated. You can run the command below to monitor whether the old Pod is terminated.
+
+    ```bash
+    kubectl get pod <vtgate-pod-name> -w
+    ```
+
+    :::
+
+3. Use the output command to view the configuration status. For example,
+
+   ```bash
+   kbcli cluster describe-ops myproxy -reconfiguring-lth8d -n default
+   ```
+
+   :::note
+
+   For more information about parameter configuration, refer to [Configuration](./../configuration/configuration.md).
+
+   :::
+
+</TabItem>
+
 </Tabs>
 
 ## Log
@@ -538,32 +538,7 @@ You can view the log files of components, Pods, and containers by both kbcli and
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-View the log of different components.
-
-```bash
-kbcli cluster list-logs myproxy
-kbcli cluster list-logs myproxy --components vtgate
-kbcli cluster list-logs myproxy --components vtcontroller
-kbcli cluster list-logs myproxy --components mysql
-```
-
-View the log of a Pod.
-
-```bash
-kbcli cluster logs myproxy --instance myproxy-vtgate-85bdcf99df-wbmnl
-```
-
-View the log of a container in a Pod.
-
-```bash
-kbcli cluster logs myproxy --instance myproxy-mysql-0 -c vttablet
-```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 View the log of VTGate.
 
@@ -593,105 +568,28 @@ ls /vtdataroot
 
 </TabItem>
 
-</Tabs>
+<TabItem value="kbcli" label="kbcli">
 
-## Monitoring
+View the log of different components.
 
-:::note
+```bash
+kbcli cluster list-logs myproxy
+kbcli cluster list-logs myproxy --components vtgate
+kbcli cluster list-logs myproxy --components vtcontroller
+kbcli cluster list-logs myproxy --components mysql
+```
 
-In the production environment, all monitoring Addons are disabled by default when installing KubeBlocks. You can enable these Addons but it is highly recommended to build your monitoring system or purchase a third-party monitoring service. For details, refer to [Monitoring](./../../observability/monitor-database.md).
+View the log of a Pod.
 
-:::
+```bash
+kbcli cluster logs myproxy --instance myproxy-vtgate-85bdcf99df-wbmnl
+```
 
-<Tabs>
+View the log of a container in a Pod.
 
-<TabItem value="kbcli" label="kbcli" default>
-
-1. Enable the monitoring function.
-
-   ```bash
-   kbcli cluster update myproxy --disable-exporter=false
-   ```
-
-2. View the Addon list and enable the Grafana Addon.
-
-   ```bash
-   kbcli addon list 
-   
-   kbcli addon enable grafana
-   ```
-
-3. View the dashboard list.
-
-   ```bash
-   kbcli dashboard list
-   ```
-
-4. Open the Grafana dashboard.
-
-   ```bash
-   kbcli dashboard open kubeblocks-grafana
-   ```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
-
-1. Enable the monitoring Addons.
-
-   For the testing/demo environment, run the commands below to enable the monitoring Addons provided by KubeBlocks.
-
-   ```bash
-   helm install prometheus kubeblocks/prometheus --namespace kb-system --create-namespace
-   helm install prometheus kubeblocks/prometheus --namespace kb-system --create-namespace
-   helm install prometheus kubeblocks/prometheus --namespace kb-system --create-namespace
-   ```
-
-   For the production environment, you can integrate the monitoring components. For details, you can refer to the relevant docs provided by the monitoring tools.
-
-2. Check whether the monitoring function of this proxy cluster is enabled.
-
-   ```bash
-   kubectl get cluster myproxy -o yaml
-   ```
-
-   If the output YAML file shows `disableExporter: false`, the monitoring function of this proxy cluster is enabled.
-
-   If the monitoring function is not enabled, run the command below to enable it first.
-
-   ```bash
-   kubectl patch cluster mycluster -n demo --type "json" -p '[{"op":"add","path":"/spec/componentSpecs/0/disableExporter","value":false}]'
-   ```
-
-3. View the dashboard.
-
-   For the testing/demo environment, run the commands below to view the Grafana dashboard.
-
-   ```bash
-   # 1. Get the username and password 
-   kubectl get secret grafana -n kb-system -o jsonpath='{.data.admin-user}' |base64 -d
-
-   kubectl get secret grafana -n kb-system -o jsonpath='{.data.admin-password}' |base64 -d
-
-   # 2. Connect to the Grafana dashboard
-   kubectl port-forward svc/grafana -n kb-system 3000:8
-
-   # 3. Open the web browser and enter the address 127.0.0.1:3000 to visit the dashboard.
-
-   # 4. Enter the username and password obtained from step 1.
-   ```
-
-   For the production environment, you can view the dashboard of the corresponding cluster via Grafana Web Console. For more detailed information, see [the Grafana dashboard documentation](https://grafana.com/docs/grafana/latest/dashboards/).
-
-:::note
-
-1. If there is no data in the dashboard, you can check whether the job is `kubeblocks-service`. Enter `kubeblocks-service` in the job field and press the enter button.
-
-   ![Monitoring dashboard](./../../../img/api-monitoring.png)
-
-2. For more details on the monitoring function, you can refer to [Monitoring](./../../observability/monitor-database.md).
-
-:::
+```bash
+kbcli cluster logs myproxy --instance myproxy-mysql-0 -c vttablet
+```
 
 </TabItem>
 
@@ -703,27 +601,7 @@ You can enable the read-write splitting function.
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-```bash
-kbcli cluster configure myproxy --components vtgate --set=read_write_splitting_policy=random
-```
-
-You can also set the ratio for read-write splitting and here is an example of directing 70% flow to the read-only node.
-
-```bash
-kbcli cluster configure myproxy --components vtgate --set=read_write_splitting_ratio=70
-```
-
-Moreover, you can [use Grafana](#monitoring) or run `show workload` in the VTGate terminal to view the flow distribution.
-
-```bash
-show workload;
-```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 1. Get the configuration file of this cluster.
 
@@ -775,23 +653,33 @@ spec:
 
 </TabItem>
 
+<TabItem value="kbcli" label="kbcli">
+
+```bash
+kbcli cluster configure myproxy --components vtgate --set=read_write_splitting_policy=random
+```
+
+You can also set the ratio for read-write splitting and here is an example of directing 70% flow to the read-only node.
+
+```bash
+kbcli cluster configure myproxy --components vtgate --set=read_write_splitting_ratio=70
+```
+
+Moreover, you can run `show workload` in the VTGate terminal to view the flow distribution.
+
+```bash
+show workload;
+```
+
+</TabItem>
+
 </Tabs>
 
 ## Transparent failover
 
 <Tabs>
 
-<TabItem value="kbcli" label="kbcli" default>
-
-Run the command below to implement transparent failover.
-
-```bash
-kbcli cluster configure myproxy --components vtgate --set=enable_buffer=true
-```
-
-</TabItem>
-
-<TabItem value="kubectl" label="kubectl">
+<TabItem value="kubectl" label="kubectl" default>
 
 1. Get the configuration file of this cluster.
 
@@ -819,6 +707,16 @@ kbcli cluster configure myproxy --components vtgate --set=enable_buffer=true
        name: vtgate-config
        payload: {}
    ```
+
+</TabItem>
+
+<TabItem value="kbcli" label="kbcli">
+
+Run the command below to implement transparent failover.
+
+```bash
+kbcli cluster configure myproxy --components vtgate --set=enable_buffer=true
+```
 
 </TabItem>
 

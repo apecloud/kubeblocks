@@ -116,18 +116,6 @@ var _ = Describe("instance_set builder", func() {
 			},
 		}
 		strategyType := apps.OnDeleteStatefulSetStrategyType
-		delay := int32(10)
-		roleProbe := workloads.RoleProbe{InitialDelaySeconds: delay}
-		actions := []workloads.Action{
-			{
-				Image:   "foo-1",
-				Command: []string{"bar-1"},
-			},
-		}
-		action := workloads.Action{
-			Image:   "foo-2",
-			Command: []string{"bar-2"},
-		}
 		memberUpdateStrategy := workloads.BestEffortParallelUpdateStrategy
 		paused := true
 		credential := workloads.Credential{
@@ -160,9 +148,6 @@ var _ = Describe("instance_set builder", func() {
 			SetPodUpdatePolicy(podUpdatePolicy).
 			SetUpdateStrategy(strategy).
 			SetUpdateStrategyType(strategyType).
-			SetRoleProbe(&roleProbe).
-			SetCustomHandler(actions).
-			AddCustomHandler(action).
 			SetMemberUpdateStrategy(&memberUpdateStrategy).
 			SetPaused(paused).
 			SetCredential(credential).
@@ -196,11 +181,6 @@ var _ = Describe("instance_set builder", func() {
 		Expect(*its.Spec.UpdateStrategy.RollingUpdate.Partition).Should(Equal(partition))
 		Expect(its.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable).ShouldNot(BeNil())
 		Expect(its.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable).ShouldNot(Equal(maxUnavailable))
-		Expect(its.Spec.RoleProbe).ShouldNot(BeNil())
-		Expect(its.Spec.RoleProbe.InitialDelaySeconds).Should(Equal(delay))
-		Expect(its.Spec.RoleProbe.CustomHandler).Should(HaveLen(2))
-		Expect(its.Spec.RoleProbe.CustomHandler[0]).Should(Equal(actions[0]))
-		Expect(its.Spec.RoleProbe.CustomHandler[1]).Should(Equal(action))
 		Expect(its.Spec.MemberUpdateStrategy).ShouldNot(BeNil())
 		Expect(*its.Spec.MemberUpdateStrategy).Should(Equal(memberUpdateStrategy))
 		Expect(its.Spec.Paused).Should(Equal(paused))

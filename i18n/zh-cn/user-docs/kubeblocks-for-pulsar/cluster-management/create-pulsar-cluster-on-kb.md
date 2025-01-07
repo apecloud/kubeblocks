@@ -13,7 +13,7 @@ import TabItem from '@theme/TabItem';
 
 KubeBlocks 可以通过良好的抽象快速集成新引擎，并支持 Pulsar 集群的创建和删除、集群组件的垂直扩缩容和水平扩缩容、存储扩容、重启和配置更改等。
 
-本系列文档重点展示 KubeBlocks 对 Pulsar 日常运维能力的支持，包括集群创建、删除、重启等基本生命周期操作，以及水平扩容、垂直扩容、存储扩容、配置变更、监控等高阶操作。
+本系列文档重点展示 KubeBlocks 对 Pulsar 日常运维能力的支持，包括集群创建、删除、重启等基本生命周期操作，以及水平扩容、垂直扩容、存储扩容、配置变更等高阶操作。
 
 ## 环境推荐
 
@@ -79,103 +79,123 @@ KubeBlocks 可以通过良好的抽象快速集成新引擎，并支持 Pulsar �
 
 ## 创建 Pulsar 集群
 
-1. 在本地创建 `helm` 使用的 Pulsar 集群模板文件 `values-production.yaml`。
-  
-   将以下信息复制到本地文件 `values-production.yaml` 中。
+1. 创建基础模式的 Pulsar 集群。如需创建其他集群模式，您可查看 [GitHub 仓库中的示例](https://github.com/apecloud/kubeblocks-addons/tree/main/examples/pulsar)。
 
-   ```bash
-   ## 配置 Bookies
-   bookies:
-     resources:
-       limits:
-         memory: 8Gi
-       requests:
-         cpu: 2
-         memory: 8Gi
-
-     persistence:
-       data:
-         storageClassName: kb-default-sc
-         size: 128Gi
-       log:
-         storageClassName: kb-default-sc
-         size: 64Gi
-
-   ## 配置 Zookeeper
-   zookeeper:
-     resources:
-       limits:
-         memory: 2Gi
-       requests:
-         cpu: 1
-         memory: 2Gi
-
-     persistence:
-       data:
-         storageClassName: kb-default-sc
-         size: 20Gi
-       log:
-         storageClassName: kb-default-sc 
-         size: 20Gi
-        
-   broker:
-     replicaCount: 3
-     resources:
-       limits:
-         memory: 8Gi
-       requests:
-         cpu: 2
-         memory: 8Gi
+   ```yaml
+   cat <<EOF | kubectl apply -f -
+   apiVersion: apps.kubeblocks.io/v1
+   kind: Cluster
+   metadata:
+     name: mycluster
+     namespace: demo
+   spec:
+     terminationPolicy: Delete
+     clusterDef: pulsar
+     topology: pulsar-basic-cluster
+     services:
+       - name: broker-bootstrap
+         serviceName: broker-bootstrap
+         componentSelector: broker
+         spec:
+           type: ClusterIP
+           ports:
+             - name: pulsar
+               port: 6650
+               targetPort: 6650
+             - name: http
+               port: 80
+               targetPort: 8080
+             - name: kafka-client
+               port: 9092
+               targetPort: 9092
+       - name: zookeeper
+         serviceName: zookeeper
+         componentSelector: zookeeper
+         spec:
+           type: ClusterIP
+           ports:
+             - name: client
+               port: 2181
+               targetPort: 2181
+     componentSpecs:
+       - name: broker
+         serviceVersion: 3.0.2
+         replicas: 1
+         env:
+           - name: KB_PULSAR_BROKER_NODEPORT
+             value: "false"
+         resources:
+           limits:
+             cpu: "1"
+             memory: "512Mi"
+           requests:
+             cpu: "200m"
+             memory: "512Mi"
+       - name: bookies
+         serviceVersion: 3.0.2
+         replicas: 4
+         resources:
+           limits:
+             cpu: "1"
+             memory: "512Mi"
+           requests:
+             cpu: "200m"
+             memory: "512Mi"
+         volumeClaimTemplates:
+           - name: ledgers
+             spec:
+               accessModes:
+                 - ReadWriteOnce
+               resources:
+                 requests:
+                   storage: 8Gi
+           - name: journal
+             spec:
+               accessModes:
+                 - ReadWriteOnce
+               resources:
+                 requests:
+                   storage: 8Gi
+       - name: zookeeper
+         serviceVersion: 3.0.2
+         replicas: 1
+         resources:
+           limits:
+             cpu: "1"
+             memory: "512Mi"
+           requests:
+             cpu: "100m"
+             memory: "512Mi"
+         volumeClaimTemplates:
+           - name: data
+             spec:
+               accessModes:
+                 - ReadWriteOnce
+               resources:
+                 requests:
+                   storage: 8Gi
+   EOF
    ```
 
-2. 创建集群。
+   | 字段                                   | 定义  |
+   |---------------------------------------|--------------------------------------|
+   | `spec.terminationPolicy`              | 集群终止策略，有效值为 `DoNotTerminate`、`Delete` 和 `WipeOut`。具体定义可参考 [终止策略](./delete-pulsar-cluster.md#终止策略)。 |
+   | `spec.clusterDef` | 指定了创建集群时要使用的 ClusterDefinition 的名称。**注意**：**请勿更新此字段**。创建 Pulsar 集群时，该值必须为 `pulsar`。 |
+   | `spec.topology` | 指定了在创建集群时要使用的 ClusterTopology 的名称。 |
+   | `spec.services` | 定义了集群暴露的额外服务列表。 |
+   | `spec.componentSpecs`                 | 集群 component 列表，定义了集群 components。该字段支持自定义配置集群中每个 component。  |
+   | `spec.componentSpecs.serviceVersion`  | 定义了 component 部署的服务版本。有效值为 [2.11.2,3.0.2]。 |
+   | `spec.componentSpecs.disableExporter` | 定义了是否在 component 无头服务（headless service）上标注指标 exporter 信息，是否开启监控 exporter。有效值为 [true, false]。 |
+   | `spec.componentSpecs.replicas`        | 定义了 component 中 replicas 的数量。 |
+   | `spec.componentSpecs.resources`       | 定义了 component 的资源要求。  |
+   | `spec.componentSpecs.volumeClaimTemplates` | PersistentVolumeClaim 模板列表，定义 component 的存储需求。 |
+   | `spec.componentSpecs.volumeClaimTemplates.name` | 引用了在 `componentDefinition.spec.runtime.containers[*].volumeMounts` 中定义的 volumeMount 名称。  |
+   | `spec.componentSpecs.volumeClaimTemplates.spec.storageClassName` | 定义了 StorageClass 的名称。如果未指定，系统将默认使用带有 `storageclass.kubernetes.io/is-default-class=true` 注释的 StorageClass。  |
+   | `spec.componentSpecs.volumeClaimTemplates.spec.resources.storage` | 可按需配置存储容量。 |
 
-   - **选项 1.**（**推荐**）使用 `values-production.yaml` 创建 Pulsar 集群。
-   配置:
-     - 3 节点 broker
-     - 4 节点 bookies
-     - 3 节点 zookeeper
+   您可参考 [API 文档](https://kubeblocks.io/docs/preview/developer_docs/api-reference/cluster)，查看更多 API 字段及说明。
 
-     ```bash
-     helm install mycluster kubeblocks/pulsar-cluster --version "x.y.z" -f values-production.yaml --namespace demo
-     ```
-
-   - **选项 2.** 创建带 proxy 的 Pulsar 集群。
-   配置:
-     - 3 节点 proxy
-     - 3 节点 broker
-     - 4 节点 bookies
-     - 3 节点 zookeeper
-
-     ```bash
-     helm install mycluster kubeblocks/pulsar-cluster --version "x.y.z" -f values-production.yaml --set proxy.enable=true --namespace demo
-     ```
-
-   - **选项 3.** 创建带 proxy 的 Pulsar 集群，并部署独立的 `bookies-recovery` 组件。
-   配置:
-     - 3 节点 proxy
-     - 3 节点 broker
-     - 4 节点 bookies
-     - 3 节点 zookeeper
-     - 3 节点 bookies-recovery
-
-     ```bash
-     helm install mycluster kubeblocks/pulsar-cluster --version "x.y.z" -f values-production.yaml --set proxy.enable=true --set bookiesRecovery.enable=true --namespace demo
-     ```
-
-   - **选项 4.** 创建 Pulsar 集群并指定 bookies 和 zookeeper 的存储参数。
-   配置:
-     - 3 节点 broker
-     - 4 节点 bookies
-     - 3 节点 zookeeper
-
-     ```bash
-     helm install mycluster kubeblocks/pulsar-cluster --version "x.y.z" -f values-production.yaml --set bookies.persistence.data.storageClassName=<sc name>,bookies.persistence.log.storageClassName=<sc name>,zookeeper.persistence.data.storageClassName=<sc name>,zookeeper.persistence.log.storageClassName=<sc name> --namespace demo
-     ```
-
-   您可以指定存储名称 `<sc name>`。
-
-3. 验证已创建的集群。
+2. 验证已创建的集群。
 
     ```bash
     kubectl get cluster mycluster -n demo

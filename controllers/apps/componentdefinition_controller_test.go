@@ -323,6 +323,26 @@ var _ = Describe("ComponentDefinition Controller", func() {
 			checkObjectStatus(componentDefObj, kbappsv1.AvailablePhase)
 		})
 
+		It("both value and valueFrom are specified", func() {
+			By("create a ComponentDefinition obj")
+			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).
+				SetRuntime(nil).
+				AddVar(kbappsv1.EnvVar{
+					Name:  "VAR1",
+					Value: "value1",
+					ValueFrom: &kbappsv1.VarSource{
+						SecretKeyRef: &corev1.SecretKeySelector{
+							LocalObjectReference: corev1.LocalObjectReference{
+								Name: "secret",
+							},
+							Key: "secret-key",
+						},
+					},
+				}).
+				Create(&testCtx).GetObject()
+			checkObjectStatus(componentDefObj, kbappsv1.UnavailablePhase)
+		})
+
 		It("duplicate vars name", func() {
 			By("create a ComponentDefinition obj")
 			componentDefObj := testapps.NewComponentDefinitionFactory(componentDefName).

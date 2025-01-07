@@ -496,7 +496,7 @@ type ComponentDefinitionSpec struct {
 	//     `Immediately`, `RuntimeReady`, `ComponentReady`, and `ClusterReady`.
 	//   - `preTerminate`: Defines the hook to be executed before terminating a Component.
 	//   - `roleProbe`: Defines the procedure which is invoked regularly to assess the role of replicas.
-	//   - `switchover`: Defines the procedure for a controlled transition of leadership from the current leader to a new replica.
+	//   - `switchover`: Defines the procedure for a controlled transition of a role to a new replica.
 	//     This approach aims to minimize downtime and maintain availability in systems with a leader-follower topology,
 	//     such as before planned maintenance or upgrades on the current leader node.
 	//   - `memberJoin`: Defines the procedure to add a new replica to the replication group.
@@ -1072,21 +1072,6 @@ type ComponentConfigSpec struct {
 	// +optional
 	Keys []string `json:"keys,omitempty"`
 
-	// Specifies the secondary rendered config spec for pod-specific customization.
-	//
-	// The template is rendered inside the pod (by the "config-manager" sidecar container) and merged with the main
-	// template's render result to generate the final configuration file.
-	//
-	// This field is intended to handle scenarios where different pods within the same Component have
-	// varying configurations. It allows for pod-specific customization of the configuration.
-	//
-	// Note: This field will be deprecated in future versions, and the functionality will be moved to
-	// `cluster.spec.componentSpecs[*].instances[*]`.
-	//
-	// +kubebuilder:deprecatedversion:warning="This field has been deprecated since 0.9.0 and will be removed in 0.10.0"
-	// +optional
-	LegacyRenderedConfigSpec *LegacyRenderedTemplateSpec `json:"legacyRenderedConfigSpec,omitempty"`
-
 	// Specifies the name of the referenced configuration constraints object.
 	//
 	// +kubebuilder:validation:MaxLength=63
@@ -1142,13 +1127,6 @@ type ComponentConfigSpec struct {
 	//
 	// +optional
 	AsSecret *bool `json:"asSecret,omitempty"`
-}
-
-// LegacyRenderedTemplateSpec describes the configuration extension for the lazy rendered template.
-// Deprecated: LegacyRenderedTemplateSpec has been deprecated since 0.9.0 and will be removed in 0.10.0
-type LegacyRenderedTemplateSpec struct {
-	// Extends the configuration template.
-	ConfigTemplateExtension `json:",inline"`
 }
 
 type ConfigTemplateExtension struct {
@@ -1271,11 +1249,10 @@ type TLS struct {
 	// +kubebuilder:validation:Required
 	MountPath string `json:"mountPath"`
 
-	// The default permissions for the mounted path.
+	// The permissions for the mounted path. Defaults to 0600.
 	//
 	// This field is immutable once set.
 	//
-	// +kubebuilder:default=0600
 	// +optional
 	DefaultMode *int32 `json:"defaultMode,omitempty"`
 
@@ -1576,15 +1553,20 @@ type ComponentLifecycleActions struct {
 	// +optional
 	AvailableProbe *Probe `json:"availableProbe,omitempty"`
 
-	// Defines the procedure for a controlled transition of leadership from the current leader to a new replica.
-	// This approach aims to minimize downtime and maintain availability in systems with a leader-follower topology,
-	// during events such as planned maintenance or when performing stop, shutdown, restart, or upgrade operations
-	// involving the current leader node.
+	// Defines the procedure for a controlled transition of a role to a new replica.
+	// This approach aims to minimize downtime and maintain availability
+	// during events such as planned maintenance or when performing stop, shutdown, restart, or upgrade operations.
+	// In a typical consensus system, this action is used to transfer leader role to another replica.
 	//
 	// The container executing this action has access to following variables:
 	//
-	// - KB_SWITCHOVER_CANDIDATE_NAME: The name of the pod for the new leader candidate, which may not be specified (empty).
-	// - KB_SWITCHOVER_CANDIDATE_FQDN: The FQDN of the new leader candidate's pod, which may not be specified (empty).
+	// - KB_SWITCHOVER_CANDIDATE_NAME: The name of the pod of the new role's candidate, which may not be specified (empty).
+	// - KB_SWITCHOVER_CANDIDATE_FQDN: The FQDN of the pod of the new role's candidate, which may not be specified (empty).
+	// - KB_SWITCHOVER_CURRENT_NAME: The name of the pod of the current role.
+	// - KB_SWITCHOVER_CURRENT_FQDN: The FQDN of the pod of the current role.
+	// - KB_SWITCHOVER_ROLE: The role that will be transferred to another replica.
+	//   This variable can be empty if, for example, role probe does not succeed.
+	//   It depends on the addon implementation what to do under such cases.
 	//
 	// Note: This field is immutable once it has been set.
 	//
@@ -1772,9 +1754,7 @@ type ComponentLifecycleActions struct {
 //     `Immediately`, `RuntimeReady`, `ComponentReady`, and `ClusterReady`.
 //   - `preTerminate`: Defines the hook to be executed before terminating a Component.
 //   - `roleProbe`: Defines the procedure which is invoked regularly to assess the role of replicas.
-//   - `switchover`: Defines the procedure for a controlled transition of leadership from the current leader to a new replica.
-//     This approach aims to minimize downtime and maintain availability in systems with a leader-follower topology,
-//     such as during planned maintenance or upgrades on the current leader node.
+//   - `switchover`: Defines the procedure for a controlled transition of a role to a new replica.
 //   - `memberJoin`: Defines the procedure to add a new replica to the replication group.
 //   - `memberLeave`: Defines the method to remove a replica from the replication group.
 //   - `readOnly`: Defines the procedure to switch a replica into the read-only state.

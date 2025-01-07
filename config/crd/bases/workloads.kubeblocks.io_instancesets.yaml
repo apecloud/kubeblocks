@@ -4174,87 +4174,9 @@ spec:
                 format: int32
                 minimum: 0
                 type: integer
-              roleProbe:
-                description: Provides method to probe role.
-                properties:
-                  customHandler:
-                    description: |-
-                      Defines a custom method for role probing.
-                      Actions defined here are executed in series.
-                      Upon completion of all actions, the final output should be a single string representing the role name defined in spec.Roles.
-                      The latest [BusyBox](https://busybox.net/) image will be used if Image is not configured.
-                      Environment variables can be used in Command:
-                      - v_KB_ITS_LAST_STDOUT: stdout from the last action, watch for 'v_' prefix
-                      - KB_ITS_USERNAME: username part of the credential
-                      - KB_ITS_PASSWORD: password part of the credential
-                    items:
-                      properties:
-                        args:
-                          description: Additional parameters used to perform specific
-                            statements. This field is optional.
-                          items:
-                            type: string
-                          type: array
-                        command:
-                          description: A set of instructions that will be executed
-                            within the Container to retrieve or process role information.
-                            This field is required.
-                          items:
-                            type: string
-                          type: array
-                        image:
-                          description: Refers to the utility image that contains the
-                            command which can be utilized to retrieve or process role
-                            information.
-                          type: string
-                      required:
-                      - command
-                      type: object
-                    type: array
-                  failureThreshold:
-                    default: 3
-                    description: Specifies the minimum number of consecutive failures
-                      for the probe to be considered failed after having succeeded.
-                    format: int32
-                    minimum: 1
-                    type: integer
-                  initialDelaySeconds:
-                    default: 0
-                    description: Specifies the number of seconds to wait after the
-                      container has started before initiating role probing.
-                    format: int32
-                    minimum: 0
-                    type: integer
-                  periodSeconds:
-                    default: 2
-                    description: Specifies the frequency (in seconds) of probe execution.
-                    format: int32
-                    minimum: 1
-                    type: integer
-                  roleUpdateMechanism:
-                    default: ReadinessProbeEventUpdate
-                    description: Specifies the method for updating the pod role label.
-                    enum:
-                    - ReadinessProbeEventUpdate
-                    - DirectAPIServerEventUpdate
-                    type: string
-                  successThreshold:
-                    default: 1
-                    description: Specifies the minimum number of consecutive successes
-                      for the probe to be considered successful after having failed.
-                    format: int32
-                    minimum: 1
-                    type: integer
-                  timeoutSeconds:
-                    default: 1
-                    description: Specifies the number of seconds after which the probe
-                      times out.
-                    format: int32
-                    minimum: 1
-                    type: integer
-                type: object
               roles:
-                description: A list of roles defined in the system.
+                description: A list of roles defined in the system. Instanceset obtains
+                  role through pods' role label `kubeblocks.io/role`.
                 items:
                   properties:
                     accessMode:
@@ -16713,6 +16635,12 @@ spec:
               roleProbe:
                 description: Provides method to probe role.
                 properties:
+                  builtinHandlerName:
+                    description: |-
+                      Specifies the builtin handler name to use to probe the role of the main container.
+                      Available handlers include: mysql, postgres, mongodb, redis, etcd, kafka.
+                      Use CustomHandler to define a custom role probe function if none of the built-in handlers meet the requirement.
+                    type: string
                   customHandler:
                     description: |-
                       Defines a custom method for role probing.
@@ -24926,42 +24854,43 @@ spec:
                   Indicates the StatefulSetUpdateStrategy that will be
                   employed to update Pods in the InstanceSet when a revision is made to
                   Template.
-                  UpdateStrategy.Type will be set to appsv1.OnDeleteStatefulSetStrategyType if MemberUpdateStrategy is not nil
 
 
                   Note: This field will be removed in future version.
                 properties:
-                  rollingUpdate:
-                    description: RollingUpdate is used to communicate parameters when
-                      Type is RollingUpdateStatefulSetStrategyType.
-                    properties:
-                      maxUnavailable:
-                        anyOf:
-                        - type: integer
-                        - type: string
-                        description: |-
-                          The maximum number of pods that can be unavailable during the update.
-                          Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
-                          Absolute number is calculated from percentage by rounding up. This can not be 0.
-                          Defaults to 1. This field is alpha-level and is only honored by servers that enable the
-                          MaxUnavailableStatefulSet feature. The field applies to all pods in the range 0 to
-                          Replicas-1. That means if there is any unavailable pod in the range 0 to Replicas-1, it
-                          will be counted towards MaxUnavailable.
-                        x-kubernetes-int-or-string: true
-                      partition:
-                        description: |-
-                          Partition indicates the ordinal at which the StatefulSet should be partitioned
-                          for updates. During a rolling update, all pods from ordinal Replicas-1 to
-                          Partition are updated. All pods from ordinal Partition-1 to 0 remain untouched.
-                          This is helpful in being able to do a canary based deployment. The default value is 0.
-                        format: int32
-                        type: integer
-                    type: object
-                  type:
+                  maxUnavailable:
+                    anyOf:
+                    - type: integer
+                    - type: string
                     description: |-
-                      Type indicates the type of the StatefulSetUpdateStrategy.
-                      Default is RollingUpdate.
+                      The maximum number of pods that can be unavailable during the update.
+                      Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
+                      Absolute number is calculated from percentage by rounding up. This can not be 0.
+                      Defaults to 1. The field applies to all pods. That means if there is any unavailable pod,
+                      it will be counted towards MaxUnavailable.
+                    x-kubernetes-int-or-string: true
+                  memberUpdateStrategy:
+                    description: |-
+                      Members(Pods) update strategy.
+
+
+                      - serial: update Members one by one that guarantee minimum component unavailable time.
+                      - bestEffortParallel: update Members in parallel that guarantee minimum component un-writable time.
+                      - parallel: force parallel
+                    enum:
+                    - Serial
+                    - BestEffortParallel
+                    - Parallel
                     type: string
+                  partition:
+                    description: |-
+                      Partition indicates the number of pods that should be updated during a rolling update.
+                      The remaining pods will remain untouched. This is helpful in defining how many pods
+                      should participate in the update process. The update process will follow the order
+                      of pod names in descending lexicographical (dictionary) order. The default value is
+                      Replicas (i.e., update all pods).
+                    format: int32
+                    type: integer
                 type: object
               volumeClaimTemplates:
                 description: |-

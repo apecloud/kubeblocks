@@ -28,37 +28,23 @@ RabbitMQ 是可靠且成熟的消息和流处理中间件，支持在云环境�
 
 ## 创建集群
 
-KubeBlocks 通过 `Cluster` 定义集群。以下是创建 RabbitMQ 集群的示例。Pod 默认分布在不同节点。但如果您只有一个节点可用于部署集群，可将 `spec.affinity.topologyKeys` 设置为 `null`。
+KubeBlocks 通过 `Cluster` 定义集群。以下是创建 RabbitMQ 集群的示例。Pod 默认分布在不同节点。如果您只有一个节点可用于部署多副本集群，可设置 `spec.schedulingPolicy` 或 `spec.componentSpecs.schedulingPolicy`，具体可参考 [API 文档](https://kubeblocks.io/docs/preview/developer_docs/api-reference/cluster#apps.kubeblocks.io/v1.SchedulingPolicy)。但生产环境中，不建议将所有副本部署在同一个节点上，因为这可能会降低集群的可用性。
 
-:::note
-
-生产环境中，不建议将所有副本部署在同一个节点上，因为这可能会降低集群的可用性。
-
-:::
-
-```bash
+```yaml
 cat <<EOF | kubectl apply -f -
-apiVersion: apps.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1
 kind: Cluster
 metadata:
   name: mycluster
   namespace: demo
-  labels:
-    helm.sh/chart: rabbitmq-cluster-0.9.0
-    app.kubernetes.io/version: "3.13.2"
-    app.kubernetes.io/instance: mycluster
 spec:
   terminationPolicy: Delete
-  affinity:
-    podAntiAffinity: Preferred
-    topologyKeys:
-      - kubernetes.io/hostname
   componentSpecs:
     - name: rabbitmq
       componentDef: rabbitmq
-      serviceVersion: 3.13.2
+      serviceVersion: 3.13.7
+      serviceAccountName: kb-rabbitmq-cluster
       replicas: 3
-      serviceAccountName: kb-mycluster
       resources:
         limits:
           cpu: "0.5"
@@ -67,30 +53,69 @@ spec:
           cpu: "0.5"
           memory: "0.5Gi"
       volumeClaimTemplates:
-        - name: data # ref clusterDefinition components.containers.volumeMounts.name
+        - name: data
           spec:
+            storageClassName: ""
             accessModes:
               - ReadWriteOnce
             resources:
               requests:
                 storage: 20Gi
-      services:
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: rabbitmq-cluster-peer-discovery
+  namespace: demo
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - endpoints
+  verbs:
+  - get
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kb-rabbitmq-cluster
+  namespace: demo
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: kb-rabbitmq-cluster
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: rabbitmq-cluster-peer-discovery
+subjects:
+  - kind: ServiceAccount
+    name: kb-rabbitmq-cluster
+    namespace: demo
 EOF
 ```
 
 | 字段                                   | 定义  |
 |---------------------------------------|--------------------------------------|
-| `spec.terminationPolicy`              | 集群的终止策略，默认值为 `Delete`，有效值为 `DoNotTerminate`、`Halt`、`Delete` 和 `WipeOut`。 具体定义可参考 [终止策略](#终止策略)。|
-| `spec.affinity`                       | 为集群的 Pods 定义了一组节点亲和性调度规则。该字段可控制 Pods 在集群中节点上的分布。 |
-| `spec.affinity.podAntiAffinity`       | 定义了不在同一 component 中的 Pods 的反亲和性水平。该字段决定了 Pods 以何种方式跨节点分布，以提升可用性和性能。 |
-| `spec.affinity.topologyKeys`          | 用于定义 Pod 反亲和性和 Pod 分布约束的拓扑域的节点标签值。 |
-| `spec.tolerations`                    | 该字段为数组，用于定义集群中 Pods 的容忍，确保 Pod 可被调度到具有匹配污点的节点上。 |
-| `spec.componentSpecs`                 | 集群 components 列表，定义了集群 components。该字段允许对集群中的每个 component 进行自定义配置。 |
-| `spec.componentSpecs.componentDefRef` | 表示 cluster definition 中定义的 component definition 的名称，可通过执行 `kubectl get clusterdefinition rabbitmq -o json \| jq '.spec.componentDefs[].name'` 命令获取 component definition 名称。 |
-| `spec.componentSpecs.name`            | 定义了 component 的名称。  |
-| `spec.componentSpecs.disableExporter` | 定义了是否开启监控功能。 |
-| `spec.componentSpecs.replicas`        | 定义了 component 中 replicas 的数量。 |
+| `spec.terminationPolicy`              | 集群终止策略，有效值为 `DoNotTerminate`、`Delete` 和 `WipeOut`。具体定义可参考 [终止策略](#终止策略)。 |
+| `spec.componentSpecs`                 | 集群 component 列表，定义了集群 components。该字段支持自定义配置集群中每个 component。  |
+| `spec.componentSpecs.serviceVersion`  | 定义了 component 部署的服务版本。可选值为 [3.10.25,3.11.28,3.12.14,3.13.2,3.13.7,3.8.14,3.9.29]。  |
+| `spec.componentSpecs.serviceAccountName` | 指定了运行 component 所需的 ServiceAccount 名称。RabbitMQ 需要 peer-discovery 角色来创建事件和获取端点。这对于发现其他 RabbitMQ 节点并形成集群至关重要。  |
+| `spec.componentSpecs.replicas`        | 定义了 component 中 replicas 的数量。RabbitMQ 建议配置奇数，如 [3,5,7]。所有数据/状态都会在所有副本之间进行复制。 |
 | `spec.componentSpecs.resources`       | 定义了 component 的资源要求。  |
+| `spec.componentSpecs.volumeClaimTemplates` | PersistentVolumeClaim 模板列表，定义 component 的存储需求。 |
+| `spec.componentSpecs.volumeClaimTemplates.name` | 引用了在 `componentDefinition.spec.runtime.containers[*].volumeMounts` 中定义的 volumeMount 名称。  |
+| `spec.componentSpecs.volumeClaimTemplates.spec.storageClassName` | 定义了 StorageClass 的名称。如果未指定，系统将默认使用带有 `storageclass.kubernetes.io/is-default-class=true` 注释的 StorageClass。  |
+| `spec.componentSpecs.volumeClaimTemplates.spec.resources.storage` | 可按需配置存储容量。 |
+
+您可参考 [API 文档](https://kubeblocks.io/docs/preview/developer_docs/api-reference/cluster)，查看更多 API 字段及说明。
 
 KubeBlocks operator 监控 `Cluster` CRD 并创建集群和全部依赖资源。您可执行以下命令获取集群创建的所有资源信息。
 

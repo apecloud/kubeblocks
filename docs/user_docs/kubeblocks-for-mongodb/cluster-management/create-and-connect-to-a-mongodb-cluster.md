@@ -1,7 +1,7 @@
 ---
 title: Create and connect to a MongoDB Cluster
 description: How to create and connect to a MongoDB cluster
-keywords: [mogodb, create a mongodb cluster]
+keywords: [mongodb, create a mongodb cluster]
 sidebar_position: 1
 sidebar_label: Create and connect
 ---
@@ -39,7 +39,7 @@ This tutorial shows how to create and connect to a MongoDB cluster.
   ```bash
   kbcli addon list
   >
-  NAME                           TYPE   STATUS     EXTRAS         AUTO-INSTALL   
+  NAME                           TYPE   STATUS     EXTRAS         AUTO-INSTALL
   ...
   mongodb                        Helm   Enabled                   true
   ...
@@ -139,7 +139,7 @@ KubeBlocks supports creating two types of MongoDB clusters: Standalone and Repli
    | Field                                 | Definition  |
    |---------------------------------------|--------------------------------------|
    | `spec.terminationPolicy`              | It is the policy of cluster termination. Valid values are `DoNotTerminate`, `Delete`, `WipeOut`. For the detailed definition, you can refer to [Termination Policy](./delete-mongodb-cluster.md#termination-policy). |
-   | `spec.clusterDef` | It specifies the name of the ClusterDefinition to use when creating a Cluster. **Note: DO NOT UPDATE THIS FIELD**. The value must be `mongodb` to create a MongoDB Cluste. |
+   | `spec.clusterDef` | It specifies the name of the ClusterDefinition to use when creating a Cluster. **Note: DO NOT UPDATE THIS FIELD**. The value must be `mongodb` to create a MongoDB Cluster. |
    | `spec.topology` | It specifies the name of the ClusterTopology to be used when creating the Cluster. |
    | `spec.componentSpecs`                 | It is the list of ClusterComponentSpec objects that define the individual Components that make up a Cluster. This field allows customized configuration of each component within a cluster.   |
    | `spec.componentSpecs.serviceVersion` | It specifies the version of the Service expected to be provisioned by this Component. Valid options are: [4.0.28,4.2.24,4.4.29,5.0.28,6.0.16,7.0.1]. |
@@ -260,7 +260,7 @@ You can also port forward the service to connect to the database from your local
 1. Run the following command to port forward the service.
 
    ```bash
-   kubectl port-forward -n demo svc/mycluster-mongodb 27017:27017  
+   kubectl port-forward -n demo svc/mycluster-mongodb 27017:27017
    ```
 
 2. Open a new terminal and run the following command to connect to the database.

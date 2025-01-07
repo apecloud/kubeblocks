@@ -166,7 +166,7 @@ If you use AWS EKS, you may want to access to the Kafka cluster from EC2 instanc
 
 :::caution
 
-The current version only supports Kafka broker with a single replica (combined: --replicas=1 or separated: --broker-replicas=1) to adpot the following approach.
+The current version only supports Kafka broker with a single replica (combined: --replicas=1 or separated: --broker-replicas=1) to adopt the following approach.
 
 :::
 

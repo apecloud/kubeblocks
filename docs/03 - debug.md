@@ -6,7 +6,7 @@ We can use [Delve](https://github.com/go-delve/delve) for Go debugging.
 ### Install Delve
 - Follow the [General install instructions](https://github.com/go-delve/delve/tree/master/Documentation/installation).
   > Make sure `PATH` containers `$GOPATH/bin` which will allow you to run Go binary executables without specifying the absolute path.
-- If you are using MacOS, you can install vid HomeBrew with the following command :
+- If you are using MacOS, you can install via HomeBrew with the following command :
     ```shell
     brew install delve
     ```
@@ -47,7 +47,7 @@ API server listening at: [::]:2347
 ### Connect the debug server with a frontend client
 `Delve` support lots of code editors ([editor plugins for Delve](https://github.com/go-delve/delve/blob/master/Documentation/EditorIntegration.md)), you can choose your favorite editor to connect with the listen address for debugging. 
 
-This section introduces how to start debugging with the Delve CLI, Goland and VSCode. Please refer to the Delve or editors documentation for more details.
+This section introduces how to start debugging with the Delve CLI, GoLand and VSCode. Please refer to the Delve or editors documentation for more details.
 
 #### Delve CLI
 

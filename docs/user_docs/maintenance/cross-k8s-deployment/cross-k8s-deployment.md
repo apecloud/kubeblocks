@@ -41,7 +41,7 @@ Create several K8s clusters and prepare the configuration information for deploy
          ...
    ```
 
-## Deloy cross-K8s clusters
+## Deploy cross-K8s clusters
 
 ### Deploy the Kubeblocks operator
 
@@ -169,7 +169,7 @@ Here takes MetalLB as an example for providing LoadBalancer Services.
    | 2       | k8s-2   | k8s-2 | 2  | 10.5.0.0/16 |
    | 3       | k8s-3   | k8s-3 | 3  | 10.6.0.0/16 |
 
-2. Deploy MetalLbB in all the data place K8s clusters.
+2. Deploy MetalLB in all the data place K8s clusters.
 
    ```bash
    helm repo add metallb https://metallb.github.io/metallb

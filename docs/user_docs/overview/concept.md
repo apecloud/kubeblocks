@@ -104,7 +104,7 @@ Although users do not need to write CRs for ClusterDefinition and ComponentDefin
 #### Cluster
 A Cluster object represents an entire database cluster managed by KubeBlocks. A Cluster can include multiple Components. Users specify the configuration for each Component here, and the Cluster Controller will generate and reconcile corresponding Component objects. Additionally, the Cluster Controller manages all Service addresses that are exposed at the Cluster level.
 
-For distributed databases with a sharded-nothing architecture, like Redis Cluster, the Cluster supports managing multiple shards, with each shard managed by a separate Component. This architecture also supports dynamic resharding: if you need to scale out and add a new shard, you simply add a new Component; conversely, if you need to scale in and reduce the number of shards, you remove a Component.
+For distributed databases with a shared-nothing architecture, like Redis Cluster, the Cluster supports managing multiple shards, with each shard managed by a separate Component. This architecture also supports dynamic resharding: if you need to scale out and add a new shard, you simply add a new Component; conversely, if you need to scale in and reduce the number of shards, you remove a Component.
 
 #### Component
 Component is a fundamental building block of a Cluster object. For example, a Redis Cluster can include Components like `redis`, `sentinel`, and potentially a proxy like `twemproxy`.

@@ -126,4 +126,4 @@ kbcli cluster list-instances -n demo
 
 ## Handle an exception
 
-If an error occurs, refer to [Handle an exaception](./../../handle-an-exception/handle-a-cluster-exception.md) to troubleshoot the operation.
+If an error occurs, refer to [Handle an exception](./../../handle-an-exception/handle-a-cluster-exception.md) to troubleshoot the operation.

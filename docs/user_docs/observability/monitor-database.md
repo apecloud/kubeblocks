@@ -113,47 +113,40 @@ Make sure `spec.componentSpecs.disableExporter` is set to `false` when creating 
 
 ```yaml
 cat <<EOF | kubectl apply -f -
-apiVersion: apps.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1
 kind: Cluster
 metadata:
   name: mycluster
   namespace: demo
 spec:
-  clusterDefinitionRef: postgresql
-  clusterVersionRef: postgresql-12.14.0
   terminationPolicy: Delete
-  affinity:
-    podAntiAffinity: Preferred
-    topologyKeys:
-    - kubernetes.io/hostname
-    tenancy: SharedNode
-  tolerations:
-    - key: kb-data
-      operator: Equal
-      value: 'true'
-      effect: NoSchedule
+  clusterDef: postgresql
+  topology: replication
   componentSpecs:
-  - name: postgresql
-    componentDefRef: postgresql
-    enabledLogs:
-    - running
-    disableExporter: true # Set to `false` to enable exporter
-    replicas: 2
-    resources:
-      limits:
-        cpu: '0.5'
-        memory: 0.5Gi
-      requests:
-        cpu: '0.5'
-        memory: 0.5Gi
-    volumeClaimTemplates:
-    - name: data
-      spec:
-        accessModes:
-        - ReadWriteOnce
-        resources:
-          requests:
-            storage: 20Gi
+    - name: postgresql
+      componentDef: postgresql
+      serviceVersion: "14.7.2"
+      disableExporter: false
+      labels:
+        apps.kubeblocks.postgres.patroni/scope: mycluster-postgresql
+      replicas: 2
+      resources:
+        limits:
+          cpu: "0.5"
+          memory: "0.5Gi"
+        requests:
+          cpu: "0.5"
+          memory: "0.5Gi"
+      volumeClaimTemplates:
+        - name: data
+          spec:
+            storageClassName: ""
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 20Gi
+
 EOF
 ```
 
@@ -206,12 +199,7 @@ Edit the value of `disableExporter`.
 ```yaml
 ...
 componentSpecs:
-  - name: mysql
-    componentDefRef: mysql
-    enabledLogs:
-    - error
-    - general
-    - slow
+...
     disableExporter: true # Set to `false` to enable exporter
 ...
 ```
@@ -246,14 +234,20 @@ When the cluster is running, each Pod should have a sidecar container, named `ex
 
 2. Create `PodMonitor`.
 
-   Apply the `PodMonitor` file to monitor the cluster. You can also find the latest example YAML file in the [KubeBlocks Addons repo](https://github.com/apecloud/kubeblocks-addons/blob/main/examples/postgresql/pod-monitor.yml).
+   Apply the `PodMonitor` file to monitor the cluster. Below are examples for different engines and you can edit the values according to your needs.
+
+   <Tabs>
+
+   <TabItem value="ApeCloud MySQL" label="ApeCloud MySQL">
+
+   You can also find the latest example YAML file in the [KubeBlocks Addons repo](https://github.com/apecloud/kubeblocks-addons/blob/main/examples/apecloud-mysql/pod-monitor.yaml).
 
    ```yaml
    kubectl apply -f - <<EOF
    apiVersion: monitoring.coreos.com/v1
    kind: PodMonitor
    metadata:
-     name: pg-cluster-pod-monitor
+     name: mycluster-pod-monitor
      namespace: monitoring # Note: this is namespace for prometheus operator
      labels:               # This is labels set in `prometheus.spec.podMonitorSelector`
        release: prometheus
@@ -276,10 +270,131 @@ When the cluster is running, each Pod should have a sidecar container, named `ex
          - default
      selector:
        matchLabels:
-         app.kubernetes.io/instance: pg-cluster
-         apps.kubeblocks.io/component-name: postgresql
+         app.kubernetes.io/instance: mycluster
+         apps.kubeblocks.io/component-name: mysql
    EOF
    ```
+
+   </TabItem>
+
+   <TabItem value="MySQL Community Edition" label="MySQL Community Edition">
+
+   You can also find the latest example YAML file in the [KubeBlocks Addons repo](https://github.com/apecloud/kubeblocks-addons/blob/main/examples/mysql/pod-monitor.yaml).
+
+   ```yaml
+   kubectl apply -f - <<EOF
+   apiVersion: monitoring.coreos.com/v1
+   kind: PodMonitor
+   metadata:
+     name: mycluster-pod-monitor
+     namespace: monitoring # Note: this is namespace for prometheus operator
+     labels:               # This is labels set in `prometheus.spec.podMonitorSelector`
+       release: prometheus
+   spec:
+     jobLabel: kubeblocks-service
+     # Define the labels which are transferred from the
+     # associated Kubernetes `Pod` object onto the ingested metrics
+     # set the labels w.r.t your own needs
+     podTargetLabels:
+     - app.kubernetes.io/instance
+     - app.kubernetes.io/managed-by
+     - apps.kubeblocks.io/component-name
+     - apps.kubeblocks.io/pod-name
+     podMetricsEndpoints:
+       - path: /metrics
+         port: http-metrics
+         scheme: http
+     namespaceSelector:
+       matchNames:
+         - default
+     selector:
+       matchLabels:
+         app.kubernetes.io/instance: mycluster
+         apps.kubeblocks.io/component-name: mysql
+   EOF
+   ```
+
+   </TabItem>
+
+   <TabItem value="PostgreSQL" label="PostgreSQL">
+
+   You can also find the latest example YAML file in the [KubeBlocks Addons repo](https://github.com/apecloud/kubeblocks-addons/blob/main/examples/postgresql/pod-monitor.yaml).
+
+   ```yaml
+   kubectl apply -f - <<EOF
+   apiVersion: monitoring.coreos.com/v1
+   kind: PodMonitor
+   metadata:
+     name: mycluster-pod-monitor
+     namespace: monitoring # Note: this is namespace for prometheus operator
+     labels:               # This is labels set in `prometheus.spec.podMonitorSelector`
+       release: prometheus
+   spec:
+     jobLabel: kubeblocks-service
+     # Define the labels which are transferred from the
+     # associated Kubernetes `Pod` object onto the ingested metrics
+     # set the labels w.r.t your own needs
+     podTargetLabels:
+     - app.kubernetes.io/instance
+     - app.kubernetes.io/managed-by
+     - apps.kubeblocks.io/component-name
+     - apps.kubeblocks.io/pod-name
+     podMetricsEndpoints:
+       - path: /metrics
+         port: http-metrics
+         scheme: http
+     namespaceSelector:
+       matchNames:
+         - default
+     selector:
+       matchLabels:
+         app.kubernetes.io/instance: mycluster
+         apps.kubeblocks.io/component-name: mysql
+   EOF
+   ```
+
+   </TabItem>
+
+   <TabItem value="Redis" label="Redis">
+
+   You can also find the latest example YAML file in the [KubeBlocks Addons repo](https://github.com/apecloud/kubeblocks-addons/blob/main/examples/redis/pod-monitor.yaml).
+
+   ```yaml
+   kubectl apply -f - <<EOF
+   apiVersion: monitoring.coreos.com/v1
+   kind: PodMonitor
+   metadata:
+     name: mycluster-pod-monitor
+     namespace: monitoring # Note: this is namespace for prometheus operator
+     labels:               # This is labels set in `prometheus.spec.podMonitorSelector`
+       release: prometheus
+   spec:
+     jobLabel: kubeblocks-service
+     # Define the labels which are transferred from the
+     # associated Kubernetes `Pod` object onto the ingested metrics
+     # set the labels w.r.t your own needs
+     podTargetLabels:
+     - app.kubernetes.io/instance
+     - app.kubernetes.io/managed-by
+     - apps.kubeblocks.io/component-name
+     - apps.kubeblocks.io/pod-name
+     podMetricsEndpoints:
+       - path: /metrics
+         port: http-metrics
+         scheme: http
+     namespaceSelector:
+       matchNames:
+         - default
+     selector:
+       matchLabels:
+         app.kubernetes.io/instance: mycluster
+         apps.kubeblocks.io/component-name: redis
+   EOF
+   ```
+
+   </TabItem>
+
+   </Tabs>
 
 3. Access the Grafana dashboard.
 

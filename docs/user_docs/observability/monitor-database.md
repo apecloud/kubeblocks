@@ -124,6 +124,7 @@ spec:
   topology: replication
   componentSpecs:
     - name: postgresql
+      componentDef: postgresql
       serviceVersion: "14.7.2"
       disableExporter: false
       labels:
@@ -199,7 +200,7 @@ Edit the value of `disableExporter`.
 ...
 componentSpecs:
   - name: mysql
-    componentDefRef: mysql
+    componentDef: mysql
     disableExporter: true # Set to `false` to enable exporter
 ...
 ```

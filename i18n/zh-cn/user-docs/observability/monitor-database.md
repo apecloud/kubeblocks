@@ -124,6 +124,7 @@ spec:
   topology: replication
   componentSpecs:
     - name: postgresql
+      componentDef: postgresql
       serviceVersion: "14.7.2"
       disableExporter: false
       labels:
@@ -203,7 +204,7 @@ kubectl edit cluster mycluster -n demo
 ...
 componentSpecs:
   - name: mysql
-    componentDefRef: mysql
+    componentDef: mysql
     disableExporter: true # 将参数值设为 `false`，开启 exporter
 ```
 

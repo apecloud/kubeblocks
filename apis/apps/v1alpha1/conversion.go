@@ -90,14 +90,14 @@ func incrementConvertFrom(converter incrementConverter, source metav1.Object, ic
 	return nil
 }
 
-func GetClusterDefFromIncrementConverter(obj client.Object) (string, error) {
+func GetV1Alpha1ClusterFromIncrementConverter(obj client.Object) (*Cluster, error) {
 	incrementConverterStr := obj.GetAnnotations()[kbIncrementConverterAK]
 	if len(incrementConverterStr) == 0 {
-		return "", nil
+		return nil, nil
 	}
 	var alpha1Cluster Cluster
 	if err := json.Unmarshal([]byte(incrementConverterStr), &alpha1Cluster); err != nil {
-		return "", err
+		return &alpha1Cluster, err
 	}
-	return alpha1Cluster.Spec.ClusterDefRef, nil
+	return &alpha1Cluster, nil
 }

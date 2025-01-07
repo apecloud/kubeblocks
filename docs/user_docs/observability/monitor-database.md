@@ -199,8 +199,7 @@ Edit the value of `disableExporter`.
 ```yaml
 ...
 componentSpecs:
-  - name: mysql
-    componentDef: mysql
+...
     disableExporter: true # Set to `false` to enable exporter
 ...
 ```

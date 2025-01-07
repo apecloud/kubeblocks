@@ -203,8 +203,7 @@ kubectl edit cluster mycluster -n demo
 ```yaml
 ...
 componentSpecs:
-  - name: mysql
-    componentDef: mysql
+...
     disableExporter: true # 将参数值设为 `false`，开启 exporter
 ```
 

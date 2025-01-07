@@ -4501,9 +4501,9 @@ spec:
                       The container executing this action has access to following variables:
 
 
-                      - KB_ACCOUNT_NAME: The name of the system account to be created.
+                      - KB_ACCOUNT_NAME: The name of the system account to be manipulated.
                       - KB_ACCOUNT_PASSWORD: The password for the system account.
-                      - KB_ACCOUNT_STATEMENT: The statement used to create the system account.
+                      - KB_ACCOUNT_STATEMENT: The statement used to manipulate the system account.
 
 
                       Note: This field is immutable once it has been set.

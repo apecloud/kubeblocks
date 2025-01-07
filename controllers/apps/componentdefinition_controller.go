@@ -342,18 +342,22 @@ func (r *ComponentDefinitionReconciler) validateConfigs(cli client.Client, rctx 
 
 func (r *ComponentDefinitionReconciler) validateSystemAccounts(cli client.Client, rctx intctrlutil.RequestCtx,
 	cmpd *appsv1.ComponentDefinition) error {
-	for _, v := range cmpd.Spec.SystemAccounts {
-		if !v.InitAccount && (cmpd.Spec.LifecycleActions == nil || cmpd.Spec.LifecycleActions.AccountProvision == nil) {
-			return fmt.Errorf(`the AccountProvision action is needed to provision system account %s`, v.Name)
-		}
-	}
 	if !checkUniqueItemWithValue(cmpd.Spec.SystemAccounts, "Name", nil) {
 		return fmt.Errorf("duplicate system accounts are not allowed")
 	}
+
+	hasNonInitAccount := false
 	for _, account := range cmpd.Spec.SystemAccounts {
-		if !account.InitAccount && (account.Statement == nil || len(account.Statement.Create) == 0) {
+		if account.InitAccount {
+			continue
+		}
+		hasNonInitAccount = true
+		if account.Statement == nil || len(account.Statement.Create) == 0 {
 			return fmt.Errorf("the create statement must be provided to provision system account: %s", account.Name)
 		}
+	}
+	if hasNonInitAccount && (cmpd.Spec.LifecycleActions == nil || cmpd.Spec.LifecycleActions.AccountProvision == nil) {
+		return fmt.Errorf("the AccountProvision action is needed to provision system accounts")
 	}
 	return nil
 }

@@ -85,7 +85,7 @@ func (t *componentAccountProvisionTransformer) Transform(ctx graph.TransformCont
 	protoNameSet := sets.New(maps.Keys(secrets)...)
 
 	cond := t.provisionCond(transCtx)
-	provisionedNameSet := sets.New(strings.Split(cond.Message, ",")...)
+	provisionedNameSet := t.getProvisionedAccounts(cond)
 
 	createSet, deleteSet, updateSet := setDiff(provisionedNameSet, protoNameSet)
 	if len(createSet) == 0 && len(deleteSet) == 0 && len(updateSet) == 0 {
@@ -160,13 +160,17 @@ func (t *componentAccountProvisionTransformer) createAccount(transCtx *component
 
 	if err == nil {
 		// TODO: how about the password restored from backup?
-		t.addOrUpdateProvisionedAccount(cond, account.Name, secret.Annotations[systemAccountHashAnnotation])
+		t.updateProvisionedAccount(cond, account.Name, secret.Annotations[systemAccountHashAnnotation])
 	}
 	return err
 }
 
 func (t *componentAccountProvisionTransformer) deleteAccount(transCtx *componentTransformContext,
 	lfa lifecycle.Lifecycle, cond *metav1.Condition, account synthesizedSystemAccount) error {
+	if account.Statement == nil || len(account.Statement.Delete) == 0 {
+		return fmt.Errorf("has no delete statement defined for system account: %s", account.Name)
+	}
+
 	err := lfa.AccountProvision(transCtx.Context, transCtx.Client, nil, account.Statement.Delete, account.Name, "")
 	if lifecycle.IgnoreNotDefined(err) == nil {
 		t.removeProvisionedAccount(cond, account.Name)
@@ -176,16 +180,23 @@ func (t *componentAccountProvisionTransformer) deleteAccount(transCtx *component
 
 func (t *componentAccountProvisionTransformer) updateAccount(transCtx *componentTransformContext,
 	lfa lifecycle.Lifecycle, cond *metav1.Condition, account synthesizedSystemAccount, secret *corev1.Secret) error {
-	hashedPassword := t.getHashedPasswordFromCond(cond, account.Name)
+	hashedPassword := t.hashedPasswordFromCond(cond, account.Name)
+	if hashedPassword == "" {
+		return nil // does not support password update?
+	}
 	if verifySystemAccountPassword(secret, []byte(hashedPassword)) {
 		return nil // the password is not changed
+	}
+
+	if account.Statement == nil || len(account.Statement.Update) == 0 {
+		return fmt.Errorf("has no update statement defined for system account: %s", account.Name)
 	}
 
 	// TODO: how to notify other apps to update the new password?
 
 	err := t.provision(transCtx, lfa, account.Statement.Update, secret)
 	if err == nil {
-		t.addOrUpdateProvisionedAccount(cond, account.Name, secret.Annotations[systemAccountHashAnnotation])
+		t.updateProvisionedAccount(cond, account.Name, secret.Annotations[systemAccountHashAnnotation])
 	}
 	return err
 }
@@ -225,11 +236,11 @@ func (t *componentAccountProvisionTransformer) provisionCondDone(transCtx *compo
 		cond.Status = metav1.ConditionFalse
 		// cond.Reason = err.Error() // TODO: error
 	}
-	cond.ObservedGeneration = transCtx.Component.Generation
 
 	if !reflect.DeepEqual(cond, condCopy) {
 		cond.LastTransitionTime = metav1.Now()
 	}
+	cond.ObservedGeneration = transCtx.Component.Generation
 
 	conditions := transCtx.Component.Status.Conditions
 	if conditions == nil {
@@ -248,9 +259,26 @@ func (t *componentAccountProvisionTransformer) provisionCondDone(transCtx *compo
 	transCtx.Component.Status.Conditions = conditions
 }
 
-func (t *componentAccountProvisionTransformer) addOrUpdateProvisionedAccount(cond *metav1.Condition, account, hashedPassword string) {
-	accounts := strings.Split(cond.Message, ",")
-	idx := slices.Index(accounts, account)
+func (t *componentAccountProvisionTransformer) getProvisionedAccounts(cond metav1.Condition) sets.Set[string] {
+	accounts := sets.New[string]()
+	if len(cond.Message) > 0 {
+		for _, e := range strings.Split(cond.Message, ",") {
+			if len(e) > 0 {
+				accounts.Insert(strings.Split(e, ":")[0])
+			}
+		}
+	}
+	return accounts
+}
+
+func (t *componentAccountProvisionTransformer) updateProvisionedAccount(cond *metav1.Condition, account, hashedPassword string) {
+	accounts := make([]string, 0)
+	if len(cond.Message) > 0 {
+		accounts = strings.Split(cond.Message, ",")
+	}
+	idx := slices.IndexFunc(accounts, func(s string) bool {
+		return strings.HasPrefix(s, fmt.Sprintf("%s:", account))
+	})
 	if idx >= 0 {
 		accounts[idx] = fmt.Sprintf("%s:%s", account, hashedPassword)
 	} else {
@@ -260,16 +288,24 @@ func (t *componentAccountProvisionTransformer) addOrUpdateProvisionedAccount(con
 }
 
 func (t *componentAccountProvisionTransformer) removeProvisionedAccount(cond *metav1.Condition, account string) {
-	accounts := strings.Split(cond.Message, ",")
+	accounts := make([]string, 0)
+	if len(cond.Message) > 0 {
+		accounts = strings.Split(cond.Message, ",")
+	}
 	accounts = slices.DeleteFunc(accounts, func(s string) bool {
-		return s == account
+		return strings.HasPrefix(s, fmt.Sprintf("%s:", account))
 	})
 	cond.Message = strings.Join(accounts, ",")
 }
 
-func (t *componentAccountProvisionTransformer) getHashedPasswordFromCond(cond *metav1.Condition, account string) string {
-	accounts := strings.Split(cond.Message, ",")
-	idx := slices.Index(accounts, account)
+func (t *componentAccountProvisionTransformer) hashedPasswordFromCond(cond *metav1.Condition, account string) string {
+	accounts := make([]string, 0)
+	if len(cond.Message) > 0 {
+		accounts = strings.Split(cond.Message, ",")
+	}
+	idx := slices.IndexFunc(accounts, func(s string) bool {
+		return strings.HasPrefix(s, fmt.Sprintf("%s:", account))
+	})
 	if idx >= 0 {
 		val := strings.Split(accounts[idx], ":")
 		if len(val) == 2 {

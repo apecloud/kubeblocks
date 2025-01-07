@@ -104,70 +104,66 @@ KubeBlocks supports creating two types of PostgreSQL clusters: Standalone and Re
 
 <TabItem value="kubectl" label="kubectl" default>
 
-1. Create a PostgreSQL cluster.
+1. Create a PostgreSQL cluster. If you only have one node for deploying a Replication Cluster, configure the cluster affinity by setting `spec.schedulingPolicy` or `spec.componentSpecs.schedulingPolicy`. For details, you can refer to the [API docs](https://kubeblocks.io/docs/preview/developer_docs/api-reference/cluster#apps.kubeblocks.io/v1.SchedulingPolicy). But for a production environment, it is not recommended to deploy all replicas on one node, which may decrease the cluster availability.
 
    KubeBlocks implements a `Cluster` CRD to define a cluster. Here is an example of creating a Replication.
 
    ```yaml
    cat <<EOF | kubectl apply -f -
-   apiVersion: apps.kubeblocks.io/v1alpha1
+   apiVersion: apps.kubeblocks.io/v1
    kind: Cluster
    metadata:
      name: mycluster
      namespace: demo
    spec:
-     clusterDefinitionRef: postgresql
-     clusterVersionRef: postgresql-14.8.0
      terminationPolicy: Delete
-     affinity:
-       podAntiAffinity: Preferred
-       topologyKeys:
-       - kubernetes.io/hostname
-     tolerations:
-       - key: kb-data
-         operator: Equal
-         value: 'true'
-         effect: NoSchedule
+     clusterDef: postgresql
+     topology: replication
      componentSpecs:
-     - name: postgresql
-       componentDefRef: postgresql
-       enabledLogs:
-       - running
-       disableExporter: true
-       replicas: 2
-       resources:
-         limits:
-           cpu: '0.5'
-           memory: 0.5Gi
-         requests:
-           cpu: '0.5'
-           memory: 0.5Gi
-       volumeClaimTemplates:
-       - name: data
-         spec:
-           accessModes:
-           - ReadWriteOnce
-           resources:
-             requests:
-               storage: 20Gi
+       - name: postgresql
+         serviceVersion: "14.7.2"
+         disableExporter: false
+         labels:
+           # Note: DO NOT REMOVE THIS LABEL
+           apps.kubeblocks.postgres.patroni/scope: mycluster-postgresql
+         replicas: 2
+         resources:
+           limits:
+             cpu: "0.5"
+             memory: "0.5Gi"
+           requests:
+             cpu: "0.5"
+             memory: "0.5Gi"
+         volumeClaimTemplates:
+           - name: data
+             spec:
+               storageClassName: ""
+               accessModes:
+                 - ReadWriteOnce
+               resources:
+                 requests:
+                   storage: 20Gi
    EOF
    ```
 
    | Field                                 | Definition  |
    |---------------------------------------|--------------------------------------|
-   | `spec.clusterDefinitionRef`           | It specifies the name of the ClusterDefinition for creating a specific type of cluster.  |
-   | `spec.clusterVersionRef`              | It is the name of the cluster version CRD that defines the cluster version.  |
-   | `spec.terminationPolicy`              | It is the policy of cluster termination. The default value is `Delete`. Valid values are `DoNotTerminate`, `Delete`, `WipeOut`. For the detailed definition, you can refer to [Termination Policy](./delete-a-postgresql-cluster.md#termination-policy). |
-   | `spec.affinity`                       | It defines a set of node affinity scheduling rules for the cluster's Pods. This field helps control the placement of Pods on nodes within the cluster.  |
-   | `spec.affinity.podAntiAffinity`       | It specifies the anti-affinity level of Pods within a component. It determines how pods should spread across nodes to improve availability and performance. |
-   | `spec.affinity.topologyKeys`          | It represents the key of node labels used to define the topology domain for Pod anti-affinity and Pod spread constraints.   |
-   | `spec.tolerations`                    | It is an array that specifies tolerations attached to the cluster's Pods, allowing them to be scheduled onto nodes with matching taints.  |
-   | `spec.componentSpecs`                 | It is the list of components that define the cluster components. This field allows customized configuration of each component within a cluster.   |
-   | `spec.componentSpecs.componentDefRef` | It is the name of the component definition that is defined in the cluster definition and you can get the component definition names with `kubectl get clusterdefinition postgresql -o json \| jq '.spec.componentDefs[].name'`.   |
-   | `spec.componentSpecs.name`            | It specifies the name of the component.     |
-   | `spec.componentSpecs.disableExporter` | It defines whether the monitoring function is enabled. |
-   | `spec.componentSpecs.replicas`        | It specifies the number of replicas of the component.  |
-   | `spec.componentSpecs.resources`       | It specifies the resource requirements of the component.  |
+   | `spec.terminationPolicy`              | It is the policy of cluster termination. Valid values are `DoNotTerminate`, `Delete`, `WipeOut`. For the detailed definition, you can refer to [Termination Policy](./delete-a-postgresql-cluster.md#termination-policy). |
+   | `spec.clusterDef` | It specifies the name of the ClusterDefinition to use when creating a Cluster. Note: DO NOT UPDATE THIS FIELD. The value must be `postgresql` to create a PostgreSQL Cluster. |
+   | `spec.topology` | It specifies the name of the ClusterTopology to be used when creating the Cluster. The valid option is [replication]. |
+   | `spec.componentSpecs`                 | It is the list of ClusterComponentSpec objects that define the individual Components that make up a Cluster. This field allows customized configuration of each component within a cluster.   |
+   | `spec.componentSpecs.serviceVersion` | It specifies the version of the Service expected to be provisioned by this Component. Valid options are: [12.14.0,12.14.1,12.15.0,14.7.2,14.8.0,15.7.0,16.4.0]. |
+   | `spec.componentSpecs.disableExporter` | It determines whether metrics exporter information is annotated on the Component's headless Service. Valid options are [true, false]. |
+   | `spec.componentSpecs.labels` | It specifies Labels to override or add for underlying Pods, PVCs, Account & TLS Secrets, Services owned by Component. |
+   | `spec.componentSpecs.labels.apps.kubeblocks.postgres.patroni/scope` | PostgreSQL's `ComponentDefinition` specifies the environment variable `KUBERNETES_SCOPE_LABEL=apps.kubeblocks.postgres.patroni/scope`. This variable defines the label key Patroni uses to tag Kubernetes resources, helping Patroni identify which resources belong to the specified scope (or cluster). **Note**: **DO NOT REMOVE THIS LABEL.** You can update its value to match your cluster name. The value must follow the format `<cluster.metadata.name>-postgresql`. For example, if your cluster name is `mycluster`, the value would be `mycluster-postgresql`. Replace `mycluster` with your actual cluster name as needed.  |
+   | `spec.componentSpecs.replicas`        | It specifies the number of replicas of the component. |
+   | `spec.componentSpecs.resources`       | It specifies the resources required by the Component.  |
+   | `spec.componentSpecs.volumeClaimTemplates` | It specifies a list of PersistentVolumeClaim templates that define the storage requirements for the Component. |
+   | `spec.componentSpecs.volumeClaimTemplates.name` | It refers to the name of a volumeMount defined in `componentDefinition.spec.runtime.containers[*].volumeMounts`. |
+   | `spec.componentSpecs.volumeClaimTemplates.spec.storageClassName` | It is the name of the StorageClass required by the claim. If not specified, the StorageClass annotated with `storageclass.kubernetes.io/is-default-class=true` will be used by default. |
+   | `spec.componentSpecs.volumeClaimTemplates.spec.resources.storage` | You can set the storage size as needed. |
+
+   For more API fields and descriptions, refer to the [API Reference](https://kubeblocks.io/docs/preview/developer_docs/api-reference/cluster).
 
    KubeBlocks operator watches for the `Cluster` CRD and creates the cluster and all dependent resources. You can get all the resources created by the cluster with `kubectl get all,secret,rolebinding,serviceaccount -l app.kubernetes.io/instance=mycluster -n demo`.
 
@@ -209,16 +205,15 @@ KubeBlocks supports creating two types of PostgreSQL clusters: Standalone and Re
    kbcli cluster create postgresql -h
    ```
 
-   For example, you can create a Replication Cluster with the `--replicas` flag.
+   If you only have one node for deploying a Replication Cluster, you can configure the cluster affinity by setting `--pod-anti-affinity`, `--tolerations`, and `--topology-keys` when creating a Replication Cluster. But you should note that for a production environment, it is not recommended to deploy all replicas on one node, which may decrease the cluster availability. For example,
 
    ```bash
-   kbcli cluster create postgresql mycluster --replicas=2 -n demo
-   ```
-
-   If you only have one node for deploying a Replication Cluster, set the `--topology-keys` as `null` when creating a Replication Cluster. But you should note that for a production environment, it is not recommended to deploy all replicas on one node, which may decrease the cluster availability.
-
-   ```bash
-   kbcli cluster create postgresql mycluster --replicas=2 --availability-policy='none' -n demo
+   kbcli cluster create postgresql mycluster \
+       --mode='replication' \
+       --pod-anti-affinity='Preferred' \
+       --tolerations='node-role.kubeblocks.io/data-plane:NoSchedule' \
+       --topology-keys='null' \
+       --namespace demo
    ```
 
 2. Verify whether this cluster is created successfully.

@@ -15,7 +15,7 @@ import TabItem from '@theme/TabItem';
 
 Milvus 是高度灵活、可靠且速度极快的云原生开源矢量数据库。它为 embedding 相似性搜索和 AI 应用程序提供支持，并努力使每个组织都可以访问矢量数据库。 Milvus 可以存储、索引和管理由深度神经网络和其他机器学习 (ML) 模型生成的十亿级别以上的 embedding 向量。
 
-本文档展示了如何通过 kbcli、kubectl 或 YAML 文件等当时创建和管理  Milvus 集群。您可以在 [GitHub 仓库](https://github.com/apecloud/kubeblocks-addons/tree/release-0.9/examples/milvus)查看 YAML 示例。
+本文档展示了如何通过 kbcli、kubectl 或 YAML 文件等当时创建和管理  Milvus 集群。您可以在 [GitHub 仓库](https://github.com/apecloud/kubeblocks-addons/tree/main/examples/milvus)查看 YAML 示例。
 
 ## 开始之前
 
@@ -34,217 +34,248 @@ Milvus 是高度灵活、可靠且速度极快的云原生开源矢量数据库�
 
 ***步骤：***
 
-<Tabs>
-
-<TabItem value="kubectl" label="kubectl" default>
-
-KubeBlocks 通过 `Cluster` 定义集群。以下是创建 Milvus 集群的示例。Pod 默认分布在不同节点。但如果您只有一个节点可用于部署集群，可将 `spec.affinity.topologyKeys` 设置为 `null`。
-
-:::note
-
-生产环境中，不建议将所有副本部署在同一个节点上，因为这可能会降低集群的可用性。
-
-:::
+KubeBlocks 通过 `Cluster` 定义集群。以下是创建 Milvus 集群的示例。Pod 默认分布在不同节点。如果您只有一个节点可用于部署多副本集群，可设置 `spec.schedulingPolicy` 或 `spec.componentSpecs.schedulingPolicy`，具体可参考 [API 文档](https://kubeblocks.io/docs/preview/developer_docs/api-reference/cluster#apps.kubeblocks.io/v1.SchedulingPolicy)。但生产环境中，不建议将所有副本部署在同一个节点上，因为这可能会降低集群的可用性。
 
 ```yaml
 cat <<EOF | kubectl apply -f -
-apiVersion: apps.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1
 kind: Cluster
 metadata:
-  name: mycluster
   namespace: demo
+  name: mycluster
 spec:
-  affinity:
-    podAntiAffinity: Preferred
-    topologyKeys: 
-    - kubernetes.io/hostname
-  clusterDefinitionRef: milvus-2.3.2
-  componentSpecs:
-  - componentDefRef: milvus
-    disableExporter: true
-    name: milvus
-    replicas: 1
-    resources:
-      limits:
-        cpu: "1"
-        memory: 1Gi
-      requests:
-        cpu: "1"
-        memory: 1Gi
-    serviceAccountName: kb-mycluster
-    volumeClaimTemplates:
-    - name: data
-      spec:
-        accessModes:
-        - ReadWriteOnce
-        resources:
-          requests:
-            storage: 20Gi
-  - componentDefRef: etcd
-    disableExporter: true
-    name: etcd
-    replicas: 1
-    resources:
-      limits:
-        cpu: "1"
-        memory: 1Gi
-      requests:
-        cpu: "1"
-        memory: 1Gi
-    serviceAccountName: kb-mycluster
-    volumeClaimTemplates:
-    - name: data
-      spec:
-        accessModes:
-        - ReadWriteOnce
-        resources:
-          requests:
-            storage: 20Gi
-  - componentDefRef: minio
-    disableExporter: true
-    name: minio
-    replicas: 1
-    resources:
-      limits:
-        cpu: "1"
-        memory: 1Gi
-      requests:
-        cpu: "1"
-        memory: 1Gi
-    serviceAccountName: kb-mycluster
-    volumeClaimTemplates:
-    - name: data
-      spec:
-        accessModes:
-        - ReadWriteOnce
-        resources:
-          requests:
-            storage: 20Gi
-  - componentDefRef: proxy
-    disableExporter: true
-    name: proxy
-    replicas: 1
-    resources:
-      limits:
-        cpu: "1"
-        memory: 1Gi
-      requests:
-        cpu: "1"
-        memory: 1Gi
-    serviceAccountName: kb-mycluster
-    volumeClaimTemplates:
-    - name: data
-      spec:
-        accessModes:
-        - ReadWriteOnce
-        resources:
-          requests:
-            storage: 20Gi
-  - componentDefRef: mixcoord
-    disableExporter: true
-    name: mixcoord
-    replicas: 1
-    resources:
-      limits:
-        cpu: "1"
-        memory: 1Gi
-      requests:
-        cpu: "1"
-        memory: 1Gi
-    serviceAccountName: kb-mycluster
-    volumeClaimTemplates:
-    - name: data
-      spec:
-        accessModes:
-        - ReadWriteOnce
-        resources:
-          requests:
-            storage: 20Gi
-  - componentDefRef: datanode
-    disableExporter: true
-    name: datanode
-    replicas: 1
-    resources:
-      limits:
-        cpu: "1"
-        memory: 1Gi
-      requests:
-        cpu: "1"
-        memory: 1Gi
-    serviceAccountName: kb-mycluster
-    volumeClaimTemplates:
-    - name: data
-      spec:
-        accessModes:
-        - ReadWriteOnce
-        resources:
-          requests:
-            storage: 20Gi
-  - componentDefRef: indexnode
-    disableExporter: true
-    name: indexnode
-    replicas: 1
-    resources:
-      limits:
-        cpu: "1"
-        memory: 1Gi
-      requests:
-        cpu: "1"
-        memory: 1Gi
-    serviceAccountName: kb-mycluster
-    volumeClaimTemplates:
-    - name: data
-      spec:
-        accessModes:
-        - ReadWriteOnce
-        resources:
-          requests:
-            storage: 20Gi
-  - componentDefRef: querynode
-    disableExporter: true
-    name: querynode
-    replicas: 1
-    resources:
-      limits:
-        cpu: "1"
-        memory: 1Gi
-      requests:
-        cpu: "1"
-        memory: 1Gi
-    serviceAccountName: kb-mycluster
-    volumeClaimTemplates:
-    - name: data
-      spec:
-        accessModes:
-        - ReadWriteOnce
-        resources:
-          requests:
-            storage: 20Gi
-  resources:
-    cpu: "0"
-    memory: "0"
-  storage:
-    size: "0"
   terminationPolicy: Delete
-status: {}
+  clusterDef: milvus
+  topology: cluster
+  componentSpecs:
+    - name: proxy
+      replicas: 1
+      resources:
+        limits:
+          cpu: "0.5"
+          memory: "0.5Gi"
+        requests:
+          cpu: "0.5"
+          memory: "0.5Gi"
+      serviceRefs:
+        - name: milvus-meta-storage 
+          namespace: demo        
+          clusterServiceSelector:
+            cluster: etcdm-cluster  
+            service:
+              component: etcd       
+              service: headless     
+              port: client          
+        - name: milvus-log-storage
+          namespace: demo
+          clusterServiceSelector:
+            cluster: pulsarm-cluster
+            service:
+              component: broker
+              service: headless
+              port: pulsar
+        - name: milvus-object-storage
+          namespace: demo
+          clusterServiceSelector:
+            cluster: miniom-cluster
+            service:
+              component: minio
+              service: headless
+              port: http
+            credential:            
+              component: minio     
+              name: admin          
+      disableExporter: true
+    - name: mixcoord
+      replicas: 1
+      resources:
+        limits:
+          cpu: "0.5"
+          memory: "0.5Gi"
+        requests:
+          cpu: "0.5"
+          memory: "0.5Gi"
+      serviceRefs:
+        - name: milvus-meta-storage
+          namespace: demo
+          clusterServiceSelector:
+            cluster: etcdm-cluster
+            service:
+              component: etcd
+              service: headless
+              port: client
+
+        - name: milvus-log-storage
+          namespace: demo
+          clusterServiceSelector:
+            cluster: pulsarm-cluster
+            service:
+              component: broker
+              service: headless
+              port: pulsar
+
+        - name: milvus-object-storage
+          namespace: demo
+          clusterServiceSelector:
+            cluster: miniom-cluster
+            service:
+              component: minio
+              service: headless
+              port: http
+            credential:
+              component: minio
+              name: admin
+
+      disableExporter: true
+    - name: datanode
+      replicas: 1
+      disableExporter: true
+      resources:
+        limits:
+          cpu: "0.5"
+          memory: "0.5Gi"
+        requests:
+          cpu: "0.5"
+          memory: "0.5Gi"
+      serviceRefs:
+        - name: milvus-meta-storage
+          namespace: demo
+          clusterServiceSelector:
+            cluster: etcdm-cluster
+            service:
+              component: etcd
+              service: headless
+              port: client
+
+        - name: milvus-log-storage
+          namespace: demo
+          clusterServiceSelector:
+            cluster: pulsarm-cluster
+            service:
+              component: broker
+              service: headless
+              port: pulsar
+
+        - name: milvus-object-storage
+          namespace: demo
+          clusterServiceSelector:
+            cluster: miniom-cluster
+            service:
+              component: minio
+              service: headless
+              port: http
+            credential:
+              component: minio
+              name: admin
+
+      disableExporter: true
+    - name: indexnode
+      replicas: 1
+      disableExporter: true
+      resources:
+        limits:
+          cpu: "0.5"
+          memory: "0.5Gi"
+        requests:
+          cpu: "0.5"
+          memory: "0.5Gi"
+      serviceRefs:
+        - name: milvus-meta-storage
+          namespace: demo
+          clusterServiceSelector:
+            cluster: etcdm-cluster
+            service:
+              component: etcd
+              service: headless
+              port: client
+
+        - name: milvus-log-storage
+          namespace: demo
+          clusterServiceSelector:
+            cluster: pulsarm-cluster
+            service:
+              component: broker
+              service: headless
+              port: pulsar
+
+        - name: milvus-object-storage
+          namespace: demo
+          clusterServiceSelector:
+            cluster: miniom-cluster
+            service:
+              component: minio
+              service: headless
+              port: http
+            credential:
+              component: minio
+              name: admin
+
+      disableExporter: true
+    - name: querynode
+      replicas: 1
+      disableExporter: true
+      resources:
+        limits:
+          cpu: "0.5"
+          memory: "0.5Gi"
+        requests:
+          cpu: "0.5"
+          memory: "0.5Gi"
+      serviceRefs:
+        - name: milvus-meta-storage
+          namespace: demo
+          clusterServiceSelector:
+            cluster: etcdm-cluster
+            service:
+              component: etcd
+              service: headless
+              port: client
+
+        - name: milvus-log-storage
+          namespace: demo
+          clusterServiceSelector:
+            cluster: pulsarm-cluster
+            service:
+              component: broker
+              service: headless
+              port: pulsar
+
+        - name: milvus-object-storage
+          namespace: demo
+          clusterServiceSelector:
+            cluster: miniom-cluster
+            service:
+              component: minio
+              service: headless
+              port: http
+            credential:
+              component: minio
+              name: admin
+
+      disableExporter: true
 EOF
 ```
 
 | 字段                                   | 定义  |
 |---------------------------------------|--------------------------------------|
-| `spec.clusterDefinitionRef`           | 集群定义 CRD 的名称，用来定义集群组件。  |
-| `spec.clusterVersionRef`              | 集群版本 CRD 的名称，用来定义集群版本。 |
-| `spec.terminationPolicy`              | 集群的终止策略，默认值为 `Delete`，有效值为 `DoNotTerminate`、`Halt`、`Delete` 和 `WipeOut`。具体定义可参考 [终止策略](#终止策略)。 |
-| `spec.affinity`                       | 为集群的 Pods 定义了一组节点亲和性调度规则。该字段可控制 Pods 在集群中节点上的分布。 |
-| `spec.affinity.podAntiAffinity`       | 定义了不在同一 component 中的 Pods 的反亲和性水平。该字段决定了 Pods 以何种方式跨节点分布，以提升可用性和性能。 |
-| `spec.affinity.topologyKeys`          | 用于定义 Pod 反亲和性和 Pod 分布约束的拓扑域的节点标签值。 |
-| `spec.tolerations`                    | 该字段为数组，用于定义集群中 Pods 的容忍，确保 Pod 可被调度到具有匹配污点的节点上。 |
-| `spec.componentSpecs`                 | 集群 components 列表，定义了集群 components。该字段允许对集群中的每个 component 进行自定义配置。 |
-| `spec.componentSpecs.componentDefRef` | 表示 cluster definition 中定义的 component definition 的名称，可通过执行 `kubectl get clusterdefinition milvus -o json \| jq '.spec.componentDefs[].name'` 命令获取 component definition 名称。 |
-| `spec.componentSpecs.name`            | 定义了 component 的名称。  |
-| `spec.componentSpecs.disableExporter` | 定义了是否开启监控功能。 |
+| `spec.terminationPolicy`              | 集群终止策略，有效值为 `DoNotTerminate`、`Delete` 和 `WipeOut`。具体定义可参考 [终止策略](#终止策略)。 |
+| `spec.clusterDef` | 指定了创建集群时要使用的 ClusterDefinition 的名称。**注意**：**请勿更新此字段**。创建 Milvus 集群时，该值必须为 `milvus`。 |
+| `spec.topology` | 指定了在创建集群时要使用的 ClusterTopology 的名称。可选值为[standalone, cluster]。 |
+| `spec.componentSpecs`                 | 集群 component 列表，定义了集群 components。该字段支持自定义配置集群中每个 component。  |
+| `spec.componentSpecs.serviceRefs` | 定义了 component 的 ServiceRef 列表。 |
+| `spec.componentSpecs.serviceRefs.name` | 指定了服务引用声明的标识符，该标识符在 `componentDefinition.spec.serviceRefDeclarations[*].name` 中定义。 |
+| `spec.componentSpecs.serviceRefs.clusterServiceSelector` | 引用了另一个 KubeBlocks 集群提供的服务。 |
+| `spec.componentSpecs.serviceRefs.clusterServiceSelector.cluster` | 定义了集群名称，您可以按需修改。 |
+| `spec.componentSpecs.serviceRefs.clusterServiceSelector.service.component` | 定义了组件名称。 |
+| `spec.componentSpecs.serviceRefs.clusterServiceSelector.service.service` | 引用了默认的无头服务（headless Service）。 |
+| `spec.componentSpecs.serviceRefs.clusterServiceSelector.service.port` | 引用了端口名称。 |
+| `spec.componentSpecs.serviceRefs.clusterServiceSelector.credential` | 指定了用于验证并与被引用集群建立连接的系统账号（SystemAccount）。  |
+| `spec.componentSpecs.serviceRefs.clusterServiceSelector.credential.name` | 指定了要引用的凭证（SystemAccount）名称，本例中使用 'admin' 账号。 |
+| `spec.componentSpecs.disableExporter` | 定义了是否在 component 无头服务（headless service）上标注指标 exporter 信息，是否开启监控 exporter。有效值为 [true, false]。 |
 | `spec.componentSpecs.replicas`        | 定义了 component 中 replicas 的数量。 |
 | `spec.componentSpecs.resources`       | 定义了 component 的资源要求。  |
+
+您可参考 [API 文档](https://kubeblocks.io/docs/preview/developer_docs/api-reference/cluster)，查看更多 API 字段及说明。
 
 KubeBlocks operator 监控 `Cluster` CRD 并创建集群和全部依赖资源。您可执行以下命令获取集群创建的所有资源信息。
 
@@ -257,89 +288,6 @@ kubectl get all,secret,rolebinding,serviceaccount -l app.kubernetes.io/instance=
 ```bash
 kubectl get cluster mycluster -n demo -o yaml
 ```
-
-</TabItem>
-
-<TabItem value="kbcli" label="kbcli">
-
-1. 创建一个 Milvus 集群。
-
-   ```bash
-   kbcli cluster create mycluster --cluster-definition=milvus-2.3.2 -n demo
-   ```
-
-   如果您需要自定义集群规格，kbcli 也提供了诸多参数，如支持设置引擎版本、终止策略、CPU、内存规格。您可通过在命令结尾添加 `--help` 或 `-h` 来查看具体说明。比如，
-
-   ```bash
-   kbcli cluster create milvus --help
-
-   kbcli cluster create milvus -h
-   ```
-
-2. 检查集群是否已创建。
-
-   ```bash
-   kbcli cluster list -n demo
-   >
-   NAME        NAMESPACE   CLUSTER-DEFINITION        VERSION               TERMINATION-POLICY   STATUS           CREATED-TIME
-   mycluster   demo        milvus-2.3.2                                    Delete               Running          Jul 05,2024 17:35 UTC+0800 
-   ```
-
-3. 查看集群信息。
-
-   ```bash
-   kbcli cluster describe mycluster -n demo
-   >
-   Name: milvus	 Created Time: Jul 05,2024 17:35 UTC+0800
-   NAMESPACE   CLUSTER-DEFINITION   VERSION   STATUS    TERMINATION-POLICY   
-   demo        milvus-2.3.2                   Running   Delete               
-
-   Endpoints:
-   COMPONENT   MODE        INTERNAL                                        EXTERNAL   
-   milvus      ReadWrite   milvus-milvus.default.svc.cluster.local:19530   <none>     
-   minio       ReadWrite   milvus-minio.default.svc.cluster.local:9000     <none>     
-   proxy       ReadWrite   milvus-proxy.default.svc.cluster.local:19530    <none>     
-                           milvus-proxy.default.svc.cluster.local:9091                
-
-   Topology:
-   COMPONENT   INSTANCE             ROLE     STATUS    AZ       NODE     CREATED-TIME                 
-   etcd        milvus-etcd-0        <none>   Running   <none>   <none>   Jul 05,2024 17:35 UTC+0800   
-   minio       milvus-minio-0       <none>   Running   <none>   <none>   Jul 05,2024 17:35 UTC+0800   
-   milvus      milvus-milvus-0      <none>   Running   <none>   <none>   Jul 05,2024 17:35 UTC+0800   
-   indexnode   milvus-indexnode-0   <none>   Running   <none>   <none>   Jul 05,2024 17:35 UTC+0800   
-   mixcoord    milvus-mixcoord-0    <none>   Running   <none>   <none>   Jul 05,2024 17:35 UTC+0800   
-   querynode   milvus-querynode-0   <none>   Running   <none>   <none>   Jul 05,2024 17:35 UTC+0800   
-   datanode    milvus-datanode-0    <none>   Running   <none>   <none>   Jul 05,2024 17:35 UTC+0800   
-   proxy       milvus-proxy-0       <none>   Running   <none>   <none>   Jul 05,2024 17:35 UTC+0800   
-
-   Resources Allocation:
-   COMPONENT   DEDICATED   CPU(REQUEST/LIMIT)   MEMORY(REQUEST/LIMIT)   STORAGE-SIZE   STORAGE-CLASS     
-   milvus      false       1 / 1                1Gi / 1Gi               data:20Gi      csi-hostpath-sc   
-   etcd        false       1 / 1                1Gi / 1Gi               data:20Gi      csi-hostpath-sc   
-   minio       false       1 / 1                1Gi / 1Gi               data:20Gi      csi-hostpath-sc   
-   proxy       false       1 / 1                1Gi / 1Gi               data:20Gi      csi-hostpath-sc   
-   mixcoord    false       1 / 1                1Gi / 1Gi               data:20Gi      csi-hostpath-sc   
-   datanode    false       1 / 1                1Gi / 1Gi               data:20Gi      csi-hostpath-sc   
-   indexnode   false       1 / 1                1Gi / 1Gi               data:20Gi      csi-hostpath-sc   
-   querynode   false       1 / 1                1Gi / 1Gi               data:20Gi      csi-hostpath-sc   
-
-   Images:
-   COMPONENT   TYPE        IMAGE                                                
-   milvus      milvus      milvusdb/milvus:v2.3.2                               
-   etcd        etcd        docker.io/milvusdb/etcd:3.5.5-r2                     
-   minio       minio       docker.io/minio/minio:RELEASE.2022-03-17T06-34-49Z   
-   proxy       proxy       milvusdb/milvus:v2.3.2                               
-   mixcoord    mixcoord    milvusdb/milvus:v2.3.2                               
-   datanode    datanode    milvusdb/milvus:v2.3.2                               
-   indexnode   indexnode   milvusdb/milvus:v2.3.2                               
-   querynode   querynode   milvusdb/milvus:v2.3.2                               
-
-   Show cluster events: kbcli cluster list-events -n demo milvus
-   ```
-
-</TabItem>
-
-</Tabs>
 
 ## 扩缩容
 
@@ -911,8 +859,7 @@ mycluster   demo        milvus-2.3.2                           Delete           
 | **终止策略** | **删除操作**                                                                     |
 |:----------------------|:-------------------------------------------------------------------------------------------|
 | `DoNotTerminate`      | `DoNotTerminate` 禁止删除操作。                                                  |
-| `Halt`                | `Halt` 删除集群资源（如 Pods、Services 等），但保留 PVC。停止其他运维操作的同时，保留了数据。但 `Halt` 策略在 v0.9.1 中已删除，设置为 `Halt` 的效果与 `DoNotTerminate` 相同。  |
-| `Delete`              | `Delete` 在 `Halt` 的基础上，删除 PVC 及所有持久数据。                              |
+| `Delete`              | `Delete` 删除 Pod、服务、PVC 等集群资源，删除所有持久数据。                              |
 | `WipeOut`             | `WipeOut`  删除所有集群资源，包括外部存储中的卷快照和备份。使用该策略将会删除全部数据，特别是在非生产环境，该策略将会带来不可逆的数据丢失。请谨慎使用。   |
 
 执行以下命令查看终止策略。

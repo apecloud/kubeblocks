@@ -100,57 +100,58 @@ KubeBlocks supports creating two types of MongoDB clusters: Standalone and Repli
 
    KubeBlocks implements a `Cluster` CRD to define a cluster. Here is an example of creating a MongoDB Standalone.
 
-   If you only have one node for deploying a ReplicaSet Cluster, set `spec.affinity.topologyKeys` as `null`. But for a production environment, it is not recommended to deploy all replicas on one node, which may decrease the cluster availability.
+   If you only have one node for deploying a ReplicaSet Cluster, configure the cluster affinity by setting `spec.schedulingPolicy` or `spec.componentSpecs.schedulingPolicy`. For details, you can refer to the [API docs](https://kubeblocks.io/docs/preview/developer_docs/api-reference/cluster#apps.kubeblocks.io/v1.SchedulingPolicy). But for a production environment, it is not recommended to deploy all replicas on one node, which may decrease the cluster availability.
 
    ```yaml
    cat <<EOF | kubectl apply -f -
-   apiVersion: apps.kubeblocks.io/v1alpha1
+   apiVersion: apps.kubeblocks.io/v1
    kind: Cluster
    metadata:
      name: mycluster
      namespace: demo
    spec:
-     affinity:
-       podAntiAffinity: Preferred
-       tenancy: SharedNode
-       topologyKeys:
-       - kubernetes.io/hostname
-     componentSpecs:
-     - componentDef: mongodb
-       name: mongodb
-       replicas: 3
-       resources:
-         limits:
-           cpu: "0.5"
-           memory: 0.5Gi
-         requests:
-           cpu: "0.5"
-           memory: 0.5Gi
-       serviceVersion: 6.0.16
-       volumeClaimTemplates:
-       - name: data
-         spec:
-           accessModes:
-           - ReadWriteOnce
-           resources:
-             requests:
-               storage: 20Gi
      terminationPolicy: Delete
+     clusterDef: mongodb
+     topology: replicaset
+     componentSpecs:
+       - name: mongodb
+         serviceVersion: "6.0.16"
+         replicas: 3
+         resources:
+           limits:
+             cpu: '0.5'
+             memory: 0.5Gi
+           requests:
+             cpu: '0.5'
+             memory: 0.5Gi
+         volumeClaimTemplates:
+           - name: data
+             spec:
+               storageClassName: ""
+               accessModes:
+                 - ReadWriteOnce
+               resources:
+                 requests:
+                   storage: 20Gi
    EOF
    ```
 
    | Field                                 | Definition  |
    |---------------------------------------|--------------------------------------|
-   | `spec.terminationPolicy`              | It is the policy of cluster termination. The default value is `Delete`. Valid values are `DoNotTerminate`, `Delete`, `WipeOut`. For the detailed definition, you can refer to [Termination Policy](./delete-mongodb-cluster.md#termination-policy). |
-   | `spec.affinity`                       | It defines a set of node affinity scheduling rules for the cluster's Pods. This field helps control the placement of Pods on nodes within the cluster.  |
-   | `spec.affinity.podAntiAffinity`       | It specifies the anti-affinity level of Pods within a component. It determines how pods should spread across nodes to improve availability and performance. |
-   | `spec.affinity.topologyKeys`          | It represents the key of node labels used to define the topology domain for Pod anti-affinity and Pod spread constraints.   |
-   | `spec.tolerations`                    | It is an array that specifies tolerations attached to the cluster's Pods, allowing them to be scheduled onto nodes with matching taints.  |
-   | `spec.componentSpecs`                 | It is the list of components that define the cluster components. This field allows customized configuration of each component within a cluster.   |
-   | `spec.componentSpecs.componentDefRef` | It is the name of the component definition that is defined in the cluster definition and you can get the component definition names with `kubectl get clusterdefinition mongodb -o json \| jq '.spec.componentDefs[].name'`.   |
-   | `spec.componentSpecs.name`            | It specifies the name of the component.     |
-   | `spec.componentSpecs.replicas`        | It specifies the number of replicas of the component.  |
-   | `spec.componentSpecs.resources`       | It specifies the resource requirements of the component.  |
+   | `spec.terminationPolicy`              | It is the policy of cluster termination. Valid values are `DoNotTerminate`, `Delete`, `WipeOut`. For the detailed definition, you can refer to [Termination Policy](./delete-mongodb-cluster.md#termination-policy). |
+   | `spec.clusterDef` | It specifies the name of the ClusterDefinition to use when creating a Cluster. **Note: DO NOT UPDATE THIS FIELD**. The value must be `mongodb` to create a MongoDB Cluste. |
+   | `spec.topology` | It specifies the name of the ClusterTopology to be used when creating the Cluster. |
+   | `spec.componentSpecs`                 | It is the list of ClusterComponentSpec objects that define the individual Components that make up a Cluster. This field allows customized configuration of each component within a cluster.   |
+   | `spec.componentSpecs.serviceVersion` | It specifies the version of the Service expected to be provisioned by this Component. Valid options are: [4.0.28,4.2.24,4.4.29,5.0.28,6.0.16,7.0.1]. |
+   | `spec.componentSpecs.disableExporter` | It determines whether metrics exporter information is annotated on the Component's headless Service. Valid options are [true, false]. |
+   | `spec.componentSpecs.replicas`        | It specifies the number of replicas of the component. |
+   | `spec.componentSpecs.resources`       | It specifies the resources required by the Component.  |
+   | `spec.componentSpecs.volumeClaimTemplates` | It specifies a list of PersistentVolumeClaim templates that define the storage requirements for the Component. |
+   | `spec.componentSpecs.volumeClaimTemplates.name` | It refers to the name of a volumeMount defined in `componentDefinition.spec.runtime.containers[*].volumeMounts`. |
+   | `spec.componentSpecs.volumeClaimTemplates.spec.storageClassName` | It is the name of the StorageClass required by the claim. If not specified, the StorageClass annotated with `storageclass.kubernetes.io/is-default-class=true` will be used by default. |
+   | `spec.componentSpecs.volumeClaimTemplates.spec.resources.storage` | You can set the storage size as needed. |
+
+   For more API fields and descriptions, refer to the [API Reference](https://kubeblocks.io/docs/preview/developer_docs/api-reference/cluster).
 
    KubeBlocks operator watches for the `Cluster` CRD and creates the cluster and all dependent resources. You can get all the resources created by the cluster by running the command below.
 
@@ -180,7 +181,7 @@ KubeBlocks supports creating two types of MongoDB clusters: Standalone and Repli
 1. Create a MongoDB cluster.
 
    ```bash
-   kbcli cluster create mycluster --cluster-definition mongodb -n demo
+   kbcli cluster create mongodb mycluster -n demo
    ```
 
    The commands above are some common examples to create a cluster with default settings. If you want to customize your cluster specifications, kbcli provides various options, such as setting cluster version, termination policy, CPU, and memory. You can view these options by adding `--help` or `-h` flag.
@@ -188,6 +189,17 @@ KubeBlocks supports creating two types of MongoDB clusters: Standalone and Repli
    ```bash
    kbcli cluster create mongodb --help
    kbcli cluster create mongodb -h
+   ```
+
+   If you only have one node for deploying a cluster with multiple replicas, you can configure the cluster affinity by setting `--pod-anti-affinity`, `--tolerations`, and `--topology-keys` when creating a cluster. But you should note that for a production environment, it is not recommended to deploy all replicas on one node, which may decrease the cluster availability. For example,
+
+   ```bash
+   kbcli cluster create mongodb mycluster \
+       --mode='replicaset' \
+       --pod-anti-affinity='Preferred' \
+       --tolerations='node-role.kubeblocks.io/data-plane:NoSchedule' \
+       --topology-keys='null' \
+       --namespace demo
    ```
 
 2. Verify whether this cluster is created successfully.

@@ -76,7 +76,7 @@ func (t *componentAccountProvisionTransformer) Transform(ctx graph.TransformCont
 		return nil
 	}
 
-	accounts := synthesizeSystemAccounts(compDef.Spec.SystemAccounts, comp.Spec.SystemAccounts, true)
+	accounts, _ := synthesizeSystemAccounts(compDef.Spec.SystemAccounts, comp.Spec.SystemAccounts, true)
 
 	secrets, err1 := listSystemAccountObjects(ctx, transCtx.SynthesizeComponent)
 	if err1 != nil {

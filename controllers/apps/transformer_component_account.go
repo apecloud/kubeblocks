@@ -73,7 +73,11 @@ func (t *componentAccountTransformer) Transform(ctx graph.TransformContext, dag 
 	runningNameSet := sets.New(maps.Keys(secrets)...)
 
 	// proto accounts
-	accounts := synthesizeSystemAccounts(transCtx.CompDef.Spec.SystemAccounts, transCtx.Component.Spec.SystemAccounts, false)
+	accounts, err := synthesizeSystemAccounts(transCtx.CompDef.Spec.SystemAccounts,
+		transCtx.Component.Spec.SystemAccounts, false)
+	if err != nil {
+		return err
+	}
 	protoNameSet := sets.New(maps.Keys(accounts)...)
 
 	createSet, deleteSet, updateSet := setDiff(runningNameSet, protoNameSet)
@@ -265,7 +269,7 @@ type synthesizedSystemAccount struct {
 }
 
 func synthesizeSystemAccounts(compDefAccounts []appsv1.SystemAccount,
-	compAccounts []appsv1.ComponentSystemAccount, keepDisabled bool) map[string]synthesizedSystemAccount {
+	compAccounts []appsv1.ComponentSystemAccount, keepDisabled bool) (map[string]synthesizedSystemAccount, error) {
 	accounts := make(map[string]synthesizedSystemAccount)
 	for _, account := range compDefAccounts {
 		accounts[account.Name] = synthesizedSystemAccount{
@@ -285,17 +289,21 @@ func synthesizeSystemAccounts(compDefAccounts []appsv1.SystemAccount,
 	for i := range compAccounts {
 		account, ok := accounts[compAccounts[i].Name]
 		if !ok {
-			continue // ignore it silently
+			return nil, fmt.Errorf("system account %s not defined in component definition", compAccounts[i].Name)
 		}
-		accounts[compAccounts[i].Name] = merge(account, compAccounts[i])
+		accounts[account.Name] = merge(account, compAccounts[i])
 	}
 
 	if !keepDisabled {
 		for _, name := range maps.Keys(accounts) {
-			if accounts[name].Disabled != nil && *accounts[name].Disabled {
+			account := accounts[name]
+			if account.Disabled != nil && *account.Disabled {
+				if account.InitAccount {
+					return nil, fmt.Errorf("cannot disable init system account: %s", name)
+				}
 				delete(accounts, name)
 			}
 		}
 	}
-	return accounts
+	return accounts, nil
 }

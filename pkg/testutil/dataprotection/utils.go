@@ -58,3 +58,10 @@ func PatchBackupStatus(testCtx *testutil.TestContext, key client.ObjectKey, stat
 		fetched.Status = status
 	})).Should(Succeed())
 }
+
+func NewFakeIncActionSet(testCtx *testutil.TestContext) *dpv1alpha1.ActionSet {
+	return NewFakeActionSet(testCtx, func(as *dpv1alpha1.ActionSet) {
+		as.Name = IncActionSetName
+		as.Spec.BackupType = dpv1alpha1.BackupTypeIncremental
+	})
+}

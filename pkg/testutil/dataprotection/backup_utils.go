@@ -42,9 +42,14 @@ import (
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
-func NewFakeActionSet(testCtx *testutil.TestContext) *dpv1alpha1.ActionSet {
+func NewFakeActionSet(testCtx *testutil.TestContext, change func(as *dpv1alpha1.ActionSet)) *dpv1alpha1.ActionSet {
 	as := testapps.CreateCustomizedObj(testCtx, "backup/actionset.yaml",
-		&dpv1alpha1.ActionSet{}, testapps.WithName(ActionSetName))
+		&dpv1alpha1.ActionSet{}, func(obj *dpv1alpha1.ActionSet) {
+			obj.Name = ActionSetName
+			if change != nil {
+				change(obj)
+			}
+		})
 	Eventually(testapps.CheckObj(testCtx, client.ObjectKeyFromObject(as),
 		func(g Gomega, as *dpv1alpha1.ActionSet) {
 			g.Expect(as.Status.Phase).Should(BeEquivalentTo(dpv1alpha1.AvailablePhase))
@@ -65,6 +70,10 @@ func NewFakeBackupPolicy(testCtx *testutil.TestContext,
 		AddBackupMethod(BackupMethodName, false, ActionSetName).
 		SetBackupMethodVolumeMounts(DataVolumeName, DataVolumeMountPath,
 			LogVolumeName, LogVolumeMountPath).
+		AddBackupMethod(IncBackupMethodName, false, IncActionSetName).
+		SetBackupMethodVolumeMounts(DataVolumeName, DataVolumeMountPath,
+			LogVolumeName, LogVolumeMountPath).
+		SetBackupMethodCompatibleMethod(BackupMethodName).
 		AddBackupMethod(VSBackupMethodName, true, "").
 		SetBackupMethodVolumes([]string{DataVolumeName}).
 		Apply(change).
@@ -273,6 +282,9 @@ func MockBackupStatusMethod(backup *dpv1alpha1.Backup, backupMethodName, targetV
 				{Name: targetVolume, MountPath: "/"},
 			},
 		},
+	}
+	if backupMethodName == IncBackupMethodName {
+		backup.Status.BackupMethod.CompatibleMethod = BackupMethodName
 	}
 }
 

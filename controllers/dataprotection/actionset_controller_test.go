@@ -54,7 +54,7 @@ var _ = Describe("ActionSet Controller test", func() {
 
 	Context("create a actionSet", func() {
 		It("should be available", func() {
-			as := testdp.NewFakeActionSet(&testCtx)
+			as := testdp.NewFakeActionSet(&testCtx, nil)
 			Expect(as).ShouldNot(BeNil())
 		})
 	})

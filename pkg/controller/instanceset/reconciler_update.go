@@ -33,6 +33,7 @@ import (
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -214,6 +215,20 @@ func (r *updateReconciler) switchover(tree *kubebuilderx.ObjectTree, its *worklo
 		return nil
 	}
 
+	clusterName, err := func() (string, error) {
+		var clusterName string
+		if its.Annotations != nil {
+			clusterName = its.Annotations[constant.AppInstanceLabelKey]
+		}
+		if len(clusterName) == 0 {
+			return "", fmt.Errorf("InstanceSet %s/%s has no annotation %s", its.Namespace, its.Name, constant.AppInstanceLabelKey)
+		}
+		return clusterName, nil
+
+	}()
+	if err != nil {
+		return err
+	}
 	lifecycleActions := &kbappsv1.ComponentLifecycleActions{
 		Switchover: its.Spec.MembershipReconfiguration.Switchover,
 	}
@@ -227,10 +242,11 @@ func (r *updateReconciler) switchover(tree *kubebuilderx.ObjectTree, its *worklo
 		}
 		return m
 	}()
-	lfa, err := lifecycle.New(its.Namespace, its.Name, its.Name, lifecycleActions, templateVars, pod)
+	lfa, err := lifecycle.New(its.Namespace, clusterName, its.Name, lifecycleActions, templateVars, pod)
 	if err != nil {
 		return err
 	}
+
 	err = lfa.Switchover(tree.Context, nil, nil, "")
 	if err != nil {
 		if errors.Is(err, lifecycle.ErrActionNotDefined) {

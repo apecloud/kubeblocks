@@ -49,7 +49,7 @@ The versions listed below may not be up-to-date, and some supported versions mig
 | postgresql      | This addon provides PostgreSQL services using the Spilo image with Patroni for high availability (HA).                                                                       |
 | apecloud-postgresql | ApeCloud PostgreSQL is a free, fully compatible drop-in replacement for PostgreSQL,  offering enhanced high availability through a RAFT protocol replication plugin.         |
 | vanilla-postgresql | This Addon is based on the vanilla PostgreSQL, providing high availability capabilities for native PostgreSQL and its variants. |
-| oriolebd        | OrioleDB is a new storage engine for PostgreSQL, bringing a modern approach to database capacity, capabilities and performance to the world's most-loved database platform.  |
+| orioledb        | OrioleDB is a new storage engine for PostgreSQL, bringing a modern approach to database capacity, capabilities and performance to the world's most-loved database platform.  |
 | neon            | Neon is Serverless Postgres.                                                                                                                                                 |
 
 **Supported Features**
@@ -143,7 +143,7 @@ The versions listed below may not be up-to-date, and some supported versions mig
 | Addon (v0.9.0)     | Supported Versions                                                    | Vscale           | Hscale           | Volumeexpand | Stop/Start       | Restart          | Expose | Backup/Restore | Logs | Config | Upgrade (DB engine version) | Account | Failover | Switchover |
 |:-------------------:|:---------------------------------------------------------:|:----------------:|:----------------:|:------------:|:----------------:|:----------------:|:------:|:--------------:|:----:|:------:|:---------------------------:|:-------:|:--------:|:----------:|
 | kafka               | <p>kafka-broker-3.3.2</p><p>kafka-combine-3.3.2</p><p>kafka-controller-3.3.2</p><p>kafka-exporter-1.6.0</p> | ✔️ | ✔️ | ✔️ | ✔️       | ✔️                | N/A    | N/A            | N/A  | ✔️      | N/A                         | N/A     | N/A      | N/A        |
-| rabbitmq            | <p>3.13.2</p><p>3.12.14</p><p>3.11.28</p><p>3.10.25</p><p>3.9.29</p><p>3.8.14</p>    | ✔️   | ✔️  | ✔️            | ✔️                | ✔️                | ✔️      | N/A            | N/A  | N/A    | N/A                         | Managed by the RabitMQ Management system.     | ✔️      | ✔️        |
+| rabbitmq            | <p>3.13.2</p><p>3.12.14</p><p>3.11.28</p><p>3.10.25</p><p>3.9.29</p><p>3.8.14</p>    | ✔️   | ✔️  | ✔️            | ✔️                | ✔️                | ✔️      | N/A            | N/A  | N/A    | N/A                         | Managed by the RabbitMQ Management system.     | ✔️      | ✔️        |
 | pulsar | <p>pulsar-bkrecovery-2.11.2</p><p>pulsar-bkrecovery-3.0.2</p><p>pulsar-bookkeeper-2.11.2</p><p>pulsar-bookkeeper-3.0.2</p><p>pulsar-broker-2.11.2</p><p>pulsar-broker-3.0.2</p><p>pulsar-proxy-2.11.2</p><p>pulsar-proxy-3.0.2</p><p>pulsar-zookeeper-2.11.2</p><p>pulsar-zookeeper-3.0.2</p>  | ✔️                | ✔️                | ✔️            | ✔️                | ✔️                | N/A    | N/A            | N/A  | ✔️      | N/A                         | N/A     | N/A      | N/A        |
 
 ## Vector Databases

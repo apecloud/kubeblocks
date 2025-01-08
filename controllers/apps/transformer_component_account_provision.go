@@ -35,8 +35,8 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	"github.com/apecloud/kubeblocks/pkg/controller/component/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
@@ -135,7 +135,8 @@ func (t *componentAccountProvisionTransformer) lifecycleAction(transCtx *compone
 	if err != nil {
 		return nil, err
 	}
-	lfa, err := lifecycle.New(transCtx.SynthesizeComponent, nil, pods...)
+	lfa, err := lifecycle.New(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name,
+		synthesizedComp.LifecycleActions, synthesizedComp.TemplateVars, nil, pods...)
 	if err != nil {
 		return nil, err
 	}

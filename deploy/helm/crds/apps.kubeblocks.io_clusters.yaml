@@ -573,6 +573,40 @@ spec:
                             maxLength: 54
                             pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                             type: string
+                          ordinals:
+                            description: |-
+                              Specifies the desired Ordinals of this InstanceTemplate.
+                              The Ordinals used to specify the ordinal of the instance (pod) names to be generated under this InstanceTemplate.
+
+
+                              For example, if Ordinals is {ranges: [{start: 0, end: 1}], discrete: [7]},
+                              then the instance names generated under this InstanceTemplate would be
+                              $(cluster.name)-$(component.name)-$(template.name)-0、$(cluster.name)-$(component.name)-$(template.name)-1 and
+                              $(cluster.name)-$(component.name)-$(template.name)-7
+                            properties:
+                              discrete:
+                                items:
+                                  format: int32
+                                  type: integer
+                                type: array
+                              ranges:
+                                items:
+                                  description: |-
+                                    Range represents a range with a start and an end value.
+                                    It is used to define a continuous segment.
+                                  properties:
+                                    end:
+                                      format: int32
+                                      type: integer
+                                    start:
+                                      format: int32
+                                      type: integer
+                                  required:
+                                  - end
+                                  - start
+                                  type: object
+                                type: array
+                            type: object
                           replicas:
                             default: 1
                             description: |-
@@ -9226,6 +9260,40 @@ spec:
                                 maxLength: 54
                                 pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                                 type: string
+                              ordinals:
+                                description: |-
+                                  Specifies the desired Ordinals of this InstanceTemplate.
+                                  The Ordinals used to specify the ordinal of the instance (pod) names to be generated under this InstanceTemplate.
+
+
+                                  For example, if Ordinals is {ranges: [{start: 0, end: 1}], discrete: [7]},
+                                  then the instance names generated under this InstanceTemplate would be
+                                  $(cluster.name)-$(component.name)-$(template.name)-0、$(cluster.name)-$(component.name)-$(template.name)-1 and
+                                  $(cluster.name)-$(component.name)-$(template.name)-7
+                                properties:
+                                  discrete:
+                                    items:
+                                      format: int32
+                                      type: integer
+                                    type: array
+                                  ranges:
+                                    items:
+                                      description: |-
+                                        Range represents a range with a start and an end value.
+                                        It is used to define a continuous segment.
+                                      properties:
+                                        end:
+                                          format: int32
+                                          type: integer
+                                        start:
+                                          format: int32
+                                          type: integer
+                                      required:
+                                      - end
+                                      - start
+                                      type: object
+                                    type: array
+                                type: object
                               replicas:
                                 default: 1
                                 description: |-

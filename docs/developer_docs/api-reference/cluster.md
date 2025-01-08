@@ -2187,7 +2187,7 @@ SidecarDefinitionStatus
 <h3 id="apps.kubeblocks.io/v1.Action">Action
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentLifecycleActions">ComponentLifecycleActions</a>, <a href="#apps.kubeblocks.io/v1.Probe">Probe</a>, <a href="#apps.kubeblocks.io/v1.ShardingLifecycleActions">ShardingLifecycleActions</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentLifecycleActions">ComponentLifecycleActions</a>, <a href="#apps.kubeblocks.io/v1.Probe">Probe</a>, <a href="#apps.kubeblocks.io/v1.ShardingLifecycleActions">ShardingLifecycleActions</a>, <a href="#workloads.kubeblocks.io/v1.MembershipReconfiguration">MembershipReconfiguration</a>)
 </p>
 <div>
 <p>Action defines a customizable hook or procedure tailored for different database engines,
@@ -7760,7 +7760,7 @@ ContainerVars
 <h3 id="apps.kubeblocks.io/v1.InstanceTemplate">InstanceTemplate
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>)
 </p>
 <div>
 <p>InstanceTemplate allows customization of individual replica configurations in a Component.</p>
@@ -7800,6 +7800,24 @@ int32
 This field allows setting how many replicated instances of the Component,
 with the specific overrides in the InstanceTemplate, are created.
 The default value is 1. A value of 0 disables instance creation.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>ordinals</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Ordinals">
+Ordinals
+</a>
+</em>
+</td>
+<td>
+<p>Specifies the desired Ordinals of this InstanceTemplate.
+The Ordinals used to specify the ordinal of the instance (pod) names to be generated under this InstanceTemplate.</p>
+<p>For example, if Ordinals is &#123;ranges: [&#123;start: 0, end: 1&#125;], discrete: [7]&#125;,
+then the instance names generated under this InstanceTemplate would be
+$(cluster.name)-$(component.name)-$(template.name)-0、$(cluster.name)-$(component.name)-$(template.name)-1 and
+$(cluster.name)-$(component.name)-$(template.name)-7</p>
 </td>
 </tr>
 <tr>
@@ -8337,6 +8355,46 @@ VarOption
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1.Ordinals">Ordinals
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.InstanceTemplate">InstanceTemplate</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>)
+</p>
+<div>
+<p>Ordinals represents a combination of continuous segments and individual values.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>ranges</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Range">
+[]Range
+</a>
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>discrete</code><br/>
+<em>
+[]int32
+</em>
+</td>
+<td>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1.PasswordConfig">PasswordConfig
 </h3>
 <p>
@@ -8719,6 +8777,45 @@ string
 <td>
 <em>(Optional)</em>
 <p>The key in the secret data that contains the password.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.Range">Range
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.Ordinals">Ordinals</a>)
+</p>
+<div>
+<p>Range represents a range with a start and an end value.
+It is used to define a continuous segment.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>start</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+</td>
+</tr>
+<tr>
+<td>
+<code>end</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
 </td>
 </tr>
 </tbody>
@@ -28806,7 +28903,7 @@ Defaults to 1 if unspecified.</p>
 <td>
 <code>defaultTemplateOrdinals</code><br/>
 <em>
-<a href="#workloads.kubeblocks.io/v1.Ordinals">
+<a href="#apps.kubeblocks.io/v1.Ordinals">
 Ordinals
 </a>
 </em>
@@ -28864,7 +28961,7 @@ Kubernetes core/v1.PodTemplateSpec
 <td>
 <code>instances</code><br/>
 <em>
-<a href="#workloads.kubeblocks.io/v1.InstanceTemplate">
+<a href="#apps.kubeblocks.io/v1.InstanceTemplate">
 []InstanceTemplate
 </a>
 </em>
@@ -29028,6 +29125,18 @@ MembershipReconfiguration
 <td>
 <em>(Optional)</em>
 <p>Provides actions to do membership dynamic reconfiguration.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>templateVars</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Provides variables which are used to call Actions.</p>
 </td>
 </tr>
 <tr>
@@ -29323,7 +29432,7 @@ Defaults to 1 if unspecified.</p>
 <td>
 <code>defaultTemplateOrdinals</code><br/>
 <em>
-<a href="#workloads.kubeblocks.io/v1.Ordinals">
+<a href="#apps.kubeblocks.io/v1.Ordinals">
 Ordinals
 </a>
 </em>
@@ -29381,7 +29490,7 @@ Kubernetes core/v1.PodTemplateSpec
 <td>
 <code>instances</code><br/>
 <em>
-<a href="#workloads.kubeblocks.io/v1.InstanceTemplate">
+<a href="#apps.kubeblocks.io/v1.InstanceTemplate">
 []InstanceTemplate
 </a>
 </em>
@@ -29545,6 +29654,18 @@ MembershipReconfiguration
 <td>
 <em>(Optional)</em>
 <p>Provides actions to do membership dynamic reconfiguration.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>templateVars</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Provides variables which are used to call Actions.</p>
 </td>
 </tr>
 <tr>
@@ -29816,201 +29937,6 @@ key is the pod name, value is the revision.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="workloads.kubeblocks.io/v1.InstanceTemplate">InstanceTemplate
-</h3>
-<p>
-(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>)
-</p>
-<div>
-<p>InstanceTemplate allows customization of individual replica configurations within a Component,
-without altering the base component template defined in ClusterComponentSpec.
-It enables the application of distinct settings to specific instances (replicas),
-providing flexibility while maintaining a common configuration baseline.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>name</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Name specifies the unique name of the instance Pod created using this InstanceTemplate.
-This name is constructed by concatenating the component&rsquo;s name, the template&rsquo;s name, and the instance&rsquo;s ordinal
-using the pattern: $(cluster.name)-$(component.name)-$(template.name)-$(ordinal). Ordinals start from 0.
-The specified name overrides any default naming conventions or patterns.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>replicas</code><br/>
-<em>
-int32
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the number of instances (Pods) to create from this InstanceTemplate.
-This field allows setting how many replicated instances of the component,
-with the specific overrides in the InstanceTemplate, are created.
-The default value is 1. A value of 0 disables instance creation.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>ordinals</code><br/>
-<em>
-<a href="#workloads.kubeblocks.io/v1.Ordinals">
-Ordinals
-</a>
-</em>
-</td>
-<td>
-<p>Specifies the desired Ordinals of this InstanceTemplate.
-The Ordinals used to specify the ordinal of the instance (pod) names to be generated under this InstanceTemplate.</p>
-<p>For example, if Ordinals is &#123;ranges: [&#123;start: 0, end: 1&#125;], discrete: [7]&#125;,
-then the instance names generated under this InstanceTemplate would be
-$(cluster.name)-$(component.name)-$(template.name)-0、$(cluster.name)-$(component.name)-$(template.name)-1 and
-$(cluster.name)-$(component.name)-$(template.name)-7</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>annotations</code><br/>
-<em>
-map[string]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies a map of key-value pairs to be merged into the Pod&rsquo;s existing annotations.
-Existing keys will have their values overwritten, while new keys will be added to the annotations.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>labels</code><br/>
-<em>
-map[string]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies a map of key-value pairs that will be merged into the Pod&rsquo;s existing labels.
-Values for existing keys will be overwritten, and new keys will be added.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>image</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies an override for the first container&rsquo;s image in the pod.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>schedulingPolicy</code><br/>
-<em>
-<a href="#workloads.kubeblocks.io/v1.SchedulingPolicy">
-SchedulingPolicy
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the scheduling policy for the Component.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>resources</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#resourcerequirements-v1-core">
-Kubernetes core/v1.ResourceRequirements
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies an override for the resource requirements of the first container in the Pod.
-This field allows for customizing resource allocation (CPU, memory, etc.) for the container.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>env</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#envvar-v1-core">
-[]Kubernetes core/v1.EnvVar
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines Env to override.
-Add new or override existing envs.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>volumes</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#volume-v1-core">
-[]Kubernetes core/v1.Volume
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines Volumes to override.
-Add new or override existing volumes.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>volumeMounts</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#volumemount-v1-core">
-[]Kubernetes core/v1.VolumeMount
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines VolumeMounts to override.
-Add new or override existing volume mounts of the first container in the pod.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>volumeClaimTemplates</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#persistentvolumeclaim-v1-core">
-[]Kubernetes core/v1.PersistentVolumeClaim
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines VolumeClaimTemplates to override.
-Add new or override existing volume claim templates.</p>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="workloads.kubeblocks.io/v1.InstanceTemplateStatus">InstanceTemplateStatus
 </h3>
 <p>
@@ -30262,44 +30188,18 @@ Action
 If the Image is not configured, the Image from the previous non-nil action will be used.</p>
 </td>
 </tr>
-</tbody>
-</table>
-<h3 id="workloads.kubeblocks.io/v1.Ordinals">Ordinals
-</h3>
-<p>
-(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceTemplate">InstanceTemplate</a>)
-</p>
-<div>
-<p>Ordinals represents a combination of continuous segments and individual values.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
 <tr>
 <td>
-<code>ranges</code><br/>
+<code>switchover</code><br/>
 <em>
-<a href="#workloads.kubeblocks.io/v1.Range">
-[]Range
+<a href="#apps.kubeblocks.io/v1.Action">
+Action
 </a>
 </em>
 </td>
 <td>
-</td>
-</tr>
-<tr>
-<td>
-<code>discrete</code><br/>
-<em>
-[]int32
-</em>
-</td>
-<td>
+<em>(Optional)</em>
+<p>Defines the procedure for a controlled transition of a role to a new replica.</p>
 </td>
 </tr>
 </tbody>
@@ -30327,45 +30227,6 @@ If that fails, it will fall back to the ReCreate, where pod will be recreated.</
 Any attempt to modify other fields will be rejected.</p>
 </td>
 </tr></tbody>
-</table>
-<h3 id="workloads.kubeblocks.io/v1.Range">Range
-</h3>
-<p>
-(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.Ordinals">Ordinals</a>)
-</p>
-<div>
-<p>Range represents a range with a start and an end value.
-It is used to define a continuous segment.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>start</code><br/>
-<em>
-int32
-</em>
-</td>
-<td>
-</td>
-</tr>
-<tr>
-<td>
-<code>end</code><br/>
-<em>
-int32
-</em>
-</td>
-<td>
-</td>
-</tr>
-</tbody>
 </table>
 <h3 id="workloads.kubeblocks.io/v1.ReplicaRole">ReplicaRole
 </h3>
@@ -30449,117 +30310,6 @@ bool
 </tr><tr><td><p>&#34;ReadinessProbeEventUpdate&#34;</p></td>
 <td></td>
 </tr></tbody>
-</table>
-<h3 id="workloads.kubeblocks.io/v1.SchedulingPolicy">SchedulingPolicy
-</h3>
-<p>
-(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceTemplate">InstanceTemplate</a>)
-</p>
-<div>
-<p>SchedulingPolicy the scheduling policy.
-Deprecated: Unify with apps/v1alpha1.SchedulingPolicy</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>schedulerName</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>If specified, the Pod will be dispatched by specified scheduler.
-If not specified, the Pod will be dispatched by default scheduler.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>nodeSelector</code><br/>
-<em>
-map[string]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>NodeSelector is a selector which must be true for the Pod to fit on a node.
-Selector which must match a node&rsquo;s labels for the Pod to be scheduled on that node.
-More info: <a href="https://kubernetes.io/docs/concepts/configuration/assign-pod-node/">https://kubernetes.io/docs/concepts/configuration/assign-pod-node/</a></p>
-</td>
-</tr>
-<tr>
-<td>
-<code>nodeName</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>NodeName is a request to schedule this Pod onto a specific node. If it is non-empty,
-the scheduler simply schedules this Pod onto that node, assuming that it fits resource
-requirements.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>affinity</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#affinity-v1-core">
-Kubernetes core/v1.Affinity
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies a group of affinity scheduling rules of the Cluster, including NodeAffinity, PodAffinity, and PodAntiAffinity.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>tolerations</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#toleration-v1-core">
-[]Kubernetes core/v1.Toleration
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Allows Pods to be scheduled onto nodes with matching taints.
-Each toleration in the array allows the Pod to tolerate node taints based on
-specified <code>key</code>, <code>value</code>, <code>effect</code>, and <code>operator</code>.</p>
-<ul>
-<li>The <code>key</code>, <code>value</code>, and <code>effect</code> identify the taint that the toleration matches.</li>
-<li>The <code>operator</code> determines how the toleration matches the taint.</li>
-</ul>
-<p>Pods with matching tolerations are allowed to be scheduled on tainted nodes, typically reserved for specific purposes.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>topologySpreadConstraints</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#topologyspreadconstraint-v1-core">
-[]Kubernetes core/v1.TopologySpreadConstraint
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>TopologySpreadConstraints describes how a group of Pods ought to spread across topology
-domains. Scheduler will schedule Pods in a way which abides by the constraints.
-All topologySpreadConstraints are ANDed.</p>
-</td>
-</tr>
-</tbody>
 </table>
 <hr/>
 <h2 id="workloads.kubeblocks.io/v1alpha1">workloads.kubeblocks.io/v1alpha1</h2>

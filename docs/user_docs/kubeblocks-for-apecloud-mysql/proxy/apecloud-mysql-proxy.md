@@ -84,7 +84,7 @@ It is recommended to use kbcli to create an ApeCloud MySQL Proxy Cluster.
        etcd-cluster   etcd                 etcd-v3.5.6   Halt                 Running     10s
        ```
 
-   5. View the service address of this etcd clsuter.
+   5. View the service address of this etcd cluster.
 
        ```bash
        kubectl get service
@@ -110,7 +110,7 @@ It is recommended to use kbcli to create an ApeCloud MySQL Proxy Cluster.
        helm search repo kubeblocks/apecloud-mysql --devel --versions
        ```
 
-   2. (Optional) If you disable the `apecloud-mysql` Addon when installing KuebBlocks, run the command below to specify a version and install the cluster definition of ApeCloud MySQL. Skip this step if you install KubeBlocks with the default settings.
+   2. (Optional) If you disable the `apecloud-mysql` Addon when installing KubeBlocks, run the command below to specify a version and install the cluster definition of ApeCloud MySQL. Skip this step if you install KubeBlocks with the default settings.
 
        ```bash
        helm install myproxy kubeblocks/apecloud-mysql --version=v0.9.0

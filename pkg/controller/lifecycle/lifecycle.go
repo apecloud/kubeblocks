@@ -27,7 +27,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	"github.com/apecloud/kubeblocks/pkg/controller/component"
 )
 
 type Options struct {
@@ -58,7 +57,8 @@ type Lifecycle interface {
 	AccountProvision(ctx context.Context, cli client.Reader, opts *Options, statement, user, password string) error
 }
 
-func New(synthesizedComp *component.SynthesizedComponent, pod *corev1.Pod, pods ...*corev1.Pod) (Lifecycle, error) {
+func New(namespace, clusterName, compName string, lifecycleActions *appsv1.ComponentLifecycleActions,
+	templateVars map[string]any, pod *corev1.Pod, pods ...*corev1.Pod) (Lifecycle, error) {
 	if pod == nil && len(pods) == 0 {
 		return nil, fmt.Errorf("either pod or pods must be provided to call lifecycle actions")
 	}
@@ -69,8 +69,12 @@ func New(synthesizedComp *component.SynthesizedComponent, pod *corev1.Pod, pods 
 		pods = []*corev1.Pod{pod}
 	}
 	return &kbagent{
-		synthesizedComp: synthesizedComp,
-		pods:            pods,
-		pod:             pod,
+		namespace:        namespace,
+		clusterName:      clusterName,
+		compName:         compName,
+		lifecycleActions: lifecycleActions,
+		templateVars:     templateVars,
+		pods:             pods,
+		pod:              pod,
 	}, nil
 }

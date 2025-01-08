@@ -107,6 +107,9 @@ func (t *componentAccountTransformer) createAccount(transCtx *componentTransform
 	if err != nil {
 		return err
 	}
+	if err = t.buildAccountHash(account, nil, secret); err != nil {
+		return err
+	}
 	graphCli.Create(dag, secret, inUniversalContext4G())
 	return nil
 }
@@ -120,6 +123,9 @@ func (t *componentAccountTransformer) updateAccount(transCtx *componentTransform
 	dag *graph.DAG, graphCli model.GraphClient, account synthesizedSystemAccount, running *corev1.Secret) error {
 	secret, err := t.buildAccountSecret(transCtx, transCtx.SynthesizeComponent, account)
 	if err != nil {
+		return err
+	}
+	if err = t.buildAccountHash(account, running, secret); err != nil {
 		return err
 	}
 
@@ -136,6 +142,23 @@ func (t *componentAccountTransformer) updateAccount(transCtx *componentTransform
 	return nil
 }
 
+func (t *componentAccountTransformer) buildAccountHash(account synthesizedSystemAccount, running, secret *corev1.Secret) error {
+	if account.SecretRef == nil {
+		return nil
+	}
+	if running != nil {
+		hashedPassword := running.Annotations[systemAccountHashAnnotation]
+		if verifySystemAccountPassword(secret, []byte(hashedPassword)) {
+			if secret.Annotations == nil {
+				secret.Annotations = map[string]string{}
+			}
+			secret.Annotations[systemAccountHashAnnotation] = hashedPassword
+			return nil // have the same password
+		}
+	}
+	return signatureSystemAccountPassword(secret)
+}
+
 func (t *componentAccountTransformer) buildAccountSecret(ctx *componentTransformContext,
 	synthesizeComp *component.SynthesizedComponent, account synthesizedSystemAccount) (*corev1.Secret, error) {
 	var password []byte
@@ -148,7 +171,7 @@ func (t *componentAccountTransformer) buildAccountSecret(ctx *componentTransform
 	default:
 		password = t.buildPassword(ctx, account)
 	}
-	return t.buildAccountSecretWithPassword(ctx, synthesizeComp, account, password, account.SecretRef != nil)
+	return t.buildAccountSecretWithPassword(ctx, synthesizeComp, account, password)
 }
 
 func (t *componentAccountTransformer) getPasswordFromSecret(ctx graph.TransformContext, account synthesizedSystemAccount) ([]byte, error) {
@@ -198,7 +221,7 @@ func (t *componentAccountTransformer) generatePassword(account synthesizedSystem
 }
 
 func (t *componentAccountTransformer) buildAccountSecretWithPassword(ctx *componentTransformContext,
-	synthesizeComp *component.SynthesizedComponent, account synthesizedSystemAccount, password []byte, signature bool) (*corev1.Secret, error) {
+	synthesizeComp *component.SynthesizedComponent, account synthesizedSystemAccount, password []byte) (*corev1.Secret, error) {
 	secretName := constant.GenerateAccountSecretName(synthesizeComp.ClusterName, synthesizeComp.Name, account.Name)
 	secret := builder.NewSecretBuilder(synthesizeComp.Namespace, secretName).
 		// Priority: static < dynamic < built-in
@@ -210,13 +233,8 @@ func (t *componentAccountTransformer) buildAccountSecretWithPassword(ctx *compon
 		AddAnnotationsInMap(synthesizeComp.DynamicAnnotations).
 		PutData(constant.AccountNameForSecret, []byte(account.Name)).
 		PutData(constant.AccountPasswdForSecret, password).
-		SetImmutable(true).
+		// SetImmutable(true).
 		GetObject()
-	if signature {
-		if err := signatureSystemAccountPassword(secret); err != nil {
-			return nil, err
-		}
-	}
 	if err := setCompOwnershipNFinalizer(ctx.Component, secret); err != nil {
 		return nil, err
 	}

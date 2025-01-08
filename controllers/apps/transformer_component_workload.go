@@ -687,7 +687,15 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn(deleteReplicas, joinedReplica
 }
 
 func (r *componentWorkloadOps) leaveMemberForPod(pod *corev1.Pod, pods []*corev1.Pod) error {
+	var (
+		synthesizedComp  = r.synthesizeComp
+		lifecycleActions = synthesizedComp.LifecycleActions
+	)
+
 	trySwitchover := func(lfa lifecycle.Lifecycle, pod *corev1.Pod) error {
+		if lifecycleActions.Switchover == nil {
+			return nil
+		}
 		err := lfa.Switchover(r.reqCtx.Ctx, r.cli, nil, "")
 		if err != nil {
 			if errors.Is(err, lifecycle.ErrActionNotDefined) {
@@ -700,6 +708,9 @@ func (r *componentWorkloadOps) leaveMemberForPod(pod *corev1.Pod, pods []*corev1
 	}
 
 	tryMemberLeave := func(lfa lifecycle.Lifecycle, pod *corev1.Pod) error {
+		if lifecycleActions.MemberLeave == nil {
+			return nil
+		}
 		err := lfa.MemberLeave(r.reqCtx.Ctx, r.cli, nil)
 		if err != nil {
 			if errors.Is(err, lifecycle.ErrActionNotDefined) {
@@ -707,14 +718,16 @@ func (r *componentWorkloadOps) leaveMemberForPod(pod *corev1.Pod, pods []*corev1
 			}
 			return err
 		}
-
 		r.reqCtx.Log.Info("successfully call leave member action for pod", "pod", pod.Name)
 		return nil
 	}
 
-	synthesizedComp := r.synthesizeComp
+	if lifecycleActions == nil || (lifecycleActions.Switchover == nil && lifecycleActions.MemberLeave == nil) {
+		return nil
+	}
+
 	lfa, err := lifecycle.New(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name,
-		synthesizedComp.LifecycleActions, synthesizedComp.TemplateVars, pod, pods...)
+		lifecycleActions, synthesizedComp.TemplateVars, pod, pods...)
 	if err != nil {
 		return err
 	}

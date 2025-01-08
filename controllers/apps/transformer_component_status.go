@@ -39,7 +39,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
-	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -230,7 +229,7 @@ func (t *componentStatusTransformer) isInstanceSetRunning() bool {
 	if !t.isWorkloadUpdated() {
 		return false
 	}
-	return instanceset.IsInstanceSetReady(t.runningITS)
+	return t.runningITS.IsInstanceSetReady()
 }
 
 // isAllConfigSynced checks if all configTemplates are synced.

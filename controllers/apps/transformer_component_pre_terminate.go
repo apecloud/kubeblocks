@@ -29,8 +29,8 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	"github.com/apecloud/kubeblocks/pkg/controller/component/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -137,7 +137,8 @@ func (t *componentPreTerminateTransformer) lifecycleAction4Component(transCtx *c
 		// TODO: (good-first-issue) we should handle the case that the component has no pods
 		return nil, fmt.Errorf("has no pods to running the pre-terminate action")
 	}
-	return lifecycle.New(synthesizedComp, nil, pods...)
+	return lifecycle.New(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name,
+		synthesizedComp.LifecycleActions, synthesizedComp.TemplateVars, nil, pods...)
 }
 
 func (t *componentPreTerminateTransformer) synthesizedComponent(transCtx *componentTransformContext, compDef *appsv1.ComponentDefinition) (*component.SynthesizedComponent, error) {

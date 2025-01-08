@@ -35,6 +35,7 @@ import (
 
 type ObjectTree struct {
 	// TODO(free6om): should find a better place to hold these two params?
+	context.Context
 	record.EventRecorder
 	logr.Logger
 
@@ -113,6 +114,7 @@ func (t *ObjectTree) DeepCopy() (*ObjectTree, error) {
 	}
 	out.children = children
 	out.finalizer = t.finalizer
+	out.Context = t.Context
 	out.EventRecorder = t.EventRecorder
 	out.Logger = t.Logger
 	return out, nil

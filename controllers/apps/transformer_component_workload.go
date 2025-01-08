@@ -44,10 +44,10 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	"github.com/apecloud/kubeblocks/pkg/controller/component/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -451,6 +451,7 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet) *workloads.InstanceS
 	itsObjCopy.Spec.Replicas = itsProto.Spec.Replicas
 	itsObjCopy.Spec.Roles = itsProto.Spec.Roles
 	itsObjCopy.Spec.MembershipReconfiguration = itsProto.Spec.MembershipReconfiguration
+	itsObjCopy.Spec.TemplateVars = itsProto.Spec.TemplateVars
 	itsObjCopy.Spec.MemberUpdateStrategy = itsProto.Spec.MemberUpdateStrategy
 	itsObjCopy.Spec.Credential = itsProto.Spec.Credential
 	itsObjCopy.Spec.Instances = itsProto.Spec.Instances
@@ -542,7 +543,8 @@ func (r *componentWorkloadOps) expandVolume() error {
 	for i := range r.runningITS.Spec.Instances {
 		runningInsSpec := r.runningITS.Spec.DeepCopy()
 		runningInsTPL := runningInsSpec.Instances[i]
-		intctrlutil.MergeList(&runningInsTPL.VolumeClaimTemplates, &runningInsSpec.VolumeClaimTemplates,
+		vcts := intctrlutil.ToCoreV1PVCs(runningInsTPL.VolumeClaimTemplates)
+		intctrlutil.MergeList(&vcts, &runningInsSpec.VolumeClaimTemplates,
 			func(item corev1.PersistentVolumeClaim) func(corev1.PersistentVolumeClaim) bool {
 				return func(claim corev1.PersistentVolumeClaim) bool {
 					return claim.Name == item.Name
@@ -710,7 +712,9 @@ func (r *componentWorkloadOps) leaveMemberForPod(pod *corev1.Pod, pods []*corev1
 		return nil
 	}
 
-	lfa, err := lifecycle.New(r.synthesizeComp, pod, pods...)
+	synthesizedComp := r.synthesizeComp
+	lfa, err := lifecycle.New(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name,
+		synthesizedComp.LifecycleActions, synthesizedComp.TemplateVars, pod, pods...)
 	if err != nil {
 		return err
 	}
@@ -880,7 +884,9 @@ func (r *componentWorkloadOps) joinMember4ScaleOut() error {
 }
 
 func (r *componentWorkloadOps) joinMemberForPod(pod *corev1.Pod, pods []*corev1.Pod) error {
-	lfa, err := lifecycle.New(r.synthesizeComp, pod, pods...)
+	synthesizedComp := r.synthesizeComp
+	lfa, err := lifecycle.New(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name,
+		synthesizedComp.LifecycleActions, synthesizedComp.TemplateVars, pod, pods...)
 	if err != nil {
 		return err
 	}

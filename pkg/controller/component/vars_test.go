@@ -34,6 +34,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 var _ = Describe("vars", func() {
@@ -1781,12 +1782,13 @@ var _ = Describe("vars", func() {
 				fqdnList := func(fn ...func(string) string) []string {
 					l := make([]string, 0)
 					for _, i := range mockInstanceList {
-						l = append(l, PodFQDN(synthesizedComp.Namespace, synthesizedComp.FullCompName, i))
+						l = append(l, intctrlutil.PodFQDN(synthesizedComp.Namespace, synthesizedComp.FullCompName, i))
 					}
 					return l
 				}
 				checkEnvVarWithValue(envVars, "podFQDNs", strings.Join(fqdnList(), ","))
-				checkEnvVarWithValue(envVars, "podFQDNs4Leader", PodFQDN(synthesizedComp.Namespace, synthesizedComp.FullCompName, podName("leader")))
+				checkEnvVarWithValue(envVars, "podFQDNs4Leader",
+					intctrlutil.PodFQDN(synthesizedComp.Namespace, synthesizedComp.FullCompName, podName("leader")))
 			})
 		})
 

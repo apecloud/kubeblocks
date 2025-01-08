@@ -24,6 +24,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
 // +genclient
@@ -83,7 +85,7 @@ type InstanceSetSpec struct {
 	// For example, if Ordinals is {ranges: [{start: 0, end: 1}], discrete: [7]},
 	// then the instance names generated under the default template would be
 	// $(cluster.name)-$(component.name)-0、$(cluster.name)-$(component.name)-1 and $(cluster.name)-$(component.name)-7
-	DefaultTemplateOrdinals Ordinals `json:"defaultTemplateOrdinals,omitempty"`
+	DefaultTemplateOrdinals kbappsv1.Ordinals `json:"defaultTemplateOrdinals,omitempty"`
 
 	// Defines the minimum number of seconds a newly created pod should be ready
 	// without any of its container crashing to be considered available.
@@ -200,6 +202,11 @@ type InstanceSetSpec struct {
 	// +optional
 	MembershipReconfiguration *MembershipReconfiguration `json:"membershipReconfiguration,omitempty"`
 
+	// Provides variables which are used to call Actions.
+	//
+	// +optional
+	TemplateVars map[string]string `json:"templateVars,omitempty"`
+
 	// Members(Pods) update strategy.
 	//
 	// - serial: update Members one by one that guarantee minimum component unavailable time.
@@ -306,150 +313,10 @@ type InstanceSetStatus struct {
 	TemplatesStatus []InstanceTemplateStatus `json:"templatesStatus,omitempty"`
 }
 
-// Range represents a range with a start and an end value.
-// It is used to define a continuous segment.
-type Range struct {
-	Start int32 `json:"start"`
-	End   int32 `json:"end"`
-}
-
-// Ordinals represents a combination of continuous segments and individual values.
-type Ordinals struct {
-	Ranges   []Range `json:"ranges,omitempty"`
-	Discrete []int32 `json:"discrete,omitempty"`
-}
-
-// InstanceTemplate allows customization of individual replica configurations within a Component,
-// without altering the base component template defined in ClusterComponentSpec.
-// It enables the application of distinct settings to specific instances (replicas),
-// providing flexibility while maintaining a common configuration baseline.
-type InstanceTemplate struct {
-	// Name specifies the unique name of the instance Pod created using this InstanceTemplate.
-	// This name is constructed by concatenating the component's name, the template's name, and the instance's ordinal
-	// using the pattern: $(cluster.name)-$(component.name)-$(template.name)-$(ordinal). Ordinals start from 0.
-	// The specified name overrides any default naming conventions or patterns.
-	//
-	// +kubebuilder:validation:MaxLength=54
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	// +kubebuilder:validation:Required
-	Name string `json:"name"`
-
-	// Specifies the number of instances (Pods) to create from this InstanceTemplate.
-	// This field allows setting how many replicated instances of the component,
-	// with the specific overrides in the InstanceTemplate, are created.
-	// The default value is 1. A value of 0 disables instance creation.
-	//
-	// +kubebuilder:default=1
-	// +kubebuilder:validation:Minimum=0
-	// +optional
-	Replicas *int32 `json:"replicas,omitempty"`
-
-	// Specifies the desired Ordinals of this InstanceTemplate.
-	// The Ordinals used to specify the ordinal of the instance (pod) names to be generated under this InstanceTemplate.
-	//
-	// For example, if Ordinals is {ranges: [{start: 0, end: 1}], discrete: [7]},
-	// then the instance names generated under this InstanceTemplate would be
-	// $(cluster.name)-$(component.name)-$(template.name)-0、$(cluster.name)-$(component.name)-$(template.name)-1 and
-	// $(cluster.name)-$(component.name)-$(template.name)-7
-	Ordinals Ordinals `json:"ordinals,omitempty"`
-
-	// Specifies a map of key-value pairs to be merged into the Pod's existing annotations.
-	// Existing keys will have their values overwritten, while new keys will be added to the annotations.
-	//
-	// +optional
-	Annotations map[string]string `json:"annotations,omitempty"`
-
-	// Specifies a map of key-value pairs that will be merged into the Pod's existing labels.
-	// Values for existing keys will be overwritten, and new keys will be added.
-	//
-	// +optional
-	Labels map[string]string `json:"labels,omitempty"`
-
-	// Specifies an override for the first container's image in the pod.
-	//
-	// +optional
-	Image *string `json:"image,omitempty"`
-
-	// Specifies the scheduling policy for the Component.
-	//
-	// +optional
-	SchedulingPolicy *SchedulingPolicy `json:"schedulingPolicy,omitempty"`
-
-	// Specifies an override for the resource requirements of the first container in the Pod.
-	// This field allows for customizing resource allocation (CPU, memory, etc.) for the container.
-	//
-	// +optional
-	Resources *corev1.ResourceRequirements `json:"resources,omitempty"`
-
-	// Defines Env to override.
-	// Add new or override existing envs.
-	// +optional
-	Env []corev1.EnvVar `json:"env,omitempty"`
-
-	// Defines Volumes to override.
-	// Add new or override existing volumes.
-	// +optional
-	Volumes []corev1.Volume `json:"volumes,omitempty"`
-
-	// Defines VolumeMounts to override.
-	// Add new or override existing volume mounts of the first container in the pod.
-	// +optional
-	VolumeMounts []corev1.VolumeMount `json:"volumeMounts,omitempty"`
-
-	// Defines VolumeClaimTemplates to override.
-	// Add new or override existing volume claim templates.
-	// +optional
-	VolumeClaimTemplates []corev1.PersistentVolumeClaim `json:"volumeClaimTemplates,omitempty"`
-}
-
-// SchedulingPolicy the scheduling policy.
-// Deprecated: Unify with apps/v1alpha1.SchedulingPolicy
-type SchedulingPolicy struct {
-	// If specified, the Pod will be dispatched by specified scheduler.
-	// If not specified, the Pod will be dispatched by default scheduler.
-	//
-	// +optional
-	SchedulerName string `json:"schedulerName,omitempty"`
-
-	// NodeSelector is a selector which must be true for the Pod to fit on a node.
-	// Selector which must match a node's labels for the Pod to be scheduled on that node.
-	// More info: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/
-	//
-	// +optional
-	// +mapType=atomic
-	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
-
-	// NodeName is a request to schedule this Pod onto a specific node. If it is non-empty,
-	// the scheduler simply schedules this Pod onto that node, assuming that it fits resource
-	// requirements.
-	//
-	// +optional
-	NodeName string `json:"nodeName,omitempty"`
-
-	// Specifies a group of affinity scheduling rules of the Cluster, including NodeAffinity, PodAffinity, and PodAntiAffinity.
-	//
-	// +optional
-	Affinity *corev1.Affinity `json:"affinity,omitempty"`
-
-	// Allows Pods to be scheduled onto nodes with matching taints.
-	// Each toleration in the array allows the Pod to tolerate node taints based on
-	// specified `key`, `value`, `effect`, and `operator`.
-	//
-	// - The `key`, `value`, and `effect` identify the taint that the toleration matches.
-	// - The `operator` determines how the toleration matches the taint.
-	//
-	// Pods with matching tolerations are allowed to be scheduled on tainted nodes, typically reserved for specific purposes.
-	//
-	// +optional
-	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
-
-	// TopologySpreadConstraints describes how a group of Pods ought to spread across topology
-	// domains. Scheduler will schedule Pods in a way which abides by the constraints.
-	// All topologySpreadConstraints are ANDed.
-	//
-	// +optional
-	TopologySpreadConstraints []corev1.TopologySpreadConstraint `json:"topologySpreadConstraints,omitempty"`
-}
+// InstanceTemplate allows customization of individual replica configurations in a Component.
+//
+// +kubebuilder:object:generate=false
+type InstanceTemplate = kbappsv1.InstanceTemplate
 
 type PodUpdatePolicyType string
 
@@ -564,6 +431,11 @@ type MembershipReconfiguration struct {
 	//
 	// +optional
 	PromoteAction *Action `json:"promoteAction,omitempty"`
+
+	// Defines the procedure for a controlled transition of a role to a new replica.
+	//
+	// +optional
+	Switchover *kbappsv1.Action `json:"switchover,omitempty"`
 }
 
 // MemberUpdateStrategy defines Cluster Component update strategy.
@@ -687,19 +559,63 @@ const (
 	ReasonInstanceUpdateRestricted = "InstanceUpdateRestricted"
 )
 
-const defaultInstanceTemplateReplicas = 1
-
-func (t *InstanceTemplate) GetName() string {
-	return t.Name
-}
-
-func (t *InstanceTemplate) GetReplicas() int32 {
-	if t.Replicas != nil {
-		return *t.Replicas
+// IsInstancesReady gives Instance level 'ready' state when all instances are available
+func (r *InstanceSet) IsInstancesReady() bool {
+	if r == nil {
+		return false
 	}
-	return defaultInstanceTemplateReplicas
+	// check whether the cluster has been initialized
+	if r.Status.ReadyInitReplicas != r.Status.InitReplicas {
+		return false
+	}
+	// check whether latest spec has been sent to the underlying workload
+	if r.Status.ObservedGeneration != r.Generation {
+		return false
+	}
+	// check whether the underlying workload is ready
+	if r.Spec.Replicas == nil {
+		return false
+	}
+	replicas := *r.Spec.Replicas
+	if r.Status.Replicas != replicas ||
+		r.Status.ReadyReplicas != replicas ||
+		r.Status.UpdatedReplicas != replicas {
+		return false
+	}
+	// check availableReplicas only if minReadySeconds is set
+	if r.Spec.MinReadySeconds > 0 && r.Status.AvailableReplicas != replicas {
+		return false
+	}
+
+	return true
 }
 
-func (t *InstanceTemplate) GetOrdinals() Ordinals {
-	return t.Ordinals
+// IsInstanceSetReady gives InstanceSet level 'ready' state:
+// 1. all instances are available
+// 2. and all members have role set (if they are role-ful)
+func (r *InstanceSet) IsInstanceSetReady() bool {
+	instancesReady := r.IsInstancesReady()
+	if !instancesReady {
+		return false
+	}
+
+	// check whether role probe has done
+	if len(r.Spec.Roles) == 0 {
+		return true
+	}
+	membersStatus := r.Status.MembersStatus
+	if len(membersStatus) != int(*r.Spec.Replicas) {
+		return false
+	}
+	if r.Status.ReadyWithoutPrimary {
+		return true
+	}
+	hasLeader := false
+	for _, status := range membersStatus {
+		if status.ReplicaRole != nil && status.ReplicaRole.IsLeader {
+			hasLeader = true
+			break
+		}
+	}
+	return hasLeader
 }

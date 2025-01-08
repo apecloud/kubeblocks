@@ -97,7 +97,7 @@ func GetV1Alpha1ClusterFromIncrementConverter(obj client.Object) (*Cluster, erro
 	}
 	var alpha1Cluster Cluster
 	if err := json.Unmarshal([]byte(incrementConverterStr), &alpha1Cluster); err != nil {
-		return &alpha1Cluster, err
+		return nil, err
 	}
 	return &alpha1Cluster, nil
 }

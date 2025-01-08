@@ -21,14 +21,15 @@ package lifecycle
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 const (
@@ -126,8 +127,8 @@ func hackParameters4Comp(ctx context.Context, cli client.Reader, namespace, clus
 		cl := make([][]string, 0)
 		ccl := make([][]string, 0)
 		for _, comp := range compList.Items {
-			name, _ := component.ShortName(clusterName, comp.Name)
-			pods, err := component.ListOwnedPods(ctx, cli, namespace, clusterName, name)
+			name, _ := shortName(clusterName, comp.Name)
+			pods, err := intctrlutil.ListOwnedPods(ctx, cli, namespace, clusterName, name)
 			if err != nil {
 				return err
 			}
@@ -163,7 +164,7 @@ func hackParameters4Comp(ctx context.Context, cli client.Reader, namespace, clus
 	func() {
 		all, deleting, undeleted := make([]string, 0), make([]string, 0), make([]string, 0)
 		for _, comp := range compList.Items {
-			name, _ := component.ShortName(clusterName, comp.Name)
+			name, _ := shortName(clusterName, comp.Name)
 			all = append(all, name)
 			if model.IsObjectDeleting(&comp) {
 				deleting = append(deleting, name)
@@ -179,7 +180,7 @@ func hackParameters4Comp(ctx context.Context, cli client.Reader, namespace, clus
 	if terminate {
 		func() {
 			for _, comp := range compList.Items {
-				name, _ := component.ShortName(clusterName, comp.Name)
+				name, _ := shortName(clusterName, comp.Name)
 				if name == compName {
 					if comp.Annotations != nil {
 						val, ok := comp.Annotations[constant.ComponentScaleInAnnotationKey]
@@ -193,4 +194,12 @@ func hackParameters4Comp(ctx context.Context, cli client.Reader, namespace, clus
 		}()
 	}
 	return m, nil
+}
+
+func shortName(clusterName, compName string) (string, error) {
+	name, found := strings.CutPrefix(compName, fmt.Sprintf("%s-", clusterName))
+	if !found {
+		return "", fmt.Errorf("the component name has no cluster name as prefix: %s", compName)
+	}
+	return name, nil
 }

@@ -417,17 +417,17 @@ func (t *clusterNormalizationTransformer) writeBackCompNShardingSpecs(transCtx *
 }
 
 func (t *clusterNormalizationTransformer) checkNPatchCRDAPIVersionKey(transCtx *clusterTransformContext) error {
+	// get the v1Alpha1Cluster from the annotations
+	v1Alpha1Cluster, err := appsv1alpha1.GetV1Alpha1ClusterFromIncrementConverter(transCtx.Cluster)
+	if err != nil {
+		return err
+	}
 	getCRDAPIVersion := func() (string, error) {
 		apiVersion := transCtx.Cluster.Annotations[constant.CRDAPIVersionAnnotationKey]
 		if len(apiVersion) > 0 {
 			return apiVersion, nil
 		}
-		// check if the cluster is the alpha1 version
-		clusterDefRef, err := appsv1alpha1.GetClusterDefFromIncrementConverter(transCtx.Cluster)
-		if err != nil {
-			return "", err
-		}
-		if len(clusterDefRef) > 0 {
+		if v1Alpha1Cluster != nil && len(v1Alpha1Cluster.Spec.ClusterDefRef) > 0 {
 			return appsv1alpha1.GroupVersion.String(), nil
 		}
 
@@ -468,6 +468,10 @@ func (t *clusterNormalizationTransformer) checkNPatchCRDAPIVersionKey(transCtx *
 	transCtx.Cluster.Annotations[constant.CRDAPIVersionAnnotationKey] = apiVersion
 	if controllerutil.IsAPIVersionSupported(apiVersion) {
 		return nil
+	}
+	if v1Alpha1Cluster != nil && len(v1Alpha1Cluster.Spec.ClusterVersionRef) > 0 {
+		// revert the topology to empty
+		transCtx.Cluster.Spec.Topology = ""
 	}
 	return graph.ErrPrematureStop // un-supported CRD API version, stop the transformation
 }

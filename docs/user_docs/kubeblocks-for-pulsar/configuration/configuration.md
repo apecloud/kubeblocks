@@ -95,7 +95,7 @@ KubeBlocks supports configuring cluster parameters with OpsRequest.
    | `spec.reconfigure.configurations.name`                 | It specifies the configuration template name.  |
    | `preConditionDeadlineSeconds`                          | It specifies the maximum number of seconds this OpsRequest will wait for its start conditions to be met before aborting. If set to 0 (default), the start conditions must be met immediately for the OpsRequest to proceed. |
 
-2. Apply the configuration opsRequest.
+2. Apply the configuration OpsRequest.
 
    ```bash
    kubectl apply -f mycluster-configuring-demo.yaml

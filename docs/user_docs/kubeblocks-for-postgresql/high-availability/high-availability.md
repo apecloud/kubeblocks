@@ -14,7 +14,7 @@ KubeBlocks integrates [the open-source Patroni solution](https://patroni.readthe
 
 ## Before you start
 
-* [Install kbcli](./../../installation/install-kbcli.md) if you want to manage the PostreSQL cluster with `kbcli`.
+* [Install kbcli](./../../installation/install-kbcli.md) if you want to manage the PostgreSQL cluster with `kbcli`.
 * [Install KubeBlocks](./../../installation/install-kubeblocks.md).
 * [Create a PostgreSQL Replication Cluster](./../cluster-management/create-and-connect-a-postgresql-cluster.md#create-a-postgresql-cluster).
 * Check whether the following role probe parameters exist to verify the role probe is enabled.

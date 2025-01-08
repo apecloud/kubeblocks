@@ -101,7 +101,7 @@ EOF
 | `spec.terminationPolicy`              | It is the policy of cluster termination. Valid values are `DoNotTerminate`, `Delete`, `WipeOut`. For the detailed definition, you can refer to [Termination Policy](#termination-policy). |
 | `spec.componentSpecs`                 | It is the list of ClusterComponentSpec objects that define the individual Components that make up a Cluster. This field allows customized configuration of each component within a cluster.   |
 | `spec.componentSpecs.serviceVersion` | It specifies the version of the Service expected to be provisioned by this Component. Valid options are [3.10.25,3.11.28,3.12.14,3.13.2,3.13.7,3.8.14,3.9.29]. |
-| `spec.componentSpecs.serviceAccountName` | It specifies the name of the ServiceAccount required by the running Component. RabbitMQ needs the `peer-discovery` role to create events and get endpoiints. This is essential for discovering other RabbitMQ nodes and forming a cluster. |
+| `spec.componentSpecs.serviceAccountName` | It specifies the name of the ServiceAccount required by the running Component. RabbitMQ needs the `peer-discovery` role to create events and get endpoints. This is essential for discovering other RabbitMQ nodes and forming a cluster. |
 | `spec.componentSpecs.replicas`        | It specifies the number of replicas of the component. RabbitMQ prefers ODD numbers like [3, 5, 7]. All data/state is replicated across all replicas. |
 | `spec.componentSpecs.resources`       | It specifies the resources required by the Component.  |
 | `spec.componentSpecs.volumeClaimTemplates` | It specifies a list of PersistentVolumeClaim templates that define the storage requirements for the Component. |

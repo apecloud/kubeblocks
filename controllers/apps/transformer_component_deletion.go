@@ -168,10 +168,15 @@ func handleRBACResourceDeletion(obj client.Object, transCtx *componentTransformC
 		}
 		// if any, transfer ownership to any other component
 		for _, otherComp := range compList.Items {
+			// skip current component
 			if otherComp.Name == comp.Name {
-				// skip current component
 				continue
 			}
+			// skip deleting component
+			if !otherComp.DeletionTimestamp.IsZero() {
+				continue
+			}
+
 			if err := controllerutil.RemoveControllerReference(comp, v, rscheme); err != nil {
 				return false, err
 			}

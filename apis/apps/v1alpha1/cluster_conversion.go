@@ -199,7 +199,7 @@ func (r *Cluster) changesFromCluster(cluster *appsv1.Cluster) {
 	//           spec:
 	//             resources: corev1.ResourceRequirements -> corev1.VolumeResourceRequirements
 	//         podUpdatePolicy: *workloads.PodUpdatePolicyType -> *PodUpdatePolicyType
-	//     sharings
+	//     shardingSpecs -> shardings
 	//       - template
 	//           volumeClaimTemplates
 	//             spec:

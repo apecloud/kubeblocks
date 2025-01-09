@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package v1
 
 import (
+	"time"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -120,6 +122,7 @@ type ComponentVersionCompatibilityRule struct {
 // ComponentVersionRelease represents a release of component instances within a ComponentVersion.
 type ComponentVersionRelease struct {
 	// Name is a unique identifier for this release.
+	//
 	// Cannot be updated.
 	//
 	// +kubebuilder:validation:Required
@@ -133,8 +136,10 @@ type ComponentVersionRelease struct {
 	Changes string `json:"changes,omitempty"`
 
 	// ServiceVersion defines the version of the well-known service that the component provides.
+	//
 	// The version should follow the syntax and semantics of the "Semantic Versioning" specification (http://semver.org/).
 	// If the release is used, it will serve as the service version for component instances, overriding the one defined in the component definition.
+	//
 	// Cannot be updated.
 	//
 	// +kubebuilder:validation:Required
@@ -152,4 +157,49 @@ type ComponentVersionRelease struct {
 	// +kubebuilder:validation:XValidation:rule="self.all(key, size(key) <= 32)",message="Container, action or external application name may not exceed maximum length of 32 characters"
 	// +kubebuilder:validation:XValidation:rule="self.all(key, size(self[key]) <= 256)",message="Image name may not exceed maximum length of 256 characters"
 	Images map[string]string `json:"images"`
+
+	// Status represents the status of the release (e.g., "alpha", "beta", "stable", "deprecated").
+	//
+	// For a release in the "deprecated" state, the release is no longer supported and the controller will prevent new instances from employing it.
+	//
+	// +kubebuilder:validation:Required
+	Status ReleaseStatus `json:"status"`
+
+	// Reason is the detailed reason for the release status.
+	//
+	// For a release in the "deprecated" state, the reason should explain why the release is deprecated. For example:
+	//   {
+	//		Description: "Vulnerability in logging library",
+	//		Severity:    "high",
+	//		Mitigation:  "Upgrade to logging library v2.0.0",
+	//		CVE:         "CVE-2024-12345",
+	//   }
+	//
+	// +kubebuilder:validation:MaxLength=256
+	// +optional
+	Reason string `json:"reason,omitempty"`
+
+	// ReleaseDate is the date when this version was released.
+	//
+	// +optional
+	ReleaseDate time.Time `json:"releaseDate,omitempty"`
+
+	// EndOfLifeDate is the date when this version is no longer supported.
+	//
+	// When this field is set and the release has passed its end-of-life (EOL) date, the controller will prevent new instances from employing it.
+	//
+	// +optional
+	EndOfLifeDate time.Time `json:"endOfLifeDate,omitempty"`
 }
+
+// ReleaseStatus represents the status of a release.
+//
+// +kubebuilder:validation:Enum={alpha,beta,stable,deprecated}
+type ReleaseStatus string
+
+const (
+	ReleaseStatusAlpha      ReleaseStatus = "alpha"
+	ReleaseStatusBeta       ReleaseStatus = "beta"
+	ReleaseStatusStable     ReleaseStatus = "stable"
+	ReleaseStatusDeprecated ReleaseStatus = "deprecated"
+)

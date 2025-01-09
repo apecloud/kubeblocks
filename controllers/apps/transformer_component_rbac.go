@@ -34,7 +34,6 @@ import (
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -82,10 +81,6 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 
-	if err := cleanOldResource(transCtx, graphCli, dag, synthesizedComp); err != nil {
-		return err
-	}
-
 	var err error
 	if serviceAccountName == "" {
 		serviceAccountName = constant.GenerateDefaultServiceAccountName(synthesizedComp.CompDefName)
@@ -115,34 +110,6 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 		for _, its := range itsList {
 			graphCli.DependOn(dag, its, sa)
 		}
-	}
-
-	return nil
-}
-
-// since serviceaccount and rolebinding's naming rule has changed, need to clean old resources
-// TODO: remove this function after 1.0
-func cleanOldResource(transCtx *componentTransformContext, graphCli model.GraphClient, dag *graph.DAG, synthesizedComp *component.SynthesizedComponent) error {
-	oldSaName := fmt.Sprintf("%s-%s", constant.KBLowerPrefix, synthesizedComp.ClusterName)
-	sa := &corev1.ServiceAccount{}
-	err := transCtx.Client.Get(transCtx.Context, types.NamespacedName{Namespace: synthesizedComp.Namespace, Name: oldSaName}, sa)
-	if err != nil {
-		if !errors.IsNotFound(err) {
-			return err
-		}
-	} else {
-		graphCli.Delete(dag, sa, inDataContext4G())
-	}
-
-	oldRbName := oldSaName
-	rb := &rbacv1.RoleBinding{}
-	err = transCtx.Client.Get(transCtx.Context, types.NamespacedName{Namespace: synthesizedComp.Namespace, Name: oldRbName}, rb)
-	if err != nil {
-		if !errors.IsNotFound(err) {
-			return err
-		}
-	} else {
-		graphCli.Delete(dag, rb, inDataContext4G())
 	}
 
 	return nil

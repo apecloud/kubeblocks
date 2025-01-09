@@ -70,6 +70,11 @@ func main() {
 	hook.CheckErr(err)
 
 	upgradeContext := hook.NewUpgradeContext(ctx, config, version, crdPath, namespace)
+	// If KubeBlocks deployment does not exist, ignore the hook.
+	if hook.IgnoreKubeblocksHook(ctx, upgradeContext.K8sClient, namespace) {
+		return
+	}
+
 	hook.CheckErr(hook.NewUpgradeWorkflow().
 		WrapStage(hook.PrepareFor).
 		AddStage(&hook.StopOperator{}).

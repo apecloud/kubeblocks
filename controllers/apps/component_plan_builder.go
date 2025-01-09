@@ -105,11 +105,6 @@ func (c *componentPlanBuilder) AddTransformer(transformer ...graph.Transformer) 
 	return c
 }
 
-func (c *componentPlanBuilder) AddParallelTransformer(transformer ...graph.Transformer) graph.PlanBuilder {
-	c.transformers = append(c.transformers, &ParallelTransformers{transformers: transformer})
-	return c
-}
-
 // Build runs all transformers to generate a plan
 func (c *componentPlanBuilder) Build() (graph.Plan, error) {
 	dag := graph.NewDAG()

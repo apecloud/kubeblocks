@@ -194,11 +194,6 @@ func (c *clusterPlanBuilder) AddTransformer(transformer ...graph.Transformer) gr
 	return c
 }
 
-func (c *clusterPlanBuilder) AddParallelTransformer(transformer ...graph.Transformer) graph.PlanBuilder {
-	c.transformers = append(c.transformers, &ParallelTransformers{transformers: transformer})
-	return c
-}
-
 // Build runs all transformers to generate a plan
 func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 	var err error

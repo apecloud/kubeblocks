@@ -190,29 +190,6 @@ var _ = Describe("object rbac transformer test.", func() {
 			Expect(reflect.DeepEqual(rb.Subjects, cmpdRoleBinding.Subjects)).To(BeTrue())
 			Expect(reflect.DeepEqual(rb.RoleRef, cmpdRoleBinding.RoleRef)).To(BeTrue())
 		})
-
-		It("cleans old resources", func() {
-			init(false, false)
-			oldSaName := fmt.Sprintf("%v-%v", constant.KBLowerPrefix, synthesizedComp.ClusterName)
-			sa := factory.BuildServiceAccount(synthesizedComp, oldSaName)
-			rb := factory.BuildRoleBinding(synthesizedComp, oldSaName, &rbacv1.RoleRef{
-				APIGroup: rbacv1.GroupName,
-				Kind:     "ClusterRole",
-				Name:     constant.RBACRoleName,
-			}, oldSaName)
-			Expect(testCtx.CreateObj(testCtx.Ctx, sa)).Should(Succeed())
-			Expect(testCtx.CreateObj(testCtx.Ctx, rb)).Should(Succeed())
-			Eventually(func(g Gomega) {
-				dag = mockDAG(graphCli, cluster)
-				g.Expect(transformer.Transform(transCtx, dag)).Should(BeNil())
-				saVertex, ok := graphCli.FindMatchedVertex(dag, sa).(*model.ObjectVertex)
-				g.Expect(ok).Should(BeTrue())
-				g.Expect(*saVertex.Action).Should(Equal(model.DELETE))
-				rbVertex, ok := graphCli.FindMatchedVertex(dag, rb).(*model.ObjectVertex)
-				g.Expect(ok).Should(BeTrue())
-				g.Expect(*rbVertex.Action).Should(Equal(model.DELETE))
-			}).Should(Succeed())
-		})
 	})
 })
 

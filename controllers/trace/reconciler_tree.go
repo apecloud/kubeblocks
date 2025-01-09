@@ -45,7 +45,8 @@ import (
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	tracev1 "github.com/apecloud/kubeblocks/apis/trace/v1"
 	workloadsAPI "github.com/apecloud/kubeblocks/apis/workloads/v1"
-	"github.com/apecloud/kubeblocks/controllers/apps"
+	"github.com/apecloud/kubeblocks/controllers/apps/cluster"
+	"github.com/apecloud/kubeblocks/controllers/apps/component"
 	"github.com/apecloud/kubeblocks/controllers/apps/configuration"
 	"github.com/apecloud/kubeblocks/controllers/dataprotection"
 	"github.com/apecloud/kubeblocks/controllers/workloads"
@@ -162,7 +163,7 @@ func newReconciler(mClient client.Client, recorder record.EventRecorder, objectT
 }
 
 func newClusterReconciler(cli client.Client, recorder record.EventRecorder) reconcile.Reconciler {
-	return &apps.ClusterReconciler{
+	return &cluster.ClusterReconciler{
 		Client:   cli,
 		Scheme:   cli.Scheme(),
 		Recorder: recorder,
@@ -170,7 +171,7 @@ func newClusterReconciler(cli client.Client, recorder record.EventRecorder) reco
 }
 
 func newComponentReconciler(cli client.Client, recorder record.EventRecorder) reconcile.Reconciler {
-	return &apps.ComponentReconciler{
+	return &component.ComponentReconciler{
 		Client:   cli,
 		Scheme:   cli.Scheme(),
 		Recorder: recorder,

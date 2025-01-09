@@ -21,6 +21,7 @@ package factory
 
 import (
 	"encoding/json"
+	"fmt"
 	"path/filepath"
 	"strconv"
 
@@ -343,12 +344,13 @@ func BuildRoleBinding(synthesizedComp *component.SynthesizedComponent, name stri
 		GetObject()
 }
 
-func BuildComponentRole(synthesizedComp *component.SynthesizedComponent, cmpd *appsv1.ComponentDefinition, saName string) *rbacv1.Role {
+func BuildComponentRole(synthesizedComp *component.SynthesizedComponent, cmpd *appsv1.ComponentDefinition) *rbacv1.Role {
 	rules := cmpd.Spec.PolicyRules
 	if len(rules) == 0 {
 		return nil
 	}
-	return builder.NewRoleBuilder(synthesizedComp.Namespace, saName).
+	roleName := fmt.Sprintf("%s-%s", constant.KBLowerPrefix, cmpd.Name)
+	return builder.NewRoleBuilder(synthesizedComp.Namespace, roleName).
 		AddLabelsInMap(constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name)).
 		AddLabelsInMap(synthesizedComp.StaticLabels).
 		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).

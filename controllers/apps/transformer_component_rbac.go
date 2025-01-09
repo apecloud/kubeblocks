@@ -76,7 +76,7 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 		}
 	}
 	if !viper.GetBool(constant.EnableRBACManager) {
-		transCtx.EventRecorder.Event(transCtx.Cluster, corev1.EventTypeWarning, EventReasonRBACManager, "RBAC manager is disabled")
+		transCtx.EventRecorder.Event(transCtx.Cluster, corev1.EventTypeNormal, EventReasonRBACManager, "RBAC manager is disabled")
 		return nil
 	}
 
@@ -95,7 +95,7 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 			return err
 		}
 	}
-	role, err := createOrUpdateRole(transCtx, serviceAccountName, graphCli, dag)
+	role, err := createOrUpdateRole(transCtx, graphCli, dag)
 	if err != nil {
 		return err
 	}
@@ -186,9 +186,9 @@ func createOrUpdateServiceAccount(transCtx *componentTransformContext, serviceAc
 }
 
 func createOrUpdateRole(
-	transCtx *componentTransformContext, serviceAccountName string, graphCli model.GraphClient, dag *graph.DAG,
+	transCtx *componentTransformContext, graphCli model.GraphClient, dag *graph.DAG,
 ) (*rbacv1.Role, error) {
-	role := factory.BuildComponentRole(transCtx.SynthesizeComponent, transCtx.CompDef, serviceAccountName)
+	role := factory.BuildComponentRole(transCtx.SynthesizeComponent, transCtx.CompDef)
 	if role == nil {
 		return nil, nil
 	}

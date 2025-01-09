@@ -166,7 +166,7 @@ var _ = Describe("object rbac transformer test.", func() {
 		It("w/ cmpd's PolicyRules", func() {
 			init(false, true)
 			Expect(transformer.Transform(transCtx, dag)).Should(BeNil())
-			cmpdRole := factory.BuildComponentRole(synthesizedComp, compDefObj, serviceAccountName)
+			cmpdRole := factory.BuildComponentRole(synthesizedComp, compDefObj)
 			cmpdRoleBinding := factory.BuildRoleBinding(synthesizedComp, serviceAccountName, &rbacv1.RoleRef{
 				APIGroup: rbacv1.GroupName,
 				Kind:     "Role",

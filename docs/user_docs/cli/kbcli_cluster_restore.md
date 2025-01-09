@@ -18,10 +18,16 @@ kbcli cluster restore [flags]
 ### Options
 
 ```
-      --backup string                  Backup name
-  -h, --help                           help for restore
-      --restore-to-time string         point in time recovery(PITR)
-      --volume-restore-policy string   the volume claim restore policy, supported values: [Serial, Parallel] (default "Parallel")
+      --backup string                   Backup name
+      --dry-run string[="unchanged"]    Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent. (default "none")
+      --edit                            Edit the API resource before creating
+  -h, --help                            help for restore
+  -o, --output format                   Prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
+      --restore-after-cluster-running   do the postReady phase when the cluster is Running rather than the component is Running.
+      --restore-key string              specify the key to restore in kv database, support multiple keys split by comma with wildcard pattern matching
+      --restore-key-ignore-errors       whether or not to ignore errors when restore kv database by keys
+      --restore-to-time string          point in time recovery(PITR)
+      --volume-restore-policy string    the volume claim restore policy, supported values: [Serial, Parallel] (default "Parallel")
 ```
 
 ### Options inherited from parent commands

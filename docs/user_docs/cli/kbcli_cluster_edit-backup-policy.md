@@ -13,19 +13,12 @@ kbcli cluster edit-backup-policy
 ```
   # edit backup policy
   kbcli cluster edit-backup-policy <backup-policy-name>
-  
-  # update backup Repo
-  kbcli cluster edit-backup-policy <backup-policy-name> --set backupRepoName=<backup-repo-name>
-  
-  # using short cmd to edit backup policy
-  kbcli cluster edit-bp <backup-policy-name>
 ```
 
 ### Options
 
 ```
-  -h, --help              help for edit-backup-policy
-      --set stringArray   set values on the command line (can specify multiple or separate values with commas: key1=val1,key2=val2)
+  -h, --help   help for edit-backup-policy
 ```
 
 ### Options inherited from parent commands

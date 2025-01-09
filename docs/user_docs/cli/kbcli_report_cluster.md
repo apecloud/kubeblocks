@@ -40,10 +40,12 @@ kbcli report cluster NAME [-f file] [-with-logs] [-mask] [flags]
   -f, --file string         zip file for output
   -h, --help                help for cluster
       --mask                mask sensitive info for secrets and configmaps (default true)
+  -n, --namespace string    KubeBlocks namespace
   -o, --output string       Output format. One of: json|yaml. (default "json")
       --since duration      Only return logs newer than a relative duration like 5s, 2m, or 3h. Defaults to all logs. Only one of since-time / since may be used.
       --since-time string   Only return logs after a specific date (RFC3339). Defaults to all logs. Only one of since-time / since may be used.
       --with-logs           include pod logs
+      --with-secrets        include secrets
 ```
 
 ### Options inherited from parent commands
@@ -62,7 +64,6 @@ kbcli report cluster NAME [-f file] [-with-logs] [-mask] [flags]
       --insecure-skip-tls-verify       If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure
       --kubeconfig string              Path to the kubeconfig file to use for CLI requests.
       --match-server-version           Require server version to match client version
-  -n, --namespace string               If present, the namespace scope for this CLI request
       --request-timeout string         The length of time to wait before giving up on a single server request. Non-zero values should contain a corresponding time unit (e.g. 1s, 2m, 3h). A value of zero means don't timeout requests. (default "0")
   -s, --server string                  The address and port of the Kubernetes API server
       --tls-server-name string         Server name to use for server certificate validation. If it is not provided, the hostname used to contact the server is used
@@ -72,7 +73,7 @@ kbcli report cluster NAME [-f file] [-with-logs] [-mask] [flags]
 
 ### SEE ALSO
 
-* [kbcli report](kbcli_report.md)	 - report kubeblocks or cluster info.
+* [kbcli report](kbcli_report.md)	 - Report kubeblocks or cluster info.
 
 #### Go Back to [CLI Overview](cli.md) Homepage.
 

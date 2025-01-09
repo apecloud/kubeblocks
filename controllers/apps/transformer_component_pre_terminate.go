@@ -21,14 +21,16 @@ package apps
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"k8s.io/apimachinery/pkg/types"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	"github.com/apecloud/kubeblocks/pkg/controller/component/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
@@ -62,7 +64,9 @@ func (t *componentPreTerminateTransformer) Transform(ctx graph.TransformContext,
 		return nil
 	}
 
-	// TODO: force skip the pre-terminate action?
+	if t.skipPreTerminate(transCtx) {
+		return nil
+	}
 
 	if t.checkPreTerminateDone(transCtx, dag) {
 		return nil
@@ -72,6 +76,15 @@ func (t *componentPreTerminateTransformer) Transform(ctx graph.TransformContext,
 		return lifecycle.IgnoreNotDefined(err)
 	}
 	return t.markPreTerminateDone(transCtx, dag)
+}
+
+func (t *componentPreTerminateTransformer) skipPreTerminate(transCtx *componentTransformContext) bool {
+	comp := transCtx.Component
+	if comp.Annotations == nil {
+		return false
+	}
+	skip, ok := comp.Annotations[constant.SkipPreTerminateAnnotationKey]
+	return ok && strings.ToLower(skip) == "true"
 }
 
 func (t *componentPreTerminateTransformer) checkPreTerminateDone(transCtx *componentTransformContext, dag *graph.DAG) bool {
@@ -124,7 +137,8 @@ func (t *componentPreTerminateTransformer) lifecycleAction4Component(transCtx *c
 		// TODO: (good-first-issue) we should handle the case that the component has no pods
 		return nil, fmt.Errorf("has no pods to running the pre-terminate action")
 	}
-	return lifecycle.New(synthesizedComp, nil, pods...)
+	return lifecycle.New(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name,
+		synthesizedComp.LifecycleActions, synthesizedComp.TemplateVars, nil, pods...)
 }
 
 func (t *componentPreTerminateTransformer) synthesizedComponent(transCtx *componentTransformContext, compDef *appsv1.ComponentDefinition) (*component.SynthesizedComponent, error) {

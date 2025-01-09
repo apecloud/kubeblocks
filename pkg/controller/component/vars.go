@@ -37,10 +37,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 )
 
@@ -530,7 +530,7 @@ func composeHostValueFromServices(obj any, fqdn bool) string {
 		if !fqdn {
 			return svc.Name
 		}
-		return serviceFQDN(svc.Namespace, svc.Name)
+		return intctrlutil.ServiceFQDN(svc.Namespace, svc.Name)
 	}
 
 	svcNames := make([]string, 0)
@@ -1153,13 +1153,13 @@ func componentVarPodsGetter(ctx context.Context, cli client.Reader,
 	for i := range comp.Spec.Instances {
 		templates = append(templates, &comp.Spec.Instances[i])
 	}
-	names, err := instanceset.GenerateAllInstanceNames(comp.Name, comp.Spec.Replicas, templates, comp.Spec.OfflineInstances, workloads.Ordinals{})
+	names, err := instanceset.GenerateAllInstanceNames(comp.Name, comp.Spec.Replicas, templates, comp.Spec.OfflineInstances, appsv1.Ordinals{})
 	if err != nil {
 		return "", err
 	}
 	if fqdn {
 		for i := range names {
-			names[i] = PodFQDN(namespace, comp.Name, names[i])
+			names[i] = intctrlutil.PodFQDN(namespace, comp.Name, names[i])
 		}
 	}
 	return strings.Join(names, ","), nil
@@ -1189,7 +1189,7 @@ func componentVarPodsWithRoleGetter(ctx context.Context, cli client.Reader,
 	if fqdn {
 		fullCompName := constant.GenerateClusterComponentName(clusterName, compName)
 		for i := range names {
-			names[i] = PodFQDN(namespace, fullCompName, names[i])
+			names[i] = intctrlutil.PodFQDN(namespace, fullCompName, names[i])
 		}
 	}
 	return strings.Join(names, ","), nil

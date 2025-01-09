@@ -13,15 +13,21 @@ kbcli cluster stop NAME [flags]
 ```
   # stop the cluster and release all the pods of the cluster
   kbcli cluster stop mycluster
+  
+  # stop the component of the cluster and release all the pods of the component
+  kbcli cluster stop mycluster --components=mysql
 ```
 
 ### Options
 
 ```
       --auto-approve                   Skip interactive approval before stopping the cluster
+      --components strings             Component names to this operations
       --dry-run string[="unchanged"]   Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent. (default "none")
+      --edit                           Edit the API resource before creating
+      --force                           skip the pre-checks of the opsRequest to run the opsRequest forcibly
   -h, --help                           help for stop
-      --name string                    OpsRequest name. if not specified, it will be randomly generated 
+      --name string                    OpsRequest name. if not specified, it will be randomly generated
   -o, --output format                  Prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
       --ttlSecondsAfterSucceed int     Time to live after the OpsRequest succeed
 ```

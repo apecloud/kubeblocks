@@ -22,6 +22,7 @@ package restore
 import (
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -188,21 +189,6 @@ func transformTimeWithZone(targetTime *metav1.Time, timeZone string) (*metav1.Ti
 	return &metav1.Time{Time: targetTime.In(zone)}, nil
 }
 
-func CompareWithBackupStopTime(backupI, backupJ dpv1alpha1.Backup) bool {
-	endTimeI := backupI.GetEndTime()
-	endTimeJ := backupJ.GetEndTime()
-	if endTimeI.IsZero() {
-		return false
-	}
-	if endTimeJ.IsZero() {
-		return true
-	}
-	if endTimeI.Equal(endTimeJ) {
-		return backupI.Name < backupJ.Name
-	}
-	return endTimeI.Before(endTimeJ)
-}
-
 func BuildJobKeyForActionStatus(jobName string) string {
 	return fmt.Sprintf("%s/%s", constant.JobKind, jobName)
 }
@@ -278,7 +264,7 @@ func ValidateAndInitRestoreMGR(reqCtx intctrlutil.RequestCtx,
 	case dpv1alpha1.BackupTypeFull, dpv1alpha1.BackupTypeSelective:
 		restoreMgr.SetBackupSets(*backupSet)
 	case dpv1alpha1.BackupTypeIncremental:
-		err = restoreMgr.BuildIncrementalBackupActionSets(reqCtx, cli, *backupSet)
+		err = restoreMgr.BuildIncrementalBackupActionSet(reqCtx, cli, *backupSet)
 	case dpv1alpha1.BackupTypeDifferential:
 		err = restoreMgr.BuildDifferentialBackupActionSets(reqCtx, cli, *backupSet)
 	case dpv1alpha1.BackupTypeContinuous:
@@ -429,4 +415,92 @@ func GetVolumeSnapshotsBySourcePod(backup *dpv1alpha1.Backup, target *dpv1alpha1
 		return snapshotGroup
 	}
 	return nil
+}
+
+// ValidateParentBackupSet validates the parent backup and child backup.
+func ValidateParentBackupSet(parentBackupSet *BackupActionSet, backupSet *BackupActionSet) error {
+	parentBackup := parentBackupSet.Backup
+	backup := backupSet.Backup
+	if parentBackup == nil || backup == nil {
+		return fmt.Errorf("parent backup or child backup is nil")
+	}
+	if parentBackup.Status.Phase != dpv1alpha1.BackupPhaseCompleted ||
+		backup.Status.Phase != dpv1alpha1.BackupPhaseCompleted {
+		return fmt.Errorf("parent backup or child backup is not completed")
+	}
+	// validate parent backup policy
+	if parentBackup.Spec.BackupPolicyName != backup.Spec.BackupPolicyName {
+		return fmt.Errorf(`parent backup policy: "%s" is defferent with child backup policy: "%s"`,
+			parentBackup.Spec.BackupPolicyName, backup.Spec.BackupPolicyName)
+	}
+	// validate parent backup method and base backup name
+	var parentBackupType dpv1alpha1.BackupType
+	if parentBackupSet.ActionSet != nil {
+		parentBackupType = parentBackupSet.ActionSet.Spec.BackupType
+	}
+	switch parentBackupType {
+	case dpv1alpha1.BackupTypeIncremental:
+		if parentBackup.Spec.BackupMethod != backup.Spec.BackupMethod {
+			return fmt.Errorf(`the parent incremental backup method "%s" is not the same with the child backup method "%s"`,
+				parentBackup.Spec.BackupMethod, backup.Spec.BackupMethod)
+		}
+		if parentBackup.Status.BaseBackupName != backup.Status.BaseBackupName {
+			return fmt.Errorf(`the parent incremental backup base backup "%s" is not the same with the child backup base backup "%s"`,
+				parentBackup.Status.BaseBackupName, backup.Status.BaseBackupName)
+		}
+	case dpv1alpha1.BackupTypeFull:
+		if parentBackup.Spec.BackupMethod != backup.Status.BackupMethod.CompatibleMethod {
+			return fmt.Errorf(`the parent full backup method "%s" is not compatible with the child backup method "%s"`,
+				parentBackup.Spec.BackupMethod, backup.Spec.BackupMethod)
+		}
+		if parentBackup.Name != backup.Status.BaseBackupName {
+			return fmt.Errorf(`the parent full backup base backup "%s" is not the same with the child backup base backup "%s"`,
+				parentBackup.Name, backup.Status.BaseBackupName)
+		}
+	default:
+		return fmt.Errorf(`the parent backup "%s" is not incremental or full backup`, parentBackup.Name)
+	}
+	// validate parent backup end time
+	if !utils.CompareWithBackupStopTime(*parentBackup, *backup) {
+		return fmt.Errorf(`the parent backup "%s" is not before the child backup "%s"`, parentBackup.Name, backup.Name)
+	}
+	return nil
+}
+
+// GetTargetRelativePath returns the target relative path.
+func GetTargetRelativePath(targetName, targetPodName string) string {
+	targetRelativePath := ""
+	if targetName != "" {
+		targetRelativePath = filepath.Join(targetRelativePath, targetName)
+	}
+	if targetPodName != "" {
+		targetRelativePath = filepath.Join(targetRelativePath, targetPodName)
+	}
+	// ${targetName}/${targetPodName}
+	return targetRelativePath
+}
+
+// BackupFilePathEnv returns the envs for backup root path and target relative path.
+func BackupFilePathEnv(filePath, targetName, targetPodName string) []corev1.EnvVar {
+	envs := []corev1.EnvVar{}
+	if len(filePath) == 0 {
+		return envs
+	}
+	targetRelativePath := GetTargetRelativePath(targetName, targetPodName)
+	envs = append(envs, []corev1.EnvVar{
+		{
+			Name:  dptypes.DPTargetRelativePath,
+			Value: targetRelativePath,
+		},
+		{
+			Name:  dptypes.DPBackupRootPath,
+			Value: filepath.Join("/", filePath, "../"),
+		},
+		// construct the backup base path with target relative path
+		{
+			Name:  dptypes.DPBackupBasePath,
+			Value: filepath.Join("/", filePath, targetRelativePath),
+		},
+	}...)
+	return envs
 }

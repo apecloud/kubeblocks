@@ -82,7 +82,9 @@ spec:
               
               # 3. start KubeBlocks
               kubectl patch deployment {{ include "kubeblocks.fullname" . }} -n {{ .Release.Namespace }} -p '{"spec":{"replicas":{{ .Values.replicaCount }}}}'
+              {{- if .Values.dataProtection.enabled }}
               kubectl patch deployment {{ include "kubeblocks.fullname" . }}-dataprotection -n {{ .Release.Namespace }} -p '{"spec":{"replicas":{{ .Values.replicaCount }}}}'
+              {{- end }}
           volumeMounts:
             - mountPath: /opt
               name: crd-multi-version-conversion

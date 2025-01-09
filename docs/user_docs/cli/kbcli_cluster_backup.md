@@ -17,7 +17,7 @@ kbcli cluster backup NAME [flags]
   # create a backup with a specified method, run "kbcli cluster desc-backup-policy mycluster" to show supported backup methods
   kbcli cluster backup mycluster --method volume-snapshot
   
-  # create a backup with specified backup policy, run "kbcli cluster list-backup-policy mycluster" to show the cluster supported backup policies
+  # create a backup with specified backup policy, run "kbcli cluster list-backup-policies mycluster" to show the cluster supported backup policies
   kbcli cluster backup mycluster --method volume-snapshot --policy <backup-policy-name>
   
   # create a backup from a parent backup
@@ -27,13 +27,16 @@ kbcli cluster backup NAME [flags]
 ### Options
 
 ```
-      --deletion-policy string    Deletion policy for backup, determine whether the backup content in backup repo will be deleted after the backup is deleted, supported values: [Delete, Retain] (default "Delete")
-  -h, --help                      help for backup
-      --method string             Backup methods are defined in backup policy (required), if only one backup method in backup policy, use it as default backup method, if multiple backup methods in backup policy, use method which volume snapshot is true as default backup method
-      --name string               Backup name
-      --parent-backup string      Parent backup name, used for incremental backup
-      --policy string             Backup policy name, if not specified, use the cluster default backup policy
-      --retention-period string   Retention period for backup, supported values: [1y, 1mo, 1d, 1h, 1m] or combine them [1y1mo1d1h1m], if not specified, the backup will not be automatically deleted, you need to manually delete it.
+      --deletion-policy string         Deletion policy for backup, determine whether the backup content in backup repo will be deleted after the backup is deleted, supported values: [Delete, Retain] (default "Delete")
+      --dry-run string[="unchanged"]   Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent. (default "none")
+      --edit                           Edit the API resource before creating
+  -h, --help                           help for backup
+      --method string                  Backup methods are defined in backup policy (required), if only one backup method in backup policy, use it as default backup method, if multiple backup methods in backup policy, use method which volume snapshot is true as default backup method
+      --name string                    Backup name
+  -o, --output format                  Prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
+      --parent-backup string           Parent backup name, used for incremental backup
+      --policy string                  Backup policy name, if not specified, use the cluster default backup policy
+      --retention-period string        Retention period for backup, supported values: [1y, 1mo, 1d, 1h, 1m] or combine them [1y1mo1d1h1m], if not specified, the backup will not be automatically deleted, you need to manually delete it.
 ```
 
 ### Options inherited from parent commands

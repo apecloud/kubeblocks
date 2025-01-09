@@ -26,6 +26,7 @@ import (
 
 	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -115,4 +116,31 @@ func BuildVolumeMode(configs []string, configSpec appsv1.ComponentTemplateSpec) 
 		return &configsDefaultMode
 	}
 	return &scriptsDefaultMode
+}
+
+func ToCoreV1PVCs(vcts []appsv1.ClusterComponentVolumeClaimTemplate) []corev1.PersistentVolumeClaim {
+	storageClassName := func(spec appsv1.PersistentVolumeClaimSpec, defaultStorageClass string) *string {
+		if spec.StorageClassName != nil && *spec.StorageClassName != "" {
+			return spec.StorageClassName
+		}
+		if defaultStorageClass != "" {
+			return &defaultStorageClass
+		}
+		return nil
+	}
+	var pvcs []corev1.PersistentVolumeClaim
+	for _, v := range vcts {
+		pvcs = append(pvcs, corev1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: v.Name,
+			},
+			Spec: corev1.PersistentVolumeClaimSpec{
+				AccessModes:      v.Spec.AccessModes,
+				Resources:        v.Spec.Resources,
+				StorageClassName: storageClassName(v.Spec, viper.GetString(constant.CfgKeyDefaultStorageClass)),
+				VolumeMode:       v.Spec.VolumeMode,
+			},
+		})
+	}
+	return pvcs
 }

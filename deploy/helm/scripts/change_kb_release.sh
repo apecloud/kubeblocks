@@ -1,12 +1,47 @@
 #!/bin/bash
-release=$1
-namespace=$2
+release=
+namespace=
 
-function updateRelease() {
+for i in "$@"; do
+  case $i in
+    --release-name=*)
+      release="${i#*=}"
+      shift
+      ;;
+    --namespace=*)
+      namespace="${i#*=}"
+      shift
+      ;;
+    *)
+      echo "Unknown option $i"
+      exit 1
+      ;;
+  esac
+done
+if [ "$release" == "" ] || [ "$namespace" == "" ]; then
+  echo "--release-name and --namespace are required"
+  exit 1
+fi
+echo "KubeBlocks release name: $release, namespace: $namespace"
+
+
+function takeOverResources() {
     local kind=$1
     local name=$2
     kubectl annotate $kind $name --overwrite meta.helm.sh/release-name=$release
     kubectl annotate $kind $name --overwrite meta.helm.sh/release-namespace=$namespace
+}
+
+function setCRDAPIVersion() {
+    local kind=$1
+    crs=$(kubectl get $kind)
+    OLD_IFS=$IFS
+    IFS=$'\n'
+    for line in $crs; do
+      name=$(echo "$line" | awk '{print $1}')
+      kubectl annotate $kind $name --overwrite kubeblocks.io/crd-api-version=apps.kubeblocks.io/v1alpha1
+    done
+    IFS=$OLD_IFS
 }
 
 # 1. change clusterRoles
@@ -33,10 +68,10 @@ clusterRoles=(
 )
 
 for role in "${clusterRoles[@]}"; do
-    updateRelease ClusterRole "${release}-${role}"
+    takeOverResources ClusterRole "${release}-${role}"
 done
-updateRelease ClusterRole "${release}"
-updateRelease ClusterRole "kubeblocks-cluster-pod-role"
+takeOverResources ClusterRole "${release}"
+takeOverResources ClusterRole "kubeblocks-cluster-pod-role"
 
 # 2. change addons
 addons=(
@@ -59,7 +94,7 @@ addons=(
 )
 
 for addon in "${addons[@]}"; do
-    updateRelease Addon "$addon"
+    takeOverResources Addon "$addon"
 done
 
 # 3. change storageProvider
@@ -76,8 +111,11 @@ storageProviders=(
 )
 
 for sp in "${storageProviders[@]}"; do
-    updateRelease StorageProviders "$sp"
+    takeOverResources StorageProviders "$sp"
 done
 
 # 4. change backupRepo
-updateRelease BackupRepo ${release}-backuprepo
+takeOverResources BackupRepo ${release}-backuprepo
+
+# 5. set kubeblocks.io/crd-api-version: apps.kubeblocks.io/v1alpha1 to old componentDefinition
+setCRDAPIVersion ComponentDefinition

@@ -12,7 +12,9 @@ kbcli plugin index add [flags]
 
 ```
   # Add a new plugin index
-  kbcli plugin index add myIndex
+  kbcli plugin index add default https://github.com/apecloud/block-index.git
+  
+  kbcli plugin index add krew https://github.com/kubernetes-sigs/krew-index.git
 ```
 
 ### Options

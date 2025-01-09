@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 )
 
@@ -133,6 +134,26 @@ func (builder *InstanceSetBuilder) SetMembershipReconfiguration(reconfiguration 
 	return builder
 }
 
+func (builder *InstanceSetBuilder) SetLifecycleActions(lifecycleActions *kbappsv1.ComponentLifecycleActions) *InstanceSetBuilder {
+	if lifecycleActions != nil && lifecycleActions.Switchover != nil {
+		if builder.get().Spec.MembershipReconfiguration == nil {
+			builder.get().Spec.MembershipReconfiguration = &workloads.MembershipReconfiguration{}
+		}
+		builder.get().Spec.MembershipReconfiguration.Switchover = lifecycleActions.Switchover
+	}
+	return builder
+}
+
+func (builder *InstanceSetBuilder) SetTemplateVars(templateVars map[string]any) *InstanceSetBuilder {
+	if templateVars != nil {
+		builder.get().Spec.TemplateVars = make(map[string]string)
+		for k, v := range templateVars {
+			builder.get().Spec.TemplateVars[k] = v.(string)
+		}
+	}
+	return builder
+}
+
 func (builder *InstanceSetBuilder) SetMemberUpdateStrategy(strategy *workloads.MemberUpdateStrategy) *InstanceSetBuilder {
 	builder.get().Spec.MemberUpdateStrategy = strategy
 	if strategy != nil {
@@ -153,5 +174,10 @@ func (builder *InstanceSetBuilder) SetCredential(credential workloads.Credential
 
 func (builder *InstanceSetBuilder) SetInstances(instances []workloads.InstanceTemplate) *InstanceSetBuilder {
 	builder.get().Spec.Instances = instances
+	return builder
+}
+
+func (builder *InstanceSetBuilder) SetOfflineInstances(offlineInstances []string) *InstanceSetBuilder {
+	builder.get().Spec.OfflineInstances = offlineInstances
 	return builder
 }

@@ -17,6 +17,11 @@ data:
     # the default storage class name.
     DEFAULT_STORAGE_CLASS: {{ include "kubeblocks.defaultStorageClass" . | quote }}
 
+    {{- with .Values.registryConfig }}
+    registries:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+
 ---
 apiVersion: v1
 kind: ConfigMap

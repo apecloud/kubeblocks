@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instanceset
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -30,8 +31,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
+	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
@@ -95,6 +99,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	// 3. do update
 	// do nothing if UpdateStrategyType is 'OnDelete'
 	if its.Spec.UpdateStrategy.Type == apps.OnDeleteStatefulSetStrategyType {
+		// TODO: how to handle the OnDelete type?
 		return kubebuilderx.Continue, nil
 	}
 
@@ -176,12 +181,18 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 				return kubebuilderx.Continue, err
 			}
 			newPod := copyAndMerge(pod, newInstance.pod)
+			if err = r.switchover(tree, its, newPod.(*corev1.Pod)); err != nil {
+				return kubebuilderx.Continue, err
+			}
 			if err = tree.Update(newPod); err != nil {
 				return kubebuilderx.Continue, err
 			}
 			updatingPods++
 		} else if updatePolicy == RecreatePolicy {
 			if !isTerminating(pod) {
+				if err = r.switchover(tree, its, pod); err != nil {
+					return kubebuilderx.Continue, err
+				}
 				if err = tree.Delete(pod); err != nil {
 					return kubebuilderx.Continue, err
 				}
@@ -197,6 +208,54 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		return kubebuilderx.RetryAfter(2 * time.Second), nil
 	}
 	return kubebuilderx.Continue, nil
+}
+
+func (r *updateReconciler) switchover(tree *kubebuilderx.ObjectTree, its *workloads.InstanceSet, pod *corev1.Pod) error {
+	if its.Spec.MembershipReconfiguration == nil || its.Spec.MembershipReconfiguration.Switchover == nil {
+		return nil
+	}
+
+	clusterName, err := func() (string, error) {
+		var clusterName string
+		if its.Annotations != nil {
+			clusterName = its.Annotations[constant.AppInstanceLabelKey]
+		}
+		if len(clusterName) == 0 {
+			return "", fmt.Errorf("InstanceSet %s/%s has no annotation %s", its.Namespace, its.Name, constant.AppInstanceLabelKey)
+		}
+		return clusterName, nil
+
+	}()
+	if err != nil {
+		return err
+	}
+	lifecycleActions := &kbappsv1.ComponentLifecycleActions{
+		Switchover: its.Spec.MembershipReconfiguration.Switchover,
+	}
+	templateVars := func() map[string]any {
+		if its.Spec.TemplateVars == nil {
+			return nil
+		}
+		m := make(map[string]any)
+		for k, v := range its.Spec.TemplateVars {
+			m[k] = v
+		}
+		return m
+	}()
+	lfa, err := lifecycle.New(its.Namespace, clusterName, its.Name, lifecycleActions, templateVars, pod)
+	if err != nil {
+		return err
+	}
+
+	err = lfa.Switchover(tree.Context, nil, nil, "")
+	if err != nil {
+		if errors.Is(err, lifecycle.ErrActionNotDefined) {
+			return nil
+		}
+		return err
+	}
+	tree.Logger.Info("successfully call switchover action for pod", "pod", pod.Name)
+	return nil
 }
 
 func buildBlockedCondition(its *workloads.InstanceSet, message string) *metav1.Condition {

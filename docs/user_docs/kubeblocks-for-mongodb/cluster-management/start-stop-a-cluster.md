@@ -1,7 +1,7 @@
 ---
 title: Stop/Start a MongoDB cluster
 description: How to start/stop a MongoDB cluster
-keywords: [mongodb, stop a momgodb cluster, start a mongodb cluster]
+keywords: [mongodb, stop a mongodb cluster, start a mongodb cluster]
 sidebar_position: 5
 sidebar_label: Stop/Start
 ---

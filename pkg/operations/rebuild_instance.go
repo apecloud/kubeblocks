@@ -276,7 +276,7 @@ func (r rebuildInstanceOpsHandler) rebuildInstanceInPlace(reqCtx intctrlutil.Req
 	instance opsv1alpha1.Instance,
 	index int) (bool, error) {
 	inPlaceHelper, err := r.prepareInplaceRebuildHelper(reqCtx, cli, opsRes, rebuildFrom.RestoreEnv,
-		instance, rebuildFrom.BackupName, index)
+		instance, rebuildFrom.BackupName, rebuildFrom.SourceBackupTargetName, index)
 	if err != nil {
 		return false, err
 	}
@@ -554,6 +554,7 @@ func (r rebuildInstanceOpsHandler) prepareInplaceRebuildHelper(reqCtx intctrluti
 	envForRestore []corev1.EnvVar,
 	instance opsv1alpha1.Instance,
 	backupName string,
+	sourceBackupTargetName string,
 	index int) (*inplaceRebuildHelper, error) {
 	var (
 		backup          *dpv1alpha1.Backup
@@ -595,17 +596,18 @@ func (r rebuildInstanceOpsHandler) prepareInplaceRebuildHelper(reqCtx intctrluti
 		return nil, err
 	}
 	return &inplaceRebuildHelper{
-		index:           index,
-		backup:          backup,
-		instance:        instance,
-		actionSet:       actionSet,
-		synthesizedComp: synthesizedComp,
-		pvcMap:          pvcMap,
-		volumes:         volumes,
-		targetPod:       targetPod,
-		volumeMounts:    volumeMounts,
-		rebuildPrefix:   rebuildPrefix,
-		envForRestore:   envForRestore,
+		index:                  index,
+		backup:                 backup,
+		instance:               instance,
+		actionSet:              actionSet,
+		synthesizedComp:        synthesizedComp,
+		sourceBackupTargetName: sourceBackupTargetName,
+		pvcMap:                 pvcMap,
+		volumes:                volumes,
+		targetPod:              targetPod,
+		volumeMounts:           volumeMounts,
+		rebuildPrefix:          rebuildPrefix,
+		envForRestore:          envForRestore,
 	}, nil
 }
 

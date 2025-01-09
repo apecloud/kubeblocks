@@ -25,8 +25,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
-	basev1 "github.com/apecloud/kubeblocks/apis/base/v1"
-
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
@@ -329,7 +327,7 @@ const (
 
 // ReplicaRole represents a role that can be assigned to a component instance, defining its behavior and responsibilities.
 // +kubebuilder:object:generate=false
-type ReplicaRole = basev1.ReplicaRole
+type ReplicaRole = kbappsv1.ReplicaRole
 
 // AccessMode defines SVC access mode enums.
 // +enum
@@ -577,18 +575,5 @@ func (r *InstanceSet) IsInstanceSetReady() bool {
 		return true
 	}
 	membersStatus := r.Status.MembersStatus
-	if len(membersStatus) != int(*r.Spec.Replicas) {
-		return false
-	}
-	if r.Status.ReadyWithoutPrimary {
-		return true
-	}
-	hasLeader := false
-	for _, status := range membersStatus {
-		if status.ReplicaRole != nil && status.ReplicaRole.IsLeader {
-			hasLeader = true
-			break
-		}
-	}
-	return hasLeader
+	return len(membersStatus) == int(*r.Spec.Replicas)
 }

@@ -26,8 +26,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	basev1 "github.com/apecloud/kubeblocks/apis/base/v1"
 )
 
 // +genclient
@@ -1428,8 +1426,56 @@ type ComponentAvailableProbeAssertion struct {
 }
 
 // ReplicaRole represents a role that can be assigned to a component instance, defining its behavior and responsibilities.
-// +kubebuilder:object:generate=false
-type ReplicaRole = basev1.ReplicaRole
+type ReplicaRole struct {
+	// Name defines the role's unique identifier. This value is used to set the "apps.kubeblocks.io/role" label
+	// on the corresponding object to identify its role.
+	//
+	// For example, common role names include:
+	// - "leader": The primary/master instance that handles write operations
+	// - "follower": Secondary/replica instances that replicate data from the leader
+	// - "learner": Read-only instances that don't participate in elections
+	//
+	// This field is immutable once set.
+	//
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=32
+	// +kubebuilder:validation:Pattern=`^.*[^\s]+.*$`
+	Name string `json:"name"`
+
+	// UpdatePriority determines the order in which pods with different roles are updated.
+	// Pods are sorted by this priority (higher numbers = higher priority) and updated accordingly.
+	// Roles with the highest priority will be updated last.
+	// The default priority is 0.
+	//
+	// For example:
+	// - Leader role may have priority 2 (updated last)
+	// - Follower role may have priority 1 (updated before leader)
+	// - Learner role may have priority 0 (updated first)
+	//
+	// This field is immutable once set.
+	//
+	// +kubebuilder:default=0
+	// +optional
+	UpdatePriority int `json:"updatePriority"`
+
+	// ParticipatesInQuorum indicates if pods with this role are counted when determining quorum.
+	// This affects update strategies that need to maintain quorum for availability. Roles participate
+	// in quorum should have higher update priority than roles do not participate in quorum.
+	// The default value is false.
+	//
+	// For example, in a 5-pod component where:
+	// - 2 learner pods (participatesInQuorum=false)
+	// - 2 follower pods (participatesInQuorum=true)
+	// - 1 leader pod (participatesInQuorum=true)
+	// The quorum size would be 3 (based on the 3 participating pods), allowing parallel updates
+	// of 2 learners and 1 follower while maintaining quorum.
+	//
+	// This field is immutable once set.
+	//
+	// +kubebuilder:default=false
+	// +optional
+	ParticipatesInQuorum bool `json:"participatesInQuorum"`
+}
 
 // UpdateStrategy defines the update strategy for cluster components. This strategy determines how updates are applied
 // across the cluster.

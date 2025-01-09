@@ -24,7 +24,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package v1
 
 import (
-	basev1 "github.com/apecloud/kubeblocks/apis/base/v1"
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -195,7 +194,7 @@ func (in *InstanceSetSpec) DeepCopyInto(out *InstanceSetSpec) {
 	in.UpdateStrategy.DeepCopyInto(&out.UpdateStrategy)
 	if in.Roles != nil {
 		in, out := &in.Roles, &out.Roles
-		*out = make([]basev1.ReplicaRole, len(*in))
+		*out = make([]appsv1.ReplicaRole, len(*in))
 		copy(*out, *in)
 	}
 	if in.MembershipReconfiguration != nil {
@@ -300,7 +299,7 @@ func (in *MemberStatus) DeepCopyInto(out *MemberStatus) {
 	*out = *in
 	if in.ReplicaRole != nil {
 		in, out := &in.ReplicaRole, &out.ReplicaRole
-		*out = new(basev1.ReplicaRole)
+		*out = new(appsv1.ReplicaRole)
 		**out = **in
 	}
 }

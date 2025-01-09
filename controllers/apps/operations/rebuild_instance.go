@@ -95,7 +95,8 @@ func (r rebuildInstanceOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli cli
 			if err := cli.Get(reqCtx.Ctx, client.ObjectKey{Name: ins.Name, Namespace: opsRes.Cluster.Namespace}, targetPod); err != nil {
 				return err
 			}
-			synthesizedComp, err = r.buildSynthesizedComponent(reqCtx, cli, opsRes.Cluster, targetPod.Labels[constant.KBAppComponentLabelKey])
+
+			synthesizedComp, err = r.buildSynthesizedComponent(reqCtx, cli, opsRes.Cluster, targetPod, v.ComponentName)
 			if err != nil {
 				return err
 			}
@@ -274,8 +275,7 @@ func (r rebuildInstanceOpsHandler) rebuildInstanceInPlace(reqCtx intctrlutil.Req
 	rebuildFrom appsv1alpha1.RebuildInstance,
 	instance appsv1alpha1.Instance,
 	index int) (bool, error) {
-	inPlaceHelper, err := r.prepareInplaceRebuildHelper(reqCtx, cli, opsRes, rebuildFrom.RestoreEnv,
-		instance, rebuildFrom.BackupName, index)
+	inPlaceHelper, err := r.prepareInplaceRebuildHelper(reqCtx, cli, opsRes, rebuildFrom, instance, index)
 	if err != nil {
 		return false, err
 	}
@@ -443,10 +443,6 @@ func (r rebuildInstanceOpsHandler) checkProgressForScalingOutPods(reqCtx intctrl
 		failedCount            int
 		completedCount         int
 	)
-	synthesizedComp, err := r.buildSynthesizedComponent(reqCtx, cli, opsRes.Cluster, rebuildInstance.ComponentName)
-	if err != nil {
-		return 0, 0, nil, err
-	}
 	currPodSet, _ := component.GenerateAllPodNamesToSet(compSpec.Replicas, compSpec.Instances, compSpec.OfflineInstances,
 		opsRes.Cluster.Name, compSpec.Name)
 	for _, instance := range rebuildInstance.Instances {
@@ -462,6 +458,10 @@ func (r rebuildInstanceOpsHandler) checkProgressForScalingOutPods(reqCtx intctrl
 		} else if !exist {
 			reqCtx.Log.Info(fmt.Sprintf("waiting to create the pod %s", scalingOutPodName))
 			continue
+		}
+		synthesizedComp, err := r.buildSynthesizedComponent(reqCtx, cli, opsRes.Cluster, pod, rebuildInstance.ComponentName)
+		if err != nil {
+			return 0, 0, nil, err
 		}
 		isAvailable, err := instanceIsAvailable(synthesizedComp, pod, opsRes.OpsRequest.Annotations[ignoreRoleCheckAnnotationKey])
 		if err != nil {
@@ -539,13 +539,17 @@ func (r rebuildInstanceOpsHandler) getScalingOutPodNameFromMessage(progressMsg s
 func (r rebuildInstanceOpsHandler) buildSynthesizedComponent(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
+	pod *corev1.Pod,
 	componentName string) (*component.SynthesizedComponent, error) {
 	compSpec := getComponentSpecOrShardingTemplate(cluster, componentName)
+	if compSpec == nil {
+		return nil, intctrlutil.NewFatalError(fmt.Sprintf(`the component "%s" is not found`, componentName))
+	}
 	if compSpec.ComponentDef == "" {
 		// TODO: remove after 0.9
 		return component.BuildSynthesizedComponentWrapper(reqCtx, cli, cluster, compSpec)
 	}
-	comp, compDef, err := component.GetCompNCompDefByName(reqCtx.Ctx, cli, cluster.Namespace, constant.GenerateClusterComponentName(cluster.Name, componentName))
+	comp, compDef, err := component.GetCompNCompDefByName(reqCtx.Ctx, cli, cluster.Namespace, constant.GenerateClusterComponentName(cluster.Name, pod.Labels[constant.KBAppComponentLabelKey]))
 	if err != nil {
 		return nil, err
 	}
@@ -555,9 +559,8 @@ func (r rebuildInstanceOpsHandler) buildSynthesizedComponent(reqCtx intctrlutil.
 func (r rebuildInstanceOpsHandler) prepareInplaceRebuildHelper(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	opsRes *OpsResource,
-	envForRestore []corev1.EnvVar,
+	rebuildInstance appsv1alpha1.RebuildInstance,
 	instance appsv1alpha1.Instance,
-	backupName string,
 	index int) (*inplaceRebuildHelper, error) {
 	var (
 		backup          *dpv1alpha1.Backup
@@ -565,20 +568,20 @@ func (r rebuildInstanceOpsHandler) prepareInplaceRebuildHelper(reqCtx intctrluti
 		synthesizedComp *component.SynthesizedComponent
 		err             error
 	)
-	if backupName != "" {
+	if rebuildInstance.BackupName != "" {
 		// prepare backup infos
 		backup = &dpv1alpha1.Backup{}
-		if err = cli.Get(reqCtx.Ctx, client.ObjectKey{Name: backupName, Namespace: opsRes.Cluster.Namespace}, backup); err != nil {
+		if err = cli.Get(reqCtx.Ctx, client.ObjectKey{Name: rebuildInstance.BackupName, Namespace: opsRes.Cluster.Namespace}, backup); err != nil {
 			return nil, err
 		}
 		if backup.Labels[dptypes.BackupTypeLabelKey] != string(dpv1alpha1.BackupTypeFull) {
-			return nil, intctrlutil.NewFatalError(fmt.Sprintf(`the backup "%s" is not a Full backup`, backupName))
+			return nil, intctrlutil.NewFatalError(fmt.Sprintf(`the backup "%s" is not a Full backup`, rebuildInstance.BackupName))
 		}
 		if backup.Status.Phase != dpv1alpha1.BackupPhaseCompleted {
-			return nil, intctrlutil.NewFatalError(fmt.Sprintf(`the backup "%s" phase is not Completed`, backupName))
+			return nil, intctrlutil.NewFatalError(fmt.Sprintf(`the backup "%s" phase is not Completed`, rebuildInstance.BackupName))
 		}
 		if backup.Status.BackupMethod == nil {
-			return nil, intctrlutil.NewFatalError(fmt.Sprintf(`the backupMethod of the backup "%s" can not be empty`, backupName))
+			return nil, intctrlutil.NewFatalError(fmt.Sprintf(`the backupMethod of the backup "%s" can not be empty`, rebuildInstance.BackupName))
 		}
 		actionSet, err = dputils.GetActionSetByName(reqCtx, cli, backup.Status.BackupMethod.ActionSetName)
 		if err != nil {
@@ -589,7 +592,7 @@ func (r rebuildInstanceOpsHandler) prepareInplaceRebuildHelper(reqCtx intctrluti
 	if err = cli.Get(reqCtx.Ctx, client.ObjectKey{Name: instance.Name, Namespace: opsRes.Cluster.Namespace}, targetPod); err != nil {
 		return nil, err
 	}
-	synthesizedComp, err = r.buildSynthesizedComponent(reqCtx, cli, opsRes.Cluster, targetPod.Labels[constant.KBAppComponentLabelKey])
+	synthesizedComp, err = r.buildSynthesizedComponent(reqCtx, cli, opsRes.Cluster, targetPod, rebuildInstance.ComponentName)
 	if err != nil {
 		return nil, err
 	}
@@ -599,17 +602,18 @@ func (r rebuildInstanceOpsHandler) prepareInplaceRebuildHelper(reqCtx intctrluti
 		return nil, err
 	}
 	return &inplaceRebuildHelper{
-		index:           index,
-		backup:          backup,
-		instance:        instance,
-		actionSet:       actionSet,
-		synthesizedComp: synthesizedComp,
-		pvcMap:          pvcMap,
-		volumes:         volumes,
-		targetPod:       targetPod,
-		volumeMounts:    volumeMounts,
-		rebuildPrefix:   rebuildPrefix,
-		envForRestore:   envForRestore,
+		index:                  index,
+		backup:                 backup,
+		instance:               instance,
+		actionSet:              actionSet,
+		synthesizedComp:        synthesizedComp,
+		sourceBackupTargetName: rebuildInstance.SourceBackupTargetName,
+		pvcMap:                 pvcMap,
+		volumes:                volumes,
+		targetPod:              targetPod,
+		volumeMounts:           volumeMounts,
+		rebuildPrefix:          rebuildPrefix,
+		envForRestore:          rebuildInstance.RestoreEnv,
 	}, nil
 }
 

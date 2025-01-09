@@ -9249,7 +9249,7 @@ and other administrative tasks.</p>
 <h3 id="apps.kubeblocks.io/v1alpha1.ComponentOps">ComponentOps
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.CustomOpsComponent">CustomOpsComponent</a>, <a href="#apps.kubeblocks.io/v1alpha1.HorizontalScaling">HorizontalScaling</a>, <a href="#apps.kubeblocks.io/v1alpha1.RebuildInstance">RebuildInstance</a>, <a href="#apps.kubeblocks.io/v1alpha1.Reconfigure">Reconfigure</a>, <a href="#apps.kubeblocks.io/v1alpha1.ScriptSpec">ScriptSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.SpecificOpsRequest">SpecificOpsRequest</a>, <a href="#apps.kubeblocks.io/v1alpha1.Switchover">Switchover</a>, <a href="#apps.kubeblocks.io/v1alpha1.UpgradeComponent">UpgradeComponent</a>, <a href="#apps.kubeblocks.io/v1alpha1.VerticalScaling">VerticalScaling</a>, <a href="#apps.kubeblocks.io/v1alpha1.VolumeExpansion">VolumeExpansion</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1alpha1.CustomOpsComponent">CustomOpsComponent</a>, <a href="#apps.kubeblocks.io/v1alpha1.HorizontalScaling">HorizontalScaling</a>, <a href="#apps.kubeblocks.io/v1alpha1.RebuildInstance">RebuildInstance</a>, <a href="#apps.kubeblocks.io/v1alpha1.Reconfigure">Reconfigure</a>, <a href="#apps.kubeblocks.io/v1alpha1.ScriptSpec">ScriptSpec</a>, <a href="#apps.kubeblocks.io/v1alpha1.SpecificOpsRequest">SpecificOpsRequest</a>, <a href="#apps.kubeblocks.io/v1alpha1.UpgradeComponent">UpgradeComponent</a>, <a href="#apps.kubeblocks.io/v1alpha1.VerticalScaling">VerticalScaling</a>, <a href="#apps.kubeblocks.io/v1alpha1.VolumeExpansion">VolumeExpansion</a>)
 </p>
 <div>
 <p>ComponentOps specifies the Component to be operated on.</p>
@@ -9270,7 +9270,7 @@ string
 </em>
 </td>
 <td>
-<p>Specifies the name of the Component.</p>
+<p>Specifies the name of the Component as defined in the cluster.spec</p>
 </td>
 </tr>
 </tbody>
@@ -21170,18 +21170,26 @@ required to implement their own HA solution or integrate an existing open-source
 <tbody>
 <tr>
 <td>
-<code>ComponentOps</code><br/>
+<code>componentName</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1alpha1.ComponentOps">
-ComponentOps
-</a>
+string
 </em>
 </td>
 <td>
-<p>
-(Members of <code>ComponentOps</code> are embedded into this type.)
-</p>
-<p>Specifies the name of the Component.</p>
+<em>(Optional)</em>
+<p>Specifies the name of the Component as defined in the cluster.spec.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>componentObjectName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the name of the Component object.</p>
 </td>
 </tr>
 <tr>

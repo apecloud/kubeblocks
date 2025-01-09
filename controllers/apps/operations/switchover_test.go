@@ -195,8 +195,8 @@ var _ = Describe("", func() {
 				clusterObj.Name, appsv1alpha1.SwitchoverType)
 			ops.Spec.SwitchoverList = []appsv1alpha1.Switchover{
 				{
-					ComponentOps: appsv1alpha1.ComponentOps{ComponentName: consensusComp},
-					InstanceName: fmt.Sprintf("%s-%s-%d", clusterObj.Name, consensusComp, 1),
+					ComponentName: consensusComp,
+					InstanceName:  fmt.Sprintf("%s-%s-%d", clusterObj.Name, consensusComp, 1),
 				},
 			}
 			opsRes.OpsRequest = testapps.CreateOpsRequest(ctx, testCtx, ops)

@@ -640,10 +640,14 @@ func (r *OpsRequest) validateSwitchover(ctx context.Context, cli client.Client, 
 	if len(switchoverList) == 0 {
 		return notEmptyError("spec.switchover")
 	}
-	compOpsList := make([]ComponentOps, len(switchoverList))
-	for i, v := range switchoverList {
-		compOpsList[i] = v.ComponentOps
-
+	compOpsList := make([]ComponentOps, 0)
+	for _, v := range switchoverList {
+		if len(v.ComponentName) == 0 {
+			continue
+		}
+		compOpsList = append(compOpsList, ComponentOps{
+			ComponentName: v.ComponentName,
+		})
 	}
 	if err := r.checkComponentExistence(cluster, compOpsList); err != nil {
 		return err
@@ -962,6 +966,39 @@ func GetRunningOpsByOpsType(ctx context.Context, cli client.Client,
 	return runningOpsList, nil
 }
 
+func getClusterCompSpec(cluster *Cluster, componentName string) (*ClusterComponentSpec, error) {
+	compSpec := cluster.Spec.GetComponentByName(componentName)
+	if compSpec != nil {
+		return compSpec, nil
+	}
+	shardingSpec := cluster.Spec.GetShardingByName(componentName)
+	if shardingSpec != nil {
+		return &shardingSpec.Template, nil
+	}
+	return nil, fmt.Errorf(`component "%s" not found`, componentName)
+}
+
+func GetCompSpecBySwitchover(ctx context.Context, cli client.Client, cluster *Cluster, switchover Switchover) (*ClusterComponentSpec, error) {
+	if len(switchover.ComponentName) > 0 {
+		return getClusterCompSpec(cluster, switchover.ComponentName)
+	}
+	compObj := &Component{}
+	if err := cli.Get(ctx, client.ObjectKey{
+		Namespace: cluster.Namespace,
+		Name:      switchover.ComponentObjectName,
+	}, compObj); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil, fmt.Errorf(`component object "%s" not found`, switchover.ComponentObjectName)
+		}
+		return nil, err
+	}
+	compName := compObj.Labels[constant.KBAppShardingNameLabelKey]
+	if len(compName) == 0 {
+		compName = compObj.Labels[constant.KBAppComponentLabelKey]
+	}
+	return getClusterCompSpec(cluster, compName)
+}
+
 // validateSwitchoverResourceList checks if switchover resourceList is legal.
 func validateSwitchoverResourceList(ctx context.Context, cli client.Client, cluster *Cluster, switchoverList []Switchover) error {
 	var (
@@ -972,6 +1009,17 @@ func validateSwitchoverResourceList(ctx context.Context, cli client.Client, clus
 			return notEmptyError("switchover.instanceName")
 		}
 
+		validatePodLegal := func(pod *corev1.Pod) error {
+			podLegalPrefix := fmt.Sprintf("%s-%s", cluster.Name, switchover.ComponentName)
+			if len(switchover.ComponentObjectName) > 0 {
+				podLegalPrefix = switchover.ComponentObjectName
+			}
+			if !strings.HasPrefix(pod.Name, podLegalPrefix) {
+				return fmt.Errorf("instanceName %s does not belong to the current component, please check the validity of the instance using \"kbcli cluster list-instances\"", switchover.InstanceName)
+			}
+			return nil
+		}
+
 		// TODO(xingran): this will be removed in the future.
 		validateBaseOnClusterCompDef := func(clusterCmpDef string) error {
 			// check clusterComponentDefinition whether support switchover
@@ -979,20 +1027,21 @@ func validateSwitchoverResourceList(ctx context.Context, cli client.Client, clus
 			if err != nil {
 				return err
 			}
+			compName := switchover.GetComponentName()
 			if clusterCompDefObj == nil {
-				return fmt.Errorf("this cluster component %s is invalid", switchover.ComponentName)
+				return fmt.Errorf("this cluster component %s is invalid", compName)
 			}
 			if clusterCompDefObj.SwitchoverSpec == nil {
-				return fmt.Errorf("this cluster component %s does not support switchover", switchover.ComponentName)
+				return fmt.Errorf("this cluster component %s does not support switchover", compName)
 			}
 			switch switchover.InstanceName {
 			case KBSwitchoverCandidateInstanceForAnyPod:
 				if clusterCompDefObj.SwitchoverSpec.WithoutCandidate == nil {
-					return fmt.Errorf("this cluster component %s does not support promote without specifying an instance. Please specify a specific instance for the promotion", switchover.ComponentName)
+					return fmt.Errorf("this cluster component %s does not support promote without specifying an instance. Please specify a specific instance for the promotion", compName)
 				}
 			default:
 				if clusterCompDefObj.SwitchoverSpec.WithCandidate == nil {
-					return fmt.Errorf("this cluster component %s does not support specifying an instance for promote. If you want to perform a promote operation, please do not specify an instance", switchover.ComponentName)
+					return fmt.Errorf("this cluster component %s does not support specifying an instance for promote. If you want to perform a promote operation, please do not specify an instance", compName)
 				}
 			}
 			// check switchover.InstanceName whether exist and role label is correct
@@ -1010,10 +1059,7 @@ func validateSwitchoverResourceList(ctx context.Context, cli client.Client, clus
 			if v == constant.Primary || v == constant.Leader {
 				return fmt.Errorf("instanceName %s cannot be promoted because it is already the primary or leader instance", switchover.InstanceName)
 			}
-			if !strings.HasPrefix(pod.Name, fmt.Sprintf("%s-%s", cluster.Name, switchover.ComponentName)) {
-				return fmt.Errorf("instanceName %s does not belong to the current component, please check the validity of the instance using \"kbcli cluster list-instances\"", switchover.InstanceName)
-			}
-			return nil
+			return validatePodLegal(pod)
 		}
 
 		validateBaseOnCompDef := func(compDef string) error {
@@ -1036,20 +1082,21 @@ func validateSwitchoverResourceList(ctx context.Context, cli client.Client, clus
 			if err != nil {
 				return err
 			}
+			compName := switchover.GetComponentName()
 			if compDefObj == nil {
-				return fmt.Errorf("this component %s referenced componentDefinition is invalid", switchover.ComponentName)
+				return fmt.Errorf("this component %s referenced componentDefinition is invalid", compName)
 			}
 			if compDefObj.Spec.LifecycleActions == nil || compDefObj.Spec.LifecycleActions.Switchover == nil {
-				return fmt.Errorf("this cluster component %s does not support switchover", switchover.ComponentName)
+				return fmt.Errorf("this cluster component %s does not support switchover", compName)
 			}
 			switch switchover.InstanceName {
 			case KBSwitchoverCandidateInstanceForAnyPod:
 				if compDefObj.Spec.LifecycleActions.Switchover.WithoutCandidate == nil {
-					return fmt.Errorf("this cluster component %s does not support promote without specifying an instance. Please specify a specific instance for the promotion", switchover.ComponentName)
+					return fmt.Errorf("this cluster component %s does not support promote without specifying an instance. Please specify a specific instance for the promotion", compName)
 				}
 			default:
 				if compDefObj.Spec.LifecycleActions.Switchover.WithCandidate == nil {
-					return fmt.Errorf("this cluster component %s does not support specifying an instance for promote. If you want to perform a promote operation, please do not specify an instance", switchover.ComponentName)
+					return fmt.Errorf("this cluster component %s does not support specifying an instance for promote. If you want to perform a promote operation, please do not specify an instance", compName)
 				}
 			}
 			// check switchover.InstanceName whether exist and role label is correct
@@ -1074,20 +1121,17 @@ func validateSwitchoverResourceList(ctx context.Context, cli client.Client, clus
 			if v == targetRole {
 				return fmt.Errorf("instanceName %s cannot be promoted because it is already the primary or leader instance", switchover.InstanceName)
 			}
-			if !strings.HasPrefix(pod.Name, fmt.Sprintf("%s-%s", cluster.Name, switchover.ComponentName)) {
-				return fmt.Errorf("instanceName %s does not belong to the current component, please check the validity of the instance using \"kbcli cluster list-instances\"", switchover.InstanceName)
-			}
-			return nil
+			return validatePodLegal(pod)
 		}
 
-		compSpec := cluster.Spec.GetComponentByName(switchover.ComponentName)
-		if compSpec == nil {
-			return fmt.Errorf("component %s not found", switchover.ComponentName)
+		compSpec, err := GetCompSpecBySwitchover(ctx, cli, cluster, switchover)
+		if err != nil {
+			return err
 		}
 		if compSpec.ComponentDef != "" {
 			return validateBaseOnCompDef(compSpec.ComponentDef)
 		} else {
-			return validateBaseOnClusterCompDef(cluster.Spec.GetComponentDefRefName(switchover.ComponentName))
+			return validateBaseOnClusterCompDef(compSpec.ComponentDefRef)
 		}
 	}
 	return nil

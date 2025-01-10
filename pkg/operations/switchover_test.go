@@ -46,6 +46,7 @@ var _ = Describe("", func() {
 		compDefName = "test-compdef-"
 		clusterName = "test-cluster-"
 		compDefObj  *appsv1.ComponentDefinition
+		compObj     *appsv1.Component
 		clusterObj  *appsv1.Cluster
 	)
 
@@ -100,9 +101,10 @@ var _ = Describe("", func() {
 				Create(&testCtx).GetObject()
 
 			By("creating a component")
-			_ = testapps.NewComponentFactory(testCtx.DefaultNamespace, clusterObj.Name+"-"+defaultCompName, compDefObj.Name).
+			compObj = testapps.NewComponentFactory(testCtx.DefaultNamespace, clusterObj.Name+"-"+defaultCompName, compDefObj.Name).
 				AddAppManagedByLabel().
 				AddAppInstanceLabel(clusterObj.Name).
+				AddAppComponentLabel(defaultCompName).
 				AddAnnotations(constant.KBAppClusterUIDKey, string(clusterObj.UID)).
 				Create(&testCtx).
 				GetObject()
@@ -191,7 +193,7 @@ var _ = Describe("", func() {
 			Expect(err).ShouldNot(HaveOccurred())
 		})
 
-		It("Test switchover OpsRequest with candidate", func() {
+		testSwitchoverWithCandidate := func(useComponentObjectName bool) {
 			By("create switchover opsRequest")
 			ops := testops.NewOpsRequestObj("ops-switchover-"+testCtx.GetRandomStr(), testCtx.DefaultNamespace,
 				clusterObj.Name, opsv1alpha1.SwitchoverType)
@@ -204,6 +206,11 @@ var _ = Describe("", func() {
 					CandidateName: candidateName,
 				},
 			}
+			if useComponentObjectName {
+				ops.Spec.SwitchoverList[0].ComponentName = ""
+				ops.Spec.SwitchoverList[0].ComponentObjectName = compObj.Name
+			}
+			fmt.Printf("ops: %#v\n", ops.Spec.SwitchoverList[0])
 			opsRes.OpsRequest = testops.CreateOpsRequest(ctx, testCtx, ops)
 			opsRes.OpsRequest.Status.Phase = opsv1alpha1.OpsPendingPhase
 
@@ -230,6 +237,14 @@ var _ = Describe("", func() {
 			By("do reconcile switchover action")
 			_, err = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 			Expect(err).ShouldNot(HaveOccurred())
+		}
+
+		It("Test switchover OpsRequest with candidate", func() {
+			testSwitchoverWithCandidate(false)
+		})
+
+		It("Test switchover OpsRequest with candidate and specified a component object name", func() {
+			testSwitchoverWithCandidate(true)
 		})
 	})
 })

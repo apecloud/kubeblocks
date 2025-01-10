@@ -39,6 +39,10 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
+const (
+	clusterDefinitionFinalizerName = "clusterdefinition.kubeblocks.io/finalizer"
+)
+
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusterdefinitions,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusterdefinitions/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=apps.kubeblocks.io,resources=clusterdefinitions/finalizers,verbs=update
@@ -357,39 +361,4 @@ func (r *ClusterDefinitionReconciler) validateTopologyOrders(topology appsv1.Clu
 		return fmt.Errorf("the components and shardings in update orders are different from those in definition")
 	}
 	return nil
-}
-
-// defaultClusterTopology returns the default cluster topology in specified cluster definition.
-func defaultClusterTopology(clusterDef *appsv1.ClusterDefinition) *appsv1.ClusterTopology {
-	for i, topology := range clusterDef.Spec.Topologies {
-		if topology.Default {
-			return &clusterDef.Spec.Topologies[i]
-		}
-	}
-	return nil
-}
-
-// referredClusterTopology returns the cluster topology which has name @name.
-func referredClusterTopology(clusterDef *appsv1.ClusterDefinition, name string) *appsv1.ClusterTopology {
-	if clusterDef != nil {
-		if len(name) == 0 {
-			return defaultClusterTopology(clusterDef)
-		}
-		for i, topology := range clusterDef.Spec.Topologies {
-			if topology.Name == name {
-				return &clusterDef.Spec.Topologies[i]
-			}
-		}
-	}
-	return nil
-}
-
-func clusterTopologyCompMatched(comp appsv1.ClusterTopologyComponent, compName string) bool {
-	if comp.Name == compName {
-		return true
-	}
-	if comp.Template != nil && *comp.Template {
-		return strings.HasPrefix(compName, comp.Name)
-	}
-	return false
 }

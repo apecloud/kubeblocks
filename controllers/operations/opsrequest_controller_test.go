@@ -40,7 +40,6 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
-	"github.com/apecloud/kubeblocks/controllers/apps"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/generics"
@@ -396,7 +395,7 @@ var _ = Describe("OpsRequest Controller", func() {
 				condition := meta.FindStatusCondition(fetched.Status.Conditions, appsv1.ConditionTypeProvisioningStarted)
 				g.Expect(condition).ShouldNot(BeNil())
 				g.Expect(condition.Status).Should(BeFalse())
-				g.Expect(condition.Reason).Should(Equal(apps.ReasonPreCheckFailed))
+				g.Expect(condition.Reason).Should(Equal("PreCheckFailed"))
 				g.Expect(condition.Message).Should(Equal("HorizontalScaleFailed: volume snapshot not support"))
 			}))
 

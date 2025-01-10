@@ -17,23 +17,23 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package graph
+package apps
 
-// PlanBuilder builds a Plan by applying a group of Transformer to an empty DAG.
-type PlanBuilder interface {
-	// Init loads the primary object to be reconciled, and does meta initialization
-	Init() error
+import (
+	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 
-	// AddTransformer adds transformers to the builder in sequence order.
-	// And the transformers will be executed in the add order.
-	AddTransformer(transformer ...Transformer) PlanBuilder
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+)
 
-	// Build runs all the transformers added by AddTransformer.
-	Build() (Plan, error)
-}
+var (
+	rscheme = runtime.NewScheme()
+)
 
-// Plan defines the final actions should be executed.
-type Plan interface {
-	// Execute the plan
-	Execute() error
+func init() {
+	utilruntime.Must(clientgoscheme.AddToScheme(rscheme))
+	utilruntime.Must(appsv1.AddToScheme(rscheme))
+	utilruntime.Must(workloads.AddToScheme(rscheme))
 }

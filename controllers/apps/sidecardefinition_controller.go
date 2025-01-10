@@ -46,6 +46,10 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
+const (
+	sidecarDefinitionFinalizerName = "sidecardefinition.kubeblocks.io/finalizer"
+)
+
 // SidecarDefinitionReconciler reconciles a SidecarDefinition object
 type SidecarDefinitionReconciler struct {
 	client.Client

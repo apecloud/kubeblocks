@@ -12,10 +12,12 @@ on:
         required: false
         default: ''
       TEST_TYPE:
-        description: 'test type (e.g.  apecloud-mysql|postgresql|redis|mongodb|kafka|pulsar|mysqlscale|weaviate|qdrant|smartengine|
-        greptimedb|nebula|risingwave|starrocks|etcd|oceanbase|foxlake|orioledb|oracle-mysql|vanilla-pg|asmysql|openldap|
+        description: 'test type (e.g.  apecloud-mysql|postgresql|redis|mongodb|kafka|pulsar|mysqlscale|weaviate|qdrant|
+        smartengine|greptimedb|nebula|risingwave|starrocks|etcd|oceanbase|foxlake|orioledb|vanilla-pg|asmysql|openldap|
         polardbx|opensearch|elasticsearch|vllm|tdengine|milvus|clickhouse|pika|ggml|zookeeper|mariadb|tidb|xinference|
-        oracle|opengauss|influxdb|flink|solr|doris|halo|mogdb|oceanbase-ent|starrocks-ent|yashandb|redis-cluster|camellia-redis-proxy|dmdb|minio)'
+        oracle|opengauss|influxdb|flink|solr|mogdb|oceanbase-ent|starrocks-ent|apecloud-postgresql|yashandb|
+        redis-cluster|camellia-redis-proxy|dmdb|minio|orchestrator|rabbitmq|loki|victoria-metrics|gaussdb|damengdb|
+        kingbase|vastbase|mssql|rocketmq)'
         required: false
         default: ''
       CLOUD_PROVIDER:

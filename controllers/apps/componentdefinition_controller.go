@@ -31,7 +31,6 @@ import (
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
@@ -47,7 +46,8 @@ import (
 )
 
 const (
-	immutableHashAnnotationKey = "apps.kubeblocks.io/immutable-hash"
+	componentDefinitionFinalizerName = "componentdefinition.kubeblocks.io/finalizer"
+	immutableHashAnnotationKey       = "apps.kubeblocks.io/immutable-hash"
 )
 
 // ComponentDefinitionReconciler reconciles a ComponentDefinition object
@@ -468,23 +468,6 @@ func (r *ComponentDefinitionReconciler) cmpdHash(cmpd *appsv1.ComponentDefinitio
 	hash := fnv.New32a()
 	hash.Write(data)
 	return rand.SafeEncodeString(fmt.Sprintf("%d", hash.Sum32())), nil
-}
-
-func getNCheckCompDefinition(ctx context.Context, cli client.Reader, name string) (*appsv1.ComponentDefinition, error) {
-	compKey := types.NamespacedName{
-		Name: name,
-	}
-	compDef := &appsv1.ComponentDefinition{}
-	if err := cli.Get(ctx, compKey, compDef); err != nil {
-		return nil, err
-	}
-	if compDef.Generation != compDef.Status.ObservedGeneration {
-		return nil, fmt.Errorf("the referenced ComponentDefinition is not up to date: %s", compDef.Name)
-	}
-	if compDef.Status.Phase != appsv1.AvailablePhase {
-		return nil, fmt.Errorf("the referenced ComponentDefinition is unavailable: %s", compDef.Name)
-	}
-	return compDef, nil
 }
 
 // listCompDefinitionsWithPattern returns all component definitions whose names match the given pattern

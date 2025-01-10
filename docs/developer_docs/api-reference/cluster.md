@@ -2546,6 +2546,30 @@ bool
 <p>Specifies whether to enable point-in-time recovery.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>incrementalBackupEnabled</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies whether to enable incremental backup.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>incrementalCronExpression</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The cron expression for the incremental backup schedule. The timezone is in UTC. See <a href="https://en.wikipedia.org/wiki/Cron">https://en.wikipedia.org/wiki/Cron</a>.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1.ClusterComponentConfig">ClusterComponentConfig
@@ -15121,6 +15145,30 @@ bool
 <td>
 <em>(Optional)</em>
 <p>Specifies whether to enable point-in-time recovery.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>incrementalBackupEnabled</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies whether to enable incremental backup.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>incrementalCronExpression</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The cron expression for the incremental backup schedule. The timezone is in UTC. See <a href="https://en.wikipedia.org/wiki/Cron">https://en.wikipedia.org/wiki/Cron</a>.</p>
 </td>
 </tr>
 </tbody>

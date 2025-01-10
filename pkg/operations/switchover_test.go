@@ -160,8 +160,8 @@ var _ = Describe("", func() {
 			instanceName := fmt.Sprintf("%s-%s-%d", clusterObj.Name, defaultCompName, 1)
 			ops.Spec.SwitchoverList = []opsv1alpha1.Switchover{
 				{
-					ComponentOps: opsv1alpha1.ComponentOps{ComponentName: defaultCompName},
-					InstanceName: instanceName,
+					ComponentName: defaultCompName,
+					InstanceName:  instanceName,
 				},
 			}
 			opsRes.OpsRequest = testops.CreateOpsRequest(ctx, testCtx, ops)
@@ -199,7 +199,7 @@ var _ = Describe("", func() {
 			candidateName := fmt.Sprintf("%s-%s-%d", clusterObj.Name, defaultCompName, 0)
 			ops.Spec.SwitchoverList = []opsv1alpha1.Switchover{
 				{
-					ComponentOps:  opsv1alpha1.ComponentOps{ComponentName: defaultCompName},
+					ComponentName: defaultCompName,
 					InstanceName:  instanceName,
 					CandidateName: candidateName,
 				},

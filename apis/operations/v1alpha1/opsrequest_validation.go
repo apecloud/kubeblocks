@@ -499,9 +499,14 @@ func (r *OpsRequest) validateSwitchover(cluster *appsv1.Cluster) error {
 	if len(switchoverList) == 0 {
 		return notEmptyError("spec.switchover")
 	}
-	compOpsList := make([]ComponentOps, len(switchoverList))
-	for i, v := range switchoverList {
-		compOpsList[i] = v.ComponentOps
+	compOpsList := make([]ComponentOps, 0)
+	for _, v := range switchoverList {
+		if len(v.ComponentName) == 0 {
+			continue
+		}
+		compOpsList = append(compOpsList, ComponentOps{
+			ComponentName: v.ComponentName,
+		})
 
 	}
 	if err := r.checkComponentExistence(cluster, compOpsList); err != nil {

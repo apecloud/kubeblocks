@@ -164,14 +164,17 @@ func GenerateAllPodNamesToSet(
 
 func GetTemplateNameAndOrdinal(workloadName, podName string) (string, int32, error) {
 	podSuffix := strings.Replace(podName, workloadName+"-", "", 1)
-	suffixArr := strings.Split(podSuffix, "-")
+	lastDashIndex := strings.LastIndex(podSuffix, "-")
+	if lastDashIndex == len(podSuffix)-1 {
+		return "", 0, fmt.Errorf("no pod ordinal found after the last dash")
+	}
 	templateName := ""
 	indexStr := ""
-	if len(suffixArr) == 2 {
-		templateName = suffixArr[0]
-		indexStr = suffixArr[1]
+	if lastDashIndex == -1 {
+		indexStr = podSuffix
 	} else {
-		indexStr = suffixArr[0]
+		templateName = podSuffix[0:lastDashIndex]
+		indexStr = podSuffix[lastDashIndex+1:]
 	}
 	index, err := strconv.Atoi(indexStr)
 	if err != nil {

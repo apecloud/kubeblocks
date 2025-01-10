@@ -135,12 +135,28 @@ func ToCoreV1PVCs(vcts []appsv1.ClusterComponentVolumeClaimTemplate) []corev1.Pe
 				Name: v.Name,
 			},
 			Spec: corev1.PersistentVolumeClaimSpec{
-				AccessModes:      v.Spec.AccessModes,
-				Resources:        v.Spec.Resources,
-				StorageClassName: storageClassName(v.Spec, viper.GetString(constant.CfgKeyDefaultStorageClass)),
-				VolumeMode:       v.Spec.VolumeMode,
+				AccessModes:               v.Spec.AccessModes,
+				Resources:                 v.Spec.Resources,
+				StorageClassName:          storageClassName(v.Spec, viper.GetString(constant.CfgKeyDefaultStorageClass)),
+				VolumeMode:                v.Spec.VolumeMode,
+				VolumeAttributesClassName: v.Spec.VolumeAttributesClassName,
 			},
 		})
 	}
 	return pvcs
+}
+
+func ToCoreV1PVCTs(vcts []appsv1.ClusterComponentVolumeClaimTemplate) []corev1.PersistentVolumeClaimTemplate {
+	pvcs := ToCoreV1PVCs(vcts)
+	pvct := func(i int) corev1.PersistentVolumeClaimTemplate {
+		return corev1.PersistentVolumeClaimTemplate{
+			ObjectMeta: pvcs[i].ObjectMeta,
+			Spec:       pvcs[i].Spec,
+		}
+	}
+	var pvcts []corev1.PersistentVolumeClaimTemplate
+	for i := range pvcs {
+		pvcts = append(pvcts, pvct(i))
+	}
+	return pvcts
 }

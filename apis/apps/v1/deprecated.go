@@ -160,21 +160,22 @@ func (r *ClusterComponentVolumeClaimTemplate) toVolumeClaimTemplate() corev1.Per
 
 func (r *PersistentVolumeClaimSpec) ToV1PersistentVolumeClaimSpec() corev1.PersistentVolumeClaimSpec {
 	return corev1.PersistentVolumeClaimSpec{
-		AccessModes:      r.AccessModes,
-		Resources:        r.Resources,
-		StorageClassName: r.getStorageClassName(viper.GetString(constant.CfgKeyDefaultStorageClass)),
-		VolumeMode:       r.VolumeMode,
+		AccessModes:               r.AccessModes,
+		Resources:                 r.Resources,
+		StorageClassName:          r.getStorageClassName(viper.GetString(constant.CfgKeyDefaultStorageClass)),
+		VolumeMode:                r.VolumeMode,
+		VolumeAttributesClassName: r.VolumeAttributesClassName,
 	}
 }
 
 // getStorageClassName returns PersistentVolumeClaimSpec.StorageClassName if a value is assigned; otherwise,
-// it returns preferSC argument.
-func (r *PersistentVolumeClaimSpec) getStorageClassName(preferSC string) *string {
+// it returns the defaultStorageClass argument.
+func (r *PersistentVolumeClaimSpec) getStorageClassName(defaultStorageClass string) *string {
 	if r.StorageClassName != nil && *r.StorageClassName != "" {
 		return r.StorageClassName
 	}
-	if preferSC != "" {
-		return &preferSC
+	if defaultStorageClass != "" {
+		return &defaultStorageClass
 	}
 	return nil
 }

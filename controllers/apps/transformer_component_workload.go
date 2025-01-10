@@ -555,7 +555,7 @@ func (r *componentWorkloadOps) expandVolume() error {
 		protoVCTs = append(protoVCTs, r.synthesizeComp.VolumeClaimTemplates...)
 		for _, v := range r.synthesizeComp.Instances {
 			if runningInsTPL.Name == v.Name {
-				insVCTs := component.ToVolumeClaimTemplates(v.VolumeClaimTemplates)
+				insVCTs := intctrlutil.ToCoreV1PVCTs(v.VolumeClaimTemplates)
 				intctrlutil.MergeList(&insVCTs, &protoVCTs,
 					func(item corev1.PersistentVolumeClaimTemplate) func(corev1.PersistentVolumeClaimTemplate) bool {
 						return func(claim corev1.PersistentVolumeClaimTemplate) bool {

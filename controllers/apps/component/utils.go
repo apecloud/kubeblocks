@@ -28,6 +28,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -216,4 +217,8 @@ func newFailedProvisioningStartedCondition(err error) metav1.Condition {
 		Message: err.Error(),
 		Reason:  getConditionReasonWithError(ReasonPreCheckFailed, err),
 	}
+}
+
+func setDiff(s1, s2 sets.Set[string]) (sets.Set[string], sets.Set[string], sets.Set[string]) {
+	return s2.Difference(s1), s1.Difference(s2), s1.Intersection(s2)
 }

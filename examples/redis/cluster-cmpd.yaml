@@ -3,6 +3,8 @@ kind: Cluster
 metadata:
   name: redis-cluster
   namespace: default
+  annotations:
+    kubeblocks.io/crd-api-version: apps.kubeblocks.io/v1alpha1
 spec:
   # Specifies the behavior when a Cluster is deleted.
   # - `DoNotTerminate`: Prevents deletion of the Cluster. This policy ensures that all resources remain intact.
@@ -14,10 +16,26 @@ spec:
   componentSpecs:
     # Specifies the name of the Component. This name is also part of the Service DNS name and must comply with the IANA service naming rule. When ClusterComponentSpec is referenced as a template, the name is optional. Otherwise, it is required. 
   - name: redis
+    instances:
+    - annotations:
+        xxx: yyy
+      labels: {}
+      name: tpl-0
+      replicas: 2
+      resources:
+        limits:
+          cpu: '0.5'
+          memory: 0.5Gi
+        requests:
+          cpu: 100m
+          memory: 500M
     # References the name of a ComponentDefinition. The ComponentDefinition specifies the behavior and characteristics of the Component. If both `componentDefRef` and `componentDef` are provided, the `componentDef` will take precedence over `componentDefRef`.
     componentDef: redis-7
     # Determines whether the metrics exporter needs to be published to the service endpoint.  
     disableExporter: true
+    serviceVersion: "7.2.4"
+    labels: {}
+    # podUpdatePolicy: StrictInPlace
     # Specifies which types of logs should be collected for the Cluster. 
     enabledLogs:
     - running

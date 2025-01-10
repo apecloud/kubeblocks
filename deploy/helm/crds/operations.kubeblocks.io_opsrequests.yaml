@@ -4207,6 +4207,10 @@ spec:
                         type: object
                       type: array
                       x-kubernetes-preserve-unknown-fields: true
+                    sourceBackupTargetName:
+                      description: When multiple source targets exist of the backup,
+                        you must specify the source target to restore.
+                      type: string
                   required:
                   - componentName
                   - instances

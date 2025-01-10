@@ -300,6 +300,17 @@ type ClusterBackup struct {
 	// +kubebuilder:default=false
 	// +optional
 	PITREnabled *bool `json:"pitrEnabled,omitempty"`
+
+	// Specifies whether to enable incremental backup.
+	//
+	// +kubebuilder:default=false
+	// +optional
+	IncrementalBackupEnabled *bool `json:"incrementalBackupEnabled,omitempty"`
+
+	// The cron expression for the incremental backup schedule. The timezone is in UTC. See https://en.wikipedia.org/wiki/Cron.
+	//
+	// +optional
+	IncrementalCronExpression string `json:"incrementalCronExpression,omitempty"`
 }
 
 // ClusterResources is deprecated since v0.9.

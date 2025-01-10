@@ -270,6 +270,10 @@ type RebuildInstance struct {
 	// +optional
 	BackupName string `json:"backupName,omitempty"`
 
+	// When multiple source targets exist of the backup, you must specify the source target to restore.
+	// +optional
+	SourceBackupTargetName string `json:"sourceBackupTargetName,omitempty"`
+
 	// Defines container environment variables for the restore process.
 	// merged with the ones specified in the Backup and ActionSet resources.
 	//

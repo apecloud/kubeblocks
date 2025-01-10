@@ -60,13 +60,14 @@ type inplaceRebuildHelper struct {
 	instance  opsv1alpha1.Instance
 	actionSet *dpv1alpha1.ActionSet
 	// key: source pvc name, value: the tmp pvc which using to rebuild
-	pvcMap          map[string]*corev1.PersistentVolumeClaim
-	synthesizedComp *component.SynthesizedComponent
-	volumes         []corev1.Volume
-	volumeMounts    []corev1.VolumeMount
-	envForRestore   []corev1.EnvVar
-	rebuildPrefix   string
-	index           int
+	pvcMap                 map[string]*corev1.PersistentVolumeClaim
+	synthesizedComp        *component.SynthesizedComponent
+	volumes                []corev1.Volume
+	volumeMounts           []corev1.VolumeMount
+	envForRestore          []corev1.EnvVar
+	sourceBackupTargetName string
+	rebuildPrefix          string
+	index                  int
 }
 
 // rebuildPodWithNoBackup rebuilds the instance with no backup.
@@ -219,8 +220,9 @@ func (inPlaceHelper *inplaceRebuildHelper) createPrepareDataRestore(reqCtx intct
 		ObjectMeta: inPlaceHelper.buildRestoreMetaObject(opsRequest, restoreName),
 		Spec: dpv1alpha1.RestoreSpec{
 			Backup: dpv1alpha1.BackupRef{
-				Name:      inPlaceHelper.backup.Name,
-				Namespace: opsRequest.Namespace,
+				Name:             inPlaceHelper.backup.Name,
+				Namespace:        opsRequest.Namespace,
+				SourceTargetName: inPlaceHelper.sourceBackupTargetName,
 			},
 			Env: inPlaceHelper.envForRestore,
 			PrepareDataConfig: &dpv1alpha1.PrepareDataConfig{
@@ -262,8 +264,9 @@ func (inPlaceHelper *inplaceRebuildHelper) createPostReadyRestore(reqCtx intctrl
 		ObjectMeta: inPlaceHelper.buildRestoreMetaObject(opsRequest, restoreName),
 		Spec: dpv1alpha1.RestoreSpec{
 			Backup: dpv1alpha1.BackupRef{
-				Name:      inPlaceHelper.backup.Name,
-				Namespace: inPlaceHelper.backup.Namespace,
+				Name:             inPlaceHelper.backup.Name,
+				Namespace:        inPlaceHelper.backup.Namespace,
+				SourceTargetName: inPlaceHelper.sourceBackupTargetName,
 			},
 			Env: inPlaceHelper.envForRestore,
 			ReadyConfig: &dpv1alpha1.ReadyConfig{

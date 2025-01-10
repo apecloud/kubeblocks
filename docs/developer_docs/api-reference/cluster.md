@@ -17683,6 +17683,18 @@ Defaults to an empty PersistentVolume if unspecified.</p>
 </tr>
 <tr>
 <td>
+<code>sourceBackupTargetName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>When multiple source targets exist of the backup, you must specify the source target to restore.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>restoreEnv</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#envvar-v1-core">

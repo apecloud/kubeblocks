@@ -3274,6 +3274,19 @@ Kubernetes core/v1.PersistentVolumeMode
 <p>Defines what type of volume is required by the claim, either Block or Filesystem.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>volumeAttributesClassName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>volumeAttributesClassName may be used to set the VolumeAttributesClass used by this claim.</p>
+<p>More info: <a href="https://kubernetes.io/docs/concepts/storage/persistent-volumes#volumeattributesclass">https://kubernetes.io/docs/concepts/storage/persistent-volumes#volumeattributesclass</a></p>
+</td>
+</tr>
 </table>
 </td>
 </tr>
@@ -8593,6 +8606,19 @@ Kubernetes core/v1.PersistentVolumeMode
 <td>
 <em>(Optional)</em>
 <p>Defines what type of volume is required by the claim, either Block or Filesystem.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>volumeAttributesClassName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>volumeAttributesClassName may be used to set the VolumeAttributesClass used by this claim.</p>
+<p>More info: <a href="https://kubernetes.io/docs/concepts/storage/persistent-volumes#volumeattributesclass">https://kubernetes.io/docs/concepts/storage/persistent-volumes#volumeattributesclass</a></p>
 </td>
 </tr>
 </tbody>

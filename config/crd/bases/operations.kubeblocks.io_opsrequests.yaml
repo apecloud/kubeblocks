@@ -2157,6 +2157,13 @@ spec:
                                             The name of the StorageClass required by the claim.
                                             More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1.
                                           type: string
+                                        volumeAttributesClassName:
+                                          description: |-
+                                            volumeAttributesClassName may be used to set the VolumeAttributesClass used by this claim.
+
+
+                                            More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#volumeattributesclass
+                                          type: string
                                         volumeMode:
                                           description: Defines what type of volume
                                             is required by the claim, either Block
@@ -6718,6 +6725,13 @@ spec:
                                           description: |-
                                             The name of the StorageClass required by the claim.
                                             More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1.
+                                          type: string
+                                        volumeAttributesClassName:
+                                          description: |-
+                                            volumeAttributesClassName may be used to set the VolumeAttributesClass used by this claim.
+
+
+                                            More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#volumeattributesclass
                                           type: string
                                         volumeMode:
                                           description: Defines what type of volume

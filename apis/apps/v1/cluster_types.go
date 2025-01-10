@@ -680,7 +680,7 @@ type ClusterBackup struct {
 	// +optional
 	PITREnabled *bool `json:"pitrEnabled,omitempty"`
 
-	// Specifies whether to eanble incremental backup.
+	// Specifies whether to enable incremental backup.
 	//
 	// +kubebuilder:default=false
 	// +optional

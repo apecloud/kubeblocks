@@ -2542,7 +2542,7 @@ bool
 </td>
 <td>
 <em>(Optional)</em>
-<p>Specifies whether to eanble incremental backup.</p>
+<p>Specifies whether to enable incremental backup.</p>
 </td>
 </tr>
 <tr>

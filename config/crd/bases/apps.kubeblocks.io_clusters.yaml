@@ -101,7 +101,7 @@ spec:
                     type: boolean
                   incrementalBackupEnabled:
                     default: false
-                    description: Specifies whether to eanble incremental backup.
+                    description: Specifies whether to enable incremental backup.
                     type: boolean
                   incrementalCronExpression:
                     description: The cron expression for the incremental backup schedule.

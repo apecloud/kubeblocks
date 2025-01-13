@@ -187,6 +187,7 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 				progressDetails := tmpOps.Status.Components[consensusCompName].ProgressDetails
 				progressDetail := findStatusProgressDetail(progressDetails, getPVCProgressObjectKey(pvcName))
 				g.Expect(progressDetail != nil && progressDetail.Status == opsv1alpha1.ProcessingProgressStatus).Should(BeTrue())
+				g.Expect(progressDetail.StartTime.IsZero()).Should(BeFalse())
 			})).Should(Succeed())
 
 			By("mock pvc resizing succeed")
@@ -199,6 +200,12 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 		// waiting for OpsRequest.status.phase is succeed
 		_, err := GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 		Expect(err).Should(BeNil())
+		Eventually(testapps.CheckObj(&testCtx, client.ObjectKeyFromObject(newOps), func(g Gomega, tmpOps *opsv1alpha1.OpsRequest) {
+			progressDetails := tmpOps.Status.Components[consensusCompName].ProgressDetails
+			progressDetail := findStatusProgressDetail(progressDetails, getPVCProgressObjectKey(pvcNames[0]))
+			g.Expect(progressDetail != nil && progressDetail.Status == opsv1alpha1.SucceedProgressStatus).Should(BeTrue())
+			g.Expect(progressDetail.EndTime.IsZero()).Should(BeFalse())
+		})).Should(Succeed())
 		Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(opsv1alpha1.OpsSucceedPhase))
 	}
 

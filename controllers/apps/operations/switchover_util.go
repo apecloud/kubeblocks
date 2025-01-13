@@ -30,6 +30,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -169,7 +170,7 @@ func checkPodRoleLabelConsistency(ctx context.Context,
 	}
 
 	for _, switchoverMessage := range switchoverMessageMap {
-		if switchoverMessage.ComponentName != synthesizedComp.Name {
+		if switchoverMessage.GetComponentName() != switchover.GetComponentName() {
 			continue
 		}
 		switch switchoverMessage.Switchover.InstanceName {
@@ -270,6 +271,7 @@ func renderSwitchoverCmdJob(ctx context.Context,
 				Labels:    getSwitchoverCmdJobLabel(cluster.Name, synthesizedComp.Name),
 			},
 			Spec: batchv1.JobSpec{
+				BackoffLimit: pointer.Int32(2),
 				Template: corev1.PodTemplateSpec{
 					ObjectMeta: metav1.ObjectMeta{
 						Namespace: cluster.Namespace,
@@ -286,6 +288,7 @@ func renderSwitchoverCmdJob(ctx context.Context,
 								Command:         cmdExecutorConfig.Exec.Command,
 								Args:            cmdExecutorConfig.Exec.Args,
 								Env:             switchoverEnvs,
+								EnvFrom:         pod.Spec.Containers[0].EnvFrom,
 								VolumeMounts:    volumeMounts,
 							},
 						},

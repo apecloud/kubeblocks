@@ -114,8 +114,8 @@ var _ = Describe("Switchover Util", func() {
 		}
 
 		opsSwitchover := &appsv1alpha1.Switchover{
-			ComponentOps: appsv1alpha1.ComponentOps{ComponentName: testapps.DefaultRedisCompSpecName},
-			InstanceName: fmt.Sprintf("%s-%s-%d", clusterObj.Name, testapps.DefaultRedisCompSpecName, 0),
+			ComponentName: testapps.DefaultRedisCompSpecName,
+			InstanceName:  fmt.Sprintf("%s-%s-%d", clusterObj.Name, testapps.DefaultRedisCompSpecName, 0),
 		}
 
 		reqCtx := intctrlutil.RequestCtx{
@@ -177,8 +177,8 @@ var _ = Describe("Switchover Util", func() {
 				Create(&testCtx).GetObject()
 		}
 		opsSwitchover := &appsv1alpha1.Switchover{
-			ComponentOps: appsv1alpha1.ComponentOps{ComponentName: testapps.DefaultRedisCompSpecName},
-			InstanceName: fmt.Sprintf("%s-%s-%d", clusterObj.Name, testapps.DefaultRedisCompSpecName, 1),
+			ComponentName: testapps.DefaultRedisCompSpecName,
+			InstanceName:  fmt.Sprintf("%s-%s-%d", clusterObj.Name, testapps.DefaultRedisCompSpecName, 1),
 		}
 		reqCtx := intctrlutil.RequestCtx{
 			Ctx:      testCtx.Ctx,

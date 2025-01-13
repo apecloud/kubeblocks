@@ -503,24 +503,24 @@ var _ = Describe("OpsRequest webhook", func() {
 	testSwitchover := func(clusterDef *ClusterDefinition, cluster *Cluster) {
 		switchoverList := []Switchover{
 			{
-				ComponentOps: ComponentOps{ComponentName: "switchover-component-not-exist"},
-				InstanceName: "*",
+				ComponentName: "switchover-component-not-exist",
+				InstanceName:  "*",
 			},
 			{
-				ComponentOps: ComponentOps{ComponentName: componentName},
-				InstanceName: "",
+				ComponentName: componentName,
+				InstanceName:  "",
 			},
 			{
-				ComponentOps: ComponentOps{ComponentName: componentName},
-				InstanceName: "switchover-instance-name-not-exist",
+				ComponentName: componentName,
+				InstanceName:  "switchover-instance-name-not-exist",
 			},
 			{
-				ComponentOps: ComponentOps{ComponentName: componentName},
-				InstanceName: "*",
+				ComponentName: componentName,
+				InstanceName:  "*",
 			},
 			{
-				ComponentOps: ComponentOps{ComponentName: componentName},
-				InstanceName: fmt.Sprintf("%s-%s-0", cluster.Name, componentName),
+				ComponentName: componentName,
+				InstanceName:  fmt.Sprintf("%s-%s-0", cluster.Name, componentName),
 			},
 		}
 
@@ -590,24 +590,24 @@ var _ = Describe("OpsRequest webhook", func() {
 	testSwitchoverWithCompDef := func(_ *ClusterDefinition, compDef *ComponentDefinition, cluster *Cluster) {
 		switchoverList := []Switchover{
 			{
-				ComponentOps: ComponentOps{ComponentName: "switchover-component-not-exist"},
-				InstanceName: "*",
+				ComponentName: "switchover-component-not-exist",
+				InstanceName:  "*",
 			},
 			{
-				ComponentOps: ComponentOps{ComponentName: componentName},
-				InstanceName: "",
+				ComponentName: componentName,
+				InstanceName:  "",
 			},
 			{
-				ComponentOps: ComponentOps{ComponentName: componentName},
-				InstanceName: "switchover-instance-name-not-exist",
+				ComponentName: componentName,
+				InstanceName:  "switchover-instance-name-not-exist",
 			},
 			{
-				ComponentOps: ComponentOps{ComponentName: componentName},
-				InstanceName: "*",
+				ComponentName: componentName,
+				InstanceName:  "*",
 			},
 			{
-				ComponentOps: ComponentOps{ComponentName: componentName},
-				InstanceName: fmt.Sprintf("%s-%s-0", cluster.Name, componentName),
+				ComponentName: componentName,
+				InstanceName:  fmt.Sprintf("%s-%s-0", cluster.Name, componentName),
 			},
 		}
 

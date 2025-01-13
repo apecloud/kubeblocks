@@ -240,7 +240,7 @@ func renderSwitchoverCmdJob(ctx context.Context,
 		return volumes, volumeMounts
 	}
 
-	renderJob := func(switchoverSpec *appsv1alpha1.ComponentSwitchover, switchoverEnvs []corev1.EnvVar) (*batchv1.Job, error) {
+	renderJob := func(switchoverSpec *appsv1alpha1.ComponentSwitchover, switchoverEnvs []corev1.EnvVar, switchoverEnvFroms []corev1.EnvFromSource) (*batchv1.Job, error) {
 		var (
 			cmdExecutorConfig   *appsv1alpha1.Action
 			scriptSpecSelectors []appsv1alpha1.ScriptSpecSelector
@@ -286,6 +286,7 @@ func renderSwitchoverCmdJob(ctx context.Context,
 								Command:         cmdExecutorConfig.Exec.Command,
 								Args:            cmdExecutorConfig.Exec.Args,
 								Env:             switchoverEnvs,
+								EnvFrom:         switchoverEnvFroms,
 								VolumeMounts:    volumeMounts,
 							},
 						},
@@ -302,11 +303,11 @@ func renderSwitchoverCmdJob(ctx context.Context,
 		return job, nil
 	}
 
-	switchoverEnvs, err := buildSwitchoverEnvs(ctx, cli, cluster, synthesizedComp, switchover)
+	switchoverEnvs, switchoverEnvFrom, err := buildSwitchoverEnvs(ctx, cli, cluster, synthesizedComp, switchover)
 	if err != nil {
 		return nil, err
 	}
-	job, err := renderJob(synthesizedComp.LifecycleActions.Switchover, switchoverEnvs)
+	job, err := renderJob(synthesizedComp.LifecycleActions.Switchover, switchoverEnvs, switchoverEnvFrom)
 	if err != nil {
 		return nil, err
 	}
@@ -357,14 +358,14 @@ func buildSwitchoverEnvs(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
 	synthesizeComp *component.SynthesizedComponent,
-	switchover *appsv1alpha1.Switchover) ([]corev1.EnvVar, error) {
+	switchover *appsv1alpha1.Switchover) ([]corev1.EnvVar, []corev1.EnvFromSource, error) {
 	if synthesizeComp == nil || synthesizeComp.LifecycleActions == nil ||
 		synthesizeComp.LifecycleActions.Switchover == nil || switchover == nil {
-		return nil, errors.New("switchover spec not found")
+		return nil, nil, errors.New("switchover spec not found")
 	}
 
 	if synthesizeComp.LifecycleActions.Switchover.WithCandidate == nil && synthesizeComp.LifecycleActions.Switchover.WithoutCandidate == nil {
-		return nil, errors.New("switchover spec withCandidate and withoutCandidate can't be nil at the same time")
+		return nil, nil, errors.New("switchover spec withCandidate and withoutCandidate can't be nil at the same time")
 	}
 
 	// replace secret env and merge envs defined in SwitchoverSpec
@@ -382,16 +383,16 @@ func buildSwitchoverEnvs(ctx context.Context,
 	}
 
 	// inject the old primary info into the environment variable
-	workloadEnvs, err := buildSwitchoverWorkloadEnvs(ctx, cli, cluster, synthesizeComp)
+	workloadEnvs, workloadEnvFroms, err := buildSwitchoverWorkloadEnvs(ctx, cli, cluster, synthesizeComp)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	switchoverEnvs = append(switchoverEnvs, workloadEnvs...)
 
 	// inject the candidate instance name into the environment variable if specify the candidate instance
 	switchoverCandidateEnvs := buildSwitchoverCandidateEnv(cluster, synthesizeComp.Name, switchover)
 	switchoverEnvs = append(switchoverEnvs, switchoverCandidateEnvs...)
-	return switchoverEnvs, nil
+	return switchoverEnvs, workloadEnvFroms, nil
 }
 
 // replaceSwitchoverConnCredentialEnv replaces the connection credential environment variables for the switchover job.
@@ -413,14 +414,15 @@ func replaceSwitchoverConnCredentialEnv(switchoverSpec *appsv1alpha1.ComponentSw
 func buildSwitchoverWorkloadEnvs(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
-	synthesizeComp *component.SynthesizedComponent) ([]corev1.EnvVar, error) {
+	synthesizeComp *component.SynthesizedComponent) ([]corev1.EnvVar, []corev1.EnvFromSource, error) {
 	var workloadEnvs []corev1.EnvVar
+	var workloadEnvFroms []corev1.EnvFromSource
 	pod, err := getServiceableNWritablePod(ctx, cli, *cluster, *synthesizeComp)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if pod == nil {
-		return nil, errors.New("serviceable and writable pod not found")
+		return nil, nil, errors.New("serviceable and writable pod not found")
 	}
 	svcName := strings.Join([]string{cluster.Name, synthesizeComp.Name, "headless"}, "-")
 
@@ -469,7 +471,8 @@ func buildSwitchoverWorkloadEnvs(ctx context.Context,
 
 	// add the first container's environment variables of the primary pod
 	workloadEnvs = append(workloadEnvs, pod.Spec.Containers[0].Env...)
-	return workloadEnvs, nil
+	workloadEnvFroms = append(workloadEnvFroms, pod.Spec.Containers[0].EnvFrom...)
+	return workloadEnvs, workloadEnvFroms, nil
 }
 
 // getServiceableNWritablePod returns the serviceable and writable pod of the component.

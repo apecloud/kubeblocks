@@ -20,8 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package v1
 
 import (
-	"time"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -182,14 +180,14 @@ type ComponentVersionRelease struct {
 	// ReleaseDate is the date when this version was released.
 	//
 	// +optional
-	ReleaseDate time.Time `json:"releaseDate,omitempty"`
+	ReleaseDate metav1.Time `json:"releaseDate,omitempty"`
 
 	// EndOfLifeDate is the date when this version is no longer supported.
 	//
 	// When this field is set and the release has passed its end-of-life (EOL) date, the controller will prevent new instances from employing it.
 	//
 	// +optional
-	EndOfLifeDate time.Time `json:"endOfLifeDate,omitempty"`
+	EndOfLifeDate metav1.Time `json:"endOfLifeDate,omitempty"`
 }
 
 // ReleaseStatus represents the status of a release.

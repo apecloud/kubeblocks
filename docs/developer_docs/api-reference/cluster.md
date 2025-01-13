@@ -481,6 +481,18 @@ The version should follow the syntax and semantics of the &ldquo;Semantic Versio
 </tr>
 <tr>
 <td>
+<code>forceServiceVersion</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Forces to use the specified service version, ignoring any version constraints.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>serviceRefs</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.ServiceRef">
@@ -2753,6 +2765,18 @@ string
 <p>ServiceVersion specifies the version of the Service expected to be provisioned by this Component.
 The version should follow the syntax and semantics of the &ldquo;Semantic Versioning&rdquo; specification (<a href="http://semver.org/">http://semver.org/</a>).
 If no version is specified, the latest available version will be used.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>forceServiceVersion</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Forces to use the specified service version, ignoring any version constraints.</p>
 </td>
 </tr>
 <tr>
@@ -5947,6 +5971,18 @@ The version should follow the syntax and semantics of the &ldquo;Semantic Versio
 </tr>
 <tr>
 <td>
+<code>forceServiceVersion</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Forces to use the specified service version, ignoring any version constraints.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>serviceRefs</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.ServiceRef">
@@ -6794,8 +6830,8 @@ string
 </em>
 </td>
 <td>
-<p>Name is a unique identifier for this release.
-Cannot be updated.</p>
+<p>Name is a unique identifier for this release.</p>
+<p>Cannot be updated.</p>
 </td>
 </tr>
 <tr>
@@ -6818,10 +6854,10 @@ string
 </em>
 </td>
 <td>
-<p>ServiceVersion defines the version of the well-known service that the component provides.
-The version should follow the syntax and semantics of the &ldquo;Semantic Versioning&rdquo; specification (<a href="http://semver.org/">http://semver.org/</a>).
-If the release is used, it will serve as the service version for component instances, overriding the one defined in the component definition.
-Cannot be updated.</p>
+<p>ServiceVersion defines the version of the well-known service that the component provides.</p>
+<p>The version should follow the syntax and semantics of the &ldquo;Semantic Versioning&rdquo; specification (<a href="http://semver.org/">http://semver.org/</a>).
+If the release is used, it will serve as the service version for component instances, overriding the one defined in the component definition.</p>
+<p>Cannot be updated.</p>
 </td>
 </tr>
 <tr>
@@ -6835,6 +6871,68 @@ map[string]string
 <p>Images define the new images for containers, actions or external applications within the release.</p>
 <p>If an image is specified for a lifecycle action, the key should be the field name (case-insensitive) of
 the action in the LifecycleActions struct.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>status</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ReleaseStatus">
+ReleaseStatus
+</a>
+</em>
+</td>
+<td>
+<p>Status represents the status of the release (e.g., &ldquo;alpha&rdquo;, &ldquo;beta&rdquo;, &ldquo;stable&rdquo;, &ldquo;deprecated&rdquo;).</p>
+<p>For a release in the &ldquo;deprecated&rdquo; state, the release is no longer supported and the controller will prevent new instances from employing it.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>reason</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Reason is the detailed reason for the release status.</p>
+<p>For a release in the &ldquo;deprecated&rdquo; state, the reason should explain why the release is deprecated. For example:
+  &#123;
+		Description: &ldquo;Vulnerability in logging library&rdquo;,
+		Severity:    &ldquo;high&rdquo;,
+		Mitigation:  &ldquo;Upgrade to logging library v2.0.0&rdquo;,
+		CVE:         &ldquo;CVE-2024-12345&rdquo;,
+&#125;</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>releaseDate</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#time-v1-meta">
+Kubernetes meta/v1.Time
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ReleaseDate is the date when this version was released.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>endOfLifeDate</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#time-v1-meta">
+Kubernetes meta/v1.Time
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>EndOfLifeDate is the date when this version is no longer supported.</p>
+<p>When this field is set and the release has passed its end-of-life (EOL) date, the controller will prevent new instances from employing it.</p>
 </td>
 </tr>
 </tbody>
@@ -8794,6 +8892,31 @@ int32
 </td>
 </tr>
 </tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ReleaseStatus">ReleaseStatus
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentVersionRelease">ComponentVersionRelease</a>)
+</p>
+<div>
+<p>ReleaseStatus represents the status of a release.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;alpha&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;beta&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;deprecated&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;stable&#34;</p></td>
+<td></td>
+</tr></tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1.ReplicaRole">ReplicaRole
 </h3>

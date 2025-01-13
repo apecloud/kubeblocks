@@ -27,9 +27,11 @@ import (
 
 	"golang.org/x/exp/maps"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -343,9 +345,9 @@ func (t *clusterNormalizationTransformer) resolveCompDefinitionNServiceVersionWi
 		cli = transCtx.Client
 	)
 	if comp == nil || t.checkCompUpgrade(compSpec, comp) {
-		return resolveCompDefinitionNServiceVersion(ctx, cli, compSpec.ComponentDef, compSpec.ServiceVersion)
+		return resolveCompDefinitionNServiceVersion(ctx, cli, compSpec.ComponentDef, compSpec.ServiceVersion, compSpec.ForceServiceVersion)
 	}
-	return resolveCompDefinitionNServiceVersion(ctx, cli, comp.Spec.CompDef, comp.Spec.ServiceVersion)
+	return resolveCompDefinitionNServiceVersion(ctx, cli, comp.Spec.CompDef, comp.Spec.ServiceVersion, comp.Spec.ForceServiceVersion)
 }
 
 func (t *clusterNormalizationTransformer) checkCompUpgrade(compSpec *appsv1.ClusterComponentSpec, comp *appsv1.Component) bool {
@@ -575,7 +577,8 @@ func shardsOutOfLimitError(shardingName string, shards int32, limit appsv1.Shard
 }
 
 // resolveCompDefinitionNServiceVersion resolves and returns the specific component definition object and the service version supported.
-func resolveCompDefinitionNServiceVersion(ctx context.Context, cli client.Reader, compDefName, serviceVersion string) (*appsv1.ComponentDefinition, string, error) {
+func resolveCompDefinitionNServiceVersion(ctx context.Context, cli client.Reader,
+	compDefName, serviceVersion string, forces ...*bool) (*appsv1.ComponentDefinition, string, error) {
 	var (
 		compDef *appsv1.ComponentDefinition
 	)
@@ -584,8 +587,14 @@ func resolveCompDefinitionNServiceVersion(ctx context.Context, cli client.Reader
 		return compDef, serviceVersion, err
 	}
 
+	// whether to force the service version to be specified
+	force := ptr.To(true)
+	if len(forces) > 0 {
+		force = forces[0]
+	}
+
 	// mapping from <service version> to <[]*appsv1.ComponentDefinition>
-	serviceVersionToCompDefs, err := serviceVersionToCompDefinitions(ctx, cli, compDefs, serviceVersion)
+	serviceVersionToCompDefs, err := serviceVersionToCompDefinitions(ctx, cli, compDefs, serviceVersion, force)
 	if err != nil {
 		return compDef, serviceVersion, err
 	}
@@ -602,7 +611,8 @@ func resolveCompDefinitionNServiceVersion(ctx context.Context, cli client.Reader
 	// component definitions that support the service version
 	compatibleCompDefs := serviceVersionToCompDefs[serviceVersion]
 	if len(compatibleCompDefs) == 0 {
-		return compDef, serviceVersion, fmt.Errorf(`no matched component definition found with componentDef "%s" and serviceVersion "%s"`, compDefName, serviceVersion)
+		return compDef, serviceVersion,
+			fmt.Errorf(`no matched component definition found with componentDef "%s" and serviceVersion "%s"`, compDefName, serviceVersion)
 	}
 
 	// choose the latest one
@@ -636,7 +646,7 @@ func listCompDefinitionsWithPattern(ctx context.Context, cli client.Reader, name
 }
 
 func serviceVersionToCompDefinitions(ctx context.Context, cli client.Reader,
-	compDefs []*appsv1.ComponentDefinition, serviceVersion string) (map[string]map[string]*appsv1.ComponentDefinition, error) {
+	compDefs []*appsv1.ComponentDefinition, serviceVersion string, force *bool) (map[string]map[string]*appsv1.ComponentDefinition, error) {
 	result := make(map[string]map[string]*appsv1.ComponentDefinition)
 
 	insert := func(version string, compDef *appsv1.ComponentDefinition) {
@@ -666,7 +676,7 @@ func serviceVersionToCompDefinitions(ctx context.Context, cli client.Reader,
 			serviceVersions.Insert(compDef.Spec.ServiceVersion)
 		}
 		for _, compVersion := range compVersions {
-			serviceVersions = serviceVersions.Union(compatibleServiceVersions4Definition(compDef, compVersion))
+			serviceVersions = serviceVersions.Union(compatibleServiceVersions4Definition(compDef, compVersion, force))
 		}
 
 		for version := range serviceVersions {
@@ -679,7 +689,7 @@ func serviceVersionToCompDefinitions(ctx context.Context, cli client.Reader,
 }
 
 // compatibleServiceVersions4Definition returns all service versions that are compatible with specified component definition.
-func compatibleServiceVersions4Definition(compDef *appsv1.ComponentDefinition, compVersion *appsv1.ComponentVersion) sets.Set[string] {
+func compatibleServiceVersions4Definition(compDef *appsv1.ComponentDefinition, compVersion *appsv1.ComponentVersion, force *bool) sets.Set[string] {
 	match := func(pattern string) bool {
 		return component.PrefixOrRegexMatched(compDef.Name, pattern)
 	}
@@ -693,11 +703,28 @@ func compatibleServiceVersions4Definition(compDef *appsv1.ComponentDefinition, c
 	}
 	serviceVersions := sets.New[string]()
 	for _, release := range compVersion.Spec.Releases {
-		if releases[release.Name] {
+		if releases[release.Name] && isReleaseAvailable(release, force) {
 			serviceVersions = serviceVersions.Insert(release.ServiceVersion)
 		}
 	}
 	return serviceVersions
+}
+
+func isReleaseAvailable(release appsv1.ComponentVersionRelease, force *bool) bool {
+	if force != nil && *force {
+		return true
+	}
+
+	deprecated := func() bool {
+		return release.Status == appsv1.ReleaseStatusDeprecated
+	}
+	eol := func() bool {
+		if release.EndOfLifeDate.IsZero() {
+			return false
+		}
+		return release.EndOfLifeDate.Before(ptr.To(metav1.Now()))
+	}
+	return !(deprecated() || eol())
 }
 
 func serviceVersionComparator(a, b string) int {

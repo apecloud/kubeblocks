@@ -106,6 +106,14 @@ spec:
                         made in this release.
                       maxLength: 256
                       type: string
+                    endOfLifeDate:
+                      description: |-
+                        EndOfLifeDate is the date when this version is no longer supported.
+
+
+                        When this field is set and the release has passed its end-of-life (EOL) date, the controller will prevent new instances from employing it.
+                      format: date-time
+                      type: string
                     images:
                       additionalProperties:
                         type: string
@@ -127,21 +135,53 @@ spec:
                     name:
                       description: |-
                         Name is a unique identifier for this release.
+
+
                         Cannot be updated.
                       maxLength: 32
+                      type: string
+                    reason:
+                      description: "Reason is the detailed reason for the release
+                        status.\n\n\nFor a release in the \"deprecated\" state, the
+                        reason should explain why the release is deprecated. For example:\n
+                        \ {\n\t\tDescription: \"Vulnerability in logging library\",\n\t\tSeverity:
+                        \   \"high\",\n\t\tMitigation:  \"Upgrade to logging library
+                        v2.0.0\",\n\t\tCVE:         \"CVE-2024-12345\",\n  }"
+                      maxLength: 256
+                      type: string
+                    releaseDate:
+                      description: ReleaseDate is the date when this version was released.
+                      format: date-time
                       type: string
                     serviceVersion:
                       description: |-
                         ServiceVersion defines the version of the well-known service that the component provides.
+
+
                         The version should follow the syntax and semantics of the "Semantic Versioning" specification (http://semver.org/).
                         If the release is used, it will serve as the service version for component instances, overriding the one defined in the component definition.
+
+
                         Cannot be updated.
                       maxLength: 32
+                      type: string
+                    status:
+                      description: |-
+                        Status represents the status of the release (e.g., "alpha", "beta", "stable", "deprecated").
+
+
+                        For a release in the "deprecated" state, the release is no longer supported and the controller will prevent new instances from employing it.
+                      enum:
+                      - alpha
+                      - beta
+                      - stable
+                      - deprecated
                       type: string
                   required:
                   - images
                   - name
                   - serviceVersion
+                  - status
                   type: object
                 maxItems: 128
                 minItems: 1

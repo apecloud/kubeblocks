@@ -46,6 +46,11 @@ func (builder *ComponentBuilder) SetServiceVersion(serviceVersion string) *Compo
 	return builder
 }
 
+func (builder *ComponentBuilder) SetForceServiceVersion(forceServiceVersion *bool) *ComponentBuilder {
+	builder.get().Spec.ForceServiceVersion = forceServiceVersion
+	return builder
+}
+
 func (builder *ComponentBuilder) SetLabels(labels map[string]string) *ComponentBuilder {
 	builder.get().Spec.Labels = labels
 	return builder

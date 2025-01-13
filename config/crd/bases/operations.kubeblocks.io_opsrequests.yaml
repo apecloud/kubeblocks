@@ -176,7 +176,8 @@ spec:
                     items:
                       properties:
                         componentName:
-                          description: Specifies the name of the Component.
+                          description: Specifies the name of the Component as defined
+                            in the cluster.spec
                           type: string
                         parameters:
                           description: Specifies the parameters that match the schema
@@ -562,7 +563,8 @@ spec:
                     scaling operation.
                   properties:
                     componentName:
-                      description: Specifies the name of the Component.
+                      description: Specifies the name of the Component as defined
+                        in the cluster.spec
                       type: string
                     scaleIn:
                       description: |-
@@ -4053,7 +4055,8 @@ spec:
                         - Logical backups (e.g., 'mysqldump' for MySQL) are unsupported in the current version.
                       type: string
                     componentName:
-                      description: Specifies the name of the Component.
+                      description: Specifies the name of the Component as defined
+                        in the cluster.spec
                       type: string
                     inPlace:
                       description: |-
@@ -4230,7 +4233,8 @@ spec:
                     configuration.
                   properties:
                     componentName:
-                      description: Specifies the name of the Component.
+                      description: Specifies the name of the Component as defined
+                        in the cluster.spec
                       type: string
                     configurations:
                       description: |-
@@ -4330,7 +4334,8 @@ spec:
                     on.
                   properties:
                     componentName:
-                      description: Specifies the name of the Component.
+                      description: Specifies the name of the Component as defined
+                        in the cluster.spec
                       type: string
                   required:
                   - componentName
@@ -4540,7 +4545,8 @@ spec:
                     on.
                   properties:
                     componentName:
-                      description: Specifies the name of the Component.
+                      description: Specifies the name of the Component as defined
+                        in the cluster.spec
                       type: string
                   required:
                   - componentName
@@ -4561,7 +4567,8 @@ spec:
                     on.
                   properties:
                     componentName:
-                      description: Specifies the name of the Component.
+                      description: Specifies the name of the Component as defined
+                        in the cluster.spec
                       type: string
                   required:
                   - componentName
@@ -4586,7 +4593,11 @@ spec:
                         Refer to ComponentDefinition's Swtichover lifecycle action for more details.
                       type: string
                     componentName:
-                      description: Specifies the name of the Component.
+                      description: Specifies the name of the Component as defined
+                        in the cluster.spec.
+                      type: string
+                    componentObjectName:
+                      description: Specifies the name of the Component object.
                       type: string
                     instanceName:
                       description: |-
@@ -4594,13 +4605,13 @@ spec:
                         in a consensus system.
                       type: string
                   required:
-                  - componentName
                   - instanceName
                   type: object
+                  x-kubernetes-validations:
+                  - message: need to specified only componentName or componentObjectName
+                    rule: (has(self.componentName) && !has(self.componentObjectName))
+                      || (!has(self.componentName) && has(self.componentObjectName))
                 type: array
-                x-kubernetes-list-map-keys:
-                - componentName
-                x-kubernetes-list-type: map
                 x-kubernetes-validations:
                 - message: forbidden to update spec.switchover
                   rule: self == oldSelf
@@ -4673,7 +4684,8 @@ spec:
                           maxLength: 64
                           type: string
                         componentName:
-                          description: Specifies the name of the Component.
+                          description: Specifies the name of the Component as defined
+                            in the cluster.spec
                           type: string
                         serviceVersion:
                           description: |-
@@ -4734,7 +4746,8 @@ spec:
                       - name
                       x-kubernetes-list-type: map
                     componentName:
-                      description: Specifies the name of the Component.
+                      description: Specifies the name of the Component as defined
+                        in the cluster.spec
                       type: string
                     instances:
                       description: Specifies the desired compute resources of the
@@ -4846,7 +4859,8 @@ spec:
                     for a volume expansion operation.
                   properties:
                     componentName:
-                      description: Specifies the name of the Component.
+                      description: Specifies the name of the Component as defined
+                        in the cluster.spec
                       type: string
                     instances:
                       description: Specifies the desired storage size of the instance

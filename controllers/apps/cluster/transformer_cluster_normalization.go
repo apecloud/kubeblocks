@@ -593,7 +593,7 @@ func resolveCompDefinitionNServiceVersion(ctx context.Context, cli client.Reader
 		force = forces[0]
 	}
 
-	// mapping from <service version> to <[]*appsv1.ComponentDefinition>
+	// mapping from <service version> to {name -> *appsv1.ComponentDefinition}
 	serviceVersionToCompDefs, err := serviceVersionToCompDefinitions(ctx, cli, compDefs, serviceVersion, force)
 	if err != nil {
 		return compDef, serviceVersion, err

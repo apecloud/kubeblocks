@@ -6920,6 +6920,7 @@ ReleaseStatus
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>Status represents the status of the release (e.g., &ldquo;alpha&rdquo;, &ldquo;beta&rdquo;, &ldquo;stable&rdquo;, &ldquo;deprecated&rdquo;).</p>
 <p>For a release in the &ldquo;deprecated&rdquo; state, the release is no longer supported and the controller will prevent new instances from employing it.</p>
 </td>

@@ -160,8 +160,8 @@ type ComponentVersionRelease struct {
 	//
 	// For a release in the "deprecated" state, the release is no longer supported and the controller will prevent new instances from employing it.
 	//
-	// +kubebuilder:validation:Required
-	Status ReleaseStatus `json:"status"`
+	// +optional
+	Status ReleaseStatus `json:"status,omitempty"`
 
 	// Reason is the detailed reason for the release status.
 	//

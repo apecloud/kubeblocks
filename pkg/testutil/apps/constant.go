@@ -286,6 +286,7 @@ var (
 					Images: map[string]string{
 						defaultMySQLContainer.Name: defaultMySQLContainer.Image,
 					},
+					Status: appsv1.ReleaseStatusStable,
 				},
 			},
 		}

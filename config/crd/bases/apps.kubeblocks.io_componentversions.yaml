@@ -181,7 +181,6 @@ spec:
                   - images
                   - name
                   - serviceVersion
-                  - status
                   type: object
                 maxItems: 128
                 minItems: 1

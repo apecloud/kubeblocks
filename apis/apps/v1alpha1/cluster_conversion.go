@@ -131,19 +131,26 @@ func (r *Cluster) changesToCluster(cluster *appsv1.Cluster) {
 		compSpec := r.Spec.ComponentSpecs[i]
 		r.toComponentSpec(compSpec, &cluster.Spec.ComponentSpecs[i], compSpec.Name)
 	}
-	var shardingRequiredPodAntiAffinity []string
-	for i := range r.Spec.ShardingSpecs {
-		shardingSpec := r.Spec.ShardingSpecs[i]
-		podAntiAffinityRequired := r.toComponentSpec(shardingSpec.Template, &cluster.Spec.Shardings[i].Template, shardingSpec.Name)
-		if podAntiAffinityRequired {
-			shardingRequiredPodAntiAffinity = append(shardingRequiredPodAntiAffinity, shardingSpec.Name)
+
+	if len(r.Spec.ShardingSpecs) > 0 {
+		var shardingRequiredPodAntiAffinity []string
+		cluster.Spec.Shardings = make([]appsv1.ClusterSharding, len(r.Spec.ShardingSpecs))
+		for i := range r.Spec.ShardingSpecs {
+			shardingSpec := r.Spec.ShardingSpecs[i]
+			// copy sharding spec
+			_ = copier.Copy(&cluster.Spec.Shardings[i], &shardingSpec)
+			// transformer schedulePolicy
+			podAntiAffinityRequired := r.toComponentSpec(shardingSpec.Template, &cluster.Spec.Shardings[i].Template, shardingSpec.Name)
+			if podAntiAffinityRequired {
+				shardingRequiredPodAntiAffinity = append(shardingRequiredPodAntiAffinity, shardingSpec.Name)
+			}
 		}
-	}
-	if len(shardingRequiredPodAntiAffinity) > 0 {
-		if cluster.Annotations == nil {
-			cluster.Annotations = make(map[string]string)
+		if len(shardingRequiredPodAntiAffinity) > 0 {
+			if cluster.Annotations == nil {
+				cluster.Annotations = make(map[string]string)
+			}
+			cluster.Annotations["apps.kubeblocks.io/shard-pod-anti-affinity"] = strings.Join(shardingRequiredPodAntiAffinity, ",")
 		}
-		cluster.Annotations["apps.kubeblocks.io/shard-pod-anti-affinity"] = strings.Join(shardingRequiredPodAntiAffinity, ",")
 	}
 }
 
@@ -192,7 +199,7 @@ func (r *Cluster) changesFromCluster(cluster *appsv1.Cluster) {
 	//           spec:
 	//             resources: corev1.ResourceRequirements -> corev1.VolumeResourceRequirements
 	//         podUpdatePolicy: *workloads.PodUpdatePolicyType -> *PodUpdatePolicyType
-	//     sharings
+	//     shardingSpecs -> shardings
 	//       - template
 	//           volumeClaimTemplates
 	//             spec:
@@ -205,6 +212,12 @@ func (r *Cluster) changesFromCluster(cluster *appsv1.Cluster) {
 	if len(cluster.Spec.ClusterDef) > 0 {
 		r.Spec.ClusterDefRef = cluster.Spec.ClusterDef
 	}
+
+	for i := range cluster.Spec.Shardings {
+		shardingSpec := cluster.Spec.Shardings[i]
+		// copy from sharding spec
+		_ = copier.Copy(&r.Spec.ShardingSpecs[i], &shardingSpec)
+	}
 }
 
 type clusterConverter struct {
@@ -213,19 +226,19 @@ type clusterConverter struct {
 }
 
 type clusterSpecConverter struct {
-	ClusterDefRef      string                          `json:"clusterDefinitionRef,omitempty"`
-	ClusterVersionRef  string                          `json:"clusterVersionRef,omitempty"`
-	TerminationPolicy  TerminationPolicyType           `json:"terminationPolicy"`
-	Affinity           *Affinity                       `json:"affinity,omitempty"`
-	Tolerations        []corev1.Toleration             `json:"tolerations,omitempty"`
-	Tenancy            TenancyType                     `json:"tenancy,omitempty"`
-	AvailabilityPolicy AvailabilityPolicyType          `json:"availabilityPolicy,omitempty"`
-	Replicas           *int32                          `json:"replicas,omitempty"`
-	Resources          ClusterResources                `json:"resources,omitempty"`
-	Storage            ClusterStorage                  `json:"storage,omitempty"`
-	Network            *ClusterNetwork                 `json:"network,omitempty"`
-	Components         map[string]clusterCompConverter `json:"components,omitempty"`
-	Shardings          map[string]clusterCompConverter `json:"shardings,omitempty"`
+	ClusterDefRef      string                           `json:"clusterDefinitionRef,omitempty"`
+	ClusterVersionRef  string                           `json:"clusterVersionRef,omitempty"`
+	TerminationPolicy  TerminationPolicyType            `json:"terminationPolicy"`
+	Affinity           *Affinity                        `json:"affinity,omitempty"`
+	Tolerations        []corev1.Toleration              `json:"tolerations,omitempty"`
+	Tenancy            TenancyType                      `json:"tenancy,omitempty"`
+	AvailabilityPolicy AvailabilityPolicyType           `json:"availabilityPolicy,omitempty"`
+	Replicas           *int32                           `json:"replicas,omitempty"`
+	Resources          ClusterResources                 `json:"resources,omitempty"`
+	Storage            ClusterStorage                   `json:"storage,omitempty"`
+	Network            *ClusterNetwork                  `json:"network,omitempty"`
+	Components         map[string]clusterCompConverter  `json:"components,omitempty"`
+	Shardings          map[string]clusterShardConverter `json:"shardings,omitempty"`
 }
 
 type clusterCompConverter struct {
@@ -239,6 +252,12 @@ type clusterCompConverter struct {
 	UpdateStrategy         *UpdateStrategy         `json:"updateStrategy,omitempty"`
 	InstanceUpdateStrategy *InstanceUpdateStrategy `json:"instanceUpdateStrategy,omitempty"`
 	Monitor                *bool                   `json:"monitor,omitempty"`
+}
+
+type clusterShardConverter struct {
+	shards int32
+	index  int
+	clusterCompConverter
 }
 
 type clusterStatusConverter struct {
@@ -285,9 +304,13 @@ func (c *clusterConverter) fromCluster(cluster *Cluster) {
 		}
 	}
 	if len(cluster.Spec.ShardingSpecs) > 0 {
-		c.Spec.Shardings = make(map[string]clusterCompConverter)
-		for _, sharding := range cluster.Spec.ShardingSpecs {
-			c.Spec.Shardings[sharding.Name] = deletedComp(sharding.Template)
+		c.Spec.Shardings = make(map[string]clusterShardConverter)
+		for i, sharding := range cluster.Spec.ShardingSpecs {
+			c.Spec.Shardings[sharding.Name] = clusterShardConverter{
+				shards:               sharding.Shards,
+				index:                i,
+				clusterCompConverter: deletedComp(sharding.Template),
+			}
 		}
 	}
 
@@ -334,10 +357,14 @@ func (c *clusterConverter) toCluster(cluster *Cluster) {
 			deletedComp(comp, &cluster.Spec.ComponentSpecs[i])
 		}
 	}
-	for i, spec := range cluster.Spec.ShardingSpecs {
-		template, ok := c.Spec.Shardings[spec.Name]
-		if ok {
-			deletedComp(template, &cluster.Spec.ShardingSpecs[i].Template)
+	if len(c.Spec.Shardings) > 0 {
+		cluster.Spec.ShardingSpecs = make([]ShardingSpec, len(c.Spec.Shardings))
+		for shardName, shardSpec := range c.Spec.Shardings {
+			cluster.Spec.ShardingSpecs[shardSpec.index] = ShardingSpec{
+				Name:   shardName,
+				Shards: shardSpec.shards,
+			}
+			deletedComp(shardSpec.clusterCompConverter, &cluster.Spec.ShardingSpecs[shardSpec.index].Template)
 		}
 	}
 

@@ -110,18 +110,17 @@ func switchoverPreCheck(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes
 	}
 
 	for _, switchover := range switchoverList {
-		compSpec := opsRes.Cluster.Spec.GetComponentByName(switchover.ComponentName)
-		synthesizedComp, err := buildSynthesizedComp(reqCtx.Ctx, cli, opsRes, compSpec)
+		synthesizedComp, err := buildSynthesizedComp(reqCtx.Ctx, cli, opsRes, switchover)
 		if err != nil {
 			return err
 		}
-
+		compName := switchover.GetComponentName()
 		if synthesizedComp.LifecycleActions == nil || synthesizedComp.LifecycleActions.Switchover == nil {
-			return intctrlutil.NewFatalError(fmt.Sprintf(`the component "%s" does not define switchover lifecycle action`, switchover.ComponentName))
+			return intctrlutil.NewFatalError(fmt.Sprintf(`the component "%s" does not define switchover lifecycle action`, compName))
 		}
 
 		if len(synthesizedComp.Roles) == 0 {
-			return intctrlutil.NewFatalError(fmt.Sprintf(`the component "%s" does not have any role`, switchover.ComponentName))
+			return intctrlutil.NewFatalError(fmt.Sprintf(`the component "%s" does not have any role`, compName))
 		}
 
 		getPod := func(name string) (*corev1.Pod, error) {
@@ -136,8 +135,8 @@ func switchoverPreCheck(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes
 		}
 
 		checkOwnership := func(pod *corev1.Pod) error {
-			if pod.Labels[constant.AppInstanceLabelKey] != synthesizedComp.ClusterName || component.GetComponentNameFromObj(pod) != switchover.ComponentName {
-				return intctrlutil.NewFatalError(fmt.Sprintf(`the pod "%s" not belongs to the component "%s"`, switchover.InstanceName, switchover.ComponentName))
+			if pod.Labels[constant.AppInstanceLabelKey] != synthesizedComp.ClusterName || component.GetComponentNameFromObj(pod) != synthesizedComp.Name {
+				return intctrlutil.NewFatalError(fmt.Sprintf(`the pod "%s" not belongs to the component "%s"`, switchover.InstanceName, compName))
 			}
 			return nil
 		}
@@ -208,36 +207,36 @@ func handleSwitchover(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *
 	if switchoverCondition == nil {
 		return errors.New("switchover condition is nil")
 	}
-
+	compName := switchover.GetComponentName()
 	detail := opsv1alpha1.ProgressStatusDetail{
-		ObjectKey: getProgressObjectKey(KBSwitchoverKey, switchover.ComponentName),
+		ObjectKey: getProgressObjectKey(KBSwitchoverKey, compName),
 		Status:    opsv1alpha1.ProcessingProgressStatus,
-		Message:   fmt.Sprintf("do switchover for component %s", switchover.ComponentName),
+		Message:   fmt.Sprintf("do switchover for component %s", compName),
 	}
 
-	synthesizedComp, err := buildSynthesizedComp(reqCtx.Ctx, cli, opsRes, opsRes.Cluster.Spec.GetComponentByName(switchover.ComponentName))
+	synthesizedComp, err := buildSynthesizedComp(reqCtx.Ctx, cli, opsRes, *switchover)
 	if err != nil {
-		return handleError(reqCtx, opsRequest, &detail, switchover.ComponentName, fmt.Sprintf("build synthesizedComponent failed: %s", err.Error()), failedCount)
+		return handleError(reqCtx, opsRequest, &detail, compName, fmt.Sprintf("build synthesizedComponent failed: %s", err.Error()), failedCount)
 	}
 
 	compDef, err := component.GetCompDefByName(reqCtx.Ctx, cli, synthesizedComp.CompDefName)
 	if err != nil {
-		return handleError(reqCtx, opsRequest, &detail, switchover.ComponentName, fmt.Sprintf("get component definition failed: %s", err.Error()), failedCount)
+		return handleError(reqCtx, opsRequest, &detail, compName, fmt.Sprintf("get component definition failed: %s", err.Error()), failedCount)
 	}
 
 	synthesizedComp.TemplateVars, _, err = component.ResolveTemplateNEnvVars(reqCtx.Ctx, cli, synthesizedComp, compDef.Spec.Vars)
 	if err != nil {
-		return handleError(reqCtx, opsRequest, &detail, switchover.ComponentName, fmt.Sprintf("build synthesizedComponent template vars failed: %s", err.Error()), failedCount)
+		return handleError(reqCtx, opsRequest, &detail, compName, fmt.Sprintf("build synthesizedComponent template vars failed: %s", err.Error()), failedCount)
 	}
 
 	if err = doSwitchover(reqCtx.Ctx, cli, synthesizedComp, switchover); err != nil {
-		return handleError(reqCtx, opsRequest, &detail, switchover.ComponentName, fmt.Sprintf("call switchover action failed: %s", err.Error()), failedCount)
+		return handleError(reqCtx, opsRequest, &detail, compName, fmt.Sprintf("call switchover action failed: %s", err.Error()), failedCount)
 	}
 
 	*completedCount++
-	detail.Message = fmt.Sprintf("do switchover for component %s succeeded", switchover.ComponentName)
+	detail.Message = fmt.Sprintf("do switchover for component %s succeeded", compName)
 	detail.Status = opsv1alpha1.SucceedProgressStatus
-	setComponentSwitchoverProgressDetails(reqCtx.Recorder, opsRequest, appsv1.RunningComponentPhase, detail, switchover.ComponentName)
+	setComponentSwitchoverProgressDetails(reqCtx.Recorder, opsRequest, appsv1.RunningComponentPhase, detail, compName)
 	return nil
 }
 
@@ -281,9 +280,50 @@ func setComponentSwitchoverProgressDetails(recorder record.EventRecorder,
 	}
 }
 
-func buildSynthesizedComp(ctx context.Context, cli client.Client, opsRes *OpsResource, clusterCompSpec *appsv1.ClusterComponentSpec) (*component.SynthesizedComponent, error) {
+func getClusterCompSpec(cluster *appsv1.Cluster, clusterCompName string) (*appsv1.ClusterComponentSpec, error) {
+	compSpec := cluster.Spec.GetComponentByName(clusterCompName)
+	if compSpec != nil {
+		return compSpec, nil
+	}
+	shardingSpec := cluster.Spec.GetShardingByName(clusterCompName)
+	if shardingSpec != nil {
+		return &shardingSpec.Template, nil
+	}
+	return nil, fmt.Errorf(`component "%s" not found`, clusterCompName)
+}
+
+func getCompSpecBySwitchover(ctx context.Context, cli client.Client, cluster *appsv1.Cluster, switchover opsv1alpha1.Switchover) (*appsv1.ClusterComponentSpec, error) {
+	if len(switchover.ComponentName) > 0 {
+		return getClusterCompSpec(cluster, switchover.ComponentName)
+	}
+	compObj := &appsv1.Component{}
+	if err := cli.Get(ctx, client.ObjectKey{
+		Namespace: cluster.Namespace,
+		Name:      switchover.ComponentObjectName,
+	}, compObj); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil, fmt.Errorf(`component object "%s" not found`, switchover.ComponentObjectName)
+		}
+		return nil, err
+	}
+	clusterCompName := compObj.Labels[constant.KBAppShardingNameLabelKey]
+	if len(clusterCompName) == 0 {
+		clusterCompName = compObj.Labels[constant.KBAppComponentLabelKey]
+	}
+	return getClusterCompSpec(cluster, clusterCompName)
+}
+
+func buildSynthesizedComp(ctx context.Context, cli client.Client, opsRes *OpsResource, switchover opsv1alpha1.Switchover) (*component.SynthesizedComponent, error) {
+	clusterCompSpec, err := getCompSpecBySwitchover(ctx, cli, opsRes.Cluster, switchover)
+	if err != nil {
+		return nil, err
+	}
+	componentObjectName := constant.GenerateClusterComponentName(opsRes.Cluster.Name, clusterCompSpec.Name)
+	if len(switchover.ComponentObjectName) > 0 {
+		componentObjectName = switchover.ComponentObjectName
+	}
 	compObj, compDefObj, err := component.GetCompNCompDefByName(ctx, cli,
-		opsRes.Cluster.Namespace, constant.GenerateClusterComponentName(opsRes.Cluster.Name, clusterCompSpec.Name))
+		opsRes.Cluster.Namespace, componentObjectName)
 	if err != nil {
 		return nil, err
 	}
@@ -291,10 +331,19 @@ func buildSynthesizedComp(ctx context.Context, cli client.Client, opsRes *OpsRes
 	return component.BuildSynthesizedComponent(ctx, cli, compDefObj, compObj, opsRes.Cluster)
 }
 
-func handleError(reqCtx intctrlutil.RequestCtx, opsRequest *opsv1alpha1.OpsRequest, detail *opsv1alpha1.ProgressStatusDetail, componentName, errorMsg string, failedCount *int32) error {
-	*failedCount++
+func handleError(reqCtx intctrlutil.RequestCtx,
+	opsRequest *opsv1alpha1.OpsRequest,
+	detail *opsv1alpha1.ProgressStatusDetail,
+	componentName, errorMsg string,
+	failedCount *int32) error {
 	detail.Message = fmt.Sprintf("component %s %s", componentName, errorMsg)
-	detail.Status = opsv1alpha1.FailedProgressStatus
+	detail.Status = opsv1alpha1.ProcessingProgressStatus
 	setComponentSwitchoverProgressDetails(reqCtx.Recorder, opsRequest, appsv1.UpdatingComponentPhase, *detail, componentName)
+	// set timeout to 5 minutes for handling the switchover
+	if !detail.StartTime.IsZero() && time.Now().After(detail.StartTime.Add(5*time.Minute)) {
+		detail.Status = opsv1alpha1.FailedProgressStatus
+		*failedCount++
+		return intctrlutil.NewFatalError("timeout exit: " + errorMsg)
+	}
 	return nil
 }

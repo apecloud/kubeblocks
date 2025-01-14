@@ -99,6 +99,14 @@ spec:
                     description: Specifies whether automated backup is enabled for
                       the Cluster.
                     type: boolean
+                  incrementalBackupEnabled:
+                    default: false
+                    description: Specifies whether to enable incremental backup.
+                    type: boolean
+                  incrementalCronExpression:
+                    description: The cron expression for the incremental backup schedule.
+                      The timezone is in UTC. See https://en.wikipedia.org/wiki/Cron.
+                    type: string
                   method:
                     description: Specifies the backup method to use, as defined in
                       backupPolicy.
@@ -1918,6 +1926,13 @@ spec:
                                       description: |-
                                         The name of the StorageClass required by the claim.
                                         More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1.
+                                      type: string
+                                    volumeAttributesClassName:
+                                      description: |-
+                                        volumeAttributesClassName may be used to set the VolumeAttributesClass used by this claim.
+
+
+                                        More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#volumeattributesclass
                                       type: string
                                     volumeMode:
                                       description: Defines what type of volume is
@@ -5460,6 +5475,13 @@ spec:
                                 description: |-
                                   The name of the StorageClass required by the claim.
                                   More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1.
+                                type: string
+                              volumeAttributesClassName:
+                                description: |-
+                                  volumeAttributesClassName may be used to set the VolumeAttributesClass used by this claim.
+
+
+                                  More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#volumeattributesclass
                                 type: string
                               volumeMode:
                                 description: Defines what type of volume is required
@@ -10615,6 +10637,13 @@ spec:
                                             The name of the StorageClass required by the claim.
                                             More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1.
                                           type: string
+                                        volumeAttributesClassName:
+                                          description: |-
+                                            volumeAttributesClassName may be used to set the VolumeAttributesClass used by this claim.
+
+
+                                            More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#volumeattributesclass
+                                          type: string
                                         volumeMode:
                                           description: Defines what type of volume
                                             is required by the claim, either Block
@@ -14198,6 +14227,13 @@ spec:
                                       The name of the StorageClass required by the claim.
                                       More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1.
                                     type: string
+                                  volumeAttributesClassName:
+                                    description: |-
+                                      volumeAttributesClassName may be used to set the VolumeAttributesClass used by this claim.
+
+
+                                      More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#volumeattributesclass
+                                    type: string
                                   volumeMode:
                                     description: Defines what type of volume is required
                                       by the claim, either Block or Filesystem.
@@ -16349,6 +16385,14 @@ spec:
                     description: Specifies whether automated backup is enabled for
                       the Cluster.
                     type: boolean
+                  incrementalBackupEnabled:
+                    default: false
+                    description: Specifies whether to enable incremental backup.
+                    type: boolean
+                  incrementalCronExpression:
+                    description: The cron expression for the incremental backup schedule.
+                      The timezone is in UTC. See https://en.wikipedia.org/wiki/Cron.
+                    type: string
                   method:
                     description: Specifies the backup method to use, as defined in
                       backupPolicy.

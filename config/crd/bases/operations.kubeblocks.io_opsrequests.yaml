@@ -176,7 +176,8 @@ spec:
                     items:
                       properties:
                         componentName:
-                          description: Specifies the name of the Component.
+                          description: Specifies the name of the Component as defined
+                            in the cluster.spec
                           type: string
                         parameters:
                           description: Specifies the parameters that match the schema
@@ -562,7 +563,8 @@ spec:
                     scaling operation.
                   properties:
                     componentName:
-                      description: Specifies the name of the Component.
+                      description: Specifies the name of the Component as defined
+                        in the cluster.spec
                       type: string
                     scaleIn:
                       description: |-
@@ -2156,6 +2158,13 @@ spec:
                                           description: |-
                                             The name of the StorageClass required by the claim.
                                             More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1.
+                                          type: string
+                                        volumeAttributesClassName:
+                                          description: |-
+                                            volumeAttributesClassName may be used to set the VolumeAttributesClass used by this claim.
+
+
+                                            More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#volumeattributesclass
                                           type: string
                                         volumeMode:
                                           description: Defines what type of volume
@@ -4046,7 +4055,8 @@ spec:
                         - Logical backups (e.g., 'mysqldump' for MySQL) are unsupported in the current version.
                       type: string
                     componentName:
-                      description: Specifies the name of the Component.
+                      description: Specifies the name of the Component as defined
+                        in the cluster.spec
                       type: string
                     inPlace:
                       description: |-
@@ -4200,6 +4210,10 @@ spec:
                         type: object
                       type: array
                       x-kubernetes-preserve-unknown-fields: true
+                    sourceBackupTargetName:
+                      description: When multiple source targets exist of the backup,
+                        you must specify the source target to restore.
+                      type: string
                   required:
                   - componentName
                   - instances
@@ -4219,7 +4233,8 @@ spec:
                     configuration.
                   properties:
                     componentName:
-                      description: Specifies the name of the Component.
+                      description: Specifies the name of the Component as defined
+                        in the cluster.spec
                       type: string
                     configurations:
                       description: |-
@@ -4319,7 +4334,8 @@ spec:
                     on.
                   properties:
                     componentName:
-                      description: Specifies the name of the Component.
+                      description: Specifies the name of the Component as defined
+                        in the cluster.spec
                       type: string
                   required:
                   - componentName
@@ -4529,7 +4545,8 @@ spec:
                     on.
                   properties:
                     componentName:
-                      description: Specifies the name of the Component.
+                      description: Specifies the name of the Component as defined
+                        in the cluster.spec
                       type: string
                   required:
                   - componentName
@@ -4550,7 +4567,8 @@ spec:
                     on.
                   properties:
                     componentName:
-                      description: Specifies the name of the Component.
+                      description: Specifies the name of the Component as defined
+                        in the cluster.spec
                       type: string
                   required:
                   - componentName
@@ -4575,7 +4593,11 @@ spec:
                         Refer to ComponentDefinition's Swtichover lifecycle action for more details.
                       type: string
                     componentName:
-                      description: Specifies the name of the Component.
+                      description: Specifies the name of the Component as defined
+                        in the cluster.spec.
+                      type: string
+                    componentObjectName:
+                      description: Specifies the name of the Component object.
                       type: string
                     instanceName:
                       description: |-
@@ -4583,13 +4605,13 @@ spec:
                         in a consensus system.
                       type: string
                   required:
-                  - componentName
                   - instanceName
                   type: object
+                  x-kubernetes-validations:
+                  - message: need to specified only componentName or componentObjectName
+                    rule: (has(self.componentName) && !has(self.componentObjectName))
+                      || (!has(self.componentName) && has(self.componentObjectName))
                 type: array
-                x-kubernetes-list-map-keys:
-                - componentName
-                x-kubernetes-list-type: map
                 x-kubernetes-validations:
                 - message: forbidden to update spec.switchover
                   rule: self == oldSelf
@@ -4662,7 +4684,8 @@ spec:
                           maxLength: 64
                           type: string
                         componentName:
-                          description: Specifies the name of the Component.
+                          description: Specifies the name of the Component as defined
+                            in the cluster.spec
                           type: string
                         serviceVersion:
                           description: |-
@@ -4723,7 +4746,8 @@ spec:
                       - name
                       x-kubernetes-list-type: map
                     componentName:
-                      description: Specifies the name of the Component.
+                      description: Specifies the name of the Component as defined
+                        in the cluster.spec
                       type: string
                     instances:
                       description: Specifies the desired compute resources of the
@@ -4835,7 +4859,8 @@ spec:
                     for a volume expansion operation.
                   properties:
                     componentName:
-                      description: Specifies the name of the Component.
+                      description: Specifies the name of the Component as defined
+                        in the cluster.spec
                       type: string
                     instances:
                       description: Specifies the desired storage size of the instance
@@ -6714,6 +6739,13 @@ spec:
                                           description: |-
                                             The name of the StorageClass required by the claim.
                                             More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1.
+                                          type: string
+                                        volumeAttributesClassName:
+                                          description: |-
+                                            volumeAttributesClassName may be used to set the VolumeAttributesClass used by this claim.
+
+
+                                            More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#volumeattributesclass
                                           type: string
                                         volumeMode:
                                           description: Defines what type of volume

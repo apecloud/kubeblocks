@@ -2533,6 +2533,30 @@ bool
 <p>Specifies whether to enable point-in-time recovery.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>incrementalBackupEnabled</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies whether to enable incremental backup.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>incrementalCronExpression</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The cron expression for the incremental backup schedule. The timezone is in UTC. See <a href="https://en.wikipedia.org/wiki/Cron">https://en.wikipedia.org/wiki/Cron</a>.</p>
+</td>
+</tr>
 </tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1.ClusterComponentConfig">ClusterComponentConfig
@@ -3272,6 +3296,19 @@ Kubernetes core/v1.PersistentVolumeMode
 <td>
 <em>(Optional)</em>
 <p>Defines what type of volume is required by the claim, either Block or Filesystem.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>volumeAttributesClassName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>volumeAttributesClassName may be used to set the VolumeAttributesClass used by this claim.</p>
+<p>More info: <a href="https://kubernetes.io/docs/concepts/storage/persistent-volumes#volumeattributesclass">https://kubernetes.io/docs/concepts/storage/persistent-volumes#volumeattributesclass</a></p>
 </td>
 </tr>
 </table>
@@ -8535,6 +8572,19 @@ Kubernetes core/v1.PersistentVolumeMode
 <td>
 <em>(Optional)</em>
 <p>Defines what type of volume is required by the claim, either Block or Filesystem.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>volumeAttributesClassName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>volumeAttributesClassName may be used to set the VolumeAttributesClass used by this claim.</p>
+<p>More info: <a href="https://kubernetes.io/docs/concepts/storage/persistent-volumes#volumeattributesclass">https://kubernetes.io/docs/concepts/storage/persistent-volumes#volumeattributesclass</a></p>
 </td>
 </tr>
 </tbody>
@@ -14930,6 +14980,30 @@ bool
 <td>
 <em>(Optional)</em>
 <p>Specifies whether to enable point-in-time recovery.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>incrementalBackupEnabled</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies whether to enable incremental backup.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>incrementalCronExpression</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The cron expression for the incremental backup schedule. The timezone is in UTC. See <a href="https://en.wikipedia.org/wiki/Cron">https://en.wikipedia.org/wiki/Cron</a>.</p>
 </td>
 </tr>
 </tbody>

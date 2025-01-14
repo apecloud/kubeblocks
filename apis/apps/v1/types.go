@@ -229,6 +229,13 @@ type PersistentVolumeClaimSpec struct {
 	//
 	// +optional
 	VolumeMode *corev1.PersistentVolumeMode `json:"volumeMode,omitempty" protobuf:"bytes,6,opt,name=volumeMode,casttype=PersistentVolumeMode"`
+
+	// volumeAttributesClassName may be used to set the VolumeAttributesClass used by this claim.
+	//
+	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#volumeattributesclass
+	//
+	// +optional
+	VolumeAttributesClassName *string `json:"volumeAttributesClassName,omitempty"`
 }
 
 type Service struct {

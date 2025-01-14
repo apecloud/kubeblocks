@@ -690,7 +690,9 @@ var _ = Describe("Component Controller", func() {
 							constant.AppInstanceLabelKey:    clusterKey.Name,
 							constant.KBAppComponentLabelKey: compName,
 						}},
-					Spec: pvcSpec.ToV1PersistentVolumeClaimSpec(),
+					Spec: func() corev1.PersistentVolumeClaimSpec {
+						return intctrlutil.ToCoreV1PVCs([]kbappsv1.ClusterComponentVolumeClaimTemplate{{Spec: pvcSpec}})[0].Spec
+					}(),
 				}
 				if i == replicas-1 {
 					pvc.Labels[constant.KBAppComponentInstanceTemplateLabelKey] = insTPLName
@@ -796,9 +798,10 @@ var _ = Describe("Component Controller", func() {
 	}
 
 	testVolumeExpansionFailedAndRecover := func(compName, compDefName string) {
-
-		const storageClassName = "test-sc"
-		const replicas = 3
+		const (
+			storageClassName = "test-sc"
+			replicas         = 3
+		)
 
 		By("Mock a StorageClass which allows resize")
 		sc := testapps.CreateStorageClass(&testCtx, storageClassName, true)
@@ -814,7 +817,9 @@ var _ = Describe("Component Controller", func() {
 
 		By("Mock PVCs in Bound Status")
 		for i := 0; i < replicas; i++ {
-			tmpSpec := pvcSpec.ToV1PersistentVolumeClaimSpec()
+			tmpSpec := func() corev1.PersistentVolumeClaimSpec {
+				return intctrlutil.ToCoreV1PVCs([]kbappsv1.ClusterComponentVolumeClaimTemplate{{Spec: pvcSpec}})[0].Spec
+			}()
 			tmpSpec.VolumeName = getPVCName(testapps.DataVolumeName, compName, i)
 			pvc := &corev1.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{

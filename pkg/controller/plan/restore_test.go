@@ -152,7 +152,7 @@ var _ = Describe("Restore", func() {
 
 			synthesizedComponent = &component.SynthesizedComponent{
 				PodSpec:              &compDef.Spec.Runtime,
-				VolumeClaimTemplates: cluster.Spec.ComponentSpecs[0].ToVolumeClaimTemplates(),
+				VolumeClaimTemplates: intctrlutil.ToCoreV1PVCTs(cluster.Spec.ComponentSpecs[0].VolumeClaimTemplates),
 				Name:                 defaultCompName,
 				Replicas:             1,
 				Roles: []appsv1.ReplicaRole{

@@ -35,6 +35,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
@@ -94,7 +95,7 @@ func (t *componentServiceTransformer) Transform(ctx graph.TransformContext, dag 
 	}
 
 	for svc := range runningServices {
-		graphCli.Delete(dag, runningServices[svc], inDataContext4G())
+		graphCli.Delete(dag, runningServices[svc], appsutil.InDataContext4G())
 	}
 
 	return nil
@@ -295,9 +296,9 @@ func (t *componentServiceTransformer) createOrUpdateService(ctx graph.TransformC
 			Name:      service.Name,
 		}
 		originSvc := &corev1.Service{}
-		if err := ctx.GetClient().Get(ctx.GetContext(), key, originSvc, inDataContext4C()); err != nil {
+		if err := ctx.GetClient().Get(ctx.GetContext(), key, originSvc, appsutil.InDataContext4C()); err != nil {
 			if apierrors.IsNotFound(err) {
-				graphCli.Create(dag, service, inDataContext4G())
+				graphCli.Create(dag, service, appsutil.InDataContext4G())
 				return nil
 			}
 			return err
@@ -315,9 +316,9 @@ func (t *componentServiceTransformer) createOrUpdateService(ctx graph.TransformC
 		// if skip immutable check, update the service directly
 		if skipImmutableCheckForComponentService(originSvc) {
 			newSvc.Spec = service.Spec
-			resolveServiceDefaultFields(&originSvc.Spec, &newSvc.Spec)
+			appsutil.ResolveServiceDefaultFields(&originSvc.Spec, &newSvc.Spec)
 			if !reflect.DeepEqual(originSvc, newSvc) {
-				graphCli.Update(dag, originSvc, newSvc, inDataContext4G())
+				graphCli.Update(dag, originSvc, newSvc, appsutil.InDataContext4G())
 			}
 			return nil
 		}
@@ -329,7 +330,7 @@ func (t *componentServiceTransformer) createOrUpdateService(ctx graph.TransformC
 		}
 		overrideMutableParams()
 		if !reflect.DeepEqual(originSvc, newSvc) {
-			graphCli.Update(dag, originSvc, newSvc, inDataContext4G())
+			graphCli.Update(dag, originSvc, newSvc, appsutil.InDataContext4G())
 		}
 		return nil
 	}

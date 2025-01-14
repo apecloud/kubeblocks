@@ -23,10 +23,8 @@ import (
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -51,10 +49,3 @@ func init() {
 	utilruntime.Must(batchv1.AddToScheme(rscheme))
 	utilruntime.Must(workloads.AddToScheme(rscheme))
 }
-
-type gvkNObjKey struct {
-	schema.GroupVersionKind
-	client.ObjectKey
-}
-
-type owningObjects map[gvkNObjKey]client.Object

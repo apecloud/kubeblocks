@@ -27,6 +27,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
@@ -45,7 +46,7 @@ var _ = Describe("Component Workload Operations Test", func() {
 	)
 
 	var (
-		reader         *mockReader
+		reader         *appsutil.MockReader
 		dag            *graph.DAG
 		comp           *appsv1.Component
 		synthesizeComp *component.SynthesizedComponent
@@ -58,7 +59,7 @@ var _ = Describe("Component Workload Operations Test", func() {
 	}
 
 	BeforeEach(func() {
-		reader = &mockReader{}
+		reader = &appsutil.MockReader{}
 		comp = &appsv1.Component{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: testCtx.DefaultNamespace,

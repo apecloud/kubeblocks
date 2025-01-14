@@ -32,6 +32,7 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
@@ -54,14 +55,14 @@ func (t *componentDeletionTransformer) Transform(ctx graph.TransformContext, dag
 	comp := transCtx.Component
 	cluster, err := t.getCluster(transCtx, comp)
 	if err != nil {
-		return newRequeueError(requeueDuration, err.Error())
+		return intctrlutil.NewRequeueError(appsutil.RequeueDuration, err.Error())
 	}
 
 	// step1: update the component status to deleting
 	if comp.Status.Phase != appsv1.DeletingComponentPhase {
 		comp.Status.Phase = appsv1.DeletingComponentPhase
 		graphCli.Status(dag, comp, transCtx.Component)
-		return newRequeueError(time.Second*1, "updating component status to deleting")
+		return intctrlutil.NewRequeueError(time.Second*1, "updating component status to deleting")
 	}
 
 	// step2: delete the sub-resources
@@ -103,7 +104,7 @@ func (t *componentDeletionTransformer) deleteCompResources(transCtx *componentTr
 	// firstly, delete the workloads owned by the component
 	workloads, err := model.ReadCacheSnapshot(transCtx, comp, matchLabels, compOwnedWorkloadKinds()...)
 	if err != nil {
-		return newRequeueError(requeueDuration, err.Error())
+		return intctrlutil.NewRequeueError(appsutil.RequeueDuration, err.Error())
 	}
 	if len(workloads) > 0 {
 		for _, workload := range workloads {
@@ -117,18 +118,18 @@ func (t *componentDeletionTransformer) deleteCompResources(transCtx *componentTr
 	// secondly, delete the other sub-resources owned by the component
 	snapshot, err1 := model.ReadCacheSnapshot(transCtx, comp, matchLabels, kinds...)
 	if err1 != nil {
-		return newRequeueError(requeueDuration, err1.Error())
+		return intctrlutil.NewRequeueError(appsutil.RequeueDuration, err1.Error())
 	}
 	if len(snapshot) > 0 {
 		// delete the sub-resources owned by the component before deleting the component
 		for _, object := range snapshot {
-			if isOwnedByInstanceSet(object) {
+			if appsutil.IsOwnedByInstanceSet(object) {
 				continue
 			}
 			graphCli.Delete(dag, object)
 		}
 		graphCli.Status(dag, comp, transCtx.Component)
-		return newRequeueError(time.Second*1, "not all component sub-resources deleted")
+		return intctrlutil.NewRequeueError(time.Second*1, "not all component sub-resources deleted")
 	} else {
 		graphCli.Delete(dag, comp)
 	}
@@ -136,7 +137,7 @@ func (t *componentDeletionTransformer) deleteCompResources(transCtx *componentTr
 	// release the allocated host-network ports for the component
 	pm := intctrlutil.GetPortManager()
 	if err = pm.ReleaseByPrefix(comp.Name); err != nil {
-		return newRequeueError(time.Second*1, fmt.Sprintf("release host ports for component %s error: %s", comp.Name, err.Error()))
+		return intctrlutil.NewRequeueError(time.Second*1, fmt.Sprintf("release host ports for component %s error: %s", comp.Name, err.Error()))
 	}
 
 	// fast return, that is stopping the plan.Build() stage and jump to plan.Execute() directly

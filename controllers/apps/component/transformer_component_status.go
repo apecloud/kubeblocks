@@ -35,6 +35,7 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -262,7 +263,7 @@ func (t *componentStatusTransformer) isAllConfigSynced(transCtx *componentTransf
 			Namespace: t.cluster.Namespace,
 			Name:      cfgcore.GetComponentCfgName(t.cluster.Name, t.synthesizeComp.Name, configSpec.Name),
 		}
-		if err := t.Client.Get(transCtx.Context, cmKey, cmObj, inDataContext4C()); err != nil {
+		if err := t.Client.Get(transCtx.Context, cmKey, cmObj, appsutil.InDataContext4C()); err != nil {
 			return false, err
 		}
 		if intctrlutil.GetConfigSpecReconcilePhase(cmObj, *item, status) != appsv1alpha1.CFinishedPhase {

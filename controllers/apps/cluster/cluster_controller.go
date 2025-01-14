@@ -22,6 +22,7 @@ package cluster
 import (
 	"context"
 	"math"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -34,6 +35,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -108,7 +110,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			return intctrlutil.Requeue(reqCtx.Log, err.Error())
 		}
 		c := planBuilder.(*clusterPlanBuilder)
-		sendWarningEventWithError(r.Recorder, c.transCtx.Cluster, corev1.EventTypeWarning, err)
+		appsutil.SendWarningEventWithError(r.Recorder, c.transCtx.Cluster, corev1.EventTypeWarning, err)
 		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
 	}
 
@@ -171,6 +173,10 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	retryDurationMS := viper.GetInt(constant.CfgKeyCtrlrReconcileRetryDurationMS)
+	if retryDurationMS != 0 {
+		appsutil.RequeueDuration = time.Millisecond * time.Duration(retryDurationMS)
+	}
 	return intctrlutil.NewControllerManagedBy(mgr).
 		For(&appsv1.Cluster{}).
 		WithOptions(controller.Options{

@@ -27,8 +27,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 // componentLoadResourcesTransformer handles referenced resources validation and load them into context
@@ -47,13 +49,13 @@ func (t *componentLoadResourcesTransformer) Transform(ctx graph.TransformContext
 
 	clusterName, err := component.GetClusterName(comp)
 	if err != nil {
-		return newRequeueError(requeueDuration, err.Error())
+		return intctrlutil.NewRequeueError(appsutil.RequeueDuration, err.Error())
 	}
 
 	cluster := &appsv1.Cluster{}
 	err = transCtx.Client.Get(transCtx.Context, types.NamespacedName{Name: clusterName, Namespace: comp.Namespace}, cluster)
 	if err != nil {
-		return newRequeueError(requeueDuration, err.Error())
+		return intctrlutil.NewRequeueError(appsutil.RequeueDuration, err.Error())
 	}
 	transCtx.Cluster = cluster
 
@@ -68,17 +70,17 @@ func (t *componentLoadResourcesTransformer) transformForNativeComponent(transCtx
 	)
 	compDef, err := getNCheckCompDefinition(ctx, cli, comp.Spec.CompDef)
 	if err != nil {
-		return newRequeueError(requeueDuration, err.Error())
+		return intctrlutil.NewRequeueError(appsutil.RequeueDuration, err.Error())
 	}
 	if err = component.UpdateCompDefinitionImages4ServiceVersion(ctx, cli, compDef, comp.Spec.ServiceVersion); err != nil {
-		return newRequeueError(requeueDuration, err.Error())
+		return intctrlutil.NewRequeueError(appsutil.RequeueDuration, err.Error())
 	}
 	transCtx.CompDef = compDef
 
 	synthesizedComp, err := component.BuildSynthesizedComponent(ctx, transCtx.Client, compDef, comp, transCtx.Cluster)
 	if err != nil {
 		message := fmt.Sprintf("build synthesized component for %s failed: %s", comp.Name, err.Error())
-		return newRequeueError(requeueDuration, message)
+		return intctrlutil.NewRequeueError(appsutil.RequeueDuration, message)
 	}
 	transCtx.SynthesizeComponent = synthesizedComp
 

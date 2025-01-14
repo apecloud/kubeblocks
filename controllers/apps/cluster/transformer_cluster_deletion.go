@@ -33,6 +33,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -129,10 +130,10 @@ func (t *clusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 	delKindMap := map[string]sets.Empty{}
 	for _, o := range delObjs {
 		// skip the objects owned by the component and InstanceSet controller
-		if shouldSkipObjOwnedByComp(o, *cluster) || isOwnedByInstanceSet(o) {
+		if shouldSkipObjOwnedByComp(o, *cluster) || appsutil.IsOwnedByInstanceSet(o) {
 			continue
 		}
-		graphCli.Delete(dag, o, inUniversalContext4G())
+		graphCli.Delete(dag, o, appsutil.InUniversalContext4G())
 		delKindMap[o.GetObjectKind().GroupVersionKind().Kind] = sets.Empty{}
 	}
 
@@ -143,7 +144,7 @@ func (t *clusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 		transCtx.Logger.Info(fmt.Sprintf("deleting the sub-resource kinds: %v", maps.Keys(delKindMap)))
 		graphCli.Status(dag, cluster, transCtx.Cluster)
 		// requeue since pvc isn't owned by cluster, and deleting it won't trigger event
-		return newRequeueError(time.Second*1, "not all sub-resources deleted")
+		return intctrlutil.NewRequeueError(time.Second*1, "not all sub-resources deleted")
 	}
 
 	// fast return, that is stopping the plan.Build() stage and jump to plan.Execute() directly

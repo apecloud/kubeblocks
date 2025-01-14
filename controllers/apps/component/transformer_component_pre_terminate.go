@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
@@ -150,17 +151,17 @@ func (t *componentPreTerminateTransformer) synthesizedComponent(transCtx *compon
 
 	clusterName, err := component.GetClusterName(comp)
 	if err != nil {
-		return nil, newRequeueError(requeueDuration, err.Error())
+		return nil, intctrlutil.NewRequeueError(appsutil.RequeueDuration, err.Error())
 	}
 	cluster := &appsv1.Cluster{}
 	err = cli.Get(ctx, types.NamespacedName{Name: clusterName, Namespace: comp.Namespace}, cluster)
 	if err != nil {
-		return nil, newRequeueError(requeueDuration, err.Error())
+		return nil, intctrlutil.NewRequeueError(appsutil.RequeueDuration, err.Error())
 	}
 
 	synthesizedComp, err := component.BuildSynthesizedComponent(ctx, cli, compDef, comp, cluster)
 	if err != nil {
-		return nil, newRequeueError(requeueDuration,
+		return nil, intctrlutil.NewRequeueError(appsutil.RequeueDuration,
 			fmt.Sprintf("build synthesized component failed at pre-terminate transformer: %s", err.Error()))
 	}
 	synthesizedComp.TemplateVars, _, err = component.ResolveTemplateNEnvVars(ctx, cli, synthesizedComp, compDef.Spec.Vars)

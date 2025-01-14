@@ -101,8 +101,12 @@ var _ = Describe("Component Controller", func() {
 		// create the new objects.
 		By("clean resources")
 
+		// TODO: remove me
 		// delete cluster(and all dependent sub-resources), cluster definition
 		testapps.ClearClusterResourcesWithRemoveFinalizerOption(&testCtx)
+
+		// delete components (and all dependent sub-resources), and component definitions & versions
+		testapps.ClearComponentResourcesWithRemoveFinalizerOption(&testCtx)
 
 		// delete rest mocked objects
 		inNS := client.InNamespace(testCtx.DefaultNamespace)

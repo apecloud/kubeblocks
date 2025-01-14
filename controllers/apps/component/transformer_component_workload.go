@@ -42,6 +42,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/configuration"
@@ -681,7 +682,7 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn(deleteReplicas, joinedReplica
 			fmt.Errorf("some replicas have joined but not leaved since the Pod object is not exist: %v", sets.List(joinedReplicasSet)))
 	}
 	if len(leaveErrors) > 0 {
-		return newRequeueError(time.Second, fmt.Sprintf("%v", leaveErrors))
+		return intctrlutil.NewRequeueError(time.Second, fmt.Sprintf("%v", leaveErrors))
 	}
 	return nil
 }
@@ -755,7 +756,7 @@ func (r *componentWorkloadOps) deletePVCs4ScaleIn(itsObj *workloads.InstanceSet)
 				Name:      fmt.Sprintf("%s-%s", vct.Name, podName),
 			}
 			pvc := corev1.PersistentVolumeClaim{}
-			if err := r.cli.Get(r.reqCtx.Ctx, pvcKey, &pvc, inDataContext4C()); err != nil {
+			if err := r.cli.Get(r.reqCtx.Ctx, pvcKey, &pvc, appsutil.InDataContext4C()); err != nil {
 				if apierrors.IsNotFound(err) {
 					continue // the pvc is already deleted or not created
 				}
@@ -765,7 +766,7 @@ func (r *componentWorkloadOps) deletePVCs4ScaleIn(itsObj *workloads.InstanceSet)
 			// after updating ITS and before deleting PVCs, the PVCs intended to scale-in will be leaked.
 			// For simplicity, the updating dependency is added between them to guarantee that the PVCs to scale-in
 			// will be deleted or the scaling-in operation will be failed.
-			graphCli.Delete(r.dag, &pvc, inDataContext4G())
+			graphCli.Delete(r.dag, &pvc, appsutil.InDataContext4G())
 		}
 	}
 	return nil
@@ -891,7 +892,7 @@ func (r *componentWorkloadOps) joinMember4ScaleOut() error {
 	}
 
 	if len(joinErrors) > 0 {
-		return newRequeueError(time.Second, fmt.Sprintf("%v", joinErrors))
+		return intctrlutil.NewRequeueError(time.Second, fmt.Sprintf("%v", joinErrors))
 	}
 	return nil
 }
@@ -920,7 +921,7 @@ func (r *componentWorkloadOps) expandVolumes(insTPLName string, vctName string, 
 			Name:      fmt.Sprintf("%s-%s", vctName, pod),
 		}
 		pvcNotFound := false
-		if err := r.cli.Get(r.reqCtx.Ctx, pvcKey, pvc, inDataContext4C()); err != nil {
+		if err := r.cli.Get(r.reqCtx.Ctx, pvcKey, pvc, appsutil.InDataContext4C()); err != nil {
 			if apierrors.IsNotFound(err) {
 				pvcNotFound = true
 			} else {
@@ -966,7 +967,7 @@ func (r *componentWorkloadOps) updatePVCSize(pvcKey types.NamespacedName,
 			constant.PVCNameLabelKey: pvcKey.Name,
 		}
 		pvList := corev1.PersistentVolumeList{}
-		if err := r.cli.List(r.reqCtx.Ctx, &pvList, ml, inDataContext4C()); err != nil {
+		if err := r.cli.List(r.reqCtx.Ctx, &pvList, ml, appsutil.InDataContext4C()); err != nil {
 			return err
 		}
 		for _, pv := range pvList.Items {
@@ -997,7 +998,7 @@ func (r *componentWorkloadOps) updatePVCSize(pvcKey types.NamespacedName,
 			Namespace: pvcKey.Namespace,
 			Name:      newPVC.Spec.VolumeName,
 		}
-		if err := r.cli.Get(r.reqCtx.Ctx, pvKey, pv, inDataContext4C()); err != nil {
+		if err := r.cli.Get(r.reqCtx.Ctx, pvKey, pv, appsutil.InDataContext4C()); err != nil {
 			if apierrors.IsNotFound(err) {
 				pvNotFound = true
 			} else {
@@ -1031,14 +1032,14 @@ func (r *componentWorkloadOps) updatePVCSize(pvcKey types.NamespacedName,
 			}
 			retainPV.Annotations[constant.PVLastClaimPolicyAnnotationKey] = string(pv.Spec.PersistentVolumeReclaimPolicy)
 			retainPV.Spec.PersistentVolumeReclaimPolicy = corev1.PersistentVolumeReclaimRetain
-			return graphCli.Do(r.dag, pv, retainPV, model.ActionPatchPtr(), fromVertex, inDataContext4G())
+			return graphCli.Do(r.dag, pv, retainPV, model.ActionPatchPtr(), fromVertex, appsutil.InDataContext4G())
 		},
 		deletePVCStep: func(fromVertex *model.ObjectVertex, step pvcRecreateStep) *model.ObjectVertex {
 			// step 2: delete pvc, this will not delete pv because policy is 'retain'
 			removeFinalizerPVC := pvc.DeepCopy()
 			removeFinalizerPVC.SetFinalizers([]string{})
-			removeFinalizerPVCVertex := graphCli.Do(r.dag, pvc, removeFinalizerPVC, model.ActionPatchPtr(), fromVertex, inDataContext4G())
-			return graphCli.Do(r.dag, nil, removeFinalizerPVC, model.ActionDeletePtr(), removeFinalizerPVCVertex, inDataContext4G())
+			removeFinalizerPVCVertex := graphCli.Do(r.dag, pvc, removeFinalizerPVC, model.ActionPatchPtr(), fromVertex, appsutil.InDataContext4G())
+			return graphCli.Do(r.dag, nil, removeFinalizerPVC, model.ActionDeletePtr(), removeFinalizerPVCVertex, appsutil.InDataContext4G())
 		},
 		removePVClaimRefStep: func(fromVertex *model.ObjectVertex, step pvcRecreateStep) *model.ObjectVertex {
 			// step 3: remove claimRef in pv
@@ -1047,12 +1048,12 @@ func (r *componentWorkloadOps) updatePVCSize(pvcKey types.NamespacedName,
 				removeClaimRefPV.Spec.ClaimRef.UID = ""
 				removeClaimRefPV.Spec.ClaimRef.ResourceVersion = ""
 			}
-			return graphCli.Do(r.dag, pv, removeClaimRefPV, model.ActionPatchPtr(), fromVertex, inDataContext4G())
+			return graphCli.Do(r.dag, pv, removeClaimRefPV, model.ActionPatchPtr(), fromVertex, appsutil.InDataContext4G())
 		},
 		createPVCStep: func(fromVertex *model.ObjectVertex, step pvcRecreateStep) *model.ObjectVertex {
 			// step 4: create new pvc
 			newPVC.SetResourceVersion("")
-			return graphCli.Do(r.dag, nil, newPVC, model.ActionCreatePtr(), fromVertex, inDataContext4G())
+			return graphCli.Do(r.dag, nil, newPVC, model.ActionCreatePtr(), fromVertex, appsutil.InDataContext4G())
 		},
 		pvRestorePolicyStep: func(fromVertex *model.ObjectVertex, step pvcRecreateStep) *model.ObjectVertex {
 			// step 5: restore to previous pv policy
@@ -1062,7 +1063,7 @@ func (r *componentWorkloadOps) updatePVCSize(pvcKey types.NamespacedName,
 				policy = corev1.PersistentVolumeReclaimDelete
 			}
 			restorePV.Spec.PersistentVolumeReclaimPolicy = policy
-			return graphCli.Do(r.dag, pv, restorePV, model.ActionPatchPtr(), fromVertex, inDataContext4G())
+			return graphCli.Do(r.dag, pv, restorePV, model.ActionPatchPtr(), fromVertex, appsutil.InDataContext4G())
 		},
 	}
 
@@ -1102,7 +1103,7 @@ func (r *componentWorkloadOps) updatePVCSize(pvcKey types.NamespacedName,
 	}
 	if pvcQuantity := pvc.Spec.Resources.Requests[corev1.ResourceStorage]; pvcQuantity.Cmp(vctProto.Spec.Resources.Requests[corev1.ResourceStorage]) != 0 {
 		// use pvc's update without anything extra
-		graphCli.Update(r.dag, nil, newPVC, inDataContext4G())
+		graphCli.Update(r.dag, nil, newPVC, appsutil.InDataContext4G())
 		return nil
 	}
 	// all the else means no need to update
@@ -1141,7 +1142,7 @@ func getRunningVolumes(ctx context.Context, cli client.Client, synthesizedComp *
 }
 
 func buildInstanceSetPlacementAnnotation(comp *appsv1.Component, its *workloads.InstanceSet) {
-	p := placement(comp)
+	p := appsutil.Placement(comp)
 	if len(p) > 0 {
 		if its.Annotations == nil {
 			its.Annotations = make(map[string]string)

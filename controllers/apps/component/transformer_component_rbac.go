@@ -31,6 +31,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -83,7 +84,7 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 	if err != nil {
 		return err
 	}
-	graphCli.Create(dag, rb, inDataContext4G())
+	graphCli.Create(dag, rb, appsutil.InDataContext4G())
 
 	createServiceAccount(serviceAccount, graphCli, dag, rb)
 	itsList := graphCli.FindAll(dag, &workloads.InstanceSet{})
@@ -106,7 +107,7 @@ func isServiceAccountExist(transCtx *componentTransformContext, serviceAccountNa
 		Name:      serviceAccountName,
 	}
 	sa := &corev1.ServiceAccount{}
-	if err := transCtx.Client.Get(transCtx.Context, namespaceName, sa, inDataContext4C()); err != nil {
+	if err := transCtx.Client.Get(transCtx.Context, namespaceName, sa, appsutil.InDataContext4C()); err != nil {
 		// KubeBlocks will create a rolebinding only if it has RBAC access priority and
 		// the rolebinding is not already present.
 		if errors.IsNotFound(err) {
@@ -126,7 +127,7 @@ func isRoleBindingExist(transCtx *componentTransformContext, serviceAccountName 
 		Name:      constant.GenerateDefaultServiceAccountName(synthesizedComp.ClusterName),
 	}
 	rb := &rbacv1.RoleBinding{}
-	if err := transCtx.Client.Get(transCtx.Context, namespaceName, rb, inDataContext4C()); err != nil {
+	if err := transCtx.Client.Get(transCtx.Context, namespaceName, rb, appsutil.InDataContext4C()); err != nil {
 		// KubeBlocks will create a role binding only if it has RBAC access priority and
 		// the role binding is not already present.
 		if errors.IsNotFound(err) {
@@ -196,6 +197,6 @@ func buildRoleBinding(synthesizedComp *component.SynthesizedComponent, comp *app
 
 func createServiceAccount(serviceAccount *corev1.ServiceAccount, graphCli model.GraphClient, dag *graph.DAG, parent client.Object) {
 	// serviceAccount must be created before roleBinding
-	graphCli.Create(dag, serviceAccount, inDataContext4G())
+	graphCli.Create(dag, serviceAccount, appsutil.InDataContext4G())
 	graphCli.DependOn(dag, parent, serviceAccount)
 }

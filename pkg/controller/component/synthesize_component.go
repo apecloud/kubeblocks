@@ -508,9 +508,9 @@ func toVolumeClaimTemplates(compSpec *appsv1alpha1.ComponentSpec) []corev1.Persi
 	for _, t := range compSpec.VolumeClaimTemplates {
 		ts = append(ts, corev1.PersistentVolumeClaimTemplate{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: t.Name,
+				Labels:      t.Labels,
 				Annotations: t.Annotations,
-				Labels: t.Labels,
+				Name:        t.Name,
 			},
 			Spec: t.Spec.ToV1PersistentVolumeClaimSpec(),
 		})

@@ -138,6 +138,63 @@ func MockInstanceSetPods(
 	return podList
 }
 
+// MockInstanceSetPods2 mocks the InstanceSet pods, just using in envTest
+func MockInstanceSetPods2(
+	testCtx *testutil.TestContext,
+	its *workloads.InstanceSet,
+	clusterName, compName string, comp *appsv1.Component) []*corev1.Pod {
+	getReplicas := func() int {
+		if its == nil || its.Spec.Replicas == nil {
+			return replicas
+		}
+		return int(*its.Spec.Replicas)
+	}
+	leaderRole := func() *workloads.ReplicaRole {
+		if its == nil {
+			return nil
+		}
+		for i := range its.Spec.Roles {
+			if its.Spec.Roles[i].IsLeader {
+				return &its.Spec.Roles[i]
+			}
+		}
+		return nil
+	}()
+	noneLeaderRole := func() *workloads.ReplicaRole {
+		if its == nil {
+			return nil
+		}
+		for i := range its.Spec.Roles {
+			if !its.Spec.Roles[i].IsLeader {
+				return &its.Spec.Roles[i]
+			}
+		}
+		return nil
+	}()
+	podList := make([]*corev1.Pod, getReplicas())
+	podNames := generatePodNames2(clusterName, compName, comp)
+	for i, pName := range podNames {
+		var podRole, accessMode string
+		if its != nil && len(its.Spec.Roles) > 0 {
+			if i == 0 {
+				podRole = leaderRole.Name
+				accessMode = string(leaderRole.AccessMode)
+			} else {
+				podRole = noneLeaderRole.Name
+				accessMode = string(noneLeaderRole.AccessMode)
+			}
+		}
+		pod := MockInstanceSetPod(testCtx, its, clusterName, compName, pName, podRole, accessMode)
+		annotations := pod.Annotations
+		if annotations == nil {
+			annotations = make(map[string]string)
+		}
+		pod.Annotations = annotations
+		podList[i] = pod
+	}
+	return podList
+}
+
 // MockInstanceSetPod mocks to create the pod of the InstanceSet, just using in envTest
 func MockInstanceSetPod(
 	testCtx *testutil.TestContext,
@@ -260,6 +317,22 @@ func generatePodNames(cluster *appsv1.Cluster, compName string) []string {
 	return podNames
 }
 
+func generatePodNames2(clusterName, compName string, comp *appsv1.Component) []string {
+	podNames := make([]string, 0)
+	insTPLReplicasCnt := int32(0)
+	workloadName := constant.GenerateWorkloadNamePattern(clusterName, compName)
+	for _, insTpl := range comp.Spec.Instances {
+		insReplicas := *insTpl.Replicas
+		insTPLReplicasCnt += insReplicas
+		podNames = append(podNames, generateInstanceNames(workloadName, insTpl.Name, insReplicas, comp.Spec.OfflineInstances)...)
+	}
+	if insTPLReplicasCnt < comp.Spec.Replicas {
+		podNames = append(podNames, generateInstanceNames(workloadName, "",
+			comp.Spec.Replicas-insTPLReplicasCnt, comp.Spec.OfflineInstances)...)
+	}
+	return podNames
+}
+
 func podIsReady(pod *corev1.Pod) bool {
 	if !pod.DeletionTimestamp.IsZero() {
 		return false
@@ -272,8 +345,8 @@ func podIsReady(pod *corev1.Pod) bool {
 	return false
 }
 
-func MockInstanceSetStatus(testCtx testutil.TestContext, cluster *appsv1.Cluster, fullCompName string) {
-	currentPodNames := generatePodNames(cluster, fullCompName)
+func MockInstanceSetStatus(testCtx testutil.TestContext, cluster *appsv1.Cluster, compName string) {
+	currentPodNames := generatePodNames(cluster, compName)
 	updateRevisions := map[string]string{}
 	for _, podName := range currentPodNames {
 		updateRevisions[podName] = "revision"
@@ -281,7 +354,7 @@ func MockInstanceSetStatus(testCtx testutil.TestContext, cluster *appsv1.Cluster
 	podList := &corev1.PodList{}
 	gomega.Expect(testCtx.Cli.List(testCtx.Ctx, podList, client.MatchingLabels{
 		constant.AppInstanceLabelKey:    cluster.Name,
-		constant.KBAppComponentLabelKey: fullCompName,
+		constant.KBAppComponentLabelKey: compName,
 	})).Should(gomega.Succeed())
 	currRevisions := map[string]string{}
 	newMembersStatus := make([]workloads.MemberStatus, 0)
@@ -310,8 +383,8 @@ func MockInstanceSetStatus(testCtx testutil.TestContext, cluster *appsv1.Cluster
 		}
 		newMembersStatus = append(newMembersStatus, memberStatus)
 	}
-	itsName := constant.GenerateClusterComponentName(cluster.Name, fullCompName)
-	compSpec := cluster.Spec.GetComponentByName(fullCompName)
+	itsName := constant.GenerateClusterComponentName(cluster.Name, compName)
+	compSpec := cluster.Spec.GetComponentByName(compName)
 	gomega.Eventually(GetAndChangeObjStatus(&testCtx, client.ObjectKey{Name: itsName, Namespace: cluster.Namespace}, func(its *workloads.InstanceSet) {
 		its.Status.CurrentRevisions = currRevisions
 		its.Status.UpdateRevisions = updateRevisions

@@ -56,7 +56,6 @@ const (
 type componentStatusTransformer struct {
 	client.Client
 
-	cluster        *appsv1.Cluster
 	comp           *appsv1.Component
 	synthesizeComp *component.SynthesizedComponent
 	dag            *graph.DAG
@@ -104,7 +103,6 @@ func (t *componentStatusTransformer) Transform(ctx graph.TransformContext, dag *
 }
 
 func (t *componentStatusTransformer) init(transCtx *componentTransformContext, dag *graph.DAG) {
-	t.cluster = transCtx.Cluster
 	t.comp = transCtx.Component
 	t.synthesizeComp = transCtx.SynthesizeComponent
 	t.runningITS = transCtx.RunningWorkload.(*workloads.InstanceSet)
@@ -245,8 +243,8 @@ func (t *componentStatusTransformer) isAllConfigSynced(transCtx *componentTransf
 	}
 
 	configurationKey := client.ObjectKey{
-		Namespace: t.cluster.Namespace,
-		Name:      cfgcore.GenerateComponentConfigurationName(t.cluster.Name, t.synthesizeComp.Name),
+		Namespace: t.synthesizeComp.Namespace,
+		Name:      cfgcore.GenerateComponentConfigurationName(t.synthesizeComp.ClusterName, t.synthesizeComp.Name),
 	}
 	configuration := &appsv1alpha1.Configuration{}
 	if err := t.Client.Get(transCtx.Context, configurationKey, configuration); err != nil {
@@ -260,8 +258,8 @@ func (t *componentStatusTransformer) isAllConfigSynced(transCtx *componentTransf
 			return false, nil
 		}
 		cmKey = client.ObjectKey{
-			Namespace: t.cluster.Namespace,
-			Name:      cfgcore.GetComponentCfgName(t.cluster.Name, t.synthesizeComp.Name, configSpec.Name),
+			Namespace: t.synthesizeComp.Namespace,
+			Name:      cfgcore.GetComponentCfgName(t.synthesizeComp.ClusterName, t.synthesizeComp.Name, configSpec.Name),
 		}
 		if err := t.Client.Get(transCtx.Context, cmKey, cmObj, appsutil.InDataContext4C()); err != nil {
 			return false, err

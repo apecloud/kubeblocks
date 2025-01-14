@@ -70,6 +70,12 @@ func init() {
 
 // ComponentSpec defines the desired state of Component
 type ComponentSpec struct {
+	// Specifies the behavior when a Component is deleted.
+	//
+	// +kubebuilder:default=Delete
+	// +optional
+	TerminationPolicy TerminationPolicyType `json:"terminationPolicy"`
+
 	// Specifies the name of the referenced ComponentDefinition.
 	//
 	// +kubebuilder:validation:Required

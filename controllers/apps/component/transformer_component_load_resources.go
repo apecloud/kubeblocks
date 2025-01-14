@@ -47,18 +47,6 @@ func (t *componentLoadResourcesTransformer) Transform(ctx graph.TransformContext
 		setProvisioningStartedCondition(&comp.Status.Conditions, comp.Name, comp.Generation, err)
 	}()
 
-	clusterName, err := component.GetClusterName(comp)
-	if err != nil {
-		return intctrlutil.NewRequeueError(appsutil.RequeueDuration, err.Error())
-	}
-
-	cluster := &appsv1.Cluster{}
-	err = transCtx.Client.Get(transCtx.Context, types.NamespacedName{Name: clusterName, Namespace: comp.Namespace}, cluster)
-	if err != nil {
-		return intctrlutil.NewRequeueError(appsutil.RequeueDuration, err.Error())
-	}
-	transCtx.Cluster = cluster
-
 	return t.transformForNativeComponent(transCtx)
 }
 

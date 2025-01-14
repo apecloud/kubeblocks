@@ -53,7 +53,8 @@ func (t *componentDeletionTransformer) Transform(ctx graph.TransformContext, dag
 
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	comp := transCtx.Component
-	cluster, err := t.getCluster(transCtx, comp)
+
+	clusterName, err := component.GetClusterName(comp)
 	if err != nil {
 		return intctrlutil.NewRequeueError(appsutil.RequeueDuration, err.Error())
 	}
@@ -66,17 +67,17 @@ func (t *componentDeletionTransformer) Transform(ctx graph.TransformContext, dag
 	}
 
 	// step2: delete the sub-resources
-	compShortName, err := component.ShortName(cluster.Name, comp.Name)
+	compName, err := component.ShortName(clusterName, comp.Name)
 	if err != nil {
 		return err
 	}
-	ml := constant.GetCompLabels(cluster.Name, compShortName)
+	ml := constant.GetCompLabels(clusterName, compName)
 
 	compScaleIn, ok := comp.Annotations[constant.ComponentScaleInAnnotationKey]
 	if ok && compScaleIn == "true" {
 		return t.handleCompDeleteWhenScaleIn(transCtx, graphCli, dag, comp, ml)
 	}
-	return t.handleCompDeleteWhenClusterDelete(transCtx, graphCli, dag, cluster, comp, ml)
+	return t.handleCompDeleteWhenClusterDelete(transCtx, graphCli, dag, comp, ml)
 }
 
 // handleCompDeleteWhenScaleIn handles the component deletion when scale-in, this scenario will delete all the sub-resources owned by the component by default.
@@ -87,9 +88,9 @@ func (t *componentDeletionTransformer) handleCompDeleteWhenScaleIn(transCtx *com
 
 // handleCompDeleteWhenClusterDelete handles the component deletion when the cluster is being deleted, the sub-resources owned by the component depends on the cluster's TerminationPolicy.
 func (t *componentDeletionTransformer) handleCompDeleteWhenClusterDelete(transCtx *componentTransformContext, graphCli model.GraphClient,
-	dag *graph.DAG, cluster *appsv1.Cluster, comp *appsv1.Component, matchLabels map[string]string) error {
+	dag *graph.DAG, comp *appsv1.Component, matchLabels map[string]string) error {
 	var kinds []client.ObjectList
-	switch cluster.Spec.TerminationPolicy {
+	switch comp.Spec.TerminationPolicy {
 	case appsv1.Delete:
 		kinds = kindsForCompDelete()
 	case appsv1.WipeOut:

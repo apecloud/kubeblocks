@@ -75,7 +75,6 @@ var _ = Describe("TLS self-signed cert function", func() {
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// non-namespaced
 		testapps.ClearResources(&testCtx, generics.ConfigConstraintSignature, ml)
-		testapps.ClearResources(&testCtx, generics.BackupPolicyTemplateSignature, ml)
 	}
 
 	BeforeEach(cleanEnv)

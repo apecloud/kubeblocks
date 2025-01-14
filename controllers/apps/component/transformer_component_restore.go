@@ -51,7 +51,7 @@ func (t *componentRestoreTransformer) Transform(ctx graph.TransformContext, dag 
 	}
 	commitError := func(err error) error {
 		if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeNeedWaiting) {
-			transCtx.EventRecorder.Event(transCtx.Cluster, corev1.EventTypeNormal, string(intctrlutil.ErrorTypeNeedWaiting), err.Error())
+			transCtx.EventRecorder.Event(transCtx.Component, corev1.EventTypeNormal, string(intctrlutil.ErrorTypeNeedWaiting), err.Error())
 			return graph.ErrPrematureStop
 		}
 		return err

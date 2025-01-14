@@ -67,7 +67,6 @@ type componentWorkloadTransformer struct {
 type componentWorkloadOps struct {
 	cli            client.Client
 	reqCtx         intctrlutil.RequestCtx
-	cluster        *appsv1.Cluster
 	component      *appsv1.Component
 	synthesizeComp *component.SynthesizedComponent
 	dag            *graph.DAG
@@ -90,7 +89,6 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 		return nil
 	}
 
-	cluster := transCtx.Cluster
 	compDef := transCtx.CompDef
 	comp := transCtx.Component
 	synthesizeComp := transCtx.SynthesizeComponent
@@ -131,7 +129,7 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 		if protoITS == nil {
 			graphCli.Delete(dag, runningITS)
 		} else {
-			err = t.handleUpdate(reqCtx, graphCli, dag, cluster, synthesizeComp, comp, runningITS, protoITS)
+			err = t.handleUpdate(reqCtx, graphCli, dag, synthesizeComp, comp, runningITS, protoITS)
 		}
 	}
 	return err
@@ -228,7 +226,7 @@ func hasMemberJoinNDataActionDefined(lifecycleActions *appsv1.ComponentLifecycle
 }
 
 func (t *componentWorkloadTransformer) handleUpdate(reqCtx intctrlutil.RequestCtx, cli model.GraphClient, dag *graph.DAG,
-	cluster *appsv1.Cluster, synthesizedComp *component.SynthesizedComponent, comp *appsv1.Component, runningITS, protoITS *workloads.InstanceSet) error {
+	synthesizedComp *component.SynthesizedComponent, comp *appsv1.Component, runningITS, protoITS *workloads.InstanceSet) error {
 	start, stop, err := t.handleWorkloadStartNStop(synthesizedComp, runningITS, &protoITS)
 	if err != nil {
 		return err
@@ -236,7 +234,7 @@ func (t *componentWorkloadTransformer) handleUpdate(reqCtx intctrlutil.RequestCt
 
 	if !(start || stop) {
 		// postpone the update of the workload until the component is back to running.
-		if err := t.handleWorkloadUpdate(reqCtx, dag, cluster, synthesizedComp, comp, runningITS, protoITS); err != nil {
+		if err := t.handleWorkloadUpdate(reqCtx, dag, synthesizedComp, comp, runningITS, protoITS); err != nil {
 			return err
 		}
 	}
@@ -353,8 +351,8 @@ func (t *componentWorkloadTransformer) startWorkload(
 }
 
 func (t *componentWorkloadTransformer) handleWorkloadUpdate(reqCtx intctrlutil.RequestCtx, dag *graph.DAG,
-	cluster *appsv1.Cluster, synthesizeComp *component.SynthesizedComponent, comp *appsv1.Component, obj, its *workloads.InstanceSet) error {
-	cwo, err := newComponentWorkloadOps(reqCtx, t.Client, cluster, synthesizeComp, comp, obj, its, dag)
+	synthesizeComp *component.SynthesizedComponent, comp *appsv1.Component, obj, its *workloads.InstanceSet) error {
+	cwo, err := newComponentWorkloadOps(reqCtx, t.Client, synthesizeComp, comp, obj, its, dag)
 	if err != nil {
 		return err
 	}
@@ -615,11 +613,11 @@ func (r *componentWorkloadOps) horizontalScale() error {
 		}
 	}
 
-	r.reqCtx.Recorder.Eventf(r.cluster,
+	r.reqCtx.Recorder.Eventf(r.component,
 		corev1.EventTypeNormal,
 		"HorizontalScale",
 		"start horizontal scale component %s of cluster %s from %d to %d",
-		r.synthesizeComp.Name, r.cluster.Name, int(*r.runningITS.Spec.Replicas), r.synthesizeComp.Replicas)
+		r.synthesizeComp.Name, r.synthesizeComp.ClusterName, int(*r.runningITS.Spec.Replicas), r.synthesizeComp.Replicas)
 
 	return nil
 }
@@ -653,7 +651,8 @@ func (r *componentWorkloadOps) scaleIn() error {
 }
 
 func (r *componentWorkloadOps) leaveMember4ScaleIn(deleteReplicas, joinedReplicas []string) error {
-	pods, err := component.ListOwnedPods(r.reqCtx.Ctx, r.cli, r.cluster.Namespace, r.cluster.Name, r.synthesizeComp.Name)
+	pods, err := component.ListOwnedPods(r.reqCtx.Ctx, r.cli,
+		r.synthesizeComp.Namespace, r.synthesizeComp.ClusterName, r.synthesizeComp.Name)
 	if err != nil {
 		return err
 	}
@@ -821,7 +820,8 @@ func (r *componentWorkloadOps) scaleOut() error {
 }
 
 func (r *componentWorkloadOps) sourceReplica(dataDump *appsv1.Action) (*corev1.Pod, error) {
-	pods, err := component.ListOwnedPods(r.reqCtx.Ctx, r.cli, r.cluster.Namespace, r.cluster.Name, r.synthesizeComp.Name)
+	pods, err := component.ListOwnedPods(r.reqCtx.Ctx, r.cli,
+		r.synthesizeComp.Namespace, r.synthesizeComp.ClusterName, r.synthesizeComp.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -848,7 +848,8 @@ func (r *componentWorkloadOps) postHorizontalScale() error {
 }
 
 func (r *componentWorkloadOps) joinMember4ScaleOut() error {
-	pods, err := component.ListOwnedPods(r.reqCtx.Ctx, r.cli, r.cluster.Namespace, r.cluster.Name, r.synthesizeComp.Name)
+	pods, err := component.ListOwnedPods(r.reqCtx.Ctx, r.cli,
+		r.synthesizeComp.Namespace, r.synthesizeComp.ClusterName, r.synthesizeComp.Name)
 	if err != nil {
 		return err
 	}
@@ -917,7 +918,7 @@ func (r *componentWorkloadOps) expandVolumes(insTPLName string, vctName string, 
 	for _, pod := range r.runningItsPodNames {
 		pvc := &corev1.PersistentVolumeClaim{}
 		pvcKey := types.NamespacedName{
-			Namespace: r.cluster.Namespace,
+			Namespace: r.synthesizeComp.Namespace,
 			Name:      fmt.Sprintf("%s-%s", vctName, pod),
 		}
 		pvcNotFound := false
@@ -937,7 +938,7 @@ func (r *componentWorkloadOps) expandVolumes(insTPLName string, vctName string, 
 			if quantity.Cmp(*pvc.Status.Capacity.Storage()) == 0 && newQuantity.Cmp(*quantity) < 0 {
 				errMsg := fmt.Sprintf("shrinking the volume is not supported, volume: %s, quantity: %s, new quantity: %s",
 					pvc.GetName(), quantity.String(), newQuantity.String())
-				r.reqCtx.Event(r.cluster, corev1.EventTypeWarning, "VolumeExpansionFailed", errMsg)
+				r.reqCtx.Event(r.component, corev1.EventTypeWarning, "VolumeExpansionFailed", errMsg)
 				return fmt.Errorf("%s", errMsg)
 			}
 		}
@@ -1153,7 +1154,6 @@ func buildInstanceSetPlacementAnnotation(comp *appsv1.Component, its *workloads.
 
 func newComponentWorkloadOps(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
-	cluster *appsv1.Cluster,
 	synthesizeComp *component.SynthesizedComponent,
 	comp *appsv1.Component,
 	runningITS *workloads.InstanceSet,
@@ -1170,7 +1170,6 @@ func newComponentWorkloadOps(reqCtx intctrlutil.RequestCtx,
 	return &componentWorkloadOps{
 		cli:                   cli,
 		reqCtx:                reqCtx,
-		cluster:               cluster,
 		component:             comp,
 		synthesizeComp:        synthesizeComp,
 		runningITS:            runningITS,

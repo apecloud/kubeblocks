@@ -67,6 +67,7 @@ func BuildComponent(cluster *appsv1.Cluster, compSpec *appsv1.ClusterComponentSp
 		AddAnnotationsInMap(inheritedAnnotations(cluster)).
 		AddAnnotationsInMap(annotations). // annotations added by the cluster controller
 		AddLabelsInMap(constant.GetCompLabelsWithDef(cluster.Name, compSpec.Name, compSpec.ComponentDef, labels)).
+		SetTerminationPolicy(cluster.Spec.TerminationPolicy).
 		SetServiceVersion(compSpec.ServiceVersion).
 		SetLabels(compSpec.Labels).
 		SetAnnotations(compSpec.Annotations).

@@ -159,13 +159,9 @@ var _ = Describe("Component Workload Operations Test", func() {
 				}).
 				GetObject()
 
-			mockCluster := testapps.NewClusterFactory(testCtx.DefaultNamespace, "test-cluster", "test-def").
-				GetObject()
-
 			ops = &componentWorkloadOps{
 				cli:            k8sClient,
 				reqCtx:         intctrlutil.RequestCtx{Ctx: ctx, Log: logger, Recorder: clusterRecorder},
-				cluster:        mockCluster,
 				component:      comp,
 				synthesizeComp: synthesizeComp,
 				runningITS:     mockITS,

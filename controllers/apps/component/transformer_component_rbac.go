@@ -75,7 +75,7 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 
 	if !viper.GetBool(constant.EnableRBACManager) {
 		transCtx.Logger.V(1).Info("rbac manager is disabled")
-		transCtx.EventRecorder.Event(transCtx.Cluster, corev1.EventTypeWarning,
+		transCtx.EventRecorder.Event(transCtx.Component, corev1.EventTypeWarning,
 			string(ictrlutil.ErrorTypeNotFound), fmt.Sprintf("ServiceAccount %s is not exist", serviceAccount.Name))
 		return ictrlutil.NewRequeueError(time.Second, "RBAC manager is disabled, but service account is not exist")
 	}
@@ -161,7 +161,6 @@ func isRoleBindingExist(transCtx *componentTransformContext, serviceAccountName 
 // buildServiceAccount builds the service account for the component.
 func buildServiceAccount(transCtx *componentTransformContext) (*corev1.ServiceAccount, error) {
 	var (
-		cluster         = transCtx.Cluster
 		comp            = transCtx.Component
 		compDef         = transCtx.CompDef
 		synthesizedComp = transCtx.SynthesizeComponent
@@ -173,7 +172,7 @@ func buildServiceAccount(transCtx *componentTransformContext) (*corev1.ServiceAc
 			return nil, nil
 		}
 		// use cluster.name to keep compatible with existed clusters
-		serviceAccountName = constant.GenerateDefaultServiceAccountName(cluster.Name)
+		serviceAccountName = constant.GenerateDefaultServiceAccountName(synthesizedComp.ClusterName)
 	}
 
 	if isRoleBindingExist(transCtx, serviceAccountName) && isServiceAccountExist(transCtx, serviceAccountName) {

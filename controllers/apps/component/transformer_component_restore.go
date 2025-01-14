@@ -58,7 +58,7 @@ func (t *componentRestoreTransformer) Transform(ctx graph.TransformContext, dag 
 	}
 
 	cluster := transCtx.Cluster
-	restoreMGR := plan.NewRestoreManager(reqCtx.Ctx, t.Client, cluster, rscheme, nil, synthesizedComp.Replicas, 0)
+	restoreMGR := plan.NewRestoreManager(reqCtx.Ctx, t.Client, cluster, model.GetScheme(), nil, synthesizedComp.Replicas, 0)
 
 	postProvisionDone := checkPostProvisionDone(transCtx)
 	if err := restoreMGR.DoRestore(synthesizedComp, transCtx.Component, postProvisionDone); err != nil {

@@ -21,6 +21,7 @@ package cluster
 
 import (
 	"context"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"reflect"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -91,7 +92,7 @@ func getFailedBackups(ctx context.Context,
 			continue
 		}
 		if backup.Labels[dptypes.BackupTypeLabelKey] != string(dpv1alpha1.BackupTypeContinuous) {
-			gvr, err := getGVKName(backup, rscheme)
+			gvr, err := getGVKName(backup, model.GetScheme())
 			if err != nil {
 				return err
 			}
@@ -133,7 +134,7 @@ func getOwningObjectsWithOptions(ctx context.Context,
 		for i := 0; i < l; i++ {
 			// get the underlying object
 			object := items.Index(i).Addr().Interface().(client.Object)
-			name, err := getGVKName(object, rscheme)
+			name, err := getGVKName(object, model.GetScheme())
 			if err != nil {
 				return nil, err
 			}

@@ -25,8 +25,6 @@ import (
 	"reflect"
 
 	"github.com/go-logr/logr"
-	snapshotv1beta1 "github.com/kubernetes-csi/external-snapshotter/client/v3/apis/volumesnapshot/v1beta1"
-	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -37,11 +35,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
-	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
-	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
@@ -167,19 +160,6 @@ func (c *clusterTransformContext) traverse(f func(spec *appsv1.ClusterComponentS
 		}
 	}
 }
-
-func init() {
-	model.AddScheme(appsv1alpha1.AddToScheme)
-	model.AddScheme(appsv1beta1.AddToScheme)
-	model.AddScheme(appsv1.AddToScheme)
-	model.AddScheme(dpv1alpha1.AddToScheme)
-	model.AddScheme(snapshotv1.AddToScheme)
-	model.AddScheme(snapshotv1beta1.AddToScheme)
-	model.AddScheme(extensionsv1alpha1.AddToScheme)
-	model.AddScheme(workloadsv1.AddToScheme)
-}
-
-// PlanBuilder implementation
 
 func (c *clusterPlanBuilder) Init() error {
 	cluster := &appsv1.Cluster{}

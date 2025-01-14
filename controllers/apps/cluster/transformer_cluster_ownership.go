@@ -43,7 +43,7 @@ func (f *clusterOwnershipTransformer) Transform(ctx graph.TransformContext, dag 
 
 	controllerutil.AddFinalizer(cluster, constant.DBClusterFinalizerName)
 	for _, object := range objects {
-		if err := intctrlutil.SetOwnership(cluster, object, rscheme, constant.DBClusterFinalizerName); err != nil {
+		if err := intctrlutil.SetOwnership(cluster, object, model.GetScheme(), constant.DBClusterFinalizerName); err != nil {
 			if _, ok := err.(*controllerutil.AlreadyOwnedError); ok {
 				continue
 			}

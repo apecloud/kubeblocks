@@ -61,6 +61,8 @@ import (
 	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	workloadsv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	appscontrollers "github.com/apecloud/kubeblocks/controllers/apps"
+	"github.com/apecloud/kubeblocks/controllers/apps/cluster"
+	"github.com/apecloud/kubeblocks/controllers/apps/component"
 	"github.com/apecloud/kubeblocks/controllers/apps/configuration"
 	experimentalcontrollers "github.com/apecloud/kubeblocks/controllers/experimental"
 	extensionscontrollers "github.com/apecloud/kubeblocks/controllers/extensions"
@@ -443,7 +445,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		if err = (&appscontrollers.ClusterReconciler{
+		if err = (&cluster.ClusterReconciler{
 			Client:          client,
 			Scheme:          mgr.GetScheme(),
 			Recorder:        mgr.GetEventRecorderFor("cluster-controller"),
@@ -453,7 +455,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		if err = (&appscontrollers.ComponentReconciler{
+		if err = (&component.ComponentReconciler{
 			Client:   client,
 			Scheme:   mgr.GetScheme(),
 			Recorder: mgr.GetEventRecorderFor("component-controller"),

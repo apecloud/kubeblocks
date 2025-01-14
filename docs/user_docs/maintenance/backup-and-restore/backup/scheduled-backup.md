@@ -57,7 +57,7 @@ kbcli cluster update mysql-cluster --backup-enabled=true \
 
 - `--backup-enabled` indicates whether to enable scheduled backups.
 - `--backup-method` specifies the backup method. You can use the `kbcli cluster describe-backup-policy mysql-cluster` command to view the supported backup methods.
-- `--backup-repo-name` specifies the name of the backupRepo.
+- `--backup-repo-name` specifies the name of the BackupRepo.
 - `--backup-retention-period` specifies the retention period for backups, which is 7 days in the example.
 - `--backup-cron-expression` specifies the backup schedule using a cron expression in UTC timezone. Refer to [cron](https://en.wikipedia.org/wiki/Cron) for the expression format.
 

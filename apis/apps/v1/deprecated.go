@@ -23,7 +23,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -161,21 +160,22 @@ func (r *ClusterComponentVolumeClaimTemplate) toVolumeClaimTemplate() corev1.Per
 
 func (r *PersistentVolumeClaimSpec) ToV1PersistentVolumeClaimSpec() corev1.PersistentVolumeClaimSpec {
 	return corev1.PersistentVolumeClaimSpec{
-		AccessModes:      r.AccessModes,
-		Resources:        r.Resources,
-		StorageClassName: r.getStorageClassName(viper.GetString(constant.CfgKeyDefaultStorageClass)),
-		VolumeMode:       r.VolumeMode,
+		AccessModes:               r.AccessModes,
+		Resources:                 r.Resources,
+		StorageClassName:          r.getStorageClassName(viper.GetString(constant.CfgKeyDefaultStorageClass)),
+		VolumeMode:                r.VolumeMode,
+		VolumeAttributesClassName: r.VolumeAttributesClassName,
 	}
 }
 
 // getStorageClassName returns PersistentVolumeClaimSpec.StorageClassName if a value is assigned; otherwise,
-// it returns preferSC argument.
-func (r *PersistentVolumeClaimSpec) getStorageClassName(preferSC string) *string {
+// it returns the defaultStorageClass argument.
+func (r *PersistentVolumeClaimSpec) getStorageClassName(defaultStorageClass string) *string {
 	if r.StorageClassName != nil && *r.StorageClassName != "" {
 		return r.StorageClassName
 	}
-	if preferSC != "" {
-		return &preferSC
+	if defaultStorageClass != "" {
+		return &defaultStorageClass
 	}
 	return nil
 }
@@ -217,7 +217,6 @@ func (t *InstanceTemplate) GetReplicas() int32 {
 	return defaultInstanceTemplateReplicas
 }
 
-// GetOrdinals TODO(free6om): Remove after resolving the circular dependencies between apps and workloads.
-func (t *InstanceTemplate) GetOrdinals() workloads.Ordinals {
-	return workloads.Ordinals{}
+func (t *InstanceTemplate) GetOrdinals() Ordinals {
+	return t.Ordinals
 }

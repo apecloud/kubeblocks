@@ -42,7 +42,7 @@ One of these limitations is evident in horizontal scaling scenarios, where *Stat
 
 Another issue arises in the same scenario: if the node hosting Pods experiences a hardware failure, causing disk damage and rendering data read-write inaccessible, according to operational best practices, we need to offload the damaged Pod and rebuild replicas on healthy nodes. However, performing such operational tasks based on *StatefulSets* isn't easy. [Similar discussions](https://github.com/kubernetes/kubernetes/issues/83224) can be observed in the Kubernetes community.
 
-To solve the limitations mentioned above, starting from version 0.9, KubeBlocks replaces *StatefulStes* with *InstanceSet* which is a general workload API and is in charge of a set of instances. With *InstanceSet*, KubeBlocks introduces the *specified instance scaling* feature to improve the availability.
+To solve the limitations mentioned above, starting from version 0.9, KubeBlocks replaces *StatefulSets* with *InstanceSet* which is a general workload API and is in charge of a set of instances. With *InstanceSet*, KubeBlocks introduces the *specified instance scaling* feature to improve the availability.
 
 ## Before you start
 

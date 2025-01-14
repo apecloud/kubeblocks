@@ -14,7 +14,7 @@ This tutorial demonstrates how to configure the monitoring function for a Postgr
 
 ## Step 1. Install Prometheus Operator and Grafana
 
-Install the Promethus Operator and Grafana to monitor the performance of a database. Skip this step if a Prometheus Operator is already installed in your environment.
+Install the Prometheus Operator and Grafana to monitor the performance of a database. Skip this step if a Prometheus Operator is already installed in your environment.
 
 1. Create a new namespace for Prometheus Operator.
 

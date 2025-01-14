@@ -27,7 +27,6 @@ import (
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -35,7 +34,6 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
-	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 var (
@@ -253,7 +251,7 @@ func buildSchedulingPolicy(synthesizedComp *SynthesizedComponent, comp *appsv1.C
 
 func buildVolumeClaimTemplates(synthesizeComp *SynthesizedComponent, comp *appsv1.Component) {
 	if comp.Spec.VolumeClaimTemplates != nil {
-		synthesizeComp.VolumeClaimTemplates = ToVolumeClaimTemplates(comp.Spec.VolumeClaimTemplates)
+		synthesizeComp.VolumeClaimTemplates = intctrlutil.ToCoreV1PVCTs(comp.Spec.VolumeClaimTemplates)
 	}
 }
 
@@ -324,33 +322,6 @@ func limitSharedMemoryVolumeSize(synthesizeComp *SynthesizedComponent, comp *app
 		}
 		synthesizeComp.PodSpec.Volumes[i].EmptyDir.SizeLimit = &shm
 	}
-}
-
-func ToVolumeClaimTemplates(vcts []appsv1.ClusterComponentVolumeClaimTemplate) []corev1.PersistentVolumeClaimTemplate {
-	storageClassName := func(spec appsv1.PersistentVolumeClaimSpec, defaultStorageClass string) *string {
-		if spec.StorageClassName != nil && *spec.StorageClassName != "" {
-			return spec.StorageClassName
-		}
-		if defaultStorageClass != "" {
-			return &defaultStorageClass
-		}
-		return nil
-	}
-	var ts []corev1.PersistentVolumeClaimTemplate
-	for _, t := range vcts {
-		ts = append(ts, corev1.PersistentVolumeClaimTemplate{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: t.Name,
-			},
-			Spec: corev1.PersistentVolumeClaimSpec{
-				AccessModes:      t.Spec.AccessModes,
-				Resources:        t.Spec.Resources,
-				StorageClassName: storageClassName(t.Spec, viper.GetString(constant.CfgKeyDefaultStorageClass)),
-				VolumeMode:       t.Spec.VolumeMode,
-			},
-		})
-	}
-	return ts
 }
 
 // buildAndUpdateResources updates podSpec resources from component

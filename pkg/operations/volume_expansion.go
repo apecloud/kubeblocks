@@ -354,10 +354,7 @@ func (ve volumeExpansionOpsHandler) handleVCTExpansionProgress(reqCtx intctrluti
 			continue
 		}
 		objectKey := getPVCProgressObjectKey(v.Name)
-		progressDetail := findStatusProgressDetail(compStatus.ProgressDetails, objectKey)
-		if progressDetail == nil {
-			progressDetail = &opsv1alpha1.ProgressStatusDetail{ObjectKey: objectKey, Group: veHelper.vctName}
-		}
+		progressDetail := ve.getProgressDetail(veHelper, compStatus, objectKey)
 		if progressDetail.Status == opsv1alpha1.FailedProgressStatus {
 			completedCount += 1
 			continue
@@ -373,7 +370,7 @@ func (ve volumeExpansionOpsHandler) handleVCTExpansionProgress(reqCtx intctrluti
 			completedCount += 1
 			message := fmt.Sprintf("Successfully expand volume: %s in component: %s", objectKey, veHelper.compOps.GetComponentName())
 			progressDetail.SetStatusAndMessage(opsv1alpha1.SucceedProgressStatus, message)
-			setComponentStatusProgressDetail(opsRes.Recorder, opsRes.OpsRequest, &compStatus.ProgressDetails, *progressDetail)
+			setComponentStatusProgressDetail(opsRes.Recorder, opsRes.OpsRequest, &compStatus.ProgressDetails, progressDetail)
 			continue
 		}
 		if ve.pvcIsResizing(&v) {
@@ -383,9 +380,17 @@ func (ve volumeExpansionOpsHandler) handleVCTExpansionProgress(reqCtx intctrluti
 			message := fmt.Sprintf("Waiting for an external controller to process the pvc: %s in component: %s", objectKey, veHelper.compOps.GetComponentName())
 			progressDetail.SetStatusAndMessage(opsv1alpha1.PendingProgressStatus, message)
 		}
-		setComponentStatusProgressDetail(opsRes.Recorder, opsRes.OpsRequest, &compStatus.ProgressDetails, *progressDetail)
+		setComponentStatusProgressDetail(opsRes.Recorder, opsRes.OpsRequest, &compStatus.ProgressDetails, progressDetail)
 	}
 	return succeedCount, completedCount, nil
+}
+
+func (ve volumeExpansionOpsHandler) getProgressDetail(veHelper volumeExpansionHelper, compStatus *opsv1alpha1.OpsRequestComponentStatus, objectKey string) opsv1alpha1.ProgressStatusDetail {
+	progressDetail := findStatusProgressDetail(compStatus.ProgressDetails, objectKey)
+	if progressDetail == nil {
+		return opsv1alpha1.ProgressStatusDetail{ObjectKey: objectKey, Group: veHelper.vctName}
+	}
+	return *progressDetail
 }
 
 func getComponentVCTKey(compoName, insTemplateName, vctName string) string {

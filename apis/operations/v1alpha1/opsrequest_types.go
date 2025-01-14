@@ -173,10 +173,6 @@ type SpecificOpsRequest struct {
 	// Lists Switchover objects, each specifying a Component to perform the switchover operation.
 	//
 	// +optional
-	// +patchMergeKey=componentName
-	// +patchStrategy=merge,retainKeys
-	// +listType=map
-	// +listMapKey=componentName
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="forbidden to update spec.switchover"
 	SwitchoverList []Switchover `json:"switchover,omitempty"  patchStrategy:"merge,retainKeys" patchMergeKey:"componentName"`
 
@@ -239,7 +235,7 @@ type SpecificOpsRequest struct {
 
 // ComponentOps specifies the Component to be operated on.
 type ComponentOps struct {
-	// Specifies the name of the Component.
+	// Specifies the name of the Component as defined in the cluster.spec
 	// +kubebuilder:validation:Required
 	ComponentName string `json:"componentName"`
 }
@@ -270,6 +266,10 @@ type RebuildInstance struct {
 	// +optional
 	BackupName string `json:"backupName,omitempty"`
 
+	// When multiple source targets exist of the backup, you must specify the source target to restore.
+	// +optional
+	SourceBackupTargetName string `json:"sourceBackupTargetName,omitempty"`
+
 	// Defines container environment variables for the restore process.
 	// merged with the ones specified in the Backup and ActionSet resources.
 	//
@@ -298,9 +298,16 @@ type Instance struct {
 	TargetNodeName string `json:"targetNodeName,omitempty"`
 }
 
+// +kubebuilder:validation:XValidation:rule="(has(self.componentName) && !has(self.componentObjectName)) || (!has(self.componentName) && has(self.componentObjectName))",message="need to specified only componentName or componentObjectName"
+
 type Switchover struct {
-	// Specifies the name of the Component.
-	ComponentOps `json:",inline"`
+	// Specifies the name of the Component as defined in the cluster.spec.
+	// +optional
+	ComponentName string `json:"componentName,omitempty"`
+
+	// Specifies the name of the Component object.
+	// +optional
+	ComponentObjectName string `json:"componentObjectName,omitempty"`
 
 	// Specifies the instance whose role will be transferred. A typical usage is to transfer the leader role
 	// in a consensus system.
@@ -1333,4 +1340,11 @@ func (r OpsRequestSpec) GetRestore() *Restore {
 func (p *ProgressStatusDetail) SetStatusAndMessage(status ProgressStatus, message string) {
 	p.Message = message
 	p.Status = status
+}
+
+func (s *Switchover) GetComponentName() string {
+	if len(s.ComponentObjectName) > 0 {
+		return s.ComponentObjectName
+	}
+	return s.ComponentName
 }

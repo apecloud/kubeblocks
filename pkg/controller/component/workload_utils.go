@@ -35,7 +35,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/instanceset"
 	"github.com/apecloud/kubeblocks/pkg/generics"
-	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 func ListOwnedWorkloads(ctx context.Context, cli client.Reader, namespace, clusterName, compName string) ([]*workloads.InstanceSet, error) {
@@ -139,7 +138,7 @@ func GenerateAllPodNames(
 			Replicas: instances[i].Replicas,
 		})
 	}
-	return instanceset.GenerateAllInstanceNames(fullCompName, compReplicas, templates, offlineInstances, workloads.Ordinals{})
+	return instanceset.GenerateAllInstanceNames(fullCompName, compReplicas, templates, offlineInstances, appsv1.Ordinals{})
 }
 
 // GenerateAllPodNamesToSet generate all pod names for a component
@@ -165,30 +164,21 @@ func GenerateAllPodNamesToSet(
 
 func GetTemplateNameAndOrdinal(workloadName, podName string) (string, int32, error) {
 	podSuffix := strings.Replace(podName, workloadName+"-", "", 1)
-	suffixArr := strings.Split(podSuffix, "-")
+	lastDashIndex := strings.LastIndex(podSuffix, "-")
+	if lastDashIndex == len(podSuffix)-1 {
+		return "", 0, fmt.Errorf("no pod ordinal found after the last dash")
+	}
 	templateName := ""
 	indexStr := ""
-	if len(suffixArr) == 2 {
-		templateName = suffixArr[0]
-		indexStr = suffixArr[1]
+	if lastDashIndex == -1 {
+		indexStr = podSuffix
 	} else {
-		indexStr = suffixArr[0]
+		templateName = podSuffix[0:lastDashIndex]
+		indexStr = podSuffix[lastDashIndex+1:]
 	}
 	index, err := strconv.Atoi(indexStr)
 	if err != nil {
 		return "", 0, fmt.Errorf("failed to obtain pod ordinal")
 	}
 	return templateName, int32(index), nil
-}
-
-func PodFQDN(namespace, compName, podName string) string {
-	return fmt.Sprintf("%s.%s-headless.%s.svc.%s", podName, compName, namespace, clusterDomain())
-}
-
-func serviceFQDN(namespace, serviceName string) string {
-	return fmt.Sprintf("%s.%s.svc.%s", serviceName, namespace, clusterDomain())
-}
-
-func clusterDomain() string {
-	return viper.GetString(constant.KubernetesClusterDomainEnv)
 }

@@ -118,7 +118,7 @@ Kind stands for Kubernetes IN Docker. It runs Kubernetes clusters within Docker 
 
 Minikube runs a single-node Kubernetes cluster on your local machine, either in a virtual machine or a container.
 
-1. Install Minikube. For details, you can refer to [Minikube Quck Start](https://minikube.sigs.k8s.io/docs/start/).
+1. Install Minikube. For details, you can refer to [Minikube Quick Start](https://minikube.sigs.k8s.io/docs/start/).
 
    <Tabs>
 

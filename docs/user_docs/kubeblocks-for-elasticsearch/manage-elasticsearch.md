@@ -210,7 +210,7 @@ curl http://127.0.0.1:9200/_cat/nodes?v
 
 ## Scale
 
-KubeBlocks supports horizontally and vertially scaling an Elasticsearch cluster.
+KubeBlocks supports horizontally and vertically scaling an Elasticsearch cluster.
 
 ### Before you start
 

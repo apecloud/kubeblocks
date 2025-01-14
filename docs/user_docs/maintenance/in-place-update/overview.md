@@ -22,7 +22,7 @@ In principle, KubeBlocks instance in-place updates leverage [the Kubernetes Pod 
 * `spec.containers[*].image`
 * `spec.tolerations (only supports adding Toleration)`
 
-Starting from Kubernetes version 1.27, support for in-place updates of CPU and Memory can be further enabled through the `InPlacePodVerticalScaling` feature switch. KubeBlocks also supports the `InPlacePodVerticalScaling` feature switc which further supports the following capabilities:
+Starting from Kubernetes version 1.27, support for in-place updates of CPU and Memory can be further enabled through the `InPlacePodVerticalScaling` feature switch. KubeBlocks also supports the `InPlacePodVerticalScaling` feature switch which further supports the following capabilities:
 
 For Kubernetes versions equal to or greater than 1.27 with InPlacePodVerticalScaling enabled, the following fields' in-place updates are supported:
 

@@ -48,7 +48,8 @@ import (
 )
 
 const (
-	compatibleDefinitionsKey = "componentversion.kubeblocks.io/compatible-definitions"
+	componentVersionFinalizerName = "componentversion.kubeblocks.io/finalizer"
+	compatibleDefinitionsKey      = "componentversion.kubeblocks.io/compatible-definitions"
 )
 
 // ComponentVersionReconciler reconciles a ComponentVersion object
@@ -391,110 +392,6 @@ func validateCompatibilityRulesCompDef(compVersion *appsv1.ComponentVersion) err
 		}
 	}
 	return nil
-}
-
-// resolveCompDefinitionNServiceVersion resolves and returns the specific component definition object and the service version supported.
-func resolveCompDefinitionNServiceVersion(ctx context.Context, cli client.Reader, compDefName, serviceVersion string) (*appsv1.ComponentDefinition, string, error) {
-	var (
-		compDef *appsv1.ComponentDefinition
-	)
-	compDefs, err := listCompDefinitionsWithPattern(ctx, cli, compDefName)
-	if err != nil {
-		return compDef, serviceVersion, err
-	}
-
-	// mapping from <service version> to <[]*appsv1.ComponentDefinition>
-	serviceVersionToCompDefs, err := serviceVersionToCompDefinitions(ctx, cli, compDefs, serviceVersion)
-	if err != nil {
-		return compDef, serviceVersion, err
-	}
-
-	// use specified service version or the latest.
-	if len(serviceVersion) == 0 {
-		serviceVersions := maps.Keys(serviceVersionToCompDefs)
-		if len(serviceVersions) > 0 {
-			slices.SortFunc(serviceVersions, serviceVersionComparator)
-			serviceVersion = serviceVersions[len(serviceVersions)-1]
-		}
-	}
-
-	// component definitions that support the service version
-	compatibleCompDefs := serviceVersionToCompDefs[serviceVersion]
-	if len(compatibleCompDefs) == 0 {
-		return compDef, serviceVersion, fmt.Errorf(`no matched component definition found with componentDef "%s" and serviceVersion "%s"`, compDefName, serviceVersion)
-	}
-
-	// choose the latest one
-	compatibleCompDefNames := maps.Keys(compatibleCompDefs)
-	slices.Sort(compatibleCompDefNames)
-	compatibleCompDefName := compatibleCompDefNames[len(compatibleCompDefNames)-1]
-
-	return compatibleCompDefs[compatibleCompDefName], serviceVersion, nil
-}
-
-func serviceVersionToCompDefinitions(ctx context.Context, cli client.Reader,
-	compDefs []*appsv1.ComponentDefinition, serviceVersion string) (map[string]map[string]*appsv1.ComponentDefinition, error) {
-	result := make(map[string]map[string]*appsv1.ComponentDefinition)
-
-	insert := func(version string, compDef *appsv1.ComponentDefinition) {
-		if _, ok := result[version]; !ok {
-			result[version] = make(map[string]*appsv1.ComponentDefinition)
-		}
-		result[version][compDef.Name] = compDef
-	}
-
-	checkedInsert := func(version string, compDef *appsv1.ComponentDefinition) error {
-		match, err := component.CompareServiceVersion(serviceVersion, version)
-		if err == nil && match {
-			insert(version, compDef)
-		}
-		return err
-	}
-
-	for _, compDef := range compDefs {
-		compVersions, err := component.CompatibleCompVersions4Definition(ctx, cli, compDef)
-		if err != nil {
-			return nil, err
-		}
-
-		serviceVersions := sets.New[string]()
-		// add definition's service version as default, in case there is no component versions provided
-		if compDef.Spec.ServiceVersion != "" {
-			serviceVersions.Insert(compDef.Spec.ServiceVersion)
-		}
-		for _, compVersion := range compVersions {
-			serviceVersions = serviceVersions.Union(compatibleServiceVersions4Definition(compDef, compVersion))
-		}
-
-		for version := range serviceVersions {
-			if err = checkedInsert(version, compDef); err != nil {
-				return nil, err
-			}
-		}
-	}
-	return result, nil
-}
-
-// compatibleServiceVersions4Definition returns all service versions that are compatible with specified component definition.
-func compatibleServiceVersions4Definition(compDef *appsv1.ComponentDefinition, compVersion *appsv1.ComponentVersion) sets.Set[string] {
-	match := func(pattern string) bool {
-		return component.PrefixOrRegexMatched(compDef.Name, pattern)
-	}
-	releases := make(map[string]bool, 0)
-	for _, rule := range compVersion.Spec.CompatibilityRules {
-		if slices.IndexFunc(rule.CompDefs, match) >= 0 {
-			for _, release := range rule.Releases {
-				releases[release] = true
-			}
-		}
-	}
-	serviceVersions := sets.New[string]()
-	for _, release := range compVersion.Spec.Releases {
-		if releases[release.Name] {
-			serviceVersions = serviceVersions.Insert(release.ServiceVersion)
-		}
-	}
-	return serviceVersions
 }
 
 func serviceVersionComparator(a, b string) int {

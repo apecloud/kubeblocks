@@ -200,8 +200,8 @@ func (s *Scheduler) buildPodSpec(schedulePolicy *dpv1alpha1.SchedulePolicy) (*co
 	if err != nil {
 		return nil, err
 	}
-	createBackupCmd := fmt.Sprintf(`
-%skubectl create -f - <<EOF
+	createBackupCmd := fmt.Sprintf(`%s
+kubectl create -f - <<EOF
 apiVersion: dataprotection.kubeblocks.io/v1alpha1
 kind: Backup
 metadata:
@@ -533,7 +533,7 @@ func (s *Scheduler) buildCheckCommand(schedulePolicy *dpv1alpha1.SchedulePolicy)
 		labelSlice = append(labelSlice, fmt.Sprintf("%s=%s", k, v))
 	}
 	checkCommand := fmt.Sprintf(`
-count=$(kubectl get backups.dataprotection.kubeblocks.io -n %s--selector=%s -o jsonpath='{range .items[?(@.spec.backupMethod=="%s")]}{.status.phase}{"\n"}{end}' | grep "Completed" | wc -l)
+count=$(kubectl get backups.dataprotection.kubeblocks.io -n %s --selector=%s -o jsonpath='{range .items[?(@.spec.backupMethod=="%s")]}{.status.phase}{"\n"}{end}' | grep "Completed" | wc -l)
 if [ "$count" -eq 0 ]; then
     echo "No completed full backups found. Exiting."
     exit 0

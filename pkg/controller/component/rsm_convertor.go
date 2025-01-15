@@ -227,9 +227,9 @@ func toPersistentVolumeClaims(vcts []appsv1alpha1.ClusterComponentVolumeClaimTem
 	for _, v := range vcts {
 		pvcs = append(pvcs, corev1.PersistentVolumeClaim{
 			ObjectMeta: metav1.ObjectMeta{
-				Labels: v.Labels,
+				Labels:      v.Labels,
 				Annotations: v.Annotations,
-				Name: v.Name,
+				Name:        v.Name,
 			},
 			Spec: v.Spec.ToV1PersistentVolumeClaimSpec(),
 		})

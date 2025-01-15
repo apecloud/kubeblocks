@@ -21,7 +21,6 @@ package cluster
 
 import (
 	"context"
-	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"reflect"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -33,6 +32,7 @@ import (
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 )
 

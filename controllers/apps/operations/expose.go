@@ -61,7 +61,9 @@ func (e ExposeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clien
 	for _, comp := range opsRes.Cluster.Spec.ComponentSpecs {
 		compMap[comp.Name] = comp
 	}
-
+	for _, shard := range opsRes.Cluster.Spec.ShardingSpecs {
+		compMap[shard.Name] = shard.Template
+	}
 	for _, expose := range exposeMap {
 		clusterCompSpecName := ""
 		compDef := ""
@@ -384,7 +386,11 @@ func (e ExposeOpsHandler) buildClusterServices(reqCtx intctrlutil.RequestCtx,
 		}
 
 		genServiceName := generateServiceName(clusterCompSpecName, exposeService.Name)
-
+		shardName, ok := exposeService.Annotations[constant.KBAppShardingNameLabelKey]
+		if ok {
+			delete(exposeService.Annotations, constant.KBAppShardingNameLabelKey)
+			clusterCompSpecName = ""
+		}
 		clusterService := appsv1alpha1.ClusterService{
 			Service: appsv1alpha1.Service{
 				Name:        genServiceName,
@@ -395,6 +401,7 @@ func (e ExposeOpsHandler) buildClusterServices(reqCtx intctrlutil.RequestCtx,
 				},
 			},
 			ComponentSelector: clusterCompSpecName,
+			ShardingSelector:  shardName,
 		}
 
 		// set service ports

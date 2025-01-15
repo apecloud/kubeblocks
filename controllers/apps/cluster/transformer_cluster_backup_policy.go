@@ -631,15 +631,20 @@ func (r *backupPolicyBuilder) mergeClusterBackup(
 			}
 			hasSyncPITRMethod = true
 		}
-		if as.Spec.BackupType == dpv1alpha1.BackupTypeIncremental && backup.IncrementalBackupEnabled != nil &&
-			!hasSyncIncMethod && len(backup.Method) > 0 && m.CompatibleMethod == backup.Method {
-			// auto-sync the first compatible incremental backup for the 'incrementalBackupEnabled' option.
-			mergeSchedulePolicy(&dpv1alpha1.SchedulePolicy{
-				Enabled:         backup.IncrementalBackupEnabled,
-				RetentionPeriod: backup.RetentionPeriod,
-				CronExpression:  backup.IncrementalCronExpression,
-			}, &backupSchedule.Spec.Schedules[i])
-			hasSyncIncMethod = true
+		if as.Spec.BackupType == dpv1alpha1.BackupTypeIncremental {
+			if len(backup.Method) == 0 || m.CompatibleMethod != backup.Method {
+				backupSchedule.Spec.Schedules[i].Enabled = boolptr.False()
+			} else {
+				if backup.IncrementalBackupEnabled != nil && !hasSyncIncMethod {
+					// auto-sync the first compatible incremental backup for the 'incrementalBackupEnabled' option.
+					mergeSchedulePolicy(&dpv1alpha1.SchedulePolicy{
+						Enabled:         backup.IncrementalBackupEnabled,
+						RetentionPeriod: backup.RetentionPeriod,
+						CronExpression:  backup.IncrementalCronExpression,
+					}, &backupSchedule.Spec.Schedules[i])
+					hasSyncIncMethod = true
+				}
+			}
 		}
 		if as.Spec.BackupType == dpv1alpha1.BackupTypeFull && enableAutoBackup {
 			// disable the automatic backup for other full backup method

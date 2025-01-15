@@ -24,6 +24,7 @@ import (
 	"reflect"
 	"slices"
 	"sort"
+	"strings"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -195,8 +196,12 @@ func (s *Scheduler) buildPodSpec(schedulePolicy *dpv1alpha1.SchedulePolicy) (*co
 	if err != nil {
 		return nil, err
 	}
+	checkCommand, err := s.buildCheckCommand(schedulePolicy)
+	if err != nil {
+		return nil, err
+	}
 	createBackupCmd := fmt.Sprintf(`
-kubectl create -f - <<EOF
+%skubectl create -f - <<EOF
 apiVersion: dataprotection.kubeblocks.io/v1alpha1
 kind: Backup
 metadata:
@@ -210,7 +215,7 @@ spec:
   backupMethod: %s
   retentionPeriod: %s%s
 EOF
-`, s.BackupSchedule.Name, s.generateBackupName(schedulePolicy), s.BackupSchedule.Namespace,
+`, checkCommand, s.BackupSchedule.Name, s.generateBackupName(schedulePolicy), s.BackupSchedule.Namespace,
 		s.BackupPolicy.Name, schedulePolicy.BackupMethod,
 		schedulePolicy.RetentionPeriod, parameters)
 
@@ -506,4 +511,37 @@ func (s *Scheduler) reconcileReconfigure(backupSchedule *dpv1alpha1.BackupSchedu
 		}
 	}
 	return nil
+}
+
+func (s *Scheduler) buildCheckCommand(schedulePolicy *dpv1alpha1.SchedulePolicy) (string, error) {
+	backupMethod := dputils.GetBackupMethodByName(schedulePolicy.BackupMethod, s.BackupPolicy)
+	actionSet, err := dputils.GetActionSetByName(s.RequestCtx, s.Client, backupMethod.ActionSetName)
+	if err != nil {
+		return "", err
+	}
+	// command is used by incremental backup
+	if backupType := dputils.GetBackupType(actionSet, backupMethod.SnapshotVolumes); backupType != dpv1alpha1.BackupTypeIncremental {
+		return "", nil
+	}
+	// filter completed full backup, if there is no completed full backup, exit.
+	labelMap := map[string]string{
+		dptypes.BackupPolicyLabelKey: s.BackupSchedule.Spec.BackupPolicyName,
+		dptypes.BackupTypeLabelKey:   string(dpv1alpha1.BackupTypeFull),
+	}
+	labelSlice := []string{}
+	for k, v := range labelMap {
+		labelSlice = append(labelSlice, fmt.Sprintf("%s=%s", k, v))
+	}
+	checkCommand := fmt.Sprintf(`
+count=$(kubectl get backups.dataprotection.kubeblocks.io -n %s--selector=%s -o jsonpath='{range .items[?(@.spec.backupMethod=="%s")]}{.status.phase}{"\n"}{end}' | grep "Completed" | wc -l)
+if [ "$count" -eq 0 ]; then
+    echo "No completed full backups found. Exiting."
+    exit 0
+fi
+`,
+		s.BackupSchedule.Namespace,
+		strings.Join(labelSlice, ","),
+		backupMethod.CompatibleMethod,
+	)
+	return checkCommand, nil
 }

@@ -45,7 +45,6 @@ type componentTransformContext struct {
 	Client client.Reader
 	record.EventRecorder
 	logr.Logger
-	Cluster             *appsv1.Cluster // TODO: comp -> compdefs for vars
 	CompDef             *appsv1.ComponentDefinition
 	Component           *appsv1.Component
 	ComponentOrig       *appsv1.Component

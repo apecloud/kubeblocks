@@ -84,7 +84,7 @@ var _ = Describe("object rbac transformer test.", func() {
 		graphCli = model.NewGraphClient(k8sClient)
 
 		var err error
-		synthesizedComp, err = component.BuildSynthesizedComponent(ctx, k8sClient, compDefObj, compObj, nil)
+		synthesizedComp, err = component.BuildSynthesizedComponent(ctx, k8sClient, compDefObj, compObj)
 		Expect(err).Should(Succeed())
 
 		transCtx = &componentTransformContext{

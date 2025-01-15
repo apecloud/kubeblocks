@@ -148,18 +148,7 @@ func (t *componentPreTerminateTransformer) synthesizedComponent(transCtx *compon
 		cli  = transCtx.Client
 		comp = transCtx.Component
 	)
-
-	clusterName, err := component.GetClusterName(comp)
-	if err != nil {
-		return nil, intctrlutil.NewRequeueError(appsutil.RequeueDuration, err.Error())
-	}
-	cluster := &appsv1.Cluster{}
-	err = cli.Get(ctx, types.NamespacedName{Name: clusterName, Namespace: comp.Namespace}, cluster)
-	if err != nil {
-		return nil, intctrlutil.NewRequeueError(appsutil.RequeueDuration, err.Error())
-	}
-
-	synthesizedComp, err := component.BuildSynthesizedComponent(ctx, cli, compDef, comp, cluster)
+	synthesizedComp, err := component.BuildSynthesizedComponent(ctx, cli, compDef, comp)
 	if err != nil {
 		return nil, intctrlutil.NewRequeueError(appsutil.RequeueDuration,
 			fmt.Sprintf("build synthesized component failed at pre-terminate transformer: %s", err.Error()))

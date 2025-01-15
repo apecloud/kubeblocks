@@ -34,6 +34,7 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/generics"
 )
 
 var (
@@ -43,7 +44,7 @@ var (
 // BuildSynthesizedComponent builds a new SynthesizedComponent object, which is a mixture of component-related configs from ComponentDefinition and Component.
 // TODO: remove @ctx & @cli
 func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
-	compDef *appsv1.ComponentDefinition, comp *appsv1.Component, cluster *appsv1.Cluster) (*SynthesizedComponent, error) {
+	compDef *appsv1.ComponentDefinition, comp *appsv1.Component) (*SynthesizedComponent, error) {
 	if compDef == nil || comp == nil {
 		return nil, nil
 	}
@@ -60,7 +61,7 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 	if err != nil {
 		return nil, err
 	}
-	comp2CompDef, err := buildComp2CompDefs(ctx, cli, cluster)
+	comp2CompDef, err := buildComp2CompDefs(ctx, cli, comp.Namespace, clusterName)
 	if err != nil {
 		return nil, err
 	}
@@ -153,36 +154,28 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 	return synthesizeComp, nil
 }
 
-func buildComp2CompDefs(ctx context.Context, cli client.Reader, cluster *appsv1.Cluster) (map[string]string, error) {
-	if cluster == nil {
-		return nil, nil
+func buildComp2CompDefs(ctx context.Context, cli client.Reader, namespace, clusterName string) (map[string]string, error) {
+	if cli == nil {
+		return nil, nil // for test
 	}
+
+	labels := constant.GetClusterLabels(clusterName)
+	comps, err := listObjWithLabelsInNamespace(ctx, cli, generics.ComponentSignature, namespace, labels)
+	if err != nil {
+		return nil, err
+	}
+
 	mapping := make(map[string]string)
-
-	// build from componentSpecs
-	for _, comp := range cluster.Spec.ComponentSpecs {
-		if len(comp.ComponentDef) > 0 {
-			mapping[comp.Name] = comp.ComponentDef
+	for _, comp := range comps {
+		if len(comp.Spec.CompDef) > 0 {
+			continue
 		}
+		compName, err1 := ShortName(clusterName, comp.Name)
+		if err1 != nil {
+			return nil, err1
+		}
+		mapping[compName] = comp.Spec.CompDef
 	}
-
-	// build from shardings
-	for _, spec := range cluster.Spec.Shardings {
-		shardingComps, err := intctrlutil.ListShardingComponents(ctx, cli, cluster, spec.Name)
-		if err != nil {
-			return nil, err
-		}
-		for _, shardingComp := range shardingComps {
-			if len(shardingComp.Spec.CompDef) > 0 {
-				compShortName, err := ShortName(cluster.Name, shardingComp.Name)
-				if err != nil {
-					return nil, err
-				}
-				mapping[compShortName] = shardingComp.Spec.CompDef
-			}
-		}
-	}
-
 	return mapping, nil
 }
 

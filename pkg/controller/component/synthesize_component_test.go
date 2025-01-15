@@ -44,15 +44,6 @@ var _ = Describe("synthesized component", func() {
 		// in race conditions, it will find the existence of old objects, resulting failure to
 		// create the new objects.
 		By("clean resources")
-
-		// inNS := client.InNamespace(testCtx.DefaultNamespace)
-		// ml := client.HasLabels{testCtx.TestObjLabelKey}
-
-		// non-namespaced
-		// testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ClusterDefinitionSignature, true, ml)
-
-		// namespaced
-		// testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ConfigMapSignature, true, inNS, ml)
 	}
 
 	BeforeEach(func() {
@@ -105,7 +96,7 @@ var _ = Describe("synthesized component", func() {
 		})
 
 		It("comp def", func() {
-			synthesizedComp, err := BuildSynthesizedComponent(ctx, cli, compDef, comp, nil)
+			synthesizedComp, err := BuildSynthesizedComponent(ctx, cli, compDef, comp)
 			Expect(err).Should(BeNil())
 
 			Expect(synthesizedComp).ShouldNot(BeNil())
@@ -123,7 +114,7 @@ var _ = Describe("synthesized component", func() {
 					},
 				},
 			})
-			synthesizedComp, err := BuildSynthesizedComponent(ctx, cli, compDef, comp, nil)
+			synthesizedComp, err := BuildSynthesizedComponent(ctx, cli, compDef, comp)
 			Expect(err).Should(BeNil())
 
 			Expect(synthesizedComp).ShouldNot(BeNil())
@@ -145,7 +136,7 @@ var _ = Describe("synthesized component", func() {
 					},
 				},
 			})
-			_, err := BuildSynthesizedComponent(ctx, cli, compDef, comp, nil)
+			_, err := BuildSynthesizedComponent(ctx, cli, compDef, comp)
 			Expect(err).ShouldNot(BeNil())
 			Expect(err.Error()).Should(ContainSubstring("not defined in definition"))
 		})
@@ -162,7 +153,7 @@ var _ = Describe("synthesized component", func() {
 					},
 				},
 			})
-			_, err := BuildSynthesizedComponent(ctx, cli, compDef, comp, nil)
+			_, err := BuildSynthesizedComponent(ctx, cli, compDef, comp)
 			Expect(err).ShouldNot(BeNil())
 			Expect(err.Error()).Should(ContainSubstring("partial overriding is not supported"))
 		})
@@ -172,7 +163,7 @@ var _ = Describe("synthesized component", func() {
 				Name:                         func() *string { name := "external"; return &name }(),
 				ClusterComponentConfigSource: appsv1.ClusterComponentConfigSource{},
 			})
-			_, err := BuildSynthesizedComponent(ctx, cli, compDef, comp, nil)
+			_, err := BuildSynthesizedComponent(ctx, cli, compDef, comp)
 			Expect(err).ShouldNot(BeNil())
 			Expect(err.Error()).Should(ContainSubstring("there is no content provided for config template"))
 		})
@@ -225,13 +216,13 @@ var _ = Describe("synthesized component", func() {
 		It("duplicated", func() {
 			comp.Spec.Env = append(comp.Spec.Env, comp.Spec.Env[0])
 
-			_, err := BuildSynthesizedComponent(ctx, cli, compDef, comp, nil)
+			_, err := BuildSynthesizedComponent(ctx, cli, compDef, comp)
 			Expect(err).ShouldNot(BeNil())
 			Expect(err.Error()).Should(ContainSubstring("duplicated user-defined env var"))
 		})
 
 		It("ok", func() {
-			synthesizedComp, err := BuildSynthesizedComponent(ctx, cli, compDef, comp, nil)
+			synthesizedComp, err := BuildSynthesizedComponent(ctx, cli, compDef, comp)
 			Expect(err).Should(BeNil())
 			Expect(synthesizedComp).ShouldNot(BeNil())
 			Expect(synthesizedComp.PodSpec.Containers[0].Env).Should(HaveLen(2))
@@ -304,7 +295,7 @@ var _ = Describe("synthesized component", func() {
 		It("duplicated", func() {
 			comp.Spec.Volumes = append(comp.Spec.Volumes, comp.Spec.Volumes[0])
 
-			_, err := BuildSynthesizedComponent(ctx, cli, compDef, comp, nil)
+			_, err := BuildSynthesizedComponent(ctx, cli, compDef, comp)
 			Expect(err).ShouldNot(BeNil())
 			Expect(err.Error()).Should(ContainSubstring("duplicated volume"))
 		})
@@ -312,13 +303,13 @@ var _ = Describe("synthesized component", func() {
 		It("duplicated with definition", func() {
 			comp.Spec.Volumes = append(comp.Spec.Volumes, compDef.Spec.Runtime.Volumes[0])
 
-			_, err := BuildSynthesizedComponent(ctx, cli, compDef, comp, nil)
+			_, err := BuildSynthesizedComponent(ctx, cli, compDef, comp)
 			Expect(err).ShouldNot(BeNil())
 			Expect(err.Error()).Should(ContainSubstring("duplicated volume"))
 		})
 
 		It("ok", func() {
-			synthesizedComp, err := BuildSynthesizedComponent(ctx, cli, compDef, comp, nil)
+			synthesizedComp, err := BuildSynthesizedComponent(ctx, cli, compDef, comp)
 			Expect(err).Should(BeNil())
 			Expect(synthesizedComp).ShouldNot(BeNil())
 			Expect(synthesizedComp.PodSpec.Volumes).Should(HaveLen(4))

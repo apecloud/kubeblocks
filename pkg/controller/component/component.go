@@ -169,11 +169,3 @@ func GetComponentNameFromObj(obj client.Object) string {
 	}
 	return obj.GetLabels()[constant.KBAppComponentLabelKey]
 }
-
-// GetComponentNameLabelKey gets the component name label key.
-func GetComponentNameLabelKey(cluster *appsv1.Cluster, componentName string) string {
-	if cluster.Spec.GetShardingByName(componentName) != nil {
-		return constant.KBAppShardingNameLabelKey
-	}
-	return constant.KBAppComponentLabelKey
-}

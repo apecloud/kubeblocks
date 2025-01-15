@@ -44,7 +44,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -53,7 +52,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
-	testdp "github.com/apecloud/kubeblocks/pkg/testutil/dataprotection"
 	testk8s "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -107,13 +105,11 @@ var _ = Describe("Component Controller", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PodSignature, true, inNS, ml)
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupSignature, true, inNS, ml)
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupPolicySignature, true, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS, ml)
 		// non-namespaced
-		testapps.ClearResources(&testCtx, generics.ActionSetSignature, ml)
 		testapps.ClearResources(&testCtx, generics.StorageClassSignature, ml)
+
 		resetTestContext()
 	}
 
@@ -148,21 +144,6 @@ var _ = Describe("Component Controller", func() {
 
 		By("mock kb-agent client for the default transformer of system accounts provision")
 		testapps.MockKBAgentClientDefault()
-	}
-
-	waitForCreatingResourceCompletely := func(clusterKey client.ObjectKey, compNames ...string) {
-		Eventually(testapps.ClusterReconciled(&testCtx, clusterKey)).Should(BeTrue())
-		cluster := &kbappsv1.Cluster{}
-		Eventually(testapps.CheckObjExists(&testCtx, clusterKey, cluster, true)).Should(Succeed())
-		for _, compName := range compNames {
-			compPhase := kbappsv1.CreatingComponentPhase
-			for _, spec := range cluster.Spec.ComponentSpecs {
-				if spec.Name == compName && spec.Replicas == 0 {
-					compPhase = kbappsv1.StoppedComponentPhase
-				}
-			}
-			Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, compName)).Should(Equal(compPhase))
-		}
 	}
 
 	createCompObjX := func(compName, compDefName string, processor func(*testapps.MockComponentFactory), phase *kbappsv1.ComponentPhase) {
@@ -1393,74 +1374,6 @@ var _ = Describe("Component Controller", func() {
 		checkRBACResourcesExistence(saName, true)
 	}
 
-	testRestoreComponentFromBackup := func(compName, compDefName string) {
-		By("mock backup tool object")
-		backupPolicyName := "test-backup-policy"
-		backupName := "test-backup"
-		_ = testapps.CreateCustomizedObj(&testCtx, "backup/actionset.yaml", &dpv1alpha1.ActionSet{}, testapps.RandomizedObjName())
-
-		By("creating backup")
-		backup := testdp.NewBackupFactory(testCtx.DefaultNamespace, backupName).
-			SetBackupPolicyName(backupPolicyName).
-			SetBackupMethod(testdp.BackupMethodName).
-			Create(&testCtx).
-			GetObject()
-
-		By("mocking backup status completed, we don't need backup reconcile here")
-		Eventually(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(backup), func(backup *dpv1alpha1.Backup) {
-			backup.Status.PersistentVolumeClaimName = "backup-pvc"
-			backup.Status.Phase = dpv1alpha1.BackupPhaseCompleted
-			testdp.MockBackupStatusMethod(backup, testdp.BackupMethodName, testapps.DataVolumeName, testdp.ActionSetName)
-		})).Should(Succeed())
-
-		By("creating a component with backup")
-
-		restoreFromBackup := fmt.Sprintf(`{"%s":{"name":"%s"}}`, compName, backupName)
-		pvcSpec := testapps.NewPVCSpec("1Gi")
-		replicas := 3
-		createCompObj(compName, compDefName, func(f *testapps.MockComponentFactory) {
-			f.AddAnnotations(constant.RestoreFromBackupAnnotationKey, restoreFromBackup).
-				SetReplicas(int32(replicas)).
-				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec)
-		})
-
-		// mock pvcs have restored
-		mockComponentPVCsAndBound(compObj, compName, replicas, true, testk8s.DefaultStorageClassName)
-
-		By("wait for restore created")
-		ml := client.MatchingLabels{
-			constant.AppInstanceLabelKey:    clusterKey.Name,
-			constant.KBAppComponentLabelKey: compName,
-		}
-		Eventually(testapps.List(&testCtx, generics.RestoreSignature,
-			ml, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(1))
-
-		By("Mocking restore phase to Completed")
-		// mock prepareData restore completed
-		testdp.MockRestoreCompleted(&testCtx, ml)
-
-		// TODO: fix-me
-		By("Waiting for the cluster controller to create resources completely")
-		waitForCreatingResourceCompletely(clusterKey, compName)
-
-		itsList := testk8s.ListAndCheckInstanceSetWithComponent(&testCtx, clusterKey, compName)
-		its := &itsList.Items[0]
-		By("mock pod are available and wait for component enter running phase")
-		mockPods := testapps.MockInstanceSetPods2(&testCtx, its, clusterKey.Name, compName, compObj)
-		Expect(testapps.ChangeObjStatus(&testCtx, its, func() {
-			testk8s.MockInstanceSetReady(its, mockPods...)
-		})).ShouldNot(HaveOccurred())
-		Eventually(testapps.GetComponentPhase(&testCtx, compKey)).Should(Equal(kbappsv1.RunningComponentPhase))
-
-		By("clean up annotations after component running")
-		Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *kbappsv1.Component) {
-			g.Expect(comp.Status.Phase).Should(Equal(kbappsv1.RunningComponentPhase))
-			// mock postReady restore completed
-			testdp.MockRestoreCompleted(&testCtx, ml)
-			g.Expect(comp.Annotations[constant.RestoreFromBackupAnnotationKey]).Should(BeEmpty())
-		})).Should(Succeed())
-	}
-
 	Context("provisioning", func() {
 		BeforeEach(func() {
 			createDefinitionObjects()
@@ -1585,21 +1498,6 @@ var _ = Describe("Component Controller", func() {
 		It("scale-out", func() {
 			testVolumeExpansion(defaultCompName, compDefObj.Name, mockStorageClass)
 			horizontalScale(5, mockStorageClass.Name, defaultCompName, compDefObj.Name)
-		})
-	})
-
-	// TODO: fix-me
-	PContext("restore", func() {
-		BeforeEach(func() {
-			createDefinitionObjects()
-		})
-
-		AfterEach(func() {
-			cleanEnv()
-		})
-
-		It("test restore component from backup", func() {
-			testRestoreComponentFromBackup(defaultCompName, compDefObj.Name)
 		})
 	})
 
@@ -1855,7 +1753,7 @@ var _ = Describe("Component Controller", func() {
 		})
 	})
 
-	Context("with registry replace enabled", func() {
+	Context("registry config", func() {
 		registry := "foo.bar"
 		setRegistryConfig := func() {
 			viper.Set(constant.CfgRegistries, map[string]any{

@@ -40,7 +40,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-var _ = Describe(" component service transformer test", func() {
+var _ = Describe("component service transformer test", func() {
 	const (
 		clusterName = "test-cluster"
 		compName    = "comp"

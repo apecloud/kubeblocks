@@ -22,9 +22,12 @@ package component
 import (
 	"reflect"
 
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -57,7 +60,15 @@ func (t *componentRestoreTransformer) Transform(ctx graph.TransformContext, dag 
 		return err
 	}
 
-	cluster := transCtx.Cluster
+	clusterKey := types.NamespacedName{
+		Namespace: synthesizedComp.Namespace,
+		Name:      synthesizedComp.ClusterName,
+	}
+	cluster := &appsv1.Cluster{}
+	if err := t.Client.Get(reqCtx.Ctx, clusterKey, cluster); err != nil {
+		return errors.Wrap(err, "obtain the cluster object error for restore")
+	}
+
 	restoreMGR := plan.NewRestoreManager(reqCtx.Ctx, t.Client, cluster, model.GetScheme(), nil, synthesizedComp.Replicas, 0)
 
 	postProvisionDone := checkPostProvisionDone(transCtx)

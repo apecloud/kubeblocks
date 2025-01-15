@@ -864,7 +864,6 @@ var _ = Describe("Component Controller", func() {
 		By("check component finalizers and labels")
 		Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *kbappsv1.Component) {
 			g.Expect(comp.Finalizers).Should(ContainElements(constant.DBComponentFinalizerName))
-			//g.Expect(comp.Finalizers).Should(ContainElements(constant.DBClusterFinalizerName))
 			g.Expect(comp.Labels).Should(HaveKeyWithValue(constant.AppManagedByLabelKey, constant.AppName))
 			g.Expect(comp.Labels).Should(HaveKeyWithValue(constant.AppInstanceLabelKey, clusterKey.Name))
 			g.Expect(comp.Labels).Should(HaveKeyWithValue(constant.KBAppComponentLabelKey, compName))

@@ -23,10 +23,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -143,19 +141,6 @@ func (t *componentDeletionTransformer) deleteCompResources(transCtx *componentTr
 
 	// fast return, that is stopping the plan.Build() stage and jump to plan.Execute() directly
 	return graph.ErrPrematureStop
-}
-
-func (t *componentDeletionTransformer) getCluster(transCtx *componentTransformContext, comp *appsv1.Component) (*appsv1.Cluster, error) {
-	clusterName, err := component.GetClusterName(comp)
-	if err != nil {
-		return nil, err
-	}
-	cluster := &appsv1.Cluster{}
-	err = transCtx.Client.Get(transCtx.Context, types.NamespacedName{Name: clusterName, Namespace: comp.Namespace}, cluster)
-	if err != nil {
-		return nil, errors.New(fmt.Sprintf("failed to get cluster %s: %v", clusterName, err))
-	}
-	return cluster, nil
 }
 
 func compOwnedWorkloadKinds() []client.ObjectList {

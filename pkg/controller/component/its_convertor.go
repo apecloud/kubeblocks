@@ -24,13 +24,10 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 // BuildWorkloadFrom builds a new Component object based on SynthesizedComponent.
@@ -42,17 +39,10 @@ func BuildWorkloadFrom(synthesizeComp *SynthesizedComponent, protoITS *workloads
 		protoITS = &workloads.InstanceSet{}
 	}
 	convertors := map[string]convertor{
-		"service":                          &itsServiceConvertor{},
-		"alternativeservices":              &itsAlternativeServicesConvertor{},
-		"roles":                            &itsRolesConvertor{},
-		"roleprobe":                        &itsRoleProbeConvertor{},
-		"credential":                       &itsCredentialConvertor{},
-		"membershipreconfiguration":        &itsMembershipReconfigurationConvertor{},
-		"podmanagementpolicy":              &itsPodManagementPolicyConvertor{},
-		"parallelpodmanagementconcurrency": &itsParallelPodManagementConcurrencyConvertor{},
-		"updatestrategy":                   &itsUpdateStrategyConvertor{},
-		"instances":                        &itsInstancesConvertor{},
-		"offlineinstances":                 &itsOfflineInstancesConvertor{},
+		"roles":               &itsRolesConvertor{},
+		"credential":          &itsCredentialConvertor{},
+		"podmanagementpolicy": &itsPodManagementPolicyConvertor{},
+		"updatestrategy":      &itsUpdateStrategyConvertor{},
 	}
 	if err := covertObject(convertors, &protoITS.Spec, synthesizeComp); err != nil {
 		return nil, err
@@ -60,185 +50,8 @@ func BuildWorkloadFrom(synthesizeComp *SynthesizedComponent, protoITS *workloads
 	return protoITS, nil
 }
 
-// itsServiceConvertor is an implementation of the convertor interface, used to convert the given object into InstanceSet.Spec.Service.
-type itsServiceConvertor struct{}
-
-// itsAlternativeServicesConvertor is an implementation of the convertor interface, used to convert the given object into InstanceSet.Spec.AlternativeServices.
-type itsAlternativeServicesConvertor struct{}
-
 // itsRolesConvertor is an implementation of the convertor interface, used to convert the given object into InstanceSet.Spec.Roles.
 type itsRolesConvertor struct{}
-
-// itsRoleProbeConvertor is an implementation of the convertor interface, used to convert the given object into InstanceSet.Spec.RoleProbe.
-type itsRoleProbeConvertor struct{}
-
-// itsCredentialConvertor is an implementation of the convertor interface, used to convert the given object into InstanceSet.Spec.Credential.
-type itsCredentialConvertor struct{}
-
-// itsMembershipReconfigurationConvertor is an implementation of the convertor interface, used to convert the given object into InstanceSet.Spec.MembershipReconfiguration.
-type itsMembershipReconfigurationConvertor struct{}
-
-// itsPodManagementPolicyConvertor is an implementation of the convertor interface, used to convert the given object into InstanceSet.Spec.PodManagementPolicy.
-type itsPodManagementPolicyConvertor struct{}
-
-func (c *itsPodManagementPolicyConvertor) convert(args ...any) (any, error) {
-	synthesizedComp, err := parseITSConvertorArgs(args...)
-	if err != nil {
-		return nil, err
-	}
-	if synthesizedComp.PodManagementPolicy != nil {
-		return *synthesizedComp.PodManagementPolicy, nil
-	}
-	return appsv1.OrderedReadyPodManagement, nil
-}
-
-// itsParallelPodManagementConcurrencyConvertor is an implementation of the convertor interface, used to convert the given object into InstanceSet.Spec.ParallelPodManagementConcurrency.
-type itsParallelPodManagementConcurrencyConvertor struct{}
-
-func (c *itsParallelPodManagementConcurrencyConvertor) convert(args ...any) (any, error) {
-	synthesizedComp, err := parseITSConvertorArgs(args...)
-	if err != nil {
-		return nil, err
-	}
-	if synthesizedComp.ParallelPodManagementConcurrency != nil {
-		return synthesizedComp.ParallelPodManagementConcurrency, nil
-	}
-	return &intstr.IntOrString{Type: intstr.String, StrVal: "100%"}, nil
-}
-
-// itsUpdateStrategyConvertor is an implementation of the convertor interface, used to convert the given object into InstanceSet.Spec.Instances.
-type itsUpdateStrategyConvertor struct{}
-
-func (c *itsUpdateStrategyConvertor) convert(args ...any) (any, error) {
-	synthesizedComp, err := parseITSConvertorArgs(args...)
-	if err != nil {
-		return nil, err
-	}
-	var updateStrategy *workloads.UpdateStrategy
-	if synthesizedComp.UpdateStrategy != nil {
-		updateStrategy = &workloads.UpdateStrategy{
-			Type:                 workloads.UpdateStrategyType(synthesizedComp.UpdateStrategy.Type),
-			InstanceUpdatePolicy: (*workloads.InstanceUpdatePolicyType)(synthesizedComp.UpdateStrategy.InstanceUpdatePolicy),
-		}
-		if synthesizedComp.UpdateStrategy.RollingUpdate != nil {
-			updateStrategy.RollingUpdate = &workloads.RollingUpdate{
-				Replicas:          synthesizedComp.UpdateStrategy.RollingUpdate.Replicas,
-				MaxUnavailable:    synthesizedComp.UpdateStrategy.RollingUpdate.MaxUnavailable,
-				UpdateConcurrency: (*workloads.UpdateConcurrency)(synthesizedComp.UpdateStrategy.RollingUpdate.UpdateConcurrency),
-			}
-		}
-	}
-	return updateStrategy, nil
-}
-
-// itsInstancesConvertor converts component instanceTemplate to ITS instanceTemplate
-type itsInstancesConvertor struct{}
-
-func (c *itsInstancesConvertor) convert(args ...any) (any, error) {
-	synthesizedComp, err := parseITSConvertorArgs(args...)
-	if err != nil {
-		return nil, err
-	}
-
-	var instances []workloads.InstanceTemplate
-	for _, instance := range synthesizedComp.Instances {
-		instances = append(instances, *AppsInstanceToWorkloadInstance(&instance))
-	}
-	return instances, nil
-}
-
-// itsOfflineInstancesConvertor converts component offlineInstances to ITS offlineInstances
-type itsOfflineInstancesConvertor struct{}
-
-func (c *itsOfflineInstancesConvertor) convert(args ...any) (any, error) {
-	synthesizedComp, err := parseITSConvertorArgs(args...)
-	if err != nil {
-		return nil, err
-	}
-
-	var offlineInstances []string
-	offlineInstances = append(offlineInstances, synthesizedComp.OfflineInstances...)
-	return offlineInstances, nil
-}
-
-func AppsInstanceToWorkloadInstance(instance *kbappsv1.InstanceTemplate) *workloads.InstanceTemplate {
-	if instance == nil {
-		return nil
-	}
-	var schedulingPolicy *workloads.SchedulingPolicy
-	if instance.SchedulingPolicy != nil {
-		schedulingPolicy = &workloads.SchedulingPolicy{
-			SchedulerName:             instance.SchedulingPolicy.SchedulerName,
-			NodeSelector:              instance.SchedulingPolicy.NodeSelector,
-			NodeName:                  instance.SchedulingPolicy.NodeName,
-			Affinity:                  instance.SchedulingPolicy.Affinity,
-			Tolerations:               instance.SchedulingPolicy.Tolerations,
-			TopologySpreadConstraints: instance.SchedulingPolicy.TopologySpreadConstraints,
-		}
-	}
-
-	return &workloads.InstanceTemplate{
-		Name:                 instance.Name,
-		Replicas:             instance.Replicas,
-		Annotations:          instance.Annotations,
-		Labels:               instance.Labels,
-		Image:                instance.Image,
-		SchedulingPolicy:     schedulingPolicy,
-		Resources:            instance.Resources,
-		Env:                  instance.Env,
-		Volumes:              instance.Volumes,
-		VolumeMounts:         instance.VolumeMounts,
-		VolumeClaimTemplates: toPersistentVolumeClaims(instance.VolumeClaimTemplates),
-	}
-}
-
-func toPersistentVolumeClaims(vcts []kbappsv1.ClusterComponentVolumeClaimTemplate) []corev1.PersistentVolumeClaim {
-	storageClassName := func(spec kbappsv1.PersistentVolumeClaimSpec, defaultStorageClass string) *string {
-		if spec.StorageClassName != nil && *spec.StorageClassName != "" {
-			return spec.StorageClassName
-		}
-		if defaultStorageClass != "" {
-			return &defaultStorageClass
-		}
-		return nil
-	}
-	var pvcs []corev1.PersistentVolumeClaim
-	for _, v := range vcts {
-		pvcs = append(pvcs, corev1.PersistentVolumeClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: v.Name,
-			},
-			Spec: corev1.PersistentVolumeClaimSpec{
-				AccessModes:      v.Spec.AccessModes,
-				Resources:        v.Spec.Resources,
-				StorageClassName: storageClassName(v.Spec, viper.GetString(constant.CfgKeyDefaultStorageClass)),
-				VolumeMode:       v.Spec.VolumeMode,
-			},
-		})
-	}
-	return pvcs
-}
-
-// parseITSConvertorArgs parses the args of ITS convertor.
-func parseITSConvertorArgs(args ...any) (*SynthesizedComponent, error) {
-	synthesizeComp, ok := args[0].(*SynthesizedComponent)
-	if !ok {
-		return nil, errors.New("args[0] not a SynthesizedComponent object")
-	}
-	return synthesizeComp, nil
-}
-
-// itsServiceConvertor converts the given object into InstanceSet.Spec.Service.
-func (c *itsServiceConvertor) convert(args ...any) (any, error) {
-	return nil, nil
-}
-
-// itsAlternativeServicesConvertor converts the given object into InstanceSet.Spec.AlternativeServices.
-// TODO: ComponentServices are not consistent with InstanceSet.Spec.AlternativeServices, If it is based on the new ComponentDefinition API,
-// the services is temporarily handled in the component controller, and the corresponding InstanceSet.Spec.AlternativeServices is temporarily set nil.
-func (c *itsAlternativeServicesConvertor) convert(args ...any) (any, error) {
-	return nil, nil
-}
 
 // itsRolesConvertor converts the ComponentDefinition.Spec.Roles into InstanceSet.Spec.Roles.
 func (c *itsRolesConvertor) convert(args ...any) (any, error) {
@@ -249,10 +62,8 @@ func (c *itsRolesConvertor) convert(args ...any) (any, error) {
 	return ConvertSynthesizeCompRoleToInstanceSetRole(synthesizeComp), nil
 }
 
-// itsRoleProbeConvertor converts the ComponentDefinition.Spec.LifecycleActions.RoleProbe into InstanceSet.Spec.RoleProbe.
-func (c *itsRoleProbeConvertor) convert(args ...any) (any, error) {
-	return nil, nil
-}
+// itsCredentialConvertor is an implementation of the convertor interface, used to convert the given object into InstanceSet.Spec.Credential.
+type itsCredentialConvertor struct{}
 
 func (c *itsCredentialConvertor) convert(args ...any) (any, error) {
 	synthesizeComp, err := parseITSConvertorArgs(args...)
@@ -295,9 +106,52 @@ func (c *itsCredentialConvertor) convert(args ...any) (any, error) {
 	return nil, nil
 }
 
-func (c *itsMembershipReconfigurationConvertor) convert(args ...any) (any, error) {
-	// synthesizeComp, err := parseITSConvertorArgs(args...)
-	return "", nil // TODO
+// itsPodManagementPolicyConvertor is an implementation of the convertor interface, used to convert the given object into InstanceSet.Spec.PodManagementPolicy.
+type itsPodManagementPolicyConvertor struct{}
+
+func (c *itsPodManagementPolicyConvertor) convert(args ...any) (any, error) {
+	synthesizedComp, err := parseITSConvertorArgs(args...)
+	if err != nil {
+		return nil, err
+	}
+	if synthesizedComp.PodManagementPolicy != nil {
+		return *synthesizedComp.PodManagementPolicy, nil
+	}
+	return appsv1.OrderedReadyPodManagement, nil
+}
+
+// itsUpdateStrategyConvertor is an implementation of the convertor interface, used to convert the given object into InstanceSet.Spec.Instances.
+type itsUpdateStrategyConvertor struct{}
+
+func (c *itsUpdateStrategyConvertor) convert(args ...any) (any, error) {
+	synthesizedComp, err := parseITSConvertorArgs(args...)
+	if err != nil {
+		return nil, err
+	}
+	var updateStrategy *workloads.UpdateStrategy
+	if synthesizedComp.UpdateStrategy != nil {
+		updateStrategy = &workloads.UpdateStrategy{
+			Type:                 workloads.UpdateStrategyType(synthesizedComp.UpdateStrategy.Type),
+			InstanceUpdatePolicy: (*workloads.InstanceUpdatePolicyType)(synthesizedComp.UpdateStrategy.InstanceUpdatePolicy),
+		}
+		if synthesizedComp.UpdateStrategy.RollingUpdate != nil {
+			updateStrategy.RollingUpdate = &workloads.RollingUpdate{
+				Replicas:          synthesizedComp.UpdateStrategy.RollingUpdate.Replicas,
+				MaxUnavailable:    synthesizedComp.UpdateStrategy.RollingUpdate.MaxUnavailable,
+				UpdateConcurrency: (*workloads.UpdateConcurrency)(synthesizedComp.UpdateStrategy.RollingUpdate.UpdateConcurrency),
+			}
+		}
+	}
+	return updateStrategy, nil
+}
+
+// parseITSConvertorArgs parses the args of ITS convertor.
+func parseITSConvertorArgs(args ...any) (*SynthesizedComponent, error) {
+	synthesizeComp, ok := args[0].(*SynthesizedComponent)
+	if !ok {
+		return nil, errors.New("args[0] not a SynthesizedComponent object")
+	}
+	return synthesizeComp, nil
 }
 
 // ConvertSynthesizeCompRoleToInstanceSetRole converts the component.SynthesizedComponent.Roles to workloads.ReplicaRole.

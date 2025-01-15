@@ -18,7 +18,8 @@ kbcli cluster describe-backup BACKUP-NAME [flags]
 ### Options
 
 ```
-  -h, --help   help for describe-backup
+  -h, --help            help for describe-backup
+      --names strings   Backup names
 ```
 
 ### Options inherited from parent commands

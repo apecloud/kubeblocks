@@ -99,6 +99,14 @@ spec:
                     description: Specifies whether automated backup is enabled for
                       the Cluster.
                     type: boolean
+                  incrementalBackupEnabled:
+                    default: false
+                    description: Specifies whether to enable incremental backup.
+                    type: boolean
+                  incrementalCronExpression:
+                    description: The cron expression for the incremental backup schedule.
+                      The timezone is in UTC. See https://en.wikipedia.org/wiki/Cron.
+                    type: string
                   method:
                     description: Specifies the backup method to use, as defined in
                       backupPolicy.
@@ -573,6 +581,40 @@ spec:
                             maxLength: 54
                             pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                             type: string
+                          ordinals:
+                            description: |-
+                              Specifies the desired Ordinals of this InstanceTemplate.
+                              The Ordinals used to specify the ordinal of the instance (pod) names to be generated under this InstanceTemplate.
+
+
+                              For example, if Ordinals is {ranges: [{start: 0, end: 1}], discrete: [7]},
+                              then the instance names generated under this InstanceTemplate would be
+                              $(cluster.name)-$(component.name)-$(template.name)-0、$(cluster.name)-$(component.name)-$(template.name)-1 and
+                              $(cluster.name)-$(component.name)-$(template.name)-7
+                            properties:
+                              discrete:
+                                items:
+                                  format: int32
+                                  type: integer
+                                type: array
+                              ranges:
+                                items:
+                                  description: |-
+                                    Range represents a range with a start and an end value.
+                                    It is used to define a continuous segment.
+                                  properties:
+                                    end:
+                                      format: int32
+                                      type: integer
+                                    start:
+                                      format: int32
+                                      type: integer
+                                  required:
+                                  - end
+                                  - start
+                                  type: object
+                                type: array
+                            type: object
                           replicas:
                             default: 1
                             description: |-
@@ -1884,6 +1926,13 @@ spec:
                                       description: |-
                                         The name of the StorageClass required by the claim.
                                         More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1.
+                                      type: string
+                                    volumeAttributesClassName:
+                                      description: |-
+                                        volumeAttributesClassName may be used to set the VolumeAttributesClass used by this claim.
+
+
+                                        More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#volumeattributesclass
                                       type: string
                                     volumeMode:
                                       description: Defines what type of volume is
@@ -5219,6 +5268,7 @@ spec:
                             maxLength: 25
                             type: string
                           podService:
+                            default: false
                             description: |-
                               Indicates whether to generate individual Services for each Pod.
                               If set to true, a separate Service will be created for each Pod in the Cluster.
@@ -5492,6 +5542,13 @@ spec:
                                 description: |-
                                   The name of the StorageClass required by the claim.
                                   More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1.
+                                type: string
+                              volumeAttributesClassName:
+                                description: |-
+                                  volumeAttributesClassName may be used to set the VolumeAttributesClass used by this claim.
+
+
+                                  More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#volumeattributesclass
                                 type: string
                               volumeMode:
                                 description: Defines what type of volume is required
@@ -9283,6 +9340,40 @@ spec:
                                 maxLength: 54
                                 pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                                 type: string
+                              ordinals:
+                                description: |-
+                                  Specifies the desired Ordinals of this InstanceTemplate.
+                                  The Ordinals used to specify the ordinal of the instance (pod) names to be generated under this InstanceTemplate.
+
+
+                                  For example, if Ordinals is {ranges: [{start: 0, end: 1}], discrete: [7]},
+                                  then the instance names generated under this InstanceTemplate would be
+                                  $(cluster.name)-$(component.name)-$(template.name)-0、$(cluster.name)-$(component.name)-$(template.name)-1 and
+                                  $(cluster.name)-$(component.name)-$(template.name)-7
+                                properties:
+                                  discrete:
+                                    items:
+                                      format: int32
+                                      type: integer
+                                    type: array
+                                  ranges:
+                                    items:
+                                      description: |-
+                                        Range represents a range with a start and an end value.
+                                        It is used to define a continuous segment.
+                                      properties:
+                                        end:
+                                          format: int32
+                                          type: integer
+                                        start:
+                                          format: int32
+                                          type: integer
+                                      required:
+                                      - end
+                                      - start
+                                      type: object
+                                    type: array
+                                type: object
                               replicas:
                                 default: 1
                                 description: |-
@@ -10612,6 +10703,13 @@ spec:
                                           description: |-
                                             The name of the StorageClass required by the claim.
                                             More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1.
+                                          type: string
+                                        volumeAttributesClassName:
+                                          description: |-
+                                            volumeAttributesClassName may be used to set the VolumeAttributesClass used by this claim.
+
+
+                                            More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#volumeattributesclass
                                           type: string
                                         volumeMode:
                                           description: Defines what type of volume
@@ -13987,6 +14085,7 @@ spec:
                                 maxLength: 25
                                 type: string
                               podService:
+                                default: false
                                 description: |-
                                   Indicates whether to generate individual Services for each Pod.
                                   If set to true, a separate Service will be created for each Pod in the Cluster.
@@ -14262,6 +14361,13 @@ spec:
                                     description: |-
                                       The name of the StorageClass required by the claim.
                                       More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1.
+                                    type: string
+                                  volumeAttributesClassName:
+                                    description: |-
+                                      volumeAttributesClassName may be used to set the VolumeAttributesClass used by this claim.
+
+
+                                      More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#volumeattributesclass
                                     type: string
                                   volumeMode:
                                     description: Defines what type of volume is required
@@ -16414,6 +16520,14 @@ spec:
                     description: Specifies whether automated backup is enabled for
                       the Cluster.
                     type: boolean
+                  incrementalBackupEnabled:
+                    default: false
+                    description: Specifies whether to enable incremental backup.
+                    type: boolean
+                  incrementalCronExpression:
+                    description: The cron expression for the incremental backup schedule.
+                      The timezone is in UTC. See https://en.wikipedia.org/wiki/Cron.
+                    type: string
                   method:
                     description: Specifies the backup method to use, as defined in
                       backupPolicy.
@@ -21746,6 +21860,7 @@ spec:
                             maxLength: 25
                             type: string
                           podService:
+                            default: false
                             description: |-
                               Indicates whether to generate individual Services for each Pod.
                               If set to true, a separate Service will be created for each Pod in the Cluster.
@@ -30978,6 +31093,7 @@ spec:
                                 maxLength: 25
                                 type: string
                               podService:
+                                default: false
                                 description: |-
                                   Indicates whether to generate individual Services for each Pod.
                                   If set to true, a separate Service will be created for each Pod in the Cluster.

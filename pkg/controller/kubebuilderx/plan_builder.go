@@ -92,10 +92,6 @@ func (b *PlanBuilder) AddTransformer(_ ...graph.Transformer) graph.PlanBuilder {
 	return b
 }
 
-func (b *PlanBuilder) AddParallelTransformer(_ ...graph.Transformer) graph.PlanBuilder {
-	return b
-}
-
 func (b *PlanBuilder) Build() (graph.Plan, error) {
 	vertices := buildOrderedVertices(b.transCtx.GetContext(), b.currentTree, b.desiredTree)
 	plan := &Plan{

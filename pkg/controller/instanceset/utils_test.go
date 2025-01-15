@@ -171,7 +171,7 @@ var _ = Describe("utils test", func() {
 		It("should work well", func() {
 			By("set its to nil")
 			its = nil
-			Expect(IsInstanceSetReady(its)).Should(BeFalse())
+			Expect(its.IsInstanceSetReady()).Should(BeFalse())
 
 			By("set its to not initialized")
 			replicas := int32(3)
@@ -182,17 +182,17 @@ var _ = Describe("utils test", func() {
 			its.Status = workloads.InstanceSetStatus{
 				InitReplicas: replicas,
 			}
-			Expect(IsInstanceSetReady(its)).Should(BeFalse())
+			Expect(its.IsInstanceSetReady()).Should(BeFalse())
 
 			By("set its.status.observedGeneration to not equal generation")
 			its.Status.ReadyInitReplicas = replicas
 			its.Generation = 1
-			Expect(IsInstanceSetReady(its)).Should(BeFalse())
+			Expect(its.IsInstanceSetReady()).Should(BeFalse())
 
 			By("set its.status.replicas to not as expected")
 			its.Status.ObservedGeneration = its.Generation
 			its.Status.Replicas = replicas - 1
-			Expect(IsInstanceSetReady(its)).Should(BeFalse())
+			Expect(its.IsInstanceSetReady()).Should(BeFalse())
 
 			By("set spec.minReadySeconds to not zero")
 			its.Status.Replicas = replicas
@@ -200,16 +200,16 @@ var _ = Describe("utils test", func() {
 			its.Status.UpdatedReplicas = replicas
 			its.Status.AvailableReplicas = replicas - 1
 			its.Spec.MinReadySeconds = int32(5)
-			Expect(IsInstanceSetReady(its)).Should(BeFalse())
+			Expect(its.IsInstanceSetReady()).Should(BeFalse())
 
 			By("set its to role-less")
 			its.Status.AvailableReplicas = replicas
 			its.Spec.Roles = nil
-			Expect(IsInstanceSetReady(its)).Should(BeTrue())
+			Expect(its.IsInstanceSetReady()).Should(BeTrue())
 
 			By("set its to role-ful")
 			its.Spec.Roles = roles
-			Expect(IsInstanceSetReady(its)).Should(BeFalse())
+			Expect(its.IsInstanceSetReady()).Should(BeFalse())
 
 			By("set membersStatus to ready")
 			its.Status.MembersStatus = []workloads.MemberStatus{
@@ -226,7 +226,7 @@ var _ = Describe("utils test", func() {
 					ReplicaRole: &roles[2],
 				},
 			}
-			Expect(IsInstanceSetReady(its)).Should(BeTrue())
+			Expect(its.IsInstanceSetReady()).Should(BeTrue())
 		})
 	})
 

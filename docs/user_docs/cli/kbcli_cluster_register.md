@@ -5,7 +5,7 @@ title: kbcli cluster register
 Pull the cluster chart to the local cache and register the type to 'create' sub-command
 
 ```
-kbcli cluster register [NAME] --source [CHART-URL] [flags]
+kbcli cluster register [NAME] [flags]
 ```
 
 ### Examples
@@ -15,16 +15,21 @@ kbcli cluster register [NAME] --source [CHART-URL] [flags]
   kbcli cluster register orioledb --source https://github.com/apecloud/helm-charts/releases/download/orioledb-cluster-0.6.0-beta.44/orioledb-cluster-0.6.0-beta.44.tgz
   
   # Register a cluster type from a local path file
-  kbcli cluster register neon -source pkg/cli/cluster/charts/neon-cluster.tgz
+  kbcli cluster register neon --source pkg/cli/cluster/charts/neon-cluster.tgz
+  
+  # Register a cluster type from a Helm repository, specifying the version and engine.
+  kbcli cluster register mysql --engine mysql --version 0.9.0 --repo https://jihulab.com/api/v4/projects/150246/packages/helm/stable
 ```
 
 ### Options
 
 ```
-      --alias string    Set the cluster type alias
-      --auto-approve    Skip interactive approval when registering an existed cluster type
-  -h, --help            help for register
-  -S, --source string   Specify the cluster type chart source, support a URL or a local file path
+      --alias string     Set the cluster type alias
+      --engine string    Specify the cluster chart name in helm repo
+  -h, --help             help for register
+      --repo string      Specify the url of helm repo which contains cluster charts (default "https://jihulab.com/api/v4/projects/150246/packages/helm/stable")
+  -S, --source string    Specify the cluster type chart source, support a URL or a local file path
+      --version string   Specify the version of cluster chart to register
 ```
 
 ### Options inherited from parent commands

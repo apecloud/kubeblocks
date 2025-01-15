@@ -13,7 +13,7 @@ import TabItem from '@theme/TabItem';
 
 StarRocks is a next-gen, high-performance analytical data warehouse that enables real-time, multi-dimensional, and highly concurrent data analysis.
 
-This tutorial illustrates how to create and manage a StarRocks cluster by `kbcli`, `kubectl` or a YAML file. You can find the YAML examples and guides in [the GitHub repository](https://github.com/apecloud/kubeblocks-addons/tree/release-0.9/examples/starrocks).
+This tutorial illustrates how to create and manage a StarRocks cluster by `kbcli`, `kubectl` or a YAML file. You can find the YAML examples and guides in [the GitHub repository](https://github.com/apecloud/kubeblocks-addons/tree/main/examples/starrocks).
 
 ## Before you start
 
@@ -28,56 +28,41 @@ This tutorial illustrates how to create and manage a StarRocks cluster by `kbcli
 
 ## Create a cluster
 
-<Tabs>
-
-<TabItem value="kubectl" label="kubectl" default>
-
-KubeBlocks implements a `Cluster` CRD to define a cluster. Here is an example of creating a StarRocks cluster.
+KubeBlocks implements a `Cluster` CRD to define a cluster. Here is an example of creating a StarRocks cluster. If you only have one node for deploying a cluster with multiple replicas, configure the cluster affinity by setting `spec.schedulingPolicy` or `spec.componentSpecs.schedulingPolicy`. For details, you can refer to the [API docs](https://kubeblocks.io/docs/preview/developer_docs/api-reference/cluster#apps.kubeblocks.io/v1.SchedulingPolicy). But for a production environment, it is not recommended to deploy all replicas on one node, which may decrease the cluster availability.
 
 ```yaml
 cat <<EOF | kubectl apply -f -
-apiVersion: apps.kubeblocks.io/v1alpha1
+apiVersion: apps.kubeblocks.io/v1
 kind: Cluster
 metadata:
   name: mycluster
   namespace: demo
 spec:
-  clusterDefinitionRef: starrocks-ce
-  clusterVersionRef: starrocks-ce-3.1.1
   terminationPolicy: Delete
-  affinity:
-    podAntiAffinity: Preferred
-    topologyKeys:
-    - kubernetes.io/hostname
-  tolerations:
-    - key: kb-data
-      operator: Equal
-      value: 'true'
-      effect: NoSchedule
   componentSpecs:
   - name: fe
-    componentDefRef: fe
+    componentDef: starrocks-ce-fe
     serviceAccountName: kb-starrocks-cluster
     replicas: 1
     resources:
       limits:
-        cpu: '0.5'
-        memory: 0.5Gi
+        cpu: '1'
+        memory: 1Gi
       requests:
-        cpu: '0.5'
-        memory: 0.5Gi
+        cpu: '1'
+        memory: 1Gi
   - name: be
-    componentDefRef: be
+    componentDef: starrocks-ce-be
     replicas: 2
     resources:
       limits:
-        cpu: '0.5'
-        memory: 0.5Gi
+        cpu: '1'
+        memory: 1Gi
       requests:
-        cpu: '0.5'
-        memory: 0.5Gi
+        cpu: '1'
+        memory: 1Gi
     volumeClaimTemplates:
-    - name: be-storage
+    - name: data
       spec:
         accessModes:
         - ReadWriteOnce
@@ -89,18 +74,16 @@ EOF
 
 | Field                                 | Definition  |
 |---------------------------------------|--------------------------------------|
-| `spec.clusterDefinitionRef`           | It specifies the name of the ClusterDefinition for creating a specific type of cluster.  |
-| `spec.clusterVersionRef`              | It is the name of the cluster version CRD that defines the cluster version.  |
-| `spec.terminationPolicy`              | It is the policy of cluster termination. The default value is `Delete`. Valid values are `DoNotTerminate`, `Delete`, `WipeOut`. For the detailed definition, you can refer to [Termination Policy](#termination-policy). |
-| `spec.affinity`                       | It defines a set of node affinity scheduling rules for the cluster's Pods. This field helps control the placement of Pods on nodes within the cluster.  |
-| `spec.affinity.podAntiAffinity`       | It specifies the anti-affinity level of Pods within a component. It determines how pods should spread across nodes to improve availability and performance. |
-| `spec.affinity.topologyKeys`          | It represents the key of node labels used to define the topology domain for Pod anti-affinity and Pod spread constraints.   |
-| `spec.tolerations`                    | It is an array that specifies tolerations attached to the cluster's Pods, allowing them to be scheduled onto nodes with matching taints.  |
-| `spec.componentSpecs`                 | It is the list of components that define the cluster components. This field allows customized configuration of each component within a cluster.   |
-| `spec.componentSpecs.componentDefRef` | It is the name of the component definition that is defined in the cluster definition and you can get the component definition names with `kubectl get clusterdefinition starrocks -o json \| jq '.spec.componentDefs[].name'`.   |
-| `spec.componentSpecs.name`            | It specifies the name of the component.     |
-| `spec.componentSpecs.replicas`        | It specifies the number of replicas of the component.  |
-| `spec.componentSpecs.resources`       | It specifies the resource requirements of the component.  |
+| `spec.terminationPolicy`              | It is the policy of cluster termination. Valid values are `DoNotTerminate`, `Delete`, `WipeOut`. For the detailed definition, you can refer to [Termination Policy](#termination-policy). |
+| `spec.componentSpecs`                 | It is the list of ClusterComponentSpec objects that define the individual Components that make up a Cluster. This field allows customized configuration of each component within a cluster. Note: `shardingSpecs` and `componentSpecs` cannot both be empty; at least one must be defined to configure a cluster. ClusterComponentSpec defines the specifications for a Component in a Cluster. |
+| `spec.componentSpecs.replicas`        | It specifies the number of replicas of the component. |
+| `spec.componentSpecs.resources`       | It specifies the resources required by the Component.  |
+| `spec.componentSpecs.volumeClaimTemplates` | It specifies a list of PersistentVolumeClaim templates that define the storage requirements for the Component. |
+| `spec.componentSpecs.volumeClaimTemplates.name` | It refers to the name of a volumeMount defined in `componentDefinition.spec.runtime.containers[*].volumeMounts`. |
+| `spec.componentSpecs.volumeClaimTemplates.spec.storageClassName` | It is the name of the StorageClass required by the claim. If not specified, the StorageClass annotated with `storageclass.kubernetes.io/is-default-class=true` will be used by default. |
+| `spec.componentSpecs.volumeClaimTemplates.spec.resources.storage` | You can set the storage size as needed. |
+
+For more API fields and descriptions, refer to the [API Reference](https://kubeblocks.io/docs/preview/developer_docs/api-reference/cluster).
 
 KubeBlocks operator watches for the `Cluster` CRD and creates the cluster and all dependent resources. You can get all the resources created by the cluster with `kubectl get all,secret,rolebinding,serviceaccount -l app.kubernetes.io/instance=mycluster -n demo`.
 
@@ -113,79 +96,6 @@ Run the following command to see the created StarRocks cluster object:
 ```bash
 kubectl get cluster mycluster -n demo -o yaml
 ```
-
-</TabItem>
-
-<TabItem value="kbcli" label="kbcli">
-
-***Steps***
-
-1. Execute the following command to create a StarRocks cluster.
-
-   ```bash
-   kbcli cluster create mycluster --cluster-definition=starrocks -n demo
-   ```
-
-   You can also create a cluster with specified CPU, memory and storage values.
-
-   ```bash
-   kbcli cluster create mycluster --cluster-definition=starrocks --set cpu=1,memory=2Gi,storage=10Gi -n demo
-   ```
-
-:::note
-
-If you want to customize your cluster specifications, `kbcli` provides various options, such as setting cluster version, termination policy, CPU, and memory. You can view these options by adding `--help` or `-h` flag.
-
-```bash
-kbcli cluster create --help
-kbcli cluster create -h
-```
-
-:::
-
-2. Check whether the cluster is created successfully.
-
-   ```bash
-   kbcli cluster list -n demo
-   >
-   NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS     CREATED-TIME
-   mycluster   demo        starrocks            starrocks-3.1.1   Delete               Running    Jul 17,2024 19:06 UTC+0800   
-   ```
-
-3. Check the cluster information.
-
-    ```bash
-    kbcli cluster describe mycluster -n demo
-    >
-    Name: mycluster	 Created Time: Jul 17,2024 19:06 UTC+0800
-    NAMESPACE   CLUSTER-DEFINITION   VERSION           STATUS    TERMINATION-POLICY
-    demo        starrocks            starrocks-3.1.1   Running   Delete
-
-    Endpoints:
-    COMPONENT   MODE        INTERNAL                                      EXTERNAL
-    fe          ReadWrite   mycluster-fe.default.svc.cluster.local:9030   <none>
-
-    Topology:
-    COMPONENT   INSTANCE         ROLE     STATUS    AZ       NODE                    CREATED-TIME
-    be          mycluster-be-0   <none>   Running   <none>   minikube/192.168.49.2   Jul 17,2024 19:06 UTC+0800
-    fe          mycluster-fe-0   <none>   Running   <none>   minikube/192.168.49.2   Jul 17,2024 19:06 UTC+0800
-
-    Resources Allocation:
-    COMPONENT   DEDICATED   CPU(REQUEST/LIMIT)   MEMORY(REQUEST/LIMIT)   STORAGE-SIZE   STORAGE-CLASS
-    fe          false       1 / 1                1Gi / 1Gi               data:20Gi      standard
-    be          false       1 / 1                1Gi / 1Gi               data:20Gi      standard
-
-    Images:
-    COMPONENT   TYPE   IMAGE
-    fe          fe     apecloud-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/fe-ubuntu:2.5.4
-    be          be     apecloud-registry.cn-zhangjiakou.cr.aliyuncs.com/apecloud/fe-ubuntu:2.5.4
-
-    Show cluster events: kbcli cluster list-events -n demo mycluster
-    ```
-
-</TabItem>
-
-</Tabs>
 
 ## Scale
 
@@ -946,10 +856,9 @@ The termination policy determines how a cluster is deleted.
 
 | **terminationPolicy** | **Deleting Operation**                           |
 |:----------------------|:-------------------------------------------------|
-| `DoNotTerminate`      | `DoNotTerminate` blocks delete operation.        |
-| `Halt`                | `Halt` deletes Cluster resources like Pods and Services but retains Persistent Volume Claims (PVCs), allowing for data preservation while stopping other operations. Halt policy is deprecated in v0.9.1 and will have same meaning as DoNotTerminate. |
-| `Delete`              | `Delete` extends the Halt policy by also removing PVCs, leading to a thorough cleanup while removing all persistent data.   |
-| `WipeOut`             | `WipeOut` deletes all Cluster resources, including volume snapshots and backups in external storage. This results in complete data removal and should be used cautiously, especially in non-production environments, to avoid irreversible data loss.   |
+| `DoNotTerminate`      | `DoNotTerminate` prevents deletion of the Cluster. This policy ensures that all resources remain intact.       |
+| `Delete`              | `Delete` deletes Cluster resources like Pods, Services, and Persistent Volume Claims (PVCs), leading to a thorough cleanup while removing all persistent data.   |
+| `WipeOut`             | `WipeOut` is an aggressive policy that deletes all Cluster resources, including volume snapshots and backups in external storage. This results in complete data removal and should be used cautiously, primarily in non-production environments to avoid irreversible data loss.  |
 
 To check the termination policy, execute the following command.
 

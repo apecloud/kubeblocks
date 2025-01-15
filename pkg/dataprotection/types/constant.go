@@ -103,11 +103,23 @@ const (
 	// DPTargetPodRole the target pod role
 	DPTargetPodRole = "DP_TARGET_POD_ROLE"
 	// DPBackupBasePath the base path for backup data in the storage
+	// In a backup action pod, it equals ${DP_BACKUP_ROOT_PATH}/${DP_BACKUP_NAME}/${DP_TARGET_RELATIVE_PATH}
 	DPBackupBasePath = "DP_BACKUP_BASE_PATH"
+	// DPBackupRootPath the root path for backup data
+	DPBackupRootPath = "DP_BACKUP_ROOT_PATH"
+	// DPTargetRelativePath the relative path based on the backup data root path
+	// ${DP_TARGET_RELATIVE_PATH}=${target.name}/${target.selectedTargetPod[*]}
+	DPTargetRelativePath = "DP_TARGET_RELATIVE_PATH"
 	// DPBackupName backup CR name
 	DPBackupName = "DP_BACKUP_NAME"
 	// DPParentBackupName backup CR name
 	DPParentBackupName = "DP_PARENT_BACKUP_NAME"
+	// DPBaseBackupName backup CR name
+	DPBaseBackupName = "DP_BASE_BACKUP_NAME"
+	// DPAncestorIncrementalBackupNames backup CR names
+	// Used to restore incremental backups, recording the incremental ancestor backup names in order of end time
+	// For example: ${DP_ANCESTOR_INCREMENTAL_BACKUP_NAMES}=incrementalBackupName1,incrementalBackupName2,incrementalBackupName3
+	DPAncestorIncrementalBackupNames = "DP_ANCESTOR_INCREMENTAL_BACKUP_NAMES"
 	// DPTTL backup time to live, reference the backup.spec.retentionPeriod
 	DPTTL = "DP_TTL"
 	// DPCheckInterval check interval for sync backup progress

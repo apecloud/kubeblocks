@@ -1,6 +1,6 @@
 ## Basics
 ### Kubebuilder
-`KubeBlocks` is using kubebuilder as the operator framework, before your start to code, suggest to read [kubebuilder books](https://book.kubebuilder.io/).
+`KubeBlocks` is using KubeBuilder as the operator framework, before your start to code, suggest to read [kubebuilder books](https://book.kubebuilder.io/).
 
 ### Makefile
 `KubeBlocks` includes a [Makefile](../Makefile) in the root of the repo. This serves as a high-level interface for common commands. Running `make help` will produce a list of make targets with descriptions. These targets will be referenced throughout this document.

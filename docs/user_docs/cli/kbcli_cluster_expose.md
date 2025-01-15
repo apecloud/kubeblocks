@@ -5,20 +5,20 @@ title: kbcli cluster expose
 Expose a cluster with a new endpoint, the new endpoint can be found by executing 'kbcli cluster describe NAME'.
 
 ```
-kbcli cluster expose NAME --enable=[true|false] --type=[vpc|internet] [flags]
+kbcli cluster expose NAME --enable=[true|false] --type=[intranet|internet] [flags]
 ```
 
 ### Examples
 
 ```
-  # Expose a cluster to vpc
-  kbcli cluster expose mycluster --type vpc --enable=true
+  # Expose a cluster to intranet
+  kbcli cluster expose mycluster --type intranet --enable=true
   
   # Expose a cluster to public internet
   kbcli cluster expose mycluster --type internet --enable=true
   
   # Stop exposing a cluster
-  kbcli cluster expose mycluster --type vpc --enable=false
+  kbcli cluster expose mycluster --type intranet --enable=false
 ```
 
 ### Options
@@ -27,12 +27,15 @@ kbcli cluster expose NAME --enable=[true|false] --type=[vpc|internet] [flags]
       --auto-approve                   Skip interactive approval before exposing the cluster
       --components strings             Component names to this operations
       --dry-run string[="unchanged"]   Must be "client", or "server". If with client strategy, only print the object that would be sent, and no data is actually sent. If with server strategy, submit the server-side request, but no data is persistent. (default "none")
+      --edit                           Edit the API resource before creating
       --enable string                  Enable or disable the expose, values can be true or false
+      --force                           skip the pre-checks of the opsRequest to run the opsRequest forcibly
   -h, --help                           help for expose
-      --name string                    OpsRequest name. if not specified, it will be randomly generated 
+      --name string                    OpsRequest name. if not specified, it will be randomly generated
   -o, --output format                  Prints the output in the specified format. Allowed values: JSON and YAML (default yaml)
+      --sub-type string                Expose sub type, currently supported types are 'NodePort', 'LoadBalancer', only available if type is intranet (default "LoadBalancer")
       --ttlSecondsAfterSucceed int     Time to live after the OpsRequest succeed
-      --type string                    Expose type, currently supported types are 'vpc', 'internet'
+      --type string                    Expose type, currently supported types are 'intranet', 'internet'
 ```
 
 ### Options inherited from parent commands

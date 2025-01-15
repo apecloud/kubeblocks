@@ -12,7 +12,7 @@ kbcli clusterdefinition list-service-reference [flags]
 
 ```
   # List cluster references name declared in a cluster definition.
-  kbcli clusterdefinition list-service-reference apecloud-mysql
+  kbcli clusterdefinition list-service-reference orioledb
 ```
 
 ### Options

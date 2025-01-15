@@ -21,8 +21,11 @@ package v1alpha1
 
 import (
 	"slices"
+	"sort"
+	"strings"
 
 	"github.com/jinzhu/copier"
+	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/conversion"
@@ -113,11 +116,44 @@ func (r *Cluster) changesToCluster(cluster *appsv1.Cluster) {
 	//   status
 	//     components
 	//       - message: ComponentMessageMap -> map[string]string
+	if len(r.Spec.ClusterDefRef) > 0 {
+		cluster.Spec.ClusterDef = r.Spec.ClusterDefRef
+	}
+
 	if r.Spec.TerminationPolicy == Halt {
 		cluster.Spec.TerminationPolicy = appsv1.DoNotTerminate
 	} else {
 		cluster.Spec.TerminationPolicy = appsv1.TerminationPolicyType(r.Spec.TerminationPolicy)
 	}
+
+	r.toClusterServices(cluster)
+
+	for i := range r.Spec.ComponentSpecs {
+		compSpec := r.Spec.ComponentSpecs[i]
+		r.toComponentSpec(compSpec, &cluster.Spec.ComponentSpecs[i], compSpec.Name)
+	}
+
+	if len(r.Spec.ShardingSpecs) > 0 {
+		var shardingRequiredPodAntiAffinity []string
+		cluster.Spec.Shardings = make([]appsv1.ClusterSharding, len(r.Spec.ShardingSpecs))
+		for i := range r.Spec.ShardingSpecs {
+			shardingSpec := r.Spec.ShardingSpecs[i]
+			// copy sharding spec
+			_ = copier.Copy(&cluster.Spec.Shardings[i], &shardingSpec)
+			// transformer schedulePolicy
+			podAntiAffinityRequired := r.toComponentSpec(shardingSpec.Template, &cluster.Spec.Shardings[i].Template, shardingSpec.Name)
+			if podAntiAffinityRequired {
+				shardingRequiredPodAntiAffinity = append(shardingRequiredPodAntiAffinity, shardingSpec.Name)
+			}
+		}
+		if len(shardingRequiredPodAntiAffinity) > 0 {
+			if cluster.Annotations == nil {
+				cluster.Annotations = make(map[string]string)
+			}
+			cluster.Annotations["apps.kubeblocks.io/shard-pod-anti-affinity"] = strings.Join(shardingRequiredPodAntiAffinity, ",")
+		}
+	}
+
 	for i := range r.Spec.ComponentSpecs {
 		spec := &r.Spec.ComponentSpecs[i]
 		if spec.PodUpdatePolicy == nil {
@@ -152,6 +188,42 @@ func (r *Cluster) changesToCluster(cluster *appsv1.Cluster) {
 	}
 }
 
+func (r *Cluster) toClusterServices(cluster *appsv1.Cluster) {
+	for i := range r.Spec.Services {
+		clusterSVC := r.Spec.Services[i]
+		if len(clusterSVC.ShardingSelector) > 0 && len(clusterSVC.ComponentSelector) == 0 {
+			cluster.Spec.Services[i].ComponentSelector = clusterSVC.ShardingSelector
+		}
+	}
+}
+
+func (r *Cluster) toSchedulingPolicy(affinity *Affinity, tolerations []corev1.Toleration, compName string) *appsv1.SchedulingPolicy {
+	if affinity == nil && len(tolerations) == 0 {
+		return nil
+	}
+	schedulingPolicy := &appsv1.SchedulingPolicy{}
+	schedulingPolicy.Tolerations = tolerations
+
+	schedulingPolicy.Affinity = convertToAffinity(r.Name, compName, affinity)
+	schedulingPolicy.TopologySpreadConstraints = convertTopologySpreadConstraints4Legacy(r.Name, compName, affinity)
+	return schedulingPolicy
+}
+
+func (r *Cluster) toComponentSpec(fromCompSpec ClusterComponentSpec, toCompSpec *appsv1.ClusterComponentSpec, componentName string) bool {
+	var requiredPodAntiAffinity bool
+	if r.Spec.SchedulingPolicy == nil && toCompSpec.SchedulingPolicy == nil {
+		affinity := fromCompSpec.Affinity
+		if affinity == nil {
+			affinity = buildAffinity(r)
+		}
+		if affinity != nil && affinity.PodAntiAffinity == Required {
+			requiredPodAntiAffinity = true
+		}
+		toCompSpec.SchedulingPolicy = r.toSchedulingPolicy(affinity, fromCompSpec.Tolerations, componentName)
+	}
+	return requiredPodAntiAffinity
+}
+
 func (r *Cluster) changesFromCluster(cluster *appsv1.Cluster) {
 	// changed:
 	//   spec
@@ -161,7 +233,7 @@ func (r *Cluster) changesFromCluster(cluster *appsv1.Cluster) {
 	//           spec:
 	//             resources: corev1.ResourceRequirements -> corev1.VolumeResourceRequirements
 	//         podUpdatePolicy: *workloads.InstanceUpdatePolicyType -> *UpdateStrategy.InstanceUpdatePolicyType
-	//     sharings
+	//     shardingSpecs -> shardings
 	//       - template
 	//           volumeClaimTemplates
 	//             spec:
@@ -171,6 +243,16 @@ func (r *Cluster) changesFromCluster(cluster *appsv1.Cluster) {
 	//     components
 	//       - message: ComponentMessageMap -> map[string]string
 	// appsv1.TerminationPolicyType is a subset of appsv1alpha1.TerminationPolicyType, it can be converted directly.
+	if len(cluster.Spec.ClusterDef) > 0 {
+		r.Spec.ClusterDefRef = cluster.Spec.ClusterDef
+	}
+
+	for i := range cluster.Spec.Shardings {
+		shardingSpec := cluster.Spec.Shardings[i]
+		// copy from sharding spec
+		_ = copier.Copy(&r.Spec.ShardingSpecs[i], &shardingSpec)
+	}
+
 	for _, spec := range cluster.Spec.ComponentSpecs {
 		if spec.UpdateStrategy == nil || spec.UpdateStrategy.InstanceUpdatePolicy == nil {
 			continue
@@ -203,19 +285,19 @@ type clusterConverter struct {
 }
 
 type clusterSpecConverter struct {
-	ClusterDefRef      string                          `json:"clusterDefinitionRef,omitempty"`
-	ClusterVersionRef  string                          `json:"clusterVersionRef,omitempty"`
-	TerminationPolicy  TerminationPolicyType           `json:"terminationPolicy"`
-	Affinity           *Affinity                       `json:"affinity,omitempty"`
-	Tolerations        []corev1.Toleration             `json:"tolerations,omitempty"`
-	Tenancy            TenancyType                     `json:"tenancy,omitempty"`
-	AvailabilityPolicy AvailabilityPolicyType          `json:"availabilityPolicy,omitempty"`
-	Replicas           *int32                          `json:"replicas,omitempty"`
-	Resources          ClusterResources                `json:"resources,omitempty"`
-	Storage            ClusterStorage                  `json:"storage,omitempty"`
-	Network            *ClusterNetwork                 `json:"network,omitempty"`
-	Components         map[string]clusterCompConverter `json:"components,omitempty"`
-	Shardings          map[string]clusterCompConverter `json:"shardings,omitempty"`
+	ClusterDefRef      string                           `json:"clusterDefinitionRef,omitempty"`
+	ClusterVersionRef  string                           `json:"clusterVersionRef,omitempty"`
+	TerminationPolicy  TerminationPolicyType            `json:"terminationPolicy"`
+	Affinity           *Affinity                        `json:"affinity,omitempty"`
+	Tolerations        []corev1.Toleration              `json:"tolerations,omitempty"`
+	Tenancy            TenancyType                      `json:"tenancy,omitempty"`
+	AvailabilityPolicy AvailabilityPolicyType           `json:"availabilityPolicy,omitempty"`
+	Replicas           *int32                           `json:"replicas,omitempty"`
+	Resources          ClusterResources                 `json:"resources,omitempty"`
+	Storage            ClusterStorage                   `json:"storage,omitempty"`
+	Network            *ClusterNetwork                  `json:"network,omitempty"`
+	Components         map[string]clusterCompConverter  `json:"components,omitempty"`
+	Shardings          map[string]clusterShardConverter `json:"shardings,omitempty"`
 }
 
 type clusterCompConverter struct {
@@ -229,6 +311,12 @@ type clusterCompConverter struct {
 	UpdateStrategy         *UpdateStrategy         `json:"updateStrategy,omitempty"`
 	InstanceUpdateStrategy *InstanceUpdateStrategy `json:"instanceUpdateStrategy,omitempty"`
 	Monitor                *bool                   `json:"monitor,omitempty"`
+}
+
+type clusterShardConverter struct {
+	shards int32
+	index  int
+	clusterCompConverter
 }
 
 type clusterStatusConverter struct {
@@ -275,9 +363,13 @@ func (c *clusterConverter) fromCluster(cluster *Cluster) {
 		}
 	}
 	if len(cluster.Spec.ShardingSpecs) > 0 {
-		c.Spec.Shardings = make(map[string]clusterCompConverter)
-		for _, sharding := range cluster.Spec.ShardingSpecs {
-			c.Spec.Shardings[sharding.Name] = deletedComp(sharding.Template)
+		c.Spec.Shardings = make(map[string]clusterShardConverter)
+		for i, sharding := range cluster.Spec.ShardingSpecs {
+			c.Spec.Shardings[sharding.Name] = clusterShardConverter{
+				shards:               sharding.Shards,
+				index:                i,
+				clusterCompConverter: deletedComp(sharding.Template),
+			}
 		}
 	}
 
@@ -324,10 +416,14 @@ func (c *clusterConverter) toCluster(cluster *Cluster) {
 			deletedComp(comp, &cluster.Spec.ComponentSpecs[i])
 		}
 	}
-	for i, spec := range cluster.Spec.ShardingSpecs {
-		template, ok := c.Spec.Shardings[spec.Name]
-		if ok {
-			deletedComp(template, &cluster.Spec.ShardingSpecs[i].Template)
+	if len(c.Spec.Shardings) > 0 {
+		cluster.Spec.ShardingSpecs = make([]ShardingSpec, len(c.Spec.Shardings))
+		for shardName, shardSpec := range c.Spec.Shardings {
+			cluster.Spec.ShardingSpecs[shardSpec.index] = ShardingSpec{
+				Name:   shardName,
+				Shards: shardSpec.shards,
+			}
+			deletedComp(shardSpec.clusterCompConverter, &cluster.Spec.ShardingSpecs[shardSpec.index].Template)
 		}
 	}
 
@@ -340,4 +436,119 @@ func (c *clusterConverter) toCluster(cluster *Cluster) {
 			cluster.Status.Components[name] = comp
 		}
 	}
+}
+
+func convertToAffinity(clusterName, compName string, compAffinity *Affinity) *corev1.Affinity {
+	if compAffinity == nil {
+		return nil
+	}
+	affinity := new(corev1.Affinity)
+	// Build NodeAffinity
+	var matchExpressions []corev1.NodeSelectorRequirement
+	nodeLabelKeys := maps.Keys(compAffinity.NodeLabels)
+	// NodeLabels must be ordered
+	sort.Strings(nodeLabelKeys)
+	for _, key := range nodeLabelKeys {
+		values := strings.Split(compAffinity.NodeLabels[key], ",")
+		matchExpressions = append(matchExpressions, corev1.NodeSelectorRequirement{
+			Key:      key,
+			Operator: corev1.NodeSelectorOpIn,
+			Values:   values,
+		})
+	}
+	if len(matchExpressions) > 0 {
+		nodeSelectorTerm := corev1.NodeSelectorTerm{
+			MatchExpressions: matchExpressions,
+		}
+		affinity.NodeAffinity = &corev1.NodeAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+				NodeSelectorTerms: []corev1.NodeSelectorTerm{nodeSelectorTerm},
+			},
+		}
+	}
+	// Build PodAntiAffinity
+	var podAntiAffinity *corev1.PodAntiAffinity
+	var podAffinityTerms []corev1.PodAffinityTerm
+	for _, topologyKey := range compAffinity.TopologyKeys {
+		podAffinityTerms = append(podAffinityTerms, corev1.PodAffinityTerm{
+			TopologyKey: topologyKey,
+			LabelSelector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"app.kubernetes.io/instance":        clusterName,
+					"apps.kubeblocks.io/component-name": compName,
+				},
+			},
+		})
+	}
+	if compAffinity.PodAntiAffinity == Required {
+		podAntiAffinity = &corev1.PodAntiAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: podAffinityTerms,
+		}
+	} else {
+		var weightedPodAffinityTerms []corev1.WeightedPodAffinityTerm
+		for _, podAffinityTerm := range podAffinityTerms {
+			weightedPodAffinityTerms = append(weightedPodAffinityTerms, corev1.WeightedPodAffinityTerm{
+				Weight:          100,
+				PodAffinityTerm: podAffinityTerm,
+			})
+		}
+		podAntiAffinity = &corev1.PodAntiAffinity{
+			PreferredDuringSchedulingIgnoredDuringExecution: weightedPodAffinityTerms,
+		}
+	}
+	affinity.PodAntiAffinity = podAntiAffinity
+	return affinity
+}
+
+func convertTopologySpreadConstraints4Legacy(clusterName, compName string, compAffinity *Affinity) []corev1.TopologySpreadConstraint {
+	if compAffinity == nil {
+		return nil
+	}
+
+	var topologySpreadConstraints []corev1.TopologySpreadConstraint
+
+	var whenUnsatisfiable corev1.UnsatisfiableConstraintAction
+	if compAffinity.PodAntiAffinity == Required {
+		whenUnsatisfiable = corev1.DoNotSchedule
+	} else {
+		whenUnsatisfiable = corev1.ScheduleAnyway
+	}
+	for _, topologyKey := range compAffinity.TopologyKeys {
+		topologySpreadConstraints = append(topologySpreadConstraints, corev1.TopologySpreadConstraint{
+			MaxSkew:           1,
+			WhenUnsatisfiable: whenUnsatisfiable,
+			TopologyKey:       topologyKey,
+			LabelSelector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"app.kubernetes.io/instance":        clusterName,
+					"apps.kubeblocks.io/component-name": compName,
+				},
+			},
+		})
+	}
+	return topologySpreadConstraints
+}
+
+func buildAffinity(cluster *Cluster) *Affinity {
+	if cluster.Spec.Affinity != nil {
+		return cluster.Spec.Affinity
+	}
+	affinityTopoKey := func(policyType AvailabilityPolicyType) string {
+		switch policyType {
+		case AvailabilityPolicyZone:
+			return "topology.kubernetes.io/zone"
+		case AvailabilityPolicyNode:
+			return "kubernetes.io/hostname"
+		}
+		return ""
+	}
+	var affinity *Affinity
+	if len(cluster.Spec.Tenancy) > 0 || len(cluster.Spec.AvailabilityPolicy) > 0 {
+		affinity = &Affinity{
+			PodAntiAffinity: Preferred,
+			TopologyKeys:    []string{affinityTopoKey(cluster.Spec.AvailabilityPolicy)},
+			Tenancy:         cluster.Spec.Tenancy,
+		}
+	}
+	return affinity
 }

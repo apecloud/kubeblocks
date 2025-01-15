@@ -20,9 +20,6 @@ kbcli cluster update NAME [flags]
   # enable all logs
   kbcli cluster update mycluster --enable-all-logs=true
   
-  # update cluster topology keys and affinity
-  kbcli cluster update mycluster --topology-keys=kubernetes.io/hostname --pod-anti-affinity=Required
-  
   # update cluster tolerations
   kbcli cluster update mycluster --tolerations='"key=engineType,value=mongo,operator=Equal,effect=NoSchedule","key=diskType,value=ssd,operator=Equal,effect=NoSchedule"'
   
@@ -64,21 +61,18 @@ kbcli cluster update NAME [flags]
       --backup-repo-name string                the backup repository name
       --backup-retention-period string         a time string ending with the 'd'|'D'|'h'|'H' character to describe how long the Backup should be retained (default "1d")
       --backup-starting-deadline-minutes int   the deadline in minutes for starting the backup job if it misses its scheduled time for any reason
+      --disable-exporter                       Enable or disable monitoring (default true)
       --dry-run string[="unchanged"]           Must be "none", "server", or "client". If client strategy, only print the object that would be sent, without sending it. If server strategy, submit server-side request without persisting the resource. (default "none")
       --edit                                   Edit the API resource
       --enable-all-logs                        Enable advanced application all log extraction, set to true will ignore enabledLogs of component level, default is false
   -h, --help                                   help for update
-      --monitoring-interval uint8              The monitoring interval of cluster, 0 is disabled, the unit is second, any non-zero value means enabling monitoring.
-      --node-labels stringToString             Node label selector (default [])
   -o, --output string                          Output format. One of: (json, yaml, name, go-template, go-template-file, template, templatefile, jsonpath, jsonpath-as-json, jsonpath-file).
       --pitr-enabled                           Specify whether enabled point in time recovery
-      --pod-anti-affinity string               Pod anti-affinity type, one of: (Preferred, Required) (default "Preferred")
+      --runtime-class-name string              Specifies runtimeClassName for all Pods managed by this Cluster.
       --show-managed-fields                    If true, keep the managedFields when printing objects in JSON or YAML format.
       --template string                        Template string or path to template file to use when -o=go-template, -o=go-template-file. The template format is golang templates [http://golang.org/pkg/text/template/#pkg-overview].
-      --tenancy string                         Tenancy options, one of: (SharedNode, DedicatedNode) (default "SharedNode")
       --termination-policy string              Termination policy, one of: (DoNotTerminate, Halt, Delete, WipeOut) (default "Delete")
       --tolerations strings                    Tolerations for cluster, such as "key=value:effect, key:effect", for example '"engineType=mongo:NoSchedule", "diskType:NoSchedule"'
-      --topology-keys stringArray              Topology keys for affinity
 ```
 
 ### Options inherited from parent commands

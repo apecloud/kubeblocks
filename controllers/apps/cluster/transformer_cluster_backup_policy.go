@@ -633,6 +633,7 @@ func (r *backupPolicyBuilder) mergeClusterBackup(
 		}
 		if as.Spec.BackupType == dpv1alpha1.BackupTypeIncremental {
 			if len(backup.Method) == 0 || m.CompatibleMethod != backup.Method {
+				// disable other incremental backup schedules
 				backupSchedule.Spec.Schedules[i].Enabled = boolptr.False()
 			} else {
 				if backup.IncrementalBackupEnabled != nil && !hasSyncIncMethod {

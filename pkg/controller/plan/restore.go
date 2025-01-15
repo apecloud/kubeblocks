@@ -166,13 +166,13 @@ func (r *RestoreManager) BuildPrepareDataRestore(comp *component.SynthesizedComp
 	}
 
 	var templates []dpv1alpha1.RestoreVolumeClaim
-	pvcLabels := constant.GetCompLabels(comp.ClusterName, comp.Name)
+	pvcLabels := constant.GetCompLabels(r.Cluster.Name, comp.Name)
 	// TODO: create pvc by the volumeClaimTemplates of instance template if it is necessary.
 	for _, v := range comp.VolumeClaimTemplates {
 		if !dputils.ExistTargetVolume(targetVolumes, v.Name) {
 			continue
 		}
-		name := fmt.Sprintf("%s-%s-%s", v.Name, comp.ClusterName, comp.Name)
+		name := fmt.Sprintf("%s-%s-%s", v.Name, r.Cluster.Name, comp.Name)
 		if templateName != "" {
 			name += "-" + templateName
 		}
@@ -227,7 +227,7 @@ func (r *RestoreManager) BuildPrepareDataRestore(comp *component.SynthesizedComp
 func (r *RestoreManager) DoPostReady(comp *component.SynthesizedComponent,
 	compObj *appsv1.Component,
 	backupObj *dpv1alpha1.Backup) error {
-	jobActionLabels := constant.GetCompLabels(comp.ClusterName, comp.Name)
+	jobActionLabels := constant.GetCompLabels(r.Cluster.Name, comp.Name)
 	if len(comp.Roles) > 0 {
 		jobActionLabels[instanceset.AccessModeLabelKey] = string(appsv1alpha1.ReadWrite)
 	}
@@ -247,7 +247,7 @@ func (r *RestoreManager) DoPostReady(comp *component.SynthesizedComponent,
 				ExecAction: &dpv1alpha1.ExecAction{
 					Target: dpv1alpha1.ExecActionTarget{
 						PodSelector: metav1.LabelSelector{
-							MatchLabels: constant.GetCompLabels(comp.ClusterName, comp.Name),
+							MatchLabels: constant.GetCompLabels(r.Cluster.Name, comp.Name),
 						},
 					},
 				},
@@ -299,7 +299,7 @@ func (r *RestoreManager) buildSchedulingSpec(comp *component.SynthesizedComponen
 }
 
 func (r *RestoreManager) GetRestoreObjectMeta(comp *component.SynthesizedComponent, stage dpv1alpha1.RestoreStage, templateName string) metav1.ObjectMeta {
-	name := fmt.Sprintf("%s-%s-%s-%s", comp.ClusterName, comp.Name, comp.ClusterUID[:8], strings.ToLower(string(stage)))
+	name := fmt.Sprintf("%s-%s-%s-%s", r.Cluster.Name, comp.Name, r.Cluster.UID[:8], strings.ToLower(string(stage)))
 	if templateName != "" {
 		name = fmt.Sprintf("%s-%s", name, templateName)
 	}
@@ -307,17 +307,17 @@ func (r *RestoreManager) GetRestoreObjectMeta(comp *component.SynthesizedCompone
 		name = fmt.Sprintf("%s-%d", name, r.startingIndex)
 	}
 	if len(r.restoreLabels) == 0 {
-		r.restoreLabels = constant.GetCompLabels(comp.ClusterName, comp.Name)
+		r.restoreLabels = constant.GetCompLabels(r.Cluster.Name, comp.Name)
 	}
 	return metav1.ObjectMeta{
 		Name:      name,
-		Namespace: comp.Namespace,
+		Namespace: r.Cluster.Namespace,
 		Labels:    r.restoreLabels,
 	}
 }
 
 func (r *RestoreManager) initFromAnnotation(comp *component.SynthesizedComponent, compObj *appsv1.Component) (*dpv1alpha1.Backup, error) {
-	valueString := compObj.Annotations[constant.RestoreFromBackupAnnotationKey]
+	valueString := r.Cluster.Annotations[constant.RestoreFromBackupAnnotationKey]
 	if len(valueString) == 0 {
 		return nil, nil
 	}
@@ -355,7 +355,7 @@ func (r *RestoreManager) initFromAnnotation(comp *component.SynthesizedComponent
 			return nil, err
 		}
 	}
-	return GetBackupFromClusterAnnotation(r.Ctx, r.Client, backupSource, comp.Name, comp.Namespace)
+	return GetBackupFromClusterAnnotation(r.Ctx, r.Client, backupSource, comp.Name, r.Cluster.Namespace)
 }
 
 // createRestoreAndWait create the restore CR and wait for completion.

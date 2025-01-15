@@ -22,6 +22,7 @@ package component
 import (
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -62,6 +63,9 @@ func (t *componentConfigurationTransformer) Transform(ctx graph.TransformContext
 	}
 	cluster := &appsv1.Cluster{}
 	if err := t.Client.Get(transCtx.Context, clusterKey, cluster); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
 		return errors.Wrap(err, "obtain the cluster object error for configuration")
 	}
 

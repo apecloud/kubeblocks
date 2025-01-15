@@ -62,7 +62,9 @@ func (e ExposeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clien
 	for _, comp := range opsRes.Cluster.Spec.ComponentSpecs {
 		compMap[comp.Name] = comp
 	}
-
+	for _, shard := range opsRes.Cluster.Spec.Shardings {
+		compMap[shard.Name] = shard.Template
+	}
 	for _, expose := range exposeMap {
 		clusterCompSpecName := ""
 		compDef := ""
@@ -71,7 +73,8 @@ func (e ExposeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clien
 			if !ok {
 				return fmt.Errorf("component spec not found: %s", expose.ComponentName)
 			}
-			clusterCompSpecName = clusterCompSpec.Name
+			// shardName or compName
+			clusterCompSpecName = expose.ComponentName
 			compDef = clusterCompSpec.ComponentDef
 		}
 

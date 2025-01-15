@@ -73,7 +73,8 @@ func (e ExposeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clien
 			if !ok {
 				return fmt.Errorf("component spec not found: %s", expose.ComponentName)
 			}
-			clusterCompSpecName = clusterCompSpec.Name
+			// shardName or compName
+			clusterCompSpecName = expose.ComponentName
 			compDef = clusterCompSpec.ComponentDef
 		}
 
@@ -355,11 +356,7 @@ func (e ExposeOpsHandler) buildClusterServices(reqCtx intctrlutil.RequestCtx,
 		}
 
 		genServiceName := generateServiceName(clusterCompSpecName, exposeService.Name)
-		shardName, ok := exposeService.Annotations[constant.KBAppShardingNameLabelKey]
-		if ok {
-			delete(exposeService.Annotations, constant.KBAppShardingNameLabelKey)
-			clusterCompSpecName = shardName
-		}
+
 		clusterService := appsv1.ClusterService{
 			Service: appsv1.Service{
 				Name:        genServiceName,

@@ -58,27 +58,36 @@ func (e ExposeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clien
 	)
 	reqCtx.Log.Info("cluster service before action", "clusterService", opsRes.Cluster.Spec.Services)
 	compMap := make(map[string]appsv1alpha1.ClusterComponentSpec)
+	shardCompMap := make(map[string]appsv1alpha1.ClusterComponentSpec)
 	for _, comp := range opsRes.Cluster.Spec.ComponentSpecs {
 		compMap[comp.Name] = comp
 	}
-
+	for _, shard := range opsRes.Cluster.Spec.ShardingSpecs {
+		shardCompMap[shard.Name] = shard.Template
+	}
 	for _, expose := range exposeMap {
 		clusterCompSpecName := ""
 		compDef := ""
 		clusterCompDefRefName := ""
+		isSharding := false
 		if len(expose.ComponentName) > 0 {
 			clusterCompSpec, ok := compMap[expose.ComponentName]
 			if !ok {
-				return fmt.Errorf("component spec not found: %s", expose.ComponentName)
+				clusterCompSpec, ok = shardCompMap[expose.ComponentName]
+				if !ok {
+					return fmt.Errorf("component spec not found: %s", expose.ComponentName)
+				}
+				isSharding = true
 			}
-			clusterCompSpecName = clusterCompSpec.Name
+			// shardName and compName
+			clusterCompSpecName = expose.ComponentName
 			compDef = clusterCompSpec.ComponentDef
 			clusterCompDefRefName = clusterCompSpec.ComponentDefRef
 		}
 
 		switch expose.Switch {
 		case appsv1alpha1.EnableExposeSwitch:
-			if err := e.buildClusterServices(reqCtx, cli, opsRes.Cluster, clusterCompSpecName, compDef, clusterCompDefRefName, expose.Services); err != nil {
+			if err := e.buildClusterServices(reqCtx, cli, opsRes.Cluster, isSharding, clusterCompSpecName, compDef, clusterCompDefRefName, expose.Services); err != nil {
 				return err
 			}
 		case appsv1alpha1.DisableExposeSwitch:
@@ -267,6 +276,7 @@ func (e ExposeOpsHandler) removeClusterServices(cluster *appsv1alpha1.Cluster,
 func (e ExposeOpsHandler) buildClusterServices(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
 	cluster *appsv1alpha1.Cluster,
+	isSharding bool,
 	clusterCompSpecName string,
 	compDefName string,
 	clusterCompDefRefName string,
@@ -283,7 +293,7 @@ func (e ExposeOpsHandler) buildClusterServices(reqCtx intctrlutil.RequestCtx,
 		genServiceName := generateServiceName(clusterCompSpecName, exposeService.Name)
 
 		for _, clusterService := range cluster.Spec.Services {
-			if clusterService.ComponentSelector != clusterCompSpecName {
+			if clusterService.ComponentSelector != clusterCompSpecName && clusterService.ShardingSelector != clusterCompSpecName {
 				continue
 			}
 			if clusterService.Name == genServiceName {
@@ -384,7 +394,12 @@ func (e ExposeOpsHandler) buildClusterServices(reqCtx intctrlutil.RequestCtx,
 		}
 
 		genServiceName := generateServiceName(clusterCompSpecName, exposeService.Name)
-
+		compSelector := clusterCompSpecName
+		shardingSelector := ""
+		if isSharding {
+			compSelector = ""
+			shardingSelector = clusterCompSpecName
+		}
 		clusterService := appsv1alpha1.ClusterService{
 			Service: appsv1alpha1.Service{
 				Name:        genServiceName,
@@ -394,7 +409,8 @@ func (e ExposeOpsHandler) buildClusterServices(reqCtx intctrlutil.RequestCtx,
 					Type: exposeService.ServiceType,
 				},
 			},
-			ComponentSelector: clusterCompSpecName,
+			ComponentSelector: compSelector,
+			ShardingSelector:  shardingSelector,
 		}
 
 		// set service ports

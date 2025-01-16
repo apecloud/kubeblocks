@@ -928,9 +928,9 @@ var _ = Describe("Backup Controller test", func() {
 				By("waiting for the full backup " + fullBackupKey2.String() + " to complete")
 				checkBackupCompleted(fullBackup2)
 				mockBackupStatus(fullBackup2, "", "")
-				By("creating an incremental backup " + incBackupName + "3")
+				By("creating a scheduled incremental backup " + incBackupName + "3")
 				incBackup3 := mockIncBackupAndComplete(true, incBackupName+"3", "", fullBackup2.Name, fullBackup2.Name)
-				By("creating an incremental backup " + incBackupName + "4")
+				By("creating a scheduled incremental backup " + incBackupName + "4")
 				_ = mockIncBackupAndComplete(true, incBackupName+"4", "", incBackup3.Name, fullBackup2.Name)
 				By("creating a scheduled full backup from backupPolicy " + testdp.BackupPolicyName)
 				fullBackup3 := testdp.NewFakeBackup(&testCtx, func(backup *dpv1alpha1.Backup) {
@@ -941,10 +941,12 @@ var _ = Describe("Backup Controller test", func() {
 				By("waiting for the full backup " + fullBackupKey3.String() + " to complete")
 				checkBackupCompleted(fullBackup3)
 				mockBackupStatus(fullBackup3, "", "")
-				By("creating an incremental backup " + incBackupName + "5")
+				By("creating a scheduled incremental backup " + incBackupName + "5")
 				incBackup5 := mockIncBackupAndComplete(true, incBackupName+"5", "", fullBackup3.Name, fullBackup3.Name)
-				By("creating an incremental backup " + incBackupName + "6")
-				_ = mockIncBackupAndComplete(true, incBackupName+"6", "", incBackup5.Name, fullBackup3.Name)
+				By("creating a unscheduled incremental backup " + incBackupName + "6")
+				_ = mockIncBackupAndComplete(false, incBackupName+"6", "", incBackup5.Name, fullBackup3.Name)
+				By("creating a scheduled incremental backup " + incBackupName + "7")
+				_ = mockIncBackupAndComplete(true, incBackupName+"7", "", incBackup5.Name, fullBackup3.Name)
 			})
 
 			It("creates an incremental backup without valid parent backups", func() {

@@ -190,19 +190,65 @@ func (r *ShardingDefinitionReconciler) validateShardsLimit(ctx context.Context, 
 
 func (r *ShardingDefinitionReconciler) validateProvisionNUpdateStrategy(ctx context.Context, cli client.Client,
 	shardingDef *appsv1.ShardingDefinition) error {
+	var (
+		provision = shardingDef.Spec.ProvisionStrategy
+		update    = shardingDef.Spec.UpdateStrategy
+	)
+
 	supported := func(strategy *appsv1.UpdateStrategy) bool {
 		if strategy == nil {
 			return true
 		}
 		return *strategy == appsv1.SerialStrategy || *strategy == appsv1.ParallelStrategy
 	}
-	if !supported(shardingDef.Spec.ProvisionStrategy) {
-		return fmt.Errorf("unsupported provision strategy: %s", *shardingDef.Spec.ProvisionStrategy)
+	if !supported(provision) {
+		return fmt.Errorf("unsupported provision strategy: %s", *provision)
 	}
-	if !supported(shardingDef.Spec.UpdateStrategy) {
-		return fmt.Errorf("unsupported update strategy: %s", *shardingDef.Spec.UpdateStrategy)
+	if !supported(update) {
+		return fmt.Errorf("unsupported update strategy: %s", *update)
+	}
+
+	if provision != nil && *provision == appsv1.SerialStrategy && r.requireParallelProvision() {
+		return fmt.Errorf("serial provision strategy is conflicted with vars that requires parallel provision when mutiple objects matched")
 	}
 	return nil
+}
+
+func (r *ShardingDefinitionReconciler) requireParallelProvision() bool {
+	requireAll := func(opt *appsv1.MultipleClusterObjectOption) bool {
+		return opt != nil && opt.RequireAllComponentObjects != nil && *opt.RequireAllComponentObjects
+	}
+	require := func(v appsv1.EnvVar) bool {
+		if v.ValueFrom != nil {
+			if v.ValueFrom.HostNetworkVarRef != nil {
+				return requireAll(v.ValueFrom.HostNetworkVarRef.MultipleClusterObjectOption)
+			}
+			if v.ValueFrom.ServiceVarRef != nil {
+				return requireAll(v.ValueFrom.ServiceVarRef.MultipleClusterObjectOption)
+			}
+			if v.ValueFrom.CredentialVarRef != nil {
+				return requireAll(v.ValueFrom.CredentialVarRef.MultipleClusterObjectOption)
+			}
+			if v.ValueFrom.TLSVarRef != nil {
+				return requireAll(v.ValueFrom.TLSVarRef.MultipleClusterObjectOption)
+			}
+			if v.ValueFrom.ServiceRefVarRef != nil {
+				return requireAll(v.ValueFrom.ServiceRefVarRef.MultipleClusterObjectOption)
+			}
+			if v.ValueFrom.ComponentVarRef != nil {
+				return requireAll(v.ValueFrom.ComponentVarRef.MultipleClusterObjectOption)
+			}
+		}
+		return false
+	}
+	for _, compDef := range r.compDefs {
+		for _, v := range compDef.Spec.Vars {
+			if require(v) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (r *ShardingDefinitionReconciler) validateLifecycleActions(ctx context.Context, cli client.Client,

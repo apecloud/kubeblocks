@@ -70,6 +70,7 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 		ClusterName:                      clusterName,
 		ClusterUID:                       clusterUID,
 		Comp2CompDefs:                    comp2CompDef,
+		CompDef2CompCnt:                  buildCompDef2CompCount(cluster),
 		Name:                             compName,
 		FullCompName:                     comp.Name,
 		Generation:                       strconv.FormatInt(comp.Generation, 10),
@@ -157,6 +158,7 @@ func buildComp2CompDefs(ctx context.Context, cli client.Reader, cluster *appsv1.
 	if cluster == nil {
 		return nil, nil
 	}
+
 	mapping := make(map[string]string)
 
 	// build from componentSpecs
@@ -182,8 +184,33 @@ func buildComp2CompDefs(ctx context.Context, cli client.Reader, cluster *appsv1.
 			}
 		}
 	}
-
 	return mapping, nil
+}
+
+func buildCompDef2CompCount(cluster *appsv1.Cluster) map[string]int32 {
+	if cluster == nil {
+		return nil
+	}
+
+	result := make(map[string]int32)
+
+	add := func(name string, cnt int32) {
+		if len(name) > 0 {
+			if val, ok := result[name]; !ok {
+				result[name] = cnt
+			} else {
+				result[name] = val + cnt
+			}
+		}
+	}
+
+	for _, comp := range cluster.Spec.ComponentSpecs {
+		add(comp.ComponentDef, 1)
+	}
+	for _, spec := range cluster.Spec.Shardings {
+		add(spec.Template.ComponentDef, spec.Shards)
+	}
+	return result
 }
 
 func mergeUserDefinedEnv(synthesizedComp *SynthesizedComponent, comp *appsv1.Component) error {

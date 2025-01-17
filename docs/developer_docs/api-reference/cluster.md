@@ -24874,6 +24874,8 @@ StatefulSetSpec
 <td></td>
 </tr><tr><td><p>&#34;vscale&#34;</p></td>
 <td></td>
+</tr><tr><td><p>&#34;shardingHScale&#34;</p></td>
+<td></td>
 </tr></tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1alpha1.ResourceMeta">ResourceMeta

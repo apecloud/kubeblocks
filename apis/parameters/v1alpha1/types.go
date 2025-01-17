@@ -124,9 +124,10 @@ const (
 type RerenderResourceType string
 
 const (
-	ComponentVScaleType RerenderResourceType = "vscale"
-	ComponentHScaleType RerenderResourceType = "hscale"
-	ComponentTLSType    RerenderResourceType = "tls"
+	ComponentVScaleType          RerenderResourceType = "vscale"
+	ComponentHScaleType          RerenderResourceType = "hscale"
+	ComponentTLSType             RerenderResourceType = "tls"
+	ShardingComponentHVScaleType RerenderResourceType = "shardingHVScale"
 )
 
 // ParameterPhase defines the Configuration FSM phase

@@ -205,8 +205,12 @@ func buildComponentParameter(reqCtx intctrlutil.RequestCtx, reader client.Reader
 	if err = intctrlutil.SetOwnerReference(comp, parameterObj); err != nil {
 		return nil, err
 	}
+	sharding, err := configctrl.ResolveShardingReference(reqCtx.Ctx, reader, comp)
+	if err != nil {
+		return nil, err
+	}
 	if configRender != nil {
-		err = configctrl.UpdateConfigPayload(&parameterObj.Spec, &comp.Spec, &configRender.Spec)
+		err = configctrl.UpdateConfigPayload(&parameterObj.Spec, &comp.Spec, &configRender.Spec, sharding)
 	}
 	return parameterObj, err
 }

@@ -214,6 +214,12 @@ func (r *ShardingDefinitionReconciler) validateProvisionNUpdateStrategy(ctx cont
 	return nil
 }
 
+// requireParallelProvision checks whether the provision strategy must be parallel.
+//
+// If any Vars in the ShardingDefinition have requireAllComponentObjects set to true,
+// all sharding components must exist before Vars resolving can proceed. This requirement
+// conflicts with a serial provision strategy, where components are created one at a time,
+// potentially leading to a logical deadlock.
 func (r *ShardingDefinitionReconciler) requireParallelProvision() bool {
 	requireAll := func(opt *appsv1.MultipleClusterObjectOption) bool {
 		return opt != nil && opt.RequireAllComponentObjects != nil && *opt.RequireAllComponentObjects

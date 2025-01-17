@@ -91,6 +91,7 @@ jobs:
       GO_VERSION: "1.21"
       APECD_REF: "v0.1.24"
       DOCKERFILE_PATH: "./docker/Dockerfile-tools"
+      BUILDX_PLATFORMS: "linux/amd64,linux/arm64,linux/s390x"
     secrets: inherit
 
   release-dataprotection-image:
@@ -102,6 +103,7 @@ jobs:
       VERSION: "${{ needs.release-version.outputs.release-version }}"
       APECD_REF: "v0.1.24"
       DOCKERFILE_PATH: "./docker/Dockerfile-dataprotection"
+      BUILDX_PLATFORMS: "linux/amd64,linux/arm64,linux/s390x"
     secrets: inherit
 
   release-charts-image:
@@ -115,6 +117,7 @@ jobs:
       GO_VERSION: "1.21"
       APECD_REF: "v0.1.24"
       DOCKERFILE_PATH: "./docker/Dockerfile-charts"
+      BUILDX_PLATFORMS: "linux/amd64,linux/arm64,linux/s390x"
     secrets: inherit
 
   release-dev-image:
@@ -127,6 +130,7 @@ jobs:
       APECD_REF: "v0.1.24"
       DOCKERFILE_PATH: "./docker/Dockerfile-dev"
       CONTEXT: "./docker"
+      BUILDX_PLATFORMS: "linux/amd64,linux/arm64,linux/s390x"
     secrets: inherit
 
   release-message:

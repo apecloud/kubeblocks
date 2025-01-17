@@ -332,21 +332,27 @@ func createOrUpdateService(ctx graph.TransformContext, dag *graph.DAG, graphCli 
 }
 
 func resolveServiceDefaultFields(obj, objCopy *corev1.ServiceSpec) {
-	// TODO: how about the order changed?
+	servicePorts := make(map[int32]corev1.ServicePort)
+	for i, port := range obj.Ports {
+		servicePorts[port.Port] = obj.Ports[i]
+	}
 	for i, port := range objCopy.Ports {
-		if i == len(obj.Ports) {
-			break
+		servicePort, ok := servicePorts[port.Port]
+		if !ok {
+			continue // new port added
 		}
 		// if the service type is NodePort or LoadBalancer, and the nodeport is not set, we should use the nodeport of the exist service
-		if (objCopy.Type == corev1.ServiceTypeNodePort || objCopy.Type == corev1.ServiceTypeLoadBalancer) && port.NodePort == 0 && obj.Ports[i].NodePort != 0 {
-			objCopy.Ports[i].NodePort = obj.Ports[i].NodePort
+		if (objCopy.Type == corev1.ServiceTypeNodePort || objCopy.Type == corev1.ServiceTypeLoadBalancer) &&
+			port.NodePort == 0 &&
+			servicePort.NodePort != 0 {
+			objCopy.Ports[i].NodePort = servicePort.NodePort
 		}
 		if port.TargetPort.IntVal != 0 {
 			continue
 		}
-		port.TargetPort = obj.Ports[i].TargetPort
-		if reflect.DeepEqual(port, obj.Ports[i]) {
-			objCopy.Ports[i].TargetPort = obj.Ports[i].TargetPort
+		port.TargetPort = servicePort.TargetPort
+		if reflect.DeepEqual(port, servicePort) {
+			objCopy.Ports[i].TargetPort = servicePort.TargetPort
 		}
 	}
 	if len(objCopy.ClusterIP) == 0 {

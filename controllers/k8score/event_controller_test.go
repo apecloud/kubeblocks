@@ -227,6 +227,7 @@ var _ = Describe("Event Controller", func() {
 			role = "follower"
 			sndValidEvent := createRoleChangedEvent(podName, role, uid)
 			sndValidEvent.LastTimestamp = metav1.NewTime(afterLastTS)
+			sndValidEvent.EventTime = metav1.NewMicroTime(afterLastTS)
 			Expect(testCtx.CreateObj(ctx, sndValidEvent)).Should(Succeed())
 			Eventually(func() string {
 				event := &corev1.Event{}

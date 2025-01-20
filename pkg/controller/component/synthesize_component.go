@@ -376,20 +376,11 @@ func overrideConfigTemplates(synthesizedComp *SynthesizedComponent, comp *appsv1
 		if template == nil {
 			return fmt.Errorf("the config template %s is not defined in definition", *config.Name)
 		}
-
-		specified := func() bool {
-			return config.ConfigMap != nil && len(config.ConfigMap.Name) > 0
-		}
-		switch {
-		case len(template.TemplateRef) == 0 && !specified():
+		if config.ConfigMap == nil || config.ConfigMap.Name == "" {
 			return fmt.Errorf("there is no content provided for config template %s", *config.Name)
-		case len(template.TemplateRef) > 0 && specified():
-			return fmt.Errorf("partial overriding is not supported, config template: %s", *config.Name)
-		case specified():
-			template.TemplateRef = config.ConfigMap.Name
-		default:
-			// do nothing
 		}
+		template.TemplateRef = config.ConfigMap.Name
+		template.Namespace = comp.Namespace
 	}
 	return nil
 }

@@ -672,7 +672,16 @@ func FindParentBackupIfNotSet(ctx context.Context, cli client.Client, backup *dp
 	if err != nil {
 		return nil, err
 	}
-	// 3. prefer the latest backup; if it is an incremental backup, it should be based on the latest full backup.
+	// 3. get the latest unscheduled full backup if scheduled full backups not found
+	// no scheduled incremental backups or some based on unscheduled full backup
+	if len(scheduleName) != 0 && latestFullBackup == nil {
+		delete(labelMap, dptypes.BackupScheduleLabelKey)
+		latestFullBackup, err = getLatestParentBackup(labelMap, false)
+		if err != nil {
+			return nil, err
+		}
+	}
+	// 4. prefer the latest backup; if it is an incremental backup, it should be based on the latest full backup.
 	if latestIncrementalBackup != nil && latestFullBackup != nil {
 		if !dputils.CompareWithBackupStopTime(*latestIncrementalBackup, *latestFullBackup) &&
 			latestIncrementalBackup.Status.BaseBackupName == latestFullBackup.Name {
@@ -681,14 +690,6 @@ func FindParentBackupIfNotSet(ctx context.Context, cli client.Client, backup *dp
 		// the base backup of the latest incremental backup is not found,
 		// or the latest full backup is newer than the base backup of the latest incremental backup
 		return latestFullBackup, nil
-	}
-	// 4. get the latest unscheduled full backup if scheduled backups not found
-	if len(scheduleName) != 0 && latestFullBackup == nil {
-		delete(labelMap, dptypes.BackupScheduleLabelKey)
-		latestFullBackup, err = getLatestParentBackup(labelMap, false)
-		if err != nil {
-			return nil, err
-		}
 	}
 	// 5. only full backup found
 	if latestFullBackup != nil {

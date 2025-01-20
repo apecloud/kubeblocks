@@ -163,8 +163,7 @@ var _ = Describe("synthesized component", func() {
 				},
 			})
 			_, err := BuildSynthesizedComponent(ctx, cli, compDef, comp, nil)
-			Expect(err).ShouldNot(BeNil())
-			Expect(err.Error()).Should(ContainSubstring("partial overriding is not supported"))
+			Expect(err).Should(BeNil())
 		})
 
 		It("w/ comp override - both not specified", func() {

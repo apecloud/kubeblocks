@@ -176,8 +176,8 @@ KubeBlocks supports creating two types of ApeCloud MySQL clusters: Standalone an
    ```bash
    kubectl get cluster mycluster -n demo
    >
-   NAME        CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    AGE
-   mycluster   apecloud-mysql       ac-mysql-8.0.30   Delete               Running   12m
+   NAME        CLUSTER-DEFINITION   TERMINATION-POLICY   STATUS    AGE
+   mycluster   apecloud-mysql       Delete               Running   40s
    ```
 
 </TabItem>
@@ -222,8 +222,8 @@ KubeBlocks supports creating two types of ApeCloud MySQL clusters: Standalone an
    ```bash
    kbcli cluster list -n demo
    >
-   NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    CREATED-TIME
-   mycluster   demo        apecloud-mysql       ac-mysql-8.0.30   Delete               Running   Sep 19,2024 16:01 UTC+0800
+   NAME        NAMESPACE   CLUSTER-DEFINITION   TERMINATION-POLICY   STATUS    CREATED-TIME
+   mycluster   demo        apecloud-mysql       Delete               Running   Jan 20,2025 16:27 UTC+0800
    ```
 
 </TabItem>

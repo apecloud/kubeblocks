@@ -41,8 +41,8 @@ cat <<EOF | kubectl apply -f -
 apiVersion: apps.kubeblocks.io/v1
 kind: Cluster
 metadata:
-  name: es-multinode
-  namespace: default
+  name: mycluster
+  namespace: demo
   annotations:
     kubeblocks.io/extra-env: '{"master-roles":"master", "data-roles": "data", "ingest-roles": "ingest", "transform-roles": "transform"}'
 spec:
@@ -184,16 +184,16 @@ kubectl get cluster mycluster -n demo -o yaml
 2. Check whether the cluster is created.
 
    ```bash
-   kbcli cluster list
+   kbcli cluster list -n demo
    >
-   NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION   TERMINATION-POLICY   STATUS     CREATED-TIME
-   mycluster   demo                                       Delete               Creating   Sep 27,2024 11:42 UTC+0800  
+   NAME        NAMESPACE   CLUSTER-DEFINITION   TERMINATION-POLICY   STATUS     CREATED-TIME
+   mycluster   demo                             Delete               Running    Jan 20,2025 17:14 UTC+0800 
    ```
 
 3. Check the cluster details.
 
    ```bash
-   kbcli cluster describe elasticsearch -n demo
+   kbcli cluster describe mycluster -n demo
    ```
 
 </TabItem>
@@ -223,8 +223,8 @@ Check whether the cluster status is `Running`. Otherwise, the following operatio
 ```bash
 kubectl get cluster mycluster -n demo
 >
-NAME        CLUSTER-DEFINITION   VERSION                  TERMINATION-POLICY   STATUS    AGE
-mycluster                                                 Delete               Running   4m29s
+NAME        CLUSTER-DEFINITION   TERMINATION-POLICY   STATUS     AGE
+mycluster                        Delete               Running    5m49s
 ```
 
 </TabItem>
@@ -234,8 +234,8 @@ mycluster                                                 Delete               R
 ```bash
 kbcli cluster list mycluster -n demo
 >
-NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    CREATED-TIME
-mycluster   demo                                               Delete               Running   Sep 27,2024 11:42 UTC+0800
+NAME        NAMESPACE   CLUSTER-DEFINITION   TERMINATION-POLICY   STATUS     CREATED-TIME
+mycluster   demo                             Delete               Running    Jan 20,2025 17:14 UTC+0800
 ```
 
 </TabItem>
@@ -256,21 +256,20 @@ From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out insta
 
    The example below means adding two replicas.
 
-   ```bash
+   ```yaml
    kubectl apply -f - <<EOF
-   >
-   apiVersion: apps.kubeblocks.io/v1alpha1
+   apiVersion: operations.kubeblocks.io/v1alpha1
    kind: OpsRequest
    metadata:
-     name: ops-horizontal-scaling
+     name: es-scale-out
      namespace: demo
    spec:
      clusterName: mycluster
      type: HorizontalScaling
      horizontalScaling:
-     - componentName: elasticsearch
+     - componentName: master
        scaleOut:
-         replicaChanges: 2
+         replicaChanges: 1
    EOF
    ```
 
@@ -278,21 +277,20 @@ From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out insta
 
    The example below means deleting two replicas.
 
-   ```bash
+   ```yaml
    kubectl apply -f - <<EOF
-   >
-   apiVersion: apps.kubeblocks.io/v1alpha1
+   apiVersion: operations.kubeblocks.io/v1alpha1
    kind: OpsRequest
    metadata:
-     name: ops-horizontal-scaling
+     name: es-scale-in
      namespace: demo
    spec:
      clusterName: mycluster
      type: HorizontalScaling
      horizontalScaling:
-     - componentName: elasticsearch
+     - componentName: master
        scaleIn:
-         replicaChanges: 2
+         replicaChanges: 1
    EOF
    ```
 
@@ -301,8 +299,8 @@ From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out insta
    ```bash
    kubectl get ops -n demo
    >
-   NAMESPACE   NAME                     TYPE                CLUSTER     STATUS    PROGRESS   AGE
-   demo        ops-horizontal-scaling   HorizontalScaling   mycluster   Succeed   3/3        6m
+   NAME                 TYPE                CLUSTER     STATUS    PROGRESS   AGE
+   es-scale-in          HorizontalScaling   mycluster   Succeed   3/3        6m
    ```
 
    If an error occurs, you can troubleshoot with `kubectl describe ops -n demo` command to view the events of this operation.
@@ -329,7 +327,7 @@ From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out insta
    ...
    spec:
      componentSpecs:
-     - name: mdit
+     - name: master
        componentDefRef: elasticsearch
        replicas: 1 # Change this value
    ...
@@ -371,8 +369,8 @@ From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out insta
      ```bash
      kbcli cluster list mycluster -n demo
      >
-     NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS     CREATED-TIME
-     mycluster   demo                                               Delete               Updating   Sep 27,2024 10:01 UTC+0800
+     NAME        NAMESPACE   CLUSTER-DEFINITION   TERMINATION-POLICY   STATUS     CREATED-TIME
+     mycluster   demo                             Delete               Updating   Jan 20,2025 17:14 UTC+0800
      ```
 
      - STATUS=Updating: it means horizontal scaling is in progress.
@@ -397,7 +395,7 @@ From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out insta
 1. Apply an OpsRequest to a specified cluster. Configure the parameters according to your needs.
 
     ```yaml
-    apiVersion: apps.kubeblocks.io/v1alpha1
+    apiVersion: operations.kubeblocks.io/v1alpha1
     kind: OpsRequest
     metadata:
       name: elasticsearch-verticalscaling
@@ -406,7 +404,7 @@ From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out insta
       clusterName: mycluster
       type: VerticalScaling
       verticalScaling:
-      - componentName: mdit
+      - componentName: master
         requests:
           cpu: '1'
           memory: '3Gi'
@@ -420,8 +418,8 @@ From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out insta
    ```bash
    kubectl get ops -n demo
    >
-   NAMESPACE   NAME                     TYPE                CLUSTER     STATUS    PROGRESS   AGE
-   demo        ops-horizontal-scaling   HorizontalScaling   mycluster   Succeed   3/3        6m
+   NAME                            TYPE                CLUSTER     STATUS    PROGRESS   AGE
+   elasticsearch-verticalscaling   VerticalScaling     mycluster   Succeed   3/3        6m
    ```
 
    If an error occurs, you can troubleshoot with `kubectl describe ops -n demo` command to view the events of this operation.
@@ -459,7 +457,7 @@ From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out insta
         value: 'true'
         effect: NoSchedule
       componentSpecs:
-      - name: mdit
+      - name: master
         componentDef: elasticsearch
         serviceAccountName: null
         disableExporter: true
@@ -507,8 +505,8 @@ From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out insta
      ```bash
      kbcli cluster list mycluster -n demo
      >
-     NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS     CREATED-TIME
-     mycluster   demo                                               Delete               Updating   Sep 27,2024 10:01 UTC+0800
+     NAME        NAMESPACE   CLUSTER-DEFINITION   TERMINATION-POLICY   STATUS     CREATED-TIME
+     mycluster   demo                             Delete               Updating   Jan 20,2025 17:14 UTC+0800
      ```
 
      - STATUS=Updating: it means the vertical scaling is in progress.
@@ -540,8 +538,8 @@ Check whether the cluster status is `Running`. Otherwise, the following operatio
 ```bash
 kubectl get cluster mycluster -n demo
 >
-NAME        CLUSTER-DEFINITION   VERSION                  TERMINATION-POLICY   STATUS    AGE
-mycluster                                                 Delete               Running   4m29s
+NAME        CLUSTER-DEFINITION   TERMINATION-POLICY   STATUS    AGE
+mycluster                        Delete               Running   29m
 ```
 
 </TabItem>
@@ -551,8 +549,8 @@ mycluster                                                 Delete               R
 ```bash
 kbcli cluster list mycluster -n demo
 >
-NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    CREATED-TIME
-mycluster   demo                                               Delete               Running   Sep 27,2024 11:42 UTC+0800
+NAME        NAMESPACE   CLUSTER-DEFINITION   TERMINATION-POLICY   STATUS    CREATED-TIME
+mycluster   demo                             Delete               Running   Jan 20,2025 17:14 UTC+0800
 ```
 
 </TabItem>
@@ -569,19 +567,19 @@ mycluster   demo                                               Delete           
 
     ```yaml
     kubectl apply -f - <<EOF
-    apiVersion: apps.kubeblocks.io/v1alpha1
+    apiVersion: operations.kubeblocks.io/v1alpha1
     kind: OpsRequest
     metadata:
-      name: ops-volume-expansion
+      name: elasticsearch-volumeexpansion
       namespace: demo
     spec:
       clusterName: mycluster
       type: VolumeExpansion
       volumeExpansion:
-      - componentName: elasticsearch
+      - componentName: data
         volumeClaimTemplates:
         - name: data
-          storage: "40Gi"
+          storage: 30Gi
     EOF
     ```
 
@@ -590,8 +588,8 @@ mycluster   demo                                               Delete           
     ```bash
     kubectl get ops -n demo
     >
-    NAMESPACE   NAME                   TYPE              CLUSTER     STATUS    PROGRESS   AGE
-    demo        ops-volume-expansion   VolumeExpansion   mycluster   Succeed   3/3        6m
+    NAME                            TYPE              CLUSTER     STATUS    PROGRESS   AGE
+    elasticsearch-volumeexpansion   VolumeExpansion   mycluster   Succeed   3/3        6m
     ```
 
     If an error occurs, you can troubleshoot with `kubectl describe ops -n demo` command to view the events of this operation.
@@ -620,7 +618,7 @@ mycluster   demo                                               Delete           
    ...
    spec:
      componentSpecs:
-     - name: mdit
+     - name: master
        componentDefRef: elasticsearch
        replicas: 2
        volumeClaimTemplates:
@@ -667,8 +665,8 @@ mycluster   demo                                               Delete           
       ```bash
       kbcli cluster list mycluster
       >
-      NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS     CREATED-TIME
-      mycluster   demo                                               Delete               Updating   Sep 27,2024 10:01 UTC+0800
+      NAME        NAMESPACE   CLUSTER-DEFINITION   TERMINATION-POLICY   STATUS     CREATED-TIME
+      mycluster   demo                             Delete               Updating   Jan 20,2025 17:14 UTC+0800
       ```
 
       * STATUS=Updating: it means the volume expansion is in progress.
@@ -698,14 +696,15 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
 
     Configure replicas as 0 to delete pods.
 
-    ```bash
+    ```yaml
     kubectl apply -f - <<EOF
-    apiVersion: apps.kubeblocks.io/v1alpha1
+    apiVersion: operations.kubeblocks.io/v1alpha1
     kind: OpsRequest
     metadata:
-      name: ops-stop
+      name: elasticsearch-stop
       namespace: demo
     spec:
+      # Specifies the name of the Cluster resource that this operation is targeting.
       clusterName: mycluster
       type: Stop
     EOF
@@ -719,17 +718,18 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
     kubectl edit cluster mycluster -n demo
     ```
 
-    Configure the value of `spec.componentSpecs.replicas` as 0 to delete pods.
+    Configure the value of `spec.componentSpecs.stop` to `true` to delete pods.
 
     ```yaml
     ...
     spec:
       terminationPolicy: Delete
       componentSpecs:
-      - name: mdit
-        componentDefRef: elasticsearch
-        disableExporter: true  
-        replicas: 0 # Change this value
+        - name: master
+          componentDef: elasticsearch-8
+          serviceVersion: 8.8.2
+          stop: true  # set stop `true` to stop the component
+          replicas: 3
     ...
     ```
 
@@ -777,12 +777,12 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
 
     Run the command below to start a cluster.
 
-    ```bash
+    ```yaml
     kubectl apply -f - <<EOF
-    apiVersion: apps.kubeblocks.io/v1alpha1
+    apiVersion: operations.kubeblocks.io/v1alpha1
     kind: OpsRequest
     metadata:
-      name: ops-start
+      name: elasticsearch-start
       namespace: demo
     spec:
       clusterName: mycluster
@@ -798,17 +798,18 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
     kubectl edit cluster mycluster -n demo
     ```
 
-    Change the value of `spec.componentSpecs.replicas` back to the original amount to start this cluster again.
+    Change the value of `spec.componentSpecs.stop` to `false` to start this cluster again.
 
     ```yaml
     ...
     spec:
       terminationPolicy: Delete
       componentSpecs:
-      - name: mdit
-        componentDefRef: elasticsearch
-        disableExporter: true  
-        replicas: 1 # Change this value
+        - name: master
+          componentDef: elasticsearch-8
+          serviceVersion: 8.8.2
+          stop: true  # set to `false` (or remove this field) to start the component
+          replicas: 3
     ...
     ```
 
@@ -854,18 +855,18 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
 
 1. Restart a cluster.
 
-   ```bash
+   ```yaml
    kubectl apply -f - <<EOF
-   apiVersion: apps.kubeblocks.io/v1alpha1
+   apiVersion: operations.kubeblocks.io/v1alpha1
    kind: OpsRequest
    metadata:
-     name: ops-restart
+     name: elasticsearch-restart
      namespace: demo
    spec:
      clusterName: mycluster
-     type: Restart 
+     type: Restart
      restart:
-     - componentName: elasticsearch
+     - componentName: data
    EOF
    ```
 
@@ -904,8 +905,8 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
    ```bash
    kbcli cluster list mycluster -n demo
    >
-   NAME            CLUSTER-DEFINITION          VERSION               TERMINATION-POLICY   STATUS    CREATED-TIME
-   mycluster                                                         Delete               Running   Jul 05,2024 17:51 UTC+0800
+   NAME            CLUSTER-DEFINITION          TERMINATION-POLICY   STATUS    CREATED-TIME
+   mycluster                                   Delete               Running   Jan 20,2025 17:14 UTC+0800
    ```
 
    * STATUS=Updating: it means the cluster restart is in progress.
@@ -940,8 +941,8 @@ To check the termination policy, execute the following command.
 ```bash
 kubectl get cluster mycluster -n demo
 >
-NAME     CLUSTER-DEFINITION   VERSION   TERMINATION-POLICY   STATUS     AGE
-mydemo                                  Delete               Creating   27m
+NAME     CLUSTER-DEFINITION   TERMINATION-POLICY   STATUS     AGE
+mydemo                        Delete               Running    37m
 ```
 
 </TabItem>
@@ -951,8 +952,8 @@ mydemo                                  Delete               Creating   27m
 ```bash
 kbcli cluster list mycluster -n demo
 >
-NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    CREATED-TIME
-mycluster   demo                                               Delete               Running   Sep 27,2024 11:42 UTC+0800
+NAME        NAMESPACE   CLUSTER-DEFINITION   TERMINATION-POLICY   STATUS    CREATED-TIME
+mycluster   demo                             Delete               Running   Jan 20,2025 17:14 UTC+0800
 ```
 
 </TabItem>

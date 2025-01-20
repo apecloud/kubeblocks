@@ -33,8 +33,8 @@ Check whether the cluster status is `Running`. Otherwise, the following operatio
 ```bash
 kubectl get cluster mycluster -n demo
 >
-NAME        CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    AGE
-mycluster   apecloud-mysql       ac-mysql-8.0.30   Delete               Running   27m
+NAME        CLUSTER-DEFINITION   TERMINATION-POLICY   STATUS    AGE
+mycluster   apecloud-mysql       Delete               Running   30m
 ```
 
 </TabItem>
@@ -44,8 +44,8 @@ mycluster   apecloud-mysql       ac-mysql-8.0.30   Delete               Running 
 ```bash
 kbcli cluster list mycluster -n demo
 >
-NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    CREATED-TIME
-mycluster   demo        apecloud-mysql       ac-mysql-8.0.30   Delete               Running   Sep 19,2024 16:01 UTC+0800
+NAME        NAMESPACE   CLUSTER-DEFINITION   TERMINATION-POLICY   STATUS    CREATED-TIME
+mycluster   demo        apecloud-mysql       Delete               Running   Jan 20,2025 16:27 UTC+0800
 ```
 
 </TabItem>
@@ -86,8 +86,8 @@ mycluster   demo        apecloud-mysql       ac-mysql-8.0.30   Delete           
    ```bash
    kubectl get ops -n demo
    >
-   NAMESPACE   NAME                   TYPE              CLUSTER     STATUS    PROGRESS   AGE
-   demo        ops-vertical-scaling   VerticalScaling   mycluster   Succeed   3/3        6m
+   NAME                      TYPE              CLUSTER     STATUS    PROGRESS   AGE
+   acmysql-verticalscaling   VerticalScaling   mycluster   Succeed   1/1        3m54s
    ```
 
    If an error occurs, you can troubleshoot with `kubectl describe ops -n demo` command to view the events of this operation.
@@ -161,8 +161,8 @@ mycluster   demo        apecloud-mysql       ac-mysql-8.0.30   Delete           
      ```bash
      kbcli cluster list mycluster -n demo
      >
-     NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS     CREATED-TIME
-     mycluster   demo        apecloud-mysql       ac-mysql-8.0.30   Delete               Updating   Sep 26,2024 16:01 UTC+0800
+     NAME        NAMESPACE   CLUSTER-DEFINITION   TERMINATION-POLICY   STATUS     CREATED-TIME
+     mycluster   demo        apecloud-mysql       Delete               Running    Jan 20,2025 16:27 UTC+0800
      ```
 
      - STATUS=Updating: it means the vertical scaling is in progress.
@@ -198,8 +198,8 @@ Check whether the cluster STATUS is `Running`. Otherwise, the following operatio
 ```bash
 kubectl get cluster mycluster -n demo
 >
-NAME        CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    AGE
-mycluster   apecloud-mysql       ac-mysql-8.0.30   Delete               Running   27m
+NAME        CLUSTER-DEFINITION   TERMINATION-POLICY   STATUS    AGE
+mycluster   apecloud-mysql       Delete               Running   40m
 ```
 
 </TabItem>
@@ -209,8 +209,8 @@ mycluster   apecloud-mysql       ac-mysql-8.0.30   Delete               Running 
 ```bash
 kbcli cluster list mycluster -n demo
 >
-NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    CREATED-TIME
-mycluster   demo        apecloud-mysql       ac-mysql-8.0.30   Delete               Running   Sep 19,2024 16:01 UTC+0800
+NAME        NAMESPACE   CLUSTER-DEFINITION   TERMINATION-POLICY   STATUS    CREATED-TIME
+mycluster   demo        apecloud-mysql       Delete               Running   Jan 20,2025 16:27 UTC+0800
 ```
 
 </TabItem>
@@ -269,8 +269,8 @@ mycluster   demo        apecloud-mysql       ac-mysql-8.0.30   Delete           
    ```bash
    kubectl get ops -n demo
    >
-   NAMESPACE   NAME                     TYPE                CLUSTER     STATUS    PROGRESS   AGE
-   demo        ops-horizontal-scaling   HorizontalScaling   mycluster   Succeed   3/3        6m
+   NAME                        TYPE                CLUSTER     STATUS    PROGRESS   AGE
+   acmysql-horizontalscaling   HorizontalScaling   mycluster   Succeed   1/1        2m54s
    ```
 
    If an error occurs, you can troubleshoot with `kubectl describe ops -n demo` command to view the events of this operation.

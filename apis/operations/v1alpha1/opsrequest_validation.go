@@ -438,6 +438,9 @@ func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, com
 		if replicaChanger.ReplicaChanges != nil && allReplicaChanges > *replicaChanger.ReplicaChanges {
 			return fmt.Errorf(`%s "replicaChanges" can't be less than the sum of "replicaChanges" for specified instance templates`, msgPrefix)
 		}
+		if isScaleIn && len(offlineOrOnlineInsNames) == int(compSpec.Replicas) {
+			return fmt.Errorf(`scaling down all the replicas of component "%s" is not allowed`, hScale.ComponentName)
+		}
 		return nil
 	}
 	if scaleIn != nil {

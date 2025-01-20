@@ -21,9 +21,9 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
 
     <TabItem value="OpsRequest" label="OpsRequest" default>
 
-    ```bash
+    ```yaml
     kubectl apply -f - <<EOF
-    apiVersion: apps.kubeblocks.io/v1alpha1
+    apiVersion: operations.kubeblocks.io/v1alpha1
     kind: OpsRequest
     metadata:
       name: ops-stop
@@ -42,19 +42,18 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
     kubectl edit cluster mycluster -n demo
     ```
 
-    Configure the value of `spec.componentSpecs.replicas` as 0 to delete pods.
+    Configure the value of `spec.componentSpecs.stop` to `true` to delete pods.
 
     ```yaml
+    apiVersion: apps.kubeblocks.io/v1
+    kind: Cluster
+    metadata:
     ...
     spec:
-      clusterDefinitionRef: apecloud-mysql
-      clusterVersionRef: ac-mysql-8.0.30
-      terminationPolicy: Delete
       componentSpecs:
-      - name: mysql
-        componentDefRef: mysql
-        disableExporter: true  
-        replicas: 0 # Change this value
+        - name: apecloud-mysql
+          stop: true  # set stop `true` to stop the component
+          replicas: 3
     ...
     ```
 
@@ -69,6 +68,7 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
     </TabItem>
 
     </Tabs>
+
 2. Check the status of the cluster to see whether it is stopped.
 
     <Tabs>
@@ -99,9 +99,9 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
 
     <TabItem value="OpsRequest" label="OpsRequest" default>
 
-    ```bash
+    ```yaml
     kubectl apply -f - <<EOF
-    apiVersion: apps.kubeblocks.io/v1alpha1
+    apiVersion: operations.kubeblocks.io/v1alpha1
     kind: OpsRequest
     metadata:
       name: ops-start
@@ -109,7 +109,7 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
     spec:
       clusterName: mycluster
       type: Start
-    EOF 
+    EOF
     ```
 
     </TabItem>
@@ -120,19 +120,18 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
     kubectl edit cluster mycluster -n demo
     ```
 
-    Change the value of `spec.componentSpecs.replicas` back to the original amount to start this cluster again.
+    Change the value of `spec.componentSpecs.stop` to `false` to start this cluster again.
 
     ```yaml
+    apiVersion: apps.kubeblocks.io/v1
+    kind: Cluster
+    metadata:
     ...
     spec:
-      clusterDefinitionRef: apecloud-mysql
-      clusterVersionRef: ac-mysql-8.0.30
-      terminationPolicy: Delete
       componentSpecs:
-      - name: mysql
-        componentDefRef: mysql
-        disableExporter: true
-        replicas: 3 # Change this value
+        - name: apecloud-mysql
+          stop: false  # set to `false` (or remove this field) to start the component
+          replicas: 3
     ...
     ```
 

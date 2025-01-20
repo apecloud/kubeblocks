@@ -21,9 +21,9 @@ You can restart all pods of the cluster. When an exception occurs in a database,
 
 1. Create an OpsRequest to restart a cluster.
 
-   ```bash
+   ```yaml
    kubectl apply -f - <<EOF
-   apiVersion: apps.kubeblocks.io/v1alpha1
+   apiVersion: operations.kubeblocks.io/v1alpha1
    kind: OpsRequest
    metadata:
      name: ops-restart

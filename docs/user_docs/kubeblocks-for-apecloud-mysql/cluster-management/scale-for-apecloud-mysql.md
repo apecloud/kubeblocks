@@ -60,12 +60,12 @@ mycluster   demo        apecloud-mysql       ac-mysql-8.0.30   Delete           
 
 1. Apply an OpsRequest to the specified cluster. Configure the parameters according to your needs.
 
-   ```bash
+   ```yaml
    kubectl apply -f - <<EOF
-   apiVersion: apps.kubeblocks.io/v1alpha1
+   apiVersion: operations.kubeblocks.io/v1alpha1
    kind: OpsRequest
    metadata:
-     name: ops-vertical-scaling
+     name: acmysql-verticalscaling
      namespace: demo
    spec:
      clusterName: mycluster
@@ -73,11 +73,11 @@ mycluster   demo        apecloud-mysql       ac-mysql-8.0.30   Delete           
      verticalScaling:
      - componentName: mysql
        requests:
-         memory: "2Gi"
-         cpu: "1"
+         cpu: '1'
+         memory: 1Gi
        limits:
-         memory: "4Gi"
-         cpu: "2"
+         cpu: '1'
+         memory: 1Gi
    EOF
    ```
 
@@ -113,19 +113,16 @@ mycluster   demo        apecloud-mysql       ac-mysql-8.0.30   Delete           
    ```yaml
    ...
    spec:
-     clusterDefinitionRef: apecloud-mysql
-     clusterVersionRef: ac-mysql-8.0.30
      componentSpecs:
-     - name: mysql
-       componentDefRef: mysql
-       replicas: 3
-       resources: # Change the values of resources
-         requests:
-           memory: "2Gi"
-           cpu: "1"
-         limits:
-           memory: "4Gi"
-           cpu: "2"
+       - name: mysql
+         replicas: 3
+         resources:
+           requests:
+             cpu: "1"       # Update the resources to your need.
+             memory: "2Gi"  # Update the resources to your need.
+           limits:
+             cpu: "2"       # Update the resources to your need.
+             memory: "4Gi"  # Update the resources to your need.
    ...
    ```
 
@@ -230,28 +227,27 @@ mycluster   demo        apecloud-mysql       ac-mysql-8.0.30   Delete           
 
    The example below means adding two replicas.
 
-   ```bash
+   ```yaml
    kubectl apply -f - <<EOF
-   apiVersion: apps.kubeblocks.io/v1alpha1
+   apiVersion: operations.kubeblocks.io/v1alpha1
    kind: OpsRequest
    metadata:
-     name: ops-horizontal-scaling
+     name: acmysql-horizontalscaling
      namespace: demo
    spec:
-     clusterName: mycluster
+     clusterName: acmysql-cluster
      type: HorizontalScaling
      horizontalScaling:
      - componentName: mysql
-       scaleOut:
-         replicaChanges: 2
+       replicas: 3
    EOF
    ```
 
-    If you want to scale in replicas, replace `scaleOut` with `scaleIn`.
+   If you want to scale in replicas, replace `scaleOut` with `scaleIn`.
 
    The example below means adding two replicas.
 
-   ```bash
+   ```yaml
    kubectl apply -f - <<EOF
    apiVersion: apps.kubeblocks.io/v1alpha1
    kind: OpsRequest
@@ -302,12 +298,9 @@ mycluster   demo        apecloud-mysql       ac-mysql-8.0.30   Delete           
    ```yaml
    ...
    spec:
-     clusterDefinitionRef: apecloud-mysql
-     clusterVersionRef: ac-mysql-8.0.30
-     componentSpecs:
-     - name: mysql
-       componentDefRef: mysql
-       replicas: 1 # Change the value
+   componentSpecs:
+     - name: apecloud-mysql
+       replicas: 3 # decrease `replicas` for scaling in, and increase for scaling out
    ...
    ```
 

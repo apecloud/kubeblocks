@@ -97,40 +97,46 @@ KubeBlocks supports configuring cluster parameters with an OpsRequest.
 
 1. Define an OpsRequest file and configure the parameters in the OpsRequest in a YAML file named `mycluster-configuring-demo.yaml`. In this example, `max_connections` is configured as `600`.
 
-   ```bash
-   apiVersion: apps.kubeblocks.io/v1alpha1
+   ```yaml
+   apiVersion: operations.kubeblocks.io/v1alpha1
    kind: OpsRequest
    metadata:
-     name: mycluster-configuring-demo
+     name: acmysql-reconfiguring
      namespace: demo
    spec:
+     type: Reconfiguring
      clusterName: mycluster
-     reconfigure:
-       componentName: mysql
+     force: false
+     reconfigures:
+     - componentName: mysql
        configurations:
        - keys:
          - key: my.cnf
            parameters:
+           - key: innodb_buffer_pool_size
+             value: 512M
            - key: max_connections
-             value: "600"
-         name: mysql-consensusset-configuration
+             value: '600'
+         name: mysql-consensusset-config
      preConditionDeadlineSeconds: 0
-     type: Reconfiguring
    ```
 
    | Field                                                  | Definition     |
    |--------------------------------------------------------|--------------------------------|
    | `metadata.name`                                        | It specifies the name of this OpsRequest. |
    | `metadata.namespace`                                   | It specifies the namespace where this cluster is created. |
+   | `spec.type`                                            | It specifies the type of this operation. |
    | `spec.clusterName`                                     | It specifies the cluster name that this operation is targeted at. |
-   | `spec.reconfigure`                                     | It specifies a component and its configuration updates. |
+   | `spec.force`                                           | It instructs the system to bypass pre-checks (including cluster state checks and customized pre-conditions hooks) and immediately execute the opsRequest, except for the opsRequest of `Start` type, which will still undergo pre-checks even if `force` is true.  Note: Once set, the `force` field is immutable and cannot be updated. |
+   | `spec.reconfigures`                                    | It specifies a component and its configuration updates. |
    | `spec.reconfigure.componentName`                       | It specifies the component name of this cluster.  |
-   | `spec.configurations`                                  | It contains a list of ConfigurationItem objects, specifying the component's configuration template name, upgrade policy, and parameter key-value pairs to be updated. |
-   | `spec.reconfigure.configurations.keys.key`             | It specifies the configuration map. |
-   | `spec.reconfigure.configurations.keys.parameters`      | It defines a list of key-value pairs for a single configuration file. |
-   | `spec.reconfigure.configurations.keys.parameter.key`   | It represents the name of the parameter you want to edit. |
-   | `spec.reconfigure.configurations.keys.parameter.value` | It represents the parameter values that are to be updated. If set to nil, the parameter defined by the Key field will be removed from the configuration file.  |
-   | `spec.reconfigure.configurations.name`                 | It specifies the configuration template name.  |
+   | `spec.reconfigures.configurations`                     | It contains a list of ConfigurationItem objects, specifying the component's configuration template name, upgrade policy, and parameter key-value pairs to be updated. |
+   | `spec.reconfigures.keys`                                | It sets the parameters to be updated. It should contain at least one item. The keys are merged and retained during patch operations. |
+   | `spec.reconfigures.configurations.keys.key`             | It represents the unique identifier for the ConfigMap. |
+   | `spec.reconfigures.configurations.keys.parameters`      | It defines a list of key-value pairs for a single configuration file. These parameters are used to update the specified configuration settings. |
+   | `spec.reconfigures.configurations.keys.parameter.key`   | It represents the name of the parameter you want to edit. |
+   | `spec.reconfigures.configurations.keys.parameter.value` | It represents the parameter values that are to be updated. If set to nil, the parameter defined by the Key field will be removed from the configuration file.  |
+   | `spec.reconfigures.configurations.name`                 | It specifies the configuration template name.  |
    | `preConditionDeadlineSeconds`                          | It specifies the maximum number of seconds this OpsRequest will wait for its start conditions to be met before aborting. If set to 0 (default), the start conditions must be met immediately for the OpsRequest to proceed. |
 
 2. Apply the configuration OpsRequest.

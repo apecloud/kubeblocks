@@ -66,39 +66,51 @@ The value of `instanceName` decides whether a new leader instance is specified f
 
 * Initiate a switchover with no leader instance specified.
 
-  ```yaml
-  kubectl apply -f -<<EOF
-  apiVersion: apps.kubeblocks.io/v1alpha1
-  kind: OpsRequest
-  metadata:
-    name: mycluster-switchover
-    namespace: demo
-  spec:
-    clusterName: mycluster
-    type: Switchover
-    switchover:
-    - componentName: apecloud-mysql
-      instanceName: '*'
-  EOF
-  ```
+   ```yaml
+   kubectl apply -f -<<EOF
+   apiVersion: operations.kubeblocks.io/v1alpha1
+   kind: OpsRequest
+   metadata:
+     name: acmysql-switchover
+     namespace: demo
+   spec:
+     # Specifies the name of the Cluster resource that this operation is targeting.
+     clusterName: mycluster
+     type: Switchover
+     # Lists Switchover objects, each specifying a Component to perform the switchover operation.
+     switchover:
+       # Specifies the name of the Component.
+     - componentName: mysql
+       # Specifies the instance to become the primary or leader during a switchover operation. The value of `instanceName` can be either:
+       # - "*" (wildcard value): - Indicates no specific instance is designated as the primary or leader.
+       # - A valid instance name (pod name)
+       instanceName: '*'
+   EOF
+   ```
 
 * Initiate a switchover with a specified new leader instance.
 
-  ```yaml
-  kubectl apply -f -<<EOF
-  apiVersion: apps.kubeblocks.io/v1alpha1
-  kind: OpsRequest
-  metadata:
-    name: mycluster-switchover
-    namespace: demo
-  spec:
-    clusterName: mycluster
-    type: Switchover
-    switchover:
-    - componentName: apecloud-mysql
-      instanceName: 'mycluster-mysql-2'
-  EOF
-  ```
+   ```yaml
+   kubectl apply -f -<<EOF
+   apiVersion: operations.kubeblocks.io/v1alpha1
+   kind: OpsRequest
+   metadata:
+     name: acmysql-switchover-specify
+     namespace: demo
+   spec:
+     # Specifies the name of the Cluster resource that this operation is targeting.
+     clusterName: mycluster
+     type: Switchover
+     # Lists Switchover objects, each specifying a Component to perform the switchover operation.
+     switchover:
+       # Specifies the name of the Component.
+     - componentName: mysql
+       # Specifies the instance to become the primary or leader during a switchover operation. The value of `instanceName` can be either:
+       # - "*" (wildcard value): - Indicates no specific instance is designated as the primary or leader.
+       # - A valid instance name (pod name)
+       instanceName: acmysql-cluster-mysql-2
+   EOF
+   ```
 
 </TabItem>
 

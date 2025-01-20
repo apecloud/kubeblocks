@@ -56,12 +56,12 @@ mycluster   demo        apecloud-mysql       ac-mysql-8.0.30   Delete           
 
 1. Apply an OpsRequest. Change the value of storage according to your need and run the command below to expand the volume of a cluster.
 
-   ```bash
+   ```yaml
    kubectl apply -f - <<EOF
-   apiVersion: apps.kubeblocks.io/v1alpha1
+   apiVersion: operations.kubeblocks.io/v1alpha1
    kind: OpsRequest
    metadata:
-     name: ops-volume-expansion
+     name: acmysql-volumeexpansion
      namespace: demo
    spec:
      clusterName: mycluster
@@ -70,7 +70,7 @@ mycluster   demo        apecloud-mysql       ac-mysql-8.0.30   Delete           
      - componentName: mysql
        volumeClaimTemplates:
        - name: data
-         storage: "40Gi"
+         storage: 30Gi
    EOF
    ```
 
@@ -103,30 +103,25 @@ mycluster   demo        apecloud-mysql       ac-mysql-8.0.30   Delete           
    kubectl edit cluster mycluster -n demo
    ```
 
-   Edit the value of `spec.componentSpecs.volumeClaimTemplates.spec.resources`.
+   Edit the value of `spec.componentSpecs.volumeClaimTemplates.spec.resources.requests.storage`.
 
    ```yaml
-   apiVersion: apps.kubeblocks.io/v1alpha1
+   apiVersion: apps.kubeblocks.io/v1
    kind: Cluster
    metadata:
-     name: mycluster
-     namespace: demo
+   ...
    spec:
-     clusterDefinitionRef: apecloud-mysql
-     clusterVersionRef: ac-mysql-8.0.30
      componentSpecs:
-     - name: mysql
-       componentDefRef: mysql
-       replicas: 3
-       volumeClaimTemplates:
-       - name: data
-         spec:
-           accessModes:
-             - ReadWriteOnce
-           resources:
-             requests:
-               storage: 40Gi # Change the volume storage size
-     terminationPolicy: Delete
+       - name: mysql
+         volumeClaimTemplates:
+           - name: data
+             spec:
+               storageClassName: "<you-preferred-sc>"
+               accessModes:
+                 - ReadWriteOnce
+               resources:
+                 requests:
+                   storage: 30Gi  # specify new size, and make sure it is larger than the current size
    ```
 
 2. Check whether the corresponding cluster is running and whether resources change.

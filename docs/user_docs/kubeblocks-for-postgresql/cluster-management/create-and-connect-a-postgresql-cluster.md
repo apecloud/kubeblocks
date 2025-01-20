@@ -56,25 +56,22 @@ This tutorial shows how to create and connect to a PostgreSQL cluster.
   <TabItem value="kubectl" label="kubectl" default>
   
   ```bash
-  kubectl get clusterdefinition postgresql
+  kubectl get componentdefinition | grep postgresql
   >
-  NAME         TOPOLOGIES   SERVICEREFS   STATUS      AGE
-  postgresql                              Available   30m
+  NAME                                SERVICE            SERVICE-VERSION   STATUS      AGE
+  postgresql-12-1.0.0-alpha.0         postgresql         12.15.0           Available   27m
+  postgresql-14-1.0.0-alpha.0         postgresql         14.8.0            Available   27m
+  postgresql-15-1.0.0-alpha.0         postgresql         15.7.0            Available   27m
+  postgresql-16-1.0.0-alpha.0         postgresql         16.4.0            Available   27m
   ```
 
   View all available versions for creating a cluster.
 
   ```bash
-  kubectl get clusterversions -l clusterdefinition.kubeblocks.io/name=postgresql
+  kubectl get componentversions | grep postgresql
   >
-  NAME                 CLUSTER-DEFINITION   STATUS      AGE
-  postgresql-12.14.0   postgresql           Available   30m
-  postgresql-12.14.1   postgresql           Available   30m
-  postgresql-12.15.0   postgresql           Available   30m
-  postgresql-14.7.2    postgresql           Available   30m
-  postgresql-14.8.0    postgresql           Available   30m
-  postgresql-15.7.0    postgresql           Available   30m
-  postgresql-16.4.0    postgresql           Available   30m
+  NAME               VERSIONS                                                            STATUS      AGE
+  postgresql         16.4.0,15.7.0,14.8.0,14.7.2,12.15.0,12.14.1,12.14.0                 Available   28m
   ```
 
   </TabItem>
@@ -82,8 +79,9 @@ This tutorial shows how to create and connect to a PostgreSQL cluster.
   <TabItem value="kbcli" label="kbcli">
 
   ```bash
-  kbcli clusterdefinition list
-  kbcli clusterversion list
+  kbcli componentdefinition list | grep postgresql
+
+  kbcli componentversion list | grep postgresql
   ```
 
   </TabItem>

@@ -58,19 +58,19 @@ import TabItem from '@theme/TabItem';
   确认 `apecloud-mysql` cluster definition 是否已安装。
 
   ```bash
-  kubectl get clusterdefinition apecloud-mysql
+  kubectl get componentdefinition | grep apecloud-mysql
   >
-  NAME             TOPOLOGIES   SERVICEREFS   STATUS      AGE
-  apecloud-mysql                              Available   85m
+  NAME                                SERVICE            SERVICE-VERSION   STATUS      AGE
+  apecloud-mysql-1.0.0                mysql              8.0.30            Available   13m
   ```
 
   查看可用于创建集群的版本。
 
   ```bash
-  kubectl get clusterversions -l clusterdefinition.kubeblocks.io/name=apecloud-mysql
+  kubectl get componentversions | grep apecloud-mysql
   >
-  NAME                CLUSTER-DEFINITION   STATUS      AGE
-  ac-mysql-8.0.30     apecloud-mysql       Available   85m
+  NAME               VERSIONS                           STATUS      AGE
+  apecloud-mysql     8.0.30                             Available   15m
   ```
 
   </TabItem>
@@ -78,9 +78,9 @@ import TabItem from '@theme/TabItem';
   <TabItem value="kbcli" label="kbcli">
 
   ```bash
-  kbcli clusterdefinition list
+  kbcli componentdefinition list | grep apecloud-mysql
 
-  kbcli clusterversion list
+  kbcli componentversion list | grep apecloud-mysql
   ```
 
   </TabItem>

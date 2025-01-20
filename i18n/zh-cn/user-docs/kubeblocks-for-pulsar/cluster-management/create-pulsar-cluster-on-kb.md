@@ -40,20 +40,32 @@ KubeBlocks 可以通过良好的抽象快速集成新引擎，并支持 Pulsar �
   <TabItem value="kubectl" label="kubectl" default>
 
   ```bash
-  kubectl get clusterdefinition pulsar
+  kubectl get componentdefinition | grep pulsar
   >
-  NAME    TOPOLOGIES                                        SERVICEREFS    STATUS      AGE
-  pulsar  pulsar-basic-cluster,pulsar-enhanced-cluster                     Available   16m
+  NAME                                      SERVICE            SERVICE-VERSION   STATUS      AGE
+  pulsar-bookies-recovery-2-1.0.0-alpha.0   pulsar             2.11.2            Available   108s
+  pulsar-bookies-recovery-3-1.0.0-alpha.0   pulsar             3.0.2             Available   108s
+  pulsar-bookkeeper-2-1.0.0-alpha.0         pulsar             2.11.2            Available   108s
+  pulsar-bookkeeper-3-1.0.0-alpha.0         pulsar             3.0.2             Available   108s
+  pulsar-broker-2-1.0.0-alpha.0             pulsar             2.11.2            Available   108s
+  pulsar-broker-3-1.0.0-alpha.0             pulsar             3.0.2             Available   108s
+  pulsar-proxy-2-1.0.0-alpha.0              pulsar             2.11.2            Available   108s
+  pulsar-proxy-3-1.0.0-alpha.0              pulsar             3.0.2             Available   108s
+  pulsar-zookeeper-2-1.0.0-alpha.0          pulsar             2.11.2            Available   108s
+  pulsar-zookeeper-3-1.0.0-alpha.0          pulsar             3.0.2             Available   108s
   ```
 
   查看可用版本。
 
   ```bash
-  kubectl get clusterversions -l clusterdefinition.kubeblocks.io/name=pulsar
+  kubectl get componentversion | grep pulsar
   >
-  NAME            CLUSTER-DEFINITION   STATUS      AGE
-  pulsar-2.11.2   pulsar               Available   16m
-  pulsar-3.0.2    pulsar               Available   16m
+  NAME                      VERSIONS                        STATUS      AGE
+  pulsar-bookies-recovery   3.0.2,2.11.2                    Available   2m46s
+  pulsar-bookkeeper         3.0.2,2.11.2                    Available   2m46s
+  pulsar-broker             3.0.2,2.11.2                    Available   2m46s
+  pulsar-proxy              3.0.2,2.11.2                    Available   2m46s
+  pulsar-zookeeper          3.0.2,2.11.2                    Available   2m46s
   ```
 
   </TabItem>
@@ -61,8 +73,9 @@ KubeBlocks 可以通过良好的抽象快速集成新引擎，并支持 Pulsar �
   <TabItem value="kbcli" label="kbcli">
 
   ```bash
-  kbcli clusterdefinition list
-  kbcli clusterversion list
+  kbcli componentdefinition list | grep pulsar
+
+  kbcli componentversion list | grep pulsar
   ```
 
   </TabItem>

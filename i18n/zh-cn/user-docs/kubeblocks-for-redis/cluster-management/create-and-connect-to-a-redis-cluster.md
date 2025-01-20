@@ -56,18 +56,23 @@ import TabItem from '@theme/TabItem';
   <TabItem value="kubectl" label="kubectl" default>
 
   ```bash
-  kubectl get clusterdefinition redis
+  kubectl get componentdefinition | grep redis
   >
-  NAME    TOPOLOGIES                                              SERVICEREFS   STATUS      AGE
-  redis   replication,replication-twemproxy,standalone                          Available   16m
+  NAME                                      SERVICE            SERVICE-VERSION   STATUS      AGE
+  redis-7-1.0.0-alpha.0                     redis              7.2.4             Available   44m
+  redis-cluster-7-1.0.0-alpha.0             redis-cluster      7.2.4             Available   44m
+  redis-sentinel-7-1.0.0-alpha.0            redis-sentinel     7.2.4             Available   44m
+  redis-twemproxy-0.5-1.0.0-alpha.0         redis-twemproxy    0.5.0             Available   44m
   ```
 
   ```bash
-  kubectl get clusterversions -l clusterdefinition.kubeblocks.io/name=redis
+  kubectl get componentversion | grep redis
   >
-  NAME          CLUSTER-DEFINITION   STATUS      AGE
-  redis-7.0.6   redis                Available   16m
-  redis-7.2.4   redis                Available   16m
+  NAME                      VERSIONS                               STATUS      AGE
+  redis                     7.2.4,7.0.6                            Available   45m
+  redis-cluster             7.2.4,7.0.6                            Available   45m
+  redis-sentinel            7.2.4,7.0.6                            Available   45m
+  redis-twemproxy           0.5.0                                  Available   45m
   ```
 
   </TabItem>
@@ -75,16 +80,9 @@ import TabItem from '@theme/TabItem';
   <TabItem value="kbcli" label="kbcli">
 
   ```bash
-  kbcli clusterdefinition list
-  >
-  NAME               TOPOLOGIES                                              SERVICEREFS   STATUS      AGE
-  redis              replication,replication-twemproxy,standalone                          Available   16m
+  kbcli componentdefinition list | grep redis
 
-  kbcli clusterversion list
-  >
-  NAME                 CLUSTER-DEFINITION   STATUS      IS-DEFAULT   CREATED-TIME
-  redis-7.0.6          redis                Available   false        Sep 27,2024 11:36 UTC+0800
-  redis-7.2.4          redis                Available   false        Sep 27,2024 11:36 UTC+0800
+  kbcli componentversion list | grep redis
   ```
 
   </TabItem>

@@ -58,21 +58,22 @@ import TabItem from '@theme/TabItem';
   确保 `mysql` cluster definition 已安装。
 
   ```bash
-  kubectl get clusterdefinition mysql
+  kubectl get componentdefinition | grep mysql
   >
-  NAME             TOPOLOGIES   SERVICEREFS   STATUS      AGE
-  mysql                                       Available   85m
+  NAME                                SERVICE            SERVICE-VERSION   STATUS      AGE
+  mysql-5.7-1.0.0-alpha.0             mysql              5.7.44            Available   18m
+  mysql-8.0-1.0.0-alpha.0             mysql              8.0.33            Available   18m
+  mysql-8.4-1.0.0-alpha.0             mysql              8.4.2             Available   18m
+  mysql-proxysql-1.0.0-alpha.0        proxysql           2.4.4             Available   18m
   ```
 
   查看可用的集群版本。
 
   ```bash
-  kubectl get clusterversions -l clusterdefinition.kubeblocks.io/name=mysql
+  kubectl get componentversions | grep mysql
   >
-  NAME           CLUSTER-DEFINITION   STATUS      AGE
-  mysql-5.7.44   mysql                Available   27h
-  mysql-8.0.33   mysql                Available   27h
-  mysql-8.4.2    mysql                Available   27h
+  NAME               VERSIONS                                                                                         STATUS      AGE
+  mysql              8.4.2,8.4.1,8.4.0,8.0.39,8.0.38,8.0.37,8.0.36,8.0.35,8.0.34,8.0.33,8.0.32,8.0.31,8.0.30,5.7.44   Available   23m
   ```
 
   </TabItem>
@@ -80,8 +81,9 @@ import TabItem from '@theme/TabItem';
   <TabItem value="kbcli" label="kbcli">
 
   ```bash
-  kbcli clusterdefinition list
-  kbcli clusterversion list
+  kbcli componentdefinition list | grep mysql
+
+  kbcli componentversion list | grep mysql
   ```
 
   </TabItem>

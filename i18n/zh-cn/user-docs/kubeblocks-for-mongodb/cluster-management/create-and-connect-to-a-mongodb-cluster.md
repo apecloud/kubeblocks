@@ -56,14 +56,17 @@ import TabItem from '@theme/TabItem';
    <TabItem value="kubectl" label="kubectl" default>
 
    ```bash
-   kubectl get clusterdefinition mongodb
+   kubectl get componentdefinition | grep mongodb
    >
-   NAME      TOPOLOGIES   SERVICEREFS   STATUS      AGE
-   mongodb                              Available   23m
+   NAME                       SERVICE            SERVICE-VERSION   STATUS      AGE
+   mongodb-1.0.0              mongodb            5.0.14            Available   18m
    ```
 
    ```bash
-   kubectl get clusterversions -l clusterdefinition.kubeblocks.io/name=mongodb
+   kubectl get componentversions | grep mongodb
+   >
+   NAME               VERSIONS                                                STATUS      AGE
+   mongodb            7.0.12,6.0.16,5.0.28,4.4.29,4.2.24,4.0.28               Available   19m
    ```
 
    </TabItem>
@@ -71,9 +74,9 @@ import TabItem from '@theme/TabItem';
    <TabItem value="kbcli" label="kbcli">
 
    ```bash
-   kbcli clusterdefinition list
+   kbcli componentdefinition list | grep apecloud-mysql
 
-   kbcli clusterversion list
+   kbcli componentversion list | grep apecloud-mysql
    ```
 
    </TabItem>

@@ -475,7 +475,7 @@ var _ = Describe("OpsRequest Controller", func() {
 			})).Should(Succeed())
 		})
 
-		FIt("HorizontalScaling when offline the only instance in MySQL", func() {
+		It("HorizontalScaling when offline the only instance in MySQL", func() {
 			createMysqlCluster(2)
 			By("mock cluster status")
 			Expect(testapps.ChangeObj(&testCtx, clusterObj, func(clusterObj *appsv1.Cluster) {

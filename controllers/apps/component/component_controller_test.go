@@ -1247,22 +1247,19 @@ var _ = Describe("Component Controller", func() {
 		By("check default component roles")
 		targetRoles := []workloads.ReplicaRole{
 			{
-				Name:       "leader",
-				AccessMode: workloads.ReadWriteMode,
-				CanVote:    true,
-				IsLeader:   true,
+				Name:                 "leader",
+				ParticipatesInQuorum: true,
+				UpdatePriority:       5,
 			},
 			{
-				Name:       "follower",
-				AccessMode: workloads.ReadonlyMode,
-				CanVote:    true,
-				IsLeader:   false,
+				Name:                 "follower",
+				ParticipatesInQuorum: true,
+				UpdatePriority:       4,
 			},
 			{
-				Name:       "learner",
-				AccessMode: workloads.NoneMode,
-				CanVote:    false,
-				IsLeader:   false,
+				Name:                 "learner",
+				ParticipatesInQuorum: false,
+				UpdatePriority:       2,
 			},
 		}
 		itsKey := types.NamespacedName{

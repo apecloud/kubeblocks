@@ -62,16 +62,10 @@ var _ = Describe("utils test", func() {
 
 	Context("ComposeRolePriorityMap function", func() {
 		It("should work well", func() {
-			priorityList := []int{
-				leaderPriority,
-				followerReadonlyPriority,
-				followerNonePriority,
-				learnerPriority,
-			}
 			Expect(priorityMap).ShouldNot(BeZero())
 			Expect(priorityMap).Should(HaveLen(len(roles) + 1))
-			for i, role := range roles {
-				Expect(priorityMap[role.Name]).Should(Equal(priorityList[i]))
+			for _, role := range roles {
+				Expect(priorityMap[role.Name]).Should(Equal(role.UpdatePriority))
 			}
 		})
 	})

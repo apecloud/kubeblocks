@@ -60,7 +60,7 @@ func (c *itsRolesConvertor) convert(args ...any) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	return ConvertSynthesizeCompRoleToInstanceSetRole(synthesizeComp), nil
+	return synthesizeComp.Roles, nil
 }
 
 // itsCredentialConvertor is an implementation of the convertor interface, used to convert the given object into InstanceSet.Spec.Credential.
@@ -179,39 +179,4 @@ func getMemberUpdateStrategy(synthesizedComp *SynthesizedComponent) *workloads.M
 	default:
 		return nil
 	}
-}
-
-// ConvertSynthesizeCompRoleToInstanceSetRole converts the component.SynthesizedComponent.Roles to workloads.ReplicaRole.
-func ConvertSynthesizeCompRoleToInstanceSetRole(synthesizedComp *SynthesizedComponent) []workloads.ReplicaRole {
-	if synthesizedComp.Roles == nil {
-		return nil
-	}
-
-	accessMode := func(role kbappsv1.ReplicaRole) workloads.AccessMode {
-		switch {
-		case role.Serviceable && role.Writable:
-			return workloads.ReadWriteMode
-		case role.Serviceable:
-			return workloads.ReadonlyMode
-		default:
-			return workloads.NoneMode
-		}
-	}
-	itsReplicaRoles := make([]workloads.ReplicaRole, 0)
-	for _, role := range synthesizedComp.Roles {
-		itsReplicaRole := workloads.ReplicaRole{
-			Name:       role.Name,
-			AccessMode: accessMode(role),
-			CanVote:    role.Votable,
-			// HACK: Since the InstanceSet relies on IsLeader field to determine whether a workload is available, we are using
-			// such a workaround to combine these two fields to provide the information.
-			// However, the condition will be broken if a service with multiple different roles that can be writable
-			// at the same time, such as Zookeeper.
-			// TODO: We need to discuss further whether we should rely on the concept of "Leader" in the case
-			//  where the KB controller does not provide HA functionality.
-			IsLeader: role.Serviceable && role.Writable,
-		}
-		itsReplicaRoles = append(itsReplicaRoles, itsReplicaRole)
-	}
-	return itsReplicaRoles
 }

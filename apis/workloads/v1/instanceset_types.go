@@ -291,11 +291,6 @@ type InstanceSetStatus struct {
 	// +optional
 	MembersStatus []MemberStatus `json:"membersStatus,omitempty"`
 
-	// Indicates whether it is required for the InstanceSet to have at least one primary instance ready.
-	//
-	// +optional
-	ReadyWithoutPrimary bool `json:"readyWithoutPrimary,omitempty"`
-
 	// currentRevisions, if not empty, indicates the old version of the InstanceSet used to generate the underlying workload.
 	// key is the pod name, value is the revision.
 	//
@@ -330,33 +325,9 @@ const (
 	PreferInPlacePodUpdatePolicyType PodUpdatePolicyType = "PreferInPlace"
 )
 
-type ReplicaRole struct {
-
-	// Defines the role name of the replica.
-	//
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=leader
-	Name string `json:"name"`
-
-	// Specifies the service capabilities of this member.
-	//
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=ReadWrite
-	// +kubebuilder:validation:Enum={None, Readonly, ReadWrite}
-	AccessMode AccessMode `json:"accessMode"`
-
-	// Indicates if this member has voting rights.
-	//
-	// +kubebuilder:default=true
-	// +optional
-	CanVote bool `json:"canVote"`
-
-	// Determines if this member is the leader.
-	//
-	// +kubebuilder:default=false
-	// +optional
-	IsLeader bool `json:"isLeader"`
-}
+// ReplicaRole represents a role that can be assigned to a component instance, defining its behavior and responsibilities.
+// +kubebuilder:object:generate=false
+type ReplicaRole = kbappsv1.ReplicaRole
 
 // AccessMode defines SVC access mode enums.
 // +enum
@@ -604,18 +575,5 @@ func (r *InstanceSet) IsInstanceSetReady() bool {
 		return true
 	}
 	membersStatus := r.Status.MembersStatus
-	if len(membersStatus) != int(*r.Spec.Replicas) {
-		return false
-	}
-	if r.Status.ReadyWithoutPrimary {
-		return true
-	}
-	hasLeader := false
-	for _, status := range membersStatus {
-		if status.ReplicaRole != nil && status.ReplicaRole.IsLeader {
-			hasLeader = true
-			break
-		}
-	}
-	return hasLeader
+	return len(membersStatus) == int(*r.Spec.Replicas)
 }

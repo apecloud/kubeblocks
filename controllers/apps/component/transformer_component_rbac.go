@@ -26,6 +26,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -62,8 +63,8 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 
 	var serviceAccountName string
 	var sa *corev1.ServiceAccount
-	// If the user has disabled rbac manager or specified comp.Spec.ServiceAccountName, it is now the user's responsibility to
-	// provide appropriate serviceaccount.
+	// If the user has disabled rbac manager or specified comp.Spec.ServiceAccountName, it is now
+	// the user's responsibility to provide appropriate serviceaccount.
 	if serviceAccountName = transCtx.Component.Spec.ServiceAccountName; serviceAccountName != "" {
 		// if user provided serviceaccount does not exist, raise error
 		sa := &corev1.ServiceAccount{}
@@ -119,6 +120,11 @@ func isLifecycleActionsEnabled(compDef *appsv1.ComponentDefinition) bool {
 	return compDef.Spec.LifecycleActions != nil
 }
 
+func labelAndAnnotationEqual(old, new metav1.Object) bool {
+	return equality.Semantic.DeepEqual(old.GetLabels(), new.GetLabels()) &&
+		equality.Semantic.DeepEqual(old.GetAnnotations(), new.GetAnnotations())
+}
+
 func createOrUpdate[T any, PT generics.PObject[T]](
 	transCtx *componentTransformContext, obj PT, graphCli model.GraphClient, dag *graph.DAG, cmpFn func(oldObj, newObj PT) bool,
 ) (PT, error) {
@@ -146,7 +152,8 @@ func createOrUpdateServiceAccount(transCtx *componentTransformContext, serviceAc
 	}
 
 	return createOrUpdate(transCtx, sa, graphCli, dag, func(old, new *corev1.ServiceAccount) bool {
-		return equality.Semantic.DeepEqual(old.ImagePullSecrets, new.ImagePullSecrets) &&
+		return labelAndAnnotationEqual(old, new) &&
+			equality.Semantic.DeepEqual(old.ImagePullSecrets, new.ImagePullSecrets) &&
 			equality.Semantic.DeepEqual(old.Secrets, new.Secrets) &&
 			equality.Semantic.DeepEqual(old.AutomountServiceAccountToken, new.AutomountServiceAccountToken)
 	})
@@ -155,7 +162,7 @@ func createOrUpdateServiceAccount(transCtx *componentTransformContext, serviceAc
 func createOrUpdateRole(
 	transCtx *componentTransformContext, graphCli model.GraphClient, dag *graph.DAG,
 ) (*rbacv1.Role, error) {
-	role := factory.BuildComponentRole(transCtx.SynthesizeComponent, transCtx.CompDef)
+	role := factory.BuildRole(transCtx.SynthesizeComponent, transCtx.CompDef)
 	if role == nil {
 		return nil, nil
 	}
@@ -163,7 +170,8 @@ func createOrUpdateRole(
 		return nil, err
 	}
 	return createOrUpdate(transCtx, role, graphCli, dag, func(old, new *rbacv1.Role) bool {
-		return equality.Semantic.DeepEqual(old.Rules, new.Rules)
+		return labelAndAnnotationEqual(old, new) &&
+			equality.Semantic.DeepEqual(old.Rules, new.Rules)
 	})
 }
 
@@ -171,7 +179,9 @@ func createOrUpdateRoleBinding(
 	transCtx *componentTransformContext, cmpdRole *rbacv1.Role, serviceAccountName string, graphCli model.GraphClient, dag *graph.DAG,
 ) ([]*rbacv1.RoleBinding, error) {
 	cmpRoleBinding := func(old, new *rbacv1.RoleBinding) bool {
-		return equality.Semantic.DeepEqual(old.Subjects, new.Subjects) && equality.Semantic.DeepEqual(old.RoleRef, new.RoleRef)
+		return labelAndAnnotationEqual(old, new) &&
+			equality.Semantic.DeepEqual(old.Subjects, new.Subjects) &&
+			equality.Semantic.DeepEqual(old.RoleRef, new.RoleRef)
 	}
 	res := make([]*rbacv1.RoleBinding, 0)
 

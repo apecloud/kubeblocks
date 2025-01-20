@@ -29,6 +29,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -132,6 +133,59 @@ var _ = Describe("object rbac transformer test.", func() {
 	}
 
 	Context("transformer rbac manager", func() {
+		It("tests labelAndAnnotationEqual", func() {
+			// nil and not nil
+			Expect(labelAndAnnotationEqual(
+				&corev1.ServiceAccount{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: map[string]string{},
+					},
+				}, &corev1.ServiceAccount{}),
+			).Should(BeTrue())
+			// labels are equal
+			Expect(labelAndAnnotationEqual(&corev1.ServiceAccount{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"test": "test",
+					},
+				},
+			}, &corev1.ServiceAccount{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"test": "test",
+					},
+				},
+			})).Should(BeTrue())
+			// labels are not equal
+			Expect(labelAndAnnotationEqual(&corev1.ServiceAccount{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"test": "test",
+					},
+				},
+			}, &corev1.ServiceAccount{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"test": "test1",
+					},
+				},
+			})).Should(BeFalse())
+			// annotations are not equal
+			Expect(labelAndAnnotationEqual(&corev1.ServiceAccount{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"test": "test",
+					},
+				},
+			}, &corev1.ServiceAccount{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"test": "test1",
+					},
+				},
+			})).Should(BeFalse())
+		})
+
 		It("w/o any rolebindings", func() {
 			init(false, false)
 			Expect(transformer.Transform(transCtx, dag)).Should(BeNil())
@@ -166,7 +220,7 @@ var _ = Describe("object rbac transformer test.", func() {
 		It("w/ cmpd's PolicyRules", func() {
 			init(false, true)
 			Expect(transformer.Transform(transCtx, dag)).Should(BeNil())
-			cmpdRole := factory.BuildComponentRole(synthesizedComp, compDefObj)
+			cmpdRole := factory.BuildRole(synthesizedComp, compDefObj)
 			cmpdRoleBinding := factory.BuildRoleBinding(synthesizedComp, serviceAccountName, &rbacv1.RoleRef{
 				APIGroup: rbacv1.GroupName,
 				Kind:     "Role",

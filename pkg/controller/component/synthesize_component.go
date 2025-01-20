@@ -34,6 +34,7 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 var (
@@ -399,11 +400,10 @@ func buildServiceAccountName(synthesizeComp *SynthesizedComponent) {
 		synthesizeComp.PodSpec.ServiceAccountName = synthesizeComp.ServiceAccountName
 		return
 	}
-	if synthesizeComp.LifecycleActions == nil || synthesizeComp.LifecycleActions.RoleProbe == nil {
+	if !viper.GetBool(constant.EnableRBACManager) {
 		return
 	}
-	synthesizeComp.ServiceAccountName = constant.GenerateDefaultServiceAccountName(synthesizeComp.ClusterName)
-	// set component.PodSpec.ServiceAccountName
+	synthesizeComp.ServiceAccountName = constant.GenerateDefaultServiceAccountName(synthesizeComp.CompDefName)
 	synthesizeComp.PodSpec.ServiceAccountName = synthesizeComp.ServiceAccountName
 }
 

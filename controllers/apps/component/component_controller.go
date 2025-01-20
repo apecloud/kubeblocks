@@ -212,10 +212,8 @@ func (r *ComponentReconciler) setupWithManager(mgr ctrl.Manager) error {
 
 	if viper.GetBool(constant.EnableRBACManager) {
 		b.Owns(&rbacv1.RoleBinding{}).
+			Owns(&rbacv1.Role{}).
 			Owns(&corev1.ServiceAccount{})
-	} else {
-		b.Watches(&rbacv1.RoleBinding{}, handler.EnqueueRequestsFromMapFunc(r.filterComponentResources)).
-			Watches(&corev1.ServiceAccount{}, handler.EnqueueRequestsFromMapFunc(r.filterComponentResources))
 	}
 
 	return b.Complete(r)

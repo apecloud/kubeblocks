@@ -121,7 +121,21 @@ func isLifecycleActionsEnabled(compDef *appsv1.ComponentDefinition) bool {
 }
 
 func labelAndAnnotationEqual(old, new metav1.Object) bool {
-	return equality.Semantic.DeepEqual(old.GetLabels(), new.GetLabels()) &&
+	// exclude component labels, since they are different for each component
+	compLabels := constant.GetCompLabels("", "")
+	oldLabels := make(map[string]string)
+	for k, v := range old.GetLabels() {
+		if _, ok := compLabels[k]; !ok {
+			oldLabels[k] = v
+		}
+	}
+	newLabels := make(map[string]string)
+	for k, v := range new.GetLabels() {
+		if _, ok := compLabels[k]; !ok {
+			newLabels[k] = v
+		}
+	}
+	return equality.Semantic.DeepEqual(oldLabels, newLabels) &&
 		equality.Semantic.DeepEqual(old.GetAnnotations(), new.GetAnnotations())
 }
 

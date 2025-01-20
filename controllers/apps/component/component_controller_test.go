@@ -48,6 +48,7 @@ import (
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/plan"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -108,7 +109,10 @@ var _ = Describe("Component Controller", func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ComponentSignature, true, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ComponentSignature, true, inNS)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ServiceAccountSignature, true, inNS)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.RoleSignature, true, inNS)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.RoleBindingSignature, true, inNS)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PodSignature, true, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupSignature, true, inNS, ml)
@@ -138,7 +142,6 @@ var _ = Describe("Component Controller", func() {
 	createAllDefinitionObjects := func() {
 		By("Create a componentDefinition obj")
 		compDefObj = testapps.NewComponentDefinitionFactory(compDefName).
-			WithRandomName().
 			AddAnnotations(constant.SkipImmutableCheckAnnotationKey, "true").
 			SetDefaultSpec().
 			Create(&testCtx).
@@ -1338,33 +1341,29 @@ var _ = Describe("Component Controller", func() {
 		})).Should(Succeed())
 	}
 
-	checkRBACResourcesExistence := func(saName string, expectExisted bool) {
+	checkRBACResourcesExistence := func(saName, rbName string, expectExisted bool) {
 		saKey := types.NamespacedName{
 			Namespace: compObj.Namespace,
 			Name:      saName,
 		}
 		rbKey := types.NamespacedName{
 			Namespace: compObj.Namespace,
-			Name:      saName,
+			Name:      rbName,
 		}
 		Eventually(testapps.CheckObjExists(&testCtx, saKey, &corev1.ServiceAccount{}, expectExisted)).Should(Succeed())
 		Eventually(testapps.CheckObjExists(&testCtx, rbKey, &rbacv1.RoleBinding{}, expectExisted)).Should(Succeed())
 	}
 
 	testCompRBAC := func(compName, compDefName, saName string) {
-		By("update comp definition to enable lifecycle actions")
-		Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(compDefObj), func(compDef *kbappsv1.ComponentDefinition) {
-			compDef.Spec.LifecycleActions.Readonly = testapps.NewLifecycleAction("readonly")
-			compDef.Spec.LifecycleActions.Readwrite = testapps.NewLifecycleAction("readwrite")
-		})()).Should(Succeed())
-
 		By("creating a component with target service account name")
 		if len(saName) == 0 {
-			saName = "test-sa-" + randomStr()
+			createClusterObj(compName, compDefName, nil)
+			saName = constant.GenerateDefaultServiceAccountName(compDefName)
+		} else {
+			createClusterObj(compName, compDefName, func(f *testapps.MockClusterFactory) {
+				f.SetServiceAccountName(saName)
+			})
 		}
-		createClusterObj(compName, compDefName, func(f *testapps.MockClusterFactory) {
-			f.SetServiceAccountName(saName)
-		})
 
 		By("check the service account used in Pod")
 		itsKey := types.NamespacedName{
@@ -1375,52 +1374,107 @@ var _ = Describe("Component Controller", func() {
 			g.Expect(its.Spec.Template.Spec.ServiceAccountName).To(Equal(saName))
 		})).Should(Succeed())
 
-		By("check the RBAC resources created")
-		checkRBACResourcesExistence(saName, true)
+		By("check the RBAC resources status")
+		checkRBACResourcesExistence(saName, fmt.Sprintf("%v-pod", saName), true)
+	}
+
+	testCompWithRBAC := func(compName, compDefName string) {
+		testCompRBAC(compName, compDefName, "")
+		By("delete the cluster(component)")
+		testapps.DeleteObject(&testCtx, clusterKey, &kbappsv1.Cluster{})
+		Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &kbappsv1.Cluster{}, false)).Should(Succeed())
+		Eventually(testapps.CheckObjExists(&testCtx, compKey, &kbappsv1.Component{}, false)).Should(Succeed())
+
+		By("check the RBAC resources deleted")
+		saName := constant.GenerateDefaultServiceAccountName(compDefName)
+		checkRBACResourcesExistence(saName, fmt.Sprintf("%v-pod", saName), false)
 	}
 
 	testRecreateCompWithRBACCreateByKubeBlocks := func(compName, compDefName string) {
-		saName := "test-sa-" + randomStr()
-		testCompRBAC(compName, compDefName, saName)
+		testCompRBAC(compName, compDefName, "")
 
 		By("delete the cluster(component)")
 		testapps.DeleteObject(&testCtx, clusterKey, &kbappsv1.Cluster{})
 		Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &kbappsv1.Cluster{}, false)).Should(Succeed())
 
 		By("check the RBAC resources deleted")
-		checkRBACResourcesExistence(saName, false)
+		saName := constant.GenerateDefaultServiceAccountName(compDefName)
+		checkRBACResourcesExistence(saName, fmt.Sprintf("%v-pod", saName), false)
 
 		By("re-create cluster(component) with same name")
-		testCompRBAC(compName, compDefName, saName)
+		testCompRBAC(compName, compDefName, "")
 	}
 
-	tesCreateCompWithRBACCreateByUser := func(compName, compDefName string) {
-		saName := "test-sa-exist" + randomStr()
+	testSharedRBACResoucreDeletion := func() {
+		By("create first cluster")
+		createClusterObj(defaultCompName+"-comp1", compDefName, nil)
+		comp1Key := compKey
+		cluster1Key := clusterKey
 
-		testCompRBAC(compName, compDefName, saName)
-
+		By("check rbac resources owner")
+		saName := constant.GenerateDefaultServiceAccountName(compDefName)
 		saKey := types.NamespacedName{
 			Namespace: compObj.Namespace,
 			Name:      saName,
 		}
-		By("mock the ServiceAccount and RoleBinding created by user by setting annotations to nil")
-		Eventually(testapps.GetAndChangeObj(&testCtx, saKey, func(sa *corev1.ServiceAccount) {
-			sa.Annotations = nil
+		Eventually(testapps.CheckObj(&testCtx, saKey, func(g Gomega, sa *corev1.ServiceAccount) {
+			refs := sa.GetOwnerReferences()
+			g.Expect(refs).Should(HaveLen(1))
+			owner := refs[0]
+			g.Expect(owner.Name).Should(Equal(comp1Key.Name))
 		})).Should(Succeed())
-		rbKey := types.NamespacedName{
-			Namespace: compObj.Namespace,
-			Name:      saName,
-		}
-		Eventually(testapps.GetAndChangeObj(&testCtx, rbKey, func(rb *rbacv1.RoleBinding) {
-			rb.Annotations = nil
+
+		checkRBACResourcesExistence(saName, fmt.Sprintf("%v-pod", saName), true)
+
+		By("create second cluster")
+		createClusterObj(defaultCompName+"-comp2", compDefName, nil)
+		comp2Key := compKey
+		By("check rbac resources owner not modified")
+		Consistently(testapps.CheckObj(&testCtx, saKey, func(g Gomega, sa *corev1.ServiceAccount) {
+			refs := sa.GetOwnerReferences()
+			g.Expect(refs).Should(HaveLen(1))
+			owner := refs[0]
+			g.Expect(owner.Name).Should(Equal(comp1Key.Name))
 		})).Should(Succeed())
+
+		By("delete first cluster")
+		testapps.DeleteObject(&testCtx, cluster1Key, &kbappsv1.Cluster{})
+		Eventually(testapps.CheckObjExists(&testCtx, cluster1Key, &kbappsv1.Cluster{}, false)).Should(Succeed())
+
+		By("check rbac resources owner transferred")
+		Eventually(testapps.CheckObj(&testCtx, saKey, func(g Gomega, sa *corev1.ServiceAccount) {
+			refs := sa.GetOwnerReferences()
+			g.Expect(refs).Should(HaveLen(1))
+			owner := refs[0]
+			g.Expect(owner.Name).Should(Equal(comp2Key.Name))
+		})).Should(Succeed())
+	}
+
+	testCreateCompWithNonExistRBAC := func(compName, compDefName string) {
+		saName := "test-sa-non-exist" + randomStr()
+
+		// component controller won't complete reconciliation, so the phase will be empty
+		createClusterObjWithPhase(compName, compDefName, func(f *testapps.MockClusterFactory) {
+			f.SetServiceAccountName(saName)
+		}, kbappsv1.ClusterPhase(""))
+		Consistently(testapps.GetComponentPhase(&testCtx, compKey)).Should(Equal(kbappsv1.ComponentPhase("")))
+	}
+
+	testCreateCompWithRBACCreateByUser := func(compName, compDefName string) {
+		saName := "test-sa-exist" + randomStr()
+
+		By("user manually creates ServiceAccount and RoleBinding")
+		sa := builder.NewServiceAccountBuilder(testCtx.DefaultNamespace, saName).GetObject()
+		testapps.CheckedCreateK8sResource(&testCtx, sa)
+
+		testCompRBAC(compName, compDefName, saName)
 
 		By("delete the cluster(component)")
 		testapps.DeleteObject(&testCtx, clusterKey, &kbappsv1.Cluster{})
 		Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &kbappsv1.Cluster{}, true)).Should(Succeed())
 
-		By("check the RBAC resources deleted")
-		checkRBACResourcesExistence(saName, true)
+		By("check the serviceaccount not deleted")
+		Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(sa), &corev1.ServiceAccount{}, true)).Should(Succeed())
 	}
 
 	testThreeReplicas := func(compName, compDefName string) {
@@ -1646,16 +1700,24 @@ var _ = Describe("Component Controller", func() {
 			testCompTLSConfig(defaultCompName, compDefName)
 		})
 
-		It("with component RBAC set", func() {
-			testCompRBAC(defaultCompName, compDefName, "")
+		It("creates component RBAC resources", func() {
+			testCompWithRBAC(defaultCompName, compDefName)
 		})
 
-		It("re-create component with custom RBAC which is not exist and auto created by KubeBlocks", func() {
+		It("re-creates component with custom RBAC which is not exist and auto created by KubeBlocks", func() {
 			testRecreateCompWithRBACCreateByKubeBlocks(defaultCompName, compDefName)
 		})
 
+		It("transfers rbac resources' ownership when multiple components share them", func() {
+			testSharedRBACResoucreDeletion()
+		})
+
+		It("creates component with non-exist serviceaccount", func() {
+			testCreateCompWithNonExistRBAC(defaultCompName, compDefName)
+		})
+
 		It("create component with custom RBAC which is already exist created by User", func() {
-			tesCreateCompWithRBACCreateByUser(defaultCompName, compDefName)
+			testCreateCompWithRBACCreateByUser(defaultCompName, compDefName)
 		})
 	})
 

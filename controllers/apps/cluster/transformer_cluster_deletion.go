@@ -21,14 +21,13 @@ package cluster
 
 import (
 	"fmt"
-	"reflect"
 	"strings"
 	"time"
 
 	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
-	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -129,7 +128,7 @@ func (t *clusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 	delKindMap := map[string]sets.Empty{}
 	for _, o := range delObjs {
 		// skip the objects owned by the component and InstanceSet controller
-		if shouldSkipObjOwnedByComp(o, *cluster) || isOwnedByInstanceSet(o) {
+		if isOwnedByComp(o) || isOwnedByInstanceSet(o) {
 			continue
 		}
 		graphCli.Delete(dag, o, inUniversalContext4G())
@@ -138,6 +137,7 @@ func (t *clusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 
 	// set cluster action to status until all the sub-resources deleted
 	if len(delObjs) == 0 {
+		transCtx.Logger.Info(fmt.Sprintf("deleting cluster %v", klog.KObj(cluster)))
 		graphCli.Delete(dag, cluster)
 	} else {
 		transCtx.Logger.Info(fmt.Sprintf("deleting the sub-resource kinds: %v", maps.Keys(delKindMap)))
@@ -172,37 +172,6 @@ func kindsForWipeOut() ([]client.ObjectList, []client.ObjectList) {
 		&dpv1alpha1.BackupList{},
 	}
 	return append(namespacedKinds, namespacedKindsPlus...), nonNamespacedKinds
-}
-
-// shouldSkipObjOwnedByComp is used to judge whether the object owned by component should be skipped when deleting the cluster
-func shouldSkipObjOwnedByComp(obj client.Object, cluster appsv1.Cluster) bool {
-	ownByComp := isOwnedByComp(obj)
-	if !ownByComp {
-		// if the object is not owned by component, it should not be skipped
-		return false
-	}
-
-	// Due to compatibility reasons, the component controller creates cluster-scoped RoleBinding and ServiceAccount objects in the following two scenarios:
-	// 1. When the user does not specify a ServiceAccount, KubeBlocks automatically creates a ServiceAccount and a RoleBinding with named pattern kb-{cluster.Name}.
-	// 2. When the user specifies a ServiceAccount that does not exist, KubeBlocks will automatically create a ServiceAccount and a RoleBinding with the same name.
-	// In both cases, the lifecycle of the RoleBinding and ServiceAccount should not be tied to the component. They should be deleted when the cluster is deleted.
-	doNotSkipTypes := []interface{}{
-		&rbacv1.RoleBinding{},
-		&corev1.ServiceAccount{},
-	}
-	for _, t := range doNotSkipTypes {
-		if objType, ok := obj.(interface{ GetName() string }); ok && reflect.TypeOf(obj) == reflect.TypeOf(t) {
-			if strings.EqualFold(objType.GetName(), constant.GenerateDefaultServiceAccountName(cluster.GetName())) {
-				return false
-			}
-			labels := obj.GetLabels()
-			value, ok := labels[constant.AppManagedByLabelKey]
-			if ok && value == constant.AppName {
-				return false
-			}
-		}
-	}
-	return true
 }
 
 func deleteCompNShardingInOrder4Terminate(transCtx *clusterTransformContext, dag *graph.DAG) (sets.Set[string], error) {

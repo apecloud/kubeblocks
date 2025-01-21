@@ -1331,7 +1331,26 @@ var _ = Describe("Component Controller", func() {
 	}
 
 	testCompSystemAccount := func(compName, compDefName string) {
-		createCompObj(compName, compDefName, nil)
+		secret := corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: testCtx.DefaultNamespace,
+				Name:      "sysaccount",
+			},
+			StringData: map[string]string{
+				constant.AccountPasswdForSecret: "sysaccount",
+			},
+		}
+		secretRef := func() *kbappsv1.ProvisionSecretRef {
+			Expect(testCtx.CreateObj(testCtx.Ctx, &secret)).Should(Succeed())
+			return &kbappsv1.ProvisionSecretRef{
+				Name:      secret.Name,
+				Namespace: testCtx.DefaultNamespace,
+			}
+		}
+
+		createCompObj(compName, compDefName, func(f *testapps.MockComponentFactory) {
+			f.AddSystemAccount("admin", nil, nil, secretRef())
+		})
 
 		By("check root account")
 		var rootHashedPassword string
@@ -1401,8 +1420,8 @@ var _ = Describe("Component Controller", func() {
 		}
 
 		createCompObj(compName, compDefName, func(f *testapps.MockComponentFactory) {
-			f.AddSystemAccount("root", false, passwordConfig, nil).
-				AddSystemAccount("admin", false, nil, secretRef())
+			f.AddSystemAccount("root", nil, passwordConfig, nil).
+				AddSystemAccount("admin", nil, nil, secretRef())
 		})
 
 		By("check root account")
@@ -1433,8 +1452,8 @@ var _ = Describe("Component Controller", func() {
 		}
 
 		createCompObj(compName, compDefName, func(f *testapps.MockComponentFactory) {
-			f.AddSystemAccount("root", false, passwordConfig, nil).
-				AddSystemAccount("admin", false, passwordConfig, nil)
+			f.AddSystemAccount("root", ptr.To(false), passwordConfig, nil).
+				AddSystemAccount("admin", ptr.To(true), passwordConfig, nil)
 		})
 
 		By("check root account")
@@ -1460,8 +1479,8 @@ var _ = Describe("Component Controller", func() {
 		}
 
 		createCompObj(compName, compDefName, func(f *testapps.MockComponentFactory) {
-			f.AddSystemAccount("root", false, passwordConfig, nil).
-				AddSystemAccount("admin", false, passwordConfig, nil)
+			f.AddSystemAccount("root", ptr.To(false), passwordConfig, nil).
+				AddSystemAccount("admin", ptr.To(false), passwordConfig, nil)
 		})
 
 		By("check the root account")
@@ -1516,8 +1535,8 @@ var _ = Describe("Component Controller", func() {
 		}
 
 		createCompObj(compName, compDefName, func(f *testapps.MockComponentFactory) {
-			f.AddSystemAccount("root", false, passwordConfig, nil).
-				AddSystemAccount("admin", false, nil, secretRef())
+			f.AddSystemAccount("root", nil, passwordConfig, nil).
+				AddSystemAccount("admin", nil, nil, secretRef())
 		})
 
 		By("check root account")
@@ -1666,23 +1685,23 @@ var _ = Describe("Component Controller", func() {
 		})
 
 		It("provisioning", func() {
-			testCompSystemAccount(defaultCompName, compDefName)
+			testCompSystemAccount(defaultCompName, compDefObj.Name)
 		})
 
 		It("override", func() {
-			testCompSystemAccountOverride(defaultCompName, compDefName)
+			testCompSystemAccountOverride(defaultCompName, compDefObj.Name)
 		})
 
 		It("disable", func() {
-			testCompSystemAccountDisable(defaultCompName, compDefName)
+			testCompSystemAccountDisable(defaultCompName, compDefObj.Name)
 		})
 
 		It("disable - after provision", func() {
-			testCompSystemAccountDisableAfterProvision(defaultCompName, compDefName)
+			testCompSystemAccountDisableAfterProvision(defaultCompName, compDefObj.Name)
 		})
 
 		It("update", func() {
-			testCompSystemAccountUpdate(defaultCompName, compDefName)
+			testCompSystemAccountUpdate(defaultCompName, compDefObj.Name)
 		})
 	})
 

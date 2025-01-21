@@ -20,12 +20,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
+	"fmt"
+	"reflect"
 	"slices"
 	"strings"
 
+	"golang.org/x/exp/maps"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -59,120 +62,70 @@ func (t *componentAccountProvisionTransformer) Transform(ctx graph.TransformCont
 		return nil
 	}
 
-	if len(transCtx.SynthesizeComponent.SystemAccounts) == 0 {
-		return nil
-	}
-	if transCtx.Component.Status.Phase != appsv1.RunningComponentPhase {
-		return nil
-	}
-	// TODO: (good-first-issue) if the component's account is deleted by user, we should re-provision it
-	cond, provisioned := t.isProvisioned(transCtx)
-	if provisioned {
+	comp := transCtx.Component
+	compDef := transCtx.CompDef
+
+	// provision accounts only when the component is running
+	if comp.Status.Phase != appsv1.RunningComponentPhase {
 		return nil
 	}
 
-	lifecycleActions := transCtx.CompDef.Spec.LifecycleActions
+	// has no lifecycle actions defined, skip the account provision
+	lifecycleActions := compDef.Spec.LifecycleActions
 	if lifecycleActions == nil || lifecycleActions.AccountProvision == nil {
 		return nil
 	}
 
-	lfa, err := t.lifecycleAction(transCtx)
-	if err != nil {
-		return err
+	accounts, _ := synthesizeSystemAccounts(compDef.Spec.SystemAccounts, comp.Spec.SystemAccounts, true)
+
+	secrets, err1 := listSystemAccountObjects(ctx, transCtx.SynthesizeComponent)
+	if err1 != nil {
+		return err1
 	}
-	for _, account := range transCtx.SynthesizeComponent.SystemAccounts {
-		// The secret of initAccount should be rendered into the config file,
-		// or injected into the container through specific account&password environment variables name supported by the engine.
-		// When the engine starts up, it will automatically load and create this account.
-		if account.InitAccount {
-			continue
-		}
-		if t.isAccountProvisioned(cond, account) {
-			continue
-		}
-		if transCtx.SynthesizeComponent.Annotations[constant.RestoreFromBackupAnnotationKey] == "" {
-			// TODO: restore account secret from backup.
-			// provision account when the component is not recovered from backup
-			if err = t.provisionAccount(transCtx, cond, lfa, account); err != nil {
-				t.markProvisionAsFailed(transCtx, &cond, err)
-				return err
+	protoNameSet := sets.New(maps.Keys(secrets)...)
+
+	cond := t.provisionCond(transCtx)
+	provisionedNameSet := t.getProvisionedAccounts(cond)
+
+	createSet, deleteSet, updateSet := setDiff(provisionedNameSet, protoNameSet)
+	if len(createSet) == 0 && len(deleteSet) == 0 && len(updateSet) == 0 {
+		return nil
+	}
+
+	lfa, err2 := t.lifecycleAction(transCtx)
+	if err2 != nil {
+		return err2
+	}
+
+	var err3 error
+	condCopy := cond.DeepCopy()
+	for _, name := range sets.List(createSet) {
+		if err := t.createAccount(transCtx, lfa, &cond, accounts[name], secrets[name]); err != nil {
+			if err3 == nil {
+				err3 = err
 			}
 		}
-		t.markAccountProvisioned(&cond, account)
 	}
-	t.markProvisioned(transCtx, cond)
 
-	return nil
-}
-
-func (t *componentAccountProvisionTransformer) isProvisioned(transCtx *componentTransformContext) (metav1.Condition, bool) {
-	for _, cond := range transCtx.Component.Status.Conditions {
-		if cond.Type == accountProvisionConditionType {
-			if cond.Status == metav1.ConditionTrue {
-				return cond, true
+	for _, name := range sets.List(deleteSet) {
+		if err := t.deleteAccount(transCtx, lfa, &cond, accounts[name]); err != nil {
+			if err3 == nil {
+				err3 = err
 			}
-			return cond, false
 		}
 	}
-	return metav1.Condition{
-		Type:               accountProvisionConditionType,
-		Status:             metav1.ConditionFalse,
-		ObservedGeneration: transCtx.Component.Generation,
-		LastTransitionTime: metav1.Now(),
-		Reason:             accountProvisionConditionReasonInProgress,
-		Message:            "",
-	}, false
-}
 
-func (t *componentAccountProvisionTransformer) markProvisionAsFailed(transCtx *componentTransformContext, cond *metav1.Condition, err error) {
-	cond.Status = metav1.ConditionFalse
-	cond.ObservedGeneration = transCtx.Component.Generation
-	cond.LastTransitionTime = metav1.Now()
-	// cond.Reason = err.Error() // TODO: error
-}
-
-func (t *componentAccountProvisionTransformer) markProvisioned(transCtx *componentTransformContext, cond metav1.Condition) {
-	cond.Status = metav1.ConditionTrue
-	cond.ObservedGeneration = transCtx.Component.Generation
-	cond.LastTransitionTime = metav1.Now()
-	cond.Reason = accountProvisionConditionReasonDone
-
-	conditions := transCtx.Component.Status.Conditions
-	if conditions == nil {
-		conditions = make([]metav1.Condition, 0)
-	}
-	existed := false
-	for i, c := range conditions {
-		if c.Type == cond.Type {
-			existed = true
-			conditions[i] = cond
+	for _, name := range sets.List(updateSet) {
+		if err := t.updateAccount(transCtx, lfa, &cond, accounts[name], secrets[name]); err != nil {
+			if err3 == nil {
+				err3 = err
+			}
 		}
 	}
-	if !existed {
-		conditions = append(conditions, cond)
-	}
-	transCtx.Component.Status.Conditions = conditions
-}
 
-func (t *componentAccountProvisionTransformer) isAccountProvisioned(cond metav1.Condition, account appsv1.SystemAccount) bool {
-	if len(cond.Message) == 0 {
-		return false
-	}
-	accounts := strings.Split(cond.Message, ",")
-	return slices.Contains(accounts, account.Name)
-}
+	t.provisionCondDone(transCtx, condCopy, &cond, err3)
 
-func (t *componentAccountProvisionTransformer) markAccountProvisioned(cond *metav1.Condition, account appsv1.SystemAccount) {
-	if len(cond.Message) == 0 {
-		cond.Message = account.Name
-		return
-	}
-	accounts := strings.Split(cond.Message, ",")
-	if slices.Contains(accounts, account.Name) {
-		return
-	}
-	accounts = append(accounts, account.Name)
-	cond.Message = strings.Join(accounts, ",")
+	return err3
 }
 
 func (t *componentAccountProvisionTransformer) lifecycleAction(transCtx *componentTransformContext) (lifecycle.Lifecycle, error) {
@@ -190,33 +143,176 @@ func (t *componentAccountProvisionTransformer) lifecycleAction(transCtx *compone
 	return lfa, nil
 }
 
-func (t *componentAccountProvisionTransformer) provisionAccount(transCtx *componentTransformContext,
-	_ metav1.Condition, lfa lifecycle.Lifecycle, account appsv1.SystemAccount) error {
+func (t *componentAccountProvisionTransformer) createAccount(transCtx *componentTransformContext,
+	lfa lifecycle.Lifecycle, cond *metav1.Condition, account synthesizedSystemAccount, secret *corev1.Secret) error {
+	var (
+		err error
+	)
 
-	synthesizedComp := transCtx.SynthesizeComponent
-	secret, err := t.getAccountSecret(transCtx, synthesizedComp, account)
-	if err != nil {
-		return err
+	// The secret of an initial account should be injected into the container through
+	// specific account&password environment variables name supported by the engine.
+	// When the engine starts up, it will automatically load and create this account.
+	if !account.InitAccount {
+		// TODO: restore account secret from backup.
+		if transCtx.SynthesizeComponent.Annotations[constant.RestoreFromBackupAnnotationKey] == "" {
+			// provision account when the component is not recovered from backup
+			err = t.provision(transCtx, lfa, account.Statement.Create, secret)
+		}
 	}
 
+	if err == nil {
+		// TODO: how about the password restored from backup?
+		t.updateProvisionedAccount(cond, account.Name, secret.Annotations[systemAccountHashAnnotation])
+	}
+	return err
+}
+
+func (t *componentAccountProvisionTransformer) deleteAccount(transCtx *componentTransformContext,
+	lfa lifecycle.Lifecycle, cond *metav1.Condition, account synthesizedSystemAccount) error {
+	if account.Statement == nil || len(account.Statement.Delete) == 0 {
+		return fmt.Errorf("has no delete statement defined for system account: %s", account.Name)
+	}
+
+	err := lfa.AccountProvision(transCtx.Context, transCtx.Client, nil, account.Statement.Delete, account.Name, "")
+	if lifecycle.IgnoreNotDefined(err) == nil {
+		t.removeProvisionedAccount(cond, account.Name)
+	}
+	return lifecycle.IgnoreNotDefined(err)
+}
+
+func (t *componentAccountProvisionTransformer) updateAccount(transCtx *componentTransformContext,
+	lfa lifecycle.Lifecycle, cond *metav1.Condition, account synthesizedSystemAccount, secret *corev1.Secret) error {
+	hashedPassword := t.hashedPasswordFromCond(cond, account.Name)
+	if hashedPassword == "" {
+		return nil // passwords that generated by KB or restored from backup, do not support updating?
+	}
+	if verifySystemAccountPassword(secret, []byte(hashedPassword)) {
+		return nil // the password is not changed
+	}
+
+	if account.Statement == nil || len(account.Statement.Update) == 0 {
+		return fmt.Errorf("has no update statement defined for system account: %s", account.Name)
+	}
+
+	// TODO: how to notify other apps to update the new password?
+
+	err := t.provision(transCtx, lfa, account.Statement.Update, secret)
+	if err == nil {
+		t.updateProvisionedAccount(cond, account.Name, secret.Annotations[systemAccountHashAnnotation])
+	}
+	return err
+}
+
+func (t *componentAccountProvisionTransformer) provision(transCtx *componentTransformContext,
+	lfa lifecycle.Lifecycle, statement string, secret *corev1.Secret) error {
 	username, password := secret.Data[constant.AccountNameForSecret], secret.Data[constant.AccountPasswdForSecret]
 	if len(username) == 0 || len(password) == 0 {
 		return nil
 	}
-
-	err = lfa.AccountProvision(transCtx.Context, transCtx.Client, nil, account.Statement, string(username), string(password))
+	err := lfa.AccountProvision(transCtx.Context, transCtx.Client, nil, statement, string(username), string(password))
 	return lifecycle.IgnoreNotDefined(err)
 }
 
-func (t *componentAccountProvisionTransformer) getAccountSecret(ctx graph.TransformContext,
-	synthesizeComp *component.SynthesizedComponent, account appsv1.SystemAccount) (*corev1.Secret, error) {
-	secretKey := types.NamespacedName{
-		Namespace: synthesizeComp.Namespace,
-		Name:      constant.GenerateAccountSecretName(synthesizeComp.ClusterName, synthesizeComp.Name, account.Name),
+func (t *componentAccountProvisionTransformer) provisionCond(transCtx *componentTransformContext) metav1.Condition {
+	for _, cond := range transCtx.Component.Status.Conditions {
+		if cond.Type == accountProvisionConditionType {
+			return cond
+		}
 	}
-	secret := &corev1.Secret{}
-	if err := ctx.GetClient().Get(ctx.GetContext(), secretKey, secret); err != nil {
-		return nil, err
+	return metav1.Condition{
+		Type:               accountProvisionConditionType,
+		Status:             metav1.ConditionFalse,
+		ObservedGeneration: transCtx.Component.Generation,
+		LastTransitionTime: metav1.Now(),
+		Reason:             accountProvisionConditionReasonInProgress,
+		Message:            "",
 	}
-	return secret, nil
+}
+
+func (t *componentAccountProvisionTransformer) provisionCondDone(transCtx *componentTransformContext,
+	condCopy, cond *metav1.Condition, err error) {
+	if err == nil {
+		cond.Status = metav1.ConditionTrue
+		cond.Reason = accountProvisionConditionReasonDone
+	} else {
+		cond.Status = metav1.ConditionFalse
+		// cond.Reason = err.Error() // TODO: error
+	}
+
+	if !reflect.DeepEqual(cond, condCopy) {
+		cond.LastTransitionTime = metav1.Now()
+	}
+	cond.ObservedGeneration = transCtx.Component.Generation
+
+	conditions := transCtx.Component.Status.Conditions
+	if conditions == nil {
+		conditions = make([]metav1.Condition, 0)
+	}
+	existed := false
+	for i, c := range conditions {
+		if c.Type == cond.Type {
+			existed = true
+			conditions[i] = *cond
+		}
+	}
+	if !existed {
+		conditions = append(conditions, *cond)
+	}
+	transCtx.Component.Status.Conditions = conditions
+}
+
+func (t *componentAccountProvisionTransformer) getProvisionedAccounts(cond metav1.Condition) sets.Set[string] {
+	accounts := sets.New[string]()
+	if len(cond.Message) > 0 {
+		for _, e := range strings.Split(cond.Message, ",") {
+			if len(e) > 0 {
+				accounts.Insert(strings.Split(e, ":")[0])
+			}
+		}
+	}
+	return accounts
+}
+
+func (t *componentAccountProvisionTransformer) updateProvisionedAccount(cond *metav1.Condition, account, hashedPassword string) {
+	accounts := make([]string, 0)
+	if len(cond.Message) > 0 {
+		accounts = strings.Split(cond.Message, ",")
+	}
+	idx := slices.IndexFunc(accounts, func(s string) bool {
+		return strings.HasPrefix(s, fmt.Sprintf("%s:", account))
+	})
+	if idx >= 0 {
+		accounts[idx] = fmt.Sprintf("%s:%s", account, hashedPassword)
+	} else {
+		accounts = append(accounts, fmt.Sprintf("%s:%s", account, hashedPassword))
+	}
+	cond.Message = strings.Join(accounts, ",")
+}
+
+func (t *componentAccountProvisionTransformer) removeProvisionedAccount(cond *metav1.Condition, account string) {
+	accounts := make([]string, 0)
+	if len(cond.Message) > 0 {
+		accounts = strings.Split(cond.Message, ",")
+	}
+	accounts = slices.DeleteFunc(accounts, func(s string) bool {
+		return strings.HasPrefix(s, fmt.Sprintf("%s:", account))
+	})
+	cond.Message = strings.Join(accounts, ",")
+}
+
+func (t *componentAccountProvisionTransformer) hashedPasswordFromCond(cond *metav1.Condition, account string) string {
+	accounts := make([]string, 0)
+	if len(cond.Message) > 0 {
+		accounts = strings.Split(cond.Message, ",")
+	}
+	idx := slices.IndexFunc(accounts, func(s string) bool {
+		return strings.HasPrefix(s, fmt.Sprintf("%s:", account))
+	})
+	if idx >= 0 {
+		val := strings.Split(accounts[idx], ":")
+		if len(val) == 2 {
+			return val[1]
+		}
+	}
+	return ""
 }

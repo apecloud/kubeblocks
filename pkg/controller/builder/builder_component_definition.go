@@ -192,19 +192,6 @@ func (builder *ComponentDefinitionBuilder) SetReplicasLimit(minReplicas, maxRepl
 	return builder
 }
 
-func (builder *ComponentDefinitionBuilder) AddSystemAccount(accountName string, initAccount bool, statement string) *ComponentDefinitionBuilder {
-	account := appsv1.SystemAccount{
-		Name:        accountName,
-		InitAccount: initAccount,
-		Statement:   statement,
-	}
-	if builder.get().Spec.SystemAccounts == nil {
-		builder.get().Spec.SystemAccounts = make([]appsv1.SystemAccount, 0)
-	}
-	builder.get().Spec.SystemAccounts = append(builder.get().Spec.SystemAccounts, account)
-	return builder
-}
-
 func (builder *ComponentDefinitionBuilder) SetUpdateStrategy(strategy *appsv1.UpdateStrategy) *ComponentDefinitionBuilder {
 	builder.get().Spec.UpdateStrategy = strategy
 	return builder

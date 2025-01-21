@@ -913,98 +913,6 @@ var _ = Describe("Component Controller", func() {
 		})).Should(Succeed())
 	}
 
-	testCompSystemAccount := func(compName, compDefName string) {
-		createCompObj(compName, compDefName, nil)
-
-		By("check root account")
-		rootSecretKey := types.NamespacedName{
-			Namespace: compObj.Namespace,
-			Name:      constant.GenerateAccountSecretName(clusterKey.Name, compName, "root"),
-		}
-		Eventually(testapps.CheckObj(&testCtx, rootSecretKey, func(g Gomega, secret *corev1.Secret) {
-			g.Expect(secret.Data).Should(HaveKeyWithValue(constant.AccountNameForSecret, []byte("root")))
-			g.Expect(secret.Data).Should(HaveKey(constant.AccountPasswdForSecret))
-		})).Should(Succeed())
-
-		By("check admin account")
-		adminSecretKey := types.NamespacedName{
-			Namespace: compObj.Namespace,
-			Name:      constant.GenerateAccountSecretName(clusterKey.Name, compName, "admin"),
-		}
-		Eventually(testapps.CheckObj(&testCtx, adminSecretKey, func(g Gomega, secret *corev1.Secret) {
-			g.Expect(secret.Data).Should(HaveKeyWithValue(constant.AccountNameForSecret, []byte("admin")))
-			g.Expect(secret.Data).Should(HaveKey(constant.AccountPasswdForSecret))
-		})).Should(Succeed())
-
-		By("mock component as Running")
-		mockCompRunning(compName, compObj)
-
-		By("wait accounts to be provisioned")
-		Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *kbappsv1.Component) {
-			g.Expect(len(comp.Status.Conditions) > 0).Should(BeTrue())
-			var cond *metav1.Condition
-			for i, c := range comp.Status.Conditions {
-				if c.Type == accountProvisionConditionType {
-					cond = &comp.Status.Conditions[i]
-					break
-				}
-			}
-			g.Expect(cond).ShouldNot(BeNil())
-			g.Expect(cond.Status).Should(BeEquivalentTo(metav1.ConditionTrue))
-			g.Expect(cond.Message).ShouldNot(ContainSubstring("root"))
-			g.Expect(cond.Message).Should(ContainSubstring("admin"))
-		})).Should(Succeed())
-	}
-
-	testCompSystemAccountOverride := func(compName, compDefName string) {
-		passwordConfig := &kbappsv1.PasswordConfig{
-			Length: 29,
-		}
-		secret := corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: testCtx.DefaultNamespace,
-				Name:      "sysaccount-override",
-			},
-			StringData: map[string]string{
-				constant.AccountPasswdForSecret: "sysaccount-override",
-			},
-		}
-		secretRef := func() *kbappsv1.ProvisionSecretRef {
-			Expect(testCtx.CreateObj(testCtx.Ctx, &secret)).Should(Succeed())
-			return &kbappsv1.ProvisionSecretRef{
-				Name:      secret.Name,
-				Namespace: testCtx.DefaultNamespace,
-			}
-		}
-
-		createCompObj(compName, compDefName, func(f *testapps.MockComponentFactory) {
-			f.AddSystemAccount("root", passwordConfig, nil).
-				AddSystemAccount("admin", nil, secretRef()).
-				AddSystemAccount("not-exist", nil, nil)
-		})
-
-		By("check root account")
-		rootSecretKey := types.NamespacedName{
-			Namespace: compObj.Namespace,
-			Name:      constant.GenerateAccountSecretName(clusterKey.Name, compName, "root"),
-		}
-		Eventually(testapps.CheckObj(&testCtx, rootSecretKey, func(g Gomega, secret *corev1.Secret) {
-			g.Expect(secret.Data).Should(HaveKeyWithValue(constant.AccountNameForSecret, []byte("root")))
-			g.Expect(secret.Data).Should(HaveKey(constant.AccountPasswdForSecret))
-			g.Expect(secret.Data[constant.AccountPasswdForSecret]).Should(HaveLen(int(passwordConfig.Length)))
-		})).Should(Succeed())
-
-		By("check admin account")
-		adminSecretKey := types.NamespacedName{
-			Namespace: compObj.Namespace,
-			Name:      constant.GenerateAccountSecretName(clusterKey.Name, compName, "admin"),
-		}
-		Eventually(testapps.CheckObj(&testCtx, adminSecretKey, func(g Gomega, secret *corev1.Secret) {
-			g.Expect(secret.Data).Should(HaveKeyWithValue(constant.AccountNameForSecret, []byte("admin")))
-			g.Expect(secret.Data).Should(HaveKeyWithValue(constant.AccountPasswdForSecret, secret.Data[constant.AccountPasswdForSecret]))
-		})).Should(Succeed())
-	}
-
 	testCompVars := func(compName, compDefName string) {
 		compDefKey := client.ObjectKeyFromObject(compDefObj)
 		Eventually(testapps.GetAndChangeObj(&testCtx, compDefKey, func(compDef *kbappsv1.ComponentDefinition) {
@@ -1422,6 +1330,288 @@ var _ = Describe("Component Controller", func() {
 		Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(sa), &corev1.ServiceAccount{}, true)).Should(Succeed())
 	}
 
+	testCompSystemAccount := func(compName, compDefName string) {
+		secret := corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: testCtx.DefaultNamespace,
+				Name:      "sysaccount",
+			},
+			StringData: map[string]string{
+				constant.AccountPasswdForSecret: "sysaccount",
+			},
+		}
+		secretRef := func() *kbappsv1.ProvisionSecretRef {
+			Expect(testCtx.CreateObj(testCtx.Ctx, &secret)).Should(Succeed())
+			return &kbappsv1.ProvisionSecretRef{
+				Name:      secret.Name,
+				Namespace: testCtx.DefaultNamespace,
+			}
+		}
+
+		createCompObj(compName, compDefName, func(f *testapps.MockComponentFactory) {
+			f.AddSystemAccount("admin", nil, nil, secretRef())
+		})
+
+		By("check root account")
+		var rootHashedPassword string
+		rootSecretKey := types.NamespacedName{
+			Namespace: compObj.Namespace,
+			Name:      constant.GenerateAccountSecretName(clusterKey.Name, compName, "root"),
+		}
+		Eventually(testapps.CheckObj(&testCtx, rootSecretKey, func(g Gomega, secret *corev1.Secret) {
+			g.Expect(secret.Data).Should(HaveKeyWithValue(constant.AccountNameForSecret, []byte("root")))
+			g.Expect(secret.Data).Should(HaveKey(constant.AccountPasswdForSecret))
+			rootHashedPassword = secret.Annotations[systemAccountHashAnnotation]
+			g.Expect(rootHashedPassword).Should(BeEmpty()) // kb generated password
+		})).Should(Succeed())
+
+		By("check admin account")
+		var adminHashedPassword string
+		adminSecretKey := types.NamespacedName{
+			Namespace: compObj.Namespace,
+			Name:      constant.GenerateAccountSecretName(clusterKey.Name, compName, "admin"),
+		}
+		Eventually(testapps.CheckObj(&testCtx, adminSecretKey, func(g Gomega, secret *corev1.Secret) {
+			g.Expect(secret.Data).Should(HaveKeyWithValue(constant.AccountNameForSecret, []byte("admin")))
+			g.Expect(secret.Data).Should(HaveKey(constant.AccountPasswdForSecret))
+			adminHashedPassword = secret.Annotations[systemAccountHashAnnotation]
+			g.Expect(adminHashedPassword).ShouldNot(BeEmpty()) // user-provided
+		})).Should(Succeed())
+
+		By("mock component as Running")
+		mockCompRunning(compName, compObj)
+
+		By("wait accounts to be provisioned")
+		Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *kbappsv1.Component) {
+			g.Expect(len(comp.Status.Conditions) > 0).Should(BeTrue())
+			var cond *metav1.Condition
+			for i, c := range comp.Status.Conditions {
+				if c.Type == accountProvisionConditionType {
+					cond = &comp.Status.Conditions[i]
+					break
+				}
+			}
+			g.Expect(cond).ShouldNot(BeNil())
+			g.Expect(cond.Status).Should(BeEquivalentTo(metav1.ConditionTrue))
+			g.Expect(cond.Message).Should(ContainSubstring(fmt.Sprintf("%s:%s", "root", rootHashedPassword)))
+			g.Expect(cond.Message).Should(ContainSubstring(fmt.Sprintf("%s:%s", "admin", adminHashedPassword)))
+		})).Should(Succeed())
+	}
+
+	testCompSystemAccountOverride := func(compName, compDefName string) {
+		passwordConfig := &kbappsv1.PasswordConfig{
+			Length: 29,
+		}
+		secret := corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: testCtx.DefaultNamespace,
+				Name:      "sysaccount-override",
+			},
+			StringData: map[string]string{
+				constant.AccountPasswdForSecret: "sysaccount-override",
+			},
+		}
+		secretRef := func() *kbappsv1.ProvisionSecretRef {
+			Expect(testCtx.CreateObj(testCtx.Ctx, &secret)).Should(Succeed())
+			return &kbappsv1.ProvisionSecretRef{
+				Name:      secret.Name,
+				Namespace: testCtx.DefaultNamespace,
+			}
+		}
+
+		createCompObj(compName, compDefName, func(f *testapps.MockComponentFactory) {
+			f.AddSystemAccount("root", nil, passwordConfig, nil).
+				AddSystemAccount("admin", nil, nil, secretRef())
+		})
+
+		By("check root account")
+		rootSecretKey := types.NamespacedName{
+			Namespace: compObj.Namespace,
+			Name:      constant.GenerateAccountSecretName(clusterKey.Name, compName, "root"),
+		}
+		Eventually(testapps.CheckObj(&testCtx, rootSecretKey, func(g Gomega, secret *corev1.Secret) {
+			g.Expect(secret.Data).Should(HaveKeyWithValue(constant.AccountNameForSecret, []byte("root")))
+			g.Expect(secret.Data).Should(HaveKey(constant.AccountPasswdForSecret))
+			g.Expect(secret.Data[constant.AccountPasswdForSecret]).Should(HaveLen(int(passwordConfig.Length)))
+		})).Should(Succeed())
+
+		By("check admin account")
+		adminSecretKey := types.NamespacedName{
+			Namespace: compObj.Namespace,
+			Name:      constant.GenerateAccountSecretName(clusterKey.Name, compName, "admin"),
+		}
+		Eventually(testapps.CheckObj(&testCtx, adminSecretKey, func(g Gomega, secret *corev1.Secret) {
+			g.Expect(secret.Data).Should(HaveKeyWithValue(constant.AccountNameForSecret, []byte("admin")))
+			g.Expect(secret.Data).Should(HaveKeyWithValue(constant.AccountPasswdForSecret, secret.Data[constant.AccountPasswdForSecret]))
+		})).Should(Succeed())
+	}
+
+	testCompSystemAccountDisable := func(compName, compDefName string) {
+		passwordConfig := &kbappsv1.PasswordConfig{
+			Length: 29,
+		}
+
+		createCompObj(compName, compDefName, func(f *testapps.MockComponentFactory) {
+			f.AddSystemAccount("root", ptr.To(false), passwordConfig, nil).
+				AddSystemAccount("admin", ptr.To(true), passwordConfig, nil)
+		})
+
+		By("check root account")
+		rootSecretKey := types.NamespacedName{
+			Namespace: compObj.Namespace,
+			Name:      constant.GenerateAccountSecretName(clusterKey.Name, compName, "root"),
+		}
+		rootSecret := &corev1.Secret{}
+		Eventually(testapps.CheckObjExists(&testCtx, rootSecretKey, rootSecret, true)).Should(Succeed())
+
+		By("check admin account")
+		adminSecretKey := types.NamespacedName{
+			Namespace: compObj.Namespace,
+			Name:      constant.GenerateAccountSecretName(clusterKey.Name, compName, "admin"),
+		}
+		adminSecret := &corev1.Secret{}
+		Consistently(testapps.CheckObjExists(&testCtx, adminSecretKey, adminSecret, false)).Should(Succeed())
+	}
+
+	testCompSystemAccountDisableAfterProvision := func(compName, compDefName string) {
+		passwordConfig := &kbappsv1.PasswordConfig{
+			Length: 29,
+		}
+
+		createCompObj(compName, compDefName, func(f *testapps.MockComponentFactory) {
+			f.AddSystemAccount("root", ptr.To(false), passwordConfig, nil).
+				AddSystemAccount("admin", ptr.To(false), passwordConfig, nil)
+		})
+
+		By("check the root account")
+		rootSecretKey := types.NamespacedName{
+			Namespace: compObj.Namespace,
+			Name:      constant.GenerateAccountSecretName(clusterKey.Name, compName, "root"),
+		}
+		rootSecret := &corev1.Secret{}
+		Eventually(testapps.CheckObjExists(&testCtx, rootSecretKey, rootSecret, true)).Should(Succeed())
+
+		By("check the admin account")
+		adminSecretKey := types.NamespacedName{
+			Namespace: compObj.Namespace,
+			Name:      constant.GenerateAccountSecretName(clusterKey.Name, compName, "admin"),
+		}
+		adminSecret := &corev1.Secret{}
+		Eventually(testapps.CheckObjExists(&testCtx, adminSecretKey, adminSecret, true)).Should(Succeed())
+
+		By("disable the admin account")
+		Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
+			for j, account := range comp.Spec.SystemAccounts {
+				if account.Name == "admin" {
+					comp.Spec.SystemAccounts[j].Disabled = ptr.To(true)
+				}
+			}
+		})()).Should(Succeed())
+
+		By("check the admin account is disabled")
+		Eventually(testapps.CheckObjExists(&testCtx, adminSecretKey, adminSecret, false)).Should(Succeed())
+	}
+
+	testCompSystemAccountUpdate := func(compName, compDefName string) {
+		passwordConfig := &kbappsv1.PasswordConfig{
+			Length: 29,
+		}
+		secret := corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: testCtx.DefaultNamespace,
+				Name:      "sysaccount-update",
+			},
+			StringData: map[string]string{
+				"sysaccount-update": "sysaccount-update",
+			},
+		}
+		secretRef := func() *kbappsv1.ProvisionSecretRef {
+			Expect(testCtx.CreateObj(testCtx.Ctx, &secret)).Should(Succeed())
+			return &kbappsv1.ProvisionSecretRef{
+				Name:      secret.Name,
+				Namespace: testCtx.DefaultNamespace,
+				Password:  "sysaccount-update",
+			}
+		}
+
+		createCompObj(compName, compDefName, func(f *testapps.MockComponentFactory) {
+			f.AddSystemAccount("root", nil, passwordConfig, nil).
+				AddSystemAccount("admin", nil, nil, secretRef())
+		})
+
+		By("check root account")
+		var rootHashedPassword string
+		rootSecretKey := types.NamespacedName{
+			Namespace: compObj.Namespace,
+			Name:      constant.GenerateAccountSecretName(clusterKey.Name, compName, "root"),
+		}
+		Eventually(testapps.CheckObj(&testCtx, rootSecretKey, func(g Gomega, secret *corev1.Secret) {
+			g.Expect(secret.Data).Should(HaveKeyWithValue(constant.AccountNameForSecret, []byte("root")))
+			g.Expect(secret.Data).Should(HaveKey(constant.AccountPasswdForSecret))
+			g.Expect(secret.Data[constant.AccountPasswdForSecret]).Should(HaveLen(int(passwordConfig.Length)))
+			rootHashedPassword = secret.Annotations[systemAccountHashAnnotation]
+			g.Expect(rootHashedPassword).Should(BeEmpty()) // kb generated password
+		})).Should(Succeed())
+
+		By("check admin account")
+		var adminHashedPassword string
+		adminSecretKey := types.NamespacedName{
+			Namespace: compObj.Namespace,
+			Name:      constant.GenerateAccountSecretName(clusterKey.Name, compName, "admin"),
+		}
+		Eventually(testapps.CheckObj(&testCtx, adminSecretKey, func(g Gomega, secret *corev1.Secret) {
+			g.Expect(secret.Data).Should(HaveKeyWithValue(constant.AccountNameForSecret, []byte("admin")))
+			g.Expect(secret.Data).Should(HaveKeyWithValue(constant.AccountPasswdForSecret, []byte("sysaccount-update")))
+			adminHashedPassword = secret.Annotations[systemAccountHashAnnotation]
+			g.Expect(adminHashedPassword).ShouldNot(BeEmpty()) // user-provided
+		})).Should(Succeed())
+
+		By("mock component as Running")
+		mockCompRunning(compName, compObj)
+
+		By("update the password of admin account")
+		Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(&secret), func(obj *corev1.Secret) {
+			if obj.StringData == nil {
+				obj.StringData = map[string]string{}
+			}
+			obj.StringData["sysaccount-update"] = "sysaccount-update-new"
+		})()).Should(Succeed())
+
+		By("trigger the component to reconcile")
+		Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
+			if comp.Annotations == nil {
+				comp.Annotations = map[string]string{}
+			}
+			comp.Annotations["reconcile"] = time.Now().String()
+		})()).Should(Succeed())
+
+		By("check the admin account updated")
+		var updatedAdminHashedPassword string
+		Eventually(testapps.CheckObj(&testCtx, adminSecretKey, func(g Gomega, secret *corev1.Secret) {
+			g.Expect(secret.Data).Should(HaveKeyWithValue(constant.AccountNameForSecret, []byte("admin")))
+			g.Expect(secret.Data).Should(HaveKeyWithValue(constant.AccountPasswdForSecret, []byte("sysaccount-update-new")))
+			updatedAdminHashedPassword = secret.Annotations[systemAccountHashAnnotation]
+			g.Expect(updatedAdminHashedPassword).ShouldNot(BeEmpty()) // user-provided
+			g.Expect(updatedAdminHashedPassword).ShouldNot(Equal(adminHashedPassword))
+		})).Should(Succeed())
+
+		By("wait accounts to be updated")
+		Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *kbappsv1.Component) {
+			g.Expect(len(comp.Status.Conditions) > 0).Should(BeTrue())
+			var cond *metav1.Condition
+			for i, c := range comp.Status.Conditions {
+				if c.Type == accountProvisionConditionType {
+					cond = &comp.Status.Conditions[i]
+					break
+				}
+			}
+			g.Expect(cond).ShouldNot(BeNil())
+			g.Expect(cond.Status).Should(BeEquivalentTo(metav1.ConditionTrue))
+			g.Expect(cond.Message).Should(ContainSubstring(fmt.Sprintf("%s:%s", "root", rootHashedPassword)))
+			g.Expect(cond.Message).Should(ContainSubstring(fmt.Sprintf("%s:%s", "admin", updatedAdminHashedPassword)))
+		})).Should(Succeed())
+	}
+
 	Context("provisioning", func() {
 		BeforeEach(func() {
 			createDefinitionObjects()
@@ -1446,14 +1636,6 @@ var _ = Describe("Component Controller", func() {
 
 		It("with component services", func() {
 			testCompService(defaultCompName, compDefObj.Name)
-		})
-
-		It("with component system accounts", func() {
-			testCompSystemAccount(defaultCompName, compDefObj.Name)
-		})
-
-		It("with component system accounts - override", func() {
-			testCompSystemAccountOverride(defaultCompName, compDefObj.Name)
 		})
 
 		It("with component vars", func() {
@@ -1490,6 +1672,36 @@ var _ = Describe("Component Controller", func() {
 
 		It("create component with custom RBAC which is already exist created by User", func() {
 			testCreateCompWithRBACCreateByUser(defaultCompName, compDefObj.Name)
+		})
+	})
+
+	Context("system account", func() {
+		BeforeEach(func() {
+			createDefinitionObjects()
+		})
+
+		AfterEach(func() {
+			cleanEnv()
+		})
+
+		It("provisioning", func() {
+			testCompSystemAccount(defaultCompName, compDefObj.Name)
+		})
+
+		It("override", func() {
+			testCompSystemAccountOverride(defaultCompName, compDefObj.Name)
+		})
+
+		It("disable", func() {
+			testCompSystemAccountDisable(defaultCompName, compDefObj.Name)
+		})
+
+		It("disable - after provision", func() {
+			testCompSystemAccountDisableAfterProvision(defaultCompName, compDefObj.Name)
+		})
+
+		It("update", func() {
+			testCompSystemAccountUpdate(defaultCompName, compDefObj.Name)
 		})
 	})
 

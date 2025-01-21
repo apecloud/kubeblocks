@@ -87,7 +87,7 @@ func (t *componentDeletionTransformer) handleCompDeleteWhenScaleIn(transCtx *com
 	return t.deleteCompResources(transCtx, graphCli, dag, comp, matchLabels, kindsForCompWipeOut())
 }
 
-// handleCompDeleteWhenClusterDelete handles the component deletion when the cluster is being deleted, the sub-resources owned by the component depends on the cluster's TerminationPolicy.
+// handleCompDeleteWhenClusterDelete handles the component deletion when the cluster is being deleted.
 func (t *componentDeletionTransformer) handleCompDeleteWhenClusterDelete(transCtx *componentTransformContext, graphCli model.GraphClient,
 	dag *graph.DAG, comp *appsv1.Component, matchLabels map[string]string) error {
 	var kinds []client.ObjectList

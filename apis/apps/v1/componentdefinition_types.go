@@ -1275,6 +1275,13 @@ type TLS struct {
 	// +optional
 	CAFile *string `json:"caFile,omitempty"`
 
+	// The CA key file of the TLS.
+	//
+	// This field is immutable once set.
+	//
+	// +optional
+	CAKeyFile *string `json:"caKeyFile,omitempty"`
+
 	// The certificate file of the TLS.
 	//
 	// This field is immutable once set.

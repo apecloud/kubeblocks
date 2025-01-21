@@ -78,27 +78,32 @@ func ComposeTLSSecret(compDef *appsv1.ComponentDefinition, synthesizedComp compo
 	{{- $cert := genSignedCert "%s peer" (list "127.0.0.1" "::1") (list "localhost" "*.%s-%s-headless.%s.svc.cluster.local") 36500 $ca -}}
 	{{- $ca.Cert -}}
 	{{- print "%s" -}}
+    {{- $ca.Key -}}
+	{{- print "%s" -}}
 	{{- $cert.Cert -}}
 	{{- print "%s" -}}
 	{{- $cert.Key -}}
-`, compName, clusterName, compName, namespace, spliter, spliter)
+`, compName, clusterName, compName, namespace, spliter, spliter, spliter)
 	out, err := buildFromTemplate(SignedCertTpl, nil)
 	if err != nil {
 		return nil, err
 	}
 	parts := strings.Split(out, spliter)
-	if len(parts) != 3 {
+	if len(parts) != 4 {
 		return nil, errors.Errorf("generate TLS certificates failed with cluster name %s, component name %s in namespace %s",
 			clusterName, compName, namespace)
 	}
 	if compDef.Spec.TLS.CAFile != nil {
 		secret.StringData[*compDef.Spec.TLS.CAFile] = parts[0]
 	}
+	if compDef.Spec.TLS.CAKeyFile != nil {
+		secret.StringData[*compDef.Spec.TLS.CAKeyFile] = parts[1]
+	}
 	if compDef.Spec.TLS.CertFile != nil {
-		secret.StringData[*compDef.Spec.TLS.CertFile] = parts[1]
+		secret.StringData[*compDef.Spec.TLS.CertFile] = parts[2]
 	}
 	if compDef.Spec.TLS.KeyFile != nil {
-		secret.StringData[*compDef.Spec.TLS.KeyFile] = parts[2]
+		secret.StringData[*compDef.Spec.TLS.KeyFile] = parts[3]
 	}
 	return secret, nil
 }

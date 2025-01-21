@@ -11385,6 +11385,19 @@ string
 </tr>
 <tr>
 <td>
+<code>caKeyFile</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The CA key file of the TLS.</p>
+<p>This field is immutable once set.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>certFile</code><br/>
 <em>
 string

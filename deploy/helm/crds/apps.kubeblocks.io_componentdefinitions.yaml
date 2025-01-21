@@ -16782,6 +16782,13 @@ spec:
 
                       This field is immutable once set.
                     type: string
+                  caKeyFile:
+                    description: |-
+                      The CA key file of the TLS.
+
+
+                      This field is immutable once set.
+                    type: string
                   certFile:
                     description: |-
                       The certificate file of the TLS.

@@ -3311,6 +3311,11 @@ func (in *TLS) DeepCopyInto(out *TLS) {
 		*out = new(string)
 		**out = **in
 	}
+	if in.CAKeyFile != nil {
+		in, out := &in.CAKeyFile, &out.CAKeyFile
+		*out = new(string)
+		**out = **in
+	}
 	if in.CertFile != nil {
 		in, out := &in.CertFile, &out.CertFile
 		*out = new(string)

@@ -46,9 +46,10 @@ var _ = Describe("TLSUtilsTest", func() {
 			compDef := &appsv1.ComponentDefinition{
 				Spec: appsv1.ComponentDefinitionSpec{
 					TLS: &appsv1.TLS{
-						CAFile:   ptr.To("ca.pem"),
-						CertFile: ptr.To("cert.pem"),
-						KeyFile:  ptr.To("key.pem"),
+						CAFile:    ptr.To("ca.pem"),
+						CAKeyFile: ptr.To("ca-key.pem"),
+						CertFile:  ptr.To("cert.pem"),
+						KeyFile:   ptr.To("key.pem"),
 					},
 				},
 			}
@@ -67,6 +68,7 @@ var _ = Describe("TLSUtilsTest", func() {
 			Expect(secret.Labels[constant.KBAppComponentLabelKey]).Should(Equal(synthesizedComp.Name))
 			Expect(secret.StringData).ShouldNot(BeNil())
 			Expect(secret.StringData[*compDef.Spec.TLS.CAFile]).ShouldNot(BeZero())
+			Expect(secret.StringData[*compDef.Spec.TLS.CAKeyFile]).ShouldNot(BeZero())
 			Expect(secret.StringData[*compDef.Spec.TLS.CertFile]).ShouldNot(BeZero())
 			Expect(secret.StringData[*compDef.Spec.TLS.KeyFile]).ShouldNot(BeZero())
 		})

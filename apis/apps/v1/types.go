@@ -182,6 +182,16 @@ type ServiceRefCredentialSelector struct {
 }
 
 type ClusterComponentVolumeClaimTemplate struct {
+	// Specifies the labels for the PVC of the volume.
+	//
+	// +optional
+	Labels map[string]string `json:"labels,omitempty"`
+
+	// Specifies the annotations for the PVC of the volume.
+	//
+	// +optional
+	Annotations map[string]string `json:"annotations,omitempty"`
+
 	// Refers to the name of a volumeMount defined in either:
 	//
 	// - `componentDefinition.spec.runtime.containers[*].volumeMounts`

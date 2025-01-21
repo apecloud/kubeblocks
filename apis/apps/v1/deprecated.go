@@ -152,7 +152,9 @@ func (r *ClusterComponentStatus) GetObjectMessage(objectKind, objectName string)
 func (r *ClusterComponentVolumeClaimTemplate) toVolumeClaimTemplate() corev1.PersistentVolumeClaimTemplate {
 	return corev1.PersistentVolumeClaimTemplate{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: r.Name,
+			Labels:      r.Labels,
+			Annotations: r.Annotations,
+			Name:        r.Name,
 		},
 		Spec: r.Spec.ToV1PersistentVolumeClaimSpec(),
 	}

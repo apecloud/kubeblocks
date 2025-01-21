@@ -3205,6 +3205,30 @@ The keys are either podName, deployName, or statefulSetName, formatted as &lsquo
 <tbody>
 <tr>
 <td>
+<code>labels</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the labels for the PVC of the volume.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>annotations</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the annotations for the PVC of the volume.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>name</code><br/>
 <em>
 string
@@ -16333,6 +16357,30 @@ This is the readiness time of the last Component Pod.</p>
 </tr>
 </thead>
 <tbody>
+<tr>
+<td>
+<code>labels</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the labels for the PVC of the volume.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>annotations</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the annotations for the PVC of the volume.</p>
+</td>
+</tr>
 <tr>
 <td>
 <code>name</code><br/>

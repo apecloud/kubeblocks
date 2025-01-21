@@ -40,6 +40,7 @@ import (
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -126,7 +127,7 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			return intctrlutil.Requeue(reqCtx.Log, err.Error())
 		}
 		c := planBuilder.(*componentPlanBuilder)
-		sendWarningEventWithError(r.Recorder, c.transCtx.Component, corev1.EventTypeWarning, err)
+		appsutil.SendWarningEventWithError(r.Recorder, c.transCtx.Component, corev1.EventTypeWarning, err)
 		return intctrlutil.RequeueWithError(err, reqCtx.Log, "")
 	}
 
@@ -190,7 +191,7 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 func (r *ComponentReconciler) SetupWithManager(mgr ctrl.Manager, multiClusterMgr multicluster.Manager) error {
 	retryDurationMS := viper.GetInt(constant.CfgKeyCtrlrReconcileRetryDurationMS)
 	if retryDurationMS != 0 {
-		requeueDuration = time.Millisecond * time.Duration(retryDurationMS)
+		appsutil.RequeueDuration = time.Millisecond * time.Duration(retryDurationMS)
 	}
 	if multiClusterMgr == nil {
 		return r.setupWithManager(mgr)
@@ -214,10 +215,8 @@ func (r *ComponentReconciler) setupWithManager(mgr ctrl.Manager) error {
 
 	if viper.GetBool(constant.EnableRBACManager) {
 		b.Owns(&rbacv1.RoleBinding{}).
+			Owns(&rbacv1.Role{}).
 			Owns(&corev1.ServiceAccount{})
-	} else {
-		b.Watches(&rbacv1.RoleBinding{}, handler.EnqueueRequestsFromMapFunc(r.filterComponentResources)).
-			Watches(&corev1.ServiceAccount{}, handler.EnqueueRequestsFromMapFunc(r.filterComponentResources))
 	}
 
 	return b.Complete(r)

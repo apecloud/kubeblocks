@@ -21,40 +21,24 @@ package cluster
 
 import (
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
-	batchv1 "k8s.io/api/batch/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
-)
-
-var (
-	rscheme = runtime.NewScheme()
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
 func init() {
-	utilruntime.Must(clientgoscheme.AddToScheme(rscheme))
-	utilruntime.Must(appsv1alpha1.AddToScheme(rscheme))
-	utilruntime.Must(appsv1beta1.AddToScheme(rscheme))
-	utilruntime.Must(appsv1.AddToScheme(rscheme))
-	utilruntime.Must(dpv1alpha1.AddToScheme(rscheme))
-	utilruntime.Must(snapshotv1.AddToScheme(rscheme))
-	utilruntime.Must(extensionsv1alpha1.AddToScheme(rscheme))
-	utilruntime.Must(batchv1.AddToScheme(rscheme))
-	utilruntime.Must(workloads.AddToScheme(rscheme))
+	model.AddScheme(clientgoscheme.AddToScheme)
+	model.AddScheme(appsv1alpha1.AddToScheme)
+	model.AddScheme(appsv1beta1.AddToScheme)
+	model.AddScheme(appsv1.AddToScheme)
+	model.AddScheme(dpv1alpha1.AddToScheme)
+	model.AddScheme(snapshotv1.AddToScheme)
+	// model.AddScheme(snapshotv1beta1.AddToScheme)
+	// model.AddScheme(extensionsv1alpha1.AddToScheme)
+	// model.AddScheme(workloadsv1.AddToScheme)
+	// model.AddScheme(batchv1.AddToScheme)
 }
-
-type gvkNObjKey struct {
-	schema.GroupVersionKind
-	client.ObjectKey
-}
-
-type owningObjects map[gvkNObjKey]client.Object

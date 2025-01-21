@@ -186,6 +186,7 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1.Component) *appsv1.Com
 	ictrlutil.MergeMetadataMapInplace(compProto.Labels, &compObjCopy.Labels)
 
 	// merge spec
+	compObjCopy.Spec.TerminationPolicy = compProto.Spec.TerminationPolicy
 	compObjCopy.Spec.CompDef = compProto.Spec.CompDef
 	compObjCopy.Spec.ServiceVersion = compProto.Spec.ServiceVersion
 	compObjCopy.Spec.ServiceRefs = compProto.Spec.ServiceRefs
@@ -196,6 +197,7 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1.Component) *appsv1.Com
 	compObjCopy.Spec.VolumeClaimTemplates = compProto.Spec.VolumeClaimTemplates
 	compObjCopy.Spec.Volumes = compProto.Spec.Volumes
 	compObjCopy.Spec.Services = compProto.Spec.Services
+	compObjCopy.Spec.SystemAccounts = compProto.Spec.SystemAccounts
 	compObjCopy.Spec.Replicas = compProto.Spec.Replicas
 	compObjCopy.Spec.Configs = compProto.Spec.Configs
 	compObjCopy.Spec.ServiceAccountName = compProto.Spec.ServiceAccountName

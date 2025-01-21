@@ -27,8 +27,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 )
 
@@ -49,22 +51,22 @@ func (t *clusterValidationTransformer) Transform(ctx graph.TransformContext, dag
 	}()
 
 	if err = t.apiValidation(cluster); err != nil {
-		return newRequeueError(requeueDuration, err.Error())
+		return intctrlutil.NewRequeueError(appsutil.RequeueDuration, err.Error())
 	}
 
 	if err = loadNCheckClusterDefinition(transCtx, cluster); err != nil {
-		return newRequeueError(requeueDuration, err.Error())
+		return intctrlutil.NewRequeueError(appsutil.RequeueDuration, err.Error())
 	}
 
 	if err = t.checkDefinitionNamePattern(cluster); err != nil {
-		return newRequeueError(requeueDuration, err.Error())
+		return intctrlutil.NewRequeueError(appsutil.RequeueDuration, err.Error())
 	}
 
 	if withClusterTopology(cluster) {
 		// check again with cluster definition loaded,
 		// and update topology to cluster spec in case the default topology changed.
 		if err = t.checkNUpdateClusterTopology(transCtx, cluster); err != nil {
-			return newRequeueError(requeueDuration, err.Error())
+			return intctrlutil.NewRequeueError(appsutil.RequeueDuration, err.Error())
 		}
 	}
 	return nil

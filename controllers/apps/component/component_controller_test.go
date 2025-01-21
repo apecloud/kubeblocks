@@ -38,23 +38,21 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/utils/pointer"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/plan"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
-	testdp "github.com/apecloud/kubeblocks/pkg/testutil/dataprotection"
 	testk8s "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
@@ -67,29 +65,29 @@ var _ = Describe("Component Controller", func() {
 	const (
 		compDefName     = "test-compdef"
 		compVerName     = "test-compver"
-		clusterName     = "test-cluster" // this become cluster prefix name if used with testapps.NewClusterFactory().WithRandomName()
+		clusterName     = "test-cluster"
 		leader          = "leader"
 		follower        = "follower"
 		defaultCompName = "default"
 	)
 
 	var (
-		compDefObj  *kbappsv1.ComponentDefinition
-		compVerObj  *kbappsv1.ComponentVersion
-		clusterObj  *kbappsv1.Cluster
-		clusterKey  types.NamespacedName
-		compObj     *kbappsv1.Component
-		compKey     types.NamespacedName
-		allSettings map[string]interface{}
+		compDefObj        *kbappsv1.ComponentDefinition
+		compVerObj        *kbappsv1.ComponentVersion
+		clusterKey        types.NamespacedName
+		clusterUID        string
+		clusterGeneration int64
+		compObj           *kbappsv1.Component
+		compKey           types.NamespacedName
+		settings          map[string]interface{}
 	)
 
 	resetTestContext := func() {
 		compDefObj = nil
 		compVerObj = nil
-		clusterObj = nil
-		if allSettings != nil {
-			Expect(viper.MergeConfigMap(allSettings)).ShouldNot(HaveOccurred())
-			allSettings = nil
+		if settings != nil {
+			Expect(viper.MergeConfigMap(settings)).ShouldNot(HaveOccurred())
+			settings = nil
 		}
 	}
 
@@ -101,28 +99,27 @@ var _ = Describe("Component Controller", func() {
 		// create the new objects.
 		By("clean resources")
 
-		// delete cluster(and all dependent sub-resources), cluster definition
-		testapps.ClearClusterResourcesWithRemoveFinalizerOption(&testCtx)
+		// delete components (and all dependent sub-resources), and component definitions & versions
+		testapps.ClearComponentResourcesWithRemoveFinalizerOption(&testCtx)
 
 		// delete rest mocked objects
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
 		ml := client.HasLabels{testCtx.TestObjLabelKey}
 		// namespaced
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ComponentSignature, true, inNS, ml)
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ServiceAccountSignature, true, inNS)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.RoleSignature, true, inNS)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.RoleBindingSignature, true, inNS)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PodSignature, true, inNS, ml)
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupSignature, true, inNS, ml)
-		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.BackupPolicySignature, true, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS, ml)
 		// non-namespaced
-		testapps.ClearResources(&testCtx, generics.BackupPolicyTemplateSignature, ml)
-		testapps.ClearResources(&testCtx, generics.ActionSetSignature, ml)
 		testapps.ClearResources(&testCtx, generics.StorageClassSignature, ml)
+
 		resetTestContext()
 	}
 
 	BeforeEach(func() {
 		cleanEnv()
-		allSettings = viper.AllSettings()
+		settings = viper.AllSettings()
 	})
 
 	AfterEach(func() {
@@ -134,146 +131,85 @@ var _ = Describe("Component Controller", func() {
 		return str
 	}
 
-	// test function helpers
-	createAllDefinitionObjects := func() {
-		By("Create a componentDefinition obj")
+	createDefinitionObjects := func() {
+		By("create a componentDefinition obj")
 		compDefObj = testapps.NewComponentDefinitionFactory(compDefName).
-			WithRandomName().
 			AddAnnotations(constant.SkipImmutableCheckAnnotationKey, "true").
 			SetDefaultSpec().
 			Create(&testCtx).
 			GetObject()
 
-		By("Create a componentVersion obj")
+		By("create a componentVersion obj")
 		compVerObj = testapps.NewComponentVersionFactory(compVerName).
 			SetDefaultSpec(compDefName).
 			Create(&testCtx).
 			GetObject()
 
-		By("Mock kb-agent client for the default transformer of system accounts provision")
+		By("mock kb-agent client for the default transformer of system accounts provision")
 		testapps.MockKBAgentClientDefault()
 	}
 
-	waitForCreatingResourceCompletely := func(clusterKey client.ObjectKey, compNames ...string) {
-		Eventually(testapps.ClusterReconciled(&testCtx, clusterKey)).Should(BeTrue())
-		cluster := &kbappsv1.Cluster{}
-		Eventually(testapps.CheckObjExists(&testCtx, clusterKey, cluster, true)).Should(Succeed())
-		for _, compName := range compNames {
-			compPhase := kbappsv1.CreatingComponentPhase
-			for _, spec := range cluster.Spec.ComponentSpecs {
-				if spec.Name == compName && spec.Replicas == 0 {
-					compPhase = kbappsv1.StoppedComponentPhase
-				}
-			}
-			Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, compName)).Should(Equal(compPhase))
+	createCompObjX := func(compName, compDefName string, processor func(*testapps.MockComponentFactory), phase *kbappsv1.ComponentPhase) {
+		By("randomize a cluster name and UID")
+		clusterKey = types.NamespacedName{
+			Namespace: testCtx.DefaultNamespace,
+			Name:      testapps.GetRandomizedKey("", clusterName).Name,
 		}
-	}
+		clusterUID = string(uuid.NewUUID())
+		clusterGeneration = 1
 
-	createClusterObjX := func(compName, compDefName string,
-		processor func(*testapps.MockClusterFactory), phase *kbappsv1.ClusterPhase) {
-		factory := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
-			WithRandomName().
-			AddComponent(compName, compDefName).
+		By("creating a component")
+		compObjName := constant.GenerateClusterComponentName(clusterKey.Name, compName)
+		factory := testapps.NewComponentFactory(testCtx.DefaultNamespace, compObjName, compDefName).
+			AddLabels().
+			AddAnnotations(constant.KubeBlocksGenerationKey, strconv.FormatInt(clusterGeneration, 10)).
+			AddAnnotations(constant.CRDAPIVersionAnnotationKey, kbappsv1.GroupVersion.String()).
+			AddAnnotations(constant.KBAppClusterUIDKey, clusterUID).
+			AddLabelsInMap(constant.GetCompLabelsWithDef(clusterKey.Name, compName, compDefName)).
 			SetReplicas(1)
 		if processor != nil {
 			processor(factory)
 		}
-		clusterObj = factory.Create(&testCtx).GetObject()
-		clusterKey = client.ObjectKeyFromObject(clusterObj)
+		compObj = factory.Create(&testCtx).GetObject()
+		compKey = client.ObjectKeyFromObject(compObj)
 
-		By("Waiting for the cluster enter expected phase")
-		Eventually(testapps.ClusterReconciled(&testCtx, clusterKey)).Should(BeTrue())
-		if phase == nil || *phase == "" {
-			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(kbappsv1.CreatingClusterPhase))
-		} else {
-			Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(*phase))
-		}
-
-		By("Waiting for the component enter expected phase")
-		compKey = types.NamespacedName{
-			Namespace: clusterObj.Namespace,
-			Name:      component.FullName(clusterObj.Name, compName),
-		}
-		compObj = &kbappsv1.Component{}
+		By("waiting for the component enter expected phase")
 		Eventually(testapps.CheckObjExists(&testCtx, compKey, compObj, true)).Should(Succeed())
-		if phase == nil {
+		if phase == nil || *phase != "" {
 			Eventually(testapps.ComponentReconciled(&testCtx, compKey)).Should(BeTrue())
+		} else {
+			Consistently(testapps.ComponentReconciled(&testCtx, compKey)).Should(BeFalse())
+		}
+		if phase == nil {
 			Eventually(testapps.GetComponentPhase(&testCtx, compKey)).Should(Equal(kbappsv1.CreatingComponentPhase))
+		} else if *phase != "" {
+			Eventually(testapps.GetComponentPhase(&testCtx, compKey)).Should(Equal(*phase))
 		}
 	}
 
-	createClusterObj := func(compName, compDefName string, processor func(*testapps.MockClusterFactory)) {
-		By("Creating a cluster with new component definition")
-		createClusterObjX(compName, compDefName, processor, nil)
+	createCompObj := func(compName, compDefName string, processor func(*testapps.MockComponentFactory)) {
+		createCompObjX(compName, compDefName, processor, nil)
 	}
 
-	createClusterObjWithPhase := func(compName, compDefName string, processor func(*testapps.MockClusterFactory), phase kbappsv1.ClusterPhase) {
-		By("Creating a cluster with new component definition")
-		createClusterObjX(compName, compDefName, processor, &phase)
+	createCompObjWithPhase := func(compName, compDefName string, processor func(*testapps.MockComponentFactory), phase kbappsv1.ComponentPhase) {
+		createCompObjX(compName, compDefName, processor, &phase)
 	}
 
-	mockCompRunning := func(compName string) {
-		itsList := testk8s.ListAndCheckInstanceSetWithComponent(&testCtx, client.ObjectKeyFromObject(clusterObj), compName)
+	mockCompRunning := func(compName string, comp *kbappsv1.Component) {
+		itsList := testk8s.ListAndCheckInstanceSetWithComponent(&testCtx, clusterKey, compName)
 		Expect(itsList.Items).Should(HaveLen(1))
 		its := itsList.Items[0]
-		pods := testapps.MockInstanceSetPods(&testCtx, &its, clusterObj, compName)
+		pods := testapps.MockInstanceSetPods2(&testCtx, &its, clusterKey.Name, compName, comp)
 		Expect(testapps.ChangeObjStatus(&testCtx, &its, func() {
 			testk8s.MockInstanceSetReady(&its, pods...)
 		})).ShouldNot(HaveOccurred())
 		Eventually(testapps.GetComponentPhase(&testCtx, types.NamespacedName{
-			Namespace: clusterObj.Namespace,
-			Name:      component.FullName(clusterObj.Name, compName),
+			Namespace: clusterKey.Namespace,
+			Name:      component.FullName(clusterKey.Name, compName),
 		})).Should(Equal(kbappsv1.RunningComponentPhase))
 	}
 
-	// createCompObj := func(compName, compDefName, serviceVersion string, processor func(*testapps.MockComponentFactory)) {
-	//	By("Creating a component")
-	//	factory := testapps.NewComponentFactory(testCtx.DefaultNamespace, component.FullName(clusterObj.Name, compName), compDefName).
-	//		AddAnnotations(constant.KBAppClusterUIDKey, string(clusterObj.UID)),
-	//		AddLabels(constant.AppInstanceLabelKey, clusterObj.Name).
-	//		SetServiceVersion(serviceVersion).
-	//		SetReplicas(1)
-	//	if processor != nil {
-	//		processor(factory)
-	//	}
-	//	compObj = factory.Create(&testCtx).GetObject()
-	//	compKey = client.ObjectKeyFromObject(compObj)
-	//
-	//	Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *kbappsv1.Component) {
-	//		g.Expect(comp.Status.ObservedGeneration).To(BeEquivalentTo(comp.Generation))
-	//		g.Expect(comp.Status.Phase).To(Equal(kbappsv1.CreatingComponentPhase))
-	//	})).Should(Succeed())
-	// }
-
-	changeCompReplicas := func(clusterName types.NamespacedName, replicas int32, comp *kbappsv1.ClusterComponentSpec) {
-		Expect(testapps.GetAndChangeObj(&testCtx, clusterName, func(cluster *kbappsv1.Cluster) {
-			for i, clusterComp := range cluster.Spec.ComponentSpecs {
-				if clusterComp.Name == comp.Name {
-					cluster.Spec.ComponentSpecs[i].Replicas = replicas
-				}
-			}
-		})()).ShouldNot(HaveOccurred())
-	}
-
-	changeComponentReplicas := func(clusterName types.NamespacedName, replicas int32) {
-		Expect(testapps.GetAndChangeObj(&testCtx, clusterName, func(cluster *kbappsv1.Cluster) {
-			Expect(cluster.Spec.ComponentSpecs).Should(HaveLen(1))
-			cluster.Spec.ComponentSpecs[0].Replicas = replicas
-		})()).ShouldNot(HaveOccurred())
-	}
-
-	getStableClusterObservedGeneration := func(clusterKey types.NamespacedName, waitFor *time.Duration) (int64, *kbappsv1.Cluster) {
-		sleepTime := 300 * time.Millisecond
-		if waitFor != nil {
-			sleepTime = *waitFor
-		}
-		time.Sleep(sleepTime)
-		cluster := &kbappsv1.Cluster{}
-		Expect(testCtx.Cli.Get(testCtx.Ctx, clusterKey, cluster)).Should(Succeed())
-		return cluster.Status.ObservedGeneration, cluster
-	}
-
-	getStableComponentObservedGeneration := func(compKey types.NamespacedName, waitFor *time.Duration) (int64, *kbappsv1.Component) {
+	stableCompObservedGeneration := func(compKey types.NamespacedName, waitFor *time.Duration) (int64, *kbappsv1.Component) {
 		sleepTime := 300 * time.Millisecond
 		if waitFor != nil {
 			sleepTime = *waitFor
@@ -284,24 +220,29 @@ var _ = Describe("Component Controller", func() {
 		return comp.Status.ObservedGeneration, comp
 	}
 
+	changeCompReplicas := func(compKey types.NamespacedName, replicas int32) {
+		Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
+			comp.Spec.Replicas = replicas
+		})()).ShouldNot(HaveOccurred())
+	}
+
 	testChangeReplicas := func(compName, compDefName string) {
 		compDefKey := client.ObjectKeyFromObject(compDefObj)
 		Eventually(testapps.GetAndChangeObj(&testCtx, compDefKey, func(compDef *kbappsv1.ComponentDefinition) {
 			compDef.Spec.LifecycleActions.MemberLeave = nil
 		})).Should(Succeed())
 
-		createClusterObj(compName, compDefName, nil)
-		replicasSeq := []int32{5, 3, 1, 2, 4}
+		createCompObj(compName, compDefName, nil)
 		expectedOG := int64(1)
-		for _, replicas := range replicasSeq {
-			By(fmt.Sprintf("Change replicas to %d", replicas))
-			changeComponentReplicas(clusterKey, replicas)
+		for _, replicas := range []int32{5, 3, 1, 2, 4} {
+			By(fmt.Sprintf("change replicas to %d", replicas))
+			changeCompReplicas(compKey, replicas)
 			expectedOG++
 
-			By("Checking cluster status and the number of replicas changed")
-			Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, fetched *kbappsv1.Cluster) {
-				g.Expect(fetched.Status.ObservedGeneration).To(BeEquivalentTo(expectedOG))
-				g.Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(BeElementOf(kbappsv1.CreatingClusterPhase, kbappsv1.UpdatingClusterPhase))
+			By("checking component status and the number of replicas changed")
+			Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *kbappsv1.Component) {
+				g.Expect(comp.Status.ObservedGeneration).To(BeEquivalentTo(expectedOG))
+				g.Eventually(testapps.GetComponentPhase(&testCtx, compKey)).Should(BeElementOf(kbappsv1.CreatingComponentPhase, kbappsv1.UpdatingComponentPhase))
 			})).Should(Succeed())
 
 			itsKey := compKey
@@ -317,12 +258,12 @@ var _ = Describe("Component Controller", func() {
 			target = int32(0)
 		)
 
-		createClusterObj(compName, compDefName, func(f *testapps.MockClusterFactory) {
+		createCompObj(compName, compDefName, func(f *testapps.MockComponentFactory) {
 			f.SetReplicas(init)
 		})
 
 		By(fmt.Sprintf("change replicas to %d", target))
-		changeComponentReplicas(clusterKey, target)
+		changeCompReplicas(compKey, target)
 
 		By("checking the number of replicas in component as expected")
 		Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *kbappsv1.Component) {
@@ -341,27 +282,31 @@ var _ = Describe("Component Controller", func() {
 		})).Should(Succeed())
 	}
 
+	changeReplicasLimit := func(compDefName string, minReplicas, maxReplicas int32) {
+		By(fmt.Sprintf("set replicas limit to [%d, %d]", minReplicas, maxReplicas))
+		compDefKey := types.NamespacedName{Name: compDefName}
+		Eventually(testapps.GetAndChangeObj(&testCtx, compDefKey, func(compDef *kbappsv1.ComponentDefinition) {
+			compDef.Spec.ReplicasLimit = &kbappsv1.ReplicasLimit{
+				MinReplicas: minReplicas,
+				MaxReplicas: maxReplicas,
+			}
+		})).Should(Succeed())
+	}
+
 	testChangeReplicasToZeroWithReplicasLimit := func(compName, compDefName string) {
 		var (
 			init   = int32(3)
 			target = int32(0)
 		)
 
-		By("set min replicas limit to 0")
-		compDefKey := client.ObjectKeyFromObject(compDefObj)
-		Eventually(testapps.GetAndChangeObj(&testCtx, compDefKey, func(compDef *kbappsv1.ComponentDefinition) {
-			compDef.Spec.ReplicasLimit = &kbappsv1.ReplicasLimit{
-				MinReplicas: 0,
-				MaxReplicas: 5,
-			}
-		})).Should(Succeed())
+		changeReplicasLimit(compDefName, 0, 16384)
 
-		createClusterObj(compName, compDefName, func(f *testapps.MockClusterFactory) {
+		createCompObj(compName, compDefName, func(f *testapps.MockComponentFactory) {
 			f.SetReplicas(init)
 		})
 
 		By(fmt.Sprintf("change replicas to %d", target))
-		changeComponentReplicas(clusterKey, target)
+		changeCompReplicas(compKey, target)
 
 		By("checking the number of replicas in component as expected")
 		Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *kbappsv1.Component) {
@@ -396,15 +341,15 @@ var _ = Describe("Component Controller", func() {
 			CheckedCreate(&testCtx)
 	}
 
-	mockComponentPVCsAndBound := func(comp *kbappsv1.ClusterComponentSpec, replicas int, create bool, storageClassName string) {
+	mockComponentPVCsAndBound := func(comp *kbappsv1.Component, compName string, replicas int, create bool, storageClassName string) {
 		for i := 0; i < replicas; i++ {
-			for _, vct := range comp.VolumeClaimTemplates {
+			for _, vct := range comp.Spec.VolumeClaimTemplates {
 				pvcKey := types.NamespacedName{
 					Namespace: clusterKey.Namespace,
-					Name:      getPVCName(vct.Name, comp.Name, i),
+					Name:      getPVCName(vct.Name, compName, i),
 				}
 				if create {
-					createPVC(clusterKey.Name, pvcKey.Name, comp.Name, vct.Spec.Resources.Requests.Storage().String(), storageClassName)
+					createPVC(clusterKey.Name, pvcKey.Name, compName, vct.Spec.Resources.Requests.Storage().String(), storageClassName)
 				}
 				Eventually(testapps.CheckObjExists(&testCtx, pvcKey,
 					&corev1.PersistentVolumeClaim{}, true)).Should(Succeed())
@@ -419,9 +364,8 @@ var _ = Describe("Component Controller", func() {
 		}
 	}
 
-	mockPodsForTest := func(cluster *kbappsv1.Cluster, componentName, compDefName string, number int) []*corev1.Pod {
-		clusterName := cluster.Name
-		itsName := cluster.Name + "-" + componentName
+	mockPodsForTest := func(clusterName, compName, compDefName string, number int) []*corev1.Pod {
+		itsName := clusterName + "-" + compName
 		pods := make([]*corev1.Pod, 0)
 		for i := 0; i < number; i++ {
 			pod := &corev1.Pod{
@@ -432,7 +376,7 @@ var _ = Describe("Component Controller", func() {
 						constant.AppManagedByLabelKey:         constant.AppName,
 						constant.AppNameLabelKey:              compDefName,
 						constant.AppInstanceLabelKey:          clusterName,
-						constant.KBAppComponentLabelKey:       componentName,
+						constant.KBAppComponentLabelKey:       compName,
 						appsv1.ControllerRevisionHashLabelKey: "mock-version",
 					},
 					Annotations: map[string]string{
@@ -454,16 +398,16 @@ var _ = Describe("Component Controller", func() {
 		return pods
 	}
 
-	horizontalScaleComp := func(updatedReplicas int, comp *kbappsv1.ClusterComponentSpec, storageClassName string) {
+	horizontalScaleComp := func(updatedReplicas int, comp *kbappsv1.Component, compName, storageClassName string) {
 		By("Mocking component PVCs to bound")
-		mockComponentPVCsAndBound(comp, int(comp.Replicas), true, storageClassName)
+		mockComponentPVCsAndBound(comp, compName, int(comp.Spec.Replicas), true, storageClassName)
 
 		By("Checking its replicas right")
-		itsList := testk8s.ListAndCheckInstanceSetWithComponent(&testCtx, clusterKey, comp.Name)
-		Expect(int(*itsList.Items[0].Spec.Replicas)).To(BeEquivalentTo(comp.Replicas))
+		itsList := testk8s.ListAndCheckInstanceSetWithComponent(&testCtx, clusterKey, compName)
+		Expect(int(*itsList.Items[0].Spec.Replicas)).To(BeEquivalentTo(comp.Spec.Replicas))
 
 		By("Creating mock pods in InstanceSet")
-		pods := mockPodsForTest(clusterObj, comp.Name, comp.ComponentDef, int(comp.Replicas))
+		pods := mockPodsForTest(clusterKey.Name, compName, comp.Spec.CompDef, int(comp.Spec.Replicas))
 		for i := range pods {
 			if i == 0 {
 				pods[i].Labels[constant.RoleLabelKey] = leader
@@ -481,40 +425,36 @@ var _ = Describe("Component Controller", func() {
 		})).ShouldNot(HaveOccurred())
 
 		By("Waiting for the component enter Running phase")
-		compKey := types.NamespacedName{
-			Namespace: clusterKey.Namespace,
-			Name:      fmt.Sprintf("%s-%s", clusterKey.Name, comp.Name),
-		}
 		Eventually(testapps.GetComponentPhase(&testCtx, compKey)).Should(Equal(kbappsv1.RunningComponentPhase))
 
 		By(fmt.Sprintf("Changing replicas to %d", updatedReplicas))
-		changeCompReplicas(clusterKey, int32(updatedReplicas), comp)
+		changeCompReplicas(compKey, int32(updatedReplicas))
 
 		checkUpdatedItsReplicas := func() {
 			By("Checking updated its replicas")
 			Eventually(func() int32 {
-				itsList := testk8s.ListAndCheckInstanceSetWithComponent(&testCtx, clusterKey, comp.Name)
+				itsList := testk8s.ListAndCheckInstanceSetWithComponent(&testCtx, clusterKey, compName)
 				return *itsList.Items[0].Spec.Replicas
 			}).Should(BeEquivalentTo(updatedReplicas))
 		}
 
 		scaleOutCheck := func() {
-			if comp.Replicas == 0 {
+			if comp.Spec.Replicas == 0 {
 				return
 			}
 
 			By("Mock PVCs and set status to bound")
-			mockComponentPVCsAndBound(comp, updatedReplicas, true, storageClassName)
+			mockComponentPVCsAndBound(comp, compName, updatedReplicas, true, storageClassName)
 
 			checkUpdatedItsReplicas()
 
 			By("Checking updated its replicas' PVC and size")
-			for _, vct := range comp.VolumeClaimTemplates {
+			for _, vct := range comp.Spec.VolumeClaimTemplates {
 				var volumeQuantity resource.Quantity
 				for i := 0; i < updatedReplicas; i++ {
 					pvcKey := types.NamespacedName{
 						Namespace: clusterKey.Namespace,
-						Name:      getPVCName(vct.Name, comp.Name, i),
+						Name:      getPVCName(vct.Name, compName, i),
 					}
 					Eventually(testapps.CheckObj(&testCtx, pvcKey, func(g Gomega, pvc *corev1.PersistentVolumeClaim) {
 						if volumeQuantity.IsZero() {
@@ -533,12 +473,12 @@ var _ = Describe("Component Controller", func() {
 					pvcList := corev1.PersistentVolumeClaimList{}
 					g.Expect(k8sClient.List(testCtx.Ctx, &pvcList, client.MatchingLabels{
 						constant.AppInstanceLabelKey:    clusterKey.Name,
-						constant.KBAppComponentLabelKey: comp.Name,
+						constant.KBAppComponentLabelKey: compName,
 					})).Should(Succeed())
 					for _, pvc := range pvcList.Items {
 						ss := strings.Split(pvc.Name, "-")
 						idx, _ := strconv.Atoi(ss[len(ss)-1])
-						if idx >= updatedReplicas && idx < int(comp.Replicas) {
+						if idx >= updatedReplicas && idx < int(comp.Spec.Replicas) {
 							g.Expect(pvc.DeletionTimestamp).Should(BeNil())
 						}
 					}
@@ -553,12 +493,12 @@ var _ = Describe("Component Controller", func() {
 				pvcList := corev1.PersistentVolumeClaimList{}
 				g.Expect(k8sClient.List(testCtx.Ctx, &pvcList, client.MatchingLabels{
 					constant.AppInstanceLabelKey:    clusterKey.Name,
-					constant.KBAppComponentLabelKey: comp.Name,
+					constant.KBAppComponentLabelKey: compName,
 				})).Should(Succeed())
 				for _, pvc := range pvcList.Items {
 					ss := strings.Split(pvc.Name, "-")
 					idx, _ := strconv.Atoi(ss[len(ss)-1])
-					if idx >= updatedReplicas && idx < int(comp.Replicas) {
+					if idx >= updatedReplicas && idx < int(comp.Spec.Replicas) {
 						g.Expect(pvc.DeletionTimestamp).ShouldNot(BeNil())
 					}
 				}
@@ -569,7 +509,7 @@ var _ = Describe("Component Controller", func() {
 				podList := corev1.PodList{}
 				g.Expect(k8sClient.List(testCtx.Ctx, &podList, client.MatchingLabels{
 					constant.AppInstanceLabelKey:    clusterKey.Name,
-					constant.KBAppComponentLabelKey: comp.Name,
+					constant.KBAppComponentLabelKey: compName,
 				})).Should(Succeed())
 				for _, pod := range podList.Items {
 					ss := strings.Split(pod.Name, "-")
@@ -583,49 +523,62 @@ var _ = Describe("Component Controller", func() {
 			}).Should(Succeed())
 		}
 
-		if int(comp.Replicas) < updatedReplicas {
+		if int(comp.Spec.Replicas) < updatedReplicas {
 			scaleOutCheck()
 		}
-		if int(comp.Replicas) > updatedReplicas {
+		if int(comp.Spec.Replicas) > updatedReplicas {
 			scaleInCheck()
 		}
 	}
 
-	horizontalScale := func(updatedReplicas int, storageClassName string, compDefNames ...string) {
+	horizontalScale := func(updatedReplicas int, storageClassName, compName string, compDefNames ...string) {
 		defer kbacli.UnsetMockClient()
 
-		initialGeneration, cluster := getStableClusterObservedGeneration(clusterKey, nil)
+		initialGeneration, comp := stableCompObservedGeneration(compKey, nil)
 
-		By("Mocking all components' PVCs to bound")
-		for _, comp := range cluster.Spec.ComponentSpecs {
-			mockComponentPVCsAndBound(&comp, int(comp.Replicas), true, storageClassName)
-		}
+		By("mock all component PVCs to bound")
+		mockComponentPVCsAndBound(comp, compName, int(comp.Spec.Replicas), true, storageClassName)
 
-		for i, comp := range cluster.Spec.ComponentSpecs {
-			testapps.MockKBAgentClient4HScale(&testCtx, clusterKey, comp.Name, podAnnotationKey4Test, updatedReplicas)
+		By("mock kb-agent for h-scale")
+		testapps.MockKBAgentClient4HScale(&testCtx, clusterKey, compName, podAnnotationKey4Test, updatedReplicas)
 
-			By(fmt.Sprintf("H-scale component %s", comp.Name))
-			horizontalScaleComp(updatedReplicas, &cluster.Spec.ComponentSpecs[i], storageClassName)
-		}
+		By(fmt.Sprintf("h-scale component %s", compName))
+		horizontalScaleComp(updatedReplicas, comp, compName, storageClassName)
 
-		By("Checking cluster status and the number of replicas changed")
-		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).
-			Should(BeEquivalentTo(int(initialGeneration) + len(cluster.Spec.ComponentSpecs)))
+		By("check component status and the number of replicas changed")
+		Eventually(testapps.GetComponentObservedGeneration(&testCtx, compKey)).Should(BeEquivalentTo(int(initialGeneration) + 1))
 	}
 
 	testHorizontalScale := func(compName, compDefName string, initialReplicas, updatedReplicas int32) {
-		By("Creating a single component cluster with VolumeClaimTemplate")
+		By("creating a component with VolumeClaimTemplate")
 		pvcSpec := testapps.NewPVCSpec("1Gi")
-		createClusterObj(compName, compDefName, func(f *testapps.MockClusterFactory) {
+		createCompObj(compName, compDefName, func(f *testapps.MockComponentFactory) {
 			f.SetReplicas(initialReplicas).
 				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 				AddVolumeClaimTemplate(testapps.LogVolumeName, pvcSpec)
 		})
 
-		horizontalScale(int(updatedReplicas), testk8s.DefaultStorageClassName, compDefName)
+		horizontalScale(int(updatedReplicas), testk8s.DefaultStorageClassName, compName, compDefName)
 	}
 
-	testVolumeExpansion := func(compDef *kbappsv1.ComponentDefinition, compName string, storageClass *storagev1.StorageClass) {
+	testHorizontalScaleWithDataActions := func(compName, compDefName string, initialReplicas, updatedReplicas int32) {
+		By("update cmpd to enable data actions")
+		Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(compDefObj), func(cmpd *kbappsv1.ComponentDefinition) {
+			cmpd.Spec.LifecycleActions.DataDump = testapps.NewLifecycleAction("data-dump")
+			cmpd.Spec.LifecycleActions.DataLoad = testapps.NewLifecycleAction("data-load")
+		})()).Should(Succeed())
+
+		By("creating a component with VolumeClaimTemplate")
+		pvcSpec := testapps.NewPVCSpec("1Gi")
+		createCompObj(compName, compDefName, func(f *testapps.MockComponentFactory) {
+			f.SetReplicas(initialReplicas).
+				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec)
+		})
+
+		horizontalScale(int(updatedReplicas), testk8s.DefaultStorageClassName, compName, compDefName)
+	}
+
+	testVolumeExpansion := func(compName, compDefName string, storageClass *storagev1.StorageClass) {
 		var (
 			insTPLName           = "foo"
 			replicas             = 3
@@ -638,22 +591,21 @@ var _ = Describe("Component Controller", func() {
 			compAndTPLName       = fmt.Sprintf("%s-%s", compName, insTPLName)
 		)
 
-		By("Mock a StorageClass which allows resize")
+		By("mock a StorageClass which allows resize")
 		Expect(*storageClass.AllowVolumeExpansion).Should(BeTrue())
 
-		By("Creating a cluster with VolumeClaimTemplate")
+		By("creating a component with VolumeClaimTemplate")
 		pvcSpec := testapps.NewPVCSpec(volumeSize)
 		pvcSpec.StorageClassName = &storageClass.Name
 
 		By("Create cluster and waiting for the cluster initialized")
-		createClusterObj(compName, compDef.GetName(), func(f *testapps.MockClusterFactory) {
+		createCompObj(compName, compDefName, func(f *testapps.MockComponentFactory) {
 			f.SetReplicas(int32(replicas)).
-				SetServiceVersion(compDef.Spec.ServiceVersion).
 				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 				AddVolumeClaimTemplate(testapps.LogVolumeName, pvcSpec).
-				AddInstances(compName, kbappsv1.InstanceTemplate{
+				AddInstances(kbappsv1.InstanceTemplate{
 					Name:     insTPLName,
-					Replicas: pointer.Int32(1),
+					Replicas: ptr.To(int32(1)),
 					VolumeClaimTemplates: []kbappsv1.ClusterComponentVolumeClaimTemplate{
 						{Name: testapps.DataVolumeName, Spec: pvcSpec},
 						{Name: testapps.LogVolumeName, Spec: pvcSpec},
@@ -661,8 +613,8 @@ var _ = Describe("Component Controller", func() {
 				})
 		})
 
-		By("Checking the replicas")
-		itsList := testk8s.ListAndCheckInstanceSet(&testCtx, clusterKey)
+		By("checking the replicas")
+		itsList := testk8s.ListAndCheckInstanceSetWithComponent(&testCtx, clusterKey, compName)
 		its := &itsList.Items[0]
 		Expect(*its.Spec.Replicas).Should(BeEquivalentTo(replicas))
 		pvcName := func(vctName string, index int) string {
@@ -690,7 +642,9 @@ var _ = Describe("Component Controller", func() {
 							constant.AppInstanceLabelKey:    clusterKey.Name,
 							constant.KBAppComponentLabelKey: compName,
 						}},
-					Spec: pvcSpec.ToV1PersistentVolumeClaimSpec(),
+					Spec: func() corev1.PersistentVolumeClaimSpec {
+						return intctrlutil.ToCoreV1PVCs([]kbappsv1.ClusterComponentVolumeClaimTemplate{{Spec: pvcSpec}})[0].Spec
+					}(),
 				}
 				if i == replicas-1 {
 					pvc.Labels[constant.KBAppComponentInstanceTemplateLabelKey] = insTPLName
@@ -707,18 +661,16 @@ var _ = Describe("Component Controller", func() {
 		}
 
 		By("mock pods of component are available")
-		mockPods := testapps.MockInstanceSetPods(&testCtx, its, clusterObj, compName)
+		mockPods := testapps.MockInstanceSetPods2(&testCtx, its, clusterKey.Name, compName, compObj)
 		Expect(testapps.ChangeObjStatus(&testCtx, its, func() {
 			testk8s.MockInstanceSetReady(its, mockPods...)
 		})).ShouldNot(HaveOccurred())
 
-		initialGeneration, _ := getStableClusterObservedGeneration(clusterKey, nil)
-		Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, compName)).Should(Equal(kbappsv1.RunningComponentPhase))
-		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(kbappsv1.RunningClusterPhase))
+		initialGeneration, _ := stableCompObservedGeneration(compKey, nil)
+		Eventually(testapps.GetComponentPhase(&testCtx, compKey)).Should(Equal(kbappsv1.RunningComponentPhase))
 
-		By("Updating data PVC storage size")
-		Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *kbappsv1.Cluster) {
-			comp := &cluster.Spec.ComponentSpecs[0]
+		By("updating data PVC storage size")
+		Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
 			expandVolume := func(vcts []kbappsv1.ClusterComponentVolumeClaimTemplate, quantity resource.Quantity) {
 				for i, vct := range vcts {
 					if vct.Name == testapps.DataVolumeName {
@@ -726,19 +678,18 @@ var _ = Describe("Component Controller", func() {
 					}
 				}
 			}
-			expandVolume(comp.VolumeClaimTemplates, newVolumeQuantity)
-			for i, insTPL := range comp.Instances {
+			expandVolume(comp.Spec.VolumeClaimTemplates, newVolumeQuantity)
+			for i, insTPL := range comp.Spec.Instances {
 				if insTPL.Name == insTPLName {
-					expandVolume(comp.Instances[i].VolumeClaimTemplates, newFooVolumeQuantity)
+					expandVolume(comp.Spec.Instances[i].VolumeClaimTemplates, newFooVolumeQuantity)
 					break
 				}
 			}
 		})()).ShouldNot(HaveOccurred())
 
-		By("Checking the resize operation in progress for data volume")
-		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(initialGeneration + 1))
-		Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, compName)).Should(Equal(kbappsv1.UpdatingComponentPhase))
-		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(kbappsv1.UpdatingClusterPhase))
+		By("checking the resize operation in progress for data volume")
+		Eventually(testapps.GetComponentObservedGeneration(&testCtx, compKey)).Should(BeEquivalentTo(initialGeneration + 1))
+		Eventually(testapps.GetComponentPhase(&testCtx, compKey)).Should(Equal(kbappsv1.UpdatingComponentPhase))
 		for i := 0; i < replicas; i++ {
 			pvc := &corev1.PersistentVolumeClaim{}
 			pvcKey := types.NamespacedName{
@@ -752,7 +703,7 @@ var _ = Describe("Component Controller", func() {
 			}).Should(Succeed())
 		}
 
-		By("Mock resizing of data volumes finished")
+		By("mock resizing of data volumes finished")
 		for i := 0; i < replicas; i++ {
 			pvcKey := types.NamespacedName{
 				Namespace: clusterKey.Namespace,
@@ -763,15 +714,14 @@ var _ = Describe("Component Controller", func() {
 			})()).ShouldNot(HaveOccurred())
 		}
 
-		By("Checking the resize operation finished")
+		By("checking the resize operation finished")
 		Expect(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(its), func(its *workloads.InstanceSet) {
 			testk8s.MockInstanceSetReady(its, mockPods...)
 		})()).ShouldNot(HaveOccurred())
-		Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(initialGeneration + 1))
-		Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, compName)).Should(Equal(kbappsv1.RunningComponentPhase))
-		Eventually(testapps.GetClusterPhase(&testCtx, clusterKey)).Should(Equal(kbappsv1.RunningClusterPhase))
+		Eventually(testapps.GetComponentObservedGeneration(&testCtx, compKey)).Should(BeEquivalentTo(initialGeneration + 1))
+		Eventually(testapps.GetComponentPhase(&testCtx, compKey)).Should(Equal(kbappsv1.RunningComponentPhase))
 
-		By("Checking data volumes are resized")
+		By("checking data volumes are resized")
 		for i := 0; i < replicas; i++ {
 			pvcKey := types.NamespacedName{
 				Namespace: clusterKey.Namespace,
@@ -782,7 +732,7 @@ var _ = Describe("Component Controller", func() {
 			})).Should(Succeed())
 		}
 
-		By("Checking log volumes stay unchanged")
+		By("checking log volumes stay unchanged")
 		for i := 0; i < replicas; i++ {
 			pvc := &corev1.PersistentVolumeClaim{}
 			pvcKey := types.NamespacedName{
@@ -796,25 +746,29 @@ var _ = Describe("Component Controller", func() {
 	}
 
 	testVolumeExpansionFailedAndRecover := func(compName, compDefName string) {
+		const (
+			storageClassName = "test-sc"
+			replicas         = 3
+		)
 
-		const storageClassName = "test-sc"
-		const replicas = 3
-
-		By("Mock a StorageClass which allows resize")
+		By("mock a StorageClass which allows resize")
 		sc := testapps.CreateStorageClass(&testCtx, storageClassName, true)
 
-		By("Creating a cluster with VolumeClaimTemplate")
+		By("creating a cluster with VolumeClaimTemplate")
 		pvcSpec := testapps.NewPVCSpec("1Gi")
 		pvcSpec.StorageClassName = &sc.Name
 
-		By("Create cluster and waiting for the cluster initialized")
-		createClusterObj(compName, compDefName, func(f *testapps.MockClusterFactory) {
-			f.SetReplicas(replicas).AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec)
+		By("create cluster and waiting for the cluster initialized")
+		createCompObj(compName, compDefName, func(f *testapps.MockComponentFactory) {
+			f.SetReplicas(replicas).
+				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec)
 		})
 
-		By("Mock PVCs in Bound Status")
+		By("mock PVCs in Bound Status")
 		for i := 0; i < replicas; i++ {
-			tmpSpec := pvcSpec.ToV1PersistentVolumeClaimSpec()
+			tmpSpec := func() corev1.PersistentVolumeClaimSpec {
+				return intctrlutil.ToCoreV1PVCs([]kbappsv1.ClusterComponentVolumeClaimTemplate{{Spec: pvcSpec}})[0].Spec
+			}()
 			tmpSpec.VolumeName = getPVCName(testapps.DataVolumeName, compName, i)
 			pvc := &corev1.PersistentVolumeClaim{
 				ObjectMeta: metav1.ObjectMeta{
@@ -863,9 +817,8 @@ var _ = Describe("Component Controller", func() {
 		}
 
 		changePVC := func(quantity resource.Quantity) {
-			Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *kbappsv1.Cluster) {
-				comp := &cluster.Spec.ComponentSpecs[0]
-				comp.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = quantity
+			Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
+				comp.Spec.VolumeClaimTemplates[0].Spec.Resources.Requests[corev1.ResourceStorage] = quantity
 			})()).ShouldNot(HaveOccurred())
 		}
 
@@ -881,11 +834,9 @@ var _ = Describe("Component Controller", func() {
 			}
 		}
 
-		initialClusterGeneration, _ := getStableClusterObservedGeneration(clusterKey, nil)
-		initialComponentGeneration, _ := getStableComponentObservedGeneration(compKey, pointer.Duration(0) /* no need to sleep */)
+		initialComponentGeneration, _ := stableCompObservedGeneration(compKey, pointer.Duration(0) /* no need to sleep */)
 
 		checkResizeOperationFinished := func(diffGeneration int64) {
-			Eventually(testapps.GetClusterObservedGeneration(&testCtx, clusterKey)).Should(BeEquivalentTo(initialClusterGeneration + diffGeneration))
 			Eventually(testapps.GetComponentObservedGeneration(&testCtx, compKey)).Should(BeEquivalentTo(initialComponentGeneration + diffGeneration))
 		}
 
@@ -911,20 +862,19 @@ var _ = Describe("Component Controller", func() {
 	}
 
 	testCompFinalizerNLabel := func(compName, compDefName string) {
-		createClusterObj(compName, compDefName, nil)
+		createCompObj(compName, compDefName, nil)
 
 		By("check component finalizers and labels")
 		Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *kbappsv1.Component) {
-			// g.Expect(comp.Finalizers).Should(ContainElements(constant.DBComponentFinalizerName))
-			g.Expect(comp.Finalizers).Should(ContainElements(constant.DBClusterFinalizerName))
+			g.Expect(comp.Finalizers).Should(ContainElements(constant.DBComponentFinalizerName))
 			g.Expect(comp.Labels).Should(HaveKeyWithValue(constant.AppManagedByLabelKey, constant.AppName))
-			g.Expect(comp.Labels).Should(HaveKeyWithValue(constant.AppInstanceLabelKey, clusterObj.Name))
+			g.Expect(comp.Labels).Should(HaveKeyWithValue(constant.AppInstanceLabelKey, clusterKey.Name))
 			g.Expect(comp.Labels).Should(HaveKeyWithValue(constant.KBAppComponentLabelKey, compName))
 		})).Should(Succeed())
 	}
 
 	testCompService := func(compName, compDefName string) {
-		createClusterObj(compName, compDefName, nil)
+		createCompObj(compName, compDefName, nil)
 
 		targetPort := corev1.ServicePort{
 			Protocol: corev1.ProtocolTCP,
@@ -938,12 +888,12 @@ var _ = Describe("Component Controller", func() {
 		By("check rw component services")
 		rwSvcKey := types.NamespacedName{
 			Namespace: compObj.Namespace,
-			Name:      constant.GenerateComponentServiceName(clusterObj.Name, compName, "rw"),
+			Name:      constant.GenerateComponentServiceName(clusterKey.Name, compName, "rw"),
 		}
 		Eventually(testapps.CheckObj(&testCtx, rwSvcKey, func(g Gomega, svc *corev1.Service) {
 			g.Expect(svc.Spec.Ports).Should(ContainElements(targetPort))
 			g.Expect(svc.Spec.Selector).Should(HaveKeyWithValue(constant.AppManagedByLabelKey, constant.AppName))
-			g.Expect(svc.Spec.Selector).Should(HaveKeyWithValue(constant.AppInstanceLabelKey, clusterObj.Name))
+			g.Expect(svc.Spec.Selector).Should(HaveKeyWithValue(constant.AppInstanceLabelKey, clusterKey.Name))
 			g.Expect(svc.Spec.Selector).Should(HaveKeyWithValue(constant.KBAppComponentLabelKey, compName))
 			g.Expect(svc.Spec.Selector).Should(HaveKeyWithValue(constant.RoleLabelKey, "leader"))
 
@@ -952,106 +902,14 @@ var _ = Describe("Component Controller", func() {
 		By("check ro component services")
 		roSvcKey := types.NamespacedName{
 			Namespace: compObj.Namespace,
-			Name:      constant.GenerateComponentServiceName(clusterObj.Name, compName, "ro"),
+			Name:      constant.GenerateComponentServiceName(clusterKey.Name, compName, "ro"),
 		}
 		Eventually(testapps.CheckObj(&testCtx, roSvcKey, func(g Gomega, svc *corev1.Service) {
 			g.Expect(svc.Spec.Ports).Should(ContainElements(targetPort))
 			g.Expect(svc.Spec.Selector).Should(HaveKeyWithValue(constant.AppManagedByLabelKey, constant.AppName))
-			g.Expect(svc.Spec.Selector).Should(HaveKeyWithValue(constant.AppInstanceLabelKey, clusterObj.Name))
+			g.Expect(svc.Spec.Selector).Should(HaveKeyWithValue(constant.AppInstanceLabelKey, clusterKey.Name))
 			g.Expect(svc.Spec.Selector).Should(HaveKeyWithValue(constant.KBAppComponentLabelKey, compName))
 			g.Expect(svc.Spec.Selector).Should(HaveKeyWithValue(constant.RoleLabelKey, "follower"))
-		})).Should(Succeed())
-	}
-
-	testCompSystemAccount := func(compName, compDefName string) {
-		createClusterObj(compName, compDefName, nil)
-
-		By("check root account")
-		rootSecretKey := types.NamespacedName{
-			Namespace: compObj.Namespace,
-			Name:      constant.GenerateAccountSecretName(clusterObj.Name, compName, "root"),
-		}
-		Eventually(testapps.CheckObj(&testCtx, rootSecretKey, func(g Gomega, secret *corev1.Secret) {
-			g.Expect(secret.Data).Should(HaveKeyWithValue(constant.AccountNameForSecret, []byte("root")))
-			g.Expect(secret.Data).Should(HaveKey(constant.AccountPasswdForSecret))
-		})).Should(Succeed())
-
-		By("check admin account")
-		adminSecretKey := types.NamespacedName{
-			Namespace: compObj.Namespace,
-			Name:      constant.GenerateAccountSecretName(clusterObj.Name, compName, "admin"),
-		}
-		Eventually(testapps.CheckObj(&testCtx, adminSecretKey, func(g Gomega, secret *corev1.Secret) {
-			g.Expect(secret.Data).Should(HaveKeyWithValue(constant.AccountNameForSecret, []byte("admin")))
-			g.Expect(secret.Data).Should(HaveKey(constant.AccountPasswdForSecret))
-		})).Should(Succeed())
-
-		By("mock component as Running")
-		mockCompRunning(compName)
-
-		By("wait accounts to be provisioned")
-		Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *kbappsv1.Component) {
-			g.Expect(len(comp.Status.Conditions) > 0).Should(BeTrue())
-			var cond *metav1.Condition
-			for i, c := range comp.Status.Conditions {
-				if c.Type == accountProvisionConditionType {
-					cond = &comp.Status.Conditions[i]
-					break
-				}
-			}
-			g.Expect(cond).ShouldNot(BeNil())
-			g.Expect(cond.Status).Should(BeEquivalentTo(metav1.ConditionTrue))
-			g.Expect(cond.Message).ShouldNot(ContainSubstring("root"))
-			g.Expect(cond.Message).Should(ContainSubstring("admin"))
-		})).Should(Succeed())
-	}
-
-	testCompSystemAccountOverride := func(compName, compDefName string) {
-		passwordConfig := &kbappsv1.PasswordConfig{
-			Length: 29,
-		}
-		secret := corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: testCtx.DefaultNamespace,
-				Name:      "sysaccount-override",
-			},
-			StringData: map[string]string{
-				constant.AccountPasswdForSecret: "sysaccount-override",
-			},
-		}
-		secretRef := func() *kbappsv1.ProvisionSecretRef {
-			Expect(testCtx.CreateObj(testCtx.Ctx, &secret)).Should(Succeed())
-			return &kbappsv1.ProvisionSecretRef{
-				Name:      secret.Name,
-				Namespace: testCtx.DefaultNamespace,
-			}
-		}
-
-		createClusterObj(compName, compDefName, func(f *testapps.MockClusterFactory) {
-			f.AddSystemAccount("root", passwordConfig, nil).
-				AddSystemAccount("admin", nil, secretRef()).
-				AddSystemAccount("not-exist", nil, nil)
-		})
-
-		By("check root account")
-		rootSecretKey := types.NamespacedName{
-			Namespace: compObj.Namespace,
-			Name:      constant.GenerateAccountSecretName(clusterObj.Name, compName, "root"),
-		}
-		Eventually(testapps.CheckObj(&testCtx, rootSecretKey, func(g Gomega, secret *corev1.Secret) {
-			g.Expect(secret.Data).Should(HaveKeyWithValue(constant.AccountNameForSecret, []byte("root")))
-			g.Expect(secret.Data).Should(HaveKey(constant.AccountPasswdForSecret))
-			g.Expect(secret.Data[constant.AccountPasswdForSecret]).Should(HaveLen(int(passwordConfig.Length)))
-		})).Should(Succeed())
-
-		By("check admin account")
-		adminSecretKey := types.NamespacedName{
-			Namespace: compObj.Namespace,
-			Name:      constant.GenerateAccountSecretName(clusterObj.Name, compName, "admin"),
-		}
-		Eventually(testapps.CheckObj(&testCtx, adminSecretKey, func(g Gomega, secret *corev1.Secret) {
-			g.Expect(secret.Data).Should(HaveKeyWithValue(constant.AccountNameForSecret, []byte("admin")))
-			g.Expect(secret.Data).Should(HaveKeyWithValue(constant.AccountPasswdForSecret, secret.Data[constant.AccountPasswdForSecret]))
 		})).Should(Succeed())
 	}
 
@@ -1113,13 +971,13 @@ var _ = Describe("Component Controller", func() {
 				},
 			}
 		})).Should(Succeed())
-		createClusterObj(compName, compDefName, nil)
+		createCompObj(compName, compDefName, nil)
 
 		By("check workload template env")
 		targetEnvVars := []corev1.EnvVar{
 			{
 				Name:  "SERVICE_HOST",
-				Value: constant.GenerateComponentServiceName(clusterObj.Name, compName, compDefObj.Spec.Services[0].ServiceName),
+				Value: constant.GenerateComponentServiceName(clusterKey.Name, compName, compDefObj.Spec.Services[0].ServiceName),
 			},
 			{
 				Name:  "SERVICE_PORT",
@@ -1130,7 +988,7 @@ var _ = Describe("Component Controller", func() {
 				ValueFrom: &corev1.EnvVarSource{
 					SecretKeyRef: &corev1.SecretKeySelector{
 						LocalObjectReference: corev1.LocalObjectReference{
-							Name: constant.GenerateAccountSecretName(clusterObj.Name, compName, compDefObj.Spec.SystemAccounts[0].Name),
+							Name: constant.GenerateAccountSecretName(clusterKey.Name, compName, compDefObj.Spec.SystemAccounts[0].Name),
 						},
 						Key: constant.AccountNameForSecret,
 					},
@@ -1141,7 +999,7 @@ var _ = Describe("Component Controller", func() {
 				ValueFrom: &corev1.EnvVarSource{
 					SecretKeyRef: &corev1.SecretKeySelector{
 						LocalObjectReference: corev1.LocalObjectReference{
-							Name: constant.GenerateAccountSecretName(clusterObj.Name, compName, compDefObj.Spec.SystemAccounts[0].Name),
+							Name: constant.GenerateAccountSecretName(clusterKey.Name, compName, compDefObj.Spec.SystemAccounts[0].Name),
 						},
 						Key: constant.AccountPasswdForSecret,
 					},
@@ -1168,13 +1026,13 @@ var _ = Describe("Component Controller", func() {
 					}
 					g.Expect(envValueMapping).Should(BeEquivalentTo(targetEnvVarsMapping))
 					// check envData source
-					g.Expect(c.EnvFrom).Should(ContainElement(envConfigMapSource(clusterObj.Name, compName)))
+					g.Expect(c.EnvFrom).Should(ContainElement(envConfigMapSource(clusterKey.Name, compName)))
 				}
 			}
 		})).Should(Succeed())
 		envCMKey := types.NamespacedName{
 			Namespace: compObj.Namespace,
-			Name:      constant.GenerateClusterComponentEnvPattern(clusterObj.Name, compName),
+			Name:      constant.GenerateClusterComponentEnvPattern(clusterKey.Name, compName),
 		}
 		Eventually(testapps.CheckObj(&testCtx, envCMKey, func(g Gomega, cm *corev1.ConfigMap) {
 			_, envData := buildEnvVarsNData(targetEnvVars)
@@ -1190,7 +1048,7 @@ var _ = Describe("Component Controller", func() {
 			MaxReplicas: 16,
 		}
 		By("create component w/o replicas limit set")
-		createClusterObj(compName, compDefName, func(f *testapps.MockClusterFactory) {
+		createCompObj(compName, compDefName, func(f *testapps.MockComponentFactory) {
 			f.SetReplicas(replicasLimit.MaxReplicas * 2)
 		})
 		itsKey := types.NamespacedName{
@@ -1209,7 +1067,7 @@ var _ = Describe("Component Controller", func() {
 
 		By("create component w/ replicas limit set - out-of-limit")
 		for _, replicas := range []int32{replicasLimit.MinReplicas / 2, replicasLimit.MaxReplicas * 2} {
-			createClusterObjWithPhase(compName, compDefName, func(f *testapps.MockClusterFactory) {
+			createCompObjWithPhase(compName, compDefName, func(f *testapps.MockComponentFactory) {
 				f.SetReplicas(replicas)
 			}, "")
 			Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *kbappsv1.Component) {
@@ -1228,7 +1086,7 @@ var _ = Describe("Component Controller", func() {
 
 		By("create component w/ replicas limit set - ok")
 		for _, replicas := range []int32{replicasLimit.MinReplicas, (replicasLimit.MinReplicas + replicasLimit.MaxReplicas) / 2, replicasLimit.MaxReplicas} {
-			createClusterObj(compName, compDefName, func(f *testapps.MockClusterFactory) {
+			createCompObj(compName, compDefName, func(f *testapps.MockComponentFactory) {
 				f.SetReplicas(replicas)
 			})
 			itsKey := types.NamespacedName{
@@ -1241,28 +1099,25 @@ var _ = Describe("Component Controller", func() {
 		}
 	}
 
-	testCompRole := func(compName, compDefName string) {
-		createClusterObj(compName, compDefName, nil)
+	testCompRoles := func(compName, compDefName string) {
+		createCompObj(compName, compDefName, nil)
 
 		By("check default component roles")
 		targetRoles := []workloads.ReplicaRole{
 			{
-				Name:       "leader",
-				AccessMode: workloads.ReadWriteMode,
-				CanVote:    true,
-				IsLeader:   true,
+				Name:                 "leader",
+				ParticipatesInQuorum: true,
+				UpdatePriority:       5,
 			},
 			{
-				Name:       "follower",
-				AccessMode: workloads.ReadonlyMode,
-				CanVote:    true,
-				IsLeader:   false,
+				Name:                 "follower",
+				ParticipatesInQuorum: true,
+				UpdatePriority:       4,
 			},
 			{
-				Name:       "learner",
-				AccessMode: workloads.NoneMode,
-				CanVote:    false,
-				IsLeader:   false,
+				Name:                 "learner",
+				ParticipatesInQuorum: false,
+				UpdatePriority:       2,
 			},
 		}
 		itsKey := types.NamespacedName{
@@ -1289,17 +1144,17 @@ var _ = Describe("Component Controller", func() {
 			compDef.Spec.TLS = &tls
 		})()).Should(Succeed())
 
-		createClusterObj(compName, compDefName, func(f *testapps.MockClusterFactory) {
+		createCompObj(compName, compDefName, func(f *testapps.MockComponentFactory) {
 			issuer := &kbappsv1.Issuer{
 				Name: kbappsv1.IssuerKubeBlocks,
 			}
-			f.SetTLS(true).SetIssuer(issuer)
+			f.SetTLSConfig(true, issuer)
 		})
 
 		By("check TLS secret")
 		secretKey := types.NamespacedName{
 			Namespace: compObj.Namespace,
-			Name:      plan.GenerateTLSSecretName(clusterObj.Name, compName),
+			Name:      plan.GenerateTLSSecretName(clusterKey.Name, compName),
 		}
 		Eventually(testapps.CheckObj(&testCtx, secretKey, func(g Gomega, secret *corev1.Secret) {
 			g.Expect(secret.Data).Should(HaveKey(*tls.CAFile))
@@ -1341,33 +1196,29 @@ var _ = Describe("Component Controller", func() {
 		})).Should(Succeed())
 	}
 
-	checkRBACResourcesExistence := func(saName string, expectExisted bool) {
+	checkRBACResourcesExistence := func(saName, rbName string, expectExisted bool) {
 		saKey := types.NamespacedName{
 			Namespace: compObj.Namespace,
 			Name:      saName,
 		}
 		rbKey := types.NamespacedName{
 			Namespace: compObj.Namespace,
-			Name:      saName,
+			Name:      rbName,
 		}
 		Eventually(testapps.CheckObjExists(&testCtx, saKey, &corev1.ServiceAccount{}, expectExisted)).Should(Succeed())
 		Eventually(testapps.CheckObjExists(&testCtx, rbKey, &rbacv1.RoleBinding{}, expectExisted)).Should(Succeed())
 	}
 
 	testCompRBAC := func(compName, compDefName, saName string) {
-		By("update comp definition to enable lifecycle actions")
-		Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(compDefObj), func(compDef *kbappsv1.ComponentDefinition) {
-			compDef.Spec.LifecycleActions.Readonly = testapps.NewLifecycleAction("readonly")
-			compDef.Spec.LifecycleActions.Readwrite = testapps.NewLifecycleAction("readwrite")
-		})()).Should(Succeed())
-
 		By("creating a component with target service account name")
 		if len(saName) == 0 {
-			saName = "test-sa-" + randomStr()
+			createCompObj(compName, compDefName, nil)
+			saName = constant.GenerateDefaultServiceAccountName(compDefName)
+		} else {
+			createCompObj(compName, compDefName, func(f *testapps.MockComponentFactory) {
+				f.SetServiceAccountName(saName)
+			})
 		}
-		createClusterObj(compName, compDefName, func(f *testapps.MockClusterFactory) {
-			f.SetServiceAccountName(saName)
-		})
 
 		By("check the service account used in Pod")
 		itsKey := types.NamespacedName{
@@ -1378,224 +1229,392 @@ var _ = Describe("Component Controller", func() {
 			g.Expect(its.Spec.Template.Spec.ServiceAccountName).To(Equal(saName))
 		})).Should(Succeed())
 
-		By("check the RBAC resources created")
-		checkRBACResourcesExistence(saName, true)
+		By("check the RBAC resources status")
+		checkRBACResourcesExistence(saName, fmt.Sprintf("%v-pod", saName), true)
+	}
+
+	testCompWithRBAC := func(compName, compDefName string) {
+		testCompRBAC(compName, compDefName, "")
+		By("delete the component")
+		testapps.DeleteObject(&testCtx, compKey, &kbappsv1.Component{})
+		Eventually(testapps.CheckObjExists(&testCtx, compKey, &kbappsv1.Component{}, false)).Should(Succeed())
+
+		By("check the RBAC resources deleted")
+		saName := constant.GenerateDefaultServiceAccountName(compDefName)
+		checkRBACResourcesExistence(saName, fmt.Sprintf("%v-pod", saName), false)
 	}
 
 	testRecreateCompWithRBACCreateByKubeBlocks := func(compName, compDefName string) {
-		saName := "test-sa-" + randomStr()
-		testCompRBAC(compName, compDefName, saName)
+		testCompRBAC(compName, compDefName, "")
 
-		By("delete the cluster(component)")
-		testapps.DeleteObject(&testCtx, clusterKey, &kbappsv1.Cluster{})
-		Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &kbappsv1.Cluster{}, false)).Should(Succeed())
+		By("delete the component")
+		testapps.DeleteObject(&testCtx, compKey, &kbappsv1.Component{})
+		Eventually(testapps.CheckObjExists(&testCtx, compKey, &kbappsv1.Component{}, false)).Should(Succeed())
 
 		By("check the RBAC resources deleted")
-		checkRBACResourcesExistence(saName, false)
+		saName := constant.GenerateDefaultServiceAccountName(compDefName)
+		checkRBACResourcesExistence(saName, fmt.Sprintf("%v-pod", saName), false)
 
-		By("re-create cluster(component) with same name")
-		testCompRBAC(compName, compDefName, saName)
+		By("re-create component with same name")
+		testCompRBAC(compName, compDefName, "")
 	}
 
-	tesCreateCompWithRBACCreateByUser := func(compName, compDefName string) {
-		saName := "test-sa-exist" + randomStr()
+	testSharedRBACResourceDeletion := func(compNamePrefix, compDefName string) {
+		By("create first component")
+		createCompObj(compNamePrefix+"-comp1", compDefName, nil)
+		comp1Key := compKey
 
-		testCompRBAC(compName, compDefName, saName)
-
+		By("check rbac resources owner")
+		saName := constant.GenerateDefaultServiceAccountName(compDefName)
 		saKey := types.NamespacedName{
 			Namespace: compObj.Namespace,
 			Name:      saName,
 		}
-		By("mock the ServiceAccount and RoleBinding created by user by setting annotations to nil")
-		Eventually(testapps.GetAndChangeObj(&testCtx, saKey, func(sa *corev1.ServiceAccount) {
-			sa.Annotations = nil
-		})).Should(Succeed())
-		rbKey := types.NamespacedName{
-			Namespace: compObj.Namespace,
-			Name:      saName,
-		}
-		Eventually(testapps.GetAndChangeObj(&testCtx, rbKey, func(rb *rbacv1.RoleBinding) {
-			rb.Annotations = nil
+		Eventually(testapps.CheckObj(&testCtx, saKey, func(g Gomega, sa *corev1.ServiceAccount) {
+			refs := sa.GetOwnerReferences()
+			g.Expect(refs).Should(HaveLen(1))
+			owner := refs[0]
+			g.Expect(owner.Name).Should(Equal(comp1Key.Name))
 		})).Should(Succeed())
 
-		By("delete the cluster(component)")
-		testapps.DeleteObject(&testCtx, clusterKey, &kbappsv1.Cluster{})
-		Eventually(testapps.CheckObjExists(&testCtx, clusterKey, &kbappsv1.Cluster{}, true)).Should(Succeed())
+		checkRBACResourcesExistence(saName, fmt.Sprintf("%v-pod", saName), true)
 
-		By("check the RBAC resources deleted")
-		checkRBACResourcesExistence(saName, true)
+		By("create second cluster")
+		createCompObj(compNamePrefix+"-comp2", compDefName, nil)
+		comp2Key := compKey
+		By("check rbac resources owner not modified")
+		Consistently(testapps.CheckObj(&testCtx, saKey, func(g Gomega, sa *corev1.ServiceAccount) {
+			refs := sa.GetOwnerReferences()
+			g.Expect(refs).Should(HaveLen(1))
+			owner := refs[0]
+			g.Expect(owner.Name).Should(Equal(comp1Key.Name))
+		})).Should(Succeed())
+
+		By("delete first component")
+		testapps.DeleteObject(&testCtx, comp1Key, &kbappsv1.Component{})
+		Eventually(testapps.CheckObjExists(&testCtx, comp1Key, &kbappsv1.Component{}, false)).Should(Succeed())
+
+		By("check rbac resources owner transferred")
+		Eventually(testapps.CheckObj(&testCtx, saKey, func(g Gomega, sa *corev1.ServiceAccount) {
+			refs := sa.GetOwnerReferences()
+			g.Expect(refs).Should(HaveLen(1))
+			owner := refs[0]
+			g.Expect(owner.Name).Should(Equal(comp2Key.Name))
+		})).Should(Succeed())
 	}
 
-	testThreeReplicas := func(compName, compDefName string) {
-		const replicas = 3
+	testCreateCompWithNonExistRBAC := func(compName, compDefName string) {
+		saName := "test-sa-non-exist" + randomStr()
 
-		By("Mock a cluster obj")
-		pvcSpec := testapps.NewPVCSpec("1Gi")
-		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
-			WithRandomName().
-			AddComponent(compName, compDefName).
-			SetReplicas(replicas).
-			AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
-			Create(&testCtx).GetObject()
-		clusterKey = client.ObjectKeyFromObject(clusterObj)
+		// component controller won't complete reconciliation, so the phase will be empty
+		createCompObjWithPhase(compName, compDefName, func(f *testapps.MockComponentFactory) {
+			f.SetServiceAccountName(saName)
+		}, "")
+		Consistently(testapps.GetComponentPhase(&testCtx, compKey)).Should(Equal(kbappsv1.ComponentPhase("")))
+	}
 
-		By("Waiting for the cluster controller to create resources completely")
-		waitForCreatingResourceCompletely(clusterKey, compName)
+	testCreateCompWithRBACCreateByUser := func(compName, compDefName string) {
+		saName := "test-sa-exist" + randomStr()
 
-		var its *workloads.InstanceSet
-		Eventually(func(g Gomega) {
-			itsList := testk8s.ListAndCheckInstanceSet(&testCtx, clusterKey)
-			g.Expect(itsList.Items).ShouldNot(BeEmpty())
-			its = &itsList.Items[0]
-		}).Should(Succeed())
+		By("user manually creates ServiceAccount and RoleBinding")
+		sa := builder.NewServiceAccountBuilder(testCtx.DefaultNamespace, saName).GetObject()
+		testapps.CheckedCreateK8sResource(&testCtx, sa)
 
-		By("Creating mock pods in InstanceSet, and set controller reference")
-		mockPods := mockPodsForTest(clusterObj, compName, compDefName, replicas)
-		for i, pod := range mockPods {
-			Expect(controllerutil.SetControllerReference(its, pod, scheme.Scheme)).Should(Succeed())
-			Expect(testCtx.CreateObj(testCtx.Ctx, pod)).Should(Succeed())
-			patch := client.MergeFrom(pod.DeepCopy())
-			// mock the status to pass the isReady(pod) check in consensus_set
-			pod.Status.Conditions = []corev1.PodCondition{{
-				Type:   corev1.PodReady,
-				Status: corev1.ConditionTrue,
-			}}
-			Eventually(k8sClient.Status().Patch(ctx, pod, patch)).Should(Succeed())
-			role := "follower"
-			if i == 0 {
-				role = "leader"
+		testCompRBAC(compName, compDefName, saName)
+
+		By("delete the component")
+		testapps.DeleteObject(&testCtx, compKey, &kbappsv1.Component{})
+		Eventually(testapps.CheckObjExists(&testCtx, compKey, &kbappsv1.Component{}, true)).Should(Succeed())
+
+		By("check the serviceaccount not deleted")
+		Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(sa), &corev1.ServiceAccount{}, true)).Should(Succeed())
+	}
+
+	testCompSystemAccount := func(compName, compDefName string) {
+		secret := corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: testCtx.DefaultNamespace,
+				Name:      "sysaccount",
+			},
+			StringData: map[string]string{
+				constant.AccountPasswdForSecret: "sysaccount",
+			},
+		}
+		secretRef := func() *kbappsv1.ProvisionSecretRef {
+			Expect(testCtx.CreateObj(testCtx.Ctx, &secret)).Should(Succeed())
+			return &kbappsv1.ProvisionSecretRef{
+				Name:      secret.Name,
+				Namespace: testCtx.DefaultNamespace,
 			}
-			patch = client.MergeFrom(pod.DeepCopy())
-			pod.Labels[constant.RoleLabelKey] = role
-			Eventually(k8sClient.Patch(ctx, pod, patch)).Should(Succeed())
 		}
 
-		By("Checking pods' role are changed accordingly")
-		Eventually(func(g Gomega) {
-			pods, err := intctrlutil.GetPodListByInstanceSet(ctx, k8sClient, its)
-			g.Expect(err).ShouldNot(HaveOccurred())
-			// should have 3 pods
-			g.Expect(pods).Should(HaveLen(3))
-			// 1 leader
-			// 2 followers
-			leaderCount, followerCount := 0, 0
-			for _, pod := range pods {
-				switch pod.Labels[constant.RoleLabelKey] {
-				case leader:
-					leaderCount++
-				case follower:
-					followerCount++
+		createCompObj(compName, compDefName, func(f *testapps.MockComponentFactory) {
+			f.AddSystemAccount("admin", nil, nil, secretRef())
+		})
+
+		By("check root account")
+		var rootHashedPassword string
+		rootSecretKey := types.NamespacedName{
+			Namespace: compObj.Namespace,
+			Name:      constant.GenerateAccountSecretName(clusterKey.Name, compName, "root"),
+		}
+		Eventually(testapps.CheckObj(&testCtx, rootSecretKey, func(g Gomega, secret *corev1.Secret) {
+			g.Expect(secret.Data).Should(HaveKeyWithValue(constant.AccountNameForSecret, []byte("root")))
+			g.Expect(secret.Data).Should(HaveKey(constant.AccountPasswdForSecret))
+			rootHashedPassword = secret.Annotations[systemAccountHashAnnotation]
+			g.Expect(rootHashedPassword).Should(BeEmpty()) // kb generated password
+		})).Should(Succeed())
+
+		By("check admin account")
+		var adminHashedPassword string
+		adminSecretKey := types.NamespacedName{
+			Namespace: compObj.Namespace,
+			Name:      constant.GenerateAccountSecretName(clusterKey.Name, compName, "admin"),
+		}
+		Eventually(testapps.CheckObj(&testCtx, adminSecretKey, func(g Gomega, secret *corev1.Secret) {
+			g.Expect(secret.Data).Should(HaveKeyWithValue(constant.AccountNameForSecret, []byte("admin")))
+			g.Expect(secret.Data).Should(HaveKey(constant.AccountPasswdForSecret))
+			adminHashedPassword = secret.Annotations[systemAccountHashAnnotation]
+			g.Expect(adminHashedPassword).ShouldNot(BeEmpty()) // user-provided
+		})).Should(Succeed())
+
+		By("mock component as Running")
+		mockCompRunning(compName, compObj)
+
+		By("wait accounts to be provisioned")
+		Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *kbappsv1.Component) {
+			g.Expect(len(comp.Status.Conditions) > 0).Should(BeTrue())
+			var cond *metav1.Condition
+			for i, c := range comp.Status.Conditions {
+				if c.Type == accountProvisionConditionType {
+					cond = &comp.Status.Conditions[i]
+					break
 				}
 			}
-			g.Expect(leaderCount).Should(Equal(1))
-			g.Expect(followerCount).Should(Equal(2))
-		}).Should(Succeed())
-
-		// trigger its to reconcile as the underlying its is not created
-		Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(its), func(its *workloads.InstanceSet) {
-			its.Annotations["time"] = time.Now().Format(time.RFC3339)
-		})()).Should(Succeed())
-
-		By("Updating ITS status")
-		itsPatch := client.MergeFrom(its.DeepCopy())
-		its.Status.UpdateRevision = "mock-version"
-		pods, err := intctrlutil.GetPodListByInstanceSet(ctx, k8sClient, its)
-		Expect(err).Should(BeNil())
-		var podList []*corev1.Pod
-		for i := range pods {
-			podList = append(podList, &pods[i])
-		}
-		testk8s.MockInstanceSetReady(its, podList...)
-		Expect(k8sClient.Status().Patch(ctx, its, itsPatch)).Should(Succeed())
-
-		By("Checking pods' role are updated in cluster status")
-		Eventually(func(g Gomega) {
-			fetched := &kbappsv1.Cluster{}
-			g.Expect(k8sClient.Get(ctx, clusterKey, fetched)).To(Succeed())
-			compName := fetched.Spec.ComponentSpecs[0].Name
-			g.Expect(fetched.Status.Components != nil).To(BeTrue())
-			g.Expect(fetched.Status.Components).To(HaveKey(compName))
-			_, ok := fetched.Status.Components[compName]
-			g.Expect(ok).Should(BeTrue())
-		}).Should(Succeed())
-
-		By("Waiting the component be running")
-		Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, compName)).Should(Equal(kbappsv1.RunningComponentPhase))
+			g.Expect(cond).ShouldNot(BeNil())
+			g.Expect(cond.Status).Should(BeEquivalentTo(metav1.ConditionTrue))
+			g.Expect(cond.Message).Should(ContainSubstring(fmt.Sprintf("%s:%s", "root", rootHashedPassword)))
+			g.Expect(cond.Message).Should(ContainSubstring(fmt.Sprintf("%s:%s", "admin", adminHashedPassword)))
+		})).Should(Succeed())
 	}
 
-	testRestoreClusterFromBackup := func(compName string, compDef *kbappsv1.ComponentDefinition) {
-		By("mock backuptool object")
-		backupPolicyName := "test-backup-policy"
-		backupName := "test-backup"
-		_ = testapps.CreateCustomizedObj(&testCtx, "backup/actionset.yaml", &dpv1alpha1.ActionSet{}, testapps.RandomizedObjName())
+	testCompSystemAccountOverride := func(compName, compDefName string) {
+		passwordConfig := &kbappsv1.PasswordConfig{
+			Length: 29,
+		}
+		secret := corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: testCtx.DefaultNamespace,
+				Name:      "sysaccount-override",
+			},
+			StringData: map[string]string{
+				constant.AccountPasswdForSecret: "sysaccount-override",
+			},
+		}
+		secretRef := func() *kbappsv1.ProvisionSecretRef {
+			Expect(testCtx.CreateObj(testCtx.Ctx, &secret)).Should(Succeed())
+			return &kbappsv1.ProvisionSecretRef{
+				Name:      secret.Name,
+				Namespace: testCtx.DefaultNamespace,
+			}
+		}
 
-		By("creating backup")
-		backup := testdp.NewBackupFactory(testCtx.DefaultNamespace, backupName).
-			SetBackupPolicyName(backupPolicyName).
-			SetBackupMethod(testdp.BackupMethodName).
-			Create(&testCtx).GetObject()
+		createCompObj(compName, compDefName, func(f *testapps.MockComponentFactory) {
+			f.AddSystemAccount("root", nil, passwordConfig, nil).
+				AddSystemAccount("admin", nil, nil, secretRef())
+		})
 
-		By("mocking backup status completed, we don't need backup reconcile here")
-		Eventually(testapps.GetAndChangeObjStatus(&testCtx, client.ObjectKeyFromObject(backup), func(backup *dpv1alpha1.Backup) {
-			backup.Status.PersistentVolumeClaimName = "backup-pvc"
-			backup.Status.Phase = dpv1alpha1.BackupPhaseCompleted
-			testdp.MockBackupStatusMethod(backup, testdp.BackupMethodName, testapps.DataVolumeName, testdp.ActionSetName)
+		By("check root account")
+		rootSecretKey := types.NamespacedName{
+			Namespace: compObj.Namespace,
+			Name:      constant.GenerateAccountSecretName(clusterKey.Name, compName, "root"),
+		}
+		Eventually(testapps.CheckObj(&testCtx, rootSecretKey, func(g Gomega, secret *corev1.Secret) {
+			g.Expect(secret.Data).Should(HaveKeyWithValue(constant.AccountNameForSecret, []byte("root")))
+			g.Expect(secret.Data).Should(HaveKey(constant.AccountPasswdForSecret))
+			g.Expect(secret.Data[constant.AccountPasswdForSecret]).Should(HaveLen(int(passwordConfig.Length)))
 		})).Should(Succeed())
 
-		By("creating cluster with backup")
-		restoreFromBackup := fmt.Sprintf(`{"%s":{"name":"%s"}}`, compName, backupName)
-		pvcSpec := testapps.NewPVCSpec("1Gi")
-		replicas := 3
-		clusterObj = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
-			WithRandomName().
-			AddComponent(compName, compDef.GetName()).
-			SetServiceVersion(compDef.Spec.ServiceVersion).
-			SetReplicas(int32(replicas)).
-			AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
-			AddAnnotations(constant.RestoreFromBackupAnnotationKey, restoreFromBackup).
-			Create(&testCtx).
-			GetObject()
-		clusterKey = client.ObjectKeyFromObject(clusterObj)
-
-		// mock pvcs have restored
-		mockComponentPVCsAndBound(clusterObj.Spec.GetComponentByName(compName), replicas, true, testk8s.DefaultStorageClassName)
-
-		By("wait for restore created")
-		ml := client.MatchingLabels{
-			constant.AppInstanceLabelKey:    clusterKey.Name,
-			constant.KBAppComponentLabelKey: compName,
+		By("check admin account")
+		adminSecretKey := types.NamespacedName{
+			Namespace: compObj.Namespace,
+			Name:      constant.GenerateAccountSecretName(clusterKey.Name, compName, "admin"),
 		}
-		Eventually(testapps.List(&testCtx, generics.RestoreSignature,
-			ml, client.InNamespace(clusterKey.Namespace))).Should(HaveLen(1))
+		Eventually(testapps.CheckObj(&testCtx, adminSecretKey, func(g Gomega, secret *corev1.Secret) {
+			g.Expect(secret.Data).Should(HaveKeyWithValue(constant.AccountNameForSecret, []byte("admin")))
+			g.Expect(secret.Data).Should(HaveKeyWithValue(constant.AccountPasswdForSecret, secret.Data[constant.AccountPasswdForSecret]))
+		})).Should(Succeed())
+	}
 
-		By("Mocking restore phase to Completed")
-		// mock prepareData restore completed
-		testdp.MockRestoreCompleted(&testCtx, ml)
+	testCompSystemAccountDisable := func(compName, compDefName string) {
+		passwordConfig := &kbappsv1.PasswordConfig{
+			Length: 29,
+		}
 
-		By("Waiting for the cluster controller to create resources completely")
-		waitForCreatingResourceCompletely(clusterKey, compName)
+		createCompObj(compName, compDefName, func(f *testapps.MockComponentFactory) {
+			f.AddSystemAccount("root", ptr.To(false), passwordConfig, nil).
+				AddSystemAccount("admin", ptr.To(true), passwordConfig, nil)
+		})
 
-		itsList := testk8s.ListAndCheckInstanceSet(&testCtx, clusterKey)
-		its := &itsList.Items[0]
-		By("mock pod are available and wait for component enter running phase")
-		mockPods := testapps.MockInstanceSetPods(&testCtx, its, clusterObj, compName)
-		Expect(testapps.ChangeObjStatus(&testCtx, its, func() {
-			testk8s.MockInstanceSetReady(its, mockPods...)
-		})).ShouldNot(HaveOccurred())
-		Eventually(testapps.GetClusterComponentPhase(&testCtx, clusterKey, compName)).Should(Equal(kbappsv1.RunningComponentPhase))
+		By("check root account")
+		rootSecretKey := types.NamespacedName{
+			Namespace: compObj.Namespace,
+			Name:      constant.GenerateAccountSecretName(clusterKey.Name, compName, "root"),
+		}
+		rootSecret := &corev1.Secret{}
+		Eventually(testapps.CheckObjExists(&testCtx, rootSecretKey, rootSecret, true)).Should(Succeed())
 
-		By("clean up annotations after cluster running")
-		Eventually(testapps.CheckObj(&testCtx, clusterKey, func(g Gomega, tmpCluster *kbappsv1.Cluster) {
-			g.Expect(tmpCluster.Status.Phase).Should(Equal(kbappsv1.RunningClusterPhase))
-			// mock postReady restore completed
-			testdp.MockRestoreCompleted(&testCtx, ml)
-			g.Expect(tmpCluster.Annotations[constant.RestoreFromBackupAnnotationKey]).Should(BeEmpty())
+		By("check admin account")
+		adminSecretKey := types.NamespacedName{
+			Namespace: compObj.Namespace,
+			Name:      constant.GenerateAccountSecretName(clusterKey.Name, compName, "admin"),
+		}
+		adminSecret := &corev1.Secret{}
+		Consistently(testapps.CheckObjExists(&testCtx, adminSecretKey, adminSecret, false)).Should(Succeed())
+	}
+
+	testCompSystemAccountDisableAfterProvision := func(compName, compDefName string) {
+		passwordConfig := &kbappsv1.PasswordConfig{
+			Length: 29,
+		}
+
+		createCompObj(compName, compDefName, func(f *testapps.MockComponentFactory) {
+			f.AddSystemAccount("root", ptr.To(false), passwordConfig, nil).
+				AddSystemAccount("admin", ptr.To(false), passwordConfig, nil)
+		})
+
+		By("check the root account")
+		rootSecretKey := types.NamespacedName{
+			Namespace: compObj.Namespace,
+			Name:      constant.GenerateAccountSecretName(clusterKey.Name, compName, "root"),
+		}
+		rootSecret := &corev1.Secret{}
+		Eventually(testapps.CheckObjExists(&testCtx, rootSecretKey, rootSecret, true)).Should(Succeed())
+
+		By("check the admin account")
+		adminSecretKey := types.NamespacedName{
+			Namespace: compObj.Namespace,
+			Name:      constant.GenerateAccountSecretName(clusterKey.Name, compName, "admin"),
+		}
+		adminSecret := &corev1.Secret{}
+		Eventually(testapps.CheckObjExists(&testCtx, adminSecretKey, adminSecret, true)).Should(Succeed())
+
+		By("disable the admin account")
+		Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
+			for j, account := range comp.Spec.SystemAccounts {
+				if account.Name == "admin" {
+					comp.Spec.SystemAccounts[j].Disabled = ptr.To(true)
+				}
+			}
+		})()).Should(Succeed())
+
+		By("check the admin account is disabled")
+		Eventually(testapps.CheckObjExists(&testCtx, adminSecretKey, adminSecret, false)).Should(Succeed())
+	}
+
+	testCompSystemAccountUpdate := func(compName, compDefName string) {
+		passwordConfig := &kbappsv1.PasswordConfig{
+			Length: 29,
+		}
+		secret := corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: testCtx.DefaultNamespace,
+				Name:      "sysaccount-update",
+			},
+			StringData: map[string]string{
+				"sysaccount-update": "sysaccount-update",
+			},
+		}
+		secretRef := func() *kbappsv1.ProvisionSecretRef {
+			Expect(testCtx.CreateObj(testCtx.Ctx, &secret)).Should(Succeed())
+			return &kbappsv1.ProvisionSecretRef{
+				Name:      secret.Name,
+				Namespace: testCtx.DefaultNamespace,
+				Password:  "sysaccount-update",
+			}
+		}
+
+		createCompObj(compName, compDefName, func(f *testapps.MockComponentFactory) {
+			f.AddSystemAccount("root", nil, passwordConfig, nil).
+				AddSystemAccount("admin", nil, nil, secretRef())
+		})
+
+		By("check root account")
+		var rootHashedPassword string
+		rootSecretKey := types.NamespacedName{
+			Namespace: compObj.Namespace,
+			Name:      constant.GenerateAccountSecretName(clusterKey.Name, compName, "root"),
+		}
+		Eventually(testapps.CheckObj(&testCtx, rootSecretKey, func(g Gomega, secret *corev1.Secret) {
+			g.Expect(secret.Data).Should(HaveKeyWithValue(constant.AccountNameForSecret, []byte("root")))
+			g.Expect(secret.Data).Should(HaveKey(constant.AccountPasswdForSecret))
+			g.Expect(secret.Data[constant.AccountPasswdForSecret]).Should(HaveLen(int(passwordConfig.Length)))
+			rootHashedPassword = secret.Annotations[systemAccountHashAnnotation]
+			g.Expect(rootHashedPassword).Should(BeEmpty()) // kb generated password
+		})).Should(Succeed())
+
+		By("check admin account")
+		var adminHashedPassword string
+		adminSecretKey := types.NamespacedName{
+			Namespace: compObj.Namespace,
+			Name:      constant.GenerateAccountSecretName(clusterKey.Name, compName, "admin"),
+		}
+		Eventually(testapps.CheckObj(&testCtx, adminSecretKey, func(g Gomega, secret *corev1.Secret) {
+			g.Expect(secret.Data).Should(HaveKeyWithValue(constant.AccountNameForSecret, []byte("admin")))
+			g.Expect(secret.Data).Should(HaveKeyWithValue(constant.AccountPasswdForSecret, []byte("sysaccount-update")))
+			adminHashedPassword = secret.Annotations[systemAccountHashAnnotation]
+			g.Expect(adminHashedPassword).ShouldNot(BeEmpty()) // user-provided
+		})).Should(Succeed())
+
+		By("mock component as Running")
+		mockCompRunning(compName, compObj)
+
+		By("update the password of admin account")
+		Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(&secret), func(obj *corev1.Secret) {
+			if obj.StringData == nil {
+				obj.StringData = map[string]string{}
+			}
+			obj.StringData["sysaccount-update"] = "sysaccount-update-new"
+		})()).Should(Succeed())
+
+		By("trigger the component to reconcile")
+		Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
+			if comp.Annotations == nil {
+				comp.Annotations = map[string]string{}
+			}
+			comp.Annotations["reconcile"] = time.Now().String()
+		})()).Should(Succeed())
+
+		By("check the admin account updated")
+		var updatedAdminHashedPassword string
+		Eventually(testapps.CheckObj(&testCtx, adminSecretKey, func(g Gomega, secret *corev1.Secret) {
+			g.Expect(secret.Data).Should(HaveKeyWithValue(constant.AccountNameForSecret, []byte("admin")))
+			g.Expect(secret.Data).Should(HaveKeyWithValue(constant.AccountPasswdForSecret, []byte("sysaccount-update-new")))
+			updatedAdminHashedPassword = secret.Annotations[systemAccountHashAnnotation]
+			g.Expect(updatedAdminHashedPassword).ShouldNot(BeEmpty()) // user-provided
+			g.Expect(updatedAdminHashedPassword).ShouldNot(Equal(adminHashedPassword))
+		})).Should(Succeed())
+
+		By("wait accounts to be updated")
+		Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *kbappsv1.Component) {
+			g.Expect(len(comp.Status.Conditions) > 0).Should(BeTrue())
+			var cond *metav1.Condition
+			for i, c := range comp.Status.Conditions {
+				if c.Type == accountProvisionConditionType {
+					cond = &comp.Status.Conditions[i]
+					break
+				}
+			}
+			g.Expect(cond).ShouldNot(BeNil())
+			g.Expect(cond.Status).Should(BeEquivalentTo(metav1.ConditionTrue))
+			g.Expect(cond.Message).Should(ContainSubstring(fmt.Sprintf("%s:%s", "root", rootHashedPassword)))
+			g.Expect(cond.Message).Should(ContainSubstring(fmt.Sprintf("%s:%s", "admin", updatedAdminHashedPassword)))
 		})).Should(Succeed())
 	}
 
 	Context("provisioning", func() {
 		BeforeEach(func() {
-			createAllDefinitionObjects()
+			createDefinitionObjects()
 		})
 
 		AfterEach(func() {
@@ -1603,68 +1622,92 @@ var _ = Describe("Component Controller", func() {
 		})
 
 		It("component finalizers and labels", func() {
-			testCompFinalizerNLabel(defaultCompName, compDefName)
+			testCompFinalizerNLabel(defaultCompName, compDefObj.Name)
 		})
 
 		It("with component zero replicas", func() {
-			createClusterObjWithPhase(defaultCompName, compDefName, func(f *testapps.MockClusterFactory) {
+			createCompObjWithPhase(defaultCompName, compDefObj.Name, func(f *testapps.MockComponentFactory) {
 				f.SetReplicas(0)
 			}, "")
 
 			By("checking the component status can't be reconciled well")
-			Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *kbappsv1.Component) {
-				g.Expect(comp.Generation > comp.Status.ObservedGeneration).Should(BeTrue())
-			})).Should(Succeed())
+			Consistently(testapps.ComponentReconciled(&testCtx, compKey)).Should(BeFalse())
 		})
 
 		It("with component services", func() {
-			testCompService(defaultCompName, compDefName)
-		})
-
-		It("with component system accounts", func() {
-			testCompSystemAccount(defaultCompName, compDefName)
-		})
-
-		It("with component system accounts - override", func() {
-			testCompSystemAccountOverride(defaultCompName, compDefName)
+			testCompService(defaultCompName, compDefObj.Name)
 		})
 
 		It("with component vars", func() {
-			testCompVars(defaultCompName, compDefName)
+			testCompVars(defaultCompName, compDefObj.Name)
 		})
 
 		It("with component replicas limit", func() {
-			testCompReplicasLimit(defaultCompName, compDefName)
+			testCompReplicasLimit(defaultCompName, compDefObj.Name)
 		})
 
 		It("with component roles", func() {
-			testCompRole(defaultCompName, compDefName)
-		})
-
-		It("with component roles - should success with one leader pod and two follower pods", func() {
-			testThreeReplicas(defaultCompName, compDefObj.Name)
+			testCompRoles(defaultCompName, compDefObj.Name)
 		})
 
 		It("with component TlS", func() {
-			testCompTLSConfig(defaultCompName, compDefName)
+			testCompTLSConfig(defaultCompName, compDefObj.Name)
 		})
 
-		It("with component RBAC set", func() {
-			testCompRBAC(defaultCompName, compDefName, "")
+		It("creates component RBAC resources", func() {
+			testCompWithRBAC(defaultCompName, compDefObj.Name)
 		})
 
-		It("re-create component with custom RBAC which is not exist and auto created by KubeBlocks", func() {
-			testRecreateCompWithRBACCreateByKubeBlocks(defaultCompName, compDefName)
+		It("re-creates component with custom RBAC which is not exist and auto created by KubeBlocks", func() {
+			testRecreateCompWithRBACCreateByKubeBlocks(defaultCompName, compDefObj.Name)
+		})
+
+		It("transfers rbac resources' ownership when multiple components share them", func() {
+			testSharedRBACResourceDeletion(defaultCompName, compDefObj.Name)
+		})
+
+		It("creates component with non-exist serviceaccount", func() {
+			testCreateCompWithNonExistRBAC(defaultCompName, compDefObj.Name)
 		})
 
 		It("create component with custom RBAC which is already exist created by User", func() {
-			tesCreateCompWithRBACCreateByUser(defaultCompName, compDefName)
+			testCreateCompWithRBACCreateByUser(defaultCompName, compDefObj.Name)
+		})
+	})
+
+	Context("system account", func() {
+		BeforeEach(func() {
+			createDefinitionObjects()
+		})
+
+		AfterEach(func() {
+			cleanEnv()
+		})
+
+		It("provisioning", func() {
+			testCompSystemAccount(defaultCompName, compDefObj.Name)
+		})
+
+		It("override", func() {
+			testCompSystemAccountOverride(defaultCompName, compDefObj.Name)
+		})
+
+		It("disable", func() {
+			testCompSystemAccountDisable(defaultCompName, compDefObj.Name)
+		})
+
+		It("disable - after provision", func() {
+			testCompSystemAccountDisableAfterProvision(defaultCompName, compDefObj.Name)
+		})
+
+		It("update", func() {
+			testCompSystemAccountUpdate(defaultCompName, compDefObj.Name)
 		})
 	})
 
 	Context("h-scaling", func() {
 		BeforeEach(func() {
-			createAllDefinitionObjects()
+			createDefinitionObjects()
 		})
 
 		AfterEach(func() {
@@ -1692,60 +1735,13 @@ var _ = Describe("Component Controller", func() {
 		})
 
 		It("scale-in to 0 and PVCs should not been deleted", func() {
+			changeReplicasLimit(compDefObj.Name, 0, 16384)
+
 			testHorizontalScale(defaultCompName, compDefObj.Name, 3, 0)
 		})
 
-		Context("scale-out multiple components", func() {
-			createNWaitClusterObj := func(components map[string]string,
-				processor func(compName string, factory *testapps.MockClusterFactory),
-				withFixedName ...bool) {
-				Expect(components).ShouldNot(BeEmpty())
-
-				By("Creating a cluster")
-				clusterBuilder := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "")
-
-				compNames := make([]string, 0, len(components))
-				for compName, compDefName := range components {
-					clusterBuilder = clusterBuilder.AddComponent(compName, compDefName)
-					if processor != nil {
-						processor(compName, clusterBuilder)
-					}
-					compNames = append(compNames, compName)
-				}
-				if len(withFixedName) == 0 || !withFixedName[0] {
-					clusterBuilder.WithRandomName()
-				}
-				clusterObj = clusterBuilder.Create(&testCtx).GetObject()
-				clusterKey = client.ObjectKeyFromObject(clusterObj)
-
-				By("Waiting for the cluster controller to create resources completely")
-				waitForCreatingResourceCompletely(clusterKey, compNames...)
-			}
-
-			It("h-scale with data actions", func() {
-				By("update cmpd to enable data actions")
-				Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(compDefObj), func(cmpd *kbappsv1.ComponentDefinition) {
-					cmpd.Spec.LifecycleActions.DataDump = testapps.NewLifecycleAction("data-dump")
-					cmpd.Spec.LifecycleActions.DataLoad = testapps.NewLifecycleAction("data-load")
-				})()).Should(Succeed())
-
-				compNameNDef := map[string]string{
-					fmt.Sprintf("%s-0", defaultCompName): compDefObj.Name,
-					fmt.Sprintf("%s-1", defaultCompName): compDefObj.Name,
-					fmt.Sprintf("%s-2", defaultCompName): compDefObj.Name,
-				}
-				initialReplicas := int32(1)
-				updatedReplicas := int32(2)
-
-				By("Creating a multi components cluster with VolumeClaimTemplate")
-				pvcSpec := testapps.NewPVCSpec("1Gi")
-
-				createNWaitClusterObj(compNameNDef, func(compName string, factory *testapps.MockClusterFactory) {
-					factory.AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).SetReplicas(initialReplicas)
-				}, false)
-
-				horizontalScale(int(updatedReplicas), testk8s.DefaultStorageClassName, compDefObj.Name)
-			})
+		It("h-scale with data actions", func() {
+			testHorizontalScaleWithDataActions(defaultCompName, compDefObj.Name, 1, 2)
 		})
 	})
 
@@ -1755,57 +1751,43 @@ var _ = Describe("Component Controller", func() {
 		)
 
 		BeforeEach(func() {
-			createAllDefinitionObjects()
+			createDefinitionObjects()
 			mockStorageClass = testk8s.CreateMockStorageClass(&testCtx, testk8s.DefaultStorageClassName)
 		})
 
 		It("should update PVC request storage size accordingly", func() {
-			testVolumeExpansion(compDefObj, defaultCompName, mockStorageClass)
+			testVolumeExpansion(defaultCompName, compDefObj.Name, mockStorageClass)
 		})
 
 		It("should be able to recover if volume expansion fails", func() {
-			testVolumeExpansionFailedAndRecover(defaultCompName, compDefName)
+			testVolumeExpansionFailedAndRecover(defaultCompName, compDefObj.Name)
 		})
 
 		It("scale-out", func() {
-			testVolumeExpansion(compDefObj, defaultCompName, mockStorageClass)
-			horizontalScale(5, mockStorageClass.Name, compDefObj.Name)
-		})
-	})
-
-	Context("restore", func() {
-		BeforeEach(func() {
-			createAllDefinitionObjects()
-		})
-
-		AfterEach(func() {
-			cleanEnv()
-		})
-
-		It("test restore cluster from backup", func() {
-			testRestoreClusterFromBackup(defaultCompName, compDefObj)
+			testVolumeExpansion(defaultCompName, compDefObj.Name, mockStorageClass)
+			horizontalScale(5, mockStorageClass.Name, defaultCompName, compDefObj.Name)
 		})
 	})
 
 	Context("start & stop", func() {
 		BeforeEach(func() {
 			cleanEnv()
-			createAllDefinitionObjects()
+			createDefinitionObjects()
 		})
 
 		startComp := func() {
-			Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *kbappsv1.Cluster) {
-				cluster.Spec.ComponentSpecs[0].Stop = nil
+			Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
+				comp.Spec.Stop = nil
 			})()).Should(Succeed())
 		}
 
 		stopComp := func() {
-			Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *kbappsv1.Cluster) {
-				cluster.Spec.ComponentSpecs[0].Stop = func() *bool { b := true; return &b }()
+			Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
+				comp.Spec.Stop = ptr.To(true)
 			})()).Should(Succeed())
 		}
 
-		checkCompRunningAs := func(phase kbappsv1.ComponentPhase) {
+		checkCompRunningWithPhase := func(phase kbappsv1.ComponentPhase) {
 			Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *kbappsv1.Component) {
 				g.Expect(comp.Status.ObservedGeneration).To(BeEquivalentTo(comp.Generation))
 				if comp.Spec.Stop != nil {
@@ -1821,11 +1803,11 @@ var _ = Describe("Component Controller", func() {
 		}
 
 		checkCompCreating := func() {
-			checkCompRunningAs(kbappsv1.CreatingComponentPhase)
+			checkCompRunningWithPhase(kbappsv1.CreatingComponentPhase)
 		}
 
 		checkCompRunning := func() {
-			checkCompRunningAs(kbappsv1.StartingComponentPhase)
+			checkCompRunningWithPhase(kbappsv1.StartingComponentPhase)
 		}
 
 		checkCompStopped := func() {
@@ -1843,7 +1825,7 @@ var _ = Describe("Component Controller", func() {
 		}
 
 		It("stop a component", func() {
-			createClusterObj(defaultCompName, compDefName, nil)
+			createCompObj(defaultCompName, compDefObj.Name, nil)
 			checkCompCreating()
 
 			By("stop it")
@@ -1856,7 +1838,7 @@ var _ = Describe("Component Controller", func() {
 		})
 
 		It("start a component", func() {
-			createClusterObj(defaultCompName, compDefName, nil)
+			createCompObj(defaultCompName, compDefObj.Name, nil)
 			checkCompCreating()
 
 			By("start it")
@@ -1877,13 +1859,15 @@ var _ = Describe("Component Controller", func() {
 		})
 
 		It("h-scale a stopped component", func() {
-			createClusterObjWithPhase(defaultCompName, compDefName, func(f *testapps.MockClusterFactory) {
-				f.SetStop(func() *bool { b := true; return &b }())
-			}, kbappsv1.StoppedClusterPhase)
+			createCompObjWithPhase(defaultCompName, compDefObj.Name, func(f *testapps.MockComponentFactory) {
+				f.SetStop(ptr.To(true))
+			}, kbappsv1.StoppedComponentPhase)
 			checkCompStopped()
 
 			By("scale-out")
-			changeCompReplicas(clusterKey, 3, &clusterObj.Spec.ComponentSpecs[0])
+			Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
+				comp.Spec.Replicas = 3
+			})()).ShouldNot(HaveOccurred())
 
 			By("check comp & its")
 			Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *kbappsv1.Component) {
@@ -1921,13 +1905,15 @@ var _ = Describe("Component Controller", func() {
 					cmpd.Spec.LifecycleActions.DataDump = testapps.NewLifecycleAction("data-dump")
 				})()).Should(Succeed())
 
-			createClusterObjWithPhase(defaultCompName, compDefName, func(f *testapps.MockClusterFactory) {
-				f.SetStop(func() *bool { b := true; return &b }())
-			}, kbappsv1.StoppedClusterPhase)
+			createCompObjWithPhase(defaultCompName, compDefObj.Name, func(f *testapps.MockComponentFactory) {
+				f.SetStop(ptr.To(true))
+			}, kbappsv1.StoppedComponentPhase)
 			checkCompStopped()
 
 			By("scale-out")
-			changeCompReplicas(clusterKey, 3, &clusterObj.Spec.ComponentSpecs[0])
+			Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
+				comp.Spec.Replicas = 3
+			})()).ShouldNot(HaveOccurred())
 
 			By("check comp & its")
 			Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *kbappsv1.Component) {
@@ -1960,7 +1946,7 @@ var _ = Describe("Component Controller", func() {
 	Context("reconcile with definition and version", func() {
 		BeforeEach(func() {
 			cleanEnv()
-			createAllDefinitionObjects()
+			createDefinitionObjects()
 		})
 
 		testImageUnchangedAfterNewReleasePublished := func(release kbappsv1.ComponentVersionRelease) {
@@ -1971,8 +1957,7 @@ var _ = Describe("Component Controller", func() {
 			Expect(maps.Keys(prevRelease.Images)).Should(BeEquivalentTo(maps.Keys(release.Images)))
 			Expect(maps.Values(prevRelease.Images)).ShouldNot(BeEquivalentTo(maps.Values(release.Images)))
 
-			// createCompObj(defaultCompName, compDefName, compVerObj.Spec.Releases[0].ServiceVersion, nil)
-			createClusterObj(defaultCompName, compDefName, func(f *testapps.MockClusterFactory) {
+			createCompObj(defaultCompName, compDefObj.Name, func(f *testapps.MockComponentFactory) {
 				f.SetServiceVersion(prevRelease.ServiceVersion)
 			})
 
@@ -2036,7 +2021,7 @@ var _ = Describe("Component Controller", func() {
 		})
 	})
 
-	Context("with registry replace enabled", func() {
+	Context("registry config", func() {
 		registry := "foo.bar"
 		setRegistryConfig := func() {
 			viper.Set(constant.CfgRegistries, map[string]any{
@@ -2046,7 +2031,7 @@ var _ = Describe("Component Controller", func() {
 		}
 
 		BeforeEach(func() {
-			createAllDefinitionObjects()
+			createDefinitionObjects()
 		})
 
 		AfterEach(func() {
@@ -2057,7 +2042,7 @@ var _ = Describe("Component Controller", func() {
 		It("replaces image registry", func() {
 			setRegistryConfig()
 
-			createClusterObj(defaultCompName, compDefName, nil)
+			createCompObj(defaultCompName, compDefObj.Name, nil)
 
 			itsKey := compKey
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
@@ -2068,7 +2053,9 @@ var _ = Describe("Component Controller", func() {
 		})
 
 		It("handles running its and upgrade", func() {
-			createClusterObj(defaultCompName, compDefName, nil)
+			createCompObj(defaultCompName, compDefObj.Name, func(f *testapps.MockComponentFactory) {
+				f.SetServiceVersion(compDefObj.Spec.ServiceVersion)
+			})
 			itsKey := compKey
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 				// check the image
@@ -2077,6 +2064,7 @@ var _ = Describe("Component Controller", func() {
 			})).Should(Succeed())
 
 			setRegistryConfig()
+
 			By("trigger component reconcile")
 			now := time.Now().Format(time.RFC3339)
 			Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
@@ -2105,15 +2093,9 @@ var _ = Describe("Component Controller", func() {
 				compVer.Spec.CompatibilityRules[0].Releases = append(compVer.Spec.CompatibilityRules[0].Releases, release.Name)
 			})()).Should(Succeed())
 
-			By("update serviceversion in cluster")
-			Expect(testapps.GetAndChangeObj(&testCtx, clusterKey, func(cluster *kbappsv1.Cluster) {
-				cluster.Spec.ComponentSpecs[0].ServiceVersion = "8.0.31"
-			})()).Should(Succeed())
-
-			By("trigger component reconcile")
-			now = time.Now().Format(time.RFC3339)
+			By("update service version in component")
 			Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
-				comp.Annotations["now"] = now
+				comp.Spec.ServiceVersion = "8.0.31"
 			})()).Should(Succeed())
 
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {

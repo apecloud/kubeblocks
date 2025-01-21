@@ -328,7 +328,7 @@ func buildSynthesizedComp(ctx context.Context, cli client.Client, opsRes *OpsRes
 		return nil, err
 	}
 	// build synthesized component for the component
-	return component.BuildSynthesizedComponent(ctx, cli, compDefObj, compObj, opsRes.Cluster)
+	return component.BuildSynthesizedComponent(ctx, cli, compDefObj, compObj)
 }
 
 func handleError(reqCtx intctrlutil.RequestCtx,

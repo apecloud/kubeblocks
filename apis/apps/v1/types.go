@@ -354,6 +354,12 @@ type ComponentSystemAccount struct {
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
+	// Specifies whether the system account is disabled.
+	//
+	// +kubebuilder:default=false
+	// +optional
+	Disabled *bool `json:"disabled,omitempty"`
+
 	// Specifies the policy for generating the account's password.
 	//
 	// This field is immutable once set.
@@ -362,6 +368,8 @@ type ComponentSystemAccount struct {
 	PasswordConfig *PasswordConfig `json:"passwordConfig,omitempty"`
 
 	// Refers to the secret from which data will be copied to create the new account.
+	//
+	// For user-specified passwords, the maximum length is limited to 64 bytes.
 	//
 	// This field is immutable once set.
 	//
@@ -436,6 +444,12 @@ type ProvisionSecretRef struct {
 	//
 	// +kubebuilder:validation:Required
 	Namespace string `json:"namespace"`
+
+	// The key in the secret data that contains the password.
+	//
+	// +kubebuilder:default="password"
+	// +optional
+	Password string `json:"password,omitempty"`
 }
 
 // ClusterComponentConfig represents a config with its source bound.

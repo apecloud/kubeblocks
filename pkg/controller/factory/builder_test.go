@@ -26,6 +26,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -79,7 +80,7 @@ var _ = Describe("builder", func() {
 		By("assign every available fields")
 		comp, err := component.BuildComponent(cluster, &cluster.Spec.ComponentSpecs[0], nil, nil)
 		Expect(err).Should(Succeed())
-		synthesizeComp, err := component.BuildSynthesizedComponent(testCtx.Ctx, testCtx.Cli, compDef, comp, cluster)
+		synthesizeComp, err := component.BuildSynthesizedComponent(testCtx.Ctx, testCtx.Cli, compDef, comp)
 		Expect(err).Should(Succeed())
 		Expect(synthesizeComp).ShouldNot(BeNil())
 		// to resolve and inject env vars
@@ -207,7 +208,11 @@ var _ = Describe("builder", func() {
 		It("builds rolebinding correctly", func() {
 			_, cluster, synthesizedComp := newClusterObjs(nil)
 			expectName := fmt.Sprintf("kb-%s", cluster.Name)
-			rb := BuildRoleBinding(synthesizedComp, expectName)
+			rb := BuildRoleBinding(synthesizedComp, expectName, &rbacv1.RoleRef{
+				APIGroup: rbacv1.GroupName,
+				Kind:     "ClusterRole",
+				Name:     constant.RBACRoleName,
+			}, expectName)
 			Expect(rb).ShouldNot(BeNil())
 			Expect(rb.Name).Should(Equal(expectName))
 		})

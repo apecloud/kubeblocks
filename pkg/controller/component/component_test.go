@@ -87,7 +87,7 @@ var _ = Describe("Component", func() {
 				testapps.NginxImage: serviceDescriptor,
 			}
 			By("call build")
-			synthesizeComp, err := BuildSynthesizedComponent(ctx, testCtx.Cli, compDef, compObj(), cluster)
+			synthesizeComp, err := BuildSynthesizedComponent(ctx, testCtx.Cli, compDef, compObj())
 			Expect(err).Should(Succeed())
 			Expect(synthesizeComp).ShouldNot(BeNil())
 			Expect(synthesizeComp.ServiceReferences).ShouldNot(BeNil())
@@ -150,7 +150,7 @@ var _ = Describe("Component", func() {
 			}
 			cluster.Spec.ComponentSpecs[0].Resources.Requests[corev1.ResourceMemory] = _512m
 			cluster.Spec.ComponentSpecs[0].Resources.Limits[corev1.ResourceMemory] = _1024m
-			comp, err := BuildSynthesizedComponent(ctx, testCtx.Cli, compDef.DeepCopy(), compObj(), cluster)
+			comp, err := BuildSynthesizedComponent(ctx, testCtx.Cli, compDef.DeepCopy(), compObj())
 			Expect(err).Should(Succeed())
 			Expect(comp).ShouldNot(BeNil())
 			for _, vol := range comp.PodSpec.Volumes {
@@ -171,7 +171,7 @@ var _ = Describe("Component", func() {
 			By("without memory resource set")
 			delete(cluster.Spec.ComponentSpecs[0].Resources.Requests, corev1.ResourceMemory)
 			delete(cluster.Spec.ComponentSpecs[0].Resources.Limits, corev1.ResourceMemory)
-			comp, err = BuildSynthesizedComponent(ctx, testCtx.Cli, compDef.DeepCopy(), compObj(), cluster)
+			comp, err = BuildSynthesizedComponent(ctx, testCtx.Cli, compDef.DeepCopy(), compObj())
 			Expect(err).Should(Succeed())
 			Expect(comp).ShouldNot(BeNil())
 			for _, vol := range comp.PodSpec.Volumes {

@@ -89,7 +89,7 @@ var _ = Describe("Ops ProgressDetails", func() {
 		By("mock one pod of InstanceSet to update successfully")
 		testk8s.RemovePodFinalizer(ctx, testCtx, pod)
 		testapps.MockInstanceSetPod(&testCtx, nil, clusterName, defaultCompName,
-			pod.Name, "leader", "ReadWrite")
+			pod.Name, "leader")
 
 		_, _ = GetOpsManager().Reconcile(reqCtx, k8sClient, opsRes)
 		Expect(getProgressDetailStatus(opsRes, defaultCompName, pod)).Should(Equal(opsv1alpha1.SucceedProgressStatus))
@@ -204,7 +204,7 @@ var _ = Describe("Ops ProgressDetails", func() {
 			tokens := strings.Split(podList[2].Name, "-")
 			targetPodName := fmt.Sprintf("%s-3", strings.Join(tokens[0:len(tokens)-1], "-"))
 			testapps.MockInstanceSetPod(&testCtx, nil, clusterName, defaultCompName,
-				targetPodName, "follower", "Readonly")
+				targetPodName, "follower")
 			targetPod := &corev1.Pod{}
 			Expect(k8sClient.Get(ctx, client.ObjectKey{Name: targetPodName, Namespace: testCtx.DefaultNamespace}, targetPod)).Should(Succeed())
 			testapps.MockInstanceSetStatus(testCtx, opsRes.Cluster, defaultCompName)

@@ -14,11 +14,12 @@ aggregationRule:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ include "kubeblocks.fullname" . }}-agent-pod-role
+  name: {{ include "kubeblocks.fullname" . }}-kbagent-pod-role
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
     app.kubernetes.io/required-by: pod
 rules:
+# this is needed to create role probe events
 - apiGroups:
   - ""
   resources:
@@ -27,88 +28,3 @@ rules:
   - create
   - get
   - update
-- apiGroups:
-  - ""
-  resources:
-  - configmaps
-  verbs:
-  - create
-  - get
-  - list
-  - patch
-  - update
-  - delete
-- apiGroups:
-  - apps.kubeblocks.io
-  resources:
-  - clusters
-  verbs:
-  - get
-  - list
-- apiGroups:
-  - apps.kubeblocks.io
-  resources:
-  - clusters/status
-  verbs:
-  - get
-- apiGroups:
-  - ""
-  resources:
-  - pods
-  verbs:
-  - get
-  - list
-- apiGroups:
-  - apps.kubeblocks.io
-  resources:
-  - opsrequests/status
-  verbs:
-  - get
-  - patch
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: {{ include "kubeblocks.fullname" . }}-patroni-pod-role
-  labels:
-    {{- include "kubeblocks.labels" . | nindent 4 }}
-    app.kubernetes.io/required-by: pod
-rules:
-- apiGroups:
-  - ""
-  resources:
-  - configmaps
-  verbs:
-  - create
-  - get
-  - list
-  - patch
-  - update
-  - watch
-  # delete is required only for 'patronictl remove'
-  - delete
-- apiGroups:
-  - ""
-  resources:
-  - endpoints
-  verbs:
-  - get
-  - patch
-  - update
-  - create
-  - list
-  - watch
-  # delete is required only for 'patronictl remove'
-  - delete
-- apiGroups:
-  - ""
-  resources:
-  - pods
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch

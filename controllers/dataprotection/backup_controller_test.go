@@ -906,6 +906,49 @@ var _ = Describe("Backup Controller test", func() {
 
 			})
 
+			It("creates scheduled incremental backups", func() {
+				By("creating a unscheduled full backup from backupPolicy " + testdp.BackupPolicyName)
+				fullBackup1 := testdp.NewFakeBackup(&testCtx, func(backup *dpv1alpha1.Backup) {
+					backup.Name = "full-bakcup-1"
+				})
+				fullBackupKey1 := client.ObjectKeyFromObject(fullBackup1)
+				By("waiting for the full backup " + fullBackupKey1.String() + " to complete")
+				checkBackupCompleted(fullBackup1)
+				mockBackupStatus(fullBackup1, "", "")
+				By("creating a scheduled incremental backup " + incBackupName + "1")
+				incBackup1 := mockIncBackupAndComplete(true, incBackupName+"1", "", fullBackup1.Name, fullBackup1.Name)
+				By("creating a scheduled incremental backup " + incBackupName + "2")
+				_ = mockIncBackupAndComplete(true, incBackupName+"2", "", incBackup1.Name, fullBackup1.Name)
+				By("creating a scheduled full backup from backupPolicy " + testdp.BackupPolicyName)
+				fullBackup2 := testdp.NewFakeBackup(&testCtx, func(backup *dpv1alpha1.Backup) {
+					backup.Name = "full-bakcup-2"
+					backup.Labels[dptypes.BackupScheduleLabelKey] = scheduleName
+				})
+				fullBackupKey2 := client.ObjectKeyFromObject(fullBackup2)
+				By("waiting for the full backup " + fullBackupKey2.String() + " to complete")
+				checkBackupCompleted(fullBackup2)
+				mockBackupStatus(fullBackup2, "", "")
+				By("creating a scheduled incremental backup " + incBackupName + "3")
+				incBackup3 := mockIncBackupAndComplete(true, incBackupName+"3", "", fullBackup2.Name, fullBackup2.Name)
+				By("creating a scheduled incremental backup " + incBackupName + "4")
+				_ = mockIncBackupAndComplete(true, incBackupName+"4", "", incBackup3.Name, fullBackup2.Name)
+				By("creating a scheduled full backup from backupPolicy " + testdp.BackupPolicyName)
+				fullBackup3 := testdp.NewFakeBackup(&testCtx, func(backup *dpv1alpha1.Backup) {
+					backup.Name = "full-bakcup-3"
+					backup.Labels[dptypes.BackupScheduleLabelKey] = scheduleName
+				})
+				fullBackupKey3 := client.ObjectKeyFromObject(fullBackup3)
+				By("waiting for the full backup " + fullBackupKey3.String() + " to complete")
+				checkBackupCompleted(fullBackup3)
+				mockBackupStatus(fullBackup3, "", "")
+				By("creating a scheduled incremental backup " + incBackupName + "5")
+				incBackup5 := mockIncBackupAndComplete(true, incBackupName+"5", "", fullBackup3.Name, fullBackup3.Name)
+				By("creating a unscheduled incremental backup " + incBackupName + "6")
+				_ = mockIncBackupAndComplete(false, incBackupName+"6", "", incBackup5.Name, fullBackup3.Name)
+				By("creating a scheduled incremental backup " + incBackupName + "7")
+				_ = mockIncBackupAndComplete(true, incBackupName+"7", "", incBackup5.Name, fullBackup3.Name)
+			})
+
 			It("creates an incremental backup without valid parent backups", func() {
 				By("creating an incremental backup without specific parent backup")
 				incBackup1 := newFakeIncBackup(incBackupName+"1", "", false)

@@ -21,6 +21,7 @@ package apps
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/utils/ptr"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
@@ -206,11 +207,12 @@ func (factory *MockClusterFactory) AddComponentService(serviceName string, servi
 	})
 }
 
-func (factory *MockClusterFactory) AddSystemAccount(name string, passwordConfig *appsv1.PasswordConfig, secretRef *appsv1.ProvisionSecretRef) *MockClusterFactory {
+func (factory *MockClusterFactory) AddSystemAccount(name string, disabled bool, passwordConfig *appsv1.PasswordConfig, secretRef *appsv1.ProvisionSecretRef) *MockClusterFactory {
 	return factory.lastComponentRef(func(comp *appsv1.ClusterComponentSpec) {
 		comp.SystemAccounts = append(comp.SystemAccounts,
 			appsv1.ComponentSystemAccount{
 				Name:           name,
+				Disabled:       ptr.To(disabled),
 				PasswordConfig: passwordConfig,
 				SecretRef:      secretRef,
 			})
@@ -225,11 +227,5 @@ func (factory *MockClusterFactory) SetBackup(backup *appsv1.ClusterBackup) *Mock
 func (factory *MockClusterFactory) SetServiceRefs(serviceRefs []appsv1.ServiceRef) *MockClusterFactory {
 	return factory.lastComponentRef(func(comp *appsv1.ClusterComponentSpec) {
 		comp.ServiceRefs = serviceRefs
-	})
-}
-
-func (factory *MockClusterFactory) SetStop(stop *bool) *MockClusterFactory {
-	return factory.lastComponentRef(func(comp *appsv1.ClusterComponentSpec) {
-		comp.Stop = stop
 	})
 }

@@ -81,7 +81,7 @@ func newAllFieldsSynthesizedComponent(compDef *appsv1.ComponentDefinition, clust
 	if err != nil {
 		panic(fmt.Sprintf("build component object error: %v", err))
 	}
-	synthesizeComp, err := component.BuildSynthesizedComponent(testCtx.Ctx, testCtx.Cli, compDef, comp, cluster)
+	synthesizeComp, err := component.BuildSynthesizedComponent(testCtx.Ctx, testCtx.Cli, compDef, comp)
 	Expect(err).Should(Succeed())
 	Expect(synthesizeComp).ShouldNot(BeNil())
 	addTestVolumeMount(synthesizeComp.PodSpec, mysqlCompName)

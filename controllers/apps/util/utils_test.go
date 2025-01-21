@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package cluster
+package util
 
 import (
 	"fmt"
@@ -61,7 +61,7 @@ func TestReflect(t *testing.T) {
 
 func TestIsOwnedByInstanceSet(t *testing.T) {
 	its := &workloads.InstanceSet{}
-	assert.False(t, isOwnedByInstanceSet(its))
+	assert.False(t, IsOwnedByInstanceSet(its))
 
 	its.OwnerReferences = []metav1.OwnerReference{
 		{
@@ -69,7 +69,7 @@ func TestIsOwnedByInstanceSet(t *testing.T) {
 			Controller: pointer.Bool(true),
 		},
 	}
-	assert.True(t, isOwnedByInstanceSet(its))
+	assert.True(t, IsOwnedByInstanceSet(its))
 
 	its.OwnerReferences = []metav1.OwnerReference{
 		{
@@ -77,5 +77,5 @@ func TestIsOwnedByInstanceSet(t *testing.T) {
 			Controller: pointer.Bool(true),
 		},
 	}
-	assert.False(t, isOwnedByInstanceSet(its))
+	assert.False(t, IsOwnedByInstanceSet(its))
 }

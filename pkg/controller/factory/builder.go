@@ -52,7 +52,7 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, component
 	)
 
 	podBuilder := builder.NewPodBuilder("", "").
-		// Priority: static < dynamic < built-in
+		// priority: static < dynamic < built-in
 		AddLabelsInMap(synthesizedComp.StaticLabels).
 		AddLabelsInMap(synthesizedComp.DynamicLabels).
 		AddLabelsInMap(constant.GetCompLabels(clusterName, compName, synthesizedComp.Labels)).
@@ -65,7 +65,9 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, component
 
 	itsName := constant.GenerateWorkloadNamePattern(clusterName, compName)
 	itsBuilder := builder.NewInstanceSetBuilder(namespace, itsName).
+		// priority: static < dynamic < built-in
 		AddLabelsInMap(synthesizedComp.StaticLabels).
+		AddLabelsInMap(synthesizedComp.DynamicLabels).
 		AddLabelsInMap(constant.GetCompLabels(clusterName, compName)).
 		AddAnnotations(constant.KubeBlocksGenerationKey, synthesizedComp.Generation).
 		AddAnnotations(constant.CRDAPIVersionAnnotationKey, workloads.GroupVersion.String()).

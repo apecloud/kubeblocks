@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
@@ -44,7 +45,7 @@ var _ = Describe("Component Workload Operations Test", func() {
 	)
 
 	var (
-		reader         *mockReader
+		reader         *appsutil.MockReader
 		dag            *graph.DAG
 		comp           *appsv1.Component
 		synthesizeComp *component.SynthesizedComponent
@@ -62,7 +63,7 @@ var _ = Describe("Component Workload Operations Test", func() {
 	}
 
 	BeforeEach(func() {
-		reader = &mockReader{}
+		reader = &appsutil.MockReader{}
 		comp = &appsv1.Component{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: testCtx.DefaultNamespace,
@@ -156,13 +157,9 @@ var _ = Describe("Component Workload Operations Test", func() {
 				SetRoles(roles).
 				GetObject()
 
-			mockCluster := testapps.NewClusterFactory(testCtx.DefaultNamespace, "test-cluster", "test-def").
-				GetObject()
-
 			ops = &componentWorkloadOps{
 				cli:            k8sClient,
 				reqCtx:         intctrlutil.RequestCtx{Ctx: ctx, Log: logger, Recorder: clusterRecorder},
-				cluster:        mockCluster,
 				component:      comp,
 				synthesizeComp: synthesizeComp,
 				runningITS:     mockITS,

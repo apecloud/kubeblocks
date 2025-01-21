@@ -23,7 +23,9 @@ import (
 	"fmt"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
 var (
@@ -48,7 +50,7 @@ func (t *componentValidationTransformer) Transform(ctx graph.TransformContext, d
 	}()
 
 	if err = validateCompReplicas(comp, transCtx.CompDef); err != nil {
-		return newRequeueError(requeueDuration, err.Error())
+		return intctrlutil.NewRequeueError(appsutil.RequeueDuration, err.Error())
 	}
 	// if err = validateSidecarContainers(comp, transCtx.CompDef); err != nil {
 	// 	return newRequeueError(requeueDuration, err.Error())

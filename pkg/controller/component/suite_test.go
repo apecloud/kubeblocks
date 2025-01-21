@@ -56,7 +56,6 @@ import (
 
 var cfg *rest.Config
 var k8sClient client.Client
-var graphCli model.GraphClient
 var testEnv *envtest.Environment
 var ctx context.Context
 var cancel context.CancelFunc
@@ -127,8 +126,6 @@ var _ = BeforeSuite(func() {
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
-
-	graphCli = model.NewGraphClient(k8sClient)
 
 	// run reconcile
 	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{

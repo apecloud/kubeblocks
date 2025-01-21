@@ -26,6 +26,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
@@ -35,7 +36,7 @@ func setCompOwnershipNFinalizer(comp *appsv1.Component, object client.Object) er
 	}
 	// add finalizer to the object
 	controllerutil.AddFinalizer(object, constant.DBComponentFinalizerName)
-	if err := intctrlutil.SetOwnership(comp, object, rscheme, ""); err != nil {
+	if err := intctrlutil.SetOwnership(comp, object, model.GetScheme(), ""); err != nil {
 		if _, ok := err.(*controllerutil.AlreadyOwnedError); ok {
 			return nil
 		}

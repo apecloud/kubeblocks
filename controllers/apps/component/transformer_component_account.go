@@ -32,6 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
@@ -115,13 +116,13 @@ func (t *componentAccountTransformer) createAccount(transCtx *componentTransform
 	if err = t.buildAccountHash(account, nil, secret); err != nil {
 		return err
 	}
-	graphCli.Create(dag, secret, inUniversalContext4G())
+	graphCli.Create(dag, secret, appsutil.InUniversalContext4G())
 	return nil
 }
 
 func (t *componentAccountTransformer) deleteAccount(transCtx *componentTransformContext,
 	dag *graph.DAG, graphCli model.GraphClient, secret *corev1.Secret) {
-	graphCli.Delete(dag, secret, inUniversalContext4G())
+	graphCli.Delete(dag, secret, appsutil.InUniversalContext4G())
 }
 
 func (t *componentAccountTransformer) updateAccount(transCtx *componentTransformContext,
@@ -142,7 +143,7 @@ func (t *componentAccountTransformer) updateAccount(transCtx *componentTransform
 	ctrlutil.MergeMetadataMapInplace(secret.Labels, &runningCopy.Labels)
 	ctrlutil.MergeMetadataMapInplace(secret.Annotations, &runningCopy.Annotations)
 	if !reflect.DeepEqual(running, runningCopy) {
-		graphCli.Update(dag, running, runningCopy, inUniversalContext4G())
+		graphCli.Update(dag, running, runningCopy, appsutil.InUniversalContext4G())
 	}
 	return nil
 }

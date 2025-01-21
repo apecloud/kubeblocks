@@ -33,6 +33,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/factory"
@@ -70,13 +71,14 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 		sa := &corev1.ServiceAccount{}
 		if err := transCtx.Client.Get(transCtx.Context, types.NamespacedName{Namespace: synthesizedComp.Namespace, Name: serviceAccountName}, sa); err != nil {
 			if errors.IsNotFound(err) {
-				transCtx.EventRecorder.Event(transCtx.Cluster, corev1.EventTypeWarning, EventReasonRBACManager, fmt.Sprintf("serviceaccount %v not found", serviceAccountName))
+				transCtx.EventRecorder.Event(transCtx.Component, corev1.EventTypeWarning, EventReasonRBACManager,
+					fmt.Sprintf("serviceaccount %v not found", serviceAccountName))
 			}
 			return err
 		}
 	}
 	if !viper.GetBool(constant.EnableRBACManager) {
-		transCtx.EventRecorder.Event(transCtx.Cluster, corev1.EventTypeNormal, EventReasonRBACManager, "RBAC manager is disabled")
+		transCtx.EventRecorder.Event(transCtx.Component, corev1.EventTypeNormal, EventReasonRBACManager, "RBAC manager is disabled")
 		return nil
 	}
 
@@ -116,10 +118,6 @@ func (t *componentRBACTransformer) Transform(ctx graph.TransformContext, dag *gr
 	return nil
 }
 
-func isLifecycleActionsEnabled(compDef *appsv1.ComponentDefinition) bool {
-	return compDef.Spec.LifecycleActions != nil
-}
-
 func labelAndAnnotationEqual(old, new metav1.Object) bool {
 	// exclude component labels, since they are different for each component
 	compLabels := constant.GetCompLabels("", "")
@@ -139,25 +137,26 @@ func labelAndAnnotationEqual(old, new metav1.Object) bool {
 		equality.Semantic.DeepEqual(old.GetAnnotations(), new.GetAnnotations())
 }
 
-func createOrUpdate[T any, PT generics.PObject[T]](
-	transCtx *componentTransformContext, obj PT, graphCli model.GraphClient, dag *graph.DAG, cmpFn func(oldObj, newObj PT) bool,
-) (PT, error) {
+func createOrUpdate[T any, PT generics.PObject[T]](transCtx *componentTransformContext,
+	obj PT, graphCli model.GraphClient, dag *graph.DAG, cmpFn func(oldObj, newObj PT) bool) (PT, error) {
 	oldObj := PT(new(T))
 	if err := transCtx.Client.Get(transCtx.Context, client.ObjectKeyFromObject(obj), oldObj); err != nil {
 		if errors.IsNotFound(err) {
-			graphCli.Create(dag, obj, inDataContext4G())
+			graphCli.Create(dag, obj, appsutil.InDataContext4G())
 			return obj, nil
 		}
 		return nil, err
 	}
 	if !cmpFn(oldObj, obj) {
-		transCtx.Logger.V(1).Info("updating rbac resources", "name", klog.KObj(obj).String(), "obj", fmt.Sprintf("%#v", obj))
-		graphCli.Update(dag, oldObj, obj, inDataContext4G())
+		transCtx.Logger.V(1).Info("updating rbac resources",
+			"name", klog.KObj(obj).String(), "obj", fmt.Sprintf("%#v", obj))
+		graphCli.Update(dag, oldObj, obj, appsutil.InDataContext4G())
 	}
 	return obj, nil
 }
 
-func createOrUpdateServiceAccount(transCtx *componentTransformContext, serviceAccountName string, graphCli model.GraphClient, dag *graph.DAG) (*corev1.ServiceAccount, error) {
+func createOrUpdateServiceAccount(transCtx *componentTransformContext,
+	serviceAccountName string, graphCli model.GraphClient, dag *graph.DAG) (*corev1.ServiceAccount, error) {
 	synthesizedComp := transCtx.SynthesizeComponent
 
 	sa := factory.BuildServiceAccount(synthesizedComp, serviceAccountName)
@@ -173,9 +172,7 @@ func createOrUpdateServiceAccount(transCtx *componentTransformContext, serviceAc
 	})
 }
 
-func createOrUpdateRole(
-	transCtx *componentTransformContext, graphCli model.GraphClient, dag *graph.DAG,
-) (*rbacv1.Role, error) {
+func createOrUpdateRole(transCtx *componentTransformContext, graphCli model.GraphClient, dag *graph.DAG) (*rbacv1.Role, error) {
 	role := factory.BuildRole(transCtx.SynthesizeComponent, transCtx.CompDef)
 	if role == nil {
 		return nil, nil
@@ -189,9 +186,8 @@ func createOrUpdateRole(
 	})
 }
 
-func createOrUpdateRoleBinding(
-	transCtx *componentTransformContext, cmpdRole *rbacv1.Role, serviceAccountName string, graphCli model.GraphClient, dag *graph.DAG,
-) ([]*rbacv1.RoleBinding, error) {
+func createOrUpdateRoleBinding(transCtx *componentTransformContext,
+	cmpdRole *rbacv1.Role, serviceAccountName string, graphCli model.GraphClient, dag *graph.DAG) ([]*rbacv1.RoleBinding, error) {
 	cmpRoleBinding := func(old, new *rbacv1.RoleBinding) bool {
 		return labelAndAnnotationEqual(old, new) &&
 			equality.Semantic.DeepEqual(old.Subjects, new.Subjects) &&
@@ -237,4 +233,8 @@ func createOrUpdateRoleBinding(
 	}
 
 	return res, nil
+}
+
+func isLifecycleActionsEnabled(compDef *appsv1.ComponentDefinition) bool {
+	return compDef.Spec.LifecycleActions != nil
 }

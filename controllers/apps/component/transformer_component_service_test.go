@@ -32,6 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
@@ -39,14 +40,14 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-var _ = Describe(" component service transformer test", func() {
+var _ = Describe("component service transformer test", func() {
 	const (
 		clusterName = "test-cluster"
 		compName    = "comp"
 	)
 
 	var (
-		reader   *mockReader
+		reader   *appsutil.MockReader
 		dag      *graph.DAG
 		transCtx *componentTransformContext
 	)
@@ -58,7 +59,7 @@ var _ = Describe(" component service transformer test", func() {
 	}
 
 	BeforeEach(func() {
-		reader = &mockReader{}
+		reader = &appsutil.MockReader{}
 		comp := &appsv1.Component{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: testCtx.DefaultNamespace,
@@ -149,7 +150,7 @@ var _ = Describe(" component service transformer test", func() {
 			for i := int32(0); i < transCtx.SynthesizeComponent.Replicas; i++ {
 				services = append(services, podService(i))
 			}
-			reader.objs = append(reader.objs, services...)
+			reader.Objects = append(reader.Objects, services...)
 
 			// remove component services
 			transCtx.SynthesizeComponent.ComponentServices = nil
@@ -176,7 +177,7 @@ var _ = Describe(" component service transformer test", func() {
 			for i := int32(0); i < transCtx.SynthesizeComponent.Replicas; i++ {
 				services = append(services, podService(i))
 			}
-			reader.objs = append(reader.objs, services...)
+			reader.Objects = append(reader.Objects, services...)
 
 			// scale-in
 			replicas := transCtx.SynthesizeComponent.Replicas

@@ -186,6 +186,7 @@ func copyAndMergeComponent(oldCompObj, newCompObj *appsv1.Component) *appsv1.Com
 	ictrlutil.MergeMetadataMapInplace(compProto.Labels, &compObjCopy.Labels)
 
 	// merge spec
+	compObjCopy.Spec.TerminationPolicy = compProto.Spec.TerminationPolicy
 	compObjCopy.Spec.CompDef = compProto.Spec.CompDef
 	compObjCopy.Spec.ServiceVersion = compProto.Spec.ServiceVersion
 	compObjCopy.Spec.ServiceRefs = compProto.Spec.ServiceRefs

@@ -28,6 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
@@ -68,13 +69,13 @@ func (t *clusterServiceTransformer) Transform(ctx graph.TransformContext, dag *g
 	toCreateServices, toDeleteServices, toUpdateServices := mapDiff(services, protoServices)
 
 	for svc := range toCreateServices {
-		graphCli.Create(dag, protoServices[svc], inDataContext4G())
+		graphCli.Create(dag, protoServices[svc], appsutil.InDataContext4G())
 	}
 	for svc := range toUpdateServices {
 		t.updateService(dag, graphCli, services[svc], protoServices[svc])
 	}
 	for svc := range toDeleteServices {
-		graphCli.Delete(dag, services[svc], inDataContext4G())
+		graphCli.Delete(dag, services[svc], appsutil.InDataContext4G())
 	}
 	return nil
 }
@@ -224,9 +225,9 @@ func (t *clusterServiceTransformer) updateService(dag *graph.DAG, graphCli model
 	newSvc.Spec = proto.Spec
 	ctrlutil.MergeMetadataMapInplace(proto.Labels, &newSvc.Labels)
 	ctrlutil.MergeMetadataMapInplace(proto.Annotations, &newSvc.Annotations)
-	resolveServiceDefaultFields(&running.Spec, &newSvc.Spec)
+	appsutil.ResolveServiceDefaultFields(&running.Spec, &newSvc.Spec)
 
 	if !reflect.DeepEqual(running, newSvc) {
-		graphCli.Update(dag, running, newSvc, inDataContext4G())
+		graphCli.Update(dag, running, newSvc, appsutil.InDataContext4G())
 	}
 }

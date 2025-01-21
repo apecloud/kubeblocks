@@ -5588,6 +5588,14 @@ spec:
                   - name
                   type: object
                 type: array
+              terminationPolicy:
+                default: Delete
+                description: Specifies the behavior when a Component is deleted.
+                enum:
+                - DoNotTerminate
+                - Delete
+                - WipeOut
+                type: string
               tlsConfig:
                 description: "Specifies the TLS configuration for the Component, including:\n\n\n-
                   A boolean flag that indicates whether the Component should use Transport

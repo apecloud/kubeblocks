@@ -29,7 +29,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
@@ -230,12 +229,4 @@ func filterImmutableParameters(parameters map[string]any, immutableParams []stri
 		}
 	}
 	return validParameters
-}
-
-func TransformConfigTemplate(configs []appsv1.ComponentConfigSpec) []appsv1.ComponentTemplateSpec {
-	arr := make([]appsv1.ComponentTemplateSpec, 0, len(configs))
-	for _, config := range configs {
-		arr = append(arr, config.ComponentTemplateSpec)
-	}
-	return arr
 }

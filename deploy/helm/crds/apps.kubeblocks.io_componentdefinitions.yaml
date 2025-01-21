@@ -17039,6 +17039,11 @@ spec:
                                         components.
                                       type: string
                                   type: object
+                                requireAllComponentObjects:
+                                  description: |-
+                                    RequireAllComponentObjects controls whether all component objects must exist before resolving.
+                                    If set to true, resolving will only proceed if all component objects are present.
+                                  type: boolean
                                 strategy:
                                   description: Define the strategy for handling multiple
                                     cluster objects.
@@ -17186,6 +17191,11 @@ spec:
                                         components.
                                       type: string
                                   type: object
+                                requireAllComponentObjects:
+                                  description: |-
+                                    RequireAllComponentObjects controls whether all component objects must exist before resolving.
+                                    If set to true, resolving will only proceed if all component objects are present.
+                                  type: boolean
                                 strategy:
                                   description: Define the strategy for handling multiple
                                     cluster objects.
@@ -17291,6 +17301,11 @@ spec:
                                         components.
                                       type: string
                                   type: object
+                                requireAllComponentObjects:
+                                  description: |-
+                                    RequireAllComponentObjects controls whether all component objects must exist before resolving.
+                                    If set to true, resolving will only proceed if all component objects are present.
+                                  type: boolean
                                 strategy:
                                   description: Define the strategy for handling multiple
                                     cluster objects.
@@ -17394,6 +17409,11 @@ spec:
                                         components.
                                       type: string
                                   type: object
+                                requireAllComponentObjects:
+                                  description: |-
+                                    RequireAllComponentObjects controls whether all component objects must exist before resolving.
+                                    If set to true, resolving will only proceed if all component objects are present.
+                                  type: boolean
                                 strategy:
                                   description: Define the strategy for handling multiple
                                     cluster objects.
@@ -17507,6 +17527,11 @@ spec:
                                         components.
                                       type: string
                                   type: object
+                                requireAllComponentObjects:
+                                  description: |-
+                                    RequireAllComponentObjects controls whether all component objects must exist before resolving.
+                                    If set to true, resolving will only proceed if all component objects are present.
+                                  type: boolean
                                 strategy:
                                   description: Define the strategy for handling multiple
                                     cluster objects.
@@ -17607,6 +17632,11 @@ spec:
                                         components.
                                       type: string
                                   type: object
+                                requireAllComponentObjects:
+                                  description: |-
+                                    RequireAllComponentObjects controls whether all component objects must exist before resolving.
+                                    If set to true, resolving will only proceed if all component objects are present.
+                                  type: boolean
                                 strategy:
                                   description: Define the strategy for handling multiple
                                     cluster objects.

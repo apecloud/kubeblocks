@@ -8222,6 +8222,19 @@ MultipleClusterObjectValueFormatFlatten
 <tbody>
 <tr>
 <td>
+<code>requireAllComponentObjects</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>RequireAllComponentObjects controls whether all component objects must exist before resolving.
+If set to true, resolving will only proceed if all component objects are present.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>strategy</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.MultipleClusterObjectStrategy">

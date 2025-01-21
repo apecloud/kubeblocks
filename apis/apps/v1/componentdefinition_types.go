@@ -881,6 +881,12 @@ type ClusterObjectReference struct {
 
 // MultipleClusterObjectOption defines the options for handling multiple cluster objects matched.
 type MultipleClusterObjectOption struct {
+	// RequireAllComponentObjects controls whether all component objects must exist before resolving.
+	// If set to true, resolving will only proceed if all component objects are present.
+	//
+	// +optional
+	RequireAllComponentObjects *bool `json:"requireAllComponentObjects,omitempty"`
+
 	// Define the strategy for handling multiple cluster objects.
 	//
 	// +kubebuilder:validation:Required

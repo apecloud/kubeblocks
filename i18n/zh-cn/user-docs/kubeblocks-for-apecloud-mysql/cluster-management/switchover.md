@@ -9,7 +9,7 @@ sidebar_label: 切换
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# 切换 ApeCloud MySQL 集群
+# 切换 ApeCloud MySQL 集群 
 
 数据库 switchover 是指在数据库集群中将主数据库的角色切换到备用数据库的过程，使备用数据库成为新的主数据库实例。通常在主数据库故障、维护或升级时执行 switchover 操作，以确保数据库服务的高可用性和连续性。可使用命令对 ApeCloud MySQL 集群版执行切换，KubeBlocks 将切换实例角色。
 
@@ -24,8 +24,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    kubectl get cluster mycluster -n demo
    >
-   NAME        CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    AGE
-   mycluster   apecloud-mysql       ac-mysql-8.0.30   Delete               Running   27m
+   NAME        CLUSTER-DEFINITION   TERMINATION-POLICY   STATUS    AGE
+   mycluster   apecloud-mysql       Delete               Running   45m
    ```
 
    </TabItem>
@@ -35,8 +35,8 @@ import TabItem from '@theme/TabItem';
    ```bash
    kbcli cluster list mycluster -n demo
    >
-   NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    CREATED-TIME
-   mycluster   demo        apecloud-mysql       ac-mysql-8.0.30   Delete               Running   Sep 19,2024 16:01 UTC+0800
+   NAME        NAMESPACE   CLUSTER-DEFINITION   TERMINATION-POLICY   STATUS    CREATED-TIME
+   mycluster   demo        apecloud-mysql       Delete               Running   Jan 20,2025 16:27 UTC+0800
    ```
 
    </TabItem>
@@ -65,39 +65,51 @@ import TabItem from '@theme/TabItem';
 
 * 不指定 Leader 实例进行切换。
 
-  ```yaml
-  kubectl apply -f -<<EOF
-  apiVersion: apps.kubeblocks.io/v1alpha1
-  kind: OpsRequest
-  metadata:
-    name: mycluster-switchover
-    namespace: demo
-  spec:
-    clusterName: mycluster
-    type: Switchover
-    switchover:
-    - componentName: apecloud-mysql
-      instanceName: '*'
-  EOF
-  ```
+   ```yaml
+   kubectl apply -f -<<EOF
+   apiVersion: operations.kubeblocks.io/v1alpha1
+   kind: OpsRequest
+   metadata:
+     name: acmysql-switchover
+     namespace: demo
+   spec:
+     # 定义了本次运维操作指向的集群名称
+     clusterName: mycluster
+     type: Switchover
+     # 列出切换的对象，指定执行本次切换任务面向的 Component
+     switchover:
+       # 定义了 Component 的名称
+     - componentName: mysql
+       # 定义了本次切换任务将哪个实例切换为主实例。`instanceName` 可设置为以下任一值：
+       # - "*" （通配符）: 表示不指定主实例
+       # - 某一实例的名称（即 pod 名称）
+       instanceName: '*'
+   EOF
+   ```
 
 * 指定一个新的 Leader 实例进行切换。
 
-  ```yaml
-  kubectl apply -f -<<EOF
-  apiVersion: apps.kubeblocks.io/v1alpha1
-  kind: OpsRequest
-  metadata:
-    name: mycluster-switchover
-    namespace: demo
-  spec:
-    clusterName: mycluster
-    type: Switchover
-    switchover:
-    - componentName: apecloud-mysql
-      instanceName: 'mycluster-mysql-2'
-  EOF
-  ```
+   ```yaml
+   kubectl apply -f -<<EOF
+   apiVersion: operations.kubeblocks.io/v1alpha1
+   kind: OpsRequest
+   metadata:
+     name: acmysql-switchover-specify
+     namespace: demo
+   spec:
+     # 定义了本次运维操作指向的集群名称
+     clusterName: mycluster
+     type: Switchover
+     # 列出切换的对象，指定执行本次切换任务面向的 Component
+     switchover:
+       # 定义了 Component 的名称
+     - componentName: mysql
+       # 定义了本次切换任务将哪个实例切换为主实例。`instanceName` 可设置为以下任一值：
+       # - "*" （通配符）: 表示不指定主实例
+       # - 某一实例的名称（即 pod 名称）
+       instanceName: acmysql-cluster-mysql-2
+   EOF
+   ```
 
 </TabItem>
 

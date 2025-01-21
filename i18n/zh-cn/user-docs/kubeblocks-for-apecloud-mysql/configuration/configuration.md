@@ -26,11 +26,15 @@ import TabItem from '@theme/TabItem';
 
    ```bash
    kubectl get configurations.apps.kubeblocks.io -n demo
+   ```
 
+2. 编辑配置文件。
+
+   ```bash
    kubectl edit configurations.apps.kubeblocks.io mycluster-mysql -n demo
    ```
 
-2. 按需配置参数。以下实例中添加了 `spec.configFileParams`，用于配置 `max_connections` 参数。
+   按需配置参数。以下实例中添加了 `spec.configFileParams`，用于配置 `max_connections` 参数。
 
    ```yaml
    spec:
@@ -96,42 +100,47 @@ kbcli cluster describe-config mycluster -n demo
 
 <TabItem value="OpsRequest" label="OpsRequest">
 
-1. 在名为 `mycluster-configuring-demo.yaml` 的 YAML 文件中定义 OpsRequest，并修改参数。如下示例中，`max_connections` 参数修改为 `600`。
+1. 在名为 `mycluster-configuring-demo.yaml` 的 YAML 文件中定义 OpsRequest，并修改参数。如下示例中，`innodb_buffer_pool_size` 参数修改为 `512M`，`max_connections` 参数修改为 `600`。
 
-   ```bash
-   apiVersion: apps.kubeblocks.io/v1alpha1
+   ```yaml
+   apiVersion: operations.kubeblocks.io/v1alpha1
    kind: OpsRequest
    metadata:
-     name: mycluster-configuring-demo
+     name: acmysql-reconfiguring
      namespace: demo
    spec:
+     type: Reconfiguring
      clusterName: mycluster
-     reconfigure:
-       componentName: mysql
+     force: false
+     reconfigures:
+     - componentName: mysql
        configurations:
        - keys:
          - key: my.cnf
            parameters:
+           - key: innodb_buffer_pool_size
+             value: 512M
            - key: max_connections
-             value: "600"
-         name: mysql-consensusset-configuration
+             value: '600'
+         name: mysql-consensusset-config
      preConditionDeadlineSeconds: 0
-     type: Reconfiguring
    ```
 
    | 字段                                                    | 定义     |
    |--------------------------------------------------------|--------------------------------|
    | `metadata.name`                                        | 定义了 OpsRequest 的名称。 |
    | `metadata.namespace`                                   | 定义了集群所在的 namespace。 |
+   | `spec.type`                                            | 定义了本次运维操作的类型。 |
    | `spec.clusterName`                                     | 定义了本次运维操作指向的集群名称。 |
-   | `spec.reconfigure`                                     | 定义了需配置的 component 及相关配置更新内容。 |
-   | `spec.reconfigure.componentName`                       | 定义了该集群的 component 名称。  |
+   | `spec.force`                                           | 用于指示系统绕过预检查（包括集群状态检查和自定义前置条件钩子），直接执行 opsRequest。但对于 `Start` 类型的 opsRequest，即使 `force` 为 true，也仍然会进行预检查。注意：一旦设置，`force` 字段将不可变，无法更新。 |
+   | `spec.reconfigures`                                    | 定义了需配置的 component 及相关配置更新内容。 |
+   | `spec.reconfigures.componentName`                      | 定义了该集群的 component 名称。  |
    | `spec.configurations`                                  | 包含一系列 ConfigurationItem 对象，定义了 component 的配置模板名称、更新策略、参数键值对。 |
-   | `spec.reconfigure.configurations.keys.key`             | 定义了 configuration map。 |
-   | `spec.reconfigure.configurations.keys.parameters`      | 定义了单个参数文件的键值对列表。 |
-   | `spec.reconfigure.configurations.keys.parameter.key`   | 代表您需要编辑的参数名称。|
-   | `spec.reconfigure.configurations.keys.parameter.value` | 代表了将要更新的参数值。如果设置为 nil，Key 字段定义的参数将会被移出配置文件。  |
-   | `spec.reconfigure.configurations.name`                 | 定义了配置模板名称。  |
+   | `spec.reconfigures.configurations.keys.key`            | 定义了 configuration map。 |
+   | `spec.reconfigures.configurations.keys.parameters`     | 定义了单个参数文件的键值对列表。 |
+   | `spec.reconfigures.configurations.keys.parameter.key`  | 代表您需要编辑的参数名称。|
+   | `spec.reconfigures.configurations.keys.parameter.value`| 代表了将要更新的参数值。如果设置为 nil，Key 字段定义的参数将会被移出配置文件。  |
+   | `spec.reconfigures.configurations.name`                | 定义了配置模板名称。  |
    | `preConditionDeadlineSeconds`                          | 定义了本次 OpsRequest 中止之前，满足其启动条件的最长等待时间（单位为秒）。如果设置为 0（默认），则必须立即满足启动条件，OpsRequest 才能继续。|
 
 2. 应用配置 OpsRequest。

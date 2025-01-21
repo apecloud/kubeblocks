@@ -28,8 +28,8 @@ import TabItem from '@theme/TabItem';
   ```bash
   kubectl get addons.extensions.kubeblocks.io apecloud-mysql
   >
-  NAME             TYPE   VERSION   PROVIDER   STATUS    AGE
-  apecloud-mysql   Helm                        Enabled   61m
+  NAME             TYPE   VERSION         PROVIDER   STATUS    AGE
+  apecloud-mysql   Helm   1.0.0-alpha.0   apecloud   Enabled   10m
   ```
 
   </TabItem>
@@ -41,7 +41,7 @@ import TabItem from '@theme/TabItem';
   >
   NAME                           VERSION         PROVIDER    STATUS     AUTO-INSTALL
   ...
-  apecloud-mysql                 0.9.0           apecloud    Enabled    true
+  apecloud-mysql                 1.0.0-alpha.0   apecloud    Enabled    true
   ...
   ```
 
@@ -176,8 +176,8 @@ KubeBlocks 支持创建两种类型的 ApeCloud MySQL 集群：单机版（Stand
    ```bash
    kubectl get cluster mycluster -n demo
    >
-   NAME        CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    AGE
-   mycluster   apecloud-mysql       ac-mysql-8.0.30   Delete               Running   12m
+   NAME        CLUSTER-DEFINITION   TERMINATION-POLICY   STATUS    AGE
+   mycluster   apecloud-mysql       Delete               Running   40s
    ```
 
 </TabItem>
@@ -222,8 +222,8 @@ KubeBlocks 支持创建两种类型的 ApeCloud MySQL 集群：单机版（Stand
    ```bash
    kbcli cluster list -n demo
    >
-   NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    CREATED-TIME
-   mycluster   demo        apecloud-mysql       ac-mysql-8.0.30   Delete               Running   Sep 19,2024 16:01 UTC+0800
+   NAME        NAMESPACE   CLUSTER-DEFINITION   TERMINATION-POLICY   STATUS    CREATED-TIME
+   mycluster   demo        apecloud-mysql       Delete               Running   Jan 20,2025 16:27 UTC+0800
    ```
 
 </TabItem>

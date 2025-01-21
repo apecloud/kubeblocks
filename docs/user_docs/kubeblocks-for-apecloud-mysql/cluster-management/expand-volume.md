@@ -163,8 +163,8 @@ mycluster   demo        apecloud-mysql       Delete               Running   Jan 
       ```bash
       kbcli cluster list mycluster -n demo
       >
-      NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS     CREATED-TIME
-      mycluster   demo        apecloud-mysql       ac-mysql-8.0.30   Delete               Updating   Sep 19,2024 16:01 UTC+0800
+      NAME        NAMESPACE   CLUSTER-DEFINITION   TERMINATION-POLICY   STATUS     CREATED-TIME
+      mycluster   demo        apecloud-mysql       Delete               Updating   Jan 20,2025 16:27 UTC+0800
       ```
 
       * STATUS=Updating: it means the volume expansion is in progress.

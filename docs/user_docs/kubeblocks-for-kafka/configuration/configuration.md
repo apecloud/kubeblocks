@@ -40,6 +40,7 @@ KubeBlocks supports configuring cluster parameters by editing its configuration 
    Configure parameters according to your needs. The example below adds the `spec.configFileParams` part to configure `log.cleanup.policy`.
 
    ```yaml
+   ...
    spec:
      clusterRef: mycluster
      componentName: kafka-combine
@@ -55,6 +56,7 @@ KubeBlocks supports configuring cluster parameters by editing its configuration 
          templateRef: kafka-configuration-tpl
          volumeName: kafka-config
        name: kafka-configuration-tpl
+   ...
    ```
 
 3. Connect to this cluster to verify whether the configuration takes effect as expected.

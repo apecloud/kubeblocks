@@ -45,11 +45,13 @@ You can restart all pods of the cluster. When an exception occurs in a database,
    mycluster-mysql-0   4/4     Running       0          5m32s
    mycluster-mysql-1   4/4     Running       0          6m36s
    mycluster-mysql-2   3/4     Terminating   0          7m37s
-
-   kubectl get ops ops-restart -n demo
+   ```bash
+   kubectl get pod -n demo
    >
-   NAME          TYPE      CLUSTER     STATUS    PROGRESS   AGE
-   ops-restart   Restart   mycluster   Succeed   1/1        3m26s
+   NAME                READY   STATUS        RESTARTS   AGE
+   mycluster-mysql-0   4/4     Running       0          5m32s
+   mycluster-mysql-1   4/4     Running       0          6m36s
+   mycluster-mysql-2   3/4     Terminating   0          7m37s
    ```
 
    During the restarting process, there are two status types for pods.
@@ -57,7 +59,19 @@ You can restart all pods of the cluster. When an exception occurs in a database,
    - STATUS=Terminating: it means the cluster restart is in progress.
    - STATUS=Running: it means the cluster has been restarted.
 
-   If an error occurs, you can troubleshoot with `kubectl describe` command to view the events of this operation.
+   ```bash
+   kubectl get ops ops-restart -n demo
+   >
+   NAME          TYPE      CLUSTER     STATUS    PROGRESS   AGE
+   ops-restart   Restart   mycluster   Succeed   1/1        3m26s
+   ```
+
+   For the OpsRequest, there are two status types.
+
+   - STATUS=Running: it means the cluster restart operation is in progress.
+   - STATUS=Succeed: it means the cluster has been restarted.
+
+   If an error occurs, you can troubleshoot with `kubectl describe ops -n demo` command to view the events of this operation.
 
 </TabItem>
 

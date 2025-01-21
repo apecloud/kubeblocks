@@ -9,7 +9,7 @@ sidebar_label: 扩缩容
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-# MySQL 集群扩缩容
+# ApeCloud MySQL 集群扩缩容
 
 KubeBlocks 支持对 ApeCloud MySQL 集群进行垂直扩缩容和水平扩缩容。
 
@@ -34,8 +34,8 @@ KubeBlocks 支持对 ApeCloud MySQL 集群进行垂直扩缩容和水平扩缩�
 ```bash
 kubectl get cluster mycluster -n demo
 >
-NAME        CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    AGE
-mycluster   apecloud-mysql       ac-mysql-8.0.30   Delete               Running   27m
+NAME        CLUSTER-DEFINITION   TERMINATION-POLICY   STATUS    AGE
+mycluster   apecloud-mysql       Delete               Running   30m
 ```
 
 </TabItem>
@@ -45,8 +45,8 @@ mycluster   apecloud-mysql       ac-mysql-8.0.30   Delete               Running 
 ```bash
 kbcli cluster list mycluster -n demo
 >
-NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    CREATED-TIME
-mycluster   demo        apecloud-mysql       ac-mysql-8.0.30   Delete               Running   Sep 19,2024 16:01 UTC+0800
+NAME        NAMESPACE   CLUSTER-DEFINITION   TERMINATION-POLICY   STATUS    CREATED-TIME
+mycluster   demo        apecloud-mysql       Delete               Running   Jan 20,2025 16:27 UTC+0800
 ```
 
 </TabItem>
@@ -61,12 +61,12 @@ mycluster   demo        apecloud-mysql       ac-mysql-8.0.30   Delete           
 
 1. 对指定的集群应用 OpsRequest，可根据您的需求配置参数。
 
-   ```bash
+   ```yaml
    kubectl apply -f - <<EOF
-   apiVersion: apps.kubeblocks.io/v1alpha1
+   apiVersion: operations.kubeblocks.io/v1alpha1
    kind: OpsRequest
    metadata:
-     name: ops-vertical-scaling
+     name: acmysql-verticalscaling
      namespace: demo
    spec:
      clusterName: mycluster
@@ -74,11 +74,11 @@ mycluster   demo        apecloud-mysql       ac-mysql-8.0.30   Delete           
      verticalScaling:
      - componentName: mysql
        requests:
-         memory: "2Gi"
-         cpu: "1"
+         cpu: '1'
+         memory: 1Gi
        limits:
-         memory: "4Gi"
-         cpu: "2"
+         cpu: '1'
+         memory: 1Gi
    EOF
    ```
 
@@ -87,8 +87,8 @@ mycluster   demo        apecloud-mysql       ac-mysql-8.0.30   Delete           
    ```bash
    kubectl get ops -n demo
    >
-   NAMESPACE   NAME                   TYPE              CLUSTER     STATUS    PROGRESS   AGE
-   demo        ops-vertical-scaling   VerticalScaling   mycluster   Succeed   3/3        6m
+   NAME                      TYPE              CLUSTER     STATUS    PROGRESS   AGE
+   acmysql-verticalscaling   VerticalScaling   mycluster   Succeed   1/1        3m54s
    ```
 
    如果有报错，可执行 `kubectl describe ops -n demo` 命令查看该运维操作的相关事件，协助排障。
@@ -114,28 +114,17 @@ mycluster   demo        apecloud-mysql       ac-mysql-8.0.30   Delete           
    ```yaml
    ...
    spec:
-     clusterDefinitionRef: apecloud-mysql
-     clusterVersionRef: ac-mysql-8.0.30
      componentSpecs:
-     - name: mysql
-       componentDefRef: mysql
-       replicas: 3
-       resources: # 修改资源参数值
-         requests:
-           memory: "2Gi"
-           cpu: "1"
-         limits:
-           memory: "4Gi"
-           cpu: "2"
-       volumeClaimTemplates:
-       - name: data
-         spec:
-           accessModes:
-             - ReadWriteOnce
-           resources:
-             requests:
-               storage: 20Gi
-     terminationPolicy: Delete
+       - name: mysql
+         replicas: 3
+         resources:
+           requests:
+             cpu: "1"       # 按需编辑参数值
+             memory: "2Gi"  # 按需编辑参数值
+           limits:
+             cpu: "2"       # 按需编辑参数值
+             memory: "4Gi"  # 按需编辑参数值
+   ...
    ```
 
 2. 当集群状态再次回到 `Running` 后，查看相应资源是否变更。
@@ -175,8 +164,8 @@ mycluster   demo        apecloud-mysql       ac-mysql-8.0.30   Delete           
      ```bash
      kbcli cluster list mycluster -n demo
      >
-     NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS     CREATED-TIME
-     mycluster   demo        apecloud-mysql       ac-mysql-8.0.30   Delete               Updating   Sep 26,2024 16:01 UTC+0800
+     NAME        NAMESPACE   CLUSTER-DEFINITION   TERMINATION-POLICY   STATUS     CREATED-TIME
+     mycluster   demo        apecloud-mysql       Delete               Running    Jan 20,2025 16:27 UTC+0800
      ```
 
      - STATUS=Updating 表示正在进行垂直扩容。
@@ -212,8 +201,8 @@ mycluster   demo        apecloud-mysql       ac-mysql-8.0.30   Delete           
 ```bash
 kubectl get cluster mycluster -n demo
 >
-NAME        CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    AGE
-mycluster   apecloud-mysql       ac-mysql-8.0.30   Delete               Running   27m
+NAME        CLUSTER-DEFINITION   TERMINATION-POLICY   STATUS    AGE
+mycluster   apecloud-mysql       Delete               Running   40m
 ```
 
 </TabItem>
@@ -223,8 +212,8 @@ mycluster   apecloud-mysql       ac-mysql-8.0.30   Delete               Running 
 ```bash
 kbcli cluster list mycluster -n demo
 >
-NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    CREATED-TIME
-mycluster   demo        apecloud-mysql       ac-mysql-8.0.30   Delete               Running   Sep 19,2024 16:01 UTC+0800
+NAME        NAMESPACE   CLUSTER-DEFINITION   TERMINATION-POLICY   STATUS    CREATED-TIME
+mycluster   demo        apecloud-mysql       Delete               Running   Jan 20,2025 16:27 UTC+0800
 ```
 
 </TabItem>
@@ -241,20 +230,19 @@ mycluster   demo        apecloud-mysql       ac-mysql-8.0.30   Delete           
 
    以下示例演示了增加 2 个副本。
 
-   ```bash
+   ```yaml
    kubectl apply -f - <<EOF
-   apiVersion: apps.kubeblocks.io/v1alpha1
+   apiVersion: operations.kubeblocks.io/v1alpha1
    kind: OpsRequest
    metadata:
-     name: ops-horizontal-scaling
+     name: acmysql-horizontalscaling
      namespace: demo
    spec:
-     clusterName: mycluster
+     clusterName: acmysql-cluster
      type: HorizontalScaling
      horizontalScaling:
      - componentName: mysql
-       scaleOut: 
-         replicaChanges: 2
+       replicas: 3
    EOF
    ```
 
@@ -262,7 +250,7 @@ mycluster   demo        apecloud-mysql       ac-mysql-8.0.30   Delete           
 
    以下示例演示了删除 2 个副本。
 
-   ```bash
+   ```yaml
    kubectl apply -f - <<EOF
    apiVersion: apps.kubeblocks.io/v1alpha1
    kind: OpsRequest
@@ -274,7 +262,7 @@ mycluster   demo        apecloud-mysql       ac-mysql-8.0.30   Delete           
      type: HorizontalScaling
      horizontalScaling:
      - componentName: mysql
-       scaleIn: 
+       scaleIn:
          replicaChanges: 2
    EOF
    ```
@@ -284,8 +272,8 @@ mycluster   demo        apecloud-mysql       ac-mysql-8.0.30   Delete           
    ```bash
    kubectl get ops -n demo
    >
-   NAMESPACE   NAME                     TYPE                CLUSTER     STATUS    PROGRESS   AGE
-   demo        ops-horizontal-scaling   HorizontalScaling   mycluster   Succeed   3/3        6m
+   NAME                        TYPE                CLUSTER     STATUS    PROGRESS   AGE
+   acmysql-horizontalscaling   HorizontalScaling   mycluster   Succeed   1/1        2m54s
    ```
 
    如果有报错，可执行 `kubectl describe ops -n demo` 命令查看该运维操作的相关事件，协助排障。
@@ -311,24 +299,21 @@ mycluster   demo        apecloud-mysql       ac-mysql-8.0.30   Delete           
    ```yaml
    ...
    spec:
-     clusterDefinitionRef: apecloud-mysql
-     clusterVersionRef: ac-mysql-8.0.30
-     componentSpecs:
-     - name: mysql
-       componentDefRef: mysql
-       replicas: 1 # 修改该参数值
-       volumeClaimTemplates:
-       - name: data
-         spec:
-           accessModes:
-             - ReadWriteOnce
-           resources:
-             requests:
-               storage: 20Gi
-    terminationPolicy: Delete
+   componentSpecs:
+     - name: apecloud-mysql
+       replicas: 3 # 按需调整该数值
+   ...
    ```
 
 2. 当集群状态再次回到 `Running` 后，查看相关资源是否变更。
+
+   查看集群状态是否回到 `Running`。
+
+   ```bash
+   kubectl get cluster mycluster -n demo
+   ```
+
+   查看相关资源参数值是否按要求变更。
 
    ```bash
    kubectl describe cluster mycluster -n demo

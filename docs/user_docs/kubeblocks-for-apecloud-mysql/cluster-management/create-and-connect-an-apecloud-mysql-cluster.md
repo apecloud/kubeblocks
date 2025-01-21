@@ -28,8 +28,8 @@ This tutorial shows how to create and connect to an ApeCloud MySQL cluster.
   ```bash
   kubectl get addons.extensions.kubeblocks.io apecloud-mysql
   >
-  NAME             TYPE   VERSION   PROVIDER   STATUS    AGE
-  apecloud-mysql   Helm                        Enabled   61m
+  NAME             TYPE   VERSION         PROVIDER   STATUS    AGE
+  apecloud-mysql   Helm   1.0.0-alpha.0   apecloud   Enabled   10m
   ```
 
   </TabItem>
@@ -41,7 +41,7 @@ This tutorial shows how to create and connect to an ApeCloud MySQL cluster.
   >
   NAME                           VERSION         PROVIDER    STATUS     AUTO-INSTALL
   ...
-  apecloud-mysql                 0.9.0           apecloud    Enabled    true
+  apecloud-mysql                 1.0.0-alpha.0   apecloud    Enabled    true
   ...
   ```
 

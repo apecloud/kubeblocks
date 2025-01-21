@@ -27,36 +27,49 @@ KubeBlocks 支持重启集群中的所有 Pod。当数据库出现异常时，�
 
 1. 创建 OpsRequest，重启集群。
 
-   ```bash
-   kubectl apply -f - <<EOF
-   apiVersion: apps.kubeblocks.io/v1alpha1
-   kind: OpsRequest
-   metadata:
-     name: ops-restart
-     namespace: demo
-   spec:
-     clusterName: mycluster
-     type: Restart 
-     restart:
-     - componentName: broker
-   EOF
-   ```
+    ```yaml
+    kubectl apply -f - <<EOF
+    apiVersion: operations.kubeblocks.io/v1alpha1
+    kind: OpsRequest
+    metadata:
+      name: kafka-combine-restart
+      namespace: demo
+    spec:
+      clusterName: mycluster
+      type: Restart
+      restart:
+      - componentName: kafka-combine
+    EOF
+    ```
 
 2. 查看 pod 和运维操作状态，验证重启操作。
 
    ```bash
    kubectl get pod -n demo
-
-   kubectl get ops ops-restart -n demo
    >
-   NAME          TYPE      CLUSTER     STATUS    PROGRESS   AGE
-   ops-restart   Restart   mycluster   Succeed   1/1        3m26s
+   NAME                         READY   STATUS        RESTARTS   AGE
+   mycluster-kafka-combine-0    2/2     Terminating   0          36m
+   mycluster-kafka-exporter-0   1/1     Running       0          36m
    ```
 
    重启过程中，Pod 有如下两种状态：
 
    - STATUS=Terminating：表示集群正在重启。
    - STATUS=Running：表示集群已重启。
+
+   ```bash
+   kubectl get ops kafka-combine-restart -n demo
+   >
+   NAME                    TYPE      CLUSTER     STATUS    PROGRESS   AGE
+   kafka-combine-restart   Restart   mycluster   Succeed   1/1        63s
+   ```
+
+   OpsRequest 有如下两种状态：
+
+   - STATUS=Running：表示集群正在重启。
+   - STATUS=Succeed：表示集群已重启。
+
+   如果操作过程中出现报错，可通过 `kubectl describe ops -n demo` 查看该操作的事件，协助排障。
 
 </TabItem>
 
@@ -81,8 +94,8 @@ KubeBlocks 支持重启集群中的所有 Pod。当数据库出现异常时，�
    ```bash
    kbcli cluster list mycluster -n demo
    >
-   NAME    CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS     AGE
-   kafka   kafka                kafka-3.3.2    Delete               Running    19m
+   NAME        NAMESPACE   CLUSTER-DEFINITION   TERMINATION-POLICY   STATUS    CREATED-TIME
+   mycluster   demo        kafka                Delete               Running   Jan 21,2025 12:31 UTC+0800
    ```
 
    * STATUS=Updating 表示集群正在重启中。

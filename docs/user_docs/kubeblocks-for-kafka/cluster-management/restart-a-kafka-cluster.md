@@ -42,19 +42,6 @@ The pod role may change after the cluster restarts.
     EOF
     ```
 
-kubectl apply -f - <<EOF
-apiVersion: operations.kubeblocks.io/v1alpha1
-kind: OpsRequest
-metadata:
-  name: kafka-combine-restart
-  namespace: demo
-spec:
-  clusterName: mycluster
-  type: Restart
-  restart:
-  - componentName: kafka-combine
-EOF
-
 2. Check the pod and operation status to validate the restarting.
 
    ```bash
@@ -77,10 +64,12 @@ EOF
    kafka-combine-restart   Restart   mycluster   Succeed   1/1        63s
    ```
 
-   For the OpsRequest, there are two status types for pods.
+   For the OpsRequest, there are two status types.
 
    - STATUS=Running: it means the cluster restart operation is in progress.
    - STATUS=Succeed: it means the cluster has been restarted.
+
+   If an error occurs, you can troubleshoot with `kubectl describe ops -n demo` command to view the events of this operation.
 
 </TabItem>
 

@@ -306,9 +306,15 @@ mycluster   demo        apecloud-mysql       Delete               Running   Jan 
 
 2. Check whether the corresponding cluster is running and whether resources change.
 
+   Check whether the cluster is running again.
+
    ```bash
    kubectl get cluster mycluster -n demo
+   ```
 
+   Check whether the values of resources change.
+
+   ```bash
    kubectl describe cluster mycluster -n demo
    ```
 

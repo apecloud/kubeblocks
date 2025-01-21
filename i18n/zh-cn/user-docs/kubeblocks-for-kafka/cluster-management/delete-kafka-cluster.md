@@ -34,8 +34,8 @@ import TabItem from '@theme/TabItem';
 ```bash
 kubectl -n demo get cluster mycluster
 >
-NAME           CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS     AGE
-mycluster      kafka                kafka-3.3.2    Delete               Running    19m
+NAME        CLUSTER-DEFINITION   TERMINATION-POLICY   STATUS     AGE
+mycluster   kafka                Delete               Running    30m
 ```
 
 </TabItem>
@@ -45,8 +45,8 @@ mycluster      kafka                kafka-3.3.2    Delete               Running 
 ```bash
 kbcli cluster list mycluster -n demo
 >
-NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION       TERMINATION-POLICY   STATUS    CREATED-TIME
-mycluster   demo        kafka                kafka-3.3.2   Delete               Running   Sep 27,2024 15:15 UTC+0800
+NAME        NAMESPACE   CLUSTER-DEFINITION   TERMINATION-POLICY   STATUS     CREATED-TIME
+mycluster   demo        kafka                Delete               Running    Jan 21,2025 11:31 UTC+0800
 ```
 
 </TabItem>

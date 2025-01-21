@@ -23,7 +23,7 @@ import TabItem from '@theme/TabItem';
 
     ```bash
     kubectl apply -f - <<EOF
-    apiVersion: apps.kubeblocks.io/v1alpha1
+    apiVersion: operations.kubeblocks.io/v1alpha1
     kind: OpsRequest
     metadata:
       name: ops-stop
@@ -42,19 +42,18 @@ import TabItem from '@theme/TabItem';
     kubectl edit cluster mycluster -n demo
     ```
 
-    将 replicas 设为 0，删除 Pods。
+    将 `spec.componentSpecs.stop` 的值 设为 `true`，删除 Pods。
 
     ```yaml
+    apiVersion: apps.kubeblocks.io/v1
+    kind: Cluster
+    metadata:
     ...
     spec:
-      clusterDefinitionRef: apecloud-mysql
-      clusterVersionRef: ac-mysql-8.0.30
-      terminationPolicy: Delete
       componentSpecs:
-      - name: mysql
-        componentDefRef: mysql
-        disableExporter: true  
-        replicas: 0 # 修改该参数值
+        - name: apecloud-mysql
+          stop: true  # 将该值设置为 `true`，停止当前 component
+          replicas: 3
     ...
     ```
 
@@ -100,9 +99,9 @@ import TabItem from '@theme/TabItem';
 
     <TabItem value="OpsRequest" label="OpsRequest" default>
 
-    ```bash
+    ```yaml
     kubectl apply -f - <<EOF
-    apiVersion: apps.kubeblocks.io/v1alpha1
+    apiVersion: operations.kubeblocks.io/v1alpha1
     kind: OpsRequest
     metadata:
       name: ops-start
@@ -110,7 +109,7 @@ import TabItem from '@theme/TabItem';
     spec:
       clusterName: mycluster
       type: Start
-    EOF 
+    EOF
     ```
 
     </TabItem>
@@ -121,19 +120,18 @@ import TabItem from '@theme/TabItem';
     kubectl edit cluster mycluster -n demo
     ```
 
-    将 replicas 数值调整为停止集群前的数量，再次启动集群。
+    将 `spec.componentSpecs.stop` 的值 设为 `false`，启动集群。
 
     ```yaml
+    apiVersion: apps.kubeblocks.io/v1
+    kind: Cluster
+    metadata:
     ...
     spec:
-      clusterDefinitionRef: apecloud-mysql
-      clusterVersionRef: ac-mysql-8.0.30
-      terminationPolicy: Delete
       componentSpecs:
-      - name: mysql
-        componentDefRef: mysql
-        disableExporter: true
-        replicas: 3 # 修改该参数值
+        - name: apecloud-mysql
+          stop: false  # 将该值设置为 `false` 或者删除该字段，启动当前 component
+          replicas: 3
     ...
     ```
 

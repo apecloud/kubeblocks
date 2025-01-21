@@ -269,7 +269,7 @@ From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out insta
      horizontalScaling:
      - componentName: master
        scaleOut:
-         replicaChanges: 1
+         replicaChanges: 2
    EOF
    ```
 
@@ -290,7 +290,7 @@ From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out insta
      horizontalScaling:
      - componentName: master
        scaleIn:
-         replicaChanges: 1
+         replicaChanges: 2
    EOF
    ```
 
@@ -299,8 +299,8 @@ From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out insta
    ```bash
    kubectl get ops -n demo
    >
-   NAME                 TYPE                CLUSTER     STATUS    PROGRESS   AGE
-   es-scale-in          HorizontalScaling   mycluster   Succeed   3/3        6m
+   NAME                  TYPE                CLUSTER     STATUS    PROGRESS   AGE
+   es-scale-out          HorizontalScaling   mycluster   Succeed   3/3        6m
    ```
 
    If an error occurs, you can troubleshoot with `kubectl describe ops -n demo` command to view the events of this operation.
@@ -436,7 +436,7 @@ From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out insta
 
 1. Change the configuration of `spec.componentSpecs.resources` in the YAML file. `spec.componentSpecs.resources` controls the requirement and limit of resources and changing them triggers a vertical scaling.
 
-    ```yaml
+    ```bash
     kubectl edit cluster mycluster -n demo
     ```
 
@@ -694,8 +694,6 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
 
     <TabItem value="OpsRequest" label="OpsRequest" default>
 
-    Configure replicas as 0 to delete pods.
-
     ```yaml
     kubectl apply -f - <<EOF
     apiVersion: operations.kubeblocks.io/v1alpha1
@@ -704,7 +702,6 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
       name: elasticsearch-stop
       namespace: demo
     spec:
-      # Specifies the name of the Cluster resource that this operation is targeting.
       clusterName: mycluster
       type: Stop
     EOF
@@ -874,14 +871,26 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
 
    ```bash
    kubectl get pod -n demo
-
-   kubectl get ops ops-restart -n demo
    ```
 
    During the restarting process, there are two status types for pods.
 
    - STATUS=Terminating: it means the cluster restart is in progress.
    - STATUS=Running: it means the cluster has been restarted.
+
+   ```bash
+   kubectl get ops ops-restart -n demo
+   >
+   NAME          TYPE      CLUSTER     STATUS    PROGRESS   AGE
+   ops-restart   Restart   mycluster   Succeed   1/1        3m26s
+   ```
+
+   For the OpsRequest, there are two status types.
+
+   - STATUS=Running: it means the cluster restart operation is in progress.
+   - STATUS=Succeed: it means the cluster has been restarted.
+
+   If an error occurs, you can troubleshoot with `kubectl describe ops -n demo` command to view the events of this operation.
 
 </TabItem>
 
@@ -941,8 +950,8 @@ To check the termination policy, execute the following command.
 ```bash
 kubectl get cluster mycluster -n demo
 >
-NAME     CLUSTER-DEFINITION   TERMINATION-POLICY   STATUS     AGE
-mydemo                        Delete               Running    37m
+NAME     CLUSTER-DEFINITION      TERMINATION-POLICY   STATUS     AGE
+mycluster                        Delete               Running    37m
 ```
 
 </TabItem>

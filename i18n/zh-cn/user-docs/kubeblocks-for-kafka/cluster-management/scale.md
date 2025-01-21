@@ -28,8 +28,8 @@ KubeBlocks 支持对 Kafka 集群进行垂直扩缩容和水平扩缩容。
 ```bash
 kubectl -n demo get cluster mycluster
 >
-NAME           CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS     AGE
-mycluster      kafka                kafka-3.3.2    Delete               Running    19m
+NAME        CLUSTER-DEFINITION   TERMINATION-POLICY   STATUS    AGE
+mycluster   kafka                Delete               Running   20m
 ```
 
 </TabItem>
@@ -39,8 +39,8 @@ mycluster      kafka                kafka-3.3.2    Delete               Running 
 ```bash
 kbcli cluster list mycluster -n demo
 >
-NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION       TERMINATION-POLICY   STATUS    CREATED-TIME
-mycluster   demo        kafka                kafka-3.3.2   Delete               Running   Sep 27,2024 15:15 UTC+0800
+NAME        NAMESPACE   CLUSTER-DEFINITION   TERMINATION-POLICY   STATUS    CREATED-TIME
+mycluster   demo        kafka                Delete               Running   Jan 21,2025 11:31 UTC+0800
 ```
 
 </TabItem>
@@ -57,22 +57,22 @@ mycluster   demo        kafka                kafka-3.3.2   Delete               
 
    ```yaml
    kubectl apply -f - <<EOF
-   apiVersion: apps.kubeblocks.io/v1alpha1
+   apiVersion: operations.kubeblocks.io/v1alpha1
    kind: OpsRequest
    metadata:
-     name: ops-vertical-scaling
+     name: kafka-combined-vscale
      namespace: demo
    spec:
-     clusterRef: mycluster
-     type: VerticalScaling 
+     clusterName: mycluster
+     type: VerticalScaling
      verticalScaling:
-     - componentName: broker
+     - componentName: kafka-combine
        requests:
-         memory: "2Gi"
-         cpu: "1"
+         cpu: '1'
+         memory: 1Gi
        limits:
-         memory: "4Gi"
-         cpu: "2"
+         cpu: '1'
+         memory: 1Gi
    EOF
    ```
 
@@ -81,8 +81,8 @@ mycluster   demo        kafka                kafka-3.3.2   Delete               
    ```bash
    kubectl get ops -n demo
    >
-   NAMESPACE   NAME                   TYPE              CLUSTER     STATUS    PROGRESS   AGE
-   demo        ops-vertical-scaling   VerticalScaling   mycluster   Succeed   3/3        6m
+   NAME                    TYPE              CLUSTER     STATUS    PROGRESS   AGE
+   kafka-combined-vscale   VerticalScaling   mycluster   Succeed   3/3        6m
    ```
 
    如果有报错，可执行 `kubectl describe ops -n demo` 命令查看该运维操作的相关事件，协助排障。
@@ -93,20 +93,20 @@ mycluster   demo        kafka                kafka-3.3.2   Delete               
    kubectl describe cluster mycluster -n demo
    >
    ...
-   Component Specs:
-    Component Def Ref:  kafka
-    Enabled Logs:
-      running
-    DisableExporter:   true
-    Name:      kafka
-    Replicas:  2
-    Resources:
-      Limits:
-        Cpu:     2
-        Memory:  4Gi
-      Requests:
-        Cpu:     1
-        Memory:  2Gi
+   Spec:
+     Cluster Def:  kafka
+     Component Specs:
+     ...
+       Name:      kafka-combine
+       Replicas:  1
+       Resources:
+         Limits:
+           Cpu:     1
+           Memory:  1Gi
+         Requests:
+           Cpu:          1
+           Memory:       1Gi
+   ...
    ```
 
 </TabItem>
@@ -115,35 +115,37 @@ mycluster   demo        kafka                kafka-3.3.2   Delete               
 
 1. 修改 YAML 文件中 `spec.componentSpecs.resources` 的配置。`spec.componentSpecs.resources` 控制资源的请求值和限制值，修改参数值将触发垂直扩缩容。
 
+   ```bash
+   kubectl edit cluster mycluster -n demo
+   ```
+
+   在编辑器中调整 `spec.componentSpecs.resources` 下字段的参数值。
+
    ```yaml
-   apiVersion: apps.kubeblocks.io/v1alpha1
+   apiVersion: apps.kubeblocks.io/v1
    kind: Cluster
    metadata:
-     name: mycluster
-     namespace: demo
+   ...
    spec:
-     clusterDefinitionRef: kafka
-     clusterVersionRef: kafka-3.3.2
+     clusterDef: kafka
      componentSpecs:
-     - name: broker
-       componentDefRef: broker
+     - componentDef: kafka-combine-1.0.0-alpha.0
+       ...
+       name: kafka-combine
        replicas: 1
-       resources: # 修改参数值
-         requests:
-           memory: "2Gi"
-           cpu: "1"
+       resources: # 修改 resources 下字段的参数值
          limits:
-           memory: "4Gi"
            cpu: "2"
-       volumeClaimTemplates:
-       - name: data
-         spec:
-           accessModes:
-             - ReadWriteOnce
-           resources:
-             requests:
-               storage: 1Gi
-     terminationPolicy: Delete
+           memory: 4Gi
+         requests:
+           cpu: "1"
+           memory: 2Gi
+       serviceVersion: 3.3.2
+       services:
+       - name: advertised-listener
+         podService: true
+         serviceType: ClusterIP
+   ...
    ```
 
 2. 当集群状态再次回到 `Running` 后，查看相应资源是否变更。
@@ -152,20 +154,20 @@ mycluster   demo        kafka                kafka-3.3.2   Delete               
    kubectl describe cluster mycluster -n demo
    >
    ...
-   Component Specs:
-    Component Def Ref:  kafka
-    Enabled Logs:
-      running
-    DisableExporter:   true
-    Name:      kafka
-    Replicas:  2
-    Resources:
-      Limits:
-        Cpu:     2
-        Memory:  4Gi
-      Requests:
-        Cpu:     1
-        Memory:  2Gi
+   Spec:
+     Cluster Def:  kafka
+     Component Specs:
+     ...
+       Name:      kafka-combine
+       Replicas:  1
+       Resources:
+         Limits:
+           Cpu:     2
+           Memory:  4Gi
+         Requests:
+           Cpu:          1
+           Memory:       2Gi
+   ...
    ```
 
 </TabItem>
@@ -177,12 +179,10 @@ mycluster   demo        kafka                kafka-3.3.2   Delete               
    配置参数 `--components`、`--memory` 和 `--cpu`，并执行以下命令。
 
    ```bash
-   kbcli cluster vscale mycluster -n demo --components="broker" --memory="4Gi" --cpu="2" 
+   kbcli cluster vscale mycluster -n demo --components="kafka-combine" --memory="4Gi" --cpu="2" 
    ```
 
-   - `--components` 的值可以是 `broker` 或 `controller`。
-     - broker：在组合模式下表示所有节点；在分离模式下表示所有 broker 节点。
-     - controller：表示在分离模式下的所有对应节点。
+   - `--components` 定义了本次运维操作面向的 Component 名称。
    - `--memory` 表示组件内存的请求和限制大小。
    - `--cpu` 表示组件 CPU 的请求和限制大小。
   
@@ -201,8 +201,8 @@ mycluster   demo        kafka                kafka-3.3.2   Delete               
      ```bash
      kbcli cluster list mycluster -n demo
      >
-     NAME             NAMESPACE        CLUSTER-DEFINITION       VERSION                TERMINATION-POLICY        STATUS          CREATED-TIME
-     mycluster        demo         kafka                    kafka-3.3.2            Delete                    Updating        Sep 27,2024 15:15 UTC+0800
+     NAME        NAMESPACE   CLUSTER-DEFINITION   TERMINATION-POLICY   STATUS     CREATED-TIME
+     mycluster   demo        kafka                Delete               Updating   Jan 21,2025 11:31 UTC+0800
      ```
 
      - STATUS=Updating 表示正在进行垂直扩容。
@@ -243,8 +243,8 @@ mycluster   demo        kafka                kafka-3.3.2   Delete               
    ```bash
    kubectl -n demo get cluster mycluster
    >
-   NAME           CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS     AGE
-   mycluster      kafka                kafka-3.3.2    Delete               Running    19m
+   NAME        CLUSTER-DEFINITION   TERMINATION-POLICY   STATUS    AGE
+   mycluster   kafka                Delete               Running   30m
    ```
 
    </TabItem>
@@ -254,13 +254,14 @@ mycluster   demo        kafka                kafka-3.3.2   Delete               
    ```bash
    kbcli cluster list mycluster -n demo
    >
-   NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION       TERMINATION-POLICY   STATUS    CREATED-TIME
-   mycluster   demo        kafka                kafka-3.3.2   Delete               Running   Sep 27,2024 15:15 UTC+0800
+   NAME        NAMESPACE   CLUSTER-DEFINITION   TERMINATION-POLICY   STATUS    CREATED-TIME
+   mycluster   demo        kafka                Delete               Running   Jan 21,2025 11:31 UTC+0800
    ```
 
    </TabItem>
 
    </Tabs>
+
 - 不建议在 controller 节点上进行水平扩缩容（包括组合模式和分离模式的 controller 节点）。
 - 在进行水平扩缩容时，必须了解主题分区（topic partition）的存储情况。如果主题只有一个副本，在 broker 扩缩容时可能会导致数据丢失。
 
@@ -276,17 +277,17 @@ mycluster   demo        kafka                kafka-3.3.2   Delete               
 
    ```yaml
    kubectl apply -f - <<EOF
-   apiVersion: apps.kubeblocks.io/v1alpha1
+   apiVersion: operations.kubeblocks.io/v1alpha1
    kind: OpsRequest
    metadata:
-     name: ops-horizontal-scaling
+     name: kafka-combined-scale-out
      namespace: demo
    spec:
-     clusterRef: mycluster
+     clusterName: mycluster
      type: HorizontalScaling
      horizontalScaling:
-     - componentName: broker
-       scaleOut:
+     - componentName: kafka-combine
+       scaleOut: 
          replicaChanges: 2
    EOF
    ```
@@ -297,17 +298,17 @@ mycluster   demo        kafka                kafka-3.3.2   Delete               
 
    ```yaml
    kubectl apply -f - <<EOF
-   apiVersion: apps.kubeblocks.io/v1alpha1
+   apiVersion: operations.kubeblocks.io/v1alpha1
    kind: OpsRequest
    metadata:
-     name: ops-horizontal-scaling
+     name: kafka-combined-scale-in
      namespace: demo
    spec:
-     clusterRef: mycluster
+     clusterName: mycluster
      type: HorizontalScaling
      horizontalScaling:
-     - componentName: broker
-       scaleIn:
+     - componentName: kafka-combine
+       scaleIn: 
          replicaChanges: 2
    EOF
    ```
@@ -317,8 +318,8 @@ mycluster   demo        kafka                kafka-3.3.2   Delete               
    ```bash
    kubectl get ops -n demo
    >
-   NAMESPACE   NAME                     TYPE                CLUSTER     STATUS    PROGRESS   AGE
-   demo        ops-horizontal-scaling   HorizontalScaling   mycluster   Succeed   3/3        6m
+   NAME                       TYPE                CLUSTER     STATUS    PROGRESS   AGE
+   kafka-combined-scale-out   HorizontalScaling   mycluster   Succeed   3/3        5m
    ```
 
    如果有报错，可执行 `kubectl describe ops -n demo` 命令查看该运维操作的相关事件，协助排障。
@@ -335,7 +336,7 @@ mycluster   demo        kafka                kafka-3.3.2   Delete               
       running
     DisableExporter:   true
     Name:      kafka
-    Replicas:  2
+    Replicas:  3
     Resources:
       Limits:
         Cpu:     2
@@ -359,13 +360,16 @@ mycluster   demo        kafka                kafka-3.3.2   Delete               
 
    ```yaml
    ...
+   apiVersion: apps.kubeblocks.io/v1
+   kind: Cluster
+   metadata:
+   ...
    spec:
-     clusterDefinitionRef: kafka
-     clusterVersionRef: kafka-3.3.2 
+     clusterDef: kafka
      componentSpecs:
-     - name: broker
-       componentDefRef: broker
-       replicas: 2 # 修改该参数值
+     ...
+       name: kafka-combine
+       replicas: 3 # 修改该参数值
    ...
    ```
 
@@ -381,7 +385,7 @@ mycluster   demo        kafka                kafka-3.3.2   Delete               
       running
     DisableExporter:   true
     Name:      kafka
-    Replicas:  2
+    Replicas:  3
     Resources:
       Limits:
         Cpu:     2
@@ -400,15 +404,10 @@ mycluster   demo        kafka                kafka-3.3.2   Delete               
    配置参数 `--components` 和 `--replicas`，并执行以下命令。
 
    ```bash
-   kbcli cluster hscale mycluster -n demo \
-     --components="broker" --replicas=3
+   kbcli cluster hscale mycluster -n demo --components="kafka-combine" --replicas=3
    ```
 
-   - `--components` - 的值可以是 `broker` 或 `controller`。
-     - broker：在组合模式下表示所有节点；在分离模式下表示所有 broker 节点。
-     - controller：表示在分离模式下的所有对应节点。
-   - `--memory` 表示组件请求和限制的内存大小。
-   - `--cpu` 表示组件请求和限制的 CPU 大小。
+   - `--components` 定义了水平扩缩容的对象。
    - `--replicas` 表示指定组件的副本数。
 
 2. 验证水平扩容是否完成。

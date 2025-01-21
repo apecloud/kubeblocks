@@ -27,9 +27,9 @@ KubeBlocks 支持重启集群中的所有 Pod。当数据库出现异常时，�
 
 1. 创建 OpsRequest 重启集群。
 
-   ```bash
+   ```yaml
    kubectl apply -f - <<EOF
-   apiVersion: apps.kubeblocks.io/v1alpha1
+   apiVersion: operations.kubeblocks.io/v1alpha1
    kind: OpsRequest
    metadata:
      name: ops-restart
@@ -51,17 +51,24 @@ KubeBlocks 支持重启集群中的所有 Pod。当数据库出现异常时，�
    mycluster-mysql-0   4/4     Running       0          5m32s
    mycluster-mysql-1   4/4     Running       0          6m36s
    mycluster-mysql-2   3/4     Terminating   0          7m37s
-
-   kubectl get ops ops-restart -n demo
-   >
-   NAME          TYPE      CLUSTER     STATUS    PROGRESS   AGE
-   ops-restart   Restart   mycluster   Succeed   1/1        3m26s
    ```
 
    重启过程中，Pod 有如下两种状态：
 
    - STATUS=Terminating：表示集群正在重启。
    - STATUS=Running：表示集群已重启。
+
+   ```bash
+   kubectl get ops ops-restart -n demo
+   >
+   NAME          TYPE      CLUSTER     STATUS    PROGRESS   AGE
+   ops-restart   Restart   mycluster   Succeed   1/1        3m26s
+   ```
+
+   OpsRequest 有如下两种状态：
+
+   - STATUS=Running：表示集群正在重启。
+   - STATUS=Succeed：表示集群已重启。
 
    如果操作过程中出现报错，可通过 `kubectl describe ops -n demo` 查看该操作的事件，协助排障。
 
@@ -86,8 +93,8 @@ KubeBlocks 支持重启集群中的所有 Pod。当数据库出现异常时，�
    ```bash
    kbcli cluster list mycluster -n demo
    >
-   NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION           TERMINATION-POLICY   STATUS    CREATED-TIME
-   mycluster   demo        apecloud-mysql       ac-mysql-8.0.30   Delete               Running   Sep 19,2024 16:01 UTC+0800
+   NAME        NAMESPACE   CLUSTER-DEFINITION   TERMINATION-POLICY   STATUS    CREATED-TIME
+   mycluster   demo        apecloud-mysql       Delete               Running   Jan 20,2025 18:27 UTC+0800
    ```
 
    - STATUS=Updating 表示集群正在重启中。

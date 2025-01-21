@@ -28,10 +28,16 @@ KubeBlocks supports configuring cluster parameters by editing the configuration 
 1. Get the configuration file of this cluster.
 
    ```bash
+   kubectl get configurations.apps.kubeblocks.io -n demo
+   ```
+
+2. Edit the configuration file.
+
+   ```bash
    kubectl edit configurations.apps.kubeblocks.io mycluster-mysql -n demo
    ```
 
-2. Configure parameters according to your needs. The example below adds the `spec.configFileParams` part to configure `max_connections`.
+   Configure parameters according to your needs. The example below adds the `spec.configFileParams` part to configure `max_connections`.
 
    ```yaml
    spec:
@@ -95,7 +101,7 @@ Just in case you cannot find the configuration file of your cluster, you can swi
 
 KubeBlocks supports configuring cluster parameters with an OpsRequest.
 
-1. Define an OpsRequest file and configure the parameters in the OpsRequest in a YAML file named `mycluster-configuring-demo.yaml`. In this example, `max_connections` is configured as `600`.
+1. Define an OpsRequest file and configure the parameters in the OpsRequest in a YAML file named `mycluster-configuring-demo.yaml`. In this example, `innodb_buffer_pool_size` is configured as `512M` and `max_connections` is configured as `600`.
 
    ```yaml
    apiVersion: operations.kubeblocks.io/v1alpha1

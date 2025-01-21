@@ -104,28 +104,26 @@ func clientOption(v *model.ObjectVertex) *multicluster.ClientOption {
 }
 
 func resolveServiceDefaultFields(oldSpec, newSpec *corev1.ServiceSpec) {
-	var exist *corev1.ServicePort
+	servicePorts := make(map[int32]corev1.ServicePort)
+	for i, port := range oldSpec.Ports {
+		servicePorts[port.Port] = oldSpec.Ports[i]
+	}
 	for i, port := range newSpec.Ports {
-		for _, oldPort := range oldSpec.Ports {
-			// assume that port.Name is user specified, if it is not changed, we need to keep the old NodePort and TargetPort if they are not set
-			if port.Name != "" && port.Name == oldPort.Name {
-				exist = &oldPort
-				break
-			}
-		}
-		if exist == nil {
-			continue
+		servicePort, ok := servicePorts[port.Port]
+		if !ok {
+			continue // new port added
 		}
 		// if the service type is NodePort or LoadBalancer, and the nodeport is not set, we should use the nodeport of the exist service
-		if shouldAllocateNodePorts(newSpec) && port.NodePort == 0 && exist.NodePort != 0 {
-			newSpec.Ports[i].NodePort = exist.NodePort
-			port.NodePort = exist.NodePort
+		if shouldAllocateNodePorts(newSpec) && port.NodePort == 0 && servicePort.NodePort != 0 {
+			port.NodePort = servicePort.NodePort
+			newSpec.Ports[i].NodePort = servicePort.NodePort
 		}
-		if port.TargetPort.IntVal == 0 && port.TargetPort.StrVal == "" {
-			port.TargetPort = exist.TargetPort
+		if port.TargetPort.IntVal != 0 {
+			continue
 		}
-		if reflect.DeepEqual(port, *exist) {
-			newSpec.Ports[i].TargetPort = exist.TargetPort
+		port.TargetPort = servicePort.TargetPort
+		if reflect.DeepEqual(port, servicePort) {
+			newSpec.Ports[i].TargetPort = servicePort.TargetPort
 		}
 	}
 	if len(newSpec.ClusterIP) == 0 {

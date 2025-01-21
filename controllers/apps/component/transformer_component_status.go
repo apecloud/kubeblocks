@@ -221,7 +221,7 @@ func (t *componentStatusTransformer) isWorkloadUpdated() bool {
 	return generation == strconv.FormatInt(t.comp.Generation, 10)
 }
 
-// isRunning checks if the component underlying workload is running.
+// isRunning checks if the component's underlying workload is running.
 func (t *componentStatusTransformer) isInstanceSetRunning() bool {
 	if t.runningITS == nil {
 		return false

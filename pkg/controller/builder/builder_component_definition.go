@@ -197,11 +197,13 @@ func (builder *ComponentDefinitionBuilder) SetUpdateStrategy(strategy *appsv1.Up
 	return builder
 }
 
-func (builder *ComponentDefinitionBuilder) AddRole(name string, serviceable, writable bool) *ComponentDefinitionBuilder {
+func (builder *ComponentDefinitionBuilder) AddRole(
+	name string, updatePriority int, participatesInQuorum bool,
+) *ComponentDefinitionBuilder {
 	role := appsv1.ReplicaRole{
-		Name:        name,
-		Serviceable: serviceable,
-		Writable:    writable,
+		Name:                 name,
+		UpdatePriority:       updatePriority,
+		ParticipatesInQuorum: participatesInQuorum,
 	}
 	if builder.get().Spec.Roles == nil {
 		builder.get().Spec.Roles = make([]appsv1.ReplicaRole, 0)

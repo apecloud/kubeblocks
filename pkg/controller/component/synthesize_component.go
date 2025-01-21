@@ -27,7 +27,6 @@ import (
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -72,6 +71,7 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 		ClusterName:                      clusterName,
 		ClusterUID:                       clusterUID,
 		Comp2CompDefs:                    comp2CompDef,
+		CompDef2CompCnt:                  buildCompDef2CompCount(cluster),
 		Name:                             compName,
 		FullCompName:                     comp.Name,
 		Generation:                       strconv.FormatInt(comp.Generation, 10),
@@ -159,6 +159,7 @@ func buildComp2CompDefs(ctx context.Context, cli client.Reader, cluster *appsv1.
 	if cluster == nil {
 		return nil, nil
 	}
+
 	mapping := make(map[string]string)
 
 	// build from componentSpecs
@@ -184,8 +185,33 @@ func buildComp2CompDefs(ctx context.Context, cli client.Reader, cluster *appsv1.
 			}
 		}
 	}
-
 	return mapping, nil
+}
+
+func buildCompDef2CompCount(cluster *appsv1.Cluster) map[string]int32 {
+	if cluster == nil {
+		return nil
+	}
+
+	result := make(map[string]int32)
+
+	add := func(name string, cnt int32) {
+		if len(name) > 0 {
+			if val, ok := result[name]; !ok {
+				result[name] = cnt
+			} else {
+				result[name] = val + cnt
+			}
+		}
+	}
+
+	for _, comp := range cluster.Spec.ComponentSpecs {
+		add(comp.ComponentDef, 1)
+	}
+	for _, spec := range cluster.Spec.Shardings {
+		add(spec.Template.ComponentDef, spec.Shards)
+	}
+	return result
 }
 
 func mergeUserDefinedEnv(synthesizedComp *SynthesizedComponent, comp *appsv1.Component) error {
@@ -224,7 +250,7 @@ func buildSchedulingPolicy(synthesizedComp *SynthesizedComponent, comp *appsv1.C
 
 func buildVolumeClaimTemplates(synthesizeComp *SynthesizedComponent, comp *appsv1.Component) {
 	if comp.Spec.VolumeClaimTemplates != nil {
-		synthesizeComp.VolumeClaimTemplates = ToVolumeClaimTemplates(comp.Spec.VolumeClaimTemplates)
+		synthesizeComp.VolumeClaimTemplates = intctrlutil.ToCoreV1PVCTs(comp.Spec.VolumeClaimTemplates)
 	}
 }
 
@@ -295,33 +321,6 @@ func limitSharedMemoryVolumeSize(synthesizeComp *SynthesizedComponent, comp *app
 		}
 		synthesizeComp.PodSpec.Volumes[i].EmptyDir.SizeLimit = &shm
 	}
-}
-
-func ToVolumeClaimTemplates(vcts []appsv1.ClusterComponentVolumeClaimTemplate) []corev1.PersistentVolumeClaimTemplate {
-	storageClassName := func(spec appsv1.PersistentVolumeClaimSpec, defaultStorageClass string) *string {
-		if spec.StorageClassName != nil && *spec.StorageClassName != "" {
-			return spec.StorageClassName
-		}
-		if defaultStorageClass != "" {
-			return &defaultStorageClass
-		}
-		return nil
-	}
-	var ts []corev1.PersistentVolumeClaimTemplate
-	for _, t := range vcts {
-		ts = append(ts, corev1.PersistentVolumeClaimTemplate{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: t.Name,
-			},
-			Spec: corev1.PersistentVolumeClaimSpec{
-				AccessModes:      t.Spec.AccessModes,
-				Resources:        t.Spec.Resources,
-				StorageClassName: storageClassName(t.Spec, viper.GetString(constant.CfgKeyDefaultStorageClass)),
-				VolumeMode:       t.Spec.VolumeMode,
-			},
-		})
-	}
-	return ts
 }
 
 // buildAndUpdateResources updates podSpec resources from component
@@ -399,11 +398,10 @@ func buildServiceAccountName(synthesizeComp *SynthesizedComponent) {
 		synthesizeComp.PodSpec.ServiceAccountName = synthesizeComp.ServiceAccountName
 		return
 	}
-	if synthesizeComp.LifecycleActions == nil || synthesizeComp.LifecycleActions.RoleProbe == nil {
+	if !viper.GetBool(constant.EnableRBACManager) {
 		return
 	}
-	synthesizeComp.ServiceAccountName = constant.GenerateDefaultServiceAccountName(synthesizeComp.ClusterName)
-	// set component.PodSpec.ServiceAccountName
+	synthesizeComp.ServiceAccountName = constant.GenerateDefaultServiceAccountName(synthesizeComp.CompDefName)
 	synthesizeComp.PodSpec.ServiceAccountName = synthesizeComp.ServiceAccountName
 }
 

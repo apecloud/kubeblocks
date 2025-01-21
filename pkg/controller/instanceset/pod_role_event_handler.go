@@ -195,7 +195,7 @@ func parseGlobalRoleSnapshot(role string, event *corev1.Event) *common.GlobalRol
 	if err := json.Unmarshal([]byte(role), snapshot); err == nil {
 		return snapshot
 	}
-	snapshot.Version = strconv.FormatInt(event.LastTimestamp.UnixMicro(), 10)
+	snapshot.Version = strconv.FormatInt(event.EventTime.UnixMicro(), 10)
 	pair := common.PodRoleNamePair{
 		PodName:  event.InvolvedObject.Name,
 		RoleName: role,
@@ -251,10 +251,8 @@ func updatePodRoleLabel(cli client.Client, reqCtx intctrlutil.RequestCtx,
 	switch ok {
 	case true:
 		pod.Labels[RoleLabelKey] = role.Name
-		pod.Labels[AccessModeLabelKey] = string(role.AccessMode)
 	case false:
 		delete(pod.Labels, RoleLabelKey)
-		delete(pod.Labels, AccessModeLabelKey)
 	}
 
 	if pod.Annotations == nil {

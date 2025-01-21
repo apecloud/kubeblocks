@@ -367,7 +367,7 @@ var _ = Describe("CustomOps", func() {
 				GetObject()
 
 			// create a pod which belongs to the sharding component
-			pod := testapps.MockInstanceSetPod(&testCtx, nil, cluster.Name, defaultCompName, fmt.Sprintf(shardingCompName+"-0"), "", "")
+			pod := testapps.MockInstanceSetPod(&testCtx, nil, cluster.Name, defaultCompName, fmt.Sprintf(shardingCompName+"-0"), "")
 			Expect(testapps.ChangeObj(&testCtx, pod, func(obj *corev1.Pod) {
 				pod.Labels[constant.KBAppShardingNameLabelKey] = defaultCompName
 			})).Should(Succeed())

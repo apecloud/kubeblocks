@@ -415,11 +415,16 @@ type ComponentDefinitionSpec struct {
 	// +optional
 	Available *ComponentAvailable `json:"available,omitempty"`
 
+	// FIXME: there's a bug in CEL's cost estimation when chaining .filter() and .map().
+	// It was fixed in k8s 1.30, see: https://github.com/kubernetes/kubernetes/pull/123562.
+	// Maybe we can add this back later.
+	// TODO +kubebuilder:validation:XValidation:rule="self.filter(x, x.participatesInQuorum == true).map(x, x.updatePriority).min() > self.filter(x, x.participatesInQuorum == false).map(x, x.updatePriority).max()",message="Roles participate in quorum should have higher update priority than roles do not participate in quorum."
+
 	// Enumerate all possible roles assigned to each replica of the Component, influencing its behavior.
 	//
-	// A replica can have zero to multiple roles.
-	// KubeBlocks operator determines the roles of each replica by invoking the `lifecycleActions.roleProbe` method.
-	// This action returns a list of roles for each replica, and the returned roles must be predefined in the `roles` field.
+	// A replica can have zero or one role.
+	// KubeBlocks operator determines the role of each replica by invoking the `lifecycleActions.roleProbe` method.
+	// This action returns the role for each replica, and the returned role must be predefined here.
 	//
 	// The roles assigned to a replica can influence various aspects of the Component's behavior, such as:
 	//
@@ -430,6 +435,7 @@ type ComponentDefinitionSpec struct {
 	//
 	// This field is immutable.
 	//
+	// +kubebuilder:validation:MaxItems=128
 	// +optional
 	Roles []ReplicaRole `json:"roles,omitempty"`
 
@@ -482,8 +488,6 @@ type ComponentDefinitionSpec struct {
 	// The purpose of this field is to automatically generate the necessary RBAC roles
 	// for the Component based on the specified policy rules.
 	// This ensures that the Pods in the Component has appropriate permissions to function.
-	//
-	// Note: This field is currently non-functional and is reserved for future implementation.
 	//
 	// This field is immutable.
 	//
@@ -877,6 +881,12 @@ type ClusterObjectReference struct {
 
 // MultipleClusterObjectOption defines the options for handling multiple cluster objects matched.
 type MultipleClusterObjectOption struct {
+	// RequireAllComponentObjects controls whether all component objects must exist before resolving.
+	// If set to true, resolving will only proceed if all component objects are present.
+	//
+	// +optional
+	RequireAllComponentObjects *bool `json:"requireAllComponentObjects,omitempty"`
+
 	// Define the strategy for handling multiple cluster objects.
 	//
 	// +kubebuilder:validation:Required
@@ -1435,10 +1445,15 @@ type ComponentAvailableProbeAssertion struct {
 	Strict *bool `json:"strict,omitempty"`
 }
 
-// ReplicaRole represents a role that can be assumed by a component instance.
+// ReplicaRole represents a role that can be assigned to a component instance, defining its behavior and responsibilities.
 type ReplicaRole struct {
-	// Defines the role's identifier. It is used to set the "apps.kubeblocks.io/role" label value
-	// on the corresponding object.
+	// Name defines the role's unique identifier. This value is used to set the "apps.kubeblocks.io/role" label
+	// on the corresponding object to identify its role.
+	//
+	// For example, common role names include:
+	// - "leader": The primary/master instance that handles write operations
+	// - "follower": Secondary/replica instances that replicate data from the leader
+	// - "learner": Read-only instances that don't participate in elections
 	//
 	// This field is immutable once set.
 	//
@@ -1447,32 +1462,39 @@ type ReplicaRole struct {
 	// +kubebuilder:validation:Pattern=`^.*[^\s]+.*$`
 	Name string `json:"name"`
 
-	// Indicates whether a replica assigned this role is capable of providing services.
+	// UpdatePriority determines the order in which pods with different roles are updated.
+	// Pods are sorted by this priority (higher numbers = higher priority) and updated accordingly.
+	// Roles with the highest priority will be updated last.
+	// The default priority is 0.
+	//
+	// For example:
+	// - Leader role may have priority 2 (updated last)
+	// - Follower role may have priority 1 (updated before leader)
+	// - Learner role may have priority 0 (updated first)
 	//
 	// This field is immutable once set.
 	//
-	// +kubebuilder:default=false
+	// +kubebuilder:default=0
 	// +optional
-	Serviceable bool `json:"serviceable,omitempty"`
+	UpdatePriority int `json:"updatePriority"`
 
-	// Determines if a replica in this role has the authority to perform write operations.
-	// A writable replica can modify data, handle update operations.
+	// ParticipatesInQuorum indicates if pods with this role are counted when determining quorum.
+	// This affects update strategies that need to maintain quorum for availability. Roles participate
+	// in quorum should have higher update priority than roles do not participate in quorum.
+	// The default value is false.
+	//
+	// For example, in a 5-pod component where:
+	// - 2 learner pods (participatesInQuorum=false)
+	// - 2 follower pods (participatesInQuorum=true)
+	// - 1 leader pod (participatesInQuorum=true)
+	// The quorum size would be 3 (based on the 3 participating pods), allowing parallel updates
+	// of 2 learners and 1 follower while maintaining quorum.
 	//
 	// This field is immutable once set.
 	//
 	// +kubebuilder:default=false
 	// +optional
-	Writable bool `json:"writable,omitempty"`
-
-	// Specifies whether a replica with this role has voting rights.
-	// In distributed systems, this typically means the replica can participate in consensus decisions,
-	// configuration changes, or other processes that require a quorum.
-	//
-	// This field is immutable once set.
-	//
-	// +kubebuilder:default=false
-	// +optional
-	Votable bool `json:"votable,omitempty"`
+	ParticipatesInQuorum bool `json:"participatesInQuorum"`
 }
 
 // UpdateStrategy defines the update strategy for cluster components. This strategy determines how updates are applied

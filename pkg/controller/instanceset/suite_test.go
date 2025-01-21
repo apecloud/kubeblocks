@@ -75,28 +75,24 @@ var (
 	}
 	roles = []workloads.ReplicaRole{
 		{
-			Name:       "leader",
-			IsLeader:   true,
-			CanVote:    true,
-			AccessMode: workloads.ReadWriteMode,
+			Name:                 "leader",
+			ParticipatesInQuorum: true,
+			UpdatePriority:       5,
 		},
 		{
-			Name:       "follower",
-			IsLeader:   false,
-			CanVote:    true,
-			AccessMode: workloads.ReadonlyMode,
+			Name:                 "follower",
+			ParticipatesInQuorum: true,
+			UpdatePriority:       4,
 		},
 		{
-			Name:       "logger",
-			IsLeader:   false,
-			CanVote:    true,
-			AccessMode: workloads.NoneMode,
+			Name:                 "logger",
+			ParticipatesInQuorum: false,
+			UpdatePriority:       3,
 		},
 		{
-			Name:       "learner",
-			IsLeader:   false,
-			CanVote:    false,
-			AccessMode: workloads.ReadonlyMode,
+			Name:                 "learner",
+			ParticipatesInQuorum: false,
+			UpdatePriority:       2,
 		},
 	}
 	pod = builder.NewPodBuilder("", "").

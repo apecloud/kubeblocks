@@ -23,10 +23,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
@@ -34,6 +32,7 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
@@ -55,30 +54,31 @@ func (t *componentDeletionTransformer) Transform(ctx graph.TransformContext, dag
 
 	graphCli, _ := transCtx.Client.(model.GraphClient)
 	comp := transCtx.Component
-	cluster, err := t.getCluster(transCtx, comp)
+
+	clusterName, err := component.GetClusterName(comp)
 	if err != nil {
-		return newRequeueError(requeueDuration, err.Error())
+		return intctrlutil.NewRequeueError(appsutil.RequeueDuration, err.Error())
 	}
 
 	// step1: update the component status to deleting
 	if comp.Status.Phase != appsv1.DeletingComponentPhase {
 		comp.Status.Phase = appsv1.DeletingComponentPhase
 		graphCli.Status(dag, comp, transCtx.Component)
-		return newRequeueError(time.Second*1, "updating component status to deleting")
+		return intctrlutil.NewRequeueError(time.Second*1, "updating component status to deleting")
 	}
 
 	// step2: delete the sub-resources
-	compShortName, err := component.ShortName(cluster.Name, comp.Name)
+	compName, err := component.ShortName(clusterName, comp.Name)
 	if err != nil {
 		return err
 	}
-	ml := constant.GetCompLabels(cluster.Name, compShortName)
+	ml := constant.GetCompLabels(clusterName, compName)
 
 	compScaleIn, ok := comp.Annotations[constant.ComponentScaleInAnnotationKey]
 	if ok && compScaleIn == "true" {
 		return t.handleCompDeleteWhenScaleIn(transCtx, graphCli, dag, comp, ml)
 	}
-	return t.handleCompDeleteWhenClusterDelete(transCtx, graphCli, dag, cluster, comp, ml)
+	return t.handleCompDeleteWhenClusterDelete(transCtx, graphCli, dag, comp, ml)
 }
 
 // handleCompDeleteWhenScaleIn handles the component deletion when scale-in, this scenario will delete all the sub-resources owned by the component by default.
@@ -87,11 +87,11 @@ func (t *componentDeletionTransformer) handleCompDeleteWhenScaleIn(transCtx *com
 	return t.deleteCompResources(transCtx, graphCli, dag, comp, matchLabels, kindsForCompWipeOut())
 }
 
-// handleCompDeleteWhenClusterDelete handles the component deletion when the cluster is being deleted, the sub-resources owned by the component depends on the cluster's TerminationPolicy.
+// handleCompDeleteWhenClusterDelete handles the component deletion when the cluster is being deleted.
 func (t *componentDeletionTransformer) handleCompDeleteWhenClusterDelete(transCtx *componentTransformContext, graphCli model.GraphClient,
-	dag *graph.DAG, cluster *appsv1.Cluster, comp *appsv1.Component, matchLabels map[string]string) error {
+	dag *graph.DAG, comp *appsv1.Component, matchLabels map[string]string) error {
 	var kinds []client.ObjectList
-	switch cluster.Spec.TerminationPolicy {
+	switch comp.Spec.TerminationPolicy {
 	case appsv1.Delete:
 		kinds = kindsForCompDelete()
 	case appsv1.WipeOut:
@@ -106,7 +106,7 @@ func (t *componentDeletionTransformer) deleteCompResources(transCtx *componentTr
 	// firstly, delete the workloads owned by the component
 	workloads, err := model.ReadCacheSnapshot(transCtx, comp, matchLabels, compOwnedWorkloadKinds()...)
 	if err != nil {
-		return newRequeueError(requeueDuration, err.Error())
+		return intctrlutil.NewRequeueError(appsutil.RequeueDuration, err.Error())
 	}
 	if len(workloads) > 0 {
 		for _, workload := range workloads {
@@ -120,12 +120,12 @@ func (t *componentDeletionTransformer) deleteCompResources(transCtx *componentTr
 	// secondly, delete the other sub-resources owned by the component
 	snapshot, err1 := model.ReadCacheSnapshot(transCtx, comp, matchLabels, kinds...)
 	if err1 != nil {
-		return newRequeueError(requeueDuration, err1.Error())
+		return intctrlutil.NewRequeueError(appsutil.RequeueDuration, err1.Error())
 	}
 	if len(snapshot) > 0 {
 		// delete the sub-resources owned by the component before deleting the component
 		for _, object := range snapshot {
-			if isOwnedByInstanceSet(object) {
+			if appsutil.IsOwnedByInstanceSet(object) {
 				continue
 			}
 			skipDeletion, err := handleRBACResourceDeletion(object, transCtx, comp, graphCli, dag)
@@ -138,7 +138,7 @@ func (t *componentDeletionTransformer) deleteCompResources(transCtx *componentTr
 			graphCli.Delete(dag, object)
 		}
 		graphCli.Status(dag, comp, transCtx.Component)
-		return newRequeueError(time.Second*1, "not all component sub-resources deleted")
+		return intctrlutil.NewRequeueError(time.Second*1, "not all component sub-resources deleted")
 	} else {
 		graphCli.Delete(dag, comp)
 	}
@@ -146,7 +146,7 @@ func (t *componentDeletionTransformer) deleteCompResources(transCtx *componentTr
 	// release the allocated host-network ports for the component
 	pm := intctrlutil.GetPortManager()
 	if err = pm.ReleaseByPrefix(comp.Name); err != nil {
-		return newRequeueError(time.Second*1, fmt.Sprintf("release host ports for component %s error: %s", comp.Name, err.Error()))
+		return intctrlutil.NewRequeueError(time.Second*1, fmt.Sprintf("release host ports for component %s error: %s", comp.Name, err.Error()))
 	}
 
 	// fast return, that is stopping the plan.Build() stage and jump to plan.Execute() directly
@@ -177,10 +177,10 @@ func handleRBACResourceDeletion(obj client.Object, transCtx *componentTransformC
 				continue
 			}
 
-			if err := controllerutil.RemoveControllerReference(comp, v, rscheme); err != nil {
+			if err := controllerutil.RemoveControllerReference(comp, v, model.GetScheme()); err != nil {
 				return false, err
 			}
-			if err := controllerutil.SetControllerReference(&otherComp, v, rscheme); err != nil {
+			if err := controllerutil.SetControllerReference(&otherComp, v, model.GetScheme()); err != nil {
 				return false, err
 			}
 			// component controller selects a comp's subresource by labels, so change them too
@@ -197,7 +197,7 @@ func handleRBACResourceDeletion(obj client.Object, transCtx *componentTransformC
 				v.GetLabels()[k] = val
 			}
 			graphCli.Update(dag, nil, v)
-			gvk, err := apiutil.GVKForObject(v, rscheme)
+			gvk, err := apiutil.GVKForObject(v, model.GetScheme())
 			if err != nil {
 				return false, err
 			}
@@ -209,19 +209,6 @@ func handleRBACResourceDeletion(obj client.Object, transCtx *componentTransformC
 	default:
 		return false, nil
 	}
-}
-
-func (t *componentDeletionTransformer) getCluster(transCtx *componentTransformContext, comp *appsv1.Component) (*appsv1.Cluster, error) {
-	clusterName, err := component.GetClusterName(comp)
-	if err != nil {
-		return nil, err
-	}
-	cluster := &appsv1.Cluster{}
-	err = transCtx.Client.Get(transCtx.Context, types.NamespacedName{Name: clusterName, Namespace: comp.Namespace}, cluster)
-	if err != nil {
-		return nil, errors.New(fmt.Sprintf("failed to get cluster %s: %v", clusterName, err))
-	}
-	return cluster, nil
 }
 
 func compOwnedWorkloadKinds() []client.ObjectList {

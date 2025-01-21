@@ -325,7 +325,7 @@ func (r *RestoreManager) GetRestoreObjectMeta(comp *component.SynthesizedCompone
 	}
 }
 
-func (r *RestoreManager) initFromAnnotation(synthesizedComponent *component.SynthesizedComponent, compObj *appsv1.Component) (*dpv1alpha1.Backup, error) {
+func (r *RestoreManager) initFromAnnotation(comp *component.SynthesizedComponent, compObj *appsv1.Component) (*dpv1alpha1.Backup, error) {
 	valueString := r.Cluster.Annotations[constant.RestoreFromBackupAnnotationKey]
 	if len(valueString) == 0 {
 		return nil, nil
@@ -337,7 +337,7 @@ func (r *RestoreManager) initFromAnnotation(synthesizedComponent *component.Synt
 	}
 	compName := compObj.Labels[constant.KBAppShardingNameLabelKey]
 	if len(compName) == 0 {
-		compName = synthesizedComponent.Name
+		compName = comp.Name
 	}
 	backupSource, ok := backupMap[compName]
 	if !ok {
@@ -364,7 +364,7 @@ func (r *RestoreManager) initFromAnnotation(synthesizedComponent *component.Synt
 			return nil, err
 		}
 	}
-	return GetBackupFromClusterAnnotation(r.Ctx, r.Client, backupSource, synthesizedComponent.Name, r.Cluster.Namespace)
+	return GetBackupFromClusterAnnotation(r.Ctx, r.Client, backupSource, comp.Name, r.Cluster.Namespace)
 }
 
 // createRestoreAndWait create the restore CR and wait for completion.

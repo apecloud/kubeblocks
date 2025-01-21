@@ -19,12 +19,6 @@ package v1
 import (
 	"fmt"
 	"strings"
-
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"github.com/apecloud/kubeblocks/pkg/constant"
-	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 const (
@@ -55,58 +49,6 @@ func (r *Cluster) GetComponentByName(componentName string) *ClusterComponentSpec
 	return nil
 }
 
-// GetVolumeClaimNames gets all PVC names of component compName.
-//
-// r.Spec.GetComponentByName(compName).VolumeClaimTemplates[*].Name will be used if no claimNames provided
-//
-// nil return if:
-// 1. component compName not found or
-// 2. len(VolumeClaimTemplates)==0 or
-// 3. any claimNames not found
-func (r *Cluster) GetVolumeClaimNames(compName string, claimNames ...string) []string {
-	if r == nil {
-		return nil
-	}
-	comp := r.Spec.GetComponentByName(compName)
-	if comp == nil {
-		return nil
-	}
-	if len(comp.VolumeClaimTemplates) == 0 {
-		return nil
-	}
-	if len(claimNames) == 0 {
-		for _, template := range comp.VolumeClaimTemplates {
-			claimNames = append(claimNames, template.Name)
-		}
-	}
-	allExist := true
-	for _, name := range claimNames {
-		found := false
-		for _, template := range comp.VolumeClaimTemplates {
-			if template.Name == name {
-				found = true
-				break
-			}
-		}
-		if !found {
-			allExist = false
-			break
-		}
-	}
-	if !allExist {
-		return nil
-	}
-
-	pvcNames := make([]string, 0)
-	for _, claimName := range claimNames {
-		for i := 0; i < int(comp.Replicas); i++ {
-			pvcName := fmt.Sprintf("%s-%s-%s-%d", claimName, r.Name, compName, i)
-			pvcNames = append(pvcNames, pvcName)
-		}
-	}
-	return pvcNames
-}
-
 func (r *ClusterSpec) GetComponentByName(componentName string) *ClusterComponentSpec {
 	for _, v := range r.ComponentSpecs {
 		if v.Name == componentName {
@@ -133,51 +75,9 @@ func (r *ClusterStatus) SetComponentStatus(name string, status ClusterComponentS
 	r.Components[name] = status
 }
 
-func (r *ClusterComponentSpec) ToVolumeClaimTemplates() []corev1.PersistentVolumeClaimTemplate {
-	if r == nil {
-		return nil
-	}
-	var ts []corev1.PersistentVolumeClaimTemplate
-	for _, t := range r.VolumeClaimTemplates {
-		ts = append(ts, t.toVolumeClaimTemplate())
-	}
-	return ts
-}
-
 func (r *ClusterComponentStatus) GetObjectMessage(objectKind, objectName string) string {
 	messageKey := fmt.Sprintf("%s/%s", objectKind, objectName)
 	return r.Message[messageKey]
-}
-
-func (r *ClusterComponentVolumeClaimTemplate) toVolumeClaimTemplate() corev1.PersistentVolumeClaimTemplate {
-	return corev1.PersistentVolumeClaimTemplate{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: r.Name,
-		},
-		Spec: r.Spec.ToV1PersistentVolumeClaimSpec(),
-	}
-}
-
-func (r *PersistentVolumeClaimSpec) ToV1PersistentVolumeClaimSpec() corev1.PersistentVolumeClaimSpec {
-	return corev1.PersistentVolumeClaimSpec{
-		AccessModes:               r.AccessModes,
-		Resources:                 r.Resources,
-		StorageClassName:          r.getStorageClassName(viper.GetString(constant.CfgKeyDefaultStorageClass)),
-		VolumeMode:                r.VolumeMode,
-		VolumeAttributesClassName: r.VolumeAttributesClassName,
-	}
-}
-
-// getStorageClassName returns PersistentVolumeClaimSpec.StorageClassName if a value is assigned; otherwise,
-// it returns the defaultStorageClass argument.
-func (r *PersistentVolumeClaimSpec) getStorageClassName(defaultStorageClass string) *string {
-	if r.StorageClassName != nil && *r.StorageClassName != "" {
-		return r.StorageClassName
-	}
-	if defaultStorageClass != "" {
-		return &defaultStorageClass
-	}
-	return nil
 }
 
 func GetClusterUpRunningPhases() []ClusterPhase {

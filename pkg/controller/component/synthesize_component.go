@@ -27,6 +27,7 @@ import (
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -34,6 +35,7 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"github.com/apecloud/kubeblocks/pkg/generics"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -44,7 +46,7 @@ var (
 // BuildSynthesizedComponent builds a new SynthesizedComponent object, which is a mixture of component-related configs from ComponentDefinition and Component.
 // TODO: remove @ctx & @cli
 func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
-	compDef *appsv1.ComponentDefinition, comp *appsv1.Component, cluster *appsv1.Cluster) (*SynthesizedComponent, error) {
+	compDef *appsv1.ComponentDefinition, comp *appsv1.Component) (*SynthesizedComponent, error) {
 	if compDef == nil || comp == nil {
 		return nil, nil
 	}
@@ -61,7 +63,11 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 	if err != nil {
 		return nil, err
 	}
-	comp2CompDef, err := buildComp2CompDefs(ctx, cli, cluster)
+	comp2CompDef, err := buildComp2CompDefs(ctx, cli, comp.Namespace, clusterName)
+	if err != nil {
+		return nil, err
+	}
+	compDef2CompCnt, err := buildCompDef2CompCount(ctx, cli, comp.Namespace, clusterName)
 	if err != nil {
 		return nil, err
 	}
@@ -71,7 +77,7 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 		ClusterName:                      clusterName,
 		ClusterUID:                       clusterUID,
 		Comp2CompDefs:                    comp2CompDef,
-		CompDef2CompCnt:                  buildCompDef2CompCount(cluster),
+		CompDef2CompCnt:                  compDef2CompCnt,
 		Name:                             compName,
 		FullCompName:                     comp.Name,
 		Generation:                       strconv.FormatInt(comp.Generation, 10),
@@ -155,42 +161,43 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 	return synthesizeComp, nil
 }
 
-func buildComp2CompDefs(ctx context.Context, cli client.Reader, cluster *appsv1.Cluster) (map[string]string, error) {
-	if cluster == nil {
-		return nil, nil
+func buildComp2CompDefs(ctx context.Context, cli client.Reader, namespace, clusterName string) (map[string]string, error) {
+	if cli == nil {
+		return nil, nil // for test
+	}
+
+	labels := constant.GetClusterLabels(clusterName)
+	comps, err := listObjWithLabelsInNamespace(ctx, cli, generics.ComponentSignature, namespace, labels)
+	if err != nil {
+		return nil, err
 	}
 
 	mapping := make(map[string]string)
-
-	// build from componentSpecs
-	for _, comp := range cluster.Spec.ComponentSpecs {
-		if len(comp.ComponentDef) > 0 {
-			mapping[comp.Name] = comp.ComponentDef
+	for _, comp := range comps {
+		if len(comp.Spec.CompDef) == 0 {
+			continue
 		}
-	}
-
-	// build from shardings
-	for _, spec := range cluster.Spec.Shardings {
-		shardingComps, err := intctrlutil.ListShardingComponents(ctx, cli, cluster, spec.Name)
-		if err != nil {
-			return nil, err
+		compName, err1 := ShortName(clusterName, comp.Name)
+		if err1 != nil {
+			return nil, err1
 		}
-		for _, shardingComp := range shardingComps {
-			if len(shardingComp.Spec.CompDef) > 0 {
-				compShortName, err := ShortName(cluster.Name, shardingComp.Name)
-				if err != nil {
-					return nil, err
-				}
-				mapping[compShortName] = shardingComp.Spec.CompDef
-			}
-		}
+		mapping[compName] = comp.Spec.CompDef
 	}
 	return mapping, nil
 }
 
-func buildCompDef2CompCount(cluster *appsv1.Cluster) map[string]int32 {
-	if cluster == nil {
-		return nil
+func buildCompDef2CompCount(ctx context.Context, cli client.Reader, namespace, clusterName string) (map[string]int32, error) {
+	if cli == nil {
+		return nil, nil // for test
+	}
+
+	clusterKey := types.NamespacedName{
+		Namespace: namespace,
+		Name:      clusterName,
+	}
+	cluster := &appsv1.Cluster{}
+	if err := cli.Get(ctx, clusterKey, cluster); err != nil {
+		return nil, client.IgnoreNotFound(err)
 	}
 
 	result := make(map[string]int32)
@@ -211,7 +218,7 @@ func buildCompDef2CompCount(cluster *appsv1.Cluster) map[string]int32 {
 	for _, spec := range cluster.Spec.Shardings {
 		add(spec.Template.ComponentDef, spec.Shards)
 	}
-	return result
+	return result, nil
 }
 
 func mergeUserDefinedEnv(synthesizedComp *SynthesizedComponent, comp *appsv1.Component) error {

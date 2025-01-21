@@ -457,6 +457,20 @@ ComponentSpec
 <table>
 <tr>
 <td>
+<code>terminationPolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.TerminationPolicyType">
+TerminationPolicyType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the behavior when a Component is deleted.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>compDef</code><br/>
 <em>
 string
@@ -5955,6 +5969,20 @@ Instead, you can enable the creation of this service by specifying it explicitly
 </tr>
 </thead>
 <tbody>
+<tr>
+<td>
+<code>terminationPolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.TerminationPolicyType">
+TerminationPolicyType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the behavior when a Component is deleted.</p>
+</td>
+</tr>
 <tr>
 <td>
 <code>compDef</code><br/>
@@ -11605,7 +11633,7 @@ VarOption
 <h3 id="apps.kubeblocks.io/v1.TerminationPolicyType">TerminationPolicyType
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterSpec">ClusterSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterSpec">ClusterSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>)
 </p>
 <div>
 <p>TerminationPolicyType defines termination policy types.</p>

@@ -30,6 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -75,8 +76,8 @@ var _ = Describe("clusterDeletionTransformer", func() {
 			GetObject()
 		cluster.DeletionTimestamp = &metav1.Time{Time: time.Now()}
 
-		reader = &mockReader{
-			objs: []client.Object{
+		reader = &appsutil.MockReader{
+			Objects: []client.Object{
 				clusterDef,
 				&appsv1.Component{
 					ObjectMeta: metav1.ObjectMeta{
@@ -132,8 +133,8 @@ var _ = Describe("clusterDeletionTransformer", func() {
 		Expect(dag.Vertices()).Should(HaveLen(1 + 1))
 
 		// delete component 1
-		mockReader := reader.(*mockReader)
-		mockReader.objs = slices.DeleteFunc(mockReader.objs, func(obj client.Object) bool {
+		mockReader := reader.(*appsutil.MockReader)
+		mockReader.Objects = slices.DeleteFunc(mockReader.Objects, func(obj client.Object) bool {
 			return obj.GetName() == "test-cluster-comp1"
 		})
 		dag = newDag(transCtx.Client.(model.GraphClient))
@@ -143,7 +144,7 @@ var _ = Describe("clusterDeletionTransformer", func() {
 		Expect(dag.Vertices()).Should(HaveLen(1 + 1))
 
 		// delete component 2
-		mockReader.objs = slices.DeleteFunc(mockReader.objs, func(obj client.Object) bool {
+		mockReader.Objects = slices.DeleteFunc(mockReader.Objects, func(obj client.Object) bool {
 			return obj.GetName() == "test-cluster-comp2"
 		})
 		dag = newDag(transCtx.Client.(model.GraphClient))
@@ -152,7 +153,7 @@ var _ = Describe("clusterDeletionTransformer", func() {
 		Expect(dag.Vertices()).Should(HaveLen(1 + 1))
 
 		// delete component 3
-		mockReader.objs = slices.DeleteFunc(mockReader.objs, func(obj client.Object) bool {
+		mockReader.Objects = slices.DeleteFunc(mockReader.Objects, func(obj client.Object) bool {
 			return obj.GetName() == "test-cluster-comp3"
 		})
 		dag = newDag(transCtx.Client.(model.GraphClient))

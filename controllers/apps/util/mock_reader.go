@@ -17,7 +17,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package cluster
+package util
 
 import (
 	"context"
@@ -30,12 +30,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-type mockReader struct {
-	objs []client.Object
+type MockReader struct {
+	Objects []client.Object
 }
 
-func (r *mockReader) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
-	for _, o := range r.objs {
+func (r *MockReader) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+	for _, o := range r.Objects {
 		// ignore the GVK check
 		if client.ObjectKeyFromObject(o) == key {
 			reflect.ValueOf(obj).Elem().Set(reflect.ValueOf(o).Elem())
@@ -45,23 +45,23 @@ func (r *mockReader) Get(ctx context.Context, key client.ObjectKey, obj client.O
 	return apierrors.NewNotFound(schema.GroupResource{}, key.Name)
 }
 
-func (r *mockReader) List(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
+func (r *MockReader) List(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
 	items := reflect.ValueOf(list).Elem().FieldByName("Items")
 	if !items.IsValid() {
 		return fmt.Errorf("ObjectList has no Items field: %s", list.GetObjectKind().GroupVersionKind().String())
 	}
 
 	objs := reflect.MakeSlice(items.Type(), 0, 0)
-	if len(r.objs) > 0 {
+	if len(r.Objects) > 0 {
 		listOpts := &client.ListOptions{}
 		for _, opt := range opts {
 			opt.ApplyToList(listOpts)
 		}
 
-		for i, o := range r.objs {
-			if reflect.TypeOf(r.objs[i]).Elem().AssignableTo(items.Type().Elem()) {
+		for i, o := range r.Objects {
+			if reflect.TypeOf(r.Objects[i]).Elem().AssignableTo(items.Type().Elem()) {
 				if listOpts.LabelSelector == nil || listOpts.LabelSelector.Matches(labels.Set(o.GetLabels())) {
-					objs = reflect.Append(objs, reflect.ValueOf(r.objs[i]).Elem())
+					objs = reflect.Append(objs, reflect.ValueOf(r.Objects[i]).Elem())
 				}
 			}
 		}

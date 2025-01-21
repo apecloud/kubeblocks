@@ -28,12 +28,13 @@ type MockComponentFactory struct {
 	BaseFactory[appsv1.Component, *appsv1.Component, MockComponentFactory]
 }
 
-func NewComponentFactory(namespace, name, componentDefinition string) *MockComponentFactory {
+func NewComponentFactory(namespace, name, compDef string) *MockComponentFactory {
 	f := &MockComponentFactory{}
 	f.Init(namespace, name,
 		&appsv1.Component{
 			Spec: appsv1.ComponentSpec{
-				CompDef: componentDefinition,
+				TerminationPolicy: appsv1.WipeOut,
+				CompDef:           compDef,
 			},
 		}, f)
 	return f
@@ -59,11 +60,6 @@ func (factory *MockComponentFactory) SetResources(resources corev1.ResourceRequi
 	return factory
 }
 
-// func (factory *MockComponentFactory) SetMonitor(monitor bool) *MockComponentFactory {
-// 	factory.Get().Spec.Monitor = monitor
-// 	return factory
-// }
-
 func (factory *MockComponentFactory) SetTLSConfig(enable bool, issuer *appsv1.Issuer) *MockComponentFactory {
 	if enable {
 		factory.Get().Spec.TLSConfig = &appsv1.TLSConfig{
@@ -80,5 +76,31 @@ func (factory *MockComponentFactory) AddVolumeClaimTemplate(volumeName string,
 		Name: volumeName,
 		Spec: pvcSpec,
 	})
+	return factory
+}
+
+func (factory *MockComponentFactory) AddSystemAccount(name string, passwordConfig *appsv1.PasswordConfig, secretRef *appsv1.ProvisionSecretRef) *MockComponentFactory {
+	if factory.Get().Spec.SystemAccounts == nil {
+		factory.Get().Spec.SystemAccounts = make([]appsv1.ComponentSystemAccount, 0)
+	}
+	factory.Get().Spec.SystemAccounts = append(factory.Get().Spec.SystemAccounts,
+		appsv1.ComponentSystemAccount{
+			Name:           name,
+			PasswordConfig: passwordConfig,
+			SecretRef:      secretRef,
+		})
+	return factory
+}
+
+func (factory *MockComponentFactory) SetStop(stop *bool) *MockComponentFactory {
+	factory.Get().Spec.Stop = stop
+	return factory
+}
+
+func (factory *MockComponentFactory) AddInstances(instance appsv1.InstanceTemplate) *MockComponentFactory {
+	if factory.Get().Spec.Instances == nil {
+		factory.Get().Spec.Instances = make([]appsv1.InstanceTemplate, 0)
+	}
+	factory.Get().Spec.Instances = append(factory.Get().Spec.Instances, instance)
 	return factory
 }

@@ -146,7 +146,7 @@ func mockReconcileResource() (*corev1.ConfigMap, *appsv1beta1.ConfigConstraint, 
 		AddAnnotations(core.GenerateTPLUniqLabelKeyWithConfig(configSpecName), configmap.Name).
 		Create(&testCtx).GetObject()
 
-	synthesizedComp, err := component.BuildSynthesizedComponent(testCtx.Ctx, testCtx.Cli, compDefObj, compObj, clusterObj)
+	synthesizedComp, err := component.BuildSynthesizedComponent(testCtx.Ctx, testCtx.Cli, compDefObj, compObj)
 	Expect(err).ShouldNot(HaveOccurred())
 
 	return configmap, constraint, clusterObj, compObj, synthesizedComp

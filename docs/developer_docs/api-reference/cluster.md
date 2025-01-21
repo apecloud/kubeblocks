@@ -6507,6 +6507,7 @@ ProvisionSecretRef
 <td>
 <em>(Optional)</em>
 <p>Refers to the secret from which data will be copied to create the new account.</p>
+<p>For user-specified passwords, the maximum length is limited to 64 bytes.</p>
 <p>This field is immutable once set.</p>
 </td>
 </tr>

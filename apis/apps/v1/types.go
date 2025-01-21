@@ -369,6 +369,8 @@ type ComponentSystemAccount struct {
 
 	// Refers to the secret from which data will be copied to create the new account.
 	//
+	// For user-specified passwords, the maximum length is limited to 64 bytes.
+	//
 	// This field is immutable once set.
 	//
 	// +optional

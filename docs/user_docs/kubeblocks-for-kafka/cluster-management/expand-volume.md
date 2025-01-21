@@ -24,8 +24,8 @@ Run the command below to check whether the cluster STATUS is `Running`. Otherwis
 ```bash
 kubectl -n demo get cluster mycluster
 >
-NAME           CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS     AGE
-mycluster      kafka                kafka-3.3.2    Delete               Running    19m
+NAME        CLUSTER-DEFINITION   TERMINATION-POLICY   STATUS    AGE
+mycluster   kafka                Delete               Running   43m
 ```
 
 </TabItem>
@@ -35,8 +35,8 @@ mycluster      kafka                kafka-3.3.2    Delete               Running 
 ```bash
 kbcli cluster list mycluster -n demo
 >
-NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION       TERMINATION-POLICY   STATUS    CREATED-TIME
-mycluster   demo        kafka                kafka-3.3.2   Delete               Running   Sep 27,2024 15:15 UTC+0800
+NAME        NAMESPACE   CLUSTER-DEFINITION   TERMINATION-POLICY   STATUS    CREATED-TIME
+mycluster   demo        kafka                Delete               Running   Jan 21,2025 11:31 UTC+0800
 ```
 
 </TabItem>
@@ -51,18 +51,18 @@ mycluster   demo        kafka                kafka-3.3.2   Delete               
 
 1. Apply an OpsRequest. Change the value of storage according to your need and run the command below to expand the volume of a cluster.
 
-   ```bash
+   ```yaml
    kubectl apply -f - <<EOF
-   apiVersion: apps.kubeblocks.io/v1alpha1
+   apiVersion: operations.kubeblocks.io/v1alpha1
    kind: OpsRequest
    metadata:
-     name: ops-volumeexpansion
+     name: kafka-combined-volumeexpansion
      namespace: demo
    spec:
      clusterName: mycluster
      type: VolumeExpansion
      volumeExpansion:
-     - componentName: broker
+     - componentName: kafka-combine
        volumeClaimTemplates:
        - name: data
          storage: 40Gi
@@ -74,8 +74,8 @@ mycluster   demo        kafka                kafka-3.3.2   Delete               
    ```bash
    kubectl get ops -n demo
    >
-   NAMESPACE   NAME                   TYPE              CLUSTER     STATUS    PROGRESS   AGE
-   demo        ops-volume-expansion   VolumeExpansion   mycluster   Succeed   3/3        6m
+   NAME                             TYPE              CLUSTER     STATUS    PROGRESS   AGE
+   kafka-combined-volumeexpansion   VolumeExpansion   mycluster   Succeed   3/3        6m
    ```
 
 3. Check whether the corresponding cluster resources change.
@@ -98,9 +98,15 @@ mycluster   demo        kafka                kafka-3.3.2   Delete               
 
 <TabItem value="Edit cluster YAML file" label="Edit cluster YAML file">
 
-1. Change the value of `spec.componentSpecs.volumeClaimTemplates.spec.resources` in the cluster YAML file.
+1. Change the value of `spec.componentSpecs.volumeClaimTemplates.spec.resources.requests.storage` in the cluster YAML file.
 
-   `spec.componentSpecs.volumeClaimTemplates.spec.resources` is the storage resource information of the pod and changing this value triggers the volume expansion of a cluster.
+   `spec.componentSpecs.volumeClaimTemplates.spec.resources.requests.storage` is the storage resource information of the pod and changing this value triggers the volume expansion of a cluster.
+
+   ```bash
+   kubectl edit cluster mycluster -n demo
+   ```
+
+   Edit the values of `spec.componentSpecs.volumeClaimTemplates.spec.resources.requests.storage` in the YAML file.
 
    ```yaml
    apiVersion: apps.kubeblocks.io/v1alpha1
@@ -109,36 +115,33 @@ mycluster   demo        kafka                kafka-3.3.2   Delete               
      name: mycluster
      namespace: demo 
    spec:
-     clusterDefinitionRef: kafka
-     clusterVersionRef: kafka-3.3.2
+   ...
      componentSpecs:
-     - name: kafka 
-       componentDefRef: kafka
-       volumeClaimTemplates:
-       - name: data
-         spec:
-           accessModes:
-             - ReadWriteOnce
-           resources:
-             requests:
-               storage: 40Gi # Change the volume storage size
-     terminationPolicy: Delete
+       - name: kafka-combine
+       ...
+         volumeClaimTemplates:
+           - name: data
+             spec: 
+               storageClassName: "<you-preferred-sc>"
+               accessModes:
+                 - ReadWriteOnce
+               resources:
+                 requests:
+                   storage: 40Gi # Change this value to specify new size, and make sure it is larger than the current size
+           - name: metadata
+             spec: 
+               storageClassName: "<you-preferred-sc>"
+               accessModes:
+                 - ReadWriteOnce
+               resources:
+                 requests:
+                   storage: 40Gi # Change this value to specify new size, and make sure it is larger than the current size
    ```
 
 2. Check whether the corresponding cluster resources change.
 
    ```bash
    kubectl describe cluster mycluster -n demo
-   >
-   ...
-   Volume Claim Templates:
-     Name:  data
-     Spec:
-       Access Modes:
-         ReadWriteOnce
-       Resources:
-         Requests:
-           Storage:   40Gi
    ```
 
 </TabItem>
@@ -148,7 +151,7 @@ mycluster   demo        kafka                kafka-3.3.2   Delete               
 1. Configure the resources according to your needs and run the command to expand the volume.
 
    ```bash
-   kbcli cluster volume-expand mycluster -n demo --storage=30Gi --components=kafka --volume-claim-templates=data 
+   kbcli cluster volume-expand mycluster -n demo --storage=30Gi --components=kafka-combine --volume-claim-templates=data 
    ```
 
    - `--components` describes the component name for volume expansion.
@@ -169,8 +172,8 @@ mycluster   demo        kafka                kafka-3.3.2   Delete               
       ```bash
       kbcli cluster list mycluster -n demo
       >
-      NAME             NAMESPACE     CLUSTER-DEFINITION        VERSION                  TERMINATION-POLICY        STATUS          CREATED-TIME
-      mycluster        demo          kafka                     kafka-3.3.2              Delete                    Updating        Sep 27,2024 15:27 UTC+0800
+      NAME        NAMESPACE   CLUSTER-DEFINITION   TERMINATION-POLICY   STATUS     CREATED-TIME
+      mycluster   demo        kafka                Delete               Updating   Jan 21,2025 11:31 UTC+0800
       ```
 
       * STATUS=Updating: it means the volume expansion is in progress.

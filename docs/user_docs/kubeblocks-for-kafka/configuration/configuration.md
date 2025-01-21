@@ -26,23 +26,30 @@ KubeBlocks supports configuring cluster parameters by editing its configuration 
 
    ```bash
    kubectl get configurations.apps.kubeblocks.io -n demo
+   >
+   mycluster-kafka-combine    47m
+   mycluster-kafka-exporter   46m
+   ```
 
+2. Edit the configuration file.
+
+   ```bash
    kubectl edit configurations.apps.kubeblocks.io mycluster-kafka-combine -n demo
    ```
 
-2. Configure parameters according to your needs. The example below adds the `spec.configFileParams` part to configure `log.cleanup.policy`.
+   Configure parameters according to your needs. The example below adds the `spec.configFileParams` part to configure `log.cleanup.policy`.
 
    ```yaml
    spec:
      clusterRef: mycluster
-     componentName: kafka
+     componentName: kafka-combine
      configItemDetails:
      - configFileParams:
          server.properties:
            parameters:
              log.cleanup.policy: "compact"
        configSpec:
-         constraintRef: kafka-cc
+         constraintRef: kafka-config-constraints
          name: kafka-configuration-tpl
          namespace: kb-system
          templateRef: kafka-configuration-tpl
@@ -70,24 +77,26 @@ Just in case you cannot find the configuration file of your cluster, you can swi
 
 KubeBlocks supports configuring cluster parameters with OpsRequest.
 
-1. Define an OpsRequest file and configure the parameters in the OpsRequest in a yaml file named `mycluster-configuring-demo.yaml`. In this example, `log.cleanup.policy` is configured as `compact`.
+1. Define an OpsRequest file and configure the parameters in the OpsRequest in a yaml file named `mycluster-configuring-demo.yaml`. In this example, `log.flush.interval.ms` is configured as `2000`.
 
-   ```bash
-   apiVersion: apps.kubeblocks.io/v1alpha1
+   ```yaml
+   kubectl apply -f - <<EOF
+   apiVersion: operations.kubeblocks.io/v1alpha1
    kind: OpsRequest
    metadata:
-     name: mycluster-configuring-demo
+     name:  kafka-combined-reconfiguring
      namespace: demo
    spec:
      clusterName: mycluster
-     reconfigure:
-       componentName: kafka
+     force: false
+     reconfigures:
+     - componentName: kafka-combine
        configurations:
        - keys:
          - key: server.properties
            parameters:
-           - key: log.cleanup.policy
-             value: "compact"
+           - key: log.flush.interval.ms
+             value: "2000"
          name: kafka-configuration-tpl
      preConditionDeadlineSeconds: 0
      type: Reconfiguring
@@ -98,15 +107,18 @@ KubeBlocks supports configuring cluster parameters with OpsRequest.
    |--------------------------------------------------------|--------------------------------|
    | `metadata.name`                                        | It specifies the name of this OpsRequest. |
    | `metadata.namespace`                                   | It specifies the namespace where this cluster is created. |
+   | `spec.type`                                            | It specifies the type of this operation. |
    | `spec.clusterName`                                     | It specifies the cluster name that this operation is targeted at. |
-   | `spec.reconfigure`                                     | It specifies a component and its configuration updates. |
+   | `spec.force`                                           | It instructs the system to bypass pre-checks (including cluster state checks and customized pre-conditions hooks) and immediately execute the opsRequest, except for the opsRequest of `Start` type, which will still undergo pre-checks even if `force` is true.  Note: Once set, the `force` field is immutable and cannot be updated. |
+   | `spec.reconfigures`                                    | It specifies a component and its configuration updates. |
    | `spec.reconfigure.componentName`                       | It specifies the component name of this cluster.  |
-   | `spec.configurations`                                  | It contains a list of ConfigurationItem objects, specifying the component's configuration template name, upgrade policy, and parameter key-value pairs to be updated. |
-   | `spec.reconfigure.configurations.keys.key`             | It specifies the configuration map. |
-   | `spec.reconfigure.configurations.keys.parameters`      | It defines a list of key-value pairs for a single configuration file. |
-   | `spec.reconfigure.configurations.keys.parameter.key`   | It represents the name of the parameter you want to edit. |
-   | `spec.reconfigure.configurations.keys.parameter.value` | It represents the parameter values that are to be updated. If set to nil, the parameter defined by the Key field will be removed from the configuration file.  |
-   | `spec.reconfigure.configurations.name`                 | It specifies the configuration template name.  |
+   | `spec.reconfigures.configurations`                     | It contains a list of ConfigurationItem objects, specifying the component's configuration template name, upgrade policy, and parameter key-value pairs to be updated. |
+   | `spec.reconfigures.keys`                                | It sets the parameters to be updated. It should contain at least one item. The keys are merged and retained during patch operations. |
+   | `spec.reconfigures.configurations.keys.key`             | It represents the unique identifier for the ConfigMap. |
+   | `spec.reconfigures.configurations.keys.parameters`      | It defines a list of key-value pairs for a single configuration file. These parameters are used to update the specified configuration settings. |
+   | `spec.reconfigures.configurations.keys.parameter.key`   | It represents the name of the parameter you want to edit. |
+   | `spec.reconfigures.configurations.keys.parameter.value` | It represents the parameter values that are to be updated. If set to nil, the parameter defined by the Key field will be removed from the configuration file.  |
+   | `spec.reconfigures.configurations.name`                 | It specifies the configuration template name.  |
    | `preConditionDeadlineSeconds`                          | It specifies the maximum number of seconds this OpsRequest will wait for its start conditions to be met before aborting. If set to 0 (default), the start conditions must be met immediately for the OpsRequest to proceed. |
 
 2. Apply the configuration OpsRequest.
@@ -118,9 +130,9 @@ KubeBlocks supports configuring cluster parameters with OpsRequest.
 3. Verify whether the configuration takes effect as expected.
 
    ```bash
-   kbcli cluster describe-config mycluster -n demo --show-detail | grep log.cleanup.policy
+   kbcli cluster describe-config mycluster -n demo --show-detail | grep log.flush.interval.ms
    >
-   log.cleanup.policy = compact
+   log.flush.interval.ms = 2000
    ```
 
 :::note
@@ -153,9 +165,9 @@ You can also view the details of this configuration file and parameters.
 
 * View the parameter description.
 
-  ```bash
-  kbcli cluster explain-config mycluster -n demo | head -n 20
-  ```
+   ```bash
+   kbcli cluster explain-config mycluster -n demo | head -n 20
+   ```
 
 * View the user guide of a specified parameter.
   

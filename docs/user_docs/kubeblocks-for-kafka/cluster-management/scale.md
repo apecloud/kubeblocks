@@ -28,8 +28,8 @@ Check whether the cluster status is `Running`. Otherwise, the following operatio
 ```bash
 kubectl -n demo get cluster mycluster
 >
-NAME           CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS     AGE
-mycluster      kafka                kafka-3.3.2    Delete               Running    19m
+NAME        CLUSTER-DEFINITION   TERMINATION-POLICY   STATUS    AGE
+mycluster   kafka                Delete               Running   20m
 ```
 
 </TabItem>
@@ -39,8 +39,8 @@ mycluster      kafka                kafka-3.3.2    Delete               Running 
 ```bash
 kbcli cluster list mycluster -n demo
 >
-NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION       TERMINATION-POLICY   STATUS    CREATED-TIME
-mycluster   demo        kafka                kafka-3.3.2   Delete               Running   Sep 27,2024 15:15 UTC+0800
+NAME        NAMESPACE   CLUSTER-DEFINITION   TERMINATION-POLICY   STATUS    CREATED-TIME
+mycluster   demo        kafka                Delete               Running   Jan 21,2025 11:31 UTC+0800
 ```
 
 </TabItem>
@@ -57,22 +57,22 @@ mycluster   demo        kafka                kafka-3.3.2   Delete               
 
    ```yaml
    kubectl apply -f - <<EOF
-   apiVersion: apps.kubeblocks.io/v1alpha1
+   apiVersion: operations.kubeblocks.io/v1alpha1
    kind: OpsRequest
    metadata:
-     name: ops-vertical-scaling
+     name: kafka-combined-vscale
      namespace: demo
    spec:
-     clusterRef: mycluster
-     type: VerticalScaling 
+     clusterName: mycluster
+     type: VerticalScaling
      verticalScaling:
-     - componentName: broker
+     - componentName: kafka-combine
        requests:
-         memory: "2Gi"
-         cpu: "1"
+         cpu: '1'
+         memory: 1Gi
        limits:
-         memory: "4Gi"
-         cpu: "2"
+         cpu: '1'
+         memory: 1Gi
    EOF
    ```
 
@@ -81,8 +81,8 @@ mycluster   demo        kafka                kafka-3.3.2   Delete               
    ```bash
    kubectl get ops -n demo
    >
-   NAMESPACE   NAME                   TYPE              CLUSTER     STATUS    PROGRESS   AGE
-   demo        ops-vertical-scaling   VerticalScaling   mycluster   Succeed   3/3        6m
+   NAME                    TYPE              CLUSTER     STATUS    PROGRESS   AGE
+   kafka-combined-vscale   VerticalScaling   mycluster   Succeed   3/3        6m
    ```
 
    If an error occurs, you can troubleshoot with `kubectl describe ops -n demo` command to view the events of this operation.
@@ -93,20 +93,20 @@ mycluster   demo        kafka                kafka-3.3.2   Delete               
    kubectl describe cluster mycluster -n demo
    >
    ...
-   Component Specs:
-    Component Def Ref:  kafka
-    Enabled Logs:
-      running
-    DisableExporter:   true
-    Name:      kafka
-    Replicas:  2
-    Resources:
-      Limits:
-        Cpu:     2
-        Memory:  4Gi
-      Requests:
-        Cpu:     1
-        Memory:  2Gi
+   Spec:
+     Cluster Def:  kafka
+     Component Specs:
+     ...
+       Name:      kafka-combine
+       Replicas:  1
+       Resources:
+         Limits:
+           Cpu:     1
+           Memory:  1Gi
+         Requests:
+           Cpu:          1
+           Memory:       1Gi
+   ...
    ```
 
 </TabItem>
@@ -115,35 +115,37 @@ mycluster   demo        kafka                kafka-3.3.2   Delete               
 
 1. Change the configuration of `spec.componentSpecs.resources` in the YAML file. `spec.componentSpecs.resources` controls the requirement and limit of resources and changing them triggers a vertical scaling.
 
+   ```bash
+   kubectl edit cluster mycluster -n demo
+   ```
+
+   Edit the values of `spec.componentSpecs.resources` in the YAML file.
+
    ```yaml
-   apiVersion: apps.kubeblocks.io/v1alpha1
+   apiVersion: apps.kubeblocks.io/v1
    kind: Cluster
    metadata:
-     name: mycluster
-     namespace: demo
+   ...
    spec:
-     clusterDefinitionRef: kafka
-     clusterVersionRef: kafka-3.3.2
+     clusterDef: kafka
      componentSpecs:
-     - name: broker
-       componentDefRef: broker
+     - componentDef: kafka-combine-1.0.0-alpha.0
+       ...
+       name: kafka-combine
        replicas: 1
-       resources: # Change the values of resources.
-         requests:
-           memory: "2Gi"
-           cpu: "1"
+       resources: # Edit the values of resources
          limits:
-           memory: "4Gi"
            cpu: "2"
-       volumeClaimTemplates:
-       - name: data
-         spec:
-           accessModes:
-             - ReadWriteOnce
-           resources:
-             requests:
-               storage: 1Gi
-     terminationPolicy: Delete
+           memory: 4Gi
+         requests:
+           cpu: "1"
+           memory: 2Gi
+       serviceVersion: 3.3.2
+       services:
+       - name: advertised-listener
+         podService: true
+         serviceType: ClusterIP
+   ...
    ```
 
 2. Check whether the corresponding resources change.
@@ -152,20 +154,20 @@ mycluster   demo        kafka                kafka-3.3.2   Delete               
    kubectl describe cluster mycluster -n demo
    >
    ...
-   Component Specs:
-    Component Def Ref:  kafka
-    Enabled Logs:
-      running
-    DisableExporter:   true
-    Name:      kafka
-    Replicas:  2
-    Resources:
-      Limits:
-        Cpu:     2
-        Memory:  4Gi
-      Requests:
-        Cpu:     1
-        Memory:  2Gi
+   Spec:
+     Cluster Def:  kafka
+     Component Specs:
+     ...
+       Name:      kafka-combine
+       Replicas:  1
+       Resources:
+         Limits:
+           Cpu:     2
+           Memory:  4Gi
+         Requests:
+           Cpu:          1
+           Memory:       2Gi
+   ...
    ```
 
 </TabItem>
@@ -175,12 +177,10 @@ mycluster   demo        kafka                kafka-3.3.2   Delete               
 1. Configure the parameters `--components`, `--memory`, and `--cpu` and run the command.
 
    ```bash
-    kbcli cluster vscale mycluster -n demo --components="broker" --memory="4Gi" --cpu="2" 
+   kbcli cluster vscale mycluster -n demo --components="kafka-combine" --memory="4Gi" --cpu="2" 
    ```
 
-   - `--components` value can be `broker` or `controller`.
-     - broker: all nodes in the combined mode, or all the broker node in the separated node.
-     - controller: all the corresponding nodes in the separated mode.
+   - `--components` specifies the component name of this operations.
    - `--memory` describes the requested and limited size of the component memory.
    - `--cpu` describes the requested and limited size of the component CPU.
 
@@ -199,14 +199,14 @@ mycluster   demo        kafka                kafka-3.3.2   Delete               
      ```bash
      kbcli cluster list mycluster -n demo
      >
-     NAME             NAMESPACE        CLUSTER-DEFINITION       VERSION                TERMINATION-POLICY        STATUS          CREATED-TIME
-     mycluster        demo         kafka                    kafka-3.3.2            Delete                    Updating        Sep 27,2024 15:15 UTC+0800
+     NAME        NAMESPACE   CLUSTER-DEFINITION   TERMINATION-POLICY   STATUS     CREATED-TIME
+     mycluster   demo        kafka                Delete               Updating   Jan 21,2025 11:31 UTC+0800
      ```
 
-    - STATUS=Updating: it means the vertical scaling is in progress.
-    - STATUS=Running: it means the vertical scaling operation has been applied.
-    - STATUS=Abnormal: it means the vertical scaling is abnormal. The reason may be that the number of the normal instances is less than that of the total instance or the leader instance is running properly while others are abnormal.
-      > To solve the problem, you can manually check whether this error is caused by insufficient resources. Then if AutoScaling is supported by the Kubernetes cluster, the system recovers when there are enough resources. Otherwise, you can create enough resources and troubleshoot with `kubectl describe` command.
+     - STATUS=Updating: it means the vertical scaling is in progress.
+     - STATUS=Running: it means the vertical scaling operation has been applied.
+     - STATUS=Abnormal: it means the vertical scaling is abnormal. The reason may be that the number of the normal instances is less than that of the total instance or the leader instance is running properly while others are abnormal.
+       > To solve the problem, you can manually check whether this error is caused by insufficient resources. Then if AutoScaling is supported by the Kubernetes cluster, the system recovers when there are enough resources. Otherwise, you can create enough resources and troubleshoot with `kubectl describe` command.
 
 :::note
 
@@ -240,8 +240,8 @@ From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out insta
    ```bash
    kubectl -n demo get cluster mycluster
    >
-   NAME           CLUSTER-DEFINITION   VERSION        TERMINATION-POLICY   STATUS     AGE
-   mycluster      kafka                kafka-3.3.2    Delete               Running    19m
+   NAME        CLUSTER-DEFINITION   TERMINATION-POLICY   STATUS    AGE
+   mycluster   kafka                Delete               Running   30m
    ```
 
    </TabItem>
@@ -251,13 +251,14 @@ From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out insta
    ```bash
    kbcli cluster list mycluster -n demo
    >
-   NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION       TERMINATION-POLICY   STATUS    CREATED-TIME
-   mycluster   demo        kafka                kafka-3.3.2   Delete               Running   Sep 27,2024 15:15 UTC+0800
+   NAME        NAMESPACE   CLUSTER-DEFINITION   TERMINATION-POLICY   STATUS    CREATED-TIME
+   mycluster   demo        kafka                Delete               Running   Jan 21,2025 11:31 UTC+0800
    ```
 
    </TabItem>
 
    </Tabs>
+
 - You are not recommended to perform horizontal scaling on the controller node, including the controller node both in combined mode and separated node.
 - When scaling in horizontally, you must know the topic partition storage. If the topic has only one replication, data loss may caused when you scale in broker.
 
@@ -273,17 +274,17 @@ From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out insta
 
    ```yaml
    kubectl apply -f - <<EOF
-   apiVersion: apps.kubeblocks.io/v1alpha1
+   apiVersion: operations.kubeblocks.io/v1alpha1
    kind: OpsRequest
    metadata:
-     name: ops-horizontal-scaling
+     name: kafka-combined-scale-out
      namespace: demo
    spec:
-     clusterRef: mycluster
+     clusterName: mycluster
      type: HorizontalScaling
      horizontalScaling:
-     - componentName: broker
-       scaleOut:
+     - componentName: kafka-combine
+       scaleOut: 
          replicaChanges: 2
    EOF
    ```
@@ -294,17 +295,17 @@ From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out insta
 
    ```yaml
    kubectl apply -f - <<EOF
-   apiVersion: apps.kubeblocks.io/v1alpha1
+   apiVersion: operations.kubeblocks.io/v1alpha1
    kind: OpsRequest
    metadata:
-     name: ops-horizontal-scaling
+     name: kafka-combined-scale-in
      namespace: demo
    spec:
-     clusterRef: mycluster
+     clusterName: mycluster
      type: HorizontalScaling
      horizontalScaling:
-     - componentName: broker
-       scaleIn:
+     - componentName: kafka-combine
+       scaleIn: 
          replicaChanges: 2
    EOF
    ```
@@ -314,8 +315,8 @@ From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out insta
    ```bash
    kubectl get ops -n demo
    >
-   NAMESPACE   NAME                     TYPE                CLUSTER     STATUS    PROGRESS   AGE
-   demo        ops-horizontal-scaling   HorizontalScaling   mycluster   Succeed   3/3        6m
+   NAME                       TYPE                CLUSTER     STATUS    PROGRESS   AGE
+   kafka-combined-scale-out   HorizontalScaling   mycluster   Succeed   3/3        5m
    ```
 
    If an error occurs, you can troubleshoot with `kubectl describe ops -n demo` command to view the events of this operation.
@@ -332,7 +333,7 @@ From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out insta
       running
     DisableExporter:   true
     Name:      kafka
-    Replicas:  2
+    Replicas:  3
     Resources:
       Limits:
         Cpu:     2
@@ -356,13 +357,16 @@ From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out insta
 
    ```yaml
    ...
+   apiVersion: apps.kubeblocks.io/v1
+   kind: Cluster
+   metadata:
+   ...
    spec:
-     clusterDefinitionRef: kafka
-     clusterVersionRef: kafka-3.3.2 
+     clusterDef: kafka
      componentSpecs:
-     - name: broker
-       componentDefRef: broker
-       replicas: 2 # Change this value
+     ...
+       name: kafka-combine
+       replicas: 3 # Change this value
    ...
    ```
 
@@ -378,7 +382,7 @@ From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out insta
       running
     DisableExporter:   true
     Name:      kafka
-    Replicas:  2
+    Replicas:  3
     Resources:
       Limits:
         Cpu:     2
@@ -395,7 +399,7 @@ From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out insta
 1. Configure the parameters `--components` and `--replicas`, and run the command.
 
    ```bash
-   kbcli cluster hscale mycluster -n demo --components="broker" --replicas=3
+   kbcli cluster hscale mycluster -n demo --components="kafka-combine" --replicas=3
    ```
 
    - `--components` describes the component name ready for horizontal scaling.

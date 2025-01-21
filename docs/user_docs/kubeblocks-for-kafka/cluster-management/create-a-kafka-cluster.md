@@ -26,8 +26,8 @@ This document shows how to create a Kafka cluster.
   ```bash
   kubectl get addons.extensions.kubeblocks.io kafka
   >
-  NAME    TYPE   VERSION   PROVIDER   STATUS    AGE
-  kafka   Helm                        Enabled   13m
+  NAME    TYPE   VERSION         PROVIDER    STATUS    AGE
+  kafka   Helm   1.0.0-alpha.0   community   Enabled   2h
   ```
 
   </TabItem>
@@ -37,9 +37,9 @@ This document shows how to create a Kafka cluster.
   ```bash
   kbcli addon list
   >
-  NAME                           TYPE   STATUS     EXTRAS         AUTO-INSTALL  
+  NAME                           VERSION         PROVIDER    STATUS     AUTO-INSTALL
   ...
-  kafka                          Helm   Enabled                   true
+  kafka                          1.0.0-alpha.0   community   Enabled    true
   ...
   ```
 
@@ -229,8 +229,8 @@ This document shows how to create a Kafka cluster.
    ```bash
    kubectl get cluster mycluster -n demo
    >
-   NAME        CLUSTER-DEFINITION   VERSION       TERMINATION-POLICY   STATUS    AGE
-   mycluster   kafka                kafka-3.3.2   Delete               Running   2m2s
+   NAME        CLUSTER-DEFINITION   TERMINATION-POLICY   STATUS     AGE
+   mycluster   kafka                Delete               Running    3m
    ```
 
 </TabItem>
@@ -270,8 +270,8 @@ This document shows how to create a Kafka cluster.
    ```bash
    kbcli cluster list -n demo
    >
-   NAME        NAMESPACE   CLUSTER-DEFINITION   VERSION       TERMINATION-POLICY   STATUS    CREATED-TIME
-   mycluster   demo        kafka                kafka-3.3.2   Delete               Running   Sep 27,2024 15:15 UTC+0800
+   NAME        NAMESPACE   CLUSTER-DEFINITION   TERMINATION-POLICY   STATUS     CREATED-TIME
+   mycluster   demo        kafka                Delete               Running    Jan 21,2025 11:31 UTC+0800
    ```
 
 </TabItem>

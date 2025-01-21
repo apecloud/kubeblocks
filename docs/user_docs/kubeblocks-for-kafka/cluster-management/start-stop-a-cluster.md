@@ -25,15 +25,15 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
 
    Run the command below to stop a cluster.
 
-   ```bash
+   ```yaml
    kubectl apply -f - <<EOF
-   apiVersion: apps.kubeblocks.io/v1alpha1
+   apiVersion: operations.kubeblocks.io/v1alpha1
    kind: OpsRequest
    metadata:
-     name: ops-stop
+     name:  kafka-combine-stop
      namespace: demo
    spec:
-     clusterName: mycluster
+     clusterName:  mycluster
      type: Stop
    EOF
    ```
@@ -46,19 +46,21 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
    kubectl edit cluster mycluster -n demo
    ```
 
-   Configure the value of `spec.componentSpecs.replicas` as 0 to delete pods.
+   Configure the value of `spec.componentSpecs.stop` to `true` to delete pods.
 
    ```yaml
+   apiVersion: apps.kubeblocks.io/v1
+   kind: Cluster
+   metadata:
+     name: mycluster
+     namespace: demo
    ...
    spec:
-     clusterDefinitionRef: kafka
-     clusterVersionRef: kafka-3.3.2
-     terminationPolicy: Delete
+   ...
      componentSpecs:
-     - name: kafka
-       componentDefRef: kafka
-       disableExporter: true  
-       replicas: 0 # Change this value
+       - name: kafka-combine
+         stop: true  # set stop `true` to stop the component
+         replicas: 1
    ...
    ```
 
@@ -106,17 +108,17 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
 
    Apply an OpsRequest to start the cluster.
 
-   ```bash
+   ```yaml
    kubectl apply -f - <<EOF
-   apiVersion: apps.kubeblocks.io/v1alpha1
+   apiVersion: operations.kubeblocks.io/v1alpha1
    kind: OpsRequest
    metadata:
-     name: ops-start
+     name: kafka-combined-start
      namespace: demo
    spec:
      clusterName: mycluster
      type: Start
-   EOF 
+   EOF
    ```
 
    </TabItem>
@@ -127,19 +129,21 @@ You can stop/start a cluster to save computing resources. When a cluster is stop
    kubectl edit cluster mycluster -n demo
    ```
 
-   Change the value of `spec.componentSpecs.replicas` back to the original amount to start this cluster again.
+   Change the value of `spec.componentSpecs.stop` to `false` to start this cluster again.
 
    ```yaml
+   apiVersion: apps.kubeblocks.io/v1
+   kind: Cluster
+   metadata:
+     name: mycluster
+     namespace: demo
    ...
    spec:
-     clusterDefinitionRef: kafka
-     clusterVersionRef: kafka-3.3.2
-     terminationPolicy: Delete
+   ...
      componentSpecs:
-     - name: kafka
-       componentDefRef: kafka
-       disableExporter: true   
-       replicas: 1 # Change this value
+       - name: kafka-combine
+         stop: false  # set to `false` (or remove this field) to start the component
+         replicas: 1
    ...
    ```
 

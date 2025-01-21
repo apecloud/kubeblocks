@@ -350,20 +350,29 @@ func BuildServiceAccount(synthesizedComp *component.SynthesizedComponent, saName
 		GetObject()
 }
 
-func BuildRoleBinding(synthesizedComp *component.SynthesizedComponent, saName string) *rbacv1.RoleBinding {
-	return builder.NewRoleBindingBuilder(synthesizedComp.Namespace, saName).
+func BuildRoleBinding(synthesizedComp *component.SynthesizedComponent, name string, roleRef *rbacv1.RoleRef, saName string) *rbacv1.RoleBinding {
+	return builder.NewRoleBindingBuilder(synthesizedComp.Namespace, name).
 		AddLabelsInMap(synthesizedComp.StaticLabels).
 		AddLabelsInMap(constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name)).
 		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
-		SetRoleRef(rbacv1.RoleRef{
-			APIGroup: rbacv1.GroupName,
-			Kind:     "ClusterRole",
-			Name:     constant.RBACRoleName,
-		}).
+		SetRoleRef(*roleRef).
 		AddSubjects(rbacv1.Subject{
 			Kind:      rbacv1.ServiceAccountKind,
 			Namespace: synthesizedComp.Namespace,
 			Name:      saName,
 		}).
+		GetObject()
+}
+
+func BuildRole(synthesizedComp *component.SynthesizedComponent, cmpd *appsv1.ComponentDefinition) *rbacv1.Role {
+	rules := cmpd.Spec.PolicyRules
+	if len(rules) == 0 {
+		return nil
+	}
+	return builder.NewRoleBuilder(synthesizedComp.Namespace, constant.GenerateDefaultRoleName(cmpd.Name)).
+		AddLabelsInMap(synthesizedComp.StaticLabels).
+		AddLabelsInMap(constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name)).
+		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
+		AddPolicyRules(rules).
 		GetObject()
 }

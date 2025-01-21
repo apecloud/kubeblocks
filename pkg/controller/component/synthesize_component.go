@@ -27,6 +27,7 @@ import (
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -35,6 +36,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
+	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 var (
@@ -65,12 +67,17 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 	if err != nil {
 		return nil, err
 	}
+	compDef2CompCnt, err := buildCompDef2CompCount(ctx, cli, comp.Namespace, clusterName)
+	if err != nil {
+		return nil, err
+	}
 	compDefObj := compDef.DeepCopy()
 	synthesizeComp := &SynthesizedComponent{
 		Namespace:                        comp.Namespace,
 		ClusterName:                      clusterName,
 		ClusterUID:                       clusterUID,
 		Comp2CompDefs:                    comp2CompDef,
+		CompDef2CompCnt:                  compDef2CompCnt,
 		Name:                             compName,
 		FullCompName:                     comp.Name,
 		Generation:                       strconv.FormatInt(comp.Generation, 10),
@@ -167,7 +174,7 @@ func buildComp2CompDefs(ctx context.Context, cli client.Reader, namespace, clust
 
 	mapping := make(map[string]string)
 	for _, comp := range comps {
-		if len(comp.Spec.CompDef) > 0 {
+		if len(comp.Spec.CompDef) == 0 {
 			continue
 		}
 		compName, err1 := ShortName(clusterName, comp.Name)
@@ -177,6 +184,41 @@ func buildComp2CompDefs(ctx context.Context, cli client.Reader, namespace, clust
 		mapping[compName] = comp.Spec.CompDef
 	}
 	return mapping, nil
+}
+
+func buildCompDef2CompCount(ctx context.Context, cli client.Reader, namespace, clusterName string) (map[string]int32, error) {
+	if cli == nil {
+		return nil, nil // for test
+	}
+
+	clusterKey := types.NamespacedName{
+		Namespace: namespace,
+		Name:      clusterName,
+	}
+	cluster := &appsv1.Cluster{}
+	if err := cli.Get(ctx, clusterKey, cluster); err != nil {
+		return nil, client.IgnoreNotFound(err)
+	}
+
+	result := make(map[string]int32)
+
+	add := func(name string, cnt int32) {
+		if len(name) > 0 {
+			if val, ok := result[name]; !ok {
+				result[name] = cnt
+			} else {
+				result[name] = val + cnt
+			}
+		}
+	}
+
+	for _, comp := range cluster.Spec.ComponentSpecs {
+		add(comp.ComponentDef, 1)
+	}
+	for _, spec := range cluster.Spec.Shardings {
+		add(spec.Template.ComponentDef, spec.Shards)
+	}
+	return result, nil
 }
 
 func mergeUserDefinedEnv(synthesizedComp *SynthesizedComponent, comp *appsv1.Component) error {
@@ -392,11 +434,10 @@ func buildServiceAccountName(synthesizeComp *SynthesizedComponent) {
 		synthesizeComp.PodSpec.ServiceAccountName = synthesizeComp.ServiceAccountName
 		return
 	}
-	if synthesizeComp.LifecycleActions == nil || synthesizeComp.LifecycleActions.RoleProbe == nil {
+	if !viper.GetBool(constant.EnableRBACManager) {
 		return
 	}
-	synthesizeComp.ServiceAccountName = constant.GenerateDefaultServiceAccountName(synthesizeComp.ClusterName)
-	// set component.PodSpec.ServiceAccountName
+	synthesizeComp.ServiceAccountName = constant.GenerateDefaultServiceAccountName(synthesizeComp.CompDefName)
 	synthesizeComp.PodSpec.ServiceAccountName = synthesizeComp.ServiceAccountName
 }
 

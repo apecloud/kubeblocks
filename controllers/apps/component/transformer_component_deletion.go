@@ -25,7 +25,9 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
@@ -36,6 +38,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 // componentDeletionTransformer handles component deletion
@@ -125,6 +128,13 @@ func (t *componentDeletionTransformer) deleteCompResources(transCtx *componentTr
 			if appsutil.IsOwnedByInstanceSet(object) {
 				continue
 			}
+			skipDeletion, err := handleRBACResourceDeletion(object, transCtx, comp, graphCli, dag)
+			if err != nil {
+				return fmt.Errorf("handle rbac deletion failed: %w", err)
+			}
+			if skipDeletion {
+				continue
+			}
 			graphCli.Delete(dag, object)
 		}
 		graphCli.Status(dag, comp, transCtx.Component)
@@ -143,6 +153,64 @@ func (t *componentDeletionTransformer) deleteCompResources(transCtx *componentTr
 	return graph.ErrPrematureStop
 }
 
+func handleRBACResourceDeletion(obj client.Object, transCtx *componentTransformContext, comp *appsv1.Component,
+	graphCli model.GraphClient, dag *graph.DAG) (skipDeletion bool, err error) {
+	switch v := obj.(type) {
+	case *corev1.ServiceAccount, *rbacv1.Role, *rbacv1.RoleBinding:
+		// list other components that reference the same componentdefinition
+		transCtx.Logger.V(1).Info("handling rbac resources deletion",
+			"comp", comp.Name, "name", klog.KObj(v).String())
+		compDefName := comp.Spec.CompDef
+		compList := &appsv1.ComponentList{}
+		if err := transCtx.Client.List(transCtx.Context, compList, client.InNamespace(comp.Namespace),
+			client.MatchingLabels{constant.ComponentDefinitionLabelKey: compDefName}); err != nil {
+			return false, err
+		}
+		// if any, transfer ownership to any other component
+		for _, otherComp := range compList.Items {
+			// skip current component
+			if otherComp.Name == comp.Name {
+				continue
+			}
+			// skip deleting component
+			if !otherComp.DeletionTimestamp.IsZero() {
+				continue
+			}
+
+			if err := controllerutil.RemoveControllerReference(comp, v, model.GetScheme()); err != nil {
+				return false, err
+			}
+			if err := controllerutil.SetControllerReference(&otherComp, v, model.GetScheme()); err != nil {
+				return false, err
+			}
+			// component controller selects a comp's subresource by labels, so change them too
+			clusterName, err := component.GetClusterName(&otherComp)
+			if err != nil {
+				return false, err
+			}
+			compShortName, err := component.ShortName(clusterName, otherComp.Name)
+			if err != nil {
+				return false, err
+			}
+			newLabels := constant.GetCompLabels(clusterName, compShortName)
+			for k, val := range newLabels {
+				v.GetLabels()[k] = val
+			}
+			graphCli.Update(dag, nil, v)
+			gvk, err := apiutil.GVKForObject(v, model.GetScheme())
+			if err != nil {
+				return false, err
+			}
+			transCtx.Logger.V(1).Info("rbac resources owner transferred, skip deletion",
+				"fromComp", comp.Name, "toComp", otherComp.Name, "name", klog.KObj(v).String(), "gvk", gvk)
+			return true, nil
+		}
+		return false, nil
+	default:
+		return false, nil
+	}
+}
+
 func compOwnedWorkloadKinds() []client.ObjectList {
 	return []client.ObjectList{
 		&workloads.InstanceSetList{},
@@ -158,6 +226,7 @@ func compOwnedKinds() []client.ObjectList {
 		&corev1.PersistentVolumeClaimList{},
 		&appsv1alpha1.ConfigurationList{},
 		&corev1.ServiceAccountList{},
+		&rbacv1.RoleList{},
 		&rbacv1.RoleBindingList{},
 	}
 }

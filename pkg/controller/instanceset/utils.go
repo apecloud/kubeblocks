@@ -35,37 +35,15 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
-const (
-	leaderPriority            = 1 << 5
-	followerReadWritePriority = 1 << 4
-	followerReadonlyPriority  = 1 << 3
-	followerNonePriority      = 1 << 2
-	learnerPriority           = 1 << 1
-	emptyPriority             = 1 << 0
-	// unknownPriority           = 0
-)
+const defaultPriority = 0
 
 // ComposeRolePriorityMap generates a priority map based on roles.
 func ComposeRolePriorityMap(roles []workloads.ReplicaRole) map[string]int {
 	rolePriorityMap := make(map[string]int)
-	rolePriorityMap[""] = emptyPriority
+	rolePriorityMap[""] = defaultPriority
 	for _, role := range roles {
 		roleName := strings.ToLower(role.Name)
-		switch {
-		case role.IsLeader:
-			rolePriorityMap[roleName] = leaderPriority
-		case role.CanVote:
-			switch role.AccessMode {
-			case workloads.NoneMode:
-				rolePriorityMap[roleName] = followerNonePriority
-			case workloads.ReadonlyMode:
-				rolePriorityMap[roleName] = followerReadonlyPriority
-			case workloads.ReadWriteMode:
-				rolePriorityMap[roleName] = followerReadWritePriority
-			}
-		default:
-			rolePriorityMap[roleName] = learnerPriority
-		}
+		rolePriorityMap[roleName] = role.UpdatePriority
 	}
 
 	return rolePriorityMap

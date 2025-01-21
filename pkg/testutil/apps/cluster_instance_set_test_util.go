@@ -23,6 +23,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 
 	"github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -75,8 +76,16 @@ func MockInstanceSetComponent(
 	return NewInstanceSetFactory(testCtx.DefaultNamespace, itsName, clusterName, itsCompName).SetReplicas(replicas).
 		AddContainer(corev1.Container{Name: DefaultMySQLContainerName, Image: ApeCloudMySQLImage}).
 		SetRoles([]workloads.ReplicaRole{
-			{Name: "leader", AccessMode: workloads.ReadWriteMode, CanVote: true, IsLeader: true},
-			{Name: "follower", AccessMode: workloads.ReadonlyMode, CanVote: true, IsLeader: false},
+			{
+				Name:                 "leader",
+				ParticipatesInQuorum: true,
+				UpdatePriority:       5,
+			},
+			{
+				Name:                 "follower",
+				ParticipatesInQuorum: true,
+				UpdatePriority:       4,
+			},
 		}).Create(testCtx).GetObject()
 }
 
@@ -96,38 +105,42 @@ func MockInstanceSetPods(
 		if its == nil {
 			return nil
 		}
-		for i := range its.Spec.Roles {
-			if its.Spec.Roles[i].IsLeader {
-				return &its.Spec.Roles[i]
+		highestPriority := 0
+		var role *workloads.ReplicaRole
+		for i, r := range its.Spec.Roles {
+			if its.Spec.Roles[i].UpdatePriority > highestPriority {
+				highestPriority = r.UpdatePriority
+				role = &r
 			}
 		}
-		return nil
+		return role
 	}()
 	noneLeaderRole := func() *workloads.ReplicaRole {
 		if its == nil {
 			return nil
 		}
-		for i := range its.Spec.Roles {
-			if !its.Spec.Roles[i].IsLeader {
-				return &its.Spec.Roles[i]
+		lowestPriority := math.MaxInt
+		var role *workloads.ReplicaRole
+		for i, r := range its.Spec.Roles {
+			if its.Spec.Roles[i].UpdatePriority < lowestPriority {
+				lowestPriority = r.UpdatePriority
+				role = &r
 			}
 		}
-		return nil
+		return role
 	}()
 	podList := make([]*corev1.Pod, getReplicas())
 	podNames := generatePodNames(cluster, compName)
 	for i, pName := range podNames {
-		var podRole, accessMode string
+		var podRole string
 		if its != nil && len(its.Spec.Roles) > 0 {
 			if i == 0 {
 				podRole = leaderRole.Name
-				accessMode = string(leaderRole.AccessMode)
 			} else {
 				podRole = noneLeaderRole.Name
-				accessMode = string(noneLeaderRole.AccessMode)
 			}
 		}
-		pod := MockInstanceSetPod(testCtx, its, cluster.Name, compName, pName, podRole, accessMode)
+		pod := MockInstanceSetPod(testCtx, its, cluster.Name, compName, pName, podRole)
 		annotations := pod.Annotations
 		if annotations == nil {
 			annotations = make(map[string]string)
@@ -153,38 +166,42 @@ func MockInstanceSetPods2(
 		if its == nil {
 			return nil
 		}
-		for i := range its.Spec.Roles {
-			if its.Spec.Roles[i].IsLeader {
-				return &its.Spec.Roles[i]
+		highestPriority := 0
+		var role *workloads.ReplicaRole
+		for i, r := range its.Spec.Roles {
+			if its.Spec.Roles[i].UpdatePriority > highestPriority {
+				highestPriority = r.UpdatePriority
+				role = &r
 			}
 		}
-		return nil
+		return role
 	}()
 	noneLeaderRole := func() *workloads.ReplicaRole {
 		if its == nil {
 			return nil
 		}
-		for i := range its.Spec.Roles {
-			if !its.Spec.Roles[i].IsLeader {
-				return &its.Spec.Roles[i]
+		lowestPriority := math.MaxInt
+		var role *workloads.ReplicaRole
+		for i, r := range its.Spec.Roles {
+			if its.Spec.Roles[i].UpdatePriority < lowestPriority {
+				lowestPriority = r.UpdatePriority
+				role = &r
 			}
 		}
-		return nil
+		return role
 	}()
 	podList := make([]*corev1.Pod, getReplicas())
 	podNames := generatePodNames2(clusterName, compName, comp)
 	for i, pName := range podNames {
-		var podRole, accessMode string
+		var podRole string
 		if its != nil && len(its.Spec.Roles) > 0 {
 			if i == 0 {
 				podRole = leaderRole.Name
-				accessMode = string(leaderRole.AccessMode)
 			} else {
 				podRole = noneLeaderRole.Name
-				accessMode = string(noneLeaderRole.AccessMode)
 			}
 		}
-		pod := MockInstanceSetPod(testCtx, its, clusterName, compName, pName, podRole, accessMode)
+		pod := MockInstanceSetPod(testCtx, its, clusterName, compName, pName, podRole)
 		annotations := pod.Annotations
 		if annotations == nil {
 			annotations = make(map[string]string)
@@ -202,8 +219,9 @@ func MockInstanceSetPod(
 	clusterName,
 	consensusCompName,
 	podName,
-	podRole, accessMode string,
-	resources ...corev1.ResourceRequirements) *corev1.Pod {
+	podRole string,
+	resources ...corev1.ResourceRequirements,
+) *corev1.Pod {
 	var stsUpdateRevision string
 	if its != nil {
 		stsUpdateRevision = its.Status.UpdateRevision
@@ -222,7 +240,6 @@ func MockInstanceSetPod(
 		AddAppComponentLabel(consensusCompName).
 		AddAppManagedByLabel().
 		AddRoleLabel(podRole).
-		AddAccessModeLabel(accessMode).
 		AddControllerRevisionHashLabel(stsUpdateRevision).
 		AddLabelsInMap(ml).
 		AddVolume(corev1.Volume{
@@ -346,6 +363,9 @@ func podIsReady(pod *corev1.Pod) bool {
 }
 
 func MockInstanceSetStatus(testCtx testutil.TestContext, cluster *appsv1.Cluster, compName string) {
+	itsName := constant.GenerateClusterComponentName(cluster.Name, compName)
+	its := &workloads.InstanceSet{}
+	gomega.Expect(testCtx.Cli.Get(testCtx.Ctx, client.ObjectKey{Name: itsName, Namespace: cluster.Namespace}, its)).Should(gomega.Succeed())
 	currentPodNames := generatePodNames(cluster, compName)
 	updateRevisions := map[string]string{}
 	for _, podName := range currentPodNames {
@@ -368,22 +388,20 @@ func MockInstanceSetStatus(testCtx testutil.TestContext, cluster *appsv1.Cluster
 		if _, ok := pod.Labels[constant.RoleLabelKey]; !ok {
 			continue
 		}
-		memberStatus := workloads.MemberStatus{
-			PodName: pod.Name,
-			ReplicaRole: &workloads.ReplicaRole{
-				Name:       pod.Labels[constant.RoleLabelKey],
-				AccessMode: workloads.AccessMode(pod.Labels[constant.AccessModeLabelKey]),
-				CanVote:    true,
-			},
+		var role *workloads.ReplicaRole
+		for _, r := range its.Spec.Roles {
+			if r.Name == pod.Labels[constant.RoleLabelKey] {
+				role = r.DeepCopy()
+				break
+			}
 		}
-		if memberStatus.ReplicaRole.AccessMode == "" {
-			memberStatus.ReplicaRole.AccessMode = workloads.NoneMode
-		} else if memberStatus.ReplicaRole.AccessMode == workloads.ReadWriteMode {
-			memberStatus.ReplicaRole.IsLeader = true
+		// role can be nil
+		memberStatus := workloads.MemberStatus{
+			PodName:     pod.Name,
+			ReplicaRole: role,
 		}
 		newMembersStatus = append(newMembersStatus, memberStatus)
 	}
-	itsName := constant.GenerateClusterComponentName(cluster.Name, compName)
 	compSpec := cluster.Spec.GetComponentByName(compName)
 	gomega.Eventually(GetAndChangeObjStatus(&testCtx, client.ObjectKey{Name: itsName, Namespace: cluster.Namespace}, func(its *workloads.InstanceSet) {
 		its.Status.CurrentRevisions = currRevisions

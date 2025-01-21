@@ -80,7 +80,8 @@ var _ = Describe("synthesized component", func() {
 			}
 			comp = &appsv1.Component{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-cluster-comp",
+					Namespace: testCtx.DefaultNamespace,
+					Name:      "test-cluster-comp",
 					Labels: map[string]string{
 						constant.AppInstanceLabelKey: "test-cluster",
 					},
@@ -193,7 +194,8 @@ var _ = Describe("synthesized component", func() {
 			}
 			comp = &appsv1.Component{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-cluster-comp",
+					Namespace: testCtx.DefaultNamespace,
+					Name:      "test-cluster-comp",
 					Labels: map[string]string{
 						constant.AppInstanceLabelKey: "test-cluster",
 					},
@@ -267,7 +269,8 @@ var _ = Describe("synthesized component", func() {
 			}
 			comp = &appsv1.Component{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-cluster-comp",
+					Namespace: testCtx.DefaultNamespace,
+					Name:      "test-cluster-comp",
 					Labels: map[string]string{
 						constant.AppInstanceLabelKey: "test-cluster",
 					},
@@ -317,6 +320,151 @@ var _ = Describe("synthesized component", func() {
 			Expect(synthesizedComp.PodSpec.Volumes[1].Name).Should(Equal("data"))
 			Expect(synthesizedComp.PodSpec.Volumes[2].Name).Should(Equal("log"))
 			Expect(synthesizedComp.PodSpec.Volumes[3].Name).Should(Equal("not-defined"))
+		})
+	})
+
+	Context("components and definitions", func() {
+		var (
+			reader       *mockReader
+			cluster      *appsv1.Cluster
+			comp1, comp2 *appsv1.Component
+			shardComp1   *appsv1.Component
+		)
+
+		BeforeEach(func() {
+			compDef = &appsv1.ComponentDefinition{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-compdef-a",
+				},
+				Spec: appsv1.ComponentDefinitionSpec{
+					ServiceVersion: "8.0.30",
+					Runtime: corev1.PodSpec{
+						Containers: []corev1.Container{
+							{
+								Name: "app",
+							},
+						},
+					},
+				},
+			}
+			cluster = &appsv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testCtx.DefaultNamespace,
+					Name:      "test-cluster",
+				},
+				Spec: appsv1.ClusterSpec{
+					ComponentSpecs: []appsv1.ClusterComponentSpec{
+						{
+							Name:         "comp1",
+							ComponentDef: "test-compdef-a",
+						},
+						{
+							Name:         "comp2",
+							ComponentDef: "test-compdef-b",
+						},
+					},
+					Shardings: []appsv1.ClusterSharding{
+						{
+							Name:   "sharding1",
+							Shards: 3,
+							Template: appsv1.ClusterComponentSpec{
+								ComponentDef: "test-compdef-a",
+							},
+						},
+						{
+							Name:   "sharding2",
+							Shards: 5,
+							Template: appsv1.ClusterComponentSpec{
+								ComponentDef: "test-compdef-c",
+							},
+						},
+					},
+				},
+			}
+			comp1 = &appsv1.Component{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testCtx.DefaultNamespace,
+					Name:      "test-cluster-comp1",
+					Labels:    constant.GetClusterLabels("test-cluster"),
+					Annotations: map[string]string{
+						constant.KBAppClusterUIDKey:      "uuid",
+						constant.KubeBlocksGenerationKey: "1",
+					},
+				},
+				Spec: appsv1.ComponentSpec{
+					CompDef:        "test-compdef-a",
+					ServiceVersion: "8.0.30",
+				},
+			}
+			comp2 = &appsv1.Component{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testCtx.DefaultNamespace,
+					Name:      "test-cluster-comp2",
+					Labels:    constant.GetClusterLabels("test-cluster"),
+					Annotations: map[string]string{
+						constant.KBAppClusterUIDKey:      "uuid",
+						constant.KubeBlocksGenerationKey: "1",
+					},
+				},
+				Spec: appsv1.ComponentSpec{
+					CompDef:        "test-compdef-b",
+					ServiceVersion: "8.0.30",
+				},
+			}
+			shardComp1 = &appsv1.Component{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testCtx.DefaultNamespace,
+					Name:      "test-cluster-sharding1-a",
+					Labels: constant.GetClusterLabels("test-cluster",
+						map[string]string{constant.KBAppShardingNameLabelKey: "sharding1"}),
+					Annotations: map[string]string{
+						constant.KBAppClusterUIDKey:      "uuid",
+						constant.KubeBlocksGenerationKey: "1",
+					},
+				},
+				Spec: appsv1.ComponentSpec{
+					CompDef:        "test-compdef-a",
+					ServiceVersion: "8.0.30",
+				},
+			}
+			reader = &mockReader{
+				cli: k8sClient,
+			}
+		})
+
+		It("buildComp2CompDefs", func() {
+			reader.objs = []client.Object{comp1, comp2}
+
+			synthesizedComp, err := BuildSynthesizedComponent(ctx, reader, compDef, comp1)
+			Expect(err).Should(BeNil())
+			Expect(synthesizedComp).ShouldNot(BeNil())
+			Expect(synthesizedComp.Comp2CompDefs).Should(HaveLen(2))
+			Expect(synthesizedComp.Comp2CompDefs).Should(HaveKeyWithValue("comp1", "test-compdef-a"))
+			Expect(synthesizedComp.Comp2CompDefs).Should(HaveKeyWithValue("comp2", "test-compdef-b"))
+		})
+
+		It("buildComp2CompDefs - with sharding comp", func() {
+			reader.objs = []client.Object{comp1, comp2, shardComp1}
+
+			synthesizedComp, err := BuildSynthesizedComponent(ctx, reader, compDef, comp1)
+			Expect(err).Should(BeNil())
+			Expect(synthesizedComp).ShouldNot(BeNil())
+			Expect(synthesizedComp.Comp2CompDefs).Should(HaveLen(3))
+			Expect(synthesizedComp.Comp2CompDefs).Should(HaveKeyWithValue("comp1", "test-compdef-a"))
+			Expect(synthesizedComp.Comp2CompDefs).Should(HaveKeyWithValue("comp2", "test-compdef-b"))
+			Expect(synthesizedComp.Comp2CompDefs).Should(HaveKeyWithValue("sharding1-a", "test-compdef-a"))
+		})
+
+		It("buildCompDef2CompCount", func() {
+			reader.objs = []client.Object{cluster, comp1}
+
+			synthesizedComp, err := BuildSynthesizedComponent(ctx, reader, compDef, comp1)
+			Expect(err).Should(BeNil())
+			Expect(synthesizedComp).ShouldNot(BeNil())
+			Expect(synthesizedComp.CompDef2CompCnt).Should(HaveLen(3))
+			Expect(synthesizedComp.CompDef2CompCnt).Should(HaveKeyWithValue("test-compdef-a", int32(4)))
+			Expect(synthesizedComp.CompDef2CompCnt).Should(HaveKeyWithValue("test-compdef-b", int32(1)))
+			Expect(synthesizedComp.CompDef2CompCnt).Should(HaveKeyWithValue("test-compdef-c", int32(5)))
 		})
 	})
 })

@@ -227,9 +227,3 @@ func (factory *MockClusterFactory) SetServiceRefs(serviceRefs []appsv1.ServiceRe
 		comp.ServiceRefs = serviceRefs
 	})
 }
-
-func (factory *MockClusterFactory) SetStop(stop *bool) *MockClusterFactory {
-	return factory.lastComponentRef(func(comp *appsv1.ClusterComponentSpec) {
-		comp.Stop = stop
-	})
-}

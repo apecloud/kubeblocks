@@ -85,7 +85,7 @@ func (c *configReconcileContext) Workload() *configReconcileContext {
 func (c *configReconcileContext) SynthesizedComponent() *configReconcileContext {
 	return c.Wrap(func() (err error) {
 		// build synthesized component for the component
-		c.BuiltinComponent, err = component.BuildSynthesizedComponent(c.ctx, c.Client, c.ComponentDefObj, c.ComponentObj, c.ClusterObj)
+		c.BuiltinComponent, err = component.BuildSynthesizedComponent(c.ctx, c.Client, c.ComponentDefObj, c.ComponentObj)
 		return err
 	})
 }

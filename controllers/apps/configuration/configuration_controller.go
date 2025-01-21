@@ -156,7 +156,7 @@ func (r *ConfigurationReconciler) runTasks(taskCtx TaskContext, tasks []Task) (e
 
 	// build synthesized component for the component
 	synthesizedComp, err = component.BuildSynthesizedComponent(taskCtx.ctx, r.Client,
-		taskCtx.fetcher.ComponentDefObj, taskCtx.fetcher.ComponentObj, taskCtx.fetcher.ClusterObj)
+		taskCtx.fetcher.ComponentDefObj, taskCtx.fetcher.ComponentObj)
 	if err == nil {
 		err = buildTemplateVars(taskCtx.ctx, r.Client, taskCtx.fetcher.ComponentDefObj, synthesizedComp)
 	}

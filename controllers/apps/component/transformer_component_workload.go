@@ -42,6 +42,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/configuration"
@@ -66,7 +67,6 @@ type componentWorkloadTransformer struct {
 type componentWorkloadOps struct {
 	cli            client.Client
 	reqCtx         intctrlutil.RequestCtx
-	cluster        *appsv1.Cluster
 	component      *appsv1.Component
 	synthesizeComp *component.SynthesizedComponent
 	dag            *graph.DAG
@@ -89,7 +89,6 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 		return nil
 	}
 
-	cluster := transCtx.Cluster
 	compDef := transCtx.CompDef
 	comp := transCtx.Component
 	synthesizeComp := transCtx.SynthesizeComponent
@@ -130,7 +129,7 @@ func (t *componentWorkloadTransformer) Transform(ctx graph.TransformContext, dag
 		if protoITS == nil {
 			graphCli.Delete(dag, runningITS)
 		} else {
-			err = t.handleUpdate(reqCtx, graphCli, dag, cluster, synthesizeComp, comp, runningITS, protoITS)
+			err = t.handleUpdate(reqCtx, graphCli, dag, synthesizeComp, comp, runningITS, protoITS)
 		}
 	}
 	return err
@@ -227,7 +226,7 @@ func hasMemberJoinNDataActionDefined(lifecycleActions *appsv1.ComponentLifecycle
 }
 
 func (t *componentWorkloadTransformer) handleUpdate(reqCtx intctrlutil.RequestCtx, cli model.GraphClient, dag *graph.DAG,
-	cluster *appsv1.Cluster, synthesizedComp *component.SynthesizedComponent, comp *appsv1.Component, runningITS, protoITS *workloads.InstanceSet) error {
+	synthesizedComp *component.SynthesizedComponent, comp *appsv1.Component, runningITS, protoITS *workloads.InstanceSet) error {
 	start, stop, err := t.handleWorkloadStartNStop(synthesizedComp, runningITS, &protoITS)
 	if err != nil {
 		return err
@@ -235,7 +234,7 @@ func (t *componentWorkloadTransformer) handleUpdate(reqCtx intctrlutil.RequestCt
 
 	if !(start || stop) {
 		// postpone the update of the workload until the component is back to running.
-		if err := t.handleWorkloadUpdate(reqCtx, dag, cluster, synthesizedComp, comp, runningITS, protoITS); err != nil {
+		if err := t.handleWorkloadUpdate(reqCtx, dag, synthesizedComp, comp, runningITS, protoITS); err != nil {
 			return err
 		}
 	}
@@ -352,8 +351,8 @@ func (t *componentWorkloadTransformer) startWorkload(
 }
 
 func (t *componentWorkloadTransformer) handleWorkloadUpdate(reqCtx intctrlutil.RequestCtx, dag *graph.DAG,
-	cluster *appsv1.Cluster, synthesizeComp *component.SynthesizedComponent, comp *appsv1.Component, obj, its *workloads.InstanceSet) error {
-	cwo, err := newComponentWorkloadOps(reqCtx, t.Client, cluster, synthesizeComp, comp, obj, its, dag)
+	synthesizeComp *component.SynthesizedComponent, comp *appsv1.Component, obj, its *workloads.InstanceSet) error {
+	cwo, err := newComponentWorkloadOps(reqCtx, t.Client, synthesizeComp, comp, obj, its, dag)
 	if err != nil {
 		return err
 	}
@@ -614,11 +613,11 @@ func (r *componentWorkloadOps) horizontalScale() error {
 		}
 	}
 
-	r.reqCtx.Recorder.Eventf(r.cluster,
+	r.reqCtx.Recorder.Eventf(r.component,
 		corev1.EventTypeNormal,
 		"HorizontalScale",
 		"start horizontal scale component %s of cluster %s from %d to %d",
-		r.synthesizeComp.Name, r.cluster.Name, int(*r.runningITS.Spec.Replicas), r.synthesizeComp.Replicas)
+		r.synthesizeComp.Name, r.synthesizeComp.ClusterName, int(*r.runningITS.Spec.Replicas), r.synthesizeComp.Replicas)
 
 	return nil
 }
@@ -652,7 +651,8 @@ func (r *componentWorkloadOps) scaleIn() error {
 }
 
 func (r *componentWorkloadOps) leaveMember4ScaleIn(deleteReplicas, joinedReplicas []string) error {
-	pods, err := component.ListOwnedPods(r.reqCtx.Ctx, r.cli, r.cluster.Namespace, r.cluster.Name, r.synthesizeComp.Name)
+	pods, err := component.ListOwnedPods(r.reqCtx.Ctx, r.cli,
+		r.synthesizeComp.Namespace, r.synthesizeComp.ClusterName, r.synthesizeComp.Name)
 	if err != nil {
 		return err
 	}
@@ -681,7 +681,7 @@ func (r *componentWorkloadOps) leaveMember4ScaleIn(deleteReplicas, joinedReplica
 			fmt.Errorf("some replicas have joined but not leaved since the Pod object is not exist: %v", sets.List(joinedReplicasSet)))
 	}
 	if len(leaveErrors) > 0 {
-		return newRequeueError(time.Second, fmt.Sprintf("%v", leaveErrors))
+		return intctrlutil.NewRequeueError(time.Second, fmt.Sprintf("%v", leaveErrors))
 	}
 	return nil
 }
@@ -755,7 +755,7 @@ func (r *componentWorkloadOps) deletePVCs4ScaleIn(itsObj *workloads.InstanceSet)
 				Name:      fmt.Sprintf("%s-%s", vct.Name, podName),
 			}
 			pvc := corev1.PersistentVolumeClaim{}
-			if err := r.cli.Get(r.reqCtx.Ctx, pvcKey, &pvc, inDataContext4C()); err != nil {
+			if err := r.cli.Get(r.reqCtx.Ctx, pvcKey, &pvc, appsutil.InDataContext4C()); err != nil {
 				if apierrors.IsNotFound(err) {
 					continue // the pvc is already deleted or not created
 				}
@@ -765,7 +765,7 @@ func (r *componentWorkloadOps) deletePVCs4ScaleIn(itsObj *workloads.InstanceSet)
 			// after updating ITS and before deleting PVCs, the PVCs intended to scale-in will be leaked.
 			// For simplicity, the updating dependency is added between them to guarantee that the PVCs to scale-in
 			// will be deleted or the scaling-in operation will be failed.
-			graphCli.Delete(r.dag, &pvc, inDataContext4G())
+			graphCli.Delete(r.dag, &pvc, appsutil.InDataContext4G())
 		}
 	}
 	return nil
@@ -820,7 +820,8 @@ func (r *componentWorkloadOps) scaleOut() error {
 }
 
 func (r *componentWorkloadOps) sourceReplica(dataDump *appsv1.Action) (*corev1.Pod, error) {
-	pods, err := component.ListOwnedPods(r.reqCtx.Ctx, r.cli, r.cluster.Namespace, r.cluster.Name, r.synthesizeComp.Name)
+	pods, err := component.ListOwnedPods(r.reqCtx.Ctx, r.cli,
+		r.synthesizeComp.Namespace, r.synthesizeComp.ClusterName, r.synthesizeComp.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -847,7 +848,8 @@ func (r *componentWorkloadOps) postHorizontalScale() error {
 }
 
 func (r *componentWorkloadOps) joinMember4ScaleOut() error {
-	pods, err := component.ListOwnedPods(r.reqCtx.Ctx, r.cli, r.cluster.Namespace, r.cluster.Name, r.synthesizeComp.Name)
+	pods, err := component.ListOwnedPods(r.reqCtx.Ctx, r.cli,
+		r.synthesizeComp.Namespace, r.synthesizeComp.ClusterName, r.synthesizeComp.Name)
 	if err != nil {
 		return err
 	}
@@ -891,7 +893,7 @@ func (r *componentWorkloadOps) joinMember4ScaleOut() error {
 	}
 
 	if len(joinErrors) > 0 {
-		return newRequeueError(time.Second, fmt.Sprintf("%v", joinErrors))
+		return intctrlutil.NewRequeueError(time.Second, fmt.Sprintf("%v", joinErrors))
 	}
 	return nil
 }
@@ -916,11 +918,11 @@ func (r *componentWorkloadOps) expandVolumes(insTPLName string, vctName string, 
 	for _, pod := range r.runningItsPodNames {
 		pvc := &corev1.PersistentVolumeClaim{}
 		pvcKey := types.NamespacedName{
-			Namespace: r.cluster.Namespace,
+			Namespace: r.synthesizeComp.Namespace,
 			Name:      fmt.Sprintf("%s-%s", vctName, pod),
 		}
 		pvcNotFound := false
-		if err := r.cli.Get(r.reqCtx.Ctx, pvcKey, pvc, inDataContext4C()); err != nil {
+		if err := r.cli.Get(r.reqCtx.Ctx, pvcKey, pvc, appsutil.InDataContext4C()); err != nil {
 			if apierrors.IsNotFound(err) {
 				pvcNotFound = true
 			} else {
@@ -936,7 +938,7 @@ func (r *componentWorkloadOps) expandVolumes(insTPLName string, vctName string, 
 			if quantity.Cmp(*pvc.Status.Capacity.Storage()) == 0 && newQuantity.Cmp(*quantity) < 0 {
 				errMsg := fmt.Sprintf("shrinking the volume is not supported, volume: %s, quantity: %s, new quantity: %s",
 					pvc.GetName(), quantity.String(), newQuantity.String())
-				r.reqCtx.Event(r.cluster, corev1.EventTypeWarning, "VolumeExpansionFailed", errMsg)
+				r.reqCtx.Event(r.component, corev1.EventTypeWarning, "VolumeExpansionFailed", errMsg)
 				return fmt.Errorf("%s", errMsg)
 			}
 		}
@@ -966,7 +968,7 @@ func (r *componentWorkloadOps) updatePVCSize(pvcKey types.NamespacedName,
 			constant.PVCNameLabelKey: pvcKey.Name,
 		}
 		pvList := corev1.PersistentVolumeList{}
-		if err := r.cli.List(r.reqCtx.Ctx, &pvList, ml, inDataContext4C()); err != nil {
+		if err := r.cli.List(r.reqCtx.Ctx, &pvList, ml, appsutil.InDataContext4C()); err != nil {
 			return err
 		}
 		for _, pv := range pvList.Items {
@@ -997,7 +999,7 @@ func (r *componentWorkloadOps) updatePVCSize(pvcKey types.NamespacedName,
 			Namespace: pvcKey.Namespace,
 			Name:      newPVC.Spec.VolumeName,
 		}
-		if err := r.cli.Get(r.reqCtx.Ctx, pvKey, pv, inDataContext4C()); err != nil {
+		if err := r.cli.Get(r.reqCtx.Ctx, pvKey, pv, appsutil.InDataContext4C()); err != nil {
 			if apierrors.IsNotFound(err) {
 				pvNotFound = true
 			} else {
@@ -1031,14 +1033,14 @@ func (r *componentWorkloadOps) updatePVCSize(pvcKey types.NamespacedName,
 			}
 			retainPV.Annotations[constant.PVLastClaimPolicyAnnotationKey] = string(pv.Spec.PersistentVolumeReclaimPolicy)
 			retainPV.Spec.PersistentVolumeReclaimPolicy = corev1.PersistentVolumeReclaimRetain
-			return graphCli.Do(r.dag, pv, retainPV, model.ActionPatchPtr(), fromVertex, inDataContext4G())
+			return graphCli.Do(r.dag, pv, retainPV, model.ActionPatchPtr(), fromVertex, appsutil.InDataContext4G())
 		},
 		deletePVCStep: func(fromVertex *model.ObjectVertex, step pvcRecreateStep) *model.ObjectVertex {
 			// step 2: delete pvc, this will not delete pv because policy is 'retain'
 			removeFinalizerPVC := pvc.DeepCopy()
 			removeFinalizerPVC.SetFinalizers([]string{})
-			removeFinalizerPVCVertex := graphCli.Do(r.dag, pvc, removeFinalizerPVC, model.ActionPatchPtr(), fromVertex, inDataContext4G())
-			return graphCli.Do(r.dag, nil, removeFinalizerPVC, model.ActionDeletePtr(), removeFinalizerPVCVertex, inDataContext4G())
+			removeFinalizerPVCVertex := graphCli.Do(r.dag, pvc, removeFinalizerPVC, model.ActionPatchPtr(), fromVertex, appsutil.InDataContext4G())
+			return graphCli.Do(r.dag, nil, removeFinalizerPVC, model.ActionDeletePtr(), removeFinalizerPVCVertex, appsutil.InDataContext4G())
 		},
 		removePVClaimRefStep: func(fromVertex *model.ObjectVertex, step pvcRecreateStep) *model.ObjectVertex {
 			// step 3: remove claimRef in pv
@@ -1047,12 +1049,12 @@ func (r *componentWorkloadOps) updatePVCSize(pvcKey types.NamespacedName,
 				removeClaimRefPV.Spec.ClaimRef.UID = ""
 				removeClaimRefPV.Spec.ClaimRef.ResourceVersion = ""
 			}
-			return graphCli.Do(r.dag, pv, removeClaimRefPV, model.ActionPatchPtr(), fromVertex, inDataContext4G())
+			return graphCli.Do(r.dag, pv, removeClaimRefPV, model.ActionPatchPtr(), fromVertex, appsutil.InDataContext4G())
 		},
 		createPVCStep: func(fromVertex *model.ObjectVertex, step pvcRecreateStep) *model.ObjectVertex {
 			// step 4: create new pvc
 			newPVC.SetResourceVersion("")
-			return graphCli.Do(r.dag, nil, newPVC, model.ActionCreatePtr(), fromVertex, inDataContext4G())
+			return graphCli.Do(r.dag, nil, newPVC, model.ActionCreatePtr(), fromVertex, appsutil.InDataContext4G())
 		},
 		pvRestorePolicyStep: func(fromVertex *model.ObjectVertex, step pvcRecreateStep) *model.ObjectVertex {
 			// step 5: restore to previous pv policy
@@ -1062,7 +1064,7 @@ func (r *componentWorkloadOps) updatePVCSize(pvcKey types.NamespacedName,
 				policy = corev1.PersistentVolumeReclaimDelete
 			}
 			restorePV.Spec.PersistentVolumeReclaimPolicy = policy
-			return graphCli.Do(r.dag, pv, restorePV, model.ActionPatchPtr(), fromVertex, inDataContext4G())
+			return graphCli.Do(r.dag, pv, restorePV, model.ActionPatchPtr(), fromVertex, appsutil.InDataContext4G())
 		},
 	}
 
@@ -1102,7 +1104,7 @@ func (r *componentWorkloadOps) updatePVCSize(pvcKey types.NamespacedName,
 	}
 	if pvcQuantity := pvc.Spec.Resources.Requests[corev1.ResourceStorage]; pvcQuantity.Cmp(vctProto.Spec.Resources.Requests[corev1.ResourceStorage]) != 0 {
 		// use pvc's update without anything extra
-		graphCli.Update(r.dag, nil, newPVC, inDataContext4G())
+		graphCli.Update(r.dag, nil, newPVC, appsutil.InDataContext4G())
 		return nil
 	}
 	// all the else means no need to update
@@ -1141,7 +1143,7 @@ func getRunningVolumes(ctx context.Context, cli client.Client, synthesizedComp *
 }
 
 func buildInstanceSetPlacementAnnotation(comp *appsv1.Component, its *workloads.InstanceSet) {
-	p := placement(comp)
+	p := appsutil.Placement(comp)
 	if len(p) > 0 {
 		if its.Annotations == nil {
 			its.Annotations = make(map[string]string)
@@ -1152,7 +1154,6 @@ func buildInstanceSetPlacementAnnotation(comp *appsv1.Component, its *workloads.
 
 func newComponentWorkloadOps(reqCtx intctrlutil.RequestCtx,
 	cli client.Client,
-	cluster *appsv1.Cluster,
 	synthesizeComp *component.SynthesizedComponent,
 	comp *appsv1.Component,
 	runningITS *workloads.InstanceSet,
@@ -1169,7 +1170,6 @@ func newComponentWorkloadOps(reqCtx intctrlutil.RequestCtx,
 	return &componentWorkloadOps{
 		cli:                   cli,
 		reqCtx:                reqCtx,
-		cluster:               cluster,
 		component:             comp,
 		synthesizeComp:        synthesizeComp,
 		runningITS:            runningITS,

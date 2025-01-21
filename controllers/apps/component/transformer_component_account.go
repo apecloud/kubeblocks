@@ -30,6 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
@@ -69,7 +70,7 @@ func (t *componentAccountTransformer) Transform(ctx graph.TransformContext, dag 
 		}
 
 		if existSecret == nil {
-			graphCli.Create(dag, secret, inUniversalContext4G())
+			graphCli.Create(dag, secret, appsutil.InUniversalContext4G())
 			continue
 		}
 
@@ -78,7 +79,7 @@ func (t *componentAccountTransformer) Transform(ctx graph.TransformContext, dag 
 		ctrlutil.MergeMetadataMapInplace(secret.Labels, &existSecretCopy.Labels)
 		ctrlutil.MergeMetadataMapInplace(secret.Annotations, &existSecretCopy.Annotations)
 		if !reflect.DeepEqual(existSecret, existSecretCopy) {
-			graphCli.Update(dag, existSecret, existSecretCopy, inUniversalContext4G())
+			graphCli.Update(dag, existSecret, existSecretCopy, appsutil.InUniversalContext4G())
 		}
 	}
 	// TODO: (good-first-issue) if an account is deleted from the Spec, the secret and account should be deleted

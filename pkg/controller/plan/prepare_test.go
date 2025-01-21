@@ -109,7 +109,7 @@ var _ = Describe("Prepare Test", func() {
 		})
 
 		It("render configuration should success", func() {
-			synthesizeComp, err := component.BuildSynthesizedComponent(ctx, testCtx.Cli, compDefObj, comp, cluster)
+			synthesizeComp, err := component.BuildSynthesizedComponent(ctx, testCtx.Cli, compDefObj, comp)
 			Expect(err).Should(Succeed())
 			Expect(synthesizeComp.PodSpec).ShouldNot(BeNil())
 			resCtx := &configuration.ResourceCtx{

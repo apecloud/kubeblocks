@@ -20,9 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
@@ -41,9 +45,8 @@ func (t *componentConfigurationTransformer) Transform(ctx graph.TransformContext
 	transCtx, _ := ctx.(*componentTransformContext)
 
 	comp := transCtx.Component
-	cluster := transCtx.Cluster
 	compOrig := transCtx.ComponentOrig
-	synthesizeComp := transCtx.SynthesizeComponent
+	synthesizedComp := transCtx.SynthesizeComponent
 
 	if model.IsObjectDeleting(compOrig) {
 		return nil
@@ -52,6 +55,18 @@ func (t *componentConfigurationTransformer) Transform(ctx graph.TransformContext
 		transCtx.V(1).Info("Component is in compact mode, no need to create configuration related objects",
 			"component", client.ObjectKeyFromObject(transCtx.ComponentOrig))
 		return nil
+	}
+
+	clusterKey := types.NamespacedName{
+		Namespace: synthesizedComp.Namespace,
+		Name:      synthesizedComp.ClusterName,
+	}
+	cluster := &appsv1.Cluster{}
+	if err := t.Client.Get(transCtx.Context, clusterKey, cluster); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		return errors.Wrap(err, "obtain the cluster object error for configuration")
 	}
 
 	// get dependOnObjs which will be used in configuration render
@@ -74,13 +89,13 @@ func (t *componentConfigurationTransformer) Transform(ctx graph.TransformContext
 			Context:       transCtx.Context,
 			Client:        t.Client,
 			Namespace:     comp.GetNamespace(),
-			ClusterName:   synthesizeComp.ClusterName,
-			ComponentName: synthesizeComp.Name,
+			ClusterName:   synthesizedComp.ClusterName,
+			ComponentName: synthesizedComp.Name,
 		},
 		cluster,
 		comp,
-		synthesizeComp,
-		synthesizeComp.PodSpec,
+		synthesizedComp,
+		synthesizedComp.PodSpec,
 		dependOnObjs); err != nil {
 		return err
 	}

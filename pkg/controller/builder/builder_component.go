@@ -41,6 +41,11 @@ func NewComponentBuilder(namespace, name, compDef string) *ComponentBuilder {
 	return builder
 }
 
+func (builder *ComponentBuilder) SetTerminationPolicy(terminationPolicy appsv1.TerminationPolicyType) *ComponentBuilder {
+	builder.get().Spec.TerminationPolicy = terminationPolicy
+	return builder
+}
+
 func (builder *ComponentBuilder) SetServiceVersion(serviceVersion string) *ComponentBuilder {
 	builder.get().Spec.ServiceVersion = serviceVersion
 	return builder

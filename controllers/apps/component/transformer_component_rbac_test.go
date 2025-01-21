@@ -25,12 +25,13 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/uuid"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
@@ -44,18 +45,23 @@ import (
 )
 
 var _ = Describe("object rbac transformer test.", func() {
-	const clusterName = "test-cluster"
-	const compName = "default"
-	var serviceAccountName = ""
+	const (
+		compDefName = "test-compdef"
+		clusterName = "test-cluster"
+		compName    = "test-comp"
+	)
 
-	var transCtx graph.TransformContext
-	var dag *graph.DAG
-	var graphCli model.GraphClient
-	var transformer graph.Transformer
-	var cluster *appsv1.Cluster
-	var compDefObj *appsv1.ComponentDefinition
-	var compObj *appsv1.Component
-	var synthesizedComp *component.SynthesizedComponent
+	var (
+		serviceAccountName string
+		transCtx           graph.TransformContext
+		dag                *graph.DAG
+		graphCli           model.GraphClient
+		transformer        graph.Transformer
+		compDefObj         *appsv1.ComponentDefinition
+		clusterUID         = string(uuid.NewUUID())
+		compObj            *appsv1.Component
+		synthesizedComp    *component.SynthesizedComponent
+	)
 
 	AfterEach(func() {
 		inNS := client.InNamespace(testCtx.DefaultNamespace)
@@ -65,7 +71,6 @@ var _ = Describe("object rbac transformer test.", func() {
 
 	init := func(enableLifecycleAction bool, enablePolicyRules bool) {
 		By("Create a component definition")
-		compDefName := "test-compdef"
 		compDefFactory := testapps.NewComponentDefinitionFactory(compDefName).
 			WithRandomName().
 			SetDefaultSpec().
@@ -87,26 +92,18 @@ var _ = Describe("object rbac transformer test.", func() {
 		}
 		compDefObj = compDefFactory.GetObject()
 
-		By("Creating a cluster")
-		cluster = testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, "").
-			WithRandomName().
-			AddComponent(compName, compDefName).
-			SetReplicas(1).
-			GetObject()
-
 		By("Creating a component")
-		fullCompName := constant.GenerateClusterComponentName(cluster.Name, compName)
+		fullCompName := constant.GenerateClusterComponentName(clusterName, compName)
 		compObj = testapps.NewComponentFactory(testCtx.DefaultNamespace, fullCompName, compDefName).
-			AddAnnotations(constant.KBAppClusterUIDKey, string(cluster.UID)).
-			AddLabels(constant.AppInstanceLabelKey, cluster.Name).
+			AddAnnotations(constant.KBAppClusterUIDKey, clusterUID).
+			AddLabels(constant.AppInstanceLabelKey, clusterName).
 			SetReplicas(1).
 			GetObject()
 
 		graphCli = model.NewGraphClient(k8sClient)
 
 		var err error
-		serviceAccountName = constant.GenerateDefaultServiceAccountName(compDefFactory.Get().Name)
-		synthesizedComp, err = component.BuildSynthesizedComponent(ctx, k8sClient, compDefObj, compObj, cluster)
+		synthesizedComp, err = component.BuildSynthesizedComponent(ctx, k8sClient, compDefObj, compObj)
 		Expect(err).Should(Succeed())
 
 		transCtx = &componentTransformContext{
@@ -114,16 +111,16 @@ var _ = Describe("object rbac transformer test.", func() {
 			Client:              graphCli,
 			EventRecorder:       clusterRecorder,
 			Logger:              logger,
-			Cluster:             cluster,
 			CompDef:             compDefObj,
 			Component:           compObj,
 			ComponentOrig:       compObj.DeepCopy(),
 			SynthesizeComponent: synthesizedComp,
 		}
 
-		dag = mockDAG(graphCli, cluster)
+		dag = mockDAG(graphCli, compObj)
 		transformer = &componentRBACTransformer{}
 
+		serviceAccountName = constant.GenerateDefaultServiceAccountName(compDefObj.Name)
 		saKey := types.NamespacedName{
 			Namespace: testCtx.DefaultNamespace,
 			Name:      serviceAccountName,
@@ -191,7 +188,8 @@ var _ = Describe("object rbac transformer test.", func() {
 			Expect(transformer.Transform(transCtx, dag)).Should(BeNil())
 			// sa should be created
 			serviceAccount := factory.BuildServiceAccount(synthesizedComp, serviceAccountName)
-			dagExpected := mockDAG(graphCli, cluster)
+
+			dagExpected := mockDAG(graphCli, compObj)
 			graphCli.Create(dagExpected, serviceAccount)
 
 			Expect(dag.Equals(dagExpected, model.DefaultLess)).Should(BeTrue())
@@ -206,7 +204,7 @@ var _ = Describe("object rbac transformer test.", func() {
 				Name:     constant.RBACRoleName,
 			}, serviceAccountName)
 			serviceAccount := factory.BuildServiceAccount(synthesizedComp, serviceAccountName)
-			dagExpected := mockDAG(graphCli, cluster)
+			dagExpected := mockDAG(graphCli, compObj)
 			graphCli.Create(dagExpected, serviceAccount)
 			graphCli.Create(dagExpected, clusterPodRoleBinding)
 			graphCli.DependOn(dagExpected, clusterPodRoleBinding, serviceAccount)
@@ -227,7 +225,7 @@ var _ = Describe("object rbac transformer test.", func() {
 				Name:     cmpdRole.Name,
 			}, serviceAccountName)
 			serviceAccount := factory.BuildServiceAccount(synthesizedComp, serviceAccountName)
-			dagExpected := mockDAG(graphCli, cluster)
+			dagExpected := mockDAG(graphCli, compObj)
 			graphCli.Create(dagExpected, serviceAccount)
 			graphCli.Create(dagExpected, cmpdRoleBinding)
 			graphCli.Create(dagExpected, cmpdRole)
@@ -247,9 +245,9 @@ var _ = Describe("object rbac transformer test.", func() {
 	})
 })
 
-func mockDAG(graphCli model.GraphClient, cluster *appsv1.Cluster) *graph.DAG {
+func mockDAG(graphCli model.GraphClient, comp *appsv1.Component) *graph.DAG {
 	d := graph.NewDAG()
-	graphCli.Root(d, cluster, cluster, model.ActionStatusPtr())
+	graphCli.Root(d, comp, comp, model.ActionStatusPtr())
 	its := &workloads.InstanceSet{}
 	graphCli.Create(d, its)
 	return d

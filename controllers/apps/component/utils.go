@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -77,4 +78,8 @@ func newFailedProvisioningStartedCondition(err error) metav1.Condition {
 		Message: err.Error(),
 		Reason:  getConditionReasonWithError(reasonPreCheckFailed, err),
 	}
+}
+
+func setDiff(s1, s2 sets.Set[string]) (sets.Set[string], sets.Set[string], sets.Set[string]) {
+	return s2.Difference(s1), s1.Difference(s2), s1.Intersection(s2)
 }

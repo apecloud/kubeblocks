@@ -20,8 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
-	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
 type MockComponentFactory struct {
@@ -79,13 +80,14 @@ func (factory *MockComponentFactory) AddVolumeClaimTemplate(volumeName string,
 	return factory
 }
 
-func (factory *MockComponentFactory) AddSystemAccount(name string, passwordConfig *appsv1.PasswordConfig, secretRef *appsv1.ProvisionSecretRef) *MockComponentFactory {
+func (factory *MockComponentFactory) AddSystemAccount(name string, disabled *bool, passwordConfig *appsv1.PasswordConfig, secretRef *appsv1.ProvisionSecretRef) *MockComponentFactory {
 	if factory.Get().Spec.SystemAccounts == nil {
 		factory.Get().Spec.SystemAccounts = make([]appsv1.ComponentSystemAccount, 0)
 	}
 	factory.Get().Spec.SystemAccounts = append(factory.Get().Spec.SystemAccounts,
 		appsv1.ComponentSystemAccount{
 			Name:           name,
+			Disabled:       disabled,
 			PasswordConfig: passwordConfig,
 			SecretRef:      secretRef,
 		})

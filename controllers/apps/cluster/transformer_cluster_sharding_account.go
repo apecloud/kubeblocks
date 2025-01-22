@@ -203,9 +203,11 @@ func (t *clusterShardingAccountTransformer) rewriteSystemAccount(transCtx *clust
 	)
 	newAccount := appsv1.ComponentSystemAccount{
 		Name: accountName,
-		SecretRef: &appsv1.ProvisionSecretRef{
-			Name:      shardingAccountSecretName(cluster.Name, sharding.Name, accountName),
-			Namespace: cluster.Namespace,
+		SecretRef: &appsv1.SystemAccountSecretReference{
+			SecretReference: corev1.SecretReference{
+				Namespace: cluster.Namespace,
+				Name:      shardingAccountSecretName(cluster.Name, sharding.Name, accountName),
+			},
 		},
 	}
 	for i, account := range sharding.Template.SystemAccounts {

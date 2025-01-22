@@ -165,8 +165,11 @@ func (t *clusterShardingTLSTransformer) rewriteTLSConfig(
 	transCtx *clusterTransformContext, sharding *appsv1.ClusterSharding, compDef *appsv1.ComponentDefinition) {
 	sharding.Template.Issuer = &appsv1.Issuer{
 		Name: appsv1.IssuerUserProvided,
-		SecretRef: &appsv1.TLSSecretRef{
-			Name: shardingTLSSecretName(transCtx.Cluster.Name, sharding.Name),
+		SecretRef: &appsv1.TLSSecretReference{
+			SecretReference: corev1.SecretReference{
+				Namespace: transCtx.Cluster.Namespace,
+				Name:      shardingTLSSecretName(transCtx.Cluster.Name, sharding.Name),
+			},
 		},
 	}
 	tls := compDef.Spec.TLS

@@ -374,7 +374,7 @@ type ComponentSystemAccount struct {
 	// This field is immutable once set.
 	//
 	// +optional
-	SecretRef *ProvisionSecretRef `json:"secretRef,omitempty"`
+	SecretRef *SystemAccountSecretReference `json:"secretRef,omitempty"`
 }
 
 // PasswordConfig helps provide to customize complexity of password generation pattern.
@@ -433,17 +433,9 @@ const (
 	MixedCases LetterCase = "MixedCases"
 )
 
-// ProvisionSecretRef represents the reference to a secret.
-type ProvisionSecretRef struct {
-	// The unique identifier of the secret.
-	//
-	// +kubebuilder:validation:Required
-	Name string `json:"name"`
-
-	// The namespace where the secret is located.
-	//
-	// +kubebuilder:validation:Required
-	Namespace string `json:"namespace"`
+// SystemAccountSecretReference represents the reference to a secret.
+type SystemAccountSecretReference struct {
+	corev1.SecretReference `json:",inline"`
 
 	// The key in the secret data that contains the password.
 	//
@@ -577,7 +569,7 @@ type Issuer struct {
 	// It is required when the issuer is set to `UserProvided`.
 	//
 	// +optional
-	SecretRef *TLSSecretRef `json:"secretRef,omitempty"`
+	SecretRef *TLSSecretReference `json:"secretRef,omitempty"`
 }
 
 // IssuerName defines the name of the TLS certificates issuer.
@@ -593,11 +585,9 @@ const (
 	IssuerUserProvided IssuerName = "UserProvided"
 )
 
-// TLSSecretRef defines Secret contains Tls certs
-type TLSSecretRef struct {
-	// Name of the Secret that contains user-provided certificates.
-	// +kubebuilder:validation:Required
-	Name string `json:"name"`
+// TLSSecretReference defines the Secret that contains TLS certs.
+type TLSSecretReference struct {
+	corev1.SecretReference `json:",inline"`
 
 	// Key of CA cert in Secret
 	// +kubebuilder:validation:Required

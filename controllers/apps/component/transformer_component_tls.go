@@ -88,7 +88,7 @@ func buildNCheckTLSCert(ctx context.Context, cli client.Reader,
 	tls := synthesizedComp.TLSConfig
 	switch tls.Issuer.Name {
 	case appsv1.IssuerUserProvided:
-		return plan.CheckTLSSecretRef(ctx, cli, synthesizedComp.Namespace, tls.Issuer.SecretRef)
+		return plan.CheckTLSSecretRef(ctx, cli, tls.Issuer.SecretRef)
 	case appsv1.IssuerKubeBlocks:
 		return buildTLSCertByKubeBlocks(ctx, cli, compDef, synthesizedComp, dag)
 	default:

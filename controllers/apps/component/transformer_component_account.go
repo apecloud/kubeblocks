@@ -136,7 +136,7 @@ func (t *componentAccountTransformer) updateAccount(transCtx *componentTransform
 	}
 
 	runningCopy := running.DeepCopy()
-	if account.SecretRef != nil {
+	if account.secretRef != nil {
 		// sync password from the external secret
 		runningCopy.Data[constant.AccountPasswdForSecret] = secret.Data[constant.AccountPasswdForSecret]
 	}
@@ -149,7 +149,7 @@ func (t *componentAccountTransformer) updateAccount(transCtx *componentTransform
 }
 
 func (t *componentAccountTransformer) buildAccountHash(account synthesizedSystemAccount, running, secret *corev1.Secret) error {
-	if account.SecretRef == nil {
+	if account.secretRef == nil {
 		return nil
 	}
 	if running != nil {
@@ -169,7 +169,7 @@ func (t *componentAccountTransformer) buildAccountSecret(ctx *componentTransform
 	synthesizeComp *component.SynthesizedComponent, account synthesizedSystemAccount) (*corev1.Secret, error) {
 	var password []byte
 	switch {
-	case account.SecretRef != nil:
+	case account.secretRef != nil:
 		var err error
 		if password, err = t.getPasswordFromSecret(ctx, account); err != nil {
 			return nil, err
@@ -185,8 +185,8 @@ func (t *componentAccountTransformer) buildAccountSecret(ctx *componentTransform
 
 func (t *componentAccountTransformer) getPasswordFromSecret(ctx graph.TransformContext, account synthesizedSystemAccount) ([]byte, error) {
 	secretKey := types.NamespacedName{
-		Namespace: account.SecretRef.Namespace,
-		Name:      account.SecretRef.Name,
+		Namespace: account.secretRef.Namespace,
+		Name:      account.secretRef.Name,
 	}
 	secret := &corev1.Secret{}
 	if err := ctx.GetClient().Get(ctx.GetContext(), secretKey, secret); err != nil {
@@ -194,8 +194,8 @@ func (t *componentAccountTransformer) getPasswordFromSecret(ctx graph.TransformC
 	}
 
 	passwordKey := constant.AccountPasswdForSecret
-	if len(account.SecretRef.Password) > 0 {
-		passwordKey = account.SecretRef.Password
+	if len(account.secretRef.Password) > 0 {
+		passwordKey = account.secretRef.Password
 	}
 	if len(secret.Data) == 0 || len(secret.Data[passwordKey]) == 0 {
 		return nil, fmt.Errorf("referenced account secret has no required credential field: %s", passwordKey)
@@ -291,8 +291,8 @@ func verifySystemAccountPassword(secret *corev1.Secret, hashedPassword []byte) b
 
 type synthesizedSystemAccount struct {
 	appsv1.SystemAccount
-	Disabled  *bool
-	SecretRef *appsv1.ProvisionSecretRef
+	disabled  *bool
+	secretRef *appsv1.SystemAccountSecretReference
 }
 
 func synthesizeSystemAccounts(compDefAccounts []appsv1.SystemAccount,
@@ -308,8 +308,8 @@ func synthesizeSystemAccounts(compDefAccounts []appsv1.SystemAccount,
 		if compAccount.PasswordConfig != nil {
 			account.PasswordGenerationPolicy = *compAccount.PasswordConfig
 		}
-		account.Disabled = compAccount.Disabled
-		account.SecretRef = compAccount.SecretRef
+		account.disabled = compAccount.Disabled
+		account.secretRef = compAccount.SecretRef
 		return account
 	}
 
@@ -324,7 +324,7 @@ func synthesizeSystemAccounts(compDefAccounts []appsv1.SystemAccount,
 	if !keepDisabled {
 		for _, name := range maps.Keys(accounts) {
 			account := accounts[name]
-			if account.Disabled != nil && *account.Disabled {
+			if account.disabled != nil && *account.disabled {
 				if account.InitAccount {
 					return nil, fmt.Errorf("cannot disable init system account: %s", name)
 				}

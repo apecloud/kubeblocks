@@ -114,13 +114,13 @@ func buildFromTemplate(tpl string, vars interface{}) (string, error) {
 	return b.String(), nil
 }
 
-func CheckTLSSecretRef(ctx context.Context, cli client.Reader, namespace string, secretRef *appsv1.TLSSecretRef) error {
+func CheckTLSSecretRef(ctx context.Context, cli client.Reader, secretRef *appsv1.TLSSecretReference) error {
 	if secretRef == nil {
 		return errors.New("issuer.secretRef shouldn't be nil when issuer is UserProvided")
 	}
 
 	secret := &v1.Secret{}
-	if err := cli.Get(ctx, types.NamespacedName{Namespace: namespace, Name: secretRef.Name}, secret); err != nil {
+	if err := cli.Get(ctx, types.NamespacedName{Namespace: secretRef.Namespace, Name: secretRef.Name}, secret); err != nil {
 		return err
 	}
 	if secret.Data == nil {

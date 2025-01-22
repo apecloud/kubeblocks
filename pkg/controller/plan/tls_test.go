@@ -76,8 +76,11 @@ var _ = Describe("TLSUtilsTest", func() {
 		It("should work well", func() {
 			ctx := context.Background()
 			name := "bar"
-			secretRef := &appsv1.TLSSecretRef{
-				Name: name,
+			secretRef := &appsv1.TLSSecretReference{
+				SecretReference: corev1.SecretReference{
+					Namespace: namespace,
+					Name:      name,
+				},
 				CA:   "caName",
 				Cert: "certName",
 				Key:  "keyName",
@@ -91,7 +94,7 @@ var _ = Describe("TLSUtilsTest", func() {
 				DoAndReturn(func(_ context.Context, objKey client.ObjectKey, obj *corev1.Secret, _ ...client.GetOption) error {
 					return apierrors.NewNotFound(schema.GroupResource{}, obj.Name)
 				}).Times(1)
-			err := CheckTLSSecretRef(ctx, k8sMock, namespace, secretRef)
+			err := CheckTLSSecretRef(ctx, k8sMock, secretRef)
 			Expect(apierrors.IsNotFound(err)).Should(BeTrue())
 
 			By("set empty CA in map Data")
@@ -108,7 +111,7 @@ var _ = Describe("TLSUtilsTest", func() {
 					}
 					return nil
 				}).Times(1)
-			err = CheckTLSSecretRef(ctx, k8sMock, namespace, secretRef)
+			err = CheckTLSSecretRef(ctx, k8sMock, secretRef)
 			Expect(err).ShouldNot(BeNil())
 			Expect(err.Error()).Should(ContainSubstring(secretRef.CA))
 
@@ -126,7 +129,7 @@ var _ = Describe("TLSUtilsTest", func() {
 					}
 					return nil
 				}).Times(1)
-			Expect(CheckTLSSecretRef(ctx, k8sMock, namespace, secretRef)).Should(Succeed())
+			Expect(CheckTLSSecretRef(ctx, k8sMock, secretRef)).Should(Succeed())
 		})
 	})
 })

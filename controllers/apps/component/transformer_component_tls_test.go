@@ -146,8 +146,11 @@ var _ = Describe("TLS self-signed cert function", func() {
 			It("should create the cluster when secret referenced exist", func() {
 				tlsIssuer := &appsv1.Issuer{
 					Name: appsv1.IssuerUserProvided,
-					SecretRef: &appsv1.TLSSecretRef{
-						Name: secretObj.Name,
+					SecretRef: &appsv1.TLSSecretReference{
+						SecretReference: corev1.SecretReference{
+							Namespace: testCtx.DefaultNamespace,
+							Name:      secretObj.Name,
+						},
 						CA:   caFile,
 						Cert: certFile,
 						Key:  keyFile,

@@ -6527,8 +6527,8 @@ PasswordConfig
 <td>
 <code>secretRef</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.ProvisionSecretRef">
-ProvisionSecretRef
+<a href="#apps.kubeblocks.io/v1.SystemAccountSecretReference">
+SystemAccountSecretReference
 </a>
 </em>
 </td>
@@ -8052,8 +8052,8 @@ for TLS communication.</li>
 <td>
 <code>secretRef</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.TLSSecretRef">
-TLSSecretRef
+<a href="#apps.kubeblocks.io/v1.TLSSecretReference">
+TLSSecretReference
 </a>
 </em>
 </td>
@@ -8817,58 +8817,6 @@ Defaults to 3. Minimum value is 1.</p>
 </tr><tr><td><p>&#34;https&#34;</p></td>
 <td></td>
 </tr></tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1.ProvisionSecretRef">ProvisionSecretRef
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentSystemAccount">ComponentSystemAccount</a>)
-</p>
-<div>
-<p>ProvisionSecretRef represents the reference to a secret.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>name</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>The unique identifier of the secret.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>namespace</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>The namespace where the secret is located.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>password</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>The key in the secret data that contains the password.</p>
-</td>
-</tr>
-</tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1.Range">Range
 </h3>
@@ -11329,6 +11277,51 @@ PasswordConfig
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1.SystemAccountSecretReference">SystemAccountSecretReference
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentSystemAccount">ComponentSystemAccount</a>)
+</p>
+<div>
+<p>SystemAccountSecretReference represents the reference to a secret.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>SecretReference</code><br/>
+<em>
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#secretreference-v1-core">
+Kubernetes core/v1.SecretReference
+</a>
+</em>
+</td>
+<td>
+<p>
+(Members of <code>SecretReference</code> are embedded into this type.)
+</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>password</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The key in the secret data that contains the password.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1.SystemAccountStatement">SystemAccountStatement
 </h3>
 <p>
@@ -11532,13 +11525,13 @@ Required when TLS is enabled.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1.TLSSecretRef">TLSSecretRef
+<h3 id="apps.kubeblocks.io/v1.TLSSecretReference">TLSSecretReference
 </h3>
 <p>
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.Issuer">Issuer</a>)
 </p>
 <div>
-<p>TLSSecretRef defines Secret contains Tls certs</p>
+<p>TLSSecretReference defines the Secret that contains TLS certs.</p>
 </div>
 <table>
 <thead>
@@ -11550,13 +11543,17 @@ Required when TLS is enabled.</p>
 <tbody>
 <tr>
 <td>
-<code>name</code><br/>
+<code>SecretReference</code><br/>
 <em>
-string
+<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#secretreference-v1-core">
+Kubernetes core/v1.SecretReference
+</a>
 </em>
 </td>
 <td>
-<p>Name of the Secret that contains user-provided certificates.</p>
+<p>
+(Members of <code>SecretReference</code> are embedded into this type.)
+</p>
 </td>
 </tr>
 <tr>

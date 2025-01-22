@@ -598,7 +598,8 @@ func (r *backupPolicyBuilder) mergeClusterBackup(
 	hasSyncPITRMethod := false
 	hasSyncIncMethod := false
 	enableAutoBackup := boolptr.IsSetToTrue(backup.Enabled)
-	for i, s := range backupSchedule.Spec.Schedules {
+	for i := range backupSchedule.Spec.Schedules {
+		s := &backupSchedule.Spec.Schedules[i]
 		if s.BackupMethod == backup.Method {
 			mergeSchedulePolicy(sp, &backupSchedule.Spec.Schedules[i])
 			exist = true
@@ -622,31 +623,40 @@ func (r *backupPolicyBuilder) mergeClusterBackup(
 			r.Error(err, "failed to get ActionSet for backup.", "ActionSet", as.Name)
 			continue
 		}
-		if as.Spec.BackupType == dpv1alpha1.BackupTypeContinuous && backup.PITREnabled != nil && !hasSyncPITRMethod {
-			// auto-sync the first continuous backup for the 'pirtEnable' option.
-			backupSchedule.Spec.Schedules[i].Enabled = backup.PITREnabled
+		switch as.Spec.BackupType {
+		case dpv1alpha1.BackupTypeContinuous:
+			if backup.PITREnabled == nil {
+				continue
+			}
+			if boolptr.IsSetToFalse(backup.PITREnabled) || hasSyncPITRMethod ||
+				(len(backup.ContinuousMethod) > 0 && backup.ContinuousMethod != s.BackupMethod) {
+				s.Enabled = boolptr.False()
+				continue
+			}
+			// auto-sync the first or specified continuous backup for the 'pirtEnable' option.
+			s.Enabled = backup.PITREnabled
 			if backup.RetentionPeriod.String() != "" {
-				backupSchedule.Spec.Schedules[i].RetentionPeriod = backup.RetentionPeriod
+				s.RetentionPeriod = backup.RetentionPeriod
 			}
 			hasSyncPITRMethod = true
-		}
-		if as.Spec.BackupType == dpv1alpha1.BackupTypeIncremental {
+		case dpv1alpha1.BackupTypeIncremental:
 			if len(backup.Method) == 0 || m.CompatibleMethod != backup.Method {
 				// disable other incremental backup schedules
-				backupSchedule.Spec.Schedules[i].Enabled = boolptr.False()
+				s.Enabled = boolptr.False()
 			} else if backup.IncrementalBackupEnabled != nil && !hasSyncIncMethod {
 				// auto-sync the first compatible incremental backup for the 'incrementalBackupEnabled' option.
 				mergeSchedulePolicy(&dpv1alpha1.SchedulePolicy{
 					Enabled:         backup.IncrementalBackupEnabled,
 					RetentionPeriod: backup.RetentionPeriod,
 					CronExpression:  backup.IncrementalCronExpression,
-				}, &backupSchedule.Spec.Schedules[i])
+				}, s)
 				hasSyncIncMethod = true
 			}
-		}
-		if as.Spec.BackupType == dpv1alpha1.BackupTypeFull && enableAutoBackup {
-			// disable the automatic backup for other full backup method
-			backupSchedule.Spec.Schedules[i].Enabled = boolptr.False()
+		case dpv1alpha1.BackupTypeFull:
+			if enableAutoBackup {
+				// disable the automatic backup for other full backup method
+				s.Enabled = boolptr.False()
+			}
 		}
 	}
 	if !exist {

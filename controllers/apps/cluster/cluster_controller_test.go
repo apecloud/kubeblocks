@@ -39,6 +39,7 @@ import (
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils/boolptr"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testdp "github.com/apecloud/kubeblocks/pkg/testutil/dataprotection"
@@ -961,7 +962,7 @@ var _ = Describe("Cluster Controller", func() {
 				}, client.InNamespace(clusterKey.Namespace))).ShouldNot(BeEmpty())
 		})
 
-		It("Creating cluster with backup", func() {
+		FIt("Creating cluster with backup", func() {
 			var (
 				boolTrue  = true
 				boolFalse = false
@@ -985,6 +986,19 @@ var _ = Describe("Cluster Controller", func() {
 						Method:                  testdp.VSBackupMethodName,
 						CronExpression:          "*/1 * * * *",
 						StartingDeadlineMinutes: int64Ptr(int64(10)),
+						PITREnabled:             &boolTrue,
+						RepoName:                backupRepoName,
+					},
+				},
+				{
+					desc: "backup with snapshot method and specified continuous method",
+					backup: &appsv1.ClusterBackup{
+						Enabled:                 &boolTrue,
+						RetentionPeriod:         retention("1d"),
+						Method:                  testdp.VSBackupMethodName,
+						CronExpression:          "*/1 * * * *",
+						StartingDeadlineMinutes: int64Ptr(int64(10)),
+						ContinuousMethod:        testdp.ContinuousMethodName1,
 						PITREnabled:             &boolTrue,
 						RepoName:                backupRepoName,
 					},
@@ -1026,19 +1040,36 @@ var _ = Describe("Cluster Controller", func() {
 
 				checkSchedule := func(g Gomega, schedule *dpv1alpha1.BackupSchedule) {
 					var policy *dpv1alpha1.SchedulePolicy
-					enableOtherFullMethod := false
-					for i, s := range schedule.Spec.Schedules {
+					hasCheckPITRMethod := false
+					for i := range schedule.Spec.Schedules {
+						s := &schedule.Spec.Schedules[i]
 						if s.BackupMethod == backup.Method {
 							Expect(*s.Enabled).Should(BeEquivalentTo(*backup.Enabled))
-							policy = &schedule.Spec.Schedules[i]
-							if *backup.Enabled {
-								enableOtherFullMethod = true
+							policy = s
+							continue
+						}
+						if !slices.Contains([]string{testdp.ContinuousMethodName, testdp.ContinuousMethodName1}, s.BackupMethod) {
+							if boolptr.IsSetToTrue(backup.Enabled) {
+								// another full backup method should be disabled.
+								Expect(*s.Enabled).Should(BeFalse())
 							}
 							continue
 						}
-						if enableOtherFullMethod {
-							// another full backup method should be disabled.
-							Expect(*s.Enabled).Should(BeFalse())
+						if len(backup.ContinuousMethod) == 0 {
+							// first continuous backup method should be equal to "PITREnabled", another is disabled.
+							if !hasCheckPITRMethod {
+								Expect(*s.Enabled).Should(BeEquivalentTo(*backup.PITREnabled))
+								hasCheckPITRMethod = true
+							} else {
+								Expect(*s.Enabled).Should(BeFalse())
+							}
+						} else {
+							// specified continuous backup method should be equal to "PITREnabled", another is disabled.
+							if backup.ContinuousMethod == s.BackupMethod {
+								Expect(*s.Enabled).Should(BeEquivalentTo(*backup.PITREnabled))
+							} else {
+								Expect(*s.Enabled).Should(BeFalse())
+							}
 						}
 					}
 					if backup.Enabled != nil && *backup.Enabled {

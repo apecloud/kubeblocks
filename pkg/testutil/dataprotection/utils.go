@@ -64,10 +64,10 @@ func PatchBackupStatus(testCtx *testutil.TestContext, key client.ObjectKey, stat
 	})).Should(Succeed())
 }
 
-func fakeActionSet(testCtx *testutil.TestContext, clusterDefName string) *dpv1alpha1.ActionSet {
+func fakeActionSet(testCtx *testutil.TestContext, actionSetName, clusterDefName string, backupType dpv1alpha1.BackupType) *dpv1alpha1.ActionSet {
 	actionSet := &dpv1alpha1.ActionSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:   ActionSetName,
+			Name:   actionSetName,
 			Labels: map[string]string{},
 		},
 		Spec: dpv1alpha1.ActionSetSpec{
@@ -77,7 +77,7 @@ func fakeActionSet(testCtx *testutil.TestContext, clusterDefName string) *dpv1al
 					Value: "test-value",
 				},
 			},
-			BackupType: dpv1alpha1.BackupTypeFull,
+			BackupType: backupType,
 			Backup: &dpv1alpha1.BackupActionSpec{
 				BackupData: &dpv1alpha1.BackupDataActionSpec{
 					JobActionSpec: dpv1alpha1.JobActionSpec{
@@ -111,8 +111,8 @@ func fakeActionSet(testCtx *testutil.TestContext, clusterDefName string) *dpv1al
 
 func CreateBackupPolicyTpl(testCtx *testutil.TestContext, compDef string) *dpv1alpha1.BackupPolicyTemplate {
 	By("create actionSet")
-	fakeActionSet(testCtx, "")
-
+	fakeActionSet(testCtx, ActionSetName, "", dpv1alpha1.BackupTypeFull)
+	fakeActionSet(testCtx, continuousActionSetName, "", dpv1alpha1.BackupTypeContinuous)
 	By("Creating a BackupPolicyTemplate")
 	ttl := "7d"
 	return NewBackupPolicyTemplateFactory(BackupPolicyTPLName).AddBackupMethod(BackupMethodName, false, ActionSetName).
@@ -120,8 +120,16 @@ func CreateBackupPolicyTpl(testCtx *testutil.TestContext, compDef string) *dpv1a
 		SetCompDefs(compDef).
 		AddBackupMethod(VSBackupMethodName, true, "").
 		SetBackupMethodVolumes([]string{"data"}).
+		AddBackupMethod(ContinuousMethodName, false, continuousActionSetName).
+		SetCompDefs(compDef).
+		SetBackupMethodVolumeMounts("data", "/data").
+		AddBackupMethod(ContinuousMethodName1, false, continuousActionSetName).
+		SetCompDefs(compDef).
+		SetBackupMethodVolumeMounts("data", "/data").
 		AddSchedule(BackupMethodName, "0 0 * * *", ttl, true, "", nil).
 		AddSchedule(VSBackupMethodName, "0 0 * * *", ttl, true, "", nil).
+		AddSchedule(ContinuousMethodName, "0 0 * * *", ttl, false, "", nil).
+		AddSchedule(ContinuousMethodName1, "0 0 * * *", ttl, false, "", nil).
 		Create(testCtx).Get()
 }
 

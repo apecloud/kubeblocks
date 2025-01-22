@@ -66,10 +66,13 @@ import (
 )
 
 const (
-	backupPolicyTPLName = "test-backup-policy-template-mysql"
-	backupMethodName    = "test-backup-method"
-	vsBackupMethodName  = "test-vs-backup-method"
-	actionSetName       = "test-action-set"
+	backupPolicyTPLName     = "test-backup-policy-template-mysql"
+	backupMethodName        = "test-backup-method"
+	continuousMethodName    = "continuous-backup-method"
+	continuousMethodName1   = "continuous-backup-method1"
+	vsBackupMethodName      = "test-vs-backup-method"
+	actionSetName           = "test-action-set"
+	continuousActionSetName = "test-continuous-action-set"
 )
 
 var (
@@ -700,7 +703,7 @@ var _ = Describe("Component Controller", func() {
 
 					if policyType == appsv1alpha1.HScaleDataClonePolicyCloneVolume {
 						By("creating actionSet if backup policy is backup")
-						fakeActionSet(clusterDef.Name)
+						fakeActionSet(actionSetName, clusterDef.Name, dpv1alpha1.BackupTypeFull)
 					}
 				}
 			})()).ShouldNot(HaveOccurred())
@@ -2052,7 +2055,7 @@ var _ = Describe("Component Controller", func() {
 	Context("provisioning", func() {
 		BeforeEach(func() {
 			createAllWorkloadTypesClusterDef()
-			createBackupPolicyTpl(clusterDefObj, compDefName)
+			createBackupPolicyTpl(clusterDefObj, compDefName, true)
 		})
 
 		AfterEach(func() {
@@ -2123,7 +2126,7 @@ var _ = Describe("Component Controller", func() {
 
 		BeforeEach(func() {
 			createAllWorkloadTypesClusterDef()
-			createBackupPolicyTpl(clusterDefObj, compDefName)
+			createBackupPolicyTpl(clusterDefObj, compDefName, true)
 		})
 
 		AfterEach(func() {
@@ -2143,7 +2146,7 @@ var _ = Describe("Component Controller", func() {
 		BeforeEach(func() {
 			cleanEnv()
 			createAllWorkloadTypesClusterDef()
-			createBackupPolicyTpl(clusterDefObj, compDefName)
+			createBackupPolicyTpl(clusterDefObj, compDefName, true)
 		})
 
 		createNWaitClusterObj := func(components map[string]string,
@@ -2220,7 +2223,7 @@ var _ = Describe("Component Controller", func() {
 
 		BeforeEach(func() {
 			createAllWorkloadTypesClusterDef()
-			createBackupPolicyTpl(clusterDefObj, compDefName)
+			createBackupPolicyTpl(clusterDefObj, compDefName, true)
 			mockStorageClass = testk8s.CreateMockStorageClass(&testCtx, testk8s.DefaultStorageClassName)
 		})
 
@@ -2289,7 +2292,7 @@ var _ = Describe("Component Controller", func() {
 	When("creating cluster with workloadType=consensus component", func() {
 		BeforeEach(func() {
 			createAllWorkloadTypesClusterDef()
-			createBackupPolicyTpl(clusterDefObj, compDefName)
+			createBackupPolicyTpl(clusterDefObj, compDefName, true)
 		})
 
 		AfterEach(func() {
@@ -2544,7 +2547,7 @@ func checkRestoreAndSetCompleted(clusterKey types.NamespacedName, compName strin
 	mockRestoreCompleted(ml)
 }
 
-func fakeActionSet(clusterDefName string) *dpv1alpha1.ActionSet {
+func fakeActionSet(actionSetName, clusterDefName string, backupType dpv1alpha1.BackupType) *dpv1alpha1.ActionSet {
 	actionSet := &dpv1alpha1.ActionSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: actionSetName,
@@ -2559,7 +2562,7 @@ func fakeActionSet(clusterDefName string) *dpv1alpha1.ActionSet {
 					Value: "test-value",
 				},
 			},
-			BackupType: dpv1alpha1.BackupTypeFull,
+			BackupType: backupType,
 			Backup: &dpv1alpha1.BackupActionSpec{
 				BackupData: &dpv1alpha1.BackupDataActionSpec{
 					JobActionSpec: dpv1alpha1.JobActionSpec{

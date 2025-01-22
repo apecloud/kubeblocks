@@ -298,6 +298,11 @@ type ClusterBackup struct {
 	// +optional
 	PITREnabled *bool `json:"pitrEnabled,omitempty"`
 
+	// Specifies the backup method to use, if not set, use the first continuous method.
+	//
+	// +optional
+	ContinuousMethod string `json:"continuousMethod,omitempty"`
+
 	// Specifies whether to enable incremental backup.
 	//
 	// +kubebuilder:default=false

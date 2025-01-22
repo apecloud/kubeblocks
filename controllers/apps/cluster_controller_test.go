@@ -40,6 +40,7 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/scheduling"
+	"github.com/apecloud/kubeblocks/pkg/dataprotection/utils/boolptr"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testdp "github.com/apecloud/kubeblocks/pkg/testutil/dataprotection"
@@ -161,7 +162,7 @@ var _ = Describe("Cluster Controller", func() {
 			GetObject()
 
 		By("Create a bpt obj")
-		createBackupPolicyTpl(clusterDefObj, compDefObj.Name, clusterVersionName)
+		createBackupPolicyTpl(clusterDefObj, compDefObj.Name, false, clusterVersionName)
 
 		By("Create a componentVersion obj")
 		compVersionObj = testapps.NewComponentVersionFactory(compVersionName).
@@ -1369,6 +1370,19 @@ var _ = Describe("Cluster Controller", func() {
 					},
 				},
 				{
+					desc: "backup with snapshot method and specified continuous method",
+					backup: &appsv1alpha1.ClusterBackup{
+						Enabled:                 &boolTrue,
+						RetentionPeriod:         retention("1d"),
+						Method:                  vsBackupMethodName,
+						CronExpression:          "*/1 * * * *",
+						StartingDeadlineMinutes: int64Ptr(int64(10)),
+						ContinuousMethod:        continuousMethodName1,
+						PITREnabled:             &boolTrue,
+						RepoName:                backupRepoName,
+					},
+				},
+				{
 					desc: "disable backup",
 					backup: &appsv1alpha1.ClusterBackup{
 						Enabled:                 &boolFalse,
@@ -1405,19 +1419,36 @@ var _ = Describe("Cluster Controller", func() {
 
 				checkSchedule := func(g Gomega, schedule *dpv1alpha1.BackupSchedule) {
 					var policy *dpv1alpha1.SchedulePolicy
-					enableOtherFullMethod := false
-					for i, s := range schedule.Spec.Schedules {
+					hasCheckPITRMethod := false
+					for i := range schedule.Spec.Schedules {
+						s := &schedule.Spec.Schedules[i]
 						if s.BackupMethod == backup.Method {
 							Expect(*s.Enabled).Should(BeEquivalentTo(*backup.Enabled))
-							policy = &schedule.Spec.Schedules[i]
-							if *backup.Enabled {
-								enableOtherFullMethod = true
+							policy = s
+							continue
+						}
+						if !slices.Contains([]string{continuousMethodName, continuousMethodName1}, s.BackupMethod) {
+							if boolptr.IsSetToTrue(backup.Enabled) {
+								// another full backup method should be disabled.
+								Expect(*s.Enabled).Should(BeFalse())
 							}
 							continue
 						}
-						if enableOtherFullMethod {
-							// another full backup method should be disabled.
-							Expect(*s.Enabled).Should(BeFalse())
+						if len(backup.ContinuousMethod) == 0 {
+							// first continuous backup method should be equal to "PITREnabled", another is disabled.
+							if !hasCheckPITRMethod {
+								Expect(*s.Enabled).Should(BeEquivalentTo(*backup.PITREnabled))
+								hasCheckPITRMethod = true
+							} else {
+								Expect(*s.Enabled).Should(BeFalse())
+							}
+						} else {
+							// specified continuous backup method should be equal to "PITREnabled", another is disabled.
+							if backup.ContinuousMethod == s.BackupMethod {
+								Expect(*s.Enabled).Should(BeEquivalentTo(*backup.PITREnabled))
+							} else {
+								Expect(*s.Enabled).Should(BeFalse())
+							}
 						}
 					}
 					if backup.Enabled != nil && *backup.Enabled {
@@ -1593,9 +1624,10 @@ var _ = Describe("Cluster Controller", func() {
 	})
 })
 
-func createBackupPolicyTpl(clusterDefObj *appsv1alpha1.ClusterDefinition, compDef string, mappingClusterVersions ...string) {
+func createBackupPolicyTpl(clusterDefObj *appsv1alpha1.ClusterDefinition, compDef string, forHScale bool, mappingClusterVersions ...string) {
 	By("create actionSet")
-	fakeActionSet(clusterDefObj.Name)
+	fakeActionSet(actionSetName, clusterDefObj.Name, dpv1alpha1.BackupTypeFull)
+	fakeActionSet(continuousActionSetName, clusterDefObj.Name, dpv1alpha1.BackupTypeContinuous)
 
 	By("Creating a BackupPolicyTemplate")
 	bpt := testapps.NewBackupPolicyTemplateFactory(backupPolicyTPLName).
@@ -1617,6 +1649,16 @@ func createBackupPolicyTpl(clusterDefObj *appsv1alpha1.ClusterDefinition, compDe
 			bpt.SetTargetRole("leader")
 		case appsv1alpha1.Replication:
 			bpt.SetTargetRole("primary")
+		}
+		if !forHScale {
+			bpt.AddBackupMethod(continuousMethodName, false, continuousActionSetName).
+				SetComponentDef(compDef).
+				SetBackupMethodVolumeMounts("data", "/data").
+				AddBackupMethod(continuousMethodName1, false, continuousActionSetName).
+				SetComponentDef(compDef).
+				SetBackupMethodVolumeMounts("data", "/data").
+				AddSchedule(continuousMethodName, "0 0 * * *", ttl, false).
+				AddSchedule(continuousMethodName1, "0 0 * * *", ttl, false)
 		}
 	}
 	bpt.Create(&testCtx)

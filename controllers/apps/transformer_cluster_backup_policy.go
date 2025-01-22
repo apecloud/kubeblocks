@@ -647,7 +647,8 @@ func (r *clusterBackupPolicyTransformer) mergeClusterBackup(
 	hasSyncPITRMethod := false
 	hasSyncIncMethod := false
 	enableAutoBackup := boolptr.IsSetToTrue(backup.Enabled)
-	for i, s := range backupSchedule.Spec.Schedules {
+	for i := range backupSchedule.Spec.Schedules {
+		s := &backupSchedule.Spec.Schedules[i]
 		if s.BackupMethod == backup.Method {
 			mergeSchedulePolicy(sp, &backupSchedule.Spec.Schedules[i])
 			exist = true
@@ -671,15 +672,20 @@ func (r *clusterBackupPolicyTransformer) mergeClusterBackup(
 			r.Error(err, "failed to get ActionSet for backup.", "ActionSet", as.Name)
 			continue
 		}
-		if as.Spec.BackupType == dpv1alpha1.BackupTypeContinuous && backup.PITREnabled != nil && !hasSyncPITRMethod {
-			// auto-sync the first continuous backup for the 'pirtEnable' option.
-			backupSchedule.Spec.Schedules[i].Enabled = backup.PITREnabled
+		switch {
+		case as.Spec.BackupType == dpv1alpha1.BackupTypeContinuous && backup.PITREnabled != nil:
+			if boolptr.IsSetToFalse(backup.PITREnabled) || hasSyncPITRMethod ||
+				(len(backup.ContinuousMethod) > 0 && backup.ContinuousMethod != s.BackupMethod) {
+				s.Enabled = boolptr.False()
+				continue
+			}
+			// auto-sync the first or specified continuous backup for the 'pirtEnable' option.
+			s.Enabled = backup.PITREnabled
 			if backup.RetentionPeriod.String() != "" {
-				backupSchedule.Spec.Schedules[i].RetentionPeriod = backup.RetentionPeriod
+				s.RetentionPeriod = backup.RetentionPeriod
 			}
 			hasSyncPITRMethod = true
-		}
-		if as.Spec.BackupType == dpv1alpha1.BackupTypeIncremental {
+		case as.Spec.BackupType == dpv1alpha1.BackupTypeIncremental:
 			if len(backup.Method) == 0 || m.CompatibleMethod != backup.Method {
 				// disable other incremental backup schedules
 				backupSchedule.Spec.Schedules[i].Enabled = boolptr.False()
@@ -692,10 +698,9 @@ func (r *clusterBackupPolicyTransformer) mergeClusterBackup(
 				}, &backupSchedule.Spec.Schedules[i])
 				hasSyncIncMethod = true
 			}
-		}
-		if as.Spec.BackupType == dpv1alpha1.BackupTypeFull && enableAutoBackup {
+		case as.Spec.BackupType == dpv1alpha1.BackupTypeFull && enableAutoBackup:
 			// disable the automatic backup for other full backup method
-			backupSchedule.Spec.Schedules[i].Enabled = boolptr.False()
+			s.Enabled = boolptr.False()
 		}
 	}
 	if !exist {

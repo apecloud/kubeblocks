@@ -319,7 +319,7 @@ var _ = Describe("OpsRequest Controller", func() {
 		}
 
 		createMysqlCluster := func(replicas int32) {
-			createBackupPolicyTpl(clusterDefObj, mysqlCompDefName)
+			createBackupPolicyTpl(clusterDefObj, mysqlCompDefName, true)
 
 			By("set component to horizontal with snapshot policy and create a cluster")
 			testk8s.MockEnableVolumeSnapshot(&testCtx, testk8s.DefaultStorageClassName)

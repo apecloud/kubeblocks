@@ -4548,6 +4548,18 @@ bool
 </tr>
 <tr>
 <td>
+<code>continuousMethod</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the backup method to use, if not set, use the first continuous method.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>incrementalBackupEnabled</code><br/>
 <em>
 bool

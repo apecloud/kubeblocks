@@ -56,6 +56,9 @@ fullnameOverride: ""
 ##   groups=core,resources=serviceaccounts/status,verbs=get;update;patch
 ##   groups=core,resources=serviceaccounts/finalizers,verbs=update
 ##
+##   groups=rbac.authorization.k8s.io,resources=roles,verbs=get;list;watch;create;update;patch;delete
+##   groups=rbac.authorization.k8s.io,resources=roles/status,verbs=get;update;patch
+##
 ##   groups=rbac.authorization.k8s.io,resources=rolebindings,verbs=get;list;watch;create;update;patch;delete
 ##   groups=rbac.authorization.k8s.io,resources=rolebindings/status,verbs=get;update;patch
 ##   groups=rbac.authorization.k8s.io,resources=rolebindings/finalizers,verbs=update

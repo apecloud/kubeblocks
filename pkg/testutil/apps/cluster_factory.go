@@ -185,14 +185,9 @@ func (factory *MockClusterFactory) AddVolumeClaimTemplate(volumeName string,
 	})
 }
 
-func (factory *MockClusterFactory) SetTLS(tls bool) *MockClusterFactory {
+func (factory *MockClusterFactory) SetTLSConfig(enable bool, issuer *appsv1.Issuer) *MockClusterFactory {
 	return factory.lastComponentRef(func(comp *appsv1.ClusterComponentSpec) {
-		comp.TLS = tls
-	})
-}
-
-func (factory *MockClusterFactory) SetIssuer(issuer *appsv1.Issuer) *MockClusterFactory {
-	return factory.lastComponentRef(func(comp *appsv1.ClusterComponentSpec) {
+		comp.TLS = enable
 		comp.Issuer = issuer
 	})
 }

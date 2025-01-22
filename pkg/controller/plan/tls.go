@@ -21,21 +21,17 @@ package plan
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"strings"
 	"text/template"
 
 	"github.com/Masterminds/sprig/v3"
-	"github.com/pkg/errors"
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
+	"github.com/pkg/errors"
+	v1 "k8s.io/api/core/v1"
 )
 
 func GenerateTLSSecretName(clusterName, componentName string) string {
@@ -52,6 +48,7 @@ func BuildTLSSecret(synthesizedComp component.SynthesizedComponent) *v1.Secret {
 		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
 		AddAnnotationsInMap(synthesizedComp.DynamicAnnotations).
 		SetStringData(map[string]string{}).
+		SetData(map[string][]byte{}).
 		GetObject()
 }
 
@@ -112,25 +109,4 @@ func buildFromTemplate(tpl string, vars interface{}) (string, error) {
 		return "", err
 	}
 	return b.String(), nil
-}
-
-func CheckTLSSecretRef(ctx context.Context, cli client.Reader, secretRef *appsv1.TLSSecretReference) error {
-	if secretRef == nil {
-		return errors.New("issuer.secretRef shouldn't be nil when issuer is UserProvided")
-	}
-
-	secret := &v1.Secret{}
-	if err := cli.Get(ctx, types.NamespacedName{Namespace: secretRef.Namespace, Name: secretRef.Name}, secret); err != nil {
-		return err
-	}
-	if secret.Data == nil {
-		return errors.New("tls secret's data field shouldn't be nil")
-	}
-	keys := []string{secretRef.CA, secretRef.Cert, secretRef.Key}
-	for _, key := range keys {
-		if len(secret.Data[key]) == 0 {
-			return errors.Errorf("tls secret's data[%s] field shouldn't be empty", key)
-		}
-	}
-	return nil
 }

@@ -26,7 +26,6 @@ import (
 	"slices"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -37,6 +36,12 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	"github.com/apecloud/kubeblocks/pkg/controller/plan"
 )
+
+type tlsIssuer interface {
+	create(ctx context.Context, cli client.Reader) (*corev1.Secret, error)
+	delete(ctx context.Context, cli client.Reader, secret *corev1.Secret) (*corev1.Secret, error)
+	update(ctx context.Context, cli client.Reader, secret *corev1.Secret) (*corev1.Secret, error)
+}
 
 // componentTLSTransformer handles the TLS configuration for the component.
 type componentTLSTransformer struct {
@@ -56,81 +61,230 @@ func (t *componentTLSTransformer) Transform(ctx graph.TransformContext, dag *gra
 	if err != nil {
 		return err
 	}
-	if !enabled {
-		return nil
-	}
-	if synthesizedComp.TLSConfig.Issuer == nil {
-		return fmt.Errorf("issuer shouldn't be nil when tls enabled")
-	}
 
-	if err = buildNCheckTLSCert(transCtx.Context, transCtx.Client, compDef, *synthesizedComp, dag); err != nil {
+	secretObj, err := t.secretObject(transCtx, synthesizedComp)
+	if err != nil {
 		return err
 	}
 
-	if err = t.updateVolumeNVolumeMount(compDef, synthesizedComp); err != nil {
-		return err
+	issuer := t.newTLSIssuer(compDef, synthesizedComp)
+	if enabled {
+		if secretObj == nil {
+			if err = t.handleCreate(transCtx.Context, transCtx.Client, dag, issuer); err != nil {
+				return err
+			}
+		} else {
+			if err = t.handleUpdate(transCtx.Context, transCtx.Client, dag, issuer, secretObj); err != nil {
+				return err
+			}
+		}
+		return t.updateVolumeNVolumeMount(compDef, synthesizedComp)
+	} else {
+		// the issuer and secretObj may be nil
+		if err = t.handleDelete(transCtx.Context, transCtx.Client, dag, issuer, secretObj); err != nil {
+			return err
+		}
+		return t.removeVolumeNVolumeMount(compDef, synthesizedComp)
 	}
-	return nil
 }
 
-func (t *componentTLSTransformer) enabled(compDef *appsv1.ComponentDefinition, synthesizedComp *component.SynthesizedComponent) (bool, error) {
-	if synthesizedComp.TLSConfig == nil || !synthesizedComp.TLSConfig.Enable {
+func (t *componentTLSTransformer) enabled(compDef *appsv1.ComponentDefinition,
+	synthesizedComp *component.SynthesizedComponent) (bool, error) {
+	tls := synthesizedComp.TLSConfig
+	if tls == nil || !tls.Enable {
 		return false, nil
 	}
+	if tls.Issuer == nil {
+		return false, fmt.Errorf("the issuer shouldn't be nil when the TLS is enabled")
+	}
+	if slices.Contains([]appsv1.IssuerName{appsv1.IssuerUserProvided, appsv1.IssuerKubeBlocks}, tls.Issuer.Name) {
+		return false, fmt.Errorf("unknown TLS issuer %s", tls.Issuer.Name)
+	}
 	if compDef.Spec.TLS == nil {
-		return false, fmt.Errorf("the tls is enabled but the component definition %s doesn't support it", compDef.Name)
+		return false, fmt.Errorf("the TLS is enabled but the component definition %s doesn't support it", compDef.Name)
 	}
 	return true, nil
 }
 
-func buildNCheckTLSCert(ctx context.Context, cli client.Reader,
-	compDef *appsv1.ComponentDefinition, synthesizedComp component.SynthesizedComponent, dag *graph.DAG) error {
-	tls := synthesizedComp.TLSConfig
-	switch tls.Issuer.Name {
+func (t *componentTLSTransformer) secretObject(transCtx *componentTransformContext,
+	synthesizedComp *component.SynthesizedComponent) (*corev1.Secret, error) {
+	secretKey := types.NamespacedName{
+		Namespace: synthesizedComp.Namespace,
+		Name:      plan.GenerateTLSSecretName(synthesizedComp.ClusterName, synthesizedComp.Name),
+	}
+	secret := &corev1.Secret{}
+	err := transCtx.Client.Get(transCtx.Context, secretKey, secret)
+	if err != nil {
+		return nil, client.IgnoreNotFound(err)
+	}
+	return secret, nil
+}
+
+func (t *componentTLSTransformer) newTLSIssuer(compDef *appsv1.ComponentDefinition,
+	synthesizedComp *component.SynthesizedComponent) tlsIssuer {
+	var issuerName appsv1.IssuerName
+	if synthesizedComp.TLSConfig != nil && synthesizedComp.TLSConfig.Issuer != nil {
+		issuerName = synthesizedComp.TLSConfig.Issuer.Name
+	}
+	switch issuerName {
 	case appsv1.IssuerUserProvided:
-		return plan.CheckTLSSecretRef(ctx, cli, tls.Issuer.SecretRef)
+		return &tlsIssuerUserProvided{
+			compDef:         compDef,
+			synthesizedComp: synthesizedComp,
+		}
 	case appsv1.IssuerKubeBlocks:
-		return buildTLSCertByKubeBlocks(ctx, cli, compDef, synthesizedComp, dag)
+		return &tlsIssuerKubeBlocks{
+			compDef:         compDef,
+			synthesizedComp: synthesizedComp,
+		}
 	default:
-		return fmt.Errorf("unknown TLS issuer %s", tls.Issuer.Name)
+		return nil
 	}
 }
 
-func buildTLSCertByKubeBlocks(ctx context.Context, cli client.Reader,
-	compDef *appsv1.ComponentDefinition, synthesizedComp component.SynthesizedComponent, dag *graph.DAG) error {
-	var (
-		namespace   = synthesizedComp.Namespace
-		clusterName = synthesizedComp.ClusterName
-		compName    = synthesizedComp.Name
-	)
-	secretName := plan.GenerateTLSSecretName(clusterName, compName)
-	secret := &corev1.Secret{}
-	err := cli.Get(ctx, types.NamespacedName{Namespace: namespace, Name: secretName}, secret)
-	if err != nil && !errors.IsNotFound(err) {
+func (t *componentTLSTransformer) handleCreate(ctx context.Context, cli client.Reader, dag *graph.DAG, issuer tlsIssuer) error {
+	secret, err := issuer.create(ctx, cli)
+	if err != nil {
 		return err
 	}
-
-	graphCli, _ := cli.(model.GraphClient)
-	if err != nil {
-		secret, err = plan.ComposeTLSSecret(compDef, synthesizedComp, nil)
-		if err != nil {
-			return err
-		}
+	if secret != nil {
+		graphCli, _ := cli.(model.GraphClient)
 		graphCli.Create(dag, secret)
-	} else {
-		proto := plan.BuildTLSSecret(synthesizedComp)
-		secretCopy := secret.DeepCopy()
-		secretCopy.Labels = proto.Labels
-		secretCopy.Annotations = proto.Annotations
-		if !reflect.DeepEqual(secret, secretCopy) {
-			graphCli.Update(dag, secret, secretCopy)
-		}
 	}
 	return nil
 }
 
-func (t *componentTLSTransformer) updateVolumeNVolumeMount(
-	compDef *appsv1.ComponentDefinition, synthesizedComp *component.SynthesizedComponent) error {
+func (t *componentTLSTransformer) handleDelete(ctx context.Context, cli client.Reader,
+	dag *graph.DAG, issuer tlsIssuer, secretObj *corev1.Secret) error {
+	var (
+		secret = secretObj
+		err    error
+	)
+	if issuer != nil {
+		secret, err = issuer.delete(ctx, cli, secretObj)
+		if err != nil {
+			return err
+		}
+	}
+	if secret != nil {
+		graphCli, _ := cli.(model.GraphClient)
+		graphCli.Delete(dag, secret)
+	}
+	return nil
+}
+
+func (t *componentTLSTransformer) handleUpdate(ctx context.Context, cli client.Reader,
+	dag *graph.DAG, issuer tlsIssuer, secretObj *corev1.Secret) error {
+	secret, err := issuer.update(ctx, cli, secretObj)
+	if err != nil {
+		return err
+	}
+	if secret != nil {
+		graphCli, _ := cli.(model.GraphClient)
+		graphCli.Update(dag, secretObj, secret)
+	}
+	return nil
+}
+
+type tlsIssuerKubeBlocks struct {
+	compDef         *appsv1.ComponentDefinition
+	synthesizedComp *component.SynthesizedComponent
+}
+
+func (i *tlsIssuerKubeBlocks) create(ctx context.Context, cli client.Reader) (*corev1.Secret, error) {
+	return plan.ComposeTLSSecret(i.compDef, *i.synthesizedComp, nil)
+}
+
+func (i *tlsIssuerKubeBlocks) delete(ctx context.Context, cli client.Reader, secret *corev1.Secret) (*corev1.Secret, error) {
+	return secret, nil
+}
+
+func (i *tlsIssuerKubeBlocks) update(ctx context.Context, cli client.Reader, secret *corev1.Secret) (*corev1.Secret, error) {
+	proto := plan.BuildTLSSecret(*i.synthesizedComp)
+
+	// TODO: update secret data if needed
+	secretCopy := secret.DeepCopy()
+	secretCopy.Labels = proto.Labels
+	secretCopy.Annotations = proto.Annotations
+
+	if !reflect.DeepEqual(secret, secretCopy) {
+		return secretCopy, nil
+	}
+	return nil, nil
+}
+
+type tlsIssuerUserProvided struct {
+	compDef         *appsv1.ComponentDefinition
+	synthesizedComp *component.SynthesizedComponent
+}
+
+func (i *tlsIssuerUserProvided) create(ctx context.Context, cli client.Reader) (*corev1.Secret, error) {
+	secret, err := i.referenced(ctx, cli)
+	if err != nil {
+		return nil, err
+	}
+
+	proto := plan.BuildTLSSecret(*i.synthesizedComp)
+
+	secretRef := i.synthesizedComp.TLSConfig.Issuer.SecretRef
+	if i.compDef.Spec.TLS.CAFile != nil {
+		proto.Data[*i.compDef.Spec.TLS.CAFile] = secret.Data[secretRef.CA]
+	}
+	if i.compDef.Spec.TLS.CertFile != nil {
+		proto.Data[*i.compDef.Spec.TLS.CertFile] = secret.Data[secretRef.Cert]
+	}
+	if i.compDef.Spec.TLS.KeyFile != nil {
+		proto.Data[*i.compDef.Spec.TLS.KeyFile] = secret.Data[secretRef.Key]
+	}
+
+	return proto, nil
+}
+
+func (i *tlsIssuerUserProvided) delete(ctx context.Context, cli client.Reader, secret *corev1.Secret) (*corev1.Secret, error) {
+	return secret, nil
+}
+
+func (i *tlsIssuerUserProvided) update(ctx context.Context, cli client.Reader, secret *corev1.Secret) (*corev1.Secret, error) {
+	proto := plan.BuildTLSSecret(*i.synthesizedComp)
+
+	// TODO: update secret data if needed
+	secretCopy := secret.DeepCopy()
+	secretCopy.Labels = proto.Labels
+	secretCopy.Annotations = proto.Annotations
+
+	if !reflect.DeepEqual(secret, secretCopy) {
+		return secretCopy, nil
+	}
+	return nil, nil
+}
+
+func (i *tlsIssuerUserProvided) referenced(ctx context.Context, cli client.Reader) (*corev1.Secret, error) {
+	var (
+		secretRef = i.synthesizedComp.TLSConfig.Issuer.SecretRef
+	)
+	secretKey := types.NamespacedName{
+		Namespace: secretRef.Namespace,
+		Name:      secretRef.Name,
+	}
+	secret := &corev1.Secret{}
+	if err := cli.Get(ctx, secretKey, secret); err != nil {
+		return nil, err
+	}
+	// TODO: should keep aligned with the cmpd
+	if secret.Data == nil {
+		return nil, fmt.Errorf("tls secret's data field shouldn't be nil")
+	}
+	keys := []string{secretRef.CA, secretRef.Cert, secretRef.Key}
+	for _, key := range keys {
+		if len(secret.Data[key]) == 0 {
+			return nil, fmt.Errorf("tls secret's data[%s] field shouldn't be empty", key)
+		}
+	}
+	return secret, nil
+}
+
+func (t *componentTLSTransformer) updateVolumeNVolumeMount(compDef *appsv1.ComponentDefinition,
+	synthesizedComp *component.SynthesizedComponent) error {
 	// update volume
 	volumes := synthesizedComp.PodSpec.Volumes
 	volume, err := t.composeTLSVolume(compDef, synthesizedComp)
@@ -164,8 +318,8 @@ func (t *componentTLSTransformer) updateVolumeNVolumeMount(
 	return nil
 }
 
-func (t *componentTLSTransformer) composeTLSVolume(
-	compDef *appsv1.ComponentDefinition, synthesizedComp *component.SynthesizedComponent) (*corev1.Volume, error) {
+func (t *componentTLSTransformer) composeTLSVolume(compDef *appsv1.ComponentDefinition,
+	synthesizedComp *component.SynthesizedComponent) (*corev1.Volume, error) {
 	var secretName string
 	var ca, cert, key *string
 
@@ -227,4 +381,26 @@ func (t *componentTLSTransformer) composeTLSVolume(
 	}
 
 	return &volume, nil
+}
+
+func (t *componentTLSTransformer) removeVolumeNVolumeMount(compDef *appsv1.ComponentDefinition,
+	synthesizedComp *component.SynthesizedComponent) error {
+	if compDef.Spec.TLS == nil || len(compDef.Spec.TLS.VolumeName) == 0 {
+		return nil
+	}
+
+	// remove the volume
+	synthesizedComp.PodSpec.Volumes = slices.DeleteFunc(synthesizedComp.PodSpec.Volumes, func(vol corev1.Volume) bool {
+		return vol.Name == compDef.Spec.TLS.VolumeName
+	})
+
+	// remove the volume mount
+	for i := range synthesizedComp.PodSpec.Containers {
+		synthesizedComp.PodSpec.Containers[i].VolumeMounts =
+			slices.DeleteFunc(synthesizedComp.PodSpec.Containers[i].VolumeMounts, func(m corev1.VolumeMount) bool {
+				return m.Name == compDef.Spec.TLS.VolumeName
+			})
+	}
+
+	return nil
 }

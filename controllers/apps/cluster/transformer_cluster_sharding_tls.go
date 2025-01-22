@@ -137,7 +137,7 @@ func (t *clusterShardingTLSTransformer) buildTLSSecret(transCtx *clusterTransfor
 		Name:        sharding.Name,
 	}
 	secret := t.newTLSSecret(transCtx, sharding, compDef)
-	return plan.ComposeTLSSecret(compDef, synthesizedComp, secret)
+	return plan.ComposeTLSCertsWithSecret(compDef, synthesizedComp, secret)
 }
 
 func (t *clusterShardingTLSTransformer) newTLSSecret(transCtx *clusterTransformContext,
@@ -157,7 +157,7 @@ func (t *clusterShardingTLSTransformer) newTLSSecret(transCtx *clusterTransformC
 		AddLabelsInMap(compDef.Spec.Labels).
 		AddAnnotationsInMap(sharding.Template.Annotations).
 		AddAnnotationsInMap(compDef.Spec.Annotations).
-		SetStringData(map[string]string{}).
+		SetData(map[string][]byte{}).
 		GetObject()
 }
 

@@ -90,8 +90,8 @@ var _ = Describe("pod role label event handler test", func() {
 					return nil
 				}).Times(1)
 			k8sMock.EXPECT().
-				Patch(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-				DoAndReturn(func(_ context.Context, pd *corev1.Pod, patch client.Patch, _ ...client.PatchOption) error {
+				Update(gomock.Any(), gomock.Any(), gomock.Any()).
+				DoAndReturn(func(_ context.Context, pd *corev1.Pod, _ ...client.UpdateOption) error {
 					Expect(pd).ShouldNot(BeNil())
 					Expect(pd.Labels).ShouldNot(BeNil())
 					Expect(pd.Labels[RoleLabelKey]).Should(Equal(role.Name))

@@ -301,10 +301,10 @@ func FormatRestoreTimeAndValidate(restoreTimeStr string, continuousBackup *dpv1a
 	restoreTimeStr = restoreTime.UTC().Format(time.RFC3339)
 	// TODO: check with Recoverable time
 
-	if continuousBackup.Status.TimeRange == nil || continuousBackup.Status.TimeRange.Start.IsZero() || continuousBackup.Status.TimeRange.End.IsZero() {
+	if continuousBackup.Status.TimeRange == nil || continuousBackup.GetStartTime().IsZero() || continuousBackup.GetEndTime().IsZero() {
 		return restoreTimeStr, fmt.Errorf("invalid timeRange of the backup")
 	}
-	if !isTimeInRange(restoreTime, continuousBackup.Status.TimeRange.Start.Time, continuousBackup.Status.TimeRange.End.Time) {
+	if !isTimeInRange(restoreTime, continuousBackup.GetStartTime().Time, continuousBackup.GetEndTime().Time) {
 		return restoreTimeStr, fmt.Errorf("restore-to-time is out of time range, you can view the recoverable time: \n"+
 			"\tkbcli cluster describe %s -n %s", continuousBackup.Labels[constant.AppInstanceLabelKey], continuousBackup.Namespace)
 	}

@@ -672,8 +672,11 @@ func (r *clusterBackupPolicyTransformer) mergeClusterBackup(
 			r.Error(err, "failed to get ActionSet for backup.", "ActionSet", as.Name)
 			continue
 		}
-		switch {
-		case as.Spec.BackupType == dpv1alpha1.BackupTypeContinuous && backup.PITREnabled != nil:
+		switch as.Spec.BackupType {
+		case dpv1alpha1.BackupTypeContinuous:
+			if backup.PITREnabled == nil {
+				continue
+			}
 			if boolptr.IsSetToFalse(backup.PITREnabled) || hasSyncPITRMethod ||
 				(len(backup.ContinuousMethod) > 0 && backup.ContinuousMethod != s.BackupMethod) {
 				s.Enabled = boolptr.False()
@@ -685,7 +688,7 @@ func (r *clusterBackupPolicyTransformer) mergeClusterBackup(
 				s.RetentionPeriod = backup.RetentionPeriod
 			}
 			hasSyncPITRMethod = true
-		case as.Spec.BackupType == dpv1alpha1.BackupTypeIncremental:
+		case  dpv1alpha1.BackupTypeIncremental:
 			if len(backup.Method) == 0 || m.CompatibleMethod != backup.Method {
 				// disable other incremental backup schedules
 				backupSchedule.Spec.Schedules[i].Enabled = boolptr.False()
@@ -698,9 +701,11 @@ func (r *clusterBackupPolicyTransformer) mergeClusterBackup(
 				}, &backupSchedule.Spec.Schedules[i])
 				hasSyncIncMethod = true
 			}
-		case as.Spec.BackupType == dpv1alpha1.BackupTypeFull && enableAutoBackup:
-			// disable the automatic backup for other full backup method
-			s.Enabled = boolptr.False()
+		case dpv1alpha1.BackupTypeFull:
+			if enableAutoBackup {
+				// disable the automatic backup for other full backup method
+				s.Enabled = boolptr.False()
+			}
 		}
 	}
 	if !exist {

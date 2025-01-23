@@ -688,7 +688,7 @@ func (r *clusterBackupPolicyTransformer) mergeClusterBackup(
 				s.RetentionPeriod = backup.RetentionPeriod
 			}
 			hasSyncPITRMethod = true
-		case  dpv1alpha1.BackupTypeIncremental:
+		case dpv1alpha1.BackupTypeIncremental:
 			if len(backup.Method) == 0 || m.CompatibleMethod != backup.Method {
 				// disable other incremental backup schedules
 				backupSchedule.Spec.Schedules[i].Enabled = boolptr.False()

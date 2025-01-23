@@ -398,18 +398,42 @@ type backupReconfigureRef struct {
 
 type parameterPairs map[string][]opsv1alpha1.ParameterPair
 
+// @Deprecated remove it in next release, only compatible with old release.
+func (s *Scheduler) convertLastAppliedConfigs(continuousMethod string) {
+	if _, ok := s.BackupSchedule.Annotations[dptypes.LastAppliedConfigsAnnotationKey]; ok {
+		return
+	}
+	lastAppliedConfig := s.BackupSchedule.Annotations[constant.LastAppliedConfigAnnotationKey]
+	if lastAppliedConfig == "" {
+		return
+	}
+	lastAppliedConfigMap := map[string]string{}
+	lastAppliedConfigMap[continuousMethod] = lastAppliedConfig
+	str, _ := json.Marshal(lastAppliedConfigMap)
+	s.BackupSchedule.Annotations[dptypes.LastAppliedConfigsAnnotationKey] = string(str)
+}
+
+func (s *Scheduler) getLastAppliedConfigsMap() (map[string]string, error) {
+	resMap := map[string]string{}
+	if err := json.Unmarshal([]byte(s.BackupSchedule.Annotations[dptypes.LastAppliedConfigsAnnotationKey]), &resMap); err != nil {
+		return nil, err
+	}
+	return resMap, nil
+}
+
 func (s *Scheduler) reconfigure(schedulePolicy *dpv1alpha1.SchedulePolicy) error {
 	reCfgRef := s.BackupSchedule.Annotations[dptypes.ReconfigureRefAnnotationKey]
 	if reCfgRef == "" {
 		return nil
 	}
+	// convert deprecated "lastAppliedConfig "to "lastAppliedConfigs"
+	s.convertLastAppliedConfigs(schedulePolicy.BackupMethod)
 	configRef := backupReconfigureRef{}
 	if err := json.Unmarshal([]byte(reCfgRef), &configRef); err != nil {
 		return err
 	}
-
 	enable := boolptr.IsSetToTrue(schedulePolicy.Enabled)
-	if s.BackupSchedule.Annotations[constant.LastAppliedConfigAnnotationKey] == "" && !enable {
+	if s.BackupSchedule.Annotations[dptypes.LastAppliedConfigsAnnotationKey] == "" && !enable {
 		// disable in the first policy created, no need reconfigure because default configs had been set.
 		return nil
 	}
@@ -425,9 +449,13 @@ func (s *Scheduler) reconfigure(schedulePolicy *dpv1alpha1.SchedulePolicy) error
 		// skip reconfigure if not found parameters.
 		return nil
 	}
+	lastAppliedConfigsMap, err := s.getLastAppliedConfigsMap()
+	if err != nil {
+		return err
+	}
 	updateParameterPairsBytes, _ := json.Marshal(parameters)
 	updateParameterPairs := string(updateParameterPairsBytes)
-	if updateParameterPairs == s.BackupSchedule.Annotations[constant.LastAppliedConfigAnnotationKey] {
+	if updateParameterPairs == lastAppliedConfigsMap[schedulePolicy.BackupMethod] {
 		// reconcile the config job if finished
 		return s.reconcileReconfigure(s.BackupSchedule)
 	}
@@ -485,7 +513,10 @@ func (s *Scheduler) reconfigure(schedulePolicy *dpv1alpha1.SchedulePolicy) error
 	if s.BackupSchedule.Annotations == nil {
 		s.BackupSchedule.Annotations = map[string]string{}
 	}
-	s.BackupSchedule.Annotations[constant.LastAppliedConfigAnnotationKey] = updateParameterPairs
+	lastAppliedConfigsMap[schedulePolicy.BackupMethod] = updateParameterPairs
+	updateParameterPairsBytes, _ = json.Marshal(lastAppliedConfigsMap)
+	s.BackupSchedule.Annotations[dptypes.LastAppliedConfigsAnnotationKey] = string(updateParameterPairsBytes)
+	delete(s.BackupSchedule.Annotations, constant.LastAppliedConfigAnnotationKey)
 	if err := s.Client.Patch(s.Ctx, s.BackupSchedule, patch); err != nil {
 		return err
 	}

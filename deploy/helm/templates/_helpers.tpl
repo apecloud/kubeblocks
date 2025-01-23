@@ -141,82 +141,6 @@ Allow the release namespace to be overridden for multi-namespace deployments in 
 {{- end -}}
 
 
-
-
-{{/*
-Use the prometheus namespace override for multi-namespace deployments in combined charts
-*/}}
-{{- define "kubeblocks.prometheus.namespace" -}}
-  {{- if .Values.prometheus.namespaceOverride -}}
-    {{- .Values.prometheus.namespaceOverride -}}
-  {{- else -}}
-    {{- .Release.Namespace -}}
-  {{- end -}}
-{{- end -}}
-
-{{/*
-Use the grafana namespace override for multi-namespace deployments in combined charts
-*/}}
-{{- define "kubeblocks.grafana.namespace" -}}
-  {{- if .Values.grafana.namespaceOverride -}}
-    {{- .Values.grafana.namespaceOverride -}}
-  {{- else -}}
-    {{- .Release.Namespace -}}
-  {{- end -}}
-{{- end -}}
-
-{{/*
-Create a fully qualified Prometheus server name.
-We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
-*/}}
-{{- define "kubeblocks.prometheus.server.fullname" -}}
-{{- if .Values.prometheus.server.fullnameOverride -}}
-{{- .Values.prometheus.server.fullnameOverride | trunc 63 | trimSuffix "-" -}}
-{{- else -}}
-{{- $name := default .Values.prometheus.nameOverride "prometheus" -}}
-{{- if contains $name .Release.Name -}}
-{{- printf "%s-%s" .Release.Name .Values.prometheus.server.name | trunc 63 | trimSuffix "-" -}}
-{{- else -}}
-{{- printf "%s-%s-%s" .Release.Name $name .Values.prometheus.server.name | trunc 63 | trimSuffix "-" -}}
-{{- end -}}
-{{- end -}}
-{{- end -}}
-
-{{/*
-Create a fully qualified alertmanager name.
-We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
-*/}}
-{{- define "kubeblocks.prometheus.alertmanager.fullname" -}}
-{{- if .Values.prometheus.alertmanager.fullnameOverride -}}
-{{- .Values.prometheus.alertmanager.fullnameOverride | trunc 63 | trimSuffix "-" -}}
-{{- else -}}
-{{- $name := default .Values.prometheus.nameOverride "prometheus" -}}
-{{- if contains $name .Release.Name -}}
-{{- printf "%s-%s" .Release.Name .Values.prometheus.alertmanager.name | trunc 63 | trimSuffix "-" -}}
-{{- else -}}
-{{- printf "%s-%s-%s" .Release.Name $name .Values.prometheus.alertmanager.name | trunc 63 | trimSuffix "-" -}}
-{{- end -}}
-{{- end -}}
-{{- end -}}
-
-{{/*
-Create a default fully qualified app name.
-We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
-If release name contains chart name it will be used as a full name.
-*/}}
-{{- define "kubeblocks.grafana.fullname" -}}
-{{- if .Values.grafana.fullnameOverride -}}
-{{- .Values.grafana.fullnameOverride | trunc 63 | trimSuffix "-" -}}
-{{- else -}}
-{{- $name := default .Values.grafana.nameOverride "grafana" -}}
-{{- if contains $name .Release.Name -}}
-{{- .Release.Name | trunc 63 | trimSuffix "-" -}}
-{{- else -}}
-{{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" -}}
-{{- end -}}
-{{- end -}}
-{{- end -}}
-
 {{/*
 Specify KubeBlocks Operator deployment with priorityClassName=system-cluster-critical, if deployed to "kube-system"
 namespace and unspecified priorityClassName.
@@ -240,34 +164,6 @@ Get addon controller enabled attributes.
 {{- else }}
 {{- false }}
 {{- end }}
-{{- end }}
-
-{{/*
-Define addon prometheus name
-*/}}
-{{- define "addon.prometheus.name" -}}
-{{- print "prometheus" }}
-{{- end }}
-
-{{/*
-Define addon alertmanager-webhook-adaptor name
-*/}}
-{{- define "addon.alertmanager-webhook-adaptor.name" -}}
-{{- print "alertmanager-webhook-adaptor" }}
-{{- end }}
-
-{{/*
-Define addon loki name
-*/}}
-{{- define "addon.loki.name" -}}
-{{- print "loki" }}
-{{- end }}
-
-{{/*
-Define addon apecloud-otel-collector name
-*/}}
-{{- define "addon.apecloud-otel-collector.name" -}}
-{{- print "apecloud-otel-collector" }}
 {{- end }}
 
 {{/*

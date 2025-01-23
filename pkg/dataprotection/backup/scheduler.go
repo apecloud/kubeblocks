@@ -516,9 +516,7 @@ func (s *Scheduler) reconfigure(schedulePolicy *dpv1alpha1.SchedulePolicy) error
 	lastAppliedConfigsMap[schedulePolicy.BackupMethod] = updateParameterPairs
 	updateParameterPairsBytes, _ = json.Marshal(lastAppliedConfigsMap)
 	s.BackupSchedule.Annotations[dptypes.LastAppliedConfigsAnnotationKey] = string(updateParameterPairsBytes)
-	if _, ok := s.BackupSchedule.Annotations[constant.LastAppliedConfigAnnotationKey]; ok {
-		delete(s.BackupSchedule.Annotations, constant.LastAppliedConfigAnnotationKey)
-	}
+	delete(s.BackupSchedule.Annotations, constant.LastAppliedConfigAnnotationKey)
 	if err := s.Client.Patch(s.Ctx, s.BackupSchedule, patch); err != nil {
 		return err
 	}

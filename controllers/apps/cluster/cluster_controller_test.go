@@ -962,7 +962,7 @@ var _ = Describe("Cluster Controller", func() {
 				}, client.InNamespace(clusterKey.Namespace))).ShouldNot(BeEmpty())
 		})
 
-		FIt("Creating cluster with backup", func() {
+		It("Creating cluster with backup", func() {
 			var (
 				boolTrue  = true
 				boolFalse = false

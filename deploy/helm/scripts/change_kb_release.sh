@@ -83,14 +83,7 @@ addons=(
     "postgresql"
     "qdrant"
     "redis"
-    "alertmanager-webhook-adaptor"
-    "aws-load-balancer-controller"
-    "csi-driver-nfs"
-    "csi-hostpath-driver"
-    "grafana"
-    "prometheus"
     "snapshot-controller"
-    "victoria-metrics-agent"
 )
 
 for addon in "${addons[@]}"; do

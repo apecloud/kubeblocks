@@ -69,10 +69,15 @@ fullnameOverride: ""
 ##
 ## If it is set to false, then you will need to create the service account
 ## named `cluster.ComponentSpec.ServiceAccountName` and the corresponding (cluster) role binding
-## manually or through the cluster's Helm template, as shown in the example:
-##   helm install mysql apecloud-mysql-cluster
+## manually.
+##
+## @param rbac.additionalPolicyRules
+## In your Componentdefinition CR's `policyRules` field, you can only define rules kubeblocks
+## already has. If you want to define a rule that kubeblocks does not have, you can add it here. 
+## This field is `[]rbacv1.PolicyRule`.
 rbac:
   enabled: true
+  additionalPolicyRules: []
 
 ## Deployment update strategy.
 ## Ref: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#strategy

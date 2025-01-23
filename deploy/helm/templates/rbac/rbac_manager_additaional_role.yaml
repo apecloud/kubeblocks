@@ -3,7 +3,7 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ include "kubeblocks.fullname" . }}-rbac-manager-role
+  name: {{ include "kubeblocks.fullname" . }}-rbac-manager-additional-role
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
 rules:

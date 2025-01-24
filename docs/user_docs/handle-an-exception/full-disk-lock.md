@@ -44,11 +44,17 @@ When the space water level of all configured volumes falls below the defined thr
 2. Add the `volumeProtectionSpec` field under `spec.componentDefs[]` to enable the full disk lock function. You can set the values of `highWatermark` as needed.
 
    ```yaml
-   volumeProtectionSpec:
-     highWatermark: 90
-     volumes:
-     - highWatermark: 85
-       name: data
+   ...
+   spec:
+     componentDefs:
+     ...
+     - name: mysql
+       volumeProtectionSpec:
+         highWatermark: 90
+         volumes:
+         - highWatermark: 85
+           name: data
+     ...
    ```
 
    :::note

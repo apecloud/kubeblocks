@@ -39,11 +39,17 @@ KubeBlocks 的磁盘满锁功能确保了数据库的稳定性和可用性。该
 2. 将 `volumeProtectionSpec` 字段添加至 `spec.componentDefs[]`，启用磁盘满锁功能。可根据需要设置 `highWatermark` 的值。
 
    ```yaml
-   volumeProtectionSpec:
-     highWatermark: 90
-     volumes:
-     - highWatermark: 85
-       name: data
+   ...
+   spec:
+     componentDefs:
+     ...
+     - name: mysql
+       volumeProtectionSpec:
+         highWatermark: 90
+         volumes:
+         - highWatermark: 85
+           name: data
+     ...
    ```
 
    :::note

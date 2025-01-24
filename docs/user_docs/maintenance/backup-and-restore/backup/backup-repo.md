@@ -501,7 +501,7 @@ To troubleshoot:
 
 * Check whether configuration parameters, such as `endpoint`, `accessKeyId`, and `secretAccessKey`, are correctly specified.
 * For self-hosted object storage (e.g., Ceph Object Storage), try using `minio` as StorageProvider. The default `s3` StorageProvider uses a virtual hosting URL style, which some self-hosted storage may not support.
-* If an `InvalidLocationConstraint` error occurs, check whether its parameter is corretly configured. If this error persists, leave the `region` parameter empty and try again.
+* If an `InvalidLocationConstraint` error occurs, check whether its parameter is correctly configured. If this error persists, leave the `region` parameter empty and try again.
 * If the status remains in the `PreChecking` state, check your network connection. Ensure the storage service is accessible from within the Kubernetes cluster. You can test this by running a Pod and connecting to the storage service using the corresponding client.
 * KubeBlocks uses [rclone](https://rclone.org/) internally for data transfer. Check whether rclone can successfully access the storage service.
 

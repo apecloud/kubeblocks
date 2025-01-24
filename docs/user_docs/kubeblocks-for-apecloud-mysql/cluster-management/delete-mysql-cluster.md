@@ -11,6 +11,8 @@ import TabItem from '@theme/TabItem';
 
 # Delete an ApeCloud MySQL Cluster
 
+This guide describes how to view the termination policy and delete an ApeCloud MySQL cluster.
+
 ## Termination policy
 
 :::note
@@ -35,7 +37,7 @@ To check the termination policy, execute the following command.
 kubectl get cluster mycluster -n demo
 >
 NAME        CLUSTER-DEFINITION   TERMINATION-POLICY   STATUS    AGE
-mycluster   apecloud-mysql       Delete               Running   40s
+mycluster   apecloud-mysql       Delete               Running   40m
 ```
 
 </TabItem>

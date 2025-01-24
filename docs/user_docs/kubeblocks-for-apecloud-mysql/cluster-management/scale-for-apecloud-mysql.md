@@ -10,7 +10,7 @@ import TabItem from '@theme/TabItem';
 
 # Scale an ApeCloud MySQL cluster
 
-You can scale an ApeCloud MySQL cluster in two ways, vertical scaling and horizontal scaling.
+This guide describes how to vertically and horizontally scale an ApeCloud MySQL cluster. Vertical scaling changes the CPU and memory of this cluster. Horizontal scaling changes the replica number of this cluster.
 
 :::note
 
@@ -20,11 +20,11 @@ After vertical scaling or horizontal scaling is performed, KubeBlocks automatica
 
 ## Vertical scaling
 
-You can vertically scale a cluster by changing resource requirements and limits (CPU and storage). For example, you can change the resource class from 1C2G to 2C4G by performing vertical scaling.
+You can perform a vertical scaling task to changes resource requirements and limits (CPU and memory) of a cluster. For example, you can change the resource class from 1C2G to 2C4G by performing a vertical scaling task.
 
 ### Before you start
 
-Check whether the cluster status is `Running`. Otherwise, the following operations may fail.
+Make sure the cluster status is `Running`. Otherwise, the following operations may fail.
 
 <Tabs>
 
@@ -58,7 +58,7 @@ mycluster   demo        apecloud-mysql       Delete               Running   Jan 
 
 <TabItem value="OpsRequest" label="OpsRequest" default>
 
-1. Apply an OpsRequest to the specified cluster. Configure the parameters according to your needs.
+1. Apply an OpsRequest on the cluster `mycluster`. Configure the values of `spec.verticalscaling.requests` and  `spec.verticalscaling.limits` as needed.
 
    ```yaml
    kubectl apply -f - <<EOF
@@ -81,7 +81,7 @@ mycluster   demo        apecloud-mysql       Delete               Running   Jan 
    EOF
    ```
 
-2. Check the operation status to validate the vertical scaling.
+2. Check the OpsRequest status to verify the vertical scaling .
 
    ```bash
    kubectl get ops -n demo
@@ -90,7 +90,11 @@ mycluster   demo        apecloud-mysql       Delete               Running   Jan 
    acmysql-verticalscaling   VerticalScaling   mycluster   Succeed   1/1        3m54s
    ```
 
-   If an error occurs, you can troubleshoot with `kubectl describe ops -n demo` command to view the events of this operation.
+   The OpsRequest statuses are as follow:
+
+   - STATUS=Running: It means the vertical scaling task is in progress.
+   - STATUS=Succeed: It means the vertical scaling task has completed and the cluster class is changed as required.
+   - STATUS=Failed: It means the vertical scaling task failed. You can troubleshoot it with `kubectl describe ops <opsRequestName> -n demo` to view the details of this OpsRequest.
 
 3. Check whether the cluster is running again and corresponding resources change.
 
@@ -118,11 +122,11 @@ mycluster   demo        apecloud-mysql       Delete               Running   Jan 
          replicas: 3
          resources:
            requests:
-             cpu: "1"       # Update the resources to your need.
-             memory: "2Gi"  # Update the resources to your need.
+             cpu: "1"       # Update the values according to your needs
+             memory: "2Gi"  # Update the values according to your needs
            limits:
-             cpu: "2"       # Update the resources to your need.
-             memory: "4Gi"  # Update the resources to your need.
+             cpu: "2"       # Update the values according to your needs
+             memory: "4Gi"  # Update the values according to your needs
    ...
    ```
 
@@ -146,7 +150,7 @@ mycluster   demo        apecloud-mysql       Delete               Running   Jan 
    - `--memory` describes the requested and limited size of the component memory.
    - `--cpu` describes the requested and limited size of the component CPU.
 
-2. Validate the vertical scaling operation.
+2. Choose one of the following options to validate the vertical scaling operation.
 
    - View the OpsRequest progress.
 
@@ -169,7 +173,7 @@ mycluster   demo        apecloud-mysql       Delete               Running   Jan 
      - STATUS=Running: it means the vertical scaling operation has been applied.
      - STATUS=Abnormal: it means the vertical scaling is abnormal. The reason may be that the number of the normal instances is less than that of the total instance or the leader instance is running properly while others are abnormal.
 
-         To solve the problem, you can manually check whether this error is caused by insufficient resources. Then if AutoScaling is supported by the Kubernetes cluster, the system recovers when there are enough resources. Otherwise, you can create enough resources and troubleshoot with `kubectl describe` command.
+       > To solve the problem, you can manually check whether this error is caused by insufficient resources. Then if AutoScaling is supported by the Kubernetes cluster, the system recovers when there are enough resources. Otherwise, you can create enough resources and troubleshoot with `kubectl describe` command.
 
 3. After the OpsRequest status is `Succeed` or the cluster status is `Running` again, check whether the corresponding resources change.
 
@@ -183,7 +187,7 @@ mycluster   demo        apecloud-mysql       Delete               Running   Jan 
 
 ## Horizontal scaling
 
-Horizontal scaling changes the amount of pods. For example, you can scale out replicas from three to five. The scaling process includes the backup and restore of data.
+Horizontal scaling changes the number of pods. For example, you can scale out replicas from three to five. The scaling process includes the backup and restore of data.
 
 From v0.9.0, besides replicas, KubeBlocks also supports scaling in and out instances, refer to the [Horizontal Scale tutorial](./../../maintenance/scale/horizontal-scale.md) for more details and examples.
 
@@ -245,7 +249,7 @@ mycluster   demo        apecloud-mysql       Delete               Running   Jan 
 
    If you want to scale in replicas, replace `scaleOut` with `scaleIn`.
 
-   The example below means adding two replicas.
+   The example below means decreasing two replicas.
 
    ```yaml
    kubectl apply -f - <<EOF
@@ -273,7 +277,7 @@ mycluster   demo        apecloud-mysql       Delete               Running   Jan 
    acmysql-horizontalscaling   HorizontalScaling   mycluster   Succeed   1/1        2m54s
    ```
 
-   If an error occurs, you can troubleshoot with `kubectl describe ops -n demo` command to view the events of this operation.
+   If an error occurs, you can troubleshoot it with `kubectl describe ops -n demo` command to view the events of this operation.
 
 3. After the cluster status is `Running` again, check whether the corresponding resources change.
 
@@ -287,7 +291,7 @@ mycluster   demo        apecloud-mysql       Delete               Running   Jan 
 
 1. Change the value of `spec.componentSpecs.replicas` in the YAML file.
 
-   `spec.componentSpecs.replicas` stands for the pod amount and changing this value triggers a horizontal scaling of a cluster.
+   `spec.componentSpecs.replicas` stands for the pod number and changing this value triggers a horizontal scaling of a cluster.
 
    ```bash
    kubectl edit cluster mycluster -n demo
@@ -300,7 +304,7 @@ mycluster   demo        apecloud-mysql       Delete               Running   Jan 
    spec:
    componentSpecs:
      - name: apecloud-mysql
-       replicas: 3 # decrease `replicas` for scaling in, and increase for scaling out
+       replicas: 3 # Decrease the value of `replicas` for scale-in, and increase the value for scale-out
    ...
    ```
 
@@ -329,9 +333,9 @@ mycluster   demo        apecloud-mysql       Delete               Running   Jan 
     ```
 
     - `--components` describes the component name ready for horizontal scaling.
-    - `--replicas` describes the replica amount of the specified components. Edit the amount based on your demands to scale in or out replicas.
+    - `--replicas` describes the replica number of the specified components. Edit the value based on your demands to scale in or out replicas.
 
-2. Validate the horizontal scaling operation.
+2. Choose one of the following options to validate the horizontal scaling operation.
 
    - View the OpsRequest progress.
 

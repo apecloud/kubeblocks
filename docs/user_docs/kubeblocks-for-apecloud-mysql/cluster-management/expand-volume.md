@@ -10,17 +10,17 @@ import TabItem from '@theme/TabItem';
 
 # Expand volume
 
-You can expand the storage volume size of each pod.
+This guide describes how to expand the storage volume size of each pod.
 
 :::note
 
-Volume expansion triggers pod restart, all pods restart in the order of learner -> follower -> leader and the leader pod may change after the operation.
+Volume expansion triggers pod restart. All pods restart in the order of learner -> follower -> leader and the pod roles may change.
 
 :::
 
 ## Before you start
 
-Check whether the cluster status is `Running`. Otherwise, the following operations may fail.
+Check whether the cluster status is `Running`. Otherwise, the following operation tasks may fail.
 
 <Tabs>
 
@@ -74,7 +74,7 @@ mycluster   demo        apecloud-mysql       Delete               Running   Jan 
    EOF
    ```
 
-2. Validate the volume expansion operation.
+2. Verify the volume expansion task.
 
    ```bash
    kubectl get ops -n demo
@@ -83,9 +83,9 @@ mycluster   demo        apecloud-mysql       Delete               Running   Jan 
    acmysql-volumeexpansion   VolumeExpansion   mycluster   Succeed   1/1        3m8s
    ```
 
-   If an error occurs, you can troubleshoot with `kubectl describe ops -n demo` command to view the events of this operation.
+   If an error occurs, you can troubleshoot it with `kubectl describe ops -n demo` command to view the events of this operation task.
 
-3. After the cluster status is `Running` again, check whether the corresponding cluster resources change.
+3. Check whether the cluster is running and whether the corresponding cluster resources change.
 
    ```bash
    kubectl describe cluster mycluster -n demo
@@ -97,7 +97,7 @@ mycluster   demo        apecloud-mysql       Delete               Running   Jan 
 
 1. Change the value of `spec.componentSpecs.volumeClaimTemplates.spec.resources` in the cluster YAML file.
 
-   `spec.componentSpecs.volumeClaimTemplates.spec.resources` is the storage resource information of the pod and changing this value triggers the volume expansion of a cluster.
+   `spec.componentSpecs.volumeClaimTemplates.spec.resources` is the storage resource information of a cluster and changing this value triggers the volume expansion of this cluster.
 
    ```bash
    kubectl edit cluster mycluster -n demo
@@ -121,14 +121,12 @@ mycluster   demo        apecloud-mysql       Delete               Running   Jan 
                  - ReadWriteOnce
                resources:
                  requests:
-                   storage: 30Gi  # Specify new size and make sure it is larger than the current size
+                   storage: 30Gi  # Specify a new size and make sure it is larger than the current size
    ```
 
-2. Check whether the corresponding cluster is running and whether resources change.
+2. Check whether the cluster is running and whether resources change.
 
    ```bash
-   kubectl get cluster mycluster -n demo
-
    kubectl describe cluster mycluster -n demo
    ```
 
@@ -136,7 +134,7 @@ mycluster   demo        apecloud-mysql       Delete               Running   Jan 
 
 <TabItem value="kbcli" label="kbcli">
 
-1. Change configuration.
+1. Change the cluster configuration.
 
    Configure the values of `--components`, `--volume-claim-templates`, and `--storage`, and run the command below to expand the volume.
 
@@ -148,7 +146,7 @@ mycluster   demo        apecloud-mysql       Delete               Running   Jan 
    - `--volume-claim-templates` describes the VolumeClaimTemplate names in components.
    - `--storage` describes the volume storage size.
 
-2. Validate the volume expansion operation.
+2. Choose one of the following options to verify the volume expansion task.
 
     - View the OpsRequest progress.
 
@@ -168,7 +166,7 @@ mycluster   demo        apecloud-mysql       Delete               Running   Jan 
       ```
 
       * STATUS=Updating: it means the volume expansion is in progress.
-      * STATUS=Running: it means the volume expansion operation has been applied.
+      * STATUS=Running: it means the volume expansion task has been applied.
 
 3. After the OpsRequest status is `Succeed` or the cluster status is `Running` again, check whether the corresponding resources change.
 

@@ -221,8 +221,8 @@ func updatePodRoleLabel(cli client.Client, reqCtx intctrlutil.RequestCtx,
 		delete(newPod.Labels, AccessModeLabelKey)
 	}
 
-	if pod.Annotations == nil {
-		pod.Annotations = map[string]string{}
+	if newPod.Annotations == nil {
+		newPod.Annotations = map[string]string{}
 	}
 	newPod.Annotations[constant.LastRoleSnapshotVersionAnnotationKey] = version
 	return cli.Update(ctx, newPod, inDataContext())

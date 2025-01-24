@@ -468,7 +468,7 @@ If you do not configure the BackupRepo information when installing KubeBlocks, y
 
    ```bash
    kbcli backuprepo create my-repo \
-     --provider gcs \
+     --provider gcs-s3comp \
      --region auto \
      --bucket  test-kb-backup \
      --access-key-id <ACCESS KEY> \

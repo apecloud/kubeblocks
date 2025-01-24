@@ -479,7 +479,7 @@ BackupRepo 是备份数据的存储仓库，支持配置 OSS（阿里云对象�
 
    ```bash
    kbcli backuprepo create my-repo \
-     --provider gcs \
+     --provider gcs-s3comp \
      --region auto \
      --bucket  test-kb-backup \
      --access-key-id <ACCESS KEY> \
@@ -603,7 +603,7 @@ BackupRepo 是备份数据的存储仓库，支持配置 OSS（阿里云对象�
 
 :::note
 
-* KubeBlocks 中，`storageProvider` 目前可选 `s3`、`cos`、`gcs-s3comp`、`obs`、`oss`、`s3-compatible`、`ftp`、`nfs`。
+* KubeBlocks 中，`storageProvider` 目前可选 `s3`、`cos`、`gcs-s3comp`、`obs`、`oss`、`minio`、`s3-compatible`、`ftp`、`nfs`。
 * 不同 `storageProvider` 所需的配置信息并不统一，上面展示的 `config` 和 `secrets` 适用于 S3。
 * 执行 `kubectl get storageproviders.dataprotection.kubeblocks.io` 命令可以查看支持的 `storageProvider`。
 

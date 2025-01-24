@@ -489,7 +489,7 @@ type ComponentDefinitionSpec struct {
 	// for the Component based on the specified policy rules.
 	// This ensures that the Pods in the Component has appropriate permissions to function.
 	//
-	// To prevent privilege escalation, only permissions already owned by Kubeblocks can be added here.
+	// To prevent privilege escalation, only permissions already owned by KubeBlocks can be added here.
 	//
 	// This field is immutable.
 	//

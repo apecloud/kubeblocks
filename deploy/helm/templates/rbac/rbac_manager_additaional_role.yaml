@@ -7,13 +7,19 @@ metadata:
   labels:
     {{- include "kubeblocks.labels" . | nindent 4 }}
 rules:
-# rabbitmq needs this
+# rabbitmq/patroni needs this
 - apiGroups:
   - ""
   resources:
   - endpoints
   verbs:
   - get
+  - patch
+  - update
+  - create
+  - list
+  - watch
+  - delete
 # user defined rules
 {{- with .Values.rbac.additionalPolicyRules }}
 {{ toYaml . }}

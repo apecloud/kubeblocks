@@ -446,14 +446,17 @@ If you do not configure the BackupRepo information when installing KubeBlocks, y
 
    </TabItem>
 
-   <TabItem value="PVC" label="PVC">
+   <TabItem value="S3-compatible" label="S3-compatible">
 
    ```bash
    kbcli backuprepo create my-repo \
-     --provider pvc \
-     --storage-class-name "nfs-storage" \
-     --access-mode "ReadWriteMany" \
-     --volume-capacity "100Gi" \
+     --provider s3-compatible \
+     --endpoint <endpoint> \
+     --bucket test-minio \
+     --access-key-id <ACCESS KEY> \
+     --secret-access-key <SECRET KEY> \
+     --access-method Tool \
+     --force-path-style=true \
      --default
    ```
 
@@ -499,9 +502,9 @@ If the BackupRepo status shows Failed or remains in PreChecking for a long time,
 
 To troubleshoot:
 
-* Verify whether configuration parameters, such as `endpoint`, `accessKeyId`, and `secretAccessKey`, are correctly specified.
-* For self-hosted object storage (e.g., Ceph Object Storage), try using `minio` as StorageProvider. The default `s3` StorageProvider uses a virtual hosting URL style, which some self-hosted storage may not support.
-* If you see an `InvalidLocationConstraint` error, leave the `region` parameter empty and try again.
+* Check whether configuration parameters, such as `endpoint`, `accessKeyId`, and `secretAccessKey`, are correctly specified.
+* For self-hosted object storage (e.g., Ceph Object Storage), try using `s3-compatible` as StorageProvider. The default `s3` StorageProvider uses a virtual hosting URL style, which some self-hosted storage may not support.
+* If an `InvalidLocationConstraint` error occurs, check whether its parameter is correctly configured. If this error persists, leave the `region` parameter empty and try again.
 * If the status remains in the `PreChecking` state, check your network connection. Ensure the storage service is accessible from within the Kubernetes cluster. You can test this by running a Pod and connecting to the storage service using the corresponding client.
 * KubeBlocks uses [rclone](https://rclone.org/) internally for data transfer. Check whether rclone can successfully access the storage service.
 
@@ -509,7 +512,7 @@ To troubleshoot:
 
 ### Automatic BackupRepo configuration
 
-You can specify the BackupRepo information in a YAML configuration file when installing KubeBlocks, and KubeBlocks will create the BackupRepo and automatically install the necessary CSI Driver based on the provided configuration.
+You can specify the BackupRepo information in a YAML configuration file when installing KubeBlocks, and KubeBlocks will create the BackupRepo accordingly.
 
 1. Prepare the configuration file.
 

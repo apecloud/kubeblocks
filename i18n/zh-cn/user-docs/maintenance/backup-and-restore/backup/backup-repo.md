@@ -218,25 +218,13 @@ BackupRepo 是备份数据的存储仓库，支持配置 OSS（阿里云对象�
 
    </TabItem>
 
-   <TabItem value="PVC" label="PVC">
-
-   ```bash
-   kbcli backuprepo create my-repo \
-     --provider pvc \
-     --storage-class-name "nfs-storage" \
-     --access-mode "ReadWriteMany" \
-     --volume-capacity "100Gi" \
-     --default
-   ```
-
-   </TabItem>
    </Tabs>
 
    以上命令创建了一个名为 `my-repo` 的默认备份仓库。
 
    * `my-repo` 为仓库名，可以留空不填，此时 kbcli 会使用形如 `backuprepo-xxxxx` 的随机名字。
    * `--default` 表示该仓库是默认仓库。全局只能有一个默认仓库，如果系统中存在多个默认仓库，KubeBlocks 无法选出应该使用哪个仓库（这个行为跟 K8s 的 default StorageClass 类似），会导致备份失败。使用 kbcli 创建 BackupRepo 能避免出现这种情况，因为 kbcli 在创建时会确保当前没有第二个默认仓库。
-   * `--provider` 参数对应后端存储类型，即 `storageProvider`，可选值为 `s3`、`cos`、`gcs-s3comp`、`obs`、`oss`、`minio`、`ftp`、`nfs`。不同存储所需的命令行参数不同，可以通过 `kbcli backuprepo create --provider STORAGE-PROVIDER-NAME -h` 命令查看参数信息（注意 `--provider` 参数是必需的）。
+   * `--provider` 参数对应后端存储类型，即 `storageProvider`，可选值为 `s3`、`cos`、`gcs-s3comp`、`obs`、`oss`、`s3-compatible`、`ftp`、`nfs`。不同存储所需的命令行参数不同，可以通过 `kbcli backuprepo create --provider STORAGE-PROVIDER-NAME -h` 命令查看参数信息（注意 `--provider` 参数是必需的）。
 
      `kbcli backuprepo create` 命令执行成功后，就会在系统中创建一个类型为 BackupRepo 的 K8s 资源，可以通过修改该资源的 annotation 来调整默认仓库。
 
@@ -491,6 +479,22 @@ BackupRepo 是备份数据的存储仓库，支持配置 OSS（阿里云对象�
 
       </TabItem>
 
+      <TabItem value="S3-compatible" label="S3-compatible">
+
+      ```bash
+      kbcli backuprepo create my-repo \
+        --provider s3-compatible \
+        --endpoint <endpoint> \
+       --bucket test-minio \
+       --access-key-id <ACCESS KEY> \
+       --secret-access-key <SECRET KEY> \
+       --access-method Tool \
+       --force-path-style=true \
+       --default
+      ```
+
+      </TabItem>
+
       </Tabs>
 
 3. 查看 BackupRepo 及其状态。 如果 STATUS 为 `Ready`，说明 BackupRepo 已经准备就绪。
@@ -510,8 +514,8 @@ BackupRepo 是备份数据的存储仓库，支持配置 OSS（阿里云对象�
 建议从以下方面进行排查：
 
 * 检查配置内容是否正确，如 `endpoint`，`accessKeyId` 和 `secretAccessKey` 等参数是否正确填写。
-* 对于其他自建的对象存储，如 Ceph Object Storage ，可尝试使用 `minio` StorageProvider。由于 `s3` StorageProvider 默认使用 virtual hosting 风格的 URL 访问服务端，自建对象存储很可能不支持这种访问方式。
-* 如提示 `InvalidLocationConstraint` 错误，`region` 参数可尝试留空不填。
+* 对于其他自建的对象存储，如 Ceph Object Storage ，可尝试使用 `s3-compatible` StorageProvider。由于 `s3` StorageProvider 默认使用 virtual hosting 风格的 URL 访问服务端，自建对象存储很可能不支持这种访问方式。
+* 如提示 `InvalidLocationConstraint` 错误，请先检查 `region` 参数是否正确填写。如果仍有 `InvalidLocationConstraint` 报错，可将尝试 `region` 参数留空不填。
 * 如果长时间处于 `PreChecking` 状态，很可能是网络问题。请确保在 K8s 集群内能正常访问存储服务，例如可运行一个 Pod，在 Pod 里面通过对应的客户端尝试连接存储服务。
 * KubeBlocks 内部使用 [rclone](https://rclone.org/) 传输数据，请确保能通过 rclone 正常访问当前所使用的存储服务。
 
@@ -519,7 +523,7 @@ BackupRepo 是备份数据的存储仓库，支持配置 OSS（阿里云对象�
 
 ### 自动配置 BackupRepo
 
-安装 KubeBlocks 时，可以通过配置文件指定 BackupRepo 相关信息，KubeBlocks 会根据配置信息创建 BackupRepo 并自动安装必要的 CSI Driver。
+安装 KubeBlocks 时，可以通过配置文件指定 BackupRepo 相关信息，KubeBlocks 会根据配置信息创建 BackupRepo。
 
 1. 准备配置文件。
 

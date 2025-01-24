@@ -28,22 +28,43 @@ KubeBlocks 的磁盘满锁功能确保了数据库的稳定性和可用性。该
 - 对于 PostgreSQL 和 MongoDB 数据库，当磁盘使用量达到 `highwatermark` 时，无论是读写用户还是超级用户都无法写入。
 - 组件级别的高水位的默认阈值为 `90`，当磁盘使用量达到 90% 时将锁定磁盘。而卷级别的设置为 `85`，会覆盖组件级别的阈值。
 
-在集群定义中，添加以下内容以启用磁盘满锁功能。你可以根据需要进行设置。
+1. 编辑数据库引擎的 ClusterDefinition Custom Resource（CR）。
 
-```yaml
-volumeProtectionSpec:
-  highWatermark: 90
-  volumes:
-  - highWatermark: 85
-    name: data
-```
+   本文档以 `mysql` 为例，可按需将 `mysql` 替换为 `postgresql` 或 `mongodb`。
 
-:::note
+   ```bash
+   kubectl edit clusterdefinition mysql
+   ```
 
-推荐将 `highWatermark` 设置为 90。
+2. 将 `volumeProtectionSpec` 字段添加至 `spec.componentDefs[]`，启用磁盘满锁功能。可根据需要设置 `highWatermark` 的值。
 
-:::
+   ```yaml
+   volumeProtectionSpec:
+     highWatermark: 90
+     volumes:
+     - highWatermark: 85
+       name: data
+   ```
+
+   :::note
+
+   推荐将 `highWatermark` 设置为 90。
+
+   :::
+
+3. 保存设置，并退出。
 
 ## 禁用磁盘满锁
 
-从 ClusterDefinition 文件中删除 `volumeProtectionSpec`。
+从 ClusterDefinition 文件中删除 `volumeProtectionSpec` 即可禁用磁盘满锁功能。
+
+1. 编辑数据库引擎的 ClusterDefinition CR。
+
+   本文档以 `mysql` 为例，可按需将 `mysql` 替换为 `postgresql` 或 `mongodb`。
+
+   ```bash
+   kubectl edit clusterdefinition mysql
+   ```
+
+2. 删除 `volumeProtectionSpec` 字段。
+3. 保存设置，并退出。

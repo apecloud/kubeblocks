@@ -150,6 +150,12 @@ kbcli 目前支持 macOS、Windows 和 Linux 系统。
     curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash
     ```
 
+    如果想安装 kbcli 的指定版本，在上述命令后面加上 `-s` 和你想安装的版本号。
+
+    ```bash
+    curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash -s x.y.z
+    ```
+
 2. 执行 `kbcli version` 命令，检查 `kbcli` 版本并确保已成功安装。
 
 :::note
@@ -160,6 +166,10 @@ kbcli 目前支持 macOS、Windows 和 Linux 系统。
 
 </TabItem>
 </Tabs>
+
+## 升级 kbcli
+
+升级 kbcli 仅需[卸载当前版本](./uninstall-kubeblocks-and-kbcli.md#卸载-kbcli)，并安装新版本。
 
 ## (可选) 启用 kbcli 的自动补全功能
 

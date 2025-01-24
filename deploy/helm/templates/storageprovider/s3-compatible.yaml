@@ -1,0 +1,92 @@
+apiVersion: dataprotection.kubeblocks.io/v1alpha1
+kind: StorageProvider
+metadata:
+  name: s3-compatible
+spec:
+  csiDriverName: ru.yandex.s3.csi
+  csiDriverSecretTemplate: |
+    accessKeyID: {{ `{{ index .Parameters "accessKeyId" }}` }}
+    secretAccessKey: {{ `{{ index .Parameters "secretAccessKey" }}` }}
+    endpoint: {{ `{{ index .Parameters "endpoint" }}` }}
+  storageClassTemplate: |
+    provisioner: ru.yandex.s3.csi
+    parameters:
+      mounter: geesefs
+      {{ `{{ $regionOption := "" }}` }}
+      {{ `{{ if .Parameters.region }}` }}
+        {{ `{{ $regionOption = (printf "--region %s" .Parameters.region) }}` }}
+      {{ `{{ end }}` }}
+      # you can set mount options here, for example limit memory cache size (recommended)
+      options: {{ `{{ printf "--memory-limit %s --read-ahead-large %s --dir-mode 0777 --file-mode 0666 %s %s" .Parameters.geesefsMemoryLimit .Parameters.geesefsReadAheadLarge .Parameters.mountOptions $regionOption }}` }}
+      bucket: {{ `{{ index .Parameters "bucket" }}` }}
+      csi.storage.k8s.io/provisioner-secret-name: {{ `{{ .CSIDriverSecretRef.Name }}` }}
+      csi.storage.k8s.io/provisioner-secret-namespace: {{ `{{ .CSIDriverSecretRef.Namespace }}` }}
+      csi.storage.k8s.io/controller-publish-secret-name: {{ `{{ .CSIDriverSecretRef.Name }}` }}
+      csi.storage.k8s.io/controller-publish-secret-namespace: {{ `{{ .CSIDriverSecretRef.Namespace }}` }}
+      csi.storage.k8s.io/node-stage-secret-name: {{ `{{ .CSIDriverSecretRef.Name }}` }}
+      csi.storage.k8s.io/node-stage-secret-namespace: {{ `{{ .CSIDriverSecretRef.Namespace }}` }}
+      csi.storage.k8s.io/node-publish-secret-name: {{ `{{ .CSIDriverSecretRef.Name }}` }}
+      csi.storage.k8s.io/node-publish-secret-namespace: {{ `{{ .CSIDriverSecretRef.Namespace }}` }}
+  datasafedConfigTemplate: |
+    [storage]
+    type = s3
+    provider = {{ `{{ index .Parameters "serviceProvider" | default "Other" }}` }}
+    env_auth = false
+    access_key_id = {{ `{{ index .Parameters "accessKeyId" }}` }}
+    secret_access_key = {{ `{{ index .Parameters "secretAccessKey" }}` }}
+    region = {{ `{{ index .Parameters "region" }}` }}
+    endpoint = {{ `{{ index .Parameters "endpoint" }}` }}
+    root = {{ `{{ index .Parameters "bucket" }}` }}
+    no_check_certificate = {{ `{{ index .Parameters "insecure" }}` }}
+    chunk_size = 50Mi
+    force_path_style = {{ `{{ index .Parameters "forcePathStyle" | default "false" }}` }}
+  parametersSchema:
+    openAPIV3Schema:
+      type: "object"
+      properties:
+        region:
+          type: string
+          description: "Storage region (optional), e.g. us-west-1"
+        bucket:
+          type: string
+          description: "Storage bucket"
+        endpoint:
+          type: string
+          description: "Storage endpoint"
+        mountOptions:
+          type: string
+          description: "Extra mount options for geesefs"
+        geesefsMemoryLimit:
+          type: integer
+          default: 512
+          description: "The value of --memory-limit parameter for geesefs, in MB"
+        geesefsReadAheadLarge:
+          type: integer
+          default: 20480
+          description: "The value of --read-ahead-large parameter for geesefs, in KB"
+        accessKeyId:
+          type: string
+          description: "Storage access key"
+        secretAccessKey:
+          type: string
+          description: "Storage secret key"
+        insecure:
+          type: boolean
+          default: false
+          description: "Do not verify the server SSL certificate"
+        serviceProvider:
+          type: string
+          default: "Other"
+          description: "Provider name supported by rclone (https://rclone.org/s3/#configuration), e.g. DigitalOcean"
+        forcePathStyle:
+          type: boolean
+          default: false
+          description: "Force path-style access"
+      required:
+        - bucket
+        - endpoint
+        - accessKeyId
+        - secretAccessKey
+    credentialFields:
+      - accessKeyId
+      - secretAccessKey

@@ -90,74 +90,6 @@ BackupRepo 是备份数据的存储仓库，支持配置 OSS（阿里云对象�
 
 不过，由于备份和恢复任务需要运行在数据库集群所在的 namespace 下，在 “Tool” 方式下，我们会自动将访问远端存储所需的密钥以 secret 资源的形式同步到这些 namespace 中，以供我们的数据传输工具使用。在多租户隔离的情况下，如果你认为这种同步 secret 的做法会带来安全隐患，可以选择使用 “Mount”。
 
-### 自动配置 BackupRepo
-
-安装 KubeBlocks 时，可以通过配置文件指定 BackupRepo 相关信息，KubeBlocks 会根据配置信息创建 BackupRepo 并自动安装必要的 CSI Driver。
-
-1. 准备配置文件。
-
-   以 AWS 的 S3 为例，配置文件 `backuprepo.yaml` 如下：
-
-    ```yaml
-    backupRepo:
-      create: true
-      storageProvider: s3
-      config:
-        region: cn-northwest-1
-        bucket: test-kb-backup
-      secrets:
-        accessKeyId: <ACCESS KEY>
-        secretAccessKey: <SECRET KEY>
-    ```
-
-    * `region` 表示 S3 所在区域。
-    * `bucket` 表示 S3 的桶名称。
-    * `accessKeyId` 表示 AWS 的 Access Key。
-    * `secretAccessKey` 表示 AWS 的 Secret Key。
-    * `storageProvider` 表示对象存储提供者，该示例中为 s3。
-
-:::note
-
-* 在 KubeBlocks v0.8.0 中，`storageProvider` 目前可选 `s3`、`cos`、`gcs-s3comp`、`obs`、`oss`、`minio`、`pvc`、`ftp`、`nfs`。
-* 不同 `storageProvider` 所需的配置信息并不统一，上面展示的 `config` 和 `secrets` 适用于 S3。
-* 执行 `kubectl get storageproviders.dataprotection.kubeblocks.io` 命令可以查看支持的 `storageProvider`。
-
-:::
-
-2. 安装 KubeBlocks 时指定配置文件。
-
-   <Tabs>
-
-   <TabItem value="kbcli" label="kbcli" default>
-
-   ```bash
-   kbcli kubeblocks install -f backuprepo.yaml
-   ```
-
-   安装完成后，可以执行命令查看 BackupRepo。
-
-   ```bash
-   kbcli backuprepo list
-   ```
-
-   </TabItem>
-
-   <TabItem value="kubectl" label="kubectl">
-
-   ```bash
-   kubectl create -f backuprepo.yaml
-   ```
-
-   安装完成后，可以执行命令查看 BackupRepo。
-
-   ```bash
-   kubectl get backuprepo
-   ```
-
-   </TabItem>
-
-   </Tabs>
-
 ### 手动配置 BackupRepo
 
 如果在安装 KubeBlocks 时没有配置 BackupRepo 信息，你可以按照以下说明进行手动配置。
@@ -564,3 +496,85 @@ BackupRepo 是备份数据的存储仓库，支持配置 OSS（阿里云对象�
 </TabItem>
 
 </Tabs>
+
+:::note
+
+如果 BackupRepo 状态显示 Failed，或者长时间处于 PreChecking 状态，可执行 `kubectl describe backuprepo my-repo` 或 `kbcli backuprepo describe my-repo` 命令，根据 `status.conditions` 中的信息，查找异常原因。
+
+建议从以下方面进行排查：
+
+* 检查配置内容是否正确，如 `endpoint`，`accessKeyId` 和 `secretAccessKey` 等参数是否正确填写。
+* 对于其他自建的对象存储，如 Ceph Object Storage ，可尝试使用 `minio` StorageProvider。由于 `s3` StorageProvider 默认使用 virtual hosting 风格的 URL 访问服务端，自建对象存储很可能不支持这种访问方式。
+* 如提示 `InvalidLocationConstraint` 错误，`region` 参数可尝试留空不填。
+* 如果长时间处于 `PreChecking` 状态，很可能是网络问题。请确保在 K8s 集群内能正常访问存储服务，例如可运行一个 Pod，在 Pod 里面通过对应的客户端尝试连接存储服务。
+* KubeBlocks 内部使用 [rclone](https://rclone.org/) 传输数据，请确保能通过 rclone 正常访问当前所使用的存储服务。
+
+:::
+
+### 自动配置 BackupRepo
+
+安装 KubeBlocks 时，可以通过配置文件指定 BackupRepo 相关信息，KubeBlocks 会根据配置信息创建 BackupRepo 并自动安装必要的 CSI Driver。
+
+1. 准备配置文件。
+
+   以 AWS 的 S3 为例，配置文件 `backuprepo.yaml` 如下：
+
+    ```yaml
+    backupRepo:
+      create: true
+      storageProvider: s3
+      config:
+        region: cn-northwest-1
+        bucket: test-kb-backup
+      secrets:
+        accessKeyId: <ACCESS KEY>
+        secretAccessKey: <SECRET KEY>
+    ```
+
+    * `region` 表示 S3 所在区域。
+    * `bucket` 表示 S3 的桶名称。
+    * `accessKeyId` 表示 AWS 的 Access Key。
+    * `secretAccessKey` 表示 AWS 的 Secret Key。
+    * `storageProvider` 表示对象存储提供者，该示例中为 s3。
+
+:::note
+
+* 在 KubeBlocks v0.8.0 中，`storageProvider` 目前可选 `s3`、`cos`、`gcs-s3comp`、`obs`、`oss`、`minio`、`pvc`、`ftp`、`nfs`。
+* 不同 `storageProvider` 所需的配置信息并不统一，上面展示的 `config` 和 `secrets` 适用于 S3。
+* 执行 `kubectl get storageproviders.dataprotection.kubeblocks.io` 命令可以查看支持的 `storageProvider`。
+
+:::
+
+2. 安装 KubeBlocks 时指定配置文件。
+
+   <Tabs>
+
+   <TabItem value="kbcli" label="kbcli" default>
+
+   ```bash
+   kbcli kubeblocks install -f backuprepo.yaml
+   ```
+
+   安装完成后，可以执行命令查看 BackupRepo。
+
+   ```bash
+   kbcli backuprepo list
+   ```
+
+   </TabItem>
+
+   <TabItem value="kubectl" label="kubectl">
+
+   ```bash
+   kubectl create -f backuprepo.yaml
+   ```
+
+   安装完成后，可以执行命令查看 BackupRepo。
+
+   ```bash
+   kubectl get backuprepo
+   ```
+
+   </TabItem>
+
+   </Tabs>

@@ -519,7 +519,7 @@ BackupRepo 是备份数据的存储仓库，支持配置 OSS（阿里云对象�
 
 * 检查配置内容是否正确，如 `endpoint`，`accessKeyId` 和 `secretAccessKey` 等参数是否正确填写。
 * 对于其他自建的对象存储，如 Ceph Object Storage ，可尝试使用 `minio` StorageProvider。由于 `s3` StorageProvider 默认使用 virtual hosting 风格的 URL 访问服务端，自建对象存储很可能不支持这种访问方式。
-* 如提示 `InvalidLocationConstraint` 错误，请先检查 `region` 参数是否正确填写。如果仍有 `InvalidLocationConstraint` 报错，可将尝试 `region` 参数留空不填。
+* 如提示 `InvalidLocationConstraint` 错误，请先检查 `region` 参数是否正确填写。如果仍有 `InvalidLocationConstraint` 报错，可尝试将 `region` 参数留空不填。
 * 如果长时间处于 `PreChecking` 状态，很可能是网络问题。请确保在 K8s 集群内能正常访问存储服务，例如可运行一个 Pod，在 Pod 里面通过对应的客户端尝试连接存储服务。
 * KubeBlocks 内部使用 [rclone](https://rclone.org/) 传输数据，请确保能通过 rclone 正常访问当前所使用的存储服务。
 

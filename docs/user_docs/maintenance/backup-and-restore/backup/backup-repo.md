@@ -11,7 +11,7 @@ import TabItem from '@theme/TabItem';
 
 # Introduction
 
-BackupRepo is the storage repository for backup data. Currently, KubeBlocks supports configuring various object storage services as backup repositories, including OSS (Alibaba Cloud Object Storage Service), S3 (Amazon Simple Storage Service), COS (Tencent Cloud Object Storage), GCS (Google Cloud Storage), OBS (Huawei Cloud Object Storage), MinIO, and other S3-compatible services. Additionally, it also supports using Kubernetes-native PVCs as backup repositories.
+BackupRepo is the storage repository for backup data. Currently, KubeBlocks supports configuring various object storage services as backup repositories, including OSS (Alibaba Cloud Object Storage Service), S3 (Amazon Simple Storage Service), COS (Tencent Cloud Object Storage), GCS (Google Cloud Storage), OBS (Huawei Cloud Object Storage), MinIO, and other S3-compatible services.
 
 You can create multiple BackupRepos to suit different scenarios. For example, based on different businesses, the data of business A is stored in repository A, and the data of business B is stored in repository B. Or you can configure multiple repositories by region to realize geo-disaster recovery. But it is required to specify backup repositories when you create a backup. You can also create a default backup repository and KubeBlocks uses this default repository to store backup data if no specific repository is specified.
 
@@ -420,7 +420,7 @@ If you do not configure the BackupRepo information when installing KubeBlocks, y
    ```bash
    # The current GCS is the S3-compatible version provided by Google Cloud
    kbcli backuprepo create my-repo \
-     --provider gcs \
+     --provider gcs-s3comp \
      --region auto \
      --bucket  test-kb-backup \
      --access-key-id <ACCESS KEY> \

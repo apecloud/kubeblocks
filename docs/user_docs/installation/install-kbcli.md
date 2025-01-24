@@ -148,7 +148,7 @@ Install kbcli using the `curl` command.
    curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash
    ```
 
-   To install a specified version of kbcli, use `-v` after the command and describe the version you want to install.
+   To install a specified version of kbcli, use `-s` after the command and describe the version you want to install.
 
    ```bash
    curl -fsSL https://kubeblocks.io/installer/install_cli.sh | bash -s x.y.z

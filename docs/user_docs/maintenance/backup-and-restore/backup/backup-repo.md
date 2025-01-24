@@ -320,6 +320,40 @@ If you do not configure the BackupRepo information when installing KubeBlocks, y
 
    </TabItem>
 
+   <TabItem value="S3-compatible" label="S3-compatible">
+
+   ```bash
+   # Create a secret to save the access key for the S3 compatible storage
+   kubectl create secret generic s3-comp-credential-for-backuprepo \
+     -n kb-system \
+     --from-literal=accessKeyId=<ACCESS KEY> \
+     --from-literal=secretAccessKey=<SECRET KEY>
+   
+   # Create the BackupRepo resource
+   kubectl apply -f - <<-'EOF'
+   apiVersion: dataprotection.kubeblocks.io/v1alpha1
+   kind: BackupRepo
+   metadata:
+     name: my-repo
+     annotations:
+       dataprotection.kubeblocks.io/is-default-repo: "true"
+   spec:
+     storageProviderRef: s3-compatible
+     accessMethod: Tool
+     pvReclaimPolicy: Retain
+     volumeCapacity: 100Gi
+     config:
+       bucket: test-kb-backup
+       endpoint: <endpoint>
+       forcePathStyle: true
+     credential:
+       name: s3-comp-credential-for-backuprepo
+       namespace: kb-system
+   EOF
+   ```
+
+   </TabItem>
+
    </Tabs>
 
 3. View the BackupRepo and its status. If the status is `Ready`, the BackupRepo is ready.

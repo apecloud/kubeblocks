@@ -33,8 +33,7 @@ If you don't have an object storage service from a cloud provider, you can deplo
 1. Install MinIO in the `kb-system` namespace.
 
    ```bash
-   helm repo add kubeblocks-apps https://jihulab.com/api/v4/projects/152630/packages/helm/stable
-   helm install minio kubeblocks-apps/minio --namespace kb-system --create-namespace --set "extraEnvVars[0].name=MINIO_BROWSER_LOGIN_ANIMATION" --set "extraEnvVars[0].value=off"
+   helm install minio oci://registry-1.docker.io/bitnamicharts/minio --namespace kb-system --create-namespace --set "extraEnvVars[0].name=MINIO_BROWSER_LOGIN_ANIMATION" --set "extraEnvVars[0].value=off"
    ```
 
    Get the initial username and password:
@@ -536,13 +535,13 @@ You can specify the BackupRepo information in a YAML configuration file when ins
 
 :::note
 
-* For KubeBlocks v0.8.0, the available `storageProvider` options are `s3`, `cos`, `gcs-s3comp`, `obs`, `oss`, `minio`, `pvc`, `ftp`, and `nfs`.
+* In KubeBlocks, the available `storageProvider` options are `s3`, `cos`, `gcs-s3comp`, `obs`, `oss`, `s3-compatible`, `pvc`, `ftp`, and `nfs`.
 * For different `storageProvider`, the configuration may differ. `config` and `secrets` in the above example are applied to S3.
 * Execute the command `kubectl get storageproviders.dataprotection.kubeblocks.io` to view the supported `storageProvider` options.
 
 :::
 
-2. Specify the configuration file when installing KubeBlocks.
+1. Specify the configuration file when installing KubeBlocks.
 
    <Tabs>
 

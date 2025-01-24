@@ -35,6 +35,12 @@ BackupRepo 是备份数据的存储仓库，支持配置 OSS（阿里云对象�
 1. 在 `kb-system` 命名空间中安装 MinIO。
 
    ```bash
+   helm install minio oci://registry-1.docker.io/bitnamicharts/minio --namespace kb-system --create-namespace --set "extraEnvVars[0].name=MINIO_BROWSER_LOGIN_ANIMATION" --set "extraEnvVars[0].value=off"
+   ```
+
+   如果上述仓库地址网络无法连接，可使用以下命令安装。
+
+   ```bash
    helm repo add kubeblocks-apps https://jihulab.com/api/v4/projects/152630/packages/helm/stable
    helm install minio kubeblocks-apps/minio --namespace kb-system --create-namespace --set "extraEnvVars[0].name=MINIO_BROWSER_LOGIN_ANIMATION" --set "extraEnvVars[0].value=off"
    ```
@@ -539,13 +545,13 @@ BackupRepo 是备份数据的存储仓库，支持配置 OSS（阿里云对象�
 
 :::note
 
-* 在 KubeBlocks v0.8.0 中，`storageProvider` 目前可选 `s3`、`cos`、`gcs-s3comp`、`obs`、`oss`、`minio`、`pvc`、`ftp`、`nfs`。
+* KubeBlocks 中，`storageProvider` 目前可选值为 `s3`、`cos`、`gcs-s3comp`、`obs`、`oss`、`s3-compatible`、`ftp`、`nfs`。
 * 不同 `storageProvider` 所需的配置信息并不统一，上面展示的 `config` 和 `secrets` 适用于 S3。
 * 执行 `kubectl get storageproviders.dataprotection.kubeblocks.io` 命令可以查看支持的 `storageProvider`。
 
 :::
 
-2. 安装 KubeBlocks 时指定配置文件。
+1. 安装 KubeBlocks 时指定配置文件。
 
    <Tabs>
 

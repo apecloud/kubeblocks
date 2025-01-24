@@ -35,11 +35,17 @@ BackupRepo 是备份数据的存储仓库，支持配置 OSS（阿里云对象�
 1. 在 `kb-system` 命名空间中安装 MinIO。
 
    ```bash
+   helm install minio oci://registry-1.docker.io/bitnamicharts/minio --namespace kb-system --create-namespace --set "extraEnvVars[0].name=MINIO_BROWSER_LOGIN_ANIMATION" --set "extraEnvVars[0].value=off"
+   ```
+
+   如果上述仓库地址网络无法连接，可使用以下命令安装。
+
+   ```bash
    helm repo add kubeblocks-apps https://jihulab.com/api/v4/projects/152630/packages/helm/stable
    helm install minio kubeblocks-apps/minio --namespace kb-system --create-namespace --set "extraEnvVars[0].name=MINIO_BROWSER_LOGIN_ANIMATION" --set "extraEnvVars[0].value=off"
    ```
 
-   获取初始的用户名和密码：
+2. 获取初始的用户名和密码.
 
    ```bash
    # 初始 username
@@ -49,7 +55,7 @@ BackupRepo 是备份数据的存储仓库，支持配置 OSS（阿里云对象�
    echo $(kubectl get secret --namespace kb-system minio -o jsonpath="{.data.root-password}" | base64 -d)
    ```
 
-2. 生成连接凭证。
+3. 生成连接凭证。
 
    执行 `kubectl port-forward --namespace kb-system svc/minio 9001:9001`，然后访问 `127.0.0.1:9001` 进入登录页面。
 
@@ -57,7 +63,7 @@ BackupRepo 是备份数据的存储仓库，支持配置 OSS（阿里云对象�
 
    ![backup-and-restore-backup-repo-1](./../../../../img/backup-and-restore-backup-repo-1.png)
 
-3. 创建 bucket。
+4. 创建 bucket。
 
    在 MinIO 仪表盘上创建一个名为 `test-minio` 的存储桶。
 
@@ -539,13 +545,13 @@ BackupRepo 是备份数据的存储仓库，支持配置 OSS（阿里云对象�
 
 :::note
 
-* 在 KubeBlocks v0.8.0 中，`storageProvider` 目前可选 `s3`、`cos`、`gcs-s3comp`、`obs`、`oss`、`minio`、`pvc`、`ftp`、`nfs`。
+* KubeBlocks 中，`storageProvider` 目前可选 `s3`、`cos`、`gcs-s3comp`、`obs`、`oss`、`s3-compatible`、`pvc`、`ftp`、`nfs`。
 * 不同 `storageProvider` 所需的配置信息并不统一，上面展示的 `config` 和 `secrets` 适用于 S3。
 * 执行 `kubectl get storageproviders.dataprotection.kubeblocks.io` 命令可以查看支持的 `storageProvider`。
 
 :::
 
-2. 安装 KubeBlocks 时指定配置文件。
+1. 安装 KubeBlocks 时指定配置文件。
 
    <Tabs>
 

@@ -374,7 +374,7 @@ type ComponentSystemAccount struct {
 	// This field is immutable once set.
 	//
 	// +optional
-	SecretRef *SystemAccountSecretReference `json:"secretRef,omitempty"`
+	SecretRef *ProvisionSecretRef `json:"secretRef,omitempty"`
 }
 
 // PasswordConfig helps provide to customize complexity of password generation pattern.
@@ -433,9 +433,17 @@ const (
 	MixedCases LetterCase = "MixedCases"
 )
 
-// SystemAccountSecretReference represents the reference to a secret.
-type SystemAccountSecretReference struct {
-	corev1.SecretReference `json:",inline"`
+// ProvisionSecretRef represents the reference to a secret.
+type ProvisionSecretRef struct {
+	// The unique identifier of the secret.
+	//
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// The namespace where the secret is located.
+	//
+	// +kubebuilder:validation:Required
+	Namespace string `json:"namespace"`
 
 	// The key in the secret data that contains the password.
 	//

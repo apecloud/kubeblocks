@@ -202,7 +202,7 @@ func (factory *MockClusterFactory) AddComponentService(serviceName string, servi
 	})
 }
 
-func (factory *MockClusterFactory) AddSystemAccount(name string, disabled bool, passwordConfig *appsv1.PasswordConfig, secretRef *appsv1.SystemAccountSecretReference) *MockClusterFactory {
+func (factory *MockClusterFactory) AddSystemAccount(name string, disabled bool, passwordConfig *appsv1.PasswordConfig, secretRef *appsv1.ProvisionSecretRef) *MockClusterFactory {
 	return factory.lastComponentRef(func(comp *appsv1.ClusterComponentSpec) {
 		comp.SystemAccounts = append(comp.SystemAccounts,
 			appsv1.ComponentSystemAccount{

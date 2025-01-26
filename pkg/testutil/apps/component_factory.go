@@ -80,7 +80,7 @@ func (factory *MockComponentFactory) AddVolumeClaimTemplate(volumeName string,
 	return factory
 }
 
-func (factory *MockComponentFactory) AddSystemAccount(name string, disabled *bool, passwordConfig *appsv1.PasswordConfig, secretRef *appsv1.SystemAccountSecretReference) *MockComponentFactory {
+func (factory *MockComponentFactory) AddSystemAccount(name string, disabled *bool, passwordConfig *appsv1.PasswordConfig, secretRef *appsv1.ProvisionSecretRef) *MockComponentFactory {
 	if factory.Get().Spec.SystemAccounts == nil {
 		factory.Get().Spec.SystemAccounts = make([]appsv1.ComponentSystemAccount, 0)
 	}

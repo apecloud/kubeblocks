@@ -5570,20 +5570,20 @@ spec:
                         This field is immutable once set.
                       properties:
                         name:
-                          description: name is unique within a namespace to reference
-                            a secret resource.
+                          description: The unique identifier of the secret.
                           type: string
                         namespace:
-                          description: namespace defines the space within which the
-                            secret name must be unique.
+                          description: The namespace where the secret is located.
                           type: string
                         password:
                           default: password
                           description: The key in the secret data that contains the
                             password.
                           type: string
+                      required:
+                      - name
+                      - namespace
                       type: object
-                      x-kubernetes-map-type: atomic
                   required:
                   - name
                   type: object

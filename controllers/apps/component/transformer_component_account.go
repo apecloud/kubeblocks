@@ -292,7 +292,7 @@ func verifySystemAccountPassword(secret *corev1.Secret, hashedPassword []byte) b
 type synthesizedSystemAccount struct {
 	appsv1.SystemAccount
 	disabled  *bool
-	secretRef *appsv1.SystemAccountSecretReference
+	secretRef *appsv1.ProvisionSecretRef
 }
 
 func synthesizeSystemAccounts(compDefAccounts []appsv1.SystemAccount,

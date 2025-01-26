@@ -1339,9 +1339,9 @@ var _ = Describe("Component Controller", func() {
 				constant.AccountPasswdForSecret: "sysaccount",
 			},
 		}
-		secretRef := func() *kbappsv1.SystemAccountSecretReference {
+		secretRef := func() *kbappsv1.ProvisionSecretRef {
 			Expect(testCtx.CreateObj(testCtx.Ctx, &secret)).Should(Succeed())
-			return &kbappsv1.SystemAccountSecretReference{
+			return &kbappsv1.ProvisionSecretRef{
 				SecretReference: corev1.SecretReference{
 					Namespace: testCtx.DefaultNamespace,
 					Name:      secret.Name,
@@ -1412,9 +1412,9 @@ var _ = Describe("Component Controller", func() {
 				constant.AccountPasswdForSecret: "sysaccount-override",
 			},
 		}
-		secretRef := func() *kbappsv1.SystemAccountSecretReference {
+		secretRef := func() *kbappsv1.ProvisionSecretRef {
 			Expect(testCtx.CreateObj(testCtx.Ctx, &secret)).Should(Succeed())
-			return &kbappsv1.SystemAccountSecretReference{
+			return &kbappsv1.ProvisionSecretRef{
 				SecretReference: corev1.SecretReference{
 					Namespace: testCtx.DefaultNamespace,
 					Name:      secret.Name,
@@ -1528,9 +1528,9 @@ var _ = Describe("Component Controller", func() {
 				"sysaccount-update": "sysaccount-update",
 			},
 		}
-		secretRef := func() *kbappsv1.SystemAccountSecretReference {
+		secretRef := func() *kbappsv1.ProvisionSecretRef {
 			Expect(testCtx.CreateObj(testCtx.Ctx, &secret)).Should(Succeed())
-			return &kbappsv1.SystemAccountSecretReference{
+			return &kbappsv1.ProvisionSecretRef{
 				SecretReference: corev1.SecretReference{
 					Namespace: testCtx.DefaultNamespace,
 					Name:      secret.Name,

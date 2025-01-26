@@ -1166,12 +1166,7 @@ var _ = Describe("Component Controller", func() {
 			Name: tls.VolumeName,
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
-					SecretName: secretKey.Name,
-					Items: []corev1.KeyToPath{
-						{Key: *tls.CAFile, Path: *tls.CAFile},
-						{Key: *tls.CertFile, Path: *tls.CertFile},
-						{Key: *tls.KeyFile, Path: *tls.KeyFile},
-					},
+					SecretName:  secretKey.Name,
 					Optional:    ptr.To(false),
 					DefaultMode: tls.DefaultMode,
 				},

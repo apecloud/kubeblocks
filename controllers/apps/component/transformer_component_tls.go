@@ -46,9 +46,7 @@ type tlsIssuer interface {
 }
 
 // componentTLSTransformer handles the TLS configuration for the component.
-type componentTLSTransformer struct {
-	client.Client
-}
+type componentTLSTransformer struct{}
 
 var _ graph.Transformer = &componentTLSTransformer{}
 
@@ -83,10 +81,7 @@ func (t *componentTLSTransformer) Transform(ctx graph.TransformContext, dag *gra
 		return t.updateVolumeNVolumeMount(compDef, synthesizedComp)
 	} else {
 		// the issuer and secretObj may be nil
-		if err = t.handleDelete(transCtx.Context, transCtx.Client, dag, issuer, secretObj); err != nil {
-			return err
-		}
-		return t.removeVolumeNVolumeMount(compDef, synthesizedComp)
+		return t.handleDelete(transCtx.Context, transCtx.Client, dag, issuer, secretObj)
 	}
 }
 
@@ -331,89 +326,21 @@ func (t *componentTLSTransformer) updateVolumeNVolumeMount(compDef *appsv1.Compo
 
 func (t *componentTLSTransformer) composeTLSVolume(compDef *appsv1.ComponentDefinition,
 	synthesizedComp *component.SynthesizedComponent) (*corev1.Volume, error) {
-	var secretName string
-	var ca, cert, key *string
-
-	tls := synthesizedComp.TLSConfig
-	switch tls.Issuer.Name {
-	case appsv1.IssuerKubeBlocks:
-		secretName = tlsSecretName(synthesizedComp.ClusterName, synthesizedComp.Name)
-		ca = compDef.Spec.TLS.CAFile
-		cert = compDef.Spec.TLS.CertFile
-		key = compDef.Spec.TLS.KeyFile
-	case appsv1.IssuerUserProvided:
-		secretName = tls.Issuer.SecretRef.Name
-		if len(tls.Issuer.SecretRef.CA) > 0 {
-			ca = &tls.Issuer.SecretRef.CA
-		}
-		if len(tls.Issuer.SecretRef.Cert) > 0 {
-			cert = &tls.Issuer.SecretRef.Cert
-		}
-		if len(tls.Issuer.SecretRef.Key) > 0 {
-			key = &tls.Issuer.SecretRef.Key
-		}
-	}
-
 	volume := corev1.Volume{
 		Name: compDef.Spec.TLS.VolumeName,
 		VolumeSource: corev1.VolumeSource{
 			Secret: &corev1.SecretVolumeSource{
-				SecretName: secretName,
-				Items:      []corev1.KeyToPath{},
+				SecretName: tlsSecretName(synthesizedComp.ClusterName, synthesizedComp.Name),
 				Optional:   ptr.To(false),
 			},
 		},
 	}
-
-	addItem := func(source, target *string) error {
-		if target != nil && source == nil {
-			return fmt.Errorf("%s is required but not provided", *target)
-		}
-		if target != nil && source != nil {
-			volume.VolumeSource.Secret.Items =
-				append(volume.VolumeSource.Secret.Items, corev1.KeyToPath{Key: *source, Path: *target})
-		}
-		return nil
-	}
-	if err := addItem(ca, compDef.Spec.TLS.CAFile); err != nil {
-		return nil, err
-	}
-	if err := addItem(cert, compDef.Spec.TLS.CertFile); err != nil {
-		return nil, err
-	}
-	if err := addItem(key, compDef.Spec.TLS.KeyFile); err != nil {
-		return nil, err
-	}
-
 	if compDef.Spec.TLS.DefaultMode != nil {
 		volume.VolumeSource.Secret.DefaultMode = ptr.To(*compDef.Spec.TLS.DefaultMode)
 	} else {
 		volume.VolumeSource.Secret.DefaultMode = ptr.To(int32(0600))
 	}
-
 	return &volume, nil
-}
-
-func (t *componentTLSTransformer) removeVolumeNVolumeMount(compDef *appsv1.ComponentDefinition,
-	synthesizedComp *component.SynthesizedComponent) error {
-	if compDef.Spec.TLS == nil || len(compDef.Spec.TLS.VolumeName) == 0 {
-		return nil
-	}
-
-	// remove the volume
-	synthesizedComp.PodSpec.Volumes = slices.DeleteFunc(synthesizedComp.PodSpec.Volumes, func(vol corev1.Volume) bool {
-		return vol.Name == compDef.Spec.TLS.VolumeName
-	})
-
-	// remove the volume mount
-	for i := range synthesizedComp.PodSpec.Containers {
-		synthesizedComp.PodSpec.Containers[i].VolumeMounts =
-			slices.DeleteFunc(synthesizedComp.PodSpec.Containers[i].VolumeMounts, func(m corev1.VolumeMount) bool {
-				return m.Name == compDef.Spec.TLS.VolumeName
-			})
-	}
-
-	return nil
 }
 
 func tlsSecretName(clusterName, compName string) string {

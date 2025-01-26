@@ -1342,10 +1342,8 @@ var _ = Describe("Component Controller", func() {
 		secretRef := func() *kbappsv1.ProvisionSecretRef {
 			Expect(testCtx.CreateObj(testCtx.Ctx, &secret)).Should(Succeed())
 			return &kbappsv1.ProvisionSecretRef{
-				SecretReference: corev1.SecretReference{
-					Namespace: testCtx.DefaultNamespace,
-					Name:      secret.Name,
-				},
+				Name:      secret.Name,
+				Namespace: testCtx.DefaultNamespace,
 			}
 		}
 
@@ -1415,10 +1413,8 @@ var _ = Describe("Component Controller", func() {
 		secretRef := func() *kbappsv1.ProvisionSecretRef {
 			Expect(testCtx.CreateObj(testCtx.Ctx, &secret)).Should(Succeed())
 			return &kbappsv1.ProvisionSecretRef{
-				SecretReference: corev1.SecretReference{
-					Namespace: testCtx.DefaultNamespace,
-					Name:      secret.Name,
-				},
+				Name:      secret.Name,
+				Namespace: testCtx.DefaultNamespace,
 			}
 		}
 
@@ -1531,11 +1527,9 @@ var _ = Describe("Component Controller", func() {
 		secretRef := func() *kbappsv1.ProvisionSecretRef {
 			Expect(testCtx.CreateObj(testCtx.Ctx, &secret)).Should(Succeed())
 			return &kbappsv1.ProvisionSecretRef{
-				SecretReference: corev1.SecretReference{
-					Namespace: testCtx.DefaultNamespace,
-					Name:      secret.Name,
-				},
-				Password: "sysaccount-update",
+				Name:      secret.Name,
+				Namespace: testCtx.DefaultNamespace,
+				Password:  "sysaccount-update",
 			}
 		}
 

@@ -577,7 +577,7 @@ type Issuer struct {
 	// It is required when the issuer is set to `UserProvided`.
 	//
 	// +optional
-	SecretRef *TLSSecretReference `json:"secretRef,omitempty"`
+	SecretRef *TLSSecretRef `json:"secretRef,omitempty"`
 }
 
 // IssuerName defines the name of the TLS certificates issuer.
@@ -593,9 +593,17 @@ const (
 	IssuerUserProvided IssuerName = "UserProvided"
 )
 
-// TLSSecretReference defines the Secret that contains TLS certs.
-type TLSSecretReference struct {
-	corev1.SecretReference `json:",inline"`
+// TLSSecretRef defines the Secret that contains TLS certs.
+type TLSSecretRef struct {
+	// The namespace where the secret is located.
+	// If not provided, the secret is assumed to be in the same namespace as the Cluster object.
+	//
+	// +optional
+	Namespace string `json:"namespace"`
+
+	// Name of the Secret that contains user-provided certificates.
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
 
 	// Key of CA cert in Secret
 	// +kubebuilder:validation:Required

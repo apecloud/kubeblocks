@@ -8064,8 +8064,8 @@ for TLS communication.</li>
 <td>
 <code>secretRef</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.TLSSecretReference">
-TLSSecretReference
+<a href="#apps.kubeblocks.io/v1.TLSSecretRef">
+TLSSecretRef
 </a>
 </em>
 </td>
@@ -11544,13 +11544,13 @@ Required when TLS is enabled.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1.TLSSecretReference">TLSSecretReference
+<h3 id="apps.kubeblocks.io/v1.TLSSecretRef">TLSSecretRef
 </h3>
 <p>
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.Issuer">Issuer</a>)
 </p>
 <div>
-<p>TLSSecretReference defines the Secret that contains TLS certs.</p>
+<p>TLSSecretRef defines the Secret that contains TLS certs.</p>
 </div>
 <table>
 <thead>
@@ -11562,17 +11562,26 @@ Required when TLS is enabled.</p>
 <tbody>
 <tr>
 <td>
-<code>SecretReference</code><br/>
+<code>namespace</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#secretreference-v1-core">
-Kubernetes core/v1.SecretReference
-</a>
+string
 </em>
 </td>
 <td>
-<p>
-(Members of <code>SecretReference</code> are embedded into this type.)
-</p>
+<em>(Optional)</em>
+<p>The namespace where the secret is located.
+If not provided, the secret is assumed to be in the same namespace as the Cluster object.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Name of the Secret that contains user-provided certificates.</p>
 </td>
 </tr>
 <tr>

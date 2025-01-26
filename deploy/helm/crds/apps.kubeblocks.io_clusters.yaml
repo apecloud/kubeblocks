@@ -3779,19 +3779,20 @@ spec:
                               description: Key of TLS private key in Secret
                               type: string
                             name:
-                              description: name is unique within a namespace to reference
-                                a secret resource.
+                              description: Name of the Secret that contains user-provided
+                                certificates.
                               type: string
                             namespace:
-                              description: namespace defines the space within which
-                                the secret name must be unique.
+                              description: |-
+                                The namespace where the secret is located.
+                                If not provided, the secret is assumed to be in the same namespace as the Cluster object.
                               type: string
                           required:
                           - ca
                           - cert
                           - key
+                          - name
                           type: object
-                          x-kubernetes-map-type: atomic
                       required:
                       - name
                       type: object
@@ -12531,19 +12532,20 @@ spec:
                                   description: Key of TLS private key in Secret
                                   type: string
                                 name:
-                                  description: name is unique within a namespace to
-                                    reference a secret resource.
+                                  description: Name of the Secret that contains user-provided
+                                    certificates.
                                   type: string
                                 namespace:
-                                  description: namespace defines the space within
-                                    which the secret name must be unique.
+                                  description: |-
+                                    The namespace where the secret is located.
+                                    If not provided, the secret is assumed to be in the same namespace as the Cluster object.
                                   type: string
                               required:
                               - ca
                               - cert
                               - key
+                              - name
                               type: object
-                              x-kubernetes-map-type: atomic
                           required:
                           - name
                           type: object

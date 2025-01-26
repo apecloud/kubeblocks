@@ -287,6 +287,11 @@ type ClusterComponentSpec struct {
 	// +optional
 	ServiceVersion string `json:"serviceVersion,omitempty"`
 
+	// Forces to use the specified service version, ignoring any version constraints.
+	//
+	// +optional
+	ForceServiceVersion *bool `json:"forceServiceVersion,omitempty"`
+
 	// Defines a list of ServiceRef for a Component, enabling access to both external services and
 	// Services provided by other Clusters.
 	//

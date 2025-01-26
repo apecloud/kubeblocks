@@ -3782,6 +3782,11 @@ spec:
                               description: Name of the Secret that contains user-provided
                                 certificates.
                               type: string
+                            namespace:
+                              description: |-
+                                The namespace where the secret is located.
+                                If not provided, the secret is assumed to be in the same namespace as the Cluster object.
+                              type: string
                           required:
                           - ca
                           - cert
@@ -12529,6 +12534,11 @@ spec:
                                 name:
                                   description: Name of the Secret that contains user-provided
                                     certificates.
+                                  type: string
+                                namespace:
+                                  description: |-
+                                    The namespace where the secret is located.
+                                    If not provided, the secret is assumed to be in the same namespace as the Cluster object.
                                   type: string
                               required:
                               - ca

@@ -90,6 +90,10 @@ spec:
               backup:
                 description: Specifies the backup configuration of the Cluster.
                 properties:
+                  continuousMethod:
+                    description: Specifies the backup method to use, if not set, use
+                      the first continuous method.
+                    type: string
                   cronExpression:
                     description: The cron expression for the schedule. The timezone
                       is in UTC. See https://en.wikipedia.org/wiki/Cron.

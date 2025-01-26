@@ -11,7 +11,7 @@ import TabItem from '@theme/TabItem';
 
 # Introduction
 
-BackupRepo is the storage repository for backup data. Currently, KubeBlocks supports configuring various object storage services as backup repositories, including OSS (Alibaba Cloud Object Storage Service), S3 (Amazon Simple Storage Service), COS (Tencent Cloud Object Storage), GCS (Google Cloud Storage), OBS (Huawei Cloud Object Storage), MinIO, and other S3-compatible services. Additionally, it also supports using Kubernetes-native PVCs as backup repositories.
+BackupRepo is the storage repository for backup data. Currently, KubeBlocks supports configuring various object storage services as backup repositories, including OSS (Alibaba Cloud Object Storage Service), S3 (Amazon Simple Storage Service), COS (Tencent Cloud Object Storage), GCS (Google Cloud Storage), OBS (Huawei Cloud Object Storage), MinIO, and other S3-compatible services.
 
 You can create multiple BackupRepos to suit different scenarios. For example, based on different businesses, the data of business A is stored in repository A, and the data of business B is stored in repository B. Or you can configure multiple repositories by region to realize geo-disaster recovery. But it is required to specify backup repositories when you create a backup. You can also create a default backup repository and KubeBlocks uses this default repository to store backup data if no specific repository is specified.
 
@@ -33,8 +33,7 @@ If you don't have an object storage service from a cloud provider, you can deplo
 1. Install MinIO in the `kb-system` namespace.
 
    ```bash
-   helm repo add kubeblocks-apps https://jihulab.com/api/v4/projects/152630/packages/helm/stable
-   helm install minio kubeblocks-apps/minio --namespace kb-system --create-namespace --set "extraEnvVars[0].name=MINIO_BROWSER_LOGIN_ANIMATION" --set "extraEnvVars[0].value=off"
+   helm install minio oci://registry-1.docker.io/bitnamicharts/minio --namespace kb-system --create-namespace --set "extraEnvVars[0].name=MINIO_BROWSER_LOGIN_ANIMATION" --set "extraEnvVars[0].value=off"
    ```
 
    Get the initial username and password:
@@ -87,74 +86,6 @@ The two access methods are referred to as "Tool" and "Mount". When creating Back
 Generally, it is recommended to use the "Tool" method as it does not require installing an additional CSI driver, thus reducing dependencies.
 
 However, as backup and restore tasks require running in the namespace of the database cluster, using the "Tool" approach automatically synchronizes the necessary credentials for accessing the remote storage as secret resources in those namespaces. These credentials are used by the data transfer tool. If you have concerns about security risks associated with synchronizing secrets in a multi-tenant environment, you can choose to use the "Mount" method.
-
-### Automatic BackupRepo configuration
-
-You can specify the BackupRepo information in a YAML configuration file when installing KubeBlocks, and KubeBlocks will create the BackupRepo and automatically install the necessary CSI Driver based on the provided configuration.
-
-1. Prepare the configuration file.
-
-   Taking AWS S3 as an example, the configuration file `backuprepo.yaml` is:
-
-    ```yaml
-    backupRepo:
-      create: true
-      storageProvider: s3
-      config:
-        region: cn-northwest-1
-        bucket: test-kb-backup
-      secrets:
-        accessKeyId: <ACCESS KEY>
-        secretAccessKey: <SECRET KEY>
-    ```
-
-    * `region`: specifies the region where S3 is located.
-    * `bucket`: specifies the bucket name of S3.
-    * `accessKeyId`: specifies the Access Key of AWS.
-    * `secretAccessKey`: specifies the Secret Key of AWS.
-    * `storageProvider`：specifies the object storage provider, which is S3 in this case.
-
-:::note
-
-* For KubeBlocks v0.8.0, the available `storageProvider` options are `s3`, `cos`, `gcs-s3comp`, `obs`, `oss`, `minio`, `pvc`, `ftp`, and `nfs`.
-* For different `storageProvider`, the configuration may differ. `config` and `secrets` in the above example are applied to S3.
-* Execute the command `kubectl get storageproviders.dataprotection.kubeblocks.io` to view the supported `storageProvider` options.
-
-:::
-
-2. Specify the configuration file when installing KubeBlocks.
-
-   <Tabs>
-
-   <TabItem value="kubectl" label="kubectl" default>
-
-   ```bash
-   kubectl create -f backuprepo.yaml
-   ```
-
-   Use the command below to check the BackupRepo after installation.
-
-   ```bash
-   kubectl get backuprepo
-   ```
-
-   </TabItem>
-
-   <TabItem value="kbcli" label="kbcli">
-
-   ```bash
-   kbcli kubeblocks install -f backuprepo.yaml
-   ```
-
-   Use the command below to check the BackupRepo after installation.
-
-   ```bash
-   kbcli backuprepo list
-   ```
-
-   </TabItem>
-
-   </Tabs>
 
 ### Manual BackupRepo configuration
 
@@ -389,6 +320,40 @@ If you do not configure the BackupRepo information when installing KubeBlocks, y
 
    </TabItem>
 
+   <TabItem value="S3-compatible" label="S3-compatible">
+
+   ```bash
+   # Create a secret to save the access key for the S3 compatible storage
+   kubectl create secret generic s3-comp-credential-for-backuprepo \
+     -n kb-system \
+     --from-literal=accessKeyId=<ACCESS KEY> \
+     --from-literal=secretAccessKey=<SECRET KEY>
+   
+   # Create the BackupRepo resource
+   kubectl apply -f - <<-'EOF'
+   apiVersion: dataprotection.kubeblocks.io/v1alpha1
+   kind: BackupRepo
+   metadata:
+     name: my-repo
+     annotations:
+       dataprotection.kubeblocks.io/is-default-repo: "true"
+   spec:
+     storageProviderRef: s3-compatible
+     accessMethod: Tool
+     pvReclaimPolicy: Retain
+     volumeCapacity: 100Gi
+     config:
+       bucket: test-kb-backup
+       endpoint: <endpoint>
+       forcePathStyle: true
+     credential:
+       name: s3-comp-credential-for-backuprepo
+       namespace: kb-system
+   EOF
+   ```
+
+   </TabItem>
+
    </Tabs>
 
 3. View the BackupRepo and its status. If the status is `Ready`, the BackupRepo is ready.
@@ -430,9 +395,11 @@ If you do not configure the BackupRepo information when installing KubeBlocks, y
      --bucket test-kb-backup \
      --access-key-id <ACCESS KEY> \
      --secret-access-key <SECRET KEY> \
-     --access-method Tool \ # Mount is also acceptable
+     --access-method Tool \ 
      --default
    ```
+
+   You can also specify `--access-method` as `Mount`.
 
    </TabItem>
 
@@ -443,7 +410,20 @@ If you do not configure the BackupRepo information when installing KubeBlocks, y
      --provider oss \
      --region cn-zhangjiakou \
      --bucket  test-kb-backup \
-     # --endpoint https://oss-cn-zhangjiakou-internal.aliyuncs.com \ can show the specified oss endpoint
+     --access-key-id <ACCESS KEY> \
+     --secret-access-key <SECRET KEY> \
+     --access-method Tool \ 
+     --default
+   ```
+
+   You can also explicitly specify the OSS endpoint using the `--endpoint` flag. For example,
+
+   ```bash
+   kbcli backuprepo create my-repo \
+     --provider oss \
+     --region cn-zhangjiakou \
+     --bucket  test-kb-backup \
+     --endpoint https://oss-cn-zhangjiakou-internal.aliyuncs.com \
      --access-key-id <ACCESS KEY> \
      --secret-access-key <SECRET KEY> \
      --access-method Tool \ 
@@ -469,12 +449,12 @@ If you do not configure the BackupRepo information when installing KubeBlocks, y
 
    <TabItem value="COS" label="COS">
 
+    For COS, the naming format of a bucket is `<BucketName-APPID>`，where APPID is automatically generated by Tencent Cloud. When setting `--bucket`, first create the bucket on the Tencent Cloud console and retrieve the bucket name.
+
    ```bash
    kbcli backuprepo create my-repo \
      --provider cos \
      --region ap-guangzhou \
-     # In COS, the naming format of a bucket is <BucketName-APPID>，where APPID is automatically generated by Tencent Cloud
-     # When setting up, first create the bucket through Tencent Cloud's console and obtain the bucket name
      --bucket  test-kb-backup \ 
      --access-key-id <ACCESS KEY> \
      --secret-access-key <SECRET KEY> \
@@ -487,9 +467,8 @@ If you do not configure the BackupRepo information when installing KubeBlocks, y
    <TabItem value="GCS" label="GCS">
 
    ```bash
-   # The current GCS is the S3-compatible version provided by Google Cloud
    kbcli backuprepo create my-repo \
-     --provider gcs \
+     --provider gcs-s3comp \
      --region auto \
      --bucket  test-kb-backup \
      --access-key-id <ACCESS KEY> \
@@ -498,6 +477,8 @@ If you do not configure the BackupRepo information when installing KubeBlocks, y
      --default
    ```
 
+   GCS supported by KubeBlocks is the S3-compatible version provided by Google Cloud.
+
    </TabItem>
 
    <TabItem value="MinIO" label="MinIO">
@@ -505,7 +486,7 @@ If you do not configure the BackupRepo information when installing KubeBlocks, y
    ```bash
    kbcli backuprepo create my-repo \
      --provider minio \
-     --endpoint <ip:port> \    # The access address for the deployed MinIO is: http://minio.kb-system.svc.cluster.local:9000
+     --endpoint <ip:port> \
      --bucket test-minio \
      --access-key-id <ACCESS KEY> \
      --secret-access-key <SECRET KEY> \
@@ -513,16 +494,21 @@ If you do not configure the BackupRepo information when installing KubeBlocks, y
      --default
    ```
 
+   The address for the deployed MinIO is http://minio.kb-system.svc.cluster.local:9000.
+
    </TabItem>
 
-   <TabItem value="PVC" label="PVC">
+   <TabItem value="S3-compatible" label="S3-compatible">
 
    ```bash
    kbcli backuprepo create my-repo \
-     --provider pvc \
-     --storage-class-name "nfs-storage" \
-     --access-mode "ReadWriteMany" \
-     --volume-capacity "100Gi" \
+     --provider s3-compatible \
+     --endpoint <endpoint> \
+     --bucket test-minio \
+     --access-key-id <ACCESS KEY> \
+     --secret-access-key <SECRET KEY> \
+     --access-method Tool \
+     --force-path-style=true \
      --default
    ```
 
@@ -534,7 +520,7 @@ If you do not configure the BackupRepo information when installing KubeBlocks, y
 
    * `my-repo` is the name of the created backup repository. If you do not specify a name, the system creates a random name, following the format `backuprepo-xxxxx`.
    * `--default` means that this repository is set as the default repository. Note that there can only be one default global repository. If there exist multiple default repositories, KubeBlocks cannot decide which one to use (similar to the default StorageClass of Kubernetes), which further results in backup failure. Using kbcli to create BackupRepo can avoid such problems because kbcli checks whether there is another default repository before creating a new one.
-   * `--provider` specifies the storage type, i.e. `storageProvider`, and is required for creating a BakcupRepo. The available values are `s3`, `cos`, `gcs-s3comp`, `obs`, `oss`, `minio`, `ftp`, and `nfs`. Parameters for different storage providers vary and you can run `kbcli backuprepo create --provider STORAGE-PROVIDER-NAME -h` to view the flags for different storage providers. Please note that `--provider` is mandatory in configuration.
+   * `--provider` specifies the storage type, i.e. `storageProvider`, and is required for creating a BakcupRepo. The available values are `s3`, `cos`, `gcs-s3comp`, `obs`, `oss`, `minio`, `s3-compatible`, `ftp`, and `nfs`. Parameters for different storage providers vary and you can run `kbcli backuprepo create --provider STORAGE-PROVIDER-NAME -h` to view the flags for different storage providers. Please note that `--provider` is mandatory in configuration.
 
    After `kbcli backuprepo create` is executed successfully, the system creates the K8s resource whose type is `BackupRepo`. You can modify the annotation of this resource to adjust the default repository.
 
@@ -561,3 +547,85 @@ If you do not configure the BackupRepo information when installing KubeBlocks, y
 </TabItem>
 
 </Tabs>
+
+:::note
+
+If the BackupRepo status shows Failed or remains in PreChecking for a long time, run `kubectl describe backuprepo my-repo` or `kbcli backuprepo describe my-repo` to check the `status.conditions` for details.
+
+To troubleshoot:
+
+* Check whether configuration parameters, such as `endpoint`, `accessKeyId`, and `secretAccessKey`, are correctly specified.
+* For self-hosted object storage (e.g., Ceph Object Storage), try using `s3-compatible` as StorageProvider. The default `s3` StorageProvider uses a virtual hosting URL style, which some self-hosted storage may not support.
+* If an `InvalidLocationConstraint` error occurs, check whether its parameter is correctly configured. If this error persists, leave the `region` parameter empty and try again.
+* If the status remains in the `PreChecking` state, check your network connection. Ensure the storage service is accessible from within the Kubernetes cluster. You can test this by running a Pod and connecting to the storage service using the corresponding client.
+* KubeBlocks uses [rclone](https://rclone.org/) internally for data transfer. Check whether rclone can successfully access the storage service.
+
+:::
+
+### Automatic BackupRepo configuration
+
+You can specify the BackupRepo information in a YAML configuration file when installing KubeBlocks, and KubeBlocks will create the BackupRepo accordingly.
+
+1. Prepare the configuration file.
+
+   Taking AWS S3 as an example, the configuration file `backuprepo.yaml` is:
+
+    ```yaml
+    backupRepo:
+      create: true
+      storageProvider: s3
+      config:
+        region: cn-northwest-1
+        bucket: test-kb-backup
+      secrets:
+        accessKeyId: <ACCESS KEY>
+        secretAccessKey: <SECRET KEY>
+    ```
+
+    * `region`: specifies the region where S3 is located.
+    * `bucket`: specifies the bucket name of S3.
+    * `accessKeyId`: specifies the Access Key of AWS.
+    * `secretAccessKey`: specifies the Secret Key of AWS.
+    * `storageProvider`：specifies the object storage provider, which is S3 in this case.
+
+:::note
+
+* In KubeBlocks, the available `storageProvider` options are `s3`, `cos`, `gcs-s3comp`, `obs`, `oss`, `minio`, `s3-compatible`, `ftp`, and `nfs`.
+* For different `storageProvider`, the configuration may differ. `config` and `secrets` in the above example are applied to S3.
+* Execute the command `kubectl get storageproviders.dataprotection.kubeblocks.io` to view the supported `storageProvider` options.
+
+:::
+
+2. Specify the configuration file when installing KubeBlocks.
+
+   <Tabs>
+
+   <TabItem value="kubectl" label="kubectl" default>
+
+   ```bash
+   kubectl create -f backuprepo.yaml
+   ```
+
+   Use the command below to check the BackupRepo after installation.
+
+   ```bash
+   kubectl get backuprepo
+   ```
+
+   </TabItem>
+
+   <TabItem value="kbcli" label="kbcli">
+
+   ```bash
+   kbcli kubeblocks install -f backuprepo.yaml
+   ```
+
+   Use the command below to check the BackupRepo after installation.
+
+   ```bash
+   kbcli backuprepo list
+   ```
+
+   </TabItem>
+
+   </Tabs>

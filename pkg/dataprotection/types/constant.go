@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2024 ApeCloud Co., Ltd
+Copyright (C) 2022-2025 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -62,6 +62,8 @@ const (
 	ConnectionPasswordAnnotationKey = "dataprotection.kubeblocks.io/connection-password"
 	// GeminiAcknowledgedAnnotationKey indicates whether Gemini has acknowledged the backup.
 	GeminiAcknowledgedAnnotationKey = "dataprotection.kubeblocks.io/gemini-acknowledged"
+	// LastAppliedConfigsAnnotationKey specifies last applied reconfigurations.
+	LastAppliedConfigsAnnotationKey = "dataprotection.kubeblocks.io/last-applied-configurations"
 )
 
 // label keys

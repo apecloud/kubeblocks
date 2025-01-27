@@ -27,7 +27,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
@@ -122,7 +121,7 @@ func (t *componentNotifierTransformer) notify(transCtx *componentTransformContex
 	graphCli model.GraphClient, dag *graph.DAG, compName string) error {
 	synthesizedComp := transCtx.SynthesizeComponent
 
-	comp := &appsv1alpha1.Component{}
+	comp := &appsv1.Component{}
 	compKey := types.NamespacedName{
 		Namespace: synthesizedComp.Namespace,
 		Name:      constant.GenerateClusterComponentName(synthesizedComp.ClusterName, compName),

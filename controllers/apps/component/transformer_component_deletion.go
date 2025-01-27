@@ -23,8 +23,10 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
@@ -140,6 +142,9 @@ func (t *componentDeletionTransformer) deleteCompResources(transCtx *componentTr
 		graphCli.Status(dag, comp, transCtx.Component)
 		return intctrlutil.NewRequeueError(time.Second*1, "not all component sub-resources deleted")
 	} else {
+		if err = notifyDependents4CompDeletion(transCtx, dag); err != nil {
+			return intctrlutil.NewRequeueError(appsutil.RequeueDuration, fmt.Sprintf("notify dependent components error: %s", err.Error()))
+		}
 		graphCli.Delete(dag, comp)
 	}
 
@@ -209,6 +214,33 @@ func handleRBACResourceDeletion(obj client.Object, transCtx *componentTransformC
 	default:
 		return false, nil
 	}
+}
+
+func notifyDependents4CompDeletion(transCtx *componentTransformContext, dag *graph.DAG) error {
+	var (
+		ctx  = transCtx.Context
+		cli  = transCtx.Client
+		comp = transCtx.Component
+	)
+
+	compDef := &appsv1.ComponentDefinition{}
+	if err := transCtx.Client.Get(transCtx.Context, types.NamespacedName{Name: comp.Spec.CompDef}, compDef); err != nil {
+		return errors.Wrap(err, "failed to get the component definition for dependents notifier at deletion")
+	}
+
+	synthesizedComp, err := component.BuildSynthesizedComponent(ctx, cli, compDef, comp)
+	if err != nil {
+		return errors.Wrap(err, "failed to build synthesized component for dependents notifier at deletion")
+	}
+
+	bak := transCtx.SynthesizeComponent
+	defer func() {
+		transCtx.SynthesizeComponent = bak
+	}()
+
+	transCtx.SynthesizeComponent = synthesizedComp
+	transformer := &componentNotifierTransformer{}
+	return transformer.Transform(transCtx, dag)
 }
 
 func compOwnedWorkloadKinds() []client.ObjectList {

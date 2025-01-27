@@ -39,7 +39,7 @@ var _ graph.Transformer = &componentNotifierTransformer{}
 
 func (t *componentNotifierTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*componentTransformContext)
-	if model.IsObjectDeleting(transCtx.ComponentOrig) || model.IsObjectStatusUpdating(transCtx.ComponentOrig) {
+	if !model.IsObjectUpdating(transCtx.ComponentOrig) {
 		return nil
 	}
 

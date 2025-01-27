@@ -5900,6 +5900,30 @@ This overrides the image and env attributes defined in clusterDefinition.spec.co
 <tbody>
 <tr>
 <td>
+<code>labels</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the labels for the PVC of the volume.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>annotations</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the annotations for the PVC of the volume.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>name</code><br/>
 <em>
 string

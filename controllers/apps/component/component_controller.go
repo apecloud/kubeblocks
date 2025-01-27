@@ -175,7 +175,7 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			// update component status
 			&componentStatusTransformer{Client: r.Client},
 			// notify dependent components the possible spec changes
-			&componentNotifyDependentsTransformer{},
+			&componentNotifierTransformer{},
 		).Build()
 
 	// Execute stage

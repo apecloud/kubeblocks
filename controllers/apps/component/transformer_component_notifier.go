@@ -34,11 +34,11 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
-type componentNotifyDependentsTransformer struct{}
+type componentNotifierTransformer struct{}
 
-var _ graph.Transformer = &componentNotifyDependentsTransformer{}
+var _ graph.Transformer = &componentNotifierTransformer{}
 
-func (t *componentNotifyDependentsTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
+func (t *componentNotifierTransformer) Transform(ctx graph.TransformContext, dag *graph.DAG) error {
 	transCtx, _ := ctx.(*componentTransformContext)
 	if model.IsObjectDeleting(transCtx.ComponentOrig) || model.IsObjectStatusUpdating(transCtx.ComponentOrig) {
 		return nil
@@ -58,7 +58,7 @@ func (t *componentNotifyDependentsTransformer) Transform(ctx graph.TransformCont
 	return nil
 }
 
-func (t *componentNotifyDependentsTransformer) dependents(transCtx *componentTransformContext) ([]string, error) {
+func (t *componentNotifierTransformer) dependents(transCtx *componentTransformContext) ([]string, error) {
 	synthesizedComp := transCtx.SynthesizeComponent
 	dependents := make([]string, 0)
 	for compName, compDefName := range synthesizedComp.Comp2CompDefs {
@@ -76,7 +76,7 @@ func (t *componentNotifyDependentsTransformer) dependents(transCtx *componentTra
 	return dependents, nil
 }
 
-func (t *componentNotifyDependentsTransformer) depended(transCtx *componentTransformContext, compDefName string) (bool, error) {
+func (t *componentNotifierTransformer) depended(transCtx *componentTransformContext, compDefName string) (bool, error) {
 	compDefReferenced := func(v appsv1.EnvVar) string {
 		if v.ValueFrom != nil {
 			if v.ValueFrom.HostNetworkVarRef != nil {
@@ -118,7 +118,7 @@ func (t *componentNotifyDependentsTransformer) depended(transCtx *componentTrans
 	return false, nil
 }
 
-func (t *componentNotifyDependentsTransformer) notify(transCtx *componentTransformContext,
+func (t *componentNotifierTransformer) notify(transCtx *componentTransformContext,
 	graphCli model.GraphClient, dag *graph.DAG, compName string) error {
 	synthesizedComp := transCtx.SynthesizeComponent
 
@@ -131,13 +131,14 @@ func (t *componentNotifyDependentsTransformer) notify(transCtx *componentTransfo
 		return client.IgnoreNotFound(err)
 	}
 
-	if comp.Annotations == nil {
-		comp.Annotations = make(map[string]string)
+	compCopy := comp.DeepCopy()
+	if compCopy.Annotations == nil {
+		compCopy.Annotations = make(map[string]string)
 	}
-	comp.Annotations[constant.ReconcileAnnotationKey] =
+	compCopy.Annotations[constant.ReconcileAnnotationKey] =
 		fmt.Sprintf("%s@%s", synthesizedComp.Name, time.Now().Format(time.RFC3339))
 
-	graphCli.Update(dag, nil, comp)
+	graphCli.Patch(dag, comp, compCopy)
 
 	return nil
 }

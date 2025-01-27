@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -269,7 +270,7 @@ func findPortByPortName(container corev1.Container) (int32, bool) {
 }
 
 // UpdateConfigPayload updates the configuration payload
-func UpdateConfigPayload(config *appsv1alpha1.ConfigurationSpec, component *component.SynthesizedComponent) (bool, error) {
+func UpdateConfigPayload(config *appsv1alpha1.ConfigurationSpec, component *component.SynthesizedComponent, sharding *appsv1.ClusterSharding) (bool, error) {
 	updated := false
 	for i := range config.ConfigItemDetails {
 		configSpec := &config.ConfigItemDetails[i]
@@ -290,8 +291,23 @@ func UpdateConfigPayload(config *appsv1alpha1.ConfigurationSpec, component *comp
 			}
 			updated = updated || ret
 		}
+		// check sharding h-scale operation
+		if sharding != nil && enableShardingHScaleTrigger(configSpec.ConfigSpec) {
+			ret, err := intctrlutil.CheckAndPatchPayload(configSpec, constant.ShardingPayload, resolveShardingResource(sharding))
+			if err != nil {
+				return false, err
+			}
+			updated = updated || ret
+		}
 	}
 	return updated, nil
+}
+
+func resolveShardingResource(sharding *appsv1.ClusterSharding) map[string]string {
+	return map[string]string{
+		"shards":   strconv.Itoa(int(sharding.Shards)),
+		"replicas": strconv.Itoa(int(sharding.Template.Replicas)),
+	}
 }
 
 func validRerenderResources(configSpec *appsv1alpha1.ComponentConfigSpec) bool {
@@ -300,6 +316,10 @@ func validRerenderResources(configSpec *appsv1alpha1.ComponentConfigSpec) bool {
 
 func enableHScaleTrigger(configSpec *appsv1alpha1.ComponentConfigSpec) bool {
 	return validRerenderResources(configSpec) && slices.Contains(configSpec.ReRenderResourceTypes, appsv1alpha1.ComponentHScaleType)
+}
+
+func enableShardingHScaleTrigger(configSpec *appsv1alpha1.ComponentConfigSpec) bool {
+	return validRerenderResources(configSpec) && slices.Contains(configSpec.ReRenderResourceTypes, appsv1alpha1.ShardingComponentHScaleType)
 }
 
 func enableVScaleTrigger(configSpec *appsv1alpha1.ComponentConfigSpec) bool {
@@ -312,4 +332,22 @@ func configSetFromComponent(templates []appsv1.ComponentConfigSpec) []string {
 		configSet = append(configSet, template.Name)
 	}
 	return configSet
+}
+
+func ResolveShardingReference(component *appsv1.Component, cluster *appsv1.Cluster) *appsv1.ClusterSharding {
+	if len(cluster.Spec.Shardings) == 0 || len(component.Labels) == 0 {
+		return nil
+	}
+
+	clusterCompName := component.Labels[constant.KBAppShardingNameLabelKey]
+	if clusterCompName == "" {
+		return nil
+	}
+
+	for i, comp := range cluster.Spec.Shardings {
+		if comp.Name == clusterCompName {
+			return &cluster.Spec.Shardings[i]
+		}
+	}
+	return nil
 }

@@ -100,7 +100,7 @@ func (p *pipeline) UpdateConfiguration() *pipeline {
 		if intctrlutil.SetControllerReference(p.ctx.Component, expectedConfiguration) != nil {
 			return
 		}
-		_, _ = UpdateConfigPayload(&expectedConfiguration.Spec, p.ctx.SynthesizedComponent)
+		_, _ = UpdateConfigPayload(&expectedConfiguration.Spec, p.ctx.SynthesizedComponent, ResolveShardingReference(p.ctx.Component, p.ctx.Cluster))
 
 		existingConfiguration := appsv1alpha1.Configuration{}
 		err = p.ResourceFetcher.Client.Get(p.Context, client.ObjectKeyFromObject(expectedConfiguration), &existingConfiguration)

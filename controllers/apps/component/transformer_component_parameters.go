@@ -24,7 +24,7 @@ import (
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
-	"github.com/apecloud/kubeblocks/pkg/controller/configuration"
+	configctrl "github.com/apecloud/kubeblocks/pkg/controller/configuration"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 )
 
@@ -46,7 +46,7 @@ func (c *componentRelatedParametersTransformer) Transform(ctx graph.TransformCon
 	}
 
 	configNew := config.DeepCopy()
-	updated, err := configuration.UpdateConfigPayload(&configNew.Spec, synthesizedComp)
+	updated, err := configctrl.UpdateConfigPayload(&configNew.Spec, synthesizedComp, configctrl.ResolveShardingReference(transCtx.Component, transCtx.Cluster))
 	if err != nil {
 		return err
 	}

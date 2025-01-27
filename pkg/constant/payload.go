@@ -23,4 +23,5 @@ const (
 	ComponentResourcePayload = "component-resource"
 	ReplicasPayload          = "replicas"
 	BinaryVersionPayload     = "binary-version"
+	ShardingPayload          = "sharding"
 )

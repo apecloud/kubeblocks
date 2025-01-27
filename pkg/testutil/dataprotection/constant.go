@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2024 ApeCloud Co., Ltd
+Copyright (C) 2022-2025 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -29,15 +29,18 @@ const (
 	ProtocolName  = "TCP"
 	PortNum       = 10000
 
-	BackupName          = "test-backup"
-	BackupRepoName      = "test-repo"
-	BackupPolicyName    = "test-backup-policy"
-	BackupMethodName    = "xtrabackup"
-	IncBackupMethodName = "xtrabackup-inc"
-	VSBackupMethodName  = "volume-snapshot"
-	BackupPathPrefix    = "/backup"
-	ActionSetName       = "xtrabackup"
-	IncActionSetName    = "xtrabackup-inc"
+	BackupName              = "test-backup"
+	BackupRepoName          = "test-repo"
+	BackupPolicyName        = "test-backup-policy"
+	BackupMethodName        = "xtrabackup"
+	ContinuousMethodName    = "continuous-method"
+	ContinuousMethodName1   = "continuous-method1"
+	IncBackupMethodName     = "xtrabackup-inc"
+	VSBackupMethodName      = "volume-snapshot"
+	BackupPathPrefix        = "/backup"
+	ActionSetName           = "xtrabackup"
+	IncActionSetName        = "xtrabackup-inc"
+	continuousActionSetName = "archive-log"
 
 	DataVolumeName      = "data"
 	DataVolumeMountPath = "/data"

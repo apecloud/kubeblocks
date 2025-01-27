@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2024 ApeCloud Co., Ltd
+Copyright (C) 2022-2025 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -217,11 +217,11 @@ func (r *updateReconciler) switchover(tree *kubebuilderx.ObjectTree, its *worklo
 
 	clusterName, err := func() (string, error) {
 		var clusterName string
-		if its.Annotations != nil {
-			clusterName = its.Annotations[constant.AppInstanceLabelKey]
+		if its.Labels != nil {
+			clusterName = its.Labels[constant.AppInstanceLabelKey]
 		}
 		if len(clusterName) == 0 {
-			return "", fmt.Errorf("InstanceSet %s/%s has no annotation %s", its.Namespace, its.Name, constant.AppInstanceLabelKey)
+			return "", fmt.Errorf("InstanceSet %s/%s has no label %s", its.Namespace, its.Name, constant.AppInstanceLabelKey)
 		}
 		return clusterName, nil
 

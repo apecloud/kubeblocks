@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2024 ApeCloud Co., Ltd
+Copyright (C) 2022-2025 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -677,6 +677,11 @@ type ClusterBackup struct {
 	// +kubebuilder:default=false
 	// +optional
 	PITREnabled *bool `json:"pitrEnabled,omitempty"`
+
+	// Specifies the backup method to use, if not set, use the first continuous method.
+	//
+	// +optional
+	ContinuousMethod string `json:"continuousMethod,omitempty"`
 
 	// Specifies whether to enable incremental backup.
 	//

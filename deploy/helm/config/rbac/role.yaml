@@ -882,6 +882,20 @@ rules:
   verbs:
   - get
 - apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
+  - roles
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
+  - roles/status
+  verbs:
+  - get
+- apiGroups:
   - snapshot.storage.k8s.io
   resources:
   - volumesnapshotclasses

@@ -45,9 +45,8 @@ var _ = Describe("pod role label event handler test", func() {
 				Ctx: ctx,
 				Log: logger,
 			}
-			resourceVersion := "1"
 			pod := builder.NewPodBuilder(namespace, getPodName(name, 0)).SetUID(uid).GetObject()
-			pod.ResourceVersion = resourceVersion
+			pod.ResourceVersion = "1"
 			objectRef := corev1.ObjectReference{
 				APIVersion: "v1",
 				Kind:       "Pod",
@@ -162,7 +161,7 @@ var _ = Describe("pod role label event handler test", func() {
 					Expect(pd).ShouldNot(BeNil())
 					Expect(pd.Labels).ShouldNot(BeNil())
 					Expect(pd.Labels[RoleLabelKey]).Should(Equal(role.Name))
-					if pd.ResourceVersion <= resourceVersion {
+					if pd.ResourceVersion <= pod.ResourceVersion {
 						return updateErr
 					}
 					return nil

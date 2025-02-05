@@ -244,8 +244,8 @@ func handleSwitchover(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *
 		} else {
 			progressDetail.Message = fmt.Sprintf("doing switchover")
 			progressDetail.Status = opsv1alpha1.ProcessingProgressStatus
-			progressDetail.StartTime = metav1.Now()
 		}
+		progressDetail.StartTime = metav1.Now()
 	case opsv1alpha1.ProcessingProgressStatus:
 		// check role
 		targetRole := progressDetail.Group

@@ -242,7 +242,7 @@ func handleSwitchover(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *
 			progressDetail.Status = opsv1alpha1.FailedProgressStatus
 			progressDetail.Message = fmt.Sprintf("component %s %s", compName, err.Error())
 		} else {
-			progressDetail.Message = fmt.Sprintf("doing switchover")
+			progressDetail.Message = "doing switchover"
 			progressDetail.Status = opsv1alpha1.ProcessingProgressStatus
 		}
 		progressDetail.StartTime = metav1.Now()
@@ -255,7 +255,7 @@ func handleSwitchover(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *
 				return err
 			}
 			if targetRole == candidatePod.Labels[constant.RoleLabelKey] {
-				progressDetail.Message = fmt.Sprintf("do switchover succeed")
+				progressDetail.Message = "do switchover succeed"
 				progressDetail.Status = opsv1alpha1.SucceedProgressStatus
 			}
 		} else {
@@ -264,7 +264,7 @@ func handleSwitchover(reqCtx intctrlutil.RequestCtx, cli client.Client, opsRes *
 				return err
 			}
 			if currRole, ok := fromInstance.Labels[constant.RoleLabelKey]; ok && currRole != targetRole {
-				progressDetail.Message = fmt.Sprintf("do switchover succeed")
+				progressDetail.Message = "do switchover succeed"
 				progressDetail.Status = opsv1alpha1.SucceedProgressStatus
 			}
 		}
@@ -375,7 +375,7 @@ func handleProgressDetail(
 	if progressDetail.Status == opsv1alpha1.ProcessingProgressStatus &&
 		!progressDetail.StartTime.IsZero() && time.Now().After(progressDetail.StartTime.Add(5*time.Minute)) {
 		progressDetail.Status = opsv1alpha1.FailedProgressStatus
-		progressDetail.Message = fmt.Sprintf("switchover timeout after 5 minutes")
+		progressDetail.Message = "switchover timeout after 5 minutes"
 	}
 	if isCompletedProgressStatus(progressDetail.Status) {
 		*completedCount++

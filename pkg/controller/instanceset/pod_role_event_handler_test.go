@@ -45,7 +45,9 @@ var _ = Describe("pod role label event handler test", func() {
 				Ctx: ctx,
 				Log: logger,
 			}
+			resourceVersion := "1"
 			pod := builder.NewPodBuilder(namespace, getPodName(name, 0)).SetUID(uid).GetObject()
+			pod.ResourceVersion = resourceVersion
 			objectRef := corev1.ObjectReference{
 				APIVersion: "v1",
 				Kind:       "Pod",
@@ -131,10 +133,12 @@ var _ = Describe("pod role label event handler test", func() {
 				SetReason(checkRoleOperation).
 				SetMessage(message).
 				GetObject()
+
 			k8sMock.EXPECT().
 				Get(gomock.Any(), gomock.Any(), &corev1.Pod{}, gomock.Any()).
 				DoAndReturn(func(_ context.Context, objKey client.ObjectKey, p *corev1.Pod, _ ...client.GetOption) error {
 					p.Namespace = objKey.Namespace
+					p.ResourceVersion = "0"
 					p.Name = objKey.Name
 					p.UID = pod.UID
 					p.Labels = map[string]string{
@@ -158,7 +162,10 @@ var _ = Describe("pod role label event handler test", func() {
 					Expect(pd).ShouldNot(BeNil())
 					Expect(pd.Labels).ShouldNot(BeNil())
 					Expect(pd.Labels[RoleLabelKey]).Should(Equal(role.Name))
-					return updateErr
+					if pd.ResourceVersion <= resourceVersion {
+						return updateErr
+					}
+					return nil
 				}).Times(1)
 			Expect(handler.Handle(cli, reqCtx, nil, event)).Should(Equal(updateErr))
 		})

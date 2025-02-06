@@ -61,7 +61,7 @@ KubeBlocks 是 Kubernetes 原生 operator，可通过 Helm、 kubectl 应用 YAM
 
 <TabItem value="Helm" label="Helm" default>
 
-按照以下步骤使用 Helm 安装 KubeBlocks。
+按照以下步骤使用 Helm 安装 KubeBlocks：
 
 1. 获取 KubeBlocks 版本:
 
@@ -71,7 +71,7 @@ KubeBlocks 是 Kubernetes 原生 operator，可通过 Helm、 kubectl 应用 YAM
    ```
 
    * 选项 B - 查看所有可用版本(包括 alpha 和 beta 版本):
-     * 访问 [KubeBlocks 发布列表](https://github.com/apecloud/kubeblocks/releases)
+     * 访问 [KubeBlocks 发布列表](https://github.com/apecloud/kubeblocks/releases)。
      * 或使用命令:
      ```bash
      curl -s "https://api.github.com/repos/apecloud/kubeblocks/releases?per_page=100&page=1" | jq -r '.[].tag_name' | sort -V -r
@@ -86,14 +86,14 @@ KubeBlocks 是 Kubernetes 原生 operator，可通过 Helm、 kubectl 应用 YAM
    kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/v0.9.2/kubeblocks_crds.yaml
    ```
 
-3. 添加 KubeBlocks 的 Helm 仓库。
+3. 添加 KubeBlocks 的 Helm 仓库：
 
    ```bash
    helm repo add kubeblocks https://apecloud.github.io/helm-charts
    helm repo update
    ```
 
-4. 安装 KubeBlocks。
+4. 安装 KubeBlocks：
 
    ```bash
    helm install kubeblocks kubeblocks/kubeblocks --namespace kb-system --create-namespace
@@ -110,7 +110,7 @@ KubeBlocks 是 Kubernetes 原生 operator，可通过 Helm、 kubectl 应用 YAM
    如果您想要安装指定版本的 KubeBlocks，可执行如下步骤：
 
    1. 在 [KubeBlocks 发布列表](https://github.com/apecloud/kubeblocks/releases/) 中查看可用版本。
-   2. 使用 `--version` 指定版本，并执行以下命令。
+   2. 使用 `--version` 指定版本，并执行以下命令：
 
       ```bash
       helm install kubeblocks kubeblocks/kubeblocks --namespace kb-system --create-namespace --version=<VERSION>
@@ -136,7 +136,7 @@ KubeBlocks 是 Kubernetes 原生 operator，可通过 Helm、 kubectl 应用 YAM
    ```
 
    * 选项 B - 查看所有可用版本(包括 alpha 和 beta 版本):
-      * 访问 [KubeBlocks 发布列表](https://github.com/apecloud/kubeblocks/releases)
+      * 访问 [KubeBlocks 发布列表](https://github.com/apecloud/kubeblocks/releases)。
       * 或使用命令:
      ```bash
      curl -s "https://api.github.com/repos/apecloud/kubeblocks/releases?per_page=100&page=1" | jq -r '.[].tag_name' | sort -V -r
@@ -179,13 +179,13 @@ kbcli kubeblocks install
 
 如果想安装 KubeBlocks 的指定版本，请按照以下步骤操作：
 
-1. 查看可用的版本。
+1. 查看可用的版本：
 
     ```bash
     kbcli kubeblocks list-versions
     ```
 
-    如需查看包含 alpha 和 beta 在内的版本，可执行以下命令。
+    如需查看包含 alpha 和 beta 在内的版本，可执行以下命令：
 
     ```bash
     kbcli kb list-versions --devel --limit=100
@@ -193,7 +193,7 @@ kbcli kubeblocks install
 
     或者，你可以在 [KubeBlocks 发布列表](https://github.com/apecloud/kubeblocks/releases/)中查看可用的版本。
 
-2. 使用 `--version` 指定版本。
+2. 使用 `--version` 指定版本：
 
     ```bash
     kbcli kubeblocks install --version=<VERSION>
@@ -203,7 +203,7 @@ kbcli kubeblocks install
 
     kbcli 默认安装最新版本。如果您的环境中已有正在运行的 KubeBlocks 实例，则需要安装与之匹配的 kbcli 版本。
 
-    例如，如果您当前使用的 KubeBlocks 版本是 v0.8.3，kbcli 应安装对应的 v0.8.3，而不是更高版本（如 v0.9.0），否则系统将因版本不匹配产生报错。
+    例如，如果您当前使用的 KubeBlocks 版本是 v0.9.2，kbcli 应安装对应的 v0.9.2，而不是更高版本（如 v1.0.0），否则系统将因版本不匹配产生报错。
 
     :::
 
@@ -213,7 +213,7 @@ kbcli kubeblocks install
 
 ## 验证 KubeBlocks 安装
 
-执行以下命令，检查 KubeBlocks 是否已成功安装。
+执行以下命令，检查 KubeBlocks 是否已成功安装：
 
 <Tabs>
 

@@ -86,14 +86,14 @@ Follow these steps to install KubeBlocks using Helm.
    kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/v0.9.2/kubeblocks_crds.yaml
    ```
 
-3. Add the KubeBlocks Helm repo.
+3. Add the KubeBlocks Helm repo:
 
    ```bash
    helm repo add kubeblocks https://apecloud.github.io/helm-charts
    helm repo update
    ```
 
-4. Install KubeBlocks.
+4. Install KubeBlocks:
 
    ```bash
    helm install kubeblocks kubeblocks/kubeblocks --namespace kb-system --create-namespace
@@ -107,10 +107,10 @@ Follow these steps to install KubeBlocks using Helm.
        --set-json 'dataPlane.tolerations=[{ "key": "data-plane-taint", "operator": "Equal", "effect": "NoSchedule", "value": "true"    }]'
    ```
 
-   If you want to install KubeBlocks with a specified version, follow the steps below.
+   If you want to install KubeBlocks with a specified version, follow the steps below:
 
    1. View the available versions in the [KubeBlocks Releases](https://github.com/apecloud/kubeblocks/releases/).
-   2. Specify a version with `--version` and run the command below.
+   2. Specify a version with `--version` and run the command below:
 
       ```bash
       helm install kubeblocks kubeblocks/kubeblocks --namespace kb-system --create-namespace --version=<VERSION>
@@ -164,9 +164,9 @@ Like any other resource in Kubernetes, KubeBlocks can be installed through a YAM
    ```
 
    :::note
-4. 
+
    Make sure to use the same version for both CRDs and KubeBlocks installation to avoid compatibility issues.
-5. 
+
    :::
 
 </TabItem>
@@ -181,7 +181,7 @@ kbcli kubeblocks install
 
 If you want to install KubeBlocks with a specified version, follow the steps below.
 
-1. View the available versions.
+1. View the available versions:
 
    ```bash
    kbcli kubeblocks list-versions
@@ -194,7 +194,7 @@ If you want to install KubeBlocks with a specified version, follow the steps bel
    ```
 
    Or you can view all available versions in [KubeBlocks Releases](https://github.com/apecloud/kubeblocks/releases/).
-2. Specify a version with `--version` and run the command below.
+2. Specify a version with `--version` and run the command below:
 
    ```bash
    kbcli kubeblocks install --version=<VERSION>
@@ -204,7 +204,7 @@ If you want to install KubeBlocks with a specified version, follow the steps bel
 
    By default, when installing KubeBlocks, kbcli installs the corresponding version of KubeBlocks. It's important to ensure the major versions of kbcli and KubeBlocks are the same, if you specify a different version explicitly here.
 
-   For example, you can install kbcli v0.8.3 with KubeBlocks v0.8.1, but using mismatched major versions, such as kbcli v0.8.3 with KubeBlocks v0.9.0, may lead to errors.
+   For example, you can install kbcli v0.9.2 with KubeBlocks v0.9.1, but using mismatched major versions, such as kbcli v0.9.2 with KubeBlocks v1.0.0, may lead to errors.
   
   :::
 

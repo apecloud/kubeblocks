@@ -414,8 +414,12 @@ func (s *Scheduler) convertLastAppliedConfigs(continuousMethod string) {
 }
 
 func (s *Scheduler) getLastAppliedConfigsMap() (map[string]string, error) {
+	lastAppliedConfigAnno := s.BackupSchedule.Annotations[dptypes.LastAppliedConfigsAnnotationKey]
+	if lastAppliedConfigAnno == "" {
+		return map[string]string{}, nil
+	}
 	resMap := map[string]string{}
-	if err := json.Unmarshal([]byte(s.BackupSchedule.Annotations[dptypes.LastAppliedConfigsAnnotationKey]), &resMap); err != nil {
+	if err := json.Unmarshal([]byte(lastAppliedConfigAnno), &resMap); err != nil {
 		return nil, err
 	}
 	return resMap, nil

@@ -59,30 +59,41 @@ To try out KubeBlocks on your local host, you can use the [Playground](./../try-
 
 <TabItem value="Helm" label="Install with Helm" default>
 
-Use Helm and follow the steps below to install KubeBlocks.
+Follow these steps to install KubeBlocks using Helm.
 
-1. Create dependent CRDs. Specify the version you want to install.
+1. Get the KubeBlocks version:
+
+   * Option A - Get the latest stable version (e.g., v0.9.2):
+   
+      ```bash
+      curl -s "https://api.github.com/repos/apecloud/kubeblocks/releases?per_page=100&page=1" | jq -r '.[] | select(.prerelease == false) | .tag_name' | sort -V -r | head -n 1
+      ```
+        
+   * Option B - View all available versions (including alpha and beta releases):
+      * Visit the [KubeBlocks Releases](https://github.com/apecloud/kubeblocks/releases).
+      * Or use the command:
+        ```bash
+        curl -s "https://api.github.com/repos/apecloud/kubeblocks/releases?per_page=100&page=1" | jq -r '.[].tag_name' | sort -V -r
+        ```
+
+2. Create the required CRDs using your selected version:
 
    ```bash
-   kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/vx.y.z/kubeblocks_crds.yaml
+   # Replace <VERSION> with your selected version
+   kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/<VERSION>/kubeblocks_crds.yaml
+   
+   # Example: If the version is v0.9.2
+   kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/v0.9.2/kubeblocks_crds.yaml
    ```
 
-   You can view all versions of kubeblocks, including alpha and beta releases, on the [kubeblocks releases list](https://github.com/apecloud/kubeblocks/releases).
-
-   To get stable releases, use this command:
-
-   ```bash
-   curl -s "https://api.github.com/repos/apecloud/kubeblocks/releases?per_page=100&page=1" | jq -r '.[] | select(.prerelease == false) | .tag_name' | sort -V -r
-   ```
-
-2. Add the KubeBlocks Helm repo.
+3. Add the KubeBlocks Helm repo:
 
    ```bash
    helm repo add kubeblocks https://apecloud.github.io/helm-charts
    helm repo update
    ```
 
-3. Install KubeBlocks.
+4. Install KubeBlocks:
 
    ```bash
    helm install kubeblocks kubeblocks/kubeblocks --namespace kb-system --create-namespace
@@ -96,13 +107,13 @@ Use Helm and follow the steps below to install KubeBlocks.
        --set-json 'dataPlane.tolerations=[{ "key": "data-plane-taint", "operator": "Equal", "effect": "NoSchedule", "value": "true"    }]'
    ```
 
-   If you want to install KubeBlocks with a specified version, follow the steps below.
+   If you want to install KubeBlocks with a specified version, follow the steps below:
 
-   1. View the available versions in the [KubeBlocks Release](https://github.com/apecloud/kubeblocks/releases/).
-   2. Specify a version with `--version` and run the command below.
+   1. View the available versions in the [KubeBlocks Releases](https://github.com/apecloud/kubeblocks/releases/).
+   2. Specify a version with `--version` and run the command below:
 
       ```bash
-      helm install kubeblocks kubeblocks/kubeblocks --namespace kb-system --create-namespace --version="x.y.z"
+      helm install kubeblocks kubeblocks/kubeblocks --namespace kb-system --create-namespace --version=<VERSION>
       ```
 
      :::note
@@ -117,26 +128,46 @@ Use Helm and follow the steps below to install KubeBlocks.
 
 Like any other resource in Kubernetes, KubeBlocks can be installed through a YAML manifest applied via `kubectl`.
 
-1. Create dependent CRDs. Specify the version you want to install.
+1. Get the KubeBlocks version:
+
+   * Option A - Get the latest stable version (e.g., v0.9.2):
+
+      ```bash
+      curl -s "https://api.github.com/repos/apecloud/kubeblocks/releases?per_page=100&page=1" | jq -r '.[] | select(.prerelease == false) | .tag_name' | sort -V -r | head -n 1
+      ```
+
+   * Option B - View all available versions (including alpha and beta releases):
+      * Visit the [KubeBlocks Releases](https://github.com/apecloud/kubeblocks/releases).
+      * Or use the command:
+        ```bash
+        curl -s "https://api.github.com/repos/apecloud/kubeblocks/releases?per_page=100&page=1" | jq -r '.[].tag_name' | sort -V -r
+        ```
+
+2. Create the required CRDs using your selected version:
 
    ```bash
-   kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/vx.y.z/kubeblocks_crds.yaml
+   # Replace <VERSION> with your selected version
+   kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/<VERSION>/kubeblocks_crds.yaml
+   
+   # Example: If the version is v0.9.2
+   kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/v0.9.2/kubeblocks_crds.yaml
    ```
 
-   You can view all versions of kubeblocks, including alpha and beta releases, on the [kubeblocks releases list](https://github.com/apecloud/kubeblocks/releases).
-
-   To get stable releases, use this command:
+3. Install KubeBlocks:
 
    ```bash
-   curl -s "https://api.github.com/repos/apecloud/kubeblocks/releases?per_page=100&page=1" | jq -r '.[] | select(.prerelease == false) | .tag_name' | sort -V -r
+   # Replace <VERSION> with the same version used in step 2
+   kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/<VERSION>/kubeblocks.yaml
+
+   # Example: If the version is v0.9.2
+   kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/v0.9.2/kubeblocks.yaml
    ```
 
-2. Copy the URL of the `kubeblocks.yaml` file for the version you need from the Assets on the [KubeBlocks Release page](https://github.com/apecloud/kubeblocks/releases).
-3. Replace the YAML file URL in the command below and run this command to install KubeBlocks.
+   :::note
 
-     ```bash
-     kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/vx.y.x/kubeblocks.yaml
-     ```
+   Make sure to use the same version for both CRDs and KubeBlocks installation to avoid compatibility issues.
+
+   :::
 
 </TabItem>
 
@@ -150,7 +181,7 @@ kbcli kubeblocks install
 
 If you want to install KubeBlocks with a specified version, follow the steps below.
 
-1. View the available versions.
+1. View the available versions:
 
    ```bash
    kbcli kubeblocks list-versions
@@ -162,18 +193,18 @@ If you want to install KubeBlocks with a specified version, follow the steps bel
    kbcli kb list-versions --devel --limit=100
    ```
 
-   Or you can view all available versions in [KubeBlocks Release](https://github.com/apecloud/kubeblocks/releases/).
-2. Specify a version with `--version` and run the command below.
+   Or you can view all available versions in [KubeBlocks Releases](https://github.com/apecloud/kubeblocks/releases/).
+2. Specify a version with `--version` and run the command below:
 
    ```bash
-   kbcli kubeblocks install --version=x.y.z
+   kbcli kubeblocks install --version=<VERSION>
    ```
 
   :::note
 
    By default, when installing KubeBlocks, kbcli installs the corresponding version of KubeBlocks. It's important to ensure the major versions of kbcli and KubeBlocks are the same, if you specify a different version explicitly here.
 
-   For example, you can install kbcli v0.8.3 with KubeBlocks v0.8.1, but using mismatched major versions, such as kbcli v0.8.3 with KubeBlocks v0.9.0, may lead to errors.
+   For example, you can install kbcli v0.9.2 with KubeBlocks v0.9.1, but using mismatched major versions, such as kbcli v0.9.2 with KubeBlocks v1.0.0, may lead to errors.
   
   :::
 
@@ -224,7 +255,7 @@ kbcli kubeblocks status
 If the KubeBlocks Workloads are all ready, KubeBlocks has been installed successfully.
 
 ```bash
-KubeBlocks is deployed in namespace: kb-system,version: x.y.z
+KubeBlocks is deployed in namespace: kb-system, version: <VERSION>
 >
 KubeBlocks Workloads:
 NAMESPACE   KIND         NAME                           READY PODS   CPU(CORES)   MEMORY(BYTES)   CREATED-AT

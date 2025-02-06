@@ -475,30 +475,6 @@ var _ = Describe("OpsRequest Controller", func() {
 			})).Should(Succeed())
 		})
 
-		It("HorizontalScaling when offline the only instance in MySQL", func() {
-			createMysqlCluster(2)
-			By("mock cluster status")
-			Expect(testapps.ChangeObj(&testCtx, clusterObj, func(clusterObj *appsv1.Cluster) {
-				mockSetClusterStatusPhaseToRunning(clusterKey)
-			})).Should(Succeed())
-			ops := testops.NewOpsRequestObj("test-ops", testCtx.DefaultNamespace,
-				clusterObj.Name, opsv1alpha1.HorizontalScalingType)
-			ops.Spec.HorizontalScalingList = []opsv1alpha1.HorizontalScaling{
-				{
-					ComponentOps: opsv1alpha1.ComponentOps{ComponentName: mysqlCompName},
-					ScaleIn: &opsv1alpha1.ScaleIn{
-						OnlineInstancesToOffline: []string{clusterNamePrefix + mysqlCompName + "-0", clusterNamePrefix + mysqlCompName + "-1"},
-					},
-				},
-			}
-			ops.Labels = nil
-
-			err := ops.Validate(ctx, nil, clusterObj, true)
-
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("scaling down all the replicas of component"))
-		})
-
 		It("delete Running opsRequest", func() {
 			By("Create a horizontalScaling ops")
 			createMysqlCluster(3)

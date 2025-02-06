@@ -246,20 +246,20 @@ func updatePodRoleLabel(cli client.Client, reqCtx intctrlutil.RequestCtx,
 	roleName = strings.ToLower(roleName)
 
 	// update pod role label
-	patch := client.MergeFrom(pod.DeepCopy())
+	newPod := pod.DeepCopy()
 	role, ok := roleMap[roleName]
 	switch ok {
 	case true:
-		pod.Labels[RoleLabelKey] = role.Name
+		newPod.Labels[RoleLabelKey] = role.Name
 	case false:
-		delete(pod.Labels, RoleLabelKey)
+		delete(newPod.Labels, RoleLabelKey)
 	}
 
-	if pod.Annotations == nil {
-		pod.Annotations = map[string]string{}
+	if newPod.Annotations == nil {
+		newPod.Annotations = map[string]string{}
 	}
-	pod.Annotations[constant.LastRoleSnapshotVersionAnnotationKey] = version
-	return cli.Patch(ctx, pod, patch, inDataContext())
+	newPod.Annotations[constant.LastRoleSnapshotVersionAnnotationKey] = version
+	return cli.Update(ctx, newPod, inDataContext())
 }
 
 func inDataContext() *multicluster.ClientOption {

@@ -163,9 +163,11 @@ Like any other resource in Kubernetes, KubeBlocks can be installed through a YAM
    kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/v0.9.2/kubeblocks.yaml
    ```
 
-:::note
-Make sure to use the same version for both CRDs and KubeBlocks installation to avoid compatibility issues.
-:::
+   :::note
+4. 
+   Make sure to use the same version for both CRDs and KubeBlocks installation to avoid compatibility issues.
+5. 
+   :::
 
 </TabItem>
 

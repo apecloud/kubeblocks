@@ -160,10 +160,12 @@ KubeBlocks 是 Kubernetes 原生 operator，可通过 Helm、 kubectl 应用 YAM
    # 示例:如果版本是 v0.9.2
    kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/v0.9.2/kubeblocks.yaml
    ```
-
-:::note
-请确保创建 CRDs 和安装 KubeBlocks 时使用相同版本以避免兼容性问题。
-:::
+   
+   :::note
+   
+   请确保创建 CRDs 和安装 KubeBlocks 时使用相同版本以避免兼容性问题。
+   
+   :::
 
 </TabItem>
 

@@ -505,7 +505,7 @@ BackupRepo 是备份数据的存储仓库，支持配置 OSS（阿里云对象�
      --default
    ```
 
-   以上部署的 MinIO 的访问地址为 http://minio.kb-system.svc.cluster.local:9000。
+   以上部署的 MinIO 的访问地址为 http://minio.kb-system.svc.cluster.local:9000
 
    </TabItem>
 

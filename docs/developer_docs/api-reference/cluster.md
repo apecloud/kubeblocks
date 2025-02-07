@@ -11608,7 +11608,7 @@ Required when TLS is enabled.</p>
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.Issuer">Issuer</a>)
 </p>
 <div>
-<p>TLSSecretRef defines Secret contains Tls certs</p>
+<p>TLSSecretRef defines the Secret that contains TLS certs.</p>
 </div>
 <table>
 <thead>
@@ -11618,6 +11618,19 @@ Required when TLS is enabled.</p>
 </tr>
 </thead>
 <tbody>
+<tr>
+<td>
+<code>namespace</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The namespace where the secret is located.
+If not provided, the secret is assumed to be in the same namespace as the Cluster object.</p>
+</td>
+</tr>
 <tr>
 <td>
 <code>name</code><br/>

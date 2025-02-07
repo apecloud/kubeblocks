@@ -96,12 +96,20 @@ var _ = Describe("synthesized component", func() {
 			}
 		})
 
-		It("comp def", func() {
+		It("ok", func() {
+			compDef.Spec.Configs[1].TemplateRef = "external"
+
 			synthesizedComp, err := BuildSynthesizedComponent(ctx, cli, compDef, comp)
 			Expect(err).Should(BeNil())
 
 			Expect(synthesizedComp).ShouldNot(BeNil())
 			Expect(synthesizedComp.ConfigTemplates).Should(BeEquivalentTo(compDef.Spec.Configs))
+		})
+
+		It("has config template not specified", func() {
+			_, err := BuildSynthesizedComponent(ctx, cli, compDef, comp)
+			Expect(err).ShouldNot(BeNil())
+			Expect(err.Error()).Should(ContainSubstring("required config template is empty"))
 		})
 
 		It("w/ comp override - ok", func() {
@@ -123,6 +131,7 @@ var _ = Describe("synthesized component", func() {
 
 			expectExternalConfig := compDef.Spec.Configs[1]
 			expectExternalConfig.TemplateRef = comp.Spec.Configs[0].ConfigMap.Name
+			expectExternalConfig.Namespace = comp.Namespace
 			Expect(synthesizedComp.ConfigTemplates[1]).Should(BeEquivalentTo(expectExternalConfig))
 		})
 

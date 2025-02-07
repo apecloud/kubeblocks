@@ -16049,9 +16049,15 @@ spec:
                   It establishes the initial composition and structure of the Cluster and is intended for one-time configuration.
                 maxLength: 32
                 type: string
+                x-kubernetes-validations:
+                - message: topology is immutable
+                  rule: self == oldSelf
             required:
             - terminationPolicy
             type: object
+            x-kubernetes-validations:
+            - message: topology is required once set
+              rule: '!has(oldSelf.topology) || has(self.topology)'
           status:
             description: ClusterStatus defines the observed state of the Cluster.
             properties:

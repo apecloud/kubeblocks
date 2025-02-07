@@ -225,7 +225,56 @@ func (r RestoreOpsHandler) getClusterObjFromBackup(backup *dpv1alpha1.Backup, op
 		cluster.Spec.ComponentSpecs[i].OfflineInstances = nil
 	}
 	r.rebuildShardAccountSecrets(cluster)
+	r.normalizeSchedulePolicy(cluster, cluster.Spec.SchedulingPolicy)
+	for i := range cluster.Spec.ComponentSpecs {
+		r.normalizeSchedulePolicy(cluster, cluster.Spec.ComponentSpecs[i].SchedulingPolicy)
+	}
+	for i := range cluster.Spec.Shardings {
+		r.normalizeSchedulePolicy(cluster, cluster.Spec.Shardings[i].Template.SchedulingPolicy)
+	}
 	return cluster, nil
+}
+
+// normalizeSchedulePolicy normalizes the schedule policy of the new cluster.
+func (r RestoreOpsHandler) normalizeSchedulePolicy(cluster *appsv1.Cluster, schedulePolicy *appsv1.SchedulingPolicy) {
+	if schedulePolicy == nil {
+		return
+	}
+	updateLabelSelector := func(selector *metav1.LabelSelector) {
+		if _, ok := selector.MatchLabels[constant.AppInstanceLabelKey]; ok {
+			selector.MatchLabels[constant.AppInstanceLabelKey] = cluster.Name
+		}
+		for i := range selector.MatchExpressions {
+			matchExpression := &selector.MatchExpressions[i]
+			if matchExpression.Key == constant.AppInstanceLabelKey {
+				matchExpression.Values = []string{cluster.Name}
+			}
+		}
+	}
+	for i := range schedulePolicy.TopologySpreadConstraints {
+		updateLabelSelector(schedulePolicy.TopologySpreadConstraints[i].LabelSelector)
+	}
+	if schedulePolicy.Affinity == nil {
+		return
+	}
+	updatePodAffinityTerm := func(pats []corev1.PodAffinityTerm, wpats []corev1.WeightedPodAffinityTerm) {
+		for i := range pats {
+			podAffinityTerm := &pats[i]
+			updateLabelSelector(podAffinityTerm.LabelSelector)
+		}
+		for i := range wpats {
+			wpat := &wpats[i]
+			updateLabelSelector(wpat.PodAffinityTerm.LabelSelector)
+		}
+	}
+	if schedulePolicy.Affinity.PodAntiAffinity != nil {
+		updatePodAffinityTerm(schedulePolicy.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
+			schedulePolicy.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution)
+	}
+	if schedulePolicy.Affinity.PodAffinity != nil {
+		updatePodAffinityTerm(schedulePolicy.Affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
+			schedulePolicy.Affinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution)
+	}
 }
 
 func (r RestoreOpsHandler) rebuildShardAccountSecrets(cluster *appsv1.Cluster) {

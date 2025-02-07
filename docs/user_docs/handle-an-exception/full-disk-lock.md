@@ -31,22 +31,53 @@ When the space water level of all configured volumes falls below the defined thr
 - For PostgreSQL and MongoDB, both the read/write user and the superuser cannot write when the disk usage reaches `highwatermark`.
 - `90` is the default value setting for the high watermark at the component level which means the disk is locked when the disk usage reaches 90%, while `85` is used for the volumes which overwrites the component's threshold value.
 
-In the cluster definition, add the following content to enable the full disk lock function. You can set the value according to your need.
+**Steps:**
 
-```bash
-volumeProtectionSpec:
-  highWatermark: 90
-  volumes:
-  - highWatermark: 85
-    name: data
-```
+1. Edit the ClusterDefinition Custom Resource (CR) of a database.
 
-:::note
+   This guide takes `mysql` as an example. You can replace `mysql` with `postgresql` or `mongodb`.
 
-The recommended value of `highWatermark` is 90.
+   ```bash
+   kubectl edit clusterdefinition mysql
+   ```
 
-:::
+2. Add the `volumeProtectionSpec` field under `spec.componentDefs[]` to enable the full disk lock function. You can set the values of `highWatermark` as needed.
+
+   ```yaml
+   ...
+   spec:
+     componentDefs:
+     ...
+     - name: mysql
+       volumeProtectionSpec:
+         highWatermark: 90
+         volumes:
+         - highWatermark: 85
+           name: data
+     ...
+   ```
+
+   :::note
+
+   The recommended value of `highWatermark` is 90.
+
+   :::
+
+3. Save the changes and exit.
 
 ## Disable full disk lock
 
-Delete `volumeProtectionSpec` from the cluster definition file.
+To disable the full disk lock function, just delete the `volumeProtectionSpec` field from the ClusterDefinition CR.
+
+**Steps:**
+
+1. Edit the ClusterDefinition CR of a database.
+
+   This guide takes `mysql` as an example. You can replace `mysql` with `postgresql` or `mongodb`.
+
+   ```bash
+   kubectl edit clusterdefinition mysql
+   ```
+
+2. Delete the `volumeProtectionSpec` field.
+3. Save the changes and exit.

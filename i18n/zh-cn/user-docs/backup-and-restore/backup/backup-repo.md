@@ -13,7 +13,7 @@ import TabItem from '@theme/TabItem';
 
 ## 概述
 
-BackupRepo 是备份数据的存储仓库，支持配置 OSS（阿里云对象存储），S3（亚马逊对象存储），COS（腾讯云对象存储），GCS（谷歌云对象存储），OBS（华为云对象存储），MinIO 等兼容 S3 协议的对象存储作为备份仓库，同时支持 K8s 原生的 PVC 作为备份仓库。
+BackupRepo 是备份数据的存储仓库，支持配置 OSS（阿里云对象存储），S3（亚马逊对象存储），COS（腾讯云对象存储），GCS（谷歌云对象存储），OBS（华为云对象存储），MinIO 等兼容 S3 协议的对象存储作为备份仓库。
 
 用户可以创建多个 BackupRepo 以适应不同的场景。例如，根据不同的业务需求，可以把业务 A 的数据存储在 A 仓库，把业务 B 的数据存储在 B 仓库，或者可以按地区配置多个仓库以实现异地容灾。在创建备份时，你需要指定备份仓库。你也可以创建一个默认的备份仓库，如果在创建备份时未指定具体的仓库，KubeBlocks 将使用此默认仓库来存储备份数据。
 
@@ -35,11 +35,17 @@ BackupRepo 是备份数据的存储仓库，支持配置 OSS（阿里云对象�
 1. 在 `kb-system` 命名空间中安装 MinIO。
 
    ```bash
+   helm install minio oci://registry-1.docker.io/bitnamicharts/minio --namespace kb-system --create-namespace --set "extraEnvVars[0].name=MINIO_BROWSER_LOGIN_ANIMATION" --set "extraEnvVars[0].value=off"
+   ```
+
+   如果上述仓库地址网络无法连接，可使用以下命令安装。
+
+   ```bash
    helm repo add kubeblocks-apps https://jihulab.com/api/v4/projects/152630/packages/helm/stable
    helm install minio kubeblocks-apps/minio --namespace kb-system --create-namespace --set "extraEnvVars[0].name=MINIO_BROWSER_LOGIN_ANIMATION" --set "extraEnvVars[0].value=off"
    ```
 
-   获取初始的用户名和密码：
+2. 获取初始的用户名和密码：
 
    ```bash
    # 初始 username
@@ -49,7 +55,7 @@ BackupRepo 是备份数据的存储仓库，支持配置 OSS（阿里云对象�
    echo $(kubectl get secret --namespace kb-system minio -o jsonpath="{.data.root-password}" | base64 -d)
    ```
 
-2. 生成连接凭证。
+3. 生成连接凭证。
 
    执行 `kubectl port-forward --namespace kb-system svc/minio 9001:9001`，然后访问 `127.0.0.1:9001` 进入登录页面。
 
@@ -57,7 +63,7 @@ BackupRepo 是备份数据的存储仓库，支持配置 OSS（阿里云对象�
 
    ![backup-and-restore-backup-repo-1](../img/../../../img/backup-and-restore-backup-repo-1.png)
 
-3. 创建 bucket。
+4. 创建 bucket。
 
    在 MinIO 仪表盘上创建一个名为 `test-minio` 的存储桶。
 
@@ -90,68 +96,6 @@ BackupRepo 是备份数据的存储仓库，支持配置 OSS（阿里云对象�
 
 不过，由于备份和恢复任务需要运行在数据库集群所在的 namespace 下，在 “Tool” 方式下，我们会自动将访问远端存储所需的密钥以 secret 资源的形式同步到这些 namespace 中，以供我们的数据传输工具使用。在多租户隔离的情况下，如果你认为这种同步 secret 的做法会带来安全隐患，可以选择使用 “Mount”。
 
-### 自动配置 BackupRepo
-
-安装 KubeBlocks 时，可以通过配置文件指定 BackupRepo 相关信息，KubeBlocks 会根据配置信息创建 BackupRepo 并自动安装必要的 CSI Driver。
-
-1. 准备配置文件。
-
-   以 AWS 的 S3 为例，配置文件 `backuprepo.yaml` 如下：
-
-    ```yaml
-    backupRepo:
-      create: true
-      storageProvider: s3
-      config:
-        region: cn-northwest-1
-        bucket: test-kb-backup
-      secrets:
-        accessKeyId: <ACCESS KEY>
-        secretAccessKey: <SECRET KEY>
-    ```
-
-    * `region` 表示 S3 所在区域。
-    * `bucket` 表示 S3 的桶名称。
-    * `accessKeyId` 表示 AWS 的 Access Key。
-    * `secretAccessKey` 表示 AWS 的 Secret Key。
-    * `storageProvider` 表示对象存储提供者，该示例中为 s3。
-
-:::note
-
-* 在 KubeBlocks v0.8.0 中，`storageProvider` 目前可选 `s3`、`cos`、`gcs-s3comp`、`obs`、`oss`、`minio`、`pvc`、`ftp`、`nfs`。
-* 不同 `storageProvider` 所需的配置信息并不统一，上面展示的 `config` 和 `secrets` 适用于 s3。
-* 执行 `kubectl get storageproviders.storage.kubeblocks.io` 命令可以查看支持的 `storageProvider`。
-
-:::
-
-2. 安装 KubeBlocks 时指定配置文件。
-
-   ```bash
-   kbcli kubeblocks install -f backuprepo.yaml
-   ```
-
-   安装完成后，可以执行命令查看 BackupRepo。
-
-   <Tabs>
-
-   <TabItem value="kbcli" label="kbcli" default>
-
-   ```bash
-   kbcli backuprepo list
-   ```
-
-   </TabItem>
-
-   <TabItem value="kubectl" label="kubectl">
-
-   ```bash
-   kubectl get backuprepo
-   ```
-
-   </TabItem>
-
-   </Tabs>
-
 ### 手动配置 BackupRepo
 
 如果在安装 KubeBlocks 时没有配置 BackupRepo 信息，你可以按照以下说明进行手动配置。
@@ -183,11 +127,13 @@ BackupRepo 是备份数据的存储仓库，支持配置 OSS（阿里云对象�
     ```bash
     helm repo add kubeblocks https://jihulab.com/api/v4/projects/85949/packages/helm/stable
     helm install csi-s3 kubeblocks/csi-s3 --version=0.7.0 -n kb-system
+    ```
 
-    # 还可以添加下面的参数来控制安装
-    # 默认 csi-s3 会在所有 node 安装 daemonSet pod，可以配置 tolerations，安装在指定 node
-    --set-json tolerations='[{"key":"taintkey","operator":"Equal","effect":"NoSchedule","value":"taintValue"}]'
-    --set-json daemonsetTolerations='[{"key":"taintkey","operator":"Equal","effect":"NoSchedule","value":"taintValue"}]'
+    您也可以自定义安装 S3 CSI driver。例如，`csi-s3` 默认在所有节点上安装一个 daemonSet Pod，您可以通过配置容忍，实现仅在指定节点上安装。
+
+    ```bash
+    helm repo add kubeblocks https://jihulab.com/api/v4/projects/85949/packages/helm/stable
+    helm install csi-s3 kubeblocks/csi-s3 --version=0.7.0 -n kb-system --set-json tolerations='[{"key":"taintkey","operator":"Equal","effect":"NoSchedule","value":"taintValue"}]' --set-json daemonsetTolerations='[{"key":"taintkey","operator":"Equal","effect":"NoSchedule","value":"taintValue"}]'
     ```
 
     </TabItem>
@@ -215,6 +161,8 @@ BackupRepo 是备份数据的存储仓库，支持配置 OSS（阿里云对象�
         --default
       ```
 
+      你也可将 `--access-method` 配置为 `Mount`。
+
       </TabItem>
 
       <TabItem value="OSS" label="OSS">
@@ -224,7 +172,20 @@ BackupRepo 是备份数据的存储仓库，支持配置 OSS（阿里云对象�
         --provider oss \
         --region cn-zhangjiakou \
         --bucket  test-kb-backup \
-        # --endpoint https://oss-cn-zhangjiakou-internal.aliyuncs.com \ 可以显示指定 oss endpoint
+        --access-key-id <ACCESS KEY> \
+        --secret-access-key <SECRET KEY> \
+        --access-method Tool \ 
+        --default
+      ```
+
+      你还可以使用 `--endpoint` 显示指定 OSS endpoint，示例如下：
+
+      ```bash
+      kbcli backuprepo create my-repo \
+        --provider oss \
+        --region cn-zhangjiakou \
+        --bucket  test-kb-backup \
+        --endpoint https://oss-cn-zhangjiakou-internal.aliyuncs.com \
         --access-key-id <ACCESS KEY> \
         --secret-access-key <SECRET KEY> \
         --access-method Tool \ 
@@ -250,12 +211,12 @@ BackupRepo 是备份数据的存储仓库，支持配置 OSS（阿里云对象�
 
       <TabItem value="COS" label="COS">
 
+      腾讯云中存储桶的命名格式为 `<BucketName-APPID>`，APPID 为腾讯云自动生成。设置 `--bucket` 时，请先通过腾讯云的控制台创建 bucket，获取存储桶名称。
+
       ```bash
       kbcli backuprepo create my-repo \
         --provider cos \
         --region ap-guangzhou \
-        # 腾讯云中存储桶的命名格式为 <BucketName-APPID>，APPID 为腾讯云自动生成
-        # 设置 bucket 时先通过腾讯云的控制台创建 bucket，获取存储桶名称
         --bucket  test-kb-backup \ 
         --access-key-id <ACCESS KEY> \
         --secret-access-key <SECRET KEY> \
@@ -268,7 +229,6 @@ BackupRepo 是备份数据的存储仓库，支持配置 OSS（阿里云对象�
       <TabItem value="GCS" label="GCS">
 
       ```bash
-      # 目前的 gcs 为谷歌云的 s3 兼容版
       kbcli backuprepo create my-repo \
         --provider gcs \
         --region auto \
@@ -279,6 +239,8 @@ BackupRepo 是备份数据的存储仓库，支持配置 OSS（阿里云对象�
         --default
       ```
 
+      KubeBlocks 目前支持的 GCS 为谷歌云的 S3 兼容版。
+
       </TabItem>
 
       <TabItem value="MinIO" label="MinIO">
@@ -286,7 +248,7 @@ BackupRepo 是备份数据的存储仓库，支持配置 OSS（阿里云对象�
       ```bash
       kbcli backuprepo create my-repo \
         --provider minio \
-        --endpoint <ip:port> \    # 以上部署的 MinIO 的访问地址为 http://minio.kb-system.svc.cluster.local:9000
+        --endpoint <ip:port> \    
         --bucket test-minio \
         --access-key-id <ACCESS KEY> \
         --secret-access-key <SECRET KEY> \
@@ -294,19 +256,10 @@ BackupRepo 是备份数据的存储仓库，支持配置 OSS（阿里云对象�
         --default
       ```
 
-      </TabItem>
-
-      <TabItem value="PVC" label="PVC">
-
-      ```bash
-      kbcli backuprepo create --provider pvc \
-        --storage-class-name "nfs-storage" \
-        --access-mode "ReadWriteMany" \
-        --volume-capacity "100Gi" \
-        --default
-      ```
+      以上部署的 MinIO 的访问地址为 http://minio.kb-system.svc.cluster.local:9000
 
       </TabItem>
+
       </Tabs>
 
       以上命令创建了一个名为 `my-repo` 的默认备份仓库。
@@ -556,6 +509,81 @@ BackupRepo 是备份数据的存储仓库，支持配置 OSS（阿里云对象�
 
 3. 查看 BackupRepo 及其状态。
    如果 STATUS 为 `Ready`，说明 BackupRepo 已经准备就绪。
+
+   <Tabs>
+
+   <TabItem value="kbcli" label="kbcli" default>
+
+   ```bash
+   kbcli backuprepo list
+   ```
+
+   </TabItem>
+
+   <TabItem value="kubectl" label="kubectl">
+
+   ```bash
+   kubectl get backuprepo
+   ```
+
+   </TabItem>
+
+   </Tabs>
+
+:::note
+
+如果 BackupRepo 状态显示 Failed，或者长时间处于 PreChecking 状态，可执行 `kubectl describe backuprepo my-repo` 或 `kbcli backuprepo describe my-repo` 命令，根据 `status.conditions` 中的信息，查找异常原因。
+建议从以下方面进行排查：
+
+* 检查配置内容是否正确，如 `endpoint`，`accessKeyId` 和 `secretAccessKey` 等参数是否正确填写。
+* 对于其他自建的对象存储，如 Ceph Object Storage ，可尝试使用 `s3-compatible` StorageProvider。由于 `s3` StorageProvider 默认使用 virtual hosting 风格的 URL 访问服务端，自建对象存储很可能不支持这种访问方式。
+* 如提示 `InvalidLocationConstraint` 错误，请先检查 `region` 参数是否正确填写。如果仍有 `InvalidLocationConstraint` 报错，可尝试将 `region` 参数留空不填。
+* 如果长时间处于 `PreChecking` 状态，很可能是网络问题。请确保在 K8s 集群内能正常访问存储服务，例如可运行一个 Pod，在 Pod 里面通过对应的客户端尝试连接存储服务。
+* KubeBlocks 内部使用 [rclone](https://rclone.org/) 传输数据，请确保能通过 rclone 正常访问当前所使用的存储服务。
+
+:::
+
+### 自动配置 BackupRepo
+
+安装 KubeBlocks 时，可以通过配置文件指定 BackupRepo 相关信息，KubeBlocks 会根据配置信息创建 BackupRepo 并自动安装必要的 CSI Driver。
+
+1. 准备配置文件。
+
+   以 AWS 的 S3 为例，配置文件 `backuprepo.yaml` 如下：
+
+    ```yaml
+    backupRepo:
+      create: true
+      storageProvider: s3
+      config:
+        region: cn-northwest-1
+        bucket: test-kb-backup
+      secrets:
+        accessKeyId: <ACCESS KEY>
+        secretAccessKey: <SECRET KEY>
+    ```
+
+    * `region` 表示 S3 所在区域。
+    * `bucket` 表示 S3 的桶名称。
+    * `accessKeyId` 表示 AWS 的 Access Key。
+    * `secretAccessKey` 表示 AWS 的 Secret Key。
+    * `storageProvider` 表示对象存储提供者，该示例中为 s3。
+
+:::note
+
+* 在 KubeBlocks v0.8.0 中，`storageProvider` 目前可选 `s3`、`cos`、`gcs-s3comp`、`obs`、`oss`、`minio`、`pvc`、`ftp`、`nfs`。
+* 不同 `storageProvider` 所需的配置信息并不统一，上面展示的 `config` 和 `secrets` 适用于 s3。
+* 执行 `kubectl get storageproviders.storage.kubeblocks.io` 命令可以查看支持的 `storageProvider`。
+
+:::
+
+2. 安装 KubeBlocks 时指定配置文件。
+
+   ```bash
+   kbcli kubeblocks install -f backuprepo.yaml
+   ```
+
+   安装完成后，可以执行命令查看 BackupRepo。
 
    <Tabs>
 

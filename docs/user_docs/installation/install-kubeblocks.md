@@ -21,6 +21,7 @@ To try out KubeBlocks on your local host, you can use the [Playground](./../try-
 
 - Note that you install and uninstall KubeBlocks with the same tool. For example, if you install KubeBlocks with Helm, to uninstall it, you have to use Helm too.
 - Make sure you have [kubectl](https://kubernetes.io/docs/tasks/tools/), [Helm](https://helm.sh/docs/intro/install/), or [kbcli](./install-kbcli.md) installed.
+- Make sure you have Snapshot Controller installed before installing KubeBlocks. If you haven't installed it, follow the steps in section [Install Snapshot Controller](#install-snapshot-controller) to install it.
 
 :::
 
@@ -53,6 +54,67 @@ To try out KubeBlocks on your local host, you can use the [Playground](./../try-
 	</tr>
 </table>
 
+## Install Snapshot Controller
+
+The SnapshotController is a Kubernetes component that manages CSI Volume Snapshots, enabling users to create, restore, and delete snapshots of Persistent Volumes (PVs). KubeBlocks Dataprotection Controller uses the Snapshot Controller to create and manage snapshots for databases.
+
+If your Kubernetes cluster does NOT have the following CRDs, you likely also do not have a snapshot controller deployed and you need to install one.
+
+```bash
+kubectl get crd volumesnapshotclasses.snapshot.storage.k8s.io
+kubectl get crd volumesnapshots.snapshot.storage.k8s.io
+kubectl get crd volumesnapshotcontents.snapshot.storage.k8s.io
+```
+
+:::note
+
+If you are sure you don't need the snapshot backup feature, you can install only the SnapshotController CRD and skip steps 1 and 2.
+
+```bash
+kubectl create -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/v8.2.0/client/config/crd/snapshot.storage.k8s.io_volumesnapshotclasses.yaml
+kubectl create -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/v8.2.0/client/config/crd/snapshot.storage.k8s.io_volumesnapshots.yaml
+kubectl create -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/v8.2.0/client/config/crd/snapshot.storage.k8s.io_volumesnapshotcontents.yaml
+```
+
+:::
+
+### Step 1. Deploy Snapshot Controller
+
+You can install the Snapshot Controller using Helm or kubectl. Here are the steps to install the Snapshot Controller using Helm.
+
+```bash
+helm repo add piraeus-charts https://piraeus.io/helm-charts/
+helm repo update
+# Update the namespace to an appropriate value for your environment (e.g. kb-system)
+helm install snapshot-controller piraeus-charts/snapshot-controller -n kb-system --create-namespace
+```
+
+For more information, please refer to [Snapshot Controller Configuration](https://artifacthub.io/packages/helm/piraeus-charts/snapshot-controller#configuration).
+
+### Step 2. Verify Snapshot Controller installation
+
+Check if the snapshot-controller Pod is running:
+
+```bash
+kubectl get pods -n kb-system | grep snapshot-controller
+```
+
+<details>
+
+<summary>Output</summary>
+
+```bash
+snapshot-controller-xxxx-yyyy   1/1   Running   0   30s
+```
+
+</details>
+
+If the pod is in a CrashLoopBackOff state, check logs:
+
+```bash
+kubectl logs -n kb-system deployment/snapshot-controller
+```
+
 ## Installation steps
 
 <Tabs>
@@ -64,11 +126,11 @@ Follow these steps to install KubeBlocks using Helm.
 1. Get the KubeBlocks version:
 
    * Option A - Get the latest stable version (e.g., v0.9.2):
-   
+
       ```bash
       curl -s "https://api.github.com/repos/apecloud/kubeblocks/releases?per_page=100&page=1" | jq -r '.[] | select(.prerelease == false) | .tag_name' | sort -V -r | head -n 1
       ```
-        
+
    * Option B - View all available versions (including alpha and beta releases):
       * Visit the [KubeBlocks Releases](https://github.com/apecloud/kubeblocks/releases).
       * Or use the command:
@@ -81,7 +143,7 @@ Follow these steps to install KubeBlocks using Helm.
    ```bash
    # Replace <VERSION> with your selected version
    kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/<VERSION>/kubeblocks_crds.yaml
-   
+
    # Example: If the version is v0.9.2
    kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/v0.9.2/kubeblocks_crds.yaml
    ```
@@ -148,7 +210,7 @@ Like any other resource in Kubernetes, KubeBlocks can be installed through a YAM
    ```bash
    # Replace <VERSION> with your selected version
    kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/<VERSION>/kubeblocks_crds.yaml
-   
+
    # Example: If the version is v0.9.2
    kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/v0.9.2/kubeblocks_crds.yaml
    ```
@@ -205,7 +267,7 @@ If you want to install KubeBlocks with a specified version, follow the steps bel
    By default, when installing KubeBlocks, kbcli installs the corresponding version of KubeBlocks. It's important to ensure the major versions of kbcli and KubeBlocks are the same, if you specify a different version explicitly here.
 
    For example, you can install kbcli v0.9.2 with KubeBlocks v0.9.1, but using mismatched major versions, such as kbcli v0.9.2 with KubeBlocks v1.0.0, may lead to errors.
-  
+
   :::
 
 </TabItem>
@@ -230,16 +292,8 @@ If the KubeBlocks Workloads are all ready, KubeBlocks has been installed success
 
 ```bash
 NAME                                             READY   STATUS    RESTARTS       AGE
-alertmanager-webhook-adaptor-8dfc4878d-svzrc     2/2     Running   0              3m56s
-grafana-77dfd6959-4gnhp                          1/1     Running   0              3m56s
-kb-addon-snapshot-controller-546f84b78d-8rjs4    1/1     Running   0              3m56s
 kubeblocks-7cf7745685-ddlwk                      1/1     Running   0              4m39s
 kubeblocks-dataprotection-95fbc79cc-b544l        1/1     Running   0              4m39s
-prometheus-alertmanager-5c9fc88996-qltrk         2/2     Running   0              3m56s
-prometheus-kube-state-metrics-5dbbf757f5-db9v6   1/1     Running   0              3m56s
-prometheus-node-exporter-r6kvl                   1/1     Running   0              3m56s
-prometheus-pushgateway-8555888c7d-xkgfc          1/1     Running   0              3m56s
-prometheus-server-5759b94fc8-686xp               2/2     Running   0              3m56s
 ```
 
 </TabItem>
@@ -259,7 +313,6 @@ KubeBlocks is deployed in namespace: kb-system, version: <VERSION>
 >
 KubeBlocks Workloads:
 NAMESPACE   KIND         NAME                           READY PODS   CPU(CORES)   MEMORY(BYTES)   CREATED-AT
-kb-system   Deployment   kb-addon-snapshot-controller   1/1          N/A          N/A             Oct 13,2023 14:27 UTC+0800
 kb-system   Deployment   kubeblocks                     1/1          N/A          N/A             Oct 13,2023 14:26 UTC+0800
 kb-system   Deployment   kubeblocks-dataprotection      1/1          N/A          N/A             Oct 13,2023 14:26 UTC+0800
 ```

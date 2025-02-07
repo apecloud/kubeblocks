@@ -1239,8 +1239,12 @@ func resolveReferentObjects(synthesizedComp *SynthesizedComponent,
 }
 
 func resolveReferentComponents(synthesizedComp *SynthesizedComponent, objRef appsv1alpha1.ClusterObjectReference) ([]string, error) {
+	var (
+		mopt = objRef.MultipleClusterObjectOption
+	)
+
 	// match the current component when the multiple cluster object option not set
-	if len(objRef.CompDef) == 0 || (CompDefMatched(synthesizedComp.CompDefName, objRef.CompDef) && objRef.MultipleClusterObjectOption == nil) {
+	if len(objRef.CompDef) == 0 || (CompDefMatched(synthesizedComp.CompDefName, objRef.CompDef) && mopt == nil) {
 		return []string{synthesizedComp.Name}, nil
 	}
 
@@ -1250,18 +1254,35 @@ func resolveReferentComponents(synthesizedComp *SynthesizedComponent, objRef app
 			compNames = append(compNames, k)
 		}
 	}
-	switch len(compNames) {
-	case 1:
-		return compNames, nil
-	case 0:
-		return nil, apierrors.NewNotFound(schema.GroupResource{}, "") // the error msg is trivial
-	default:
-		if objRef.MultipleClusterObjectOption == nil {
-			return nil, fmt.Errorf("more than one referent component found: %s", strings.Join(compNames, ","))
-		} else {
+
+	if mopt == nil || mopt.RequireAllComponentObjects == nil || !*mopt.RequireAllComponentObjects {
+		switch len(compNames) {
+		case 1:
 			return compNames, nil
+		case 0:
+			return nil, apierrors.NewNotFound(schema.GroupResource{}, "") // the error msg is trivial
+		default:
+			if mopt == nil {
+				return nil, fmt.Errorf("more than one referent component found: %s", strings.Join(compNames, ","))
+			} else {
+				return compNames, nil
+			}
 		}
 	}
+	// objRef.MultipleClusterObjectOption.RequireAllComponentObjects == true
+	total := int32(0)
+	for compDef, cnt := range synthesizedComp.CompDef2CompCnt {
+		if CompDefMatched(compDef, objRef.CompDef) {
+			total += cnt
+		}
+	}
+	if len(compNames) != int(total) {
+		return nil, fmt.Errorf("insufficient component objects to resolve vars, expected: %d, actual: %d", total, len(compNames))
+	}
+	if len(compNames) == 0 {
+		return nil, apierrors.NewNotFound(schema.GroupResource{}, "") // the error msg is trivial
+	}
+	return compNames, nil
 }
 
 func resolveClusterObjectVars(kind string, objRef appsv1alpha1.ClusterObjectReference, option *appsv1alpha1.VarOption,

@@ -825,6 +825,15 @@ type ClusterComponentSpec struct {
 	// +optional
 	ServiceAccountName string `json:"serviceAccountName,omitempty"`
 
+	// Specifies the strategy for provisioning shards of the sharding. Only `Serial` and `Parallel` are supported.
+	//
+	// This field is immutable.
+	//
+	// +kubebuilder:default=Serial
+	// +kubebuilder:validation:Enum={Serial,Parallel}
+	// +optional
+	ProvisionStrategy *UpdateStrategy `json:"provisionStrategy,omitempty"`
+
 	// Defines the update strategy for the Component.
 	//
 	// Deprecated since v0.9.

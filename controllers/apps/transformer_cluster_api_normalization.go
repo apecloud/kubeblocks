@@ -72,6 +72,10 @@ func (t *ClusterAPINormalizationTransformer) Transform(ctx graph.TransformContex
 		return err
 	}
 
+	if err = t.validateShardingProvision(cluster, transCtx.ComponentDefs); err != nil {
+		return err
+	}
+
 	// update the resolved component definitions and service versions to cluster spec.
 	t.updateCompSpecs(transCtx)
 
@@ -92,6 +96,88 @@ func (t *ClusterAPINormalizationTransformer) validateSpec(cluster *appsv1alpha1.
 		}
 	}
 	return nil
+}
+
+func (t *ClusterAPINormalizationTransformer) validateShardingProvision(cluster *appsv1alpha1.Cluster, compDefs map[string]*appsv1alpha1.ComponentDefinition) error {
+	// Validate ProvisionStrategy in sharding specs
+	for _, v := range cluster.Spec.ShardingSpecs {
+		if err := t.validateProvisionNUpdateStrategy(v, compDefs); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (t *ClusterAPINormalizationTransformer) validateProvisionNUpdateStrategy(shardingSpec appsv1alpha1.ShardingSpec, compDefs map[string]*appsv1alpha1.ComponentDefinition) error {
+	var (
+		provision = shardingSpec.Template.ProvisionStrategy
+		update    = shardingSpec.Template.UpdateStrategy
+	)
+
+	supported := func(strategy *appsv1alpha1.UpdateStrategy) bool {
+		if strategy == nil {
+			return true
+		}
+		return *strategy == appsv1alpha1.SerialStrategy || *strategy == appsv1alpha1.ParallelStrategy
+	}
+	if !supported(provision) {
+		return fmt.Errorf("unsupported provision strategy: %s", *provision)
+	}
+	if !supported(update) {
+		return fmt.Errorf("unsupported update strategy: %s", *update)
+	}
+
+	if provision != nil && *provision == appsv1alpha1.SerialStrategy && t.requireParallelProvision(shardingSpec, compDefs) {
+		return fmt.Errorf("serial provision strategy is conflicted with vars that requires parallel provision when mutiple objects matched")
+	}
+	return nil
+}
+
+// requireParallelProvision checks whether the provision strategy must be parallel.
+//
+// If any Vars in the ShardingDefinition have requireAllComponentObjects set to true,
+// all sharding components must exist before Vars resolving can proceed. This requirement
+// conflicts with a serial provision strategy, where components are created one at a time,
+// potentially leading to a logical deadlock.
+func (t *ClusterAPINormalizationTransformer) requireParallelProvision(shardingSpec appsv1alpha1.ShardingSpec, compDefs map[string]*appsv1alpha1.ComponentDefinition) bool {
+	requireAll := func(opt *appsv1alpha1.MultipleClusterObjectOption) bool {
+		return opt != nil && opt.RequireAllComponentObjects != nil && *opt.RequireAllComponentObjects
+	}
+	require := func(v appsv1alpha1.EnvVar) bool {
+		if v.ValueFrom != nil {
+			if v.ValueFrom.HostNetworkVarRef != nil {
+				return requireAll(v.ValueFrom.HostNetworkVarRef.MultipleClusterObjectOption)
+			}
+			if v.ValueFrom.ServiceVarRef != nil {
+				return requireAll(v.ValueFrom.ServiceVarRef.MultipleClusterObjectOption)
+			}
+			if v.ValueFrom.CredentialVarRef != nil {
+				return requireAll(v.ValueFrom.CredentialVarRef.MultipleClusterObjectOption)
+			}
+			if v.ValueFrom.ServiceRefVarRef != nil {
+				return requireAll(v.ValueFrom.ServiceRefVarRef.MultipleClusterObjectOption)
+			}
+			if v.ValueFrom.ComponentVarRef != nil {
+				return requireAll(v.ValueFrom.ComponentVarRef.MultipleClusterObjectOption)
+			}
+		}
+		return false
+	}
+
+	componentDef := shardingSpec.Template.ComponentDef
+	if componentDef == "" {
+		componentDef = shardingSpec.Template.ComponentDefRef
+	}
+	fmt.Println("need ", componentDef)
+	if compDefs[componentDef] == nil {
+		return false
+	}
+	for _, v := range compDefs[componentDef].Spec.Vars {
+		if require(v) {
+			return true
+		}
+	}
+	return false
 }
 
 func (t *ClusterAPINormalizationTransformer) buildCompSpecs(transCtx *clusterTransformContext,

@@ -3865,6 +3865,22 @@ spec:
                       - PreferInPlace
                       - Recreate
                       type: string
+                    provisionStrategy:
+                      allOf:
+                      - enum:
+                        - Serial
+                        - BestEffortParallel
+                        - Parallel
+                      - enum:
+                        - Serial
+                        - Parallel
+                      default: Serial
+                      description: |-
+                        Specifies the strategy for provisioning shards of the sharding. Only `Serial` and `Parallel` are supported.
+
+
+                        This field is immutable.
+                      type: string
                     replicas:
                       default: 1
                       description: Specifies the desired number of replicas in the
@@ -12499,6 +12515,22 @@ spec:
                           - StrictInPlace
                           - PreferInPlace
                           - Recreate
+                          type: string
+                        provisionStrategy:
+                          allOf:
+                          - enum:
+                            - Serial
+                            - BestEffortParallel
+                            - Parallel
+                          - enum:
+                            - Serial
+                            - Parallel
+                          default: Serial
+                          description: |-
+                            Specifies the strategy for provisioning shards of the sharding. Only `Serial` and `Parallel` are supported.
+
+
+                            This field is immutable.
                           type: string
                         replicas:
                           default: 1

@@ -80,8 +80,8 @@ BackupRepo 是备份数据的存储仓库，支持配置 OSS（阿里云对象�
 
 准备好对象存储服务后，就可以配置 BackupRepo 了。KubeBlocks 提供两种配置方式：
 
-* 安装 KubeBlocks 时自动配置 BackupRepo；
 * 按需手动配置 BackupRepo。
+* 安装 KubeBlocks 时自动配置 BackupRepo。
   
 ### 访问 BackupRepo
 
@@ -471,7 +471,7 @@ BackupRepo 是备份数据的存储仓库，支持配置 OSS（阿里云对象�
      --default
    ```
 
-   以上部署的 MinIO 的访问地址为 http://minio.kb-system.svc.cluster.local:9000。
+   以上部署的 MinIO 的访问地址为 http://minio.kb-system.svc.cluster.local:9000
 
    </TabItem>
 

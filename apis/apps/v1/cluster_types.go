@@ -84,6 +84,7 @@ func init() {
 }
 
 // ClusterSpec defines the desired state of Cluster.
+// +kubebuilder:validation:XValidation:rule="!has(oldSelf.topology) || has(self.topology)", message="topology is required once set"
 type ClusterSpec struct {
 	// Specifies the name of the ClusterDefinition to use when creating a Cluster.
 	//
@@ -122,6 +123,7 @@ type ClusterSpec struct {
 	// It establishes the initial composition and structure of the Cluster and is intended for one-time configuration.
 	//
 	// +kubebuilder:validation:MaxLength=32
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="topology is immutable"
 	// +optional
 	Topology string `json:"topology,omitempty"`
 

@@ -21,7 +21,7 @@ KubeBlocks 是 Kubernetes 原生 operator，可通过 Helm、 kubectl 应用 YAM
 
 - 请确保您安装和卸载 KubeBlocks 使用的方式保持一致，例如，如果您使用 Helm 安装 KubeBlocks，卸载时也需使用 Helm。
 - 请确保您已安装 [kubectl](https://kubernetes.io/docs/tasks/tools/)，[Helm](https://helm.sh/docs/intro/install/) 或 [kbcli](./install-kbcli.md)。
-- 请确保您已安装 Snapshot Controller。如果尚未安装，请按照 [安装 Snapshot Controller](#install-snapshot-controller) 部分中的步骤安装。
+- 请确保您已安装 Snapshot Controller。如果尚未安装，请按照 [安装 Snapshot Controller](#安装-kubeblocks) 部分中的步骤安装。
 
 :::
 
@@ -56,13 +56,11 @@ KubeBlocks 是 Kubernetes 原生 operator，可通过 Helm、 kubectl 应用 YAM
 	</tr>
 </table>
 
-## 安装步骤
-
-## Install Snapshot Controller
+## 安装 Snapshot Controller
 
 SnapshotController 是一个 Kubernetes 组件，用于管理 CSI 卷快照，可让用户创建、恢复和删除持久卷 (PV) 的快照。KubeBlocks DataProtection 控制器会使用 Snapshot Controller 来为数据库创建快照备份.
 
-如果您的 Kubernetes 集群没有以下 CRD，那么您可能没有部署Snapshot Controller，您需要安装一个。
+如果您的 Kubernetes 集群没有以下 CRD，说明您可能没有部署 Snapshot Controller.
 
 ```bash
 kubectl get crd volumesnapshotclasses.snapshot.storage.k8s.io
@@ -120,7 +118,7 @@ snapshot-controller-xxxx-yyyy   1/1   Running   0   30s
 kubectl logs -n kb-system deployment/snapshot-controller
 ```
 
-## Installation steps
+## 安装步骤
 
 <Tabs>
 

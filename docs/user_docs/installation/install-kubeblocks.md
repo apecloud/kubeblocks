@@ -71,6 +71,7 @@ kubectl get crd volumesnapshotcontents.snapshot.storage.k8s.io
 If you are sure you don't need the snapshot backup feature, you can install only the SnapshotController CRD and skip steps 1 and 2.
 
 ```bash
+# v8.2.0 is the latest version of the external-snapshotter, you can replace it with the version you need.
 kubectl create -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/v8.2.0/client/config/crd/snapshot.storage.k8s.io_volumesnapshotclasses.yaml
 kubectl create -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/v8.2.0/client/config/crd/snapshot.storage.k8s.io_volumesnapshots.yaml
 kubectl create -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/v8.2.0/client/config/crd/snapshot.storage.k8s.io_volumesnapshotcontents.yaml

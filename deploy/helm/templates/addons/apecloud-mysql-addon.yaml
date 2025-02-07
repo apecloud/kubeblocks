@@ -6,7 +6,7 @@
   "name" "apecloud-mysql"
   "version" "0.9.1"
   "model" "RDBMS"
-  "provider" "apecloud"
+  "provider" "community"
   "description" "ApeCloud MySQL is a database that is compatible with MySQL syntax and achieves high availability through the utilization of the RAFT consensus protocol."
   "autoInstall" true ) .) -}}
 {{- end }}

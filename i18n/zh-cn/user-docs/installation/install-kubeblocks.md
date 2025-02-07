@@ -118,7 +118,7 @@ snapshot-controller-xxxx-yyyy   1/1   Running   0   30s
 kubectl logs -n kb-system deployment/snapshot-controller
 ```
 
-## 安装步骤
+## 安装KubeBlocks
 
 <Tabs>
 

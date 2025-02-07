@@ -116,7 +116,7 @@ If the pod is in a CrashLoopBackOff state, check logs:
 kubectl logs -n kb-system deployment/snapshot-controller
 ```
 
-## Installation steps
+## Installation KubeBlocks
 
 <Tabs>
 

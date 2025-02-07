@@ -56,7 +56,7 @@ To try out KubeBlocks on your local host, you can use the [Playground](./../try-
 
 ## Install Snapshot Controller
 
-The SnapshotController is a Kubernetes component that manages CSI Volume Snapshots, enabling users to create, restore, and delete snapshots of Persistent Volumes (PVs). KubeBlocks Dataprotection Controller uses the Snapshot Controller to create and manage snapshots for databases.
+The SnapshotController is a Kubernetes component that manages CSI Volume Snapshots, enabling users to create, restore, and delete snapshots of Persistent Volumes (PVs). KubeBlocks DataProtection Controller uses the Snapshot Controller to create and manage snapshots for databases.
 
 If your Kubernetes cluster does NOT have the following CRDs, you likely also do not have a snapshot controller deployed and you need to install one.
 

@@ -68,7 +68,7 @@ func checkConfigLabels(object client.Object, requiredLabs []string) bool {
 
 func getConfigMapByTemplateName(cli client.Client, ctx intctrlutil.RequestCtx, templateName, ns string) (*corev1.ConfigMap, error) {
 	if len(templateName) == 0 {
-		return nil, fmt.Errorf("required configmap reference name is empty! [%v]", templateName)
+		return nil, nil
 	}
 
 	configObj := &corev1.ConfigMap{}
@@ -216,6 +216,9 @@ func updateConfigMapFinalizerImpl(cli client.Client, ctx intctrlutil.RequestCtx,
 		ctx.Log.Error(err, "failed to get template cm object!", "configMapName", cmObj.Name)
 		return err
 	}
+	if cmObj == nil {
+		return nil
+	}
 
 	if controllerutil.ContainsFinalizer(cmObj, constant.ConfigFinalizerName) {
 		return nil
@@ -240,6 +243,9 @@ func deleteConfigMapFinalizer(cli client.Client, ctx intctrlutil.RequestCtx, con
 	} else if err != nil {
 		ctx.Log.Error(err, "failed to get config template cm object!", "configMapName", configSpec.TemplateRef)
 		return err
+	}
+	if cmObj == nil {
+		return nil
 	}
 
 	if !controllerutil.ContainsFinalizer(cmObj, constant.ConfigFinalizerName) {

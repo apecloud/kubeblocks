@@ -136,7 +136,7 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 	// override componentService
 	overrideComponentServices(synthesizeComp, comp)
 
-	if err = overrideConfigTemplates(synthesizeComp, comp); err != nil {
+	if err = overrideNCheckConfigTemplates(synthesizeComp, comp); err != nil {
 		return nil, err
 	}
 
@@ -363,9 +363,9 @@ func overrideComponentServices(synthesizeComp *SynthesizedComponent, comp *appsv
 	}
 }
 
-func overrideConfigTemplates(synthesizedComp *SynthesizedComponent, comp *appsv1.Component) error {
+func overrideNCheckConfigTemplates(synthesizedComp *SynthesizedComponent, comp *appsv1.Component) error {
 	if comp == nil || len(comp.Spec.Configs) == 0 {
-		return nil
+		return checkConfigTemplates(synthesizedComp)
 	}
 
 	templates := make(map[string]*appsv1.ComponentConfigSpec)
@@ -392,8 +392,18 @@ func overrideConfigTemplates(synthesizedComp *SynthesizedComponent, comp *appsv1
 			return fmt.Errorf("partial overriding is not supported, config template: %s", *config.Name)
 		case specified():
 			template.TemplateRef = config.ConfigMap.Name
+			template.Namespace = synthesizedComp.Namespace
 		default:
 			// do nothing
+		}
+	}
+	return checkConfigTemplates(synthesizedComp)
+}
+
+func checkConfigTemplates(synthesizedComp *SynthesizedComponent) error {
+	for _, template := range synthesizedComp.ConfigTemplates {
+		if len(template.TemplateRef) == 0 {
+			return fmt.Errorf("required config template is empty: %s", template.Name)
 		}
 	}
 	return nil

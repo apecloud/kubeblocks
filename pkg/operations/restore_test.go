@@ -118,33 +118,8 @@ var _ = Describe("Restore OpsRequest", func() {
 			Expect(opsRes.OpsRequest.Status.Phase).Should(Equal(opsv1alpha1.OpsSucceedPhase))
 		})
 
-		It("test if source cluster exists services", func() {
+		handleRestoreOpsWithCustomOldCluster := func() {
 			By("mock backup annotations and labels")
-			opsRes.Cluster.Spec.Services = []appsv1.ClusterService{
-				{
-					ComponentSelector: defaultCompName,
-					Service: appsv1.Service{
-						Name: "svc",
-						Spec: corev1.ServiceSpec{
-							Ports: []corev1.ServicePort{
-								{Name: "port", Port: 3306, NodePort: nodePort},
-							},
-						},
-					},
-				},
-				{
-					ComponentSelector: defaultCompName,
-					Service: appsv1.Service{
-						Name:        "svc-2",
-						ServiceName: "svc-2",
-						Spec: corev1.ServiceSpec{
-							Type: corev1.ServiceTypeLoadBalancer,
-							Ports: []corev1.ServicePort{
-								{Name: "port", Port: 3306, NodePort: nodePort},
-							},
-						},
-					},
-				}}
 			Expect(testapps.ChangeObj(&testCtx, backup, func(backup *dpv1alpha1.Backup) {
 				backup.Labels = map[string]string{
 					dptypes.BackupTypeLabelKey:      string(dpv1alpha1.BackupTypeFull),
@@ -170,10 +145,94 @@ var _ = Describe("Restore OpsRequest", func() {
 			By("test restore action")
 			restoreHandler := RestoreOpsHandler{}
 			_ = restoreHandler.Action(reqCtx, k8sClient, opsRes)
+		}
 
+		It("test if source cluster exists services", func() {
+			opsRes.Cluster.Spec.Services = []appsv1.ClusterService{
+				{
+					ComponentSelector: defaultCompName,
+					Service: appsv1.Service{
+						Name: "svc",
+						Spec: corev1.ServiceSpec{
+							Ports: []corev1.ServicePort{
+								{Name: "port", Port: 3306, NodePort: nodePort},
+							},
+						},
+					},
+				},
+				{
+					ComponentSelector: defaultCompName,
+					Service: appsv1.Service{
+						Name:        "svc-2",
+						ServiceName: "svc-2",
+						Spec: corev1.ServiceSpec{
+							Type: corev1.ServiceTypeLoadBalancer,
+							Ports: []corev1.ServicePort{
+								{Name: "port", Port: 3306, NodePort: nodePort},
+							},
+						},
+					},
+				}}
+			handleRestoreOpsWithCustomOldCluster()
 			By("the loadBalancer should be reset")
 			Eventually(testapps.CheckObj(&testCtx, client.ObjectKey{Name: restoreClusterName, Namespace: opsRes.OpsRequest.Namespace}, func(g Gomega, restoreCluster *appsv1.Cluster) {
 				Expect(restoreCluster.Spec.Services).Should(HaveLen(1))
+			})).Should(Succeed())
+		})
+
+		It("test if source cluster exists schedulePolicy", func() {
+			pat := corev1.PodAffinityTerm{
+				LabelSelector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						constant.AppInstanceLabelKey: opsRes.Cluster.Name,
+					},
+					MatchExpressions: []metav1.LabelSelectorRequirement{
+						{
+							Key:      constant.AppInstanceLabelKey,
+							Operator: metav1.LabelSelectorOpIn,
+							Values:   []string{opsRes.Cluster.Name},
+						},
+					},
+				},
+			}
+			schedulePolicy := &appsv1.SchedulingPolicy{
+				Affinity: &corev1.Affinity{
+					PodAntiAffinity: &corev1.PodAntiAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{pat},
+						PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
+							{PodAffinityTerm: pat},
+						},
+					},
+					PodAffinity: &corev1.PodAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{pat},
+						PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{
+							{PodAffinityTerm: pat},
+						},
+					},
+				},
+				TopologySpreadConstraints: []corev1.TopologySpreadConstraint{
+					{LabelSelector: pat.LabelSelector},
+				},
+			}
+			opsRes.Cluster.Spec.SchedulingPolicy = schedulePolicy
+			opsRes.Cluster.Spec.ComponentSpecs[0].SchedulingPolicy = schedulePolicy
+			handleRestoreOpsWithCustomOldCluster()
+
+			By("the value of the app.kubernetes.io/instance has been updated")
+			Eventually(testapps.CheckObj(&testCtx, client.ObjectKey{Name: restoreClusterName, Namespace: opsRes.OpsRequest.Namespace}, func(g Gomega, restoreCluster *appsv1.Cluster) {
+				expect := func(labelSelector *metav1.LabelSelector) {
+					Expect(labelSelector.MatchLabels[constant.AppInstanceLabelKey]).Should(Equal(restoreClusterName))
+					Expect(labelSelector.MatchExpressions[0].Values[0]).Should(Equal(restoreClusterName))
+				}
+				checkSchedulePolicy := func(schedulePolicy *appsv1.SchedulingPolicy) {
+					expect(schedulePolicy.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].LabelSelector)
+					expect(schedulePolicy.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution[0].PodAffinityTerm.LabelSelector)
+					expect(schedulePolicy.Affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution[0].LabelSelector)
+					expect(schedulePolicy.Affinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution[0].PodAffinityTerm.LabelSelector)
+					expect(schedulePolicy.TopologySpreadConstraints[0].LabelSelector)
+				}
+				checkSchedulePolicy(restoreCluster.Spec.SchedulingPolicy)
+				checkSchedulePolicy(restoreCluster.Spec.ComponentSpecs[0].SchedulingPolicy)
 			})).Should(Succeed())
 		})
 

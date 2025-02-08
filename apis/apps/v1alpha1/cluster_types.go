@@ -352,7 +352,6 @@ type ResourceMeta struct {
 	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=256
-	// +kubebuilder:validation:Pattern:=`^/[a-z]([a-z0-9\-]*[a-z0-9])?$`
 	MountPoint string `json:"mountPoint"`
 
 	// SubPath specifies a path within the volume from which to mount.

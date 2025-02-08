@@ -5447,7 +5447,6 @@ spec:
                                 description: MountPoint is the filesystem path where
                                   the volume will be mounted.
                                 maxLength: 256
-                                pattern: ^/[a-z]([a-z0-9\-]*[a-z0-9])?$
                                 type: string
                               name:
                                 description: Name is the name of the referenced ConfigMap
@@ -5484,7 +5483,6 @@ spec:
                                 description: MountPoint is the filesystem path where
                                   the volume will be mounted.
                                 maxLength: 256
-                                pattern: ^/[a-z]([a-z0-9\-]*[a-z0-9])?$
                                 type: string
                               name:
                                 description: Name is the name of the referenced ConfigMap
@@ -14097,7 +14095,6 @@ spec:
                                     description: MountPoint is the filesystem path
                                       where the volume will be mounted.
                                     maxLength: 256
-                                    pattern: ^/[a-z]([a-z0-9\-]*[a-z0-9])?$
                                     type: string
                                   name:
                                     description: Name is the name of the referenced
@@ -14135,7 +14132,6 @@ spec:
                                     description: MountPoint is the filesystem path
                                       where the volume will be mounted.
                                     maxLength: 256
-                                    pattern: ^/[a-z]([a-z0-9\-]*[a-z0-9])?$
                                     type: string
                                   name:
                                     description: Name is the name of the referenced

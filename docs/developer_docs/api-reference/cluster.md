@@ -7102,58 +7102,6 @@ as defined in <code>componentDefinition.spec.lifecycleActions.readWrite</code>, 
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1.ConfigTemplateExtension">ConfigTemplateExtension
-</h3>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>templateRef</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Specifies the name of the referenced configuration template ConfigMap object.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>namespace</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the namespace of the referenced configuration template ConfigMap object.
-An empty namespace is equivalent to the &ldquo;default&rdquo; namespace.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>policy</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.MergedPolicy">
-MergedPolicy
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the strategy for merging externally imported templates into component templates.</p>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1.ConnectionCredentialAuth">ConnectionCredentialAuth
 </h3>
 <p>
@@ -8171,31 +8119,6 @@ This field allows the system to locate and manage log files effectively.</p>
 </td>
 </tr>
 </tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1.MergedPolicy">MergedPolicy
-(<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ConfigTemplateExtension">ConfigTemplateExtension</a>)
-</p>
-<div>
-<p>MergedPolicy defines how to merge external imported templates into component templates.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>&#34;none&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;add&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;patch&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;replace&#34;</p></td>
-<td></td>
-</tr></tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1.MultipleClusterObjectCombinedOption">MultipleClusterObjectCombinedOption
 </h3>

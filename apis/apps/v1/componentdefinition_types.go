@@ -1141,40 +1141,6 @@ type ComponentConfigSpec struct {
 	AsSecret *bool `json:"asSecret,omitempty"`
 }
 
-type ConfigTemplateExtension struct {
-	// Specifies the name of the referenced configuration template ConfigMap object.
-	//
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	TemplateRef string `json:"templateRef"`
-
-	// Specifies the namespace of the referenced configuration template ConfigMap object.
-	// An empty namespace is equivalent to the "default" namespace.
-	//
-	// +kubebuilder:default="default"
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$`
-	// +optional
-	Namespace string `json:"namespace,omitempty"`
-
-	// Defines the strategy for merging externally imported templates into component templates.
-	//
-	// +kubebuilder:default="none"
-	// +optional
-	Policy MergedPolicy `json:"policy,omitempty"`
-}
-
-// MergedPolicy defines how to merge external imported templates into component templates.
-// +enum
-// +kubebuilder:validation:Enum={patch,replace,none}
-type MergedPolicy string
-
-const (
-	PatchPolicy     MergedPolicy = "patch"
-	ReplacePolicy   MergedPolicy = "replace"
-	OnlyAddPolicy   MergedPolicy = "add"
-	NoneMergePolicy MergedPolicy = "none"
-)
-
 // RerenderResourceType defines the resource requirements for a component.
 // +enum
 // +kubebuilder:validation:Enum={vscale,hscale,tls}

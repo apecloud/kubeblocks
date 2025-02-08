@@ -60,7 +60,7 @@ import TabItem from '@theme/TabItem';
 
        ```bash
        kubectl get secrets prometheus-operator-grafana -n monitoring -oyaml
-       ```  
+       ```
 
    4. 使用 port forward 从本地连接 Grafana 大盘。
 
@@ -251,11 +251,11 @@ componentSpecs:
    kind: PodMonitor
    metadata:
      name: mycluster-pod-monitor
-     namespace: monitoring # 说明：此处为 Prometheus operator 所在的 namespace
-     labels:               # 此处对应 `prometheus.spec.podMonitorSelector` 中设置的标签。
+     namespace: demo       # 此处应匹配 `prometheus.spec.podMonitorNamespaceSelector` 中设置的值。
+     labels:               # 此处应匹配 `prometheus.spec.podMonitorSelector` 中设置的标签。
        release: prometheus
    spec:
-     jobLabel: kubeblocks-service
+     jobLabel: app.kubernetes.io/managed-by
      # 定义了从关联的 Kubernetes `Pod` 对象
      # 传递到采集指标上的标签
      # 请按需设置标签
@@ -270,7 +270,7 @@ componentSpecs:
          scheme: http
      namespaceSelector:
        matchNames:
-         - default
+         - demo
      selector:
        matchLabels:
          app.kubernetes.io/instance: mycluster
@@ -290,11 +290,11 @@ componentSpecs:
    kind: PodMonitor
    metadata:
      name: mycluster-pod-monitor
-     namespace: monitoring # 说明：此处为 Prometheus operator 所在的 namespace
-     labels:               # 此处对应 `prometheus.spec.podMonitorSelector` 中设置的标签。
+     namespace: demo       # 此处应匹配 `prometheus.spec.podMonitorNamespaceSelector` 中设置的值。
+     labels:               # 此处应匹配 `prometheus.spec.podMonitorSelector` 中设置的标签。
        release: prometheus
    spec:
-     jobLabel: kubeblocks-service
+     jobLabel: app.kubernetes.io/managed-by
      # 定义了从关联的 Kubernetes `Pod` 对象
      # 传递到采集指标上的标签
      # 请按需设置标签
@@ -309,7 +309,7 @@ componentSpecs:
          scheme: http
      namespaceSelector:
        matchNames:
-         - default
+         - demo
      selector:
        matchLabels:
          app.kubernetes.io/instance: mycluster
@@ -329,11 +329,11 @@ componentSpecs:
    kind: PodMonitor
    metadata:
      name: mycluster-pod-monitor
-     namespace: monitoring # 说明：此处为 Prometheus operator 所在的 namespace
-     labels:               # 此处对应 `prometheus.spec.podMonitorSelector` 中设置的标签。
+     namespace: demo       # 此处应匹配 `prometheus.spec.podMonitorNamespaceSelector` 中设置的值。
+     labels:               # 此处应匹配 `prometheus.spec.podMonitorSelector` 中设置的标签。
        release: prometheus
    spec:
-     jobLabel: kubeblocks-service
+     jobLabel: app.kubernetes.io/managed-by
      # 定义了从关联的 Kubernetes `Pod` 对象
      # 传递到采集指标上的标签
      # 请按需设置标签
@@ -368,11 +368,11 @@ componentSpecs:
    kind: PodMonitor
    metadata:
      name: mycluster-pod-monitor
-     namespace: monitoring # 说明：此处为 Prometheus operator 所在的 namespace
-     labels:               # 此处对应 `prometheus.spec.podMonitorSelector` 中设置的标签。
+     namespace: demo       # 此处应匹配 `prometheus.spec.podMonitorNamespaceSelector` 中设置的值。
+     labels:               # 此处应匹配 `prometheus.spec.podMonitorSelector` 中设置的标签。
        release: prometheus
    spec:
-     jobLabel: kubeblocks-service
+     jobLabel: app.kubernetes.io/managed-by
      # 定义了从关联的 Kubernetes `Pod` 对象
      # 传递到采集指标上的标签
      # 请按需设置标签

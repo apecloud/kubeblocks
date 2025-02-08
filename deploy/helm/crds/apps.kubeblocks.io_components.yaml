@@ -87,8 +87,8 @@ spec:
               configs:
                 description: Specifies the configuration content of a config template.
                 items:
-                  description: ClusterComponentConfig represents a config with its
-                    source bound.
+                  description: ClusterComponentConfig represents a configuration for
+                    a component.
                   properties:
                     configMap:
                       description: ConfigMap source for the config.
@@ -156,6 +156,16 @@ spec:
                     name:
                       description: The name of the config.
                       type: string
+                    reconfigure:
+                      description: The custom reconfigure action to reload the service
+                        configuration whenever changes to this config are detected.
+                      type: string
+                    variables:
+                      additionalProperties:
+                        type: string
+                      description: Variables are key-value pairs for dynamic configuration
+                        values that can be provided by the user.
+                      type: object
                   type: object
                 type: array
               disableExporter:

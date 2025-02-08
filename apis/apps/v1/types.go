@@ -452,25 +452,35 @@ type ProvisionSecretRef struct {
 	Password string `json:"password,omitempty"`
 }
 
-// ClusterComponentConfig represents a config with its source bound.
+// ClusterComponentConfig represents a configuration for a component.
 type ClusterComponentConfig struct {
 	// The name of the config.
 	//
 	// +optional
 	Name *string `json:"name,omitempty"`
 
-	// The source of the config.
+	// Variables are key-value pairs for dynamic configuration values that can be provided by the user.
+	//
+	// +optional
+	Variables map[string]string `json:"variables,omitempty"`
+
+	// The external source for the configuration.
 	ClusterComponentConfigSource `json:",inline"`
+
+	// The custom reconfigure action to reload the service configuration whenever changes to this config are detected.
+	//
+	// +optional
+	Reconfigure *string `json:"reconfigure,omitempty"`
 }
 
-// ClusterComponentConfigSource represents the source of a config.
+// ClusterComponentConfigSource represents the source of a configuration for a component.
 type ClusterComponentConfigSource struct {
 	// ConfigMap source for the config.
 	//
 	// +optional
 	ConfigMap *corev1.ConfigMapVolumeSource `json:"configMap,omitempty"`
 
-	// TODO: support more diverse sources:
+	// TODO: additional fields can be added to support other types of sources in the future, such as:
 	// - Config template of other components within the same cluster
 	// - Config template of components from other clusters
 	// - Secret

@@ -456,6 +456,8 @@ type ProvisionSecretRef struct {
 type ClusterComponentConfig struct {
 	// The name of the config.
 	//
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	// +optional
 	Name *string `json:"name,omitempty"`
 

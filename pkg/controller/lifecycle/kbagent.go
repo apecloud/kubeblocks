@@ -113,6 +113,11 @@ func (a *kbagent) MemberLeave(ctx context.Context, cli client.Reader, opts *Opti
 	return a.ignoreOutput(a.checkedCallAction(ctx, cli, a.lifecycleActions.MemberLeave, lfa, opts))
 }
 
+func (a *kbagent) Reconfigure(ctx context.Context, cli client.Reader, opts *Options, changes string) error {
+	lfa := &reconfigure{}
+	return a.ignoreOutput(a.checkedCallAction(ctx, cli, a.lifecycleActions.Reconfigure, lfa, opts))
+}
+
 func (a *kbagent) AccountProvision(ctx context.Context, cli client.Reader, opts *Options, statement, user, password string) error {
 	lfa := &accountProvision{
 		statement: statement,
@@ -120,6 +125,10 @@ func (a *kbagent) AccountProvision(ctx context.Context, cli client.Reader, opts 
 		password:  password,
 	}
 	return a.ignoreOutput(a.checkedCallAction(ctx, cli, a.lifecycleActions.AccountProvision, lfa, opts))
+}
+
+func (a *kbagent) Custom(ctx context.Context, cli client.Reader, opts *Options, name string, args ...any) error {
+	return ErrActionNotImplemented
 }
 
 func (a *kbagent) ignoreOutput(_ []byte, err error) error {

@@ -155,6 +155,8 @@ spec:
                       x-kubernetes-map-type: atomic
                     name:
                       description: The name of the config.
+                      maxLength: 63
+                      pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
                       type: string
                     reconfigure:
                       description: The custom reconfigure action to reload the service

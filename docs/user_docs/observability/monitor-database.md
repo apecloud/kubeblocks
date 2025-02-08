@@ -60,7 +60,7 @@ Install the Promethus Operator and Grafana to monitor the performance of a datab
 
        ```bash
        kubectl get secrets prometheus-operator-grafana -n monitoring -o yaml
-       ```  
+       ```
 
    4. Use port forwarding to access the Grafana dashboard locally.
 
@@ -248,11 +248,11 @@ When the cluster is running, each Pod should have a sidecar container, named `ex
    kind: PodMonitor
    metadata:
      name: mycluster-pod-monitor
-     namespace: monitoring # Note: this is namespace for prometheus operator
-     labels:               # This is labels set in `prometheus.spec.podMonitorSelector`
+     namespace: demo       # make sure `namespace` matches the settings in `prometheus.spec.podMonitorNamespaceSelector`
+     labels:               # make sure `labels` matches the settings in`prometheus.spec.podMonitorSelector`
        release: prometheus
    spec:
-     jobLabel: kubeblocks-service
+     jobLabel: app.kubernetes.io/managed-by
      # Define the labels which are transferred from the
      # associated Kubernetes `Pod` object onto the ingested metrics
      # set the labels w.r.t your own needs
@@ -267,7 +267,7 @@ When the cluster is running, each Pod should have a sidecar container, named `ex
          scheme: http
      namespaceSelector:
        matchNames:
-         - default
+         - demo
      selector:
        matchLabels:
          app.kubernetes.io/instance: mycluster
@@ -287,11 +287,11 @@ When the cluster is running, each Pod should have a sidecar container, named `ex
    kind: PodMonitor
    metadata:
      name: mycluster-pod-monitor
-     namespace: monitoring # Note: this is namespace for prometheus operator
-     labels:               # This is labels set in `prometheus.spec.podMonitorSelector`
+     namespace: demo       # make sure `namespace` matches the settings in `prometheus.spec.podMonitorNamespaceSelector`
+     labels:               # make sure `labels` matches the settings in`prometheus.spec.podMonitorSelector`
        release: prometheus
    spec:
-     jobLabel: kubeblocks-service
+     jobLabel: app.kubernetes.io/managed-by
      # Define the labels which are transferred from the
      # associated Kubernetes `Pod` object onto the ingested metrics
      # set the labels w.r.t your own needs
@@ -306,7 +306,7 @@ When the cluster is running, each Pod should have a sidecar container, named `ex
          scheme: http
      namespaceSelector:
        matchNames:
-         - default
+         - demo
      selector:
        matchLabels:
          app.kubernetes.io/instance: mycluster
@@ -326,11 +326,11 @@ When the cluster is running, each Pod should have a sidecar container, named `ex
    kind: PodMonitor
    metadata:
      name: mycluster-pod-monitor
-     namespace: monitoring # Note: this is namespace for prometheus operator
-     labels:               # This is labels set in `prometheus.spec.podMonitorSelector`
+     namespace: demo       # make sure `namespace` matches the settings in `prometheus.spec.podMonitorNamespaceSelector`
+     labels:               # make sure `labels` matches the settings in`prometheus.spec.podMonitorSelector`
        release: prometheus
    spec:
-     jobLabel: kubeblocks-service
+     jobLabel: app.kubernetes.io/managed-by
      # Define the labels which are transferred from the
      # associated Kubernetes `Pod` object onto the ingested metrics
      # set the labels w.r.t your own needs
@@ -345,11 +345,11 @@ When the cluster is running, each Pod should have a sidecar container, named `ex
          scheme: http
      namespaceSelector:
        matchNames:
-         - default
+         - demo
      selector:
        matchLabels:
          app.kubernetes.io/instance: mycluster
-         apps.kubeblocks.io/component-name: mysql
+         apps.kubeblocks.io/component-name: postgresql
    EOF
    ```
 
@@ -365,11 +365,11 @@ When the cluster is running, each Pod should have a sidecar container, named `ex
    kind: PodMonitor
    metadata:
      name: mycluster-pod-monitor
-     namespace: monitoring # Note: this is namespace for prometheus operator
-     labels:               # This is labels set in `prometheus.spec.podMonitorSelector`
+     namespace: demo       # make sure `namespace` matches the settings in `prometheus.spec.podMonitorNamespaceSelector`
+     labels:               # make sure `labels` matches the settings in`prometheus.spec.podMonitorSelector`
        release: prometheus
    spec:
-     jobLabel: kubeblocks-service
+     jobLabel: app.kubernetes.io/managed-by
      # Define the labels which are transferred from the
      # associated Kubernetes `Pod` object onto the ingested metrics
      # set the labels w.r.t your own needs
@@ -384,7 +384,7 @@ When the cluster is running, each Pod should have a sidecar container, named `ex
          scheme: http
      namespaceSelector:
        matchNames:
-         - default
+         - demo
      selector:
        matchLabels:
          app.kubernetes.io/instance: mycluster

@@ -1492,6 +1492,7 @@ Kubernetes resources within the namespace.</p>
 <p>The purpose of this field is to automatically generate the necessary RBAC roles
 for the Component based on the specified policy rules.
 This ensures that the Pods in the Component has appropriate permissions to function.</p>
+<p>To prevent privilege escalation, only permissions already owned by KubeBlocks can be added here.</p>
 <p>This field is immutable.</p>
 </td>
 </tr>
@@ -5392,6 +5393,7 @@ Kubernetes resources within the namespace.</p>
 <p>The purpose of this field is to automatically generate the necessary RBAC roles
 for the Component based on the specified policy rules.
 This ensures that the Pods in the Component has appropriate permissions to function.</p>
+<p>To prevent privilege escalation, only permissions already owned by KubeBlocks can be added here.</p>
 <p>This field is immutable.</p>
 </td>
 </tr>

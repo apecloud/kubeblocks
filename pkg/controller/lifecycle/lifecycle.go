@@ -78,3 +78,13 @@ func New(namespace, clusterName, compName string, lifecycleActions *appsv1.Compo
 		pod:              pod,
 	}, nil
 }
+
+func New2(namespace, clusterName, compName string, lifecycleActions *appsv1.ComponentLifecycleActions, templateVars map[string]any) (Lifecycle, error) {
+	return &job{
+		namespace:        namespace,
+		clusterName:      clusterName,
+		compName:         compName,
+		lifecycleActions: lifecycleActions,
+		templateVars:     templateVars,
+	}, nil
+}

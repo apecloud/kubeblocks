@@ -24,9 +24,11 @@ import (
 	"strings"
 	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -65,27 +67,60 @@ func (t *componentPreTerminateTransformer) Transform(ctx graph.TransformContext,
 		return nil
 	}
 
-	if t.skipPreTerminate(transCtx) {
+	skip, err := t.skipPreTerminate(transCtx)
+	if err != nil {
+		return err
+	}
+	if skip {
 		return nil
 	}
 
 	if t.checkPreTerminateDone(transCtx, dag) {
 		return nil
 	}
-	err := t.preTerminate(transCtx, compDef)
+	err = t.preTerminate(transCtx, compDef)
 	if err != nil {
 		return lifecycle.IgnoreNotDefined(err)
 	}
 	return t.markPreTerminateDone(transCtx, dag)
 }
 
-func (t *componentPreTerminateTransformer) skipPreTerminate(transCtx *componentTransformContext) bool {
+func (t *componentPreTerminateTransformer) skipPreTerminate(transCtx *componentTransformContext) (bool, error) {
+	if t.skipByUser(transCtx) {
+		return true, nil
+	}
+	return t.skipThatNotProvision(transCtx)
+}
+
+func (t *componentPreTerminateTransformer) skipByUser(transCtx *componentTransformContext) bool {
 	comp := transCtx.Component
 	if comp.Annotations == nil {
 		return false
 	}
 	skip, ok := comp.Annotations[constant.SkipPreTerminateAnnotationKey]
 	return ok && strings.ToLower(skip) == "true"
+}
+
+func (t *componentPreTerminateTransformer) skipThatNotProvision(transCtx *componentTransformContext) (bool, error) {
+	its := &workloads.InstanceSet{}
+	itsKey := types.NamespacedName{
+		Namespace: transCtx.Component.Namespace,
+		Name:      transCtx.Component.Name, // hack the ITS object name
+	}
+	err := transCtx.Client.Get(transCtx.Context, itsKey, its)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return true, nil
+		}
+		return false, err
+	}
+	replicas, err := component.GetReplicasStatusFunc(its, func(r component.ReplicaStatus) bool {
+		return r.Provisioned
+	})
+	if err != nil {
+		return false, err
+	}
+	return len(replicas) == 0, nil
 }
 
 func (t *componentPreTerminateTransformer) checkPreTerminateDone(transCtx *componentTransformContext, dag *graph.DAG) bool {
@@ -135,8 +170,8 @@ func (t *componentPreTerminateTransformer) lifecycleAction4Component(transCtx *c
 		return nil, err2
 	}
 	if len(pods) == 0 {
-		// TODO: (good-first-issue) we should handle the case that the component has no pods
-		return nil, fmt.Errorf("has no pods to running the pre-terminate action")
+		return lifecycle.New2(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name,
+			synthesizedComp.LifecycleActions, synthesizedComp.TemplateVars)
 	}
 	return lifecycle.New(synthesizedComp.Namespace, synthesizedComp.ClusterName, synthesizedComp.Name,
 		synthesizedComp.LifecycleActions, synthesizedComp.TemplateVars, nil, pods...)

@@ -130,7 +130,7 @@ func (a *kbagent) checkedCallAction(ctx context.Context, cli client.Reader, spec
 	if spec == nil || spec.Exec == nil {
 		return nil, errors.Wrap(ErrActionNotDefined, lfa.name())
 	}
-	if err := a.precondition(ctx, cli, spec); err != nil {
+	if err := precondition(ctx, cli, a.namespace, a.clusterName, a.compName, spec); err != nil {
 		return nil, err
 	}
 	// TODO: exactly once
@@ -142,64 +142,6 @@ func (a *kbagent) checkedCallProbe(ctx context.Context, cli client.Reader, spec 
 		return nil, errors.Wrap(ErrActionNotDefined, lfa.name())
 	}
 	return a.checkedCallAction(ctx, cli, &spec.Action, lfa, opts)
-}
-
-func (a *kbagent) precondition(ctx context.Context, cli client.Reader, spec *appsv1.Action) error {
-	if spec.PreCondition == nil {
-		return nil
-	}
-	switch *spec.PreCondition {
-	case appsv1.ImmediatelyPreConditionType:
-		return nil
-	case appsv1.RuntimeReadyPreConditionType:
-		return a.runtimeReadyCheck(ctx, cli)
-	case appsv1.ComponentReadyPreConditionType:
-		return a.compReadyCheck(ctx, cli)
-	case appsv1.ClusterReadyPreConditionType:
-		return a.clusterReadyCheck(ctx, cli)
-	default:
-		return fmt.Errorf("unknown precondition type %s", *spec.PreCondition)
-	}
-}
-
-func (a *kbagent) clusterReadyCheck(ctx context.Context, cli client.Reader) error {
-	ready := func(object client.Object) bool {
-		cluster := object.(*appsv1.Cluster)
-		return cluster.Status.Phase == appsv1.RunningClusterPhase
-	}
-	return a.readyCheck(ctx, cli, a.clusterName, "cluster", &appsv1.Cluster{}, ready)
-}
-
-func (a *kbagent) compReadyCheck(ctx context.Context, cli client.Reader) error {
-	ready := func(object client.Object) bool {
-		comp := object.(*appsv1.Component)
-		return comp.Status.Phase == appsv1.RunningComponentPhase
-	}
-	compName := constant.GenerateClusterComponentName(a.clusterName, a.compName)
-	return a.readyCheck(ctx, cli, compName, "component", &appsv1.Component{}, ready)
-}
-
-func (a *kbagent) runtimeReadyCheck(ctx context.Context, cli client.Reader) error {
-	name := constant.GenerateWorkloadNamePattern(a.clusterName, a.compName)
-	ready := func(object client.Object) bool {
-		its := object.(*workloads.InstanceSet)
-		return its.IsInstancesReady()
-	}
-	return a.readyCheck(ctx, cli, name, "runtime", &workloads.InstanceSet{}, ready)
-}
-
-func (a *kbagent) readyCheck(ctx context.Context, cli client.Reader, name, kind string, obj client.Object, ready func(object client.Object) bool) error {
-	key := types.NamespacedName{
-		Namespace: a.namespace,
-		Name:      name,
-	}
-	if err := cli.Get(ctx, key, obj); err != nil {
-		return errors.Wrap(err, fmt.Sprintf("precondition check error for %s ready", kind))
-	}
-	if !ready(obj) {
-		return fmt.Errorf("precondition check error, %s is not ready", kind)
-	}
-	return nil
 }
 
 func (a *kbagent) callAction(ctx context.Context, cli client.Reader, spec *appsv1.Action, lfa lifecycleAction, opts *Options) ([]byte, error) {
@@ -399,4 +341,63 @@ func SelectTargetPods(pods []*corev1.Pod, pod *corev1.Pod, spec *appsv1.Action) 
 	default:
 		return nil, fmt.Errorf("unknown pod selector: %s", spec.Exec.TargetPodSelector)
 	}
+}
+
+func precondition(ctx context.Context, cli client.Reader, namespace, clusterName, compName string, spec *appsv1.Action) error {
+	if spec.PreCondition == nil {
+		return nil
+	}
+	switch *spec.PreCondition {
+	case appsv1.ImmediatelyPreConditionType:
+		return nil
+	case appsv1.RuntimeReadyPreConditionType:
+		return runtimeReadyCheck(ctx, cli, namespace, clusterName, compName)
+	case appsv1.ComponentReadyPreConditionType:
+		return compReadyCheck(ctx, cli, namespace, clusterName, compName)
+	case appsv1.ClusterReadyPreConditionType:
+		return clusterReadyCheck(ctx, cli, namespace, clusterName)
+	default:
+		return fmt.Errorf("unknown precondition type %s", *spec.PreCondition)
+	}
+}
+
+func clusterReadyCheck(ctx context.Context, cli client.Reader, namespace, clusterName string) error {
+	ready := func(object client.Object) bool {
+		cluster := object.(*appsv1.Cluster)
+		return cluster.Status.Phase == appsv1.RunningClusterPhase
+	}
+	return readyCheck(ctx, cli, namespace, clusterName, "cluster", &appsv1.Cluster{}, ready)
+}
+
+func compReadyCheck(ctx context.Context, cli client.Reader, namespace, clusterName, compName string) error {
+	ready := func(object client.Object) bool {
+		comp := object.(*appsv1.Component)
+		return comp.Status.Phase == appsv1.RunningComponentPhase
+	}
+	compObjName := constant.GenerateClusterComponentName(clusterName, compName)
+	return readyCheck(ctx, cli, namespace, compObjName, "component", &appsv1.Component{}, ready)
+}
+
+func runtimeReadyCheck(ctx context.Context, cli client.Reader, namespace, clusterName, compName string) error {
+	name := constant.GenerateWorkloadNamePattern(clusterName, compName)
+	ready := func(object client.Object) bool {
+		its := object.(*workloads.InstanceSet)
+		return its.IsInstancesReady()
+	}
+	return readyCheck(ctx, cli, namespace, name, "runtime", &workloads.InstanceSet{}, ready)
+}
+
+func readyCheck(ctx context.Context, cli client.Reader,
+	namespace, name, kind string, obj client.Object, ready func(object client.Object) bool) error {
+	key := types.NamespacedName{
+		Namespace: namespace,
+		Name:      name,
+	}
+	if err := cli.Get(ctx, key, obj); err != nil {
+		return errors.Wrap(err, fmt.Sprintf("precondition check error for %s ready", kind))
+	}
+	if !ready(obj) {
+		return fmt.Errorf("precondition check error, %s is not ready", kind)
+	}
+	return nil
 }

@@ -34,7 +34,7 @@ func testGeneratorGeneratePasswordWithSeed(t *testing.T) {
 	resultSeedFirstTime := ""
 	resultSeedEachTime := ""
 	for i := 0; i < N; i++ {
-		res, err := GeneratePassword(10, 5, 0, false, seed)
+		res, err := GenerateMixedCasePassword(10, 5, 0, seed)
 		if err != nil {
 			t.Error(err)
 		}
@@ -52,11 +52,11 @@ func testGeneratorGeneratePassword(t *testing.T) {
 	t.Run("exceeds_length", func(t *testing.T) {
 		t.Parallel()
 
-		if _, err := GeneratePassword(0, 1, 0, false, ""); err != password.ErrExceedsTotalLength {
+		if _, err := GenerateMixedCasePassword(0, 1, 0, ""); err != password.ErrExceedsTotalLength {
 			t.Errorf("expected %q to be %q", err, password.ErrExceedsTotalLength)
 		}
 
-		if _, err := GeneratePassword(0, 0, 1, false, ""); err != password.ErrExceedsTotalLength {
+		if _, err := GenerateMixedCasePassword(0, 0, 1, ""); err != password.ErrExceedsTotalLength {
 			t.Errorf("expected %q to be %q", err, password.ErrExceedsTotalLength)
 		}
 	})
@@ -67,7 +67,7 @@ func testGeneratorGeneratePassword(t *testing.T) {
 		resultSeedEachTime := ""
 		hasDiffPassword := false
 		for i := 0; i < N; i++ {
-			res, err := GeneratePassword(i%len(password.LowerLetters), 0, 0, true, "")
+			res, err := GenerateMixedCasePassword(i%(len(password.LowerLetters)+len(password.UpperLetters)), 0, 0, "")
 			if err != nil {
 				t.Error(err)
 			}
@@ -126,7 +126,7 @@ func TestGeneratorEnsureMixedCase(t *testing.T) {
 
 		// Generate multiple passwords and check they have both upper and lower letters.
 		for i := 0; i < 100; i++ {
-			pwd, err := GeneratePassword(length, numDigits, numSymbols, false, seed)
+			pwd, err := GenerateMixedCasePassword(length, numDigits, numSymbols, seed)
 			if err != nil {
 				t.Fatalf("unexpected error generating password: %v", err)
 			}
@@ -144,7 +144,7 @@ func TestGeneratorEnsureMixedCase(t *testing.T) {
 
 		var firstPwd string
 		for i := 0; i < 50; i++ {
-			pwd, err := GeneratePassword(length, numDigits, numSymbols, false, seed)
+			pwd, err := GenerateMixedCasePassword(length, numDigits, numSymbols, seed)
 			if err != nil {
 				t.Fatalf("unexpected error generating password with seed: %v", err)
 			}

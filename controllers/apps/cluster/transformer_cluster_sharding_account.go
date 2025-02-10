@@ -164,7 +164,7 @@ func (t *clusterShardingAccountTransformer) buildPassword(transCtx *clusterTrans
 
 func (t *clusterShardingAccountTransformer) generatePassword(account appsv1.SystemAccount) []byte {
 	config := account.PasswordGenerationPolicy
-	passwd, _ := common.GeneratePassword((int)(config.Length), (int)(config.NumDigits), (int)(config.NumSymbols), false, config.Seed)
+	passwd, _ := common.GenerateMixedCasePassword((int)(config.Length), (int)(config.NumDigits), (int)(config.NumSymbols), config.Seed)
 	switch config.LetterCase {
 	case appsv1.UpperCases:
 		passwd = strings.ToUpper(passwd)

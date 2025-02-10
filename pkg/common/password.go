@@ -22,8 +22,10 @@ package common
 import (
 	"crypto/sha256"
 	"encoding/binary"
+	"fmt"
 	mathrand "math/rand"
 	"time"
+	"unicode"
 
 	"github.com/sethvargo/go-password/password"
 )
@@ -47,17 +49,9 @@ func (r *PasswordReader) Seed(seed int64) {
 
 // GeneratePassword generates a password with the given requirements and seed.
 func GeneratePassword(length, numDigits, numSymbols int, noUpper bool, seed string) (string, error) {
-	var rand *mathrand.Rand
-	if len(seed) == 0 {
-		rand = mathrand.New(mathrand.NewSource(time.Now().UnixNano()))
-	} else {
-		h := sha256.New()
-		_, err := h.Write([]byte(seed))
-		if err != nil {
-			return "", err
-		}
-		uSeed := binary.BigEndian.Uint64(h.Sum(nil))
-		rand = mathrand.New(mathrand.NewSource(int64(uSeed)))
+	rand, err := newRngFromSeed(seed)
+	if err != nil {
+		return "", err
 	}
 	passwordReader := &PasswordReader{rand: rand}
 	gen, err := password.NewGenerator(&password.GeneratorInput{
@@ -70,5 +64,86 @@ func GeneratePassword(length, numDigits, numSymbols int, noUpper bool, seed stri
 	if err != nil {
 		return "", err
 	}
-	return gen.Generate(length, numDigits, numSymbols, noUpper, true)
+	pwd, err := gen.Generate(length, numDigits, numSymbols, noUpper, true)
+	if err != nil {
+		return "", err
+	}
+	if noUpper {
+		return pwd, nil
+	} else {
+		return EnsureMixedCase(pwd, seed)
+	}
+}
+
+// EnsureMixedCase randomizes the letter casing in the given string, ensuring
+// that the result contains at least one uppercase and one lowercase letter
+// if there are at least two letters in total. Non-letter characters (digits,
+// symbols) remain unchanged. If seed is non-empty, it provides deterministic
+// randomness; otherwise, the current time is used for a non-deterministic seed.
+func EnsureMixedCase(in, seed string) (string, error) {
+	// Convert string to a mutable slice of runes.
+	runes := []rune(in)
+
+	// Gather indices of all letters in the string.
+	letterIndices := make([]int, 0, len(runes))
+	for i, r := range runes {
+		if unicode.IsLetter(r) {
+			letterIndices = append(letterIndices, i)
+		}
+	}
+	L := len(letterIndices)
+
+	// If fewer than two letters, we cannot guarantee both uppercase and lowercase.
+	if L < 2 {
+		return in, nil
+	}
+
+	// To avoid overflow with 1<<L operations, limit L to 62 bits for safe int64 usage.
+	// 2^63 cannot fit in an int64.
+	if L > 62 {
+		return in, fmt.Errorf("too many letters: potential overflow in bit patterns")
+	}
+
+	// We want an integer in [1, 2^L - 2], effectively discarding the all-0 and all-1 patterns.
+	// => 2^L - 2 is safe because we checked L <= 62 above.
+	rng, err := newRngFromSeed(seed)
+	if err != nil {
+		return in, err
+	}
+	rangeSize := int64((1 << L) - 2)
+	if rangeSize <= 0 {
+		return in, nil
+	}
+
+	// Get a random number x in [0, rangeSize), then shift to [1, 2^L - 2].
+	x := uint64(rng.Int63n(rangeSize)) + 1
+
+	// For each letter, pick the bit at position i to decide uppercase (1) or lowercase (0).
+	for i := 0; i < L; i++ {
+		bit := (x >> i) & 1
+		idx := letterIndices[i]
+		if bit == 0 {
+			runes[idx] = unicode.ToLower(runes[idx])
+		} else {
+			runes[idx] = unicode.ToUpper(runes[idx])
+		}
+	}
+
+	return string(runes), nil
+}
+
+// newRngFromSeed initializes a *mathrand.Rand from the given seed. If seed is empty,
+// it uses the current time, making the output non-deterministic.
+func newRngFromSeed(seed string) (*mathrand.Rand, error) {
+	if seed == "" {
+		return mathrand.New(mathrand.NewSource(time.Now().UnixNano())), nil
+	}
+	// Convert seed string to a 64-bit integer via SHA-256
+	h := sha256.New()
+	if _, err := h.Write([]byte(seed)); err != nil {
+		return nil, err
+	}
+	sum := h.Sum(nil)
+	uSeed := binary.BigEndian.Uint64(sum)
+	return mathrand.New(mathrand.NewSource(int64(uSeed))), nil
 }

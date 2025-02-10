@@ -3131,9 +3131,7 @@ future reuse or data recovery, but it is no longer actively used.</li>
 and avoiding conflicts with new instances.</li>
 </ol>
 <p>Setting instances to offline allows for a controlled scale-in process, preserving their data and maintaining
-ordinal consistency within the Cluster.
-Note that offline instances and their associated resources, such as PVCs, are not automatically deleted.
-The administrator must manually manage the cleanup and removal of these resources when they are no longer needed.</p>
+ordinal consistency within the Cluster.</p>
 </td>
 </tr>
 <tr>

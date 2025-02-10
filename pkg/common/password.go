@@ -22,7 +22,7 @@ package common
 import (
 	"crypto/sha256"
 	"encoding/binary"
-	"fmt"
+	"errors"
 	mathrand "math/rand"
 	"time"
 	"unicode"
@@ -93,19 +93,12 @@ func EnsureMixedCase(in, seed string) (string, error) {
 	}
 	L := len(letterIndices)
 
-	// If fewer than two letters, we cannot guarantee both uppercase and lowercase.
+	// If fewer than two letters,cannot generate both uppercase and lowercase.
 	if L < 2 {
-		return in, nil
-	}
-
-	// To avoid overflow with 1<<L operations, limit L to 62 bits for safe int64 usage.
-	// 2^63 cannot fit in an int64.
-	if L > 62 {
-		return in, fmt.Errorf("too many letters: potential overflow in bit patterns")
+		return in, errors.New("not enough letters in the password to generate mixed cases")
 	}
 
 	// We want an integer in [1, 2^L - 2], effectively discarding the all-0 and all-1 patterns.
-	// => 2^L - 2 is safe because we checked L <= 62 above.
 	rng, err := newRngFromSeed(seed)
 	if err != nil {
 		return in, err

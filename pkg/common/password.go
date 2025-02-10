@@ -22,7 +22,6 @@ package common
 import (
 	"crypto/sha256"
 	"encoding/binary"
-	"errors"
 	mathrand "math/rand"
 	"time"
 	"unicode"
@@ -77,14 +76,8 @@ func GeneratePassword(length, numDigits, numSymbols int, noUpper bool, seed stri
 
 // EnsureMixedCase randomizes the letter casing in the given string, ensuring
 // that the result contains at least one uppercase and one lowercase letter
-// if there are at least two letters in total. Non-letter characters (digits,
-// symbols) remain unchanged. If seed is non-empty, it provides deterministic
-// randomness; otherwise, the current time is used for a non-deterministic seed.
 func EnsureMixedCase(in, seed string) (string, error) {
-	// Convert string to a mutable slice of runes.
 	runes := []rune(in)
-
-	// Gather indices of all letters in the string.
 	letterIndices := make([]int, 0, len(runes))
 	for i, r := range runes {
 		if unicode.IsLetter(r) {
@@ -93,25 +86,18 @@ func EnsureMixedCase(in, seed string) (string, error) {
 	}
 	L := len(letterIndices)
 
-	// If fewer than two letters,cannot generate both uppercase and lowercase.
 	if L < 2 {
-		return in, errors.New("not enough letters in the password to generate mixed cases")
+		return in, nil
 	}
 
-	// We want an integer in [1, 2^L - 2], effectively discarding the all-0 and all-1 patterns.
+	// Get a random number x in [1, 2^L - 2], whose binary list will be used to determine the letter casing.
+	// avoid the all-0 and all-1 patterns, which cause all-lowercase and all-uppercase password.
 	rng, err := newRngFromSeed(seed)
 	if err != nil {
 		return in, err
 	}
-	rangeSize := int64((1 << L) - 2)
-	if rangeSize <= 0 {
-		return in, nil
-	}
+	x := uint64(rng.Int63n(int64((1<<L)-2))) + 1
 
-	// Get a random number x in [0, rangeSize), then shift to [1, 2^L - 2].
-	x := uint64(rng.Int63n(rangeSize)) + 1
-
-	// For each letter, pick the bit at position i to decide uppercase (1) or lowercase (0).
 	for i := 0; i < L; i++ {
 		bit := (x >> i) & 1
 		idx := letterIndices[i]
@@ -121,7 +107,6 @@ func EnsureMixedCase(in, seed string) (string, error) {
 			runes[idx] = unicode.ToUpper(runes[idx])
 		}
 	}
-
 	return string(runes), nil
 }
 

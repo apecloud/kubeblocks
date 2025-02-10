@@ -150,10 +150,8 @@ func TestGeneratorEnsureMixedCase(t *testing.T) {
 			}
 			if i == 0 {
 				firstPwd = pwd
-			} else {
-				if pwd != firstPwd {
-					t.Errorf("expected the same password for the same seed, but got %q vs %q", firstPwd, pwd)
-				}
+			} else if pwd != firstPwd {
+				t.Errorf("expected the same password for the same seed, but got %q vs %q", firstPwd, pwd)
 			}
 		}
 	})

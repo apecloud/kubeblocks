@@ -136,6 +136,8 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 	// override componentService
 	overrideComponentServices(synthesizeComp, comp)
 
+	buildConfigNScriptTemplates(synthesizeComp, compDef, comp)
+
 	if err = overrideNCheckConfigTemplates(synthesizeComp, comp); err != nil {
 		return nil, err
 	}
@@ -407,6 +409,50 @@ func checkConfigTemplates(synthesizedComp *SynthesizedComponent) error {
 		}
 	}
 	return nil
+}
+
+func buildConfigNScriptTemplates(synthesizedComp *SynthesizedComponent, compDef *appsv1.ComponentDefinition, comp *appsv1.Component) {
+	merge := func(tpl SynthesizedFileTemplate, utpl appsv1.ClusterComponentConfig) SynthesizedFileTemplate {
+		tpl.Variables = utpl.Variables
+		if utpl.ConfigMap != nil {
+			tpl.Namespace = comp.Namespace
+			tpl.Template = utpl.ConfigMap.Name
+		}
+		tpl.Reconfigure = utpl.Reconfigure // custom reconfigure action
+		tpl.ExternalManaged = utpl.ExternalManaged
+
+		if tpl.ExternalManaged != nil && *tpl.ExternalManaged {
+			if utpl.ConfigMap == nil {
+				// reset the template and wait the external system to provision it.
+				tpl.Namespace = ""
+				tpl.Template = ""
+			}
+		}
+		return tpl
+	}
+
+	synthesize := func(tpl appsv1.ComponentFileTemplate, config bool) SynthesizedFileTemplate {
+		stpl := SynthesizedFileTemplate{
+			ComponentFileTemplate: tpl,
+		}
+		if config {
+			for _, utpl := range comp.Spec.Configs {
+				if utpl.Name != nil && *utpl.Name == tpl.Name {
+					return merge(stpl, utpl)
+				}
+			}
+		}
+		return stpl
+	}
+
+	templates := make([]SynthesizedFileTemplate, 0)
+	for _, tpl := range compDef.Spec.Configs2 {
+		templates = append(templates, synthesize(tpl, true))
+	}
+	for _, tpl := range compDef.Spec.Scripts2 {
+		templates = append(templates, synthesize(tpl, false))
+	}
+	synthesizedComp.FileTemplates = templates
 }
 
 // buildServiceAccountName builds serviceAccountName for component and podSpec.

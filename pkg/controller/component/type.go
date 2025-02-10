@@ -46,6 +46,7 @@ type SynthesizedComponent struct {
 	SidecarVars                      []kbappsv1.EnvVar                      // vars defined by sidecars
 	VolumeClaimTemplates             []corev1.PersistentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
 	LogConfigs                       []kbappsv1.LogConfig                   `json:"logConfigs,omitempty"`
+	FileTemplates                    []SynthesizedFileTemplate
 	ConfigTemplates                  []kbappsv1.ComponentConfigSpec         `json:"configTemplates,omitempty"`
 	ScriptTemplates                  []kbappsv1.ComponentTemplateSpec       `json:"scriptTemplates,omitempty"`
 	TLSConfig                        *kbappsv1.TLSConfig                    `json:"tlsConfig"`
@@ -76,4 +77,11 @@ type SynthesizedComponent struct {
 	MinReadySeconds                  int32                                  `json:"minReadySeconds,omitempty"`
 	DisableExporter                  *bool                                  `json:"disableExporter,omitempty"`
 	Stop                             *bool
+}
+
+type SynthesizedFileTemplate struct {
+	kbappsv1.ComponentFileTemplate
+	Variables       map[string]string
+	Reconfigure     *kbappsv1.Action
+	ExternalManaged *bool
 }

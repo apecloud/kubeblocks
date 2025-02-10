@@ -26,6 +26,7 @@ import (
 var (
 	ErrNotDefined     = errors.New("notDefined")
 	ErrNotImplemented = errors.New("notImplemented")
+	ErrNotReady       = errors.New("notReady")
 	ErrBadRequest     = errors.New("badRequest")
 	ErrInProgress     = errors.New("inProgress")
 	ErrBusy           = errors.New("busy")
@@ -43,6 +44,8 @@ func Error2Type(err error) string {
 		return "notDefined"
 	case errors.Is(err, ErrNotImplemented):
 		return "notImplemented"
+	case errors.Is(err, ErrNotReady):
+		return "notReady"
 	case errors.Is(err, ErrBadRequest):
 		return "badRequest"
 	case errors.Is(err, ErrInProgress):
@@ -68,6 +71,8 @@ func Type2Error(errType string) error {
 		return ErrNotDefined
 	case "notImplemented":
 		return ErrNotImplemented
+	case "notReady":
+		return ErrNotReady
 	case "badRequest":
 		return ErrBadRequest
 	case "inProgress":

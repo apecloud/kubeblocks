@@ -471,8 +471,23 @@ type ClusterComponentConfig struct {
 
 	// The custom reconfigure action to reload the service configuration whenever changes to this config are detected.
 	//
+	// The container executing this action has access to following variables:
+	//
+	// - KB_CONFIG_FILES_CREATED: file1,file2...
+	// - KB_CONFIG_FILES_REMOVED: file1,file2...
+	// - KB_CONFIG_FILES_UPDATED: file1:checksum1,file2:checksum2...
+	//
+	// Note: This field is immutable once it has been set.
+	//
 	// +optional
-	Reconfigure *string `json:"reconfigure,omitempty"`
+	Reconfigure *Action `json:"reconfigure,omitempty"`
+
+	// ExternalManaged indicates whether the configuration is managed by an external system.
+	// When set to true, the controller will use the user-provided template and reconfigure action,
+	// ignoring the default template and update behavior.
+	//
+	// +optional
+	ExternalManaged *bool `json:"externalManaged,omitempty"`
 }
 
 // ClusterComponentConfigSource represents the source of a configuration for a component.

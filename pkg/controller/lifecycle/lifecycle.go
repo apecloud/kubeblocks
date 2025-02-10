@@ -52,11 +52,11 @@ type Lifecycle interface {
 
 	// Readwrite(ctx context.Context, cli client.Reader, opts *Options) error
 
-	Reconfigure(ctx context.Context, cli client.Reader, opts *Options, changes string) error
+	Reconfigure(ctx context.Context, cli client.Reader, opts *Options, created, removed, updated string) error
 
 	AccountProvision(ctx context.Context, cli client.Reader, opts *Options, statement, user, password string) error
 
-	Custom(ctx context.Context, cli client.Reader, opts *Options, name string, args ...any) error
+	UserDefined(ctx context.Context, cli client.Reader, opts *Options, name string, action *appsv1.Action, args map[string]string) error
 }
 
 func New(namespace, clusterName, compName string, lifecycleActions *appsv1.ComponentLifecycleActions,

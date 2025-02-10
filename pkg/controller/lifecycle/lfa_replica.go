@@ -25,8 +25,24 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+const (
+	configFilesCreated = "KB_CONFIG_FILES_CREATED"
+	configFilesRemoved = "KB_CONFIG_FILES_REMOVED"
+	configFilesUpdated = "KB_CONFIG_FILES_UPDATED"
+)
+
+func FileTemplateChanges(created, removed, updated string) map[string]string {
+	return map[string]string{
+		configFilesCreated: created,
+		configFilesRemoved: removed,
+		configFilesUpdated: updated,
+	}
+}
+
 type reconfigure struct {
-	// TODO: files, changes, old & new content
+	created string
+	removed string
+	updated string
 }
 
 var _ lifecycleAction = &reconfigure{}
@@ -38,6 +54,8 @@ func (a *reconfigure) name() string {
 func (a *reconfigure) parameters(ctx context.Context, cli client.Reader) (map[string]string, error) {
 	// The container executing this action has access to following variables:
 	//
-	// TODO:
-	return map[string]string{}, nil
+	// - KB_CONFIG_FILES_CREATED: file1,file2...
+	// - KB_CONFIG_FILES_REMOVED: file1,file2...
+	// - KB_CONFIG_FILES_UPDATED: file1:checksum1,file2:checksum2...
+	return FileTemplateChanges(a.created, a.removed, a.updated), nil
 }

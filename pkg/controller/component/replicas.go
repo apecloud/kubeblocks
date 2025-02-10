@@ -62,7 +62,7 @@ type ReplicaStatus struct {
 	Provisioned       bool       `json:"provisioned,omitempty"`
 	DataLoaded        *bool      `json:"dataLoaded,omitempty"`
 	MemberJoined      *bool      `json:"memberJoined,omitempty"`
-	// Reconfigured      *bool      `json:"reconfigured,omitempty"`
+	Reconfigured      *string    `json:"reconfigured,omitempty"` // TODO: component status
 }
 
 func BuildReplicasStatus(running, proto *workloads.InstanceSet) {

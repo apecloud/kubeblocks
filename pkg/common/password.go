@@ -46,8 +46,8 @@ func (r *PasswordReader) Seed(seed int64) {
 	r.rand.Seed(seed)
 }
 
-// GenerateMixedCasePassword generates a password with the given requirements and seed with mixed cases.
-func GenerateMixedCasePassword(length, numDigits, numSymbols int, seed string) (string, error) {
+// GeneratePassword generates a password with the given requirements and seed in lowercase.
+func GeneratePassword(length, numDigits, numSymbols int, seed string) (string, error) {
 	rand, err := newRngFromSeed(seed)
 	if err != nil {
 		return "", err
@@ -63,11 +63,7 @@ func GenerateMixedCasePassword(length, numDigits, numSymbols int, seed string) (
 	if err != nil {
 		return "", err
 	}
-	pwd, err := gen.Generate(length, numDigits, numSymbols, true, true)
-	if err != nil {
-		return "", err
-	}
-	return EnsureMixedCase(pwd, seed)
+	return gen.Generate(length, numDigits, numSymbols, true, true)
 }
 
 // EnsureMixedCase randomizes the letter casing in the given string, ensuring

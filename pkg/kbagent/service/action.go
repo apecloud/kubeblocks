@@ -83,6 +83,9 @@ func (s *actionService) HandleRequest(ctx context.Context, payload []byte) ([]by
 	if err != nil {
 		return s.encode(nil, err), nil
 	}
+	if err := s.precondition(ctx, req); err != nil {
+		return s.encode(nil, err), nil
+	}
 	resp, err := s.handleRequest(ctx, req)
 	result := string(resp)
 	if err != nil {
@@ -110,6 +113,10 @@ func (s *actionService) encode(out []byte, err error) []byte {
 	}
 	data, _ := json.Marshal(rsp)
 	return data
+}
+
+func (s *actionService) precondition(ctx context.Context, req *proto.ActionRequest) error {
+	return reconfigure(ctx, req)
 }
 
 func (s *actionService) handleRequest(ctx context.Context, req *proto.ActionRequest) ([]byte, error) {

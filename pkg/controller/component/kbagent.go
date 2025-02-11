@@ -31,6 +31,7 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
+	"github.com/apecloud/kubeblocks/pkg/controller/lifecycle"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/kbagent"
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
@@ -291,6 +292,16 @@ func buildKBAgentStartupEnvs(synthesizedComp *SynthesizedComponent) ([]corev1.En
 	}
 	if a := buildAction4KBAgent(synthesizedComp.LifecycleActions.AccountProvision, "accountProvision"); a != nil {
 		actions = append(actions, *a)
+	}
+
+	// user-defined actions
+	for i, tpl := range synthesizedComp.FileTemplates {
+		if tpl.Reconfigure != nil {
+			name := lifecycle.UDFActionName(UDFReconfigureActionName(tpl))
+			if a := buildAction4KBAgent(synthesizedComp.FileTemplates[i].Reconfigure, name); a != nil {
+				actions = append(actions, *a)
+			}
+		}
 	}
 
 	if a, p := buildProbe4KBAgent(synthesizedComp.LifecycleActions.RoleProbe, "roleProbe", synthesizedComp.FullCompName); a != nil && p != nil {

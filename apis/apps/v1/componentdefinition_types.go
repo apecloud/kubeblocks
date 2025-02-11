@@ -301,6 +301,24 @@ type ComponentDefinitionSpec struct {
 	// +optional
 	Services []ComponentService `json:"services,omitempty"`
 
+	// Specifies the config file templates and volume mount parameters used by the Component.
+	//
+	// This field specifies a list of templates that will be rendered into Component containers' config files.
+	// Each template is represented as a ConfigMap and may contain multiple config files, with each file being a key in the ConfigMap.
+	//
+	// This field is immutable.
+	//
+	// +optional
+	Configs2 []ComponentFileTemplate `json:"configs2,omitempty"`
+
+	// Specifies groups of scripts, each provided via a ConfigMap, to be mounted as volumes in the container.
+	// These scripts can be executed during container startup or via specific actions.
+	//
+	// This field is immutable.
+	//
+	// +optional
+	Scripts2 []ComponentFileTemplate `json:"scripts2,omitempty"`
+
 	// Specifies the configuration file templates and volume mount parameters used by the Component.
 	// It also includes descriptions of the parameters in the ConfigMaps, such as value range limitations.
 	//
@@ -1016,6 +1034,55 @@ type HostNetworkContainerPort struct {
 	Ports []string `json:"ports"`
 }
 
+type ComponentFileTemplate struct {
+	// Specifies the name of the template.
+	//
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	Name string `json:"name"`
+
+	// Specifies the name of the referenced template ConfigMap object.
+	//
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	// +optional
+	Template string `json:"template,omitempty"`
+
+	// Specifies the namespace of the referenced template ConfigMap object.
+	//
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$`
+	// +kubebuilder:default="default"
+	// +optional
+	Namespace string `json:"namespace,omitempty"`
+
+	// Refers to the volume name of PodTemplate. The file produced through the template will be mounted to
+	// the corresponding volume. Must be a DNS_LABEL name.
+	// The volume name must be defined in podSpec.containers[*].volumeMounts.
+	//
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z]([a-z0-9\-]*[a-z0-9])?$`
+	// +optional
+	VolumeName string `json:"volumeName,omitempty"`
+
+	// The operator attempts to set default file permissions (0444).
+	//
+	// Must be specified as an octal value between 0000 and 0777 (inclusive),
+	// or as a decimal value between 0 and 511 (inclusive).
+	// YAML supports both octal and decimal values for file permissions.
+	//
+	// Please note that this setting only affects the permissions of the files themselves.
+	// Directories within the specified path are not impacted by this setting.
+	// It's important to be aware that this setting might conflict with other options
+	// that influence the file mode, such as fsGroup.
+	// In such cases, the resulting file mode may have additional bits set.
+	// Refers to documents of k8s.ConfigMapVolumeSource.defaultMode for more information.
+	//
+	// +optional
+	DefaultMode *int32 `json:"defaultMode,omitempty"`
+}
+
 type ComponentTemplateSpec struct {
 	// Specifies the name of the configuration template.
 	//
@@ -1142,40 +1209,6 @@ type ComponentConfigSpec struct {
 	// +optional
 	AsSecret *bool `json:"asSecret,omitempty"`
 }
-
-type ConfigTemplateExtension struct {
-	// Specifies the name of the referenced configuration template ConfigMap object.
-	//
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	TemplateRef string `json:"templateRef"`
-
-	// Specifies the namespace of the referenced configuration template ConfigMap object.
-	// An empty namespace is equivalent to the "default" namespace.
-	//
-	// +kubebuilder:default="default"
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$`
-	// +optional
-	Namespace string `json:"namespace,omitempty"`
-
-	// Defines the strategy for merging externally imported templates into component templates.
-	//
-	// +kubebuilder:default="none"
-	// +optional
-	Policy MergedPolicy `json:"policy,omitempty"`
-}
-
-// MergedPolicy defines how to merge external imported templates into component templates.
-// +enum
-// +kubebuilder:validation:Enum={patch,replace,none}
-type MergedPolicy string
-
-const (
-	PatchPolicy     MergedPolicy = "patch"
-	ReplacePolicy   MergedPolicy = "replace"
-	OnlyAddPolicy   MergedPolicy = "add"
-	NoneMergePolicy MergedPolicy = "none"
-)
 
 // RerenderResourceType defines the resource requirements for a component.
 // +enum

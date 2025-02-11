@@ -21,6 +21,7 @@ package component
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 	"slices"
 	"strings"
@@ -181,3 +182,7 @@ var (
 )
 
 type mockHostNetworkPortManagerKey struct{}
+
+func UDFReconfigureActionName(tpl SynthesizedFileTemplate) string {
+	return fmt.Sprintf("reconfigure@%s", tpl.Name)
+}

@@ -39,8 +39,30 @@ type TemplateMerger interface {
 	renderTemplate() (map[string]string, error)
 }
 
+type configTemplateExtension struct {
+	// Specifies the name of the referenced configuration template ConfigMap object.
+	templateRef string
+
+	// Specifies the namespace of the referenced configuration template ConfigMap object.
+	// An empty namespace is equivalent to the "default" namespace.
+	namespace string
+
+	// Defines the strategy for merging externally imported templates into component templates.
+	policy mergedPolicy
+}
+
+// mergedPolicy defines how to merge external imported templates into component templates.
+type mergedPolicy string
+
+const (
+	patchPolicy     mergedPolicy = "patch"
+	replacePolicy   mergedPolicy = "replace"
+	onlyAddPolicy   mergedPolicy = "add"
+	noneMergePolicy mergedPolicy = "none"
+)
+
 type mergeContext struct {
-	template   appsv1.ConfigTemplateExtension
+	template   configTemplateExtension
 	configSpec appsv1.ComponentConfigSpec
 	ccSpec     *appsv1beta1.ConfigConstraintSpec
 
@@ -50,8 +72,8 @@ type mergeContext struct {
 func (m *mergeContext) renderTemplate() (map[string]string, error) {
 	templateSpec := appsv1.ComponentTemplateSpec{
 		// Name:        m.template.Name,
-		Namespace:   m.template.Namespace,
-		TemplateRef: m.template.TemplateRef,
+		Namespace:   m.template.namespace,
+		TemplateRef: m.template.templateRef,
 	}
 	configs, err := m.RenderConfigMapTemplate(templateSpec)
 	if err != nil {
@@ -118,7 +140,7 @@ func (c *configOnlyAddMerger) Merge(baseData map[string]string, updatedData map[
 	return nil, core.MakeError("not implemented")
 }
 
-func NewTemplateMerger(template appsv1.ConfigTemplateExtension,
+func NewTemplateMerger(template configTemplateExtension,
 	templateRender render.TemplateRender,
 	configSpec appsv1.ComponentConfigSpec,
 	ccSpec *appsv1beta1.ConfigConstraintSpec) (TemplateMerger, error) {
@@ -131,22 +153,22 @@ func NewTemplateMerger(template appsv1.ConfigTemplateExtension,
 	}
 
 	var merger TemplateMerger
-	switch template.Policy {
+	switch template.policy {
 	default:
-		return nil, core.MakeError("unknown template policy: %s", template.Policy)
-	case appsv1.NoneMergePolicy:
+		return nil, core.MakeError("unknown template policy: %s", template.policy)
+	case noneMergePolicy:
 		merger = &noneOp{templateData}
-	case appsv1.PatchPolicy:
+	case patchPolicy:
 		merger = &configPatcher{templateData}
-	case appsv1.OnlyAddPolicy:
+	case onlyAddPolicy:
 		merger = &configOnlyAddMerger{templateData}
-	case appsv1.ReplacePolicy:
+	case replacePolicy:
 		merger = &configReplaceMerger{templateData}
 	}
 	return merger, nil
 }
 
-func mergerConfigTemplate(template appsv1.ConfigTemplateExtension,
+func mergerConfigTemplate(template configTemplateExtension,
 	templateRender render.TemplateRender,
 	configSpec appsv1.ComponentConfigSpec,
 	baseData map[string]string,

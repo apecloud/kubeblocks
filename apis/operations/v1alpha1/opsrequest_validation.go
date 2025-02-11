@@ -339,13 +339,13 @@ func (r *OpsRequest) validateHorizontalScaling(ctx context.Context, cli client.C
 	}
 	for _, comSpec := range cluster.Spec.ComponentSpecs {
 		// Default values if no limit is found
-		minNum, maxNum := 0, 16384
+		minNum, maxNum := 1, 16384
 		if comSpec.ComponentDef != "" {
 			compDef := &appsv1.ComponentDefinition{}
 			if err := cli.Get(ctx, client.ObjectKey{Name: comSpec.ComponentDef, Namespace: r.Namespace}, compDef); err != nil {
 				return err
 			}
-			if compDef != nil && compDef.Spec.ReplicasLimit != nil {
+			if compDef.Spec.ReplicasLimit != nil {
 				minNum = int(compDef.Spec.ReplicasLimit.MinReplicas)
 				maxNum = int(compDef.Spec.ReplicasLimit.MaxReplicas)
 			}
@@ -358,14 +358,13 @@ func (r *OpsRequest) validateHorizontalScaling(ctx context.Context, cli client.C
 	}
 	for _, spec := range cluster.Spec.Shardings {
 		// Default values if no limit is found
-		minNum, maxNum := 0, 2048
+		minNum, maxNum := 1, 2048
 		if spec.ShardingDef != "" {
 			shardingDef := &appsv1.ShardingDefinition{}
 			if err := cli.Get(ctx, types.NamespacedName{Name: spec.ShardingDef, Namespace: r.Namespace}, shardingDef); err != nil {
 				return err
 			}
-
-			if shardingDef != nil && shardingDef.Spec.ShardsLimit != nil {
+			if shardingDef.Spec.ShardsLimit != nil {
 				minNum = int(shardingDef.Spec.ShardsLimit.MinShards)
 				maxNum = int(shardingDef.Spec.ShardsLimit.MaxShards)
 			}
@@ -421,6 +420,7 @@ func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, com
 	// Rules:
 	// 1. length of offlineInstancesToOnline or onlineInstancesToOffline can't greater than the configured replicaChanges for the component.
 	// 2. replicaChanges for component must greater than or equal to the sum of replicaChanges configured in instance templates.
+	// 3. target replicas after scaling must be within the replica limit defined in the componentDef.
 	validateHScaleOperation := func(replicaChanger ReplicaChanger, newInstances []appsv1.InstanceTemplate, offlineOrOnlineInsNames []string, isScaleIn bool) error {
 		msgPrefix := "ScaleIn:"
 		hScaleInstanceFieldName := "onlineInstancesToOffline"
@@ -470,12 +470,9 @@ func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, com
 		if replicaChanger.ReplicaChanges != nil && allReplicaChanges > *replicaChanger.ReplicaChanges {
 			return fmt.Errorf(`%s "replicaChanges" can't be less than the sum of "replicaChanges" for specified instance templates`, msgPrefix)
 		}
-
-		var replicaChange int32
+		replicaChange := allReplicaChanges
 		if replicaChanger.ReplicaChanges != nil {
 			replicaChange = *replicaChanger.ReplicaChanges
-		} else {
-			replicaChange = allReplicaChanges
 		}
 		if isScaleIn && int(compSpec.Replicas)-int(replicaChange) < minReplicasOrShards {
 			return fmt.Errorf(`the number of replicas after scaling down violates the replica limit for component "%s"`, hScale.ComponentName)

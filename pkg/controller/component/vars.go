@@ -1147,6 +1147,7 @@ func componentVarPodsGetter(ctx context.Context, cli client.Reader,
 		if err != nil {
 			return "", err
 		}
+		// TODO: what if the component is being deleted?
 	}
 
 	var templates []instanceset.InstanceTemplate
@@ -1205,7 +1206,7 @@ func resolveComponentVarRefLow(ctx context.Context, cli client.Reader, synthesiz
 			}
 			obj := &appsv1.Component{}
 			err := cli.Get(ctx, key, obj, inDataContext())
-			return obj, err
+			return obj, err // TODO: what if the component is being deleted?
 		}
 		return resolveReferentObjects(synthesizedComp, objRef, getter)
 	}

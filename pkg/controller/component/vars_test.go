@@ -2428,7 +2428,7 @@ var _ = Describe("vars", func() {
 									Name:     "service",
 									Optional: required(),
 									MultipleClusterObjectOption: &appsv1alpha1.MultipleClusterObjectOption{
-										RequireAllComponentObjects: ptr.To(false), // false
+										RequireAllComponentObjects: ptr.To(false),
 										Strategy:                   appsv1alpha1.MultipleClusterObjectStrategyIndividual,
 									},
 								},
@@ -2466,7 +2466,7 @@ var _ = Describe("vars", func() {
 									Name:     "service",
 									Optional: required(),
 									MultipleClusterObjectOption: &appsv1alpha1.MultipleClusterObjectOption{
-										RequireAllComponentObjects: ptr.To(true), // true
+										RequireAllComponentObjects: ptr.To(true),
 										Strategy:                   appsv1alpha1.MultipleClusterObjectStrategyIndividual,
 									},
 								},
@@ -2501,7 +2501,7 @@ var _ = Describe("vars", func() {
 									Name:     "service",
 									Optional: required(),
 									MultipleClusterObjectOption: &appsv1alpha1.MultipleClusterObjectOption{
-										RequireAllComponentObjects: ptr.To(true), // true
+										RequireAllComponentObjects: ptr.To(true),
 										Strategy:                   appsv1alpha1.MultipleClusterObjectStrategyIndividual,
 									},
 								},

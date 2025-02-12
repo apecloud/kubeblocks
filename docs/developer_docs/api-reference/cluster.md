@@ -5510,6 +5510,21 @@ an existed ServiceAccount in this field.</p>
 </tr>
 <tr>
 <td>
+<code>provisionStrategy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1alpha1.UpdateStrategy">
+UpdateStrategy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the strategy for provisioning shards of the sharding. Only <code>Serial</code> and <code>Parallel</code> are supported.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>updateStrategy</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.UpdateStrategy">
@@ -14674,6 +14689,19 @@ MultipleClusterObjectValueFormatFlatten
 </tr>
 </thead>
 <tbody>
+<tr>
+<td>
+<code>requireAllComponentObjects</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>RequireAllComponentObjects controls whether all component objects must exist before resolving.
+If set to true, resolving will only proceed if all component objects are present.</p>
+</td>
+</tr>
 <tr>
 <td>
 <code>strategy</code><br/>

@@ -87,6 +87,7 @@ var _ = Describe("cluster utils test", func() {
 				AddShardingSpecV2(mysqlShardingName, mysqlCompDefName).
 				SetShards(0).
 				Create(&testCtx).GetObject()
+
 		})
 
 		It("get original or generated cluster component spec test", func() {

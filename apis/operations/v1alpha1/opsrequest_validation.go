@@ -470,14 +470,14 @@ func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, com
 		if replicaChanger.ReplicaChanges != nil && allReplicaChanges > *replicaChanger.ReplicaChanges {
 			return fmt.Errorf(`%s "replicaChanges" can't be less than the sum of "replicaChanges" for specified instance templates`, msgPrefix)
 		}
-		replicaChange := allReplicaChanges
+		actualReplicaChange := allReplicaChanges
 		if replicaChanger.ReplicaChanges != nil {
-			replicaChange = *replicaChanger.ReplicaChanges
+			actualReplicaChange = *replicaChanger.ReplicaChanges
 		}
-		if isScaleIn && int(compSpec.Replicas)-int(replicaChange) < minReplicasOrShards {
+		if isScaleIn && int(compSpec.Replicas)-int(actualReplicaChange) < minReplicasOrShards {
 			return fmt.Errorf(`the number of replicas after scaling down violates the replica limit for component "%s"`, hScale.ComponentName)
 		}
-		if !isScaleIn && int(compSpec.Replicas)+int(replicaChange) > maxReplicasOrShards {
+		if !isScaleIn && int(compSpec.Replicas)+int(actualReplicaChange) > maxReplicasOrShards {
 			return fmt.Errorf(`the number of replicas after scaling up violates the replica limit for component "%s"`, hScale.ComponentName)
 		}
 		return nil

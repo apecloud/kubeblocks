@@ -90,7 +90,13 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			horizontalScaling opsv1alpha1.HorizontalScaling,
 			ignoreHscaleStrictValidate bool) (*OpsResource, []*corev1.Pod) {
 			By("init operations resources with CLusterDefinition/Hybrid components Cluster/consensus Pods")
-			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
+			opsRes, compDef, _ := initOperationsResources(compDefName, clusterName)
+			Expect(testapps.ChangeObj(&testCtx, compDef, func(compDef *appsv1.ComponentDefinition) {
+				compDef.Spec.ReplicasLimit = &appsv1.ReplicasLimit{
+					MinReplicas: 0,
+					MaxReplicas: 10,
+				}
+			})).Should(Succeed())
 			its := testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
 			if changeClusterSpec != nil {
 				Expect(testapps.ChangeObj(&testCtx, opsRes.Cluster, func(cluster *appsv1.Cluster) {

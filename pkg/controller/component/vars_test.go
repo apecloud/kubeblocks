@@ -22,7 +22,6 @@ package component
 import (
 	"encoding/json"
 	"fmt"
-	"k8s.io/utils/ptr"
 	"strconv"
 	"strings"
 
@@ -32,6 +31,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"

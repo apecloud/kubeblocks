@@ -20,8 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package apps
 
 import (
-	"context"
-
 	"github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -82,8 +80,7 @@ func CheckedCreateK8sResource(testCtx *testutil.TestContext, obj client.Object) 
 func GetClusterComponentPhase(testCtx *testutil.TestContext, clusterKey types.NamespacedName, componentName string) func(g gomega.Gomega) appsv1alpha1.ClusterComponentPhase {
 	return func(g gomega.Gomega) appsv1alpha1.ClusterComponentPhase {
 		tmpCluster := &appsv1alpha1.Cluster{}
-		g.Expect(testCtx.Cli.Get(context.Background(), client.ObjectKey{Name: clusterKey.Name,
-			Namespace: clusterKey.Namespace}, tmpCluster)).Should(gomega.Succeed())
+		g.Expect(testCtx.Cli.Get(testCtx.Ctx, clusterKey, tmpCluster)).Should(gomega.Succeed())
 		return tmpCluster.Status.Components[componentName].Phase
 	}
 }

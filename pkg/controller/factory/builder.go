@@ -215,7 +215,7 @@ func randomString(length int) string {
 }
 
 func strongRandomString(length int) string {
-	str, _ := common.GeneratePassword(length, 3, 3, false, "")
+	str, _ := common.GeneratePassword(length, 3, 3, "")
 	return str
 }
 

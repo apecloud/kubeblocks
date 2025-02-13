@@ -148,12 +148,14 @@ func (t *componentAccountTransformer) buildPassword(ctx *componentTransformConte
 
 func (t *componentAccountTransformer) generatePassword(account appsv1alpha1.SystemAccount) []byte {
 	config := account.PasswordGenerationPolicy
-	passwd, _ := common.GeneratePassword((int)(config.Length), (int)(config.NumDigits), (int)(config.NumSymbols), false, config.Seed)
+	passwd, _ := common.GeneratePassword((int)(config.Length), (int)(config.NumDigits), (int)(config.NumSymbols), config.Seed)
 	switch config.LetterCase {
 	case appsv1alpha1.UpperCases:
 		passwd = strings.ToUpper(passwd)
 	case appsv1alpha1.LowerCases:
 		passwd = strings.ToLower(passwd)
+	case appsv1alpha1.MixedCases:
+		passwd, _ = common.EnsureMixedCase(passwd, config.Seed)
 	}
 	return []byte(passwd)
 }

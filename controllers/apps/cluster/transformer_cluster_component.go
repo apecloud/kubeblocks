@@ -133,8 +133,12 @@ func deleteCompNShardingInOrder(transCtx *clusterTransformContext, dag *graph.DA
 }
 
 func handleCompNShardingInOrder(transCtx *clusterTransformContext, dag *graph.DAG, nameSet sets.Set[string], handler clusterConditionalHandler) error {
+	orderedNames, err := handler.ordered(sets.List(nameSet))
+	if err != nil {
+		return err
+	}
 	unmatched := ""
-	for _, name := range handler.ordered(sets.List(nameSet)) {
+	for _, name := range orderedNames {
 		ok, err := handler.match(transCtx, dag, name)
 		if err != nil {
 			return err
@@ -301,15 +305,15 @@ func newOrderedHandler(topology appsv1.ClusterTopology, orders []string, op int)
 }
 
 type clusterConditionalHandler interface {
-	ordered([]string) []string
+	ordered([]string) ([]string, error)
 	match(transCtx *clusterTransformContext, dag *graph.DAG, name string) (bool, error)
 	handle(transCtx *clusterTransformContext, dag *graph.DAG, name string) error
 }
 
 type clusterParallelOrder struct{}
 
-func (o *clusterParallelOrder) ordered(names []string) []string {
-	return names
+func (o *clusterParallelOrder) ordered(names []string) ([]string, error) {
+	return names, nil
 }
 
 type clusterOrderedOrder struct {
@@ -317,7 +321,7 @@ type clusterOrderedOrder struct {
 	orders   []string
 }
 
-func (o *clusterOrderedOrder) ordered(names []string) []string {
+func (o *clusterOrderedOrder) ordered(names []string) ([]string, error) {
 	result := make([]string, 0)
 	for _, order := range o.orders {
 		entities := strings.Split(order, ",")
@@ -330,9 +334,9 @@ func (o *clusterOrderedOrder) ordered(names []string) []string {
 		}
 	}
 	if len(result) != len(names) {
-		panic("runtime error: cannot find order for components and shardings " + strings.Join(names, ","))
+		return nil, fmt.Errorf("cannot find order for components and shardings: %s", strings.Join(names, ","))
 	}
-	return result
+	return result, nil
 }
 
 type dummyPrecondition struct{}
@@ -347,7 +351,11 @@ type notExistPrecondition struct {
 }
 
 func (c *notExistPrecondition) match(transCtx *clusterTransformContext, dag *graph.DAG, name string) (bool, error) {
-	for _, predecessor := range predecessors(c.topology, c.orders, name) {
+	predecessors, err := predecessors(c.topology, c.orders, name)
+	if err != nil {
+		return false, err
+	}
+	for _, predecessor := range predecessors {
 		exist, err := c.predecessorExist(transCtx, dag, predecessor)
 		if err != nil {
 			return false, err
@@ -447,7 +455,11 @@ type phasePrecondition struct {
 }
 
 func (c *phasePrecondition) match(transCtx *clusterTransformContext, dag *graph.DAG, name string) (bool, error) {
-	for _, predecessor := range predecessors(c.topology, c.orders, name) {
+	predecessors, err := predecessors(c.topology, c.orders, name)
+	if err != nil {
+		return false, err
+	}
+	for _, predecessor := range predecessors {
 		match, err := c.predecessorMatch(transCtx, dag, predecessor)
 		if err != nil {
 			return false, err
@@ -588,18 +600,18 @@ func (h *clusterCompNShardingHandler) handle(transCtx *clusterTransformContext, 
 	}
 }
 
-func predecessors(topology appsv1.ClusterTopology, orders []string, name string) []string {
+func predecessors(topology appsv1.ClusterTopology, orders []string, name string) ([]string, error) {
 	var previous []string
 	for _, order := range orders {
 		entities := strings.Split(order, ",")
 		if slices.ContainsFunc(entities, func(e string) bool {
 			return clusterTopologyEntityMatched(topology, e, name)
 		}) {
-			return previous
+			return previous, nil
 		}
 		previous = entities
 	}
-	panic("runtime error: cannot find predecessor for component or sharding " + name)
+	return nil, fmt.Errorf("cannot find predecessor for component or sharding %s", name)
 }
 
 func clusterTopologyEntityMatched(topology appsv1.ClusterTopology, entityName, name string) bool {

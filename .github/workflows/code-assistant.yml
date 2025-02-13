@@ -1,0 +1,24 @@
+name: Code Assistant
+on:
+  issue_comment:
+    types: [created]
+
+env:
+  GH_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+  CODE_ASSISTANT_API_URL: ${{ secrets.CODE_ASSISTANT_API_URL }}
+
+jobs:
+  code-assistant:
+    name: Code Assistant
+    if: contains(github.event.comment.body, '/code-assistant')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ env.GH_TOKEN }}
+          fetch-depth: 0
+      - name: Code Assistant
+        uses: apecloud-inc/gha-code-assistant@main
+        env:
+          GITHUB_TOKEN: ${{ env.GH_TOKEN }}
+          CODE_ASSISTANT_API_URL: ${{ env.CODE_ASSISTANT_API_URL }}

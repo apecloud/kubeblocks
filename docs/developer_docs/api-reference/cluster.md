@@ -1525,6 +1525,7 @@ Kubernetes resources within the namespace.</p>
 <p>The purpose of this field is to automatically generate the necessary RBAC roles
 for the Component based on the specified policy rules.
 This ensures that the Pods in the Component has appropriate permissions to function.</p>
+<p>To prevent privilege escalation, only permissions already owned by KubeBlocks can be added here.</p>
 <p>This field is immutable.</p>
 </td>
 </tr>
@@ -3211,9 +3212,7 @@ future reuse or data recovery, but it is no longer actively used.</li>
 and avoiding conflicts with new instances.</li>
 </ol>
 <p>Setting instances to offline allows for a controlled scale-in process, preserving their data and maintaining
-ordinal consistency within the Cluster.
-Note that offline instances and their associated resources, such as PVCs, are not automatically deleted.
-The administrator must manually manage the cleanup and removal of these resources when they are no longer needed.</p>
+ordinal consistency within the Cluster.</p>
 </td>
 </tr>
 <tr>
@@ -5487,6 +5486,7 @@ Kubernetes resources within the namespace.</p>
 <p>The purpose of this field is to automatically generate the necessary RBAC roles
 for the Component based on the specified policy rules.
 This ensures that the Pods in the Component has appropriate permissions to function.</p>
+<p>To prevent privilege escalation, only permissions already owned by KubeBlocks can be added here.</p>
 <p>This field is immutable.</p>
 </td>
 </tr>

@@ -21,7 +21,6 @@ package component
 
 import (
 	"fmt"
-	"time"
 
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -135,7 +134,7 @@ func (t *componentNotifierTransformer) notify(transCtx *componentTransformContex
 		compCopy.Annotations = make(map[string]string)
 	}
 	compCopy.Annotations[constant.ReconcileAnnotationKey] =
-		fmt.Sprintf("%s@%s", synthesizedComp.Name, time.Now().Format(time.RFC3339))
+		fmt.Sprintf("%s@%s", synthesizedComp.Name, synthesizedComp.Generation)
 
 	graphCli.Patch(dag, comp, compCopy)
 

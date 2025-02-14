@@ -4356,6 +4356,10 @@ spec:
                   backupName:
                     description: Specifies the name of the Backup custom resource.
                     type: string
+                  backupNamespace:
+                    description: Specifies the namespace of the backup custom resource.
+                      If not specified, the namespace of the opsRequest will be used.
+                    type: string
                   deferPostReadyUntilClusterRunning:
                     description: |-
                       Controls the timing of PostReady actions during the recovery process.

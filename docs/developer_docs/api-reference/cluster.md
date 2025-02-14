@@ -8071,18 +8071,6 @@ Values for existing keys will be overwritten, and new keys will be added.</p>
 </tr>
 <tr>
 <td>
-<code>image</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies an override for the first container&rsquo;s image in the Pod.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>schedulingPolicy</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.SchedulingPolicy">

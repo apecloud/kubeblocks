@@ -688,11 +688,6 @@ type InstanceTemplate struct {
 	// +optional
 	Labels map[string]string `json:"labels,omitempty"`
 
-	// Specifies an override for the first container's image in the Pod.
-	//
-	// +optional
-	Image *string `json:"image,omitempty"`
-
 	// Specifies the scheduling policy for the Component.
 	//
 	// +optional

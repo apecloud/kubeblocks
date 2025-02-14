@@ -170,7 +170,6 @@ func mockCompressedInstanceTemplates(ns, name string) (*corev1.ConfigMap, string
 		{
 			Name:     "bar0",
 			Replicas: func() *int32 { r := int32(1); return &r }(),
-			Image:    func() *string { i := "busybox"; return &i }(),
 		},
 	}
 	templateByte, err := json.Marshal(instances)

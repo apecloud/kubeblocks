@@ -29,7 +29,7 @@ import (
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster
-// +kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=paramstemplate
+// +kubebuilder:resource:categories={kubeblocks},scope=Cluster,shortName=pcr
 // +kubebuilder:printcolumn:name="COMPD",type="string",JSONPath=".spec.componentDef",description="componentdefinition name"
 // +kubebuilder:printcolumn:name="PHASE",type="string",JSONPath=".status.phase",description="status phase"
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"

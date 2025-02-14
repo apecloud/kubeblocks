@@ -15,7 +15,7 @@ spec:
     listKind: ParamConfigRendererList
     plural: paramconfigrenderers
     shortNames:
-    - paramstemplate
+    - pcr
     singular: paramconfigrenderer
   scope: Cluster
   versions:

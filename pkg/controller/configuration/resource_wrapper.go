@@ -30,6 +30,7 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/render"
@@ -48,6 +49,8 @@ type ResourceFetcher[T any] struct {
 	ConfigMapObj        *corev1.ConfigMap
 	ConfigurationObj    *appsv1alpha1.Configuration
 	ConfigConstraintObj *appsv1beta1.ConfigConstraint
+
+	ComponentParameterObj *parametersv1alpha1.ComponentParameter
 }
 
 func (r *ResourceFetcher[T]) Init(ctx *render.ResourceCtx, object *T) *T {
@@ -152,6 +155,21 @@ func (r *ResourceFetcher[T]) ConfigConstraints(ccName string) *T {
 			r.ConfigConstraintObj = &appsv1beta1.ConfigConstraint{}
 			return r.Client.Get(r.Context, client.ObjectKey{Name: ccName}, r.ConfigConstraintObj)
 		}
+		return nil
+	})
+}
+
+func (r *ResourceFetcher[T]) ComponentParameter() *T {
+	configKey := client.ObjectKey{
+		Name:      cfgcore.GenerateComponentConfigurationName(r.ClusterName, r.ComponentName),
+		Namespace: r.Namespace,
+	}
+	return r.Wrap(func() error {
+		componentParameters := &parametersv1alpha1.ComponentParameter{}
+		if err := r.Client.Get(r.Context, configKey, componentParameters); err != nil {
+			return err
+		}
+		r.ComponentParameterObj = componentParameters
 		return nil
 	})
 }

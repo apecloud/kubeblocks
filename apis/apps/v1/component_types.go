@@ -294,15 +294,6 @@ type ComponentSpec struct {
 	//
 	// +optional
 	Sidecars []Sidecar `json:"sidecars,omitempty"`
-
-	// Specifies the initialization parameters.
-	//
-	// +patchMergeKey=name
-	// +patchStrategy=merge,retainKeys
-	// +listType=map
-	// +listMapKey=name
-	// +optional
-	InitParameters []ComponentParameter `json:"initParameters,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 }
 
 type ComponentParameter struct {

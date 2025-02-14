@@ -867,20 +867,6 @@ If set, all the computing resources will be released.</p>
 <p>Specifies the sidecars to be injected into the Component.</p>
 </td>
 </tr>
-<tr>
-<td>
-<code>initParameters</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.ComponentParameter">
-[]ComponentParameter
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the initialization parameters.</p>
-</td>
-</tr>
 </table>
 </td>
 </tr>
@@ -3179,20 +3165,6 @@ bool
 <em>(Optional)</em>
 <p>Stop the Component.
 If set, all the computing resources will be released.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>initParameters</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.ComponentParameter">
-[]ComponentParameter
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the initialization parameters.</p>
 </td>
 </tr>
 </tbody>
@@ -5869,9 +5841,6 @@ and other administrative tasks.</p>
 </table>
 <h3 id="apps.kubeblocks.io/v1.ComponentParameter">ComponentParameter
 </h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>)
-</p>
 <div>
 </div>
 <table>
@@ -6461,20 +6430,6 @@ If set, all the computing resources will be released.</p>
 <td>
 <em>(Optional)</em>
 <p>Specifies the sidecars to be injected into the Component.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>initParameters</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.ComponentParameter">
-[]ComponentParameter
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the initialization parameters.</p>
 </td>
 </tr>
 </tbody>

@@ -51,9 +51,9 @@ import (
 	"github.com/apecloud/kubeblocks/controllers/apps"
 	"github.com/apecloud/kubeblocks/controllers/apps/cluster"
 	"github.com/apecloud/kubeblocks/controllers/apps/component"
-	"github.com/apecloud/kubeblocks/controllers/apps/configuration"
 	"github.com/apecloud/kubeblocks/controllers/dataprotection"
 	"github.com/apecloud/kubeblocks/controllers/k8score"
+	"github.com/apecloud/kubeblocks/controllers/parameters"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -240,14 +240,14 @@ var _ = BeforeSuite(func() {
 	}).SetupWithManager(k8sManager, nil)
 	Expect(err).ToNot(HaveOccurred())
 
-	err = (&configuration.ConfigConstraintReconciler{
+	err = (&parameters.ConfigConstraintReconciler{
 		Client:   k8sManager.GetClient(),
 		Scheme:   k8sManager.GetScheme(),
 		Recorder: k8sManager.GetEventRecorderFor("configuration-template-controller"),
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
-	err = (&configuration.ConfigurationReconciler{
+	err = (&parameters.ConfigurationReconciler{
 		Client:   k8sManager.GetClient(),
 		Scheme:   k8sManager.GetScheme(),
 		Recorder: k8sManager.GetEventRecorderFor("configuration-controller"),

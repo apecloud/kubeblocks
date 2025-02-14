@@ -570,11 +570,11 @@ func (s *Scheduler) buildCheckCommand(schedulePolicy *dpv1alpha1.SchedulePolicy)
 	checkCommand := fmt.Sprintf(`
 repoName=$(kubectl -n "%s" get backuppolicies.dataprotection.kubeblocks.io "%s" -o jsonpath={.spec.backupRepoName})
 if [ -z "$repoName" ]; then
-	defaultRepos=$(kubectl get backuprepos.dataprotection.kubeblocks.io -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.metadata.annotations.dataprotection\.kubeblocks\.io/is-default-repo}{"\n"}{end}' | grep "true")
+	defaultRepos=$(kubectl get backuprepos.dataprotection.kubeblocks.io -o jsonpath='{range .items[?(@.metadata.annotations.dataprotection\.kubeblocks\.io/is-default-repo=="true")]}{.metadata.name}{"\t"}{end}')
 	if [ -z "$defaultRepos" ]; then
 		echo "No default backupRepo found. Exiting."
 		exit 0
-	elif [ $(echo $defaultRepos | wc -l) -ne 1 ]; then
+	elif [ $(echo $defaultRepos | wc -w) -ne 1 ]; then
 		echo "Multiple default backupRepo found. Exiting."
 		exit 0
 	fi

@@ -568,12 +568,27 @@ func (s *Scheduler) buildCheckCommand(schedulePolicy *dpv1alpha1.SchedulePolicy)
 		labelSlice = append(labelSlice, fmt.Sprintf("%s=%s", k, v))
 	}
 	checkCommand := fmt.Sprintf(`
-count=$(kubectl get backups.dataprotection.kubeblocks.io -n %s --selector=%s -o jsonpath='{range .items[?(@.spec.backupMethod=="%s")]}{.status.phase}{"\n"}{end}' | grep "Completed" | wc -l)
+repoName=$(kubectl -n "%s" get backuppolicies.dataprotection.kubeblocks.io "%s" -o jsonpath={.spec.backupRepoName})
+if [ -z "$repoName" ]; then
+	defaultRepos=$(kubectl get backuprepos.dataprotection.kubeblocks.io -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.metadata.annotations.dataprotection\.kubeblocks\.io/is-default-repo}{"\n"}{end}' | grep "true")
+	if [ -z "$defaultRepos" ]; then
+		echo "No default backupRepo found. Exiting."
+		exit 0
+	elif [ $(echo $defaultRepos | wc -l) -ne 1 ]; then
+		echo "Multiple default backupRepo found. Exiting."
+		exit 0
+	fi
+	repoName=$(echo $defaultRepos | awk '{print $1}')
+fi
+repoLabel=",dataprotection.kubeblocks.io/backup-repo-name=$repoName"
+count=$(kubectl get backups.dataprotection.kubeblocks.io -n %s --selector=%s$repoLabel -o jsonpath='{range .items[?(@.spec.backupMethod=="%s")]}{.status.phase}{"\n"}{end}' | grep "Completed" | wc -l)
 if [ "$count" -eq 0 ]; then
     echo "No completed full backups found. Exiting."
     exit 0
 fi
 `,
+		s.BackupSchedule.Namespace,
+		s.BackupSchedule.Spec.BackupPolicyName,
 		s.BackupSchedule.Namespace,
 		strings.Join(labelSlice, ","),
 		backupMethod.CompatibleMethod,

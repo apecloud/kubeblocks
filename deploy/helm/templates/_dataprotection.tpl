@@ -24,6 +24,13 @@ Create the name of the ClusterRole for worker pods.
 {{- end }}
 
 {{/*
+Create the name of the additional ClusterRole for worker pods.
+*/}}
+{{- define "dataprotection.workerAdditionalClusterRoleName" -}}
+{{- include "kubeblocks.fullname" . }}-dataprotection-worker-additional-role
+{{- end }}
+
+{{/*
 Create the name of the Role for exec worker pods.
 */}}
 {{- define "dataprotection.execWorkerRoleName" -}}

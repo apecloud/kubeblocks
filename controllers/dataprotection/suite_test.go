@@ -91,6 +91,7 @@ var _ = BeforeSuite(func() {
 	viper.SetDefault(dptypes.CfgKeyExecWorkerServiceAccountName, "kubeblocks-dataprotection-exec-worker")
 	viper.SetDefault(dptypes.CfgKeyWorkerServiceAccountAnnotations, `{"role-arn":"arn:xxx:xxx"}`)
 	viper.SetDefault(dptypes.CfgKeyWorkerClusterRoleName, "kubeblocks-dataprotection-worker-role")
+	viper.SetDefault(dptypes.CfgKeyWorkerAdditionalClusterRoleName, "kubeblocks-dataprotection-worker-additional-role")
 
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{

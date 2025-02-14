@@ -147,6 +147,8 @@ spec:
               value: {{ .Values.dataProtection.worker.serviceAccount.annotations | toJson | quote }}
             - name: WORKER_CLUSTER_ROLE_NAME
               value: {{ include "dataprotection.workerClusterRoleName" . }}
+            - name: WORKER_ADDITIONAL_CLUSTER_ROLE_NAME
+              value: {{ include "dataprotection.workerAdditionalClusterRoleName" . }}
             {{- if .Values.dataProtection.extraEnvs }}
             {{- toYaml .Values.dataProtection.extraEnvs | nindent 12 }}
             {{- end }}

@@ -21,6 +21,7 @@ KubeBlocks 是 Kubernetes 原生 operator，可通过 Helm、 kubectl 应用 YAM
 
 - 请确保您安装和卸载 KubeBlocks 使用的方式保持一致，例如，如果您使用 Helm 安装 KubeBlocks，卸载时也需使用 Helm。
 - 请确保您已安装 [kubectl](https://kubernetes.io/docs/tasks/tools/)，[Helm](https://helm.sh/docs/intro/install/) 或 [kbcli](./install-kbcli.md)。
+- 请确保您已安装 Snapshot Controller。如果尚未安装，请按照 [安装 Snapshot Controller](#安装-kubeblocks) 部分中的步骤安装。
 
 :::
 
@@ -55,36 +56,107 @@ KubeBlocks 是 Kubernetes 原生 operator，可通过 Helm、 kubectl 应用 YAM
 	</tr>
 </table>
 
-## 安装步骤
+## 安装 Snapshot Controller
+
+SnapshotController 是一个 Kubernetes 组件，用于管理 CSI 卷快照，可让用户创建、恢复和删除持久卷 (PV) 的快照。KubeBlocks DataProtection 控制器会使用 Snapshot Controller 来为数据库创建快照备份。
+
+如果您的 Kubernetes 集群没有以下 CRD，说明您可能没有部署 Snapshot Controller。
+
+```bash
+kubectl get crd volumesnapshotclasses.snapshot.storage.k8s.io
+kubectl get crd volumesnapshots.snapshot.storage.k8s.io
+kubectl get crd volumesnapshotcontents.snapshot.storage.k8s.io
+```
+
+:::note
+
+如果您确定不需要使用快照备份功能, 可以只安装SnapshotController CRD, 跳过后续步骤。
+
+```bash
+# v8.2.0 is the latest version of the external-snapshotter, you can replace it with the version you need.
+kubectl create -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/v8.2.0/client/config/crd/snapshot.storage.k8s.io_volumesnapshotclasses.yaml
+kubectl create -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/v8.2.0/client/config/crd/snapshot.storage.k8s.io_volumesnapshots.yaml
+kubectl create -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/v8.2.0/client/config/crd/snapshot.storage.k8s.io_volumesnapshotcontents.yaml
+```
+
+:::
+
+### 第 1 步：部署 Snapshot Controller
+
+可以通过 Helm 或者 kubectl 安装 Snapshot Controller。以下演示如何使用 Helm 安装：
+
+```bash
+helm repo add piraeus-charts https://piraeus.io/helm-charts/
+helm repo update
+# Update the namespace to an appropriate value for your environment (e.g. kb-system)
+helm install snapshot-controller piraeus-charts/snapshot-controller -n kb-system --create-namespace
+```
+
+如需更多信息，请参阅 [Snapshot Controller Configuration](https://artifacthub.io/packages/helm/piraeus-charts/snapshot-controller#configuration)。
+
+### 第 2 步：验证 Snapshot Controller 是否安装成功
+
+检查 snapshot-controller Pod 是否正在运行：
+
+```bash
+kubectl get pods -n kb-system | grep snapshot-controller
+```
+
+<details>
+
+<summary>Output</summary>
+
+```bash
+snapshot-controller-xxxx-yyyy   1/1   Running   0   30s
+```
+
+</details>
+
+如果该 Pod 处于 CrashLoopBackOff 状态，请查看日志：
+
+```bash
+kubectl logs -n kb-system deployment/snapshot-controller
+```
+
+## 安装KubeBlocks
 
 <Tabs>
 
 <TabItem value="Helm" label="Helm" default>
 
-按照以下步骤使用 Helm 安装 KubeBlocks。
+按照以下步骤使用 Helm 安装 KubeBlocks：
 
-1. 创建安装所依赖的 CRDs，并指定您想要安装的版本。
+1. 获取 KubeBlocks 版本:
 
+   * 选项 A - 获取最新稳定版本(例如 v0.9.2):
    ```bash
-   kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/vx.y.z/kubeblocks_crds.yaml
+   curl -s "https://api.github.com/repos/apecloud/kubeblocks/releases?per_page=100&page=1" | jq -r '.[] | select(.prerelease == false) | .tag_name' | sort -V -r | head -n 1
    ```
 
-   您可以通过 [KubeBlocks 发布列表](https://github.com/apecloud/kubeblocks/releases) 查看 KubeBlocks 的所有版本，包括 alpha 及 beta 版本。
+   * 选项 B - 查看所有可用版本(包括 alpha 和 beta 版本):
+     * 访问 [KubeBlocks 发布列表](https://github.com/apecloud/kubeblocks/releases)。
+     * 或使用命令:
+     ```bash
+     curl -s "https://api.github.com/repos/apecloud/kubeblocks/releases?per_page=100&page=1" | jq -r '.[].tag_name' | sort -V -r
+     ```
 
-   也可通过执行以下命令，获取稳定版本：
-
+2. 使用选择的版本创建所需的 CRDs:
    ```bash
-   curl -s "https://api.github.com/repos/apecloud/kubeblocks/releases?per_page=100&page=1" | jq -r '.[] | select(.prerelease == false) | .tag_name' | sort -V -r
+   # 将 <VERSION> 替换为您选择的版本
+   kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/<VERSION>/kubeblocks_crds.yaml
+
+   # 示例:如果版本是 v0.9.2
+   kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/v0.9.2/kubeblocks_crds.yaml
    ```
 
-2. 添加 KubeBlocks 的 Helm 仓库。
+3. 添加 KubeBlocks 的 Helm 仓库：
 
    ```bash
    helm repo add kubeblocks https://apecloud.github.io/helm-charts
    helm repo update
    ```
 
-3. 安装 KubeBlocks。
+4. 安装 KubeBlocks：
 
    ```bash
    helm install kubeblocks kubeblocks/kubeblocks --namespace kb-system --create-namespace
@@ -101,10 +173,10 @@ KubeBlocks 是 Kubernetes 原生 operator，可通过 Helm、 kubectl 应用 YAM
    如果您想要安装指定版本的 KubeBlocks，可执行如下步骤：
 
    1. 在 [KubeBlocks 发布列表](https://github.com/apecloud/kubeblocks/releases/) 中查看可用版本。
-   2. 使用 `--version` 指定版本，并执行以下命令。
+   2. 使用 `--version` 指定版本，并执行以下命令：
 
       ```bash
-      helm install kubeblocks kubeblocks/kubeblocks --namespace kb-system --create-namespace --version="x.y.z"
+      helm install kubeblocks kubeblocks/kubeblocks --namespace kb-system --create-namespace --version=<VERSION>
       ```
 
      :::note
@@ -119,27 +191,44 @@ KubeBlocks 是 Kubernetes 原生 operator，可通过 Helm、 kubectl 应用 YAM
 
 与 Kubernetes 中的其他资源相同，KubeBlocks 也可以通过 YAML 文件和 kubectl 命令进行安装。
 
-1. 创建安装所依赖的 CRDs，并指定您想要安装的版本。
+1. 获取 KubeBlocks 版本:
 
+   * 选项 A - 获取最新稳定版本(例如 v0.9.2):
    ```bash
-   kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/vx.y.z/kubeblocks_crds.yaml
+   curl -s "https://api.github.com/repos/apecloud/kubeblocks/releases?per_page=100&page=1" | jq -r '.[] | select(.prerelease == false) | .tag_name' | sort -V -r | head -n 1
    ```
 
-   您可以通过 [KubeBlocks 发布列表](https://github.com/apecloud/kubeblocks/releases) 查看 KubeBlocks 的所有版本，包括 alpha 及 beta 版本。
-
-   也可通过执行以下命令，获取稳定版本：
-
-   ```bash
-   curl -s "https://api.github.com/repos/apecloud/kubeblocks/releases?per_page=100&page=1" | jq -r '.[] | select(.prerelease == false) | .tag_name' | sort -V -r
-   ```
-
-2. 从对应版本的 [KubeBlocks 发布列表](https://github.com/apecloud/kubeblocks/releases) 中的资产部分获取 `kubeblocks.yaml` 文件地址。
-
-3. 替换 YAML 文件地址，执行以下命令，安装 KubeBlocks。
-
+   * 选项 B - 查看所有可用版本(包括 alpha 和 beta 版本):
+      * 访问 [KubeBlocks 发布列表](https://github.com/apecloud/kubeblocks/releases)。
+      * 或使用命令:
      ```bash
-     kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/vx.y.x/kubeblocks.yaml
+     curl -s "https://api.github.com/repos/apecloud/kubeblocks/releases?per_page=100&page=1" | jq -r '.[].tag_name' | sort -V -r
      ```
+
+2. 使用选择的版本创建所需的 CRDs:
+   ```bash
+   # 将 <VERSION> 替换为您选择的版本
+   kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/<VERSION>/kubeblocks_crds.yaml
+
+   # 示例:如果版本是 v0.9.2
+   kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/v0.9.2/kubeblocks_crds.yaml
+   ```
+
+3. 安装 KubeBlocks:
+
+   ```bash
+   # 将 <VERSION> 替换为在步骤 2 中使用的相同版本
+   kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/<VERSION>/kubeblocks.yaml
+
+   # 示例:如果版本是 v0.9.2
+   kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/v0.9.2/kubeblocks.yaml
+   ```
+
+   :::note
+
+   请确保创建 CRDs 和安装 KubeBlocks 时使用相同版本以避免兼容性问题。
+
+   :::
 
 </TabItem>
 
@@ -153,31 +242,31 @@ kbcli kubeblocks install
 
 如果想安装 KubeBlocks 的指定版本，请按照以下步骤操作：
 
-1. 查看可用的版本。
+1. 查看可用的版本：
 
     ```bash
     kbcli kubeblocks list-versions
     ```
 
-    如需查看包含 alpha 和 beta 在内的版本，可执行以下命令。
+    如需查看包含 alpha 和 beta 在内的版本，可执行以下命令：
 
     ```bash
     kbcli kb list-versions --devel --limit=100
     ```
 
-    或者，你可以在 [KubeBlocks Release 页面](https://github.com/apecloud/kubeblocks/releases/)中查看可用的版本。
+    或者，你可以在 [KubeBlocks 发布列表](https://github.com/apecloud/kubeblocks/releases/)中查看可用的版本。
 
-2. 使用 `--version` 指定版本。
+2. 使用 `--version` 指定版本：
 
     ```bash
-    kbcli kubeblocks install --version=x.x.x
+    kbcli kubeblocks install --version=<VERSION>
     ```
 
     :::note
 
     kbcli 默认安装最新版本。如果您的环境中已有正在运行的 KubeBlocks 实例，则需要安装与之匹配的 kbcli 版本。
 
-    例如，如果您当前使用的 KubeBlocks 版本是 v0.8.3，kbcli 应安装对应的 v0.8.3，而不是更高版本（如 v0.9.0），否则系统将因版本不匹配产生报错。
+    例如，如果您当前使用的 KubeBlocks 版本是 v0.9.2，kbcli 应安装对应的 v0.9.2，而不是更高版本（如 v1.0.0），否则系统将因版本不匹配产生报错。
 
     :::
 
@@ -187,7 +276,7 @@ kbcli kubeblocks install
 
 ## 验证 KubeBlocks 安装
 
-执行以下命令，检查 KubeBlocks 是否已成功安装。
+执行以下命令，检查 KubeBlocks 是否已成功安装：
 
 <Tabs>
 
@@ -228,7 +317,7 @@ kbcli kubeblocks status
 如果工作负载都显示已准备就绪，则表明已成功安装 KubeBlocks。
 
 ```bash
-KubeBlocks is deployed in namespace: kb-system,version: x.x.x
+KubeBlocks is deployed in namespace: kb-system, version: <VERSION>
 >
 KubeBlocks Workloads:
 NAMESPACE   KIND         NAME                           READY PODS   CPU(CORES)   MEMORY(BYTES)   CREATED-AT

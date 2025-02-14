@@ -48,7 +48,6 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	"github.com/apecloud/kubeblocks/pkg/controller/plan"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
@@ -1154,7 +1153,7 @@ var _ = Describe("Component Controller", func() {
 		By("check TLS secret")
 		secretKey := types.NamespacedName{
 			Namespace: compObj.Namespace,
-			Name:      plan.GenerateTLSSecretName(clusterKey.Name, compName),
+			Name:      tlsSecretName(clusterKey.Name, compName),
 		}
 		Eventually(testapps.CheckObj(&testCtx, secretKey, func(g Gomega, secret *corev1.Secret) {
 			g.Expect(secret.Data).Should(HaveKey(*tls.CAFile))
@@ -1167,12 +1166,7 @@ var _ = Describe("Component Controller", func() {
 			Name: tls.VolumeName,
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
-					SecretName: secretKey.Name,
-					Items: []corev1.KeyToPath{
-						{Key: *tls.CAFile, Path: *tls.CAFile},
-						{Key: *tls.CertFile, Path: *tls.CertFile},
-						{Key: *tls.KeyFile, Path: *tls.KeyFile},
-					},
+					SecretName:  secretKey.Name,
 					Optional:    ptr.To(false),
 					DefaultMode: tls.DefaultMode,
 				},

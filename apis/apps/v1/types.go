@@ -593,8 +593,14 @@ const (
 	IssuerUserProvided IssuerName = "UserProvided"
 )
 
-// TLSSecretRef defines Secret contains Tls certs
+// TLSSecretRef defines the Secret that contains TLS certs.
 type TLSSecretRef struct {
+	// The namespace where the secret is located.
+	// If not provided, the secret is assumed to be in the same namespace as the Cluster object.
+	//
+	// +optional
+	Namespace string `json:"namespace"`
+
 	// Name of the Secret that contains user-provided certificates.
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`

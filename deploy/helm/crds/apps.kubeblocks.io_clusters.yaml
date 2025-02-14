@@ -3782,6 +3782,11 @@ spec:
                               description: Name of the Secret that contains user-provided
                                 certificates.
                               type: string
+                            namespace:
+                              description: |-
+                                The namespace where the secret is located.
+                                If not provided, the secret is assumed to be in the same namespace as the Cluster object.
+                              type: string
                           required:
                           - ca
                           - cert
@@ -3822,8 +3827,6 @@ spec:
 
                         Setting instances to offline allows for a controlled scale-in process, preserving their data and maintaining
                         ordinal consistency within the Cluster.
-                        Note that offline instances and their associated resources, such as PVCs, are not automatically deleted.
-                        The administrator must manually manage the cleanup and removal of these resources when they are no longer needed.
                       items:
                         type: string
                       type: array
@@ -12530,6 +12533,11 @@ spec:
                                   description: Name of the Secret that contains user-provided
                                     certificates.
                                   type: string
+                                namespace:
+                                  description: |-
+                                    The namespace where the secret is located.
+                                    If not provided, the secret is assumed to be in the same namespace as the Cluster object.
+                                  type: string
                               required:
                               - ca
                               - cert
@@ -12570,8 +12578,6 @@ spec:
 
                             Setting instances to offline allows for a controlled scale-in process, preserving their data and maintaining
                             ordinal consistency within the Cluster.
-                            Note that offline instances and their associated resources, such as PVCs, are not automatically deleted.
-                            The administrator must manually manage the cleanup and removal of these resources when they are no longer needed.
                           items:
                             type: string
                           type: array
@@ -16049,9 +16055,15 @@ spec:
                   It establishes the initial composition and structure of the Cluster and is intended for one-time configuration.
                 maxLength: 32
                 type: string
+                x-kubernetes-validations:
+                - message: topology is immutable
+                  rule: self == oldSelf
             required:
             - terminationPolicy
             type: object
+            x-kubernetes-validations:
+            - message: topology is required once set
+              rule: '!has(oldSelf.topology) || has(self.topology)'
           status:
             description: ClusterStatus defines the observed state of the Cluster.
             properties:
@@ -22042,7 +22054,6 @@ spec:
                                 description: MountPoint is the filesystem path where
                                   the volume will be mounted.
                                 maxLength: 256
-                                pattern: ^/[a-z]([a-z0-9\-]*[a-z0-9])?$
                                 type: string
                               name:
                                 description: Name is the name of the referenced ConfigMap
@@ -22079,7 +22090,6 @@ spec:
                                 description: MountPoint is the filesystem path where
                                   the volume will be mounted.
                                 maxLength: 256
-                                pattern: ^/[a-z]([a-z0-9\-]*[a-z0-9])?$
                                 type: string
                               name:
                                 description: Name is the name of the referenced ConfigMap
@@ -31278,7 +31288,6 @@ spec:
                                     description: MountPoint is the filesystem path
                                       where the volume will be mounted.
                                     maxLength: 256
-                                    pattern: ^/[a-z]([a-z0-9\-]*[a-z0-9])?$
                                     type: string
                                   name:
                                     description: Name is the name of the referenced
@@ -31316,7 +31325,6 @@ spec:
                                     description: MountPoint is the filesystem path
                                       where the volume will be mounted.
                                     maxLength: 256
-                                    pattern: ^/[a-z]([a-z0-9\-]*[a-z0-9])?$
                                     type: string
                                   name:
                                     description: Name is the name of the referenced

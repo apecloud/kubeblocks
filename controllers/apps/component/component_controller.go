@@ -155,7 +155,7 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			// handle component system accounts
 			&componentAccountTransformer{},
 			// handle the TLS configuration
-			&componentTLSTransformer{Client: r.Client},
+			&componentTLSTransformer{},
 			// rerender parameters after v-scale and h-scale
 			&componentRelatedParametersTransformer{Client: r.Client},
 			// resolve and build vars for template and Env

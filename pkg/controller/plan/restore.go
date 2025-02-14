@@ -231,14 +231,15 @@ func (r *RestoreManager) DoPostReady(comp *component.SynthesizedComponent,
 	if len(comp.Roles) > 0 {
 		// HACK: assume the role with highest priority to be writable
 		highestPriority := math.MinInt
-		var role *appsv1.ReplicaRole
-		for _, r := range comp.Roles {
-			if r.UpdatePriority > highestPriority {
-				highestPriority = r.UpdatePriority
-				role = &r
+		var highestPriorityRole appsv1.ReplicaRole
+		for i := range comp.Roles {
+			role := comp.Roles[i]
+			if role.UpdatePriority > highestPriority {
+				highestPriority = role.UpdatePriority
+				highestPriorityRole = role
 			}
 		}
-		jobActionLabels[instanceset.RoleLabelKey] = role.Name
+		jobActionLabels[instanceset.RoleLabelKey] = highestPriorityRole.Name
 	}
 	sourceTargetName := compObj.Annotations[constant.BackupSourceTargetAnnotationKey]
 	restore := &dpv1alpha1.Restore{

@@ -1492,6 +1492,7 @@ Kubernetes resources within the namespace.</p>
 <p>The purpose of this field is to automatically generate the necessary RBAC roles
 for the Component based on the specified policy rules.
 This ensures that the Pods in the Component has appropriate permissions to function.</p>
+<p>To prevent privilege escalation, only permissions already owned by KubeBlocks can be added here.</p>
 <p>This field is immutable.</p>
 </td>
 </tr>
@@ -3131,9 +3132,7 @@ future reuse or data recovery, but it is no longer actively used.</li>
 and avoiding conflicts with new instances.</li>
 </ol>
 <p>Setting instances to offline allows for a controlled scale-in process, preserving their data and maintaining
-ordinal consistency within the Cluster.
-Note that offline instances and their associated resources, such as PVCs, are not automatically deleted.
-The administrator must manually manage the cleanup and removal of these resources when they are no longer needed.</p>
+ordinal consistency within the Cluster.</p>
 </td>
 </tr>
 <tr>
@@ -5374,6 +5373,7 @@ Kubernetes resources within the namespace.</p>
 <p>The purpose of this field is to automatically generate the necessary RBAC roles
 for the Component based on the specified policy rules.
 This ensures that the Pods in the Component has appropriate permissions to function.</p>
+<p>To prevent privilege escalation, only permissions already owned by KubeBlocks can be added here.</p>
 <p>This field is immutable.</p>
 </td>
 </tr>
@@ -11550,7 +11550,7 @@ Required when TLS is enabled.</p>
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.Issuer">Issuer</a>)
 </p>
 <div>
-<p>TLSSecretRef defines Secret contains Tls certs</p>
+<p>TLSSecretRef defines the Secret that contains TLS certs.</p>
 </div>
 <table>
 <thead>
@@ -11560,6 +11560,19 @@ Required when TLS is enabled.</p>
 </tr>
 </thead>
 <tbody>
+<tr>
+<td>
+<code>namespace</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The namespace where the secret is located.
+If not provided, the secret is assumed to be in the same namespace as the Cluster object.</p>
+</td>
+</tr>
 <tr>
 <td>
 <code>name</code><br/>

@@ -142,11 +142,11 @@ max_connections=666
 
 	Context("with patch Merge", func() {
 		It("mergerConfigTemplate patch policy", func() {
-			importedTemplate := configTemplateExtension{
-				namespace: "default",
+			importedTemplate := appsv1.ConfigTemplateExtension{
+				Namespace: "default",
 				// Name:        configSpec.Name,
-				templateRef: updatedCMObject.GetName(),
-				policy:      patchPolicy,
+				TemplateRef: updatedCMObject.GetName(),
+				Policy:      appsv1.PatchPolicy,
 			}
 
 			tmpCM := baseCMObject.DeepCopy()
@@ -170,10 +170,10 @@ max_connections=666
 
 	Context("with replace Merge", func() {
 		It("test mergerConfigTemplate replace policy", func() {
-			importedTemplate := configTemplateExtension{
-				namespace:   "default",
-				templateRef: updatedCMObject.GetName(),
-				policy:      replacePolicy,
+			importedTemplate := appsv1.ConfigTemplateExtension{
+				Namespace:   "default",
+				TemplateRef: updatedCMObject.GetName(),
+				Policy:      appsv1.ReplacePolicy,
 			}
 
 			tmpCM := baseCMObject.DeepCopy()
@@ -195,10 +195,10 @@ max_connections=666
 
 	Context("with only add Merge", func() {
 		It("test mergerConfigTemplate add policy", func() {
-			importedTemplate := configTemplateExtension{
-				namespace:   "default",
-				templateRef: updatedCMObject.GetName(),
-				policy:      onlyAddPolicy,
+			importedTemplate := appsv1.ConfigTemplateExtension{
+				Namespace:   "default",
+				TemplateRef: updatedCMObject.GetName(),
+				Policy:      appsv1.OnlyAddPolicy,
 			}
 
 			tmpCM := baseCMObject.DeepCopy()
@@ -209,10 +209,10 @@ max_connections=666
 
 	Context("with none Merge", func() {
 		It("test mergerConfigTemplate none policy", func() {
-			importedTemplate := configTemplateExtension{
-				namespace:   "default",
-				templateRef: updatedCMObject.GetName(),
-				policy:      noneMergePolicy,
+			importedTemplate := appsv1.ConfigTemplateExtension{
+				Namespace:   "default",
+				TemplateRef: updatedCMObject.GetName(),
+				Policy:      appsv1.NoneMergePolicy,
 			}
 
 			tmpCM := baseCMObject.DeepCopy()
@@ -224,10 +224,10 @@ max_connections=666
 
 	Context("failed test", func() {
 		It("test mergerConfigTemplate function", func() {
-			importedTemplate := configTemplateExtension{
-				namespace:   "default",
-				templateRef: updatedCMObject.GetName(),
-				policy:      "",
+			importedTemplate := appsv1.ConfigTemplateExtension{
+				Namespace:   "default",
+				TemplateRef: updatedCMObject.GetName(),
+				Policy:      "",
 			}
 
 			tmpCM := baseCMObject.DeepCopy()
@@ -236,10 +236,10 @@ max_connections=666
 		})
 
 		It("not configconstraint", func() {
-			importedTemplate := configTemplateExtension{
-				namespace:   "default",
-				templateRef: updatedCMObject.GetName(),
-				policy:      "none",
+			importedTemplate := appsv1.ConfigTemplateExtension{
+				Namespace:   "default",
+				TemplateRef: updatedCMObject.GetName(),
+				Policy:      "none",
 			}
 
 			tmpCM := baseCMObject.DeepCopy()
@@ -250,10 +250,10 @@ max_connections=666
 		})
 
 		It("not formatter", func() {
-			importedTemplate := configTemplateExtension{
-				namespace:   "default",
-				templateRef: updatedCMObject.GetName(),
-				policy:      "none",
+			importedTemplate := appsv1.ConfigTemplateExtension{
+				Namespace:   "default",
+				TemplateRef: updatedCMObject.GetName(),
+				Policy:      "none",
 			}
 
 			tmpCM := baseCMObject.DeepCopy()

@@ -2138,11 +2138,6 @@ func (in *InstanceTemplate) DeepCopyInto(out *InstanceTemplate) {
 			(*out)[key] = val
 		}
 	}
-	if in.Image != nil {
-		in, out := &in.Image, &out.Image
-		*out = new(string)
-		**out = **in
-	}
 	if in.SchedulingPolicy != nil {
 		in, out := &in.SchedulingPolicy, &out.SchedulingPolicy
 		*out = new(SchedulingPolicy)

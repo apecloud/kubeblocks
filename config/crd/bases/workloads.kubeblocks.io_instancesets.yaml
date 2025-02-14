@@ -457,10 +457,6 @@ spec:
                         - name
                         type: object
                       type: array
-                    image:
-                      description: Specifies an override for the first container's
-                        image in the Pod.
-                      type: string
                     labels:
                       additionalProperties:
                         type: string

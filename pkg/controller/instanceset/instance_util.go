@@ -906,9 +906,6 @@ func buildInstanceTemplateExt(template workloads.InstanceTemplate, templateExt *
 		mergeMap(&template.SchedulingPolicy.NodeSelector, &templateExt.Spec.NodeSelector)
 	}
 	if len(templateExt.Spec.Containers) > 0 {
-		if template.Image != nil {
-			templateExt.Spec.Containers[0].Image = *template.Image
-		}
 		if template.Resources != nil {
 			src := template.Resources
 			dst := &templateExt.Spec.Containers[0].Resources

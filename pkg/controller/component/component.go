@@ -69,6 +69,7 @@ func BuildComponent(cluster *appsv1.Cluster, compSpec *appsv1.ClusterComponentSp
 		AddLabelsInMap(constant.GetCompLabelsWithDef(cluster.Name, compSpec.Name, compSpec.ComponentDef, labels)).
 		SetTerminationPolicy(cluster.Spec.TerminationPolicy).
 		SetServiceVersion(compSpec.ServiceVersion).
+		SetForceServiceVersion(compSpec.ForceServiceVersion).
 		SetLabels(compSpec.Labels).
 		SetAnnotations(compSpec.Annotations).
 		SetEnv(compSpec.Env).

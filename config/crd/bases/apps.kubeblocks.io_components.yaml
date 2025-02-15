@@ -285,6 +285,10 @@ spec:
                   - name
                   type: object
                 type: array
+              forceServiceVersion:
+                description: Forces to use the specified service version, ignoring
+                  any version constraints.
+                type: boolean
               instances:
                 description: |-
                   Allows for the customization of configuration values for each instance within a Component.

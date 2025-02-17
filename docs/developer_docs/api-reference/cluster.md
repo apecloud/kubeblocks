@@ -18423,6 +18423,18 @@ string
 </tr>
 <tr>
 <td>
+<code>backupNamespace</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the namespace of the backup custom resource. If not specified, the namespace of the opsRequest will be used.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>restorePointInTime</code><br/>
 <em>
 string

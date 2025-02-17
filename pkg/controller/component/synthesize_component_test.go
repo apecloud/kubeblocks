@@ -54,6 +54,8 @@ var _ = Describe("synthesized component", func() {
 		cleanEnv()
 	})
 
+	// TODO: file templates
+
 	Context("config template", func() {
 		BeforeEach(func() {
 			compDef = &appsv1.ComponentDefinition{

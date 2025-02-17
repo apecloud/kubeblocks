@@ -244,6 +244,9 @@ func mergedActionEnv4KBAgent(synthesizedComp *SynthesizedComponent) []corev1.Env
 	} {
 		checkedAppend(action)
 	}
+	traverseUserDefinedActions(synthesizedComp, func(_ string, action *appsv1.Action) {
+		checkedAppend(action)
+	})
 	if synthesizedComp.LifecycleActions.RoleProbe != nil {
 		checkedAppend(&synthesizedComp.LifecycleActions.RoleProbe.Action)
 	}
@@ -294,15 +297,11 @@ func buildKBAgentStartupEnvs(synthesizedComp *SynthesizedComponent) ([]corev1.En
 		actions = append(actions, *a)
 	}
 
-	// user-defined actions
-	for i, tpl := range synthesizedComp.FileTemplates {
-		if tpl.Reconfigure != nil {
-			name := lifecycle.UDFActionName(UDFReconfigureActionName(tpl))
-			if a := buildAction4KBAgent(synthesizedComp.FileTemplates[i].Reconfigure, name); a != nil {
-				actions = append(actions, *a)
-			}
+	traverseUserDefinedActions(synthesizedComp, func(name string, action *appsv1.Action) {
+		if a := buildAction4KBAgent(action, name); a != nil {
+			actions = append(actions, *a)
 		}
-	}
+	})
 
 	if a, p := buildProbe4KBAgent(synthesizedComp.LifecycleActions.RoleProbe, "roleProbe", synthesizedComp.FullCompName); a != nil && p != nil {
 		actions = append(actions, *a)
@@ -416,6 +415,9 @@ func customExecActionImageNContainer(synthesizedComp *SynthesizedComponent) (str
 		synthesizedComp.LifecycleActions.Reconfigure,
 		synthesizedComp.LifecycleActions.AccountProvision,
 	}
+	traverseUserDefinedActions(synthesizedComp, func(_ string, action *appsv1.Action) {
+		actions = append(actions, action)
+	})
 	if synthesizedComp.LifecycleActions.RoleProbe != nil && synthesizedComp.LifecycleActions.RoleProbe.Exec != nil {
 		actions = append(actions, &synthesizedComp.LifecycleActions.RoleProbe.Action)
 	}
@@ -498,6 +500,16 @@ func iterAvailablePort(port int32, set map[int32]bool) (int32, error) {
 		}
 		if port > maxAvailablePort {
 			port = minAvailablePort
+		}
+	}
+}
+
+func traverseUserDefinedActions(synthesizedComp *SynthesizedComponent, f func(name string, action *appsv1.Action)) {
+	// user-defined actions
+	for i, tpl := range synthesizedComp.FileTemplates {
+		if tpl.Reconfigure != nil {
+			name := lifecycle.UDFActionName(UDFReconfigureActionName(tpl))
+			f(name, synthesizedComp.FileTemplates[i].Reconfigure)
 		}
 	}
 }

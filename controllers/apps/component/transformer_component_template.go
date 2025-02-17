@@ -416,7 +416,7 @@ func (t *componentFileTemplateTransformer) reconfigureReplicaTemplate(transCtx *
 	reconfigure := func(lfa lifecycle.Lifecycle) error {
 		if tpl.ExternalManaged != nil && *tpl.ExternalManaged {
 			if tpl.Reconfigure == nil {
-				return nil // disabled
+				return nil // disabled by the external
 			}
 		}
 		if tpl.Reconfigure != nil {

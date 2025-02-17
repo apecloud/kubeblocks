@@ -136,7 +136,7 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 	// override componentService
 	overrideComponentServices(synthesizeComp, comp)
 
-	buildConfigNScriptTemplates(synthesizeComp, compDef, comp)
+	buildFileTemplates(synthesizeComp, compDef, comp)
 
 	if err = overrideNCheckConfigTemplates(synthesizeComp, comp); err != nil {
 		return nil, err
@@ -411,7 +411,7 @@ func checkConfigTemplates(synthesizedComp *SynthesizedComponent) error {
 	return nil
 }
 
-func buildConfigNScriptTemplates(synthesizedComp *SynthesizedComponent, compDef *appsv1.ComponentDefinition, comp *appsv1.Component) {
+func buildFileTemplates(synthesizedComp *SynthesizedComponent, compDef *appsv1.ComponentDefinition, comp *appsv1.Component) {
 	merge := func(tpl SynthesizedFileTemplate, utpl appsv1.ClusterComponentConfig) SynthesizedFileTemplate {
 		tpl.Variables = utpl.Variables
 		if utpl.ConfigMap != nil {

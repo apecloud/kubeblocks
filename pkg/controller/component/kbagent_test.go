@@ -31,7 +31,7 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	kbagent "github.com/apecloud/kubeblocks/pkg/kbagent"
+	"github.com/apecloud/kubeblocks/pkg/kbagent"
 	"github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -345,5 +345,7 @@ var _ = Describe("kb-agent", func() {
 		})
 
 		// TODO: host-network
+
+		// TODO: user-defined actions
 	})
 })

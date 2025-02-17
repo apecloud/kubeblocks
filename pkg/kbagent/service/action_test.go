@@ -26,4 +26,6 @@ import (
 var _ = Describe("action", func() {
 	Context("action", func() {
 	})
+
+	// TODO: precondition failed
 })

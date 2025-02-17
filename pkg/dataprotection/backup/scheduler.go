@@ -403,8 +403,12 @@ func (s *Scheduler) reconfigure(schedulePolicy *dpv1alpha1.SchedulePolicy) error
 		return err
 	}
 
+	lastAppliedConfigsMap, err := s.getLastAppliedConfigsMap()
+	if err != nil {
+		return err
+	}
 	enable := boolptr.IsSetToTrue(schedulePolicy.Enabled)
-	if s.BackupSchedule.Annotations[dptypes.LastAppliedConfigsAnnotationKey] == "" && !enable {
+	if _, ok := lastAppliedConfigsMap[schedulePolicy.BackupMethod]; !ok && !enable {
 		// disable in the first policy created, no need reconfigure because default configs had been set.
 		return nil
 	}
@@ -419,10 +423,6 @@ func (s *Scheduler) reconfigure(schedulePolicy *dpv1alpha1.SchedulePolicy) error
 	if len(parameters) == 0 {
 		// skip reconfigure if not found parameters.
 		return nil
-	}
-	lastAppliedConfigsMap, err := s.getLastAppliedConfigsMap()
-	if err != nil {
-		return err
 	}
 	updateParameterPairsBytes, _ := json.Marshal(parameters)
 	updateParameterPairs := string(updateParameterPairsBytes)

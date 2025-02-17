@@ -49,11 +49,11 @@ func reconfigure(ctx context.Context, req *proto.ActionRequest) error {
 	for _, item := range files {
 		tokens := strings.Split(item, ":")
 		if len(tokens) != 2 {
-			return errors.Wrapf(proto.ErrBadRequest, "updated files format error: %s", updated)
+			return errors.Wrapf(proto.ErrBadRequest, "reconfigure - updated files format error: %s", updated)
 		}
 		file, checksum := tokens[0], tokens[1]
 		if err := checkLocalFileUpToDate(ctx, file, checksum); err != nil {
-			return errors.Wrapf(proto.ErrNotReady, "precondition is not matched: %s", err.Error())
+			return errors.Wrapf(proto.ErrPreconditionFailed, "reconfigure - precondition is not matched: %s", err.Error())
 		}
 	}
 	return nil

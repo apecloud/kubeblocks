@@ -83,9 +83,6 @@ func (s *actionService) HandleRequest(ctx context.Context, payload []byte) ([]by
 	if err != nil {
 		return s.encode(nil, err), nil
 	}
-	if err := s.precondition(ctx, req); err != nil {
-		return s.encode(nil, err), nil
-	}
 	resp, err := s.handleRequest(ctx, req)
 	result := string(resp)
 	if err != nil {
@@ -115,10 +112,6 @@ func (s *actionService) encode(out []byte, err error) []byte {
 	return data
 }
 
-func (s *actionService) precondition(ctx context.Context, req *proto.ActionRequest) error {
-	return reconfigure(ctx, req)
-}
-
 func (s *actionService) handleRequest(ctx context.Context, req *proto.ActionRequest) ([]byte, error) {
 	if _, ok := s.actions[req.Action]; !ok {
 		return nil, errors.Wrapf(proto.ErrNotDefined, "%s is not defined", req.Action)
@@ -127,7 +120,14 @@ func (s *actionService) handleRequest(ctx context.Context, req *proto.ActionRequ
 	if action.Exec == nil {
 		return nil, errors.Wrap(proto.ErrNotImplemented, "only exec action is supported")
 	}
+	if err := s.precondition(ctx, req); err != nil {
+		return nil, err
+	}
 	return s.handleExecAction(ctx, req, action)
+}
+
+func (s *actionService) precondition(ctx context.Context, req *proto.ActionRequest) error {
+	return reconfigure(ctx, req)
 }
 
 func (s *actionService) handleExecAction(ctx context.Context, req *proto.ActionRequest, action *proto.Action) ([]byte, error) {

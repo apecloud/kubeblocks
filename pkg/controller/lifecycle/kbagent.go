@@ -360,8 +360,8 @@ func (a *kbagent) formatError(lfa lifecycleAction, rsp proto.ActionResponse) err
 		return wrapError(ErrActionNotDefined)
 	case errors.Is(err, proto.ErrNotImplemented):
 		return wrapError(ErrActionNotImplemented)
-	case errors.Is(err, proto.ErrNotReady):
-		return wrapError(ErrActionNotReady)
+	case errors.Is(err, proto.ErrPreconditionFailed):
+		return wrapError(ErrPreconditionFailed)
 	case errors.Is(err, proto.ErrBadRequest):
 		return wrapError(ErrActionInternalError)
 	case errors.Is(err, proto.ErrInProgress):

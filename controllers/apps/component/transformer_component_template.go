@@ -434,7 +434,7 @@ func (t *componentFileTemplateTransformer) reconfigureReplicaTemplate(transCtx *
 	}
 
 	if err := reconfigure(lfa); err != nil {
-		if errors.Is(err, lifecycle.ErrActionNotReady) {
+		if errors.Is(err, lifecycle.ErrPreconditionFailed) {
 			return intctrlutil.NewDelayedRequeueError(time.Second,
 				fmt.Sprintf("replicas not up-to-date when reconfiguring: %s", err.Error()))
 		}

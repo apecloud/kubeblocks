@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -46,50 +47,10 @@ var _ = Describe("file templates transformer test", func() {
 	)
 
 	var (
-		reader   *appsutil.MockReader
-		dag      *graph.DAG
-		transCtx *componentTransformContext
-
-		tls = &appsv1.TLS{
-			VolumeName:  "tls",
-			MountPath:   "/etc/pki/tls",
-			DefaultMode: ptr.To(int32(0600)),
-			CAFile:      ptr.To("ca.pem"),
-			CertFile:    ptr.To("cert.pem"),
-			KeyFile:     ptr.To("key.pem"),
-		}
-
-		tlsConfig4KB = &appsv1.TLSConfig{
-			Enable: true,
-			Issuer: &appsv1.Issuer{
-				Name: appsv1.IssuerKubeBlocks,
-			},
-		}
-
-		tlsSecret4User = &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: testCtx.DefaultNamespace,
-				Name:      "tls-secret-4-user",
-			},
-			Data: map[string][]byte{
-				"ca":   []byte("ca-4-user"),
-				"cert": []byte("cert-4-user"),
-				"key":  []byte("key-4-user"),
-			},
-		}
-		tlsConfig4User = &appsv1.TLSConfig{
-			Enable: true,
-			Issuer: &appsv1.Issuer{
-				Name: appsv1.IssuerUserProvided,
-				SecretRef: &appsv1.TLSSecretRef{
-					Namespace: tlsSecret4User.Namespace,
-					Name:      tlsSecret4User.Name,
-					CA:        "ca",
-					Cert:      "cert",
-					Key:       "key",
-				},
-			},
-		}
+		reader                  *appsutil.MockReader
+		dag                     *graph.DAG
+		transCtx                *componentTransformContext
+		logConfCM, serverConfCM *corev1.ConfigMap
 
 		newDAG = func(graphCli model.GraphClient, comp *appsv1.Component) *graph.DAG {
 			d := graph.NewDAG()
@@ -99,10 +60,6 @@ var _ = Describe("file templates transformer test", func() {
 	)
 
 	BeforeEach(func() {
-		reader = &appsutil.MockReader{
-			Objects: []client.Object{tlsSecret4User},
-		}
-
 		compDef := &appsv1.ComponentDefinition{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: compDefName,
@@ -121,6 +78,31 @@ var _ = Describe("file templates transformer test", func() {
 			},
 			Spec: appsv1.ComponentSpec{},
 		}
+		its := &workloads.InstanceSet{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: testCtx.DefaultNamespace,
+				Name:      fmt.Sprintf("%s-%s", clusterName, compName),
+			},
+		}
+
+		logConfCM = &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: testCtx.DefaultNamespace,
+				Name:      "logConf",
+			},
+			Data: map[string]string{},
+		}
+		serverConfCM = &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: testCtx.DefaultNamespace,
+				Name:      "serverConf",
+			},
+			Data: map[string]string{},
+		}
+
+		reader = &appsutil.MockReader{
+			Objects: []client.Object{its, logConfCM, serverConfCM},
+		}
 
 		graphCli := model.NewGraphClient(reader)
 		dag = newDAG(graphCli, comp)
@@ -134,9 +116,10 @@ var _ = Describe("file templates transformer test", func() {
 			Component:     comp,
 			ComponentOrig: comp.DeepCopy(),
 			SynthesizeComponent: &component.SynthesizedComponent{
-				Namespace:   testCtx.DefaultNamespace,
-				ClusterName: clusterName,
-				Name:        compName,
+				Namespace:    testCtx.DefaultNamespace,
+				ClusterName:  clusterName,
+				Name:         compName,
+				FullCompName: fmt.Sprintf("%s-%s", clusterName, compName),
 				PodSpec: &corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
@@ -144,175 +127,177 @@ var _ = Describe("file templates transformer test", func() {
 						},
 					},
 				},
+				FileTemplates: []component.SynthesizedFileTemplate{
+					{
+						ComponentFileTemplate: appsv1.ComponentFileTemplate{
+							Name:       "logConf",
+							Template:   logConfCM.Name,
+							Namespace:  logConfCM.Namespace,
+							VolumeName: "logConf",
+						},
+					},
+					{
+						ComponentFileTemplate: appsv1.ComponentFileTemplate{
+							Name:       "serverConf",
+							Template:   serverConfCM.Name,
+							Namespace:  serverConfCM.Namespace,
+							VolumeName: "serverConf",
+						},
+					},
+				},
 			},
 		}
 	})
 
-	checkTLSSecret := func(exist bool, issuer ...appsv1.IssuerName) {
+	checkTemplateObjects := func(tpls []string) {
 		graphCli := transCtx.Client.(model.GraphClient)
-		objs := graphCli.FindAll(dag, &corev1.Secret{})
-		if !exist {
-			Expect(len(objs)).Should(Equal(0))
-		} else {
-			Expect(objs).Should(HaveLen(1))
-			secret := objs[0].(*corev1.Secret)
-			Expect(secret.GetName()).Should(Equal(tlsSecretName(clusterName, compName)))
-			if issuer[0] == appsv1.IssuerKubeBlocks {
-				Expect(secret.Data).Should(HaveKey(*tls.CAFile))
-				Expect(secret.Data).Should(HaveKey(*tls.CertFile))
-				Expect(secret.Data).Should(HaveKey(*tls.KeyFile))
-			} else {
-				Expect(secret.Data).Should(HaveKeyWithValue(*tls.CAFile, tlsSecret4User.Data[tlsConfig4User.Issuer.SecretRef.CA]))
-				Expect(secret.Data).Should(HaveKeyWithValue(*tls.CertFile, tlsSecret4User.Data[tlsConfig4User.Issuer.SecretRef.Cert]))
-				Expect(secret.Data).Should(HaveKeyWithValue(*tls.KeyFile, tlsSecret4User.Data[tlsConfig4User.Issuer.SecretRef.Key]))
-			}
+		objs := graphCli.FindAll(dag, &corev1.ConfigMap{})
+
+		mobjs := make(map[string]client.Object)
+		for i, obj := range objs {
+			mobjs[obj.GetName()] = objs[i]
+		}
+
+		for _, tpl := range tpls {
+			objName := fileTemplateObjectName(transCtx.SynthesizeComponent, tpl)
+			Expect(mobjs).Should(HaveKey(objName))
 		}
 	}
 
-	checkVolumeNMounts := func(exist bool) {
-		targetVolume := corev1.Volume{
-			Name: tls.VolumeName,
+	checkTemplateObject := func(tplName string, f func(configMap *corev1.ConfigMap)) {
+		graphCli := transCtx.Client.(model.GraphClient)
+		objs := graphCli.FindAll(dag, &corev1.ConfigMap{})
+
+		mobjs := make(map[string]client.Object)
+		for i, obj := range objs {
+			mobjs[obj.GetName()] = objs[i]
+		}
+
+		objName := fileTemplateObjectName(transCtx.SynthesizeComponent, tplName)
+		Expect(mobjs).Should(HaveKey(objName))
+		if f != nil {
+			f(mobjs[objName].(*corev1.ConfigMap))
+		}
+	}
+
+	newVolume := func(tplName string) corev1.Volume {
+		return corev1.Volume{
+			Name: tplName,
 			VolumeSource: corev1.VolumeSource{
-				Secret: &corev1.SecretVolumeSource{
-					SecretName:  tlsSecretName(clusterName, compName),
-					Optional:    ptr.To(false),
-					DefaultMode: tls.DefaultMode,
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: fileTemplateObjectName(transCtx.SynthesizeComponent, tplName),
+					},
+					DefaultMode: ptr.To[int32](0444),
 				},
 			},
 		}
-		targetVolumeMount := corev1.VolumeMount{
-			Name:      tls.VolumeName,
-			MountPath: tls.MountPath,
-			ReadOnly:  true,
-		}
+	}
 
+	checkVolumes := func(tpls []string) {
 		podSpec := transCtx.SynthesizeComponent.PodSpec
-		if exist {
-			Expect(podSpec.Volumes).Should(ContainElements(targetVolume))
-			for _, c := range podSpec.Containers {
-				Expect(c.VolumeMounts).Should(ContainElements(targetVolumeMount))
-			}
-		} else {
-			Expect(podSpec.Volumes).ShouldNot(ContainElements(targetVolume))
-			for _, c := range podSpec.Containers {
-				Expect(c.VolumeMounts).ShouldNot(ContainElements(targetVolumeMount))
-			}
+		for _, tpl := range tpls {
+			Expect(podSpec.Volumes).Should(ContainElement(newVolume(tpl)))
 		}
 	}
+
+	// checkEnvWithAction := func(action string) {
+	//	podSpec := transCtx.SynthesizeComponent.PodSpec
+	//	for _, c := range podSpec.Containers {
+	//		found := false
+	//		for _, e := range c.Env {
+	//			if strings.Contains(e.Value, action) {
+	//				found = true
+	//				break
+	//			}
+	//		}
+	//		Expect(found).Should(BeTrue())
+	//	}
+	// }
 
 	Context("provision", func() {
-		It("w/o define, disabled", func() {
-			transformer := &componentTLSTransformer{}
+		It("ok", func() {
+			transformer := &componentFileTemplateTransformer{}
 			err := transformer.Transform(transCtx, dag)
 			Expect(err).Should(BeNil())
 
-			// check the secret, volume and mounts
-			checkTLSSecret(false)
-			checkVolumeNMounts(false)
+			checkVolumes([]string{"logConf", "serverConf"})
+			checkTemplateObjects([]string{"logConf", "serverConf"})
 		})
 
-		It("w/o define, enabled", func() {
-			// enable the TLS
-			transCtx.SynthesizeComponent.TLSConfig = tlsConfig4KB
+		It("variables - w/o", func() {
+			logConfCM.Data["level"] = "{{- if (index $ \"LOG_LEVEL\") }}\n\t{{- .LOG_LEVEL }}\n{{- else }}\n\t{{- \"info\" }}\n{{- end }}"
 
-			transformer := &componentTLSTransformer{}
-			err := transformer.Transform(transCtx, dag)
-			Expect(err).ShouldNot(BeNil())
-			Expect(err.Error()).Should(ContainSubstring(
-				fmt.Sprintf("the TLS is enabled but the component definition %s doesn't support it", transCtx.CompDef.Name)))
+			transformer := &componentFileTemplateTransformer{}
+			Expect(transformer.Transform(transCtx, dag)).Should(BeNil())
+
+			checkVolumes([]string{"logConf", "serverConf"})
+			checkTemplateObjects([]string{"logConf", "serverConf"})
+			checkTemplateObject("logConf", func(obj *corev1.ConfigMap) {
+				Expect(obj.Data).Should(HaveKeyWithValue("level", "info"))
+			})
+
 		})
 
-		It("w/ define, disabled", func() {
-			// define the TLS
-			transCtx.CompDef.Spec.TLS = tls
+		It("variables - w/", func() {
+			logConfCM.Data["level"] = "{{- if (index $ \"LOG_LEVEL\") }}\n\t{{- .LOG_LEVEL }}\n{{- else }}\n\t{{- \"info\" }}\n{{- end }}"
+			transCtx.SynthesizeComponent.FileTemplates[0].Variables = map[string]string{
+				"LOG_LEVEL": "debug",
+			}
 
-			transformer := &componentTLSTransformer{}
-			err := transformer.Transform(transCtx, dag)
-			Expect(err).Should(BeNil())
+			transformer := &componentFileTemplateTransformer{}
+			Expect(transformer.Transform(transCtx, dag)).Should(BeNil())
 
-			// check the secret, volume and mounts
-			checkTLSSecret(false)
-			checkVolumeNMounts(false)
-		})
-
-		It("w/ define, enabled - kb", func() {
-			// define and enable the TLS
-			transCtx.CompDef.Spec.TLS = tls
-			transCtx.SynthesizeComponent.TLSConfig = tlsConfig4KB
-
-			transformer := &componentTLSTransformer{}
-			err := transformer.Transform(transCtx, dag)
-			Expect(err).Should(BeNil())
-
-			// check the secret, volume and mounts
-			checkTLSSecret(true, appsv1.IssuerKubeBlocks)
-			checkVolumeNMounts(true)
-		})
-
-		It("w/ define, enabled - user", func() {
-			// define and enable the TLS
-			transCtx.CompDef.Spec.TLS = tls
-			transCtx.SynthesizeComponent.TLSConfig = tlsConfig4User
-
-			transformer := &componentTLSTransformer{}
-			err := transformer.Transform(transCtx, dag)
-			Expect(err).Should(BeNil())
-
-			// check the secret, volume and mounts
-			checkTLSSecret(true, appsv1.IssuerUserProvided)
-			checkVolumeNMounts(true)
-		})
-	})
-
-	Context("update & disable", func() {
-		BeforeEach(func() {
-			// mock the TLS secret object
-			reader.Objects = append(reader.Objects, &corev1.Secret{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: testCtx.DefaultNamespace,
-					Name:      tlsSecretName(clusterName, compName),
-				},
+			checkVolumes([]string{"logConf", "serverConf"})
+			checkTemplateObjects([]string{"logConf", "serverConf"})
+			checkTemplateObject("logConf", func(obj *corev1.ConfigMap) {
+				Expect(obj.Data).Should(HaveKeyWithValue("level", "debug"))
 			})
 		})
 
-		It("update", func() {
-			// define and enable the TLS
-			transCtx.CompDef.Spec.TLS = tls
-			transCtx.SynthesizeComponent.TLSConfig = tlsConfig4User // user only
-
-			// update the certs
-			tlsSecret4User.Data = map[string][]byte{
-				"ca":   []byte("ca-4-user-updated"),
-				"cert": []byte("cert-4-user-updated"),
-				"key":  []byte("key-4-user-updated"),
+		It("udf reconfigure", func() {
+			transCtx.SynthesizeComponent.FileTemplates[0].Reconfigure = &appsv1.Action{
+				Exec: &appsv1.ExecAction{
+					Command: []string{"echo", "reconfigure"},
+				},
 			}
 
-			transformer := &componentTLSTransformer{}
+			transformer := &componentFileTemplateTransformer{}
 			err := transformer.Transform(transCtx, dag)
 			Expect(err).Should(BeNil())
 
-			// check the secret updated
-			checkTLSSecret(true, appsv1.IssuerUserProvided)
+			checkVolumes([]string{"logConf", "serverConf"})
+			checkTemplateObjects([]string{"logConf", "serverConf"})
+			// checkEnvWithAction(component.UDFReconfigureActionName(transCtx.SynthesizeComponent.FileTemplates[0]))
 		})
 
-		It("disable after provision", func() {
-			// define the TLS
-			transCtx.CompDef.Spec.TLS = tls
+		It("external managed", func() {
+			transCtx.SynthesizeComponent.FileTemplates[1].Reconfigure = &appsv1.Action{
+				Exec: &appsv1.ExecAction{
+					Command: []string{"echo", "reconfigure"},
+				},
+			}
+			transCtx.SynthesizeComponent.FileTemplates[1].ExternalManaged = ptr.To(true)
 
-			transformer := &componentTLSTransformer{}
+			transformer := &componentFileTemplateTransformer{}
 			err := transformer.Transform(transCtx, dag)
 			Expect(err).Should(BeNil())
 
-			// check the secret, volume and mounts to be deleted
-			graphCli := transCtx.Client.(model.GraphClient)
+			checkVolumes([]string{"logConf", "serverConf"})
+			checkTemplateObjects([]string{"logConf", "serverConf"})
+			// checkEnvWithAction(component.UDFReconfigureActionName(transCtx.SynthesizeComponent.FileTemplates[1]))
+		})
 
-			objs := graphCli.FindAll(dag, &corev1.Secret{})
-			Expect(objs).Should(HaveLen(1))
-			Expect(graphCli.IsAction(dag, objs[0], model.ActionDeletePtr())).Should(BeTrue())
-			secret := objs[0].(*corev1.Secret)
-			Expect(secret.GetName()).Should(Equal(tlsSecretName(clusterName, compName)))
+		It("external managed - w/o template", func() {
+			transCtx.SynthesizeComponent.FileTemplates[1].Template = ""
+			transCtx.SynthesizeComponent.FileTemplates[1].Namespace = ""
+			transCtx.SynthesizeComponent.FileTemplates[1].Reconfigure = nil
+			transCtx.SynthesizeComponent.FileTemplates[1].ExternalManaged = ptr.To(true)
 
-			checkVolumeNMounts(false)
+			transformer := &componentFileTemplateTransformer{}
+			err := transformer.Transform(transCtx, dag)
+			Expect(err).ShouldNot(BeNil())
+			Expect(err.Error()).Should(ContainSubstring("config/script template has no template specified"))
 		})
 	})
 })

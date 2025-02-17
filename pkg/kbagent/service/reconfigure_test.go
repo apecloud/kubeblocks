@@ -20,65 +20,96 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package service
 
 import (
+	"crypto/sha256"
+	"errors"
+	"fmt"
+	"os"
+	"time"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
-	"github.com/go-logr/logr"
 
 	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 )
 
 var _ = Describe("reconfigure", func() {
 	Context("reconfigure", func() {
+		var (
+			localFile = "log.conf"
+		)
+
+		createFile := func() (string, string) {
+			f, err1 := os.Create(localFile)
+			Expect(err1).Should(BeNil())
+			str := fmt.Sprintf("%s - d21afb29f88140d502f6957b4d5f8379", time.Now().String())
+			cnt, err2 := f.WriteString(str)
+			Expect(err2).Should(BeNil())
+			Expect(cnt).Should(Equal(len(str)))
+			Expect(f.Close()).Should(BeNil())
+
+			return localFile, fmt.Sprintf("%x", sha256.Sum256([]byte(str)))
+		}
+
+		removeFile := func() {
+			Expect(os.Remove(localFile)).Should(BeNil())
+		}
+
 		It("not a reconfigure request", func() {
-			services, err := New(logr.New(nil), nil, nil, nil)
+			req := &proto.ActionRequest{
+				Action: "switchover",
+			}
+			err := reconfigure(ctx, req)
 			Expect(err).Should(BeNil())
-			Expect(services).Should(HaveLen(3))
-			Expect(services[0]).ShouldNot(BeNil())
-			Expect(services[1]).ShouldNot(BeNil())
-			Expect(services[2]).ShouldNot(BeNil())
+		})
+
+		It("empty parameter", func() {
+			req := &proto.ActionRequest{
+				Action:     "reconfigure",
+				Parameters: map[string]string{},
+			}
+			err := reconfigure(ctx, req)
+			Expect(err).Should(BeNil())
 		})
 
 		It("bad request", func() {
-			actions := []proto.Action{
-				{
-					Name: "action",
+			req := &proto.ActionRequest{
+				Action: "reconfigure",
+				Parameters: map[string]string{
+					configFilesUpdated: "log.conf",
 				},
 			}
-			services, err := New(logr.New(nil), actions, nil, nil)
-			Expect(err).Should(BeNil())
-			Expect(services).Should(HaveLen(3))
-			Expect(services[0]).ShouldNot(BeNil())
-			Expect(services[1]).ShouldNot(BeNil())
-			Expect(services[2]).ShouldNot(BeNil())
+			err := reconfigure(ctx, req)
+			Expect(err).ShouldNot(BeNil())
+			Expect(errors.Is(err, proto.ErrBadRequest)).Should(BeTrue())
 		})
 
 		It("precondition failed", func() {
-			actions := []proto.Action{
-				{
-					Name: "action",
+			file, checksum := createFile()
+			defer removeFile()
+
+			req := &proto.ActionRequest{
+				Action: "reconfigure",
+				Parameters: map[string]string{
+					configFilesUpdated: fmt.Sprintf("%s:%s++", file, checksum),
 				},
 			}
-			services, err := New(logr.New(nil), actions, nil, nil)
-			Expect(err).Should(BeNil())
-			Expect(services).Should(HaveLen(3))
-			Expect(services[0]).ShouldNot(BeNil())
-			Expect(services[1]).ShouldNot(BeNil())
-			Expect(services[2]).ShouldNot(BeNil())
+			err := reconfigure(ctx, req)
+			Expect(err).ShouldNot(BeNil())
+			Expect(errors.Is(err, proto.ErrPreconditionFailed)).Should(BeTrue())
 		})
 
 		It("ok", func() {
-			actions := []proto.Action{
-				{
-					Name: "action",
+			file, checksum := createFile()
+			defer removeFile()
+
+			req := &proto.ActionRequest{
+				Action: "reconfigure",
+				Parameters: map[string]string{
+					configFilesUpdated: fmt.Sprintf("%s:%s", file, checksum),
 				},
 			}
-			services, err := New(logr.New(nil), actions, nil, nil)
+			err := reconfigure(ctx, req)
 			Expect(err).Should(BeNil())
-			Expect(services).Should(HaveLen(3))
-			Expect(services[0]).ShouldNot(BeNil())
-			Expect(services[1]).ShouldNot(BeNil())
-			Expect(services[2]).ShouldNot(BeNil())
 		})
 	})
 })

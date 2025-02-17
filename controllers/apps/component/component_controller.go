@@ -172,6 +172,8 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			&componentWorkloadTransformer{Client: r.Client},
 			// handle RBAC for component workloads
 			&componentRBACTransformer{},
+			// reconfigure config/script templates
+			&componentReconfigureTransformer{},
 			// handle component postProvision lifecycle action
 			&componentPostProvisionTransformer{},
 			// update component status

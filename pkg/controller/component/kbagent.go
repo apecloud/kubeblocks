@@ -120,7 +120,7 @@ func updateKBAgentTaskEnv(envVars map[string]string, f func(proto.Task) *proto.T
 }
 
 func buildKBAgentContainer(synthesizedComp *SynthesizedComponent) error {
-	if synthesizedComp.LifecycleActions == nil {
+	if !hasActionDefined(synthesizedComp) {
 		return nil
 	}
 
@@ -229,27 +229,29 @@ func mergedActionEnv4KBAgent(synthesizedComp *SynthesizedComponent) []corev1.Env
 		}
 	}
 
-	for _, action := range []*appsv1.Action{
-		synthesizedComp.LifecycleActions.PostProvision,
-		synthesizedComp.LifecycleActions.PreTerminate,
-		synthesizedComp.LifecycleActions.Switchover,
-		synthesizedComp.LifecycleActions.MemberJoin,
-		synthesizedComp.LifecycleActions.MemberLeave,
-		synthesizedComp.LifecycleActions.Readonly,
-		synthesizedComp.LifecycleActions.Readwrite,
-		synthesizedComp.LifecycleActions.DataDump,
-		synthesizedComp.LifecycleActions.DataLoad,
-		synthesizedComp.LifecycleActions.Reconfigure,
-		synthesizedComp.LifecycleActions.AccountProvision,
-	} {
-		checkedAppend(action)
+	if synthesizedComp.LifecycleActions != nil {
+		for _, action := range []*appsv1.Action{
+			synthesizedComp.LifecycleActions.PostProvision,
+			synthesizedComp.LifecycleActions.PreTerminate,
+			synthesizedComp.LifecycleActions.Switchover,
+			synthesizedComp.LifecycleActions.MemberJoin,
+			synthesizedComp.LifecycleActions.MemberLeave,
+			synthesizedComp.LifecycleActions.Readonly,
+			synthesizedComp.LifecycleActions.Readwrite,
+			synthesizedComp.LifecycleActions.DataDump,
+			synthesizedComp.LifecycleActions.DataLoad,
+			synthesizedComp.LifecycleActions.Reconfigure,
+			synthesizedComp.LifecycleActions.AccountProvision,
+		} {
+			checkedAppend(action)
+		}
+		if synthesizedComp.LifecycleActions.RoleProbe != nil {
+			checkedAppend(&synthesizedComp.LifecycleActions.RoleProbe.Action)
+		}
 	}
 	traverseUserDefinedActions(synthesizedComp, func(_ string, action *appsv1.Action) {
 		checkedAppend(action)
 	})
-	if synthesizedComp.LifecycleActions.RoleProbe != nil {
-		checkedAppend(&synthesizedComp.LifecycleActions.RoleProbe.Action)
-	}
 
 	return env
 }
@@ -261,40 +263,53 @@ func buildKBAgentStartupEnvs(synthesizedComp *SynthesizedComponent) ([]corev1.En
 		streaming []string
 	)
 
-	if a := buildAction4KBAgent(synthesizedComp.LifecycleActions.PostProvision, "postProvision"); a != nil {
-		actions = append(actions, *a)
-	}
-	if a := buildAction4KBAgent(synthesizedComp.LifecycleActions.PreTerminate, "preTerminate"); a != nil {
-		actions = append(actions, *a)
-	}
-	if a := buildAction4KBAgent(synthesizedComp.LifecycleActions.Switchover, "switchover"); a != nil {
-		actions = append(actions, *a)
-	}
-	if a := buildAction4KBAgent(synthesizedComp.LifecycleActions.MemberJoin, "memberJoin"); a != nil {
-		actions = append(actions, *a)
-	}
-	if a := buildAction4KBAgent(synthesizedComp.LifecycleActions.MemberLeave, "memberLeave"); a != nil {
-		actions = append(actions, *a)
-	}
-	if a := buildAction4KBAgent(synthesizedComp.LifecycleActions.Readonly, "readonly"); a != nil {
-		actions = append(actions, *a)
-	}
-	if a := buildAction4KBAgent(synthesizedComp.LifecycleActions.Readwrite, "readwrite"); a != nil {
-		actions = append(actions, *a)
-	}
-	if a := buildAction4KBAgent(synthesizedComp.LifecycleActions.DataDump, "dataDump"); a != nil {
-		actions = append(actions, *a)
-		streaming = append(streaming, "dataDump")
-	}
-	if a := buildAction4KBAgent(synthesizedComp.LifecycleActions.DataLoad, "dataLoad"); a != nil {
-		actions = append(actions, *a)
-		streaming = append(streaming, "dataLoad")
-	}
-	if a := buildAction4KBAgent(synthesizedComp.LifecycleActions.Reconfigure, "reconfigure"); a != nil {
-		actions = append(actions, *a)
-	}
-	if a := buildAction4KBAgent(synthesizedComp.LifecycleActions.AccountProvision, "accountProvision"); a != nil {
-		actions = append(actions, *a)
+	if synthesizedComp.LifecycleActions != nil {
+		if a := buildAction4KBAgent(synthesizedComp.LifecycleActions.PostProvision, "postProvision"); a != nil {
+			actions = append(actions, *a)
+		}
+		if a := buildAction4KBAgent(synthesizedComp.LifecycleActions.PreTerminate, "preTerminate"); a != nil {
+			actions = append(actions, *a)
+		}
+		if a := buildAction4KBAgent(synthesizedComp.LifecycleActions.Switchover, "switchover"); a != nil {
+			actions = append(actions, *a)
+		}
+		if a := buildAction4KBAgent(synthesizedComp.LifecycleActions.MemberJoin, "memberJoin"); a != nil {
+			actions = append(actions, *a)
+		}
+		if a := buildAction4KBAgent(synthesizedComp.LifecycleActions.MemberLeave, "memberLeave"); a != nil {
+			actions = append(actions, *a)
+		}
+		if a := buildAction4KBAgent(synthesizedComp.LifecycleActions.Readonly, "readonly"); a != nil {
+			actions = append(actions, *a)
+		}
+		if a := buildAction4KBAgent(synthesizedComp.LifecycleActions.Readwrite, "readwrite"); a != nil {
+			actions = append(actions, *a)
+		}
+		if a := buildAction4KBAgent(synthesizedComp.LifecycleActions.DataDump, "dataDump"); a != nil {
+			actions = append(actions, *a)
+			streaming = append(streaming, "dataDump")
+		}
+		if a := buildAction4KBAgent(synthesizedComp.LifecycleActions.DataLoad, "dataLoad"); a != nil {
+			actions = append(actions, *a)
+			streaming = append(streaming, "dataLoad")
+		}
+		if a := buildAction4KBAgent(synthesizedComp.LifecycleActions.Reconfigure, "reconfigure"); a != nil {
+			actions = append(actions, *a)
+		}
+		if a := buildAction4KBAgent(synthesizedComp.LifecycleActions.AccountProvision, "accountProvision"); a != nil {
+			actions = append(actions, *a)
+		}
+
+		if a, p := buildProbe4KBAgent(synthesizedComp.LifecycleActions.RoleProbe, "roleProbe", synthesizedComp.FullCompName); a != nil && p != nil {
+			actions = append(actions, *a)
+			probes = append(probes, *p)
+		}
+		// TODO: how to schedule the execution of probes?
+		if a, p := buildProbe4KBAgent(synthesizedComp.LifecycleActions.AvailableProbe, availableProbe, synthesizedComp.FullCompName); a != nil && p != nil {
+			p.ReportPeriodSeconds = probeReportPeriodSeconds(p.PeriodSeconds)
+			actions = append(actions, *a)
+			probes = append(probes, *p)
+		}
 	}
 
 	traverseUserDefinedActions(synthesizedComp, func(name string, action *appsv1.Action) {
@@ -302,17 +317,6 @@ func buildKBAgentStartupEnvs(synthesizedComp *SynthesizedComponent) ([]corev1.En
 			actions = append(actions, *a)
 		}
 	})
-
-	if a, p := buildProbe4KBAgent(synthesizedComp.LifecycleActions.RoleProbe, "roleProbe", synthesizedComp.FullCompName); a != nil && p != nil {
-		actions = append(actions, *a)
-		probes = append(probes, *p)
-	}
-	// TODO: how to schedule the execution of probes?
-	if a, p := buildProbe4KBAgent(synthesizedComp.LifecycleActions.AvailableProbe, availableProbe, synthesizedComp.FullCompName); a != nil && p != nil {
-		p.ReportPeriodSeconds = probeReportPeriodSeconds(p.PeriodSeconds)
-		actions = append(actions, *a)
-		probes = append(probes, *p)
-	}
 
 	return kbagent.BuildEnv4Server(actions, probes, streaming)
 }
@@ -398,29 +402,32 @@ func handleCustomImageNContainerDefined(synthesizedComp *SynthesizedComponent, c
 }
 
 func customExecActionImageNContainer(synthesizedComp *SynthesizedComponent) (string, *corev1.Container, error) {
-	if synthesizedComp.LifecycleActions == nil {
+	if !hasActionDefined(synthesizedComp) {
 		return "", nil, nil
 	}
 
-	actions := []*appsv1.Action{
-		synthesizedComp.LifecycleActions.PostProvision,
-		synthesizedComp.LifecycleActions.PreTerminate,
-		synthesizedComp.LifecycleActions.Switchover,
-		synthesizedComp.LifecycleActions.MemberJoin,
-		synthesizedComp.LifecycleActions.MemberLeave,
-		synthesizedComp.LifecycleActions.Readonly,
-		synthesizedComp.LifecycleActions.Readwrite,
-		synthesizedComp.LifecycleActions.DataDump,
-		synthesizedComp.LifecycleActions.DataLoad,
-		synthesizedComp.LifecycleActions.Reconfigure,
-		synthesizedComp.LifecycleActions.AccountProvision,
+	actions := make([]*appsv1.Action, 0)
+	if synthesizedComp.LifecycleActions != nil {
+		actions = append(actions, []*appsv1.Action{
+			synthesizedComp.LifecycleActions.PostProvision,
+			synthesizedComp.LifecycleActions.PreTerminate,
+			synthesizedComp.LifecycleActions.Switchover,
+			synthesizedComp.LifecycleActions.MemberJoin,
+			synthesizedComp.LifecycleActions.MemberLeave,
+			synthesizedComp.LifecycleActions.Readonly,
+			synthesizedComp.LifecycleActions.Readwrite,
+			synthesizedComp.LifecycleActions.DataDump,
+			synthesizedComp.LifecycleActions.DataLoad,
+			synthesizedComp.LifecycleActions.Reconfigure,
+			synthesizedComp.LifecycleActions.AccountProvision,
+		}...)
+		if synthesizedComp.LifecycleActions.RoleProbe != nil && synthesizedComp.LifecycleActions.RoleProbe.Exec != nil {
+			actions = append(actions, &synthesizedComp.LifecycleActions.RoleProbe.Action)
+		}
 	}
 	traverseUserDefinedActions(synthesizedComp, func(_ string, action *appsv1.Action) {
 		actions = append(actions, action)
 	})
-	if synthesizedComp.LifecycleActions.RoleProbe != nil && synthesizedComp.LifecycleActions.RoleProbe.Exec != nil {
-		actions = append(actions, &synthesizedComp.LifecycleActions.RoleProbe.Action)
-	}
 
 	var image, container string
 	for _, action := range actions {
@@ -502,6 +509,18 @@ func iterAvailablePort(port int32, set map[int32]bool) (int32, error) {
 			port = minAvailablePort
 		}
 	}
+}
+
+func hasActionDefined(synthesizedComp *SynthesizedComponent) bool {
+	if synthesizedComp.LifecycleActions != nil {
+		return true
+	}
+	for _, tpl := range synthesizedComp.FileTemplates {
+		if tpl.Reconfigure != nil {
+			return true
+		}
+	}
+	return false
 }
 
 func traverseUserDefinedActions(synthesizedComp *SynthesizedComponent, f func(name string, action *appsv1.Action)) {

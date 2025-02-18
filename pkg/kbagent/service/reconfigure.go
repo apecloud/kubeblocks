@@ -32,14 +32,61 @@ import (
 )
 
 const (
+	configFilesCreated = "KB_CONFIG_FILES_CREATED"
+	configFilesRemoved = "KB_CONFIG_FILES_REMOVED"
 	configFilesUpdated = "KB_CONFIG_FILES_UPDATED"
 )
 
-func reconfigure(ctx context.Context, req *proto.ActionRequest) error {
+func reconfigure(_ context.Context, req *proto.ActionRequest) error {
 	if req.Action != "reconfigure" && !strings.HasPrefix(req.Action, "udf-reconfigure") {
 		return nil
 	}
 
+	if err := checkReconfigureCreated(req); err != nil {
+		return err
+	}
+	if err := checkReconfigureRemoved(req); err != nil {
+		return err
+	}
+	if err := checkReconfigureUpdated(req); err != nil {
+		return err
+	}
+	return nil
+}
+
+func checkReconfigureCreated(req *proto.ActionRequest) error {
+	created := req.Parameters[configFilesCreated]
+	if len(created) > 0 {
+		for _, file := range strings.Split(created, ",") {
+			exist, err := checkLocalFileExist(file)
+			if err != nil {
+				return err
+			}
+			if !exist {
+				return errors.Wrapf(proto.ErrPreconditionFailed, "reconfigure - created file is not exist: %s", file)
+			}
+		}
+	}
+	return nil
+}
+
+func checkReconfigureRemoved(req *proto.ActionRequest) error {
+	removed := req.Parameters[configFilesRemoved]
+	if len(removed) > 0 {
+		for _, file := range strings.Split(removed, ",") {
+			exist, err := checkLocalFileExist(file)
+			if err != nil {
+				return err
+			}
+			if exist {
+				return errors.Wrapf(proto.ErrPreconditionFailed, "reconfigure - removed file is still exist: %s", file)
+			}
+		}
+	}
+	return nil
+}
+
+func checkReconfigureUpdated(req *proto.ActionRequest) error {
 	updated := req.Parameters[configFilesUpdated]
 	if len(updated) == 0 {
 		return nil
@@ -52,21 +99,32 @@ func reconfigure(ctx context.Context, req *proto.ActionRequest) error {
 			return errors.Wrapf(proto.ErrBadRequest, "reconfigure - updated files format error: %s", updated)
 		}
 		file, checksum := tokens[0], tokens[1]
-		if err := checkLocalFileUpToDate(ctx, file, checksum); err != nil {
-			return errors.Wrapf(proto.ErrPreconditionFailed, "reconfigure - precondition is not matched: %s", err.Error())
+		if err := checkLocalFileUpToDate(file, checksum); err != nil {
+			return errors.Wrapf(proto.ErrPreconditionFailed, "reconfigure - %s", err.Error())
 		}
 	}
 	return nil
 }
 
-func checkLocalFileUpToDate(_ context.Context, file, checksum string) error {
+func checkLocalFileExist(file string) (bool, error) {
+	_, err := os.Stat(file)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}
+
+func checkLocalFileUpToDate(file, checksum string) error {
 	content, err := os.ReadFile(file)
 	if err != nil {
 		return err
 	}
 	actual := fmt.Sprintf("%x", sha256.Sum256(content))
 	if actual != checksum {
-		return fmt.Errorf("file not up-to-date %s: expected %s, got %s", file, checksum, actual)
+		return fmt.Errorf("updated file is not up-to-date %s: expected %s, got %s", file, checksum, actual)
 	}
 	return nil
 }

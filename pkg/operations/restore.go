@@ -142,13 +142,19 @@ func (r RestoreOpsHandler) restoreClusterFromBackup(reqCtx intctrlutil.RequestCt
 		return nil, intctrlutil.NewFatalError("spec.restore can not be empty")
 	}
 	backupName := restoreSpec.BackupName
-
+	backupNamespace := restoreSpec.BackupNamespace
+	if backupNamespace == "" {
+		backupNamespace = opsRequest.Namespace
+	}
 	// check if the backup exists
 	backup := &dpv1alpha1.Backup{}
 	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{
 		Name:      backupName,
-		Namespace: opsRequest.Namespace,
+		Namespace: backupNamespace,
 	}, backup); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil, intctrlutil.NewFatalError(fmt.Sprintf("backup %s not found in namespace %s", backupName, backupNamespace))
+		}
 		return nil, err
 	}
 
@@ -203,6 +209,7 @@ func (r RestoreOpsHandler) getClusterObjFromBackup(backup *dpv1alpha1.Backup, op
 	}
 	cluster.Annotations[constant.RestoreFromBackupAnnotationKey] = restoreAnnotation
 	cluster.Name = opsRequest.Spec.GetClusterName()
+	cluster.Namespace = opsRequest.Namespace
 	// Reset cluster services
 	var services []appsv1.ClusterService
 	for i := range cluster.Spec.Services {

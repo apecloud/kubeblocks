@@ -46,13 +46,10 @@ var _ = Describe("test EnsureWorkerServiceAccount", func() {
 		}
 		roleBindingSignature := func(_ rbacv1.RoleBinding, _ *rbacv1.RoleBinding, _ rbacv1.RoleBindingList, _ *rbacv1.RoleBindingList) {
 		}
-		clusterRoleBindingSignature := func(_ rbacv1.ClusterRoleBinding, _ *rbacv1.ClusterRoleBinding, _ rbacv1.ClusterRoleBindingList, _ *rbacv1.ClusterRoleBindingList) {
-		}
+
 		// namespaced
 		testapps.ClearResources(&testCtx, serviceAccountSignature, inNS, ml)
 		testapps.ClearResources(&testCtx, roleBindingSignature, inNS, ml)
-		// none-namespaced
-		testapps.ClearResources(&testCtx, clusterRoleBindingSignature, ml)
 	}
 
 	const (
@@ -60,13 +57,11 @@ var _ = Describe("test EnsureWorkerServiceAccount", func() {
 		defaultExecWorkerServiceAccountName    = "exec-sa-name"
 		defaultWorkerServiceAccountAnnotations = `{"role-arn": "arn:xxx:xxx"}`
 		defaultWorkerClusterRoleName           = "worker-role"
-		defaultWorkerAdditionalClusterRoleName = "worker-additional-role"
 	)
 
 	var (
-		saKey  types.NamespacedName
-		rbKey  types.NamespacedName
-		crbKey types.NamespacedName
+		saKey types.NamespacedName
+		rbKey types.NamespacedName
 	)
 
 	BeforeEach(func() {
@@ -75,7 +70,6 @@ var _ = Describe("test EnsureWorkerServiceAccount", func() {
 		viper.SetDefault(dptypes.CfgKeyExecWorkerServiceAccountName, defaultExecWorkerServiceAccountName)
 		viper.SetDefault(dptypes.CfgKeyWorkerServiceAccountAnnotations, defaultWorkerServiceAccountAnnotations)
 		viper.SetDefault(dptypes.CfgKeyWorkerClusterRoleName, defaultWorkerClusterRoleName)
-		viper.SetDefault(dptypes.CfgKeyWorkerAdditionalClusterRoleName, defaultWorkerAdditionalClusterRoleName)
 
 		saKey = types.NamespacedName{
 			Name:      defaultWorkerServiceAccountName,
@@ -84,10 +78,6 @@ var _ = Describe("test EnsureWorkerServiceAccount", func() {
 		rbKey = types.NamespacedName{
 			Name:      defaultWorkerServiceAccountName + "-rolebinding",
 			Namespace: testCtx.DefaultNamespace,
-		}
-		crbKey = types.NamespacedName{
-			Name:      defaultWorkerServiceAccountName + "-clusterrolebinding",
-			Namespace: "",
 		}
 	})
 
@@ -98,7 +88,6 @@ var _ = Describe("test EnsureWorkerServiceAccount", func() {
 	It("should create a service account if not exists", func() {
 		Eventually(testapps.CheckObjExists(&testCtx, saKey, &corev1.ServiceAccount{}, false)).Should(Succeed())
 		Eventually(testapps.CheckObjExists(&testCtx, rbKey, &rbacv1.RoleBinding{}, false)).Should(Succeed())
-		Eventually(testapps.CheckObjExists(&testCtx, crbKey, &rbacv1.ClusterRoleBinding{}, false)).Should(Succeed())
 
 		reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
 		saName, err := EnsureWorkerServiceAccount(reqCtx, testCtx.Cli, testCtx.DefaultNamespace, nil)
@@ -108,7 +97,6 @@ var _ = Describe("test EnsureWorkerServiceAccount", func() {
 		// become available
 		Eventually(testapps.CheckObjExists(&testCtx, saKey, &corev1.ServiceAccount{}, true)).Should(Succeed())
 		Eventually(testapps.CheckObjExists(&testCtx, rbKey, &rbacv1.RoleBinding{}, true)).Should(Succeed())
-		Eventually(testapps.CheckObjExists(&testCtx, crbKey, &rbacv1.ClusterRoleBinding{}, true)).Should(Succeed())
 
 		Eventually(testapps.CheckObj(&testCtx, saKey, func(g Gomega, sa *corev1.ServiceAccount) {
 			g.Expect(sa.Annotations).To(Equal(map[string]string{
@@ -128,21 +116,6 @@ var _ = Describe("test EnsureWorkerServiceAccount", func() {
 				Kind:     "ClusterRole",
 				APIGroup: "rbac.authorization.k8s.io",
 				Name:     defaultWorkerClusterRoleName,
-			}))
-		})).Should(Succeed())
-
-		Eventually(testapps.CheckObj(&testCtx, crbKey, func(g Gomega, crb *rbacv1.ClusterRoleBinding) {
-			g.Expect(crb.Subjects).To(HaveLen(1))
-			g.Expect(crb.Subjects[0]).To(Equal(rbacv1.Subject{
-				Kind:      "ServiceAccount",
-				APIGroup:  "",
-				Name:      defaultWorkerServiceAccountName,
-				Namespace: testCtx.DefaultNamespace,
-			}))
-			g.Expect(crb.RoleRef).To(Equal(rbacv1.RoleRef{
-				Kind:     "ClusterRole",
-				APIGroup: "rbac.authorization.k8s.io",
-				Name:     defaultWorkerAdditionalClusterRoleName,
 			}))
 		})).Should(Succeed())
 	})
@@ -206,14 +179,6 @@ var _ = Describe("test EnsureWorkerServiceAccount", func() {
 			_, err := EnsureWorkerServiceAccount(reqCtx, testCtx.Cli, testCtx.DefaultNamespace, nil)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("worker cluster role name is empty"))
-		})
-
-		It("should return error if CfgKeyWorkerAdditionalClusterRoleName is empty", func() {
-			defer updateDefaultEnv(dptypes.CfgKeyWorkerAdditionalClusterRoleName, "")()
-			reqCtx := intctrlutil.RequestCtx{Ctx: testCtx.Ctx}
-			_, err := EnsureWorkerServiceAccount(reqCtx, testCtx.Cli, testCtx.DefaultNamespace, nil)
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("worker additional cluster role name is empty"))
 		})
 	})
 })

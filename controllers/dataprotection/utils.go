@@ -380,11 +380,6 @@ func EnsureWorkerServiceAccount(reqCtx intctrlutil.RequestCtx, cli client.Client
 		return "", fmt.Errorf("worker cluster role name is empty")
 	}
 
-	additionalClusterRoleName := viper.GetString(dptypes.CfgKeyWorkerAdditionalClusterRoleName)
-	if additionalClusterRoleName == "" {
-		return "", fmt.Errorf("worker additional cluster role name is empty")
-	}
-
 	var extraAnnotations map[string]string
 	annotationsJSON := viper.GetString(dptypes.CfgKeyWorkerServiceAccountAnnotations)
 	if annotationsJSON != "" {
@@ -398,6 +393,27 @@ func EnsureWorkerServiceAccount(reqCtx intctrlutil.RequestCtx, cli client.Client
 
 	ctx := UniversalContext(reqCtx.Ctx, mcMgr)
 
+	if saExists {
+		// SA exists, check if annotations are consistent
+		saCopy := sa.DeepCopy()
+		if len(extraAnnotations) > 0 && sa.Annotations == nil {
+			sa.Annotations = extraAnnotations
+		} else {
+			for k, v := range extraAnnotations {
+				sa.Annotations[k] = v
+			}
+		}
+		sa.ImagePullSecrets = intctrlutil.BuildImagePullSecrets()
+		if !reflect.DeepEqual(sa, saCopy) {
+			err := cli.Patch(ctx, sa, client.MergeFrom(saCopy), multicluster.InUniversalContext())
+			if err != nil {
+				return "", fmt.Errorf("failed to patch worker service account: %w", err)
+			}
+		}
+		// fast path
+		return saName, nil
+	}
+
 	createRoleBinding := func() error {
 		rb := &rbacv1.RoleBinding{}
 		rb.Name = fmt.Sprintf("%s-rolebinding", saName)
@@ -410,25 +426,6 @@ func EnsureWorkerServiceAccount(reqCtx intctrlutil.RequestCtx, cli client.Client
 		rb.RoleRef = rbacv1.RoleRef{
 			Kind:     "ClusterRole",
 			Name:     clusterRoleName,
-			APIGroup: "rbac.authorization.k8s.io",
-		}
-		if err := cli.Create(ctx, rb, multicluster.InUniversalContext()); err != nil {
-			return client.IgnoreAlreadyExists(err)
-		}
-		return nil
-	}
-
-	createClusterRoleBinding := func() error {
-		rb := &rbacv1.ClusterRoleBinding{}
-		rb.Name = fmt.Sprintf("%s-clusterrolebinding", saName)
-		rb.Subjects = []rbacv1.Subject{{
-			Kind:      rbacv1.ServiceAccountKind,
-			Name:      saName,
-			Namespace: namespace,
-		}}
-		rb.RoleRef = rbacv1.RoleRef{
-			Kind:     "ClusterRole",
-			Name:     additionalClusterRoleName,
 			APIGroup: "rbac.authorization.k8s.io",
 		}
 		if err := cli.Create(ctx, rb, multicluster.InUniversalContext()); err != nil {
@@ -454,31 +451,6 @@ func EnsureWorkerServiceAccount(reqCtx intctrlutil.RequestCtx, cli client.Client
 	if err := createRoleBinding(); err != nil {
 		return "", fmt.Errorf("failed to create rolebinding: %w", err)
 	}
-	if err := createClusterRoleBinding(); err != nil {
-		return "", fmt.Errorf("failed to create cluster role binding: %w", err)
-	}
-
-	if saExists {
-		// SA exists, check if annotations are consistent
-		saCopy := sa.DeepCopy()
-		if len(extraAnnotations) > 0 && sa.Annotations == nil {
-			sa.Annotations = extraAnnotations
-		} else {
-			for k, v := range extraAnnotations {
-				sa.Annotations[k] = v
-			}
-		}
-		sa.ImagePullSecrets = intctrlutil.BuildImagePullSecrets()
-		if !reflect.DeepEqual(sa, saCopy) {
-			err := cli.Patch(ctx, sa, client.MergeFrom(saCopy), multicluster.InUniversalContext())
-			if err != nil {
-				return "", fmt.Errorf("failed to patch worker service account: %w", err)
-			}
-		}
-		// fast path
-		return saName, nil
-	}
-
 	if err := createServiceAccount(); err != nil {
 		return "", fmt.Errorf("failed to create service account: %w", err)
 	}

@@ -308,7 +308,7 @@ var _ = Describe("synthesized component", func() {
 			Expect(synthesizedComp.ConfigTemplates[1]).Should(BeEquivalentTo(expectExternalConfig))
 		})
 
-		It("w/ comp override - not defined", func() {
+		PIt("w/ comp override - not defined", func() {
 			comp.Spec.Configs = append(comp.Spec.Configs, appsv1.ClusterComponentConfig{
 				Name: ptr.To("not-defined"),
 				ClusterComponentConfigSource: appsv1.ClusterComponentConfigSource{

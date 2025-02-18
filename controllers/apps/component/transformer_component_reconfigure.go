@@ -54,42 +54,26 @@ func (t *componentReconfigureTransformer) Transform(ctx graph.TransformContext, 
 		return nil
 	}
 
-	runningObjs, err := getFileTemplateObjects(transCtx.Context, transCtx.Client, transCtx.SynthesizeComponent)
+	runningObjs, err := getFileTemplateObjects(transCtx)
 	if err != nil {
 		return err
 	}
 
-	protoObjs, err := t.getProtoTemplateObjects(transCtx, dag)
+	protoObjs, err := buildFileTemplateObjects(transCtx)
 	if err != nil {
 		return err
 	}
 
 	toCreate, toDelete, toUpdate := mapDiff(runningObjs, protoObjs)
 
-	return t.handleReconfigure(transCtx, runningObjs, protoObjs, toCreate, toDelete, toUpdate)
+	return t.handleReconfigure(transCtx, dag, runningObjs, protoObjs, toCreate, toDelete, toUpdate)
 }
 
-func (t *componentReconfigureTransformer) getProtoTemplateObjects(
-	transCtx *componentTransformContext, dag *graph.DAG) (map[string]*corev1.ConfigMap, error) {
-	graphCli := transCtx.Client.(model.GraphClient)
-	objs := graphCli.FindAll(dag, &corev1.ConfigMap{})
-	result := make(map[string]*corev1.ConfigMap)
-	for i, obj := range objs {
-		labels := obj.GetLabels()
-		if labels != nil {
-			if _, ok := labels[kubeBlockFileTemplateLabelKey]; ok {
-				result[obj.GetName()] = objs[i].(*corev1.ConfigMap)
-			}
-		}
-	}
-	return result, nil
-}
-
-func (t *componentReconfigureTransformer) handleReconfigure(transCtx *componentTransformContext,
+func (t *componentReconfigureTransformer) handleReconfigure(transCtx *componentTransformContext, dag *graph.DAG,
 	runningObjs, protoObjs map[string]*corev1.ConfigMap, toCreate, toDelete, toUpdate sets.Set[string]) error {
 	if len(toCreate) > 0 || len(toDelete) > 0 {
 		// since pod volumes changed, the workload will be restarted, cancel the queued reconfigure.
-		return t.cancelQueuedReconfigure(transCtx)
+		return t.cancelQueuedReconfigure(transCtx, dag)
 	}
 
 	changes := t.templateFileChanges(transCtx, runningObjs, protoObjs, toUpdate)
@@ -98,13 +82,13 @@ func (t *componentReconfigureTransformer) handleReconfigure(transCtx *componentT
 		if err != nil {
 			return err
 		}
-		if err := t.queueReconfigure(transCtx, string(msg)); err != nil {
+		if err := t.queueReconfigure(transCtx, dag, string(msg)); err != nil {
 			return err
 		}
 		return intctrlutil.NewDelayedRequeueError(time.Second, fmt.Sprintf("pending reconfigure task: %s", msg))
 	}
 
-	return t.reconfigure(transCtx)
+	return t.reconfigure(transCtx, dag)
 }
 
 func (t *componentReconfigureTransformer) templateFileChanges(transCtx *componentTransformContext,
@@ -143,7 +127,8 @@ func (t *componentReconfigureTransformer) templateFileChanges(transCtx *componen
 	for name := range update {
 		rData, pData := runningObjs[name].Data, protoObjs[name].Data
 		if !reflect.DeepEqual(rData, pData) {
-			result[name] = diff(runningObjs[name], rData, pData)
+			tplName := fileTemplateNameFromObject(transCtx.SynthesizeComponent, runningObjs[name])
+			result[tplName] = diff(runningObjs[name], rData, pData)
 		}
 	}
 	return result
@@ -189,8 +174,8 @@ type fileTemplateChanges struct {
 	Updated string `json:"updated,omitempty"`
 }
 
-func (t *componentReconfigureTransformer) reconfigure(transCtx *componentTransformContext) error {
-	replicas, changes, err := t.reconfigureStatus(transCtx)
+func (t *componentReconfigureTransformer) reconfigure(transCtx *componentTransformContext, dag *graph.DAG) error {
+	replicas, changes, err := t.reconfigureStatus(transCtx, dag)
 	if err != nil {
 		return err
 	}
@@ -198,7 +183,7 @@ func (t *componentReconfigureTransformer) reconfigure(transCtx *componentTransfo
 		if err := t.reconfigureReplica(transCtx, changes, replica); err != nil {
 			return err
 		}
-		if err := t.reconfigured(transCtx, []string{replica}); err != nil {
+		if err := t.reconfigured(transCtx, dag, []string{replica}); err != nil {
 			return err
 		}
 	}
@@ -245,9 +230,9 @@ func (t *componentReconfigureTransformer) reconfigureReplicaTemplate(transCtx *c
 			}
 		}
 		if tpl.Reconfigure != nil {
-			name := component.UDFReconfigureActionName(tpl)
+			actionName := component.UDFReconfigureActionName(tpl)
 			args := lifecycle.FileTemplateChanges(changes.Created, changes.Removed, changes.Updated)
-			return lfa.UserDefined(transCtx.Context, transCtx.Client, nil, name, tpl.Reconfigure, args)
+			return lfa.UserDefined(transCtx.Context, transCtx.Client, nil, actionName, tpl.Reconfigure, args)
 		}
 		return lfa.Reconfigure(transCtx.Context, transCtx.Client, nil, changes.Created, changes.Removed, changes.Updated)
 	}
@@ -268,21 +253,21 @@ func (t *componentReconfigureTransformer) reconfigureReplicaTemplate(transCtx *c
 	return nil
 }
 
-func (t *componentReconfigureTransformer) queueReconfigure(transCtx *componentTransformContext, changes string) error {
-	return t.updateReconfigureStatus(transCtx, func(s *component.ReplicaStatus) {
+func (t *componentReconfigureTransformer) queueReconfigure(transCtx *componentTransformContext, dag *graph.DAG, changes string) error {
+	return t.updateReconfigureStatus(transCtx, dag, func(s *component.ReplicaStatus) {
 		s.Reconfigured = ptr.To(changes)
 	})
 }
 
-func (t *componentReconfigureTransformer) cancelQueuedReconfigure(transCtx *componentTransformContext) error {
-	return t.updateReconfigureStatus(transCtx, func(s *component.ReplicaStatus) {
+func (t *componentReconfigureTransformer) cancelQueuedReconfigure(transCtx *componentTransformContext, dag *graph.DAG) error {
+	return t.updateReconfigureStatus(transCtx, dag, func(s *component.ReplicaStatus) {
 		s.Reconfigured = nil
 	})
 }
 
-func (t *componentReconfigureTransformer) reconfigured(transCtx *componentTransformContext, replicas []string) error {
+func (t *componentReconfigureTransformer) reconfigured(transCtx *componentTransformContext, dag *graph.DAG, replicas []string) error {
 	replicasSet := sets.New(replicas...)
-	return t.updateReconfigureStatus(transCtx, func(s *component.ReplicaStatus) {
+	return t.updateReconfigureStatus(transCtx, dag, func(s *component.ReplicaStatus) {
 		if replicasSet.Has(s.Name) {
 			s.Reconfigured = ptr.To("")
 		}
@@ -290,28 +275,41 @@ func (t *componentReconfigureTransformer) reconfigured(transCtx *componentTransf
 }
 
 func (t *componentReconfigureTransformer) updateReconfigureStatus(
-	transCtx *componentTransformContext, f func(*component.ReplicaStatus)) error {
-	if transCtx.ProtoWorkload == nil {
+	transCtx *componentTransformContext, dag *graph.DAG, f func(*component.ReplicaStatus)) error {
+	its, inDag := t.itsObject(transCtx, dag)
+	if its == nil {
 		return nil
 	}
-	its := transCtx.ProtoWorkload.(*workloads.InstanceSet)
-	return component.UpdateReplicasStatusFunc(its, func(r *component.ReplicasStatus) error {
+	err := component.UpdateReplicasStatusFunc(its, func(r *component.ReplicasStatus) error {
 		for i := range r.Status {
 			f(&r.Status[i])
 		}
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+
+	if !inDag {
+		runningIts := transCtx.RunningWorkload.(*workloads.InstanceSet)
+		if !reflect.DeepEqual(runningIts.Annotations, its.Annotations) {
+			graphCli, _ := transCtx.Client.(model.GraphClient)
+			// its is copied from running its, and only the annotation is modified.
+			graphCli.Update(dag, nil, its)
+		}
+	}
+	return nil
 }
 
 func (t *componentReconfigureTransformer) reconfigureStatus(
-	transCtx *componentTransformContext) ([]string, map[string]fileTemplateChanges, error) {
-	if transCtx.ProtoWorkload == nil {
+	transCtx *componentTransformContext, dag *graph.DAG) ([]string, map[string]fileTemplateChanges, error) {
+	its, _ := t.itsObject(transCtx, dag)
+	if its == nil {
 		return nil, nil, nil
 	}
 
 	var err1 error
 	changes := map[string]fileTemplateChanges{}
-	its := transCtx.ProtoWorkload.(*workloads.InstanceSet)
 	replicas, err2 := component.GetReplicasStatusFunc(its, func(r component.ReplicaStatus) bool {
 		if r.Reconfigured == nil || len(*r.Reconfigured) == 0 {
 			return false
@@ -328,4 +326,16 @@ func (t *componentReconfigureTransformer) reconfigureStatus(
 		return nil, nil, err1
 	}
 	return replicas, changes, nil
+}
+
+func (t *componentReconfigureTransformer) itsObject(transCtx *componentTransformContext, dag *graph.DAG) (*workloads.InstanceSet, bool) {
+	graphCli, _ := transCtx.Client.(model.GraphClient)
+	objs := graphCli.FindAll(dag, &workloads.InstanceSet{})
+	if len(objs) > 0 {
+		return objs[0].(*workloads.InstanceSet), true // reuse it
+	}
+	if transCtx.RunningWorkload != nil {
+		return transCtx.RunningWorkload.(*workloads.InstanceSet).DeepCopy(), false
+	}
+	return nil, false
 }

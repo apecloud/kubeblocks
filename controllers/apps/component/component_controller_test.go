@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
@@ -28,6 +29,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/golang/mock/gomock"
 	"github.com/sethvargo/go-password/password"
 	"golang.org/x/exp/maps"
 	appsv1 "k8s.io/api/apps/v1"
@@ -51,6 +53,7 @@ import (
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
+	kbagentproto "github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
@@ -110,6 +113,7 @@ var _ = Describe("Component Controller", func() {
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.RoleBindingSignature, true, inNS)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PodSignature, true, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ConfigMapSignature, true, inNS, ml)
 		// non-namespaced
 		testapps.ClearResources(&testCtx, generics.StorageClassSignature, ml)
 
@@ -1606,116 +1610,282 @@ var _ = Describe("Component Controller", func() {
 		})).Should(Succeed())
 	}
 
-	testReconfigureVolumes := func(compName, compDefName string) {
-		passwordConfig := &kbappsv1.PasswordConfig{
-			Length: 29,
-		}
-		secret := corev1.Secret{
+	testReconfigureVolumes := func(compName, compDefName, fileTemplate string) {
+		createCompObj(compName, compDefName, nil)
+
+		By("mock a file template object that not defined in the cmpd")
+		labels := constant.GetCompLabels(clusterKey.Name, compName)
+		labels[kubeBlockFileTemplateLabelKey] = "true"
+		cm := &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: testCtx.DefaultNamespace,
-				Name:      "sysaccount-update",
+				Name:      "test-log-conf-not-defined",
+				Labels:    labels,
 			},
-			StringData: map[string]string{
-				"sysaccount-update": "sysaccount-update",
-			},
+			Data: map[string]string{},
 		}
-		secretRef := func() *kbappsv1.ProvisionSecretRef {
-			Expect(testCtx.CreateObj(testCtx.Ctx, &secret)).Should(Succeed())
-			return &kbappsv1.ProvisionSecretRef{
-				Name:      secret.Name,
-				Namespace: testCtx.DefaultNamespace,
-				Password:  "sysaccount-update",
-			}
+		Expect(testCtx.CreateObj(testCtx.Ctx, cm)).Should(Succeed())
+
+		fileTemplateCMKey := types.NamespacedName{
+			Namespace: testCtx.DefaultNamespace,
+			Name:      fileTemplateObjectName(&component.SynthesizedComponent{FullCompName: compKey.Name}, fileTemplate),
 		}
 
-		createCompObj(compName, compDefName, func(f *testapps.MockComponentFactory) {
-			f.AddSystemAccount("root", nil, passwordConfig, nil).
-				AddSystemAccount("admin", nil, nil, secretRef())
+		By("check the pod volumes")
+		itsKey := compKey
+		Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+			expectVolume := corev1.Volume{
+				Name: fileTemplate,
+				VolumeSource: corev1.VolumeSource{
+					ConfigMap: &corev1.ConfigMapVolumeSource{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: fileTemplateCMKey.Name,
+						},
+						DefaultMode: ptr.To[int32](0444),
+					},
+				},
+			}
+			g.Expect(its.Spec.Template.Spec.Volumes).Should(ContainElement(expectVolume))
+		})).Should(Succeed())
+
+		By("check the file template objects")
+		Eventually(testapps.CheckObjExists(&testCtx, fileTemplateCMKey, &corev1.ConfigMap{}, true)).Should(Succeed())
+		Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(cm), &corev1.ConfigMap{}, false)).Should(Succeed())
+	}
+
+	testReconfigure := func(compName, compDefName, fileTemplate string) {
+		By("mock reconfigure action calls")
+		var (
+			reconfigure string
+			parameters  map[string]string
+		)
+		testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+			recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+				if req.Action == "reconfigure" || strings.HasPrefix(req.Action, "udf-reconfigure") {
+					reconfigure = req.Action
+					parameters = req.Parameters
+				}
+				return kbagentproto.ActionResponse{}, nil
+			}).AnyTimes()
 		})
 
-		By("check root account")
-		var rootHashedPassword string
-		rootSecretKey := types.NamespacedName{
-			Namespace: compObj.Namespace,
-			Name:      constant.GenerateAccountSecretName(clusterKey.Name, compName, "root"),
+		createCompObj(compName, compDefName, nil)
+
+		By("check the file template object")
+		fileTemplateCMKey := types.NamespacedName{
+			Namespace: testCtx.DefaultNamespace,
+			Name:      fileTemplateObjectName(&component.SynthesizedComponent{FullCompName: compKey.Name}, fileTemplate),
 		}
-		Eventually(testapps.CheckObj(&testCtx, rootSecretKey, func(g Gomega, secret *corev1.Secret) {
-			g.Expect(secret.Data).Should(HaveKeyWithValue(constant.AccountNameForSecret, []byte("root")))
-			g.Expect(secret.Data).Should(HaveKey(constant.AccountPasswdForSecret))
-			g.Expect(secret.Data[constant.AccountPasswdForSecret]).Should(HaveLen(int(passwordConfig.Length)))
-			rootHashedPassword = secret.Annotations[systemAccountHashAnnotation]
-			g.Expect(rootHashedPassword).Should(BeEmpty()) // kb generated password
+		Eventually(testapps.CheckObj(&testCtx, fileTemplateCMKey, func(g Gomega, cm *corev1.ConfigMap) {
+			g.Expect(cm.Data).Should(HaveKeyWithValue("level", "info"))
 		})).Should(Succeed())
 
-		By("check admin account")
-		var adminHashedPassword string
-		adminSecretKey := types.NamespacedName{
-			Namespace: compObj.Namespace,
-			Name:      constant.GenerateAccountSecretName(clusterKey.Name, compName, "admin"),
+		By("mock pods")
+		pods := mockPodsForTest(clusterKey.Name, compName, compDefName, int(compObj.Spec.Replicas))
+		for i := range pods {
+			Expect(testCtx.CheckedCreateObj(testCtx.Ctx, pods[i])).Should(Succeed())
 		}
-		Eventually(testapps.CheckObj(&testCtx, adminSecretKey, func(g Gomega, secret *corev1.Secret) {
-			g.Expect(secret.Data).Should(HaveKeyWithValue(constant.AccountNameForSecret, []byte("admin")))
-			g.Expect(secret.Data).Should(HaveKeyWithValue(constant.AccountPasswdForSecret, []byte("sysaccount-update")))
-			adminHashedPassword = secret.Annotations[systemAccountHashAnnotation]
-			g.Expect(adminHashedPassword).ShouldNot(BeEmpty()) // user-provided
-		})).Should(Succeed())
 
-		By("mock component as Running")
-		mockCompRunning(compName, compObj)
-
-		By("update the password of admin account")
-		Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(&secret), func(obj *corev1.Secret) {
-			if obj.StringData == nil {
-				obj.StringData = map[string]string{}
-			}
-			obj.StringData["sysaccount-update"] = "sysaccount-update-new"
-		})()).Should(Succeed())
-
-		By("trigger the component to reconcile")
+		By("update the config template variables")
 		Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
-			if comp.Annotations == nil {
-				comp.Annotations = map[string]string{}
+			comp.Spec.Configs = []kbappsv1.ClusterComponentConfig{
+				{
+					Name: ptr.To(fileTemplate),
+					Variables: map[string]string{
+						"LOG_LEVEL": "debug",
+					},
+				},
 			}
-			comp.Annotations["reconcile"] = time.Now().String()
 		})()).Should(Succeed())
 
-		By("check the admin account updated")
-		var updatedAdminHashedPassword string
-		Eventually(testapps.CheckObj(&testCtx, adminSecretKey, func(g Gomega, secret *corev1.Secret) {
-			g.Expect(secret.Data).Should(HaveKeyWithValue(constant.AccountNameForSecret, []byte("admin")))
-			g.Expect(secret.Data).Should(HaveKeyWithValue(constant.AccountPasswdForSecret, []byte("sysaccount-update-new")))
-			updatedAdminHashedPassword = secret.Annotations[systemAccountHashAnnotation]
-			g.Expect(updatedAdminHashedPassword).ShouldNot(BeEmpty()) // user-provided
-			g.Expect(updatedAdminHashedPassword).ShouldNot(Equal(adminHashedPassword))
+		By("check the file template object again")
+		Eventually(testapps.CheckObj(&testCtx, fileTemplateCMKey, func(g Gomega, cm *corev1.ConfigMap) {
+			g.Expect(cm.Data).Should(HaveKeyWithValue("level", "debug"))
 		})).Should(Succeed())
 
-		By("wait accounts to be updated")
-		Eventually(testapps.CheckObj(&testCtx, compKey, func(g Gomega, comp *kbappsv1.Component) {
-			g.Expect(len(comp.Status.Conditions) > 0).Should(BeTrue())
-			var cond *metav1.Condition
-			for i, c := range comp.Status.Conditions {
-				if c.Type == accountProvisionConditionType {
-					cond = &comp.Status.Conditions[i]
-					break
+		By("check the reconfigure action call")
+		Eventually(func(g Gomega) {
+			g.Expect(reconfigure).Should(Equal("reconfigure"))
+			g.Expect(parameters).ShouldNot(BeNil())
+			g.Expect(parameters).Should(HaveKey("KB_CONFIG_FILES_UPDATED"))
+			g.Expect(parameters["KB_CONFIG_FILES_UPDATED"]).Should(ContainSubstring("level"))
+		}).Should(Succeed())
+	}
+
+	testReconfigureUDF := func(compName, compDefName, fileTemplate string) {
+		By("mock reconfigure action calls")
+		var (
+			reconfigure string
+			parameters  map[string]string
+		)
+		testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+			recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+				if req.Action == "reconfigure" || strings.HasPrefix(req.Action, "udf-reconfigure") {
+					reconfigure = req.Action
+					parameters = req.Parameters
 				}
+				return kbagentproto.ActionResponse{}, nil
+			}).AnyTimes()
+		})
+
+		createCompObj(compName, compDefName, func(f *testapps.MockComponentFactory) {
+			f.SetConfigs([]kbappsv1.ClusterComponentConfig{
+				{
+					Name: ptr.To(fileTemplate),
+					Variables: map[string]string{
+						"LOG_LEVEL": "debug",
+					},
+					Reconfigure: testapps.NewLifecycleAction("reconfigure"),
+				},
+			})
+		})
+
+		By("check the file template object")
+		fileTemplateCMKey := types.NamespacedName{
+			Namespace: testCtx.DefaultNamespace,
+			Name:      fileTemplateObjectName(&component.SynthesizedComponent{FullCompName: compKey.Name}, fileTemplate),
+		}
+		Eventually(testapps.CheckObj(&testCtx, fileTemplateCMKey, func(g Gomega, cm *corev1.ConfigMap) {
+			g.Expect(cm.Data).Should(HaveKeyWithValue("level", "debug"))
+		})).Should(Succeed())
+
+		By("mock pods")
+		pods := mockPodsForTest(clusterKey.Name, compName, compDefName, int(compObj.Spec.Replicas))
+		for i := range pods {
+			Expect(testCtx.CheckedCreateObj(testCtx.Ctx, pods[i])).Should(Succeed())
+		}
+
+		By("update the config template variables")
+		Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
+			comp.Spec.Configs[0].Variables = map[string]string{
+				"LOG_LEVEL": "warn",
 			}
-			g.Expect(cond).ShouldNot(BeNil())
-			g.Expect(cond.Status).Should(BeEquivalentTo(metav1.ConditionTrue))
-			g.Expect(cond.Message).Should(ContainSubstring(fmt.Sprintf("%s:%s", "root", rootHashedPassword)))
-			g.Expect(cond.Message).Should(ContainSubstring(fmt.Sprintf("%s:%s", "admin", updatedAdminHashedPassword)))
+		})()).Should(Succeed())
+
+		By("check the file template object again")
+		Eventually(testapps.CheckObj(&testCtx, fileTemplateCMKey, func(g Gomega, cm *corev1.ConfigMap) {
+			g.Expect(cm.Data).Should(HaveKeyWithValue("level", "warn"))
+		})).Should(Succeed())
+
+		By("check the reconfigure action call")
+		Eventually(func(g Gomega) {
+			g.Expect(reconfigure).Should(Equal(fmt.Sprintf("udf-reconfigure-%s", fileTemplate)))
+			g.Expect(parameters).ShouldNot(BeNil())
+			g.Expect(parameters).Should(HaveKey("KB_CONFIG_FILES_UPDATED"))
+			g.Expect(parameters["KB_CONFIG_FILES_UPDATED"]).Should(ContainSubstring("level"))
+		}).Should(Succeed())
+	}
+
+	testReconfigureStatus := func(compName, compDefName, fileTemplate string) {
+		By("mock reconfigure action calls")
+		var (
+			replicas  = 3
+			callTimes = 0
+		)
+		testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+			recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+				if req.Action == "reconfigure" || strings.HasPrefix(req.Action, "udf-reconfigure") {
+					callTimes += 1
+					if callTimes >= replicas {
+						return kbagentproto.ActionResponse{}, fmt.Errorf("mock internal error")
+					}
+				}
+				return kbagentproto.ActionResponse{}, nil
+			}).AnyTimes()
+		})
+
+		createCompObj(compName, compDefName, func(f *testapps.MockComponentFactory) {
+			f.SetReplicas(int32(replicas))
+		})
+
+		By("check the file template object")
+		fileTemplateCMKey := types.NamespacedName{
+			Namespace: testCtx.DefaultNamespace,
+			Name:      fileTemplateObjectName(&component.SynthesizedComponent{FullCompName: compKey.Name}, fileTemplate),
+		}
+		Eventually(testapps.CheckObj(&testCtx, fileTemplateCMKey, func(g Gomega, cm *corev1.ConfigMap) {
+			g.Expect(cm.Data).Should(HaveKeyWithValue("level", "info"))
+		})).Should(Succeed())
+
+		By("mock pods")
+		pods := mockPodsForTest(clusterKey.Name, compName, compDefName, int(compObj.Spec.Replicas))
+		for i := range pods {
+			Expect(testCtx.CheckedCreateObj(testCtx.Ctx, pods[i])).Should(Succeed())
+		}
+
+		By("update the config template variables")
+		Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
+			comp.Spec.Configs = []kbappsv1.ClusterComponentConfig{
+				{
+					Name: ptr.To(fileTemplate),
+					Variables: map[string]string{
+						"LOG_LEVEL": "debug",
+					},
+				},
+			}
+		})()).Should(Succeed())
+
+		By("check the file template object again")
+		Eventually(testapps.CheckObj(&testCtx, fileTemplateCMKey, func(g Gomega, cm *corev1.ConfigMap) {
+			g.Expect(cm.Data).Should(HaveKeyWithValue("level", "debug"))
+		})).Should(Succeed())
+
+		By("check the reconfigure action call")
+		Eventually(func(g Gomega) {
+			g.Expect(callTimes >= replicas).Should(BeTrue())
+		}).Should(Succeed())
+
+		By("check the replicas status")
+		itsKey := compKey
+		Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+			replicas, err := component.GetReplicasStatusFunc(its, func(r component.ReplicaStatus) bool {
+				g.Expect(r.Reconfigured).ShouldNot(BeNil())
+				return len(*r.Reconfigured) > 0
+			})
+			g.Expect(err).Should(BeNil())
+			g.Expect(len(replicas)).Should(Equal(1))
 		})).Should(Succeed())
 	}
 
-	testReconfigure := func(compName, compDefName string) {
-	}
+	testReconfigureStatusCanceled := func(compName, compDefName, fileTemplate string) {
+		testReconfigureStatus(compName, compDefName, fileTemplate)
 
-	testReconfigureUDF := func(compName, compDefName string) {
-	}
+		By("update the cmpd to add a new config template (volume)")
+		compDefKey := client.ObjectKeyFromObject(compDefObj)
+		Expect(testapps.GetAndChangeObj(&testCtx, compDefKey, func(cmpd *kbappsv1.ComponentDefinition) {
+			cmpd.Spec.Configs2 = append(cmpd.Spec.Configs2, kbappsv1.ComponentFileTemplate{
+				Name:       "server-conf",
+				Template:   "test-log-conf-template", // reuse log-conf template
+				Namespace:  testCtx.DefaultNamespace,
+				VolumeName: "server-conf",
+			})
+			for i := range cmpd.Spec.Runtime.Containers {
+				cmpd.Spec.Runtime.Containers[i].VolumeMounts =
+					append(cmpd.Spec.Runtime.Containers[i].VolumeMounts, corev1.VolumeMount{
+						Name:      "server-conf",
+						MountPath: "/var/run/app/conf/server",
+					})
+			}
+		})()).ShouldNot(HaveOccurred())
 
-	testReconfigureStatus := func(compName, compDefName string) {
-	}
+		By("check new file template object")
+		newFileTemplateCMKey := types.NamespacedName{
+			Namespace: testCtx.DefaultNamespace,
+			Name:      fileTemplateObjectName(&component.SynthesizedComponent{FullCompName: compKey.Name}, "server-conf"),
+		}
+		Eventually(testapps.CheckObjExists(&testCtx, newFileTemplateCMKey, &corev1.ConfigMap{}, true)).Should(Succeed())
 
-	testReconfigureStatusCanceled := func(compName, compDefName string) {
+		By("check the replicas status")
+		itsKey := compKey
+		Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+			// all the reconfigure tasks of all replicas have been canceled
+			replicas, err := component.GetReplicasStatusFunc(its, func(r component.ReplicaStatus) bool {
+				g.Expect(r.Reconfigured).Should(BeNil())
+				return true
+			})
+			g.Expect(err).Should(BeNil())
+			g.Expect(len(replicas)).Should(Equal(3))
+		})).Should(Succeed())
 	}
 
 	Context("provisioning", func() {
@@ -2213,8 +2383,48 @@ var _ = Describe("Component Controller", func() {
 	})
 
 	Context("reconfigure file (config/script) template", func() {
+		var (
+			fileTemplate = "log-conf"
+		)
+
 		BeforeEach(func() {
 			createDefinitionObjects()
+
+			// create the config file template object
+			cm := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testCtx.DefaultNamespace,
+					Name:      "test-log-conf-template",
+				},
+				Data: map[string]string{
+					"level": "{{- if (index $ \"LOG_LEVEL\") }}\n\t{{- .LOG_LEVEL }}\n{{- else }}\n\t{{- \"info\" }}\n{{- end }}",
+				},
+			}
+			Expect(testCtx.CreateObj(testCtx.Ctx, cm)).Should(Succeed())
+
+			// mock the cmpd to add the config file template and volume mount
+			compDefKey := client.ObjectKeyFromObject(compDefObj)
+			Expect(testapps.GetAndChangeObj(&testCtx, compDefKey, func(cmpd *kbappsv1.ComponentDefinition) {
+				cmpd.Spec.Configs2 = []kbappsv1.ComponentFileTemplate{
+					{
+						Name:       fileTemplate,
+						Template:   "test-log-conf-template",
+						Namespace:  testCtx.DefaultNamespace,
+						VolumeName: fileTemplate,
+					},
+				}
+				for i := range cmpd.Spec.Runtime.Containers {
+					if cmpd.Spec.Runtime.Containers[i].VolumeMounts == nil {
+						cmpd.Spec.Runtime.Containers[i].VolumeMounts = make([]corev1.VolumeMount, 0)
+					}
+					cmpd.Spec.Runtime.Containers[i].VolumeMounts =
+						append(cmpd.Spec.Runtime.Containers[i].VolumeMounts, corev1.VolumeMount{
+							Name:      fileTemplate,
+							MountPath: "/var/run/app/conf/log",
+						})
+				}
+				cmpd.Spec.LifecycleActions.Reconfigure = testapps.NewLifecycleAction("reconfigure")
+			})()).ShouldNot(HaveOccurred())
 		})
 
 		AfterEach(func() {
@@ -2222,23 +2432,23 @@ var _ = Describe("Component Controller", func() {
 		})
 
 		It("add/delete volumes", func() {
-			testReconfigureVolumes(defaultCompName, compDefObj.Name)
+			testReconfigureVolumes(defaultCompName, compDefObj.Name, fileTemplate)
 		})
 
 		It("reconfigure", func() {
-			testReconfigure(defaultCompName, compDefObj.Name)
+			testReconfigure(defaultCompName, compDefObj.Name, fileTemplate)
 		})
 
 		It("reconfigure - udf", func() {
-			testReconfigureUDF(defaultCompName, compDefObj.Name)
+			testReconfigureUDF(defaultCompName, compDefObj.Name, fileTemplate)
 		})
 
 		It("reconfigure - status", func() {
-			testReconfigureStatus(defaultCompName, compDefObj.Name)
+			testReconfigureStatus(defaultCompName, compDefObj.Name, fileTemplate)
 		})
 
 		It("reconfigure - canceled by volumes change", func() {
-			testReconfigureStatusCanceled(defaultCompName, compDefObj.Name)
+			testReconfigureStatusCanceled(defaultCompName, compDefObj.Name, fileTemplate)
 		})
 	})
 })

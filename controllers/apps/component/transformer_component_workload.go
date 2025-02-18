@@ -410,7 +410,6 @@ func buildPodSpecVolumeMounts(synthesizeComp *component.SynthesizedComponent) {
 //  1. new an object targetObj by copying from oldObj
 //  2. merge all fields can be updated from newObj into targetObj
 func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet) *workloads.InstanceSet {
-
 	updateUpdateStrategy := func(itsObj, itsProto *workloads.InstanceSet) {
 		var objMaxUnavailable *intstr.IntOrString
 		if itsObj.Spec.UpdateStrategy.RollingUpdate != nil {

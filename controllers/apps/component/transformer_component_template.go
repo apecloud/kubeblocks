@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
-	"context"
 	"fmt"
 	"maps"
 	"reflect"
@@ -60,12 +59,12 @@ func (t *componentFileTemplateTransformer) Transform(ctx graph.TransformContext,
 		return err
 	}
 
-	runningObjs, err := getFileTemplateObjects(transCtx.Context, transCtx.Client, transCtx.SynthesizeComponent)
+	runningObjs, err := getFileTemplateObjects(transCtx)
 	if err != nil {
 		return err
 	}
 
-	protoObjs, err := t.buildTemplateObjects(transCtx)
+	protoObjs, err := buildFileTemplateObjects(transCtx)
 	if err != nil {
 		return err
 	}
@@ -84,94 +83,6 @@ func (t *componentFileTemplateTransformer) precheck(transCtx *componentTransform
 		}
 	}
 	return nil
-}
-
-func (t *componentFileTemplateTransformer) buildTemplateObjects(transCtx *componentTransformContext) (map[string]*corev1.ConfigMap, error) {
-	objs := make(map[string]*corev1.ConfigMap)
-	for _, tpl := range transCtx.SynthesizeComponent.FileTemplates {
-		obj, err := t.buildTemplateObject(transCtx, tpl)
-		if err != nil {
-			return nil, err
-		}
-		objs[obj.Name] = obj
-	}
-	return objs, nil
-}
-
-func (t *componentFileTemplateTransformer) buildTemplateObject(
-	transCtx *componentTransformContext, tpl component.SynthesizedFileTemplate) (*corev1.ConfigMap, error) {
-	var (
-		compDef         = transCtx.CompDef
-		synthesizedComp = transCtx.SynthesizeComponent
-	)
-
-	data, err := t.buildTemplateData(transCtx, tpl)
-	if err != nil {
-		return nil, err
-	}
-
-	objName := fileTemplateObjectName(transCtx.SynthesizeComponent, tpl.Name)
-	obj := builder.NewConfigMapBuilder(synthesizedComp.Namespace, objName).
-		AddLabelsInMap(synthesizedComp.StaticLabels).
-		AddLabelsInMap(constant.GetCompLabelsWithDef(synthesizedComp.ClusterName, synthesizedComp.Name, compDef.Name)).
-		AddLabels(kubeBlockFileTemplateLabelKey, "true").
-		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
-		SetData(data).
-		GetObject()
-	return obj, nil
-}
-
-func (t *componentFileTemplateTransformer) buildTemplateData(transCtx *componentTransformContext, tpl component.SynthesizedFileTemplate) (map[string]string, error) {
-	cmObj, err := func() (*corev1.ConfigMap, error) {
-		cm := &corev1.ConfigMap{}
-		cmKey := types.NamespacedName{
-			Namespace: func() string {
-				if len(tpl.Namespace) > 0 {
-					return tpl.Namespace
-				}
-				return "default"
-			}(),
-			Name: tpl.Template,
-		}
-		if err := transCtx.Client.Get(transCtx.Context, cmKey, cm); err != nil {
-			return nil, err
-		}
-		return cm, nil
-	}()
-	if err != nil {
-		return nil, err
-	}
-	return t.renderTemplateData(transCtx, tpl, cmObj.Data)
-}
-
-func (t *componentFileTemplateTransformer) renderTemplateData(transCtx *componentTransformContext,
-	fileTemplate component.SynthesizedFileTemplate, data map[string]string) (map[string]string, error) {
-	var (
-		synthesizedComp = transCtx.SynthesizeComponent
-		rendered        = make(map[string]string)
-	)
-
-	variables := make(map[string]any)
-	if synthesizedComp.TemplateVars != nil {
-		maps.Copy(variables, synthesizedComp.TemplateVars)
-	}
-	for k, v := range fileTemplate.Variables {
-		variables[k] = v // override
-	}
-
-	tpl := template.New(fileTemplate.Name).Option("missingkey=error").Funcs(sprig.TxtFuncMap())
-	for key, val := range data {
-		ptpl, err := tpl.Parse(val)
-		if err != nil {
-			return nil, err
-		}
-		var buf strings.Builder
-		if err = ptpl.Execute(&buf, variables); err != nil {
-			return nil, err
-		}
-		rendered[key] = buf.String()
-	}
-	return rendered, nil
 }
 
 func (t *componentFileTemplateTransformer) handleTemplateObjectChanges(transCtx *componentTransformContext,
@@ -225,7 +136,10 @@ func (t *componentFileTemplateTransformer) newVolume(tpl component.SynthesizedFi
 	return vol
 }
 
-func getFileTemplateObjects(ctx context.Context, cli client.Reader, synthesizedComp *component.SynthesizedComponent) (map[string]*corev1.ConfigMap, error) {
+func getFileTemplateObjects(transCtx *componentTransformContext) (map[string]*corev1.ConfigMap, error) {
+	var (
+		synthesizedComp = transCtx.SynthesizeComponent
+	)
 	labels := constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name)
 	labels[kubeBlockFileTemplateLabelKey] = "true"
 	opts := []client.ListOption{
@@ -234,7 +148,7 @@ func getFileTemplateObjects(ctx context.Context, cli client.Reader, synthesizedC
 	}
 
 	cmList := &corev1.ConfigMapList{}
-	if err := cli.List(ctx, cmList, opts...); err != nil {
+	if err := transCtx.Client.List(transCtx.Context, cmList, opts...); err != nil {
 		return nil, err
 	}
 
@@ -243,6 +157,93 @@ func getFileTemplateObjects(ctx context.Context, cli client.Reader, synthesizedC
 		objs[obj.Name] = &cmList.Items[i]
 	}
 	return objs, nil
+}
+
+func buildFileTemplateObjects(transCtx *componentTransformContext) (map[string]*corev1.ConfigMap, error) {
+	objs := make(map[string]*corev1.ConfigMap)
+	for _, tpl := range transCtx.SynthesizeComponent.FileTemplates {
+		obj, err := buildFileTemplateObject(transCtx, tpl)
+		if err != nil {
+			return nil, err
+		}
+		objs[obj.Name] = obj
+	}
+	return objs, nil
+}
+
+func buildFileTemplateObject(transCtx *componentTransformContext, tpl component.SynthesizedFileTemplate) (*corev1.ConfigMap, error) {
+	var (
+		compDef         = transCtx.CompDef
+		synthesizedComp = transCtx.SynthesizeComponent
+	)
+
+	data, err := buildFileTemplateData(transCtx, tpl)
+	if err != nil {
+		return nil, err
+	}
+
+	objName := fileTemplateObjectName(transCtx.SynthesizeComponent, tpl.Name)
+	obj := builder.NewConfigMapBuilder(synthesizedComp.Namespace, objName).
+		AddLabelsInMap(synthesizedComp.StaticLabels).
+		AddLabelsInMap(constant.GetCompLabelsWithDef(synthesizedComp.ClusterName, synthesizedComp.Name, compDef.Name)).
+		AddLabels(kubeBlockFileTemplateLabelKey, "true").
+		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
+		SetData(data).
+		GetObject()
+	return obj, nil
+}
+
+func buildFileTemplateData(transCtx *componentTransformContext, tpl component.SynthesizedFileTemplate) (map[string]string, error) {
+	cmObj, err := func() (*corev1.ConfigMap, error) {
+		cm := &corev1.ConfigMap{}
+		cmKey := types.NamespacedName{
+			Namespace: func() string {
+				if len(tpl.Namespace) > 0 {
+					return tpl.Namespace
+				}
+				return "default"
+			}(),
+			Name: tpl.Template,
+		}
+		if err := transCtx.Client.Get(transCtx.Context, cmKey, cm); err != nil {
+			return nil, err
+		}
+		return cm, nil
+	}()
+	if err != nil {
+		return nil, err
+	}
+	return renderFileTemplateData(transCtx, tpl, cmObj.Data)
+}
+
+func renderFileTemplateData(transCtx *componentTransformContext,
+	fileTemplate component.SynthesizedFileTemplate, data map[string]string) (map[string]string, error) {
+	var (
+		synthesizedComp = transCtx.SynthesizeComponent
+		rendered        = make(map[string]string)
+	)
+
+	variables := make(map[string]any)
+	if synthesizedComp.TemplateVars != nil {
+		maps.Copy(variables, synthesizedComp.TemplateVars)
+	}
+	for k, v := range fileTemplate.Variables {
+		variables[k] = v // override
+	}
+
+	tpl := template.New(fileTemplate.Name).Option("missingkey=error").Funcs(sprig.TxtFuncMap())
+	for key, val := range data {
+		ptpl, err := tpl.Parse(val)
+		if err != nil {
+			return nil, err
+		}
+		var buf strings.Builder
+		if err = ptpl.Execute(&buf, variables); err != nil {
+			return nil, err
+		}
+		rendered[key] = buf.String()
+	}
+	return rendered, nil
 }
 
 func fileTemplateObjectName(synthesizedComp *component.SynthesizedComponent, tplName string) string {

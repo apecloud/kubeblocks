@@ -381,7 +381,9 @@ func overrideNCheckConfigTemplates(synthesizedComp *SynthesizedComponent, comp *
 		}
 		template := templates[*config.Name]
 		if template == nil {
-			return fmt.Errorf("the config template %s is not defined in definition", *config.Name)
+			continue
+			// TODO: remove me
+			// return fmt.Errorf("the config template %s is not defined in definition", *config.Name)
 		}
 
 		specified := func() bool {

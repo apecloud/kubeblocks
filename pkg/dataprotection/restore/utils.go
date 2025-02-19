@@ -464,6 +464,11 @@ func ValidateParentBackupSet(parentBackupSet *BackupActionSet, backupSet *Backup
 	if !utils.CompareWithBackupStopTime(*parentBackup, *backup) {
 		return fmt.Errorf(`the parent backup "%s" is not before the child backup "%s"`, parentBackup.Name, backup.Name)
 	}
+	// validate parent backup repo
+	if parentBackup.Status.BackupRepoName != backup.Status.BackupRepoName {
+		return fmt.Errorf(`the parent backup repo "%s" is not the same with the child backup's repo "%s"`,
+			parentBackup.Status.BackupRepoName, backup.Status.BackupRepoName)
+	}
 	return nil
 }
 

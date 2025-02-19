@@ -784,8 +784,9 @@ var _ = Describe("Backup Controller test", func() {
 
 		Context("create incremental backup", func() {
 			const (
-				incBackupName = "inc-backup-"
-				scheduleName  = "schedule"
+				incBackupName   = "inc-backup-"
+				scheduleName    = "schedule"
+				anotherRepoName = testdp.BackupRepoName + "-another"
 			)
 			var (
 				fullBackup    *dpv1alpha1.Backup
@@ -817,9 +818,10 @@ var _ = Describe("Backup Controller test", func() {
 				return &bak
 			}
 
-			mockBackupStatus := func(backup *dpv1alpha1.Backup, parentBackup, baseBackup string) {
+			mockBackupStatus := func(backup *dpv1alpha1.Backup, parentBackup, baseBackup, repoName string) {
 				backupStatus := dpv1alpha1.BackupStatus{
 					Phase:            dpv1alpha1.BackupPhaseCompleted,
+					BackupRepoName:   repoName,
 					ParentBackupName: parentBackup,
 					BaseBackupName:   baseBackup,
 					TimeRange: &dpv1alpha1.BackupTimeRange{
@@ -859,7 +861,7 @@ var _ = Describe("Backup Controller test", func() {
 				checkBackupParentAndBase(incBackup, expectedParent, expectedBase)
 				By("check backup completed")
 				checkBackupCompleted(incBackup)
-				mockBackupStatus(incBackup, expectedParent, expectedBase)
+				mockBackupStatus(incBackup, expectedParent, expectedBase, testdp.BackupRepoName)
 				return client.ObjectKeyFromObject(incBackup)
 			}
 
@@ -874,7 +876,7 @@ var _ = Describe("Backup Controller test", func() {
 			It("creates an incremental backup based on a specific backup", func() {
 				By("waiting for the full backup " + fullBackupKey.String() + " to complete")
 				checkBackupCompleted(fullBackup)
-				mockBackupStatus(fullBackup, "", "")
+				mockBackupStatus(fullBackup, "", "", testdp.BackupRepoName)
 				By("creating an incremental backup from the specific full backup " + fullBackupKey.String())
 				incBackup1 := mockIncBackupAndComplete(false, incBackupName+"1", fullBackup.Name, fullBackup.Name, fullBackup.Name)
 				By("creating an incremental backup from the specific incremental backup " + incBackup1.String())
@@ -884,7 +886,7 @@ var _ = Describe("Backup Controller test", func() {
 			It("creates an incremental backup without specific backup", func() {
 				By("waiting for the full backup " + fullBackupKey.String() + " to complete")
 				checkBackupCompleted(fullBackup)
-				mockBackupStatus(fullBackup, "", "")
+				mockBackupStatus(fullBackup, "", "", testdp.BackupRepoName)
 				By("creating an incremental backup" + incBackupName + "1 without specific backup")
 				incBackup1 := mockIncBackupAndComplete(true, incBackupName+"1", "", fullBackup.Name, fullBackup.Name)
 				By("creating an incremental backup" + incBackupName + "2 without specific backup")
@@ -900,7 +902,7 @@ var _ = Describe("Backup Controller test", func() {
 				fullBackupKey1 := client.ObjectKeyFromObject(fullBackup1)
 				By("waiting for the full backup " + fullBackupKey1.String() + " to complete")
 				checkBackupCompleted(fullBackup1)
-				mockBackupStatus(fullBackup1, "", "")
+				mockBackupStatus(fullBackup1, "", "", testdp.BackupRepoName)
 				By("creating an incremental backup " + incBackupName + "5, it prefers the latest full backup as parent")
 				_ = mockIncBackupAndComplete(false, incBackupName+"5", "", fullBackup1.Name, fullBackup1.Name)
 
@@ -914,7 +916,7 @@ var _ = Describe("Backup Controller test", func() {
 				fullBackupKey1 := client.ObjectKeyFromObject(fullBackup1)
 				By("waiting for the full backup " + fullBackupKey1.String() + " to complete")
 				checkBackupCompleted(fullBackup1)
-				mockBackupStatus(fullBackup1, "", "")
+				mockBackupStatus(fullBackup1, "", "", testdp.BackupRepoName)
 				By("creating a scheduled incremental backup " + incBackupName + "1")
 				incBackup1 := mockIncBackupAndComplete(true, incBackupName+"1", "", fullBackup1.Name, fullBackup1.Name)
 				By("creating a scheduled incremental backup " + incBackupName + "2")
@@ -927,7 +929,7 @@ var _ = Describe("Backup Controller test", func() {
 				fullBackupKey2 := client.ObjectKeyFromObject(fullBackup2)
 				By("waiting for the full backup " + fullBackupKey2.String() + " to complete")
 				checkBackupCompleted(fullBackup2)
-				mockBackupStatus(fullBackup2, "", "")
+				mockBackupStatus(fullBackup2, "", "", testdp.BackupRepoName)
 				By("creating a scheduled incremental backup " + incBackupName + "3")
 				incBackup3 := mockIncBackupAndComplete(true, incBackupName+"3", "", fullBackup2.Name, fullBackup2.Name)
 				By("creating a scheduled incremental backup " + incBackupName + "4")
@@ -940,7 +942,7 @@ var _ = Describe("Backup Controller test", func() {
 				fullBackupKey3 := client.ObjectKeyFromObject(fullBackup3)
 				By("waiting for the full backup " + fullBackupKey3.String() + " to complete")
 				checkBackupCompleted(fullBackup3)
-				mockBackupStatus(fullBackup3, "", "")
+				mockBackupStatus(fullBackup3, "", "", testdp.BackupRepoName)
 				By("creating a scheduled incremental backup " + incBackupName + "5")
 				incBackup5 := mockIncBackupAndComplete(true, incBackupName+"5", "", fullBackup3.Name, fullBackup3.Name)
 				By("creating a unscheduled incremental backup " + incBackupName + "6")
@@ -959,10 +961,33 @@ var _ = Describe("Backup Controller test", func() {
 				})).Should(Succeed())
 			})
 
+			It("creates incremental backups when there are full backups having different backup repos", func() {
+				By("waiting for the full backup " + fullBackupKey.String() + "with repo " + testdp.BackupRepoName + " to complete")
+				checkBackupCompleted(fullBackup)
+				mockBackupStatus(fullBackup, "", "", testdp.BackupRepoName)
+				By("creating a unscheduled full backup from backupPolicy " + testdp.BackupPolicyName)
+				fullBackup1 := testdp.NewFakeBackup(&testCtx, func(backup *dpv1alpha1.Backup) {
+					backup.Name = "full-bakcup-1"
+				})
+				fullBackupKey1 := client.ObjectKeyFromObject(fullBackup1)
+				By("waiting for the full backup " + fullBackupKey1.String() + "with repo " + anotherRepoName + " to complete")
+				checkBackupCompleted(fullBackup1)
+				mockBackupStatus(fullBackup1, "", "", anotherRepoName)
+				By("creating an incremental backup with a specific parent backup with different repo")
+				incBackup1 := newFakeIncBackup(incBackupName+"1", fullBackup1.Name, false)
+				incBackupKey1 := client.ObjectKeyFromObject(incBackup1)
+				By("check backup failed")
+				Eventually(testapps.CheckObj(&testCtx, incBackupKey1, func(g Gomega, fetched *dpv1alpha1.Backup) {
+					g.Expect(fetched.Status.Phase).To(Equal(dpv1alpha1.BackupPhaseFailed))
+				})).Should(Succeed())
+				By("creating an incremental backup " + incBackupName + "2" + " with the parent having the same repo")
+				_ = mockIncBackupAndComplete(true, incBackupName+"2", "", fullBackup.Name, fullBackup.Name)
+			})
+
 			It("deletes incremental backups", func() {
 				By("waiting for the full backup to complete, the full backup: " + fullBackupKey.String())
 				checkBackupCompleted(fullBackup)
-				mockBackupStatus(fullBackup, "", "")
+				mockBackupStatus(fullBackup, "", "", testdp.BackupRepoName)
 				By("creating an incremental backup " + incBackupName + "1")
 				incBackup1 := mockIncBackupAndComplete(false, incBackupName+"1", fullBackup.Name, fullBackup.Name, fullBackup.Name)
 				By("creating an incremental backup " + incBackupName + "2")

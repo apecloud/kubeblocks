@@ -7967,36 +7967,6 @@ Add new or override existing envs.</p>
 </tr>
 <tr>
 <td>
-<code>volumes</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#volume-v1-core">
-[]Kubernetes core/v1.Volume
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines Volumes to override.
-Add new or override existing volumes.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>volumeMounts</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#volumemount-v1-core">
-[]Kubernetes core/v1.VolumeMount
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines VolumeMounts to override.
-Add new or override existing volume mounts of the first container in the Pod.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>volumeClaimTemplates</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.ClusterComponentVolumeClaimTemplate">

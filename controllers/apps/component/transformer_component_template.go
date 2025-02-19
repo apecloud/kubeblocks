@@ -190,6 +190,9 @@ func buildFileTemplateObject(transCtx *componentTransformContext, tpl component.
 		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
 		SetData(data).
 		GetObject()
+	if err := setCompOwnershipNFinalizer(transCtx.Component, obj); err != nil {
+		return nil, err
+	}
 	return obj, nil
 }
 

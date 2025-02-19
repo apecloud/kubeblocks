@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2024 ApeCloud Co., Ltd
+Copyright (C) 2022-2025 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -25,6 +25,7 @@ import (
 	"strings"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -49,7 +50,7 @@ func (t *clusterPlacementTransformer) Transform(ctx graph.TransformContext, dag 
 	}
 
 	if t.assigned(transCtx) {
-		transCtx.Context = intoContext(transCtx.Context, placement(transCtx.OrigCluster))
+		transCtx.Context = appsutil.IntoContext(transCtx.Context, appsutil.Placement(transCtx.OrigCluster))
 		return nil
 	}
 
@@ -60,7 +61,7 @@ func (t *clusterPlacementTransformer) Transform(ctx graph.TransformContext, dag 
 		cluster.Annotations = make(map[string]string)
 	}
 	cluster.Annotations[constant.KBAppMultiClusterPlacementKey] = strings.Join(p, ",")
-	transCtx.Context = intoContext(transCtx.Context, placement(cluster))
+	transCtx.Context = appsutil.IntoContext(transCtx.Context, appsutil.Placement(cluster))
 
 	return nil
 }

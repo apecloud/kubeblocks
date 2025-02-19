@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2024 ApeCloud Co., Ltd
+Copyright (C) 2022-2025 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -23,8 +23,7 @@ const (
 	WorkloadsManagedByLabelKey = "workloads.kubeblocks.io/managed-by"
 	WorkloadsInstanceLabelKey  = "workloads.kubeblocks.io/instance"
 
-	RoleLabelKey       = "kubeblocks.io/role"
-	AccessModeLabelKey = "workloads.kubeblocks.io/access-mode"
+	RoleLabelKey = "kubeblocks.io/role"
 )
 
 const (

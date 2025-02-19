@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2024 ApeCloud Co., Ltd
+Copyright (C) 2022-2025 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -81,57 +81,6 @@ func MockKBAgentClient4HScale(testCtx *testutil.TestContext, clusterKey types.Na
 				}
 			}
 			return rsp, nil
-		}).AnyTimes()
-	})
-}
-
-func MockKBAgentClient4Workload(testCtx *testutil.TestContext, pods []*corev1.Pod) {
-	const (
-		memberJoinCompletedLabel  = "test.kubeblock.io/memberjoin-completed"
-		memberLeaveCompletedLabel = "test.kubeblock.io/memberleave-completed"
-	)
-
-	rsp := kbagentproto.ActionResponse{Message: "mock success"}
-	handleMemberLeave := func(podName string) (kbagentproto.ActionResponse, error) {
-		for _, pod := range pods {
-			if pod.Name != podName {
-				continue
-			}
-			pod.Labels[memberLeaveCompletedLabel] = "true"
-			err := testCtx.Cli.Update(testCtx.Ctx, pod)
-			if err != nil {
-				return kbagentproto.ActionResponse{}, err
-			}
-		}
-		return rsp, nil
-	}
-
-	handleMemberJoin := func(podName string) (kbagentproto.ActionResponse, error) {
-		for _, pod := range pods {
-			if pod.Name != podName {
-				continue
-			}
-			pod.Labels[memberJoinCompletedLabel] = "true"
-			err := testCtx.Cli.Update(testCtx.Ctx, pod)
-			if err != nil {
-				return kbagentproto.ActionResponse{}, err
-			}
-		}
-		return rsp, nil
-	}
-
-	MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
-		recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
-			switch req.Action {
-			case "memberLeave":
-				podName := req.Parameters["KB_LEAVE_MEMBER_POD_NAME"]
-				return handleMemberLeave(podName)
-			case "memberJoin":
-				podName := req.Parameters["KB_JOIN_MEMBER_POD_NAME"]
-				return handleMemberJoin(podName)
-			default:
-				return rsp, nil
-			}
 		}).AnyTimes()
 	})
 }

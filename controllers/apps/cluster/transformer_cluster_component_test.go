@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2024 ApeCloud Co., Ltd
+Copyright (C) 2022-2025 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -32,6 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
@@ -521,8 +522,8 @@ var _ = Describe("cluster component transformer test", func() {
 			transformer, transCtx, dag := newTransformerNCtx(clusterTopologyDefault)
 
 			// mock first two components status as running and creating
-			reader := &mockReader{
-				objs: []client.Object{
+			reader := &appsutil.MockReader{
+				Objects: []client.Object{
 					mockCompObj(transCtx, comp1aName, func(comp *appsv1.Component) {
 						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
@@ -547,8 +548,8 @@ var _ = Describe("cluster component transformer test", func() {
 			transformer, transCtx, dag := newTransformerNCtx(clusterTopologyDefault)
 
 			// mock one of first two components status as running
-			reader := &mockReader{
-				objs: []client.Object{
+			reader := &appsutil.MockReader{
+				Objects: []client.Object{
 					mockCompObj(transCtx, comp1aName, func(comp *appsv1.Component) {
 						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
@@ -573,8 +574,8 @@ var _ = Describe("cluster component transformer test", func() {
 			transformer, transCtx, dag := newTransformerNCtx(clusterTopologyDefault)
 
 			// mock first two components status as running
-			reader := &mockReader{
-				objs: []client.Object{
+			reader := &appsutil.MockReader{
+				Objects: []client.Object{
 					mockCompObj(transCtx, comp1aName, func(comp *appsv1.Component) {
 						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
@@ -603,8 +604,8 @@ var _ = Describe("cluster component transformer test", func() {
 			transformer, transCtx, dag := newTransformerNCtx(clusterTopologyDefault)
 
 			// mock first two components
-			reader := &mockReader{
-				objs: []client.Object{
+			reader := &appsutil.MockReader{
+				Objects: []client.Object{
 					mockCompObj(transCtx, comp1aName, func(comp *appsv1.Component) {
 						comp.Spec.Replicas = 2 // to update
 						comp.Status.Phase = appsv1.RunningComponentPhase
@@ -633,8 +634,8 @@ var _ = Describe("cluster component transformer test", func() {
 			transformer, transCtx, dag := newTransformerNCtx(clusterTopologyDefault)
 
 			// mock components
-			reader := &mockReader{
-				objs: []client.Object{
+			reader := &appsutil.MockReader{
+				Objects: []client.Object{
 					mockCompObj(transCtx, comp1aName, func(comp *appsv1.Component) {
 						comp.Status.Phase = appsv1.CreatingComponentPhase // not ready
 					}),
@@ -667,8 +668,8 @@ var _ = Describe("cluster component transformer test", func() {
 			transformer, transCtx, dag := newTransformerNCtx(clusterTopologyDefault)
 
 			// mock components
-			reader := &mockReader{
-				objs: []client.Object{
+			reader := &appsutil.MockReader{
+				Objects: []client.Object{
 					mockCompObj(transCtx, comp1aName, func(comp *appsv1.Component) {
 						comp.Spec.Replicas = 2 // to update
 						comp.Status.Phase = appsv1.RunningComponentPhase
@@ -705,8 +706,8 @@ var _ = Describe("cluster component transformer test", func() {
 			transformer, transCtx, dag := newTransformerNCtx(clusterTopologyDefault)
 
 			// mock components
-			reader := &mockReader{
-				objs: []client.Object{
+			reader := &appsutil.MockReader{
+				Objects: []client.Object{
 					mockCompObj(transCtx, comp1aName, func(comp *appsv1.Component) {
 						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
@@ -740,8 +741,8 @@ var _ = Describe("cluster component transformer test", func() {
 			transformer, transCtx, dag := newTransformerNCtx(clusterTopologyStop)
 
 			// mock to stop all components
-			reader := &mockReader{
-				objs: []client.Object{
+			reader := &appsutil.MockReader{
+				Objects: []client.Object{
 					mockCompObj(transCtx, comp1aName, func(comp *appsv1.Component) {
 						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
@@ -778,8 +779,8 @@ var _ = Describe("cluster component transformer test", func() {
 			transformer, transCtx, dag := newTransformerNCtx(clusterTopologyStop)
 
 			// mock to stop all components and the first component has been stopped
-			reader := &mockReader{
-				objs: []client.Object{
+			reader := &appsutil.MockReader{
+				Objects: []client.Object{
 					mockCompObj(transCtx, comp1aName, func(comp *appsv1.Component) {
 						comp.Spec.Stop = pointer.Bool(true)
 						comp.Status.Phase = appsv1.StoppedComponentPhase
@@ -817,8 +818,8 @@ var _ = Describe("cluster component transformer test", func() {
 			transformer, transCtx, dag := newTransformerNCtx(clusterTopologyProvisionNUpdateOOD)
 
 			// mock first two components status as running
-			reader := &mockReader{
-				objs: []client.Object{
+			reader := &appsutil.MockReader{
+				Objects: []client.Object{
 					mockCompObj(transCtx, comp1aName, func(comp *appsv1.Component) {
 						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
@@ -845,7 +846,7 @@ var _ = Describe("cluster component transformer test", func() {
 			}
 
 			// mock last two components status as running
-			reader.objs = append(reader.objs, []client.Object{
+			reader.Objects = append(reader.Objects, []client.Object{
 				mockCompObj(transCtx, comp2aName, func(comp *appsv1.Component) {
 					comp.Status.Phase = appsv1.RunningComponentPhase
 				}),
@@ -869,8 +870,8 @@ var _ = Describe("cluster component transformer test", func() {
 			Expect(transCtx.components[2].Name).Should(Equal(comp3aName))
 
 			// mock first component status as running
-			reader := &mockReader{
-				objs: []client.Object{
+			reader := &appsutil.MockReader{
+				Objects: []client.Object{
 					mockCompObj(transCtx, comp1aName, func(comp *appsv1.Component) {
 						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
@@ -908,8 +909,8 @@ var _ = Describe("cluster component transformer test", func() {
 			Expect(transCtx.components[4].Name).Should(Equal(comp3aName))
 
 			// mock first component status as running
-			reader := &mockReader{
-				objs: []client.Object{
+			reader := &appsutil.MockReader{
+				Objects: []client.Object{
 					mockCompObj(transCtx, comp1aName, func(comp *appsv1.Component) {
 						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
@@ -985,8 +986,8 @@ var _ = Describe("cluster component transformer test", func() {
 			})
 
 			// mock first two components status as running and creating
-			reader := &mockReader{
-				objs: []client.Object{
+			reader := &appsutil.MockReader{
+				Objects: []client.Object{
 					mockShardingCompObj(transCtx, sharding1aName, func(comp *appsv1.Component) {
 						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
@@ -1016,8 +1017,8 @@ var _ = Describe("cluster component transformer test", func() {
 			})
 
 			// mock one of first two components status as running
-			reader := &mockReader{
-				objs: []client.Object{
+			reader := &appsutil.MockReader{
+				Objects: []client.Object{
 					mockShardingCompObj(transCtx, sharding1aName, func(comp *appsv1.Component) {
 						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
@@ -1047,8 +1048,8 @@ var _ = Describe("cluster component transformer test", func() {
 			})
 
 			// mock first two components status as running
-			reader := &mockReader{
-				objs: []client.Object{
+			reader := &appsutil.MockReader{
+				Objects: []client.Object{
 					mockShardingCompObj(transCtx, sharding1aName, func(comp *appsv1.Component) {
 						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
@@ -1082,8 +1083,8 @@ var _ = Describe("cluster component transformer test", func() {
 			})
 
 			// mock first two components
-			reader := &mockReader{
-				objs: []client.Object{
+			reader := &appsutil.MockReader{
+				Objects: []client.Object{
 					mockShardingCompObj(transCtx, sharding1aName, func(comp *appsv1.Component) {
 						comp.Spec.Replicas = 2 // to update
 						comp.Status.Phase = appsv1.RunningComponentPhase
@@ -1117,8 +1118,8 @@ var _ = Describe("cluster component transformer test", func() {
 			})
 
 			// mock components
-			reader := &mockReader{
-				objs: []client.Object{
+			reader := &appsutil.MockReader{
+				Objects: []client.Object{
 					mockShardingCompObj(transCtx, sharding1aName, func(comp *appsv1.Component) {
 						comp.Status.Phase = appsv1.CreatingComponentPhase // not ready
 					}),
@@ -1156,8 +1157,8 @@ var _ = Describe("cluster component transformer test", func() {
 			})
 
 			// mock components
-			reader := &mockReader{
-				objs: []client.Object{
+			reader := &appsutil.MockReader{
+				Objects: []client.Object{
 					mockShardingCompObj(transCtx, sharding1aName, func(comp *appsv1.Component) {
 						comp.Spec.Replicas = 2 // to update
 						comp.Status.Phase = appsv1.RunningComponentPhase
@@ -1199,8 +1200,8 @@ var _ = Describe("cluster component transformer test", func() {
 			})
 
 			// mock components
-			reader := &mockReader{
-				objs: []client.Object{
+			reader := &appsutil.MockReader{
+				Objects: []client.Object{
 					mockShardingCompObj(transCtx, sharding1aName, func(comp *appsv1.Component) {
 						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
@@ -1238,8 +1239,8 @@ var _ = Describe("cluster component transformer test", func() {
 			})
 
 			// mock to stop all components
-			reader := &mockReader{
-				objs: []client.Object{
+			reader := &appsutil.MockReader{
+				Objects: []client.Object{
 					mockShardingCompObj(transCtx, sharding1aName, func(comp *appsv1.Component) {
 						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
@@ -1283,8 +1284,8 @@ var _ = Describe("cluster component transformer test", func() {
 			})
 
 			// mock to stop all components and the first component has been stopped
-			reader := &mockReader{
-				objs: []client.Object{
+			reader := &appsutil.MockReader{
+				Objects: []client.Object{
 					mockShardingCompObj(transCtx, sharding1aName, func(comp *appsv1.Component) {
 						comp.Spec.Stop = pointer.Bool(true)
 						comp.Status.Phase = appsv1.StoppedComponentPhase
@@ -1330,8 +1331,8 @@ var _ = Describe("cluster component transformer test", func() {
 			})
 
 			// mock first two components status as running
-			reader := &mockReader{
-				objs: []client.Object{
+			reader := &appsutil.MockReader{
+				Objects: []client.Object{
 					mockShardingCompObj(transCtx, sharding1aName, func(comp *appsv1.Component) {
 						comp.Status.Phase = appsv1.RunningComponentPhase
 					}),
@@ -1358,7 +1359,7 @@ var _ = Describe("cluster component transformer test", func() {
 			}
 
 			// mock last two components status as running
-			reader.objs = append(reader.objs, []client.Object{
+			reader.Objects = append(reader.Objects, []client.Object{
 				mockShardingCompObj(transCtx, sharding2aName, func(comp *appsv1.Component) {
 					comp.Status.Phase = appsv1.RunningComponentPhase
 				}),
@@ -1428,7 +1429,7 @@ var _ = Describe("cluster component transformer test", func() {
 				}
 
 				// mock first component status as running
-				reader := &mockReader{objs: suit.mockObjects(transCtx)}
+				reader := &appsutil.MockReader{Objects: suit.mockObjects(transCtx)}
 				transCtx.Client = model.NewGraphClient(reader)
 
 				// try again and check the last component
@@ -1461,8 +1462,8 @@ var _ = Describe("cluster component transformer test", func() {
 					f.AddSharding(sharding1aName, "", "")
 				})
 
-				reader := &mockReader{
-					objs: []client.Object{
+				reader := &appsutil.MockReader{
+					Objects: []client.Object{
 						mockCompObj(transCtx, comp1aName, func(comp *appsv1.Component) {
 							comp.Spec.Replicas = 2 // to update
 							comp.Status.Phase = appsv1.RunningComponentPhase
@@ -1506,8 +1507,8 @@ var _ = Describe("cluster component transformer test", func() {
 				})
 
 				// mock to stop all components and shardings
-				reader := &mockReader{
-					objs: []client.Object{
+				reader := &appsutil.MockReader{
+					Objects: []client.Object{
 						mockCompObj(transCtx, comp1aName, func(comp *appsv1.Component) {
 							comp.Status.Phase = appsv1.RunningComponentPhase
 						}),
@@ -1594,7 +1595,7 @@ var _ = Describe("cluster component transformer test", func() {
 				})
 
 				// mock first component status as running
-				reader := &mockReader{objs: suit.firstMockObjects(transCtx)}
+				reader := &appsutil.MockReader{Objects: suit.firstMockObjects(transCtx)}
 				transCtx.Client = model.NewGraphClient(reader)
 
 				// sharding1aName(comp1aName) is not ready (exist) when updating comp1aName(sharding1aName)
@@ -1613,7 +1614,7 @@ var _ = Describe("cluster component transformer test", func() {
 				}
 
 				// mock another component status as running
-				reader.objs = append(reader.objs, suit.secondMockObjects(transCtx)...)
+				reader.Objects = append(reader.Objects, suit.secondMockObjects(transCtx)...)
 
 				// try again
 				err = transformer.Transform(transCtx, newDAG(graphCli, transCtx.Cluster))

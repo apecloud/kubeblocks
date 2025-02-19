@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2024 ApeCloud Co., Ltd
+Copyright (C) 2022-2025 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -182,8 +182,7 @@ var _ = Describe("update plan test.", func() {
 				},
 			}
 			expectedPlan := [][]*corev1.Pod{
-				{pod2, pod3, pod4, pod6},
-				{pod1},
+				{pod2, pod3, pod4, pod6, pod1},
 				{pod0},
 				{pod5},
 			}

@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2024 ApeCloud Co., Ltd
+Copyright (C) 2022-2025 ApeCloud Co., Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -355,6 +355,12 @@ type ComponentSystemAccount struct {
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
+	// Specifies whether the system account is disabled.
+	//
+	// +kubebuilder:default=false
+	// +optional
+	Disabled *bool `json:"disabled,omitempty"`
+
 	// Specifies the policy for generating the account's password.
 	//
 	// This field is immutable once set.
@@ -363,6 +369,8 @@ type ComponentSystemAccount struct {
 	PasswordConfig *PasswordConfig `json:"passwordConfig,omitempty"`
 
 	// Refers to the secret from which data will be copied to create the new account.
+	//
+	// For user-specified passwords, the maximum length is limited to 64 bytes.
 	//
 	// This field is immutable once set.
 	//
@@ -437,6 +445,12 @@ type ProvisionSecretRef struct {
 	//
 	// +kubebuilder:validation:Required
 	Namespace string `json:"namespace"`
+
+	// The key in the secret data that contains the password.
+	//
+	// +kubebuilder:default="password"
+	// +optional
+	Password string `json:"password,omitempty"`
 }
 
 // ClusterComponentConfig represents a config with its source bound.
@@ -580,8 +594,14 @@ const (
 	IssuerUserProvided IssuerName = "UserProvided"
 )
 
-// TLSSecretRef defines Secret contains Tls certs
+// TLSSecretRef defines the Secret that contains TLS certs.
 type TLSSecretRef struct {
+	// The namespace where the secret is located.
+	// If not provided, the secret is assumed to be in the same namespace as the Cluster object.
+	//
+	// +optional
+	Namespace string `json:"namespace"`
+
 	// Name of the Secret that contains user-provided certificates.
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
@@ -641,11 +661,6 @@ type InstanceTemplate struct {
 	//
 	// +optional
 	Labels map[string]string `json:"labels,omitempty"`
-
-	// Specifies an override for the first container's image in the Pod.
-	//
-	// +optional
-	Image *string `json:"image,omitempty"`
 
 	// Specifies the scheduling policy for the Component.
 	//

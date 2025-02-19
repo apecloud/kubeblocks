@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2024 ApeCloud Co., Ltd
+Copyright (C) 2022-2025 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -79,23 +79,12 @@ func ListAndCheckInstanceSet(testCtx *testutil.TestContext, key types.Namespaced
 	return itsList
 }
 
-func ListAndCheckInstanceSetItemsCount(testCtx *testutil.TestContext, key types.NamespacedName, cnt int) *workloads.InstanceSetList {
-	itsList := &workloads.InstanceSetList{}
-	gomega.Eventually(func(g gomega.Gomega) {
-		g.Expect(testCtx.Cli.List(testCtx.Ctx, itsList, client.MatchingLabels{
-			constant.AppInstanceLabelKey: key.Name,
-		}, client.InNamespace(key.Namespace))).Should(gomega.Succeed())
-		g.Expect(len(itsList.Items)).Should(gomega.Equal(cnt))
-	}).Should(gomega.Succeed())
-	return itsList
-}
-
-func ListAndCheckInstanceSetWithComponent(testCtx *testutil.TestContext, key types.NamespacedName, componentName string) *workloads.InstanceSetList {
+func ListAndCheckInstanceSetWithComponent(testCtx *testutil.TestContext, key types.NamespacedName, compName string) *workloads.InstanceSetList {
 	itsList := &workloads.InstanceSetList{}
 	gomega.Eventually(func(g gomega.Gomega) {
 		g.Expect(testCtx.Cli.List(testCtx.Ctx, itsList, client.MatchingLabels{
 			constant.AppInstanceLabelKey:    key.Name,
-			constant.KBAppComponentLabelKey: componentName,
+			constant.KBAppComponentLabelKey: compName,
 		}, client.InNamespace(key.Namespace))).Should(gomega.Succeed())
 		g.Expect(itsList.Items).ShouldNot(gomega.BeNil())
 		g.Expect(itsList.Items).ShouldNot(gomega.BeEmpty())

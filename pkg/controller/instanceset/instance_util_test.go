@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2024 ApeCloud Co., Ltd
+Copyright (C) 2022-2025 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -144,7 +144,6 @@ var _ = Describe("instance util test", func() {
 			labelOverride := map[string]string{
 				"foo": "bar",
 			}
-			imageOverride := "foo:latest"
 			resources := corev1.ResourceRequirements{
 				Limits: map[corev1.ResourceName]resource.Quantity{
 					corev1.ResourceCPU: resource.MustParse("600m"),
@@ -154,7 +153,6 @@ var _ = Describe("instance util test", func() {
 				Name:        nameOverride,
 				Annotations: annotationOverride,
 				Labels:      labelOverride,
-				Image:       &imageOverride,
 				Resources:   &resources,
 			}
 			its.Spec.Instances = append(its.Spec.Instances, instance)
@@ -174,7 +172,6 @@ var _ = Describe("instance util test", func() {
 			Expect(nameTemplate[nameOverride0].PodTemplateSpec.Spec).ShouldNot(Equal(expectedTemplate.Spec))
 			Expect(nameTemplate[nameOverride0].PodTemplateSpec.Annotations).Should(Equal(annotationOverride))
 			Expect(nameTemplate[nameOverride0].PodTemplateSpec.Labels).Should(Equal(labelOverride))
-			Expect(nameTemplate[nameOverride0].PodTemplateSpec.Spec.Containers[0].Image).Should(Equal(imageOverride))
 			Expect(nameTemplate[nameOverride0].PodTemplateSpec.Spec.Containers[0].Resources.Limits[corev1.ResourceCPU]).Should(Equal(resources.Limits[corev1.ResourceCPU]))
 			Expect(nameTemplate[nameOverride0].PodTemplateSpec.Spec.Containers[0].Resources.Requests[corev1.ResourceCPU]).Should(Equal(its.Spec.Template.Spec.Containers[0].Resources.Requests[corev1.ResourceCPU]))
 		})
@@ -414,7 +411,6 @@ var _ = Describe("instance util test", func() {
 				{
 					Name:     "bar0",
 					Replicas: func() *int32 { r := int32(1); return &r }(),
-					Image:    func() *string { i := "busybox"; return &i }(),
 				},
 			}...)
 			Expect(instanceTemplates).Should(Equal(instances))

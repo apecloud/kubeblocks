@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2024 ApeCloud Co., Ltd
+Copyright (C) 2022-2025 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -22,6 +22,7 @@ package plan
 import (
 	"context"
 	"fmt"
+	"math"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -33,7 +34,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -229,7 +229,17 @@ func (r *RestoreManager) DoPostReady(comp *component.SynthesizedComponent,
 	backupObj *dpv1alpha1.Backup) error {
 	jobActionLabels := constant.GetCompLabels(r.Cluster.Name, comp.Name)
 	if len(comp.Roles) > 0 {
-		jobActionLabels[instanceset.AccessModeLabelKey] = string(appsv1alpha1.ReadWrite)
+		// HACK: assume the role with highest priority to be writable
+		highestPriority := math.MinInt
+		var highestPriorityRole appsv1.ReplicaRole
+		for i := range comp.Roles {
+			role := comp.Roles[i]
+			if role.UpdatePriority > highestPriority {
+				highestPriority = role.UpdatePriority
+				highestPriorityRole = role
+			}
+		}
+		jobActionLabels[instanceset.RoleLabelKey] = highestPriorityRole.Name
 	}
 	sourceTargetName := compObj.Annotations[constant.BackupSourceTargetAnnotationKey]
 	restore := &dpv1alpha1.Restore{
@@ -316,7 +326,7 @@ func (r *RestoreManager) GetRestoreObjectMeta(comp *component.SynthesizedCompone
 	}
 }
 
-func (r *RestoreManager) initFromAnnotation(synthesizedComponent *component.SynthesizedComponent, compObj *appsv1.Component) (*dpv1alpha1.Backup, error) {
+func (r *RestoreManager) initFromAnnotation(comp *component.SynthesizedComponent, compObj *appsv1.Component) (*dpv1alpha1.Backup, error) {
 	valueString := r.Cluster.Annotations[constant.RestoreFromBackupAnnotationKey]
 	if len(valueString) == 0 {
 		return nil, nil
@@ -328,7 +338,7 @@ func (r *RestoreManager) initFromAnnotation(synthesizedComponent *component.Synt
 	}
 	compName := compObj.Labels[constant.KBAppShardingNameLabelKey]
 	if len(compName) == 0 {
-		compName = synthesizedComponent.Name
+		compName = comp.Name
 	}
 	backupSource, ok := backupMap[compName]
 	if !ok {
@@ -355,7 +365,7 @@ func (r *RestoreManager) initFromAnnotation(synthesizedComponent *component.Synt
 			return nil, err
 		}
 	}
-	return GetBackupFromClusterAnnotation(r.Ctx, r.Client, backupSource, synthesizedComponent.Name, r.Cluster.Namespace)
+	return GetBackupFromClusterAnnotation(r.Ctx, r.Client, backupSource, comp.Name, r.Cluster.Namespace)
 }
 
 // createRestoreAndWait create the restore CR and wait for completion.

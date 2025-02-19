@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2024 ApeCloud Co., Ltd
+Copyright (C) 2022-2025 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -25,7 +25,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 
-	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 )
@@ -59,7 +58,7 @@ func (c *itsRolesConvertor) convert(args ...any) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	return ConvertSynthesizeCompRoleToInstanceSetRole(synthesizeComp), nil
+	return synthesizeComp.Roles, nil
 }
 
 // itsCredentialConvertor is an implementation of the convertor interface, used to convert the given object into InstanceSet.Spec.Credential.
@@ -71,8 +70,8 @@ func (c *itsCredentialConvertor) convert(args ...any) (any, error) {
 		return nil, err
 	}
 
-	credential := func(sysAccount kbappsv1.SystemAccount) *workloads.Credential {
-		secretName := constant.GenerateAccountSecretName(synthesizeComp.ClusterName, synthesizeComp.Name, sysAccount.Name)
+	credential := func(sysAccount string) *workloads.Credential {
+		secretName := constant.GenerateAccountSecretName(synthesizeComp.ClusterName, synthesizeComp.Name, sysAccount)
 		return &workloads.Credential{
 			Username: workloads.CredentialVar{
 				ValueFrom: &corev1.EnvVarSource{
@@ -98,9 +97,9 @@ func (c *itsCredentialConvertor) convert(args ...any) (any, error) {
 	}
 
 	// use first init account as the default credential
-	for index, sysAccount := range synthesizeComp.SystemAccounts {
+	for _, sysAccount := range synthesizeComp.SystemAccounts {
 		if sysAccount.InitAccount {
-			return credential(synthesizeComp.SystemAccounts[index]), nil
+			return credential(sysAccount.Name), nil
 		}
 	}
 	return nil, nil
@@ -152,39 +151,4 @@ func parseITSConvertorArgs(args ...any) (*SynthesizedComponent, error) {
 		return nil, errors.New("args[0] not a SynthesizedComponent object")
 	}
 	return synthesizeComp, nil
-}
-
-// ConvertSynthesizeCompRoleToInstanceSetRole converts the component.SynthesizedComponent.Roles to workloads.ReplicaRole.
-func ConvertSynthesizeCompRoleToInstanceSetRole(synthesizedComp *SynthesizedComponent) []workloads.ReplicaRole {
-	if synthesizedComp.Roles == nil {
-		return nil
-	}
-
-	accessMode := func(role kbappsv1.ReplicaRole) workloads.AccessMode {
-		switch {
-		case role.Serviceable && role.Writable:
-			return workloads.ReadWriteMode
-		case role.Serviceable:
-			return workloads.ReadonlyMode
-		default:
-			return workloads.NoneMode
-		}
-	}
-	itsReplicaRoles := make([]workloads.ReplicaRole, 0)
-	for _, role := range synthesizedComp.Roles {
-		itsReplicaRole := workloads.ReplicaRole{
-			Name:       role.Name,
-			AccessMode: accessMode(role),
-			CanVote:    role.Votable,
-			// HACK: Since the InstanceSet relies on IsLeader field to determine whether a workload is available, we are using
-			// such a workaround to combine these two fields to provide the information.
-			// However, the condition will be broken if a service with multiple different roles that can be writable
-			// at the same time, such as Zookeeper.
-			// TODO: We need to discuss further whether we should rely on the concept of "Leader" in the case
-			//  where the KB controller does not provide HA functionality.
-			IsLeader: role.Serviceable && role.Writable,
-		}
-		itsReplicaRoles = append(itsReplicaRoles, itsReplicaRole)
-	}
-	return itsReplicaRoles
 }

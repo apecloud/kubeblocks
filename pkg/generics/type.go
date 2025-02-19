@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2024 ApeCloud Co., Ltd
+Copyright (C) 2022-2025 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -25,6 +25,7 @@ import (
 	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -35,6 +36,7 @@ import (
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 )
 
@@ -70,6 +72,12 @@ var PersistentVolumeSignature = func(_ corev1.PersistentVolume, _ *corev1.Persis
 var PodSignature = func(_ corev1.Pod, _ *corev1.Pod, _ corev1.PodList, _ *corev1.PodList) {}
 var EventSignature = func(_ corev1.Event, _ *corev1.Event, _ corev1.EventList, _ *corev1.EventList) {}
 var ConfigMapSignature = func(_ corev1.ConfigMap, _ *corev1.ConfigMap, _ corev1.ConfigMapList, _ *corev1.ConfigMapList) {}
+var ServiceAccountSignature = func(_ corev1.ServiceAccount, _ *corev1.ServiceAccount, _ corev1.ServiceAccountList, _ *corev1.ServiceAccountList) {
+}
+var RoleBindingSignature = func(_ rbacv1.RoleBinding, _ *rbacv1.RoleBinding, _ rbacv1.RoleBindingList, _ *rbacv1.RoleBindingList) {
+}
+var RoleSignature = func(_ rbacv1.Role, _ *rbacv1.Role, _ rbacv1.RoleList, _ *rbacv1.RoleList) {
+}
 
 var JobSignature = func(_ batchv1.Job, _ *batchv1.Job, _ batchv1.JobList, _ *batchv1.JobList) {}
 var CronJobSignature = func(_ batchv1.CronJob, _ *batchv1.CronJob, _ batchv1.CronJobList, _ *batchv1.CronJobList) {}
@@ -127,6 +135,15 @@ var StorageProviderSignature = func(_ dpv1alpha1.StorageProvider, _ *dpv1alpha1.
 }
 
 var AddonSignature = func(_ extensionsv1alpha1.Addon, _ *extensionsv1alpha1.Addon, _ extensionsv1alpha1.AddonList, _ *extensionsv1alpha1.AddonList) {
+}
+
+var ParametersDefinitionSignature = func(_ parametersv1alpha1.ParametersDefinition, _ *parametersv1alpha1.ParametersDefinition, _ parametersv1alpha1.ParametersDefinitionList, _ *parametersv1alpha1.ParametersDefinitionList) {
+}
+var ParameterSignature = func(_ parametersv1alpha1.Parameter, _ *parametersv1alpha1.Parameter, _ parametersv1alpha1.ParameterList, _ *parametersv1alpha1.ParameterList) {
+}
+var ParamConfigRendererSignature = func(_ parametersv1alpha1.ParamConfigRenderer, _ *parametersv1alpha1.ParamConfigRenderer, _ parametersv1alpha1.ParamConfigRendererList, _ *parametersv1alpha1.ParamConfigRendererList) {
+}
+var ComponentParameterSignature = func(_ parametersv1alpha1.ComponentParameter, _ *parametersv1alpha1.ComponentParameter, _ parametersv1alpha1.ComponentParameterList, _ *parametersv1alpha1.ComponentParameterList) {
 }
 
 func ToGVK(object client.Object) schema.GroupVersionKind {

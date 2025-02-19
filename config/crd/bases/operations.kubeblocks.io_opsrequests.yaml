@@ -775,10 +775,6 @@ spec:
                                   - name
                                   type: object
                                 type: array
-                              image:
-                                description: Specifies an override for the first container's
-                                  image in the Pod.
-                                type: string
                               labels:
                                 additionalProperties:
                                   type: string
@@ -4356,6 +4352,10 @@ spec:
                   backupName:
                     description: Specifies the name of the Backup custom resource.
                     type: string
+                  backupNamespace:
+                    description: Specifies the namespace of the backup custom resource.
+                      If not specified, the namespace of the opsRequest will be used.
+                    type: string
                   deferPostReadyUntilClusterRunning:
                     description: |-
                       Controls the timing of PostReady actions during the recovery process.
@@ -5356,10 +5356,6 @@ spec:
                                   - name
                                   type: object
                                 type: array
-                              image:
-                                description: Specifies an override for the first container's
-                                  image in the Pod.
-                                type: string
                               labels:
                                 additionalProperties:
                                   type: string

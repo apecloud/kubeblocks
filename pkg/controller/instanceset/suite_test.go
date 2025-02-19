@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2024 ApeCloud Co., Ltd
+Copyright (C) 2022-2025 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -75,28 +75,24 @@ var (
 	}
 	roles = []workloads.ReplicaRole{
 		{
-			Name:       "leader",
-			IsLeader:   true,
-			CanVote:    true,
-			AccessMode: workloads.ReadWriteMode,
+			Name:                 "leader",
+			ParticipatesInQuorum: true,
+			UpdatePriority:       5,
 		},
 		{
-			Name:       "follower",
-			IsLeader:   false,
-			CanVote:    true,
-			AccessMode: workloads.ReadonlyMode,
+			Name:                 "follower",
+			ParticipatesInQuorum: true,
+			UpdatePriority:       4,
 		},
 		{
-			Name:       "logger",
-			IsLeader:   false,
-			CanVote:    true,
-			AccessMode: workloads.NoneMode,
+			Name:                 "logger",
+			ParticipatesInQuorum: false,
+			UpdatePriority:       3,
 		},
 		{
-			Name:       "learner",
-			IsLeader:   false,
-			CanVote:    false,
-			AccessMode: workloads.ReadonlyMode,
+			Name:                 "learner",
+			ParticipatesInQuorum: false,
+			UpdatePriority:       2,
 		},
 	}
 	pod = builder.NewPodBuilder("", "").
@@ -174,7 +170,6 @@ func mockCompressedInstanceTemplates(ns, name string) (*corev1.ConfigMap, string
 		{
 			Name:     "bar0",
 			Replicas: func() *int32 { r := int32(1); return &r }(),
-			Image:    func() *string { i := "busybox"; return &i }(),
 		},
 	}
 	templateByte, err := json.Marshal(instances)

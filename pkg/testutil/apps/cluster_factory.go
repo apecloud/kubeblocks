@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2024 ApeCloud Co., Ltd
+Copyright (C) 2022-2025 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -21,6 +21,7 @@ package apps
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/utils/ptr"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
@@ -184,14 +185,9 @@ func (factory *MockClusterFactory) AddVolumeClaimTemplate(volumeName string,
 	})
 }
 
-func (factory *MockClusterFactory) SetTLS(tls bool) *MockClusterFactory {
+func (factory *MockClusterFactory) SetTLSConfig(enable bool, issuer *appsv1.Issuer) *MockClusterFactory {
 	return factory.lastComponentRef(func(comp *appsv1.ClusterComponentSpec) {
-		comp.TLS = tls
-	})
-}
-
-func (factory *MockClusterFactory) SetIssuer(issuer *appsv1.Issuer) *MockClusterFactory {
-	return factory.lastComponentRef(func(comp *appsv1.ClusterComponentSpec) {
+		comp.TLS = enable
 		comp.Issuer = issuer
 	})
 }
@@ -206,11 +202,12 @@ func (factory *MockClusterFactory) AddComponentService(serviceName string, servi
 	})
 }
 
-func (factory *MockClusterFactory) AddSystemAccount(name string, passwordConfig *appsv1.PasswordConfig, secretRef *appsv1.ProvisionSecretRef) *MockClusterFactory {
+func (factory *MockClusterFactory) AddSystemAccount(name string, disabled bool, passwordConfig *appsv1.PasswordConfig, secretRef *appsv1.ProvisionSecretRef) *MockClusterFactory {
 	return factory.lastComponentRef(func(comp *appsv1.ClusterComponentSpec) {
 		comp.SystemAccounts = append(comp.SystemAccounts,
 			appsv1.ComponentSystemAccount{
 				Name:           name,
+				Disabled:       ptr.To(disabled),
 				PasswordConfig: passwordConfig,
 				SecretRef:      secretRef,
 			})
@@ -225,11 +222,5 @@ func (factory *MockClusterFactory) SetBackup(backup *appsv1.ClusterBackup) *Mock
 func (factory *MockClusterFactory) SetServiceRefs(serviceRefs []appsv1.ServiceRef) *MockClusterFactory {
 	return factory.lastComponentRef(func(comp *appsv1.ClusterComponentSpec) {
 		comp.ServiceRefs = serviceRefs
-	})
-}
-
-func (factory *MockClusterFactory) SetStop(stop *bool) *MockClusterFactory {
-	return factory.lastComponentRef(func(comp *appsv1.ClusterComponentSpec) {
-		comp.Stop = stop
 	})
 }

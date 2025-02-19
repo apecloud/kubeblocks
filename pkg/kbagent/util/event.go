@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2024 ApeCloud Co., Ltd
+Copyright (C) 2022-2025 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -106,7 +106,10 @@ func createOrUpdateEvent(reason, message string) error {
 		if err == nil {
 			// update
 			event.Count++
-			event.LastTimestamp = metav1.Now()
+			// the granularity of lastTimestamp is second and it is not enough for the event.
+			// there may multiple events in the same second, so we need to use EventTime here.
+			// event.LastTimestamp = metav1.Now()
+			event.EventTime = metav1.NowMicro()
 			_, err = eventsClient.Update(context.Background(), event, metav1.UpdateOptions{})
 			if err == nil {
 				return nil

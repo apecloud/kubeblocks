@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2024 ApeCloud Co., Ltd
+Copyright (C) 2022-2025 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -38,6 +38,11 @@ func NewComponentBuilder(namespace, name, compDef string) *ComponentBuilder {
 				CompDef: compDef,
 			},
 		}, builder)
+	return builder
+}
+
+func (builder *ComponentBuilder) SetTerminationPolicy(terminationPolicy appsv1.TerminationPolicyType) *ComponentBuilder {
+	builder.get().Spec.TerminationPolicy = terminationPolicy
 	return builder
 }
 

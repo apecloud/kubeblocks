@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2024 ApeCloud Co., Ltd
+Copyright (C) 2022-2025 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -32,7 +32,6 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -348,7 +347,7 @@ func (r *backupPolicyBuilder) syncBackupPolicy(backupPolicy *dpv1alpha1.BackupPo
 	r.syncBackupPolicyTargetSpec(backupPolicy)
 }
 
-func (r *backupPolicyBuilder) syncRoleLabelSelector(target *dpv1alpha1.BackupTarget, role, alternateRole, fullCompName string) {
+func (r *backupPolicyBuilder) syncRoleLabelSelector(target *dpv1alpha1.BackupTarget, role, alternateRole, compName string) {
 	if len(role) == 0 || target == nil {
 		return
 	}
@@ -356,7 +355,7 @@ func (r *backupPolicyBuilder) syncRoleLabelSelector(target *dpv1alpha1.BackupTar
 	if podSelector.LabelSelector == nil || podSelector.LabelSelector.MatchLabels == nil {
 		podSelector.LabelSelector = &metav1.LabelSelector{MatchLabels: map[string]string{}}
 	}
-	if r.getCompReplicas(fullCompName) == 1 {
+	if r.getCompReplicas(compName) == 1 {
 		delete(podSelector.LabelSelector.MatchLabels, constant.RoleLabelKey)
 		if podSelector.FallbackLabelSelector != nil && podSelector.FallbackLabelSelector.MatchLabels != nil {
 			delete(podSelector.FallbackLabelSelector.MatchLabels, constant.RoleLabelKey)
@@ -372,13 +371,13 @@ func (r *backupPolicyBuilder) syncRoleLabelSelector(target *dpv1alpha1.BackupTar
 	}
 }
 
-func (r *backupPolicyBuilder) getCompReplicas(fullCompName string) int32 {
-	its := &workloads.InstanceSet{}
-	name := fmt.Sprintf("%s-%s", r.Cluster.Name, fullCompName)
-	if err := r.Client.Get(r.Context, client.ObjectKey{Name: name, Namespace: r.Cluster.Namespace}, its); err != nil {
+func (r *backupPolicyBuilder) getCompReplicas(compName string) int32 {
+	comp := &appsv1.Component{}
+	name := fmt.Sprintf("%s-%s", r.Cluster.Name, compName)
+	if err := r.Client.Get(r.Context, client.ObjectKey{Name: name, Namespace: r.Cluster.Namespace}, comp); err != nil {
 		return r.compSpec.Replicas
 	}
-	return *its.Spec.Replicas
+	return comp.Spec.Replicas
 }
 
 // buildBackupPolicy builds a new backup policy by the backup policy template.
@@ -484,8 +483,8 @@ func (r *backupPolicyBuilder) buildBackupTargets(targets []dpv1alpha1.BackupTarg
 	}
 	var backupTargets []dpv1alpha1.BackupTarget
 	for _, v := range shardComponents {
-		fullComponentName := v.Labels[constant.KBAppComponentLabelKey]
-		target := r.buildBackupTarget(sourceTargetMap[fullComponentName], r.backupPolicyTPL.Spec.Target, fullComponentName)
+		compName := v.Labels[constant.KBAppComponentLabelKey]
+		target := r.buildBackupTarget(sourceTargetMap[compName], r.backupPolicyTPL.Spec.Target, compName)
 		if target != nil {
 			backupTargets = append(backupTargets, *target)
 		}
@@ -496,11 +495,11 @@ func (r *backupPolicyBuilder) buildBackupTargets(targets []dpv1alpha1.BackupTarg
 func (r *backupPolicyBuilder) buildBackupTarget(
 	oldTarget *dpv1alpha1.BackupTarget,
 	targetTpl dpv1alpha1.TargetInstance,
-	fullCompName string,
+	compName string,
 ) *dpv1alpha1.BackupTarget {
 	if oldTarget != nil {
 		// if the target already exists, only sync the role by component replicas automatically.
-		r.syncRoleLabelSelector(oldTarget, targetTpl.Role, targetTpl.FallbackRole, fullCompName)
+		r.syncRoleLabelSelector(oldTarget, targetTpl.Role, targetTpl.FallbackRole, compName)
 		return oldTarget
 	}
 	clusterName := r.Cluster.Name
@@ -511,7 +510,7 @@ func (r *backupPolicyBuilder) buildBackupTarget(
 		PodSelector: &dpv1alpha1.PodSelector{
 			Strategy: targetTpl.Strategy,
 			LabelSelector: &metav1.LabelSelector{
-				MatchLabels: r.buildTargetPodLabels(targetTpl.Role, fullCompName),
+				MatchLabels: r.buildTargetPodLabels(targetTpl.Role, compName),
 			},
 		},
 		// dataprotection will use its dedicated service account if this field is empty.
@@ -520,16 +519,16 @@ func (r *backupPolicyBuilder) buildBackupTarget(
 	}
 	if len(targetTpl.Role) != 0 && len(targetTpl.FallbackRole) != 0 {
 		target.PodSelector.FallbackLabelSelector = &metav1.LabelSelector{
-			MatchLabels: r.buildTargetPodLabels(targetTpl.FallbackRole, fullCompName),
+			MatchLabels: r.buildTargetPodLabels(targetTpl.FallbackRole, compName),
 		}
 	}
 	if r.isSharding {
-		target.Name = fullCompName
+		target.Name = compName
 	}
 	// build the target connection credential
 	if targetTpl.Account != "" {
 		target.ConnectionCredential = &dpv1alpha1.ConnectionCredential{
-			SecretName:  constant.GenerateAccountSecretName(clusterName, fullCompName, targetTpl.Account),
+			SecretName:  constant.GenerateAccountSecretName(clusterName, compName, targetTpl.Account),
 			PasswordKey: constant.AccountPasswdForSecret,
 			UsernameKey: constant.AccountNameForSecret,
 		}
@@ -599,7 +598,8 @@ func (r *backupPolicyBuilder) mergeClusterBackup(
 	hasSyncPITRMethod := false
 	hasSyncIncMethod := false
 	enableAutoBackup := boolptr.IsSetToTrue(backup.Enabled)
-	for i, s := range backupSchedule.Spec.Schedules {
+	for i := range backupSchedule.Spec.Schedules {
+		s := &backupSchedule.Spec.Schedules[i]
 		if s.BackupMethod == backup.Method {
 			mergeSchedulePolicy(sp, &backupSchedule.Spec.Schedules[i])
 			exist = true
@@ -623,27 +623,40 @@ func (r *backupPolicyBuilder) mergeClusterBackup(
 			r.Error(err, "failed to get ActionSet for backup.", "ActionSet", as.Name)
 			continue
 		}
-		if as.Spec.BackupType == dpv1alpha1.BackupTypeContinuous && backup.PITREnabled != nil && !hasSyncPITRMethod {
-			// auto-sync the first continuous backup for the 'pirtEnable' option.
-			backupSchedule.Spec.Schedules[i].Enabled = backup.PITREnabled
+		switch as.Spec.BackupType {
+		case dpv1alpha1.BackupTypeContinuous:
+			if backup.PITREnabled == nil {
+				continue
+			}
+			if boolptr.IsSetToFalse(backup.PITREnabled) || hasSyncPITRMethod ||
+				(len(backup.ContinuousMethod) > 0 && backup.ContinuousMethod != s.BackupMethod) {
+				s.Enabled = boolptr.False()
+				continue
+			}
+			// auto-sync the first or specified continuous backup for the 'pirtEnable' option.
+			s.Enabled = backup.PITREnabled
 			if backup.RetentionPeriod.String() != "" {
-				backupSchedule.Spec.Schedules[i].RetentionPeriod = backup.RetentionPeriod
+				s.RetentionPeriod = backup.RetentionPeriod
 			}
 			hasSyncPITRMethod = true
-		}
-		if as.Spec.BackupType == dpv1alpha1.BackupTypeIncremental && backup.IncrementalBackupEnabled != nil &&
-			!hasSyncIncMethod && len(backup.Method) > 0 && m.CompatibleMethod == backup.Method {
-			// auto-sync the first compatible incremental backup for the 'incrementalBackupEnabled' option.
-			mergeSchedulePolicy(&dpv1alpha1.SchedulePolicy{
-				Enabled:         backup.IncrementalBackupEnabled,
-				RetentionPeriod: backup.RetentionPeriod,
-				CronExpression:  backup.IncrementalCronExpression,
-			}, &backupSchedule.Spec.Schedules[i])
-			hasSyncIncMethod = true
-		}
-		if as.Spec.BackupType == dpv1alpha1.BackupTypeFull && enableAutoBackup {
-			// disable the automatic backup for other full backup method
-			backupSchedule.Spec.Schedules[i].Enabled = boolptr.False()
+		case dpv1alpha1.BackupTypeIncremental:
+			if len(backup.Method) == 0 || m.CompatibleMethod != backup.Method {
+				// disable other incremental backup schedules
+				s.Enabled = boolptr.False()
+			} else if backup.IncrementalBackupEnabled != nil && !hasSyncIncMethod {
+				// auto-sync the first compatible incremental backup for the 'incrementalBackupEnabled' option.
+				mergeSchedulePolicy(&dpv1alpha1.SchedulePolicy{
+					Enabled:         backup.IncrementalBackupEnabled,
+					RetentionPeriod: backup.RetentionPeriod,
+					CronExpression:  backup.IncrementalCronExpression,
+				}, s)
+				hasSyncIncMethod = true
+			}
+		case dpv1alpha1.BackupTypeFull:
+			if enableAutoBackup {
+				// disable the automatic backup for other full backup method
+				s.Enabled = boolptr.False()
+			}
 		}
 	}
 	if !exist {

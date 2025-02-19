@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2024 ApeCloud Co., Ltd
+Copyright (C) 2022-2025 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -1147,6 +1147,7 @@ func componentVarPodsGetter(ctx context.Context, cli client.Reader,
 		if err != nil {
 			return "", err
 		}
+		// TODO: what if the component is being deleted?
 	}
 
 	var templates []instanceset.InstanceTemplate
@@ -1205,7 +1206,7 @@ func resolveComponentVarRefLow(ctx context.Context, cli client.Reader, synthesiz
 			}
 			obj := &appsv1.Component{}
 			err := cli.Get(ctx, key, obj, inDataContext())
-			return obj, err
+			return obj, err // TODO: what if the component is being deleted?
 		}
 		return resolveReferentObjects(synthesizedComp, objRef, getter)
 	}
@@ -1252,8 +1253,12 @@ func resolveReferentObjects(synthesizedComp *SynthesizedComponent,
 }
 
 func resolveReferentComponents(synthesizedComp *SynthesizedComponent, objRef appsv1.ClusterObjectReference) ([]string, error) {
+	var (
+		mopt = objRef.MultipleClusterObjectOption
+	)
+
 	// match the current component when the multiple cluster object option not set
-	if len(objRef.CompDef) == 0 || (PrefixOrRegexMatched(synthesizedComp.CompDefName, objRef.CompDef) && objRef.MultipleClusterObjectOption == nil) {
+	if len(objRef.CompDef) == 0 || (PrefixOrRegexMatched(synthesizedComp.CompDefName, objRef.CompDef) && mopt == nil) {
 		return []string{synthesizedComp.Name}, nil
 	}
 
@@ -1263,18 +1268,36 @@ func resolveReferentComponents(synthesizedComp *SynthesizedComponent, objRef app
 			compNames = append(compNames, k)
 		}
 	}
-	switch len(compNames) {
-	case 1:
-		return compNames, nil
-	case 0:
-		return nil, apierrors.NewNotFound(schema.GroupResource{}, "") // the error msg is trivial
-	default:
-		if objRef.MultipleClusterObjectOption == nil {
-			return nil, fmt.Errorf("more than one referent component found: %s", strings.Join(compNames, ","))
-		} else {
+
+	if mopt == nil || mopt.RequireAllComponentObjects == nil || !*mopt.RequireAllComponentObjects {
+		switch len(compNames) {
+		case 1:
 			return compNames, nil
+		case 0:
+			return nil, apierrors.NewNotFound(schema.GroupResource{}, "") // the error msg is trivial
+		default:
+			if mopt == nil {
+				return nil, fmt.Errorf("more than one referent component found: %s", strings.Join(compNames, ","))
+			} else {
+				return compNames, nil
+			}
 		}
 	}
+
+	// objRef.MultipleClusterObjectOption.RequireAllComponentObjects == true
+	total := int32(0)
+	for compDef, cnt := range synthesizedComp.CompDef2CompCnt {
+		if PrefixOrRegexMatched(compDef, objRef.CompDef) {
+			total += cnt
+		}
+	}
+	if len(compNames) != int(total) {
+		return nil, fmt.Errorf("insufficient component objects to resolve vars, expected: %d, actual: %d", total, len(compNames))
+	}
+	if len(compNames) == 0 {
+		return nil, apierrors.NewNotFound(schema.GroupResource{}, "") // the error msg is trivial
+	}
+	return compNames, nil
 }
 
 func resolveClusterObjectVars(kind string, objRef appsv1.ClusterObjectReference, option *appsv1.VarOption,

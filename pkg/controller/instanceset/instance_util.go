@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2024 ApeCloud Co., Ltd
+Copyright (C) 2022-2025 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -910,9 +910,6 @@ func buildInstanceTemplateExt(template workloads.InstanceTemplate, templateExt *
 		mergeMap(&template.SchedulingPolicy.NodeSelector, &templateExt.Spec.NodeSelector)
 	}
 	if len(templateExt.Spec.Containers) > 0 {
-		if template.Image != nil {
-			templateExt.Spec.Containers[0].Image = *template.Image
-		}
 		if template.Resources != nil {
 			src := template.Resources
 			dst := &templateExt.Spec.Containers[0].Resources

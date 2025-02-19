@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2024 ApeCloud Co., Ltd
+Copyright (C) 2022-2025 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -540,12 +540,12 @@ func (r rebuildInstanceOpsHandler) getScalingOutPodNameFromMessage(progressMsg s
 func (r rebuildInstanceOpsHandler) buildSynthesizedComponent(ctx context.Context,
 	cli client.Client,
 	cluster *appsv1.Cluster,
-	componentName string) (*component.SynthesizedComponent, error) {
-	comp, compDef, err := component.GetCompNCompDefByName(ctx, cli, cluster.Namespace, constant.GenerateClusterComponentName(cluster.Name, componentName))
+	compName string) (*component.SynthesizedComponent, error) {
+	comp, compDef, err := component.GetCompNCompDefByName(ctx, cli, cluster.Namespace, constant.GenerateClusterComponentName(cluster.Name, compName))
 	if err != nil {
 		return nil, err
 	}
-	return component.BuildSynthesizedComponent(ctx, cli, compDef, comp, cluster)
+	return component.BuildSynthesizedComponent(ctx, cli, compDef, comp)
 }
 
 func (r rebuildInstanceOpsHandler) prepareInplaceRebuildHelper(reqCtx intctrlutil.RequestCtx,

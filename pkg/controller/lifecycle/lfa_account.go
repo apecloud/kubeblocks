@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2024 ApeCloud Co., Ltd
+Copyright (C) 2022-2025 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -46,9 +46,9 @@ func (a *accountProvision) name() string {
 func (a *accountProvision) parameters(ctx context.Context, cli client.Reader) (map[string]string, error) {
 	// The container executing this action has access to following variables:
 	//
-	// - KB_ACCOUNT_NAME: The name of the system account to be created.
+	// - KB_ACCOUNT_NAME: The name of the system account to be manipulated.
 	// - KB_ACCOUNT_PASSWORD: The password for the system account.
-	// - KB_ACCOUNT_STATEMENT: The statement used to create the system account.
+	// - KB_ACCOUNT_STATEMENT: The statement used to manipulate the system account.
 	return map[string]string{
 		accountName:      a.user,
 		accountPassword:  a.password,

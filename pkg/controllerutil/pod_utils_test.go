@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2024 ApeCloud Co., Ltd
+Copyright (C) 2022-2025 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -618,15 +618,13 @@ var _ = Describe("pod utils", func() {
 				compName    = "component"
 				podName     = "pod"
 				role        = "leader"
-				mode        = "ReadWrite"
 			)
-			pod := testapps.MockInstanceSetPod(&testCtx, nil, clusterName, compName, podName, role, mode)
+			pod := testapps.MockInstanceSetPod(&testCtx, nil, clusterName, compName, podName, role)
 			ppod := testapps.NewPodFactory(testCtx.DefaultNamespace, "pod").
 				AddAppInstanceLabel(clusterName).
 				AddAppComponentLabel(compName).
 				AddAppManagedByLabel().
 				AddRoleLabel(role).
-				AddAccessModeLabel(mode).
 				AddControllerRevisionHashLabel("").
 				AddVolume(corev1.Volume{
 					Name: testapps.DataVolumeName,

@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2024 ApeCloud Co., Ltd
+Copyright (C) 2022-2025 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -167,7 +167,10 @@ func (r *realGraphClient) DependOn(dag *graph.DAG, object client.Object, depende
 		return
 	}
 	for _, d := range dependency {
-		if d == nil {
+		// d == nil can't tell if d is (*T)(nil)
+		// e.g. `var d *corev1.Pod`
+		value := reflect.ValueOf(d)
+		if d == nil || (value.Kind() == reflect.Ptr && value.IsNil()) {
 			continue
 		}
 		v := r.FindMatchedVertex(dag, d)

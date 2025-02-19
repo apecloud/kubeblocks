@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2024 ApeCloud Co., Ltd
+Copyright (C) 2022-2025 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -26,7 +26,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -131,13 +131,87 @@ var _ = Describe("ShardingDefinition Controller", func() {
 
 			checkObjectStatus(shardingDefObj, appsv1.UnavailablePhase)
 		})
+
+		It("provision strategy & vars - serial", func() {
+			By("create a ShardingDefinition obj")
+			shardingDefObj := testapps.NewShardingDefinitionFactory(shardingDefName, compDefObj.GetName()).
+				SetProvisionStrategy(appsv1.SerialConcurrency).
+				SetUpdateStrategy(appsv1.SerialConcurrency).
+				Create(&testCtx).GetObject()
+
+			checkObjectStatus(shardingDefObj, appsv1.AvailablePhase)
+		})
+
+		It("provision strategy & vars - parallel & all", func() {
+			By("add a var in cmpd")
+			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(compDefObj), func(compDef *appsv1.ComponentDefinition) {
+				compDef.Spec.Vars = []appsv1.EnvVar{
+					{
+						Name: "test",
+						ValueFrom: &appsv1.VarSource{
+							ComponentVarRef: &appsv1.ComponentVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
+									MultipleClusterObjectOption: &appsv1.MultipleClusterObjectOption{
+										RequireAllComponentObjects: ptr.To(true),
+										Strategy:                   appsv1.MultipleClusterObjectStrategyCombined,
+									},
+								},
+								ComponentVars: appsv1.ComponentVars{
+									PodFQDNs: &appsv1.VarRequired,
+								},
+							},
+						},
+					},
+				}
+			})()).Should(Succeed())
+
+			By("create a ShardingDefinition obj")
+			shardingDefObj := testapps.NewShardingDefinitionFactory(shardingDefName, compDefObj.GetName()).
+				SetProvisionStrategy(appsv1.ParallelConcurrency).
+				SetUpdateStrategy(appsv1.ParallelConcurrency).
+				Create(&testCtx).GetObject()
+
+			checkObjectStatus(shardingDefObj, appsv1.AvailablePhase)
+		})
+
+		It("provision strategy & vars - serial & all", func() {
+			By("add a var in cmpd")
+			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(compDefObj), func(compDef *appsv1.ComponentDefinition) {
+				compDef.Spec.Vars = []appsv1.EnvVar{
+					{
+						Name: "test",
+						ValueFrom: &appsv1.VarSource{
+							ComponentVarRef: &appsv1.ComponentVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
+									MultipleClusterObjectOption: &appsv1.MultipleClusterObjectOption{
+										RequireAllComponentObjects: ptr.To(true),
+										Strategy:                   appsv1.MultipleClusterObjectStrategyCombined,
+									},
+								},
+								ComponentVars: appsv1.ComponentVars{
+									PodFQDNs: &appsv1.VarRequired,
+								},
+							},
+						},
+					},
+				}
+			})()).Should(Succeed())
+
+			By("create a ShardingDefinition obj")
+			shardingDefObj := testapps.NewShardingDefinitionFactory(shardingDefName, compDefObj.GetName()).
+				SetProvisionStrategy(appsv1.SerialConcurrency).
+				SetUpdateStrategy(appsv1.SerialConcurrency).
+				Create(&testCtx).GetObject()
+
+			checkObjectStatus(shardingDefObj, appsv1.UnavailablePhase)
+		})
 	})
 
 	Context("system accounts", func() {
 		It("ok", func() {
 			By("create a ShardingDefinition obj")
 			shardingDefObj := testapps.NewShardingDefinitionFactory(shardingDefName, compDefObj.GetName()).
-				AddSystemAccount(appsv1.ShardingSystemAccount{Name: adminAccount, Shared: pointer.Bool(true)}).
+				AddSystemAccount(appsv1.ShardingSystemAccount{Name: adminAccount, Shared: ptr.To(true)}).
 				Create(&testCtx).GetObject()
 
 			checkObjectStatus(shardingDefObj, appsv1.AvailablePhase)
@@ -147,7 +221,7 @@ var _ = Describe("ShardingDefinition Controller", func() {
 			By("create a ShardingDefinition obj")
 			shardingDefObj := testapps.NewShardingDefinitionFactory(shardingDefName, compDefObj.GetName()).
 				AddSystemAccount(appsv1.ShardingSystemAccount{Name: adminAccount}).
-				AddSystemAccount(appsv1.ShardingSystemAccount{Name: adminAccount, Shared: pointer.Bool(true)}).
+				AddSystemAccount(appsv1.ShardingSystemAccount{Name: adminAccount, Shared: ptr.To(true)}).
 				Create(&testCtx).GetObject()
 
 			checkObjectStatus(shardingDefObj, appsv1.UnavailablePhase)

@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2024 ApeCloud Co., Ltd
+Copyright (C) 2022-2025 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -32,6 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -46,7 +47,7 @@ var _ = Describe("cluster service transformer test", func() {
 	)
 
 	var (
-		reader   *mockReader
+		reader   *appsutil.MockReader
 		dag      *graph.DAG
 		transCtx *clusterTransformContext
 	)
@@ -58,7 +59,7 @@ var _ = Describe("cluster service transformer test", func() {
 	}
 
 	BeforeEach(func() {
-		reader = &mockReader{}
+		reader = &appsutil.MockReader{}
 		graphCli := model.NewGraphClient(reader)
 		cluster := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterName, clusterDefName).
 			SetReplicas(1).
@@ -105,7 +106,7 @@ var _ = Describe("cluster service transformer test", func() {
 
 	Context("cluster service", func() {
 		It("deletion", func() {
-			reader.objs = append(reader.objs, clusterNodePortService())
+			reader.Objects = append(reader.Objects, clusterNodePortService())
 			// remove cluster services
 			transCtx.Cluster.Spec.Services = nil
 			transformer := &clusterServiceTransformer{}
@@ -115,11 +116,11 @@ var _ = Describe("cluster service transformer test", func() {
 			// check services to delete
 			graphCli := transCtx.Client.(model.GraphClient)
 			objs := graphCli.FindAll(dag, &corev1.Service{})
-			Expect(len(objs)).Should(Equal(len(reader.objs)))
+			Expect(len(objs)).Should(Equal(len(reader.Objects)))
 			slices.SortFunc(objs, func(a, b client.Object) int {
 				return strings.Compare(a.GetName(), b.GetName())
 			})
-			for i := 0; i < len(reader.objs); i++ {
+			for i := 0; i < len(reader.Objects); i++ {
 				svc := objs[i].(*corev1.Service)
 				Expect(svc.Name).Should(Equal(clusterServiceName(clusterName, testapps.ServiceNodePortName)))
 				Expect(graphCli.IsAction(dag, svc, model.ActionDeletePtr())).Should(BeTrue())
@@ -139,7 +140,7 @@ var _ = Describe("cluster service transformer test", func() {
 		}
 		svc := clusterNodePortService()
 		svc.Spec.Ports = []corev1.ServicePort{port}
-		reader.objs = append(reader.objs, svc)
+		reader.Objects = append(reader.Objects, svc)
 		transCtx.Cluster.Spec.Services[0].Spec.Ports = newPorts
 		transformer := &clusterServiceTransformer{}
 		err := transformer.Transform(transCtx, dag)

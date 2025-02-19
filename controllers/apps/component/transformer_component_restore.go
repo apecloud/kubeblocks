@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2024 ApeCloud Co., Ltd
+Copyright (C) 2022-2025 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -22,9 +22,13 @@ package component
 import (
 	"reflect"
 
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -51,14 +55,25 @@ func (t *componentRestoreTransformer) Transform(ctx graph.TransformContext, dag 
 	}
 	commitError := func(err error) error {
 		if intctrlutil.IsTargetError(err, intctrlutil.ErrorTypeNeedWaiting) {
-			transCtx.EventRecorder.Event(transCtx.Cluster, corev1.EventTypeNormal, string(intctrlutil.ErrorTypeNeedWaiting), err.Error())
+			transCtx.EventRecorder.Event(transCtx.Component, corev1.EventTypeNormal, string(intctrlutil.ErrorTypeNeedWaiting), err.Error())
 			return graph.ErrPrematureStop
 		}
 		return err
 	}
 
-	cluster := transCtx.Cluster
-	restoreMGR := plan.NewRestoreManager(reqCtx.Ctx, t.Client, cluster, rscheme, nil, synthesizedComp.Replicas, 0)
+	clusterKey := types.NamespacedName{
+		Namespace: synthesizedComp.Namespace,
+		Name:      synthesizedComp.ClusterName,
+	}
+	cluster := &appsv1.Cluster{}
+	if err := t.Client.Get(reqCtx.Ctx, clusterKey, cluster); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		return errors.Wrap(err, "obtain the cluster object error for restore")
+	}
+
+	restoreMGR := plan.NewRestoreManager(reqCtx.Ctx, t.Client, cluster, model.GetScheme(), nil, synthesizedComp.Replicas, 0)
 
 	postProvisionDone := checkPostProvisionDone(transCtx)
 	if err := restoreMGR.DoRestore(synthesizedComp, transCtx.Component, postProvisionDone); err != nil {

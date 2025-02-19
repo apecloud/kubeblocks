@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2024 ApeCloud Co., Ltd
+Copyright (C) 2022-2025 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -215,6 +215,9 @@ func actionsToResolveImage(compDef *appsv1.ComponentDefinition) map[string]*apps
 	}
 	if compDef.Spec.LifecycleActions.RoleProbe != nil {
 		actions[normalize("roleProbe")] = &compDef.Spec.LifecycleActions.RoleProbe.Action
+	}
+	if compDef.Spec.LifecycleActions.AvailableProbe != nil {
+		actions[normalize("availableProbe")] = &compDef.Spec.LifecycleActions.AvailableProbe.Action
 	}
 	return actions
 }

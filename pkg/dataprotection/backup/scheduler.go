@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2024 ApeCloud Co., Ltd
+Copyright (C) 2022-2025 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -24,6 +24,7 @@ import (
 	"reflect"
 	"slices"
 	"sort"
+	"strings"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -195,7 +196,11 @@ func (s *Scheduler) buildPodSpec(schedulePolicy *dpv1alpha1.SchedulePolicy) (*co
 	if err != nil {
 		return nil, err
 	}
-	createBackupCmd := fmt.Sprintf(`
+	checkCommand, err := s.buildCheckCommand(schedulePolicy)
+	if err != nil {
+		return nil, err
+	}
+	createBackupCmd := fmt.Sprintf(`%s
 kubectl create -f - <<EOF
 apiVersion: dataprotection.kubeblocks.io/v1alpha1
 kind: Backup
@@ -210,7 +215,7 @@ spec:
   backupMethod: %s
   retentionPeriod: %s%s
 EOF
-`, s.BackupSchedule.Name, s.generateBackupName(schedulePolicy), s.BackupSchedule.Namespace,
+`, checkCommand, s.BackupSchedule.Name, s.generateBackupName(schedulePolicy), s.BackupSchedule.Namespace,
 		s.BackupPolicy.Name, schedulePolicy.BackupMethod,
 		schedulePolicy.RetentionPeriod, parameters)
 
@@ -393,18 +398,50 @@ type backupReconfigureRef struct {
 
 type parameterPairs map[string][]opsv1alpha1.ParameterPair
 
+// @Deprecated remove it in next release, only compatible with old release.
+func (s *Scheduler) convertLastAppliedConfigs(continuousMethod string) {
+	if _, ok := s.BackupSchedule.Annotations[dptypes.LastAppliedConfigsAnnotationKey]; ok {
+		return
+	}
+	lastAppliedConfig := s.BackupSchedule.Annotations[constant.LastAppliedConfigAnnotationKey]
+	if lastAppliedConfig == "" {
+		return
+	}
+	lastAppliedConfigMap := map[string]string{}
+	lastAppliedConfigMap[continuousMethod] = lastAppliedConfig
+	str, _ := json.Marshal(lastAppliedConfigMap)
+	s.BackupSchedule.Annotations[dptypes.LastAppliedConfigsAnnotationKey] = string(str)
+}
+
+func (s *Scheduler) getLastAppliedConfigsMap() (map[string]string, error) {
+	lastAppliedConfigAnno := s.BackupSchedule.Annotations[dptypes.LastAppliedConfigsAnnotationKey]
+	if lastAppliedConfigAnno == "" {
+		return map[string]string{}, nil
+	}
+	resMap := map[string]string{}
+	if err := json.Unmarshal([]byte(lastAppliedConfigAnno), &resMap); err != nil {
+		return nil, err
+	}
+	return resMap, nil
+}
+
 func (s *Scheduler) reconfigure(schedulePolicy *dpv1alpha1.SchedulePolicy) error {
 	reCfgRef := s.BackupSchedule.Annotations[dptypes.ReconfigureRefAnnotationKey]
 	if reCfgRef == "" {
 		return nil
 	}
+	// convert deprecated "lastAppliedConfig "to "lastAppliedConfigs"
+	s.convertLastAppliedConfigs(schedulePolicy.BackupMethod)
 	configRef := backupReconfigureRef{}
 	if err := json.Unmarshal([]byte(reCfgRef), &configRef); err != nil {
 		return err
 	}
-
+	lastAppliedConfigsMap, err := s.getLastAppliedConfigsMap()
+	if err != nil {
+		return err
+	}
 	enable := boolptr.IsSetToTrue(schedulePolicy.Enabled)
-	if s.BackupSchedule.Annotations[constant.LastAppliedConfigAnnotationKey] == "" && !enable {
+	if _, ok := lastAppliedConfigsMap[schedulePolicy.BackupMethod]; !ok && !enable {
 		// disable in the first policy created, no need reconfigure because default configs had been set.
 		return nil
 	}
@@ -422,7 +459,7 @@ func (s *Scheduler) reconfigure(schedulePolicy *dpv1alpha1.SchedulePolicy) error
 	}
 	updateParameterPairsBytes, _ := json.Marshal(parameters)
 	updateParameterPairs := string(updateParameterPairsBytes)
-	if updateParameterPairs == s.BackupSchedule.Annotations[constant.LastAppliedConfigAnnotationKey] {
+	if updateParameterPairs == lastAppliedConfigsMap[schedulePolicy.BackupMethod] {
 		// reconcile the config job if finished
 		return s.reconcileReconfigure(s.BackupSchedule)
 	}
@@ -480,7 +517,10 @@ func (s *Scheduler) reconfigure(schedulePolicy *dpv1alpha1.SchedulePolicy) error
 	if s.BackupSchedule.Annotations == nil {
 		s.BackupSchedule.Annotations = map[string]string{}
 	}
-	s.BackupSchedule.Annotations[constant.LastAppliedConfigAnnotationKey] = updateParameterPairs
+	lastAppliedConfigsMap[schedulePolicy.BackupMethod] = updateParameterPairs
+	updateParameterPairsBytes, _ = json.Marshal(lastAppliedConfigsMap)
+	s.BackupSchedule.Annotations[dptypes.LastAppliedConfigsAnnotationKey] = string(updateParameterPairsBytes)
+	delete(s.BackupSchedule.Annotations, constant.LastAppliedConfigAnnotationKey)
 	if err := s.Client.Patch(s.Ctx, s.BackupSchedule, patch); err != nil {
 		return err
 	}
@@ -506,4 +546,37 @@ func (s *Scheduler) reconcileReconfigure(backupSchedule *dpv1alpha1.BackupSchedu
 		}
 	}
 	return nil
+}
+
+func (s *Scheduler) buildCheckCommand(schedulePolicy *dpv1alpha1.SchedulePolicy) (string, error) {
+	backupMethod := dputils.GetBackupMethodByName(schedulePolicy.BackupMethod, s.BackupPolicy)
+	actionSet, err := dputils.GetActionSetByName(s.RequestCtx, s.Client, backupMethod.ActionSetName)
+	if err != nil {
+		return "", err
+	}
+	// command is used by incremental backup
+	if backupType := dputils.GetBackupType(actionSet, backupMethod.SnapshotVolumes); backupType != dpv1alpha1.BackupTypeIncremental {
+		return "", nil
+	}
+	// filter completed full backup, if there is no completed full backup, exit.
+	labelMap := map[string]string{
+		dptypes.BackupPolicyLabelKey: s.BackupSchedule.Spec.BackupPolicyName,
+		dptypes.BackupTypeLabelKey:   string(dpv1alpha1.BackupTypeFull),
+	}
+	labelSlice := []string{}
+	for k, v := range labelMap {
+		labelSlice = append(labelSlice, fmt.Sprintf("%s=%s", k, v))
+	}
+	checkCommand := fmt.Sprintf(`
+count=$(kubectl get backups.dataprotection.kubeblocks.io -n %s --selector=%s -o jsonpath='{range .items[?(@.spec.backupMethod=="%s")]}{.status.phase}{"\n"}{end}' | grep "Completed" | wc -l)
+if [ "$count" -eq 0 ]; then
+    echo "No completed full backups found. Exiting."
+    exit 0
+fi
+`,
+		s.BackupSchedule.Namespace,
+		strings.Join(labelSlice, ","),
+		backupMethod.CompatibleMethod,
+	)
+	return checkCommand, nil
 }

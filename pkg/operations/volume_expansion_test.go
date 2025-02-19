@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2024 ApeCloud Co., Ltd
+Copyright (C) 2022-2025 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package operations
 
 import (
+	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -87,8 +88,60 @@ var _ = Describe("OpsRequest Controller Volume Expansion Handler", func() {
 			constant.KBAppComponentLabelKey, consensusCompName).SetStorage("2Gi").SetStorageClass(storageClassName).CheckedCreate(&testCtx)
 	}
 
+	// getVolumeClaimNames gets all PVC names of component compName.
+	//
+	// cluster.Spec.GetComponentByName(compName).VolumeClaimTemplates[*].Name will be used if no claimNames provided
+	//
+	// nil return if:
+	//   1. component compName not found or
+	//   2. len(VolumeClaimTemplates)==0 or
+	//   3. any claimNames not found
+	getVolumeClaimNames := func(cluster *appsv1.Cluster, compName string, claimNames ...string) []string {
+		if cluster == nil {
+			return nil
+		}
+		comp := cluster.Spec.GetComponentByName(compName)
+		if comp == nil {
+			return nil
+		}
+		if len(comp.VolumeClaimTemplates) == 0 {
+			return nil
+		}
+		if len(claimNames) == 0 {
+			for _, template := range comp.VolumeClaimTemplates {
+				claimNames = append(claimNames, template.Name)
+			}
+		}
+		allExist := true
+		for _, name := range claimNames {
+			found := false
+			for _, template := range comp.VolumeClaimTemplates {
+				if template.Name == name {
+					found = true
+					break
+				}
+			}
+			if !found {
+				allExist = false
+				break
+			}
+		}
+		if !allExist {
+			return nil
+		}
+
+		pvcNames := make([]string, 0)
+		for _, claimName := range claimNames {
+			for i := 0; i < int(comp.Replicas); i++ {
+				pvcName := fmt.Sprintf("%s-%s-%s-%d", claimName, cluster.Name, compName, i)
+				pvcNames = append(pvcNames, pvcName)
+			}
+		}
+		return pvcNames
+	}
+
 	initResourcesForVolumeExpansion := func(clusterObject *appsv1.Cluster, opsRes *OpsResource, storage string, replicas int) (*opsv1alpha1.OpsRequest, []string) {
-		pvcNames := opsRes.Cluster.GetVolumeClaimNames(consensusCompName)
+		pvcNames := getVolumeClaimNames(opsRes.Cluster, consensusCompName)
 		for _, pvcName := range pvcNames {
 			createPVC(clusterObject.Name, storageClassName, vctName, pvcName)
 			// mock pvc is Bound

@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2024 ApeCloud Co., Ltd
+Copyright (C) 2022-2025 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -35,6 +35,7 @@ import (
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -55,7 +56,6 @@ const (
 type componentStatusTransformer struct {
 	client.Client
 
-	cluster        *appsv1.Cluster
 	comp           *appsv1.Component
 	synthesizeComp *component.SynthesizedComponent
 	dag            *graph.DAG
@@ -103,7 +103,6 @@ func (t *componentStatusTransformer) Transform(ctx graph.TransformContext, dag *
 }
 
 func (t *componentStatusTransformer) init(transCtx *componentTransformContext, dag *graph.DAG) {
-	t.cluster = transCtx.Cluster
 	t.comp = transCtx.Component
 	t.synthesizeComp = transCtx.SynthesizeComponent
 	t.runningITS = transCtx.RunningWorkload.(*workloads.InstanceSet)
@@ -221,7 +220,7 @@ func (t *componentStatusTransformer) isWorkloadUpdated() bool {
 	return generation == strconv.FormatInt(t.comp.Generation, 10)
 }
 
-// isRunning checks if the component underlying workload is running.
+// isRunning checks if the component's underlying workload is running.
 func (t *componentStatusTransformer) isInstanceSetRunning() bool {
 	if t.runningITS == nil {
 		return false
@@ -244,8 +243,8 @@ func (t *componentStatusTransformer) isAllConfigSynced(transCtx *componentTransf
 	}
 
 	configurationKey := client.ObjectKey{
-		Namespace: t.cluster.Namespace,
-		Name:      cfgcore.GenerateComponentConfigurationName(t.cluster.Name, t.synthesizeComp.Name),
+		Namespace: t.synthesizeComp.Namespace,
+		Name:      cfgcore.GenerateComponentConfigurationName(t.synthesizeComp.ClusterName, t.synthesizeComp.Name),
 	}
 	configuration := &appsv1alpha1.Configuration{}
 	if err := t.Client.Get(transCtx.Context, configurationKey, configuration); err != nil {
@@ -259,10 +258,10 @@ func (t *componentStatusTransformer) isAllConfigSynced(transCtx *componentTransf
 			return false, nil
 		}
 		cmKey = client.ObjectKey{
-			Namespace: t.cluster.Namespace,
-			Name:      cfgcore.GetComponentCfgName(t.cluster.Name, t.synthesizeComp.Name, configSpec.Name),
+			Namespace: t.synthesizeComp.Namespace,
+			Name:      cfgcore.GetComponentCfgName(t.synthesizeComp.ClusterName, t.synthesizeComp.Name, configSpec.Name),
 		}
-		if err := t.Client.Get(transCtx.Context, cmKey, cmObj, inDataContext4C()); err != nil {
+		if err := t.Client.Get(transCtx.Context, cmKey, cmObj, appsutil.InDataContext4C()); err != nil {
 			return false, err
 		}
 		if intctrlutil.GetConfigSpecReconcilePhase(cmObj, *item, status) != appsv1alpha1.CFinishedPhase {

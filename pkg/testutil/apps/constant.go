@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2024 ApeCloud Co., Ltd
+Copyright (C) 2022-2025 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -196,8 +196,12 @@ var (
 				},
 			},
 			{
-				Name:      "admin",
-				Statement: "CREATE USER $(USERNAME) IDENTIFIED BY '$(PASSWORD)'; GRANT ALL PRIVILEGES ON *.* TO $(USERNAME);",
+				Name: "admin",
+				Statement: &appsv1.SystemAccountStatement{
+					Create: "CREATE USER $(USERNAME) IDENTIFIED BY '$(PASSWORD)'; GRANT ALL PRIVILEGES ON *.* TO $(USERNAME);",
+					Delete: "DROP USER '$(USERNAME)'@'%';",
+					Update: "ALTER USER '$(USERNAME)'@'%' IDENTIFIED BY '$(PASSWORD)';",
+				},
 				PasswordGenerationPolicy: appsv1.PasswordConfig{
 					Length:     10,
 					NumDigits:  5,
@@ -209,22 +213,19 @@ var (
 		UpdateConcurrency: &[]appsv1.UpdateConcurrency{appsv1.BestEffortParallelConcurrency}[0],
 		Roles: []appsv1.ReplicaRole{
 			{
-				Name:        "leader",
-				Serviceable: true,
-				Writable:    true,
-				Votable:     true,
+				Name:                 "leader",
+				ParticipatesInQuorum: true,
+				UpdatePriority:       5,
 			},
 			{
-				Name:        "follower",
-				Serviceable: true,
-				Writable:    false,
-				Votable:     true,
+				Name:                 "follower",
+				ParticipatesInQuorum: true,
+				UpdatePriority:       4,
 			},
 			{
-				Name:        "learner",
-				Serviceable: false,
-				Writable:    false,
-				Votable:     false,
+				Name:                 "learner",
+				ParticipatesInQuorum: false,
+				UpdatePriority:       2,
 			},
 		},
 		Exporter: &appsv1.Exporter{

@@ -435,10 +435,6 @@ spec:
                         - name
                         type: object
                       type: array
-                    image:
-                      description: Specifies an override for the first container's
-                        image in the Pod.
-                      type: string
                     labels:
                       additionalProperties:
                         type: string
@@ -4830,18 +4826,16 @@ spec:
                   with other Kubernetes resources, such as modifying Pod labels or sending events.
 
 
-                  Defaults:
-                  If not specified, KubeBlocks automatically assigns a default ServiceAccount named "kb-{cluster.name}",
-                  bound to a default role defined during KubeBlocks installation.
+                  If not specified, KubeBlocks automatically creates a default ServiceAccount named
+                  "kb-{componentdefinition.name}", bound to a role with rules defined in ComponentDefinition's
+                  `policyRules` field. If needed (currently this means if any lifecycleAction is enabled),
+                  it will also be bound to a default role named
+                  "kubeblocks-cluster-pod-role", which is installed together with KubeBlocks.
+                  If multiple components use the same ComponentDefinition, they will share one ServiceAccount.
 
 
-                  Future Changes:
-                  Future versions might change the default ServiceAccount creation strategy to one per Component,
-                  potentially revising the naming to "kb-{cluster.name}-{component.name}".
-
-
-                  Users can override the automatic ServiceAccount assignment by explicitly setting the name of
-                  an existed ServiceAccount in this field.
+                  If the field is not empty, the specified ServiceAccount will be used, and KubeBlocks will not
+                  create a ServiceAccount. But KubeBlocks does create RoleBindings for the specified ServiceAccount.
                 type: string
               serviceRefs:
                 description: |-
@@ -5501,6 +5495,10 @@ spec:
                 description: Overrides system accounts defined in referenced ComponentDefinition.
                 items:
                   properties:
+                    disabled:
+                      default: false
+                      description: Specifies whether the system account is disabled.
+                      type: boolean
                     name:
                       description: The name of the system account.
                       type: string
@@ -5551,6 +5549,9 @@ spec:
                         Refers to the secret from which data will be copied to create the new account.
 
 
+                        For user-specified passwords, the maximum length is limited to 64 bytes.
+
+
                         This field is immutable once set.
                       properties:
                         name:
@@ -5558,6 +5559,11 @@ spec:
                           type: string
                         namespace:
                           description: The namespace where the secret is located.
+                          type: string
+                        password:
+                          default: password
+                          description: The key in the secret data that contains the
+                            password.
                           type: string
                       required:
                       - name
@@ -5567,6 +5573,14 @@ spec:
                   - name
                   type: object
                 type: array
+              terminationPolicy:
+                default: Delete
+                description: Specifies the behavior when a Component is deleted.
+                enum:
+                - DoNotTerminate
+                - Delete
+                - WipeOut
+                type: string
               tlsConfig:
                 description: "Specifies the TLS configuration for the Component, including:\n\n\n-
                   A boolean flag that indicates whether the Component should use Transport
@@ -5631,6 +5645,11 @@ spec:
                           name:
                             description: Name of the Secret that contains user-provided
                               certificates.
+                            type: string
+                          namespace:
+                            description: |-
+                              The namespace where the secret is located.
+                              If not provided, the secret is assumed to be in the same namespace as the Cluster object.
                             type: string
                         required:
                         - ca

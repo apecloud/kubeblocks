@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2024 ApeCloud Co., Ltd
+Copyright (C) 2022-2025 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -84,6 +84,7 @@ func init() {
 }
 
 // ClusterSpec defines the desired state of Cluster.
+// +kubebuilder:validation:XValidation:rule="!has(oldSelf.topology) || has(self.topology)", message="topology is required once set"
 type ClusterSpec struct {
 	// Specifies the name of the ClusterDefinition to use when creating a Cluster.
 	//
@@ -122,6 +123,7 @@ type ClusterSpec struct {
 	// It establishes the initial composition and structure of the Cluster and is intended for one-time configuration.
 	//
 	// +kubebuilder:validation:MaxLength=32
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="topology is immutable"
 	// +optional
 	Topology string `json:"topology,omitempty"`
 
@@ -404,17 +406,15 @@ type ClusterComponentSpec struct {
 	// This ServiceAccount is used to grant necessary permissions for the Component's Pods to interact
 	// with other Kubernetes resources, such as modifying Pod labels or sending events.
 	//
-	// Defaults:
-	// To perform certain operational tasks, agent sidecars running in Pods require specific RBAC permissions.
-	// The service account will be bound to a default role named "kubeblocks-cluster-pod-role" which is installed together with KubeBlocks.
-	// If not specified, KubeBlocks automatically assigns a default ServiceAccount named "kb-{cluster.name}"
+	// If not specified, KubeBlocks automatically creates a default ServiceAccount named
+	// "kb-{componentdefinition.name}", bound to a role with rules defined in ComponentDefinition's
+	// `policyRules` field. If needed (currently this means if any lifecycleAction is enabled),
+	// it will also be bound to a default role named
+	// "kubeblocks-cluster-pod-role", which is installed together with KubeBlocks.
+	// If multiple components use the same ComponentDefinition, they will share one ServiceAccount.
 	//
-	// Future Changes:
-	// Future versions might change the default ServiceAccount creation strategy to one per Component,
-	// potentially revising the naming to "kb-{cluster.name}-{component.name}".
-	//
-	// Users can override the automatic ServiceAccount assignment by explicitly setting the name of
-	// an existed ServiceAccount in this field.
+	// If the field is not empty, the specified ServiceAccount will be used, and KubeBlocks will not
+	// create a ServiceAccount. But KubeBlocks does create RoleBindings for the specified ServiceAccount.
 	//
 	// +optional
 	ServiceAccountName string `json:"serviceAccountName,omitempty"`
@@ -468,8 +468,6 @@ type ClusterComponentSpec struct {
 	//
 	// Setting instances to offline allows for a controlled scale-in process, preserving their data and maintaining
 	// ordinal consistency within the Cluster.
-	// Note that offline instances and their associated resources, such as PVCs, are not automatically deleted.
-	// The administrator must manually manage the cleanup and removal of these resources when they are no longer needed.
 	//
 	// +optional
 	OfflineInstances []string `json:"offlineInstances,omitempty"`
@@ -672,6 +670,11 @@ type ClusterBackup struct {
 	// +kubebuilder:default=false
 	// +optional
 	PITREnabled *bool `json:"pitrEnabled,omitempty"`
+
+	// Specifies the backup method to use, if not set, use the first continuous method.
+	//
+	// +optional
+	ContinuousMethod string `json:"continuousMethod,omitempty"`
 
 	// Specifies whether to enable incremental backup.
 	//

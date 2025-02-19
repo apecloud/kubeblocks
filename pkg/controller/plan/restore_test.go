@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2024 ApeCloud Co., Ltd
+Copyright (C) 2022-2025 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -152,21 +152,17 @@ var _ = Describe("Restore", func() {
 
 			synthesizedComponent = &component.SynthesizedComponent{
 				PodSpec:              &compDef.Spec.Runtime,
-				VolumeClaimTemplates: cluster.Spec.ComponentSpecs[0].ToVolumeClaimTemplates(),
+				VolumeClaimTemplates: intctrlutil.ToCoreV1PVCTs(cluster.Spec.ComponentSpecs[0].VolumeClaimTemplates),
 				Name:                 defaultCompName,
 				Replicas:             1,
 				Roles: []appsv1.ReplicaRole{
 					{
-						Name:        "leader",
-						Serviceable: true,
-						Writable:    true,
-						Votable:     true,
+						Name:           "leader",
+						UpdatePriority: 2,
 					},
 					{
-						Name:        "follower",
-						Serviceable: true,
-						Writable:    false,
-						Votable:     true,
+						Name:           "follower",
+						UpdatePriority: 1,
 					},
 				},
 			}

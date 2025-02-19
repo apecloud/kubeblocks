@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2024 ApeCloud Co., Ltd
+Copyright (C) 2022-2025 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -21,6 +21,7 @@ package instanceset
 
 import (
 	"errors"
+	"math"
 
 	corev1 "k8s.io/api/core/v1"
 
@@ -138,17 +139,28 @@ func (p *realUpdatePlan) build() {
 	}
 }
 
-// unknown & empty & learner & 1/2 followers -> 1/2 followers -> leader
+// unknown & empty & roles that do not participate in quorum & 1/2 followers -> 1/2 followers -> leader
 func (p *realUpdatePlan) buildBestEffortParallelUpdatePlan(rolePriorityMap map[string]int) {
 	currentVertex, _ := model.FindRootVertex(p.dag)
 	preVertex := currentVertex
 
-	// append unknown, empty and learner
+	quorumPriority := math.MaxInt32
+	leaderPriority := 0
+	for _, role := range p.its.Spec.Roles {
+		if rolePriorityMap[role.Name] > leaderPriority {
+			leaderPriority = rolePriorityMap[role.Name]
+		}
+		if role.ParticipatesInQuorum && quorumPriority > rolePriorityMap[role.Name] {
+			quorumPriority = rolePriorityMap[role.Name]
+		}
+	}
+
+	// append unknown, empty and roles that do not participate in quorum
 	index := 0
 	podList := p.pods
 	for i, pod := range podList {
 		roleName := getRoleName(&pod)
-		if rolePriorityMap[roleName] <= learnerPriority {
+		if rolePriorityMap[roleName] < quorumPriority {
 			vertex := &model.ObjectVertex{Obj: &podList[i]}
 			p.dag.AddConnect(preVertex, vertex)
 			currentVertex = vertex
@@ -193,7 +205,7 @@ func (p *realUpdatePlan) buildBestEffortParallelUpdatePlan(rolePriorityMap map[s
 	}
 }
 
-// unknown & empty & leader & followers & learner
+// unknown & empty & all roles
 func (p *realUpdatePlan) buildParallelUpdatePlan() {
 	root, _ := model.FindRootVertex(p.dag)
 	for i := range p.pods {
@@ -202,7 +214,7 @@ func (p *realUpdatePlan) buildParallelUpdatePlan() {
 	}
 }
 
-// unknown -> empty -> learner -> followers(none->readonly->readwrite) -> leader
+// update according to role update priority
 func (p *realUpdatePlan) buildSerialUpdatePlan() {
 	preVertex, _ := model.FindRootVertex(p.dag)
 	for i := range p.pods {

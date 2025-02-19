@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2024 ApeCloud Co., Ltd
+Copyright (C) 2022-2025 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -20,211 +20,299 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
-	"context"
+	"fmt"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
+	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
-	"github.com/apecloud/kubeblocks/pkg/controller/plan"
-	"github.com/apecloud/kubeblocks/pkg/generics"
-	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
+	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
 
-var _ = Describe("TLS self-signed cert function", func() {
+var _ = Describe("TLS transformer test", func() {
 	const (
-		compDefName        = "test-compdef"
-		clusterNamePrefix  = "test-cluster"
-		serviceKind        = "mysql"
-		defaultCompName    = "mysql"
-		configTemplateName = "mysql-config-tpl"
-		caFile             = "ca.pem"
-		certFile           = "cert.pem"
-		keyFile            = "key.pem"
+		compDefName = "test-compdef"
+		clusterName = "test-cluster"
+		compName    = "comp"
 	)
 
 	var (
-		compDefObj *appsv1.ComponentDefinition
+		reader   *appsutil.MockReader
+		dag      *graph.DAG
+		transCtx *componentTransformContext
+
+		tls = &appsv1.TLS{
+			VolumeName:  "tls",
+			MountPath:   "/etc/pki/tls",
+			DefaultMode: ptr.To(int32(0600)),
+			CAFile:      ptr.To("ca.pem"),
+			CertFile:    ptr.To("cert.pem"),
+			KeyFile:     ptr.To("key.pem"),
+		}
+
+		tlsConfig4KB = &appsv1.TLSConfig{
+			Enable: true,
+			Issuer: &appsv1.Issuer{
+				Name: appsv1.IssuerKubeBlocks,
+			},
+		}
+
+		tlsSecret4User = &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: testCtx.DefaultNamespace,
+				Name:      "tls-secret-4-user",
+			},
+			Data: map[string][]byte{
+				"ca":   []byte("ca-4-user"),
+				"cert": []byte("cert-4-user"),
+				"key":  []byte("key-4-user"),
+			},
+		}
+		tlsConfig4User = &appsv1.TLSConfig{
+			Enable: true,
+			Issuer: &appsv1.Issuer{
+				Name: appsv1.IssuerUserProvided,
+				SecretRef: &appsv1.TLSSecretRef{
+					Namespace: tlsSecret4User.Namespace,
+					Name:      tlsSecret4User.Name,
+					CA:        "ca",
+					Cert:      "cert",
+					Key:       "key",
+				},
+			},
+		}
+
+		newDAG = func(graphCli model.GraphClient, comp *appsv1.Component) *graph.DAG {
+			d := graph.NewDAG()
+			graphCli.Root(d, comp, comp, model.ActionStatusPtr())
+			return d
+		}
 	)
 
-	ctx := context.Background()
+	BeforeEach(func() {
+		reader = &appsutil.MockReader{
+			Objects: []client.Object{tlsSecret4User},
+		}
 
-	// Cleanups
+		compDef := &appsv1.ComponentDefinition{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: compDefName,
+			},
+			Spec: appsv1.ComponentDefinitionSpec{},
+		}
+		comp := &appsv1.Component{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: testCtx.DefaultNamespace,
+				Name:      constant.GenerateClusterComponentName(clusterName, compName),
+				Labels: map[string]string{
+					constant.AppManagedByLabelKey:   constant.AppName,
+					constant.AppInstanceLabelKey:    clusterName,
+					constant.KBAppComponentLabelKey: compName,
+				},
+			},
+			Spec: appsv1.ComponentSpec{},
+		}
 
-	cleanEnv := func() {
-		// must wait until resources deleted and no longer exist before the testcases start,
-		// otherwise if later it needs to create some new resource objects with the same name,
-		// in race conditions, it will find the existence of old objects, resulting failure to
-		// create the new objects.
-		By("clean resources")
+		graphCli := model.NewGraphClient(reader)
+		dag = newDAG(graphCli, comp)
 
-		// delete cluster(and all dependent sub-resources), cluster definition
-		testapps.ClearClusterResourcesWithRemoveFinalizerOption(&testCtx)
+		transCtx = &componentTransformContext{
+			Context:       ctx,
+			Client:        graphCli,
+			EventRecorder: nil,
+			Logger:        logger,
+			CompDef:       compDef,
+			Component:     comp,
+			ComponentOrig: comp.DeepCopy(),
+			SynthesizeComponent: &component.SynthesizedComponent{
+				Namespace:   testCtx.DefaultNamespace,
+				ClusterName: clusterName,
+				Name:        compName,
+				PodSpec: &corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name: "app",
+						},
+					},
+				},
+			},
+		}
+	})
 
-		// delete rest configurations
-		ml := client.HasLabels{testCtx.TestObjLabelKey}
-		// non-namespaced
-		testapps.ClearResources(&testCtx, generics.ConfigConstraintSignature, ml)
-		testapps.ClearResources(&testCtx, generics.BackupPolicyTemplateSignature, ml)
+	checkTLSSecret := func(exist bool, issuer ...appsv1.IssuerName) {
+		graphCli := transCtx.Client.(model.GraphClient)
+		objs := graphCli.FindAll(dag, &corev1.Secret{})
+		if !exist {
+			Expect(len(objs)).Should(Equal(0))
+		} else {
+			Expect(objs).Should(HaveLen(1))
+			secret := objs[0].(*corev1.Secret)
+			Expect(secret.GetName()).Should(Equal(tlsSecretName(clusterName, compName)))
+			if issuer[0] == appsv1.IssuerKubeBlocks {
+				Expect(secret.Data).Should(HaveKey(*tls.CAFile))
+				Expect(secret.Data).Should(HaveKey(*tls.CertFile))
+				Expect(secret.Data).Should(HaveKey(*tls.KeyFile))
+			} else {
+				Expect(secret.Data).Should(HaveKeyWithValue(*tls.CAFile, tlsSecret4User.Data[tlsConfig4User.Issuer.SecretRef.CA]))
+				Expect(secret.Data).Should(HaveKeyWithValue(*tls.CertFile, tlsSecret4User.Data[tlsConfig4User.Issuer.SecretRef.Cert]))
+				Expect(secret.Data).Should(HaveKeyWithValue(*tls.KeyFile, tlsSecret4User.Data[tlsConfig4User.Issuer.SecretRef.Key]))
+			}
+		}
 	}
 
-	BeforeEach(cleanEnv)
+	checkVolumeNMounts := func(exist bool) {
+		targetVolume := corev1.Volume{
+			Name: tls.VolumeName,
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName:  tlsSecretName(clusterName, compName),
+					Optional:    ptr.To(false),
+					DefaultMode: tls.DefaultMode,
+				},
+			},
+		}
+		targetVolumeMount := corev1.VolumeMount{
+			Name:      tls.VolumeName,
+			MountPath: tls.MountPath,
+			ReadOnly:  true,
+		}
 
-	AfterEach(cleanEnv)
+		podSpec := transCtx.SynthesizeComponent.PodSpec
+		if exist {
+			Expect(podSpec.Volumes).Should(ContainElements(targetVolume))
+			for _, c := range podSpec.Containers {
+				Expect(c.VolumeMounts).Should(ContainElements(targetVolumeMount))
+			}
+		} else {
+			Expect(podSpec.Volumes).ShouldNot(ContainElements(targetVolume))
+			for _, c := range podSpec.Containers {
+				Expect(c.VolumeMounts).ShouldNot(ContainElements(targetVolumeMount))
+			}
+		}
+	}
 
-	Context("tls is enabled/disabled", func() {
+	Context("provision", func() {
+		It("w/o define, disabled", func() {
+			transformer := &componentTLSTransformer{}
+			err := transformer.Transform(transCtx, dag)
+			Expect(err).Should(BeNil())
+
+			// check the secret, volume and mounts
+			checkTLSSecret(false)
+			checkVolumeNMounts(false)
+		})
+
+		It("w/o define, enabled", func() {
+			// enable the TLS
+			transCtx.SynthesizeComponent.TLSConfig = tlsConfig4KB
+
+			transformer := &componentTLSTransformer{}
+			err := transformer.Transform(transCtx, dag)
+			Expect(err).ShouldNot(BeNil())
+			Expect(err.Error()).Should(ContainSubstring(
+				fmt.Sprintf("the TLS is enabled but the component definition %s doesn't support it", transCtx.CompDef.Name)))
+		})
+
+		It("w/ define, disabled", func() {
+			// define the TLS
+			transCtx.CompDef.Spec.TLS = tls
+
+			transformer := &componentTLSTransformer{}
+			err := transformer.Transform(transCtx, dag)
+			Expect(err).Should(BeNil())
+
+			// check the secret, volume and mounts
+			checkTLSSecret(false)
+			checkVolumeNMounts(false)
+		})
+
+		It("w/ define, enabled - kb", func() {
+			// define and enable the TLS
+			transCtx.CompDef.Spec.TLS = tls
+			transCtx.SynthesizeComponent.TLSConfig = tlsConfig4KB
+
+			transformer := &componentTLSTransformer{}
+			err := transformer.Transform(transCtx, dag)
+			Expect(err).Should(BeNil())
+
+			// check the secret, volume and mounts
+			checkTLSSecret(true, appsv1.IssuerKubeBlocks)
+			checkVolumeNMounts(true)
+		})
+
+		It("w/ define, enabled - user", func() {
+			// define and enable the TLS
+			transCtx.CompDef.Spec.TLS = tls
+			transCtx.SynthesizeComponent.TLSConfig = tlsConfig4User
+
+			transformer := &componentTLSTransformer{}
+			err := transformer.Transform(transCtx, dag)
+			Expect(err).Should(BeNil())
+
+			// check the secret, volume and mounts
+			checkTLSSecret(true, appsv1.IssuerUserProvided)
+			checkVolumeNMounts(true)
+		})
+	})
+
+	Context("update & disable", func() {
 		BeforeEach(func() {
-			configMapObj := testapps.CheckedCreateCustomizedObj(&testCtx,
-				"resources/mysql-tls-config-template.yaml",
-				&corev1.ConfigMap{},
-				testCtx.UseDefaultNamespace(),
-				testapps.WithAnnotations(constant.CMInsEnableRerenderTemplateKey, "true"))
-
-			configConstraintObj := testapps.CheckedCreateCustomizedObj(&testCtx,
-				"resources/mysql-config-constraint.yaml",
-				&appsv1beta1.ConfigConstraint{})
-
-			By("Create a componentDefinition obj")
-			compDefObj = testapps.NewComponentDefinitionFactory(compDefName).
-				WithRandomName().
-				AddAnnotations(constant.SkipImmutableCheckAnnotationKey, "true").
-				SetDefaultSpec().
-				SetServiceKind(serviceKind).
-				AddConfigTemplate(configTemplateName, configMapObj.Name, configConstraintObj.Name, testCtx.DefaultNamespace, testapps.ConfVolumeName).
-				AddEnv(testapps.DefaultMySQLContainerName, corev1.EnvVar{Name: "MYSQL_ALLOW_EMPTY_PASSWORD", Value: "yes"}).
-				Create(&testCtx).
-				GetObject()
-		})
-
-		Context("when issuer is UserProvided", func() {
-			var (
-				secretObj *corev1.Secret
-			)
-
-			BeforeEach(func() {
-				// prepare self provided tls certs secret
-				var err error
-				compDef := &appsv1.ComponentDefinition{
-					Spec: appsv1.ComponentDefinitionSpec{
-						TLS: &appsv1.TLS{
-							CAFile:   ptr.To(caFile),
-							CertFile: ptr.To(certFile),
-							KeyFile:  ptr.To(keyFile),
-						},
-					},
-				}
-				synthesizedComp := component.SynthesizedComponent{
-					Namespace:   testCtx.DefaultNamespace,
-					ClusterName: "test",
-					Name:        "self-provided",
-				}
-				secretObj, err = plan.ComposeTLSSecret(compDef, synthesizedComp, nil)
-				Expect(err).Should(BeNil())
-				Expect(k8sClient.Create(ctx, secretObj)).Should(Succeed())
-			})
-
-			AfterEach(func() {
-				// delete self provided tls certs secret
-				Expect(k8sClient.Delete(ctx, secretObj)).Should(Succeed())
-				Eventually(func() bool {
-					err := k8sClient.Get(ctx,
-						client.ObjectKeyFromObject(secretObj),
-						secretObj)
-					return apierrors.IsNotFound(err)
-				}).Should(BeTrue())
-			})
-
-			It("should create the cluster when secret referenced exist", func() {
-				tlsIssuer := &appsv1.Issuer{
-					Name: appsv1.IssuerUserProvided,
-					SecretRef: &appsv1.TLSSecretRef{
-						Name: secretObj.Name,
-						CA:   caFile,
-						Cert: certFile,
-						Key:  keyFile,
-					},
-				}
-				By("create cluster obj")
-				clusterObj := testapps.NewClusterFactory(testCtx.DefaultNamespace, clusterNamePrefix, "").
-					WithRandomName().
-					AddComponent(defaultCompName, compDefObj.Name).
-					SetReplicas(3).
-					SetTLS(true).
-					SetIssuer(tlsIssuer).
-					Create(&testCtx).
-					GetObject()
-				Eventually(k8sClient.Get(ctx,
-					client.ObjectKeyFromObject(clusterObj),
-					clusterObj)).
-					Should(Succeed())
+			// mock the TLS secret object
+			reader.Objects = append(reader.Objects, &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testCtx.DefaultNamespace,
+					Name:      tlsSecretName(clusterName, compName),
+				},
 			})
 		})
 
-		Context("when issuer is KubeBlocks check secret exists or not", func() {
-			var (
-				compDef         *appsv1.ComponentDefinition
-				synthesizedComp component.SynthesizedComponent
-				dag             *graph.DAG
-				secretObj       *corev1.Secret
-				err             error
-			)
+		It("update", func() {
+			// define and enable the TLS
+			transCtx.CompDef.Spec.TLS = tls
+			transCtx.SynthesizeComponent.TLSConfig = tlsConfig4User // user only
 
-			BeforeEach(func() {
-				compDef = &appsv1.ComponentDefinition{
-					Spec: appsv1.ComponentDefinitionSpec{
-						TLS: &appsv1.TLS{
-							CAFile:   ptr.To(caFile),
-							CertFile: ptr.To(certFile),
-							KeyFile:  ptr.To(keyFile),
-						},
-					},
-				}
-				synthesizedComp = component.SynthesizedComponent{
-					Namespace:   testCtx.DefaultNamespace,
-					ClusterName: "test-kb",
-					Name:        "test-kb-tls",
-					TLSConfig: &appsv1.TLSConfig{
-						Enable: true,
-						Issuer: &appsv1.Issuer{
-							Name: appsv1.IssuerKubeBlocks,
-						},
-					},
-				}
-				dag = &graph.DAG{}
-				secretObj, err = plan.ComposeTLSSecret(compDef, synthesizedComp, nil)
-				Expect(err).Should(BeNil())
-				Expect(k8sClient.Create(ctx, secretObj)).Should(Succeed())
-			})
+			// update the certs
+			tlsSecret4User.Data = map[string][]byte{
+				"ca":   []byte("ca-4-user-updated"),
+				"cert": []byte("cert-4-user-updated"),
+				"key":  []byte("key-4-user-updated"),
+			}
 
-			AfterEach(func() {
-				// delete self provided tls certs secret
-				Expect(k8sClient.Delete(ctx, secretObj)).Should(Succeed())
-				Eventually(func() bool {
-					err := k8sClient.Get(ctx,
-						client.ObjectKeyFromObject(secretObj),
-						secretObj)
-					return apierrors.IsNotFound(err)
-				}).Should(BeTrue())
-			})
+			transformer := &componentTLSTransformer{}
+			err := transformer.Transform(transCtx, dag)
+			Expect(err).Should(BeNil())
 
-			It("should skip if the existence of the secret is confirmed", func() {
-				err := buildNCheckTLSCert(ctx, k8sClient, compDef, synthesizedComp, dag)
-				Expect(err).Should(BeNil())
-				secret := &corev1.Secret{}
-				err = k8sClient.Get(ctx, types.NamespacedName{Namespace: testCtx.DefaultNamespace, Name: secretObj.Name}, secret)
-				Expect(err).Should(BeNil())
-				Expect(secret.Data).To(Equal(secretObj.Data))
-			})
+			// check the secret updated
+			checkTLSSecret(true, appsv1.IssuerUserProvided)
+		})
+
+		It("disable after provision", func() {
+			// define the TLS
+			transCtx.CompDef.Spec.TLS = tls
+
+			transformer := &componentTLSTransformer{}
+			err := transformer.Transform(transCtx, dag)
+			Expect(err).Should(BeNil())
+
+			// check the secret, volume and mounts to be deleted
+			graphCli := transCtx.Client.(model.GraphClient)
+
+			objs := graphCli.FindAll(dag, &corev1.Secret{})
+			Expect(objs).Should(HaveLen(1))
+			Expect(graphCli.IsAction(dag, objs[0], model.ActionDeletePtr())).Should(BeTrue())
+			secret := objs[0].(*corev1.Secret)
+			Expect(secret.GetName()).Should(Equal(tlsSecretName(clusterName, compName)))
+
+			checkVolumeNMounts(false)
 		})
 	})
 })

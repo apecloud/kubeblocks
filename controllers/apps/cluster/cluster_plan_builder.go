@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2024 ApeCloud Co., Ltd
+Copyright (C) 2022-2025 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -25,8 +25,6 @@ import (
 	"reflect"
 
 	"github.com/go-logr/logr"
-	snapshotv1beta1 "github.com/kubernetes-csi/external-snapshotter/client/v3/apis/volumesnapshot/v1beta1"
-	snapshotv1 "github.com/kubernetes-csi/external-snapshotter/client/v6/apis/volumesnapshot/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -37,11 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
-	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
-	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -167,19 +161,6 @@ func (c *clusterTransformContext) traverse(f func(spec *appsv1.ClusterComponentS
 	}
 }
 
-func init() {
-	model.AddScheme(appsv1alpha1.AddToScheme)
-	model.AddScheme(appsv1beta1.AddToScheme)
-	model.AddScheme(appsv1.AddToScheme)
-	model.AddScheme(dpv1alpha1.AddToScheme)
-	model.AddScheme(snapshotv1.AddToScheme)
-	model.AddScheme(snapshotv1beta1.AddToScheme)
-	model.AddScheme(extensionsv1alpha1.AddToScheme)
-	model.AddScheme(workloadsv1.AddToScheme)
-}
-
-// PlanBuilder implementation
-
 func (c *clusterPlanBuilder) Init() error {
 	cluster := &appsv1.Cluster{}
 	if err := c.cli.Get(c.transCtx.Context, c.req.NamespacedName, cluster); err != nil {
@@ -210,11 +191,11 @@ func (c *clusterPlanBuilder) Build() (graph.Plan, error) {
 		}
 		// if pre-check failed, this is a fast return, no need to set apply resource condition
 		if preCheckCondition.Status != metav1.ConditionTrue {
-			sendWarningEventWithError(c.transCtx.GetRecorder(), c.transCtx.Cluster, ReasonPreCheckFailed, err)
+			appsutil.SendWarningEventWithError(c.transCtx.GetRecorder(), c.transCtx.Cluster, ReasonPreCheckFailed, err)
 			return
 		}
 		setApplyResourceCondition(&c.transCtx.Cluster.Status.Conditions, c.transCtx.Cluster.Generation, err)
-		sendWarningEventWithError(c.transCtx.GetRecorder(), c.transCtx.Cluster, ReasonApplyResourcesFailed, err)
+		appsutil.SendWarningEventWithError(c.transCtx.GetRecorder(), c.transCtx.Cluster, ReasonApplyResourcesFailed, err)
 	}()
 
 	// new a DAG and apply chain on it
@@ -339,7 +320,7 @@ func (c *clusterPlanBuilder) reconcileObject(node *model.ObjectVertex) error {
 }
 
 func (c *clusterPlanBuilder) reconcileCreateObject(ctx context.Context, node *model.ObjectVertex) error {
-	err := c.cli.Create(ctx, node.Obj, clientOption(node))
+	err := c.cli.Create(ctx, node.Obj, appsutil.ClientOption(node))
 	if err != nil && !apierrors.IsAlreadyExists(err) {
 		return err
 	}
@@ -347,7 +328,7 @@ func (c *clusterPlanBuilder) reconcileCreateObject(ctx context.Context, node *mo
 }
 
 func (c *clusterPlanBuilder) reconcileUpdateObject(ctx context.Context, node *model.ObjectVertex) error {
-	err := c.cli.Update(ctx, node.Obj, clientOption(node))
+	err := c.cli.Update(ctx, node.Obj, appsutil.ClientOption(node))
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
@@ -356,7 +337,7 @@ func (c *clusterPlanBuilder) reconcileUpdateObject(ctx context.Context, node *mo
 
 func (c *clusterPlanBuilder) reconcilePatchObject(ctx context.Context, node *model.ObjectVertex) error {
 	patch := client.MergeFrom(node.OriObj)
-	err := c.cli.Patch(ctx, node.Obj, patch, clientOption(node))
+	err := c.cli.Patch(ctx, node.Obj, patch, appsutil.ClientOption(node))
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
@@ -365,7 +346,7 @@ func (c *clusterPlanBuilder) reconcilePatchObject(ctx context.Context, node *mod
 
 func (c *clusterPlanBuilder) reconcileDeleteObject(ctx context.Context, node *model.ObjectVertex) error {
 	if controllerutil.RemoveFinalizer(node.Obj, constant.DBClusterFinalizerName) {
-		err := c.cli.Update(ctx, node.Obj, clientOption(node))
+		err := c.cli.Update(ctx, node.Obj, appsutil.ClientOption(node))
 		if err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}
@@ -375,7 +356,7 @@ func (c *clusterPlanBuilder) reconcileDeleteObject(ctx context.Context, node *mo
 		deleteOptions := &client.DeleteOptions{
 			PropagationPolicy: &deletePropagation,
 		}
-		if err := c.cli.Delete(ctx, node.Obj, deleteOptions, clientOption(node)); err != nil {
+		if err := c.cli.Delete(ctx, node.Obj, deleteOptions, appsutil.ClientOption(node)); err != nil {
 			return client.IgnoreNotFound(err)
 		}
 		return nil
@@ -392,7 +373,7 @@ func (c *clusterPlanBuilder) reconcileDeleteObject(ctx context.Context, node *mo
 
 func (c *clusterPlanBuilder) reconcileStatusObject(ctx context.Context, node *model.ObjectVertex) error {
 	patch := client.MergeFrom(node.OriObj)
-	if err := c.cli.Status().Patch(ctx, node.Obj, patch, clientOption(node)); err != nil {
+	if err := c.cli.Status().Patch(ctx, node.Obj, patch, appsutil.ClientOption(node)); err != nil {
 		return err
 	}
 	// handle condition and phase changing triggered events

@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2024 ApeCloud Co., Ltd
+Copyright (C) 2022-2025 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -192,29 +192,18 @@ func (builder *ComponentDefinitionBuilder) SetReplicasLimit(minReplicas, maxRepl
 	return builder
 }
 
-func (builder *ComponentDefinitionBuilder) AddSystemAccount(accountName string, initAccount bool, statement string) *ComponentDefinitionBuilder {
-	account := appsv1.SystemAccount{
-		Name:        accountName,
-		InitAccount: initAccount,
-		Statement:   statement,
-	}
-	if builder.get().Spec.SystemAccounts == nil {
-		builder.get().Spec.SystemAccounts = make([]appsv1.SystemAccount, 0)
-	}
-	builder.get().Spec.SystemAccounts = append(builder.get().Spec.SystemAccounts, account)
-	return builder
-}
-
 func (builder *ComponentDefinitionBuilder) SetUpdateConcurrency(concurrency *appsv1.UpdateConcurrency) *ComponentDefinitionBuilder {
 	builder.get().Spec.UpdateConcurrency = concurrency
 	return builder
 }
 
-func (builder *ComponentDefinitionBuilder) AddRole(name string, serviceable, writable bool) *ComponentDefinitionBuilder {
+func (builder *ComponentDefinitionBuilder) AddRole(
+	name string, updatePriority int, participatesInQuorum bool,
+) *ComponentDefinitionBuilder {
 	role := appsv1.ReplicaRole{
-		Name:        name,
-		Serviceable: serviceable,
-		Writable:    writable,
+		Name:                 name,
+		UpdatePriority:       updatePriority,
+		ParticipatesInQuorum: participatesInQuorum,
 	}
 	if builder.get().Spec.Roles == nil {
 		builder.get().Spec.Roles = make([]appsv1.ReplicaRole, 0)

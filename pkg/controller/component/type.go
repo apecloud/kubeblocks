@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2024 ApeCloud Co., Ltd
+Copyright (C) 2022-2025 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -32,9 +32,10 @@ type SynthesizedComponent struct {
 	Namespace                        string            `json:"namespace,omitempty"`
 	ClusterName                      string            `json:"clusterName,omitempty"`
 	ClusterUID                       string            `json:"clusterUID,omitempty"`
-	Comp2CompDefs                    map[string]string `json:"comp2CompDefs,omitempty"` // {compName: compDefName}
-	Name                             string            `json:"name,omitempty"`          // the name of the component w/o clusterName prefix
-	FullCompName                     string            `json:"fullCompName,omitempty"`  // the full name of the component w/ clusterName prefix
+	Comp2CompDefs                    map[string]string `json:"comp2CompDefs,omitempty"`   // {compName: compDefName}
+	CompDef2CompCnt                  map[string]int32  `json:"compDef2CompCnt,omitempty"` // {compDefName: expected comp cnt}
+	Name                             string            `json:"name,omitempty"`            // the name of the component w/o clusterName prefix
+	FullCompName                     string            `json:"fullCompName,omitempty"`    // the full name of the component w/ clusterName prefix
 	Generation                       string
 	CompDefName                      string `json:"compDefName,omitempty"` // the name of the componentDefinition
 	ServiceKind                      string

@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2024 ApeCloud Co., Ltd
+Copyright (C) 2022-2025 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -52,7 +52,7 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, component
 	)
 
 	podBuilder := builder.NewPodBuilder("", "").
-		// Priority: static < dynamic < built-in
+		// priority: static < dynamic < built-in
 		AddLabelsInMap(synthesizedComp.StaticLabels).
 		AddLabelsInMap(synthesizedComp.DynamicLabels).
 		AddLabelsInMap(constant.GetCompLabels(clusterName, compName, synthesizedComp.Labels)).
@@ -65,7 +65,9 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, component
 
 	itsName := constant.GenerateWorkloadNamePattern(clusterName, compName)
 	itsBuilder := builder.NewInstanceSetBuilder(namespace, itsName).
+		// priority: static < dynamic < built-in
 		AddLabelsInMap(synthesizedComp.StaticLabels).
+		AddLabelsInMap(synthesizedComp.DynamicLabels).
 		AddLabelsInMap(constant.GetCompLabels(clusterName, compName)).
 		AddAnnotations(constant.KubeBlocksGenerationKey, synthesizedComp.Generation).
 		AddAnnotations(constant.CRDAPIVersionAnnotationKey, workloads.GroupVersion.String()).
@@ -342,20 +344,29 @@ func BuildServiceAccount(synthesizedComp *component.SynthesizedComponent, saName
 		GetObject()
 }
 
-func BuildRoleBinding(synthesizedComp *component.SynthesizedComponent, saName string) *rbacv1.RoleBinding {
-	return builder.NewRoleBindingBuilder(synthesizedComp.Namespace, saName).
+func BuildRoleBinding(synthesizedComp *component.SynthesizedComponent, name string, roleRef *rbacv1.RoleRef, saName string) *rbacv1.RoleBinding {
+	return builder.NewRoleBindingBuilder(synthesizedComp.Namespace, name).
 		AddLabelsInMap(synthesizedComp.StaticLabels).
 		AddLabelsInMap(constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name)).
 		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
-		SetRoleRef(rbacv1.RoleRef{
-			APIGroup: rbacv1.GroupName,
-			Kind:     "ClusterRole",
-			Name:     constant.RBACRoleName,
-		}).
+		SetRoleRef(*roleRef).
 		AddSubjects(rbacv1.Subject{
 			Kind:      rbacv1.ServiceAccountKind,
 			Namespace: synthesizedComp.Namespace,
 			Name:      saName,
 		}).
+		GetObject()
+}
+
+func BuildRole(synthesizedComp *component.SynthesizedComponent, cmpd *appsv1.ComponentDefinition) *rbacv1.Role {
+	rules := cmpd.Spec.PolicyRules
+	if len(rules) == 0 {
+		return nil
+	}
+	return builder.NewRoleBuilder(synthesizedComp.Namespace, constant.GenerateDefaultRoleName(cmpd.Name)).
+		AddLabelsInMap(synthesizedComp.StaticLabels).
+		AddLabelsInMap(constant.GetCompLabels(synthesizedComp.ClusterName, synthesizedComp.Name)).
+		AddAnnotationsInMap(synthesizedComp.StaticAnnotations).
+		AddPolicyRules(rules).
 		GetObject()
 }

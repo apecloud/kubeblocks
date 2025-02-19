@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2024 ApeCloud Co., Ltd
+Copyright (C) 2022-2025 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -32,7 +32,7 @@ type MockPersistentVolumeClaimFactory struct {
 	BaseFactory[corev1.PersistentVolumeClaim, *corev1.PersistentVolumeClaim, MockPersistentVolumeClaimFactory]
 }
 
-func NewPersistentVolumeClaimFactory(namespace, name, clusterName, componentName, vctName string) *MockPersistentVolumeClaimFactory {
+func NewPersistentVolumeClaimFactory(namespace, name, clusterName, compName, vctName string) *MockPersistentVolumeClaimFactory {
 	f := &MockPersistentVolumeClaimFactory{}
 	volumeMode := corev1.PersistentVolumeFilesystem
 	f.Init(namespace, name,
@@ -40,7 +40,7 @@ func NewPersistentVolumeClaimFactory(namespace, name, clusterName, componentName
 			ObjectMeta: metav1.ObjectMeta{
 				Labels: map[string]string{
 					constant.AppInstanceLabelKey:             clusterName,
-					constant.KBAppComponentLabelKey:          componentName,
+					constant.KBAppComponentLabelKey:          compName,
 					constant.AppManagedByLabelKey:            constant.AppName,
 					constant.VolumeClaimTemplateNameLabelKey: vctName,
 				},

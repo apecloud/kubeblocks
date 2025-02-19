@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2024 ApeCloud Co., Ltd
+Copyright (C) 2022-2025 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -47,8 +47,8 @@ import (
 	workloadsAPI "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/controllers/apps/cluster"
 	"github.com/apecloud/kubeblocks/controllers/apps/component"
-	"github.com/apecloud/kubeblocks/controllers/apps/configuration"
 	"github.com/apecloud/kubeblocks/controllers/dataprotection"
+	"github.com/apecloud/kubeblocks/controllers/parameters"
 	"github.com/apecloud/kubeblocks/controllers/workloads"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
@@ -179,7 +179,7 @@ func newComponentReconciler(cli client.Client, recorder record.EventRecorder) re
 }
 
 func newConfigurationReconciler(cli client.Client, recorder record.EventRecorder) reconcile.Reconciler {
-	return &configuration.ConfigurationReconciler{
+	return &parameters.ConfigurationReconciler{
 		Client:   cli,
 		Scheme:   cli.Scheme(),
 		Recorder: recorder,

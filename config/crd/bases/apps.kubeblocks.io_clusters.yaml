@@ -90,6 +90,10 @@ spec:
               backup:
                 description: Specifies the backup configuration of the Cluster.
                 properties:
+                  continuousMethod:
+                    description: Specifies the backup method to use, if not set, use
+                      the first continuous method.
+                    type: string
                   cronExpression:
                     description: The cron expression for the schedule. The timezone
                       is in UTC. See https://en.wikipedia.org/wiki/Cron.
@@ -561,10 +565,6 @@ spec:
                               - name
                               type: object
                             type: array
-                          image:
-                            description: Specifies an override for the first container's
-                              image in the Pod.
-                            type: string
                           labels:
                             additionalProperties:
                               type: string
@@ -3778,6 +3778,11 @@ spec:
                               description: Name of the Secret that contains user-provided
                                 certificates.
                               type: string
+                            namespace:
+                              description: |-
+                                The namespace where the secret is located.
+                                If not provided, the secret is assumed to be in the same namespace as the Cluster object.
+                              type: string
                           required:
                           - ca
                           - cert
@@ -3818,8 +3823,6 @@ spec:
 
                         Setting instances to offline allows for a controlled scale-in process, preserving their data and maintaining
                         ordinal consistency within the Cluster.
-                        Note that offline instances and their associated resources, such as PVCs, are not automatically deleted.
-                        The administrator must manually manage the cleanup and removal of these resources when they are no longer needed.
                       items:
                         type: string
                       type: array
@@ -5063,19 +5066,16 @@ spec:
                         with other Kubernetes resources, such as modifying Pod labels or sending events.
 
 
-                        Defaults:
-                        To perform certain operational tasks, agent sidecars running in Pods require specific RBAC permissions.
-                        The service account will be bound to a default role named "kubeblocks-cluster-pod-role" which is installed together with KubeBlocks.
-                        If not specified, KubeBlocks automatically assigns a default ServiceAccount named "kb-{cluster.name}"
+                        If not specified, KubeBlocks automatically creates a default ServiceAccount named
+                        "kb-{componentdefinition.name}", bound to a role with rules defined in ComponentDefinition's
+                        `policyRules` field. If needed (currently this means if any lifecycleAction is enabled),
+                        it will also be bound to a default role named
+                        "kubeblocks-cluster-pod-role", which is installed together with KubeBlocks.
+                        If multiple components use the same ComponentDefinition, they will share one ServiceAccount.
 
 
-                        Future Changes:
-                        Future versions might change the default ServiceAccount creation strategy to one per Component,
-                        potentially revising the naming to "kb-{cluster.name}-{component.name}".
-
-
-                        Users can override the automatic ServiceAccount assignment by explicitly setting the name of
-                        an existed ServiceAccount in this field.
+                        If the field is not empty, the specified ServiceAccount will be used, and KubeBlocks will not
+                        create a ServiceAccount. But KubeBlocks does create RoleBindings for the specified ServiceAccount.
                       type: string
                     serviceRefs:
                       description: |-
@@ -5312,6 +5312,10 @@ spec:
                         ComponentDefinition.
                       items:
                         properties:
+                          disabled:
+                            default: false
+                            description: Specifies whether the system account is disabled.
+                            type: boolean
                           name:
                             description: The name of the system account.
                             type: string
@@ -5362,6 +5366,9 @@ spec:
                               Refers to the secret from which data will be copied to create the new account.
 
 
+                              For user-specified passwords, the maximum length is limited to 64 bytes.
+
+
                               This field is immutable once set.
                             properties:
                               name:
@@ -5369,6 +5376,11 @@ spec:
                                 type: string
                               namespace:
                                 description: The namespace where the secret is located.
+                                type: string
+                              password:
+                                default: password
+                                description: The key in the secret data that contains
+                                  the password.
                                 type: string
                             required:
                             - name
@@ -9320,10 +9332,6 @@ spec:
                                   - name
                                   type: object
                                 type: array
-                              image:
-                                description: Specifies an override for the first container's
-                                  image in the Pod.
-                                type: string
                               labels:
                                 additionalProperties:
                                   type: string
@@ -12584,6 +12592,11 @@ spec:
                                   description: Name of the Secret that contains user-provided
                                     certificates.
                                   type: string
+                                namespace:
+                                  description: |-
+                                    The namespace where the secret is located.
+                                    If not provided, the secret is assumed to be in the same namespace as the Cluster object.
+                                  type: string
                               required:
                               - ca
                               - cert
@@ -12624,8 +12637,6 @@ spec:
 
                             Setting instances to offline allows for a controlled scale-in process, preserving their data and maintaining
                             ordinal consistency within the Cluster.
-                            Note that offline instances and their associated resources, such as PVCs, are not automatically deleted.
-                            The administrator must manually manage the cleanup and removal of these resources when they are no longer needed.
                           items:
                             type: string
                           type: array
@@ -13880,19 +13891,16 @@ spec:
                             with other Kubernetes resources, such as modifying Pod labels or sending events.
 
 
-                            Defaults:
-                            To perform certain operational tasks, agent sidecars running in Pods require specific RBAC permissions.
-                            The service account will be bound to a default role named "kubeblocks-cluster-pod-role" which is installed together with KubeBlocks.
-                            If not specified, KubeBlocks automatically assigns a default ServiceAccount named "kb-{cluster.name}"
+                            If not specified, KubeBlocks automatically creates a default ServiceAccount named
+                            "kb-{componentdefinition.name}", bound to a role with rules defined in ComponentDefinition's
+                            `policyRules` field. If needed (currently this means if any lifecycleAction is enabled),
+                            it will also be bound to a default role named
+                            "kubeblocks-cluster-pod-role", which is installed together with KubeBlocks.
+                            If multiple components use the same ComponentDefinition, they will share one ServiceAccount.
 
 
-                            Future Changes:
-                            Future versions might change the default ServiceAccount creation strategy to one per Component,
-                            potentially revising the naming to "kb-{cluster.name}-{component.name}".
-
-
-                            Users can override the automatic ServiceAccount assignment by explicitly setting the name of
-                            an existed ServiceAccount in this field.
+                            If the field is not empty, the specified ServiceAccount will be used, and KubeBlocks will not
+                            create a ServiceAccount. But KubeBlocks does create RoleBindings for the specified ServiceAccount.
                           type: string
                         serviceRefs:
                           description: |-
@@ -14129,6 +14137,11 @@ spec:
                             ComponentDefinition.
                           items:
                             properties:
+                              disabled:
+                                default: false
+                                description: Specifies whether the system account
+                                  is disabled.
+                                type: boolean
                               name:
                                 description: The name of the system account.
                                 type: string
@@ -14179,6 +14192,9 @@ spec:
                                   Refers to the secret from which data will be copied to create the new account.
 
 
+                                  For user-specified passwords, the maximum length is limited to 64 bytes.
+
+
                                   This field is immutable once set.
                                 properties:
                                   name:
@@ -14187,6 +14203,11 @@ spec:
                                   namespace:
                                     description: The namespace where the secret is
                                       located.
+                                    type: string
+                                  password:
+                                    default: password
+                                    description: The key in the secret data that contains
+                                      the password.
                                     type: string
                                 required:
                                 - name
@@ -16161,9 +16182,15 @@ spec:
                   It establishes the initial composition and structure of the Cluster and is intended for one-time configuration.
                 maxLength: 32
                 type: string
+                x-kubernetes-validations:
+                - message: topology is immutable
+                  rule: self == oldSelf
             required:
             - terminationPolicy
             type: object
+            x-kubernetes-validations:
+            - message: topology is required once set
+              rule: '!has(oldSelf.topology) || has(self.topology)'
           status:
             description: ClusterStatus defines the observed state of the Cluster.
             properties:
@@ -22154,7 +22181,6 @@ spec:
                                 description: MountPoint is the filesystem path where
                                   the volume will be mounted.
                                 maxLength: 256
-                                pattern: ^/[a-z]([a-z0-9\-]*[a-z0-9])?$
                                 type: string
                               name:
                                 description: Name is the name of the referenced ConfigMap
@@ -22191,7 +22217,6 @@ spec:
                                 description: MountPoint is the filesystem path where
                                   the volume will be mounted.
                                 maxLength: 256
-                                pattern: ^/[a-z]([a-z0-9\-]*[a-z0-9])?$
                                 type: string
                               name:
                                 description: Name is the name of the referenced ConfigMap
@@ -31390,7 +31415,6 @@ spec:
                                     description: MountPoint is the filesystem path
                                       where the volume will be mounted.
                                     maxLength: 256
-                                    pattern: ^/[a-z]([a-z0-9\-]*[a-z0-9])?$
                                     type: string
                                   name:
                                     description: Name is the name of the referenced
@@ -31428,7 +31452,6 @@ spec:
                                     description: MountPoint is the filesystem path
                                       where the volume will be mounted.
                                     maxLength: 256
-                                    pattern: ^/[a-z]([a-z0-9\-]*[a-z0-9])?$
                                     type: string
                                   name:
                                     description: Name is the name of the referenced

@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2024 ApeCloud Co., Ltd
+Copyright (C) 2022-2025 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -369,6 +369,15 @@ func ClearClusterResourcesWithRemoveFinalizerOption(testCtx *testutil.TestContex
 	ClearResourcesWithRemoveFinalizerOption(testCtx, intctrlutil.ClusterSignature, true, inNs, hasLabels)
 	// finalizer of ConfigMap are deleted in ClusterDefinition controller
 	ClearResourcesWithRemoveFinalizerOption(testCtx, intctrlutil.ClusterDefinitionSignature, true, hasLabels)
+	ClearResourcesWithRemoveFinalizerOption(testCtx, intctrlutil.ComponentDefinitionSignature, true, hasLabels)
+	ClearResourcesWithRemoveFinalizerOption(testCtx, intctrlutil.ComponentVersionSignature, true, hasLabels)
+}
+
+// ClearComponentResourcesWithRemoveFinalizerOption clears all dependent resources belonging to existing components.
+func ClearComponentResourcesWithRemoveFinalizerOption(testCtx *testutil.TestContext) {
+	inNs := client.InNamespace(testCtx.DefaultNamespace)
+	hasLabels := client.HasLabels{testCtx.TestObjLabelKey}
+	ClearResourcesWithRemoveFinalizerOption(testCtx, intctrlutil.ComponentSignature, true, inNs, hasLabels)
 	ClearResourcesWithRemoveFinalizerOption(testCtx, intctrlutil.ComponentDefinitionSignature, true, hasLabels)
 	ClearResourcesWithRemoveFinalizerOption(testCtx, intctrlutil.ComponentVersionSignature, true, hasLabels)
 }

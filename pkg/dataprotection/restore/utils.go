@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2024 ApeCloud Co., Ltd
+Copyright (C) 2022-2025 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -301,10 +301,10 @@ func FormatRestoreTimeAndValidate(restoreTimeStr string, continuousBackup *dpv1a
 	restoreTimeStr = restoreTime.UTC().Format(time.RFC3339)
 	// TODO: check with Recoverable time
 
-	if continuousBackup.Status.TimeRange == nil || continuousBackup.Status.TimeRange.Start.IsZero() || continuousBackup.Status.TimeRange.End.IsZero() {
+	if continuousBackup.Status.TimeRange == nil || continuousBackup.GetStartTime().IsZero() || continuousBackup.GetEndTime().IsZero() {
 		return restoreTimeStr, fmt.Errorf("invalid timeRange of the backup")
 	}
-	if !isTimeInRange(restoreTime, continuousBackup.Status.TimeRange.Start.Time, continuousBackup.Status.TimeRange.End.Time) {
+	if !isTimeInRange(restoreTime, continuousBackup.GetStartTime().Time, continuousBackup.GetEndTime().Time) {
 		return restoreTimeStr, fmt.Errorf("restore-to-time is out of time range, you can view the recoverable time: \n"+
 			"\tkbcli cluster describe %s -n %s", continuousBackup.Labels[constant.AppInstanceLabelKey], continuousBackup.Namespace)
 	}
@@ -463,6 +463,11 @@ func ValidateParentBackupSet(parentBackupSet *BackupActionSet, backupSet *Backup
 	// validate parent backup end time
 	if !utils.CompareWithBackupStopTime(*parentBackup, *backup) {
 		return fmt.Errorf(`the parent backup "%s" is not before the child backup "%s"`, parentBackup.Name, backup.Name)
+	}
+	// validate parent backup repo
+	if parentBackup.Status.BackupRepoName != backup.Status.BackupRepoName {
+		return fmt.Errorf(`the parent backup repo "%s" is not the same with the child backup's repo "%s"`,
+			parentBackup.Status.BackupRepoName, backup.Status.BackupRepoName)
 	}
 	return nil
 }

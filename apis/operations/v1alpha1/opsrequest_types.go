@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2024 ApeCloud Co., Ltd
+Copyright (C) 2022-2025 ApeCloud Co., Ltd
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -939,6 +939,11 @@ type Restore struct {
 	//
 	// +kubebuilder:validation:Required
 	BackupName string `json:"backupName"`
+
+	// Specifies the namespace of the backup custom resource. If not specified, the namespace of the opsRequest will be used.
+	//
+	// +optional
+	BackupNamespace string `json:"backupNamespace,omitempty"`
 
 	// Specifies the point in time to which the restore should be performed.
 	// Supported time formats:

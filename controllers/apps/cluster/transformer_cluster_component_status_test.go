@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2024 ApeCloud Co., Ltd
+Copyright (C) 2022-2025 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -27,6 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
@@ -72,7 +73,7 @@ var _ = Describe("cluster component status transformer", func() {
 
 		transCtx = &clusterTransformContext{
 			Context:       testCtx.Ctx,
-			Client:        model.NewGraphClient(&mockReader{objs: []client.Object{}}),
+			Client:        model.NewGraphClient(&appsutil.MockReader{Objects: []client.Object{}}),
 			EventRecorder: clusterRecorder,
 			Logger:        logger,
 			Cluster:       cluster.DeepCopy(),
@@ -97,8 +98,8 @@ var _ = Describe("cluster component status transformer", func() {
 			transCtx.Cluster.Status.Components = nil
 
 			// only have comp1 object in the cluster
-			reader := &mockReader{
-				objs: []client.Object{
+			reader := &appsutil.MockReader{
+				Objects: []client.Object{
 					&appsv1.Component{
 						ObjectMeta: metav1.ObjectMeta{
 							Namespace: testCtx.DefaultNamespace,
@@ -137,8 +138,8 @@ var _ = Describe("cluster component status transformer", func() {
 				},
 			}
 
-			reader := &mockReader{
-				objs: []client.Object{
+			reader := &appsutil.MockReader{
+				Objects: []client.Object{
 					&appsv1.Component{
 						ObjectMeta: metav1.ObjectMeta{
 							Namespace: testCtx.DefaultNamespace,
@@ -194,8 +195,8 @@ var _ = Describe("cluster component status transformer", func() {
 			}
 
 			// comp2 object is deleted???
-			reader := &mockReader{
-				objs: []client.Object{
+			reader := &appsutil.MockReader{
+				Objects: []client.Object{
 					&appsv1.Component{
 						ObjectMeta: metav1.ObjectMeta{
 							Namespace: testCtx.DefaultNamespace,
@@ -235,8 +236,8 @@ var _ = Describe("cluster component status transformer", func() {
 			}
 
 			// delete comp2 object
-			reader := &mockReader{
-				objs: []client.Object{
+			reader := &appsutil.MockReader{
+				Objects: []client.Object{
 					&appsv1.Component{
 						ObjectMeta: metav1.ObjectMeta{
 							Namespace: testCtx.DefaultNamespace,
@@ -267,8 +268,8 @@ var _ = Describe("cluster component status transformer", func() {
 		})
 
 		It("ok", func() {
-			reader := &mockReader{
-				objs: []client.Object{
+			reader := &appsutil.MockReader{
+				Objects: []client.Object{
 					&appsv1.Component{
 						ObjectMeta: metav1.ObjectMeta{
 							Namespace: testCtx.DefaultNamespace,
@@ -319,8 +320,8 @@ var _ = Describe("cluster component status transformer", func() {
 				},
 			}
 
-			reader := &mockReader{
-				objs: []client.Object{
+			reader := &appsutil.MockReader{
+				Objects: []client.Object{
 					&appsv1.Component{
 						ObjectMeta: metav1.ObjectMeta{
 							Namespace: testCtx.DefaultNamespace,
@@ -376,8 +377,8 @@ var _ = Describe("cluster component status transformer", func() {
 			transCtx.Cluster.Status.Shardings = nil
 
 			// only have sharding1 object in the cluster
-			reader := &mockReader{
-				objs: []client.Object{
+			reader := &appsutil.MockReader{
+				Objects: []client.Object{
 					&appsv1.Component{
 						ObjectMeta: metav1.ObjectMeta{
 							Namespace: testCtx.DefaultNamespace,
@@ -417,8 +418,8 @@ var _ = Describe("cluster component status transformer", func() {
 				},
 			}
 
-			reader := &mockReader{
-				objs: []client.Object{
+			reader := &appsutil.MockReader{
+				Objects: []client.Object{
 					&appsv1.Component{
 						ObjectMeta: metav1.ObjectMeta{
 							Namespace: testCtx.DefaultNamespace,
@@ -476,8 +477,8 @@ var _ = Describe("cluster component status transformer", func() {
 			}
 
 			// sharding2 object is deleted???
-			reader := &mockReader{
-				objs: []client.Object{
+			reader := &appsutil.MockReader{
+				Objects: []client.Object{
 					&appsv1.Component{
 						ObjectMeta: metav1.ObjectMeta{
 							Namespace: testCtx.DefaultNamespace,
@@ -518,8 +519,8 @@ var _ = Describe("cluster component status transformer", func() {
 			}
 
 			// delete sharding2 object
-			reader := &mockReader{
-				objs: []client.Object{
+			reader := &appsutil.MockReader{
+				Objects: []client.Object{
 					&appsv1.Component{
 						ObjectMeta: metav1.ObjectMeta{
 							Namespace: testCtx.DefaultNamespace,
@@ -551,8 +552,8 @@ var _ = Describe("cluster component status transformer", func() {
 		})
 
 		It("ok", func() {
-			reader := &mockReader{
-				objs: []client.Object{
+			reader := &appsutil.MockReader{
+				Objects: []client.Object{
 					&appsv1.Component{
 						ObjectMeta: metav1.ObjectMeta{
 							Namespace: testCtx.DefaultNamespace,
@@ -596,8 +597,8 @@ var _ = Describe("cluster component status transformer", func() {
 		})
 
 		It("compose phases", func() {
-			reader := &mockReader{
-				objs: []client.Object{
+			reader := &appsutil.MockReader{
+				Objects: []client.Object{
 					&appsv1.Component{
 						ObjectMeta: metav1.ObjectMeta{
 							Namespace: testCtx.DefaultNamespace,
@@ -647,8 +648,8 @@ var _ = Describe("cluster component status transformer", func() {
 				},
 			}
 
-			reader := &mockReader{
-				objs: []client.Object{
+			reader := &appsutil.MockReader{
+				Objects: []client.Object{
 					&appsv1.Component{
 						ObjectMeta: metav1.ObjectMeta{
 							Namespace: testCtx.DefaultNamespace,

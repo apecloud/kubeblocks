@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2024 ApeCloud Co., Ltd
+Copyright (C) 2022-2025 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -30,6 +30,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -2516,6 +2517,117 @@ var _ = Describe("vars", func() {
 				checkEnvVarNotExist(envVars, svcVarName1)
 				checkEnvVarNotExist(envVars, svcVarName2)
 				checkEnvVarNotExist(envVars, svcVarName3)
+			})
+
+			It("require all component objects - false", func() {
+				synthesizedComp.Comp2CompDefs = map[string]string{
+					compName1: synthesizedComp.CompDefName,
+				}
+				synthesizedComp.CompDef2CompCnt = map[string]int32{
+					synthesizedComp.CompDefName: int32(2),
+				}
+				vars := []appsv1.EnvVar{
+					{
+						Name: "service-host",
+						ValueFrom: &appsv1.VarSource{
+							ServiceVarRef: &appsv1.ServiceVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
+									CompDef:  synthesizedComp.CompDefName,
+									Name:     "service",
+									Optional: required(),
+									MultipleClusterObjectOption: &appsv1.MultipleClusterObjectOption{
+										RequireAllComponentObjects: ptr.To(false), // false
+										Strategy:                   appsv1.MultipleClusterObjectStrategyIndividual,
+									},
+								},
+								ServiceVars: appsv1.ServiceVars{
+									Host: &appsv1.VarRequired,
+								},
+							},
+						},
+					},
+				}
+				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
+				Expect(err).Should(BeNil())
+				// Expect(templateVars).Should(HaveKeyWithValue("service-host", ""))
+				// Expect(templateVars).Should(HaveKeyWithValue(svcVarName1, svcName1))
+				// checkEnvVarWithValue(envVars, "service-host", "")
+				// checkEnvVarWithValue(envVars, svcVarName1, svcName1)
+				Expect(templateVars).Should(HaveKeyWithValue("service-host", svcName1))
+				checkEnvVarWithValue(envVars, "service-host", svcName1)
+			})
+
+			It("require all component objects - true", func() {
+				synthesizedComp.Comp2CompDefs = map[string]string{
+					compName1: synthesizedComp.CompDefName,
+				}
+				synthesizedComp.CompDef2CompCnt = map[string]int32{
+					synthesizedComp.CompDefName: int32(2),
+				}
+				vars := []appsv1.EnvVar{
+					{
+						Name: "service-host",
+						ValueFrom: &appsv1.VarSource{
+							ServiceVarRef: &appsv1.ServiceVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
+									CompDef:  synthesizedComp.CompDefName,
+									Name:     "service",
+									Optional: required(),
+									MultipleClusterObjectOption: &appsv1.MultipleClusterObjectOption{
+										RequireAllComponentObjects: ptr.To(true), // true
+										Strategy:                   appsv1.MultipleClusterObjectStrategyIndividual,
+									},
+								},
+								ServiceVars: appsv1.ServiceVars{
+									Host: &appsv1.VarRequired,
+								},
+							},
+						},
+					},
+				}
+				_, _, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
+				Expect(err).ShouldNot(BeNil())
+				Expect(err.Error()).Should(And(ContainSubstring("insufficient component objects to resolve vars"),
+					ContainSubstring(fmt.Sprintf("expected: %d, actual: %d", 2, 1))))
+			})
+
+			It("require all component objects - true and ok", func() {
+				synthesizedComp.Comp2CompDefs = map[string]string{
+					compName1: synthesizedComp.CompDefName,
+					compName2: synthesizedComp.CompDefName,
+				}
+				synthesizedComp.CompDef2CompCnt = map[string]int32{
+					synthesizedComp.CompDefName: int32(2),
+				}
+				vars := []appsv1.EnvVar{
+					{
+						Name: "service-host",
+						ValueFrom: &appsv1.VarSource{
+							ServiceVarRef: &appsv1.ServiceVarSelector{
+								ClusterObjectReference: appsv1.ClusterObjectReference{
+									CompDef:  synthesizedComp.CompDefName,
+									Name:     "service",
+									Optional: required(),
+									MultipleClusterObjectOption: &appsv1.MultipleClusterObjectOption{
+										RequireAllComponentObjects: ptr.To(true), // true
+										Strategy:                   appsv1.MultipleClusterObjectStrategyIndividual,
+									},
+								},
+								ServiceVars: appsv1.ServiceVars{
+									Host: &appsv1.VarRequired,
+								},
+							},
+						},
+					},
+				}
+				templateVars, envVars, err := ResolveTemplateNEnvVars(testCtx.Ctx, reader, synthesizedComp, vars)
+				Expect(err).Should(BeNil())
+				Expect(templateVars).Should(HaveKeyWithValue("service-host", ""))
+				Expect(templateVars).Should(HaveKeyWithValue(svcVarName1, svcName1))
+				Expect(templateVars).Should(HaveKeyWithValue(svcVarName2, svcName2))
+				checkEnvVarWithValue(envVars, "service-host", "")
+				checkEnvVarWithValue(envVars, svcVarName1, svcName1)
+				checkEnvVarWithValue(envVars, svcVarName2, svcName2)
 			})
 		})
 

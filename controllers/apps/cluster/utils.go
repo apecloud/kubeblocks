@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2024 ApeCloud Co., Ltd
+Copyright (C) 2022-2025 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -21,32 +21,20 @@ package cluster
 
 import (
 	"context"
-	"fmt"
 	"reflect"
-	"time"
 
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
-	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
-	"github.com/apecloud/kubeblocks/pkg/controller/multicluster"
-	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	dptypes "github.com/apecloud/kubeblocks/pkg/dataprotection/types"
 )
-
-// default reconcile requeue after duration
-var requeueDuration = time.Millisecond * 1000
-
-func newRequeueError(after time.Duration, reason string) error {
-	return intctrlutil.NewRequeueError(after, reason)
-}
 
 func boolValue(b *bool) bool {
 	if b == nil {
@@ -61,103 +49,12 @@ func mergeMap(dst, src map[string]string) {
 	}
 }
 
-func placement(obj client.Object) string {
-	if obj == nil || obj.GetAnnotations() == nil {
-		return ""
-	}
-	return obj.GetAnnotations()[constant.KBAppMultiClusterPlacementKey]
+type gvkNObjKey struct {
+	schema.GroupVersionKind
+	client.ObjectKey
 }
 
-func intoContext(ctx context.Context, placement string) context.Context {
-	return multicluster.IntoContext(ctx, placement)
-}
-
-func inUniversalContext4C() *multicluster.ClientOption {
-	return multicluster.InUniversalContext()
-}
-
-func inDataContext4G() model.GraphOption {
-	return model.WithClientOption(multicluster.InDataContext())
-}
-
-func inUniversalContext4G() model.GraphOption {
-	return model.WithClientOption(multicluster.InUniversalContext())
-}
-
-func clientOption(v *model.ObjectVertex) *multicluster.ClientOption {
-	if v.ClientOpt != nil {
-		opt, ok := v.ClientOpt.(*multicluster.ClientOption)
-		if ok {
-			return opt
-		}
-		panic(fmt.Sprintf("unknown client option: %T", v.ClientOpt))
-	}
-	return multicluster.InControlContext()
-}
-
-func resolveServiceDefaultFields(oldSpec, newSpec *corev1.ServiceSpec) {
-	var exist *corev1.ServicePort
-	for i, port := range newSpec.Ports {
-		for _, oldPort := range oldSpec.Ports {
-			// assume that port.Name is user specified, if it is not changed, we need to keep the old NodePort and TargetPort if they are not set
-			if port.Name != "" && port.Name == oldPort.Name {
-				exist = &oldPort
-				break
-			}
-		}
-		if exist == nil {
-			continue
-		}
-		// if the service type is NodePort or LoadBalancer, and the nodeport is not set, we should use the nodeport of the exist service
-		if shouldAllocateNodePorts(newSpec) && port.NodePort == 0 && exist.NodePort != 0 {
-			newSpec.Ports[i].NodePort = exist.NodePort
-			port.NodePort = exist.NodePort
-		}
-		if port.TargetPort.IntVal == 0 && port.TargetPort.StrVal == "" {
-			port.TargetPort = exist.TargetPort
-		}
-		if reflect.DeepEqual(port, *exist) {
-			newSpec.Ports[i].TargetPort = exist.TargetPort
-		}
-	}
-	if len(newSpec.ClusterIP) == 0 {
-		newSpec.ClusterIP = oldSpec.ClusterIP
-	}
-	if len(newSpec.ClusterIPs) == 0 {
-		newSpec.ClusterIPs = oldSpec.ClusterIPs
-	}
-	if len(newSpec.Type) == 0 {
-		newSpec.Type = oldSpec.Type
-	}
-	if len(newSpec.SessionAffinity) == 0 {
-		newSpec.SessionAffinity = oldSpec.SessionAffinity
-	}
-	if len(newSpec.IPFamilies) == 0 || (len(newSpec.IPFamilies) == 1 && *newSpec.IPFamilyPolicy != corev1.IPFamilyPolicySingleStack) {
-		newSpec.IPFamilies = oldSpec.IPFamilies
-	}
-	if newSpec.IPFamilyPolicy == nil {
-		newSpec.IPFamilyPolicy = oldSpec.IPFamilyPolicy
-	}
-	if newSpec.InternalTrafficPolicy == nil {
-		newSpec.InternalTrafficPolicy = oldSpec.InternalTrafficPolicy
-	}
-	if newSpec.ExternalTrafficPolicy == "" && oldSpec.ExternalTrafficPolicy != "" {
-		newSpec.ExternalTrafficPolicy = oldSpec.ExternalTrafficPolicy
-	}
-}
-
-func shouldAllocateNodePorts(svc *corev1.ServiceSpec) bool {
-	if svc.Type == corev1.ServiceTypeNodePort {
-		return true
-	}
-	if svc.Type == corev1.ServiceTypeLoadBalancer {
-		if svc.AllocateLoadBalancerNodePorts != nil {
-			return *svc.AllocateLoadBalancerNodePorts
-		}
-		return true
-	}
-	return false
-}
+type owningObjects map[gvkNObjKey]client.Object
 
 func getGVKName(object client.Object, scheme *runtime.Scheme) (*gvkNObjKey, error) {
 	gvk, err := apiutil.GVKForObject(object, scheme)
@@ -195,7 +92,7 @@ func getFailedBackups(ctx context.Context,
 			continue
 		}
 		if backup.Labels[dptypes.BackupTypeLabelKey] != string(dpv1alpha1.BackupTypeContinuous) {
-			gvr, err := getGVKName(backup, rscheme)
+			gvr, err := getGVKName(backup, model.GetScheme())
 			if err != nil {
 				return err
 			}
@@ -211,14 +108,14 @@ func getOwningNamespacedObjects(ctx context.Context,
 	labels client.MatchingLabels,
 	kinds []client.ObjectList) (owningObjects, error) {
 	inNS := client.InNamespace(namespace)
-	return getOwningObjectsWithOptions(ctx, cli, kinds, inNS, labels, inUniversalContext4C())
+	return getOwningObjectsWithOptions(ctx, cli, kinds, inNS, labels, appsutil.InUniversalContext4C())
 }
 
 func getOwningNonNamespacedObjects(ctx context.Context,
 	cli client.Reader,
 	labels client.MatchingLabels,
 	kinds []client.ObjectList) (owningObjects, error) {
-	return getOwningObjectsWithOptions(ctx, cli, kinds, labels, inUniversalContext4C())
+	return getOwningObjectsWithOptions(ctx, cli, kinds, labels, appsutil.InUniversalContext4C())
 }
 
 func getOwningObjectsWithOptions(ctx context.Context,
@@ -237,7 +134,7 @@ func getOwningObjectsWithOptions(ctx context.Context,
 		for i := 0; i < l; i++ {
 			// get the underlying object
 			object := items.Index(i).Addr().Interface().(client.Object)
-			name, err := getGVKName(object, rscheme)
+			name, err := getGVKName(object, model.GetScheme())
 			if err != nil {
 				return nil, err
 			}
@@ -247,37 +144,10 @@ func getOwningObjectsWithOptions(ctx context.Context,
 	return objs, nil
 }
 
-// sendWarningEventWithError sends a warning event when occurs error.
-func sendWarningEventWithError(
-	recorder record.EventRecorder,
-	obj client.Object,
-	reason string,
-	err error) {
-	// ignore requeue error
-	if err == nil || intctrlutil.IsRequeueError(err) {
-		return
-	}
-	controllerErr := intctrlutil.UnwrapControllerError(err)
-	if controllerErr != nil {
-		reason = string(controllerErr.Type)
-	}
-	recorder.Event(obj, corev1.EventTypeWarning, reason, err.Error())
-}
-
 // isOwnedByComp is used to judge if the obj is owned by Component.
 func isOwnedByComp(obj client.Object) bool {
 	for _, ref := range obj.GetOwnerReferences() {
 		if ref.Kind == appsv1.ComponentKind && ref.Controller != nil && *ref.Controller {
-			return true
-		}
-	}
-	return false
-}
-
-// isOwnedByInstanceSet is used to judge if the obj is owned by the InstanceSet controller
-func isOwnedByInstanceSet(obj client.Object) bool {
-	for _, ref := range obj.GetOwnerReferences() {
-		if ref.Kind == workloads.InstanceSetKind && ref.Controller != nil && *ref.Controller {
 			return true
 		}
 	}

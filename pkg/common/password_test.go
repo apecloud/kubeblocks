@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2024 ApeCloud Co., Ltd
+Copyright (C) 2022-2025 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -34,7 +34,7 @@ func testGeneratorGeneratePasswordWithSeed(t *testing.T) {
 	resultSeedFirstTime := ""
 	resultSeedEachTime := ""
 	for i := 0; i < N; i++ {
-		res, err := GeneratePassword(10, 5, 0, false, seed)
+		res, err := GeneratePassword(10, 5, 0, seed)
 		if err != nil {
 			t.Error(err)
 		}
@@ -52,11 +52,11 @@ func testGeneratorGeneratePassword(t *testing.T) {
 	t.Run("exceeds_length", func(t *testing.T) {
 		t.Parallel()
 
-		if _, err := GeneratePassword(0, 1, 0, false, ""); err != password.ErrExceedsTotalLength {
+		if _, err := GeneratePassword(0, 1, 0, ""); err != password.ErrExceedsTotalLength {
 			t.Errorf("expected %q to be %q", err, password.ErrExceedsTotalLength)
 		}
 
-		if _, err := GeneratePassword(0, 0, 1, false, ""); err != password.ErrExceedsTotalLength {
+		if _, err := GeneratePassword(0, 0, 1, ""); err != password.ErrExceedsTotalLength {
 			t.Errorf("expected %q to be %q", err, password.ErrExceedsTotalLength)
 		}
 	})
@@ -67,7 +67,7 @@ func testGeneratorGeneratePassword(t *testing.T) {
 		resultSeedEachTime := ""
 		hasDiffPassword := false
 		for i := 0; i < N; i++ {
-			res, err := GeneratePassword(i%len(password.LowerLetters), 0, 0, true, "")
+			res, err := GeneratePassword(i%(len(password.LowerLetters)+len(password.UpperLetters)), 0, 0, "")
 			if err != nil {
 				t.Error(err)
 			}
@@ -92,4 +92,75 @@ func TestGeneratorGeneratePassword(t *testing.T) {
 
 func TestGeneratorGeneratePasswordWithSeed(t *testing.T) {
 	testGeneratorGeneratePasswordWithSeed(t)
+}
+
+// containsUppercase checks if s has at least one uppercase letter (A-Z).
+func containsUppercase(s string) bool {
+	for _, r := range s {
+		if r >= 'A' && r <= 'Z' {
+			return true
+		}
+	}
+	return false
+}
+
+// containsLowercase checks if s has at least one lowercase letter (a-z).
+func containsLowercase(s string) bool {
+	for _, r := range s {
+		if r >= 'a' && r <= 'z' {
+			return true
+		}
+	}
+	return false
+}
+
+// TestGeneratorEnsureMixedCase verifies two requirements:
+// 1) When noUpper = false, the generated password contains uppercase and lowercase letters.
+// 2) Passwords generated with the same seed are identical.
+func TestGeneratorEnsureMixedCase(t *testing.T) {
+	t.Run("should_contain_mixed_case_when_noUpper_false", func(t *testing.T) {
+		length := 12
+		numDigits := 3
+		numSymbols := 2
+		seed := ""
+
+		// Generate multiple passwords and check they have both upper and lower letters.
+		for i := 0; i < 100; i++ {
+			pwd, err := GeneratePassword(length, numDigits, numSymbols, seed)
+			if err != nil {
+				t.Fatalf("unexpected error generating password: %v", err)
+			}
+			pwd, err = EnsureMixedCase(pwd, seed)
+			if err != nil {
+				t.Fatalf("unexpected error Ensuring mixed-case password: %v", err)
+			}
+			if !containsUppercase(pwd) || !containsLowercase(pwd) {
+				t.Errorf("password %q does not contain both uppercase and lowercase letters", pwd)
+			}
+		}
+	})
+
+	t.Run("should_produce_same_result_with_same_seed", func(t *testing.T) {
+		length := 10
+		numDigits := 2
+		numSymbols := 1
+		seed := "fixed-seed-123"
+
+		var firstPwd string
+		for i := 0; i < 50; i++ {
+			pwd, err := GeneratePassword(length, numDigits, numSymbols, seed)
+			if err != nil {
+				t.Fatalf("unexpected error generating password with seed: %v", err)
+			}
+			pwd, err = EnsureMixedCase(pwd, seed)
+			if err != nil {
+				t.Fatalf("unexpected error Ensuring mixed-case password: %v", err)
+			}
+			if i == 0 {
+				firstPwd = pwd
+			} else if pwd != firstPwd {
+				t.Errorf("expected the same password for the same seed, but got %q vs %q", firstPwd, pwd)
+			}
+		}
+	})
 }

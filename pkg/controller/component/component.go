@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2024 ApeCloud Co., Ltd
+Copyright (C) 2022-2025 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -67,6 +67,7 @@ func BuildComponent(cluster *appsv1.Cluster, compSpec *appsv1.ClusterComponentSp
 		AddAnnotationsInMap(inheritedAnnotations(cluster)).
 		AddAnnotationsInMap(annotations). // annotations added by the cluster controller
 		AddLabelsInMap(constant.GetCompLabelsWithDef(cluster.Name, compSpec.Name, compSpec.ComponentDef, labels)).
+		SetTerminationPolicy(cluster.Spec.TerminationPolicy).
 		SetServiceVersion(compSpec.ServiceVersion).
 		SetLabels(compSpec.Labels).
 		SetAnnotations(compSpec.Annotations).
@@ -167,12 +168,4 @@ func GetComponentNameFromObj(obj client.Object) string {
 		return shardingName
 	}
 	return obj.GetLabels()[constant.KBAppComponentLabelKey]
-}
-
-// GetComponentNameLabelKey gets the component name label key.
-func GetComponentNameLabelKey(cluster *appsv1.Cluster, componentName string) string {
-	if cluster.Spec.GetShardingByName(componentName) != nil {
-		return constant.KBAppShardingNameLabelKey
-	}
-	return constant.KBAppComponentLabelKey
 }

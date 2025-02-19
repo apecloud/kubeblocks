@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2024 ApeCloud Co., Ltd
+Copyright (C) 2022-2025 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -84,7 +84,7 @@ var _ = Describe("ConfigEnvFrom test", func() {
 			comp, err := component.BuildComponent(cluster, &cluster.Spec.ComponentSpecs[0], nil, nil)
 			Expect(err).Should(Succeed())
 
-			synthesizeComp, err := component.BuildSynthesizedComponent(ctx, testCtx.Cli, compDef, comp, cluster)
+			synthesizeComp, err := component.BuildSynthesizedComponent(ctx, testCtx.Cli, compDef, comp)
 			Expect(err).Should(Succeed())
 
 			podSpec := &corev1.PodSpec{
@@ -116,7 +116,7 @@ var _ = Describe("ConfigEnvFrom test", func() {
 			comp, err := component.BuildComponent(cluster, &cluster.Spec.ComponentSpecs[0], nil, nil)
 			Expect(err).Should(Succeed())
 
-			synthesizeComp, err := component.BuildSynthesizedComponent(ctx, testCtx.Cli, compDef, comp, cluster)
+			synthesizeComp, err := component.BuildSynthesizedComponent(ctx, testCtx.Cli, compDef, comp)
 			Expect(err).Should(Succeed())
 
 			cmObj := origCMObject.DeepCopy()
@@ -136,7 +136,7 @@ var _ = Describe("ConfigEnvFrom test", func() {
 			comp, err := component.BuildComponent(cluster, &cluster.Spec.ComponentSpecs[0], nil, nil)
 			Expect(err).Should(Succeed())
 
-			synthesizeComp, err := component.BuildSynthesizedComponent(ctx, testCtx.Cli, compDef, comp, cluster)
+			synthesizeComp, err := component.BuildSynthesizedComponent(ctx, testCtx.Cli, compDef, comp)
 			Expect(err).Should(Succeed())
 
 			configSpec := compDef.Spec.Configs[0]

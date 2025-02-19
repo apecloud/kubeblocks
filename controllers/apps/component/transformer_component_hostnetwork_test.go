@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2024 ApeCloud Co., Ltd
+Copyright (C) 2022-2025 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/graph"
@@ -40,7 +41,7 @@ var _ = Describe("component hostnetwork transformer test", func() {
 	)
 
 	var (
-		reader   *mockReader
+		reader   *appsutil.MockReader
 		dag      *graph.DAG
 		transCtx *componentTransformContext
 	)
@@ -52,7 +53,7 @@ var _ = Describe("component hostnetwork transformer test", func() {
 	}
 
 	BeforeEach(func() {
-		reader = &mockReader{}
+		reader = &appsutil.MockReader{}
 		comp := &appsv1.Component{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: testCtx.DefaultNamespace,

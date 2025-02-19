@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2024 ApeCloud Co., Ltd
+Copyright (C) 2022-2025 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -143,16 +143,14 @@ var _ = Describe("Event Controller", func() {
 			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(its), func(tmpITS *workloads.InstanceSet) {
 				tmpITS.Spec.Roles = []workloads.ReplicaRole{
 					{
-						Name:       "leader",
-						IsLeader:   true,
-						AccessMode: workloads.ReadWriteMode,
-						CanVote:    true,
+						Name:                 "leader",
+						ParticipatesInQuorum: true,
+						UpdatePriority:       5,
 					},
 					{
-						Name:       "follower",
-						IsLeader:   false,
-						AccessMode: workloads.ReadonlyMode,
-						CanVote:    true,
+						Name:                 "follower",
+						ParticipatesInQuorum: true,
+						UpdatePriority:       4,
 					},
 				}
 			})()).Should(Succeed())
@@ -227,6 +225,7 @@ var _ = Describe("Event Controller", func() {
 			role = "follower"
 			sndValidEvent := createRoleChangedEvent(podName, role, uid)
 			sndValidEvent.LastTimestamp = metav1.NewTime(afterLastTS)
+			sndValidEvent.EventTime = metav1.NewMicroTime(afterLastTS)
 			Expect(testCtx.CreateObj(ctx, sndValidEvent)).Should(Succeed())
 			Eventually(func() string {
 				event := &corev1.Event{}

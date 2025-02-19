@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2024 ApeCloud Co., Ltd
+Copyright (C) 2022-2025 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -195,7 +195,7 @@ func parseGlobalRoleSnapshot(role string, event *corev1.Event) *common.GlobalRol
 	if err := json.Unmarshal([]byte(role), snapshot); err == nil {
 		return snapshot
 	}
-	snapshot.Version = strconv.FormatInt(event.LastTimestamp.UnixMicro(), 10)
+	snapshot.Version = strconv.FormatInt(event.EventTime.UnixMicro(), 10)
 	pair := common.PodRoleNamePair{
 		PodName:  event.InvolvedObject.Name,
 		RoleName: role,
@@ -246,22 +246,20 @@ func updatePodRoleLabel(cli client.Client, reqCtx intctrlutil.RequestCtx,
 	roleName = strings.ToLower(roleName)
 
 	// update pod role label
-	patch := client.MergeFrom(pod.DeepCopy())
+	newPod := pod.DeepCopy()
 	role, ok := roleMap[roleName]
 	switch ok {
 	case true:
-		pod.Labels[RoleLabelKey] = role.Name
-		pod.Labels[AccessModeLabelKey] = string(role.AccessMode)
+		newPod.Labels[RoleLabelKey] = role.Name
 	case false:
-		delete(pod.Labels, RoleLabelKey)
-		delete(pod.Labels, AccessModeLabelKey)
+		delete(newPod.Labels, RoleLabelKey)
 	}
 
-	if pod.Annotations == nil {
-		pod.Annotations = map[string]string{}
+	if newPod.Annotations == nil {
+		newPod.Annotations = map[string]string{}
 	}
-	pod.Annotations[constant.LastRoleSnapshotVersionAnnotationKey] = version
-	return cli.Patch(ctx, pod, patch, inDataContext())
+	newPod.Annotations[constant.LastRoleSnapshotVersionAnnotationKey] = version
+	return cli.Update(ctx, newPod, inDataContext())
 }
 
 func inDataContext() *multicluster.ClientOption {

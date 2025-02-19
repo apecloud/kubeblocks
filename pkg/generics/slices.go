@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2024 ApeCloud Co., Ltd
+Copyright (C) 2022-2025 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -27,4 +27,23 @@ func CountFunc[S ~[]E, E any](s S, f func(E) bool) int {
 		}
 	}
 	return cnt
+}
+
+func FindFunc[S ~[]E, E any](s S, f func(E) bool) S {
+	var arr S
+	for _, e := range s {
+		if f(e) {
+			arr = append(arr, e)
+		}
+	}
+	return arr
+}
+
+func FindFirstFunc[S ~[]E, E any](s S, f func(E) bool) int {
+	for i, e := range s {
+		if f(e) {
+			return i
+		}
+	}
+	return -1
 }

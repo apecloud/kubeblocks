@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2024 ApeCloud Co., Ltd
+Copyright (C) 2022-2025 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -146,7 +146,7 @@ var _ = Describe("OpsRequest Controller", func() {
 		By("mock pods are available and wait for cluster enter running phase")
 		podName := fmt.Sprintf("%s-%s-0", clusterObj.Name, mysqlCompName)
 		pod := testapps.MockInstanceSetPod(&testCtx, nil, clusterObj.Name, mysqlCompName,
-			podName, "leader", "ReadWrite")
+			podName, "leader")
 
 		// the opsRequest will use startTime to check some condition.
 		// if there is no sleep for 1 second, unstable error may occur.
@@ -193,7 +193,7 @@ var _ = Describe("OpsRequest Controller", func() {
 		testk8s.MockPodIsTerminating(ctx, testCtx, pod)
 		testk8s.RemovePodFinalizer(ctx, testCtx, pod)
 		testapps.MockInstanceSetPod(&testCtx, nil, clusterObj.Name, mysqlCompName,
-			pod.Name, "leader", "ReadWrite", scalingCtx.target)
+			pod.Name, "leader", scalingCtx.target)
 		Expect(testapps.ChangeObj(&testCtx, verticalScalingOpsRequest, func(lopsReq *opsv1alpha1.OpsRequest) {
 			if lopsReq.Annotations == nil {
 				lopsReq.Annotations = map[string]string{}

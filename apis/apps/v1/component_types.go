@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2024 ApeCloud Co., Ltd
+Copyright (C) 2022-2025 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -70,6 +70,12 @@ func init() {
 
 // ComponentSpec defines the desired state of Component
 type ComponentSpec struct {
+	// Specifies the behavior when a Component is deleted.
+	//
+	// +kubebuilder:default=Delete
+	// +optional
+	TerminationPolicy TerminationPolicyType `json:"terminationPolicy"`
+
 	// Specifies the name of the referenced ComponentDefinition.
 	//
 	// +kubebuilder:validation:Required
@@ -175,16 +181,15 @@ type ComponentSpec struct {
 	// This ServiceAccount is used to grant necessary permissions for the Component's Pods to interact
 	// with other Kubernetes resources, such as modifying Pod labels or sending events.
 	//
-	// Defaults:
-	// If not specified, KubeBlocks automatically assigns a default ServiceAccount named "kb-{cluster.name}",
-	// bound to a default role defined during KubeBlocks installation.
+	// If not specified, KubeBlocks automatically creates a default ServiceAccount named
+	// "kb-{componentdefinition.name}", bound to a role with rules defined in ComponentDefinition's
+	// `policyRules` field. If needed (currently this means if any lifecycleAction is enabled),
+	// it will also be bound to a default role named
+	// "kubeblocks-cluster-pod-role", which is installed together with KubeBlocks.
+	// If multiple components use the same ComponentDefinition, they will share one ServiceAccount.
 	//
-	// Future Changes:
-	// Future versions might change the default ServiceAccount creation strategy to one per Component,
-	// potentially revising the naming to "kb-{cluster.name}-{component.name}".
-	//
-	// Users can override the automatic ServiceAccount assignment by explicitly setting the name of
-	// an existed ServiceAccount in this field.
+	// If the field is not empty, the specified ServiceAccount will be used, and KubeBlocks will not
+	// create a ServiceAccount. But KubeBlocks does create RoleBindings for the specified ServiceAccount.
 	//
 	// +optional
 	ServiceAccountName string `json:"serviceAccountName,omitempty"`

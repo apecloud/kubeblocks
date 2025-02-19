@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2024 ApeCloud Co., Ltd
+Copyright (C) 2022-2025 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -208,7 +208,7 @@ var _ = Describe("VerticalScaling OpsRequest", func() {
 				testk8s.MockPodIsTerminating(ctx, testCtx, pod)
 				testk8s.RemovePodFinalizer(ctx, testCtx, pod)
 				testapps.MockInstanceSetPod(&testCtx, nil, clusterName, defaultCompName,
-					pod.Name, "leader", "ReadWrite", ops.Spec.VerticalScalingList[0].ResourceRequirements)
+					pod.Name, "leader", ops.Spec.VerticalScalingList[0].ResourceRequirements)
 			}
 
 			By("mock podList[0] rolling update successfully by re-creating it")

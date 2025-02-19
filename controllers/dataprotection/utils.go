@@ -587,7 +587,7 @@ func fromFlattenName(flatten string) (name string, namespace string) {
 // then validate and return the parent backup.
 // If parentBackupName is not specified, find the latest valid parent backup.
 func GetParentBackup(ctx context.Context, cli client.Client, backup *dpv1alpha1.Backup,
-	backupMethod *dpv1alpha1.BackupMethod) (*dpv1alpha1.Backup, error) {
+	backupMethod *dpv1alpha1.BackupMethod, backupRepoName string) (*dpv1alpha1.Backup, error) {
 	if backup == nil || backupMethod == nil {
 		return nil, fmt.Errorf("backup or backupMethod is nil")
 	}
@@ -607,12 +607,12 @@ func GetParentBackup(ctx context.Context, cli client.Client, backup *dpv1alpha1.
 		}, parentBackup); err != nil {
 			return nil, err
 		}
-		if err := ValidateParentBackup(backup, parentBackup, backupMethod); err != nil {
+		if err := ValidateParentBackup(backup, parentBackup, backupMethod, backupRepoName); err != nil {
 			return nil, fmt.Errorf("failed to validate specified parent backup %s: %w", backup.Spec.ParentBackupName, err)
 		}
 		return parentBackup, nil
 	}
-	parentBackup, err := FindParentBackupIfNotSet(ctx, cli, backup, backupMethod, scheduleName)
+	parentBackup, err := FindParentBackupIfNotSet(ctx, cli, backup, backupMethod, scheduleName, backupRepoName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find parent backup: %w", err)
 	}
@@ -631,7 +631,7 @@ func GetParentBackup(ctx context.Context, cli client.Client, backup *dpv1alpha1.
 // if not found, find the full backup as the parent within all backups.
 // For on-demand backups, find the parent within all backups.
 func FindParentBackupIfNotSet(ctx context.Context, cli client.Client, backup *dpv1alpha1.Backup,
-	backupMethod *dpv1alpha1.BackupMethod, scheduleName string) (*dpv1alpha1.Backup, error) {
+	backupMethod *dpv1alpha1.BackupMethod, scheduleName, backupRepoName string) (*dpv1alpha1.Backup, error) {
 	getLatestBackup := func(backupList []*dpv1alpha1.Backup) *dpv1alpha1.Backup {
 		if len(backupList) == 0 {
 			return nil
@@ -649,13 +649,15 @@ func FindParentBackupIfNotSet(ctx context.Context, cli client.Client, backup *dp
 			client.MatchingLabels(labels)); err != nil && !apierrors.IsNotFound(err) {
 			return nil, err
 		}
-		filteredbackupList := FilterParentBackups(backupList, backup, backupMethod, incremental)
+		filteredbackupList := FilterParentBackups(backupList, backup, backupMethod, incremental, backupRepoName)
 		return getLatestBackup(filteredbackupList), nil
 	}
 
-	labelMap := map[string]string{}
-	// with backup policy label
-	labelMap[dptypes.BackupPolicyLabelKey] = backup.Spec.BackupPolicyName
+	// with backup policy and backup repo label
+	labelMap := map[string]string{
+		dptypes.BackupPolicyLabelKey: backup.Spec.BackupPolicyName,
+		dataProtectionBackupRepoKey:  backupRepoName,
+	}
 	// with the schedule label if specified schedule
 	if len(scheduleName) != 0 {
 		labelMap[dptypes.BackupScheduleLabelKey] = scheduleName
@@ -706,13 +708,13 @@ func FindParentBackupIfNotSet(ctx context.Context, cli client.Client, backup *dp
 
 // FilterParentBackups filters the parent backups by backup phase, backup method and end time.
 func FilterParentBackups(backupList *dpv1alpha1.BackupList, targetBackup *dpv1alpha1.Backup,
-	backupMethod *dpv1alpha1.BackupMethod, incremental bool) []*dpv1alpha1.Backup {
+	backupMethod *dpv1alpha1.BackupMethod, incremental bool, backupRepoName string) []*dpv1alpha1.Backup {
 	var res []*dpv1alpha1.Backup
 	if backupList == nil || len(backupList.Items) == 0 {
 		return res
 	}
 	for i, backup := range backupList.Items {
-		if err := ValidateParentBackup(targetBackup, &backup, backupMethod); err != nil {
+		if err := ValidateParentBackup(targetBackup, &backup, backupMethod, backupRepoName); err != nil {
 			continue
 		}
 		// backups are listed by backup type label, validate if the backup method matches
@@ -733,7 +735,7 @@ func FilterParentBackups(backupList *dpv1alpha1.BackupList, targetBackup *dpv1al
 
 // ValidateParentBackup validates the parent backup.
 func ValidateParentBackup(backup *dpv1alpha1.Backup, parentBackup *dpv1alpha1.Backup,
-	backupMethod *dpv1alpha1.BackupMethod) error {
+	backupMethod *dpv1alpha1.BackupMethod, backupRepoName string) error {
 	// validate parent backup is completed
 	if parentBackup.Status.Phase != dpv1alpha1.BackupPhaseCompleted {
 		return fmt.Errorf("parent backup %s/%s is not completed", parentBackup.Namespace, parentBackup.Name)
@@ -752,6 +754,11 @@ func ValidateParentBackup(backup *dpv1alpha1.Backup, parentBackup *dpv1alpha1.Ba
 	// valiate parent end time
 	if parentBackup.GetEndTime().IsZero() {
 		return fmt.Errorf("parent backup %s/%s end time is zero", parentBackup.Namespace, parentBackup.Name)
+	}
+	// validate parent backup repo
+	if parentBackup.Status.BackupRepoName != backupRepoName {
+		return fmt.Errorf("parent backup %s/%s repo %s is not consistent with the backup repo %s",
+			parentBackup.Namespace, parentBackup.Name, parentBackup.Status.BackupRepoName, backupRepoName)
 	}
 	return nil
 }

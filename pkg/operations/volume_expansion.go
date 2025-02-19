@@ -89,15 +89,6 @@ func (ve volumeExpansionOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli cl
 		}
 		volumeExpansion := obj.(opsv1alpha1.VolumeExpansion)
 		setVolumeStorage(volumeExpansion.VolumeClaimTemplates, compSpec.VolumeClaimTemplates)
-		// update the vct of the instances.
-		for _, v := range volumeExpansion.Instances {
-			for i := range compSpec.Instances {
-				if compSpec.Instances[i].Name == v.Name {
-					setVolumeStorage(v.VolumeClaimTemplates, compSpec.Instances[i].VolumeClaimTemplates)
-					break
-				}
-			}
-		}
 		return nil
 	}
 	compOpsSet := newComponentOpsHelper(opsRes.OpsRequest.Spec.VolumeExpansionList)
@@ -146,20 +137,6 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCt
 					vctName:              vct.Name,
 					offlineInstanceNames: compSpec.OfflineInstances,
 				})
-			}
-		}
-		if len(volumeExpansion.Instances) > 0 {
-			for _, ins := range compSpec.Instances {
-				for _, vct := range ins.VolumeClaimTemplates {
-					veHelpers = append(veHelpers, volumeExpansionHelper{
-						compOps:              compOps,
-						fullComponentName:    fullComponentName,
-						expectCount:          int(ins.GetReplicas()),
-						vctName:              vct.Name,
-						offlineInstanceNames: compSpec.OfflineInstances,
-						templateName:         ins.Name,
-					})
-				}
 			}
 		}
 	}
@@ -248,20 +225,6 @@ func (ve volumeExpansionOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.Req
 			}
 			return lastVCTs
 		}
-		volumeExpansion := comOps.(opsv1alpha1.VolumeExpansion)
-		// save the last vcts of the instances
-		var instanceTemplates []appsv1.InstanceTemplate
-		for _, v := range volumeExpansion.Instances {
-			for _, ins := range compSpec.Instances {
-				if ins.Name != v.Name {
-					continue
-				}
-				instanceTemplates = append(instanceTemplates, appsv1.InstanceTemplate{
-					Name:                 v.Name,
-					VolumeClaimTemplates: getLastVCTs(ins.VolumeClaimTemplates, ins.Name),
-				})
-			}
-		}
 		// save the last vcts of the componnet
 		lastVCTS := getLastVCTs(compSpec.VolumeClaimTemplates, "")
 		var convertedLastVCTs []opsv1alpha1.OpsRequestVolumeClaimTemplate
@@ -273,7 +236,6 @@ func (ve volumeExpansionOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.Req
 		}
 		return opsv1alpha1.LastComponentConfiguration{
 			VolumeClaimTemplates: convertedLastVCTs,
-			Instances:            instanceTemplates,
 		}
 	})
 	return nil

@@ -601,15 +601,7 @@ var _ = Describe("Component Controller", func() {
 		createCompObj(compName, compDefName, func(f *testapps.MockComponentFactory) {
 			f.SetReplicas(int32(replicas)).
 				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
-				AddVolumeClaimTemplate(testapps.LogVolumeName, pvcSpec).
-				AddInstances(kbappsv1.InstanceTemplate{
-					Name:     insTPLName,
-					Replicas: ptr.To(int32(1)),
-					VolumeClaimTemplates: []kbappsv1.ClusterComponentVolumeClaimTemplate{
-						{Name: testapps.DataVolumeName, Spec: pvcSpec},
-						{Name: testapps.LogVolumeName, Spec: pvcSpec},
-					},
-				})
+				AddVolumeClaimTemplate(testapps.LogVolumeName, pvcSpec)
 		})
 
 		By("checking the replicas")
@@ -678,12 +670,6 @@ var _ = Describe("Component Controller", func() {
 				}
 			}
 			expandVolume(comp.Spec.VolumeClaimTemplates, newVolumeQuantity)
-			for i, insTPL := range comp.Spec.Instances {
-				if insTPL.Name == insTPLName {
-					expandVolume(comp.Spec.Instances[i].VolumeClaimTemplates, newFooVolumeQuantity)
-					break
-				}
-			}
 		})()).ShouldNot(HaveOccurred())
 
 		By("checking the resize operation in progress for data volume")

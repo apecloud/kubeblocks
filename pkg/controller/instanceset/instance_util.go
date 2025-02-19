@@ -941,14 +941,6 @@ func buildInstanceTemplateExt(template workloads.InstanceTemplate, templateExt *
 			})
 		mergeAffinity(&template.SchedulingPolicy.Affinity, &templateExt.Spec.Affinity)
 	}
-
-	vcts := intctrlutil.ToCoreV1PVCs(template.VolumeClaimTemplates)
-	intctrlutil.MergeList(&vcts, &templateExt.VolumeClaimTemplates,
-		func(item corev1.PersistentVolumeClaim) func(corev1.PersistentVolumeClaim) bool {
-			return func(claim corev1.PersistentVolumeClaim) bool {
-				return claim.Name == item.Name
-			}
-		})
 }
 
 func mergeCPUNMemory(s, d *corev1.ResourceList) {

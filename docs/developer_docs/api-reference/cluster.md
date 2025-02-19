@@ -3216,7 +3216,7 @@ The keys are either podName, deployName, or statefulSetName, formatted as &lsquo
 <h3 id="apps.kubeblocks.io/v1.ClusterComponentVolumeClaimTemplate">ClusterComponentVolumeClaimTemplate
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.InstanceTemplate">InstanceTemplate</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>)
 </p>
 <div>
 </div>
@@ -7963,21 +7963,6 @@ This field allows for customizing resource allocation (CPU, memory, etc.) for th
 <em>(Optional)</em>
 <p>Defines Env to override.
 Add new or override existing envs.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>volumeClaimTemplates</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.ClusterComponentVolumeClaimTemplate">
-[]ClusterComponentVolumeClaimTemplate
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines VolumeClaimTemplates to override.
-Add new or override existing volume claim templates.</p>
 </td>
 </tr>
 </tbody>

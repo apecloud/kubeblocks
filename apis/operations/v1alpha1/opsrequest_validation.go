@@ -630,12 +630,6 @@ func (r *OpsRequest) checkVolumesAllowExpansion(ctx context.Context, cli client.
 		for _, vct := range compSpec.VolumeClaimTemplates {
 			fillVol(vct, key, isShardingComp)
 		}
-		for _, ins := range compSpec.Instances {
-			key = getKey(componentName, ins.Name)
-			for _, vct := range ins.VolumeClaimTemplates {
-				fillVol(vct, key, isShardingComp)
-			}
-		}
 	}
 	// traverse the spec to update volumes
 	for _, comp := range cluster.Spec.ComponentSpecs {

@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package v1
 
 import (
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -211,6 +212,12 @@ type ComponentSpec struct {
 	//
 	// +optional
 	PodUpdatePolicy *PodUpdatePolicyType `json:"podUpdatePolicy,omitempty"`
+
+	// PodUpdateStrategy indicates the update strategy that will be employed to update Pods
+	// in the workload when a revision is made to Template.
+	//
+	// +optional
+	PodUpdateStrategy *appsv1.StatefulSetUpdateStrategy `json:"podUpdateStrategy,omitempty"`
 
 	// Specifies the scheduling policy for the Component.
 	//

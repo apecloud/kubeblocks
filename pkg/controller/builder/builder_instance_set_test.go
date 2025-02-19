@@ -45,7 +45,7 @@ var _ = Describe("instance_set builder", func() {
 			minReadySeconds              = int32(11)
 			port                         = int32(12345)
 			policy                       = apps.OrderedReadyPodManagement
-			instanceUpdatePolicy         = workloads.PreferInPlaceInstanceUpdatePolicyType
+			podUpdatePolicy              = workloads.PreferInPlacePodUpdatePolicyType
 		)
 		parallelPodManagementConcurrency := &intstr.IntOrString{Type: intstr.String, StrVal: "100%"}
 		selectors := map[string]string{selectorKey4: selectorValue4}
@@ -106,11 +106,9 @@ var _ = Describe("instance_set builder", func() {
 				},
 			},
 		}
-		itUpdatePolicy := workloads.PreferInPlaceInstanceUpdatePolicyType
 		updateReplicas, maxUnavailable := intstr.FromInt32(3), intstr.FromInt32(2)
 		updateConcurrency := workloads.BestEffortParallelConcurrency
 		strategy := workloads.UpdateStrategy{
-			InstanceUpdatePolicy: &itUpdatePolicy,
 			RollingUpdate: &workloads.RollingUpdate{
 				Replicas:          &updateReplicas,
 				MaxUnavailable:    &maxUnavailable,
@@ -145,6 +143,7 @@ var _ = Describe("instance_set builder", func() {
 			AddVolumeClaimTemplates(vc).
 			SetPodManagementPolicy(policy).
 			SetParallelPodManagementConcurrency(parallelPodManagementConcurrency).
+			SetPodUpdatePolicy(podUpdatePolicy).
 			SetUpdateStrategy(&strategy).
 			SetPaused(paused).
 			SetCredential(credential).
@@ -171,9 +170,8 @@ var _ = Describe("instance_set builder", func() {
 		Expect(its.Spec.VolumeClaimTemplates[1]).Should(Equal(vc))
 		Expect(its.Spec.PodManagementPolicy).Should(Equal(policy))
 		Expect(its.Spec.ParallelPodManagementConcurrency).Should(Equal(parallelPodManagementConcurrency))
+		Expect(its.Spec.PodUpdatePolicy).Should(Equal(podUpdatePolicy))
 		Expect(its.Spec.UpdateStrategy).ShouldNot(BeNil())
-		Expect(its.Spec.UpdateStrategy.InstanceUpdatePolicy).ShouldNot(BeNil())
-		Expect(*its.Spec.UpdateStrategy.InstanceUpdatePolicy).Should(Equal(instanceUpdatePolicy))
 		Expect(its.Spec.UpdateStrategy.RollingUpdate).ShouldNot(BeNil())
 		Expect(its.Spec.UpdateStrategy.RollingUpdate.Replicas).ShouldNot(BeNil())
 		Expect(*its.Spec.UpdateStrategy.RollingUpdate.Replicas).Should(Equal(updateReplicas))

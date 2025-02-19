@@ -91,6 +91,11 @@ func (builder *ComponentBuilder) SetParallelPodManagementConcurrency(parallelPod
 	return builder
 }
 
+func (builder *ComponentBuilder) SetPodUpdatePolicy(policy *appsv1.PodUpdatePolicyType) *ComponentBuilder {
+	builder.get().Spec.PodUpdatePolicy = policy
+	return builder
+}
+
 func (builder *ComponentBuilder) SetUpdateStrategy(strategy *appsv1.UpdateStrategy) *ComponentBuilder {
 	builder.get().Spec.UpdateStrategy = strategy
 	return builder

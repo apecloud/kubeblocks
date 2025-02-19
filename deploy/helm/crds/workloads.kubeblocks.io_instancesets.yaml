@@ -4057,6 +4057,17 @@ spec:
 
                   Note: This field will be removed in future version.
                 type: string
+              podUpdatePolicy:
+                description: |-
+                  PodUpdatePolicy indicates how pods should be updated
+
+
+                  - `StrictInPlace` indicates that only allows in-place upgrades.
+                  Any attempt to modify other fields will be rejected.
+                  - `PreferInPlace` indicates that we will first attempt an in-place upgrade of the Pod.
+                  If that fails, it will fall back to the ReCreate, where pod will be recreated.
+                  Default value is "PreferInPlace"
+                type: string
               replicas:
                 default: 1
                 description: |-
@@ -11698,20 +11709,6 @@ spec:
                 description: Provides fine-grained control over the spec update process
                   of all instances.
                 properties:
-                  instanceUpdatePolicy:
-                    description: |-
-                      Indicates how instances should be updated.
-
-
-                      - `StrictInPlace` indicates that only allows in-place update.
-                      Any attempt to modify other fields that not support in-place update will be rejected.
-                      - `PreferInPlace` indicates that we will first attempt an in-place update of the instance.
-                      If that fails, it will fall back to the ReCreate, where instance will be recreated.
-                      Default value is "PreferInPlace".
-                    enum:
-                    - StrictInPlace
-                    - PreferInPlace
-                    type: string
                   rollingUpdate:
                     description: Specifies how the rolling update should be applied.
                     properties:

@@ -218,10 +218,7 @@ var _ = Describe("update reconciler test", func() {
 			Expect(err).Should(BeNil())
 			root, ok = preferInPlaceTree.GetRoot().(*workloads.InstanceSet)
 			Expect(ok).Should(BeTrue())
-			instanceUpdatePolicy := workloads.PreferInPlaceInstanceUpdatePolicyType
-			root.Spec.UpdateStrategy = &workloads.UpdateStrategy{
-				InstanceUpdatePolicy: &instanceUpdatePolicy,
-			}
+			root.Spec.PodUpdatePolicy = workloads.PreferInPlacePodUpdatePolicyType
 			// try to add env to instanceHello to trigger the recreation
 			root.Spec.Instances[0].Env = []corev1.EnvVar{
 				{
@@ -239,10 +236,7 @@ var _ = Describe("update reconciler test", func() {
 			Expect(err).Should(BeNil())
 			root, ok = strictInPlaceTree.GetRoot().(*workloads.InstanceSet)
 			Expect(ok).Should(BeTrue())
-			instanceUpdatePolicy = workloads.StrictInPlaceInstanceUpdatePolicyType
-			root.Spec.UpdateStrategy = &workloads.UpdateStrategy{
-				InstanceUpdatePolicy: &instanceUpdatePolicy,
-			}
+			root.Spec.PodUpdatePolicy = workloads.StrictInPlacePodUpdatePolicyType
 			// try to add env to instanceHello to trigger the recreation
 			root.Spec.Instances[0].Env = []corev1.EnvVar{
 				{

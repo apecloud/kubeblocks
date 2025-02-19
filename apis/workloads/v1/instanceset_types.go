@@ -173,6 +173,17 @@ type InstanceSetSpec struct {
 	// +optional
 	ParallelPodManagementConcurrency *intstr.IntOrString `json:"parallelPodManagementConcurrency,omitempty"`
 
+	// PodUpdatePolicy indicates how pods should be updated
+	//
+	// - `StrictInPlace` indicates that only allows in-place upgrades.
+	// Any attempt to modify other fields will be rejected.
+	// - `PreferInPlace` indicates that we will first attempt an in-place upgrade of the Pod.
+	// If that fails, it will fall back to the ReCreate, where pod will be recreated.
+	// Default value is "PreferInPlace"
+	//
+	// +optional
+	PodUpdatePolicy PodUpdatePolicyType `json:"podUpdatePolicy,omitempty"`
+
 	// Provides fine-grained control over the spec update process of all instances.
 	//
 	// +optional
@@ -289,6 +300,18 @@ type InstanceSetStatus struct {
 // +kubebuilder:object:generate=false
 type InstanceTemplate = kbappsv1.InstanceTemplate
 
+type PodUpdatePolicyType string
+
+const (
+	// StrictInPlacePodUpdatePolicyType indicates that only allows in-place upgrades.
+	// Any attempt to modify other fields will be rejected.
+	StrictInPlacePodUpdatePolicyType PodUpdatePolicyType = "StrictInPlace"
+
+	// PreferInPlacePodUpdatePolicyType indicates that we will first attempt an in-place upgrade of the Pod.
+	// If that fails, it will fall back to the ReCreate, where pod will be recreated.
+	PreferInPlacePodUpdatePolicyType PodUpdatePolicyType = "PreferInPlace"
+)
+
 // UpdateStrategy defines fine-grained control over the spec update process of all instances.
 type UpdateStrategy struct {
 	// Indicates the type of the UpdateStrategy.
@@ -296,18 +319,6 @@ type UpdateStrategy struct {
 	//
 	// +optional
 	Type UpdateStrategyType `json:"type,omitempty"`
-
-	// Indicates how instances should be updated.
-	//
-	// - `StrictInPlace` indicates that only allows in-place update.
-	// Any attempt to modify other fields that not support in-place update will be rejected.
-	// - `PreferInPlace` indicates that we will first attempt an in-place update of the instance.
-	// If that fails, it will fall back to the ReCreate, where instance will be recreated.
-	// Default value is "PreferInPlace".
-	//
-	// +kubebuilder:validation:Enum={StrictInPlace,PreferInPlace}
-	// +optional
-	InstanceUpdatePolicy *InstanceUpdatePolicyType `json:"instanceUpdatePolicy,omitempty"`
 
 	// Specifies how the rolling update should be applied.
 	//
@@ -372,18 +383,6 @@ type RollingUpdate struct {
 	// +optional
 	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty"`
 }
-
-type InstanceUpdatePolicyType string
-
-const (
-	// StrictInPlaceInstanceUpdatePolicyType indicates that only allows in-place update.
-	// Any attempt to modify other fields that not support in-place update will be rejected.
-	StrictInPlaceInstanceUpdatePolicyType InstanceUpdatePolicyType = "StrictInPlace"
-
-	// PreferInPlaceInstanceUpdatePolicyType indicates that we will first attempt an in-place update of the instance.
-	// If that fails, it will fall back to the ReCreate, where instance will be recreated.
-	PreferInPlaceInstanceUpdatePolicyType InstanceUpdatePolicyType = "PreferInPlace"
-)
 
 // UpdateConcurrency defines the update concurrency level for cluster components. This concurrency level determines how updates are applied
 // across the cluster.

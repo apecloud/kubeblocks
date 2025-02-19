@@ -130,8 +130,7 @@ func (c *itsUpdateStrategyConvertor) convert(args ...any) (any, error) {
 	var updateStrategy *workloads.UpdateStrategy
 	if synthesizedComp.UpdateStrategy != nil {
 		updateStrategy = &workloads.UpdateStrategy{
-			Type:                 workloads.UpdateStrategyType(synthesizedComp.UpdateStrategy.Type),
-			InstanceUpdatePolicy: (*workloads.InstanceUpdatePolicyType)(synthesizedComp.UpdateStrategy.InstanceUpdatePolicy),
+			Type: workloads.UpdateStrategyType(synthesizedComp.UpdateStrategy.Type),
 		}
 		if synthesizedComp.UpdateStrategy.RollingUpdate != nil {
 			updateStrategy.RollingUpdate = &workloads.RollingUpdate{

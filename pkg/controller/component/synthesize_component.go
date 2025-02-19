@@ -111,6 +111,7 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 		Stop:                             comp.Spec.Stop,
 		PodManagementPolicy:              compDef.Spec.PodManagementPolicy,
 		ParallelPodManagementConcurrency: comp.Spec.ParallelPodManagementConcurrency,
+		PodUpdatePolicy:                  comp.Spec.PodUpdatePolicy,
 	}
 
 	if err = mergeUserDefinedEnv(synthesizeComp, comp); err != nil {
@@ -248,8 +249,7 @@ func buildUpdateStrategy(synthesizeComp *SynthesizedComponent, comp *appsv1.Comp
 	var updateStrategy *appsv1.UpdateStrategy
 	if comp.Spec.UpdateStrategy != nil {
 		updateStrategy = &appsv1.UpdateStrategy{
-			Type:                 comp.Spec.UpdateStrategy.Type,
-			InstanceUpdatePolicy: comp.Spec.UpdateStrategy.InstanceUpdatePolicy,
+			Type: comp.Spec.UpdateStrategy.Type,
 		}
 		if comp.Spec.UpdateStrategy.RollingUpdate != nil {
 			updateStrategy.RollingUpdate = &appsv1.RollingUpdate{

@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package v1alpha1
 
 import (
-	"slices"
 	"sort"
 	"strings"
 
@@ -106,13 +105,13 @@ func (r *Cluster) changesToCluster(cluster *appsv1.Cluster) {
 	//       - volumeClaimTemplates
 	//           spec:
 	//             resources: corev1.ResourceRequirements -> corev1.VolumeResourceRequirements
-	//         podUpdatePolicy: *workloads.InstanceUpdatePolicyType -> *UpdateStrategy.InstanceUpdatePolicyType
+	//         podUpdatePolicy: *workloads.PodUpdatePolicyType -> *PodUpdatePolicyType
 	//     sharings
 	//       - template
 	//           volumeClaimTemplates
 	//             spec:
 	//               resources: corev1.ResourceRequirements -> corev1.VolumeResourceRequirements
-	//           podUpdatePolicy: *workloads.InstanceUpdatePolicyType -> *UpdateStrategy.InstanceUpdatePolicyType
+	//           podUpdatePolicy: *workloads.PodUpdatePolicyType -> *PodUpdatePolicyType
 	//   status
 	//     components
 	//       - message: ComponentMessageMap -> map[string]string
@@ -152,39 +151,6 @@ func (r *Cluster) changesToCluster(cluster *appsv1.Cluster) {
 			}
 			cluster.Annotations["apps.kubeblocks.io/shard-pod-anti-affinity"] = strings.Join(shardingRequiredPodAntiAffinity, ",")
 		}
-	}
-
-	for i := range r.Spec.ComponentSpecs {
-		spec := &r.Spec.ComponentSpecs[i]
-		if spec.PodUpdatePolicy == nil {
-			continue
-		}
-		index := slices.IndexFunc(cluster.Spec.ComponentSpecs, func(componentSpec appsv1.ClusterComponentSpec) bool {
-			return spec.Name == componentSpec.Name
-		})
-		if index < 0 {
-			continue
-		}
-		if cluster.Spec.ComponentSpecs[index].UpdateStrategy == nil {
-			cluster.Spec.ComponentSpecs[index].UpdateStrategy = &appsv1.UpdateStrategy{}
-		}
-		cluster.Spec.ComponentSpecs[index].UpdateStrategy.InstanceUpdatePolicy = (*appsv1.InstanceUpdatePolicyType)(spec.PodUpdatePolicy)
-	}
-	for i := range r.Spec.ShardingSpecs {
-		spec := &r.Spec.ShardingSpecs[i]
-		if spec.Template.PodUpdatePolicy == nil {
-			continue
-		}
-		index := slices.IndexFunc(cluster.Spec.Shardings, func(sharding appsv1.ClusterSharding) bool {
-			return spec.Name == sharding.Name
-		})
-		if index < 0 {
-			continue
-		}
-		if cluster.Spec.Shardings[index].Template.UpdateStrategy == nil {
-			cluster.Spec.Shardings[index].Template.UpdateStrategy = &appsv1.UpdateStrategy{}
-		}
-		cluster.Spec.Shardings[index].Template.UpdateStrategy.InstanceUpdatePolicy = (*appsv1.InstanceUpdatePolicyType)(spec.Template.PodUpdatePolicy)
 	}
 }
 
@@ -232,13 +198,13 @@ func (r *Cluster) changesFromCluster(cluster *appsv1.Cluster) {
 	//       - volumeClaimTemplates
 	//           spec:
 	//             resources: corev1.ResourceRequirements -> corev1.VolumeResourceRequirements
-	//         podUpdatePolicy: *workloads.InstanceUpdatePolicyType -> *UpdateStrategy.InstanceUpdatePolicyType
+	//         podUpdatePolicy: *workloads.PodUpdatePolicyType -> *PodUpdatePolicyType
 	//     shardingSpecs -> shardings
 	//       - template
 	//           volumeClaimTemplates
 	//             spec:
 	//               resources: corev1.ResourceRequirements -> corev1.VolumeResourceRequirements
-	//           podUpdatePolicy: *workloads.InstanceUpdatePolicyType -> *UpdateStrategy.InstanceUpdatePolicyType
+	//           podUpdatePolicy: *workloads.PodUpdatePolicyType -> *PodUpdatePolicyType
 	//   status
 	//     components
 	//       - message: ComponentMessageMap -> map[string]string
@@ -251,31 +217,6 @@ func (r *Cluster) changesFromCluster(cluster *appsv1.Cluster) {
 		shardingSpec := cluster.Spec.Shardings[i]
 		// copy from sharding spec
 		_ = copier.Copy(&r.Spec.ShardingSpecs[i], &shardingSpec)
-	}
-
-	for _, spec := range cluster.Spec.ComponentSpecs {
-		if spec.UpdateStrategy == nil || spec.UpdateStrategy.InstanceUpdatePolicy == nil {
-			continue
-		}
-		index := slices.IndexFunc(r.Spec.ComponentSpecs, func(componentSpec ClusterComponentSpec) bool {
-			return spec.Name == componentSpec.Name
-		})
-		if index < 0 {
-			continue
-		}
-		r.Spec.ComponentSpecs[index].PodUpdatePolicy = (*workloads.PodUpdatePolicyType)(spec.UpdateStrategy.InstanceUpdatePolicy)
-	}
-	for _, sharding := range cluster.Spec.Shardings {
-		if sharding.Template.UpdateStrategy == nil || sharding.Template.UpdateStrategy.InstanceUpdatePolicy == nil {
-			continue
-		}
-		index := slices.IndexFunc(r.Spec.ShardingSpecs, func(spec ShardingSpec) bool {
-			return spec.Name == sharding.Name
-		})
-		if index < 0 {
-			continue
-		}
-		r.Spec.ShardingSpecs[index].Template.PodUpdatePolicy = (*workloads.PodUpdatePolicyType)(sharding.Template.UpdateStrategy.InstanceUpdatePolicy)
 	}
 }
 

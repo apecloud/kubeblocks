@@ -26,7 +26,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/conversion"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	"github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 )
 
 // ConvertTo converts this Component to the Hub version (v1).
@@ -77,7 +76,8 @@ func (r *Component) ConvertFrom(srcRaw conversion.Hub) error {
 
 func (r *Component) incrementConvertTo(dstRaw metav1.Object) (incrementChange, error) {
 	// changed
-	r.changesToComponent(dstRaw.(*appsv1.Component))
+	comp := dstRaw.(*appsv1.Component)
+	comp.Status.Message = r.Status.Message
 
 	// deleted
 	return &componentConverter{
@@ -97,32 +97,10 @@ func (r *Component) incrementConvertFrom(srcRaw metav1.Object, ic incrementChang
 	r.Spec.InstanceUpdateStrategy = c.InstanceUpdateStrategy
 
 	// changed
-	r.changesFromComponent(srcRaw.(*appsv1.Component))
+	comp := srcRaw.(*appsv1.Component)
+	r.Status.Message = comp.Status.Message
 
 	return nil
-}
-
-func (r *Component) changesToComponent(comp *appsv1.Component) {
-	// changed:
-	//   spec
-	//     podUpdatePolicy: *workloads.InstanceUpdatePolicyType -> *UpdateStrategy.InstanceUpdatePolicyType
-	comp.Status.Message = r.Status.Message
-	if r.Spec.PodUpdatePolicy != nil {
-		if comp.Spec.UpdateStrategy == nil {
-			comp.Spec.UpdateStrategy = &appsv1.UpdateStrategy{}
-		}
-		comp.Spec.UpdateStrategy.InstanceUpdatePolicy = (*appsv1.InstanceUpdatePolicyType)(r.Spec.PodUpdatePolicy)
-	}
-}
-
-func (r *Component) changesFromComponent(comp *appsv1.Component) {
-	// changed:
-	//   spec
-	//     podUpdatePolicy: *workloads.InstanceUpdatePolicyType -> *UpdateStrategy.InstanceUpdatePolicyType
-	if comp.Spec.UpdateStrategy != nil && comp.Spec.UpdateStrategy.InstanceUpdatePolicy != nil {
-		r.Spec.PodUpdatePolicy = (*v1alpha1.PodUpdatePolicyType)(comp.Spec.UpdateStrategy.InstanceUpdatePolicy)
-	}
-	r.Status.Message = comp.Status.Message
 }
 
 type componentConverter struct {

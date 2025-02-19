@@ -66,6 +66,7 @@ type SynthesizedComponent struct {
 	UpdateStrategy                   *kbappsv1.UpdateStrategy               `json:"updateStrategy,omitempty"`
 	PodManagementPolicy              *appsv1.PodManagementPolicyType        `json:"podManagementPolicy,omitempty"`
 	ParallelPodManagementConcurrency *intstr.IntOrString                    `json:"parallelPodManagementConcurrency,omitempty"`
+	PodUpdatePolicy                  *kbappsv1.PodUpdatePolicyType          `json:"podUpdatePolicy,omitempty"`
 	PolicyRules                      []rbacv1.PolicyRule                    `json:"policyRules,omitempty"`
 	LifecycleActions                 *kbappsv1.ComponentLifecycleActions    `json:"lifecycleActions,omitempty"`
 	SystemAccounts                   []kbappsv1.SystemAccount               `json:"systemAccounts,omitempty"`

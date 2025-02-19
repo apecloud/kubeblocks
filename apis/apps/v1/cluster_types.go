@@ -426,6 +426,18 @@ type ClusterComponentSpec struct {
 	// +optional
 	ParallelPodManagementConcurrency *intstr.IntOrString `json:"parallelPodManagementConcurrency,omitempty"`
 
+	// PodUpdatePolicy indicates how pods should be updated
+	//
+	// - `StrictInPlace` indicates that only allows in-place upgrades.
+	// Any attempt to modify other fields will be rejected.
+	// - `PreferInPlace` indicates that we will first attempt an in-place upgrade of the Pod.
+	// If that fails, it will fall back to the ReCreate, where pod will be recreated.
+	// Default value is "PreferInPlace"
+	//
+	// +kubebuilder:validation:Enum={StrictInPlace,PreferInPlace}
+	// +optional
+	PodUpdatePolicy *PodUpdatePolicyType `json:"podUpdatePolicy,omitempty"`
+
 	// Provides fine-grained control over the spec update process of all instances.
 	//
 	// +optional

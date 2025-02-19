@@ -84,6 +84,7 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, component
 		SetInstances(synthesizedComp.Instances).
 		SetOfflineInstances(synthesizedComp.OfflineInstances).
 		SetParallelPodManagementConcurrency(getParallelPodManagementConcurrency(synthesizedComp)).
+		SetPodUpdatePolicy(getPodUpdatePolicy(synthesizedComp)).
 		SetLifecycleActions(synthesizedComp.LifecycleActions).
 		SetTemplateVars(synthesizedComp.TemplateVars)
 
@@ -128,6 +129,13 @@ func getParallelPodManagementConcurrency(synthesizedComp *component.SynthesizedC
 		return synthesizedComp.ParallelPodManagementConcurrency
 	}
 	return &intstr.IntOrString{Type: intstr.String, StrVal: "100%"} // default value
+}
+
+func getPodUpdatePolicy(synthesizedComp *component.SynthesizedComponent) workloads.PodUpdatePolicyType {
+	if synthesizedComp.PodUpdatePolicy != nil {
+		return workloads.PodUpdatePolicyType(*synthesizedComp.PodUpdatePolicy)
+	}
+	return workloads.PreferInPlacePodUpdatePolicyType // default value
 }
 
 func vctToPVC(vct corev1.PersistentVolumeClaimTemplate) corev1.PersistentVolumeClaim {

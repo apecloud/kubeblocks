@@ -162,13 +162,9 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		if err != nil {
 			return kubebuilderx.Continue, err
 		}
-		instanceUpdatePolicy := workloads.PreferInPlaceInstanceUpdatePolicyType
-		if its.Spec.UpdateStrategy != nil && its.Spec.UpdateStrategy.InstanceUpdatePolicy != nil {
-			instanceUpdatePolicy = *its.Spec.UpdateStrategy.InstanceUpdatePolicy
-		}
-		if instanceUpdatePolicy == workloads.StrictInPlaceInstanceUpdatePolicyType && updatePolicy == RecreatePolicy {
-			message := fmt.Sprintf("InstanceSet %s/%s blocks on update as the InstanceUpdatePolicy is %s and the pod %s can not inplace update",
-				its.Namespace, its.Name, workloads.StrictInPlaceInstanceUpdatePolicyType, pod.Name)
+		if its.Spec.PodUpdatePolicy == workloads.StrictInPlacePodUpdatePolicyType && updatePolicy == RecreatePolicy {
+			message := fmt.Sprintf("InstanceSet %s/%s blocks on update as the PodUpdatePolicy is %s and the pod %s can not inplace update",
+				its.Namespace, its.Name, workloads.StrictInPlacePodUpdatePolicyType, pod.Name)
 			if tree != nil && tree.EventRecorder != nil {
 				tree.EventRecorder.Eventf(its, corev1.EventTypeWarning, EventReasonStrictInPlace, message)
 			}

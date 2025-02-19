@@ -113,6 +113,10 @@ func (builder *InstanceSetBuilder) SetParallelPodManagementConcurrency(parallelP
 	builder.get().Spec.ParallelPodManagementConcurrency = parallelPodManagementConcurrency
 	return builder
 }
+func (builder *InstanceSetBuilder) SetPodUpdatePolicy(policy workloads.PodUpdatePolicyType) *InstanceSetBuilder {
+	builder.get().Spec.PodUpdatePolicy = policy
+	return builder
+}
 
 func (builder *InstanceSetBuilder) SetUpdateStrategy(strategy *workloads.UpdateStrategy) *InstanceSetBuilder {
 	builder.get().Spec.UpdateStrategy = strategy

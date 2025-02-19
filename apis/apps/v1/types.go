@@ -478,16 +478,16 @@ type ClusterComponentConfigSource struct {
 	// - Local file
 }
 
-type InstanceUpdatePolicyType string
+type PodUpdatePolicyType string
 
 const (
-	// StrictInPlaceInstanceUpdatePolicyType indicates that only allows in-place update.
-	// Any attempt to modify other fields that not support in-place update will be rejected.
-	StrictInPlaceInstanceUpdatePolicyType InstanceUpdatePolicyType = "StrictInPlace"
+	// StrictInPlacePodUpdatePolicyType indicates that only allows in-place upgrades.
+	// Any attempt to modify other fields will be rejected.
+	StrictInPlacePodUpdatePolicyType PodUpdatePolicyType = "StrictInPlace"
 
-	// PreferInPlaceInstanceUpdatePolicyType indicates that we will first attempt an in-place update of the instance.
-	// If that fails, it will fall back to the ReCreate, where instance will be recreated.
-	PreferInPlaceInstanceUpdatePolicyType InstanceUpdatePolicyType = "PreferInPlace"
+	// PreferInPlacePodUpdatePolicyType indicates that we will first attempt an in-place upgrade of the Pod.
+	// If that fails, it will fall back to the ReCreate, where pod will be recreated.
+	PreferInPlacePodUpdatePolicyType PodUpdatePolicyType = "PreferInPlace"
 )
 
 type SchedulingPolicy struct {
@@ -714,18 +714,6 @@ type UpdateStrategy struct {
 	//
 	// +optional
 	Type UpdateStrategyType `json:"type,omitempty"`
-
-	// Indicates how instances should be updated.
-	//
-	// - `StrictInPlace` indicates that only allows in-place update.
-	// Any attempt to modify other fields that not support in-place update will be rejected.
-	// - `PreferInPlace` indicates that we will first attempt an in-place update of the instance.
-	// If that fails, it will fall back to the ReCreate, where instance will be recreated.
-	// Default value is "PreferInPlace".
-	//
-	// +kubebuilder:validation:Enum={StrictInPlace,PreferInPlace}
-	// +optional
-	InstanceUpdatePolicy *InstanceUpdatePolicyType `json:"instanceUpdatePolicy,omitempty"`
 
 	// Specifies how the rolling update should be applied.
 	//

@@ -125,7 +125,6 @@ type instanceSetConverter struct {
 func (r *InstanceSet) changesToInstanceSet(its *workloadsv1.InstanceSet) {
 	// changed:
 	// spec
-	//   podUpdatePolicy -> updateStrategy.instanceUpdatePolicy
 	//   memberUpdateStrategy -> updateStrategy.rollingUpdate.updateConcurrency
 	//   updateStrategy.partition -> updateStrategy.rollingUpdate.replicas
 	//   updateStrategy.maxUnavailable -> updateStrategy.rollingUpdate.maxUnavailable
@@ -133,7 +132,6 @@ func (r *InstanceSet) changesToInstanceSet(its *workloadsv1.InstanceSet) {
 	if its.Spec.UpdateStrategy == nil {
 		its.Spec.UpdateStrategy = &workloadsv1.UpdateStrategy{}
 	}
-	its.Spec.UpdateStrategy.InstanceUpdatePolicy = (*workloadsv1.InstanceUpdatePolicyType)(&r.Spec.PodUpdatePolicy)
 	initRollingUpdate := func() {
 		if its.Spec.UpdateStrategy.RollingUpdate == nil {
 			its.Spec.UpdateStrategy.RollingUpdate = &workloadsv1.RollingUpdate{}
@@ -164,16 +162,12 @@ func (r *InstanceSet) changesToInstanceSet(its *workloadsv1.InstanceSet) {
 func (r *InstanceSet) changesFromInstanceSet(its *workloadsv1.InstanceSet) {
 	// changed:
 	// spec
-	//   podUpdatePolicy -> updateStrategy.instanceUpdatePolicy
 	//   memberUpdateStrategy -> updateStrategy.rollingUpdate.updateConcurrency
 	//   updateStrategy.partition -> updateStrategy.rollingUpdate.replicas
 	//   updateStrategy.maxUnavailable -> updateStrategy.rollingUpdate.maxUnavailable
 	//   updateStrategy.memberUpdateStrategy -> updateStrategy.rollingUpdate.updateConcurrency
 	if its.Spec.UpdateStrategy == nil {
 		return
-	}
-	if its.Spec.UpdateStrategy.InstanceUpdatePolicy != nil {
-		r.Spec.PodUpdatePolicy = PodUpdatePolicyType(*its.Spec.UpdateStrategy.InstanceUpdatePolicy)
 	}
 	if its.Spec.UpdateStrategy.RollingUpdate == nil {
 		return

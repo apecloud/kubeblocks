@@ -719,6 +719,27 @@ The default Concurrency is 100%.</p>
 </tr>
 <tr>
 <td>
+<code>podUpdatePolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.PodUpdatePolicyType">
+PodUpdatePolicyType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>PodUpdatePolicy indicates how pods should be updated</p>
+<ul>
+<li><code>StrictInPlace</code> indicates that only allows in-place upgrades.
+Any attempt to modify other fields will be rejected.</li>
+<li><code>PreferInPlace</code> indicates that we will first attempt an in-place upgrade of the Pod.
+If that fails, it will fall back to the ReCreate, where pod will be recreated.
+Default value is &ldquo;PreferInPlace&rdquo;</li>
+</ul>
+</td>
+</tr>
+<tr>
+<td>
 <code>schedulingPolicy</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.SchedulingPolicy">
@@ -3056,6 +3077,27 @@ Kubernetes api utils intstr.IntOrString
 <p>Controls the concurrency of pods during initial scale up, when replacing pods on nodes,
 or when scaling down. It only used when <code>PodManagementPolicy</code> is set to <code>Parallel</code>.
 The default Concurrency is 100%.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>podUpdatePolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.PodUpdatePolicyType">
+PodUpdatePolicyType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>PodUpdatePolicy indicates how pods should be updated</p>
+<ul>
+<li><code>StrictInPlace</code> indicates that only allows in-place upgrades.
+Any attempt to modify other fields will be rejected.</li>
+<li><code>PreferInPlace</code> indicates that we will first attempt an in-place upgrade of the Pod.
+If that fails, it will fall back to the ReCreate, where pod will be recreated.
+Default value is &ldquo;PreferInPlace&rdquo;</li>
+</ul>
 </td>
 </tr>
 <tr>
@@ -6232,6 +6274,27 @@ The default Concurrency is 100%.</p>
 </tr>
 <tr>
 <td>
+<code>podUpdatePolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.PodUpdatePolicyType">
+PodUpdatePolicyType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>PodUpdatePolicy indicates how pods should be updated</p>
+<ul>
+<li><code>StrictInPlace</code> indicates that only allows in-place upgrades.
+Any attempt to modify other fields will be rejected.</li>
+<li><code>PreferInPlace</code> indicates that we will first attempt an in-place upgrade of the Pod.
+If that fails, it will fall back to the ReCreate, where pod will be recreated.
+Default value is &ldquo;PreferInPlace&rdquo;</li>
+</ul>
+</td>
+</tr>
+<tr>
+<td>
 <code>schedulingPolicy</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.SchedulingPolicy">
@@ -7991,30 +8054,6 @@ Add new or override existing volume claim templates.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1.InstanceUpdatePolicyType">InstanceUpdatePolicyType
-(<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.UpdateStrategy">UpdateStrategy</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>&#34;PreferInPlace&#34;</p></td>
-<td><p>PreferInPlaceInstanceUpdatePolicyType indicates that we will first attempt an in-place update of the instance.
-If that fails, it will fall back to the ReCreate, where instance will be recreated.</p>
-</td>
-</tr><tr><td><p>&#34;StrictInPlace&#34;</p></td>
-<td><p>StrictInPlaceInstanceUpdatePolicyType indicates that only allows in-place update.
-Any attempt to modify other fields that not support in-place update will be rejected.</p>
-</td>
-</tr></tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1.Issuer">Issuer
 </h3>
 <p>
@@ -8664,6 +8703,30 @@ string
 </td>
 </tr><tr><td><p>&#34;Unavailable&#34;</p></td>
 <td><p>UnavailablePhase indicates that a CR is in an unavailable state.</p>
+</td>
+</tr></tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.PodUpdatePolicyType">PodUpdatePolicyType
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;PreferInPlace&#34;</p></td>
+<td><p>PreferInPlacePodUpdatePolicyType indicates that we will first attempt an in-place upgrade of the Pod.
+If that fails, it will fall back to the ReCreate, where pod will be recreated.</p>
+</td>
+</tr><tr><td><p>&#34;StrictInPlace&#34;</p></td>
+<td><p>StrictInPlacePodUpdatePolicyType indicates that only allows in-place upgrades.
+Any attempt to modify other fields will be rejected.</p>
 </td>
 </tr></tbody>
 </table>
@@ -11868,27 +11931,6 @@ UpdateStrategyType
 <em>(Optional)</em>
 <p>Indicates the type of the UpdateStrategy.
 Default is RollingUpdate.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>instanceUpdatePolicy</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.InstanceUpdatePolicyType">
-InstanceUpdatePolicyType
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Indicates how instances should be updated.</p>
-<ul>
-<li><code>StrictInPlace</code> indicates that only allows in-place update.
-Any attempt to modify other fields that not support in-place update will be rejected.</li>
-<li><code>PreferInPlace</code> indicates that we will first attempt an in-place update of the instance.
-If that fails, it will fall back to the ReCreate, where instance will be recreated.
-Default value is &ldquo;PreferInPlace&rdquo;.</li>
-</ul>
 </td>
 </tr>
 <tr>
@@ -29389,6 +29431,27 @@ The default Concurrency is 100%.</p>
 </tr>
 <tr>
 <td>
+<code>podUpdatePolicy</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.PodUpdatePolicyType">
+PodUpdatePolicyType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>PodUpdatePolicy indicates how pods should be updated</p>
+<ul>
+<li><code>StrictInPlace</code> indicates that only allows in-place upgrades.
+Any attempt to modify other fields will be rejected.</li>
+<li><code>PreferInPlace</code> indicates that we will first attempt an in-place upgrade of the Pod.
+If that fails, it will fall back to the ReCreate, where pod will be recreated.
+Default value is &ldquo;PreferInPlace&rdquo;</li>
+</ul>
+</td>
+</tr>
+<tr>
+<td>
 <code>updateStrategy</code><br/>
 <em>
 <a href="#workloads.kubeblocks.io/v1.UpdateStrategy">
@@ -29872,6 +29935,27 @@ The default Concurrency is 100%.</p>
 </tr>
 <tr>
 <td>
+<code>podUpdatePolicy</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.PodUpdatePolicyType">
+PodUpdatePolicyType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>PodUpdatePolicy indicates how pods should be updated</p>
+<ul>
+<li><code>StrictInPlace</code> indicates that only allows in-place upgrades.
+Any attempt to modify other fields will be rejected.</li>
+<li><code>PreferInPlace</code> indicates that we will first attempt an in-place upgrade of the Pod.
+If that fails, it will fall back to the ReCreate, where pod will be recreated.
+Default value is &ldquo;PreferInPlace&rdquo;</li>
+</ul>
+</td>
+</tr>
+<tr>
+<td>
 <code>updateStrategy</code><br/>
 <em>
 <a href="#workloads.kubeblocks.io/v1.UpdateStrategy">
@@ -30252,30 +30336,6 @@ indicated by UpdateRevisions.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="workloads.kubeblocks.io/v1.InstanceUpdatePolicyType">InstanceUpdatePolicyType
-(<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.UpdateStrategy">UpdateStrategy</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>&#34;PreferInPlace&#34;</p></td>
-<td><p>PreferInPlaceInstanceUpdatePolicyType indicates that we will first attempt an in-place update of the instance.
-If that fails, it will fall back to the ReCreate, where instance will be recreated.</p>
-</td>
-</tr><tr><td><p>&#34;StrictInPlace&#34;</p></td>
-<td><p>StrictInPlaceInstanceUpdatePolicyType indicates that only allows in-place update.
-Any attempt to modify other fields that not support in-place update will be rejected.</p>
-</td>
-</tr></tbody>
-</table>
 <h3 id="workloads.kubeblocks.io/v1.MemberStatus">MemberStatus
 </h3>
 <p>
@@ -30429,6 +30489,30 @@ Action
 </td>
 </tr>
 </tbody>
+</table>
+<h3 id="workloads.kubeblocks.io/v1.PodUpdatePolicyType">PodUpdatePolicyType
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;PreferInPlace&#34;</p></td>
+<td><p>PreferInPlacePodUpdatePolicyType indicates that we will first attempt an in-place upgrade of the Pod.
+If that fails, it will fall back to the ReCreate, where pod will be recreated.</p>
+</td>
+</tr><tr><td><p>&#34;StrictInPlace&#34;</p></td>
+<td><p>StrictInPlacePodUpdatePolicyType indicates that only allows in-place upgrades.
+Any attempt to modify other fields will be rejected.</p>
+</td>
+</tr></tbody>
 </table>
 <h3 id="workloads.kubeblocks.io/v1.RoleUpdateMechanism">RoleUpdateMechanism
 (<code>string</code> alias)</h3>
@@ -30599,27 +30683,6 @@ UpdateStrategyType
 <em>(Optional)</em>
 <p>Indicates the type of the UpdateStrategy.
 Default is RollingUpdate.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>instanceUpdatePolicy</code><br/>
-<em>
-<a href="#workloads.kubeblocks.io/v1.InstanceUpdatePolicyType">
-InstanceUpdatePolicyType
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Indicates how instances should be updated.</p>
-<ul>
-<li><code>StrictInPlace</code> indicates that only allows in-place update.
-Any attempt to modify other fields that not support in-place update will be rejected.</li>
-<li><code>PreferInPlace</code> indicates that we will first attempt an in-place update of the instance.
-If that fails, it will fall back to the ReCreate, where instance will be recreated.
-Default value is &ldquo;PreferInPlace&rdquo;.</li>
-</ul>
 </td>
 </tr>
 <tr>

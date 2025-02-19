@@ -2961,50 +2961,6 @@ spec:
                       description: Specifies the name of the Component as defined
                         in the cluster.spec
                       type: string
-                    instances:
-                      description: Specifies the desired storage size of the instance
-                        template that need to volume expand.
-                      items:
-                        properties:
-                          name:
-                            description: Refer to the instance template name of the
-                              component or sharding.
-                            type: string
-                          volumeClaimTemplates:
-                            description: volumeClaimTemplates specifies the storage
-                              size and volumeClaimTemplate name.
-                            items:
-                              properties:
-                                name:
-                                  description: |-
-                                    Specify the name of the volumeClaimTemplate in the Component.
-                                    The specified name must match one of the volumeClaimTemplates defined
-                                    in the `clusterComponentSpec.volumeClaimTemplates` field.
-                                  type: string
-                                storage:
-                                  anyOf:
-                                  - type: integer
-                                  - type: string
-                                  description: Specifies the desired storage size
-                                    for the volume.
-                                  pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                                  x-kubernetes-int-or-string: true
-                              required:
-                              - name
-                              - storage
-                              type: object
-                            type: array
-                            x-kubernetes-list-map-keys:
-                            - name
-                            x-kubernetes-list-type: map
-                        required:
-                        - name
-                        - volumeClaimTemplates
-                        type: object
-                      type: array
-                      x-kubernetes-list-map-keys:
-                      - name
-                      x-kubernetes-list-type: map
                     volumeClaimTemplates:
                       description: |-
                         Specifies a list of OpsRequestVolumeClaimTemplate objects, defining the volumeClaimTemplates

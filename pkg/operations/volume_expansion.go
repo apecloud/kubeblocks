@@ -45,7 +45,6 @@ type volumeExpansionOpsHandler struct {
 type volumeExpansionHelper struct {
 	compOps              ComponentOpsInterface
 	fullComponentName    string
-	templateName         string
 	vctName              string
 	expectCount          int
 	offlineInstanceNames []string
@@ -164,7 +163,7 @@ func (ve volumeExpansionOpsHandler) ReconcileAction(reqCtx intctrlutil.RequestCt
 	// sync the volumeClaimTemplate status and component phase On the OpsRequest and Cluster.
 	for _, veHelper := range veHelpers {
 		opsCompStatus := opsRequest.Status.Components[veHelper.compOps.GetComponentName()]
-		key := getComponentVCTKey(veHelper.compOps.GetComponentName(), veHelper.templateName, veHelper.vctName)
+		key := getComponentVCTKey(veHelper.compOps.GetComponentName(), veHelper.vctName)
 		requestStorage, ok := storageMap[key]
 		if !ok {
 			continue
@@ -214,10 +213,10 @@ func (ve volumeExpansionOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.Req
 	compOpsHelper := newComponentOpsHelper(opsRequest.Spec.VolumeExpansionList)
 	storageMap := ve.getRequestStorageMap(opsRequest)
 	compOpsHelper.saveLastConfigurations(opsRes, func(compSpec appsv1.ClusterComponentSpec, comOps ComponentOpsInterface) opsv1alpha1.LastComponentConfiguration {
-		getLastVCTs := func(vcts []appsv1.ClusterComponentVolumeClaimTemplate, templateName string) []appsv1.ClusterComponentVolumeClaimTemplate {
+		getLastVCTs := func(vcts []appsv1.ClusterComponentVolumeClaimTemplate) []appsv1.ClusterComponentVolumeClaimTemplate {
 			lastVCTs := make([]appsv1.ClusterComponentVolumeClaimTemplate, 0)
 			for _, vct := range vcts {
-				key := getComponentVCTKey(comOps.GetComponentName(), templateName, vct.Name)
+				key := getComponentVCTKey(comOps.GetComponentName(), vct.Name)
 				if _, ok := storageMap[key]; !ok {
 					continue
 				}
@@ -226,7 +225,7 @@ func (ve volumeExpansionOpsHandler) SaveLastConfiguration(reqCtx intctrlutil.Req
 			return lastVCTs
 		}
 		// save the last vcts of the componnet
-		lastVCTS := getLastVCTs(compSpec.VolumeClaimTemplates, "")
+		lastVCTS := getLastVCTs(compSpec.VolumeClaimTemplates)
 		var convertedLastVCTs []opsv1alpha1.OpsRequestVolumeClaimTemplate
 		for _, v := range lastVCTS {
 			convertedLastVCTs = append(convertedLastVCTs, opsv1alpha1.OpsRequestVolumeClaimTemplate{
@@ -253,18 +252,13 @@ func (ve volumeExpansionOpsHandler) pvcIsResizing(pvc *corev1.PersistentVolumeCl
 
 func (ve volumeExpansionOpsHandler) getRequestStorageMap(opsRequest *opsv1alpha1.OpsRequest) map[string]resource.Quantity {
 	storageMap := map[string]resource.Quantity{}
-	setStorageMap := func(vct opsv1alpha1.OpsRequestVolumeClaimTemplate, compOps opsv1alpha1.ComponentOps, templateName string) {
-		key := getComponentVCTKey(compOps.GetComponentName(), templateName, vct.Name)
+	setStorageMap := func(vct opsv1alpha1.OpsRequestVolumeClaimTemplate, compOps opsv1alpha1.ComponentOps) {
+		key := getComponentVCTKey(compOps.GetComponentName(), vct.Name)
 		storageMap[key] = vct.Storage
 	}
 	for _, v := range opsRequest.Spec.VolumeExpansionList {
 		for _, vct := range v.VolumeClaimTemplates {
-			setStorageMap(vct, v.ComponentOps, "")
-		}
-		for _, ins := range v.Instances {
-			for _, vct := range ins.VolumeClaimTemplates {
-				setStorageMap(vct, v.ComponentOps, ins.Name)
-			}
+			setStorageMap(vct, v.ComponentOps)
 		}
 	}
 	return storageMap
@@ -295,24 +289,18 @@ func (ve volumeExpansionOpsHandler) handleVCTExpansionProgress(reqCtx intctrluti
 		constant.VolumeClaimTemplateNameLabelKey: veHelper.vctName,
 		constant.KBAppComponentLabelKey:          veHelper.fullComponentName,
 	}
-	if veHelper.templateName != "" {
-		matchingLabels[constant.KBAppComponentInstanceTemplateLabelKey] = veHelper.templateName
-	}
 	pvcList := &corev1.PersistentVolumeClaimList{}
 	if err = cli.List(reqCtx.Ctx, pvcList, matchingLabels, client.InNamespace(opsRes.Cluster.Namespace)); err != nil {
 		return 0, 0, err
 	}
 	workloadName := constant.GenerateWorkloadNamePattern(opsRes.Cluster.Name, veHelper.fullComponentName)
-	instanceNames, err := instanceset.GenerateInstanceNamesFromTemplate(workloadName, veHelper.templateName, int32(veHelper.expectCount), veHelper.offlineInstanceNames, nil)
+	instanceNames, err := instanceset.GenerateInstanceNamesFromTemplate(workloadName, "", int32(veHelper.expectCount), veHelper.offlineInstanceNames, nil)
 	if err != nil {
 		return 0, 0, err
 	}
 	instanceNameSet := sets.New(instanceNames...)
 	for _, v := range pvcList.Items {
 		if _, ok := instanceNameSet[strings.Replace(v.Name, veHelper.vctName+"-", "", 1)]; !ok {
-			continue
-		}
-		if v.Labels[constant.KBAppComponentInstanceTemplateLabelKey] != veHelper.templateName {
 			continue
 		}
 		objectKey := getPVCProgressObjectKey(v.Name)
@@ -355,12 +343,8 @@ func (ve volumeExpansionOpsHandler) getProgressDetail(veHelper volumeExpansionHe
 	return *progressDetail
 }
 
-func getComponentVCTKey(compoName, insTemplateName, vctName string) string {
-	var instanceNameKey string
-	if insTemplateName != "" {
-		instanceNameKey = "." + insTemplateName
-	}
-	return fmt.Sprintf("%s%s.%s", compoName, instanceNameKey, vctName)
+func getComponentVCTKey(compoName, vctName string) string {
+	return fmt.Sprintf("%s.%s", compoName, vctName)
 }
 
 func getPVCProgressObjectKey(pvcName string) string {

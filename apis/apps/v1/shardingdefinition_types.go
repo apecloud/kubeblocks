@@ -150,7 +150,7 @@ type ShardsLimit struct {
 	// +kubebuilder:validation:Required
 	MinShards int32 `json:"minShards"`
 
-	// The maximum limit of replicas.
+	// The maximum limit of shards.
 	//
 	// +kubebuilder:validation:Required
 	MaxShards int32 `json:"maxShards"`

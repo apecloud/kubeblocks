@@ -195,11 +195,11 @@ func (r *ShardingDefinitionReconciler) validateProvisionNUpdateStrategy(ctx cont
 		update    = shardingDef.Spec.UpdateStrategy
 	)
 
-	supported := func(strategy *appsv1.UpdateConcurrency) bool {
+	supported := func(strategy *appsv1.UpdateStrategy2) bool {
 		if strategy == nil {
 			return true
 		}
-		return *strategy == appsv1.SerialConcurrency || *strategy == appsv1.ParallelConcurrency
+		return *strategy == appsv1.SerialStrategy || *strategy == appsv1.ParallelStrategy
 	}
 	if !supported(provision) {
 		return fmt.Errorf("unsupported provision strategy: %s", *provision)
@@ -208,7 +208,7 @@ func (r *ShardingDefinitionReconciler) validateProvisionNUpdateStrategy(ctx cont
 		return fmt.Errorf("unsupported update strategy: %s", *update)
 	}
 
-	if provision != nil && *provision == appsv1.SerialConcurrency && r.requireParallelProvision() {
+	if provision != nil && *provision == appsv1.SerialStrategy && r.requireParallelProvision() {
 		return fmt.Errorf("serial provision strategy is conflicted with vars that requires parallel provision when mutiple objects matched")
 	}
 	return nil

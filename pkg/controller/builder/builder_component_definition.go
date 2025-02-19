@@ -192,8 +192,8 @@ func (builder *ComponentDefinitionBuilder) SetReplicasLimit(minReplicas, maxRepl
 	return builder
 }
 
-func (builder *ComponentDefinitionBuilder) SetUpdateConcurrency(concurrency *appsv1.UpdateConcurrency) *ComponentDefinitionBuilder {
-	builder.get().Spec.UpdateConcurrency = concurrency
+func (builder *ComponentDefinitionBuilder) SetUpdateStrategy(strategy *appsv1.UpdateStrategy2) *ComponentDefinitionBuilder {
+	builder.get().Spec.UpdateStrategy = strategy
 	return builder
 }
 

@@ -259,16 +259,17 @@ func buildUpdateStrategy(synthesizeComp *SynthesizedComponent, comp *appsv1.Comp
 			}
 		}
 	}
-	if compDef.Spec.UpdateConcurrency != nil {
+	if compDef.Spec.UpdateStrategy != nil {
 		if updateStrategy == nil {
 			updateStrategy = &appsv1.UpdateStrategy{}
 		}
 		if updateStrategy.RollingUpdate == nil {
 			updateStrategy.RollingUpdate = &appsv1.RollingUpdate{}
 		}
-		if updateStrategy.RollingUpdate.UpdateConcurrency == nil {
-			updateStrategy.RollingUpdate.UpdateConcurrency = compDef.Spec.UpdateConcurrency
-		}
+		// TODO: impl
+		// if updateStrategy.RollingUpdate.UpdateConcurrency == nil {
+		//	updateStrategy.RollingUpdate.UpdateConcurrency = compDef.Spec.UpdateStrategy
+		// }
 	}
 	synthesizeComp.UpdateStrategy = updateStrategy
 }

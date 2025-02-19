@@ -117,7 +117,6 @@ func (r *ComponentDefinition) changesToComponentDefinition(cmpd *appsv1.Componen
 	//       - ValueFrom
 	//           componentVarRef:
 	//             instanceNames -> podNames
-	//     updateStrategy -> updateConcurrency
 	//     lifecycleActions
 
 	for _, v := range r.Spec.Vars {
@@ -127,9 +126,6 @@ func (r *ComponentDefinition) changesToComponentDefinition(cmpd *appsv1.Componen
 		if err := r.toV1VarsPodNames(v, cmpd); err != nil {
 			return err
 		}
-	}
-	if r.Spec.UpdateStrategy != nil {
-		cmpd.Spec.UpdateConcurrency = (*appsv1.UpdateConcurrency)(r.Spec.UpdateStrategy)
 	}
 	r.toV1LifecycleActions(cmpd)
 	return nil
@@ -142,7 +138,6 @@ func (r *ComponentDefinition) changesFromComponentDefinition(cmpd *appsv1.Compon
 	//       - ValueFrom
 	//           componentVarRef:
 	//             instanceNames -> podNames
-	//     updateStrategy -> updateConcurrency
 	//     lifecycleActions
 
 	for _, v := range cmpd.Spec.Vars {
@@ -152,9 +147,6 @@ func (r *ComponentDefinition) changesFromComponentDefinition(cmpd *appsv1.Compon
 		if err := r.fromV1VarsPodNames(v); err != nil {
 			return err
 		}
-	}
-	if cmpd.Spec.UpdateConcurrency != nil {
-		r.Spec.UpdateStrategy = (*UpdateStrategy)(cmpd.Spec.UpdateConcurrency)
 	}
 	r.fromV1LifecycleActions(cmpd)
 	return nil

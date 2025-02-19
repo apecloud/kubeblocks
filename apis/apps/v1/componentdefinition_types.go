@@ -450,24 +450,24 @@ type ComponentDefinitionSpec struct {
 	// +optional
 	MinReadySeconds int32 `json:"minReadySeconds,omitempty"`
 
-	// Specifies the concurrency level for updating instances during a rolling update.
-	// Available levels:
+	// Specifies the concurrency strategy for updating multiple instances of the Component.
+	// Available strategies:
 	//
-	// - `Serial`: Updates instances one at a time, ensuring minimal downtime by waiting for each instance to become ready
+	// - `Serial`: Updates replicas one at a time, ensuring minimal downtime by waiting for each replica to become ready
 	//   before updating the next.
-	// - `Parallel`: Updates all instances simultaneously, optimizing for speed but potentially reducing availability
+	// - `Parallel`: Updates all replicas simultaneously, optimizing for speed but potentially reducing availability
 	//   during the update.
-	// - `BestEffortParallel`: Updates instances concurrently with a limit on simultaneous updates to ensure a minimum
+	// - `BestEffortParallel`: Updates replicas concurrently with a limit on simultaneous updates to ensure a minimum
 	//   number of operational replicas for maintaining quorum.
-	//	 For example, in a 5-instances setup, updating a maximum of 2 instances simultaneously keeps
+	//	 For example, in a 5-replica component, updating a maximum of 2 replicas simultaneously keeps
 	//	 at least 3 operational for quorum.
 	//
-	// Defaults to 'Serial'.
+	// This field is immutable and defaults to 'Serial'.
 	//
 	// +kubebuilder:validation:Enum={Serial,Parallel,BestEffortParallel}
 	// +kubebuilder:default=Serial
 	// +optional
-	UpdateConcurrency *UpdateConcurrency `json:"updateConcurrency,omitempty"`
+	UpdateStrategy *UpdateStrategy2 `json:"updateStrategy,omitempty"`
 
 	// InstanceSet controls the creation of pods during initial scale up, replacement of pods on nodes, and scaling down.
 	//
@@ -1499,6 +1499,40 @@ type ReplicaRole struct {
 	// +optional
 	ParticipatesInQuorum bool `json:"participatesInQuorum"`
 }
+
+// UpdateStrategy2 defines the update strategy for cluster components. This strategy determines how updates are applied
+// across the cluster.
+// The available strategies are `Serial`, `BestEffortParallel`, and `Parallel`.
+//
+// +enum
+// +kubebuilder:validation:Enum={Serial,BestEffortParallel,Parallel}
+type UpdateStrategy2 string
+
+const (
+	// SerialStrategy indicates that updates are applied one at a time in a sequential manner.
+	// The operator waits for each replica to be updated and ready before proceeding to the next one.
+	// This ensures that only one replica is unavailable at a time during the update process.
+	SerialStrategy UpdateStrategy2 = "Serial"
+
+	// ParallelStrategy indicates that updates are applied simultaneously to all Pods of a Component.
+	// The replicas are updated in parallel, with the operator updating all replicas concurrently.
+	// This strategy provides the fastest update time but may lead to a period of reduced availability or
+	// capacity during the update process.
+	ParallelStrategy UpdateStrategy2 = "Parallel"
+
+	// BestEffortParallelStrategy indicates that the replicas are updated in parallel, with the operator making
+	// a best-effort attempt to update as many replicas as possible concurrently
+	// while maintaining the component's availability.
+	// Unlike the `Parallel` strategy, the `BestEffortParallel` strategy aims to ensure that a minimum number
+	// of replicas remain available during the update process to maintain the component's quorum and functionality.
+	//
+	// For example, consider a component with 5 replicas. To maintain the component's availability and quorum,
+	// the operator may allow a maximum of 2 replicas to be simultaneously updated. This ensures that at least
+	// 3 replicas (a quorum) remain available and functional during the update process.
+	//
+	// The `BestEffortParallel` strategy strikes a balance between update speed and component availability.
+	BestEffortParallelStrategy UpdateStrategy2 = "BestEffortParallel"
+)
 
 // ComponentLifecycleActions defines a collection of Actions for customizing the behavior of a Component.
 type ComponentLifecycleActions struct {

@@ -278,8 +278,8 @@ func (f *MockComponentDefinitionFactory) AddSystemAccount(accountName string, in
 	return f
 }
 
-func (f *MockComponentDefinitionFactory) SetUpdateConcurrency(concurrency *kbappsv1.UpdateConcurrency) *MockComponentDefinitionFactory {
-	f.Get().Spec.UpdateConcurrency = concurrency
+func (f *MockComponentDefinitionFactory) SetUpdateStrategy(strategy *kbappsv1.UpdateStrategy2) *MockComponentDefinitionFactory {
+	f.Get().Spec.UpdateStrategy = strategy
 	return f
 }
 

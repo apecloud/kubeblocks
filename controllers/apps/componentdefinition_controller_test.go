@@ -29,6 +29,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -493,7 +494,7 @@ var _ = Describe("ComponentDefinition Controller", func() {
 					Image:   "image:v0.0.1",
 					Command: []string{"command"},
 				}).
-				SetUpdateConcurrency(nil).
+				SetUpdateStrategy(nil).
 				SetPodManagementPolicy(nil)
 			if processor != nil {
 				processor(builder)
@@ -542,8 +543,7 @@ var _ = Describe("ComponentDefinition Controller", func() {
 			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(componentDefObj), func(cmpd *kbappsv1.ComponentDefinition) {
 				cmpd.Spec.Description = "v0.0.2"
 				cmpd.Spec.Runtime.Containers[0].Image = "image:v0.0.2"
-				parallel := kbappsv1.ParallelConcurrency
-				cmpd.Spec.UpdateConcurrency = &parallel
+				cmpd.Spec.UpdateStrategy = ptr.To(kbappsv1.ParallelStrategy)
 			})()).Should(Succeed())
 
 			By(fmt.Sprintf("checking the updated object as %s", strings.ToLower(string(kbappsv1.AvailablePhase))))
@@ -558,8 +558,8 @@ var _ = Describe("ComponentDefinition Controller", func() {
 						Command: []string{"command"},
 					}
 					g.Expect(cmpd.Spec.Runtime.Containers[0]).Should(BeEquivalentTo(c))
-					g.Expect(cmpd.Spec.UpdateConcurrency).ShouldNot(BeNil())
-					g.Expect(*cmpd.Spec.UpdateConcurrency).Should(Equal(kbappsv1.ParallelConcurrency))
+					g.Expect(cmpd.Spec.UpdateStrategy).ShouldNot(BeNil())
+					g.Expect(*cmpd.Spec.UpdateStrategy).Should(Equal(kbappsv1.ParallelStrategy))
 				})).Should(Succeed())
 		})
 
@@ -570,8 +570,7 @@ var _ = Describe("ComponentDefinition Controller", func() {
 			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(componentDefObj), func(cmpd *kbappsv1.ComponentDefinition) {
 				cmpd.Spec.Description = "v0.0.2"
 				cmpd.Spec.Runtime.Containers[0].Image = "image:v0.0.2"
-				parallel := kbappsv1.ParallelConcurrency
-				cmpd.Spec.UpdateConcurrency = &parallel
+				cmpd.Spec.UpdateStrategy = ptr.To(kbappsv1.ParallelStrategy)
 			})()).Should(Succeed())
 
 			By(fmt.Sprintf("checking the updated object as %s", strings.ToLower(string(kbappsv1.UnavailablePhase))))
@@ -586,14 +585,14 @@ var _ = Describe("ComponentDefinition Controller", func() {
 						Command: []string{"command"},
 					}
 					g.Expect(cmpd.Spec.Runtime.Containers[0]).Should(BeEquivalentTo(c))
-					g.Expect(cmpd.Spec.UpdateConcurrency).ShouldNot(BeNil())
-					g.Expect(*cmpd.Spec.UpdateConcurrency).Should(Equal(kbappsv1.ParallelConcurrency))
+					g.Expect(cmpd.Spec.UpdateStrategy).ShouldNot(BeNil())
+					g.Expect(*cmpd.Spec.UpdateStrategy).Should(Equal(kbappsv1.ParallelStrategy))
 				})).Should(Succeed())
 
 			By("revert the change to immutable fields back")
 			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(componentDefObj), func(cmpd *kbappsv1.ComponentDefinition) {
 				cmpd.Spec.Runtime.Containers[0].Image = "image:v0.0.1"
-				cmpd.Spec.UpdateConcurrency = nil
+				cmpd.Spec.UpdateStrategy = nil
 			})()).Should(Succeed())
 
 			By(fmt.Sprintf("checking the updated object as %s", strings.ToLower(string(kbappsv1.AvailablePhase))))
@@ -608,8 +607,8 @@ var _ = Describe("ComponentDefinition Controller", func() {
 						Command: []string{"command"},
 					}
 					g.Expect(cmpd.Spec.Runtime.Containers[0]).Should(BeEquivalentTo(c))
-					g.Expect(cmpd.Spec.UpdateConcurrency).ShouldNot(BeNil())
-					g.Expect(*cmpd.Spec.UpdateConcurrency).Should(Equal(kbappsv1.SerialConcurrency))
+					g.Expect(cmpd.Spec.UpdateStrategy).ShouldNot(BeNil())
+					g.Expect(*cmpd.Spec.UpdateStrategy).Should(Equal(kbappsv1.SerialStrategy))
 				})).Should(Succeed())
 		})
 	})

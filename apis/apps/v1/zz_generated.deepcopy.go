@@ -1196,9 +1196,9 @@ func (in *ComponentDefinitionSpec) DeepCopyInto(out *ComponentDefinitionSpec) {
 		*out = make([]ReplicaRole, len(*in))
 		copy(*out, *in)
 	}
-	if in.UpdateConcurrency != nil {
-		in, out := &in.UpdateConcurrency, &out.UpdateConcurrency
-		*out = new(UpdateConcurrency)
+	if in.UpdateStrategy != nil {
+		in, out := &in.UpdateStrategy, &out.UpdateStrategy
+		*out = new(UpdateStrategy2)
 		**out = **in
 	}
 	if in.PodManagementPolicy != nil {
@@ -3013,12 +3013,12 @@ func (in *ShardingDefinitionSpec) DeepCopyInto(out *ShardingDefinitionSpec) {
 	}
 	if in.ProvisionStrategy != nil {
 		in, out := &in.ProvisionStrategy, &out.ProvisionStrategy
-		*out = new(UpdateConcurrency)
+		*out = new(UpdateStrategy2)
 		**out = **in
 	}
 	if in.UpdateStrategy != nil {
 		in, out := &in.UpdateStrategy, &out.UpdateStrategy
-		*out = new(UpdateConcurrency)
+		*out = new(UpdateStrategy2)
 		**out = **in
 	}
 	if in.LifecycleActions != nil {

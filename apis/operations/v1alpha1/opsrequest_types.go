@@ -418,14 +418,6 @@ type VolumeExpansion struct {
 	// +listType=map
 	// +listMapKey=name
 	VolumeClaimTemplates []OpsRequestVolumeClaimTemplate `json:"volumeClaimTemplates" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
-
-	// Specifies the desired storage size of the instance template that need to volume expand.
-	// +patchMergeKey=name
-	// +patchStrategy=merge,retainKeys
-	// +listType=map
-	// +listMapKey=name
-	// +optional
-	Instances []InstanceVolumeClaimTemplate `json:"instances,omitempty"  patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 }
 
 type OpsRequestVolumeClaimTemplate struct {

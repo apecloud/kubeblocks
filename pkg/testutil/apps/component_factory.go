@@ -51,6 +51,11 @@ func (factory *MockComponentFactory) SetReplicas(replicas int32) *MockComponentF
 	return factory
 }
 
+func (factory *MockComponentFactory) SetConfigs(configs []appsv1.ClusterComponentConfig) *MockComponentFactory {
+	factory.Get().Spec.Configs = configs
+	return factory
+}
+
 func (factory *MockComponentFactory) SetServiceAccountName(serviceAccountName string) *MockComponentFactory {
 	factory.Get().Spec.ServiceAccountName = serviceAccountName
 	return factory

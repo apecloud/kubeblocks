@@ -453,25 +453,52 @@ type ProvisionSecretRef struct {
 	Password string `json:"password,omitempty"`
 }
 
-// ClusterComponentConfig represents a config with its source bound.
+// ClusterComponentConfig represents a configuration for a component.
 type ClusterComponentConfig struct {
 	// The name of the config.
 	//
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	// +optional
 	Name *string `json:"name,omitempty"`
 
-	// The source of the config.
+	// Variables are key-value pairs for dynamic configuration values that can be provided by the user.
+	//
+	// +optional
+	Variables map[string]string `json:"variables,omitempty"`
+
+	// The external source for the configuration.
 	ClusterComponentConfigSource `json:",inline"`
+
+	// The custom reconfigure action to reload the service configuration whenever changes to this config are detected.
+	//
+	// The container executing this action has access to following variables:
+	//
+	// - KB_CONFIG_FILES_CREATED: file1,file2...
+	// - KB_CONFIG_FILES_REMOVED: file1,file2...
+	// - KB_CONFIG_FILES_UPDATED: file1:checksum1,file2:checksum2...
+	//
+	// Note: This field is immutable once it has been set.
+	//
+	// +optional
+	Reconfigure *Action `json:"reconfigure,omitempty"`
+
+	// ExternalManaged indicates whether the configuration is managed by an external system.
+	// When set to true, the controller will use the user-provided template and reconfigure action,
+	// ignoring the default template and update behavior.
+	//
+	// +optional
+	ExternalManaged *bool `json:"externalManaged,omitempty"`
 }
 
-// ClusterComponentConfigSource represents the source of a config.
+// ClusterComponentConfigSource represents the source of a configuration for a component.
 type ClusterComponentConfigSource struct {
 	// ConfigMap source for the config.
 	//
 	// +optional
 	ConfigMap *corev1.ConfigMapVolumeSource `json:"configMap,omitempty"`
 
-	// TODO: support more diverse sources:
+	// TODO: additional fields can be added to support other types of sources in the future, such as:
 	// - Config template of other components within the same cluster
 	// - Config template of components from other clusters
 	// - Secret

@@ -2507,11 +2507,6 @@ func (in *RollingUpdate) DeepCopyInto(out *RollingUpdate) {
 		*out = new(intstr.IntOrString)
 		**out = **in
 	}
-	if in.UpdateConcurrency != nil {
-		in, out := &in.UpdateConcurrency, &out.UpdateConcurrency
-		*out = new(UpdateConcurrency)
-		**out = **in
-	}
 	if in.MaxUnavailable != nil {
 		in, out := &in.MaxUnavailable, &out.MaxUnavailable
 		*out = new(intstr.IntOrString)

@@ -464,7 +464,6 @@ type ComponentDefinitionSpec struct {
 	//
 	// This field is immutable and defaults to 'Serial'.
 	//
-	// +kubebuilder:validation:Enum={Serial,Parallel,BestEffortParallel}
 	// +kubebuilder:default=Serial
 	// +optional
 	UpdateStrategy *UpdateStrategy `json:"updateStrategy,omitempty"`
@@ -1506,8 +1505,6 @@ type ReplicaRole struct {
 //
 // +enum
 // +kubebuilder:validation:Enum={Serial,BestEffortParallel,Parallel}
-// UpdateStrategy defines the update strategy for cluster components. This strategy determines how updates are applied
-// across the cluster.
 type UpdateStrategy string
 
 const (

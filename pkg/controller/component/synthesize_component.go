@@ -112,14 +112,13 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 		PodManagementPolicy:              compDef.Spec.PodManagementPolicy,
 		ParallelPodManagementConcurrency: comp.Spec.ParallelPodManagementConcurrency,
 		PodUpdatePolicy:                  comp.Spec.PodUpdatePolicy,
+		UpdateStrategy:                   compDef.Spec.UpdateStrategy,
+		InstanceUpdateStrategy:           comp.Spec.UpdateStrategy,
 	}
 
 	if err = mergeUserDefinedEnv(synthesizeComp, comp); err != nil {
 		return nil, err
 	}
-
-	// build update strategy for workload
-	buildUpdateStrategy(synthesizeComp, comp, compDefObj)
 
 	// build scheduling policy for workload
 	buildSchedulingPolicy(synthesizeComp, comp)
@@ -243,35 +242,6 @@ func mergeUserDefinedEnv(synthesizedComp *SynthesizedComponent, comp *appsv1.Com
 		synthesizedComp.PodSpec.Containers[i].Env = append(synthesizedComp.PodSpec.Containers[i].Env, comp.Spec.Env...)
 	}
 	return nil
-}
-
-func buildUpdateStrategy(synthesizeComp *SynthesizedComponent, comp *appsv1.Component, compDef *appsv1.ComponentDefinition) {
-	var updateStrategy *appsv1.InstanceUpdateStrategy
-	if comp.Spec.UpdateStrategy != nil {
-		updateStrategy = &appsv1.InstanceUpdateStrategy{
-			Type: comp.Spec.UpdateStrategy.Type,
-		}
-		if comp.Spec.UpdateStrategy.RollingUpdate != nil {
-			updateStrategy.RollingUpdate = &appsv1.RollingUpdate{
-				Replicas:          comp.Spec.UpdateStrategy.RollingUpdate.Replicas,
-				MaxUnavailable:    comp.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable,
-				UpdateConcurrency: comp.Spec.UpdateStrategy.RollingUpdate.UpdateConcurrency,
-			}
-		}
-	}
-	if compDef.Spec.UpdateStrategy != nil {
-		if updateStrategy == nil {
-			updateStrategy = &appsv1.InstanceUpdateStrategy{}
-		}
-		if updateStrategy.RollingUpdate == nil {
-			updateStrategy.RollingUpdate = &appsv1.RollingUpdate{}
-		}
-		// TODO: impl
-		// if updateStrategy.RollingUpdate.UpdateConcurrency == nil {
-		//	updateStrategy.RollingUpdate.UpdateConcurrency = compDef.Spec.UpdateStrategy
-		// }
-	}
-	synthesizeComp.UpdateStrategy = updateStrategy
 }
 
 func buildSchedulingPolicy(synthesizedComp *SynthesizedComponent, comp *appsv1.Component) {

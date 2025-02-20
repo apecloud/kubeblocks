@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package builder
 
 import (
-	apps "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -104,7 +104,7 @@ func (builder *InstanceSetBuilder) SetVolumeClaimTemplates(templates ...corev1.P
 	return builder
 }
 
-func (builder *InstanceSetBuilder) SetPodManagementPolicy(policy apps.PodManagementPolicyType) *InstanceSetBuilder {
+func (builder *InstanceSetBuilder) SetPodManagementPolicy(policy appsv1.PodManagementPolicyType) *InstanceSetBuilder {
 	builder.get().Spec.PodManagementPolicy = policy
 	return builder
 }
@@ -153,8 +153,8 @@ func (builder *InstanceSetBuilder) SetPaused(paused bool) *InstanceSetBuilder {
 	return builder
 }
 
-func (builder *InstanceSetBuilder) SetCredential(credential workloads.Credential) *InstanceSetBuilder {
-	builder.get().Spec.Credential = &credential
+func (builder *InstanceSetBuilder) SetCredential(credential *workloads.Credential) *InstanceSetBuilder {
+	builder.get().Spec.Credential = credential
 	return builder
 }
 

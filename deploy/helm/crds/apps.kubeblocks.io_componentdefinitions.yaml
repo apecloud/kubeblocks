@@ -16833,15 +16833,6 @@ spec:
                 - volumeName
                 type: object
               updateStrategy:
-                allOf:
-                - enum:
-                  - Serial
-                  - BestEffortParallel
-                  - Parallel
-                - enum:
-                  - Serial
-                  - Parallel
-                  - BestEffortParallel
                 default: Serial
                 description: "Specifies the concurrency strategy for updating multiple
                   instances of the Component.\nAvailable strategies:\n\n\n- `Serial`:
@@ -16855,6 +16846,10 @@ spec:
                   component, updating a maximum of 2 replicas simultaneously keeps\n\t
                   at least 3 operational for quorum.\n\n\nThis field is immutable
                   and defaults to 'Serial'."
+                enum:
+                - Serial
+                - BestEffortParallel
+                - Parallel
                 type: string
               vars:
                 description: |-

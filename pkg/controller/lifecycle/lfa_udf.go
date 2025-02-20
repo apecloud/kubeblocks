@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2024 ApeCloud Co., Ltd
+Copyright (C) 2022-2025 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -20,23 +20,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package lifecycle
 
 import (
-	"errors"
+	"context"
+	"fmt"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-var (
-	ErrActionNotDefined     = errors.New("action is not defined")
-	ErrActionNotImplemented = errors.New("action is not implemented")
-	ErrPreconditionFailed   = errors.New("action precondition is not matched")
-	ErrActionInProgress     = errors.New("action is in progress")
-	ErrActionBusy           = errors.New("action is busy")
-	ErrActionTimedOut       = errors.New("action timed-out")
-	ErrActionFailed         = errors.New("action failed")
-	ErrActionInternalError  = errors.New("action internal error")
-)
+func UDFActionName(name string) string {
+	return fmt.Sprintf("udf-%s", name)
+}
 
-func IgnoreNotDefined(err error) error {
-	if errors.Is(err, ErrActionNotDefined) {
-		return nil
-	}
-	return err
+type udf struct {
+	uname string
+	args  map[string]string
+}
+
+var _ lifecycleAction = &udf{}
+
+func (a *udf) name() string {
+	return UDFActionName(a.uname)
+}
+
+func (a *udf) parameters(ctx context.Context, cli client.Reader) (map[string]string, error) {
+	return a.args, nil
 }

@@ -162,6 +162,8 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			&componentVarsTransformer{},
 			// provision component system accounts, depend on vars
 			&componentAccountProvisionTransformer{},
+			// render config/script templates
+			&componentFileTemplateTransformer{},
 			// render component configurations
 			&componentConfigurationTransformer{Client: r.Client},
 			// handle restore before workloads transform
@@ -170,6 +172,8 @@ func (r *ComponentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			&componentWorkloadTransformer{Client: r.Client},
 			// handle RBAC for component workloads
 			&componentRBACTransformer{},
+			// reconfigure config/script templates
+			&componentReconfigureTransformer{},
 			// handle component postProvision lifecycle action
 			&componentPostProvisionTransformer{},
 			// update component status

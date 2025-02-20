@@ -1239,6 +1239,39 @@ and bind Services at Cluster creation time with <code>clusterComponentSpec.Servi
 </tr>
 <tr>
 <td>
+<code>configs2</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentFileTemplate">
+[]ComponentFileTemplate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the config file templates and volume mount parameters used by the Component.</p>
+<p>This field specifies a list of templates that will be rendered into Component containers&rsquo; config files.
+Each template is represented as a ConfigMap and may contain multiple config files, with each file being a key in the ConfigMap.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>scripts2</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentFileTemplate">
+[]ComponentFileTemplate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies groups of scripts, each provided via a ConfigMap, to be mounted as volumes in the container.
+These scripts can be executed during container startup or via specific actions.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>configs</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.ComponentConfigSpec">
@@ -2201,7 +2234,7 @@ SidecarDefinitionStatus
 <h3 id="apps.kubeblocks.io/v1.Action">Action
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentLifecycleActions">ComponentLifecycleActions</a>, <a href="#apps.kubeblocks.io/v1.Probe">Probe</a>, <a href="#apps.kubeblocks.io/v1.ShardingLifecycleActions">ShardingLifecycleActions</a>, <a href="#workloads.kubeblocks.io/v1.MembershipReconfiguration">MembershipReconfiguration</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentConfig">ClusterComponentConfig</a>, <a href="#apps.kubeblocks.io/v1.ComponentLifecycleActions">ComponentLifecycleActions</a>, <a href="#apps.kubeblocks.io/v1.Probe">Probe</a>, <a href="#apps.kubeblocks.io/v1.ShardingLifecycleActions">ShardingLifecycleActions</a>, <a href="#workloads.kubeblocks.io/v1.MembershipReconfiguration">MembershipReconfiguration</a>)
 </p>
 <div>
 <p>Action defines a customizable hook or procedure tailored for different database engines,
@@ -2591,7 +2624,7 @@ string
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>)
 </p>
 <div>
-<p>ClusterComponentConfig represents a config with its source bound.</p>
+<p>ClusterComponentConfig represents a configuration for a component.</p>
 </div>
 <table>
 <thead>
@@ -2615,6 +2648,18 @@ string
 </tr>
 <tr>
 <td>
+<code>variables</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Variables are key-value pairs for dynamic configuration values that can be provided by the user.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>ClusterComponentConfigSource</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.ClusterComponentConfigSource">
@@ -2626,7 +2671,42 @@ ClusterComponentConfigSource
 <p>
 (Members of <code>ClusterComponentConfigSource</code> are embedded into this type.)
 </p>
-<p>The source of the config.</p>
+<p>The external source for the configuration.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>reconfigure</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The custom reconfigure action to reload the service configuration whenever changes to this config are detected.</p>
+<p>The container executing this action has access to following variables:</p>
+<ul>
+<li>KB_CONFIG_FILES_CREATED: file1,file2&hellip;</li>
+<li>KB_CONFIG_FILES_REMOVED: file1,file2&hellip;</li>
+<li>KB_CONFIG_FILES_UPDATED: file1:checksum1,file2:checksum2&hellip;</li>
+</ul>
+<p>Note: This field is immutable once it has been set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>externalManaged</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ExternalManaged indicates whether the configuration is managed by an external system.
+When set to true, the controller will use the user-provided template and reconfigure action,
+ignoring the default template and update behavior.</p>
 </td>
 </tr>
 </tbody>
@@ -2637,7 +2717,7 @@ ClusterComponentConfigSource
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentConfig">ClusterComponentConfig</a>)
 </p>
 <div>
-<p>ClusterComponentConfigSource represents the source of a config.</p>
+<p>ClusterComponentConfigSource represents the source of a configuration for a component.</p>
 </div>
 <table>
 <thead>
@@ -5140,6 +5220,39 @@ and bind Services at Cluster creation time with <code>clusterComponentSpec.Servi
 </tr>
 <tr>
 <td>
+<code>configs2</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentFileTemplate">
+[]ComponentFileTemplate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the config file templates and volume mount parameters used by the Component.</p>
+<p>This field specifies a list of templates that will be rendered into Component containers&rsquo; config files.
+Each template is represented as a ConfigMap and may contain multiple config files, with each file being a key in the ConfigMap.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>scripts2</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentFileTemplate">
+[]ComponentFileTemplate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies groups of scripts, each provided via a ConfigMap, to be mounted as volumes in the container.
+These scripts can be executed during container startup or via specific actions.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>configs</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.ComponentConfigSpec">
@@ -5515,6 +5628,93 @@ string
 <td>
 <em>(Optional)</em>
 <p>Provides additional information about the current phase.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ComponentFileTemplate">ComponentFileTemplate
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the name of the template.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>template</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the name of the referenced template ConfigMap object.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>namespace</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the namespace of the referenced template ConfigMap object.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>volumeName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Refers to the volume name of PodTemplate. The file produced through the template will be mounted to
+the corresponding volume. Must be a DNS_LABEL name.
+The volume name must be defined in podSpec.containers[*].volumeMounts.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>defaultMode</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The operator attempts to set default file permissions (0444).</p>
+<p>Must be specified as an octal value between 0000 and 0777 (inclusive),
+or as a decimal value between 0 and 511 (inclusive).
+YAML supports both octal and decimal values for file permissions.</p>
+<p>Please note that this setting only affects the permissions of the files themselves.
+Directories within the specified path are not impacted by this setting.
+It&rsquo;s important to be aware that this setting might conflict with other options
+that influence the file mode, such as fsGroup.
+In such cases, the resulting file mode may have additional bits set.
+Refers to documents of k8s.ConfigMapVolumeSource.defaultMode for more information.</p>
 </td>
 </tr>
 </tbody>

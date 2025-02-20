@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"time"
@@ -28,10 +29,12 @@ import (
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/utils/ptr"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
-	kbagent "github.com/apecloud/kubeblocks/pkg/kbagent"
+	"github.com/apecloud/kubeblocks/pkg/kbagent"
+	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 	"github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -345,5 +348,99 @@ var _ = Describe("kb-agent", func() {
 		})
 
 		// TODO: host-network
+
+		It("user-defined actions", func() {
+			synthesizedComp.LifecycleActions.Reconfigure = &appsv1.Action{
+				Exec: &appsv1.ExecAction{
+					Command: []string{"echo", "reconfigure"},
+				},
+			}
+			synthesizedComp.FileTemplates = []SynthesizedFileTemplate{
+				{
+					ComponentFileTemplate: appsv1.ComponentFileTemplate{
+						Name:     "default",
+						Template: "default",
+					},
+				},
+				{
+					ComponentFileTemplate: appsv1.ComponentFileTemplate{
+						Name:     "log.conf",
+						Template: "default",
+					},
+					Reconfigure: &appsv1.Action{
+						Exec: &appsv1.ExecAction{
+							Env: []corev1.EnvVar{
+								{
+									Name:  "LOG_CONF_PATH",
+									Value: "/var/run/log.conf",
+								},
+							},
+							Command: []string{"echo", "reconfigure"},
+						},
+					},
+				},
+				{
+					ComponentFileTemplate: appsv1.ComponentFileTemplate{
+						Name:     "server.conf",
+						Template: "default",
+					},
+					Reconfigure: &appsv1.Action{
+						Exec: &appsv1.ExecAction{
+							Env: []corev1.EnvVar{
+								{
+									Name:  "SERVER_CONF_PATH",
+									Value: "/var/run/server.conf",
+								},
+							},
+							Command: []string{"echo", "reconfigure"},
+						},
+					},
+					ExternalManaged: ptr.To(true),
+				},
+			}
+
+			err := buildKBAgentContainer(synthesizedComp)
+			Expect(err).Should(BeNil())
+
+			c := kbAgentContainer()
+			var val string
+			for _, e := range c.Env {
+				if e.Name == "KB_AGENT_ACTION" {
+					val = e.Value
+				}
+			}
+			Expect(val).ShouldNot(BeEmpty())
+
+			actions := make([]proto.Action, 0)
+			Expect(json.Unmarshal([]byte(val), &actions)).Should(BeNil())
+
+			Expect(actions).Should(ContainElement(proto.Action{
+				Name: "reconfigure",
+				Exec: &proto.ExecAction{
+					Commands: []string{"echo", "reconfigure"},
+				},
+			}))
+			Expect(actions).Should(ContainElement(proto.Action{
+				Name: "udf-reconfigure-log.conf",
+				Exec: &proto.ExecAction{
+					Commands: []string{"echo", "reconfigure"},
+				},
+			}))
+			Expect(actions).Should(ContainElement(proto.Action{
+				Name: "udf-reconfigure-server.conf",
+				Exec: &proto.ExecAction{
+					Commands: []string{"echo", "reconfigure"},
+				},
+			}))
+
+			Expect(c.Env).Should(ContainElement(corev1.EnvVar{
+				Name:  "LOG_CONF_PATH",
+				Value: "/var/run/log.conf",
+			}))
+			Expect(c.Env).Should(ContainElement(corev1.EnvVar{
+				Name:  "SERVER_CONF_PATH",
+				Value: "/var/run/server.conf",
+			}))
+		})
 	})
 })

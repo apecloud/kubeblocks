@@ -120,6 +120,10 @@ func (s *actionService) handleRequest(ctx context.Context, req *proto.ActionRequ
 	if action.Exec == nil {
 		return nil, errors.Wrap(proto.ErrNotImplemented, "only exec action is supported")
 	}
+	// HACK: pre-check for the reconfigure action
+	if err := checkReconfigure(ctx, req); err != nil {
+		return nil, err
+	}
 	return s.handleExecAction(ctx, req, action)
 }
 

@@ -1012,7 +1012,9 @@ type ClusterComponentVolumeClaimTemplate struct {
 func (r *ClusterComponentVolumeClaimTemplate) toVolumeClaimTemplate() corev1.PersistentVolumeClaimTemplate {
 	return corev1.PersistentVolumeClaimTemplate{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: r.Name,
+			Name:        r.Name,
+			Labels:      r.Labels,
+			Annotations: r.Annotations,
 		},
 		Spec: r.Spec.ToV1PersistentVolumeClaimSpec(),
 	}

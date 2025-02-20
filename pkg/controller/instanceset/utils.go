@@ -186,10 +186,10 @@ func CalculateConcurrencyReplicas(concurrency *intstr.IntOrString, replicas int)
 
 func getUpdateConcurrency(its *workloads.InstanceSet) workloads.UpdateConcurrency {
 	updateConcurrency := workloads.SerialConcurrency
-	if its.Spec.UpdateStrategy != nil &&
-		its.Spec.UpdateStrategy.RollingUpdate != nil &&
-		its.Spec.UpdateStrategy.RollingUpdate.UpdateConcurrency != nil {
-		updateConcurrency = *its.Spec.UpdateStrategy.RollingUpdate.UpdateConcurrency
+	if its.Spec.InstanceUpdateStrategy != nil &&
+		its.Spec.InstanceUpdateStrategy.RollingUpdate != nil &&
+		its.Spec.InstanceUpdateStrategy.RollingUpdate.UpdateConcurrency != nil {
+		updateConcurrency = *its.Spec.InstanceUpdateStrategy.RollingUpdate.UpdateConcurrency
 	}
 	return updateConcurrency
 }

@@ -410,19 +410,19 @@ func buildPodSpecVolumeMounts(synthesizeComp *component.SynthesizedComponent) {
 //  1. new an object targetObj by copying from oldObj
 //  2. merge all fields can be updated from newObj into targetObj
 func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet) *workloads.InstanceSet {
-	updateUpdateStrategy := func(itsObj, itsProto *workloads.InstanceSet) {
+	updateInstanceUpdateStrategy := func(itsObj, itsProto *workloads.InstanceSet) {
 		var objMaxUnavailable *intstr.IntOrString
-		if itsObj.Spec.UpdateStrategy.RollingUpdate != nil {
-			objMaxUnavailable = itsObj.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable
+		if itsObj.Spec.InstanceUpdateStrategy.RollingUpdate != nil {
+			objMaxUnavailable = itsObj.Spec.InstanceUpdateStrategy.RollingUpdate.MaxUnavailable
 		}
-		itsObj.Spec.UpdateStrategy = itsProto.Spec.UpdateStrategy
-		if objMaxUnavailable == nil && itsObj.Spec.UpdateStrategy.RollingUpdate != nil {
+		itsObj.Spec.InstanceUpdateStrategy = itsProto.Spec.InstanceUpdateStrategy
+		if objMaxUnavailable == nil && itsObj.Spec.InstanceUpdateStrategy.RollingUpdate != nil {
 			// HACK: This field is alpha-level (since v1.24) and is only honored by servers that enable the
 			// MaxUnavailableStatefulSet feature.
 			// When we get a nil MaxUnavailable from k8s, we consider that the field is not supported by the server,
 			// and set the MaxUnavailable as nil explicitly to avoid the workload been updated unexpectedly.
 			// Ref: https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#maximum-unavailable-pods
-			itsObj.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable = nil
+			itsObj.Spec.InstanceUpdateStrategy.RollingUpdate.MaxUnavailable = nil
 		}
 	}
 
@@ -457,10 +457,10 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet) *workloads.InstanceS
 	itsObjCopy.Spec.VolumeClaimTemplates = itsProto.Spec.VolumeClaimTemplates
 	itsObjCopy.Spec.ParallelPodManagementConcurrency = itsProto.Spec.ParallelPodManagementConcurrency
 	itsObjCopy.Spec.PodUpdatePolicy = itsProto.Spec.PodUpdatePolicy
-	itsObjCopy.Spec.UpdateStrategy = itsProto.Spec.UpdateStrategy
+	itsObjCopy.Spec.InstanceUpdateStrategy = itsProto.Spec.InstanceUpdateStrategy
 
-	if itsProto.Spec.UpdateStrategy != nil || itsProto.Spec.UpdateStrategy.RollingUpdate != nil {
-		updateUpdateStrategy(itsObjCopy, itsProto)
+	if itsProto.Spec.InstanceUpdateStrategy != nil || itsProto.Spec.InstanceUpdateStrategy.RollingUpdate != nil {
+		updateInstanceUpdateStrategy(itsObjCopy, itsProto)
 	}
 
 	intctrlutil.ResolvePodSpecDefaultFields(oldITS.Spec.Template.Spec, &itsObjCopy.Spec.Template.Spec)

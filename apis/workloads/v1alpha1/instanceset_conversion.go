@@ -125,16 +125,16 @@ type instanceSetConverter struct {
 func (r *InstanceSet) changesToInstanceSet(its *workloadsv1.InstanceSet) {
 	// changed:
 	// spec
-	//   memberUpdateStrategy -> updateStrategy.rollingUpdate.updateConcurrency
-	//   updateStrategy.partition -> updateStrategy.rollingUpdate.replicas
-	//   updateStrategy.maxUnavailable -> updateStrategy.rollingUpdate.maxUnavailable
-	//   updateStrategy.memberUpdateStrategy -> updateStrategy.rollingUpdate.updateConcurrency
-	if its.Spec.UpdateStrategy == nil {
-		its.Spec.UpdateStrategy = &workloadsv1.UpdateStrategy{}
+	//   memberUpdateStrategy -> instanceUpdateStrategy.rollingUpdate.updateConcurrency
+	//   updateStrategy.partition -> instanceUpdateStrategy.rollingUpdate.replicas
+	//   updateStrategy.maxUnavailable -> instanceUpdateStrategy.rollingUpdate.maxUnavailable
+	//   updateStrategy.memberUpdateStrategy -> instanceUpdateStrategy.rollingUpdate.updateConcurrency
+	if its.Spec.InstanceUpdateStrategy == nil {
+		its.Spec.InstanceUpdateStrategy = &workloadsv1.InstanceUpdateStrategy{}
 	}
 	initRollingUpdate := func() {
-		if its.Spec.UpdateStrategy.RollingUpdate == nil {
-			its.Spec.UpdateStrategy.RollingUpdate = &workloadsv1.RollingUpdate{}
+		if its.Spec.InstanceUpdateStrategy.RollingUpdate == nil {
+			its.Spec.InstanceUpdateStrategy.RollingUpdate = &workloadsv1.RollingUpdate{}
 		}
 	}
 	setUpdateConcurrency := func(strategy *MemberUpdateStrategy) {
@@ -142,7 +142,7 @@ func (r *InstanceSet) changesToInstanceSet(its *workloadsv1.InstanceSet) {
 			return
 		}
 		initRollingUpdate()
-		its.Spec.UpdateStrategy.RollingUpdate.UpdateConcurrency = (*workloadsv1.UpdateConcurrency)(strategy)
+		its.Spec.InstanceUpdateStrategy.RollingUpdate.UpdateConcurrency = (*workloadsv1.UpdateConcurrency)(strategy)
 	}
 	setUpdateConcurrency(r.Spec.MemberUpdateStrategy)
 	if r.Spec.UpdateStrategy != nil {
@@ -150,11 +150,11 @@ func (r *InstanceSet) changesToInstanceSet(its *workloadsv1.InstanceSet) {
 		if r.Spec.UpdateStrategy.Partition != nil {
 			initRollingUpdate()
 			replicas := intstr.FromInt32(*r.Spec.UpdateStrategy.Partition)
-			its.Spec.UpdateStrategy.RollingUpdate.Replicas = &replicas
+			its.Spec.InstanceUpdateStrategy.RollingUpdate.Replicas = &replicas
 		}
 		if r.Spec.UpdateStrategy.MaxUnavailable != nil {
 			initRollingUpdate()
-			its.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable = r.Spec.UpdateStrategy.MaxUnavailable
+			its.Spec.InstanceUpdateStrategy.RollingUpdate.MaxUnavailable = r.Spec.UpdateStrategy.MaxUnavailable
 		}
 	}
 }
@@ -162,28 +162,28 @@ func (r *InstanceSet) changesToInstanceSet(its *workloadsv1.InstanceSet) {
 func (r *InstanceSet) changesFromInstanceSet(its *workloadsv1.InstanceSet) {
 	// changed:
 	// spec
-	//   memberUpdateStrategy -> updateStrategy.rollingUpdate.updateConcurrency
-	//   updateStrategy.partition -> updateStrategy.rollingUpdate.replicas
-	//   updateStrategy.maxUnavailable -> updateStrategy.rollingUpdate.maxUnavailable
-	//   updateStrategy.memberUpdateStrategy -> updateStrategy.rollingUpdate.updateConcurrency
-	if its.Spec.UpdateStrategy == nil {
+	//   memberUpdateStrategy -> instanceUpdateStrategy.rollingUpdate.updateConcurrency
+	//   updateStrategy.partition -> instanceUpdateStrategy.rollingUpdate.replicas
+	//   updateStrategy.maxUnavailable -> instanceUpdateStrategy.rollingUpdate.maxUnavailable
+	//   updateStrategy.memberUpdateStrategy -> instanceUpdateStrategy.rollingUpdate.updateConcurrency
+	if its.Spec.InstanceUpdateStrategy == nil {
 		return
 	}
-	if its.Spec.UpdateStrategy.RollingUpdate == nil {
+	if its.Spec.InstanceUpdateStrategy.RollingUpdate == nil {
 		return
 	}
 	if r.Spec.UpdateStrategy == nil {
 		r.Spec.UpdateStrategy = &InstanceUpdateStrategy{}
 	}
-	if its.Spec.UpdateStrategy.RollingUpdate.UpdateConcurrency != nil {
-		r.Spec.MemberUpdateStrategy = (*MemberUpdateStrategy)(its.Spec.UpdateStrategy.RollingUpdate.UpdateConcurrency)
+	if its.Spec.InstanceUpdateStrategy.RollingUpdate.UpdateConcurrency != nil {
+		r.Spec.MemberUpdateStrategy = (*MemberUpdateStrategy)(its.Spec.InstanceUpdateStrategy.RollingUpdate.UpdateConcurrency)
 		r.Spec.UpdateStrategy.MemberUpdateStrategy = r.Spec.MemberUpdateStrategy
 	}
-	if its.Spec.UpdateStrategy.RollingUpdate.Replicas != nil {
-		partition, _ := intstr.GetScaledValueFromIntOrPercent(its.Spec.UpdateStrategy.RollingUpdate.Replicas, int(*its.Spec.Replicas), false)
+	if its.Spec.InstanceUpdateStrategy.RollingUpdate.Replicas != nil {
+		partition, _ := intstr.GetScaledValueFromIntOrPercent(its.Spec.InstanceUpdateStrategy.RollingUpdate.Replicas, int(*its.Spec.Replicas), false)
 		r.Spec.UpdateStrategy.Partition = pointer.Int32(int32(partition))
 	}
-	if its.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable != nil {
-		r.Spec.UpdateStrategy.MaxUnavailable = its.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable
+	if its.Spec.InstanceUpdateStrategy.RollingUpdate.MaxUnavailable != nil {
+		r.Spec.UpdateStrategy.MaxUnavailable = its.Spec.InstanceUpdateStrategy.RollingUpdate.MaxUnavailable
 	}
 }

@@ -122,7 +122,7 @@ var _ = Describe("update plan test.", func() {
 		It("should work well in a serial plan", func() {
 			By("build a serial plan")
 			updateConcurrency := workloads.SerialConcurrency
-			its.Spec.UpdateStrategy = &workloads.UpdateStrategy{
+			its.Spec.InstanceUpdateStrategy = &workloads.InstanceUpdateStrategy{
 				RollingUpdate: &workloads.RollingUpdate{
 					UpdateConcurrency: &updateConcurrency,
 				},
@@ -142,7 +142,7 @@ var _ = Describe("update plan test.", func() {
 		It("should work well in a serial plan when pod has no role", func() {
 			By("build a serial plan")
 			updateConcurrency := workloads.SerialConcurrency
-			its.Spec.UpdateStrategy = &workloads.UpdateStrategy{
+			its.Spec.InstanceUpdateStrategy = &workloads.InstanceUpdateStrategy{
 				RollingUpdate: &workloads.RollingUpdate{
 					UpdateConcurrency: &updateConcurrency,
 				},
@@ -162,7 +162,7 @@ var _ = Describe("update plan test.", func() {
 		It("should work well in a parallel plan", func() {
 			By("build a parallel plan")
 			updateConcurrency := workloads.ParallelConcurrency
-			its.Spec.UpdateStrategy = &workloads.UpdateStrategy{
+			its.Spec.InstanceUpdateStrategy = &workloads.InstanceUpdateStrategy{
 				RollingUpdate: &workloads.RollingUpdate{
 					UpdateConcurrency: &updateConcurrency,
 				},
@@ -176,7 +176,7 @@ var _ = Describe("update plan test.", func() {
 		It("should work well in a best effort parallel", func() {
 			By("build a best effort parallel plan")
 			updateConcurrency := workloads.BestEffortParallelConcurrency
-			its.Spec.UpdateStrategy = &workloads.UpdateStrategy{
+			its.Spec.InstanceUpdateStrategy = &workloads.InstanceUpdateStrategy{
 				RollingUpdate: &workloads.RollingUpdate{
 					UpdateConcurrency: &updateConcurrency,
 				},
@@ -192,7 +192,7 @@ var _ = Describe("update plan test.", func() {
 		It("should work well with role-less and heterogeneous pods", func() {
 			By("build a serial plan with role-less and heterogeneous pods")
 			updateConcurrency := workloads.SerialConcurrency
-			its.Spec.UpdateStrategy = &workloads.UpdateStrategy{
+			its.Spec.InstanceUpdateStrategy = &workloads.InstanceUpdateStrategy{
 				RollingUpdate: &workloads.RollingUpdate{
 					UpdateConcurrency: &updateConcurrency,
 				},

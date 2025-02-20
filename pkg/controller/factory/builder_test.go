@@ -125,11 +125,11 @@ var _ = Describe("builder", func() {
 			Expect(its.Spec.Roles).Should(HaveLen(len(compDef.Spec.Roles)))
 
 			// test update strategy
-			Expect(its.Spec.UpdateStrategy).ShouldNot(BeNil())
-			Expect(its.Spec.UpdateStrategy.Type).Should(BeEmpty())
-			Expect(its.Spec.UpdateStrategy.RollingUpdate).ShouldNot(BeNil())
-			Expect(its.Spec.UpdateStrategy.RollingUpdate.UpdateConcurrency).ShouldNot(BeNil())
-			Expect(*its.Spec.UpdateStrategy.RollingUpdate.UpdateConcurrency).Should(BeEquivalentTo(workloads.BestEffortParallelConcurrency))
+			Expect(its.Spec.InstanceUpdateStrategy).ShouldNot(BeNil())
+			Expect(its.Spec.InstanceUpdateStrategy.Type).Should(BeEmpty())
+			Expect(its.Spec.InstanceUpdateStrategy.RollingUpdate).ShouldNot(BeNil())
+			Expect(its.Spec.InstanceUpdateStrategy.RollingUpdate.UpdateConcurrency).ShouldNot(BeNil())
+			Expect(*its.Spec.InstanceUpdateStrategy.RollingUpdate.UpdateConcurrency).Should(BeEquivalentTo(workloads.BestEffortParallelConcurrency))
 		})
 
 		It("builds ConfigMap with template correctly", func() {

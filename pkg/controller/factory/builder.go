@@ -158,11 +158,11 @@ func getPodUpdatePolicy(synthesizedComp *component.SynthesizedComponent) workloa
 	return workloads.PreferInPlacePodUpdatePolicyType // default value
 }
 
-func getUpdateStrategy(synthesizedComp *component.SynthesizedComponent) *workloads.UpdateStrategy {
-	var updateStrategy *workloads.UpdateStrategy
+func getUpdateStrategy(synthesizedComp *component.SynthesizedComponent) *workloads.InstanceUpdateStrategy {
+	var updateStrategy *workloads.InstanceUpdateStrategy
 	if synthesizedComp.InstanceUpdateStrategy != nil {
-		updateStrategy = &workloads.UpdateStrategy{
-			Type: workloads.UpdateStrategyType(synthesizedComp.InstanceUpdateStrategy.Type),
+		updateStrategy = &workloads.InstanceUpdateStrategy{
+			Type: workloads.InstanceUpdateStrategyType(synthesizedComp.InstanceUpdateStrategy.Type),
 		}
 		if synthesizedComp.InstanceUpdateStrategy.RollingUpdate != nil {
 			updateStrategy.RollingUpdate = &workloads.RollingUpdate{
@@ -173,7 +173,7 @@ func getUpdateStrategy(synthesizedComp *component.SynthesizedComponent) *workloa
 	}
 	if synthesizedComp.UpdateStrategy != nil {
 		if updateStrategy == nil {
-			updateStrategy = &workloads.UpdateStrategy{}
+			updateStrategy = &workloads.InstanceUpdateStrategy{}
 		}
 		if updateStrategy.RollingUpdate == nil {
 			updateStrategy.RollingUpdate = &workloads.RollingUpdate{}

@@ -161,7 +161,7 @@ var _ = Describe("update reconciler test", func() {
 			Expect(ok).Should(BeTrue())
 			updateReplicas := intstr.FromInt32(3)
 			maxUnavailable := intstr.FromInt32(2)
-			root.Spec.UpdateStrategy = &workloads.UpdateStrategy{
+			root.Spec.InstanceUpdateStrategy = &workloads.InstanceUpdateStrategy{
 				RollingUpdate: &workloads.RollingUpdate{
 					Replicas:       &updateReplicas,
 					MaxUnavailable: &maxUnavailable,
@@ -179,7 +179,7 @@ var _ = Describe("update reconciler test", func() {
 			Expect(err).Should(BeNil())
 			root, ok = partitionTree.GetRoot().(*workloads.InstanceSet)
 			Expect(ok).Should(BeTrue())
-			root.Spec.UpdateStrategy = &workloads.UpdateStrategy{
+			root.Spec.InstanceUpdateStrategy = &workloads.InstanceUpdateStrategy{
 				RollingUpdate: &workloads.RollingUpdate{
 					Replicas:       &updateReplicas,
 					MaxUnavailable: &maxUnavailable,
@@ -203,7 +203,7 @@ var _ = Describe("update reconciler test", func() {
 			Expect(err).Should(BeNil())
 			root, ok = onDeleteTree.GetRoot().(*workloads.InstanceSet)
 			Expect(ok).Should(BeTrue())
-			root.Spec.UpdateStrategy = &workloads.UpdateStrategy{
+			root.Spec.InstanceUpdateStrategy = &workloads.InstanceUpdateStrategy{
 				Type: workloads.OnDeleteStrategyType,
 			}
 			res, err = reconciler.Reconcile(onDeleteTree)

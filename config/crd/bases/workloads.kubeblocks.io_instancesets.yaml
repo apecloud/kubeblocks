@@ -309,6 +309,71 @@ spec:
                       type: object
                     type: array
                 type: object
+              instanceUpdateStrategy:
+                description: Provides fine-grained control over the spec update process
+                  of all instances.
+                properties:
+                  rollingUpdate:
+                    description: Specifies how the rolling update should be applied.
+                    properties:
+                      maxUnavailable:
+                        anyOf:
+                        - type: integer
+                        - type: string
+                        description: |-
+                          The maximum number of instances that can be unavailable during the update.
+                          Value can be an absolute number (ex: 5) or a percentage of desired instances (ex: 10%).
+                          Absolute number is calculated from percentage by rounding up. This can not be 0.
+                          Defaults to 1. The field applies to all instances. That means if there is any unavailable pod,
+                          it will be counted towards MaxUnavailable.
+                        x-kubernetes-int-or-string: true
+                      replicas:
+                        anyOf:
+                        - type: integer
+                        - type: string
+                        description: |-
+                          Indicates the number of instances that should be updated during a rolling update.
+                          The remaining instances will remain untouched. This is helpful in defining how many instances
+                          should participate in the update process.
+                          Value can be an absolute number (ex: 5) or a percentage of desired instances (ex: 10%).
+                          Absolute number is calculated from percentage by rounding up.
+                          The default value is ComponentSpec.Replicas (i.e., update all instances).
+                        x-kubernetes-int-or-string: true
+                      updateConcurrency:
+                        allOf:
+                        - enum:
+                          - Serial
+                          - BestEffortParallel
+                          - Parallel
+                        - enum:
+                          - Serial
+                          - Parallel
+                          - BestEffortParallel
+                        default: Serial
+                        description: "Specifies the concurrency level for updating
+                          instances during a rolling update.\nAvailable levels:\n\n\n-
+                          `Serial`: Updates instances one at a time, ensuring minimal
+                          downtime by waiting for each instance to become ready\n
+                          \ before updating the next.\n- `Parallel`: Updates all instances
+                          simultaneously, optimizing for speed but potentially reducing
+                          availability\n  during the update.\n- `BestEffortParallel`:
+                          Updates instances concurrently with a limit on simultaneous
+                          updates to ensure a minimum\n  number of operational replicas
+                          for maintaining quorum.\n\t For example, in a 5-instances
+                          setup, updating a maximum of 2 instances simultaneously
+                          keeps\n\t at least 3 operational for quorum.\n\n\nDefaults
+                          to 'Serial'."
+                        type: string
+                    type: object
+                  type:
+                    description: |-
+                      Indicates the type of the update strategy.
+                      Default is RollingUpdate.
+                    enum:
+                    - RollingUpdate
+                    - OnDelete
+                    type: string
+                type: object
               instances:
                 description: |-
                   Overrides values in default Template.
@@ -9855,71 +9920,6 @@ spec:
                 additionalProperties:
                   type: string
                 description: Provides variables which are used to call Actions.
-                type: object
-              updateStrategy:
-                description: Provides fine-grained control over the spec update process
-                  of all instances.
-                properties:
-                  rollingUpdate:
-                    description: Specifies how the rolling update should be applied.
-                    properties:
-                      maxUnavailable:
-                        anyOf:
-                        - type: integer
-                        - type: string
-                        description: |-
-                          The maximum number of instances that can be unavailable during the update.
-                          Value can be an absolute number (ex: 5) or a percentage of desired instances (ex: 10%).
-                          Absolute number is calculated from percentage by rounding up. This can not be 0.
-                          Defaults to 1. The field applies to all instances. That means if there is any unavailable pod,
-                          it will be counted towards MaxUnavailable.
-                        x-kubernetes-int-or-string: true
-                      replicas:
-                        anyOf:
-                        - type: integer
-                        - type: string
-                        description: |-
-                          Indicates the number of instances that should be updated during a rolling update.
-                          The remaining instances will remain untouched. This is helpful in defining how many instances
-                          should participate in the update process.
-                          Value can be an absolute number (ex: 5) or a percentage of desired instances (ex: 10%).
-                          Absolute number is calculated from percentage by rounding up.
-                          The default value is ComponentSpec.Replicas (i.e., update all instances).
-                        x-kubernetes-int-or-string: true
-                      updateConcurrency:
-                        allOf:
-                        - enum:
-                          - Serial
-                          - BestEffortParallel
-                          - Parallel
-                        - enum:
-                          - Serial
-                          - Parallel
-                          - BestEffortParallel
-                        default: Serial
-                        description: "Specifies the concurrency level for updating
-                          instances during a rolling update.\nAvailable levels:\n\n\n-
-                          `Serial`: Updates instances one at a time, ensuring minimal
-                          downtime by waiting for each instance to become ready\n
-                          \ before updating the next.\n- `Parallel`: Updates all instances
-                          simultaneously, optimizing for speed but potentially reducing
-                          availability\n  during the update.\n- `BestEffortParallel`:
-                          Updates instances concurrently with a limit on simultaneous
-                          updates to ensure a minimum\n  number of operational replicas
-                          for maintaining quorum.\n\t For example, in a 5-instances
-                          setup, updating a maximum of 2 instances simultaneously
-                          keeps\n\t at least 3 operational for quorum.\n\n\nDefaults
-                          to 'Serial'."
-                        type: string
-                    type: object
-                  type:
-                    description: |-
-                      Indicates the type of the UpdateStrategy.
-                      Default is RollingUpdate.
-                    enum:
-                    - RollingUpdate
-                    - OnDelete
-                    type: string
                 type: object
               volumeClaimTemplates:
                 description: |-

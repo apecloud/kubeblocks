@@ -37,7 +37,7 @@ const (
 	configFilesUpdated = "KB_CONFIG_FILES_UPDATED"
 )
 
-func reconfigure(_ context.Context, req *proto.ActionRequest) error {
+func checkReconfigure(_ context.Context, req *proto.ActionRequest) error {
 	if req.Action != "reconfigure" && !strings.HasPrefix(req.Action, "udf-reconfigure") {
 		return nil
 	}

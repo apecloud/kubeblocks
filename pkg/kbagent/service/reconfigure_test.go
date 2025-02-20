@@ -58,7 +58,7 @@ var _ = Describe("reconfigure", func() {
 			req := &proto.ActionRequest{
 				Action: "switchover",
 			}
-			err := reconfigure(ctx, req)
+			err := checkReconfigure(ctx, req)
 			Expect(err).Should(BeNil())
 		})
 
@@ -67,7 +67,7 @@ var _ = Describe("reconfigure", func() {
 				Action:     "reconfigure",
 				Parameters: map[string]string{},
 			}
-			err := reconfigure(ctx, req)
+			err := checkReconfigure(ctx, req)
 			Expect(err).Should(BeNil())
 		})
 
@@ -78,12 +78,12 @@ var _ = Describe("reconfigure", func() {
 					configFilesUpdated: "log.conf",
 				},
 			}
-			err := reconfigure(ctx, req)
+			err := checkReconfigure(ctx, req)
 			Expect(err).ShouldNot(BeNil())
 			Expect(errors.Is(err, proto.ErrBadRequest)).Should(BeTrue())
 		})
 
-		It("precondition failed", func() {
+		It("check failed", func() {
 			file, checksum := createFile()
 			defer removeFile()
 
@@ -93,7 +93,7 @@ var _ = Describe("reconfigure", func() {
 					configFilesUpdated: fmt.Sprintf("%s:%s++", file, checksum),
 				},
 			}
-			err := reconfigure(ctx, req)
+			err := checkReconfigure(ctx, req)
 			Expect(err).ShouldNot(BeNil())
 			Expect(errors.Is(err, proto.ErrPreconditionFailed)).Should(BeTrue())
 		})
@@ -108,7 +108,7 @@ var _ = Describe("reconfigure", func() {
 					configFilesUpdated: fmt.Sprintf("%s:%s", file, checksum),
 				},
 			}
-			err := reconfigure(ctx, req)
+			err := checkReconfigure(ctx, req)
 			Expect(err).Should(BeNil())
 		})
 	})

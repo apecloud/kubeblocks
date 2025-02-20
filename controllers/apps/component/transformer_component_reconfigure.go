@@ -107,7 +107,7 @@ func (t *componentReconfigureTransformer) templateFileChanges(transCtx *componen
 				absPath := t.absoluteFilePath(transCtx, tplName, item)
 				if len(absPath) > 0 {
 					checksum := sha256.Sum256([]byte(pData[item]))
-					items[2] = append(items[2], fmt.Sprintf("%s@%x", absPath, checksum))
+					items[2] = append(items[2], fmt.Sprintf("%s:%x", absPath, checksum))
 				}
 			}
 		}

@@ -320,8 +320,8 @@ var _ = Describe("Component Controller", func() {
 		})).Should(Succeed())
 	}
 
-	getPVCName := func(vctName, compAndTPLName string, i int) string {
-		return fmt.Sprintf("%s-%s-%s-%d", vctName, clusterKey.Name, compAndTPLName, i)
+	getPVCName := func(vctName, compName string, i int) string {
+		return fmt.Sprintf("%s-%s-%s-%d", vctName, clusterKey.Name, compName, i)
 	}
 
 	createPVC := func(clusterName, pvcName, compName, storageSize, storageClassName string) {
@@ -579,15 +579,11 @@ var _ = Describe("Component Controller", func() {
 
 	testVolumeExpansion := func(compName, compDefName string, storageClass *storagev1.StorageClass) {
 		var (
-			insTPLName           = "foo"
-			replicas             = 3
-			volumeSize           = "1Gi"
-			newVolumeSize        = "2Gi"
-			newFooVolumeSize     = "3Gi"
-			volumeQuantity       = resource.MustParse(volumeSize)
-			newVolumeQuantity    = resource.MustParse(newVolumeSize)
-			newFooVolumeQuantity = resource.MustParse(newFooVolumeSize)
-			compAndTPLName       = fmt.Sprintf("%s-%s", compName, insTPLName)
+			replicas          = 3
+			volumeSize        = "1Gi"
+			newVolumeSize     = "2Gi"
+			volumeQuantity    = resource.MustParse(volumeSize)
+			newVolumeQuantity = resource.MustParse(newVolumeSize)
 		)
 
 		By("mock a StorageClass which allows resize")
@@ -609,17 +605,7 @@ var _ = Describe("Component Controller", func() {
 		its := &itsList.Items[0]
 		Expect(*its.Spec.Replicas).Should(BeEquivalentTo(replicas))
 		pvcName := func(vctName string, index int) string {
-			pvcName := getPVCName(vctName, compName, index)
-			if index == replicas-1 {
-				pvcName = getPVCName(vctName, compAndTPLName, 0)
-			}
-			return pvcName
-		}
-		newVolumeQuantityF := func(index int) resource.Quantity {
-			if index == replicas-1 {
-				return newFooVolumeQuantity
-			}
-			return newVolumeQuantity
+			return getPVCName(vctName, compName, index)
 		}
 		By("Mock PVCs in Bound Status")
 		for i := 0; i < replicas; i++ {
@@ -636,9 +622,6 @@ var _ = Describe("Component Controller", func() {
 					Spec: func() corev1.PersistentVolumeClaimSpec {
 						return intctrlutil.ToCoreV1PVCs([]kbappsv1.ClusterComponentVolumeClaimTemplate{{Spec: pvcSpec}})[0].Spec
 					}(),
-				}
-				if i == replicas-1 {
-					pvc.Labels[constant.KBAppComponentInstanceTemplateLabelKey] = insTPLName
 				}
 				Expect(testCtx.CreateObj(testCtx.Ctx, pvc)).Should(Succeed())
 				patch := client.MergeFrom(pvc.DeepCopy())
@@ -684,7 +667,7 @@ var _ = Describe("Component Controller", func() {
 			Eventually(func(g Gomega) {
 				g.Expect(k8sClient.Get(testCtx.Ctx, pvcKey, pvc)).Should(Succeed())
 				g.Expect(pvc.Status.Capacity[corev1.ResourceStorage]).To(Equal(volumeQuantity))
-				g.Expect(pvc.Spec.Resources.Requests[corev1.ResourceStorage]).To(Equal(newVolumeQuantityF(i)))
+				g.Expect(pvc.Spec.Resources.Requests[corev1.ResourceStorage]).To(Equal(newVolumeQuantity))
 			}).Should(Succeed())
 		}
 
@@ -695,7 +678,7 @@ var _ = Describe("Component Controller", func() {
 				Name:      pvcName(testapps.DataVolumeName, i),
 			}
 			Expect(testapps.GetAndChangeObjStatus(&testCtx, pvcKey, func(pvc *corev1.PersistentVolumeClaim) {
-				pvc.Status.Capacity[corev1.ResourceStorage] = newVolumeQuantityF(i)
+				pvc.Status.Capacity[corev1.ResourceStorage] = newVolumeQuantity
 			})()).ShouldNot(HaveOccurred())
 		}
 
@@ -713,7 +696,7 @@ var _ = Describe("Component Controller", func() {
 				Name:      pvcName(testapps.DataVolumeName, i),
 			}
 			Eventually(testapps.CheckObj(&testCtx, pvcKey, func(g Gomega, pvc *corev1.PersistentVolumeClaim) {
-				g.Expect(pvc.Status.Capacity[corev1.ResourceStorage]).To(Equal(newVolumeQuantityF(i)))
+				g.Expect(pvc.Status.Capacity[corev1.ResourceStorage]).To(Equal(newVolumeQuantity))
 			})).Should(Succeed())
 		}
 

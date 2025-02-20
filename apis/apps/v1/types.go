@@ -676,21 +676,6 @@ type InstanceTemplate struct {
 	// Add new or override existing envs.
 	// +optional
 	Env []corev1.EnvVar `json:"env,omitempty"`
-
-	// Defines Volumes to override.
-	// Add new or override existing volumes.
-	// +optional
-	Volumes []corev1.Volume `json:"volumes,omitempty"`
-
-	// Defines VolumeMounts to override.
-	// Add new or override existing volume mounts of the first container in the Pod.
-	// +optional
-	VolumeMounts []corev1.VolumeMount `json:"volumeMounts,omitempty"`
-
-	// Defines VolumeClaimTemplates to override.
-	// Add new or override existing volume claim templates.
-	// +optional
-	VolumeClaimTemplates []ClusterComponentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
 }
 
 // Range represents a range with a start and an end value.

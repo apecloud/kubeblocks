@@ -334,8 +334,8 @@ func (in *ClusterComponentSpec) DeepCopyInto(out *ClusterComponentSpec) {
 		*out = new(PodUpdatePolicyType)
 		**out = **in
 	}
-	if in.UpdateStrategy != nil {
-		in, out := &in.UpdateStrategy, &out.UpdateStrategy
+	if in.InstanceUpdateStrategy != nil {
+		in, out := &in.InstanceUpdateStrategy, &out.InstanceUpdateStrategy
 		*out = new(InstanceUpdateStrategy)
 		(*in).DeepCopyInto(*out)
 	}
@@ -1467,11 +1467,6 @@ func (in *ComponentSpec) DeepCopyInto(out *ComponentSpec) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
-	if in.UpdateStrategy != nil {
-		in, out := &in.UpdateStrategy, &out.UpdateStrategy
-		*out = new(InstanceUpdateStrategy)
-		(*in).DeepCopyInto(*out)
-	}
 	if in.ParallelPodManagementConcurrency != nil {
 		in, out := &in.ParallelPodManagementConcurrency, &out.ParallelPodManagementConcurrency
 		*out = new(intstr.IntOrString)
@@ -1481,6 +1476,11 @@ func (in *ComponentSpec) DeepCopyInto(out *ComponentSpec) {
 		in, out := &in.PodUpdatePolicy, &out.PodUpdatePolicy
 		*out = new(PodUpdatePolicyType)
 		**out = **in
+	}
+	if in.InstanceUpdateStrategy != nil {
+		in, out := &in.InstanceUpdateStrategy, &out.InstanceUpdateStrategy
+		*out = new(InstanceUpdateStrategy)
+		(*in).DeepCopyInto(*out)
 	}
 	if in.SchedulingPolicy != nil {
 		in, out := &in.SchedulingPolicy, &out.SchedulingPolicy

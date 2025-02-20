@@ -194,11 +194,6 @@ type ComponentSpec struct {
 	// +optional
 	ServiceAccountName string `json:"serviceAccountName,omitempty"`
 
-	// Provides fine-grained control over the spec update process of all instances.
-	//
-	// +optional
-	UpdateStrategy *InstanceUpdateStrategy `json:"updateStrategy,omitempty"`
-
 	// Controls the concurrency of pods during initial scale up, when replacing pods on nodes,
 	// or when scaling down. It only used when `PodManagementPolicy` is set to `Parallel`.
 	// The default Concurrency is 100%.
@@ -216,6 +211,11 @@ type ComponentSpec struct {
 	//
 	// +optional
 	PodUpdatePolicy *PodUpdatePolicyType `json:"podUpdatePolicy,omitempty"`
+
+	// Provides fine-grained control over the spec update process of all instances.
+	//
+	// +optional
+	InstanceUpdateStrategy *InstanceUpdateStrategy `json:"instanceUpdateStrategy,omitempty"`
 
 	// Specifies the scheduling policy for the Component.
 	//

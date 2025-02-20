@@ -414,6 +414,47 @@ spec:
                         - name
                         type: object
                       type: array
+                    instanceUpdateStrategy:
+                      description: Provides fine-grained control over the spec update
+                        process of all instances.
+                      properties:
+                        rollingUpdate:
+                          description: Specifies how the rolling update should be
+                            applied.
+                          properties:
+                            maxUnavailable:
+                              anyOf:
+                              - type: integer
+                              - type: string
+                              description: |-
+                                The maximum number of instances that can be unavailable during the update.
+                                Value can be an absolute number (ex: 5) or a percentage of desired instances (ex: 10%).
+                                Absolute number is calculated from percentage by rounding up. This can not be 0.
+                                Defaults to 1. The field applies to all instances. That means if there is any unavailable pod,
+                                it will be counted towards MaxUnavailable.
+                              x-kubernetes-int-or-string: true
+                            replicas:
+                              anyOf:
+                              - type: integer
+                              - type: string
+                              description: |-
+                                Indicates the number of instances that should be updated during a rolling update.
+                                The remaining instances will remain untouched. This is helpful in defining how many instances
+                                should participate in the update process.
+                                Value can be an absolute number (ex: 5) or a percentage of desired instances (ex: 10%).
+                                Absolute number is calculated from percentage by rounding up.
+                                The default value is ComponentSpec.Replicas (i.e., update all instances).
+                              x-kubernetes-int-or-string: true
+                          type: object
+                        type:
+                          description: |-
+                            Indicates the type of the update strategy.
+                            Default is RollingUpdate.
+                          enum:
+                          - RollingUpdate
+                          - OnDelete
+                          type: string
+                      type: object
                     instances:
                       description: |-
                         Allows for the customization of configuration values for each instance within a Component.
@@ -3542,47 +3583,6 @@ spec:
                         If TLS is enabled, the Component may require additional configuration, such as specifying TLS certificates and keys,
                         to properly set up the secure communication channel.
                       type: boolean
-                    updateStrategy:
-                      description: Provides fine-grained control over the spec update
-                        process of all instances.
-                      properties:
-                        rollingUpdate:
-                          description: Specifies how the rolling update should be
-                            applied.
-                          properties:
-                            maxUnavailable:
-                              anyOf:
-                              - type: integer
-                              - type: string
-                              description: |-
-                                The maximum number of instances that can be unavailable during the update.
-                                Value can be an absolute number (ex: 5) or a percentage of desired instances (ex: 10%).
-                                Absolute number is calculated from percentage by rounding up. This can not be 0.
-                                Defaults to 1. The field applies to all instances. That means if there is any unavailable pod,
-                                it will be counted towards MaxUnavailable.
-                              x-kubernetes-int-or-string: true
-                            replicas:
-                              anyOf:
-                              - type: integer
-                              - type: string
-                              description: |-
-                                Indicates the number of instances that should be updated during a rolling update.
-                                The remaining instances will remain untouched. This is helpful in defining how many instances
-                                should participate in the update process.
-                                Value can be an absolute number (ex: 5) or a percentage of desired instances (ex: 10%).
-                                Absolute number is calculated from percentage by rounding up.
-                                The default value is ComponentSpec.Replicas (i.e., update all instances).
-                              x-kubernetes-int-or-string: true
-                          type: object
-                        type:
-                          description: |-
-                            Indicates the type of the UpdateStrategy.
-                            Default is RollingUpdate.
-                          enum:
-                          - RollingUpdate
-                          - OnDelete
-                          type: string
-                      type: object
                     volumeClaimTemplates:
                       description: |-
                         Specifies a list of PersistentVolumeClaim templates that represent the storage requirements for the Component.
@@ -7280,6 +7280,47 @@ spec:
                             - name
                             type: object
                           type: array
+                        instanceUpdateStrategy:
+                          description: Provides fine-grained control over the spec
+                            update process of all instances.
+                          properties:
+                            rollingUpdate:
+                              description: Specifies how the rolling update should
+                                be applied.
+                              properties:
+                                maxUnavailable:
+                                  anyOf:
+                                  - type: integer
+                                  - type: string
+                                  description: |-
+                                    The maximum number of instances that can be unavailable during the update.
+                                    Value can be an absolute number (ex: 5) or a percentage of desired instances (ex: 10%).
+                                    Absolute number is calculated from percentage by rounding up. This can not be 0.
+                                    Defaults to 1. The field applies to all instances. That means if there is any unavailable pod,
+                                    it will be counted towards MaxUnavailable.
+                                  x-kubernetes-int-or-string: true
+                                replicas:
+                                  anyOf:
+                                  - type: integer
+                                  - type: string
+                                  description: |-
+                                    Indicates the number of instances that should be updated during a rolling update.
+                                    The remaining instances will remain untouched. This is helpful in defining how many instances
+                                    should participate in the update process.
+                                    Value can be an absolute number (ex: 5) or a percentage of desired instances (ex: 10%).
+                                    Absolute number is calculated from percentage by rounding up.
+                                    The default value is ComponentSpec.Replicas (i.e., update all instances).
+                                  x-kubernetes-int-or-string: true
+                              type: object
+                            type:
+                              description: |-
+                                Indicates the type of the update strategy.
+                                Default is RollingUpdate.
+                              enum:
+                              - RollingUpdate
+                              - OnDelete
+                              type: string
+                          type: object
                         instances:
                           description: |-
                             Allows for the customization of configuration values for each instance within a Component.
@@ -10442,47 +10483,6 @@ spec:
                             If TLS is enabled, the Component may require additional configuration, such as specifying TLS certificates and keys,
                             to properly set up the secure communication channel.
                           type: boolean
-                        updateStrategy:
-                          description: Provides fine-grained control over the spec
-                            update process of all instances.
-                          properties:
-                            rollingUpdate:
-                              description: Specifies how the rolling update should
-                                be applied.
-                              properties:
-                                maxUnavailable:
-                                  anyOf:
-                                  - type: integer
-                                  - type: string
-                                  description: |-
-                                    The maximum number of instances that can be unavailable during the update.
-                                    Value can be an absolute number (ex: 5) or a percentage of desired instances (ex: 10%).
-                                    Absolute number is calculated from percentage by rounding up. This can not be 0.
-                                    Defaults to 1. The field applies to all instances. That means if there is any unavailable pod,
-                                    it will be counted towards MaxUnavailable.
-                                  x-kubernetes-int-or-string: true
-                                replicas:
-                                  anyOf:
-                                  - type: integer
-                                  - type: string
-                                  description: |-
-                                    Indicates the number of instances that should be updated during a rolling update.
-                                    The remaining instances will remain untouched. This is helpful in defining how many instances
-                                    should participate in the update process.
-                                    Value can be an absolute number (ex: 5) or a percentage of desired instances (ex: 10%).
-                                    Absolute number is calculated from percentage by rounding up.
-                                    The default value is ComponentSpec.Replicas (i.e., update all instances).
-                                  x-kubernetes-int-or-string: true
-                              type: object
-                            type:
-                              description: |-
-                                Indicates the type of the UpdateStrategy.
-                                Default is RollingUpdate.
-                              enum:
-                              - RollingUpdate
-                              - OnDelete
-                              type: string
-                          type: object
                         volumeClaimTemplates:
                           description: |-
                             Specifies a list of PersistentVolumeClaim templates that represent the storage requirements for the Component.

@@ -113,7 +113,7 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 		ParallelPodManagementConcurrency: comp.Spec.ParallelPodManagementConcurrency,
 		PodUpdatePolicy:                  comp.Spec.PodUpdatePolicy,
 		UpdateStrategy:                   compDef.Spec.UpdateStrategy,
-		InstanceUpdateStrategy:           comp.Spec.UpdateStrategy,
+		InstanceUpdateStrategy:           comp.Spec.InstanceUpdateStrategy,
 	}
 
 	if err = mergeUserDefinedEnv(synthesizeComp, comp); err != nil {

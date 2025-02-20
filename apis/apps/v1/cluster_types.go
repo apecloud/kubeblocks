@@ -441,7 +441,7 @@ type ClusterComponentSpec struct {
 	// Provides fine-grained control over the spec update process of all instances.
 	//
 	// +optional
-	UpdateStrategy *UpdateStrategy `json:"updateStrategy,omitempty"`
+	UpdateStrategy *InstanceUpdateStrategy `json:"updateStrategy,omitempty"`
 
 	// Allows for the customization of configuration values for each instance within a Component.
 	// An instance represent a single replica (Pod and associated K8s resources like PVCs, Services, and ConfigMaps).

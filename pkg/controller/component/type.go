@@ -63,7 +63,7 @@ type SynthesizedComponent struct {
 	Instances                        []kbappsv1.InstanceTemplate            `json:"instances,omitempty"`
 	OfflineInstances                 []string                               `json:"offlineInstances,omitempty"`
 	Roles                            []kbappsv1.ReplicaRole                 `json:"roles,omitempty"`
-	UpdateStrategy                   *kbappsv1.UpdateStrategy               `json:"updateStrategy,omitempty"`
+	UpdateStrategy                   *kbappsv1.InstanceUpdateStrategy       `json:"updateStrategy,omitempty"`
 	PodManagementPolicy              *appsv1.PodManagementPolicyType        `json:"podManagementPolicy,omitempty"`
 	ParallelPodManagementConcurrency *intstr.IntOrString                    `json:"parallelPodManagementConcurrency,omitempty"`
 	PodUpdatePolicy                  *kbappsv1.PodUpdatePolicyType          `json:"podUpdatePolicy,omitempty"`

@@ -691,8 +691,8 @@ create a ServiceAccount. But KubeBlocks does create RoleBindings for the specifi
 <td>
 <code>updateStrategy</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.UpdateStrategy">
-UpdateStrategy
+<a href="#apps.kubeblocks.io/v1.InstanceUpdateStrategy">
+InstanceUpdateStrategy
 </a>
 </em>
 </td>
@@ -1445,8 +1445,8 @@ This ensures the Pod&rsquo;s stability and readiness to serve requests.</p>
 <td>
 <code>updateStrategy</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.UpdateStrategy2">
-UpdateStrategy2
+<a href="#apps.kubeblocks.io/v1.UpdateStrategy">
+UpdateStrategy
 </a>
 </em>
 </td>
@@ -1955,8 +1955,8 @@ ShardsLimit
 <td>
 <code>provisionStrategy</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.UpdateStrategy2">
-UpdateStrategy2
+<a href="#apps.kubeblocks.io/v1.UpdateStrategy">
+UpdateStrategy
 </a>
 </em>
 </td>
@@ -1970,8 +1970,8 @@ UpdateStrategy2
 <td>
 <code>updateStrategy</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.UpdateStrategy2">
-UpdateStrategy2
+<a href="#apps.kubeblocks.io/v1.UpdateStrategy">
+UpdateStrategy
 </a>
 </em>
 </td>
@@ -3104,8 +3104,8 @@ Default value is &ldquo;PreferInPlace&rdquo;</li>
 <td>
 <code>updateStrategy</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.UpdateStrategy">
-UpdateStrategy
+<a href="#apps.kubeblocks.io/v1.InstanceUpdateStrategy">
+InstanceUpdateStrategy
 </a>
 </em>
 </td>
@@ -5340,8 +5340,8 @@ This ensures the Pod&rsquo;s stability and readiness to serve requests.</p>
 <td>
 <code>updateStrategy</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.UpdateStrategy2">
-UpdateStrategy2
+<a href="#apps.kubeblocks.io/v1.UpdateStrategy">
+UpdateStrategy
 </a>
 </em>
 </td>
@@ -6246,8 +6246,8 @@ create a ServiceAccount. But KubeBlocks does create RoleBindings for the specifi
 <td>
 <code>updateStrategy</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.UpdateStrategy">
-UpdateStrategy
+<a href="#apps.kubeblocks.io/v1.InstanceUpdateStrategy">
+InstanceUpdateStrategy
 </a>
 </em>
 </td>
@@ -8009,6 +8009,53 @@ Add new or override existing envs.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1.InstanceUpdateStrategy">InstanceUpdateStrategy
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>)
+</p>
+<div>
+<p>InstanceUpdateStrategy defines fine-grained control over the spec update process of all instances.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>type</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.UpdateStrategyType">
+UpdateStrategyType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates the type of the UpdateStrategy.
+Default is RollingUpdate.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>rollingUpdate</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.RollingUpdate">
+RollingUpdate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies how the rolling update should be applied.</p>
+</td>
+</tr>
+</tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1.Issuer">Issuer
 </h3>
 <p>
@@ -9131,7 +9178,7 @@ VarOption
 <h3 id="apps.kubeblocks.io/v1.RollingUpdate">RollingUpdate
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.UpdateStrategy">UpdateStrategy</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.InstanceUpdateStrategy">InstanceUpdateStrategy</a>)
 </p>
 <div>
 <p>RollingUpdate specifies how the rolling update should be applied.</p>
@@ -10726,8 +10773,8 @@ ShardsLimit
 <td>
 <code>provisionStrategy</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.UpdateStrategy2">
-UpdateStrategy2
+<a href="#apps.kubeblocks.io/v1.UpdateStrategy">
+UpdateStrategy
 </a>
 </em>
 </td>
@@ -10741,8 +10788,8 @@ UpdateStrategy2
 <td>
 <code>updateStrategy</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.UpdateStrategy2">
-UpdateStrategy2
+<a href="#apps.kubeblocks.io/v1.UpdateStrategy">
+UpdateStrategy
 </a>
 </em>
 </td>
@@ -11858,61 +11905,16 @@ This ensures that only one replica is unavailable at a time during the update pr
 </tr></tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1.UpdateStrategy">UpdateStrategy
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>)
-</p>
-<div>
-<p>UpdateStrategy defines fine-grained control over the spec update process of all instances.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>type</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.UpdateStrategyType">
-UpdateStrategyType
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Indicates the type of the UpdateStrategy.
-Default is RollingUpdate.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>rollingUpdate</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.RollingUpdate">
-RollingUpdate
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies how the rolling update should be applied.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1.UpdateStrategy2">UpdateStrategy2
 (<code>string</code> alias)</h3>
 <p>
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>, <a href="#apps.kubeblocks.io/v1.ShardingDefinitionSpec">ShardingDefinitionSpec</a>)
 </p>
 <div>
-<p>UpdateStrategy2 defines the update strategy for cluster components. This strategy determines how updates are applied
+<p>UpdateStrategy defines the update strategy for cluster components. This strategy determines how updates are applied
 across the cluster.
 The available strategies are <code>Serial</code>, <code>BestEffortParallel</code>, and <code>Parallel</code>.</p>
+<p>UpdateStrategy defines the update strategy for cluster components. This strategy determines how updates are applied
+across the cluster.</p>
 </div>
 <table>
 <thead>
@@ -11948,7 +11950,7 @@ This ensures that only one replica is unavailable at a time during the update pr
 <h3 id="apps.kubeblocks.io/v1.UpdateStrategyType">UpdateStrategyType
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.UpdateStrategy">UpdateStrategy</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.InstanceUpdateStrategy">InstanceUpdateStrategy</a>)
 </p>
 <div>
 <p>UpdateStrategyType is a string enumeration type that enumerates

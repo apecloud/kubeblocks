@@ -246,9 +246,9 @@ func mergeUserDefinedEnv(synthesizedComp *SynthesizedComponent, comp *appsv1.Com
 }
 
 func buildUpdateStrategy(synthesizeComp *SynthesizedComponent, comp *appsv1.Component, compDef *appsv1.ComponentDefinition) {
-	var updateStrategy *appsv1.UpdateStrategy
+	var updateStrategy *appsv1.InstanceUpdateStrategy
 	if comp.Spec.UpdateStrategy != nil {
-		updateStrategy = &appsv1.UpdateStrategy{
+		updateStrategy = &appsv1.InstanceUpdateStrategy{
 			Type: comp.Spec.UpdateStrategy.Type,
 		}
 		if comp.Spec.UpdateStrategy.RollingUpdate != nil {
@@ -261,7 +261,7 @@ func buildUpdateStrategy(synthesizeComp *SynthesizedComponent, comp *appsv1.Comp
 	}
 	if compDef.Spec.UpdateStrategy != nil {
 		if updateStrategy == nil {
-			updateStrategy = &appsv1.UpdateStrategy{}
+			updateStrategy = &appsv1.InstanceUpdateStrategy{}
 		}
 		if updateStrategy.RollingUpdate == nil {
 			updateStrategy.RollingUpdate = &appsv1.RollingUpdate{}

@@ -195,7 +195,7 @@ func (r *ShardingDefinitionReconciler) validateProvisionNUpdateStrategy(ctx cont
 		update    = shardingDef.Spec.UpdateStrategy
 	)
 
-	supported := func(strategy *appsv1.UpdateStrategy2) bool {
+	supported := func(strategy *appsv1.UpdateStrategy) bool {
 		if strategy == nil {
 			return true
 		}

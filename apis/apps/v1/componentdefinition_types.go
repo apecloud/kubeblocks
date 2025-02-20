@@ -467,7 +467,7 @@ type ComponentDefinitionSpec struct {
 	// +kubebuilder:validation:Enum={Serial,Parallel,BestEffortParallel}
 	// +kubebuilder:default=Serial
 	// +optional
-	UpdateStrategy *UpdateStrategy2 `json:"updateStrategy,omitempty"`
+	UpdateStrategy *UpdateStrategy `json:"updateStrategy,omitempty"`
 
 	// InstanceSet controls the creation of pods during initial scale up, replacement of pods on nodes, and scaling down.
 	//
@@ -1500,25 +1500,27 @@ type ReplicaRole struct {
 	ParticipatesInQuorum bool `json:"participatesInQuorum"`
 }
 
-// UpdateStrategy2 defines the update strategy for cluster components. This strategy determines how updates are applied
+// UpdateStrategy defines the update strategy for cluster components. This strategy determines how updates are applied
 // across the cluster.
 // The available strategies are `Serial`, `BestEffortParallel`, and `Parallel`.
 //
 // +enum
 // +kubebuilder:validation:Enum={Serial,BestEffortParallel,Parallel}
-type UpdateStrategy2 string
+// UpdateStrategy defines the update strategy for cluster components. This strategy determines how updates are applied
+// across the cluster.
+type UpdateStrategy string
 
 const (
 	// SerialStrategy indicates that updates are applied one at a time in a sequential manner.
 	// The operator waits for each replica to be updated and ready before proceeding to the next one.
 	// This ensures that only one replica is unavailable at a time during the update process.
-	SerialStrategy UpdateStrategy2 = "Serial"
+	SerialStrategy UpdateStrategy = "Serial"
 
 	// ParallelStrategy indicates that updates are applied simultaneously to all Pods of a Component.
 	// The replicas are updated in parallel, with the operator updating all replicas concurrently.
 	// This strategy provides the fastest update time but may lead to a period of reduced availability or
 	// capacity during the update process.
-	ParallelStrategy UpdateStrategy2 = "Parallel"
+	ParallelStrategy UpdateStrategy = "Parallel"
 
 	// BestEffortParallelStrategy indicates that the replicas are updated in parallel, with the operator making
 	// a best-effort attempt to update as many replicas as possible concurrently
@@ -1531,7 +1533,7 @@ const (
 	// 3 replicas (a quorum) remain available and functional during the update process.
 	//
 	// The `BestEffortParallel` strategy strikes a balance between update speed and component availability.
-	BestEffortParallelStrategy UpdateStrategy2 = "BestEffortParallel"
+	BestEffortParallelStrategy UpdateStrategy = "BestEffortParallel"
 )
 
 // ComponentLifecycleActions defines a collection of Actions for customizing the behavior of a Component.

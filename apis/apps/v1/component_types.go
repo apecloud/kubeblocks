@@ -197,7 +197,7 @@ type ComponentSpec struct {
 	// Provides fine-grained control over the spec update process of all instances.
 	//
 	// +optional
-	UpdateStrategy *UpdateStrategy `json:"updateStrategy,omitempty"`
+	UpdateStrategy *InstanceUpdateStrategy `json:"updateStrategy,omitempty"`
 
 	// Controls the concurrency of pods during initial scale up, when replacing pods on nodes,
 	// or when scaling down. It only used when `PodManagementPolicy` is set to `Parallel`.

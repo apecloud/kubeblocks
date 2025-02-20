@@ -192,7 +192,7 @@ func (builder *ComponentDefinitionBuilder) SetReplicasLimit(minReplicas, maxRepl
 	return builder
 }
 
-func (builder *ComponentDefinitionBuilder) SetUpdateStrategy(strategy *appsv1.UpdateStrategy2) *ComponentDefinitionBuilder {
+func (builder *ComponentDefinitionBuilder) SetUpdateStrategy(strategy *appsv1.UpdateStrategy) *ComponentDefinitionBuilder {
 	builder.get().Spec.UpdateStrategy = strategy
 	return builder
 }

@@ -96,7 +96,7 @@ func (builder *ComponentBuilder) SetPodUpdatePolicy(policy *appsv1.PodUpdatePoli
 	return builder
 }
 
-func (builder *ComponentBuilder) SetUpdateStrategy(strategy *appsv1.UpdateStrategy) *ComponentBuilder {
+func (builder *ComponentBuilder) SetUpdateStrategy(strategy *appsv1.InstanceUpdateStrategy) *ComponentBuilder {
 	builder.get().Spec.UpdateStrategy = strategy
 	return builder
 }

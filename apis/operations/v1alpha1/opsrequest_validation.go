@@ -478,13 +478,6 @@ func (r *OpsRequest) validateVolumeExpansion(ctx context.Context, cli client.Cli
 	compOpsList := make([]ComponentOps, len(volumeExpansionList))
 	for i, v := range volumeExpansionList {
 		compOpsList[i] = v.ComponentOps
-		var instanceNames []string
-		for j := range v.Instances {
-			instanceNames = append(instanceNames, v.Instances[j].Name)
-		}
-		if err := r.checkInstanceTemplate(cluster, v.ComponentOps, instanceNames); err != nil {
-			return err
-		}
 	}
 	if err := r.checkComponentExistence(cluster, compOpsList); err != nil {
 		return err
@@ -587,30 +580,19 @@ func (r *OpsRequest) checkVolumesAllowExpansion(ctx context.Context, cli client.
 		isShardingComponent bool
 	}
 
-	vols := make(map[string]map[string]Entity)
 	// component name/ sharding name -> vct name -> entity
-	getKey := func(componentName string, templateName string) string {
-		templateKey := ""
-		if templateName != "" {
-			templateKey = "." + templateName
-		}
-		return fmt.Sprintf("%s%s", componentName, templateKey)
-	}
-	setVols := func(vcts []OpsRequestVolumeClaimTemplate, componentName, templateName string) {
+	vols := make(map[string]map[string]Entity)
+	setVols := func(vcts []OpsRequestVolumeClaimTemplate, componentName string) {
 		for _, vct := range vcts {
-			key := getKey(componentName, templateName)
-			if _, ok := vols[key]; !ok {
-				vols[key] = make(map[string]Entity)
+			if _, ok := vols[componentName]; !ok {
+				vols[componentName] = make(map[string]Entity)
 			}
-			vols[key][vct.Name] = Entity{false, nil, false, vct.Storage, false}
+			vols[componentName][vct.Name] = Entity{false, nil, false, vct.Storage, false}
 		}
 	}
 
 	for _, comp := range r.Spec.VolumeExpansionList {
-		setVols(comp.VolumeClaimTemplates, comp.ComponentOps.ComponentName, "")
-		for _, ins := range comp.Instances {
-			setVols(ins.VolumeClaimTemplates, comp.ComponentOps.ComponentName, ins.Name)
-		}
+		setVols(comp.VolumeClaimTemplates, comp.ComponentOps.ComponentName)
 	}
 	fillVol := func(vct appsv1.ClusterComponentVolumeClaimTemplate, key string, isShardingComp bool) {
 		e, ok := vols[key][vct.Name]
@@ -623,18 +605,11 @@ func (r *OpsRequest) checkVolumesAllowExpansion(ctx context.Context, cli client.
 		vols[key][vct.Name] = e
 	}
 	fillCompVols := func(compSpec appsv1.ClusterComponentSpec, componentName string, isShardingComp bool) {
-		key := getKey(componentName, "")
-		if _, ok := vols[key]; !ok {
+		if _, ok := vols[componentName]; !ok {
 			return // ignore not-exist component
 		}
 		for _, vct := range compSpec.VolumeClaimTemplates {
-			fillVol(vct, key, isShardingComp)
-		}
-		for _, ins := range compSpec.Instances {
-			key = getKey(componentName, ins.Name)
-			for _, vct := range ins.VolumeClaimTemplates {
-				fillVol(vct, key, isShardingComp)
-			}
+			fillVol(vct, componentName, isShardingComp)
 		}
 	}
 	// traverse the spec to update volumes

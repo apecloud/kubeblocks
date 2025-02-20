@@ -106,16 +106,15 @@ var _ = Describe("instance_set builder", func() {
 				},
 			},
 		}
-		partition, maxUnavailable := int32(3), intstr.FromInt(2)
-		strategy := apps.StatefulSetUpdateStrategy{
-			Type: apps.RollingUpdateStatefulSetStrategyType,
-			RollingUpdate: &apps.RollingUpdateStatefulSetStrategy{
-				Partition:      &partition,
-				MaxUnavailable: &maxUnavailable,
+		updateReplicas, maxUnavailable := intstr.FromInt32(3), intstr.FromInt32(2)
+		updateConcurrency := workloads.BestEffortParallelConcurrency
+		strategy := workloads.InstanceUpdateStrategy{
+			RollingUpdate: &workloads.RollingUpdate{
+				Replicas:          &updateReplicas,
+				MaxUnavailable:    &maxUnavailable,
+				UpdateConcurrency: &updateConcurrency,
 			},
 		}
-		strategyType := apps.OnDeleteStatefulSetStrategyType
-		memberUpdateStrategy := workloads.BestEffortParallelUpdateStrategy
 		paused := true
 		credential := workloads.Credential{
 			Username: workloads.CredentialVar{Value: "foo"},
@@ -145,11 +144,9 @@ var _ = Describe("instance_set builder", func() {
 			SetPodManagementPolicy(policy).
 			SetParallelPodManagementConcurrency(parallelPodManagementConcurrency).
 			SetPodUpdatePolicy(podUpdatePolicy).
-			SetUpdateStrategy(strategy).
-			SetUpdateStrategyType(strategyType).
-			SetMemberUpdateStrategy(&memberUpdateStrategy).
+			SetInstanceUpdateStrategy(&strategy).
 			SetPaused(paused).
-			SetCredential(credential).
+			SetCredential(&credential).
 			SetInstances(instances).
 			GetObject()
 
@@ -174,14 +171,14 @@ var _ = Describe("instance_set builder", func() {
 		Expect(its.Spec.PodManagementPolicy).Should(Equal(policy))
 		Expect(its.Spec.ParallelPodManagementConcurrency).Should(Equal(parallelPodManagementConcurrency))
 		Expect(its.Spec.PodUpdatePolicy).Should(Equal(podUpdatePolicy))
-		Expect(its.Spec.UpdateStrategy.Type).Should(Equal(strategyType))
-		Expect(its.Spec.UpdateStrategy.RollingUpdate).ShouldNot(BeNil())
-		Expect(its.Spec.UpdateStrategy.RollingUpdate.Partition).ShouldNot(BeNil())
-		Expect(*its.Spec.UpdateStrategy.RollingUpdate.Partition).Should(Equal(partition))
-		Expect(its.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable).ShouldNot(BeNil())
-		Expect(its.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable).ShouldNot(Equal(maxUnavailable))
-		Expect(its.Spec.MemberUpdateStrategy).ShouldNot(BeNil())
-		Expect(*its.Spec.MemberUpdateStrategy).Should(Equal(memberUpdateStrategy))
+		Expect(its.Spec.InstanceUpdateStrategy).ShouldNot(BeNil())
+		Expect(its.Spec.InstanceUpdateStrategy.RollingUpdate).ShouldNot(BeNil())
+		Expect(its.Spec.InstanceUpdateStrategy.RollingUpdate.Replicas).ShouldNot(BeNil())
+		Expect(*its.Spec.InstanceUpdateStrategy.RollingUpdate.Replicas).Should(Equal(updateReplicas))
+		Expect(its.Spec.InstanceUpdateStrategy.RollingUpdate.MaxUnavailable).ShouldNot(BeNil())
+		Expect(*its.Spec.InstanceUpdateStrategy.RollingUpdate.MaxUnavailable).Should(Equal(maxUnavailable))
+		Expect(its.Spec.InstanceUpdateStrategy.RollingUpdate.UpdateConcurrency).ShouldNot(BeNil())
+		Expect(*its.Spec.InstanceUpdateStrategy.RollingUpdate.UpdateConcurrency).Should(Equal(updateConcurrency))
 		Expect(its.Spec.Paused).Should(Equal(paused))
 		Expect(its.Spec.Credential).ShouldNot(BeNil())
 		Expect(*its.Spec.Credential).Should(Equal(credential))

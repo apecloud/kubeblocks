@@ -159,11 +159,11 @@ var _ = Describe("update reconciler test", func() {
 			Expect(err).Should(BeNil())
 			root, ok := partitionTree.GetRoot().(*workloads.InstanceSet)
 			Expect(ok).Should(BeTrue())
-			partition := int32(3)
+			updateReplicas := intstr.FromInt32(3)
 			maxUnavailable := intstr.FromInt32(2)
-			root.Spec.UpdateStrategy = appsv1.StatefulSetUpdateStrategy{
-				RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
-					Partition:      &partition,
+			root.Spec.InstanceUpdateStrategy = &workloads.InstanceUpdateStrategy{
+				RollingUpdate: &workloads.RollingUpdate{
+					Replicas:       &updateReplicas,
 					MaxUnavailable: &maxUnavailable,
 				},
 			}
@@ -179,9 +179,9 @@ var _ = Describe("update reconciler test", func() {
 			Expect(err).Should(BeNil())
 			root, ok = partitionTree.GetRoot().(*workloads.InstanceSet)
 			Expect(ok).Should(BeTrue())
-			root.Spec.UpdateStrategy = appsv1.StatefulSetUpdateStrategy{
-				RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
-					Partition:      &partition,
+			root.Spec.InstanceUpdateStrategy = &workloads.InstanceUpdateStrategy{
+				RollingUpdate: &workloads.RollingUpdate{
+					Replicas:       &updateReplicas,
 					MaxUnavailable: &maxUnavailable,
 				},
 			}
@@ -203,7 +203,9 @@ var _ = Describe("update reconciler test", func() {
 			Expect(err).Should(BeNil())
 			root, ok = onDeleteTree.GetRoot().(*workloads.InstanceSet)
 			Expect(ok).Should(BeTrue())
-			root.Spec.UpdateStrategy.Type = appsv1.OnDeleteStatefulSetStrategyType
+			root.Spec.InstanceUpdateStrategy = &workloads.InstanceUpdateStrategy{
+				Type: workloads.OnDeleteStrategyType,
+			}
 			res, err = reconciler.Reconcile(onDeleteTree)
 			Expect(err).Should(BeNil())
 			Expect(res).Should(Equal(kubebuilderx.Continue))

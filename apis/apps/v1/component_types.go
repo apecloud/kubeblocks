@@ -212,6 +212,11 @@ type ComponentSpec struct {
 	// +optional
 	PodUpdatePolicy *PodUpdatePolicyType `json:"podUpdatePolicy,omitempty"`
 
+	// Provides fine-grained control over the spec update process of all instances.
+	//
+	// +optional
+	InstanceUpdateStrategy *InstanceUpdateStrategy `json:"instanceUpdateStrategy,omitempty"`
+
 	// Specifies the scheduling policy for the Component.
 	//
 	// +optional

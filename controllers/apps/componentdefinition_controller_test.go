@@ -29,6 +29,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -542,8 +543,7 @@ var _ = Describe("ComponentDefinition Controller", func() {
 			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(componentDefObj), func(cmpd *kbappsv1.ComponentDefinition) {
 				cmpd.Spec.Description = "v0.0.2"
 				cmpd.Spec.Runtime.Containers[0].Image = "image:v0.0.2"
-				parallel := kbappsv1.ParallelStrategy
-				cmpd.Spec.UpdateStrategy = &parallel
+				cmpd.Spec.UpdateStrategy = ptr.To(kbappsv1.ParallelStrategy)
 			})()).Should(Succeed())
 
 			By(fmt.Sprintf("checking the updated object as %s", strings.ToLower(string(kbappsv1.AvailablePhase))))
@@ -570,8 +570,7 @@ var _ = Describe("ComponentDefinition Controller", func() {
 			Expect(testapps.GetAndChangeObj(&testCtx, client.ObjectKeyFromObject(componentDefObj), func(cmpd *kbappsv1.ComponentDefinition) {
 				cmpd.Spec.Description = "v0.0.2"
 				cmpd.Spec.Runtime.Containers[0].Image = "image:v0.0.2"
-				parallel := kbappsv1.ParallelStrategy
-				cmpd.Spec.UpdateStrategy = &parallel
+				cmpd.Spec.UpdateStrategy = ptr.To(kbappsv1.ParallelStrategy)
 			})()).Should(Succeed())
 
 			By(fmt.Sprintf("checking the updated object as %s", strings.ToLower(string(kbappsv1.UnavailablePhase))))

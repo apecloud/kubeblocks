@@ -207,12 +207,13 @@ type ComponentConfigSpec struct {
 
 // RerenderResourceType defines the resource requirements for a component.
 // +enum
-// +kubebuilder:validation:Enum={vscale,hscale,tls}
+// +kubebuilder:validation:Enum={vscale,hscale,tls,shardingHScale}
 type RerenderResourceType string
 
 const (
-	ComponentVScaleType RerenderResourceType = "vscale"
-	ComponentHScaleType RerenderResourceType = "hscale"
+	ComponentVScaleType         RerenderResourceType = "vscale"
+	ComponentHScaleType         RerenderResourceType = "hscale"
+	ShardingComponentHScaleType RerenderResourceType = "shardingHScale"
 )
 
 // MergedPolicy defines how to merge external imported templates into component templates.

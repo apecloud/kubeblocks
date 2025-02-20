@@ -4127,6 +4127,16 @@ spec:
                   These templates are used to dynamically provision persistent volumes for the Component.
                 items:
                   properties:
+                    annotations:
+                      additionalProperties:
+                        type: string
+                      description: Specifies the annotations for the PVC of the volume.
+                      type: object
+                    labels:
+                      additionalProperties:
+                        type: string
+                      description: Specifies the labels for the PVC of the volume.
+                      type: object
                     name:
                       description: |-
                         Refers to the name of a volumeMount defined in either:
@@ -7849,6 +7859,17 @@ spec:
                         Add new or override existing volume claim templates.
                       items:
                         properties:
+                          annotations:
+                            additionalProperties:
+                              type: string
+                            description: Specifies the annotations for the PVC of
+                              the volume.
+                            type: object
+                          labels:
+                            additionalProperties:
+                              type: string
+                            description: Specifies the labels for the PVC of the volume.
+                            type: object
                           name:
                             description: |-
                               Refers to the name of a volumeMount defined in either:
@@ -11797,6 +11818,16 @@ spec:
                   These templates are used to dynamically provision persistent volumes for the Component.
                 items:
                   properties:
+                    annotations:
+                      additionalProperties:
+                        type: string
+                      description: Specifies the annotations for the PVC of the volume.
+                      type: object
+                    labels:
+                      additionalProperties:
+                        type: string
+                      description: Specifies the labels for the PVC of the volume.
+                      type: object
                     name:
                       description: |-
                         Refers to the name of a volumeMount defined in either:

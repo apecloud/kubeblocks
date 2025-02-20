@@ -132,7 +132,9 @@ func ToCoreV1PVCs(vcts []appsv1.ClusterComponentVolumeClaimTemplate) []corev1.Pe
 	for _, v := range vcts {
 		pvcs = append(pvcs, corev1.PersistentVolumeClaim{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: v.Name,
+				Name:        v.Name,
+				Labels:      v.Labels,
+				Annotations: v.Annotations,
 			},
 			Spec: corev1.PersistentVolumeClaimSpec{
 				AccessModes:               v.Spec.AccessModes,

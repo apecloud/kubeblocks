@@ -102,7 +102,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 	}
 
 	// handle 'RollingUpdate'
-	partition, maxUnavailable, err := parseReplicasNMaxUnavailable(its.Spec.InstanceUpdateStrategy, len(oldPodList))
+	replicas, maxUnavailable, err := parseReplicasNMaxUnavailable(its.Spec.InstanceUpdateStrategy, len(oldPodList))
 	if err != nil {
 		return kubebuilderx.Continue, err
 	}
@@ -135,7 +135,7 @@ func (r *updateReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilder
 		if updatingPods >= updateCount || updatingPods >= unavailable {
 			break
 		}
-		if updatedPods >= partition {
+		if updatedPods >= replicas {
 			break
 		}
 

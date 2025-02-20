@@ -77,7 +77,7 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, component
 		SetPodManagementPolicy(getPodManagementPolicy(synthesizedComp)).
 		SetParallelPodManagementConcurrency(getParallelPodManagementConcurrency(synthesizedComp)).
 		SetPodUpdatePolicy(getPodUpdatePolicy(synthesizedComp)).
-		SetUpdateStrategy(getUpdateStrategy(synthesizedComp)).
+		SetInstanceUpdateStrategy(getUpdateStrategy(synthesizedComp)).
 		SetLifecycleActions(synthesizedComp.LifecycleActions).
 		SetTemplateVars(synthesizedComp.TemplateVars).
 		SetCredential(getCredential(synthesizedComp))

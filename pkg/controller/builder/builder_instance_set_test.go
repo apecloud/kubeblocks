@@ -144,7 +144,7 @@ var _ = Describe("instance_set builder", func() {
 			SetPodManagementPolicy(policy).
 			SetParallelPodManagementConcurrency(parallelPodManagementConcurrency).
 			SetPodUpdatePolicy(podUpdatePolicy).
-			SetUpdateStrategy(&strategy).
+			SetInstanceUpdateStrategy(&strategy).
 			SetPaused(paused).
 			SetCredential(&credential).
 			SetInstances(instances).

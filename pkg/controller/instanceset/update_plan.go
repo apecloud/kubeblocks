@@ -117,7 +117,7 @@ func (p *realUpdatePlan) defaultIsPodUpdatedFunc(its *workloads.InstanceSet, pod
 	return intctrlutil.GetPodRevision(pod) == its.Status.UpdateRevision, nil
 }
 
-// build builds the update plan based on updateStrategy
+// build builds the update plan based on updateConcurrency
 func (p *realUpdatePlan) build() {
 	// make a root vertex with nil Obj
 	root := &model.ObjectVertex{}
@@ -128,7 +128,7 @@ func (p *realUpdatePlan) build() {
 	rolePriorityMap := ComposeRolePriorityMap(p.its.Spec.Roles)
 	SortPods(p.pods, rolePriorityMap, false)
 
-	// generate plan by MemberUpdateStrategy
+	// generate plan by updateConcurrency
 	switch updateConcurrency {
 	case workloads.SerialConcurrency:
 		p.buildSerialUpdatePlan()

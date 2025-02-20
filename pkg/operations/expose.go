@@ -71,7 +71,7 @@ func (e ExposeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clien
 		if len(expose.ComponentName) > 0 {
 			clusterCompSpec, ok := compMap[expose.ComponentName]
 			if !ok {
-				return fmt.Errorf("component spec not found: %s", expose.ComponentName)
+				return intctrlutil.NewFatalError(fmt.Sprintf("component spec not found: %s", expose.ComponentName))
 			}
 			// shardName or compName
 			clusterCompSpecName = expose.ComponentName
@@ -88,7 +88,7 @@ func (e ExposeOpsHandler) Action(reqCtx intctrlutil.RequestCtx, cli client.Clien
 				return err
 			}
 		default:
-			return fmt.Errorf("invalid expose switch: %s", expose.Switch)
+			return intctrlutil.NewFatalError(fmt.Sprintf("invalid expose switch: %s", expose.Switch))
 		}
 	}
 	reqCtx.Log.Info("cluster service to be updated", "clusterService", opsRes.Cluster.Spec.Services)
@@ -296,7 +296,7 @@ func (e ExposeOpsHandler) buildClusterServices(reqCtx intctrlutil.RequestCtx,
 
 	convertDefaultCompDefServicePorts := func(compServices []appsv1.ComponentService) ([]corev1.ServicePort, error) {
 		if len(compServices) == 0 {
-			return nil, fmt.Errorf("component service is not defined, expose operation is not supported, cluster: %s, component: %s", cluster.Name, clusterCompSpecName)
+			return nil, intctrlutil.NewFatalError(fmt.Sprintf("component service is not defined, expose operation is not supported, cluster: %s, component: %s", cluster.Name, clusterCompSpecName))
 		}
 		defaultServicePorts := make([]corev1.ServicePort, 0, len(compServices))
 		portsSet := make(map[string]bool) // to avoid duplicate ports
@@ -322,7 +322,7 @@ func (e ExposeOpsHandler) buildClusterServices(reqCtx intctrlutil.RequestCtx,
 			}
 		}
 		if len(defaultServicePorts) == 0 {
-			return nil, fmt.Errorf("component does not define an available service, expose operation is not supported, cluster: %s, component: %s", cluster.Name, clusterCompSpecName)
+			return nil, intctrlutil.NewFatalError(fmt.Sprintf("component does not define an available service, expose operation is not supported, cluster: %s, component: %s", cluster.Name, clusterCompSpecName))
 		}
 		return defaultServicePorts, nil
 	}
@@ -335,7 +335,7 @@ func (e ExposeOpsHandler) buildClusterServices(reqCtx intctrlutil.RequestCtx,
 			}
 			return convertDefaultCompDefServicePorts(compDef.Spec.Services)
 		}
-		return nil, fmt.Errorf("component definition is not defined, cluster: %s, component: %s", cluster.Name, clusterCompSpecName)
+		return nil, intctrlutil.NewFatalError(fmt.Sprintf("component definition is not defined, cluster: %s, component: %s", cluster.Name, clusterCompSpecName))
 	}
 
 	checkComponentHasRoles := func() (bool, error) {
@@ -404,7 +404,7 @@ func (e ExposeOpsHandler) buildClusterServices(reqCtx intctrlutil.RequestCtx,
 				return err
 			}
 			if hasRoles && exposeService.PodSelector == nil {
-				return fmt.Errorf("component has roles, at least one of 'roleSelector' or 'podSelector' must be specified, cluster: %s, component: %s", cluster.Name, clusterCompSpecName)
+				return intctrlutil.NewFatalError(fmt.Sprintf("component has roles, at least one of 'roleSelector' or 'podSelector' must be specified, cluster: %s, component: %s", cluster.Name, clusterCompSpecName))
 			}
 		}
 		cluster.Spec.Services = append(cluster.Spec.Services, clusterService)

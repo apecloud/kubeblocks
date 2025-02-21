@@ -5888,6 +5888,22 @@ This overrides the image and env attributes defined in clusterDefinition.spec.co
 <tbody>
 <tr>
 <td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Refers to the name of a volumeMount defined in either:</p>
+<ul>
+<li><code>componentDefinition.spec.runtime.containers[*].volumeMounts</code></li>
+<li><code>clusterDefinition.spec.componentDefs[*].podSpec.containers[*].volumeMounts</code> (deprecated)</li>
+</ul>
+<p>The value of <code>name</code> must match the <code>name</code> field of a volumeMount specified in the corresponding <code>volumeMounts</code> array.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>labels</code><br/>
 <em>
 map[string]string
@@ -5908,22 +5924,6 @@ map[string]string
 <td>
 <em>(Optional)</em>
 <p>Specifies the annotations for the PVC of the volume.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>name</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Refers to the name of a volumeMount defined in either:</p>
-<ul>
-<li><code>componentDefinition.spec.runtime.containers[*].volumeMounts</code></li>
-<li><code>clusterDefinition.spec.componentDefs[*].podSpec.containers[*].volumeMounts</code> (deprecated)</li>
-</ul>
-<p>The value of <code>name</code> must match the <code>name</code> field of a volumeMount specified in the corresponding <code>volumeMounts</code> array.</p>
 </td>
 </tr>
 <tr>

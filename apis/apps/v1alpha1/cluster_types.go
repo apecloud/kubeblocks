@@ -988,16 +988,6 @@ type ClusterSwitchPolicy struct {
 }
 
 type ClusterComponentVolumeClaimTemplate struct {
-	// Specifies the labels for the PVC of the volume.
-	//
-	// +optional
-	Labels map[string]string `json:"labels,omitempty"`
-
-	// Specifies the annotations for the PVC of the volume.
-	//
-	// +optional
-	Annotations map[string]string `json:"annotations,omitempty"`
-
 	// Refers to the name of a volumeMount defined in either:
 	//
 	// - `componentDefinition.spec.runtime.containers[*].volumeMounts`
@@ -1007,6 +997,16 @@ type ClusterComponentVolumeClaimTemplate struct {
 	//
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
+
+	// Specifies the labels for the PVC of the volume.
+	//
+	// +optional
+	Labels map[string]string `json:"labels,omitempty"`
+
+	// Specifies the annotations for the PVC of the volume.
+	//
+	// +optional
+	Annotations map[string]string `json:"annotations,omitempty"`
 
 	// Defines the desired characteristics of a PersistentVolumeClaim that will be created for the volume
 	// with the mount name specified in the `name` field.

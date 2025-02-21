@@ -199,7 +199,7 @@ func updateOrCreateEnvObject[T generics.Object, PT generics.PObject[T]](ctx cont
 		obj.SetNamespace(objKey.Namespace)
 		updater(obj)
 		return obj, cli.Create(ctx, obj, inDataContext())
-	case err == nil && createOnly:
+	case createOnly:
 		return obj, nil
 	default:
 		updater(obj)

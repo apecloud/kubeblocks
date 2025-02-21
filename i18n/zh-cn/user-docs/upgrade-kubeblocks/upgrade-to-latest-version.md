@@ -68,7 +68,7 @@ KubeBlocks v0.9.3 可以兼容 KubeBlocks v0.8 的 API，但不保证兼容 v0.8
     helm -n kb-system upgrade kubeblocks kubeblocks/kubeblocks --version 0.9.3 --set crd.enabled=false
     ```
 
-    KubeBlocks v0.9.0/v0.9.1 到 v0.9.3 的升级不涉及 API 变更，可通过设置 `--set crd.enabled=false` 跳过 API 升级任务。
+    KubeBlocks v0.9.0/v0.9.1/v0.9.2 到 v0.9.3 的升级不涉及 API 变更，可通过设置 `--set crd.enabled=false` 跳过 API 升级任务。
 
     :::warning
 

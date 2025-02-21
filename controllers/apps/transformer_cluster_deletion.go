@@ -128,6 +128,7 @@ func (t *clusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 
 	delKindMap := map[string]sets.Empty{}
 	for _, o := range delObjs {
+		delKindMap[o.GetObjectKind().GroupVersionKind().Kind] = sets.Empty{}
 		// skip the objects owned by the component and InstanceSet controller
 		if shouldSkipObjOwnedByComp(o, *cluster) || isOwnedByInstanceSet(o) {
 			continue
@@ -137,7 +138,6 @@ func (t *clusterDeletionTransformer) Transform(ctx graph.TransformContext, dag *
 			continue
 		}
 		graphCli.Delete(dag, o, inUniversalContext4G())
-		delKindMap[o.GetObjectKind().GroupVersionKind().Kind] = sets.Empty{}
 	}
 
 	// set cluster action to noop until all the sub-resources deleted

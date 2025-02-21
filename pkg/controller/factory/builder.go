@@ -78,6 +78,7 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, component
 		SetParallelPodManagementConcurrency(getParallelPodManagementConcurrency(synthesizedComp)).
 		SetPodUpdatePolicy(getPodUpdatePolicy(synthesizedComp)).
 		SetInstanceUpdateStrategy(getUpdateStrategy(synthesizedComp)).
+		SetMemberUpdateStrategy(getMemberUpdateStrategy(synthesizedComp)).
 		SetLifecycleActions(synthesizedComp.LifecycleActions).
 		SetTemplateVars(synthesizedComp.TemplateVars).
 		SetCredential(getCredential(synthesizedComp))
@@ -171,16 +172,14 @@ func getUpdateStrategy(synthesizedComp *component.SynthesizedComponent) *workloa
 			}
 		}
 	}
-	if synthesizedComp.UpdateStrategy != nil {
-		if updateStrategy == nil {
-			updateStrategy = &workloads.InstanceUpdateStrategy{}
-		}
-		if updateStrategy.RollingUpdate == nil {
-			updateStrategy.RollingUpdate = &workloads.RollingUpdate{}
-		}
-		updateStrategy.RollingUpdate.UpdateConcurrency = (*workloads.UpdateConcurrency)(synthesizedComp.UpdateStrategy)
-	}
 	return updateStrategy
+}
+
+func getMemberUpdateStrategy(synthesizedComp *component.SynthesizedComponent) *workloads.MemberUpdateStrategy {
+	if synthesizedComp.UpdateStrategy != nil {
+		return (*workloads.MemberUpdateStrategy)(synthesizedComp.UpdateStrategy)
+	}
+	return nil
 }
 
 func getCredential(synthesizedComp *component.SynthesizedComponent) *workloads.Credential {

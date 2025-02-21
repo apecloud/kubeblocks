@@ -107,14 +107,13 @@ var _ = Describe("instance_set builder", func() {
 			},
 		}
 		updateReplicas, maxUnavailable := intstr.FromInt32(3), intstr.FromInt32(2)
-		updateConcurrency := workloads.BestEffortParallelConcurrency
 		strategy := workloads.InstanceUpdateStrategy{
 			RollingUpdate: &workloads.RollingUpdate{
-				Replicas:          &updateReplicas,
-				MaxUnavailable:    &maxUnavailable,
-				UpdateConcurrency: &updateConcurrency,
+				Replicas:       &updateReplicas,
+				MaxUnavailable: &maxUnavailable,
 			},
 		}
+		memberUpdateStrategy := workloads.BestEffortParallelUpdateStrategy
 		paused := true
 		credential := workloads.Credential{
 			Username: workloads.CredentialVar{Value: "foo"},
@@ -145,6 +144,7 @@ var _ = Describe("instance_set builder", func() {
 			SetParallelPodManagementConcurrency(parallelPodManagementConcurrency).
 			SetPodUpdatePolicy(podUpdatePolicy).
 			SetInstanceUpdateStrategy(&strategy).
+			SetMemberUpdateStrategy(&memberUpdateStrategy).
 			SetPaused(paused).
 			SetCredential(&credential).
 			SetInstances(instances).
@@ -177,8 +177,8 @@ var _ = Describe("instance_set builder", func() {
 		Expect(*its.Spec.InstanceUpdateStrategy.RollingUpdate.Replicas).Should(Equal(updateReplicas))
 		Expect(its.Spec.InstanceUpdateStrategy.RollingUpdate.MaxUnavailable).ShouldNot(BeNil())
 		Expect(*its.Spec.InstanceUpdateStrategy.RollingUpdate.MaxUnavailable).Should(Equal(maxUnavailable))
-		Expect(its.Spec.InstanceUpdateStrategy.RollingUpdate.UpdateConcurrency).ShouldNot(BeNil())
-		Expect(*its.Spec.InstanceUpdateStrategy.RollingUpdate.UpdateConcurrency).Should(Equal(updateConcurrency))
+		Expect(its.Spec.MemberUpdateStrategy).ShouldNot(BeNil())
+		Expect(*its.Spec.MemberUpdateStrategy).Should(Equal(memberUpdateStrategy))
 		Expect(its.Spec.Paused).Should(Equal(paused))
 		Expect(its.Spec.Credential).ShouldNot(BeNil())
 		Expect(*its.Spec.Credential).Should(Equal(credential))

@@ -22,6 +22,7 @@ package instanceset
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"k8s.io/utils/ptr"
 
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -121,12 +122,7 @@ var _ = Describe("update plan test.", func() {
 
 		It("should work well in a serial plan", func() {
 			By("build a serial plan")
-			updateConcurrency := workloads.SerialConcurrency
-			its.Spec.InstanceUpdateStrategy = &workloads.InstanceUpdateStrategy{
-				RollingUpdate: &workloads.RollingUpdate{
-					UpdateConcurrency: &updateConcurrency,
-				},
-			}
+			its.Spec.MemberUpdateStrategy = ptr.To(workloads.SerialUpdateStrategy)
 			expectedPlan := [][]*corev1.Pod{
 				{pod4},
 				{pod2},
@@ -141,12 +137,7 @@ var _ = Describe("update plan test.", func() {
 
 		It("should work well in a serial plan when pod has no role", func() {
 			By("build a serial plan")
-			updateConcurrency := workloads.SerialConcurrency
-			its.Spec.InstanceUpdateStrategy = &workloads.InstanceUpdateStrategy{
-				RollingUpdate: &workloads.RollingUpdate{
-					UpdateConcurrency: &updateConcurrency,
-				},
-			}
+			its.Spec.MemberUpdateStrategy = ptr.To(workloads.SerialUpdateStrategy)
 			expectedPlan := [][]*corev1.Pod{
 				{pod4},
 				{pod2},
@@ -161,12 +152,7 @@ var _ = Describe("update plan test.", func() {
 
 		It("should work well in a parallel plan", func() {
 			By("build a parallel plan")
-			updateConcurrency := workloads.ParallelConcurrency
-			its.Spec.InstanceUpdateStrategy = &workloads.InstanceUpdateStrategy{
-				RollingUpdate: &workloads.RollingUpdate{
-					UpdateConcurrency: &updateConcurrency,
-				},
-			}
+			its.Spec.MemberUpdateStrategy = ptr.To(workloads.ParallelUpdateStrategy)
 			expectedPlan := [][]*corev1.Pod{
 				{pod0, pod1, pod2, pod3, pod4, pod5, pod6},
 			}
@@ -175,12 +161,7 @@ var _ = Describe("update plan test.", func() {
 
 		It("should work well in a best effort parallel", func() {
 			By("build a best effort parallel plan")
-			updateConcurrency := workloads.BestEffortParallelConcurrency
-			its.Spec.InstanceUpdateStrategy = &workloads.InstanceUpdateStrategy{
-				RollingUpdate: &workloads.RollingUpdate{
-					UpdateConcurrency: &updateConcurrency,
-				},
-			}
+			its.Spec.MemberUpdateStrategy = ptr.To(workloads.BestEffortParallelUpdateStrategy)
 			expectedPlan := [][]*corev1.Pod{
 				{pod2, pod3, pod4, pod6, pod1},
 				{pod0},
@@ -191,12 +172,7 @@ var _ = Describe("update plan test.", func() {
 
 		It("should work well with role-less and heterogeneous pods", func() {
 			By("build a serial plan with role-less and heterogeneous pods")
-			updateConcurrency := workloads.SerialConcurrency
-			its.Spec.InstanceUpdateStrategy = &workloads.InstanceUpdateStrategy{
-				RollingUpdate: &workloads.RollingUpdate{
-					UpdateConcurrency: &updateConcurrency,
-				},
-			}
+			its.Spec.MemberUpdateStrategy = ptr.To(workloads.SerialUpdateStrategy)
 			its.Spec.Roles = nil
 			for _, pod := range []*corev1.Pod{pod0, pod1, pod2, pod3, pod4, pod5, pod6} {
 				labels := pod.Labels

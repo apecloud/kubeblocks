@@ -29554,6 +29554,25 @@ InstanceUpdateStrategy
 </tr>
 <tr>
 <td>
+<code>memberUpdateStrategy</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.MemberUpdateStrategy">
+MemberUpdateStrategy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Members(Pods) update strategy.</p>
+<ul>
+<li>serial: update Members one by one that guarantee minimum component unavailable time.</li>
+<li>bestEffortParallel: update Members in parallel that guarantee minimum component un-writable time.</li>
+<li>parallel: force parallel</li>
+</ul>
+</td>
+</tr>
+<tr>
+<td>
 <code>roles</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.ReplicaRole">
@@ -30058,6 +30077,25 @@ InstanceUpdateStrategy
 </tr>
 <tr>
 <td>
+<code>memberUpdateStrategy</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.MemberUpdateStrategy">
+MemberUpdateStrategy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Members(Pods) update strategy.</p>
+<ul>
+<li>serial: update Members one by one that guarantee minimum component unavailable time.</li>
+<li>bestEffortParallel: update Members in parallel that guarantee minimum component un-writable time.</li>
+<li>parallel: force parallel</li>
+</ul>
+</td>
+</tr>
+<tr>
+<td>
 <code>roles</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.ReplicaRole">
@@ -30540,6 +30578,29 @@ ReplicaRole
 </tr>
 </tbody>
 </table>
+<h3 id="workloads.kubeblocks.io/v1.MemberUpdateStrategy">MemberUpdateStrategy
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>)
+</p>
+<div>
+<p>MemberUpdateStrategy defines Cluster Component update strategy.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;BestEffortParallel&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Parallel&#34;</p></td>
+<td></td>
+</tr><tr><td><p>&#34;Serial&#34;</p></td>
+<td></td>
+</tr></tbody>
+</table>
 <h3 id="workloads.kubeblocks.io/v1.MembershipReconfiguration">MembershipReconfiguration
 </h3>
 <p>
@@ -30731,32 +30792,6 @@ The default value is ComponentSpec.Replicas (i.e., update all instances).</p>
 </tr>
 <tr>
 <td>
-<code>updateConcurrency</code><br/>
-<em>
-<a href="#workloads.kubeblocks.io/v1.UpdateConcurrency">
-UpdateConcurrency
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the concurrency level for updating instances during a rolling update.
-Available levels:</p>
-<ul>
-<li><code>Serial</code>: Updates instances one at a time, ensuring minimal downtime by waiting for each instance to become ready
-before updating the next.</li>
-<li><code>Parallel</code>: Updates all instances simultaneously, optimizing for speed but potentially reducing availability
-during the update.</li>
-<li><code>BestEffortParallel</code>: Updates instances concurrently with a limit on simultaneous updates to ensure a minimum
-number of operational replicas for maintaining quorum.
- For example, in a 5-instances setup, updating a maximum of 2 instances simultaneously keeps
-at least 3 operational for quorum.</li>
-</ul>
-<p>Defaults to &lsquo;Serial&rsquo;.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>maxUnavailable</code><br/>
 <em>
 <a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/util/intstr#IntOrString">
@@ -30774,47 +30809,6 @@ it will be counted towards MaxUnavailable.</p>
 </td>
 </tr>
 </tbody>
-</table>
-<h3 id="workloads.kubeblocks.io/v1.UpdateConcurrency">UpdateConcurrency
-(<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.RollingUpdate">RollingUpdate</a>)
-</p>
-<div>
-<p>UpdateConcurrency defines the update concurrency level for cluster components. This concurrency level determines how updates are applied
-across the cluster.
-The available concurrency levels are <code>Serial</code>, <code>BestEffortParallel</code>, and <code>Parallel</code>.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>&#34;BestEffortParallel&#34;</p></td>
-<td><p>BestEffortParallelConcurrency indicates that the replicas are updated in parallel, with the operator making
-a best-effort attempt to update as many replicas as possible concurrently
-while maintaining the component&rsquo;s availability.
-Unlike the <code>Parallel</code> strategy, the <code>BestEffortParallel</code> strategy aims to ensure that a minimum number
-of replicas remain available during the update process to maintain the component&rsquo;s quorum and functionality.</p>
-<p>For example, consider a component with 5 replicas. To maintain the component&rsquo;s availability and quorum,
-the operator may allow a maximum of 2 replicas to be simultaneously updated. This ensures that at least
-3 replicas (a quorum) remain available and functional during the update process.</p>
-<p>The <code>BestEffortParallel</code> strategy strikes a balance between update speed and component availability.</p>
-</td>
-</tr><tr><td><p>&#34;Parallel&#34;</p></td>
-<td><p>ParallelConcurrency indicates that updates are applied simultaneously to all Pods of a Component.
-The replicas are updated in parallel, with the operator updating all replicas concurrently.
-This strategy provides the fastest update time but may lead to a period of reduced availability or
-capacity during the update process.</p>
-</td>
-</tr><tr><td><p>&#34;Serial&#34;</p></td>
-<td><p>SerialConcurrency indicates that updates are applied one at a time in a sequential manner.
-The operator waits for each replica to be updated and ready before proceeding to the next one.
-This ensures that only one replica is unavailable at a time during the update process.</p>
-</td>
-</tr></tbody>
 </table>
 <hr/>
 <h2 id="workloads.kubeblocks.io/v1alpha1">workloads.kubeblocks.io/v1alpha1</h2>

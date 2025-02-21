@@ -123,6 +123,11 @@ func (builder *InstanceSetBuilder) SetInstanceUpdateStrategy(strategy *workloads
 	return builder
 }
 
+func (builder *InstanceSetBuilder) SetMemberUpdateStrategy(strategy *workloads.MemberUpdateStrategy) *InstanceSetBuilder {
+	builder.get().Spec.MemberUpdateStrategy = strategy
+	return builder
+}
+
 func (builder *InstanceSetBuilder) SetMembershipReconfiguration(reconfiguration *workloads.MembershipReconfiguration) *InstanceSetBuilder {
 	builder.get().Spec.MembershipReconfiguration = reconfiguration
 	return builder

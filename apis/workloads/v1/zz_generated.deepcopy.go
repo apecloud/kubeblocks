@@ -196,6 +196,11 @@ func (in *InstanceSetSpec) DeepCopyInto(out *InstanceSetSpec) {
 		*out = new(InstanceUpdateStrategy)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.MemberUpdateStrategy != nil {
+		in, out := &in.MemberUpdateStrategy, &out.MemberUpdateStrategy
+		*out = new(MemberUpdateStrategy)
+		**out = **in
+	}
 	if in.Roles != nil {
 		in, out := &in.Roles, &out.Roles
 		*out = make([]appsv1.ReplicaRole, len(*in))
@@ -384,11 +389,6 @@ func (in *RollingUpdate) DeepCopyInto(out *RollingUpdate) {
 	if in.Replicas != nil {
 		in, out := &in.Replicas, &out.Replicas
 		*out = new(intstr.IntOrString)
-		**out = **in
-	}
-	if in.UpdateConcurrency != nil {
-		in, out := &in.UpdateConcurrency, &out.UpdateConcurrency
-		*out = new(UpdateConcurrency)
 		**out = **in
 	}
 	if in.MaxUnavailable != nil {

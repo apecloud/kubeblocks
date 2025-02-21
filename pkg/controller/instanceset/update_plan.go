@@ -98,8 +98,8 @@ func (p *realUpdatePlan) planWalkFunc(vertex graph.Vertex) error {
 			// This change may lead to false alarms, as when all replicas are temporarily unavailable for some reason,
 			// the system will update them without waiting for their roles to be elected and probed. This cloud
 			// potentially hide some uncertain risks.
-			updateConcurrency := getUpdateConcurrency(&p.its)
-			serialUpdate := updateConcurrency == workloads.SerialConcurrency
+			memberUpdateStrategy := getMemberUpdateStrategy(&p.its)
+			serialUpdate := memberUpdateStrategy == workloads.SerialUpdateStrategy
 			hasRoleProbed := len(p.its.Status.MembersStatus) > 0
 			if !serialUpdate || hasRoleProbed {
 				return ErrWait
@@ -117,24 +117,24 @@ func (p *realUpdatePlan) defaultIsPodUpdatedFunc(its *workloads.InstanceSet, pod
 	return intctrlutil.GetPodRevision(pod) == its.Status.UpdateRevision, nil
 }
 
-// build builds the update plan based on updateConcurrency
+// build builds the update plan based on memberUpdateStrategy
 func (p *realUpdatePlan) build() {
 	// make a root vertex with nil Obj
 	root := &model.ObjectVertex{}
 	p.dag.AddVertex(root)
 
-	updateConcurrency := getUpdateConcurrency(&p.its)
+	memberUpdateStrategy := getMemberUpdateStrategy(&p.its)
 
 	rolePriorityMap := ComposeRolePriorityMap(p.its.Spec.Roles)
 	SortPods(p.pods, rolePriorityMap, false)
 
-	// generate plan by updateConcurrency
-	switch updateConcurrency {
-	case workloads.SerialConcurrency:
+	// generate plan by memberUpdateStrategy
+	switch memberUpdateStrategy {
+	case workloads.SerialUpdateStrategy:
 		p.buildSerialUpdatePlan()
-	case workloads.ParallelConcurrency:
+	case workloads.ParallelUpdateStrategy:
 		p.buildParallelUpdatePlan()
-	case workloads.BestEffortParallelConcurrency:
+	case workloads.BestEffortParallelUpdateStrategy:
 		p.buildBestEffortParallelUpdatePlan(rolePriorityMap)
 	}
 }

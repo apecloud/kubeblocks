@@ -1018,7 +1018,7 @@ type ClusterComponentVolumeClaimTemplate struct {
 	Spec PersistentVolumeClaimSpec `json:"spec,omitempty"`
 }
 
-func (r *ClusterComponentVolumeClaimTemplate) toVolumeClaimTemplate() corev1.PersistentVolumeClaimTemplate {
+func (r *ClusterComponentVolumeClaimTemplate) ToVolumeClaimTemplate() corev1.PersistentVolumeClaimTemplate {
 	return corev1.PersistentVolumeClaimTemplate{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:      r.Labels,
@@ -1708,7 +1708,7 @@ func (r *ClusterComponentSpec) ToVolumeClaimTemplates() []corev1.PersistentVolum
 	}
 	var ts []corev1.PersistentVolumeClaimTemplate
 	for _, t := range r.VolumeClaimTemplates {
-		ts = append(ts, t.toVolumeClaimTemplate())
+		ts = append(ts, t.ToVolumeClaimTemplate())
 	}
 	return ts
 }

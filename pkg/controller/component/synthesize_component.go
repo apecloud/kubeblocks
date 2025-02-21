@@ -506,14 +506,7 @@ func limitSharedMemoryVolumeSize(synthesizeComp *SynthesizedComponent, comp *app
 func toVolumeClaimTemplates(compSpec *appsv1alpha1.ComponentSpec) []corev1.PersistentVolumeClaimTemplate {
 	var ts []corev1.PersistentVolumeClaimTemplate
 	for _, t := range compSpec.VolumeClaimTemplates {
-		ts = append(ts, corev1.PersistentVolumeClaimTemplate{
-			ObjectMeta: metav1.ObjectMeta{
-				Labels:      t.Labels,
-				Annotations: t.Annotations,
-				Name:        t.Name,
-			},
-			Spec: t.Spec.ToV1PersistentVolumeClaimSpec(),
-		})
+		ts = append(ts, t.ToVolumeClaimTemplate())
 	}
 	return ts
 }

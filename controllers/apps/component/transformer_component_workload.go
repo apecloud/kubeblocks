@@ -35,7 +35,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -410,22 +409,6 @@ func buildPodSpecVolumeMounts(synthesizeComp *component.SynthesizedComponent) {
 //  1. new an object targetObj by copying from oldObj
 //  2. merge all fields can be updated from newObj into targetObj
 func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet) *workloads.InstanceSet {
-	updateInstanceUpdateStrategy := func(itsObj, itsProto *workloads.InstanceSet) {
-		var objMaxUnavailable *intstr.IntOrString
-		if itsObj.Spec.InstanceUpdateStrategy.RollingUpdate != nil {
-			objMaxUnavailable = itsObj.Spec.InstanceUpdateStrategy.RollingUpdate.MaxUnavailable
-		}
-		itsObj.Spec.InstanceUpdateStrategy = itsProto.Spec.InstanceUpdateStrategy
-		if objMaxUnavailable == nil && itsObj.Spec.InstanceUpdateStrategy.RollingUpdate != nil {
-			// HACK: This field is alpha-level (since v1.24) and is only honored by servers that enable the
-			// MaxUnavailableStatefulSet feature.
-			// When we get a nil MaxUnavailable from k8s, we consider that the field is not supported by the server,
-			// and set the MaxUnavailable as nil explicitly to avoid the workload been updated unexpectedly.
-			// Ref: https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#maximum-unavailable-pods
-			itsObj.Spec.InstanceUpdateStrategy.RollingUpdate.MaxUnavailable = nil
-		}
-	}
-
 	itsObjCopy := oldITS.DeepCopy()
 	itsProto := newITS
 
@@ -460,8 +443,18 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet) *workloads.InstanceS
 	itsObjCopy.Spec.InstanceUpdateStrategy = itsProto.Spec.InstanceUpdateStrategy
 	itsObjCopy.Spec.MemberUpdateStrategy = itsProto.Spec.MemberUpdateStrategy
 
-	if itsProto.Spec.InstanceUpdateStrategy != nil || itsProto.Spec.InstanceUpdateStrategy.RollingUpdate != nil {
-		updateInstanceUpdateStrategy(itsObjCopy, itsProto)
+	if itsObjCopy.Spec.InstanceUpdateStrategy != nil && itsObjCopy.Spec.InstanceUpdateStrategy.RollingUpdate != nil {
+		// use oldITS because itsObjCopy has been overwritten
+		if oldITS.Spec.InstanceUpdateStrategy != nil &&
+			oldITS.Spec.InstanceUpdateStrategy.RollingUpdate != nil &&
+			oldITS.Spec.InstanceUpdateStrategy.RollingUpdate.MaxUnavailable == nil {
+			// HACK: This field is alpha-level (since v1.24) and is only honored by servers that enable the
+			// MaxUnavailableStatefulSet feature.
+			// When we get a nil MaxUnavailable from k8s, we consider that the field is not supported by the server,
+			// and set the MaxUnavailable as nil explicitly to avoid the workload been updated unexpectedly.
+			// Ref: https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#maximum-unavailable-pods
+			itsObjCopy.Spec.InstanceUpdateStrategy.RollingUpdate.MaxUnavailable = nil
+		}
 	}
 
 	intctrlutil.ResolvePodSpecDefaultFields(oldITS.Spec.Template.Spec, &itsObjCopy.Spec.Template.Spec)

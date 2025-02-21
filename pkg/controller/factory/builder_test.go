@@ -125,9 +125,7 @@ var _ = Describe("builder", func() {
 			Expect(its.Spec.Roles).Should(HaveLen(len(compDef.Spec.Roles)))
 
 			// test update strategy
-			Expect(its.Spec.InstanceUpdateStrategy).ShouldNot(BeNil())
-			Expect(its.Spec.InstanceUpdateStrategy.Type).Should(BeEmpty())
-			Expect(its.Spec.InstanceUpdateStrategy.RollingUpdate).ShouldNot(BeNil())
+			Expect(its.Spec.InstanceUpdateStrategy).Should(BeNil())
 			Expect(its.Spec.MemberUpdateStrategy).ShouldNot(BeNil())
 			Expect(*its.Spec.MemberUpdateStrategy).Should(BeEquivalentTo(workloads.BestEffortParallelUpdateStrategy))
 		})

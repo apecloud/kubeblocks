@@ -36,7 +36,7 @@ var _ = Describe("", func() {
 	It("test toVolumeClaimTemplate", func() {
 		r := ClusterComponentVolumeClaimTemplate{}
 		r.Name = "test-name"
-		Expect(r.toVolumeClaimTemplate().ObjectMeta.Name).Should(BeEquivalentTo(r.Name))
+		Expect(r.ToVolumeClaimTemplate().ObjectMeta.Name).Should(BeEquivalentTo(r.Name))
 	})
 
 	It("test ToV1PersistentVolumeClaimSpec", func() {

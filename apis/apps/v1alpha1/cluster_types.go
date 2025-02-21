@@ -1002,6 +1002,16 @@ type ClusterComponentVolumeClaimTemplate struct {
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
+	// Specifies the labels for the PVC of the volume.
+	//
+	// +optional
+	Labels map[string]string `json:"labels,omitempty"`
+
+	// Specifies the annotations for the PVC of the volume.
+	//
+	// +optional
+	Annotations map[string]string `json:"annotations,omitempty"`
+
 	// Defines the desired characteristics of a PersistentVolumeClaim that will be created for the volume
 	// with the mount name specified in the `name` field.
 	//
@@ -1012,10 +1022,12 @@ type ClusterComponentVolumeClaimTemplate struct {
 	Spec PersistentVolumeClaimSpec `json:"spec,omitempty"`
 }
 
-func (r *ClusterComponentVolumeClaimTemplate) toVolumeClaimTemplate() corev1.PersistentVolumeClaimTemplate {
+func (r *ClusterComponentVolumeClaimTemplate) ToVolumeClaimTemplate() corev1.PersistentVolumeClaimTemplate {
 	return corev1.PersistentVolumeClaimTemplate{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: r.Name,
+			Labels:      r.Labels,
+			Annotations: r.Annotations,
+			Name:        r.Name,
 		},
 		Spec: r.Spec.ToV1PersistentVolumeClaimSpec(),
 	}
@@ -1700,7 +1712,7 @@ func (r *ClusterComponentSpec) ToVolumeClaimTemplates() []corev1.PersistentVolum
 	}
 	var ts []corev1.PersistentVolumeClaimTemplate
 	for _, t := range r.VolumeClaimTemplates {
-		ts = append(ts, t.toVolumeClaimTemplate())
+		ts = append(ts, t.ToVolumeClaimTemplate())
 	}
 	return ts
 }

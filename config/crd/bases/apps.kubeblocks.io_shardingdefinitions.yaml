@@ -1192,7 +1192,7 @@ spec:
                   This field is immutable.
                 properties:
                   maxShards:
-                    description: The maximum limit of replicas.
+                    description: The maximum limit of shards.
                     format: int32
                     type: integer
                   minShards:

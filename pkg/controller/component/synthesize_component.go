@@ -97,7 +97,6 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 		ConfigTemplates:                  compDefObj.Spec.Configs,
 		ScriptTemplates:                  compDefObj.Spec.Scripts,
 		Roles:                            compDefObj.Spec.Roles,
-		UpdateStrategy:                   compDefObj.Spec.UpdateStrategy,
 		MinReadySeconds:                  compDefObj.Spec.MinReadySeconds,
 		PolicyRules:                      compDefObj.Spec.PolicyRules,
 		LifecycleActions:                 compDefObj.Spec.LifecycleActions,
@@ -113,6 +112,8 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 		PodManagementPolicy:              compDef.Spec.PodManagementPolicy,
 		ParallelPodManagementConcurrency: comp.Spec.ParallelPodManagementConcurrency,
 		PodUpdatePolicy:                  comp.Spec.PodUpdatePolicy,
+		UpdateStrategy:                   compDef.Spec.UpdateStrategy,
+		InstanceUpdateStrategy:           comp.Spec.InstanceUpdateStrategy,
 	}
 
 	if err = mergeUserDefinedEnv(synthesizeComp, comp); err != nil {

@@ -23,12 +23,13 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	apps "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 )
 
@@ -44,8 +45,8 @@ var _ = Describe("instance_set builder", func() {
 			replicas                     = int32(5)
 			minReadySeconds              = int32(11)
 			port                         = int32(12345)
-			policy                       = apps.OrderedReadyPodManagement
-			podUpdatePolicy              = workloads.PreferInPlacePodUpdatePolicyType
+			policy                       = appsv1.OrderedReadyPodManagement
+			podUpdatePolicy              = kbappsv1.PreferInPlacePodUpdatePolicyType
 		)
 		parallelPodManagementConcurrency := &intstr.IntOrString{Type: intstr.String, StrVal: "100%"}
 		selectors := map[string]string{selectorKey4: selectorValue4}

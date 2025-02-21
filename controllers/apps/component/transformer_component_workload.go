@@ -458,6 +458,7 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet) *workloads.InstanceS
 	itsObjCopy.Spec.ParallelPodManagementConcurrency = itsProto.Spec.ParallelPodManagementConcurrency
 	itsObjCopy.Spec.PodUpdatePolicy = itsProto.Spec.PodUpdatePolicy
 	itsObjCopy.Spec.InstanceUpdateStrategy = itsProto.Spec.InstanceUpdateStrategy
+	itsObjCopy.Spec.MemberUpdateStrategy = itsProto.Spec.MemberUpdateStrategy
 
 	if itsProto.Spec.InstanceUpdateStrategy != nil || itsProto.Spec.InstanceUpdateStrategy.RollingUpdate != nil {
 		updateInstanceUpdateStrategy(itsObjCopy, itsProto)

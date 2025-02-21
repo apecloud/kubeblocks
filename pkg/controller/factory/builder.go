@@ -77,7 +77,7 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, component
 		SetPodManagementPolicy(getPodManagementPolicy(synthesizedComp)).
 		SetParallelPodManagementConcurrency(getParallelPodManagementConcurrency(synthesizedComp)).
 		SetPodUpdatePolicy(getPodUpdatePolicy(synthesizedComp)).
-		SetInstanceUpdateStrategy(getUpdateStrategy(synthesizedComp)).
+		SetInstanceUpdateStrategy(getInstanceUpdateStrategy(synthesizedComp)).
 		SetMemberUpdateStrategy(getMemberUpdateStrategy(synthesizedComp)).
 		SetLifecycleActions(synthesizedComp.LifecycleActions).
 		SetTemplateVars(synthesizedComp.TemplateVars).
@@ -154,25 +154,14 @@ func getParallelPodManagementConcurrency(synthesizedComp *component.SynthesizedC
 
 func getPodUpdatePolicy(synthesizedComp *component.SynthesizedComponent) workloads.PodUpdatePolicyType {
 	if synthesizedComp.PodUpdatePolicy != nil {
-		return workloads.PodUpdatePolicyType(*synthesizedComp.PodUpdatePolicy)
+		return *synthesizedComp.PodUpdatePolicy
 	}
-	return workloads.PreferInPlacePodUpdatePolicyType // default value
+	return kbappsv1.PreferInPlacePodUpdatePolicyType // default value
 }
 
-func getUpdateStrategy(synthesizedComp *component.SynthesizedComponent) *workloads.InstanceUpdateStrategy {
-	var updateStrategy *workloads.InstanceUpdateStrategy
-	if synthesizedComp.InstanceUpdateStrategy != nil {
-		updateStrategy = &workloads.InstanceUpdateStrategy{
-			Type: workloads.InstanceUpdateStrategyType(synthesizedComp.InstanceUpdateStrategy.Type),
-		}
-		if synthesizedComp.InstanceUpdateStrategy.RollingUpdate != nil {
-			updateStrategy.RollingUpdate = &workloads.RollingUpdate{
-				Replicas:       synthesizedComp.InstanceUpdateStrategy.RollingUpdate.Replicas,
-				MaxUnavailable: synthesizedComp.InstanceUpdateStrategy.RollingUpdate.MaxUnavailable,
-			}
-		}
-	}
-	return updateStrategy
+func getInstanceUpdateStrategy(synthesizedComp *component.SynthesizedComponent) *workloads.InstanceUpdateStrategy {
+	// TODO: on-delete if the member update strategy is not null?
+	return synthesizedComp.InstanceUpdateStrategy
 }
 
 func getMemberUpdateStrategy(synthesizedComp *component.SynthesizedComponent) *workloads.MemberUpdateStrategy {

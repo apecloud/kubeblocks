@@ -310,70 +310,20 @@ type InstanceSetStatus struct {
 // +kubebuilder:object:generate=false
 type InstanceTemplate = kbappsv1.InstanceTemplate
 
-type PodUpdatePolicyType string
-
-const (
-	// StrictInPlacePodUpdatePolicyType indicates that only allows in-place upgrades.
-	// Any attempt to modify other fields will be rejected.
-	StrictInPlacePodUpdatePolicyType PodUpdatePolicyType = "StrictInPlace"
-
-	// PreferInPlacePodUpdatePolicyType indicates that we will first attempt an in-place upgrade of the Pod.
-	// If that fails, it will fall back to the ReCreate, where pod will be recreated.
-	PreferInPlacePodUpdatePolicyType PodUpdatePolicyType = "PreferInPlace"
-)
+// PodUpdatePolicyType indicates how pods should be updated
+//
+// +kubebuilder:object:generate=false
+type PodUpdatePolicyType = kbappsv1.PodUpdatePolicyType
 
 // InstanceUpdateStrategy defines fine-grained control over the spec update process of all instances.
-type InstanceUpdateStrategy struct {
-	// Indicates the type of the update strategy.
-	// Default is RollingUpdate.
-	//
-	// +optional
-	Type InstanceUpdateStrategyType `json:"type,omitempty"`
-
-	// Specifies how the rolling update should be applied.
-	//
-	// +optional
-	RollingUpdate *RollingUpdate `json:"rollingUpdate,omitempty"`
-}
-
-// InstanceUpdateStrategyType is a string enumeration type that enumerates
-// all possible update strategies for the KubeBlocks controllers.
 //
-// +enum
-// +kubebuilder:validation:Enum={RollingUpdate,OnDelete}
-type InstanceUpdateStrategyType string
-
-const (
-	// RollingUpdateStrategyType indicates that update will be
-	// applied to all Instances with respect to the workload
-	// ordering constraints.
-	RollingUpdateStrategyType InstanceUpdateStrategyType = "RollingUpdate"
-	// OnDeleteStrategyType indicates that ordered rolling restarts are disabled. Instances are recreated
-	// when they are manually deleted.
-	OnDeleteStrategyType InstanceUpdateStrategyType = "OnDelete"
-)
+// +kubebuilder:object:generate=false
+type InstanceUpdateStrategy = kbappsv1.InstanceUpdateStrategy
 
 // RollingUpdate specifies how the rolling update should be applied.
-type RollingUpdate struct {
-	// Indicates the number of instances that should be updated during a rolling update.
-	// The remaining instances will remain untouched. This is helpful in defining how many instances
-	// should participate in the update process.
-	// Value can be an absolute number (ex: 5) or a percentage of desired instances (ex: 10%).
-	// Absolute number is calculated from percentage by rounding up.
-	// The default value is ComponentSpec.Replicas (i.e., update all instances).
-	//
-	// +optional
-	Replicas *intstr.IntOrString `json:"replicas,omitempty"`
-
-	// The maximum number of instances that can be unavailable during the update.
-	// Value can be an absolute number (ex: 5) or a percentage of desired instances (ex: 10%).
-	// Absolute number is calculated from percentage by rounding up. This can not be 0.
-	// Defaults to 1. The field applies to all instances. That means if there is any unavailable pod,
-	// it will be counted towards MaxUnavailable.
-	//
-	// +optional
-	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty"`
-}
+//
+// +kubebuilder:object:generate=false
+type RollingUpdate = kbappsv1.RollingUpdate
 
 // MemberUpdateStrategy defines Cluster Component update strategy.
 // +enum
@@ -381,8 +331,8 @@ type MemberUpdateStrategy string
 
 const (
 	SerialUpdateStrategy             MemberUpdateStrategy = "Serial"
-	BestEffortParallelUpdateStrategy MemberUpdateStrategy = "BestEffortParallel"
 	ParallelUpdateStrategy           MemberUpdateStrategy = "Parallel"
+	BestEffortParallelUpdateStrategy MemberUpdateStrategy = "BestEffortParallel"
 )
 
 // ReplicaRole represents a role that can be assigned to a component instance, defining its behavior and responsibilities.

@@ -82,8 +82,7 @@ func CheckedCreateK8sResource(testCtx *testutil.TestContext, obj client.Object) 
 func GetClusterComponentPhase(testCtx *testutil.TestContext, clusterKey types.NamespacedName, componentName string) func(g gomega.Gomega) appsv1alpha1.ClusterComponentPhase {
 	return func(g gomega.Gomega) appsv1alpha1.ClusterComponentPhase {
 		tmpCluster := &appsv1alpha1.Cluster{}
-		g.Expect(testCtx.Cli.Get(context.Background(), client.ObjectKey{Name: clusterKey.Name,
-			Namespace: clusterKey.Namespace}, tmpCluster)).Should(gomega.Succeed())
+		g.Expect(testCtx.Cli.Get(testCtx.Ctx, clusterKey, tmpCluster)).Should(gomega.Succeed())
 		return tmpCluster.Status.Components[componentName].Phase
 	}
 }

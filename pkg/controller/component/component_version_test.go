@@ -55,6 +55,24 @@ var _ = Describe("Component Version", func() {
 			cleanEnv()
 		})
 
+		It("checkNMergeImages", func() {
+			appsInDef := map[string]appNameVersionImage{
+				"action1": {name: "action1", required: false},
+				"image1":  {name: "image1", version: "1.0.0", image: "wrong", required: true},
+				"image2":  {name: "image2", version: "1.0.1", required: true}, // this image has different serviceVersion
+			}
+			appsInVer := map[string]appNameVersionImage{
+				"image1": {name: "image1", version: "1.0.0", image: "right", required: true}, // this image overrides the one in appsInDef
+			}
+			apps := checkNMergeImages("1.0.0", appsInDef, appsInVer)
+			Expect(apps["image1"].err).NotTo(HaveOccurred())
+			Expect(apps["image1"].image).To(Equal("right"))
+
+			Expect(apps["image2"].err).To(HaveOccurred())
+
+			Expect(apps["action1"].err).NotTo(HaveOccurred())
+		})
+
 		It("resolve images before and after new release", func() {
 			By("create new definition v4.0 with service version v4")
 			compDefObj := testapps.NewComponentDefinitionFactory(testapps.CompDefName("v1")).

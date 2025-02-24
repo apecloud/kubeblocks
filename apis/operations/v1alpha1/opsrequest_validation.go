@@ -323,7 +323,7 @@ func compareQuantity(requestQuantity, limitQuantity *resource.Quantity) bool {
 }
 
 // validateHorizontalScaling validates api when spec.type is HorizontalScaling
-func (r *OpsRequest) validateHorizontalScaling(_ context.Context, _ client.Client, cluster *appsv1.Cluster) error {
+func (r *OpsRequest) validateHorizontalScaling(ctx context.Context, cli client.Client, cluster *appsv1.Cluster) error {
 	horizontalScalingList := r.Spec.HorizontalScalingList
 	if len(horizontalScalingList) == 0 {
 		return notEmptyError("spec.horizontalScaling")
@@ -338,15 +338,40 @@ func (r *OpsRequest) validateHorizontalScaling(_ context.Context, _ client.Clien
 		return err
 	}
 	for _, comSpec := range cluster.Spec.ComponentSpecs {
+		// Default values if no limit is found
+		minNum, maxNum := 1, 16384
+		if comSpec.ComponentDef != "" {
+			compDef := &appsv1.ComponentDefinition{}
+			if err := cli.Get(ctx, client.ObjectKey{Name: comSpec.ComponentDef, Namespace: r.Namespace}, compDef); err != nil {
+				return err
+			}
+			if compDef.Spec.ReplicasLimit != nil {
+				minNum = int(compDef.Spec.ReplicasLimit.MinReplicas)
+				maxNum = int(compDef.Spec.ReplicasLimit.MaxReplicas)
+			}
+		}
 		if hScale, ok := hScaleMap[comSpec.Name]; ok {
-			if err := r.validateHorizontalScalingSpec(hScale, comSpec, cluster.Name, false); err != nil {
+			if err := r.validateHorizontalScalingSpec(hScale, comSpec, cluster.Name, false, maxNum, minNum); err != nil {
 				return err
 			}
 		}
 	}
 	for _, spec := range cluster.Spec.Shardings {
+		// Default values if no limit is found
+		minNum, maxNum := 1, 2048
+		if spec.ShardingDef != "" {
+			shardingDef := &appsv1.ShardingDefinition{}
+			if err := cli.Get(ctx, types.NamespacedName{Name: spec.ShardingDef, Namespace: r.Namespace}, shardingDef); err != nil {
+				return err
+			}
+			if shardingDef.Spec.ShardsLimit != nil {
+				minNum = int(shardingDef.Spec.ShardsLimit.MinShards)
+				maxNum = int(shardingDef.Spec.ShardsLimit.MaxShards)
+			}
+		}
+
 		if hScale, ok := hScaleMap[spec.Name]; ok {
-			if err := r.validateHorizontalScalingSpec(hScale, spec.Template, cluster.Name, true); err != nil {
+			if err := r.validateHorizontalScalingSpec(hScale, spec.Template, cluster.Name, true, maxNum, minNum); err != nil {
 				return err
 			}
 		}
@@ -364,7 +389,7 @@ func (r *OpsRequest) CountOfflineOrOnlineInstances(clusterName, componentName st
 	return offlineOrOnlineInsCountMap
 }
 
-func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, compSpec appsv1.ClusterComponentSpec, clusterName string, isSharding bool) error {
+func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, compSpec appsv1.ClusterComponentSpec, clusterName string, isSharding bool, maxReplicasOrShards int, minReplicasOrShards int) error {
 	scaleIn := hScale.ScaleIn
 	scaleOut := hScale.ScaleOut
 	if hScale.Shards != nil {
@@ -373,6 +398,12 @@ func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, com
 		}
 		if scaleOut != nil || scaleIn != nil {
 			return fmt.Errorf(`shards field cannot be used together with scaleOut or scaleIn for the component "%s"`, hScale.ComponentName)
+		}
+		if int(*hScale.Shards) < minReplicasOrShards {
+			return fmt.Errorf(`the number of shards after horizontal scale violates the shards limit "%s"`, hScale.ComponentName)
+		}
+		if int(*hScale.Shards) > maxReplicasOrShards {
+			return fmt.Errorf(`the number of shards after horizontal scale violates the shards limit "%s"`, hScale.ComponentName)
 		}
 		return nil
 	}
@@ -389,6 +420,7 @@ func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, com
 	// Rules:
 	// 1. length of offlineInstancesToOnline or onlineInstancesToOffline can't greater than the configured replicaChanges for the component.
 	// 2. replicaChanges for component must greater than or equal to the sum of replicaChanges configured in instance templates.
+	// 3. target replicas after scaling must be within the replica limit defined in the componentDef.
 	validateHScaleOperation := func(replicaChanger ReplicaChanger, newInstances []appsv1.InstanceTemplate, offlineOrOnlineInsNames []string, isScaleIn bool) error {
 		msgPrefix := "ScaleIn:"
 		hScaleInstanceFieldName := "onlineInstancesToOffline"
@@ -437,6 +469,16 @@ func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, com
 		}
 		if replicaChanger.ReplicaChanges != nil && allReplicaChanges > *replicaChanger.ReplicaChanges {
 			return fmt.Errorf(`%s "replicaChanges" can't be less than the sum of "replicaChanges" for specified instance templates`, msgPrefix)
+		}
+		actualReplicaChange := allReplicaChanges
+		if replicaChanger.ReplicaChanges != nil {
+			actualReplicaChange = *replicaChanger.ReplicaChanges
+		}
+		if isScaleIn && int(compSpec.Replicas)-int(actualReplicaChange) < minReplicasOrShards {
+			return fmt.Errorf(`the number of replicas after scaling down violates the replica limit for component "%s"`, hScale.ComponentName)
+		}
+		if !isScaleIn && int(compSpec.Replicas)+int(actualReplicaChange) > maxReplicasOrShards {
+			return fmt.Errorf(`the number of replicas after scaling up violates the replica limit for component "%s"`, hScale.ComponentName)
 		}
 		return nil
 	}

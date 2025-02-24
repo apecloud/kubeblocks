@@ -162,11 +162,6 @@ func (builder *InstanceSetBuilder) SetMemberUpdateStrategy(strategy *workloads.M
 	return builder
 }
 
-func (builder *InstanceSetBuilder) SetPaused(paused bool) *InstanceSetBuilder {
-	builder.get().Spec.Paused = paused
-	return builder
-}
-
 func (builder *InstanceSetBuilder) SetCredential(credential workloads.Credential) *InstanceSetBuilder {
 	builder.get().Spec.Credential = &credential
 	return builder

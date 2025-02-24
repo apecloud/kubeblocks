@@ -217,10 +217,6 @@ type InstanceSetSpec struct {
 	// +optional
 	MemberUpdateStrategy *MemberUpdateStrategy `json:"memberUpdateStrategy,omitempty"`
 
-	// Indicates that the InstanceSet is paused, meaning the reconciliation of this InstanceSet object will be paused.
-	// +optional
-	Paused bool `json:"paused,omitempty"`
-
 	// Credential used to connect to DB engine
 	//
 	// +optional

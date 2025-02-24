@@ -116,7 +116,6 @@ var _ = Describe("instance_set builder", func() {
 		}
 		strategyType := apps.OnDeleteStatefulSetStrategyType
 		memberUpdateStrategy := workloads.BestEffortParallelUpdateStrategy
-		paused := true
 		credential := workloads.Credential{
 			Username: workloads.CredentialVar{Value: "foo"},
 			Password: workloads.CredentialVar{Value: "bar"},
@@ -148,7 +147,6 @@ var _ = Describe("instance_set builder", func() {
 			SetUpdateStrategy(strategy).
 			SetUpdateStrategyType(strategyType).
 			SetMemberUpdateStrategy(&memberUpdateStrategy).
-			SetPaused(paused).
 			SetCredential(credential).
 			SetInstances(instances).
 			GetObject()
@@ -182,7 +180,6 @@ var _ = Describe("instance_set builder", func() {
 		Expect(its.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable).ShouldNot(Equal(maxUnavailable))
 		Expect(its.Spec.MemberUpdateStrategy).ShouldNot(BeNil())
 		Expect(*its.Spec.MemberUpdateStrategy).Should(Equal(memberUpdateStrategy))
-		Expect(its.Spec.Paused).Should(Equal(paused))
 		Expect(its.Spec.Credential).ShouldNot(BeNil())
 		Expect(*its.Spec.Credential).Should(Equal(credential))
 		Expect(its.Spec.Instances).Should(Equal(instances))

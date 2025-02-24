@@ -53,7 +53,7 @@ func (s *streamingServer) StartNonBlocking() error {
 	var err1 error
 	s.listener, err1 = net.Listen("tcp", fmt.Sprintf("%s:%v", s.config.Address, s.config.StreamingPort))
 	if err1 != nil {
-		s.logger.Error(err1, "listen address", s.config.Address, "port", s.config.StreamingPort)
+		s.logger.Error(err1, "listen failed", "listen address", s.config.Address, "port", s.config.StreamingPort)
 		return err1
 	}
 

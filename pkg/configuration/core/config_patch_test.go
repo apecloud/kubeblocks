@@ -22,6 +22,7 @@ package core
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -75,7 +76,7 @@ func TestConfigPatch(t *testing.T) {
 	require.True(t, exist)
 	patch, err := CreateMergePatch([]byte(iniConfig), []byte(newContent), cfg.Option)
 	require.Nil(t, err)
-	log.Log.Info("patch : %v", patch)
+	log.Log.Info(fmt.Sprintf("patch : %v", patch))
 	require.True(t, patch.IsModify)
 	require.Equal(t, string(patch.UpdateConfig["raw"]), `{"mysqld":{"server-id":"2","socket":"xxxxxxxxxxxxxxx"}}`)
 
@@ -91,7 +92,7 @@ func TestConfigPatch(t *testing.T) {
 		// CreateMergePatch([]byte(iniConfig), []byte(newContent), cfg.Option)
 		patch, err := CreateMergePatch([]byte(iniConfig), []byte(newContent), cfg.Option)
 		require.Nil(t, err)
-		log.Log.Info("patch : %v", patch)
+		log.Log.Info(fmt.Sprintf("patch : %v", patch))
 		require.False(t, patch.IsModify)
 	}
 }

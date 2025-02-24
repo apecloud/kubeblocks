@@ -22,6 +22,7 @@ package core
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"sort"
 	"strings"
 	"testing"
@@ -88,7 +89,7 @@ func TestConfigMapConfig(t *testing.T) {
 	})
 
 	require.Nil(t, err)
-	log.Log.Info("cfg option: %v", cfg.Option)
+	log.Log.Info(fmt.Sprintf("cfg option: %v", cfg.Option))
 
 	require.Equal(t, cfg.fileCount, 2)
 	require.NotNil(t, cfg.getConfigObject(NewCfgOptions("my.cnf")))

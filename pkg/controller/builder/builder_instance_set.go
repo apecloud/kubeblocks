@@ -162,11 +162,6 @@ func (builder *InstanceSetBuilder) SetMemberUpdateStrategy(strategy *workloads.M
 	return builder
 }
 
-func (builder *InstanceSetBuilder) SetCredential(credential workloads.Credential) *InstanceSetBuilder {
-	builder.get().Spec.Credential = &credential
-	return builder
-}
-
 func (builder *InstanceSetBuilder) SetInstances(instances []workloads.InstanceTemplate) *InstanceSetBuilder {
 	builder.get().Spec.Instances = instances
 	return builder

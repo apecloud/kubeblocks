@@ -37,7 +37,6 @@ var _ = Describe("object generation transformer test.", func() {
 			SetReplicas(3).
 			AddMatchLabelsInMap(selectors).
 			SetRoles(roles).
-			SetCredential(credential).
 			SetTemplate(template).
 			GetObject()
 	})

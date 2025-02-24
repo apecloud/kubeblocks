@@ -216,11 +216,6 @@ type InstanceSetSpec struct {
 	// +kubebuilder:validation:Enum={Serial,BestEffortParallel,Parallel}
 	// +optional
 	MemberUpdateStrategy *MemberUpdateStrategy `json:"memberUpdateStrategy,omitempty"`
-
-	// Credential used to connect to DB engine
-	//
-	// +optional
-	Credential *Credential `json:"credential,omitempty"`
 }
 
 // InstanceSetStatus defines the observed state of InstanceSet
@@ -414,37 +409,6 @@ const (
 	BestEffortParallelUpdateStrategy MemberUpdateStrategy = "BestEffortParallel"
 	ParallelUpdateStrategy           MemberUpdateStrategy = "Parallel"
 )
-
-type Credential struct {
-	// Defines the user's name for the credential.
-	// The corresponding environment variable will be KB_ITS_USERNAME.
-	//
-	// +kubebuilder:validation:Required
-	Username CredentialVar `json:"username"`
-
-	// Represents the user's password for the credential.
-	// The corresponding environment variable will be KB_ITS_PASSWORD.
-	//
-	// +kubebuilder:validation:Required
-	Password CredentialVar `json:"password"`
-}
-
-type CredentialVar struct {
-	// Specifies the value of the environment variable. This field is optional and defaults to an empty string.
-	// The value can include variable references in the format $(VAR_NAME) which will be expanded using previously defined environment variables in the container and any service environment variables.
-	//
-	// If a variable cannot be resolved, the reference in the input string will remain unchanged.
-	// Double $$ can be used to escape the $(VAR_NAME) syntax, resulting in a single $ and producing the string literal "$(VAR_NAME)".
-	// Escaped references will not be expanded, regardless of whether the variable exists or not.
-	//
-	// +optional
-	Value string `json:"value,omitempty"`
-
-	// Defines the source for the environment variable's value. This field is optional and cannot be used if the 'Value' field is not empty.
-	//
-	// +optional
-	ValueFrom *corev1.EnvVarSource `json:"valueFrom,omitempty"`
-}
 
 type MemberStatus struct {
 	// Represents the name of the pod.

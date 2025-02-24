@@ -23,11 +23,9 @@ import (
 	"errors"
 
 	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
-	"github.com/apecloud/kubeblocks/pkg/constant"
 )
 
 // BuildWorkloadFrom builds a new Component object based on SynthesizedComponent.
@@ -40,7 +38,6 @@ func BuildWorkloadFrom(synthesizeComp *SynthesizedComponent, protoITS *workloads
 	}
 	convertors := map[string]convertor{
 		"roles":                &itsRolesConvertor{},
-		"credential":           &itsCredentialConvertor{},
 		"memberupdatestrategy": &itsMemberUpdateStrategyConvertor{},
 		"podmanagementpolicy":  &itsPodManagementPolicyConvertor{},
 		"updatestrategy":       &itsUpdateStrategyConvertor{},
@@ -61,50 +58,6 @@ func (c *itsRolesConvertor) convert(args ...any) (any, error) {
 		return nil, err
 	}
 	return synthesizeComp.Roles, nil
-}
-
-// itsCredentialConvertor is an implementation of the convertor interface, used to convert the given object into InstanceSet.Spec.Credential.
-type itsCredentialConvertor struct{}
-
-func (c *itsCredentialConvertor) convert(args ...any) (any, error) {
-	synthesizeComp, err := parseITSConvertorArgs(args...)
-	if err != nil {
-		return nil, err
-	}
-
-	credential := func(sysAccount string) *workloads.Credential {
-		secretName := constant.GenerateAccountSecretName(synthesizeComp.ClusterName, synthesizeComp.Name, sysAccount)
-		return &workloads.Credential{
-			Username: workloads.CredentialVar{
-				ValueFrom: &corev1.EnvVarSource{
-					SecretKeyRef: &corev1.SecretKeySelector{
-						LocalObjectReference: corev1.LocalObjectReference{
-							Name: secretName,
-						},
-						Key: constant.AccountNameForSecret,
-					},
-				},
-			},
-			Password: workloads.CredentialVar{
-				ValueFrom: &corev1.EnvVarSource{
-					SecretKeyRef: &corev1.SecretKeySelector{
-						LocalObjectReference: corev1.LocalObjectReference{
-							Name: secretName,
-						},
-						Key: constant.AccountPasswdForSecret,
-					},
-				},
-			},
-		}
-	}
-
-	// use first init account as the default credential
-	for _, sysAccount := range synthesizeComp.SystemAccounts {
-		if sysAccount.InitAccount {
-			return credential(sysAccount.Name), nil
-		}
-	}
-	return nil, nil
 }
 
 // itsMemberUpdateStrategyConvertor is an implementation of the convertor interface, used to convert the given object into InstanceSet.Spec.MemberUpdateStrategy.

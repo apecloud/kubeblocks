@@ -1987,6 +1987,10 @@ spec:
                   or when scaling down. It only used when `PodManagementPolicy` is set to `Parallel`.
                   The default Concurrency is 100%.
                 x-kubernetes-int-or-string: true
+              paused:
+                description: Indicates that the InstanceSet is paused, meaning the
+                  reconciliation of this InstanceSet object will be paused.
+                type: boolean
               podManagementPolicy:
                 description: |-
                   Controls how pods are created during initial scale up,

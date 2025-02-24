@@ -216,6 +216,10 @@ type InstanceSetSpec struct {
 	// +kubebuilder:validation:Enum={Serial,BestEffortParallel,Parallel}
 	// +optional
 	MemberUpdateStrategy *MemberUpdateStrategy `json:"memberUpdateStrategy,omitempty"`
+
+	// Indicates that the InstanceSet is paused, meaning the reconciliation of this InstanceSet object will be paused.
+	// +optional
+	Paused bool `json:"paused,omitempty"`
 }
 
 // InstanceSetStatus defines the observed state of InstanceSet

@@ -116,6 +116,7 @@ var _ = Describe("instance_set builder", func() {
 		}
 		strategyType := apps.OnDeleteStatefulSetStrategyType
 		memberUpdateStrategy := workloads.BestEffortParallelUpdateStrategy
+		paused := true
 		instances := []workloads.InstanceTemplate{
 			{
 				Name:     "hello",
@@ -143,6 +144,7 @@ var _ = Describe("instance_set builder", func() {
 			SetUpdateStrategy(strategy).
 			SetUpdateStrategyType(strategyType).
 			SetMemberUpdateStrategy(&memberUpdateStrategy).
+			SetPaused(paused).
 			SetInstances(instances).
 			GetObject()
 
@@ -175,6 +177,7 @@ var _ = Describe("instance_set builder", func() {
 		Expect(its.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable).ShouldNot(Equal(maxUnavailable))
 		Expect(its.Spec.MemberUpdateStrategy).ShouldNot(BeNil())
 		Expect(*its.Spec.MemberUpdateStrategy).Should(Equal(memberUpdateStrategy))
+		Expect(its.Spec.Paused).Should(Equal(paused))
 		Expect(its.Spec.Instances).Should(Equal(instances))
 	})
 })

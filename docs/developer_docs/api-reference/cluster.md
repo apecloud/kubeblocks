@@ -29491,6 +29491,18 @@ MemberUpdateStrategy
 </ul>
 </td>
 </tr>
+<tr>
+<td>
+<code>paused</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates that the InstanceSet is paused, meaning the reconciliation of this InstanceSet object will be paused.</p>
+</td>
+</tr>
 </table>
 </td>
 </tr>
@@ -29897,6 +29909,18 @@ MemberUpdateStrategy
 <li>bestEffortParallel: update Members in parallel that guarantee minimum component un-writable time.</li>
 <li>parallel: force parallel</li>
 </ul>
+</td>
+</tr>
+<tr>
+<td>
+<code>paused</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates that the InstanceSet is paused, meaning the reconciliation of this InstanceSet object will be paused.</p>
 </td>
 </tr>
 </tbody>

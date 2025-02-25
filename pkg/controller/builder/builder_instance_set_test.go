@@ -23,12 +23,13 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	apps "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 )
 
@@ -44,8 +45,8 @@ var _ = Describe("instance_set builder", func() {
 			replicas                     = int32(5)
 			minReadySeconds              = int32(11)
 			port                         = int32(12345)
-			policy                       = apps.OrderedReadyPodManagement
-			podUpdatePolicy              = workloads.PreferInPlacePodUpdatePolicyType
+			policy                       = appsv1.OrderedReadyPodManagement
+			podUpdatePolicy              = kbappsv1.PreferInPlacePodUpdatePolicyType
 		)
 		parallelPodManagementConcurrency := &intstr.IntOrString{Type: intstr.String, StrVal: "100%"}
 		selectors := map[string]string{selectorKey4: selectorValue4}
@@ -106,15 +107,13 @@ var _ = Describe("instance_set builder", func() {
 				},
 			},
 		}
-		partition, maxUnavailable := int32(3), intstr.FromInt(2)
-		strategy := apps.StatefulSetUpdateStrategy{
-			Type: apps.RollingUpdateStatefulSetStrategyType,
-			RollingUpdate: &apps.RollingUpdateStatefulSetStrategy{
-				Partition:      &partition,
+		updateReplicas, maxUnavailable := intstr.FromInt32(3), intstr.FromInt32(2)
+		strategy := workloads.InstanceUpdateStrategy{
+			RollingUpdate: &workloads.RollingUpdate{
+				Replicas:       &updateReplicas,
 				MaxUnavailable: &maxUnavailable,
 			},
 		}
-		strategyType := apps.OnDeleteStatefulSetStrategyType
 		memberUpdateStrategy := workloads.BestEffortParallelUpdateStrategy
 		paused := true
 		instances := []workloads.InstanceTemplate{
@@ -141,8 +140,7 @@ var _ = Describe("instance_set builder", func() {
 			SetPodManagementPolicy(policy).
 			SetParallelPodManagementConcurrency(parallelPodManagementConcurrency).
 			SetPodUpdatePolicy(podUpdatePolicy).
-			SetUpdateStrategy(strategy).
-			SetUpdateStrategyType(strategyType).
+			SetInstanceUpdateStrategy(&strategy).
 			SetMemberUpdateStrategy(&memberUpdateStrategy).
 			SetPaused(paused).
 			SetInstances(instances).
@@ -169,12 +167,12 @@ var _ = Describe("instance_set builder", func() {
 		Expect(its.Spec.PodManagementPolicy).Should(Equal(policy))
 		Expect(its.Spec.ParallelPodManagementConcurrency).Should(Equal(parallelPodManagementConcurrency))
 		Expect(its.Spec.PodUpdatePolicy).Should(Equal(podUpdatePolicy))
-		Expect(its.Spec.UpdateStrategy.Type).Should(Equal(strategyType))
-		Expect(its.Spec.UpdateStrategy.RollingUpdate).ShouldNot(BeNil())
-		Expect(its.Spec.UpdateStrategy.RollingUpdate.Partition).ShouldNot(BeNil())
-		Expect(*its.Spec.UpdateStrategy.RollingUpdate.Partition).Should(Equal(partition))
-		Expect(its.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable).ShouldNot(BeNil())
-		Expect(its.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable).ShouldNot(Equal(maxUnavailable))
+		Expect(its.Spec.InstanceUpdateStrategy).ShouldNot(BeNil())
+		Expect(its.Spec.InstanceUpdateStrategy.RollingUpdate).ShouldNot(BeNil())
+		Expect(its.Spec.InstanceUpdateStrategy.RollingUpdate.Replicas).ShouldNot(BeNil())
+		Expect(*its.Spec.InstanceUpdateStrategy.RollingUpdate.Replicas).Should(Equal(updateReplicas))
+		Expect(its.Spec.InstanceUpdateStrategy.RollingUpdate.MaxUnavailable).ShouldNot(BeNil())
+		Expect(*its.Spec.InstanceUpdateStrategy.RollingUpdate.MaxUnavailable).Should(Equal(maxUnavailable))
 		Expect(its.Spec.MemberUpdateStrategy).ShouldNot(BeNil())
 		Expect(*its.Spec.MemberUpdateStrategy).Should(Equal(memberUpdateStrategy))
 		Expect(its.Spec.Paused).Should(Equal(paused))

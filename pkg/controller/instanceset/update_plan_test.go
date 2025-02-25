@@ -26,6 +26,7 @@ import (
 	apps "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/ptr"
 
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
@@ -121,8 +122,7 @@ var _ = Describe("update plan test.", func() {
 
 		It("should work well in a serial plan", func() {
 			By("build a serial plan")
-			strategy := workloads.SerialUpdateStrategy
-			its.Spec.MemberUpdateStrategy = &strategy
+			its.Spec.MemberUpdateStrategy = ptr.To(workloads.SerialUpdateStrategy)
 			expectedPlan := [][]*corev1.Pod{
 				{pod4},
 				{pod2},
@@ -137,8 +137,7 @@ var _ = Describe("update plan test.", func() {
 
 		It("should work well in a serial plan when pod has no role", func() {
 			By("build a serial plan")
-			strategy := workloads.SerialUpdateStrategy
-			its.Spec.MemberUpdateStrategy = &strategy
+			its.Spec.MemberUpdateStrategy = ptr.To(workloads.SerialUpdateStrategy)
 			expectedPlan := [][]*corev1.Pod{
 				{pod4},
 				{pod2},
@@ -153,8 +152,7 @@ var _ = Describe("update plan test.", func() {
 
 		It("should work well in a parallel plan", func() {
 			By("build a parallel plan")
-			strategy := workloads.ParallelUpdateStrategy
-			its.Spec.MemberUpdateStrategy = &strategy
+			its.Spec.MemberUpdateStrategy = ptr.To(workloads.ParallelUpdateStrategy)
 			expectedPlan := [][]*corev1.Pod{
 				{pod0, pod1, pod2, pod3, pod4, pod5, pod6},
 			}
@@ -163,8 +161,7 @@ var _ = Describe("update plan test.", func() {
 
 		It("should work well in a best effort parallel", func() {
 			By("build a best effort parallel plan")
-			strategy := workloads.BestEffortParallelUpdateStrategy
-			its.Spec.MemberUpdateStrategy = &strategy
+			its.Spec.MemberUpdateStrategy = ptr.To(workloads.BestEffortParallelUpdateStrategy)
 			expectedPlan := [][]*corev1.Pod{
 				{pod2, pod3, pod4, pod6, pod1},
 				{pod0},
@@ -175,8 +172,7 @@ var _ = Describe("update plan test.", func() {
 
 		It("should work well with role-less and heterogeneous pods", func() {
 			By("build a serial plan with role-less and heterogeneous pods")
-			strategy := workloads.SerialUpdateStrategy
-			its.Spec.MemberUpdateStrategy = &strategy
+			its.Spec.MemberUpdateStrategy = ptr.To(workloads.SerialUpdateStrategy)
 			its.Spec.Roles = nil
 			for _, pod := range []*corev1.Pod{pod0, pod1, pod2, pod3, pod4, pod5, pod6} {
 				labels := pod.Labels

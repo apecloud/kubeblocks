@@ -162,8 +162,8 @@ func (param *reconfigureParams) maxRollingReplicas() int32 {
 
 	var maxUnavailable *intstr.IntOrString
 	for _, its := range param.InstanceSetUnits {
-		if its.Spec.UpdateStrategy.RollingUpdate != nil {
-			maxUnavailable = its.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable
+		if its.Spec.InstanceUpdateStrategy.RollingUpdate != nil {
+			maxUnavailable = its.Spec.InstanceUpdateStrategy.RollingUpdate.MaxUnavailable
 		}
 		if maxUnavailable != nil {
 			break

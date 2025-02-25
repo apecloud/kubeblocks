@@ -114,6 +114,12 @@ func (s *taskService) newTask(task proto.Task) task {
 			task:          task.NewReplica,
 		}
 	}
+	if task.Render != nil {
+		return &renderTask{
+			logger: s.logger,
+			task:   task.Render,
+		}
+	}
 	return nil
 }
 

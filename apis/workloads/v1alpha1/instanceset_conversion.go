@@ -87,6 +87,7 @@ func (r *InstanceSet) incrementConvertTo(dstRaw metav1.Object) error {
 	instanceConvert := instanceSetConverter{
 		RoleProbe:      r.Spec.RoleProbe,
 		UpdateStrategy: r.Spec.UpdateStrategy,
+		Credential:     r.Spec.Credential,
 	}
 
 	if r.Spec.UpdateStrategy == nil || r.Spec.UpdateStrategy.MemberUpdateStrategy == nil {
@@ -121,10 +122,12 @@ func (r *InstanceSet) incrementConvertFrom(srcRaw metav1.Object) error {
 	delete(srcRaw.GetAnnotations(), kbIncrementConverterAK)
 	r.Spec.RoleProbe = instanceConvert.RoleProbe
 	r.Spec.UpdateStrategy = instanceConvert.UpdateStrategy
+	r.Spec.Credential = instanceConvert.Credential
 	return nil
 }
 
 type instanceSetConverter struct {
 	RoleProbe      *RoleProbe              `json:"roleProbe,omitempty"`
 	UpdateStrategy *InstanceUpdateStrategy `json:"updateStrategy,omitempty"`
+	Credential     *Credential             `json:"credential,omitempty"`
 }

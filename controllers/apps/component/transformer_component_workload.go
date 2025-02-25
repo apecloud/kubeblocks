@@ -451,13 +451,13 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet) *workloads.InstanceS
 	itsObjCopy.Spec.MembershipReconfiguration = itsProto.Spec.MembershipReconfiguration
 	itsObjCopy.Spec.TemplateVars = itsProto.Spec.TemplateVars
 	itsObjCopy.Spec.MemberUpdateStrategy = itsProto.Spec.MemberUpdateStrategy
-	itsObjCopy.Spec.Credential = itsProto.Spec.Credential
 	itsObjCopy.Spec.Instances = itsProto.Spec.Instances
 	itsObjCopy.Spec.OfflineInstances = itsProto.Spec.OfflineInstances
 	itsObjCopy.Spec.MinReadySeconds = itsProto.Spec.MinReadySeconds
 	itsObjCopy.Spec.VolumeClaimTemplates = itsProto.Spec.VolumeClaimTemplates
 	itsObjCopy.Spec.ParallelPodManagementConcurrency = itsProto.Spec.ParallelPodManagementConcurrency
 	itsObjCopy.Spec.PodUpdatePolicy = itsProto.Spec.PodUpdatePolicy
+	itsObjCopy.Spec.Paused = itsProto.Spec.Paused
 
 	if itsProto.Spec.UpdateStrategy.Type != "" || itsProto.Spec.UpdateStrategy.RollingUpdate != nil {
 		updateUpdateStrategy(itsObjCopy, itsProto)

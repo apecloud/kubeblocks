@@ -116,10 +116,6 @@ var _ = Describe("instance_set builder", func() {
 		}
 		memberUpdateStrategy := workloads.BestEffortParallelUpdateStrategy
 		paused := true
-		credential := workloads.Credential{
-			Username: workloads.CredentialVar{Value: "foo"},
-			Password: workloads.CredentialVar{Value: "bar"},
-		}
 		instances := []workloads.InstanceTemplate{
 			{
 				Name:     "hello",
@@ -147,7 +143,6 @@ var _ = Describe("instance_set builder", func() {
 			SetInstanceUpdateStrategy(&strategy).
 			SetMemberUpdateStrategy(&memberUpdateStrategy).
 			SetPaused(paused).
-			SetCredential(&credential).
 			SetInstances(instances).
 			GetObject()
 
@@ -181,8 +176,6 @@ var _ = Describe("instance_set builder", func() {
 		Expect(its.Spec.MemberUpdateStrategy).ShouldNot(BeNil())
 		Expect(*its.Spec.MemberUpdateStrategy).Should(Equal(memberUpdateStrategy))
 		Expect(its.Spec.Paused).Should(Equal(paused))
-		Expect(its.Spec.Credential).ShouldNot(BeNil())
-		Expect(*its.Spec.Credential).Should(Equal(credential))
 		Expect(its.Spec.Instances).Should(Equal(instances))
 	})
 })

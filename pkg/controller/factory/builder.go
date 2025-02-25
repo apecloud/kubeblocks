@@ -80,8 +80,7 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, component
 		SetInstanceUpdateStrategy(getInstanceUpdateStrategy(synthesizedComp)).
 		SetMemberUpdateStrategy(getMemberUpdateStrategy(synthesizedComp)).
 		SetLifecycleActions(synthesizedComp.LifecycleActions).
-		SetTemplateVars(synthesizedComp.TemplateVars).
-		SetCredential(getCredential(synthesizedComp))
+		SetTemplateVars(synthesizedComp.TemplateVars)
 
 	if common.IsCompactMode(synthesizedComp.Annotations) {
 		itsBuilder.AddAnnotations(constant.FeatureReconciliationInCompactModeAnnotationKey,
@@ -167,41 +166,6 @@ func getInstanceUpdateStrategy(synthesizedComp *component.SynthesizedComponent) 
 func getMemberUpdateStrategy(synthesizedComp *component.SynthesizedComponent) *workloads.MemberUpdateStrategy {
 	if synthesizedComp.UpdateStrategy != nil {
 		return (*workloads.MemberUpdateStrategy)(synthesizedComp.UpdateStrategy)
-	}
-	return nil
-}
-
-func getCredential(synthesizedComp *component.SynthesizedComponent) *workloads.Credential {
-	credential := func(sysAccount string) *workloads.Credential {
-		secretName := constant.GenerateAccountSecretName(synthesizedComp.ClusterName, synthesizedComp.Name, sysAccount)
-		return &workloads.Credential{
-			Username: workloads.CredentialVar{
-				ValueFrom: &corev1.EnvVarSource{
-					SecretKeyRef: &corev1.SecretKeySelector{
-						LocalObjectReference: corev1.LocalObjectReference{
-							Name: secretName,
-						},
-						Key: constant.AccountNameForSecret,
-					},
-				},
-			},
-			Password: workloads.CredentialVar{
-				ValueFrom: &corev1.EnvVarSource{
-					SecretKeyRef: &corev1.SecretKeySelector{
-						LocalObjectReference: corev1.LocalObjectReference{
-							Name: secretName,
-						},
-						Key: constant.AccountPasswdForSecret,
-					},
-				},
-			},
-		}
-	}
-	// use first init account as the default credential
-	for _, sysAccount := range synthesizedComp.SystemAccounts {
-		if sysAccount.InitAccount {
-			return credential(sysAccount.Name)
-		}
 	}
 	return nil
 }

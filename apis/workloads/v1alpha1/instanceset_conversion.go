@@ -89,7 +89,8 @@ func (r *InstanceSet) incrementConvertTo(dstRaw metav1.Object) error {
 	}
 	// changed
 	instanceConvert := instanceSetConverter{
-		RoleProbe: r.Spec.RoleProbe,
+		RoleProbe:  r.Spec.RoleProbe,
+		Credential: r.Spec.Credential,
 	}
 	bytes, err := json.Marshal(instanceConvert)
 	if err != nil {
@@ -115,11 +116,13 @@ func (r *InstanceSet) incrementConvertFrom(srcRaw metav1.Object) error {
 	}
 	delete(srcRaw.GetAnnotations(), kbIncrementConverterAK)
 	r.Spec.RoleProbe = instanceConvert.RoleProbe
+	r.Spec.Credential = instanceConvert.Credential
 	return nil
 }
 
 type instanceSetConverter struct {
-	RoleProbe *RoleProbe `json:"roleProbe,omitempty"`
+	RoleProbe  *RoleProbe  `json:"roleProbe,omitempty"`
+	Credential *Credential `json:"credential,omitempty"`
 }
 
 func (r *InstanceSet) changesToInstanceSet(its *workloadsv1.InstanceSet) {

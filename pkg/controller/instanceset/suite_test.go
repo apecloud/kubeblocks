@@ -136,11 +136,6 @@ var (
 			},
 		},
 	}
-
-	credential = workloads.Credential{
-		Username: workloads.CredentialVar{Value: "foo"},
-		Password: workloads.CredentialVar{Value: "bar"},
-	}
 )
 
 func makePodUpdateReady(newRevision string, roleful bool, pods ...*corev1.Pod) {

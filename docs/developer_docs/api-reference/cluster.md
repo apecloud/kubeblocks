@@ -3354,6 +3354,30 @@ string
 </tr>
 <tr>
 <td>
+<code>labels</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the labels for the PVC of the volume.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>annotations</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the annotations for the PVC of the volume.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>spec</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.PersistentVolumeClaimSpec">
@@ -16788,6 +16812,30 @@ string
 </tr>
 <tr>
 <td>
+<code>labels</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the labels for the PVC of the volume.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>annotations</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the annotations for the PVC of the volume.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>spec</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1alpha1.PersistentVolumeClaimSpec">
@@ -29624,20 +29672,6 @@ bool
 <p>Indicates that the InstanceSet is paused, meaning the reconciliation of this InstanceSet object will be paused.</p>
 </td>
 </tr>
-<tr>
-<td>
-<code>credential</code><br/>
-<em>
-<a href="#workloads.kubeblocks.io/v1.Credential">
-Credential
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Credential used to connect to DB engine</p>
-</td>
-</tr>
 </table>
 </td>
 </tr>
@@ -29756,98 +29790,6 @@ Or, a NotReady reason with not ready instances encoded in the Message filed will
 PodUpdatePolicy is set to StrictInPlace but the pods cannot be updated in-place).</p>
 </td>
 </tr></tbody>
-</table>
-<h3 id="workloads.kubeblocks.io/v1.Credential">Credential
-</h3>
-<p>
-(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>username</code><br/>
-<em>
-<a href="#workloads.kubeblocks.io/v1.CredentialVar">
-CredentialVar
-</a>
-</em>
-</td>
-<td>
-<p>Defines the user&rsquo;s name for the credential.
-The corresponding environment variable will be KB_ITS_USERNAME.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>password</code><br/>
-<em>
-<a href="#workloads.kubeblocks.io/v1.CredentialVar">
-CredentialVar
-</a>
-</em>
-</td>
-<td>
-<p>Represents the user&rsquo;s password for the credential.
-The corresponding environment variable will be KB_ITS_PASSWORD.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="workloads.kubeblocks.io/v1.CredentialVar">CredentialVar
-</h3>
-<p>
-(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.Credential">Credential</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>value</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the value of the environment variable. This field is optional and defaults to an empty string.
-The value can include variable references in the format $(VAR_NAME) which will be expanded using previously defined environment variables in the container and any service environment variables.</p>
-<p>If a variable cannot be resolved, the reference in the input string will remain unchanged.
-Double $$ can be used to escape the $(VAR_NAME) syntax, resulting in a single $ and producing the string literal &ldquo;$(VAR_NAME)&rdquo;.
-Escaped references will not be expanded, regardless of whether the variable exists or not.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>valueFrom</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#envvarsource-v1-core">
-Kubernetes core/v1.EnvVarSource
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the source for the environment variable&rsquo;s value. This field is optional and cannot be used if the &lsquo;Value&rsquo; field is not empty.</p>
-</td>
-</tr>
-</tbody>
 </table>
 <h3 id="workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec
 </h3>
@@ -30145,20 +30087,6 @@ bool
 <td>
 <em>(Optional)</em>
 <p>Indicates that the InstanceSet is paused, meaning the reconciliation of this InstanceSet object will be paused.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>credential</code><br/>
-<em>
-<a href="#workloads.kubeblocks.io/v1.Credential">
-Credential
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Credential used to connect to DB engine</p>
 </td>
 </tr>
 </tbody>

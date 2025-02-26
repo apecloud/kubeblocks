@@ -37,7 +37,7 @@ kbcli cluster create oriol NAME [flags]
       --storage-class-name string    Storage class name of the data volume
       --tenancy string               The tenancy of cluster. Legal values [SharedNode, DedicatedNode]. (default "SharedNode")
       --termination-policy string    The termination policy of cluster. Legal values [DoNotTerminate, Halt, Delete, WipeOut]. (default "Delete")
-      --version string               
+      --version string                (default "orioledb-beta1")
 ```
 
 ### Options inherited from parent commands

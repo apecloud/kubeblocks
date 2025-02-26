@@ -726,6 +726,20 @@ Default value is &ldquo;PreferInPlace&rdquo;</li>
 </tr>
 <tr>
 <td>
+<code>instanceUpdateStrategy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.InstanceUpdateStrategy">
+InstanceUpdateStrategy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Provides fine-grained control over the spec update process of all instances.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>schedulingPolicy</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.SchedulingPolicy">
@@ -3164,6 +3178,20 @@ Any attempt to modify other fields will be rejected.</li>
 If that fails, it will fall back to the ReCreate, where pod will be recreated.
 Default value is &ldquo;PreferInPlace&rdquo;</li>
 </ul>
+</td>
+</tr>
+<tr>
+<td>
+<code>instanceUpdateStrategy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.InstanceUpdateStrategy">
+InstanceUpdateStrategy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Provides fine-grained control over the spec update process of all instances.</p>
 </td>
 </tr>
 <tr>
@@ -6497,6 +6525,20 @@ Default value is &ldquo;PreferInPlace&rdquo;</li>
 </tr>
 <tr>
 <td>
+<code>instanceUpdateStrategy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.InstanceUpdateStrategy">
+InstanceUpdateStrategy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Provides fine-grained control over the spec update process of all instances.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>schedulingPolicy</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.SchedulingPolicy">
@@ -8214,6 +8256,80 @@ Add new or override existing envs.</p>
 </tr>
 </tbody>
 </table>
+<h3 id="apps.kubeblocks.io/v1.InstanceUpdateStrategy">InstanceUpdateStrategy
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>)
+</p>
+<div>
+<p>InstanceUpdateStrategy defines fine-grained control over the spec update process of all instances.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>type</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.InstanceUpdateStrategyType">
+InstanceUpdateStrategyType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates the type of the update strategy.
+Default is RollingUpdate.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>rollingUpdate</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.RollingUpdate">
+RollingUpdate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies how the rolling update should be applied.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.InstanceUpdateStrategyType">InstanceUpdateStrategyType
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.InstanceUpdateStrategy">InstanceUpdateStrategy</a>)
+</p>
+<div>
+<p>InstanceUpdateStrategyType is a string enumeration type that enumerates
+all possible update strategies for the KubeBlocks controllers.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;OnDelete&#34;</p></td>
+<td><p>OnDeleteStrategyType indicates that ordered rolling restarts are disabled. Instances are recreated
+when they are manually deleted.</p>
+</td>
+</tr><tr><td><p>&#34;RollingUpdate&#34;</p></td>
+<td><p>RollingUpdateStrategyType indicates that update will be
+applied to all Instances with respect to the workload
+ordering constraints.</p>
+</td>
+</tr></tbody>
+</table>
 <h3 id="apps.kubeblocks.io/v1.Issuer">Issuer
 </h3>
 <p>
@@ -8904,9 +9020,10 @@ string
 <h3 id="apps.kubeblocks.io/v1.PodUpdatePolicyType">PodUpdatePolicyType
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>)
 </p>
 <div>
+<p>PodUpdatePolicyType indicates how pods should be updated</p>
 </div>
 <table>
 <thead>
@@ -9364,6 +9481,61 @@ VarOption
 </td>
 <td>
 <em>(Optional)</em>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.RollingUpdate">RollingUpdate
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.InstanceUpdateStrategy">InstanceUpdateStrategy</a>)
+</p>
+<div>
+<p>RollingUpdate specifies how the rolling update should be applied.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>replicas</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/util/intstr#IntOrString">
+Kubernetes api utils intstr.IntOrString
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates the number of instances that should be updated during a rolling update.
+The remaining instances will remain untouched. This is helpful in defining how many instances
+should participate in the update process.
+Value can be an absolute number (ex: 5) or a percentage of desired instances (ex: 10%).
+Absolute number is calculated from percentage by rounding up.
+The default value is ComponentSpec.Replicas (i.e., update all instances).</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>maxUnavailable</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/util/intstr#IntOrString">
+Kubernetes api utils intstr.IntOrString
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The maximum number of instances that can be unavailable during the update.
+Value can be an absolute number (ex: 5) or a percentage of desired instances (ex: 10%).
+Absolute number is calculated from percentage by rounding up. This can not be 0.
+Defaults to 1. The field applies to all instances. That means if there is any unavailable pod,
+it will be counted towards MaxUnavailable.</p>
 </td>
 </tr>
 </tbody>
@@ -29456,7 +29628,7 @@ The default Concurrency is 100%.</p>
 <td>
 <code>podUpdatePolicy</code><br/>
 <em>
-<a href="#workloads.kubeblocks.io/v1.PodUpdatePolicyType">
+<a href="#apps.kubeblocks.io/v1.PodUpdatePolicyType">
 PodUpdatePolicyType
 </a>
 </em>
@@ -29475,19 +29647,35 @@ Default value is &ldquo;PreferInPlace&rdquo;</li>
 </tr>
 <tr>
 <td>
-<code>updateStrategy</code><br/>
+<code>instanceUpdateStrategy</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#statefulsetupdatestrategy-v1-apps">
-Kubernetes apps/v1.StatefulSetUpdateStrategy
+<a href="#apps.kubeblocks.io/v1.InstanceUpdateStrategy">
+InstanceUpdateStrategy
 </a>
 </em>
 </td>
 <td>
-<p>Indicates the StatefulSetUpdateStrategy that will be
-employed to update Pods in the InstanceSet when a revision is made to
-Template.
-UpdateStrategy.Type will be set to appsv1.OnDeleteStatefulSetStrategyType if MemberUpdateStrategy is not nil</p>
-<p>Note: This field will be removed in future version.</p>
+<em>(Optional)</em>
+<p>Provides fine-grained control over the spec update process of all instances.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>memberUpdateStrategy</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.MemberUpdateStrategy">
+MemberUpdateStrategy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Members(Pods) update strategy.</p>
+<ul>
+<li>serial: update Members one by one that guarantee minimum component unavailable time.</li>
+<li>parallel: force parallel</li>
+<li>bestEffortParallel: update Members in parallel that guarantee minimum component un-writable time.</li>
+</ul>
 </td>
 </tr>
 <tr>
@@ -29528,25 +29716,6 @@ map[string]string
 <td>
 <em>(Optional)</em>
 <p>Provides variables which are used to call Actions.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>memberUpdateStrategy</code><br/>
-<em>
-<a href="#workloads.kubeblocks.io/v1.MemberUpdateStrategy">
-MemberUpdateStrategy
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Members(Pods) update strategy.</p>
-<ul>
-<li>serial: update Members one by one that guarantee minimum component unavailable time.</li>
-<li>bestEffortParallel: update Members in parallel that guarantee minimum component un-writable time.</li>
-<li>parallel: force parallel</li>
-</ul>
 </td>
 </tr>
 <tr>
@@ -29876,7 +30045,7 @@ The default Concurrency is 100%.</p>
 <td>
 <code>podUpdatePolicy</code><br/>
 <em>
-<a href="#workloads.kubeblocks.io/v1.PodUpdatePolicyType">
+<a href="#apps.kubeblocks.io/v1.PodUpdatePolicyType">
 PodUpdatePolicyType
 </a>
 </em>
@@ -29895,19 +30064,35 @@ Default value is &ldquo;PreferInPlace&rdquo;</li>
 </tr>
 <tr>
 <td>
-<code>updateStrategy</code><br/>
+<code>instanceUpdateStrategy</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#statefulsetupdatestrategy-v1-apps">
-Kubernetes apps/v1.StatefulSetUpdateStrategy
+<a href="#apps.kubeblocks.io/v1.InstanceUpdateStrategy">
+InstanceUpdateStrategy
 </a>
 </em>
 </td>
 <td>
-<p>Indicates the StatefulSetUpdateStrategy that will be
-employed to update Pods in the InstanceSet when a revision is made to
-Template.
-UpdateStrategy.Type will be set to appsv1.OnDeleteStatefulSetStrategyType if MemberUpdateStrategy is not nil</p>
-<p>Note: This field will be removed in future version.</p>
+<em>(Optional)</em>
+<p>Provides fine-grained control over the spec update process of all instances.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>memberUpdateStrategy</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.MemberUpdateStrategy">
+MemberUpdateStrategy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Members(Pods) update strategy.</p>
+<ul>
+<li>serial: update Members one by one that guarantee minimum component unavailable time.</li>
+<li>parallel: force parallel</li>
+<li>bestEffortParallel: update Members in parallel that guarantee minimum component un-writable time.</li>
+</ul>
 </td>
 </tr>
 <tr>
@@ -29948,25 +30133,6 @@ map[string]string
 <td>
 <em>(Optional)</em>
 <p>Provides variables which are used to call Actions.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>memberUpdateStrategy</code><br/>
-<em>
-<a href="#workloads.kubeblocks.io/v1.MemberUpdateStrategy">
-MemberUpdateStrategy
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Members(Pods) update strategy.</p>
-<ul>
-<li>serial: update Members one by one that guarantee minimum component unavailable time.</li>
-<li>bestEffortParallel: update Members in parallel that guarantee minimum component un-writable time.</li>
-<li>parallel: force parallel</li>
-</ul>
 </td>
 </tr>
 <tr>
@@ -30459,30 +30625,6 @@ Action
 </td>
 </tr>
 </tbody>
-</table>
-<h3 id="workloads.kubeblocks.io/v1.PodUpdatePolicyType">PodUpdatePolicyType
-(<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>&#34;PreferInPlace&#34;</p></td>
-<td><p>PreferInPlacePodUpdatePolicyType indicates that we will first attempt an in-place upgrade of the Pod.
-If that fails, it will fall back to the ReCreate, where pod will be recreated.</p>
-</td>
-</tr><tr><td><p>&#34;StrictInPlace&#34;</p></td>
-<td><p>StrictInPlacePodUpdatePolicyType indicates that only allows in-place upgrades.
-Any attempt to modify other fields will be rejected.</p>
-</td>
-</tr></tbody>
 </table>
 <h3 id="workloads.kubeblocks.io/v1.RoleUpdateMechanism">RoleUpdateMechanism
 (<code>string</code> alias)</h3>

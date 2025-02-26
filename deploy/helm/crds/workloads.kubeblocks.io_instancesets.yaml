@@ -94,6 +94,46 @@ spec:
                       type: object
                     type: array
                 type: object
+              instanceUpdateStrategy:
+                description: Provides fine-grained control over the spec update process
+                  of all instances.
+                properties:
+                  rollingUpdate:
+                    description: Specifies how the rolling update should be applied.
+                    properties:
+                      maxUnavailable:
+                        anyOf:
+                        - type: integer
+                        - type: string
+                        description: |-
+                          The maximum number of instances that can be unavailable during the update.
+                          Value can be an absolute number (ex: 5) or a percentage of desired instances (ex: 10%).
+                          Absolute number is calculated from percentage by rounding up. This can not be 0.
+                          Defaults to 1. The field applies to all instances. That means if there is any unavailable pod,
+                          it will be counted towards MaxUnavailable.
+                        x-kubernetes-int-or-string: true
+                      replicas:
+                        anyOf:
+                        - type: integer
+                        - type: string
+                        description: |-
+                          Indicates the number of instances that should be updated during a rolling update.
+                          The remaining instances will remain untouched. This is helpful in defining how many instances
+                          should participate in the update process.
+                          Value can be an absolute number (ex: 5) or a percentage of desired instances (ex: 10%).
+                          Absolute number is calculated from percentage by rounding up.
+                          The default value is ComponentSpec.Replicas (i.e., update all instances).
+                        x-kubernetes-int-or-string: true
+                    type: object
+                  type:
+                    description: |-
+                      Indicates the type of the update strategy.
+                      Default is RollingUpdate.
+                    enum:
+                    - RollingUpdate
+                    - OnDelete
+                    type: string
+                type: object
               instances:
                 description: |-
                   Overrides values in default Template.
@@ -1530,12 +1570,12 @@ spec:
 
 
                   - serial: update Members one by one that guarantee minimum component unavailable time.
-                  - bestEffortParallel: update Members in parallel that guarantee minimum component un-writable time.
                   - parallel: force parallel
+                  - bestEffortParallel: update Members in parallel that guarantee minimum component un-writable time.
                 enum:
                 - Serial
-                - BestEffortParallel
                 - Parallel
+                - BestEffortParallel
                 type: string
               membershipReconfiguration:
                 description: Provides actions to do membership dynamic reconfiguration.
@@ -9653,48 +9693,6 @@ spec:
                 additionalProperties:
                   type: string
                 description: Provides variables which are used to call Actions.
-                type: object
-              updateStrategy:
-                description: |-
-                  Indicates the StatefulSetUpdateStrategy that will be
-                  employed to update Pods in the InstanceSet when a revision is made to
-                  Template.
-                  UpdateStrategy.Type will be set to appsv1.OnDeleteStatefulSetStrategyType if MemberUpdateStrategy is not nil
-
-
-                  Note: This field will be removed in future version.
-                properties:
-                  rollingUpdate:
-                    description: RollingUpdate is used to communicate parameters when
-                      Type is RollingUpdateStatefulSetStrategyType.
-                    properties:
-                      maxUnavailable:
-                        anyOf:
-                        - type: integer
-                        - type: string
-                        description: |-
-                          The maximum number of pods that can be unavailable during the update.
-                          Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
-                          Absolute number is calculated from percentage by rounding up. This can not be 0.
-                          Defaults to 1. This field is alpha-level and is only honored by servers that enable the
-                          MaxUnavailableStatefulSet feature. The field applies to all pods in the range 0 to
-                          Replicas-1. That means if there is any unavailable pod in the range 0 to Replicas-1, it
-                          will be counted towards MaxUnavailable.
-                        x-kubernetes-int-or-string: true
-                      partition:
-                        description: |-
-                          Partition indicates the ordinal at which the StatefulSet should be partitioned
-                          for updates. During a rolling update, all pods from ordinal Replicas-1 to
-                          Partition are updated. All pods from ordinal Partition-1 to 0 remain untouched.
-                          This is helpful in being able to do a canary based deployment. The default value is 0.
-                        format: int32
-                        type: integer
-                    type: object
-                  type:
-                    description: |-
-                      Type indicates the type of the StatefulSetUpdateStrategy.
-                      Default is RollingUpdate.
-                    type: string
                 type: object
               volumeClaimTemplates:
                 description: |-

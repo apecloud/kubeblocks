@@ -61,9 +61,9 @@ func (mgr *Manager) GetReplicaRole(ctx context.Context, _ *dcs.Cluster) (string,
 		}
 	}
 
-	masterName := strings.Split(masterAddr[0], ".")[0]
+	masterIp := masterAddr[0]
 	// if current member is not master from sentinel, just return secondary to avoid double master
-	if masterName != mgr.CurrentMemberName {
+	if masterIp != mgr.CurrentMemberIP {
 		return models.SECONDARY, nil
 	}
 	return models.PRIMARY, nil

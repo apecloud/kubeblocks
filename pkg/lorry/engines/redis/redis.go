@@ -151,11 +151,20 @@ func newSentinelClient(s *Settings, clusterCompName string) *redis.SentinelClien
 		sentinelPort = viper.GetString("REDIS_SENTINEL_HOST_NETWORK_PORT")
 	}
 
+	sentinelUser := s.Username
+	if viper.IsSet("SENTINEL_USER") {
+		sentinelUser = viper.GetString("SENTINEL_USER")
+	}
+	sentinelPassword := s.Password
+	if viper.IsSet("SENTINEL_PASSWORD") {
+		sentinelPassword = viper.GetString("SENTINEL_PASSWORD")
+	}
+
 	opt := &redis.Options{
 		DB:              s.DB,
 		Addr:            fmt.Sprintf("%s:%s", sentinelHost, sentinelPort),
-		Password:        s.Password,
-		Username:        s.Username,
+		Password:        sentinelPassword,
+		Username:        sentinelUser,
 		MaxRetries:      s.RedisMaxRetries,
 		MaxRetryBackoff: time.Duration(s.RedisMaxRetryInterval),
 		MinRetryBackoff: time.Duration(s.RedisMinRetryInterval),

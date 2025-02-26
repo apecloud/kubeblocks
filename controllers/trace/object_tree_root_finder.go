@@ -22,6 +22,7 @@ package trace
 import (
 	"container/list"
 	"context"
+	"fmt"
 
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -69,14 +70,14 @@ func (f *rootFinder) findRoots(ctx context.Context, object client.Object) []reco
 		obj, _ := e.Value.(client.Object)
 		objGVK, err := apiutil.GVKForObject(obj, f.Scheme())
 		if err != nil {
-			f.logger.Error(err, "get GVK of %s/%s failed", obj.GetNamespace(), obj.GetName())
+			f.logger.Error(err, fmt.Sprintf("get GVK of %s/%s failed", obj.GetNamespace(), obj.GetName()))
 			return nil
 		}
 		found := false
 		for _, primaryType := range primaryTypeList {
 			gvk, err := objectTypeToGVK(&primaryType)
 			if err != nil {
-				f.logger.Error(err, "convert objectType %s to GVK failed", primaryType)
+				f.logger.Error(err, fmt.Sprintf("convert objectType %s to GVK failed", primaryType))
 				return nil
 			}
 			if objGVK == *gvk {
@@ -93,7 +94,7 @@ func (f *rootFinder) findRoots(ctx context.Context, object client.Object) []reco
 			for _, resource := range rule.OwnedResources {
 				gvk, err := objectTypeToGVK(&resource.Secondary)
 				if err != nil {
-					f.logger.Error(err, "convert objectType %s to GVK failed", resource.Secondary)
+					f.logger.Error(err, fmt.Sprintf("convert objectType %s to GVK failed", resource.Secondary))
 					return nil
 				}
 				if objGVK != *gvk {
@@ -101,18 +102,18 @@ func (f *rootFinder) findRoots(ctx context.Context, object client.Object) []reco
 				}
 				primaryGVK, err := objectTypeToGVK(&rule.Primary)
 				if err != nil {
-					f.logger.Error(err, "convert objectType %s to GVK failed", rule.Primary)
+					f.logger.Error(err, fmt.Sprintf("convert objectType %s to GVK failed", rule.Primary))
 					return nil
 				}
 				objectList, err := getObjectsByGVK(ctx, f, primaryGVK, nil)
 				if err != nil {
-					f.logger.Error(err, "getObjectsByGVK for GVK %s failed", primaryGVK)
+					f.logger.Error(err, fmt.Sprintf("getObjectsByGVK for GVK %s failed", primaryGVK))
 					return nil
 				}
 				for _, owner := range objectList {
 					opts, err := parseQueryOptions(owner, &resource.Criteria)
 					if err != nil {
-						f.logger.Error(err, "parse query options failed: %s", resource.Criteria)
+						f.logger.Error(err, fmt.Sprintf("parse query options failed: %v", resource.Criteria))
 						return nil
 					}
 					if opts.match(obj) {
@@ -131,7 +132,7 @@ func (f *rootFinder) findRoots(ctx context.Context, object client.Object) []reco
 	// list all trace objects, filter by result Cluster objects.
 	traceList := &tracev1.ReconciliationTraceList{}
 	if err := f.List(ctx, traceList); err != nil {
-		f.logger.Error(err, "list trace failed", "")
+		f.logger.Error(err, "list trace failed")
 		return nil
 	}
 	getTargetObjectKey := func(trace *tracev1.ReconciliationTrace) client.ObjectKey {

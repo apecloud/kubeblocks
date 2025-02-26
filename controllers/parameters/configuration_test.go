@@ -132,19 +132,6 @@ func mockReconcileResource() (*corev1.ConfigMap, *parametersv1alpha1.ParametersD
 		Create(&testCtx).
 		GetObject()
 
-	By("Create a componentParameter obj")
-	componentParameter := builder.NewComponentParameterBuilder(testCtx.DefaultNamespace, core.GenerateComponentConfigurationName(clusterName, defaultCompName)).
-		ClusterRef(clusterName).
-		Component(defaultCompName).
-		AddConfigurationItem(appsv1.ComponentTemplateSpec{
-			Name:        configSpecName,
-			TemplateRef: configmap.Name,
-			Namespace:   configmap.Namespace,
-			VolumeName:  configVolumeName,
-		}).
-		GetObject()
-	Expect(testCtx.CreateObj(testCtx.Ctx, componentParameter)).Should(Succeed())
-
 	container := *builder.NewContainerBuilder("mock-container").
 		AddVolumeMounts(corev1.VolumeMount{
 			Name:      configVolumeName,

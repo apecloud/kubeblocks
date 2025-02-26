@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package builder
 
 import (
-	apps "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -104,7 +104,7 @@ func (builder *InstanceSetBuilder) SetVolumeClaimTemplates(templates ...corev1.P
 	return builder
 }
 
-func (builder *InstanceSetBuilder) SetPodManagementPolicy(policy apps.PodManagementPolicyType) *InstanceSetBuilder {
+func (builder *InstanceSetBuilder) SetPodManagementPolicy(policy appsv1.PodManagementPolicyType) *InstanceSetBuilder {
 	builder.get().Spec.PodManagementPolicy = policy
 	return builder
 }
@@ -113,19 +113,18 @@ func (builder *InstanceSetBuilder) SetParallelPodManagementConcurrency(parallelP
 	builder.get().Spec.ParallelPodManagementConcurrency = parallelPodManagementConcurrency
 	return builder
 }
-
 func (builder *InstanceSetBuilder) SetPodUpdatePolicy(policy workloads.PodUpdatePolicyType) *InstanceSetBuilder {
 	builder.get().Spec.PodUpdatePolicy = policy
 	return builder
 }
 
-func (builder *InstanceSetBuilder) SetUpdateStrategy(strategy apps.StatefulSetUpdateStrategy) *InstanceSetBuilder {
-	builder.get().Spec.UpdateStrategy = strategy
+func (builder *InstanceSetBuilder) SetInstanceUpdateStrategy(strategy *workloads.InstanceUpdateStrategy) *InstanceSetBuilder {
+	builder.get().Spec.InstanceUpdateStrategy = strategy
 	return builder
 }
 
-func (builder *InstanceSetBuilder) SetUpdateStrategyType(strategyType apps.StatefulSetUpdateStrategyType) *InstanceSetBuilder {
-	builder.get().Spec.UpdateStrategy.Type = strategyType
+func (builder *InstanceSetBuilder) SetMemberUpdateStrategy(strategy *workloads.MemberUpdateStrategy) *InstanceSetBuilder {
+	builder.get().Spec.MemberUpdateStrategy = strategy
 	return builder
 }
 
@@ -150,14 +149,6 @@ func (builder *InstanceSetBuilder) SetTemplateVars(templateVars map[string]any) 
 		for k, v := range templateVars {
 			builder.get().Spec.TemplateVars[k] = v.(string)
 		}
-	}
-	return builder
-}
-
-func (builder *InstanceSetBuilder) SetMemberUpdateStrategy(strategy *workloads.MemberUpdateStrategy) *InstanceSetBuilder {
-	builder.get().Spec.MemberUpdateStrategy = strategy
-	if strategy != nil {
-		builder.SetUpdateStrategyType(apps.OnDeleteStatefulSetStrategyType)
 	}
 	return builder
 }

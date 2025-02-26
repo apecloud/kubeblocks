@@ -184,13 +184,20 @@ type InstanceSetSpec struct {
 	// +optional
 	PodUpdatePolicy PodUpdatePolicyType `json:"podUpdatePolicy,omitempty"`
 
-	// Indicates the StatefulSetUpdateStrategy that will be
-	// employed to update Pods in the InstanceSet when a revision is made to
-	// Template.
-	// UpdateStrategy.Type will be set to appsv1.OnDeleteStatefulSetStrategyType if MemberUpdateStrategy is not nil
+	// Provides fine-grained control over the spec update process of all instances.
 	//
-	// Note: This field will be removed in future version.
-	UpdateStrategy appsv1.StatefulSetUpdateStrategy `json:"updateStrategy,omitempty"`
+	// +optional
+	InstanceUpdateStrategy *InstanceUpdateStrategy `json:"instanceUpdateStrategy,omitempty"`
+
+	// Members(Pods) update strategy.
+	//
+	// - serial: update Members one by one that guarantee minimum component unavailable time.
+	// - parallel: force parallel
+	// - bestEffortParallel: update Members in parallel that guarantee minimum component un-writable time.
+	//
+	// +kubebuilder:validation:Enum={Serial,Parallel,BestEffortParallel}
+	// +optional
+	MemberUpdateStrategy *MemberUpdateStrategy `json:"memberUpdateStrategy,omitempty"`
 
 	// A list of roles defined in the system. Instanceset obtains role through pods' role label `kubeblocks.io/role`.
 	//
@@ -206,16 +213,6 @@ type InstanceSetSpec struct {
 	//
 	// +optional
 	TemplateVars map[string]string `json:"templateVars,omitempty"`
-
-	// Members(Pods) update strategy.
-	//
-	// - serial: update Members one by one that guarantee minimum component unavailable time.
-	// - bestEffortParallel: update Members in parallel that guarantee minimum component un-writable time.
-	// - parallel: force parallel
-	//
-	// +kubebuilder:validation:Enum={Serial,BestEffortParallel,Parallel}
-	// +optional
-	MemberUpdateStrategy *MemberUpdateStrategy `json:"memberUpdateStrategy,omitempty"`
 
 	// Indicates that the InstanceSet is paused, meaning the reconciliation of this InstanceSet object will be paused.
 	// +optional
@@ -308,16 +305,29 @@ type InstanceSetStatus struct {
 // +kubebuilder:object:generate=false
 type InstanceTemplate = kbappsv1.InstanceTemplate
 
-type PodUpdatePolicyType string
+// PodUpdatePolicyType indicates how pods should be updated
+//
+// +kubebuilder:object:generate=false
+type PodUpdatePolicyType = kbappsv1.PodUpdatePolicyType
+
+// InstanceUpdateStrategy defines fine-grained control over the spec update process of all instances.
+//
+// +kubebuilder:object:generate=false
+type InstanceUpdateStrategy = kbappsv1.InstanceUpdateStrategy
+
+// RollingUpdate specifies how the rolling update should be applied.
+//
+// +kubebuilder:object:generate=false
+type RollingUpdate = kbappsv1.RollingUpdate
+
+// MemberUpdateStrategy defines Cluster Component update strategy.
+// +enum
+type MemberUpdateStrategy string
 
 const (
-	// StrictInPlacePodUpdatePolicyType indicates that only allows in-place upgrades.
-	// Any attempt to modify other fields will be rejected.
-	StrictInPlacePodUpdatePolicyType PodUpdatePolicyType = "StrictInPlace"
-
-	// PreferInPlacePodUpdatePolicyType indicates that we will first attempt an in-place upgrade of the Pod.
-	// If that fails, it will fall back to the ReCreate, where pod will be recreated.
-	PreferInPlacePodUpdatePolicyType PodUpdatePolicyType = "PreferInPlace"
+	SerialUpdateStrategy             MemberUpdateStrategy = "Serial"
+	ParallelUpdateStrategy           MemberUpdateStrategy = "Parallel"
+	BestEffortParallelUpdateStrategy MemberUpdateStrategy = "BestEffortParallel"
 )
 
 // ReplicaRole represents a role that can be assigned to a component instance, defining its behavior and responsibilities.
@@ -403,16 +413,6 @@ type MembershipReconfiguration struct {
 	// +optional
 	Switchover *kbappsv1.Action `json:"switchover,omitempty"`
 }
-
-// MemberUpdateStrategy defines Cluster Component update strategy.
-// +enum
-type MemberUpdateStrategy string
-
-const (
-	SerialUpdateStrategy             MemberUpdateStrategy = "Serial"
-	BestEffortParallelUpdateStrategy MemberUpdateStrategy = "BestEffortParallel"
-	ParallelUpdateStrategy           MemberUpdateStrategy = "Parallel"
-)
 
 type MemberStatus struct {
 	// Represents the name of the pod.

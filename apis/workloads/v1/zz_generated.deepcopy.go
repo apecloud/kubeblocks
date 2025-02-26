@@ -154,7 +154,16 @@ func (in *InstanceSetSpec) DeepCopyInto(out *InstanceSetSpec) {
 		*out = new(intstr.IntOrString)
 		**out = **in
 	}
-	in.UpdateStrategy.DeepCopyInto(&out.UpdateStrategy)
+	if in.InstanceUpdateStrategy != nil {
+		in, out := &in.InstanceUpdateStrategy, &out.InstanceUpdateStrategy
+		*out = new(appsv1.InstanceUpdateStrategy)
+		(*in).DeepCopyInto(*out)
+	}
+	if in.MemberUpdateStrategy != nil {
+		in, out := &in.MemberUpdateStrategy, &out.MemberUpdateStrategy
+		*out = new(MemberUpdateStrategy)
+		**out = **in
+	}
 	if in.Roles != nil {
 		in, out := &in.Roles, &out.Roles
 		*out = make([]appsv1.ReplicaRole, len(*in))
@@ -171,11 +180,6 @@ func (in *InstanceSetSpec) DeepCopyInto(out *InstanceSetSpec) {
 		for key, val := range *in {
 			(*out)[key] = val
 		}
-	}
-	if in.MemberUpdateStrategy != nil {
-		in, out := &in.MemberUpdateStrategy, &out.MemberUpdateStrategy
-		*out = new(MemberUpdateStrategy)
-		**out = **in
 	}
 }
 

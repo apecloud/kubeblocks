@@ -69,9 +69,9 @@ func (mgr *Manager) GetReplicaRole(ctx context.Context, _ *dcs.Cluster) (string,
 		return getRoleFromRedisClient()
 	}
 
-	masterName := strings.Split(masterAddr[0], ".")[0]
+	masterIP := masterAddr[0]
 	// if current member is not master from sentinel, just return secondary to avoid double master
-	if masterName != mgr.CurrentMemberName {
+	if masterIP != mgr.CurrentMemberIP {
 		return models.SECONDARY, nil
 	}
 	return models.PRIMARY, nil

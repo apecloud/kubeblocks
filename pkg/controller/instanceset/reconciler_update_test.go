@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
@@ -159,11 +160,11 @@ var _ = Describe("update reconciler test", func() {
 			Expect(err).Should(BeNil())
 			root, ok := partitionTree.GetRoot().(*workloads.InstanceSet)
 			Expect(ok).Should(BeTrue())
-			partition := int32(3)
+			updateReplicas := intstr.FromInt32(3)
 			maxUnavailable := intstr.FromInt32(2)
-			root.Spec.UpdateStrategy = appsv1.StatefulSetUpdateStrategy{
-				RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
-					Partition:      &partition,
+			root.Spec.InstanceUpdateStrategy = &workloads.InstanceUpdateStrategy{
+				RollingUpdate: &workloads.RollingUpdate{
+					Replicas:       &updateReplicas,
 					MaxUnavailable: &maxUnavailable,
 				},
 			}
@@ -179,9 +180,9 @@ var _ = Describe("update reconciler test", func() {
 			Expect(err).Should(BeNil())
 			root, ok = partitionTree.GetRoot().(*workloads.InstanceSet)
 			Expect(ok).Should(BeTrue())
-			root.Spec.UpdateStrategy = appsv1.StatefulSetUpdateStrategy{
-				RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
-					Partition:      &partition,
+			root.Spec.InstanceUpdateStrategy = &workloads.InstanceUpdateStrategy{
+				RollingUpdate: &workloads.RollingUpdate{
+					Replicas:       &updateReplicas,
 					MaxUnavailable: &maxUnavailable,
 				},
 			}
@@ -203,7 +204,9 @@ var _ = Describe("update reconciler test", func() {
 			Expect(err).Should(BeNil())
 			root, ok = onDeleteTree.GetRoot().(*workloads.InstanceSet)
 			Expect(ok).Should(BeTrue())
-			root.Spec.UpdateStrategy.Type = appsv1.OnDeleteStatefulSetStrategyType
+			root.Spec.InstanceUpdateStrategy = &workloads.InstanceUpdateStrategy{
+				Type: kbappsv1.OnDeleteStrategyType,
+			}
 			res, err = reconciler.Reconcile(onDeleteTree)
 			Expect(err).Should(BeNil())
 			Expect(res).Should(Equal(kubebuilderx.Continue))
@@ -216,7 +219,7 @@ var _ = Describe("update reconciler test", func() {
 			Expect(err).Should(BeNil())
 			root, ok = preferInPlaceTree.GetRoot().(*workloads.InstanceSet)
 			Expect(ok).Should(BeTrue())
-			root.Spec.PodUpdatePolicy = workloads.PreferInPlacePodUpdatePolicyType
+			root.Spec.PodUpdatePolicy = kbappsv1.PreferInPlacePodUpdatePolicyType
 			// try to add env to instanceHello to trigger the recreation
 			root.Spec.Instances[0].Env = []corev1.EnvVar{
 				{
@@ -234,7 +237,7 @@ var _ = Describe("update reconciler test", func() {
 			Expect(err).Should(BeNil())
 			root, ok = strictInPlaceTree.GetRoot().(*workloads.InstanceSet)
 			Expect(ok).Should(BeTrue())
-			root.Spec.PodUpdatePolicy = workloads.StrictInPlacePodUpdatePolicyType
+			root.Spec.PodUpdatePolicy = kbappsv1.StrictInPlacePodUpdatePolicyType
 			// try to add env to instanceHello to trigger the recreation
 			root.Spec.Instances[0].Env = []corev1.EnvVar{
 				{

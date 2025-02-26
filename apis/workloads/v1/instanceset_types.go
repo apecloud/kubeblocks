@@ -192,10 +192,10 @@ type InstanceSetSpec struct {
 	// Members(Pods) update strategy.
 	//
 	// - serial: update Members one by one that guarantee minimum component unavailable time.
-	// - bestEffortParallel: update Members in parallel that guarantee minimum component un-writable time.
 	// - parallel: force parallel
+	// - bestEffortParallel: update Members in parallel that guarantee minimum component un-writable time.
 	//
-	// +kubebuilder:validation:Enum={Serial,BestEffortParallel,Parallel}
+	// +kubebuilder:validation:Enum={Serial,Parallel,BestEffortParallel}
 	// +optional
 	MemberUpdateStrategy *MemberUpdateStrategy `json:"memberUpdateStrategy,omitempty"`
 

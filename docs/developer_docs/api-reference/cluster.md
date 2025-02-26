@@ -29615,8 +29615,8 @@ MemberUpdateStrategy
 <p>Members(Pods) update strategy.</p>
 <ul>
 <li>serial: update Members one by one that guarantee minimum component unavailable time.</li>
-<li>bestEffortParallel: update Members in parallel that guarantee minimum component un-writable time.</li>
 <li>parallel: force parallel</li>
+<li>bestEffortParallel: update Members in parallel that guarantee minimum component un-writable time.</li>
 </ul>
 </td>
 </tr>
@@ -30032,8 +30032,8 @@ MemberUpdateStrategy
 <p>Members(Pods) update strategy.</p>
 <ul>
 <li>serial: update Members one by one that guarantee minimum component unavailable time.</li>
-<li>bestEffortParallel: update Members in parallel that guarantee minimum component un-writable time.</li>
 <li>parallel: force parallel</li>
+<li>bestEffortParallel: update Members in parallel that guarantee minimum component un-writable time.</li>
 </ul>
 </td>
 </tr>

@@ -1570,12 +1570,12 @@ spec:
 
 
                   - serial: update Members one by one that guarantee minimum component unavailable time.
-                  - bestEffortParallel: update Members in parallel that guarantee minimum component un-writable time.
                   - parallel: force parallel
+                  - bestEffortParallel: update Members in parallel that guarantee minimum component un-writable time.
                 enum:
                 - Serial
-                - BestEffortParallel
                 - Parallel
+                - BestEffortParallel
                 type: string
               membershipReconfiguration:
                 description: Provides actions to do membership dynamic reconfiguration.

@@ -84,10 +84,9 @@ func (r *InstanceSet) ConvertFrom(srcRaw conversion.Hub) error {
 }
 
 func (r *InstanceSet) incrementConvertTo(dstRaw metav1.Object) error {
-	if r.Spec.RoleProbe == nil {
+	if r.Spec.RoleProbe == nil && r.Spec.Credential == nil {
 		return nil
 	}
-	// changed
 	instanceConvert := instanceSetConverter{
 		RoleProbe:  r.Spec.RoleProbe,
 		Credential: r.Spec.Credential,

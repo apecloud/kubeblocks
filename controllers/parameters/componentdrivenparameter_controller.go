@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2024 ApeCloud Co., Ltd
+Copyright (C) 2022-2025 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -200,9 +200,7 @@ func buildComponentParameter(reqCtx intctrlutil.RequestCtx, reader client.Reader
 		AddLabelsInMap(constant.GetCompLabelsWithDef(clusterName, componentName, cmpd.Name)).
 		ClusterRef(clusterName).
 		Component(componentName).
-		SetConfigurationItem(configctrl.ClassifyParamsFromConfigTemplate(
-			intctrlutil.TransformComponentParameters(comp.Spec.InitParameters),
-			cmpd, paramsDefs, tpls)).
+		SetConfigurationItem(configctrl.ClassifyParamsFromConfigTemplate(nil, cmpd, paramsDefs, tpls)).
 		GetObject()
 	if err = intctrlutil.SetOwnerReference(comp, parameterObj); err != nil {
 		return nil, err

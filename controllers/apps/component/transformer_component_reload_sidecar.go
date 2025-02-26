@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2024 ApeCloud Co., Ltd
+Copyright (C) 2022-2025 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -17,16 +17,19 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package apps
+package component
 
 import (
 	"context"
 
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	appsutil "github.com/apecloud/kubeblocks/controllers/apps/util"
 	"github.com/apecloud/kubeblocks/pkg/common"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -48,9 +51,8 @@ func (t *componentReloadActionSidecarTransformer) Transform(ctx graph.TransformC
 	transCtx, _ := ctx.(*componentTransformContext)
 
 	comp := transCtx.Component
-	cluster := transCtx.Cluster
 	compOrig := transCtx.ComponentOrig
-	synthesizeComp := transCtx.SynthesizeComponent
+	builtinComp := transCtx.SynthesizeComponent
 
 	if model.IsObjectDeleting(compOrig) {
 		return nil
@@ -61,18 +63,30 @@ func (t *componentReloadActionSidecarTransformer) Transform(ctx graph.TransformC
 		return nil
 	}
 
+	clusterKey := types.NamespacedName{
+		Namespace: builtinComp.Namespace,
+		Name:      builtinComp.ClusterName,
+	}
+	cluster := &appsv1.Cluster{}
+	if err := t.Client.Get(transCtx, clusterKey, cluster); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		return errors.Wrap(err, "obtain the cluster object error for restore")
+	}
+
 	reconcileCtx := &render.ResourceCtx{
 		Context:       transCtx.Context,
 		Client:        t.Client,
 		Namespace:     comp.GetNamespace(),
-		ClusterName:   synthesizeComp.ClusterName,
-		ComponentName: synthesizeComp.Name,
+		ClusterName:   builtinComp.ClusterName,
+		ComponentName: builtinComp.Name,
 	}
 
 	var configmaps []*corev1.ConfigMap
 	cachedObjs := resolveRerenderDependOnObjects(dag)
-	for _, tpls := range [][]appsv1.ComponentTemplateSpec{synthesizeComp.ScriptTemplates, synthesizeComp.ConfigTemplates} {
-		objects, err := render.RenderTemplate(reconcileCtx, cluster, synthesizeComp, comp, cachedObjs, tpls)
+	for _, tpls := range [][]appsv1.ComponentTemplateSpec{builtinComp.ScriptTemplates, builtinComp.ConfigTemplates} {
+		objects, err := render.RenderTemplate(reconcileCtx, cluster, builtinComp, comp, cachedObjs, tpls)
 		if err != nil {
 			return err
 		}
@@ -83,14 +97,14 @@ func (t *componentReloadActionSidecarTransformer) Transform(ctx graph.TransformC
 	if err := ensureConfigMapsPresence(transCtx, graphCli, dag, configmaps...); err != nil {
 		return err
 	}
-	if err := updatePodVolumes(synthesizeComp.PodSpec, synthesizeComp); err != nil {
+	if err := updatePodVolumes(builtinComp.PodSpec, builtinComp); err != nil {
 		return err
 	}
-	if len(synthesizeComp.ConfigTemplates) == 0 {
+	if len(builtinComp.ConfigTemplates) == 0 {
 		return nil
 	}
 
-	return configctrl.BuildReloadActionContainer(reconcileCtx, cluster, synthesizeComp, transCtx.CompDef, configmaps)
+	return configctrl.BuildReloadActionContainer(reconcileCtx, cluster, builtinComp, transCtx.CompDef, configmaps)
 }
 
 func ensureConfigMapsPresence(ctx context.Context, cli model.GraphClient, dag *graph.DAG, configmaps ...*corev1.ConfigMap) error {
@@ -100,7 +114,7 @@ func ensureConfigMapsPresence(ctx context.Context, cli model.GraphClient, dag *g
 			if !apierrors.IsNotFound(err) {
 				return err
 			}
-			cli.Create(dag, configmap, inDataContext4G())
+			cli.Create(dag, configmap, appsutil.InDataContext4G())
 		}
 	}
 	return nil

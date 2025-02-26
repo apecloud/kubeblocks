@@ -2338,17 +2338,17 @@ spec:
                         This field is used to override or set the values of parameters without modifying the entire configuration file.
                       items:
                         properties:
-                          name:
-                            description: Specifies the name of the parameter that
+                          key:
+                            description: Represents the name of the parameter that
                               is to be updated.
                             type: string
                           value:
                             description: |-
-                              Specifies the parameter values that are to be updated.
+                              Represents the parameter values that are to be updated.
                               If set to nil, the parameter defined by the Key field will be removed from the configuration file.
                             type: string
                         required:
-                        - name
+                        - key
                         type: object
                       type: array
                   required:

@@ -26,7 +26,6 @@ import (
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -79,12 +78,12 @@ var _ = Describe("Reconfigure OpsRequest", func() {
 			ops.Spec.Reconfigures = []opsv1alpha1.Reconfigure{
 				{
 					ComponentOps: opsv1alpha1.ComponentOps{ComponentName: defaultCompName},
-					Parameters: []appsv1.ComponentParameter{
+					Parameters: []opsv1alpha1.ParameterPair{
 						{
-							Name:  "max_connections",
+							Key:   "max_connections",
 							Value: pointer.String("200"),
 						}, {
-							Name:  "key",
+							Key:   "key",
 							Value: pointer.String("abcd"),
 						}},
 				},

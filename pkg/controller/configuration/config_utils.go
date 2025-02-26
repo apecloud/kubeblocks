@@ -349,7 +349,8 @@ func buildComponentParameter(ctx context.Context, reader client.Reader, comp *co
 		AddLabelsInMap(constant.GetCompLabelsWithDef(comp.ClusterName, comp.Name, cmpd.Name)).
 		ClusterRef(comp.ClusterName).
 		Component(comp.Name).
-		SetConfigurationItem(ClassifyParamsFromConfigTemplate(intctrlutil.TransformComponentParameters(owner.Spec.InitParameters), cmpd, paramsDefs, tpls)).
+		// TODO: support init parameters
+		SetConfigurationItem(ClassifyParamsFromConfigTemplate(nil, cmpd, paramsDefs, tpls)).
 		GetObject()
 	if err = intctrlutil.SetOwnerReference(owner, parameterObj); err != nil {
 		return nil, err

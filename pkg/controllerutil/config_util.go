@@ -32,6 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/configuration/validate"
@@ -314,10 +315,10 @@ func ReloadStaticParameters(pd *parametersv1alpha1.ParametersDefinitionSpec) boo
 	return false
 }
 
-func TransformComponentParameters(params []appsv1.ComponentParameter) parametersv1alpha1.ComponentParameters {
+func TransformComponentParameters(params []opsv1alpha1.ParameterPair) parametersv1alpha1.ComponentParameters {
 	ret := make(parametersv1alpha1.ComponentParameters, len(params))
 	for _, param := range params {
-		ret[param.Name] = param.Value
+		ret[param.Key] = param.Value
 	}
 	return ret
 }

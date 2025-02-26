@@ -23,7 +23,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 )
 
@@ -528,32 +527,7 @@ type Reconfigure struct {
 	// This field is used to override or set the values of parameters without modifying the entire configuration file.
 	//
 	// +optional
-	Parameters []appsv1.ComponentParameter `json:"parameters,omitempty"`
-}
-
-type ConfigurationItem struct {
-	// Specifies the name of the configuration template.
-	//
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MaxLength=63
-	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
-	Name string `json:"name"`
-
-	// Defines the upgrade policy for the configuration.
-	//
-	// +optional
-	Policy *appsv1alpha1.UpgradePolicy `json:"policy,omitempty"`
-
-	// Sets the configuration files and their associated parameters that need to be updated.
-	// It should contain at least one item.
-	//
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MinItems=1
-	// +patchMergeKey=key
-	// +patchStrategy=merge,retainKeys
-	// +listType=map
-	// +listMapKey=key
-	Keys []ParameterConfig `json:"keys" patchStrategy:"merge,retainKeys" patchMergeKey:"key"`
+	Parameters []ParameterPair `json:"parameters,omitempty"`
 }
 
 type CustomOps struct {
@@ -639,31 +613,6 @@ type ParameterPair struct {
 	// If set to nil, the parameter defined by the Key field will be removed from the configuration file.
 	// +optional
 	Value *string `json:"value"`
-}
-
-type ParameterConfig struct {
-	// Represents a key in the configuration template(as ConfigMap).
-	// Each key in the ConfigMap corresponds to a specific configuration file.
-	//
-	// +kubebuilder:validation:Required
-	Key string `json:"key"`
-
-	// Specifies a list of key-value pairs representing parameters and their corresponding values
-	// within a single configuration file.
-	// This field is used to override or set the values of parameters without modifying the entire configuration file.
-	//
-	// Either the `parameters` field or the `fileContent` field must be set, but not both.
-	//
-	// +optional
-	Parameters []ParameterPair `json:"parameters,omitempty"`
-
-	// Specifies the content of the entire configuration file.
-	// This field is used to update the complete configuration file.
-	//
-	// Either the `parameters` field or the `fileContent` field must be set, but not both.
-	//
-	// +optional
-	FileContent string `json:"fileContent,omitempty"`
 }
 
 // ExposeSwitch Specifies the switch for the expose operation. This switch can be used to enable or disable the expose operation.

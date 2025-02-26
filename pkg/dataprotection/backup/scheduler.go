@@ -493,7 +493,7 @@ func (s *Scheduler) reconfigure(schedulePolicy *dpv1alpha1.SchedulePolicy) error
 						ComponentOps: opsv1alpha1.ComponentOps{
 							ComponentName: targetPodSelector.MatchLabels[constant.KBAppComponentLabelKey],
 						},
-						Parameters: ToV1ReconfigureParameters(parameters),
+						Parameters: parameters,
 					},
 				},
 			},
@@ -569,15 +569,4 @@ fi
 		backupMethod.CompatibleMethod,
 	)
 	return checkCommand, nil
-}
-
-func ToV1ReconfigureParameters(parameters []opsv1alpha1.ParameterPair) []appsv1.ComponentParameter {
-	params := make([]appsv1.ComponentParameter, len(parameters))
-	for _, parameter := range parameters {
-		params = append(params, appsv1.ComponentParameter{
-			Name:  parameter.Key,
-			Value: parameter.Value,
-		})
-	}
-	return params
 }

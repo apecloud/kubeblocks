@@ -55,7 +55,7 @@ type TaskContext struct {
 func NewTaskContext(ctx context.Context, cli client.Client, componentParameter *parametersv1alpha1.ComponentParameter, fetchTask *Task) (*TaskContext, error) {
 	// build synthesized component for the component
 	cmpd := fetchTask.ComponentDefObj
-	synthesizedComp, err := component.BuildSynthesizedComponent(ctx, cli, cmpd, fetchTask.ComponentObj, fetchTask.ClusterObj)
+	synthesizedComp, err := component.BuildSynthesizedComponent(ctx, cli, cmpd, fetchTask.ComponentObj)
 	if err == nil {
 		err = buildTemplateVars(ctx, cli, fetchTask.ComponentDefObj, synthesizedComp)
 	}

@@ -47,7 +47,7 @@ type SynthesizedComponent struct {
 	VolumeClaimTemplates             []corev1.PersistentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
 	LogConfigs                       []kbappsv1.LogConfig                   `json:"logConfigs,omitempty"`
 	FileTemplates                    []SynthesizedFileTemplate
-	ConfigTemplates                  []kbappsv1.ComponentTemplateSpec         `json:"configTemplates,omitempty"`
+	ConfigTemplates                  []kbappsv1.ComponentTemplateSpec       `json:"configTemplates,omitempty"`
 	ScriptTemplates                  []kbappsv1.ComponentTemplateSpec       `json:"scriptTemplates,omitempty"`
 	TLSConfig                        *kbappsv1.TLSConfig                    `json:"tlsConfig"`
 	ServiceAccountName               string                                 `json:"serviceAccountName,omitempty"`

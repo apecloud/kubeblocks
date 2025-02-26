@@ -134,7 +134,7 @@ func (m *informerManager) processNextWorkItem() bool {
 		object, _ = ro.(client.Object)
 		err = m.cli.Get(context.Background(), client.ObjectKey{Namespace: evt.InvolvedObject.Namespace, Name: evt.InvolvedObject.Name}, object)
 		if err != nil && !apierrors.IsNotFound(err) {
-			m.logger.Error(err, "get involved object failed: %s", evt.InvolvedObject)
+			m.logger.Error(err, "get involved object failed", "InvolvedObject", evt.InvolvedObject)
 			return true
 		}
 	}

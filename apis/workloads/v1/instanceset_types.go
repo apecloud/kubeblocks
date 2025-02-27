@@ -152,6 +152,16 @@ type InstanceSetSpec struct {
 	// +optional
 	VolumeClaimTemplates []corev1.PersistentVolumeClaim `json:"volumeClaimTemplates,omitempty"`
 
+	// persistentVolumeClaimRetentionPolicy describes the lifecycle of persistent
+	// volume claims created from volumeClaimTemplates. By default, all persistent
+	// volume claims are created as needed and retained until manually deleted. This
+	// policy allows the lifecycle to be altered, for example by deleting persistent
+	// volume claims when their workload is deleted, or when their pod is scaled
+	// down.
+	//
+	// +optional
+	PersistentVolumeClaimRetentionPolicy *PersistentVolumeClaimRetentionPolicy `json:"persistentVolumeClaimRetentionPolicy,omitempty"`
+
 	// Controls how pods are created during initial scale up,
 	// when replacing pods on nodes, or when scaling down.
 	//
@@ -299,6 +309,11 @@ type InstanceSetStatus struct {
 	// +optional
 	TemplatesStatus []InstanceTemplateStatus `json:"templatesStatus,omitempty"`
 }
+
+// PersistentVolumeClaimRetentionPolicy
+//
+// +kubebuilder:object:generate=false
+type PersistentVolumeClaimRetentionPolicy = kbappsv1.PersistentVolumeClaimRetentionPolicy
 
 // InstanceTemplate allows customization of individual replica configurations in a Component.
 //

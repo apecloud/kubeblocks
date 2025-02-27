@@ -249,6 +249,34 @@ type PersistentVolumeClaimSpec struct {
 	VolumeAttributesClassName *string `json:"volumeAttributesClassName,omitempty"`
 }
 
+// PersistentVolumeClaimRetentionPolicy describes the policy used for PVCs created from the VolumeClaimTemplates.
+type PersistentVolumeClaimRetentionPolicy struct {
+	// WhenDeleted specifies what happens to PVCs created from VolumeClaimTemplates when the workload is deleted.
+	// The default policy of `Retain` causes PVCs to not be affected by workload deletion.
+	// The `Delete` policy causes those PVCs to be deleted.
+	WhenDeleted PersistentVolumeClaimRetentionPolicyType `json:"whenDeleted,omitempty"`
+
+	// WhenScaled specifies what happens to PVCs created from VolumeClaimTemplates when the workload is scaled down.
+	// The default policy of `Retain` causes PVCs to not be affected by a scale down.
+	// The `Delete` policy causes the associated PVCs for pods scaled down to be deleted.
+	WhenScaled PersistentVolumeClaimRetentionPolicyType `json:"whenScaled,omitempty"`
+}
+
+// PersistentVolumeClaimRetentionPolicyType is a string enumeration of the policies that will determine
+// when volumes from the VolumeClaimTemplates will be deleted when the controlling StatefulSet is
+// deleted or scaled down.
+type PersistentVolumeClaimRetentionPolicyType string
+
+const (
+	// RetainPersistentVolumeClaimRetentionPolicyType is the default PersistentVolumeClaimRetentionPolicy
+	// and specifies that PersistentVolumeClaims associated with VolumeClaimTemplates will not be deleted.
+	RetainPersistentVolumeClaimRetentionPolicyType PersistentVolumeClaimRetentionPolicyType = "Retain"
+
+	// DeletePersistentVolumeClaimRetentionPolicyType specifies that PersistentVolumeClaims associated with
+	// VolumeClaimTemplates will be deleted in the scenario specified in PersistentVolumeClaimRetentionPolicy.
+	DeletePersistentVolumeClaimRetentionPolicyType PersistentVolumeClaimRetentionPolicyType = "Delete"
+)
+
 type Service struct {
 	// Name defines the name of the service.
 	// otherwise, it indicates the name of the service.

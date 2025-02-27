@@ -18,8 +18,6 @@ package v1alpha1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
 
 // +genclient
@@ -109,7 +107,7 @@ type ComponentParametersSpec struct {
 	// This allows users to customize the configuration template according to their specific requirements.
 	//
 	// +optional
-	CustomTemplates map[string]appsv1.ConfigTemplateExtension `json:"userConfigTemplates,omitempty"`
+	CustomTemplates map[string]ConfigTemplateExtension `json:"userConfigTemplates,omitempty"`
 }
 
 type ComponentReconfiguringStatus struct {
@@ -149,5 +147,5 @@ type ReconfiguringStatus struct {
 	// This allows users to customize the configuration template according to their specific requirements.
 	//
 	// +optional
-	CustomTemplate *appsv1.ConfigTemplateExtension `json:"userConfigTemplates,omitempty"`
+	CustomTemplate *ConfigTemplateExtension `json:"userConfigTemplates,omitempty"`
 }

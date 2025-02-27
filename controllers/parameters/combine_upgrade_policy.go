@@ -19,26 +19,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 package parameters
 
-import appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+import (
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
+)
+
+var combineUpgradePolicyInstance = &combineUpgradePolicy{
+	policyExecutors: []reconfigurePolicy{
+		syncPolicyInstance,
+		restartPolicyInstance,
+	},
+}
 
 type combineUpgradePolicy struct {
 	policyExecutors []reconfigurePolicy
 }
 
 func init() {
-	RegisterPolicy(appsv1alpha1.DynamicReloadAndRestartPolicy, &combineUpgradePolicy{
-		policyExecutors: []reconfigurePolicy{&syncPolicy{}, &simplePolicy{}},
-	})
+	registerPolicy(parametersv1alpha1.DynamicReloadAndRestartPolicy, combineUpgradePolicyInstance)
 }
 
 func (h *combineUpgradePolicy) GetPolicyName() string {
-	return string(appsv1alpha1.DynamicReloadAndRestartPolicy)
+	return string(parametersv1alpha1.DynamicReloadAndRestartPolicy)
 }
 
-func (h *combineUpgradePolicy) Upgrade(params reconfigureParams) (ReturnedStatus, error) {
+func (h *combineUpgradePolicy) Upgrade(rctx reconfigureContext) (ReturnedStatus, error) {
 	var ret ReturnedStatus
 	for _, executor := range h.policyExecutors {
-		retStatus, err := executor.Upgrade(params)
+		retStatus, err := executor.Upgrade(rctx)
 		if err != nil {
 			return retStatus, err
 		}

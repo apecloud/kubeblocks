@@ -139,8 +139,6 @@ func (r *OpsRequest) ValidateOps(ctx context.Context,
 		return r.validateVolumeExpansion(ctx, k8sClient, cluster)
 	case RestartType:
 		return r.validateRestart(cluster)
-	case ReconfiguringType:
-		return r.validateReconfigure(ctx, k8sClient, cluster)
 	case SwitchoverType:
 		return r.validateSwitchover(cluster)
 	case ExposeType:
@@ -243,61 +241,6 @@ func (r *OpsRequest) validateVerticalScaling(cluster *appsv1.Cluster) error {
 		}
 	}
 	return r.checkComponentExistence(cluster, compOpsList)
-}
-
-// validateVerticalScaling validate api is legal when spec.type is VerticalScaling
-func (r *OpsRequest) validateReconfigure(ctx context.Context,
-	k8sClient client.Client,
-	cluster *appsv1.Cluster) error {
-	if len(r.Spec.Reconfigures) == 0 {
-		return notEmptyError("spec.reconfigures")
-	}
-	for _, reconfigure := range r.Spec.Reconfigures {
-		if err := r.validateReconfigureParams(ctx, k8sClient, cluster, &reconfigure); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (r *OpsRequest) validateReconfigureParams(ctx context.Context,
-	k8sClient client.Client,
-	cluster *appsv1.Cluster,
-	reconfigure *Reconfigure) error {
-	if cluster.Spec.GetComponentByName(reconfigure.ComponentName) == nil {
-		return fmt.Errorf("component %s not found", reconfigure.ComponentName)
-	}
-	for _, configuration := range reconfigure.Configurations {
-		cmObj, err := r.getConfigMap(ctx, k8sClient, fmt.Sprintf("%s-%s-%s", r.Spec.GetClusterName(), reconfigure.ComponentName, configuration.Name))
-		if err != nil {
-			return err
-		}
-		for _, key := range configuration.Keys {
-			// check add file
-			if _, ok := cmObj.Data[key.Key]; !ok && key.FileContent == "" {
-				return errors.Errorf("key %s not found in configmap %s", key.Key, configuration.Name)
-			}
-			if key.FileContent == "" && len(key.Parameters) == 0 {
-				return errors.New("key.fileContent and key.parameters cannot be empty at the same time")
-			}
-		}
-	}
-	return nil
-}
-
-func (r *OpsRequest) getConfigMap(ctx context.Context,
-	k8sClient client.Client,
-	cmName string) (*corev1.ConfigMap, error) {
-	cmObj := &corev1.ConfigMap{}
-	cmKey := client.ObjectKey{
-		Namespace: r.Namespace,
-		Name:      cmName,
-	}
-
-	if err := k8sClient.Get(ctx, cmKey, cmObj); err != nil {
-		return nil, err
-	}
-	return cmObj, nil
 }
 
 // compareRequestsAndLimits compares the resource requests and limits

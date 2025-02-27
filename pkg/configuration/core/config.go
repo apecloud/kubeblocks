@@ -27,7 +27,7 @@ import (
 	"github.com/StudioSol/set"
 	"github.com/spf13/cast"
 
-	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/util"
 	"github.com/apecloud/kubeblocks/pkg/unstructured"
 )
@@ -108,15 +108,30 @@ func init() {
 			indexer:   make(map[string]unstructured.ConfigObject, 1),
 		}
 
+		configType := func(fileName string) parametersv1alpha1.CfgFileFormat {
+			fileType := option.CfgType
+			if option.FileFormatFn == nil {
+				return fileType
+			}
+			if fileConfig := option.FileFormatFn(fileName); fileConfig != nil {
+				fileType = fileConfig.Format
+			}
+			return fileType
+		}
+
 		var err error
 		var index = 0
 		var v unstructured.ConfigObject
+		var format parametersv1alpha1.CfgFileFormat
 		for fileName, content := range ctx.ConfigData {
 			if ctx.CMKeys != nil && !ctx.CMKeys.InArray(fileName) {
 				continue
 			}
-			if v, err = unstructured.LoadConfig(fileName, content, option.CfgType); err != nil {
-				return nil, WrapError(err, "failed to load config: filename[%s], type[%s]", fileName, option.CfgType)
+			if format = configType(fileName); format == "" {
+				continue
+			}
+			if v, err = unstructured.LoadConfig(fileName, content, format); err != nil {
+				return nil, WrapError(err, "failed to load config: filename[%s], type[%s]", fileName, format)
 			}
 			meta.indexer[fileName] = v
 			meta.v[index] = v
@@ -229,9 +244,9 @@ func NewCfgOptions(filename string, options ...Option) CfgOpOption {
 	return context
 }
 
-func WithFormatterConfig(formatConfig *appsv1beta1.FileFormatConfig) Option {
+func WithFormatterConfig(formatConfig *parametersv1alpha1.FileFormatConfig) Option {
 	return func(ctx *CfgOpOption) {
-		if formatConfig.Format == appsv1beta1.Ini && formatConfig.IniConfig != nil {
+		if formatConfig.Format == parametersv1alpha1.Ini && formatConfig.IniConfig != nil {
 			ctx.IniContext = &IniContext{
 				SectionName: formatConfig.IniConfig.SectionName,
 			}
@@ -239,8 +254,8 @@ func WithFormatterConfig(formatConfig *appsv1beta1.FileFormatConfig) Option {
 	}
 }
 
-func NestedPrefixField(formatConfig *appsv1beta1.FileFormatConfig) string {
-	if formatConfig != nil && formatConfig.Format == appsv1beta1.Ini && formatConfig.IniConfig != nil {
+func NestedPrefixField(formatConfig *parametersv1alpha1.FileFormatConfig) string {
+	if formatConfig != nil && formatConfig.Format == parametersv1alpha1.Ini && formatConfig.IniConfig != nil {
 		return formatConfig.IniConfig.SectionName
 	}
 	return ""
@@ -304,25 +319,31 @@ func FromCMKeysSelector(keys []string) *set.LinkedHashSetString {
 	return cmKeySet
 }
 
-func GenerateVisualizedParamsList(configPatch *ConfigPatchInfo, formatConfig *appsv1beta1.FileFormatConfig, sets *set.LinkedHashSetString) []VisualizedParam {
+func GenerateVisualizedParamsList(configPatch *ConfigPatchInfo, configDescs []parametersv1alpha1.ComponentConfigDescription) []VisualizedParam {
 	if !configPatch.IsModify {
 		return nil
 	}
 
-	var trimPrefix = NestedPrefixField(formatConfig)
+	sets := NewConfigFileFilter(configDescs)
+	resolveParameterPrefix := func(file string) string {
+		fileConfig := ResolveConfigFormat(configDescs, file)
+		if fileConfig == nil {
+			return ""
+		}
+		return NestedPrefixField(fileConfig)
+	}
 
 	r := make([]VisualizedParam, 0)
-	r = append(r, generateUpdateParam(configPatch.UpdateConfig, trimPrefix, sets)...)
-	r = append(r, generateUpdateKeyParam(configPatch.AddConfig, trimPrefix, AddedType, sets)...)
-	r = append(r, generateUpdateKeyParam(configPatch.DeleteConfig, trimPrefix, DeletedType, sets)...)
+	r = append(r, generateUpdateParam(configPatch.UpdateConfig, resolveParameterPrefix, sets)...)
+	r = append(r, generateUpdateKeyParam(configPatch.AddConfig, resolveParameterPrefix, AddedType, sets)...)
+	r = append(r, generateUpdateKeyParam(configPatch.DeleteConfig, resolveParameterPrefix, DeletedType, sets)...)
 	return r
 }
 
-func generateUpdateParam(updatedParams map[string][]byte, trimPrefix string, sets *set.LinkedHashSetString) []VisualizedParam {
+func generateUpdateParam(updatedParams map[string][]byte, trimPrefix func(string) string, sets *set.LinkedHashSetString) []VisualizedParam {
 	r := make([]VisualizedParam, 0, len(updatedParams))
 
 	for key, b := range updatedParams {
-		// TODO support keys
 		if sets != nil && sets.Length() > 0 && !sets.InArray(key) {
 			continue
 		}
@@ -330,7 +351,7 @@ func generateUpdateParam(updatedParams map[string][]byte, trimPrefix string, set
 		if err := json.Unmarshal(b, &v); err != nil {
 			return nil
 		}
-		if params := checkAndFlattenMap(v, trimPrefix); params != nil {
+		if params := checkAndFlattenMap(v, trimPrefix(key)); params != nil {
 			r = append(r, VisualizedParam{
 				Key:        key,
 				Parameters: params,
@@ -382,14 +403,14 @@ func flattenMap(m map[string]interface{}, prefix string) []ParameterPair {
 	return r
 }
 
-func generateUpdateKeyParam(files map[string]interface{}, trimPrefix string, updatedType ParameterUpdateType, sets *set.LinkedHashSetString) []VisualizedParam {
+func generateUpdateKeyParam(files map[string]interface{}, trimPrefix func(string) string, updatedType ParameterUpdateType, sets *set.LinkedHashSetString) []VisualizedParam {
 	r := make([]VisualizedParam, 0, len(files))
 
 	for key, params := range files {
 		if sets != nil && sets.Length() > 0 && !sets.InArray(key) {
 			continue
 		}
-		if params := checkAndFlattenMap(params, trimPrefix); params != nil {
+		if params := checkAndFlattenMap(params, trimPrefix(key)); params != nil {
 			r = append(r, VisualizedParam{
 				Key:        key,
 				Parameters: params,

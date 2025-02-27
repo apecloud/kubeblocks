@@ -161,7 +161,7 @@ func (param *reconfigureContext) maxRollingReplicas() int32 {
 
 	var maxUnavailable *intstr.IntOrString
 	for _, its := range param.InstanceSetUnits {
-		if its.Spec.InstanceUpdateStrategy.RollingUpdate != nil {
+		if its.Spec.InstanceUpdateStrategy != nil && its.Spec.InstanceUpdateStrategy.RollingUpdate != nil {
 			maxUnavailable = its.Spec.InstanceUpdateStrategy.RollingUpdate.MaxUnavailable
 		}
 		if maxUnavailable != nil {
@@ -173,7 +173,6 @@ func (param *reconfigureContext) maxRollingReplicas() int32 {
 		return defaultRolling
 	}
 
-	// TODO(xingran&zhangtao): review this logic, set to nil in new API version
 	v, isPercentage, err := intctrlutil.GetIntOrPercentValue(maxUnavailable)
 	if err != nil {
 		param.Log.Error(err, "failed to get maxUnavailable!")

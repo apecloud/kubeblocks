@@ -255,7 +255,6 @@ func compOwnedKinds() []client.ObjectList {
 		&corev1.ServiceList{},
 		&corev1.SecretList{},
 		&corev1.ConfigMapList{},
-		&corev1.PersistentVolumeClaimList{},
 		&appsv1alpha1.ConfigurationList{},
 		&corev1.ServiceAccountList{},
 		&rbacv1.RoleList{},

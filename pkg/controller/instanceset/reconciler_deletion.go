@@ -20,6 +20,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package instanceset
 
 import (
+	"maps"
+
+	corev1 "k8s.io/api/core/v1"
+
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
@@ -38,15 +44,54 @@ func (r *deletionReconciler) PreCondition(tree *kubebuilderx.ObjectTree) *kubebu
 }
 
 func (r *deletionReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuilderx.Result, error) {
+	its, _ := tree.GetRoot().(*workloads.InstanceSet)
+	pvcRetentionPolicy := its.Spec.PersistentVolumeClaimRetentionPolicy
+	retainPVC := pvcRetentionPolicy != nil && pvcRetentionPolicy.WhenDeleted == kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType
+
 	// delete secondary objects first
-	if len(tree.GetSecondaryObjects()) > 0 {
-		tree.DeleteSecondaryObjects()
+	secondaryObjects, err := r.getSecondaryObjects(tree, retainPVC)
+	if err != nil {
+		return kubebuilderx.Continue, err
+	}
+	if len(secondaryObjects) > 0 {
+		if err := r.deleteSecondaryObjects(tree, secondaryObjects, retainPVC); err != nil {
+			return kubebuilderx.Continue, err
+		}
 		return kubebuilderx.Continue, nil
 	}
 
 	// delete root object
 	tree.DeleteRoot()
 	return kubebuilderx.Continue, nil
+}
+
+func (r *deletionReconciler) getSecondaryObjects(tree *kubebuilderx.ObjectTree, retainPVC bool) (model.ObjectSnapshot, error) {
+	secondaryObjects := maps.Clone(tree.GetSecondaryObjects())
+	if retainPVC {
+		pvcList := tree.List(&corev1.PersistentVolumeClaim{})
+		for _, pvc := range pvcList {
+			name, err := model.GetGVKName(pvc)
+			if err != nil {
+				return nil, err
+			}
+			delete(secondaryObjects, *name)
+		}
+	}
+	return secondaryObjects, nil
+}
+
+func (r *deletionReconciler) deleteSecondaryObjects(tree *kubebuilderx.ObjectTree, secondaryObjects model.ObjectSnapshot, retainPVC bool) error {
+	if retainPVC {
+		for _, obj := range secondaryObjects {
+			if err := tree.Delete(obj); err != nil {
+				return err
+			}
+		}
+	} else {
+		// fast path
+		tree.DeleteSecondaryObjects()
+	}
+	return nil
 }
 
 func NewDeletionReconciler() kubebuilderx.Reconciler {

@@ -21,103 +21,93 @@ package parameters
 
 import (
 	"context"
-	"os"
+	"log"
 
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	podutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
 const (
-	// StatefulSetSpec.Spec.MinReadySeconds
-	// units: s
 	defaultMinReadySeconds = 10
 )
 
-type rollingUpgradePolicy struct {
-}
+var rollingUpgradePolicyInstance = &rollingUpgradePolicy{}
+
+type rollingUpgradePolicy struct{}
 
 func init() {
-	RegisterPolicy(appsv1alpha1.RollingPolicy, &rollingUpgradePolicy{})
+	registerPolicy(parametersv1alpha1.RollingPolicy, rollingUpgradePolicyInstance)
 	if err := viper.BindEnv(constant.PodMinReadySecondsEnv); err != nil {
-		os.Exit(-1)
+		log.Fatalf("failed to bind environment variable: %v", err)
 	}
 	viper.SetDefault(constant.PodMinReadySecondsEnv, defaultMinReadySeconds)
 }
 
-func (r *rollingUpgradePolicy) Upgrade(params reconfigureParams) (ReturnedStatus, error) {
-	return performRollingUpgrade(params, GetInstanceSetRollingUpgradeFuncs())
+// Upgrade performs a rolling upgrade based on the provided parameters.
+func (r *rollingUpgradePolicy) Upgrade(rctx reconfigureContext) (ReturnedStatus, error) {
+	return performRollingUpgrade(rctx, GetInstanceSetRollingUpgradeFuncs())
 }
 
 func (r *rollingUpgradePolicy) GetPolicyName() string {
-	return string(appsv1alpha1.RollingPolicy)
+	return string(parametersv1alpha1.RollingPolicy)
 }
 
-func canPerformUpgrade(pods []corev1.Pod, params reconfigureParams) bool {
-	target := params.getTargetReplicas()
-	// TODO(xingran&zhangtao): review this logic
-	return len(pods) == target
-
-	/*
-		if len(pods) < target {
-			params.Ctx.Log.Info(fmt.Sprintf("component pods are not all ready, %d pods are ready, which is less than the expected replicas(%d).", len(pods), target))
-			return false
-		}
-		return true
-	*/
+func canPerformUpgrade(pods []corev1.Pod, params reconfigureContext) bool {
+	return len(pods) == params.getTargetReplicas()
 }
 
-func performRollingUpgrade(params reconfigureParams, funcs RollingUpgradeFuncs) (ReturnedStatus, error) {
-	pods, err := funcs.GetPodsFunc(params)
+func performRollingUpgrade(rctx reconfigureContext, funcs RollingUpgradeFuncs) (ReturnedStatus, error) {
+	pods, err := funcs.GetPodsFunc(rctx)
 	if err != nil {
 		return makeReturnedStatus(ESFailedAndRetry), err
 	}
 
 	var (
-		rollingReplicas = params.maxRollingReplicas()
-		configKey       = params.getConfigKey()
-		configVersion   = params.getTargetVersionHash()
+		rollingReplicas = rctx.maxRollingReplicas()
+		configKey       = rctx.getConfigKey()
+		configVersion   = rctx.getTargetVersionHash()
 	)
 
-	if !canPerformUpgrade(pods, params) {
+	if !canPerformUpgrade(pods, rctx) {
 		return makeReturnedStatus(ESRetry), nil
 	}
 
-	podStats := staticPodStats(pods, params.getTargetReplicas(), params.podMinReadySeconds())
-	podWins := markDynamicCursor(pods, podStats, configKey, configVersion, rollingReplicas)
-	if !validPodState(podWins) {
-		params.Ctx.Log.Info("wait for pod stat ready.")
+	podStatus := classifyPodByStats(pods, rctx.getTargetReplicas(), rctx.podMinReadySeconds())
+	updateWindow := markDynamicSwitchWindow(pods, podStatus, configKey, configVersion, rollingReplicas)
+	if !canSafeUpdatePods(updateWindow) {
+		rctx.Log.Info("wait for pod stat ready.")
 		return makeReturnedStatus(ESRetry), nil
 	}
 
-	waitRollingPods := podWins.getWaitRollingPods()
-	if len(waitRollingPods) == 0 {
-		return makeReturnedStatus(ESNone, withSucceed(int32(podStats.targetReplica)), withExpected(int32(podStats.targetReplica))), nil
+	podsToUpgrade := updateWindow.getPendingUpgradePods()
+	if len(podsToUpgrade) == 0 {
+		return makeReturnedStatus(ESNone, withSucceed(int32(podStatus.targetReplica)), withExpected(int32(podStatus.targetReplica))), nil
 	}
 
-	for _, pod := range waitRollingPods {
-		if podStats.isUpdating(&pod) {
-			params.Ctx.Log.Info("pod is in rolling update.", "pod name", pod.Name)
+	for _, pod := range podsToUpgrade {
+		if podStatus.isUpdating(&pod) {
+			rctx.Log.Info("pod is in rolling update.", "pod name", pod.Name)
 			continue
 		}
-		if err := funcs.RestartContainerFunc(&pod, params.Ctx.Ctx, params.ContainerNames, params.ReconfigureClientFactory); err != nil {
+		if err := funcs.RestartContainerFunc(&pod, rctx.Ctx, rctx.ContainerNames, rctx.ReconfigureClientFactory); err != nil {
 			return makeReturnedStatus(ESFailedAndRetry), err
 		}
-		if err := updatePodLabelsWithConfigVersion(&pod, configKey, configVersion, params.Client, params.Ctx.Ctx); err != nil {
+		if err := updatePodLabelsWithConfigVersion(&pod, configKey, configVersion, rctx.Client, rctx.Ctx); err != nil {
 			return makeReturnedStatus(ESFailedAndRetry), err
 		}
 	}
 
 	return makeReturnedStatus(ESRetry,
-		withExpected(int32(podStats.targetReplica)),
-		withSucceed(int32(len(podStats.updated)+len(podStats.updating)))), nil
+		withExpected(int32(podStatus.targetReplica)),
+		withSucceed(int32(len(podStatus.updated)+len(podStatus.updating)))), nil
 }
 
-func validPodState(wind switchWindow) bool {
+func canSafeUpdatePods(wind switchWindow) bool {
 	for i := 0; i < wind.begin; i++ {
 		pod := &wind.pods[i]
 		if !wind.isReady(pod) {
@@ -127,7 +117,7 @@ func validPodState(wind switchWindow) bool {
 	return true
 }
 
-func markDynamicCursor(pods []corev1.Pod, podsStats *componentPodStats, configKey, currentVersion string, rollingReplicas int32) switchWindow {
+func markDynamicSwitchWindow(pods []corev1.Pod, podsStats *componentPodStats, configKey, currentVersion string, rollingReplicas int32) switchWindow {
 	podWindows := switchWindow{
 		end:               0,
 		begin:             len(pods),
@@ -135,7 +125,6 @@ func markDynamicCursor(pods []corev1.Pod, podsStats *componentPodStats, configKe
 		componentPodStats: podsStats,
 	}
 
-	// find update last
 	for i := podsStats.targetReplica - 1; i >= 0; i-- {
 		pod := &pods[i]
 		if !podutil.IsMatchConfigVersion(pod, configKey, currentVersion) {
@@ -160,7 +149,7 @@ func markDynamicCursor(pods []corev1.Pod, podsStats *componentPodStats, configKe
 	return podWindows
 }
 
-func staticPodStats(pods []corev1.Pod, targetReplicas int, minReadySeconds int32) *componentPodStats {
+func classifyPodByStats(pods []corev1.Pod, targetReplicas int, minReadySeconds int32) *componentPodStats {
 	podsStats := &componentPodStats{
 		updated:       make(map[string]*corev1.Pod),
 		updating:      make(map[string]*corev1.Pod),
@@ -183,15 +172,10 @@ func staticPodStats(pods []corev1.Pod, targetReplicas int, minReadySeconds int32
 }
 
 type componentPodStats struct {
-	// failed to start pod
-	ready     map[string]*corev1.Pod
-	available map[string]*corev1.Pod
-
-	// updated pod count
-	updated  map[string]*corev1.Pod
-	updating map[string]*corev1.Pod
-
-	// expected pod
+	ready         map[string]*corev1.Pod
+	available     map[string]*corev1.Pod
+	updated       map[string]*corev1.Pod
+	updating      map[string]*corev1.Pod
 	targetReplica int
 }
 
@@ -213,12 +197,11 @@ func (s *componentPodStats) isUpdating(pod *corev1.Pod) bool {
 type switchWindow struct {
 	begin int
 	end   int
-
-	pods []corev1.Pod
+	pods  []corev1.Pod
 	*componentPodStats
 }
 
-func (w *switchWindow) getWaitRollingPods() []corev1.Pod {
+func (w *switchWindow) getPendingUpgradePods() []corev1.Pod {
 	return w.pods[w.begin:w.end]
 }
 

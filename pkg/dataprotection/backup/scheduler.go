@@ -493,17 +493,7 @@ func (s *Scheduler) reconfigure(schedulePolicy *dpv1alpha1.SchedulePolicy) error
 						ComponentOps: opsv1alpha1.ComponentOps{
 							ComponentName: targetPodSelector.MatchLabels[constant.KBAppComponentLabelKey],
 						},
-						Configurations: []opsv1alpha1.ConfigurationItem{
-							{
-								Name: configRef.Name,
-								Keys: []opsv1alpha1.ParameterConfig{
-									{
-										Key:        configRef.Key,
-										Parameters: parameters,
-									},
-								},
-							},
-						},
+						Parameters: parameters,
 					},
 				},
 			},

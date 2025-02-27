@@ -56,6 +56,8 @@ func init() {
 	SchemeBuilder.Register(&ComponentParameter{}, &ComponentParameterList{})
 }
 
+// Payload holds the payload data. This field is optional and can contain any type of data.
+// Not included in the JSON representation of the object.
 type Payload map[string]json.RawMessage
 
 // ConfigTemplateItemDetail corresponds to settings of a configuration template (a ConfigMap).
@@ -76,7 +78,9 @@ type ConfigTemplateItemDetail struct {
 	// Note: Currently, the `payload` field is opaque and its content is not interpreted by the system.
 	// Modifying this field will cause a rerender, regardless of the specific content of this field.
 	//
+	// +kubebuilder:validation:Schemaless
 	// +kubebuilder:pruning:PreserveUnknownFields
+	// +kubebuilder:validation:Type=object
 	// +optional
 	Payload Payload `json:"payload,omitempty"`
 
@@ -98,7 +102,7 @@ type ConfigTemplateItemDetail struct {
 	// This allows users to customize the configuration template according to their specific requirements.
 	//
 	// +optional
-	CustomTemplates *appsv1.ConfigTemplateExtension `json:"userConfigTemplates,omitempty"`
+	CustomTemplates *ConfigTemplateExtension `json:"userConfigTemplates,omitempty"`
 
 	// Specifies the user-defined configuration parameters.
 	//

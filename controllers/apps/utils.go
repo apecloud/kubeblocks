@@ -17,35 +17,33 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-package operations
+package apps
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
+	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 )
 
-func testUpdateConfigConfigmapResource(
-	reqCtx intctrlutil.RequestCtx,
-	cli client.Client,
-	resource *OpsResource,
-	config opsv1alpha1.ConfigurationItem,
-	clusterName, componentName string) reconfiguringResult {
-
-	return newPipeline(reconfigureContext{
-		cli:           cli,
-		reqCtx:        reqCtx,
-		resource:      resource,
-		config:        config,
-		clusterName:   clusterName,
-		componentName: componentName,
-	}).Configuration().
-		Validate().
-		ConfigMap(config.Name).
-		ConfigConstraints().
-		Merge().
-		UpdateOpsLabel().
-		Sync().
-		Complete()
+func validateComponentTemplate(cli client.Client, rctx intctrlutil.RequestCtx, compd *appsv1.ComponentDefinition) error {
+	validateObject := func(objectKey client.ObjectKey) error {
+		configObj := &corev1.ConfigMap{}
+		return cli.Get(rctx.Ctx, objectKey, configObj)
+	}
+	validateTemplate := func(tpl appsv1.ComponentTemplateSpec) error {
+		if tpl.TemplateRef != "" {
+			return validateObject(client.ObjectKey{Namespace: tpl.Namespace, Name: tpl.TemplateRef})
+		}
+		return nil
+	}
+	for _, tpls := range [][]appsv1.ComponentTemplateSpec{compd.Spec.Configs, compd.Spec.Scripts} {
+		for _, tpl := range tpls {
+			if err := validateTemplate(tpl); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }

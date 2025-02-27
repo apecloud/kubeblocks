@@ -8271,28 +8271,6 @@ This field allows the system to locate and manage log files effectively.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1.MergedPolicy">MergedPolicy
-(<code>string</code> alias)</h3>
-<div>
-<p>MergedPolicy defines how to merge external imported templates into component templates.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>&#34;none&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;add&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;patch&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;replace&#34;</p></td>
-<td></td>
-</tr></tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1.MultipleClusterObjectCombinedOption">MultipleClusterObjectCombinedOption
 </h3>
 <p>

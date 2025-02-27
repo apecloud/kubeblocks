@@ -1135,18 +1135,6 @@ type ComponentTemplateSpec struct {
 	DefaultMode *int32 `json:"defaultMode,omitempty" protobuf:"varint,3,opt,name=defaultMode"`
 }
 
-// MergedPolicy defines how to merge external imported templates into component templates.
-// +enum
-// +kubebuilder:validation:Enum={patch,replace,none}
-type MergedPolicy string
-
-const (
-	PatchPolicy     MergedPolicy = "patch"
-	ReplacePolicy   MergedPolicy = "replace"
-	OnlyAddPolicy   MergedPolicy = "add"
-	NoneMergePolicy MergedPolicy = "none"
-)
-
 // RerenderResourceType defines the resource requirements for a component.
 // +enum
 // +kubebuilder:validation:Enum={vscale,hscale,tls}

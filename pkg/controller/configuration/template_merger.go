@@ -143,13 +143,13 @@ func NewTemplateMerger(template parametersv1alpha1.ConfigTemplateExtension,
 	switch template.Policy {
 	default:
 		return nil, core.MakeError("unknown template policy: %s", template.Policy)
-	case appsv1.NoneMergePolicy:
+	case parametersv1alpha1.NoneMergePolicy:
 		merger = &noneOp{templateData}
-	case appsv1.PatchPolicy:
+	case parametersv1alpha1.PatchPolicy:
 		merger = &configPatcher{templateData}
-	case appsv1.OnlyAddPolicy:
+	case parametersv1alpha1.OnlyAddPolicy:
 		merger = &configOnlyAddMerger{templateData}
-	case appsv1.ReplacePolicy:
+	case parametersv1alpha1.ReplacePolicy:
 		merger = &configReplaceMerger{templateData}
 	}
 	return merger, nil

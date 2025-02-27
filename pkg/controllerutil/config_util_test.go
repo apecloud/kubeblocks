@@ -31,7 +31,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 
-	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
@@ -124,7 +123,7 @@ func TestIsRerender(t *testing.T) {
 				CustomTemplates: &parametersv1alpha1.ConfigTemplateExtension{
 					TemplateRef: "contig-test-template",
 					Namespace:   "default",
-					Policy:      appsv1.PatchPolicy,
+					Policy:      parametersv1alpha1.PatchPolicy,
 				},
 			},
 		},
@@ -148,7 +147,7 @@ func TestIsRerender(t *testing.T) {
 				CustomTemplates: &parametersv1alpha1.ConfigTemplateExtension{
 					TemplateRef: "contig-test-template",
 					Namespace:   "default",
-					Policy:      appsv1.PatchPolicy,
+					Policy:      parametersv1alpha1.PatchPolicy,
 				},
 			},
 		},

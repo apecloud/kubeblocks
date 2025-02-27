@@ -151,7 +151,7 @@ max_connections=666
 				Namespace: "default",
 				// Name:        configSpec.Name,
 				TemplateRef: updatedCMObject.GetName(),
-				Policy:      appsv1.PatchPolicy,
+				Policy:      parametersv1alpha1.PatchPolicy,
 			}
 
 			tmpCM := baseCMObject.DeepCopy()
@@ -178,7 +178,7 @@ max_connections=666
 			importedTemplate := parametersv1alpha1.ConfigTemplateExtension{
 				Namespace:   "default",
 				TemplateRef: updatedCMObject.GetName(),
-				Policy:      appsv1.ReplacePolicy,
+				Policy:      parametersv1alpha1.ReplacePolicy,
 			}
 
 			tmpCM := baseCMObject.DeepCopy()
@@ -203,7 +203,7 @@ max_connections=666
 			importedTemplate := parametersv1alpha1.ConfigTemplateExtension{
 				Namespace:   "default",
 				TemplateRef: updatedCMObject.GetName(),
-				Policy:      appsv1.OnlyAddPolicy,
+				Policy:      parametersv1alpha1.OnlyAddPolicy,
 			}
 
 			tmpCM := baseCMObject.DeepCopy()
@@ -217,7 +217,7 @@ max_connections=666
 			importedTemplate := parametersv1alpha1.ConfigTemplateExtension{
 				Namespace:   "default",
 				TemplateRef: updatedCMObject.GetName(),
-				Policy:      appsv1.NoneMergePolicy,
+				Policy:      parametersv1alpha1.NoneMergePolicy,
 			}
 
 			tmpCM := baseCMObject.DeepCopy()

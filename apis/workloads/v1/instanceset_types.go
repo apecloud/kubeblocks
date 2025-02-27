@@ -310,7 +310,7 @@ type InstanceSetStatus struct {
 	TemplatesStatus []InstanceTemplateStatus `json:"templatesStatus,omitempty"`
 }
 
-// PersistentVolumeClaimRetentionPolicy
+// PersistentVolumeClaimRetentionPolicy describes the policy used for PVCs created from the VolumeClaimTemplates.
 //
 // +kubebuilder:object:generate=false
 type PersistentVolumeClaimRetentionPolicy = kbappsv1.PersistentVolumeClaimRetentionPolicy

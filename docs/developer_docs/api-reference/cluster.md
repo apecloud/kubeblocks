@@ -8910,7 +8910,7 @@ Cannot be updated.</p>
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>)
 </p>
 <div>
-<p>PersistentVolumeClaimRetentionPolicy</p>
+<p>PersistentVolumeClaimRetentionPolicy describes the policy used for PVCs created from the VolumeClaimTemplates.</p>
 </div>
 <table>
 <thead>

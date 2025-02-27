@@ -291,6 +291,12 @@ func (t *componentWorkloadTransformer) stopWorkload(
 		protoITS.Spec.Instances[i].Replicas = ptr.To(int32(0))
 	}
 
+	// set the pvc retention policy as Retain explicitly
+	if protoITS.Spec.PersistentVolumeClaimRetentionPolicy == nil {
+		protoITS.Spec.PersistentVolumeClaimRetentionPolicy = &workloads.PersistentVolumeClaimRetentionPolicy{}
+	}
+	protoITS.Spec.PersistentVolumeClaimRetentionPolicy.WhenScaled = appsv1.RetainPersistentVolumeClaimRetentionPolicyType
+
 	// backup the replicas of runningITS
 	snapshot, ok := runningITS.Annotations[stopReplicasSnapshotKey]
 	if !ok {

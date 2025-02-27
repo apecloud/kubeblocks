@@ -49,6 +49,7 @@ type Manager struct {
 	role                    string
 	roleSubscribeUpdateTime int64
 	roleProbePeriod         int64
+	masterName              string
 }
 
 var _ engines.DBManager = &Manager{}
@@ -75,6 +76,11 @@ func NewManager(properties engines.Properties) (engines.DBManager, error) {
 	mgr := &Manager{
 		DBManagerBase:   *managerBase,
 		roleProbePeriod: int64(viper.GetInt(constant.KBEnvRoleProbePeriod)),
+	}
+
+	mgr.masterName = mgr.ClusterCompName
+	if viper.IsSet("CUSTOM_SENTINEL_MASTER_NAME") {
+		mgr.masterName = viper.GetString("CUSTOM_SENTINEL_MASTER_NAME")
 	}
 
 	majorVersion, err := getRedisMajorVersion()

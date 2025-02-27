@@ -1043,7 +1043,11 @@ func (r *componentWorkloadOps) updatePVCSize(pvcKey types.NamespacedName,
 		// if both pvc and pv not found, do nothing
 		return nil
 	}
-	if reflect.DeepEqual(pvc.Spec.Resources, newPVC.Spec.Resources) && pv.Spec.PersistentVolumeReclaimPolicy == corev1.PersistentVolumeReclaimRetain {
+	if reflect.DeepEqual(pvc.Spec.Resources, newPVC.Spec.Resources) &&
+		pv.Spec.PersistentVolumeReclaimPolicy == corev1.PersistentVolumeReclaimRetain &&
+		pv.Annotations != nil &&
+		len(pv.Annotations[constant.PVLastClaimPolicyAnnotationKey]) > 0 &&
+		pv.Annotations[constant.PVLastClaimPolicyAnnotationKey] != string(corev1.PersistentVolumeReclaimRetain) {
 		// this could happen if create pvc succeeded but last step failed
 		updatePVCByRecreateFromStep(pvRestorePolicyStep)
 		return nil

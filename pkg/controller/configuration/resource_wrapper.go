@@ -23,13 +23,10 @@ import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -46,10 +43,7 @@ type ResourceFetcher[T any] struct {
 	ComponentDefObj *appsv1.ComponentDefinition
 	ClusterComObj   *appsv1.ClusterComponentSpec
 
-	ConfigMapObj        *corev1.ConfigMap
-	ConfigurationObj    *appsv1alpha1.Configuration
-	ConfigConstraintObj *appsv1beta1.ConfigConstraint
-
+	ConfigMapObj          *corev1.ConfigMap
 	ComponentParameterObj *parametersv1alpha1.ComponentParameter
 }
 
@@ -86,15 +80,11 @@ func (r *ResourceFetcher[T]) ComponentAndComponentDef() *T {
 	}
 	return r.Wrap(func() error {
 		r.ComponentObj = &appsv1.Component{}
-		err := r.Client.Get(r.Context, componentKey, r.ComponentObj, inDataContext())
-		if apierrors.IsNotFound(err) {
-			return nil
-		} else if err != nil {
+		if err := r.Client.Get(r.Context, componentKey, r.ComponentObj, inDataContext()); err != nil {
 			return err
 		}
-
 		if len(r.ComponentObj.Spec.CompDef) == 0 {
-			return nil
+			return fmt.Errorf("componentDefinition not found in component: %s", r.ComponentObj.Name)
 		}
 
 		compDefKey := types.NamespacedName{
@@ -121,22 +111,6 @@ func (r *ResourceFetcher[T]) ComponentSpec() *T {
 	})
 }
 
-func (r *ResourceFetcher[T]) Configuration() *T {
-	configKey := client.ObjectKey{
-		Name:      cfgcore.GenerateComponentConfigurationName(r.ClusterName, r.ComponentName),
-		Namespace: r.Namespace,
-	}
-	return r.Wrap(func() (err error) {
-		configuration := appsv1alpha1.Configuration{}
-		err = r.Client.Get(r.Context, configKey, &configuration)
-		if err != nil {
-			return client.IgnoreNotFound(err)
-		}
-		r.ConfigurationObj = &configuration
-		return
-	})
-}
-
 func (r *ResourceFetcher[T]) ConfigMap(configSpec string) *T {
 	cmKey := client.ObjectKey{
 		Name:      cfgcore.GetComponentCfgName(r.ClusterName, r.ComponentName, configSpec),
@@ -146,16 +120,6 @@ func (r *ResourceFetcher[T]) ConfigMap(configSpec string) *T {
 	return r.Wrap(func() error {
 		r.ConfigMapObj = &corev1.ConfigMap{}
 		return r.Client.Get(r.Context, cmKey, r.ConfigMapObj, inDataContextUnspecified())
-	})
-}
-
-func (r *ResourceFetcher[T]) ConfigConstraints(ccName string) *T {
-	return r.Wrap(func() error {
-		if ccName != "" {
-			r.ConfigConstraintObj = &appsv1beta1.ConfigConstraint{}
-			return r.Client.Get(r.Context, client.ObjectKey{Name: ccName}, r.ConfigConstraintObj)
-		}
-		return nil
 	})
 }
 

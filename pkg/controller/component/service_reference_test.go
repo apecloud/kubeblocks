@@ -52,7 +52,6 @@ var _ = Describe("service references", func() {
 		// resources should be released in following order
 		// non-namespaced
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ClusterDefinitionSignature, true, ml)
-		testapps.ClearResources(&testCtx, generics.ConfigConstraintSignature, ml)
 
 		// namespaced
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ConfigMapSignature, true, inNS, ml)

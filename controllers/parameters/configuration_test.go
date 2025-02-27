@@ -132,19 +132,6 @@ func mockReconcileResource() (*corev1.ConfigMap, *parametersv1alpha1.ParametersD
 		Create(&testCtx).
 		GetObject()
 
-	By("Create a componentParameter obj")
-	componentParameter := builder.NewComponentParameterBuilder(testCtx.DefaultNamespace, core.GenerateComponentConfigurationName(clusterName, defaultCompName)).
-		ClusterRef(clusterName).
-		Component(defaultCompName).
-		AddConfigurationItem(appsv1.ComponentTemplateSpec{
-			Name:        configSpecName,
-			TemplateRef: configmap.Name,
-			Namespace:   configmap.Namespace,
-			VolumeName:  configVolumeName,
-		}).
-		GetObject()
-	Expect(testCtx.CreateObj(testCtx.Ctx, componentParameter)).Should(Succeed())
-
 	container := *builder.NewContainerBuilder("mock-container").
 		AddVolumeMounts(corev1.VolumeMount{
 			Name:      configVolumeName,
@@ -179,7 +166,6 @@ func cleanEnv() {
 	inNS := client.InNamespace(testCtx.DefaultNamespace)
 	ml := client.HasLabels{testCtx.TestObjLabelKey}
 	// non-namespaced
-	testapps.ClearResources(&testCtx, generics.ConfigConstraintSignature, ml)
 	testapps.ClearResources(&testCtx, generics.ParametersDefinitionSignature, ml)
 	testapps.ClearResources(&testCtx, generics.ParamConfigRendererSignature, ml)
 	// namespaced
@@ -187,7 +173,6 @@ func cleanEnv() {
 	testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ConfigMapSignature, true, inNS)
 	testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.SecretSignature, true, inNS)
 	testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.InstanceSetSignature, true, inNS, ml)
-	testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ConfigurationSignature, false, inNS, ml)
 	testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ComponentParameterSignature, true, inNS)
 	testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ParameterSignature, true, inNS, ml)
 }

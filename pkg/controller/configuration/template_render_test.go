@@ -77,7 +77,7 @@ var _ = Describe("ToolsImageBuilderTest", func() {
 		return r
 	}
 
-	rerender := func(parameters parametersv1alpha1.ComponentParameters, tpl *corev1.ConfigMap, customTemplate *appsv1.ConfigTemplateExtension) unstructured.ConfigObject {
+	rerender := func(parameters parametersv1alpha1.ComponentParameters, tpl *corev1.ConfigMap, customTemplate *parametersv1alpha1.ConfigTemplateExtension) unstructured.ConfigObject {
 		rctx := &render.ReconcileCtx{
 			ResourceCtx: &render.ResourceCtx{
 				Context:       testCtx.Ctx,
@@ -154,10 +154,10 @@ gtid_mode=OFF
 				customTemplate,
 			}), testutil.WithAnyTimes()))
 
-			renderedObj := rerender(nil, nil, &appsv1.ConfigTemplateExtension{
+			renderedObj := rerender(nil, nil, &parametersv1alpha1.ConfigTemplateExtension{
 				TemplateRef: customTemplate.Name,
 				Namespace:   testCtx.DefaultNamespace,
-				Policy:      appsv1.ReplacePolicy,
+				Policy:      parametersv1alpha1.ReplacePolicy,
 			})
 			Expect(renderedObj).ShouldNot(BeNil())
 			Expect(renderedObj.Get("innodb_buffer_pool_size")).Should(BeEquivalentTo("512M"))

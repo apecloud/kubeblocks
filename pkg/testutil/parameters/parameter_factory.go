@@ -58,9 +58,9 @@ func (f *MockParameterFactory) AddParameters(paramName, paramValue string) *Mock
 func (f *MockParameterFactory) AddCustomTemplate(tpl string, templateName, ns string) *MockParameterFactory {
 	param := &f.Get().Spec.ComponentParameters[0]
 	if param.CustomTemplates == nil {
-		param.CustomTemplates = make(map[string]appsv1.ConfigTemplateExtension)
+		param.CustomTemplates = make(map[string]parametersv1alpha1.ConfigTemplateExtension)
 	}
-	param.CustomTemplates[tpl] = appsv1.ConfigTemplateExtension{
+	param.CustomTemplates[tpl] = parametersv1alpha1.ConfigTemplateExtension{
 		TemplateRef: templateName,
 		Namespace:   ns,
 		Policy:      appsv1.PatchPolicy,

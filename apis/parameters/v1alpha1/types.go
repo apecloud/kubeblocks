@@ -16,6 +16,8 @@ limitations under the License.
 
 package v1alpha1
 
+import "github.com/apecloud/kubeblocks/apis/apps/v1"
+
 // DynamicParameterSelectedPolicy determines how to select the parameters of dynamic reload actions
 //
 // +enum
@@ -179,3 +181,25 @@ const (
 )
 
 type ComponentParameters map[string]*string
+
+type ConfigTemplateExtension struct {
+	// Specifies the name of the referenced configuration template ConfigMap object.
+	//
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
+	TemplateRef string `json:"templateRef"`
+
+	// Specifies the namespace of the referenced configuration template ConfigMap object.
+	// An empty namespace is equivalent to the "default" namespace.
+	//
+	// +kubebuilder:default="default"
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$`
+	// +optional
+	Namespace string `json:"namespace,omitempty"`
+
+	// Defines the strategy for merging externally imported templates into component templates.
+	//
+	// +kubebuilder:default="none"
+	// +optional
+	Policy v1.MergedPolicy `json:"policy,omitempty"`
+}

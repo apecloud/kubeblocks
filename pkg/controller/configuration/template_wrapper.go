@@ -191,7 +191,7 @@ func (wrapper *renderWrapper) rerenderConfigTemplate(cluster *appsv1.Cluster,
 	// render user specified template
 	if item != nil && item.CustomTemplates != nil {
 		newData, err := mergerConfigTemplate(
-			appsv1.ConfigTemplateExtension{
+			parametersv1alpha1.ConfigTemplateExtension{
 				TemplateRef: item.CustomTemplates.TemplateRef,
 				Namespace:   item.CustomTemplates.Namespace,
 				Policy:      item.CustomTemplates.Policy,

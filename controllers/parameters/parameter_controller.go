@@ -31,7 +31,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/render"
@@ -172,7 +171,7 @@ func (r *ParameterReconciler) fail(reqCtx intctrlutil.RequestCtx, parameter *par
 	return intctrlutil.CheckedRequeueWithError(err, reqCtx.Log, "")
 }
 
-func validateCustomTemplate(ctx context.Context, cli client.Client, templates map[string]appsv1.ConfigTemplateExtension) error {
+func validateCustomTemplate(ctx context.Context, cli client.Client, templates map[string]parametersv1alpha1.ConfigTemplateExtension) error {
 	for configSpec, custom := range templates {
 		cm := &corev1.ConfigMap{}
 		err := cli.Get(ctx, types.NamespacedName{Name: custom.TemplateRef, Namespace: custom.Namespace}, cm)

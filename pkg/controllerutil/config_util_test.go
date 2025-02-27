@@ -121,7 +121,7 @@ func TestIsRerender(t *testing.T) {
 				GetObject(),
 			item: parametersv1alpha1.ConfigTemplateItemDetail{
 				Name: "test",
-				CustomTemplates: &appsv1.ConfigTemplateExtension{
+				CustomTemplates: &parametersv1alpha1.ConfigTemplateExtension{
 					TemplateRef: "contig-test-template",
 					Namespace:   "default",
 					Policy:      appsv1.PatchPolicy,
@@ -145,7 +145,7 @@ func TestIsRerender(t *testing.T) {
 				GetObject(),
 			item: parametersv1alpha1.ConfigTemplateItemDetail{
 				Name: "test",
-				CustomTemplates: &appsv1.ConfigTemplateExtension{
+				CustomTemplates: &parametersv1alpha1.ConfigTemplateExtension{
 					TemplateRef: "contig-test-template",
 					Namespace:   "default",
 					Policy:      appsv1.PatchPolicy,

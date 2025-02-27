@@ -102,7 +102,7 @@ type ConfigTemplateItemDetail struct {
 	// This allows users to customize the configuration template according to their specific requirements.
 	//
 	// +optional
-	CustomTemplates *appsv1.ConfigTemplateExtension `json:"userConfigTemplates,omitempty"`
+	CustomTemplates *ConfigTemplateExtension `json:"userConfigTemplates,omitempty"`
 
 	// Specifies the user-defined configuration parameters.
 	//

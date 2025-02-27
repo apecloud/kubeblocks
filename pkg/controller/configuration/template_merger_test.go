@@ -147,7 +147,7 @@ max_connections=666
 
 	Context("with patch Merge", func() {
 		It("mergerConfigTemplate patch policy", func() {
-			importedTemplate := appsv1.ConfigTemplateExtension{
+			importedTemplate := parametersv1alpha1.ConfigTemplateExtension{
 				Namespace: "default",
 				// Name:        configSpec.Name,
 				TemplateRef: updatedCMObject.GetName(),
@@ -175,7 +175,7 @@ max_connections=666
 
 	Context("with replace Merge", func() {
 		It("test mergerConfigTemplate replace policy", func() {
-			importedTemplate := appsv1.ConfigTemplateExtension{
+			importedTemplate := parametersv1alpha1.ConfigTemplateExtension{
 				Namespace:   "default",
 				TemplateRef: updatedCMObject.GetName(),
 				Policy:      appsv1.ReplacePolicy,
@@ -200,7 +200,7 @@ max_connections=666
 
 	Context("with only add Merge", func() {
 		It("test mergerConfigTemplate add policy", func() {
-			importedTemplate := appsv1.ConfigTemplateExtension{
+			importedTemplate := parametersv1alpha1.ConfigTemplateExtension{
 				Namespace:   "default",
 				TemplateRef: updatedCMObject.GetName(),
 				Policy:      appsv1.OnlyAddPolicy,
@@ -214,7 +214,7 @@ max_connections=666
 
 	Context("with none Merge", func() {
 		It("test mergerConfigTemplate none policy", func() {
-			importedTemplate := appsv1.ConfigTemplateExtension{
+			importedTemplate := parametersv1alpha1.ConfigTemplateExtension{
 				Namespace:   "default",
 				TemplateRef: updatedCMObject.GetName(),
 				Policy:      appsv1.NoneMergePolicy,
@@ -229,7 +229,7 @@ max_connections=666
 
 	Context("failed test", func() {
 		It("test mergerConfigTemplate function", func() {
-			importedTemplate := appsv1.ConfigTemplateExtension{
+			importedTemplate := parametersv1alpha1.ConfigTemplateExtension{
 				Namespace:   "default",
 				TemplateRef: updatedCMObject.GetName(),
 				Policy:      "",
@@ -241,7 +241,7 @@ max_connections=666
 		})
 
 		It("not parameterDrivenConfigRender", func() {
-			importedTemplate := appsv1.ConfigTemplateExtension{
+			importedTemplate := parametersv1alpha1.ConfigTemplateExtension{
 				Namespace:   "default",
 				TemplateRef: updatedCMObject.GetName(),
 				Policy:      "none",

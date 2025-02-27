@@ -40,7 +40,7 @@ type TemplateMerger interface {
 type mergeContext struct {
 	render.TemplateRender
 
-	template     appsv1.ConfigTemplateExtension
+	template     parametersv1alpha1.ConfigTemplateExtension
 	configSpec   appsv1.ComponentTemplateSpec
 	paramsDefs   []*parametersv1alpha1.ParametersDefinition
 	configRender *parametersv1alpha1.ParamConfigRenderer
@@ -125,7 +125,7 @@ func (c *configOnlyAddMerger) Merge(baseData map[string]string, updatedData map[
 	return nil, core.MakeError("not implemented")
 }
 
-func NewTemplateMerger(template appsv1.ConfigTemplateExtension,
+func NewTemplateMerger(template parametersv1alpha1.ConfigTemplateExtension,
 	templateRender render.TemplateRender,
 	configSpec appsv1.ComponentTemplateSpec,
 	paramsDefs []*parametersv1alpha1.ParametersDefinition,
@@ -155,7 +155,7 @@ func NewTemplateMerger(template appsv1.ConfigTemplateExtension,
 	return merger, nil
 }
 
-func mergerConfigTemplate(template appsv1.ConfigTemplateExtension,
+func mergerConfigTemplate(template parametersv1alpha1.ConfigTemplateExtension,
 	templateRender render.TemplateRender,
 	configSpec appsv1.ComponentTemplateSpec,
 	baseData map[string]string,

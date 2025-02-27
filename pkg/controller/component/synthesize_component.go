@@ -262,6 +262,7 @@ func buildVolumeClaimTemplates(synthesizeComp *SynthesizedComponent, comp *appsv
 	if comp.Spec.VolumeClaimTemplates != nil {
 		synthesizeComp.VolumeClaimTemplates = intctrlutil.ToCoreV1PVCTs(comp.Spec.VolumeClaimTemplates)
 	}
+	synthesizeComp.PVCRetentionPolicy = comp.Spec.PersistentVolumeClaimRetentionPolicy
 }
 
 func mergeUserDefinedVolumes(synthesizedComp *SynthesizedComponent, comp *appsv1.Component) error {

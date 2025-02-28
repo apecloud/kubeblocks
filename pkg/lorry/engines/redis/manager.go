@@ -22,6 +22,7 @@ package redis
 import (
 	"context"
 	"fmt"
+	"net"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -50,6 +51,8 @@ type Manager struct {
 	roleSubscribeUpdateTime int64
 	roleProbePeriod         int64
 	masterName              string
+	currentRedisIP          string
+	currentRedisPort        string
 }
 
 var _ engines.DBManager = &Manager{}
@@ -81,6 +84,26 @@ func NewManager(properties engines.Properties) (engines.DBManager, error) {
 	mgr.masterName = mgr.ClusterCompName
 	if viper.IsSet("CUSTOM_SENTINEL_MASTER_NAME") {
 		mgr.masterName = viper.GetString("CUSTOM_SENTINEL_MASTER_NAME")
+	}
+	mgr.currentRedisIP = mgr.CurrentMemberIP
+	mgr.currentRedisPort = viper.GetString(constant.KBEnvServicePort)
+
+	switch {
+	case viper.IsSet("FIXED_POD_IP_ENABLED"):
+		fixPodIP, err := getFixedPodIP(viper.GetString("KB_POD_FQDN"))
+		if err != nil {
+			return nil, err
+		}
+		mgr.currentRedisIP = fixPodIP
+	case viper.IsSet("HOST_NETWORK_ENABLED") || viper.IsSet("REDIS_HOST_NETWORK_PORT"):
+		mgr.currentRedisIP = viper.GetString("KB_HOST_IP")
+		if viper.IsSet("REDIS_ADVERTISED_PORT") {
+			port, err := mgr.getAdvertisedPort(viper.GetString("REDIS_ADVERTISED_PORT"))
+			if err != nil {
+				return nil, err
+			}
+			mgr.currentRedisPort = port
+		}
 	}
 
 	majorVersion, err := getRedisMajorVersion()
@@ -161,4 +184,36 @@ func getRedisMajorVersion() (int, error) {
 		return -1, err
 	}
 	return majorVersion, nil
+}
+
+func getFixedPodIP(podFQDN string) (string, error) {
+	addrs, err := net.LookupHost(podFQDN)
+	if err != nil {
+		return "", err
+	}
+	if len(addrs) > 0 {
+		return addrs[0], nil
+	}
+
+	return "", fmt.Errorf("Error: Failed to get IP address for %s", podFQDN)
+}
+
+func (mgr *Manager) getAdvertisedPort(redisAdvertisedPort string) (string, error) {
+	// redisAdvertisedPort: pod1Svc:advertisedPort1,pod2Svc:advertisedPort2,...
+	addrList := strings.Split(redisAdvertisedPort, ",")
+
+	getIndex := func(name string) string {
+		items := strings.Split(name, "-")
+		return items[len(items)-1]
+	}
+
+	for _, addr := range addrList {
+		host := strings.Split(addr, ":")[0]
+		port := strings.Split(addr, ":")[1]
+		if getIndex(host) == getIndex(mgr.CurrentMemberName) {
+			return port, nil
+		}
+	}
+
+	return "", fmt.Errorf("Error: Failed to get advertised port for %s", mgr.CurrentMemberName)
 }

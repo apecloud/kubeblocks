@@ -26,7 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	cfgcm "github.com/apecloud/kubeblocks/pkg/configuration/config_manager"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
@@ -67,12 +67,12 @@ var _ = Describe("ToolsImageBuilderTest", func() {
 				ConfigSpecsBuildParams: []cfgcm.ConfigSpecMeta{{
 					ConfigSpecInfo: cfgcm.ConfigSpecInfo{
 						ConfigSpec:      clusterComponent.ConfigTemplates[0],
-						ReloadType:      appsv1beta1.TPLScriptType,
-						FormatterConfig: appsv1beta1.FileFormatConfig{},
+						ReloadType:      parametersv1alpha1.TPLScriptType,
+						FormatterConfig: parametersv1alpha1.FileFormatConfig{},
 					},
-					ToolsImageSpec: &appsv1beta1.ToolsSetup{
+					ToolsImageSpec: &parametersv1alpha1.ToolsSetup{
 						MountPoint: "/opt/tools",
-						ToolConfigs: []appsv1beta1.ToolConfig{
+						ToolConfigs: []parametersv1alpha1.ToolConfig{
 							{
 								Name:    "test",
 								Image:   "test_images",
@@ -92,23 +92,13 @@ var _ = Describe("ToolsImageBuilderTest", func() {
 						},
 					},
 				}},
-				ConfigLazyRenderedVolumes: make(map[string]corev1.VolumeMount),
 			}
 			cfgManagerParams.ConfigSpecsBuildParams[0].ConfigSpec.VolumeName = "data"
-			cfgManagerParams.ConfigSpecsBuildParams[0].ConfigSpec.LegacyRenderedConfigSpec = &appsv1.LegacyRenderedTemplateSpec{
-				ConfigTemplateExtension: appsv1.ConfigTemplateExtension{
-					Namespace:   testCtx.DefaultNamespace,
-					TemplateRef: "secondary_template",
-					Policy:      appsv1.NoneMergePolicy,
-				},
-			}
 			Expect(buildReloadToolsContainer(cfgManagerParams, &its.Spec.Template.Spec)).Should(Succeed())
-			Expect(4).Should(BeEquivalentTo(len(cfgManagerParams.ToolsContainers)))
+			Expect(3).Should(BeEquivalentTo(len(cfgManagerParams.ToolsContainers)))
 			Expect("test_images").Should(BeEquivalentTo(cfgManagerParams.ToolsContainers[0].Image))
 			Expect(its.Spec.Template.Spec.Containers[0].Image).Should(BeEquivalentTo(cfgManagerParams.ToolsContainers[1].Image))
 			Expect(kbToolsImage).Should(BeEquivalentTo(cfgManagerParams.ToolsContainers[2].Image))
-			Expect(kbToolsImage).Should(BeEquivalentTo(cfgManagerParams.ToolsContainers[3].Image))
-			Expect(initSecRenderedToolContainerName).Should(BeEquivalentTo(cfgManagerParams.ToolsContainers[3].Name))
 		})
 	})
 

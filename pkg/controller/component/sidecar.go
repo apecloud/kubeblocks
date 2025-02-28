@@ -91,17 +91,7 @@ func buildSidecarVars(sidecarDef *appsv1.SidecarDefinition, synthesizedComp *Syn
 
 func buildSidecarConfigs(sidecarDef *appsv1.SidecarDefinition, synthesizedComp *SynthesizedComponent) error {
 	if sidecarDef.Spec.Configs != nil {
-		templateToConfig := func() []appsv1.ComponentConfigSpec {
-			if len(sidecarDef.Spec.Configs) == 0 {
-				return nil
-			}
-			l := make([]appsv1.ComponentConfigSpec, 0)
-			for i := range sidecarDef.Spec.Configs {
-				l = append(l, appsv1.ComponentConfigSpec{ComponentTemplateSpec: sidecarDef.Spec.Configs[i]})
-			}
-			return l
-		}
-		synthesizedComp.ConfigTemplates = append(synthesizedComp.ConfigTemplates, templateToConfig()...)
+		synthesizedComp.ConfigTemplates = append(synthesizedComp.ConfigTemplates, sidecarDef.Spec.Configs...)
 	}
 	return nil
 }

@@ -2010,6 +2010,7 @@ var _ = Describe("Component Controller", func() {
 			itsKey := compKey
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 				g.Expect(*its.Spec.Replicas).To(BeEquivalentTo(1))
+				g.Expect(its.Spec.PersistentVolumeClaimRetentionPolicy).Should(BeNil())
 			})).Should(Succeed())
 		}
 
@@ -2032,6 +2033,8 @@ var _ = Describe("Component Controller", func() {
 			itsKey := compKey
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 				g.Expect(*its.Spec.Replicas).To(BeEquivalentTo(0))
+				g.Expect(its.Spec.PersistentVolumeClaimRetentionPolicy).ShouldNot(BeNil())
+				g.Expect(its.Spec.PersistentVolumeClaimRetentionPolicy.WhenScaled).Should(Equal(kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType))
 			})).Should(Succeed())
 		}
 

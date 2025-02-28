@@ -64,17 +64,15 @@ func (mgr *Manager) GetReplicaRole(ctx context.Context, _ *dcs.Cluster) (string,
 	}
 
 	// We use the role obtained from Sentinel as the sole source of truth.
-	masterAddr, err := mgr.sentinelClient.GetMasterAddrByName(ctx, mgr.ClusterCompName).Result()
+	masterAddr, err := mgr.sentinelClient.GetMasterAddrByName(ctx, mgr.masterName).Result()
 	if err != nil {
+		mgr.Logger.Info("failed to get master address from Sentinel, try to get from Redis", "error", err.Error())
 		return getRoleFromRedisClient()
 	}
 
 	masterIP := masterAddr[0]
-	// if current member is not master from sentinel, just return secondary to avoid double master
-	if masterIP != mgr.CurrentMemberIP {
-		return models.SECONDARY, nil
-	}
-	return models.PRIMARY, nil
+	masterPort := masterAddr[1]
+	return mgr.checkPrimary(masterIP, masterPort), nil
 }
 
 func (mgr *Manager) SubscribeRoleChange(ctx context.Context) {
@@ -86,14 +84,24 @@ func (mgr *Manager) SubscribeRoleChange(ctx context.Context) {
 	ch := pubSub.Channel()
 	for msg := range ch {
 		// +switch-master <master name> <old ip> <old port> <new ip> <new port>
-		masterAddr := strings.Split(msg.Payload, " ")
-		masterName := strings.Split(masterAddr[3], ".")[0]
-
-		if masterName == mgr.CurrentMemberName {
-			mgr.role = models.PRIMARY
-		} else {
-			mgr.role = models.SECONDARY
+		msgInfo := strings.Split(msg.Payload, " ")
+		if len(msgInfo) != 5 {
+			mgr.Logger.Info("failed to get switch master info from subscribe", "msg", msg.Payload)
 		}
+
+		masterIP := msgInfo[3]
+		masterPort := msgInfo[4]
+		mgr.role = mgr.checkPrimary(masterIP, masterPort)
 		mgr.roleSubscribeUpdateTime = time.Now().Unix()
 	}
+}
+
+// If current member is not master from sentinel, just return secondary to avoid double master
+// When currentRedisHost is a domain name, it does not include dnsDomain by default,
+// and prefix matching can override the matching of domain names or IPs.
+func (mgr *Manager) checkPrimary(masterIP, masterPort string) string {
+	if !strings.HasPrefix(masterIP, mgr.currentRedisHost) || masterPort != mgr.currentRedisPort {
+		return models.SECONDARY
+	}
+	return models.PRIMARY
 }

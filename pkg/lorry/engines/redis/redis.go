@@ -155,8 +155,8 @@ func newSentinelClient(s *Settings, clusterCompName string) *redis.SentinelClien
 		sentinelHost = viper.GetString("SENTINEL_HEADLESS_SERVICE_NAME")
 	}
 	sentinelPort := "26379"
-	if viper.IsSet("REDIS_SENTINEL_HOST_NETWORK_PORT") {
-		sentinelPort = viper.GetString("REDIS_SENTINEL_HOST_NETWORK_PORT")
+	if viper.IsSet("SENTINEL_SERVICE_PORT") {
+		sentinelPort = viper.GetString("SENTINEL_SERVICE_PORT")
 	}
 
 	sentinelUser := s.Username

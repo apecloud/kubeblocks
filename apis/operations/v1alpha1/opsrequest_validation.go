@@ -350,7 +350,7 @@ func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, com
 	}
 
 	// Define the scaling operation validation function
-	validateScalingOperation := func(replicaChanger ReplicaChanger, newInstances []appsv1.InstanceTemplate, instanceNames []string, isScaleIn bool) error {
+	validateHScaleOperation := func(replicaChanger ReplicaChanger, newInstances []appsv1.InstanceTemplate, instanceNames []string, isScaleIn bool) error {
 		var operationPrefix, instanceField string
 		if isScaleIn {
 			operationPrefix = "ScaleIn:"
@@ -388,15 +388,15 @@ func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, com
 		}
 
 		// Rule 3: Ensure replicaChanges are not less than the replicaCount for each instance template
-		for instanceName, replicaCount := range instanceCountMap {
-			changes, exists := instanceChangeMap[instanceName]
+		for insTplName, replicaCount := range instanceCountMap {
+			changes, exists := instanceChangeMap[insTplName]
 			if !exists {
 				totalReplicaChanges += replicaCount
 				continue
 			}
 			if changes < replicaCount {
 				return fmt.Errorf(`"replicaChanges" can't be less than %d when %d instances of the instance template "%s" are configured in %s`,
-					replicaCount, replicaCount, instanceName, instanceField)
+					replicaCount, replicaCount, insTplName, instanceField)
 			}
 		}
 
@@ -429,7 +429,7 @@ func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, com
 
 	// Validate scaleIn and scaleOut separately
 	if scaleIn != nil {
-		if err := validateScalingOperation(scaleIn.ReplicaChanger, nil, scaleIn.OnlineInstancesToOffline, true); err != nil {
+		if err := validateHScaleOperation(scaleIn.ReplicaChanger, nil, scaleIn.OnlineInstancesToOffline, true); err != nil {
 			return err
 		}
 		if scaleIn.ReplicaChanges != nil && *scaleIn.ReplicaChanges > compSpec.Replicas {
@@ -437,7 +437,7 @@ func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, com
 		}
 	}
 	if scaleOut != nil {
-		if err := validateScalingOperation(scaleOut.ReplicaChanger, scaleOut.NewInstances, scaleOut.OfflineInstancesToOnline, false); err != nil {
+		if err := validateHScaleOperation(scaleOut.ReplicaChanger, scaleOut.NewInstances, scaleOut.OfflineInstancesToOnline, false); err != nil {
 			return err
 		}
 	}

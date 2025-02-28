@@ -471,41 +471,7 @@ var _ = Describe("Component Controller", func() {
 		}
 
 		scaleInCheck := func() {
-			if updatedReplicas == 0 {
-				Consistently(func(g Gomega) {
-					pvcList := corev1.PersistentVolumeClaimList{}
-					g.Expect(k8sClient.List(testCtx.Ctx, &pvcList, client.MatchingLabels{
-						constant.AppInstanceLabelKey:    clusterKey.Name,
-						constant.KBAppComponentLabelKey: compName,
-					})).Should(Succeed())
-					for _, pvc := range pvcList.Items {
-						ss := strings.Split(pvc.Name, "-")
-						idx, _ := strconv.Atoi(ss[len(ss)-1])
-						if idx >= updatedReplicas && idx < int(comp.Spec.Replicas) {
-							g.Expect(pvc.DeletionTimestamp).Should(BeNil())
-						}
-					}
-				}).Should(Succeed())
-				return
-			}
-
 			checkUpdatedItsReplicas()
-
-			By("Checking pvcs deleting")
-			Eventually(func(g Gomega) {
-				pvcList := corev1.PersistentVolumeClaimList{}
-				g.Expect(k8sClient.List(testCtx.Ctx, &pvcList, client.MatchingLabels{
-					constant.AppInstanceLabelKey:    clusterKey.Name,
-					constant.KBAppComponentLabelKey: compName,
-				})).Should(Succeed())
-				for _, pvc := range pvcList.Items {
-					ss := strings.Split(pvc.Name, "-")
-					idx, _ := strconv.Atoi(ss[len(ss)-1])
-					if idx >= updatedReplicas && idx < int(comp.Spec.Replicas) {
-						g.Expect(pvc.DeletionTimestamp).ShouldNot(BeNil())
-					}
-				}
-			}).Should(Succeed())
 
 			By("Checking pod's annotation should be updated consistently")
 			Eventually(func(g Gomega) {

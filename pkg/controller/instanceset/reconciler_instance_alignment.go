@@ -49,7 +49,7 @@ func (r *instanceAlignmentReconciler) PreCondition(tree *kubebuilderx.ObjectTree
 	}
 	its, _ := tree.GetRoot().(*workloads.InstanceSet)
 	if err := validateSpec(its, tree); err != nil {
-		return kubebuilderx.CheckResultWithError(err)
+		return kubebuilderx.ConditionUnsatisfiedWithError(err)
 	}
 	return kubebuilderx.ConditionSatisfied
 }

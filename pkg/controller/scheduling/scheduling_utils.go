@@ -23,9 +23,11 @@ import (
 	"encoding/json"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
+	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
 )
 
@@ -47,7 +49,7 @@ func buildSchedulingPolicy(cluster *appsv1.Cluster, compSpec *appsv1.ClusterComp
 		if err != nil {
 			return err
 		}
-		schedulingPolicy.Affinity = mergeAffinity(schedulingPolicy.Affinity, affinity)
+		schedulingPolicy.Affinity = MergeAffinity(schedulingPolicy.Affinity, affinity)
 		return nil
 	}
 
@@ -98,68 +100,57 @@ func buildClusterWideTolerations() ([]corev1.Toleration, error) {
 	return tolerations, nil
 }
 
-// mergeAffinity merges affinity from src to dest
-func mergeAffinity(dest, src *corev1.Affinity) *corev1.Affinity {
+func makeCmp[E any]() func(E) func(E) bool {
+	return func(a E) func(E) bool {
+		return func(b E) bool {
+			return equality.Semantic.DeepEqual(a, b)
+		}
+	}
+}
+
+// MergeAffinity merges src to dst, return value is deepcopied
+func MergeAffinity(src, dst *corev1.Affinity) *corev1.Affinity {
 	if src == nil {
-		return dest
+		return dst.DeepCopy()
 	}
 
-	if dest == nil {
+	if dst == nil {
 		return src.DeepCopy()
 	}
 
-	rst := dest.DeepCopy()
-	skipPodAffinity := src.PodAffinity == nil
-	skipPodAntiAffinity := src.PodAntiAffinity == nil
-	skipNodeAffinity := src.NodeAffinity == nil
+	rtn := dst.DeepCopy()
 
-	if rst.PodAffinity == nil && !skipPodAffinity {
-		rst.PodAffinity = src.PodAffinity
-		skipPodAffinity = true
-	}
-	if rst.PodAntiAffinity == nil && !skipPodAntiAffinity {
-		rst.PodAntiAffinity = src.PodAntiAffinity
-		skipPodAntiAffinity = true
-	}
-	if rst.NodeAffinity == nil && !skipNodeAffinity {
-		rst.NodeAffinity = src.NodeAffinity
-		skipNodeAffinity = true
-	}
-
-	// if not skip, both are not nil
-	if !skipPodAffinity {
-		rst.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution = append(
-			rst.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
-			src.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution...)
-
-		rst.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(
-			rst.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
-			src.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution...)
-	}
-	if !skipPodAntiAffinity {
-		rst.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution = append(
-			rst.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
-			src.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution...)
-
-		rst.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(
-			rst.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
-			src.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution...)
-	}
-	if !skipNodeAffinity {
-		rst.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution = append(
-			rst.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
-			src.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution...)
-
-		skip := src.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution == nil
-		if rst.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution == nil && !skip {
-			rst.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution = src.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution
-			skip = true
+	// Merge PodAffinity
+	if src.PodAffinity != nil {
+		if rtn.PodAffinity == nil {
+			rtn.PodAffinity = &corev1.PodAffinity{}
 		}
-		if !skip {
-			rst.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms = append(
-				rst.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms,
-				src.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms...)
-		}
+		intctrlutil.MergeList(&src.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution, &rtn.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution, makeCmp[corev1.PodAffinityTerm]())
+		intctrlutil.MergeList(&src.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution, &rtn.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution, makeCmp[corev1.WeightedPodAffinityTerm]())
 	}
-	return rst
+
+	// Merge PodAntiAffinity
+	if src.PodAntiAffinity != nil {
+		if rtn.PodAntiAffinity == nil {
+			rtn.PodAntiAffinity = &corev1.PodAntiAffinity{}
+		}
+		intctrlutil.MergeList(&src.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution, &rtn.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution, makeCmp[corev1.PodAffinityTerm]())
+		intctrlutil.MergeList(&src.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution, &rtn.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution, makeCmp[corev1.WeightedPodAffinityTerm]())
+	}
+
+	// Merge NodeAffinity
+	if src.NodeAffinity != nil {
+		if rtn.NodeAffinity == nil {
+			rtn.NodeAffinity = &corev1.NodeAffinity{}
+		}
+		if src.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution != nil {
+			if rtn.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution == nil {
+				rtn.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution = &corev1.NodeSelector{}
+			}
+			intctrlutil.MergeList(&src.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms, &rtn.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms, makeCmp[corev1.NodeSelectorTerm]())
+		}
+		intctrlutil.MergeList(&src.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution, &rtn.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution, makeCmp[corev1.PreferredSchedulingTerm]())
+	}
+
+	return rtn
 }

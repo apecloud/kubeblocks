@@ -66,7 +66,7 @@ func (mgr *Manager) GetReplicaRole(ctx context.Context, _ *dcs.Cluster) (string,
 	// We use the role obtained from Sentinel as the sole source of truth.
 	masterAddr, err := mgr.sentinelClient.GetMasterAddrByName(ctx, mgr.masterName).Result()
 	if err != nil {
-		mgr.Logger.Info("failed to get master address from Sentinel", "error", err.Error())
+		mgr.Logger.Info("failed to get master address from Sentinel, try to get from Redis", "error", err.Error())
 		return getRoleFromRedisClient()
 	}
 

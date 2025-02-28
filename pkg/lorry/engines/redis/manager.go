@@ -95,7 +95,7 @@ func NewManager(properties engines.Properties) (engines.DBManager, error) {
 			return nil, err
 		}
 		mgr.currentRedisHost = fixPodIP
-	case viper.IsSet("HOST_NETWORK_ENABLED") || viper.IsSet("REDIS_HOST_NETWORK_PORT"):
+	case viper.IsSet("HOST_NETWORK_ENABLED") || viper.IsSet("REDIS_ADVERTISED_PORT"):
 		mgr.currentRedisHost = viper.GetString("KB_HOST_IP")
 		if viper.IsSet("REDIS_ADVERTISED_PORT") {
 			port, err := mgr.getAdvertisedPort(viper.GetString("REDIS_ADVERTISED_PORT"))

@@ -51,7 +51,7 @@ type Manager struct {
 	roleSubscribeUpdateTime int64
 	roleProbePeriod         int64
 	masterName              string
-	currentRedisIP          string
+	currentRedisHost        string
 	currentRedisPort        string
 }
 
@@ -85,7 +85,7 @@ func NewManager(properties engines.Properties) (engines.DBManager, error) {
 	if viper.IsSet("CUSTOM_SENTINEL_MASTER_NAME") {
 		mgr.masterName = viper.GetString("CUSTOM_SENTINEL_MASTER_NAME")
 	}
-	mgr.currentRedisIP = mgr.CurrentMemberIP
+	mgr.currentRedisHost = fmt.Sprintf("%s.%s", viper.GetString("KB_POD_FQDN"), constant.DefaultDNSDomain)
 	mgr.currentRedisPort = viper.GetString(constant.KBEnvServicePort)
 
 	switch {
@@ -94,9 +94,9 @@ func NewManager(properties engines.Properties) (engines.DBManager, error) {
 		if err != nil {
 			return nil, err
 		}
-		mgr.currentRedisIP = fixPodIP
+		mgr.currentRedisHost = fixPodIP
 	case viper.IsSet("HOST_NETWORK_ENABLED") || viper.IsSet("REDIS_HOST_NETWORK_PORT"):
-		mgr.currentRedisIP = viper.GetString("KB_HOST_IP")
+		mgr.currentRedisHost = viper.GetString("KB_HOST_IP")
 		if viper.IsSet("REDIS_ADVERTISED_PORT") {
 			port, err := mgr.getAdvertisedPort(viper.GetString("REDIS_ADVERTISED_PORT"))
 			if err != nil {

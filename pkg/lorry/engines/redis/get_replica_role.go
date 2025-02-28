@@ -66,14 +66,14 @@ func (mgr *Manager) GetReplicaRole(ctx context.Context, _ *dcs.Cluster) (string,
 	// We use the role obtained from Sentinel as the sole source of truth.
 	masterAddr, err := mgr.sentinelClient.GetMasterAddrByName(ctx, mgr.masterName).Result()
 	if err != nil {
-		mgr.Logger.Info("Failed to get master address from Sentinel", "error", err.Error())
+		mgr.Logger.Info("failed to get master address from Sentinel", "error", err.Error())
 		return getRoleFromRedisClient()
 	}
 
 	masterIP := masterAddr[0]
 	masterPort := masterAddr[1]
 	// if current member is not master from sentinel, just return secondary to avoid double master
-	if masterIP != mgr.currentRedisIP || masterPort != mgr.currentRedisPort {
+	if masterIP != mgr.currentRedisHost || masterPort != mgr.currentRedisPort {
 		return models.SECONDARY, nil
 	}
 	return models.PRIMARY, nil

@@ -85,7 +85,7 @@ func NewManager(properties engines.Properties) (engines.DBManager, error) {
 	if viper.IsSet("CUSTOM_SENTINEL_MASTER_NAME") {
 		mgr.masterName = viper.GetString("CUSTOM_SENTINEL_MASTER_NAME")
 	}
-	mgr.currentRedisHost = fmt.Sprintf("%s.%s", viper.GetString("KB_POD_FQDN"), constant.DefaultDNSDomain)
+	mgr.currentRedisHost = viper.GetString("KB_POD_FQDN")
 	mgr.currentRedisPort = viper.GetString(constant.KBEnvServicePort)
 
 	switch {

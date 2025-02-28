@@ -1,5 +1,5 @@
 /*
-Copyright (C) 2022-2025 ApeCloud Co., Ltd
+Copyright (C) 2022-2024 ApeCloud Co., Ltd
 
 This file is part of KubeBlocks project
 
@@ -51,7 +51,7 @@ var disableDNSChecker bool
 
 func init() {
 	viper.AutomaticEnv()
-	pflag.StringVar(&configDir, "config-path", "/config/lorry/components/", "Lorry default config directory for builtin type")
+	pflag.StringVar(&configDir, "config-path", "/Users/buyanbujuan/go/src/kubeblocks/config/lorry/components/", "Lorry default config directory for builtin type")
 	pflag.BoolVar(&disableDNSChecker, "disable-dns-checker", false, "disable dns checker, for test&dev")
 }
 

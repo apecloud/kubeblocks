@@ -195,7 +195,7 @@ func getFixedPodIP(podFQDN string) (string, error) {
 		return addrs[0], nil
 	}
 
-	return "", fmt.Errorf("Error: Failed to get IP address for %s", podFQDN)
+	return "", fmt.Errorf("failed to get IP address for %s", podFQDN)
 }
 
 func (mgr *Manager) getAdvertisedPort(redisAdvertisedPort string) (string, error) {
@@ -215,5 +215,5 @@ func (mgr *Manager) getAdvertisedPort(redisAdvertisedPort string) (string, error
 		}
 	}
 
-	return "", fmt.Errorf("Error: Failed to get advertised port for %s", mgr.CurrentMemberName)
+	return "", fmt.Errorf("failed to get advertised port for %s", mgr.CurrentMemberName)
 }

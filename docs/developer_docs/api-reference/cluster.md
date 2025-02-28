@@ -726,6 +726,20 @@ Default value is &ldquo;PreferInPlace&rdquo;</li>
 </tr>
 <tr>
 <td>
+<code>instanceUpdateStrategy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.InstanceUpdateStrategy">
+InstanceUpdateStrategy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Provides fine-grained control over the spec update process of all instances.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>schedulingPolicy</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.SchedulingPolicy">
@@ -1239,10 +1253,43 @@ and bind Services at Cluster creation time with <code>clusterComponentSpec.Servi
 </tr>
 <tr>
 <td>
+<code>configs2</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentFileTemplate">
+[]ComponentFileTemplate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the config file templates and volume mount parameters used by the Component.</p>
+<p>This field specifies a list of templates that will be rendered into Component containers&rsquo; config files.
+Each template is represented as a ConfigMap and may contain multiple config files, with each file being a key in the ConfigMap.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>scripts2</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentFileTemplate">
+[]ComponentFileTemplate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies groups of scripts, each provided via a ConfigMap, to be mounted as volumes in the container.
+These scripts can be executed during container startup or via specific actions.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>configs</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.ComponentConfigSpec">
-[]ComponentConfigSpec
+<a href="#apps.kubeblocks.io/v1.ComponentTemplateSpec">
+[]ComponentTemplateSpec
 </a>
 </em>
 </td>
@@ -1492,6 +1539,7 @@ Kubernetes resources within the namespace.</p>
 <p>The purpose of this field is to automatically generate the necessary RBAC roles
 for the Component based on the specified policy rules.
 This ensures that the Pods in the Component has appropriate permissions to function.</p>
+<p>To prevent privilege escalation, only permissions already owned by KubeBlocks can be added here.</p>
 <p>This field is immutable.</p>
 </td>
 </tr>
@@ -2200,7 +2248,7 @@ SidecarDefinitionStatus
 <h3 id="apps.kubeblocks.io/v1.Action">Action
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentLifecycleActions">ComponentLifecycleActions</a>, <a href="#apps.kubeblocks.io/v1.Probe">Probe</a>, <a href="#apps.kubeblocks.io/v1.ShardingLifecycleActions">ShardingLifecycleActions</a>, <a href="#workloads.kubeblocks.io/v1.MembershipReconfiguration">MembershipReconfiguration</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentConfig">ClusterComponentConfig</a>, <a href="#apps.kubeblocks.io/v1.ComponentLifecycleActions">ComponentLifecycleActions</a>, <a href="#apps.kubeblocks.io/v1.Probe">Probe</a>, <a href="#apps.kubeblocks.io/v1.ShardingLifecycleActions">ShardingLifecycleActions</a>, <a href="#workloads.kubeblocks.io/v1.MembershipReconfiguration">MembershipReconfiguration</a>)
 </p>
 <div>
 <p>Action defines a customizable hook or procedure tailored for different database engines,
@@ -2590,7 +2638,7 @@ string
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>)
 </p>
 <div>
-<p>ClusterComponentConfig represents a config with its source bound.</p>
+<p>ClusterComponentConfig represents a configuration for a component.</p>
 </div>
 <table>
 <thead>
@@ -2614,6 +2662,18 @@ string
 </tr>
 <tr>
 <td>
+<code>variables</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Variables are key-value pairs for dynamic configuration values that can be provided by the user.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>ClusterComponentConfigSource</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.ClusterComponentConfigSource">
@@ -2625,7 +2685,42 @@ ClusterComponentConfigSource
 <p>
 (Members of <code>ClusterComponentConfigSource</code> are embedded into this type.)
 </p>
-<p>The source of the config.</p>
+<p>The external source for the configuration.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>reconfigure</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.Action">
+Action
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The custom reconfigure action to reload the service configuration whenever changes to this config are detected.</p>
+<p>The container executing this action has access to following variables:</p>
+<ul>
+<li>KB_CONFIG_FILES_CREATED: file1,file2&hellip;</li>
+<li>KB_CONFIG_FILES_REMOVED: file1,file2&hellip;</li>
+<li>KB_CONFIG_FILES_UPDATED: file1:checksum1,file2:checksum2&hellip;</li>
+</ul>
+<p>Note: This field is immutable once it has been set.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>externalManaged</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ExternalManaged indicates whether the configuration is managed by an external system.
+When set to true, the controller will use the user-provided template and reconfigure action,
+ignoring the default template and update behavior.</p>
 </td>
 </tr>
 </tbody>
@@ -2636,7 +2731,7 @@ ClusterComponentConfigSource
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentConfig">ClusterComponentConfig</a>)
 </p>
 <div>
-<p>ClusterComponentConfigSource represents the source of a config.</p>
+<p>ClusterComponentConfigSource represents the source of a configuration for a component.</p>
 </div>
 <table>
 <thead>
@@ -3087,6 +3182,20 @@ Default value is &ldquo;PreferInPlace&rdquo;</li>
 </tr>
 <tr>
 <td>
+<code>instanceUpdateStrategy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.InstanceUpdateStrategy">
+InstanceUpdateStrategy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Provides fine-grained control over the spec update process of all instances.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>instances</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.InstanceTemplate">
@@ -3131,9 +3240,7 @@ future reuse or data recovery, but it is no longer actively used.</li>
 and avoiding conflicts with new instances.</li>
 </ol>
 <p>Setting instances to offline allows for a controlled scale-in process, preserving their data and maintaining
-ordinal consistency within the Cluster.
-Note that offline instances and their associated resources, such as PVCs, are not automatically deleted.
-The administrator must manually manage the cleanup and removal of these resources when they are no longer needed.</p>
+ordinal consistency within the Cluster.</p>
 </td>
 </tr>
 <tr>
@@ -3217,7 +3324,7 @@ The keys are either podName, deployName, or statefulSetName, formatted as &lsquo
 <h3 id="apps.kubeblocks.io/v1.ClusterComponentVolumeClaimTemplate">ClusterComponentVolumeClaimTemplate
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.InstanceTemplate">InstanceTemplate</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>)
 </p>
 <div>
 </div>
@@ -3243,6 +3350,30 @@ string
 <li><code>clusterDefinition.spec.componentDefs[*].podSpec.containers[*].volumeMounts</code> (deprecated)</li>
 </ul>
 <p>The value of <code>name</code> must match the <code>name</code> field of a volumeMount specified in the corresponding <code>volumeMounts</code> array.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>labels</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the labels for the PVC of the volume.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>annotations</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the annotations for the PVC of the volume.</p>
 </td>
 </tr>
 <tr>
@@ -4695,138 +4826,6 @@ string
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1.ComponentConfigSpec">ComponentConfigSpec
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>ComponentTemplateSpec</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.ComponentTemplateSpec">
-ComponentTemplateSpec
-</a>
-</em>
-</td>
-<td>
-<p>
-(Members of <code>ComponentTemplateSpec</code> are embedded into this type.)
-</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>keys</code><br/>
-<em>
-[]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the configuration files within the ConfigMap that support dynamic updates.</p>
-<p>A configuration template (provided in the form of a ConfigMap) may contain templates for multiple
-configuration files.
-Each configuration file corresponds to a key in the ConfigMap.
-Some of these configuration files may support dynamic modification and reloading without requiring
-a pod restart.</p>
-<p>If empty or omitted, all configuration files in the ConfigMap are assumed to support dynamic updates,
-and ConfigConstraint applies to all keys.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>constraintRef</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the name of the referenced configuration constraints object.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>asEnvFrom</code><br/>
-<em>
-[]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the containers to inject the ConfigMap parameters as environment variables.</p>
-<p>This is useful when application images accept parameters through environment variables and
-generate the final configuration file in the startup script based on these variables.</p>
-<p>This field allows users to specify a list of container names, and KubeBlocks will inject the environment
-variables converted from the ConfigMap into these designated containers. This provides a flexible way to
-pass the configuration items from the ConfigMap to the container without modifying the image.</p>
-<p>Deprecated: <code>asEnvFrom</code> has been deprecated since 0.9.0 and will be removed in 0.10.0.
-Use <code>injectEnvTo</code> instead.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>injectEnvTo</code><br/>
-<em>
-[]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the containers to inject the ConfigMap parameters as environment variables.</p>
-<p>This is useful when application images accept parameters through environment variables and
-generate the final configuration file in the startup script based on these variables.</p>
-<p>This field allows users to specify a list of container names, and KubeBlocks will inject the environment
-variables converted from the ConfigMap into these designated containers. This provides a flexible way to
-pass the configuration items from the ConfigMap to the container without modifying the image.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>reRenderResourceTypes</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.RerenderResourceType">
-[]RerenderResourceType
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies whether the configuration needs to be re-rendered after v-scale or h-scale operations to reflect changes.</p>
-<p>In some scenarios, the configuration may need to be updated to reflect the changes in resource allocation
-or cluster topology. Examples:</p>
-<ul>
-<li>Redis: adjust maxmemory after v-scale operation.</li>
-<li>MySQL: increase max connections after v-scale operation.</li>
-<li>Zookeeper: update zoo.cfg with new node addresses after h-scale operation.</li>
-</ul>
-</td>
-</tr>
-<tr>
-<td>
-<code>asSecret</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Whether to store the final rendered parameters as a secret.</p>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec
 </h3>
 <p>
@@ -5121,10 +5120,43 @@ and bind Services at Cluster creation time with <code>clusterComponentSpec.Servi
 </tr>
 <tr>
 <td>
+<code>configs2</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentFileTemplate">
+[]ComponentFileTemplate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the config file templates and volume mount parameters used by the Component.</p>
+<p>This field specifies a list of templates that will be rendered into Component containers&rsquo; config files.
+Each template is represented as a ConfigMap and may contain multiple config files, with each file being a key in the ConfigMap.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>scripts2</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.ComponentFileTemplate">
+[]ComponentFileTemplate
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies groups of scripts, each provided via a ConfigMap, to be mounted as volumes in the container.
+These scripts can be executed during container startup or via specific actions.</p>
+<p>This field is immutable.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>configs</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.ComponentConfigSpec">
-[]ComponentConfigSpec
+<a href="#apps.kubeblocks.io/v1.ComponentTemplateSpec">
+[]ComponentTemplateSpec
 </a>
 </em>
 </td>
@@ -5374,6 +5406,7 @@ Kubernetes resources within the namespace.</p>
 <p>The purpose of this field is to automatically generate the necessary RBAC roles
 for the Component based on the specified policy rules.
 This ensures that the Pods in the Component has appropriate permissions to function.</p>
+<p>To prevent privilege escalation, only permissions already owned by KubeBlocks can be added here.</p>
 <p>This field is immutable.</p>
 </td>
 </tr>
@@ -5495,6 +5528,93 @@ string
 <td>
 <em>(Optional)</em>
 <p>Provides additional information about the current phase.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.ComponentFileTemplate">ComponentFileTemplate
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
+</p>
+<div>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>name</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<p>Specifies the name of the template.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>template</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the name of the referenced template ConfigMap object.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>namespace</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the namespace of the referenced template ConfigMap object.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>volumeName</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Refers to the volume name of PodTemplate. The file produced through the template will be mounted to
+the corresponding volume. Must be a DNS_LABEL name.
+The volume name must be defined in podSpec.containers[*].volumeMounts.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>defaultMode</code><br/>
+<em>
+int32
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The operator attempts to set default file permissions (0444).</p>
+<p>Must be specified as an octal value between 0000 and 0777 (inclusive),
+or as a decimal value between 0 and 511 (inclusive).
+YAML supports both octal and decimal values for file permissions.</p>
+<p>Please note that this setting only affects the permissions of the files themselves.
+Directories within the specified path are not impacted by this setting.
+It&rsquo;s important to be aware that this setting might conflict with other options
+that influence the file mode, such as fsGroup.
+In such cases, the resulting file mode may have additional bits set.
+Refers to documents of k8s.ConfigMapVolumeSource.defaultMode for more information.</p>
 </td>
 </tr>
 </tbody>
@@ -6253,6 +6373,20 @@ Default value is &ldquo;PreferInPlace&rdquo;</li>
 </tr>
 <tr>
 <td>
+<code>instanceUpdateStrategy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.InstanceUpdateStrategy">
+InstanceUpdateStrategy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Provides fine-grained control over the spec update process of all instances.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>schedulingPolicy</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.SchedulingPolicy">
@@ -6556,7 +6690,7 @@ ProvisionSecretRef
 <h3 id="apps.kubeblocks.io/v1.ComponentTemplateSpec">ComponentTemplateSpec
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentConfigSpec">ComponentConfigSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>, <a href="#apps.kubeblocks.io/v1.SidecarDefinitionSpec">SidecarDefinitionSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>, <a href="#apps.kubeblocks.io/v1.SidecarDefinitionSpec">SidecarDefinitionSpec</a>)
 </p>
 <div>
 </div>
@@ -7098,58 +7232,6 @@ This precaution helps prevent space depletion while maintaining read-only access
 If the space utilization later falls below this threshold, the system reverts the volume to read-write mode
 as defined in <code>componentDefinition.spec.lifecycleActions.readWrite</code>, restoring full functionality.</p>
 <p>Note: This field cannot be updated.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1.ConfigTemplateExtension">ConfigTemplateExtension
-</h3>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>templateRef</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Specifies the name of the referenced configuration template ConfigMap object.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>namespace</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the namespace of the referenced configuration template ConfigMap object.
-An empty namespace is equivalent to the &ldquo;default&rdquo; namespace.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>policy</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.MergedPolicy">
-MergedPolicy
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the strategy for merging externally imported templates into component templates.</p>
 </td>
 </tr>
 </tbody>
@@ -7923,18 +8005,6 @@ Values for existing keys will be overwritten, and new keys will be added.</p>
 </tr>
 <tr>
 <td>
-<code>image</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies an override for the first container&rsquo;s image in the Pod.</p>
-</td>
-</tr>
-<tr>
-<td>
 <code>schedulingPolicy</code><br/>
 <em>
 <a href="#apps.kubeblocks.io/v1.SchedulingPolicy">
@@ -7977,52 +8047,81 @@ This field allows for customizing resource allocation (CPU, memory, etc.) for th
 Add new or override existing envs.</p>
 </td>
 </tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.InstanceUpdateStrategy">InstanceUpdateStrategy
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>)
+</p>
+<div>
+<p>InstanceUpdateStrategy defines fine-grained control over the spec update process of all instances.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
 <tr>
 <td>
-<code>volumes</code><br/>
+<code>type</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#volume-v1-core">
-[]Kubernetes core/v1.Volume
+<a href="#apps.kubeblocks.io/v1.InstanceUpdateStrategyType">
+InstanceUpdateStrategyType
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines Volumes to override.
-Add new or override existing volumes.</p>
+<p>Indicates the type of the update strategy.
+Default is RollingUpdate.</p>
 </td>
 </tr>
 <tr>
 <td>
-<code>volumeMounts</code><br/>
+<code>rollingUpdate</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#volumemount-v1-core">
-[]Kubernetes core/v1.VolumeMount
+<a href="#apps.kubeblocks.io/v1.RollingUpdate">
+RollingUpdate
 </a>
 </em>
 </td>
 <td>
 <em>(Optional)</em>
-<p>Defines VolumeMounts to override.
-Add new or override existing volume mounts of the first container in the Pod.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>volumeClaimTemplates</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.ClusterComponentVolumeClaimTemplate">
-[]ClusterComponentVolumeClaimTemplate
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines VolumeClaimTemplates to override.
-Add new or override existing volume claim templates.</p>
+<p>Specifies how the rolling update should be applied.</p>
 </td>
 </tr>
 </tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.InstanceUpdateStrategyType">InstanceUpdateStrategyType
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.InstanceUpdateStrategy">InstanceUpdateStrategy</a>)
+</p>
+<div>
+<p>InstanceUpdateStrategyType is a string enumeration type that enumerates
+all possible update strategies for the KubeBlocks controllers.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;OnDelete&#34;</p></td>
+<td><p>OnDeleteStrategyType indicates that ordered rolling restarts are disabled. Instances are recreated
+when they are manually deleted.</p>
+</td>
+</tr><tr><td><p>&#34;RollingUpdate&#34;</p></td>
+<td><p>RollingUpdateStrategyType indicates that update will be
+applied to all Instances with respect to the workload
+ordering constraints.</p>
+</td>
+</tr></tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1.Issuer">Issuer
 </h3>
@@ -8171,31 +8270,6 @@ This field allows the system to locate and manage log files effectively.</p>
 </td>
 </tr>
 </tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1.MergedPolicy">MergedPolicy
-(<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ConfigTemplateExtension">ConfigTemplateExtension</a>)
-</p>
-<div>
-<p>MergedPolicy defines how to merge external imported templates into component templates.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>&#34;none&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;add&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;patch&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;replace&#34;</p></td>
-<td></td>
-</tr></tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1.MultipleClusterObjectCombinedOption">MultipleClusterObjectCombinedOption
 </h3>
@@ -8679,9 +8753,10 @@ string
 <h3 id="apps.kubeblocks.io/v1.PodUpdatePolicyType">PodUpdatePolicyType
 (<code>string</code> alias)</h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>)
 </p>
 <div>
+<p>PodUpdatePolicyType indicates how pods should be updated</p>
 </div>
 <table>
 <thead>
@@ -9040,9 +9115,6 @@ int32
 </table>
 <h3 id="apps.kubeblocks.io/v1.RerenderResourceType">RerenderResourceType
 (<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentConfigSpec">ComponentConfigSpec</a>)
-</p>
 <div>
 <p>RerenderResourceType defines the resource requirements for a component.</p>
 </div>
@@ -9139,6 +9211,61 @@ VarOption
 </td>
 <td>
 <em>(Optional)</em>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.RollingUpdate">RollingUpdate
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.InstanceUpdateStrategy">InstanceUpdateStrategy</a>)
+</p>
+<div>
+<p>RollingUpdate specifies how the rolling update should be applied.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>replicas</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/util/intstr#IntOrString">
+Kubernetes api utils intstr.IntOrString
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates the number of instances that should be updated during a rolling update.
+The remaining instances will remain untouched. This is helpful in defining how many instances
+should participate in the update process.
+Value can be an absolute number (ex: 5) or a percentage of desired instances (ex: 10%).
+Absolute number is calculated from percentage by rounding up.
+The default value is ComponentSpec.Replicas (i.e., update all instances).</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>maxUnavailable</code><br/>
+<em>
+<a href="https://pkg.go.dev/k8s.io/apimachinery/pkg/util/intstr#IntOrString">
+Kubernetes api utils intstr.IntOrString
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The maximum number of instances that can be unavailable during the update.
+Value can be an absolute number (ex: 5) or a percentage of desired instances (ex: 10%).
+Absolute number is calculated from percentage by rounding up. This can not be 0.
+Defaults to 1. The field applies to all instances. That means if there is any unavailable pod,
+it will be counted towards MaxUnavailable.</p>
 </td>
 </tr>
 </tbody>
@@ -11550,7 +11677,7 @@ Required when TLS is enabled.</p>
 (<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.Issuer">Issuer</a>)
 </p>
 <div>
-<p>TLSSecretRef defines Secret contains Tls certs</p>
+<p>TLSSecretRef defines the Secret that contains TLS certs.</p>
 </div>
 <table>
 <thead>
@@ -11560,6 +11687,19 @@ Required when TLS is enabled.</p>
 </tr>
 </thead>
 <tbody>
+<tr>
+<td>
+<code>namespace</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>The namespace where the secret is located.
+If not provided, the secret is assumed to be in the same namespace as the Cluster object.</p>
+</td>
+</tr>
 <tr>
 <td>
 <code>name</code><br/>
@@ -16456,6 +16596,30 @@ string
 <li><code>clusterDefinition.spec.componentDefs[*].podSpec.containers[*].volumeMounts</code> (deprecated)</li>
 </ul>
 <p>The value of <code>name</code> must match the <code>name</code> field of a volumeMount specified in the corresponding <code>volumeMounts</code> array.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>labels</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the labels for the PVC of the volume.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>annotations</code><br/>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Specifies the annotations for the PVC of the volume.</p>
 </td>
 </tr>
 <tr>
@@ -29194,7 +29358,7 @@ The default Concurrency is 100%.</p>
 <td>
 <code>podUpdatePolicy</code><br/>
 <em>
-<a href="#workloads.kubeblocks.io/v1.PodUpdatePolicyType">
+<a href="#apps.kubeblocks.io/v1.PodUpdatePolicyType">
 PodUpdatePolicyType
 </a>
 </em>
@@ -29213,19 +29377,35 @@ Default value is &ldquo;PreferInPlace&rdquo;</li>
 </tr>
 <tr>
 <td>
-<code>updateStrategy</code><br/>
+<code>instanceUpdateStrategy</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#statefulsetupdatestrategy-v1-apps">
-Kubernetes apps/v1.StatefulSetUpdateStrategy
+<a href="#apps.kubeblocks.io/v1.InstanceUpdateStrategy">
+InstanceUpdateStrategy
 </a>
 </em>
 </td>
 <td>
-<p>Indicates the StatefulSetUpdateStrategy that will be
-employed to update Pods in the InstanceSet when a revision is made to
-Template.
-UpdateStrategy.Type will be set to appsv1.OnDeleteStatefulSetStrategyType if MemberUpdateStrategy is not nil</p>
-<p>Note: This field will be removed in future version.</p>
+<em>(Optional)</em>
+<p>Provides fine-grained control over the spec update process of all instances.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>memberUpdateStrategy</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.MemberUpdateStrategy">
+MemberUpdateStrategy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Members(Pods) update strategy.</p>
+<ul>
+<li>serial: update Members one by one that guarantee minimum component unavailable time.</li>
+<li>parallel: force parallel</li>
+<li>bestEffortParallel: update Members in parallel that guarantee minimum component un-writable time.</li>
+</ul>
 </td>
 </tr>
 <tr>
@@ -29270,25 +29450,6 @@ map[string]string
 </tr>
 <tr>
 <td>
-<code>memberUpdateStrategy</code><br/>
-<em>
-<a href="#workloads.kubeblocks.io/v1.MemberUpdateStrategy">
-MemberUpdateStrategy
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Members(Pods) update strategy.</p>
-<ul>
-<li>serial: update Members one by one that guarantee minimum component unavailable time.</li>
-<li>bestEffortParallel: update Members in parallel that guarantee minimum component un-writable time.</li>
-<li>parallel: force parallel</li>
-</ul>
-</td>
-</tr>
-<tr>
-<td>
 <code>paused</code><br/>
 <em>
 bool
@@ -29297,20 +29458,6 @@ bool
 <td>
 <em>(Optional)</em>
 <p>Indicates that the InstanceSet is paused, meaning the reconciliation of this InstanceSet object will be paused.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>credential</code><br/>
-<em>
-<a href="#workloads.kubeblocks.io/v1.Credential">
-Credential
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Credential used to connect to DB engine</p>
 </td>
 </tr>
 </table>
@@ -29431,98 +29578,6 @@ Or, a NotReady reason with not ready instances encoded in the Message filed will
 PodUpdatePolicy is set to StrictInPlace but the pods cannot be updated in-place).</p>
 </td>
 </tr></tbody>
-</table>
-<h3 id="workloads.kubeblocks.io/v1.Credential">Credential
-</h3>
-<p>
-(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>username</code><br/>
-<em>
-<a href="#workloads.kubeblocks.io/v1.CredentialVar">
-CredentialVar
-</a>
-</em>
-</td>
-<td>
-<p>Defines the user&rsquo;s name for the credential.
-The corresponding environment variable will be KB_ITS_USERNAME.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>password</code><br/>
-<em>
-<a href="#workloads.kubeblocks.io/v1.CredentialVar">
-CredentialVar
-</a>
-</em>
-</td>
-<td>
-<p>Represents the user&rsquo;s password for the credential.
-The corresponding environment variable will be KB_ITS_PASSWORD.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="workloads.kubeblocks.io/v1.CredentialVar">CredentialVar
-</h3>
-<p>
-(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.Credential">Credential</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>value</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the value of the environment variable. This field is optional and defaults to an empty string.
-The value can include variable references in the format $(VAR_NAME) which will be expanded using previously defined environment variables in the container and any service environment variables.</p>
-<p>If a variable cannot be resolved, the reference in the input string will remain unchanged.
-Double $$ can be used to escape the $(VAR_NAME) syntax, resulting in a single $ and producing the string literal &ldquo;$(VAR_NAME)&rdquo;.
-Escaped references will not be expanded, regardless of whether the variable exists or not.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>valueFrom</code><br/>
-<em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#envvarsource-v1-core">
-Kubernetes core/v1.EnvVarSource
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the source for the environment variable&rsquo;s value. This field is optional and cannot be used if the &lsquo;Value&rsquo; field is not empty.</p>
-</td>
-</tr>
-</tbody>
 </table>
 <h3 id="workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec
 </h3>
@@ -29720,7 +29775,7 @@ The default Concurrency is 100%.</p>
 <td>
 <code>podUpdatePolicy</code><br/>
 <em>
-<a href="#workloads.kubeblocks.io/v1.PodUpdatePolicyType">
+<a href="#apps.kubeblocks.io/v1.PodUpdatePolicyType">
 PodUpdatePolicyType
 </a>
 </em>
@@ -29739,19 +29794,35 @@ Default value is &ldquo;PreferInPlace&rdquo;</li>
 </tr>
 <tr>
 <td>
-<code>updateStrategy</code><br/>
+<code>instanceUpdateStrategy</code><br/>
 <em>
-<a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#statefulsetupdatestrategy-v1-apps">
-Kubernetes apps/v1.StatefulSetUpdateStrategy
+<a href="#apps.kubeblocks.io/v1.InstanceUpdateStrategy">
+InstanceUpdateStrategy
 </a>
 </em>
 </td>
 <td>
-<p>Indicates the StatefulSetUpdateStrategy that will be
-employed to update Pods in the InstanceSet when a revision is made to
-Template.
-UpdateStrategy.Type will be set to appsv1.OnDeleteStatefulSetStrategyType if MemberUpdateStrategy is not nil</p>
-<p>Note: This field will be removed in future version.</p>
+<em>(Optional)</em>
+<p>Provides fine-grained control over the spec update process of all instances.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>memberUpdateStrategy</code><br/>
+<em>
+<a href="#workloads.kubeblocks.io/v1.MemberUpdateStrategy">
+MemberUpdateStrategy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Members(Pods) update strategy.</p>
+<ul>
+<li>serial: update Members one by one that guarantee minimum component unavailable time.</li>
+<li>parallel: force parallel</li>
+<li>bestEffortParallel: update Members in parallel that guarantee minimum component un-writable time.</li>
+</ul>
 </td>
 </tr>
 <tr>
@@ -29796,25 +29867,6 @@ map[string]string
 </tr>
 <tr>
 <td>
-<code>memberUpdateStrategy</code><br/>
-<em>
-<a href="#workloads.kubeblocks.io/v1.MemberUpdateStrategy">
-MemberUpdateStrategy
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Members(Pods) update strategy.</p>
-<ul>
-<li>serial: update Members one by one that guarantee minimum component unavailable time.</li>
-<li>bestEffortParallel: update Members in parallel that guarantee minimum component un-writable time.</li>
-<li>parallel: force parallel</li>
-</ul>
-</td>
-</tr>
-<tr>
-<td>
 <code>paused</code><br/>
 <em>
 bool
@@ -29823,20 +29875,6 @@ bool
 <td>
 <em>(Optional)</em>
 <p>Indicates that the InstanceSet is paused, meaning the reconciliation of this InstanceSet object will be paused.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>credential</code><br/>
-<em>
-<a href="#workloads.kubeblocks.io/v1.Credential">
-Credential
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Credential used to connect to DB engine</p>
 </td>
 </tr>
 </tbody>
@@ -30317,30 +30355,6 @@ Action
 </td>
 </tr>
 </tbody>
-</table>
-<h3 id="workloads.kubeblocks.io/v1.PodUpdatePolicyType">PodUpdatePolicyType
-(<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>&#34;PreferInPlace&#34;</p></td>
-<td><p>PreferInPlacePodUpdatePolicyType indicates that we will first attempt an in-place upgrade of the Pod.
-If that fails, it will fall back to the ReCreate, where pod will be recreated.</p>
-</td>
-</tr><tr><td><p>&#34;StrictInPlace&#34;</p></td>
-<td><p>StrictInPlacePodUpdatePolicyType indicates that only allows in-place upgrades.
-Any attempt to modify other fields will be rejected.</p>
-</td>
-</tr></tbody>
 </table>
 <h3 id="workloads.kubeblocks.io/v1.RoleUpdateMechanism">RoleUpdateMechanism
 (<code>string</code> alias)</h3>

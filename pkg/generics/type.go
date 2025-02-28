@@ -31,11 +31,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
 )
 
@@ -111,11 +110,6 @@ var OpsDefinitionSignature = func(_ opsv1alpha1.OpsDefinition, _ *opsv1alpha1.Op
 }
 var OpsRequestSignature = func(_ opsv1alpha1.OpsRequest, _ *opsv1alpha1.OpsRequest, _ opsv1alpha1.OpsRequestList, _ *opsv1alpha1.OpsRequestList) {
 }
-var ConfigConstraintSignature = func(_ appsv1beta1.ConfigConstraint, _ *appsv1beta1.ConfigConstraint, _ appsv1beta1.ConfigConstraintList, _ *appsv1beta1.ConfigConstraintList) {
-}
-var ConfigurationSignature = func(_ appsv1alpha1.Configuration, _ *appsv1alpha1.Configuration, _ appsv1alpha1.ConfigurationList, _ *appsv1alpha1.ConfigurationList) {
-}
-
 var BackupPolicyTemplateSignature = func(_ dpv1alpha1.BackupPolicyTemplate, _ *dpv1alpha1.BackupPolicyTemplate, _ dpv1alpha1.BackupPolicyTemplateList, _ *dpv1alpha1.BackupPolicyTemplateList) {
 }
 var BackupPolicySignature = func(_ dpv1alpha1.BackupPolicy, _ *dpv1alpha1.BackupPolicy, _ dpv1alpha1.BackupPolicyList, _ *dpv1alpha1.BackupPolicyList) {
@@ -134,6 +128,15 @@ var StorageProviderSignature = func(_ dpv1alpha1.StorageProvider, _ *dpv1alpha1.
 }
 
 var AddonSignature = func(_ extensionsv1alpha1.Addon, _ *extensionsv1alpha1.Addon, _ extensionsv1alpha1.AddonList, _ *extensionsv1alpha1.AddonList) {
+}
+
+var ParametersDefinitionSignature = func(_ parametersv1alpha1.ParametersDefinition, _ *parametersv1alpha1.ParametersDefinition, _ parametersv1alpha1.ParametersDefinitionList, _ *parametersv1alpha1.ParametersDefinitionList) {
+}
+var ParameterSignature = func(_ parametersv1alpha1.Parameter, _ *parametersv1alpha1.Parameter, _ parametersv1alpha1.ParameterList, _ *parametersv1alpha1.ParameterList) {
+}
+var ParamConfigRendererSignature = func(_ parametersv1alpha1.ParamConfigRenderer, _ *parametersv1alpha1.ParamConfigRenderer, _ parametersv1alpha1.ParamConfigRendererList, _ *parametersv1alpha1.ParamConfigRendererList) {
+}
+var ComponentParameterSignature = func(_ parametersv1alpha1.ComponentParameter, _ *parametersv1alpha1.ComponentParameter, _ parametersv1alpha1.ComponentParameterList, _ *parametersv1alpha1.ComponentParameterList) {
 }
 
 func ToGVK(object client.Object) schema.GroupVersionKind {

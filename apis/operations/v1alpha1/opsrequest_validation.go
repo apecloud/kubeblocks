@@ -139,8 +139,6 @@ func (r *OpsRequest) ValidateOps(ctx context.Context,
 		return r.validateVolumeExpansion(ctx, k8sClient, cluster)
 	case RestartType:
 		return r.validateRestart(cluster)
-	case ReconfiguringType:
-		return r.validateReconfigure(ctx, k8sClient, cluster)
 	case SwitchoverType:
 		return r.validateSwitchover(cluster)
 	case ExposeType:
@@ -243,61 +241,6 @@ func (r *OpsRequest) validateVerticalScaling(cluster *appsv1.Cluster) error {
 		}
 	}
 	return r.checkComponentExistence(cluster, compOpsList)
-}
-
-// validateVerticalScaling validate api is legal when spec.type is VerticalScaling
-func (r *OpsRequest) validateReconfigure(ctx context.Context,
-	k8sClient client.Client,
-	cluster *appsv1.Cluster) error {
-	if len(r.Spec.Reconfigures) == 0 {
-		return notEmptyError("spec.reconfigures")
-	}
-	for _, reconfigure := range r.Spec.Reconfigures {
-		if err := r.validateReconfigureParams(ctx, k8sClient, cluster, &reconfigure); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (r *OpsRequest) validateReconfigureParams(ctx context.Context,
-	k8sClient client.Client,
-	cluster *appsv1.Cluster,
-	reconfigure *Reconfigure) error {
-	if cluster.Spec.GetComponentByName(reconfigure.ComponentName) == nil {
-		return fmt.Errorf("component %s not found", reconfigure.ComponentName)
-	}
-	for _, configuration := range reconfigure.Configurations {
-		cmObj, err := r.getConfigMap(ctx, k8sClient, fmt.Sprintf("%s-%s-%s", r.Spec.GetClusterName(), reconfigure.ComponentName, configuration.Name))
-		if err != nil {
-			return err
-		}
-		for _, key := range configuration.Keys {
-			// check add file
-			if _, ok := cmObj.Data[key.Key]; !ok && key.FileContent == "" {
-				return errors.Errorf("key %s not found in configmap %s", key.Key, configuration.Name)
-			}
-			if key.FileContent == "" && len(key.Parameters) == 0 {
-				return errors.New("key.fileContent and key.parameters cannot be empty at the same time")
-			}
-		}
-	}
-	return nil
-}
-
-func (r *OpsRequest) getConfigMap(ctx context.Context,
-	k8sClient client.Client,
-	cmName string) (*corev1.ConfigMap, error) {
-	cmObj := &corev1.ConfigMap{}
-	cmKey := client.ObjectKey{
-		Namespace: r.Namespace,
-		Name:      cmName,
-	}
-
-	if err := k8sClient.Get(ctx, cmKey, cmObj); err != nil {
-		return nil, err
-	}
-	return cmObj, nil
 }
 
 // compareRequestsAndLimits compares the resource requests and limits
@@ -520,13 +463,6 @@ func (r *OpsRequest) validateVolumeExpansion(ctx context.Context, cli client.Cli
 	compOpsList := make([]ComponentOps, len(volumeExpansionList))
 	for i, v := range volumeExpansionList {
 		compOpsList[i] = v.ComponentOps
-		var instanceNames []string
-		for j := range v.Instances {
-			instanceNames = append(instanceNames, v.Instances[j].Name)
-		}
-		if err := r.checkInstanceTemplate(cluster, v.ComponentOps, instanceNames); err != nil {
-			return err
-		}
 	}
 	if err := r.checkComponentExistence(cluster, compOpsList); err != nil {
 		return err
@@ -629,30 +565,19 @@ func (r *OpsRequest) checkVolumesAllowExpansion(ctx context.Context, cli client.
 		isShardingComponent bool
 	}
 
-	vols := make(map[string]map[string]Entity)
 	// component name/ sharding name -> vct name -> entity
-	getKey := func(componentName string, templateName string) string {
-		templateKey := ""
-		if templateName != "" {
-			templateKey = "." + templateName
-		}
-		return fmt.Sprintf("%s%s", componentName, templateKey)
-	}
-	setVols := func(vcts []OpsRequestVolumeClaimTemplate, componentName, templateName string) {
+	vols := make(map[string]map[string]Entity)
+	setVols := func(vcts []OpsRequestVolumeClaimTemplate, componentName string) {
 		for _, vct := range vcts {
-			key := getKey(componentName, templateName)
-			if _, ok := vols[key]; !ok {
-				vols[key] = make(map[string]Entity)
+			if _, ok := vols[componentName]; !ok {
+				vols[componentName] = make(map[string]Entity)
 			}
-			vols[key][vct.Name] = Entity{false, nil, false, vct.Storage, false}
+			vols[componentName][vct.Name] = Entity{false, nil, false, vct.Storage, false}
 		}
 	}
 
 	for _, comp := range r.Spec.VolumeExpansionList {
-		setVols(comp.VolumeClaimTemplates, comp.ComponentOps.ComponentName, "")
-		for _, ins := range comp.Instances {
-			setVols(ins.VolumeClaimTemplates, comp.ComponentOps.ComponentName, ins.Name)
-		}
+		setVols(comp.VolumeClaimTemplates, comp.ComponentOps.ComponentName)
 	}
 	fillVol := func(vct appsv1.ClusterComponentVolumeClaimTemplate, key string, isShardingComp bool) {
 		e, ok := vols[key][vct.Name]
@@ -665,18 +590,11 @@ func (r *OpsRequest) checkVolumesAllowExpansion(ctx context.Context, cli client.
 		vols[key][vct.Name] = e
 	}
 	fillCompVols := func(compSpec appsv1.ClusterComponentSpec, componentName string, isShardingComp bool) {
-		key := getKey(componentName, "")
-		if _, ok := vols[key]; !ok {
+		if _, ok := vols[componentName]; !ok {
 			return // ignore not-exist component
 		}
 		for _, vct := range compSpec.VolumeClaimTemplates {
-			fillVol(vct, key, isShardingComp)
-		}
-		for _, ins := range compSpec.Instances {
-			key = getKey(componentName, ins.Name)
-			for _, vct := range ins.VolumeClaimTemplates {
-				fillVol(vct, key, isShardingComp)
-			}
+			fillVol(vct, componentName, isShardingComp)
 		}
 	}
 	// traverse the spec to update volumes

@@ -21,6 +21,7 @@ KubeBlocks 是 Kubernetes 原生 operator，可通过 Helm、 kubectl 应用 YAM
 
 - 请确保您安装和卸载 KubeBlocks 使用的方式保持一致，例如，如果您使用 Helm 安装 KubeBlocks，卸载时也需使用 Helm。
 - 请确保您已安装 [kubectl](https://kubernetes.io/docs/tasks/tools/)，[Helm](https://helm.sh/docs/intro/install/) 或 [kbcli](./install-kbcli.md)。
+- 请确保您已安装 Snapshot Controller。如果尚未安装，请按照 [安装 Snapshot Controller](#安装-kubeblocks) 部分中的步骤安装。
 
 :::
 
@@ -55,7 +56,69 @@ KubeBlocks 是 Kubernetes 原生 operator，可通过 Helm、 kubectl 应用 YAM
 	</tr>
 </table>
 
-## 安装步骤
+## 安装 Snapshot Controller
+
+SnapshotController 是一个 Kubernetes 组件，用于管理 CSI 卷快照，可让用户创建、恢复和删除持久卷 (PV) 的快照。KubeBlocks DataProtection 控制器会使用 Snapshot Controller 来为数据库创建快照备份。
+
+如果您的 Kubernetes 集群没有以下 CRD，说明您可能没有部署 Snapshot Controller。
+
+```bash
+kubectl get crd volumesnapshotclasses.snapshot.storage.k8s.io
+kubectl get crd volumesnapshots.snapshot.storage.k8s.io
+kubectl get crd volumesnapshotcontents.snapshot.storage.k8s.io
+```
+
+:::note
+
+如果您确定不需要使用快照备份功能, 可以只安装SnapshotController CRD, 跳过后续步骤。
+
+```bash
+# v8.2.0 is the latest version of the external-snapshotter, you can replace it with the version you need.
+kubectl create -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/v8.2.0/client/config/crd/snapshot.storage.k8s.io_volumesnapshotclasses.yaml
+kubectl create -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/v8.2.0/client/config/crd/snapshot.storage.k8s.io_volumesnapshots.yaml
+kubectl create -f https://raw.githubusercontent.com/kubernetes-csi/external-snapshotter/v8.2.0/client/config/crd/snapshot.storage.k8s.io_volumesnapshotcontents.yaml
+```
+
+:::
+
+### 第 1 步：部署 Snapshot Controller
+
+可以通过 Helm 或者 kubectl 安装 Snapshot Controller。以下演示如何使用 Helm 安装：
+
+```bash
+helm repo add piraeus-charts https://piraeus.io/helm-charts/
+helm repo update
+# Update the namespace to an appropriate value for your environment (e.g. kb-system)
+helm install snapshot-controller piraeus-charts/snapshot-controller -n kb-system --create-namespace
+```
+
+如需更多信息，请参阅 [Snapshot Controller Configuration](https://artifacthub.io/packages/helm/piraeus-charts/snapshot-controller#configuration)。
+
+### 第 2 步：验证 Snapshot Controller 是否安装成功
+
+检查 snapshot-controller Pod 是否正在运行：
+
+```bash
+kubectl get pods -n kb-system | grep snapshot-controller
+```
+
+<details>
+
+<summary>Output</summary>
+
+```bash
+snapshot-controller-xxxx-yyyy   1/1   Running   0   30s
+```
+
+</details>
+
+如果该 Pod 处于 CrashLoopBackOff 状态，请查看日志：
+
+```bash
+kubectl logs -n kb-system deployment/snapshot-controller
+```
+
+## 安装KubeBlocks
 
 <Tabs>
 
@@ -81,7 +144,7 @@ KubeBlocks 是 Kubernetes 原生 operator，可通过 Helm、 kubectl 应用 YAM
    ```bash
    # 将 <VERSION> 替换为您选择的版本
    kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/<VERSION>/kubeblocks_crds.yaml
-   
+
    # 示例:如果版本是 v0.9.2
    kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/v0.9.2/kubeblocks_crds.yaml
    ```
@@ -146,7 +209,7 @@ KubeBlocks 是 Kubernetes 原生 operator，可通过 Helm、 kubectl 应用 YAM
    ```bash
    # 将 <VERSION> 替换为您选择的版本
    kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/<VERSION>/kubeblocks_crds.yaml
-   
+
    # 示例:如果版本是 v0.9.2
    kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/v0.9.2/kubeblocks_crds.yaml
    ```
@@ -160,11 +223,11 @@ KubeBlocks 是 Kubernetes 原生 operator，可通过 Helm、 kubectl 应用 YAM
    # 示例:如果版本是 v0.9.2
    kubectl create -f https://github.com/apecloud/kubeblocks/releases/download/v0.9.2/kubeblocks.yaml
    ```
-   
+
    :::note
-   
+
    请确保创建 CRDs 和安装 KubeBlocks 时使用相同版本以避免兼容性问题。
-   
+
    :::
 
 </TabItem>

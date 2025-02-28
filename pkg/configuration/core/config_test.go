@@ -22,17 +22,17 @@ package core
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"sort"
 	"strings"
 	"testing"
 
-	"github.com/StudioSol/set"
 	"github.com/bhmj/jsonslice"
 	"github.com/stretchr/testify/require"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/util"
 )
 
@@ -72,7 +72,7 @@ func TestConfigMapConfig(t *testing.T) {
 	cfg, err := NewConfigLoader(CfgOption{
 		Type:    CfgCmType,
 		Log:     log.FromContext(context.Background()),
-		CfgType: appsv1beta1.Ini,
+		CfgType: parametersv1alpha1.Ini,
 		ConfigResource: &ConfigResource{
 			CfgKey: client.ObjectKey{
 				Name:      "xxxx",    // set cm name
@@ -88,7 +88,7 @@ func TestConfigMapConfig(t *testing.T) {
 	})
 
 	require.Nil(t, err)
-	log.Log.Info("cfg option: %v", cfg.Option)
+	log.Log.Info(fmt.Sprintf("cfg option: %v", cfg.Option))
 
 	require.Equal(t, cfg.fileCount, 2)
 	require.NotNil(t, cfg.getConfigObject(NewCfgOptions("my.cnf")))
@@ -153,8 +153,7 @@ func TestConfigMapConfig(t *testing.T) {
 func TestGenerateVisualizedParamsList(t *testing.T) {
 	type args struct {
 		configPatch  *ConfigPatchInfo
-		formatConfig *appsv1beta1.FileFormatConfig
-		sets         *set.LinkedHashSetString
+		formatConfig *parametersv1alpha1.FileFormatConfig
 	}
 
 	var (
@@ -204,9 +203,9 @@ func TestGenerateVisualizedParamsList(t *testing.T) {
 			configPatch: &ConfigPatchInfo{
 				IsModify:     true,
 				UpdateConfig: map[string][]byte{"key": testUpdatedParams}},
-			formatConfig: &appsv1beta1.FileFormatConfig{
-				Format: appsv1beta1.Ini,
-				FormatterAction: appsv1beta1.FormatterAction{IniConfig: &appsv1beta1.IniConfig{
+			formatConfig: &parametersv1alpha1.FileFormatConfig{
+				Format: parametersv1alpha1.Ini,
+				FormatterAction: parametersv1alpha1.FormatterAction{IniConfig: &parametersv1alpha1.IniConfig{
 					SectionName: "mysqld",
 				}},
 			},
@@ -233,9 +232,9 @@ func TestGenerateVisualizedParamsList(t *testing.T) {
 				IsModify:  true,
 				AddConfig: map[string]interface{}{"key": testJSON},
 			},
-			formatConfig: &appsv1beta1.FileFormatConfig{
-				Format: appsv1beta1.Ini,
-				FormatterAction: appsv1beta1.FormatterAction{IniConfig: &appsv1beta1.IniConfig{
+			formatConfig: &parametersv1alpha1.FileFormatConfig{
+				Format: parametersv1alpha1.Ini,
+				FormatterAction: parametersv1alpha1.FormatterAction{IniConfig: &parametersv1alpha1.IniConfig{
 					SectionName: "mysqld",
 				}},
 			},
@@ -259,9 +258,9 @@ func TestGenerateVisualizedParamsList(t *testing.T) {
 				IsModify:     true,
 				DeleteConfig: map[string]interface{}{"key": testJSON},
 			},
-			formatConfig: &appsv1beta1.FileFormatConfig{
-				Format: appsv1beta1.Ini,
-				FormatterAction: appsv1beta1.FormatterAction{IniConfig: &appsv1beta1.IniConfig{
+			formatConfig: &parametersv1alpha1.FileFormatConfig{
+				Format: parametersv1alpha1.Ini,
+				FormatterAction: parametersv1alpha1.FormatterAction{IniConfig: &parametersv1alpha1.IniConfig{
 					SectionName: "mysqld",
 				}},
 			},
@@ -281,12 +280,26 @@ func TestGenerateVisualizedParamsList(t *testing.T) {
 	}}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := GenerateVisualizedParamsList(tt.args.configPatch, tt.args.formatConfig, tt.args.sets)
+			got := GenerateVisualizedParamsList(tt.args.configPatch, ToV1ConfigDescription(resolveKey(tt.args.configPatch), tt.args.formatConfig))
 			sortParams(got)
 			sortParams(tt.want)
 			require.Equal(t, got, tt.want)
 		})
 	}
+}
+
+func resolveKey(patch *ConfigPatchInfo) []string {
+	var keys []string
+	if len(patch.AddConfig) != 0 {
+		keys = append(keys, util.ToSet(patch.AddConfig).AsSlice()...)
+	}
+	if len(patch.UpdateConfig) != 0 {
+		keys = append(keys, util.ToSet(patch.UpdateConfig).AsSlice()...)
+	}
+	if len(patch.DeleteConfig) != 0 {
+		keys = append(keys, util.ToSet(patch.DeleteConfig).AsSlice()...)
+	}
+	return keys
 }
 
 func sortParams(param []VisualizedParam) {

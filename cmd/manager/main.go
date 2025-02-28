@@ -52,22 +52,22 @@ import (
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
-	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
 	experimentalv1alpha1 "github.com/apecloud/kubeblocks/apis/experimental/v1alpha1"
 	extensionsv1alpha1 "github.com/apecloud/kubeblocks/apis/extensions/v1alpha1"
 	opsv1alpha1 "github.com/apecloud/kubeblocks/apis/operations/v1alpha1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	tracev1 "github.com/apecloud/kubeblocks/apis/trace/v1"
 	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	workloadsv1alpha1 "github.com/apecloud/kubeblocks/apis/workloads/v1alpha1"
 	appscontrollers "github.com/apecloud/kubeblocks/controllers/apps"
 	"github.com/apecloud/kubeblocks/controllers/apps/cluster"
 	"github.com/apecloud/kubeblocks/controllers/apps/component"
-	"github.com/apecloud/kubeblocks/controllers/apps/configuration"
 	experimentalcontrollers "github.com/apecloud/kubeblocks/controllers/experimental"
 	extensionscontrollers "github.com/apecloud/kubeblocks/controllers/extensions"
 	k8scorecontrollers "github.com/apecloud/kubeblocks/controllers/k8score"
 	opscontrollers "github.com/apecloud/kubeblocks/controllers/operations"
+	parameterscontrollers "github.com/apecloud/kubeblocks/controllers/parameters"
 	tracecontrollers "github.com/apecloud/kubeblocks/controllers/trace"
 	workloadscontrollers "github.com/apecloud/kubeblocks/controllers/workloads"
 	"github.com/apecloud/kubeblocks/pkg/constant"
@@ -96,6 +96,7 @@ const (
 	extensionsFlagKey   flagName = "extensions"
 	experimentalFlagKey flagName = "experimental"
 	traceFlagKey        flagName = "trace"
+	parametersFlagKey   flagName = "parameters"
 
 	multiClusterKubeConfigFlagKey       flagName = "multi-cluster-kubeconfig"
 	multiClusterContextsFlagKey         flagName = "multi-cluster-contexts"
@@ -112,7 +113,6 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(appsv1alpha1.AddToScheme(scheme))
-	utilruntime.Must(appsv1beta1.AddToScheme(scheme))
 	utilruntime.Must(appsv1.AddToScheme(scheme))
 	utilruntime.Must(opsv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(dpv1alpha1.AddToScheme(scheme))
@@ -124,6 +124,7 @@ func init() {
 	utilruntime.Must(experimentalv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(tracev1.AddToScheme(scheme))
 
+	utilruntime.Must(parametersv1alpha1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 
 	viper.SetConfigName("config")                          // name of config file (without extension)
@@ -189,6 +190,8 @@ func setupFlags() {
 		"Enable the experimental controller manager.")
 	flag.Bool(traceFlagKey.String(), false,
 		"Enable the trace controller manager.")
+	flag.Bool(parametersFlagKey.String(), true,
+		"Enable the parameters controller manager.")
 
 	flag.String(multiClusterKubeConfigFlagKey.String(), "", "Paths to the kubeconfig for multi-cluster accessing.")
 	flag.String(multiClusterContextsFlagKey.String(), "", "Kube contexts the manager will talk to.")
@@ -481,33 +484,6 @@ func main() {
 			setupLog.Error(err, "unable to create controller", "controller", "Event")
 			os.Exit(1)
 		}
-
-		if err = (&configuration.ConfigConstraintReconciler{
-			Client:   mgr.GetClient(),
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("config-constraint-controller"),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "ConfigConstraint")
-			os.Exit(1)
-		}
-
-		if err = (&configuration.ConfigurationReconciler{
-			Client:   client,
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("configuration-controller"),
-		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "Configuration")
-			os.Exit(1)
-		}
-
-		if err = (&configuration.ReconfigureReconciler{
-			Client:   client,
-			Scheme:   mgr.GetScheme(),
-			Recorder: mgr.GetEventRecorderFor("reconfigure-controller"),
-		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "ReconfigureRequest")
-			os.Exit(1)
-		}
 	}
 
 	if viper.GetBool(workloadsFlagKey.viperName()) {
@@ -607,6 +583,63 @@ func main() {
 		}
 		if err = (&appsv1.ServiceDescriptor{}).SetupWebhookWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "ServiceDescriptor")
+			os.Exit(1)
+		}
+	}
+
+	if viper.GetBool(parametersFlagKey.viperName()) {
+		if err = (&parameterscontrollers.ParametersDefinitionReconciler{
+			Client:   mgr.GetClient(),
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("parameters-definition-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "ParametersDefinition")
+			os.Exit(1)
+		}
+		if err = (&parameterscontrollers.ParameterReconciler{
+			Client:   client,
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("parameter-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "Parameter")
+			os.Exit(1)
+		}
+		if err = (&parameterscontrollers.ComponentDrivenParameterReconciler{
+			Client:   client,
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("component-driven-parameter-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "ComponentParameter")
+			os.Exit(1)
+		}
+		if err = (&parameterscontrollers.ComponentParameterReconciler{
+			Client:   client,
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("component-parameter-controller"),
+		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "ComponentParameter")
+			os.Exit(1)
+		}
+		if err = (&parameterscontrollers.ReconfigureReconciler{
+			Client:   client,
+			Scheme:   mgr.GetScheme(),
+			Recorder: mgr.GetEventRecorderFor("reconfigure-controller"),
+		}).SetupWithManager(mgr, multiClusterMgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "ReconfigureRequest")
+			os.Exit(1)
+		}
+		if err = (&parameterscontrollers.ParametersDefinitionReconciler{
+			Client: mgr.GetClient(),
+			Scheme: mgr.GetScheme(),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "ParametersDefinition")
+			os.Exit(1)
+		}
+		if err = (&parameterscontrollers.ParameterDrivenConfigRenderReconciler{
+			Client: mgr.GetClient(),
+			Scheme: mgr.GetScheme(),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "ParamConfigRenderer")
 			os.Exit(1)
 		}
 	}

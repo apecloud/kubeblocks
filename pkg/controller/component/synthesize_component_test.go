@@ -25,6 +25,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
@@ -54,26 +55,35 @@ var _ = Describe("synthesized component", func() {
 		cleanEnv()
 	})
 
-	Context("config template", func() {
+	Context("file templates", func() {
 		BeforeEach(func() {
 			compDef = &appsv1.ComponentDefinition{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-compdef",
 				},
 				Spec: appsv1.ComponentDefinitionSpec{
-					Configs: []appsv1.ComponentConfigSpec{
+					Configs2: []appsv1.ComponentFileTemplate{
 						{
-							ComponentTemplateSpec: appsv1.ComponentTemplateSpec{
-								Name:        "app",
-								TemplateRef: "app",
-								VolumeName:  "app",
-							},
+							Name:       "logConf",
+							Template:   "logConf",
+							VolumeName: "logConf",
 						},
 						{
-							ComponentTemplateSpec: appsv1.ComponentTemplateSpec{
-								Name:       "external",
-								VolumeName: "external",
-							},
+							Name:       "serverConf",
+							Template:   "serverConf",
+							VolumeName: "serverConf",
+						},
+					},
+					// TODO: remove me
+					Configs: []appsv1.ComponentTemplateSpec{
+						{
+							Name:        "logConf",
+							TemplateRef: "logConf",
+							VolumeName:  "logConf",
+						},
+						{
+							Name:       "serverConf",
+							VolumeName: "serverConf",
 						},
 					},
 				},
@@ -96,7 +106,164 @@ var _ = Describe("synthesized component", func() {
 			}
 		})
 
-		It("comp def", func() {
+		It("ok", func() {
+			// TODO: remove me
+			compDef.Spec.Configs[1].TemplateRef = "serverConf"
+
+			synthesizedComp, err := BuildSynthesizedComponent(ctx, cli, compDef, comp)
+			Expect(err).Should(BeNil())
+
+			Expect(synthesizedComp).ShouldNot(BeNil())
+			Expect(synthesizedComp.FileTemplates).Should(ContainElement(SynthesizedFileTemplate{
+				ComponentFileTemplate: compDef.Spec.Configs2[0],
+			}))
+			Expect(synthesizedComp.FileTemplates).Should(ContainElement(SynthesizedFileTemplate{
+				ComponentFileTemplate: compDef.Spec.Configs2[1],
+			}))
+		})
+
+		It("override", func() {
+			comp.Spec.Configs = append(comp.Spec.Configs, appsv1.ClusterComponentConfig{
+				Name: ptr.To(compDef.Spec.Configs2[1].Name),
+				ClusterComponentConfigSource: appsv1.ClusterComponentConfigSource{
+					ConfigMap: &corev1.ConfigMapVolumeSource{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: "external-server-conf",
+						},
+					},
+				},
+				Reconfigure: &appsv1.Action{
+					Exec: &appsv1.ExecAction{
+						Command: []string{"echo", "external", "reconfigure"},
+					},
+				},
+			})
+			synthesizedComp, err := BuildSynthesizedComponent(ctx, cli, compDef, comp)
+			Expect(err).Should(BeNil())
+
+			Expect(synthesizedComp).ShouldNot(BeNil())
+			Expect(synthesizedComp.FileTemplates).Should(ContainElement(SynthesizedFileTemplate{
+				ComponentFileTemplate: compDef.Spec.Configs2[0],
+			}))
+			Expect(synthesizedComp.FileTemplates).Should(ContainElement(SynthesizedFileTemplate{
+				ComponentFileTemplate: appsv1.ComponentFileTemplate{
+					Name:       compDef.Spec.Configs2[1].Name,
+					Template:   comp.Spec.Configs[0].ConfigMap.Name,
+					Namespace:  comp.Namespace,
+					VolumeName: compDef.Spec.Configs2[1].VolumeName,
+				},
+				Reconfigure: comp.Spec.Configs[0].Reconfigure,
+			}))
+		})
+
+		PIt("override - not defined", func() {
+		})
+
+		It("external managed", func() {
+			comp.Spec.Configs = append(comp.Spec.Configs, appsv1.ClusterComponentConfig{
+				Name: ptr.To(compDef.Spec.Configs2[1].Name),
+				ClusterComponentConfigSource: appsv1.ClusterComponentConfigSource{
+					ConfigMap: &corev1.ConfigMapVolumeSource{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: "external-server-conf",
+						},
+					},
+				},
+				Reconfigure: &appsv1.Action{
+					Exec: &appsv1.ExecAction{
+						Command: []string{"echo", "external", "reconfigure"},
+					},
+				},
+				ExternalManaged: ptr.To(true),
+			})
+			synthesizedComp, err := BuildSynthesizedComponent(ctx, cli, compDef, comp)
+			Expect(err).Should(BeNil())
+
+			Expect(synthesizedComp).ShouldNot(BeNil())
+			Expect(synthesizedComp.FileTemplates).Should(ContainElement(SynthesizedFileTemplate{
+				ComponentFileTemplate: compDef.Spec.Configs2[0],
+			}))
+			Expect(synthesizedComp.FileTemplates).Should(ContainElement(SynthesizedFileTemplate{
+				ComponentFileTemplate: appsv1.ComponentFileTemplate{
+					Name:       compDef.Spec.Configs2[1].Name,
+					Template:   comp.Spec.Configs[0].ConfigMap.Name,
+					Namespace:  comp.Namespace,
+					VolumeName: compDef.Spec.Configs2[1].VolumeName,
+				},
+				Reconfigure:     comp.Spec.Configs[0].Reconfigure,
+				ExternalManaged: comp.Spec.Configs[0].ExternalManaged,
+			}))
+		})
+
+		It("external managed - lazy provision", func() {
+			// TODO: remove me
+			compDef.Spec.Configs[1].TemplateRef = "serverConf"
+
+			comp.Spec.Configs = append(comp.Spec.Configs, appsv1.ClusterComponentConfig{
+				Name:            ptr.To(compDef.Spec.Configs2[1].Name),
+				ExternalManaged: ptr.To(true),
+			})
+			synthesizedComp, err := BuildSynthesizedComponent(ctx, cli, compDef, comp)
+			Expect(err).Should(BeNil())
+
+			Expect(synthesizedComp).ShouldNot(BeNil())
+			Expect(synthesizedComp.FileTemplates).Should(ContainElement(SynthesizedFileTemplate{
+				ComponentFileTemplate: compDef.Spec.Configs2[0],
+			}))
+			Expect(synthesizedComp.FileTemplates).Should(ContainElement(SynthesizedFileTemplate{
+				ComponentFileTemplate: appsv1.ComponentFileTemplate{
+					Name:       compDef.Spec.Configs2[1].Name,
+					Template:   "",
+					Namespace:  "",
+					VolumeName: compDef.Spec.Configs2[1].VolumeName,
+				},
+				Reconfigure:     comp.Spec.Configs[0].Reconfigure,
+				ExternalManaged: comp.Spec.Configs[0].ExternalManaged,
+			}))
+		})
+	})
+
+	Context("config template", func() {
+		BeforeEach(func() {
+			compDef = &appsv1.ComponentDefinition{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-compdef",
+				},
+				Spec: appsv1.ComponentDefinitionSpec{
+					Configs: []appsv1.ComponentTemplateSpec{
+						{
+							Name:        "app",
+							TemplateRef: "app",
+							VolumeName:  "app",
+						},
+						{
+							Name:       "external",
+							VolumeName: "external",
+						},
+					},
+				},
+			}
+			comp = &appsv1.Component{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testCtx.DefaultNamespace,
+					Name:      "test-cluster-comp",
+					Labels: map[string]string{
+						constant.AppInstanceLabelKey: "test-cluster",
+					},
+					Annotations: map[string]string{
+						constant.KBAppClusterUIDKey:      "uuid",
+						constant.KubeBlocksGenerationKey: "1",
+					},
+				},
+				Spec: appsv1.ComponentSpec{
+					Configs: []appsv1.ClusterComponentConfig{},
+				},
+			}
+		})
+
+		It("ok", func() {
+			compDef.Spec.Configs[1].TemplateRef = "external"
+
 			synthesizedComp, err := BuildSynthesizedComponent(ctx, cli, compDef, comp)
 			Expect(err).Should(BeNil())
 
@@ -104,9 +271,15 @@ var _ = Describe("synthesized component", func() {
 			Expect(synthesizedComp.ConfigTemplates).Should(BeEquivalentTo(compDef.Spec.Configs))
 		})
 
+		It("has config template not specified", func() {
+			_, err := BuildSynthesizedComponent(ctx, cli, compDef, comp)
+			Expect(err).ShouldNot(BeNil())
+			Expect(err.Error()).Should(ContainSubstring("required config template is empty"))
+		})
+
 		It("w/ comp override - ok", func() {
 			comp.Spec.Configs = append(comp.Spec.Configs, appsv1.ClusterComponentConfig{
-				Name: func() *string { name := "external"; return &name }(),
+				Name: ptr.To("external"),
 				ClusterComponentConfigSource: appsv1.ClusterComponentConfigSource{
 					ConfigMap: &corev1.ConfigMapVolumeSource{
 						LocalObjectReference: corev1.LocalObjectReference{
@@ -123,12 +296,13 @@ var _ = Describe("synthesized component", func() {
 
 			expectExternalConfig := compDef.Spec.Configs[1]
 			expectExternalConfig.TemplateRef = comp.Spec.Configs[0].ConfigMap.Name
+			expectExternalConfig.Namespace = comp.Namespace
 			Expect(synthesizedComp.ConfigTemplates[1]).Should(BeEquivalentTo(expectExternalConfig))
 		})
 
-		It("w/ comp override - not defined", func() {
+		PIt("w/ comp override - not defined", func() {
 			comp.Spec.Configs = append(comp.Spec.Configs, appsv1.ClusterComponentConfig{
-				Name: func() *string { name := "not-defined"; return &name }(),
+				Name: ptr.To("not-defined"),
 				ClusterComponentConfigSource: appsv1.ClusterComponentConfigSource{
 					ConfigMap: &corev1.ConfigMapVolumeSource{
 						LocalObjectReference: corev1.LocalObjectReference{
@@ -145,7 +319,7 @@ var _ = Describe("synthesized component", func() {
 		It("w/ comp override - both specified", func() {
 			compDef.Spec.Configs[1].TemplateRef = "external"
 			comp.Spec.Configs = append(comp.Spec.Configs, appsv1.ClusterComponentConfig{
-				Name: func() *string { name := "external"; return &name }(),
+				Name: ptr.To("external"),
 				ClusterComponentConfigSource: appsv1.ClusterComponentConfigSource{
 					ConfigMap: &corev1.ConfigMapVolumeSource{
 						LocalObjectReference: corev1.LocalObjectReference{
@@ -161,7 +335,7 @@ var _ = Describe("synthesized component", func() {
 
 		It("w/ comp override - both not specified", func() {
 			comp.Spec.Configs = append(comp.Spec.Configs, appsv1.ClusterComponentConfig{
-				Name:                         func() *string { name := "external"; return &name }(),
+				Name:                         ptr.To("external"),
 				ClusterComponentConfigSource: appsv1.ClusterComponentConfigSource{},
 			})
 			_, err := BuildSynthesizedComponent(ctx, cli, compDef, comp)

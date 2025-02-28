@@ -1,0 +1,27 @@
+{{- if .Values.rbac.enabled }}
+# Additional role that is required for addons. Can be defined by user.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "kubeblocks.fullname" . }}-rbac-manager-additional-role
+  labels:
+    {{- include "kubeblocks.labels" . | nindent 4 }}
+rules:
+# rabbitmq/patroni needs this
+- apiGroups:
+  - ""
+  resources:
+  - endpoints
+  verbs:
+  - get
+  - patch
+  - update
+  - create
+  - list
+  - watch
+  - delete
+# user defined rules
+{{- with .Values.rbac.additionalPolicyRules }}
+{{ toYaml . }}
+{{- end }}
+{{- end }}

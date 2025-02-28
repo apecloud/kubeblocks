@@ -83,7 +83,6 @@ addons=(
     "postgresql"
     "qdrant"
     "redis"
-    "snapshot-controller"
 )
 
 for addon in "${addons[@]}"; do

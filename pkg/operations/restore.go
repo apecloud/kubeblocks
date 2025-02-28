@@ -142,13 +142,19 @@ func (r RestoreOpsHandler) restoreClusterFromBackup(reqCtx intctrlutil.RequestCt
 		return nil, intctrlutil.NewFatalError("spec.restore can not be empty")
 	}
 	backupName := restoreSpec.BackupName
-
+	backupNamespace := restoreSpec.BackupNamespace
+	if backupNamespace == "" {
+		backupNamespace = opsRequest.Namespace
+	}
 	// check if the backup exists
 	backup := &dpv1alpha1.Backup{}
 	if err := cli.Get(reqCtx.Ctx, client.ObjectKey{
 		Name:      backupName,
-		Namespace: opsRequest.Namespace,
+		Namespace: backupNamespace,
 	}, backup); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil, intctrlutil.NewFatalError(fmt.Sprintf("backup %s not found in namespace %s", backupName, backupNamespace))
+		}
 		return nil, err
 	}
 
@@ -203,6 +209,7 @@ func (r RestoreOpsHandler) getClusterObjFromBackup(backup *dpv1alpha1.Backup, op
 	}
 	cluster.Annotations[constant.RestoreFromBackupAnnotationKey] = restoreAnnotation
 	cluster.Name = opsRequest.Spec.GetClusterName()
+	cluster.Namespace = opsRequest.Namespace
 	// Reset cluster services
 	var services []appsv1.ClusterService
 	for i := range cluster.Spec.Services {
@@ -225,7 +232,56 @@ func (r RestoreOpsHandler) getClusterObjFromBackup(backup *dpv1alpha1.Backup, op
 		cluster.Spec.ComponentSpecs[i].OfflineInstances = nil
 	}
 	r.rebuildShardAccountSecrets(cluster)
+	r.normalizeSchedulePolicy(cluster, cluster.Spec.SchedulingPolicy)
+	for i := range cluster.Spec.ComponentSpecs {
+		r.normalizeSchedulePolicy(cluster, cluster.Spec.ComponentSpecs[i].SchedulingPolicy)
+	}
+	for i := range cluster.Spec.Shardings {
+		r.normalizeSchedulePolicy(cluster, cluster.Spec.Shardings[i].Template.SchedulingPolicy)
+	}
 	return cluster, nil
+}
+
+// normalizeSchedulePolicy normalizes the schedule policy of the new cluster.
+func (r RestoreOpsHandler) normalizeSchedulePolicy(cluster *appsv1.Cluster, schedulePolicy *appsv1.SchedulingPolicy) {
+	if schedulePolicy == nil {
+		return
+	}
+	updateLabelSelector := func(selector *metav1.LabelSelector) {
+		if _, ok := selector.MatchLabels[constant.AppInstanceLabelKey]; ok {
+			selector.MatchLabels[constant.AppInstanceLabelKey] = cluster.Name
+		}
+		for i := range selector.MatchExpressions {
+			matchExpression := &selector.MatchExpressions[i]
+			if matchExpression.Key == constant.AppInstanceLabelKey {
+				matchExpression.Values = []string{cluster.Name}
+			}
+		}
+	}
+	for i := range schedulePolicy.TopologySpreadConstraints {
+		updateLabelSelector(schedulePolicy.TopologySpreadConstraints[i].LabelSelector)
+	}
+	if schedulePolicy.Affinity == nil {
+		return
+	}
+	updatePodAffinityTerm := func(pats []corev1.PodAffinityTerm, wpats []corev1.WeightedPodAffinityTerm) {
+		for i := range pats {
+			podAffinityTerm := &pats[i]
+			updateLabelSelector(podAffinityTerm.LabelSelector)
+		}
+		for i := range wpats {
+			wpat := &wpats[i]
+			updateLabelSelector(wpat.PodAffinityTerm.LabelSelector)
+		}
+	}
+	if schedulePolicy.Affinity.PodAntiAffinity != nil {
+		updatePodAffinityTerm(schedulePolicy.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
+			schedulePolicy.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution)
+	}
+	if schedulePolicy.Affinity.PodAffinity != nil {
+		updatePodAffinityTerm(schedulePolicy.Affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
+			schedulePolicy.Affinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution)
+	}
 }
 
 func (r RestoreOpsHandler) rebuildShardAccountSecrets(cluster *appsv1.Cluster) {

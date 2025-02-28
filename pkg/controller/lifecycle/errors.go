@@ -26,6 +26,7 @@ import (
 var (
 	ErrActionNotDefined     = errors.New("action is not defined")
 	ErrActionNotImplemented = errors.New("action is not implemented")
+	ErrPreconditionFailed   = errors.New("action precondition is not matched")
 	ErrActionInProgress     = errors.New("action is in progress")
 	ErrActionBusy           = errors.New("action is busy")
 	ErrActionTimedOut       = errors.New("action timed-out")
@@ -34,7 +35,7 @@ var (
 )
 
 func IgnoreNotDefined(err error) error {
-	if err == ErrActionNotDefined {
+	if errors.Is(err, ErrActionNotDefined) {
 		return nil
 	}
 	return err

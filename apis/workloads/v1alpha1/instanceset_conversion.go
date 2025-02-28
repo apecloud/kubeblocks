@@ -22,7 +22,9 @@ package v1alpha1
 import (
 	"github.com/jinzhu/copier"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/json"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/conversion"
 
 	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
@@ -43,6 +45,7 @@ func (r *InstanceSet) ConvertTo(dstRaw conversion.Hub) error {
 	if err := copier.Copy(&dst.Spec, &r.Spec); err != nil {
 		return err
 	}
+	r.changesToInstanceSet(dst)
 
 	// status
 	if err := copier.Copy(&dst.Status, &r.Status); err != nil {
@@ -67,6 +70,7 @@ func (r *InstanceSet) ConvertFrom(srcRaw conversion.Hub) error {
 	if err := copier.Copy(&r.Spec, &src.Spec); err != nil {
 		return err
 	}
+	r.changesFromInstanceSet(src)
 
 	// status
 	if err := copier.Copy(&r.Status, &src.Status); err != nil {
@@ -80,21 +84,12 @@ func (r *InstanceSet) ConvertFrom(srcRaw conversion.Hub) error {
 }
 
 func (r *InstanceSet) incrementConvertTo(dstRaw metav1.Object) error {
-	if r.Spec.RoleProbe == nil && r.Spec.UpdateStrategy == nil {
+	if r.Spec.RoleProbe == nil && r.Spec.Credential == nil {
 		return nil
 	}
-	// changed
 	instanceConvert := instanceSetConverter{
-		RoleProbe:      r.Spec.RoleProbe,
-		UpdateStrategy: r.Spec.UpdateStrategy,
-	}
-
-	if r.Spec.UpdateStrategy == nil || r.Spec.UpdateStrategy.MemberUpdateStrategy == nil {
-		// 1. set default update strategy
-		updateStrategy := SerialUpdateStrategy
-		instanceConvert.UpdateStrategy = &InstanceUpdateStrategy{
-			MemberUpdateStrategy: &updateStrategy,
-		}
+		RoleProbe:  r.Spec.RoleProbe,
+		Credential: r.Spec.Credential,
 	}
 	bytes, err := json.Marshal(instanceConvert)
 	if err != nil {
@@ -120,11 +115,73 @@ func (r *InstanceSet) incrementConvertFrom(srcRaw metav1.Object) error {
 	}
 	delete(srcRaw.GetAnnotations(), kbIncrementConverterAK)
 	r.Spec.RoleProbe = instanceConvert.RoleProbe
-	r.Spec.UpdateStrategy = instanceConvert.UpdateStrategy
+	r.Spec.Credential = instanceConvert.Credential
 	return nil
 }
 
 type instanceSetConverter struct {
-	RoleProbe      *RoleProbe              `json:"roleProbe,omitempty"`
-	UpdateStrategy *InstanceUpdateStrategy `json:"updateStrategy,omitempty"`
+	RoleProbe  *RoleProbe  `json:"roleProbe,omitempty"`
+	Credential *Credential `json:"credential,omitempty"`
+}
+
+func (r *InstanceSet) changesToInstanceSet(its *workloadsv1.InstanceSet) {
+	// changed:
+	// spec
+	//   updateStrategy.partition -> instanceUpdateStrategy.rollingUpdate.replicas
+	//   updateStrategy.maxUnavailable -> instanceUpdateStrategy.rollingUpdate.maxUnavailable
+	//   updateStrategy.memberUpdateStrategy -> memberUpdateStrategy
+	if its.Spec.InstanceUpdateStrategy == nil {
+		its.Spec.InstanceUpdateStrategy = &workloadsv1.InstanceUpdateStrategy{}
+	}
+	initRollingUpdate := func() {
+		if its.Spec.InstanceUpdateStrategy.RollingUpdate == nil {
+			its.Spec.InstanceUpdateStrategy.RollingUpdate = &workloadsv1.RollingUpdate{}
+		}
+	}
+	setMemberUpdateStrategy := func(strategy *MemberUpdateStrategy) {
+		if strategy == nil {
+			return
+		}
+		its.Spec.MemberUpdateStrategy = (*workloadsv1.MemberUpdateStrategy)(strategy)
+	}
+	setMemberUpdateStrategy(r.Spec.MemberUpdateStrategy)
+	if r.Spec.UpdateStrategy != nil {
+		setMemberUpdateStrategy(r.Spec.UpdateStrategy.MemberUpdateStrategy)
+		if r.Spec.UpdateStrategy.Partition != nil {
+			initRollingUpdate()
+			replicas := intstr.FromInt32(*r.Spec.UpdateStrategy.Partition)
+			its.Spec.InstanceUpdateStrategy.RollingUpdate.Replicas = &replicas
+		}
+		if r.Spec.UpdateStrategy.MaxUnavailable != nil {
+			initRollingUpdate()
+			its.Spec.InstanceUpdateStrategy.RollingUpdate.MaxUnavailable = r.Spec.UpdateStrategy.MaxUnavailable
+		}
+	}
+}
+
+func (r *InstanceSet) changesFromInstanceSet(its *workloadsv1.InstanceSet) {
+	// changed:
+	// spec
+	//   updateStrategy.partition -> instanceUpdateStrategy.rollingUpdate.replicas
+	//   updateStrategy.maxUnavailable -> instanceUpdateStrategy.rollingUpdate.maxUnavailable
+	//   updateStrategy.memberUpdateStrategy -> memberUpdateStrategy
+	r.Spec.MemberUpdateStrategy = (*MemberUpdateStrategy)(its.Spec.MemberUpdateStrategy)
+	if its.Spec.InstanceUpdateStrategy == nil {
+		return
+	}
+	if its.Spec.InstanceUpdateStrategy.RollingUpdate == nil {
+		return
+	}
+	if r.Spec.UpdateStrategy == nil {
+		r.Spec.UpdateStrategy = &InstanceUpdateStrategy{
+			MemberUpdateStrategy: r.Spec.MemberUpdateStrategy,
+		}
+	}
+	if its.Spec.InstanceUpdateStrategy.RollingUpdate.Replicas != nil {
+		partition, _ := intstr.GetScaledValueFromIntOrPercent(its.Spec.InstanceUpdateStrategy.RollingUpdate.Replicas, int(*its.Spec.Replicas), false)
+		r.Spec.UpdateStrategy.Partition = pointer.Int32(int32(partition))
+	}
+	if its.Spec.InstanceUpdateStrategy.RollingUpdate.MaxUnavailable != nil {
+		r.Spec.UpdateStrategy.MaxUnavailable = its.Spec.InstanceUpdateStrategy.RollingUpdate.MaxUnavailable
+	}
 }

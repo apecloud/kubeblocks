@@ -96,6 +96,11 @@ func (builder *ComponentBuilder) SetPodUpdatePolicy(policy *appsv1.PodUpdatePoli
 	return builder
 }
 
+func (builder *ComponentBuilder) SetInstanceUpdateStrategy(strategy *appsv1.InstanceUpdateStrategy) *ComponentBuilder {
+	builder.get().Spec.InstanceUpdateStrategy = strategy
+	return builder
+}
+
 func (builder *ComponentBuilder) SetResources(resources corev1.ResourceRequirements) *ComponentBuilder {
 	builder.get().Spec.Resources = resources
 	return builder

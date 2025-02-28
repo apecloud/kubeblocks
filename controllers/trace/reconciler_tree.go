@@ -41,14 +41,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	tracev1 "github.com/apecloud/kubeblocks/apis/trace/v1"
 	workloadsAPI "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/controllers/apps/cluster"
 	"github.com/apecloud/kubeblocks/controllers/apps/component"
-	"github.com/apecloud/kubeblocks/controllers/apps/configuration"
 	"github.com/apecloud/kubeblocks/controllers/dataprotection"
+	"github.com/apecloud/kubeblocks/controllers/parameters"
 	"github.com/apecloud/kubeblocks/controllers/workloads"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
@@ -65,24 +65,24 @@ type ReconcilerTree interface {
 type reconcilerFunc func(client.Client, record.EventRecorder) reconcile.Reconciler
 
 var reconcilerFuncMap = map[tracev1.ObjectType]reconcilerFunc{
-	objectType(kbappsv1.SchemeGroupVersion.String(), kbappsv1.ClusterKind):             newClusterReconciler,
-	objectType(kbappsv1.SchemeGroupVersion.String(), kbappsv1.ComponentKind):           newComponentReconciler,
-	objectType(corev1.SchemeGroupVersion.String(), constant.SecretKind):                newSecretReconciler,
-	objectType(corev1.SchemeGroupVersion.String(), constant.ServiceKind):               newServiceReconciler,
-	objectType(workloadsAPI.SchemeGroupVersion.String(), workloadsAPI.InstanceSetKind): newInstanceSetReconciler,
-	objectType(corev1.SchemeGroupVersion.String(), constant.ConfigMapKind):             newConfigMapReconciler,
-	objectType(corev1.SchemeGroupVersion.String(), constant.PersistentVolumeClaimKind): newPVCReconciler,
-	objectType(rbacv1.SchemeGroupVersion.String(), constant.RoleBindingKind):           newRoleBindingReconciler,
-	objectType(corev1.SchemeGroupVersion.String(), constant.ServiceAccountKind):        newSAReconciler,
-	objectType(batchv1.SchemeGroupVersion.String(), constant.JobKind):                  newJobReconciler,
-	objectType(dpv1alpha1.SchemeGroupVersion.String(), types.BackupKind):               newBackupReconciler,
-	objectType(dpv1alpha1.SchemeGroupVersion.String(), types.RestoreKind):              newRestoreReconciler,
-	objectType(appsv1alpha1.SchemeGroupVersion.String(), constant.ConfigurationKind):   newConfigurationReconciler,
-	objectType(corev1.SchemeGroupVersion.String(), constant.PodKind):                   newPodReconciler,
-	objectType(appsv1.SchemeGroupVersion.String(), constant.StatefulSetKind):           newSTSReconciler,
-	objectType(vsv1.SchemeGroupVersion.String(), constant.VolumeSnapshotKind):          newVolumeSnapshotV1Reconciler,
-	objectType(vsv1beta1.SchemeGroupVersion.String(), constant.VolumeSnapshotKind):     newVolumeSnapshotV1Beta1Reconciler,
-	objectType(corev1.SchemeGroupVersion.String(), constant.PersistentVolumeKind):      newPVReconciler,
+	objectType(kbappsv1.SchemeGroupVersion.String(), kbappsv1.ClusterKind):                      newClusterReconciler,
+	objectType(kbappsv1.SchemeGroupVersion.String(), kbappsv1.ComponentKind):                    newComponentReconciler,
+	objectType(corev1.SchemeGroupVersion.String(), constant.SecretKind):                         newSecretReconciler,
+	objectType(corev1.SchemeGroupVersion.String(), constant.ServiceKind):                        newServiceReconciler,
+	objectType(workloadsAPI.SchemeGroupVersion.String(), workloadsAPI.InstanceSetKind):          newInstanceSetReconciler,
+	objectType(corev1.SchemeGroupVersion.String(), constant.ConfigMapKind):                      newConfigMapReconciler,
+	objectType(corev1.SchemeGroupVersion.String(), constant.PersistentVolumeClaimKind):          newPVCReconciler,
+	objectType(rbacv1.SchemeGroupVersion.String(), constant.RoleBindingKind):                    newRoleBindingReconciler,
+	objectType(corev1.SchemeGroupVersion.String(), constant.ServiceAccountKind):                 newSAReconciler,
+	objectType(batchv1.SchemeGroupVersion.String(), constant.JobKind):                           newJobReconciler,
+	objectType(dpv1alpha1.SchemeGroupVersion.String(), types.BackupKind):                        newBackupReconciler,
+	objectType(dpv1alpha1.SchemeGroupVersion.String(), types.RestoreKind):                       newRestoreReconciler,
+	objectType(parametersv1alpha1.SchemeGroupVersion.String(), constant.ComponentParameterKind): newConfigurationReconciler,
+	objectType(corev1.SchemeGroupVersion.String(), constant.PodKind):                            newPodReconciler,
+	objectType(appsv1.SchemeGroupVersion.String(), constant.StatefulSetKind):                    newSTSReconciler,
+	objectType(vsv1.SchemeGroupVersion.String(), constant.VolumeSnapshotKind):                   newVolumeSnapshotV1Reconciler,
+	objectType(vsv1beta1.SchemeGroupVersion.String(), constant.VolumeSnapshotKind):              newVolumeSnapshotV1Beta1Reconciler,
+	objectType(corev1.SchemeGroupVersion.String(), constant.PersistentVolumeKind):               newPVReconciler,
 }
 
 type reconcilerTree struct {
@@ -179,7 +179,7 @@ func newComponentReconciler(cli client.Client, recorder record.EventRecorder) re
 }
 
 func newConfigurationReconciler(cli client.Client, recorder record.EventRecorder) reconcile.Reconciler {
-	return &configuration.ConfigurationReconciler{
+	return &parameters.ComponentParameterReconciler{
 		Client:   cli,
 		Scheme:   cli.Scheme(),
 		Recorder: recorder,

@@ -422,21 +422,22 @@ func (r *BackupReconciler) prepareBackupRequest(
 	request.BackupPolicy = backupPolicy
 	request.BackupMethod = backupMethod
 
+	if !snapshotVolumes {
+		// if use volume snapshot, ignore backup repo
+		if err = HandleBackupRepo(request); err != nil {
+			return nil, err
+		}
+	}
+
 	switch dpv1alpha1.BackupType(request.GetBackupType()) {
 	case dpv1alpha1.BackupTypeIncremental:
+		// requires backup repo info to validate parent backup
 		request, err = prepare4Incremental(request)
 	case dpv1alpha1.BackupTypeContinuous:
 		err = validateContinuousBackup(backup, reqCtx, request.Client)
 	}
 	if err != nil {
 		return nil, err
-	}
-
-	if !snapshotVolumes {
-		// if use volume snapshot, ignore backup repo
-		if err = HandleBackupRepo(request); err != nil {
-			return nil, err
-		}
 	}
 
 	return request, nil
@@ -978,8 +979,11 @@ func validateContinuousBackup(backup *dpv1alpha1.Backup, reqCtx intctrlutil.Requ
 
 // prepare4Incremental prepares for incremental backup
 func prepare4Incremental(request *dpbackup.Request) (*dpbackup.Request, error) {
+	if request.BackupRepo == nil {
+		return nil, fmt.Errorf("backupRepo for incremental backup can't be empty")
+	}
 	// get and validate parent backup
-	parentBackup, err := GetParentBackup(request.Ctx, request.Client, request.Backup, request.BackupMethod)
+	parentBackup, err := GetParentBackup(request.Ctx, request.Client, request.Backup, request.BackupMethod, request.BackupRepo.Name)
 	if err != nil {
 		return nil, err
 	}

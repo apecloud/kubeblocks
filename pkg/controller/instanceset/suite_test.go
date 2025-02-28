@@ -136,11 +136,6 @@ var (
 			},
 		},
 	}
-
-	credential = workloads.Credential{
-		Username: workloads.CredentialVar{Value: "foo"},
-		Password: workloads.CredentialVar{Value: "bar"},
-	}
 )
 
 func makePodUpdateReady(newRevision string, roleful bool, pods ...*corev1.Pod) {
@@ -170,7 +165,6 @@ func mockCompressedInstanceTemplates(ns, name string) (*corev1.ConfigMap, string
 		{
 			Name:     "bar0",
 			Replicas: func() *int32 { r := int32(1); return &r }(),
-			Image:    func() *string { i := "busybox"; return &i }(),
 		},
 	}
 	templateByte, err := json.Marshal(instances)

@@ -34,8 +34,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
 	dpv1alpha1 "github.com/apecloud/kubeblocks/apis/dataprotection/v1alpha1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	tracev1 "github.com/apecloud/kubeblocks/apis/trace/v1"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
@@ -271,9 +271,9 @@ var _ = Describe("desired_state_handler test", func() {
 					return apierrors.NewNotFound(kbappsv1.Resource(kbappsv1.ComponentKind), objKey.Name)
 				}).AnyTimes()
 			k8sMock.EXPECT().
-				Get(gomock.Any(), gomock.Any(), &appsv1alpha1.Configuration{}, gomock.Any()).
-				DoAndReturn(func(_ context.Context, objKey client.ObjectKey, obj *appsv1alpha1.Configuration, _ ...client.GetOption) error {
-					return apierrors.NewNotFound(appsv1alpha1.Resource(constant.ConfigurationKind), objKey.Name)
+				Get(gomock.Any(), gomock.Any(), &parametersv1alpha1.ComponentParameter{}, gomock.Any()).
+				DoAndReturn(func(_ context.Context, objKey client.ObjectKey, obj *parametersv1alpha1.ComponentParameter, _ ...client.GetOption) error {
+					return apierrors.NewNotFound(parametersv1alpha1.Resource(constant.ComponentParameterKind), objKey.Name)
 				}).AnyTimes()
 			k8sMock.EXPECT().
 				Get(gomock.Any(), gomock.Any(), &corev1.ConfigMap{}, gomock.Any()).

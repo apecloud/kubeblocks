@@ -350,7 +350,6 @@ type ResourceMeta struct {
 	//
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MaxLength=256
-	// +kubebuilder:validation:Pattern:=`^/[a-z]([a-z0-9\-]*[a-z0-9])?$`
 	MountPoint string `json:"mountPoint"`
 
 	// SubPath specifies a path within the volume from which to mount.
@@ -990,6 +989,16 @@ type ClusterComponentVolumeClaimTemplate struct {
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
+	// Specifies the labels for the PVC of the volume.
+	//
+	// +optional
+	Labels map[string]string `json:"labels,omitempty"`
+
+	// Specifies the annotations for the PVC of the volume.
+	//
+	// +optional
+	Annotations map[string]string `json:"annotations,omitempty"`
+
 	// Defines the desired characteristics of a PersistentVolumeClaim that will be created for the volume
 	// with the mount name specified in the `name` field.
 	//
@@ -1003,7 +1012,9 @@ type ClusterComponentVolumeClaimTemplate struct {
 func (r *ClusterComponentVolumeClaimTemplate) toVolumeClaimTemplate() corev1.PersistentVolumeClaimTemplate {
 	return corev1.PersistentVolumeClaimTemplate{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: r.Name,
+			Name:        r.Name,
+			Labels:      r.Labels,
+			Annotations: r.Annotations,
 		},
 		Spec: r.Spec.ToV1PersistentVolumeClaimSpec(),
 	}

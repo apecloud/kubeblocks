@@ -18,6 +18,7 @@ package v1
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 const (
@@ -191,6 +192,16 @@ type ClusterComponentVolumeClaimTemplate struct {
 	//
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
+
+	// Specifies the labels for the PVC of the volume.
+	//
+	// +optional
+	Labels map[string]string `json:"labels,omitempty"`
+
+	// Specifies the annotations for the PVC of the volume.
+	//
+	// +optional
+	Annotations map[string]string `json:"annotations,omitempty"`
 
 	// Defines the desired characteristics of a PersistentVolumeClaim that will be created for the volume
 	// with the mount name specified in the `name` field.
@@ -452,25 +463,52 @@ type ProvisionSecretRef struct {
 	Password string `json:"password,omitempty"`
 }
 
-// ClusterComponentConfig represents a config with its source bound.
+// ClusterComponentConfig represents a configuration for a component.
 type ClusterComponentConfig struct {
 	// The name of the config.
 	//
+	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:Pattern:=`^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$`
 	// +optional
 	Name *string `json:"name,omitempty"`
 
-	// The source of the config.
+	// Variables are key-value pairs for dynamic configuration values that can be provided by the user.
+	//
+	// +optional
+	Variables map[string]string `json:"variables,omitempty"`
+
+	// The external source for the configuration.
 	ClusterComponentConfigSource `json:",inline"`
+
+	// The custom reconfigure action to reload the service configuration whenever changes to this config are detected.
+	//
+	// The container executing this action has access to following variables:
+	//
+	// - KB_CONFIG_FILES_CREATED: file1,file2...
+	// - KB_CONFIG_FILES_REMOVED: file1,file2...
+	// - KB_CONFIG_FILES_UPDATED: file1:checksum1,file2:checksum2...
+	//
+	// Note: This field is immutable once it has been set.
+	//
+	// +optional
+	Reconfigure *Action `json:"reconfigure,omitempty"`
+
+	// ExternalManaged indicates whether the configuration is managed by an external system.
+	// When set to true, the controller will use the user-provided template and reconfigure action,
+	// ignoring the default template and update behavior.
+	//
+	// +optional
+	ExternalManaged *bool `json:"externalManaged,omitempty"`
 }
 
-// ClusterComponentConfigSource represents the source of a config.
+// ClusterComponentConfigSource represents the source of a configuration for a component.
 type ClusterComponentConfigSource struct {
 	// ConfigMap source for the config.
 	//
 	// +optional
 	ConfigMap *corev1.ConfigMapVolumeSource `json:"configMap,omitempty"`
 
-	// TODO: support more diverse sources:
+	// TODO: additional fields can be added to support other types of sources in the future, such as:
 	// - Config template of other components within the same cluster
 	// - Config template of components from other clusters
 	// - Secret
@@ -488,6 +526,59 @@ const (
 	// If that fails, it will fall back to the ReCreate, where pod will be recreated.
 	PreferInPlacePodUpdatePolicyType PodUpdatePolicyType = "PreferInPlace"
 )
+
+// InstanceUpdateStrategy defines fine-grained control over the spec update process of all instances.
+type InstanceUpdateStrategy struct {
+	// Indicates the type of the update strategy.
+	// Default is RollingUpdate.
+	//
+	// +optional
+	Type InstanceUpdateStrategyType `json:"type,omitempty"`
+
+	// Specifies how the rolling update should be applied.
+	//
+	// +optional
+	RollingUpdate *RollingUpdate `json:"rollingUpdate,omitempty"`
+}
+
+// InstanceUpdateStrategyType is a string enumeration type that enumerates
+// all possible update strategies for the KubeBlocks controllers.
+//
+// +enum
+// +kubebuilder:validation:Enum={RollingUpdate,OnDelete}
+type InstanceUpdateStrategyType string
+
+const (
+	// RollingUpdateStrategyType indicates that update will be
+	// applied to all Instances with respect to the workload
+	// ordering constraints.
+	RollingUpdateStrategyType InstanceUpdateStrategyType = "RollingUpdate"
+	// OnDeleteStrategyType indicates that ordered rolling restarts are disabled. Instances are recreated
+	// when they are manually deleted.
+	OnDeleteStrategyType InstanceUpdateStrategyType = "OnDelete"
+)
+
+// RollingUpdate specifies how the rolling update should be applied.
+type RollingUpdate struct {
+	// Indicates the number of instances that should be updated during a rolling update.
+	// The remaining instances will remain untouched. This is helpful in defining how many instances
+	// should participate in the update process.
+	// Value can be an absolute number (ex: 5) or a percentage of desired instances (ex: 10%).
+	// Absolute number is calculated from percentage by rounding up.
+	// The default value is ComponentSpec.Replicas (i.e., update all instances).
+	//
+	// +optional
+	Replicas *intstr.IntOrString `json:"replicas,omitempty"`
+
+	// The maximum number of instances that can be unavailable during the update.
+	// Value can be an absolute number (ex: 5) or a percentage of desired instances (ex: 10%).
+	// Absolute number is calculated from percentage by rounding up. This can not be 0.
+	// Defaults to 1. The field applies to all instances. That means if there is any unavailable pod,
+	// it will be counted towards MaxUnavailable.
+	//
+	// +optional
+	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty"`
+}
 
 type SchedulingPolicy struct {
 	// If specified, the Pod will be dispatched by specified scheduler.
@@ -593,8 +684,14 @@ const (
 	IssuerUserProvided IssuerName = "UserProvided"
 )
 
-// TLSSecretRef defines Secret contains Tls certs
+// TLSSecretRef defines the Secret that contains TLS certs.
 type TLSSecretRef struct {
+	// The namespace where the secret is located.
+	// If not provided, the secret is assumed to be in the same namespace as the Cluster object.
+	//
+	// +optional
+	Namespace string `json:"namespace"`
+
 	// Name of the Secret that contains user-provided certificates.
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
@@ -655,11 +752,6 @@ type InstanceTemplate struct {
 	// +optional
 	Labels map[string]string `json:"labels,omitempty"`
 
-	// Specifies an override for the first container's image in the Pod.
-	//
-	// +optional
-	Image *string `json:"image,omitempty"`
-
 	// Specifies the scheduling policy for the Component.
 	//
 	// +optional
@@ -675,21 +767,6 @@ type InstanceTemplate struct {
 	// Add new or override existing envs.
 	// +optional
 	Env []corev1.EnvVar `json:"env,omitempty"`
-
-	// Defines Volumes to override.
-	// Add new or override existing volumes.
-	// +optional
-	Volumes []corev1.Volume `json:"volumes,omitempty"`
-
-	// Defines VolumeMounts to override.
-	// Add new or override existing volume mounts of the first container in the Pod.
-	// +optional
-	VolumeMounts []corev1.VolumeMount `json:"volumeMounts,omitempty"`
-
-	// Defines VolumeClaimTemplates to override.
-	// Add new or override existing volume claim templates.
-	// +optional
-	VolumeClaimTemplates []ClusterComponentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
 }
 
 // Range represents a range with a start and an end value.

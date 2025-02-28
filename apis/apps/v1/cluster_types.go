@@ -84,6 +84,7 @@ func init() {
 }
 
 // ClusterSpec defines the desired state of Cluster.
+// +kubebuilder:validation:XValidation:rule="!has(oldSelf.topology) || has(self.topology)", message="topology is required once set"
 type ClusterSpec struct {
 	// Specifies the name of the ClusterDefinition to use when creating a Cluster.
 	//
@@ -122,6 +123,7 @@ type ClusterSpec struct {
 	// It establishes the initial composition and structure of the Cluster and is intended for one-time configuration.
 	//
 	// +kubebuilder:validation:MaxLength=32
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="topology is immutable"
 	// +optional
 	Topology string `json:"topology,omitempty"`
 
@@ -436,6 +438,11 @@ type ClusterComponentSpec struct {
 	// +optional
 	PodUpdatePolicy *PodUpdatePolicyType `json:"podUpdatePolicy,omitempty"`
 
+	// Provides fine-grained control over the spec update process of all instances.
+	//
+	// +optional
+	InstanceUpdateStrategy *InstanceUpdateStrategy `json:"instanceUpdateStrategy,omitempty"`
+
 	// Allows for the customization of configuration values for each instance within a Component.
 	// An instance represent a single replica (Pod and associated K8s resources like PVCs, Services, and ConfigMaps).
 	// While instances typically share a common configuration as defined in the ClusterComponentSpec,
@@ -473,8 +480,6 @@ type ClusterComponentSpec struct {
 	//
 	// Setting instances to offline allows for a controlled scale-in process, preserving their data and maintaining
 	// ordinal consistency within the Cluster.
-	// Note that offline instances and their associated resources, such as PVCs, are not automatically deleted.
-	// The administrator must manually manage the cleanup and removal of these resources when they are no longer needed.
 	//
 	// +optional
 	OfflineInstances []string `json:"offlineInstances,omitempty"`

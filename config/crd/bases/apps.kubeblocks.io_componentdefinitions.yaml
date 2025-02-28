@@ -4233,36 +4233,6 @@ spec:
                   This field is immutable.
                 items:
                   properties:
-                    asEnvFrom:
-                      description: |-
-                        Specifies the containers to inject the ConfigMap parameters as environment variables.
-
-
-                        This is useful when application images accept parameters through environment variables and
-                        generate the final configuration file in the startup script based on these variables.
-
-
-                        This field allows users to specify a list of container names, and KubeBlocks will inject the environment
-                        variables converted from the ConfigMap into these designated containers. This provides a flexible way to
-                        pass the configuration items from the ConfigMap to the container without modifying the image.
-
-
-                        Deprecated: `asEnvFrom` has been deprecated since 0.9.0 and will be removed in 0.10.0.
-                        Use `injectEnvTo` instead.
-                      items:
-                        type: string
-                      type: array
-                      x-kubernetes-list-type: set
-                    asSecret:
-                      description: Whether to store the final rendered parameters
-                        as a secret.
-                      type: boolean
-                    constraintRef:
-                      description: Specifies the name of the referenced configuration
-                        constraints object.
-                      maxLength: 63
-                      pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
-                      type: string
                     defaultMode:
                       description: |-
                         The operator attempts to set default file permissions for scripts (0555) and configurations (0444).
@@ -4283,40 +4253,6 @@ spec:
                         Refers to documents of k8s.ConfigMapVolumeSource.defaultMode for more information.
                       format: int32
                       type: integer
-                    injectEnvTo:
-                      description: |-
-                        Specifies the containers to inject the ConfigMap parameters as environment variables.
-
-
-                        This is useful when application images accept parameters through environment variables and
-                        generate the final configuration file in the startup script based on these variables.
-
-
-                        This field allows users to specify a list of container names, and KubeBlocks will inject the environment
-                        variables converted from the ConfigMap into these designated containers. This provides a flexible way to
-                        pass the configuration items from the ConfigMap to the container without modifying the image.
-                      items:
-                        type: string
-                      type: array
-                      x-kubernetes-list-type: set
-                    keys:
-                      description: |-
-                        Specifies the configuration files within the ConfigMap that support dynamic updates.
-
-
-                        A configuration template (provided in the form of a ConfigMap) may contain templates for multiple
-                        configuration files.
-                        Each configuration file corresponds to a key in the ConfigMap.
-                        Some of these configuration files may support dynamic modification and reloading without requiring
-                        a pod restart.
-
-
-                        If empty or omitted, all configuration files in the ConfigMap are assumed to support dynamic updates,
-                        and ConfigConstraint applies to all keys.
-                      items:
-                        type: string
-                      type: array
-                      x-kubernetes-list-type: set
                     name:
                       description: Specifies the name of the configuration template.
                       maxLength: 63
@@ -4330,28 +4266,6 @@ spec:
                       maxLength: 63
                       pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
                       type: string
-                    reRenderResourceTypes:
-                      description: |-
-                        Specifies whether the configuration needs to be re-rendered after v-scale or h-scale operations to reflect changes.
-
-
-                        In some scenarios, the configuration may need to be updated to reflect the changes in resource allocation
-                        or cluster topology. Examples:
-
-
-                        - Redis: adjust maxmemory after v-scale operation.
-                        - MySQL: increase max connections after v-scale operation.
-                        - Zookeeper: update zoo.cfg with new node addresses after h-scale operation.
-                      items:
-                        description: RerenderResourceType defines the resource requirements
-                          for a component.
-                        enum:
-                        - vscale
-                        - hscale
-                        - tls
-                        type: string
-                      type: array
-                      x-kubernetes-list-type: set
                     templateRef:
                       description: Specifies the name of the referenced configuration
                         template ConfigMap object.
@@ -4373,6 +4287,66 @@ spec:
                 x-kubernetes-list-map-keys:
                 - name
                 x-kubernetes-list-type: map
+              configs2:
+                description: |-
+                  Specifies the config file templates and volume mount parameters used by the Component.
+
+
+                  This field specifies a list of templates that will be rendered into Component containers' config files.
+                  Each template is represented as a ConfigMap and may contain multiple config files, with each file being a key in the ConfigMap.
+
+
+                  This field is immutable.
+                items:
+                  properties:
+                    defaultMode:
+                      description: |-
+                        The operator attempts to set default file permissions (0444).
+
+
+                        Must be specified as an octal value between 0000 and 0777 (inclusive),
+                        or as a decimal value between 0 and 511 (inclusive).
+                        YAML supports both octal and decimal values for file permissions.
+
+
+                        Please note that this setting only affects the permissions of the files themselves.
+                        Directories within the specified path are not impacted by this setting.
+                        It's important to be aware that this setting might conflict with other options
+                        that influence the file mode, such as fsGroup.
+                        In such cases, the resulting file mode may have additional bits set.
+                        Refers to documents of k8s.ConfigMapVolumeSource.defaultMode for more information.
+                      format: int32
+                      type: integer
+                    name:
+                      description: Specifies the name of the template.
+                      maxLength: 63
+                      pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                      type: string
+                    namespace:
+                      default: default
+                      description: Specifies the namespace of the referenced template
+                        ConfigMap object.
+                      maxLength: 63
+                      pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
+                      type: string
+                    template:
+                      description: Specifies the name of the referenced template ConfigMap
+                        object.
+                      maxLength: 63
+                      pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                      type: string
+                    volumeName:
+                      description: |-
+                        Refers to the volume name of PodTemplate. The file produced through the template will be mounted to
+                        the corresponding volume. Must be a DNS_LABEL name.
+                        The volume name must be defined in podSpec.containers[*].volumeMounts.
+                      maxLength: 63
+                      pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
+                      type: string
+                  required:
+                  - name
+                  type: object
+                type: array
               description:
                 description: |-
                   Provides a brief and concise explanation of the Component's purpose, functionality, and any relevant details.
@@ -8329,6 +8303,9 @@ spec:
                   The purpose of this field is to automatically generate the necessary RBAC roles
                   for the Component based on the specified policy rules.
                   This ensures that the Pods in the Component has appropriate permissions to function.
+
+
+                  To prevent privilege escalation, only permissions already owned by KubeBlocks can be added here.
 
 
                   This field is immutable.
@@ -16041,6 +16018,63 @@ spec:
                 x-kubernetes-list-map-keys:
                 - name
                 x-kubernetes-list-type: map
+              scripts2:
+                description: |-
+                  Specifies groups of scripts, each provided via a ConfigMap, to be mounted as volumes in the container.
+                  These scripts can be executed during container startup or via specific actions.
+
+
+                  This field is immutable.
+                items:
+                  properties:
+                    defaultMode:
+                      description: |-
+                        The operator attempts to set default file permissions (0444).
+
+
+                        Must be specified as an octal value between 0000 and 0777 (inclusive),
+                        or as a decimal value between 0 and 511 (inclusive).
+                        YAML supports both octal and decimal values for file permissions.
+
+
+                        Please note that this setting only affects the permissions of the files themselves.
+                        Directories within the specified path are not impacted by this setting.
+                        It's important to be aware that this setting might conflict with other options
+                        that influence the file mode, such as fsGroup.
+                        In such cases, the resulting file mode may have additional bits set.
+                        Refers to documents of k8s.ConfigMapVolumeSource.defaultMode for more information.
+                      format: int32
+                      type: integer
+                    name:
+                      description: Specifies the name of the template.
+                      maxLength: 63
+                      pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                      type: string
+                    namespace:
+                      default: default
+                      description: Specifies the namespace of the referenced template
+                        ConfigMap object.
+                      maxLength: 63
+                      pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
+                      type: string
+                    template:
+                      description: Specifies the name of the referenced template ConfigMap
+                        object.
+                      maxLength: 63
+                      pattern: ^[a-z0-9]([a-z0-9\.\-]*[a-z0-9])?$
+                      type: string
+                    volumeName:
+                      description: |-
+                        Refers to the volume name of PodTemplate. The file produced through the template will be mounted to
+                        the corresponding volume. Must be a DNS_LABEL name.
+                        The volume name must be defined in podSpec.containers[*].volumeMounts.
+                      maxLength: 63
+                      pattern: ^[a-z]([a-z0-9\-]*[a-z0-9])?$
+                      type: string
+                  required:
+                  - name
+                  type: object
+                type: array
               serviceKind:
                 description: |-
                   Defines the type of well-known service protocol that the Component provides.

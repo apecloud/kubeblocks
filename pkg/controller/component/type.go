@@ -46,7 +46,8 @@ type SynthesizedComponent struct {
 	SidecarVars                      []kbappsv1.EnvVar                      // vars defined by sidecars
 	VolumeClaimTemplates             []corev1.PersistentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
 	LogConfigs                       []kbappsv1.LogConfig                   `json:"logConfigs,omitempty"`
-	ConfigTemplates                  []kbappsv1.ComponentConfigSpec         `json:"configTemplates,omitempty"`
+	FileTemplates                    []SynthesizedFileTemplate
+	ConfigTemplates                  []kbappsv1.ComponentTemplateSpec       `json:"configTemplates,omitempty"`
 	ScriptTemplates                  []kbappsv1.ComponentTemplateSpec       `json:"scriptTemplates,omitempty"`
 	TLSConfig                        *kbappsv1.TLSConfig                    `json:"tlsConfig"`
 	ServiceAccountName               string                                 `json:"serviceAccountName,omitempty"`
@@ -63,10 +64,11 @@ type SynthesizedComponent struct {
 	Instances                        []kbappsv1.InstanceTemplate            `json:"instances,omitempty"`
 	OfflineInstances                 []string                               `json:"offlineInstances,omitempty"`
 	Roles                            []kbappsv1.ReplicaRole                 `json:"roles,omitempty"`
-	UpdateStrategy                   *kbappsv1.UpdateStrategy               `json:"updateStrategy,omitempty"`
 	PodManagementPolicy              *appsv1.PodManagementPolicyType        `json:"podManagementPolicy,omitempty"`
 	ParallelPodManagementConcurrency *intstr.IntOrString                    `json:"parallelPodManagementConcurrency,omitempty"`
 	PodUpdatePolicy                  *kbappsv1.PodUpdatePolicyType          `json:"podUpdatePolicy,omitempty"`
+	UpdateStrategy                   *kbappsv1.UpdateStrategy               `json:"updateStrategy,omitempty"`
+	InstanceUpdateStrategy           *kbappsv1.InstanceUpdateStrategy       `json:"instanceUpdateStrategy,omitempty"`
 	PolicyRules                      []rbacv1.PolicyRule                    `json:"policyRules,omitempty"`
 	LifecycleActions                 *kbappsv1.ComponentLifecycleActions    `json:"lifecycleActions,omitempty"`
 	SystemAccounts                   []kbappsv1.SystemAccount               `json:"systemAccounts,omitempty"`
@@ -76,4 +78,11 @@ type SynthesizedComponent struct {
 	MinReadySeconds                  int32                                  `json:"minReadySeconds,omitempty"`
 	DisableExporter                  *bool                                  `json:"disableExporter,omitempty"`
 	Stop                             *bool
+}
+
+type SynthesizedFileTemplate struct {
+	kbappsv1.ComponentFileTemplate
+	Variables       map[string]string
+	Reconfigure     *kbappsv1.Action
+	ExternalManaged *bool
 }

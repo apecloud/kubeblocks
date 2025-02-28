@@ -25,6 +25,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/ptr"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 )
@@ -210,7 +211,7 @@ var (
 				},
 			},
 		},
-		UpdateStrategy: &[]appsv1.UpdateStrategy{appsv1.BestEffortParallelStrategy}[0],
+		UpdateStrategy: ptr.To(appsv1.BestEffortParallelStrategy),
 		Roles: []appsv1.ReplicaRole{
 			{
 				Name:                 "leader",
@@ -252,14 +253,11 @@ var (
 		},
 	}
 
-	DefaultCompDefConfigs = []appsv1.ComponentConfigSpec{
+	DefaultCompDefConfigs = []appsv1.ComponentTemplateSpec{
 		{
-			ComponentTemplateSpec: appsv1.ComponentTemplateSpec{
-				Name:        DefaultConfigSpecName,
-				TemplateRef: DefaultConfigSpecTplRef,
-				VolumeName:  DefaultConfigSpecVolumeName,
-			},
-			ConfigConstraintRef: DefaultConfigSpecConstraintRef,
+			Name:        DefaultConfigSpecName,
+			TemplateRef: DefaultConfigSpecTplRef,
+			VolumeName:  DefaultConfigSpecVolumeName,
 		},
 	}
 

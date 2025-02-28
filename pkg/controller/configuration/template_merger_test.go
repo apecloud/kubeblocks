@@ -27,15 +27,16 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
-	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	cfgcore "github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 	"github.com/apecloud/kubeblocks/pkg/controller/render"
-	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
+	testparameters "github.com/apecloud/kubeblocks/pkg/testutil/parameters"
 )
 
 var _ = Describe("TemplateMergerTest", func() {
@@ -71,10 +72,11 @@ max_connections=666
 	)
 
 	var (
-		mockClient          *testutil.K8sClientMockHelper
-		templateBuilder     render.TemplateRender
-		configSpec          appsv1.ComponentConfigSpec
-		configConstraintObj *appsv1beta1.ConfigConstraint
+		mockClient      *testutil.K8sClientMockHelper
+		templateBuilder render.TemplateRender
+		configSpec      appsv1.ComponentTemplateSpec
+		paramsDefs      *parametersv1alpha1.ParametersDefinition
+		pdcr            *parametersv1alpha1.ParamConfigRenderer
 
 		baseCMObject    *corev1.ConfigMap
 		updatedCMObject *corev1.ConfigMap
@@ -82,9 +84,13 @@ max_connections=666
 
 	BeforeEach(func() {
 		mockClient = testutil.NewK8sMockClient()
-		configConstraintObj = testapps.CheckedCreateCustomizedObj(&testCtx,
-			"resources/mysql-config-constraint.yaml",
-			&appsv1beta1.ConfigConstraint{})
+		paramsDefs = testparameters.NewParametersDefinitionFactory("test-pd").
+			SetConfigFile(testConfigName).
+			GetObject()
+		pdcr = testparameters.NewParamConfigRendererFactory("test-pdcr").
+			SetTemplateName(testConfigSpecName).
+			GetObject()
+
 		baseCMObject = &corev1.ConfigMap{
 			Data: map[string]string{
 				testConfigName:  baseConfig,
@@ -102,22 +108,18 @@ max_connections=666
 		updatedCMObject.SetName(updatedCMName)
 		updatedCMObject.SetNamespace("default")
 
-		configSpec = appsv1.ComponentConfigSpec{
-			ComponentTemplateSpec: appsv1.ComponentTemplateSpec{
-				Name:        testConfigSpecName,
-				TemplateRef: baseCMObject.GetName(),
-				Namespace:   "default",
-			},
-			Keys:                []string{"my.cnf"},
-			ConfigConstraintRef: configConstraintObj.GetName(),
+		configSpec = appsv1.ComponentTemplateSpec{
+			Name:        testConfigSpecName,
+			TemplateRef: baseCMObject.GetName(),
+			Namespace:   "default",
 		}
 
 		templateBuilder = render.NewTemplateBuilder(&render.ReconcileCtx{
 			ResourceCtx: &render.ResourceCtx{
 				Context:     ctx,
 				Client:      mockClient.Client(),
+				Namespace:   testCtx.DefaultNamespace,
 				ClusterName: testClusterName,
-				Namespace:   "default",
 			},
 			Cluster: &appsv1.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
@@ -132,8 +134,11 @@ max_connections=666
 		mockClient.MockGetMethod(testutil.WithGetReturned(testutil.WithConstructSimpleGetResult([]client.Object{
 			baseCMObject,
 			updatedCMObject,
-			configConstraintObj,
 		}), testutil.WithAnyTimes()))
+		mockClient.MockNListMethod(0, testutil.WithListReturned(
+			testutil.WithConstructListReturnedResult([]runtime.Object{pdcr}),
+			testutil.WithAnyTimes(),
+		))
 	})
 
 	AfterEach(func() {
@@ -142,19 +147,19 @@ max_connections=666
 
 	Context("with patch Merge", func() {
 		It("mergerConfigTemplate patch policy", func() {
-			importedTemplate := appsv1.ConfigTemplateExtension{
+			importedTemplate := parametersv1alpha1.ConfigTemplateExtension{
 				Namespace: "default",
 				// Name:        configSpec.Name,
 				TemplateRef: updatedCMObject.GetName(),
-				Policy:      appsv1.PatchPolicy,
+				Policy:      parametersv1alpha1.PatchPolicy,
 			}
 
 			tmpCM := baseCMObject.DeepCopy()
-			mergedData, err := mergerConfigTemplate(importedTemplate, templateBuilder, configSpec, tmpCM.Data, ctx, mockClient.Client())
+			mergedData, err := mergerConfigTemplate(importedTemplate, templateBuilder, configSpec, tmpCM.Data, []*parametersv1alpha1.ParametersDefinition{paramsDefs}, pdcr)
 			Expect(err).To(Succeed())
 			Expect(mergedData).Should(HaveLen(2))
 
-			configReaders, err := cfgcore.LoadRawConfigObject(mergedData, configConstraintObj.Spec.FileFormatConfig, configSpec.Keys)
+			configReaders, err := cfgcore.LoadRawConfigObject(mergedData, pdcr.Spec.Configs[0].FileFormatConfig, []string{testConfigName})
 			Expect(err).Should(Succeed())
 			Expect(configReaders).Should(HaveLen(1))
 			configObject := configReaders[testConfigName]
@@ -170,19 +175,19 @@ max_connections=666
 
 	Context("with replace Merge", func() {
 		It("test mergerConfigTemplate replace policy", func() {
-			importedTemplate := appsv1.ConfigTemplateExtension{
+			importedTemplate := parametersv1alpha1.ConfigTemplateExtension{
 				Namespace:   "default",
 				TemplateRef: updatedCMObject.GetName(),
-				Policy:      appsv1.ReplacePolicy,
+				Policy:      parametersv1alpha1.ReplacePolicy,
 			}
 
 			tmpCM := baseCMObject.DeepCopy()
-			mergedData, err := mergerConfigTemplate(importedTemplate, templateBuilder, configSpec, tmpCM.Data, ctx, mockClient.Client())
+			mergedData, err := mergerConfigTemplate(importedTemplate, templateBuilder, configSpec, tmpCM.Data, []*parametersv1alpha1.ParametersDefinition{paramsDefs}, pdcr)
 			Expect(err).Should(Succeed())
 			Expect(mergedData).Should(HaveLen(2))
 			Expect(reflect.DeepEqual(mergedData, updatedCMObject.Data)).Should(BeTrue())
 
-			configReaders, err := cfgcore.LoadRawConfigObject(mergedData, configConstraintObj.Spec.FileFormatConfig, configSpec.Keys)
+			configReaders, err := cfgcore.LoadRawConfigObject(mergedData, pdcr.Spec.Configs[0].FileFormatConfig, []string{testConfigName})
 			Expect(err).Should(Succeed())
 			Expect(configReaders).Should(HaveLen(1))
 			configObject := configReaders[testConfigName]
@@ -195,28 +200,28 @@ max_connections=666
 
 	Context("with only add Merge", func() {
 		It("test mergerConfigTemplate add policy", func() {
-			importedTemplate := appsv1.ConfigTemplateExtension{
+			importedTemplate := parametersv1alpha1.ConfigTemplateExtension{
 				Namespace:   "default",
 				TemplateRef: updatedCMObject.GetName(),
-				Policy:      appsv1.OnlyAddPolicy,
+				Policy:      parametersv1alpha1.OnlyAddPolicy,
 			}
 
 			tmpCM := baseCMObject.DeepCopy()
-			_, err := mergerConfigTemplate(importedTemplate, templateBuilder, configSpec, tmpCM.Data, ctx, mockClient.Client())
+			_, err := mergerConfigTemplate(importedTemplate, templateBuilder, configSpec, tmpCM.Data, []*parametersv1alpha1.ParametersDefinition{paramsDefs}, pdcr)
 			Expect(err).ShouldNot(Succeed())
 		})
 	})
 
 	Context("with none Merge", func() {
 		It("test mergerConfigTemplate none policy", func() {
-			importedTemplate := appsv1.ConfigTemplateExtension{
+			importedTemplate := parametersv1alpha1.ConfigTemplateExtension{
 				Namespace:   "default",
 				TemplateRef: updatedCMObject.GetName(),
-				Policy:      appsv1.NoneMergePolicy,
+				Policy:      parametersv1alpha1.NoneMergePolicy,
 			}
 
 			tmpCM := baseCMObject.DeepCopy()
-			mergedData, err := mergerConfigTemplate(importedTemplate, templateBuilder, configSpec, tmpCM.Data, ctx, mockClient.Client())
+			mergedData, err := mergerConfigTemplate(importedTemplate, templateBuilder, configSpec, tmpCM.Data, []*parametersv1alpha1.ParametersDefinition{paramsDefs}, pdcr)
 			Expect(err).Should(Succeed())
 			Expect(reflect.DeepEqual(mergedData, updatedCMObject.Data)).Should(BeTrue())
 		})
@@ -224,43 +229,27 @@ max_connections=666
 
 	Context("failed test", func() {
 		It("test mergerConfigTemplate function", func() {
-			importedTemplate := appsv1.ConfigTemplateExtension{
+			importedTemplate := parametersv1alpha1.ConfigTemplateExtension{
 				Namespace:   "default",
 				TemplateRef: updatedCMObject.GetName(),
 				Policy:      "",
 			}
 
 			tmpCM := baseCMObject.DeepCopy()
-			_, err := mergerConfigTemplate(importedTemplate, templateBuilder, configSpec, tmpCM.Data, ctx, mockClient.Client())
+			_, err := mergerConfigTemplate(importedTemplate, templateBuilder, configSpec, tmpCM.Data, []*parametersv1alpha1.ParametersDefinition{paramsDefs}, pdcr)
 			Expect(err).ShouldNot(Succeed())
 		})
 
-		It("not configconstraint", func() {
-			importedTemplate := appsv1.ConfigTemplateExtension{
+		It("not parameterDrivenConfigRender", func() {
+			importedTemplate := parametersv1alpha1.ConfigTemplateExtension{
 				Namespace:   "default",
 				TemplateRef: updatedCMObject.GetName(),
 				Policy:      "none",
 			}
 
 			tmpCM := baseCMObject.DeepCopy()
-			tmpConfigSpec := configSpec.DeepCopy()
-			tmpConfigSpec.ConfigConstraintRef = ""
-			_, err := mergerConfigTemplate(importedTemplate, templateBuilder, *tmpConfigSpec, tmpCM.Data, ctx, mockClient.Client())
-			Expect(err).ShouldNot(Succeed())
-		})
-
-		It("not formatter", func() {
-			importedTemplate := appsv1.ConfigTemplateExtension{
-				Namespace:   "default",
-				TemplateRef: updatedCMObject.GetName(),
-				Policy:      "none",
-			}
-
-			tmpCM := baseCMObject.DeepCopy()
-			tmpConfigSpec := configSpec.DeepCopy()
-			tmpConfigSpec.ConfigConstraintRef = "not_exist"
-			_, err := mergerConfigTemplate(importedTemplate, templateBuilder, *tmpConfigSpec, tmpCM.Data, ctx, mockClient.Client())
-			Expect(err).ShouldNot(Succeed())
+			_, err := mergerConfigTemplate(importedTemplate, templateBuilder, configSpec, tmpCM.Data, []*parametersv1alpha1.ParametersDefinition{paramsDefs}, &parametersv1alpha1.ParamConfigRenderer{})
+			Expect(err).Should(Succeed())
 		})
 	})
 })

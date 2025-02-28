@@ -97,7 +97,6 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 		ConfigTemplates:                  compDefObj.Spec.Configs,
 		ScriptTemplates:                  compDefObj.Spec.Scripts,
 		Roles:                            compDefObj.Spec.Roles,
-		UpdateStrategy:                   compDefObj.Spec.UpdateStrategy,
 		MinReadySeconds:                  compDefObj.Spec.MinReadySeconds,
 		PolicyRules:                      compDefObj.Spec.PolicyRules,
 		LifecycleActions:                 compDefObj.Spec.LifecycleActions,
@@ -113,6 +112,8 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 		PodManagementPolicy:              compDef.Spec.PodManagementPolicy,
 		ParallelPodManagementConcurrency: comp.Spec.ParallelPodManagementConcurrency,
 		PodUpdatePolicy:                  comp.Spec.PodUpdatePolicy,
+		UpdateStrategy:                   compDef.Spec.UpdateStrategy,
+		InstanceUpdateStrategy:           comp.Spec.InstanceUpdateStrategy,
 	}
 
 	if err = mergeUserDefinedEnv(synthesizeComp, comp); err != nil {
@@ -136,7 +137,9 @@ func BuildSynthesizedComponent(ctx context.Context, cli client.Reader,
 	// override componentService
 	overrideComponentServices(synthesizeComp, comp)
 
-	if err = overrideConfigTemplates(synthesizeComp, comp); err != nil {
+	buildFileTemplates(synthesizeComp, compDef, comp)
+
+	if err = overrideNCheckConfigTemplates(synthesizeComp, comp); err != nil {
 		return nil, err
 	}
 
@@ -289,7 +292,7 @@ func mergeUserDefinedVolumes(synthesizedComp *SynthesizedComponent, comp *appsv1
 		return nil
 	}
 	for _, tpl := range synthesizedComp.ConfigTemplates {
-		if err := checkConfigNScriptTemplate(tpl.ComponentTemplateSpec); err != nil {
+		if err := checkConfigNScriptTemplate(tpl); err != nil {
 			return err
 		}
 	}
@@ -363,12 +366,12 @@ func overrideComponentServices(synthesizeComp *SynthesizedComponent, comp *appsv
 	}
 }
 
-func overrideConfigTemplates(synthesizedComp *SynthesizedComponent, comp *appsv1.Component) error {
+func overrideNCheckConfigTemplates(synthesizedComp *SynthesizedComponent, comp *appsv1.Component) error {
 	if comp == nil || len(comp.Spec.Configs) == 0 {
-		return nil
+		return checkConfigTemplates(synthesizedComp)
 	}
 
-	templates := make(map[string]*appsv1.ComponentConfigSpec)
+	templates := make(map[string]*appsv1.ComponentTemplateSpec)
 	for i, template := range synthesizedComp.ConfigTemplates {
 		templates[template.Name] = &synthesizedComp.ConfigTemplates[i]
 	}
@@ -379,7 +382,9 @@ func overrideConfigTemplates(synthesizedComp *SynthesizedComponent, comp *appsv1
 		}
 		template := templates[*config.Name]
 		if template == nil {
-			return fmt.Errorf("the config template %s is not defined in definition", *config.Name)
+			continue
+			// TODO: remove me
+			// return fmt.Errorf("the config template %s is not defined in definition", *config.Name)
 		}
 
 		specified := func() bool {
@@ -392,11 +397,65 @@ func overrideConfigTemplates(synthesizedComp *SynthesizedComponent, comp *appsv1
 			return fmt.Errorf("partial overriding is not supported, config template: %s", *config.Name)
 		case specified():
 			template.TemplateRef = config.ConfigMap.Name
+			template.Namespace = synthesizedComp.Namespace
 		default:
 			// do nothing
 		}
 	}
+	return checkConfigTemplates(synthesizedComp)
+}
+
+func checkConfigTemplates(synthesizedComp *SynthesizedComponent) error {
+	for _, template := range synthesizedComp.ConfigTemplates {
+		if len(template.TemplateRef) == 0 {
+			return fmt.Errorf("required config template is empty: %s", template.Name)
+		}
+	}
 	return nil
+}
+
+func buildFileTemplates(synthesizedComp *SynthesizedComponent, compDef *appsv1.ComponentDefinition, comp *appsv1.Component) {
+	merge := func(tpl SynthesizedFileTemplate, utpl appsv1.ClusterComponentConfig) SynthesizedFileTemplate {
+		tpl.Variables = utpl.Variables
+		if utpl.ConfigMap != nil {
+			tpl.Namespace = comp.Namespace
+			tpl.Template = utpl.ConfigMap.Name
+		}
+		tpl.Reconfigure = utpl.Reconfigure // custom reconfigure action
+		tpl.ExternalManaged = utpl.ExternalManaged
+
+		if tpl.ExternalManaged != nil && *tpl.ExternalManaged {
+			if utpl.ConfigMap == nil {
+				// reset the template and wait the external system to provision it.
+				tpl.Namespace = ""
+				tpl.Template = ""
+			}
+		}
+		return tpl
+	}
+
+	synthesize := func(tpl appsv1.ComponentFileTemplate, config bool) SynthesizedFileTemplate {
+		stpl := SynthesizedFileTemplate{
+			ComponentFileTemplate: tpl,
+		}
+		if config {
+			for _, utpl := range comp.Spec.Configs {
+				if utpl.Name != nil && *utpl.Name == tpl.Name {
+					return merge(stpl, utpl)
+				}
+			}
+		}
+		return stpl
+	}
+
+	templates := make([]SynthesizedFileTemplate, 0)
+	for _, tpl := range compDef.Spec.Configs2 {
+		templates = append(templates, synthesize(tpl, true))
+	}
+	for _, tpl := range compDef.Spec.Scripts2 {
+		templates = append(templates, synthesize(tpl, false))
+	}
+	synthesizedComp.FileTemplates = templates
 }
 
 // buildServiceAccountName builds serviceAccountName for component and podSpec.
@@ -417,14 +476,4 @@ func buildRuntimeClassName(synthesizeComp *SynthesizedComponent, comp *appsv1.Co
 		return
 	}
 	synthesizeComp.PodSpec.RuntimeClassName = comp.Spec.RuntimeClassName
-}
-
-func GetConfigSpecByName(synthesizedComp *SynthesizedComponent, configSpec string) *appsv1.ComponentConfigSpec {
-	for i := range synthesizedComp.ConfigTemplates {
-		template := &synthesizedComp.ConfigTemplates[i]
-		if template.Name == configSpec {
-			return template
-		}
-	}
-	return nil
 }

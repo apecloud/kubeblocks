@@ -35,7 +35,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -410,23 +409,6 @@ func buildPodSpecVolumeMounts(synthesizeComp *component.SynthesizedComponent) {
 //  1. new an object targetObj by copying from oldObj
 //  2. merge all fields can be updated from newObj into targetObj
 func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet) *workloads.InstanceSet {
-
-	updateUpdateStrategy := func(itsObj, itsProto *workloads.InstanceSet) {
-		var objMaxUnavailable *intstr.IntOrString
-		if itsObj.Spec.UpdateStrategy.RollingUpdate != nil {
-			objMaxUnavailable = itsObj.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable
-		}
-		itsObj.Spec.UpdateStrategy = itsProto.Spec.UpdateStrategy
-		if objMaxUnavailable == nil && itsObj.Spec.UpdateStrategy.RollingUpdate != nil {
-			// HACK: This field is alpha-level (since v1.24) and is only honored by servers that enable the
-			// MaxUnavailableStatefulSet feature.
-			// When we get a nil MaxUnavailable from k8s, we consider that the field is not supported by the server,
-			// and set the MaxUnavailable as nil explicitly to avoid the workload been updated unexpectedly.
-			// Ref: https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#maximum-unavailable-pods
-			itsObj.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable = nil
-		}
-	}
-
 	itsObjCopy := oldITS.DeepCopy()
 	itsProto := newITS
 
@@ -451,17 +433,28 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet) *workloads.InstanceS
 	itsObjCopy.Spec.Roles = itsProto.Spec.Roles
 	itsObjCopy.Spec.MembershipReconfiguration = itsProto.Spec.MembershipReconfiguration
 	itsObjCopy.Spec.TemplateVars = itsProto.Spec.TemplateVars
-	itsObjCopy.Spec.MemberUpdateStrategy = itsProto.Spec.MemberUpdateStrategy
-	itsObjCopy.Spec.Credential = itsProto.Spec.Credential
 	itsObjCopy.Spec.Instances = itsProto.Spec.Instances
 	itsObjCopy.Spec.OfflineInstances = itsProto.Spec.OfflineInstances
 	itsObjCopy.Spec.MinReadySeconds = itsProto.Spec.MinReadySeconds
 	itsObjCopy.Spec.VolumeClaimTemplates = itsProto.Spec.VolumeClaimTemplates
 	itsObjCopy.Spec.ParallelPodManagementConcurrency = itsProto.Spec.ParallelPodManagementConcurrency
 	itsObjCopy.Spec.PodUpdatePolicy = itsProto.Spec.PodUpdatePolicy
+	itsObjCopy.Spec.InstanceUpdateStrategy = itsProto.Spec.InstanceUpdateStrategy
+	itsObjCopy.Spec.MemberUpdateStrategy = itsProto.Spec.MemberUpdateStrategy
+	itsObjCopy.Spec.Paused = itsProto.Spec.Paused
 
-	if itsProto.Spec.UpdateStrategy.Type != "" || itsProto.Spec.UpdateStrategy.RollingUpdate != nil {
-		updateUpdateStrategy(itsObjCopy, itsProto)
+	if itsObjCopy.Spec.InstanceUpdateStrategy != nil && itsObjCopy.Spec.InstanceUpdateStrategy.RollingUpdate != nil {
+		// use oldITS because itsObjCopy has been overwritten
+		if oldITS.Spec.InstanceUpdateStrategy != nil &&
+			oldITS.Spec.InstanceUpdateStrategy.RollingUpdate != nil &&
+			oldITS.Spec.InstanceUpdateStrategy.RollingUpdate.MaxUnavailable == nil {
+			// HACK: This field is alpha-level (since v1.24) and is only honored by servers that enable the
+			// MaxUnavailableStatefulSet feature.
+			// When we get a nil MaxUnavailable from k8s, we consider that the field is not supported by the server,
+			// and set the MaxUnavailable as nil explicitly to avoid the workload been updated unexpectedly.
+			// Ref: https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#maximum-unavailable-pods
+			itsObjCopy.Spec.InstanceUpdateStrategy.RollingUpdate.MaxUnavailable = nil
+		}
 	}
 
 	intctrlutil.ResolvePodSpecDefaultFields(oldITS.Spec.Template.Spec, &itsObjCopy.Spec.Template.Spec)
@@ -531,47 +524,10 @@ func checkNRollbackProtoImages(itsObj, itsProto *workloads.InstanceSet) {
 
 // expandVolume handles workload expand volume
 func (r *componentWorkloadOps) expandVolume() error {
-	// 1. expand the volumes without instance template name.
-	if err := r.expandVolumeClaimTemplates(r.runningITS.Spec.VolumeClaimTemplates, r.synthesizeComp.VolumeClaimTemplates, ""); err != nil {
-		return err
-	}
-	if len(r.runningITS.Spec.Instances) == 0 {
-		return nil
-	}
-	// 2. expand the volumes with instance template name.
-	for i := range r.runningITS.Spec.Instances {
-		runningInsSpec := r.runningITS.Spec.DeepCopy()
-		runningInsTPL := runningInsSpec.Instances[i]
-		vcts := intctrlutil.ToCoreV1PVCs(runningInsTPL.VolumeClaimTemplates)
-		intctrlutil.MergeList(&vcts, &runningInsSpec.VolumeClaimTemplates,
-			func(item corev1.PersistentVolumeClaim) func(corev1.PersistentVolumeClaim) bool {
-				return func(claim corev1.PersistentVolumeClaim) bool {
-					return claim.Name == item.Name
-				}
-			})
-
-		var protoVCTs []corev1.PersistentVolumeClaimTemplate
-		protoVCTs = append(protoVCTs, r.synthesizeComp.VolumeClaimTemplates...)
-		for _, v := range r.synthesizeComp.Instances {
-			if runningInsTPL.Name == v.Name {
-				insVCTs := intctrlutil.ToCoreV1PVCTs(v.VolumeClaimTemplates)
-				intctrlutil.MergeList(&insVCTs, &protoVCTs,
-					func(item corev1.PersistentVolumeClaimTemplate) func(corev1.PersistentVolumeClaimTemplate) bool {
-						return func(claim corev1.PersistentVolumeClaimTemplate) bool {
-							return claim.Name == item.Name
-						}
-					})
-				break
-			}
-		}
-		if err := r.expandVolumeClaimTemplates(runningInsSpec.VolumeClaimTemplates, protoVCTs, runningInsTPL.Name); err != nil {
-			return err
-		}
-	}
-	return nil
+	return r.expandVolumeClaimTemplates(r.runningITS.Spec.VolumeClaimTemplates, r.synthesizeComp.VolumeClaimTemplates)
 }
 
-func (r *componentWorkloadOps) expandVolumeClaimTemplates(runningVCTs []corev1.PersistentVolumeClaim, protoVCTs []corev1.PersistentVolumeClaimTemplate, insTPLName string) error {
+func (r *componentWorkloadOps) expandVolumeClaimTemplates(runningVCTs []corev1.PersistentVolumeClaim, protoVCTs []corev1.PersistentVolumeClaimTemplate) error {
 	for _, vct := range runningVCTs {
 		var proto *corev1.PersistentVolumeClaimTemplate
 		for i, v := range protoVCTs {
@@ -585,7 +541,7 @@ func (r *componentWorkloadOps) expandVolumeClaimTemplates(runningVCTs []corev1.P
 			continue
 		}
 
-		if err := r.expandVolumes(insTPLName, vct.Name, proto); err != nil {
+		if err := r.expandVolumes(vct.Name, proto); err != nil {
 			return err
 		}
 	}
@@ -914,7 +870,7 @@ func (r *componentWorkloadOps) joinMemberForPod(pod *corev1.Pod, pods []*corev1.
 	return nil
 }
 
-func (r *componentWorkloadOps) expandVolumes(insTPLName string, vctName string, proto *corev1.PersistentVolumeClaimTemplate) error {
+func (r *componentWorkloadOps) expandVolumes(vctName string, proto *corev1.PersistentVolumeClaimTemplate) error {
 	for _, pod := range r.runningItsPodNames {
 		pvc := &corev1.PersistentVolumeClaim{}
 		pvcKey := types.NamespacedName{
@@ -928,9 +884,6 @@ func (r *componentWorkloadOps) expandVolumes(insTPLName string, vctName string, 
 			} else {
 				return err
 			}
-		}
-		if insTPLName != pvc.Labels[constant.KBAppComponentInstanceTemplateLabelKey] {
-			continue
 		}
 		if !pvcNotFound {
 			quantity := pvc.Spec.Resources.Requests.Storage()
@@ -1090,7 +1043,11 @@ func (r *componentWorkloadOps) updatePVCSize(pvcKey types.NamespacedName,
 		// if both pvc and pv not found, do nothing
 		return nil
 	}
-	if reflect.DeepEqual(pvc.Spec.Resources, newPVC.Spec.Resources) && pv.Spec.PersistentVolumeReclaimPolicy == corev1.PersistentVolumeReclaimRetain {
+	if reflect.DeepEqual(pvc.Spec.Resources, newPVC.Spec.Resources) &&
+		pv.Spec.PersistentVolumeReclaimPolicy == corev1.PersistentVolumeReclaimRetain &&
+		pv.Annotations != nil &&
+		len(pv.Annotations[constant.PVLastClaimPolicyAnnotationKey]) > 0 &&
+		pv.Annotations[constant.PVLastClaimPolicyAnnotationKey] != string(corev1.PersistentVolumeReclaimRetain) {
 		// this could happen if create pvc succeeded but last step failed
 		updatePVCByRecreateFromStep(pvRestorePolicyStep)
 		return nil

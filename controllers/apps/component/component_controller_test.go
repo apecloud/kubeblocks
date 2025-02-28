@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package component
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
@@ -28,6 +29,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/golang/mock/gomock"
 	"github.com/sethvargo/go-password/password"
 	"golang.org/x/exp/maps"
 	appsv1 "k8s.io/api/apps/v1"
@@ -48,10 +50,10 @@ import (
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/builder"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
-	"github.com/apecloud/kubeblocks/pkg/controller/plan"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
 	"github.com/apecloud/kubeblocks/pkg/generics"
 	kbacli "github.com/apecloud/kubeblocks/pkg/kbagent/client"
+	kbagentproto "github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 	testk8s "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 	viper "github.com/apecloud/kubeblocks/pkg/viperx"
@@ -111,6 +113,7 @@ var _ = Describe("Component Controller", func() {
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.RoleBindingSignature, true, inNS)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PodSignature, true, inNS, ml)
 		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.PersistentVolumeClaimSignature, true, inNS, ml)
+		testapps.ClearResourcesWithRemoveFinalizerOption(&testCtx, generics.ConfigMapSignature, true, inNS, ml)
 		// non-namespaced
 		testapps.ClearResources(&testCtx, generics.StorageClassSignature, ml)
 
@@ -321,8 +324,8 @@ var _ = Describe("Component Controller", func() {
 		})).Should(Succeed())
 	}
 
-	getPVCName := func(vctName, compAndTPLName string, i int) string {
-		return fmt.Sprintf("%s-%s-%s-%d", vctName, clusterKey.Name, compAndTPLName, i)
+	getPVCName := func(vctName, compName string, i int) string {
+		return fmt.Sprintf("%s-%s-%s-%d", vctName, clusterKey.Name, compName, i)
 	}
 
 	createPVC := func(clusterName, pvcName, compName, storageSize, storageClassName string) {
@@ -580,15 +583,11 @@ var _ = Describe("Component Controller", func() {
 
 	testVolumeExpansion := func(compName, compDefName string, storageClass *storagev1.StorageClass) {
 		var (
-			insTPLName           = "foo"
-			replicas             = 3
-			volumeSize           = "1Gi"
-			newVolumeSize        = "2Gi"
-			newFooVolumeSize     = "3Gi"
-			volumeQuantity       = resource.MustParse(volumeSize)
-			newVolumeQuantity    = resource.MustParse(newVolumeSize)
-			newFooVolumeQuantity = resource.MustParse(newFooVolumeSize)
-			compAndTPLName       = fmt.Sprintf("%s-%s", compName, insTPLName)
+			replicas          = 3
+			volumeSize        = "1Gi"
+			newVolumeSize     = "2Gi"
+			volumeQuantity    = resource.MustParse(volumeSize)
+			newVolumeQuantity = resource.MustParse(newVolumeSize)
 		)
 
 		By("mock a StorageClass which allows resize")
@@ -602,15 +601,7 @@ var _ = Describe("Component Controller", func() {
 		createCompObj(compName, compDefName, func(f *testapps.MockComponentFactory) {
 			f.SetReplicas(int32(replicas)).
 				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
-				AddVolumeClaimTemplate(testapps.LogVolumeName, pvcSpec).
-				AddInstances(kbappsv1.InstanceTemplate{
-					Name:     insTPLName,
-					Replicas: ptr.To(int32(1)),
-					VolumeClaimTemplates: []kbappsv1.ClusterComponentVolumeClaimTemplate{
-						{Name: testapps.DataVolumeName, Spec: pvcSpec},
-						{Name: testapps.LogVolumeName, Spec: pvcSpec},
-					},
-				})
+				AddVolumeClaimTemplate(testapps.LogVolumeName, pvcSpec)
 		})
 
 		By("checking the replicas")
@@ -618,17 +609,7 @@ var _ = Describe("Component Controller", func() {
 		its := &itsList.Items[0]
 		Expect(*its.Spec.Replicas).Should(BeEquivalentTo(replicas))
 		pvcName := func(vctName string, index int) string {
-			pvcName := getPVCName(vctName, compName, index)
-			if index == replicas-1 {
-				pvcName = getPVCName(vctName, compAndTPLName, 0)
-			}
-			return pvcName
-		}
-		newVolumeQuantityF := func(index int) resource.Quantity {
-			if index == replicas-1 {
-				return newFooVolumeQuantity
-			}
-			return newVolumeQuantity
+			return getPVCName(vctName, compName, index)
 		}
 		By("Mock PVCs in Bound Status")
 		for i := 0; i < replicas; i++ {
@@ -645,9 +626,6 @@ var _ = Describe("Component Controller", func() {
 					Spec: func() corev1.PersistentVolumeClaimSpec {
 						return intctrlutil.ToCoreV1PVCs([]kbappsv1.ClusterComponentVolumeClaimTemplate{{Spec: pvcSpec}})[0].Spec
 					}(),
-				}
-				if i == replicas-1 {
-					pvc.Labels[constant.KBAppComponentInstanceTemplateLabelKey] = insTPLName
 				}
 				Expect(testCtx.CreateObj(testCtx.Ctx, pvc)).Should(Succeed())
 				patch := client.MergeFrom(pvc.DeepCopy())
@@ -679,12 +657,6 @@ var _ = Describe("Component Controller", func() {
 				}
 			}
 			expandVolume(comp.Spec.VolumeClaimTemplates, newVolumeQuantity)
-			for i, insTPL := range comp.Spec.Instances {
-				if insTPL.Name == insTPLName {
-					expandVolume(comp.Spec.Instances[i].VolumeClaimTemplates, newFooVolumeQuantity)
-					break
-				}
-			}
 		})()).ShouldNot(HaveOccurred())
 
 		By("checking the resize operation in progress for data volume")
@@ -699,7 +671,7 @@ var _ = Describe("Component Controller", func() {
 			Eventually(func(g Gomega) {
 				g.Expect(k8sClient.Get(testCtx.Ctx, pvcKey, pvc)).Should(Succeed())
 				g.Expect(pvc.Status.Capacity[corev1.ResourceStorage]).To(Equal(volumeQuantity))
-				g.Expect(pvc.Spec.Resources.Requests[corev1.ResourceStorage]).To(Equal(newVolumeQuantityF(i)))
+				g.Expect(pvc.Spec.Resources.Requests[corev1.ResourceStorage]).To(Equal(newVolumeQuantity))
 			}).Should(Succeed())
 		}
 
@@ -710,7 +682,7 @@ var _ = Describe("Component Controller", func() {
 				Name:      pvcName(testapps.DataVolumeName, i),
 			}
 			Expect(testapps.GetAndChangeObjStatus(&testCtx, pvcKey, func(pvc *corev1.PersistentVolumeClaim) {
-				pvc.Status.Capacity[corev1.ResourceStorage] = newVolumeQuantityF(i)
+				pvc.Status.Capacity[corev1.ResourceStorage] = newVolumeQuantity
 			})()).ShouldNot(HaveOccurred())
 		}
 
@@ -728,7 +700,7 @@ var _ = Describe("Component Controller", func() {
 				Name:      pvcName(testapps.DataVolumeName, i),
 			}
 			Eventually(testapps.CheckObj(&testCtx, pvcKey, func(g Gomega, pvc *corev1.PersistentVolumeClaim) {
-				g.Expect(pvc.Status.Capacity[corev1.ResourceStorage]).To(Equal(newVolumeQuantityF(i)))
+				g.Expect(pvc.Status.Capacity[corev1.ResourceStorage]).To(Equal(newVolumeQuantity))
 			})).Should(Succeed())
 		}
 
@@ -1154,7 +1126,7 @@ var _ = Describe("Component Controller", func() {
 		By("check TLS secret")
 		secretKey := types.NamespacedName{
 			Namespace: compObj.Namespace,
-			Name:      plan.GenerateTLSSecretName(clusterKey.Name, compName),
+			Name:      tlsSecretName(clusterKey.Name, compName),
 		}
 		Eventually(testapps.CheckObj(&testCtx, secretKey, func(g Gomega, secret *corev1.Secret) {
 			g.Expect(secret.Data).Should(HaveKey(*tls.CAFile))
@@ -1167,12 +1139,7 @@ var _ = Describe("Component Controller", func() {
 			Name: tls.VolumeName,
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
-					SecretName: secretKey.Name,
-					Items: []corev1.KeyToPath{
-						{Key: *tls.CAFile, Path: *tls.CAFile},
-						{Key: *tls.CertFile, Path: *tls.CertFile},
-						{Key: *tls.KeyFile, Path: *tls.KeyFile},
-					},
+					SecretName:  secretKey.Name,
 					Optional:    ptr.To(false),
 					DefaultMode: tls.DefaultMode,
 				},
@@ -1609,6 +1576,284 @@ var _ = Describe("Component Controller", func() {
 			g.Expect(cond.Status).Should(BeEquivalentTo(metav1.ConditionTrue))
 			g.Expect(cond.Message).Should(ContainSubstring(fmt.Sprintf("%s:%s", "root", rootHashedPassword)))
 			g.Expect(cond.Message).Should(ContainSubstring(fmt.Sprintf("%s:%s", "admin", updatedAdminHashedPassword)))
+		})).Should(Succeed())
+	}
+
+	testReconfigureVolumes := func(compName, compDefName, fileTemplate string) {
+		createCompObj(compName, compDefName, nil)
+
+		By("mock a file template object that not defined in the cmpd")
+		labels := constant.GetCompLabels(clusterKey.Name, compName)
+		labels[kubeBlockFileTemplateLabelKey] = "true"
+		cm := &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: testCtx.DefaultNamespace,
+				Name:      "test-log-conf-not-defined",
+				Labels:    labels,
+			},
+			Data: map[string]string{},
+		}
+		Expect(testCtx.CreateObj(testCtx.Ctx, cm)).Should(Succeed())
+
+		fileTemplateCMKey := types.NamespacedName{
+			Namespace: testCtx.DefaultNamespace,
+			Name:      fileTemplateObjectName(&component.SynthesizedComponent{FullCompName: compKey.Name}, fileTemplate),
+		}
+
+		By("check the pod volumes")
+		itsKey := compKey
+		Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+			expectVolume := corev1.Volume{
+				Name: fileTemplate,
+				VolumeSource: corev1.VolumeSource{
+					ConfigMap: &corev1.ConfigMapVolumeSource{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: fileTemplateCMKey.Name,
+						},
+						DefaultMode: ptr.To[int32](0444),
+					},
+				},
+			}
+			g.Expect(its.Spec.Template.Spec.Volumes).Should(ContainElement(expectVolume))
+		})).Should(Succeed())
+
+		By("check the file template objects")
+		Eventually(testapps.CheckObjExists(&testCtx, fileTemplateCMKey, &corev1.ConfigMap{}, true)).Should(Succeed())
+		Eventually(testapps.CheckObjExists(&testCtx, client.ObjectKeyFromObject(cm), &corev1.ConfigMap{}, false)).Should(Succeed())
+	}
+
+	testReconfigure := func(compName, compDefName, fileTemplate string) {
+		By("mock reconfigure action calls")
+		var (
+			reconfigure string
+			parameters  map[string]string
+		)
+		testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+			recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+				if req.Action == "reconfigure" || strings.HasPrefix(req.Action, "udf-reconfigure") {
+					reconfigure = req.Action
+					parameters = req.Parameters
+				}
+				return kbagentproto.ActionResponse{}, nil
+			}).AnyTimes()
+		})
+
+		createCompObj(compName, compDefName, nil)
+
+		By("check the file template object")
+		fileTemplateCMKey := types.NamespacedName{
+			Namespace: testCtx.DefaultNamespace,
+			Name:      fileTemplateObjectName(&component.SynthesizedComponent{FullCompName: compKey.Name}, fileTemplate),
+		}
+		Eventually(testapps.CheckObj(&testCtx, fileTemplateCMKey, func(g Gomega, cm *corev1.ConfigMap) {
+			g.Expect(cm.Data).Should(HaveKeyWithValue("level", "info"))
+		})).Should(Succeed())
+
+		By("mock pods")
+		pods := mockPodsForTest(clusterKey.Name, compName, compDefName, int(compObj.Spec.Replicas))
+		for i := range pods {
+			Expect(testCtx.CheckedCreateObj(testCtx.Ctx, pods[i])).Should(Succeed())
+		}
+
+		By("update the config template variables")
+		Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
+			comp.Spec.Configs = []kbappsv1.ClusterComponentConfig{
+				{
+					Name: ptr.To(fileTemplate),
+					Variables: map[string]string{
+						"LOG_LEVEL": "debug",
+					},
+				},
+			}
+		})()).Should(Succeed())
+
+		By("check the file template object again")
+		Eventually(testapps.CheckObj(&testCtx, fileTemplateCMKey, func(g Gomega, cm *corev1.ConfigMap) {
+			g.Expect(cm.Data).Should(HaveKeyWithValue("level", "debug"))
+		})).Should(Succeed())
+
+		By("check the reconfigure action call")
+		Eventually(func(g Gomega) {
+			g.Expect(reconfigure).Should(Equal("reconfigure"))
+			g.Expect(parameters).ShouldNot(BeNil())
+			g.Expect(parameters).Should(HaveKey("KB_CONFIG_FILES_UPDATED"))
+			g.Expect(parameters["KB_CONFIG_FILES_UPDATED"]).Should(ContainSubstring("level"))
+		}).Should(Succeed())
+	}
+
+	testReconfigureUDF := func(compName, compDefName, fileTemplate string) {
+		By("mock reconfigure action calls")
+		var (
+			reconfigure string
+			parameters  map[string]string
+		)
+		testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+			recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+				if req.Action == "reconfigure" || strings.HasPrefix(req.Action, "udf-reconfigure") {
+					reconfigure = req.Action
+					parameters = req.Parameters
+				}
+				return kbagentproto.ActionResponse{}, nil
+			}).AnyTimes()
+		})
+
+		createCompObj(compName, compDefName, func(f *testapps.MockComponentFactory) {
+			f.SetConfigs([]kbappsv1.ClusterComponentConfig{
+				{
+					Name: ptr.To(fileTemplate),
+					Variables: map[string]string{
+						"LOG_LEVEL": "debug",
+					},
+					Reconfigure: testapps.NewLifecycleAction("reconfigure"),
+				},
+			})
+		})
+
+		By("check the file template object")
+		fileTemplateCMKey := types.NamespacedName{
+			Namespace: testCtx.DefaultNamespace,
+			Name:      fileTemplateObjectName(&component.SynthesizedComponent{FullCompName: compKey.Name}, fileTemplate),
+		}
+		Eventually(testapps.CheckObj(&testCtx, fileTemplateCMKey, func(g Gomega, cm *corev1.ConfigMap) {
+			g.Expect(cm.Data).Should(HaveKeyWithValue("level", "debug"))
+		})).Should(Succeed())
+
+		By("mock pods")
+		pods := mockPodsForTest(clusterKey.Name, compName, compDefName, int(compObj.Spec.Replicas))
+		for i := range pods {
+			Expect(testCtx.CheckedCreateObj(testCtx.Ctx, pods[i])).Should(Succeed())
+		}
+
+		By("update the config template variables")
+		Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
+			comp.Spec.Configs[0].Variables = map[string]string{
+				"LOG_LEVEL": "warn",
+			}
+		})()).Should(Succeed())
+
+		By("check the file template object again")
+		Eventually(testapps.CheckObj(&testCtx, fileTemplateCMKey, func(g Gomega, cm *corev1.ConfigMap) {
+			g.Expect(cm.Data).Should(HaveKeyWithValue("level", "warn"))
+		})).Should(Succeed())
+
+		By("check the reconfigure action call")
+		Eventually(func(g Gomega) {
+			g.Expect(reconfigure).Should(Equal(fmt.Sprintf("udf-reconfigure-%s", fileTemplate)))
+			g.Expect(parameters).ShouldNot(BeNil())
+			g.Expect(parameters).Should(HaveKey("KB_CONFIG_FILES_UPDATED"))
+			g.Expect(parameters["KB_CONFIG_FILES_UPDATED"]).Should(ContainSubstring("level"))
+		}).Should(Succeed())
+	}
+
+	testReconfigureStatus := func(compName, compDefName, fileTemplate string) {
+		By("mock reconfigure action calls")
+		var (
+			replicas  = 3
+			callTimes = 0
+		)
+		testapps.MockKBAgentClient(func(recorder *kbacli.MockClientMockRecorder) {
+			recorder.Action(gomock.Any(), gomock.Any()).DoAndReturn(func(ctx context.Context, req kbagentproto.ActionRequest) (kbagentproto.ActionResponse, error) {
+				if req.Action == "reconfigure" || strings.HasPrefix(req.Action, "udf-reconfigure") {
+					callTimes += 1
+					if callTimes >= replicas {
+						return kbagentproto.ActionResponse{}, fmt.Errorf("mock internal error")
+					}
+				}
+				return kbagentproto.ActionResponse{}, nil
+			}).AnyTimes()
+		})
+
+		createCompObj(compName, compDefName, func(f *testapps.MockComponentFactory) {
+			f.SetReplicas(int32(replicas))
+		})
+
+		By("check the file template object")
+		fileTemplateCMKey := types.NamespacedName{
+			Namespace: testCtx.DefaultNamespace,
+			Name:      fileTemplateObjectName(&component.SynthesizedComponent{FullCompName: compKey.Name}, fileTemplate),
+		}
+		Eventually(testapps.CheckObj(&testCtx, fileTemplateCMKey, func(g Gomega, cm *corev1.ConfigMap) {
+			g.Expect(cm.Data).Should(HaveKeyWithValue("level", "info"))
+		})).Should(Succeed())
+
+		By("mock pods")
+		pods := mockPodsForTest(clusterKey.Name, compName, compDefName, int(compObj.Spec.Replicas))
+		for i := range pods {
+			Expect(testCtx.CheckedCreateObj(testCtx.Ctx, pods[i])).Should(Succeed())
+		}
+
+		By("update the config template variables")
+		Expect(testapps.GetAndChangeObj(&testCtx, compKey, func(comp *kbappsv1.Component) {
+			comp.Spec.Configs = []kbappsv1.ClusterComponentConfig{
+				{
+					Name: ptr.To(fileTemplate),
+					Variables: map[string]string{
+						"LOG_LEVEL": "debug",
+					},
+				},
+			}
+		})()).Should(Succeed())
+
+		By("check the file template object again")
+		Eventually(testapps.CheckObj(&testCtx, fileTemplateCMKey, func(g Gomega, cm *corev1.ConfigMap) {
+			g.Expect(cm.Data).Should(HaveKeyWithValue("level", "debug"))
+		})).Should(Succeed())
+
+		By("check the reconfigure action call")
+		Eventually(func(g Gomega) {
+			g.Expect(callTimes >= replicas).Should(BeTrue())
+		}).Should(Succeed())
+
+		By("check the replicas status")
+		itsKey := compKey
+		Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+			replicas, err := component.GetReplicasStatusFunc(its, func(r component.ReplicaStatus) bool {
+				g.Expect(r.Reconfigured).ShouldNot(BeNil())
+				return len(*r.Reconfigured) > 0
+			})
+			g.Expect(err).Should(BeNil())
+			g.Expect(len(replicas)).Should(Equal(1))
+		})).Should(Succeed())
+	}
+
+	testReconfigureStatusCanceled := func(compName, compDefName, fileTemplate string) {
+		testReconfigureStatus(compName, compDefName, fileTemplate)
+
+		By("update the cmpd to add a new config template (volume)")
+		compDefKey := client.ObjectKeyFromObject(compDefObj)
+		Expect(testapps.GetAndChangeObj(&testCtx, compDefKey, func(cmpd *kbappsv1.ComponentDefinition) {
+			cmpd.Spec.Configs2 = append(cmpd.Spec.Configs2, kbappsv1.ComponentFileTemplate{
+				Name:       "server-conf",
+				Template:   "test-log-conf-template", // reuse log-conf template
+				Namespace:  testCtx.DefaultNamespace,
+				VolumeName: "server-conf",
+			})
+			for i := range cmpd.Spec.Runtime.Containers {
+				cmpd.Spec.Runtime.Containers[i].VolumeMounts =
+					append(cmpd.Spec.Runtime.Containers[i].VolumeMounts, corev1.VolumeMount{
+						Name:      "server-conf",
+						MountPath: "/var/run/app/conf/server",
+					})
+			}
+		})()).ShouldNot(HaveOccurred())
+
+		By("check new file template object")
+		newFileTemplateCMKey := types.NamespacedName{
+			Namespace: testCtx.DefaultNamespace,
+			Name:      fileTemplateObjectName(&component.SynthesizedComponent{FullCompName: compKey.Name}, "server-conf"),
+		}
+		Eventually(testapps.CheckObjExists(&testCtx, newFileTemplateCMKey, &corev1.ConfigMap{}, true)).Should(Succeed())
+
+		By("check the replicas status")
+		itsKey := compKey
+		Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
+			// all the reconfigure tasks of all replicas have been canceled
+			replicas, err := component.GetReplicasStatusFunc(its, func(r component.ReplicaStatus) bool {
+				g.Expect(r.Reconfigured).Should(BeNil())
+				return true
+			})
+			g.Expect(err).Should(BeNil())
+			g.Expect(len(replicas)).Should(Equal(3))
 		})).Should(Succeed())
 	}
 
@@ -2103,6 +2348,76 @@ var _ = Describe("Component Controller", func() {
 				c := its.Spec.Template.Spec.Containers[0]
 				g.Expect(c.Image).To(HavePrefix(registry))
 			})).Should(Succeed())
+		})
+	})
+
+	Context("reconfigure file (config/script) template", func() {
+		var (
+			fileTemplate = "log-conf"
+		)
+
+		BeforeEach(func() {
+			createDefinitionObjects()
+
+			// create the config file template object
+			cm := &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: testCtx.DefaultNamespace,
+					Name:      "test-log-conf-template",
+				},
+				Data: map[string]string{
+					"level": "{{- if (index $ \"LOG_LEVEL\") }}\n\t{{- .LOG_LEVEL }}\n{{- else }}\n\t{{- \"info\" }}\n{{- end }}",
+				},
+			}
+			Expect(testCtx.CreateObj(testCtx.Ctx, cm)).Should(Succeed())
+
+			// mock the cmpd to add the config file template and volume mount
+			compDefKey := client.ObjectKeyFromObject(compDefObj)
+			Expect(testapps.GetAndChangeObj(&testCtx, compDefKey, func(cmpd *kbappsv1.ComponentDefinition) {
+				cmpd.Spec.Configs2 = []kbappsv1.ComponentFileTemplate{
+					{
+						Name:       fileTemplate,
+						Template:   "test-log-conf-template",
+						Namespace:  testCtx.DefaultNamespace,
+						VolumeName: fileTemplate,
+					},
+				}
+				for i := range cmpd.Spec.Runtime.Containers {
+					if cmpd.Spec.Runtime.Containers[i].VolumeMounts == nil {
+						cmpd.Spec.Runtime.Containers[i].VolumeMounts = make([]corev1.VolumeMount, 0)
+					}
+					cmpd.Spec.Runtime.Containers[i].VolumeMounts =
+						append(cmpd.Spec.Runtime.Containers[i].VolumeMounts, corev1.VolumeMount{
+							Name:      fileTemplate,
+							MountPath: "/var/run/app/conf/log",
+						})
+				}
+				cmpd.Spec.LifecycleActions.Reconfigure = testapps.NewLifecycleAction("reconfigure")
+			})()).ShouldNot(HaveOccurred())
+		})
+
+		AfterEach(func() {
+			cleanEnv()
+		})
+
+		It("add/delete volumes", func() {
+			testReconfigureVolumes(defaultCompName, compDefObj.Name, fileTemplate)
+		})
+
+		It("reconfigure", func() {
+			testReconfigure(defaultCompName, compDefObj.Name, fileTemplate)
+		})
+
+		It("reconfigure - udf", func() {
+			testReconfigureUDF(defaultCompName, compDefObj.Name, fileTemplate)
+		})
+
+		It("reconfigure - status", func() {
+			testReconfigureStatus(defaultCompName, compDefObj.Name, fileTemplate)
+		})
+
+		It("reconfigure - canceled by volumes change", func() {
+			testReconfigureStatusCanceled(defaultCompName, compDefObj.Name, fileTemplate)
 		})
 	})
 })

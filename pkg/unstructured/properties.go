@@ -25,7 +25,7 @@ import (
 	"github.com/magiconair/properties"
 	"github.com/spf13/cast"
 
-	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 )
 
 type propertiesConfig struct {
@@ -36,7 +36,7 @@ type propertiesConfig struct {
 const commentPrefix = "# "
 
 func init() {
-	CfgObjectRegistry().RegisterConfigCreator(appsv1beta1.PropertiesPlus, func(name string) ConfigObject {
+	CfgObjectRegistry().RegisterConfigCreator(parametersv1alpha1.PropertiesPlus, func(name string) ConfigObject {
 		return &propertiesConfig{name: name}
 	})
 }

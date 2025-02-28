@@ -24,7 +24,6 @@ import (
 	. "github.com/onsi/gomega"
 	"k8s.io/utils/pointer"
 
-	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 )
@@ -43,11 +42,11 @@ var _ = Describe("parameter builder", func() {
 				"param1": pointer.String("value1"),
 				"param2": pointer.String("value2"),
 			}).
-			AddCustomTemplate(componentName, "mysql-config", appsv1.ConfigTemplateExtension{
+			AddCustomTemplate(componentName, "mysql-config", parametersv1alpha1.ConfigTemplateExtension{
 				TemplateRef: "mysql-config-tpl",
 				Namespace:   "default",
 			}).
-			AddCustomTemplate(componentName, "mysql-config2", appsv1.ConfigTemplateExtension{
+			AddCustomTemplate(componentName, "mysql-config2", parametersv1alpha1.ConfigTemplateExtension{
 				TemplateRef: "mysql-config-tpl2",
 				Namespace:   "default",
 			}).

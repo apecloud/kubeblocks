@@ -43,7 +43,7 @@ const (
 	ConfigMapKind             = "ConfigMap"
 	PersistentVolumeClaimKind = "PersistentVolumeClaim"
 	PersistentVolumeKind      = "PersistentVolume"
-	ConfigurationKind         = "Configuration"
+	ComponentParameterKind    = "ComponentParameter"
 	RoleBindingKind           = "RoleBinding"
 	ServiceAccountKind        = "ServiceAccount"
 	EventKind                 = "Event"

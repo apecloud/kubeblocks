@@ -21,24 +21,11 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	cfgutil "github.com/apecloud/kubeblocks/pkg/configuration/util"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/component"
 )
-
-// BuildConfigConstraintLabels builds config constraints labels for object
-func BuildConfigConstraintLabels(object client.Object, configSpecs []appsv1.ComponentConfigSpec) {
-	asMapLabels := make(map[string]string)
-	for _, configSpec := range configSpecs {
-		asMapLabels[core.GenerateTPLUniqLabelKeyWithConfig(configSpec.Name)] = configSpec.TemplateRef
-		if len(configSpec.ConfigConstraintRef) != 0 {
-			asMapLabels[core.GenerateConstraintsUniqLabelKeyWithConfig(configSpec.ConfigConstraintRef)] = configSpec.ConfigConstraintRef
-		}
-	}
-	updateLabelsOrAnnotations(asMapLabels, object.GetLabels, object.SetLabels, constant.ConfigurationConstraintsLabelPrefixKey, constant.ConfigurationTplLabelPrefixKey)
-}
 
 // BuildConfigTemplateAnnotations builds config template annotations for object
 func BuildConfigTemplateAnnotations(object client.Object, synthesizedComp *component.SynthesizedComponent) {

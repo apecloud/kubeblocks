@@ -70,7 +70,7 @@ func BuildInstanceSet(synthesizedComp *component.SynthesizedComponent, component
 		AddMatchLabelsInMap(constant.GetCompLabels(clusterName, compName)).
 		SetReplicas(synthesizedComp.Replicas).
 		SetVolumeClaimTemplates(getVolumeClaimTemplates(synthesizedComp)...).
-		SetPVCRetentionPolicy(synthesizedComp.PVCRetentionPolicy).
+		SetPVCRetentionPolicy(&synthesizedComp.PVCRetentionPolicy).
 		SetMinReadySeconds(synthesizedComp.MinReadySeconds).
 		SetInstances(synthesizedComp.Instances).
 		SetOfflineInstances(synthesizedComp.OfflineInstances).

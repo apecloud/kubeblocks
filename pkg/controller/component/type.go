@@ -45,7 +45,7 @@ type SynthesizedComponent struct {
 	PodSpec                          *corev1.PodSpec                        `json:"podSpec,omitempty"`
 	SidecarVars                      []kbappsv1.EnvVar                      // vars defined by sidecars
 	VolumeClaimTemplates             []corev1.PersistentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty"`
-	PVCRetentionPolicy               *kbappsv1.PersistentVolumeClaimRetentionPolicy
+	PVCRetentionPolicy               kbappsv1.PersistentVolumeClaimRetentionPolicy
 	LogConfigs                       []kbappsv1.LogConfig `json:"logConfigs,omitempty"`
 	FileTemplates                    []SynthesizedFileTemplate
 	ConfigTemplates                  []kbappsv1.ComponentTemplateSpec       `json:"configTemplates,omitempty"`

@@ -40,7 +40,11 @@ import (
 )
 
 var (
-	defaultShmQuantity = resource.MustParse("64Mi")
+	defaultShmQuantity        = resource.MustParse("64Mi")
+	defaultPVCRetentionPolicy = appsv1.PersistentVolumeClaimRetentionPolicy{
+		WhenDeleted: appsv1.DeletePersistentVolumeClaimRetentionPolicyType,
+		WhenScaled:  appsv1.DeletePersistentVolumeClaimRetentionPolicyType,
+	}
 )
 
 // BuildSynthesizedComponent builds a new SynthesizedComponent object, which is a mixture of component-related configs from ComponentDefinition and Component.
@@ -262,7 +266,15 @@ func buildVolumeClaimTemplates(synthesizeComp *SynthesizedComponent, comp *appsv
 	if comp.Spec.VolumeClaimTemplates != nil {
 		synthesizeComp.VolumeClaimTemplates = intctrlutil.ToCoreV1PVCTs(comp.Spec.VolumeClaimTemplates)
 	}
-	synthesizeComp.PVCRetentionPolicy = comp.Spec.PersistentVolumeClaimRetentionPolicy
+	if comp.Spec.PersistentVolumeClaimRetentionPolicy != nil {
+		synthesizeComp.PVCRetentionPolicy = *comp.Spec.PersistentVolumeClaimRetentionPolicy
+	}
+	if len(synthesizeComp.PVCRetentionPolicy.WhenDeleted) == 0 {
+		synthesizeComp.PVCRetentionPolicy.WhenDeleted = defaultPVCRetentionPolicy.WhenDeleted
+	}
+	if len(synthesizeComp.PVCRetentionPolicy.WhenScaled) == 0 {
+		synthesizeComp.PVCRetentionPolicy.WhenScaled = defaultPVCRetentionPolicy.WhenScaled
+	}
 }
 
 func mergeUserDefinedVolumes(synthesizedComp *SynthesizedComponent, comp *appsv1.Component) error {

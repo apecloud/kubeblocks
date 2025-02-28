@@ -2315,14 +2315,20 @@ spec:
                         whenDeleted:
                           description: |-
                             WhenDeleted specifies what happens to PVCs created from VolumeClaimTemplates when the workload is deleted.
-                            The default policy of `Retain` causes PVCs to not be affected by workload deletion.
-                            The `Delete` policy causes those PVCs to be deleted.
+                            The `Retain` policy causes PVCs to not be affected by workload deletion.
+                            The default policy of `Delete` causes those PVCs to be deleted.
+                          enum:
+                          - Retain
+                          - Delete
                           type: string
                         whenScaled:
                           description: |-
                             WhenScaled specifies what happens to PVCs created from VolumeClaimTemplates when the workload is scaled down.
-                            The default policy of `Retain` causes PVCs to not be affected by a scale down.
-                            The `Delete` policy causes the associated PVCs for pods scaled down to be deleted.
+                            The `Retain` policy causes PVCs to not be affected by a scale down.
+                            The default policy of `Delete` causes the associated PVCs for pods scaled down to be deleted.
+                          enum:
+                          - Retain
+                          - Delete
                           type: string
                       type: object
                     podUpdatePolicy:
@@ -9539,14 +9545,20 @@ spec:
                             whenDeleted:
                               description: |-
                                 WhenDeleted specifies what happens to PVCs created from VolumeClaimTemplates when the workload is deleted.
-                                The default policy of `Retain` causes PVCs to not be affected by workload deletion.
-                                The `Delete` policy causes those PVCs to be deleted.
+                                The `Retain` policy causes PVCs to not be affected by workload deletion.
+                                The default policy of `Delete` causes those PVCs to be deleted.
+                              enum:
+                              - Retain
+                              - Delete
                               type: string
                             whenScaled:
                               description: |-
                                 WhenScaled specifies what happens to PVCs created from VolumeClaimTemplates when the workload is scaled down.
-                                The default policy of `Retain` causes PVCs to not be affected by a scale down.
-                                The `Delete` policy causes the associated PVCs for pods scaled down to be deleted.
+                                The `Retain` policy causes PVCs to not be affected by a scale down.
+                                The default policy of `Delete` causes the associated PVCs for pods scaled down to be deleted.
+                              enum:
+                              - Retain
+                              - Delete
                               type: string
                           type: object
                         podUpdatePolicy:

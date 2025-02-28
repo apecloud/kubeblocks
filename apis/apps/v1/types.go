@@ -252,19 +252,26 @@ type PersistentVolumeClaimSpec struct {
 // PersistentVolumeClaimRetentionPolicy describes the policy used for PVCs created from the VolumeClaimTemplates.
 type PersistentVolumeClaimRetentionPolicy struct {
 	// WhenDeleted specifies what happens to PVCs created from VolumeClaimTemplates when the workload is deleted.
-	// The default policy of `Retain` causes PVCs to not be affected by workload deletion.
-	// The `Delete` policy causes those PVCs to be deleted.
+	// The `Retain` policy causes PVCs to not be affected by workload deletion.
+	// The default policy of `Delete` causes those PVCs to be deleted.
+	//
+	// +optional
 	WhenDeleted PersistentVolumeClaimRetentionPolicyType `json:"whenDeleted,omitempty"`
 
 	// WhenScaled specifies what happens to PVCs created from VolumeClaimTemplates when the workload is scaled down.
-	// The default policy of `Retain` causes PVCs to not be affected by a scale down.
-	// The `Delete` policy causes the associated PVCs for pods scaled down to be deleted.
+	// The `Retain` policy causes PVCs to not be affected by a scale down.
+	// The default policy of `Delete` causes the associated PVCs for pods scaled down to be deleted.
+	//
+	// +optional
 	WhenScaled PersistentVolumeClaimRetentionPolicyType `json:"whenScaled,omitempty"`
 }
 
 // PersistentVolumeClaimRetentionPolicyType is a string enumeration of the policies that will determine
 // when volumes from the VolumeClaimTemplates will be deleted when the controlling StatefulSet is
 // deleted or scaled down.
+//
+// +enum
+// +kubebuilder:validation:Enum={Retain,Delete}
 type PersistentVolumeClaimRetentionPolicyType string
 
 const (

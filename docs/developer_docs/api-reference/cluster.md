@@ -8721,9 +8721,10 @@ PersistentVolumeClaimRetentionPolicyType
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>WhenDeleted specifies what happens to PVCs created from VolumeClaimTemplates when the workload is deleted.
-The default policy of <code>Retain</code> causes PVCs to not be affected by workload deletion.
-The <code>Delete</code> policy causes those PVCs to be deleted.</p>
+The <code>Retain</code> policy causes PVCs to not be affected by workload deletion.
+The default policy of <code>Delete</code> causes those PVCs to be deleted.</p>
 </td>
 </tr>
 <tr>
@@ -8736,9 +8737,10 @@ PersistentVolumeClaimRetentionPolicyType
 </em>
 </td>
 <td>
+<em>(Optional)</em>
 <p>WhenScaled specifies what happens to PVCs created from VolumeClaimTemplates when the workload is scaled down.
-The default policy of <code>Retain</code> causes PVCs to not be affected by a scale down.
-The <code>Delete</code> policy causes the associated PVCs for pods scaled down to be deleted.</p>
+The <code>Retain</code> policy causes PVCs to not be affected by a scale down.
+The default policy of <code>Delete</code> causes the associated PVCs for pods scaled down to be deleted.</p>
 </td>
 </tr>
 </tbody>

@@ -191,7 +191,8 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		}
 
 		retentionPolicy := its.Spec.PersistentVolumeClaimRetentionPolicy
-		if retentionPolicy != nil && retentionPolicy.WhenScaled == kbappsv1.DeletePersistentVolumeClaimRetentionPolicyType {
+		// the default policy is `Delete`
+		if retentionPolicy == nil || retentionPolicy.WhenScaled != kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType {
 			for _, obj := range oldPVCList {
 				pvc := obj.(*corev1.PersistentVolumeClaim)
 				if pvc.Labels != nil && pvc.Labels[constant.KBAppPodNameLabelKey] == pod.Name {

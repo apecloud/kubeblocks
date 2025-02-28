@@ -586,6 +586,12 @@ func (r *componentWorkloadOps) horizontalScale() error {
 }
 
 func (r *componentWorkloadOps) scaleIn() error {
+	if r.synthesizeComp.Replicas == 0 && len(r.synthesizeComp.VolumeClaimTemplates) > 0 {
+		if r.synthesizeComp.PVCRetentionPolicy.WhenScaled != appsv1.RetainPersistentVolumeClaimRetentionPolicyType {
+			return fmt.Errorf("when intending to scale-in to 0, only the \"Retain\" option is supported for the PVC retention policy")
+		}
+	}
+
 	deleteReplicas := r.runningItsPodNameSet.Difference(r.desiredCompPodNameSet).UnsortedList()
 	joinedReplicas := make([]string, 0)
 	err := component.DeleteReplicasStatus(r.protoITS, deleteReplicas, func(s component.ReplicaStatus) {
@@ -600,11 +606,9 @@ func (r *componentWorkloadOps) scaleIn() error {
 
 	// TODO: check the component definition to determine whether we need to call leave member before deleting replicas.
 	if err := r.leaveMember4ScaleIn(deleteReplicas, joinedReplicas); err != nil {
-		r.reqCtx.Log.Error(err, "leave member at scaling-in error")
+		r.reqCtx.Log.Error(err, "leave member at scale-in error")
 		return err
 	}
-
-	// TODO: if scale in to 0, do not delete pvcs, remove this later
 	return nil
 }
 

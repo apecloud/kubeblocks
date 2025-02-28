@@ -262,7 +262,10 @@ var _ = Describe("Component Controller", func() {
 		)
 
 		createCompObj(compName, compDefName, func(f *testapps.MockComponentFactory) {
-			f.SetReplicas(init)
+			f.SetReplicas(init).
+				SetPVCRetentionPolicy(&kbappsv1.PersistentVolumeClaimRetentionPolicy{
+					WhenScaled: kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType,
+				})
 		})
 
 		By(fmt.Sprintf("change replicas to %d", target))
@@ -305,7 +308,10 @@ var _ = Describe("Component Controller", func() {
 		changeReplicasLimit(compDefName, 0, 16384)
 
 		createCompObj(compName, compDefName, func(f *testapps.MockComponentFactory) {
-			f.SetReplicas(init)
+			f.SetReplicas(init).
+				SetPVCRetentionPolicy(&kbappsv1.PersistentVolumeClaimRetentionPolicy{
+					WhenScaled: kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType,
+				})
 		})
 
 		By(fmt.Sprintf("change replicas to %d", target))
@@ -525,8 +531,12 @@ var _ = Describe("Component Controller", func() {
 			f.SetReplicas(initialReplicas).
 				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 				AddVolumeClaimTemplate(testapps.LogVolumeName, pvcSpec)
+			if updatedReplicas == 0 {
+				f.SetPVCRetentionPolicy(&kbappsv1.PersistentVolumeClaimRetentionPolicy{
+					WhenScaled: kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType,
+				})
+			}
 		})
-
 		horizontalScale(int(updatedReplicas), testk8s.DefaultStorageClassName, compName, compDefName)
 	}
 
@@ -2010,7 +2020,8 @@ var _ = Describe("Component Controller", func() {
 			itsKey := compKey
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 				g.Expect(*its.Spec.Replicas).To(BeEquivalentTo(1))
-				g.Expect(its.Spec.PersistentVolumeClaimRetentionPolicy).Should(BeNil())
+				g.Expect(its.Spec.PersistentVolumeClaimRetentionPolicy).ShouldNot(BeNil())
+				g.Expect(its.Spec.PersistentVolumeClaimRetentionPolicy.WhenScaled).Should(Equal(kbappsv1.DeletePersistentVolumeClaimRetentionPolicyType))
 			})).Should(Succeed())
 		}
 

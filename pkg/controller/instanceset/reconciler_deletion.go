@@ -49,15 +49,8 @@ func (r *deletionReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuild
 	retainPVC := pvcRetentionPolicy != nil && pvcRetentionPolicy.WhenDeleted == kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType
 
 	// delete secondary objects first
-	secondaryObjects, err := r.getSecondaryObjects(tree, retainPVC)
-	if err != nil {
+	if has, err := r.deleteSecondaryObjects(tree, retainPVC); has {
 		return kubebuilderx.Continue, err
-	}
-	if len(secondaryObjects) > 0 {
-		if err := r.deleteSecondaryObjects(tree, secondaryObjects, retainPVC); err != nil {
-			return kubebuilderx.Continue, err
-		}
-		return kubebuilderx.Continue, nil
 	}
 
 	// delete root object
@@ -65,33 +58,27 @@ func (r *deletionReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (kubebuild
 	return kubebuilderx.Continue, nil
 }
 
-func (r *deletionReconciler) getSecondaryObjects(tree *kubebuilderx.ObjectTree, retainPVC bool) (model.ObjectSnapshot, error) {
+func (r *deletionReconciler) deleteSecondaryObjects(tree *kubebuilderx.ObjectTree, retainPVC bool) (bool, error) {
+	// secondary objects to be deleted
 	secondaryObjects := maps.Clone(tree.GetSecondaryObjects())
 	if retainPVC {
+		// exclude PVCs from them
 		pvcList := tree.List(&corev1.PersistentVolumeClaim{})
 		for _, pvc := range pvcList {
 			name, err := model.GetGVKName(pvc)
 			if err != nil {
-				return nil, err
+				return true, err
 			}
 			delete(secondaryObjects, *name)
 		}
 	}
-	return secondaryObjects, nil
-}
-
-func (r *deletionReconciler) deleteSecondaryObjects(tree *kubebuilderx.ObjectTree, secondaryObjects model.ObjectSnapshot, retainPVC bool) error {
-	if retainPVC {
-		for _, obj := range secondaryObjects {
-			if err := tree.Delete(obj); err != nil {
-				return err
-			}
+	// delete them
+	for _, obj := range secondaryObjects {
+		if err := tree.Delete(obj); err != nil {
+			return true, err
 		}
-	} else {
-		// fast path
-		tree.DeleteSecondaryObjects()
 	}
-	return nil
+	return len(secondaryObjects) > 0, nil
 }
 
 func NewDeletionReconciler() kubebuilderx.Reconciler {

@@ -149,6 +149,11 @@ func (in *InstanceSetSpec) DeepCopyInto(out *InstanceSetSpec) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.PersistentVolumeClaimRetentionPolicy != nil {
+		in, out := &in.PersistentVolumeClaimRetentionPolicy, &out.PersistentVolumeClaimRetentionPolicy
+		*out = new(appsv1.PersistentVolumeClaimRetentionPolicy)
+		**out = **in
+	}
 	if in.ParallelPodManagementConcurrency != nil {
 		in, out := &in.ParallelPodManagementConcurrency, &out.ParallelPodManagementConcurrency
 		*out = new(intstr.IntOrString)

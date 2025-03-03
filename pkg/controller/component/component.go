@@ -81,6 +81,7 @@ func BuildComponent(cluster *appsv1.Cluster, compSpec *appsv1.ClusterComponentSp
 		SetPodUpdatePolicy(compSpec.PodUpdatePolicy).
 		SetInstanceUpdateStrategy(compSpec.InstanceUpdateStrategy).
 		SetVolumeClaimTemplates(compSpec.VolumeClaimTemplates).
+		SetPVCRetentionPolicy(compSpec.PersistentVolumeClaimRetentionPolicy).
 		SetVolumes(compSpec.Volumes).
 		SetServices(compSpec.Services).
 		SetConfigs(compSpec.Configs).

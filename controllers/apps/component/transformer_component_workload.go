@@ -291,6 +291,12 @@ func (t *componentWorkloadTransformer) stopWorkload(
 		protoITS.Spec.Instances[i].Replicas = ptr.To(int32(0))
 	}
 
+	// set the pvc retention policy as Retain explicitly
+	if protoITS.Spec.PersistentVolumeClaimRetentionPolicy == nil {
+		protoITS.Spec.PersistentVolumeClaimRetentionPolicy = &workloads.PersistentVolumeClaimRetentionPolicy{}
+	}
+	protoITS.Spec.PersistentVolumeClaimRetentionPolicy.WhenScaled = appsv1.RetainPersistentVolumeClaimRetentionPolicyType
+
 	// backup the replicas of runningITS
 	snapshot, ok := runningITS.Annotations[stopReplicasSnapshotKey]
 	if !ok {
@@ -437,6 +443,7 @@ func copyAndMergeITS(oldITS, newITS *workloads.InstanceSet) *workloads.InstanceS
 	itsObjCopy.Spec.OfflineInstances = itsProto.Spec.OfflineInstances
 	itsObjCopy.Spec.MinReadySeconds = itsProto.Spec.MinReadySeconds
 	itsObjCopy.Spec.VolumeClaimTemplates = itsProto.Spec.VolumeClaimTemplates
+	itsObjCopy.Spec.PersistentVolumeClaimRetentionPolicy = itsProto.Spec.PersistentVolumeClaimRetentionPolicy
 	itsObjCopy.Spec.ParallelPodManagementConcurrency = itsProto.Spec.ParallelPodManagementConcurrency
 	itsObjCopy.Spec.PodUpdatePolicy = itsProto.Spec.PodUpdatePolicy
 	itsObjCopy.Spec.InstanceUpdateStrategy = itsProto.Spec.InstanceUpdateStrategy
@@ -579,6 +586,12 @@ func (r *componentWorkloadOps) horizontalScale() error {
 }
 
 func (r *componentWorkloadOps) scaleIn() error {
+	if r.synthesizeComp.Replicas == 0 && len(r.synthesizeComp.VolumeClaimTemplates) > 0 {
+		if r.synthesizeComp.PVCRetentionPolicy.WhenScaled != appsv1.RetainPersistentVolumeClaimRetentionPolicyType {
+			return fmt.Errorf("when intending to scale-in to 0, only the \"Retain\" option is supported for the PVC retention policy")
+		}
+	}
+
 	deleteReplicas := r.runningItsPodNameSet.Difference(r.desiredCompPodNameSet).UnsortedList()
 	joinedReplicas := make([]string, 0)
 	err := component.DeleteReplicasStatus(r.protoITS, deleteReplicas, func(s component.ReplicaStatus) {
@@ -593,17 +606,10 @@ func (r *componentWorkloadOps) scaleIn() error {
 
 	// TODO: check the component definition to determine whether we need to call leave member before deleting replicas.
 	if err := r.leaveMember4ScaleIn(deleteReplicas, joinedReplicas); err != nil {
-		r.reqCtx.Log.Error(err, "leave member at scaling-in error")
+		r.reqCtx.Log.Error(err, "leave member at scale-in error")
 		return err
 	}
-
-	// TODO: if scale in to 0, do not delete pvcs, remove this later
-	if r.synthesizeComp.Replicas == 0 {
-		r.reqCtx.Log.Info("scale in to 0, keep all PVCs")
-		return nil
-	}
-
-	return r.deletePVCs4ScaleIn(r.runningITS)
+	return nil
 }
 
 func (r *componentWorkloadOps) leaveMember4ScaleIn(deleteReplicas, joinedReplicas []string) error {
@@ -696,34 +702,6 @@ func (r *componentWorkloadOps) leaveMemberForPod(pod *corev1.Pod, pods []*corev1
 		return err
 	}
 
-	return nil
-}
-
-func (r *componentWorkloadOps) deletePVCs4ScaleIn(itsObj *workloads.InstanceSet) error {
-	graphCli := model.NewGraphClient(r.cli)
-	for _, podName := range r.runningItsPodNames {
-		if _, ok := r.desiredCompPodNameSet[podName]; ok {
-			continue
-		}
-		for _, vct := range itsObj.Spec.VolumeClaimTemplates {
-			pvcKey := types.NamespacedName{
-				Namespace: itsObj.Namespace,
-				Name:      fmt.Sprintf("%s-%s", vct.Name, podName),
-			}
-			pvc := corev1.PersistentVolumeClaim{}
-			if err := r.cli.Get(r.reqCtx.Ctx, pvcKey, &pvc, appsutil.InDataContext4C()); err != nil {
-				if apierrors.IsNotFound(err) {
-					continue // the pvc is already deleted or not created
-				}
-				return err
-			}
-			// Since there are no order guarantee between updating ITS and deleting PVCs, if there is any error occurred
-			// after updating ITS and before deleting PVCs, the PVCs intended to scale-in will be leaked.
-			// For simplicity, the updating dependency is added between them to guarantee that the PVCs to scale-in
-			// will be deleted or the scaling-in operation will be failed.
-			graphCli.Delete(r.dag, &pvc, appsutil.InDataContext4G())
-		}
-	}
 	return nil
 }
 

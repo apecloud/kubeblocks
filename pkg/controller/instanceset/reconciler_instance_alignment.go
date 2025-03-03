@@ -24,7 +24,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 
+	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	workloads "github.com/apecloud/kubeblocks/apis/workloads/v1"
+	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/kubebuilderx"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 )
@@ -75,6 +77,7 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 	oldNameSet := sets.New[string]()
 	oldInstanceMap := make(map[string]*corev1.Pod)
 	oldInstanceList := tree.List(&corev1.Pod{})
+	oldPVCList := tree.List(&corev1.PersistentVolumeClaim{})
 	for _, object := range oldInstanceList {
 		oldNameSet.Insert(object.GetName())
 		pod, _ := object.(*corev1.Pod)
@@ -186,8 +189,19 @@ func (r *instanceAlignmentReconciler) Reconcile(tree *kubebuilderx.ObjectTree) (
 		if err := tree.Delete(pod); err != nil {
 			return kubebuilderx.Continue, err
 		}
-		// TODO(free6om): handle pvc management policy
-		// Retain by default.
+
+		retentionPolicy := its.Spec.PersistentVolumeClaimRetentionPolicy
+		// the default policy is `Delete`
+		if retentionPolicy == nil || retentionPolicy.WhenScaled != kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType {
+			for _, obj := range oldPVCList {
+				pvc := obj.(*corev1.PersistentVolumeClaim)
+				if pvc.Labels != nil && pvc.Labels[constant.KBAppPodNameLabelKey] == pod.Name {
+					if err := tree.Delete(pvc); err != nil {
+						return kubebuilderx.Continue, err
+					}
+				}
+			}
+		}
 
 		if isOrderedReady {
 			break

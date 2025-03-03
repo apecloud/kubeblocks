@@ -103,6 +103,11 @@ func (factory *MockInstanceSetFactory) AddVolumeClaimTemplate(pvc corev1.Persist
 	return factory
 }
 
+func (factory *MockInstanceSetFactory) SetPVCRetentionPolicy(retentionPolicy *workloads.PersistentVolumeClaimRetentionPolicy) *MockInstanceSetFactory {
+	factory.Get().Spec.PersistentVolumeClaimRetentionPolicy = retentionPolicy
+	return factory
+}
+
 func (factory *MockInstanceSetFactory) AddContainer(container corev1.Container) *MockInstanceSetFactory {
 	containers := &factory.Get().Spec.Template.Spec.Containers
 	*containers = append(*containers, container)

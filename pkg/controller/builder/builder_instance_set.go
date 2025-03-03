@@ -104,6 +104,11 @@ func (builder *InstanceSetBuilder) SetVolumeClaimTemplates(templates ...corev1.P
 	return builder
 }
 
+func (builder *InstanceSetBuilder) SetPVCRetentionPolicy(retentionPolicy *workloads.PersistentVolumeClaimRetentionPolicy) *InstanceSetBuilder {
+	builder.get().Spec.PersistentVolumeClaimRetentionPolicy = retentionPolicy
+	return builder
+}
+
 func (builder *InstanceSetBuilder) SetPodManagementPolicy(policy appsv1.PodManagementPolicyType) *InstanceSetBuilder {
 	builder.get().Spec.PodManagementPolicy = policy
 	return builder

@@ -600,6 +600,25 @@ These templates are used to dynamically provision persistent volumes for the Com
 </tr>
 <tr>
 <td>
+<code>persistentVolumeClaimRetentionPolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.PersistentVolumeClaimRetentionPolicy">
+PersistentVolumeClaimRetentionPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>persistentVolumeClaimRetentionPolicy describes the lifecycle of persistent
+volume claims created from volumeClaimTemplates. By default, all persistent
+volume claims are created as needed and retained until manually deleted. This
+policy allows the lifecycle to be altered, for example by deleting persistent
+volume claims when their workload is deleted, or when their pod is scaled
+down.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>volumes</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#volume-v1-core">
@@ -3028,6 +3047,25 @@ It allows defining the CPU, memory requirements and limits for the Component&rsq
 Each template specifies the desired characteristics of a persistent volume, such as storage class,
 size, and access modes.
 These templates are used to dynamically provision persistent volumes for the Component.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>persistentVolumeClaimRetentionPolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.PersistentVolumeClaimRetentionPolicy">
+PersistentVolumeClaimRetentionPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>persistentVolumeClaimRetentionPolicy describes the lifecycle of persistent
+volume claims created from volumeClaimTemplates. By default, all persistent
+volume claims are created as needed and retained until manually deleted. This
+policy allows the lifecycle to be altered, for example by deleting persistent
+volume claims when their workload is deleted, or when their pod is scaled
+down.</p>
 </td>
 </tr>
 <tr>
@@ -6247,6 +6285,25 @@ These templates are used to dynamically provision persistent volumes for the Com
 </tr>
 <tr>
 <td>
+<code>persistentVolumeClaimRetentionPolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.PersistentVolumeClaimRetentionPolicy">
+PersistentVolumeClaimRetentionPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>persistentVolumeClaimRetentionPolicy describes the lifecycle of persistent
+volume claims created from volumeClaimTemplates. By default, all persistent
+volume claims are created as needed and retained until manually deleted. This
+policy allows the lifecycle to be altered, for example by deleting persistent
+volume claims when their workload is deleted, or when their pod is scaled
+down.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>volumes</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#volume-v1-core">
@@ -8637,6 +8694,83 @@ Cannot be updated.</p>
 </td>
 </tr>
 </tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.PersistentVolumeClaimRetentionPolicy">PersistentVolumeClaimRetentionPolicy
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>)
+</p>
+<div>
+<p>PersistentVolumeClaimRetentionPolicy describes the policy used for PVCs created from the VolumeClaimTemplates.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>whenDeleted</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.PersistentVolumeClaimRetentionPolicyType">
+PersistentVolumeClaimRetentionPolicyType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>WhenDeleted specifies what happens to PVCs created from VolumeClaimTemplates when the workload is deleted.
+The <code>Retain</code> policy causes PVCs to not be affected by workload deletion.
+The default policy of <code>Delete</code> causes those PVCs to be deleted.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>whenScaled</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.PersistentVolumeClaimRetentionPolicyType">
+PersistentVolumeClaimRetentionPolicyType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>WhenScaled specifies what happens to PVCs created from VolumeClaimTemplates when the workload is scaled down.
+The <code>Retain</code> policy causes PVCs to not be affected by a scale down.
+The default policy of <code>Delete</code> causes the associated PVCs for pods scaled down to be deleted.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.PersistentVolumeClaimRetentionPolicyType">PersistentVolumeClaimRetentionPolicyType
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.PersistentVolumeClaimRetentionPolicy">PersistentVolumeClaimRetentionPolicy</a>)
+</p>
+<div>
+<p>PersistentVolumeClaimRetentionPolicyType is a string enumeration of the policies that will determine
+when volumes from the VolumeClaimTemplates will be deleted when the controlling StatefulSet is
+deleted or scaled down.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Delete&#34;</p></td>
+<td><p>DeletePersistentVolumeClaimRetentionPolicyType specifies that PersistentVolumeClaims associated with
+VolumeClaimTemplates will be deleted in the scenario specified in PersistentVolumeClaimRetentionPolicy.</p>
+</td>
+</tr><tr><td><p>&#34;Retain&#34;</p></td>
+<td><p>RetainPersistentVolumeClaimRetentionPolicyType is the default PersistentVolumeClaimRetentionPolicy
+and specifies that PersistentVolumeClaims associated with VolumeClaimTemplates will not be deleted.</p>
+</td>
+</tr></tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1.PersistentVolumeClaimSpec">PersistentVolumeClaimSpec
 </h3>
@@ -29319,6 +29453,25 @@ The final name of each PVC is generated by appending the pod&rsquo;s identifier 
 </tr>
 <tr>
 <td>
+<code>persistentVolumeClaimRetentionPolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.PersistentVolumeClaimRetentionPolicy">
+PersistentVolumeClaimRetentionPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>persistentVolumeClaimRetentionPolicy describes the lifecycle of persistent
+volume claims created from volumeClaimTemplates. By default, all persistent
+volume claims are created as needed and retained until manually deleted. This
+policy allows the lifecycle to be altered, for example by deleting persistent
+volume claims when their workload is deleted, or when their pod is scaled
+down.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>podManagementPolicy</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#podmanagementpolicytype-v1-apps">
@@ -29732,6 +29885,25 @@ Each template specifies the desired characteristics of a persistent volume, such
 size, and access modes.
 These templates are used to dynamically provision persistent volumes for replicas upon their creation.
 The final name of each PVC is generated by appending the pod&rsquo;s identifier to the name specified in volumeClaimTemplates[*].name.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>persistentVolumeClaimRetentionPolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.PersistentVolumeClaimRetentionPolicy">
+PersistentVolumeClaimRetentionPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>persistentVolumeClaimRetentionPolicy describes the lifecycle of persistent
+volume claims created from volumeClaimTemplates. By default, all persistent
+volume claims are created as needed and retained until manually deleted. This
+policy allows the lifecycle to be altered, for example by deleting persistent
+volume claims when their workload is deleted, or when their pod is scaled
+down.</p>
 </td>
 </tr>
 <tr>

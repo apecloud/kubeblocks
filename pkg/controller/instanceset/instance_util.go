@@ -617,6 +617,7 @@ func buildInstancePVCByTemplate(name string, template *instanceTemplateExt, pare
 			AddLabelsInMap(template.Labels).
 			AddLabelsInMap(claimTemplate.Labels).
 			AddLabels(constant.VolumeClaimTemplateNameLabelKey, claimTemplate.Name).
+			AddLabels(constant.KBAppPodNameLabelKey, name).
 			AddAnnotationsInMap(claimTemplate.Annotations).
 			SetSpec(*claimTemplate.Spec.DeepCopy()).
 			GetObject()

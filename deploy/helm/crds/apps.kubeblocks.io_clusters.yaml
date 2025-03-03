@@ -2303,6 +2303,34 @@ spec:
                         or when scaling down. It only used when `PodManagementPolicy` is set to `Parallel`.
                         The default Concurrency is 100%.
                       x-kubernetes-int-or-string: true
+                    persistentVolumeClaimRetentionPolicy:
+                      description: |-
+                        persistentVolumeClaimRetentionPolicy describes the lifecycle of persistent
+                        volume claims created from volumeClaimTemplates. By default, all persistent
+                        volume claims are created as needed and retained until manually deleted. This
+                        policy allows the lifecycle to be altered, for example by deleting persistent
+                        volume claims when their workload is deleted, or when their pod is scaled
+                        down.
+                      properties:
+                        whenDeleted:
+                          description: |-
+                            WhenDeleted specifies what happens to PVCs created from VolumeClaimTemplates when the workload is deleted.
+                            The `Retain` policy causes PVCs to not be affected by workload deletion.
+                            The default policy of `Delete` causes those PVCs to be deleted.
+                          enum:
+                          - Retain
+                          - Delete
+                          type: string
+                        whenScaled:
+                          description: |-
+                            WhenScaled specifies what happens to PVCs created from VolumeClaimTemplates when the workload is scaled down.
+                            The `Retain` policy causes PVCs to not be affected by a scale down.
+                            The default policy of `Delete` causes the associated PVCs for pods scaled down to be deleted.
+                          enum:
+                          - Retain
+                          - Delete
+                          type: string
+                      type: object
                     podUpdatePolicy:
                       description: |-
                         PodUpdatePolicy indicates how pods should be updated
@@ -9505,6 +9533,34 @@ spec:
                             or when scaling down. It only used when `PodManagementPolicy` is set to `Parallel`.
                             The default Concurrency is 100%.
                           x-kubernetes-int-or-string: true
+                        persistentVolumeClaimRetentionPolicy:
+                          description: |-
+                            persistentVolumeClaimRetentionPolicy describes the lifecycle of persistent
+                            volume claims created from volumeClaimTemplates. By default, all persistent
+                            volume claims are created as needed and retained until manually deleted. This
+                            policy allows the lifecycle to be altered, for example by deleting persistent
+                            volume claims when their workload is deleted, or when their pod is scaled
+                            down.
+                          properties:
+                            whenDeleted:
+                              description: |-
+                                WhenDeleted specifies what happens to PVCs created from VolumeClaimTemplates when the workload is deleted.
+                                The `Retain` policy causes PVCs to not be affected by workload deletion.
+                                The default policy of `Delete` causes those PVCs to be deleted.
+                              enum:
+                              - Retain
+                              - Delete
+                              type: string
+                            whenScaled:
+                              description: |-
+                                WhenScaled specifies what happens to PVCs created from VolumeClaimTemplates when the workload is scaled down.
+                                The `Retain` policy causes PVCs to not be affected by a scale down.
+                                The default policy of `Delete` causes the associated PVCs for pods scaled down to be deleted.
+                              enum:
+                              - Retain
+                              - Delete
+                              type: string
+                          type: object
                         podUpdatePolicy:
                           description: |-
                             PodUpdatePolicy indicates how pods should be updated

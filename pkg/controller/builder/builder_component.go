@@ -126,6 +126,11 @@ func (builder *ComponentBuilder) SetVolumeClaimTemplates(volumeClaimTemplates []
 	return builder
 }
 
+func (builder *ComponentBuilder) SetPVCRetentionPolicy(retentionPolicy *appsv1.PersistentVolumeClaimRetentionPolicy) *ComponentBuilder {
+	builder.get().Spec.PersistentVolumeClaimRetentionPolicy = retentionPolicy
+	return builder
+}
+
 func (builder *ComponentBuilder) SetVolumes(volumes []corev1.Volume) *ComponentBuilder {
 	builder.get().Spec.Volumes = volumes
 	return builder

@@ -93,7 +93,7 @@ var _ = BeforeSuite(func() {
 	})
 	Expect(err).ToNot(HaveOccurred())
 
-	recorder := k8sManager.GetEventRecorderFor("consensus-set-controller")
+	recorder := k8sManager.GetEventRecorderFor("instance-set-controller")
 	err = (&InstanceSetReconciler{
 		Client:   k8sManager.GetClient(),
 		Scheme:   k8sManager.GetScheme(),

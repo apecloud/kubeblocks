@@ -60,6 +60,15 @@ func GetKubeBlocksDeploy(ctx context.Context, client *kubernetes.Clientset, ns s
 	return &deployments.Items[0], nil
 }
 
+// IgnoreKubeblocksHook checks if KubeBlocks deployment exists.
+func IgnoreKubeblocksHook(ctx context.Context, client *kubernetes.Clientset, ns string) bool {
+	deploy, err := GetKubeBlocksDeploy(ctx, client, ns, kubeblocksAppComponent)
+	if err != nil {
+		return false
+	}
+	return deploy == nil
+}
+
 // deleteDeployment deletes deployment.
 func deleteDeployment(ctx context.Context, client *kubernetes.Clientset, ns, componentName string, getter deploymentGetter) error {
 	deploy, err := getter(ctx, client, ns, componentName)

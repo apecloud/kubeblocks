@@ -37,9 +37,23 @@ import (
 // 1. expose EventRecorder & Logger
 // 2. parallel workflow-style reconciler chain
 
+// Controller should be implemented by a controller using kubebuilderx.
+// Typically these methods are chained like:
+//
+//	kubebuilderx.NewController(ctx, client, req, recorder, logger).
+//		Prepare(treeloader).
+//		Do(reconciler)).
+//		Do(moreReconciler)).
+//		Commit()
 type Controller interface {
+	// Prepare loads the object tree from Kubernetes.
 	Prepare(TreeLoader) Controller
+
+	// Do is the computation phase. It contains the business logic and modifies the object tree.
 	Do(...Reconciler) Controller
+
+	// Commit is the plan execution phase. It computes the difference between
+	// the old and new object trees, and applies the difference to Kubernetes.
 	Commit() (ctrl.Result, error)
 }
 

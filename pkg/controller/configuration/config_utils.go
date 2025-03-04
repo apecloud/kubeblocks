@@ -281,7 +281,7 @@ func UpdateConfigPayload(config *parametersv1alpha1.ComponentParameterSpec, comp
 			}
 		}
 		// check sharding h-scale operation
-		if sharding != nil && enableShardingHScaleTrigger(configDescs) {
+		if sharding != nil && enableShardingHVScaleTrigger(configDescs) {
 			if _, err := intctrlutil.CheckAndPatchPayload(configSpec, constant.ShardingPayload, resolveShardingResource(sharding)); err != nil {
 				return err
 			}
@@ -318,7 +318,7 @@ func enableTLSTrigger(configDescs []parametersv1alpha1.ComponentConfigDescriptio
 	return rerenderConfigEnabled(configDescs, parametersv1alpha1.ComponentTLSType)
 }
 
-func enableShardingHScaleTrigger(configDescs []parametersv1alpha1.ComponentConfigDescription) bool {
+func enableShardingHVScaleTrigger(configDescs []parametersv1alpha1.ComponentConfigDescription) bool {
 	return rerenderConfigEnabled(configDescs, parametersv1alpha1.ShardingComponentHVScaleType)
 }
 
@@ -335,11 +335,14 @@ func ResolveComponentTemplate(ctx context.Context, reader client.Reader, cmpd *a
 }
 
 func ResolveShardingReference(ctx context.Context, reader client.Reader, comp *appsv1.Component) (*appsv1.ClusterSharding, error) {
-	if len(comp.Labels) == 0 {
-		return nil, nil
+	resolveShardingName := func(comp *appsv1.Component) string {
+		if len(comp.Labels) == 0 {
+			return ""
+		}
+		return comp.Labels[constant.KBAppShardingNameLabelKey]
 	}
 
-	shardingName := comp.Labels[constant.KBAppShardingNameLabelKey]
+	shardingName := resolveShardingName(comp)
 	if shardingName == "" {
 		return nil, nil
 	}

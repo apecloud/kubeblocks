@@ -207,7 +207,7 @@ type ComponentConfigSpec struct {
 
 // RerenderResourceType defines the resource requirements for a component.
 // +enum
-// +kubebuilder:validation:Enum={vscale,hscale,tls,shardingHScale}
+// +kubebuilder:validation:Enum={vscale,hscale,tls}
 type RerenderResourceType string
 
 const (

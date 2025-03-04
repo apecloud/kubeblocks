@@ -120,7 +120,7 @@ const (
 
 // RerenderResourceType defines the resource requirements for a component.
 // +enum
-// +kubebuilder:validation:Enum={vscale,hscale,tls}
+// +kubebuilder:validation:Enum={vscale,hscale,tls,shardingHVScale}
 type RerenderResourceType string
 
 const (

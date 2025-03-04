@@ -5622,6 +5622,18 @@ string
 </tr>
 <tr>
 <td>
+<code>requiresPodRender</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>Indicates whether the template requires rendering at the pod level to incorporate pod-specific variables.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>volumeName</code><br/>
 <em>
 string

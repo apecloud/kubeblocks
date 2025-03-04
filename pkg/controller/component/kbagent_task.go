@@ -70,9 +70,6 @@ func NewReplicaTask(compName, uid string, source *corev1.Pod, replicas []string)
 }
 
 func NewRenderTask(compName, uid string, replicas []string, synthesizedComp *SynthesizedComponent, files map[string][]string) *proto.Task {
-	if len(synthesizedComp.FileTemplates) == 0 {
-		return nil
-	}
 	task := proto.Task{
 		Instance:            compName,
 		Task:                renderTask,
@@ -85,13 +82,18 @@ func NewRenderTask(compName, uid string, replicas []string, synthesizedComp *Syn
 		},
 	}
 	for _, tpl := range synthesizedComp.FileTemplates {
-		task.Render.Templates = append(task.Render.Templates, proto.RenderTaskFileTemplate{
-			Name:      tpl.Name,
-			Files:     templateFiles(synthesizedComp, tpl.Name, files[tpl.Name]),
-			Variables: tpl.Variables,
-		})
+		if tpl.RequiresPodRender {
+			task.Render.Templates = append(task.Render.Templates, proto.RenderTaskFileTemplate{
+				Name:      tpl.Name,
+				Files:     templateFiles(synthesizedComp, tpl.Name, files[tpl.Name]),
+				Variables: tpl.Variables,
+			})
+		}
 	}
-	return &task
+	if len(task.Render.Templates) > 0 {
+		return &task
+	}
+	return nil
 }
 
 type KBAgentTaskEventHandler struct{}

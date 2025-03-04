@@ -1057,6 +1057,12 @@ type ComponentFileTemplate struct {
 	// +optional
 	Namespace string `json:"namespace,omitempty"`
 
+	// Indicates whether the template requires rendering at the pod level to incorporate pod-specific variables.
+	//
+	// +kubebuilder:default=false
+	// +optional
+	RequiresPodRender bool `json:"requiresPodRender,omitempty"`
+
 	// Refers to the volume name of PodTemplate. The file produced through the template will be mounted to
 	// the corresponding volume. Must be a DNS_LABEL name.
 	// The volume name must be defined in podSpec.containers[*].volumeMounts.

@@ -242,7 +242,10 @@ func renderFileTemplateData(transCtx *componentTransformContext,
 		variables[k] = v // override
 	}
 
-	tpl := template.New(fileTemplate.Name).Option("missingkey=error").Funcs(sprig.TxtFuncMap())
+	tpl := template.New(fileTemplate.Name).Funcs(sprig.TxtFuncMap())
+	if !fileTemplate.RequiresPodRender {
+		tpl = tpl.Option("missingkey=error")
+	}
 	for key, val := range data {
 		ptpl, err := tpl.Parse(val)
 		if err != nil {

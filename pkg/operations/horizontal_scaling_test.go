@@ -46,10 +46,11 @@ import (
 var _ = Describe("HorizontalScaling OpsRequest", func() {
 
 	var (
-		randomStr   = testCtx.GetRandomStr()
-		compDefName = "test-compdef-" + randomStr
-		clusterName = "test-cluster-" + randomStr
-		insTplName  = "foo"
+		randomStr       = testCtx.GetRandomStr()
+		compDefName     = "test-compdef-" + randomStr
+		shardingDefName = "test-shardingdef-" + randomStr
+		clusterName     = "test-cluster-" + randomStr
+		insTplName      = "foo"
 	)
 
 	cleanEnv := func() {
@@ -89,7 +90,13 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 			horizontalScaling opsv1alpha1.HorizontalScaling,
 			ignoreHscaleStrictValidate bool) (*OpsResource, []*corev1.Pod) {
 			By("init operations resources with CLusterDefinition/Hybrid components Cluster/consensus Pods")
-			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
+			opsRes, compDef, _ := initOperationsResources(compDefName, clusterName)
+			Expect(testapps.ChangeObj(&testCtx, compDef, func(compDef *appsv1.ComponentDefinition) {
+				compDef.Spec.ReplicasLimit = &appsv1.ReplicasLimit{
+					MinReplicas: 0,
+					MaxReplicas: 10,
+				}
+			})).Should(Succeed())
 			its := testapps.MockInstanceSetComponent(&testCtx, clusterName, defaultCompName)
 			if changeClusterSpec != nil {
 				Expect(testapps.ChangeObj(&testCtx, opsRes.Cluster, func(cluster *appsv1.Cluster) {
@@ -732,6 +739,141 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 				g.Expect(pobj.Status.Progress).Should(Equal("1/1"))
 				g.Expect(pobj.Status.Phase).Should(Equal(opsv1alpha1.OpsSucceedPhase))
 			})).Should(Succeed())
+		})
+		It("should fail when scaling out beyond the max replicas", func() {
+			By("Setting up the component with a replica limit of 1 to 3")
+			opsRes, compDef, _ := initOperationsResources(compDefName, clusterName)
+			Expect(testapps.ChangeObj(&testCtx, compDef, func(compDef *appsv1.ComponentDefinition) {
+				compDef.Spec.ReplicasLimit = &appsv1.ReplicasLimit{
+					MinReplicas: 1,
+					MaxReplicas: 3,
+				}
+			})).Should(Succeed())
+
+			By("Creating a horizontal scaling operation to scale out beyond the limit")
+			ops := createHorizontalScaling(clusterName, opsv1alpha1.HorizontalScaling{
+				ComponentOps: opsv1alpha1.ComponentOps{
+					ComponentName: defaultCompName,
+				},
+				ScaleOut: &opsv1alpha1.ScaleOut{
+					OfflineInstancesToOnline: []string{clusterName + defaultCompName + "-3", clusterName + defaultCompName + "-4"},
+				},
+			}, false)
+
+			ops.Namespace = testCtx.DefaultNamespace
+			initClusterAnnotationAndPhaseForOps(opsRes)
+
+			By("Validating the operation")
+			err := ops.Validate(ctx, k8sClient, opsRes.Cluster, true)
+			Expect(err).To(HaveOccurred()) // Expect an error due to exceeding the maximum replica limit
+		})
+
+		It("should fail when scaling in below the min replicas", func() {
+			By("Setting up the component with a replica limit of 1 to 3")
+			opsRes, compDef, _ := initOperationsResources(compDefName, clusterName)
+			Expect(testapps.ChangeObj(&testCtx, compDef, func(compDef *appsv1.ComponentDefinition) {
+				compDef.Spec.ReplicasLimit = &appsv1.ReplicasLimit{
+					MinReplicas: 1,
+					MaxReplicas: 3,
+				}
+			})).Should(Succeed())
+
+			By("Creating a horizontal scaling operation to scale in below the limit")
+			ops := createHorizontalScaling(clusterName, opsv1alpha1.HorizontalScaling{
+				ComponentOps: opsv1alpha1.ComponentOps{
+					ComponentName: defaultCompName,
+				},
+				ScaleIn: &opsv1alpha1.ScaleIn{
+					OnlineInstancesToOffline: []string{clusterName + defaultCompName + "-0", clusterName + defaultCompName + "-1", clusterName + defaultCompName + "-2"},
+				},
+			}, false)
+
+			ops.Namespace = testCtx.DefaultNamespace
+			initClusterAnnotationAndPhaseForOps(opsRes)
+
+			By("Validating the operation")
+			err := ops.Validate(ctx, k8sClient, opsRes.Cluster, true)
+			Expect(err).To(HaveOccurred()) // Expect an error due to scaling in below the minimum replica limit
+		})
+
+		It("should succeed when scaling within the replicas limit", func() {
+			By("Setting up the component with a replica limit of 1 to 3")
+			opsRes, compDef, _ := initOperationsResources(compDefName, clusterName)
+			Expect(testapps.ChangeObj(&testCtx, compDef, func(compDef *appsv1.ComponentDefinition) {
+				compDef.Spec.ReplicasLimit = &appsv1.ReplicasLimit{
+					MinReplicas: 1,
+					MaxReplicas: 4,
+				}
+			})).Should(Succeed())
+
+			By("Creating a horizontal scaling operation to scale within the limit")
+			ops := createHorizontalScaling(clusterName, opsv1alpha1.HorizontalScaling{
+				ComponentOps: opsv1alpha1.ComponentOps{
+					ComponentName: defaultCompName,
+				},
+				ScaleOut: &opsv1alpha1.ScaleOut{
+					OfflineInstancesToOnline: []string{clusterName + defaultCompName + "-3"},
+				},
+			}, false)
+
+			ops.Namespace = testCtx.DefaultNamespace
+			initClusterAnnotationAndPhaseForOps(opsRes)
+
+			By("Validating the operation")
+			err := ops.Validate(ctx, k8sClient, opsRes.Cluster, true)
+			Expect(err).ToNot(HaveOccurred()) // Should pass as it's within the specified replica limit
+		})
+
+		It("should succeed when scaling within the replicas limit with shards", func() {
+			By("Setting up the sharding with a shard limit of 1 to 3")
+			opsRes, _, _ := initOperationsResources(compDefName, clusterName)
+			shardingDef := testapps.NewShardingDefinitionFactory(shardingDefName, compDefName).Create(&testCtx).GetObject()
+			// add a sharding component
+			Expect(testapps.ChangeObj(&testCtx, opsRes.Cluster, func(cluster *appsv1.Cluster) {
+				cluster.Spec.Shardings = []appsv1.ClusterSharding{
+					{
+						Name:        defaultCompName,
+						Shards:      int32(3),
+						Template:    cluster.Spec.ComponentSpecs[0],
+						ShardingDef: shardingDefName,
+					},
+				}
+				cluster.Spec.ComponentSpecs = []appsv1.ClusterComponentSpec{}
+			})).Should(Succeed())
+
+			Expect(testapps.ChangeObj(&testCtx, shardingDef, func(shardingDef *appsv1.ShardingDefinition) {
+				shardingDef.Spec.ShardsLimit = &appsv1.ShardsLimit{
+					MinShards: 1,
+					MaxShards: 3,
+				}
+			})).Should(Succeed())
+
+			By("Testing horizontal scaling operation with different shard values")
+			shardValues := []int32{0, 2, 4}               // Shard values to test
+			expectedResults := []bool{false, true, false} // Expected results for each shard value: fail, pass, fail
+
+			for i, shards := range shardValues {
+				ops := createHorizontalScaling(clusterName, opsv1alpha1.HorizontalScaling{
+					Shards: &shards,
+					ComponentOps: opsv1alpha1.ComponentOps{
+						ComponentName: defaultCompName,
+					},
+				}, false)
+
+				ops.Namespace = testCtx.DefaultNamespace
+				initClusterAnnotationAndPhaseForOps(opsRes)
+
+				By("Validating the operation")
+				err := ops.Validate(ctx, k8sClient, opsRes.Cluster, true)
+
+				// Check if the result matches the expected result
+				if expectedResults[i] {
+					Expect(err).ToNot(HaveOccurred()) // Should pass when shards is 2 (within limit)
+				} else {
+					Expect(err).To(HaveOccurred()) // Should fail when shards is 4 (beyond limit) and 0 (below limit)
+				}
+			}
+
 		})
 	})
 })

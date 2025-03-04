@@ -266,7 +266,7 @@ func compareQuantity(requestQuantity, limitQuantity *resource.Quantity) bool {
 }
 
 // validateHorizontalScaling validates api when spec.type is HorizontalScaling
-func (r *OpsRequest) validateHorizontalScaling(_ context.Context, _ client.Client, cluster *appsv1.Cluster) error {
+func (r *OpsRequest) validateHorizontalScaling(ctx context.Context, cli client.Client, cluster *appsv1.Cluster) error {
 	horizontalScalingList := r.Spec.HorizontalScalingList
 	if len(horizontalScalingList) == 0 {
 		return notEmptyError("spec.horizontalScaling")
@@ -282,14 +282,39 @@ func (r *OpsRequest) validateHorizontalScaling(_ context.Context, _ client.Clien
 	}
 	for _, comSpec := range cluster.Spec.ComponentSpecs {
 		if hScale, ok := hScaleMap[comSpec.Name]; ok {
-			if err := r.validateHorizontalScalingSpec(hScale, comSpec, cluster.Name, false); err != nil {
+			// Default values if no limit is found
+			minNum, maxNum := 1, 16384
+			if comSpec.ComponentDef != "" {
+				compDef := &appsv1.ComponentDefinition{}
+				if err := cli.Get(ctx, client.ObjectKey{Name: comSpec.ComponentDef, Namespace: r.Namespace}, compDef); err != nil {
+					return err
+				}
+				if compDef.Spec.ReplicasLimit != nil {
+					minNum = int(compDef.Spec.ReplicasLimit.MinReplicas)
+					maxNum = int(compDef.Spec.ReplicasLimit.MaxReplicas)
+				}
+			}
+			if err := r.validateHorizontalScalingSpec(hScale, comSpec, cluster.Name, false, maxNum, minNum); err != nil {
 				return err
 			}
 		}
+
 	}
 	for _, spec := range cluster.Spec.Shardings {
 		if hScale, ok := hScaleMap[spec.Name]; ok {
-			if err := r.validateHorizontalScalingSpec(hScale, spec.Template, cluster.Name, true); err != nil {
+			// Default values if no limit is found
+			minNum, maxNum := 1, 2048
+			if spec.ShardingDef != "" {
+				shardingDef := &appsv1.ShardingDefinition{}
+				if err := cli.Get(ctx, types.NamespacedName{Name: spec.ShardingDef, Namespace: r.Namespace}, shardingDef); err != nil {
+					return err
+				}
+				if shardingDef.Spec.ShardsLimit != nil {
+					minNum = int(shardingDef.Spec.ShardsLimit.MinShards)
+					maxNum = int(shardingDef.Spec.ShardsLimit.MaxShards)
+				}
+			}
+			if err := r.validateHorizontalScalingSpec(hScale, spec.Template, cluster.Name, true, maxNum, minNum); err != nil {
 				return err
 			}
 		}
@@ -307,82 +332,102 @@ func (r *OpsRequest) CountOfflineOrOnlineInstances(clusterName, componentName st
 	return offlineOrOnlineInsCountMap
 }
 
-func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, compSpec appsv1.ClusterComponentSpec, clusterName string, isSharding bool) error {
+func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, compSpec appsv1.ClusterComponentSpec, clusterName string, isSharding bool, maxReplicasOrShards int, minReplicasOrShards int) error {
 	scaleIn := hScale.ScaleIn
 	scaleOut := hScale.ScaleOut
+	// Validate Shards if present
 	if hScale.Shards != nil {
-		if !isSharding {
-			return fmt.Errorf(`shards field cannot be used for the component "%s"`, hScale.ComponentName)
-		}
-		if scaleOut != nil || scaleIn != nil {
-			return fmt.Errorf(`shards field cannot be used together with scaleOut or scaleIn for the component "%s"`, hScale.ComponentName)
-		}
-		return nil
+		return r.validateShards(hScale, isSharding, minReplicasOrShards, maxReplicasOrShards)
 	}
-	if lastCompConfiguration, ok := r.Status.LastConfiguration.Components[hScale.ComponentName]; ok {
-		// use last component configuration snapshot
-		compSpec.Instances = lastCompConfiguration.Instances
-		compSpec.Replicas = *lastCompConfiguration.Replicas
-		compSpec.OfflineInstances = lastCompConfiguration.OfflineInstances
+	// Use last configuration if available
+	if err := r.applyLastConfiguration(hScale.ComponentName, &compSpec); err != nil {
+		return err
 	}
-	compInsTplMap := map[string]int32{}
-	for _, v := range compSpec.Instances {
-		compInsTplMap[v.Name] = v.GetReplicas()
+
+	compInstanceTplReplicas := map[string]int32{}
+	for _, instance := range compSpec.Instances {
+		compInstanceTplReplicas[instance.Name] = instance.GetReplicas()
 	}
-	// Rules:
-	// 1. length of offlineInstancesToOnline or onlineInstancesToOffline can't greater than the configured replicaChanges for the component.
-	// 2. replicaChanges for component must greater than or equal to the sum of replicaChanges configured in instance templates.
-	validateHScaleOperation := func(replicaChanger ReplicaChanger, newInstances []appsv1.InstanceTemplate, offlineOrOnlineInsNames []string, isScaleIn bool) error {
-		msgPrefix := "ScaleIn:"
-		hScaleInstanceFieldName := "onlineInstancesToOffline"
-		if !isScaleIn {
-			msgPrefix = "ScaleOut:"
-			hScaleInstanceFieldName = "offlineInstancesToOnline"
+
+	// Define the scaling operation validation function
+	validateHScaleOperation := func(replicaChanger ReplicaChanger, newInstances []appsv1.InstanceTemplate, instanceNames []string, isScaleIn bool) error {
+		var operationPrefix, instanceField string
+		if isScaleIn {
+			operationPrefix = "ScaleIn:"
+			instanceField = "onlineInstancesToOffline"
+		} else {
+			operationPrefix = "ScaleOut:"
+			instanceField = "offlineInstancesToOnline"
 		}
-		if isSharding && len(offlineOrOnlineInsNames) > 0 {
-			return fmt.Errorf(`cannot specify %s for a sharding component "%s"`, hScaleInstanceFieldName, hScale.ComponentName)
+
+		if isSharding && len(instanceNames) > 0 {
+			return fmt.Errorf(`cannot specify %s for a sharding component "%s"`, instanceField, hScale.ComponentName)
 		}
-		if replicaChanger.ReplicaChanges != nil && len(offlineOrOnlineInsNames) > int(*replicaChanger.ReplicaChanges) {
-			return fmt.Errorf(`the length of %s can't be greater than the "replicaChanges" for the component`, hScaleInstanceFieldName)
+
+		// Rule 1: Check if the length of the instance names is greater than the configured replicaChanges
+		if replicaChanger.ReplicaChanges != nil && len(instanceNames) > int(*replicaChanger.ReplicaChanges) {
+			return fmt.Errorf(`the length of %s can't be greater than the "replicaChanges" for the component`, instanceField)
 		}
-		offlineOrOnlineInsCountMap := r.CountOfflineOrOnlineInstances(clusterName, hScale.ComponentName, offlineOrOnlineInsNames)
-		insTplChangeMap := map[string]int32{}
-		allReplicaChanges := int32(0)
-		for _, v := range replicaChanger.Instances {
-			compInsReplicas, ok := compInsTplMap[v.Name]
-			if !ok {
-				return fmt.Errorf(`%s cannot find the instance template "%s" in component "%s"`,
-					msgPrefix, v.Name, hScale.ComponentName)
+
+		// Track the count of offline/online instances
+		offlineOrOnlineInsCountMap := r.CountOfflineOrOnlineInstances(clusterName, hScale.ComponentName, instanceNames)
+		insTplChangeMap := make(map[string]int32)
+		totalReplicaChanges := int32(0)
+
+		// Rule 2: Validate each instance template and ensure replicaChanges are valid
+		for _, instance := range replicaChanger.Instances {
+			instanceReplicas, exists := compInstanceTplReplicas[instance.Name]
+			if !exists {
+				return fmt.Errorf(`%s cannot find the instance template "%s" in component "%s"`, operationPrefix, instance.Name, hScale.ComponentName)
 			}
-			if isScaleIn && v.ReplicaChanges > compInsReplicas {
-				return fmt.Errorf(`%s "replicaChanges" of instanceTemplate "%s" can't be greater than %d`,
-					msgPrefix, v.Name, compInsReplicas)
+			if isScaleIn && instance.ReplicaChanges > instanceReplicas {
+				return fmt.Errorf(`%s "replicaChanges" of instanceTemplate "%s" can't be greater than %d`, operationPrefix, instance.Name, instanceReplicas)
 			}
-			allReplicaChanges += v.ReplicaChanges
-			insTplChangeMap[v.Name] = v.ReplicaChanges
+			totalReplicaChanges += instance.ReplicaChanges
+			insTplChangeMap[instance.Name] = instance.ReplicaChanges
 		}
+
+		// Rule 3: Ensure replicaChanges are not less than the replicaCount for each instance template
 		for insTplName, replicaCount := range offlineOrOnlineInsCountMap {
-			replicaChanges, ok := insTplChangeMap[insTplName]
-			if !ok {
-				allReplicaChanges += replicaCount
+			replicaChangesForOneInsTpl, exists := insTplChangeMap[insTplName]
+			if !exists {
+				totalReplicaChanges += replicaCount
 				continue
 			}
-			if replicaChanges < replicaCount {
+			if replicaChangesForOneInsTpl < replicaCount {
 				return fmt.Errorf(`"replicaChanges" can't be less than %d when %d instances of the instance template "%s" are configured in %s`,
-					replicaCount, replicaCount, insTplName, hScaleInstanceFieldName)
+					replicaCount, replicaCount, insTplName, instanceField)
 			}
 		}
+
+		// Validate new instance templates
 		for _, insTpl := range newInstances {
-			if _, ok := compInsTplMap[insTpl.Name]; ok {
+			if _, exists := compInstanceTplReplicas[insTpl.Name]; exists {
 				return fmt.Errorf(`new instance template "%s" already exists in component "%s"`, insTpl.Name, hScale.ComponentName)
 			}
-			allReplicaChanges += insTpl.GetReplicas()
+			totalReplicaChanges += insTpl.GetReplicas()
 		}
-		if replicaChanger.ReplicaChanges != nil && allReplicaChanges > *replicaChanger.ReplicaChanges {
-			return fmt.Errorf(`%s "replicaChanges" can't be less than the sum of "replicaChanges" for specified instance templates`, msgPrefix)
+
+		// Validate if replicaChanges exceed the allowed replicaChanges limit
+		if replicaChanger.ReplicaChanges != nil && totalReplicaChanges > *replicaChanger.ReplicaChanges {
+			return fmt.Errorf(`%s "replicaChanges" can't be less than the sum of "replicaChanges" for specified instance templates`, operationPrefix)
+		}
+
+		// Check if the final replica count is within the limits
+		actualReplicaChange := totalReplicaChanges
+		if replicaChanger.ReplicaChanges != nil {
+			actualReplicaChange = *replicaChanger.ReplicaChanges
+		}
+		if isScaleIn && int(compSpec.Replicas)-int(actualReplicaChange) < minReplicasOrShards {
+			return fmt.Errorf(`the number of replicas after scaling down violates the replica limit for component "%s"`, hScale.ComponentName)
+		}
+		if !isScaleIn && int(compSpec.Replicas)+int(actualReplicaChange) > maxReplicasOrShards {
+			return fmt.Errorf(`the number of replicas after scaling up violates the replica limit for component "%s"`, hScale.ComponentName)
 		}
 		return nil
 	}
+
+	// Validate scaleIn and scaleOut separately
 	if scaleIn != nil {
 		if err := validateHScaleOperation(scaleIn.ReplicaChanger, nil, scaleIn.OnlineInstancesToOffline, true); err != nil {
 			return err
@@ -396,13 +441,51 @@ func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, com
 			return err
 		}
 	}
-	// instance cannot be both in OfflineInstancesToOnline and OnlineInstancesToOffline
-	if scaleIn != nil && scaleOut != nil {
+
+	// Check for conflicting scaling operations
+	if err := r.checkConflictingScalingOperations(hScale); err != nil {
+		return err
+	}
+	return nil
+}
+
+// validateShards validates the shards field if it is present
+func (r *OpsRequest) validateShards(hScale HorizontalScaling, isSharding bool, minReplicasOrShards int, maxReplicasOrShards int) error {
+	if hScale.Shards != nil {
+		if !isSharding {
+			return fmt.Errorf(`shards field cannot be used for the component "%s"`, hScale.ComponentName)
+		}
+		if hScale.ScaleOut != nil || hScale.ScaleIn != nil {
+			return fmt.Errorf(`shards field cannot be used together with scaleOut or scaleIn for the component "%s"`, hScale.ComponentName)
+		}
+		shards := int(*hScale.Shards)
+		if shards < minReplicasOrShards || shards > maxReplicasOrShards {
+			return fmt.Errorf(`the number of shards after horizontal scale violates the shards limit "%s"`, hScale.ComponentName)
+		}
+	}
+	return nil
+}
+
+// applyLastConfiguration applies the last known configuration to the component spec
+func (r *OpsRequest) applyLastConfiguration(componentName string, compSpec *appsv1.ClusterComponentSpec) error {
+	if lastCompConfiguration, ok := r.Status.LastConfiguration.Components[componentName]; ok {
+		compSpec.Instances = lastCompConfiguration.Instances
+		if lastCompConfiguration.Replicas != nil {
+			compSpec.Replicas = *lastCompConfiguration.Replicas
+		}
+		compSpec.OfflineInstances = lastCompConfiguration.OfflineInstances
+	}
+	return nil
+}
+
+// checkConflictingScalingOperations checks for any conflicting scaling operations
+func (r *OpsRequest) checkConflictingScalingOperations(hScale HorizontalScaling) error {
+	if hScale.ScaleIn != nil && hScale.ScaleOut != nil {
 		offlineToOnlineSet := make(map[string]struct{})
-		for _, instance := range scaleIn.OnlineInstancesToOffline {
+		for _, instance := range hScale.ScaleIn.OnlineInstancesToOffline {
 			offlineToOnlineSet[instance] = struct{}{}
 		}
-		for _, instance := range scaleOut.OfflineInstancesToOnline {
+		for _, instance := range hScale.ScaleOut.OfflineInstancesToOnline {
 			if _, exists := offlineToOnlineSet[instance]; exists {
 				return fmt.Errorf(`instance "%s" cannot be both in "OfflineInstancesToOnline" and "OnlineInstancesToOffline"`, instance)
 			}

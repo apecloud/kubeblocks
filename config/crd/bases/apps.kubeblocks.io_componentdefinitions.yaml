@@ -4329,6 +4329,11 @@ spec:
                       maxLength: 63
                       pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
                       type: string
+                    requiresPodRender:
+                      default: false
+                      description: Indicates whether the template requires rendering
+                        at the pod level to incorporate pod-specific variables.
+                      type: boolean
                     template:
                       description: Specifies the name of the referenced template ConfigMap
                         object.
@@ -16057,6 +16062,11 @@ spec:
                       maxLength: 63
                       pattern: ^[a-z0-9]([a-z0-9\-]*[a-z0-9])?$
                       type: string
+                    requiresPodRender:
+                      default: false
+                      description: Indicates whether the template requires rendering
+                        at the pod level to incorporate pod-specific variables.
+                      type: boolean
                     template:
                       description: Specifies the name of the referenced template ConfigMap
                         object.

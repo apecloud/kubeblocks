@@ -37,8 +37,8 @@ const (
 	configFilesUpdated = "KB_CONFIG_FILES_UPDATED"
 )
 
-func checkReconfigure(_ context.Context, req *proto.ActionRequest) error {
-	if req.Action != "reconfigure" && !strings.HasPrefix(req.Action, "udf-reconfigure") {
+func checkReconfigure(ctx context.Context, req *proto.ActionRequest) error {
+	if !isReconfigureRequest(req) {
 		return nil
 	}
 
@@ -51,7 +51,12 @@ func checkReconfigure(_ context.Context, req *proto.ActionRequest) error {
 	if err := checkReconfigureUpdated(req); err != nil {
 		return err
 	}
-	return nil
+
+	return reconfigurePostRender(ctx, req)
+}
+
+func isReconfigureRequest(req *proto.ActionRequest) bool {
+	return req.Action == "reconfigure" || strings.HasPrefix(req.Action, "udf-reconfigure")
 }
 
 func checkReconfigureCreated(req *proto.ActionRequest) error {
@@ -127,4 +132,51 @@ func checkLocalFileUpToDate(file, checksum string) error {
 		return fmt.Errorf("updated file is not up-to-date %s: expected %s, got %s", file, checksum, actual)
 	}
 	return nil
+}
+
+func reconfigurePostRender(ctx context.Context, req *proto.ActionRequest) error {
+	files := reconfigurePostRenderFiles(req)
+	if len(files) == 0 {
+		return nil
+	}
+
+	render := renderTask{
+		task: &proto.RenderTask{
+			Templates: []proto.RenderTaskFileTemplate{
+				{
+					Name:      "reconfigure", // TODO: tpl name
+					Files:     files,
+					Variables: req.Parameters,
+				},
+			},
+		},
+	}
+	ch, err := render.run(ctx)
+	if err != nil {
+		return err
+	}
+	if ch != nil {
+		err1, ok := <-ch
+		if !ok {
+			err1 = errors.New("runtime error: error chan closed unexpectedly")
+		}
+		return err1
+	}
+	return nil
+}
+
+func reconfigurePostRenderFiles(req *proto.ActionRequest) []string {
+	files := make([]string, 0)
+	created := req.Parameters[configFilesCreated]
+	updated := req.Parameters[configFilesUpdated]
+	if len(created) > 0 {
+		files = append(files, strings.Split(created, ",")...)
+	}
+	if len(updated) > 0 {
+		for _, item := range strings.Split(updated, ",") {
+			tokens := strings.Split(item, ":")
+			files = append(files, tokens[0])
+		}
+	}
+	return files
 }

@@ -23,13 +23,13 @@ import (
 	"fmt"
 	"sync"
 
-	appsv1beta1 "github.com/apecloud/kubeblocks/apis/apps/v1beta1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 )
 
 type ConfigObjectCreator = func(name string) ConfigObject
 
 type ConfigObjectRegistry struct {
-	objectCreator map[appsv1beta1.CfgFileFormat]ConfigObjectCreator
+	objectCreator map[parametersv1alpha1.CfgFileFormat]ConfigObjectCreator
 }
 
 var (
@@ -39,16 +39,16 @@ var (
 
 func CfgObjectRegistry() *ConfigObjectRegistry {
 	ConfigRegistryOnce.Do(func() {
-		configObjectRegistry = &ConfigObjectRegistry{objectCreator: make(map[appsv1beta1.CfgFileFormat]ConfigObjectCreator)}
+		configObjectRegistry = &ConfigObjectRegistry{objectCreator: make(map[parametersv1alpha1.CfgFileFormat]ConfigObjectCreator)}
 	})
 	return configObjectRegistry
 }
 
-func (c *ConfigObjectRegistry) RegisterConfigCreator(format appsv1beta1.CfgFileFormat, creator ConfigObjectCreator) {
+func (c *ConfigObjectRegistry) RegisterConfigCreator(format parametersv1alpha1.CfgFileFormat, creator ConfigObjectCreator) {
 	c.objectCreator[format] = creator
 }
 
-func (c *ConfigObjectRegistry) GetConfigObject(name string, format appsv1beta1.CfgFileFormat) (ConfigObject, error) {
+func (c *ConfigObjectRegistry) GetConfigObject(name string, format parametersv1alpha1.CfgFileFormat) (ConfigObject, error) {
 	creator, ok := c.objectCreator[format]
 	if !ok {
 		return nil, fmt.Errorf("not supported type[%s]", format)
@@ -56,7 +56,7 @@ func (c *ConfigObjectRegistry) GetConfigObject(name string, format appsv1beta1.C
 	return creator(name), nil
 }
 
-func LoadConfig(name string, content string, format appsv1beta1.CfgFileFormat) (ConfigObject, error) {
+func LoadConfig(name string, content string, format parametersv1alpha1.CfgFileFormat) (ConfigObject, error) {
 	configObject, err := CfgObjectRegistry().GetConfigObject(name, format)
 	if err != nil {
 		return nil, err

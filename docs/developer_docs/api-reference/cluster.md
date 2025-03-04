@@ -600,6 +600,25 @@ These templates are used to dynamically provision persistent volumes for the Com
 </tr>
 <tr>
 <td>
+<code>persistentVolumeClaimRetentionPolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.PersistentVolumeClaimRetentionPolicy">
+PersistentVolumeClaimRetentionPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>persistentVolumeClaimRetentionPolicy describes the lifecycle of persistent
+volume claims created from volumeClaimTemplates. By default, all persistent
+volume claims are created as needed and retained until manually deleted. This
+policy allows the lifecycle to be altered, for example by deleting persistent
+volume claims when their workload is deleted, or when their pod is scaled
+down.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>volumes</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#volume-v1-core">
@@ -1288,8 +1307,8 @@ These scripts can be executed during container startup or via specific actions.<
 <td>
 <code>configs</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.ComponentConfigSpec">
-[]ComponentConfigSpec
+<a href="#apps.kubeblocks.io/v1.ComponentTemplateSpec">
+[]ComponentTemplateSpec
 </a>
 </em>
 </td>
@@ -3028,6 +3047,25 @@ It allows defining the CPU, memory requirements and limits for the Component&rsq
 Each template specifies the desired characteristics of a persistent volume, such as storage class,
 size, and access modes.
 These templates are used to dynamically provision persistent volumes for the Component.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>persistentVolumeClaimRetentionPolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.PersistentVolumeClaimRetentionPolicy">
+PersistentVolumeClaimRetentionPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>persistentVolumeClaimRetentionPolicy describes the lifecycle of persistent
+volume claims created from volumeClaimTemplates. By default, all persistent
+volume claims are created as needed and retained until manually deleted. This
+policy allows the lifecycle to be altered, for example by deleting persistent
+volume claims when their workload is deleted, or when their pod is scaled
+down.</p>
 </td>
 </tr>
 <tr>
@@ -4826,138 +4864,6 @@ string
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1.ComponentConfigSpec">ComponentConfigSpec
-</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>)
-</p>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>ComponentTemplateSpec</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.ComponentTemplateSpec">
-ComponentTemplateSpec
-</a>
-</em>
-</td>
-<td>
-<p>
-(Members of <code>ComponentTemplateSpec</code> are embedded into this type.)
-</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>keys</code><br/>
-<em>
-[]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the configuration files within the ConfigMap that support dynamic updates.</p>
-<p>A configuration template (provided in the form of a ConfigMap) may contain templates for multiple
-configuration files.
-Each configuration file corresponds to a key in the ConfigMap.
-Some of these configuration files may support dynamic modification and reloading without requiring
-a pod restart.</p>
-<p>If empty or omitted, all configuration files in the ConfigMap are assumed to support dynamic updates,
-and ConfigConstraint applies to all keys.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>constraintRef</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the name of the referenced configuration constraints object.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>asEnvFrom</code><br/>
-<em>
-[]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the containers to inject the ConfigMap parameters as environment variables.</p>
-<p>This is useful when application images accept parameters through environment variables and
-generate the final configuration file in the startup script based on these variables.</p>
-<p>This field allows users to specify a list of container names, and KubeBlocks will inject the environment
-variables converted from the ConfigMap into these designated containers. This provides a flexible way to
-pass the configuration items from the ConfigMap to the container without modifying the image.</p>
-<p>Deprecated: <code>asEnvFrom</code> has been deprecated since 0.9.0 and will be removed in 0.10.0.
-Use <code>injectEnvTo</code> instead.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>injectEnvTo</code><br/>
-<em>
-[]string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the containers to inject the ConfigMap parameters as environment variables.</p>
-<p>This is useful when application images accept parameters through environment variables and
-generate the final configuration file in the startup script based on these variables.</p>
-<p>This field allows users to specify a list of container names, and KubeBlocks will inject the environment
-variables converted from the ConfigMap into these designated containers. This provides a flexible way to
-pass the configuration items from the ConfigMap to the container without modifying the image.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>reRenderResourceTypes</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.RerenderResourceType">
-[]RerenderResourceType
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies whether the configuration needs to be re-rendered after v-scale or h-scale operations to reflect changes.</p>
-<p>In some scenarios, the configuration may need to be updated to reflect the changes in resource allocation
-or cluster topology. Examples:</p>
-<ul>
-<li>Redis: adjust maxmemory after v-scale operation.</li>
-<li>MySQL: increase max connections after v-scale operation.</li>
-<li>Zookeeper: update zoo.cfg with new node addresses after h-scale operation.</li>
-</ul>
-</td>
-</tr>
-<tr>
-<td>
-<code>asSecret</code><br/>
-<em>
-bool
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Whether to store the final rendered parameters as a secret.</p>
-</td>
-</tr>
-</tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec
 </h3>
 <p>
@@ -5287,8 +5193,8 @@ These scripts can be executed during container startup or via specific actions.<
 <td>
 <code>configs</code><br/>
 <em>
-<a href="#apps.kubeblocks.io/v1.ComponentConfigSpec">
-[]ComponentConfigSpec
+<a href="#apps.kubeblocks.io/v1.ComponentTemplateSpec">
+[]ComponentTemplateSpec
 </a>
 </em>
 </td>
@@ -6379,6 +6285,25 @@ These templates are used to dynamically provision persistent volumes for the Com
 </tr>
 <tr>
 <td>
+<code>persistentVolumeClaimRetentionPolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.PersistentVolumeClaimRetentionPolicy">
+PersistentVolumeClaimRetentionPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>persistentVolumeClaimRetentionPolicy describes the lifecycle of persistent
+volume claims created from volumeClaimTemplates. By default, all persistent
+volume claims are created as needed and retained until manually deleted. This
+policy allows the lifecycle to be altered, for example by deleting persistent
+volume claims when their workload is deleted, or when their pod is scaled
+down.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>volumes</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#volume-v1-core">
@@ -6822,7 +6747,7 @@ ProvisionSecretRef
 <h3 id="apps.kubeblocks.io/v1.ComponentTemplateSpec">ComponentTemplateSpec
 </h3>
 <p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentConfigSpec">ComponentConfigSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>, <a href="#apps.kubeblocks.io/v1.SidecarDefinitionSpec">SidecarDefinitionSpec</a>)
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentDefinitionSpec">ComponentDefinitionSpec</a>, <a href="#apps.kubeblocks.io/v1.SidecarDefinitionSpec">SidecarDefinitionSpec</a>)
 </p>
 <div>
 </div>
@@ -7364,58 +7289,6 @@ This precaution helps prevent space depletion while maintaining read-only access
 If the space utilization later falls below this threshold, the system reverts the volume to read-write mode
 as defined in <code>componentDefinition.spec.lifecycleActions.readWrite</code>, restoring full functionality.</p>
 <p>Note: This field cannot be updated.</p>
-</td>
-</tr>
-</tbody>
-</table>
-<h3 id="apps.kubeblocks.io/v1.ConfigTemplateExtension">ConfigTemplateExtension
-</h3>
-<div>
-</div>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>
-<code>templateRef</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<p>Specifies the name of the referenced configuration template ConfigMap object.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>namespace</code><br/>
-<em>
-string
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Specifies the namespace of the referenced configuration template ConfigMap object.
-An empty namespace is equivalent to the &ldquo;default&rdquo; namespace.</p>
-</td>
-</tr>
-<tr>
-<td>
-<code>policy</code><br/>
-<em>
-<a href="#apps.kubeblocks.io/v1.MergedPolicy">
-MergedPolicy
-</a>
-</em>
-</td>
-<td>
-<em>(Optional)</em>
-<p>Defines the strategy for merging externally imported templates into component templates.</p>
 </td>
 </tr>
 </tbody>
@@ -8455,31 +8328,6 @@ This field allows the system to locate and manage log files effectively.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1.MergedPolicy">MergedPolicy
-(<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ConfigTemplateExtension">ConfigTemplateExtension</a>)
-</p>
-<div>
-<p>MergedPolicy defines how to merge external imported templates into component templates.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>&#34;none&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;add&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;patch&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;replace&#34;</p></td>
-<td></td>
-</tr></tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1.MultipleClusterObjectCombinedOption">MultipleClusterObjectCombinedOption
 </h3>
 <p>
@@ -8846,6 +8694,83 @@ Cannot be updated.</p>
 </td>
 </tr>
 </tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.PersistentVolumeClaimRetentionPolicy">PersistentVolumeClaimRetentionPolicy
+</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ClusterComponentSpec">ClusterComponentSpec</a>, <a href="#apps.kubeblocks.io/v1.ComponentSpec">ComponentSpec</a>, <a href="#workloads.kubeblocks.io/v1.InstanceSetSpec">InstanceSetSpec</a>)
+</p>
+<div>
+<p>PersistentVolumeClaimRetentionPolicy describes the policy used for PVCs created from the VolumeClaimTemplates.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>whenDeleted</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.PersistentVolumeClaimRetentionPolicyType">
+PersistentVolumeClaimRetentionPolicyType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>WhenDeleted specifies what happens to PVCs created from VolumeClaimTemplates when the workload is deleted.
+The <code>Retain</code> policy causes PVCs to not be affected by workload deletion.
+The default policy of <code>Delete</code> causes those PVCs to be deleted.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>whenScaled</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.PersistentVolumeClaimRetentionPolicyType">
+PersistentVolumeClaimRetentionPolicyType
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>WhenScaled specifies what happens to PVCs created from VolumeClaimTemplates when the workload is scaled down.
+The <code>Retain</code> policy causes PVCs to not be affected by a scale down.
+The default policy of <code>Delete</code> causes the associated PVCs for pods scaled down to be deleted.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="apps.kubeblocks.io/v1.PersistentVolumeClaimRetentionPolicyType">PersistentVolumeClaimRetentionPolicyType
+(<code>string</code> alias)</h3>
+<p>
+(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.PersistentVolumeClaimRetentionPolicy">PersistentVolumeClaimRetentionPolicy</a>)
+</p>
+<div>
+<p>PersistentVolumeClaimRetentionPolicyType is a string enumeration of the policies that will determine
+when volumes from the VolumeClaimTemplates will be deleted when the controlling StatefulSet is
+deleted or scaled down.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr><td><p>&#34;Delete&#34;</p></td>
+<td><p>DeletePersistentVolumeClaimRetentionPolicyType specifies that PersistentVolumeClaims associated with
+VolumeClaimTemplates will be deleted in the scenario specified in PersistentVolumeClaimRetentionPolicy.</p>
+</td>
+</tr><tr><td><p>&#34;Retain&#34;</p></td>
+<td><p>RetainPersistentVolumeClaimRetentionPolicyType is the default PersistentVolumeClaimRetentionPolicy
+and specifies that PersistentVolumeClaims associated with VolumeClaimTemplates will not be deleted.</p>
+</td>
+</tr></tbody>
 </table>
 <h3 id="apps.kubeblocks.io/v1.PersistentVolumeClaimSpec">PersistentVolumeClaimSpec
 </h3>
@@ -9324,9 +9249,6 @@ int32
 </table>
 <h3 id="apps.kubeblocks.io/v1.RerenderResourceType">RerenderResourceType
 (<code>string</code> alias)</h3>
-<p>
-(<em>Appears on:</em><a href="#apps.kubeblocks.io/v1.ComponentConfigSpec">ComponentConfigSpec</a>)
-</p>
 <div>
 <p>RerenderResourceType defines the resource requirements for a component.</p>
 </div>
@@ -29531,6 +29453,25 @@ The final name of each PVC is generated by appending the pod&rsquo;s identifier 
 </tr>
 <tr>
 <td>
+<code>persistentVolumeClaimRetentionPolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.PersistentVolumeClaimRetentionPolicy">
+PersistentVolumeClaimRetentionPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>persistentVolumeClaimRetentionPolicy describes the lifecycle of persistent
+volume claims created from volumeClaimTemplates. By default, all persistent
+volume claims are created as needed and retained until manually deleted. This
+policy allows the lifecycle to be altered, for example by deleting persistent
+volume claims when their workload is deleted, or when their pod is scaled
+down.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>podManagementPolicy</code><br/>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#podmanagementpolicytype-v1-apps">
@@ -29944,6 +29885,25 @@ Each template specifies the desired characteristics of a persistent volume, such
 size, and access modes.
 These templates are used to dynamically provision persistent volumes for replicas upon their creation.
 The final name of each PVC is generated by appending the pod&rsquo;s identifier to the name specified in volumeClaimTemplates[*].name.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>persistentVolumeClaimRetentionPolicy</code><br/>
+<em>
+<a href="#apps.kubeblocks.io/v1.PersistentVolumeClaimRetentionPolicy">
+PersistentVolumeClaimRetentionPolicy
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>persistentVolumeClaimRetentionPolicy describes the lifecycle of persistent
+volume claims created from volumeClaimTemplates. By default, all persistent
+volume claims are created as needed and retained until manually deleted. This
+policy allows the lifecycle to be altered, for example by deleting persistent
+volume claims when their workload is deleted, or when their pod is scaled
+down.</p>
 </td>
 </tr>
 <tr>

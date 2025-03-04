@@ -363,6 +363,16 @@ type ClusterComponentSpec struct {
 	// +optional
 	VolumeClaimTemplates []ClusterComponentVolumeClaimTemplate `json:"volumeClaimTemplates,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name"`
 
+	// persistentVolumeClaimRetentionPolicy describes the lifecycle of persistent
+	// volume claims created from volumeClaimTemplates. By default, all persistent
+	// volume claims are created as needed and retained until manually deleted. This
+	// policy allows the lifecycle to be altered, for example by deleting persistent
+	// volume claims when their workload is deleted, or when their pod is scaled
+	// down.
+	//
+	// +optional
+	PersistentVolumeClaimRetentionPolicy *PersistentVolumeClaimRetentionPolicy `json:"persistentVolumeClaimRetentionPolicy,omitempty"`
+
 	// List of volumes to override.
 	//
 	// +optional

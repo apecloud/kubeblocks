@@ -75,19 +75,15 @@ var _ = Describe("synthesized component", func() {
 						},
 					},
 					// TODO: remove me
-					Configs: []appsv1.ComponentConfigSpec{
+					Configs: []appsv1.ComponentTemplateSpec{
 						{
-							ComponentTemplateSpec: appsv1.ComponentTemplateSpec{
-								Name:        "logConf",
-								TemplateRef: "logConf",
-								VolumeName:  "logConf",
-							},
+							Name:        "logConf",
+							TemplateRef: "logConf",
+							VolumeName:  "logConf",
 						},
 						{
-							ComponentTemplateSpec: appsv1.ComponentTemplateSpec{
-								Name:       "serverConf",
-								VolumeName: "serverConf",
-							},
+							Name:       "serverConf",
+							VolumeName: "serverConf",
 						},
 					},
 				},
@@ -234,19 +230,15 @@ var _ = Describe("synthesized component", func() {
 					Name: "test-compdef",
 				},
 				Spec: appsv1.ComponentDefinitionSpec{
-					Configs: []appsv1.ComponentConfigSpec{
+					Configs: []appsv1.ComponentTemplateSpec{
 						{
-							ComponentTemplateSpec: appsv1.ComponentTemplateSpec{
-								Name:        "app",
-								TemplateRef: "app",
-								VolumeName:  "app",
-							},
+							Name:        "app",
+							TemplateRef: "app",
+							VolumeName:  "app",
 						},
 						{
-							ComponentTemplateSpec: appsv1.ComponentTemplateSpec{
-								Name:       "external",
-								VolumeName: "external",
-							},
+							Name:       "external",
+							VolumeName: "external",
 						},
 					},
 				},

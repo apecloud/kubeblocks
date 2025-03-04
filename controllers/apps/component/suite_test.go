@@ -49,7 +49,6 @@ import (
 	workloadsv1 "github.com/apecloud/kubeblocks/apis/workloads/v1"
 	"github.com/apecloud/kubeblocks/controllers/apps"
 	"github.com/apecloud/kubeblocks/controllers/k8score"
-	"github.com/apecloud/kubeblocks/controllers/parameters"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	"github.com/apecloud/kubeblocks/pkg/controller/model"
 	intctrlutil "github.com/apecloud/kubeblocks/pkg/controllerutil"
@@ -192,20 +191,6 @@ var _ = BeforeSuite(func() {
 		Client:   k8sManager.GetClient(),
 		Scheme:   k8sManager.GetScheme(),
 		Recorder: k8sManager.GetEventRecorderFor("component-controller"),
-	}).SetupWithManager(k8sManager, nil)
-	Expect(err).ToNot(HaveOccurred())
-
-	err = (&parameters.ConfigConstraintReconciler{
-		Client:   k8sManager.GetClient(),
-		Scheme:   k8sManager.GetScheme(),
-		Recorder: k8sManager.GetEventRecorderFor("configuration-template-controller"),
-	}).SetupWithManager(k8sManager)
-	Expect(err).ToNot(HaveOccurred())
-
-	err = (&parameters.ConfigurationReconciler{
-		Client:   k8sManager.GetClient(),
-		Scheme:   k8sManager.GetScheme(),
-		Recorder: k8sManager.GetEventRecorderFor("configuration-controller"),
 	}).SetupWithManager(k8sManager, nil)
 	Expect(err).ToNot(HaveOccurred())
 

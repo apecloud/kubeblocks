@@ -262,7 +262,10 @@ var _ = Describe("Component Controller", func() {
 		)
 
 		createCompObj(compName, compDefName, func(f *testapps.MockComponentFactory) {
-			f.SetReplicas(init)
+			f.SetReplicas(init).
+				SetPVCRetentionPolicy(&kbappsv1.PersistentVolumeClaimRetentionPolicy{
+					WhenScaled: kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType,
+				})
 		})
 
 		By(fmt.Sprintf("change replicas to %d", target))
@@ -305,7 +308,10 @@ var _ = Describe("Component Controller", func() {
 		changeReplicasLimit(compDefName, 0, 16384)
 
 		createCompObj(compName, compDefName, func(f *testapps.MockComponentFactory) {
-			f.SetReplicas(init)
+			f.SetReplicas(init).
+				SetPVCRetentionPolicy(&kbappsv1.PersistentVolumeClaimRetentionPolicy{
+					WhenScaled: kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType,
+				})
 		})
 
 		By(fmt.Sprintf("change replicas to %d", target))
@@ -471,41 +477,7 @@ var _ = Describe("Component Controller", func() {
 		}
 
 		scaleInCheck := func() {
-			if updatedReplicas == 0 {
-				Consistently(func(g Gomega) {
-					pvcList := corev1.PersistentVolumeClaimList{}
-					g.Expect(k8sClient.List(testCtx.Ctx, &pvcList, client.MatchingLabels{
-						constant.AppInstanceLabelKey:    clusterKey.Name,
-						constant.KBAppComponentLabelKey: compName,
-					})).Should(Succeed())
-					for _, pvc := range pvcList.Items {
-						ss := strings.Split(pvc.Name, "-")
-						idx, _ := strconv.Atoi(ss[len(ss)-1])
-						if idx >= updatedReplicas && idx < int(comp.Spec.Replicas) {
-							g.Expect(pvc.DeletionTimestamp).Should(BeNil())
-						}
-					}
-				}).Should(Succeed())
-				return
-			}
-
 			checkUpdatedItsReplicas()
-
-			By("Checking pvcs deleting")
-			Eventually(func(g Gomega) {
-				pvcList := corev1.PersistentVolumeClaimList{}
-				g.Expect(k8sClient.List(testCtx.Ctx, &pvcList, client.MatchingLabels{
-					constant.AppInstanceLabelKey:    clusterKey.Name,
-					constant.KBAppComponentLabelKey: compName,
-				})).Should(Succeed())
-				for _, pvc := range pvcList.Items {
-					ss := strings.Split(pvc.Name, "-")
-					idx, _ := strconv.Atoi(ss[len(ss)-1])
-					if idx >= updatedReplicas && idx < int(comp.Spec.Replicas) {
-						g.Expect(pvc.DeletionTimestamp).ShouldNot(BeNil())
-					}
-				}
-			}).Should(Succeed())
 
 			By("Checking pod's annotation should be updated consistently")
 			Eventually(func(g Gomega) {
@@ -559,8 +531,12 @@ var _ = Describe("Component Controller", func() {
 			f.SetReplicas(initialReplicas).
 				AddVolumeClaimTemplate(testapps.DataVolumeName, pvcSpec).
 				AddVolumeClaimTemplate(testapps.LogVolumeName, pvcSpec)
+			if updatedReplicas == 0 {
+				f.SetPVCRetentionPolicy(&kbappsv1.PersistentVolumeClaimRetentionPolicy{
+					WhenScaled: kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType,
+				})
+			}
 		})
-
 		horizontalScale(int(updatedReplicas), testk8s.DefaultStorageClassName, compName, compDefName)
 	}
 
@@ -2044,6 +2020,8 @@ var _ = Describe("Component Controller", func() {
 			itsKey := compKey
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 				g.Expect(*its.Spec.Replicas).To(BeEquivalentTo(1))
+				g.Expect(its.Spec.PersistentVolumeClaimRetentionPolicy).ShouldNot(BeNil())
+				g.Expect(its.Spec.PersistentVolumeClaimRetentionPolicy.WhenScaled).Should(Equal(kbappsv1.DeletePersistentVolumeClaimRetentionPolicyType))
 			})).Should(Succeed())
 		}
 
@@ -2066,6 +2044,8 @@ var _ = Describe("Component Controller", func() {
 			itsKey := compKey
 			Eventually(testapps.CheckObj(&testCtx, itsKey, func(g Gomega, its *workloads.InstanceSet) {
 				g.Expect(*its.Spec.Replicas).To(BeEquivalentTo(0))
+				g.Expect(its.Spec.PersistentVolumeClaimRetentionPolicy).ShouldNot(BeNil())
+				g.Expect(its.Spec.PersistentVolumeClaimRetentionPolicy.WhenScaled).Should(Equal(kbappsv1.RetainPersistentVolumeClaimRetentionPolicyType))
 			})).Should(Succeed())
 		}
 

@@ -26,17 +26,17 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	appsv1alpha1 "github.com/apecloud/kubeblocks/apis/apps/v1alpha1"
+	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	"github.com/apecloud/kubeblocks/pkg/configuration/core"
 	"github.com/apecloud/kubeblocks/pkg/constant"
 	testutil "github.com/apecloud/kubeblocks/pkg/testutil/k8s"
 )
 
-var _ = Describe("Reconfigure simplePolicy", func() {
+var _ = Describe("Reconfigure restartPolicy", func() {
 
 	var (
 		k8sMockClient *testutil.K8sClientMockHelper
-		simplePolicy  = upgradePolicyMap[appsv1alpha1.NormalPolicy]
+		simplePolicy  = upgradePolicyMap[parametersv1alpha1.RestartPolicy]
 	)
 
 	BeforeEach(func() {
@@ -56,9 +56,9 @@ var _ = Describe("Reconfigure simplePolicy", func() {
 
 	Context("simple reconfigure policy test", func() {
 		It("Should success without error", func() {
-			Expect(simplePolicy.GetPolicyName()).Should(BeEquivalentTo("simple"))
+			Expect(simplePolicy.GetPolicyName()).Should(BeEquivalentTo("restart"))
 
-			mockParam := newMockReconfigureParams("simplePolicy", k8sMockClient.Client(),
+			mockParam := newMockReconfigureParams("restartPolicy", k8sMockClient.Client(),
 				withMockInstanceSet(2, nil),
 				withConfigSpec("for_test", map[string]string{
 					"key": "value",
@@ -116,7 +116,7 @@ var _ = Describe("Reconfigure simplePolicy", func() {
 
 	Context("simple reconfigure policy test with Replication", func() {
 		It("Should success", func() {
-			mockParam := newMockReconfigureParams("simplePolicy", k8sMockClient.Client(),
+			mockParam := newMockReconfigureParams("restartPolicy", k8sMockClient.Client(),
 				withMockInstanceSet(2, nil),
 				withConfigSpec("for_test", map[string]string{
 					"key": "value",
@@ -149,7 +149,7 @@ var _ = Describe("Reconfigure simplePolicy", func() {
 	Context("simple reconfigure policy test for not supported component", func() {
 		It("Should failed", func() {
 			// not support type
-			mockParam := newMockReconfigureParams("simplePolicy", k8sMockClient.Client(),
+			mockParam := newMockReconfigureParams("restartPolicy", k8sMockClient.Client(),
 				withMockInstanceSet(2, nil),
 				withConfigSpec("for_test", map[string]string{
 					"key": "value",
@@ -208,7 +208,7 @@ var _ = Describe("Reconfigure simplePolicy", func() {
 	// Context("simple reconfigure policy test without not configmap volume", func() {
 	//	It("Should failed", func() {
 	//		// mock not cc
-	//		mockParam := newMockReconfigureParams("simplePolicy", nil,
+	//		mockParam := newMockReconfigureParams("restartPolicy", nil,
 	//			withMockInstanceSet(2, nil),
 	//			withConfigSpec("not_tpl_name", map[string]string{
 	//				"key": "value",
@@ -218,7 +218,7 @@ var _ = Describe("Reconfigure simplePolicy", func() {
 	//					Name:       "for_test",
 	//					VolumeName: "test_volume",
 	//				}}}))
-	//		status, err := simplePolicy.Upgrade(mockParam)
+	//		status, err := restartPolicy.Upgrade(mockParam)
 	//		Expect(err).ShouldNot(Succeed())
 	//		Expect(err.Error()).Should(ContainSubstring("failed to find config meta"))
 	//		Expect(status.Status).Should(BeEquivalentTo(ESFailed))

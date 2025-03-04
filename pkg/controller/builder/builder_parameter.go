@@ -20,7 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 package builder
 
 import (
-	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 )
 
@@ -45,10 +44,10 @@ func (c *ParameterBuilder) SetComponentParameters(component string, parameters p
 	return c
 }
 
-func (c *ParameterBuilder) AddCustomTemplate(component string, tpl string, customTemplates appsv1.ConfigTemplateExtension) *ParameterBuilder {
+func (c *ParameterBuilder) AddCustomTemplate(component string, tpl string, customTemplates parametersv1alpha1.ConfigTemplateExtension) *ParameterBuilder {
 	componentSpec := safeGetComponentSpec(&c.get().Spec, component)
 	if componentSpec.CustomTemplates == nil {
-		componentSpec.CustomTemplates = make(map[string]appsv1.ConfigTemplateExtension)
+		componentSpec.CustomTemplates = make(map[string]parametersv1alpha1.ConfigTemplateExtension)
 	}
 	componentSpec.CustomTemplates[tpl] = customTemplates
 	return c

@@ -22,7 +22,6 @@ package parameters
 import (
 	"k8s.io/utils/pointer"
 
-	appsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
 	parametersv1alpha1 "github.com/apecloud/kubeblocks/apis/parameters/v1alpha1"
 	testapps "github.com/apecloud/kubeblocks/pkg/testutil/apps"
 )
@@ -58,12 +57,12 @@ func (f *MockParameterFactory) AddParameters(paramName, paramValue string) *Mock
 func (f *MockParameterFactory) AddCustomTemplate(tpl string, templateName, ns string) *MockParameterFactory {
 	param := &f.Get().Spec.ComponentParameters[0]
 	if param.CustomTemplates == nil {
-		param.CustomTemplates = make(map[string]appsv1.ConfigTemplateExtension)
+		param.CustomTemplates = make(map[string]parametersv1alpha1.ConfigTemplateExtension)
 	}
-	param.CustomTemplates[tpl] = appsv1.ConfigTemplateExtension{
+	param.CustomTemplates[tpl] = parametersv1alpha1.ConfigTemplateExtension{
 		TemplateRef: templateName,
 		Namespace:   ns,
-		Policy:      appsv1.PatchPolicy,
+		Policy:      parametersv1alpha1.PatchPolicy,
 	}
 	return f
 }

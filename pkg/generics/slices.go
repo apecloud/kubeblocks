@@ -47,3 +47,11 @@ func FindFirstFunc[S ~[]E, E any](s S, f func(E) bool) int {
 	}
 	return -1
 }
+
+func Map[E any, F any](s []E, f func(E) F) []F {
+	var arr []F
+	for _, e := range s {
+		arr = append(arr, f(e))
+	}
+	return arr
+}

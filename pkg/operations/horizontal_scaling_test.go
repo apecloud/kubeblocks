@@ -756,7 +756,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 					ComponentName: defaultCompName,
 				},
 				ScaleOut: &opsv1alpha1.ScaleOut{
-					OfflineInstancesToOnline: []string{clusterName + defaultCompName + "3", clusterName + defaultCompName + "4"},
+					OfflineInstancesToOnline: []string{clusterName + defaultCompName + "-3", clusterName + defaultCompName + "-4"},
 				},
 			}, false)
 
@@ -784,7 +784,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 					ComponentName: defaultCompName,
 				},
 				ScaleIn: &opsv1alpha1.ScaleIn{
-					OnlineInstancesToOffline: []string{clusterName + defaultCompName + "0", clusterName + defaultCompName + "1", clusterName + defaultCompName + "2"},
+					OnlineInstancesToOffline: []string{clusterName + defaultCompName + "-0", clusterName + defaultCompName + "-1", clusterName + defaultCompName + "-2"},
 				},
 			}, false)
 
@@ -812,7 +812,7 @@ var _ = Describe("HorizontalScaling OpsRequest", func() {
 					ComponentName: defaultCompName,
 				},
 				ScaleOut: &opsv1alpha1.ScaleOut{
-					OfflineInstancesToOnline: []string{clusterName + defaultCompName + "3"},
+					OfflineInstancesToOnline: []string{clusterName + defaultCompName + "-3"},
 				},
 			}, false)
 

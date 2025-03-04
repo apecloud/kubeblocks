@@ -336,8 +336,8 @@ func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, com
 	scaleIn := hScale.ScaleIn
 	scaleOut := hScale.ScaleOut
 	// Validate Shards if present
-	if err := r.validateShards(hScale, isSharding, minReplicasOrShards, maxReplicasOrShards); err != nil {
-		return err
+	if hScale.Shards != nil {
+		return r.validateShards(hScale, isSharding, minReplicasOrShards, maxReplicasOrShards)
 	}
 	// Use last configuration if available
 	if err := r.applyLastConfiguration(hScale.ComponentName, &compSpec); err != nil {
@@ -370,8 +370,8 @@ func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, com
 		}
 
 		// Track the count of offline/online instances
-		instanceCountMap := r.CountOfflineOrOnlineInstances(clusterName, hScale.ComponentName, instanceNames)
-		instanceChangeMap := make(map[string]int32)
+		offlineOrOnlineInsCountMap := r.CountOfflineOrOnlineInstances(clusterName, hScale.ComponentName, instanceNames)
+		insTplChangeMap := make(map[string]int32)
 		totalReplicaChanges := int32(0)
 
 		// Rule 2: Validate each instance template and ensure replicaChanges are valid
@@ -384,17 +384,17 @@ func (r *OpsRequest) validateHorizontalScalingSpec(hScale HorizontalScaling, com
 				return fmt.Errorf(`%s "replicaChanges" of instanceTemplate "%s" can't be greater than %d`, operationPrefix, instance.Name, instanceReplicas)
 			}
 			totalReplicaChanges += instance.ReplicaChanges
-			instanceChangeMap[instance.Name] = instance.ReplicaChanges
+			insTplChangeMap[instance.Name] = instance.ReplicaChanges
 		}
 
 		// Rule 3: Ensure replicaChanges are not less than the replicaCount for each instance template
-		for insTplName, replicaCount := range instanceCountMap {
-			changes, exists := instanceChangeMap[insTplName]
+		for insTplName, replicaCount := range offlineOrOnlineInsCountMap {
+			replicaChangesForOneInsTpl, exists := insTplChangeMap[insTplName]
 			if !exists {
 				totalReplicaChanges += replicaCount
 				continue
 			}
-			if changes < replicaCount {
+			if replicaChangesForOneInsTpl < replicaCount {
 				return fmt.Errorf(`"replicaChanges" can't be less than %d when %d instances of the instance template "%s" are configured in %s`,
 					replicaCount, replicaCount, insTplName, instanceField)
 			}

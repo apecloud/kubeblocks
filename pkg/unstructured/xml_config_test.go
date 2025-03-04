@@ -81,3 +81,10 @@ func TestXMLFormat(t *testing.T) {
 	assert.Nil(t, xmlConfigObj.Update("profiles_test", "not_exist"))
 	assert.EqualValues(t, xmlConfigObj.Get("profiles_test"), "not_exist")
 }
+
+func TestEmptyXMLFormat(t *testing.T) {
+	xmlConfigObj, err := LoadConfig("empty_test", "", parametersv1alpha1.XML)
+	assert.Nil(t, err)
+	assert.NotNil(t, xmlConfigObj)
+	assert.EqualValues(t, xmlConfigObj.GetAllParameters(), map[string]interface{}{})
+}

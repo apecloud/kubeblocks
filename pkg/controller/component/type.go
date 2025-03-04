@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	kbappsv1 "github.com/apecloud/kubeblocks/apis/apps/v1"
+	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 )
 
 type SynthesizedComponent struct {
@@ -79,6 +80,7 @@ type SynthesizedComponent struct {
 	MinReadySeconds                  int32                                  `json:"minReadySeconds,omitempty"`
 	DisableExporter                  *bool                                  `json:"disableExporter,omitempty"`
 	Stop                             *bool
+	KBAgentTasks                     []proto.Task
 }
 
 type SynthesizedFileTemplate struct {

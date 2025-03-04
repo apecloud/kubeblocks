@@ -21,40 +21,7 @@ package component
 
 import (
 	"path/filepath"
-	"strings"
-
-	"github.com/apecloud/kubeblocks/pkg/kbagent/proto"
 )
-
-const (
-	renderTask = "render"
-)
-
-func NewRenderTask(compName, uid string, replicas []string, synthesizedComp *SynthesizedComponent, files map[string][]string) (map[string]string, error) {
-	if len(synthesizedComp.FileTemplates) == 0 {
-		return nil, nil
-	}
-
-	task := proto.Task{
-		Instance:            compName,
-		Task:                renderTask,
-		UID:                 uid,
-		Replicas:            strings.Join(replicas, ","),
-		NotifyAtFinish:      false,
-		ReportPeriodSeconds: 0,
-		Render: &proto.RenderTask{
-			Templates: []proto.RenderTaskFileTemplate{},
-		},
-	}
-	for _, tpl := range synthesizedComp.FileTemplates {
-		task.Render.Templates = append(task.Render.Templates, proto.RenderTaskFileTemplate{
-			Name:      tpl.Name,
-			Files:     templateFiles(synthesizedComp, tpl.Name, files[tpl.Name]),
-			Variables: tpl.Variables,
-		})
-	}
-	return buildKBAgentTaskEnv(task)
-}
 
 func templateFiles(synthesizedComp *SynthesizedComponent, tpl string, files []string) []string {
 	result := make([]string, 0)

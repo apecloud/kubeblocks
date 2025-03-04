@@ -9247,24 +9247,6 @@ int32
 </tr>
 </tbody>
 </table>
-<h3 id="apps.kubeblocks.io/v1.RerenderResourceType">RerenderResourceType
-(<code>string</code> alias)</h3>
-<div>
-<p>RerenderResourceType defines the resource requirements for a component.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Value</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody><tr><td><p>&#34;hscale&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;vscale&#34;</p></td>
-<td></td>
-</tr></tbody>
-</table>
 <h3 id="apps.kubeblocks.io/v1.RetryPolicy">RetryPolicy
 </h3>
 <p>
@@ -24873,8 +24855,6 @@ StatefulSetSpec
 <tbody><tr><td><p>&#34;hscale&#34;</p></td>
 <td></td>
 </tr><tr><td><p>&#34;vscale&#34;</p></td>
-<td></td>
-</tr><tr><td><p>&#34;shardingHScale&#34;</p></td>
 <td></td>
 </tr></tbody>
 </table>

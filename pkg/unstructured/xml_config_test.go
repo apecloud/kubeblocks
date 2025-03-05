@@ -87,4 +87,6 @@ func TestEmptyXMLFormat(t *testing.T) {
 	assert.Nil(t, err)
 	assert.NotNil(t, xmlConfigObj)
 	assert.EqualValues(t, xmlConfigObj.GetAllParameters(), map[string]interface{}{})
+	assert.Nil(t, xmlConfigObj.Update("profiles.web2.timeout_before_checking_execution_speed", 600))
+	assert.EqualValues(t, xmlConfigObj.Get("profiles.web2.timeout_before_checking_execution_speed"), 600)
 }

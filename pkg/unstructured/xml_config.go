@@ -21,7 +21,6 @@ package unstructured
 
 import (
 	"errors"
-	"io"
 	"strings"
 
 	mxjv2 "github.com/clbanning/mxj/v2"
@@ -143,12 +142,14 @@ func (x *xmlConfig) Marshal() (string, error) {
 }
 
 func (x *xmlConfig) Unmarshal(str string) error {
-	m, err := mxjv2.NewMapXml([]byte(str), true)
-	if err != nil && err != io.EOF {
-		return err
+	if str == "" {
+		x.data = mxjv2.New()
+		return nil
 	}
-	if err == io.EOF {
-		m = mxjv2.New()
+
+	m, err := mxjv2.NewMapXml([]byte(str), true)
+	if err != nil {
+		return err
 	}
 	x.data = m
 	return nil

@@ -91,6 +91,18 @@ var _ = Describe("instance util test", func() {
 			newPod.Spec.Tolerations = append(newPod.Spec.Tolerations, oldPod.Spec.Tolerations...)
 			mergeInPlaceFields(newPod, oldPod)
 			Expect(equalBasicInPlaceFields(oldPod, newPod)).Should(BeTrue())
+
+			By("build new pod with annotations")
+			oldPod = buildRandomPod()
+			newPod = buildRandomPod()
+			oldPod.Annotations = map[string]string{
+				constant.ComponentReplicasAnnotationKey: "3",
+			}
+			newPod.Annotations = map[string]string{
+				constant.ComponentReplicasAnnotationKey: "2",
+			}
+			mergeInPlaceFields(newPod, oldPod)
+			Expect(equalBasicInPlaceFields(oldPod, newPod)).Should(BeTrue())
 		})
 	})
 
